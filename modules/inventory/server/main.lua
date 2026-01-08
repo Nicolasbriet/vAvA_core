@@ -401,12 +401,21 @@ AddEventHandler('vAvA_inventory:useItem', function(slot)
     local itemData = Cache.items[item.name]
     
     if itemData and itemData.type == 'weapon' and itemData.weapon_hash then
+        -- Équiper l'arme
         TriggerClientEvent('vAvA_inventory:equipWeapon', src, itemData.weapon_hash, 100)
-    elseif itemData and (itemData.type == 'food' or itemData.type == 'drink') then
+    elseif itemData and itemData.type == 'food' then
+        -- Consommer nourriture - remonte la faim
         RemoveItem(src, item.name, 1)
-        TriggerClientEvent('vAvA_inventory:notify', src, 'Consomme: ' .. item.label)
+        TriggerClientEvent('vAvA_inventory:consumeFood', src, 25) -- +25% faim
+    elseif itemData and itemData.type == 'drink' then
+        -- Consommer boisson - remonte la soif
+        RemoveItem(src, item.name, 1)
+        TriggerClientEvent('vAvA_inventory:consumeDrink', src, 25) -- +25% soif
     elseif itemData and itemData.type == 'money' then
         TriggerClientEvent('vAvA_inventory:notify', src, 'Vous avez $' .. item.amount)
+    else
+        -- Item générique - juste notifier
+        TriggerClientEvent('vAvA_inventory:notify', src, 'Utilisé: ' .. item.label)
     end
 end)
 

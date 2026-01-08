@@ -61,22 +61,11 @@ body {
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
-   HOTBAR (visible en jeu)
+   HOTBAR (CACHÉE - les raccourcis fonctionnent sans affichage)
    ═══════════════════════════════════════════════════════════════════════════ */
 
 .hotbar {
-    position: fixed;
-    bottom: 30px;
-    left: 50%;
-    transform: translateX(-50%);
-    display: flex;
-    gap: 8px;
-    padding: 10px 15px;
-    background: var(--glass-bg);
-    backdrop-filter: blur(10px);
-    border: 1px solid var(--glass-border);
-    border-radius: 16px;
-    box-shadow: var(--shadow-lg);
+    display: none !important; /* Hotbar cachée - utiliser touches 1-5 directement */
 }
 
 .hotbar-slot {
