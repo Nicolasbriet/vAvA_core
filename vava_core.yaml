@@ -70,9 +70,9 @@ tasks:
     # Téléchargement des fichiers serveur CFX
     # ═══════════════════════════════════════════════════════════════════════
     - action: download_github
-      src: https://github.com/citizenfx/cfx-server-data
-      dest: ./
+      src: citizenfx/cfx-server-data
       ref: master
+      dest: ./
 
     # ═══════════════════════════════════════════════════════════════════════
     # Téléchargement de oxmysql (dépendance requise)
@@ -92,9 +92,10 @@ tasks:
     # Téléchargement de vAvA_core depuis GitHub
     # ═══════════════════════════════════════════════════════════════════════
     - action: download_github
-      src: https://github.com/Nicolasbriet/vAvA_core
-      dest: ./resources/[vava]/vAvA_core
+      src: Nicolasbriet/vAvA_core
       ref: main
+      dest: ./resources/[vava]/vAvA_core
+      subpath: /
 
     # ═══════════════════════════════════════════════════════════════════════
     # Configuration du serveur
