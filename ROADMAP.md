@@ -1,20 +1,21 @@
 # vAvA_core - Feuille de Route Développeur
 
-> **Dernière mise à jour:** 28 Janvier 2025  
-> **Version actuelle:** 2.1.0
+> **Dernière mise à jour:** 8 Janvier 2026  
+> **Version actuelle:** 2.2.0  
+> **Statut inventaire:** ⏸️ EN PAUSE
 
 ---
 
-## 📋 Tâches en cours
+## ⏸️ EN PAUSE - Module Inventaire
 
-### Module: `inventory`
+### Tâches restantes à faire
 
-| Statut | Tâche | Fichier(s) | Priorité |
-|--------|-------|------------|----------|
-| ✅ | Corriger fonction "Utiliser" items consommables | `server/main.lua`, `client/main.lua` | HAUTE |
-| ✅ | Corriger Drag & Drop | `html/js/app.js` | HAUTE |
-| ✅ | Choisir case raccourci (modal) | `html/js/app.js`, `html/index.html` | MOYENNE |
-| ✅ | Corriger "Donner" + vérif proximité | `client/main.lua`, `server/main.lua` | HAUTE |
+| Priorité | Tâche | Description |
+|----------|-------|-------------|
+| 🔴 HAUTE | Interface Admin NUI | Panel admin pour créer/modifier/supprimer des items facilement (pas en commande) |
+| 🔴 HAUTE | Drag & Drop placement | Pouvoir déplacer un item vers n'importe quel slot vide de son choix |
+| 🟠 MOYENNE | Sauvegarde au restart | S'assurer que les items sont bien sauvegardés quand on restart la ressource |
+| 🟠 MOYENNE | Métadonnées items | Ajouter système de metadata (durabilité, numéro série arme, etc.) |
 
 ---
 
@@ -29,9 +30,13 @@
 - [x] Items de base pour nouveaux joueurs
 - [x] Protection null hotbar
 - [x] UseItem envoie le slot correctement
-- [x] Drag & Drop amélioré avec feedback visuel
+- [x] Drag & Drop basique avec feedback visuel
 - [x] Modal de sélection hotbar
 - [x] GiveItem avec vérification proximité et notifications
+- [x] Désactivation roue des armes native
+- [x] Hotbar cachée (raccourcis 1-5 fonctionnels)
+- [x] Système faim/soif avec animations
+- [x] Fermeture auto inventaire lors consommation
 
 ### Core: `vAvA_core`
 - [x] Correction Wait(0) dans debug.lua
