@@ -8,24 +8,29 @@ local playerInventory = {}
 local hotbarItems = {}
 local currentWeapon = nil
 local weaponAmmo = {}
+local isReady = false
 
 -- ═══════════════════════════════════════════════════════════════════════════
 -- INITIALISATION
 -- ═══════════════════════════════════════════════════════════════════════════
 
 CreateThread(function()
-    -- Attendre que le joueur soit chargé
-    while not LocalPlayer.state.isLoggedIn do
-        Wait(500)
-    end
+    -- Attendre un peu que tout soit chargé
+    Wait(2000)
+    
+    print('[vAvA_inventory] ^2Initialisation du client...^7')
+    
+    isReady = true
     
     -- Charger l'inventaire
     LoadInventory()
     
     -- Désactiver la roue des armes
-    if InventoryConfig.Weapons.disableWeaponWheel then
+    if InventoryConfig and InventoryConfig.Weapons and InventoryConfig.Weapons.disableWeaponWheel then
         DisableWeaponWheel()
     end
+    
+    print('[vAvA_inventory] ^2Client prêt !^7')
 end)
 
 -- ═══════════════════════════════════════════════════════════════════════════
@@ -33,13 +38,36 @@ end)
 -- ═══════════════════════════════════════════════════════════════════════════
 
 -- Touche pour ouvrir l'inventaire
-RegisterKeyMapping('inventory', 'Ouvrir l\'inventaire', 'keyboard', InventoryConfig.OpenKey)
+RegisterKeyMapping('inventory', 'Ouvrir l\'inventaire', 'keyboard', InventoryConfig.OpenKey or 'F2')
+
 RegisterCommand('inventory', function()
+    print('[vAvA_inventory] Commande inventory executée')
     ToggleInventory()
 end, false)
 
+-- Commande alternative /inv
+RegisterCommand('inv', function()
+    print('[vAvA_inventory] Commande inv executée')
+    ToggleInventory()
+end, false)
+
+-- Commande debug pour test NUI direct
+RegisterCommand('testinv', function()
+    print('[vAvA_inventory] Test NUI direct')
+    isOpen = true
+    SendNUIMessage({
+        action = 'openInventory',
+        inventory = {},
+        hotbar = {},
+        maxSlots = InventoryConfig.MaxSlots or 50,
+        maxWeight = InventoryConfig.MaxWeight or 120000,
+        currentWeight = 0
+    })
+    SetNuiFocus(true, true)
+end, false)
+
 -- Hotbar keys (1-5)
-if InventoryConfig.Hotbar.enabled then
+if InventoryConfig and InventoryConfig.Hotbar and InventoryConfig.Hotbar.enabled then
     for i, key in ipairs(InventoryConfig.Hotbar.keys) do
         RegisterKeyMapping('hotbar_' .. i, 'Hotbar Slot ' .. i, 'keyboard', key)
         RegisterCommand('hotbar_' .. i, function()
@@ -53,14 +81,12 @@ end
 -- ═══════════════════════════════════════════════════════════════════════════
 
 function LoadInventory()
-    TriggerServerCallback('vAvA_inventory:getInventory', function(inventory, hotbar)
-        playerInventory = inventory or {}
-        hotbarItems = hotbar or {}
-        UpdateHotbarUI()
-    end)
+    print('[vAvA_inventory] Chargement de l\'inventaire...')
+    TriggerServerEvent('vAvA_inventory:requestInventory')
 end
 
 function ToggleInventory()
+    print('[vAvA_inventory] ToggleInventory appelé, isOpen=' .. tostring(isOpen))
     if isOpen then
         CloseInventory()
     else
@@ -69,27 +95,35 @@ function ToggleInventory()
 end
 
 function OpenInventory()
-    if isOpen then return end
+    if isOpen then 
+        print('[vAvA_inventory] Inventaire déjà ouvert')
+        return 
+    end
+    
+    print('[vAvA_inventory] Ouverture de l\'inventaire...')
     isOpen = true
     
-    -- Récupérer l'inventaire à jour
-    TriggerServerCallback('vAvA_inventory:getInventory', function(inventory, hotbar)
-        playerInventory = inventory or {}
-        hotbarItems = hotbar or {}
-        
-        local weight = Inventory.CalculateWeight(playerInventory)
-        
-        SendNUIMessage({
-            action = 'openInventory',
-            inventory = playerInventory,
-            hotbar = hotbarItems,
-            maxSlots = InventoryConfig.MaxSlots,
-            maxWeight = InventoryConfig.MaxWeight,
-            currentWeight = weight
-        })
-        
-        SetNuiFocus(true, true)
-    end)
+    -- Demander l'inventaire au serveur
+    TriggerServerEvent('vAvA_inventory:requestInventory')
+    
+    -- Calculer le poids
+    local weight = 0
+    if Inventory and Inventory.CalculateWeight then
+        weight = Inventory.CalculateWeight(playerInventory)
+    end
+    
+    -- Envoyer au NUI
+    SendNUIMessage({
+        action = 'openInventory',
+        inventory = playerInventory,
+        hotbar = hotbarItems,
+        maxSlots = InventoryConfig.MaxSlots or 50,
+        maxWeight = InventoryConfig.MaxWeight or 120000,
+        currentWeight = weight
+    })
+    
+    SetNuiFocus(true, true)
+    print('[vAvA_inventory] NUI Focus activé')
 end
 
 function CloseInventory()
@@ -360,14 +394,40 @@ AddEventHandler('vAvA_inventory:refresh', function()
     LoadInventory()
 end)
 
-RegisterNetEvent('vAvA_inventory:updateInventory')
-AddEventHandler('vAvA_inventory:updateInventory', function(inventory)
-    playerInventory = inventory
+RegisterNetEvent('vAvA_inventory:receiveInventory')
+AddEventHandler('vAvA_inventory:receiveInventory', function(inventory, hotbar)
+    print('[vAvA_inventory] Inventaire reçu du serveur')
+    playerInventory = inventory or {}
+    hotbarItems = hotbar or {}
+    UpdateHotbarUI()
+    
+    -- Si l'inventaire est ouvert, mettre à jour l'affichage
     if isOpen then
+        local weight = 0
+        if Inventory and Inventory.CalculateWeight then
+            weight = Inventory.CalculateWeight(playerInventory)
+        end
+        
         SendNUIMessage({
             action = 'updateInventory',
             inventory = playerInventory,
-            currentWeight = Inventory.CalculateWeight(playerInventory)
+            currentWeight = weight
+        })
+    end
+end)
+
+RegisterNetEvent('vAvA_inventory:updateInventory')
+AddEventHandler('vAvA_inventory:updateInventory', function(inventory)
+    playerInventory = inventory or {}
+    if isOpen then
+        local weight = 0
+        if Inventory and Inventory.CalculateWeight then
+            weight = Inventory.CalculateWeight(playerInventory)
+        end
+        SendNUIMessage({
+            action = 'updateInventory',
+            inventory = playerInventory,
+            currentWeight = weight
         })
     end
 end)

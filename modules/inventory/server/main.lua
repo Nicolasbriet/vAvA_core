@@ -46,6 +46,27 @@ end)
 -- CALLBACKS
 -- ═══════════════════════════════════════════════════════════════════════════
 
+-- Event simple pour demander l'inventaire
+RegisterNetEvent('vAvA_inventory:requestInventory')
+AddEventHandler('vAvA_inventory:requestInventory', function()
+    local source = source
+    local identifier = GetPlayerIdentifier(source)
+    
+    print('[vAvA_inventory] Demande inventaire de ' .. (identifier or 'unknown'))
+    
+    if not identifier then
+        print('[vAvA_inventory] ^1Erreur: pas d\'identifier pour source ' .. source)
+        TriggerClientEvent('vAvA_inventory:receiveInventory', source, {}, {})
+        return
+    end
+    
+    LoadPlayerInventory(source, identifier, function(inventory, hotbar)
+        print('[vAvA_inventory] Envoi inventaire à ' .. source .. ' (' .. #inventory .. ' items)')
+        TriggerClientEvent('vAvA_inventory:receiveInventory', source, inventory, hotbar)
+    end)
+end)
+
+-- Ancien système de callback (garde pour compatibilité)
 RegisterNetEvent('vAvA_inventory:triggerCallback')
 AddEventHandler('vAvA_inventory:triggerCallback', function(name, requestId, ...)
     local source = source
