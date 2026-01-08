@@ -1,6 +1,6 @@
 --[[
     vAvA_inventory - Server Main
-    Version CACHE - reponse immediate, sync BDD en background
+    Version 6 - Cache + Items de base + Money en item
 ]]
 
 local Cache = {
@@ -9,48 +9,87 @@ local Cache = {
     items = {}
 }
 
+-- Items de base pour nouveaux joueurs
+local STARTER_ITEMS = {
+    {name = 'bread', amount = 5},
+    {name = 'water', amount = 5},
+    {name = 'phone', amount = 1},
+    {name = 'money', amount = 500}  -- Argent liquide = item
+}
+
 -- ═══════════════════════════════════════════════════════════════════════════
--- INIT - Charger tout en cache au demarrage
+-- INIT
 -- ═══════════════════════════════════════════════════════════════════════════
 
 CreateThread(function()
     Wait(3000)
     
-    -- Creer tables
+    -- Drop et recreer les tables pour avoir la bonne structure
+    MySQL.Async.execute('DROP TABLE IF EXISTS player_inventories')
+    MySQL.Async.execute('DROP TABLE IF EXISTS player_hotbar')
+    
+    Wait(500)
+    
+    -- Table items
     MySQL.Async.execute([[
         CREATE TABLE IF NOT EXISTS inventory_items (
             name VARCHAR(50) PRIMARY KEY,
-            label VARCHAR(100),
+            label VARCHAR(100) NOT NULL,
             weight FLOAT DEFAULT 0.1,
             max_stack INT DEFAULT 99,
             type VARCHAR(20) DEFAULT 'item',
-            weapon_hash VARCHAR(50)
-        )
+            weapon_hash VARCHAR(50) DEFAULT NULL,
+            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
     ]])
     
+    -- Table inventaires
     MySQL.Async.execute([[
         CREATE TABLE IF NOT EXISTS player_inventories (
             id INT AUTO_INCREMENT PRIMARY KEY,
-            owner VARCHAR(60),
-            slot INT,
-            item_name VARCHAR(50),
+            owner VARCHAR(100) NOT NULL,
+            slot INT NOT NULL,
+            item_name VARCHAR(50) NOT NULL,
             amount INT DEFAULT 1,
-            UNIQUE KEY owner_slot (owner, slot)
-        )
+            metadata TEXT DEFAULT NULL,
+            UNIQUE KEY unique_owner_slot (owner, slot),
+            INDEX idx_owner (owner)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
     ]])
     
+    -- Table hotbar
     MySQL.Async.execute([[
         CREATE TABLE IF NOT EXISTS player_hotbar (
-            owner VARCHAR(60),
-            slot INT,
-            inventory_slot INT,
+            owner VARCHAR(100) NOT NULL,
+            slot INT NOT NULL,
+            inventory_slot INT NOT NULL,
             PRIMARY KEY (owner, slot)
-        )
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4
     ]])
     
     Wait(1000)
     
-    -- Charger items
+    -- Creer items de base s'ils n'existent pas
+    local defaultItems = {
+        {name='bread', label='Pain', weight=0.2, max_stack=50, type='food'},
+        {name='water', label='Bouteille d\'eau', weight=0.3, max_stack=50, type='drink'},
+        {name='phone', label='Telephone', weight=0.1, max_stack=1, type='item'},
+        {name='money', label='Argent Liquide', weight=0.001, max_stack=999999, type='money'},
+        {name='id_card', label='Carte d\'identite', weight=0.01, max_stack=1, type='item'},
+        {name='bandage', label='Bandage', weight=0.1, max_stack=20, type='item'},
+        {name='lockpick', label='Crochet', weight=0.1, max_stack=5, type='tool'}
+    }
+    
+    for _, item in ipairs(defaultItems) do
+        MySQL.Async.execute(
+            'INSERT IGNORE INTO inventory_items (name, label, weight, max_stack, type) VALUES (?, ?, ?, ?, ?)',
+            {item.name, item.label, item.weight, item.max_stack, item.type}
+        )
+    end
+    
+    Wait(500)
+    
+    -- Charger tous les items en cache
     MySQL.Async.fetchAll('SELECT * FROM inventory_items', {}, function(items)
         for _, item in ipairs(items or {}) do
             Cache.items[item.name] = item
@@ -58,11 +97,11 @@ CreateThread(function()
         print('^2[vAvA_inventory]^7 ' .. #(items or {}) .. ' items en cache')
     end)
     
-    print('^2[vAvA_inventory]^7 Systeme pret')
+    print('^2[vAvA_inventory]^7 Systeme initialise')
 end)
 
 -- ═══════════════════════════════════════════════════════════════════════════
--- HELPER
+-- HELPERS
 -- ═══════════════════════════════════════════════════════════════════════════
 
 local function GetIdentifier(src)
@@ -71,7 +110,10 @@ local function GetIdentifier(src)
     end
 end
 
--- Charger inventaire en cache (background)
+-- ═══════════════════════════════════════════════════════════════════════════
+-- CHARGER INVENTAIRE EN CACHE
+-- ═══════════════════════════════════════════════════════════════════════════
+
 local function LoadPlayerCache(src, identifier, cb)
     if Cache.inventories[identifier] then
         if cb then cb() end
@@ -91,6 +133,8 @@ local function LoadPlayerCache(src, identifier, cb)
         LEFT JOIN inventory_items ii ON pi.item_name = ii.name
         WHERE pi.owner = ?
     ]], {identifier}, function(items)
+        local hasItems = items and #items > 0
+        
         for _, item in ipairs(items or {}) do
             Cache.inventories[identifier][item.slot] = {
                 name = item.item_name,
@@ -100,6 +144,30 @@ local function LoadPlayerCache(src, identifier, cb)
                 type = item.type,
                 maxStack = item.max_stack
             }
+        end
+        
+        -- Si nouveau joueur, donner items de base
+        if not hasItems then
+            print('^3[vAvA_inventory]^7 Nouveau joueur - ajout items de base')
+            local slot = 1
+            for _, starter in ipairs(STARTER_ITEMS) do
+                local itemData = Cache.items[starter.name]
+                if itemData then
+                    Cache.inventories[identifier][slot] = {
+                        name = starter.name,
+                        label = itemData.label or starter.name,
+                        amount = starter.amount,
+                        weight = itemData.weight or 0.1,
+                        type = itemData.type or 'item',
+                        maxStack = itemData.max_stack or 99
+                    }
+                    MySQL.Async.execute(
+                        'INSERT INTO player_inventories (owner, slot, item_name, amount) VALUES (?, ?, ?, ?)',
+                        {identifier, slot, starter.name, starter.amount}
+                    )
+                    slot = slot + 1
+                end
+            end
         end
         
         MySQL.Async.fetchAll('SELECT slot, inventory_slot FROM player_hotbar WHERE owner = ?', {identifier}, function(hb)
@@ -112,7 +180,7 @@ local function LoadPlayerCache(src, identifier, cb)
 end
 
 -- ═══════════════════════════════════════════════════════════════════════════
--- OUVRIR INVENTAIRE - REPONSE IMMEDIATE DEPUIS CACHE
+-- OUVRIR INVENTAIRE
 -- ═══════════════════════════════════════════════════════════════════════════
 
 RegisterNetEvent('vAvA_inventory:requestInventory')
@@ -121,7 +189,7 @@ AddEventHandler('vAvA_inventory:requestInventory', function()
     local identifier = GetIdentifier(src)
     if not identifier then return end
     
-    -- Repondre IMMEDIATEMENT avec le cache (meme vide)
+    -- Repondre depuis cache
     local inv = Cache.inventories[identifier] or {}
     local hb = Cache.hotbars[identifier] or {}
     
@@ -141,7 +209,6 @@ AddEventHandler('vAvA_inventory:requestInventory', function()
         weight = weight + (item.weight * item.amount)
     end
     
-    -- Envoyer immediatement
     TriggerClientEvent('vAvA_inventory:open', src, {
         inventory = inventory,
         hotbar = hb,
@@ -150,17 +217,16 @@ AddEventHandler('vAvA_inventory:requestInventory', function()
         weight = weight
     })
     
-    -- Si cache vide, charger en background et re-envoyer
+    -- Si pas en cache, charger
     if not Cache.inventories[identifier] then
         LoadPlayerCache(src, identifier, function()
-            -- Re-envoyer update apres chargement
             SendUpdate(src, identifier)
         end)
     end
 end)
 
 -- ═══════════════════════════════════════════════════════════════════════════
--- CHARGER CACHE A LA CONNEXION
+-- CHARGER A LA CONNEXION
 -- ═══════════════════════════════════════════════════════════════════════════
 
 AddEventHandler('playerConnecting', function()
@@ -212,8 +278,10 @@ function AddItem(src, itemName, amount)
     end
     
     amount = amount or 1
-    local inv = Cache.inventories[identifier] or {}
-    Cache.inventories[identifier] = inv
+    if not Cache.inventories[identifier] then
+        Cache.inventories[identifier] = {}
+    end
+    local inv = Cache.inventories[identifier]
     
     -- Chercher slot pour stacker
     local targetSlot = nil
@@ -229,7 +297,6 @@ function AddItem(src, itemName, amount)
         MySQL.Async.execute('UPDATE player_inventories SET amount = ? WHERE owner = ? AND slot = ?', 
             {inv[targetSlot].amount, identifier, targetSlot})
     else
-        -- Trouver slot libre
         local free = nil
         for i = 1, 50 do
             if not inv[i] then free = i break end
@@ -287,6 +354,37 @@ function RemoveItem(src, itemName, amount)
 end
 
 -- ═══════════════════════════════════════════════════════════════════════════
+-- MONEY FUNCTIONS (argent = item)
+-- ═══════════════════════════════════════════════════════════════════════════
+
+function GetMoney(src)
+    local identifier = GetIdentifier(src)
+    if not identifier then return 0 end
+    
+    local inv = Cache.inventories[identifier]
+    if not inv then return 0 end
+    
+    for _, item in pairs(inv) do
+        if item.name == 'money' then
+            return item.amount
+        end
+    end
+    return 0
+end
+
+function AddMoney(src, amount)
+    return AddItem(src, 'money', amount)
+end
+
+function RemoveMoney(src, amount)
+    local current = GetMoney(src)
+    if current >= amount then
+        return RemoveItem(src, 'money', amount)
+    end
+    return false
+end
+
+-- ═══════════════════════════════════════════════════════════════════════════
 -- EVENTS
 -- ═══════════════════════════════════════════════════════════════════════════
 
@@ -307,6 +405,8 @@ AddEventHandler('vAvA_inventory:useItem', function(slot)
     elseif itemData and (itemData.type == 'food' or itemData.type == 'drink') then
         RemoveItem(src, item.name, 1)
         TriggerClientEvent('vAvA_inventory:notify', src, 'Consomme: ' .. item.label)
+    elseif itemData and itemData.type == 'money' then
+        TriggerClientEvent('vAvA_inventory:notify', src, 'Vous avez $' .. item.amount)
     end
 end)
 
@@ -343,12 +443,10 @@ AddEventHandler('vAvA_inventory:moveItem', function(from, to)
     local inv = Cache.inventories[identifier]
     if not inv or not inv[from] then return end
     
-    -- Swap en cache
     local temp = inv[to]
     inv[to] = inv[from]
     inv[from] = temp
     
-    -- Sync BDD
     if temp then
         MySQL.Async.execute('UPDATE player_inventories SET slot = -999 WHERE owner = ? AND slot = ?', {identifier, from})
         MySQL.Async.execute('UPDATE player_inventories SET slot = ? WHERE owner = ? AND slot = ?', {from, identifier, to})
@@ -398,7 +496,8 @@ RegisterCommand('createitem', function(src, args)
         'INSERT INTO inventory_items (name,label,weight,max_stack,type) VALUES (?,?,?,?,?) ON DUPLICATE KEY UPDATE label=?,weight=?,max_stack=?,type=?',
         {name,label,weight,stack,itype, label,weight,stack,itype}
     )
-    print('^2[vAvA_inventory]^7 Item: ' .. name)
+    print('^2[vAvA_inventory]^7 Item cree: ' .. name)
+    if src > 0 then TriggerClientEvent('vAvA_inventory:notify', src, 'Item cree: ' .. name) end
 end, true)
 
 RegisterCommand('createweapon', function(src, args)
@@ -413,7 +512,8 @@ RegisterCommand('createweapon', function(src, args)
         'INSERT INTO inventory_items (name,label,weight,max_stack,type,weapon_hash) VALUES (?,?,2,1,"weapon",?) ON DUPLICATE KEY UPDATE label=?,weapon_hash=?',
         {name,label,hash, label,hash}
     )
-    print('^2[vAvA_inventory]^7 Arme: ' .. name)
+    print('^2[vAvA_inventory]^7 Arme creee: ' .. name)
+    if src > 0 then TriggerClientEvent('vAvA_inventory:notify', src, 'Arme creee: ' .. name) end
 end, true)
 
 RegisterCommand('giveitem', function(src, args)
@@ -421,12 +521,22 @@ RegisterCommand('giveitem', function(src, args)
     local target, item, amt = tonumber(args[1]), args[2], tonumber(args[3]) or 1
     if not target or not item then print('/giveitem id item amount') return end
     local ok = AddItem(target, item, amt)
-    print('^2[vAvA_inventory]^7 ' .. (ok and 'OK' or 'FAIL'))
+    print('^2[vAvA_inventory]^7 ' .. (ok and 'OK' or 'FAIL') .. ': ' .. amt .. 'x ' .. item)
+end, true)
+
+RegisterCommand('givemoney', function(src, args)
+    if src > 0 and not IsPlayerAceAllowed(src, 'command') then return end
+    local target, amt = tonumber(args[1]), tonumber(args[2]) or 100
+    if not target then print('/givemoney id amount') return end
+    AddMoney(target, amt)
+    print('^2[vAvA_inventory]^7 Donne $' .. amt)
 end, true)
 
 RegisterCommand('listitems', function()
     print('^3=== ITEMS ===^7')
-    for n, d in pairs(Cache.items) do print('  ' .. n) end
+    for n, d in pairs(Cache.items) do 
+        print('  ' .. n .. ' (' .. (d.label or n) .. ') - ' .. (d.type or 'item'))
+    end
 end, true)
 
 RegisterCommand('clearinv', function(src, args)
@@ -439,17 +549,33 @@ RegisterCommand('clearinv', function(src, args)
         MySQL.Async.execute('DELETE FROM player_inventories WHERE owner = ?', {id})
         MySQL.Async.execute('DELETE FROM player_hotbar WHERE owner = ?', {id})
         SendUpdate(target, id)
+        print('^2[vAvA_inventory]^7 Inventaire vide')
     end
 end, true)
 
+RegisterCommand('reloaditems', function(src)
+    if src > 0 and not IsPlayerAceAllowed(src, 'command') then return end
+    MySQL.Async.fetchAll('SELECT * FROM inventory_items', {}, function(items)
+        Cache.items = {}
+        for _, item in ipairs(items or {}) do
+            Cache.items[item.name] = item
+        end
+        print('^2[vAvA_inventory]^7 ' .. #(items or {}) .. ' items recharges')
+    end)
+end, true)
+
 -- ═══════════════════════════════════════════════════════════════════════════
--- EXPORTS + CLEANUP
+-- EXPORTS
 -- ═══════════════════════════════════════════════════════════════════════════
 
 exports('AddItem', AddItem)
 exports('RemoveItem', RemoveItem)
 exports('GetItemData', function(n) return Cache.items[n] end)
+exports('GetMoney', GetMoney)
+exports('AddMoney', AddMoney)
+exports('RemoveMoney', RemoveMoney)
 
+-- Cleanup
 AddEventHandler('playerDropped', function()
     local id = GetIdentifier(source)
     if id then
