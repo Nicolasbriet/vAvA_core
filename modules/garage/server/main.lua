@@ -28,6 +28,40 @@ local DynamicGarages = {}
 local garagesFile = 'garages.json'
 
 -- ================================
+-- CRÉATION AUTOMATIQUE DES TABLES
+-- ================================
+
+function CreateTables()
+    -- Vérifier/créer la table player_vehicles si elle n'existe pas
+    exports.oxmysql:execute([[
+        CREATE TABLE IF NOT EXISTS `player_vehicles` (
+            `id` int(11) NOT NULL AUTO_INCREMENT,
+            `citizenid` varchar(50) NOT NULL,
+            `vehicle` varchar(50) NOT NULL,
+            `plate` varchar(15) NOT NULL,
+            `mods` longtext DEFAULT NULL,
+            `fuel` int(11) NOT NULL DEFAULT 100,
+            `engine` float NOT NULL DEFAULT 1000,
+            `body` float NOT NULL DEFAULT 1000,
+            `garage` varchar(50) DEFAULT NULL,
+            `state` tinyint(4) NOT NULL DEFAULT 1,
+            `type` varchar(20) NOT NULL DEFAULT 'car',
+            `parking` longtext DEFAULT NULL,
+            `tuning_data` longtext DEFAULT NULL,
+            `last_update` timestamp NULL DEFAULT NULL,
+            `created_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            PRIMARY KEY (`id`),
+            UNIQUE KEY `plate` (`plate`),
+            KEY `idx_citizenid` (`citizenid`),
+            KEY `idx_garage` (`garage`),
+            KEY `idx_state` (`state`)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+    ]], {}, function()
+        print('[vCore:Garage] Table player_vehicles créée/vérifiée')
+    end)
+end
+
+-- ================================
 -- FONCTIONS UTILITAIRES
 -- ================================
 
@@ -145,6 +179,8 @@ end
 
 -- Charger au démarrage
 Citizen.CreateThread(function()
+    Wait(500)
+    CreateTables()
     Wait(500)
     LoadDynamicGarages()
 end)

@@ -21,6 +21,8 @@ CreateThread(function()
     end
     
     Wait(2000)
+    CreateTables()
+    Wait(500)
     ValidateDatabase()
 end)
 
@@ -51,6 +53,52 @@ local function DebugLog(msg)
     if PersistConfig.Debug then
         print('[vAvA Core - Persist] ' .. tostring(msg))
     end
+end
+
+-- ================================
+-- CRÉATION AUTOMATIQUE DES TABLES
+-- ================================
+
+function CreateTables()
+    -- Créer la table player_vehicles si elle n'existe pas
+    MySQL.Async.execute([[
+        CREATE TABLE IF NOT EXISTS `player_vehicles` (
+            `id` int(11) NOT NULL AUTO_INCREMENT,
+            `citizenid` varchar(50) NOT NULL,
+            `vehicle` varchar(50) NOT NULL,
+            `plate` varchar(15) NOT NULL,
+            `mods` longtext DEFAULT NULL,
+            `fuel` int(11) NOT NULL DEFAULT 100,
+            `engine` float NOT NULL DEFAULT 1000,
+            `body` float NOT NULL DEFAULT 1000,
+            `garage` varchar(50) DEFAULT NULL,
+            `state` tinyint(4) NOT NULL DEFAULT 1,
+            `type` varchar(20) NOT NULL DEFAULT 'car',
+            `parking` longtext DEFAULT NULL,
+            `tuning_data` longtext DEFAULT NULL,
+            `stored` tinyint(4) NOT NULL DEFAULT 1,
+            `last_update` timestamp NULL DEFAULT NULL,
+            `created_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            PRIMARY KEY (`id`),
+            UNIQUE KEY `plate` (`plate`),
+            KEY `idx_citizenid` (`citizenid`),
+            KEY `idx_garage` (`garage`),
+            KEY `idx_state` (`state`),
+            KEY `idx_stored` (`stored`)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+    ]], {}, function()
+        DebugLog('Table player_vehicles créée/vérifiée')
+    end)
+    
+    -- S'assurer que les colonnes nécessaires existent
+    MySQL.Async.execute([[
+        ALTER TABLE player_vehicles 
+        ADD COLUMN IF NOT EXISTS `parking` longtext DEFAULT NULL,
+        ADD COLUMN IF NOT EXISTS `stored` tinyint(4) NOT NULL DEFAULT 1,
+        ADD COLUMN IF NOT EXISTS `last_update` timestamp NULL DEFAULT NULL
+    ]], {}, function()
+        DebugLog('Colonnes persist ajoutées/vérifiées')
+    end)
 end
 
 -- ================================

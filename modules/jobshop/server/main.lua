@@ -22,6 +22,8 @@ CreateThread(function()
     end
     
     Wait(1000)
+    CreateTables()
+    Wait(500)
     LoadAllShops()
 end)
 
@@ -76,6 +78,52 @@ local function IsEmployee(Player, job)
         return false
     end
     return Player.PlayerData.job.name == job
+end
+
+-- ================================
+-- CRÉATION AUTOMATIQUE DES TABLES
+-- ================================
+
+function CreateTables()
+    -- Table des boutiques
+    MySQL.Async.execute([[
+        CREATE TABLE IF NOT EXISTS `job_shops` (
+            `id` int(11) NOT NULL AUTO_INCREMENT,
+            `name` varchar(50) NOT NULL,
+            `job` varchar(50) NOT NULL,
+            `boss_grade` int(11) NOT NULL DEFAULT 0,
+            `x` float NOT NULL,
+            `y` float NOT NULL,
+            `z` float NOT NULL,
+            `heading` float NOT NULL DEFAULT 0,
+            `cash` int(11) NOT NULL DEFAULT 0,
+            `created_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            PRIMARY KEY (`id`),
+            KEY `idx_job` (`job`)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+    ]], {}, function()
+        print('[vAvA Core - JobShop] Table job_shops créée/vérifiée')
+    end)
+    
+    -- Table des items de boutique
+    MySQL.Async.execute([[
+        CREATE TABLE IF NOT EXISTS `job_shop_items` (
+            `id` int(11) NOT NULL AUTO_INCREMENT,
+            `shop_id` int(11) NOT NULL,
+            `item_name` varchar(50) NOT NULL,
+            `label` varchar(100) DEFAULT NULL,
+            `price` int(11) NOT NULL DEFAULT 0,
+            `stock` int(11) NOT NULL DEFAULT 0,
+            `max_stock` int(11) NOT NULL DEFAULT 100,
+            `enabled` tinyint(1) NOT NULL DEFAULT 1,
+            PRIMARY KEY (`id`),
+            UNIQUE KEY `unique_shop_item` (`shop_id`, `item_name`),
+            KEY `idx_shop_id` (`shop_id`),
+            CONSTRAINT `fk_shop_items_shop` FOREIGN KEY (`shop_id`) REFERENCES `job_shops` (`id`) ON DELETE CASCADE
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+    ]], {}, function()
+        print('[vAvA Core - JobShop] Table job_shop_items créée/vérifiée')
+    end)
 end
 
 -- ================================

@@ -20,12 +20,48 @@ Citizen.CreateThread(function()
         Wait(100)
     end
     
+    CreateTables()
     print('^2[vCore:Concess] Module concessionnaire initialisé^0')
 end)
 
 -- Variables
 local vehicles = {}
 local vehiclesFile = 'vehicles.json'
+
+-- ================================
+-- CRÉATION AUTOMATIQUE DES TABLES
+-- ================================
+
+function CreateTables()
+    -- Créer la table player_vehicles si elle n'existe pas
+    exports.oxmysql:execute([[
+        CREATE TABLE IF NOT EXISTS `player_vehicles` (
+            `id` int(11) NOT NULL AUTO_INCREMENT,
+            `citizenid` varchar(50) NOT NULL,
+            `vehicle` varchar(50) NOT NULL,
+            `plate` varchar(15) NOT NULL,
+            `mods` longtext DEFAULT NULL,
+            `fuel` int(11) NOT NULL DEFAULT 100,
+            `engine` float NOT NULL DEFAULT 1000,
+            `body` float NOT NULL DEFAULT 1000,
+            `garage` varchar(50) DEFAULT NULL,
+            `state` tinyint(4) NOT NULL DEFAULT 1,
+            `type` varchar(20) NOT NULL DEFAULT 'car',
+            `parking` longtext DEFAULT NULL,
+            `tuning_data` longtext DEFAULT NULL,
+            `stored` tinyint(4) NOT NULL DEFAULT 1,
+            `last_update` timestamp NULL DEFAULT NULL,
+            `created_at` timestamp NOT NULL DEFAULT CURRENT_TIMESTAMP,
+            PRIMARY KEY (`id`),
+            UNIQUE KEY `plate` (`plate`),
+            KEY `idx_citizenid` (`citizenid`),
+            KEY `idx_garage` (`garage`),
+            KEY `idx_state` (`state`)
+        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+    ]], {}, function()
+        print('[vCore:Concess] Table player_vehicles créée/vérifiée')
+    end)
+end
 
 -- ================================
 -- FONCTIONS UTILITAIRES
