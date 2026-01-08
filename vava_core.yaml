@@ -101,8 +101,8 @@ tasks:
     # Configuration du serveur
     # ═══════════════════════════════════════════════════════════════════════
     - action: write_file
-      path: ./server.cfg
-      file: |
+      file: ./server.cfg
+      content: |
         # ═══════════════════════════════════════════════════════════════════
         # vAvA_core - Configuration Serveur
         # Généré par txAdmin Recipe
