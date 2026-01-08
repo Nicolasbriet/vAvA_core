@@ -1,92 +1,39 @@
 --[[
     vAvA_inventory - Client Main
-    Gestion principale de l'inventaire côté client
+    Version SANS THREADS - 100% basé sur events
 ]]
 
 local isOpen = false
 local playerInventory = {}
 local hotbarItems = {}
 local currentWeapon = nil
-local weaponAmmo = {}
-local isReady = false
 
 -- ═══════════════════════════════════════════════════════════════════════════
--- INITIALISATION
+-- COMMANDES
 -- ═══════════════════════════════════════════════════════════════════════════
 
-CreateThread(function()
-    -- Attendre un peu que tout soit chargé
-    Wait(2000)
-    
-    print('[vAvA_inventory] ^2Initialisation du client...^7')
-    
-    isReady = true
-    
-    -- Charger l'inventaire
-    LoadInventory()
-    
-    -- Désactiver la roue des armes
-    if InventoryConfig and InventoryConfig.Weapons and InventoryConfig.Weapons.disableWeaponWheel then
-        DisableWeaponWheel()
-    end
-    
-    print('[vAvA_inventory] ^2Client prêt !^7')
-end)
+RegisterCommand('inventory', function() ToggleInventory() end, false)
+RegisterCommand('inv', function() ToggleInventory() end, false)
+RegisterKeyMapping('inventory', 'Ouvrir l\'inventaire', 'keyboard', 'F2')
 
--- ═══════════════════════════════════════════════════════════════════════════
--- KEYBINDS
--- ═══════════════════════════════════════════════════════════════════════════
+-- Hotbar
+RegisterCommand('hotbar1', function() TriggerServerEvent('vAvA_inventory:useHotbar', 1) end, false)
+RegisterCommand('hotbar2', function() TriggerServerEvent('vAvA_inventory:useHotbar', 2) end, false)
+RegisterCommand('hotbar3', function() TriggerServerEvent('vAvA_inventory:useHotbar', 3) end, false)
+RegisterCommand('hotbar4', function() TriggerServerEvent('vAvA_inventory:useHotbar', 4) end, false)
+RegisterCommand('hotbar5', function() TriggerServerEvent('vAvA_inventory:useHotbar', 5) end, false)
 
--- Touche pour ouvrir l'inventaire
-RegisterKeyMapping('inventory', 'Ouvrir l\'inventaire', 'keyboard', InventoryConfig.OpenKey or 'F2')
-
-RegisterCommand('inventory', function()
-    print('[vAvA_inventory] Commande inventory executée')
-    ToggleInventory()
-end, false)
-
--- Commande alternative /inv
-RegisterCommand('inv', function()
-    print('[vAvA_inventory] Commande inv executée')
-    ToggleInventory()
-end, false)
-
--- Commande debug pour test NUI direct
-RegisterCommand('testinv', function()
-    print('[vAvA_inventory] Test NUI direct')
-    isOpen = true
-    SendNUIMessage({
-        action = 'openInventory',
-        inventory = {},
-        hotbar = {},
-        maxSlots = InventoryConfig.MaxSlots or 50,
-        maxWeight = InventoryConfig.MaxWeight or 120000,
-        currentWeight = 0
-    })
-    SetNuiFocus(true, true)
-end, false)
-
--- Hotbar keys (1-5)
-if InventoryConfig and InventoryConfig.Hotbar and InventoryConfig.Hotbar.enabled then
-    for i, key in ipairs(InventoryConfig.Hotbar.keys) do
-        RegisterKeyMapping('hotbar_' .. i, 'Hotbar Slot ' .. i, 'keyboard', key)
-        RegisterCommand('hotbar_' .. i, function()
-            UseHotbarSlot(i)
-        end, false)
-    end
-end
+RegisterKeyMapping('hotbar1', 'Hotbar 1', 'keyboard', '1')
+RegisterKeyMapping('hotbar2', 'Hotbar 2', 'keyboard', '2')
+RegisterKeyMapping('hotbar3', 'Hotbar 3', 'keyboard', '3')
+RegisterKeyMapping('hotbar4', 'Hotbar 4', 'keyboard', '4')
+RegisterKeyMapping('hotbar5', 'Hotbar 5', 'keyboard', '5')
 
 -- ═══════════════════════════════════════════════════════════════════════════
 -- FONCTIONS PRINCIPALES
 -- ═══════════════════════════════════════════════════════════════════════════
 
-function LoadInventory()
-    print('[vAvA_inventory] Chargement de l\'inventaire...')
-    TriggerServerEvent('vAvA_inventory:requestInventory')
-end
-
 function ToggleInventory()
-    print('[vAvA_inventory] ToggleInventory appelé, isOpen=' .. tostring(isOpen))
     if isOpen then
         CloseInventory()
     else
@@ -95,254 +42,102 @@ function ToggleInventory()
 end
 
 function OpenInventory()
-    if isOpen then 
-        print('[vAvA_inventory] Inventaire déjà ouvert')
-        return 
-    end
-    
-    print('[vAvA_inventory] Ouverture de l\'inventaire...')
+    if isOpen then return end
     isOpen = true
-    
-    -- Demander l'inventaire au serveur
     TriggerServerEvent('vAvA_inventory:requestInventory')
-    
-    -- Calculer le poids
-    local weight = 0
-    if Inventory and Inventory.CalculateWeight then
-        weight = Inventory.CalculateWeight(playerInventory)
-    end
-    
-    -- Envoyer au NUI
-    SendNUIMessage({
-        action = 'openInventory',
-        inventory = playerInventory,
-        hotbar = hotbarItems,
-        maxSlots = InventoryConfig.MaxSlots or 50,
-        maxWeight = InventoryConfig.MaxWeight or 120000,
-        currentWeight = weight
-    })
-    
-    SetNuiFocus(true, true)
-    print('[vAvA_inventory] NUI Focus activé')
 end
 
 function CloseInventory()
     if not isOpen then return end
     isOpen = false
-    
-    SendNUIMessage({
-        action = 'closeInventory'
-    })
-    
+    SendNUIMessage({ action = 'closeInventory' })
     SetNuiFocus(false, false)
 end
 
 -- ═══════════════════════════════════════════════════════════════════════════
--- HOTBAR
+-- EVENTS SERVEUR
 -- ═══════════════════════════════════════════════════════════════════════════
 
-function UpdateHotbarUI()
+RegisterNetEvent('vAvA_inventory:open')
+AddEventHandler('vAvA_inventory:open', function(data)
+    playerInventory = data.inventory or {}
+    hotbarItems = data.hotbar or {}
+    
     SendNUIMessage({
-        action = 'updateHotbar',
-        hotbar = hotbarItems
+        action = 'openInventory',
+        inventory = playerInventory,
+        hotbar = hotbarItems,
+        maxSlots = data.maxSlots or 50,
+        maxWeight = data.maxWeight or 120,
+        currentWeight = data.weight or 0
     })
-end
-
-function UseHotbarSlot(slot)
-    local item = hotbarItems[slot]
-    if not item then return end
     
-    if Inventory.IsWeapon(item.name) then
-        EquipWeapon(item)
-    else
-        UseItem(item)
+    SetNuiFocus(true, true)
+end)
+
+RegisterNetEvent('vAvA_inventory:updateInventory')
+AddEventHandler('vAvA_inventory:updateInventory', function(inventory, weight)
+    playerInventory = inventory or {}
+    if isOpen then
+        SendNUIMessage({
+            action = 'updateInventory',
+            inventory = playerInventory,
+            currentWeight = weight or 0
+        })
     end
-end
+end)
 
-function SetHotbarSlot(slot, item)
-    TriggerServerEvent('vAvA_inventory:setHotbar', slot, item)
-    hotbarItems[slot] = item
-    UpdateHotbarUI()
-end
+RegisterNetEvent('vAvA_inventory:updateHotbar')
+AddEventHandler('vAvA_inventory:updateHotbar', function(hotbar)
+    hotbarItems = hotbar or {}
+    SendNUIMessage({ action = 'updateHotbar', hotbar = hotbarItems })
+end)
 
--- ═══════════════════════════════════════════════════════════════════════════
--- ARMES
--- ═══════════════════════════════════════════════════════════════════════════
-
-function DisableWeaponWheel()
-    CreateThread(function()
-        while true do
-            Wait(0)
-            
-            -- Désactiver les touches de la roue des armes
-            DisableControlAction(0, 37, true)  -- TAB
-            DisableControlAction(0, 157, true) -- Select next weapon
-            DisableControlAction(0, 158, true) -- Select previous weapon
-            DisableControlAction(0, 160, true) -- Select next weapon in slot
-            DisableControlAction(0, 164, true) -- Select previous weapon in slot
-            DisableControlAction(0, 165, true) -- Select melee
-            
-            -- Bloquer les armes non équipées via l'inventaire
-            local ped = PlayerPedId()
-            local currentWeaponHash = GetSelectedPedWeapon(ped)
-            
-            if currentWeaponHash ~= `WEAPON_UNARMED` then
-                if not IsWeaponEquippedFromInventory(currentWeaponHash) then
-                    SetCurrentPedWeapon(ped, `WEAPON_UNARMED`, true)
-                end
-            end
-        end
-    end)
-end
-
-function IsWeaponEquippedFromInventory(weaponHash)
-    if not currentWeapon then return false end
-    local equippedHash = Inventory.GetWeaponHash(currentWeapon.name)
-    return equippedHash == weaponHash
-end
-
-function EquipWeapon(item)
+RegisterNetEvent('vAvA_inventory:equipWeapon')
+AddEventHandler('vAvA_inventory:equipWeapon', function(weaponName, ammo)
     local ped = PlayerPedId()
-    local weaponName = string.upper(item.name)
-    local weaponHash = joaat(weaponName)
-    
-    -- Si déjà équipé, déséquiper
-    if currentWeapon and currentWeapon.name == item.name then
-        UnequipWeapon()
-        return
-    end
-    
-    -- Vérifier les munitions si nécessaire
-    local weaponData = Inventory.GetWeaponData(item.name)
-    local ammoCount = 0
-    
-    if weaponData and weaponData.ammo and InventoryConfig.Weapons.requireAmmo then
-        ammoCount = GetAmmoCount(weaponData.ammo)
-        if ammoCount <= 0 then
-            TriggerEvent('vAvA:notify', 'Vous n\'avez pas de munitions !', 'error')
-            return
-        end
-    else
-        ammoCount = 9999
-    end
-    
-    -- Retirer l'arme actuelle
-    if currentWeapon then
-        UnequipWeapon()
-    end
-    
-    -- Animation d'équipement
-    local animData = InventoryConfig.Weapons.equipAnimations[weaponData and weaponData.category] or 
-                     InventoryConfig.Weapons.equipAnimations.default
-    
-    if animData then
-        RequestAnimDict(animData.dict)
-        while not HasAnimDictLoaded(animData.dict) do Wait(10) end
-        TaskPlayAnim(ped, animData.dict, animData.anim, 8.0, -8.0, animData.duration, 0, 0, false, false, false)
-        Wait(animData.duration)
-    end
-    
-    -- Donner l'arme
-    GiveWeaponToPed(ped, weaponHash, ammoCount, false, true)
-    SetCurrentPedWeapon(ped, weaponHash, true)
-    
-    currentWeapon = item
-    weaponAmmo[weaponName] = ammoCount
-    
-    TriggerEvent('vAvA:notify', 'Arme équipée: ' .. (weaponData and weaponData.label or item.label), 'success')
-end
-
-function UnequipWeapon()
-    local ped = PlayerPedId()
+    local hash = joaat(string.upper(weaponName))
     
     if currentWeapon then
-        local weaponHash = Inventory.GetWeaponHash(currentWeapon.name)
-        
-        -- Sauvegarder les munitions restantes
-        local ammo = GetAmmoInPedWeapon(ped, weaponHash)
-        if weaponAmmo[string.upper(currentWeapon.name)] then
-            -- Sync munitions avec serveur
-            local weaponData = Inventory.GetWeaponData(currentWeapon.name)
-            if weaponData and weaponData.ammo then
-                TriggerServerEvent('vAvA_inventory:syncAmmo', weaponData.ammo, ammo)
-            end
-        end
-        
-        RemoveWeaponFromPed(ped, weaponHash)
+        RemoveWeaponFromPed(ped, joaat(string.upper(currentWeapon)))
     end
     
+    GiveWeaponToPed(ped, hash, ammo or 100, false, true)
+    SetCurrentPedWeapon(ped, hash, true)
+    currentWeapon = weaponName
+end)
+
+RegisterNetEvent('vAvA_inventory:unequipWeapon')
+AddEventHandler('vAvA_inventory:unequipWeapon', function()
+    local ped = PlayerPedId()
+    if currentWeapon then
+        RemoveWeaponFromPed(ped, joaat(string.upper(currentWeapon)))
+        currentWeapon = nil
+    end
     SetCurrentPedWeapon(ped, `WEAPON_UNARMED`, true)
-    currentWeapon = nil
-end
+end)
 
-function GetAmmoCount(ammoType)
-    local count = 0
-    for _, item in ipairs(playerInventory) do
-        local ammoData = InventoryConfig.AmmoItems[string.lower(item.name)]
-        if ammoData and ammoData.ammoType == ammoType then
-            count = count + (item.amount * ammoData.count)
-        end
-    end
-    return count
-end
-
--- ═══════════════════════════════════════════════════════════════════════════
--- UTILISATION ITEMS
--- ═══════════════════════════════════════════════════════════════════════════
-
-function UseItem(item)
-    if not item then return end
-    
-    TriggerServerEvent('vAvA_inventory:useItem', item.slot, item.name)
-end
+RegisterNetEvent('vAvA_inventory:notify')
+AddEventHandler('vAvA_inventory:notify', function(msg, type)
+    TriggerEvent('chat:addMessage', { args = { msg } })
+end)
 
 -- ═══════════════════════════════════════════════════════════════════════════
 -- NUI CALLBACKS
 -- ═══════════════════════════════════════════════════════════════════════════
 
-RegisterNUICallback('closeInventory', function(data, cb)
-    CloseInventory()
-    cb('ok')
-end)
-
-RegisterNUICallback('useItem', function(data, cb)
-    local item = data.item
-    if Inventory.IsWeapon(item.name) then
-        EquipWeapon(item)
-    else
-        UseItem(item)
-    end
-    cb('ok')
-end)
-
-RegisterNUICallback('dropItem', function(data, cb)
-    TriggerServerEvent('vAvA_inventory:dropItem', data.slot, data.amount)
-    cb('ok')
-end)
+RegisterNUICallback('closeInventory', function(_, cb) CloseInventory() cb('ok') end)
+RegisterNUICallback('useItem', function(data, cb) TriggerServerEvent('vAvA_inventory:useItem', data.slot) cb('ok') end)
+RegisterNUICallback('dropItem', function(data, cb) TriggerServerEvent('vAvA_inventory:dropItem', data.slot, data.amount) cb('ok') end)
+RegisterNUICallback('moveItem', function(data, cb) TriggerServerEvent('vAvA_inventory:moveItem', data.fromSlot, data.toSlot, data.amount) cb('ok') end)
+RegisterNUICallback('setHotbar', function(data, cb) TriggerServerEvent('vAvA_inventory:setHotbar', data.slot, data.itemSlot) cb('ok') end)
+RegisterNUICallback('splitStack', function(data, cb) TriggerServerEvent('vAvA_inventory:splitStack', data.slot, data.amount) cb('ok') end)
 
 RegisterNUICallback('giveItem', function(data, cb)
-    -- Trouver le joueur le plus proche
     local closestPlayer = GetClosestPlayer()
     if closestPlayer then
         TriggerServerEvent('vAvA_inventory:giveItem', GetPlayerServerId(closestPlayer), data.slot, data.amount)
-    else
-        TriggerEvent('vAvA:notify', 'Aucun joueur à proximité', 'error')
     end
-    cb('ok')
-end)
-
-RegisterNUICallback('moveItem', function(data, cb)
-    TriggerServerEvent('vAvA_inventory:moveItem', data.fromSlot, data.toSlot, data.amount)
-    cb('ok')
-end)
-
-RegisterNUICallback('setHotbar', function(data, cb)
-    SetHotbarSlot(data.slot, data.item)
-    cb('ok')
-end)
-
-RegisterNUICallback('splitStack', function(data, cb)
-    TriggerServerEvent('vAvA_inventory:splitStack', data.slot, data.amount)
     cb('ok')
 end)
 
@@ -352,95 +147,20 @@ end)
 
 function GetClosestPlayer()
     local players = GetActivePlayers()
-    local closestPlayer = nil
-    local closestDistance = 3.0
-    local playerPed = PlayerPedId()
-    local playerCoords = GetEntityCoords(playerPed)
+    local closestPlayer, closestDistance = nil, 3.0
+    local myPed = PlayerPedId()
+    local myCoords = GetEntityCoords(myPed)
     
     for _, player in ipairs(players) do
         if player ~= PlayerId() then
-            local targetPed = GetPlayerPed(player)
-            local targetCoords = GetEntityCoords(targetPed)
-            local distance = #(playerCoords - targetCoords)
-            
-            if distance < closestDistance then
-                closestDistance = distance
-                closestPlayer = player
+            local dist = #(myCoords - GetEntityCoords(GetPlayerPed(player)))
+            if dist < closestDistance then
+                closestDistance, closestPlayer = dist, player
             end
         end
     end
-    
     return closestPlayer
 end
 
--- Callback helper
-function TriggerServerCallback(name, cb, ...)
-    local requestId = math.random(1, 999999)
-    
-    RegisterNetEvent('vAvA_inventory:callback:' .. requestId)
-    AddEventHandler('vAvA_inventory:callback:' .. requestId, function(...)
-        cb(...)
-    end)
-    
-    TriggerServerEvent('vAvA_inventory:triggerCallback', name, requestId, ...)
-end
-
--- ═══════════════════════════════════════════════════════════════════════════
--- EVENTS
--- ═══════════════════════════════════════════════════════════════════════════
-
-RegisterNetEvent('vAvA_inventory:refresh')
-AddEventHandler('vAvA_inventory:refresh', function()
-    LoadInventory()
-end)
-
-RegisterNetEvent('vAvA_inventory:receiveInventory')
-AddEventHandler('vAvA_inventory:receiveInventory', function(inventory, hotbar)
-    print('[vAvA_inventory] Inventaire reçu du serveur')
-    playerInventory = inventory or {}
-    hotbarItems = hotbar or {}
-    UpdateHotbarUI()
-    
-    -- Si l'inventaire est ouvert, mettre à jour l'affichage
-    if isOpen then
-        local weight = 0
-        if Inventory and Inventory.CalculateWeight then
-            weight = Inventory.CalculateWeight(playerInventory)
-        end
-        
-        SendNUIMessage({
-            action = 'updateInventory',
-            inventory = playerInventory,
-            currentWeight = weight
-        })
-    end
-end)
-
-RegisterNetEvent('vAvA_inventory:updateInventory')
-AddEventHandler('vAvA_inventory:updateInventory', function(inventory)
-    playerInventory = inventory or {}
-    if isOpen then
-        local weight = 0
-        if Inventory and Inventory.CalculateWeight then
-            weight = Inventory.CalculateWeight(playerInventory)
-        end
-        SendNUIMessage({
-            action = 'updateInventory',
-            inventory = playerInventory,
-            currentWeight = weight
-        })
-    end
-end)
-
--- Export
-exports('IsInventoryOpen', function()
-    return isOpen
-end)
-
-exports('GetPlayerInventory', function()
-    return playerInventory
-end)
-
-exports('GetCurrentWeapon', function()
-    return currentWeapon
-end)
+exports('IsInventoryOpen', function() return isOpen end)
+exports('GetPlayerInventory', function() return playerInventory end)

@@ -1,6 +1,6 @@
 --[[
-    vAvA_inventory - Système d'inventaire complet
-    Version: 1.0.0
+    vAvA_inventory - Système d'inventaire 
+    Version: 2.0.0 - Items en BDD, sans threads
 ]]
 
 fx_version 'cerulean'
@@ -9,27 +9,24 @@ lua54 'yes'
 
 name 'vAvA_inventory'
 author 'vAvA'
-description 'Système d\'inventaire moderne avec gestion des armes'
-version '1.0.0'
+description 'Système d\'inventaire - Items en base de données'
+version '2.0.0'
 
 dependencies {
-    'vAvA_core'
+    'oxmysql'
 }
 
 shared_scripts {
-    '@vAvA_core/config/config.lua',
-    '@vAvA_core/shared/utils.lua',
-    'config.lua',
-    'shared/*.lua'
+    'config.lua'
 }
 
 client_scripts {
-    'client/*.lua'
+    'client/main.lua'
 }
 
 server_scripts {
     '@oxmysql/lib/MySQL.lua',
-    'server/*.lua'
+    'server/main.lua'
 }
 
 ui_page 'html/index.html'
@@ -38,6 +35,5 @@ files {
     'html/index.html',
     'html/css/*.css',
     'html/js/*.js',
-    'html/img/**/*.png',
     'html/img/items/*.png'
 }
