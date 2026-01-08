@@ -1,0 +1,104 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>vAvA Garage</title>
+    <link rel="stylesheet" href="css/style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body>
+    <div id="app" class="hidden">
+        <!-- Panel principal -->
+        <div class="garage-container">
+            <div class="garage-header">
+                <div class="header-left">
+                    <i class="fas fa-warehouse" id="header-icon"></i>
+                    <h2 id="garage-title">Garage</h2>
+                </div>
+                <button class="close-btn" id="close-btn">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+
+            <div class="garage-content">
+                <!-- Message si aucun véhicule -->
+                <div class="no-vehicles hidden" id="no-vehicles">
+                    <i class="fas fa-car-side"></i>
+                    <p>Aucun véhicule disponible</p>
+                </div>
+
+                <!-- Liste des véhicules -->
+                <div class="vehicles-list" id="vehicles-list">
+                    <!-- Véhicules générés dynamiquement -->
+                </div>
+            </div>
+
+            <!-- Prix fourrière -->
+            <div class="impound-info hidden" id="impound-info">
+                <i class="fas fa-info-circle"></i>
+                <span>Prix de sortie: $<span id="impound-price">500</span></span>
+            </div>
+        </div>
+    </div>
+
+    <!-- Panel Admin -->
+    <div id="admin-panel" class="hidden">
+        <div class="admin-container">
+            <div class="admin-header">
+                <h2><i class="fas fa-cog"></i> Gestion des garages</h2>
+                <button class="admin-close-btn" id="admin-close-btn">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+
+            <div class="admin-content">
+                <div class="admin-section">
+                    <h3>Créer un nouveau garage</h3>
+                    <form id="create-garage-form">
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label>ID du garage</label>
+                                <input type="text" id="garage-id" placeholder="mon_garage" required>
+                            </div>
+                            <div class="form-group">
+                                <label>Nom affiché</label>
+                                <input type="text" id="garage-label" placeholder="Mon Garage" required>
+                            </div>
+                        </div>
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label>Type de véhicule</label>
+                                <select id="garage-type">
+                                    <option value="car">Voiture</option>
+                                    <option value="boat">Bateau</option>
+                                    <option value="helicopter">Hélicoptère</option>
+                                    <option value="plane">Avion</option>
+                                </select>
+                            </div>
+                            <div class="form-check">
+                                <input type="checkbox" id="garage-blip" checked>
+                                <label>Afficher le blip</label>
+                            </div>
+                        </div>
+                        <p class="help-text">Positionnez-vous là où vous voulez créer le garage.</p>
+                        <button type="submit" class="create-btn">
+                            <i class="fas fa-plus"></i> Créer le garage
+                        </button>
+                    </form>
+                </div>
+
+                <div class="admin-section">
+                    <h3>Garages existants</h3>
+                    <div class="garages-list" id="garages-list">
+                        <!-- Garages générés dynamiquement -->
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="js/app.js"></script>
+</body>
+</html>

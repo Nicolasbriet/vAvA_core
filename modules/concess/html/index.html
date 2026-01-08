@@ -1,0 +1,211 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>vAvA Concessionnaire</title>
+    <link rel="stylesheet" href="css/style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body>
+    <div id="app" class="hidden">
+        <!-- Panel principal -->
+        <div class="main-container">
+            <!-- Sidebar gauche - Catégories -->
+            <div class="sidebar">
+                <div class="sidebar-header">
+                    <h2><i class="fas fa-car"></i> Concessionnaire</h2>
+                </div>
+                <div class="categories-list" id="categories-list">
+                    <!-- Catégories générées dynamiquement -->
+                </div>
+                <div class="sidebar-footer">
+                    <div class="player-info" id="player-info">
+                        <i class="fas fa-user"></i>
+                        <span id="player-job">Citoyen</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Contenu central - Liste des véhicules -->
+            <div class="content">
+                <div class="search-bar">
+                    <i class="fas fa-search"></i>
+                    <input type="text" id="search-input" placeholder="Rechercher un véhicule...">
+                    <select id="sort-select">
+                        <option value="name">Nom</option>
+                        <option value="price-asc">Prix ↑</option>
+                        <option value="price-desc">Prix ↓</option>
+                    </select>
+                </div>
+                <div class="vehicles-grid" id="vehicles-grid">
+                    <!-- Véhicules générés dynamiquement -->
+                </div>
+            </div>
+
+            <!-- Panel droit - Détails du véhicule -->
+            <div class="details-panel" id="details-panel">
+                <div class="details-header">
+                    <h3 id="vehicle-name">Sélectionnez un véhicule</h3>
+                    <span class="vehicle-price" id="vehicle-price">$0</span>
+                </div>
+                
+                <div class="details-content">
+                    <!-- Contrôles de rotation -->
+                    <div class="rotation-controls">
+                        <button class="rotate-btn" id="rotate-left">
+                            <i class="fas fa-undo"></i>
+                        </button>
+                        <span>Rotation</span>
+                        <button class="rotate-btn" id="rotate-right">
+                            <i class="fas fa-redo"></i>
+                        </button>
+                    </div>
+
+                    <!-- Couleurs -->
+                    <div class="color-section">
+                        <h4><i class="fas fa-palette"></i> Couleurs</h4>
+                        <div class="color-row">
+                            <label>Primaire</label>
+                            <input type="number" id="primary-color" min="0" max="161" value="0">
+                        </div>
+                        <div class="color-row">
+                            <label>Secondaire</label>
+                            <input type="number" id="secondary-color" min="0" max="161" value="0">
+                        </div>
+                        <button class="apply-color-btn" id="apply-colors">
+                            <i class="fas fa-check"></i> Appliquer
+                        </button>
+                    </div>
+
+                    <!-- Livrée -->
+                    <div class="livery-section" id="livery-section">
+                        <h4><i class="fas fa-paint-roller"></i> Livrée</h4>
+                        <select id="livery-select">
+                            <option value="-1">Aucune</option>
+                        </select>
+                    </div>
+
+                    <!-- Méthode de paiement -->
+                    <div class="payment-section">
+                        <h4><i class="fas fa-credit-card"></i> Paiement</h4>
+                        <div class="payment-methods">
+                            <label class="payment-option">
+                                <input type="radio" name="payment" value="cash" checked>
+                                <span><i class="fas fa-money-bill-wave"></i> Espèces</span>
+                            </label>
+                            <label class="payment-option">
+                                <input type="radio" name="payment" value="bank">
+                                <span><i class="fas fa-university"></i> Banque</span>
+                            </label>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="details-footer">
+                    <button class="buy-btn" id="buy-btn" disabled>
+                        <i class="fas fa-shopping-cart"></i> Acheter
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Bouton fermer -->
+        <button class="close-btn" id="close-btn">
+            <i class="fas fa-times"></i>
+        </button>
+
+        <!-- Bouton admin (si autorisé) -->
+        <button class="admin-btn hidden" id="admin-btn">
+            <i class="fas fa-cog"></i> Admin
+        </button>
+    </div>
+
+    <!-- Panel Admin -->
+    <div id="admin-panel" class="hidden">
+        <div class="admin-container">
+            <div class="admin-header">
+                <h2><i class="fas fa-cog"></i> Administration</h2>
+                <button class="admin-close-btn" id="admin-close-btn">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            
+            <div class="admin-tabs">
+                <button class="admin-tab active" data-tab="vehicles">Véhicules</button>
+                <button class="admin-tab" data-tab="add">Ajouter</button>
+            </div>
+
+            <div class="admin-content">
+                <!-- Liste des véhicules -->
+                <div class="admin-tab-content active" id="tab-vehicles">
+                    <div class="admin-search">
+                        <input type="text" id="admin-search" placeholder="Rechercher...">
+                    </div>
+                    <div class="admin-vehicles-list" id="admin-vehicles-list">
+                        <!-- Véhicules admin générés dynamiquement -->
+                    </div>
+                </div>
+
+                <!-- Formulaire d'ajout -->
+                <div class="admin-tab-content" id="tab-add">
+                    <form id="add-vehicle-form">
+                        <div class="form-group">
+                            <label>Nom du véhicule</label>
+                            <input type="text" id="add-name" required>
+                        </div>
+                        <div class="form-group">
+                            <label>Model (spawn name)</label>
+                            <input type="text" id="add-model" required>
+                        </div>
+                        <div class="form-group">
+                            <label>Catégorie</label>
+                            <select id="add-category">
+                                <option value="compacts">Compacts</option>
+                                <option value="sedans">Sedans</option>
+                                <option value="suvs">SUVs</option>
+                                <option value="coupes">Coupés</option>
+                                <option value="muscle">Muscle</option>
+                                <option value="sports">Sports</option>
+                                <option value="super">Super</option>
+                                <option value="motorcycles">Motos</option>
+                                <option value="offroad">Off-road</option>
+                                <option value="boats">Bateaux</option>
+                                <option value="helicopters">Hélicoptères</option>
+                                <option value="planes">Avions</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label>Prix ($)</label>
+                            <input type="number" id="add-price" min="0" required>
+                        </div>
+                        <div class="form-group">
+                            <label>Type de véhicule</label>
+                            <select id="add-vehicleType">
+                                <option value="cars">Voitures</option>
+                                <option value="boats">Bateaux</option>
+                                <option value="helicopters">Hélicoptères</option>
+                                <option value="planes">Avions</option>
+                            </select>
+                        </div>
+                        <div class="form-group">
+                            <label>Job (optionnel)</label>
+                            <input type="text" id="add-job" placeholder="police, ems, etc.">
+                        </div>
+                        <div class="form-check">
+                            <input type="checkbox" id="add-jobOnly">
+                            <label>Réservé aux jobs</label>
+                        </div>
+                        <button type="submit" class="add-btn">
+                            <i class="fas fa-plus"></i> Ajouter le véhicule
+                        </button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="js/app.js"></script>
+</body>
+</html>

@@ -1,8 +1,123 @@
 # vAvA_core - Feuille de Route Développeur
 
 > **Dernière mise à jour:** 8 Janvier 2026  
-> **Version actuelle:** 2.2.0  
-> **Statut inventaire:** ⏸️ EN PAUSE
+> **Version actuelle:** 2.4.0  
+> **Statut:** ✅ INTÉGRATION MODULES TERMINÉE
+
+---
+
+## ✅ PROJET TERMINÉ - Intégration Scripts [vAvA] en Modules
+
+### Vue d'ensemble
+Objectif: Adapter tous les scripts du dossier [vAvA] en modules intégrés au vAvA_core.
+
+| Module | Script Source | Statut | Fichiers |
+|--------|---------------|--------|----------|
+| `chat` | vAvA_chat | ✅ Terminé | 7 fichiers |
+| `concess` | vAvA_Concess | ✅ Terminé | 9 fichiers |
+| `garage` | vAvA_garage | ✅ Terminé | 9 fichiers |
+| `keys` | vAvA_keys | ✅ Terminé | 9 fichiers |
+| `jobshop` | vAvA_jobshop | ✅ Terminé | 8 fichiers |
+| `persist` | vAvA_persist | ✅ Terminé | 5 fichiers |
+| `sit` | vAvA_sit | ✅ Terminé | 6 fichiers |
+
+**Total: 7 modules, 53 fichiers créés**
+
+---
+
+## 📊 DÉTAILS DES MODULES CRÉÉS
+
+### 1. Module Chat (vAvA_chat → modules/chat/)
+**Fichiers:** fxmanifest.lua, config.lua, server/main.lua, client/main.lua, html/index.html, html/css/style.css, html/js/app.js
+
+**Fonctionnalités:**
+- 💬 Commandes RP: /me, /do, /ooc, /mp
+- 👮 Canaux métiers: /police, /ems, /staff
+- 📍 Messages par proximité (20m)
+- 🎨 Interface NUI avec onglets par type de message
+- ⌨️ Suggestions de commandes
+
+**Exports:** OpenChat, SendMessage, SetChatVisible
+
+---
+
+### 2. Module Keys (vAvA_keys → modules/keys/)
+**Fichiers:** fxmanifest.lua, config.lua, server/main.lua, client/main.lua, html/index.html, html/css/style.css, html/js/app.js, database.sql, README.md
+
+**Fonctionnalités:**
+- 🔑 Clés permanentes et temporaires
+- 🔒 Verrouillage/Déverrouillage (touche L)
+- ⚙️ Contrôle moteur (touche G)
+- 👥 Partage de clés avec interface ox_lib
+- 💾 Auto-création tables BDD
+
+**Exports Server:** GiveKeys, RemoveKeys, HasKeys, ShareKeys, GetPlayerKeys
+**Exports Client:** ToggleLock, ToggleEngine, OpenVehicleUI
+
+---
+
+### 3. Module Concess (vAvA_Concess → modules/concess/)
+**Fichiers:** fxmanifest.lua, config.lua, server/main.lua, client/main.lua, html/index.html, html/css/style.css, html/js/app.js, vehicles.json, README.md
+
+**Fonctionnalités:**
+- 🚗 Multi-types: voitures, bateaux, hélicoptères, avions
+- 🎥 Caméra preview avec rotation 360°
+- 💳 Paiement cash ou banque
+- 🔑 Intégration automatique des clés
+
+**Exports:** OpenDealership, CloseDealership, GetVehicles, AddVehicle, RemoveVehicle
+
+---
+
+### 4. Module Garage (vAvA_garage → modules/garage/)
+**Fichiers:** fxmanifest.lua, config.lua, server/main.lua, client/main.lua, html/index.html, html/css/style.css, html/js/app.js, garages.json, README.md
+
+**Fonctionnalités:**
+- 🏠 Garages dynamiques créés via interface admin
+- 🚔 Fourrière police avec ox_target
+- 💰 Prix de sortie fourrière configurable
+- 📍 Blips sur la carte
+
+**Exports:** OpenGarage, OpenImpound, StoreVehicle, SpawnVehicle, GetGarages, AddGarage
+
+---
+
+### 5. Module JobShop (vAvA_jobshop → modules/jobshop/)
+**Fichiers:** fxmanifest.lua, config.lua, server/main.lua, client/main.lua, html/index.html, html/css/style.css, html/js/app.js, README.md
+
+**Fonctionnalités:**
+- 🏪 Boutiques spécialisées par job
+- 💼 Gestion par patrons (prix, finances)
+- 📦 Approvisionnement par employés
+- 💰 Coffre de boutique avec retrait
+
+**Exports:** GetShops, GetShopData, CreateShop, DeleteShop, AddShopItem, UpdateItemPrice
+
+---
+
+### 6. Module Persist (vAvA_persist → modules/persist/)
+**Fichiers:** fxmanifest.lua, config.lua, server/main.lua, client/main.lua, README.md
+
+**Fonctionnalités:**
+- 💾 Sauvegarde position/état véhicules
+- 🔄 Restauration au redémarrage
+- 🛡️ Protection anti-collision NPC
+- 🔗 State bags pour synchronisation
+
+**Exports:** SaveVehicle, GetSpawnedVehicles, RegisterPlayerVehicle, IsPlayerVehicle
+
+---
+
+### 7. Module Sit (vAvA_sit → modules/sit/)
+**Fichiers:** fxmanifest.lua, config.lua, server/main.lua, client/main.lua, sit_points.json, README.md
+
+**Fonctionnalités:**
+- 🪑 Points d'assise configurables via interface admin
+- 🎭 8 animations d'assise différentes
+- 👻 Mode édition avec ghost ped et caméra libre
+- 📍 Intégration ox_target
+
+**Exports:** OpenSitMenu, ToggleEditMode, SitDown, StandUp, CreateSitPoint, DeleteSitPoint
 
 ---
 

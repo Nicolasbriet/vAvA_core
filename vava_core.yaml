@@ -8,7 +8,7 @@ $engine: 3
 $onesync: on
 
 name: vAvA_core Framework
-version: 1.1.0
+version: 2.4.0
 author: vAvA
 description: |
     Framework FiveM modulaire, sécurisé et multilingue.
@@ -20,17 +20,26 @@ description: |
     - Inventaire moderne avec interface drag & drop
     - Gestion complète des armes et munitions
     - Hotbar (raccourcis 1-5)
-    - Véhicules avec garage
+    - Véhicules avec garage et persistance
     - Système de logs et sécurité
     - Support multilingue (FR, EN, ES)
     
     Modules inclus:
     - vAvA_core (framework principal)
     - vAvA_inventory (système d'inventaire)
+    - vAvA_chat (chat RP avec commandes)
+    - vAvA_keys (gestion des clés véhicules)
+    - vAvA_concess (concessionnaire multi-types)
+    - vAvA_garage (garage dynamique avec fourrière)
+    - vAvA_jobshop (boutiques par métier)
+    - vAvA_persist (persistance véhicules)
+    - vAvA_sit (points d'assise avec animations)
     
     Prérequis:
     - Serveur MySQL/MariaDB
     - oxmysql
+    - ox_lib (recommandé)
+    - ox_target (recommandé)
 
 tasks:
     # ═══════════════════════════════════════════════════════════════════════
@@ -70,6 +79,55 @@ tasks:
     - action: move_path
       src: ./resources/[vava]/vAvA_core/modules/inventory
       dest: ./resources/[vava]/vAvA_inventory
+
+    # ═══════════════════════════════════════════════════════════════════════
+    # Copie du module chat
+    # ═══════════════════════════════════════════════════════════════════════
+    - action: move_path
+      src: ./resources/[vava]/vAvA_core/modules/chat
+      dest: ./resources/[vava]/vAvA_chat
+
+    # ═══════════════════════════════════════════════════════════════════════
+    # Copie du module keys
+    # ═══════════════════════════════════════════════════════════════════════
+    - action: move_path
+      src: ./resources/[vava]/vAvA_core/modules/keys
+      dest: ./resources/[vava]/vAvA_keys
+
+    # ═══════════════════════════════════════════════════════════════════════
+    # Copie du module concess
+    # ═══════════════════════════════════════════════════════════════════════
+    - action: move_path
+      src: ./resources/[vava]/vAvA_core/modules/concess
+      dest: ./resources/[vava]/vAvA_concess
+
+    # ═══════════════════════════════════════════════════════════════════════
+    # Copie du module garage
+    # ═══════════════════════════════════════════════════════════════════════
+    - action: move_path
+      src: ./resources/[vava]/vAvA_core/modules/garage
+      dest: ./resources/[vava]/vAvA_garage
+
+    # ═══════════════════════════════════════════════════════════════════════
+    # Copie du module jobshop
+    # ═══════════════════════════════════════════════════════════════════════
+    - action: move_path
+      src: ./resources/[vava]/vAvA_core/modules/jobshop
+      dest: ./resources/[vava]/vAvA_jobshop
+
+    # ═══════════════════════════════════════════════════════════════════════
+    # Copie du module persist
+    # ═══════════════════════════════════════════════════════════════════════
+    - action: move_path
+      src: ./resources/[vava]/vAvA_core/modules/persist
+      dest: ./resources/[vava]/vAvA_persist
+
+    # ═══════════════════════════════════════════════════════════════════════
+    # Copie du module sit
+    # ═══════════════════════════════════════════════════════════════════════
+    - action: move_path
+      src: ./resources/[vava]/vAvA_core/modules/sit
+      dest: ./resources/[vava]/vAvA_sit
 
     # ═══════════════════════════════════════════════════════════════════════
     # Configuration du serveur

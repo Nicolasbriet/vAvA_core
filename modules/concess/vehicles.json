@@ -1,0 +1,134 @@
+[
+    {
+        "id": 1,
+        "name": "Adder",
+        "model": "adder",
+        "category": "super",
+        "price": 1000000,
+        "image": "img/adder.png",
+        "vehicleType": "cars",
+        "job": "",
+        "jobOnly": false
+    },
+    {
+        "id": 2,
+        "name": "Zentorno",
+        "model": "zentorno",
+        "category": "super",
+        "price": 725000,
+        "image": "img/zentorno.png",
+        "vehicleType": "cars",
+        "job": "",
+        "jobOnly": false
+    },
+    {
+        "id": 3,
+        "name": "Elegy RH8",
+        "model": "elegy",
+        "category": "sports",
+        "price": 95000,
+        "image": "img/elegy.png",
+        "vehicleType": "cars",
+        "job": "",
+        "jobOnly": false
+    },
+    {
+        "id": 4,
+        "name": "Sultan RS",
+        "model": "sultanrs",
+        "category": "sports",
+        "price": 85000,
+        "image": "img/sultanrs.png",
+        "vehicleType": "cars",
+        "job": "",
+        "jobOnly": false
+    },
+    {
+        "id": 5,
+        "name": "Bati 801",
+        "model": "bati",
+        "category": "motorcycles",
+        "price": 15000,
+        "image": "img/bati.png",
+        "vehicleType": "cars",
+        "job": "",
+        "jobOnly": false
+    },
+    {
+        "id": 6,
+        "name": "Dominator",
+        "model": "dominator",
+        "category": "muscle",
+        "price": 35000,
+        "image": "img/dominator.png",
+        "vehicleType": "cars",
+        "job": "",
+        "jobOnly": false
+    },
+    {
+        "id": 7,
+        "name": "Futo",
+        "model": "futo",
+        "category": "sports",
+        "price": 9000,
+        "image": "img/futo.png",
+        "vehicleType": "cars",
+        "job": "",
+        "jobOnly": false
+    },
+    {
+        "id": 8,
+        "name": "Speeder",
+        "model": "speeder",
+        "category": "boats",
+        "price": 325000,
+        "image": "img/speeder.png",
+        "vehicleType": "boats",
+        "job": "",
+        "jobOnly": false
+    },
+    {
+        "id": 9,
+        "name": "Jetmax",
+        "model": "jetmax",
+        "category": "boats",
+        "price": 299000,
+        "image": "img/jetmax.png",
+        "vehicleType": "boats",
+        "job": "",
+        "jobOnly": false
+    },
+    {
+        "id": 10,
+        "name": "Buzzard",
+        "model": "buzzard",
+        "category": "helicopters",
+        "price": 1750000,
+        "image": "img/buzzard.png",
+        "vehicleType": "helicopters",
+        "job": "",
+        "jobOnly": false
+    },
+    {
+        "id": 11,
+        "name": "Frogger",
+        "model": "frogger",
+        "category": "helicopters",
+        "price": 1300000,
+        "image": "img/frogger.png",
+        "vehicleType": "helicopters",
+        "job": "",
+        "jobOnly": false
+    },
+    {
+        "id": 12,
+        "name": "Velum",
+        "model": "velum",
+        "category": "planes",
+        "price": 995000,
+        "image": "img/velum.png",
+        "vehicleType": "planes",
+        "job": "",
+        "jobOnly": false
+    }
+]

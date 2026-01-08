@@ -1,0 +1,102 @@
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: 'Segoe UI', Arial, sans-serif;
+    background: transparent;
+}
+
+#keys-ui {
+    position: fixed;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    z-index: 1000;
+}
+
+.keys-container {
+    background: rgba(20, 20, 20, 0.95);
+    border-radius: 10px;
+    padding: 20px;
+    min-width: 400px;
+    max-width: 500px;
+    color: #fff;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5);
+}
+
+.keys-container h2 {
+    text-align: center;
+    margin-bottom: 20px;
+    color: #4CAF50;
+}
+
+.key-item {
+    background: rgba(50, 50, 50, 0.8);
+    padding: 15px;
+    border-radius: 8px;
+    margin-bottom: 10px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.key-item .plate {
+    font-weight: bold;
+    font-size: 1.2em;
+    color: #FFD700;
+}
+
+.key-item .type {
+    font-size: 0.9em;
+    color: #888;
+}
+
+.key-item .actions {
+    display: flex;
+    gap: 8px;
+}
+
+.btn {
+    padding: 8px 16px;
+    border: none;
+    border-radius: 5px;
+    cursor: pointer;
+    font-weight: bold;
+    transition: all 0.2s;
+}
+
+.btn-lock {
+    background: #2196F3;
+    color: #fff;
+}
+
+.btn-lock:hover {
+    background: #1976D2;
+}
+
+.btn-share {
+    background: #4CAF50;
+    color: #fff;
+}
+
+.btn-share:hover {
+    background: #388E3C;
+}
+
+.btn-remove {
+    background: #f44336;
+    color: #fff;
+}
+
+.btn-remove:hover {
+    background: #d32f2f;
+}
+
+.no-keys {
+    text-align: center;
+    color: #888;
+    padding: 20px;
+}
