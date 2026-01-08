@@ -8,7 +8,7 @@ $engine: 3
 $onesync: on
 
 name: vAvA_core Framework
-version: 1.0.0
+version: 1.1.0
 author: vAvA
 description: |
     Framework FiveM modulaire, sécurisé et multilingue.
@@ -17,10 +17,16 @@ description: |
     - Système de personnages multi-personnage
     - Économie complète (cash, banque, argent sale)
     - Système de jobs
-    - Inventaire
+    - Inventaire moderne avec interface drag & drop
+    - Gestion complète des armes et munitions
+    - Hotbar (raccourcis 1-5)
     - Véhicules avec garage
     - Système de logs et sécurité
     - Support multilingue (FR, EN, ES)
+    
+    Modules inclus:
+    - vAvA_core (framework principal)
+    - vAvA_inventory (système d'inventaire)
     
     Prérequis:
     - Serveur MySQL/MariaDB
@@ -57,6 +63,13 @@ tasks:
       dest: ./resources/[vava]/vAvA_core
       ref: main
       src: https://github.com/Nicolasbriet/vAvA_core
+
+    # ═══════════════════════════════════════════════════════════════════════
+    # Copie du module d'inventaire
+    # ═══════════════════════════════════════════════════════════════════════
+    - action: move_path
+      src: ./resources/[vava]/vAvA_core/modules/inventory
+      dest: ./resources/[vava]/vAvA_inventory
 
     # ═══════════════════════════════════════════════════════════════════════
     # Configuration du serveur

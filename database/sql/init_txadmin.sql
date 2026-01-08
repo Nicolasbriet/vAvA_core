@@ -124,3 +124,28 @@ INSERT IGNORE INTO `jobs` (`name`, `label`, `grades`) VALUES
 ('police', 'Police', '[{"grade":0,"label":"Cadet","salary":500},{"grade":1,"label":"Officier","salary":750},{"grade":2,"label":"Sergent","salary":1000},{"grade":3,"label":"Lieutenant","salary":1250},{"grade":4,"label":"Chef","salary":1500}]'),
 ('ambulance', 'EMS', '[{"grade":0,"label":"Stagiaire","salary":500},{"grade":1,"label":"Ambulancier","salary":750},{"grade":2,"label":"Médecin","salary":1000},{"grade":3,"label":"Chef des urgences","salary":1250}]'),
 ('mechanic', 'Mécanicien', '[{"grade":0,"label":"Apprenti","salary":400},{"grade":1,"label":"Mécanicien","salary":600},{"grade":2,"label":"Chef atelier","salary":800}]');
+
+-- ═══════════════════════════════════════════════════════════════════════════
+-- vAvA_inventory - Tables du système d'inventaire
+-- ═══════════════════════════════════════════════════════════════════════════
+
+-- Table des inventaires joueurs
+CREATE TABLE IF NOT EXISTS `player_inventories` (
+    `id` INT AUTO_INCREMENT PRIMARY KEY,
+    `owner` VARCHAR(60) NOT NULL,
+    `items` LONGTEXT NULL,
+    `hotbar` LONGTEXT NULL,
+    `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    `updated_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    UNIQUE KEY `owner` (`owner`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Table des items au sol
+CREATE TABLE IF NOT EXISTS `dropped_items` (
+    `id` INT AUTO_INCREMENT PRIMARY KEY,
+    `item` VARCHAR(100) NOT NULL,
+    `amount` INT NOT NULL DEFAULT 1,
+    `metadata` LONGTEXT NULL,
+    `coords` VARCHAR(255) NOT NULL,
+    `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
