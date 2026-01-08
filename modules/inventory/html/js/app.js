@@ -1,7 +1,33 @@
 /**
  * vAvA Inventory - Application JavaScript
- * Gestion de l'interface NUI
+ * Gestion de l'interface NUI avec drag & drop amélioré
  */
+
+// Images par défaut en base64 SVG
+const DEFAULT_IMAGES = {
+    default: 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI2NCIgaGVpZ2h0PSI2NCIgdmlld0JveD0iMCAwIDI0IDI0IiBmaWxsPSJub25lIiBzdHJva2U9IiNhNzhjZmEiIHN0cm9rZS13aWR0aD0iMiI+PHJlY3QgeD0iMyIgeT0iMyIgd2lkdGg9IjE4IiBoZWlnaHQ9IjE4IiByeD0iMiIvPjxjaXJjbGUgY3g9IjguNSIgY3k9IjguNSIgcj0iMS41Ii8+PHBhdGggZD0ibTIxIDE1LTUtNUw1IDIxIi8+PC9zdmc+',
+    bread: 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI2NCIgaGVpZ2h0PSI2NCIgdmlld0JveD0iMCAwIDI0IDI0IiBmaWxsPSIjZjU5ZTBiIiBzdHJva2U9IiNiNDU0MDkiIHN0cm9rZS13aWR0aD0iMSI+PGVsbGlwc2UgY3g9IjEyIiBjeT0iMTQiIHJ4PSI5IiByeT0iNiIvPjxwYXRoIGQ9Ik0zIDE0VjhhOSA2IDAgMCAxIDE4IDB2NiIgZmlsbD0iI2ZiYmYyNCIvPjwvc3ZnPg==',
+    water: 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI2NCIgaGVpZ2h0PSI2NCIgdmlld0JveD0iMCAwIDI0IDI0IiBmaWxsPSIjMDZiNmQ0IiBzdHJva2U9IiMwODkxYjIiIHN0cm9rZS13aWR0aD0iMSI+PHBhdGggZD0iTTEyIDJjMCAwLTggNy00IDEyczQgMTAgNCAxMHM4LTQgNC0xMFMxMiAyIDEyIDJ6Ii8+PC9zdmc+',
+    phone: 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI2NCIgaGVpZ2h0PSI2NCIgdmlld0JveD0iMCAwIDI0IDI0IiBmaWxsPSJub25lIiBzdHJva2U9IiNhNzhjZmEiIHN0cm9rZS13aWR0aD0iMiI+PHJlY3QgeD0iNSIgeT0iMiIgd2lkdGg9IjE0IiBoZWlnaHQ9IjIwIiByeD0iMiIvPjxsaW5lIHgxPSIxMiIgeTE9IjE4IiB4Mj0iMTIuMDEiIHkyPSIxOCIvPjwvc3ZnPg==',
+    money: 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI2NCIgaGVpZ2h0PSI2NCIgdmlld0JveD0iMCAwIDI0IDI0IiBmaWxsPSIjMTBiOTgxIiBzdHJva2U9IiMwNTk2NjkiIHN0cm9rZS13aWR0aD0iMSI+PHJlY3QgeD0iMiIgeT0iNiIgd2lkdGg9IjIwIiBoZWlnaHQ9IjEyIiByeD0iMiIvPjxjaXJjbGUgY3g9IjEyIiBjeT0iMTIiIHI9IjMiIGZpbGw9IiMwNTk2NjkiLz48dGV4dCB4PSIxMiIgeT0iMTQiIHRleHQtYW5jaG9yPSJtaWRkbGUiIGZpbGw9IiMxMGI5ODEiIGZvbnQtc2l6ZT0iNiI+JDwvdGV4dD48L3N2Zz4=',
+    id_card: 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI2NCIgaGVpZ2h0PSI2NCIgdmlld0JveD0iMCAwIDI0IDI0IiBmaWxsPSJub25lIiBzdHJva2U9IiNmNTllMGIiIHN0cm9rZS13aWR0aD0iMiI+PHJlY3QgeD0iMiIgeT0iNCIgd2lkdGg9IjIwIiBoZWlnaHQ9IjE2IiByeD0iMiIvPjxjaXJjbGUgY3g9IjgiIGN5PSIxMCIgcj0iMiIvPjxwYXRoIGQ9Ik02IDE2aDRNMTQgMTBoNE0xNCAxNGg0Ii8+PC9zdmc+',
+    bandage: 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI2NCIgaGVpZ2h0PSI2NCIgdmlld0JveD0iMCAwIDI0IDI0IiBmaWxsPSIjZmVlMmUyIiBzdHJva2U9IiNlZjQ0NDQiIHN0cm9rZS13aWR0aD0iMSI+PHJlY3QgeD0iNCIgeT0iOCIgd2lkdGg9IjE2IiBoZWlnaHQ9IjgiIHJ4PSIyIi8+PGNpcmNsZSBjeD0iOSIgY3k9IjEyIiByPSIxIiBmaWxsPSIjZWY0NDQ0Ii8+PGNpcmNsZSBjeD0iMTUiIGN5PSIxMiIgcj0iMSIgZmlsbD0iI2VmNDQ0NCIvPjwvc3ZnPg==',
+    lockpick: 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI2NCIgaGVpZ2h0PSI2NCIgdmlld0JveD0iMCAwIDI0IDI0IiBmaWxsPSJub25lIiBzdHJva2U9IiM5Y2EzYWYiIHN0cm9rZS13aWR0aD0iMiI+PHBhdGggZD0iTTIgMTBoMTVhMSAxIDAgMCAxIDEgMXYyYTEgMSAwIDAgMS0xIDFIMiIvPjxwYXRoIGQ9Ik02IDEwVjdNMTAgMTBWNk0xNCAxMFY3Ii8+PC9zdmc+',
+    weapon: 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI2NCIgaGVpZ2h0PSI2NCIgdmlld0JveD0iMCAwIDI0IDI0IiBmaWxsPSJub25lIiBzdHJva2U9IiNlZjQ0NDQiIHN0cm9rZS13aWR0aD0iMiI+PHBhdGggZD0iTTIgMTRsMiAyTDIwIDJsLTIgMkw2IDE0bC0yIDJ6Ii8+PHBhdGggZD0iTTQgMjBsNC00TTEyIDEybDQgNCIvPjwvc3ZnPg==',
+    food: 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI2NCIgaGVpZ2h0PSI2NCIgdmlld0JveD0iMCAwIDI0IDI0IiBmaWxsPSIjZjU5ZTBiIiBzdHJva2U9IiNiNDU0MDkiIHN0cm9rZS13aWR0aD0iMSI+PGNpcmNsZSBjeD0iMTIiIGN5PSIxMiIgcj0iOCIvPjxwYXRoIGQ9Ik0xMiA2djEyTTYgMTJoMTIiIHN0cm9rZT0iI2I0NTQwOSIvPjwvc3ZnPg==',
+    drink: 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI2NCIgaGVpZ2h0PSI2NCIgdmlld0JveD0iMCAwIDI0IDI0IiBmaWxsPSIjMDZiNmQ0IiBzdHJva2U9IiMwODkxYjIiIHN0cm9rZS13aWR0aD0iMSI+PHBhdGggZD0iTTggMmg4bC0yIDE4SDEwTDggMnoiLz48cGF0aCBkPSJNNiAyMmgxMiIgc3Ryb2tlLXdpZHRoPSIyIi8+PC9zdmc+',
+    tool: 'data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSI2NCIgaGVpZ2h0PSI2NCIgdmlld0JveD0iMCAwIDI0IDI0IiBmaWxsPSJub25lIiBzdHJva2U9IiM5Y2EzYWYiIHN0cm9rZS13aWR0aD0iMiI+PHBhdGggZD0iTTE0LjcgNi4zYTEgMSAwIDAgMCAwIDEuNGwtNSA1YTEgMSAwIDAgMC0xLjQgMGwtMi42LTIuNmExIDEgMCAwIDAtMS40IDBMMS43IDEyLjdsLTEuNC0xLjQgMy41LTMuNWExIDEgMCAwIDEgMS40IDBsMi42IDIuNiA1LTVhMSAxIDAgMCAxIDEuNCAweiIvPjwvc3ZnPg=='
+};
+
+function getItemImage(itemName, itemType) {
+    const name = itemName?.toLowerCase() || 'default';
+    // D'abord chercher par nom
+    if (DEFAULT_IMAGES[name]) return DEFAULT_IMAGES[name];
+    // Puis par type
+    if (itemType && DEFAULT_IMAGES[itemType]) return DEFAULT_IMAGES[itemType];
+    // Sinon default
+    return DEFAULT_IMAGES.default;
+}
 
 const Inventory = {
     isOpen: false,
@@ -9,10 +35,11 @@ const Inventory = {
     hotbar: {},
     selectedItem: null,
     selectedSlot: null,
-    maxSlots: 40,
-    maxWeight: 100,
+    maxSlots: 50,
+    maxWeight: 120,
     currentWeight: 0,
     dragData: null,
+    dragSourceSlot: null,
     
     // Initialisation
     init() {
@@ -235,18 +262,25 @@ const Inventory = {
     
     // Afficher un item dans un slot
     renderItemInSlot(slot, item) {
-        const isWeapon = this.isWeapon(item.name);
+        const isWeapon = item.type === 'weapon';
+        const imgSrc = getItemImage(item.name, item.type);
         
         slot.innerHTML = `
-            <img class="item-image" src="img/items/${item.name.toLowerCase()}.png" 
-                 onerror="this.src='img/items/default.png'" alt="${item.label}">
-            ${item.amount > 1 ? `<span class="item-count">${item.amount}</span>` : ''}
+            <img class="item-image" src="${imgSrc}" alt="${item.label}" draggable="false">
+            ${item.amount > 1 ? `<span class="item-count">${this.formatNumber(item.amount)}</span>` : ''}
             <span class="item-weight">${(item.weight * item.amount).toFixed(1)}kg</span>
         `;
         
         if (isWeapon) {
             slot.classList.add('weapon');
         }
+    },
+    
+    // Formater les grands nombres
+    formatNumber(num) {
+        if (num >= 1000000) return (num / 1000000).toFixed(1) + 'M';
+        if (num >= 1000) return (num / 1000).toFixed(1) + 'k';
+        return num;
     },
     
     // Mettre à jour le poids
@@ -276,13 +310,14 @@ const Inventory = {
         document.querySelectorAll('#hotbar .hotbar-slot').forEach(slot => {
             const slotNum = parseInt(slot.dataset.slot);
             const itemContainer = slot.querySelector('.hotbar-item');
-            const item = hotbar[slotNum];
+            const invSlot = hotbar[slotNum];
+            const item = invSlot ? this.getItemBySlot(invSlot) : null;
             
             if (item) {
+                const imgSrc = getItemImage(item.name, item.type);
                 itemContainer.innerHTML = `
-                    <img src="img/items/${item.name.toLowerCase()}.png" 
-                         onerror="this.src='img/items/default.png'" alt="${item.label}">
-                    ${item.amount > 1 ? `<span class="item-count">${item.amount}</span>` : ''}
+                    <img src="${imgSrc}" alt="${item.label}">
+                    ${item.amount > 1 ? `<span class="item-count">${this.formatNumber(item.amount)}</span>` : ''}
                 `;
             } else {
                 itemContainer.innerHTML = '';
@@ -293,13 +328,14 @@ const Inventory = {
         document.querySelectorAll('#inventory-hotbar-slots .hotbar-slot').forEach(slot => {
             const slotNum = parseInt(slot.dataset.slot);
             const itemContainer = slot.querySelector('.hotbar-item');
-            const item = hotbar[slotNum];
+            const invSlot = hotbar[slotNum];
+            const item = invSlot ? this.getItemBySlot(invSlot) : null;
             
             if (item) {
+                const imgSrc = getItemImage(item.name, item.type);
                 itemContainer.innerHTML = `
-                    <img src="img/items/${item.name.toLowerCase()}.png" 
-                         onerror="this.src='img/items/default.png'" alt="${item.label}">
-                    ${item.amount > 1 ? `<span class="item-count">${item.amount}</span>` : ''}
+                    <img src="${imgSrc}" alt="${item.label}">
+                    ${item.amount > 1 ? `<span class="item-count">${this.formatNumber(item.amount)}</span>` : ''}
                 `;
             } else {
                 itemContainer.innerHTML = '';
@@ -348,11 +384,10 @@ const Inventory = {
         document.getElementById('item-name').textContent = item.label;
         document.getElementById('item-description').textContent = item.description || 'Aucune description';
         document.getElementById('item-weight').textContent = `${(item.weight * item.amount).toFixed(2)} kg`;
-        document.getElementById('item-amount').textContent = item.amount;
+        document.getElementById('item-amount').textContent = this.formatNumber(item.amount);
         
         const preview = document.getElementById('preview-image');
-        preview.src = `img/items/${item.name.toLowerCase()}.png`;
-        preview.onerror = () => preview.src = 'img/items/default.png';
+        preview.src = getItemImage(item.name, item.type);
         
         document.getElementById('item-actions').classList.remove('hidden');
     },
@@ -371,7 +406,7 @@ const Inventory = {
         document.getElementById('item-actions').classList.add('hidden');
     },
     
-    // Drag & Drop
+    // Drag & Drop amélioré
     onDragStart(slotNum, event) {
         const item = this.getItemBySlot(slotNum);
         if (!item) {
@@ -380,52 +415,87 @@ const Inventory = {
         }
         
         this.dragData = item;
-        event.target.classList.add('dragging');
+        this.dragSourceSlot = slotNum;
         
-        // Ghost image
+        const slot = event.target.closest('.inventory-slot');
+        slot.classList.add('dragging');
+        
+        // Créer ghost image personnalisé
         const ghost = document.createElement('div');
-        ghost.className = 'drag-preview';
-        ghost.innerHTML = `<img src="img/items/${item.name.toLowerCase()}.png" 
-                               onerror="this.src='img/items/default.png'">`;
+        ghost.className = 'drag-ghost';
+        ghost.innerHTML = `<img src="${getItemImage(item.name, item.type)}">`;
+        ghost.style.cssText = 'position:fixed;top:-100px;left:-100px;width:50px;height:50px;pointer-events:none;opacity:0.8;z-index:9999;';
         document.body.appendChild(ghost);
         event.dataTransfer.setDragImage(ghost, 25, 25);
+        event.dataTransfer.effectAllowed = 'move';
         
         setTimeout(() => ghost.remove(), 0);
     },
     
     onDragEnd(event) {
         this.dragData = null;
+        this.dragSourceSlot = null;
         document.querySelectorAll('.inventory-slot').forEach(s => {
-            s.classList.remove('dragging', 'drag-over');
+            s.classList.remove('dragging', 'drag-over', 'drag-target');
         });
     },
     
     onDragOver(slotNum, event) {
         event.preventDefault();
-        if (this.dragData) {
-            event.target.closest('.inventory-slot').classList.add('drag-over');
+        event.dataTransfer.dropEffect = 'move';
+        
+        if (this.dragData && slotNum !== this.dragSourceSlot) {
+            const slot = event.target.closest('.inventory-slot');
+            if (slot && !slot.classList.contains('drag-over')) {
+                document.querySelectorAll('.inventory-slot').forEach(s => s.classList.remove('drag-over'));
+                slot.classList.add('drag-over');
+            }
         }
     },
     
     onDragLeave(event) {
-        event.target.closest('.inventory-slot')?.classList.remove('drag-over');
+        const slot = event.target.closest('.inventory-slot');
+        if (slot) {
+            slot.classList.remove('drag-over');
+        }
     },
     
     onDrop(slotNum, event) {
         event.preventDefault();
-        const slot = event.target.closest('.inventory-slot');
-        slot?.classList.remove('drag-over');
+        document.querySelectorAll('.inventory-slot').forEach(s => {
+            s.classList.remove('drag-over', 'dragging');
+        });
         
-        if (!this.dragData) return;
+        if (!this.dragData || !this.dragSourceSlot) return;
         
-        const fromSlot = this.dragData.slot;
+        const fromSlot = this.dragSourceSlot;
         const toSlot = slotNum;
         
         if (fromSlot !== toSlot) {
-            this.moveItem(fromSlot, toSlot, this.dragData.amount);
+            // Animation visuelle locale immédiate
+            this.swapSlotsVisually(fromSlot, toSlot);
+            // Envoyer au serveur
+            this.moveItem(fromSlot, toSlot);
         }
         
         this.dragData = null;
+        this.dragSourceSlot = null;
+    },
+    
+    // Swap visuel immédiat pour feedback utilisateur
+    swapSlotsVisually(fromSlot, toSlot) {
+        const fromItem = this.getItemBySlot(fromSlot);
+        const toItem = this.getItemBySlot(toSlot);
+        
+        // Mettre à jour le tableau local
+        this.items = this.items.map(item => {
+            if (item.slot === fromSlot) return { ...item, slot: toSlot };
+            if (item.slot === toSlot) return { ...item, slot: fromSlot };
+            return item;
+        });
+        
+        // Re-render
+        this.renderItems();
     },
     
     // Actions
