@@ -94,7 +94,7 @@ end
 ---Affiche l'overlay de debug
 CreateThread(function()
     while true do
-        Wait(0)
+        Wait(500) -- Changé de 0 à 500 pour éviter freeze serveur
         
         if debugMode and debugOverlay then
             local ped = PlayerPedId()

@@ -91,9 +91,10 @@ end)
 
 CreateThread(function()
     while true do
-        Wait(0)
-        
-        if Config.HUD.Minimap.enabled then
+        if not Config.HUD.Minimap.enabled then
+            Wait(1000) -- Attendre si désactivé
+        else
+            Wait(100) -- 10 FPS suffisent pour la minimap
             -- Forcer l'affichage de la minimap
             if not IsPauseMenuActive() then
                 SetRadarBigmapEnabled(false, false)
@@ -121,9 +122,10 @@ end)
 
 CreateThread(function()
     while true do
-        Wait(0)
-        
-        if Config.HUD.Enabled then
+        if not Config.HUD.Enabled then
+            Wait(1000) -- Attendre si désactivé
+        else
+            Wait(0) -- Nécessaire pour HideHudComponentThisFrame
             -- Cacher les éléments natifs du HUD
             HideHudComponentThisFrame(1)  -- Wanted Stars
             HideHudComponentThisFrame(2)  -- Weapon Icon
