@@ -589,12 +589,14 @@ const Inventory = {
     
     // Définir un raccourci hotbar
     setHotbar(slot, item) {
+        if (!item || !item.slot) return; // Protection null
+        
         fetch('https://vAvA_inventory/setHotbar', {
             method: 'POST',
-            body: JSON.stringify({ slot: slot, item: item })
+            body: JSON.stringify({ slot: slot, itemSlot: item.slot })
         });
         
-        this.hotbar[slot] = item;
+        this.hotbar[slot] = item.slot;
         this.updateHotbar(this.hotbar);
     },
     

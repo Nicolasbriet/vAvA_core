@@ -462,9 +462,11 @@ RegisterNetEvent('vAvA_inventory:setHotbar')
 AddEventHandler('vAvA_inventory:setHotbar', function(hSlot, iSlot)
     local identifier = GetIdentifier(source)
     if not identifier then return end
+    if not hSlot or not iSlot then return end -- Protection null
+    
     Cache.hotbars[identifier] = Cache.hotbars[identifier] or {}
     Cache.hotbars[identifier][hSlot] = iSlot
-    MySQL.Async.execute('REPLACE INTO player_hotbar VALUES (?, ?, ?)', {identifier, hSlot, iSlot})
+    MySQL.Async.execute('REPLACE INTO player_hotbar (owner, slot, inventory_slot) VALUES (?, ?, ?)', {identifier, hSlot, iSlot})
 end)
 
 RegisterNetEvent('vAvA_inventory:useHotbar')
