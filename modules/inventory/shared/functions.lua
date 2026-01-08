@@ -18,12 +18,17 @@ Inventory.Categories = {
 function Inventory.IsWeapon(itemName)
     if not itemName then return false end
     local name = string.lower(itemName)
-    return string.find(name, 'weapon_') ~= nil or InventoryConfig.WeaponsList[name] ~= nil
+    if string.find(name, 'weapon_') then return true end
+    if InventoryConfig and InventoryConfig.WeaponsList and InventoryConfig.WeaponsList[name] then
+        return true
+    end
+    return false
 end
 
 -- Récupère les infos d'une arme
 function Inventory.GetWeaponData(weaponName)
     if not weaponName then return nil end
+    if not InventoryConfig or not InventoryConfig.WeaponsList then return nil end
     return InventoryConfig.WeaponsList[string.lower(weaponName)]
 end
 
@@ -49,6 +54,7 @@ end
 
 -- Obtient le nom propre d'une arme depuis son hash
 function Inventory.GetWeaponNameFromHash(hash)
+    if not InventoryConfig or not InventoryConfig.WeaponsList then return nil end
     for name, _ in pairs(InventoryConfig.WeaponsList) do
         if joaat(string.upper(name)) == hash then
             return name

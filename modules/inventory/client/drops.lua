@@ -99,7 +99,7 @@ CreateThread(function()
         
         local playerCoords = GetEntityCoords(PlayerPedId())
         local nearestDrop = nil
-        local nearestDistance = InventoryConfig.Drops.pickupDistance
+        local nearestDistance = (InventoryConfig and InventoryConfig.Drops and InventoryConfig.Drops.pickupDistance) or 2.0
         
         for id, drop in pairs(droppedItems) do
             local distance = #(playerCoords - drop.coords)
@@ -148,16 +148,22 @@ function HidePickupPrompt()
 end
 
 function GetItemLabel(itemName)
+    if not itemName then return 'Item' end
+    
     -- Vérifier dans les armes
-    local weaponData = InventoryConfig.Weapons.list[string.lower(itemName)]
-    if weaponData then
-        return weaponData.label
+    if InventoryConfig and InventoryConfig.WeaponsList then
+        local weaponData = InventoryConfig.WeaponsList[string.lower(itemName)]
+        if weaponData then
+            return weaponData.label
+        end
     end
     
     -- Vérifier dans les munitions
-    local ammoData = InventoryConfig.AmmoItems[string.lower(itemName)]
-    if ammoData then
-        return ammoData.label
+    if InventoryConfig and InventoryConfig.AmmoItems then
+        local ammoData = InventoryConfig.AmmoItems[string.lower(itemName)]
+        if ammoData then
+            return ammoData.label
+        end
     end
     
     return itemName
@@ -202,16 +208,14 @@ CreateThread(function()
     local rotSpeed = 0.5
     
     while true do
-        Wait(0)
+        Wait(100) -- Attendre 100ms pour éviter de surcharger
         
         for id, drop in pairs(droppedItems) do
-            if DoesEntityExist(drop.object) then
+            if drop and drop.object and DoesEntityExist(drop.object) then
                 local heading = GetEntityHeading(drop.object)
                 SetEntityHeading(drop.object, heading + rotSpeed)
             end
         end
-        
-        Wait(50)
     end
 end)
 
