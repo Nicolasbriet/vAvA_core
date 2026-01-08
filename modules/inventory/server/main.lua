@@ -69,7 +69,7 @@ CreateThread(function()
     
     Wait(1000)
     
-    -- Creer items de base s'ils n'existent pas
+    -- Items de base - ajouter directement au cache ET BDD
     local defaultItems = {
         {name='bread', label='Pain', weight=0.2, max_stack=50, type='food'},
         {name='water', label='Bouteille d\'eau', weight=0.3, max_stack=50, type='drink'},
@@ -80,23 +80,23 @@ CreateThread(function()
         {name='lockpick', label='Crochet', weight=0.1, max_stack=5, type='tool'}
     }
     
+    -- Charger IMMEDIATEMENT dans le cache
     for _, item in ipairs(defaultItems) do
+        Cache.items[item.name] = {
+            name = item.name,
+            label = item.label,
+            weight = item.weight,
+            max_stack = item.max_stack,
+            type = item.type
+        }
+        -- Aussi sauvegarder en BDD
         MySQL.Async.execute(
             'INSERT IGNORE INTO inventory_items (name, label, weight, max_stack, type) VALUES (?, ?, ?, ?, ?)',
             {item.name, item.label, item.weight, item.max_stack, item.type}
         )
     end
     
-    Wait(500)
-    
-    -- Charger tous les items en cache
-    MySQL.Async.fetchAll('SELECT * FROM inventory_items', {}, function(items)
-        for _, item in ipairs(items or {}) do
-            Cache.items[item.name] = item
-        end
-        print('^2[vAvA_inventory]^7 ' .. #(items or {}) .. ' items en cache')
-    end)
-    
+    print('^2[vAvA_inventory]^7 ' .. #defaultItems .. ' items charges')
     print('^2[vAvA_inventory]^7 Systeme initialise')
 end)
 
