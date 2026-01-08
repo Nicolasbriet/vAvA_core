@@ -482,6 +482,101 @@ AddEventHandler('vAvA_inventory:useHotbar', function(hSlot)
 end)
 
 -- ═══════════════════════════════════════════════════════════════════════════
+-- GIVE ITEM (transfert entre joueurs)
+-- ═══════════════════════════════════════════════════════════════════════════
+
+RegisterNetEvent('vAvA_inventory:giveItem')
+AddEventHandler('vAvA_inventory:giveItem', function(targetId, slot, amount)
+    local src = source
+    local srcIdentifier = GetIdentifier(src)
+    local tgtIdentifier = GetIdentifier(targetId)
+    
+    if not srcIdentifier or not tgtIdentifier then
+        TriggerClientEvent('vAvA_inventory:notify', src, 'Joueur introuvable')
+        return
+    end
+    
+    local srcInv = Cache.inventories[srcIdentifier]
+    if not srcInv or not srcInv[slot] then
+        TriggerClientEvent('vAvA_inventory:notify', src, 'Item introuvable')
+        return
+    end
+    
+    local item = srcInv[slot]
+    local giveAmount = math.min(amount or item.amount, item.amount)
+    
+    -- Ajouter à la cible
+    local itemData = Cache.items[item.name]
+    if not itemData then
+        TriggerClientEvent('vAvA_inventory:notify', src, 'Données item introuvables')
+        return
+    end
+    
+    -- Charger inventaire cible si pas en cache
+    if not Cache.inventories[tgtIdentifier] then
+        Cache.inventories[tgtIdentifier] = {}
+    end
+    
+    local tgtInv = Cache.inventories[tgtIdentifier]
+    
+    -- Chercher slot pour stacker chez la cible
+    local targetSlot = nil
+    for s, itm in pairs(tgtInv) do
+        if itm.name == item.name and itm.amount + giveAmount <= (itemData.max_stack or 99) then
+            targetSlot = s
+            break
+        end
+    end
+    
+    if targetSlot then
+        tgtInv[targetSlot].amount = tgtInv[targetSlot].amount + giveAmount
+        MySQL.Async.execute('UPDATE player_inventories SET amount = ? WHERE owner = ? AND slot = ?', 
+            {tgtInv[targetSlot].amount, tgtIdentifier, targetSlot})
+    else
+        -- Trouver slot libre chez la cible
+        local freeSlot = nil
+        for i = 1, 50 do
+            if not tgtInv[i] then freeSlot = i break end
+        end
+        
+        if not freeSlot then
+            TriggerClientEvent('vAvA_inventory:notify', src, 'Inventaire du joueur plein')
+            return
+        end
+        
+        tgtInv[freeSlot] = {
+            name = item.name,
+            label = item.label,
+            amount = giveAmount,
+            weight = item.weight,
+            type = item.type,
+            maxStack = item.maxStack
+        }
+        
+        MySQL.Async.execute('INSERT INTO player_inventories (owner, slot, item_name, amount) VALUES (?, ?, ?, ?)',
+            {tgtIdentifier, freeSlot, item.name, giveAmount})
+    end
+    
+    -- Retirer du donneur
+    if item.amount <= giveAmount then
+        srcInv[slot] = nil
+        MySQL.Async.execute('DELETE FROM player_inventories WHERE owner = ? AND slot = ?', {srcIdentifier, slot})
+    else
+        item.amount = item.amount - giveAmount
+        MySQL.Async.execute('UPDATE player_inventories SET amount = ? WHERE owner = ? AND slot = ?', 
+            {item.amount, srcIdentifier, slot})
+    end
+    
+    -- Notifications
+    TriggerClientEvent('vAvA_inventory:notify', src, 'Donné ' .. giveAmount .. 'x ' .. item.label)
+    TriggerClientEvent('vAvA_inventory:notify', targetId, 'Reçu ' .. giveAmount .. 'x ' .. item.label)
+    
+    -- Updates
+    SendUpdate(src, srcIdentifier)
+    SendUpdate(targetId, tgtIdentifier)
+end)
+
+-- ═══════════════════════════════════════════════════════════════════════════
 -- COMMANDES ADMIN
 -- ═══════════════════════════════════════════════════════════════════════════
 

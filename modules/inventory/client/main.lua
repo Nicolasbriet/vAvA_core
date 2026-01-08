@@ -134,9 +134,11 @@ RegisterNUICallback('setHotbar', function(data, cb) TriggerServerEvent('vAvA_inv
 RegisterNUICallback('splitStack', function(data, cb) TriggerServerEvent('vAvA_inventory:splitStack', data.slot, data.amount) cb('ok') end)
 
 RegisterNUICallback('giveItem', function(data, cb)
-    local closestPlayer = GetClosestPlayer()
+    local closestPlayer, distance = GetClosestPlayer()
     if closestPlayer then
         TriggerServerEvent('vAvA_inventory:giveItem', GetPlayerServerId(closestPlayer), data.slot, data.amount)
+    else
+        TriggerEvent('vAvA_inventory:notify', 'Aucun joueur à proximité', 'error')
     end
     cb('ok')
 end)
@@ -159,7 +161,7 @@ function GetClosestPlayer()
             end
         end
     end
-    return closestPlayer
+    return closestPlayer, closestDistance
 end
 
 exports('IsInventoryOpen', function() return isOpen end)

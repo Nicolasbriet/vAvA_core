@@ -152,6 +152,18 @@ const Inventory = {
         // Modal quantité
         document.querySelector('.modal-close').addEventListener('click', () => this.hideModal());
         document.querySelector('.modal-btn.cancel').addEventListener('click', () => this.hideModal());
+
+        // Modal hotbar
+        document.querySelector('.hotbar-modal-close').addEventListener('click', () => this.hideHotbarModal());
+        document.querySelectorAll('.hotbar-option').forEach(btn => {
+            btn.addEventListener('click', (e) => {
+                const slot = parseInt(e.currentTarget.dataset.slot);
+                if (this.selectedItem) {
+                    this.setHotbar(slot, this.selectedItem);
+                }
+                this.hideHotbarModal();
+            });
+        });
         
         // Slider quantité
         const slider = document.getElementById('amount-slider');
@@ -411,14 +423,18 @@ const Inventory = {
         const item = this.getItemBySlot(slotNum);
         if (!item) {
             event.preventDefault();
-            return;
+            return false;
         }
         
         this.dragData = item;
         this.dragSourceSlot = slotNum;
         
-        const slot = event.target.closest('.inventory-slot');
+        const slot = event.currentTarget;
         slot.classList.add('dragging');
+        
+        // Data transfer pour le drag
+        event.dataTransfer.setData('text/plain', slotNum.toString());
+        event.dataTransfer.effectAllowed = 'move';
         
         // Créer ghost image personnalisé
         const ghost = document.createElement('div');
@@ -427,9 +443,8 @@ const Inventory = {
         ghost.style.cssText = 'position:fixed;top:-100px;left:-100px;width:50px;height:50px;pointer-events:none;opacity:0.8;z-index:9999;';
         document.body.appendChild(ghost);
         event.dataTransfer.setDragImage(ghost, 25, 25);
-        event.dataTransfer.effectAllowed = 'move';
         
-        setTimeout(() => ghost.remove(), 0);
+        setTimeout(() => ghost.remove(), 100);
     },
     
     onDragEnd(event) {
@@ -442,10 +457,11 @@ const Inventory = {
     
     onDragOver(slotNum, event) {
         event.preventDefault();
+        event.stopPropagation();
         event.dataTransfer.dropEffect = 'move';
         
         if (this.dragData && slotNum !== this.dragSourceSlot) {
-            const slot = event.target.closest('.inventory-slot');
+            const slot = event.currentTarget;
             if (slot && !slot.classList.contains('drag-over')) {
                 document.querySelectorAll('.inventory-slot').forEach(s => s.classList.remove('drag-over'));
                 slot.classList.add('drag-over');
@@ -454,7 +470,8 @@ const Inventory = {
     },
     
     onDragLeave(event) {
-        const slot = event.target.closest('.inventory-slot');
+        event.preventDefault();
+        const slot = event.currentTarget;
         if (slot) {
             slot.classList.remove('drag-over');
         }
@@ -462,6 +479,8 @@ const Inventory = {
     
     onDrop(slotNum, event) {
         event.preventDefault();
+        event.stopPropagation();
+        
         document.querySelectorAll('.inventory-slot').forEach(s => {
             s.classList.remove('drag-over', 'dragging');
         });
@@ -470,6 +489,8 @@ const Inventory = {
         
         const fromSlot = this.dragSourceSlot;
         const toSlot = slotNum;
+        
+        console.log('[vAvA_inventory] Move:', fromSlot, '->', toSlot);
         
         if (fromSlot !== toSlot) {
             // Animation visuelle locale immédiate
@@ -518,13 +539,8 @@ const Inventory = {
                 }
                 break;
             case 'hotbar':
-                // Assigner au premier slot libre
-                for (let i = 1; i <= 5; i++) {
-                    if (!this.hotbar[i]) {
-                        this.setHotbar(i, this.selectedItem);
-                        break;
-                    }
-                }
+                // Ouvrir la modal pour choisir le slot
+                this.showHotbarModal();
                 break;
         }
     },
@@ -545,9 +561,10 @@ const Inventory = {
     
     // Utiliser un item
     useItem(item) {
+        if (!item || !item.slot) return;
         fetch('https://vAvA_inventory/useItem', {
             method: 'POST',
-            body: JSON.stringify({ item: item })
+            body: JSON.stringify({ slot: item.slot })
         });
     },
     
@@ -674,6 +691,18 @@ const Inventory = {
     
     hideModal() {
         document.getElementById('amount-modal').classList.add('hidden');
+    },
+
+    // Modal de sélection hotbar
+    showHotbarModal() {
+        if (!this.selectedItem) return;
+        
+        const modal = document.getElementById('hotbar-modal');
+        modal.classList.remove('hidden');
+    },
+
+    hideHotbarModal() {
+        document.getElementById('hotbar-modal').classList.add('hidden');
     },
     
     // Helpers

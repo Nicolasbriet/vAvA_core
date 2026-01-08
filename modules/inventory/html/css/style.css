@@ -882,3 +882,63 @@ body {
         min-width: auto;
     }
 }
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   HOTBAR SELECTION MODAL
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+#hotbar-modal .modal-content.hotbar-selector {
+    max-width: 350px;
+}
+
+.hotbar-options {
+    display: flex;
+    gap: 12px;
+    justify-content: center;
+    padding: 20px 0;
+}
+
+.hotbar-option {
+    width: 60px;
+    height: 60px;
+    background: var(--bg-slot);
+    border: 2px solid var(--glass-border);
+    border-radius: 12px;
+    cursor: pointer;
+    transition: all var(--transition-fast);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.hotbar-option:hover {
+    background: var(--primary);
+    border-color: var(--primary-light);
+    transform: scale(1.1);
+    box-shadow: var(--shadow-glow);
+}
+
+.hotbar-option .key {
+    font-family: 'Rajdhani', sans-serif;
+    font-size: 24px;
+    font-weight: 700;
+    color: var(--text-primary);
+}
+
+.hotbar-option:hover .key {
+    color: white;
+}
+
+.hotbar-modal-close {
+    background: transparent;
+    border: none;
+    color: var(--text-secondary);
+    cursor: pointer;
+    padding: 5px;
+    font-size: 16px;
+    transition: var(--transition-fast);
+}
+
+.hotbar-modal-close:hover {
+    color: var(--danger);
+}
