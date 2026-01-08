@@ -1,0 +1,26 @@
+{
+    "name": "vAvA_core Framework",
+    "version": "1.0.0",
+    "author": "vAvA",
+    "description": "Framework FiveM modulaire, sécurisé et multilingue",
+    "keywords": ["framework", "roleplay", "french", "fivem"],
+    "homepage": "",
+    "license": "MIT",
+    "fxserver": {
+        "minVersion": 5000
+    },
+    "dependencies": {
+        "oxmysql": "^2.7.0"
+    },
+    "files": [
+        "client/**/*",
+        "config/**/*",
+        "database/**/*",
+        "html/**/*",
+        "locales/**/*",
+        "server/**/*",
+        "shared/**/*",
+        "utils/**/*",
+        "fxmanifest.lua"
+    ]
+}

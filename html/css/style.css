@@ -1,0 +1,439 @@
+/* ═══════════════════════════════════════════════════════════════════════════
+   vAvA_core - Styles HUD
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    font-family: 'Roboto', sans-serif;
+    overflow: hidden;
+    background: transparent;
+    color: white;
+}
+
+.hidden {
+    display: none !important;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   STATUS HUD
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+.hud-container {
+    position: fixed;
+    bottom: 20px;
+    left: 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.status-bar {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    background: rgba(0, 0, 0, 0.6);
+    padding: 8px 12px;
+    border-radius: 8px;
+    backdrop-filter: blur(5px);
+    transition: all 0.3s ease;
+}
+
+.status-bar:hover {
+    transform: translateX(5px);
+}
+
+.status-icon {
+    width: 24px;
+    height: 24px;
+    color: #e74c3c;
+}
+
+.status-icon.armor { color: #3498db; }
+.status-icon.hunger { color: #f39c12; }
+.status-icon.thirst { color: #00bcd4; }
+.status-icon.stress { color: #9b59b6; }
+
+.status-progress {
+    width: 120px;
+    height: 8px;
+    background: rgba(255, 255, 255, 0.2);
+    border-radius: 4px;
+    overflow: hidden;
+}
+
+.status-fill {
+    height: 100%;
+    background: linear-gradient(90deg, #e74c3c, #c0392b);
+    border-radius: 4px;
+    transition: width 0.3s ease;
+}
+
+.status-fill.armor {
+    background: linear-gradient(90deg, #3498db, #2980b9);
+}
+
+.status-fill.hunger {
+    background: linear-gradient(90deg, #f39c12, #d68910);
+}
+
+.status-fill.thirst {
+    background: linear-gradient(90deg, #00bcd4, #00838f);
+}
+
+.status-fill.stress {
+    background: linear-gradient(90deg, #9b59b6, #8e44ad);
+}
+
+.status-value {
+    font-size: 14px;
+    font-weight: 500;
+    min-width: 30px;
+    text-align: right;
+}
+
+/* État critique */
+.status-bar.critical .status-fill {
+    animation: pulse 0.5s infinite;
+}
+
+@keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.5; }
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   MONEY HUD
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+.money-container {
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    align-items: flex-end;
+}
+
+.money-item {
+    background: rgba(0, 0, 0, 0.6);
+    padding: 10px 16px;
+    border-radius: 8px;
+    backdrop-filter: blur(5px);
+    display: flex;
+    flex-direction: column;
+    align-items: flex-end;
+    min-width: 150px;
+    border-left: 3px solid #2ecc71;
+}
+
+.money-item.bank {
+    border-left-color: #3498db;
+}
+
+.money-label {
+    font-size: 11px;
+    text-transform: uppercase;
+    color: rgba(255, 255, 255, 0.7);
+    letter-spacing: 1px;
+}
+
+.money-value {
+    font-size: 22px;
+    font-weight: 700;
+    color: #2ecc71;
+}
+
+.money-item.bank .money-value {
+    color: #3498db;
+}
+
+/* Animation changement d'argent */
+.money-item.increase .money-value {
+    animation: moneyIncrease 0.5s ease;
+}
+
+.money-item.decrease .money-value {
+    animation: moneyDecrease 0.5s ease;
+}
+
+@keyframes moneyIncrease {
+    0% { color: #2ecc71; transform: scale(1); }
+    50% { color: #27ae60; transform: scale(1.2); }
+    100% { color: #2ecc71; transform: scale(1); }
+}
+
+@keyframes moneyDecrease {
+    0% { color: #e74c3c; transform: scale(1); }
+    50% { color: #c0392b; transform: scale(1.2); }
+    100% { color: inherit; transform: scale(1); }
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   VEHICLE HUD
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+.vehicle-container {
+    position: fixed;
+    bottom: 20px;
+    right: 20px;
+    display: flex;
+    gap: 20px;
+    align-items: flex-end;
+}
+
+.vehicle-speedometer {
+    position: relative;
+}
+
+.speed-circle {
+    position: relative;
+    width: 120px;
+    height: 120px;
+}
+
+.speed-circle svg {
+    transform: rotate(-90deg);
+}
+
+.speed-bg {
+    fill: none;
+    stroke: rgba(255, 255, 255, 0.2);
+    stroke-width: 8;
+}
+
+.speed-fill {
+    fill: none;
+    stroke: #2ecc71;
+    stroke-width: 8;
+    stroke-linecap: round;
+    stroke-dasharray: 314;
+    stroke-dashoffset: 314;
+    transition: stroke-dashoffset 0.3s ease, stroke 0.3s ease;
+}
+
+.speed-value {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    text-align: center;
+}
+
+.speed-value span {
+    font-size: 28px;
+    font-weight: 700;
+    display: block;
+}
+
+.speed-value small {
+    font-size: 10px;
+    color: rgba(255, 255, 255, 0.7);
+}
+
+.vehicle-info {
+    background: rgba(0, 0, 0, 0.6);
+    padding: 15px;
+    border-radius: 8px;
+    backdrop-filter: blur(5px);
+}
+
+.fuel-bar {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 10px;
+}
+
+.fuel-icon {
+    font-size: 18px;
+}
+
+.fuel-progress {
+    width: 100px;
+    height: 8px;
+    background: rgba(255, 255, 255, 0.2);
+    border-radius: 4px;
+    overflow: hidden;
+}
+
+.fuel-fill {
+    height: 100%;
+    background: linear-gradient(90deg, #f39c12, #d68910);
+    border-radius: 4px;
+    transition: width 0.3s ease;
+}
+
+.fuel-fill.low {
+    background: linear-gradient(90deg, #e74c3c, #c0392b);
+    animation: pulse 0.5s infinite;
+}
+
+.fuel-value {
+    font-size: 12px;
+    min-width: 35px;
+}
+
+.vehicle-status {
+    display: flex;
+    gap: 15px;
+}
+
+.status-item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+}
+
+.status-item .label {
+    font-size: 10px;
+    color: rgba(255, 255, 255, 0.6);
+    text-transform: uppercase;
+}
+
+.status-item .value {
+    font-size: 14px;
+    font-weight: 500;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   NOTIFICATIONS
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+#notifications-container {
+    position: fixed;
+    top: 50%;
+    right: 20px;
+    transform: translateY(-50%);
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    max-width: 350px;
+    z-index: 1000;
+}
+
+.notification {
+    background: rgba(0, 0, 0, 0.85);
+    padding: 15px 20px;
+    border-radius: 8px;
+    backdrop-filter: blur(10px);
+    border-left: 4px solid #3498db;
+    animation: slideIn 0.3s ease;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+.notification.fadeOut {
+    animation: slideOut 0.3s ease forwards;
+}
+
+.notification.success { border-left-color: #2ecc71; }
+.notification.error { border-left-color: #e74c3c; }
+.notification.warning { border-left-color: #f39c12; }
+.notification.info { border-left-color: #3498db; }
+
+.notification-icon {
+    font-size: 24px;
+}
+
+.notification.success .notification-icon::before { content: '✓'; color: #2ecc71; }
+.notification.error .notification-icon::before { content: '✕'; color: #e74c3c; }
+.notification.warning .notification-icon::before { content: '⚠'; color: #f39c12; }
+.notification.info .notification-icon::before { content: 'ℹ'; color: #3498db; }
+
+.notification-content {
+    flex: 1;
+}
+
+.notification-title {
+    font-size: 14px;
+    font-weight: 600;
+    margin-bottom: 4px;
+}
+
+.notification-message {
+    font-size: 13px;
+    color: rgba(255, 255, 255, 0.8);
+    line-height: 1.4;
+}
+
+@keyframes slideIn {
+    from {
+        opacity: 0;
+        transform: translateX(100px);
+    }
+    to {
+        opacity: 1;
+        transform: translateX(0);
+    }
+}
+
+@keyframes slideOut {
+    from {
+        opacity: 1;
+        transform: translateX(0);
+    }
+    to {
+        opacity: 0;
+        transform: translateX(100px);
+    }
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   PROGRESS BAR
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+#progress-container {
+    position: fixed;
+    bottom: 50%;
+    left: 50%;
+    transform: translate(-50%, 50%);
+    width: 300px;
+}
+
+.progress-bar {
+    background: rgba(0, 0, 0, 0.8);
+    padding: 20px;
+    border-radius: 10px;
+    text-align: center;
+}
+
+.progress-fill {
+    height: 10px;
+    background: linear-gradient(90deg, #3498db, #2980b9);
+    border-radius: 5px;
+    margin-bottom: 10px;
+    transition: width 0.1s linear;
+}
+
+.progress-label {
+    font-size: 14px;
+    color: rgba(255, 255, 255, 0.9);
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   RESPONSIVE
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+@media (max-width: 1920px) {
+    .hud-container {
+        bottom: 15px;
+        left: 15px;
+    }
+    
+    .money-container {
+        top: 15px;
+        right: 15px;
+    }
+    
+    .vehicle-container {
+        bottom: 15px;
+        right: 15px;
+    }
+}

@@ -1,0 +1,5 @@
+-- Configuration MySQL générée par l'installateur 
+ 
+set mysql_connection_string "mysql://root:@localhost/fivem?charset=utf8mb4" 
+ 
+-- À ajouter dans votre server.cfg 

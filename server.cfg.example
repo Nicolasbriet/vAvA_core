@@ -1,0 +1,36 @@
+# ═══════════════════════════════════════════════════════════════════════════
+# vAvA_core - Configuration Serveur
+# Généré par l'installateur
+# ═══════════════════════════════════════════════════════════════════════════
+
+# Informations serveur
+sv_hostname "vAvA_core"
+sv_maxclients 32
+
+# Endpoints
+endpoint_add_tcp "0.0.0.0:30120"
+endpoint_add_udp "0.0.0.0:30120"
+
+# Clé de licence (https://keymaster.fivem.net/)
+sv_licenseKey "cfxk_9qTqGoK3WUyyRWYgHGDt_hkich"
+
+# Base de données MySQL
+set mysql_connection_string "mysql://root:@localhost/fivem?charset=utf8mb4"
+
+# Ressources de base
+ensure mapmanager
+ensure chat
+ensure spawnmanager
+ensure sessionmanager
+ensure basic-gamemode
+ensure hardcap
+
+# oxmysql (requis)
+ensure oxmysql
+
+# vAvA_core
+ensure vAvA_core
+
+# Sécurité
+sv_scriptHookAllowed 0
+sv_enableNetworkedPhoneExplosions 0

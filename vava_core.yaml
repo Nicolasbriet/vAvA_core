@@ -1,0 +1,157 @@
+# ═══════════════════════════════════════════════════════════════════════════
+# vAvA_core - Recipe txAdmin
+# Framework FiveM modulaire, sécurisé et multilingue
+# Version: 1.0.0
+# ═══════════════════════════════════════════════════════════════════════════
+
+$engine: 3
+
+name: vAvA_core Framework
+version: 1.0.0
+author: vAvA
+description: |
+    Framework FiveM modulaire, sécurisé et multilingue.
+    
+    Caractéristiques:
+    - Système de personnages multi-personnage
+    - Économie complète (cash, banque, argent sale)
+    - Système de jobs
+    - Inventaire
+    - Véhicules avec garage
+    - Système de logs et sécurité
+    - Support multilingue (FR, EN, ES)
+    
+    Prérequis:
+    - Serveur MySQL/MariaDB
+    - oxmysql
+
+variables:
+
+    # Database
+    dbHost:
+        name: Hôte MySQL
+        description: Adresse du serveur MySQL
+        default: localhost
+    dbUsername:
+        name: Utilisateur MySQL
+        description: Nom d'utilisateur MySQL
+        default: root
+    dbPassword:
+        name: Mot de passe MySQL
+        description: Mot de passe MySQL (laisser vide si aucun)
+        default: ""
+    dbName:
+        name: Nom de la base de données
+        description: Nom de la base de données à utiliser
+        default: vava_core
+    
+    # Server
+    svHostname:
+        name: Nom du serveur
+        description: Nom affiché dans la liste des serveurs
+        default: "vAvA_core | Roleplay"
+    svMaxClients:
+        name: Nombre max de joueurs
+        description: Nombre maximum de joueurs sur le serveur
+        default: 32
+    svPort:
+        name: Port du serveur
+        description: Port TCP/UDP du serveur
+        default: 30120
+    
+    # License
+    svLicenseKey:
+        name: Clé de licence FiveM
+        description: Votre clé de licence depuis keymaster.fivem.net
+        default: "changeme"
+
+tasks:
+    # ═══════════════════════════════════════════════════════════════════════
+    # Téléchargement des fichiers serveur CFX
+    # ═══════════════════════════════════════════════════════════════════════
+    - action: download_github
+      src: https://github.com/citizenfx/cfx-server-data
+      dest: ./
+      ref: master
+
+    # ═══════════════════════════════════════════════════════════════════════
+    # Téléchargement de oxmysql (dépendance requise)
+    # ═══════════════════════════════════════════════════════════════════════
+    - action: download_file
+      url: https://github.com/overextended/oxmysql/releases/latest/download/oxmysql.zip
+      path: ./tmp/oxmysql.zip
+
+    - action: unzip
+      src: ./tmp/oxmysql.zip
+      dest: ./resources/[standalone]
+
+    - action: remove_path
+      path: ./tmp
+
+    # ═══════════════════════════════════════════════════════════════════════
+    # Téléchargement de vAvA_core depuis GitHub
+    # ═══════════════════════════════════════════════════════════════════════
+    - action: download_github
+      src: https://github.com/Nicolasbriet/vAvA_core
+      dest: ./resources/[vava]/vAvA_core
+      ref: main
+
+    # ═══════════════════════════════════════════════════════════════════════
+    # Configuration du serveur
+    # ═══════════════════════════════════════════════════════════════════════
+    - action: write_file
+      path: ./server.cfg
+      file: |
+        # ═══════════════════════════════════════════════════════════════════
+        # vAvA_core - Configuration Serveur
+        # Généré par txAdmin Recipe
+        # ═══════════════════════════════════════════════════════════════════
+
+        # Informations serveur
+        sv_hostname "{{svHostname}}"
+        sv_maxclients {{svMaxClients}}
+
+        # Endpoints
+        endpoint_add_tcp "0.0.0.0:{{svPort}}"
+        endpoint_add_udp "0.0.0.0:{{svPort}}"
+
+        # Clé de licence (https://keymaster.fivem.net/)
+        sv_licenseKey "{{svLicenseKey}}"
+
+        # Configuration MySQL
+        set mysql_connection_string "mysql://{{dbUsername}}:{{dbPassword}}@{{dbHost}}/{{dbName}}?charset=utf8mb4"
+
+        # Paramètres de sécurité
+        sv_scriptHookAllowed 0
+        sv_enableNetworkedPhoneExplosions 0
+        sets sv_projectName "{{svHostname}}"
+        sets sv_projectDesc "Serveur Roleplay propulsé par vAvA_core Framework"
+
+        # Ressources de base CFX
+        ensure mapmanager
+        ensure chat
+        ensure spawnmanager
+        ensure sessionmanager
+        ensure basic-gamemode
+        ensure hardcap
+
+        # Base de données
+        ensure oxmysql
+
+        # vAvA_core Framework
+        ensure vAvA_core
+
+        # Ressources additionnelles (ajoutez les vôtres ici)
+        # ensure votre_resource
+
+    # ═══════════════════════════════════════════════════════════════════════
+    # Fin de l'installation
+    # ═══════════════════════════════════════════════════════════════════════
+    - action: waste_time
+      seconds: 1
+
+    - action: connect_database
+      connection_string: "mysql://{{dbUsername}}:{{dbPassword}}@{{dbHost}}/{{dbName}}?charset=utf8mb4"
+
+    - action: query_database
+      file: ./resources/[vava]/vAvA_core/database/sql/init.sql
