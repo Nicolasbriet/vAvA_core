@@ -245,21 +245,21 @@ function vCore.DB.GetBan(identifier)
     return vCore.DB.Single([[
         SELECT * FROM bans 
         WHERE identifier = ? 
-        AND (expire IS NULL OR expire > NOW())
+        AND (expire_at IS NULL OR expire_at > NOW())
     ]], {identifier})
 end
 
 ---Ajoute un ban
 ---@param identifier string
 ---@param reason string
----@param expire? string
+---@param expireAt? string
 ---@param bannedBy string
 ---@return number
-function vCore.DB.AddBan(identifier, reason, expire, bannedBy)
+function vCore.DB.AddBan(identifier, reason, expireAt, bannedBy)
     return vCore.DB.Insert([[
-        INSERT INTO bans (identifier, reason, expire, banned_by, created_at)
+        INSERT INTO bans (identifier, reason, expire_at, banned_by, created_at)
         VALUES (?, ?, ?, ?, NOW())
-    ]], {identifier, reason, expire, bannedBy})
+    ]], {identifier, reason, expireAt, bannedBy})
 end
 
 ---Retire un ban

@@ -83,10 +83,10 @@ AddEventHandler('playerConnecting', function(name, setKickReason, deferrals)
     local ban = vCore.DB.GetBan(identifier)
     if ban then
         local reason = ban.reason or 'Aucune raison spécifiée'
-        local expire = ban.expire
+        local expireAt = ban.expire_at
         
-        if expire then
-            deferrals.done(Lang('security_banned') .. '\n' .. Lang('security_ban_reason', reason) .. '\n' .. Lang('security_ban_expire', expire))
+        if expireAt then
+            deferrals.done(Lang('security_banned') .. '\n' .. Lang('security_ban_reason', reason) .. '\n' .. Lang('security_ban_expire', expireAt))
         else
             deferrals.done(Lang('security_banned') .. '\n' .. Lang('security_ban_reason', reason) .. '\n' .. Lang('security_ban_permanent'))
         end
