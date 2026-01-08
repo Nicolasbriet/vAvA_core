@@ -74,4 +74,4 @@ tasks:
     - action: connect_database
 
     - action: query_database
-      file: ./resources/[vava]/vAvA_core/database/sql/init.sql
+      file: ./resources/[vava]/vAvA_core/database/sql/init_txadmin.sql
