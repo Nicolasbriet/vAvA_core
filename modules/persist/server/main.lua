@@ -120,7 +120,7 @@ RegisterNetEvent('vCore:persist:savePosition', function(plate, coords, heading, 
     
     MySQL.Async.execute([[
         UPDATE player_vehicles 
-        SET parking = ?, engine = ?, body = ?, fuel = ?, stored = 3, last_update = NOW()
+        SET parking = ?, engine = ?, body = ?, fuel = ?, `stored` = 3, last_update = NOW()
         WHERE plate = ?
     ]], {
         parkingData,
@@ -140,7 +140,7 @@ RegisterNetEvent('vCore:persist:savePositionNow', function(plate, parking, engin
     
     MySQL.Async.execute([[
         UPDATE player_vehicles 
-        SET parking = ?, engine = ?, body = ?, fuel = ?, stored = 3, last_update = NOW()
+        SET parking = ?, engine = ?, body = ?, fuel = ?, `stored` = 3, last_update = NOW()
         WHERE plate = ?
     ]], {
         parking,
@@ -159,9 +159,9 @@ RegisterNetEvent('vCore:persist:requestVehicles', function()
     local src = source
     
     MySQL.Async.fetchAll([[
-        SELECT plate, mods, tuning_data, vehicle, parking, stored, engine, body, fuel
+        SELECT plate, mods, tuning_data, vehicle, parking, `stored`, engine, body, fuel
         FROM player_vehicles 
-        WHERE stored = 3 AND parking IS NOT NULL AND parking != ''
+        WHERE `stored` = 3 AND parking IS NOT NULL AND parking != ''
         ORDER BY plate, last_update DESC
     ]], {}, function(vehicles)
         local decoded = {}
@@ -226,7 +226,7 @@ RegisterNetEvent('vCore:persist:locateVehicle', function(plate)
     
     MySQL.Async.fetchSingle([[
         SELECT parking FROM player_vehicles 
-        WHERE citizenid = ? AND plate = ? AND stored = 3
+        WHERE citizenid = ? AND plate = ? AND `stored` = 3
     ]], {citizenid, plate}, function(result)
         if result and result.parking then
             local parkingData = json.decode(result.parking)
@@ -331,7 +331,7 @@ exports('SaveVehicle', function(plate, data)
     
     MySQL.Async.execute([[
         UPDATE player_vehicles 
-        SET parking = ?, engine = ?, body = ?, fuel = ?, stored = 3, last_update = NOW()
+        SET parking = ?, engine = ?, body = ?, fuel = ?, `stored` = 3, last_update = NOW()
         WHERE plate = ?
     ]], {
         parkingData,

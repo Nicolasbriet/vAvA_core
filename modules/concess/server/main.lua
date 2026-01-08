@@ -205,7 +205,10 @@ end)
 RegisterNetEvent('vcore_concess:requestVehicles')
 AddEventHandler('vcore_concess:requestVehicles', function(isJobOnly, vehicleType)
     local src = source
-    if not vCore then return end
+    if not vCore or not vCore.Functions then 
+        print('[vAvA Concess] ERREUR: vCore non initialisé')
+        return 
+    end
     
     local player = vCore.Functions.GetPlayer(src)
     if not player then return end

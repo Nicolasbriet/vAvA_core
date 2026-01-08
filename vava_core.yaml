@@ -66,6 +66,14 @@ tasks:
       path: ./tmp
 
     # ═══════════════════════════════════════════════════════════════════════
+    # Téléchargement de bob74_ipl (IPL loader)
+    # ═══════════════════════════════════════════════════════════════════════
+    - action: download_github
+      dest: ./resources/[standalone]/bob74_ipl
+      ref: master
+      src: https://github.com/Bob74/bob74_ipl
+
+    # ═══════════════════════════════════════════════════════════════════════
     # Téléchargement de vAvA_core depuis GitHub
     # ═══════════════════════════════════════════════════════════════════════
     - action: download_github
