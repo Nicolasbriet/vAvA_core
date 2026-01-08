@@ -5,6 +5,7 @@
 # ═══════════════════════════════════════════════════════════════════════════
 
 $engine: 3
+$onesync: on
 
 name: vAvA_core Framework
 version: 1.0.0
@@ -24,46 +25,6 @@ description: |
     Prérequis:
     - Serveur MySQL/MariaDB
     - oxmysql
-
-variables:
-
-    # Database
-    dbHost:
-        name: Hôte MySQL
-        description: Adresse du serveur MySQL
-        default: localhost
-    dbUsername:
-        name: Utilisateur MySQL
-        description: Nom d'utilisateur MySQL
-        default: root
-    dbPassword:
-        name: Mot de passe MySQL
-        description: Mot de passe MySQL (laisser vide si aucun)
-        default: ""
-    dbName:
-        name: Nom de la base de données
-        description: Nom de la base de données à utiliser
-        default: vava_core
-    
-    # Server
-    svHostname:
-        name: Nom du serveur
-        description: Nom affiché dans la liste des serveurs
-        default: "vAvA_core | Roleplay"
-    svMaxClients:
-        name: Nombre max de joueurs
-        description: Nombre maximum de joueurs sur le serveur
-        default: 32
-    svPort:
-        name: Port du serveur
-        description: Port TCP/UDP du serveur
-        default: 30120
-    
-    # License
-    svLicenseKey:
-        name: Clé de licence FiveM
-        description: Votre clé de licence depuis keymaster.fivem.net
-        default: "changeme"
 
 tasks:
     # ═══════════════════════════════════════════════════════════════════════
@@ -111,7 +72,6 @@ tasks:
       seconds: 1
 
     - action: connect_database
-      connection_string: "mysql://{{dbUsername}}:{{dbPassword}}@{{dbHost}}/{{dbName}}?charset=utf8mb4"
 
     - action: query_database
       file: ./resources/[vava]/vAvA_core/database/sql/init.sql
