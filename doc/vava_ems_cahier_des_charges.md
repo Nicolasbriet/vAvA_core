@@ -2,8 +2,8 @@
 
 > **Version:** 1.0.0  
 > **Date:** 9 janvier 2026  
-> **Auteur:** vAvA Team  
-> **Framework:** ESX / QBCore Compatible
+> **Auteur:** vAvA 
+> **Framework:** vava_core
 
 ---
 

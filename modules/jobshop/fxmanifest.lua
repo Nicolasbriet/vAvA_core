@@ -32,14 +32,6 @@ dependencies {
     'oxmysql'
 }
 
--- Fichiers partagés
-shared_scripts {
-    'config.lua',
-    'locales/*.lua'
-}
-    'vAvA_core',
-    'oxmysql'
-}
 
 -- Scripts partagés
 shared_scripts {

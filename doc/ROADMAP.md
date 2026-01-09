@@ -785,6 +785,108 @@ Objectif: Adapter tous les scripts du dossier [vAvA] en modules intégrés au vA
 
 ---
 
+## 🔜 PROCHAINS MODULES À DÉVELOPPER
+
+### 1. Module vAvA_ems (Système EMS/Médical)
+**Priorité:** 🔴 HAUTE  
+**Statut:** 📝 Cahier des charges créé  
+**Documentation:** [`doc/vava_ems_cahier_des_charges.md`](vava_ems_cahier_des_charges.md)
+
+**Vue d'ensemble:**
+Système médical complet et immersif couvrant toute la chaîne médicale RP : urgence → diagnostic → soins → hospitalisation → suivi → décès RP.
+
+**Fonctionnalités principales:**
+- 🩸 Système de blessures et traumatologie (contusions, fractures, balles, brûlures)
+- 💓 Signes vitaux (pouls, tension, saturation O₂, température)
+- 🚑 Interventions EMS complètes (appel → diagnostic → stabilisation → transport)
+- 🗺️ Géolocalisation automatique (alertes si joueur inconscient sans appel)
+- 🧰 Matériel médical (basique → avancé → critique)
+- 🩸 Système de groupes sanguins et transfusions
+- 🏥 Hôpital avec zones (urgences, bloc, réanimation, morgue)
+- ☠️ Système de coma et mort RP
+- 👥 Hiérarchie EMS (stagiaire → directeur médical)
+- 📚 Formations et certifications
+- 💰 Facturation et économie médicale
+- 📝 Dossiers médicaux persistants
+- 🦠 Maladies et états pathologiques
+- 💊 Médicaments avec effets secondaires
+
+**Livrables attendus:**
+- [ ] Code source complet (client/server/shared)
+- [ ] Configuration modulaire
+- [ ] Interface NUI (HUD médical, dispatch)
+- [ ] Base de données (tables patients, interventions)
+- [ ] Intégration vAvA_core (economy, inventory, status)
+- [ ] Tests testbench complets
+- [ ] Documentation complète
+- [ ] Locales (FR/EN/ES)
+
+**Estimation:** ~5000 lignes de code, 4-6 semaines de développement
+
+---
+
+### 2. Module vAvA_target (Système de ciblage 3D)
+**Priorité:** 🔴 HAUTE  
+**Statut:** 📝 Cahier des charges créé  
+**Documentation:** [`doc/vava_target_cahier_des_charges.md`](vava_target_cahier_des_charges.md)
+
+**Vue d'ensemble:**
+Système de ciblage 3D inspiré d'ox_target, 100% intégré à vAvA_core, permettant des interactions fluides avec entités, modèles, zones et points d'intérêt.
+
+**Fonctionnalités principales:**
+- 🎯 Raycast précis avec distances configurables
+- 📦 Support entités (peds, véhicules, objets, props)
+- 🏷️ Support modèles (hash unique ou multiple)
+- 📍 Support zones (box, sphere, cylinder, polyzone)
+- 🔧 API complète et simple d'utilisation
+- 🎨 Interface moderne (menu radial ou liste)
+- ✅ Validation permissions (job, grade, item, argent)
+- 🔐 Sécurité robuste avec anti-cheat
+- 🧪 Intégration testbench complète
+- 🎨 Respect total de la charte graphique vAvA
+- 🌍 Support multilingue
+- 🔌 Intégration avec tous les modules vAvA
+
+**Exports principaux:**
+```lua
+exports['vava_target']:AddTargetEntity(entity, options)
+exports['vava_target']:AddTargetModel(models, options)
+exports['vava_target']:AddTargetZone(zoneData, options)
+exports['vava_target']:AddTargetBone(bones, options)
+exports['vava_target']:RemoveTarget(id)
+```
+
+**Livrables attendus:**
+- [ ] Code source complet (client/server/shared)
+- [ ] Système de raycast optimisé
+- [ ] Interface NUI (menu radial/liste)
+- [ ] Configuration complète
+- [ ] API exports pour tous les modules
+- [ ] Tests testbench (unitaires, intégration, performance)
+- [ ] Documentation API complète
+- [ ] Exemples d'utilisation
+- [ ] Locales (FR/EN/ES)
+
+**Estimation:** ~2500 lignes de code, 2-3 semaines de développement
+
+---
+
+### Ordre de Développement Recommandé
+
+1. **vAvA_target** (prioritaire)
+   - Requis par presque tous les modules
+   - Améliore drastiquement l'UX
+   - Facilite le développement d'autres modules
+   - Plus court à développer
+
+2. **vAvA_ems** (après target)
+   - Système complexe et complet
+   - Peut utiliser vAvA_target pour les interactions
+   - Temps de développement plus long
+   - Nécessite tests approfondis
+
+---
+
 ## ⏸️ EN PAUSE - Module Inventaire
 
 ### Tâches restantes à faire
