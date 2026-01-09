@@ -66,6 +66,8 @@ Locales['es'] = {
     ['zone_hidden'] = 'Zonas ocultas',
     
     -- Atajos de teclado
+    ['hold_to_interact'] = 'Mantén ~INPUT_CONTEXT~ para interactuar',
     ['press_to_interact'] = 'Presiona ~INPUT_CONTEXT~ para interactuar',
     ['press_to_close'] = 'Presiona ~INPUT_FRONTEND_CANCEL~ para cerrar',
+    ['release_to_close'] = 'Suelta ~INPUT_CONTEXT~ para cerrar',
 }

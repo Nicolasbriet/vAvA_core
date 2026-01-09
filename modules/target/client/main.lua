@@ -296,22 +296,46 @@ function FilterOptions(options, entity, distance)
 end
 
 -- ============================================
--- BOUCLE PRINCIPALE DE DÉTECTION
+-- BOUCLE PRINCIPALE DE DÉTECTION (MODE ALT)
 -- ============================================
 
 Citizen.CreateThread(function()
     while true do
-        Citizen.Wait(TargetConfig.Performance.ThreadSleep or 0)
+        local sleepTime = 500
         
         if not isTargetActive then
-            Citizen.Wait(500)
+            Citizen.Wait(sleepTime)
             goto continue
         end
+        
+        -- Vérifier si ALT est pressé
+        local isKeyPressed = IsControlPressed(0, TargetConfig.ActivationKey)
+        
+        if TargetConfig.UseKeyActivation and not isKeyPressed then
+            -- ALT non pressé, fermer le menu si ouvert
+            if isMenuOpen then
+                CloseTargetMenu()
+            end
+            
+            if currentEntity or currentTarget then
+                currentEntity = nil
+                currentTarget = nil
+                currentOptions = {}
+                TriggerEvent('vava_target:onTargetExit')
+            end
+            
+            Citizen.Wait(sleepTime)
+            goto continue
+        end
+        
+        -- ALT pressé, détecter les cibles
+        sleepTime = TargetConfig.UpdateRate
         
         local now = GetGameTimer()
         
         -- Throttling
         if now - lastUpdate < TargetConfig.UpdateRate then
+            Citizen.Wait(10)
             goto continue
         end
         
@@ -385,6 +409,7 @@ Citizen.CreateThread(function()
         end
         
         ::continue::
+        Citizen.Wait(sleepTime)
     end
 end)
 
@@ -565,6 +590,33 @@ AddEventHandler('vava_target:toggle', function(state)
     
     if not state and isMenuOpen then
         CloseTargetMenu()
+    end
+end)
+
+-- Affichage helper texte ALT
+Citizen.CreateThread(function()
+    while true do
+        Citizen.Wait(0)
+        
+        if isTargetActive and TargetConfig.UseKeyActivation then
+            if not isMenuOpen then
+                -- Afficher l'aide uniquement si pas de menu ouvert
+                SetTextFont(4)
+                SetTextProportional(1)
+                SetTextScale(0.35, 0.35)
+                SetTextColour(255, 255, 255, 180)
+                SetTextDropshadow(0, 0, 0, 0, 255)
+                SetTextEdge(1, 0, 0, 0, 255)
+                SetTextDropShadow()
+                SetTextOutline()
+                SetTextCentre(1)
+                SetTextEntry("STRING")
+                AddTextComponentString("Maintenez ~INPUT_CONTEXT~ pour interagir")
+                DrawText(0.5, 0.95)
+            end
+        else
+            Citizen.Wait(500)
+        end
     end
 end)
 

@@ -19,7 +19,9 @@ TargetConfig.MaxDistance = 10.0                  -- Distance maximale (mètres)
 TargetConfig.VehicleDistance = 3.0               -- Distance pour véhicules (mètres)
 TargetConfig.ZoneDistance = 2.0                  -- Distance pour zones (mètres)
 
-TargetConfig.UpdateRate = 500                    -- Fréquence de détection (ms)
+TargetConfig.ActivationKey = 19                  -- Touche d'activation (19 = ALT)
+TargetConfig.UseKeyActivation = true             -- true = ALT pour activer, false = automatique
+TargetConfig.UpdateRate = 100                    -- Fréquence de détection quand ALT pressé (ms)
 TargetConfig.RaycastFlags = 30                   -- Flags raycast (30 = tout sauf peds)
 TargetConfig.EnableCache = true                  -- Activer le cache (optimisation)
 TargetConfig.CacheDuration = 1000                -- Durée cache (ms)

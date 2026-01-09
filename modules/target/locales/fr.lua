@@ -66,6 +66,8 @@ Locales['fr'] = {
     ['zone_hidden'] = 'Zones cachées',
     
     -- Keybinds
+    ['hold_to_interact'] = 'Maintenez ~INPUT_CONTEXT~ pour interagir',
     ['press_to_interact'] = 'Appuyez sur ~INPUT_CONTEXT~ pour interagir',
     ['press_to_close'] = 'Appuyez sur ~INPUT_FRONTEND_CANCEL~ pour fermer',
+    ['release_to_close'] = 'Relâchez ~INPUT_CONTEXT~ pour fermer',
 }
