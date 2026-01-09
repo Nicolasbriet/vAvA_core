@@ -2,6 +2,8 @@
    vAvA TESTBENCH - Application Logic
    ============================================ */
 
+console.log('[TESTBENCH] app.js loading...');
+
 // === GLOBALS ===
 const AppState = {
     modules: [],
