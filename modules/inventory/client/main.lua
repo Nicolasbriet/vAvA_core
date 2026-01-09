@@ -251,6 +251,60 @@ AddEventHandler('vAvA_inventory:notify', function(msg, type)
 end)
 
 -- ═══════════════════════════════════════════════════════════════════════════
+-- ADMIN PANEL
+-- ═══════════════════════════════════════════════════════════════════════════
+
+local adminOpen = false
+
+RegisterCommand('invadmin', function()
+    -- Vérifier si le joueur est admin via ACE
+    TriggerServerEvent('vAvA_inventory:requestAdminPanel')
+end, false)
+
+RegisterNetEvent('vAvA_inventory:openAdminPanel')
+AddEventHandler('vAvA_inventory:openAdminPanel', function(items, players)
+    adminOpen = true
+    SetNuiFocus(true, true)
+    SendNUIMessage({
+        action = 'openAdmin',
+        items = items,
+        players = players
+    })
+end)
+
+function CloseAdminPanel()
+    adminOpen = false
+    SetNuiFocus(false, false)
+    SendNUIMessage({ action = 'closeAdmin' })
+end
+
+-- NUI Callbacks pour Admin Panel
+RegisterNUICallback('closeAdmin', function(_, cb)
+    CloseAdminPanel()
+    cb('ok')
+end)
+
+RegisterNUICallback('saveItem', function(data, cb)
+    TriggerServerEvent('vAvA_inventory:adminSaveItem', data.item, data.isNew)
+    cb('ok')
+end)
+
+RegisterNUICallback('deleteItem', function(data, cb)
+    TriggerServerEvent('vAvA_inventory:adminDeleteItem', data.itemName)
+    cb('ok')
+end)
+
+RegisterNUICallback('getPlayerInventory', function(data, cb)
+    TriggerServerEvent('vAvA_inventory:adminGetPlayerInventory', data.playerId)
+    cb('ok')
+end)
+
+RegisterNUICallback('getLogs', function(data, cb)
+    TriggerServerEvent('vAvA_inventory:adminGetLogs', data.filter)
+    cb('ok')
+end)
+
+-- ═══════════════════════════════════════════════════════════════════════════
 -- NUI CALLBACKS
 -- ═══════════════════════════════════════════════════════════════════════════
 

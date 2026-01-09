@@ -33,6 +33,7 @@ ui_page 'html/index.html'
 
 files {
     'html/index.html',
+    'html/admin.html',
     'html/css/*.css',
     'html/js/*.js',
     'html/img/items/*.png'

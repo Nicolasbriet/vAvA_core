@@ -1,0 +1,217 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>vAvA Inventory - Admin Panel</title>
+    <link rel="stylesheet" href="css/admin.css">
+    <link href="https://fonts.googleapis.com/css2?family=Rajdhani:wght@400;500;600;700&family=Poppins:wght@300;400;500;600&display=swap" rel="stylesheet">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+</head>
+<body>
+    <div id="admin-panel" class="hidden">
+        <div class="admin-backdrop"></div>
+        
+        <div class="admin-container">
+            <!-- Header -->
+            <div class="admin-header">
+                <div class="header-left">
+                    <i class="fas fa-tools"></i>
+                    <h1>Panel Admin - Inventaire</h1>
+                </div>
+                <button class="close-btn" id="close-admin">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+
+            <!-- Navigation -->
+            <div class="admin-nav">
+                <button class="nav-btn active" data-tab="items">
+                    <i class="fas fa-box"></i> Items
+                </button>
+                <button class="nav-btn" data-tab="players">
+                    <i class="fas fa-users"></i> Joueurs
+                </button>
+                <button class="nav-btn" data-tab="logs">
+                    <i class="fas fa-history"></i> Logs
+                </button>
+            </div>
+
+            <!-- Content -->
+            <div class="admin-content">
+                <!-- Tab: Items -->
+                <div class="admin-tab active" id="tab-items">
+                    <div class="tab-header">
+                        <div class="search-bar">
+                            <i class="fas fa-search"></i>
+                            <input type="text" id="search-items" placeholder="Rechercher un item...">
+                        </div>
+                        <button class="btn-primary" id="create-item">
+                            <i class="fas fa-plus"></i> Créer un item
+                        </button>
+                    </div>
+
+                    <div class="items-grid" id="items-grid">
+                        <!-- Items générés dynamiquement -->
+                    </div>
+                </div>
+
+                <!-- Tab: Players -->
+                <div class="admin-tab" id="tab-players">
+                    <div class="tab-header">
+                        <div class="search-bar">
+                            <i class="fas fa-search"></i>
+                            <input type="text" id="search-players" placeholder="Rechercher un joueur...">
+                        </div>
+                    </div>
+
+                    <div class="players-list" id="players-list">
+                        <!-- Liste des joueurs générée dynamiquement -->
+                    </div>
+                </div>
+
+                <!-- Tab: Logs -->
+                <div class="admin-tab" id="tab-logs">
+                    <div class="tab-header">
+                        <select id="log-filter">
+                            <option value="all">Tous les logs</option>
+                            <option value="create">Création</option>
+                            <option value="delete">Suppression</option>
+                            <option value="edit">Modification</option>
+                            <option value="give">Don</option>
+                        </select>
+                        <button class="btn-secondary" id="clear-logs">
+                            <i class="fas fa-trash"></i> Effacer les logs
+                        </button>
+                    </div>
+
+                    <div class="logs-container" id="logs-container">
+                        <!-- Logs générés dynamiquement -->
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Modal: Créer/Modifier Item -->
+        <div class="modal hidden" id="item-modal">
+            <div class="modal-content large">
+                <div class="modal-header">
+                    <h3 id="item-modal-title">
+                        <i class="fas fa-box"></i> <span>Créer un item</span>
+                    </h3>
+                    <button class="modal-close"><i class="fas fa-times"></i></button>
+                </div>
+                <div class="modal-body">
+                    <form id="item-form">
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label for="item-name-input">Nom (ID)</label>
+                                <input type="text" id="item-name-input" placeholder="bread" required>
+                            </div>
+                            <div class="form-group">
+                                <label for="item-label-input">Label</label>
+                                <input type="text" id="item-label-input" placeholder="Pain" required>
+                            </div>
+                        </div>
+
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label for="item-weight-input">Poids (kg)</label>
+                                <input type="number" id="item-weight-input" step="0.01" min="0" value="0.1" required>
+                            </div>
+                            <div class="form-group">
+                                <label for="item-stack-input">Stack Max</label>
+                                <input type="number" id="item-stack-input" min="1" value="99" required>
+                            </div>
+                        </div>
+
+                        <div class="form-row">
+                            <div class="form-group">
+                                <label for="item-type-input">Type</label>
+                                <select id="item-type-input" required>
+                                    <option value="item">Item</option>
+                                    <option value="food">Nourriture</option>
+                                    <option value="drink">Boisson</option>
+                                    <option value="weapon">Arme</option>
+                                    <option value="tool">Outil</option>
+                                    <option value="money">Argent</option>
+                                </select>
+                            </div>
+                            <div class="form-group weapon-only hidden">
+                                <label for="item-weapon-hash-input">Weapon Hash</label>
+                                <input type="text" id="item-weapon-hash-input" placeholder="WEAPON_PISTOL">
+                            </div>
+                        </div>
+
+                        <div class="form-group">
+                            <label for="item-description-input">Description</label>
+                            <textarea id="item-description-input" rows="3" placeholder="Description de l'item..."></textarea>
+                        </div>
+                    </form>
+                </div>
+                <div class="modal-footer">
+                    <button class="btn-secondary modal-cancel">Annuler</button>
+                    <button class="btn-primary" id="save-item">
+                        <i class="fas fa-save"></i> Sauvegarder
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Modal: Gérer inventaire joueur -->
+        <div class="modal hidden" id="player-inventory-modal">
+            <div class="modal-content large">
+                <div class="modal-header">
+                    <h3>
+                        <i class="fas fa-user"></i> <span id="player-name">Inventaire Joueur</span>
+                    </h3>
+                    <button class="modal-close"><i class="fas fa-times"></i></button>
+                </div>
+                <div class="modal-body">
+                    <div class="player-inventory-actions">
+                        <button class="btn-primary" id="give-item-player">
+                            <i class="fas fa-gift"></i> Donner un item
+                        </button>
+                        <button class="btn-secondary" id="clear-inventory-player">
+                            <i class="fas fa-trash"></i> Vider l'inventaire
+                        </button>
+                    </div>
+                    <div class="player-inventory-grid" id="player-inventory-grid">
+                        <!-- Inventaire du joueur -->
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Modal: Donner un item -->
+        <div class="modal hidden" id="give-item-modal">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h3><i class="fas fa-gift"></i> Donner un item</h3>
+                    <button class="modal-close"><i class="fas fa-times"></i></button>
+                </div>
+                <div class="modal-body">
+                    <div class="form-group">
+                        <label for="give-item-select">Item</label>
+                        <select id="give-item-select" required>
+                            <option value="">Sélectionner un item...</option>
+                        </select>
+                    </div>
+                    <div class="form-group">
+                        <label for="give-item-amount">Quantité</label>
+                        <input type="number" id="give-item-amount" min="1" value="1" required>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button class="btn-secondary modal-cancel">Annuler</button>
+                    <button class="btn-primary" id="confirm-give-item">
+                        <i class="fas fa-check"></i> Donner
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="js/admin.js"></script>
+</body>
+</html>

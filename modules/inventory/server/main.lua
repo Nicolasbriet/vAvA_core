@@ -21,6 +21,18 @@ local STARTER_ITEMS = {
 -- INIT
 -- ═══════════════════════════════════════════════════════════════════════════
 
+-- Vérifier si le module economy est chargé
+local EconomyEnabled = false
+CreateThread(function()
+    Wait(5000)  -- Attendre que tous les modules soient chargés
+    if GetResourceState('vAvA_economy') == 'started' then
+        EconomyEnabled = true
+        print('^2[vAvA_inventory]^7 Module economy détecté et activé')
+    else
+        print('^3[vAvA_inventory]^7 Module economy non trouvé - Prix fixes utilisés')
+    end
+end)
+
 CreateThread(function()
     Wait(3000)
     
@@ -108,6 +120,59 @@ local function GetIdentifier(src)
     for _, id in pairs(GetPlayerIdentifiers(src) or {}) do
         if string.find(id, 'license:') then return id end
     end
+end
+
+---Obtenir le prix d'un item via le système economy
+---@param itemName string
+---@param shop string|nil
+---@param quantity number|nil
+---@return number
+local function GetItemPrice(itemName, shop, quantity)
+    if not EconomyEnabled then
+        -- Prix fixes si economy non disponible
+        local defaultPrices = {
+            bread = 5,
+            water = 3,
+            phone = 500,
+            money = 1,
+            bandage = 10,
+            lockpick = 50
+        }
+        return (defaultPrices[itemName] or 10) * (quantity or 1)
+    end
+    
+    -- Utiliser le système economy
+    return exports['vAvA_economy']:GetPrice(itemName, shop or 'general', quantity or 1)
+end
+
+---Appliquer une taxe via le système economy
+---@param taxType string
+---@param amount number
+---@return number
+local function ApplyTax(taxType, amount)
+    if not EconomyEnabled then
+        -- Taxe fixe de 5% si economy non disponible
+        return math.floor(amount * 1.05)
+    end
+    
+    return exports['vAvA_economy']:ApplyTax(taxType, amount)
+end
+
+---Enregistrer une transaction dans le système economy
+---@param transactionType string
+---@param itemName string
+---@param quantity number
+---@param price number
+local function RegisterTransaction(transactionType, itemName, quantity, price)
+    if not EconomyEnabled then return end
+    
+    exports['vAvA_economy']:RegisterTransaction(
+        transactionType,
+        itemName,
+        'item',
+        quantity,
+        price
+    )
 end
 
 -- ═══════════════════════════════════════════════════════════════════════════
@@ -671,6 +736,217 @@ RegisterCommand('reloaditems', function(src)
 end, true)
 
 -- ═══════════════════════════════════════════════════════════════════════════
+-- EVENTS ECONOMY - ACHETER/VENDRE ITEMS
+-- ═══════════════════════════════════════════════════════════════════════════
+
+RegisterNetEvent('vAvA_inventory:buyItem')
+AddEventHandler('vAvA_inventory:buyItem', function(itemName, quantity, shop)
+    local src = source
+    local identifier = GetIdentifier(src)
+    if not identifier then return end
+    
+    local itemData = Cache.items[itemName]
+    if not itemData then
+        TriggerClientEvent('vAvA_inventory:notify', src, '❌ Item introuvable')
+        return
+    end
+    
+    -- Calculer prix avec taxe
+    local basePrice = GetItemPrice(itemName, shop, quantity)
+    local finalPrice = ApplyTax('achat', basePrice)
+    
+    -- Vérifier argent
+    local money = GetMoney(src)
+    if money < finalPrice then
+        TriggerClientEvent('vAvA_inventory:notify', src, '❌ Pas assez d\'argent ($' .. finalPrice .. ')')
+        return
+    end
+    
+    -- Retirer argent
+    if not RemoveMoney(src, finalPrice) then
+        TriggerClientEvent('vAvA_inventory:notify', src, '❌ Erreur de paiement')
+        return
+    end
+    
+    -- Ajouter item
+    if AddItem(src, itemName, quantity) then
+        TriggerClientEvent('vAvA_inventory:notify', src, '✅ Acheté ' .. quantity .. 'x ' .. itemData.label .. ' ($' .. finalPrice .. ')')
+        RegisterTransaction('achat', itemName, quantity, finalPrice)
+    else
+        -- Rembourser si échec
+        AddMoney(src, finalPrice)
+        TriggerClientEvent('vAvA_inventory:notify', src, '❌ Inventaire plein')
+    end
+end)
+
+RegisterNetEvent('vAvA_inventory:sellItem')
+AddEventHandler('vAvA_inventory:sellItem', function(slot, quantity, shop)
+    local src = source
+    local identifier = GetIdentifier(src)
+    if not identifier then return end
+    
+    local inv = Cache.inventories[identifier]
+    if not inv or not inv[slot] then
+        TriggerClientEvent('vAvA_inventory:notify', src, '❌ Item introuvable')
+        return
+    end
+    
+    local item = inv[slot]
+    local sellQty = math.min(quantity or item.amount, item.amount)
+    
+    -- Calculer prix de vente (75% du prix d'achat)
+    local basePrice = GetItemPrice(item.name, shop, sellQty)
+    local sellPrice = math.floor(basePrice * 0.75)
+    local finalPrice = ApplyTax('vente', sellPrice)
+    
+    -- Retirer item
+    if RemoveItem(src, item.name, sellQty) then
+        AddMoney(src, finalPrice)
+        TriggerClientEvent('vAvA_inventory:notify', src, '✅ Vendu ' .. sellQty .. 'x ' .. item.label .. ' (+$' .. finalPrice .. ')')
+        RegisterTransaction('vente', item.name, sellQty, finalPrice)
+    else
+        TriggerClientEvent('vAvA_inventory:notify', src, '❌ Erreur de vente')
+    end
+end)
+
+-- ═══════════════════════════════════════════════════════════════════════════
+-- ADMIN PANEL EVENTS
+-- ═══════════════════════════════════════════════════════════════════════════
+
+RegisterNetEvent('vAvA_inventory:requestAdminPanel')
+AddEventHandler('vAvA_inventory:requestAdminPanel', function()
+    local src = source
+    
+    -- Vérifier permissions admin
+    if not IsPlayerAceAllowed(src, 'command') then
+        TriggerClientEvent('vAvA_inventory:notify', src, '❌ Accès refusé - Permissions admin requises')
+        return
+    end
+    
+    -- Récupérer tous les items
+    local itemsList = {}
+    for name, data in pairs(Cache.items) do
+        table.insert(itemsList, {
+            name = name,
+            label = data.label,
+            weight = data.weight,
+            max_stack = data.max_stack,
+            type = data.type,
+            weapon_hash = data.weapon_hash
+        })
+    end
+    
+    -- Récupérer tous les joueurs en ligne
+    local playersList = {}
+    local players = GetPlayers()
+    for _, playerId in ipairs(players) do
+        local identifier = GetIdentifier(playerId)
+        if identifier then
+            local inv = Cache.inventories[identifier] or {}
+            local itemCount = 0
+            local totalWeight = 0
+            
+            for _, item in pairs(inv) do
+                itemCount = itemCount + 1
+                totalWeight = totalWeight + (item.weight * item.amount)
+            end
+            
+            table.insert(playersList, {
+                id = tonumber(playerId),
+                name = GetPlayerName(playerId),
+                identifier = identifier,
+                itemCount = itemCount,
+                weight = math.floor(totalWeight * 10) / 10
+            })
+        end
+    end
+    
+    TriggerClientEvent('vAvA_inventory:openAdminPanel', src, itemsList, playersList)
+end)
+
+RegisterNetEvent('vAvA_inventory:adminSaveItem')
+AddEventHandler('vAvA_inventory:adminSaveItem', function(itemData, isNew)
+    local src = source
+    
+    if not IsPlayerAceAllowed(src, 'command') then return end
+    
+    -- Validation
+    if not itemData.name or not itemData.label then
+        TriggerClientEvent('vAvA_inventory:notify', src, '❌ Données invalides')
+        return
+    end
+    
+    -- Sauvegarder en cache
+    Cache.items[itemData.name] = {
+        name = itemData.name,
+        label = itemData.label,
+        weight = itemData.weight or 0.1,
+        max_stack = itemData.max_stack or 99,
+        type = itemData.type or 'item',
+        weapon_hash = itemData.weapon_hash
+    }
+    
+    -- Sauvegarder en BDD
+    if isNew then
+        MySQL.Async.execute(
+            'INSERT INTO inventory_items (name, label, weight, max_stack, type, weapon_hash) VALUES (?, ?, ?, ?, ?, ?)',
+            {itemData.name, itemData.label, itemData.weight, itemData.max_stack, itemData.type, itemData.weapon_hash},
+            function()
+                TriggerClientEvent('vAvA_inventory:notify', src, '✅ Item créé: ' .. itemData.label)
+            end
+        )
+    else
+        MySQL.Async.execute(
+            'UPDATE inventory_items SET label = ?, weight = ?, max_stack = ?, type = ?, weapon_hash = ? WHERE name = ?',
+            {itemData.label, itemData.weight, itemData.max_stack, itemData.type, itemData.weapon_hash, itemData.name},
+            function()
+                TriggerClientEvent('vAvA_inventory:notify', src, '✅ Item modifié: ' .. itemData.label)
+            end
+        )
+    end
+end)
+
+RegisterNetEvent('vAvA_inventory:adminDeleteItem')
+AddEventHandler('vAvA_inventory:adminDeleteItem', function(itemName)
+    local src = source
+    
+    if not IsPlayerAceAllowed(src, 'command') then return end
+    
+    -- Retirer du cache
+    Cache.items[itemName] = nil
+    
+    -- Supprimer de la BDD
+    MySQL.Async.execute('DELETE FROM inventory_items WHERE name = ?', {itemName}, function()
+        TriggerClientEvent('vAvA_inventory:notify', src, '✅ Item supprimé: ' .. itemName)
+    end)
+end)
+
+RegisterNetEvent('vAvA_inventory:adminGetPlayerInventory')
+AddEventHandler('vAvA_inventory:adminGetPlayerInventory', function(playerId)
+    local src = source
+    
+    if not IsPlayerAceAllowed(src, 'command') then return end
+    
+    local identifier = GetIdentifier(playerId)
+    if not identifier then return end
+    
+    local inv = Cache.inventories[identifier] or {}
+    local inventoryData = {}
+    
+    for slot, item in pairs(inv) do
+        table.insert(inventoryData, {
+            slot = slot,
+            name = item.name,
+            label = item.label,
+            amount = item.amount
+        })
+    end
+    
+    -- Envoyer au client pour affichage
+    TriggerClientEvent('vAvA_inventory:updatePlayerInventory', src, inventoryData)
+end)
+
+-- ═══════════════════════════════════════════════════════════════════════════
 -- EXPORTS
 -- ═══════════════════════════════════════════════════════════════════════════
 
@@ -680,6 +956,8 @@ exports('GetItemData', function(n) return Cache.items[n] end)
 exports('GetMoney', GetMoney)
 exports('AddMoney', AddMoney)
 exports('RemoveMoney', RemoveMoney)
+exports('GetItemPrice', GetItemPrice)
+exports('ApplyTax', ApplyTax)
 
 -- Cleanup
 AddEventHandler('playerDropped', function()

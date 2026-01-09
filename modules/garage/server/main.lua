@@ -7,6 +7,9 @@
 local vCore = nil
 local vCoreReady = false
 
+-- Vérifier si le module economy est chargé
+local EconomyEnabled = false
+
 -- Fonction helper pour attendre vCore
 local function WaitForVCore(maxAttempts)
     maxAttempts = maxAttempts or 50
@@ -33,8 +36,31 @@ Citizen.CreateThread(function()
     end
     
     vCoreReady = true
+    
+    -- Vérifier economy après l'init de vCore
+    Wait(2000)
+    if GetResourceState('vAvA_economy') == 'started' then
+        EconomyEnabled = true
+        print('^2[vCore:Garage] Module economy détecté et activé^0')
+    else
+        print('^3[vCore:Garage] Module economy non trouvé - Prix fixes utilisés^0')
+    end
+    
     print('^2[vCore:Garage] Module garage initialisé^0')
 end)
+
+---Obtenir le prix de fourrière via le système economy
+---@param basePrice number
+---@return number
+local function GetImpoundPrice(basePrice)
+    if not EconomyEnabled then
+        -- Prix fixe si economy non disponible
+        return basePrice or GarageConfig.ImpoundPrice
+    end
+    
+    -- Appliquer la taxe
+    return exports['vAvA_economy']:ApplyTax('vehicule', basePrice or GarageConfig.ImpoundPrice)
+end
 
 -- Variables
 local DynamicGarages = {}
@@ -375,15 +401,29 @@ AddEventHandler('vcore_garage:spawnVehicle', function(plate, garageName, isImpou
             
             -- Si fourrière, payer
             if isImpound then
-                local price = GarageConfig.General.ImpoundPrice
+                local basePrice = GarageConfig.General.ImpoundPrice
+                local price = GetImpoundPrice(basePrice)
                 
                 if player.Functions.GetMoney('cash') >= price then
                     player.Functions.RemoveMoney('cash', price, 'impound-fee')
+                    vCore.Functions.Notify(src, '💵 Frais de fourrière payés: $' .. price, 'success')
                 elseif player.Functions.GetMoney('bank') >= price then
                     player.Functions.RemoveMoney('bank', price, 'impound-fee')
+                    vCore.Functions.Notify(src, '🏦 Frais de fourrière payés: $' .. price, 'success')
                 else
                     vCore.Functions.Notify(src, 'Pas assez d\'argent ($' .. price .. ')', 'error')
                     return
+                end
+                
+                -- Enregistrer la transaction dans economy (si disponible)
+                if EconomyEnabled then
+                    exports['vAvA_economy']:RegisterTransaction(
+                        'service',
+                        'impound_fee',
+                        'service',
+                        1,
+                        price
+                    )
                 end
             end
             

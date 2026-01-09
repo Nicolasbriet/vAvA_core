@@ -1,10 +1,56 @@
 --[[
     vAvA_core - Server Jobs
-    Système de jobs/métiers
+    Système de jobs/métiers avec intégration economy
 ]]
 
 vCore = vCore or {}
 vCore.Jobs = {}
+
+-- Vérifier si le module economy est chargé
+local EconomyEnabled = false
+CreateThread(function()
+    Wait(5000)  -- Attendre que tous les modules soient chargés
+    if GetResourceState('vAvA_economy') == 'started' then
+        EconomyEnabled = true
+        print('^2[vCore:Jobs]^7 Module economy détecté et activé')
+    else
+        print('^3[vCore:Jobs]^7 Module economy non trouvé - Salaires fixes utilisés')
+    end
+end)
+
+---Obtenir le salaire d'un job via le système economy
+---@param jobName string
+---@param grade number
+---@return number
+local function GetJobSalary(jobName, grade)
+    if not EconomyEnabled then
+        -- Salaires fixes si economy non disponible
+        local defaultSalaries = {
+            unemployed = 100,
+            police = 500,
+            ambulance = 450,
+            mechanic = 400,
+            taxi = 350,
+            realestateagent = 300
+        }
+        return defaultSalaries[jobName] or 100
+    end
+    
+    -- Utiliser le système economy
+    return exports['vAvA_economy']:GetSalary(jobName, grade)
+end
+
+---Appliquer une taxe sur les salaires
+---@param amount number
+---@return number
+local function ApplyTax(amount)
+    if not EconomyEnabled then
+        -- Taxe fixe de 10% si economy non disponible
+        return math.floor(amount * 0.9)
+    end
+    
+    return exports['vAvA_economy']:ApplyTax('salaire', amount)
+end
 
 -- ═══════════════════════════════════════════════════════════════════════════
 -- FONCTIONS PRINCIPALES
@@ -218,3 +264,107 @@ RegisterNetEvent('vCore:setJob', function(targetSource, jobName, grade)
         vCore.Notify(source, Lang('admin_job_set'), 'success')
     end
 end)
+
+-- ═══════════════════════════════════════════════════════════════════════════
+-- SYSTÈME DE PAIE AUTOMATIQUE (Intégration Economy)
+-- ═══════════════════════════════════════════════════════════════════════════
+
+---Verser un salaire à un joueur
+---@param source number
+---@return boolean
+function vCore.Jobs.PaySalary(source)
+    local player = vCore.GetPlayer(source)
+    if not player then return false end
+    
+    local job = player:GetJob()
+    if not job then return false end
+    
+    -- Ne pas payer les chômeurs
+    if job.name == 'unemployed' then return false end
+    
+    -- Obtenir le salaire depuis le système economy
+    local baseSalary = GetJobSalary(job.name, job.grade)
+    
+    -- Appliquer la taxe sur le salaire
+    local netSalary = ApplyTax(baseSalary)
+    
+    -- Ajouter l'argent au joueur
+    if player.Functions.AddMoney then
+        player.Functions.AddMoney('bank', netSalary, 'salary-payment')
+    end
+    
+    -- Notifier le joueur
+    vCore.Notify(source, '💰 Salaire reçu: $' .. netSalary .. ' (' .. job.label .. ')', 'success')
+    
+    -- Log
+    vCore.Log('salary', player:GetIdentifier(), 
+        'Salaire payé: $' .. netSalary,
+        {job = job.name, grade = job.grade, baseSalary = baseSalary, netSalary = netSalary}
+    )
+    
+    -- Enregistrer la transaction dans economy (si disponible)
+    if EconomyEnabled then
+        exports['vAvA_economy']:RegisterTransaction(
+            'salaire',
+            job.name,
+            'job',
+            1,
+            netSalary
+        )
+    end
+    
+    return true
+end
+
+-- Thread de paie automatique (toutes les 30 minutes)
+CreateThread(function()
+    while true do
+        Wait(1800000) -- 30 minutes
+        
+        local players = vCore.GetPlayers()
+        for _, playerId in ipairs(players) do
+            local player = vCore.GetPlayer(playerId)
+            if player and player:IsOnDuty() then
+                vCore.Jobs.PaySalary(playerId)
+            end
+        end
+        
+        print('^2[vCore:Jobs]^7 Salaires versés à ' .. #players .. ' joueurs')
+    end
+end)
+
+-- Commande manuelle pour payer un salaire (admin)
+RegisterCommand('paysalary', function(source, args)
+    if source > 0 and not IsPlayerAceAllowed(source, 'command') then return end
+    
+    local targetId = tonumber(args[1]) or source
+    
+    if vCore.Jobs.PaySalary(targetId) then
+        if source > 0 then
+            vCore.Notify(source, 'Salaire versé au joueur ' .. targetId, 'success')
+        end
+        print('^2[vCore:Jobs]^7 Salaire versé à ' .. targetId)
+    else
+        if source > 0 then
+            vCore.Notify(source, 'Impossible de verser le salaire', 'error')
+        end
+        print('^1[vCore:Jobs]^7 Échec du paiement pour ' .. targetId)
+    end
+end, true)
+
+-- Commande pour voir son salaire
+RegisterCommand('salary', function(source)
+    local player = vCore.GetPlayer(source)
+    if not player then return end
+    
+    local job = player:GetJob()
+    if job.name == 'unemployed' then
+        vCore.Notify(source, 'Vous êtes au chômage', 'info')
+        return
+    end
+    
+    local baseSalary = GetJobSalary(job.name, job.grade)
+    local netSalary = ApplyTax(baseSalary)
+    
+    vCore.Notify(source, '💼 Job: ' .. job.label .. ' (Grade ' .. job.grade .. ')~n~💰 Salaire: $' .. netSalary .. ' / 30min', 'info')
+end, false)

@@ -1,10 +1,13 @@
 --[[
     vAvA Core - Module JobShop
-    Server-side
+    Server-side avec intégration economy
 ]]
 
 local vCore = nil
 local JobShops = {}
+
+-- Vérifier si le module economy est chargé
+local EconomyEnabled = false
 
 -- Initialisation du framework
 CreateThread(function()
@@ -25,7 +28,64 @@ CreateThread(function()
     CreateTables()
     Wait(500)
     LoadAllShops()
+    
+    -- Vérifier economy après l'init
+    Wait(2000)
+    if GetResourceState('vAvA_economy') == 'started' then
+        EconomyEnabled = true
+        print('^2[vCore:JobShop] Module economy détecté et activé^0')
+    else
+        print('^3[vCore:JobShop] Module economy non trouvé - Prix fixes utilisés^0')
+    end
 end)
+
+---Obtenir le prix d'un item via le système economy
+---@param itemName string
+---@param shopId number
+---@param quantity number
+---@return number
+local function GetItemPrice(itemName, shopId, quantity)
+    if not EconomyEnabled then
+        -- Prix fixe si economy non disponible (retourner le prix BD)
+        return nil  -- Utiliser le prix de la BD
+    end
+    
+    -- Déterminer le shop multiplier
+    local shop = JobShops[shopId]
+    local shopType = shop and shop.job or 'general'
+    
+    -- Utiliser le système economy
+    return exports['vAvA_economy']:GetPrice(itemName, shopType, quantity or 1)
+end
+
+---Appliquer une taxe via le système economy
+---@param amount number
+---@return number
+local function ApplyTax(amount)
+    if not EconomyEnabled then
+        -- Pas de taxe si economy non disponible
+        return amount
+    end
+    
+    return exports['vAvA_economy']:ApplyTax('achat', amount)
+end
+
+---Enregistrer une transaction dans le système economy
+---@param transactionType string
+---@param itemName string
+---@param quantity number
+---@param price number
+local function RegisterTransaction(transactionType, itemName, quantity, price)
+    if not EconomyEnabled then return end
+    
+    exports['vAvA_economy']:RegisterTransaction(
+        transactionType,
+        itemName,
+        'item',
+        quantity,
+        price
+    )
+end
 
 -- ================================
 -- FONCTIONS UTILITAIRES
@@ -312,7 +372,14 @@ RegisterNetEvent('vCore:jobshop:buyItem', function(shopId, itemName, quantity)
             return
         end
         
-        local totalPrice = item.price * quantity
+        -- Utiliser le système economy si disponible, sinon prix de la BD
+        local basePrice = GetItemPrice(itemName, shopId, quantity)
+        if not basePrice then
+            basePrice = item.price * quantity
+        end
+        
+        -- Appliquer la taxe
+        local totalPrice = ApplyTax(basePrice)
         local currency = JobShopConfig.CurrencyType
         
         if Player.Functions.GetMoney(currency) < totalPrice then
@@ -338,7 +405,10 @@ RegisterNetEvent('vCore:jobshop:buyItem', function(shopId, itemName, quantity)
             
             JobShops[shopId].cash = (JobShops[shopId].cash or 0) + totalPrice
             
-            Notify(src, JobShopConfig.Notifications.item_bought, 'success')
+            Notify(src, JobShopConfig.Notifications.item_bought .. ' ($' .. totalPrice .. ')', 'success')
+            
+            -- Enregistrer la transaction dans economy (si disponible)
+            RegisterTransaction('achat', itemName, quantity, totalPrice)
             
             -- Rafraîchir l'affichage
             TriggerEvent('vCore:jobshop:getShopData', shopId)

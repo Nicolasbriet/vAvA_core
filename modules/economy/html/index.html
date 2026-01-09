@@ -1,0 +1,229 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>vAvA Economy Dashboard</title>
+    <link rel="stylesheet" href="css/style.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body>
+    <div id="economyDashboard" class="dashboard-container" style="display: none;">
+        <!-- Header -->
+        <div class="dashboard-header">
+            <h1><i class="fas fa-chart-line"></i> Tableau de Bord Économie vAvA</h1>
+            <button class="btn-close" onclick="closeDashboard()">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+
+        <!-- Navigation -->
+        <nav class="dashboard-nav">
+            <button class="nav-btn active" data-tab="overview">
+                <i class="fas fa-chart-pie"></i> Vue d'ensemble
+            </button>
+            <button class="nav-btn" data-tab="items">
+                <i class="fas fa-box"></i> Items
+            </button>
+            <button class="nav-btn" data-tab="jobs">
+                <i class="fas fa-briefcase"></i> Jobs
+            </button>
+            <button class="nav-btn" data-tab="taxes">
+                <i class="fas fa-receipt"></i> Taxes
+            </button>
+            <button class="nav-btn" data-tab="logs">
+                <fas fa-history"></i> Historique
+            </button>
+            <button class="nav-btn" data-tab="settings">
+                <i class="fas fa-cog"></i> Paramètres
+            </button>
+        </nav>
+
+        <!-- Content -->
+        <div class="dashboard-content">
+            <!-- Overview Tab -->
+            <div id="tab-overview" class="tab-content active">
+                <div class="stats-grid">
+                    <div class="stat-card">
+                        <div class="stat-icon"><i class="fas fa-chart-line"></i></div>
+                        <div class="stat-info">
+                            <h3>Inflation</h3>
+                            <p id="stat-inflation" class="stat-value">1.0000</p>
+                            <span class="stat-change positive">+0.1%</span>
+                        </div>
+                    </div>
+
+                    <div class="stat-card">
+                        <div class="stat-icon"><i class="fas fa-times-circle"></i></div>
+                        <div class="stat-info">
+                            <h3>Multiplicateur Global</h3>
+                            <p id="stat-multiplier" class="stat-value">1.00</p>
+                            <span id="stat-profile" class="stat-label">Normal</span>
+                        </div>
+                    </div>
+
+                    <div class="stat-card">
+                        <div class="stat-icon"><i class="fas fa-box"></i></div>
+                        <div class="stat-info">
+                            <h3>Items Total</h3>
+                            <p id="stat-items" class="stat-value">0</p>
+                        </div>
+                    </div>
+
+                    <div class="stat-card">
+                        <div class="stat-icon"><i class="fas fa-briefcase"></i></div>
+                        <div class="stat-info">
+                            <h3>Jobs Actifs</h3>
+                            <p id="stat-jobs" class="stat-value">0</p>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="charts-grid">
+                    <div class="chart-card">
+                        <h3><i class="fas fa-chart-area"></i> Évolution des Prix</h3>
+                        <canvas id="chartPriceEvolution"></canvas>
+                    </div>
+
+                    <div class="chart-card">
+                        <h3><i class="fas fa-chart-bar"></i> Activité Économique</h3>
+                        <canvas id="chartActivity"></canvas>
+                    </div>
+                </div>
+
+                <div class="actions-card">
+                    <h3><i class="fas fa-tools"></i> Actions Rapides</h3>
+                    <button class="btn btn-primary" onclick="recalculateEconomy()">
+                        <i class="fas fa-sync"></i> Recalculer l'Économie
+                    </button>
+                    <button class="btn btn-warning" onclick="resetEconomy()">
+                        <i class="fas fa-undo"></i> Réinitialiser
+                    </button>
+                </div>
+            </div>
+
+            <!-- Items Tab -->
+            <div id="tab-items" class="tab-content">
+                <div class="table-controls">
+                    <input type="text" id="searchItems" class="search-input" placeholder="Rechercher un item...">
+                    <select id="filterCategory" class="filter-select">
+                        <option value="">Toutes les catégories</option>
+                        <option value="food">Nourriture</option>
+                        <option value="drink">Boissons</option>
+                        <option value="weapon">Armes</option>
+                        <option value="tool">Outils</option>
+                        <option value="clothing">Vêtements</option>
+                        <option value="medical">Médical</option>
+                        <option value="rare">Rares</option>
+                    </select>
+                    <select id="filterRarity" class="filter-select">
+                        <option value="">Toutes les raretés</option>
+                        <option value="1-3">Commun (1-3)</option>
+                        <option value="4-6">Rare (4-6)</option>
+                        <option value="7-10">Légendaire (7-10)</option>
+                    </select>
+                </div>
+
+                <table class="data-table" id="itemsTable">
+                    <thead>
+                        <tr>
+                            <th>Nom</th>
+                            <th>Rareté</th>
+                            <th>Catégorie</th>
+                            <th>Prix de Base</th>
+                            <th>Prix Actuel</th>
+                            <th>Variation</th>
+                            <th>Achats</th>
+                            <th>Ventes</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="itemsTableBody">
+                        <!-- Rempli dynamiquement -->
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- Jobs Tab -->
+            <div id="tab-jobs" class="tab-content">
+                <table class="data-table" id="jobsTable">
+                    <thead>
+                        <tr>
+                            <th>Nom</th>
+                            <th>Salaire de Base</th>
+                            <th>Salaire Actuel</th>
+                            <th>Bonus</th>
+                            <th>Essentiel</th>
+                            <th>Joueurs Actifs</th>
+                            <th>Variation</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="jobsTableBody">
+                        <!-- Rempli dynamiquement -->
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- Taxes Tab -->
+            <div id="tab-taxes" class="tab-content">
+                <table class="data-table" id="taxesTable">
+                    <thead>
+                        <tr>
+                            <th>Type</th>
+                            <th>Taux</th>
+                            <th>Description</th>
+                            <th>Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="taxesTableBody">
+                        <!-- Rempli dynamiquement -->
+                    </tbody>
+                </table>
+            </div>
+
+            <!-- Logs Tab -->
+            <div id="tab-logs" class="tab-content">
+                <div class="logs-container" id="logsContainer">
+                    <!-- Rempli dynamiquement -->
+                </div>
+            </div>
+
+            <!-- Settings Tab -->
+            <div id="tab-settings" class="tab-content">
+                <div class="settings-card">
+                    <h3><i class="fas fa-sliders-h"></i> Paramètres Globaux</h3>
+                    
+                    <div class="setting-item">
+                        <label>Multiplicateur Global</label>
+                        <input type="number" id="settingMultiplier" step="0.1" min="0.1" max="10" value="1.0">
+                    </div>
+
+                    <div class="setting-item">
+                        <label>Profil Économique</label>
+                        <select id="settingProfile">
+                            <option value="0.5">Hardcore</option>
+                            <option value="1.0" selected>Normal</option>
+                            <option value="2.0">Riche</option>
+                            <option value="5.0">Ultra-Riche</option>
+                        </select>
+                    </div>
+
+                    <div class="setting-item">
+                        <label>Auto-Ajustement</label>
+                        <input type="checkbox" id="settingAutoAdjust" checked>
+                    </div>
+
+                    <button class="btn btn-success" onclick="saveSettings()">
+                        <i class="fas fa-save"></i> Sauvegarder
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jquery/3.7.0/jquery.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.3.0/dist/chart.umd.min.js"></script>
+    <script src="js/app.js"></script>
+</body>
+</html>

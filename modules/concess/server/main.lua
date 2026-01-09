@@ -7,6 +7,9 @@
 local vCore = nil
 local vCoreReady = false
 
+-- Vérifier si le module economy est chargé
+local EconomyEnabled = false
+
 -- Fonction helper pour attendre vCore
 local function WaitForVCore(maxAttempts)
     maxAttempts = maxAttempts or 50
@@ -34,8 +37,49 @@ Citizen.CreateThread(function()
     
     vCoreReady = true
     CreateTables()
+    
+    -- Vérifier economy après l'init de vCore
+    Wait(2000)
+    if GetResourceState('vAvA_economy') == 'started' then
+        EconomyEnabled = true
+        print('^2[vCore:Concess] Module economy détecté et activé^0')
+    else
+        print('^3[vCore:Concess] Module economy non trouvé - Prix fixes utilisés^0')
+    end
+    
     print('^2[vCore:Concess] Module concessionnaire initialisé^0')
 end)
+
+---Obtenir le prix d'un véhicule via le système economy
+---@param vehicleModel string
+---@param vehicleType string
+---@return number
+local function GetVehiclePrice(vehicleModel, vehicleType)
+    if not EconomyEnabled then
+        -- Prix fixes par défaut si economy non disponible
+        return 50000  -- Prix par défaut
+    end
+    
+    -- Utiliser le système economy
+    local shop = 'dealership'
+    if vehicleType == 'boats' then shop = 'dealership_boat'
+    elseif vehicleType == 'aircraft' then shop = 'dealership_air'
+    end
+    
+    return exports['vAvA_economy']:GetPrice(vehicleModel, shop, 1)
+end
+
+---Appliquer une taxe sur l'achat de véhicule
+---@param amount number
+---@return number
+local function ApplyTax(amount)
+    if not EconomyEnabled then
+        -- Taxe fixe de 20% si economy non disponible
+        return math.floor(amount * 1.20)
+    end
+    
+    return exports['vAvA_economy']:ApplyTax('vehicule', amount)
+end
 
 -- Variables
 local vehicles = {}
@@ -321,7 +365,10 @@ AddEventHandler('vcore_concess:buyVehicle', function(data)
         return
     end
     
-    local price = veh.price
+    -- Obtenir le prix via le système economy
+    local basePrice = EconomyEnabled and GetVehiclePrice(veh.model, data.vehicleType) or veh.price
+    local price = ApplyTax(basePrice)
+    
     local paymentMethod = data.method or 'cash'
     local paid = false
     
@@ -427,9 +474,20 @@ AddEventHandler('vcore_concess:buyVehicle', function(data)
         -- Spawn le véhicule côté client
         TriggerClientEvent('vcore_concess:spawnVehicle', src, veh.model, plate, livery, primaryColor, secondaryColor)
         TriggerClientEvent('vcore_concess:closeNUI', src)
-        vCore.Functions.Notify(src, '✅ Véhicule acheté et enregistré!', 'success')
+        vCore.Functions.Notify(src, '✅ Véhicule acheté et enregistré! Prix: $' .. price, 'success')
         
-        print('^2[vCore:Concess] Véhicule vendu: ' .. veh.model .. ' à ' .. GetPlayerName(src) .. ' (plaque: ' .. plate .. ')^0')
+        -- Enregistrer la transaction dans economy (si disponible)
+        if EconomyEnabled then
+            exports['vAvA_economy']:RegisterTransaction(
+                'achat',
+                veh.model,
+                'vehicle',
+                1,
+                price
+            )
+        end
+        
+        print('^2[vCore:Concess] Véhicule vendu: ' .. veh.model .. ' à ' .. GetPlayerName(src) .. ' (plaque: ' .. plate .. ', prix: $' .. price .. ')^0')
     end)
 end)
 
