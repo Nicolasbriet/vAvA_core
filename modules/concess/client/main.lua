@@ -219,6 +219,33 @@ RegisterCommand('fixcam', function()
     if nuiOpen then
         SetNuiFocus(false, false)
         nuiOpen = false
+    end
+    
+    print('[vCore:Concess] Reset effectué')
+end, false)
+
+-- Commande de test pour ouvrir le concess
+RegisterCommand('testconcess', function(source, args)
+    local dealershipId = args[1] or 'cars_civilian'
+    
+    if not ConcessConfig.Dealerships[dealershipId] then
+        print('[vCore:Concess] Concessionnaire invalide. IDs disponibles:')
+        for id, _ in pairs(ConcessConfig.Dealerships) do
+            print('  - ' .. id)
+        end
+        return
+    end
+    
+    local dealership = ConcessConfig.Dealerships[dealershipId]
+    lastConcessPosition = dealership.position
+    currentIsJobOnly = dealership.isJobOnly
+    currentVehicleType = dealership.vehicleType
+    currentDealershipPosition = dealership.position
+    
+    print('[vCore:Concess] Ouverture test: ' .. dealershipId)
+    TriggerServerEvent('vcore_concess:requestVehicles', dealership.isJobOnly, dealership.vehicleType)
+end, false)
+        nuiOpen = false
         SendNUIMessage({ action = 'close' })
     end
 end, false)

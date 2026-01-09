@@ -270,12 +270,14 @@ function renderVehicles(vehiclesList) {
             card.classList.add('selected');
         }
         
+        // Utiliser l'image par défaut si aucune image n'est définie
+        const imageSrc = vehicle.image || 'img/default.svg';
+        
         card.innerHTML = `
             <div class="vehicle-image">
-                <img src="${vehicle.image || 'img/' + vehicle.model + '.png'}" 
-                     onerror="this.style.display='none'; this.nextElementSibling.style.display='block';"
+                <img src="${imageSrc}" 
+                     onerror="this.src='img/default.svg'"
                      alt="${vehicle.name}">
-                <i class="fas fa-car" style="display: none;"></i>
             </div>
             <div class="vehicle-name">${vehicle.name}</div>
             <div class="vehicle-card-price">$${formatNumber(vehicle.price)}</div>
