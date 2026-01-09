@@ -306,6 +306,7 @@ Citizen.CreateThread(function()
     while true do
         local sleepTime = 500
         local activationKey = TargetConfig.ActivationKey or 19  -- 19 = ALT par défaut
+        local isKeyPressed = IsControlPressed(0, activationKey)
         
         if not isTargetActive then
             Citizen.Wait(sleepTime)
@@ -313,8 +314,6 @@ Citizen.CreateThread(function()
         end
         
         -- Vérifier si ALT est pressé
-        local isKeyPressed = IsControlPressed(0, activationKey)
-        
         if TargetConfig.UseKeyActivation and not isKeyPressed then
             -- ALT non pressé, fermer le menu si ouvert
             if isMenuOpen then
