@@ -290,10 +290,11 @@ end)
 RegisterNetEvent('vcore_concess:requestVehicles')
 AddEventHandler('vcore_concess:requestVehicles', function(isJobOnly, vehicleType)
     local src = source
+    print('[vCore:Concess] Requête reçue de ' .. src .. ' - isJobOnly: ' .. tostring(isJobOnly) .. ' vehicleType: ' .. tostring(vehicleType))
     
     -- Attendre que vCore soit initialisé (max 5 secondes)
     if not WaitForVCore(50) or not vCore.Functions then 
-        print('[vAvA Concess] En attente de vCore...')
+        print('[vCore:Concess] ERREUR: vCore non disponible')
         TriggerClientEvent('vcore_concess:error', src, 'Le serveur démarre, réessayez dans quelques secondes.')
         return 
     end
@@ -309,8 +310,13 @@ AddEventHandler('vcore_concess:requestVehicles', function(isJobOnly, vehicleType
         playerJob = player.PlayerData.job.name
     end
     
+    print('[vCore:Concess] ConcessConfig.Categories existe?', ConcessConfig and ConcessConfig.Categories and 'OUI' or 'NON')
+    print('[vCore:Concess] vehicleType:', vehicleType)
+    print('[vCore:Concess] isJobOnly:', isJobOnly)
+    
     -- Filtrer les véhicules
     local validCategories = ConcessConfig.Categories[vehicleType] or {'compacts'}
+    print('[vCore:Concess] Catégories valides:', json.encode(validCategories))
     local vehList = {}
     
     for _, v in ipairs(vehicles) do
@@ -337,6 +343,10 @@ AddEventHandler('vcore_concess:requestVehicles', function(isJobOnly, vehicleType
         end
     end
     
+    print('[vCore:Concess] Total véhicules disponibles: ' .. #vehicles)
+    print('[vCore:Concess] Véhicules filtrés pour le client: ' .. #vehList)
+    print('[vCore:Concess] TriggerClientEvent vers src:', src)
+    print('[vCore:Concess] Envoi de ' .. #vehList .. ' véhicules au client ' .. src)
     TriggerClientEvent('vcore_concess:sendVehicles', src, vehList, isAdmin, playerJob, vehicleType, isJobOnly)
 end)
 

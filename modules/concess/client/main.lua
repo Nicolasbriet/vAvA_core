@@ -1,3 +1,5 @@
+print('^2[vCore:Concess] Script client chargé^0')
+
 --[[
     vAvA Core - Module Concessionnaire
     Client: Interface utilisateur et preview des véhicules
@@ -395,6 +397,8 @@ end)
 -- Réception des véhicules
 RegisterNetEvent('vcore_concess:sendVehicles')
 AddEventHandler('vcore_concess:sendVehicles', function(vehList, isAdmin, serverPlayerJob, vehicleType, isJobOnly)
+    print('^2[vCore:Concess] Event reçu: vcore_concess:sendVehicles^0')
+    print('^2[vCore:Concess] Nombre de véhicules reçus: ' .. tostring(#vehList) .. '^0')
     playerJob = serverPlayerJob
     currentVehicleType = vehicleType or 'cars'
     currentIsJobOnly = isJobOnly or false
@@ -669,9 +673,14 @@ Citizen.CreateThread(function()
                 
                 -- Interaction avec E
                 if IsControlJustReleased(0, ConcessConfig.General.InteractionKey) and not nuiOpen then
+                    print('[vCore:Concess] Touche E détectée près de: ' .. dealershipId)
                     local currentTime = GetGameTimer()
                     if currentTime - lastCloseTime >= ConcessConfig.General.ReopenDelay then
+                        print('[vCore:Concess] Envoi requête véhicules - isJobOnly:', dealership.isJobOnly, 'vehicleType:', dealership.vehicleType)
                         lastConcessPosition = dealership.position
+                        currentIsJobOnly = dealership.isJobOnly
+                        currentVehicleType = dealership.vehicleType
+                        currentDealershipPosition = dealership.position
                         TriggerServerEvent('vcore_concess:requestVehicles', dealership.isJobOnly, dealership.vehicleType)
                         
                         local veh = GetVehiclePedIsIn(plyPed, false)
