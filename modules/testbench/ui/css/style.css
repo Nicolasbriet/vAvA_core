@@ -44,12 +44,12 @@ html, body {
     height: 100%;
     overflow: hidden;
     font-family: var(--font-body);
-    background: var(--black);
+    background: transparent;
     color: var(--white);
     line-height: 1.6;
 }
 
-body {
+#testbench-container {
     background: 
         linear-gradient(135deg, rgba(255, 30, 30, 0.03) 0%, transparent 100%),
         linear-gradient(45deg, transparent 0%, rgba(139, 0, 0, 0.05) 100%),

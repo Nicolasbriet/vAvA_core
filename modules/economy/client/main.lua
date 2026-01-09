@@ -3,6 +3,17 @@
 -- Gestion côté client du système économique
 -- ══════════════════════════════════════════════════════════════════════════════
 
+-- Attendre que vCore soit disponible
+local vCore = nil
+CreateThread(function()
+    while not vCore do
+        vCore = exports['vAvA_core']:GetCoreObject()
+        if not vCore then 
+            Wait(100) 
+        end
+    end
+end)
+
 local adminUIOpen = false
 
 -- ══════════════════════════════════════════════════════════════════════════════
@@ -13,10 +24,10 @@ function OpenAdminUI()
     if adminUIOpen then return end
     
     -- Demander les données au serveur
-    vCore.TriggerCallback('vAvA_economy:getState', function(state)
-        vCore.TriggerCallback('vAvA_economy:getAllItems', function(items)
-            vCore.TriggerCallback('vAvA_economy:getAllJobs', function(jobs)
-                vCore.TriggerCallback('vAvA_economy:getLogs', function(logs)
+    vCore.TriggerServerCallback('vAvA_economy:getState', function(state)
+        vCore.TriggerServerCallback('vAvA_economy:getAllItems', function(items)
+            vCore.TriggerServerCallback('vAvA_economy:getAllJobs', function(jobs)
+                vCore.TriggerServerCallback('vAvA_economy:getLogs', function(logs)
                     -- Envoyer tout à la NUI
                     SendNUIMessage({
                         action = 'openDashboard',
@@ -105,7 +116,7 @@ end)
 
 -- Rafraîchir les données
 RegisterNUICallback('refresh', function(data, cb)
-    vCore.TriggerCallback('vAvA_economy:getState', function(state)
+    vCore.TriggerServerCallback('vAvA_economy:getState', function(state)
         cb(state)
     end)
 end)

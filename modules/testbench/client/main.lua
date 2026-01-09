@@ -102,7 +102,11 @@ RegisterNUICallback('testbench:getInitialData', function(data, cb)
     TriggerServerEvent('testbench:requestInitialData')
     
     -- Le serveur répondra via un event qui mettra à jour l'UI
-    cb({})
+    -- Retourner une structure valide en attendant
+    cb({
+        modules = {},
+        scenarios = {}
+    })
 end)
 
 -- Obtenir les détails d'un module
