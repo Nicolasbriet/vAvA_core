@@ -13,23 +13,6 @@ local currentClothes = {}
 local cart = {}
 
 -- ═══════════════════════════════════════════════════════════════════════════
--- INITIALISATION
--- ═══════════════════════════════════════════════════════════════════════════
-
-CreateThread(function()
-    while not vCore do
-        vCore = exports['vAvA_core']:GetCoreObject()
-        if not vCore then Wait(100) end
-    end
-    
-    -- Créer les blips pour les shops
-    CreateShopBlips()
-    
-    -- Créer les zones d'interaction
-    CreateShopZones()
-end)
-
--- ═══════════════════════════════════════════════════════════════════════════
 -- BLIPS
 -- ═══════════════════════════════════════════════════════════════════════════
 
@@ -633,4 +616,21 @@ end)
 
 exports('IsShopOpen', function()
     return isShopOpen
+end)
+
+-- ═══════════════════════════════════════════════════════════════════════════
+-- INITIALISATION (doit être à la fin après toutes les définitions de fonctions)
+-- ═══════════════════════════════════════════════════════════════════════════
+
+CreateThread(function()
+    while not vCore do
+        vCore = exports['vAvA_core']:GetCoreObject()
+        if not vCore then Wait(100) end
+    end
+    
+    -- Créer les blips pour les shops
+    CreateShopBlips()
+    
+    -- Créer les zones d'interaction
+    CreateShopZones()
 end)
