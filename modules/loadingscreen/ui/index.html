@@ -1,0 +1,107 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>vAvA Roleplay - Chargement</title>
+    
+    <!-- Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;500;600;700;800&family=Open+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+    
+    <!-- Font Awesome pour les icônes -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    
+    <!-- Styles -->
+    <link rel="stylesheet" href="style.css">
+</head>
+<body>
+    <!-- Container principal -->
+    <div id="loading-screen">
+        <!-- Image de fond -->
+        <div id="background">
+            <div id="background-image"></div>
+            <div id="background-overlay"></div>
+        </div>
+        
+        <!-- Effets visuels -->
+        <div id="effects">
+            <div id="vignette"></div>
+            <div id="scanlines"></div>
+            <div id="particles"></div>
+        </div>
+        
+        <!-- Contenu principal -->
+        <div id="content">
+            <!-- Logo -->
+            <div id="logo-container">
+                <img id="logo" src="assets/logo.png" alt="Logo">
+            </div>
+            
+            <!-- Informations serveur -->
+            <div id="server-info">
+                <h1 id="server-name">vAvA Roleplay</h1>
+                <p id="server-slogan">L'immersion au service du RP</p>
+            </div>
+            
+            <!-- Barre de progression -->
+            <div id="progress-container">
+                <div id="progress-bar-wrapper">
+                    <div id="progress-bar">
+                        <div id="progress-fill"></div>
+                        <div id="progress-glow"></div>
+                    </div>
+                </div>
+                <div id="progress-info">
+                    <span id="progress-text">Chargement...</span>
+                    <span id="progress-percentage">0%</span>
+                </div>
+            </div>
+            
+            <!-- Messages dynamiques -->
+            <div id="messages-container">
+                <div id="message-icon"><i class="fas fa-lightbulb"></i></div>
+                <p id="dynamic-message">Bienvenue sur vAvA Roleplay !</p>
+            </div>
+            
+            <!-- Informations dynamiques -->
+            <div id="dynamic-info">
+                <div class="info-item" id="players-info">
+                    <i class="fas fa-users"></i>
+                    <span id="players-count">0 joueurs connectés</span>
+                </div>
+                <div class="info-item" id="version-info">
+                    <i class="fas fa-code-branch"></i>
+                    <span id="server-version">v1.0.0</span>
+                </div>
+                <div class="info-item" id="modules-info">
+                    <i class="fas fa-puzzle-piece"></i>
+                    <span id="loading-module">Initialisation...</span>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Contrôles audio -->
+        <div id="audio-controls">
+            <button id="mute-btn" class="audio-btn">
+                <i class="fas fa-volume-up" id="volume-icon"></i>
+            </button>
+        </div>
+        
+        <!-- Footer -->
+        <div id="footer">
+            <p>Propulsé par <span class="highlight">vAvA Framework</span></p>
+        </div>
+    </div>
+    
+    <!-- Audio -->
+    <audio id="background-music" loop>
+        <source src="assets/music.mp3" type="audio/mpeg">
+        <source src="assets/music.ogg" type="audio/ogg">
+    </audio>
+    
+    <!-- Script -->
+    <script src="app.js"></script>
+</body>
+</html>

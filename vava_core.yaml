@@ -26,6 +26,8 @@ description: |
     
     Modules inclus:
     - vAvA_core (framework principal)
+    - vAvA_loadingscreen (écran de chargement immersif)
+    - vAvA_creator (créateur de personnage)
     - vAvA_inventory (système d'inventaire)
     - vAvA_chat (chat RP avec commandes)
     - vAvA_keys (gestion des clés véhicules)
@@ -80,6 +82,20 @@ tasks:
       dest: ./resources/[vava]/vAvA_core
       ref: main
       src: https://github.com/Nicolasbriet/vAvA_core
+
+    # ═══════════════════════════════════════════════════════════════════════
+    # Copie du module loadingscreen
+    # ═══════════════════════════════════════════════════════════════════════
+    - action: move_path
+      src: ./resources/[vava]/vAvA_core/modules/loadingscreen
+      dest: ./resources/[vava]/vAvA_loadingscreen
+
+    # ═══════════════════════════════════════════════════════════════════════
+    # Copie du module creator (créateur de personnage)
+    # ═══════════════════════════════════════════════════════════════════════
+    - action: move_path
+      src: ./resources/[vava]/vAvA_core/modules/creator
+      dest: ./resources/[vava]/vAvA_creator
 
     # ═══════════════════════════════════════════════════════════════════════
     # Copie du module d'inventaire

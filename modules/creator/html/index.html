@@ -1,0 +1,281 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>vAvA Creator</title>
+    <link rel="stylesheet" href="css/style.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;500;600;700&family=Orbitron:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body>
+    <!-- ═══════════════════════════════════════════════════════════════════ -->
+    <!-- SÉLECTION DE PERSONNAGES -->
+    <!-- ═══════════════════════════════════════════════════════════════════ -->
+    <div id="character-selection" class="container hidden">
+        <div class="selection-header">
+            <div class="logo">
+                <span class="logo-v">v</span><span class="logo-ava">AvA</span><span class="logo-core">Core</span>
+            </div>
+            <h1>SÉLECTION DU PERSONNAGE</h1>
+        </div>
+        
+        <div class="characters-grid" id="characters-grid">
+            <!-- Personnages générés dynamiquement -->
+        </div>
+        
+        <div class="selection-footer">
+            <button class="btn btn-primary btn-glow" id="btn-new-character">
+                <i class="fas fa-plus"></i> NOUVEAU PERSONNAGE
+            </button>
+        </div>
+    </div>
+
+    <!-- ═══════════════════════════════════════════════════════════════════ -->
+    <!-- CRÉATEUR DE PERSONNAGE -->
+    <!-- ═══════════════════════════════════════════════════════════════════ -->
+    <div id="character-creator" class="container hidden">
+        <!-- Header avec progression -->
+        <div class="creator-header">
+            <div class="logo-small">
+                <span class="logo-v">v</span><span class="logo-ava">AvA</span><span class="logo-core">Core</span>
+            </div>
+            <div class="progress-bar">
+                <div class="progress-fill" id="progress-fill"></div>
+                <div class="progress-steps" id="progress-steps">
+                    <!-- Steps générés dynamiquement -->
+                </div>
+            </div>
+        </div>
+
+        <!-- Contenu principal -->
+        <div class="creator-content">
+            <!-- Panel gauche - Options -->
+            <div class="creator-panel left-panel">
+                <div class="panel-header">
+                    <h2 id="step-title">CHOISIR LE SEXE</h2>
+                    <p id="step-description">Sélectionnez le sexe de votre personnage</p>
+                </div>
+                
+                <div class="panel-content" id="panel-content">
+                    <!-- Contenu dynamique selon l'étape -->
+                </div>
+            </div>
+
+            <!-- Panel droit - Contrôles caméra -->
+            <div class="camera-controls">
+                <button class="btn-camera" id="btn-rotate-left" title="Tourner à gauche">
+                    <i class="fas fa-undo"></i>
+                </button>
+                <button class="btn-camera" id="btn-rotate-right" title="Tourner à droite">
+                    <i class="fas fa-redo"></i>
+                </button>
+            </div>
+        </div>
+
+        <!-- Footer avec navigation -->
+        <div class="creator-footer">
+            <div class="footer-left">
+                <button class="btn btn-secondary" id="btn-reset">
+                    <i class="fas fa-sync-alt"></i> Réinitialiser
+                </button>
+                <button class="btn btn-secondary" id="btn-random">
+                    <i class="fas fa-random"></i> Aléatoire
+                </button>
+            </div>
+            <div class="footer-center">
+                <span id="step-indicator">Étape 1 / 8</span>
+            </div>
+            <div class="footer-right">
+                <button class="btn btn-secondary" id="btn-prev" disabled>
+                    <i class="fas fa-chevron-left"></i> Précédent
+                </button>
+                <button class="btn btn-primary btn-glow" id="btn-next">
+                    Suivant <i class="fas fa-chevron-right"></i>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ═══════════════════════════════════════════════════════════════════ -->
+    <!-- SHOP DE VÊTEMENTS -->
+    <!-- ═══════════════════════════════════════════════════════════════════ -->
+    <div id="clothing-shop" class="container hidden">
+        <div class="shop-header">
+            <div class="shop-info">
+                <h1 id="shop-name">BINCO</h1>
+                <div class="player-money">
+                    <span class="money-cash"><i class="fas fa-wallet"></i> $<span id="money-cash">0</span></span>
+                    <span class="money-bank"><i class="fas fa-university"></i> $<span id="money-bank">0</span></span>
+                </div>
+            </div>
+            <button class="btn-close" id="btn-close-shop">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+
+        <div class="shop-content">
+            <!-- Catégories -->
+            <div class="shop-categories" id="shop-categories">
+                <!-- Catégories générées dynamiquement -->
+            </div>
+
+            <!-- Options de l'article -->
+            <div class="shop-items" id="shop-items">
+                <div class="item-controls">
+                    <div class="control-group">
+                        <label>Style</label>
+                        <div class="slider-container">
+                            <button class="btn-slider" id="btn-drawable-prev"><i class="fas fa-minus"></i></button>
+                            <span id="drawable-value">0 / 0</span>
+                            <button class="btn-slider" id="btn-drawable-next"><i class="fas fa-plus"></i></button>
+                        </div>
+                    </div>
+                    <div class="control-group">
+                        <label>Texture</label>
+                        <div class="slider-container">
+                            <button class="btn-slider" id="btn-texture-prev"><i class="fas fa-minus"></i></button>
+                            <span id="texture-value">0 / 0</span>
+                            <button class="btn-slider" id="btn-texture-next"><i class="fas fa-plus"></i></button>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="item-price">
+                    <span class="price-label">Prix:</span>
+                    <span class="price-value" id="item-price">$0</span>
+                </div>
+            </div>
+        </div>
+
+        <div class="shop-footer">
+            <div class="shop-controls">
+                <button class="btn-camera" id="btn-shop-rotate-left">
+                    <i class="fas fa-undo"></i>
+                </button>
+                <button class="btn-camera" id="btn-shop-rotate-right">
+                    <i class="fas fa-redo"></i>
+                </button>
+            </div>
+            <div class="shop-actions">
+                <button class="btn btn-secondary" id="btn-shop-cancel">
+                    <i class="fas fa-times"></i> Annuler
+                </button>
+                <button class="btn btn-primary btn-glow" id="btn-shop-buy">
+                    <i class="fas fa-shopping-cart"></i> Acheter
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ═══════════════════════════════════════════════════════════════════ -->
+    <!-- COIFFEUR -->
+    <!-- ═══════════════════════════════════════════════════════════════════ -->
+    <div id="barber-shop" class="container hidden">
+        <div class="shop-header">
+            <div class="shop-info">
+                <h1 id="barber-name">COIFFEUR</h1>
+                <div class="player-money">
+                    <span class="money-cash"><i class="fas fa-wallet"></i> $<span id="barber-money-cash">0</span></span>
+                </div>
+            </div>
+            <button class="btn-close" id="btn-close-barber">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+
+        <div class="shop-content barber-content">
+            <div class="barber-tabs">
+                <button class="tab-btn active" data-tab="hair">Cheveux</button>
+                <button class="tab-btn" data-tab="beard">Barbe</button>
+                <button class="tab-btn" data-tab="eyebrows">Sourcils</button>
+            </div>
+
+            <div class="barber-options" id="barber-options">
+                <!-- Contenu dynamique -->
+            </div>
+        </div>
+
+        <div class="shop-footer">
+            <div class="shop-controls">
+                <button class="btn-camera" id="btn-barber-rotate-left">
+                    <i class="fas fa-undo"></i>
+                </button>
+                <button class="btn-camera" id="btn-barber-rotate-right">
+                    <i class="fas fa-redo"></i>
+                </button>
+            </div>
+            <div class="shop-actions">
+                <span class="total-price">Total: $<span id="barber-total">0</span></span>
+                <button class="btn btn-secondary" id="btn-barber-cancel">
+                    <i class="fas fa-times"></i> Annuler
+                </button>
+                <button class="btn btn-primary btn-glow" id="btn-barber-buy">
+                    <i class="fas fa-check"></i> Confirmer
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ═══════════════════════════════════════════════════════════════════ -->
+    <!-- CHIRURGIE -->
+    <!-- ═══════════════════════════════════════════════════════════════════ -->
+    <div id="surgery-shop" class="container hidden">
+        <div class="shop-header">
+            <div class="shop-info">
+                <h1>CHIRURGIE ESTHÉTIQUE</h1>
+                <div class="player-money">
+                    <span class="money-bank"><i class="fas fa-university"></i> $<span id="surgery-money">0</span></span>
+                </div>
+            </div>
+            <button class="btn-close" id="btn-close-surgery">
+                <i class="fas fa-times"></i>
+            </button>
+        </div>
+
+        <div class="shop-content surgery-content">
+            <div class="surgery-tabs">
+                <button class="tab-btn active" data-tab="heritage">Héritage</button>
+                <button class="tab-btn" data-tab="face">Visage</button>
+                <button class="tab-btn" data-tab="eyes">Yeux</button>
+            </div>
+
+            <div class="surgery-options" id="surgery-options">
+                <!-- Contenu dynamique -->
+            </div>
+        </div>
+
+        <div class="shop-footer">
+            <div class="shop-controls">
+                <button class="btn-camera" id="btn-surgery-rotate-left">
+                    <i class="fas fa-undo"></i>
+                </button>
+                <button class="btn-camera" id="btn-surgery-rotate-right">
+                    <i class="fas fa-redo"></i>
+                </button>
+            </div>
+            <div class="shop-actions">
+                <span class="total-price">Prix: $<span id="surgery-price">5000</span></span>
+                <button class="btn btn-secondary" id="btn-surgery-cancel">
+                    <i class="fas fa-times"></i> Annuler
+                </button>
+                <button class="btn btn-primary btn-glow" id="btn-surgery-confirm">
+                    <i class="fas fa-check"></i> Confirmer
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- ═══════════════════════════════════════════════════════════════════ -->
+    <!-- NOTIFICATION -->
+    <!-- ═══════════════════════════════════════════════════════════════════ -->
+    <div id="notification" class="notification hidden">
+        <i class="notification-icon fas fa-info-circle"></i>
+        <span class="notification-text"></span>
+    </div>
+
+    <script src="js/app.js"></script>
+</body>
+</html>

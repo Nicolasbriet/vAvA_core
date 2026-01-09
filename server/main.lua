@@ -272,8 +272,25 @@ function vCore.GetPlayerRole(source)
     return role
 end
 
--- Ajouter au vCore.Functions pour compatibilité
+-- Ajouter au vCore.Functions pour compatibilité (style QBCore/ESX)
 vCore.Functions = vCore.Functions or {}
+
+-- Fonctions joueurs
+vCore.Functions.GetPlayer = vCore.GetPlayer
+vCore.Functions.GetPlayers = vCore.GetPlayers
+vCore.Functions.GetPlayerCount = vCore.GetPlayerCount
+vCore.Functions.GetPlayerByIdentifier = vCore.GetPlayerByIdentifier
+vCore.Functions.GetPlayerByCharId = vCore.GetPlayerByCharId
+
+-- Fonctions notifications
+vCore.Functions.Notify = vCore.Notify
+vCore.Functions.NotifyAll = vCore.NotifyAll
+
+-- Fonctions callbacks
+vCore.Functions.CreateCallback = vCore.CreateCallback
+vCore.Functions.RegisterServerCallback = vCore.RegisterServerCallback
+
+-- Fonctions permissions (txAdmin ACE)
 vCore.Functions.HasAce = vCore.HasAce
 vCore.Functions.HasAnyAce = vCore.HasAnyAce
 vCore.Functions.GetPermissionLevel = vCore.GetPermissionLevel
