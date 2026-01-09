@@ -149,3 +149,20 @@ CREATE TABLE IF NOT EXISTS `dropped_items` (
     `coords` VARCHAR(255) NOT NULL,
     `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ═══════════════════════════════════════════════════════════════════════════
+-- Table de suivi des migrations
+-- ═══════════════════════════════════════════════════════════════════════════
+CREATE TABLE IF NOT EXISTS `vcore_migrations` (
+    `id` INT AUTO_INCREMENT PRIMARY KEY,
+    `migration` VARCHAR(255) NOT NULL UNIQUE,
+    `applied_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    INDEX `idx_migration` (`migration`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- Enregistrer la migration initiale
+INSERT IGNORE INTO `vcore_migrations` (`migration`) VALUES
+('init_txadmin'),
+('core_tables_v1'),
+('inventory_system_v1');
+
