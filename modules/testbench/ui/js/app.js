@@ -30,14 +30,8 @@ function initApp() {
     showNotification('Testbench Ready', 'Système de test initialisé', 'success');
     
     // Demander les données initiales au serveur
-    fetchNUI('testbench:getInitialData', {}).then(data => {
-        if (data) {
-            AppState.modules = data.modules || [];
-            AppState.scenarios = data.scenarios || [];
-            renderModules();
-            renderScenarios();
-        }
-    });
+    // Les données arriveront via l'event 'updateModules'
+    fetchNUI('testbench:getInitialData', {});
 }
 
 // === EVENT LISTENERS ===
