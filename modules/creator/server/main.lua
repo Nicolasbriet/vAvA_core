@@ -4,29 +4,20 @@
     ╚═══════════════════════════════════════════════════════════════════════════╝
 ]]--
 
+-- Attendre que vCore soit disponible (bloquant au démarrage)
 local vCore = nil
+while not vCore do
+    vCore = exports['vAvA_core']:GetCoreObject()
+    if not vCore then Citizen.Wait(100) end
+end
 
--- ═══════════════════════════════════════════════════════════════════════════
--- INITIALISATION
--- ═══════════════════════════════════════════════════════════════════════════
-
-CreateThread(function()
-    while not vCore do
-        vCore = exports['vAvA_core']:GetCoreObject()
-        if not vCore then Wait(100) end
-    end
-    
-    print('^2[vAvA Creator]^0 Module initialisé')
-    
-    -- Créer les tables si nécessaires
-    CreateTables()
-end)
+print('^2[vAvA Creator]^0 Module initialisé')
 
 -- ═══════════════════════════════════════════════════════════════════════════
 -- BASE DE DONNÉES
 -- ═══════════════════════════════════════════════════════════════════════════
 
-function CreateTables()
+local function CreateTables()
     MySQL.Async.execute([[
         CREATE TABLE IF NOT EXISTS `vava_characters` (
             `id` INT(11) NOT NULL AUTO_INCREMENT,
@@ -63,6 +54,11 @@ function CreateTables()
     end)
 end
 
+-- Créer les tables au démarrage
+CreateThread(function()
+    CreateTables()
+end)
+
 -- ═══════════════════════════════════════════════════════════════════════════
 -- FONCTIONS UTILITAIRES
 -- ═══════════════════════════════════════════════════════════════════════════
@@ -93,7 +89,6 @@ local function IsValidName(name)
     if len < Config.Creator.MinNameLength or len > Config.Creator.MaxNameLength then
         return false
     end
-    -- Seulement lettres, espaces et tirets
     if not string.match(name, "^[%a%s%-']+$") then
         return false
     end
@@ -110,11 +105,9 @@ local function SanitizeSkinData(skinData)
         return nil
     end
     
-    -- Vérifier les valeurs extrêmes
     local sanitized = {}
     for key, value in pairs(skinData) do
         if type(value) == 'number' then
-            -- Clamp les valeurs entre -1 et 100 (selon le type)
             if string.match(key, 'Opacity') then
                 sanitized[key] = math.max(0, math.min(1, value))
             elseif string.match(key, 'Color') or string.match(key, 'hair') or string.match(key, 'beard') then
@@ -137,7 +130,7 @@ end
 -- ═══════════════════════════════════════════════════════════════════════════
 
 -- Récupérer les personnages d'un joueur
-vCore.RegisterServerCallback('vava_creator:getCharacters', function(source, cb)
+vCore.RegisterServerCallback('vava_creator:getCharacters', function(source, cb, player)
     local license = GetPlayerLicense(source)
     if not license then
         cb({ success = false, error = 'License introuvable' })
@@ -180,7 +173,7 @@ vCore.RegisterServerCallback('vava_creator:getCharacters', function(source, cb)
 end)
 
 -- Vérifier si un slot est disponible
-vCore.RegisterServerCallback('vava_creator:checkSlot', function(source, cb, slot)
+vCore.RegisterServerCallback('vava_creator:checkSlot', function(source, cb, player, slot)
     local license = GetPlayerLicense(source)
     if not license then
         cb({ available = false })
@@ -196,7 +189,7 @@ vCore.RegisterServerCallback('vava_creator:checkSlot', function(source, cb, slot
 end)
 
 -- Créer un nouveau personnage
-vCore.RegisterServerCallback('vava_creator:createCharacter', function(source, cb, data)
+vCore.RegisterServerCallback('vava_creator:createCharacter', function(source, cb, player, data)
     local license = GetPlayerLicense(source)
     if not license then
         cb({ success = false, error = 'License introuvable' })
@@ -304,7 +297,7 @@ vCore.RegisterServerCallback('vava_creator:createCharacter', function(source, cb
 end)
 
 -- Charger un personnage
-vCore.RegisterServerCallback('vava_creator:loadCharacter', function(source, cb, citizenid)
+vCore.RegisterServerCallback('vava_creator:loadCharacter', function(source, cb, player, citizenid)
     local license = GetPlayerLicense(source)
     if not license then
         cb({ success = false, error = 'License introuvable' })
@@ -365,7 +358,7 @@ vCore.RegisterServerCallback('vava_creator:loadCharacter', function(source, cb, 
 end)
 
 -- Supprimer un personnage
-vCore.RegisterServerCallback('vava_creator:deleteCharacter', function(source, cb, citizenid)
+vCore.RegisterServerCallback('vava_creator:deleteCharacter', function(source, cb, player, citizenid)
     local license = GetPlayerLicense(source)
     if not license then
         cb({ success = false, error = 'License introuvable' })
@@ -392,7 +385,7 @@ vCore.RegisterServerCallback('vava_creator:deleteCharacter', function(source, cb
 end)
 
 -- Sauvegarder le skin
-vCore.RegisterServerCallback('vava_creator:saveSkin', function(source, cb, citizenid, skinData)
+vCore.RegisterServerCallback('vava_creator:saveSkin', function(source, cb, player, citizenid, skinData)
     local license = GetPlayerLicense(source)
     if not license then
         cb({ success = false, error = 'License introuvable' })
@@ -417,7 +410,7 @@ vCore.RegisterServerCallback('vava_creator:saveSkin', function(source, cb, citiz
 end)
 
 -- Sauvegarder les vêtements
-vCore.RegisterServerCallback('vava_creator:saveClothes', function(source, cb, citizenid, clothesData)
+vCore.RegisterServerCallback('vava_creator:saveClothes', function(source, cb, player, citizenid, clothesData)
     local license = GetPlayerLicense(source)
     if not license then
         cb({ success = false, error = 'License introuvable' })
@@ -444,7 +437,7 @@ AddEventHandler('playerConnecting', function(name, setKickReason, deferrals)
     local source = source
     deferrals.defer()
     
-    Wait(0)
+    Citizen.Wait(0)
     deferrals.update('Vérification du compte...')
     
     local license = GetPlayerLicense(source)

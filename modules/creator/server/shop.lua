@@ -4,14 +4,12 @@
     ╚═══════════════════════════════════════════════════════════════════════════╝
 ]]--
 
+-- Attendre que vCore soit disponible (bloquant)
 local vCore = nil
-
-CreateThread(function()
-    while not vCore do
-        vCore = exports['vAvA_core']:GetCoreObject()
-        if not vCore then Wait(100) end
-    end
-end)
+while not vCore do
+    vCore = exports['vAvA_core']:GetCoreObject()
+    if not vCore then Citizen.Wait(100) end
+end
 
 -- ═══════════════════════════════════════════════════════════════════════════
 -- FONCTIONS UTILITAIRES
@@ -56,8 +54,7 @@ end
 -- ═══════════════════════════════════════════════════════════════════════════
 
 -- Acheter un vêtement
-vCore.RegisterServerCallback('vava_creator:buyClothing', function(source, cb, data)
-    local player = vCore.GetPlayer(source)
+vCore.RegisterServerCallback('vava_creator:buyClothing', function(source, cb, player, data)
     if not player then
         cb({ success = false, error = 'Joueur non trouvé' })
         return
@@ -143,8 +140,7 @@ vCore.RegisterServerCallback('vava_creator:buyClothing', function(source, cb, da
 end)
 
 -- Acheter plusieurs vêtements (panier)
-vCore.RegisterServerCallback('vava_creator:buyCart', function(source, cb, data)
-    local player = vCore.GetPlayer(source)
+vCore.RegisterServerCallback('vava_creator:buyCart', function(source, cb, player, data)
     if not player then
         cb({ success = false, error = 'Joueur non trouvé' })
         return
@@ -219,8 +215,7 @@ end)
 -- CALLBACKS - COIFFEUR
 -- ═══════════════════════════════════════════════════════════════════════════
 
-vCore.RegisterServerCallback('vava_creator:buyBarberService', function(source, cb, data)
-    local player = vCore.GetPlayer(source)
+vCore.RegisterServerCallback('vava_creator:buyBarberService', function(source, cb, player, data)
     if not player then
         cb({ success = false, error = 'Joueur non trouvé' })
         return
@@ -277,8 +272,7 @@ end)
 -- CALLBACKS - CHIRURGIE
 -- ═══════════════════════════════════════════════════════════════════════════
 
-vCore.RegisterServerCallback('vava_creator:buySurgery', function(source, cb, data)
-    local player = vCore.GetPlayer(source)
+vCore.RegisterServerCallback('vava_creator:buySurgery', function(source, cb, player, data)
     if not player then
         cb({ success = false, error = 'Joueur non trouvé' })
         return
@@ -326,7 +320,7 @@ end)
 -- CALLBACKS - INFORMATIONS SHOP
 -- ═══════════════════════════════════════════════════════════════════════════
 
-vCore.RegisterServerCallback('vava_creator:getShopInfo', function(source, cb, shopId)
+vCore.RegisterServerCallback('vava_creator:getShopInfo', function(source, cb, player, shopId)
     local shop = GetShopById(shopId)
     if not shop then
         cb({ success = false, error = 'Magasin invalide' })
@@ -352,8 +346,7 @@ vCore.RegisterServerCallback('vava_creator:getShopInfo', function(source, cb, sh
 end)
 
 -- Récupérer le solde du joueur
-vCore.RegisterServerCallback('vava_creator:getPlayerMoney', function(source, cb)
-    local player = vCore.GetPlayer(source)
+vCore.RegisterServerCallback('vava_creator:getPlayerMoney', function(source, cb, player)
     if not player then
         cb({ cash = 0, bank = 0 })
         return
