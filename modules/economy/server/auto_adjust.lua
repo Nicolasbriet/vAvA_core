@@ -3,6 +3,17 @@
 -- Système d'ajustement automatique des prix et salaires
 -- ══════════════════════════════════════════════════════════════════════════════
 
+-- Attendre que vCore soit disponible
+local vCore = nil
+CreateThread(function()
+    while not vCore do
+        vCore = exports['vAvA_core']:GetCoreObject()
+        if not vCore then 
+            Wait(100) 
+        end
+    end
+end)
+
 -- ══════════════════════════════════════════════════════════════════════════════
 -- Démarrer le système auto-adaptatif
 -- ══════════════════════════════════════════════════════════════════════════════

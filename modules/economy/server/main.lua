@@ -3,6 +3,15 @@
 -- Logique serveur principale du système économique
 -- ══════════════════════════════════════════════════════════════════════════════
 
+-- Attendre que vCore soit disponible
+local vCore = nil
+while not vCore do
+    vCore = exports['vAvA_core']:GetCoreObject()
+    if not vCore then 
+        Wait(100) 
+    end
+end
+
 -- ══════════════════════════════════════════════════════════════════════════════
 -- État local
 -- ══════════════════════════════════════════════════════════════════════════════
