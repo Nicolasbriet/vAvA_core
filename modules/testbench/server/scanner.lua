@@ -264,8 +264,6 @@ function Scanner.CountAvailableTests(resourceName)
             end
         end
     end
-        end
-    end
     
     return count
 end
