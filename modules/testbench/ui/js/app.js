@@ -644,12 +644,21 @@ async function fetchNUI(eventName, data = {}) {
             body: JSON.stringify(data)
         });
         
+        // Vérifier si la réponse est OK
+        if (!response.ok) {
+            console.error(`HTTP error from ${eventName}: ${response.status}`);
+            return { success: false, error: `HTTP ${response.status}` };
+        }
+        
         const text = await response.text();
+        
+        // Vérifier si la réponse est vide
         if (!text || text.trim() === '') {
             console.warn(`Empty response from ${eventName}`);
             return { success: true };
         }
         
+        // Tenter de parser le JSON
         try {
             return JSON.parse(text);
         } catch (parseError) {
@@ -658,7 +667,7 @@ async function fetchNUI(eventName, data = {}) {
         }
     } catch (error) {
         console.error(`NUI Fetch Error (${eventName}):`, error);
-        return null;
+        return { success: false, error: error.message };
     }
 }
 

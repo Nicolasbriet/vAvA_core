@@ -132,13 +132,13 @@ end)
 -- Exécuter un scénario
 RegisterNUICallback('testbench:runScenario', function(data, cb)
     TriggerServerEvent('testbench:runScenario', data.scenario)
-    cb('ok')
+    cb({success = true})
 end)
 
 -- Exporter les résultats
 RegisterNUICallback('testbench:export', function(data, cb)
     TriggerServerEvent('testbench:exportResults', data.data)
-    cb('ok')
+    cb({success = true})
 end)
 
 -- === EVENTS DE TEST (pour les tests unitaires) ===
