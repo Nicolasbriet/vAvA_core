@@ -674,24 +674,14 @@ async function fetchNUI(eventName, data = {}) {
 }
 
 function GetParentResourceName() {
-    // In-game: get resource name from nui:// URL
+    // In-game: get resource name from cfx-nui URL
     const url = window.location.href;
     console.log('[TESTBENCH] Current URL:', url);
     
-    // Try different URL patterns
-    let match;
-    
-    // Pattern 1: nui://resource_name/...
-    match = url.match(/nui:\/\/([^\/]+)/);
+    // FiveM uses format: https://cfx-nui-resource_name/...
+    const match = url.match(/https?:\/\/cfx-nui-([^\/]+)/);
     if (match) {
-        console.log('[TESTBENCH] Resource name (pattern 1):', match[1]);
-        return match[1];
-    }
-    
-    // Pattern 2: https://resource_name/...
-    match = url.match(/https?:\/\/([^\/]+)/);
-    if (match) {
-        console.log('[TESTBENCH] Resource name (pattern 2):', match[1]);
+        console.log('[TESTBENCH] Resource name:', match[1]);
         return match[1];
     }
     
