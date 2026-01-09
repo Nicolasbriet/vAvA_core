@@ -136,12 +136,14 @@ RegisterServerEvent('testbench:runAllTests', function()
     TestbenchState.isRunning = true
     LogInfo('Running all tests...')
     
-    -- Log client
-    TriggerClientEvent('testbench:addLog', source, {
-        level = 'info',
-        message = messages.running_tests,
-        timestamp = os.time() * 1000
-    })
+    -- Log client (seulement si c'est un joueur)
+    if source > 0 then
+        TriggerClientEvent('testbench:addLog', source, {
+            level = 'info',
+            message = messages.running_tests,
+            timestamp = os.time() * 1000
+        })
+    end
     
     -- Exécuter les tests dans un thread
     CreateThread(function()
@@ -149,20 +151,22 @@ RegisterServerEvent('testbench:runAllTests', function()
         
         TestbenchState.isRunning = false
         
-        -- Envoyer résultats au client
-        TriggerClientEvent('testbench:updateStats', source, results)
-        
-        -- Log final
-        local logLevel = results.failed > 0 and 'error' or 'info'
-        local logMessage = results.failed > 0 
-            and string.format(messages.some_tests_failed, results.failed)
-            or messages.all_tests_passed
-        
-        TriggerClientEvent('testbench:addLog', source, {
-            level = logLevel,
-            message = logMessage,
-            timestamp = os.time() * 1000
-        })
+        -- Envoyer résultats au client (seulement si c'est un joueur)
+        if source > 0 then
+            TriggerClientEvent('testbench:updateStats', source, results)
+            
+            -- Log final
+            local logLevel = results.failed > 0 and 'error' or 'info'
+            local logMessage = results.failed > 0 
+                and string.format(messages.some_tests_failed, results.failed)
+                or messages.all_tests_passed
+            
+            TriggerClientEvent('testbench:addLog', source, {
+                level = logLevel,
+                message = logMessage,
+                timestamp = os.time() * 1000
+            })
+        end
     end)
 end)
 
@@ -177,7 +181,10 @@ RegisterServerEvent('testbench:runTest', function(testName)
     CreateThread(function()
         local result = RunSingleTest(testName, source)
         
-        TriggerClientEvent('testbench:testCompleted', source, result)
+        -- Envoyer résultat au client (seulement si c'est un joueur)
+        if source > 0 then
+            TriggerClientEvent('testbench:testCompleted', source, result)
+        end
     end)
 end)
 
@@ -453,6 +460,188 @@ function LogDebug(message)
     if not TestbenchConfig.LogLevel.Debug then return end
     print(string.format('^6[TESTBENCH]^7 %s^0', message))
 end
+
+-- === CONSOLE COMMANDS ===
+
+-- Commande pour scanner les modules depuis la console
+RegisterCommand('testbench_scan', function(source, args, rawCommand)
+    -- Si source == 0, c'est la console serveur
+    if source ~= 0 then
+        print('^3[TESTBENCH]^7 Cette commande est réservée à la console serveur^0')
+        return
+    end
+    
+    print('^2[TESTBENCH]^7 Scan des modules en cours...^0')
+    ScanModules()
+    
+    print(string.format('^2[TESTBENCH]^7 %d modules détectés :^0', #TestbenchState.modules))
+    for _, module in ipairs(TestbenchState.modules) do
+        local status = module.hasTests and '^2✓' or '^1✗'
+        print(string.format('  %s^7 %s - Tests: %d^0', status, module.name, module.testCount or 0))
+    end
+end, true) -- true = restricted (console only)
+
+-- Commande pour lancer tous les tests depuis la console
+RegisterCommand('testbench_run', function(source, args, rawCommand)
+    if source ~= 0 then
+        print('^3[TESTBENCH]^7 Cette commande est réservée à la console serveur^0')
+        return
+    end
+    
+    if TestbenchState.isRunning then
+        print('^3[TESTBENCH]^7 Des tests sont déjà en cours d\'exécution^0')
+        return
+    end
+    
+    TestbenchState.isRunning = true
+    print('^2[TESTBENCH]^7 Lancement de tous les tests...^0')
+    
+    CreateThread(function()
+        local results = RunAllTests(0) -- source = 0 pour console
+        
+        TestbenchState.isRunning = false
+        
+        -- Afficher les résultats dans la console
+        print('^2[TESTBENCH]^7 ========================================^0')
+        print('^2[TESTBENCH]^7 RÉSULTATS DES TESTS^0')
+        print('^2[TESTBENCH]^7 ========================================^0')
+        print(string.format('^2[TESTBENCH]^7 Réussis  : ^2%d^0', results.passed))
+        print(string.format('^2[TESTBENCH]^7 Échoués  : ^1%d^0', results.failed))
+        print(string.format('^2[TESTBENCH]^7 Warnings : ^3%d^0', results.warnings))
+        print('^2[TESTBENCH]^7 ========================================^0')
+        
+        if results.failed == 0 then
+            print('^2[TESTBENCH]^7 ✓ Tous les tests sont passés !^0')
+        else
+            print('^1[TESTBENCH]^7 ✗ Certains tests ont échoué !^0')
+        end
+    end)
+end, true)
+
+-- Commande pour lancer un test spécifique depuis la console
+RegisterCommand('testbench_run_test', function(source, args, rawCommand)
+    if source ~= 0 then
+        print('^3[TESTBENCH]^7 Cette commande est réservée à la console serveur^0')
+        return
+    end
+    
+    local testName = args[1]
+    if not testName then
+        print('^1[TESTBENCH]^7 Usage: testbench_run_test <nom_du_test>^0')
+        return
+    end
+    
+    print(string.format('^2[TESTBENCH]^7 Lancement du test: %s^0', testName))
+    
+    CreateThread(function()
+        local result = RunSingleTest(testName, 0)
+        
+        if result then
+            local status = result.success and '^2RÉUSSI' or '^1ÉCHOUÉ'
+            print(string.format('^2[TESTBENCH]^7 Test %s : %s^7^0', testName, status))
+            if result.message then
+                print(string.format('^2[TESTBENCH]^7 Message: %s^0', result.message))
+            end
+        else
+            print(string.format('^1[TESTBENCH]^7 Test introuvable: %s^0', testName))
+        end
+    end)
+end, true)
+
+-- Commande pour lancer les tests critiques depuis la console
+RegisterCommand('testbench_critical', function(source, args, rawCommand)
+    if source ~= 0 then
+        print('^3[TESTBENCH]^7 Cette commande est réservée à la console serveur^0')
+        return
+    end
+    
+    print('^2[TESTBENCH]^7 Lancement des tests critiques...^0')
+    
+    CreateThread(function()
+        RunCriticalTests()
+        print('^2[TESTBENCH]^7 Tests critiques terminés^0')
+    end)
+end, true)
+
+-- Commande pour lister tous les tests disponibles
+RegisterCommand('testbench_list', function(source, args, rawCommand)
+    if source ~= 0 then
+        print('^3[TESTBENCH]^7 Cette commande est réservée à la console serveur^0')
+        return
+    end
+    
+    print('^2[TESTBENCH]^7 ========================================^0')
+    print('^2[TESTBENCH]^7 LISTE DES TESTS DISPONIBLES^0')
+    print('^2[TESTBENCH]^7 ========================================^0')
+    
+    local totalTests = 0
+    for moduleName, tests in pairs(TestbenchState.tests) do
+        if tests and #tests > 0 then
+            print(string.format('^2[TESTBENCH]^7 Module: ^5%s^7 (%d tests)^0', moduleName, #tests))
+            for _, test in ipairs(tests) do
+                local typeColor = test.type == 'critical' and '^1' or '^2'
+                print(string.format('  %s- %s^7 [%s]^0', typeColor, test.name, test.type))
+                totalTests = totalTests + 1
+            end
+        end
+    end
+    
+    print('^2[TESTBENCH]^7 ========================================^0')
+    print(string.format('^2[TESTBENCH]^7 Total: %d tests disponibles^0', totalTests))
+end, true)
+
+-- Commande pour voir les logs récents
+RegisterCommand('testbench_logs', function(source, args, rawCommand)
+    if source ~= 0 then
+        print('^3[TESTBENCH]^7 Cette commande est réservée à la console serveur^0')
+        return
+    end
+    
+    local count = tonumber(args[1]) or 10
+    
+    print('^2[TESTBENCH]^7 ========================================^0')
+    print(string.format('^2[TESTBENCH]^7 DERNIERS LOGS (%d)^0', count))
+    print('^2[TESTBENCH]^7 ========================================^0')
+    
+    local logCount = math.min(#TestbenchState.logs, count)
+    local startIndex = math.max(1, #TestbenchState.logs - logCount + 1)
+    
+    for i = startIndex, #TestbenchState.logs do
+        local log = TestbenchState.logs[i]
+        local levelColor = '^7'
+        if log.level == 'error' or log.level == 'critical' then
+            levelColor = '^1'
+        elseif log.level == 'warning' then
+            levelColor = '^3'
+        elseif log.level == 'info' then
+            levelColor = '^2'
+        end
+        
+        print(string.format('%s[%s]^7 %s^0', levelColor, string.upper(log.level), log.message))
+    end
+    
+    print('^2[TESTBENCH]^7 ========================================^0')
+end, true)
+
+-- Commande d'aide
+RegisterCommand('testbench_help', function(source, args, rawCommand)
+    if source ~= 0 then
+        print('^3[TESTBENCH]^7 Cette commande est réservée à la console serveur^0')
+        return
+    end
+    
+    print('^2[TESTBENCH]^7 ========================================^0')
+    print('^2[TESTBENCH]^7 COMMANDES DISPONIBLES^0')
+    print('^2[TESTBENCH]^7 ========================================^0')
+    print('^5testbench_scan^7           - Scanner les modules disponibles^0')
+    print('^5testbench_list^7           - Lister tous les tests^0')
+    print('^5testbench_run^7            - Lancer tous les tests^0')
+    print('^5testbench_run_test <nom>^7 - Lancer un test spécifique^0')
+    print('^5testbench_critical^7       - Lancer uniquement les tests critiques^0')
+    print('^5testbench_logs [count]^7   - Voir les derniers logs (défaut: 10)^0')
+    print('^5testbench_help^7           - Afficher cette aide^0')
+    print('^2[TESTBENCH]^7 ========================================^0')
+end, true)
 
 -- === EXPORTS ===
 exports('ScanModules', ScanModules)

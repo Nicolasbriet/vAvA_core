@@ -124,13 +124,46 @@ ensure vAvA_testbench
 
 ## 🎮 Utilisation
 
-### Commande Principale
+### Commande en Jeu
 
 ```
 /testbench
 ```
 
 Ouvre l'interface de test (admin uniquement par défaut).
+
+### 🖥️ Commandes Console (NOUVEAU)
+
+**Parfait pour les développeurs qui ne peuvent pas se connecter au serveur !**
+
+Lancez les tests directement depuis la console serveur :
+
+| Commande | Description |
+|----------|-------------|
+| `testbench_scan` | Scanner les modules disponibles |
+| `testbench_list` | Lister tous les tests |
+| `testbench_run` | Lancer tous les tests |
+| `testbench_run_test <nom>` | Lancer un test spécifique |
+| `testbench_critical` | Lancer uniquement les tests critiques |
+| `testbench_logs [count]` | Voir les derniers logs (défaut: 10) |
+| `testbench_help` | Afficher l'aide |
+
+**Exemples :**
+```bash
+# Scanner les modules
+testbench_scan
+
+# Lancer tous les tests
+testbench_run
+
+# Lancer un test spécifique
+testbench_run_test test_economy_price_calculation
+
+# Voir les 20 derniers logs
+testbench_logs 20
+```
+
+📖 **Documentation complète** : [CONSOLE_COMMANDS.md](CONSOLE_COMMANDS.md)
 
 ### Interface Utilisateur
 
