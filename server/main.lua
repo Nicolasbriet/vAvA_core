@@ -25,6 +25,12 @@ CreateThread(function()
         vCore.Migrations.Run()
     end
     
+    -- 🔄 SYSTÈME AUTO-UPDATE - Vérifier et appliquer les mises à jour
+    Wait(500)
+    if vCore.AutoUpdate then
+        vCore.AutoUpdate.CheckAndApply()
+    end
+    
     -- Charger les caches
     Wait(500)
     vCore.Cache.Items.Load()

@@ -33,6 +33,7 @@ server_scripts {
     'database/dal.lua',
     'database/cache.lua',
     'database/migrations.lua',
+    'database/auto_update.lua',
     'server/main.lua',
     'server/callbacks.lua',
     'server/players.lua',

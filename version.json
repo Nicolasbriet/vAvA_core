@@ -1,0 +1,46 @@
+{
+    "vava_core": "1.0.0",
+    "economy": "1.2.0",
+    "creator": "1.0.0",
+    "garage": "1.0.0",
+    "inventory": "1.0.0",
+    "chat": "1.0.0",
+    "jobs": "1.0.0",
+    "keys": "1.0.0",
+    "concess": "1.0.0",
+    "jobshop": "1.0.0",
+    "persist": "1.0.0",
+    "sit": "1.0.0",
+    "loadingscreen": "1.0.0",
+    "testbench": "1.0.0",
+    "updates": [
+        {
+            "module": "economy",
+            "version": "1.2.0",
+            "description": "Ajout du système de monitoring et rapports économiques",
+            "releaseDate": "2026-01-09",
+            "queries": [
+                "CREATE TABLE IF NOT EXISTS `economy_reports` (`id` INT(11) NOT NULL AUTO_INCREMENT, `report_type` ENUM('hourly', 'daily', 'weekly', 'monthly', 'custom') NOT NULL DEFAULT 'hourly', `report_data` JSON NOT NULL, `generated_at` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP, `generated_by` VARCHAR(100) DEFAULT 'system', PRIMARY KEY (`id`), KEY `report_type` (`report_type`), KEY `generated_at` (`generated_at`)) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;",
+                "ALTER TABLE `economy_logs` MODIFY COLUMN `source` ENUM('auto', 'admin', 'system', 'monitoring') NOT NULL DEFAULT 'auto';"
+            ],
+            "files": [
+                "modules/economy/server/auto_adjust.lua",
+                "modules/economy/server/main.lua",
+                "modules/economy/config/economy.lua"
+            ],
+            "needsRestart": true,
+            "changelog": [
+                "Ajout de la fonction StartMonitoring()",
+                "Ajout de la détection d'anomalies",
+                "Génération de rapports horaires",
+                "Alertes automatiques pour les admins"
+            ]
+        }
+    ],
+    "metadata": {
+        "lastUpdate": "2026-01-09T10:30:00Z",
+        "minFrameworkVersion": "1.0.0",
+        "repository": "https://github.com/Nicolasbriet/vAvA_core",
+        "branch": "main"
+    }
+}
