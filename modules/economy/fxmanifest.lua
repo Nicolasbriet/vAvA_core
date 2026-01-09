@@ -1,7 +1,7 @@
 -- ══════════════════════════════════════════════════════════════════════════════
 -- vAvA_core - Module Economy
 -- Système d'économie automatique, centralisé et auto-adaptatif
--- Version: 1.0.0
+-- Version: 1.3.0
 -- ══════════════════════════════════════════════════════════════════════════════
 
 fx_version 'cerulean'
