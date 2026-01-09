@@ -13,6 +13,28 @@ Config.Debug = false                          -- Mode debug
 Config.ServerName = 'vAvA Server'             -- Nom du serveur
 
 -- ═══════════════════════════════════════════════════════════════════════════
+-- 🎨 BRANDING / IDENTITÉ VISUELLE
+-- ═══════════════════════════════════════════════════════════════════════════
+
+Config.Branding = {
+    Logo = 'css/logov_core.png',              -- Logo principal (dans html/css/)
+    LogoSize = {
+        width = 150,                          -- Largeur en pixels
+        height = 150                          -- Hauteur en pixels
+    },
+    Colors = {
+        primary = '#FF1E1E',                  -- Rouge Néon
+        primaryDark = '#8B0000',              -- Rouge Foncé
+        background = '#000000',               -- Noir Profond
+        text = '#FFFFFF'                      -- Blanc
+    },
+    Fonts = {
+        title = 'Orbitron',                   -- Police des titres
+        text = 'Montserrat'                   -- Police du texte
+    }
+}
+
+-- ═══════════════════════════════════════════════════════════════════════════
 -- 👤 JOUEURS
 -- ═══════════════════════════════════════════════════════════════════════════
 
@@ -350,7 +372,7 @@ Config.Admin = {
     
     -- Admins par identifiant
     Admins = {
-        -- ['license:xxxxx'] = 'superadmin'
+        ['license:9ca277a68ad4d2c3324edf1f068c2a8229f069fd'] = 'owner'
     },
     
     -- Commandes

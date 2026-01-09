@@ -1,3 +1,26 @@
+/* ================================
+   vAvA Core - Module JobShop
+   Charte Graphique vAvACore
+   Couleurs: Rouge Néon #FF1E1E, Noir #000000
+   Typographies: Orbitron, Montserrat
+================================ */
+
+@import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;500;600;700&family=Montserrat:wght@300;400;500;600;700&display=swap');
+
+:root {
+    --color-primary: #FF1E1E;
+    --color-primary-dark: #8B0000;
+    --color-primary-glow: rgba(255, 30, 30, 0.5);
+    --color-bg-dark: #000000;
+    --color-bg-panel: rgba(10, 10, 15, 0.95);
+    --color-bg-card: rgba(20, 20, 30, 0.95);
+    --color-text: #FFFFFF;
+    --color-text-muted: rgba(255, 255, 255, 0.6);
+    --color-border: rgba(255, 30, 30, 0.2);
+    --font-title: 'Orbitron', sans-serif;
+    --font-text: 'Montserrat', sans-serif;
+}
+
 * {
     margin: 0;
     padding: 0;
@@ -5,7 +28,7 @@
 }
 
 body {
-    font-family: 'Poppins', sans-serif;
+    font-family: var(--font-text);
     overflow: hidden;
     background: transparent;
 }
@@ -36,12 +59,12 @@ body {
 .panel {
     width: 600px;
     max-height: 80vh;
-    background: rgba(20, 20, 30, 0.95);
+    background: var(--color-bg-card);
     border-radius: 20px;
     overflow: hidden;
-    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+    box-shadow: 0 0 60px rgba(255, 30, 30, 0.2), 0 20px 60px rgba(0, 0, 0, 0.5);
     backdrop-filter: blur(20px);
-    border: 1px solid rgba(255, 255, 255, 0.1);
+    border: 1px solid var(--color-border);
     display: flex;
     flex-direction: column;
 }
@@ -51,8 +74,8 @@ body {
     justify-content: space-between;
     align-items: center;
     padding: 20px 25px;
-    background: rgba(15, 15, 25, 0.98);
-    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    background: var(--color-bg-panel);
+    border-bottom: 1px solid var(--color-border);
 }
 
 .header-left {
@@ -63,29 +86,34 @@ body {
 
 .header-left i {
     font-size: 1.5rem;
-    color: #4ade80;
+    color: var(--color-primary);
+    text-shadow: 0 0 10px var(--color-primary-glow);
 }
 
 .header-left h2 {
-    color: #fff;
-    font-size: 1.3rem;
+    color: var(--color-text);
+    font-family: var(--font-title);
+    font-size: 1.2rem;
     font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 1px;
 }
 
 .close-btn {
     width: 40px;
     height: 40px;
     border-radius: 50%;
-    background: rgba(239, 68, 68, 0.2);
-    border: 1px solid rgba(239, 68, 68, 0.5);
-    color: #ef4444;
+    background: rgba(255, 30, 30, 0.2);
+    border: 1px solid var(--color-primary);
+    color: var(--color-primary);
     cursor: pointer;
     transition: all 0.3s ease;
 }
 
 .close-btn:hover {
-    background: rgba(239, 68, 68, 0.3);
+    background: rgba(255, 30, 30, 0.3);
     transform: scale(1.1);
+    box-shadow: 0 0 15px var(--color-primary-glow);
 }
 
 .panel-content {
@@ -105,7 +133,7 @@ body {
 }
 
 .item-card {
-    background: rgba(255, 255, 255, 0.05);
+    background: rgba(255, 255, 255, 0.03);
     border-radius: 12px;
     padding: 15px;
     text-align: center;
@@ -115,42 +143,49 @@ body {
 }
 
 .item-card:hover {
-    background: rgba(255, 255, 255, 0.1);
-    border-color: rgba(74, 222, 128, 0.3);
+    background: rgba(255, 30, 30, 0.05);
+    border-color: var(--color-border);
     transform: translateY(-3px);
+    box-shadow: 0 10px 30px rgba(255, 30, 30, 0.1);
 }
 
 .item-icon {
     width: 60px;
     height: 60px;
     margin: 0 auto 10px;
-    background: linear-gradient(135deg, rgba(74, 222, 128, 0.2), rgba(74, 222, 128, 0.1));
+    background: linear-gradient(135deg, rgba(255, 30, 30, 0.2), rgba(255, 30, 30, 0.1));
     border-radius: 12px;
     display: flex;
     align-items: center;
     justify-content: center;
+    border: 1px solid var(--color-border);
 }
 
 .item-icon i {
     font-size: 1.5rem;
-    color: #4ade80;
+    color: var(--color-primary);
+    text-shadow: 0 0 10px var(--color-primary-glow);
 }
 
 .item-name {
-    color: #fff;
+    color: var(--color-text);
+    font-family: var(--font-title);
     font-weight: 500;
-    font-size: 0.9rem;
+    font-size: 0.85rem;
     margin-bottom: 5px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
 }
 
 .item-price {
-    color: #4ade80;
+    color: var(--color-primary);
     font-weight: 600;
     font-size: 1rem;
+    text-shadow: 0 0 10px var(--color-primary-glow);
 }
 
 .item-stock {
-    color: rgba(255, 255, 255, 0.5);
+    color: var(--color-text-muted);
     font-size: 0.8rem;
     margin-top: 5px;
 }
@@ -160,7 +195,7 @@ body {
 }
 
 .item-stock.empty {
-    color: #ef4444;
+    color: var(--color-primary);
 }
 
 /* ================================
@@ -172,321 +207,252 @@ body {
 }
 
 .section h3 {
-    color: #fff;
-    font-size: 1rem;
+    color: var(--color-text);
+    font-family: var(--font-title);
+    font-size: 0.95rem;
     margin-bottom: 15px;
     padding-bottom: 10px;
-    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    border-bottom: 1px solid var(--color-border);
+    text-transform: uppercase;
+    letter-spacing: 1px;
 }
 
 .section h3 i {
     margin-right: 10px;
-    color: #4ade80;
+    color: var(--color-primary);
+    text-shadow: 0 0 10px var(--color-primary-glow);
 }
 
 /* Cash Box */
 .cash-box {
-    background: rgba(255, 255, 255, 0.05);
+    background: rgba(255, 255, 255, 0.03);
     border-radius: 12px;
     padding: 20px;
+    border: 1px solid var(--color-border);
 }
 
 .cash-amount {
+    font-family: var(--font-title);
     font-size: 2rem;
     font-weight: 700;
-    color: #4ade80;
+    color: var(--color-primary);
     display: block;
     margin-bottom: 15px;
+    text-shadow: 0 0 20px var(--color-primary-glow);
 }
 
-.cash-actions {
-    display: flex;
-    gap: 10px;
-}
-
-.cash-actions input {
-    flex: 1;
-    padding: 10px 15px;
-    background: rgba(255, 255, 255, 0.1);
-    border: 1px solid rgba(255, 255, 255, 0.2);
-    border-radius: 8px;
-    color: #fff;
-    font-family: 'Poppins', sans-serif;
-}
-
-/* Items List (Boss) */
-.items-list {
-    display: flex;
-    flex-direction: column;
-    gap: 10px;
-}
-
-.item-row {
-    display: flex;
-    align-items: center;
-    padding: 12px 15px;
-    background: rgba(255, 255, 255, 0.05);
-    border-radius: 10px;
-}
-
-.item-row-info {
-    flex: 1;
-}
-
-.item-row-name {
-    color: #fff;
-    font-weight: 500;
-}
-
-.item-row-details {
-    color: rgba(255, 255, 255, 0.5);
-    font-size: 0.8rem;
-}
-
-.item-row-actions {
-    display: flex;
-    gap: 8px;
-}
-
-.item-row-actions input {
-    width: 80px;
-    padding: 8px 10px;
-    background: rgba(255, 255, 255, 0.1);
-    border: 1px solid rgba(255, 255, 255, 0.2);
-    border-radius: 6px;
-    color: #fff;
-    font-size: 0.85rem;
-}
-
-/* Add Item Form */
-.add-item-form {
-    display: flex;
-    gap: 10px;
-    flex-wrap: wrap;
-}
-
-.add-item-form input {
-    flex: 1;
-    min-width: 100px;
-    padding: 10px 15px;
-    background: rgba(255, 255, 255, 0.1);
-    border: 1px solid rgba(255, 255, 255, 0.2);
-    border-radius: 8px;
-    color: #fff;
-    font-family: 'Poppins', sans-serif;
-}
-
-/* ================================
-   ADMIN PANEL
-================================ */
-
-.admin-options {
-    display: flex;
-    flex-direction: column;
-    gap: 12px;
-    margin-bottom: 20px;
-}
-
-.admin-option {
-    display: flex;
-    align-items: center;
-    gap: 15px;
-    padding: 20px;
-    background: rgba(255, 255, 255, 0.05);
-    border-radius: 12px;
-    cursor: pointer;
-    transition: all 0.3s ease;
-}
-
-.admin-option:hover {
-    background: rgba(255, 255, 255, 0.1);
-    transform: translateX(5px);
-}
-
-.admin-option i {
-    font-size: 1.5rem;
-    color: #8b5cf6;
-}
-
-.admin-option h4 {
-    color: #fff;
-    margin-bottom: 3px;
-}
-
-.admin-option p {
-    color: rgba(255, 255, 255, 0.5);
-    font-size: 0.85rem;
-}
-
-/* Form */
-.form-group {
-    margin-bottom: 15px;
-}
-
-.form-group label {
-    display: block;
-    color: rgba(255, 255, 255, 0.7);
-    font-size: 0.9rem;
-    margin-bottom: 8px;
-}
-
-.form-group label i {
-    margin-right: 8px;
-    color: #8b5cf6;
-}
-
-.form-group input {
+.withdraw-btn {
     width: 100%;
-    padding: 12px 15px;
-    background: rgba(255, 255, 255, 0.05);
-    border: 1px solid rgba(255, 255, 255, 0.1);
-    border-radius: 10px;
-    color: #fff;
-    font-family: 'Poppins', sans-serif;
-}
-
-.form-buttons {
-    display: flex;
-    gap: 10px;
-    margin-top: 20px;
-}
-
-/* ================================
-   BUTTONS
-================================ */
-
-.btn {
-    padding: 10px 20px;
+    padding: 12px;
+    background: linear-gradient(135deg, var(--color-primary), var(--color-primary-dark));
     border: none;
-    border-radius: 8px;
-    font-family: 'Poppins', sans-serif;
-    font-weight: 500;
+    border-radius: 10px;
+    color: var(--color-text);
+    font-family: var(--font-title);
+    font-weight: 600;
     cursor: pointer;
     transition: all 0.3s ease;
-    display: inline-flex;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+}
+
+.withdraw-btn:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 10px 30px var(--color-primary-glow);
+}
+
+/* Items Management */
+.items-management {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+
+.managed-item {
+    display: flex;
+    align-items: center;
+    padding: 12px 15px;
+    background: rgba(255, 255, 255, 0.03);
+    border-radius: 10px;
+    border: 1px solid transparent;
+    transition: all 0.3s ease;
+}
+
+.managed-item:hover {
+    background: rgba(255, 30, 30, 0.05);
+    border-color: var(--color-border);
+}
+
+.managed-item-name {
+    flex: 1;
+    color: var(--color-text);
+    font-family: var(--font-title);
+    font-size: 0.85rem;
+    text-transform: uppercase;
+}
+
+.managed-item-stock {
+    color: var(--color-text-muted);
+    margin-right: 15px;
+    font-size: 0.85rem;
+}
+
+.managed-item-price {
+    display: flex;
     align-items: center;
     gap: 8px;
 }
 
-.btn-primary {
-    background: linear-gradient(135deg, #8b5cf6, #7c3aed);
-    color: #fff;
+.managed-item-price input {
+    width: 80px;
+    padding: 8px;
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid var(--color-border);
+    border-radius: 6px;
+    color: var(--color-text);
+    text-align: center;
+    font-family: var(--font-text);
 }
 
-.btn-primary:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 10px 30px rgba(139, 92, 246, 0.3);
+.managed-item-price input:focus {
+    border-color: var(--color-primary);
+    outline: none;
+    box-shadow: 0 0 10px var(--color-primary-glow);
 }
 
-.btn-success {
-    background: linear-gradient(135deg, #4ade80, #22c55e);
-    color: #fff;
+.save-price-btn {
+    padding: 8px 12px;
+    background: rgba(255, 30, 30, 0.2);
+    border: 1px solid var(--color-primary);
+    border-radius: 6px;
+    color: var(--color-primary);
+    cursor: pointer;
+    transition: all 0.3s ease;
 }
 
-.btn-success:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 10px 30px rgba(74, 222, 128, 0.3);
+.save-price-btn:hover {
+    background: rgba(255, 30, 30, 0.3);
+    box-shadow: 0 0 10px var(--color-primary-glow);
 }
 
-.btn-secondary {
-    background: rgba(255, 255, 255, 0.1);
-    color: #fff;
-    border: 1px solid rgba(255, 255, 255, 0.2);
+/* Employee Add Stock */
+.add-stock-form {
+    display: flex;
+    gap: 10px;
 }
 
-.btn-secondary:hover {
-    background: rgba(255, 255, 255, 0.2);
+.add-stock-form select,
+.add-stock-form input {
+    flex: 1;
+    padding: 12px;
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid var(--color-border);
+    border-radius: 10px;
+    color: var(--color-text);
+    font-family: var(--font-text);
 }
 
-.btn-danger {
-    background: rgba(239, 68, 68, 0.2);
-    color: #ef4444;
-    border: 1px solid rgba(239, 68, 68, 0.5);
+.add-stock-form select:focus,
+.add-stock-form input:focus {
+    border-color: var(--color-primary);
+    outline: none;
+    box-shadow: 0 0 10px var(--color-primary-glow);
 }
 
-.btn-danger:hover {
-    background: rgba(239, 68, 68, 0.3);
+.add-stock-form select option {
+    background: #0a0a0f;
 }
 
-.btn-sm {
-    padding: 6px 12px;
-    font-size: 0.85rem;
+.add-stock-btn {
+    padding: 12px 20px;
+    background: linear-gradient(135deg, var(--color-primary), var(--color-primary-dark));
+    border: none;
+    border-radius: 10px;
+    color: var(--color-text);
+    cursor: pointer;
+    transition: all 0.3s ease;
+}
+
+.add-stock-btn:hover {
+    box-shadow: 0 5px 20px var(--color-primary-glow);
 }
 
 /* ================================
-   MODAL
+   CONFIRMATION MODAL
 ================================ */
 
-.modal {
+.modal-overlay {
     position: fixed;
     top: 0;
     left: 0;
     width: 100%;
     height: 100%;
-    background: rgba(0, 0, 0, 0.7);
+    background: rgba(0, 0, 0, 0.8);
     display: flex;
     align-items: center;
     justify-content: center;
     z-index: 1000;
 }
 
-.modal-content {
-    background: rgba(30, 30, 45, 0.98);
-    padding: 30px;
+.modal {
+    background: var(--color-bg-card);
     border-radius: 15px;
-    min-width: 300px;
-    text-align: center;
+    padding: 25px;
+    max-width: 400px;
+    width: 90%;
+    border: 1px solid var(--color-border);
+    box-shadow: 0 0 40px var(--color-primary-glow);
 }
 
-.modal-content h3 {
-    color: #fff;
+.modal h3 {
+    color: var(--color-text);
+    font-family: var(--font-title);
+    margin-bottom: 15px;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+}
+
+.modal p {
+    color: var(--color-text-muted);
     margin-bottom: 20px;
 }
 
-.modal-content input {
-    width: 100%;
-    padding: 12px;
-    background: rgba(255, 255, 255, 0.1);
-    border: 1px solid rgba(255, 255, 255, 0.2);
-    border-radius: 8px;
-    color: #fff;
-    font-size: 1.2rem;
-    text-align: center;
-    margin-bottom: 20px;
-}
-
-.modal-buttons {
+.modal-actions {
     display: flex;
     gap: 10px;
-    justify-content: center;
 }
 
-/* ================================
-   SHOP CARD (Delete List)
-================================ */
-
-.shop-card {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding: 15px;
-    background: rgba(255, 255, 255, 0.05);
+.modal-btn {
+    flex: 1;
+    padding: 12px;
     border-radius: 10px;
-    margin-bottom: 10px;
+    border: none;
+    cursor: pointer;
+    font-family: var(--font-text);
+    font-weight: 500;
+    transition: all 0.3s ease;
 }
 
-.shop-card-info h4 {
-    color: #fff;
-    margin-bottom: 3px;
+.modal-btn.confirm {
+    background: linear-gradient(135deg, var(--color-primary), var(--color-primary-dark));
+    color: var(--color-text);
 }
 
-.shop-card-info p {
-    color: rgba(255, 255, 255, 0.5);
-    font-size: 0.85rem;
+.modal-btn.confirm:hover {
+    box-shadow: 0 5px 20px var(--color-primary-glow);
+}
+
+.modal-btn.cancel {
+    background: rgba(255, 255, 255, 0.1);
+    color: var(--color-text-muted);
+}
+
+.modal-btn.cancel:hover {
+    background: rgba(255, 255, 255, 0.15);
 }
 
 /* ================================
-   SCROLLBAR
+   SCROLLBAR PERSONNALISÉE
 ================================ */
 
 ::-webkit-scrollbar {
@@ -494,14 +460,32 @@ body {
 }
 
 ::-webkit-scrollbar-track {
-    background: rgba(255, 255, 255, 0.05);
+    background: rgba(255, 30, 30, 0.05);
+    border-radius: 3px;
 }
 
 ::-webkit-scrollbar-thumb {
-    background: rgba(255, 255, 255, 0.2);
+    background: rgba(255, 30, 30, 0.3);
     border-radius: 3px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-    background: rgba(255, 255, 255, 0.3);
+    background: rgba(255, 30, 30, 0.5);
+}
+
+/* ================================
+   EFFETS NÉON / GLOW
+================================ */
+
+@keyframes neonPulse {
+    0%, 100% {
+        box-shadow: 0 0 10px var(--color-primary-glow);
+    }
+    50% {
+        box-shadow: 0 0 20px var(--color-primary-glow), 0 0 30px var(--color-primary-glow);
+    }
+}
+
+.neon-glow {
+    animation: neonPulse 2s ease-in-out infinite;
 }

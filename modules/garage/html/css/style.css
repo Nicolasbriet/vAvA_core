@@ -1,3 +1,26 @@
+/* ================================
+   vAvA Core - Module Garage
+   Charte Graphique vAvACore
+   Couleurs: Rouge Néon #FF1E1E, Noir #000000
+   Typographies: Orbitron, Montserrat
+================================ */
+
+@import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;500;600;700&family=Montserrat:wght@300;400;500;600;700&display=swap');
+
+:root {
+    --color-primary: #FF1E1E;
+    --color-primary-dark: #8B0000;
+    --color-primary-glow: rgba(255, 30, 30, 0.5);
+    --color-bg-dark: #000000;
+    --color-bg-panel: rgba(10, 10, 15, 0.95);
+    --color-bg-card: rgba(20, 20, 30, 0.95);
+    --color-text: #FFFFFF;
+    --color-text-muted: rgba(255, 255, 255, 0.6);
+    --color-border: rgba(255, 30, 30, 0.2);
+    --font-title: 'Orbitron', sans-serif;
+    --font-text: 'Montserrat', sans-serif;
+}
+
 * {
     margin: 0;
     padding: 0;
@@ -5,7 +28,7 @@
 }
 
 body {
-    font-family: 'Poppins', sans-serif;
+    font-family: var(--font-text);
     overflow: hidden;
     background: transparent;
 }
@@ -33,12 +56,12 @@ body {
 .garage-container {
     width: 500px;
     max-height: 70vh;
-    background: rgba(20, 20, 30, 0.95);
+    background: var(--color-bg-card);
     border-radius: 20px;
     overflow: hidden;
-    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+    box-shadow: 0 0 60px rgba(255, 30, 30, 0.2), 0 20px 60px rgba(0, 0, 0, 0.5);
     backdrop-filter: blur(20px);
-    border: 1px solid rgba(255, 255, 255, 0.1);
+    border: 1px solid var(--color-border);
     display: flex;
     flex-direction: column;
 }
@@ -52,8 +75,8 @@ body {
     justify-content: space-between;
     align-items: center;
     padding: 20px 25px;
-    background: rgba(15, 15, 25, 0.98);
-    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    background: var(--color-bg-panel);
+    border-bottom: 1px solid var(--color-border);
 }
 
 .header-left {
@@ -64,29 +87,34 @@ body {
 
 .header-left i {
     font-size: 1.5rem;
-    color: #4ade80;
+    color: var(--color-primary);
+    text-shadow: 0 0 10px var(--color-primary-glow);
 }
 
 .header-left h2 {
-    color: #fff;
-    font-size: 1.3rem;
+    color: var(--color-text);
+    font-family: var(--font-title);
+    font-size: 1.2rem;
     font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 1px;
 }
 
 .close-btn {
     width: 40px;
     height: 40px;
     border-radius: 50%;
-    background: rgba(239, 68, 68, 0.2);
-    border: 1px solid rgba(239, 68, 68, 0.5);
-    color: #ef4444;
+    background: rgba(255, 30, 30, 0.2);
+    border: 1px solid var(--color-primary);
+    color: var(--color-primary);
     cursor: pointer;
     transition: all 0.3s ease;
 }
 
 .close-btn:hover {
-    background: rgba(239, 68, 68, 0.3);
+    background: rgba(255, 30, 30, 0.3);
     transform: scale(1.1);
+    box-shadow: 0 0 15px var(--color-primary-glow);
 }
 
 /* ================================
@@ -105,12 +133,13 @@ body {
     align-items: center;
     justify-content: center;
     padding: 50px 20px;
-    color: rgba(255, 255, 255, 0.4);
+    color: var(--color-text-muted);
 }
 
 .no-vehicles i {
     font-size: 4rem;
     margin-bottom: 15px;
+    color: rgba(255, 30, 30, 0.3);
 }
 
 .no-vehicles p {
@@ -131,7 +160,7 @@ body {
     display: flex;
     align-items: center;
     padding: 15px;
-    background: rgba(255, 255, 255, 0.05);
+    background: rgba(255, 255, 255, 0.03);
     border-radius: 12px;
     cursor: pointer;
     transition: all 0.3s ease;
@@ -139,25 +168,28 @@ body {
 }
 
 .vehicle-card:hover {
-    background: rgba(255, 255, 255, 0.1);
-    border-color: rgba(74, 222, 128, 0.3);
+    background: rgba(255, 30, 30, 0.05);
+    border-color: var(--color-border);
     transform: translateX(5px);
+    box-shadow: 0 5px 20px rgba(255, 30, 30, 0.1);
 }
 
 .vehicle-icon {
     width: 50px;
     height: 50px;
     border-radius: 10px;
-    background: linear-gradient(135deg, rgba(74, 222, 128, 0.2), rgba(74, 222, 128, 0.1));
+    background: linear-gradient(135deg, rgba(255, 30, 30, 0.2), rgba(255, 30, 30, 0.1));
     display: flex;
     align-items: center;
     justify-content: center;
     margin-right: 15px;
+    border: 1px solid var(--color-border);
 }
 
 .vehicle-icon i {
     font-size: 1.5rem;
-    color: #4ade80;
+    color: var(--color-primary);
+    text-shadow: 0 0 10px var(--color-primary-glow);
 }
 
 .vehicle-info {
@@ -165,14 +197,17 @@ body {
 }
 
 .vehicle-name {
-    color: #fff;
+    color: var(--color-text);
+    font-family: var(--font-title);
     font-weight: 500;
-    font-size: 1rem;
+    font-size: 0.95rem;
     margin-bottom: 3px;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
 }
 
 .vehicle-plate {
-    color: rgba(255, 255, 255, 0.5);
+    color: var(--color-text-muted);
     font-size: 0.85rem;
 }
 
@@ -198,7 +233,7 @@ body {
 }
 
 .stat-icon.engine {
-    color: #ef4444;
+    color: var(--color-primary);
 }
 
 .stat-icon.body {
@@ -207,238 +242,115 @@ body {
 
 .stat-value {
     font-size: 0.75rem;
-    color: rgba(255, 255, 255, 0.7);
+    color: var(--color-text-muted);
 }
 
-.spawn-btn {
-    padding: 10px 20px;
-    background: linear-gradient(135deg, #4ade80, #22c55e);
-    border: none;
-    border-radius: 8px;
-    color: #fff;
-    font-weight: 500;
-    cursor: pointer;
-    transition: all 0.3s ease;
-    font-family: 'Poppins', sans-serif;
-}
-
-.spawn-btn:hover {
-    transform: scale(1.05);
-    box-shadow: 0 5px 20px rgba(74, 222, 128, 0.3);
-}
-
-/* ================================
-   INFO FOURRIÈRE
-================================ */
-
-.impound-info {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 10px;
-    padding: 15px;
-    background: rgba(239, 68, 68, 0.1);
-    border-top: 1px solid rgba(239, 68, 68, 0.3);
-    color: #ef4444;
-}
-
-.impound-info i {
-    font-size: 1.1rem;
-}
-
-/* ================================
-   PANEL ADMIN
-================================ */
-
-#admin-panel {
-    position: fixed;
-    top: 0;
-    left: 0;
-    width: 100%;
-    height: 100%;
-    background: rgba(0, 0, 0, 0.8);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    z-index: 1000;
-}
-
-.admin-container {
-    width: 90%;
-    max-width: 600px;
-    max-height: 80vh;
-    background: rgba(20, 20, 30, 0.98);
-    border-radius: 20px;
-    overflow: hidden;
-    display: flex;
-    flex-direction: column;
-}
-
-.admin-header {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: 20px 25px;
-    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-}
-
-.admin-header h2 {
-    color: #fff;
-    font-size: 1.3rem;
-}
-
-.admin-header i {
-    color: #8b5cf6;
-    margin-right: 10px;
-}
-
-.admin-close-btn {
+.vehicle-action {
     width: 40px;
     height: 40px;
-    border-radius: 50%;
-    background: rgba(239, 68, 68, 0.2);
-    border: 1px solid rgba(239, 68, 68, 0.5);
-    color: #ef4444;
+    border-radius: 10px;
+    background: rgba(255, 30, 30, 0.1);
+    border: 1px solid var(--color-border);
+    color: var(--color-primary);
     cursor: pointer;
-}
-
-.admin-content {
-    flex: 1;
-    overflow-y: auto;
-    padding: 20px;
-}
-
-.admin-section {
-    margin-bottom: 30px;
-}
-
-.admin-section h3 {
-    color: #fff;
-    font-size: 1rem;
-    margin-bottom: 15px;
-    padding-bottom: 10px;
-    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
-}
-
-.form-row {
-    display: flex;
-    gap: 15px;
-    margin-bottom: 15px;
-}
-
-.form-group {
-    flex: 1;
-    display: flex;
-    flex-direction: column;
-    gap: 8px;
-}
-
-.form-group label {
-    color: rgba(255, 255, 255, 0.7);
-    font-size: 0.85rem;
-}
-
-.form-group input,
-.form-group select {
-    padding: 10px 15px;
-    background: rgba(255, 255, 255, 0.05);
-    border: 1px solid rgba(255, 255, 255, 0.1);
-    border-radius: 8px;
-    color: #fff;
-    font-family: 'Poppins', sans-serif;
-}
-
-.form-group select option {
-    background: #1a1a2e;
-}
-
-.form-check {
+    transition: all 0.3s ease;
     display: flex;
     align-items: center;
-    gap: 10px;
-    padding-top: 25px;
+    justify-content: center;
 }
 
-.form-check input {
-    width: 18px;
-    height: 18px;
+.vehicle-action:hover {
+    background: rgba(255, 30, 30, 0.2);
+    box-shadow: 0 0 15px var(--color-primary-glow);
 }
 
-.form-check label {
-    color: rgba(255, 255, 255, 0.7);
+/* ================================
+   TABS (Impound)
+================================ */
+
+.garage-tabs {
+    display: flex;
+    border-bottom: 1px solid var(--color-border);
+    padding: 0 20px;
+    background: var(--color-bg-panel);
 }
 
-.help-text {
-    color: rgba(255, 255, 255, 0.4);
-    font-size: 0.8rem;
-    margin-bottom: 15px;
-}
-
-.create-btn {
-    width: 100%;
-    padding: 12px;
-    background: linear-gradient(135deg, #8b5cf6, #7c3aed);
+.tab-btn {
+    flex: 1;
+    padding: 15px;
+    background: transparent;
     border: none;
-    border-radius: 10px;
-    color: #fff;
+    color: var(--color-text-muted);
+    cursor: pointer;
+    transition: all 0.3s ease;
+    font-family: var(--font-text);
+    font-size: 0.9rem;
+}
+
+.tab-btn:hover {
+    color: var(--color-text);
+}
+
+.tab-btn.active {
+    color: var(--color-primary);
+    border-bottom: 2px solid var(--color-primary);
+    text-shadow: 0 0 10px var(--color-primary-glow);
+}
+
+/* ================================
+   BOUTON SORTIR
+================================ */
+
+.spawn-btn {
+    width: 100%;
+    padding: 15px;
+    margin-top: 15px;
+    background: linear-gradient(135deg, var(--color-primary), var(--color-primary-dark));
+    border: none;
+    border-radius: 12px;
+    color: var(--color-text);
+    font-family: var(--font-title);
+    font-size: 0.95rem;
     font-weight: 600;
     cursor: pointer;
     transition: all 0.3s ease;
-    font-family: 'Poppins', sans-serif;
+    text-transform: uppercase;
+    letter-spacing: 2px;
 }
 
-.create-btn:hover {
+.spawn-btn:hover {
     transform: translateY(-2px);
-    box-shadow: 0 10px 30px rgba(139, 92, 246, 0.3);
-}
-
-.garages-list {
-    display: flex;
-    flex-direction: column;
-    gap: 10px;
-}
-
-.garage-item {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    padding: 12px 15px;
-    background: rgba(255, 255, 255, 0.05);
-    border-radius: 10px;
-}
-
-.garage-item-info {
-    display: flex;
-    flex-direction: column;
-}
-
-.garage-item-name {
-    color: #fff;
-    font-weight: 500;
-}
-
-.garage-item-id {
-    color: rgba(255, 255, 255, 0.5);
-    font-size: 0.8rem;
-}
-
-.delete-btn {
-    padding: 8px 15px;
-    background: rgba(239, 68, 68, 0.2);
-    border: 1px solid rgba(239, 68, 68, 0.5);
-    border-radius: 8px;
-    color: #ef4444;
-    cursor: pointer;
-    transition: all 0.3s ease;
-    font-family: 'Poppins', sans-serif;
-}
-
-.delete-btn:hover {
-    background: rgba(239, 68, 68, 0.3);
+    box-shadow: 0 10px 40px var(--color-primary-glow);
 }
 
 /* ================================
-   SCROLLBAR
+   IMPOUND PRICE
+================================ */
+
+.impound-price {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 15px;
+    background: rgba(255, 30, 30, 0.1);
+    border-radius: 10px;
+    margin-bottom: 15px;
+    border: 1px solid var(--color-border);
+}
+
+.impound-price span:first-child {
+    color: var(--color-text-muted);
+}
+
+.impound-price span:last-child {
+    color: var(--color-primary);
+    font-family: var(--font-title);
+    font-weight: 600;
+    text-shadow: 0 0 10px var(--color-primary-glow);
+}
+
+/* ================================
+   SCROLLBAR PERSONNALISÉE
 ================================ */
 
 ::-webkit-scrollbar {
@@ -446,14 +358,32 @@ body {
 }
 
 ::-webkit-scrollbar-track {
-    background: rgba(255, 255, 255, 0.05);
+    background: rgba(255, 30, 30, 0.05);
+    border-radius: 3px;
 }
 
 ::-webkit-scrollbar-thumb {
-    background: rgba(255, 255, 255, 0.2);
+    background: rgba(255, 30, 30, 0.3);
     border-radius: 3px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-    background: rgba(255, 255, 255, 0.3);
+    background: rgba(255, 30, 30, 0.5);
+}
+
+/* ================================
+   EFFETS NÉON / GLOW
+================================ */
+
+@keyframes neonPulse {
+    0%, 100% {
+        box-shadow: 0 0 10px var(--color-primary-glow);
+    }
+    50% {
+        box-shadow: 0 0 20px var(--color-primary-glow), 0 0 30px var(--color-primary-glow);
+    }
+}
+
+.neon-glow {
+    animation: neonPulse 2s ease-in-out infinite;
 }

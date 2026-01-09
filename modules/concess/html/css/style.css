@@ -1,3 +1,26 @@
+/* ================================
+   vAvA Core - Module Concess
+   Charte Graphique vAvACore
+   Couleurs: Rouge Néon #FF1E1E, Noir #000000
+   Typographies: Orbitron, Montserrat
+================================ */
+
+@import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;500;600;700&family=Montserrat:wght@300;400;500;600;700&display=swap');
+
+:root {
+    --color-primary: #FF1E1E;
+    --color-primary-dark: #8B0000;
+    --color-primary-glow: rgba(255, 30, 30, 0.5);
+    --color-bg-dark: #000000;
+    --color-bg-panel: rgba(10, 10, 15, 0.95);
+    --color-bg-card: rgba(20, 20, 30, 0.95);
+    --color-text: #FFFFFF;
+    --color-text-muted: rgba(255, 255, 255, 0.6);
+    --color-border: rgba(255, 30, 30, 0.2);
+    --font-title: 'Orbitron', sans-serif;
+    --font-text: 'Montserrat', sans-serif;
+}
+
 * {
     margin: 0;
     padding: 0;
@@ -5,7 +28,7 @@
 }
 
 body {
-    font-family: 'Poppins', sans-serif;
+    font-family: var(--font-text);
     overflow: hidden;
     background: transparent;
 }
@@ -35,12 +58,12 @@ body {
     width: 90%;
     max-width: 1400px;
     height: 80vh;
-    background: rgba(20, 20, 30, 0.95);
+    background: var(--color-bg-card);
     border-radius: 20px;
     overflow: hidden;
-    box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+    box-shadow: 0 0 60px rgba(255, 30, 30, 0.2), 0 20px 60px rgba(0, 0, 0, 0.5);
     backdrop-filter: blur(20px);
-    border: 1px solid rgba(255, 255, 255, 0.1);
+    border: 1px solid var(--color-border);
 }
 
 /* ================================
@@ -49,26 +72,30 @@ body {
 
 .sidebar {
     width: 250px;
-    background: rgba(15, 15, 25, 0.98);
+    background: var(--color-bg-panel);
     display: flex;
     flex-direction: column;
-    border-right: 1px solid rgba(255, 255, 255, 0.1);
+    border-right: 1px solid var(--color-border);
 }
 
 .sidebar-header {
     padding: 25px 20px;
-    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    border-bottom: 1px solid var(--color-border);
 }
 
 .sidebar-header h2 {
-    color: #fff;
-    font-size: 1.3rem;
+    color: var(--color-text);
+    font-family: var(--font-title);
+    font-size: 1.2rem;
     font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 1px;
 }
 
 .sidebar-header i {
-    color: #4ade80;
+    color: var(--color-primary);
     margin-right: 10px;
+    text-shadow: 0 0 10px var(--color-primary-glow);
 }
 
 .categories-list {
@@ -79,23 +106,25 @@ body {
 
 .category-item {
     padding: 12px 25px;
-    color: rgba(255, 255, 255, 0.7);
+    color: var(--color-text-muted);
     cursor: pointer;
     transition: all 0.3s ease;
     display: flex;
     align-items: center;
     gap: 12px;
+    font-family: var(--font-text);
 }
 
 .category-item:hover {
-    background: rgba(74, 222, 128, 0.1);
-    color: #fff;
+    background: rgba(255, 30, 30, 0.1);
+    color: var(--color-text);
 }
 
 .category-item.active {
-    background: linear-gradient(90deg, rgba(74, 222, 128, 0.2), transparent);
-    color: #4ade80;
-    border-left: 3px solid #4ade80;
+    background: linear-gradient(90deg, rgba(255, 30, 30, 0.2), transparent);
+    color: var(--color-primary);
+    border-left: 3px solid var(--color-primary);
+    text-shadow: 0 0 10px var(--color-primary-glow);
 }
 
 .category-item i {
@@ -105,27 +134,29 @@ body {
 
 .category-count {
     margin-left: auto;
-    background: rgba(255, 255, 255, 0.1);
+    background: rgba(255, 30, 30, 0.2);
     padding: 2px 8px;
     border-radius: 10px;
     font-size: 0.75rem;
+    color: var(--color-primary);
 }
 
 .sidebar-footer {
     padding: 20px;
-    border-top: 1px solid rgba(255, 255, 255, 0.1);
+    border-top: 1px solid var(--color-border);
 }
 
 .player-info {
     display: flex;
     align-items: center;
     gap: 10px;
-    color: rgba(255, 255, 255, 0.7);
+    color: var(--color-text-muted);
     font-size: 0.9rem;
 }
 
 .player-info i {
-    color: #4ade80;
+    color: var(--color-primary);
+    text-shadow: 0 0 10px var(--color-primary-glow);
 }
 
 /* ================================
@@ -146,13 +177,13 @@ body {
     gap: 15px;
     margin-bottom: 20px;
     padding: 12px 20px;
-    background: rgba(255, 255, 255, 0.05);
+    background: rgba(255, 255, 255, 0.03);
     border-radius: 12px;
-    border: 1px solid rgba(255, 255, 255, 0.1);
+    border: 1px solid var(--color-border);
 }
 
 .search-bar i {
-    color: rgba(255, 255, 255, 0.5);
+    color: var(--color-text-muted);
 }
 
 .search-bar input {
@@ -160,9 +191,9 @@ body {
     background: transparent;
     border: none;
     outline: none;
-    color: #fff;
+    color: var(--color-text);
     font-size: 1rem;
-    font-family: 'Poppins', sans-serif;
+    font-family: var(--font-text);
 }
 
 .search-bar input::placeholder {
@@ -170,17 +201,17 @@ body {
 }
 
 .search-bar select {
-    background: rgba(255, 255, 255, 0.1);
-    border: none;
-    color: #fff;
+    background: rgba(255, 30, 30, 0.1);
+    border: 1px solid var(--color-border);
+    color: var(--color-text);
     padding: 8px 15px;
     border-radius: 8px;
     cursor: pointer;
-    font-family: 'Poppins', sans-serif;
+    font-family: var(--font-text);
 }
 
 .search-bar select option {
-    background: #1a1a2e;
+    background: #0a0a0f;
 }
 
 .vehicles-grid {
@@ -193,7 +224,7 @@ body {
 }
 
 .vehicle-card {
-    background: rgba(255, 255, 255, 0.05);
+    background: rgba(255, 255, 255, 0.03);
     border-radius: 15px;
     padding: 15px;
     cursor: pointer;
@@ -202,20 +233,22 @@ body {
 }
 
 .vehicle-card:hover {
-    background: rgba(255, 255, 255, 0.1);
+    background: rgba(255, 30, 30, 0.05);
     transform: translateY(-5px);
-    border-color: rgba(74, 222, 128, 0.3);
+    border-color: var(--color-border);
+    box-shadow: 0 10px 30px rgba(255, 30, 30, 0.1);
 }
 
 .vehicle-card.selected {
-    background: rgba(74, 222, 128, 0.15);
-    border-color: #4ade80;
+    background: rgba(255, 30, 30, 0.1);
+    border-color: var(--color-primary);
+    box-shadow: 0 0 20px var(--color-primary-glow);
 }
 
 .vehicle-image {
     width: 100%;
     height: 100px;
-    background: rgba(255, 255, 255, 0.05);
+    background: rgba(255, 255, 255, 0.03);
     border-radius: 10px;
     margin-bottom: 12px;
     display: flex;
@@ -232,23 +265,27 @@ body {
 
 .vehicle-image i {
     font-size: 3rem;
-    color: rgba(255, 255, 255, 0.2);
+    color: rgba(255, 30, 30, 0.3);
 }
 
 .vehicle-name {
-    color: #fff;
+    color: var(--color-text);
+    font-family: var(--font-title);
     font-weight: 500;
-    font-size: 0.95rem;
+    font-size: 0.9rem;
     margin-bottom: 5px;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
 }
 
 .vehicle-card-price {
-    color: #4ade80;
+    color: var(--color-primary);
     font-weight: 600;
     font-size: 1rem;
+    text-shadow: 0 0 10px var(--color-primary-glow);
 }
 
 /* ================================
@@ -257,28 +294,33 @@ body {
 
 .details-panel {
     width: 320px;
-    background: rgba(15, 15, 25, 0.98);
+    background: var(--color-bg-panel);
     display: flex;
     flex-direction: column;
-    border-left: 1px solid rgba(255, 255, 255, 0.1);
+    border-left: 1px solid var(--color-border);
 }
 
 .details-header {
     padding: 25px 20px;
-    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    border-bottom: 1px solid var(--color-border);
     text-align: center;
 }
 
 .details-header h3 {
-    color: #fff;
-    font-size: 1.2rem;
+    color: var(--color-text);
+    font-family: var(--font-title);
+    font-size: 1.1rem;
     margin-bottom: 10px;
+    text-transform: uppercase;
+    letter-spacing: 1px;
 }
 
 .vehicle-price {
-    color: #4ade80;
+    color: var(--color-primary);
+    font-family: var(--font-title);
     font-size: 1.5rem;
     font-weight: 700;
+    text-shadow: 0 0 20px var(--color-primary-glow);
 }
 
 .details-content {
@@ -299,20 +341,21 @@ body {
     width: 45px;
     height: 45px;
     border-radius: 50%;
-    background: rgba(255, 255, 255, 0.1);
-    border: 1px solid rgba(255, 255, 255, 0.2);
-    color: #fff;
+    background: rgba(255, 30, 30, 0.1);
+    border: 1px solid var(--color-border);
+    color: var(--color-text);
     cursor: pointer;
     transition: all 0.3s ease;
 }
 
 .rotate-btn:hover {
-    background: rgba(74, 222, 128, 0.2);
-    border-color: #4ade80;
+    background: rgba(255, 30, 30, 0.2);
+    border-color: var(--color-primary);
+    box-shadow: 0 0 15px var(--color-primary-glow);
 }
 
 .rotation-controls span {
-    color: rgba(255, 255, 255, 0.6);
+    color: var(--color-text-muted);
     font-size: 0.85rem;
 }
 
@@ -325,18 +368,22 @@ body {
 .color-section h4,
 .livery-section h4,
 .payment-section h4 {
-    color: #fff;
-    font-size: 0.9rem;
+    color: var(--color-text);
+    font-family: var(--font-title);
+    font-size: 0.85rem;
     margin-bottom: 15px;
     display: flex;
     align-items: center;
     gap: 8px;
+    text-transform: uppercase;
+    letter-spacing: 1px;
 }
 
 .color-section h4 i,
 .livery-section h4 i,
 .payment-section h4 i {
-    color: #4ade80;
+    color: var(--color-primary);
+    text-shadow: 0 0 10px var(--color-primary-glow);
 }
 
 .color-row {
@@ -347,49 +394,52 @@ body {
 }
 
 .color-row label {
-    color: rgba(255, 255, 255, 0.7);
+    color: var(--color-text-muted);
     font-size: 0.85rem;
 }
 
 .color-row input {
     width: 80px;
     padding: 8px;
-    background: rgba(255, 255, 255, 0.1);
-    border: 1px solid rgba(255, 255, 255, 0.2);
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid var(--color-border);
     border-radius: 8px;
-    color: #fff;
+    color: var(--color-text);
     text-align: center;
-    font-family: 'Poppins', sans-serif;
+    font-family: var(--font-text);
 }
 
 .apply-color-btn {
     width: 100%;
     padding: 10px;
-    background: rgba(74, 222, 128, 0.2);
-    border: 1px solid #4ade80;
+    background: rgba(255, 30, 30, 0.2);
+    border: 1px solid var(--color-primary);
     border-radius: 8px;
-    color: #4ade80;
+    color: var(--color-primary);
     cursor: pointer;
     transition: all 0.3s ease;
-    font-family: 'Poppins', sans-serif;
+    font-family: var(--font-text);
+    text-transform: uppercase;
+    letter-spacing: 1px;
 }
 
 .apply-color-btn:hover {
-    background: rgba(74, 222, 128, 0.3);
+    background: rgba(255, 30, 30, 0.3);
+    box-shadow: 0 0 15px var(--color-primary-glow);
 }
 
 .livery-section select {
     width: 100%;
     padding: 10px;
-    background: rgba(255, 255, 255, 0.1);
-    border: 1px solid rgba(255, 255, 255, 0.2);
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid var(--color-border);
     border-radius: 8px;
-    color: #fff;
-    font-family: 'Poppins', sans-serif;
+    color: var(--color-text);
+    font-family: var(--font-text);
 }
 
 .livery-section select option {
-    background: #1a1a2e;
+    background: #0a0a0f;
 }
 
 .payment-methods {
@@ -402,7 +452,7 @@ body {
     display: flex;
     align-items: center;
     padding: 12px 15px;
-    background: rgba(255, 255, 255, 0.05);
+    background: rgba(255, 255, 255, 0.03);
     border-radius: 10px;
     cursor: pointer;
     transition: all 0.3s ease;
@@ -410,7 +460,7 @@ body {
 }
 
 .payment-option:hover {
-    background: rgba(255, 255, 255, 0.1);
+    background: rgba(255, 30, 30, 0.05);
 }
 
 .payment-option input {
@@ -418,16 +468,17 @@ body {
 }
 
 .payment-option input:checked + span {
-    color: #4ade80;
+    color: var(--color-primary);
 }
 
 .payment-option:has(input:checked) {
-    border-color: #4ade80;
-    background: rgba(74, 222, 128, 0.1);
+    border-color: var(--color-primary);
+    background: rgba(255, 30, 30, 0.1);
+    box-shadow: 0 0 15px var(--color-primary-glow);
 }
 
 .payment-option span {
-    color: rgba(255, 255, 255, 0.7);
+    color: var(--color-text-muted);
     display: flex;
     align-items: center;
     gap: 10px;
@@ -435,26 +486,28 @@ body {
 
 .details-footer {
     padding: 20px;
-    border-top: 1px solid rgba(255, 255, 255, 0.1);
+    border-top: 1px solid var(--color-border);
 }
 
 .buy-btn {
     width: 100%;
     padding: 15px;
-    background: linear-gradient(135deg, #4ade80, #22c55e);
+    background: linear-gradient(135deg, var(--color-primary), var(--color-primary-dark));
     border: none;
     border-radius: 12px;
-    color: #fff;
-    font-size: 1.1rem;
+    color: var(--color-text);
+    font-family: var(--font-title);
+    font-size: 1rem;
     font-weight: 600;
     cursor: pointer;
     transition: all 0.3s ease;
-    font-family: 'Poppins', sans-serif;
+    text-transform: uppercase;
+    letter-spacing: 2px;
 }
 
 .buy-btn:hover:not(:disabled) {
     transform: translateY(-2px);
-    box-shadow: 0 10px 30px rgba(74, 222, 128, 0.3);
+    box-shadow: 0 10px 40px var(--color-primary-glow);
 }
 
 .buy-btn:disabled {
@@ -474,17 +527,19 @@ body {
     width: 50px;
     height: 50px;
     border-radius: 50%;
-    background: rgba(239, 68, 68, 0.8);
+    background: rgba(255, 30, 30, 0.8);
     border: none;
-    color: #fff;
+    color: var(--color-text);
     font-size: 1.2rem;
     cursor: pointer;
     transition: all 0.3s ease;
+    box-shadow: 0 0 20px var(--color-primary-glow);
 }
 
 .close-btn:hover {
-    background: #ef4444;
+    background: var(--color-primary);
     transform: scale(1.1);
+    box-shadow: 0 0 30px var(--color-primary-glow);
 }
 
 .admin-btn {
@@ -492,19 +547,22 @@ body {
     bottom: 30px;
     right: 30px;
     padding: 12px 25px;
-    background: rgba(139, 92, 246, 0.8);
-    border: none;
+    background: rgba(139, 0, 0, 0.8);
+    border: 1px solid var(--color-primary);
     border-radius: 25px;
-    color: #fff;
-    font-size: 0.9rem;
+    color: var(--color-text);
+    font-family: var(--font-title);
+    font-size: 0.85rem;
     cursor: pointer;
     transition: all 0.3s ease;
-    font-family: 'Poppins', sans-serif;
+    text-transform: uppercase;
+    letter-spacing: 1px;
 }
 
 .admin-btn:hover {
-    background: #8b5cf6;
+    background: var(--color-primary-dark);
     transform: translateY(-2px);
+    box-shadow: 0 0 20px var(--color-primary-glow);
 }
 
 /* ================================
@@ -517,7 +575,7 @@ body {
     left: 0;
     width: 100%;
     height: 100%;
-    background: rgba(0, 0, 0, 0.8);
+    background: rgba(0, 0, 0, 0.9);
     display: flex;
     align-items: center;
     justify-content: center;
@@ -528,11 +586,13 @@ body {
     width: 90%;
     max-width: 800px;
     max-height: 80vh;
-    background: rgba(20, 20, 30, 0.98);
+    background: var(--color-bg-card);
     border-radius: 20px;
     overflow: hidden;
     display: flex;
     flex-direction: column;
+    border: 1px solid var(--color-border);
+    box-shadow: 0 0 60px var(--color-primary-glow);
 }
 
 .admin-header {
@@ -540,37 +600,42 @@ body {
     justify-content: space-between;
     align-items: center;
     padding: 20px 25px;
-    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    border-bottom: 1px solid var(--color-border);
 }
 
 .admin-header h2 {
-    color: #fff;
-    font-size: 1.3rem;
+    color: var(--color-text);
+    font-family: var(--font-title);
+    font-size: 1.2rem;
+    text-transform: uppercase;
+    letter-spacing: 1px;
 }
 
 .admin-header i {
-    color: #8b5cf6;
+    color: var(--color-primary);
     margin-right: 10px;
+    text-shadow: 0 0 10px var(--color-primary-glow);
 }
 
 .admin-close-btn {
     width: 40px;
     height: 40px;
     border-radius: 50%;
-    background: rgba(239, 68, 68, 0.2);
-    border: 1px solid rgba(239, 68, 68, 0.5);
-    color: #ef4444;
+    background: rgba(255, 30, 30, 0.2);
+    border: 1px solid var(--color-primary);
+    color: var(--color-primary);
     cursor: pointer;
     transition: all 0.3s ease;
 }
 
 .admin-close-btn:hover {
-    background: rgba(239, 68, 68, 0.3);
+    background: rgba(255, 30, 30, 0.3);
+    box-shadow: 0 0 15px var(--color-primary-glow);
 }
 
 .admin-tabs {
     display: flex;
-    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    border-bottom: 1px solid var(--color-border);
 }
 
 .admin-tab {
@@ -578,20 +643,21 @@ body {
     padding: 15px;
     background: transparent;
     border: none;
-    color: rgba(255, 255, 255, 0.6);
+    color: var(--color-text-muted);
     cursor: pointer;
     transition: all 0.3s ease;
-    font-family: 'Poppins', sans-serif;
+    font-family: var(--font-text);
 }
 
 .admin-tab:hover {
-    color: #fff;
-    background: rgba(255, 255, 255, 0.05);
+    color: var(--color-text);
+    background: rgba(255, 30, 30, 0.05);
 }
 
 .admin-tab.active {
-    color: #8b5cf6;
-    border-bottom: 2px solid #8b5cf6;
+    color: var(--color-primary);
+    border-bottom: 2px solid var(--color-primary);
+    text-shadow: 0 0 10px var(--color-primary-glow);
 }
 
 .admin-content {
@@ -617,11 +683,11 @@ body {
 .admin-search input {
     width: 100%;
     padding: 12px 20px;
-    background: rgba(255, 255, 255, 0.05);
-    border: 1px solid rgba(255, 255, 255, 0.1);
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid var(--color-border);
     border-radius: 10px;
-    color: #fff;
-    font-family: 'Poppins', sans-serif;
+    color: var(--color-text);
+    font-family: var(--font-text);
 }
 
 .admin-vehicles-list {
@@ -635,13 +701,15 @@ body {
     align-items: center;
     justify-content: space-between;
     padding: 15px;
-    background: rgba(255, 255, 255, 0.05);
+    background: rgba(255, 255, 255, 0.03);
     border-radius: 10px;
     transition: all 0.3s ease;
+    border: 1px solid transparent;
 }
 
 .admin-vehicle-item:hover {
-    background: rgba(255, 255, 255, 0.1);
+    background: rgba(255, 30, 30, 0.05);
+    border-color: var(--color-border);
 }
 
 .admin-vehicle-info {
@@ -650,12 +718,15 @@ body {
 }
 
 .admin-vehicle-name {
-    color: #fff;
+    color: var(--color-text);
+    font-family: var(--font-title);
     font-weight: 500;
+    text-transform: uppercase;
+    font-size: 0.9rem;
 }
 
 .admin-vehicle-details {
-    color: rgba(255, 255, 255, 0.5);
+    color: var(--color-text-muted);
     font-size: 0.8rem;
 }
 
@@ -670,12 +741,13 @@ body {
     border: none;
     cursor: pointer;
     transition: all 0.3s ease;
-    font-family: 'Poppins', sans-serif;
+    font-family: var(--font-text);
 }
 
 .edit-btn {
     background: rgba(59, 130, 246, 0.2);
     color: #3b82f6;
+    border: 1px solid rgba(59, 130, 246, 0.5);
 }
 
 .edit-btn:hover {
@@ -683,12 +755,14 @@ body {
 }
 
 .delete-btn {
-    background: rgba(239, 68, 68, 0.2);
-    color: #ef4444;
+    background: rgba(255, 30, 30, 0.2);
+    color: var(--color-primary);
+    border: 1px solid var(--color-primary);
 }
 
 .delete-btn:hover {
-    background: rgba(239, 68, 68, 0.3);
+    background: rgba(255, 30, 30, 0.3);
+    box-shadow: 0 0 10px var(--color-primary-glow);
 }
 
 /* Formulaire d'ajout */
@@ -705,22 +779,29 @@ body {
 }
 
 .form-group label {
-    color: rgba(255, 255, 255, 0.7);
+    color: var(--color-text-muted);
     font-size: 0.9rem;
 }
 
 .form-group input,
 .form-group select {
     padding: 12px 15px;
-    background: rgba(255, 255, 255, 0.05);
-    border: 1px solid rgba(255, 255, 255, 0.1);
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid var(--color-border);
     border-radius: 10px;
-    color: #fff;
-    font-family: 'Poppins', sans-serif;
+    color: var(--color-text);
+    font-family: var(--font-text);
+}
+
+.form-group input:focus,
+.form-group select:focus {
+    border-color: var(--color-primary);
+    outline: none;
+    box-shadow: 0 0 10px var(--color-primary-glow);
 }
 
 .form-group select option {
-    background: #1a1a2e;
+    background: #0a0a0f;
 }
 
 .form-check {
@@ -732,28 +813,31 @@ body {
 .form-check input {
     width: 20px;
     height: 20px;
+    accent-color: var(--color-primary);
 }
 
 .form-check label {
-    color: rgba(255, 255, 255, 0.7);
+    color: var(--color-text-muted);
 }
 
 .add-btn {
     padding: 15px;
-    background: linear-gradient(135deg, #8b5cf6, #7c3aed);
+    background: linear-gradient(135deg, var(--color-primary), var(--color-primary-dark));
     border: none;
     border-radius: 12px;
-    color: #fff;
-    font-size: 1rem;
+    color: var(--color-text);
+    font-family: var(--font-title);
+    font-size: 0.95rem;
     font-weight: 600;
     cursor: pointer;
     transition: all 0.3s ease;
-    font-family: 'Poppins', sans-serif;
+    text-transform: uppercase;
+    letter-spacing: 2px;
 }
 
 .add-btn:hover {
     transform: translateY(-2px);
-    box-shadow: 0 10px 30px rgba(139, 92, 246, 0.3);
+    box-shadow: 0 10px 40px var(--color-primary-glow);
 }
 
 /* ================================
@@ -765,15 +849,32 @@ body {
 }
 
 ::-webkit-scrollbar-track {
-    background: rgba(255, 255, 255, 0.05);
+    background: rgba(255, 30, 30, 0.05);
     border-radius: 3px;
 }
 
 ::-webkit-scrollbar-thumb {
-    background: rgba(255, 255, 255, 0.2);
+    background: rgba(255, 30, 30, 0.3);
     border-radius: 3px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-    background: rgba(255, 255, 255, 0.3);
+    background: rgba(255, 30, 30, 0.5);
+}
+
+/* ================================
+   EFFETS NÉON / GLOW
+================================ */
+
+@keyframes neonPulse {
+    0%, 100% {
+        box-shadow: 0 0 10px var(--color-primary-glow);
+    }
+    50% {
+        box-shadow: 0 0 20px var(--color-primary-glow), 0 0 30px var(--color-primary-glow);
+    }
+}
+
+.neon-glow {
+    animation: neonPulse 2s ease-in-out infinite;
 }
