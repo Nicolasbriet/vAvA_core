@@ -22,8 +22,7 @@ dependencies {
 }
 
 shared_scripts {
-    'config/config.lua',
-    'shared/*.lua'
+    'config/config.lua'
 }
 
 client_scripts {
@@ -35,12 +34,7 @@ server_scripts {
     'server/main.lua',
     'server/scanner.lua',
     'server/runner.lua',
-    'server/logger.lua',
-    'tests/auto/*.lua',
-    'tests/unit/*.lua',
-    'tests/integration/*.lua',
-    'tests/stress/*.lua',
-    'tests/security/*.lua'
+    'server/logger.lua'
 }
 
 ui_page 'ui/index.html'

@@ -24,10 +24,10 @@ function OpenAdminUI()
     if adminUIOpen then return end
     
     -- Demander les données au serveur
-    vCore.TriggerServerCallback('vAvA_economy:getState', function(state)
-        vCore.TriggerServerCallback('vAvA_economy:getAllItems', function(items)
-            vCore.TriggerServerCallback('vAvA_economy:getAllJobs', function(jobs)
-                vCore.TriggerServerCallback('vAvA_economy:getLogs', function(logs)
+    vCore.TriggerCallback('vAvA_economy:getState', function(state)
+        vCore.TriggerCallback('vAvA_economy:getAllItems', function(items)
+            vCore.TriggerCallback('vAvA_economy:getAllJobs', function(jobs)
+                vCore.TriggerCallback('vAvA_economy:getLogs', function(logs)
                     -- Envoyer tout à la NUI
                     SendNUIMessage({
                         action = 'openDashboard',
@@ -116,7 +116,7 @@ end)
 
 -- Rafraîchir les données
 RegisterNUICallback('refresh', function(data, cb)
-    vCore.TriggerServerCallback('vAvA_economy:getState', function(state)
+    vCore.TriggerCallback('vAvA_economy:getState', function(state)
         cb(state)
     end)
 end)
