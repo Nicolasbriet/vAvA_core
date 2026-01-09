@@ -56,7 +56,11 @@ function CloseAdminUI()
         action = 'closeDashboard'
     })
     
-    SetNuiFocus(false, false)
+    -- D\u00e9lai pour \u00e9viter le freeze
+    SetTimeout(100, function()
+        SetNuiFocus(false, false)
+    end)
+    
     adminUIOpen = false
 end
 
@@ -75,49 +79,55 @@ end, false)
 -- Fermer l'UI
 RegisterNUICallback('close', function(data, cb)
     CloseAdminUI()
-    cb('ok')
+    cb({success = true})
 end)
 
 -- Recalculer l'économie
 RegisterNUICallback('recalculate', function(data, cb)
     TriggerServerEvent('vAvA_economy:recalculate')
-    cb('ok')
+    cb({success = true})
 end)
 
 -- Changer le multiplicateur global
 RegisterNUICallback('setMultiplier', function(data, cb)
     TriggerServerEvent('vAvA_economy:setMultiplier', data.multiplier)
-    cb('ok')
+    cb({success = true})
 end)
 
 -- Modifier le prix d'un item
 RegisterNUICallback('updateItemPrice', function(data, cb)
     TriggerServerEvent('vAvA_economy:updateItemPrice', data.itemName, data.newPrice)
-    cb('ok')
+    cb({success = true})
 end)
 
 -- Modifier le salaire d'un job
 RegisterNUICallback('updateJobSalary', function(data, cb)
     TriggerServerEvent('vAvA_economy:updateJobSalary', data.jobName, data.newSalary)
-    cb('ok')
+    cb({success = true})
 end)
 
 -- Modifier une taxe
 RegisterNUICallback('updateTax', function(data, cb)
     TriggerServerEvent('vAvA_economy:updateTax', data.taxType, data.newRate)
-    cb('ok')
+    cb({success = true})
 end)
 
 -- Réinitialiser l'économie
 RegisterNUICallback('resetEconomy', function(data, cb)
     TriggerServerEvent('vAvA_economy:reset')
-    cb('ok')
+    cb({success = true})
 end)
 
 -- Rafraîchir les données
 RegisterNUICallback('refresh', function(data, cb)
-    vCore.TriggerCallback('vAvA_economy:getState', function(state)
-        cb(state)
+    cb({success = true})
+    SetTimeout(100, function()
+        vCore.TriggerCallback('vAvA_economy:getState', function(state)
+            SendNUIMessage({
+                action = 'refreshData',
+                state = state
+            })
+        end)
     end)
 end)
 

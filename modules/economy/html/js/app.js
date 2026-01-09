@@ -47,7 +47,13 @@ function openDashboard() {
 
 function closeDashboard() {
     $('#economyDashboard').fadeOut(300);
-    $.post('https://economy/close', JSON.stringify({}));
+    
+    // Utiliser fetch() au lieu de $.post() pour \u00e9viter les probl\u00e8mes
+    fetch('https://economy/close', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({})
+    }).catch(err => console.error('Error closing dashboard:', err));
 }
 
 // ══════════════════════════════════════════════════════════════════════════════
@@ -107,15 +113,18 @@ function renderJobs() {
     tbody.empty();
     
     economyData.jobs.forEach(job => {
-        const variation = ((job.current_salary - job.base_salary) / job.base_salary * 100).toFixed(2);
+        const baseSalary = parseFloat(job.base_salary) || 0;
+        const currentSalary = parseFloat(job.current_salary) || 0;
+        const bonus = parseFloat(job.bonus) || 1;
+        const variation = baseSalary > 0 ? (((currentSalary - baseSalary) / baseSalary * 100).toFixed(2)) : '0.00';
         const variationClass = variation >= 0 ? 'positive' : 'negative';
         const essential = job.essential ? '<i class="fas fa-check" style="color: #4caf50;"></i>' : '';
         
         const row = `
             <tr>
                 <td>${job.job_name}</td>
-                <td>${job.base_salary.toFixed(2)} $</td>
-                <td>${job.current_salary.toFixed(2)} $</td>
+                <td>${baseSalary.toFixed(2)} $</td>
+                <td>${currentSalary.toFixed(2)} $</td>
                 <td>x${job.bonus.toFixed(2)}</td>
                 <td>${essential}</td>
                 <td>${job.active_players || 0}</td>
