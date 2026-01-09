@@ -305,114 +305,116 @@ end
 Citizen.CreateThread(function()
     while true do
         local sleepTime = 500
-        local activationKey = TargetConfig.ActivationKey or 19  -- 19 = ALT par défaut
-        local isKeyPressed = IsControlPressed(0, activationKey)
         
         if not isTargetActive then
             Citizen.Wait(sleepTime)
-            goto continue
-        end
-        
-        -- Vérifier si ALT est pressé
-        if TargetConfig.UseKeyActivation and not isKeyPressed then
-            -- ALT non pressé, fermer le menu si ouvert
-            if isMenuOpen then
-                CloseTargetMenu()
-            end
+        else
+            local activationKey = TargetConfig.ActivationKey or 19  -- 19 = ALT par défaut
+            local isKeyPressed = IsControlPressed(0, activationKey)
             
-            if currentEntity or currentTarget then
-                currentEntity = nil
-                currentTarget = nil
-                currentOptions = {}
-                TriggerEvent('vava_target:onTargetExit')
-            end
-            
-            Citizen.Wait(sleepTime)
-            goto continue
-        end
-        
-        -- ALT pressé, détecter les cibles
-        sleepTime = TargetConfig.UpdateRate
-        
-        local now = GetGameTimer()
-        
-        -- Throttling
-        if now - lastUpdate < TargetConfig.UpdateRate then
-            Citizen.Wait(10)
-            goto continue
-        end
-        
-        lastUpdate = now
-        
-        local playerPed = PlayerPedId()
-        local playerCoords = GetEntityCoords(playerPed)
-        
-        -- 1. Vérifier raycast (entités)
-        local hit, entity, endCoords, surfaceNormal = DoRaycast(TargetConfig.MaxDistance)
-        
-        if hit and DoesEntityExist(entity) and not IsEntityBlacklisted(entity) then
-            local distance = #(playerCoords - endCoords)
-            local maxDistance = GetMaxDistance(entity)
-            
-            if distance <= maxDistance then
-                local options = GetOptionsForEntity(entity)
-                local validOptions = FilterOptions(options, entity, distance)
+            -- Vérifier si ALT est pressé
+            if TargetConfig.UseKeyActivation and not isKeyPressed then
+                -- ALT non pressé, fermer le menu si ouvert
+                if isMenuOpen then
+                    CloseTargetMenu()
+                end
                 
-                if #validOptions > 0 then
-                    -- Nouvelle cible détectée
-                    if currentEntity ~= entity then
-                        currentEntity = entity
-                        currentOptions = validOptions
-                        TriggerEvent('vava_target:onTargetEnter', entity, validOptions)
+                if currentEntity or currentTarget then
+                    currentEntity = nil
+                    currentTarget = nil
+                    currentOptions = {}
+                    TriggerEvent('vava_target:onTargetExit')
+                end
+                
+                Citizen.Wait(sleepTime)
+            else
+                -- ALT pressé, détecter les cibles
+                sleepTime = TargetConfig.UpdateRate
+                
+                local now = GetGameTimer()
+                
+                -- Throttling
+                if now - lastUpdate < TargetConfig.UpdateRate then
+                    Citizen.Wait(10)
+                else
+                    lastUpdate = now
+                    
+                    local playerPed = PlayerPedId()
+                    local playerCoords = GetEntityCoords(playerPed)
+                    local foundTarget = false
+                    
+                    -- 1. Vérifier raycast (entités)
+                    local hit, entity, endCoords, surfaceNormal = DoRaycast(TargetConfig.MaxDistance)
+                    
+                    if hit and DoesEntityExist(entity) and not IsEntityBlacklisted(entity) then
+                        local distance = #(playerCoords - endCoords)
+                        local maxDistance = GetMaxDistance(entity)
                         
-                        if not isMenuOpen then
-                            ShowTargetMenu(entity, validOptions, distance)
+                        if distance <= maxDistance then
+                            local options = GetOptionsForEntity(entity)
+                            local validOptions = FilterOptions(options, entity, distance)
+                            
+                            if #validOptions > 0 then
+                                -- Nouvelle cible détectée
+                                if currentEntity ~= entity then
+                                    currentEntity = entity
+                                    currentOptions = validOptions
+                                    TriggerEvent('vava_target:onTargetEnter', entity, validOptions)
+                                    
+                                    if not isMenuOpen then
+                                        ShowTargetMenu(entity, validOptions, distance)
+                                    end
+                                end
+                                
+                                foundTarget = true
+                            end
                         end
                     end
                     
-                    goto continue
-                end
-            end
-        end
-        
-        -- 2. Vérifier zones
-        local zone, zoneOptions = CheckZones(playerCoords)
-        
-        if zone and #zoneOptions > 0 then
-            local validOptions = FilterOptions(zoneOptions, nil, 0)
-            
-            if #validOptions > 0 then
-                -- Zone détectée
-                if currentTarget ~= zone.name then
-                    currentTarget = zone.name
-                    currentEntity = nil
-                    currentOptions = validOptions
-                    TriggerEvent('vava_target:onTargetEnter', nil, validOptions)
-                    
-                    if not isMenuOpen then
-                        ShowTargetMenu(nil, validOptions, 0)
+                    -- 2. Vérifier zones
+                    if not foundTarget then
+                        local zone, zoneOptions = CheckZones(playerCoords)
+                        
+                        if zone and #zoneOptions > 0 then
+                            local validOptions = FilterOptions(zoneOptions, nil, 0)
+                            
+                            if #validOptions > 0 then
+                                -- Zone détectée
+                                if currentTarget ~= zone.name then
+                                    currentTarget = zone.name
+                                    currentEntity = nil
+                                    currentOptions = validOptions
+                                    TriggerEvent('vava_target:onTargetEnter', nil, validOptions)
+                                    
+                                    if not isMenuOpen then
+                                        ShowTargetMenu(nil, validOptions, 0)
+                                    end
+                                end
+                                
+                                foundTarget = true
+                            end
+                        end
                     end
+                    
+                    -- 3. Aucune cible
+                    if not foundTarget then
+                        if currentEntity or currentTarget then
+                            currentEntity = nil
+                            currentTarget = nil
+                            currentOptions = {}
+                            
+                            if isMenuOpen then
+                                CloseTargetMenu()
+                            end
+                            
+                            TriggerEvent('vava_target:onTargetExit')
+                        end
+                    end
+                    
+                    Citizen.Wait(sleepTime)
                 end
-                
-                goto continue
             end
         end
-        
-        -- 3. Aucune cible
-        if currentEntity or currentTarget then
-            currentEntity = nil
-            currentTarget = nil
-            currentOptions = {}
-            
-            if isMenuOpen then
-                CloseTargetMenu()
-            end
-            
-            TriggerEvent('vava_target:onTargetExit')
-        end
-        
-        ::continue::
-        Citizen.Wait(sleepTime)
     end
 end)
 
@@ -614,48 +616,45 @@ Citizen.CreateThread(function()
             print('[vAvA Target] Dot thread tick', debugCounter, 'Active:', isTargetActive)
         end
         
-        if not isTargetActive then
-            Citizen.Wait(500)
-            goto continue
-        end
-        
-        local activationKey = TargetConfig.ActivationKey or 19  -- 19 = ALT par défaut
-        local keyPressed = IsControlPressed(0, activationKey)
-        
-        if keyPressed then
-            if not isAltPressed then
-                print('[vAvA Target] ALT KEY PRESSED!')
-                print('[vAvA Target] TargetConfig.UI:', TargetConfig.UI)
-                if TargetConfig.UI then
-                    print('[vAvA Target] ShowDot:', TargetConfig.UI.ShowDot)
-                    print('[vAvA Target] DotSize:', TargetConfig.UI.DotSize)
-                    print('[vAvA Target] DotColor:', json.encode(TargetConfig.UI.DotColor))
-                end
-            end
-            isAltPressed = true
+        if isTargetActive then
+            local activationKey = TargetConfig.ActivationKey or 19  -- 19 = ALT par défaut
+            local keyPressed = IsControlPressed(0, activationKey)
             
-            -- Afficher le point central
-            if TargetConfig.UI and TargetConfig.UI.ShowDot then
-                local color = TargetConfig.UI.DotColor or {255, 30, 30, 255}
-                local size = (TargetConfig.UI.DotSize or 8) * 0.001
+            if keyPressed then
+                if not isAltPressed then
+                    print('[vAvA Target] ALT KEY PRESSED!')
+                    print('[vAvA Target] TargetConfig.UI:', TargetConfig.UI)
+                    if TargetConfig.UI then
+                        print('[vAvA Target] ShowDot:', TargetConfig.UI.ShowDot)
+                        print('[vAvA Target] DotSize:', TargetConfig.UI.DotSize)
+                        print('[vAvA Target] DotColor:', json.encode(TargetConfig.UI.DotColor))
+                    end
+                end
+                isAltPressed = true
                 
-                -- Dessiner un point central (rectangle petit)
-                DrawRect(0.5, 0.5, size, size * 1.5, color[1], color[2], color[3], color[4])
-                
-                -- Cercle autour pour meilleure visibilité
-                local circleSize = size * 2.5
-                DrawRect(0.5, 0.5, circleSize, circleSize * 0.05, color[1], color[2], color[3], 180)
-                DrawRect(0.5, 0.5, circleSize * 0.05, circleSize, color[1], color[2], color[3], 180)
+                -- Afficher le point central
+                if TargetConfig.UI and TargetConfig.UI.ShowDot then
+                    local color = TargetConfig.UI.DotColor or {255, 30, 30, 255}
+                    local size = (TargetConfig.UI.DotSize or 8) * 0.001
+                    
+                    -- Dessiner un point central (rectangle petit)
+                    DrawRect(0.5, 0.5, size, size * 1.5, color[1], color[2], color[3], color[4])
+                    
+                    -- Cercle autour pour meilleure visibilité
+                    local circleSize = size * 2.5
+                    DrawRect(0.5, 0.5, circleSize, circleSize * 0.05, color[1], color[2], color[3], 180)
+                    DrawRect(0.5, 0.5, circleSize * 0.05, circleSize, color[1], color[2], color[3], 180)
+                end
+            else
+                if isAltPressed then
+                    print('[vAvA Target] ALT KEY RELEASED')
+                end
+                isAltPressed = false
+                Citizen.Wait(50)
             end
         else
-            if isAltPressed then
-                print('[vAvA Target] ALT KEY RELEASED')
-            end
-            isAltPressed = false
-            Citizen.Wait(50)
+            Citizen.Wait(500)
         end
-        
-        ::continue::
     end
 end)
 
