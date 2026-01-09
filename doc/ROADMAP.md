@@ -814,3 +814,195 @@ modules/inventory/
 ### v1.0.0 (Initial)
 - Framework de base
 - HUD, Notifications, Callbacks
+---
+
+## 📚 Documentation pour Créer un Nouveau Module
+
+### Documents de Référence Obligatoires
+
+Avant de créer un nouveau module pour vAvA_core, consultez ces documents dans l'ordre :
+
+#### 1. Architecture et Présentation
+**Fichier:** [`doc/vAvA_core.md`](vAvA_core.md)
+
+**À lire pour comprendre:**
+- 🏛️ Architecture générale du framework
+- 👤 Système de gestion des joueurs (vPlayer)
+- 🗄️ Fonctionnement de la base de données (DAL)
+- 💼 Système de jobs et grades
+- 💰 Système économique (cash, banque, argent sale)
+- 🎒 Inventaire et items
+- 🌍 Système multilingue
+- 🔐 Sécurité et exports
+
+**Pourquoi :** Ce document vous donne une vue d'ensemble complète du framework et de ses composants principaux.
+
+---
+
+#### 2. Système de Permissions
+**Fichier:** [`doc/PERMISSIONS_TXADMIN.md`](PERMISSIONS_TXADMIN.md)
+
+**À lire pour comprendre:**
+- 🔒 Permissions ACE (txAdmin)
+- 👮 Niveaux de permissions (owner, admin, mod, helper)
+- ⚙️ Configuration server.cfg
+- 🧪 Vérification des permissions dans le code
+- 📝 Exports disponibles
+
+**Pourquoi :** Si votre module nécessite des permissions admin, vous devez comprendre le système ACE.
+
+---
+
+#### 3. Installation et Configuration
+**Fichier:** [`doc/README.md`](README.md)
+
+**À lire pour comprendre:**
+- 🚀 Installation du framework
+- 📁 Structure des dossiers
+- 🔧 Configuration générale
+- 📚 API et exports disponibles
+- 🎮 Commandes standard
+- 🔒 Sécurité intégrée
+
+**Pourquoi :** Comprendre la structure d'installation aide à positionner correctement votre module.
+
+---
+
+#### 4. Roadmap et État du Projet
+**Fichier:** [`doc/ROADMAP.md`](ROADMAP.md) (ce document)
+
+**À lire pour comprendre:**
+- ✅ Modules déjà créés et leurs fonctionnalités
+- 🐛 Bugs connus et résolus
+- 🎨 Charte graphique vAvA (rouge néon #FF1E1E)
+- 📊 Standards de développement
+- 🧪 Système de tests (testbench)
+
+**Pourquoi :** Éviter de dupliquer des fonctionnalités existantes et respecter les standards du projet.
+
+---
+
+### 📋 Checklist Création Module
+
+Avant de commencer votre module, assurez-vous de :
+
+- [ ] Avoir lu les 4 documents de référence ci-dessus
+- [ ] Comprendre l'architecture modulaire de vAvA_core
+- [ ] Connaître les exports disponibles du framework
+- [ ] Savoir utiliser le système de permissions ACE
+- [ ] Respecter la charte graphique (rouge néon #FF1E1E)
+- [ ] Suivre la structure de dossiers standard
+- [ ] Utiliser le système multilingue (locales/)
+- [ ] Implémenter la sécurité server-side
+- [ ] Créer les tests pour testbench (si applicable)
+- [ ] Documenter votre module (README.md)
+
+---
+
+### 🛠️ Structure Standard d'un Module
+
+```
+modules/votre_module/
+├── fxmanifest.lua          # Manifest FiveM
+├── README.md               # Documentation du module
+├── config/
+│   └── config.lua          # Configuration
+├── locales/
+│   ├── fr.lua             # Traduction française
+│   └── en.lua             # Traduction anglaise
+├── shared/
+│   └── utils.lua          # Fonctions partagées
+├── server/
+│   └── main.lua           # Logique serveur
+├── client/
+│   └── main.lua           # Logique client
+├── database/
+│   └── schema.sql         # Tables BDD (si applicable)
+├── html/                   # Interface NUI (si applicable)
+│   ├── index.html
+│   ├── css/style.css
+│   └── js/app.js
+└── tests/                  # Tests testbench (recommandé)
+    └── unit/tests.lua
+```
+
+---
+
+### 🎯 Bonnes Pratiques
+
+1. **Sécurité First** : Toujours valider côté serveur
+2. **Performance** : Éviter les boucles infinies (threads)
+3. **Modularité** : Utiliser les exports du framework
+4. **Documentation** : Commenter votre code
+5. **Tests** : Créer des tests unitaires (testbench)
+6. **Locales** : Support multilingue dès le départ
+7. **Charte graphique** : Rouge néon #FF1E1E pour l'UI
+8. **Base de données** : Utiliser oxmysql et le DAL
+9. **Logs** : Utiliser le système de logs du framework
+10. **Permissions** : Intégrer le système ACE txAdmin
+
+---
+
+### 🔗 Intégration avec Modules Existants
+
+Si votre module interagit avec d'autres modules :
+
+#### Economy (vAvA_economy)
+```lua
+-- Obtenir un prix
+local price = exports['vAvA_economy']:GetPrice('bread', 'supermarket', 1)
+
+-- Enregistrer une transaction
+exports['vAvA_economy']:RegisterTransaction(source, 'buy', 'bread', 1, price, 'supermarket')
+```
+
+#### Inventory (vAvA_inventory)
+```lua
+-- Ajouter un item
+exports['vAvA_core']:AddItem(source, 'bread', 1, {quality = 100})
+
+-- Vérifier possession
+if exports['vAvA_core']:HasItem(source, 'bread') then
+    -- ...
+end
+```
+
+#### Keys (vAvA_keys)
+```lua
+-- Donner des clés
+exports['vAvA_keys']:GiveKeys(source, plate, true)
+
+-- Vérifier possession clés
+if exports['vAvA_keys']:HasKeys(source, plate) then
+    -- ...
+end
+```
+
+---
+
+### 🧪 Tests avec Testbench
+
+Créez toujours des tests pour votre module :
+
+```lua
+-- modules/votre_module/tests/unit/tests.lua
+return {
+    name = "Votre Module - Tests Unitaires",
+    category = "unit",
+    priority = 2,
+    
+    tests = {
+        {
+            name = "Test fonction basique",
+            fn = function(ctx)
+                local result = MaFonction(123)
+                ctx.assert.equals(result, 456, "La fonction devrait retourner 456")
+            end
+        }
+    }
+}
+```
+
+---
+
+*Dernière mise à jour : 9 Janvier 2026*
