@@ -108,19 +108,19 @@ function GetAllGarages()
     return allGarages
 end
 
--- Vérifier si un joueur est admin
+-- Vérifier si un joueur est admin (utilise le système txAdmin ACE de vCore)
 local function IsPlayerAdmin(src)
-    if GarageConfig.Admin.UseVCoreGroups and vCore then
-        local player = vCore.Functions.GetPlayer(src)
-        if player then
-            local group = player.PlayerData.group or 'user'
-            for _, allowedGroup in ipairs(GarageConfig.Admin.AllowedGroups) do
-                if group == allowedGroup then
-                    return true
-                end
-            end
-        end
+    -- Méthode principale: utiliser vCore.IsAdmin (basé sur txAdmin ACE)
+    if vCore and vCore.IsAdmin then
+        return vCore.IsAdmin(src)
     end
+    
+    -- Fallback: vérifier directement les ACE
+    if IsPlayerAceAllowed(src, 'vava.admin') then return true end
+    if IsPlayerAceAllowed(src, 'vava.superadmin') then return true end
+    if IsPlayerAceAllowed(src, 'vava.owner') then return true end
+    if IsPlayerAceAllowed(src, 'txadmin.operator') then return true end
+    
     return false
 end
 

@@ -45,8 +45,14 @@ local function GetPlayerJob(src)
     return nil
 end
 
--- Vérifier si le joueur est staff
+-- Vérifier si le joueur est staff (utilise le système txAdmin ACE de vCore)
 local function isStaff(src)
+    -- Méthode principale: utiliser vCore.IsStaff (basé sur txAdmin ACE)
+    if vCore and vCore.IsStaff then
+        return vCore.IsStaff(src)
+    end
+    
+    -- Fallback: vérifier directement les ACE
     for _, permission in ipairs(ChatConfig.StaffPermissions) do
         if IsPlayerAceAllowed(src, permission) then
             return true

@@ -140,6 +140,159 @@ function vCore.NotifyAll(message, type, duration)
 end
 
 -- ═══════════════════════════════════════════════════════════════════════════
+-- SYSTÈME DE PERMISSIONS (txAdmin ACE)
+-- ═══════════════════════════════════════════════════════════════════════════
+
+---Vérifie si un joueur a une permission ACE spécifique
+---@param source number
+---@param permission string
+---@return boolean
+function vCore.HasAce(source, permission)
+    return IsPlayerAceAllowed(source, permission)
+end
+
+---Vérifie si un joueur a une des permissions ACE listées
+---@param source number
+---@param permissions table Liste des permissions à vérifier
+---@return boolean
+function vCore.HasAnyAce(source, permissions)
+    for _, perm in ipairs(permissions) do
+        if IsPlayerAceAllowed(source, perm) then
+            return true
+        end
+    end
+    return false
+end
+
+---Retourne le niveau de permission d'un joueur (basé sur ACE txAdmin)
+---@param source number
+---@return number level, string role
+function vCore.GetPermissionLevel(source)
+    -- Vérifier par ACE (priorité haute)
+    if Config.Permissions.Method == 'ace' then
+        -- Vérifier les niveaux ACE définis
+        for role, data in pairs(Config.Permissions.AceLevels) do
+            for _, ace in ipairs(data.aces) do
+                if IsPlayerAceAllowed(source, ace) then
+                    return data.level, role
+                end
+            end
+        end
+        
+        -- Vérifier les ACE extras (WaveAdmin, etc.)
+        for _, ace in ipairs(Config.Permissions.ExtraAces or {}) do
+            if IsPlayerAceAllowed(source, ace) then
+                -- Déterminer le niveau basé sur le nom
+                if ace:find('owner') or ace:find('god') then
+                    return 5, 'owner'
+                elseif ace:find('_dev') then
+                    return 4, 'developer'
+                elseif ace:find('superadmin') then
+                    return 3, 'superadmin'
+                elseif ace:find('admin') or ace:find('operator') then
+                    return 2, 'admin'
+                elseif ace:find('mod') then
+                    return 1, 'mod'
+                elseif ace:find('helper') then
+                    return 0, 'helper'
+                end
+            end
+        end
+    end
+    
+    -- Fallback: utiliser le groupe vCore interne
+    if Config.Permissions.FallbackToGroups then
+        local player = vCore.Cache.Players.Get(source)
+        if player then
+            local group = player.group or 'user'
+            local level = Config.Admin.Groups[group] or 0
+            return level, group
+        end
+        
+        -- Vérifier par identifiant dans Config.Admin.Admins
+        local identifiers = GetPlayerIdentifiers(source)
+        for _, id in ipairs(identifiers) do
+            if Config.Admin.Admins[id] then
+                local role = Config.Admin.Admins[id]
+                local level = Config.Admin.Groups[role] or 0
+                return level, role
+            end
+        end
+    end
+    
+    return 0, 'user'
+end
+
+---Vérifie si un joueur est admin (niveau >= 2)
+---@param source number
+---@return boolean
+function vCore.IsAdmin(source)
+    local level, _ = vCore.GetPermissionLevel(source)
+    return level >= 2
+end
+
+---Vérifie si un joueur est superadmin (niveau >= 3)
+---@param source number
+---@return boolean
+function vCore.IsSuperAdmin(source)
+    local level, _ = vCore.GetPermissionLevel(source)
+    return level >= 3
+end
+
+---Vérifie si un joueur est owner/developer (niveau >= 4)
+---@param source number
+---@return boolean
+function vCore.IsOwner(source)
+    local level, _ = vCore.GetPermissionLevel(source)
+    return level >= 4
+end
+
+---Vérifie si un joueur est staff (mod ou plus, niveau >= 1)
+---@param source number
+---@return boolean
+function vCore.IsStaff(source)
+    local level, _ = vCore.GetPermissionLevel(source)
+    return level >= 1
+end
+
+---Vérifie si un joueur a un niveau de permission minimum
+---@param source number
+---@param minLevel number
+---@return boolean
+function vCore.HasPermissionLevel(source, minLevel)
+    local level, _ = vCore.GetPermissionLevel(source)
+    return level >= minLevel
+end
+
+---Retourne le rôle d'un joueur (string)
+---@param source number
+---@return string
+function vCore.GetPlayerRole(source)
+    local _, role = vCore.GetPermissionLevel(source)
+    return role
+end
+
+-- Ajouter au vCore.Functions pour compatibilité
+vCore.Functions = vCore.Functions or {}
+vCore.Functions.HasAce = vCore.HasAce
+vCore.Functions.HasAnyAce = vCore.HasAnyAce
+vCore.Functions.GetPermissionLevel = vCore.GetPermissionLevel
+vCore.Functions.IsAdmin = vCore.IsAdmin
+vCore.Functions.IsSuperAdmin = vCore.IsSuperAdmin
+vCore.Functions.IsOwner = vCore.IsOwner
+vCore.Functions.IsStaff = vCore.IsStaff
+vCore.Functions.HasPermissionLevel = vCore.HasPermissionLevel
+vCore.Functions.GetPlayerRole = vCore.GetPlayerRole
+
+-- Export des fonctions de permissions
+exports('IsAdmin', vCore.IsAdmin)
+exports('IsSuperAdmin', vCore.IsSuperAdmin)
+exports('IsOwner', vCore.IsOwner)
+exports('IsStaff', vCore.IsStaff)
+exports('GetPermissionLevel', vCore.GetPermissionLevel)
+exports('HasAce', vCore.HasAce)
+
+-- ═══════════════════════════════════════════════════════════════════════════
 -- SAUVEGARDE AUTOMATIQUE
 -- ═══════════════════════════════════════════════════════════════════════════
 

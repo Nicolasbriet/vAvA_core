@@ -357,20 +357,73 @@ Config.Security = {
 }
 
 -- ═══════════════════════════════════════════════════════════════════════════
--- 🛠️ ADMIN
+-- 🛠️ PERMISSIONS (Basé sur txAdmin ACE)
 -- ═══════════════════════════════════════════════════════════════════════════
 
+Config.Permissions = {
+    -- Méthode de vérification: 'ace' (txAdmin) ou 'group' (vCore interne)
+    Method = 'ace',                          -- 'ace' = txAdmin ACE permissions
+    
+    -- Préfixe des permissions ACE (ex: vava.admin, vava.mod)
+    AcePrefix = 'vava',
+    
+    -- Permissions ACE à vérifier (ordre de priorité)
+    -- Ces permissions doivent être définies dans txAdmin ou server.cfg
+    AceLevels = {
+        owner = {
+            aces = {'vava.owner', 'txadmin.operator.super'},
+            level = 5
+        },
+        developer = {
+            aces = {'vava.developer', 'vava.dev'},
+            level = 4
+        },
+        superadmin = {
+            aces = {'vava.superadmin', 'txadmin.operator'},
+            level = 3
+        },
+        admin = {
+            aces = {'vava.admin', 'txadmin.operator'},
+            level = 2
+        },
+        mod = {
+            aces = {'vava.mod', 'vava.moderator'},
+            level = 1
+        },
+        helper = {
+            aces = {'vava.helper'},
+            level = 0
+        }
+    },
+    
+    -- Compatibilité avec d'autres systèmes (WaveAdmin, etc.)
+    ExtraAces = {
+        'WaveAdmin.owner',
+        'WaveAdmin._dev',
+        'WaveAdmin.god',
+        'WaveAdmin.superadmin',
+        'WaveAdmin.mod',
+        'WaveAdmin.helper'
+    },
+    
+    -- Fallback: utiliser les groupes vCore si ACE non trouvé
+    FallbackToGroups = true
+}
+
+-- Configuration des groupes (fallback si ACE non disponible)
 Config.Admin = {
-    -- Permissions
+    -- Niveaux de permissions internes
     Groups = {
         ['user'] = 0,
+        ['helper'] = 0,
         ['mod'] = 1,
         ['admin'] = 2,
         ['superadmin'] = 3,
-        ['owner'] = 4
+        ['developer'] = 4,
+        ['owner'] = 5
     },
     
-    -- Admins par identifiant
+    -- Admins par identifiant (fallback)
     Admins = {
         ['license:9ca277a68ad4d2c3324edf1f068c2a8229f069fd'] = 'owner'
     },

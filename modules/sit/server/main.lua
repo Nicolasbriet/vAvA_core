@@ -49,36 +49,16 @@ local function Notify(source, message, type)
 end
 
 local function IsPlayerAdmin(src)
-    -- Vérifier par groupe
-    for _, group in pairs(SitConfig.AdminGroups) do
-        if vCore and vCore.Functions and vCore.Functions.HasPermission then
-            if vCore.Functions.HasPermission(src, group) then
-                return true
-            end
-        end
-        
-        if IsPlayerAceAllowed(src, 'command.' .. group) or IsPlayerAceAllowed(src, group) then
-            return true
-        end
+    -- Méthode principale: utiliser vCore.IsAdmin (basé sur txAdmin ACE)
+    if vCore and vCore.IsAdmin then
+        return vCore.IsAdmin(src)
     end
     
-    -- Vérifier par license2
-    local playerLicense = nil
-    for i = 0, GetNumPlayerIdentifiers(src) - 1 do
-        local identifier = GetPlayerIdentifier(src, i)
-        if string.match(identifier, "license2:") then
-            playerLicense = identifier
-            break
-        end
-    end
-    
-    if playerLicense then
-        for _, adminLicense in ipairs(SitConfig.AdminLicenses) do
-            if playerLicense == adminLicense then
-                return true
-            end
-        end
-    end
+    -- Fallback: vérifier directement les ACE
+    if IsPlayerAceAllowed(src, 'vava.admin') then return true end
+    if IsPlayerAceAllowed(src, 'vava.superadmin') then return true end
+    if IsPlayerAceAllowed(src, 'vava.owner') then return true end
+    if IsPlayerAceAllowed(src, 'txadmin.operator') then return true end
     
     return false
 end

@@ -51,18 +51,17 @@ local function Notify(source, message, type)
 end
 
 local function IsAdmin(source)
-    for _, group in pairs(JobShopConfig.AdminGroups) do
-        if vCore and vCore.Functions and vCore.Functions.HasPermission then
-            if vCore.Functions.HasPermission(source, group) then
-                return true
-            end
-        end
-        
-        -- Fallback: vérifier via ACE
-        if IsPlayerAceAllowed(source, 'command.' .. group) or IsPlayerAceAllowed(source, group) then
-            return true
-        end
+    -- Méthode principale: utiliser vCore.IsAdmin (basé sur txAdmin ACE)
+    if vCore and vCore.IsAdmin then
+        return vCore.IsAdmin(source)
     end
+    
+    -- Fallback: vérifier directement les ACE
+    if IsPlayerAceAllowed(source, 'vava.admin') then return true end
+    if IsPlayerAceAllowed(source, 'vava.superadmin') then return true end
+    if IsPlayerAceAllowed(source, 'vava.owner') then return true end
+    if IsPlayerAceAllowed(source, 'txadmin.operator') then return true end
+    
     return false
 end
 
