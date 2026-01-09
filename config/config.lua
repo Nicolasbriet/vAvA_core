@@ -425,7 +425,7 @@ Config.Admin = {
     
     -- Admins par identifiant (fallback)
     Admins = {
-        ['license:9ca277a68ad4d2c3324edf1f068c2a8229f069fd'] = 'owner'
+        ['license:9ca277a68ad4d2c3324edf1f068c2a8229f069fd'] = 'owner',
     },
     
     -- Commandes
