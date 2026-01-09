@@ -1,3 +1,5 @@
+Locales = Locales or {}
+
 Locales['en'] = {
     -- Interface Admin
     ['admin_title'] = 'Economy Dashboard',

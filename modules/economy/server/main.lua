@@ -292,29 +292,29 @@ end)
 -- Callbacks
 -- ══════════════════════════════════════════════════════════════════════════════
 
-vCore.RegisterCallback('vAvA_economy:getState', function(source, cb)
+vCore.RegisterServerCallback('vAvA_economy:getState', function(source, cb)
     cb(Economy.GetState())
 end)
 
-vCore.RegisterCallback('vAvA_economy:getItemInfo', function(source, cb, itemName)
+vCore.RegisterServerCallback('vAvA_economy:getItemInfo', function(source, cb, itemName)
     cb(Economy.GetItemInfo(itemName))
 end)
 
-vCore.RegisterCallback('vAvA_economy:getJobInfo', function(source, cb, jobName)
+vCore.RegisterServerCallback('vAvA_economy:getJobInfo', function(source, cb, jobName)
     cb(Economy.GetJobInfo(jobName))
 end)
 
-vCore.RegisterCallback('vAvA_economy:getAllItems', function(source, cb)
+vCore.RegisterServerCallback('vAvA_economy:getAllItems', function(source, cb)
     local items = MySQL.query.await('SELECT * FROM economy_items ORDER BY category, item_name')
     cb(items or {})
 end)
 
-vCore.RegisterCallback('vAvA_economy:getAllJobs', function(source, cb)
+vCore.RegisterServerCallback('vAvA_economy:getAllJobs', function(source, cb)
     local jobs = MySQL.query.await('SELECT * FROM economy_jobs ORDER BY job_name')
     cb(jobs or {})
 end)
 
-vCore.RegisterCallback('vAvA_economy:getLogs', function(source, cb)
+vCore.RegisterServerCallback('vAvA_economy:getLogs', function(source, cb)
     local logs = MySQL.query.await('SELECT * FROM economy_logs ORDER BY timestamp DESC LIMIT 100')
     cb(logs or {})
 end)

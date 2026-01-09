@@ -552,10 +552,13 @@ function vCore.AutoUpdate.CheckAndApply()
         
         -- Enregistrer les versions pour tous les modules
         for moduleName, version in pairs(versions) do
-            local installedVersion = vCore.AutoUpdate.GetInstalledVersion(moduleName)
-            if installedVersion == '0.0.0' then
-                vCore.AutoUpdate.SetVersion(moduleName, version)
-                print('^2[AUTO UPDATE]^0 Module ' .. moduleName .. ' enregistré: v' .. version)
+            -- Ignorer les entrées qui ne sont pas des versions (metadata, updates, etc.)
+            if moduleName ~= 'metadata' and moduleName ~= 'updates' and type(version) == 'string' then
+                local installedVersion = vCore.AutoUpdate.GetInstalledVersion(moduleName)
+                if installedVersion == '0.0.0' then
+                    vCore.AutoUpdate.SetVersion(moduleName, version)
+                    print('^2[AUTO UPDATE]^0 Module ' .. moduleName .. ' enregistré: v' .. version)
+                end
             end
         end
         
