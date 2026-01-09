@@ -5,6 +5,18 @@
 
 -- Récupérer l'objet vCore
 local vCore = nil
+local vCoreReady = false
+
+-- Fonction helper pour attendre vCore
+local function WaitForVCore(maxAttempts)
+    maxAttempts = maxAttempts or 50
+    local attempts = 0
+    while not vCore and attempts < maxAttempts do
+        Wait(100)
+        attempts = attempts + 1
+    end
+    return vCore ~= nil
+end
 
 Citizen.CreateThread(function()
     while vCore == nil do
@@ -20,6 +32,7 @@ Citizen.CreateThread(function()
         Wait(100)
     end
     
+    vCoreReady = true
     print('^2[vCore:Garage] Module garage initialisé^0')
 end)
 
@@ -113,6 +126,9 @@ end
 
 -- Vérifier si un joueur peut utiliser la fourrière
 local function CanUseImpound(src)
+    if not vCore then 
+        WaitForVCore(30)
+    end
     if not vCore then return false end
     local player = vCore.Functions.GetPlayer(src)
     if not player then return false end

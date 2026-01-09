@@ -5,6 +5,18 @@
 
 -- Récupérer l'objet vCore
 local vCore = nil
+local vCoreReady = false
+
+-- Fonction helper pour attendre vCore
+local function WaitForVCore(maxAttempts)
+    maxAttempts = maxAttempts or 50
+    local attempts = 0
+    while not vCore and attempts < maxAttempts do
+        Wait(100)
+        attempts = attempts + 1
+    end
+    return vCore ~= nil
+end
 
 Citizen.CreateThread(function()
     while vCore == nil do
@@ -20,6 +32,7 @@ Citizen.CreateThread(function()
         Wait(100)
     end
     
+    vCoreReady = true
     CreateTables()
     print('^2[vCore:Concess] Module concessionnaire initialisé^0')
 end)
@@ -241,8 +254,11 @@ end)
 RegisterNetEvent('vcore_concess:requestVehicles')
 AddEventHandler('vcore_concess:requestVehicles', function(isJobOnly, vehicleType)
     local src = source
-    if not vCore or not vCore.Functions then 
-        print('[vAvA Concess] ERREUR: vCore non initialisé')
+    
+    -- Attendre que vCore soit initialisé (max 5 secondes)
+    if not WaitForVCore(50) or not vCore.Functions then 
+        print('[vAvA Concess] En attente de vCore...')
+        TriggerClientEvent('vcore_concess:error', src, 'Le serveur démarre, réessayez dans quelques secondes.')
         return 
     end
     
@@ -292,7 +308,9 @@ end)
 RegisterNetEvent('vcore_concess:buyVehicle')
 AddEventHandler('vcore_concess:buyVehicle', function(data)
     local src = source
-    if not vCore then return end
+    
+    -- Attendre que vCore soit initialisé si nécessaire
+    if not WaitForVCore(50) or not vCore.Functions then return end
     
     local player = vCore.Functions.GetPlayer(src)
     if not player then return end
