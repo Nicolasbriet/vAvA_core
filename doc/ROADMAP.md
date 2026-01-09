@@ -6,6 +6,97 @@
 
 ---
 
+## 🐛 BUGS RÉSOLUS (9 Janvier 2026)
+
+### Module Testbench - NUI Callback Errors
+
+**Problème Initial:**
+```
+NUI Fetch Error (testbench:getInitialData): SyntaxError: Unexpected end of JSON input
+HTTP error from testbench:getInitialData: 404
+```
+
+#### Bug #1: Callbacks NUI inconsistants
+**Fichier:** `modules/testbench/client/main.lua`
+
+**Symptôme:** Certains callbacks NUI retournaient des chaînes simples (`'ok'`) au lieu d'objets JSON valides, causant des erreurs de parsing côté JavaScript.
+
+**Lignes affectées:**
+- L136: `cb('ok')` dans `testbench:runScenario`
+- L142: `cb('ok')` dans `testbench:export`
+
+**Correction:** Remplacement de tous les `cb('ok')` par `cb({success = true})` pour assurer la cohérence JSON.
+
+**Commit:** 9 Jan 2026 - Standardisation des réponses NUI callback
+
+---
+
+#### Bug #2: Détection du nom de ressource NUI incorrecte
+**Fichier:** `modules/testbench/ui/js/app.js`
+
+**Symptôme:** La fonction `GetParentResourceName()` ne détectait pas correctement le nom de la ressource, causant des erreurs 404 sur tous les appels NUI fetch.
+
+**Problème:** 
+- Le code cherchait le pattern `https://resource_name/` 
+- Mais FiveM utilise `https://cfx-nui-resource_name/`
+- L'URL était `https://cfx-nui-vava_testbench/ui/index.html`
+- Le code détectait `cfx-nui-vava_testbench` au lieu de `vava_testbench`
+
+**Correction:** 
+```javascript
+// AVANT (incorrect)
+const match = url.match(/https?:\/\/([^\/]+)/);
+return match ? match[1] : 'vAvA_testbench';
+
+// APRÈS (correct)
+const match = url.match(/https?:\/\/cfx-nui-([^\/]+)/);
+return match ? match[1] : 'vAvA_testbench';
+```
+
+**Commit:** 9 Jan 2026 - Fix GetParentResourceName pour FiveM cfx-nui URL format
+
+---
+
+#### Bug #3: Gestion d'erreur HTTP insuffisante
+**Fichier:** `modules/testbench/ui/js/app.js`
+
+**Symptôme:** Les erreurs HTTP (404, 500, etc.) n'étaient pas correctement gérées avant le parsing JSON.
+
+**Correction:** Ajout de vérification `response.ok` et retour d'objet d'erreur structuré au lieu de `null`.
+
+```javascript
+// Ajout de la vérification HTTP
+if (!response.ok) {
+    console.error(`HTTP error from ${eventName}: ${response.status}`);
+    return { success: false, error: `HTTP ${response.status}` };
+}
+```
+
+**Commit:** 9 Jan 2026 - Amélioration gestion erreurs HTTP dans fetchNUI
+
+---
+
+### Impact
+- ✅ Tous les callbacks NUI fonctionnent correctement
+- ✅ Interface testbench se charge sans erreur
+- ✅ Communication client-serveur stable
+- ✅ Gestion d'erreur robuste
+
+### Fichiers modifiés
+1. `modules/testbench/client/main.lua` - L133-143
+2. `modules/testbench/ui/js/app.js` - L639-695
+3. `modules/testbench/ui/index.html` - Version cache bumped to v20260109008
+
+### Tests de régression
+- [x] `/testbench` ouvre l'interface sans erreur
+- [x] Scanner modules fonctionne
+- [x] Lancement de tests fonctionne
+- [x] Export des résultats fonctionne
+- [x] Logs en temps réel fonctionnent
+- [x] Fermeture de l'interface fonctionne
+
+---
+
 ## ✅ MODULE TESTBENCH - TERMINÉ
 
 ### Vue d'ensemble

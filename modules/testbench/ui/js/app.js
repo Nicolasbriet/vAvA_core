@@ -2,8 +2,6 @@
    vAvA TESTBENCH - Application Logic
    ============================================ */
 
-console.log('[TESTBENCH] app.js loading...');
-
 // === GLOBALS ===
 const AppState = {
     modules: [],
@@ -674,20 +672,10 @@ async function fetchNUI(eventName, data = {}) {
 }
 
 function GetParentResourceName() {
-    // In-game: get resource name from cfx-nui URL
-    const url = window.location.href;
-    console.log('[TESTBENCH] Current URL:', url);
-    
     // FiveM uses format: https://cfx-nui-resource_name/...
+    const url = window.location.href;
     const match = url.match(/https?:\/\/cfx-nui-([^\/]+)/);
-    if (match) {
-        console.log('[TESTBENCH] Resource name:', match[1]);
-        return match[1];
-    }
-    
-    // Fallback for dev/testing
-    console.warn('[TESTBENCH] Could not detect resource name, using fallback');
-    return 'vAvA_testbench';
+    return match ? match[1] : 'vAvA_testbench';
 }
 
 // === CHART (Optional - can be enhanced with Chart.js) ===
