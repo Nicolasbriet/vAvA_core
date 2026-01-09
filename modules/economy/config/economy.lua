@@ -254,6 +254,9 @@ EconomyConfig.ui = {
 
 EconomyConfig.monitoring = {
     enabled = true,                    -- Activer le monitoring
+    interval = 300,                    -- Intervalle de collecte des métriques (5 minutes)
+    reportInterval = 3600,             -- Intervalle de génération des rapports (1 heure)
+    alertsEnabled = true,              -- Activer les alertes
     alertThreshold = {
         priceChange = 0.20,            -- Alerte si prix varie de +20%
         inflationChange = 0.10,        -- Alerte si inflation varie de +10%

@@ -146,6 +146,22 @@ INSERT INTO `economy_taxes` (`tax_type`, `rate`, `description`) VALUES
 ON DUPLICATE KEY UPDATE `id` = `id`;
 
 -- ══════════════════════════════════════════════════════════════════════════════
+-- Table: economy_reports
+-- Rapports économiques générés par le système de monitoring
+-- ══════════════════════════════════════════════════════════════════════════════
+
+CREATE TABLE IF NOT EXISTS `economy_reports` (
+    `id` INT(11) NOT NULL AUTO_INCREMENT,
+    `report_type` ENUM('hourly', 'daily', 'weekly', 'monthly', 'custom') NOT NULL DEFAULT 'hourly',
+    `report_data` JSON NOT NULL,
+    `generated_at` TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    `generated_by` VARCHAR(100) DEFAULT 'system',
+    PRIMARY KEY (`id`),
+    KEY `report_type` (`report_type`),
+    KEY `generated_at` (`generated_at`)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ══════════════════════════════════════════════════════════════════════════════
 -- Migration tracking
 -- ══════════════════════════════════════════════════════════════════════════════
 

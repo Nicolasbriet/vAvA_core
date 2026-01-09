@@ -300,3 +300,278 @@ RegisterNetEvent('vAvA_economy:recalculate', function()
         TriggerClientEvent('vcore:showNotification', source, result, 'error')
     end
 end)
+
+-- ══════════════════════════════════════════════════════════════════════════════
+-- Système de Monitoring
+-- ══════════════════════════════════════════════════════════════════════════════
+
+local MonitoringData = {
+    transactions = {},
+    alerts = {},
+    lastReport = 0
+}
+
+function StartMonitoring()
+    print('[vAvA_economy] Système de monitoring démarré')
+    
+    -- Thread de collecte des métriques
+    CreateThread(function()
+        while true do
+            Wait((EconomyConfig.monitoring.interval or 300) * 1000) -- Par défaut 5 minutes
+            
+            if EconomyConfig.monitoring.enabled then
+                CollectMonitoringMetrics()
+            end
+        end
+    end)
+    
+    -- Thread de génération de rapports
+    CreateThread(function()
+        while true do
+            Wait((EconomyConfig.monitoring.reportInterval or 3600) * 1000) -- Par défaut 1 heure
+            
+            if EconomyConfig.monitoring.enabled then
+                GenerateEconomyReport()
+            end
+        end
+    end)
+    
+    -- Thread de détection d'anomalies
+    CreateThread(function()
+        while true do
+            Wait(60000) -- Vérifier toutes les minutes
+            
+            if EconomyConfig.monitoring.enabled and EconomyConfig.monitoring.alertsEnabled then
+                DetectAnomalies()
+            end
+        end
+    end)
+end
+
+-- ══════════════════════════════════════════════════════════════════════════════
+-- Collecter les métriques de monitoring
+-- ══════════════════════════════════════════════════════════════════════════════
+
+function CollectMonitoringMetrics()
+    local metrics = {
+        timestamp = os.time(),
+        playerCount = #vCore.GetPlayers(),
+        totalTransactions = 0,
+        totalVolume = 0,
+        inflation = Economy.State.inflation,
+        baseMultiplier = Economy.State.baseMultiplier
+    }
+    
+    -- Compter les transactions récentes
+    local result = MySQL.query.await([[
+        SELECT 
+            COUNT(*) as count,
+            COALESCE(SUM(price * quantity), 0) as volume
+        FROM economy_transactions 
+        WHERE timestamp > DATE_SUB(NOW(), INTERVAL 5 MINUTE)
+    ]])
+    
+    if result and result[1] then
+        metrics.totalTransactions = result[1].count or 0
+        metrics.totalVolume = result[1].volume or 0
+    end
+    
+    -- Sauvegarder les métriques
+    table.insert(MonitoringData.transactions, metrics)
+    
+    -- Garder seulement les 100 dernières entrées
+    if #MonitoringData.transactions > 100 then
+        table.remove(MonitoringData.transactions, 1)
+    end
+    
+    if EconomyConfig.debug then
+        print(('[vAvA_economy MONITOR] Players: %d | Transactions: %d | Volume: $%d'):format(
+            metrics.playerCount,
+            metrics.totalTransactions,
+            metrics.totalVolume
+        ))
+    end
+end
+
+-- ══════════════════════════════════════════════════════════════════════════════
+-- Générer un rapport économique
+-- ══════════════════════════════════════════════════════════════════════════════
+
+function GenerateEconomyReport()
+    local report = {
+        generatedAt = os.time(),
+        period = 'hourly',
+        summary = {},
+        topItems = {},
+        alerts = MonitoringData.alerts
+    }
+    
+    -- Résumé des transactions
+    local summary = MySQL.query.await([[
+        SELECT 
+            transaction_type,
+            COUNT(*) as count,
+            COALESCE(SUM(price * quantity), 0) as total_volume,
+            COALESCE(AVG(price), 0) as avg_price
+        FROM economy_transactions 
+        WHERE timestamp > DATE_SUB(NOW(), INTERVAL 1 HOUR)
+        GROUP BY transaction_type
+    ]])
+    
+    if summary then
+        for _, row in ipairs(summary) do
+            report.summary[row.transaction_type] = {
+                count = row.count,
+                volume = row.total_volume,
+                avgPrice = row.avg_price
+            }
+        end
+    end
+    
+    -- Top items échangés
+    local topItems = MySQL.query.await([[
+        SELECT 
+            item_name,
+            COUNT(*) as transaction_count,
+            COALESCE(SUM(quantity), 0) as total_quantity,
+            COALESCE(SUM(price * quantity), 0) as total_volume
+        FROM economy_transactions 
+        WHERE timestamp > DATE_SUB(NOW(), INTERVAL 1 HOUR)
+        GROUP BY item_name
+        ORDER BY transaction_count DESC
+        LIMIT 10
+    ]])
+    
+    if topItems then
+        report.topItems = topItems
+    end
+    
+    -- Sauvegarder le rapport en BDD
+    MySQL.insert([[
+        INSERT INTO economy_reports (report_type, report_data, generated_at)
+        VALUES (?, ?, NOW())
+    ]], { 'hourly', json.encode(report) })
+    
+    -- Réinitialiser les alertes après le rapport
+    MonitoringData.alerts = {}
+    MonitoringData.lastReport = os.time()
+    
+    print('[vAvA_economy] Rapport économique généré')
+end
+
+-- ══════════════════════════════════════════════════════════════════════════════
+-- Détecter les anomalies économiques
+-- ══════════════════════════════════════════════════════════════════════════════
+
+function DetectAnomalies()
+    local alerts = {}
+    
+    -- Détecter les variations de prix anormales
+    local priceAnomalies = MySQL.query.await([[
+        SELECT 
+            item_name,
+            current_price,
+            base_price,
+            ((current_price - base_price) / base_price * 100) as variation
+        FROM economy_items
+        WHERE ABS((current_price - base_price) / base_price * 100) > 50
+    ]])
+    
+    if priceAnomalies then
+        for _, item in ipairs(priceAnomalies) do
+            table.insert(alerts, {
+                type = 'price_anomaly',
+                item = item.item_name,
+                variation = item.variation,
+                message = ('Prix anormal: %s (%.1f%% de variation)'):format(item.item_name, item.variation),
+                severity = math.abs(item.variation) > 100 and 'high' or 'medium',
+                timestamp = os.time()
+            })
+        end
+    end
+    
+    -- Détecter les transactions suspectes (volume inhabituel)
+    local suspiciousTransactions = MySQL.query.await([[
+        SELECT 
+            player_identifier,
+            COUNT(*) as transaction_count,
+            SUM(price * quantity) as total_volume
+        FROM economy_transactions
+        WHERE timestamp > DATE_SUB(NOW(), INTERVAL 10 MINUTE)
+        GROUP BY player_identifier
+        HAVING transaction_count > 50 OR total_volume > 100000
+    ]])
+    
+    if suspiciousTransactions then
+        for _, tx in ipairs(suspiciousTransactions) do
+            table.insert(alerts, {
+                type = 'suspicious_activity',
+                player = tx.player_identifier,
+                transactionCount = tx.transaction_count,
+                volume = tx.total_volume,
+                message = ('Activité suspecte: %d transactions / $%d en 10min'):format(tx.transaction_count, tx.total_volume),
+                severity = 'high',
+                timestamp = os.time()
+            })
+        end
+    end
+    
+    -- Détecter l'inflation excessive
+    if Economy.State.inflation > EconomyConfig.inflation.maxInflation * 0.9 then
+        table.insert(alerts, {
+            type = 'high_inflation',
+            value = Economy.State.inflation,
+            message = ('Inflation élevée: %.2f'):format(Economy.State.inflation),
+            severity = 'medium',
+            timestamp = os.time()
+        })
+    end
+    
+    -- Ajouter les alertes
+    for _, alert in ipairs(alerts) do
+        table.insert(MonitoringData.alerts, alert)
+        
+        -- Logger les alertes de haute sévérité
+        if alert.severity == 'high' then
+            LogEconomyChange('alert', alert.type, nil, nil, 'monitoring', nil, alert.message)
+            
+            -- Notifier les admins en ligne
+            NotifyAdmins(alert)
+        end
+    end
+end
+
+-- ══════════════════════════════════════════════════════════════════════════════
+-- Notifier les admins des alertes critiques
+-- ══════════════════════════════════════════════════════════════════════════════
+
+function NotifyAdmins(alert)
+    local xPlayers = vCore.GetPlayers()
+    
+    for _, playerId in ipairs(xPlayers) do
+        local xPlayer = vCore.GetPlayerFromId(playerId)
+        if xPlayer and xPlayer.getGroup and xPlayer.getGroup() >= 3 then
+            TriggerClientEvent('vcore:showNotification', playerId, 
+                '[ÉCONOMIE] ' .. alert.message, 
+                'warning'
+            )
+        end
+    end
+end
+
+-- ══════════════════════════════════════════════════════════════════════════════
+-- Exports Monitoring
+-- ══════════════════════════════════════════════════════════════════════════════
+
+exports('GetMonitoringData', function()
+    return MonitoringData
+end)
+
+exports('GetEconomyAlerts', function()
+    return MonitoringData.alerts
+end)
+
+exports('GenerateReport', function()
+    GenerateEconomyReport()
+    return true
+end)
