@@ -225,29 +225,45 @@ end
 function Scanner.CountAvailableTests(resourceName)
     local count = 0
     
-    -- Chercher dans les dossiers de tests
-    local testFolders = {
-        'modules/testbench/tests/unit/',
-        'modules/testbench/tests/integration/',
-        'modules/testbench/tests/stress/',
-        'modules/testbench/tests/security/'
+    -- Chemins possibles pour les tests
+    local testPaths = {
+        -- Tests dans vAvA_core/tests/
+        {resource = 'vAvA_core', path = 'tests/unit/core_tests.lua', module = 'vAvA_core'},
+        {resource = 'vAvA_core', path = 'tests/unit/economy_tests.lua', module = 'economy'},
+        {resource = 'vAvA_core', path = 'tests/unit/inventory_tests.lua', module = 'inventory'},
+        {resource = 'vAvA_core', path = 'tests/unit/jobs_tests.lua', module = 'jobs'},
+        {resource = 'vAvA_core', path = 'tests/unit/vehicles_tests.lua', module = 'vehicles'},
+        {resource = 'vAvA_core', path = 'tests/integration/full_cycle_tests.lua', module = 'vAvA_core'},
+        -- Tests dans le module testbench
+        {resource = 'vAvA_testbench', path = 'tests/unit/example_tests.lua', module = 'vAvA_testbench'}
     }
     
-    for _, folder in ipairs(testFolders) do
-        local testFile = folder .. resourceName .. '_tests.lua'
-        
-        -- Vérifier si le fichier existe (approximation)
-        -- Dans FiveM, on ne peut pas lister les fichiers directement
-        -- On doit les charger explicitement
-        
-        -- Pour l'instant, on retourne un compte basé sur la configuration
-        if TestbenchConfig.Modules then
-            for _, moduleName in ipairs(TestbenchConfig.Modules) do
-                if moduleName == resourceName then
-                    count = count + 5 -- Estimation: 5 tests par module
-                    break
+    -- Vérifier si ce module a des tests
+    for _, testPath in ipairs(testPaths) do
+        if testPath.module == resourceName then
+            -- Essayer de charger le fichier
+            local success, tests = pcall(function()
+                local corePath = GetResourcePath('vAvA_core')
+                local testbenchPath = GetResourcePath('vAvA_testbench')
+                local filePath
+                
+                if testPath.resource == 'vAvA_core' then
+                    filePath = corePath .. '/' .. testPath.path
+                else
+                    filePath = testbenchPath .. '/' .. testPath.path
                 end
+                
+                return LoadResourceFile(testPath.resource, testPath.path)
+            end)
+            
+            if success and tests then
+                -- Compter approximativement le nombre de tests
+                -- En comptant les occurrences de "name = 'test_"
+                local _, testCount = string.gsub(tests, "name%s*=%s*['\"]test_", "")
+                count = count + testCount
             end
+        end
+    end
         end
     end
     

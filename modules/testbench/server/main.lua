@@ -297,23 +297,60 @@ end
 
 -- === CHARGEMENT DES TESTS ===
 function LoadModuleTests(moduleName)
-    local tests = {}
+    local allTests = {}
     
-    -- Chemin vers les tests du module
-    local testPath = string.format('modules/testbench/tests/unit/%s_tests.lua', moduleName)
+    -- Table de correspondance entre les noms de modules et les fichiers de tests
+    local testFiles = {
+        ['vAvA_core'] = {
+            {resource = 'vAvA_core', path = 'tests/unit/core_tests.lua'},
+            {resource = 'vAvA_core', path = 'tests/integration/full_cycle_tests.lua'}
+        },
+        ['economy'] = {
+            {resource = 'vAvA_core', path = 'tests/unit/economy_tests.lua'}
+        },
+        ['inventory'] = {
+            {resource = 'vAvA_core', path = 'tests/unit/inventory_tests.lua'}
+        },
+        ['jobs'] = {
+            {resource = 'vAvA_core', path = 'tests/unit/jobs_tests.lua'}
+        },
+        ['vehicles'] = {
+            {resource = 'vAvA_core', path = 'tests/unit/vehicles_tests.lua'}
+        },
+        ['vAvA_testbench'] = {
+            {resource = 'vAvA_testbench', path = 'tests/unit/example_tests.lua'}
+        }
+    }
     
-    -- Pour l'instant, retourner des tests de démo
-    -- TODO: Implémenter le chargement dynamique des tests
+    -- Charger les tests pour ce module
+    local files = testFiles[moduleName]
     
-    table.insert(tests, {
-        name = moduleName .. '_basic_test',
-        type = 'unit',
-        description = 'Test basique pour ' .. moduleName,
-        status = 'pending',
-        critical = true
-    })
+    if files then
+        for _, file in ipairs(files) do
+            local success, tests = pcall(function()
+                -- Charger le fichier
+                local content = LoadResourceFile(file.resource, file.path)
+                
+                if content then
+                    -- Exécuter le fichier pour obtenir la table de tests
+                    local loadFunc = load(content, '@' .. file.path)
+                    if loadFunc then
+                        return loadFunc()
+                    end
+                end
+                return nil
+            end)
+            
+            if success and tests and type(tests) == 'table' then
+                -- Ajouter les tests à la liste
+                for _, test in ipairs(tests) do
+                    table.insert(allTests, test)
+                end
+            end
+        end
+    end
     
-    return tests
+    return allTests
 end
 
 -- === EXÉCUTION DES TESTS ===
@@ -329,8 +366,10 @@ function RunAllTests(source)
         local tests = LoadModuleTests(module.name)
         
         for _, test in ipairs(tests) do
-            -- Notifier le client
-            TriggerClientEvent('testbench:testStarted', source, test)
+            -- Notifier le client (seulement si c'est un joueur)
+            if source > 0 then
+                TriggerClientEvent('testbench:testStarted', source, test)
+            end
             
             -- Exécuter le test
             local result = ExecuteTest(test)
@@ -345,8 +384,10 @@ function RunAllTests(source)
                 results.warnings = results.warnings + 1
             end
             
-            -- Notifier le client
-            TriggerClientEvent('testbench:testCompleted', source, result)
+            -- Notifier le client (seulement si c'est un joueur)
+            if source > 0 then
+                TriggerClientEvent('testbench:testCompleted', source, result)
+            end
             
             Wait(100) -- Petit délai entre les tests
         end

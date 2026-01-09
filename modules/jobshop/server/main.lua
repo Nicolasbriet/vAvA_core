@@ -144,7 +144,7 @@ end
 -- ================================
 
 function CreateTables()
-    -- Table des boutiques
+    -- Table des boutiques (créer en premier)
     MySQL.Async.execute([[
         CREATE TABLE IF NOT EXISTS `job_shops` (
             `id` int(11) NOT NULL AUTO_INCREMENT,
@@ -162,26 +162,26 @@ function CreateTables()
         ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
     ]], {}, function()
         print('[vAvA Core - JobShop] Table job_shops créée/vérifiée')
-    end)
-    
-    -- Table des items de boutique
-    MySQL.Async.execute([[
-        CREATE TABLE IF NOT EXISTS `job_shop_items` (
-            `id` int(11) NOT NULL AUTO_INCREMENT,
-            `shop_id` int(11) NOT NULL,
-            `item_name` varchar(50) NOT NULL,
-            `label` varchar(100) DEFAULT NULL,
-            `price` int(11) NOT NULL DEFAULT 0,
-            `stock` int(11) NOT NULL DEFAULT 0,
-            `max_stock` int(11) NOT NULL DEFAULT 100,
-            `enabled` tinyint(1) NOT NULL DEFAULT 1,
-            PRIMARY KEY (`id`),
-            UNIQUE KEY `unique_shop_item` (`shop_id`, `item_name`),
-            KEY `idx_shop_id` (`shop_id`),
-            CONSTRAINT `fk_shop_items_shop` FOREIGN KEY (`shop_id`) REFERENCES `job_shops` (`id`) ON DELETE CASCADE
-        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
-    ]], {}, function()
-        print('[vAvA Core - JobShop] Table job_shop_items créée/vérifiée')
+        
+        -- Table des items de boutique (créer APRÈS job_shops)
+        MySQL.Async.execute([[
+            CREATE TABLE IF NOT EXISTS `job_shop_items` (
+                `id` int(11) NOT NULL AUTO_INCREMENT,
+                `shop_id` int(11) NOT NULL,
+                `item_name` varchar(50) NOT NULL,
+                `label` varchar(100) DEFAULT NULL,
+                `price` int(11) NOT NULL DEFAULT 0,
+                `stock` int(11) NOT NULL DEFAULT 0,
+                `max_stock` int(11) NOT NULL DEFAULT 100,
+                `enabled` tinyint(1) NOT NULL DEFAULT 1,
+                PRIMARY KEY (`id`),
+                UNIQUE KEY `unique_shop_item` (`shop_id`, `item_name`),
+                KEY `idx_shop_id` (`shop_id`),
+                CONSTRAINT `fk_shop_items_shop` FOREIGN KEY (`shop_id`) REFERENCES `job_shops` (`id`) ON DELETE CASCADE
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+        ]], {}, function()
+            print('[vAvA Core - JobShop] Table job_shop_items créée/vérifiée')
+        end)
     end)
 end
 
