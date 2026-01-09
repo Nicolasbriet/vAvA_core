@@ -10,7 +10,7 @@ return {
         description = 'Vérifie que le module inventory est initialisé',
         run = function(ctx)
             local hasExport = pcall(function()
-                exports['inventory']:GetInventory('test')
+                exports['vAvA_inventory']:GetInventory('test')
             end)
             
             ctx.assert.isTrue(hasExport, 'Le module inventory doit avoir des exports')
@@ -26,7 +26,7 @@ return {
             local testPlayer = 'test_player_' .. os.time()
             
             -- Ajouter un item
-            local success = exports['inventory']:AddItem(testPlayer, 'bread', 1)
+            local success = exports['vAvA_inventory']:AddItem(testPlayer, 'bread', 1)
             
             ctx.assert.isTrue(success, 'L\'item doit être ajouté avec succès')
         end
@@ -40,8 +40,8 @@ return {
             local testPlayer = 'test_player_' .. os.time()
             
             -- Ajouter puis retirer
-            exports['inventory']:AddItem(testPlayer, 'bread', 5)
-            local success = exports['inventory']:RemoveItem(testPlayer, 'bread', 2)
+            exports['vAvA_inventory']:AddItem(testPlayer, 'bread', 5)
+            local success = exports['vAvA_inventory']:RemoveItem(testPlayer, 'bread', 2)
             
             ctx.assert.isTrue(success, 'L\'item doit être retiré avec succès')
         end
@@ -55,10 +55,10 @@ return {
             local testPlayer = 'test_player_' .. os.time()
             
             -- Ajouter 3 items
-            exports['inventory']:AddItem(testPlayer, 'water', 3)
+            exports['vAvA_inventory']:AddItem(testPlayer, 'water', 3)
             
             -- Compter
-            local count = exports['inventory']:GetItemCount(testPlayer, 'water')
+            local count = exports['vAvA_inventory']:GetItemCount(testPlayer, 'water')
             
             ctx.assert.equals(count, 3, 'Le comptage doit retourner 3')
         end
@@ -72,7 +72,7 @@ return {
             local testPlayer = 'test_player_' .. os.time()
             
             -- Obtenir le poids maximum
-            local maxWeight = exports['inventory']:GetMaxWeight(testPlayer)
+            local maxWeight = exports['vAvA_inventory']:GetMaxWeight(testPlayer)
             
             ctx.assert.isNotNil(maxWeight, 'Le poids maximum doit être défini')
             ctx.assert.isTrue(maxWeight > 0, 'Le poids maximum doit être > 0')
@@ -87,7 +87,7 @@ return {
             local testPlayer = 'test_player_' .. os.time()
             
             -- Ajouter un item avec metadata
-            local success = exports['inventory']:AddItem(testPlayer, 'weapon_pistol', 1, {
+            local success = exports['vAvA_inventory']:AddItem(testPlayer, 'weapon_pistol', 1, {
                 ammo = 12,
                 serial = 'TEST123'
             })
@@ -104,7 +104,7 @@ return {
             local testPlayer = 'test_player_' .. os.time()
             
             -- Définir un slot de hotbar
-            local success = exports['inventory']:SetHotbarSlot(testPlayer, 1, 'bread')
+            local success = exports['vAvA_inventory']:SetHotbarSlot(testPlayer, 1, 'bread')
             
             ctx.assert.isTrue(success, 'Le slot hotbar doit être défini')
         end
@@ -118,10 +118,10 @@ return {
             local testPlayer = 'test_player_' .. os.time()
             
             -- Ajouter un item utilisable
-            exports['inventory']:AddItem(testPlayer, 'bread', 1)
+            exports['vAvA_inventory']:AddItem(testPlayer, 'bread', 1)
             
             -- Utiliser l'item
-            local used = exports['inventory']:UseItem(testPlayer, 'bread')
+            local used = exports['vAvA_inventory']:UseItem(testPlayer, 'bread')
             
             ctx.assert.isTrue(used, 'L\'item doit pouvoir être utilisé')
         end
@@ -135,7 +135,7 @@ return {
             local testPlayer = 'test_player_' .. os.time()
             
             -- Obtenir les slots
-            local slots = exports['inventory']:GetSlots(testPlayer)
+            local slots = exports['vAvA_inventory']:GetSlots(testPlayer)
             
             ctx.assert.isNotNil(slots, 'Les slots doivent être définis')
             ctx.assert.isTrue(slots > 0, 'Il doit y avoir au moins 1 slot')

@@ -11,7 +11,7 @@ return {
         run = function(ctx)
             -- Vérifier que les exports existent
             local hasExport = pcall(function()
-                exports['economy']:GetPrice('bread', 'supermarket', 1)
+                exports['vAvA_economy']:GetPrice('bread', 'supermarket', 1)
             end)
             
             ctx.assert.isTrue(hasExport, 'Le module economy doit avoir des exports')
@@ -23,7 +23,7 @@ return {
         type = 'unit',
         description = 'Vérifie le calcul des prix',
         run = function(ctx)
-            local price = exports['economy']:GetPrice('bread', 'supermarket', 1)
+            local price = exports['vAvA_economy']:GetPrice('bread', 'supermarket', 1)
             
             ctx.assert.isNotNil(price, 'Le prix ne doit pas être nil')
             ctx.assert.isType(price, 'number', 'Le prix doit être un nombre')
@@ -36,7 +36,7 @@ return {
         type = 'unit',
         description = 'Vérifie le calcul des salaires',
         run = function(ctx)
-            local salary = exports['economy']:GetSalary('police', 0)
+            local salary = exports['vAvA_economy']:GetSalary('police', 0)
             
             ctx.assert.isNotNil(salary, 'Le salaire ne doit pas être nil')
             ctx.assert.isType(salary, 'number', 'Le salaire doit être un nombre')
@@ -50,7 +50,7 @@ return {
         description = 'Vérifie l\'application des taxes',
         run = function(ctx)
             local amount = 1000
-            local taxed = exports['economy']:ApplyTax('purchase', amount)
+            local taxed = exports['vAvA_economy']:ApplyTax('purchase', amount)
             
             ctx.assert.isNotNil(taxed, 'Le montant taxé ne doit pas être nil')
             ctx.assert.isType(taxed, 'number', 'Le montant taxé doit être un nombre')
@@ -63,7 +63,7 @@ return {
         type = 'unit',
         description = 'Vérifie l\'état de l\'économie',
         run = function(ctx)
-            local state = exports['economy']:GetEconomyState()
+            local state = exports['vAvA_economy']:GetEconomyState()
             
             ctx.assert.isNotNil(state, 'L\'état économique ne doit pas être nil')
             ctx.assert.isNotNil(state.inflation, 'L\'inflation doit être définie')
@@ -76,8 +76,8 @@ return {
         type = 'unit',
         description = 'Vérifie les remises sur quantité',
         run = function(ctx)
-            local price1 = exports['economy']:GetPrice('bread', 'supermarket', 1)
-            local price10 = exports['economy']:GetPrice('bread', 'supermarket', 10)
+            local price1 = exports['vAvA_economy']:GetPrice('bread', 'supermarket', 1)
+            local price10 = exports['vAvA_economy']:GetPrice('bread', 'supermarket', 10)
             
             -- Le prix unitaire pour 10 devrait être <= au prix unitaire pour 1
             local unitPrice10 = price10 / 10
@@ -93,7 +93,7 @@ return {
             local logged = false
             
             -- Enregistrer une transaction de test
-            exports['economy']:RegisterTransaction({
+            exports['vAvA_economy']:RegisterTransaction({
                 type = 'purchase',
                 player = 'test_player',
                 item = 'bread',
@@ -114,7 +114,7 @@ return {
         run = function(ctx)
             -- Vérifier que la fonction existe
             local hasAdjustment = pcall(function()
-                exports['economy']:RecalculateEconomy()
+                exports['vAvA_economy']:RecalculateEconomy()
             end)
             
             ctx.assert.isTrue(hasAdjustment, 'Le système d\'auto-ajustement doit exister')

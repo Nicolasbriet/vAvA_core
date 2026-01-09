@@ -468,19 +468,41 @@ AddEventHandler('vAvA_inventory:useItem', function(slot)
     if itemData and itemData.type == 'weapon' and itemData.weapon_hash then
         -- Équiper l'arme
         TriggerClientEvent('vAvA_inventory:equipWeapon', src, itemData.weapon_hash, 100)
-    elseif itemData and itemData.type == 'food' then
-        -- Consommer nourriture - remonte la faim
-        RemoveItem(src, item.name, 1)
-        TriggerClientEvent('vAvA_inventory:consumeFood', src, 25) -- +25% faim
-    elseif itemData and itemData.type == 'drink' then
-        -- Consommer boisson - remonte la soif
-        RemoveItem(src, item.name, 1)
-        TriggerClientEvent('vAvA_inventory:consumeDrink', src, 25) -- +25% soif
+    elseif itemData and (itemData.type == 'food' or itemData.type == 'drink') then
+        -- Tenter de consommer via le module status
+        local statusModule = GetResourceState('vAvA_status')
+        
+        if statusModule == 'started' then
+            -- Utiliser le module status pour gérer la consommation
+            local success = exports['vAvA_status']:ConsumeItem(src, item.name)
+            
+            if success then
+                -- Item consommé avec succès, retirer de l'inventaire
+                RemoveItem(src, item.name, 1)
+                TriggerClientEvent('vAvA_inventory:notify', src, 'Vous avez consommé: ' .. itemData.label, 'success')
+            else
+                -- Item non reconnu par le module status, utiliser l'ancien système
+                RemoveItem(src, item.name, 1)
+                if itemData.type == 'food' then
+                    TriggerClientEvent('vAvA_inventory:consumeFood', src, 25)
+                else
+                    TriggerClientEvent('vAvA_inventory:consumeDrink', src, 25)
+                end
+            end
+        else
+            -- Module status non chargé, utiliser l'ancien système
+            RemoveItem(src, item.name, 1)
+            if itemData.type == 'food' then
+                TriggerClientEvent('vAvA_inventory:consumeFood', src, 25)
+            else
+                TriggerClientEvent('vAvA_inventory:consumeDrink', src, 25)
+            end
+        end
     elseif itemData and itemData.type == 'money' then
         TriggerClientEvent('vAvA_inventory:notify', src, 'Vous avez $' .. item.amount)
     else
         -- Item générique - juste notifier
-        TriggerClientEvent('vAvA_inventory:notify', src, 'Utilisé: ' .. item.label)
+        TriggerClientEvent('vAvA_inventory:notify', src, 'Utilisé: ' .. itemData.label)
     end
 end)
 
@@ -950,6 +972,86 @@ end)
 -- EXPORTS
 -- ═══════════════════════════════════════════════════════════════════════════
 
+-- Fonction pour obtenir le nombre de slots d'un joueur
+local function GetSlots(identifier)
+    if not identifier then return nil end
+    local id = GetIdentifier(identifier)
+    if not id then return Config.MaxSlots end
+    return Config.MaxSlots
+end
+
+-- Fonction pour utiliser un item
+local function UseItem(identifier, itemName)
+    if not identifier or not itemName then return false end
+    local id = GetIdentifier(identifier)
+    if not id then return false end
+    
+    local item = Cache.items[itemName]
+    if not item or not item.usable then return false end
+    
+    -- Vérifier si le joueur possède l'item
+    local inventory = Cache.inventories[id] or {}
+    for slot, invItem in pairs(inventory) do
+        if invItem.name == itemName and invItem.amount > 0 then
+            -- Retirer 1 item
+            RemoveItem(identifier, itemName, 1)
+            return true
+        end
+    end
+    
+    return false
+end
+
+-- Fonction pour obtenir l'inventaire complet
+local function GetInventory(identifier)
+    if not identifier then return nil end
+    local id = GetIdentifier(identifier)
+    if not id then return {} end
+    return Cache.inventories[id] or {}
+end
+
+-- Fonction pour compter les items
+local function GetItemCount(identifier, itemName)
+    if not identifier or not itemName then return 0 end
+    local id = GetIdentifier(identifier)
+    if not id then return 0 end
+    
+    local inventory = Cache.inventories[id] or {}
+    local count = 0
+    for _, item in pairs(inventory) do
+        if item.name == itemName then
+            count = count + item.amount
+        end
+    end
+    return count
+end
+
+-- Fonction pour obtenir le poids maximum
+local function GetMaxWeight(identifier)
+    return Config.MaxWeight or 120
+end
+
+-- Fonction pour définir un slot hotbar
+local function SetHotbarSlot(identifier, slot, itemName)
+    if not identifier or not slot then return false end
+    local id = GetIdentifier(identifier)
+    if not id then return false end
+    
+    -- Initialiser hotbar si nécessaire
+    if not Cache.hotbars[id] then
+        Cache.hotbars[id] = {}
+    end
+    
+    -- Définir le slot
+    Cache.hotbars[id][slot] = itemName
+    
+    -- Sauvegarder en BDD
+    MySQL.Async.execute('INSERT INTO player_hotbar (owner, slot, item_name) VALUES (?, ?, ?) ON DUPLICATE KEY UPDATE item_name = VALUES(item_name)', 
+        {id, slot, itemName})
+    
+    return true
+end
+
 exports('AddItem', AddItem)
 exports('RemoveItem', RemoveItem)
 exports('GetItemData', function(n) return Cache.items[n] end)
@@ -958,6 +1060,12 @@ exports('AddMoney', AddMoney)
 exports('RemoveMoney', RemoveMoney)
 exports('GetItemPrice', GetItemPrice)
 exports('ApplyTax', ApplyTax)
+exports('GetSlots', GetSlots)
+exports('UseItem', UseItem)
+exports('GetInventory', GetInventory)
+exports('GetItemCount', GetItemCount)
+exports('GetMaxWeight', GetMaxWeight)
+exports('SetHotbarSlot', SetHotbarSlot)
 
 -- Cleanup
 AddEventHandler('playerDropped', function()

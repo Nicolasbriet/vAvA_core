@@ -56,8 +56,8 @@ return {
         type = 'integration',
         description = 'Vérifie le système de garage',
         run = function(ctx)
-            if GetResourceState('garage') == 'started' then
-                local garages = exports['garage']:GetGarages()
+            if GetResourceState('vAvA_garage') == 'started' then
+                local garages = exports['vAvA_garage']:GetGarages()
                 ctx.assert.isNotNil(garages, 'Les garages doivent être définis')
                 ctx.assert.isType(garages, 'table', 'Les garages doivent être une table')
             else
@@ -71,12 +71,12 @@ return {
         type = 'integration',
         description = 'Vérifie la persistance des véhicules',
         run = function(ctx)
-            if GetResourceState('persist') == 'started' then
+            if GetResourceState('vAvA_persist') == 'started' then
                 local testPlayer = 'test_player_' .. os.time()
                 local plate = 'PERS' .. math.random(100, 999)
                 
                 -- Sauvegarder un véhicule
-                local success = exports['persist']:SaveVehicle(plate, {
+                local success = exports['vAvA_persist']:SaveVehicle(plate, {
                     model = 'adder',
                     coords = vector3(0, 0, 0),
                     heading = 0.0

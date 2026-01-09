@@ -287,9 +287,23 @@ exports('GetEconomyState', function()
     return Economy.GetState()
 end)
 
--- Enregistrer une transaction
-exports('RegisterTransaction', function(itemName, transactionType, quantity, price, shop, playerIdentifier)
-    RegisterTransaction(itemName, transactionType, quantity, price, shop, playerIdentifier)
+-- Enregistrer une transaction (accepte objet ou paramètres individuels)
+exports('RegisterTransaction', function(param1, param2, param3, param4, param5, param6)
+    -- Si le premier paramètre est une table (objet), utiliser ses propriétés
+    if type(param1) == 'table' then
+        local data = param1
+        RegisterTransaction(
+            data.item or data.itemName,
+            data.type or data.transactionType,
+            data.quantity,
+            data.amount or data.price,
+            data.shop,
+            data.player or data.playerIdentifier
+        )
+    else
+        -- Sinon, utiliser les paramètres individuels
+        RegisterTransaction(param1, param2, param3, param4, param5, param6)
+    end
 end)
 
 -- Obtenir le prix de vente

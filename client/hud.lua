@@ -49,6 +49,22 @@ exports('HideHUD', function() vCore.HUD.Hide() end)
 -- MISE À JOUR DU HUD
 -- ═══════════════════════════════════════════════════════════════════════════
 
+-- Réception des updates depuis le module status
+RegisterNetEvent('vAvA_hud:updateStatus')
+AddEventHandler('vAvA_hud:updateStatus', function(statusData)
+    if not vCore.PlayerData.status then
+        vCore.PlayerData.status = {}
+    end
+    
+    if statusData.hunger then
+        vCore.PlayerData.status.hunger = statusData.hunger
+    end
+    
+    if statusData.thirst then
+        vCore.PlayerData.status.thirst = statusData.thirst
+    end
+end)
+
 CreateThread(function()
     while true do
         Wait(500) -- Mise à jour toutes les 500ms
@@ -57,30 +73,39 @@ CreateThread(function()
             local ped = PlayerPedId()
             
             local hudData = {
-                type = 'updateHUD',
+                action = 'updateStatus',
                 health = GetEntityHealth(ped) - 100,
-                maxHealth = 100,
                 armor = GetPedArmour(ped),
                 hunger = vCore.PlayerData.status and vCore.PlayerData.status.hunger or 100,
                 thirst = vCore.PlayerData.status and vCore.PlayerData.status.thirst or 100,
-                stress = vCore.PlayerData.status and vCore.PlayerData.status.stress or 0,
-                cash = vCore.PlayerData.money and vCore.PlayerData.money.cash or 0,
-                bank = vCore.PlayerData.money and vCore.PlayerData.money.bank or 0,
-                job = vCore.PlayerData.job and vCore.PlayerData.job.label or 'Chômeur',
-                onDuty = vCore.PlayerData.onDuty or false
+                stress = vCore.PlayerData.status and vCore.PlayerData.status.stress or 0
             }
+            
+            SendNUIMessage(hudData)
+            
+            -- Mise à jour de l'argent séparément
+            SendNUIMessage({
+                action = 'updateMoney',
+                cash = vCore.PlayerData.money and vCore.PlayerData.money.cash or 0,
+                bank = vCore.PlayerData.money and vCore.PlayerData.money.bank or 0
+            })
             
             -- Infos véhicule si dans un véhicule
             if IsPedInAnyVehicle(ped, false) then
                 local vehicle = GetVehiclePedIsIn(ped, false)
-                hudData.inVehicle = true
-                hudData.speed = math.floor(GetEntitySpeed(vehicle) * 3.6) -- km/h
-                hudData.fuel = GetVehicleFuelLevel(vehicle)
+                SendNUIMessage({
+                    action = 'showVehicleHud'
+                })
+                SendNUIMessage({
+                    action = 'updateVehicle',
+                    speed = math.floor(GetEntitySpeed(vehicle) * 3.6), -- km/h
+                    fuel = GetVehicleFuelLevel(vehicle)
+                })
             else
-                hudData.inVehicle = false
+                SendNUIMessage({
+                    action = 'hideVehicleHud'
+                })
             end
-            
-            SendNUIMessage(hudData)
         end
     end
 end)

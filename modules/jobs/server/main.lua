@@ -422,8 +422,18 @@ end)
 -- EXPORTS
 -- ═══════════════════════════════════════════════════════════════════════════
 
+-- Fonction pour obtenir les grades d'un job
+local function GetJobGrades(jobName)
+    if not jobName then return nil end
+    local job = GetJob(jobName)
+    if not job then return nil end
+    return job.grades or {}
+end
+
 exports('GetJob', GetJob)
+exports('GetJobs', GetAllJobs)  -- Alias pour compatibilité tests
 exports('GetAllJobs', GetAllJobs)
+exports('GetJobGrades', GetJobGrades)
 exports('GetJobInteractions', GetJobInteractions)
 exports('SetPlayerJob', SetPlayerJob)
 exports('SetPlayerDuty', SetPlayerDuty)

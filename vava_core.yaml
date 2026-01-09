@@ -39,6 +39,7 @@ description: |
     - vAvA_jobshop (boutiques par métier)
     - vAvA_persist (persistance véhicules)
     - vAvA_sit (points d'assise avec animations)
+    - vAvA_status (système de besoins: faim, soif, santé)
     - vAvA_testbench (système de test automatisé)
     
     Prérequis:
@@ -170,6 +171,13 @@ tasks:
     - action: move_path
       src: ./resources/[vava]/vAvA_core/modules/sit
       dest: ./resources/[vava]/vAvA_sit
+
+    # ═══════════════════════════════════════════════════════════════════════
+    # Copie du module status (système de besoins: faim, soif, santé)
+    # ═══════════════════════════════════════════════════════════════════════
+    - action: move_path
+      src: ./resources/[vava]/vAvA_core/modules/status
+      dest: ./resources/[vava]/vAvA_status
 
     # ═══════════════════════════════════════════════════════════════════════
     # Copie du module testbench (système de test automatisé)

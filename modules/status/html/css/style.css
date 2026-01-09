@@ -1,0 +1,361 @@
+/* ========================================
+   VAVA STATUS HUD - CHARTE GRAPHIQUE
+   Couleurs: Rouge néon #FF1E1E, Noir #000000
+   ======================================== */
+
+@import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Rajdhani:wght@400;700&family=Roboto:wght@400;500&display=swap');
+
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+:root {
+    /* Charte graphique vAvA */
+    --vava-red: #FF1E1E;
+    --vava-red-dark: #8B0000;
+    --vava-black: #000000;
+    --vava-white: #FFFFFF;
+    --vava-gray: #CCCCCC;
+    
+    /* Effets */
+    --glow-red: 0 0 10px rgba(255, 30, 30, 0.5),
+                0 0 20px rgba(255, 30, 30, 0.3),
+                0 0 30px rgba(255, 30, 30, 0.1);
+    
+    --glow-red-strong: 0 0 10px rgba(255, 30, 30, 0.8),
+                       0 0 20px rgba(255, 30, 30, 0.6),
+                       0 0 30px rgba(255, 30, 30, 0.4),
+                       0 0 40px rgba(255, 30, 30, 0.2);
+}
+
+body {
+    font-family: 'Roboto', 'Inter', sans-serif;
+    background: transparent;
+    overflow: hidden;
+}
+
+/* ========================================
+   CONTAINER
+   ======================================== */
+
+.status-container {
+    position: fixed;
+    bottom: 20px;
+    right: 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    opacity: 0;
+    transform: translateX(50px);
+    transition: opacity 0.5s ease, transform 0.5s ease;
+}
+
+.status-container.visible {
+    opacity: 1;
+    transform: translateX(0);
+}
+
+/* Positions alternatives */
+.status-container.bottom-left {
+    right: auto;
+    left: 20px;
+}
+
+.status-container.top-right {
+    bottom: auto;
+    top: 20px;
+}
+
+.status-container.top-left {
+    bottom: auto;
+    top: 20px;
+    right: auto;
+    left: 20px;
+}
+
+/* ========================================
+   STATUS ITEM
+   ======================================== */
+
+.status-item {
+    background: rgba(0, 0, 0, 0.85);
+    border: 2px solid var(--vava-red);
+    border-radius: 8px;
+    padding: 12px 16px;
+    min-width: 280px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    position: relative;
+    overflow: hidden;
+    box-shadow: var(--glow-red);
+    transition: all 0.3s ease;
+}
+
+.status-item::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: -100%;
+    width: 100%;
+    height: 100%;
+    background: linear-gradient(90deg, 
+        transparent, 
+        rgba(255, 30, 30, 0.1), 
+        transparent);
+    animation: scanline 3s infinite;
+}
+
+.status-item:hover {
+    border-color: var(--vava-white);
+    box-shadow: var(--glow-red-strong);
+    transform: scale(1.02);
+}
+
+/* ========================================
+   ICON
+   ======================================== */
+
+.status-icon {
+    width: 40px;
+    height: 40px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 50%;
+    background: rgba(255, 30, 30, 0.1);
+    border: 2px solid var(--vava-red);
+    flex-shrink: 0;
+}
+
+.status-icon svg {
+    width: 24px;
+    height: 24px;
+    color: var(--vava-red);
+    filter: drop-shadow(var(--glow-red));
+}
+
+/* ========================================
+   CONTENT
+   ======================================== */
+
+.status-content {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.status-label {
+    font-family: 'Orbitron', 'Rajdhani', sans-serif;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 2px;
+    color: var(--vava-white);
+    text-transform: uppercase;
+    text-shadow: var(--glow-red);
+}
+
+/* ========================================
+   BAR CONTAINER
+   ======================================== */
+
+.status-bar-container {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.status-bar-bg {
+    flex: 1;
+    height: 20px;
+    background: rgba(0, 0, 0, 0.5);
+    border: 1px solid rgba(255, 30, 30, 0.3);
+    border-radius: 10px;
+    overflow: hidden;
+    position: relative;
+}
+
+.status-bar {
+    position: absolute;
+    top: 0;
+    left: 0;
+    height: 100%;
+    width: 100%;
+    transition: width 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+    overflow: hidden;
+}
+
+.status-bar-fill {
+    position: absolute;
+    top: 0;
+    left: 0;
+    height: 100%;
+    width: 100%;
+    background: linear-gradient(90deg, 
+        var(--vava-red-dark) 0%, 
+        var(--vava-red) 50%, 
+        var(--vava-red-dark) 100%);
+    background-size: 200% 100%;
+    animation: shimmer 2s infinite;
+}
+
+.status-bar-glow {
+    position: absolute;
+    top: 0;
+    left: 0;
+    height: 100%;
+    width: 100%;
+    background: linear-gradient(90deg, 
+        transparent 0%, 
+        rgba(255, 255, 255, 0.3) 50%, 
+        transparent 100%);
+    animation: glow-move 3s infinite;
+    opacity: 0.5;
+}
+
+/* ========================================
+   PERCENTAGE
+   ======================================== */
+
+.status-percentage {
+    font-family: 'Orbitron', monospace;
+    font-size: 13px;
+    font-weight: 700;
+    color: var(--vava-white);
+    text-shadow: var(--glow-red);
+    min-width: 40px;
+    text-align: right;
+}
+
+/* ========================================
+   BAR STATES (color based on value)
+   ======================================== */
+
+.status-bar.low {
+    animation: pulse-warning 1s infinite;
+}
+
+.status-bar.low .status-bar-fill {
+    background: linear-gradient(90deg, 
+        #8B0000 0%, 
+        #FF4444 50%, 
+        #8B0000 100%);
+}
+
+.status-bar.critical {
+    animation: pulse-critical 0.5s infinite;
+}
+
+.status-bar.critical .status-bar-fill {
+    background: linear-gradient(90deg, 
+        #660000 0%, 
+        #FF0000 50%, 
+        #660000 100%);
+}
+
+/* ========================================
+   ANIMATIONS
+   ======================================== */
+
+@keyframes scanline {
+    0% {
+        left: -100%;
+    }
+    100% {
+        left: 100%;
+    }
+}
+
+@keyframes shimmer {
+    0% {
+        background-position: 200% 0;
+    }
+    100% {
+        background-position: -200% 0;
+    }
+}
+
+@keyframes glow-move {
+    0% {
+        transform: translateX(-100%);
+    }
+    100% {
+        transform: translateX(200%);
+    }
+}
+
+@keyframes pulse-warning {
+    0%, 100% {
+        opacity: 1;
+    }
+    50% {
+        opacity: 0.7;
+    }
+}
+
+@keyframes pulse-critical {
+    0%, 100% {
+        opacity: 1;
+        box-shadow: var(--glow-red);
+    }
+    50% {
+        opacity: 0.5;
+        box-shadow: var(--glow-red-strong);
+    }
+}
+
+/* ========================================
+   HIDE WHEN FULL (optional)
+   ======================================== */
+
+.status-item.hidden {
+    opacity: 0;
+    transform: translateX(50px);
+    pointer-events: none;
+}
+
+/* ========================================
+   RESPONSIVE
+   ======================================== */
+
+@media (max-width: 768px) {
+    .status-container {
+        bottom: 10px;
+        right: 10px;
+    }
+    
+    .status-item {
+        min-width: 240px;
+        padding: 10px 12px;
+    }
+    
+    .status-icon {
+        width: 32px;
+        height: 32px;
+    }
+    
+    .status-icon svg {
+        width: 20px;
+        height: 20px;
+    }
+}
+
+/* ========================================
+   CIRCUIT BACKGROUND (optional decorative)
+   ======================================== */
+
+.status-item::after {
+    content: '';
+    position: absolute;
+    top: 50%;
+    right: -10px;
+    width: 20px;
+    height: 20px;
+    border: 1px solid rgba(255, 30, 30, 0.1);
+    border-radius: 50%;
+    transform: translateY(-50%);
+    pointer-events: none;
+}

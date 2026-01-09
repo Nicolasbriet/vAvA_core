@@ -10,7 +10,7 @@ return {
         description = 'Vérifie que le module jobs est initialisé',
         run = function(ctx)
             local hasExport = pcall(function()
-                exports['jobs']:GetJobs()
+                exports['vAvA_jobs']:GetJobs()
             end)
             
             ctx.assert.isTrue(hasExport, 'Le module jobs doit avoir des exports')
@@ -22,7 +22,7 @@ return {
         type = 'unit',
         description = 'Vérifie la récupération de la liste des jobs',
         run = function(ctx)
-            local jobs = exports['jobs']:GetJobs()
+            local jobs = exports['vAvA_jobs']:GetJobs()
             
             ctx.assert.isNotNil(jobs, 'La liste des jobs ne doit pas être nil')
             ctx.assert.isType(jobs, 'table', 'La liste doit être une table')
@@ -35,7 +35,7 @@ return {
         type = 'critical',
         description = 'Vérifie que les jobs par défaut existent',
         run = function(ctx)
-            local jobs = exports['jobs']:GetJobs()
+            local jobs = exports['vAvA_jobs']:GetJobs()
             local hasUnemployed = false
             local hasPolice = false
             
@@ -54,7 +54,7 @@ return {
         type = 'unit',
         description = 'Vérifie le système de grades',
         run = function(ctx)
-            local grades = exports['jobs']:GetJobGrades('police')
+            local grades = exports['vAvA_jobs']:GetJobGrades('police')
             
             ctx.assert.isNotNil(grades, 'Les grades ne doivent pas être nil')
             ctx.assert.isType(grades, 'table', 'Les grades doivent être une table')
