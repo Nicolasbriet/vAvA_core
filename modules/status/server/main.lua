@@ -66,12 +66,39 @@ end)
 -- Sauvegarde au drop du joueur
 AddEventHandler('playerDropped', function(reason)
     local src = source
-    local identifier = GetPlayerIdentifier(src)
     
+    -- Capturer l'identifier avant que le joueur ne soit complètement déconnecté
+    local identifier = nil
+    for i = 0, GetNumPlayerIdentifiers(src) - 1 do
+        local id = GetPlayerIdentifier(src, i)
+        if id and string.match(id, "license:") then
+            identifier = id
+            break
+        end
+    end
+    
+    -- Sauvegarder de manière asynchrone sans bloquer
     if identifier and PlayerStatus[src] then
-        SavePlayerStatus(src, identifier)
+        -- Copier les données avant de nettoyer
+        local hunger = PlayerStatus[src].hunger
+        local thirst = PlayerStatus[src].thirst
+        
+        -- Nettoyer immédiatement les tables
         PlayerStatus[src] = nil
         LastUpdate[src] = nil
+        
+        -- Sauvegarder en asynchrone sans bloquer le thread principal
+        CreateThread(function()
+            MySQL.Async.execute('UPDATE player_status SET hunger = @hunger, thirst = @thirst WHERE identifier = @identifier', {
+                ['@identifier'] = identifier,
+                ['@hunger'] = hunger,
+                ['@thirst'] = thirst
+            }, function(affectedRows)
+                if StatusConfig.Logging.enabled then
+                    print(string.format("^2[vAvA Status]^7 Statuts sauvegardés pour joueur déconnecté (ID: %s)", identifier))
+                end
+            end)
+        end)
     end
 end)
 
@@ -117,6 +144,7 @@ function SavePlayerStatus(playerId, identifier)
     
     local hunger = PlayerStatus[playerId].hunger
     local thirst = PlayerStatus[playerId].thirst
+    local playerName = GetPlayerName(playerId) or "Unknown"
     
     MySQL.Async.execute('UPDATE player_status SET hunger = @hunger, thirst = @thirst WHERE identifier = @identifier', {
         ['@identifier'] = identifier,
@@ -124,7 +152,7 @@ function SavePlayerStatus(playerId, identifier)
         ['@thirst'] = thirst
     }, function(affectedRows)
         if StatusConfig.Logging.enabled then
-            print(string.format("^2[vAvA Status]^7 Statuts sauvegardés pour %s", GetPlayerName(playerId)))
+            print(string.format("^2[vAvA Status]^7 Statuts sauvegardés pour %s", playerName))
         end
     end)
 end

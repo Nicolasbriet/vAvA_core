@@ -40,6 +40,7 @@ description: |
     - vAvA_persist (persistance véhicules)
     - vAvA_sit (points d'assise avec animations)
     - vAvA_status (système de besoins: faim, soif, santé)
+    - vAvA_target (système de ciblage 3D moderne)
     - vAvA_testbench (système de test automatisé)
     
     Prérequis:
@@ -178,6 +179,13 @@ tasks:
     - action: move_path
       src: ./resources/[vava]/vAvA_core/modules/status
       dest: ./resources/[vava]/vAvA_status
+
+    # ═══════════════════════════════════════════════════════════════════════
+    # Copie du module target (système de ciblage 3D moderne)
+    # ═══════════════════════════════════════════════════════════════════════
+    - action: move_path
+      src: ./resources/[vava]/vAvA_core/modules/target
+      dest: ./resources/[vava]/vAvA_target
 
     # ═══════════════════════════════════════════════════════════════════════
     # Copie du module testbench (système de test automatisé)

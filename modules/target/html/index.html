@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>vAvA Target</title>
+    <link rel="stylesheet" href="css/style.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+</head>
+<body>
+    <!-- Menu Radial -->
+    <div id="radial-menu" class="menu-container radial-menu" style="display: none;">
+        <div class="radial-center">
+            <div class="center-dot"></div>
+            <div class="center-pulse"></div>
+        </div>
+        <div id="radial-options" class="radial-options"></div>
+    </div>
+
+    <!-- Menu Liste -->
+    <div id="list-menu" class="menu-container list-menu" style="display: none;">
+        <div class="list-header">
+            <div class="header-glow"></div>
+            <h2><i class="fa-solid fa-crosshairs"></i> INTERACTIONS</h2>
+        </div>
+        <div id="list-options" class="list-options"></div>
+    </div>
+
+    <!-- Menu Compact -->
+    <div id="compact-menu" class="menu-container compact-menu" style="display: none;">
+        <div id="compact-options" class="compact-options"></div>
+    </div>
+
+    <!-- Distance Indicator -->
+    <div id="distance-indicator" class="distance-indicator" style="display: none;">
+        <i class="fa-solid fa-ruler"></i>
+        <span id="distance-value">0m</span>
+    </div>
+
+    <script src="js/app.js"></script>
+</body>
+</html>

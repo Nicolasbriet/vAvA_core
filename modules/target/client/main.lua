@@ -1,0 +1,588 @@
+-- ============================================
+-- vAvA Target - Client Main
+-- Système de détection et raycast
+-- ============================================
+
+local currentTarget = nil
+local currentEntity = nil
+local currentOptions = {}
+local isTargetActive = false
+local isMenuOpen = false
+local lastUpdate = 0
+local cache = {}
+
+-- ============================================
+-- DÉTECTION ET RAYCAST
+-- ============================================
+
+-- Fonction pour faire un raycast depuis la caméra
+function DoRaycast(distance)
+    local playerPed = PlayerPedId()
+    local playerCoords = GetEntityCoords(playerPed)
+    local cameraRotation = GetGameplayCamRot(2)
+    local cameraCoords = GetGameplayCamCoord()
+    
+    -- Calculer direction du raycast
+    local direction = RotationToDirection(cameraRotation)
+    local destination = vector3(
+        cameraCoords.x + direction.x * distance,
+        cameraCoords.y + direction.y * distance,
+        cameraCoords.z + direction.z * distance
+    )
+    
+    -- Exécuter le raycast
+    local rayHandle = StartShapeTestRay(
+        cameraCoords.x, cameraCoords.y, cameraCoords.z,
+        destination.x, destination.y, destination.z,
+        TargetConfig.RaycastFlags,
+        playerPed,
+        0
+    )
+    
+    local _, hit, endCoords, surfaceNormal, entity = GetShapeTestResult(rayHandle)
+    
+    return hit == 1, entity, endCoords, surfaceNormal
+end
+
+-- Convertir rotation en direction
+function RotationToDirection(rotation)
+    local adjustedRotation = vector3(
+        (math.pi / 180) * rotation.x,
+        (math.pi / 180) * rotation.y,
+        (math.pi / 180) * rotation.z
+    )
+    
+    local direction = vector3(
+        -math.sin(adjustedRotation.z) * math.abs(math.cos(adjustedRotation.x)),
+        math.cos(adjustedRotation.z) * math.abs(math.cos(adjustedRotation.x)),
+        math.sin(adjustedRotation.x)
+    )
+    
+    return direction
+end
+
+-- Obtenir distance maximale selon type d'entité
+function GetMaxDistance(entity)
+    if not DoesEntityExist(entity) then
+        return TargetConfig.DefaultDistance
+    end
+    
+    local entityType = GetEntityType(entity)
+    
+    if entityType == 2 then -- Véhicule
+        return TargetConfig.VehicleDistance
+    elseif entityType == 3 then -- Objet
+        return TargetConfig.DefaultDistance
+    elseif entityType == 1 then -- Ped
+        return TargetConfig.DefaultDistance
+    end
+    
+    return TargetConfig.DefaultDistance
+end
+
+-- Vérifier si entité est blacklistée
+function IsEntityBlacklisted(entity)
+    if not DoesEntityExist(entity) then
+        return true
+    end
+    
+    local model = GetEntityModel(entity)
+    
+    -- Vérifier modèles blacklistés
+    for _, blacklistedModel in ipairs(TargetConfig.Blacklist.models) do
+        if model == blacklistedModel then
+            return true
+        end
+    end
+    
+    -- Vérifier entités blacklistées
+    for _, blacklistedEntity in ipairs(TargetConfig.Blacklist.entities) do
+        if entity == blacklistedEntity then
+            return true
+        end
+    end
+    
+    return false
+end
+
+-- Obtenir les options pour une entité
+function GetOptionsForEntity(entity)
+    if not DoesEntityExist(entity) then
+        return {}
+    end
+    
+    local options = {}
+    local model = GetEntityModel(entity)
+    local entityType = GetEntityType(entity)
+    
+    -- Vérifier targets d'entité spécifique
+    if registeredEntities[entity] then
+        for _, option in ipairs(registeredEntities[entity]) do
+            table.insert(options, option)
+        end
+    end
+    
+    -- Vérifier targets de modèle
+    if registeredModels[model] then
+        for _, option in ipairs(registeredModels[model]) do
+            table.insert(options, option)
+        end
+    end
+    
+    -- Vérifier targets de bone (véhicules uniquement)
+    if entityType == 2 and registeredBones then
+        local boneOptions = GetBoneOptions(entity)
+        for _, option in ipairs(boneOptions) do
+            table.insert(options, option)
+        end
+    end
+    
+    return options
+end
+
+-- Obtenir les options pour un bone
+function GetBoneOptions(vehicle)
+    local options = {}
+    local playerCoords = GetEntityCoords(PlayerPedId())
+    
+    if not TargetConfig.Bones.vehicle then
+        return options
+    end
+    
+    for _, boneGroup in ipairs(TargetConfig.Bones.vehicle) do
+        for _, boneName in ipairs(boneGroup.bones) do
+            local boneIndex = GetEntityBoneIndexByName(vehicle, boneName)
+            
+            if boneIndex ~= -1 then
+                local boneCoords = GetWorldPositionOfEntityBone(vehicle, boneIndex)
+                local distance = #(playerCoords - boneCoords)
+                
+                if distance <= (boneGroup.distance or TargetConfig.DefaultDistance) then
+                    for _, option in ipairs(boneGroup.options) do
+                        local optionCopy = table.clone(option)
+                        optionCopy.bone = boneName
+                        table.insert(options, optionCopy)
+                    end
+                    break -- Un seul bone du groupe suffit
+                end
+            end
+        end
+    end
+    
+    return options
+end
+
+-- Vérifier les zones
+function CheckZones(playerCoords)
+    for _, zone in ipairs(registeredZones) do
+        if IsPlayerInZone(playerCoords, zone) then
+            return zone, zone.options
+        end
+    end
+    
+    return nil, {}
+end
+
+-- Vérifier si joueur est dans une zone
+function IsPlayerInZone(playerCoords, zone)
+    if zone.type == 'sphere' then
+        local distance = #(playerCoords - zone.coords)
+        return distance <= zone.radius
+        
+    elseif zone.type == 'box' then
+        return IsPointInBox(playerCoords, zone.coords, zone.size, zone.heading or 0.0)
+        
+    elseif zone.type == 'cylinder' then
+        local distance2D = #(vector2(playerCoords.x, playerCoords.y) - vector2(zone.coords.x, zone.coords.y))
+        local heightDiff = math.abs(playerCoords.z - zone.coords.z)
+        return distance2D <= zone.radius and heightDiff <= (zone.height / 2)
+        
+    elseif zone.type == 'poly' and zone.points then
+        return IsPointInPoly(playerCoords, zone.points, zone.minZ, zone.maxZ)
+    end
+    
+    return false
+end
+
+-- Vérifier si un point est dans une box
+function IsPointInBox(point, center, size, heading)
+    local rad = math.rad(heading)
+    local cos = math.cos(rad)
+    local sin = math.sin(rad)
+    
+    -- Rotation inverse
+    local dx = point.x - center.x
+    local dy = point.y - center.y
+    
+    local rotX = dx * cos + dy * sin
+    local rotY = -dx * sin + dy * cos
+    
+    -- Vérification dans les limites
+    local halfX = size.x / 2
+    local halfY = size.y / 2
+    local halfZ = size.z / 2
+    
+    return math.abs(rotX) <= halfX and
+           math.abs(rotY) <= halfY and
+           math.abs(point.z - center.z) <= halfZ
+end
+
+-- Vérifier si un point est dans un polygone (simplifié)
+function IsPointInPoly(point, points, minZ, maxZ)
+    if point.z < minZ or point.z > maxZ then
+        return false
+    end
+    
+    local inside = false
+    local j = #points
+    
+    for i = 1, #points do
+        local xi, yi = points[i].x, points[i].y
+        local xj, yj = points[j].x, points[j].y
+        
+        if ((yi > point.y) ~= (yj > point.y)) and
+           (point.x < (xj - xi) * (point.y - yi) / (yj - yi) + xi) then
+            inside = not inside
+        end
+        
+        j = i
+    end
+    
+    return inside
+end
+
+-- Filtrer les options selon les conditions
+function FilterOptions(options, entity, distance)
+    local validOptions = {}
+    local playerPed = PlayerPedId()
+    local playerCoords = GetEntityCoords(playerPed)
+    local isPlayerInVehicle = IsPedInAnyVehicle(playerPed, false)
+    
+    for _, option in ipairs(options) do
+        local isValid = true
+        
+        -- Vérifier distance
+        if option.distance and distance > option.distance then
+            isValid = false
+        end
+        
+        -- Vérifier véhicule
+        if option.inVehicle and not isPlayerInVehicle then
+            isValid = false
+        elseif option.outVehicle and isPlayerInVehicle then
+            isValid = false
+        end
+        
+        -- Vérifier canInteract callback
+        if option.canInteract and type(option.canInteract) == 'function' then
+            local isPlayer = entity and IsEntityAPed(entity) and IsPedAPlayer(entity)
+            if not option.canInteract(entity, distance, playerCoords, isPlayer) then
+                isValid = false
+            end
+        end
+        
+        -- Vérifier job (client-side, validation serveur aussi)
+        if option.job then
+            -- Cette vérification sera faite côté serveur
+            -- On l'affiche quand même pour l'UX
+        end
+        
+        if isValid then
+            table.insert(validOptions, option)
+        end
+    end
+    
+    return validOptions
+end
+
+-- ============================================
+-- BOUCLE PRINCIPALE DE DÉTECTION
+-- ============================================
+
+Citizen.CreateThread(function()
+    while true do
+        Citizen.Wait(TargetConfig.Performance.ThreadSleep or 0)
+        
+        if not isTargetActive then
+            Citizen.Wait(500)
+            goto continue
+        end
+        
+        local now = GetGameTimer()
+        
+        -- Throttling
+        if now - lastUpdate < TargetConfig.UpdateRate then
+            goto continue
+        end
+        
+        lastUpdate = now
+        
+        local playerPed = PlayerPedId()
+        local playerCoords = GetEntityCoords(playerPed)
+        
+        -- 1. Vérifier raycast (entités)
+        local hit, entity, endCoords, surfaceNormal = DoRaycast(TargetConfig.MaxDistance)
+        
+        if hit and DoesEntityExist(entity) and not IsEntityBlacklisted(entity) then
+            local distance = #(playerCoords - endCoords)
+            local maxDistance = GetMaxDistance(entity)
+            
+            if distance <= maxDistance then
+                local options = GetOptionsForEntity(entity)
+                local validOptions = FilterOptions(options, entity, distance)
+                
+                if #validOptions > 0 then
+                    -- Nouvelle cible détectée
+                    if currentEntity ~= entity then
+                        currentEntity = entity
+                        currentOptions = validOptions
+                        TriggerEvent('vava_target:onTargetEnter', entity, validOptions)
+                        
+                        if not isMenuOpen then
+                            ShowTargetMenu(entity, validOptions, distance)
+                        end
+                    end
+                    
+                    goto continue
+                end
+            end
+        end
+        
+        -- 2. Vérifier zones
+        local zone, zoneOptions = CheckZones(playerCoords)
+        
+        if zone and #zoneOptions > 0 then
+            local validOptions = FilterOptions(zoneOptions, nil, 0)
+            
+            if #validOptions > 0 then
+                -- Zone détectée
+                if currentTarget ~= zone.name then
+                    currentTarget = zone.name
+                    currentEntity = nil
+                    currentOptions = validOptions
+                    TriggerEvent('vava_target:onTargetEnter', nil, validOptions)
+                    
+                    if not isMenuOpen then
+                        ShowTargetMenu(nil, validOptions, 0)
+                    end
+                end
+                
+                goto continue
+            end
+        end
+        
+        -- 3. Aucune cible
+        if currentEntity or currentTarget then
+            currentEntity = nil
+            currentTarget = nil
+            currentOptions = {}
+            
+            if isMenuOpen then
+                CloseTargetMenu()
+            end
+            
+            TriggerEvent('vava_target:onTargetExit')
+        end
+        
+        ::continue::
+    end
+end)
+
+-- ============================================
+-- AFFICHAGE MENU NUI
+-- ============================================
+
+function ShowTargetMenu(entity, options, distance)
+    if #options == 0 then
+        return
+    end
+    
+    -- Limiter le nombre d'options
+    if #options > TargetConfig.UI.MaxOptions then
+        local limitedOptions = {}
+        for i = 1, TargetConfig.UI.MaxOptions do
+            table.insert(limitedOptions, options[i])
+        end
+        options = limitedOptions
+    end
+    
+    isMenuOpen = true
+    
+    SetNuiFocus(true, true)
+    SendNUIMessage({
+        action = 'open',
+        menuType = TargetConfig.UI.MenuType,
+        position = TargetConfig.UI.Position,
+        options = options,
+        distance = distance,
+        showDistance = TargetConfig.UI.ShowDistance,
+        showIcon = TargetConfig.UI.ShowIcon,
+        showKeybind = TargetConfig.UI.ShowKeybind,
+        animationDuration = TargetConfig.UI.AnimationDuration
+    })
+end
+
+function CloseTargetMenu()
+    isMenuOpen = false
+    
+    SetNuiFocus(false, false)
+    SendNUIMessage({
+        action = 'close'
+    })
+end
+
+-- ============================================
+-- CALLBACKS NUI
+-- ============================================
+
+RegisterNUICallback('selectOption', function(data, cb)
+    local option = data.option
+    
+    if not option then
+        cb({success = false, error = 'No option provided'})
+        return
+    end
+    
+    -- Fermer le menu
+    CloseTargetMenu()
+    
+    -- Déclencher l'action
+    TriggerTargetOption(option, currentEntity)
+    
+    cb({success = true})
+end)
+
+RegisterNUICallback('close', function(data, cb)
+    CloseTargetMenu()
+    cb({success = true})
+end)
+
+-- Déclencher l'action d'une option
+function TriggerTargetOption(option, entity)
+    -- Event
+    if option.event then
+        if option.server then
+            -- Validation serveur
+            TriggerServerEvent('vava_target:validateInteraction', {
+                event = option.event,
+                entity = entity and NetworkGetNetworkIdFromEntity(entity) or nil,
+                data = option.data
+            })
+        else
+            -- Event client
+            TriggerEvent(option.event, {
+                entity = entity,
+                data = option.data
+            })
+        end
+    end
+    
+    -- Export
+    if option.export and option.export.resource and option.export.func then
+        local success, result = pcall(function()
+            return exports[option.export.resource][option.export.func](entity, option.data)
+        end)
+        
+        if not success then
+            print('[vAvA Target] Export error:', result)
+        end
+    end
+    
+    -- Command
+    if option.command then
+        ExecuteCommand(option.command)
+    end
+    
+    -- Action callback
+    if option.action and type(option.action) == 'function' then
+        option.action(entity, option.data)
+    end
+    
+    -- Event système
+    TriggerEvent('vava_target:onInteract', entity, option)
+end
+
+-- ============================================
+-- AUTO-FERMETURE
+-- ============================================
+
+Citizen.CreateThread(function()
+    local lastPosition = vector3(0, 0, 0)
+    local menuOpenTime = 0
+    
+    while true do
+        Citizen.Wait(100)
+        
+        if isMenuOpen then
+            local playerPed = PlayerPedId()
+            local currentPosition = GetEntityCoords(playerPed)
+            
+            -- Fermeture si mouvement
+            if TargetConfig.UI.CloseOnMove then
+                local moved = #(currentPosition - lastPosition) > 1.0
+                if moved then
+                    CloseTargetMenu()
+                end
+            end
+            
+            -- Fermeture si distance
+            if TargetConfig.UI.CloseOnDistance and currentEntity then
+                if DoesEntityExist(currentEntity) then
+                    local distance = #(currentPosition - GetEntityCoords(currentEntity))
+                    local maxDistance = GetMaxDistance(currentEntity)
+                    
+                    if distance > maxDistance * 1.5 then -- 50% de marge
+                        CloseTargetMenu()
+                    end
+                else
+                    CloseTargetMenu()
+                end
+            end
+            
+            -- Timeout
+            if TargetConfig.UI.AutoClose then
+                if GetGameTimer() - menuOpenTime > TargetConfig.UI.AutoCloseDelay then
+                    CloseTargetMenu()
+                end
+            end
+            
+            lastPosition = currentPosition
+        else
+            menuOpenTime = GetGameTimer()
+            lastPosition = GetEntityCoords(PlayerPedId())
+        end
+    end
+end)
+
+-- ============================================
+-- EVENTS
+-- ============================================
+
+-- Activer/désactiver le système
+RegisterNetEvent('vava_target:toggle')
+AddEventHandler('vava_target:toggle', function(state)
+    isTargetActive = state
+    
+    if not state and isMenuOpen then
+        CloseTargetMenu()
+    end
+end)
+
+-- Initialisation
+Citizen.CreateThread(function()
+    Citizen.Wait(1000)
+    isTargetActive = TargetConfig.Enabled
+end)
+
+-- ============================================
+-- UTILITAIRES
+-- ============================================
+
+-- Clone de table (shallow)
+function table.clone(t)
+    local copy = {}
+    for k, v in pairs(t) do
+        copy[k] = v
+    end
+    return copy
+end
