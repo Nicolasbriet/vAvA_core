@@ -2,6 +2,8 @@
 -- vAvA Target - Locales FR
 -- ============================================
 
+Locales = Locales or {}
+
 Locales['fr'] = {
     -- Général
     ['target'] = 'Cible',

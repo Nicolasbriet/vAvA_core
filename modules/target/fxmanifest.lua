@@ -5,14 +5,9 @@ author 'vAvA Team'
 description 'vAvA Target - Système de ciblage 3D pour vAvA_core'
 version '1.0.0'
 
--- Dépendances
-dependencies {
-    'vAvA_core'
-}
-
 -- Chargement des fichiers shared
 shared_scripts {
-    '@vAvA_core/locale.lua',
+    'shared/locale.lua',      -- Charger en premier
     'locales/*.lua',
     'config/*.lua',
     'shared/*.lua'
@@ -34,10 +29,7 @@ ui_page 'html/index.html'
 files {
     'html/index.html',
     'html/css/*.css',
-    'html/js/*.js',
-    'html/img/*.png',
-    'html/img/*.jpg',
-    'html/img/*.svg'
+    'html/js/*.js'
 }
 
 -- Exports client
