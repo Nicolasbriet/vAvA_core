@@ -87,13 +87,13 @@ end)
 -- Fermer l'interface
 RegisterNUICallback('testbench:close', function(data, cb)
     TriggerEvent('testbench:close')
-    cb('ok')
+    cb({success = true})
 end)
 
 -- Scanner les modules
 RegisterNUICallback('testbench:scanModules', function(data, cb)
     TriggerServerEvent('testbench:scanModules')
-    cb('ok')
+    cb({success = true})
 end)
 
 -- Obtenir les données initiales
@@ -102,31 +102,31 @@ RegisterNUICallback('testbench:getInitialData', function(data, cb)
     TriggerServerEvent('testbench:requestInitialData')
     
     -- Le serveur répondra via un event qui mettra à jour l'UI
-    cb('ok')
+    cb({success = true})
 end)
 
 -- Obtenir les détails d'un module
 RegisterNUICallback('testbench:getModuleDetails', function(data, cb)
     TriggerServerEvent('testbench:getModuleDetails', data.moduleName)
-    cb('ok')
+    cb({success = true})
 end)
 
 -- Exécuter tous les tests
 RegisterNUICallback('testbench:runAllTests', function(data, cb)
     TriggerServerEvent('testbench:runAllTests')
-    cb('ok')
+    cb({success = true})
 end)
 
 -- Exécuter un test spécifique
 RegisterNUICallback('testbench:runTest', function(data, cb)
     TriggerServerEvent('testbench:runTest', data.testName)
-    cb('ok')
+    cb({success = true})
 end)
 
 -- Arrêter les tests
 RegisterNUICallback('testbench:stopTests', function(data, cb)
     TriggerServerEvent('testbench:stopTests')
-    cb('ok')
+    cb({success = true})
 end)
 
 -- Exécuter un scénario
