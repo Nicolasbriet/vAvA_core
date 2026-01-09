@@ -81,8 +81,8 @@ function renderItems() {
                 <td>${item.item_name}</td>
                 <td>${item.rarity}</td>
                 <td>${item.category}</td>
-                <td>${item.base_price.toFixed(2)} $</td>
-                <td>${item.current_price.toFixed(2)} $</td>
+                <td>${parseFloat(item.base_price).toFixed(2)} $</td>
+                <td>${parseFloat(item.current_price).toFixed(2)} $</td>
                 <td class="${variationClass}">${variation}%</td>
                 <td>${item.buy_count || 0}</td>
                 <td>${item.sell_count || 0}</td>
