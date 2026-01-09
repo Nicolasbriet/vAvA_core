@@ -10,6 +10,9 @@ local isTargetActive = false
 local isMenuOpen = false
 local lastUpdate = 0
 local cache = {}
+local isAltPressed = false
+
+print('[vAvA Target] Module loading...')
 
 -- ============================================
 -- DÉTECTION ET RAYCAST
@@ -598,37 +601,62 @@ AddEventHandler('vava_target:toggle', function(state)
 end)
 
 -- Affichage du point central quand ALT est pressé
-local isAltPressed = false
+local debugCounter = 0
 
 Citizen.CreateThread(function()
+    print('[vAvA Target] Dot display thread started')
+    Citizen.Wait(2000)  -- Attendre que tout soit chargé
+    
     while true do
         Citizen.Wait(0)
         
-        if isTargetActive and TargetConfig.UseKeyActivation then
-            local activationKey = TargetConfig.ActivationKey or 19  -- 19 = ALT par défaut
-            local keyPressed = IsControlPressed(0, activationKey)
-            
-            if keyPressed then
-                isAltPressed = true
-                
-                -- Afficher le point central
-                if TargetConfig.UI.ShowDot then
-                    local color = TargetConfig.UI.DotColor or {255, 30, 30, 255}
-                    local size = TargetConfig.UI.DotSize or 8
-                    
-                    -- Point central
-                    DrawSprite('helicopterhud', 'hud_corner', 0.5, 0.5, size * 0.001, size * 0.001, 0.0, color[1], color[2], color[3], color[4])
-                    
-                    -- Alternative si le sprite ne charge pas : dessiner un rectangle
-                    -- DrawRect(0.5, 0.5, 0.008, 0.012, color[1], color[2], color[3], color[4])
+        debugCounter = debugCounter + 1
+        if debugCounter == 1 or debugCounter % 500 == 0 then
+            print('[vAvA Target] Dot thread tick', debugCounter, 'Active:', isTargetActive)
+        end
+        
+        if not isTargetActive then
+            Citizen.Wait(500)
+            goto continue
+        end
+        
+        local activationKey = TargetConfig.ActivationKey or 19  -- 19 = ALT par défaut
+        local keyPressed = IsControlPressed(0, activationKey)
+        
+        if keyPressed then
+            if not isAltPressed then
+                print('[vAvA Target] ALT KEY PRESSED!')
+                print('[vAvA Target] TargetConfig.UI:', TargetConfig.UI)
+                if TargetConfig.UI then
+                    print('[vAvA Target] ShowDot:', TargetConfig.UI.ShowDot)
+                    print('[vAvA Target] DotSize:', TargetConfig.UI.DotSize)
+                    print('[vAvA Target] DotColor:', json.encode(TargetConfig.UI.DotColor))
                 end
-            else
-                isAltPressed = false
+            end
+            isAltPressed = true
+            
+            -- Afficher le point central
+            if TargetConfig.UI and TargetConfig.UI.ShowDot then
+                local color = TargetConfig.UI.DotColor or {255, 30, 30, 255}
+                local size = (TargetConfig.UI.DotSize or 8) * 0.001
+                
+                -- Dessiner un point central (rectangle petit)
+                DrawRect(0.5, 0.5, size, size * 1.5, color[1], color[2], color[3], color[4])
+                
+                -- Cercle autour pour meilleure visibilité
+                local circleSize = size * 2.5
+                DrawRect(0.5, 0.5, circleSize, circleSize * 0.05, color[1], color[2], color[3], 180)
+                DrawRect(0.5, 0.5, circleSize * 0.05, circleSize, color[1], color[2], color[3], 180)
             end
         else
+            if isAltPressed then
+                print('[vAvA Target] ALT KEY RELEASED')
+            end
             isAltPressed = false
-            Citizen.Wait(100)
+            Citizen.Wait(50)
         end
+        
+        ::continue::
     end
 end)
 
@@ -695,8 +723,19 @@ end)
 
 -- Initialisation
 Citizen.CreateThread(function()
+    print('[vAvA Target] Initialisation thread started')
     Citizen.Wait(1000)
     isTargetActive = TargetConfig.Enabled
+    print('[vAvA Target] System initialized - Active:', isTargetActive)
+    print('[vAvA Target] Config.Enabled:', TargetConfig.Enabled)
+    print('[vAvA Target] Config.UseKeyActivation:', TargetConfig.UseKeyActivation)
+    print('[vAvA Target] Config.ActivationKey:', TargetConfig.ActivationKey)
+    if TargetConfig.UI then
+        print('[vAvA Target] Config.UI.ShowDot:', TargetConfig.UI.ShowDot)
+        print('[vAvA Target] Config.UI.DotSize:', TargetConfig.UI.DotSize)
+    else
+        print('[vAvA Target] WARNING: TargetConfig.UI is nil!')
+    end
 end)
 
 -- ============================================
@@ -711,3 +750,83 @@ function table.clone(t)
     end
     return copy
 end
+
+-- ============================================
+-- COMMANDES DEBUG
+-- ============================================
+
+RegisterCommand('targetdebug', function()
+    print('=================================')
+    print('[vAvA Target] DEBUG INFO')
+    print('=================================')
+    print('isTargetActive:', isTargetActive)
+    print('isMenuOpen:', isMenuOpen)
+    print('isAltPressed:', isAltPressed)
+    print('TargetConfig.Enabled:', TargetConfig.Enabled)
+    print('TargetConfig.ActivationKey:', TargetConfig.ActivationKey)
+    print('TargetConfig.UseKeyActivation:', TargetConfig.UseKeyActivation)
+    
+    if TargetConfig.UI then
+        print('TargetConfig.UI.ShowDot:', TargetConfig.UI.ShowDot)
+        print('TargetConfig.UI.DotSize:', TargetConfig.UI.DotSize)
+        print('TargetConfig.UI.DotColor:', json.encode(TargetConfig.UI.DotColor))
+        print('TargetConfig.UI.MenuType:', TargetConfig.UI.MenuType)
+    else
+        print('TargetConfig.UI: nil (ERROR!)')
+    end
+    
+    print('Key 19 (ALT) pressed:', IsControlPressed(0, 19))
+    print('Key 21 (SHIFT) pressed:', IsControlPressed(0, 21))
+    print('=================================')
+    
+    TriggerEvent('chat:addMessage', {
+        color = {255, 30, 30},
+        multiline = true,
+        args = {"vAvA Target", "Debug info printed in F8 console"}
+    })
+end, false)
+
+RegisterCommand('targettoggle', function()
+    isTargetActive = not isTargetActive
+    print('[vAvA Target] System toggled:', isTargetActive)
+    
+    TriggerEvent('chat:addMessage', {
+        color = {255, 30, 30},
+        multiline = true,
+        args = {"vAvA Target", string.format("System %s", isTargetActive and "ENABLED" or "DISABLED")}
+    })
+end, false)
+
+RegisterCommand('targettest', function()
+    print('[vAvA Target] Testing dot display for 5 seconds...')
+    
+    local startTime = GetGameTimer()
+    
+    Citizen.CreateThread(function()
+        while GetGameTimer() - startTime < 5000 do
+            Citizen.Wait(0)
+            
+            -- Force affichage du point
+            local color = {255, 30, 30, 255}
+            local size = 0.008
+            
+            DrawRect(0.5, 0.5, size, size * 1.5, color[1], color[2], color[3], color[4])
+            
+            -- Croix
+            local circleSize = size * 2.5
+            DrawRect(0.5, 0.5, circleSize, circleSize * 0.05, color[1], color[2], color[3], 180)
+            DrawRect(0.5, 0.5, circleSize * 0.05, circleSize, color[1], color[2], color[3], 180)
+        end
+        
+        print('[vAvA Target] Test complete')
+        TriggerEvent('chat:addMessage', {
+            color = {255, 30, 30},
+            args = {"vAvA Target", "Test dot display complete"}
+        })
+    end)
+    
+    TriggerEvent('chat:addMessage', {
+        color = {255, 30, 30},
+        args = {"vAvA Target", "Testing dot display..."}
+    })
+end, false)
