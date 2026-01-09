@@ -245,10 +245,6 @@ RegisterCommand('testconcess', function(source, args)
     print('[vCore:Concess] Ouverture test: ' .. dealershipId)
     TriggerServerEvent('vcore_concess:requestVehicles', dealership.isJobOnly, dealership.vehicleType)
 end, false)
-        nuiOpen = false
-        SendNUIMessage({ action = 'close' })
-    end
-end, false)
 
 -- ================================
 -- CALLBACKS NUI
