@@ -643,7 +643,19 @@ async function fetchNUI(eventName, data = {}) {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify(data)
         });
-        return await response.json();
+        
+        const text = await response.text();
+        if (!text || text.trim() === '') {
+            console.warn(`Empty response from ${eventName}`);
+            return { success: true };
+        }
+        
+        try {
+            return JSON.parse(text);
+        } catch (parseError) {
+            console.warn(`Non-JSON response from ${eventName}: "${text}"`);
+            return { success: true, raw: text };
+        }
     } catch (error) {
         console.error(`NUI Fetch Error (${eventName}):`, error);
         return null;
