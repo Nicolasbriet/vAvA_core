@@ -102,6 +102,10 @@ RegisterNetEvent('vCore:playerLoaded', function(playerData)
     -- Notification de bienvenue
     vCore.Notify(Lang('welcome', Config.ServerName), 'success')
     
+    -- Initialiser le HUD avec les données du joueur
+    Wait(1000)
+    TriggerEvent('vAvA:initHUD')
+    
     -- Déclencher l'événement de spawn
     TriggerEvent(vCore.Events.PLAYER_SPAWNED, playerData)
 end)
@@ -113,23 +117,35 @@ end)
 RegisterNetEvent(vCore.Events.MONEY_ADDED, function(moneyType, amount)
     if vCore.PlayerData.money then
         vCore.PlayerData.money[moneyType] = (vCore.PlayerData.money[moneyType] or 0) + amount
+        
+        -- Mettre à jour le HUD
+        TriggerEvent('vAvA:setMoney', vCore.PlayerData.money)
     end
 end)
 
 RegisterNetEvent(vCore.Events.MONEY_REMOVED, function(moneyType, amount)
     if vCore.PlayerData.money then
         vCore.PlayerData.money[moneyType] = (vCore.PlayerData.money[moneyType] or 0) - amount
+        
+        -- Mettre à jour le HUD
+        TriggerEvent('vAvA:setMoney', vCore.PlayerData.money)
     end
 end)
 
 RegisterNetEvent(vCore.Events.MONEY_SET, function(moneyType, amount)
     if vCore.PlayerData.money then
         vCore.PlayerData.money[moneyType] = amount
+        
+        -- Mettre à jour le HUD
+        TriggerEvent('vAvA:setMoney', vCore.PlayerData.money)
     end
 end)
 
 RegisterNetEvent(vCore.Events.JOB_CHANGED, function(job)
     vCore.PlayerData.job = job
+    
+    -- Mettre à jour le HUD
+    TriggerEvent('vAvA:setJob', job)
 end)
 
 RegisterNetEvent(vCore.Events.JOB_DUTY_CHANGED, function(onDuty)
@@ -138,6 +154,9 @@ end)
 
 RegisterNetEvent(vCore.Events.STATUS_UPDATED, function(statusType, value)
     if vCore.PlayerData.status then
+        vCore.PlayerData.status[statusType] = value
+    else
+        vCore.PlayerData.status = {}
         vCore.PlayerData.status[statusType] = value
     end
 end)

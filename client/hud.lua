@@ -65,6 +65,54 @@ AddEventHandler('vAvA_hud:updateStatus', function(statusData)
     end
 end)
 
+-- Mise à jour instantanée du job/grade au changement
+RegisterNetEvent('vAvA:setJob')
+AddEventHandler('vAvA:setJob', function(job)
+    if job then
+        SendNUIMessage({
+            action = 'updatePlayerInfo',
+            playerId = GetPlayerServerId(PlayerId()),
+            job = job.label or 'Sans emploi',
+            grade = job.grade_label or '-'
+        })
+    end
+end)
+
+-- Mise à jour instantanée de l'argent au changement
+RegisterNetEvent('vAvA:setMoney')
+AddEventHandler('vAvA:setMoney', function(money)
+    if money then
+        SendNUIMessage({
+            action = 'updateMoney',
+            cash = money.cash or 0,
+            bank = money.bank or 0
+        })
+    end
+end)
+
+-- Initialisation des infos joueur au chargement
+RegisterNetEvent('vAvA:initHUD')
+AddEventHandler('vAvA:initHUD', function()
+    if not vCore.IsLoaded then return end
+    
+    vCore.Utils.Print('Initialisation du HUD avec les données:', json.encode(vCore.PlayerData))
+    
+    -- Envoyer l'ID joueur
+    SendNUIMessage({
+        action = 'updatePlayerInfo',
+        playerId = GetPlayerServerId(PlayerId()),
+        job = vCore.PlayerData.job and vCore.PlayerData.job.label or 'Sans emploi',
+        grade = vCore.PlayerData.job and vCore.PlayerData.job.grade_label or '-'
+    })
+    
+    -- Envoyer l'argent initial
+    SendNUIMessage({
+        action = 'updateMoney',
+        cash = vCore.PlayerData.money and vCore.PlayerData.money.cash or 0,
+        bank = vCore.PlayerData.money and vCore.PlayerData.money.bank or 0
+    })
+end)
+
 CreateThread(function()
     while true do
         Wait(500) -- Mise à jour toutes les 500ms
@@ -82,13 +130,6 @@ CreateThread(function()
             }
             
             SendNUIMessage(hudData)
-            
-            -- Mise à jour de l'argent séparément
-            SendNUIMessage({
-                action = 'updateMoney',
-                cash = vCore.PlayerData.money and vCore.PlayerData.money.cash or 0,
-                bank = vCore.PlayerData.money and vCore.PlayerData.money.bank or 0
-            })
             
             -- Infos véhicule si dans un véhicule
             if IsPedInAnyVehicle(ped, false) then

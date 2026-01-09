@@ -58,6 +58,12 @@ const DOM = {
     bankValue: document.getElementById('bank-value'),
     moneyHud: document.getElementById('money-hud'),
     
+    // Player Info
+    playerIdValue: document.getElementById('player-id-value'),
+    playerJobValue: document.getElementById('player-job-value'),
+    playerGradeValue: document.getElementById('player-grade-value'),
+    playerInfoHud: document.getElementById('player-info-hud'),
+    
     // Vehicle
     vehicleHud: document.getElementById('vehicle-hud'),
     speedValue: document.getElementById('speed-value'),
@@ -214,6 +220,27 @@ function updateMoney(data) {
 }
 
 // ═══════════════════════════════════════════════════════════════════════════
+// MISE À JOUR PLAYER INFO
+// ═══════════════════════════════════════════════════════════════════════════
+
+function updatePlayerInfo(data) {
+    // ID du joueur
+    if (data.playerId !== undefined) {
+        DOM.playerIdValue.textContent = data.playerId;
+    }
+    
+    // Job
+    if (data.job !== undefined) {
+        DOM.playerJobValue.textContent = data.job;
+    }
+    
+    // Grade
+    if (data.grade !== undefined) {
+        DOM.playerGradeValue.textContent = data.grade;
+    }
+}
+
+// ═══════════════════════════════════════════════════════════════════════════
 // MISE À JOUR VÉHICULE
 // ═══════════════════════════════════════════════════════════════════════════
 
@@ -366,6 +393,10 @@ window.addEventListener('message', function(event) {
             
         case 'updateMoney':
             updateMoney(data);
+            break;
+            
+        case 'updatePlayerInfo':
+            updatePlayerInfo(data);
             break;
             
         case 'updateVehicle':
