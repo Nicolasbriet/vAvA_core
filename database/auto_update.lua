@@ -523,6 +523,12 @@ function vCore.AutoUpdate.CheckAndApply()
         
         -- Parcourir toutes les mises à jour disponibles
         for _, update in ipairs(updates) do
+            -- Valider que update.version est une string
+            if not update.module or not update.version or type(update.version) ~= 'string' then
+                print('^1[AUTO UPDATE ERROR]^0 Update invalide détecté, ignoré')
+                goto continue
+            end
+            
             local installedVersion = vCore.AutoUpdate.GetInstalledVersion(update.module)
             local comparison = vCore.AutoUpdate.CompareVersions(installedVersion, update.version)
             
@@ -548,6 +554,8 @@ function vCore.AutoUpdate.CheckAndApply()
                 
                 Wait(100)
             end
+            
+            ::continue::
         end
         
         -- Enregistrer les versions pour tous les modules
