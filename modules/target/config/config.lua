@@ -40,6 +40,9 @@ TargetConfig.UI = {
     ShowDistance = true,                         -- Afficher la distance
     ShowIcon = true,                             -- Afficher les icônes
     ShowKeybind = true,                          -- Afficher les touches
+    ShowDot = true,                              -- Afficher le point central quand ALT pressé
+    DotSize = 8,                                 -- Taille du point (pixels)
+    DotColor = {255, 30, 30, 255},               -- Couleur du point (R, G, B, A)
     
     -- Animations
     AnimationDuration = 300,                     -- Durée animations (ms)

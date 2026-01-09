@@ -433,7 +433,10 @@ function ShowTargetMenu(entity, options, distance)
     
     isMenuOpen = true
     
+    -- Activer le focus NUI pour pouvoir cliquer
     SetNuiFocus(true, true)
+    SetNuiFocusKeepInput(false)
+    
     SendNUIMessage({
         action = 'open',
         menuType = TargetConfig.UI.MenuType,
@@ -593,30 +596,98 @@ AddEventHandler('vava_target:toggle', function(state)
     end
 end)
 
--- Affichage helper texte ALT
+-- Affichage du point central quand ALT est pressé
+local isAltPressed = false
+
 Citizen.CreateThread(function()
     while true do
         Citizen.Wait(0)
         
         if isTargetActive and TargetConfig.UseKeyActivation then
-            if not isMenuOpen then
-                -- Afficher l'aide uniquement si pas de menu ouvert
-                SetTextFont(4)
-                SetTextProportional(1)
-                SetTextScale(0.35, 0.35)
-                SetTextColour(255, 255, 255, 180)
-                SetTextDropshadow(0, 0, 0, 0, 255)
-                SetTextEdge(1, 0, 0, 0, 255)
-                SetTextDropShadow()
-                SetTextOutline()
-                SetTextCentre(1)
-                SetTextEntry("STRING")
-                AddTextComponentString("Maintenez ~INPUT_CONTEXT~ pour interagir")
-                DrawText(0.5, 0.95)
+            local keyPressed = IsControlPressed(0, TargetConfig.ActivationKey)
+            
+            if keyPressed then
+                isAltPressed = true
+                
+                -- Afficher le point central
+                if TargetConfig.UI.ShowDot then
+                    local color = TargetConfig.UI.DotColor or {255, 30, 30, 255}
+                    local size = TargetConfig.UI.DotSize or 8
+                    
+                    -- Point central
+                    DrawSprite('helicopterhud', 'hud_corner', 0.5, 0.5, size * 0.001, size * 0.001, 0.0, color[1], color[2], color[3], color[4])
+                    
+                    -- Alternative si le sprite ne charge pas : dessiner un rectangle
+                    -- DrawRect(0.5, 0.5, 0.008, 0.012, color[1], color[2], color[3], color[4])
+                end
+            else
+                isAltPressed = false
             end
         else
-            Citizen.Wait(500)
+            isAltPressed = false
+            Citizen.Wait(100)
         end
+    end
+end)
+
+-- Désactiver les contrôles de tir quand le menu est ouvert
+Citizen.CreateThread(function()
+    while true do
+        Citizen.Wait(0)
+        
+        if isMenuOpen then
+            -- Désactiver les contrôles de combat
+            DisableControlAction(0, 24, true)  -- Attaque (clic gauche)
+            DisableControlAction(0, 25, true)  -- Viser (clic droit)
+            DisableControlAction(0, 47, true)  -- Dégainer arme
+            DisableControlAction(0, 58, true)  -- Dégainer arme (touch G)
+            DisableControlAction(0, 140, true) -- Corps à corps léger
+            DisableControlAction(0, 141, true) -- Corps à corps lourd
+            DisableControlAction(0, 142, true) -- Corps à corps alternatif
+            DisableControlAction(0, 257, true) -- Attaque 2
+            DisableControlAction(0, 263, true) -- Corps à corps
+            DisableControlAction(0, 264, true) -- Corps à corps
+            
+            -- Désactiver les actions de véhicule
+            DisableControlAction(0, 59, true)  -- Viser en véhicule
+            DisableControlAction(0, 68, true)  -- Viser en véhicule (molette)
+            DisableControlAction(0, 69, true)  -- Attaque en véhicule
+            DisableControlAction(0, 70, true)  -- Attaque en véhicule 2
+            
+            -- Empêcher le joueur de courir ou sauter
+            DisableControlAction(0, 21, true)  -- Sprint
+            DisableControlAction(0, 22, true)  -- Saut
+        else
+            Citizen.Wait(200)
+        end
+    end
+end)
+
+-- Affichage helper texte ALT (optionnel)
+Citizen.CreateThread(function()
+    while true do
+        Citizen.Wait(500)
+        
+        -- Désactivé car on a le point visuel maintenant
+        -- Si vous voulez réactiver le texte, décommentez le code ci-dessous
+        
+        --[[
+        if isTargetActive and TargetConfig.UseKeyActivation and not isMenuOpen then
+            Citizen.Wait(0)
+            SetTextFont(4)
+            SetTextProportional(1)
+            SetTextScale(0.35, 0.35)
+            SetTextColour(255, 255, 255, 180)
+            SetTextDropshadow(0, 0, 0, 0, 255)
+            SetTextEdge(1, 0, 0, 0, 255)
+            SetTextDropShadow()
+            SetTextOutline()
+            SetTextCentre(1)
+            SetTextEntry("STRING")
+            AddTextComponentString("Maintenez ~INPUT_CONTEXT~ pour interagir")
+            DrawText(0.5, 0.95)
+        end
+        --]]
     end
 end)
 
