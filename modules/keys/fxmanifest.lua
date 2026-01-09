@@ -11,10 +11,11 @@ lua54 'yes'
 name 'vAvA_keys'
 author 'vAvA'
 description 'Système de gestion des clés de véhicules - Verrouillage, partage, carjack'
-version '2.0.0'
+version '2.1.0'
 
 shared_scripts {
-    'config.lua'
+    'config.lua',
+    'locales/*.lua'
 }
 
 client_scripts {

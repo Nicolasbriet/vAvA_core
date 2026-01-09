@@ -142,41 +142,40 @@ end
 exports('ToggleLock', ToggleLock)
 
 -- ═══════════════════════════════════════════════════════════════════════════
--- CONTRÔLES CLAVIER
+-- CONTRÔLES CLAVIER - ✅ OPTIMISÉ: RegisterKeyMapping au lieu de Wait(0)
 -- ═══════════════════════════════════════════════════════════════════════════
 
-CreateThread(function()
-    while true do
-        Wait(0)
-        
-        -- Touche L pour verrouiller/déverrouiller
-        if IsControlJustPressed(0, KeysConfig.Commands.LockKey) then
-            local now = GetGameTimer()
-            
-            -- Vérifier cooldown
-            if now - lastLockAction > KeysConfig.Keys.ActionCooldown then
-                -- Double appui pour moteur ?
-                if KeysConfig.DoubleTap.Enabled then
-                    if now - lastLPress < KeysConfig.DoubleTap.Delay then
-                        -- Double appui = moteur
-                        ToggleEngine()
-                        lastLPress = 0
-                    else
-                        -- Simple appui = verrouillage
-                        lastLPress = now
-                        Wait(KeysConfig.DoubleTap.Delay + 50)
-                        
-                        -- Vérifier si pas de double appui
-                        if lastLPress > 0 and GetGameTimer() - lastLPress >= KeysConfig.DoubleTap.Delay then
-                            ToggleLock()
-                            lastLockAction = GetGameTimer()
-                        end
+-- Commande pour verrouiller/déverrouiller (touche L)
+RegisterCommand('+vava_togglelock', function()
+    local now = GetGameTimer()
+    
+    -- Vérifier cooldown
+    if now - lastLockAction > KeysConfig.Keys.ActionCooldown then
+        -- Double appui pour moteur ?
+        if KeysConfig.DoubleTap.Enabled then
+            if now - lastLPress < KeysConfig.DoubleTap.Delay then
+                -- Double appui = moteur
+                ToggleEngine()
+                lastLPress = 0
+            else
+                -- Simple appui = verrouillage
+                lastLPress = now
+                SetTimeout(KeysConfig.DoubleTap.Delay + 50, function()
+                    -- Vérifier si pas de double appui
+                    if lastLPress > 0 and GetGameTimer() - lastLPress >= KeysConfig.DoubleTap.Delay then
+                        ToggleLock()
+                        lastLockAction = GetGameTimer()
                     end
-                else
-                    ToggleLock()
-                    lastLockAction = now
-                end
+                end)
             end
+        else
+            ToggleLock()
+            lastLockAction = now
         end
     end
-end)
+end, false)
+
+RegisterCommand('-vava_togglelock', function() end, false)
+
+-- Mapping de la touche L
+RegisterKeyMapping('+vava_togglelock', 'Verrouiller/Déverrouiller véhicule', 'keyboard', 'L')

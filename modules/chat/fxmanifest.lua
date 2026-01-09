@@ -11,9 +11,12 @@ lua54 'yes'
 name 'vAvA_chat'
 author 'vAvA'
 description 'Système de chat RP complet avec commandes /me, /do, /ooc, /mp, /police, /ems, /staff'
-version '1.0.0'
+version '1.1.0'
 
-shared_script 'config.lua'
+shared_scripts {
+    'config.lua',
+    'locales/*.lua'
+}
 client_script 'client/main.lua'
 server_script 'server/main.lua'
 

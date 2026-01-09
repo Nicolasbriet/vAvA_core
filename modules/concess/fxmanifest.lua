@@ -10,7 +10,7 @@ game 'gta5'
 name 'vAvA_core - Concessionnaire'
 author 'vAvA Team'
 description 'Module concessionnaire intégré au core vAvA'
-version '1.0.0'
+version '1.1.0'
 
 -- Dépendances
 dependencies {
@@ -21,7 +21,8 @@ dependencies {
 shared_scripts {
     '@vAvA_core/shared/*.lua',
     '@vAvA_core/config/config.lua',
-    'config.lua'
+    'config.lua',
+    'locales/*.lua'
 }
 
 -- Scripts serveur

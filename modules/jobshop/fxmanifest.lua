@@ -23,11 +23,20 @@ lua54 'yes'
 
 name 'vAvA_core_jobshop'
 description 'Module JobShop - Boutiques pour jobs avec gestion admin/patron'
-version '1.0.0'
+version '1.1.0'
 author 'vAvA'
 
 -- Dépendances
 dependencies {
+    'vAvA_core',
+    'oxmysql'
+}
+
+-- Fichiers partagés
+shared_scripts {
+    'config.lua',
+    'locales/*.lua'
+}
     'vAvA_core',
     'oxmysql'
 }

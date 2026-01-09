@@ -57,33 +57,35 @@ end
 exports('ToggleEngine', ToggleEngine)
 
 -- ═══════════════════════════════════════════════════════════════════════════
--- CONTRÔLES
+-- CONTRÔLES - ✅ OPTIMISÉ: RegisterKeyMapping au lieu de Wait(0)
 -- ═══════════════════════════════════════════════════════════════════════════
 
-CreateThread(function()
-    while true do
-        Wait(0)
+-- Commande pour contrôler le moteur (touche G)
+RegisterCommand('+vava_engine', function()
+    local ped = PlayerPedId()
+    local vehicle = GetVehiclePedIsIn(ped, false)
+    
+    -- Touche G pour le moteur quand dans un véhicule
+    if vehicle ~= 0 then
+        local plate = GetVehicleNumberPlateText(vehicle)
+        plate = string.gsub(plate, "%s+", "")
         
-        local ped = PlayerPedId()
-        local vehicle = GetVehiclePedIsIn(ped, false)
-        
-        -- Touche G pour le moteur quand dans un véhicule
-        if vehicle ~= 0 and IsControlJustPressed(0, KeysConfig.Commands.EngineKey) then
-            local plate = GetVehicleNumberPlateText(vehicle)
-            plate = string.gsub(plate, "%s+", "")
+        if HasKeys(plate) or _G.jobAccessCache[plate] then
+            local engineOn = GetIsVehicleEngineRunning(vehicle)
+            SetVehicleEngineOn(vehicle, not engineOn, false, true)
             
-            if HasKeys(plate) or _G.jobAccessCache[plate] then
-                local engineOn = GetIsVehicleEngineRunning(vehicle)
-                SetVehicleEngineOn(vehicle, not engineOn, false, true)
-                
-                if engineOn then
-                    ShowKeysNotif('Moteur éteint', 'info')
-                else
-                    ShowKeysNotif('Moteur démarré', 'success')
-                end
+            if engineOn then
+                ShowKeysNotif('Moteur éteint', 'info')
             else
-                ShowNoKeysNotification(plate)
+                ShowKeysNotif('Moteur démarré', 'success')
             end
+        else
+            ShowNoKeysNotification(plate)
         end
     end
-end)
+end, false)
+
+RegisterCommand('-vava_engine', function() end, false)
+
+-- Mapping de la touche G
+RegisterKeyMapping('+vava_engine', 'Contrôle moteur', 'keyboard', 'G')
