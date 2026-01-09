@@ -674,13 +674,19 @@ async function fetchNUI(eventName, data = {}) {
 }
 
 function GetParentResourceName() {
-    // For dev: return a mock name
-    if (window.location.protocol === 'file:') return 'vAvA_testbench';
-    
-    // In-game: get actual resource name
+    // In-game: get resource name from nui:// URL
     const url = window.location.href;
-    const match = url.match(/https?:\/\/([^/]+)\//);
-    return match ? match[1] : 'vAvA_testbench';
+    
+    // Match nui://resource_name/...
+    const match = url.match(/nui:\/\/([^\/]+)\//);
+    if (match) {
+        console.log('[TESTBENCH] Resource name:', match[1]);
+        return match[1];
+    }
+    
+    // Fallback for dev/testing
+    console.warn('[TESTBENCH] Could not detect resource name, using fallback');
+    return 'vAvA_testbench';
 }
 
 // === CHART (Optional - can be enhanced with Chart.js) ===
