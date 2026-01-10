@@ -20,7 +20,7 @@ game 'gta5'
 name 'vava_creator'
 author 'vAvA'
 description 'Système complet de création de personnage pour vAvA_core'
-version '1.0.0'
+version '1.0.1'
 lua54 'yes'
 
 dependencies {

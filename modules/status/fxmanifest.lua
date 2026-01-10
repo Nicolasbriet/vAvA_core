@@ -3,7 +3,7 @@ game 'gta5'
 
 author 'vAvA Development Team'
 description 'vAvA Status System - Hunger & Thirst Management'
-version '1.0.0'
+version '1.0.1'
 
 shared_scripts {
     'config/config.lua',

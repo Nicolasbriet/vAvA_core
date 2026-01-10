@@ -1,6 +1,6 @@
 --[[
     vAvA_inventory - Système d'inventaire 
-    Version: 2.0.0 - Items en BDD, sans threads
+    Version: 2.0.1 - Items en BDD, sans threads
 ]]
 
 fx_version 'cerulean'
@@ -10,7 +10,7 @@ lua54 'yes'
 name 'vAvA_inventory'
 author 'vAvA'
 description 'Système d\'inventaire - Items en base de données'
-version '2.0.0'
+version '2.0.1'
 
 dependencies {
     'oxmysql'

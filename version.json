@@ -1,9 +1,10 @@
 {
     "vava_core": "1.0.0",
     "economy": "1.3.0",
-    "creator": "1.0.0",
-    "garage": "1.0.0",
-    "inventory": "1.0.0",
+    "creator": "1.0.1",
+    "garage": "1.1.1",
+    "inventory": "2.0.1",
+    "status": "1.0.1",
     "chat": "1.0.0",
     "jobs": "1.0.0",
     "keys": "1.0.0",
@@ -53,10 +54,70 @@
                 "Amélioration de la compatibilité multi-ressources",
                 "Correction des erreurs d'initialisation Locales"
             ]
+        },
+        {
+            "module": "creator",
+            "version": "1.0.1",
+            "description": "Correction du chargement des fichiers shared",
+            "releaseDate": "2026-01-10",
+            "queries": [],
+            "files": [
+                "modules/creator/fxmanifest.lua"
+            ],
+            "needsRestart": true,
+            "changelog": [
+                "Remplacement du wildcard @vAvA_core/shared/*.lua par des fichiers explicites",
+                "Correction des erreurs de chargement au démarrage"
+            ]
+        },
+        {
+            "module": "garage",
+            "version": "1.1.1",
+            "description": "Correction du chargement des fichiers shared",
+            "releaseDate": "2026-01-10",
+            "queries": [],
+            "files": [
+                "modules/garage/fxmanifest.lua"
+            ],
+            "needsRestart": true,
+            "changelog": [
+                "Remplacement du wildcard @vAvA_core/shared/*.lua par des fichiers explicites",
+                "Correction des erreurs de chargement au démarrage"
+            ]
+        },
+        {
+            "module": "status",
+            "version": "1.0.1",
+            "description": "Correction du chargement des fichiers locales",
+            "releaseDate": "2026-01-10",
+            "queries": [],
+            "files": [
+                "modules/status/fxmanifest.lua"
+            ],
+            "needsRestart": true,
+            "changelog": [
+                "Suppression de la référence au fichier locale.lua inexistant",
+                "Correction des erreurs de chargement au démarrage"
+            ]
+        },
+        {
+            "module": "inventory",
+            "version": "2.0.1",
+            "description": "Correction des avertissements de fichiers manquants",
+            "releaseDate": "2026-01-10",
+            "queries": [],
+            "files": [
+                "modules/inventory/fxmanifest.lua"
+            ],
+            "needsRestart": true,
+            "changelog": [
+                "Retrait de la référence aux images PNG optionnelles",
+                "Suppression des avertissements au démarrage"
+            ]
         }
     ],
     "metadata": {
-        "lastUpdate": "2026-01-09T12:00:00Z",
+        "lastUpdate": "2026-01-10T10:00:00Z",
         "minFrameworkVersion": "1.0.0",
         "repository": "https://github.com/Nicolasbriet/vAvA_core",
         "branch": "main"

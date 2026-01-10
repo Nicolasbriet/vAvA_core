@@ -1,7 +1,7 @@
 --[[
     vAvA Core - Module Garage
     Système de garage et fourrière
-    Version: 1.0.0
+    Version: 1.1.1
 ]]
 
 fx_version 'cerulean'
@@ -10,7 +10,7 @@ game 'gta5'
 name 'vAvA_core - Garage'
 author 'vAvA Team'
 description 'Module garage et fourrière intégré au core vAvA'
-version '1.1.0'
+version '1.1.1'
 
 -- Dépendances
 dependencies {
