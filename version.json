@@ -13,7 +13,7 @@
     "persist": "1.0.0",
     "sit": "1.0.0",
     "loadingscreen": "1.0.0",
-    "testbench": "1.0.0",
+    "testbench": "1.0.1",
     "updates": [
         {
             "module": "economy",
@@ -114,10 +114,28 @@
                 "Retrait de la référence aux images PNG optionnelles",
                 "Suppression des avertissements au démarrage"
             ]
+        },
+        {
+            "module": "testbench",
+            "version": "1.0.1",
+            "description": "Correction de la détection automatique des tests et scan des modules",
+            "releaseDate": "2026-01-10",
+            "queries": [],
+            "files": [
+                "modules/testbench/server/main.lua",
+                "modules/testbench/config/config.lua"
+            ],
+            "needsRestart": true,
+            "changelog": [
+                "Détection automatique des tests dans plusieurs emplacements",
+                "Correction de la liste des modules avec préfixes vAvA_",
+                "Ajout de logs de debug pour le chargement des tests",
+                "Support des tests dans modules/*/tests/"
+            ]
         }
     ],
     "metadata": {
-        "lastUpdate": "2026-01-10T10:00:00Z",
+        "lastUpdate": "2026-01-10T12:00:00Z",
         "minFrameworkVersion": "1.0.0",
         "repository": "https://github.com/Nicolasbriet/vAvA_core",
         "branch": "main"

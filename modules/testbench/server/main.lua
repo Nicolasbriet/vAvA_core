@@ -299,53 +299,55 @@ end
 function LoadModuleTests(moduleName)
     local allTests = {}
     
-    -- Table de correspondance entre les noms de modules et les fichiers de tests
-    local testFiles = {
-        ['vAvA_core'] = {
-            {resource = 'vAvA_core', path = 'tests/unit/core_tests.lua'},
-            {resource = 'vAvA_core', path = 'tests/integration/full_cycle_tests.lua'}
-        },
-        ['economy'] = {
-            {resource = 'vAvA_core', path = 'tests/unit/economy_tests.lua'}
-        },
-        ['inventory'] = {
-            {resource = 'vAvA_core', path = 'tests/unit/inventory_tests.lua'}
-        },
-        ['jobs'] = {
-            {resource = 'vAvA_core', path = 'tests/unit/jobs_tests.lua'}
-        },
-        ['vehicles'] = {
-            {resource = 'vAvA_core', path = 'tests/unit/vehicles_tests.lua'}
-        },
-        ['vAvA_testbench'] = {
-            {resource = 'vAvA_testbench', path = 'tests/unit/example_tests.lua'}
-        }
+    -- Chemins possibles pour les fichiers de tests
+    local possiblePaths = {
+        -- Tests dans vAvA_core pour les modules core
+        {resource = 'vAvA_core', path = 'tests/unit/' .. moduleName .. '_tests.lua'},
+        {resource = 'vAvA_core', path = 'tests/integration/' .. moduleName .. '_tests.lua'},
+        
+        -- Tests dans les modules individuels (vAvA_xxx)
+        {resource = 'vAvA_' .. moduleName, path = 'tests/' .. moduleName .. '_tests.lua'},
+        {resource = 'vAvA_' .. moduleName, path = 'tests/unit/' .. moduleName .. '_tests.lua'},
+        {resource = 'vAvA_' .. moduleName, path = 'tests/integration/' .. moduleName .. '_tests.lua'},
     }
     
-    -- Charger les tests pour ce module
-    local files = testFiles[moduleName]
+    -- Cas spéciaux pour vAvA_core
+    if moduleName == 'vAvA_core' then
+        table.insert(possiblePaths, {resource = 'vAvA_core', path = 'tests/unit/core_tests.lua'})
+        table.insert(possiblePaths, {resource = 'vAvA_core', path = 'tests/integration/full_cycle_tests.lua'})
+    end
     
-    if files then
-        for _, file in ipairs(files) do
-            local success, tests = pcall(function()
-                -- Charger le fichier
-                local content = LoadResourceFile(file.resource, file.path)
-                
-                if content then
-                    -- Exécuter le fichier pour obtenir la table de tests
-                    local loadFunc = load(content, '@' .. file.path)
-                    if loadFunc then
-                        return loadFunc()
+    -- Charger les tests depuis tous les chemins possibles
+    for _, pathData in ipairs(possiblePaths) do
+        local success, tests = pcall(function()
+            -- Vérifier si la ressource existe
+            if GetResourceState(pathData.resource) == 'missing' then
+                return nil
+            end
+            
+            -- Charger le fichier
+            local content = LoadResourceFile(pathData.resource, pathData.path)
+            
+            if content then
+                -- Exécuter le fichier pour obtenir la table de tests
+                local loadFunc = load(content, '@' .. pathData.path)
+                if loadFunc then
+                    local result = loadFunc()
+                    if result and type(result) == 'table' then
+                        if TestbenchConfig.DevMode then
+                            print(string.format('[TESTBENCH] Loaded %d tests from %s/%s', #result, pathData.resource, pathData.path))
+                        end
+                        return result
                     end
                 end
-                return nil
-            end)
-            
-            if success and tests and type(tests) == 'table' then
-                -- Ajouter les tests à la liste
-                for _, test in ipairs(tests) do
-                    table.insert(allTests, test)
-                end
+            end
+            return nil
+        end)
+        
+        if success and tests and type(tests) == 'table' then
+            -- Ajouter les tests à la liste
+            for _, test in ipairs(tests) do
+                table.insert(allTests, test)
             end
         end
     end

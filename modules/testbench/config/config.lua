@@ -94,16 +94,20 @@ TestbenchConfig = {
     -- Modules testés (détection auto + manuel)
     Modules = {
         'vAvA_core',
-        'inventory',
-        'jobs',
-        'economy',
-        'shops',
-        'vehicles',
-        'creator',
-        'player',
-        'housing',
-        'utils',
-        'admin'
+        'vAvA_inventory',
+        'vAvA_jobs',
+        'vAvA_economy',
+        'vAvA_concess',
+        'vAvA_garage',
+        'vAvA_creator',
+        'vAvA_chat',
+        'vAvA_keys',
+        'vAvA_status',
+        'vAvA_target',
+        'vAvA_jobshop',
+        'vAvA_persist',
+        'vAvA_sit',
+        'vAvA_testbench'
     },
     
     -- Types de tests

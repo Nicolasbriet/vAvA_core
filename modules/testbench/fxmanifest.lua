@@ -1,6 +1,6 @@
 --[[
     vAvA_testbench - Module de test complet et adaptatif
-    Version: 1.0.0
+    Version: 1.0.1
     Auteur: vAvA
     Description: Environnement de test automatique pour vAvA_core
 ]]
@@ -12,7 +12,7 @@ lua54 'yes'
 name 'vAvA_testbench'
 author 'vAvA'
 description 'Module de test automatique, adaptatif et complet pour vAvA_core'
-version '1.0.0'
+version '1.0.1'
 
 -- ⚠️ MODULE DE DÉVELOPPEMENT UNIQUEMENT - NE PAS UTILISER EN PRODUCTION ⚠️
 
