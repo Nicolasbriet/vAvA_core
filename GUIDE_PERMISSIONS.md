@@ -109,8 +109,11 @@ add_principal identifier.license:ghi789... group.helper
 
 ```
 /vava_getid         → Affiche vos identifiants
+/vava_debug_perms   → Diagnostic complet
 /admin              → Test si vous avez accès admin
 /give 1 bread 10    → Test si vous pouvez give des items
+/car adder          → Test commandes FiveM natives
+/tp 0 0 72          → Test téléportation
 ```
 
 ### En console:
@@ -205,44 +208,51 @@ add_principal identifier.license:abc123 group.trial_admin
 
 ### Niveau 1 (MOD)
 - Toutes les commandes USER +
-- `/kick` - Kick un joueur
-- `/spec` - Spectate un joueur
-- `/freeze` - Freeze un joueur
+- `/kick [id] [raison]` - Kick un joueur
+- `/freeze [id]` - Freeze un joueur
+- `/unfreeze [id]` - Dégeler un joueur
 
 ### Niveau 2 (ADMIN)
 - Toutes les commandes MOD +
-- `/give` - Donner des items
-- `/tp` - Se téléporter
-- `/tpto` - TP vers un joueur
-- `/bring` - Amener un joueur
-- `/vehicle` - Spawn un véhicule
-- `/dv` - Delete véhicule
-- `/repair` - Réparer véhicule
-- `/weather` - Changer météo
-- `/time` - Changer heure
+- `/give` - Donner des items (vAvA)
+- `/tp [x] [y] [z]` - Se téléporter (FiveM)
+- `/tpm` - TP au marker (FiveM)
+- `/car [modèle]` - Spawn véhicule (FiveM)
+- `/bring [id]` - Amener un joueur (FiveM)
+- `/goto [id]` - TP vers un joueur (FiveM)
+- `/dv` - Delete véhicule (vAvA)
+- `/repair` - Réparer véhicule (vAvA)
+- `/weather [météo]` - Changer météo (FiveM)
+- `/time [h] [m]` - Changer heure (FiveM)
 
 ### Niveau 3 (SUPERADMIN)
 - Toutes les commandes ADMIN +
-- `/ban` - Ban un joueur
-- `/unban` - Unban un joueur
-- `/setjob` - Changer job d'un joueur
-- `/setmoney` - Modifier argent
-- `/revive` - Réanimer
-- `/heal` - Soigner
+- `/ban [id] [durée] [raison]` - Ban un joueur (FiveM)
+- `/unban [license]` - Unban un joueur (FiveM)
+- `/setjob [id] [job] [grade]` - Changer job (FiveM)
+- `/setmoney [id] [type] [montant]` - Modifier argent (FiveM)
+- `/setgroup [id] [groupe]` - Changer groupe (FiveM)
+- `/revive` - Réanimer (vAvA)
+- `/heal` - Soigner (vAvA)
 
 ### Niveau 4 (DEVELOPER)
 - Toutes les commandes SUPERADMIN +
-- `/refresh` - Refresh resource
-- `/restart` - Restart resource
-- `/noclip` - Mode noclip
-- `/coords` - Afficher coordonnées
-- `/debug` - Mode debug
+- `/refresh` - Refresh resources (FiveM)
+- `/restart [resource]` - Restart resource (FiveM)
+- `/start [resource]` - Start resource (FiveM)
+- `/stop [resource]` - Stop resource (FiveM)
+- `/noclip` - Mode noclip (vAvA)
+- `/coords` - Afficher coordonnées (vAvA)
+- `/debug` - Mode debug (vAvA)
 
 ### Niveau 5 (OWNER)
 - Toutes les commandes DEVELOPER +
 - Accès complet à tous les modules
 - Modification config en live
 - Accès console MySQL
+- `command allow` - Toutes commandes FiveM
+
+**📖 Voir [COMMANDES_FIVEM_NATIVES.md](COMMANDES_FIVEM_NATIVES.md) pour la liste complète**
 
 ---
 
@@ -295,7 +305,8 @@ restart vAvA_core
 ---
 
 ## 🆘 Support
-
+[GUIDE_PERMISSIONS.md](GUIDE_PERMISSIONS.md)
+6. Consultez [COMMANDES_FIVEM_NATIVES.md](COMMANDES_FIVEM_NATIVES.md) pour les commandes FiveM
 Si vous rencontrez des problèmes:
 
 1. Vérifiez les logs console: `F8` en jeu
@@ -305,7 +316,15 @@ Si vous rencontrez des problèmes:
 5. Consultez ce guide: [GUIDE_PERMISSIONS.md](GUIDE_PERMISSIONS.md)
 
 ---
-
-**Version:** 1.1.0  
+1  
 **Dernière mise à jour:** 2025-01-11  
+**Auteur:** vAvA Development Team
+
+---
+
+## 📖 Documentation Connexe
+
+- [COMMANDES_FIVEM_NATIVES.md](COMMANDES_FIVEM_NATIVES.md) - Liste complète des commandes FiveM natives
+- [FIX_PERMISSIONS_SESSION_11JAN.md](FIX_PERMISSIONS_SESSION_11JAN.md) - Rapport technique des corrections
+- [GUIDE_COMPLET_CREATION_MODULES.md](doc/GUIDE_COMPLET_CREATION_MODULES.md) - Créer vos propres modules-11  
 **Auteur:** vAvA Development Team
