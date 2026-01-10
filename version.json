@@ -13,7 +13,7 @@
     "persist": "1.0.0",
     "sit": "1.0.0",
     "loadingscreen": "1.0.0",
-    "testbench": "1.0.2",
+    "testbench": "1.0.3",
     "updates": [
         {
             "module": "economy",
@@ -150,10 +150,28 @@
                 "Logs détaillés pour chaque test exécuté",
                 "Correction de testbench_logs qui affichait des logs vides"
             ]
+        },
+        {
+            "module": "testbench",
+            "version": "1.0.3",
+            "description": "Correction complète du scan des modules et détection des tests",
+            "releaseDate": "2026-01-10",
+            "queries": [],
+            "files": [
+                "modules/testbench/server/main.lua"
+            ],
+            "needsRestart": true,
+            "changelog": [
+                "Ajout de hasTests pour afficher ✓/✗ dans le scan",
+                "Correction de testCount vs testsCount",
+                "Stockage des tests dans TestbenchState.tests",
+                "Extraction du nom court des modules (vAvA_xxx → xxx)",
+                "Correction des chemins de recherche des fichiers de tests"
+            ]
         }
     ],
     "metadata": {
-        "lastUpdate": "2026-01-10T14:00:00Z",
+        "lastUpdate": "2026-01-10T15:00:00Z",
         "minFrameworkVersion": "1.0.0",
         "repository": "https://github.com/Nicolasbriet/vAvA_core",
         "branch": "main"
