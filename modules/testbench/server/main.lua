@@ -256,16 +256,19 @@ end)
 -- === SCANNER DE MODULES ===
 function ScanModules()
     TestbenchState.modules = {}
+    TestbenchState.tests = {} -- Réinitialiser aussi les tests
     
     -- Modules configurés
     for _, moduleName in ipairs(TestbenchConfig.Modules) do
         local moduleData = {
             name = moduleName,
             path = 'modules/' .. moduleName,
-            testsCount = 0,
+            testCount = 0,
+            testsCount = 0, -- Garder pour compatibilité
             testsPassed = 0,
             testsFailed = 0,
             avgTime = 0,
+            hasTests = false,
             status = 'unknown'
         }
         
@@ -275,7 +278,14 @@ function ScanModules()
             
             -- Scanner les tests du module
             local tests = LoadModuleTests(moduleName)
+            moduleData.testCount = #tests
             moduleData.testsCount = #tests
+            moduleData.hasTests = #tests > 0
+            
+            -- Stocker les tests dans TestbenchState
+            if #tests > 0 then
+                TestbenchState.tests[moduleName] = tests
+            end
         end
         
         table.insert(TestbenchState.modules, moduleData)
@@ -299,16 +309,19 @@ end
 function LoadModuleTests(moduleName)
     local allTests = {}
     
+    -- Extraire le nom court (sans vAvA_ prefix)
+    local shortName = moduleName:gsub('^vAvA_', '')
+    
     -- Chemins possibles pour les fichiers de tests
     local possiblePaths = {
-        -- Tests dans vAvA_core pour les modules core
-        {resource = 'vAvA_core', path = 'tests/unit/' .. moduleName .. '_tests.lua'},
-        {resource = 'vAvA_core', path = 'tests/integration/' .. moduleName .. '_tests.lua'},
+        -- Tests dans vAvA_core pour les modules core (avec nom court)
+        {resource = 'vAvA_core', path = 'tests/unit/' .. shortName .. '_tests.lua'},
+        {resource = 'vAvA_core', path = 'tests/integration/' .. shortName .. '_tests.lua'},
         
-        -- Tests dans les modules individuels (vAvA_xxx)
-        {resource = 'vAvA_' .. moduleName, path = 'tests/' .. moduleName .. '_tests.lua'},
-        {resource = 'vAvA_' .. moduleName, path = 'tests/unit/' .. moduleName .. '_tests.lua'},
-        {resource = 'vAvA_' .. moduleName, path = 'tests/integration/' .. moduleName .. '_tests.lua'},
+        -- Tests dans les modules individuels (nom complet)
+        {resource = moduleName, path = 'tests/' .. shortName .. '_tests.lua'},
+        {resource = moduleName, path = 'tests/unit/' .. shortName .. '_tests.lua'},
+        {resource = moduleName, path = 'tests/integration/' .. shortName .. '_tests.lua'},
     }
     
     -- Cas spéciaux pour vAvA_core
