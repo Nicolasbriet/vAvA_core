@@ -41,6 +41,7 @@ description: |
     - vAvA_sit (points d'assise avec animations)
     - vAvA_status (système de besoins: faim, soif, santé)
     - vAvA_target (système de ciblage 3D moderne)
+    - vAvA_ems (système médical EMS et ambulancier)
     - vAvA_testbench (système de test automatisé)
     
     Prérequis:
@@ -194,8 +195,13 @@ tasks:
       src: ./resources/[vava]/vAvA_core/modules/testbench
       dest: ./resources/[vava]/vAvA_testbench
 
-    # ═══════════════════════════════════════════════════════════════════════
-    # Configuration du serveur
+    # ═══════════════════════════════════════════════════════════════════════    # Copie du module EMS (système médical et ambulancier)
+    # ═══════════════════════════════════════════════════════════════════════════════
+    - action: move_path
+      src: ./resources/[vava]/vAvA_core/modules/ems
+      dest: ./resources/[vava]/vAvA_ems
+
+    # ═══════════════════════════════════════════════════════════════════════════════    # Configuration du serveur
     # ═══════════════════════════════════════════════════════════════════════
     - action: move_path
       src: ./resources/[vava]/vAvA_core/server.cfg

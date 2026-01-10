@@ -1,0 +1,202 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>vAvA EMS System</title>
+    <link rel="stylesheet" href="css/style.css">
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Rajdhani:wght@300;400;500;600;700&family=Roboto:wght@300;400;500;700&display=swap" rel="stylesheet">
+</head>
+<body>
+    <!-- HUD Signes Vitaux (pour EMS) -->
+    <div id="vitals-hud" class="vitals-container hidden">
+        <div class="vitals-header">
+            <span class="vitals-title">SIGNES VITAUX</span>
+            <span class="vitals-status" id="patient-status">STABLE</span>
+        </div>
+        
+        <div class="vital-sign">
+            <div class="vital-label">
+                <span class="vital-icon">❤️</span>
+                <span>Pouls</span>
+            </div>
+            <div class="vital-value">
+                <span id="pulse-value">75</span>
+                <span class="vital-unit">BPM</span>
+            </div>
+            <div class="vital-bar">
+                <div class="vital-bar-fill" id="pulse-bar" style="width: 75%;"></div>
+            </div>
+        </div>
+        
+        <div class="vital-sign">
+            <div class="vital-label">
+                <span class="vital-icon">🩸</span>
+                <span>Tension</span>
+            </div>
+            <div class="vital-value">
+                <span id="bp-systolic">120</span>/<span id="bp-diastolic">80</span>
+                <span class="vital-unit">mmHg</span>
+            </div>
+        </div>
+        
+        <div class="vital-sign">
+            <div class="vital-label">
+                <span class="vital-icon">💨</span>
+                <span>O₂</span>
+            </div>
+            <div class="vital-value">
+                <span id="oxygen-value">98</span>
+                <span class="vital-unit">%</span>
+            </div>
+            <div class="vital-bar">
+                <div class="vital-bar-fill oxygen" id="oxygen-bar" style="width: 98%;"></div>
+            </div>
+        </div>
+        
+        <div class="vital-sign">
+            <div class="vital-label">
+                <span class="vital-icon">🩸</span>
+                <span>Volume Sang</span>
+            </div>
+            <div class="vital-value">
+                <span id="blood-volume-value">100</span>
+                <span class="vital-unit">%</span>
+            </div>
+            <div class="vital-bar">
+                <div class="vital-bar-fill blood" id="blood-volume-bar" style="width: 100%;"></div>
+            </div>
+        </div>
+        
+        <div class="vital-sign">
+            <div class="vital-label">
+                <span class="vital-icon">🌡️</span>
+                <span>Température</span>
+            </div>
+            <div class="vital-value">
+                <span id="temperature-value">37.0</span>
+                <span class="vital-unit">°C</span>
+            </div>
+        </div>
+        
+        <div class="vital-sign">
+            <div class="vital-label">
+                <span class="vital-icon">⚠️</span>
+                <span>Douleur</span>
+            </div>
+            <div class="vital-value">
+                <span id="pain-value">0</span>
+                <span class="vital-unit">/10</span>
+            </div>
+            <div class="vital-bar">
+                <div class="vital-bar-fill pain" id="pain-bar" style="width: 0%;"></div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Menu EMS Principal -->
+    <div id="ems-menu" class="ems-menu hidden">
+        <div class="menu-header">
+            <h1>SYSTÈME EMS</h1>
+            <button class="close-btn" onclick="closeMenu()">✕</button>
+        </div>
+        
+        <div class="menu-content">
+            <div class="menu-section">
+                <h2>🚑 INTERVENTIONS</h2>
+                <button class="menu-btn" onclick="viewEmergencyCalls()">
+                    <span class="btn-icon">📞</span>
+                    <span class="btn-text">Appels d'urgence</span>
+                    <span class="btn-badge" id="calls-count">0</span>
+                </button>
+                <button class="menu-btn" onclick="diagnoseNearestPatient()">
+                    <span class="btn-icon">🔍</span>
+                    <span class="btn-text">Diagnostiquer patient</span>
+                </button>
+            </div>
+            
+            <div class="menu-section">
+                <h2>🩸 BANQUE DE SANG</h2>
+                <div id="blood-stock" class="blood-stock-grid">
+                    <!-- Rempli dynamiquement -->
+                </div>
+            </div>
+            
+            <div class="menu-section">
+                <h2>🚗 VÉHICULES EMS</h2>
+                <button class="menu-btn" onclick="spawnVehicle('ambulance')">
+                    <span class="btn-icon">🚑</span>
+                    <span class="btn-text">Ambulance Standard</span>
+                </button>
+                <button class="menu-btn" onclick="spawnVehicle('ambulance2')">
+                    <span class="btn-icon">🚑</span>
+                    <span class="btn-text">Ambulance Réanimation</span>
+                </button>
+                <button class="menu-btn" onclick="spawnVehicle('polmav')">
+                    <span class="btn-icon">🚁</span>
+                    <span class="btn-text">Hélicoptère Médical</span>
+                </button>
+            </div>
+            
+            <div class="menu-section">
+                <h2>⚕️ ACTIONS MÉDICALES</h2>
+                <button class="menu-btn" onclick="openEquipmentMenu()">
+                    <span class="btn-icon">🧰</span>
+                    <span class="btn-text">Équipement médical</span>
+                </button>
+                <button class="menu-btn" onclick="performCPR()">
+                    <span class="btn-icon">💓</span>
+                    <span class="btn-text">Réanimation (CPR)</span>
+                </button>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Menu Diagnostic Patient -->
+    <div id="diagnosis-menu" class="diagnosis-menu hidden">
+        <div class="menu-header">
+            <h1>DIAGNOSTIC PATIENT</h1>
+            <button class="close-btn" onclick="closeDiagnosis()">✕</button>
+        </div>
+        
+        <div class="diagnosis-content">
+            <div class="diagnosis-section">
+                <h2>IDENTITÉ</h2>
+                <p><strong>Nom :</strong> <span id="patient-name">-</span></p>
+                <p><strong>Groupe sanguin :</strong> <span id="patient-blood-type">-</span></p>
+            </div>
+            
+            <div class="diagnosis-section">
+                <h2>SIGNES VITAUX</h2>
+                <div id="diagnosis-vitals">
+                    <!-- Rempli dynamiquement -->
+                </div>
+            </div>
+            
+            <div class="diagnosis-section">
+                <h2>BLESSURES</h2>
+                <div id="diagnosis-injuries">
+                    <!-- Rempli dynamiquement -->
+                </div>
+            </div>
+            
+            <div class="diagnosis-actions">
+                <button class="action-btn" onclick="treatPatient()">
+                    <span class="btn-icon">💊</span>
+                    Traiter
+                </button>
+                <button class="action-btn" onclick="transfusePatient()">
+                    <span class="btn-icon">🩸</span>
+                    Transfuser
+                </button>
+                <button class="action-btn revive" onclick="revivePatient()">
+                    <span class="btn-icon">💓</span>
+                    Réanimer
+                </button>
+            </div>
+        </div>
+    </div>
+    
+    <script src="js/app.js"></script>
+</body>
+</html>

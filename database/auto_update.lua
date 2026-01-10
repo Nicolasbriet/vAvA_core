@@ -101,7 +101,8 @@ local MODULE_MAPPING = {
     ['jobshop'] = { resource = 'vAvA_jobshop', path = 'modules/jobshop' },
     ['persist'] = { resource = 'vAvA_persist', path = 'modules/persist' },
     ['sit'] = { resource = 'vAvA_sit', path = 'modules/sit' },
-    ['testbench'] = { resource = 'vAvA_testbench', path = 'modules/testbench' }
+    ['testbench'] = { resource = 'vAvA_testbench', path = 'modules/testbench' },
+    ['ems'] = { resource = 'vAvA_ems', path = 'modules/ems' }
 }
 
 -- ═══════════════════════════════════════════════════════════════════════════
@@ -122,7 +123,8 @@ local LOCAL_VERSIONS = {
     ['persist'] = '1.0.0',
     ['sit'] = '1.0.0',
     ['loadingscreen'] = '1.0.0',
-    ['testbench'] = '1.0.0'
+    ['testbench'] = '1.0.0',
+    ['ems'] = '1.0.0'
 }
 
 -- ═══════════════════════════════════════════════════════════════════════════
