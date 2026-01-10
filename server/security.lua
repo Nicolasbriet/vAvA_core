@@ -231,7 +231,7 @@ function vCore.Security.Ban(source, reason, duration, bannedBy)
     
     -- Ajouter le ban en DB
     vCore.DB.Execute([[
-        INSERT INTO bans (identifier, license, steam, discord, ip, reason, expire, permanent, banned_by)
+        INSERT INTO bans (identifier, license, steam, discord, ip, reason, expire_at, permanent, banned_by)
         VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
     ]], {
         identifier,

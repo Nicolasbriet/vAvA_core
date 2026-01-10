@@ -112,7 +112,7 @@ CREATE TABLE IF NOT EXISTS `bans` (
     `discord` VARCHAR(60) DEFAULT NULL,
     `ip` VARCHAR(50) DEFAULT NULL,
     `reason` TEXT NOT NULL,
-    `expire` DATETIME DEFAULT NULL,
+    `expire_at` DATETIME DEFAULT NULL,
     `permanent` TINYINT(1) DEFAULT 0,
     `banned_by` VARCHAR(60) DEFAULT 'System',
     `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,

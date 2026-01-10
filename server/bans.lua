@@ -125,9 +125,9 @@ RegisterCommand('banlist', function(source, args, rawCommand)
     end
     
     local bans = vCore.DB.Query([[
-        SELECT identifier, reason, expire, banned_by, created_at 
+        SELECT identifier, reason, expire_at, banned_by, created_at 
         FROM bans 
-        WHERE expire IS NULL OR expire > NOW()
+        WHERE expire_at IS NULL OR expire_at > NOW()
         ORDER BY created_at DESC
         LIMIT 20
     ]])
@@ -149,7 +149,7 @@ RegisterCommand('banlist', function(source, args, rawCommand)
             ban.identifier,
             ban.reason,
             ban.banned_by,
-            ban.expire or 'Permanent'
+            ban.expire_at or 'Permanent'
         ))
     end
     print('==================')
@@ -165,8 +165,8 @@ CreateThread(function()
         
         local cleaned = vCore.DB.Execute([[
             DELETE FROM bans 
-            WHERE expire IS NOT NULL 
-            AND expire < NOW() 
+            WHERE expire_at IS NOT NULL 
+            AND expire_at < NOW() 
             AND permanent = 0
         ]])
         

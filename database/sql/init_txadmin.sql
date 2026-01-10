@@ -87,12 +87,19 @@ CREATE TABLE IF NOT EXISTS `vehicles` (
 CREATE TABLE IF NOT EXISTS `bans` (
     `id` INT AUTO_INCREMENT PRIMARY KEY,
     `identifier` VARCHAR(60) NOT NULL,
+    `license` VARCHAR(60) DEFAULT NULL,
+    `steam` VARCHAR(60) DEFAULT NULL,
+    `discord` VARCHAR(60) DEFAULT NULL,
+    `ip` VARCHAR(50) DEFAULT NULL,
     `reason` TEXT NOT NULL,
-    `banned_by` VARCHAR(60) DEFAULT 'System',
     `expire_at` TIMESTAMP NULL,
     `permanent` TINYINT(1) DEFAULT 0,
+    `banned_by` VARCHAR(60) DEFAULT 'System',
     `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    INDEX `idx_identifier` (`identifier`)
+    INDEX `idx_identifier` (`identifier`),
+    INDEX `idx_license` (`license`),
+    INDEX `idx_steam` (`steam`),
+    INDEX `idx_discord` (`discord`)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- Table des logs
