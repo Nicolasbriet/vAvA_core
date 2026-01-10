@@ -257,3 +257,129 @@ AddEventHandler('onResourceStop', function(resource)
         TriggerServerEvent('vCore:savePlayer')
     end
 end)
+
+-- ═══════════════════════════════════════════════════════════════════════════
+-- COMMANDES ADMIN (Events)
+-- ═══════════════════════════════════════════════════════════════════════════
+
+-- Téléportation simple
+RegisterNetEvent('vCore:teleport', function(x, y, z)
+    local ped = PlayerPedId()
+    SetEntityCoords(ped, x, y, z, false, false, false, false)
+    vCore.ShowNotification('Téléporté', 'success')
+end)
+
+-- Téléportation au marker
+RegisterNetEvent('vCore:teleportToMarker', function()
+    local waypoint = GetFirstBlipInfoId(8)
+    if not DoesBlipExist(waypoint) then
+        vCore.ShowNotification('Aucun marker placé', 'error')
+        return
+    end
+    
+    local coords = GetBlipCoords(waypoint)
+    local ped = PlayerPedId()
+    
+    -- Trouver le sol
+    local found, z = GetGroundZFor_3dCoord(coords.x, coords.y, 1000.0, false)
+    if found then
+        coords = vector3(coords.x, coords.y, z)
+    end
+    
+    SetEntityCoords(ped, coords.x, coords.y, coords.z, false, false, false, false)
+    vCore.ShowNotification('Téléporté au marker', 'success')
+end)
+
+-- Spawn véhicule admin
+RegisterNetEvent('vCore:spawnVehicleAdmin', function(model)
+    local ped = PlayerPedId()
+    local coords = GetEntityCoords(ped)
+    local heading = GetEntityHeading(ped)
+    
+    -- Charger le modèle
+    local modelHash = GetHashKey(model)
+    if not IsModelInCdimage(modelHash) or not IsModelAVehicle(modelHash) then
+        vCore.ShowNotification('Modèle de véhicule invalide', 'error')
+        return
+    end
+    
+    RequestModel(modelHash)
+    while not HasModelLoaded(modelHash) do
+        Wait(10)
+    end
+    
+    -- Spawn
+    local vehicle = CreateVehicle(modelHash, coords.x + 2.0, coords.y + 2.0, coords.z, heading, true, false)
+    SetPedIntoVehicle(ped, vehicle, -1)
+    SetVehicleEngineOn(vehicle, true, true, false)
+    SetVehicleNumberPlateText(vehicle, 'ADMIN')
+    
+    -- Custom properties
+    SetVehicleModKit(vehicle, 0)
+    SetVehicleMod(vehicle, 11, 3, false) -- Moteur Max
+    SetVehicleMod(vehicle, 12, 2, false) -- Freins Max
+    SetVehicleMod(vehicle, 13, 2, false) -- Transmission Max
+    ToggleVehicleMod(vehicle, 18, true)  -- Turbo
+    
+    SetModelAsNoLongerNeeded(modelHash)
+    vCore.ShowNotification('Véhicule spawné: ' .. model, 'success')
+end)
+
+-- Delete véhicule
+RegisterNetEvent('vCore:deleteVehicle', function()
+    local ped = PlayerPedId()
+    local vehicle = GetVehiclePedIsIn(ped, false)
+    
+    if vehicle == 0 then
+        vCore.ShowNotification('Vous n\'êtes pas dans un véhicule', 'error')
+        return
+    end
+    
+    DeleteVehicle(vehicle)
+    vCore.ShowNotification('Véhicule supprimé', 'success')
+end)
+
+-- Heal
+RegisterNetEvent('vCore:heal', function()
+    local ped = PlayerPedId()
+    SetEntityHealth(ped, GetEntityMaxHealth(ped))
+    vCore.ShowNotification('Soigné', 'success')
+end)
+
+-- Revive
+RegisterNetEvent('vCore:revive', function()
+    local ped = PlayerPedId()
+    local coords = GetEntityCoords(ped)
+    
+    NetworkResurrectLocalPlayer(coords.x, coords.y, coords.z, GetEntityHeading(ped), true, false)
+    SetEntityHealth(ped, GetEntityMaxHealth(ped))
+    ClearPedTasksImmediately(ped)
+    
+    vCore.ShowNotification('Réanimé', 'success')
+end)
+
+-- Freeze
+RegisterNetEvent('vCore:freeze', function(state)
+    local ped = PlayerPedId()
+    FreezeEntityPosition(ped, state)
+    
+    if state then
+        vCore.ShowNotification('Vous avez été gelé', 'error')
+    else
+        vCore.ShowNotification('Vous avez été dégelé', 'success')
+    end
+end)
+
+-- Météo
+RegisterNetEvent('vCore:setWeather', function(weather)
+    SetWeatherTypeNowPersist(weather)
+    vCore.ShowNotification('Météo: ' .. weather, 'info')
+end)
+
+-- Heure
+RegisterNetEvent('vCore:setTime', function(hour, minute)
+    NetworkOverrideClockTime(hour, minute, 0)
+    vCore.ShowNotification(string.format('Heure: %02d:%02d', hour, minute), 'info')
+end)
+
+print('[vAvA_core] ^2✓^7 Client admin events loaded')

@@ -6,6 +6,39 @@
 vCore = vCore or {}
 
 -- ═══════════════════════════════════════════════════════════════════════════
+-- HELPER FUNCTIONS
+-- ═══════════════════════════════════════════════════════════════════════════
+
+---Vérifie si un joueur a les permissions admin (ACE ou player object)
+---@param source number
+---@param aceCommand string|nil ACE spécifique à vérifier (ex: "command.car")
+---@return boolean
+local function HasAdminPermission(source, aceCommand)
+    if source == 0 then return true end -- Console = toujours admin
+    
+    -- Vérifier ACE directement (fonctionne même sans personnage chargé)
+    if aceCommand and IsPlayerAceAllowed(source, aceCommand) then
+        return true
+    end
+    
+    -- Vérifier ACE admin générique
+    if IsPlayerAceAllowed(source, 'vava.admin') or 
+       IsPlayerAceAllowed(source, 'vava.superadmin') or
+       IsPlayerAceAllowed(source, 'vava.developer') or
+       IsPlayerAceAllowed(source, 'vava.owner') then
+        return true
+    end
+    
+    -- Fallback: vérifier via l'objet player (si personnage chargé)
+    local player = vCore.GetPlayer(source)
+    if player and player:IsAdmin() then
+        return true
+    end
+    
+    return false
+end
+
+-- ═══════════════════════════════════════════════════════════════════════════
 -- COMMANDES UTILISATEUR
 -- ═══════════════════════════════════════════════════════════════════════════
 
@@ -117,8 +150,7 @@ end, false)
 
 -- /give - Donner un item
 RegisterCommand('give', function(source, args, rawCommand)
-    local admin = vCore.GetPlayer(source)
-    if source > 0 and (not admin or not admin:IsAdmin()) then
+    if source > 0 and not HasAdminPermission(source, 'command.give') then
         vCore.Notify(source, Lang('admin_no_permission'), 'error')
         return
     end
@@ -140,8 +172,7 @@ end, false)
 
 -- /givemoney - Donner de l'argent
 RegisterCommand('givemoney', function(source, args, rawCommand)
-    local admin = vCore.GetPlayer(source)
-    if source > 0 and (not admin or not admin:IsAdmin()) then
+    if source > 0 and not HasAdminPermission(source, 'command.givemoney') then
         vCore.Notify(source, Lang('admin_no_permission'), 'error')
         return
     end
@@ -163,8 +194,7 @@ end, false)
 
 -- /setjob - Définir le job
 RegisterCommand('setjob', function(source, args, rawCommand)
-    local admin = vCore.GetPlayer(source)
-    if source > 0 and (not admin or not admin:IsAdmin()) then
+    if source > 0 and not HasAdminPermission(source, 'command.setjob') then
         vCore.Notify(source, Lang('admin_no_permission'), 'error')
         return
     end
@@ -188,8 +218,7 @@ end, false)
 RegisterCommand('tp', function(source, args, rawCommand)
     if source <= 0 then return end
     
-    local admin = vCore.GetPlayer(source)
-    if not admin or not admin:IsAdmin() then
+    if not HasAdminPermission(source, 'command.tp') then
         vCore.Notify(source, Lang('admin_no_permission'), 'error')
         return
     end
@@ -213,8 +242,7 @@ end, false)
 RegisterCommand('bring', function(source, args, rawCommand)
     if source <= 0 then return end
     
-    local admin = vCore.GetPlayer(source)
-    if not admin or not admin:IsAdmin() then
+    if not HasAdminPermission(source, 'command.bring') then
         vCore.Notify(source, Lang('admin_no_permission'), 'error')
         return
     end
@@ -236,8 +264,7 @@ end, false)
 RegisterCommand('heal', function(source, args, rawCommand)
     if source <= 0 then return end
     
-    local admin = vCore.GetPlayer(source)
-    if not admin or not admin:IsAdmin() then
+    if not HasAdminPermission(source, 'command.heal') then
         vCore.Notify(source, Lang('admin_no_permission'), 'error')
         return
     end
@@ -252,8 +279,7 @@ end, false)
 RegisterCommand('revive', function(source, args, rawCommand)
     if source <= 0 then return end
     
-    local admin = vCore.GetPlayer(source)
-    if not admin or not admin:IsAdmin() then
+    if not HasAdminPermission(source, 'command.revive') then
         vCore.Notify(source, Lang('admin_no_permission'), 'error')
         return
     end
@@ -266,8 +292,7 @@ end, false)
 
 -- /kick - Expulser un joueur
 RegisterCommand('kick', function(source, args, rawCommand)
-    local admin = vCore.GetPlayer(source)
-    if source > 0 and (not admin or not admin:IsAdmin()) then
+    if source > 0 and not HasAdminPermission(source, 'command.kick') then
         vCore.Notify(source, Lang('admin_no_permission'), 'error')
         return
     end
@@ -294,8 +319,7 @@ end, false)
 RegisterCommand('car', function(source, args, rawCommand)
     if source <= 0 then return end
     
-    local admin = vCore.GetPlayer(source)
-    if not admin or not admin:IsAdmin() then
+    if not HasAdminPermission(source, 'command.car') then
         vCore.Notify(source, Lang('admin_no_permission'), 'error')
         return
     end
@@ -313,8 +337,7 @@ end, false)
 RegisterCommand('dv', function(source, args, rawCommand)
     if source <= 0 then return end
     
-    local admin = vCore.GetPlayer(source)
-    if not admin or not admin:IsAdmin() then
+    if not HasAdminPermission(source, 'command.dv') then
         vCore.Notify(source, Lang('admin_no_permission'), 'error')
         return
     end
@@ -342,8 +365,7 @@ end, false)
 
 -- /refresh - Recharger les caches
 RegisterCommand('refresh', function(source, args, rawCommand)
-    local admin = vCore.GetPlayer(source)
-    if source > 0 and (not admin or not admin:IsAdmin()) then
+    if source > 0 and not HasAdminPermission(source, 'command.refresh') then
         vCore.Notify(source, Lang('admin_no_permission'), 'error')
         return
     end
@@ -354,3 +376,290 @@ RegisterCommand('refresh', function(source, args, rawCommand)
     local msg = 'Caches rechargés'
     if source > 0 then vCore.Notify(source, msg, 'success') else print(msg) end
 end, false)
+
+-- ═══════════════════════════════════════════════════════════════════════════
+-- COMMANDES FIVEM NATIVES (Compatibilité)
+-- ═══════════════════════════════════════════════════════════════════════════
+
+-- /tpm - Téléportation au marker
+RegisterCommand('tpm', function(source, args, rawCommand)
+    if source <= 0 then return end
+    
+    if not HasAdminPermission(source, 'command.tpm') then
+        vCore.Notify(source, 'Vous n\'avez pas la permission', 'error')
+        return
+    end
+    
+    TriggerClientEvent('vCore:teleportToMarker', source)
+    vCore.Notify(source, 'Téléportation au marker...', 'success')
+end, false)
+
+-- /goto - TP vers un joueur
+RegisterCommand('goto', function(source, args, rawCommand)
+    if source <= 0 then return end
+    
+    if not HasAdminPermission(source, 'command.goto') then
+        vCore.Notify(source, 'Vous n\'avez pas la permission', 'error')
+        return
+    end
+    
+    if #args < 1 then
+        vCore.Notify(source, 'Usage: /goto [id]', 'info')
+        return
+    end
+    
+    local targetId = tonumber(args[1])
+    if not targetId then
+        vCore.Notify(source, 'ID invalide', 'error')
+        return
+    end
+    
+    local targetPed = GetPlayerPed(targetId)
+    if not DoesEntityExist(targetPed) then
+        vCore.Notify(source, 'Joueur introuvable', 'error')
+        return
+    end
+    
+    local coords = GetEntityCoords(targetPed)
+    TriggerClientEvent('vCore:teleport', source, coords.x, coords.y, coords.z)
+    vCore.Notify(source, 'Téléporté vers #' .. targetId, 'success')
+end, false)
+
+-- /freeze - Geler un joueur
+RegisterCommand('freeze', function(source, args, rawCommand)
+    if source <= 0 then return end
+    
+    if not HasAdminPermission(source, 'command.freeze') then
+        vCore.Notify(source, 'Vous n\'avez pas la permission', 'error')
+        return
+    end
+    
+    if #args < 1 then
+        vCore.Notify(source, 'Usage: /freeze [id]', 'info')
+        return
+    end
+    
+    local targetId = tonumber(args[1])
+    if not targetId then
+        vCore.Notify(source, 'ID invalide', 'error')
+        return
+    end
+    
+    TriggerClientEvent('vCore:freeze', targetId, true)
+    vCore.Notify(source, 'Joueur #' .. targetId .. ' gelé', 'success')
+    
+    -- Log
+    local adminName = GetPlayerName(source)
+    vCore.Log('admin', 'admin:' .. adminName, 'Freeze: #' .. targetId, {})
+end, false)
+
+-- /unfreeze - Dégeler un joueur
+RegisterCommand('unfreeze', function(source, args, rawCommand)
+    if source <= 0 then return end
+    
+    if not HasAdminPermission(source, 'command.unfreeze') then
+        vCore.Notify(source, 'Vous n\'avez pas la permission', 'error')
+        return
+    end
+    
+    if #args < 1 then
+        vCore.Notify(source, 'Usage: /unfreeze [id]', 'info')
+        return
+    end
+    
+    local targetId = tonumber(args[1])
+    if not targetId then
+        vCore.Notify(source, 'ID invalide', 'error')
+        return
+    end
+    
+    TriggerClientEvent('vCore:freeze', targetId, false)
+    vCore.Notify(source, 'Joueur #' .. targetId .. ' dégelé', 'success')
+end, false)
+
+-- /weather - Changer la météo
+RegisterCommand('weather', function(source, args, rawCommand)
+    if not HasAdminPermission(source, 'command.weather') then
+        if source > 0 then vCore.Notify(source, 'Vous n\'avez pas la permission', 'error') end
+        return
+    end
+    
+    if #args < 1 then
+        local msg = 'Usage: /weather [clear/extrasunny/clouds/overcast/rain/thunder/foggy/snow]'
+        if source > 0 then vCore.Notify(source, msg, 'info') else print(msg) end
+        return
+    end
+    
+    local weather = args[1]
+    TriggerClientEvent('vCore:setWeather', -1, weather)
+    
+    local msg = 'Météo changée: ' .. weather
+    if source > 0 then vCore.Notify(source, msg, 'success') else print(msg) end
+end, false)
+
+-- /time - Changer l'heure
+RegisterCommand('time', function(source, args, rawCommand)
+    if not HasAdminPermission(source, 'command.time') then
+        if source > 0 then vCore.Notify(source, 'Vous n\'avez pas la permission', 'error') end
+        return
+    end
+    
+    if #args < 2 then
+        local msg = 'Usage: /time [heure] [minute]'
+        if source > 0 then vCore.Notify(source, msg, 'info') else print(msg) end
+        return
+    end
+    
+    local hour = tonumber(args[1]) or 12
+    local minute = tonumber(args[2]) or 0
+    
+    TriggerClientEvent('vCore:setTime', -1, hour, minute)
+    
+    local msg = string.format('Heure changée: %02d:%02d', hour, minute)
+    if source > 0 then vCore.Notify(source, msg, 'success') else print(msg) end
+end, false)
+
+-- /setmoney - Modifier l'argent d'un joueur
+RegisterCommand('setmoney', function(source, args, rawCommand)
+    if not HasAdminPermission(source, 'command.setmoney') then
+        if source > 0 then vCore.Notify(source, 'Vous n\'avez pas la permission', 'error') end
+        return
+    end
+    
+    if #args < 3 then
+        local msg = 'Usage: /setmoney [id] [cash/bank/black] [montant]'
+        if source > 0 then vCore.Notify(source, msg, 'info') else print(msg) end
+        return
+    end
+    
+    local targetId = tonumber(args[1])
+    local moneyType = args[2]
+    local amount = tonumber(args[3])
+    
+    if not targetId or not amount then
+        local msg = 'Arguments invalides'
+        if source > 0 then vCore.Notify(source, msg, 'error') else print(msg) end
+        return
+    end
+    
+    local player = vCore.GetPlayer(targetId)
+    if not player then
+        local msg = 'Joueur introuvable'
+        if source > 0 then vCore.Notify(source, msg, 'error') else print(msg) end
+        return
+    end
+    
+    player:SetMoney(moneyType, amount)
+    
+    local msg = string.format('Argent défini: %s = %d$ pour #%d', moneyType, amount, targetId)
+    if source > 0 then vCore.Notify(source, msg, 'success') else print(msg) end
+    
+    -- Log
+    local adminName = source > 0 and GetPlayerName(source) or 'Console'
+    vCore.Log('admin', 'admin:' .. adminName, 'SetMoney: #' .. targetId, {type = moneyType, amount = amount})
+end, false)
+
+-- /setgroup - Changer le groupe d'un joueur
+RegisterCommand('setgroup', function(source, args, rawCommand)
+    if not HasAdminPermission(source, 'command.setgroup') then
+        if source > 0 then vCore.Notify(source, 'Vous n\'avez pas la permission', 'error') end
+        return
+    end
+    
+    if #args < 2 then
+        local msg = 'Usage: /setgroup [id] [user/helper/mod/admin/superadmin/developer/owner]'
+        if source > 0 then vCore.Notify(source, msg, 'info') else print(msg) end
+        return
+    end
+    
+    local targetId = tonumber(args[1])
+    local group = args[2]
+    
+    if not targetId then
+        local msg = 'ID invalide'
+        if source > 0 then vCore.Notify(source, msg, 'error') else print(msg) end
+        return
+    end
+    
+    local player = vCore.GetPlayer(targetId)
+    if not player then
+        local msg = 'Joueur introuvable'
+        if source > 0 then vCore.Notify(source, msg, 'error') else print(msg) end
+        return
+    end
+    
+    player:SetGroup(group)
+    
+    local msg = string.format('Groupe changé: #%d → %s', targetId, group)
+    if source > 0 then vCore.Notify(source, msg, 'success') else print(msg) end
+    
+    -- Log
+    local adminName = source > 0 and GetPlayerName(source) or 'Console'
+    vCore.Log('admin', 'admin:' .. adminName, 'SetGroup: #' .. targetId, {group = group})
+end, false)
+
+-- /ban - Bannir un joueur
+RegisterCommand('ban', function(source, args, rawCommand)
+    if not HasAdminPermission(source, 'command.ban') then
+        if source > 0 then vCore.Notify(source, 'Vous n\'avez pas la permission', 'error') end
+        return
+    end
+    
+    if #args < 2 then
+        local msg = 'Usage: /ban [id] [durée: 1h/24h/7d/perm] [raison]'
+        if source > 0 then vCore.Notify(source, msg, 'info') else print(msg) end
+        return
+    end
+    
+    local targetId = tonumber(args[1])
+    local duration = args[2]
+    local reason = table.concat(args, ' ', 3) or 'Aucune raison'
+    
+    if not targetId then
+        local msg = 'ID invalide'
+        if source > 0 then vCore.Notify(source, msg, 'error') else print(msg) end
+        return
+    end
+    
+    local identifier = vCore.Players.GetIdentifier(targetId)
+    if not identifier then
+        local msg = 'Joueur introuvable'
+        if source > 0 then vCore.Notify(source, msg, 'error') else print(msg) end
+        return
+    end
+    
+    -- Calculer expiration
+    local expireAt = nil
+    if duration ~= 'perm' then
+        local multipliers = {
+            h = 3600,
+            d = 86400,
+            w = 604800
+        }
+        
+        local time = tonumber(duration:match('%d+'))
+        local unit = duration:match('%a+')
+        
+        if time and multipliers[unit] then
+            expireAt = os.time() + (time * multipliers[unit])
+        end
+    end
+    
+    -- Créer le ban
+    vCore.DB.Execute([[
+        INSERT INTO bans (identifier, reason, banned_by, expire_at)
+        VALUES (?, ?, ?, FROM_UNIXTIME(?))
+    ]], {identifier, reason, source > 0 and GetPlayerName(source) or 'Console', expireAt})
+    
+    -- Kick le joueur
+    DropPlayer(targetId, 'Vous avez été banni\\nRaison: ' .. reason .. '\\nDurée: ' .. duration)
+    
+    local msg = string.format('Joueur #%d banni (%s): %s', targetId, duration, reason)
+    if source > 0 then vCore.Notify(source, msg, 'success') else print(msg) end
+    
+    -- Log
+    local adminName = source > 0 and GetPlayerName(source) or 'Console'
+    vCore.Log('admin', 'admin:' .. adminName, 'Ban: #' .. targetId, {duration = duration, reason = reason})
+end, false)
+
+print('[vAvA_core] ^2✓^7 Commands loaded (User + Admin + FiveM Natives)')
