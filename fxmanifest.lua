@@ -11,7 +11,7 @@ lua54 'yes'
 name 'vAvA_core'
 author 'vAvA'
 description 'Framework FiveM modulaire, sécurisé et multilingue'
-version '1.0.0'
+version '1.1.0'
 
 -- Dépendances
 dependencies {
