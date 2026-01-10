@@ -24,10 +24,10 @@ shared_scripts {
     'config/config.lua',
     'locales/*.lua',
     'shared/enums.lua',
+    'shared/utils.lua',         -- 🛠️ Utils en premier (requis par events)
     'shared/events.lua',        -- 🎯 Événements centralisés
     'shared/permissions.lua',   -- 🔒 Système de permissions
     'shared/validation.lua',    -- ✅ Validation de données
-    'shared/utils.lua',
     'shared/classes.lua',
     'shared/helpers.lua',       -- 🛠️ Fonctions helper (50+)
     'shared/module_base.lua',   -- 📦 Classe base modules
