@@ -19,7 +19,9 @@ dependencies {
 
 -- Fichiers partagés
 shared_scripts {
-    '@vAvA_core/shared/*.lua',
+    '@vAvA_core/shared/enums.lua',
+    '@vAvA_core/shared/utils.lua',
+    '@vAvA_core/shared/classes.lua',
     '@vAvA_core/config/config.lua',
     'config.lua',
     'locales/*.lua'

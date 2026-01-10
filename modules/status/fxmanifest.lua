@@ -7,8 +7,7 @@ version '1.0.0'
 
 shared_scripts {
     'config/config.lua',
-    'shared/api.lua',
-    '@vAvA_core/locales/locale.lua'
+    'shared/api.lua'
 }
 
 server_scripts {

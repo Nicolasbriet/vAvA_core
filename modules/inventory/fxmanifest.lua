@@ -35,6 +35,5 @@ files {
     'html/index.html',
     'html/admin.html',
     'html/css/*.css',
-    'html/js/*.js',
-    'html/img/items/*.png'
+    'html/js/*.js'
 }
