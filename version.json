@@ -13,7 +13,7 @@
     "persist": "1.0.0",
     "sit": "1.0.0",
     "loadingscreen": "1.0.0",
-    "testbench": "1.0.1",
+    "testbench": "1.0.2",
     "updates": [
         {
             "module": "economy",
@@ -132,10 +132,28 @@
                 "Ajout de logs de debug pour le chargement des tests",
                 "Support des tests dans modules/*/tests/"
             ]
+        },
+        {
+            "module": "testbench",
+            "version": "1.0.2",
+            "description": "Correction du système de logs et ajout de logs détaillés pour les tests",
+            "releaseDate": "2026-01-10",
+            "queries": [],
+            "files": [
+                "modules/testbench/server/main.lua"
+            ],
+            "needsRestart": true,
+            "changelog": [
+                "Ajout de la fonction AddLog() pour enregistrer les logs",
+                "Rotation automatique des logs (max 1000 entrées)",
+                "Ajout de la fonction LogCritical()",
+                "Logs détaillés pour chaque test exécuté",
+                "Correction de testbench_logs qui affichait des logs vides"
+            ]
         }
     ],
     "metadata": {
-        "lastUpdate": "2026-01-10T12:00:00Z",
+        "lastUpdate": "2026-01-10T14:00:00Z",
         "minFrameworkVersion": "1.0.0",
         "repository": "https://github.com/Nicolasbriet/vAvA_core",
         "branch": "main"

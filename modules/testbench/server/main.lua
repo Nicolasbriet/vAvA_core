@@ -414,6 +414,8 @@ end
 function ExecuteTest(test)
     local startTime = os.clock()
     
+    LogInfo('Running test: ' .. test.name)
+    
     -- Simuler l'exécution du test
     -- TODO: Implémenter l'exécution réelle des tests
     
@@ -422,7 +424,7 @@ function ExecuteTest(test)
     local duration = math.floor((os.clock() - startTime) * 1000)
     local success = math.random() > 0.2 -- 80% de réussite
     
-    return {
+    local result = {
         name = test.name,
         type = test.type,
         status = success and 'passed' or 'failed',
@@ -430,6 +432,15 @@ function ExecuteTest(test)
         message = success and 'Test passed' or 'Test failed: assertion error',
         timestamp = os.time() * 1000
     }
+    
+    -- Logger le résultat
+    if success then
+        LogInfo(string.format('✓ Test %s: PASSED (%dms)', test.name, duration))
+    else
+        LogError(string.format('✗ Test %s: FAILED - %s', test.name, result.message))
+    end
+    
+    return result
 end
 
 function RunCriticalTests()
@@ -484,24 +495,48 @@ function RunScenario(scenarioName, source)
 end
 
 -- === LOGS ===
+function AddLog(level, message)
+    -- Ajouter le log au tableau
+    table.insert(TestbenchState.logs, {
+        level = level,
+        message = message,
+        timestamp = os.time() * 1000
+    })
+    
+    -- Limiter la taille des logs (max 1000)
+    if #TestbenchState.logs > 1000 then
+        table.remove(TestbenchState.logs, 1)
+    end
+end
+
 function LogInfo(message)
     if not TestbenchConfig.LogLevel.Info then return end
     print(string.format('^2[TESTBENCH]^7 %s^0', message))
+    AddLog('info', message)
 end
 
 function LogWarning(message)
     if not TestbenchConfig.LogLevel.Warning then return end
     print(string.format('^3[TESTBENCH]^7 %s^0', message))
+    AddLog('warning', message)
 end
 
 function LogError(message)
     if not TestbenchConfig.LogLevel.Error then return end
     print(string.format('^1[TESTBENCH]^7 %s^0', message))
+    AddLog('error', message)
 end
 
 function LogDebug(message)
     if not TestbenchConfig.LogLevel.Debug then return end
     print(string.format('^6[TESTBENCH]^7 %s^0', message))
+    AddLog('debug', message)
+end
+
+function LogCritical(message)
+    if not TestbenchConfig.LogLevel.Critical then return end
+    print(string.format('^1[TESTBENCH CRITICAL]^7 %s^0', message))
+    AddLog('critical', message)
 end
 
 -- === CONSOLE COMMANDS ===
