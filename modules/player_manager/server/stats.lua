@@ -3,7 +3,7 @@
     Mise à jour automatique des statistiques
 ]]
 
-local PMConfig = require 'config'
+local PMConfig = PlayerManagerConfig
 
 -- ═══════════════════════════════════════════════════════════════════════════
 -- VARIABLES

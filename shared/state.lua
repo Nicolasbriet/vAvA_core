@@ -433,5 +433,3 @@ vCore.State.Load('player:123', function(loadedState)
     print('State loaded:', json.encode(loadedState))
 end)
 ]]
-
-print('^2[vCore:State]^7 Gestionnaire d'état chargé')

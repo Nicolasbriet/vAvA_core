@@ -3,7 +3,7 @@
     Gestion des événements historiques
 ]]
 
-local PMConfig = require 'config'
+local PMConfig = PlayerManagerConfig
 
 -- ═══════════════════════════════════════════════════════════════════════════
 -- NETTOYAGE AUTOMATIQUE

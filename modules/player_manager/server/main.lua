@@ -4,7 +4,7 @@
 ]]
 
 local vCore = exports['vAvA_core']:GetCoreObject()
-local PMConfig = require 'config'
+local PMConfig = PlayerManagerConfig
 
 -- ═══════════════════════════════════════════════════════════════════════════
 -- VARIABLES
