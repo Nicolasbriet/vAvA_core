@@ -241,26 +241,27 @@ tasks:
     # ═══════════════════════════════════════════════════════════════════════
     - action: query_database
       file: ./resources/[vava]/vAvA_core/database/sql/economy_system.sql
+
     # ═══════════════════════════════════════════════════════════════════════
     # Installation du système EMS (tables médicales et stock sanguin)
     # ═══════════════════════════════════════════════════════════════════════
     - action: query_database
-      file: ./resources/[vava]/vAvA_core/modules/ems/sql/ems_system.sql
+      file: ./resources/[vava]/vAvA_ems/sql/ems_system.sql
 
     # ═══════════════════════════════════════════════════════════════════════
     # Installation du système de clés véhicules (partage et historique)
     # ═══════════════════════════════════════════════════════════════════════
     - action: query_database
-      file: ./resources/[vava]/vAvA_core/modules/keys/sql/keys_system.sql
+      file: ./resources/[vava]/vAvA_keys/sql/keys_system.sql
 
     # ═══════════════════════════════════════════════════════════════════════
     # Installation du système police (amendes, prison, casier judiciaire)
     # ═══════════════════════════════════════════════════════════════════════
     - action: query_database
-      file: ./resources/[vava]/vAvA_core/modules/police/sql/police_system.sql
+      file: ./resources/[vava]/vAvA_police/sql/police_system.sql
 
     # ═══════════════════════════════════════════════════════════════════════
     # Installation du player manager (gestion avancée des joueurs)
     # ═══════════════════════════════════════════════════════════════════════
     - action: query_database
-      file: ./resources/[vava]/vAvA_core/modules/player_manager/sql/player_manager.sql
+      file: ./resources/[vava]/vAvA_player_manager/sql/player_manager.sql
