@@ -1,6 +1,6 @@
 --[[
     vAvA_core - Framework FiveM modulaire, sécurisé et multilingue
-    Version: 1.1.2
+    Version: 1.1.3
     Auteur: vAvA
 ]]
 

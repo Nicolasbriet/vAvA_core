@@ -119,10 +119,15 @@ CreateThread(function()
         
         if Config.HUD.Enabled and vCore.IsLoaded and isHUDVisible then
             local ped = PlayerPedId()
+            local health = (GetEntityHealth(ped) - 100) -- Native retourne 100-200
+            
+            -- S'assurer que les valeurs sont entre 0 et 100
+            if health < 0 then health = 0 end
+            if health > 100 then health = 100 end
             
             local hudData = {
                 action = 'updateStatus',
-                health = GetEntityHealth(ped) - 100,
+                health = health,
                 armor = GetPedArmour(ped),
                 hunger = vCore.PlayerData.status and vCore.PlayerData.status.hunger or 100,
                 thirst = vCore.PlayerData.status and vCore.PlayerData.status.thirst or 100,
@@ -140,7 +145,10 @@ CreateThread(function()
                 SendNUIMessage({
                     action = 'updateVehicle',
                     speed = math.floor(GetEntitySpeed(vehicle) * 3.6), -- km/h
-                    fuel = GetVehicleFuelLevel(vehicle)
+                    fuel = GetVehicleFuelLevel(vehicle),
+                    engine = GetIsVehicleEngineRunning(vehicle),
+                    locked = GetVehicleDoorLockStatus(vehicle) == 2,
+                    lights = IsVehicleLightOn(vehicle)
                 })
             else
                 SendNUIMessage({
@@ -217,3 +225,23 @@ RegisterCommand('+toggleHUD', function()
 end, false)
 
 RegisterKeyMapping('+toggleHUD', 'Afficher/Cacher le HUD', 'keyboard', 'F7')
+
+-- Debug HUD (pour vérifier les données)
+RegisterCommand('debughud', function()
+    if not vCore.IsLoaded then
+        print('^1[DEBUG] Joueur non chargé!^0')
+        return
+    end
+    
+    print('^2[DEBUG HUD] Données joueur:^0')
+    print('  IsLoaded:', vCore.IsLoaded)
+    print('  Money:', json.encode(vCore.PlayerData.money))
+    print('  Job:', json.encode(vCore.PlayerData.job))
+    print('  Status:', json.encode(vCore.PlayerData.status))
+    print('  Health:', GetEntityHealth(PlayerPedId()) - 100)
+    print('  Armor:', GetPedArmour(PlayerPedId()))
+    
+    -- Forcer une mise à jour du HUD
+    TriggerEvent('vAvA:initHUD')
+    print('^2[DEBUG] HUD réinitialisé!^0')
+end, false)

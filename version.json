@@ -1,5 +1,5 @@
 {
-    "vava_core": "1.1.2",
+    "vava_core": "1.1.3",
     "economy": "1.3.0",
     "creator": "1.0.1",
     "garage": "1.1.1",
@@ -18,6 +18,28 @@
     "player_manager": "1.0.0",
     "ems": "1.0.0",
     "updates": [
+        {
+            "module": "vava_core",
+            "version": "1.1.3",
+            "description": "Correctifs HUD - Transparence avec flou + Données temps réel",
+            "releaseDate": "2026-01-11",
+            "queries": [],
+            "files": [
+                "html/css/style.css",
+                "client/hud.lua",
+                "CORRECTIFS_HUD.md"
+            ],
+            "needsRestart": true,
+            "features": [
+                "Fonds transparents (0.20 opacité) au lieu de noirs opaques",
+                "Effet de flou visible sur tous les éléments HUD",
+                "Correction calcul santé (toujours entre 0-100)",
+                "Ajout infos véhicule complètes (moteur, verrou, phares)",
+                "Commande /debughud pour diagnostic",
+                "Mise à jour temps réel toutes les 500ms"
+            ],
+            "breaking_changes": []
+        },
         {
             "module": "vava_core",
             "version": "1.1.2",

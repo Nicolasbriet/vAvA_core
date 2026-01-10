@@ -185,6 +185,11 @@ RegisterNetEvent('vCore:loadPlayer', function(charId)
     -- Envoyer les données au client
     TriggerClientEvent('vCore:playerLoaded', source, player:ToClientData())
     
+    -- Envoyer l'intervalle de sauvegarde
+    if Config.Players.AutoSave.enabled then
+        TriggerClientEvent('vCore:setSaveInterval', source, Config.Players.AutoSave.interval)
+    end
+    
     -- Déclencher l'événement de chargement
     TriggerEvent(vCore.Events.PLAYER_LOADED, source, player)
     
@@ -204,16 +209,27 @@ AddEventHandler('playerDropped', function(reason)
     
     if not player then return end
     
-    -- Mettre à jour la position avant sauvegarde
-    local ped = GetPlayerPed(source)
-    if ped and DoesEntityExist(ped) then
-        local coords = GetEntityCoords(ped)
-        local heading = GetEntityHeading(ped)
-        player:SetPosition(coords.x, coords.y, coords.z, heading)
+    -- Sauvegarder à la déconnexion si activé
+    if Config.Players.AutoSave.saveOnDisconnect then
+        -- Mettre à jour la position avant sauvegarde
+        local ped = GetPlayerPed(source)
+        if ped and DoesEntityExist(ped) then
+            local coords = GetEntityCoords(ped)
+            local heading = GetEntityHeading(ped)
+            player:SetPosition(coords.x, coords.y, coords.z, heading)
+        end
+        
+        -- Sauvegarder
+        local success = vCore.DB.SavePlayer(player)
+        
+        if Config.Players.AutoSave.debug then
+            if success then
+                print('^2[vAvA_core]^7 Sauvegarde réussie pour: ' .. player:GetName())
+            else
+                print('^1[vAvA_core]^7 Échec sauvegarde pour: ' .. player:GetName())
+            end
+        end
     end
-    
-    -- Sauvegarder
-    vCore.DB.SavePlayer(player)
     
     -- Log
     vCore.Log('info', player:GetIdentifier(), 'Joueur déconnecté: ' .. player:GetName() .. ' (' .. reason .. ')')
@@ -237,17 +253,27 @@ RegisterNetEvent('vCore:savePlayer', function()
     
     if not player then return end
     
-    -- Mettre à jour la position
+    -- Mettre à jour la position actuelle
     local ped = GetPlayerPed(source)
-    if ped and DoesEntityExist(ped) then
+    if ped and DoesEntityExist(ped) and Config.Players.AutoSave.savePosition then
         local coords = GetEntityCoords(ped)
         local heading = GetEntityHeading(ped)
         player:SetPosition(coords.x, coords.y, coords.z, heading)
     end
     
-    if vCore.DB.SavePlayer(player) then
+    -- Sauvegarder
+    local success = vCore.DB.SavePlayer(player)
+    
+    if success then
         TriggerEvent(vCore.Events.PLAYER_SAVED, source, player)
-        vCore.Utils.Debug('Joueur sauvegardé:', player:GetName())
+        
+        if Config.Players.AutoSave.debug then
+            print('^2[vAvA_core]^7 Sauvegarde complète: ' .. player:GetName())
+        end
+    else
+        if Config.Players.AutoSave.debug then
+            print('^1[vAvA_core]^7 Échec sauvegarde: ' .. player:GetName())
+        end
     end
 end)
 
@@ -259,8 +285,12 @@ RegisterNetEvent('vCore:updatePosition', function(coords, heading)
     local source = source
     local player = vCore.GetPlayer(source)
     
-    if player then
+    if player and Config.Players.AutoSave.savePosition then
         player:SetPosition(coords.x, coords.y, coords.z, heading)
+        
+        if Config.Players.AutoSave.debug then
+            print('^3[vAvA_core]^7 Position mise à jour: ' .. player:GetName() .. ' → ' .. math.floor(coords.x) .. ', ' .. math.floor(coords.y))
+        end
     end
 end)
 

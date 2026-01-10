@@ -662,4 +662,86 @@ RegisterCommand('ban', function(source, args, rawCommand)
     vCore.Log('admin', 'admin:' .. adminName, 'Ban: #' .. targetId, {duration = duration, reason = reason})
 end, false)
 
-print('[vAvA_core] ^2✓^7 Commands loaded (User + Admin + FiveM Natives)')
+-- ═══════════════════════════════════════════════════════════════════════════
+-- COMMANDES SAUVEGARDE
+-- ═══════════════════════════════════════════════════════════════════════════
+
+-- /saveall - Sauvegarder tous les joueurs
+RegisterCommand('saveall', function(source, args, rawCommand)
+    if not HasAdminPermission(source, 'command.saveall') then
+        if source > 0 then vCore.Notify(source, 'Vous n\'avez pas la permission', 'error') end
+        return
+    end
+    
+    local players = vCore.GetPlayers()
+    local count = 0
+    
+    for id, player in pairs(players) do
+        -- Mettre à jour position
+        local ped = GetPlayerPed(id)
+        if ped and DoesEntityExist(ped) then
+            local coords = GetEntityCoords(ped)
+            local heading = GetEntityHeading(ped)
+            player:SetPosition(coords.x, coords.y, coords.z, heading)
+        end
+        
+        -- Sauvegarder
+        if vCore.DB.SavePlayer(player) then
+            count = count + 1
+        end
+    end
+    
+    local msg = string.format('Sauvegarde complète: %d/%d joueurs', count, vCore.GetPlayerCount())
+    if source > 0 then vCore.Notify(source, msg, 'success') else print(msg) end
+    
+    -- Log
+    local adminName = source > 0 and GetPlayerName(source) or 'Console'
+    vCore.Log('admin', 'admin:' .. adminName, 'SaveAll executed', {count = count})
+end, false)
+
+-- /saveplayer - Sauvegarder un joueur spécifique
+RegisterCommand('saveplayer', function(source, args, rawCommand)
+    if not HasAdminPermission(source, 'command.saveplayer') then
+        if source > 0 then vCore.Notify(source, 'Vous n\'avez pas la permission', 'error') end
+        return
+    end
+    
+    if #args < 1 then
+        local msg = 'Usage: /saveplayer [id]'
+        if source > 0 then vCore.Notify(source, msg, 'info') else print(msg) end
+        return
+    end
+    
+    local targetId = tonumber(args[1])
+    if not targetId then
+        local msg = 'ID invalide'
+        if source > 0 then vCore.Notify(source, msg, 'error') else print(msg) end
+        return
+    end
+    
+    local player = vCore.GetPlayer(targetId)
+    if not player then
+        local msg = 'Joueur introuvable'
+        if source > 0 then vCore.Notify(source, msg, 'error') else print(msg) end
+        return
+    end
+    
+    -- Mettre à jour position
+    local ped = GetPlayerPed(targetId)
+    if ped and DoesEntityExist(ped) then
+        local coords = GetEntityCoords(ped)
+        local heading = GetEntityHeading(ped)
+        player:SetPosition(coords.x, coords.y, coords.z, heading)
+    end
+    
+    -- Sauvegarder
+    if vCore.DB.SavePlayer(player) then
+        local msg = 'Joueur #' .. targetId .. ' sauvegardé'
+        if source > 0 then vCore.Notify(source, msg, 'success') else print(msg) end
+    else
+        local msg = 'Échec de la sauvegarde'
+        if source > 0 then vCore.Notify(source, msg, 'error') else print(msg) end
+    end
+end, false)
+
+print('[vAvA_core] ^2✓^7 Commands loaded (User + Admin + FiveM Natives + Save)')

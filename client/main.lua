@@ -228,19 +228,70 @@ RegisterNetEvent('vCore:deleteVehicle', function()
 end)
 
 -- ═══════════════════════════════════════════════════════════════════════════
--- SAUVEGARDE POSITION
+-- SAUVEGARDE POSITION AUTOMATIQUE
 -- ═══════════════════════════════════════════════════════════════════════════
 
+local lastSaveTime = 0
+local saveInterval = 300000 -- 5 minutes par défaut
+
+-- Récupérer l'intervalle depuis le serveur
+RegisterNetEvent('vCore:setSaveInterval', function(interval)
+    saveInterval = interval
+    print('[vAvA_core] Intervalle de sauvegarde: ' .. (interval / 1000) .. 's')
+end)
+
+-- Sauvegarde automatique périodique
 CreateThread(function()
     while true do
-        Wait(60000) -- Toutes les minutes
+        Wait(saveInterval)
         
         if vCore.IsLoaded then
-            local ped = PlayerPedId()
-            local coords = GetEntityCoords(ped)
-            local heading = GetEntityHeading(ped)
+            local currentTime = GetGameTimer()
             
-            TriggerServerEvent('vCore:updatePosition', coords, heading)
+            -- Éviter les sauvegardes trop rapprochées
+            if currentTime - lastSaveTime >= saveInterval then
+                local ped = PlayerPedId()
+                
+                if DoesEntityExist(ped) and not IsEntityDead(ped) then
+                    local coords = GetEntityCoords(ped)
+                    local heading = GetEntityHeading(ped)
+                    
+                    TriggerServerEvent('vCore:updatePosition', coords, heading)
+                    lastSaveTime = currentTime
+                    
+                    if GetConvar('vava_debug_save', 'false') == 'true' then
+                        print('^2[vAvA_core]^7 Position sauvegardée: ' .. math.floor(coords.x) .. ', ' .. math.floor(coords.y) .. ', ' .. math.floor(coords.z))
+                    end
+                end
+            end
+        end
+    end
+end)
+
+-- Sauvegarde manuelle
+RegisterCommand('save', function()
+    if vCore.IsLoaded then
+        TriggerServerEvent('vCore:savePlayer')
+        vCore.ShowNotification('~g~Sauvegarde en cours...', 'success')
+    end
+end, false)
+
+-- Sauvegarde lors d'événements importants
+AddEventHandler('baseevents:onPlayerDied', function()
+    if vCore.IsLoaded then
+        TriggerServerEvent('vCore:savePlayer')
+        if GetConvar('vava_debug_save', 'false') == 'true' then
+            print('^3[vAvA_core]^7 Sauvegarde déclenchée: Mort du joueur')
+        end
+    end
+end)
+
+AddEventHandler('baseevents:enteredVehicle', function(vehicle, seat, displayName)
+    if vCore.IsLoaded and seat == -1 then -- Driver seat
+        Wait(2000) -- Attendre que le joueur soit bien installé
+        TriggerServerEvent('vCore:savePlayer')
+        if GetConvar('vava_debug_save', 'false') == 'true' then
+            print('^3[vAvA_core]^7 Sauvegarde déclenchée: Véhicule')
         end
     end
 end)
