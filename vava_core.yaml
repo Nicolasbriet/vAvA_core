@@ -200,7 +200,19 @@ tasks:
     - action: move_path
       src: ./resources/[vava]/vAvA_core/modules/ems
       dest: ./resources/[vava]/vAvA_ems
+    # ═══════════════════════════════════════════════════════════════════════════
+    # Copie du module police (système police et forces de l'ordre)
+    # ═══════════════════════════════════════════════════════════════════════════
+    - action: move_path
+      src: ./resources/[vava]/vAvA_core/modules/police
+      dest: ./resources/[vava]/vAvA_police
 
+    # ═══════════════════════════════════════════════════════════════════════════
+    # Copie du module player_manager (gestion avancée des joueurs)
+    # ═══════════════════════════════════════════════════════════════════════════
+    - action: move_path
+      src: ./resources/[vava]/vAvA_core/modules/player_manager
+      dest: ./resources/[vava]/vAvA_player_manager
     # ═══════════════════════════════════════════════════════════════════════════════    # Configuration du serveur
     # ═══════════════════════════════════════════════════════════════════════
     - action: move_path
