@@ -1,0 +1,28 @@
+/* vAvA Player Manager - Sélecteur CSS */
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body { font-family: 'Rajdhani', sans-serif; background: transparent; color: #FFF; overflow: hidden; }
+.hidden { display: none !important; }
+
+.selector-container { width: 100vw; height: 100vh; display: flex; flex-direction: column; background: linear-gradient(135deg, #000 0%, #1a1a1a 100%); padding: 40px; }
+.selector-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 40px; border-bottom: 2px solid #FF1E1E; padding-bottom: 20px; }
+.selector-title { font-family: 'Orbitron', sans-serif; font-size: 32px; font-weight: 900; color: #FF1E1E; text-shadow: 0 0 20px #FF1E1E; }
+.separator { color: #8B0000; margin: 0 10px; }
+.character-count { font-family: 'Orbitron', sans-serif; font-size: 18px; color: #FFF; background: #8B0000; padding: 10px 20px; border-radius: 5px; }
+
+.characters-grid { flex: 1; display: grid; grid-template-columns: repeat(auto-fill, minmax(300px, 1fr)); gap: 20px; overflow-y: auto; padding: 10px; }
+.character-card { background: linear-gradient(135deg, #1a1a1a 0%, #0a0a0a 100%); border: 2px solid #8B0000; border-radius: 10px; padding: 20px; cursor: pointer; transition: all 0.3s; position: relative; }
+.character-card:hover, .character-card.selected { border-color: #FF1E1E; box-shadow: 0 0 20px rgba(255, 30, 30, 0.5); transform: translateY(-5px); }
+.character-card h3 { font-family: 'Orbitron', sans-serif; font-size: 24px; color: #FF1E1E; margin-bottom: 15px; }
+.character-card p { font-size: 16px; margin: 5px 0; color: #CCC; }
+.character-card .job { color: #FF1E1E; font-weight: 700; }
+.character-actions { display: flex; gap: 10px; margin-top: 15px; }
+.btn-play, .btn-delete { padding: 10px 20px; border: none; border-radius: 5px; cursor: pointer; font-family: 'Orbitron', sans-serif; font-weight: 700; transition: all 0.3s; }
+.btn-play { background: #00AA00; color: #FFF; flex: 1; }
+.btn-play:hover { background: #00FF00; box-shadow: 0 0 15px #00FF00; }
+.btn-delete { background: #8B0000; color: #FFF; }
+.btn-delete:hover { background: #FF1E1E; box-shadow: 0 0 15px #FF1E1E; }
+
+.selector-actions { display: flex; justify-content: center; padding: 20px; }
+.btn-create { background: #8B0000; border: 2px solid #FF1E1E; color: #FFF; padding: 15px 40px; font-family: 'Orbitron', sans-serif; font-size: 18px; font-weight: 700; border-radius: 10px; cursor: pointer; display: flex; align-items: center; gap: 10px; transition: all 0.3s; }
+.btn-create:hover { background: #FF1E1E; box-shadow: 0 0 25px #FF1E1E; transform: scale(1.05); }
+.btn-create .icon { font-size: 24px; }

@@ -1,0 +1,82 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>vAvA Police Tablet</title>
+    <link rel="stylesheet" href="css/style.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Rajdhani:wght@300;400;600;700&display=swap" rel="stylesheet">
+</head>
+<body>
+    <div id="tablet" class="tablet-container">
+        <!-- HEADER -->
+        <div class="tablet-header">
+            <div class="header-left">
+                <span class="logo">vAvA</span>
+                <span class="separator">|</span>
+                <span class="title">POLICE TABLET</span>
+            </div>
+            <div class="header-right">
+                <span class="time" id="currentTime">00:00</span>
+                <div class="close-btn" id="closeBtn">✕</div>
+            </div>
+        </div>
+
+        <!-- NAVIGATION -->
+        <nav class="tablet-nav">
+            <button class="nav-btn active" data-tab="search">
+                <span class="icon">🔍</span>
+                <span class="label">RECHERCHE</span>
+            </button>
+            <button class="nav-btn" data-tab="alerts">
+                <span class="icon">🚨</span>
+                <span class="label">ALERTES</span>
+            </button>
+            <button class="nav-btn" data-tab="units">
+                <span class="icon">👮</span>
+                <span class="label">UNITÉS</span>
+            </button>
+        </nav>
+
+        <!-- CONTENT -->
+        <div class="tablet-content">
+            <!-- TAB SEARCH -->
+            <div class="tab-panel active" id="search">
+                <div class="search-section">
+                    <h2 class="section-title">RECHERCHE PERSONNE</h2>
+                    <div class="search-form">
+                        <input type="text" id="searchPersonInput" placeholder="Nom ou prénom..." class="search-input">
+                        <button id="searchPersonBtn" class="search-btn">RECHERCHER</button>
+                    </div>
+                    <div id="personResults" class="results-container"></div>
+                </div>
+
+                <div class="search-section">
+                    <h2 class="section-title">RECHERCHE VÉHICULE</h2>
+                    <div class="search-form">
+                        <input type="text" id="searchVehicleInput" placeholder="Plaque d'immatriculation..." class="search-input">
+                        <button id="searchVehicleBtn" class="search-btn">RECHERCHER</button>
+                    </div>
+                    <div id="vehicleResults" class="results-container"></div>
+                </div>
+            </div>
+
+            <!-- TAB ALERTS -->
+            <div class="tab-panel" id="alerts">
+                <h2 class="section-title">ALERTES ACTIVES</h2>
+                <div id="alertsList" class="alerts-list"></div>
+            </div>
+
+            <!-- TAB UNITS -->
+            <div class="tab-panel" id="units">
+                <h2 class="section-title">UNITÉS EN SERVICE</h2>
+                <div id="unitsList" class="units-list"></div>
+            </div>
+        </div>
+    </div>
+
+    <script src="js/app.js"></script>
+</body>
+</html>

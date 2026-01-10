@@ -1,0 +1,198 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>vAvA Player Manager</title>
+    <link rel="stylesheet" href="css/selector.css">
+    <link rel="stylesheet" href="css/creator.css">
+    <link rel="stylesheet" href="css/identity.css">
+    <link rel="stylesheet" href="css/licenses.css">
+    <link rel="stylesheet" href="css/stats.css">
+    <link rel="stylesheet" href="css/history.css">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Rajdhani:wght@300;400;600;700&display=swap" rel="stylesheet">
+</head>
+<body>
+    <!-- ═══════════════════════════════════════════════════════════════════ -->
+    <!-- SÉLECTEUR DE PERSONNAGES -->
+    <!-- ═══════════════════════════════════════════════════════════════════ -->
+    <div id="selector" class="selector-container hidden">
+        <div class="selector-header">
+            <h1 class="selector-title">vAvA <span class="separator">|</span> SÉLECTION PERSONNAGE</h1>
+            <div class="character-count" id="charCount">0/5</div>
+        </div>
+        
+        <div class="characters-grid" id="charactersGrid"></div>
+        
+        <div class="selector-actions">
+            <button class="btn-create" id="btnCreate">
+                <span class="icon">➕</span>
+                <span>CRÉER PERSONNAGE</span>
+            </button>
+        </div>
+    </div>
+
+    <!-- ═══════════════════════════════════════════════════════════════════ -->
+    <!-- CRÉATEUR DE PERSONNAGE -->
+    <!-- ═══════════════════════════════════════════════════════════════════ -->
+    <div id="creator" class="creator-container hidden">
+        <div class="creator-header">
+            <h1 class="creator-title">vAvA <span class="separator">|</span> CRÉATION PERSONNAGE</h1>
+        </div>
+        
+        <div class="creator-content">
+            <div class="creator-section">
+                <h2>INFORMATIONS GÉNÉRALES</h2>
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Prénom</label>
+                        <input type="text" id="firstname" placeholder="John" maxlength="50">
+                    </div>
+                    <div class="form-group">
+                        <label>Nom</label>
+                        <input type="text" id="lastname" placeholder="Doe" maxlength="50">
+                    </div>
+                </div>
+                
+                <div class="form-row">
+                    <div class="form-group">
+                        <label>Date de naissance</label>
+                        <input type="text" id="dateofbirth" placeholder="JJ/MM/AAAA">
+                    </div>
+                    <div class="form-group">
+                        <label>Sexe</label>
+                        <select id="sex">
+                            <option value="m">Homme</option>
+                            <option value="f">Femme</option>
+                        </select>
+                    </div>
+                </div>
+                
+                <div class="form-group">
+                    <label>Nationalité</label>
+                    <select id="nationality"></select>
+                </div>
+            </div>
+            
+            <div class="creator-section" id="storySection">
+                <h2>HISTOIRE DU PERSONNAGE</h2>
+                <div class="form-group">
+                    <label>Quelle était votre profession avant Los Santos?</label>
+                    <textarea id="background" maxlength="200" rows="3"></textarea>
+                </div>
+                <div class="form-group">
+                    <label>Pourquoi êtes-vous venu(e) à Los Santos?</label>
+                    <textarea id="reason" maxlength="200" rows="3"></textarea>
+                </div>
+                <div class="form-group">
+                    <label>Quel est votre objectif principal?</label>
+                    <textarea id="goal" maxlength="200" rows="3"></textarea>
+                </div>
+            </div>
+        </div>
+        
+        <div class="creator-actions">
+            <button class="btn-cancel" id="btnCancelCreator">ANNULER</button>
+            <button class="btn-create-confirm" id="btnConfirmCreate">CRÉER</button>
+        </div>
+    </div>
+
+    <!-- ═══════════════════════════════════════════════════════════════════ -->
+    <!-- CARTE D'IDENTITÉ -->
+    <!-- ═══════════════════════════════════════════════════════════════════ -->
+    <div id="idcard" class="idcard-container hidden">
+        <div class="idcard">
+            <div class="idcard-header">
+                <h2>CARTE D'IDENTITÉ</h2>
+                <button class="close-btn" id="btnCloseID">✕</button>
+            </div>
+            <div class="idcard-body">
+                <div class="idcard-row">
+                    <span class="label">Nom:</span>
+                    <span class="value" id="idName"></span>
+                </div>
+                <div class="idcard-row">
+                    <span class="label">Prénom:</span>
+                    <span class="value" id="idFirstname"></span>
+                </div>
+                <div class="idcard-row">
+                    <span class="label">Date de naissance:</span>
+                    <span class="value" id="idDOB"></span>
+                </div>
+                <div class="idcard-row">
+                    <span class="label">Sexe:</span>
+                    <span class="value" id="idSex"></span>
+                </div>
+                <div class="idcard-row">
+                    <span class="label">Téléphone:</span>
+                    <span class="value" id="idPhone"></span>
+                </div>
+                <div class="idcard-row">
+                    <span class="label">N° Citoyen:</span>
+                    <span class="value" id="idCitizen"></span>
+                </div>
+                <div class="idcard-row">
+                    <span class="label">Emploi:</span>
+                    <span class="value" id="idJob"></span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ═══════════════════════════════════════════════════════════════════ -->
+    <!-- LICENCES -->
+    <!-- ═══════════════════════════════════════════════════════════════════ -->
+    <div id="licenses" class="licenses-container hidden">
+        <div class="licenses-panel">
+            <div class="licenses-header">
+                <h2>MES LICENCES</h2>
+                <button class="close-btn" id="btnCloseLicenses">✕</button>
+            </div>
+            <div class="licenses-body">
+                <div class="licenses-grid" id="licensesGrid"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ═══════════════════════════════════════════════════════════════════ -->
+    <!-- STATISTIQUES -->
+    <!-- ═══════════════════════════════════════════════════════════════════ -->
+    <div id="stats" class="stats-container hidden">
+        <div class="stats-panel">
+            <div class="stats-header">
+                <h2>STATISTIQUES</h2>
+                <button class="close-btn" id="btnCloseStats">✕</button>
+            </div>
+            <div class="stats-body">
+                <div class="stats-grid" id="statsGrid"></div>
+            </div>
+        </div>
+    </div>
+
+    <!-- ═══════════════════════════════════════════════════════════════════ -->
+    <!-- HISTORIQUE -->
+    <!-- ═══════════════════════════════════════════════════════════════════ -->
+    <div id="history" class="history-container hidden">
+        <div class="history-panel">
+            <div class="history-header">
+                <h2>HISTORIQUE</h2>
+                <button class="close-btn" id="btnCloseHistory">✕</button>
+            </div>
+            <div class="history-body">
+                <div class="history-list" id="historyList"></div>
+                <button class="btn-load-more" id="btnLoadMore">Charger plus</button>
+            </div>
+        </div>
+    </div>
+
+    <script src="js/selector.js"></script>
+    <script src="js/creator.js"></script>
+    <script src="js/identity.js"></script>
+    <script src="js/licenses.js"></script>
+    <script src="js/stats.js"></script>
+    <script src="js/history.js"></script>
+    <script src="js/main.js"></script>
+</body>
+</html>

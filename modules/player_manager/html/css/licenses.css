@@ -1,0 +1,38 @@
+/* vAvA Player Manager - Licences/Stats/History CSS */
+.licenses-container, .stats-container, .history-container { position: fixed; top: 0; left: 0; width: 100vw; height: 100vh; background: rgba(0, 0, 0, 0.85); display: flex; justify-content: center; align-items: center; z-index: 9999; }
+.licenses-panel, .stats-panel, .history-panel { width: 800px; max-height: 80vh; background: linear-gradient(135deg, #1a1a1a 0%, #0a0a0a 100%); border: 3px solid #FF1E1E; border-radius: 15px; box-shadow: 0 0 40px rgba(255, 30, 30, 0.5); display: flex; flex-direction: column; }
+.licenses-header, .stats-header, .history-header { display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #FF1E1E; padding: 20px 30px; }
+.licenses-header h2, .stats-header h2, .history-header h2 { font-family: 'Orbitron', sans-serif; font-size: 24px; color: #FF1E1E; text-shadow: 0 0 10px #FF1E1E; }
+.licenses-body, .stats-body, .history-body { flex: 1; overflow-y: auto; padding: 20px 30px; }
+
+/* Licences */
+.licenses-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(350px, 1fr)); gap: 15px; }
+.license-card { background: rgba(255, 30, 30, 0.05); border: 2px solid #8B0000; border-radius: 10px; padding: 20px; transition: all 0.3s; }
+.license-card:hover { border-color: #FF1E1E; box-shadow: 0 0 15px rgba(255, 30, 30, 0.3); }
+.license-card h3 { font-family: 'Orbitron', sans-serif; font-size: 18px; color: #FF1E1E; margin-bottom: 10px; }
+.license-card p { font-size: 14px; color: #CCC; margin: 5px 0; }
+.license-status { display: inline-block; padding: 5px 15px; border-radius: 20px; font-size: 12px; font-weight: 700; margin-top: 10px; }
+.license-status.valid { background: #00AA00; color: #000; }
+.license-status.expired { background: #FF0000; color: #FFF; }
+.license-status.suspended { background: #FFA500; color: #000; }
+.btn-obtain { background: #8B0000; border: 2px solid #FF1E1E; color: #FFF; padding: 10px 20px; border-radius: 5px; cursor: pointer; font-family: 'Orbitron', sans-serif; font-weight: 700; margin-top: 10px; transition: all 0.3s; }
+.btn-obtain:hover { background: #FF1E1E; box-shadow: 0 0 15px #FF1E1E; }
+
+/* Stats */
+.stats-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 20px; }
+.stat-card { background: rgba(255, 30, 30, 0.05); border: 2px solid #8B0000; border-radius: 10px; padding: 20px; text-align: center; }
+.stat-card .icon { font-size: 48px; margin-bottom: 10px; }
+.stat-card .value { font-family: 'Orbitron', sans-serif; font-size: 32px; color: #FF1E1E; font-weight: 700; margin: 10px 0; }
+.stat-card .label { font-size: 14px; color: #CCC; text-transform: uppercase; letter-spacing: 1px; }
+
+/* History */
+.history-list { display: flex; flex-direction: column; gap: 10px; }
+.history-item { background: rgba(255, 30, 30, 0.05); border-left: 4px solid #FF1E1E; border-radius: 5px; padding: 15px; display: flex; gap: 15px; align-items: center; }
+.history-item .icon { font-size: 24px; }
+.history-item .details { flex: 1; }
+.history-item .type { font-family: 'Orbitron', sans-serif; font-size: 14px; color: #FF1E1E; font-weight: 700; text-transform: uppercase; }
+.history-item .description { font-size: 14px; color: #CCC; margin: 5px 0; }
+.history-item .date { font-size: 12px; color: #888; }
+.history-item .amount { font-family: 'Orbitron', sans-serif; font-size: 18px; color: #00FF00; font-weight: 700; }
+.btn-load-more { background: #8B0000; border: 2px solid #FF1E1E; color: #FFF; padding: 12px; border-radius: 5px; cursor: pointer; font-family: 'Orbitron', sans-serif; font-weight: 700; margin-top: 15px; transition: all 0.3s; }
+.btn-load-more:hover { background: #FF1E1E; }
