@@ -403,14 +403,36 @@ end
 ---Vérifie si le joueur est admin
 ---@return boolean
 function vPlayer:IsAdmin()
-    local level = Config.Admin.Groups[self.group] or 0
-    return level >= vCore.AdminLevel.ADMIN
+    if IsDuplicityVersion() and Config.Permissions.Method == 'ace' then
+        -- Vérifier les ACE de txAdmin
+        return vCore.Permissions.HasACE(self.source, 'vava.admin') or
+               vCore.Permissions.HasACE(self.source, 'vava.superadmin') or
+               vCore.Permissions.HasACE(self.source, 'vava.developer') or
+               vCore.Permissions.HasACE(self.source, 'vava.owner')
+    else
+        -- Fallback sur les groupes internes
+        local level = Config.Admin.Groups[self.group] or 0
+        return level >= vCore.AdminLevel.ADMIN
+    end
 end
 
----Retourne le niveau de permission
+---Retourne le niveau de permission (0-5)
 ---@return number
 function vPlayer:GetPermissionLevel()
-    return Config.Admin.Groups[self.group] or 0
+    if IsDuplicityVersion() and Config.Permissions.Method == 'ace' then
+        -- Vérifier les ACE de txAdmin (ordre de priorité)
+        for groupName, groupData in pairs(Config.Permissions.AceLevels) do
+            for _, ace in ipairs(groupData.aces) do
+                if vCore.Permissions.HasACE(self.source, ace) then
+                    return groupData.level
+                end
+            end
+        end
+        return 0 -- USER par défaut
+    else
+        -- Fallback sur les groupes internes
+        return Config.Admin.Groups[self.group] or 0
+    end
 end
 
 ---Vérifie si le joueur a un niveau de permission minimum

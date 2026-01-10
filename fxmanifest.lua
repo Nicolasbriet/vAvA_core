@@ -54,7 +54,8 @@ server_scripts {
     'server/security.lua',
     'server/logs.lua',
     'server/bans.lua',
-    'server/commands.lua'
+    'server/commands.lua',
+    'server/permissions_debug.lua'  -- 🔐 Outils de diagnostic des permissions
 }
 
 -- Fichiers client

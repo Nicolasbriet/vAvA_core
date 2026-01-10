@@ -54,10 +54,12 @@ vCore.VehicleState = {
 
 vCore.AdminLevel = {
     USER = 0,
+    HELPER = 0,
     MOD = 1,
     ADMIN = 2,
     SUPERADMIN = 3,
-    OWNER = 4
+    DEVELOPER = 4,
+    OWNER = 5
 }
 
 -- ═══════════════════════════════════════════════════════════════════════════

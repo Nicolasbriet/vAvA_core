@@ -81,7 +81,36 @@ RegisterCommand('ooc', function(source, args, rawCommand)
     
     TriggerClientEvent('chat:addMessage', -1, {args = {text}})
 end, false)
-
+-- /vava_getid - Obtenir son identifiant (pour ajouter au server.cfg)
+RegisterCommand('vava_getid', function(source, args, rawCommand)
+    if source <= 0 then return end
+    
+    local identifiers = vCore.Players.GetAllIdentifiers(source)
+    local identifier = vCore.Players.GetIdentifier(source)
+    
+    vCore.Notify(source, '~b~=== VOS IDENTIFIANTS ===', 'info')
+    if identifiers.license then
+        vCore.Notify(source, '~g~License:~w~ ' .. identifiers.license, 'info')
+    end
+    if identifiers.discord then
+        vCore.Notify(source, '~b~Discord:~w~ ' .. identifiers.discord, 'info')
+    end
+    if identifiers.steam then
+        vCore.Notify(source, '~y~Steam:~w~ ' .. identifiers.steam, 'info')
+    end
+    
+    print('=================================================')
+    print('[vAvA_core] IDENTIFIANTS pour ' .. GetPlayerName(source))
+    print('=================================================')
+    print('Principal: ' .. (identifier or 'AUCUN'))
+    if identifiers.license then print('License  : ' .. identifiers.license) end
+    if identifiers.discord then print('Discord  : ' .. identifiers.discord) end
+    if identifiers.steam then print('Steam    : ' .. identifiers.steam) end
+    print('=================================================')
+    print('Pour ajouter comme admin, copiez cette ligne dans server.cfg:')
+    print('add_principal identifier.' .. (identifiers.license or 'license:VOTRE_LICENSE') .. ' group.admin')
+    print('=================================================')
+end, false)
 -- ═══════════════════════════════════════════════════════════════════════════
 -- COMMANDES ADMIN
 -- ═══════════════════════════════════════════════════════════════════════════
