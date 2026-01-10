@@ -24,8 +24,18 @@ shared_scripts {
     'config/config.lua',
     'locales/*.lua',
     'shared/enums.lua',
+    'shared/events.lua',        -- 🎯 Événements centralisés
+    'shared/permissions.lua',   -- 🔒 Système de permissions
+    'shared/validation.lua',    -- ✅ Validation de données
     'shared/utils.lua',
-    'shared/classes.lua'
+    'shared/classes.lua',
+    'shared/helpers.lua',       -- 🛠️ Fonctions helper (50+)
+    'shared/module_base.lua',   -- 📦 Classe base modules
+    'shared/builder.lua',       -- 🏗️ Builder patterns (5 types)
+    'shared/hooks.lua',         -- 🪝 Système de hooks
+    'shared/decorators.lua',    -- 🎨 Décorateurs de fonctions
+    'shared/middleware.lua',    -- 🔄 Middleware system
+    'shared/state.lua'          -- 💾 State manager réactif
 }
 
 -- Fichiers serveur
@@ -52,6 +62,7 @@ client_scripts {
     'client/main.lua',
     'client/callbacks.lua',
     'client/player.lua',
+    'client/ui_manager.lua',  -- 🎨 NOUVEAU: Gestionnaire UI centralisé
     'client/hud.lua',
     'client/status.lua',
     'client/vehicles.lua',
@@ -64,7 +75,9 @@ ui_page 'html/index.html'
 files {
     'html/index.html',
     'html/css/style.css',
-    'html/js/app.js'
+    'html/css/ui_manager.css',
+    'html/js/app.js',
+    'html/js/ui_manager.js'
 }
 
 -- Exports serveur

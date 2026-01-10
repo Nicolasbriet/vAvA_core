@@ -436,6 +436,93 @@ Config.Admin = {
 }
 
 -- ═══════════════════════════════════════════════════════════════════════════
+-- 🎨 UI (NOUVEAU - UI Manager)
+-- ═══════════════════════════════════════════════════════════════════════════
+
+Config.UI = {
+    -- Notifications
+    Notifications = {
+        enabled = true,
+        position = 'top-right',              -- top-right, top-left, bottom-right, bottom-left
+        duration = 5000,                     -- Durée par défaut en ms
+        maxStack = 5                         -- Nombre max de notifications affichées
+    },
+    
+    -- Progress Bar
+    ProgressBar = {
+        enabled = true,
+        position = 'bottom',                 -- bottom, center
+        canCancelByDefault = true            -- Autoriser annulation par défaut
+    },
+    
+    -- Prompts
+    Prompts = {
+        enabled = true,
+        closeOnEscape = true
+    },
+    
+    -- HUD Updates
+    HUDUpdate = {
+        interval = 1000,                     -- Fréquence de mise à jour en ms
+        smoothTransitions = true
+    },
+    
+    -- 3D Text & Markers
+    Rendering = {
+        text3DDistance = 10.0,               -- Distance max affichage texte 3D
+        markerDistance = 50.0,               -- Distance max affichage markers
+        updateRate = 0                       -- 0 = chaque frame, sinon ms
+    },
+    
+    -- Menus natifs
+    NativeMenus = {
+        enabled = true,
+        library = 'native'                   -- 'native', 'nativeui', 'menuv'
+    }
+}
+
+-- ═══════════════════════════════════════════════════════════════════════════
+-- 🧩 MODULES (Activation/Désactivation)
+-- ═══════════════════════════════════════════════════════════════════════════
+
+Config.Modules = {
+    -- Modules du core (intégrés)
+    Core = {
+        economy = true,
+        jobs = true,
+        inventory = true,
+        vehicles = true,
+        status = true,
+        hud = true
+    },
+    
+    -- Modules externes (dossier modules/)
+    External = {
+        police = true,
+        player_manager = true,
+        ems = true,
+        garage = true,
+        keys = true,
+        persist = true,
+        chat = true,
+        concess = true,
+        creator = true,
+        jobshop = true,
+        loadingscreen = true,
+        sit = true,
+        target = true,
+        testbench = true
+    },
+    
+    -- Dépendances inter-modules
+    Dependencies = {
+        garage = {'keys', 'persist', 'vehicles'},
+        police = {'player_manager'},
+        ems = {'player_manager'}
+    }
+}
+
+-- ═══════════════════════════════════════════════════════════════════════════
 -- 🗄️ BASE DE DONNÉES
 -- ═══════════════════════════════════════════════════════════════════════════
 
@@ -448,5 +535,46 @@ Config.Database = {
     },
     
     -- Migrations
-    AutoMigrate = true
+    AutoMigrate = true,
+    
+    -- Optimisation
+    PreparedStatements = true,
+    ConnectionPool = {
+        min = 2,
+        max = 10
+    }
+}
+
+-- ═══════════════════════════════════════════════════════════════════════════
+-- 🎮 GAMEPLAY
+-- ═══════════════════════════════════════════════════════════════════════════
+
+Config.Gameplay = {
+    -- PVP
+    PVP = {
+        enabled = true,
+        safezones = {}                       -- Coordonnées zones sûres
+    },
+    
+    -- Mort
+    Death = {
+        respawnTime = 300,                   -- Temps avant respawn (secondes)
+        loseMoneyOnDeath = true,
+        moneyLossPercentage = 5,             -- % argent perdu
+        dropInventoryOnDeath = false
+    },
+    
+    -- Voix
+    Voice = {
+        enabled = true,
+        system = 'pma-voice',                -- 'pma-voice', 'mumble-voip', 'saltychat'
+        defaultRange = 3.0
+    },
+    
+    -- Interactions
+    Interactions = {
+        enabled = true,
+        useTargetSystem = true,              -- Utiliser vAvA_target
+        interactionKey = 38                  -- E par défaut
+    }
 }
