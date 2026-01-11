@@ -8,7 +8,7 @@ $engine: 3
 $onesync: on
 
 name: vAvA_core Framework
-version: 3.1.1
+version: 3.1.2
 author: vAvA
 description: |
     Framework FiveM modulaire, sécurisé et multilingue.
@@ -42,6 +42,9 @@ description: |
     - vAvA_status (système de besoins: faim, soif, santé)
     - vAvA_target (système de ciblage 3D moderne)
     - vAvA_ems (système médical EMS et ambulancier)
+    - vAvA_police (système police et forces de l'ordre)
+    - vAvA_player_manager (gestion avancée des joueurs)
+    - vAvA_hud (système HUD moderne et configurable)
     - vAvA_testbench (système de test automatisé)
     
     Prérequis:
@@ -213,6 +216,14 @@ tasks:
     - action: move_path
       src: ./resources/[vava]/vAvA_core/modules/player_manager
       dest: ./resources/[vava]/vAvA_player_manager
+
+    # ═══════════════════════════════════════════════════════════════════════════
+    # Copie du module hud (système HUD moderne)
+    # ═══════════════════════════════════════════════════════════════════════════
+    - action: move_path
+      src: ./resources/[vava]/vAvA_core/modules/hud
+      dest: ./resources/[vava]/vAvA_hud
+
     # ═══════════════════════════════════════════════════════════════════════════════    # Configuration du serveur
     # ═══════════════════════════════════════════════════════════════════════
     - action: move_path

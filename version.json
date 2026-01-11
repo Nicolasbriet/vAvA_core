@@ -1,5 +1,5 @@
 {
-    "vava_core": "1.1.3",
+    "vava_core": "1.1.4",
     "economy": "1.3.0",
     "creator": "1.0.1",
     "garage": "1.1.1",
@@ -17,7 +17,60 @@
     "police": "1.0.0",
     "player_manager": "1.0.0",
     "ems": "1.0.0",
+    "hud": "1.0.0",
     "updates": [
+        {
+            "module": "vava_hud",
+            "version": "1.0.0",
+            "description": "Module HUD standalone - Extraction du core",
+            "releaseDate": "2026-01-11",
+            "queries": [],
+            "files": [
+                "modules/hud/fxmanifest.lua",
+                "modules/hud/config/config.lua",
+                "modules/hud/client/main.lua",
+                "modules/hud/shared/api.lua",
+                "modules/hud/html/**",
+                "modules/hud/README.md",
+                "modules/hud/CREATION_COMPLETE.md"
+            ],
+            "needsRestart": true,
+            "features": [
+                "Module HUD standalone autonome",
+                "Configuration complète (170 lignes)",
+                "10 exports client",
+                "4 sections indépendantes (Status, Money, Player, Vehicle)",
+                "Positions configurables",
+                "Charte graphique vAvA respectée",
+                "Transparence avec flou (0.20 opacité)",
+                "Mise à jour temps réel configurable (500ms)",
+                "Mode debug intégré",
+                "API complète documentée"
+            ],
+            "breaking_changes": []
+        },
+        {
+            "module": "vava_core",
+            "version": "1.1.4",
+            "description": "Extraction module HUD - Architecture modulaire",
+            "releaseDate": "2026-01-11",
+            "queries": [],
+            "files": [
+                "fxmanifest.lua",
+                "config/config.lua"
+            ],
+            "needsRestart": true,
+            "features": [
+                "HUD extrait vers module vAvA_hud",
+                "Core allégé (250 lignes en moins)",
+                "Architecture modulaire respectée",
+                "Config.HUD supprimé du core",
+                "client/hud.lua déplacé vers module"
+            ],
+            "breaking_changes": [
+                "Nécessite maintenant 'ensure vAvA_hud' dans server.cfg"
+            ]
+        },
         {
             "module": "vava_core",
             "version": "1.1.3",

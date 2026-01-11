@@ -1,6 +1,6 @@
 --[[
     vAvA_core - Framework FiveM modulaire, sécurisé et multilingue
-    Version: 1.1.3
+    Version: 1.1.4
     Auteur: vAvA
 ]]
 
@@ -64,20 +64,17 @@ client_scripts {
     'client/callbacks.lua',
     'client/player.lua',
     'client/ui_manager.lua',  -- 🎨 NOUVEAU: Gestionnaire UI centralisé
-    'client/hud.lua',
     'client/status.lua',
     'client/vehicles.lua',
     'client/notifications.lua'
 }
 
--- Fichiers UI
-ui_page 'html/index.html'
+-- Fichiers UI (seulement pour notifications et UI manager)
+ui_page 'html/ui_manager.html'
 
 files {
-    'html/index.html',
-    'html/css/style.css',
+    'html/ui_manager.html',
     'html/css/ui_manager.css',
-    'html/js/app.js',
     'html/js/ui_manager.js'
 }
 
@@ -122,7 +119,5 @@ server_exports {
 -- Exports client
 client_exports {
     'GetPlayerData',
-    'Notify',
-    'ShowHUD',
-    'HideHUD'
+    'Notify'
 }
