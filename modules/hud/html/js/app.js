@@ -224,19 +224,24 @@ function updateMoney(data) {
 // ═══════════════════════════════════════════════════════════════════════════
 
 function updatePlayerInfo(data) {
+    console.log('[vAvA_hud] updatePlayerInfo received:', data);
+    
     // ID du joueur
     if (data.playerId !== undefined) {
         DOM.playerIdValue.textContent = data.playerId;
+        console.log('[vAvA_hud] Updated playerId:', data.playerId);
     }
     
     // Job
     if (data.job !== undefined) {
         DOM.playerJobValue.textContent = data.job;
+        console.log('[vAvA_hud] Updated job:', data.job);
     }
     
     // Grade
     if (data.grade !== undefined) {
         DOM.playerGradeValue.textContent = data.grade;
+        console.log('[vAvA_hud] Updated grade:', data.grade);
     }
 }
 

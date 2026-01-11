@@ -12,7 +12,7 @@
     --color-primary-dark: #8B0000;
     --color-primary-glow: rgba(255, 30, 30, 0.5);
     --color-bg-dark: #000000;
-    --color-bg-panel: rgba(10, 10, 15, 0.20);
+    --color-bg-panel: rgba(10, 10, 15, 0.05);
     --color-text: #FFFFFF;
     --color-text-muted: rgba(255, 255, 255, 0.6);
     --color-border: rgba(255, 30, 30, 0.2);
@@ -251,10 +251,10 @@ body {
 }
 
 .player-info-item {
-    background: rgba(10, 10, 15, 0.15);
+    background: rgba(10, 10, 15, 0.05);
     padding: 10px 16px;
     border-radius: 10px;
-    backdrop-filter: blur(15px);
+    backdrop-filter: blur(20px);
     display: flex;
     align-items: center;
     gap: 12px;

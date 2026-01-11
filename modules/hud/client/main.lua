@@ -175,21 +175,32 @@ RegisterNetEvent('vAvA:initHUD')
 AddEventHandler('vAvA:initHUD', function()
     if not vCore or not vCore.IsLoaded then return end
     
-    if HUDConfig.Debug.enabled then
-        print('[vAvA_hud] Initialisation du HUD avec les données:', json.encode(vCore.PlayerData))
-    end
+    -- Debug: Afficher les données reçues
+    print('[vAvA_hud] IsLoaded:', vCore.IsLoaded)
+    print('[vAvA_hud] PlayerData:', json.encode(vCore.PlayerData, {indent = true}))
     
-    -- Envoyer l'ID joueur
+    -- Envoyer l'ID joueur avec plus de debug
+    local playerId = GetPlayerServerId(PlayerId())
+    local job = vCore.PlayerData.job and vCore.PlayerData.job.label or HUDConfig.Defaults.job
+    local grade = vCore.PlayerData.job and vCore.PlayerData.job.grade_label or HUDConfig.Defaults.grade
+    
+    print('[vAvA_hud] Sending PlayerInfo - ID:', playerId, 'Job:', job, 'Grade:', grade)
+    
     HUD.UpdatePlayerInfo({
-        playerId = GetPlayerServerId(PlayerId()),
-        job = vCore.PlayerData.job and vCore.PlayerData.job.label or HUDConfig.Defaults.job,
-        grade = vCore.PlayerData.job and vCore.PlayerData.job.grade_label or HUDConfig.Defaults.grade
+        playerId = playerId,
+        job = job,
+        grade = grade
     })
     
     -- Envoyer l'argent initial
+    local cash = vCore.PlayerData.money and vCore.PlayerData.money.cash or HUDConfig.Defaults.cash
+    local bank = vCore.PlayerData.money and vCore.PlayerData.money.bank or HUDConfig.Defaults.bank
+    
+    print('[vAvA_hud] Sending Money - Cash:', cash, 'Bank:', bank)
+    
     HUD.UpdateMoney({
-        cash = vCore.PlayerData.money and vCore.PlayerData.money.cash or HUDConfig.Defaults.cash,
-        bank = vCore.PlayerData.money and vCore.PlayerData.money.bank or HUDConfig.Defaults.bank
+        cash = cash,
+        bank = bank
     })
 end)
 
@@ -217,6 +228,23 @@ CreateThread(function()
                 thirst = vCore.PlayerData.status and vCore.PlayerData.status.thirst or HUDConfig.Defaults.thirst,
                 stress = vCore.PlayerData.status and vCore.PlayerData.status.stress or HUDConfig.Defaults.stress
             })
+            
+            -- Mise à jour des infos joueur (toutes les 500ms aussi)
+            if vCore.PlayerData.job then
+                HUD.UpdatePlayerInfo({
+                    playerId = GetPlayerServerId(PlayerId()),
+                    job = vCore.PlayerData.job.label or HUDConfig.Defaults.job,
+                    grade = vCore.PlayerData.job.grade_label or HUDConfig.Defaults.grade
+                })
+            end
+            
+            -- Mise à jour de l'argent (toutes les 500ms aussi)
+            if vCore.PlayerData.money then
+                HUD.UpdateMoney({
+                    cash = vCore.PlayerData.money.cash or HUDConfig.Defaults.cash,
+                    bank = vCore.PlayerData.money.bank or HUDConfig.Defaults.bank
+                })
+            end
             
             -- Infos véhicule si dans un véhicule
             if HUDConfig.Display.Vehicle and IsPedInAnyVehicle(ped, false) then
