@@ -23,16 +23,22 @@ CreateThread(function()
     print('[vAvA_hud] Module HUD initialisé')
     print('[vAvA_hud] vCore loaded:', vCore ~= nil)
     
-    -- Attendre que le joueur soit chargé
-    while not vCore.IsLoaded do
+    -- Attendre max 10 secondes que le joueur se charge
+    local timeout = 0
+    while not vCore.IsLoaded and timeout < 100 do
         print('[vAvA_hud] Waiting for player to load... IsLoaded:', vCore.IsLoaded)
-        Wait(1000)
+        Wait(100)
+        timeout = timeout + 1
     end
     
-    print('[vAvA_hud] Player loaded!')
-    print('[vAvA_hud] PlayerData:', json.encode(vCore.PlayerData))
+    if vCore.IsLoaded then
+        print('[vAvA_hud] Player loaded!')
+        print('[vAvA_hud] PlayerData:', json.encode(vCore.PlayerData))
+    else
+        print('^3[vAvA_hud] Player not loaded after 10s - Using default values^0')
+    end
     
-    -- Initialiser le HUD avec les données du joueur
+    -- Initialiser le HUD (même si joueur pas chargé, avec valeurs par défaut)
     TriggerEvent('vAvA:initHUD')
 end)
 
@@ -186,18 +192,33 @@ end)
 -- Initialisation des infos joueur au chargement
 RegisterNetEvent('vAvA:initHUD')
 AddEventHandler('vAvA:initHUD', function()
-    if not vCore or not vCore.IsLoaded then return end
-    
-    -- Debug: Afficher les données reçues
-    print('[vAvA_hud] IsLoaded:', vCore.IsLoaded)
-    print('[vAvA_hud] PlayerData:', json.encode(vCore.PlayerData, {indent = true}))
-    
-    -- Envoyer l'ID joueur avec plus de debug
+    -- Obtenir l'ID serveur (fonctionne toujours)
     local playerId = GetPlayerServerId(PlayerId())
-    local job = vCore.PlayerData.job and vCore.PlayerData.job.label or HUDConfig.Defaults.job
-    local grade = vCore.PlayerData.job and vCore.PlayerData.job.grade_label or HUDConfig.Defaults.grade
     
-    print('[vAvA_hud] Sending PlayerInfo - ID:', playerId, 'Job:', job, 'Grade:', grade)
+    -- Valeurs par défaut
+    local job = HUDConfig.Defaults.job
+    local grade = HUDConfig.Defaults.grade
+    local cash = HUDConfig.Defaults.cash
+    local bank = HUDConfig.Defaults.bank
+    
+    -- Si le joueur est chargé, utiliser les vraies données
+    if vCore and vCore.IsLoaded and vCore.PlayerData then
+        print('[vAvA_hud] PlayerData:', json.encode(vCore.PlayerData, {indent = true}))
+        
+        if vCore.PlayerData.job then
+            job = vCore.PlayerData.job.label or vCore.PlayerData.job.name or job
+            grade = vCore.PlayerData.job.gradeLabel or vCore.PlayerData.job.grade_label or vCore.PlayerData.job.grade or grade
+        end
+        
+        if vCore.PlayerData.money then
+            cash = vCore.PlayerData.money.cash or cash
+            bank = vCore.PlayerData.money.bank or bank
+        end
+    else
+        print('^3[vAvA_hud] Player not loaded - Using default values^0')
+    end
+    
+    print('[vAvA_hud] Init HUD - ID:', playerId, 'Job:', job, 'Grade:', grade)
     
     HUD.UpdatePlayerInfo({
         playerId = playerId,
