@@ -231,11 +231,15 @@ CreateThread(function()
             
             -- Mise à jour des infos joueur (toutes les 500ms aussi)
             if vCore.PlayerData.job then
-                HUD.UpdatePlayerInfo({
+                local jobData = {
                     playerId = GetPlayerServerId(PlayerId()),
                     job = vCore.PlayerData.job.label or HUDConfig.Defaults.job,
                     grade = vCore.PlayerData.job.grade_label or HUDConfig.Defaults.grade
-                })
+                }
+                print('[vAvA_hud] Sending player info:', json.encode(jobData))
+                HUD.UpdatePlayerInfo(jobData)
+            else
+                print('[vAvA_hud] PlayerData.job is nil - cannot update player info')
             end
             
             -- Mise à jour de l'argent (toutes les 500ms aussi)
