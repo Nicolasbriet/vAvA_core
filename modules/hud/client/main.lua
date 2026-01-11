@@ -21,6 +21,19 @@ CreateThread(function()
     end
     
     print('[vAvA_hud] Module HUD initialisé')
+    print('[vAvA_hud] vCore loaded:', vCore ~= nil)
+    
+    -- Attendre que le joueur soit chargé
+    while not vCore.IsLoaded do
+        print('[vAvA_hud] Waiting for player to load... IsLoaded:', vCore.IsLoaded)
+        Wait(1000)
+    end
+    
+    print('[vAvA_hud] Player loaded!')
+    print('[vAvA_hud] PlayerData:', json.encode(vCore.PlayerData))
+    
+    -- Initialiser le HUD avec les données du joueur
+    TriggerEvent('vAvA:initHUD')
 end)
 
 -- ═══════════════════════════════════════════════════════════════════════════
