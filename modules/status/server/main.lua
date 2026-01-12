@@ -67,39 +67,29 @@ end)
 AddEventHandler('playerDropped', function(reason)
     local src = source
     
-    -- Capturer l'identifier avant que le joueur ne soit complètement déconnecté
-    local identifier = nil
-    for i = 0, GetNumPlayerIdentifiers(src) - 1 do
-        local id = GetPlayerIdentifier(src, i)
-        if id and string.match(id, "license:") then
-            identifier = id
-            break
+    if not PlayerStatus[src] then return end
+    
+    -- Sauvegarder dans vCore avant le cleanup
+    local vCore = exports['vAvA_core']:GetCoreObject()
+    local player = vCore.GetPlayer(src)
+    
+    if player then
+        -- Mettre à jour PlayerData
+        if not player.PlayerData.status then
+            player.PlayerData.status = {}
+        end
+        player.PlayerData.status.hunger = PlayerStatus[src].hunger
+        player.PlayerData.status.thirst = PlayerStatus[src].thirst
+        player.PlayerData.status.stress = PlayerStatus[src].stress or 0
+        
+        if StatusConfig.Logging.enabled then
+            print(string.format("^2[vAvA Status]^7 Statuts mis à jour pour joueur déconnecté: %s", GetPlayerName(src)))
         end
     end
     
-    -- Sauvegarder de manière asynchrone sans bloquer
-    if identifier and PlayerStatus[src] then
-        -- Copier les données avant de nettoyer
-        local hunger = PlayerStatus[src].hunger
-        local thirst = PlayerStatus[src].thirst
-        
-        -- Nettoyer immédiatement les tables
-        PlayerStatus[src] = nil
-        LastUpdate[src] = nil
-        
-        -- Sauvegarder en asynchrone sans bloquer le thread principal
-        CreateThread(function()
-            MySQL.Async.execute('UPDATE player_status SET hunger = @hunger, thirst = @thirst WHERE identifier = @identifier', {
-                ['@identifier'] = identifier,
-                ['@hunger'] = hunger,
-                ['@thirst'] = thirst
-            }, function(affectedRows)
-                if StatusConfig.Logging.enabled then
-                    print(string.format("^2[vAvA Status]^7 Statuts sauvegardés pour joueur déconnecté (ID: %s)", identifier))
-                end
-            end)
-        end)
-    end
+    -- Nettoyer immédiatement
+    PlayerStatus[src] = nil
+    LastUpdate[src] = nil
 end)
 
 -- ========================================
@@ -107,54 +97,70 @@ end)
 -- ========================================
 
 function LoadPlayerStatus(playerId, identifier)
-    MySQL.Async.fetchAll('SELECT hunger, thirst FROM player_status WHERE identifier = @identifier', {
-        ['@identifier'] = identifier
-    }, function(result)
-        if result[1] then
-            -- Charger les valeurs existantes
-            PlayerStatus[playerId] = {
-                hunger = math.max(0, math.min(100, result[1].hunger)),
-                thirst = math.max(0, math.min(100, result[1].thirst))
-            }
-        else
-            -- Nouveau joueur : valeurs par défaut
-            PlayerStatus[playerId] = {
-                hunger = 100,
-                thirst = 100
-            }
+    -- Obtenir le joueur depuis vCore
+    local vCore = exports['vAvA_core']:GetCoreObject()
+    local player = vCore.GetPlayer(playerId)
+    
+    if player and player.PlayerData and player.PlayerData.status then
+        -- Charger depuis PlayerData
+        PlayerStatus[playerId] = {
+            hunger = player.PlayerData.status.hunger or 100,
+            thirst = player.PlayerData.status.thirst or 100
+        }
+    else
+        -- Fallback: charger depuis l'ancienne table si elle existe
+        MySQL.Async.fetchAll('SELECT hunger, thirst FROM player_status WHERE identifier = @identifier', {
+            ['@identifier'] = identifier
+        }, function(result)
+            if result[1] then
+                PlayerStatus[playerId] = {
+                    hunger = math.max(0, math.min(100, result[1].hunger)),
+                    thirst = math.max(0, math.min(100, result[1].thirst))
+                }
+            else
+                -- Nouveau joueur : valeurs par défaut
+                PlayerStatus[playerId] = {
+                    hunger = 100,
+                    thirst = 100
+                }
+            end
             
-            -- Insérer dans la base
-            MySQL.Async.execute('INSERT INTO player_status (identifier, hunger, thirst) VALUES (@identifier, 100, 100)', {
-                ['@identifier'] = identifier
-            })
-        end
-        
-        -- Envoyer au client
-        TriggerClientEvent('vAvA_status:updateStatus', playerId, PlayerStatus[playerId].hunger, PlayerStatus[playerId].thirst)
-        
-        if StatusConfig.Logging.enabled then
-            print(string.format("^2[vAvA Status]^7 Statuts chargés pour %s - Faim: %d, Soif: %d", 
-                GetPlayerName(playerId), PlayerStatus[playerId].hunger, PlayerStatus[playerId].thirst))
-        end
-    end)
+            -- Envoyer au client
+            TriggerClientEvent('vAvA_status:updateStatus', playerId, PlayerStatus[playerId].hunger, PlayerStatus[playerId].thirst)
+        end)
+        return
+    end
+    
+    -- Envoyer au client
+    TriggerClientEvent('vAvA_status:updateStatus', playerId, PlayerStatus[playerId].hunger, PlayerStatus[playerId].thirst)
+    
+    if StatusConfig.Logging.enabled then
+        print(string.format("^2[vAvA Status]^7 Statuts chargés pour %s - Faim: %d, Soif: %d", 
+            GetPlayerName(playerId), PlayerStatus[playerId].hunger, PlayerStatus[playerId].thirst))
+    end
 end
 
 function SavePlayerStatus(playerId, identifier)
     if not PlayerStatus[playerId] then return end
     
-    local hunger = PlayerStatus[playerId].hunger
-    local thirst = PlayerStatus[playerId].thirst
-    local playerName = GetPlayerName(playerId) or "Unknown"
+    -- Mettre à jour les données du joueur dans vCore
+    local vCore = exports['vAvA_core']:GetCoreObject()
+    local player = vCore.GetPlayer(playerId)
     
-    MySQL.Async.execute('UPDATE player_status SET hunger = @hunger, thirst = @thirst WHERE identifier = @identifier', {
-        ['@identifier'] = identifier,
-        ['@hunger'] = hunger,
-        ['@thirst'] = thirst
-    }, function(affectedRows)
-        if StatusConfig.Logging.enabled then
-            print(string.format("^2[vAvA Status]^7 Statuts sauvegardés pour %s", playerName))
+    if player then
+        -- Mettre à jour dans PlayerData
+        if not player.PlayerData.status then
+            player.PlayerData.status = {}
         end
-    end)
+        player.PlayerData.status.hunger = PlayerStatus[playerId].hunger
+        player.PlayerData.status.thirst = PlayerStatus[playerId].thirst
+        player.PlayerData.status.stress = PlayerStatus[playerId].stress or 0
+        
+        -- La sauvegarde automatique du core s'occupera de persister en DB
+        if StatusConfig.Logging.enabled then
+            print(string.format("^2[vAvA Status]^7 Statuts mis à jour pour %s", GetPlayerName(playerId)))
+        end
+    end
 end
 
 -- Sauvegarde automatique toutes les 5 minutes

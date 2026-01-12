@@ -138,27 +138,30 @@ vCore.RegisterServerCallback('vava_creator:getCharacters', function(source, cb, 
     end
     
     MySQL.Async.fetchAll([[
-        SELECT id, citizenid, slot, firstname, lastname, age, gender, 
-               nationality, skin_data, clothes_data, job, last_played
-        FROM vava_characters 
-        WHERE license = ? AND is_deleted = 0
-        ORDER BY slot ASC
+        SELECT id, identifier, firstname, lastname, dob, gender, 
+               job, metadata, last_played
+        FROM characters 
+        WHERE identifier = ?
+        ORDER BY last_played DESC
     ]], { license }, function(results)
         local characters = {}
         for _, row in ipairs(results) do
+            local jobData = row.job and json.decode(row.job) or { name = 'unemployed' }
+            local metadata = row.metadata and json.decode(row.metadata) or {}
+            
             table.insert(characters, {
                 id = row.id,
-                citizenid = row.citizenid,
-                slot = row.slot,
+                citizenid = row.id, -- Pour compatibilité
+                slot = row.id,
                 firstname = row.firstname,
                 lastname = row.lastname,
                 fullname = row.firstname .. ' ' .. row.lastname,
-                age = row.age,
-                gender = row.gender,
-                nationality = row.nationality,
-                skin = row.skin_data and json.decode(row.skin_data) or nil,
-                clothes = row.clothes_data and json.decode(row.clothes_data) or nil,
-                job = row.job and json.decode(row.job) or { name = 'unemployed', label = 'Chômeur' },
+                age = metadata.age or 25,
+                gender = row.gender or 0,
+                nationality = metadata.nationality or 'Française',
+                skin = metadata.skin or nil,
+                clothes = metadata.clothes or nil,
+                job = jobData,
                 lastPlayed = row.last_played
             })
         end
@@ -181,9 +184,9 @@ vCore.RegisterServerCallback('vava_creator:checkSlot', function(source, cb, play
     end
     
     MySQL.Async.fetchScalar([[
-        SELECT COUNT(*) FROM vava_characters 
-        WHERE license = ? AND slot = ? AND is_deleted = 0
-    ]], { license, slot }, function(count)
+        SELECT COUNT(*) FROM characters 
+        WHERE identifier LIKE ? AND slot = ?
+    ]], { '%' .. license .. '%', slot }, function(count)
         cb({ available = count == 0 })
     end)
 end)
@@ -223,9 +226,9 @@ vCore.RegisterServerCallback('vava_creator:createCharacter', function(source, cb
     
     -- Trouver le premier slot disponible
     MySQL.Async.fetchScalar([[
-        SELECT COALESCE(MAX(slot), 0) + 1 FROM vava_characters 
-        WHERE license = ? AND is_deleted = 0
-    ]], { license }, function(slot)
+        SELECT COALESCE(MAX(slot), 0) + 1 FROM characters 
+        WHERE identifier = ?
+    ]], { identifier }, function(slot)
         if slot > Config.Creator.MaxCharacters then
             cb({ success = false, error = 'Nombre maximum de personnages atteint' })
             return
@@ -255,16 +258,15 @@ vCore.RegisterServerCallback('vava_creator:createCharacter', function(source, cb
         })
         
         MySQL.Async.insert([[
-            INSERT INTO vava_characters 
-            (citizenid, license, slot, firstname, lastname, age, gender, nationality, story, skin_data, clothes_data, position, money, job, last_played)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())
+            INSERT INTO characters 
+            (identifier, slot, firstname, lastname, dob, gender, nationality, story, skin_data, clothes_data, position, money, job, last_played)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())
         ]], {
-            citizenid,
-            license,
+            identifier,
             slot,
             data.firstname,
             data.lastname,
-            data.age,
+            data.dob or '1990-01-01',
             data.gender or 0,
             data.nationality or 'Américain',
             data.story or '',
@@ -359,21 +361,22 @@ end)
 
 -- Supprimer un personnage
 vCore.RegisterServerCallback('vava_creator:deleteCharacter', function(source, cb, player, citizenid)
-    local license = GetPlayerLicense(source)
-    if not license then
-        cb({ success = false, error = 'License introuvable' })
+    local identifier = GetPlayerIdentifier(source)
+    if not identifier then
+        cb({ success = false, error = 'Identifier introuvable' })
         return
     end
     
+    -- Supprimer définitivement le personnage de la table characters
     MySQL.Async.execute([[
-        UPDATE vava_characters SET is_deleted = 1 WHERE citizenid = ? AND license = ?
-    ]], { citizenid, license }, function(rowsChanged)
+        DELETE FROM characters WHERE id = ? AND identifier = ?
+    ]], { citizenid, identifier }, function(rowsChanged)
         if rowsChanged > 0 then
             -- Log la suppression
             if vCore.Logs then
                 vCore.Logs('character_delete', string.format(
-                    'Personnage supprimé: %s par %s',
-                    citizenid, license
+                    'Personnage supprimé: ID %s par %s',
+                    citizenid, identifier
                 ), source)
             end
             
@@ -383,12 +386,15 @@ vCore.RegisterServerCallback('vava_creator:deleteCharacter', function(source, cb
         end
     end)
 end)
+        end
+    end)
+end)
 
 -- Sauvegarder le skin
 vCore.RegisterServerCallback('vava_creator:saveSkin', function(source, cb, player, citizenid, skinData)
-    local license = GetPlayerLicense(source)
-    if not license then
-        cb({ success = false, error = 'License introuvable' })
+    local identifier = GetPlayerIdentifier(source)
+    if not identifier then
+        cb({ success = false, error = 'Identifier introuvable' })
         return
     end
     
@@ -399,8 +405,8 @@ vCore.RegisterServerCallback('vava_creator:saveSkin', function(source, cb, playe
     end
     
     MySQL.Async.execute([[
-        UPDATE vava_characters SET skin_data = ? WHERE citizenid = ? AND license = ?
-    ]], { json.encode(sanitizedSkin), citizenid, license }, function(rowsChanged)
+        UPDATE characters SET skin_data = ? WHERE id = ? AND identifier = ?
+    ]], { json.encode(sanitizedSkin), citizenid, identifier }, function(rowsChanged)
         if rowsChanged > 0 then
             cb({ success = true })
         else
@@ -411,15 +417,15 @@ end)
 
 -- Sauvegarder les vêtements
 vCore.RegisterServerCallback('vava_creator:saveClothes', function(source, cb, player, citizenid, clothesData)
-    local license = GetPlayerLicense(source)
-    if not license then
-        cb({ success = false, error = 'License introuvable' })
+    local identifier = GetPlayerIdentifier(source)
+    if not identifier then
+        cb({ success = false, error = 'Identifier introuvable' })
         return
     end
     
     MySQL.Async.execute([[
-        UPDATE vava_characters SET clothes_data = ? WHERE citizenid = ? AND license = ?
-    ]], { json.encode(clothesData), citizenid, license }, function(rowsChanged)
+        UPDATE characters SET clothes_data = ? WHERE id = ? AND identifier = ?
+    ]], { json.encode(clothesData), citizenid, identifier }, function(rowsChanged)
         if rowsChanged > 0 then
             cb({ success = true })
         else
@@ -454,15 +460,22 @@ RegisterNetEvent('vava_creator:playerLoaded', function()
     local source = source
     local license = GetPlayerLicense(source)
     
-    -- Vérifier si le joueur a des personnages
-    MySQL.Async.fetchScalar([[
-        SELECT COUNT(*) FROM vava_characters WHERE license = ? AND is_deleted = 0
-    ]], { license }, function(count)
+    print('[vAvA_creator] Player loaded:', source, 'License:', license)
+    
+    -- Vérifier si le joueur a des personnages (utiliser la table 'characters' du core)
+    MySQL.Async.fetchAll([[
+        SELECT * FROM characters WHERE identifier = ? ORDER BY last_played DESC
+    ]], { license }, function(characters)
+        local count = #characters
+        print('[vAvA_creator] Character count for', license, ':', count)
+        
         if count == 0 then
             -- Ouvrir directement le créateur
+            print('[vAvA_creator] Opening creator for new player')
             TriggerClientEvent('vava_creator:openCreator', source, true)
         else
-            -- Ouvrir la sélection de personnages
+            -- Toujours afficher la sélection (même avec 1 seul perso)
+            print('[vAvA_creator] Opening character selection')
             TriggerClientEvent('vava_creator:openSelection', source)
         end
     end)
@@ -473,10 +486,10 @@ RegisterNetEvent('vava_creator:savePosition', function(position)
     local source = source
     local player = vCore and vCore.GetPlayer and vCore.GetPlayer(source)
     
-    if player and player.PlayerData and player.PlayerData.citizenid then
+    if player and player.PlayerData and player.charId then
         MySQL.Async.execute([[
-            UPDATE vava_characters SET position = ? WHERE citizenid = ?
-        ]], { json.encode(position), player.PlayerData.citizenid })
+            UPDATE characters SET position = ? WHERE id = ?
+        ]], { json.encode(position), player.charId })
     end
 end)
 
@@ -492,15 +505,15 @@ exports('OpenSelection', function(source)
     TriggerClientEvent('vava_creator:openSelection', source)
 end)
 
-exports('GetCharacterData', function(citizenid)
+exports('GetCharacterData', function(charId)
     local result = MySQL.Sync.fetchAll([[
-        SELECT * FROM vava_characters WHERE citizenid = ? AND is_deleted = 0
-    ]], { citizenid })
+        SELECT * FROM characters WHERE id = ?
+    ]], { charId })
     
     if #result > 0 then
         local char = result[1]
         return {
-            citizenid = char.citizenid,
+            id = char.id,
             firstname = char.firstname,
             lastname = char.lastname,
             skin = char.skin_data and json.decode(char.skin_data) or nil,

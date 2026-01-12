@@ -92,12 +92,12 @@ vCore.RegisterServerCallback('vava_creator:buyClothing', function(source, cb, pl
     end
     
     -- Sauvegarder le vêtement
-    local citizenid = player.PlayerData.citizenid
-    if citizenid then
+    local charId = player.charId
+    if charId then
         -- Récupérer les vêtements actuels
         MySQL.Async.fetchScalar([[
-            SELECT clothes_data FROM vava_characters WHERE citizenid = ?
-        ]], { citizenid }, function(clothesJson)
+            SELECT clothes_data FROM characters WHERE id = ?
+        ]], { charId }, function(clothesJson)
             local clothes = clothesJson and json.decode(clothesJson) or {}
             
             -- Mettre à jour le vêtement
@@ -115,8 +115,8 @@ vCore.RegisterServerCallback('vava_creator:buyClothing', function(source, cb, pl
             
             -- Sauvegarder
             MySQL.Async.execute([[
-                UPDATE vava_characters SET clothes_data = ? WHERE citizenid = ?
-            ]], { json.encode(clothes), citizenid })
+                UPDATE characters SET clothes_data = ? WHERE id = ?
+            ]], { json.encode(clothes), charId })
         end)
     end
     
@@ -176,11 +176,11 @@ vCore.RegisterServerCallback('vava_creator:buyCart', function(source, cb, player
     end
     
     -- Sauvegarder les vêtements
-    local citizenid = player.PlayerData.citizenid
-    if citizenid then
+    local charId = player.charId
+    if charId then
         MySQL.Async.fetchScalar([[
-            SELECT clothes_data FROM vava_characters WHERE citizenid = ?
-        ]], { citizenid }, function(clothesJson)
+            SELECT clothes_data FROM characters WHERE id = ?
+        ]], { charId }, function(clothesJson)
             local clothes = clothesJson and json.decode(clothesJson) or {}
             
             for _, item in ipairs(data.items) do
@@ -198,8 +198,8 @@ vCore.RegisterServerCallback('vava_creator:buyCart', function(source, cb, player
             end
             
             MySQL.Async.execute([[
-                UPDATE vava_characters SET clothes_data = ? WHERE citizenid = ?
-            ]], { json.encode(clothes), citizenid })
+                UPDATE characters SET clothes_data = ? WHERE id = ?
+            ]], { json.encode(clothes), charId })
         end)
     end
     
@@ -247,11 +247,11 @@ vCore.RegisterServerCallback('vava_creator:buyBarberService', function(source, c
     end
     
     -- Sauvegarder dans skin_data
-    local citizenid = player.PlayerData.citizenid
-    if citizenid and data.skinUpdates then
+    local charId = player.charId
+    if charId and data.skinUpdates then
         MySQL.Async.fetchScalar([[
-            SELECT skin_data FROM vava_characters WHERE citizenid = ?
-        ]], { citizenid }, function(skinJson)
+            SELECT skin_data FROM characters WHERE id = ?
+        ]], { charId }, function(skinJson)
             local skin = skinJson and json.decode(skinJson) or {}
             
             -- Appliquer les modifications
@@ -260,8 +260,8 @@ vCore.RegisterServerCallback('vava_creator:buyBarberService', function(source, c
             end
             
             MySQL.Async.execute([[
-                UPDATE vava_characters SET skin_data = ? WHERE citizenid = ?
-            ]], { json.encode(skin), citizenid })
+                UPDATE characters SET skin_data = ? WHERE id = ?
+            ]], { json.encode(skin), charId })
         end)
     end
     
@@ -297,11 +297,11 @@ vCore.RegisterServerCallback('vava_creator:buySurgery', function(source, cb, pla
     end
     
     -- Sauvegarder le nouveau skin
-    local citizenid = player.PlayerData.citizenid
-    if citizenid and data.newSkin then
+    local charId = player.charId
+    if charId and data.newSkin then
         MySQL.Async.execute([[
-            UPDATE vava_characters SET skin_data = ? WHERE citizenid = ?
-        ]], { json.encode(data.newSkin), citizenid })
+            UPDATE characters SET skin_data = ? WHERE id = ?
+        ]], { json.encode(data.newSkin), charId })
     end
     
     -- Log

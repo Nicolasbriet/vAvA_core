@@ -17,6 +17,11 @@ local PlayerPositions = {}  -- Dernière position connue
 
 if PMConfig.Stats.TrackDistance then
     CreateThread(function()
+        -- Attendre que le core soit prêt
+        while not vCore do
+            Wait(100)
+        end
+        
         while true do
             Wait(PMConfig.Stats.UpdateInterval)
             
@@ -44,9 +49,10 @@ if PMConfig.Stats.TrackDistance then
                         else
                             exports['vAvA_player_manager']:UpdateStat(citizenId, 'distance_walked', distanceKm)
                         end
+                    elseif citizenId then
+                        -- Initialiser la position si c'est la première fois
+                        PlayerPositions[src] = coords
                     end
-                    
-                    PlayerPositions[src] = coords
                 end
             end
         end
@@ -119,5 +125,8 @@ end)
 function GetPlayerCitizenId(source)
     local vCore = exports['vAvA_core']:GetCoreObject()
     local player = vCore.GetPlayer(source)
-    return player and player.PlayerData.citizenid or nil
+    if not player or not player.PlayerData then
+        return nil
+    end
+    return player.PlayerData.citizenid
 end

@@ -44,6 +44,7 @@ server_scripts {
     'database/cache.lua',
     'database/migrations.lua',
     'database/auto_update.lua',
+    'database/migrate_command.lua',  -- 🔄 Migration vava_characters → characters
     'server/main.lua',
     'server/callbacks.lua',
     'server/players.lua',

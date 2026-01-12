@@ -54,7 +54,7 @@ Config.Players = {
     -- Sauvegarde automatique
     AutoSave = {
         enabled = true,
-        interval = 300000,                    -- 5 minutes en ms (300000)
+        interval = 60,                        -- 1 minute pour test (60 secondes)
         saveOnDisconnect = true,              -- Sauvegarder à la déconnexion
         saveOnDeath = true,                   -- Sauvegarder à la mort
         saveOnVehicleChange = false,          -- Sauvegarder au changement de véhicule
@@ -62,7 +62,7 @@ Config.Players = {
         saveStatus = true,                    -- Sauvegarder hunger/thirst
         saveMoney = true,                     -- Sauvegarder l'argent
         saveInventory = true,                 -- Sauvegarder l'inventaire
-        debug = false                         -- Afficher logs de sauvegarde
+        debug = true                          -- Afficher logs de sauvegarde
     },
     
     -- Spawn par défaut

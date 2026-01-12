@@ -82,19 +82,57 @@ RegisterNetEvent('vCore:playerLoaded', function(playerData)
     
     vCore.Utils.Print('Données joueur chargées:', playerData.firstName, playerData.lastName)
     
-    -- Spawn le joueur
+    -- Appliquer le skin si disponible
+    if playerData.metadata and playerData.metadata.skin then
+        print('[vCore] Application du skin sauvegardé...')
+        exports['vAvA_core']:ApplySkin(playerData.metadata.skin)
+    end
+    
+    -- Spawn le joueur à sa dernière position sauvegardée
     local spawn = playerData.position or Config.Players.DefaultSpawn
+    
+    -- S'assurer que toutes les valeurs sont valides (gérer 'h' ou 'heading')
+    local x = tonumber(spawn.x) or -269.4
+    local y = tonumber(spawn.y) or -955.3
+    local z = tonumber(spawn.z) or 31.2
+    local heading = tonumber(spawn.heading or spawn.h) or 205.0
+    
+    print(string.format('[vCore] Spawn position: %.2f, %.2f, %.2f (heading: %.2f)', x, y, z, heading))
     
     DoScreenFadeOut(500)
     Wait(500)
     
     local ped = PlayerPedId()
     
-    SetEntityCoords(ped, spawn.x, spawn.y, spawn.z, false, false, false, true)
-    SetEntityHeading(ped, spawn.heading or 0.0)
+    -- Validation stricte
+    if not ped or ped == 0 or not DoesEntityExist(ped) then
+        print('^1[vCore]^7 ERROR: Invalid ped entity!')
+        ped = PlayerPedId()
+        Wait(100)
+    end
     
-    FreezeEntityPosition(ped, false)
-    SetPlayerInvincible(PlayerId(), false)
+    if ped and ped ~= 0 and DoesEntityExist(ped) then
+        RequestCollisionAtCoord(x, y, z)
+        SetEntityCoords(ped, x, y, z, false, false, false, true)
+        
+        -- Validation du heading avant de l'appliquer
+        if heading and type(heading) == 'number' then
+            SetEntityHeading(ped, heading)
+        else
+            print('^1[vCore]^7 WARNING: Invalid heading value:', heading)
+        end
+        
+        FreezeEntityPosition(ped, false)
+        SetPlayerInvincible(PlayerId(), false)
+    else
+        print('^1[vCore]^7 ERROR: Could not get valid ped!')
+        -- Fallback - unfreeze quand même
+        local safePed = PlayerPedId()
+        if safePed and safePed ~= 0 then
+            FreezeEntityPosition(safePed, false)
+            SetPlayerInvincible(PlayerId(), false)
+        end
+    end
     
     Wait(500)
     DoScreenFadeIn(500)
@@ -108,6 +146,37 @@ RegisterNetEvent('vCore:playerLoaded', function(playerData)
     
     -- Déclencher l'événement de spawn
     TriggerEvent(vCore.Events.PLAYER_SPAWNED, playerData)
+end)
+
+-- ═══════════════════════════════════════════════════════════════════════════
+-- LOGOUT (CHANGEMENT DE PERSONNAGE)
+-- ═══════════════════════════════════════════════════════════════════════════
+
+RegisterNetEvent('vCore:playerLogout', function()
+    print('[vCore] Player logout - Resetting data')
+    
+    -- Fade out
+    DoScreenFadeOut(500)
+    Wait(500)
+    
+    -- Réinitialiser les données
+    vCore.PlayerData = {}
+    vCore.IsLoaded = false
+    
+    -- Cacher le HUD
+    if exports['vAvA_hud'] then
+        exports['vAvA_hud']:HideHUD()
+    end
+    
+    -- Téléporter à un point neutre
+    local ped = PlayerPedId()
+    SetEntityCoords(ped, -265.0, -963.6, 31.2, false, false, false, true)
+    FreezeEntityPosition(ped, true)
+    
+    Wait(500)
+    DoScreenFadeIn(500)
+    
+    print('[vCore] Player logged out - Ready for character selection')
 end)
 
 -- ═══════════════════════════════════════════════════════════════════════════
@@ -146,6 +215,20 @@ RegisterNetEvent(vCore.Events.JOB_CHANGED, function(job)
     
     -- Mettre à jour le HUD
     TriggerEvent('vAvA:setJob', job)
+end)
+
+-- Mise à jour du status (faim, soif, stress)
+RegisterNetEvent('vAvA:updatePlayerStatus', function(status)
+    if vCore.PlayerData.status then
+        for k, v in pairs(status) do
+            vCore.PlayerData.status[k] = v
+        end
+    end
+end)
+
+-- Mise à jour de l'inventaire
+RegisterNetEvent('vAvA:updatePlayerInventory', function(inventory)
+    vCore.PlayerData.inventory = inventory
 end)
 
 RegisterNetEvent(vCore.Events.JOB_DUTY_CHANGED, function(onDuty)
@@ -228,51 +311,14 @@ RegisterNetEvent('vCore:deleteVehicle', function()
 end)
 
 -- ═══════════════════════════════════════════════════════════════════════════
--- SAUVEGARDE POSITION AUTOMATIQUE
+-- SAUVEGARDE MANUELLE
 -- ═══════════════════════════════════════════════════════════════════════════
-
-local lastSaveTime = 0
-local saveInterval = 300000 -- 5 minutes par défaut
-
--- Récupérer l'intervalle depuis le serveur
-RegisterNetEvent('vCore:setSaveInterval', function(interval)
-    saveInterval = interval
-    print('[vAvA_core] Intervalle de sauvegarde: ' .. (interval / 1000) .. 's')
-end)
-
--- Sauvegarde automatique périodique
-CreateThread(function()
-    while true do
-        Wait(saveInterval)
-        
-        if vCore.IsLoaded then
-            local currentTime = GetGameTimer()
-            
-            -- Éviter les sauvegardes trop rapprochées
-            if currentTime - lastSaveTime >= saveInterval then
-                local ped = PlayerPedId()
-                
-                if DoesEntityExist(ped) and not IsEntityDead(ped) then
-                    local coords = GetEntityCoords(ped)
-                    local heading = GetEntityHeading(ped)
-                    
-                    TriggerServerEvent('vCore:updatePosition', coords, heading)
-                    lastSaveTime = currentTime
-                    
-                    if GetConvar('vava_debug_save', 'false') == 'true' then
-                        print('^2[vAvA_core]^7 Position sauvegardée: ' .. math.floor(coords.x) .. ', ' .. math.floor(coords.y) .. ', ' .. math.floor(coords.z))
-                    end
-                end
-            end
-        end
-    end
-end)
 
 -- Sauvegarde manuelle
 RegisterCommand('save', function()
     if vCore.IsLoaded then
         TriggerServerEvent('vCore:savePlayer')
-        vCore.ShowNotification('~g~Sauvegarde en cours...', 'success')
+        vCore.Notify('~g~Sauvegarde en cours...', 'success')
     end
 end, false)
 
@@ -317,14 +363,14 @@ end)
 RegisterNetEvent('vCore:teleport', function(x, y, z)
     local ped = PlayerPedId()
     SetEntityCoords(ped, x, y, z, false, false, false, false)
-    vCore.ShowNotification('Téléporté', 'success')
+    vCore.Notify('Téléporté', 'success')
 end)
 
 -- Téléportation au marker
 RegisterNetEvent('vCore:teleportToMarker', function()
     local waypoint = GetFirstBlipInfoId(8)
     if not DoesBlipExist(waypoint) then
-        vCore.ShowNotification('Aucun marker placé', 'error')
+        vCore.Notify('Aucun marker placé', 'error')
         return
     end
     
@@ -338,7 +384,7 @@ RegisterNetEvent('vCore:teleportToMarker', function()
     end
     
     SetEntityCoords(ped, coords.x, coords.y, coords.z, false, false, false, false)
-    vCore.ShowNotification('Téléporté au marker', 'success')
+    vCore.Notify('Téléporté au marker', 'success')
 end)
 
 -- Spawn véhicule admin
@@ -350,7 +396,7 @@ RegisterNetEvent('vCore:spawnVehicleAdmin', function(model)
     -- Charger le modèle
     local modelHash = GetHashKey(model)
     if not IsModelInCdimage(modelHash) or not IsModelAVehicle(modelHash) then
-        vCore.ShowNotification('Modèle de véhicule invalide', 'error')
+        vCore.Notify('Modèle de véhicule invalide', 'error')
         return
     end
     
@@ -373,7 +419,7 @@ RegisterNetEvent('vCore:spawnVehicleAdmin', function(model)
     ToggleVehicleMod(vehicle, 18, true)  -- Turbo
     
     SetModelAsNoLongerNeeded(modelHash)
-    vCore.ShowNotification('Véhicule spawné: ' .. model, 'success')
+    vCore.Notify('Véhicule spawné: ' .. model, 'success')
 end)
 
 -- Delete véhicule
@@ -382,19 +428,19 @@ RegisterNetEvent('vCore:deleteVehicle', function()
     local vehicle = GetVehiclePedIsIn(ped, false)
     
     if vehicle == 0 then
-        vCore.ShowNotification('Vous n\'êtes pas dans un véhicule', 'error')
+        vCore.Notify('Vous n\'êtes pas dans un véhicule', 'error')
         return
     end
     
     DeleteVehicle(vehicle)
-    vCore.ShowNotification('Véhicule supprimé', 'success')
+    vCore.Notify('Véhicule supprimé', 'success')
 end)
 
 -- Heal
 RegisterNetEvent('vCore:heal', function()
     local ped = PlayerPedId()
     SetEntityHealth(ped, GetEntityMaxHealth(ped))
-    vCore.ShowNotification('Soigné', 'success')
+    vCore.Notify('Soigné', 'success')
 end)
 
 -- Revive
@@ -406,7 +452,7 @@ RegisterNetEvent('vCore:revive', function()
     SetEntityHealth(ped, GetEntityMaxHealth(ped))
     ClearPedTasksImmediately(ped)
     
-    vCore.ShowNotification('Réanimé', 'success')
+    vCore.Notify('Réanimé', 'success')
 end)
 
 -- Freeze
@@ -415,22 +461,44 @@ RegisterNetEvent('vCore:freeze', function(state)
     FreezeEntityPosition(ped, state)
     
     if state then
-        vCore.ShowNotification('Vous avez été gelé', 'error')
+        vCore.Notify('Vous avez été gelé', 'error')
     else
-        vCore.ShowNotification('Vous avez été dégelé', 'success')
+        vCore.Notify('Vous avez été dégelé', 'success')
     end
 end)
 
 -- Météo
 RegisterNetEvent('vCore:setWeather', function(weather)
     SetWeatherTypeNowPersist(weather)
-    vCore.ShowNotification('Météo: ' .. weather, 'info')
+    vCore.Notify('Météo: ' .. weather, 'info')
 end)
 
 -- Heure
 RegisterNetEvent('vCore:setTime', function(hour, minute)
     NetworkOverrideClockTime(hour, minute, 0)
-    vCore.ShowNotification(string.format('Heure: %02d:%02d', hour, minute), 'info')
+    vCore.Notify(string.format('Heure: %02d:%02d', hour, minute), 'info')
 end)
 
 print('[vAvA_core] ^2✓^7 Client admin events loaded')
+
+-- ═══════════════════════════════════════════════════════════════════════════
+-- COMMANDES
+-- ═══════════════════════════════════════════════════════════════════════════
+
+-- Commande de logout (changement de personnage)
+RegisterCommand('logout', function()
+    if not vCore.IsLoaded then
+        vCore.Notify('Vous n\'êtes pas connecté', 'error')
+        return
+    end
+    
+    vCore.Notify('Déconnexion en cours...', 'info')
+    Wait(500)
+    TriggerServerEvent('vCore:logoutPlayer')
+end, false)
+
+RegisterCommand('changechar', function()
+    ExecuteCommand('logout')
+end, false)
+
+print('[vAvA_core] ^2✓^7 Client commands loaded')

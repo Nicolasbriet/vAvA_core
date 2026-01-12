@@ -64,6 +64,39 @@ function showNotification(message, type = 'info') {
     }, 3000);
 }
 
+function showConfirmModal(message, onConfirm) {
+    const modal = document.getElementById('confirm-modal');
+    const messageEl = document.getElementById('confirm-message');
+    const confirmBtn = document.getElementById('modal-confirm');
+    const cancelBtn = document.getElementById('modal-cancel');
+    
+    messageEl.innerHTML = message;
+    modal.classList.remove('hidden');
+    
+    // Remove old listeners
+    const newConfirmBtn = confirmBtn.cloneNode(true);
+    const newCancelBtn = cancelBtn.cloneNode(true);
+    confirmBtn.parentNode.replaceChild(newConfirmBtn, confirmBtn);
+    cancelBtn.parentNode.replaceChild(newCancelBtn, cancelBtn);
+    
+    // Add new listeners
+    newConfirmBtn.addEventListener('click', () => {
+        modal.classList.add('hidden');
+        if (onConfirm) onConfirm();
+    });
+    
+    newCancelBtn.addEventListener('click', () => {
+        modal.classList.add('hidden');
+    });
+    
+    // Close on background click
+    modal.addEventListener('click', (e) => {
+        if (e.target === modal) {
+            modal.classList.add('hidden');
+        }
+    });
+}
+
 function hideAllContainers() {
     document.querySelectorAll('.container').forEach(c => c.classList.add('hidden'));
 }
@@ -100,7 +133,10 @@ function renderCharacterGrid() {
                 <button class="btn btn-primary btn-select" data-citizenid="${char.citizenid}">
                     <i class="fas fa-play"></i> Jouer
                 </button>
-                <button class="btn btn-delete" data-citizenid="${char.citizenid}">
+                <button class="btn btn-delete" 
+                    data-citizenid="${char.citizenid}"
+                    data-firstname="${char.firstname || ''}"
+                    data-lastname="${char.lastname || ''}">
                     <i class="fas fa-trash"></i>
                 </button>
             </div>
@@ -135,9 +171,15 @@ function renderCharacterGrid() {
         btn.addEventListener('click', (e) => {
             e.stopPropagation();
             const citizenid = btn.dataset.citizenid;
-            if (confirm('Êtes-vous sûr de vouloir supprimer ce personnage ?')) {
-                post('deleteCharacter', { citizenid });
-            }
+            const firstname = btn.dataset.firstname;
+            const lastname = btn.dataset.lastname;
+            
+            showConfirmModal(
+                `Êtes-vous sûr de vouloir supprimer définitivement <strong>${firstname} ${lastname}</strong> ?<br><br>Cette action est irréversible.`,
+                () => {
+                    post('deleteCharacter', { citizenid });
+                }
+            );
         });
     });
 }

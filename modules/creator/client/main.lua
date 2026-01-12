@@ -585,35 +585,22 @@ end)
 
 -- Sélectionner un personnage
 RegisterNUICallback('selectCharacter', function(data, cb)
-    vCore.TriggerCallback('vava_creator:loadCharacter', function(result)
-        if result.success then
-            CloseSelection()
-            
-            -- Appliquer le skin
-            local char = result.character
-            if char.skin then
-                local model = char.skin.sex == 0 and 'mp_m_freemode_01' or 'mp_f_freemode_01'
-                if LoadModel(model) then
-                    SetPlayerModel(PlayerId(), GetHashKey(model))
-                    local ped = PlayerPedId()
-                    ApplyFullSkin(ped, char.skin)
-                    SetModelAsNoLongerNeeded(GetHashKey(model))
-                end
-            end
-            
-            -- Téléporter à la dernière position
-            if char.position then
-                SetEntityCoords(PlayerPedId(), char.position.x, char.position.y, char.position.z)
-                SetEntityHeading(PlayerPedId(), char.position.h or 0)
-            end
-            
-            if vCore.Notify then
-                vCore.Notify('Bienvenue ' .. char.fullname .. '!', 'success')
-            end
-        end
-        
-        cb(result)
-    end, data.citizenid)
+    local charId = tonumber(data.citizenid)
+    
+    if not charId then
+        print('[vAvA_creator] ERROR: Invalid character ID')
+        cb({ success = false })
+        return
+    end
+    
+    print('[vAvA_creator] Loading character ID:', charId)
+    
+    CloseSelection()
+    
+    -- Charger le personnage via le système core
+    TriggerServerEvent('vCore:loadPlayer', charId)
+    
+    cb({ success = true })
 end)
 
 -- Supprimer un personnage
@@ -665,11 +652,18 @@ end)
 -- ═══════════════════════════════════════════════════════════════════════════
 
 RegisterNetEvent('vava_creator:openCreator', function(isFirstTime)
+    print('[vAvA_creator] Received openCreator event, isFirstTime:', isFirstTime)
     OpenCreator(isFirstTime)
 end)
 
 RegisterNetEvent('vava_creator:openSelection', function()
+    print('[vAvA_creator] Received openSelection event')
     OpenSelection()
+end)
+
+RegisterNetEvent('vava_creator:autoLoadCharacter', function(charId)
+    print('[vAvA_creator] Auto-loading character:', charId)
+    TriggerServerEvent('vCore:loadPlayer', charId)
 end)
 
 RegisterNetEvent('vava_creator:characterLoaded', function(characterData)

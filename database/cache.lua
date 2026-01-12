@@ -56,8 +56,8 @@ function vCore.Cache.Get(category, key)
     local timestamp = cacheTimestamps[category][key]
     if not timestamp then return nil end
     
-    -- Vérifier si expiré
-    if GetGameTimer() - timestamp.time > timestamp.ttl then
+    -- Vérifier si expiré (ttl = 0 signifie pas d'expiration)
+    if timestamp.ttl > 0 and GetGameTimer() - timestamp.time > timestamp.ttl then
         vCore.Cache.Delete(category, key)
         return nil
     end
@@ -188,11 +188,16 @@ end
 ---@return table
 function vCore.Cache.Players.GetAll()
     local players = {}
+    
     if cache['players'] then
         for source, player in pairs(cache['players']) do
-            players[tonumber(source)] = player
+            local numSource = tonumber(source)
+            if numSource and player then
+                players[numSource] = player
+            end
         end
     end
+    
     return players
 end
 

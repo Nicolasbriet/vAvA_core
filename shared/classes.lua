@@ -479,6 +479,7 @@ function vPlayer:ToClientData()
         money = self.money,
         job = self.job,
         gang = self.gang,
+        position = self.position,  -- ✅ Position pour le spawn
         status = self.status,
         onDuty = self.onDuty,
         group = self.group,
