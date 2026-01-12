@@ -261,6 +261,15 @@ end
 ---@param statusType string
 ---@return number
 function vPlayer:GetStatus(statusType)
+    -- Intégration avec le module vAvA_status pour faim/soif (côté serveur uniquement)
+    if IsDuplicityVersion() then
+        if statusType == 'hunger' and GetResourceState('vAvA_status') == 'started' then
+            return exports['vAvA_status']:GetHunger(self.source) or self.status[statusType] or 0
+        elseif statusType == 'thirst' and GetResourceState('vAvA_status') == 'started' then
+            return exports['vAvA_status']:GetThirst(self.source) or self.status[statusType] or 0
+        end
+    end
+    
     return self.status[statusType] or 0
 end
 
@@ -270,6 +279,17 @@ end
 function vPlayer:SetStatus(statusType, value)
     value = vCore.Utils.Clamp(value, 0, 100)
     self.status[statusType] = value
+    
+    -- Intégration avec le module vAvA_status pour faim/soif
+    if statusType == 'hunger' and GetResourceState('vAvA_status') == 'started' then
+        exports['vAvA_status']:SetHunger(self.source, value)
+        return -- Le module status se charge du client event
+    elseif statusType == 'thirst' and GetResourceState('vAvA_status') == 'started' then
+        exports['vAvA_status']:SetThirst(self.source, value)
+        return -- Le module status se charge du client event
+    end
+    
+    -- Fallback pour autres status (stress, etc.)
     TriggerClientEvent(vCore.Events.STATUS_UPDATED, self.source, statusType, value)
 end
 
@@ -277,6 +297,16 @@ end
 ---@param statusType string
 ---@param value number
 function vPlayer:AddStatus(statusType, value)
+    -- Intégration avec le module vAvA_status pour faim/soif
+    if statusType == 'hunger' and GetResourceState('vAvA_status') == 'started' then
+        exports['vAvA_status']:AddHunger(self.source, value)
+        return
+    elseif statusType == 'thirst' and GetResourceState('vAvA_status') == 'started' then
+        exports['vAvA_status']:AddThirst(self.source, value)
+        return
+    end
+    
+    -- Fallback pour autres status
     local current = self:GetStatus(statusType)
     self:SetStatus(statusType, current + value)
 end
@@ -285,6 +315,13 @@ end
 ---@param statusType string
 ---@param value number
 function vPlayer:RemoveStatus(statusType, value)
+    -- Pour hunger/thirst, AddStatus avec valeur négative
+    if statusType == 'hunger' or statusType == 'thirst' then
+        self:AddStatus(statusType, -value)
+        return
+    end
+    
+    -- Fallback pour autres status
     local current = self:GetStatus(statusType)
     self:SetStatus(statusType, current - value)
 end

@@ -59,7 +59,7 @@ HUDConfig.Display = {
 
 HUDConfig.Settings = {
     -- Mise à jour
-    UpdateInterval = 500,                     -- Intervalle de mise à jour en ms (500ms = 0.5s)
+    UpdateInterval = 250,                     -- Intervalle de mise à jour en ms (250ms = 0.25s) - OPTIMISÉ TEMPS RÉEL
     
     -- Minimap
     Minimap = {
@@ -153,7 +153,17 @@ HUDConfig.Debug = {
 }
 
 -- ═══════════════════════════════════════════════════════════════════════════
--- 📊 VALEURS PAR DÉFAUT
+-- � DEBUG & LOGS
+-- ═══════════════════════════════════════════════════════════════════════════
+
+HUDConfig.Logging = {
+    enabled = false,                          -- Désactiver les logs de debug en production
+    logUpdates = false,                       -- Logger les mises à jour (peut être verbeux)
+    logEvents = false                         -- Logger les événements
+}
+
+-- ═══════════════════════════════════════════════════════════════════════════
+-- �📊 VALEURS PAR DÉFAUT
 -- ═══════════════════════════════════════════════════════════════════════════
 
 HUDConfig.Defaults = {

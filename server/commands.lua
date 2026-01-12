@@ -6,6 +6,45 @@
 vCore = vCore or {}
 
 -- ═══════════════════════════════════════════════════════════════════════════
+-- COMMANDES D'URGENCE (TEMPORAIRES)
+-- ═══════════════════════════════════════════════════════════════════════════
+
+-- Commandes d'urgence pour récupérer les status
+RegisterNetEvent('vCore:admin:setHunger')
+AddEventHandler('vCore:admin:setHunger', function(value)
+    local src = source
+    local player = vCore.GetPlayer(src)
+    if not player then return end
+    
+    if GetResourceState('vAvA_status') == 'started' then
+        exports['vAvA_status']:SetHunger(src, value or 100)
+        print(string.format("^2[URGENCE]^7 Faim définie à %d pour %s", value or 100, GetPlayerName(src)))
+    end
+end)
+
+RegisterNetEvent('vCore:admin:setThirst')
+AddEventHandler('vCore:admin:setThirst', function(value)
+    local src = source
+    local player = vCore.GetPlayer(src)
+    if not player then return end
+    
+    if GetResourceState('vAvA_status') == 'started' then
+        exports['vAvA_status']:SetThirst(src, value or 100)
+        print(string.format("^2[URGENCE]^7 Soif définie à %d pour %s", value or 100, GetPlayerName(src)))
+    end
+end)
+
+RegisterNetEvent('vCore:giveItem')
+AddEventHandler('vCore:giveItem', function(itemName, amount)
+    local src = source
+    local player = vCore.GetPlayer(src)
+    if not player then return end
+    
+    vCore.Inventory.AddItem(src, itemName or 'bread', amount or 1)
+    print(string.format("^2[URGENCE]^7 Item %s x%d donné à %s", itemName or 'bread', amount or 1, GetPlayerName(src)))
+end)
+
+-- ═══════════════════════════════════════════════════════════════════════════
 -- HELPER FUNCTIONS
 -- ═══════════════════════════════════════════════════════════════════════════
 
@@ -167,28 +206,6 @@ RegisterCommand('give', function(source, args, rawCommand)
     
     if vCore.Inventory.AddItem(targetId, itemName, amount) then
         vCore.Notify(source, Lang('admin_item_given'), 'success')
-    end
-end, false)
-
--- /givemoney - Donner de l'argent
-RegisterCommand('givemoney', function(source, args, rawCommand)
-    if source > 0 and not HasAdminPermission(source, 'command.givemoney') then
-        vCore.Notify(source, Lang('admin_no_permission'), 'error')
-        return
-    end
-    
-    if #args < 3 then
-        local msg = 'Usage: /givemoney [id] [type: cash/bank] [montant]'
-        if source > 0 then vCore.Notify(source, msg, 'info') else print(msg) end
-        return
-    end
-    
-    local targetId = tonumber(args[1])
-    local moneyType = args[2]
-    local amount = tonumber(args[3]) or 0
-    
-    if vCore.Economy.AddMoney(targetId, moneyType, amount, 'Admin') then
-        vCore.Notify(source, Lang('admin_money_given'), 'success')
     end
 end, false)
 
@@ -519,46 +536,6 @@ RegisterCommand('time', function(source, args, rawCommand)
     if source > 0 then vCore.Notify(source, msg, 'success') else print(msg) end
 end, false)
 
--- /setmoney - Modifier l'argent d'un joueur
-RegisterCommand('setmoney', function(source, args, rawCommand)
-    if not HasAdminPermission(source, 'command.setmoney') then
-        if source > 0 then vCore.Notify(source, 'Vous n\'avez pas la permission', 'error') end
-        return
-    end
-    
-    if #args < 3 then
-        local msg = 'Usage: /setmoney [id] [cash/bank/black] [montant]'
-        if source > 0 then vCore.Notify(source, msg, 'info') else print(msg) end
-        return
-    end
-    
-    local targetId = tonumber(args[1])
-    local moneyType = args[2]
-    local amount = tonumber(args[3])
-    
-    if not targetId or not amount then
-        local msg = 'Arguments invalides'
-        if source > 0 then vCore.Notify(source, msg, 'error') else print(msg) end
-        return
-    end
-    
-    local player = vCore.GetPlayer(targetId)
-    if not player then
-        local msg = 'Joueur introuvable'
-        if source > 0 then vCore.Notify(source, msg, 'error') else print(msg) end
-        return
-    end
-    
-    player:SetMoney(moneyType, amount)
-    
-    local msg = string.format('Argent défini: %s = %d$ pour #%d', moneyType, amount, targetId)
-    if source > 0 then vCore.Notify(source, msg, 'success') else print(msg) end
-    
-    -- Log
-    local adminName = source > 0 and GetPlayerName(source) or 'Console'
-    vCore.Log('admin', 'admin:' .. adminName, 'SetMoney: #' .. targetId, {type = moneyType, amount = amount})
-end, false)
-
 -- /setgroup - Changer le groupe d'un joueur
 RegisterCommand('setgroup', function(source, args, rawCommand)
     if not HasAdminPermission(source, 'command.setgroup') then
@@ -744,4 +721,250 @@ RegisterCommand('saveplayer', function(source, args, rawCommand)
     end
 end, false)
 
-print('[vAvA_core] ^2✓^7 Commands loaded (User + Admin + FiveM Natives + Save)')
+-- ═══════════════════════════════════════════════════════════════════════════
+-- COMMANDES D'ARGENT
+-- ═══════════════════════════════════════════════════════════════════════════
+
+-- /givemoney [id] [type] [amount] - Donner de l'argent
+RegisterCommand('givemoney', function(source, args, rawCommand)
+    if not HasAdminPermission(source, 'command.givemoney') then
+        if source > 0 then vCore.Notify(source, 'Vous n\'avez pas la permission', 'error') end
+        return
+    end
+    
+    if #args < 3 then
+        local msg = 'Usage: /givemoney [id] [cash/bank/black_money] [montant]'
+        if source > 0 then vCore.Notify(source, msg, 'info') else print(msg) end
+        return
+    end
+    
+    local targetId = tonumber(args[1])
+    local moneyType = args[2]:lower()
+    local amount = tonumber(args[3])
+    
+    if not targetId or not amount or amount <= 0 then
+        local msg = 'Paramètres invalides'
+        if source > 0 then vCore.Notify(source, msg, 'error') else print(msg) end
+        return
+    end
+    
+    if moneyType ~= 'cash' and moneyType ~= 'bank' and moneyType ~= 'black_money' then
+        local msg = 'Type d\'argent invalide (cash/bank/black_money)'
+        if source > 0 then vCore.Notify(source, msg, 'error') else print(msg) end
+        return
+    end
+    
+    local player = vCore.GetPlayer(targetId)
+    if not player then
+        local msg = 'Joueur introuvable'
+        if source > 0 then vCore.Notify(source, msg, 'error') else print(msg) end
+        return
+    end
+    
+    local playerName = player:GetName()
+    local adminName = source > 0 and vCore.GetPlayer(source):GetName() or 'Console'
+    local formattedAmount = vCore.Utils.FormatMoney(amount)
+    
+    if vCore.AddPlayerMoney(targetId, moneyType, amount, 'admin-give') then
+        local msg = 'Donné ' .. formattedAmount .. ' (' .. moneyType .. ') à ' .. playerName
+        if source > 0 then vCore.Notify(source, msg, 'success') else print(msg) end
+        
+        vCore.Notify(targetId, 'Vous avez reçu ' .. formattedAmount .. ' (' .. moneyType .. ') de ' .. adminName, 'success')
+        
+        -- Log admin
+        vCore.Log('admin', adminName .. ' (' .. source .. ')', 'GiveMoney: ' .. formattedAmount .. ' (' .. moneyType .. ') à ' .. playerName .. ' (' .. targetId .. ')', {
+            target = playerName .. ' (' .. targetId .. ')',
+            type = moneyType,
+            amount = amount
+        })
+    else
+        local msg = 'Échec de l\'ajout d\'argent'
+        if source > 0 then vCore.Notify(source, msg, 'error') else print(msg) end
+    end
+end, false)
+
+-- /removemoney [id] [type] [amount] - Retirer de l'argent
+RegisterCommand('removemoney', function(source, args, rawCommand)
+    if not HasAdminPermission(source, 'command.removemoney') then
+        if source > 0 then vCore.Notify(source, 'Vous n\'avez pas la permission', 'error') end
+        return
+    end
+    
+    if #args < 3 then
+        local msg = 'Usage: /removemoney [id] [cash/bank/black_money] [montant]'
+        if source > 0 then vCore.Notify(source, msg, 'info') else print(msg) end
+        return
+    end
+    
+    local targetId = tonumber(args[1])
+    local moneyType = args[2]:lower()
+    local amount = tonumber(args[3])
+    
+    if not targetId or not amount or amount <= 0 then
+        local msg = 'Paramètres invalides'
+        if source > 0 then vCore.Notify(source, msg, 'error') else print(msg) end
+        return
+    end
+    
+    if moneyType ~= 'cash' and moneyType ~= 'bank' and moneyType ~= 'black_money' then
+        local msg = 'Type d\'argent invalide (cash/bank/black_money)'
+        if source > 0 then vCore.Notify(source, msg, 'error') else print(msg) end
+        return
+    end
+    
+    local player = vCore.GetPlayer(targetId)
+    if not player then
+        local msg = 'Joueur introuvable'
+        if source > 0 then vCore.Notify(source, msg, 'error') else print(msg) end
+        return
+    end
+    
+    local playerName = player:GetName()
+    local adminName = source > 0 and vCore.GetPlayer(source):GetName() or 'Console'
+    local formattedAmount = vCore.Utils.FormatMoney(amount)
+    local currentAmount = vCore.GetPlayerMoney(targetId, moneyType)
+    
+    if currentAmount < amount then
+        local msg = playerName .. ' n\'a que ' .. vCore.Utils.FormatMoney(currentAmount) .. ' (' .. moneyType .. ')'
+        if source > 0 then vCore.Notify(source, msg, 'error') else print(msg) end
+        return
+    end
+    
+    if vCore.RemovePlayerMoney(targetId, moneyType, amount, 'admin-remove') then
+        local msg = 'Retiré ' .. formattedAmount .. ' (' .. moneyType .. ') à ' .. playerName
+        if source > 0 then vCore.Notify(source, msg, 'success') else print(msg) end
+        
+        vCore.Notify(targetId, adminName .. ' vous a retiré ' .. formattedAmount .. ' (' .. moneyType .. ')', 'error')
+        
+        -- Log admin
+        vCore.Log('admin', adminName .. ' (' .. source .. ')', 'RemoveMoney: ' .. formattedAmount .. ' (' .. moneyType .. ') à ' .. playerName .. ' (' .. targetId .. ')', {
+            target = playerName .. ' (' .. targetId .. ')',
+            type = moneyType,
+            amount = amount
+        })
+    else
+        local msg = 'Échec du retrait d\'argent'
+        if source > 0 then vCore.Notify(source, msg, 'error') else print(msg) end
+    end
+end, false)
+
+-- /setmoney [id] [type] [amount] - Définir l'argent
+RegisterCommand('setmoney', function(source, args, rawCommand)
+    if not HasAdminPermission(source, 'command.setmoney') then
+        if source > 0 then vCore.Notify(source, 'Vous n\'avez pas la permission', 'error') end
+        return
+    end
+    
+    if #args < 3 then
+        local msg = 'Usage: /setmoney [id] [cash/bank/black_money] [montant]'
+        if source > 0 then vCore.Notify(source, msg, 'info') else print(msg) end
+        return
+    end
+    
+    local targetId = tonumber(args[1])
+    local moneyType = args[2]:lower()
+    local amount = tonumber(args[3])
+    
+    if not targetId or not amount or amount < 0 then
+        local msg = 'Paramètres invalides'
+        if source > 0 then vCore.Notify(source, msg, 'error') else print(msg) end
+        return
+    end
+    
+    if moneyType ~= 'cash' and moneyType ~= 'bank' and moneyType ~= 'black_money' then
+        local msg = 'Type d\'argent invalide (cash/bank/black_money)'
+        if source > 0 then vCore.Notify(source, msg, 'error') else print(msg) end
+        return
+    end
+    
+    local player = vCore.GetPlayer(targetId)
+    if not player then
+        local msg = 'Joueur introuvable'
+        if source > 0 then vCore.Notify(source, msg, 'error') else print(msg) end
+        return
+    end
+    
+    local playerName = player:GetName()
+    local adminName = source > 0 and vCore.GetPlayer(source):GetName() or 'Console'
+    local formattedAmount = vCore.Utils.FormatMoney(amount)
+    local currentAmount = vCore.GetPlayerMoney(targetId, moneyType)
+    
+    -- Calculer la différence pour ajuster
+    local difference = amount - currentAmount
+    local success = false
+    
+    if difference > 0 then
+        success = vCore.AddPlayerMoney(targetId, moneyType, difference, 'admin-set')
+    elseif difference < 0 then
+        success = vCore.RemovePlayerMoney(targetId, moneyType, -difference, 'admin-set')
+    else
+        success = true -- Pas de changement nécessaire
+    end
+    
+    if success then
+        local msg = 'Argent de ' .. playerName .. ' (' .. moneyType .. ') défini à ' .. formattedAmount
+        if source > 0 then vCore.Notify(source, msg, 'success') else print(msg) end
+        
+        vCore.Notify(targetId, adminName .. ' a défini votre argent (' .. moneyType .. ') à ' .. formattedAmount, 'info')
+        
+        -- Log admin
+        vCore.Log('admin', adminName .. ' (' .. source .. ')', 'SetMoney: ' .. playerName .. ' (' .. moneyType .. ') ' .. vCore.Utils.FormatMoney(currentAmount) .. ' → ' .. formattedAmount, {
+            target = playerName .. ' (' .. targetId .. ')',
+            type = moneyType,
+            oldAmount = currentAmount,
+            newAmount = amount
+        })
+    else
+        local msg = 'Échec de la modification d\'argent'
+        if source > 0 then vCore.Notify(source, msg, 'error') else print(msg) end
+    end
+end, false)
+
+-- /checkmoney [id] - Vérifier l'argent d'un joueur
+RegisterCommand('checkmoney', function(source, args, rawCommand)
+    if not HasAdminPermission(source, 'command.checkmoney') then
+        if source > 0 then vCore.Notify(source, 'Vous n\'avez pas la permission', 'error') end
+        return
+    end
+    
+    local targetId = source
+    if #args >= 1 then
+        targetId = tonumber(args[1])
+        if not targetId then
+            local msg = 'ID invalide'
+            if source > 0 then vCore.Notify(source, msg, 'error') else print(msg) end
+            return
+        end
+    end
+    
+    local player = vCore.GetPlayer(targetId)
+    if not player then
+        local msg = 'Joueur introuvable'
+        if source > 0 then vCore.Notify(source, msg, 'error') else print(msg) end
+        return
+    end
+    
+    local playerName = player:GetName()
+    local cash = vCore.GetPlayerMoney(targetId, 'cash')
+    local bank = vCore.GetPlayerMoney(targetId, 'bank')
+    local blackMoney = vCore.GetPlayerMoney(targetId, 'black_money')
+    
+    local msg = string.format('%s - Cash: %s | Banque: %s | Argent sale: %s', 
+        playerName,
+        vCore.Utils.FormatMoney(cash),
+        vCore.Utils.FormatMoney(bank),
+        vCore.Utils.FormatMoney(blackMoney)
+    )
+    
+    if source > 0 then 
+        vCore.Notify(source, msg, 'info')
+    else 
+        print(msg)
+    end
+end, false)
+
+-- ═══════════════════════════════════════════════════════════════════════════
+-- COMMANDES FIN
+-- ═══════════════════════════════════════════════════════════════════════════
+
+print('[vAvA_core] ^2✓^7 Commands loaded (User + Admin + Money + FiveM Natives + Save)')

@@ -371,15 +371,23 @@ end
 ---@param type string
 ---@return string|nil
 function GetPlayerInput(label, type)
-    -- Essayer ox_lib input
-    local success, result = pcall(function()
-        local input = exports.ox_lib:inputDialog(label, {
-            {type = type or 'input', label = label, required = true}
-        })
-        return input and input[1] or nil
-    end)
+    local result = nil
+    local completed = false
     
-    if success and result then
+    -- Utiliser vCore.UI.ShowInput
+    if vCore and vCore.UI and vCore.UI.ShowInput then
+        vCore.UI.ShowInput({
+            title = label,
+            placeholder = label
+        }, function(inputValue)
+            result = inputValue
+            completed = true
+        end)
+        
+        while not completed do
+            Wait(100)
+        end
+        
         return result
     end
     
@@ -402,13 +410,13 @@ end
 ---@param title string
 ---@param options table
 function RegisterSubMenu(id, title, options)
-    -- Essayer ox_lib
-    pcall(function()
-        exports.ox_lib:registerContext({
-            id = id,
+    -- Utiliser vCore.UI.ShowMenu
+    if vCore and vCore.UI and vCore.UI.ShowMenu then
+        vCore.UI.ShowMenu({
             title = title,
-            menu = 'boss_menu',
             options = options
-        })
-    end)
+        }, function(value, index)
+            -- Callback géré par les options
+        end)
+    end
 end

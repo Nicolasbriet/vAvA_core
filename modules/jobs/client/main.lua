@@ -299,18 +299,12 @@ end
 ---@param message string
 ---@param type string
 function Notify(message, type)
-    local success, _ = pcall(function()
-        exports.ox_lib:notify({description = message, type = type or 'inform'})
-    end)
-    
-    if not success then
-        if vCore and vCore.Notify then
-            vCore.Notify(message, type or 'info')
-        else
-            SetNotificationTextEntry('STRING')
-            AddTextComponentString(message)
-            DrawNotification(false, true)
-        end
+    if vCore and vCore.Notify then
+        vCore.Notify(message, type or 'info')
+    else
+        SetNotificationTextEntry('STRING')
+        AddTextComponentString(message)
+        DrawNotification(false, true)
     end
 end
 
@@ -332,4 +326,21 @@ end)
 
 exports('IsOnDuty', function()
     return CurrentJob and CurrentJob.onduty or false
+end)
+
+-- ═══════════════════════════════════════════════════════════════════════════
+-- EVENT POUR LA CARTE JOB
+-- ═══════════════════════════════════════════════════════════════════════════
+
+-- Event pour ouvrir les informations job
+RegisterNetEvent('vCore:jobs:openJobInfo', function(jobData)
+    if not jobData then return end
+    
+    SetNuiFocus(true, true)
+    IsNUIOpen = true
+    
+    SendNUIMessage({
+        action = 'openJobInfo',
+        jobData = jobData
+    })
 end)

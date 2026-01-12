@@ -714,6 +714,31 @@ exports('GetCurrentSkin', function()
 end)
 
 exports('ApplySkin', function(skin)
+    if not skin then return end
+    
     currentSkin = skin
-    ApplyFullSkin(PlayerPedId(), skin)
+    local ped = PlayerPedId()
+    
+    -- Déterminer le modèle en fonction du sexe
+    local model = skin.sex == 0 and 'mp_m_freemode_01' or 'mp_f_freemode_01'
+    local currentModel = GetEntityModel(ped)
+    local targetModel = GetHashKey(model)
+    
+    -- Charger le bon modèle si nécessaire
+    if currentModel ~= targetModel then
+        print('[vAvA_creator] Changement de modèle:', model)
+        if LoadModel(model) then
+            SetPlayerModel(PlayerId(), targetModel)
+            Wait(100)
+            ped = PlayerPedId()
+            SetModelAsNoLongerNeeded(targetModel)
+        else
+            print('^1[vAvA_creator]^7 ERROR: Failed to load model', model)
+            return
+        end
+    end
+    
+    -- Appliquer le skin complet
+    ApplyFullSkin(ped, skin)
+    print('[vAvA_creator] Skin appliqué:', model)
 end)

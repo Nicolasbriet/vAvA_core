@@ -1,8 +1,113 @@
 # vAvA_core - Feuille de Route Développeur
 
-> **Dernière mise à jour:** 9 Janvier 2026  
+> **Dernière mise à jour:** 12 Janvier 2026  
 > **Version actuelle:** 3.2.0  
-> **Statut:** ✅ SYSTÈME COMPLET ET OPÉRATIONNEL - MODULE STATUS AJOUTÉ
+> **Statut:** ⚠️ BUGS CRITIQUES IDENTIFIÉS - CORRECTIFS EN COURS
+
+---
+
+# � REFONTE COMPLÈTE REQUISE - Module vAvA_status
+
+## ⚠️ Décision : RÉÉCRITURE TOTALE du système de statuts
+
+**Date:** 12 Janvier 2026  
+**Raison:** Le module actuel présente des problèmes structurels majeurs impossibles à corriger par des patches.
+
+### Problèmes identifiés (irréparables)
+- ❌ **Blocage serveur (svMain watchdog)** - Les boucles bloquent le thread principal même avec Wait()
+- ❌ **Sauvegarde DB incohérente** - Les valeurs ne persistent pas correctement entre les sessions
+- ❌ **Synchronisation HUD défaillante** - Le HUD ne reçoit pas les bonnes valeurs à la connexion
+- ❌ **Chargement depuis player object** - Lit des valeurs à 0 au lieu de charger depuis la DB
+- ❌ **Architecture trop complexe** - Trop de fallbacks et de méthodes de chargement différentes
+
+### Spécifications pour la nouvelle version
+
+#### Architecture simplifiée
+1. **Une seule source de vérité** : La base de données `player_status`
+2. **Pas de lecture depuis player object** : Toujours charger depuis la DB
+3. **Threads séparés** : Aucun code bloquant dans les event handlers
+4. **Intervalles longs** : Minimum 10 secondes entre chaque opération
+
+#### Fonctionnalités requises
+- [ ] Faim/Soif (0-100) avec décrémentation automatique
+- [ ] Sauvegarde en DB à la déconnexion ET toutes les 5 minutes
+- [ ] Chargement depuis DB à la connexion (pas de fallback)
+- [ ] Envoi au HUD après chargement DB confirmé
+- [ ] Effets visuels (flou, stamina) selon les niveaux
+- [ ] Consommation d'items (intégration inventaire)
+- [ ] API exports simple (GetHunger, SetHunger, etc.)
+
+#### Structure de fichiers
+```
+modules/status_v2/
+├── fxmanifest.lua
+├── config.lua
+├── server.lua      # Tout le code serveur en un fichier
+├── client.lua      # Tout le code client en un fichier
+└── database.sql
+```
+
+**Priorité:** 🔴 HAUTE  
+**Estimation:** 2-3 heures de développement  
+**Statut:** 📝 À FAIRE
+
+---
+
+# �🚨 BUGS CRITIQUES À CORRIGER - Session 12 Janvier 2026
+
+## ❌ Problèmes vAvA_status identifiés
+### 1. **Système de dégâts défaillant**
+- ❌ **CRITIQUE** : Joueur perd de la vie même avec hunger/thirst suffisants
+- ❌ Seuils de dégâts mal configurés ou mal détectés
+- ❌ Thread de dégâts ne se stoppe pas correctement
+
+### 2. **HUD temps réel défaillant**  
+- ❌ **CRITIQUE** : HUD ne se met pas à jour automatiquement à la connexion
+- ❌ Nécessite restart manual du HUD (`restart vAvA_hud`) pour afficher les vraies valeurs
+- ❌ Synchronisation initiale échoue entre status et HUD
+
+### 3. **Sauvegarde inventaire cassée**
+- ❌ **CRITIQUE** : Items d'inventaire se reset à chaque connexion
+- ❌ Quantités non sauvegardées en base de données
+- ❌ Perte totale des items du joueur
+
+## 🔧 Actions immédiates requises
+1. **DEBUG système de dégâts** - identifier pourquoi GetStatusLevel() échoue
+2. **FIX initialisation HUD** - forcer sync au playerLoaded
+3. **FIX sauvegarde inventaire** - vérifier persistence DB
+
+---
+
+## 🐛 BUGS À CORRIGER
+
+### Creator - Sélection de personnage ne charge pas (12 Janvier 2026)
+
+**Statut:** 🔴 À CORRIGER
+
+**Problème:**
+- Création du 1er personnage fonctionne correctement
+- Logout fonctionne correctement
+- Mais lors de la sélection d'un autre personnage existant, le joueur n'est pas compté comme "connecté"
+- Le joueur reste bloqué et ne peut pas jouer
+
+**Impact:** 🔴 CRITIQUE - Empêche les joueurs d'utiliser plusieurs personnages
+
+**Fichiers probablement affectés:**
+- `modules/creator/client/main.lua` - Sélection de personnage
+- `modules/creator/server/main.lua` - Callback `selectCharacter`
+- `server/players.lua` - Chargement des données joueur
+
+**Étapes de reproduction:**
+1. Créer un premier personnage → ✅ Fonctionne
+2. Se déconnecter (`/changechar`) → ✅ Fonctionne
+3. Sélectionner un personnage existant → ❌ Ne charge pas
+
+**Hypothèses:**
+- Event `vCore:playerLoaded` pas déclenché pour personnage existant
+- Données du personnage pas correctement envoyées au client
+- Flag "connecté" pas défini côté serveur
+
+**Priorité:** 🔴 HAUTE - À corriger avant production
 
 ---
 

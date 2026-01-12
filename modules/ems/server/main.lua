@@ -658,7 +658,10 @@ CreateThread(function()
                     SetVitalSign(source, 'bloodVolume', newVolume)
                 end
                 
-                -- Dommages si état critique
+                -- DÉSACTIVÉ: Les natives SetEntityHealth sont CLIENT-SIDE ONLY
+                -- Ce code ne fonctionne pas sur le serveur
+                -- TODO: Envoyer un event au client pour appliquer les dégâts si nécessaire
+                --[[
                 if player.state == EMSConfig.MedicalStates.SEVERE_PAIN then
                     local ped = GetPlayerPed(source)
                     local health = GetEntityHealth(ped)
@@ -666,6 +669,7 @@ CreateThread(function()
                         SetEntityHealth(ped, health - 1)
                     end
                 end
+                ]]
             end
         end
     end

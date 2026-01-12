@@ -146,6 +146,81 @@ function vCore.NotifyAll(message, type, duration)
 end
 
 -- ═══════════════════════════════════════════════════════════════════════════
+-- FONCTIONS D'ARGENT SIMPLIFIÉES
+-- ═══════════════════════════════════════════════════════════════════════════
+
+---Récupère l'argent d'un joueur
+---@param source number
+---@param moneyType string cash, bank, black_money
+---@return number
+function vCore.GetPlayerMoney(source, moneyType)
+    local player = vCore.GetPlayer(source)
+    if not player then return 0 end
+    
+    -- Si l'objet player a la méthode GetMoney, l'utiliser
+    if player.GetMoney then
+        return player:GetMoney(moneyType)
+    end
+    
+    -- Sinon accès direct
+    return player.money and player.money[moneyType] or 0
+end
+
+---Ajoute de l'argent à un joueur
+---@param source number
+---@param moneyType string cash, bank, black_money
+---@param amount number
+---@param reason? string
+---@return boolean
+function vCore.AddPlayerMoney(source, moneyType, amount, reason)
+    local player = vCore.GetPlayer(source)
+    if not player then return false end
+    if amount <= 0 then return false end
+    
+    -- Si l'objet player a la méthode AddMoney, l'utiliser
+    if player.AddMoney then
+        return player:AddMoney(moneyType, amount, reason)
+    end
+    
+    -- Sinon gestion manuelle
+    if not player.money or not player.money[moneyType] then return false end
+    player.money[moneyType] = player.money[moneyType] + amount
+    
+    TriggerEvent('vCore:Server:MoneyChange', source, moneyType, amount, reason or 'unknown')
+    TriggerClientEvent('vCore:Client:MoneyChange', source, moneyType, amount)
+    
+    return true
+end
+
+---Retire de l'argent à un joueur
+---@param source number
+---@param moneyType string cash, bank, black_money
+---@param amount number
+---@param reason? string
+---@return boolean
+function vCore.RemovePlayerMoney(source, moneyType, amount, reason)
+    local player = vCore.GetPlayer(source)
+    if not player then return false end
+    if amount <= 0 then return false end
+    
+    -- Si l'objet player a la méthode RemoveMoney, l'utiliser
+    if player.RemoveMoney then
+        return player:RemoveMoney(moneyType, amount, reason)
+    end
+    
+    -- Sinon gestion manuelle
+    if not player.money or not player.money[moneyType] then return false end
+    if player.money[moneyType] < amount then return false end
+    
+    player.money[moneyType] = player.money[moneyType] - amount
+    
+    TriggerEvent('vCore:Server:MoneyChange', source, moneyType, -amount, reason or 'unknown')
+    TriggerClientEvent('vCore:Client:MoneyChange', source, moneyType, -amount)
+    
+    return true
+end
+
+-- ═══════════════════════════════════════════════════════════════════════════
 -- SYSTÈME DE PERMISSIONS (txAdmin ACE)
 -- ═══════════════════════════════════════════════════════════════════════════
 

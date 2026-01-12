@@ -21,11 +21,85 @@ CreateThread(function()
         end
     end
     
+    -- Attendre que vCore soit correctement chargé
+    local timeout = 0
+    while (not vCore or not vCore.GetPlayer) and timeout < 100 do
+        print('[vCore:Jobs] Attente de l\'initialisation de vCore... (' .. timeout .. '/100)')
+        Wait(500)
+        timeout = timeout + 1
+        
+        if not vCore then
+            local success, result = pcall(function()
+                return exports['vAvA_core']:GetCoreObject()
+            end)
+            if success and result then
+                vCore = result
+            end
+        end
+    end
+    
+    if vCore and vCore.GetPlayer then
+        print('^2[vCore:Jobs] vCore correctement initialisé^0')
+    else
+        print('^1[vCore:Jobs] ERREUR: Impossible d\'initialiser vCore^0')
+    end
+    
     Wait(2000)
     LoadJobsFromDatabase()
     LoadInteractionsFromDatabase()
     StartPaycheckLoop()
 end)
+
+-- ═══════════════════════════════════════════════════════════════════════════
+-- FONCTIONS UTILITAIRES
+-- ═══════════════════════════════════════════════════════════════════════════
+
+---Vérifie si vCore et le player sont valides et récupère le job de manière sûre
+---@param source number
+---@return vPlayer|nil, string|nil, table|nil
+local function GetValidPlayer(source)
+    if not vCore then 
+        return nil, '[vCore:Jobs] ERREUR: vCore non initialisé', nil
+    end
+    
+    if not vCore.GetPlayer then
+        return nil, '[vCore:Jobs] ERREUR: Méthode GetPlayer non trouvée', nil
+    end
+    
+    local player = vCore.GetPlayer(source)
+    if not player then 
+        return nil, '[vCore:Jobs] ERREUR: Joueur introuvable pour source: ' .. source, nil
+    end
+    
+    -- Récupérer le job avec plusieurs méthodes fallback
+    local jobData = nil
+    
+    -- Méthode 1: Via la méthode GetJob() si disponible
+    if type(player.GetJob) == 'function' then
+        local success, result = pcall(function()
+            return player:GetJob()
+        end)
+        if success and result then
+            jobData = result
+        end
+    end
+    
+    -- Méthode 2: Via PlayerData.job (pattern utilisé dans d'autres modules)
+    if not jobData and player.PlayerData and player.PlayerData.job then
+        jobData = player.PlayerData.job
+    end
+    
+    -- Méthode 3: Accès direct job
+    if not jobData and player.job then
+        jobData = player.job
+    end
+    
+    if not jobData then
+        return nil, '[vCore:Jobs] ERREUR: Impossible de récupérer les données job pour source: ' .. source, nil
+    end
+    
+    return player, nil, jobData
+end
 
 -- ═══════════════════════════════════════════════════════════════════════════
 -- FONCTIONS PRINCIPALES
@@ -174,8 +248,17 @@ end
 ---@param grade number
 ---@return boolean
 function SetPlayerJob(source, jobName, grade)
+    -- S'assurer que vCore est initialisé
+    if not vCore then 
+        print('[vCore:Jobs] ERREUR: vCore non initialisé')
+        return false
+    end
+    
     local player = vCore.GetPlayer(source)
-    if not player then return false end
+    if not player then
+        print('[vCore:Jobs] ERREUR: Joueur introuvable pour source:', source)
+        return false
+    end
     
     local job = GetJob(jobName)
     if not job then
@@ -188,12 +271,17 @@ function SetPlayerJob(source, jobName, grade)
         return false
     end
     
-    -- Utiliser la fonction du core
+    -- Utiliser la fonction du core si disponible
     if vCore.Jobs and vCore.Jobs.SetJob then
         return vCore.Jobs.SetJob(source, jobName, grade)
     end
     
-    -- Fallback
+    -- Fallback - vérifier que les méthodes existent
+    if not player.GetJob or not player.SetJob then
+        print('[vCore:Jobs] ERREUR: Méthodes GetJob ou SetJob non trouvées sur l\'objet player')
+        return false
+    end
+    
     local oldJob = player:GetJob()
     local success = player:SetJob(jobName, grade)
     
@@ -341,10 +429,18 @@ end
 
 RegisterNetEvent('vCore:jobs:requestData', function()
     local source = source
-    local player = vCore.GetPlayer(source)
-    if not player then return end
+    local player, error = GetValidPlayer(source)
+    if not player then
+        if error then print(error) end
+        return
+    end
     
     local job = player:GetJob()
+    if not job then
+        print('[vCore:Jobs] ERREUR: Job non trouvé pour le joueur')
+        return
+    end
+    
     local interactions = GetJobInteractions(job.name)
     
     TriggerClientEvent('vCore:jobs:receiveData', source, {
@@ -356,10 +452,18 @@ end)
 
 RegisterNetEvent('vCore:jobs:toggleDuty', function()
     local source = source
-    local player = vCore.GetPlayer(source)
-    if not player then return end
     
-    local onDuty = player:GetDuty()
+    -- S'assurer que vCore est initialisé
+    if not vCore then 
+        print('[vCore:Jobs] ERREUR: vCore non initialisé')
+        return 
+    end
+    
+    local player = vCore.GetPlayer(source)
+    if not player then 
+        print('[vCore:Jobs] ERREUR: Joueur introuvable pour source:', source)
+        return 
+    end
     SetPlayerDuty(source, not onDuty)
 end)
 
@@ -373,6 +477,112 @@ RegisterNetEvent('vCore:jobs:requestSocietyMoney', function()
     
     TriggerClientEvent('vCore:jobs:receiveSocietyMoney', source, money)
 end)
+
+-- Commande pour voir son job actuel
+RegisterCommand('myjob', function(source, args, rawCommand)
+    local player, error, jobData = GetValidPlayer(source)
+    if not player then
+        if error then print(error) end
+        vCore.Notify(source, 'Erreur lors de la récupération des informations job', 'error')
+        return
+    end
+    
+    local jobConfig = GetJob(jobData.name)
+    
+    -- Compter les collègues en ligne
+    local colleagues = 0
+    for _, otherPlayer in pairs(vCore.GetPlayers()) do
+        if otherPlayer then
+            local _, _, otherJobData = GetValidPlayer(otherPlayer.source)
+            if otherJobData and otherJobData.name == jobData.name and otherPlayer.source ~= source then
+                colleagues = colleagues + 1
+            end
+        end
+    end
+    
+    -- Préparer les données job
+    local jobDisplayData = {
+        name = jobData.name,
+        label = jobData.label,
+        gradeLabel = jobData.gradeLabel or jobData.grade_label,
+        salary = jobData.salary or 0,
+        onDuty = jobData.onDuty or false,
+        colleagues = colleagues,
+        permissions = jobData.permissions or {}
+    }
+    
+    -- Ouvrir la carte d'informations job
+    TriggerClientEvent('vCore:jobs:openJobInfo', source, jobDisplayData)
+end, false)
+
+-- Commande alternative
+RegisterCommand('job', function(source, args, rawCommand)
+    local player, error, jobData = GetValidPlayer(source)
+    if not player then
+        if error then print(error) end
+        return
+    end
+    
+    local jobConfig = GetJob(jobData.name)
+    local isOnDuty = jobData.onDuty and "En service" or "Hors service"
+    
+    -- Affichage simple dans le chat
+    local message = string.format(
+        "^3[JOB INFO]^0\n" ..
+        "^2Métier:^0 %s\n" .. 
+        "^2Grade:^0 %s\n" ..
+        "^2Salaire:^0 $%s\n" ..
+        "^2Statut:^0 %s",
+        jobData.label or jobData.name,
+        jobData.gradeLabel or jobData.grade_label or "Grade " .. (jobData.grade or 0),
+        (jobData.salary or 0),
+        isOnDuty
+    )
+    
+    TriggerClientEvent('chat:addMessage', source, {
+        color = {255, 255, 255},
+        multiline = true,
+        args = {message}
+    })
+end, false)
+
+-- Commande pour afficher les stats détaillées
+RegisterCommand('jobstats', function(source, args, rawCommand)
+    local player, error, jobData = GetValidPlayer(source)
+    if not player then
+        if error then print(error) end
+        return
+    end
+    
+    local jobConfig = GetJob(jobData.name)
+    
+    -- Compter les collègues en ligne
+    local colleagues = 0
+    for _, otherPlayer in pairs(vCore.GetPlayers()) do
+        if otherPlayer then
+            local _, _, otherJobData = GetValidPlayer(otherPlayer.source)
+            if otherJobData and otherJobData.name == jobData.name and otherPlayer.source ~= source then
+                colleagues = colleagues + 1
+            end
+        end
+    end
+    
+    -- Préparer les données job complètes avec plus d'informations
+    local jobDisplayData = {
+        name = jobData.name,
+        label = jobData.label,
+        gradeLabel = jobData.gradeLabel or jobData.grade_label,
+        salary = jobData.salary or 0,
+        onDuty = jobData.onDuty or false,
+        colleagues = colleagues,
+        permissions = jobData.permissions or {},
+        -- Ajouter des informations supplémentaires si disponibles
+        society_money = GetSocietyAccount(jobData.name) or 0
+    }
+    
+    -- Ouvrir la carte d'informations job détaillée
+    TriggerClientEvent('vCore:jobs:openJobInfo', source, jobDisplayData)
+end, false)
 
 RegisterNetEvent('vCore:jobs:withdrawMoney', function(amount)
     local source = source

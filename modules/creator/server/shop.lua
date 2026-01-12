@@ -121,8 +121,8 @@ vCore.RegisterServerCallback('vava_creator:buyClothing', function(source, cb, pl
     end
     
     -- Log l'achat
-    if vCore.Logs then
-        vCore.Logs('shop_purchase', string.format(
+    if vCore.Log then
+        vCore.Log('shop', player:GetIdentifier(), string.format(
             '%s a acheté un vêtement (%s) pour $%d chez %s',
             player.PlayerData.firstname .. ' ' .. player.PlayerData.lastname,
             data.category,
@@ -305,8 +305,8 @@ vCore.RegisterServerCallback('vava_creator:buySurgery', function(source, cb, pla
     end
     
     -- Log
-    if vCore.Logs then
-        vCore.Logs('surgery', string.format(
+    if vCore.Log then
+        vCore.Log('shop', player:GetIdentifier(), string.format(
             '%s a effectué une chirurgie esthétique pour $%d',
             player.PlayerData.firstname .. ' ' .. player.PlayerData.lastname,
             price

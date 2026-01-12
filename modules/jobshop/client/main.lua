@@ -415,12 +415,8 @@ function DrawText3D(x, y, z, text)
 end
 
 function Notify(message, type)
-    if GetResourceState('ox_lib') == 'started' then
-        exports.ox_lib:notify({
-            title = 'JobShop',
-            description = message,
-            type = type or 'info'
-        })
+    if vCore and vCore.Notify then
+        vCore.Notify(message, type or 'info')
     else
         TriggerEvent('vCore:notification', message, type)
     end

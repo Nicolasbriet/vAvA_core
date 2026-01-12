@@ -92,11 +92,19 @@ window.addEventListener('message', (event) => {
 });
 
 function fetchNUI(event, data = {}) {
-    return fetch(`https://${GetParentResourceName()}/${event}`, {
+    const resourceName = GetParentResourceName();
+    console.log(`[Concess] fetchNUI: ${event} vers ressource: ${resourceName}`);
+    return fetch(`https://${resourceName}/${event}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(data)
-    }).then(resp => resp.json()).catch(() => ({}));
+    }).then(resp => {
+        console.log(`[Concess] Réponse reçue pour ${event}`);
+        return resp.json();
+    }).catch((err) => {
+        console.error(`[Concess] Erreur fetch ${event}:`, err);
+        return {};
+    });
 }
 
 // ================================
@@ -134,13 +142,22 @@ function openNUI(data) {
 }
 
 function hideUI() {
+    console.log('[Concess] Masquage de l\'UI');
     document.getElementById('app').classList.add('hidden');
     document.getElementById('admin-panel').classList.add('hidden');
 }
 
 function closeNUI() {
-    fetchNUI('close');
-    hideUI();
+    console.log('[Concess] closeNUI appelé');
+    // Appeler le callback Lua AVANT de masquer l'UI
+    fetchNUI('close').then(() => {
+        console.log('[Concess] Callback close exécuté avec succès');
+        hideUI();
+    }).catch((err) => {
+        console.error('[Concess] Erreur callback close:', err);
+        // En cas d'erreur, masquer quand même l'UI
+        hideUI();
+    });
 }
 
 // ================================
@@ -272,6 +289,7 @@ function renderVehicles(vehiclesList) {
         
         // Utiliser l'image par défaut si aucune image n'est définie
         const imageSrc = vehicle.image || 'img/default.svg';
+        const priceToShow = vehicle.priceWithTax || vehicle.price;
         
         card.innerHTML = `
             <div class="vehicle-image">
@@ -280,7 +298,7 @@ function renderVehicles(vehiclesList) {
                      alt="${vehicle.name}">
             </div>
             <div class="vehicle-name">${vehicle.name}</div>
-            <div class="vehicle-card-price">$${formatNumber(vehicle.price)}</div>
+            <div class="vehicle-card-price">$${formatNumber(priceToShow)}</div>
         `;
         
         card.addEventListener('click', () => selectVehicle(vehicle));
@@ -320,7 +338,18 @@ function updateDetailsPanel() {
 
     if (selectedVehicle) {
         nameEl.textContent = selectedVehicle.name;
-        priceEl.textContent = '$' + formatNumber(selectedVehicle.price);
+        
+        // Afficher prix HT et TTC
+        const basePrice = selectedVehicle.price || 0;
+        const priceWithTax = selectedVehicle.priceWithTax || basePrice;
+        const tax = priceWithTax - basePrice;
+        
+        priceEl.innerHTML = `
+            <div style="font-size: 24px; font-weight: bold;">$${formatNumber(priceWithTax)}</div>
+            <div style="font-size: 14px; color: #aaa; margin-top: 5px;">
+                Prix HT: $${formatNumber(basePrice)} | Taxe: $${formatNumber(tax)}
+            </div>
+        `;
         buyBtn.disabled = false;
     } else {
         nameEl.textContent = 'Sélectionnez un véhicule';
@@ -507,5 +536,10 @@ function formatNumber(num) {
 }
 
 function GetParentResourceName() {
-    return window.GetParentResourceName ? window.GetParentResourceName() : 'vAvA_core';
+    // Vérifier si la fonction native FiveM existe
+    if (typeof window !== 'undefined' && window.GetParentResourceName && window.GetParentResourceName !== GetParentResourceName) {
+        return window.GetParentResourceName();
+    }
+    // Le nom de la ressource est vAvA_concess, pas vAvA_core
+    return 'vAvA_concess';
 }

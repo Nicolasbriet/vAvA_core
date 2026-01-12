@@ -22,7 +22,7 @@ Locale['en'] = {
     ['carjack_failed'] = 'Lockpicking ~r~failed~s~',
     ['carjacking'] = 'Lockpicking in progress...',
     
-    -- ox_lib interface
+    -- vCore UI interface
     ['give_keys_title'] = 'Give Keys',
     ['give_keys_desc'] = 'Select a nearby player',
     ['player_id'] = 'Player ID',

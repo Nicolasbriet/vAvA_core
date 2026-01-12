@@ -53,3 +53,8 @@ files {
     'html/js/app.js',
     'locales/*.lua'
 }
+
+client_exports {
+    'ApplySkin',
+    'GetCurrentSkin'
+}

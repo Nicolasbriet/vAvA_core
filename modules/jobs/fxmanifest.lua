@@ -21,7 +21,8 @@ server_scripts {
     'server/main.lua',
     'server/database.lua',
     'server/interactions.lua',
-    'server/creator.lua'
+    'server/creator.lua',
+    'test_improvements.lua'
 }
 
 ui_page 'html/index.html'

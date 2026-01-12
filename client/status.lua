@@ -1,15 +1,21 @@
 --[[
     vAvA_core - Client Status
     Gestion des status (faim, soif, stress)
+    
+    ⚠️ FICHIER DÉSACTIVÉ ⚠️
+    Tout est géré par:
+    - modules/status pour hunger/thirst/effets visuels
+    - modules/ems pour la vie/mort
 ]]
 
 vCore = vCore or {}
 vCore.Status = {}
 
 -- ═══════════════════════════════════════════════════════════════════════════
--- DÉCRÉMENTATION DES STATUS
+-- DÉSACTIVÉ: La décrémentation est faite par modules/status/server/main.lua
 -- ═══════════════════════════════════════════════════════════════════════════
 
+--[[ DÉSACTIVÉ: Module modules/status gère la décrémentation
 CreateThread(function()
     while true do
         Wait(60000) -- Toutes les minutes
@@ -39,11 +45,14 @@ CreateThread(function()
         end
     end
 end)
+]]
 
 -- ═══════════════════════════════════════════════════════════════════════════
--- EFFETS DES STATUS
+-- EFFETS DES STATUS - DÉSACTIVÉ (géré par modules/status + modules/ems)
 -- ═══════════════════════════════════════════════════════════════════════════
 
+--[[ DÉSACTIVÉ: Le module modules/status gère les effets visuels
+     et le module modules/ems gère la vie/mort
 CreateThread(function()
     while true do
         Wait(5000) -- Toutes les 5 secondes
@@ -92,7 +101,7 @@ CreateThread(function()
         end
     end
 end)
-
+]]
 -- ═══════════════════════════════════════════════════════════════════════════
 -- FONCTIONS STATUS
 -- ═══════════════════════════════════════════════════════════════════════════

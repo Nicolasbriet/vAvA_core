@@ -245,6 +245,50 @@ end
 -- ITEMS PAR DÉFAUT
 -- ═══════════════════════════════════════════════════════════════════════════
 
+-- Fonction pour enregistrer automatiquement les items du module status
+CreateThread(function()
+    -- Attendre que le module status soit chargé
+    while GetResourceState('vAvA_status') ~= 'started' do
+        Wait(1000)
+    end
+    
+    Wait(2000) -- Attendre que le module soit complètement initialisé
+    
+    -- Récupérer la configuration des items consommables depuis le module status
+    local success, statusConfig = pcall(function()
+        if exports['vAvA_status'] and exports['vAvA_status'].GetConsumableItems then
+            return exports['vAvA_status']:GetConsumableItems()
+        end
+        return nil
+    end)
+    
+    if success and statusConfig then
+        print("^2[vCore Inventory]^7 Enregistrement automatique des items du module status...")
+        
+        for itemName, itemData in pairs(statusConfig) do
+            if not usableItems[itemName] then -- Ne pas écraser les items existants
+                vCore.Inventory.RegisterUsableItem(itemName, function(source, item)
+                    local player = vCore.GetPlayer(source)
+                    if not player then return end
+                    
+                    -- Utiliser le module status
+                    exports['vAvA_status']:ConsumeItem(source, itemName)
+                    vCore.Inventory.RemoveItem(source, itemName, 1)
+                    
+                    -- Notification avec le nom de l'item
+                    local itemInfo = vCore.Cache.Items.Get(itemName)
+                    local itemLabel = itemInfo and itemInfo.label or itemName
+                    vCore.Notify(source, Lang('item_used', itemLabel), 'success')
+                end)
+                
+                print(string.format("^2[vCore Inventory]^7 Item enregistré: %s", itemName))
+            end
+        end
+    else
+        print("^3[vCore Inventory]^7 Impossible de récupérer les items du module status, utilisation des items par défaut")
+    end
+end)
+
 -- Bandage
 vCore.Inventory.RegisterUsableItem('bandage', function(source, item)
     local player = vCore.GetPlayer(source)
@@ -277,7 +321,14 @@ vCore.Inventory.RegisterUsableItem('bread', function(source, item)
     local player = vCore.GetPlayer(source)
     if not player then return end
     
-    player:AddStatus('hunger', 20)
+    -- Utiliser le module status si disponible
+    if GetResourceState('vAvA_status') == 'started' then
+        exports['vAvA_status']:ConsumeItem(source, 'bread')
+    else
+        -- Fallback
+        player:AddStatus('hunger', 20)
+    end
+    
     vCore.Inventory.RemoveItem(source, 'bread', 1)
     vCore.Notify(source, Lang('item_used', 'Pain'), 'success')
 end)
@@ -287,7 +338,14 @@ vCore.Inventory.RegisterUsableItem('burger', function(source, item)
     local player = vCore.GetPlayer(source)
     if not player then return end
     
-    player:AddStatus('hunger', 35)
+    -- Utiliser le module status si disponible
+    if GetResourceState('vAvA_status') == 'started' then
+        exports['vAvA_status']:ConsumeItem(source, 'burger')
+    else
+        -- Fallback
+        player:AddStatus('hunger', 35)
+    end
+    
     vCore.Inventory.RemoveItem(source, 'burger', 1)
     vCore.Notify(source, Lang('item_used', 'Burger'), 'success')
 end)
@@ -297,7 +355,14 @@ vCore.Inventory.RegisterUsableItem('water', function(source, item)
     local player = vCore.GetPlayer(source)
     if not player then return end
     
-    player:AddStatus('thirst', 30)
+    -- Utiliser le module status si disponible
+    if GetResourceState('vAvA_status') == 'started' then
+        exports['vAvA_status']:ConsumeItem(source, 'water')
+    else
+        -- Fallback
+        player:AddStatus('thirst', 30)
+    end
+    
     vCore.Inventory.RemoveItem(source, 'water', 1)
     vCore.Notify(source, Lang('item_used', 'Eau'), 'success')
 end)
@@ -307,8 +372,15 @@ vCore.Inventory.RegisterUsableItem('coffee', function(source, item)
     local player = vCore.GetPlayer(source)
     if not player then return end
     
-    player:AddStatus('thirst', 20)
-    player:RemoveStatus('stress', 10)
+    -- Utiliser le module status si disponible
+    if GetResourceState('vAvA_status') == 'started' then
+        exports['vAvA_status']:ConsumeItem(source, 'coffee')
+    else
+        -- Fallback
+        player:AddStatus('thirst', 20)
+        player:RemoveStatus('stress', 10)
+    end
+    
     vCore.Inventory.RemoveItem(source, 'coffee', 1)
     vCore.Notify(source, Lang('item_used', 'Café'), 'success')
 end)

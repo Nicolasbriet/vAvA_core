@@ -47,12 +47,8 @@ end)
 -- ================================
 
 local function Notify(message, type)
-    if GetResourceState('ox_lib') == 'started' then
-        exports.ox_lib:notify({
-            title = 'Assise',
-            description = message,
-            type = type or 'info'
-        })
+    if vCore and vCore.Notify then
+        vCore.Notify(message, type or 'info')
     else
         TriggerEvent('vCore:notification', message, type)
     end
@@ -128,29 +124,28 @@ function OpenAnimationMenu(pointId)
         return
     end
     
-    if GetResourceState('ox_lib') == 'started' then
+    -- Utiliser vCore.UI.ShowMenu
+    if vCore and vCore.UI and vCore.UI.ShowMenu then
         local options = {}
         
         for i, animData in ipairs(SitConfig.Animations) do
             table.insert(options, {
-                title = animData.name,
-                description = animData.description,
-                icon = 'chair',
-                onSelect = function()
-                    SitDown(pointId, i)
-                end
+                label = animData.name,
+                value = i,
+                description = animData.description
             })
         end
         
-        exports.ox_lib:registerContext({
-            id = 'sit_animation_menu',
+        vCore.UI.ShowMenu({
             title = 'Choisir une position',
             options = options
-        })
-        
-        exports.ox_lib:showContext('sit_animation_menu')
+        }, function(value, index)
+            if value then
+                SitDown(pointId, value)
+            end
+        end)
     else
-        -- Fallback sans ox_lib
+        -- Fallback sans menu
         SitDown(pointId, 1)
     end
 end
@@ -437,105 +432,120 @@ function OpenAdminMenu()
         return
     end
     
-    if GetResourceState('ox_lib') == 'started' then
-        local options = {
-            {
-                title = 'Créer un point',
-                description = 'Entrer en mode création',
-                icon = 'plus',
-                onSelect = function()
-                    EnterEditMode(nil)
-                end
-            },
-            {
-                title = 'Lister les points',
-                description = tableLength(sitPoints) .. ' point(s) enregistré(s)',
-                icon = 'list',
-                onSelect = function()
-                    OpenPointsList()
-                end
-            }
-        }
+    -- Utiliser vCore.UI.ShowMenu
+    if vCore and vCore.UI and vCore.UI.ShowMenu then
+        local options = {}
         
         if isEditMode then
-            table.insert(options, 1, {
-                title = 'Quitter mode édition',
-                icon = 'times',
-                onSelect = function()
-                    ExitEditMode()
-                end
+            table.insert(options, {
+                label = '❌ Quitter mode édition',
+                value = 'exit_edit'
             })
         end
         
-        exports.ox_lib:registerContext({
-            id = 'sit_admin_menu',
-            title = '🪑 Gestion des Points d\'Assise',
-            options = options
+        table.insert(options, {
+            label = '➕ Créer un point',
+            value = 'create',
+            description = 'Entrer en mode création'
         })
         
-        exports.ox_lib:showContext('sit_admin_menu')
+        table.insert(options, {
+            label = '📋 Lister les points',
+            value = 'list',
+            description = tableLength(sitPoints) .. ' point(s) enregistré(s)'
+        })
+        
+        vCore.UI.ShowMenu({
+            title = '🪑 Gestion des Points d\'Assise',
+            options = options
+        }, function(value, index)
+            if value == 'exit_edit' then
+                ExitEditMode()
+            elseif value == 'create' then
+                EnterEditMode(nil)
+            elseif value == 'list' then
+                OpenPointsList()
+            end
+        end)
     end
 end
 
 function OpenPointsList()
-    if GetResourceState('ox_lib') ~= 'started' then return end
+    if not vCore or not vCore.UI or not vCore.UI.ShowMenu then return end
     
     local options = {}
     
     for id, point in pairs(sitPoints) do
         table.insert(options, {
-            title = 'Point #' .. id,
-            description = string.format('Position: %.1f, %.1f, %.1f', point.coords.x, point.coords.y, point.coords.z),
-            icon = 'chair',
-            menu = 'sit_point_actions_' .. id
-        })
-        
-        exports.ox_lib:registerContext({
-            id = 'sit_point_actions_' .. id,
-            title = 'Point #' .. id,
-            menu = 'sit_points_list',
-            options = {
-                {
-                    title = 'Modifier',
-                    icon = 'edit',
-                    onSelect = function()
-                        EnterEditMode(id)
-                    end
-                },
-                {
-                    title = 'Téléporter',
-                    icon = 'map-marker',
-                    onSelect = function()
-                        SetEntityCoords(PlayerPedId(), point.coords.x, point.coords.y, point.coords.z, false, false, false, false)
-                    end
-                },
-                {
-                    title = 'Supprimer',
-                    icon = 'trash',
-                    onSelect = function()
-                        TriggerServerEvent('vCore:sit:deletePoint', id)
-                    end
-                }
-            }
+            label = 'Point #' .. id,
+            value = id,
+            description = string.format('Position: %.1f, %.1f, %.1f', point.coords.x, point.coords.y, point.coords.z)
         })
     end
     
     if #options == 0 then
         table.insert(options, {
-            title = 'Aucun point',
-            description = 'Créez votre premier point d\'assise',
-            icon = 'info'
+            label = 'Aucun point',
+            value = 'none',
+            description = 'Créez votre premier point d\'assise'
         })
     end
     
-    exports.ox_lib:registerContext({
-        id = 'sit_points_list',
-        title = 'Points d\'Assise',
-        menu = 'sit_admin_menu',
-        options = options
+    table.insert(options, {
+        label = '⬅️ Retour',
+        value = 'back'
     })
     
-    exports.ox_lib:showContext('sit_points_list')
+    vCore.UI.ShowMenu({
+        title = 'Points d\'Assise',
+        options = options
+    }, function(value, index)
+        if value == 'back' or value == 'none' then
+            OpenAdminMenu()
+        else
+            OpenPointActions(value)
+        end
+    end)
+end
+
+-- Actions pour un point spécifique
+function OpenPointActions(pointId)
+    local point = sitPoints[tostring(pointId)]
+    if not point then return end
+    
+    local options = {
+        {
+            label = '✏️ Modifier',
+            value = 'edit'
+        },
+        {
+            label = '📍 Téléporter',
+            value = 'teleport'
+        },
+        {
+            label = '🗑️ Supprimer',
+            value = 'delete'
+        },
+        {
+            label = '⬅️ Retour',
+            value = 'back'
+        }
+    }
+    
+    vCore.UI.ShowMenu({
+        title = 'Point #' .. pointId,
+        options = options
+    }, function(value, index)
+        if value == 'edit' then
+            EnterEditMode(pointId)
+        elseif value == 'teleport' then
+            SetEntityCoords(PlayerPedId(), point.coords.x, point.coords.y, point.coords.z, false, false, false, false)
+        elseif value == 'delete' then
+            TriggerServerEvent('vCore:sit:deletePoint', pointId)
+        elseif value == 'back' then
+            OpenPointsList()
+        end
+    end)
 end
 
 -- ================================

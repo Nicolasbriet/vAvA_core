@@ -99,15 +99,7 @@ local function GetPlayer(source)
 end
 
 local function Notify(source, message, type)
-    if GetResourceState('ox_lib') == 'started' then
-        TriggerClientEvent('ox_lib:notify', source, {
-            title = 'JobShop',
-            description = message,
-            type = type or 'info'
-        })
-    else
-        TriggerClientEvent('vCore:notification', source, message, type)
-    end
+    TriggerClientEvent('vCore:notify', source, message, type or 'info')
 end
 
 local function IsAdmin(source)

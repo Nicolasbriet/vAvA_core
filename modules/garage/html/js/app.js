@@ -50,7 +50,7 @@ window.addEventListener('message', (event) => {
 });
 
 function fetchNUI(event, data = {}) {
-    return fetch(`https://${GetParentResourceName()}/${event}`, {
+    return fetch(`https://${GetResourceName()}/${event}`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(data)
@@ -252,6 +252,9 @@ function closeAdmin() {
     document.getElementById('app').classList.remove('hidden');
 }
 
-function GetParentResourceName() {
-    return window.GetParentResourceName ? window.GetParentResourceName() : 'vAvA_core';
+// Récupérer le nom de la ressource parente (fourni par FiveM)
+const resourceName = window.GetParentResourceName ? window.GetParentResourceName() : 'vava_garage';
+
+function GetResourceName() {
+    return resourceName;
 }

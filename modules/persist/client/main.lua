@@ -48,12 +48,8 @@ local function NormalizePlate(plate)
 end
 
 local function Notify(message, type)
-    if GetResourceState('ox_lib') == 'started' then
-        exports.ox_lib:notify({
-            title = 'Véhicule',
-            description = message,
-            type = type or 'info'
-        })
+    if vCore and vCore.Notify then
+        vCore.Notify(message, type or 'info')
     else
         TriggerEvent('vCore:notification', message, type)
     end

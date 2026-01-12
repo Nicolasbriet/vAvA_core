@@ -159,7 +159,7 @@ local function CanUseImpound(src)
     local player = vCore.Functions.GetPlayer(src)
     if not player then return false end
     
-    local jobName = player.PlayerData.job and player.PlayerData.job.name or nil
+    local jobName = player.job and player.job.name or nil
     for _, job in ipairs(GarageConfig.ImpoundJobs) do
         if jobName == job then
             return true
@@ -168,12 +168,12 @@ local function CanUseImpound(src)
     return false
 end
 
--- Récupérer le citizenid d'un joueur
+-- Récupérer le citizenid d'un joueur (utilise charId - véhicule lié au personnage)
 local function GetPlayerCitizenId(src)
     if vCore then
         local player = vCore.Functions.GetPlayer(src)
-        if player and player.PlayerData then
-            return player.PlayerData.citizenid
+        if player then
+            return player.charId
         end
     end
     return nil
@@ -321,7 +321,7 @@ AddEventHandler('vcore_garage:requestVehicles', function(garageName, vehicleType
     local player = vCore.Functions.GetPlayer(src)
     if not player then return end
     
-    local citizenid = player.PlayerData.citizenid
+    local citizenid = player.charId
     local query, params
     
     if isImpound then
@@ -378,7 +378,7 @@ AddEventHandler('vcore_garage:spawnVehicle', function(plate, garageName, isImpou
     local player = vCore.Functions.GetPlayer(src)
     if not player then return end
     
-    local citizenid = player.PlayerData.citizenid
+    local citizenid = player.charId
     local cleanPlate = string.gsub(plate, '%s+', '')
     
     -- Vérifier la propriété
@@ -464,7 +464,7 @@ AddEventHandler('vcore_garage:spawnVehicle', function(plate, garageName, isImpou
             
             -- Configurer le véhicule
             SetVehicleNumberPlateText(veh, plate)
-            SetEntityAsMissionEntity(veh, true, true)
+            -- Note: SetEntityAsMissionEntity est client-side only, géré par le client
             
             -- Marquer comme sorti
             local netId = NetworkGetNetworkIdFromEntity(veh)
@@ -512,7 +512,7 @@ AddEventHandler('vcore_garage:storeVehicle', function(netId, garageName)
     local player = vCore.Functions.GetPlayer(src)
     if not player then return end
     
-    local citizenid = player.PlayerData.citizenid
+    local citizenid = player.charId
     local veh = NetworkGetEntityFromNetworkId(netId)
     
     if not veh or not DoesEntityExist(veh) then

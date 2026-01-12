@@ -55,39 +55,60 @@ end)
 
 -- Fermeture sécurisée du concessionnaire
 function SafeCloseConcessionnaire()
+    print('^3[vCore:Concess] Début de la fermeture...^0')
+    
     -- Désactiver la surveillance
     ToggleDistanceCheck(false)
+    
+    -- Fermer le NUI IMMÉDIATEMENT pour éviter les interactions
+    SetNuiFocus(false, false)
+    nuiOpen = false
+    SendNUIMessage({ action = 'close' })
     
     -- Nettoyer le véhicule preview
     if previewVeh and DoesEntityExist(previewVeh) then
         DeleteEntity(previewVeh)
         previewVeh = nil
+        print('^3[vCore:Concess] Véhicule preview supprimé^0')
     end
     
-    -- Restaurer la caméra AVANT le NUI
+    -- DÉSACTIVATION COMPLÈTE DE LA CAMÉRA SCRIPT
+    print('^3[vCore:Concess] Désactivation de la caméra...^0')
+    
+    -- Forcer le retour à la caméra gameplay AVANT de détruire
+    RenderScriptCams(false, false, 0, true, false)
+    
+    -- Détruire la caméra si elle existe
     if staticCam then
-        RenderScriptCams(false, true, 500, true, true)
-        Wait(100)
-        SetCamActive(staticCam, false)
-        DestroyCam(staticCam, false)
+        if DoesCamExist(staticCam) then
+            SetCamActive(staticCam, false)
+            DestroyCam(staticCam, true)
+            print('^3[vCore:Concess] Caméra détruite^0')
+        end
         staticCam = nil
     end
+    
+    -- Double sécurité: forcer le retour à la caméra normale
+    RenderScriptCams(false, false, 0, false, false)
+    Wait(100)
     
     -- Restaurer le joueur
     local playerPed = PlayerPedId()
     FreezeEntityPosition(playerPed, false)
     SetEntityVisible(playerPed, true, false)
+    SetEntityCollision(playerPed, true, true)
+    SetEntityInvincible(playerPed, false)
     
     -- Reset caméra gameplay
     SetGameplayCamRelativeHeading(0.0)
     SetGameplayCamRelativePitch(0.0, 1.0)
     
-    -- Fermer le NUI
-    SetNuiFocus(false, false)
-    nuiOpen = false
-    SendNUIMessage({ action = 'close' })
+    -- Réactiver les contrôles
+    EnableAllControlActions(0)
     
     lastCloseTime = GetGameTimer()
+    
+    print('^2[vCore:Concess] Concessionnaire fermé et caméra restaurée^0')
 end
 
 -- Alias pour compatibilité
@@ -288,7 +309,7 @@ RegisterNUICallback('selectPreview', function(data, cb)
         SetVehicleLivery(previewVeh, data.livery)
     end
     
-    cb('ok')
+    cb({status = 'ok'})
 end)
 
 -- Rotation du véhicule preview
@@ -302,7 +323,7 @@ RegisterNUICallback('rotatePreview', function(data, cb)
         end
         SetEntityHeading(previewVeh, previewVehHeading)
     end
-    cb('ok')
+    cb({status = 'ok'})
 end)
 
 -- Changement de couleur
@@ -312,7 +333,7 @@ RegisterNUICallback('changeColor', function(data, cb)
         local secondary = tonumber(data.secondary) or 0
         SetVehicleColours(previewVeh, primary, secondary)
     end
-    cb('ok')
+    cb({status = 'ok'})
 end)
 
 -- Changement de livrée
@@ -327,7 +348,7 @@ RegisterNUICallback('changeLivery', function(data, cb)
             SetVehicleLivery(previewVeh, -1)
         end
     end
-    cb('ok')
+    cb({status = 'ok'})
 end)
 
 -- Obtenir le nombre de livrées
@@ -341,14 +362,24 @@ end)
 
 -- Fermeture du NUI
 RegisterNUICallback('close', function(_, cb)
-    cb('ok')
-    SafeCloseConcessionnaire()
-    currentDealershipPosition = nil
+    print('^3[vCore:Concess] Callback close reçu du NUI^0')
+    cb({status = 'ok'}) -- Retourner un objet JSON valide
     
-    if lastConcessPosition then
-        local playerPed = PlayerPedId()
-        SetEntityCoords(playerPed, lastConcessPosition.x, lastConcessPosition.y, lastConcessPosition.z, false, false, false, true)
-    end
+    -- Utiliser CreateThread pour éviter les blocages dans le callback
+    CreateThread(function()
+        -- Repositionner le joueur AVANT de fermer
+        if lastConcessPosition then
+            print('^3[vCore:Concess] Repositionnement du joueur^0')
+            local playerPed = PlayerPedId()
+            SetEntityCoords(playerPed, lastConcessPosition.x, lastConcessPosition.y, lastConcessPosition.z, false, false, false, true)
+            Wait(100)
+        end
+        
+        -- Puis fermer tout
+        print('^3[vCore:Concess] Appel de SafeCloseConcessionnaire^0')
+        SafeCloseConcessionnaire()
+        currentDealershipPosition = nil
+    end)
 end)
 
 -- Achat d'un véhicule
@@ -356,17 +387,17 @@ RegisterNUICallback('buyVehicle', function(data, cb)
     data.vehicleType = currentVehicleType
     data.isJobOnly = currentIsJobOnly
     TriggerServerEvent('vcore_concess:buyVehicle', data)
-    cb('ok')
+    cb({status = 'ok'})
 end)
 
 -- Actions admin
 RegisterNUICallback('adminAction', function(data, cb)
     TriggerServerEvent('vcore_concess:adminAction', data)
-    cb('ok')
+    cb({status = 'ok'})
 end)
 
 RegisterNUICallback('chooseColor', function(data, cb)
-    cb('ok')
+    cb({status = 'ok'})
 end)
 
 -- ================================
@@ -403,9 +434,16 @@ AddEventHandler('vcore_concess:sendVehicles', function(vehList, isAdmin, serverP
     currentVehicleType = vehicleType or 'cars'
     currentIsJobOnly = isJobOnly or false
     
-    -- Trouver la position du concessionnaire
+    -- Sauvegarder la position ACTUELLE du joueur avant d'ouvrir le menu
     local plyPed = PlayerPedId()
     local plyCoords = GetEntityCoords(plyPed)
+    lastConcessPosition = {
+        x = plyCoords.x,
+        y = plyCoords.y,
+        z = plyCoords.z
+    }
+    
+    -- Trouver la position du concessionnaire
     for dealershipId, dealership in pairs(ConcessConfig.Dealerships) do
         local dist = #(plyCoords - dealership.position)
         if dist <= ConcessConfig.General.InteractionDistance then
@@ -707,15 +745,46 @@ Citizen.CreateThread(function()
         Wait(0)
         if nuiOpen then
             if IsControlJustReleased(0, 177) then -- Escape
-                cleanupPreviewOnExit()
+                SafeCloseConcessionnaire()
                 currentDealershipPosition = nil
-                SetNuiFocus(false, false)
-                nuiOpen = false
-                SendNUIMessage({ action = 'close' })
             end
             Wait(500)
         end
     end
 end)
+
+-- Commande d'urgence pour forcer la fermeture si bloqué
+RegisterCommand('concessfix', function()
+    print('^3[vCore:Concess] Fermeture forcée du concessionnaire^0')
+    
+    -- Forcer la fermeture complète
+    SafeCloseConcessionnaire()
+    currentDealershipPosition = nil
+    
+    -- Double sécurité: tout réinitialiser
+    if staticCam then
+        SetCamActive(staticCam, false)
+        DestroyCam(staticCam, true)
+        staticCam = nil
+    end
+    RenderScriptCams(false, false, 0, true, true)
+    
+    if previewVeh and DoesEntityExist(previewVeh) then
+        DeleteEntity(previewVeh)
+        previewVeh = nil
+    end
+    
+    local ped = PlayerPedId()
+    FreezeEntityPosition(ped, false)
+    SetEntityVisible(ped, true, false)
+    SetEntityCollision(ped, true, true)
+    EnableAllControlActions(0)
+    
+    if lastConcessPosition then
+        SetEntityCoords(ped, lastConcessPosition.x, lastConcessPosition.y, lastConcessPosition.z, false, false, false, true)
+    end
+    
+    print('^2[vCore:Concess] Réinitialisation complète effectuée^0')
+end, false)
 
 print('^2[vCore:Concess] Client initialisé^0')

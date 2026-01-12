@@ -9,8 +9,11 @@ $(document).ready(function() {
             case 'openMenu':
                 openMenu(data.id, data.title, data.options);
                 break;
+            case 'openJobInfo':
+                openJobInfo(data.jobData);
+                break;
             case 'close':
-                closeMenu();
+                closeAllMenus();
                 break;
         }
     });
@@ -18,7 +21,7 @@ $(document).ready(function() {
     // Fermer avec ESC
     $(document).keyup(function(e) {
         if (e.key === "Escape") {
-            closeMenu();
+            closeAllMenus();
         }
     });
 
@@ -34,7 +37,7 @@ $(document).ready(function() {
         if (!options || options.length === 0) {
             $('#menu-options').html(`
                 <div class="empty-state">
-                    <i class="fas fa-inbox"></i>
+                    <i class="fas fa-briefcase"></i>
                     <p>Aucune option disponible</p>
                 </div>
             `);
@@ -46,7 +49,146 @@ $(document).ready(function() {
         }
         
         $('#jobs-menu').removeClass('hidden');
+        setFocus(true);
     }
+
+    /**
+     * Ouvre la carte d'informations job
+     */
+    function openJobInfo(jobData) {
+        if (!jobData) return;
+        
+        // Mettre à jour l'icône selon le job
+        const jobIcons = {
+            'police': 'fas fa-shield-alt',
+            'ambulance': 'fas fa-heartbeat',
+            'mechanic': 'fas fa-wrench',
+            'taxi': 'fas fa-taxi',
+            'unemployed': 'fas fa-user-times'
+        };
+        
+        const icon = jobIcons[jobData.name] || 'fas fa-briefcase';
+        $('#job-card-icon').attr('class', icon);
+        
+        // Informations principales
+        $('#job-card-title').text(jobData.label || 'Job Inconnu');
+        $('#job-card-subtitle').text(jobData.gradeLabel || 'Grade Inconnu');
+        
+        // Statistiques
+        $('#job-salary').text('$' + (jobData.salary || 0).toLocaleString());
+        $('#job-duty').text(jobData.onDuty ? 'En Service' : 'Hors Service');
+        $('#job-colleagues').text(jobData.colleagues || '0');
+        
+        // Permissions
+        const permsList = $('#job-perms-list');
+        permsList.empty();
+        
+        if (jobData.permissions && jobData.permissions.length > 0) {
+            jobData.permissions.forEach(perm => {
+                permsList.append(`<span class="perm-badge">${perm}</span>`);
+            });
+        } else {
+            permsList.append('<span class="perm-badge">Aucune</span>');
+        }
+        
+        $('#job-info-card').removeClass('hidden');
+        setFocus(true);
+    }
+
+    /**
+     * Ferme tous les menus
+     */
+    function closeAllMenus() {
+        $('#jobs-menu').addClass('hidden');
+        $('#job-info-card').addClass('hidden');
+        currentMenu = null;
+        setFocus(false);
+        
+        // Notifier le client Lua
+        $.post(`https://${GetParentResourceName()}/close`);
+    }
+
+    /**
+     * Ferme le menu principal
+     */
+    window.closeMenu = function() {
+        $('#jobs-menu').addClass('hidden');
+        currentMenu = null;
+        setFocus(false);
+        
+        $.post(`https://${GetParentResourceName()}/close`);
+    }
+
+    /**
+     * Ferme la carte job
+     */
+    window.closeJobCard = function() {
+        $('#job-info-card').addClass('hidden');
+        setFocus(false);
+        
+        $.post(`https://${GetParentResourceName()}/close`);
+    }
+
+    /**
+     * Gère le focus
+     */
+    function setFocus(focus) {
+        $.post(`https://${GetParentResourceName()}/setFocus`, JSON.stringify({
+            focus: focus,
+            cursor: focus
+        }));
+    }
+
+    /**
+     * Crée un élément d'option pour le menu
+     */
+    function createOptionElement(option, index) {
+        const iconClass = option.icon || 'fas fa-cog';
+        const description = option.description || '';
+        
+        const element = $(`
+            <div class="menu-option" data-action="${option.action}" data-index="${index}">
+                <div class="option-icon">
+                    <i class="${iconClass}"></i>
+                </div>
+                <div class="option-content">
+                    <div class="option-title">${option.label}</div>
+                    ${description ? `<div class="option-description">${description}</div>` : ''}
+                </div>
+                <div class="option-arrow">
+                    <i class="fas fa-chevron-right"></i>
+                </div>
+            </div>
+        `);
+        
+        // Ajouter le gestionnaire de clic
+        element.click(function() {
+            const action = $(this).data('action');
+            const idx = $(this).data('index');
+            
+            if (action && action !== '') {
+                $.post(`https://${GetParentResourceName()}/${action}`, JSON.stringify({
+                    option: option,
+                    index: idx
+                }));
+                
+                // Fermer le menu après sélection si spécifié
+                if (option.closeOnSelect !== false) {
+                    closeMenu();
+                }
+            }
+        });
+        
+        return element;
+    }
+
+    /**
+     * Utilitaire pour obtenir le nom de la ressource parent
+     */
+    function GetParentResourceName() {
+        return window.location.hostname;
+    }
+});
 
     /**
      * Crée un élément d'option

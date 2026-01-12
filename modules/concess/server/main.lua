@@ -50,6 +50,19 @@ Citizen.CreateThread(function()
     print('^2[vCore:Concess] Module concessionnaire initialisé^0')
 end)
 
+---Formate un nombre avec des espaces
+---@param number number
+---@return string
+local function formatNumber(number)
+    local formatted = tostring(math.floor(number))
+    local k
+    while true do  
+        formatted, k = string.gsub(formatted, "^(-?%d+)(%d%d%d)", '%1 %2')
+        if k == 0 then break end
+    end
+    return formatted
+end
+
 ---Obtenir le prix d'un véhicule via le système economy
 ---@param vehicleModel string
 ---@param vehicleType string
@@ -166,9 +179,10 @@ end
 -- Récupérer l'identifiant citizenid d'un joueur
 local function GetPlayerCitizenId(src)
     if vCore then
-        local player = vCore.Functions.GetPlayer(src)
-        if player and player.PlayerData then
-            return player.PlayerData.citizenid
+        local player = vCore.GetPlayer(src)
+        if player then
+            -- vCore utilise charId (véhicule lié au personnage)
+            return player.charId
         end
     end
     return nil
@@ -299,15 +313,31 @@ AddEventHandler('vcore_concess:requestVehicles', function(isJobOnly, vehicleType
         return 
     end
     
-    local player = vCore.Functions.GetPlayer(src)
-    if not player then return end
+    -- Attendre que les données du joueur soient chargées (max 5 secondes)
+    local player = nil
+    local attempts = 0
+    while attempts < 50 do
+        player = vCore.GetPlayer(src)
+        if player and player.job then
+            break
+        end
+        attempts = attempts + 1
+        Wait(100)
+    end
+    
+    if not player then 
+        print('[vCore:Concess] ERREUR: Joueur non chargé pour ' .. src .. ' après ' .. attempts .. ' tentatives')
+        TriggerClientEvent('vcore_concess:error', src, 'Vos données joueur ne sont pas chargées. Reconnectez-vous ou attendez quelques secondes.')
+        return 
+    end
     
     vehicleType = vehicleType or 'cars'
     local isAdmin = IsPlayerAdmin(src)
     local playerJob = nil
     
-    if player.PlayerData.job and player.PlayerData.job.name then
-        playerJob = player.PlayerData.job.name
+    -- vCore utilise directement player.job, pas player.PlayerData.job
+    if player.job and player.job.name then
+        playerJob = player.job.name
     end
     
     print('[vCore:Concess] ConcessConfig.Categories existe?', ConcessConfig and ConcessConfig.Categories and 'OUI' or 'NON')
@@ -332,12 +362,24 @@ AddEventHandler('vcore_concess:requestVehicles', function(isJobOnly, vehicleType
             if isJobOnly then
                 -- Mode job: véhicules avec job défini
                 if v.job and v.job ~= "" then
-                    table.insert(vehList, v)
+                    -- Calculer le prix avec taxe
+                    local vehicleCopy = {}
+                    for k, val in pairs(v) do
+                        vehicleCopy[k] = val
+                    end
+                    vehicleCopy.priceWithTax = ApplyTax(v.price)
+                    table.insert(vehList, vehicleCopy)
                 end
             else
                 -- Mode civil: véhicules sans job
                 if not v.job or v.job == "" then
-                    table.insert(vehList, v)
+                    -- Calculer le prix avec taxe
+                    local vehicleCopy = {}
+                    for k, val in pairs(v) do
+                        vehicleCopy[k] = val
+                    end
+                    vehicleCopy.priceWithTax = ApplyTax(v.price)
+                    table.insert(vehList, vehicleCopy)
                 end
             end
         end
@@ -356,10 +398,23 @@ AddEventHandler('vcore_concess:buyVehicle', function(data)
     local src = source
     
     -- Attendre que vCore soit initialisé si nécessaire
-    if not WaitForVCore(50) or not vCore.Functions then return end
+    if not WaitForVCore(50) or not vCore then 
+        print('[vCore:Concess] ERREUR: vCore non disponible')
+        return 
+    end
     
-    local player = vCore.Functions.GetPlayer(src)
-    if not player then return end
+    local player = vCore.GetPlayer(src)
+    if not player then 
+        print('[vCore:Concess] ERREUR: Player non trouvé pour source ' .. src)
+        return 
+    end
+    
+    -- Debug: vérifier le type de l'objet player
+    print('[vCore:Concess] Type de player:', type(player))
+    print('[vCore:Concess] Player GetMoney existe?', type(player.GetMoney))
+    if player.money then
+        print('[vCore:Concess] player.money existe, type:', type(player.money))
+    end
     
     -- Trouver le véhicule
     local veh = nil
@@ -371,112 +426,129 @@ AddEventHandler('vcore_concess:buyVehicle', function(data)
     end
     
     if not veh then
-        vCore.Functions.Notify(src, 'Véhicule introuvable', 'error')
+        vCore.Notify(src, 'Véhicule introuvable', 'error')
         return
     end
     
-    -- Obtenir le prix via le système economy
-    local basePrice = EconomyEnabled and GetVehiclePrice(veh.model, data.vehicleType) or veh.price
+    -- Debug prix
+    print('[vCore:Concess] Véhicule trouvé:', veh.model)
+    print('[vCore:Concess] Prix du véhicule:', veh.price)
+    print('[vCore:Concess] EconomyEnabled:', EconomyEnabled)
+    
+    -- Obtenir le prix - toujours utiliser veh.price comme base
+    local basePrice = veh.price
+    
+    -- Si economy est activé, essayer d'obtenir le prix depuis economy (mais fallback sur veh.price)
+    if EconomyEnabled then
+        local economyPrice = GetVehiclePrice(veh.model, data.vehicleType)
+        if economyPrice and economyPrice > 0 then
+            basePrice = economyPrice
+            print('[vCore:Concess] Prix economy utilisé:', economyPrice)
+        else
+            print('[vCore:Concess] Economy retourne 0, utilisation du prix du véhicule')
+        end
+    end
+    
+    print('[vCore:Concess] basePrice:', basePrice)
+    
     local price = ApplyTax(basePrice)
+    print('[vCore:Concess] Prix final après taxe:', price)
     
     local paymentMethod = data.method or 'cash'
     local paid = false
     
-    -- Traitement du paiement via vCore
+    -- Traitement du paiement - Utiliser les fonctions vCore simplifiées
     if paymentMethod == 'cash' then
-        if player.Functions.GetMoney('cash') >= price then
-            paid = player.Functions.RemoveMoney('cash', price, 'vehicle-purchase')
+        local playerCash = vCore.GetPlayerMoney(src, 'cash')
+        print('[vCore:Concess] Cash du joueur:', playerCash, 'Prix:', price)
+        if playerCash >= price then
+            paid = vCore.RemovePlayerMoney(src, 'cash', price, 'vehicle-purchase')
             if paid then
-                vCore.Functions.Notify(src, '💵 Paiement en espèces: $' .. price, 'success')
+                vCore.Notify(src, '💵 Véhicule acheté en espèces pour $' .. formatNumber(price), 'success')
+            else
+                vCore.Notify(src, '❌ Erreur lors du paiement', 'error')
+                return
             end
         else
-            vCore.Functions.Notify(src, '❌ Pas assez d\'espèces ($' .. price .. ')', 'error')
+            local manque = price - playerCash
+            vCore.Notify(src, '❌ Argent insuffisant! Il vous manque $' .. formatNumber(manque) .. ' en espèces', 'error')
             return
         end
     elseif paymentMethod == 'bank' then
-        if player.Functions.GetMoney('bank') >= price then
-            paid = player.Functions.RemoveMoney('bank', price, 'vehicle-purchase')
+        local playerBank = vCore.GetPlayerMoney(src, 'bank')
+        print('[vCore:Concess] Banque du joueur:', playerBank, 'Prix:', price)
+        if playerBank >= price then
+            paid = vCore.RemovePlayerMoney(src, 'bank', price, 'vehicle-purchase')
             if paid then
-                vCore.Functions.Notify(src, '🏦 Virement bancaire: $' .. price, 'success')
+                vCore.Notify(src, '🏦 Véhicule acheté par virement bancaire pour $' .. formatNumber(price), 'success')
+            else
+                vCore.Notify(src, '❌ Erreur lors du paiement', 'error')
+                return
             end
         else
-            vCore.Functions.Notify(src, '❌ Pas assez en banque ($' .. price .. ')', 'error')
+            local manque = price - playerBank
+            vCore.Notify(src, '❌ Fonds insuffisants! Il vous manque $' .. formatNumber(manque) .. ' en banque', 'error')
             return
         end
     end
     
     if not paid then
-        vCore.Functions.Notify(src, '❌ Paiement refusé', 'error')
+        vCore.Notify(src, '❌ Paiement refusé', 'error')
         return
     end
     
     -- Générer plaque et enregistrer le véhicule
     local plate = GeneratePlate()
-    local citizenid = player.PlayerData.citizenid
+    local citizenid = player.charId  -- Utiliser charId (véhicule lié au personnage)
     local license = GetPlayerLicense(src)
     
     -- Job uniquement si concess job
     local vehicleJob = nil
     if data.isJobOnly == true then
-        if player.PlayerData.job and player.PlayerData.job.name then
-            vehicleJob = player.PlayerData.job.name
+        if player.job and player.job.name then
+            vehicleJob = player.job.name
         end
     end
     
-    -- Données du véhicule
+    -- Données du véhicule - Structure simplifiée compatible vCore
     local primaryColor = tonumber(data.primaryColor) or 0
     local secondaryColor = tonumber(data.secondaryColor) or 0
     local livery = tonumber(data.livery) or -1
     
-    local vehicleMods = {}
+    local vehicleMods = {
+        primaryColor = primaryColor,
+        secondaryColor = secondaryColor
+    }
     if livery >= 0 then
         vehicleMods.modLivery = livery
     end
     
-    local vehicleData = {
-        license = license,
-        citizenid = citizenid,
-        vehicle = veh.model,
-        hash = veh.model,
-        mods = json.encode(vehicleMods),
-        plate = plate,
-        fakeplate = '',
-        garage = nil,
-        fuel = 100,
-        engine = 1000,
-        body = 1000,
-        state = 1,
-        depotprice = 0,
-        drivingdistance = 0,
-        status = '{}',
-        balance = 0,
-        paymentamount = 0,
-        paymentsleft = 0,
-        financetime = 0,
-        job = vehicleJob,
-        type = ConvertVehicleTypeForDB(data.vehicleType),
-        stored = 3,
-        glovebox = '{}',
-        trunk = '{}',
-        mileage = 0,
-        last_update = os.date('%Y-%m-%d %H:%M:%S')
+    -- Structure simplifiée d'insertion
+    local sql = [[
+        INSERT INTO player_vehicles (citizenid, plate, vehicle, mods, stored, garage, fuel, engine, body, state, type)
+        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    ]]
+    
+    local params = {
+        citizenid,              -- citizenid (charId du personnage)
+        plate,                  -- plaque
+        veh.model,             -- modèle du véhicule
+        json.encode(vehicleMods), -- mods (JSON)
+        1,                     -- stored (1 = en garage)
+        nil,                   -- garage (NULL = pas de garage spécifique)
+        100,                   -- fuel
+        1000,                  -- engine
+        1000,                  -- body
+        1,                     -- state (1 = bon état)
+        ConvertVehicleTypeForDB(data.vehicleType) -- type (car, boat, etc.)
     }
     
-    -- Construire la requête SQL dynamique
-    local columns, values, params = {}, {}, {}
-    for k, v in pairs(vehicleData) do
-        table.insert(columns, k)
-        table.insert(values, '@' .. k)
-        params['@' .. k] = v
-    end
-    
-    local sql = string.format('INSERT INTO player_vehicles (%s) VALUES (%s)', 
-        table.concat(columns, ','), 
-        table.concat(values, ','))
-    
     exports.oxmysql:execute(sql, params, function(insertId)
-        -- Forcer garage à NULL
-        exports.oxmysql:execute('UPDATE player_vehicles SET garage = NULL WHERE plate = ?', {plate})
+        if not insertId then
+            print('[vCore:Concess] ERREUR: Impossible d\'enregistrer le véhicule en base')
+            vCore.Notify(src, '❌ Erreur d\'enregistrement du véhicule', 'error')
+            return
+        end
         
         -- Donner les clés
         GiveVehicleKeys(src, plate, veh.model)
@@ -484,7 +556,7 @@ AddEventHandler('vcore_concess:buyVehicle', function(data)
         -- Spawn le véhicule côté client
         TriggerClientEvent('vcore_concess:spawnVehicle', src, veh.model, plate, livery, primaryColor, secondaryColor)
         TriggerClientEvent('vcore_concess:closeNUI', src)
-        vCore.Functions.Notify(src, '✅ Véhicule acheté et enregistré! Prix: $' .. price, 'success')
+        vCore.Notify(src, '✅ Véhicule acheté et enregistré! Prix: $' .. price, 'success')
         
         -- Enregistrer la transaction dans economy (si disponible)
         if EconomyEnabled then
@@ -524,7 +596,7 @@ AddEventHandler('vcore_concess:adminAction', function(data)
     
     if not IsPlayerAdmin(src) then
         if vCore then
-            vCore.Functions.Notify(src, '❌ Accès refusé', 'error')
+            vCore.Notify(src, '❌ Accès refusé', 'error')
         end
         print('^1[vCore:Concess] Tentative admin refusée: ' .. GetPlayerName(src) .. '^0')
         return
@@ -549,7 +621,7 @@ AddEventHandler('vcore_concess:adminAction', function(data)
         
         TriggerClientEvent('vcore_concess:updateVehicleCache', -1, vehicles)
         if vCore then
-            vCore.Functions.Notify(src, '✅ Véhicule ajouté', 'success')
+            vCore.Notify(src, '✅ Véhicule ajouté', 'success')
         end
         
     elseif data.action == 'editVehicle' then
@@ -568,7 +640,7 @@ AddEventHandler('vcore_concess:adminAction', function(data)
         SaveVehicles()
         TriggerClientEvent('vcore_concess:updateVehicleCache', -1, vehicles)
         if vCore then
-            vCore.Functions.Notify(src, '✅ Véhicule modifié', 'success')
+            vCore.Notify(src, '✅ Véhicule modifié', 'success')
         end
         
     elseif data.action == 'deleteVehicle' then
@@ -581,7 +653,7 @@ AddEventHandler('vcore_concess:adminAction', function(data)
         SaveVehicles()
         TriggerClientEvent('vcore_concess:updateVehicleCache', -1, vehicles)
         if vCore then
-            vCore.Functions.Notify(src, '✅ Véhicule supprimé', 'success')
+            vCore.Notify(src, '✅ Véhicule supprimé', 'success')
         end
         
     elseif data.action == 'getVehiclesList' then
@@ -591,7 +663,7 @@ AddEventHandler('vcore_concess:adminAction', function(data)
         LoadVehicles()
         TriggerClientEvent('vcore_concess:updateVehicleCache', -1, vehicles)
         if vCore then
-            vCore.Functions.Notify(src, '✅ Configuration rechargée', 'success')
+            vCore.Notify(src, '✅ Configuration rechargée', 'success')
         end
     end
 end)
@@ -602,7 +674,7 @@ RegisterCommand('vadmin', function(source, args, rawCommand)
     
     if not IsPlayerAdmin(src) then
         if vCore then
-            vCore.Functions.Notify(src, '❌ Permissions insuffisantes', 'error')
+            vCore.Notify(src, '❌ Permissions insuffisantes', 'error')
         end
         return
     end
@@ -616,7 +688,8 @@ RegisterCommand('mylicense', function(source, args, rawCommand)
     local license = GetPlayerLicense(src)
     
     if license and vCore then
-        vCore.Functions.Notify(src, 'Votre licence: ' .. license, 'primary')
+        vCore.Notify(src, 'Votre licence: ' .. license, 'primary')
         print('[vCore:Concess] License de ' .. GetPlayerName(src) .. ': ' .. license)
     end
 end, false)
+

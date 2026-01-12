@@ -82,12 +82,6 @@ RegisterNetEvent('vCore:playerLoaded', function(playerData)
     
     vCore.Utils.Print('Données joueur chargées:', playerData.firstName, playerData.lastName)
     
-    -- Appliquer le skin si disponible
-    if playerData.metadata and playerData.metadata.skin then
-        print('[vCore] Application du skin sauvegardé...')
-        exports['vAvA_core']:ApplySkin(playerData.metadata.skin)
-    end
-    
     -- Spawn le joueur à sa dernière position sauvegardée
     local spawn = playerData.position or Config.Players.DefaultSpawn
     
@@ -137,15 +131,35 @@ RegisterNetEvent('vCore:playerLoaded', function(playerData)
     Wait(500)
     DoScreenFadeIn(500)
     
+    -- Attendre que le fade in soit terminé et le ped stable
+    Wait(1000)
+    
+    -- Appliquer le skin si disponible (APRÈS le spawn)
+    if playerData.metadata and playerData.metadata.skin then
+        print('[vCore] Application du skin sauvegardé...')
+        print('[vCore] Skin data:', json.encode(playerData.metadata.skin))
+        local ped = PlayerPedId()
+        print('[vCore] Ped ID:', ped, 'Exists:', DoesEntityExist(ped))
+        if ped and ped ~= 0 and DoesEntityExist(ped) then
+            local success, err = pcall(function()
+                exports['vAvA_creator']:ApplySkin(playerData.metadata.skin)
+            end)
+            if not success then
+                print('^1[vCore]^7 ERROR applying skin:', err)
+            else
+                print('^2[vCore]^7 Skin applied successfully!')
+            end
+        else
+            print('^1[vCore]^7 WARNING: Cannot apply skin, invalid ped!')
+        end
+    end
+    
     -- Notification de bienvenue
     vCore.Notify(Lang('welcome', Config.ServerName), 'success')
     
     -- Initialiser le HUD avec les données du joueur
     Wait(1000)
     TriggerEvent('vAvA:initHUD')
-    
-    -- Déclencher l'événement de spawn
-    TriggerEvent(vCore.Events.PLAYER_SPAWNED, playerData)
 end)
 
 -- ═══════════════════════════════════════════════════════════════════════════
@@ -501,4 +515,90 @@ RegisterCommand('changechar', function()
     ExecuteCommand('logout')
 end, false)
 
-print('[vAvA_core] ^2✓^7 Client commands loaded')
+-- ========================================
+-- SKIN MANAGEMENT
+-- ========================================
+
+-- Export pour appliquer un skin
+exports('ApplySkin', function(skinData)
+    if not skinData then return end
+    
+    local ped = PlayerPedId()
+    local model = skinData.model or GetEntityModel(ped)
+    
+    -- Charger le modèle si nécessaire
+    if GetEntityModel(ped) ~= model then
+        RequestModel(model)
+        while not HasModelLoaded(model) do
+            Wait(0)
+        end
+        SetPlayerModel(PlayerId(), model)
+        SetModelAsNoLongerNeeded(model)
+        ped = PlayerPedId()
+    end
+    
+    -- Appliquer les composants (vêtements)
+    if skinData.components then
+        for i = 0, 11 do
+            if skinData.components[tostring(i)] then
+                local comp = skinData.components[tostring(i)]
+                SetPedComponentVariation(ped, i, comp.drawable or 0, comp.texture or 0, comp.palette or 0)
+            end
+        end
+    end
+    
+    -- Appliquer les props (accessoires)
+    if skinData.props then
+        for i = 0, 7 do
+            if skinData.props[tostring(i)] then
+                local prop = skinData.props[tostring(i)]
+                if prop.drawable == -1 then
+                    ClearPedProp(ped, i)
+                else
+                    SetPedPropIndex(ped, i, prop.drawable or 0, prop.texture or 0, true)
+                end
+            end
+        end
+    end
+    
+    -- Appliquer l'apparence faciale
+    if skinData.headBlend then
+        SetPedHeadBlendData(ped, 
+            skinData.headBlend.shapeFirst or 0,
+            skinData.headBlend.shapeSecond or 0,
+            skinData.headBlend.shapeThird or 0,
+            skinData.headBlend.skinFirst or 0,
+            skinData.headBlend.skinSecond or 0,
+            skinData.headBlend.skinThird or 0,
+            skinData.headBlend.shapeMix or 0.0,
+            skinData.headBlend.skinMix or 0.0,
+            skinData.headBlend.thirdMix or 0.0
+        )
+    end
+    
+    -- Appliquer les overlays (tatouages, maquillage, etc.)
+    if skinData.headOverlays then
+        for i = 0, 12 do
+            if skinData.headOverlays[tostring(i)] then
+                local overlay = skinData.headOverlays[tostring(i)]
+                SetPedHeadOverlay(ped, i, overlay.style or 0, overlay.opacity or 0.0)
+                if overlay.color then
+                    SetPedHeadOverlayColor(ped, i, overlay.colorType or 0, overlay.color or 0, overlay.secondColor or 0)
+                end
+            end
+        end
+    end
+    
+    -- Appliquer la couleur des cheveux
+    if skinData.hair then
+        SetPedHairColor(ped, skinData.hair.color or 0, skinData.hair.highlight or 0)
+    end
+    
+    -- Appliquer la couleur des yeux
+    if skinData.eyeColor then
+        SetPedEyeColor(ped, skinData.eyeColor)
+    end
+    
+    print('[vCore] Skin appliqué avec succès')
+end)
+

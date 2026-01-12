@@ -14,48 +14,101 @@ end
 print('^2[vAvA Creator]^0 Module initialisé')
 
 -- ═══════════════════════════════════════════════════════════════════════════
+-- FONCTIONS UTILITAIRES
+-- ═══════════════════════════════════════════════════════════════════════════
+
+local function GetPlayerIdentifier(source)
+    local identifiers = GetPlayerIdentifiers(source)
+    for _, id in pairs(identifiers) do
+        if string.find(id, "license:") then
+            return id
+        end
+    end
+    return nil
+end
+
+local function GetPlayerLicense(source)
+    local identifiers = GetPlayerIdentifiers(source)
+    for _, id in pairs(identifiers) do
+        if string.find(id, "license:") then
+            return string.gsub(id, "license:", "")
+        end
+    end
+    return nil
+end
+
+-- ═══════════════════════════════════════════════════════════════════════════
 -- BASE DE DONNÉES
 -- ═══════════════════════════════════════════════════════════════════════════
 
 local function CreateTables()
+    -- Ajouter les colonnes manquantes à la table characters si elles n'existent pas
     MySQL.Async.execute([[
-        CREATE TABLE IF NOT EXISTS `vava_characters` (
-            `id` INT(11) NOT NULL AUTO_INCREMENT,
-            `citizenid` VARCHAR(50) NOT NULL,
-            `license` VARCHAR(100) NOT NULL,
-            `slot` INT(11) NOT NULL DEFAULT 1,
-            `firstname` VARCHAR(50) NOT NULL,
-            `lastname` VARCHAR(50) NOT NULL,
-            `age` INT(11) NOT NULL DEFAULT 25,
-            `gender` TINYINT(1) NOT NULL DEFAULT 0,
-            `nationality` VARCHAR(50) DEFAULT 'Américain',
-            `story` TEXT DEFAULT NULL,
-            `skin_data` LONGTEXT DEFAULT NULL,
-            `clothes_data` LONGTEXT DEFAULT NULL,
-            `position` VARCHAR(255) DEFAULT '{"x":-1045.35,"y":-2750.53,"z":21.36,"h":326.72}',
-            `money` VARCHAR(255) DEFAULT '{"cash":500,"bank":5000}',
-            `job` VARCHAR(100) DEFAULT '{"name":"unemployed","label":"Chômeur","grade":0,"gradeLabel":""}',
-            `gang` VARCHAR(255) DEFAULT NULL,
-            `metadata` LONGTEXT DEFAULT NULL,
-            `inventory` LONGTEXT DEFAULT NULL,
-            `created_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            `updated_at` TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
-            `last_played` TIMESTAMP NULL DEFAULT NULL,
-            `is_deleted` TINYINT(1) DEFAULT 0,
-            PRIMARY KEY (`id`),
-            UNIQUE KEY `citizenid` (`citizenid`),
-            KEY `license` (`license`),
-            KEY `slot` (`license`, `slot`)
-        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+        ALTER TABLE `characters` 
+        ADD COLUMN IF NOT EXISTS `nationality` VARCHAR(50) DEFAULT 'Française' AFTER `gender`,
+        ADD COLUMN IF NOT EXISTS `story` TEXT DEFAULT NULL AFTER `nationality`,
+        ADD COLUMN IF NOT EXISTS `skin_data` LONGTEXT DEFAULT NULL AFTER `story`,
+        ADD COLUMN IF NOT EXISTS `clothes_data` LONGTEXT DEFAULT NULL AFTER `skin_data`;
     ]], {}, function(success)
         if success then
-            print('^2[vAvA Creator]^0 Tables créées/vérifiées')
+            print('^2[vAvA Creator]^0 Colonnes créateur vérifiées/ajoutées dans characters')
+        else
+            -- Si ADD COLUMN IF NOT EXISTS n'est pas supporté, essayer individuellement
+            MySQL.Async.execute([[
+                SELECT COUNT(*) as col_exists 
+                FROM information_schema.COLUMNS 
+                WHERE TABLE_SCHEMA = DATABASE() 
+                AND TABLE_NAME = 'characters' 
+                AND COLUMN_NAME = 'nationality'
+            ]], {}, function(result)
+                if result and result[1] and result[1].col_exists == 0 then
+                    MySQL.Async.execute("ALTER TABLE `characters` ADD COLUMN `nationality` VARCHAR(50) DEFAULT 'Française' AFTER `gender`", {})
+                end
+            end)
+            
+            MySQL.Async.execute([[
+                SELECT COUNT(*) as col_exists 
+                FROM information_schema.COLUMNS 
+                WHERE TABLE_SCHEMA = DATABASE() 
+                AND TABLE_NAME = 'characters' 
+                AND COLUMN_NAME = 'story'
+            ]], {}, function(result)
+                if result and result[1] and result[1].col_exists == 0 then
+                    MySQL.Async.execute("ALTER TABLE `characters` ADD COLUMN `story` TEXT DEFAULT NULL AFTER `nationality`", {})
+                end
+            end)
+            
+            MySQL.Async.execute([[
+                SELECT COUNT(*) as col_exists 
+                FROM information_schema.COLUMNS 
+                WHERE TABLE_SCHEMA = DATABASE() 
+                AND TABLE_NAME = 'characters' 
+                AND COLUMN_NAME = 'skin_data'
+            ]], {}, function(result)
+                if result and result[1] and result[1].col_exists == 0 then
+                    MySQL.Async.execute("ALTER TABLE `characters` ADD COLUMN `skin_data` LONGTEXT DEFAULT NULL AFTER `story`", {})
+                end
+            end)
+            
+            MySQL.Async.execute([[
+                SELECT COUNT(*) as col_exists 
+                FROM information_schema.COLUMNS 
+                WHERE TABLE_SCHEMA = DATABASE() 
+                AND TABLE_NAME = 'characters' 
+                AND COLUMN_NAME = 'clothes_data'
+            ]], {}, function(result)
+                if result and result[1] and result[1].col_exists == 0 then
+                    MySQL.Async.execute("ALTER TABLE `characters` ADD COLUMN `clothes_data` LONGTEXT DEFAULT NULL AFTER `skin_data`", {})
+                    print('^2[vAvA Creator]^0 Colonnes créateur ajoutées à la table characters')
+                end
+            end)
         end
     end)
 end
 
 -- Créer les tables au démarrage
 CreateThread(function()
+    Wait(2000) -- Attendre que oxmysql soit prêt
     CreateTables()
 end)
 
@@ -175,27 +228,27 @@ vCore.RegisterServerCallback('vava_creator:getCharacters', function(source, cb, 
     end)
 end)
 
--- Vérifier si un slot est disponible
+-- Vérifier combien de personnages le joueur a
 vCore.RegisterServerCallback('vava_creator:checkSlot', function(source, cb, player, slot)
-    local license = GetPlayerLicense(source)
-    if not license then
+    local identifier = GetPlayerIdentifier(source)
+    if not identifier then
         cb({ available = false })
         return
     end
     
     MySQL.Async.fetchScalar([[
         SELECT COUNT(*) FROM characters 
-        WHERE identifier LIKE ? AND slot = ?
-    ]], { '%' .. license .. '%', slot }, function(count)
-        cb({ available = count == 0 })
+        WHERE identifier = ?
+    ]], { identifier }, function(count)
+        cb({ available = count < Config.Creator.MaxCharacters })
     end)
 end)
 
 -- Créer un nouveau personnage
 vCore.RegisterServerCallback('vava_creator:createCharacter', function(source, cb, player, data)
-    local license = GetPlayerLicense(source)
-    if not license then
-        cb({ success = false, error = 'License introuvable' })
+    local identifier = GetPlayerIdentifier(source)
+    if not identifier then
+        cb({ success = false, error = 'Identifier introuvable' })
         return
     end
     
@@ -224,12 +277,12 @@ vCore.RegisterServerCallback('vava_creator:createCharacter', function(source, cb
     -- Générer un CitizenID unique
     local citizenid = GenerateCitizenId()
     
-    -- Trouver le premier slot disponible
+    -- Vérifier le nombre de personnages existants
     MySQL.Async.fetchScalar([[
-        SELECT COALESCE(MAX(slot), 0) + 1 FROM characters 
+        SELECT COUNT(*) FROM characters 
         WHERE identifier = ?
-    ]], { identifier }, function(slot)
-        if slot > Config.Creator.MaxCharacters then
+    ]], { identifier }, function(count)
+        if count >= Config.Creator.MaxCharacters then
             cb({ success = false, error = 'Nombre maximum de personnages atteint' })
             return
         end
@@ -259,11 +312,10 @@ vCore.RegisterServerCallback('vava_creator:createCharacter', function(source, cb
         
         MySQL.Async.insert([[
             INSERT INTO characters 
-            (identifier, slot, firstname, lastname, dob, gender, nationality, story, skin_data, clothes_data, position, money, job, last_played)
-            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())
+            (identifier, firstname, lastname, dob, gender, nationality, story, skin_data, clothes_data, position, money, job, last_played)
+            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, NOW())
         ]], {
             identifier,
-            slot,
             data.firstname,
             data.lastname,
             data.dob or '1990-01-01',
@@ -278,8 +330,8 @@ vCore.RegisterServerCallback('vava_creator:createCharacter', function(source, cb
         }, function(id)
             if id then
                 -- Log la création
-                if vCore.Logs then
-                    vCore.Logs('character_create', string.format(
+                if vCore.Log then
+                    vCore.Log('character', playerLicense, string.format(
                         'Nouveau personnage créé: %s %s (ID: %s) par %s',
                         data.firstname, data.lastname, citizenid, license
                     ), source)
@@ -298,18 +350,20 @@ vCore.RegisterServerCallback('vava_creator:createCharacter', function(source, cb
     end)
 end)
 
--- Charger un personnage
-vCore.RegisterServerCallback('vava_creator:loadCharacter', function(source, cb, player, citizenid)
+-- Charger un personnage (callback obsolète - utiliser vCore:loadPlayer à la place)
+-- Ce callback est gardé pour compatibilité mais redirige vers le système core
+vCore.RegisterServerCallback('vava_creator:loadCharacter', function(source, cb, player, charId)
     local license = GetPlayerLicense(source)
     if not license then
         cb({ success = false, error = 'License introuvable' })
         return
     end
     
+    -- Utiliser la table characters (correcte) au lieu de vava_characters
     MySQL.Async.fetchAll([[
-        SELECT * FROM vava_characters 
-        WHERE citizenid = ? AND license = ? AND is_deleted = 0
-    ]], { citizenid, license }, function(results)
+        SELECT * FROM characters 
+        WHERE id = ? AND identifier = ?
+    ]], { charId, license }, function(results)
         if #results == 0 then
             cb({ success = false, error = 'Personnage introuvable' })
             return
@@ -319,21 +373,22 @@ vCore.RegisterServerCallback('vava_creator:loadCharacter', function(source, cb, 
         
         -- Mettre à jour last_played
         MySQL.Async.execute([[
-            UPDATE vava_characters SET last_played = NOW() WHERE citizenid = ?
-        ]], { citizenid })
+            UPDATE characters SET last_played = NOW() WHERE id = ?
+        ]], { charId })
         
         -- Construire les données du personnage
         local characterData = {
-            citizenid = char.citizenid,
-            license = char.license,
-            slot = char.slot,
+            id = char.id,
+            citizenid = char.id, -- Pour compatibilité
+            license = char.identifier,
+            slot = char.id,
             firstname = char.firstname,
             lastname = char.lastname,
             fullname = char.firstname .. ' ' .. char.lastname,
-            age = char.age,
+            age = char.dob, -- Calculer l'âge depuis dob si nécessaire
             gender = char.gender,
-            nationality = char.nationality,
-            story = char.story,
+            nationality = 'Américain',
+            story = '',
             skin = char.skin_data and json.decode(char.skin_data) or nil,
             clothes = char.clothes_data and json.decode(char.clothes_data) or nil,
             position = char.position and json.decode(char.position) or nil,
@@ -344,13 +399,8 @@ vCore.RegisterServerCallback('vava_creator:loadCharacter', function(source, cb, 
             inventory = char.inventory and json.decode(char.inventory) or {}
         }
         
-        -- Enregistrer le joueur dans vCore
-        if vCore.RegisterPlayer then
-            vCore.RegisterPlayer(source, characterData)
-        end
-        
-        -- Trigger l'event de chargement
-        TriggerClientEvent('vava_creator:characterLoaded', source, characterData)
+        -- Charger via le système core (plutôt que d'enregistrer manuellement)
+        TriggerEvent('vCore:loadPlayer', source, char.id)
         
         cb({
             success = true,
@@ -373,8 +423,8 @@ vCore.RegisterServerCallback('vava_creator:deleteCharacter', function(source, cb
     ]], { citizenid, identifier }, function(rowsChanged)
         if rowsChanged > 0 then
             -- Log la suppression
-            if vCore.Logs then
-                vCore.Logs('character_delete', string.format(
+            if vCore.Log then
+                vCore.Log('character', playerLicense, string.format(
                     'Personnage supprimé: ID %s par %s',
                     citizenid, identifier
                 ), source)
@@ -383,9 +433,6 @@ vCore.RegisterServerCallback('vava_creator:deleteCharacter', function(source, cb
             cb({ success = true, message = 'Personnage supprimé' })
         else
             cb({ success = false, error = 'Personnage introuvable' })
-        end
-    end)
-end)
         end
     end)
 end)

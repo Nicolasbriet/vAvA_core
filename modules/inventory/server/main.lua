@@ -294,15 +294,96 @@ end)
 -- CHARGER A LA CONNEXION
 -- ═══════════════════════════════════════════════════════════════════════════
 
-AddEventHandler('playerConnecting', function()
-    local src = source
-    SetTimeout(5000, function()
-        local identifier = GetIdentifier(src)
+-- IMPORTANT: Charger l'inventaire quand le personnage est chargé
+-- Utiliser AddEventHandler seul car c'est un TriggerEvent local (pas réseau)
+AddEventHandler('vCore:playerLoaded', function(playerId, player)
+    local src = playerId
+    
+    -- Attendre un court instant pour s'assurer que tout est prêt
+    CreateThread(function()
+        Wait(500)
+        
+        -- Utiliser player.identifier (propriété directe) car les méthodes via metatable peuvent ne pas être héritées
+        local identifier = (player and player.identifier) or GetIdentifier(src)
         if identifier then
-            LoadPlayerCache(src, identifier)
+            print('^2[vAvA_inventory]^7 Chargement inventaire pour ' .. (GetPlayerName(src) or 'Unknown') .. ' (' .. identifier .. ')')
+            LoadPlayerCache(src, identifier, function()
+                print('^2[vAvA_inventory]^7 Inventaire chargé avec succès pour ' .. (GetPlayerName(src) or 'Unknown'))
+            end)
+        else
+            print('^1[vAvA_inventory]^7 ERREUR: Pas d\'identifier pour source ' .. tostring(src))
         end
     end)
 end)
+
+-- Nettoyer le cache quand le joueur change de personnage ou se déconnecte
+-- Event client vers serveur donc RegisterNetEvent est correct ici
+RegisterNetEvent('vCore:playerLogout')
+AddEventHandler('vCore:playerLogout', function()
+    local src = source
+    local identifier = GetIdentifier(src)
+    
+    if identifier then
+        -- Sauvegarder avant de nettoyer le cache
+        SavePlayerInventory(src, identifier)
+        
+        -- Nettoyer le cache
+        Cache.inventories[identifier] = nil
+        Cache.hotbars[identifier] = nil
+        print('^3[vAvA_inventory]^7 Cache nettoyé pour ' .. GetPlayerName(src))
+    end
+end)
+
+-- Sauvegarder et nettoyer au drop du joueur
+AddEventHandler('playerDropped', function(reason)
+    local src = source
+    local identifier = GetIdentifier(src)
+    
+    if identifier and Cache.inventories[identifier] then
+        -- Sauvegarder l'inventaire en BDD
+        SavePlayerInventory(src, identifier)
+        
+        -- Nettoyer le cache
+        Cache.inventories[identifier] = nil
+        Cache.hotbars[identifier] = nil
+        print('^2[vAvA_inventory]^7 Inventaire sauvegardé et cache nettoyé pour joueur déconnecté')
+    end
+end)
+
+-- Fonction pour sauvegarder l'inventaire en BDD
+function SavePlayerInventory(src, identifier)
+    if not identifier then return end
+    
+    local inv = Cache.inventories[identifier]
+    if not inv then return end
+    
+    -- Supprimer l'ancien inventaire et réinsérer
+    MySQL.Async.execute('DELETE FROM player_inventories WHERE owner = ?', {identifier}, function()
+        for slot, item in pairs(inv) do
+            if item and item.amount > 0 then
+                MySQL.Async.execute(
+                    'INSERT INTO player_inventories (owner, slot, item_name, amount, metadata) VALUES (?, ?, ?, ?, ?)',
+                    {identifier, slot, item.name, item.amount, item.metadata and json.encode(item.metadata) or nil}
+                )
+            end
+        end
+    end)
+    
+    -- Sauvegarder la hotbar
+    local hb = Cache.hotbars[identifier]
+    if hb then
+        MySQL.Async.execute('DELETE FROM player_hotbar WHERE owner = ?', {identifier}, function()
+            for slot, invSlot in pairs(hb) do
+                MySQL.Async.execute(
+                    'INSERT INTO player_hotbar (owner, slot, inventory_slot) VALUES (?, ?, ?)',
+                    {identifier, slot, invSlot}
+                )
+            end
+        end)
+    end
+    
+    print('^2[vAvA_inventory]^7 Inventaire sauvegardé en BDD pour ' .. (GetPlayerName(src) or identifier))
+end
 
 -- ═══════════════════════════════════════════════════════════════════════════
 -- ENVOYER UPDATE
@@ -717,12 +798,12 @@ RegisterCommand('giveitem', function(src, args)
     print('^2[vAvA_inventory]^7 ' .. (ok and 'OK' or 'FAIL') .. ': ' .. amt .. 'x ' .. item)
 end, true)
 
-RegisterCommand('givemoney', function(src, args)
+RegisterCommand('givemoney_inventory', function(src, args)
     if src > 0 and not IsPlayerAceAllowed(src, 'command') then return end
     local target, amt = tonumber(args[1]), tonumber(args[2]) or 100
-    if not target then print('/givemoney id amount') return end
+    if not target then print('/givemoney_inventory id amount') return end
     AddMoney(target, amt)
-    print('^2[vAvA_inventory]^7 Donne $' .. amt)
+    print('^2[vAvA_inventory]^7 Donne $' .. amt .. ' (via inventory system)')
 end, true)
 
 RegisterCommand('listitems', function()

@@ -7,17 +7,79 @@ StatusConfig = {}
 StatusConfig.Enabled = true
 
 -- Interval de mise à jour (en minutes)
-StatusConfig.UpdateInterval = 5 -- Toutes les 5 minutes
+StatusConfig.UpdateInterval = 5 -- Toutes les 5 minutes (ralenti pour être moins agressif)
 
--- Décrémentation par interval
+-- Interval de mise à jour HUD (en millisecondes) - Minimum recommandé: 2000ms
+-- ATTENTION: Une valeur trop basse (<1000ms) peut causer des problèmes de performance
+StatusConfig.HUDUpdateInterval = 2000 -- Toutes les 2 secondes pour le HUD (OPTIMISÉ)
+
+-- Décrémentation par interval (RÉDUITE pour être moins agressive)
 StatusConfig.Decrementation = {
     hunger = {
-        min = 1,  -- Minimum
-        max = 3   -- Maximum
+        min = 0.5,  -- Minimum (réduit de 1 à 0.5)
+        max = 1.5   -- Maximum (réduit de 3 à 1.5)
     },
     thirst = {
-        min = 2,  -- La soif descend plus vite
-        max = 4
+        min = 1,  -- La soif descend plus vite (réduit de 2 à 1)
+        max = 2   -- (réduit de 4 à 2)
+    }
+}
+
+-- ========================================
+-- INTÉGRATION MODULE EMS
+-- ========================================
+
+-- La gestion de la vie (dégâts, mort) est ENTIÈREMENT déléguée au module EMS
+-- Ce module (status) ne gère que:
+-- - Les valeurs de faim/soif (0-100)
+-- - Les effets visuels (flou, stamina, vitesse marche)
+-- - La notification au module EMS des états critiques
+
+StatusConfig.EMSIntegration = {
+    enabled = true,           -- Activer l'intégration EMS
+    moduleName = 'vAvA_ems',  -- Nom du module EMS
+    
+    -- Events envoyés au module EMS
+    events = {
+        onStatusCritical = 'vAvA_ems:statusCritical',     -- Quand status devient critique
+        onStatusCollapse = 'vAvA_ems:statusCollapse',      -- Quand status atteint 0
+        onStatusRecovered = 'vAvA_ems:statusRecovered'     -- Quand status remonte au-dessus du danger
+    },
+    
+    -- Conditions médicales envoyées au module EMS
+    conditions = {
+        malnutrition_light = {
+            name = 'Malnutrition légère',
+            severity = 1,
+            symptoms = {'fatigue', 'faiblesse'}
+        },
+        malnutrition_severe = {
+            name = 'Malnutrition sévère',
+            severity = 3,
+            symptoms = {'fatigue_extreme', 'confusion', 'tremblements'}
+        },
+        starvation = {
+            name = 'Inanition',
+            severity = 5,
+            symptoms = {'inconscience', 'defaillance_organes'},
+            lethal = true
+        },
+        dehydration_light = {
+            name = 'Déshydratation légère',
+            severity = 1,
+            symptoms = {'soif', 'bouche_seche'}
+        },
+        dehydration_severe = {
+            name = 'Déshydratation sévère',
+            severity = 3,
+            symptoms = {'vertiges', 'confusion', 'crampes'}
+        },
+        dehydration_critical = {
+            name = 'Déshydratation critique',
+            severity = 5,
+            symptoms = {'inconscience', 'choc_hypovolemique'},
+            lethal = true
+        }
     }
 }
 
@@ -59,25 +121,45 @@ StatusConfig.Levels = {
         }
     },
 
-    -- 0-20 : Danger
+    -- 5-20 : Danger (seuil abaissé) - PAS DE DÉGÂTS (géré par EMS)
     danger = {
-        min = 0,
+        min = 5,
         max = 20,
         effects = {
-            stamina = 0.30,  -- 30% stamina
-            health = -1,     -- -1 HP toutes les 5 secondes
-            screenEffect = 'heavy_blur',
-            walkSpeed = 0.7, -- 70% vitesse marche
-            message = true
+            stamina = 0.50,  -- 50% stamina
+            screenEffect = 'slight_blur',
+            walkSpeed = 0.8, -- 80% vitesse marche
+            message = true,
+            -- Dégâts délégués au module EMS
+            notifyEMS = true,
+            emsCondition = 'malnutrition_light'
         }
     },
 
-    -- 0 : Effondrement
+    -- 0-5 : Danger critique - DÉGÂTS GÉRÉS PAR EMS
+    critical = {
+        min = 0,
+        max = 5,
+        effects = {
+            stamina = 0.30,  -- 30% stamina
+            screenEffect = 'heavy_blur',
+            walkSpeed = 0.6, -- 60% vitesse marche
+            message = true,
+            -- Dégâts délégués au module EMS
+            notifyEMS = true,
+            emsCondition = 'malnutrition_severe'
+        }
+    },
+
+    -- 0 : Effondrement - GÉRÉ PAR EMS
     collapse = {
         value = 0,
         effects = {
-            knockout = true,  -- KO le joueur
-            respawn = false   -- Pas de respawn auto (géré par ambulance)
+            knockout = false,  -- Désactivé - géré par EMS
+            respawn = false,   -- Pas de respawn auto (géré par EMS)
+            -- Notifier le module EMS pour gérer la mort
+            notifyEMS = true,
+            emsCondition = 'starvation'
         }
     }
 }
@@ -200,11 +282,11 @@ StatusConfig.Security = {
 -- ========================================
 
 StatusConfig.Logging = {
-    enabled = true,
-    logConsumption = true,     -- Logger la consommation d'items
-    logLevelChanges = true,    -- Logger les changements de niveau (normal → warning, etc.)
-    logDeath = true,           -- Logger les morts par faim/soif
-    logAPI = false             -- Logger tous les appels API (debug uniquement)
+    enabled = true,              -- Activer temporairement pour debug
+    logConsumption = true,       -- Logger la consommation d'items
+    logLevelChanges = true,      -- Logger les changements de niveau (normal → warning, etc.)
+    logDeath = true,             -- Logger les morts par faim/soif
+    logAPI = true                -- Logger tous les appels API (debug uniquement) - ACTIVÉ TEMPORAIREMENT
 }
 
 -- ========================================

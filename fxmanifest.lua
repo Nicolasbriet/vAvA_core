@@ -56,7 +56,10 @@ server_scripts {
     'server/logs.lua',
     'server/bans.lua',
     'server/commands.lua',
-    'server/permissions_debug.lua'  -- 🔐 Outils de diagnostic des permissions
+    'server/permissions_debug.lua',  -- 🔐 Outils de diagnostic des permissions
+    'server/status_integration.lua', -- 🍎 Intégration module status
+    'debug_money.lua',               -- 🔧 Debug commandes argent
+    'test_corrections_logs.lua'      -- 🧪 Test corrections logs
 }
 
 -- Fichiers client
@@ -67,7 +70,8 @@ client_scripts {
     'client/ui_manager.lua',  -- 🎨 NOUVEAU: Gestionnaire UI centralisé
     'client/status.lua',
     'client/vehicles.lua',
-    'client/notifications.lua'
+    'client/notifications.lua',
+    'client/emergency_recovery.lua'  -- 🆘 TEMPORAIRE: Récupération d'urgence
 }
 
 -- Fichiers UI (seulement pour notifications et UI manager)

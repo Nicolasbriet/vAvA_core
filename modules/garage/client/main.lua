@@ -57,13 +57,11 @@ end)
 -- FONCTIONS UTILITAIRES
 -- ================================
 
--- Notification
+-- Notification (vCore)
 local function Notify(message, type)
-    local success, _ = pcall(function()
-        exports.ox_lib:notify({description = message, type = type or 'inform'})
-    end)
-    
-    if not success then
+    if vCore and vCore.Notify then
+        vCore.Notify(message, type or 'info')
+    else
         -- Fallback
         SetNotificationTextEntry('STRING')
         AddTextComponentString(message)

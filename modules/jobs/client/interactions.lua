@@ -198,23 +198,23 @@ end
 ---@return boolean
 function ProgressBar(time, label)
     local success = false
+    local completed = false
     
-    -- Essayer ox_lib progressbar
-    local oxSuccess = pcall(function()
-        success = exports.ox_lib:progressBar({
+    -- Utiliser vCore.UI.ShowProgressBar
+    if vCore and vCore.UI and vCore.UI.ShowProgressBar then
+        vCore.UI.ShowProgressBar({
             duration = time,
             label = label,
-            useWhileDead = false,
-            canCancel = true,
-            disable = {
-                move = true,
-                car = true,
-                combat = true
-            }
-        })
-    end)
-    
-    if not oxSuccess then
+            canCancel = true
+        }, function(result)
+            success = result
+            completed = true
+        end)
+        
+        while not completed do
+            Wait(100)
+        end
+    else
         -- Fallback simple
         local startTime = GetGameTimer()
         while GetGameTimer() - startTime < time do
@@ -258,17 +258,15 @@ end
 ---@param title string
 ---@param options table
 function OpenMenu(id, title, options)
-    -- Essayer ox_lib context menu
-    local oxSuccess = pcall(function()
-        exports.ox_lib:registerContext({
-            id = id,
+    -- Utiliser vCore.UI.ShowMenu
+    if vCore and vCore.UI and vCore.UI.ShowMenu then
+        vCore.UI.ShowMenu({
             title = title,
             options = options
-        })
-        exports.ox_lib:showContext(id)
-    end)
-    
-    if not oxSuccess then
+        }, function(value, index)
+            -- Callback géré par les options
+        end)
+    else
         -- Fallback vers NUI custom ou autre système de menu
         SendNUIMessage({
             action = 'openMenu',

@@ -23,17 +23,39 @@ CreateThread(function()
     print('[vAvA_hud] Module HUD initialisé')
     print('[vAvA_hud] vCore loaded:', vCore ~= nil)
     
+    -- Attendre que le module status soit chargé
+    local statusTimeout = 0
+    while GetResourceState('vAvA_status') ~= 'started' and statusTimeout < 50 do
+        print('[vAvA_hud] Waiting for vAvA_status module...')
+        Wait(100)
+        statusTimeout = statusTimeout + 1
+    end
+    
+    if GetResourceState('vAvA_status') == 'started' then
+        print('[vAvA_hud] Module vAvA_status détecté !')
+    end
+    
     -- Attendre max 10 secondes que le joueur se charge
     local timeout = 0
     while not vCore.IsLoaded and timeout < 100 do
-        print('[vAvA_hud] Waiting for player to load... IsLoaded:', vCore.IsLoaded)
         Wait(100)
         timeout = timeout + 1
     end
     
     if vCore.IsLoaded then
         print('[vAvA_hud] Player loaded!')
-        print('[vAvA_hud] PlayerData:', json.encode(vCore.PlayerData))
+        
+        -- IMPORTANT: Demander une synchronisation des status au module status
+        -- Multiple tentatives pour garantir la réception
+        CreateThread(function()
+            for i = 1, 3 do
+                Wait(1000 * i) -- 1s, 2s, 3s
+                if GetResourceState('vAvA_status') == 'started' then
+                    print('[vAvA_hud] Demande de synchronisation status (tentative ' .. i .. ')...')
+                    TriggerServerEvent('vAvA_status:requestSync')
+                end
+            end
+        end)
     else
         print('^3[vAvA_hud] Player not loaded after 10s - Using default values^0')
     end
@@ -148,9 +170,72 @@ end
 -- ÉVÉNEMENTS
 -- ═══════════════════════════════════════════════════════════════════════════
 
--- Réception des updates depuis le module status
+-- Réception des updates depuis le module status (OPTIMISÉ TEMPS RÉEL)
 RegisterNetEvent('vAvA_hud:updateStatus')
 AddEventHandler('vAvA_hud:updateStatus', function(statusData)
+    if not statusData then return end
+    
+    print(string.format('[vAvA_hud] Réception update status: Hunger=%s, Thirst=%s', 
+        tostring(statusData.hunger), tostring(statusData.thirst)))
+    
+    if not vCore or not vCore.PlayerData then 
+        print('[vAvA_hud] vCore non disponible, stockage des données temporairement')
+        -- Stocker temporairement si vCore pas encore prêt
+        tempStatusData = statusData
+        return 
+    end
+    
+    if not vCore.PlayerData.status then
+        vCore.PlayerData.status = {}
+    end
+    
+    -- Mise à jour des valeurs
+    if statusData.hunger then
+        vCore.PlayerData.status.hunger = statusData.hunger
+        print(string.format('[vAvA_hud] Hunger mis à jour: %d', statusData.hunger))
+    end
+    
+    if statusData.thirst then
+        vCore.PlayerData.status.thirst = statusData.thirst
+        print(string.format('[vAvA_hud] Thirst mis à jour: %d', statusData.thirst))
+    end
+    
+    -- Mise à jour immédiate et forcée du HUD
+    if isHUDVisible then
+        local ped = PlayerPedId()
+        local health = math.max(0, math.min(100, GetEntityHealth(ped) - 100))
+        
+        HUD.UpdateStatus({
+            health = health,
+            armor = GetPedArmour(ped),
+            hunger = statusData.hunger or vCore.PlayerData.status.hunger or HUDConfig.Defaults.hunger,
+            thirst = statusData.thirst or vCore.PlayerData.status.thirst or HUDConfig.Defaults.thirst,
+            stress = vCore.PlayerData.status.stress or HUDConfig.Defaults.stress
+        })
+        
+        print('[vAvA_hud] HUD mis à jour immédiatement')
+    end
+end)
+
+-- Variables temporaires pour les cas où vCore n'est pas encore prêt
+local tempStatusData = nil
+
+-- Vérifier périodiquement si on a des données en attente
+CreateThread(function()
+    while true do
+        Wait(1000)
+        
+        if tempStatusData and vCore and vCore.PlayerData then
+            print('[vAvA_hud] Application des données temporaires')
+            TriggerEvent('vAvA_hud:updateStatus', tempStatusData)
+            tempStatusData = nil
+        end
+    end
+end)
+
+-- Event de fallback pour vCore si module hud non présent
+RegisterNetEvent('vCore:status:updated')
+AddEventHandler('vCore:status:updated', function(statusData)
     if not vCore or not vCore.PlayerData then return end
     
     if not vCore.PlayerData.status then
@@ -176,6 +261,46 @@ AddEventHandler('vAvA:setJob', function(job)
         job = job.label or HUDConfig.Defaults.job,
         grade = job.grade_label or HUDConfig.Defaults.grade
     })
+end)
+
+-- Écouter les événements de changement de job de vCore
+RegisterNetEvent('vCore:Client:OnJobUpdate')
+AddEventHandler('vCore:Client:OnJobUpdate', function(jobInfo)
+    if not jobInfo then return end
+    
+    -- Mettre à jour les données du joueur
+    if vCore and vCore.PlayerData then
+        vCore.PlayerData.job = jobInfo
+    end
+    
+    -- Mettre à jour le HUD
+    HUD.UpdatePlayerInfo({
+        playerId = GetPlayerServerId(PlayerId()),
+        job = jobInfo.label or jobInfo.name or HUDConfig.Defaults.job,
+        grade = jobInfo.gradeLabel or jobInfo.grade_label or HUDConfig.Defaults.grade
+    })
+    
+    print('[vAvA_hud] Job mis à jour:', jobInfo.label, '-', jobInfo.gradeLabel)
+end)
+
+-- Écouter les événements jobs du module jobs
+RegisterNetEvent('vCore:jobs:updateJob')
+AddEventHandler('vCore:jobs:updateJob', function(jobData)
+    if not jobData then return end
+    
+    -- Mettre à jour les données du joueur
+    if vCore and vCore.PlayerData then
+        vCore.PlayerData.job = jobData
+    end
+    
+    -- Mettre à jour le HUD
+    HUD.UpdatePlayerInfo({
+        playerId = GetPlayerServerId(PlayerId()),
+        job = jobData.label or jobData.name or HUDConfig.Defaults.job,
+        grade = jobData.gradeLabel or jobData.grade_label or HUDConfig.Defaults.grade
+    })
+    
+    print('[vAvA_hud] Job module - Job mis à jour:', jobData.label, '-', jobData.gradeLabel)
 end)
 
 -- Mise à jour instantanée de l'argent au changement
@@ -248,32 +373,52 @@ CreateThread(function()
         
         if HUDConfig.Enabled and vCore and vCore.IsLoaded and isHUDVisible then
             local ped = PlayerPedId()
-            local health = (GetEntityHealth(ped) - 100) -- Native retourne 100-200
+            local health = math.max(0, math.min(100, GetEntityHealth(ped) - 100))
             
-            -- S'assurer que les valeurs sont entre 0 et 100
-            if health < 0 then health = 0 end
-            if health > 100 then health = 100 end
+            -- CORRECTION: Récupération correcte des valeurs temps réel
+            local hunger = HUDConfig.Defaults.hunger
+            local thirst = HUDConfig.Defaults.thirst
             
-            -- Mise à jour des status
+            -- 1. Essayer de récupérer depuis le module status directement
+            if GetResourceState('vAvA_status') == 'started' then
+                local success1, directHunger = pcall(function()
+                    return exports['vAvA_status']:GetCurrentHunger()
+                end)
+                local success2, directThirst = pcall(function()
+                    return exports['vAvA_status']:GetCurrentThirst()
+                end)
+                
+                if success1 and directHunger then
+                    hunger = directHunger
+                end
+                if success2 and directThirst then
+                    thirst = directThirst
+                end
+            end
+            
+            -- 2. Fallback sur les données locales si module status indisponible
+            if hunger == HUDConfig.Defaults.hunger and vCore.PlayerData and vCore.PlayerData.status then
+                hunger = vCore.PlayerData.status.hunger or hunger
+                thirst = vCore.PlayerData.status.thirst or thirst
+            end
+            
+            -- Mise à jour des status avec valeurs temps réel
             HUD.UpdateStatus({
                 health = health,
                 armor = GetPedArmour(ped),
-                hunger = vCore.PlayerData.status and vCore.PlayerData.status.hunger or HUDConfig.Defaults.hunger,
-                thirst = vCore.PlayerData.status and vCore.PlayerData.status.thirst or HUDConfig.Defaults.thirst,
+                hunger = hunger,
+                thirst = thirst,
                 stress = vCore.PlayerData.status and vCore.PlayerData.status.stress or HUDConfig.Defaults.stress
             })
             
-            -- Mise à jour des infos joueur (toutes les 500ms aussi)
+            -- Mise à jour des infos joueur (réduire la fréquence)
             if vCore.PlayerData.job then
                 local jobData = {
                     playerId = GetPlayerServerId(PlayerId()),
                     job = vCore.PlayerData.job.label or HUDConfig.Defaults.job,
                     grade = vCore.PlayerData.job.grade_label or HUDConfig.Defaults.grade
                 }
-                print('[vAvA_hud] Sending player info:', json.encode(jobData))
                 HUD.UpdatePlayerInfo(jobData)
-            else
-                print('[vAvA_hud] PlayerData.job is nil - cannot update player info')
             end
             
             -- Mise à jour de l'argent (toutes les 500ms aussi)
@@ -398,6 +543,58 @@ if HUDConfig.Debug.enabled then
         -- Forcer une mise à jour du HUD
         TriggerEvent('vAvA:initHUD')
         print('^2[vAvA_hud] HUD réinitialisé!^0')
+    end, false)
+end
+
+-- ═══════════════════════════════════════════════════════════════════════════
+-- DEBUG COMMANDS & TESTS
+-- ═══════════════════════════════════════════════════════════════════════════
+
+if HUDConfig.Logging and HUDConfig.Logging.enabled then
+    -- Commande pour tester la mise à jour HUD temps réel
+    RegisterCommand('testhud', function()
+        print('^2[vAvA_hud DEBUG]^7 Test HUD temps réel...')
+        
+        -- Test avec valeurs factices
+        local testHunger = math.random(0, 100)
+        local testThirst = math.random(0, 100)
+        
+        print(string.format('^2[vAvA_hud DEBUG]^7 Test - Hunger: %d, Thirst: %d', testHunger, testThirst))
+        
+        HUD.UpdateStatus({
+            health = 75,
+            armor = 50,
+            hunger = testHunger,
+            thirst = testThirst,
+            stress = 25
+        })
+        
+        print('^2[vAvA_hud DEBUG]^7 HUD mis à jour avec valeurs test')
+    end, false)
+    
+    -- Commande pour afficher l'état actuel
+    RegisterCommand('hudinfo', function()
+        print('^2[vAvA_hud DEBUG]^7 État actuel du HUD:')
+        print('  - Visible:', isHUDVisible)
+        print('  - vCore loaded:', vCore and vCore.IsLoaded or false)
+        
+        if vCore and vCore.PlayerData and vCore.PlayerData.status then
+            print('  - Hunger:', vCore.PlayerData.status.hunger or 'N/A')
+            print('  - Thirst:', vCore.PlayerData.status.thirst or 'N/A')
+            print('  - Stress:', vCore.PlayerData.status.stress or 'N/A')
+        else
+            print('  - Status: Non disponible (vCore pas chargé)')
+        end
+        
+        -- Test de récupération directe depuis le module status
+        if GetResourceState('vAvA_status') == 'started' then
+            local directHunger = exports['vAvA_status']:GetCurrentHunger()
+            local directThirst = exports['vAvA_status']:GetCurrentThirst()
+            print('  - Direct Hunger:', directHunger or 'N/A')
+            print('  - Direct Thirst:', directThirst or 'N/A')
+        else
+            print('  - Module vAvA_status non actif')
+        end
     end, false)
 end
 
