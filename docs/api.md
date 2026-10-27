@@ -455,6 +455,7 @@ ombre portée comprise dans l'image : l'interface n'applique aucun filtre.
 | `canCarry(cible, objet, quantité, métadonnées?)` | `true` ou `false, code` (`no_space`, `too_heavy`) |
 | `count(cible, objet)` | quantité totale |
 | `getItems(cible)` | liste `{ id, item, x, y, rotated, quantity, metadata }` |
+| `setMetadata(cible, idObjet, métadonnées)` | `true` ou `false, code` (`not_found`, `invalid_request`) — remplace les métadonnées d'un objet (`nil` les retire), sauvegardé et montré aux inventaires ouverts ; depuis 1.3.0 |
 | `createContainer({ kind, ownerType?, ownerId?, width, height, maxWeight?, label? })` | id d'un conteneur conservé (coffre…) |
 | `open(source, containerId)` | ouvre un conteneur au joueur ; **l'appelant a vérifié le droit d'accès** |
 | `containerOf(source)` | id du conteneur porté par le personnage actif d'un joueur (fouille, administration), ou `nil, code` |
@@ -793,6 +794,60 @@ depuis le web, relayées par le pont à la Chancellerie.
 
 Pour travailler le rendu du mur sans le jeu : `web/index.html?players=11&layout=3` (ou `&focus=<numéro>`) dans un
 navigateur ; chaque case est une vraie connexion WebRTC locale filmant une scène dessinée.
+
+### `vava_magic`
+
+La magie : fiche magie par personnage (champ privé `vava_magic:sheet` : mage ou non, sorts et leur XP, sigils gardés,
+sigil unique dans tout le royaume), mana (100, +3 toutes les 5 s, jamais sauvegardée), 5 niveaux par sort, incantation
+commune, sorts **Murmure** (messages), **Lueur** (lumière) et **Boule de feu** (offensif), grimoire et registre
+(objets), commandes du Conseil (`/magie`). Tout le détail, la config et la liste des tests en jeu :
+`modules/vava_magic/README.md`. Demande le core 0.5.0 ; facultatifs : `vava_inventory` ≥ 1.3.0 (objets), `vava_hud`
+(mana, notifications), `vava_health` (blessures, à terre), `vava_admin` (droit `tools` et journal ; sans lui, ACE
+`magie.admin`).
+
+- **Bridge** : `bridge/server.lua` et `bridge/client.lua` sont les seuls fichiers qui appellent le core et les autres
+  modules ; les réécrire suffit pour un autre core (avec un équivalent de `core.rpc`).
+- **Incantation** : RPC `vava_magic:begin:<sort>` puis `vava_magic:finish:<sort>` (numéro d'incantation). Le serveur
+  revérifie à la fin la durée, le déplacement et la vie (lus côté serveur) ; la mana est réservée avant l'effet, rendue
+  si le sort refuse. Recharges tenues par personnage. Effets vus des autres : state bags posés par le serveur sur le
+  ped (`vava_magic:casting`, `glow`, `light`, `burn`) ou sur l'objet d'un orbe ancré (`vava_magic:orb`).
+- **Murmure** : fragments envoyés aux seuls joueurs à moins de 3 m ; registre des murmures en base sous le numéro porté
+  par l'objet (métadonnée `registre`), l'historique suit l'objet.
+- **Boule de feu** : impact signalé par le client du lanceur, validé par le serveur (portée, axe, délai, cible réelle,
+  zones protégées) avant les dégâts, appliqués par `vava_health:damage` ; journal `vava_magic_damage_log`.
+
+| Export serveur | Retour |
+|---|---|
+| `isMage(source)` | booléen — personnage en jeu |
+| `spellLevel(source, sort)` | niveau (1 à 5) d'un sort connu, ou `nil` |
+| `mana(source)` | mana actuelle, maximum (0 pour un non-mage) |
+
+**Hooks** : `vava_magic:castStarting` (`before`, annulable : `{ source, characterId, spell, level }` — prison, zone…),
+`vava_magic:castDone` (`after` : `+ success`), `vava_magic:levelUp` (`after` : `{ source, characterId, spell, level }`),
+`vava_magic:mageChanged` (`after` : `{ source, characterId, isMage }`), `vava_magic:murmur:unreachable` (`before` :
+`{ source, characterId, reason = offline|too_far, sigil, text }` — renvoyer `false, 'handled'` pour prendre le message en
+charge : pigeon voyageur, relais…).
+
+**Ajouter un sort depuis un autre module** : registre du core `vava_magic:spells`, clé = nom du sort.
+
+```lua
+core.registry.add('vava_magic:spells', 'echo', {
+    config = { label = 'Écho', baseCost = 5, xp = 5, levels = { -- 5 niveaux
+        { castMs = 1500, cooldownMs = 10000, description = '…', unlock = '…' }, --[[ … ]]
+    } },
+    beginArgs = {},                                    -- schémas des arguments du début (RPC à schéma strict)
+    finishArgs = {},                                   -- schémas des arguments de la fin
+    begin = function(ctx) return true, {} end,         -- ctx = { source, characterId, spell, level, origin, cost }
+    finish = function(ctx) return { success = true } end, -- { success, refund? (part de mana rendue), result? }
+})
+```
+
+Le noyau ouvre ses RPC (`vava_magic:begin:echo`, `vava_magic:finish:echo`), tient la mana, la recharge, l'XP et les
+contrôles de l'incantation. Côté client, le module externe appelle lui-même ces deux RPC et gère sa barre et son
+animation (`VavaMagic.casting.start` n'existe qu'à l'intérieur de vava_magic).
+
+Pour travailler le rendu sans le jeu : `web/index.html?view=grimoire` (ou `composer`, `offer`, `naming`, `confirm`,
+`lueur`, `sealed`, `register`, `messages`, `broken`) dans un navigateur.
 
 ### `vava_chancellerie`
 

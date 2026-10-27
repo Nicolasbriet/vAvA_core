@@ -73,6 +73,13 @@ exports('count', function(target, item)
     return operations.count(container, item)
 end)
 
+--- Remplace les métadonnées d'un objet de la cible (numéro d'un registre…) ; nil les retire. Depuis 1.3.0.
+exports('setMetadata', function(target, instanceId, metadata)
+    return call(target, function(container)
+        return operations.setMetadata(container, instanceId, metadata)
+    end)
+end)
+
 --- Objets d'un conteneur (représentation réseau), pour l'interface d'un autre module.
 exports('getItems', function(target)
     local container, code = resolve(target)

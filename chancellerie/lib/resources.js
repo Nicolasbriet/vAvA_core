@@ -13,7 +13,7 @@ const MANIFESTS = ['fxmanifest.lua', '__resource.lua'];
 const MAX_DEPTH = 4;
 // ordre de démarrage attendu par vAvA ; une ressource inconnue garde la place choisie, après celles-ci
 const KNOWN_ORDER = ['chat', 'sessionmanager', 'hardcap', 'oxmysql', 'vAvA_core', 'vava_world', 'vava_appearance',
-  'vava_characters_ui', 'vava_hud', 'vava_inventory', 'vava_needs', 'vava_health', 'vava_admin', 'vava_voice', 'vava_cameras',
+  'vava_characters_ui', 'vava_hud', 'vava_inventory', 'vava_needs', 'vava_health', 'vava_admin', 'vava_voice', 'vava_cameras', 'vava_magic',
   'vava_chancellerie'];
 const CORE_DESCRIPTIONS = {
   vAvA_core: 'Le cœur du serveur (obligatoire)',
@@ -28,6 +28,7 @@ const CORE_DESCRIPTIONS = {
   vava_world: 'Carte sans PNJ ni véhicules',
   vava_voice: 'Chat vocal de proximité',
   vava_cameras: 'Écran des joueurs pour le Conseil (mur des caméras)',
+  vava_magic: 'Magie : mana, Murmure, Lueur, Boule de feu, grimoire et registre',
   vava_chancellerie: 'Pont de la Chancellerie (administration du royaume depuis le web)',
 };
 

@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <title>Magie</title>
+  <!--
+    web/index.html
+    Rôle : interface de la magie : barre d'incantation, murmures reçus, parchemin d'écriture, sigil tendu ou rendu,
+           confirmation, grimoire et registre (livres). Tous les textes viennent de la config du module (message
+           « init »). Dans un navigateur, web/index.html?view=… montre chaque vue avec des données d'exemple.
+  -->
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <div class="castbar" id="castbar" hidden>
+    <div class="castbar-label" id="cast-label"></div>
+    <div class="castbar-track"><div class="castbar-fill" id="cast-fill"></div></div>
+  </div>
+
+  <div class="murmurs" id="murmurs" aria-live="polite"></div>
+
+  <div class="veil" id="veil" hidden>
+    <section class="sheet" id="view-composer" hidden></section>
+    <section class="sheet sheet-small" id="view-offer" hidden></section>
+    <section class="sheet sheet-small" id="view-naming" hidden></section>
+    <section class="sheet sheet-small" id="view-confirm" hidden></section>
+    <section class="book" id="view-grimoire" hidden></section>
+    <section class="book" id="view-register" hidden></section>
+  </div>
+
+  <script src="js/bridge.js"></script>
+  <script src="js/ui.js"></script>
+  <script src="js/sound.js"></script>
+  <script src="js/castbar.js"></script>
+  <script src="js/murmurs.js"></script>
+  <script src="js/modal.js"></script>
+  <script src="js/composer.js"></script>
+  <script src="js/prompts.js"></script>
+  <script src="js/grimoire.js"></script>
+  <script src="js/register.js"></script>
+  <script src="js/devmock.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>

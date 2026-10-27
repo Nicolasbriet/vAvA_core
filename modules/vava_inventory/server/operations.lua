@@ -515,6 +515,24 @@ function operations.hotbarUse(src, slot)
     return ok, code
 end
 
+--- Remplace les métadonnées d'un objet (numéro d'un registre, inscription…), décidé par un module. Sauvegardé et
+--- publié aux spectateurs comme toute modification.
+---@param container vAvA.Container
+---@param instanceId any
+---@param metadata any  table, ou nil pour les retirer
+---@return boolean ok
+---@return string|nil code
+function operations.setMetadata(container, instanceId, metadata)
+    if mathType(instanceId) ~= 'integer' or (metadata ~= nil and type(metadata) ~= 'table') then return false, 'invalid_request' end
+    local instance = container.items[instanceId]
+    if not instance then return false, 'not_found' end
+    instance.metadata = metadata and copy(metadata) or {}
+    local change = newChange()
+    note(change, container, instance)
+    publish(change)
+    return true
+end
+
 -- Échange tout ou rien (API des autres modules) ---------------------------------------------------------------
 
 ---@class vAvA.ItemRequest

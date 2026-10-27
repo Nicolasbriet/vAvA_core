@@ -12,7 +12,7 @@ use_experimental_fxv2_oal 'yes'
 
 name 'vava_inventory'
 description 'Inventaire en grille vAvA'
-version '1.2.0'
+version '1.3.0'
 
 dependency 'vAvA_core'
 
