@@ -14,6 +14,7 @@ serveur et le lance elle-même.
 ## Installation
 
 Seule la Chancellerie s'installe à la main ; elle installe ensuite le reste (FXServer, oxmysql, vAvA).
+Chez un hébergeur (à la place de txAdmin, VPS ou panel de jeu) : voir [docs/hebergeur.md](hebergeur.md).
 
 ### Serveur Linux (Debian, Ubuntu…)
 
