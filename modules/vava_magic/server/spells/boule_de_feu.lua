@@ -1,10 +1,12 @@
 --[[
     vava_magic/server/spells/boule_de_feu.lua
     Rôle : sort Boule de feu (offensif), décidé par le serveur.
-      - Début : impossible dans une zone protégée.
-      - Fin : direction de la caméra envoyée par le client (normalisée ici) ; risque d'échec selon le niveau (elle
-        s'éteint) ; sinon lancer noté (origine = position du lanceur lue côté serveur), annoncé aux seuls joueurs
-        proches, qui en dessinent le vol.
+      - Début : impossible dans une zone protégée. Cible verrouillée (facultative) revérifiée : joueur en jeu, pas
+        soi-même, à portée, hors zone protégée (positions serveur) ; elle seule est prévenue (un frisson).
+      - Fin : vers la cible verrouillée, la direction est calculée ici (le client n'a pas son mot à dire) ; sans
+        cible (ou si elle s'est échappée), celle de la caméra envoyée par le client, normalisée ici. Risque d'échec
+        selon le niveau (elle s'éteint) ; sinon lancer noté (origine = position du lanceur lue côté serveur), annoncé
+        aux seuls joueurs proches, qui en dessinent le vol ; aux niveaux 4 et 5, elle s'incurve vers la cible.
       - Impact : signalé par le client du lanceur (rayon le long de la trajectoire). Le serveur valide : lancer à lui,
         pas encore résolu ; point d'impact dans la portée et dans l'axe du lancer ; délai cohérent avec la vitesse ;
         cible réelle près du point annoncé (position serveur) ; zones protégées ; dégâts entre joueurs activés. Puis il
@@ -25,6 +27,7 @@ local geometry = VavaMagic.geometry
 local cfg = VavaMagic.config
 local spellCfg = cfg.spells.boule_de_feu
 local hitCfg = spellCfg.hit
+local targetingCfg = cfg.targeting
 local notify = cfg.texts.notify
 local limits = cfg.rateLimits
 local RPC = VavaMagic.RPC
@@ -34,6 +37,8 @@ local NAME = 'boule_de_feu'
 local MS_PER_SECOND = 1000
 -- en deçà, l'angle d'un point d'impact n'a pas de sens (contre le lanceur)
 local ANGLE_MIN_DISTANCE = 2.0
+-- au-delà, tout angle est possible
+local MAX_ANGLE = 180
 local DIRECTION = { type = 'number', min = -1.01, max = 1.01 }
 local COORD = { type = 'number', min = -20000, max = 20000 }
 local LAUNCH_ID = { type = 'integer', min = 1, max = 0x7FFFFFFF }
@@ -47,6 +52,8 @@ local TARGET = { type = 'integer', min = 0, max = 65535 }
 ---@field direction table
 ---@field speed number
 ---@field range number
+---@field homing number     degrés par seconde dont elle peut s'incurver vers sa cible
+---@field target integer|nil
 ---@field launchedAt integer
 ---@field resolved boolean
 
@@ -90,21 +97,51 @@ local function ignite(caster, target, burnCfg)
     tick(1)
 end
 
+--- Position (torse) d'une cible verrouillée valable depuis ce point, ou nil : joueur en jeu, pas le lanceur, à portée
+--- du niveau, hors zone protégée.
+---@param src integer
+---@param target integer
+---@param from table
+---@param levelCfg table
+---@return table|nil
+local function lockedPosition(src, target, from, levelCfg)
+    if target == src or not bridge.GetCharacterId(target) then return nil end
+    local position = world.position(target)
+    if not position or combat.protected(position) then return nil end
+    if geometry.distance(from, position) > levelCfg.range + targetingCfg.rangeMargin then return nil end
+    return { x = position.x, y = position.y, z = position.z + hitCfg.targetHeight }
+end
+
 ---@param ctx table
-local function begin(ctx)
+---@param target integer|nil  cible verrouillée par le client
+local function begin(ctx, target)
     if combat.protected(ctx.origin) then return false, 'protected_zone' end
-    return true, {}
+    if not target then return true, {} end
+    if not lockedPosition(ctx.source, target, ctx.origin, spellCfg.levels[ctx.level]) then return false, 'invalid_target' end
+    -- la cible sent la menace : elle a la durée de l'incantation pour réagir
+    TriggerClientEvent(EVENTS.TARGETED, target)
+    return true, { target = target }
 end
 
 ---@param ctx table
 local function finish(ctx, dx, dy, dz)
     local src = ctx.source
-    local direction = geometry.normalize(dx, dy, dz)
-    if not direction then return false, 'invalid' end
     local position = world.position(src)
     if not position then return false, 'no_position' end
     if combat.protected(position) then return false, 'protected_zone' end
     local levelCfg = spellCfg.levels[ctx.level]
+    local origin = { x = position.x, y = position.y, z = position.z + hitCfg.originHeight }
+    -- cible verrouillée encore valable : direction décidée ici ; sinon, la visée libre du client
+    local target = ctx.data.target
+    local aimed = target and lockedPosition(src, target, origin, levelCfg)
+    local direction
+    if aimed then
+        direction = geometry.normalize(aimed.x - origin.x, aimed.y - origin.y, aimed.z - origin.z)
+    else
+        target = nil
+        direction = geometry.normalize(dx, dy, dz)
+    end
+    if not direction then return false, 'invalid' end
     if random() < levelCfg.fizzle then
         broadcast(position, EVENTS.FIREBALL, { id = 0, caster = src, fizzle = true, level = ctx.level })
         bridge.Notify(src, notify.fizzle, 'warning')
@@ -112,9 +149,9 @@ local function finish(ctx, dx, dy, dz)
     end
     nextLaunch = nextLaunch % LAUNCH_ID.max + 1
     local launch = {
-        id = nextLaunch, source = src, level = ctx.level,
-        origin = { x = position.x, y = position.y, z = position.z + hitCfg.originHeight },
-        direction = direction, speed = levelCfg.speed, range = levelCfg.range, launchedAt = GetGameTimer(), resolved = false,
+        id = nextLaunch, source = src, level = ctx.level, origin = origin, direction = direction,
+        speed = levelCfg.speed, range = levelCfg.range, homing = target and levelCfg.homing or 0, target = target,
+        launchedAt = GetGameTimer(), resolved = false,
     }
     launches[launch.id] = launch
     local flightMs = floor(launch.range / launch.speed * MS_PER_SECOND)
@@ -124,6 +161,7 @@ local function finish(ctx, dx, dy, dz)
     broadcast(launch.origin, EVENTS.FIREBALL, {
         id = launch.id, caster = src, dx = direction.x, dy = direction.y, dz = direction.z,
         speed = launch.speed, range = launch.range, level = ctx.level, fizzle = false,
+        target = target or 0, homing = launch.homing,
     })
     return { success = true, result = { id = launch.id } }
 end
@@ -141,8 +179,11 @@ local function plausible(launch, point, src)
     local latest = launch.range / launch.speed * MS_PER_SECOND + hitCfg.launchGraceMs + (GetPlayerPing(src) or 0)
     if elapsed < earliest or elapsed > latest then return false end
     if distance >= ANGLE_MIN_DISTANCE then
+        -- une boule qui s'incurve vers sa cible a pu tourner d'autant pendant son vol
+        local turned = launch.homing * elapsed / MS_PER_SECOND
+        local limit = hitCfg.angleDeg + turned
         local angle = geometry.angle(launch.direction, launch.origin, point)
-        if not angle or angle > hitCfg.angleDeg then return false end
+        if not angle or (limit < MAX_ANGLE and angle > limit) then return false end
     end
     return true
 end
@@ -190,7 +231,7 @@ end)
 
 local ok, err = spells.register(NAME, {
     config = spellCfg,
-    beginArgs = {},
+    beginArgs = { { type = 'integer', min = 1, max = 65535, optional = true } },
     finishArgs = { DIRECTION, DIRECTION, DIRECTION },
     begin = begin,
     finish = finish,

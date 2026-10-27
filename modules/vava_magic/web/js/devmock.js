@@ -3,7 +3,7 @@
  * web/js/devmock.js
  * Rôle : aperçu de l'interface dans un navigateur, hors du jeu (sans effet en jeu) : web/index.html?view=<vue>
  *        avec composer, offer, naming, confirm, grimoire, lueur, sealed, register, cast, broken, murmur, unknown,
- *        messages, all.
+ *        threat, messages, all.
  *        Les textes ci-dessous ne sont qu'une copie d'aperçu : en jeu, ils viennent de config.lua.
  */
 
@@ -13,6 +13,7 @@ window.DevMock = (() => {
 
   const TEXTS = {
     cast: { interrupted: 'Incantation brisée' },
+    threat: { text: 'Un frisson vous parcourt…' },
     composer: {
       title: 'Murmure', to: 'Destinataires', circle: 'Votre cercle : %d contact(s) au plus',
       noContacts: 'Vous ne gardez encore aucun sigil : échangez-en face à face (/sigil offrir).',
@@ -36,7 +37,8 @@ window.DevMock = (() => {
     grimoire: {
       title: 'Grimoire', sealed: 'Les pages restent illisibles : les signes se dérobent à votre regard, comme si le livre refusait de vous parler.',
       empty: 'Aucun sort n\'est encore couché dans ces pages.', level: 'Niveau %d', mastered: 'Maîtrise achevée', xp: '%d / %d XP', xpMax: '%d XP',
-      cost: 'Mana : %d', cooldown: 'Recharge : %d s', key: 'Touche : %s', noKey: 'aucune', current: 'Ce que vous savez', next: 'Au niveau suivant',
+      cost: 'Mana : %d', cooldown: 'Recharge : %d s', key: 'Touche : %s', noKey: 'aucune', lock: 'Verrouiller : %s',
+      current: 'Ce que vous savez', next: 'Au niveau suivant',
       sigils: 'Sigils mémorisables : %d', colors: 'Couleur de la lumière', close: 'Fermer',
     },
     register: {
@@ -71,7 +73,7 @@ window.DevMock = (() => {
     {
       name: 'boule_de_feu', label: 'Boule de feu', summary: 'Rassembler les flammes et les jeter sur un adversaire.', level: 1, xp: 25, from: 0, to: 100,
       description: 'Une petite boule de feu, lente et peu sûre : elle s\'éteint une fois sur cinq. Portée : vingt mètres.',
-      next: 'Votre boule de feu frappe plus fort et plus loin.', cost: 25, cooldown: 30, key: 'K',
+      next: 'Votre boule de feu frappe plus fort et plus loin.', cost: 25, cooldown: 30, key: 'K', lock: 'TAB',
     },
   ];
   const NOW = Math.floor(Date.now() / 1000);
@@ -93,6 +95,7 @@ window.DevMock = (() => {
     broken: () => { Bridge.emit('cast:start', { label: 'Boule de feu', ms: 4000 }); setTimeout(() => Bridge.emit('cast:interrupted'), 1500); },
     murmur: () => Bridge.emit('murmur:show', { from: 'Mage du moulin', text: 'Rendez-vous au moulin ce soir, … la lune sera haute.', waypoint: true, ms: 600000 }),
     unknown: () => Bridge.emit('murmur:show', { text: 'On t\'observe depuis le pont.', ms: 600000 }),
+    threat: () => Bridge.emit('threat', { ms: 4000 }),
   };
   SCENES.lueur = () => { SCENES.grimoire(); document.querySelectorAll('#view-grimoire .entry')[1].click(); };
   SCENES.messages = () => { SCENES.murmur(); SCENES.unknown(); SCENES.cast(); };

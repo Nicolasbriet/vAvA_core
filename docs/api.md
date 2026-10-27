@@ -815,6 +815,9 @@ commune, sorts **Murmure** (messages), **Lueur** (lumière) et **Boule de feu** 
   par l'objet (métadonnée `registre`), l'historique suit l'objet.
 - **Boule de feu** : impact signalé par le client du lanceur, validé par le serveur (portée, axe, délai, cible réelle,
   zones protégées) avant les dégâts, appliqués par `vava_health:damage` ; journal `vava_magic_damage_log`.
+- **Verrouillage** (sorts `lockOn`) : touche Tab côté client ; la cible part avec le début de l'incantation, revérifiée
+  par le serveur, qui prévient la seule cible (évènement `vava_magic:targeted`) et calcule lui-même la direction ;
+  virage vers la cible aux niveaux 4 et 5 (`homing`, pris en compte dans le contrôle d'axe de l'impact).
 
 | Export serveur | Retour |
 |---|---|

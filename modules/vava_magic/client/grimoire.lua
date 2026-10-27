@@ -49,6 +49,7 @@ local function pageOf(name, view)
         description = levelCfg.description, next = nextCfg and nextCfg.unlock or nil,
         cost = progression.cost(spellCfg, level), cooldown = ceil(levelCfg.cooldownMs / MS_PER_SECOND),
         key = spellCfg.key and keys.label(spellCfg.key) or nil,
+        lock = spellCfg.lockOn and keys.label('cible') or nil,
         sigils = name == cfg.sigils.spell and view.sigilLimit or nil,
         colors = colors, color = colors and (view.lightColor ~= '' and view.lightColor or spellCfg.defaultColor) or nil,
     }

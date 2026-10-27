@@ -5,8 +5,8 @@
   <title>Magie</title>
   <!--
     web/index.html
-    Rôle : interface de la magie : barre d'incantation, murmures reçus, parchemin d'écriture, sigil tendu ou rendu,
-           confirmation, grimoire et registre (livres). Tous les textes viennent de la config du module (message
+    Rôle : interface de la magie : barre d'incantation, murmures reçus, frisson d'une cible verrouillée, parchemin
+           d'écriture, sigil tendu ou rendu, confirmation, grimoire et registre (livres). Tous les textes viennent de la config du module (message
            « init »). Dans un navigateur, web/index.html?view=… montre chaque vue avec des données d'exemple.
   -->
   <link rel="stylesheet" href="css/style.css">
@@ -18,6 +18,8 @@
   </div>
 
   <div class="murmurs" id="murmurs" aria-live="polite"></div>
+
+  <div class="threat" id="threat" hidden><p class="threat-text" id="threat-text"></p></div>
 
   <div class="veil" id="veil" hidden>
     <section class="sheet" id="view-composer" hidden></section>
@@ -33,6 +35,7 @@
   <script src="js/sound.js"></script>
   <script src="js/castbar.js"></script>
   <script src="js/murmurs.js"></script>
+  <script src="js/threat.js"></script>
   <script src="js/modal.js"></script>
   <script src="js/composer.js"></script>
   <script src="js/prompts.js"></script>

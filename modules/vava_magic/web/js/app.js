@@ -13,6 +13,7 @@
   Bridge.on('cast:end', () => Castbar.done());
   Bridge.on('cast:interrupted', () => Castbar.broken());
   Bridge.on('murmur:show', (payload) => Murmurs.show(payload));
+  Bridge.on('threat', (payload) => Threat.show(payload));
   Bridge.on('sound', (payload) => Sound.play(payload.name, payload.volume));
   for (const name of MODALS) Bridge.on(`modal:${name}`, (payload) => Modal.open(name, payload));
   Bridge.on('modal:close', () => Modal.close());

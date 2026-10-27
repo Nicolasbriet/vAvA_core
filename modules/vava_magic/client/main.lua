@@ -20,6 +20,7 @@ local gauge = VavaMagic.manaGauge
 local casting = VavaMagic.casting
 local ambient = VavaMagic.ambient
 local fireball = VavaMagic.fireball
+local targeting = VavaMagic.targeting
 local keys = VavaMagic.keys
 local cfg = VavaMagic.config
 local RPC = VavaMagic.RPC
@@ -49,6 +50,7 @@ local function stop()
     if not playing then return end
     playing = false
     casting.reset()
+    targeting.release()
     nui.close()
     state.clear()
 end

@@ -29,13 +29,25 @@ function keys.bind(name, handler)
     RegisterKeyMapping(key.command, key.label, 'keyboard', key.key)
 end
 
+--- Lie une action maintenue à sa touche (commandes +/-) : `onDown` à l'appui, `onUp` au relâchement.
+---@param name string
+---@param onDown fun()
+---@param onUp fun()
+function keys.bindHold(name, onDown, onUp)
+    local key = KEYS[name]
+    RegisterCommand('+' .. key.command, function() onDown() end, false)
+    RegisterCommand('-' .. key.command, function() onUp() end, false)
+    RegisterKeyMapping('+' .. key.command, key.label, 'keyboard', key.key)
+end
+
 --- Touche choisie par le joueur pour une action, telle que GTA l'affiche (« L »), ou celle par défaut.
 ---@param name string
 ---@return string|nil
 function keys.label(name)
     local key = KEYS[name]
     if not key then return nil end
-    local button = GetControlInstructionalButton(0, (GetHashKey(key.command) | MAPPED_COMMAND) & UINT32, true)
+    local command = key.hold and ('+' .. key.command) or key.command
+    local button = GetControlInstructionalButton(0, (GetHashKey(command) | MAPPED_COMMAND) & UINT32, true)
     if type(button) == 'string' then
         local letter = match(button, '^t_(.+)$')
         if letter then return letter end

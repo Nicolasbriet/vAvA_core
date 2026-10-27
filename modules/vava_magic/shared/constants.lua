@@ -20,6 +20,7 @@ VavaMagic.EVENTS = {
     SIGIL_CLOSED = 'vava_magic:sigilClosed', -- (idOffre) offre close (expirée, refusée, conclue)
     FIREBALL = 'vava_magic:fireball',       -- lancer { id, caster, dx, dy, dz, speed, range, level, fizzle? }
     FIREBALL_END = 'vava_magic:fireballEnd', -- (id, x, y, z) impact validé par le serveur
+    TARGETED = 'vava_magic:targeted',       -- () à la seule cible verrouillée d'un sort d'attaque : un frisson
     DAMAGE = 'vava_magic:damage',           -- (part de vie) sans vava_health : la victime applique la blessure
     GRIMOIRE = 'vava_magic:openGrimoire',   -- grimoire utilisé
     REGISTER = 'vava_magic:openRegister',   -- { id, pages, count, max } registre utilisé

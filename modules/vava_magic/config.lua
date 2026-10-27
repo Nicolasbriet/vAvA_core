@@ -172,42 +172,44 @@ VavaMagic.config = {
             baseCost = 25,
             xp = 25,
             moveSpeed = 1.2,      -- le lanceur peut marcher lentement pendant l'incantation
+            lockOn = true,        -- sort d'attaque : se lance sur la cible verrouillée (voir `targeting`)
             anim = { dict = 'anim@mp_player_intupperknuckle_crunch', clip = 'idle_a', flag = 49 },
             throwAnim = { dict = 'weapons@projectile@grenade_str', clip = 'throw_m_fb_stand', flag = 48, ms = 900 },
             ambientText = 'rassemble des flammes entre ses mains',
             key = 'feu',
             -- speed (m/s) · range (m) · damage (part de la vie) · fizzle (chance qu'elle s'éteigne) · size (taille du
-            -- feu) · aoeRadius/aoeShare (zone d'effet, dégâts réduits aux cibles secondaires) · burn (brûlure)
+            -- feu) · aoeRadius/aoeShare (zone d'effet, dégâts réduits aux cibles secondaires) · burn (brûlure) ·
+            -- homing (degrés par seconde dont elle s'incurve vers la cible verrouillée ; 0 : elle part droit vers elle)
             levels = {
                 {
                     castMs = 1600, cooldownMs = 30000, speed = 12.0, range = 20.0, damage = 0.10, fizzle = 0.20, size = 0.6,
-                    aoeRadius = 0, aoeShare = 0, burn = false,
+                    aoeRadius = 0, aoeShare = 0, burn = false, homing = 0,
                     description = 'Une petite boule de feu, lente et peu sûre : elle s\'éteint une fois sur cinq. Portée : vingt mètres.',
                     unlock = 'Vous savez lancer une petite boule de feu.',
                 },
                 {
                     castMs = 1500, cooldownMs = 28000, speed = 15.0, range = 28.0, damage = 0.15, fizzle = 0.10, size = 0.7,
-                    aoeRadius = 0, aoeShare = 0, burn = false,
+                    aoeRadius = 0, aoeShare = 0, burn = false, homing = 0,
                     description = 'Plus brûlante et plus lointaine (vingt-huit mètres) ; elle ne s\'éteint plus qu\'une fois sur dix.',
                     unlock = 'Votre boule de feu frappe plus fort et plus loin.',
                 },
                 {
                     castMs = 1400, cooldownMs = 26000, speed = 18.0, range = 34.0, damage = 0.18, fizzle = 0.06, size = 0.8,
-                    aoeRadius = 2.5, aoeShare = 0.5, burn = false,
+                    aoeRadius = 2.5, aoeShare = 0.5, burn = false, homing = 0,
                     description = 'Elle éclate à l\'impact et lèche ceux qui se tiennent à deux pas et demi de la cible.',
                     unlock = 'Votre boule de feu éclate à l\'impact et touche ceux qui entourent la cible.',
                 },
                 {
                     castMs = 1300, cooldownMs = 24000, speed = 20.0, range = 40.0, damage = 0.20, fizzle = 0.04, size = 0.9,
-                    aoeRadius = 2.5, aoeShare = 0.5, burn = { durationMs = 4000, tickMs = 1000, damage = 0.02 },
-                    description = 'La cible touchée brûle encore quelques instants.',
-                    unlock = 'La cible touchée brûle encore quelques instants.',
+                    aoeRadius = 2.5, aoeShare = 0.5, burn = { durationMs = 4000, tickMs = 1000, damage = 0.02 }, homing = 35,
+                    description = 'La cible touchée brûle encore quelques instants, et la boule s\'incurve un peu vers la cible verrouillée.',
+                    unlock = 'La cible touchée brûle encore quelques instants ; votre boule s\'incurve vers la cible verrouillée.',
                 },
                 {
                     castMs = 1000, cooldownMs = 20000, speed = 30.0, range = 50.0, damage = 0.25, fizzle = 0.01, size = 1.1,
-                    aoeRadius = 3.5, aoeShare = 0.6, burn = { durationMs = 5000, tickMs = 1000, damage = 0.025 },
-                    description = 'Un trait de feu rapide et sûr, à cinquante mètres, qui éclate largement et embrase sa cible.',
-                    unlock = 'Votre boule de feu file, frappe et embrase au plus fort.',
+                    aoeRadius = 3.5, aoeShare = 0.6, burn = { durationMs = 5000, tickMs = 1000, damage = 0.025 }, homing = 70,
+                    description = 'Un trait de feu rapide et sûr, à cinquante mètres, qui éclate largement, embrase sa cible et la suit de près.',
+                    unlock = 'Votre boule de feu file, frappe et embrase au plus fort, et suit de près la cible verrouillée.',
                 },
             },
             burnEnabled = true,   -- brûlure du niveau 4 (false : jamais de dégâts sur la durée)
@@ -220,6 +222,7 @@ VavaMagic.config = {
                 broadcastRadius = 150.0, -- joueurs qui voient le lancer
                 launchGraceMs = 3000,    -- délai d'un impact après la fin du vol
                 originHeight = 0.6,      -- hauteur des mains au-dessus de la position du ped
+                targetHeight = 0.3,      -- cible verrouillée : visée au torse, au-dessus de la position du ped
             },
             fx = {
                 asset = 'core',
@@ -229,6 +232,21 @@ VavaMagic.config = {
             light = { r = 255, g = 140, b = 40, range = 6.0, intensity = 6.0 },
             projectile = { model = 'prop_golf_ball', handBone = 57005, radius = 0.25, renderDistance = 200.0 },
         },
+    },
+
+    -- Verrouillage d'une cible, pour les sorts d'attaque (`lockOn = true`) : la touche prend le joueur le plus proche du
+    -- centre de l'écran, à portée du sort et en vue ; un nouvel appui passe au suivant ; la touche maintenue relâche.
+    -- Rien ne passe par le réseau tant qu'on ne lance pas ; la cible est revérifiée par le serveur au lancer.
+    targeting = {
+        coneDeg = 25,          -- écart permis entre le centre de l'écran et la cible
+        holdMs = 600,          -- touche maintenue au moins ce temps : verrou relâché
+        idleMs = 20000,        -- verrou relâché après ce délai sans attaque
+        checkMs = 250,         -- revérification de la portée et de la vue
+        lostChecks = 4,        -- vérifications de suite sans la voir avant de la perdre (1 s)
+        rangeMargin = 2.0,     -- marge sur la portée, côté client comme serveur
+        warnMs = 2200,         -- durée du frisson chez la cible (bord de l'écran qui rougit)
+        -- anneau sous la cible, vu du seul lanceur
+        ring = { marker = 25, size = 1.2, r = 200, g = 64, b = 40, alpha = 210, groundOffset = 0.95, spin = 90.0 },
     },
 
     -- Combat entre joueurs.
@@ -298,6 +316,8 @@ VavaMagic.config = {
         lueur = { command = 'vava_magic_lueur', key = 'L', label = 'Magie : Lueur (allumer, éteindre)' },
         ancre = { command = 'vava_magic_ancre', key = 'J', label = 'Magie : ancrer un orbe de Lueur' },
         feu = { command = 'vava_magic_feu', key = 'K', label = 'Magie : Boule de feu' },
+        -- touche maintenue (commande +/-) : appui court = verrouiller ou cible suivante, long = relâcher
+        cible = { command = 'vava_magic_cible', key = 'TAB', label = 'Magie : verrouiller une cible (sorts d\'attaque)', hold = true },
         annuler = { command = 'vava_magic_annuler', key = 'X', label = 'Magie : interrompre l\'incantation' },
     },
 
@@ -369,6 +389,8 @@ VavaMagic.config = {
             no_light = 'Aucune lueur à éteindre.',
             unknown_color = 'Cette couleur vous est inconnue.',
             no_launch = 'Cette boule de feu n\'existe plus.',
+            no_lock_target = 'Aucune cible en vue.',
+            invalid_target = 'Votre cible vous échappe.',
             invalid_impact = 'Impact refusé.',
             nobody_near = 'Personne ne se tient assez près de vous.',
             offer_pending = 'Un sigil attend déjà une réponse.',
@@ -455,6 +477,8 @@ VavaMagic.config = {
         -- interface (envoyée à la page une fois prête)
         ui = {
             cast = { interrupted = 'Incantation brisée' },
+            -- cible verrouillée par un sort d'attaque : le bord de son écran rougit, avec ce texte
+            threat = { text = 'Un frisson vous parcourt…' },
             composer = {
                 title = 'Murmure', to = 'Destinataires', circle = 'Votre cercle : %d contact(s) au plus',
                 noContacts = 'Vous ne gardez encore aucun sigil : échangez-en face à face (/sigil offrir).',
@@ -483,7 +507,7 @@ VavaMagic.config = {
                 sealed = 'Les pages restent illisibles : les signes se dérobent à votre regard, comme si le livre refusait de vous parler.',
                 empty = 'Aucun sort n\'est encore couché dans ces pages.',
                 level = 'Niveau %d', mastered = 'Maîtrise achevée', xp = '%d / %d XP', xpMax = '%d XP',
-                cost = 'Mana : %d', cooldown = 'Recharge : %d s', key = 'Touche : %s', noKey = 'aucune',
+                cost = 'Mana : %d', cooldown = 'Recharge : %d s', key = 'Touche : %s', noKey = 'aucune', lock = 'Verrouiller : %s',
                 current = 'Ce que vous savez', next = 'Au niveau suivant', sigils = 'Sigils mémorisables : %d',
                 colors = 'Couleur de la lumière', close = 'Fermer',
             },

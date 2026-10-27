@@ -25,6 +25,7 @@
     fill.style.transform = `scaleX(${share})`;
     const facts = [UI.format(texts.cost, spell.cost), UI.format(texts.cooldown, spell.cooldown),
       UI.format(texts.key, spell.key || texts.noKey)];
+    if (spell.lock) facts.push(UI.format(texts.lock, spell.lock));
     if (spell.sigils) facts.push(UI.format(texts.sigils, spell.sigils));
 
     UI.append(page,

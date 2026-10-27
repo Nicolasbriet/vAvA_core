@@ -87,7 +87,8 @@ Les touches se règlent dans **Paramètres > Raccourcis > FiveM** (même place e
 | N | `/murmure` | ouvrir le parchemin d'écriture ; `/murmure 1,3 Rendez-vous au moulin` envoie directement |
 | L | `/lueur` | allumer, ou éteindre sa lumière |
 | J | `/lueur ancrer` | ancrer un orbe là où l'on regarde (niveau 4) |
-| K | `/bouledefeu` | lancer une boule de feu vers la caméra |
+| K | `/bouledefeu` | lancer une boule de feu : sur la cible verrouillée, sinon vers la caméra |
+| Tab | — | appui court : verrouiller le joueur visé (sorts d'attaque), à nouveau : cible suivante ; maintenu : relâcher |
 | X | — | interrompre l'incantation |
 | — | `/lueur couleur <nom>` · `eteindre` · `dissiper` | couleur (niveau 5), éteindre, dissiper ses orbes ancrés |
 | — | `/grimoire` | ouvrir le grimoire (secours ; l'objet l'ouvre aussi) |
@@ -97,6 +98,21 @@ Les touches se règlent dans **Paramètres > Raccourcis > FiveM** (même place e
 | — | `/sigil brouiller` | nouveau sigil (confirmation, 60 de mana, 6 h de recharge) |
 
 Le registre s'ouvre en l'utilisant dans l'inventaire.
+
+### Verrouiller une cible (sorts d'attaque)
+
+Un sort d'attaque (`lockOn = true` dans sa config : la Boule de feu) peut viser un joueur verrouillé :
+
+- **Tab** verrouille le joueur le plus proche du centre de l'écran, à portée du sort et en vue ; un anneau rouge
+  tourne sous lui, vu du seul lanceur. Un nouvel appui passe à la cible suivante, Tab maintenu relâche.
+- Le verrou saute si la cible sort de portée, de vue (une seconde), meurt, ou après 20 s sans attaque.
+- La cible part avec le début de l'incantation. Le serveur la revérifie (joueur en jeu, à portée, hors zone
+  protégée) et **prévient la cible seule** : le bord de son écran rougit (« Un frisson vous parcourt… »), elle a la
+  durée de l'incantation pour réagir.
+- À la fin, le serveur calcule lui-même la direction vers la cible (le client n'y est pour rien). Niveaux 1 à 3 :
+  la boule part droit vers elle, on peut encore l'esquiver. Niveaux 4 et 5 : elle s'incurve vers elle pendant son vol
+  (35 puis 70 degrés par seconde, `levels[].homing`). Cible échappée pendant l'incantation : la visée libre reprend.
+- Tant qu'on ne lance pas, rien ne passe par le réseau. Pendant l'appui sur Tab, la roue d'armes de GTA est bloquée.
 
 ## Commandes du Conseil
 
@@ -125,6 +141,7 @@ serveur. Chaque commande est inscrite au journal du Registre du Conseil.
 | `spells.<sort>` | label, résumé, coût de base, XP, animation, texte d'ambiance, touche, et **5 niveaux** : durée d'incantation, recharge, description, ce que le niveau débloque, valeurs propres au sort |
 | `spells.lueur.anchor` · `colors` · `render` | orbe ancré, couleurs du niveau 5, rendu (os, décalages, flottement, scintillement) |
 | `spells.boule_de_feu.hit` · `fx` · `light` | contrôles de l'impact, particules, lumière |
+| `targeting` | verrouillage des sorts d'attaque : cône, appui long, délais, marge, frisson, anneau |
 | `combat` | dégâts entre joueurs, zones protégées (`{ label, x, y, radius }`), journal des dégâts |
 | `sigils` | longueur, nombre gardé sans Murmure, nom, échange (3 m, 30 s), brouillage |
 | `registers` | pages par registre (200) |
@@ -222,6 +239,9 @@ Deux joueurs (A et B) suffisent ; un troisième aide pour le cercle et la zone d
 **Boule de feu**
 - [ ] A lance vers B (à 10 m) : incantation en marchant lentement, jet, projectile et lumière vus de tous, impact en flammes, B blessé (vava_health). Pas d'explosion GTA.
 - [ ] Hors de portée ou derrière soi : aucun dégât. Niveau 1 : la boule s'éteint parfois (vapeur, mana dépensée).
+- [ ] Tab devant B : anneau rouge sous B (A seul le voit), pas de roue d'armes. Tab encore : cible suivante ; Tab maintenu : relâché. B derrière un mur : verrou perdu.
+- [ ] A lance sur B verrouillé : B voit le bord de son écran rougir dès le début de l'incantation ; A se tourne vers B au jet ; la boule part sur B même si A regarde ailleurs.
+- [ ] Niveau 1 à 3 : B esquive en se décalant. Niveau 4-5 (`/magie niveau <A> boule_de_feu 5`) : la boule s'incurve et le rattrape.
 - [ ] Niveau 3 : un voisin de B est touché aussi (moins fort). Niveau 4 : B brûle quelques secondes.
 - [ ] Zone protégée (`combat.protectedZones`) : impossible d'y lancer, personne n'y est blessé. `combat.pvp = false` : aucun dégât.
 - [ ] Table `vava_magic_damage_log` : lanceur, cible, dégâts, position.
