@@ -41,6 +41,16 @@ VavaBridge.config = {
         },
     },
 
+    -- Liste blanche Discord (réglée dans la Chancellerie) : délai de sa réponse à la connexion d'un joueur (ms),
+    -- messages quand elle ne répond pas.
+    whitelist = {
+        timeoutMs = 8000,
+        messages = {
+            unreachable = 'La liste blanche ne peut pas être vérifiée pour l\'instant : réessayez dans une minute.',
+            refused = 'Ce serveur est réservé aux membres de son Discord.',
+        },
+    },
+
     -- Journal du Registre pour les actions faites depuis le web dans d'autres modules (32 caractères au plus).
     messages = {
         logZoneUpdate = 'Zone de voix modifiée',

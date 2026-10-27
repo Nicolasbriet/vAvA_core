@@ -66,6 +66,7 @@ local function onCommand(src, args)
     end
     push.request({
         type = 'link', code = code, license = license, fivem = GetPlayerIdentifierByType(src, 'fivem'),
+        discord = GetPlayerIdentifierByType(src, 'discord'),
         accountId = session.accountId, player = GetPlayerName(src),
     }, function(answer)
         if not answer then

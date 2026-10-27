@@ -101,6 +101,11 @@ const STRINGS = (() => {
     db_create_failed: 'La base n\'a pas pu être créée.',
     install_failed: 'L\'installation a échoué (détail ci-dessous) : corrigez puis relancez-la ; ce qui est déjà en place est gardé.',
     not_linked: 'Ce compte n\'est relié à aucun joueur.',
+    // Discord
+    discord_not_ready: 'Le bot n\'est pas connecté, ou aucun salon d\'annonces n\'est réglé.',
+    discord_401: 'Jeton refusé par Discord.',
+    discord_403: 'Le bot n\'a pas le droit d\'écrire dans ce salon (vérifiez ses permissions).',
+    discord_404: 'Salon introuvable : vérifiez son identifiant.',
   };
 
   const fields = {
@@ -110,6 +115,8 @@ const STRINGS = (() => {
     'db.password': 'Mot de passe', resources: 'Ressources', extra: 'Options avancées',
     restarts: 'Heures des redémarrages', warnings: 'Avertissements', message: 'Message', dumpPath: 'Chemin de mysqldump',
     keep: 'Sauvegardes gardées', times: 'Heures des sauvegardes',
+    token: 'Jeton du bot', guildId: 'Serveur Discord', statusChannelId: 'Salon du statut', announceChannelId: 'Salon des annonces',
+    staffChannelId: 'Salon du staff', joinUrl: 'Lien « Rejoindre »', inviteUrl: 'Invitation Discord', roleIds: 'Rôles de la liste blanche',
   };
 
   const states = {
@@ -137,6 +144,8 @@ const STRINGS = (() => {
     scheduled_update: 'Mise à jour au redémarrage planifié',
     account_linked: 'Compte relié à son joueur', account_unlinked: 'Compte délié de son joueur',
     rank_synced: 'Rang appliqué en jeu', rank_sync_failed: 'Rang non appliqué en jeu',
+    discord_linked: 'Compte Discord relié', discord_unlinked: 'Compte Discord délié', discord_settings: 'Réglages du bot Discord',
+    discord_error: 'Erreur du bot Discord',
   };
 
   const UNITS = ['o', 'Ko', 'Mo', 'Go', 'To'];
@@ -238,13 +247,70 @@ const STRINGS = (() => {
     nav: {
       dashboard: 'Tableau', console: 'Console', setup: 'Configuration', logout: 'Se retirer',
       performance: 'Performances', resources: 'Ressources', cfg: 'server.cfg', schedule: 'Planification', backups: 'Sauvegardes',
-      updates: 'Mises à jour',
+      updates: 'Mises à jour', discord: 'Discord',
       players: 'Joueurs', reports: 'Signalements', bans: 'Sanctions', logs: 'Journal du Conseil', council: 'Conseil',
       announce: 'Proclamation', zones: 'Zones de voix', cameras: 'Caméras', accounts: 'Comptes',
       groups: { server: 'Serveur', realm: 'Royaume', chancellery: 'Chancellerie' },
     },
 
     pages: { previous: 'Page précédente', next: 'Page suivante', page: (n) => `Page ${n}` },
+
+    discord: {
+      title: 'Bot Discord',
+      intro: 'Le bot de la Chancellerie, comme celui de txAdmin : le statut du serveur en direct dans un salon, les annonces (démarrage, arrêt, redémarrage, mise à jour) et les signalements pour le staff, des commandes slash, et la liste blanche par rôle Discord. Il se connecte lui-même à Discord : rien à ouvrir sur le serveur.',
+      masterOnly: 'Seul le compte maître règle le bot Discord.',
+      nodeTooOld: 'Le bot demande Node.js 22 ou plus récent (demarrer.sh l\'installe) : mettez Node.js à jour.',
+      states: { ready: (name) => `Connecté${name ? ` : ${name}` : ''}`, connecting: 'Connexion à Discord…', stopped: 'Arrêté', error: 'Erreur' },
+      errors: {
+        bad_token: 'Jeton refusé par Discord : collez-en un nouveau (Developer Portal, Bot, Reset Token).',
+        bad_intents: 'Discord refuse les droits demandés par le bot.',
+        node_too_old: 'Node.js 22 ou plus récent est nécessaire.',
+        disconnected: 'Connexion perdue : nouvel essai en cours.',
+        network: 'Discord ne répond pas : nouvel essai en cours.',
+      },
+      disabledNote: 'Bot désactivé.',
+      invite: 'Inviter le bot sur votre Discord',
+      test: 'Message d\'essai',
+      testDone: 'Message d\'essai envoyé dans le salon des annonces.',
+      settings: 'Réglages',
+      enabled: 'Activer le bot',
+      enabledHelp: 'Le jeton et le serveur Discord sont alors nécessaires.',
+      token: 'Jeton du bot',
+      tokenHelp: 'Developer Portal → votre application → Bot → Reset Token. Il reste sur cette machine et n\'est jamais réaffiché.',
+      tokenSet: 'Jeton déjà renseigné : laissez vide pour le garder.',
+      guildId: 'Identifiant du serveur Discord',
+      idHelp: 'Discord → Paramètres → Avancés → Mode développeur, puis clic droit → Copier l\'identifiant.',
+      statusChannelId: 'Salon du statut',
+      statusHelp: 'Le bot y tient un message à jour (laissez-le épinglé). Vide : pas de statut.',
+      announceChannelId: 'Salon des annonces',
+      announceHelp: 'Démarrage, arrêt, plantage, redémarrage planifié, mise à jour. Vide : pas d\'annonces.',
+      staffChannelId: 'Salon du staff',
+      staffHelp: 'Nouveaux signalements des joueurs. Vide : le salon des annonces.',
+      joinUrl: 'Lien « Rejoindre » (facultatif)',
+      joinHelp: 'Bouton du statut, par exemple https://cfx.re/join/abc123.',
+      inviteUrl: 'Invitation de votre Discord (facultatif)',
+      inviteHelp: 'Montrée aux joueurs refusés par la liste blanche, par exemple https://discord.gg/abcdef.',
+      whitelist: 'Liste blanche par rôle Discord',
+      whitelistHelp: 'Seuls les membres du serveur Discord ayant l\'un des rôles ci-dessous entrent dans le royaume ; les comptes du panneau reliés à leur joueur passent toujours.',
+      roleIds: 'Identifiants des rôles admis',
+      roleIdsHelp: 'Séparés par des virgules (clic droit sur le rôle → Copier l\'identifiant).',
+      save: 'Sceller les réglages',
+      saved: 'Réglages enregistrés : le bot se reconnecte.',
+      stepsTitle: 'Créer le bot',
+      steps: [
+        'Sur discord.com/developers/applications : « New Application », donnez-lui un nom (celui du bot).',
+        'Onglet « Bot » : « Reset Token », copiez le jeton et collez-le ci-dessus.',
+        'Activez le mode développeur de Discord (Paramètres → Avancés), puis copiez l\'identifiant de votre serveur et de vos salons (clic droit).',
+        'Cochez « Activer le bot » et scellez : une fois connecté, « Inviter le bot sur votre Discord » l\'ajoute à votre serveur.',
+        'Pour la liste blanche : copiez l\'identifiant du ou des rôles admis, cochez la liste blanche, scellez.',
+      ],
+      commandsTitle: 'Commandes slash',
+      commands: [
+        ['/statut', 'état du serveur (pour tous)'], ['/joueurs', 'joueurs connectés (pour tous)'],
+        ['/lier code', 'relie son compte Discord à son compte de la Chancellerie (code de la page Comptes)'],
+        ['/annonce, /avertir, /expulser, /bannir', 'pour le staff relié, avec les droits de son rang du Conseil'],
+      ],
+    },
 
     quickPlayers: {
       button: 'Joueurs en ligne',
@@ -436,6 +502,13 @@ const STRINGS = (() => {
       unlink: 'Délier',
       close: 'Fermer',
       linkTitle: 'Relier au joueur',
+      linkDiscord: 'Ou, pour relier le compte Discord (commandes du staff), sur le Discord du royaume :',
+      discordLine: (name) => `Discord : ${name}`,
+      discordId: (id) => `n° ${id}`,
+      unlinkDiscord: 'Délier Discord',
+      unlinkDiscordTitle: 'Délier le compte Discord ?',
+      unlinkDiscordText: (name) => `Le compte « ${name} » ne pourra plus utiliser les commandes du staff sur Discord.`,
+      unlinkedDiscord: 'Compte Discord délié.',
       linkIntroMine: 'En jeu, ouvrez la console (touche F8) et tapez :',
       linkIntroOther: (name) => `Donnez ce code à la personne du compte « ${name} ». En jeu, elle ouvre la console (touche F8) et tape :`,
       linkHelp: (minutes) => `Valable ${minutes} minutes, une seule fois. Ce dialogue se ferme de lui-même quand la liaison est faite.`,

@@ -37,6 +37,7 @@ const App = (() => {
     { id: 'cameras', group: 'realm', label: N.cameras, realm: 'watch', view: CamerasView },
     { id: 'comptes', group: 'chancellery', label: N.accounts, view: AccountsView },
     { id: 'mises-a-jour', group: 'chancellery', label: N.updates, view: UpdatesView },
+    { id: 'discord', group: 'chancellery', label: N.discord, master: true, view: DiscordView },
   ];
   const GROUPS = ['server', 'realm', 'chancellery'];
 
@@ -73,6 +74,7 @@ const App = (() => {
   function allowed(page) {
     if (page.permission && !context.can(page.permission)) return false;
     if (page.anyPermission && !page.anyPermission.some((permission) => context.can(permission))) return false;
+    if (page.master && !(account && account.master)) return false;
     if (page.group === 'realm' && !hasRealm()) return false;
     if (page.realm && GAME.loaded() && !GAME.can(page.realm)) return false;
     return true;

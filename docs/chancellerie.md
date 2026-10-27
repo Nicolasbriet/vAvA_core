@@ -253,6 +253,30 @@ démarrage du serveur de jeu ; délier ou supprimer le compte retire le rang en 
 Chancellerie et à celui du Conseil (« Chancellerie : <compte> »). Il faut `vava_admin` 1.3.0 et `vava_chancellerie`
 1.2.0.
 
+## Bot Discord
+
+Page **Discord** (compte maître). Le bot se connecte lui-même à Discord (Gateway, sans droit privilégié) : rien à
+ouvrir sur le serveur. Il demande Node.js 22 ou plus récent (celui que `demarrer.sh` installe).
+
+- **Statut** : un message tenu à jour dans le salon choisi (chaque minute, à chaque changement d'état, arrivée ou départ
+  de joueur) : en ligne ou non, joueurs, en ligne depuis, prochain redémarrage, boutons « Rejoindre » et « Discord ».
+  Supprimé dans Discord, il est recréé.
+- **Annonces** : serveur en ligne, arrêté, planté ; redémarrage planifié (aux délais des avertissements) ; mise à jour
+  appliquée. Les nouveaux signalements vont au salon du staff.
+- **Commandes slash** : `/statut` (public) et `/joueurs` pour tous ; `/lier <code>` relie son compte Discord à son
+  compte de la Chancellerie (même code qu'en jeu, page Comptes ; une liaison faite en jeu retient aussi l'identifiant
+  Discord du joueur) ; `/annonce`, `/avertir`, `/expulser`, `/bannir` pour le staff relié, au nom de son compte : le
+  Registre du Conseil vérifie le droit de son rang et tient le journal.
+- **Liste blanche** : à la connexion d'un joueur, le pont demande à la Chancellerie s'il a l'un des rôles choisis sur
+  le serveur Discord (identifiant `discord:` du jeu) ; un joueur relié à un compte du panneau passe toujours. Refusé :
+  il lit pourquoi (pas membre, avec l'invitation ; pas le rôle ; Discord fermé). Réponses gardées une minute.
+  Discord injoignable : refusé, avec un message clair.
+
+Créer le bot : discord.com/developers/applications → New Application → Bot → Reset Token (le jeton se colle dans la
+page, il n'en ressort jamais) ; mode développeur de Discord pour copier les identifiants du serveur, des salons et des
+rôles ; le lien « Inviter le bot » de la page l'ajoute au serveur Discord (droits : voir les salons, écrire, encarts,
+historique). Il faut `vava_chancellerie` 1.2.0 pour la liste blanche.
+
 ## Le royaume depuis le web
 
 Pour les comptes qui ont un rang du Conseil, quand le serveur de jeu tourne avec la ressource `vava_chancellerie`
@@ -355,6 +379,7 @@ Réglages de `data/config.json` (créé au premier lancement) :
 | `updates.channel` | `commits` | `commits` : chaque commit de la branche ; `releases` : les releases publiées |
 | `updates.autoCheck` / `checkEveryMin` | `true` / `60` | vérification à intervalle |
 | `updates.applyAtRestart` | `false` | appliquer la mise à jour au redémarrage planifié |
+| `discord.*` | désactivé | bot Discord : jeton, serveur, salons, liens, liste blanche (réglés depuis la page Discord) |
 
 `data/install.json` retient ce qui est installé (version, empreinte de chaque fichier) : c'est lui qui permet de
 distinguer vos modifications des changements en amont.
@@ -403,3 +428,5 @@ Toutes les réponses sont `{ ok, error?, … }`. Les `POST` demandent `x-chancel
 | `POST /api/updates/apply` · `settings` | compte maître | `{ backupDb, delayMin = 0\|1\|5\|10 }` · `{ channel, autoCheck, applyAtRestart }` |
 | `POST /api/account/link` · `unlink` | connecté (soi) ou maître (`{ name }`) | code de liaison `{ code, expiresAt, ttlMs }` · délier ; flux : `linked` |
 | `GET /api/links` | rang du Conseil | `[{ accountId, name }]` : comptes de jeu reliés à un compte du panneau |
+| `GET /api/discord` · `POST /api/discord/settings` · `test` | compte maître | état du bot, lien d'invitation · réglages (jeton vide : gardé) · message d'essai |
+| `POST /api/account/discord/unlink` | connecté (soi) ou maître (`{ name }`) | délie le compte Discord |

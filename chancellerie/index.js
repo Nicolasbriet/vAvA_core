@@ -21,6 +21,7 @@ const { ServerProcess } = require('./lib/process');
 const { Metrics } = require('./lib/metrics');
 const { Scheduler } = require('./lib/scheduler');
 const { Updates, RESTART_CODE } = require('./lib/updates');
+const { DiscordBot } = require('./lib/discord-bot');
 const fs = require('fs');
 const path = require('path');
 const readline = require('readline');
@@ -91,8 +92,9 @@ async function main() {
   const metrics = new Metrics(server);
   const updates = new Updates(server);
   const scheduler = new Scheduler(server, updates);
+  const discord = new DiscordBot(server, scheduler);
   const settings = config.get();
-  const web = createServer({ host: settings.http.host }, createRouter(server, { metrics, scheduler, updates }));
+  const web = createServer({ host: settings.http.host }, createRouter(server, { metrics, scheduler, updates, discord }));
   web.on('error', (error) => {
     if (error.code === 'EADDRINUSE') {
       say(`${colors.red}Le port ${settings.http.port} est déjà pris : une autre Chancellerie (ou txAdmin) tourne-t-elle déjà ?${colors.reset}`);
@@ -111,6 +113,7 @@ async function main() {
     metrics.start();
     scheduler.start();
     updates.start();
+    discord.start();
     if (settings.setupDone && settings.autoStart) {
       const result = server.start(journal.SYSTEM);
       if (!result.ok) say(`${colors.red}  FXServer n'a pas pu être lancé : ${result.error}. Voyez la Chancellerie.${colors.reset}`);
@@ -140,6 +143,7 @@ async function main() {
     scheduler.stop();
     updates.stop();
     await server.stop(journal.SYSTEM, { quick });
+    discord.stop();
     metrics.stop();
     journal.record(journal.SYSTEM, 'panel_stopped');
     web.close();

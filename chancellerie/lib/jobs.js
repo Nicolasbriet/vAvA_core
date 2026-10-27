@@ -8,6 +8,7 @@
 
 const EventEmitter = require('events');
 const journal = require('./journal');
+const notices = require('./notices');
 
 const LOG_KEPT = 200;
 const emitter = new EventEmitter();
@@ -61,12 +62,15 @@ function run(kind, actor, work) {
       job.status = 'done';
       job.result = result || null;
       journal.record(actor, `${kind}_done`, result && result.summary ? { résumé: result.summary } : null);
+      // une mise à jour qui part redémarrer la Chancellerie s'annoncera quand celle-ci aura fini le contrôle
+      if (kind === 'update' && !(result && result.restartPanel)) notices.emit('update', { ok: true, summary: result && result.summary });
     })
     .catch((error) => {
       job.status = 'failed';
       job.error = { code: error.code || 'failed', detail: String(error.detail || error.message || '').slice(0, 500) };
       job.say(`Échec : ${job.error.detail}`);
       journal.record(actor, `${kind}_failed`, { erreur: job.error.detail.slice(0, 200) });
+      if (kind === 'update') notices.emit('update', { ok: false, code: job.error.code });
     })
     .finally(() => {
       job.endedAt = Date.now();

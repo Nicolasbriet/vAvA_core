@@ -1044,6 +1044,11 @@ select.field-input option { background: var(--paper-light); color: var(--ink); }
 /* Joueurs du tableau de bord : un clic ouvre leur fiche */
 .ledger.is-clickable tbody tr:hover .cell-strong { color: var(--rubric); }
 
+/* Page Discord : étapes et commandes */
+.discord-steps,
+.discord-commands { max-width: 52rem; margin: 0 0 0.8rem; padding-left: 1.3rem; color: var(--ink-muted); line-height: 1.6; }
+.discord-commands { list-style: none; padding-left: 0; }
+
 /* Liaison d'un compte à son joueur : le code à taper en jeu, en grand */
 .link-command { margin: 0.6rem 0 0.9rem; text-align: center; }
 .link-command code { display: inline-block; padding: 0.5rem 1.1rem; font-size: 1.5rem; font-weight: 700; letter-spacing: 0.06em; background: var(--slate); color: var(--brass-bright); }

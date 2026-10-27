@@ -31,6 +31,7 @@ const { register: registerAccounts } = require('./routes-accounts');
 const { register: registerGame } = require('./routes-game');
 const { register: registerOps } = require('./routes-ops');
 const { register: registerUpdates } = require('./routes-updates');
+const { register: registerDiscord } = require('./routes-discord');
 const jobs = require('./jobs');
 
 const COMMAND_MAX = 500;
@@ -105,9 +106,10 @@ function defaultSelection(found) {
 /**
  * @param {import('./process').ServerProcess} server
  * @param {{ metrics: import('./metrics').Metrics, scheduler: import('./scheduler').Scheduler,
+ *   discord: import('./discord-bot').DiscordBot,
  *   updates: import('./updates').Updates }} services
  */
-function createRouter(server, { metrics, scheduler, updates }) {
+function createRouter(server, { metrics, scheduler, updates, discord }) {
   const table = new Map();
   const route = (method, pathname, options, handler) => table.set(`${method} ${pathname}`, { ...options, handler });
 
@@ -293,9 +295,10 @@ function createRouter(server, { metrics, scheduler, updates }) {
   // Comptes et royaume ---------------------------------------------------------------------------------------------
 
   registerAccounts(route, { ok, fail });
-  registerGame(route, { ok, fail, endpoint: servercfg.endpoint, server });
+  registerGame(route, { ok, fail, endpoint: servercfg.endpoint, server, discord });
   registerOps(route, { ok, fail, server, metrics, scheduler });
   registerUpdates(route, { ok, fail, server, updates });
+  registerDiscord(route, { ok, fail, discord });
 
   // Aiguillage -----------------------------------------------------------------------------------------------------
 

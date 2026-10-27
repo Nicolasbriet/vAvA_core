@@ -20,10 +20,10 @@ dossier et de la lancer **à la place** de FXServer. Le client fait ensuite le r
 | --- | --- | --- |
 | Système | Linux x86-64 ou arm64, glibc (Debian 11+, Ubuntu 20.04+) | Node.js officiel et FXServer |
 | Outils | `bash`, `curl` ou `wget`, `tar`, `xz-utils`, `sha256sum` | lanceur, téléchargements, archives |
-| Node.js | 18 ou plus récent ; **absent : téléchargé seul** (v22, empreinte SHA-256 vérifiée) dans `chancellerie/node/` | la Chancellerie est en Node.js, sans dépendance npm |
+| Node.js | 18 ou plus récent (22 pour le bot Discord) ; **absent : téléchargé seul** (v22, empreinte SHA-256 vérifiée) dans `chancellerie/node/` | la Chancellerie est en Node.js, sans dépendance npm |
 | Base de données | MariaDB 10.6+ ou MySQL 8, une base dédiée (`utf8mb4`) et un utilisateur qui a tous les droits dessus | comptes, personnages, inventaires ; les tables sont créées par vAvA |
 | Client MariaDB (conseillé) | `mariadb-client` (`mysqldump`, `mysql`) | sauvegardes de la base depuis le panneau ; création de la base |
-| Internet sortant (HTTPS) | `github.com`, `api.github.com`, `codeload.github.com`, `*.githubusercontent.com`, `nodejs.org`, `changelogs-live.fivem.net`, `runtime.fivem.net` | vAvA et ses mises à jour, oxmysql, Node.js, FXServer |
+| Internet sortant (HTTPS) | `github.com`, `api.github.com`, `codeload.github.com`, `*.githubusercontent.com`, `nodejs.org`, `changelogs-live.fivem.net`, `runtime.fivem.net`, `discord.com`, `gateway.discord.gg` (WebSocket) | vAvA et ses mises à jour, oxmysql, Node.js, FXServer, bot Discord |
 | Ports entrants | jeu : 30120 TCP + UDP ; panneau : 40120 TCP (ou ceux que vous attribuez) | joueurs ; administration |
 | Disque | ~1 Go (FXServer, Node.js, ressources) + les sauvegardes de la base | |
 

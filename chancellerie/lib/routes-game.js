@@ -13,6 +13,7 @@ const accounts = require('./accounts');
 const bridge = require('./bridge');
 const camera = require('./camera');
 const links = require('./links');
+const notices = require('./notices');
 const config = require('./config');
 const events = require('./events');
 
@@ -31,7 +32,7 @@ const QUALITIES = new Set(['tile', 'full']);
  * @param {Function} route
  * @param {{ ok: Function, fail: Function, endpoint: Function, server: import('./process').ServerProcess }} deps
  */
-function register(route, { ok, fail, endpoint, server }) {
+function register(route, { ok, fail, endpoint, server, discord }) {
   const stopped = () => !server.child;
   // erreur métier (refus du Registre, joueur parti…) : réponse ordinaire, l'interface l'explique
   const answer = (result, extra) => (result.ok ? ok(extra || {}) : fail(200, result.error));
@@ -91,17 +92,25 @@ function register(route, { ok, fail, endpoint, server }) {
   });
 
   // évènements du pont : machine locale et clé du lancement (vérifiées avant d'arriver ici)
-  route('POST', '/api/bridge/event', { bridge: true }, (ctx) => {
+  route('POST', '/api/bridge/event', { bridge: true }, async (ctx) => {
     const event = ctx.body;
     if (event.type === 'report') {
-      events.broadcastRanked('report', { action: String(event.action), id: Number(event.id) || 0, author: String(event.author || '') });
+      const report = { action: String(event.action), id: Number(event.id) || 0, author: String(event.author || '').slice(0, 64) };
+      events.broadcastRanked('report', report);
+      if (report.action === 'created') notices.emit('report', report);
     } else if (event.type === 'players') {
       events.broadcastRanked('players', {});
+      notices.emit('players');
     } else if (event.type === 'camera') {
       camera.incoming(event);
     } else if (event.type === 'ready') {
-      // serveur de jeu démarré : les rangs des comptes reliés s'y appliquent
+      // serveur de jeu démarré : les rangs des comptes reliés s'y appliquent ; le pont apprend si la liste blanche joue
       links.syncAll();
+      return ok({ whitelist: discord.whitelistActive() });
+    } else if (event.type === 'whitelist') {
+      // un joueur se connecte : la liste blanche Discord décide (le pont attend la réponse)
+      const answer = await discord.whitelist({ license: String(event.license || ''), discord: event.discord ? String(event.discord) : '' });
+      return ok({ allowed: answer.allowed, reason: answer.reason || null, whitelist: discord.whitelistActive() });
     } else if (event.type === 'link') {
       // code tapé en jeu : la réponse revient au joueur (le pont l'en prévient)
       const result = links.consume(event);

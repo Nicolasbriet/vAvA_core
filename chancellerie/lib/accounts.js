@@ -53,6 +53,7 @@ function publicView(account) {
     rank: account.master ? MASTER_RANK : account.rank || '',
     createdAt: account.createdAt,
     link: account.link ? { ...account.link } : null,
+    discord: account.discord ? { ...account.discord } : null,
   };
 }
 
@@ -188,6 +189,36 @@ module.exports = {
   /** Comptes reliés à un joueur. */
   linked() {
     return store.accounts.filter((account) => account.link).map(publicView);
+  },
+
+  /**
+   * Relie un compte à son compte Discord : { id, username }. Un compte Discord ne se relie qu'à un compte : celui
+   * qui l'avait le perd. Renvoie { ok, account }.
+   */
+  setDiscord(name, discord) {
+    const index = findIndex(name);
+    if (index === -1) return { ok: false, error: 'unknown_account' };
+    for (const other of store.accounts) {
+      if (other !== store.accounts[index] && other.discord && other.discord.id === discord.id) other.discord = null;
+    }
+    store.accounts[index].discord = { id: discord.id, username: discord.username || '', linkedAt: new Date().toISOString() };
+    save();
+    return { ok: true, account: publicView(store.accounts[index]) };
+  },
+
+  clearDiscord(name) {
+    const index = findIndex(name);
+    if (index === -1) return { ok: false, error: 'unknown_account' };
+    if (!store.accounts[index].discord) return { ok: false, error: 'not_linked' };
+    store.accounts[index].discord = null;
+    save();
+    return { ok: true };
+  },
+
+  /** Compte du panneau relié à ce compte Discord, ou null. */
+  byDiscord(id) {
+    const account = store.accounts.find((a) => a.discord && a.discord.id === id);
+    return account ? publicView(account) : null;
   },
 
   /** Relit le fichier (tests). */

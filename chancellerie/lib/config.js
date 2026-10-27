@@ -48,6 +48,13 @@ const DEFAULTS = Object.freeze({
     repo: 'Nicolasbriet/vAvA_core', branch: 'main', channel: 'commits', autoCheck: true, checkEveryMin: 60, applyAtRestart: false,
     api: 'https://api.github.com', codeload: 'https://codeload.github.com',
   },
+  // Bot Discord : jeton (secret, jamais renvoyé au navigateur), serveur Discord, salons (statut, annonces, staff),
+  // lien « Rejoindre » (cfx.re/join/…) et invitation Discord montrés aux joueurs, liste blanche par rôles.
+  discord: {
+    enabled: false, token: '', guildId: '', statusChannelId: '', announceChannelId: '', staffChannelId: '',
+    joinUrl: '', inviteUrl: '', whitelist: { enabled: false, roleIds: [] },
+    api: 'https://discord.com/api/v10', gateway: 'wss://gateway.discord.gg',
+  },
 });
 
 function isObject(value) {

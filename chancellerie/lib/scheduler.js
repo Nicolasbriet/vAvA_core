@@ -11,6 +11,7 @@
 
 const backups = require('./backups');
 const jobs = require('./jobs');
+const notices = require('./notices');
 const bridge = require('./bridge');
 const config = require('./config');
 const journal = require('./journal');
@@ -144,6 +145,7 @@ class Scheduler {
   }
 
   async announce(minutes) {
+    notices.emit('restart-warning', { minutes, at: this.restartAt });
     const result = await bridge.proclaim(servercfg.endpoint(), warningText(this.settings().message, minutes));
     this.server.system(result.ok
       ? `Redémarrage planifié dans ${minutes} min : les joueurs sont prévenus.`

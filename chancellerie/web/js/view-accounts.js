@@ -94,6 +94,8 @@ const AccountsView = (() => {
     const body = UI.el('div', 'link-code', null, [
       UI.el('p', 'prose', mine ? A.linkIntroMine : A.linkIntroOther(account.name)),
       UI.el('p', 'link-command', null, [UI.el('code', null, `chancellerie ${result.code}`)]),
+      UI.el('p', 'prose', A.linkDiscord),
+      UI.el('p', 'link-command', null, [UI.el('code', null, `/lier ${result.code}`)]),
       UI.el('p', 'hint', A.linkHelp(minutes)),
       UI.el('p', 'hint', A.linkRank),
     ]);
@@ -108,19 +110,31 @@ const AccountsView = (() => {
     if (UI.report(await API.post('/api/account/unlink', mine ? {} : { name: account.name }), A.unlinked)) refresh();
   }
 
+  const discordName = (discord) => (discord.username ? discord.username : A.discordId(discord.id));
+
   function linkCell(account) {
-    if (!account.link) return UI.el('td', 'cell-sub', A.notLinked);
+    const discord = account.discord ? UI.el('div', 'cell-sub', A.discordLine(discordName(account.discord))) : null;
+    if (!account.link) return UI.el('td', null, null, [UI.el('span', 'cell-sub', A.notLinked), discord]);
     const ids = [shortLicense(account.link.license), account.link.fivem].filter(Boolean).join(' · ');
     return UI.el('td', null, null, [
       UI.el('span', 'cell-strong', account.link.player || A.gameAccount(account.link.accountId)),
       UI.el('div', 'cell-sub mono', ids),
+      discord,
     ]);
   }
 
+  async function unlinkDiscord(account) {
+    if (!(await UI.confirm({ title: A.unlinkDiscordTitle, text: A.unlinkDiscordText(account.name), confirm: A.unlink }))) return;
+    const mine = account.name === context.account().name;
+    if (UI.report(await API.post('/api/account/discord/unlink', mine ? {} : { name: account.name }), A.unlinkedDiscord)) refresh();
+  }
+
   function linkButtons(account) {
-    return account.link
+    const buttons = account.link
       ? [UI.button(A.relink, () => link(account)), UI.button(A.unlink, () => unlink(account), 'plain')]
       : [UI.button(A.link, () => link(account))];
+    if (account.discord) buttons.push(UI.button(A.unlinkDiscord, () => unlinkDiscord(account), 'plain'));
+    return buttons;
   }
 
   function table(accounts) {

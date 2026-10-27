@@ -41,12 +41,17 @@ local function setup()
         if not id then return false, err end
     end
     VavaBridge.link.start()
+    local whitelistOk, whitelistErr = VavaBridge.whitelist.start()
+    if not whitelistOk then return false, whitelistErr end
     VavaBridge.ready = true
     if not auth.enabled() then
         core.log.info('serveur lancé sans la Chancellerie : le pont reste fermé')
     else
-        -- la Chancellerie applique alors les rangs des comptes reliés (changés pendant que le serveur était arrêté)
-        push.send({ type = 'ready' })
+        -- la Chancellerie applique alors les rangs des comptes reliés (changés pendant que le serveur était arrêté) et
+        -- dit si sa liste blanche est active
+        push.request({ type = 'ready' }, function(answer)
+            VavaBridge.whitelist.setEnabled(answer and answer.whitelist)
+        end)
     end
     return true
 end
