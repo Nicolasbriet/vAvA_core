@@ -263,6 +263,9 @@ ouvrir sur le serveur. Il demande Node.js 22 ou plus récent (celui que `demarre
 - **Statut** : un message tenu à jour dans le salon choisi (chaque minute, à chaque changement d'état, arrivée ou départ
   de joueur) : en ligne ou non, joueurs, en ligne depuis, prochain redémarrage, boutons « Rejoindre » et « Discord ».
   Supprimé dans Discord, il est recréé.
+- **Activité** : le statut personnalisé du bot dans la liste des membres suit le serveur, même sans salon de statut :
+  « ⚔️ 12/48 dans le royaume » (pastille verte), « ⏳ Ouverture des portes… » ou « ⏳ Fermeture des portes… »
+  (orange), « 🏰 Portes closes » (rouge). Envoyée à Discord seulement quand elle change.
 - **Annonces** : serveur en ligne, arrêté, planté ; redémarrage planifié (aux délais des avertissements) ; mise à jour
   appliquée. Les nouveaux signalements vont au salon du staff.
 - **Commandes slash** : `/statut` (public) et `/joueurs` pour tous ; `/lier <code>` relie son compte Discord à son
@@ -273,6 +276,11 @@ ouvrir sur le serveur. Il demande Node.js 22 ou plus récent (celui que `demarre
   le serveur Discord (identifiant `discord:` du jeu) ; un joueur relié à un compte du panneau passe toujours. Refusé :
   il lit pourquoi (pas membre, avec l'invitation ; pas le rôle ; Discord fermé). Réponses gardées une minute.
   Discord injoignable : refusé, avec un message clair.
+
+Bot absent du serveur Discord réglé (pas encore invité, invité ailleurs, ou mauvais identifiant) : la page Discord le
+dit et liste les serveurs où il se trouve ; il ne tente alors ni commandes ni messages. Dès qu'il est invité sur le bon
+serveur, il y enregistre ses commandes slash et reprend, sans relance. Une même erreur répétée n'est inscrite qu'une
+fois au journal.
 
 Créer le bot : discord.com/developers/applications → New Application → Bot → Reset Token (le jeton se colle dans la
 page, il n'en ressort jamais) ; mode développeur de Discord pour copier les identifiants du serveur, des salons et des

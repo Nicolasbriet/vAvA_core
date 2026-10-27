@@ -1,7 +1,8 @@
 'use strict';
 /*
  * web/js/view-discord.js
- * Rôle : la page Discord (compte maître) : état du bot (connecté, en connexion, erreur), lien pour l'inviter sur le
+ * Rôle : la page Discord (compte maître) : état du bot (connecté, en connexion, erreur, absent du serveur réglé avec
+ *        les serveurs où il se trouve), lien pour l'inviter sur le
  *        serveur Discord, message d'essai, et ses réglages — jeton (jamais réaffiché : un champ vide garde celui en
  *        place), serveur Discord, salons du statut, des annonces et du staff, liens « Rejoindre » et d'invitation,
  *        liste blanche par rôles. Les étapes pour créer le bot sont rappelées.
@@ -21,7 +22,9 @@ const DiscordView = (() => {
   function renderState() {
     const bot = data.discord;
     const label = bot.state === 'ready' ? D.states.ready(bot.user ? bot.user.username : '') : D.states[bot.state] || bot.state;
-    const detail = bot.error ? D.errors[bot.error] || bot.error : bot.enabled ? '' : D.disabledNote;
+    const detail = bot.error ? D.errors[bot.error] || bot.error
+      : bot.problem ? D.problems[bot.problem](bot.guilds.map((guild) => guild.name || guild.id))
+        : bot.enabled ? '' : D.disabledNote;
     const actions = [];
     if (data.invite) {
       const invite = UI.el('a', 'ink-button link-button', D.invite);
@@ -36,7 +39,7 @@ const DiscordView = (() => {
         UI.slip(result.ok ? D.testDone : `${STRINGS.error(result.error)}${result.detail ? ` (${result.detail})` : ''}`);
       }));
     }
-    const kind = bot.state === 'ready' ? 'running' : bot.state === 'connecting' ? 'starting' : bot.state === 'error' ? 'crashed' : 'stopped';
+    const kind = bot.state === 'ready' ? (bot.problem ? 'starting' : 'running') : bot.state === 'connecting' ? 'starting' : bot.state === 'error' ? 'crashed' : 'stopped';
     refs.state.className = `state-banner is-${kind}`;
     refs.state.replaceChildren(
       UI.el('span', 'state-seal'),

@@ -3,15 +3,17 @@
  * lib/discord.js
  * Rôle : le client Discord du bot, sans dépendance : appels REST (avec la limite de débit de Discord respectée) et
  *        connexion Gateway par le WebSocket de Node (22 ou plus récent) : identification, battements, reprise de
- *        session après une coupure, reconnexion avec un délai croissant. Seules les interactions (commandes slash)
- *        sont écoutées : aucun droit privilégié n'est demandé à Discord. Le jeton n'apparaît dans aucun message.
+ *        session après une coupure, reconnexion avec un délai croissant, activité du bot (remise à chaque connexion),
+ *        serveurs Discord où se trouve le bot (connus à la connexion, puis ses arrivées et départs).
+ *        Seules les interactions (commandes slash) sont écoutées : aucun droit privilégié n'est demandé à Discord. Le
+ *        jeton n'apparaît dans aucun message.
  */
 
 const EventEmitter = require('events');
 const config = require('./config');
 
 const INTENT_GUILDS = 1;
-const OP = { DISPATCH: 0, HEARTBEAT: 1, IDENTIFY: 2, RESUME: 6, RECONNECT: 7, INVALID_SESSION: 9, HELLO: 10, ACK: 11 };
+const OP = { DISPATCH: 0, HEARTBEAT: 1, IDENTIFY: 2, PRESENCE: 3, RESUME: 6, RECONNECT: 7, INVALID_SESSION: 9, HELLO: 10, ACK: 11 };
 // fermetures définitives : jeton refusé, droits refusés… (les autres se reprennent)
 const FATAL_CLOSES = { 4004: 'bad_token', 4010: 'bad_shard', 4011: 'bad_shard', 4012: 'bad_version', 4013: 'bad_intents', 4014: 'bad_intents' };
 const RECONNECT_MIN_MS = 2000;
@@ -43,6 +45,10 @@ class DiscordClient extends EventEmitter {
     this.retryMs = RECONNECT_MIN_MS;
     this.reconnectTimer = null;
     this.stopping = false;
+    // activité du bot : gardée pour être remise à chaque connexion
+    this.presence = null;
+    // serveurs Discord où se trouve le bot : identifiant → nom (connu à son arrivée, vide avant)
+    this.guilds = new Map();
   }
 
   settings() {
@@ -128,7 +134,10 @@ class DiscordClient extends EventEmitter {
         else {
           this.send(ws, {
             op: OP.IDENTIFY,
-            d: { token: this.token, intents: INTENT_GUILDS, properties: { os: process.platform, browser: 'vava-chancellerie', device: 'vava-chancellerie' } },
+            d: {
+              token: this.token, intents: INTENT_GUILDS, properties: { os: process.platform, browser: 'vava-chancellerie', device: 'vava-chancellerie' },
+              ...(this.presence ? { presence: this.presence } : {}),
+            },
           });
         }
         break;
@@ -162,14 +171,24 @@ class DiscordClient extends EventEmitter {
       this.resumeUrl = data.resume_gateway_url || null;
       this.user = { id: data.user.id, username: data.user.username };
       this.applicationId = data.application ? data.application.id : data.user.id;
+      this.guilds = new Map((data.guilds || []).map((guild) => [guild.id, guild.name || '']));
       this.retryMs = RECONNECT_MIN_MS;
       this.setState('ready');
       this.emit('ready', { user: this.user, applicationId: this.applicationId });
     } else if (type === 'RESUMED') {
       this.retryMs = RECONNECT_MIN_MS;
+      if (this.presence) this.send(this.ws, { op: OP.PRESENCE, d: this.presence });
       this.setState('ready');
     } else if (type === 'INTERACTION_CREATE') {
       this.emit('interaction', data);
+    } else if (type === 'GUILD_CREATE') {
+      // à la connexion pour chaque serveur, puis quand le bot est invité sur un nouveau
+      this.guilds.set(data.id, data.name || '');
+      this.emit('guild', { id: data.id, name: data.name || '' });
+    } else if (type === 'GUILD_DELETE' && !data.unavailable) {
+      // bot retiré du serveur (une panne de Discord le marque seulement indisponible)
+      this.guilds.delete(data.id);
+      this.emit('guild-left', { id: data.id });
     }
   }
 
@@ -212,6 +231,15 @@ class DiscordClient extends EventEmitter {
     clearTimeout(this.reconnectTimer);
     this.reconnectTimer = setTimeout(() => this.connect(), this.retryMs);
     this.retryMs = Math.min(RECONNECT_MAX_MS, this.retryMs * 2);
+  }
+
+  /**
+   * Activité du bot ({ status, activities, since, afk } de Discord) : envoyée tout de suite si le bot est connecté,
+   * sinon à sa prochaine identification.
+   */
+  setPresence(presence) {
+    this.presence = presence;
+    if (this.state === 'ready') this.send(this.ws, { op: OP.PRESENCE, d: presence });
   }
 
   stop() {

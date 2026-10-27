@@ -4,6 +4,8 @@
  * Rôle : le bot Discord de la Chancellerie, comme celui de txAdmin.
  *        - Statut : un message dans le salon choisi, tenu à jour (chaque minute, et à chaque changement d'état ou
  *          arrivée de joueur) : état du serveur, joueurs, en ligne depuis, prochain redémarrage, bouton « Rejoindre ».
+ *        - Activité : le statut personnalisé du bot (joueurs connectés, ou portes closes) et sa pastille suivent le
+ *          serveur, même sans salon de statut ; envoyée à Discord seulement quand elle change.
  *        - Annonces : serveur en ligne, arrêté, planté, redémarrage planifié, mise à jour ; signalements au salon staff.
  *        - Commandes slash : /statut et /joueurs pour tous ; /lier pour relier son compte Discord à son compte du
  *          panneau (même code qu'en jeu) ; /annonce, /avertir, /expulser, /bannir pour le staff, au nom de son compte
@@ -11,6 +13,9 @@
  *        - Liste blanche : à la connexion d'un joueur, le pont demande s'il a l'un des rôles choisis sur le serveur
  *          Discord (identifiant discord du jeu) ; un compte du panneau relié à ce joueur passe toujours. Réponses
  *          gardées un court moment ; Discord injoignable : connexion refusée, avec un message clair.
+ *        - Bot absent du serveur Discord réglé : signalé à la page Discord (avec les serveurs où il se trouve) ; ni
+ *          commandes ni messages tentés. Dès qu'il y est invité, il enregistre ses commandes et reprend seul.
+ *        Une même erreur répétée (le statut réessaie chaque minute) n'est inscrite qu'une fois au journal.
  */
 
 const path = require('path');
@@ -34,6 +39,14 @@ const WHITELIST_NO_MS = 15000;
 const EPHEMERAL = 64;
 const COLORS = { running: 0x3f8f4f, starting: 0xd39a45, stopping: 0xd39a45, stopped: 0x8f2c1d, crashed: 0x8f2c1d, info: 0xb39463 };
 const STATE_TEXT = { running: '🟢 **En ligne**', starting: '🟠 **Démarrage…**', stopping: '🟠 **Arrêt en cours…**', stopped: '🔴 **Hors ligne**', crashed: '🔴 **Arrêt imprévu**' };
+// activité du bot : statut personnalisé (type 4 de Discord, texte affiché tel quel) et pastille selon l'état du serveur
+const ACTIVITY_CUSTOM = 4;
+const ACTIVITY_NAME = 'Custom Status';
+const PRESENCE_TEXT = {
+  players: (count, max) => `⚔️ ${count}/${max} dans le royaume`, running: '⚔️ Le royaume est ouvert',
+  starting: '⏳ Ouverture des portes…', stopping: '⏳ Fermeture des portes…', stopped: '🏰 Portes closes', crashed: '🏰 Portes closes',
+};
+const PRESENCE_DOT = { running: 'online', starting: 'idle', stopping: 'idle', stopped: 'dnd', crashed: 'dnd' };
 const SNOWFLAKE = /^\d{17,20}$/;
 const BAN_CHOICES = [[1, '1 heure'], [6, '6 heures'], [24, '1 jour'], [72, '3 jours'], [168, '7 jours'], [720, '30 jours'], [0, 'Définitif']];
 const PLAYERS_SHOWN = 40;
@@ -82,6 +95,14 @@ class DiscordBot {
     this.timer = null;
     this.debounce = null;
     this.busy = false;
+    // changement arrivé pendant une mise à jour : elle est refaite juste après
+    this.again = false;
+    // dernière activité envoyée (pastille|texte) : rien n'est renvoyé tant qu'elle ne change pas
+    this.presenceKey = null;
+    // 'not_in_guild' : le bot n'est pas sur le serveur Discord réglé
+    this.problem = null;
+    // dernière erreur inscrite au journal, par action : une erreur qui se répète n'y est pas réécrite
+    this.faults = new Map();
     this.cache = new Map();
     this.lastState = server.state;
     this.saved = config.readJson(STATE_FILE, { statusMessageId: null, statusChannelId: null });
@@ -103,9 +124,14 @@ class DiscordBot {
     this.stop();
     const s = this.settings();
     this.cache.clear();
+    this.presenceKey = null;
+    this.problem = null;
+    this.faults.clear();
     if (!s.enabled || !s.token) return;
     this.client = new DiscordClient(s.token);
     this.client.on('ready', () => this.onReady());
+    this.client.on('guild', ({ id }) => this.onGuild(id));
+    this.client.on('guild-left', ({ id }) => this.onGuildLeft(id));
     this.client.on('interaction', (interaction) => this.onInteraction(interaction).catch((error) => {
       console.error(`[Chancellerie] commande Discord en erreur : ${error.message}`);
     }));
@@ -129,31 +155,76 @@ class DiscordBot {
       announceChannelId: s.announceChannelId, staffChannelId: s.staffChannelId, joinUrl: s.joinUrl, inviteUrl: s.inviteUrl,
       whitelist: { enabled: s.whitelist.enabled, roleIds: [...s.whitelist.roleIds] },
       state: client ? client.state : 'stopped', error: client ? client.error : null, user: client ? client.user : null,
-      applicationId: client ? client.applicationId : null,
+      applicationId: client ? client.applicationId : null, problem: client && client.state === 'ready' ? this.problem : null,
+      guilds: client ? [...client.guilds].map(([id, name]) => ({ id, name })) : [],
     };
   }
 
-  async onReady() {
+  /** Erreur du bot au journal, une seule fois tant qu'elle se répète à l'identique pour cette action. */
+  fault(action, message) {
+    const text = String(message).slice(0, 160);
+    if (this.faults.get(action) === text) return;
+    this.faults.set(action, text);
+    journal.record(journal.SYSTEM, 'discord_error', { action, erreur: text });
+  }
+
+  inGuild() {
     const s = this.settings();
-    if (s.guildId) {
-      try {
-        await this.client.rest('PUT', `/applications/${this.client.applicationId}/guilds/${s.guildId}/commands`, COMMANDS);
-      } catch (error) {
-        journal.record(journal.SYSTEM, 'discord_error', { action: 'commandes', erreur: error.message.slice(0, 160) });
-      }
+    return Boolean(this.client && s.guildId && this.client.guilds.has(s.guildId));
+  }
+
+  async onReady() {
+    if (this.inGuild()) {
+      this.problem = null;
+      this.faults.delete('serveur');
+      await this.registerCommands();
+    } else {
+      this.problem = 'not_in_guild';
+      this.fault('serveur', 'bot absent du serveur Discord réglé');
     }
     this.refreshStatus();
   }
 
+  /** Commandes slash du bot sur le serveur Discord réglé (remplacent les précédentes). */
+  async registerCommands() {
+    if (!this.client) return;
+    try {
+      await this.client.rest('PUT', `/applications/${this.client.applicationId}/guilds/${this.settings().guildId}/commands`, COMMANDS);
+      this.faults.delete('commandes');
+    } catch (error) {
+      this.fault('commandes', error.message);
+    }
+  }
+
+  /** Le bot arrive sur un serveur Discord : invité sur celui réglé, il y enregistre ses commandes et reprend. */
+  onGuild(id) {
+    if (id !== this.settings().guildId || this.problem !== 'not_in_guild') return;
+    this.problem = null;
+    this.faults.delete('serveur');
+    journal.record(journal.SYSTEM, 'discord_joined', null);
+    this.registerCommands().then(() => this.refreshStatus());
+  }
+
+  onGuildLeft(id) {
+    if (id !== this.settings().guildId) return;
+    this.problem = 'not_in_guild';
+    this.fault('serveur', 'bot retiré du serveur Discord réglé');
+  }
+
   // Statut ------------------------------------------------------------------------------------------------------------
 
-  async statusMessage() {
+  /** État du serveur et joueurs connectés (null : liste injoignable), lus une fois pour le statut et l'activité. */
+  async snapshot() {
     const st = this.server.status();
     const cfg = servercfg.current();
     const values = cfg ? cfg.values : servercfg.DEFAULTS;
     const running = st.state === STATES.RUNNING;
     const endpoint = servercfg.endpoint();
     const players = running && endpoint ? await status.players(endpoint) : null;
+    return { st, values, running, players };
+  }
+
+  statusMessage({ st, values, running, players }) {
     const fields = [{ name: 'Joueurs', value: running && players ? `${players.length} / ${values.maxClients}` : '—', inline: true }];
     if (running && st.startedAt) fields.push({ name: 'En ligne', value: `depuis <t:${unix(st.startedAt)}:R>`, inline: true });
     if (this.scheduler && this.scheduler.restartAt) {
@@ -177,29 +248,56 @@ class DiscordBot {
     this.debounce = setTimeout(() => this.refreshStatus(), STATUS_DEBOUNCE_MS);
   }
 
-  /** Crée le message de statut, ou le met à jour (recréé s'il a été supprimé ou si le salon a changé). */
+  /** Activité du bot d'après l'état du serveur ; envoyée seulement si elle a changé. */
+  updatePresence({ st, values, running, players }) {
+    const text = running && players ? PRESENCE_TEXT.players(players.length, values.maxClients) : PRESENCE_TEXT[st.state] || PRESENCE_TEXT.stopped;
+    const dot = PRESENCE_DOT[st.state] || PRESENCE_DOT.stopped;
+    const key = `${dot}|${text}`;
+    if (key === this.presenceKey) return;
+    this.presenceKey = key;
+    this.client.setPresence({ since: null, afk: false, status: dot, activities: [{ type: ACTIVITY_CUSTOM, name: ACTIVITY_NAME, state: text }] });
+  }
+
+  /**
+   * Met à jour l'activité du bot, puis crée le message de statut ou le met à jour (recréé s'il a été supprimé ou si le
+   * salon a changé).
+   */
   async refreshStatus() {
     const s = this.settings();
-    if (!this.client || this.client.state !== 'ready' || !s.statusChannelId || this.busy) return;
+    if (!this.client || this.client.state !== 'ready') return;
+    if (this.busy) {
+      this.again = true;
+      return;
+    }
     this.busy = true;
+    this.again = false;
     try {
-      const message = await this.statusMessage();
+      const snap = await this.snapshot();
+      if (!this.client) return;
+      this.updatePresence(snap);
+      if (!s.statusChannelId || this.problem) return;
+      const message = this.statusMessage(snap);
       const same = this.saved.statusMessageId && this.saved.statusChannelId === s.statusChannelId;
+      let updated = false;
       if (same) {
         try {
           await this.client.rest('PATCH', `/channels/${s.statusChannelId}/messages/${this.saved.statusMessageId}`, message);
-          return;
+          updated = true;
         } catch (error) {
           if (error.code !== 'discord_404') throw error;
         }
       }
-      const created = await this.client.rest('POST', `/channels/${s.statusChannelId}/messages`, message);
-      this.saved = { statusMessageId: created.id, statusChannelId: s.statusChannelId };
-      config.writeJson(STATE_FILE, this.saved);
+      if (!updated) {
+        const created = await this.client.rest('POST', `/channels/${s.statusChannelId}/messages`, message);
+        this.saved = { statusMessageId: created.id, statusChannelId: s.statusChannelId };
+        config.writeJson(STATE_FILE, this.saved);
+      }
+      this.faults.delete('statut');
     } catch (error) {
-      journal.record(journal.SYSTEM, 'discord_error', { action: 'statut', erreur: error.message.slice(0, 160) });
+      this.fault('statut', error.message);
     } finally {
       this.busy = false;
+      if (this.again) this.scheduleStatus();
     }
   }
 
@@ -210,11 +308,13 @@ class DiscordBot {
     const s = this.settings();
     const id = channel === 'staff' ? s.staffChannelId || s.announceChannelId : s.announceChannelId;
     if (!this.client || this.client.state !== 'ready' || !id) return { ok: false, error: 'discord_not_ready' };
+    if (this.problem) return { ok: false, error: 'discord_not_in_guild' };
     try {
       await this.client.rest('POST', `/channels/${id}/messages`, { embeds: [{ description: text, color }], allowed_mentions: { parse: [] } });
+      this.faults.delete('annonce');
       return { ok: true };
     } catch (error) {
-      journal.record(journal.SYSTEM, 'discord_error', { action: 'annonce', erreur: error.message.slice(0, 160) });
+      this.fault('annonce', error.message);
       return { ok: false, error: error.code || 'discord_error', detail: error.message };
     }
   }
@@ -261,7 +361,7 @@ class DiscordBot {
   }
 
   async command(name, interaction, user) {
-    if (name === 'statut') return this.statusMessage();
+    if (name === 'statut') return this.statusMessage(await this.snapshot());
     if (name === 'joueurs') return this.playersReply();
     if (name === 'lier') {
       const result = links.consumeDiscord({ code: String(option(interaction, 'code') || ''), id: user.id, username: user.global_name || user.username });

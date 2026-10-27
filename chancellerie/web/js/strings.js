@@ -103,6 +103,7 @@ const STRINGS = (() => {
     not_linked: 'Ce compte n\'est relié à aucun joueur.',
     // Discord
     discord_not_ready: 'Le bot n\'est pas connecté, ou aucun salon d\'annonces n\'est réglé.',
+    discord_not_in_guild: 'Le bot n\'est pas sur le serveur Discord réglé : invitez-le d\'abord.',
     discord_401: 'Jeton refusé par Discord.',
     discord_403: 'Le bot n\'a pas le droit d\'écrire dans ce salon (vérifiez ses permissions).',
     discord_404: 'Salon introuvable : vérifiez son identifiant.',
@@ -145,7 +146,7 @@ const STRINGS = (() => {
     account_linked: 'Compte relié à son joueur', account_unlinked: 'Compte délié de son joueur',
     rank_synced: 'Rang appliqué en jeu', rank_sync_failed: 'Rang non appliqué en jeu',
     discord_linked: 'Compte Discord relié', discord_unlinked: 'Compte Discord délié', discord_settings: 'Réglages du bot Discord',
-    discord_error: 'Erreur du bot Discord',
+    discord_error: 'Erreur du bot Discord', discord_joined: 'Bot Discord arrivé sur le serveur',
   };
 
   const UNITS = ['o', 'Ko', 'Mo', 'Go', 'To'];
@@ -267,6 +268,11 @@ const STRINGS = (() => {
         node_too_old: 'Node.js 22 ou plus récent est nécessaire : relancez la Chancellerie par demarrer.bat ou demarrer.sh, qui l\'installent.',
         disconnected: 'Connexion perdue : nouvel essai en cours.',
         network: 'Discord ne répond pas : nouvel essai en cours.',
+      },
+      problems: {
+        not_in_guild: (names) => (names.length
+          ? `Le bot n'est pas sur le serveur Discord réglé ci-dessous : il est sur ${names.join(', ')}. Invitez-le sur le bon serveur (bouton ci-contre) ou corrigez l'identifiant du serveur ; ses commandes s'enregistrent alors toutes seules.`
+          : 'Le bot n\'est encore sur aucun serveur Discord : invitez-le (bouton ci-contre). Ses commandes s\'enregistrent alors toutes seules.'),
       },
       disabledNote: 'Bot désactivé.',
       invite: 'Inviter le bot sur votre Discord',
