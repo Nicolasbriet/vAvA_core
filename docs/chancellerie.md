@@ -36,8 +36,9 @@ Chez un hébergeur (à la place de txAdmin, VPS ou panel de jeu) : voir [docs/he
      | tar -xz --strip-components=1 vAvA_core-main/chancellerie
    ```
 
-3. Lancez-la : `bash chancellerie/demarrer.sh`. Sans Node.js 18 ou plus récent sur la machine, il le télécharge depuis
-   nodejs.org (version LTS fixée dans le script, empreinte SHA-256 vérifiée) dans `chancellerie/node/`.
+3. Lancez-la : `bash chancellerie/demarrer.sh`. Sans Node.js 22 ou plus récent sur la machine, il le télécharge depuis
+   nodejs.org (version LTS fixée dans le script, empreinte SHA-256 vérifiée) dans `chancellerie/node/`. Si le
+   téléchargement échoue, un Node.js 18 à 21 déjà installé sert quand même, sans le bot Discord.
 
    Pour qu'elle tourne en permanence (lancée au démarrage de la machine, relancée si elle tombe), installez-la comme
    service systemd : `sudo bash chancellerie/demarrer.sh --service`. Son code d'accès et ses messages se lisent alors
@@ -64,8 +65,9 @@ L'assistant propose par défaut d'installer le serveur à côté de la Chancelle
 
 1. Copiez le dossier `chancellerie/` où vous voulez (par exemple `D:\vAvA\chancellerie`).
 2. Arrêtez txAdmin s'il tourne : les deux se disputeraient le port 40120 et le serveur.
-3. Lancez `demarrer.bat`. Sans Node.js sur la machine, il le télécharge depuis nodejs.org (empreinte vérifiée) dans
-   `node\node.exe`, à côté de lui.
+3. Lancez `demarrer.bat`. Sans Node.js 22 ou plus récent sur la machine, il le télécharge depuis nodejs.org (empreinte
+   vérifiée) dans `node\node.exe`, à côté de lui ; le Node.js de la machine n'est pas touché. Si le téléchargement
+   échoue, un Node.js plus ancien déjà installé sert quand même, sans le bot Discord.
 4. Installez MariaDB ([mariadb.org](https://mariadb.org/), version LTS) si la machine n'en a pas.
 
 La fenêtre affiche :
@@ -256,7 +258,7 @@ Chancellerie et à celui du Conseil (« Chancellerie : <compte> »). Il faut `va
 ## Bot Discord
 
 Page **Discord** (compte maître). Le bot se connecte lui-même à Discord (Gateway, sans droit privilégié) : rien à
-ouvrir sur le serveur. Il demande Node.js 22 ou plus récent (celui que `demarrer.sh` installe).
+ouvrir sur le serveur. Il demande Node.js 22 ou plus récent (celui que `demarrer.bat` et `demarrer.sh` installent).
 
 - **Statut** : un message tenu à jour dans le salon choisi (chaque minute, à chaque changement d'état, arrivée ou départ
   de joueur) : en ligne ou non, joueurs, en ligne depuis, prochain redémarrage, boutons « Rejoindre » et « Discord ».

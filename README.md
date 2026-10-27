@@ -17,7 +17,8 @@ Aucun framework tiers (ni ESX, ni QBCore, ni Qbox, ni ox_core).
 
 - FXServer récent avec OneSync ;
 - MySQL ou MariaDB, et la ressource `oxmysql` ;
-- Node.js LTS 18 ou plus récent pour la Chancellerie.
+- Node.js 22 ou plus récent pour la Chancellerie (18 suffit sans le bot Discord) ; ses lanceurs l'installent s'il
+  manque ou s'il est trop ancien.
 
 ## Installation
 
