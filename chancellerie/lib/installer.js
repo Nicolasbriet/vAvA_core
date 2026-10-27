@@ -96,9 +96,9 @@ function targetOf(name, serverDataPath, installed, found) {
   return path.join(root, CATEGORY, name);
 }
 
-/** Un dossier suivi par git (copie de développement) : on ne l'écrase pas, on le signale. */
-function inGitCheckout(dir) {
-  let current = path.resolve(dir);
+/** `.git` dans ce dossier ou l'un de ses deux parents ? */
+function gitAbove(start) {
+  let current = start;
   for (let level = 0; level < 3; level += 1) {
     if (fs.existsSync(path.join(current, '.git'))) return true;
     const parent = path.dirname(current);
@@ -106,6 +106,22 @@ function inGitCheckout(dir) {
     current = parent;
   }
   return false;
+}
+
+/**
+ * Un dossier suivi par git (copie de développement) : on ne l'écrase pas, on le signale. Un lien ou une jonction
+ * (ressource posée par `mklink /J` vers un dépôt) est suivi jusqu'au vrai dossier : c'est lui que git suit.
+ */
+function inGitCheckout(dir) {
+  const logical = path.resolve(dir);
+  if (gitAbove(logical)) return true;
+  let real;
+  try {
+    real = fs.realpathSync.native(logical);
+  } catch (error) {
+    return false;
+  }
+  return real !== logical && gitAbove(real);
 }
 
 // Fusion --------------------------------------------------------------------------------------------------------------

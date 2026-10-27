@@ -226,7 +226,8 @@ termine le contrôle du serveur. Si la nouvelle version s'arrête au démarrage,
 relance. `data/` et `node/` ne sont jamais touchés ; un nouveau lanceur est posé à côté (`demarrer.sh.nouveau`), celui en
 cours ne pouvant se réécrire.
 
-Une copie suivie par git (dossier de développement) n'est jamais écrasée : la page le signale, `git pull` reste l'outil.
+Une copie suivie par git (dossier de développement) n'est jamais écrasée, y compris une ressource posée par une jonction
+ou un lien vers un dépôt (le vrai dossier est vérifié) : la page le signale, `git pull` reste l'outil.
 Sur un serveur où vAvA a été posé à la main, la version installée est inconnue : la première mise à jour garde les
 réglages qui diffèrent et remplace le reste ; les suivantes savent exactement ce qui a été modifié sur place.
 
