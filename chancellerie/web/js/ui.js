@@ -263,5 +263,10 @@ const UI = (() => {
     });
   }
 
-  return { el, button, heading, field, choice, slip, report, confirm, form, reading, stamps, list, pager, init };
+  /** Ferme le dialogue ouvert, comme « Annuler » (la page a obtenu ce qu'il attendait, une liaison faite…). */
+  function close() {
+    if (!refs.dialog.hidden) finish(formFields ? null : false);
+  }
+
+  return { el, button, heading, field, choice, slip, report, confirm, form, reading, close, stamps, list, pager, init };
 })();

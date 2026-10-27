@@ -37,7 +37,7 @@ const API = (() => {
   function connect(handlers) {
     disconnect();
     source = new EventSource('/api/events');
-    for (const name of ['state', 'history', 'line', 'report', 'players', 'camera', 'metrics', 'backup', 'job', 'update']) {
+    for (const name of ['state', 'history', 'line', 'report', 'players', 'camera', 'metrics', 'backup', 'job', 'update', 'linked']) {
       source.addEventListener(name, (event) => {
         let data;
         try {

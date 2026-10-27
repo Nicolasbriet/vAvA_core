@@ -4,7 +4,8 @@
  * Rôle : comptes de la Chancellerie (data/accounts.json), comme ceux de txAdmin : identifiant et mot de passe, droits
  *        sur le panneau (serveur, console, configuration, sauvegardes) et rang du Conseil pour administrer le royaume depuis le
  *        web (mêmes droits qu'en jeu, vérifiés par le Registre). Le compte maître a tous les droits du panneau et le
- *        rang de souverain. Les mots de passe sont dérivés par scrypt avec un sel aléatoire ; jamais stockés ni
+ *        rang de souverain. Un compte peut être relié à son joueur (license, fivem, compte vAvA) : son rang s'applique
+ *        alors aussi en jeu. Les mots de passe sont dérivés par scrypt avec un sel aléatoire ; jamais stockés ni
  *        journalisés en clair. Les comptes vivent hors de la base de données : le panneau reste utilisable si MySQL
  *        est en panne.
  */
@@ -51,6 +52,7 @@ function publicView(account) {
     permissions: account.master ? [...PERMISSIONS] : [...account.permissions],
     rank: account.master ? MASTER_RANK : account.rank || '',
     createdAt: account.createdAt,
+    link: account.link ? { ...account.link } : null,
   };
 }
 
@@ -149,6 +151,43 @@ module.exports = {
     store.accounts.splice(index, 1);
     save();
     return { ok: true };
+  },
+
+  /**
+   * Relie un compte à son joueur : { license, fivem, accountId, player }. Une license ne se relie qu'à un compte :
+   * celui qui l'avait la perd. Renvoie { ok, account, previous } (previous : vue du compte délié, ou null).
+   */
+  setLink(name, link) {
+    const index = findIndex(name);
+    if (index === -1) return { ok: false, error: 'unknown_account' };
+    let previous = null;
+    for (const other of store.accounts) {
+      if (other !== store.accounts[index] && other.link && other.link.license === link.license) {
+        previous = publicView(other);
+        other.link = null;
+      }
+    }
+    store.accounts[index].link = {
+      license: link.license, fivem: link.fivem || '', accountId: link.accountId, player: link.player || '', linkedAt: new Date().toISOString(),
+    };
+    save();
+    return { ok: true, account: publicView(store.accounts[index]), previous };
+  },
+
+  /** Délie un compte de son joueur ; renvoie { ok, link } (le lien retiré). */
+  clearLink(name) {
+    const index = findIndex(name);
+    if (index === -1) return { ok: false, error: 'unknown_account' };
+    const link = store.accounts[index].link || null;
+    if (!link) return { ok: false, error: 'not_linked' };
+    store.accounts[index].link = null;
+    save();
+    return { ok: true, link };
+  },
+
+  /** Comptes reliés à un joueur. */
+  linked() {
+    return store.accounts.filter((account) => account.link).map(publicView);
   },
 
   /** Relit le fichier (tests). */

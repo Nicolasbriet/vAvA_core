@@ -115,6 +115,25 @@ exports('webRanks', function()
     return ranks.list()
 end)
 
+--- Rang d'un compte de jeu relié à un compte du panneau : celui du panneau s'applique en jeu ('' : aucun, révoqué).
+--- `label` : le compte du panneau, nom de l'acteur au journal. Renvoie true et ce qui a changé, ou false et un code.
+exports('webSyncStaff', function(accountId, rankName, label)
+    if not VavaAdmin.ready then return false, 'not_ready' end
+    if not fromBridge() then return false, 'forbidden' end
+    if mathType(accountId) == 'float' then accountId = tointeger(accountId) end
+    if mathType(accountId) ~= 'integer' or accountId < 1 or accountId > VavaAdmin.MAX_ID then return false, 'invalid_args' end
+    if type(rankName) ~= 'string' or #rankName > 32 then return false, 'invalid_args' end
+    if type(label) ~= 'string' or #label == 0 or #label > LABEL_MAX then return false, 'invalid_args' end
+    local ok, changed = staff.force(accountId, rankName ~= '' and rankName or nil)
+    if not ok then return false, changed end
+    if changed then
+        local actor = { source = nil, accountId = nil, rank = ranks.CONSOLE, label = cfg.actorLabel:format(label) }
+        audit.record(actor, changed == 'granted' and 'staffGrant' or 'staffRevoke', { accountId = accountId, label = 'compte n° ' .. accountId },
+            changed == 'granted' and { rang = rankName, origine = 'compte relié' } or { origine = 'compte relié' })
+    end
+    return true, changed
+end)
+
 --- Inscrit au journal une action d'un compte du panneau faite dans un autre module (zone de voix…).
 exports('webLog', function(spec, label, details)
     if not VavaAdmin.ready then return false, 'not_ready' end

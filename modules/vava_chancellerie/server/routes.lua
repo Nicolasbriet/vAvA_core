@@ -97,6 +97,25 @@ define('POST', '/request', function(body)
     return { ok = true, result = result }
 end)
 
+-- Comptes reliés ------------------------------------------------------------------------------------------------------
+
+-- Rangs des comptes de jeu reliés à un compte du panneau : { members = { { accountId, rank ('' : aucun), label } } }.
+-- Le panneau est la source : chaque rang est appliqué tel quel par le Registre, et inscrit à son journal s'il change.
+local SYNC_MAX = 100
+
+define('POST', '/staff/sync', function(body)
+    local members = type(body.members) == 'table' and body.members or {}
+    if #members > SYNC_MAX then return failure('invalid_args') end
+    local results = {}
+    for i = 1, #members do
+        local member = members[i]
+        local called, ok, changed = call(ADMIN, 'webSyncStaff', type(member) == 'table' and member.accountId, member and member.rank, member and member.label)
+        if not called then return failure('admin_unavailable') end
+        results[i] = { ok = ok == true, changed = ok and changed or nil, error = not ok and tostring(changed) or nil }
+    end
+    return { ok = true, results = results }
+end)
+
 -- Caméras -----------------------------------------------------------------------------------------------------------
 
 --- Joueurs regardables ; `logged` : ouverture du mur, inscrite au journal.

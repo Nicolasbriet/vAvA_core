@@ -14,6 +14,8 @@ const App = (() => {
   const N = STRINGS.nav;
   const MAX_LINES = 3000;
   const STATE_TICK_MS = 1000;
+  const BASE_TITLE = document.title;
+  const TITLE_DOTS = { running: '🟢', starting: '🟠', stopping: '🟠', stopped: '🔴', crashed: '🔴' };
 
   // pages : groupe, droit du panneau (permission, ou l'un de anyPermission) ou du rang du Conseil (realm), vue
   const PAGES = [
@@ -41,6 +43,8 @@ const App = (() => {
   let account = null;
   let setupDone = false;
   let status = { state: 'stopped', since: Date.now(), crashes: 0, skew: 0 };
+  // joueurs connectés, d'après le dernier relevé (null : inconnu)
+  let playerCount = null;
   let lines = [];
   let current = null;
   let currentView = null;
@@ -54,6 +58,10 @@ const App = (() => {
     account: () => account,
     can: (permission) => Boolean(account && account.permissions.includes(permission)),
     navigate: (page) => { location.hash = page; },
+    /** Compte relu (liaison au joueur faite ou défaite) : mêmes droits, nouvelle liaison. */
+    refreshAccount(next) {
+      if (account && next && next.name === account.name) account = next;
+    },
     setServerName(name) {
       refs.server.textContent = name || '';
     },
@@ -70,10 +78,25 @@ const App = (() => {
     return true;
   }
 
+  /**
+   * Titre de l'onglet : pastille de l'état du serveur (verte en marche, orange au démarrage ou à l'arrêt, rouge arrêté
+   * ou planté), et le nombre de joueurs entre parenthèses quand il tourne. Sans session : le titre seul.
+   */
+  function renderTitle() {
+    if (!account) {
+      document.title = BASE_TITLE;
+      return;
+    }
+    const dot = TITLE_DOTS[status.state] || TITLE_DOTS.stopped;
+    const players = status.state === 'running' && Number.isInteger(playerCount) ? ` (${playerCount})` : '';
+    document.title = `${dot}${players} ${BASE_TITLE}`;
+  }
+
   function renderState() {
     refs.state.className = `sidebar-state is-${status.state}`;
     refs.stateLabel.textContent = STRINGS.states[status.state];
     refs.stateDetail.textContent = STRINGS.describe(status, setupDone);
+    renderTitle();
   }
 
   /** Droits du rang relus (ouverture, serveur reparti) ; la navigation suit. */
@@ -172,9 +195,13 @@ const App = (() => {
       players: () => {
         PlayersView.players();
         CamerasView.players();
+        QuickPlayers.players();
       },
       camera: (data) => CAMERA.event(data),
       metrics: (sample) => {
+        playerCount = sample && Number.isInteger(sample.players) ? sample.players : null;
+        renderTitle();
+        QuickPlayers.metrics(sample);
         if (currentView && currentView.metrics) currentView.metrics(sample);
       },
       backup: (state) => {
@@ -185,6 +212,9 @@ const App = (() => {
       },
       update: (view) => {
         if (currentView && currentView.updates) currentView.updates(view);
+      },
+      linked: (data) => {
+        if (currentView && currentView.linked) currentView.linked(data);
       },
     });
     clearInterval(tick);
@@ -204,6 +234,8 @@ const App = (() => {
     current = null;
     account = null;
     lines = [];
+    playerCount = null;
+    renderTitle();
     refs.shell.hidden = true;
     refs.sheet.replaceChildren();
   }
@@ -240,6 +272,7 @@ const App = (() => {
     UI.init();
     GateView.init();
     CAMERA.init();
+    QuickPlayers.init(context);
     const logout = document.querySelector('[data-action="logout"]');
     logout.textContent = N.logout;
     logout.addEventListener('click', async () => {

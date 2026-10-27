@@ -1,15 +1,16 @@
 --[[
     vava_admin/server/players.lua
     Rôle : les joueurs vus par le Conseil : liste des connectés et fiche d'un joueur (identité du personnage, compte,
-           latence, santé, besoins, avertissements). Calculées à la demande, jamais envoyées en continu ; le pseudo
-           FiveM n'est lu qu'au moment de l'affichage (rien n'est conservé).
+           latence, santé, besoins, avertissements, identifiants sauf l'adresse IP). Calculées à la demande, jamais
+           envoyées en continu ; le pseudo FiveM et les identifiants ne sont lus qu'au moment de l'affichage (rien
+           n'est conservé).
     Dépendances : config.lua, server/core.lua, server/staff.lua, server/store.lua
 ]]
 
 local ipairs, tonumber, type, floor = ipairs, tonumber, type, math.floor
 local sort = table.sort
-local GetPlayers, GetPlayerName, GetPlayerPing, GetPlayerPed, GetEntityCoords =
-    GetPlayers, GetPlayerName, GetPlayerPing, GetPlayerPed, GetEntityCoords
+local GetPlayers, GetPlayerName, GetPlayerPing, GetPlayerPed, GetEntityCoords, GetPlayerIdentifierByType =
+    GetPlayers, GetPlayerName, GetPlayerPing, GetPlayerPed, GetEntityCoords, GetPlayerIdentifierByType
 
 local staff = VavaAdmin.staff
 local store = VavaAdmin.store
@@ -68,6 +69,21 @@ function players.list()
     return out
 end
 
+-- identifiants montrés dans la fiche, dans cet ordre ; jamais l'adresse IP (ip:), ni rien d'autre
+local IDENTIFIER_TYPES = { 'license', 'license2', 'fivem', 'discord', 'steam', 'xbl', 'live' }
+
+--- Identifiants d'un joueur connecté, lus à l'instant pour la fiche, jamais conservés : { { type, value } }.
+---@param src integer
+---@return table[]
+local function identifiersOf(src)
+    local out = {}
+    for _, kind in ipairs(IDENTIFIER_TYPES) do
+        local value = GetPlayerIdentifierByType(src, kind)
+        if value then out[#out + 1] = { type = kind, value = value } end
+    end
+    return out
+end
+
 --- Fiche d'un joueur.
 ---@param target vAvA.AdminTarget
 ---@return table
@@ -87,6 +103,7 @@ function players.details(target)
         health = healthOk and type(health) == 'table' and health or nil,
         needs = needsOk and type(needs) == 'table' and needs or nil,
         warnings = warnings,
+        identifiers = identifiersOf(src),
     }
 end
 

@@ -100,6 +100,7 @@ const STRINGS = (() => {
     db_client_missing: 'Le client mysql est introuvable sur cette machine (il est livré avec MariaDB et MySQL ; sous Linux : apt install mariadb-client). Ou créez la base vous-même.',
     db_create_failed: 'La base n\'a pas pu être créée.',
     install_failed: 'L\'installation a échoué (détail ci-dessous) : corrigez puis relancez-la ; ce qui est déjà en place est gardé.',
+    not_linked: 'Ce compte n\'est relié à aucun joueur.',
   };
 
   const fields = {
@@ -134,6 +135,8 @@ const STRINGS = (() => {
     update_rolled_back: 'Mise à jour annulée (retour arrière)', panel_updated: 'Chancellerie mise à jour',
     panel_reverted: 'Chancellerie remise à sa version précédente',
     scheduled_update: 'Mise à jour au redémarrage planifié',
+    account_linked: 'Compte relié à son joueur', account_unlinked: 'Compte délié de son joueur',
+    rank_synced: 'Rang appliqué en jeu', rank_sync_failed: 'Rang non appliqué en jeu',
   };
 
   const UNITS = ['o', 'Ko', 'Mo', 'Go', 'To'];
@@ -242,6 +245,20 @@ const STRINGS = (() => {
     },
 
     pages: { previous: 'Page précédente', next: 'Page suivante', page: (n) => `Page ${n}` },
+
+    quickPlayers: {
+      button: 'Joueurs en ligne',
+      shortcut: 'Liste des joueurs connectés (touche J)',
+      title: 'Joueurs en ligne',
+      count: (n) => plural(n, 'joueur connecté', 'joueurs connectés'),
+      search: 'Chercher un joueur (nom, personnage ou numéro)…',
+      columns: ['N°', 'Nom FiveM', 'Personnage', 'Rang', 'Latence'],
+      empty: 'Personne n\'est connecté.',
+      noMatch: 'Aucun joueur ne correspond.',
+      hintRealm: 'Un clic (ou Entrée) ouvre la fiche du joueur : identifiants et administration. Touche J : cette liste, de partout.',
+      hintPlain: 'La fiche des joueurs et leur administration demandent un rang du Conseil. Touche J : cette liste, de partout.',
+      close: 'Fermer',
+    },
     done: 'C\'est fait.',
     realmStopped: 'Le serveur de jeu est arrêté : le royaume se gère quand il est en marche.',
 
@@ -253,7 +270,15 @@ const STRINGS = (() => {
       none: 'Choisissez un joueur dans la liste.',
       gone: 'Ce joueur vient de partir.',
       tags: { downed: 'À terre', frozen: 'Immobilisé' },
-      facts: { account: 'Compte', name: 'Nom FiveM', health: 'Vie', hunger: 'Faim', thirst: 'Soif', position: 'Position', ping: 'Latence' },
+      facts: { account: 'Compte', name: 'Nom FiveM', health: 'Vie', hunger: 'Faim', thirst: 'Soif', position: 'Position', ping: 'Latence', panel: 'Compte du panneau' },
+      panelAccount: (name) => `Panneau : ${name}`,
+      identifiersTitle: 'Identifiants',
+      identifierLabels: { license: 'Licence', license2: 'Licence 2', fivem: 'FiveM', discord: 'Discord', steam: 'Steam', xbl: 'Xbox', live: 'Microsoft' },
+      noIdentifiers: 'Aucun identifiant lisible.',
+      copy: 'Copier',
+      copied: 'Copié dans le presse-papiers.',
+      profile: 'Profil',
+      adminTitle: 'Administration',
       account: (id) => `n° ${id}`,
       noCharacter: 'En sélection',
       warnings: 'Avertissements',
@@ -371,7 +396,7 @@ const STRINGS = (() => {
 
     accounts: {
       title: 'Comptes de la Chancellerie',
-      columns: ['Compte', 'Droits du panneau', 'Rang du Conseil', 'Créé le', ''],
+      columns: ['Compte', 'Droits du panneau', 'Rang du Conseil', 'Joueur relié', 'Créé le', ''],
       master: 'Compte maître',
       none: 'aucun',
       create: 'Créer un compte',
@@ -403,6 +428,27 @@ const STRINGS = (() => {
       again: 'Nouveau mot de passe, encore',
       change: 'Changer',
       mismatch: 'Les deux mots de passe ne sont pas identiques.',
+      // liaison au joueur
+      notLinked: '—',
+      gameAccount: (id) => `compte de jeu n° ${id}`,
+      link: 'Relier un joueur',
+      relink: 'Nouveau code',
+      unlink: 'Délier',
+      close: 'Fermer',
+      linkTitle: 'Relier au joueur',
+      linkIntroMine: 'En jeu, ouvrez la console (touche F8) et tapez :',
+      linkIntroOther: (name) => `Donnez ce code à la personne du compte « ${name} ». En jeu, elle ouvre la console (touche F8) et tape :`,
+      linkHelp: (minutes) => `Valable ${minutes} minutes, une seule fois. Ce dialogue se ferme de lui-même quand la liaison est faite.`,
+      linkRank: 'Une fois relié, le rang du Conseil de ce compte s\'applique au joueur en jeu, et le suit : changé, retiré ou délié ici, il l\'est aussi en jeu.',
+      linkedNow: (name) => `Le compte « ${name} » est relié à son joueur ; son rang s'applique en jeu.`,
+      unlinkTitle: 'Délier le joueur ?',
+      unlinkText: (name, player) => `Le compte « ${name} » ne sera plus relié à ${player || 'son joueur'}, qui perdra son rang du Conseil en jeu.`,
+      unlinked: 'Compte délié : le rang en jeu est retiré.',
+      linkNote: 'Un compte relié à son joueur (license, fivem) lui donne son rang du Conseil en jeu : le panneau en est la source, au démarrage du serveur et à chaque changement.',
+      rankFollows: 'Compte relié : ce rang s\'applique aussi en jeu.',
+      mineLinkTitle: 'Mon joueur',
+      mineLinked: (player, license) => `Ce compte est relié à ${player} (${license}) : votre rang du Conseil s'applique en jeu.`,
+      mineNotLinked: 'Ce compte n\'est relié à aucun joueur. Reliez-le pour que votre rang du Conseil s\'applique en jeu.',
     },
 
     camera: {
@@ -490,6 +536,7 @@ const STRINGS = (() => {
       updateAvailable: (label, count) => `Une mise à jour de vAvA est disponible : ${label}${count ? ` (${plural(count, 'changement', 'changements')})` : ''}.`,
       updateRunning: 'Une installation ou une mise à jour est en cours.',
       updateSee: 'Voir',
+      openPlayer: 'Ouvrir sa fiche : identifiants et administration',
     },
 
     job: {

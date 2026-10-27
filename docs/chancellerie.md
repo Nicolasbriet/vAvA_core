@@ -238,14 +238,35 @@ sénéchal, souverain : mêmes droits qu'en jeu, pour administrer le royaume dep
 ou le supprimer. Chacun y change son propre mot de passe (l'ancien est demandé). Un mot de passe changé ou un compte
 supprimé ferme ses autres sessions. Le compte maître a tous les droits du panneau et le rang de souverain.
 
+### Relier un compte à son joueur
+
+Chaque compte peut être relié à son joueur, et son **rang du Conseil s'applique alors aussi en jeu** :
+
+1. Page **Comptes** → « Relier un joueur » : un code à 6 chiffres, valable 5 minutes, une seule fois (le maître peut en
+   tirer un pour n'importe quel compte).
+2. En jeu, console (touche F8) : `chancellerie 482913`. Le joueur est prévenu du résultat.
+3. Le compte retient la license, l'identifiant `fivem:` et le numéro de compte vAvA du joueur. Une license ne se relie
+   qu'à un seul compte ; après 5 codes faux, elle doit attendre.
+
+Le panneau est la source du rang : il s'applique en jeu à la liaison, quand le maître change le rang, et à chaque
+démarrage du serveur de jeu ; délier ou supprimer le compte retire le rang en jeu. Tout est inscrit au journal de la
+Chancellerie et à celui du Conseil (« Chancellerie : <compte> »). Il faut `vava_admin` 1.3.0 et `vava_chancellerie`
+1.2.0.
+
 ## Le royaume depuis le web
 
 Pour les comptes qui ont un rang du Conseil, quand le serveur de jeu tourne avec la ressource `vava_chancellerie`
 (`ensure vava_chancellerie` après `vava_admin`, `vava_voice` et `vava_cameras`) :
 
-- **Joueurs** : liste en direct, fiche (vie, faim, soif, position, avertissements) et actions : écrire, avertir, envoyer
-  vers un joueur ou un lieu, renvoyer, soigner, nourrir, immobiliser, expulser, bannir, voir l'inventaire, donner un
-  objet, **regarder l'écran**.
+- **Joueurs** : liste en direct (numéro de connexion, nom FiveM, personnage, rang, latence, compte du panneau relié),
+  fiche (vie, faim, soif, position, avertissements, **identifiants** : license, license2, fivem, discord, steam, xbl,
+  live — lus à l'instant, jamais conservés, jamais l'adresse IP — à copier, avec le profil Steam ou Discord) et
+  actions : écrire, avertir, envoyer vers un joueur ou un lieu, renvoyer, soigner, nourrir, immobiliser, expulser,
+  bannir, voir l'inventaire, donner un objet, **regarder l'écran**.
+- **Accès rapide** : le bouton « Joueurs en ligne » en tête de la colonne (avec leur nombre) ou la touche **J** ouvre
+  la liste des joueurs depuis n'importe quelle page ; un clic ouvre la fiche. Les joueurs du tableau de bord ouvrent
+  aussi leur fiche d'un clic. Le titre de l'onglet porte l'état du serveur : 🟢 en marche (avec le nombre de joueurs),
+  🟠 au démarrage ou à l'arrêt, 🔴 arrêté.
 - **Signalements** (en direct), **Sanctions** (bans, levée), **Journal du Conseil**, **Conseil** (nommer, changer de
   rang, révoquer), **Proclamation**, **Zones de voix** (modifier, supprimer ; la création reste en jeu, car une zone se
   centre sur la personne qui la crée), **Caméras** (le mur de l'écran des joueurs connectés).
@@ -380,3 +401,5 @@ Toutes les réponses sont `{ ok, error?, … }`. Les `POST` demandent `x-chancel
 | `GET /api/jobs/current` | connecté | opération en cours ou dernière ; flux : `job` à chaque avancée |
 | `GET /api/updates` · `POST /api/updates/check` | connecté | installé, dernière version, changements ; flux : `update` |
 | `POST /api/updates/apply` · `settings` | compte maître | `{ backupDb, delayMin = 0\|1\|5\|10 }` · `{ channel, autoCheck, applyAtRestart }` |
+| `POST /api/account/link` · `unlink` | connecté (soi) ou maître (`{ name }`) | code de liaison `{ code, expiresAt, ttlMs }` · délier ; flux : `linked` |
+| `GET /api/links` | rang du Conseil | `[{ accountId, name }]` : comptes de jeu reliés à un compte du panneau |

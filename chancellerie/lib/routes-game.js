@@ -5,11 +5,14 @@
  *        partent au pont du serveur de jeu (liste fermée de noms) au nom du compte : c'est le Registre du Conseil qui
  *        vérifie le droit du rang, la cible, le rang de la cible, et qui tient le journal. Caméras sur l'écran des
  *        joueurs (mur et vue en grand) ; évènements du pont (signalements, joueurs, caméras) reçus et relayés aux
- *        navigateurs.
+ *        navigateurs ; liaison d'un compte du panneau (code tapé en jeu) et rangs des comptes reliés appliqués quand
+ *        le serveur de jeu démarre.
  */
 
+const accounts = require('./accounts');
 const bridge = require('./bridge');
 const camera = require('./camera');
+const links = require('./links');
 const config = require('./config');
 const events = require('./events');
 
@@ -35,6 +38,7 @@ function register(route, { ok, fail, endpoint, server }) {
 
   events.onSessionEmpty((token) => camera.closeSession(endpoint(), token));
   server.on('exit', () => camera.clear());
+  links.attach(server);
 
   route('POST', '/api/game/request', { auth: true, rank: true, limit: 'game', limitBy: 'token' }, async (ctx) => {
     const { name, args } = ctx.body;
@@ -95,9 +99,23 @@ function register(route, { ok, fail, endpoint, server }) {
       events.broadcastRanked('players', {});
     } else if (event.type === 'camera') {
       camera.incoming(event);
+    } else if (event.type === 'ready') {
+      // serveur de jeu démarré : les rangs des comptes reliés s'y appliquent
+      links.syncAll();
+    } else if (event.type === 'link') {
+      // code tapé en jeu : la réponse revient au joueur (le pont l'en prévient)
+      const result = links.consume(event);
+      if (!result.ok) return fail(200, result.error);
+      events.broadcast('linked', { name: result.account.name });
+      return ok({ account: result.account.name });
     }
     return ok();
   });
+
+  // pour la page Joueurs : quel compte du panneau est relié à quel compte de jeu
+  route('GET', '/api/links', { auth: true, rank: true }, () => ok({
+    links: accounts.linked().map((account) => ({ accountId: account.link.accountId, name: account.name })),
+  }));
 }
 
 module.exports = { register };

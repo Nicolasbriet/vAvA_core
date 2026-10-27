@@ -21,8 +21,58 @@ const PlayersView = (() => {
   let players = [];
   let selected = null;
   let detail = null;
+  // compte de jeu → compte du panneau qui y est relié
+  let panelOf = new Map();
 
   const labelOf = (player) => player.character || player.name || P.account(player.accountId);
+  const panelTag = (player) => (panelOf.has(player.accountId) ? UI.el('span', 'tag tag-rank', P.panelAccount(panelOf.get(player.accountId))) : null);
+
+  /** Profil public d'un identifiant, quand il en a un (Steam : identifiant hexadécimal → SteamID64). */
+  function profileOf(identifier) {
+    const [kind, value] = [identifier.type, String(identifier.value).split(':').slice(1).join(':')];
+    if (kind === 'steam' && /^[0-9a-f]{1,16}$/i.test(value)) return `https://steamcommunity.com/profiles/${BigInt(`0x${value}`).toString()}`;
+    if (kind === 'discord' && /^\d{5,20}$/.test(value)) return `https://discord.com/users/${value}`;
+    return null;
+  }
+
+  async function copy(text) {
+    try {
+      await navigator.clipboard.writeText(text);
+    } catch (error) {
+      // presse-papiers refusé (adresse non sécurisée) : par une zone de texte, à l'ancienne
+      const area = UI.el('textarea', 'offscreen');
+      area.value = text;
+      document.body.append(area);
+      area.select();
+      document.execCommand('copy');
+      area.remove();
+    }
+    UI.slip(P.copied);
+  }
+
+  /** Identifiants du joueur (lus à l'instant par le serveur de jeu, jamais l'adresse IP). */
+  function identifiersList(identifiers) {
+    if (!identifiers.length) return message(P.noIdentifiers);
+    return UI.el('ul', 'identifiers', null, identifiers.map((identifier) => {
+      const profile = profileOf(identifier);
+      const link = profile ? UI.el('a', 'plain-button', P.profile) : null;
+      if (link) {
+        link.href = profile;
+        link.target = '_blank';
+        link.rel = 'noopener noreferrer';
+      }
+      return UI.el('li', null, null, [
+        UI.el('span', 'identifier-type', P.identifierLabels[identifier.type] || identifier.type),
+        UI.el('span', 'identifier-value mono', identifier.value),
+        UI.el('span', 'identifier-actions', null, [UI.button(P.copy, () => copy(identifier.value), 'plain'), link]),
+      ]);
+    }));
+  }
+
+  async function refreshLinks() {
+    const result = await API.get('/api/links');
+    if (result.ok) panelOf = new Map(UI.list(result.links).map((link) => [link.accountId, link.name]));
+  }
   const percent = (value) => P.percent(value);
 
   function message(text) {
@@ -43,7 +93,7 @@ const PlayersView = (() => {
       ];
       const row = UI.el('tr', `ledger-row${player.source === selected ? ' is-selected' : ''}`, null, [
         UI.el('td', 'cell-number', String(player.source)),
-        UI.el('td', 'cell-strong', player.name),
+        UI.el('td', null, null, [UI.el('span', 'cell-strong', player.name), panelTag(player)]),
         UI.el('td', null, null, [document.createTextNode(player.character || P.noCharacter), ...tags]),
         UI.el('td', 'cell-sub', player.rank || '—'),
         UI.el('td', 'cell-end', P.ms(player.ping)),
@@ -187,7 +237,11 @@ const PlayersView = (() => {
         fact(F.hunger, needs.hunger !== undefined ? percent(needs.hunger) : '—'),
         fact(F.thirst, needs.thirst !== undefined ? percent(needs.thirst) : '—'),
         fact(F.ping, P.ms(detail.ping)), fact(F.position, position),
+        panelOf.has(detail.accountId) ? fact(F.panel, panelOf.get(detail.accountId)) : null,
       ]),
+      UI.el('h4', 'section-title', P.identifiersTitle),
+      identifiersList(UI.list(detail.identifiers)),
+      UI.el('h4', 'section-title', P.adminTitle),
       UI.el('div', 'actions', null, [
         group(P.groups.words, [
           when('message', A.message, () => dialogText('message', D.message, P.done.message)),
@@ -254,6 +308,7 @@ const PlayersView = (() => {
         refs.list.replaceChildren(message(STRINGS.error(ready.error)));
         return;
       }
+      await refreshLinks();
       await refreshList();
       if (selected) refreshDetail();
       timer = setInterval(() => {
@@ -269,6 +324,18 @@ const PlayersView = (() => {
     /** Arrivée ou départ annoncé par le serveur de jeu. */
     players() {
       if (sheet) refreshList();
+    },
+    /** Joueur à ouvrir à l'arrivée sur la page (clic depuis le tableau de bord). */
+    focus(source) {
+      selected = source;
+      detail = null;
+    },
+    /** Un compte du panneau vient d'être relié à son joueur. */
+    async linked() {
+      if (!sheet) return;
+      await refreshLinks();
+      renderList();
+      if (detail) renderDetail(null);
     },
   };
 })();

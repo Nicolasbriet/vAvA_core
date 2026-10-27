@@ -110,10 +110,22 @@ const DashboardView = (() => {
     else if (!details || !Array.isArray(details.players)) body.push(UI.el('p', 'empty', D.playersUnknown));
     else if (!details.players.length) body.push(UI.el('p', 'empty', D.noPlayers));
     else {
-      const rows = details.players.map((player) => UI.el('tr', null, null, [
-        UI.el('td', 'cell-number', String(player.id)), UI.el('td', 'cell-strong', player.name), UI.el('td', 'cell-end', D.ms(player.ping)),
-      ]));
-      body.push(UI.el('table', 'ledger', null, [
+      // avec un rang du Conseil, un clic ouvre la fiche du joueur (identifiants, administration)
+      const clickable = Boolean(context.account() && context.account().rank);
+      const rows = details.players.map((player) => {
+        const row = UI.el('tr', null, null, [
+          UI.el('td', 'cell-number', String(player.id)), UI.el('td', 'cell-strong', player.name), UI.el('td', 'cell-end', D.ms(player.ping)),
+        ]);
+        if (clickable) {
+          row.title = D.openPlayer;
+          row.addEventListener('click', () => {
+            PlayersView.focus(player.id);
+            context.navigate('joueurs');
+          });
+        }
+        return row;
+      });
+      body.push(UI.el('table', `ledger${clickable ? ' is-clickable' : ''}`, null, [
         UI.el('thead', null, null, [UI.el('tr', null, null, [UI.el('th', null, D.id), UI.el('th', null, D.name), UI.el('th', 'cell-end', D.ping)])]),
         UI.el('tbody', null, null, rows),
       ]));

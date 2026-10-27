@@ -992,7 +992,112 @@ select.field-input option { background: var(--paper-light); color: var(--ink); }
 .fact dd.fact-text { font-size: 1.1rem; }
 
 .schedule-banner { margin: 0.6rem 0 0.4rem; }
+
+/* Accès rapide aux joueurs : plaque de laiton sous l'état du serveur, et sa fenêtre */
+.quick-players-button {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.6rem;
+  width: 100%;
+  margin: -0.3rem 0 1.1rem;
+  padding: 0.55rem 0.8rem;
+  border: 0;
+  border-radius: 2px;
+  background: linear-gradient(180deg, rgba(var(--brass-rgb), 0.14), rgba(var(--brass-rgb), 0.06));
+  box-shadow: inset 0 0 0 1px rgba(var(--brass-rgb), 0.32), 0 1px 2px rgba(0, 0, 0, 0.4);
+  color: var(--brass-bright);
+  font-family: var(--font-display);
+  font-size: 0.74rem;
+  font-weight: 700;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  cursor: pointer;
+  transition: background-color 140ms, box-shadow 140ms;
+}
+.quick-players-button:hover { background: rgba(var(--brass-rgb), 0.2); box-shadow: inset 0 0 0 1px rgba(var(--brass-rgb), 0.55), 0 1px 2px rgba(0, 0, 0, 0.4); }
+.quick-players-count {
+  min-width: 1.7rem;
+  padding: 0.05rem 0.45rem;
+  border-radius: 999px;
+  background: rgba(0, 0, 0, 0.35);
+  box-shadow: inset 0 0 0 1px rgba(var(--brass-rgb), 0.35);
+  font-family: var(--font-body);
+  font-size: 0.9rem;
+  letter-spacing: 0;
+  text-align: center;
+  font-variant-numeric: lining-nums tabular-nums;
+}
+.quick-players .quick-search { margin: 0.2rem 0 0.4rem; }
+.quick-count { margin: 0 0 0.3rem; }
+.quick-list { max-height: 55vh; overflow-y: auto; }
+
+/* Identifiants d'un joueur, dans sa fiche */
+.identifiers { margin: 0 0 0.6rem; padding: 0; list-style: none; }
+.identifiers li { display: grid; grid-template-columns: 5.2rem minmax(0, 1fr) auto; gap: 0 0.7rem; align-items: baseline; padding: 0.3rem 0; border-bottom: 1px dotted rgba(var(--ink-rgb), 0.25); }
+.identifier-type { color: var(--ink-faint); font-family: var(--font-display); font-size: 0.62rem; font-weight: 700; letter-spacing: 0.12em; text-transform: uppercase; }
+.identifier-value { min-width: 0; overflow-wrap: anywhere; font-size: 0.8rem; }
+.identifier-actions { display: inline-flex; gap: 0.6rem; white-space: nowrap; }
+.identifier-actions a { text-decoration: none; }
+.offscreen { position: fixed; top: -100px; left: -100px; opacity: 0; }
+
+/* Joueurs du tableau de bord : un clic ouvre leur fiche */
+.ledger.is-clickable tbody tr:hover .cell-strong { color: var(--rubric); }
+
+/* Liaison d'un compte à son joueur : le code à taper en jeu, en grand */
+.link-command { margin: 0.6rem 0 0.9rem; text-align: center; }
+.link-command code { display: inline-block; padding: 0.5rem 1.1rem; font-size: 1.5rem; font-weight: 700; letter-spacing: 0.06em; background: var(--slate); color: var(--brass-bright); }
+.link-mine { margin-bottom: 1.2rem; }
 .state-banner-label.is-struck { text-decoration: line-through; text-decoration-color: rgba(var(--rubric-rgb), 0.7); }
+
+/* Barres de défilement : fines, sans flèches, teintées selon leur support — laiton sur le cuir, le bureau et l'ardoise,
+   encre sur le parchemin ; elles s'avivent au survol. Chrome, Edge et Safari : règles -webkit- (les seules qui
+   retirent les flèches) ; Firefox : propriétés standard. ------------------------------------------------------------ */
+
+:root {
+  --scroll-brass: rgba(var(--brass-rgb), 0.28);
+  --scroll-brass-hover: rgba(var(--brass-rgb), 0.55);
+  --scroll-ink: rgba(var(--ink-rgb), 0.28);
+  --scroll-ink-hover: rgba(var(--ink-rgb), 0.5);
+}
+@supports not selector(::-webkit-scrollbar) {
+  html { scrollbar-width: thin; scrollbar-color: var(--scroll-brass) #0b0806; }
+  .sidebar,
+  .nav,
+  .slate-lines,
+  .cfg-editor,
+  .cfg-preview,
+  .viewer-card { scrollbar-width: thin; scrollbar-color: var(--scroll-brass) transparent; }
+  .nav:hover,
+  .slate-lines:hover,
+  .cfg-editor:hover,
+  .cfg-preview:hover { scrollbar-color: var(--scroll-brass-hover) transparent; }
+  .dialog-card,
+  .ledger,
+  .job-log,
+  .quick-list,
+  .field-lines { scrollbar-width: thin; scrollbar-color: var(--scroll-ink) transparent; }
+  .dialog-card:hover,
+  .ledger:hover,
+  .job-log:hover,
+  .field-lines:hover { scrollbar-color: var(--scroll-ink-hover) transparent; }
+}
+
+::-webkit-scrollbar { width: 8px; height: 8px; }
+::-webkit-scrollbar-button { display: none; }
+::-webkit-scrollbar-corner,
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { border: 2px solid transparent; border-radius: 4px; background: var(--scroll-brass) padding-box; }
+::-webkit-scrollbar-thumb:hover { background: var(--scroll-brass-hover) padding-box; }
+.dialog-card::-webkit-scrollbar-thumb,
+.ledger::-webkit-scrollbar-thumb,
+.job-log::-webkit-scrollbar-thumb,
+.quick-list::-webkit-scrollbar-thumb,
+.field-lines::-webkit-scrollbar-thumb { background: var(--scroll-ink) padding-box; }
+.dialog-card::-webkit-scrollbar-thumb:hover,
+.ledger::-webkit-scrollbar-thumb:hover,
+.job-log::-webkit-scrollbar-thumb:hover,
+.field-lines::-webkit-scrollbar-thumb:hover { background: var(--scroll-ink-hover) padding-box; }
 
 /* Petits écrans : la colonne devient un bandeau ----------------------------------------------------------------------- */
 

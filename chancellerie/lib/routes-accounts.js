@@ -3,12 +3,15 @@
  * lib/routes-accounts.js
  * Rôle : comptes du panneau. Le compte maître crée, règle (droits du panneau, rang du Conseil), remet un mot de passe
  *        et supprime les autres comptes ; chacun change son propre mot de passe (l'ancien exigé). Un mot de passe
- *        changé ou un compte supprimé ferme ses autres sessions. Tout est inscrit au journal, sans mot de passe.
+ *        changé ou un compte supprimé ferme ses autres sessions. Chacun relie son compte à son joueur (code à taper en
+ *        jeu) ou l'en délie, le maître pour tous ; le rang d'un compte relié suit en jeu. Tout est inscrit au journal,
+ *        sans mot de passe.
  */
 
 const accounts = require('./accounts');
 const events = require('./events');
 const journal = require('./journal');
+const links = require('./links');
 const sessions = require('./sessions');
 
 /** Ferme les sessions d'un compte, sauf celle de la requête. */
@@ -36,6 +39,8 @@ function register(route, { ok, fail }) {
     const result = accounts.update(name, { permissions, rank });
     if (!result.ok) return fail(400, result.error);
     journal.record(ctx.account.name, 'account_updated', { compte: result.account.name, rang: result.account.rank || '—' });
+    // compte relié : son nouveau rang s'applique aussi en jeu
+    links.sync(result.account, ctx.account.name);
     return ok({ account: result.account });
   });
 
@@ -58,6 +63,35 @@ function register(route, { ok, fail }) {
     if (!result.ok) return fail(400, result.error);
     dropSessions(target.name, null);
     journal.record(ctx.account.name, 'account_deleted', { compte: target.name });
+    // son joueur relié perd son rang en jeu
+    links.revoke(target.link, target.name, ctx.account.name);
+    return ok();
+  });
+
+  // Liaison au joueur : chacun pour son compte, le maître pour tous ----------------------------------------------
+
+  const targetOf = (ctx) => {
+    const name = ctx.body.name;
+    if (name === undefined || name === ctx.account.name) return ctx.account;
+    return ctx.account.master ? accounts.get(name) : undefined;
+  };
+
+  route('POST', '/api/account/link', { auth: true, limit: 'probe', limitBy: 'token' }, (ctx) => {
+    const target = targetOf(ctx);
+    if (target === undefined) return fail(403, 'forbidden');
+    if (!target) return fail(400, 'unknown_account');
+    const { code, expiresAt } = links.issue(target.name);
+    return ok({ code, expiresAt, ttlMs: links.CODE_TTL_MS, account: target.name });
+  });
+
+  route('POST', '/api/account/unlink', { auth: true }, (ctx) => {
+    const target = targetOf(ctx);
+    if (target === undefined) return fail(403, 'forbidden');
+    if (!target) return fail(400, 'unknown_account');
+    const result = accounts.clearLink(target.name);
+    if (!result.ok) return fail(400, result.error);
+    journal.record(ctx.account.name, 'account_unlinked', { compte: target.name });
+    links.revoke(result.link, target.name, ctx.account.name);
     return ok();
   });
 

@@ -117,6 +117,29 @@ function staff.set(actor, accountId, rankName)
     return true
 end
 
+--- Rang imposé par la Chancellerie à un compte relié à un compte du panneau (nil : révoqué), hors des règles de rang
+--- d'un acteur : le panneau en est la source. Renvoie true et ce qui a changé ('granted', 'revoked' ou nil).
+---@param accountId integer
+---@param rankName string|nil
+---@return boolean ok
+---@return string|nil changed  ou code d'erreur
+function staff.force(accountId, rankName)
+    if rankName and not ranks.get(rankName) then return false, 'unknown_rank' end
+    if members[accountId] == rankName then return true, nil end
+    local ok, err
+    if rankName then
+        ok, err = store.setStaff(accountId, rankName, nil)
+    else
+        ok, err = store.removeStaff(accountId)
+    end
+    if not ok then
+        VavaAdmin.log.error('Conseil non mis à jour : %s', tostring(err))
+        return false, 'db_error'
+    end
+    members[accountId] = rankName
+    return true, rankName and 'granted' or 'revoked'
+end
+
 --- Membres du Conseil, avec leur personnage s'ils sont en jeu.
 ---@return table[]
 function staff.list()

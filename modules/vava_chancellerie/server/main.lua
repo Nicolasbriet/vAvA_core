@@ -2,7 +2,8 @@
     vava_chancellerie/server/main.lua
     Rôle : déclaration du module auprès du core : écoute HTTP du pont, évènements relayés à la Chancellerie
            (signalements, arrivées et départs des joueurs, offres et fins des caméras regardées depuis le web, arrêt du
-           module des caméras).
+           module des caméras, pont prêt : la Chancellerie applique alors les rangs des comptes reliés) ; commande de
+           liaison d'un compte du panneau.
     Dépendances : tous les fichiers server/ du module
 ]]
 
@@ -39,9 +40,13 @@ local function setup()
         local id, err = core.hooks.after(def[1], def[2])
         if not id then return false, err end
     end
+    VavaBridge.link.start()
     VavaBridge.ready = true
     if not auth.enabled() then
         core.log.info('serveur lancé sans la Chancellerie : le pont reste fermé')
+    else
+        -- la Chancellerie applique alors les rangs des comptes reliés (changés pendant que le serveur était arrêté)
+        push.send({ type = 'ready' })
     end
     return true
 end
@@ -54,7 +59,7 @@ end)
 local registered, registerErr = core.modules.register({
     version = GetResourceMetadata(VavaBridge.resource, 'version', 0),
     coreVersion = cfg.coreVersion,
-    dependencies = { vava_admin = '1.2.0' },
+    dependencies = { vava_admin = '1.3.0' },
     setup = setup,
 })
 if not registered then
