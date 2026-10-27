@@ -1,0 +1,45 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <title>Chat</title>
+  <!--
+    web/index.html
+    Rôle : interface du chat : fil des messages (s'efface quand le chat est fermé), onglets (Général, Actions, Conseil,
+           un par conversation privée), saisie avec historique et suggestions de commandes ; fenêtre déplaçable par son
+           bandeau et agrandie par son coin. Tous les textes viennent de la config du module (message « init »).
+           Dans un navigateur, web/index.html?view=… montre chaque état avec des données d'exemple.
+  -->
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <section class="chat is-faded" id="chat" aria-label="Chat">
+    <header class="chat-head" id="chat-head">
+      <span class="chat-grip" id="chat-grip" aria-hidden="true"></span>
+      <nav class="tabs" id="tabs" role="tablist"></nav>
+    </header>
+    <div class="feeds" id="feeds"></div>
+    <footer class="chat-foot">
+      <ul class="suggestions" id="suggestions" hidden></ul>
+      <form class="composer" id="composer" autocomplete="off">
+        <span class="composer-tag" id="composer-tag"></span>
+        <input class="composer-input" id="composer-input" type="text" spellcheck="false">
+        <span class="composer-count" id="composer-count" hidden></span>
+      </form>
+      <p class="chat-hint" id="chat-hint"></p>
+    </footer>
+    <span class="chat-resize" id="chat-resize" aria-hidden="true"></span>
+  </section>
+
+  <script src="js/bridge.js"></script>
+  <script src="js/ui.js"></script>
+  <script src="js/lines.js"></script>
+  <script src="js/tabs.js"></script>
+  <script src="js/suggest.js"></script>
+  <script src="js/composer.js"></script>
+  <script src="js/layout.js"></script>
+  <script src="js/chat.js"></script>
+  <script src="js/devmock.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>

@@ -12,12 +12,13 @@ const path = require('path');
 const MANIFESTS = ['fxmanifest.lua', '__resource.lua'];
 const MAX_DEPTH = 4;
 // ordre de démarrage attendu par vAvA ; une ressource inconnue garde la place choisie, après celles-ci
-const KNOWN_ORDER = ['chat', 'sessionmanager', 'hardcap', 'oxmysql', 'vAvA_core', 'vava_world', 'vava_appearance',
+const KNOWN_ORDER = ['chat', 'sessionmanager', 'hardcap', 'oxmysql', 'vAvA_core', 'vava_chat', 'vava_world', 'vava_appearance',
   'vava_characters_ui', 'vava_hud', 'vava_inventory', 'vava_needs', 'vava_health', 'vava_admin', 'vava_voice', 'vava_cameras', 'vava_magic',
   'vava_chancellerie'];
 const CORE_DESCRIPTIONS = {
   vAvA_core: 'Le cœur du serveur (obligatoire)',
   oxmysql: 'Accès à la base de données (obligatoire)',
+  vava_chat: 'Chat du royaume : hors-RP, /me, /do, messages privés, Conseil (remplace « chat »)',
   vava_appearance: 'Apparence des personnages',
   vava_characters_ui: 'Écran de sélection et de création',
   vava_hud: 'Jauges et notifications à l\'écran',

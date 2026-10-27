@@ -84,5 +84,5 @@ VavaMagic.LINKS = {
     ADMIN = 'vava_admin',
     HEALTH = 'vava_health',
     HUD = 'vava_hud',
-    CHAT = 'chat',
+    CHAT = 'vava_chat',
 }

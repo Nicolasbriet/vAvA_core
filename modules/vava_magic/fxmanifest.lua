@@ -5,7 +5,7 @@
            sur une cible verrouillée), grimoire et registre des murmures (objets), commandes du Conseil. Le serveur décide de tout ; les effets
            visibles passent par des state bags posés par le serveur, reçus des seuls joueurs proches.
     Dépendances : vAvA_core ≥ 0.5.0 ; facultatives : vava_inventory ≥ 1.3.0 (grimoire et registre), vava_hud (mana,
-                  notifications), vava_health (dégâts, à terre), vava_admin (droits et journal du Conseil), chat
+                  notifications), vava_health (dégâts, à terre), vava_admin (droits et journal du Conseil), vava_chat
 ]]
 
 fx_version 'cerulean'
@@ -15,7 +15,7 @@ use_experimental_fxv2_oal 'yes'
 
 name 'vava_magic'
 description 'Magie vAvA : mana, progression, Murmure, Lueur, Boule de feu, grimoire et registre'
-version '1.1.0'
+version '1.1.1'
 
 dependency 'vAvA_core'
 

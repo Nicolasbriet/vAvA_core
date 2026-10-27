@@ -215,7 +215,8 @@ Le compte maître l'applique (« Mettre à jour »), ou la laisse s'appliquer au
    - un **réglage** (`config.lua`, dossier `config/`) modifié des deux côtés est gardé, et la nouvelle version posée à
      côté (`config.lua.nouveau`) pour que vous repreniez ses nouveautés ;
    - un autre fichier modifié des deux côtés prend la nouvelle version, la vôtre est gardée à côté (`.local`) ;
-   - un nouveau module est posé dans `[vava]`, à activer dans la page Ressources.
+   - un nouveau module est posé dans `[vava]`, à activer dans la page Ressources. Le chat `vava_chat` remplace la
+     ressource `chat` de FiveM : activer `vava_chat` et couper `chat` au même endroit.
 7. Relance du serveur, puis **contrôle** : en marche, sans arrêt imprévu, et toutes les ressources qui tournaient avant
    (et prévues au server.cfg) tournent encore. Sinon : **retour arrière** automatique (ressources remises à l'identique)
    et relance ; la page dit quelle ressource a échoué.

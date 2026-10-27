@@ -852,6 +852,28 @@ animation (`VavaMagic.casting.start` n'existe qu'à l'intérieur de vava_magic).
 Pour travailler le rendu sans le jeu : `web/index.html?view=grimoire` (ou `composer`, `offer`, `naming`, `confirm`,
 `lueur`, `sealed`, `register`, `messages`, `broken`) dans un navigateur.
 
+### `vava_chat`
+
+Le chat du royaume, à la place de la ressource `chat` de FiveM (`ensure vava_chat` remplace `ensure chat`, juste après
+`vAvA_core`) : `/ooc` et texte sans commande (joueurs à 20 m), `/me` et `/do` (15 m, aussi au-dessus de la tête),
+`/mp <n°>` et `/r`, `/staff` (Conseil) ; onglets Général, Actions, Conseil et un par correspondant ; fenêtre
+déplaçable. Journal de modération `vava_chat_logs` (`/ooc`, `/mp`, `/staff`, 7 jours). Tout le détail et la liste des
+tests en jeu : `modules/vava_chat/README.md`. Demande le core 0.5.0 ; facultatif : `vava_admin` (sans lui, ACE
+`vava_chat.staff`).
+
+- **Compatibilité** : `chat:addMessage`, `chatMessage`, `chat:addSuggestion(s)`, `chat:removeSuggestion`, `chat:clear`
+  marchent tels quels (local ou depuis le serveur). Texte brut seulement : les modèles HTML ne sont jamais interprétés.
+  Les exports de l'ancienne ressource ne sont pas repris.
+- **Envoi** : RPC `vava_chat:send` (genre, texte, numéro de joueur | 0, conversation | 0) ; destinataires choisis par le
+  serveur, jamais `-1`. Un `/mp` désigne son correspondant par un numéro de conversation jamais réutilisé.
+
+| Export serveur | Retour |
+|---|---|
+| `addMessage(cible, message)` | `true` ou `false, code` — `cible` : joueur connecté, ou `-1` pour tous les joueurs en jeu ; `message` : texte, `{ author?, text, color? }` ou `{ args, color? }` |
+
+**Hooks** : `vava_chat:sending` (`before`, annulable : `{ source, characterId, kind, text, target? }` — sourdine,
+prison… ; la raison du refus est montrée au joueur), `vava_chat:sent` (`after` : `+ recipients`).
+
 ### `vava_chancellerie`
 
 Le pont entre la Chancellerie (panneau web, programme à part : voir `docs/chancellerie.md`) et le serveur de jeu.

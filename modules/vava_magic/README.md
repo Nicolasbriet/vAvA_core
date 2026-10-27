@@ -32,7 +32,7 @@ Conseil. Le serveur décide de tout ; le client affiche et demande.
 | `vava_hud` | médaillon de mana, notifications | notifications de GTA, pas de médaillon |
 | `vava_health` | blessures, état « à terre » | la victime applique la blessure elle-même |
 | `vava_admin` | droits et journal du Conseil | permission ACE `magie.admin`, journal en console |
-| `chat` | commandes et suggestions | touches seulement |
+| `vava_chat` | réponses des commandes et suggestions (évènements `chat:*`, aussi ceux de la ressource « chat » de FiveM) | touches seulement |
 
 ## Arborescence
 
