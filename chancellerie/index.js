@@ -23,6 +23,7 @@ const { Scheduler } = require('./lib/scheduler');
 const { Updates, RESTART_CODE } = require('./lib/updates');
 const fs = require('fs');
 const path = require('path');
+const readline = require('readline');
 const vm = require('vm');
 
 const NODE_MAJOR_MIN = 18;
@@ -30,6 +31,10 @@ const RULE = '═'.repeat(62);
 // fermeture de la fenêtre : Windows laisse une dizaine de secondes avant de tout couper
 const CLOSE_SIGNALS = ['SIGHUP'];
 const STOP_SIGNALS = ['SIGINT', 'SIGTERM', 'SIGBREAK'];
+// un second signal dans ce délai est le même arrêt ; au-delà, il force l'arrêt immédiat
+const DOUBLE_SIGNAL_MS = 3000;
+// auteur des commandes tapées dans la console du panel de l'hébergeur
+const HOST_CONSOLE = 'console de l\'hébergeur';
 
 const colors = process.stdout.isTTY
   ? { brass: '\x1b[38;5;179m', bright: '\x1b[1;38;5;223m', dim: '\x1b[38;5;245m', red: '\x1b[38;5;167m', reset: '\x1b[0m' }
@@ -118,14 +123,18 @@ async function main() {
   });
 
   let stopping = false;
+  let stoppingAt = 0;
   /** quick : délais raccourcis (fenêtre fermée) ; code : 75 pour que demarrer.bat relance (mise à jour). */
   async function shutdown(quick, code = 0) {
+    // le même arrêt arrive parfois deux fois de suite (Ctrl+C reçu du terminal et relayé par le lanceur) : ignoré
+    if (stopping && Date.now() - stoppingAt < DOUBLE_SIGNAL_MS) return;
     if (stopping) {
       // second Ctrl+C : on n'attend plus
       say(`${colors.red}  Arrêt immédiat.${colors.reset}`);
       process.exit(1);
     }
     stopping = true;
+    stoppingAt = Date.now();
     say();
     say(`${colors.dim}  Arrêt de la Chancellerie${server.child ? ' : FXServer est arrêté proprement…' : '.'}${colors.reset}`);
     scheduler.stop();
@@ -135,6 +144,17 @@ async function main() {
     journal.record(journal.SYSTEM, 'panel_stopped');
     web.close();
     process.exit(code);
+  }
+  // console d'un panel d'hébergeur (entrée standard qui n'est pas un terminal) : « quit », « stop » ou « exit » arrêtent
+  // proprement la Chancellerie et FXServer ; toute autre ligne part dans la console de FXServer
+  if (!process.stdin.isTTY) {
+    readline.createInterface({ input: process.stdin }).on('line', (raw) => {
+      const line = raw.trim();
+      if (!line) return;
+      if (/^(quit|stop|exit)$/i.test(line)) shutdown(false);
+      else if (server.child) server.command(line.slice(0, 500), HOST_CONSOLE);
+    });
+    process.stdin.on('error', () => { /* entrée fermée : rien à lire */ });
   }
   updates.on('restart-panel', () => {
     say(`${colors.brass}  Mise à jour de la Chancellerie : redémarrage…${colors.reset}`);

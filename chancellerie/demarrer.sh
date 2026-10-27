@@ -4,7 +4,10 @@
 # téléchargé depuis nodejs.org (version LTS fixée ci-dessous, empreinte SHA-256 vérifiée) dans node/.
 # Code de sortie 75 : la Chancellerie vient de se mettre à jour et demande à être relancée. Si la nouvelle version
 # s'arrête avant d'avoir démarré, l'ancienne est remise (data/updates/chancellerie-precedente) et relancée.
-# Arrêt (Ctrl+C, ou systemd) : la Chancellerie arrête d'abord FXServer proprement (personnages sauvegardés).
+# Arrêt (Ctrl+C, systemd, panel d'hébergeur, ou « quit » sur l'entrée standard) : la Chancellerie arrête d'abord
+# FXServer proprement (personnages sauvegardés).
+# Chez un hébergeur (conteneur) : CHANCELLERIE_HOST=0.0.0.0 et CHANCELLERIE_PORT=<port attribué> fixent l'écoute du
+# panneau ; la commande de démarrage est « exec bash ./chancellerie/demarrer.sh ».
 #
 #   bash demarrer.sh             lance la Chancellerie dans ce terminal
 #   sudo bash demarrer.sh --service [utilisateur]
@@ -124,18 +127,18 @@ fi
 
 CHILD=""
 STOPPING=0
-# systemd (SIGTERM) : le signal passe à la Chancellerie, qui s'arrête proprement. Ctrl+C (SIGINT) lui parvient déjà
-# directement depuis le terminal : rien à transmettre (un second signal la ferait s'arrêter net).
-on_term() {
+# arrêt (systemd, panel d'hébergeur, Ctrl+C) : le signal passe à la Chancellerie, qui s'arrête proprement. Dans un
+# conteneur, seul ce lanceur reçoit le signal ; dans un terminal, Ctrl+C atteint aussi la Chancellerie directement :
+# elle ignore ce doublon.
+on_stop() {
   STOPPING=1
   [ -n "$CHILD" ] && kill -TERM "$CHILD" 2>/dev/null
 }
-on_int() { STOPPING=1; }
-trap on_term TERM HUP
-trap on_int INT
+trap on_stop TERM HUP INT
 
 while true; do
-  "$NODE" "$HOME_DIR/index.js" &
+  # l'entrée du lanceur passe à la Chancellerie (console d'un panel d'hébergeur : « quit » l'arrête proprement)
+  "$NODE" "$HOME_DIR/index.js" <&0 &
   CHILD=$!
   # wait rend la main à chaque signal reçu (code > 128) : tant que la Chancellerie vit, on l'attend encore
   while true; do
@@ -150,7 +153,9 @@ while true; do
   if [ -f "$UPDATES/chancellerie-a-verifier" ]; then
     echo
     say "La nouvelle version de la Chancellerie n'a pas démarré : retour à la version précédente."
-    (cd "$UPDATES/chancellerie-precedente" && find . -type f ! -name 'demarrer.sh' -exec cp -p --parents {} "$HOME_DIR" \;)
+    # le lanceur en cours ne se réécrit pas : sa copie est écartée avant de tout remettre
+    rm -f "$UPDATES/chancellerie-precedente/demarrer.sh"
+    cp -a "$UPDATES/chancellerie-precedente/." "$HOME_DIR/"
     rm -f "$UPDATES/chancellerie-a-verifier"
     echo "annulee" > "$UPDATES/chancellerie-annulee"
     continue

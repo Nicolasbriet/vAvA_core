@@ -83,7 +83,23 @@ function readJson(file, fallback) {
   }
 }
 
-let current = merge(DEFAULTS, readJson(FILE, {}));
+// réglages écrits dans data/config.json ; `current` y ajoute ce qu'impose l'environnement
+let stored = merge(DEFAULTS, readJson(FILE, {}));
+
+/**
+ * Adresse et port d'écoute imposés par l'environnement (CHANCELLERIE_HOST, CHANCELLERIE_PORT) : chez un hébergeur,
+ * le panel donne le port attribué au conteneur. Jamais écrits dans data/config.json.
+ */
+function withEnv(value) {
+  const host = process.env.CHANCELLERIE_HOST;
+  const port = Number(process.env.CHANCELLERIE_PORT);
+  const http = {};
+  if (host && /^[0-9a-fA-F.:]{2,45}$/.test(host)) http.host = host;
+  if (Number.isInteger(port) && port >= 1 && port <= 65535) http.port = port;
+  return Object.keys(http).length ? merge(value, { http }) : value;
+}
+
+let current = withEnv(stored);
 
 /**
  * Dossier du serveur proposé par défaut : le premier parent de la Chancellerie qui contient un dossier resources
@@ -126,8 +142,9 @@ module.exports = {
   get: () => current,
   /** Applique un changement et l'écrit. */
   update(patch) {
-    current = merge(current, patch);
-    writeJson(FILE, current);
+    stored = merge(stored, patch);
+    writeJson(FILE, stored);
+    current = withEnv(stored);
     return current;
   },
   /** Chemin du server.cfg géré. */
