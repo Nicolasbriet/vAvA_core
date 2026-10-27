@@ -192,6 +192,15 @@ end)
 spells.onStop(function()
     for id in pairs(anchors) do removeAnchor(id) end
 end)
+-- nettoyage d'urgence du Conseil : tous les orbes ancrés
+spells.onCleanup(function()
+    local count = 0
+    for id in pairs(anchors) do
+        removeAnchor(id)
+        count = count + 1
+    end
+    return count
+end)
 
 local ok, err = spells.register(NAME, {
     config = spellCfg,

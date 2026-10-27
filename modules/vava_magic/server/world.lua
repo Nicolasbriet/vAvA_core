@@ -1,14 +1,15 @@
 --[[
     vava_magic/server/world.lua
     Rôle : le monde vu par le serveur (OneSync) : ped et position d'un joueur lus côté serveur, vie, véhicule, joueurs
-           en jeu proches d'un point, state bags posés sur le ped d'un joueur (répliqués aux seuls joueurs proches,
-           jamais à tout le serveur).
+           en jeu proches d'un point et envoi d'un évènement à eux seuls, ped figé (gel), state bags posés sur le ped
+           d'un joueur (répliqués aux seuls joueurs proches, jamais à tout le serveur).
     Dépendances : shared/constants.lua, server/core.lua, bridge/server.lua
 ]]
 
 local ipairs, pairs, sort = ipairs, pairs, table.sort
 local GetPlayerPed, GetEntityCoords, DoesEntityExist, GetVehiclePedIsIn, GetEntityHealth, Entity =
     GetPlayerPed, GetEntityCoords, DoesEntityExist, GetVehiclePedIsIn, GetEntityHealth, Entity
+local FreezeEntityPosition, TriggerClientEvent = FreezeEntityPosition, TriggerClientEvent
 
 local bridge = VavaMagic.bridge
 local geometry = VavaMagic.geometry
@@ -69,6 +70,24 @@ function world.near(point, radius, except)
     end
     sort(found, function(a, b) return a.distance < b.distance end)
     return found
+end
+
+--- Fige (ou libère) le ped d'un joueur, côté serveur (état « gelé »).
+---@param src integer
+---@param frozen boolean
+function world.freeze(src, frozen)
+    local ped = world.ped(src)
+    if ped then FreezeEntityPosition(ped, frozen) end
+end
+
+--- Envoie un évènement aux joueurs en jeu proches d'un point.
+---@param point table
+---@param radius number
+---@param event string
+function world.broadcast(point, radius, event, ...)
+    for _, entry in ipairs(world.near(point, radius)) do
+        TriggerClientEvent(event, entry.source, ...)
+    end
 end
 
 --- Pose (ou retire, avec nil) un state bag sur le ped du joueur.

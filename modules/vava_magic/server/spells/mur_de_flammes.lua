@@ -1,0 +1,109 @@
+--[[
+    vava_magic/server/spells/mur_de_flammes.lua
+    Rôle : sort Mur de flammes (zone visée), décidé par le serveur.
+      - Début : pas dans une zone protégée ; point visé revérifié (portée du niveau depuis la position du lanceur lue
+        côté serveur, écart de hauteur borné, hors zone protégée), plafond des zones du royaume.
+      - Fin : la ligne est calculée ici, perpendiculaire à la direction lanceur → point visé, de la longueur et de la
+        largeur du niveau ; ni ses bouts ni son centre dans une zone protégée. Au-delà de `maxPerCaster` murs, le plus
+        ancien du lanceur s'éteint.
+      - Tant qu'elle brûle : qui s'y tient ou la traverse (même en courant entre deux vérifications) perd des points de
+        vie et repart en Brûlure, au plus une fois par `hitCooldownMs` ; jamais le lanceur. Le premier blessé rapporte
+        au lanceur le bonus d'XP du sort, si le lancer a rapporté.
+    Dépendances : shared/, config.lua, server/ (noyau, combat, states, zones)
+]]
+
+local tostring = tostring
+local GetGameTimer = GetGameTimer
+
+local world = VavaMagic.world
+local spells = VavaMagic.spells
+local combat = VavaMagic.combat
+local states = VavaMagic.states
+local zones = VavaMagic.zones
+local sheets = VavaMagic.sheets
+local experience = VavaMagic.experience
+local geometry = VavaMagic.geometry
+local cfg = VavaMagic.config
+local spellCfg = cfg.spells.mur_de_flammes
+local NAME = 'mur_de_flammes'
+local KIND = 'flames'
+local COORD = { type = 'number', min = -20000, max = 20000 }
+
+---@param point table
+---@return boolean
+local function protected(point)
+    return combat.protected(point)
+end
+
+---@param ctx table
+local function begin(ctx, x, y, z)
+    if protected(ctx.origin) then return false, 'protected_zone' end
+    local point = { x = x, y = y, z = z }
+    local levelCfg = spellCfg.levels[ctx.level]
+    if geometry.distance2d(ctx.origin, point) > levelCfg.reach + cfg.casting.moveMargin then return false, 'too_far' end
+    if math.abs(point.z - ctx.origin.z) > spellCfg.heightMargin then return false, 'no_point' end
+    if protected(point) then return false, 'protected_zone' end
+    if zones.count() >= cfg.zones.maxActive then return false, 'zone_limit' end
+    return true, { point = point }
+end
+
+---@param ctx table
+local function finish(ctx)
+    local src = ctx.source
+    local position = world.position(src)
+    if not position then return false, 'no_position' end
+    local levelCfg = spellCfg.levels[ctx.level]
+    local point = ctx.data.point
+    local forward = geometry.direction2d(position, point) or geometry.direction2d(ctx.origin, point)
+    if not forward then return false, 'no_point' end
+    -- la ligne barre le chemin : perpendiculaire au regard du lanceur
+    local half = levelCfg.length / 2
+    local a = { x = point.x - forward.y * half, y = point.y + forward.x * half, z = point.z }
+    local b = { x = point.x + forward.y * half, y = point.y - forward.x * half, z = point.z }
+    if protected(a) or protected(b) or protected(point) then return false, 'protected_zone' end
+    local sheet = sheets.get(src)
+    local own = sheet and zones.ofCharacter(sheet.characterId, KIND) or {}
+    for i = 1, #own - spellCfg.maxPerCaster + 1 do zones.remove(own[i].id, 'replaced') end
+    local zone, code = zones.create({
+        kind = KIND, spell = NAME, element = spellCfg.element, level = ctx.level, owner = src, shape = zones.LINE,
+        a = a, b = b, width = levelCfg.width, durationMs = levelCfg.durationMs,
+        data = { damage = levelCfg.damage, burn = levelCfg.burn, hits = {}, rewarded = false, bonus = false },
+    })
+    if not zone then return false, code end
+    return {
+        success = true, result = { id = zone.id },
+        rewarded = function(granted) zone.data.rewarded = granted end,
+    }
+end
+
+zones.define(KIND, {
+    onTick = function(zone, victim)
+        if victim == zone.owner and zone.ownerCharacter == (sheets.get(victim) or {}).characterId then return end
+        local data = zone.data
+        local now = GetGameTimer()
+        if data.hits[victim] and now - data.hits[victim] < spellCfg.hitCooldownMs then return end
+        data.hits[victim] = now
+        if not combat.damage(zone.owner, victim, NAME, data.damage, combat.KIND.ZONE, zone.ownerCharacter) then return end
+        if data.burn then
+            states.apply(victim, 'burn', {
+                durationMs = data.burn.durationMs, tickMs = data.burn.tickMs, damage = data.burn.damage,
+                caster = zone.owner, spell = NAME,
+            })
+        end
+        -- bonus du premier blessé, au lanceur toujours là (même personnage)
+        local ownerSheet = sheets.get(zone.owner)
+        if data.rewarded and not data.bonus and ownerSheet and ownerSheet.characterId == zone.ownerCharacter then
+            data.bonus = true
+            experience.bonus(zone.owner, NAME, spellCfg.hitXp or 0)
+        end
+    end,
+})
+
+local ok, err = spells.register(NAME, {
+    config = spellCfg,
+    beginArgs = { COORD, COORD, COORD },
+    finishArgs = {},
+    begin = begin,
+    finish = finish,
+})
+if not ok then VavaMagic.log.error('Mur de flammes non déclaré : %s', tostring(err)) end

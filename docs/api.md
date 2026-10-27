@@ -797,12 +797,15 @@ navigateur ; chaque case est une vraie connexion WebRTC locale filmant une scèn
 
 ### `vava_magic`
 
-La magie : fiche magie par personnage (champ privé `vava_magic:sheet` : mage ou non, sorts et leur XP, sigils gardés,
-sigil unique dans tout le royaume), mana (100, +3 toutes les 5 s, jamais sauvegardée), 5 niveaux par sort, incantation
-commune, sorts **Murmure** (messages), **Lueur** (lumière) et **Boule de feu** (offensif), grimoire et registre
-(objets), commandes du Conseil (`/magie`). Tout le détail, la config et la liste des tests en jeu :
+La magie (2.1.0) : fiche magie par personnage (champ privé `vava_magic:sheet` : mage ou non, sorts et leur XP, sort
+prêt dans les mains, combinaisons découvertes, sigils gardés, sigil unique dans tout le royaume), mana (100, +3 toutes
+les 5 s, jamais sauvegardée) et sa barre, 5 niveaux par sort, incantation commune avec délai global (1 s), roue des
+sorts (Tab) et mode magie à la souris (clic droit viser, clic gauche lancer, clic molette verrouiller), états
+élémentaires (brûlure, mouillé, ralenti, chancelant, renversé, gelé ; immunité de 6 s aux contrôles durs), zones au sol
+tenues par le serveur, sorts **Boule de feu**, **Mur de flammes**, **Nova ardente**, **Lueur** et **Murmure**, grimoire
+et registre (objets), commandes du Conseil (`/magie`, numéro de joueur facultatif). Tout le détail, la config et la liste des tests en jeu :
 `modules/vava_magic/README.md`. Demande le core 0.5.0 ; facultatifs : `vava_inventory` ≥ 1.3.0 (objets), `vava_hud`
-(mana, notifications), `vava_health` (blessures, à terre), `vava_admin` (droit `tools` et journal ; sans lui, ACE
+(notifications), `vava_health` (blessures, à terre), `vava_admin` (droit `tools` et journal ; sans lui, ACE
 `magie.admin`).
 
 - **Bridge** : `bridge/server.lua` et `bridge/client.lua` sont les seuls fichiers qui appellent le core et les autres
@@ -814,8 +817,9 @@ commune, sorts **Murmure** (messages), **Lueur** (lumière) et **Boule de feu** 
 - **Murmure** : fragments envoyés aux seuls joueurs à moins de 3 m ; registre des murmures en base sous le numéro porté
   par l'objet (métadonnée `registre`), l'historique suit l'objet.
 - **Boule de feu** : impact signalé par le client du lanceur, validé par le serveur (portée, axe, délai, cible réelle,
-  zones protégées) avant les dégâts, appliqués par `vava_health:damage` ; journal `vava_magic_damage_log`.
-- **Verrouillage** (sorts `lockOn`) : touche Tab côté client ; la cible part avec le début de l'incantation, revérifiée
+  zones protégées) avant les dégâts (en points de vie sur `combat.healthPoints`), appliqués par `vava_health:damage` ;
+  bonus d'XP au toucher si le lancer a rapporté ; journal `vava_magic_damage_log`.
+- **Verrouillage** (sorts `lockOn`) : clic molette côté client (lu par `Bridge.GetLockedTarget`) ; la cible part avec le début de l'incantation, revérifiée
   par le serveur, qui prévient la seule cible (évènement `vava_magic:targeted`) et calcule lui-même la direction ;
   virage vers la cible aux niveaux 4 et 5 (`homing`, pris en compte dans le contrôle d'axe de l'impact).
 
@@ -827,15 +831,19 @@ commune, sorts **Murmure** (messages), **Lueur** (lumière) et **Boule de feu** 
 
 **Hooks** : `vava_magic:castStarting` (`before`, annulable : `{ source, characterId, spell, level }` — prison, zone…),
 `vava_magic:castDone` (`after` : `+ success`), `vava_magic:levelUp` (`after` : `{ source, characterId, spell, level }`),
-`vava_magic:mageChanged` (`after` : `{ source, characterId, isMage }`), `vava_magic:murmur:unreachable` (`before` :
+`vava_magic:mageChanged` (`after` : `{ source, characterId, isMage }`), `vava_magic:stateApplying` (`before`, annulable :
+`{ source, state, durationMs, caster?, spell? }` — résistance, objet protecteur…), `vava_magic:murmur:unreachable` (`before` :
 `{ source, characterId, reason = offline|too_far, sigil, text }` — renvoyer `false, 'handled'` pour prendre le message en
 charge : pigeon voyageur, relais…).
 
-**Ajouter un sort depuis un autre module** : registre du core `vava_magic:spells`, clé = nom du sort.
+**Ajouter un sort depuis un autre module** : registre du core `vava_magic:spells`, clé = nom du sort. Sa config
+demande `element` (feu, eau, terre, lumiere, esprit), `type` (projectile, zone, utilitaire), `icon` et `aim.kind`
+(projectile, point, self, none).
 
 ```lua
 core.registry.add('vava_magic:spells', 'echo', {
-    config = { label = 'Écho', baseCost = 5, xp = 5, levels = { -- 5 niveaux
+    config = { label = 'Écho', element = 'esprit', type = 'utilitaire', icon = 'echo', aim = { kind = 'none' },
+        baseCost = 5, xp = 5, levels = { -- 5 niveaux
         { castMs = 1500, cooldownMs = 10000, description = '…', unlock = '…' }, --[[ … ]]
     } },
     beginArgs = {},                                    -- schémas des arguments du début (RPC à schéma strict)
@@ -849,8 +857,9 @@ Le noyau ouvre ses RPC (`vava_magic:begin:echo`, `vava_magic:finish:echo`), tien
 contrôles de l'incantation. Côté client, le module externe appelle lui-même ces deux RPC et gère sa barre et son
 animation (`VavaMagic.casting.start` n'existe qu'à l'intérieur de vava_magic).
 
-Pour travailler le rendu sans le jeu : `web/index.html?view=grimoire` (ou `composer`, `offer`, `naming`, `confirm`,
-`lueur`, `sealed`, `register`, `messages`, `broken`) dans un navigateur.
+Pour travailler le rendu sans le jeu : `web/index.html?view=grimoire` (ou `wheel`, `hud`, `aim`, `composer`, `offer`,
+`naming`, `confirm`, `lueur`, `sealed`, `register`, `messages`, `broken`) dans un navigateur, servi en HTTP (les
+icônes sont des masques CSS, refusés depuis `file://`).
 
 ### `vava_chat`
 

@@ -1,14 +1,15 @@
 --[[
     vava_magic/client/main.lua
     Rôle : assemblage côté client : à l'apparition du personnage, vue de la fiche demandée au serveur (et mana) ;
-           hors du jeu (sélection), tout est oublié et les fenêtres fermées ; ordres du serveur (fiche changée, mana,
-           messages, lignes du chat) ; suggestions des commandes du Conseil pour qui y a droit ; redémarrages de
-           vava_hud, du chat et du module lui-même.
+           hors du jeu (sélection), tout est oublié, le mode magie endormi, la roue et les fenêtres fermées, les états
+           et les zones effacés ; ordres du serveur (fiche changée, mana, recharges effacées, messages, lignes du
+           chat) ; suggestions des commandes du Conseil pour qui y a droit ; redémarrages du chat et du module.
     Dépendances : shared/, config.lua, tous les fichiers client/ du module
 ]]
 
 local type, ipairs = type, ipairs
-local CreateThread, RegisterNetEvent, AddEventHandler, SetNuiFocus = CreateThread, RegisterNetEvent, AddEventHandler, SetNuiFocus
+local CreateThread, RegisterNetEvent, AddEventHandler, SetNuiFocus, SetNuiFocusKeepInput =
+    CreateThread, RegisterNetEvent, AddEventHandler, SetNuiFocus, SetNuiFocusKeepInput
 
 local core = VavaMagic.core
 if not core then return end
@@ -16,9 +17,14 @@ if not core then return end
 local bridge = VavaMagic.bridge
 local nui = VavaMagic.nui
 local state = VavaMagic.state
-local gauge = VavaMagic.manaGauge
+local hud = VavaMagic.hud
+local fx = VavaMagic.fx
 local casting = VavaMagic.casting
+local controls = VavaMagic.controls
+local wheel = VavaMagic.wheel
 local ambient = VavaMagic.ambient
+local conditions = VavaMagic.conditions
+local zoneRender = VavaMagic.zoneRender
 local fireball = VavaMagic.fireball
 local targeting = VavaMagic.targeting
 local keys = VavaMagic.keys
@@ -50,7 +56,11 @@ local function stop()
     if not playing then return end
     playing = false
     casting.reset()
+    controls.sleep()
+    wheel.close()
     targeting.release()
+    conditions.reset()
+    zoneRender.clear()
     nui.close()
     state.clear()
 end
@@ -72,6 +82,11 @@ RegisterNetEvent(EVENTS.MANA, function(value, max, points, period, elapsed)
         if type(number) ~= 'number' then return end
     end
     state.setMana(value, max, points, period, elapsed)
+    hud.mana(value, max, points, period, elapsed)
+end)
+
+RegisterNetEvent(EVENTS.COOLDOWNS, function()
+    state.resetCooldowns()
 end)
 
 RegisterNetEvent(EVENTS.CHAT, function(lines)
@@ -84,19 +99,19 @@ RegisterNetEvent(EVENTS.CHAT, function(lines)
 end)
 
 AddEventHandler('onClientResourceStart', function(resource)
-    if resource == LINKS.HUD then
-        gauge.restarted()
-    elseif resource == LINKS.CHAT then
-        keys.resuggest()
-    end
+    if resource == LINKS.CHAT then keys.resuggest() end
 end)
 
 AddEventHandler('onResourceStop', function(resource)
     if resource ~= VavaMagic.resource then return end
     casting.reset()
+    controls.sleep()
     fireball.stop()
+    conditions.reset()
+    zoneRender.clear()
     ambient.stop()
-    bridge.GaugeHide()
+    fx.stop()
+    SetNuiFocusKeepInput(false)
     SetNuiFocus(false, false)
 end)
 

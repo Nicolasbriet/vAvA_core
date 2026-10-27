@@ -1,41 +1,44 @@
 --[[
     vava_magic/client/ambient.lua
     Rôle : effets de la magie vus par les joueurs proches, d'après les state bags posés par le serveur :
-      - incantation : texte d'ambiance au-dessus de la tête (15 m), runes au-dessus des mains ; fragments du
-        Murmure lisibles à moins de 3 m (reçus du seul serveur), runes indéchiffrables au-delà ;
+      - incantation : particules dans les deux mains selon l'élément du sort, plus grandes et plus vives selon son
+        niveau (une seule main de loin, rien au-delà de la distance des effets) avec la lueur de l'élément ; texte
+        d'ambiance au-dessus de la tête (15 m), runes au-dessus des mains ; fragments du Murmure lisibles à moins
+        de 3 m (reçus du seul serveur), runes indéchiffrables au-delà ;
       - murmure reçu : « ses yeux s'illuminent » et une brève lueur au visage ;
       - Lueur : lumière dans la main ou orbe près de l'épaule, orbes ancrés (objets cachés, seule la lumière se
         voit) ; scintillement fluide (somme de sinus), jamais tiré au hasard à chaque image ;
-      - brûlure : flammes sur la cible.
+      - états élémentaires d'un joueur : flammes (brûlure), gouttes (mouillé), givre (gelé), poussière (chancelant),
+        avec la lueur des flammes ; seulement la brûlure de loin, rien au-delà de la distance des effets.
     Les state bags sont suivis par gestionnaires de changement ; une recherche toutes les 250 ms retient ce qui est à
-    portée, et le dessin par image ne tourne que s'il y a quelque chose à dessiner.
-    Dépendances : shared/, config.lua, client/state.lua
+    portée, et le dessin par image ne tourne que s'il y a quelque chose à dessiner. Lumières et particules passent
+    par les plafonds de client/fx.lua.
+    Dépendances : shared/, config.lua, client/state.lua, client/fx.lua
 ]]
 
-local pairs, ipairs, type, sin, max, pi, concat = pairs, ipairs, type, math.sin, math.max, math.pi, table.concat
+local pairs, ipairs, next, type, sin, max, pi, concat = pairs, ipairs, next, type, math.sin, math.max, math.pi, table.concat
 local CreateThread, Wait, GetGameTimer = CreateThread, Wait, GetGameTimer
 local AddStateBagChangeHandler, GetEntityFromStateBagName = AddStateBagChangeHandler, GetEntityFromStateBagName
 local PlayerPedId, GetEntityCoords, DoesEntityExist, GetPedBoneCoords, GetOffsetFromEntityInWorldCoords, GetPedBoneIndex =
     PlayerPedId, GetEntityCoords, DoesEntityExist, GetPedBoneCoords, GetOffsetFromEntityInWorldCoords, GetPedBoneIndex
 local NetworkGetPlayerIndexFromPed, GetPlayerServerId, GetFinalRenderedCamCoord, GetAspectRatio =
     NetworkGetPlayerIndexFromPed, GetPlayerServerId, GetFinalRenderedCamCoord, GetAspectRatio
-local SetDrawOrigin, ClearDrawOrigin, DrawSprite, DrawLightWithRange, DrawMarker =
-    SetDrawOrigin, ClearDrawOrigin, DrawSprite, DrawLightWithRange, DrawMarker
+local SetDrawOrigin, ClearDrawOrigin, DrawSprite, DrawMarker = SetDrawOrigin, ClearDrawOrigin, DrawSprite, DrawMarker
 local SetTextScale, SetTextFont, SetTextProportional, SetTextColour, SetTextOutline, SetTextCentre =
     SetTextScale, SetTextFont, SetTextProportional, SetTextColour, SetTextOutline, SetTextCentre
 local BeginTextCommandDisplayText, AddTextComponentSubstringPlayerName, EndTextCommandDisplayText =
     BeginTextCommandDisplayText, AddTextComponentSubstringPlayerName, EndTextCommandDisplayText
 local SetEntityVisible, SetEntityCollision = SetEntityVisible, SetEntityCollision
-local RequestNamedPtfxAsset, HasNamedPtfxAssetLoaded, UseParticleFxAsset = RequestNamedPtfxAsset, HasNamedPtfxAssetLoaded, UseParticleFxAsset
-local StartParticleFxLoopedOnEntityBone, StopParticleFxLooped = StartParticleFxLoopedOnEntityBone, StopParticleFxLooped
+local StartParticleFxLoopedOnEntityBone = StartParticleFxLoopedOnEntityBone
 local CreateRuntimeTxd, CreateRuntimeTextureFromImage = CreateRuntimeTxd, CreateRuntimeTextureFromImage
 
 local state = VavaMagic.state
+local fx = VavaMagic.fx
 local geometry = VavaMagic.geometry
 local cfg = VavaMagic.config
 local amb = cfg.ambient
 local lightCfg = cfg.spells.lueur.render
-local fireCfg = cfg.spells.boule_de_feu
+local statesCfg = cfg.states
 local STATES = VavaMagic.STATES
 
 local HEAD_BONE, RIGHT_HAND, LEFT_HAND = 31086, 57005, 18905 -- SKEL_Head, SKEL_R_Hand, SKEL_L_Hand
@@ -44,7 +47,8 @@ local HAND_MARKER_SHARE = 0.6        -- marqueur d'une lumière tenue en main, p
 local STALE_MS = 3000                -- un state bag sans entité depuis ce délai est oublié
 local SCALE_DISTANCE = 5.0           -- en deçà, textes et runes à leur taille ; au-delà, ils rapetissent
 local MIN_SCALE = 0.45
-local FLAME_LIGHT_SHARE = 0.5        -- lueur d'une cible qui brûle, part de celle de la boule de feu
+local HAND_LIGHT_RANGE = 2.0         -- lueur de l'élément dans les mains pendant l'incantation (mètres, au niveau 1)
+local HAND_LIGHT_INTENSITY = 3.0
 
 local ambient = {}
 VavaMagic.ambient = ambient
@@ -54,10 +58,15 @@ local tracked = {}
 for _, key in pairs(STATES) do tracked[key] = {} end
 ---@type table<integer, { words: string[], untilMs: integer }>  lanceur (numéro serveur) → fragments reçus
 local fragments = {}
-local visible = { texts = {}, runes = {}, glows = {}, lights = {}, orbs = {}, burns = {} }
+local visible = { texts = {}, runes = {}, glows = {}, lights = {}, orbs = {}, burns = {}, hands = {} }
 local drawing = false
----@type table<integer, integer>  ped → effet de flammes
-local flames = {}
+---@type table<integer, table<string, integer>>  ped → état → particule posée sur lui
+local marks = {}
+-- états montrés sur un joueur, et ceux gardés de loin (effets simplifiés)
+local MARKED = { 'burn', 'wet', 'frozen', 'stagger' }
+local FAR_MARKED = { burn = true }
+---@type table<integer, { spell: string, handles: integer[] }>  ped → particules de ses mains pendant l'incantation
+local hands = {}
 ---@type table<integer, boolean>  orbes ancrés déjà cachés
 local hidden = {}
 
@@ -68,13 +77,11 @@ do
     runesReady = CreateRuntimeTextureFromImage(txd, amb.runes.texture, amb.runes.file) ~= 0
 end
 
---- Particules de GTA (chargées une fois, à la demande).
+--- Particules de GTA (chargées à la demande, par client/fx.lua).
 ---@param asset string
 ---@return boolean
 function ambient.ptfxReady(asset)
-    if HasNamedPtfxAssetLoaded(asset) then return true end
-    RequestNamedPtfxAsset(asset)
-    return false
+    return fx.ptfxReady(asset)
 end
 
 --- Fragments du Murmure reçus du serveur (lecteur à moins de 3 m).
@@ -138,24 +145,94 @@ local function entityOf(list, bagName, entry, now)
     return entity
 end
 
-local function stopFlame(ped)
-    local handle = flames[ped]
-    if handle then StopParticleFxLooped(handle, false) end
-    flames[ped] = nil
+--- Retire les particules d'états d'un ped (toutes, ou seulement celles qui ne sont plus dans `keep`).
+---@param ped integer
+---@param keep table|nil
+local function stopMarks(ped, keep)
+    local list = marks[ped]
+    if not list then return end
+    for name, handle in pairs(list) do
+        if not keep or not keep[name] then
+            fx.stopLooped(handle)
+            list[name] = nil
+        end
+    end
+    if not next(list) then marks[ped] = nil end
+end
+
+--- Pose sur le ped les particules de ses états visibles.
+---@param ped integer
+---@param shown table<string, true>
+local function startMarks(ped, shown)
+    local list = marks[ped] or {}
+    marks[ped] = list
+    for name in pairs(shown) do
+        local particle = statesCfg.fx[name]
+        if particle and not list[name] then
+            list[name] = fx.startLooped(particle.asset, function()
+                return StartParticleFxLoopedOnEntityBone(particle.name, ped, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
+                    GetPedBoneIndex(ped, particle.bone), particle.scale, false, false, false)
+            end)
+        end
+    end
+end
+
+local function stopHands(ped)
+    local entry = hands[ped]
+    if not entry then return end
+    for _, handle in ipairs(entry.handles) do fx.stopLooped(handle) end
+    hands[ped] = nil
+end
+
+--- Particules de l'élément dans les mains d'un mage qui incante (les deux de près, une seule de loin).
+---@param ped integer
+---@param spell string
+---@param spellCfg table
+---@param level integer
+---@param detail string
+local function startHands(ped, spell, spellCfg, level, detail)
+    local current = hands[ped]
+    if current and current.spell == spell then return end
+    stopHands(ped)
+    local element = cfg.elements[spellCfg.element]
+    local particle = element and element.hands
+    if not particle then return end
+    local scale = particle.scale * ((spellCfg.levelScale and spellCfg.levelScale[level]) or 1.0)
+    local bones = detail == fx.FULL and { RIGHT_HAND, LEFT_HAND } or { RIGHT_HAND }
+    local entry = { spell = spell, handles = {} }
+    for _, bone in ipairs(bones) do
+        local handle = fx.startLooped(particle.asset, function()
+            return StartParticleFxLoopedOnEntityBone(particle.name, ped, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
+                GetPedBoneIndex(ped, bone), scale, false, false, false)
+        end)
+        if handle then entry.handles[#entry.handles + 1] = handle end
+    end
+    hands[ped] = entry
 end
 
 --- Recherche de ce qui est à portée (toutes les `scanMs`).
 local function scan()
     local now = GetGameTimer()
     local origin = GetEntityCoords(PlayerPedId())
-    local found = { texts = {}, runes = {}, glows = {}, lights = {}, orbs = {}, burns = {} }
+    local found = { texts = {}, runes = {}, glows = {}, lights = {}, orbs = {}, burns = {}, hands = {} }
     local any = false
 
+    local incanting = {}
     for bagName, entry in pairs(tracked[STATES.CASTING]) do
         local ped = entityOf(tracked[STATES.CASTING], bagName, entry, now)
         local spellCfg = ped and type(entry.value) == 'table' and state.spellConfig(entry.value.spell)
         if spellCfg then
-            local distance = geometry.distance(origin, GetEntityCoords(ped))
+            local position = GetEntityCoords(ped)
+            local distance = geometry.distance(origin, position)
+            local level = type(entry.value.level) == 'number' and entry.value.level or 1
+            local detail = fx.detail(position)
+            local element = cfg.elements[spellCfg.element]
+            if detail and element then
+                incanting[ped] = true
+                startHands(ped, entry.value.spell, spellCfg, level, detail)
+                found.hands[#found.hands + 1] = { ped = ped, color = element.color, scale = (spellCfg.levelScale and spellCfg.levelScale[level]) or 1.0 }
+                any = true
+            end
             if distance <= amb.distance then
                 if spellCfg.ambientText then found.texts[#found.texts + 1] = { ped = ped, text = amb.textFormat:format(spellCfg.ambientText) } end
                 if spellCfg.runes then
@@ -193,22 +270,27 @@ local function scan()
             end
         end
     end
-    local burning = {}
-    for bagName, entry in pairs(tracked[STATES.BURN]) do
-        local ped = entityOf(tracked[STATES.BURN], bagName, entry, now)
-        if ped and geometry.distance(origin, GetEntityCoords(ped)) <= amb.distance * 2 then
-            burning[ped] = true
-            found.burns[#found.burns + 1] = { ped = ped }
-            any = true
-            if not flames[ped] and ambient.ptfxReady(fireCfg.fx.asset) then
-                UseParticleFxAsset(fireCfg.fx.asset)
-                flames[ped] = StartParticleFxLoopedOnEntityBone(fireCfg.fx.burn, ped, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
-                    GetPedBoneIndex(ped, fireCfg.fx.burnBone), fireCfg.fx.burnScale, false, false, false)
+    local marked = {}
+    for bagName, entry in pairs(tracked[STATES.CONDITIONS]) do
+        local ped = entityOf(tracked[STATES.CONDITIONS], bagName, entry, now)
+        local value = ped and type(entry.value) == 'table' and entry.value
+        local detail = value and fx.detail(GetEntityCoords(ped))
+        if detail then
+            local shown = {}
+            for _, name in ipairs(MARKED) do
+                if value[name] and (detail == fx.FULL or FAR_MARKED[name]) then shown[name] = true end
+            end
+            if next(shown) then
+                marked[ped] = shown
+                startMarks(ped, shown)
+                if shown.burn then found.burns[#found.burns + 1] = { ped = ped } end
+                any = true
             end
         end
     end
-    for ped in pairs(flames) do
-        if not burning[ped] then stopFlame(ped) end
+    for ped in pairs(marks) do stopMarks(ped, marked[ped]) end
+    for ped in pairs(hands) do
+        if not incanting[ped] then stopHands(ped) end
     end
     for orb in pairs(hidden) do
         if not DoesEntityExist(orb) then hidden[orb] = nil end
@@ -258,7 +340,7 @@ end
 
 local function drawLight(x, y, z, value, t, phase, markerShare)
     local intensity = value.intensity * (1 + value.flicker * smoothNoise(t * lightCfg.flickerSpeed + phase))
-    DrawLightWithRange(x, y, z, value.r, value.g, value.b, value.range, intensity)
+    fx.light(x, y, z, value.r, value.g, value.b, value.range, intensity)
     local s = lightCfg.markerScale * markerShare
     DrawMarker(MARKER_SPHERE, x, y, z, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, s, s, s, value.r, value.g, value.b,
         lightCfg.markerAlpha, false, false, 2, false, nil, nil, false)
@@ -285,7 +367,7 @@ local function draw()
     for _, item in ipairs(view.glows) do
         local head = GetPedBoneCoords(item.ped, HEAD_BONE, 0.0, 0.0, 0.0)
         local glowLight = amb.glowLight
-        DrawLightWithRange(head.x, head.y, head.z, glowLight.r, glowLight.g, glowLight.b, glowLight.range, glowLight.intensity)
+        fx.light(head.x, head.y, head.z, glowLight.r, glowLight.g, glowLight.b, glowLight.range, glowLight.intensity)
         text3d(head.x, head.y, head.z + amb.headOffset, item.text, amb.text, scaleAt(geometry.distance(camera, head)))
     end
     for _, item in ipairs(view.lights) do
@@ -298,8 +380,13 @@ local function draw()
     end
     for _, item in ipairs(view.burns) do
         local p = GetEntityCoords(item.ped)
-        local fire = fireCfg.light
-        DrawLightWithRange(p.x, p.y, p.z, fire.r, fire.g, fire.b, fire.range, fire.intensity * FLAME_LIGHT_SHARE)
+        local fire = statesCfg.burnLight
+        fx.light(p.x, p.y, p.z, fire.r, fire.g, fire.b, fire.range, fire.intensity)
+    end
+    for _, item in ipairs(view.hands) do
+        local p = GetPedBoneCoords(item.ped, RIGHT_HAND, 0.0, 0.0, 0.0)
+        local color = item.color
+        fx.light(p.x, p.y, p.z, color.r, color.g, color.b, HAND_LIGHT_RANGE * item.scale, HAND_LIGHT_INTENSITY * item.scale)
     end
 end
 
@@ -325,5 +412,6 @@ end)
 --- Arrêt du module : flammes éteintes.
 function ambient.stop()
     drawing = false
-    for ped in pairs(flames) do stopFlame(ped) end
+    for ped in pairs(marks) do stopMarks(ped) end
+    for ped in pairs(hands) do stopHands(ped) end
 end

@@ -1,21 +1,23 @@
 --[[
     vava_magic/client/spells/lueur.lua
-    Rôle : sort Lueur côté client : la même touche allume (incantation) ou éteint sa lumière ; une autre ancre un
-           orbe là où l'on regarde (niveau 4, position revérifiée par le serveur) ; couleur au niveau 5 (grimoire ou
-           /lueur couleur). Le rendu de toutes les lumières est dans client/ambient.lua.
+    Rôle : sort Lueur côté client : clic gauche en mode magie = allumer (incantation) ou éteindre sa lumière ; en
+           visant (niveau 4) = ancrer un orbe au point visé (position revérifiée par le serveur) ; couleur au niveau 5
+           (grimoire ou /lueur couleur). Le rendu de toutes les lumières est dans client/ambient.lua.
     Dépendances : shared/, config.lua, client/ (noyau)
 ]]
 
 local ipairs, lower = ipairs, string.lower
 local concat = table.concat
-local CreateThread, PlayerPedId, Entity = CreateThread, PlayerPedId, Entity
+local CreateThread, PlayerPedId, Entity, GetEntityCoords = CreateThread, PlayerPedId, Entity, GetEntityCoords
 
 local core = VavaMagic.core
 local bridge = VavaMagic.bridge
 local casting = VavaMagic.casting
+local controls = VavaMagic.controls
 local messages = VavaMagic.messages
 local keys = VavaMagic.keys
 local aim = VavaMagic.aim
+local geometry = VavaMagic.geometry
 local cfg = VavaMagic.config
 local spellCfg = cfg.spells.lueur
 local anchorCfg = spellCfg.anchor
@@ -44,7 +46,7 @@ local function putOut(kind)
     end)
 end
 
---- Touche : allumer, ou éteindre si sa lumière brille.
+--- Allumer, ou éteindre si sa lumière brille.
 function lueur.toggle()
     if Entity(PlayerPedId()).state[STATES.LIGHT] ~= nil then
         putOut('light')
@@ -53,13 +55,33 @@ function lueur.toggle()
     casting.start(NAME, { args = { 'light' }, count = 1 })
 end
 
---- Touche : ancrer un orbe là où l'on regarde (à portée de la main ; le serveur revérifie).
-function lueur.anchor()
+--- Ancrer un orbe en un point (à portée de la main ; le serveur revérifie). Sans point : là où l'on regarde.
+---@param point table|nil
+function lueur.anchor(point)
     if not ANCHOR_LEVEL then return end
-    local point = aim.point(anchorCfg.reach, ANCHOR_PULLBACK)
+    point = point or aim.point(anchorCfg.reach, ANCHOR_PULLBACK)
     casting.start(NAME, {
         args = { 'anchor', point.x, point.y, point.z }, count = 4, minLevel = ANCHOR_LEVEL, costShare = anchorCfg.costShare,
     })
+end
+
+--- Clic gauche en mode magie : en visant au niveau qui le permet, ancrer un orbe au point visé (un peu en deçà, pour
+--- ne pas entrer dans le mur) ; sinon allumer ou éteindre.
+---@param info table  { aiming, point, inRange }
+local function cast(info)
+    if not info.aiming then
+        lueur.toggle()
+        return
+    end
+    if not info.point or not info.inRange then
+        messages.refuse('too_far')
+        return
+    end
+    local body = GetEntityCoords(PlayerPedId())
+    local back = geometry.normalize(body.x - info.point.x, body.y - info.point.y, body.z - info.point.z)
+    local point = info.point
+    if back then point = { x = point.x + back.x * ANCHOR_PULLBACK, y = point.y + back.y * ANCHOR_PULLBACK, z = point.z + back.z * ANCHOR_PULLBACK } end
+    lueur.anchor(point)
 end
 
 --- Couleur de la lumière (niveau 5).
@@ -71,8 +93,7 @@ function lueur.setColor(name)
     end)
 end
 
-keys.bind('lueur', lueur.toggle)
-keys.bind('ancre', lueur.anchor)
+controls.register(NAME, { cast = cast })
 
 keys.command(cfg.commands.lueur, texts.suggestions.lueur, function(args)
     local action = lower(args[1] or '')

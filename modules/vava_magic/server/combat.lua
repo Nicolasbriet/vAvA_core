@@ -1,19 +1,22 @@
 --[[
     vava_magic/server/combat.lua
-    Rôle : blessures infligées par les sorts, décidées par le serveur : dégâts entre joueurs activés ou non, zones
-           protégées (personne n'y est blessé), application par le bridge (vava_health), et journal des dégâts pour
-           le Conseil (lanceur, cible, dégâts, position), écrit en base par lots.
+    Rôle : blessures infligées par les sorts, décidées par le serveur : dégâts en points de vie (sur
+           `combat.healthPoints`), entre joueurs activés ou non, zones protégées (personne n'y est blessé), application
+           par le bridge (vava_health), et journal des dégâts pour le Conseil (lanceur, cible, dégâts, position),
+           écrit en base par lots. La victime d'un impact ou d'une zone reçoit l'élément du sort (geste de réaction,
+           effet d'écran) ; une brûlure qui dure n'en envoie pas à chaque morsure.
     Dépendances : shared/, config.lua, server/core.lua, bridge/server.lua, server/world.lua
 ]]
 
 local ipairs, tostring, min = ipairs, tostring, math.min
 local time, rep, concat, move = os.time, string.rep, table.concat, table.move
-local SetTimeout = SetTimeout
+local SetTimeout, TriggerClientEvent = SetTimeout, TriggerClientEvent
 
 local bridge = VavaMagic.bridge
 local world = VavaMagic.world
 local geometry = VavaMagic.geometry
 local cfg = VavaMagic.config.combat
+local EVENTS = VavaMagic.EVENTS
 
 local INSERT = 'INSERT INTO `vava_magic_damage_log` (`at`, `spell`, `caster_id`, `target_id`, `kind`, `damage`, `x`, `y`, `z`) VALUES '
 local ROW = '(?, ?, ?, ?, ?, ?, ?, ?, ?)'
@@ -58,20 +61,26 @@ end
 ---@param caster integer   source du lanceur
 ---@param target integer   source de la cible
 ---@param spell string
----@param part number      part de la vie (0 à 1)
+---@param points number    points de vie retirés
 ---@param kind string      combat.KIND
+---@param casterCharacter? integer  personnage du lanceur, quand il a pu partir depuis (zone, brûlure)
 ---@return boolean
-function combat.damage(caster, target, spell, part, kind)
-    if not cfg.pvp or part <= 0 then return false end
+function combat.damage(caster, target, spell, points, kind, casterCharacter)
+    if not cfg.pvp or points <= 0 then return false end
+    local part = min(1, points / cfg.healthPoints)
     local position = world.position(target)
     if not position or combat.protected(position) then return false end
     local targetCharacter = bridge.GetCharacterId(target)
     if not targetCharacter then return false end
     if not bridge.ApplyDamage(target, part) then return false end
     queue[#queue + 1] = {
-        time(), spell, bridge.GetCharacterId(caster) or 0, targetCharacter, kind, part, position.x, position.y, position.z,
+        time(), spell, casterCharacter or bridge.GetCharacterId(caster) or 0, targetCharacter, kind, points, position.x, position.y, position.z,
     }
     if #queue >= cfg.log.batch then combat.flush() end
+    if kind ~= combat.KIND.BURN then
+        local def = VavaMagic.spells.get(spell)
+        if def then TriggerClientEvent(EVENTS.HIT, target, def.config.element) end
+    end
     return true
 end
 

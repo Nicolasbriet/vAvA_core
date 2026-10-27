@@ -1,8 +1,9 @@
 --[[
     vava_magic/server/progression.lua
     Rôle : XP des sorts, décidée par le serveur. Un sort réussi rapporte son XP, un échec la moitié (config) ; un même
-           sort ne rapporte qu'une fois par intervalle (anti-farm). Passage de niveau : message au joueur avec ce que
-           le niveau débloque, hook `vava_magic:levelUp`.
+           sort ne rapporte qu'une fois par intervalle (anti-farm). Un sort qui touche une cible rapporte en plus son
+           bonus (`hitXp`), seulement si son lancer a rapporté. Passage de niveau : message au joueur avec ce que le
+           niveau débloque, hook `vava_magic:levelUp`.
     Dépendances : shared/, config.lua, server/core.lua, bridge/server.lua, server/sheets.lua (server/spells.lua à
                   l'exécution)
 ]]
@@ -62,6 +63,23 @@ function experience.grant(src, spell, success)
     sheets.touch(src, true)
     for level = before + 1, after do announce(src, spell, level) end
     return amount
+end
+
+--- Ajoute de l'XP à un sort connu, sans l'anti-farm (bonus d'un lancer qui a déjà rapporté). Renvoie l'XP gagnée.
+---@param src integer
+---@param spell string
+---@param amount integer
+---@return integer
+function experience.bonus(src, spell, amount)
+    local sheet = sheets.get(src)
+    local entry = sheet and sheet.spells[spell]
+    if not entry or amount <= 0 or entry.xp >= MAX_XP then return 0 end
+    local before = progression.levelOf(entry.xp)
+    local gained = min(MAX_XP, entry.xp + amount) - entry.xp
+    entry.xp = entry.xp + gained
+    sheets.touch(src, true)
+    for level = before + 1, progression.levelOf(entry.xp) do announce(src, spell, level) end
+    return gained
 end
 
 --- Fixe l'XP d'un sort connu (Conseil). Les niveaux gagnés sont annoncés.

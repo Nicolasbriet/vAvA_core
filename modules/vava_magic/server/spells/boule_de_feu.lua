@@ -11,7 +11,9 @@
         pas encore résolu ; point d'impact dans la portée et dans l'axe du lancer ; délai cohérent avec la vitesse ;
         cible réelle près du point annoncé (position serveur) ; zones protégées ; dégâts entre joueurs activés. Puis il
         fait appliquer les dégâts (jamais sur la seule parole d'un client), la zone d'effet et la brûlure selon le
-        niveau. Aucune explosion GTA : particules et son côté clients, dégâts par le script.
+        niveau (la Brûlure est un état, server/states.lua), et le bonus d'XP d'un sort qui touche (si le lancer a
+        rapporté). Aucune explosion GTA : particules
+        et son côté clients, dégâts par le script.
     Dépendances : shared/, config.lua, server/ (noyau)
 ]]
 
@@ -23,6 +25,8 @@ local bridge = VavaMagic.bridge
 local world = VavaMagic.world
 local spells = VavaMagic.spells
 local combat = VavaMagic.combat
+local states = VavaMagic.states
+local experience = VavaMagic.experience
 local geometry = VavaMagic.geometry
 local cfg = VavaMagic.config
 local spellCfg = cfg.spells.boule_de_feu
@@ -32,7 +36,6 @@ local notify = cfg.texts.notify
 local limits = cfg.rateLimits
 local RPC = VavaMagic.RPC
 local EVENTS = VavaMagic.EVENTS
-local STATES = VavaMagic.STATES
 local NAME = 'boule_de_feu'
 local MS_PER_SECOND = 1000
 -- en deçà, l'angle d'un point d'impact n'a pas de sens (contre le lanceur)
@@ -56,11 +59,10 @@ local TARGET = { type = 'integer', min = 0, max = 65535 }
 ---@field target integer|nil
 ---@field launchedAt integer
 ---@field resolved boolean
+---@field rewarded boolean  le lancer a rapporté de l'XP : un impact sur une cible rapporte le bonus
 
 ---@type table<integer, vAvA.Fireball>
 local launches = {}
----@type table<integer, integer>  cible → jeton de sa brûlure
-local burns = {}
 local nextLaunch = 0
 
 --- Annonce aux joueurs proches d'un point.
@@ -72,29 +74,16 @@ local function broadcast(point, event, ...)
     end
 end
 
---- La cible brûle : dégâts sur la durée, flammes vues des joueurs proches.
+--- La cible brûle : dégâts sur la durée (état Brûlure, vu des joueurs proches).
 ---@param caster integer
 ---@param target integer
 ---@param burnCfg table
 local function ignite(caster, target, burnCfg)
-    local token = (burns[target] or 0) + 1
-    burns[target] = token
-    world.setState(target, STATES.BURN, true)
-    bridge.Notify(target, notify.burning, 'danger')
-    local ticks = floor(burnCfg.durationMs / burnCfg.tickMs)
-    local function tick(count)
-        SetTimeout(burnCfg.tickMs, function()
-            if burns[target] ~= token then return end
-            combat.damage(caster, target, NAME, burnCfg.damage, combat.KIND.BURN)
-            if count < ticks then
-                tick(count + 1)
-            else
-                burns[target] = nil
-                world.setState(target, STATES.BURN, nil)
-            end
-        end)
+    if states.apply(target, 'burn', {
+        durationMs = burnCfg.durationMs, tickMs = burnCfg.tickMs, damage = burnCfg.damage, caster = caster, spell = NAME,
+    }) then
+        bridge.Notify(target, notify.burning, 'danger')
     end
-    tick(1)
 end
 
 --- Position (torse) d'une cible verrouillée valable depuis ce point, ou nil : joueur en jeu, pas le lanceur, à portée
@@ -151,7 +140,7 @@ local function finish(ctx, dx, dy, dz)
     local launch = {
         id = nextLaunch, source = src, level = ctx.level, origin = origin, direction = direction,
         speed = levelCfg.speed, range = levelCfg.range, homing = target and levelCfg.homing or 0, target = target,
-        launchedAt = GetGameTimer(), resolved = false,
+        launchedAt = GetGameTimer(), resolved = false, rewarded = false,
     }
     launches[launch.id] = launch
     local flightMs = floor(launch.range / launch.speed * MS_PER_SECOND)
@@ -163,7 +152,7 @@ local function finish(ctx, dx, dy, dz)
         speed = launch.speed, range = launch.range, level = ctx.level, fizzle = false,
         target = target or 0, homing = launch.homing,
     })
-    return { success = true, result = { id = launch.id } }
+    return { success = true, result = { id = launch.id }, rewarded = function(granted) launch.rewarded = granted end }
 end
 
 --- Le point d'impact annoncé est-il possible pour ce lancer ?
@@ -203,9 +192,9 @@ local function impact(src, id, target, x, y, z)
     broadcast(point, EVENTS.FIREBALL_END, id, x, y, z)
 
     local levelCfg = spellCfg.levels[launch.level]
-    if target ~= 0 and combat.damage(src, target, NAME, levelCfg.damage, combat.KIND.IMPACT)
-        and levelCfg.burn and spellCfg.burnEnabled then
-        ignite(src, target, levelCfg.burn)
+    if target ~= 0 and combat.damage(src, target, NAME, levelCfg.damage, combat.KIND.IMPACT) then
+        if launch.rewarded then experience.bonus(src, NAME, spellCfg.hitXp or 0) end
+        if levelCfg.burn and spellCfg.burnEnabled then ignite(src, target, levelCfg.burn) end
     end
     if levelCfg.aoeRadius > 0 then
         for _, entry in ipairs(world.near(point, levelCfg.aoeRadius)) do
@@ -220,10 +209,6 @@ end
 spells.addRpc(RPC.FIREBALL_IMPACT, { LAUNCH_ID, TARGET, COORD, COORD, COORD }, limits.impact, impact)
 
 spells.onLeave(function(src)
-    if burns[src] then
-        burns[src] = nil
-        world.setState(src, STATES.BURN, nil)
-    end
     for id, launch in pairs(launches) do
         if launch.source == src then launches[id] = nil end
     end

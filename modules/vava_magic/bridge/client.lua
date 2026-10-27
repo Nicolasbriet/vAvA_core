@@ -1,25 +1,25 @@
 --[[
     vava_magic/bridge/client.lua
-    Rôle : SEUL point de contact, côté client, entre la magie et les autres modules : notifications et médaillon de
-           mana (vava_hud), état « à terre » (vava_health), lignes et suggestions du chat, blessure appliquée par la
-           victime quand vava_health manque (implémentation par défaut de Bridge.ApplyDamage côté serveur).
+    Rôle : SEUL point de contact, côté client, entre la magie et les autres modules : notifications (vava_hud), état
+           « à terre » (vava_health), droit d'incanter (CanUseMagic), cible verrouillée (GetLockedTarget), lignes et
+           suggestions du chat, blessure appliquée par la victime quand vava_health manque (ApplyMagicDamage,
+           implémentation par défaut de Bridge.ApplyDamage côté serveur).
            Pour un autre core, réécrire ces fonctions (et bridge/server.lua).
     Implémentation : modules officiels vAvA ; appels isolés, chaque module est facultatif (sans vava_hud : notification
-           de GTA, pas de médaillon).
+           de GTA). Le verrouillage de cible est celui de ce module (client/targeting.lua, clic molette).
     Dépendances : shared/constants.lua, config.lua, client/core.lua
 ]]
 
 local type, pcall, tostring, ipairs, floor = type, pcall, tostring, ipairs, math.floor
 local GetResourceState, TriggerEvent, RegisterNetEvent = GetResourceState, TriggerEvent, RegisterNetEvent
-local PlayerPedId, GetEntityHealth, GetEntityMaxHealth, ApplyDamageToPed = PlayerPedId, GetEntityHealth, GetEntityMaxHealth, ApplyDamageToPed
+local PlayerPedId, GetEntityHealth, GetEntityMaxHealth, ApplyDamageToPed, IsEntityDead, IsPedCuffed, IsPedBeingStunned =
+    PlayerPedId, GetEntityHealth, GetEntityMaxHealth, ApplyDamageToPed, IsEntityDead, IsPedCuffed, IsPedBeingStunned
 local BeginTextCommandThefeedPost, AddTextComponentSubstringPlayerName, EndTextCommandThefeedPostTicker =
     BeginTextCommandThefeedPost, AddTextComponentSubstringPlayerName, EndTextCommandThefeedPostTicker
 
 local cfg = VavaMagic.config
 local LINKS = VavaMagic.LINKS
 local EVENTS = VavaMagic.EVENTS
-local hudCfg = cfg.mana.hud
-local GAUGE = VavaMagic.resource .. ':mana'
 -- vie sous laquelle GTA met un joueur à terre (seuil de vava_health)
 local DOWN_THRESHOLD = 100
 -- natures de notification comprises par vava_hud
@@ -80,45 +80,37 @@ function Bridge.ChatSuggestion(command, help, params)
     TriggerEvent('chat:addSuggestion', '/' .. command, help, params or {})
 end
 
--- Médaillon de mana (vava_hud) ------------------------------------------------------------------------------------
+-- Magie et combat ------------------------------------------------------------------------------------------------
 
-local gaugeDefined = false
-
---- Montre le médaillon (rempli de 0 à 1).
----@param ratio number
-function Bridge.GaugeSet(ratio)
-    if not gaugeDefined then
-        local called, ok = call(LINKS.HUD, 'defineGauge', GAUGE, {
-            label = hudCfg.label, icon = hudCfg.icon, order = hudCfg.order, low = hudCfg.low, critical = hudCfg.critical,
-        })
-        gaugeDefined = called and ok ~= false
-        if not gaugeDefined then return end
-    end
-    call(LINKS.HUD, 'setGauge', GAUGE, ratio)
+--- Le personnage peut-il incanter ? Ni mort, ni à terre, ni entravé (menottes de GTA), ni assommé. Le serveur
+--- revérifie ce qui dépend de lui (à terre, véhicule, états).
+---@return boolean
+function Bridge.CanUseMagic()
+    local ped = PlayerPedId()
+    if IsEntityDead(ped) or IsPedCuffed(ped) or IsPedBeingStunned(ped, 0) then return false end
+    return not Bridge.IsDowned()
 end
 
---- Lueur de laiton autour du médaillon (incantation en cours).
----@param active boolean
-function Bridge.GaugeActive(active)
-    if gaugeDefined then call(LINKS.HUD, 'setGaugeActive', GAUGE, active) end
+--- Cible verrouillée par le système de verrouillage du serveur : numéro serveur du joueur, ou nil (visée libre).
+--- Ici, celui de la magie (clic molette).
+---@return integer|nil
+function Bridge.GetLockedTarget()
+    local targeting = VavaMagic.targeting
+    return targeting and targeting.current() or nil
 end
 
-function Bridge.GaugeHide()
-    if gaugeDefined then call(LINKS.HUD, 'removeGauge', GAUGE) end
-    gaugeDefined = false
-end
-
---- vava_hud a (re)démarré : le médaillon est à redéclarer.
-function Bridge.HudRestarted()
-    gaugeDefined = false
-end
-
-Bridge.HUD_RESOURCE = LINKS.HUD
-
--- Blessure sans vava_health : ordre du seul serveur, appliquée au ped du joueur (sa vie lui appartient dans GTA)
-RegisterNetEvent(EVENTS.DAMAGE, function(part)
-    if type(part) ~= 'number' or part <= 0 or part > 1 then return end
+--- Blessure sur le ped local, sur ordre du seul serveur, quand vava_health manque : `part` de la vie (0 à 1),
+--- au-dessus du seuil où GTA met à terre.
+---@param part number
+---@param attacker? integer  numéro serveur du lanceur
+---@param spell? string
+function Bridge.ApplyMagicDamage(part, attacker, spell)
     local ped = PlayerPedId()
     local amount = floor(part * (GetEntityMaxHealth(ped) - DOWN_THRESHOLD) + 0.5)
     if amount > 0 and GetEntityHealth(ped) > 0 then ApplyDamageToPed(ped, amount, false) end
+end
+
+RegisterNetEvent(EVENTS.DAMAGE, function(part, attacker, spell)
+    if type(part) ~= 'number' or part <= 0 or part > 1 then return end
+    Bridge.ApplyMagicDamage(part, attacker, spell)
 end)

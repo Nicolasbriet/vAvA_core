@@ -5,9 +5,11 @@
   <title>Magie</title>
   <!--
     web/index.html
-    Rôle : interface de la magie : barre d'incantation, murmures reçus, frisson d'une cible verrouillée, parchemin
-           d'écriture, sigil tendu ou rendu, confirmation, grimoire et registre (livres). Tous les textes viennent de la config du module (message
-           « init »). Dans un navigateur, web/index.html?view=… montre chaque vue avec des données d'exemple.
+    Rôle : interface de la magie : roue des sorts, barre de mana et sort prêt, états du joueur et effets d'écran,
+           réticule de visée, barre d'incantation,
+           murmures reçus, frisson d'une cible verrouillée, parchemin d'écriture, sigil tendu ou rendu, confirmation,
+           grimoire et registre (livres). Tous les textes viennent de la config du module (message « init »). Dans un
+           navigateur, web/index.html?view=… montre chaque vue avec des données d'exemple.
   -->
   <link rel="stylesheet" href="css/style.css">
 </head>
@@ -20,6 +22,33 @@
   <div class="murmurs" id="murmurs" aria-live="polite"></div>
 
   <div class="threat" id="threat" hidden><p class="threat-text" id="threat-text"></p></div>
+
+  <div class="reticle" id="reticle" hidden>
+    <svg viewBox="0 0 64 64" aria-hidden="true">
+      <g class="reticle-shadow"><circle cx="32" cy="32" r="17"/><path d="M32 6v9M32 49v9M6 32h9M49 32h9"/></g>
+      <circle class="reticle-ring" cx="32" cy="32" r="17"/>
+      <circle class="reticle-dot" cx="32" cy="32" r="2.2"/>
+      <path class="reticle-ticks" d="M32 6v9M32 49v9M6 32h9M49 32h9"/>
+      <path class="reticle-runes" d="M24.5 13.5l2 3.4M39.5 13.5l-2 3.4M50.5 24.5l-3.4 2M50.5 39.5l-3.4-2M39.5 50.5l-2-3.4M24.5 50.5l2-3.4M13.5 39.5l3.4-2M13.5 24.5l3.4 2"/>
+    </svg>
+  </div>
+
+  <div class="hud" id="hud" hidden>
+    <div class="hud-seal" id="hud-seal"><span class="hud-icon" id="hud-icon"></span></div>
+    <div class="hud-body">
+      <div class="hud-title"><span class="hud-label" id="hud-label"></span><span class="hud-level" id="hud-level"></span></div>
+      <div class="hud-track"><div class="hud-fill" id="hud-fill"></div></div>
+    </div>
+    <div class="hud-states" id="hud-states"></div>
+  </div>
+
+  <div class="conditions" id="conditions" hidden></div>
+
+  <div class="screen-burn" id="screen-burn" hidden></div>
+  <div class="screen-frost" id="screen-frost" hidden></div>
+  <div class="screen-hit" id="screen-hit" hidden></div>
+
+  <div class="wheel" id="wheel" hidden></div>
 
   <div class="veil" id="veil" hidden>
     <section class="sheet" id="view-composer" hidden></section>
@@ -36,6 +65,9 @@
   <script src="js/castbar.js"></script>
   <script src="js/murmurs.js"></script>
   <script src="js/threat.js"></script>
+  <script src="js/hud.js"></script>
+  <script src="js/conditions.js"></script>
+  <script src="js/wheel.js"></script>
   <script src="js/modal.js"></script>
   <script src="js/composer.js"></script>
   <script src="js/prompts.js"></script>

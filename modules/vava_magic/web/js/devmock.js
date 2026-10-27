@@ -3,7 +3,7 @@
  * web/js/devmock.js
  * Rôle : aperçu de l'interface dans un navigateur, hors du jeu (sans effet en jeu) : web/index.html?view=<vue>
  *        avec composer, offer, naming, confirm, grimoire, lueur, sealed, register, cast, broken, murmur, unknown,
- *        threat, messages, all.
+ *        threat, wheel, wheelfire, hud, aim, states, frost, messages, all.
  *        Les textes ci-dessous ne sont qu'une copie d'aperçu : en jeu, ils viennent de config.lua.
  */
 
@@ -37,10 +37,14 @@ window.DevMock = (() => {
     grimoire: {
       title: 'Grimoire', sealed: 'Les pages restent illisibles : les signes se dérobent à votre regard, comme si le livre refusait de vous parler.',
       empty: 'Aucun sort n\'est encore couché dans ces pages.', level: 'Niveau %d', mastered: 'Maîtrise achevée', xp: '%d / %d XP', xpMax: '%d XP',
-      cost: 'Mana : %d', cooldown: 'Recharge : %d s', key: 'Touche : %s', noKey: 'aucune', lock: 'Verrouiller : %s',
+      cost: 'Mana : %d', cooldown: 'Recharge : %s s', cast: 'Incantation : %s s', instant: 'Incantation : instantanée',
+      element: 'Élément : %s', lock: 'Verrouiller : %s', controls: 'Roue : %s · viser : %s · lancer : %s',
       current: 'Ce que vous savez', next: 'Au niveau suivant',
       sigils: 'Sigils mémorisables : %d', colors: 'Couleur de la lumière', close: 'Fermer',
     },
+    wheel: { cancel: 'Annuler', deselect: 'Ranger la magie', cost: '%d', cooldown: '%d s', noSpell: 'Aucun sort', level: 'Niveau %d' },
+    hud: { mana: 'Mana', asleep: 'Mains au repos' },
+    states: { burn: 'Brûlure', wet: 'Mouillé', slow: 'Ralenti', stagger: 'Chancelant', knockdown: 'Renversé', frozen: 'Gelé', immune: 'Protégé' },
     register: {
       title: 'Registre des murmures', empty: 'Ce registre est vierge.', sent: 'À %s', received: 'De %s', unknown: 'D\'une présence inconnue',
       tear: 'Arracher la page',
@@ -59,23 +63,48 @@ window.DevMock = (() => {
     { name: 'aube', label: 'Aube rosée', r: 255, g: 170, b: 150 }, { name: 'sylve', label: 'Sylve', r: 160, g: 240, b: 170 },
     { name: 'flamme', label: 'Flamme', r: 255, g: 140, b: 60 }, { name: 'arcane', label: 'Arcane', r: 190, g: 150, b: 255 },
   ];
+  const FIRE = { r: 255, g: 132, b: 52 };
+  const LIGHT = { r: 255, g: 224, b: 150 };
+  const SPIRIT = { r: 190, g: 164, b: 255 };
+  const GROUPS = [
+    { id: 'feu', label: 'Feu', icon: 'feu' }, { id: 'eau', label: 'Eau', icon: 'eau' },
+    { id: 'terre', label: 'Terre', icon: 'terre' }, { id: 'utilitaires', label: 'Utilitaires', icon: 'utilitaires' },
+  ];
   const SPELLS = [
     {
-      name: 'murmure', label: 'Murmure', summary: 'Confier quelques mots au vent, jusqu\'à ceux dont on garde le sigil.', level: 3, xp: 412, from: 300, to: 700,
-      description: 'Cent soixante signes, sans limite de distance. Quelques mots seulement se trahissent, et vous pouvez joindre votre position.',
-      next: 'Vous pouvez murmurer à un cercle de quatre contacts en un seul envoi.', cost: 10, cooldown: 16, key: 'N', sigils: 25,
+      name: 'boule_de_feu', label: 'Boule de feu', summary: 'Rassembler les flammes et les jeter sur un adversaire.', level: 2, xp: 140, from: 100, to: 300,
+      icon: 'boule_de_feu', element: 'Feu', group: 'feu', color: FIRE,
+      description: 'Plus brûlante et plus lointaine (vingt-six mètres) ; elle ne s\'éteint plus qu\'une fois sur dix.',
+      next: 'Votre boule de feu éclate à l\'impact et touche ceux qui entourent la cible.', cost: 13, cooldown: '3,5', lock: 'Clic molette',
     },
     {
       name: 'lueur', label: 'Lueur', summary: 'Faire naître la lumière, au creux de la main puis en orbe.', level: 5, xp: 1500, from: 1500,
-      description: 'Dix minutes de lumière, dans la couleur de votre choix ; vos orbes ancrés durent autant.', cost: 5, cooldown: 4, key: 'L',
-      colors: COLORS, color: 'lune',
+      icon: 'lueur', element: 'Lumière', group: 'utilitaires', color: LIGHT,
+      description: 'Dix minutes de lumière, dans la couleur de votre choix ; vos orbes ancrés durent autant.', cost: 5, cooldown: '4', cast: '1,5',
+      colors: COLORS, lightColor: 'lune',
     },
     {
-      name: 'boule_de_feu', label: 'Boule de feu', summary: 'Rassembler les flammes et les jeter sur un adversaire.', level: 1, xp: 25, from: 0, to: 100,
-      description: 'Une petite boule de feu, lente et peu sûre : elle s\'éteint une fois sur cinq. Portée : vingt mètres.',
-      next: 'Votre boule de feu frappe plus fort et plus loin.', cost: 25, cooldown: 30, key: 'K', lock: 'TAB',
+      name: 'murmure', label: 'Murmure', summary: 'Confier quelques mots au vent, jusqu\'à ceux dont on garde le sigil.', level: 3, xp: 412, from: 300, to: 700,
+      icon: 'murmure', element: 'Esprit', group: 'utilitaires', color: SPIRIT,
+      description: 'Cent soixante signes, sans limite de distance. Quelques mots seulement se trahissent, et vous pouvez joindre votre position.',
+      next: 'Vous pouvez murmurer à un cercle de quatre contacts en un seul envoi.', cost: 10, cooldown: '16', cast: '5', sigils: 25,
     },
   ];
+  const CONTROLS = { wheel: 'Tab', aim: 'Clic droit', cast: 'Clic gauche' };
+  const WHEEL = {
+    selected: 'boule_de_feu', releaseKey: 'TAB',
+    groups: [
+      { id: 'feu', label: 'Feu', icon: 'feu', spells: [
+        { name: 'boule_de_feu', label: 'Boule de feu', icon: 'boule_de_feu', level: 2, cost: 13, cooldown: 0, color: FIRE },
+        { name: 'mur_de_flammes', label: 'Mur de flammes', icon: 'mur_de_flammes', level: 1, cost: 24, cooldown: 0, color: FIRE },
+        { name: 'nova_ardente', label: 'Nova ardente', icon: 'nova_ardente', level: 3, cost: 24, cooldown: 6000, color: FIRE },
+      ] },
+      { id: 'utilitaires', label: 'Utilitaires', icon: 'utilitaires', spells: [
+        { name: 'lueur', label: 'Lueur', icon: 'lueur', level: 5, cost: 5, cooldown: 0, color: LIGHT },
+        { name: 'murmure', label: 'Murmure', icon: 'murmure', level: 3, cost: 10, cooldown: 9000, color: SPIRIT },
+      ] },
+    ],
+  };
   const NOW = Math.floor(Date.now() / 1000);
   const PAGES = [
     { id: 41, at: NOW - 600, direction: 2, contact: 'Mage du moulin', text: 'Rendez-vous au moulin quand la lune sera haute. Apporte le registre … et viens seul.' },
@@ -88,7 +117,7 @@ window.DevMock = (() => {
     offer: () => Bridge.emit('modal:offer', { id: 3, seconds: 30, nameMax: 24 }),
     naming: () => Bridge.emit('modal:naming', { id: 3, seconds: 30, nameMax: 24 }),
     confirm: () => Bridge.emit('modal:confirm', { kind: 'scramble', cost: 60 }),
-    grimoire: () => Bridge.emit('modal:grimoire', { sealed: false, spells: SPELLS }),
+    grimoire: () => Bridge.emit('modal:grimoire', { sealed: false, spells: SPELLS, groups: GROUPS, controls: CONTROLS }),
     sealed: () => Bridge.emit('modal:grimoire', { sealed: true }),
     register: () => Bridge.emit('modal:register', { id: 7, pages: PAGES, count: 3, max: 200 }),
     cast: () => Bridge.emit('cast:start', { label: 'Murmure', ms: 6000 }),
@@ -96,8 +125,38 @@ window.DevMock = (() => {
     murmur: () => Bridge.emit('murmur:show', { from: 'Mage du moulin', text: 'Rendez-vous au moulin ce soir, … la lune sera haute.', waypoint: true, ms: 600000 }),
     unknown: () => Bridge.emit('murmur:show', { text: 'On t\'observe depuis le pont.', ms: 600000 }),
     threat: () => Bridge.emit('threat', { ms: 4000 }),
+    hud: () => {
+      Bridge.emit('hud:spell', { name: 'boule_de_feu', label: 'Boule de feu', icon: 'boule_de_feu', level: 2, color: FIRE });
+      Bridge.emit('hud:mana', { value: 62, max: 100, points: 3, period: 5000, elapsed: 1200 });
+      Bridge.emit('hud:mode', { awake: true });
+    },
+    aim: () => { SCENES.hud(); Bridge.emit('reticle', { visible: true, color: FIRE, out: false }); },
+    states: () => {
+      SCENES.hud();
+      Bridge.emit('states', { list: [{ name: 'burn', ms: 3400 }, { name: 'wet', ms: 9000 }, { name: 'slow', ms: 2600 }, { name: 'frozen', ms: 1800 }] });
+      Bridge.emit('screen', { burn: true, frost: false });
+    },
+    frost: () => {
+      SCENES.hud();
+      Bridge.emit('states', { list: [{ name: 'frozen', ms: 1800 }, { name: 'immune', ms: 7000 }] });
+      Bridge.emit('screen', { burn: false, frost: true });
+    },
+    wheel: () => {
+      SCENES.hud();
+      Bridge.emit('wheel:open', WHEEL);
+      // la souris sur Lueur, pour l'aperçu
+      const rect = document.getElementById('wheel').getBoundingClientRect();
+      window.dispatchEvent(new MouseEvent('mousemove', { clientX: rect.left + rect.width * 0.5, clientY: rect.top + rect.height * 0.5 }));
+      window.dispatchEvent(new MouseEvent('mousemove', { clientX: rect.left + rect.width * 0.28, clientY: rect.top + rect.height * 0.84 }));
+    },
   };
   SCENES.lueur = () => { SCENES.grimoire(); document.querySelectorAll('#view-grimoire .entry')[1].click(); };
+  SCENES.wheelfire = () => {
+    SCENES.wheel();
+    const rect = document.getElementById('wheel').getBoundingClientRect();
+    window.dispatchEvent(new MouseEvent('mousemove', { clientX: rect.left + rect.width * 0.5, clientY: rect.top + rect.height * 0.32 }));
+    window.dispatchEvent(new MouseEvent('mousemove', { clientX: rect.left + rect.width * 0.5, clientY: rect.top + rect.height * 0.1 }));
+  };
   SCENES.messages = () => { SCENES.murmur(); SCENES.unknown(); SCENES.cast(); };
   SCENES.all = () => { SCENES.messages(); SCENES.grimoire(); };
 

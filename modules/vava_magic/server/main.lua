@@ -2,8 +2,8 @@
     vava_magic/server/main.lua
     Rôle : déclaration du module auprès du core : champ de fiche, catalogue des sorts et leurs RPC, objets (grimoire,
            registre), arrivée et départ des personnages (fiche chargée, mana pleine pour un mage ; tout est écrit et
-           nettoyé au départ), intentions du client en RPC à schéma strict et à débit limité, écritures régulières,
-           commandes du Conseil.
+           nettoyé au départ), intentions du client en RPC à schéma strict et à débit limité (dont le sort choisi dans
+           la roue), écritures régulières, commandes du Conseil.
     Dépendances : tous les fichiers server/ du module
 ]]
 
@@ -23,6 +23,7 @@ local casting = VavaMagic.casting
 local sigils = VavaMagic.sigils
 local registers = VavaMagic.registers
 local combat = VavaMagic.combat
+local states = VavaMagic.states
 local admin = VavaMagic.admin
 local cfg = VavaMagic.config
 local limits = cfg.rateLimits
@@ -33,6 +34,8 @@ local ID = { type = 'integer', min = 1, max = 0x7FFFFFFF }
 local PAGE_ID = { type = 'integer', min = 1, max = 2 ^ 53 }
 local INDEX = { type = 'integer', min = 1, max = sheets.SIGILS_MAX }
 local NAME = { type = 'string', max = cfg.sigils.nameMax * 4 }
+-- sort prêt dans les mains : un nom de sort, ou '' pour aucun
+local SELECTED = { type = 'string', max = 32, pattern = '^[%w_]*$' }
 local BOOL = { type = 'boolean' }
 
 --- Personnage arrivé : fiche chargée (bloque le thread du core le temps de lire son sigil), mana pleine s'il est mage.
@@ -50,6 +53,7 @@ end
 ---@param src integer
 local function leave(src)
     casting.forget(src)
+    states.clear(src)
     sigils.forgetPlayer(src)
     spells.leave(src)
     world.clearStates(src)
@@ -77,6 +81,7 @@ local function setup()
     end
     for _, def in ipairs({
         { RPC.SHEET, {}, limits.sheet, sheetRequest },
+        { RPC.SELECT, { SELECTED }, limits.select, sheets.select },
         { RPC.CANCEL, { ID }, limits.cancel, function(src, castId) casting.cancel(src, castId) end },
         { RPC.SIGILS, {}, limits.sigils, function(src)
             local list = sigils.list(src)
@@ -108,6 +113,7 @@ local function setup()
     if not ok then return false, err end
     sheets.start()
     combat.start()
+    states.start()
     admin.start()
     -- module (re)démarré en cours de partie : fiches des personnages déjà en jeu
     for _, id in ipairs(GetPlayers()) do
@@ -130,6 +136,8 @@ AddEventHandler('onResourceStop', function(resource)
         sheets.save(src)
         world.clearStates(src)
     end
+    -- un joueur gelé est libéré
+    states.clearAll()
     spells.stop()
     combat.flush()
 end)

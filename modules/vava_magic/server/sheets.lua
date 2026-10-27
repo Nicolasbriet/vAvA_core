@@ -1,7 +1,8 @@
 --[[
     vava_magic/server/sheets.lua
-    Rôle : fiches magie des personnages en jeu, décidées par le serveur : mage ou non, sorts connus et leur XP,
-           sigils gardés (contacts du Murmure), sigil du personnage, couleur de lumière, dernier registre ouvert.
+    Rôle : fiches magie des personnages en jeu, décidées par le serveur : mage ou non, sorts connus et leur XP, sort
+           prêt dans les mains (choisi dans la roue), combinaisons d'éléments découvertes, sigils gardés (contacts du
+           Murmure), sigil du personnage, couleur de lumière, dernier registre ouvert.
       - Chargée à l'arrivée du personnage (une neuve s'il n'en a jamais eu) ; son sigil est unique dans tout le
         royaume (table vava_magic_sigils), tiré au hasard la première fois.
       - Gardée en mémoire ; écrite dans le personnage au plus toutes les `persistence.flushMs` si elle a changé,
@@ -31,6 +32,8 @@ for _, spell in pairs(cfg.spells) do
 end
 local SIGIL_PATTERN = '^[' .. sigilCfg.alphabet .. ']+$'
 local SPELL_NAME = { type = 'string', min = 1, max = 32, pattern = '^[%w_]+$' }
+-- combinaisons découvertes gardées au plus (grimoire)
+local COMBOS_MAX = 32
 local SIGIL = { type = 'string', min = sigilCfg.length, max = sigilCfg.length, pattern = SIGIL_PATTERN }
 
 local SELECT_SIGIL = 'SELECT `sigil` FROM `vava_magic_sigils` WHERE `character_id` = ?'
@@ -54,6 +57,8 @@ sheets.SCHEMA = {
             sigil = SIGIL,
             name = { type = 'string', min = 1, max = sigilCfg.nameMax * 4 },
         } } },
+        selectedSpell = { type = 'string', min = 1, max = 32, pattern = '^[%w_]+$', optional = true },
+        discoveredCombos = { type = 'array', max = COMBOS_MAX, items = { type = 'string', min = 1, max = 32, pattern = '^[%w_]+$' }, optional = true },
         lightColor = { type = 'string', max = 32, optional = true },
         register = { type = 'integer', min = 1, optional = true },
         scrambledAt = { type = 'integer', min = 0, optional = true }, -- dernier brouillage (secondes, horloge du serveur)
@@ -66,6 +71,8 @@ sheets.SCHEMA = {
 ---@field sigil string
 ---@field spells table<string, { xp: integer }>
 ---@field sigils { sigil: string, name: string }[]
+---@field selectedSpell string|nil
+---@field discoveredCombos string[]
 ---@field lightColor string|nil
 ---@field register integer|nil
 ---@field scrambledAt integer|nil
@@ -87,7 +94,7 @@ end
 ---@param stored table|nil
 ---@return table
 local function sanitize(stored)
-    local clean = { isMage = false, spells = {}, sigils = {} }
+    local clean = { isMage = false, spells = {}, sigils = {}, discoveredCombos = {} }
     if type(stored) ~= 'table' then return clean end
     clean.isMage = stored.isMage == true
     if type(stored.sigil) == 'string' and #stored.sigil == sigilCfg.length then clean.sigil = stored.sigil end
@@ -103,6 +110,13 @@ local function sanitize(stored)
             if type(contact) == 'table' and type(contact.sigil) == 'string' and type(contact.name) == 'string' then
                 clean.sigils[#clean.sigils + 1] = { sigil = contact.sigil, name = contact.name }
             end
+        end
+    end
+    if type(stored.selectedSpell) == 'string' and clean.spells[stored.selectedSpell] then clean.selectedSpell = stored.selectedSpell end
+    if type(stored.discoveredCombos) == 'table' then
+        for _, combo in ipairs(stored.discoveredCombos) do
+            if #clean.discoveredCombos >= COMBOS_MAX then break end
+            if type(combo) == 'string' then clean.discoveredCombos[#clean.discoveredCombos + 1] = combo end
         end
     end
     if type(stored.lightColor) == 'string' then clean.lightColor = stored.lightColor end
@@ -212,8 +226,8 @@ function sheets.contactIndex(sheet, sigil)
     return nil
 end
 
---- Vue de la fiche pour son joueur (sans aucun sigil) : { isMage, spells = { { name, xp, level } }, sigilCount,
---- sigilLimit, lightColor }.
+--- Vue de la fiche pour son joueur (sans aucun sigil) : { isMage, spells = { { name, xp, level } }, selected,
+--- combos, sigilCount, sigilLimit, lightColor }.
 ---@param src integer
 ---@return table|nil
 function sheets.view(src)
@@ -223,9 +237,11 @@ function sheets.view(src)
     for name, entry in pairs(sheet.spells) do
         spells[#spells + 1] = { name = name, xp = entry.xp, level = progression.levelOf(entry.xp) }
     end
+    local combos = {}
+    for i, combo in ipairs(sheet.discoveredCombos) do combos[i] = combo end
     return {
-        isMage = sheet.isMage, spells = spells, sigilCount = #sheet.sigils, sigilLimit = sheets.sigilLimit(sheet),
-        lightColor = sheet.lightColor or '',
+        isMage = sheet.isMage, spells = spells, selected = sheet.selectedSpell or '', combos = combos,
+        sigilCount = #sheet.sigils, sigilLimit = sheets.sigilLimit(sheet), lightColor = sheet.lightColor or '',
     }
 end
 
@@ -253,8 +269,11 @@ local function stored(sheet)
     local spells, sigils = {}, {}
     for name, entry in pairs(sheet.spells) do spells[name] = { xp = entry.xp } end
     for i, contact in ipairs(sheet.sigils) do sigils[i] = { sigil = contact.sigil, name = contact.name } end
+    local combos = {}
+    for i, combo in ipairs(sheet.discoveredCombos) do combos[i] = combo end
     return {
         isMage = sheet.isMage, sigil = sheet.sigil, spells = spells, sigils = sigils,
+        selectedSpell = sheet.selectedSpell, discoveredCombos = combos,
         lightColor = sheet.lightColor, register = sheet.register, scrambledAt = sheet.scrambledAt,
     }
 end
@@ -300,6 +319,54 @@ function sheets.scramble(src)
         end
     end
     return false
+end
+
+--- Sort prêt dans les mains (choisi dans la roue) ; '' : aucun. Le sort doit être connu.
+---@param src integer
+---@param name string
+---@return boolean ok
+---@return string|nil code
+function sheets.select(src, name)
+    local sheet = loaded[src]
+    if not sheet then return false, 'not_ready' end
+    if name == '' then
+        if sheet.selectedSpell ~= nil then
+            sheet.selectedSpell = nil
+            sheets.touch(src)
+        end
+        return true
+    end
+    if not sheet.isMage then return false, 'not_mage' end
+    if not sheet.spells[name] or not VavaMagic.spells.get(name) then return false, 'unknown_spell' end
+    if sheet.selectedSpell ~= name then
+        sheet.selectedSpell = name
+        sheets.touch(src)
+    end
+    return true
+end
+
+--- Sort oublié : il n'est plus prêt dans les mains.
+---@param sheet vAvA.MagicSheet
+---@param name string
+function sheets.forgetSpell(sheet, name)
+    sheet.spells[name] = nil
+    if sheet.selectedSpell == name then sheet.selectedSpell = nil end
+end
+
+--- Combinaison déclenchée pour la première fois : notée pour le grimoire. Renvoie vrai si elle est nouvelle.
+---@param src integer
+---@param combo string
+---@return boolean
+function sheets.discover(src, combo)
+    local sheet = loaded[src]
+    if not sheet then return false end
+    for _, known in ipairs(sheet.discoveredCombos) do
+        if known == combo then return false end
+    end
+    if #sheet.discoveredCombos >= COMBOS_MAX then return false end
+    sheet.discoveredCombos[#sheet.discoveredCombos + 1] = combo
+    sheets.touch(src, true)
+    return true
 end
 
 --- Personnage supprimé : son sigil disparaît du royaume.

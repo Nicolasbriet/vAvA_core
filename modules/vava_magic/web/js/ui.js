@@ -72,5 +72,11 @@ const UI = (() => {
     return ROMAN[value - 1] || String(value);
   }
 
-  return { setTexts, t, format, el, append, button, length, truncate, title, roman };
+  /** Valeur CSS url() absolue d'une image de la page : une URL relative dans une variable CSS se lirait depuis la
+   *  feuille de style, pas depuis la page. */
+  function image(path) {
+    return `url("${new URL(path, document.baseURI).href}")`;
+  }
+
+  return { setTexts, t, format, el, append, button, length, truncate, title, roman, image };
 })();

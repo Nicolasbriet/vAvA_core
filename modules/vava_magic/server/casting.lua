@@ -2,11 +2,13 @@
     vava_magic/server/casting.lua
     Rôle : incantation commune à tous les sorts, décidée par le serveur.
       - Début (RPC du sort) : fiche chargée, mage, sort connu, une seule incantation à la fois, pas à terre ni en
-        véhicule, temps de recharge, hook `vava_magic:castStarting` (annulable), validation propre au sort, mana.
-        Position et vie du lanceur notées (lues côté serveur) ; state bag « incantation » sur son ped.
-      - Fin (RPC du sort) : durée écoulée, déplacement (positions serveur) et vie (une blessure interrompt) revérifiés.
+        véhicule, empêchements des autres fichiers (état « chancelant »…), délai global entre deux sorts, temps de
+        recharge du sort, hook `vava_magic:castStarting` (annulable), validation propre au sort, mana. Position et vie
+        du lanceur notées (lues côté serveur) ; state bag « incantation » (sort et niveau) sur son ped.
+      - Fin (RPC du sort) : durée écoulée, déplacement (positions serveur) et vie (une blessure interrompt les sorts
+        qui le disent, `interruptOnHurt`) revérifiés.
         La mana est réservée avant l'effet du sort : rendue en entier s'il refuse, en partie s'il le dit (échec
-        partiel) ; temps de recharge posé ; XP accordée (moitié pour un échec).
+        partiel) ; temps de recharge et délai global posés ; XP accordée (moitié pour un échec).
       - Interruption (chute, blessure, déplacement, touche) : aucune mana consommée ; incantation sans fin
         abandonnée après sa durée et une marge.
     Les temps de recharge sont tenus par personnage : se reconnecter ne les efface pas.
@@ -59,6 +61,10 @@ VavaMagic.casting = casting
 local casts = {}
 ---@type table<integer, table<string, integer>>  personnage → sort → fin du temps de recharge
 local cooldowns = {}
+---@type table<integer, integer>  personnage → fin du délai global entre deux sorts
+local globals = {}
+---@type (fun(src: integer): string|nil)[]  empêchements d'incanter (renvoient un code de refus)
+local blockers = {}
 ---@type table<string, boolean>  sorts dont les RPC sont ouvertes
 local exposed = {}
 local nextId = 0
@@ -86,6 +92,42 @@ function casting.cooldownLeft(characterId, spell)
         return 0
     end
     return left
+end
+
+---@param characterId integer
+---@return integer  millisecondes restantes du délai global
+function casting.globalLeft(characterId)
+    local untilMs = globals[characterId]
+    if not untilMs then return 0 end
+    local left = untilMs - GetGameTimer()
+    if left <= 0 then
+        globals[characterId] = nil
+        return 0
+    end
+    return left
+end
+
+--- Efface les temps de recharge d'un personnage (Conseil).
+---@param characterId integer
+function casting.resetCooldowns(characterId)
+    cooldowns[characterId] = nil
+    globals[characterId] = nil
+end
+
+--- Empêchement d'incanter tenu par un autre fichier : `check(source)` renvoie un code de refus, ou nil.
+---@param check fun(src: integer): string|nil
+function casting.addBlocker(check)
+    blockers[#blockers + 1] = check
+end
+
+---@param src integer
+---@return string|nil
+local function blocked(src)
+    for _, check in ipairs(blockers) do
+        local ok, code = pcall(check, src)
+        if ok and type(code) == 'string' then return code end
+    end
+    return nil
 end
 
 ---@param characterId integer
@@ -150,6 +192,9 @@ function casting.begin(src, name, ...)
     if casts[src] then return false, 'busy' end
     if bridge.IsDowned(src) then return false, 'downed' end
     if world.inVehicle(src) then return false, 'in_vehicle' end
+    local blocker = blocked(src)
+    if blocker then return false, blocker end
+    if casting.globalLeft(sheet.characterId) > 0 then return false, 'global_cooldown' end
     local left = casting.cooldownLeft(sheet.characterId, name)
     if left > 0 then return false, 'cooldown', ceil(left / MS_PER_SECOND) end
     local origin = world.position(src)
@@ -177,7 +222,7 @@ function casting.begin(src, name, ...)
         data = data, finishing = false,
     }
     casts[src] = cast
-    world.setState(src, STATES.CASTING, { spell = name })
+    world.setState(src, STATES.CASTING, { spell = name, level = level })
     SetTimeout(duration + cfg.graceMs, function()
         if casts[src] == cast and not cast.finishing then casting.abort(src, 'expired', true) end
     end)
@@ -209,7 +254,7 @@ function casting.finish(src, name, castId, ...)
         code = 'no_position'
     elseif geometry.distance(cast.origin, position) > cast.maxMove + cfg.moveMargin then
         code = 'moved'
-    elseif health < cast.health then
+    elseif health < cast.health and def.config.interruptOnHurt ~= false then
         code = 'hurt'
     elseif bridge.IsDowned(src) then
         code = 'downed'
@@ -236,10 +281,13 @@ function casting.finish(src, name, castId, ...)
     if refund > 0 then mana.give(src, floor(cast.cost * (refund > 1 and 1 or refund) + 0.5)) end
     local cooldownMs = def.config.levels[cast.level].cooldownMs
     casting.setCooldown(cast.characterId, name, cooldownMs)
+    globals[cast.characterId] = GetGameTimer() + cfg.globalCooldownMs
     local success = outcome.success ~= false
-    experience.grant(src, name, success)
+    local gained = experience.grant(src, name, success)
+    -- un sort qui touche plus tard (projectile) ne rapporte son bonus que si le lancer a rapporté de l'XP
+    if type(outcome.rewarded) == 'function' then outcome.rewarded(gained > 0) end
     core.hooks.runAfter(HOOKS.CAST, { source = src, characterId = cast.characterId, spell = name, level = cast.level, success = success })
-    return true, { success = success, cooldownMs = cooldownMs, result = outcome.result }
+    return true, { success = success, cooldownMs = cooldownMs, globalMs = cfg.globalCooldownMs, result = outcome.result }
 end
 
 --- Interruption demandée par le client (rien n'est consommé).

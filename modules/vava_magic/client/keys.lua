@@ -1,8 +1,8 @@
 --[[
     vava_magic/client/keys.lua
-    Rôle : touches et commandes du joueur. Chaque action de sort a une commande liée à une touche par
-           RegisterKeyMapping (réglable dans Paramètres > Raccourcis > FiveM) ; la touche choisie est relue pour le
-           grimoire. Commandes du chat avec leur suggestion en français.
+    Rôle : touches, boutons de la souris et commandes du joueur. Chaque action a une commande liée par
+           RegisterKeyMapping (clavier, bouton ou molette de la souris ; réglable dans Paramètres > Raccourcis >
+           FiveM) ; la touche choisie est relue pour le grimoire. Commandes du chat avec leur suggestion en français.
     Dépendances : config.lua, bridge/client.lua
 ]]
 
@@ -26,7 +26,7 @@ VavaMagic.keys = keys
 function keys.bind(name, handler)
     local key = KEYS[name]
     RegisterCommand(key.command, function() handler() end, false)
-    RegisterKeyMapping(key.command, key.label, 'keyboard', key.key)
+    RegisterKeyMapping(key.command, key.label, key.device or 'keyboard', key.key)
 end
 
 --- Lie une action maintenue à sa touche (commandes +/-) : `onDown` à l'appui, `onUp` au relâchement.
@@ -37,10 +37,11 @@ function keys.bindHold(name, onDown, onUp)
     local key = KEYS[name]
     RegisterCommand('+' .. key.command, function() onDown() end, false)
     RegisterCommand('-' .. key.command, function() onUp() end, false)
-    RegisterKeyMapping('+' .. key.command, key.label, 'keyboard', key.key)
+    RegisterKeyMapping('+' .. key.command, key.label, key.device or 'keyboard', key.key)
 end
 
---- Touche choisie par le joueur pour une action, telle que GTA l'affiche (« L »), ou celle par défaut.
+--- Touche choisie par le joueur pour une action, telle que GTA l'affiche (« L »), sinon son nom de la config
+--- (« Clic droit »).
 ---@param name string
 ---@return string|nil
 function keys.label(name)
@@ -52,7 +53,7 @@ function keys.label(name)
         local letter = match(button, '^t_(.+)$')
         if letter then return letter end
     end
-    return key.key
+    return key.display or key.key
 end
 
 -- suggestions envoyées au chat, renvoyées s'il (re)démarre après le module

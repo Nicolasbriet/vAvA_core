@@ -1,24 +1,26 @@
 --[[
     vava_magic/client/casting.lua
     Rôle : incantation côté client, commune à tous les sorts. Le client affiche et demande ; le serveur décide.
-      - Pré-vérification (mage, sort connu, niveau, mana prédite, recharge, à terre, en véhicule) pour éviter une
-        incantation inutile, puis demande au serveur.
-      - Pendant la durée : barre d'incantation, animation du sort, médaillon de mana lumineux. Interrompue par une
-        chute, une blessure, un déplacement au-delà de ce que le sort permet, ou la touche d'annulation : le
-        serveur est prévenu, aucune mana n'est consommée.
-      - Sort qui permet de marcher (Boule de feu) : pas de course ni de saut, allure bridée ; c'est la seule boucle
+      - Pré-vérification (mage, sort connu, niveau, mana prédite, délai global, recharge, à terre, en véhicule, droit
+        d'incanter du bridge, empêchements d'autres fichiers) pour éviter une incantation inutile, puis demande au
+        serveur.
+      - Pendant la durée : animation en trois phases (début, maintien en boucle, relâchement au succès), barre
+        d'incantation au-delà de `castBarMinMs`, lueur de la barre de mana. Interrompue par une chute, une blessure
+        (sorts qui le disent), un déplacement au-delà de ce que le sort permet, ou la touche d'annulation : le serveur
+        est prévenu, aucune mana n'est consommée.
+      - Sort qui permet de marcher (projectiles) : pas de course ni de saut, allure bridée ; c'est la seule boucle
         par image du fichier, et seulement pendant l'incantation. Sinon les contrôles ont lieu toutes les 100 ms.
-      - À la fin : arguments de fin du sort (direction de la caméra…), demande au serveur, temps de recharge noté.
+      - À la fin : arguments de fin du sort (direction visée…), demande au serveur, temps de recharge et délai global
+        notés.
     Dépendances : shared/, config.lua, client/core.lua, bridge/client.lua, client/nui.lua, client/state.lua,
-                  client/mana.lua, client/messages.lua, client/keys.lua
+                  client/fx.lua, client/hud.lua, client/messages.lua, client/keys.lua
 ]]
 
-local type, unpack = type, table.unpack
+local type, ipairs, pcall, unpack = type, ipairs, pcall, table.unpack
 local CreateThread, Wait, GetGameTimer = CreateThread, Wait, GetGameTimer
 local PlayerPedId, GetEntityCoords, GetEntityHealth, IsPedRagdoll, IsPedFalling, IsEntityDead, IsPedInAnyVehicle =
     PlayerPedId, GetEntityCoords, GetEntityHealth, IsPedRagdoll, IsPedFalling, IsEntityDead, IsPedInAnyVehicle
-local RequestAnimDict, HasAnimDictLoaded, TaskPlayAnim, StopAnimTask, RemoveAnimDict =
-    RequestAnimDict, HasAnimDictLoaded, TaskPlayAnim, StopAnimTask, RemoveAnimDict
+local TaskPlayAnim, StopAnimTask = TaskPlayAnim, StopAnimTask
 local DisableControlAction, SetPedMaxMoveBlendRatio = DisableControlAction, SetPedMaxMoveBlendRatio
 local RegisterNetEvent = RegisterNetEvent
 
@@ -26,7 +28,8 @@ local core = VavaMagic.core
 local bridge = VavaMagic.bridge
 local nui = VavaMagic.nui
 local state = VavaMagic.state
-local gauge = VavaMagic.manaGauge
+local fx = VavaMagic.fx
+local hud = VavaMagic.hud
 local messages = VavaMagic.messages
 local keys = VavaMagic.keys
 local geometry = VavaMagic.geometry
@@ -39,37 +42,31 @@ local MS_PER_SECOND = 1000
 local WALK_SPEED = 1.5
 local CONTROL_SPRINT, CONTROL_JUMP = 21, 22
 local ANIM_BLEND_IN, ANIM_BLEND_OUT, ANIM_STOP_BLEND = 8.0, -8.0, 1.0
-local ANIM_LOAD_POLL_MS = 10
 
 local casting = {}
 VavaMagic.casting = casting
 
 -- incantation en cours : { spell, id?, pending, cancelled, startedAt, ms, move, origin, health, anim, opts }
 local active = nil
+---@type (fun(): string|nil)[]  empêchements d'incanter (renvoient un code de refus)
+local blockers = {}
 
 ---@return boolean
 function casting.isCasting()
     return active ~= nil
 end
 
----@param dict string
----@return boolean
-local function loadAnim(dict)
-    if HasAnimDictLoaded(dict) then return true end
-    RequestAnimDict(dict)
-    local deadline = GetGameTimer() + cfg.animLoadMs
-    while not HasAnimDictLoaded(dict) do
-        if GetGameTimer() > deadline then return false end
-        Wait(ANIM_LOAD_POLL_MS)
-    end
-    return true
+--- Empêchement tenu par un autre fichier (état « chancelant »…) : `check()` renvoie un code de refus, ou nil.
+---@param check fun(): string|nil
+function casting.addBlocker(check)
+    blockers[#blockers + 1] = check
 end
 
---- Joue une animation { dict, clip, flag, ms? } (bloque le thread le temps de la charger).
+--- Joue une animation { dict, clip, flag, ms? } (bloque le thread le temps de la charger). Renvoie vrai si elle part.
 ---@param anim table|nil
 ---@return boolean
 function casting.playAnim(anim)
-    if type(anim) ~= 'table' or not loadAnim(anim.dict) then return false end
+    if type(anim) ~= 'table' or not fx.useAnim(anim.dict) then return false end
     TaskPlayAnim(PlayerPedId(), anim.dict, anim.clip, ANIM_BLEND_IN, ANIM_BLEND_OUT, anim.ms or -1, anim.flag or 0, 0.0, false, false, false)
     return true
 end
@@ -78,7 +75,18 @@ end
 function casting.stopAnim(anim)
     if type(anim) ~= 'table' then return end
     StopAnimTask(PlayerPedId(), anim.dict, anim.clip, ANIM_STOP_BLEND)
-    RemoveAnimDict(anim.dict)
+    fx.releaseAnim(anim.dict)
+end
+
+--- Joue une animation ponctuelle (relâchement) et la libère à la fin de sa durée.
+---@param anim table|nil
+function casting.playOnce(anim)
+    if type(anim) ~= 'table' then return end
+    CreateThread(function()
+        if not casting.playAnim(anim) then return end
+        Wait(anim.ms or MS_PER_SECOND)
+        fx.releaseAnim(anim.dict)
+    end)
 end
 
 --- Pré-vérification locale. Renvoie true, ou false, code[, secondes].
@@ -96,6 +104,12 @@ function casting.check(spell, opts)
     if active then return false, 'busy' end
     if bridge.IsDowned() then return false, 'downed' end
     if IsPedInAnyVehicle(PlayerPedId(), false) then return false, 'in_vehicle' end
+    if not bridge.CanUseMagic() then return false, 'cannot_cast' end
+    for _, check in ipairs(blockers) do
+        local ok, code = pcall(check)
+        if ok and type(code) == 'string' then return false, code end
+    end
+    if state.globalLeft() > 0 then return false, 'global_cooldown' end
     local left = state.cooldownLeft(spell)
     if left > 0 then return false, 'cooldown', (left + MS_PER_SECOND - 1) // MS_PER_SECOND end
     local cost = state.cost(spell, opts.costShare)
@@ -107,7 +121,7 @@ end
 local function release(cast)
     if active == cast then active = nil end
     casting.stopAnim(cast.anim)
-    gauge.casting(false)
+    hud.casting(false)
 end
 
 --- Interruption décidée par le client : le serveur est prévenu, rien n'est consommé.
@@ -121,7 +135,7 @@ local function interrupt(code)
     end
     core.rpc.emit(RPC.CANCEL, cast.id)
     release(cast)
-    nui.send('cast:interrupted')
+    if cast.bar then nui.send('cast:interrupted') end
     messages.refuse(code)
     if cast.opts.onAbort then cast.opts.onAbort(code) end
 end
@@ -131,15 +145,16 @@ end
 ---@param ped integer
 ---@return string|nil
 local function brokenBy(cast, ped)
-    if IsEntityDead(ped) or GetEntityHealth(ped) < cast.health then return 'hurt' end
+    if IsEntityDead(ped) then return 'hurt' end
+    if cast.hurtBreaks and GetEntityHealth(ped) < cast.health then return 'hurt' end
     if IsPedRagdoll(ped) or IsPedFalling(ped) then return 'ragdoll' end
     local coords = GetEntityCoords(ped)
     if geometry.distance(cast.origin, coords) > cast.move then return 'moved' end
     return nil
 end
 
---- Lance un sort. `opts` : args (arguments du début), finishArgs (fonction → arguments de la fin), minLevel,
---- costShare, onFinish(info), onAbort(code).
+--- Lance un sort. `opts` : args (arguments du début), count (leur nombre), finishArgs (fonction → arguments de la
+--- fin), minLevel, costShare, beforeRelease() (juste avant le geste de relâchement), onFinish(info), onAbort(code).
 ---@param spell string
 ---@param opts? table
 function casting.start(spell, opts)
@@ -151,6 +166,7 @@ function casting.start(spell, opts)
             return
         end
         local spellCfg = state.spellConfig(spell)
+        local anims = type(spellCfg.anims) == 'table' and spellCfg.anims or {}
         local cast = { spell = spell, pending = true, cancelled = false, opts = opts }
         active = cast
         local args = opts.args or {}
@@ -171,10 +187,18 @@ function casting.start(spell, opts)
         local ped = PlayerPedId()
         cast.origin = GetEntityCoords(ped)
         cast.health = GetEntityHealth(ped)
+        cast.hurtBreaks = spellCfg.interruptOnHurt ~= false
         cast.startedAt = GetGameTimer()
-        nui.send('cast:start', { label = spellCfg.label, ms = cast.ms })
-        gauge.casting(true)
-        if casting.playAnim(spellCfg.anim) then cast.anim = spellCfg.anim end
+        cast.bar = cast.ms >= cfg.castBarMinMs
+        if cast.bar then nui.send('cast:start', { label = spellCfg.label, ms = cast.ms }) end
+        hud.casting(true)
+        -- début puis maintien : le maintien prend la suite à la fin du début
+        local loopAt = cast.startedAt
+        if anims.start and casting.playAnim(anims.start) then
+            fx.releaseAnim(anims.start.dict)
+            loopAt = cast.startedAt + (anims.start.ms or 0)
+        end
+        local looping = false
 
         local slow = spellCfg.moveSpeed
         local blend = slow and slow / WALK_SPEED
@@ -182,6 +206,10 @@ function casting.start(spell, opts)
         while active == cast do
             local now = GetGameTimer()
             if now - cast.startedAt >= cast.ms then break end
+            if not looping and now >= loopAt then
+                looping = true
+                if casting.playAnim(anims.loop) then cast.anim = anims.loop end
+            end
             ped = PlayerPedId()
             if now >= nextCheck then
                 nextCheck = now + cfg.checkMs
@@ -208,14 +236,19 @@ function casting.start(spell, opts)
         local done, finished, result = core.rpc.call(FINISH_PREFIX .. spell, cast.id, unpack(finishArgs, 1, #finishArgs))
         release(cast)
         if not done or not finished then
-            nui.send('cast:interrupted')
+            if cast.bar then nui.send('cast:interrupted') end
             messages.refuse(done and result or finished)
             if opts.onAbort then opts.onAbort(done and result or finished) end
             return
         end
-        nui.send('cast:end')
+        if cast.bar then nui.send('cast:end') end
         state.setCooldown(spell, result.cooldownMs or 0)
-        gauge.flash()
+        state.setGlobal(result.globalMs or 0)
+        hud.flash()
+        if result.success ~= false then
+            if opts.beforeRelease then opts.beforeRelease(result) end
+            casting.playOnce(anims.release)
+        end
         if opts.onFinish then opts.onFinish(result) end
     end)
 end
@@ -232,7 +265,7 @@ function casting.serverAbort(id, code)
     local cast = active
     if not cast or cast.id ~= id or cast.finishing then return end
     release(cast)
-    nui.send('cast:interrupted')
+    if cast.bar then nui.send('cast:interrupted') end
     messages.refuse(code)
     if cast.opts.onAbort then cast.opts.onAbort(code) end
 end
@@ -243,7 +276,7 @@ function casting.reset()
     if not cast then return end
     if cast.id and not cast.finishing then core.rpc.emit(RPC.CANCEL, cast.id) end
     release(cast)
-    nui.send('cast:end')
+    if cast.bar then nui.send('cast:end') end
 end
 
 RegisterNetEvent(EVENTS.CAST_ABORT, function(id, code)

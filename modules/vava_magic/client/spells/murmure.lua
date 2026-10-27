@@ -1,7 +1,8 @@
 --[[
     vava_magic/client/spells/murmure.lua
-    Rôle : sort Murmure côté client : parchemin d'écriture (touche ou /murmure ; contacts gardés, cercle et longueur
-           selon le niveau, position jointe dès le niveau 3), envoi direct par `/murmure <n°[,n°…]> <message>`,
+    Rôle : sort Murmure côté client : parchemin d'écriture (clic gauche en mode magie, ou /murmure ; contacts gardés,
+           cercle et longueur selon le niveau, position jointe dès le niveau 3), envoi direct par
+           `/murmure <n°[,n°…]> <message>`,
            fragments reçus du serveur pour l'affichage au-dessus des mains, message reçu sur un parchemin (nom du
            contact ou « présence inconnue »), point de passage sur la carte si la position est jointe.
     Le serveur décide de tout (contacts, longueur, fragments, déformation, portée).
@@ -17,6 +18,7 @@ local bridge = VavaMagic.bridge
 local nui = VavaMagic.nui
 local state = VavaMagic.state
 local casting = VavaMagic.casting
+local controls = VavaMagic.controls
 local ambient = VavaMagic.ambient
 local messages = VavaMagic.messages
 local keys = VavaMagic.keys
@@ -101,7 +103,8 @@ RegisterNetEvent(EVENTS.MURMUR, function(payload)
     end
 end)
 
-keys.bind('murmure', murmure.compose)
+-- clic gauche en mode magie : le parchemin d'écriture (pas de visée)
+controls.register(NAME, { cast = function() murmure.compose() end })
 
 -- /murmure ouvre le parchemin ; /murmure 1,3 Rendez-vous au moulin : envoi direct
 keys.command(cfg.commands.murmure, texts.suggestions.murmure, function(args)

@@ -1,14 +1,14 @@
 --[[
     vava_magic/client/targeting.lua
     Rôle : verrouillage d'une cible pour les sorts d'attaque (config `lockOn`), commun à tous.
-      - Touche (Tab) : appui court = verrouiller le joueur le plus proche du centre de l'écran, à portée du sort
-        d'attaque connu et en vue ; nouvel appui = cible suivante ; touche maintenue = relâcher.
+      - Clic molette (réglable) : clic court = verrouiller le joueur le plus proche du centre de l'écran, à portée
+        du sort d'attaque connu et en vue ; nouveau clic = cible suivante ; clic maintenu = relâcher.
       - Le verrou saute hors de portée, hors de vue (quelques vérifications de suite), cible morte, ou sans attaque
-        depuis un moment. Un anneau sous la cible n'est vu que du lanceur : rien ne passe par le réseau.
-      - Pendant l'appui, la roue d'armes de GTA (même touche) est bloquée : seule boucle par image avec celle de
-        l'anneau, et seulement le temps de l'appui ou du verrou.
+        depuis un moment. Un anneau sous la cible n'est vu que du lanceur : rien ne passe par le réseau. C'est la
+        seule boucle par image du fichier, et seulement tant qu'une cible est verrouillée.
       - Cible prévenue par le serveur (au début de l'incantation) : le bord de son écran rougit un instant.
-    Le serveur revérifie la cible au lancer : ceci n'est qu'une proposition.
+    Le serveur revérifie la cible au lancer : ceci n'est qu'une proposition. Les sorts la lisent par le bridge
+    (Bridge.GetLockedTarget).
     Dépendances : shared/, config.lua, client/nui.lua, client/state.lua, client/messages.lua, client/keys.lua,
                   client/aim.lua
 ]]
@@ -18,7 +18,7 @@ local CreateThread, Wait, GetGameTimer, RegisterNetEvent = CreateThread, Wait, G
 local PlayerId, PlayerPedId, GetActivePlayers, GetPlayerPed, GetPlayerServerId, GetEntityCoords, GetGameplayCamCoord =
     PlayerId, PlayerPedId, GetActivePlayers, GetPlayerPed, GetPlayerServerId, GetEntityCoords, GetGameplayCamCoord
 local DoesEntityExist, IsEntityDead, HasEntityClearLosToEntity = DoesEntityExist, IsEntityDead, HasEntityClearLosToEntity
-local DisableControlAction, HideHudComponentThisFrame, DrawMarker = DisableControlAction, HideHudComponentThisFrame, DrawMarker
+local DrawMarker = DrawMarker
 
 local nui = VavaMagic.nui
 local state = VavaMagic.state
@@ -31,8 +31,6 @@ local ring = cfg.ring
 local EVENTS = VavaMagic.EVENTS
 -- vue dégagée : décor et objets (pas les peds ni les véhicules)
 local LOS_FLAGS = 17
-local CONTROL_WEAPON_WHEEL = 37
-local HUD_WEAPON_WHEEL, HUD_WEAPON_WHEEL_STATS = 19, 20
 local MS_PER_SECOND = 1000
 
 local targeting = {}
@@ -165,16 +163,6 @@ end
 
 local function pressed()
     pressedAt = GetGameTimer()
-    CreateThread(function()
-        local mine = pressedAt
-        -- boucle par image justifiée : le temps de l'appui seulement, la roue d'armes de GTA ne s'ouvre pas
-        while pressedAt == mine do
-            DisableControlAction(0, CONTROL_WEAPON_WHEEL, true)
-            HideHudComponentThisFrame(HUD_WEAPON_WHEEL)
-            HideHudComponentThisFrame(HUD_WEAPON_WHEEL_STATS)
-            Wait(0)
-        end
-    end)
 end
 
 local function released()

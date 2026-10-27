@@ -1,8 +1,9 @@
 --[[
     vava_magic/client/state.lua
     Rôle : ce que le client sait de sa magie, pour afficher et pré-vérifier (le serveur décide de tout) : vue de la
-           fiche (mage, sorts et leur XP), mana prédite d'après le dernier envoi du serveur (même rythme de
-           régénération), temps de recharge appris aux fins d'incantation, sorts d'autres modules.
+           fiche (mage, sorts et leur XP, sort prêt dans les mains, combinaisons découvertes), mana prédite d'après le
+           dernier envoi du serveur (même rythme de régénération), temps de recharge et délai global appris aux fins
+           d'incantation, sorts d'autres modules.
     Dépendances : shared/, config.lua
 ]]
 
@@ -22,6 +23,9 @@ local known = {}
 local catalog = {}
 ---@type table<string, integer>  sort → fin du temps de recharge (horloge locale)
 local cooldowns = {}
+local globalUntil = 0
+-- sort prêt dans les mains (choisi dans la roue), ou nil
+local selected = nil
 local admin = false
 -- mana : valeur au moment `base`, rythme de régénération
 local pool = nil
@@ -47,6 +51,9 @@ function state.set(newView, newCatalog)
         if type(spell) == 'table' and type(spell.name) == 'string' and type(spell.xp) == 'number' then known[spell.name] = spell.xp end
     end
     if type(newCatalog) == 'table' then catalog = newCatalog end
+    local wanted = type(newView.selected) == 'string' and newView.selected or ''
+    if wanted ~= '' and known[wanted] and state.spellConfig(wanted) then selected = wanted
+    elseif selected and not known[selected] then selected = nil end
     changed()
 end
 
@@ -62,7 +69,7 @@ end
 
 --- Départ du personnage : tout est oublié.
 function state.clear()
-    view, known, cooldowns, pool, admin = nil, {}, {}, nil, false
+    view, known, cooldowns, pool, admin, selected, globalUntil = nil, {}, {}, nil, false, nil, 0
     changed()
 end
 
@@ -125,6 +132,30 @@ function state.cost(name, share)
     return progression.cost(spellCfg, level, share)
 end
 
+--- Combinaisons découvertes (grimoire).
+---@return string[]
+function state.combos()
+    return view and type(view.combos) == 'table' and view.combos or {}
+end
+
+-- Sort prêt dans les mains -------------------------------------------------------------------------------------------
+
+---@return string|nil
+function state.selected()
+    return selected
+end
+
+--- Choisit le sort prêt (nil : aucun). Seul un sort connu peut l'être.
+---@param name string|nil
+---@return boolean
+function state.setSelected(name)
+    if name ~= nil and (not known[name] or not state.spellConfig(name)) then return false end
+    if selected == name then return true end
+    selected = name
+    changed()
+    return true
+end
+
 -- Mana -------------------------------------------------------------------------------------------------------------
 
 --- Mana envoyée par le serveur : valeur, maximum, points et période de régénération, temps écoulé dans la période.
@@ -149,6 +180,24 @@ end
 ---@param ms integer
 function state.setCooldown(name, ms)
     cooldowns[name] = GetGameTimer() + ms
+end
+
+--- Délai global entre deux sorts.
+---@param ms integer
+function state.setGlobal(ms)
+    globalUntil = GetGameTimer() + ms
+end
+
+---@return integer  millisecondes restantes du délai global
+function state.globalLeft()
+    local left = globalUntil - GetGameTimer()
+    return left > 0 and left or 0
+end
+
+--- Recharges effacées par le Conseil.
+function state.resetCooldowns()
+    cooldowns, globalUntil = {}, 0
+    changed()
 end
 
 ---@param name string

@@ -16,6 +16,9 @@ local sort = table.sort
 
 local core = VavaMagic.core
 local progression = VavaMagic.progression
+local ELEMENTS = VavaMagic.config.elements
+local SPELL_TYPES = VavaMagic.SPELL_TYPES
+local AIM_KINDS = VavaMagic.AIM_KINDS
 local REGISTRY = VavaMagic.SPELLS_REGISTRY
 local RESOURCE = VavaMagic.resource
 local MAX_LEVEL = progression.MAX_LEVEL
@@ -26,7 +29,7 @@ VavaMagic.spells = spells
 ---@class vAvA.MagicSpell
 ---@field name string
 ---@field owner string           ressource qui l'a déclaré
----@field config table           label, levels, baseCost, xp, moveSpeed?, order?
+---@field config table           label, element, type, icon, aim, levels, baseCost, xp, hitXp?, moveSpeed?, order?
 ---@field beginArgs table[]      schémas des arguments du début (après le nom du sort)
 ---@field finishArgs table[]     schémas des arguments de la fin (après le numéro d'incantation)
 ---@field begin fun(ctx: table, ...): boolean, any
@@ -51,6 +54,11 @@ end
 function spells.validate(config)
     if type(config) ~= 'table' then return false, 'config attendue' end
     if type(config.label) ~= 'string' or config.label == '' then return false, 'label attendu' end
+    if not ELEMENTS[config.element] then return false, 'element inconnu' end
+    if not SPELL_TYPES[config.type] then return false, 'type attendu (projectile, zone, utilitaire)' end
+    if type(config.icon) ~= 'string' or not config.icon:find('^[%w_]+$') then return false, 'icon attendu' end
+    if type(config.aim) ~= 'table' or not AIM_KINDS[config.aim.kind] then return false, 'aim.kind attendu' end
+    if config.hitXp ~= nil and (type(config.hitXp) ~= 'number' or config.hitXp < 0) then return false, 'hitXp invalide' end
     if type(config.baseCost) ~= 'number' or config.baseCost < 0 then return false, 'baseCost attendu' end
     if type(config.xp) ~= 'number' or config.xp < 0 then return false, 'xp attendu' end
     if config.moveSpeed ~= nil and (type(config.moveSpeed) ~= 'number' or config.moveSpeed < 0) then return false, 'moveSpeed invalide' end
@@ -132,6 +140,8 @@ end
 local leaveHandlers = {}
 ---@type function[]  à appeler à l'arrêt du module (objets créés par le serveur)
 local stopHandlers = {}
+---@type function[]  nettoyage d'urgence du Conseil : zones, remparts, orbes (chacun renvoie ce qu'il a retiré)
+local cleanupHandlers = {}
 
 --- Ménage d'un sort au départ d'un joueur : `handler(source)`.
 ---@param handler fun(source: integer)
@@ -143,6 +153,27 @@ end
 ---@param handler fun()
 function spells.onStop(handler)
     stopHandlers[#stopHandlers + 1] = handler
+end
+
+--- Nettoyage d'urgence (commande du Conseil) : `handler()` retire ses effets du monde et renvoie leur nombre.
+---@param handler fun(): integer
+function spells.onCleanup(handler)
+    cleanupHandlers[#cleanupHandlers + 1] = handler
+end
+
+--- Retire du monde tous les effets des sorts. Renvoie le nombre retiré.
+---@return integer
+function spells.cleanup()
+    local total = 0
+    for _, handler in ipairs(cleanupHandlers) do
+        local ok, count = pcall(handler)
+        if not ok then
+            VavaMagic.log.error('nettoyage en erreur : %s', tostring(count))
+        elseif mathType(count) == 'integer' then
+            total = total + count
+        end
+    end
+    return total
 end
 
 ---@param src integer

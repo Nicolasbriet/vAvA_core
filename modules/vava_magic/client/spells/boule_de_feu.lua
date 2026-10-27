@@ -1,42 +1,44 @@
 --[[
     vava_magic/client/spells/boule_de_feu.lua
     Rôle : sort Boule de feu côté client.
-      - Lancer : incantation (le lanceur peut marcher lentement), cible verrouillée annoncée au début (sinon la
-        direction de la caméra, envoyée à la fin), le lanceur se tourne vers sa cible, geste de jet. Le serveur décide
-        de l'échec (la boule s'éteint), de la direction vers une cible verrouillée, et annonce le lancer.
+      - Lancer (clic gauche en mode magie, ou /lancer) : incantation brève (le lanceur peut marcher), cible
+        verrouillée annoncée au début ; sinon, à la fin, la direction visée (des mains vers le point sous le
+        réticule) ou, sans visée, droit devant le personnage. Le lanceur se tourne vers sa cible ou son point, geste
+        de jet. Le serveur décide de l'échec (la boule s'éteint), de la direction vers une cible verrouillée, et
+        annonce le lancer.
       - Vers une cible verrouillée, aux niveaux 4 et 5, la boule s'incurve vers elle pendant son vol (virage borné par
         seconde, annoncé par le serveur).
       - Vol (vu de tous les joueurs proches) : chaque client simule la trajectoire en ligne droite et la dessine
         (petit objet local invisible portant les flammes, lumière, souffle). Seul le client du lanceur lance un rayon
         le long de la trajectoire et signale l'impact au serveur, qui le valide avant tout dégât.
       - Impact validé : flammes et lueur à l'endroit annoncé par le serveur, chez tous. Aucune explosion GTA.
-    La boucle par image ne vit que le temps d'un vol (deux secondes au plus).
+    Effets selon le niveau (taille, lumière) et la distance (rien au-delà de `effects.maxDistance`), dans les plafonds
+    de lumières et de particules. La boucle par image ne vit que le temps d'un vol (deux secondes au plus).
     Dépendances : shared/, config.lua, client/ (noyau)
 ]]
 
 local pairs, type, min, max, sqrt, acos, deg = pairs, type, math.min, math.max, math.sqrt, math.acos, math.deg
-local GetHeadingFromVector_2d, SetEntityHeading = GetHeadingFromVector_2d, SetEntityHeading
+local GetHeadingFromVector_2d, SetEntityHeading, GetEntityForwardVector = GetHeadingFromVector_2d, SetEntityHeading, GetEntityForwardVector
 local CreateThread, Wait, GetGameTimer, GetFrameTime, RegisterNetEvent = CreateThread, Wait, GetGameTimer, GetFrameTime, RegisterNetEvent
 local PlayerId, PlayerPedId, GetPlayerServerId, GetPlayerFromServerId, GetPlayerPed = PlayerId, PlayerPedId, GetPlayerServerId, GetPlayerFromServerId, GetPlayerPed
 local GetEntityCoords, GetPedBoneCoords, IsEntityAPed, IsPedAPlayer, NetworkGetPlayerIndexFromPed =
     GetEntityCoords, GetPedBoneCoords, IsEntityAPed, IsPedAPlayer, NetworkGetPlayerIndexFromPed
 local GetHashKey, RequestModel, HasModelLoaded, CreateObject, DeleteObject, DoesEntityExist, SetEntityCoordsNoOffset, SetEntityAlpha, SetEntityCollision =
     GetHashKey, RequestModel, HasModelLoaded, CreateObject, DeleteObject, DoesEntityExist, SetEntityCoordsNoOffset, SetEntityAlpha, SetEntityCollision
-local UseParticleFxAsset, StartParticleFxLoopedOnEntity, StartParticleFxNonLoopedAtCoord, StopParticleFxLooped =
-    UseParticleFxAsset, StartParticleFxLoopedOnEntity, StartParticleFxNonLoopedAtCoord, StopParticleFxLooped
-local StartShapeTestCapsule, GetShapeTestResult, DrawLightWithRange = StartShapeTestCapsule, GetShapeTestResult, DrawLightWithRange
+local StartParticleFxLoopedOnEntity, StartParticleFxNonLoopedAtCoord = StartParticleFxLoopedOnEntity, StartParticleFxNonLoopedAtCoord
+local StartShapeTestCapsule, GetShapeTestResult = StartShapeTestCapsule, GetShapeTestResult
 
 local core = VavaMagic.core
 local nui = VavaMagic.nui
+local bridge = VavaMagic.bridge
 local casting = VavaMagic.casting
-local ambient = VavaMagic.ambient
-local keys = VavaMagic.keys
-local aim = VavaMagic.aim
+local controls = VavaMagic.controls
+local fx = VavaMagic.fx
 local targeting = VavaMagic.targeting
 local geometry = VavaMagic.geometry
 local cfg = VavaMagic.config
 local spellCfg = cfg.spells.boule_de_feu
-local fx = spellCfg.fx
+local fxCfg = spellCfg.fx
 local lightCfg = spellCfg.light
 local projectileCfg = spellCfg.projectile
 local RPC = VavaMagic.RPC
@@ -52,6 +54,7 @@ local ENDED_MEMORY_MS = 10000  -- un impact déjà montré n'est pas montré deu
 local HEARING_DISTANCE = 60.0  -- au-delà, plus aucun son
 local LIGHT_SIZE_SHARE = 0.8   -- la lumière du projectile suit sa taille
 local CHEST_BONE = 24818       -- SKEL_Spine3 : une boule qui s'incurve vise le torse
+local HAND_HEIGHT = 0.6        -- hauteur des mains au-dessus de la position du ped (comme le serveur)
 
 local fireball = {}
 VavaMagic.fireball = fireball
@@ -65,7 +68,7 @@ local flying = false
 
 -- modèle et particules préchargés : le premier lancer ne doit pas attendre
 RequestModel(MODEL)
-ambient.ptfxReady(fx.asset)
+fx.ptfxReady(fxCfg.asset)
 
 ---@return integer
 local function myServerId()
@@ -86,12 +89,12 @@ local function sound(name, x, y, z)
     if volume > 0 then nui.send('sound', { name = name, volume = volume }) end
 end
 
---- Flammes et lueur d'un impact.
+--- Flammes et lueur d'un impact (rien au-delà de la distance des effets).
 local function impactAt(x, y, z, size)
-    if ambient.ptfxReady(fx.asset) then
-        UseParticleFxAsset(fx.asset)
-        StartParticleFxNonLoopedAtCoord(fx.impact, x, y, z, 0.0, 0.0, 0.0, fx.impactScale * size, false, false, false)
-    end
+    if not fx.detail({ x = x, y = y, z = z }) then return end
+    fx.oneShot(fxCfg.asset, function()
+        StartParticleFxNonLoopedAtCoord(fxCfg.impact, x, y, z, 0.0, 0.0, 0.0, fxCfg.impactScale * size, false, false, false)
+    end)
     flashes[#flashes + 1] = { x = x, y = y, z = z, untilMs = GetGameTimer() + FLASH_MS, size = size }
     sound('impact', x, y, z)
 end
@@ -100,7 +103,7 @@ end
 ---@param point table|nil  point d'impact (nil : la boule s'est dissipée en bout de course)
 local function land(projectile, point)
     projectiles[projectile.id] = nil
-    if projectile.flame then StopParticleFxLooped(projectile.flame, false) end
+    fx.stopLooped(projectile.flame)
     if projectile.object and DoesEntityExist(projectile.object) then DeleteObject(projectile.object) end
     if point then
         ended[projectile.id] = GetGameTimer()
@@ -166,7 +169,7 @@ local function advance(projectile, dt)
         if projectile.object then SetEntityCoordsNoOffset(projectile.object, to.x, to.y, to.z, false, false, false) end
     end
     local at = projectile.position
-    DrawLightWithRange(at.x, at.y, at.z, lightCfg.r, lightCfg.g, lightCfg.b, lightCfg.range * projectile.size * LIGHT_SIZE_SHARE, lightCfg.intensity)
+    fx.light(at.x, at.y, at.z, lightCfg.r, lightCfg.g, lightCfg.b, lightCfg.range * projectile.size * LIGHT_SIZE_SHARE, lightCfg.intensity * projectile.glow)
     if projectile.travelled >= projectile.range and not projectile.test then land(projectile, nil) end
 end
 
@@ -184,7 +187,7 @@ local function fly()
                 if now > flash.untilMs then
                     table.remove(flashes, i)
                 else
-                    DrawLightWithRange(flash.x, flash.y, flash.z, lightCfg.r, lightCfg.g, lightCfg.b, lightCfg.range * flash.size, lightCfg.intensity * 2)
+                    fx.light(flash.x, flash.y, flash.z, lightCfg.r, lightCfg.g, lightCfg.b, lightCfg.range * flash.size, lightCfg.intensity * 2)
                 end
             end
             Wait(0)
@@ -204,22 +207,24 @@ RegisterNetEvent(EVENTS.FIREBALL, function(payload)
     local ped = GetPlayerPed(player)
     if not ped or ped == 0 then return end
     local hand = GetPedBoneCoords(ped, projectileCfg.handBone, 0.0, 0.0, 0.0)
-    local levelCfg = spellCfg.levels[payload.level] or spellCfg.levels[1]
+    local level = spellCfg.levels[payload.level] and payload.level or 1
+    local levelCfg = spellCfg.levels[level]
+    local scale = spellCfg.levelScale[level] or 1.0
     if payload.fizzle then
-        if ambient.ptfxReady(fx.asset) then
-            UseParticleFxAsset(fx.asset)
-            StartParticleFxNonLoopedAtCoord(fx.fizzle, hand.x, hand.y, hand.z, 0.0, 0.0, 0.0, fx.fizzleScale, false, false, false)
-        end
+        fx.oneShot(fxCfg.asset, function()
+            StartParticleFxNonLoopedAtCoord(fxCfg.fizzle, hand.x, hand.y, hand.z, 0.0, 0.0, 0.0, fxCfg.fizzleScale * scale, false, false, false)
+        end)
         sound('fizzle', hand.x, hand.y, hand.z)
         return
     end
     if type(payload.id) ~= 'number' or type(payload.dx) ~= 'number' or type(payload.speed) ~= 'number' then return end
     local own = payload.caster == myServerId()
-    if not own and geometry.distance(GetEntityCoords(PlayerPedId()), hand) > projectileCfg.renderDistance then return end
+    -- trop loin pour être vu : seul le lanceur simule le vol (il doit signaler l'impact)
+    if not own and not fx.detail(hand) then return end
     local projectile = {
         id = payload.id, own = own, position = { x = hand.x, y = hand.y, z = hand.z },
         dx = payload.dx, dy = payload.dy, dz = payload.dz, speed = payload.speed, range = payload.range,
-        travelled = 0, size = levelCfg.size,
+        travelled = 0, size = levelCfg.size * scale, glow = scale,
         target = type(payload.target) == 'number' and payload.target > 0 and payload.target or nil,
         homing = type(payload.homing) == 'number' and payload.homing or 0,
     }
@@ -229,10 +234,9 @@ RegisterNetEvent(EVENTS.FIREBALL, function(payload)
             SetEntityAlpha(object, 0, false)
             SetEntityCollision(object, false, false)
             projectile.object = object
-            if ambient.ptfxReady(fx.asset) then
-                UseParticleFxAsset(fx.asset)
-                projectile.flame = StartParticleFxLoopedOnEntity(fx.trail, object, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, levelCfg.size, false, false, false)
-            end
+            projectile.flame = fx.startLooped(fxCfg.asset, function()
+                return StartParticleFxLoopedOnEntity(fxCfg.trail, object, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, projectile.size, false, false, false)
+            end)
         end
     end
     projectiles[projectile.id] = projectile
@@ -253,29 +257,48 @@ RegisterNetEvent(EVENTS.FIREBALL_END, function(id, x, y, z)
     end
 end)
 
---- Se tourne vers la cible verrouillée avant le jet.
-local function faceTarget()
-    local ped = targeting.ped()
-    if not ped then return end
+--- Se tourne vers la cible verrouillée, ou vers la direction du jet.
+---@param direction table|nil
+local function face(direction)
     local me = PlayerPedId()
-    local from, to = GetEntityCoords(me), GetEntityCoords(ped)
-    SetEntityHeading(me, GetHeadingFromVector_2d(to.x - from.x, to.y - from.y))
+    local ped = targeting.ped()
+    if ped then
+        local from, to = GetEntityCoords(me), GetEntityCoords(ped)
+        SetEntityHeading(me, GetHeadingFromVector_2d(to.x - from.x, to.y - from.y))
+    elseif direction then
+        SetEntityHeading(me, GetHeadingFromVector_2d(direction.x, direction.y))
+    end
 end
 
---- Touche : lancer une boule de feu sur la cible verrouillée, ou dans la direction de la caméra.
-function fireball.cast()
-    local target = targeting.current()
+--- Direction du jet à la fin de l'incantation : vers le point visé (depuis les mains), la caméra si l'on vise sans
+--- rien toucher, droit devant le personnage sans visée.
+---@return table
+local function throwDirection()
+    local info = controls.aimInfo()
+    if info.aiming and info.point then
+        local body = GetEntityCoords(PlayerPedId())
+        local direction = geometry.normalize(info.point.x - body.x, info.point.y - body.y, info.point.z - body.z - HAND_HEIGHT)
+        if direction then return direction end
+    end
+    if info.aiming then return info.direction end
+    local forward = GetEntityForwardVector(PlayerPedId())
+    return { x = forward.x, y = forward.y, z = 0.0 }
+end
+
+--- Clic gauche en mode magie (ou /lancer) : une boule de feu sur la cible verrouillée, ou là où l'on vise.
+---@param info table  { aiming, point, inRange, direction, target }
+local function cast(info)
+    local target = info.target or bridge.GetLockedTarget()
+    local direction = nil
     casting.start(NAME, {
         args = { target }, count = target and 1 or 0,
         finishArgs = function()
-            local direction = aim.direction()
+            direction = throwDirection()
             return { direction.x, direction.y, direction.z }
         end,
-        onFinish = function(info)
-            if not info.success then return end
-            targeting.used()
-            faceTarget()
-            casting.playAnim(spellCfg.throwAnim)
+        beforeRelease = function() face(direction) end,
+        onFinish = function(result)
+            if result.success ~= false then targeting.used() end
         end,
     })
 end
@@ -285,5 +308,4 @@ function fireball.stop()
     for _, projectile in pairs(projectiles) do land(projectile, nil) end
 end
 
-keys.bind('feu', fireball.cast)
-keys.command(cfg.commands.feu, cfg.texts.suggestions.feu, fireball.cast)
+controls.register(NAME, { cast = cast })

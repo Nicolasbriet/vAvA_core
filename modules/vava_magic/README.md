@@ -1,8 +1,14 @@
 # vava_magic — la magie du royaume
 
-Système de magie pour vAvA_core : fiche magie par personnage, mana, progression sur 5 niveaux, incantation commune et
-trois sorts (**Murmure**, **Lueur**, **Boule de feu**), grimoire et registre des murmures (objets), commandes du
-Conseil. Le serveur décide de tout ; le client affiche et demande.
+Système de magie pour vAvA_core : fiche magie par personnage, mana et sa barre, progression sur 5 niveaux,
+incantation commune, **roue des sorts** (Tab) et **mode magie à la souris** (viser, lancer, verrouiller une cible),
+**états élémentaires** (brûlure, mouillé, ralenti, chancelant, renversé, gelé, avec immunité aux contrôles durs),
+**zones au sol**, sorts de feu (**Boule de feu**, **Mur de flammes**, **Nova ardente**), **Lueur** et **Murmure**,
+grimoire et registre des murmures (objets), commandes du Conseil. Le serveur décide de tout ; le client affiche et
+demande.
+
+Version 2.1.0 : étapes 1 (noyau, roue, contrôles) et 2 (états, zones, feu) de la refonte. Les sorts d'eau et de terre,
+puis les combinaisons d'éléments, viennent ensuite.
 
 ## Installation
 
@@ -19,8 +25,7 @@ Conseil. Le serveur décide de tout ; le client affiche et demande.
 4. Faire un premier mage depuis le jeu (membre du Conseil) ou la console du serveur :
 
    ```
-   magie mage 1 oui
-   magie apprendre 1 murmure
+   magie tous 1          (le joueur 1 devient mage et apprend tous les sorts au niveau 1)
    magie donner 1 grimoire
    magie donner 1 registre
    ```
@@ -29,7 +34,7 @@ Conseil. Le serveur décide de tout ; le client affiche et demande.
 | --- | --- | --- |
 | `vAvA_core` ≥ 0.5.0 | personnages, RPC, hooks, base, journal | obligatoire |
 | `vava_inventory` ≥ 1.3.0 | grimoire et registre (objets, métadonnées) | pas d'objets ; `/grimoire` reste |
-| `vava_hud` | médaillon de mana, notifications | notifications de GTA, pas de médaillon |
+| `vava_hud` | notifications | notifications de GTA (la barre de mana est celle du module) |
 | `vava_health` | blessures, état « à terre » | la victime applique la blessure elle-même |
 | `vava_admin` | droits et journal du Conseil | permission ACE `magie.admin`, journal en console |
 | `vava_chat` | réponses des commandes et suggestions (évènements `chat:*`, aussi ceux de la ressource « chat » de FiveM) | touches seulement |
@@ -41,11 +46,15 @@ vava_magic/
   fxmanifest.lua · config.lua · README.md
   shared/   constants.lua · text.lua (UTF-8) · progression.lua · geometry.lua
   bridge/   server.lua · client.lua                 ← seul contact avec le core et les autres modules
-  server/   core · world · sheets · mana · spells · progression · combat · registers · sigils · casting
-            admin · api · main · spells/murmure · spells/lueur · spells/boule_de_feu
-  client/   core · nui · state · messages · mana · keys · aim · casting · ambient · sigils · grimoire
-            register · main · spells/murmure · spells/lueur · spells/boule_de_feu
-  web/      index.html · css/ · js/ · fonts/ (OFL) · img/ (runes, mana, textures) · items/ (grimoire, registre)
+  server/   core · world · sheets · mana · spells · progression · combat · states (états) · zones (au sol)
+            registers · sigils · casting · admin · api · main
+            spells/murmure · spells/lueur · spells/boule_de_feu · spells/mur_de_flammes · spells/nova_ardente
+  client/   core · nui · state · messages · fx (budget des effets) · hud (barre de mana) · keys · aim · targeting
+            casting · controls (mode magie) · wheel (roue) · states (états sur soi) · ambient · zones (rendu)
+            sigils · grimoire · register · main
+            spells/boule_de_feu · spells/mur_de_flammes · spells/nova_ardente · spells/lueur · spells/murmure
+  web/      index.html · css/ · js/ (dont wheel, hud) · fonts/ (OFL) · img/ (runes, textures, spells/, elements/)
+            items/ (grimoire, registre)
   sql/      0001_magic.sql
 ```
 
@@ -75,27 +84,47 @@ Le noyau utilise en plus l'infrastructure du core (`core.rpc` à schéma strict 
 | --- | --- |
 | `Notify(message, nature)` | `vava_hud:notify`, sinon notification de GTA |
 | `IsDowned()` | `vava_health:get().downed` |
-| `GaugeSet` · `GaugeActive` · `GaugeHide` | médaillon de mana de `vava_hud` |
+| `CanUseMagic()` | ni mort, ni à terre, ni menotté (`IsPedCuffed`), ni assommé |
+| `GetLockedTarget()` | cible du verrouillage de ce module (clic molette), numéro serveur ou nil |
+| `ApplyMagicDamage(part, lanceur, sort)` | sans vava_health : `ApplyDamageToPed` sur ordre du serveur |
 | `ChatLines` · `ChatSuggestion` | `chat:addMessage` · `chat:addSuggestion` |
+
+Les dégâts restent décidés et appliqués par le serveur (`ApplyDamage` → vava_health) : un tricheur ne peut pas ignorer
+une blessure. `ApplyMagicDamage` n'est que le repli sans vava_health.
 
 ## Commandes et touches du joueur
 
-Les touches se règlent dans **Paramètres > Raccourcis > FiveM** (même place en AZERTY et en QWERTY).
+Les touches et boutons se règlent dans **Paramètres > Raccourcis > FiveM** (même place en AZERTY et en QWERTY).
 
-| Touche | Commande | Action |
-| --- | --- | --- |
-| N | `/murmure` | ouvrir le parchemin d'écriture ; `/murmure 1,3 Rendez-vous au moulin` envoie directement |
-| L | `/lueur` | allumer, ou éteindre sa lumière |
-| J | `/lueur ancrer` | ancrer un orbe là où l'on regarde (niveau 4) |
-| K | `/bouledefeu` | lancer une boule de feu : sur la cible verrouillée, sinon vers la caméra |
-| Tab | — | appui court : verrouiller le joueur visé (sorts d'attaque), à nouveau : cible suivante ; maintenu : relâcher |
-| X | — | interrompre l'incantation |
-| — | `/lueur couleur <nom>` · `eteindre` · `dissiper` | couleur (niveau 5), éteindre, dissiper ses orbes ancrés |
-| — | `/grimoire` | ouvrir le grimoire (secours ; l'objet l'ouvre aussi) |
-| — | `/sigils` | lister les sigils gardés |
-| — | `/sigil offrir` | tendre son sigil au plus proche (3 m) |
-| — | `/sigil renommer <n°> <nom>` · `oublier <n°>` | gérer ses contacts |
-| — | `/sigil brouiller` | nouveau sigil (confirmation, 60 de mana, 6 h de recharge) |
+**La roue des sorts** : **Tab maintenu** ouvre la roue au centre de l'écran (la caméra se fige). Anneau intérieur :
+les éléments dont on connaît un sort (Feu, Eau, Terre, Utilitaires) ; anneau extérieur : les sorts de l'élément
+survolé, avec icône, niveau, coût en mana, et temps de recharge (sort grisé). Relâcher Tab sur un sort le prépare dans
+les mains ; au centre, rien ne change ; sur la main ouverte, « Ranger la magie ». Le sort prêt est gardé par le
+serveur et s'affiche près de la barre de mana.
+
+**Le mode magie** : un sort prêt, mains vides, à pied, debout. Le clic gauche lance alors le sort au lieu de frapper.
+Il s'endort après 20 s sans viser ni lancer (le clic gauche refrappe comme d'habitude) ; **le clic droit le réveille**.
+Sortir une arme ou monter en véhicule le coupe, sans perdre le sort prêt.
+
+| Touche ou bouton | Action |
+| --- | --- |
+| Tab (maintenu) | roue des sorts |
+| Clic droit (maintenu) | viser : réticule aux couleurs de l'élément, grisé hors de portée ; allure un peu ralentie ; aperçu au sol du point visé |
+| Clic gauche | lancer le sort prêt (Boule de feu : vers le réticule, ou droit devant sans viser ; Mur de flammes : au sol visé, rien sans viser ; Nova ardente : autour de soi ; Lueur : allumer ou éteindre, ancrer un orbe en visant au niveau 4 ; Murmure : ouvrir le parchemin) |
+| Clic molette | verrouiller le joueur visé (sorts d'attaque), à nouveau : cible suivante ; maintenu : relâcher |
+| Molette | sort suivant ou précédent du même élément (mode magie) |
+| X | interrompre l'incantation |
+
+Commandes de secours (chat) :
+
+| Commande | Action |
+| --- | --- |
+| `/sort <nom>` · `/sort aucun` | préparer un sort sans la roue, ou ranger la magie |
+| `/lancer [sort]` | lancer le sort prêt (ou celui nommé), sans visée |
+| `/murmure` · `/murmure 1,3 <message>` | ouvrir le parchemin, ou envoyer directement |
+| `/lueur` · `ancrer` · `couleur <nom>` · `eteindre` · `dissiper` | Lueur : allumer, ancrer là où l'on regarde (niveau 4), couleur (niveau 5), éteindre, dissiper ses orbes |
+| `/grimoire` | ouvrir le grimoire (l'objet l'ouvre aussi) |
+| `/sigils` · `/sigil offrir` · `renommer <n°> <nom>` · `oublier <n°>` · `brouiller` | gérer ses sigils |
 
 Le registre s'ouvre en l'utilisant dans l'inventaire.
 
@@ -103,61 +132,110 @@ Le registre s'ouvre en l'utilisant dans l'inventaire.
 
 Un sort d'attaque (`lockOn = true` dans sa config : la Boule de feu) peut viser un joueur verrouillé :
 
-- **Tab** verrouille le joueur le plus proche du centre de l'écran, à portée du sort et en vue ; un anneau rouge
-  tourne sous lui, vu du seul lanceur. Un nouvel appui passe à la cible suivante, Tab maintenu relâche.
+- **Clic molette** verrouille le joueur le plus proche du centre de l'écran, à portée du sort et en vue ; un anneau
+  rouge tourne sous lui, vu du seul lanceur. Un nouveau clic passe à la cible suivante, le clic maintenu relâche.
 - Le verrou saute si la cible sort de portée, de vue (une seconde), meurt, ou après 20 s sans attaque.
 - La cible part avec le début de l'incantation. Le serveur la revérifie (joueur en jeu, à portée, hors zone
-  protégée) et **prévient la cible seule** : le bord de son écran rougit (« Un frisson vous parcourt… »), elle a la
-  durée de l'incantation pour réagir.
-- À la fin, le serveur calcule lui-même la direction vers la cible (le client n'y est pour rien). Niveaux 1 à 3 :
-  la boule part droit vers elle, on peut encore l'esquiver. Niveaux 4 et 5 : elle s'incurve vers elle pendant son vol
-  (35 puis 70 degrés par seconde, `levels[].homing`). Cible échappée pendant l'incantation : la visée libre reprend.
-- Tant qu'on ne lance pas, rien ne passe par le réseau. Pendant l'appui sur Tab, la roue d'armes de GTA est bloquée.
+  protégée) et **prévient la cible seule** : le bord de son écran rougit (« Un frisson vous parcourt… »).
+- À la fin, le serveur calcule lui-même la direction vers la cible. Niveaux 1 à 3 : la boule part droit vers elle, on
+  peut encore l'esquiver. Niveaux 4 et 5 : elle s'incurve vers elle pendant son vol (35 puis 70 degrés par seconde,
+  `levels[].homing`). Cible échappée pendant l'incantation : la visée reprend.
+- Les sorts lisent la cible par `Bridge.GetLockedTarget()` : un autre système de verrouillage se branche là.
+
+## États élémentaires
+
+Posés et retirés par le serveur ; vus de tous les joueurs proches (flammes, gouttes, givre, poussière sur le
+personnage) ; le joueur affecté voit leurs icônes et leurs secondes à droite de sa barre de mana.
+
+| État | Effet |
+| --- | --- |
+| Brûlure | dégâts toutes les secondes ; bord de l'écran rougi |
+| Mouillé | aucun effet direct ; sert aux combinaisons (étape 4) |
+| Ralenti | allure réduite (jamais cumulé : le plus fort l'emporte), course interdite au-delà de la moitié |
+| Chancelant | démarche titubante, caméra qui tangue, **impossible d'incanter** |
+| Renversé | chute courte (ragdoll), impossible d'incanter |
+| Gelé | immobilisé (le serveur fige aussi le personnage), givre au bord de l'écran, impossible d'incanter |
+
+**Règle d'équité** : dès qu'un contrôle dur (Chancelant, Renversé, Gelé) touche, la cible est protégée des autres
+jusqu'à 6 s après sa fin (`states.hardImmunityMs`) : aucun enchaînement. Les dégâts s'appliquent toujours. Un contrôle
+dur brise l'incantation en cours. « Renversé » plutôt qu'« À terre » : ce mot désigne déjà, chez vava_health, un
+personnage hors de combat. Le hook `vava_magic:stateApplying` permet à un autre module de refuser un état.
+
+Dans GTA, l'allure et la chute d'un personnage sont calculées par le jeu de son joueur : un tricheur pourrait ignorer
+un Ralenti ou une chute. Le Gelé est aussi imposé par le serveur ; l'impossibilité d'incanter est décidée par lui.
+
+## Zones au sol
+
+Le serveur tient chaque zone (forme, position, élément, fin) et vérifie toutes les 500 ms qui s'y trouve, ou l'a
+traversée depuis la vérification précédente (un joueur qui court ne passe pas entre deux). Une zone n'est envoyée
+qu'aux joueurs à moins de 150 m, y compris ceux qui s'en approchent après coup. Au plus 60 zones dans le royaume.
 
 ## Commandes du Conseil
 
 Droit `tools` de vava_admin (Sénéchal et Souverain), réglable (`config.admin.permission`) ; aussi depuis la console du
-serveur. Chaque commande est inscrite au journal du Registre du Conseil.
+serveur. Chaque commande est inscrite au journal du Registre du Conseil. **Le numéro de joueur est facultatif** : sans
+lui, la commande vise son auteur.
 
 | Commande | Effet |
 | --- | --- |
-| `/magie mage <id> <oui\|non>` | rendre mage, ou retirer la magie |
-| `/magie apprendre <id> <sort>` · `oublier <id> <sort>` | apprendre ou retirer un sort |
-| `/magie niveau <id> <sort> <1-5>` · `xp <id> <sort> <xp>` | fixer le niveau ou l'XP (le sort est appris s'il ne l'était pas) |
-| `/magie mana <id>` | remplir la mana |
-| `/magie fiche <id>` | mage, sorts, niveaux, XP, sigils, mana |
-| `/magie donner <id> <grimoire\|registre>` | donner un objet (un registre neuf, numéroté) |
+| `/magie mage [id] <oui\|non>` | rendre mage, ou retirer la magie |
+| `/magie apprendre [id] <sort>` · `oublier [id] <sort>` | apprendre ou retirer un sort |
+| `/magie niveau [id] <sort> <1-5>` · `xp [id] <sort> <xp>` | fixer le niveau ou l'XP (le sort est appris s'il ne l'était pas) |
+| `/magie tous [id]` | tous les sorts au niveau 1 (le personnage devient mage) |
+| `/magie maitrise [id]` | tous les sorts au niveau maximal (le personnage devient mage) |
+| `/magie vider [id]` | retirer tous les sorts |
+| `/magie mana [id]` · `recharges [id]` | remplir la mana · effacer les recharges et le délai global |
+| `/magie fiche [id]` | mage, sort prêt, sorts, niveaux, XP, sigils, mana |
+| `/magie donner [id] <grimoire\|registre>` | donner un objet (un registre neuf, numéroté) |
+| `/magie nettoyer` | nettoyage d'urgence : retire du monde les effets des sorts (zones au sol, orbes ancrés ; plus tard remparts) |
 
-`<id>` est le numéro du joueur en jeu ; `<sort>` : `murmure`, `lueur`, `boule_de_feu`.
+`<sort>` : `boule_de_feu`, `mur_de_flammes`, `nova_ardente`, `lueur`, `murmure`.
 
 ## Configuration (`config.lua`)
 
 | Section | Contenu |
 | --- | --- |
-| `mana` | maximum (100), régénération (3 points / 5 s), médaillon (paliers, temps d'affichage après un sort) |
+| `mana` | maximum (100), régénération (3 points / 5 s), temps d'affichage de la barre après un sort |
 | `progression` | seuils d'XP (0, 100, 300, 700, 1500), coût selon le niveau, part d'XP d'un échec, anti-farm (20 s) |
-| `casting` | mètre de tolérance, marges du serveur, délai d'abandon d'une incantation sans fin |
+| `casting` | délai global entre deux sorts (1 s), tolérances, barre d'incantation au-delà de 0,5 s |
 | `persistence` | écriture de la fiche dans le personnage (au plus toutes les 15 s, et au départ) |
-| `spells.<sort>` | label, résumé, coût de base, XP, animation, texte d'ambiance, touche, et **5 niveaux** : durée d'incantation, recharge, description, ce que le niveau débloque, valeurs propres au sort |
+| `elements` | feu, eau, terre, lumière, esprit : nom, groupe de la roue, couleur, particules des mains pendant l'incantation |
+| `wheel` | groupes de l'anneau intérieur, dans l'ordre |
+| `controls` | mode magie : endormissement (20 s), allure en visant, molette, aperçu au sol |
+| `effects` | niveau de détail (complet en deçà de 30 m, rien au-delà de 150 m), plafonds de lumières et de particules, chargement et libération des ressources |
+| `spells.<sort>` | champs communs (voir plus bas) et **5 niveaux** : durée d'incantation, recharge, description, ce que le niveau débloque, valeurs propres au sort |
 | `spells.lueur.anchor` · `colors` · `render` | orbe ancré, couleurs du niveau 5, rendu (os, décalages, flottement, scintillement) |
 | `spells.boule_de_feu.hit` · `fx` · `light` | contrôles de l'impact, particules, lumière |
-| `targeting` | verrouillage des sorts d'attaque : cône, appui long, délais, marge, frisson, anneau |
-| `combat` | dégâts entre joueurs, zones protégées (`{ label, x, y, radius }`), journal des dégâts |
-| `sigils` | longueur, nombre gardé sans Murmure, nom, échange (3 m, 30 s), brouillage |
-| `registers` | pages par registre (200) |
-| `items` | grimoire et registre (taille, poids, image) |
+| `targeting` | verrouillage des sorts d'attaque : cône, clic long, délais, marge, frisson, anneau |
+| `states` | contrôles durs et immunité (6 s), durées par défaut, allure minimale, démarche et tremblement du chancelant, particules de chaque état |
+| `zones` | vérification (500 ms), distance d'envoi (150 m), plafond du royaume (60) |
+| `spells.mur_de_flammes` | portée, longueur et largeur par niveau, durée, dégâts au passage, brûlure, murs par lanceur, flammes et lumières |
+| `spells.nova_ardente` | rayon, dégâts, recul (niveau 3), brûlure (niveau 4), gerbes, anneau, éclat |
+| `combat` | dégâts entre joueurs, points de vie d'un personnage (100), zones protégées (`{ label, x, y, radius }`), journal, réaction de la victime par élément, durée du recul |
+| `sigils` · `registers` · `items` | sigils, registre (200 pages), objets |
 | `ambient` | effets vus des autres (15 m, fragments à 3 m, runes, textes) |
-| `admin` · `keys` · `commands` · `rateLimits` | droits, touches, commandes, limites de débit |
+| `admin` · `keys` · `commands` · `rateLimits` | droits, touches et boutons, commandes, limites de débit |
 | `texts` | **tous** les textes vus par les joueurs (refus, messages, chat, journal, interface) |
+
+Champs communs d'un sort : `order` (roue et grimoire), `label`, `summary`, `element` (clé de `elements`), `type`
+(`projectile`, `zone`, `utilitaire`), `icon` (`web/img/spells/<icon>.svg`), `baseCost`, `xp`, `hitXp` (bonus quand le
+sort touche, si le lancer a rapporté), `moveSpeed` (marche permise pendant l'incantation), `interruptOnHurt` (vrai par
+défaut), `lockOn`, `aim` (`kind` = `projectile`, `point`, `self` ou `none` ; `reach` ; `minLevel`), `anims` (`start`,
+`loop`, `release` : `{ dict, clip, flag, ms }`), `ambientText`, `runes`, `levelScale` (taille des effets par niveau).
+Les dégâts sont en **points de vie** (sur `combat.healthPoints`).
 
 ## Ajouter un sort
 
 1. `server/spells/<nom>.lua` : `VavaMagic.spells.register('<nom>', { config, beginArgs, finishArgs, begin, finish })`.
    `begin(ctx, …)` valide et prépare (`true, données[, coût]` ou `false, code`) ; `finish(ctx, …)` produit l'effet et
-   rend `{ success, refund?, result? }`. Intentions propres : `spells.addRpc` ; ménage : `spells.onLeave`, `onStop`.
-2. `client/spells/<nom>.lua` : `VavaMagic.casting.start('<nom>', { args, finishArgs, onFinish })` et sa touche
-   (`VavaMagic.keys.bind`).
-3. `config.lua` : `spells.<nom>` (mêmes champs communs) ; les lister dans le `fxmanifest.lua`.
+   rend `{ success, refund?, result?, rewarded? }`. Intentions propres : `spells.addRpc` ; ménage : `spells.onLeave`,
+   `onStop` ; nettoyage d'urgence du Conseil : `spells.onCleanup`.
+2. `client/spells/<nom>.lua` : son geste au clic gauche, `VavaMagic.controls.register('<nom>', { cast = function(info) … end })`
+   (`info` : `aiming`, `point`, `inRange`, `direction`, `target`), qui appelle
+   `VavaMagic.casting.start('<nom>', { args, finishArgs, beforeRelease, onFinish })`.
+3. `config.lua` : `spells.<nom>` (champs communs) et son icône `web/img/spells/<icon>.svg` (silhouette blanche) ; lister
+   ses deux fichiers dans le `fxmanifest.lua`. La roue, le grimoire, `/sort`, `/lancer` et les commandes du Conseil le
+   prennent d'eux-mêmes.
 
 Un autre module peut aussi ajouter un sort par le registre du core `vava_magic:spells` (voir `docs/api.md`).
 
@@ -174,7 +252,11 @@ Un autre module peut aussi ajouter un sort par le registre du core `vava_magic:s
 
 | Fonction | Réseau |
 | --- | --- |
-| Mana | ~60 o au seul lanceur, à chaque changement ; aucun envoi périodique |
+| Mana | ~60 o au seul lanceur, à chaque changement ; aucun envoi périodique (la page anime la remontée) |
+| Roue | ~40 o au serveur quand le sort prêt change ; la roue et la visée sont locales |
+| États | state bag du ped (~60 o) aux joueurs proches, durées (~80 o) au seul joueur affecté, à chaque changement |
+| Zones | ~150 o par zone aux joueurs à moins de 150 m (une fois, ou en approchant), sa fin à ceux qui la connaissent ; vérification serveur toutes les 500 ms, seulement s'il y en a |
+| Nova | ~80 o aux joueurs à moins de 120 m ; recul et réaction à la seule victime |
 | Incantation | 2 RPC, plus un state bag du ped (~80 o) reçu des joueurs proches |
 | Murmure | < 1 Ko par destinataire ; fragments aux seuls joueurs à moins de 3 m |
 | Lueur | ~100 o à l'allumage et à l'extinction ; un objet réseau par orbe ancré |
@@ -182,21 +264,33 @@ Un autre module peut aussi ajouter un sort par le registre du core `vava_magic:s
 
 Serveur : aucune boucle permanente (mana calculée à la demande ; écritures groupées toutes les 10 à 15 s). Client : une
 recherche des effets proches toutes les 250 ms ; le dessin par image ne tourne que si une lumière, un texte ou un
-projectile est à portée, ou pendant l'incantation d'un sort qui permet de marcher.
+projectile est à portée, pendant l'incantation d'un sort qui permet de marcher, roue ouverte, ou en mode magie éveillé
+(qui coupe l'attaque de GTA à chaque image ; il s'endort après 20 s sans action). Plafonds de lumières et de particules,
+rien au-delà de 150 m.
 
 ## À vérifier en jeu (noms tirés de GTA V)
 
-| Usage | Animation ou particule | Réglage |
+| Usage | Animation, particule ou bouton | Réglage |
 | --- | --- | --- |
-| Murmure : tracer des runes | `anim@mp_player_intupperair_synth` / `idle_a` | `spells.murmure.anim` |
-| Lueur : incantation | `amb@world_human_stand_fire@male@base` / `base` | `spells.lueur.anim` |
-| Boule de feu : charge | `anim@mp_player_intupperknuckle_crunch` / `idle_a` | `spells.boule_de_feu.anim` |
-| Boule de feu : jet | `weapons@projectile@grenade_str` / `throw_m_fb_stand` | `spells.boule_de_feu.throwAnim` |
-| Traînée, brûlure | `core` / `ent_amb_torch_fire` | `spells.boule_de_feu.fx` |
-| Impact | `core` / `ent_sht_flame` | idem |
-| Boule éteinte | `core` / `ent_sht_steam` | idem |
+| Boule de feu : début, maintien | `anim@mp_player_intupperknuckle_crunch` / `enter`, `idle_a` | `spells.boule_de_feu.anims` |
+| Boule de feu : jet | `weapons@projectile@grenade_str` / `throw_m_fb_stand` | idem (`release`) |
+| Mur de flammes : bras levés | `anim@mp_player_intuppersurrender` / `enter`, `idle_a`, `exit` | `spells.mur_de_flammes.anims` |
+| Nova ardente : gerbe | `anim@mp_player_intcelebrationmale@jazz_hands` / `jazz_hands` — **à juger** | `spells.nova_ardente.anims` |
+| Réaction au feu | `anim@mp_player_intupperface_palm` / `idle_a` — **à juger** | `combat.reactions.feu` |
+| Chancelant : démarche | jeu de mouvements `move_m@drunk@verydrunk`, tremblement `DRUNK_SHAKE` | `states.stagger` |
+| Nova : sol qui tremble | tremblement `SMALL_EXPLOSION_SHAKE`, marqueur 25 (anneau) | `spells.nova_ardente.fx` |
+| Mur : flammes · embrasement · extinction | `core` / `ent_amb_torch_fire` · `ent_sht_flame` · `ent_sht_steam` (en boucle au sol) | `spells.mur_de_flammes.fx` |
+| États : brûlure · mouillé · gelé · chancelant | `core` / `ent_amb_torch_fire` · `ent_sht_water` — **incertain** · `ent_sht_steam` (faute de givre) · `ent_dst_dust` — **incertain** | `states.fx` |
+| Lueur : incantation | `amb@world_human_stand_fire@male@base` / `base` | `spells.lueur.anims` |
+| Murmure : tracer des runes | `anim@mp_player_intupperair_synth` / `idle_a` | `spells.murmure.anims` |
+| Mains du feu, traînée, brûlure | `core` / `ent_amb_torch_fire` | `elements.feu.hands`, `spells.boule_de_feu.fx` |
+| Impact · boule éteinte | `core` / `ent_sht_flame` · `ent_sht_steam` | `spells.boule_de_feu.fx` |
+| Mains de l'eau (étape 3) | `core` / `ent_amb_waterfall_splash_p` — **incertain** | `elements.eau.hands` |
+| Mains de la terre (étape 3) | `core` / `ent_dst_dust` — **incertain** | `elements.terre.hands` |
 | Orbe | marqueur 28 (sphère) et `DrawLightWithRange` | `spells.lueur.render` |
-| Touche du grimoire | `GetControlInstructionalButton` | — |
+| Aperçu au sol | marqueurs 1 (disque) et 28 (point) | `controls.preview` |
+| Boutons de la souris | `MOUSE_BUTTON` / `MOUSE_LEFT`, `MOUSE_RIGHT`, `MOUSE_MIDDLE` ; `MOUSE_WHEEL` / `IOM_WHEEL_UP`, `IOM_WHEEL_DOWN` | `keys` |
+| Nom des touches au grimoire | `GetControlInstructionalButton` (sinon `keys.<action>.display`) | — |
 
 Les sons (carillon, souffle, impact, boule éteinte) sont fabriqués par l'interface (Web Audio) : à juger à l'oreille.
 
@@ -205,27 +299,38 @@ Les sons (carillon, souffle, impact, boule éteinte) sont fabriqués par l'inter
 Deux joueurs (A et B) suffisent ; un troisième aide pour le cercle et la zone d'effet.
 
 **Fiche, Conseil, grimoire**
-- [ ] `/magie fiche <A>` : non mage, sigil présent ; `/magie mage <A> oui` → message « La magie s'éveille », médaillon de mana absent tant qu'elle est pleine.
-- [ ] `/magie apprendre <A> murmure`, `lueur`, `boule_de_feu` ; `/magie donner <A> grimoire` puis l'utiliser : trois pages, niveau I, XP, touches N / L / K affichées.
+- [ ] `/magie fiche <A>` : non mage, sigil présent ; `/magie mage <A> oui` → message « La magie s'éveille », barre de mana absente tant qu'elle est pleine.
+- [ ] `/magie tous <A>` (puis `/magie tous` sans numéro, sur soi) ; `/magie donner <A> grimoire` puis l'utiliser : sorts rangés par élément, icônes, niveau I, XP, recharge, incantation, touches de la roue.
+- [ ] `/magie maitrise`, `/magie vider`, `/magie recharges`, `/magie nettoyer` (orbe ancré disparu).
 - [ ] B (non mage) ouvre un grimoire : pages illisibles. Un joueur hors du Conseil tape `/magie` : refusé.
 - [ ] Le journal du Registre du Conseil (et la Chancellerie) montre chaque commande.
 
+**Roue et mode magie**
+- [ ] Tab maintenu : la roue s'ouvre, la caméra ne bouge pas, la roue d'armes de GTA n'apparaît pas. Survoler Feu puis la Boule de feu, relâcher : sort prêt, affiché près de la barre de mana.
+- [ ] Relâcher au centre : rien ne change ; sur la main ouverte : magie rangée. Échap : rien n'est choisi. Un sort en recharge est grisé avec ses secondes.
+- [ ] Clic gauche mains vides : la boule part (pas de coup de poing). Sortir une arme : le clic gauche tire à nouveau normalement, le sort reste prêt.
+- [ ] 20 s sans rien faire : le sceau de la barre pâlit, le clic gauche refrappe. Clic droit : réveillé.
+- [ ] Clic droit maintenu : réticule orange au centre, gris quand on vise trop loin ; on marche moins vite. Lueur niveau 4 : petite sphère au point visé.
+- [ ] Molette en mode magie avec Lueur prête : passe au Murmure (même élément), et retour.
+- [ ] Changer les touches dans Paramètres > Raccourcis > FiveM (roue sur une autre touche) : la roue suit.
+
 **Incantation**
 - [ ] A lance la Lueur : barre d'incantation, animation, texte « fait naître une lueur… » vu de B à moins de 15 m, puis la lumière.
+- [ ] Boule de feu : incantation brève sans barre, flammes dans les deux mains vues de B (plus grandes au niveau 5).
 - [ ] Interrompre par X, en marchant de plus d'un mètre, en se faisant frapper : barre brisée, mana inchangée.
-- [ ] Relancer aussitôt : « pas encore prêt (n s) ». Deux sorts à la fois : impossible.
-- [ ] Médaillon de mana : apparaît après un sort, remonte de 3 toutes les 5 s, disparaît une fois plein.
+- [ ] Relancer dans la seconde : « Laissez la magie retomber un instant » ; puis « pas encore prêt (n s) ». Deux sorts à la fois : impossible.
+- [ ] Barre de mana : apparaît après un sort et en mode magie, remonte de 3 toutes les 5 s, disparaît une fois pleine.
 - [ ] Se déconnecter et revenir : sorts, XP et sigils gardés, mana pleine.
 
 **Lueur**
 - [ ] Niveaux 1-2 : lumière dans la main, qui vacille sans saccade ; s'éteint seule (1 min au niveau 1) ; même touche pour éteindre.
-- [ ] `/magie niveau <A> lueur 3` : orbe près de l'épaule. Niveau 4 : J ancre un orbe là où l'on regarde (B le voit, sans objet visible) ; `/lueur dissiper`.
+- [ ] `/magie niveau <A> lueur 3` : orbe près de l'épaule. Niveau 4 : clic gauche en visant ancre un orbe au point visé (B le voit, sans objet visible) ; `/lueur dissiper`.
 - [ ] Niveau 5 : couleur choisie dans le grimoire, appliquée à la lumière allumée.
 
 **Sigils et Murmure**
 - [ ] A et B face à face, `/sigil offrir` : B nomme A, coche « confier le mien », A nomme B. Sans réponse 30 s : offre close. Trop loin : refusé.
 - [ ] À sens unique : B murmure à A qui ne le connaît pas → « Une présence inconnue ».
-- [ ] A ouvre le parchemin (N) : contacts, compteur de signes, envoi. Pendant l'incantation : B à moins de 3 m lit des mots dorés au-dessus des mains de A ; à 5 m, seulement des runes.
+- [ ] A, Murmure prêt, clic gauche : le parchemin s'ouvre (contacts, compteur de signes, envoi). Pendant l'incantation : B à moins de 3 m lit des mots dorés au-dessus des mains de A ; à 5 m, seulement des runes.
 - [ ] B reçoit le parchemin, entend le carillon ; un témoin voit « ses yeux s'illuminent ». Niveau 1 : certains mots arrivent en « … ».
 - [ ] B déconnecté : « Le lien reste silencieux », part de mana rendue. Trop loin au niveau 1 (300 m) : « Le lien ne porte pas si loin ».
 - [ ] Niveau 3 : position jointe → point de passage chez B. Niveau 4 : cercle de plusieurs contacts.
@@ -237,14 +342,30 @@ Deux joueurs (A et B) suffisent ; un troisième aide pour le cercle et la zone d
 - [ ] Arracher une page. Donner le registre à B : B lit l'historique (il suit l'objet). Un registre neuf est vierge.
 
 **Boule de feu**
-- [ ] A lance vers B (à 10 m) : incantation en marchant lentement, jet, projectile et lumière vus de tous, impact en flammes, B blessé (vava_health). Pas d'explosion GTA.
+- [ ] A vise B (à 10 m) et clique : jet vers le réticule, projectile et lumière vus de tous, impact en flammes, B blessé (vava_health), A gagne son XP et le bonus au toucher. Pas d'explosion GTA.
 - [ ] Hors de portée ou derrière soi : aucun dégât. Niveau 1 : la boule s'éteint parfois (vapeur, mana dépensée).
-- [ ] Tab devant B : anneau rouge sous B (A seul le voit), pas de roue d'armes. Tab encore : cible suivante ; Tab maintenu : relâché. B derrière un mur : verrou perdu.
+- [ ] Clic molette devant B : anneau rouge sous B (A seul le voit). Encore : cible suivante ; maintenu : relâché. B derrière un mur : verrou perdu.
 - [ ] A lance sur B verrouillé : B voit le bord de son écran rougir dès le début de l'incantation ; A se tourne vers B au jet ; la boule part sur B même si A regarde ailleurs.
 - [ ] Niveau 1 à 3 : B esquive en se décalant. Niveau 4-5 (`/magie niveau <A> boule_de_feu 5`) : la boule s'incurve et le rattrape.
 - [ ] Niveau 3 : un voisin de B est touché aussi (moins fort). Niveau 4 : B brûle quelques secondes.
 - [ ] Zone protégée (`combat.protectedZones`) : impossible d'y lancer, personne n'y est blessé. `combat.pvp = false` : aucun dégât.
 - [ ] Table `vava_magic_damage_log` : lanceur, cible, dégâts, position.
+
+**États (avec `/magie` et un test du Conseil, ou les sorts)**
+- [ ] Brûlure (Boule de feu niveau 4, Mur, Nova niveau 4) : flammes sur la victime vues de tous, icône et secondes chez elle, bord de l'écran rougi, dégâts chaque seconde, puis plus rien.
+- [ ] Contrôle dur, puis un autre aussitôt : refusé ; l'icône « Protégé » paraît à la fin du premier, 6 s. Les dégâts passent pendant ce temps.
+- [ ] Pendant un contrôle dur, tenter d'incanter : « impossible d'incanter » ; une incantation en cours se brise.
+- [ ] Se déconnecter gelé et revenir : rien ne reste (personnage libre).
+
+**Mur de flammes**
+- [ ] Clic droit sur le sol : bande lumineuse au sol, en travers du regard, à la longueur du niveau ; grise trop loin. Clic gauche sans viser : « Visez le sol ».
+- [ ] Le mur s'embrase, flammes et lumière vues de tous (de nuit, il éclaire les murs et les personnages). B le traverse en courant : blessé et brûlé ; il y reste : une blessure par seconde. A n'en souffre pas.
+- [ ] Un troisième mur éteint le plus ancien (`/magie recharges` entre deux). Le mur s'éteint seul (fumée). `/magie nettoyer` éteint tout.
+- [ ] Zone protégée : impossible d'y dresser un mur. B arrive après coup, de loin : il voit le mur en approchant.
+
+**Nova ardente**
+- [ ] Clic droit : disque de son rayon autour de soi. Clic gauche : gerbes en cercle, anneau qui s'élargit, éclat, sol qui tremble pour les proches ; B à moins du rayon est blessé, C plus loin non, A jamais.
+- [ ] Niveau 3 : B est repoussé ; niveau 4 : B brûle ; niveau 5 : rayon de 6 m. XP et bonus au toucher pour A.
 
 **Performance**
 - [ ] `resmon` : `vava_magic` à ~0,00 ms au repos, quelques centièmes pendant une incantation ou une lumière proche.

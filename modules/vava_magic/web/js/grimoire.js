@@ -1,13 +1,16 @@
 'use strict';
 /*
  * web/js/grimoire.js
- * Rôle : grimoire, livre de cuir à deux pages : sorts connus à gauche ; à droite, le sort choisi (niveau en chiffres
- *        romains sur un sceau, barre d'XP dorée, ce que l'on sait, ce que débloque le niveau suivant, mana, recharge,
- *        touche, sigils mémorisables, couleur de la lumière quand le niveau le permet). Pour un non-mage, pages
- *        illisibles. Échap ou le ruban de fermeture le referment.
+ * Rôle : grimoire, livre de cuir à deux pages : sorts connus à gauche, rangés par élément ; à droite, le sort choisi
+ *        (icône aux couleurs de l'élément, niveau en chiffres romains sur un sceau, barre d'XP dorée, ce que l'on
+ *        sait, ce que débloque le niveau suivant, mana, recharge, incantation, élément, commandes, sigils
+ *        mémorisables, couleur de la lumière quand le niveau le permet). Pour un non-mage, pages illisibles. Échap
+ *        ou le ruban de fermeture le referment.
  */
 
 (() => {
+  // part de la couleur gardée pour une icône posée sur le parchemin
+  const INK_SHADE = 0.62;
   let selected = null;
 
   function header(texts) {
@@ -17,19 +20,32 @@
     ]);
   }
 
-  function detail(spell, texts) {
+  /** Icône d'un sort aux couleurs de son élément. */
+  function spellIcon(spell, className) {
+    const icon = UI.el('span', className);
+    if (spell.icon) icon.style.setProperty('--icon', UI.image(`img/spells/${spell.icon}.svg`));
+    // sur le parchemin, la couleur de l'élément est foncée pour rester lisible
+    const c = spell.color || { r: 190, g: 136, b: 64 };
+    const ink = (value) => Math.round(value * INK_SHADE);
+    icon.style.setProperty('--element', `rgb(${ink(c.r)}, ${ink(c.g)}, ${ink(c.b)})`);
+    return icon;
+  }
+
+  function detail(spell, texts, controls) {
     const page = UI.el('div', 'page page-right');
     const atMax = spell.to === null || spell.to === undefined;
     const share = atMax ? 1 : Math.max(0, Math.min(1, (spell.xp - spell.from) / Math.max(1, spell.to - spell.from)));
     const fill = UI.el('div', 'xp-fill');
     fill.style.transform = `scaleX(${share})`;
     const facts = [UI.format(texts.cost, spell.cost), UI.format(texts.cooldown, spell.cooldown),
-      UI.format(texts.key, spell.key || texts.noKey)];
+      spell.cast ? UI.format(texts.cast, spell.cast) : texts.instant];
+    if (spell.element) facts.push(UI.format(texts.element, spell.element));
     if (spell.lock) facts.push(UI.format(texts.lock, spell.lock));
     if (spell.sigils) facts.push(UI.format(texts.sigils, spell.sigils));
 
     UI.append(page,
       UI.el('div', 'spell-head', null, [
+        spellIcon(spell, 'spell-icon'),
         UI.title(spell.label, 'page-title'),
         UI.el('span', 'level-seal', UI.roman(spell.level)),
       ]),
@@ -43,14 +59,15 @@
       spell.next ? UI.el('h3', 'section-title', texts.next) : null,
       spell.next ? UI.el('p', 'prose is-next', spell.next) : null,
       UI.el('ul', 'facts', null, facts.map((fact) => UI.el('li', null, fact))),
+      controls ? UI.el('p', 'controls-line', UI.format(texts.controls, controls.wheel, controls.aim, controls.cast)) : null,
     );
     if (Array.isArray(spell.colors) && spell.colors.length) {
       const swatches = UI.el('div', 'swatches');
       for (const color of spell.colors) {
-        const swatch = UI.button('', `swatch${color.name === spell.color ? ' is-selected' : ''}`, () => {
+        const swatch = UI.button('', `swatch${color.name === spell.lightColor ? ' is-selected' : ''}`, () => {
           for (const other of swatches.children) other.classList.remove('is-selected');
           swatch.classList.add('is-selected');
-          spell.color = color.name;
+          spell.lightColor = color.name;
           Bridge.post('grimoire:color', { name: color.name });
         });
         swatch.title = color.label;
@@ -82,21 +99,30 @@
     const list = UI.el('div', 'page page-left');
     const pages = UI.el('div', 'pages');
     const show = () => {
-      for (const entry of list.children) entry.classList.toggle('is-selected', entry.dataset.name === selected);
+      for (const entry of list.querySelectorAll('.entry')) entry.classList.toggle('is-selected', entry.dataset.name === selected);
       const spell = spells.find((s) => s.name === selected);
       const right = pages.querySelector('.page-right');
-      const next = detail(spell, texts);
+      const next = detail(spell, texts, data.controls);
       if (right) right.replaceWith(next); else pages.append(next);
     };
+    // un titre par élément (ordre de la roue), puis ses sorts
+    const labels = {};
+    for (const group of Array.isArray(data.groups) ? data.groups : []) labels[group.id] = group.label;
+    let lastGroup = null;
     for (const spell of spells) {
-      const entry = UI.button('', 'entry', () => {
+      if (spell.group && spell.group !== lastGroup) {
+        lastGroup = spell.group;
+        list.append(UI.el('h3', 'entry-group', labels[spell.group] || spell.element || ''));
+      }
+      const entry = UI.button('', 'entry is-spell', () => {
         selected = spell.name;
         show();
       });
       entry.dataset.name = spell.name;
       entry.append(
-        UI.el('span', 'entry-seal', UI.roman(spell.level)),
+        spellIcon(spell, 'entry-icon'),
         UI.el('span', 'entry-main', null, [UI.el('span', 'entry-name', spell.label), UI.el('span', 'entry-sub', UI.format(texts.level, spell.level))]),
+        UI.el('span', 'entry-seal', UI.roman(spell.level)),
       );
       list.append(entry);
     }
