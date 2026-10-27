@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <title>vAvA · Registre du Conseil</title>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <div id="app" class="app" hidden>
+    <div class="book" role="dialog" aria-modal="true" aria-labelledby="book-title">
+      <header class="book-header">
+        <h1 id="book-title" class="book-title"></h1>
+        <div class="book-seal"><span class="seal" aria-hidden="true"></span><span class="seal-label"></span></div>
+        <button type="button" class="book-close" data-action="close"></button>
+      </header>
+      <nav class="ribbons" role="tablist"></nav>
+      <div class="pages">
+        <section class="page page-left"></section>
+        <section class="page page-right"></section>
+      </div>
+    </div>
+
+    <div class="dialog" hidden>
+      <form class="dialog-card" novalidate>
+        <h2 class="dialog-title"></h2>
+        <p class="dialog-text"></p>
+        <div class="dialog-body"></div>
+        <div class="dialog-actions">
+          <button type="button" class="ink-button" data-dialog="cancel"></button>
+          <button type="submit" class="seal-button" data-dialog="confirm"></button>
+        </div>
+      </form>
+    </div>
+
+    <div class="slip" role="status" aria-live="polite" hidden></div>
+  </div>
+
+  <div class="proclamation" role="status" aria-live="polite" hidden>
+    <p class="proclamation-title"></p>
+    <p class="proclamation-text"></p>
+    <p class="proclamation-author"></p>
+  </div>
+
+  <div class="watch" hidden>
+    <span class="watch-label"></span>
+    <kbd class="watch-key"></kbd>
+  </div>
+
+  <script src="js/strings.js"></script>
+  <script src="js/devmock.js"></script>
+  <script src="js/bridge.js"></script>
+  <script src="js/ui.js"></script>
+  <script src="js/view-players.js"></script>
+  <script src="js/view-reports.js"></script>
+  <script src="js/view-bans.js"></script>
+  <script src="js/view-logs.js"></script>
+  <script src="js/view-staff.js"></script>
+  <script src="js/view-tools.js"></script>
+  <script src="js/view-announce.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>

@@ -1,0 +1,33 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <title>vAvA · Santé</title>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <div id="downed" class="downed" hidden>
+    <section class="downed-card" role="status" aria-live="polite">
+      <div class="downed-ornament" aria-hidden="true"></div>
+      <h1 class="downed-title"></h1>
+      <p class="downed-subtitle"></p>
+      <div class="bar downed-bar" hidden><span class="bar-fill"></span></div>
+      <p class="downed-timer"></p>
+      <p class="downed-giveup" hidden>
+        <span class="hold"><kbd class="hold-key"></kbd><span class="hold-bar"><span class="hold-fill"></span></span></span>
+        <span class="downed-giveup-label"></span>
+      </p>
+      <p class="downed-auto"></p>
+    </section>
+  </div>
+
+  <div id="assist" class="assist" role="status" hidden>
+    <p class="assist-label"></p>
+    <div class="bar"><span class="bar-fill"></span></div>
+  </div>
+
+  <script src="js/strings.js"></script>
+  <script src="js/devmock.js"></script>
+  <script src="js/screen.js"></script>
+</body>
+</html>

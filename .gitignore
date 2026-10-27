@@ -1,0 +1,15 @@
+# Données locales de la Chancellerie : compte maître, configuration, journal, sauvegardes du server.cfg (secrets)
+chancellerie/data/
+# Node.js posé à côté de demarrer.bat
+chancellerie/node.exe
+chancellerie/node/
+node_modules/
+
+# Sauvegardes et journaux locaux
+*.bak
+*.log
+
+# Fichiers du système
+Thumbs.db
+desktop.ini
+.DS_Store

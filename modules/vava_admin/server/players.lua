@@ -1,0 +1,97 @@
+--[[
+    vava_admin/server/players.lua
+    Rôle : les joueurs vus par le Conseil : liste des connectés et fiche d'un joueur (identité du personnage, compte,
+           latence, santé, besoins, avertissements). Calculées à la demande, jamais envoyées en continu ; le pseudo
+           FiveM n'est lu qu'au moment de l'affichage (rien n'est conservé).
+    Dépendances : config.lua, server/core.lua, server/staff.lua, server/store.lua
+]]
+
+local ipairs, tonumber, type, floor = ipairs, tonumber, type, math.floor
+local sort = table.sort
+local GetPlayers, GetPlayerName, GetPlayerPing, GetPlayerPed, GetEntityCoords =
+    GetPlayers, GetPlayerName, GetPlayerPing, GetPlayerPed, GetEntityCoords
+
+local staff = VavaAdmin.staff
+local store = VavaAdmin.store
+local call = VavaAdmin.call
+
+-- avertissements montrés dans une fiche
+local WARNINGS_SHOWN = 10
+
+local players = {}
+VavaAdmin.players = players
+
+-- joueurs immobilisés par le Conseil (état montré dans la liste)
+local frozen = {}
+players.frozen = frozen
+
+--- Cible d'une action : joueur connecté et chargé (compte connu).
+---@param src any
+---@return vAvA.AdminTarget|nil
+---@return string|nil code
+function players.resolve(src)
+    local session = type(src) == 'number' and VavaAdmin.core.players.get(src)
+    if not session or not session.accountId then return nil, 'not_found' end
+    local name = staff.characterName(src)
+    return {
+        source = src, accountId = session.accountId, characterId = session.characterId,
+        label = name or ('compte n° ' .. session.accountId),
+    }
+end
+
+---@param src integer
+---@return boolean|nil
+local function isDowned(src)
+    local ok, downed = call('vava_health', 'isDowned', src)
+    if ok then return downed == true end
+    return nil
+end
+
+--- Joueurs connectés, pour la liste du panneau.
+---@return table[]
+function players.list()
+    local out = {}
+    for _, id in ipairs(GetPlayers()) do
+        local src = tonumber(id)
+        local session = src and VavaAdmin.core.players.get(src)
+        if session and session.accountId then
+            local rank = staff.rankOfAccount(session.accountId)
+            out[#out + 1] = {
+                source = src, name = GetPlayerName(src), accountId = session.accountId,
+                character = staff.characterName(src), ping = GetPlayerPing(src),
+                rank = rank and rank.label or nil, frozen = frozen[src] == true,
+                downed = session.characterId and isDowned(src) or false,
+            }
+        end
+    end
+    sort(out, function(a, b) return a.source < b.source end)
+    return out
+end
+
+--- Fiche d'un joueur.
+---@param target vAvA.AdminTarget
+---@return table
+function players.details(target)
+    local src = target.source
+    local ped = GetPlayerPed(src)
+    local coords = ped ~= 0 and GetEntityCoords(ped)
+    local rank = staff.rankOfAccount(target.accountId)
+    local healthOk, health = call('vava_health', 'get', src)
+    local needsOk, needs = call('vava_needs', 'get', src)
+    local warnings = store.warningsOf(target.accountId, WARNINGS_SHOWN) or {}
+    return {
+        source = src, name = GetPlayerName(src), accountId = target.accountId, characterId = target.characterId,
+        character = staff.characterName(src), ping = GetPlayerPing(src), rank = rank and rank.name or nil,
+        rankLabel = rank and rank.label or nil, frozen = frozen[src] == true,
+        position = coords and { x = floor(coords.x * 10) / 10, y = floor(coords.y * 10) / 10, z = floor(coords.z * 10) / 10 } or nil,
+        health = healthOk and type(health) == 'table' and health or nil,
+        needs = needsOk and type(needs) == 'table' and needs or nil,
+        warnings = warnings,
+    }
+end
+
+--- Le joueur parti : son numéro de session ne le désigne plus.
+---@param src integer
+function players.forget(src)
+    frozen[src] = nil
+end

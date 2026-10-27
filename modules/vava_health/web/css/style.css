@@ -1,0 +1,194 @@
+/*
+ * web/css/style.css
+ * Rôle : écran à terre et bandeau du geste pour relever, dans la matière des autres interfaces : voile sombre qui
+ *        rougit vers les bords, titre en Cinzel, filet orné, touche gravée, barres de laiton. Polices embarquées
+ *        (licence OFL).
+ * Performance : aucun filtre ni flou ; les barres se remplissent par une seule transition de transform ; le voile
+ *        apparaît en fondu d'opacité.
+ */
+
+@font-face {
+  font-family: "Cinzel";
+  src: url("../fonts/cinzel.woff2") format("woff2");
+  font-weight: 400 700;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "EB Garamond";
+  src: url("../fonts/eb_garamond.woff2") format("woff2");
+  font-weight: 400 700;
+  font-style: normal;
+  font-display: swap;
+}
+@font-face {
+  font-family: "EB Garamond";
+  src: url("../fonts/eb_garamond_italic.woff2") format("woff2");
+  font-weight: 400 700;
+  font-style: italic;
+  font-display: swap;
+}
+
+:root {
+  --edge: #070504;
+  --well: #0a0705;
+  --parchment: #ece1c8;
+  --parchment-muted: #a69881;
+  --parchment-faint: #786c5c;
+  --brass-rgb: 220, 192, 138;
+  --font-display: "Cinzel", "Palatino Linotype", Georgia, serif;
+  --font-body: "EB Garamond", "Palatino Linotype", Georgia, serif;
+  --ease: cubic-bezier(0.2, 0.7, 0.2, 1);
+}
+
+* { box-sizing: border-box; }
+
+html { font-size: clamp(12px, 0.5vw + 6px, 18px); }
+
+html,
+body { height: 100%; margin: 0; overflow: hidden; background: transparent; }
+
+body {
+  color: var(--parchment);
+  font-family: var(--font-body);
+  font-size: 1.05rem;
+  font-variant-numeric: lining-nums;
+  user-select: none;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* aperçu hors jeu : simule la scène derrière l'écran */
+body.dev { background: radial-gradient(ellipse at 50% 60%, #6b6a58 0%, #3a3a2e 55%, #15150f 100%); }
+
+[hidden] { display: none !important; }
+
+@keyframes veil-in {
+  from { opacity: 0; }
+}
+
+/* Écran à terre ------------------------------------------------------------------------------------------- */
+
+.downed {
+  position: fixed;
+  inset: 0;
+  display: grid;
+  place-items: end center;
+  padding-bottom: 16vh;
+  background:
+    radial-gradient(ellipse 75% 70% at 50% 45%, rgba(20, 4, 2, 0.15), rgba(44, 6, 3, 0.62) 70%, rgba(26, 3, 1, 0.9) 100%),
+    linear-gradient(180deg, rgba(0, 0, 0, 0.35), transparent 30%, transparent 65%, rgba(0, 0, 0, 0.55));
+  animation: veil-in 900ms var(--ease) both;
+}
+
+.downed-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.55rem;
+  min-width: min(30rem, 90vw);
+  text-align: center;
+  text-shadow: 0 2px 6px rgba(0, 0, 0, 0.85);
+}
+
+/* filet orné : trait estompé et losange central */
+.downed-ornament {
+  width: min(22rem, 70vw);
+  height: 10px;
+  margin-bottom: 0.4rem;
+  background:
+    url("../img/diamond.svg") center / 10px 10px no-repeat,
+    url("../img/divider.svg") center / 100% 10px no-repeat;
+}
+
+.downed-title {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: 2.3rem;
+  font-weight: 600;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+}
+.downed-subtitle { margin: 0 0 0.4rem; color: var(--parchment-muted); font-size: 1.25rem; font-style: italic; }
+.downed-timer,
+.downed-auto { margin: 0; color: var(--parchment-faint); font-size: 1.05rem; font-variant-numeric: lining-nums tabular-nums; }
+.downed-auto { font-size: 0.95rem; font-style: italic; }
+
+.downed-giveup { display: flex; align-items: center; gap: 0.7rem; margin: 0.2rem 0 0; color: var(--parchment-muted); font-size: 1.05rem; }
+
+/* touche gravée, jauge de maintien en dessous */
+.hold { position: relative; display: inline-flex; flex-direction: column; align-items: center; gap: 4px; }
+kbd {
+  display: inline-block;
+  min-width: 2rem;
+  padding: 0 0.55rem;
+  border-radius: 3px;
+  background: linear-gradient(180deg, #33281d, #1e1710);
+  box-shadow: 0 0 0 1px var(--edge), inset 0 1px 0 rgba(255, 235, 200, 0.12), 0 2px 0 var(--edge);
+  color: var(--parchment);
+  font-family: var(--font-body);
+  font-size: 1rem;
+  font-weight: 600;
+  line-height: 1.8rem;
+  text-align: center;
+  text-shadow: none;
+}
+.hold-bar { width: 100%; height: 3px; overflow: hidden; border-radius: 2px; background: rgba(0, 0, 0, 0.6); }
+.hold-fill {
+  display: block;
+  height: 100%;
+  background: linear-gradient(90deg, #9c7b49, #e2c896);
+  transform: scaleX(0);
+  transform-origin: left;
+}
+.hold.is-holding .hold-fill { transform: scaleX(1); transition: transform var(--hold-ms, 3000ms) linear; }
+.hold.is-holding kbd { color: #fff4dc; box-shadow: 0 0 0 1px var(--edge), 0 0 0 2px rgba(var(--brass-rgb), 0.6), inset 0 1px 0 rgba(255, 235, 200, 0.18); }
+
+/* Barres de progression (on me relève, je relève) ---------------------------------------------------------- */
+
+.bar {
+  width: min(20rem, 70vw);
+  height: 6px;
+  overflow: hidden;
+  border-radius: 3px;
+  background: var(--well);
+  box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.9), 0 0 0 1px rgba(var(--brass-rgb), 0.18);
+}
+.bar-fill {
+  display: block;
+  height: 100%;
+  background: linear-gradient(180deg, #e2c896, #9c7b49 60%, #6f5530);
+  transform: scaleX(0);
+  transform-origin: left;
+}
+.downed-bar { margin: 0.2rem 0 0.4rem; }
+
+.assist {
+  position: fixed;
+  bottom: 12vh;
+  left: 50%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.55rem;
+  padding: 0.75rem 1.4rem 0.95rem;
+  border-radius: 4px;
+  background:
+    url("../img/grain.png") 0 0 / 96px 96px,
+    linear-gradient(180deg, #2a2017, #1a130e);
+  box-shadow: 0 0 0 1px var(--edge), 0 0 0 2px rgba(var(--brass-rgb), 0.2), inset 0 1px 0 rgba(255, 235, 200, 0.07), 0 1rem 2rem rgba(0, 0, 0, 0.55);
+  transform: translateX(-50%);
+  animation: veil-in 220ms var(--ease) both;
+}
+.assist-label {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: 0.9rem;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after { animation: none !important; }
+}

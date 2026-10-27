@@ -1,0 +1,210 @@
+'use strict';
+/*
+ * web/js/app.js
+ * Rôle : assemblage : messages du jeu, gestes (déplacer et fusionner sont prévus localement puis confirmés ou
+ *        annulés par le serveur), menu contextuel, double-clic, raccourcis clavier.
+ */
+
+(() => {
+  const app = document.getElementById('app');
+  const A = STRINGS.actions;
+
+  const uniq = (list) => [...new Set(list)];
+  const own = () => Model.state.containers.get(Model.state.own);
+
+  function refresh(containers) {
+    for (const container of uniq(containers)) View.renderContainer(container);
+    View.renderHotbar();
+  }
+
+  /** Prévision locale : appliquée tout de suite, annulée si le serveur refuse. */
+  async function predicted(containers, apply, request) {
+    const saved = Model.save(uniq(containers));
+    apply();
+    refresh(containers);
+    const result = await request();
+    if (!result.ok) {
+      Model.restore(saved);
+      refresh(containers);
+      Menu.toast(errorMessage(result.error));
+    }
+    return result;
+  }
+
+  async function plain(name, data) {
+    const result = await Bridge.post(name, data);
+    if (!result.ok) Menu.toast(errorMessage(result.error));
+    return result;
+  }
+
+  const actions = {
+    move(item, container, x, y, rotated) {
+      const found = Model.find(item.id);
+      if (!found) return;
+      const from = found.container;
+      const def = Model.definition(item.item);
+      return predicted([from, container], () => {
+        from.items.delete(item.id);
+        container.items.set(item.id, { ...item, x, y, rotated });
+        if (from !== container) {
+          from.weight -= def.weight * item.quantity;
+          container.weight += def.weight * item.quantity;
+        }
+      }, () => Bridge.post('move', { id: item.id, container: container.id, x, y, rotated }));
+    },
+    merge(item, target) {
+      const source = Model.find(item.id);
+      const destination = Model.find(target.id);
+      if (!source || !destination) return;
+      const def = Model.definition(item.item);
+      const amount = Math.min(item.quantity, def.stack - target.quantity);
+      return predicted([source.container, destination.container], () => {
+        destination.container.items.set(target.id, { ...target, quantity: target.quantity + amount });
+        if (amount >= item.quantity) source.container.items.delete(item.id);
+        else source.container.items.set(item.id, { ...item, quantity: item.quantity - amount });
+        if (source.container !== destination.container) {
+          source.container.weight -= def.weight * amount;
+          destination.container.weight += def.weight * amount;
+        }
+      }, () => Bridge.post('merge', { id: item.id, target: target.id }));
+    },
+    split(item, quantity, container, x, y, rotated) {
+      return plain('split', { id: item.id, quantity, container: container.id, x, y, rotated });
+    },
+    drop(item, quantity) {
+      return plain('drop', { id: item.id, quantity });
+    },
+    hotbarSet(slot, id) {
+      return plain('hotbarSet', { slot, id });
+    },
+  };
+
+  function use(item) {
+    return plain('use', { id: item.id });
+  }
+
+  /** Ramasser : premier emplacement libre de son inventaire. */
+  function pickup(item) {
+    const container = own();
+    const def = Model.definition(item.item);
+    if (!container || !def) return;
+    const space = Grid.findSpace(container, Grid.occupancy(container, Model.state.definitions), def);
+    if (!space) {
+      Menu.toast(errorMessage('no_space'));
+      return;
+    }
+    actions.move(item, container, space.x, space.y, space.rotated);
+  }
+
+  async function splitDialog(item, container) {
+    const def = Model.definition(item.item);
+    const quantity = await Menu.quantity({ title: `${STRINGS.split.title} : ${def.label}`, max: item.quantity - 1, value: Math.floor(item.quantity / 2) });
+    if (!quantity) return;
+    const space = Grid.findSpace(container, Grid.occupancy(container, Model.state.definitions), def);
+    if (!space) {
+      Menu.toast(errorMessage('no_space'));
+      return;
+    }
+    actions.split(item, quantity, container, space.x, space.y, space.rotated);
+  }
+
+  function itemFromEvent(event) {
+    const node = event.target.closest('.panels .item');
+    return node ? Model.find(Number(node.dataset.id)) : null;
+  }
+
+  function openContextMenu(event) {
+    const slotNode = event.target.closest('.hotbar-slot');
+    if (slotNode) {
+      event.preventDefault();
+      if (slotNode.classList.contains('is-filled')) {
+        Menu.context(event.clientX, event.clientY, [{ label: A.clearSlot, run: () => actions.hotbarSet(Number(slotNode.dataset.slot), 0) }]);
+      }
+      return;
+    }
+    const found = itemFromEvent(event);
+    if (!found) return;
+    event.preventDefault();
+    View.hideTooltip();
+    const { item, container } = found;
+    const def = Model.definition(item.item);
+    const inOwn = container.id === Model.state.own;
+    const entries = [];
+    if (def && def.usable && inOwn) entries.push({ label: A.use, run: () => use(item) });
+    if (def && def.stack > 1 && item.quantity > 1) entries.push({ label: A.split, run: () => splitDialog(item, container) });
+    if (container.kind === 'drop') entries.push({ label: A.pickup, run: () => pickup(item) });
+    else entries.push({ label: A.drop, danger: true, run: () => actions.drop(item) });
+    Menu.context(event.clientX, event.clientY, entries);
+  }
+
+  function onDoubleClick(event) {
+    const found = itemFromEvent(event);
+    if (!found) return;
+    const def = Model.definition(found.item.item);
+    if (found.container.kind === 'drop') pickup(found.item);
+    else if (def && def.usable && found.container.id === Model.state.own) use(found.item);
+  }
+
+  function onHotbarClick(event) {
+    const slotNode = event.target.closest('.hotbar-slot.is-filled');
+    if (!slotNode || event.button !== 0) return;
+    const found = Model.find(Number(slotNode.dataset.id));
+    if (found) use(found.item);
+  }
+
+  function close() {
+    app.hidden = true;
+    Menu.dismiss();
+    View.hideTooltip();
+    Bridge.post('close');
+  }
+
+  View.init(app);
+  Menu.init(app);
+  Drag.init(app, actions);
+  app.addEventListener('contextmenu', openContextMenu);
+  app.addEventListener('dblclick', onDoubleClick);
+  app.addEventListener('click', onHotbarClick);
+  app.addEventListener('pointerover', (event) => {
+    if (Drag.isDragging()) return;
+    const found = itemFromEvent(event);
+    if (found) View.showTooltip(found.item, event.target.closest('.item'));
+  });
+  app.addEventListener('pointerout', (event) => {
+    if (event.target.closest('.item')) View.hideTooltip();
+  });
+
+  Bridge.onMessage((action, payload) => {
+    if (action === 'open') {
+      Model.load(payload);
+      View.render();
+      app.hidden = false;
+    } else if (action === 'delta') {
+      const container = Model.applyDelta(payload);
+      if (container) refresh([...Model.state.containers.values()]);
+    } else if (action === 'containerClosed') {
+      Model.removeContainer(payload.id);
+      View.render();
+    } else if (action === 'hotbar') {
+      Model.setHotbar(payload.hotbar);
+      View.renderHotbar();
+    } else if (action === 'notify') {
+      Menu.toast(payload.message);
+    } else if (action === 'close') {
+      app.hidden = true;
+      Menu.dismiss();
+      View.hideTooltip();
+    }
+  });
+
+  document.addEventListener('keydown', (event) => {
+    if (app.hidden || Drag.isDragging()) return;
+    const typing = event.target instanceof HTMLInputElement;
+    if (event.key === 'Escape') {
+      event.preventDefault();
+      if (!Menu.dismiss()) close();
+      return;
+    }
+    if (!typing && !Menu.isOpen() && event.key.toLowerCase() === String(Model.state.closeKey).toLowerCase()) close();
+  });
+})();

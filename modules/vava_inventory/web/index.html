@@ -1,0 +1,55 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>vAvA · Inventaire</title>
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <div id="app" class="app" hidden>
+    <div class="layout">
+      <div class="panels"></div>
+      <section class="hotbar">
+        <header class="hotbar-header">
+          <h2 class="hotbar-title"></h2>
+          <p class="hotbar-hint"></p>
+        </header>
+        <div class="hotbar-slots"></div>
+      </section>
+    </div>
+
+    <p class="hints"></p>
+    <div class="drop-zone" hidden></div>
+    <div class="tooltip" role="tooltip" hidden></div>
+    <div class="context" role="menu" hidden></div>
+
+    <div class="dialog" hidden>
+      <div class="dialog-box" role="dialog" aria-modal="true">
+        <h2 class="dialog-title"></h2>
+        <label class="dialog-label" for="dialog-number"></label>
+        <div class="dialog-row">
+          <input class="dialog-range" type="range" min="1" step="1">
+          <input id="dialog-number" class="dialog-number" type="number" min="1" step="1">
+        </div>
+        <div class="dialog-actions">
+          <button type="button" class="button button-ghost" data-dialog="cancel"></button>
+          <button type="button" class="button button-primary" data-dialog="confirm"></button>
+        </div>
+      </div>
+    </div>
+
+    <div class="toast" role="status" aria-live="polite" hidden></div>
+  </div>
+
+  <script src="js/strings.js"></script>
+  <script src="js/devmock.js"></script>
+  <script src="js/bridge.js"></script>
+  <script src="js/grid.js"></script>
+  <script src="js/model.js"></script>
+  <script src="js/view.js"></script>
+  <script src="js/menu.js"></script>
+  <script src="js/drag.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>

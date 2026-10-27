@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <title>vAvA · Mur des caméras</title>
+  <link rel="stylesheet" href="css/wall.css">
+</head>
+<body>
+  <!-- capture de l'image du jeu, hors de l'écran -->
+  <canvas id="capture" class="capture" width="2" height="2" aria-hidden="true"></canvas>
+
+  <div id="wall" class="wall" hidden>
+    <div class="frame" role="dialog" aria-modal="true" aria-labelledby="wall-title">
+      <header class="frame-header">
+        <h1 id="wall-title" class="frame-title"></h1>
+        <p class="frame-count"></p>
+        <div class="layouts" role="group"></div>
+        <nav class="pager">
+          <button type="button" class="pager-arrow" data-page="-1"></button>
+          <span class="pager-label"></span>
+          <button type="button" class="pager-arrow pager-next" data-page="1"></button>
+        </nav>
+        <button type="button" class="frame-close" data-action="exit"></button>
+      </header>
+
+      <div class="grid"></div>
+
+      <div class="focus" hidden>
+        <button type="button" class="focus-arrow" data-step="-1"></button>
+        <figure class="focus-screen">
+          <video class="focus-video" muted autoplay playsinline></video>
+          <p class="screen-status"></p>
+          <figcaption class="plate focus-plate"><span class="plate-name"></span><span class="plate-number"></span></figcaption>
+        </figure>
+        <button type="button" class="focus-arrow focus-next" data-step="1"></button>
+        <button type="button" class="ink-button focus-back" data-action="back"></button>
+      </div>
+
+      <p class="frame-hint"></p>
+    </div>
+  </div>
+
+  <script src="js/strings.js"></script>
+  <script src="js/devmock.js"></script>
+  <script src="js/bridge.js"></script>
+  <script src="js/capture.js"></script>
+  <script src="js/viewer.js"></script>
+  <script src="js/wall.js"></script>
+</body>
+</html>

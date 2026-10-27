@@ -1,0 +1,5 @@
+# Fins de ligne normalisées dans le dépôt ; demarrer.bat garde celles de Windows
+* text=auto
+*.bat text eol=crlf
+*.png binary
+*.woff2 binary
