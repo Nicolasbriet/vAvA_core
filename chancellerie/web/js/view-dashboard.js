@@ -2,8 +2,9 @@
 /*
  * web/js/view-dashboard.js
  * Rôle : le tableau de bord : état du serveur avec ses commandes (démarrer, arrêter, redémarrer), chiffres
- *        (joueurs, durée, arrêts imprévus), joueurs connectés et dernières inscriptions du journal. L'état arrive
- *        en direct ; la liste des joueurs et le journal sont relus à intervalle tant que la page est affichée.
+ *        (joueurs, durée, arrêts imprévus ; charge de FXServer, réseau, prochain redémarrage planifié), joueurs
+ *        connectés et dernières inscriptions du journal. L'état et les relevés arrivent en direct ; la liste des
+ *        joueurs et le journal sont relus à intervalle tant que la page est affichée.
  */
 
 const DashboardView = (() => {
@@ -18,6 +19,7 @@ const DashboardView = (() => {
   let context = null;
   let details = null;
   let journal = [];
+  let latest = null;
   let pollTimer = null;
   let tickTimer = null;
 
@@ -70,6 +72,38 @@ const DashboardView = (() => {
     );
   }
 
+  /** Mise à jour de vAvA disponible, ou installation / mise à jour en cours. */
+  function renderNotice() {
+    const text = details && details.job ? D.updateRunning : details && details.update ? D.updateAvailable(details.update.label, details.update.commits) : null;
+    if (!text) {
+      refs.notice.replaceChildren();
+      return;
+    }
+    refs.notice.replaceChildren(UI.el('div', 'state-banner update-banner', null, [
+      UI.el('div', 'state-banner-text', null, [UI.el('span', 'state-banner-detail update-notice', text)]),
+      UI.el('div', 'state-banner-actions', null, [UI.button(D.updateSee, () => context.navigate('mises-a-jour'))]),
+    ]));
+  }
+
+  /** Charge du serveur (dernier relevé) et prochain redémarrage planifié. */
+  function renderLoad() {
+    const sample = latest || (details && details.metrics) || {};
+    const schedule = details && details.schedule;
+    const now = Date.now() - (context.status().skew || 0);
+    let next = D.noRestart;
+    let nextSmall = null;
+    if (schedule && schedule.restartAt) {
+      next = STRINGS.time(schedule.restartAt);
+      nextSmall = schedule.skipped ? D.skipped : D.in(Math.max(0, schedule.restartAt - now));
+    }
+    refs.load.replaceChildren(
+      fact(D.fxCpu, STRINGS.percent(sample.fxCpu)),
+      fact(D.fxMem, STRINGS.bytes(sample.fxMem)),
+      fact(D.network, sample.rx === null || sample.rx === undefined ? '—' : `${STRINGS.bitrate(sample.rx)} / ${STRINGS.bitrate(sample.tx)}`),
+      fact(D.nextRestart, next, nextSmall),
+    );
+  }
+
   function renderPlayers(status) {
     const body = [];
     if (status.state !== 'running') body.push(UI.el('p', 'empty', D.offline));
@@ -89,7 +123,9 @@ const DashboardView = (() => {
 
   function renderJournal() {
     const body = journal.length ? [UI.el('table', 'ledger', null, [UI.el('tbody', null, null, journal.slice(0, JOURNAL_SHOWN).map((entry) => {
-      const detail = entry.details && entry.details.command ? entry.details.command : '';
+      // la commande telle quelle ; sinon les précisions de l'inscription (ressource, fichier, heures…)
+      const details = entry.details || {};
+      const detail = details.command || Object.values(details).filter((v) => v !== null && v !== '').join(' · ');
       return UI.el('tr', null, null, [
         UI.el('td', 'cell-date', STRINGS.date(entry.at)),
         UI.el('td', null, null, [UI.el('span', 'cell-strong', STRINGS.actions[entry.action] || entry.action), detail ? UI.el('div', 'cell-sub mono', detail) : null]),
@@ -114,6 +150,8 @@ const DashboardView = (() => {
     context.setServerName(details ? details.hostname : '');
     const status = context.status();
     renderFacts(status);
+    renderLoad();
+    renderNotice();
     renderPlayers(status);
     renderJournal();
   }
@@ -137,6 +175,8 @@ const DashboardView = (() => {
         bannerDetail: UI.el('span', 'state-banner-detail'),
         actions: UI.el('div', 'state-banner-actions'),
         facts: UI.el('dl', 'facts'),
+        load: UI.el('dl', 'facts facts-load'),
+        notice: UI.el('div', 'dashboard-notice'),
         players: UI.el('div'),
         journal: UI.el('div'),
       };
@@ -144,11 +184,15 @@ const DashboardView = (() => {
       sheet.replaceChildren(
         UI.heading(D.title),
         context.setupDone() ? refs.banner : renderSetup(),
+        refs.notice,
         refs.facts,
+        refs.load,
         UI.el('div', 'columns', null, [refs.players, refs.journal]),
       );
+      latest = null;
       renderBanner(status);
       renderFacts(status);
+      renderLoad();
       renderPlayers(status);
       renderJournal();
       refresh();
@@ -157,7 +201,25 @@ const DashboardView = (() => {
         const current = context.status();
         refs.bannerDetail.textContent = STRINGS.describe(current, context.setupDone());
         if (current.state === 'running') renderFacts(current);
+        renderLoad();
       }, TICK_MS);
+    },
+
+    /** Une mise à jour est apparue, ou une opération a commencé ou fini. */
+    updates() {
+      if (sheet) refresh();
+    },
+
+    job(job) {
+      if (sheet && job && job.status !== 'running') refresh();
+      else if (sheet && details && !details.job) refresh();
+    },
+
+    /** Nouveau relevé des performances. */
+    metrics(sample) {
+      if (!sheet) return;
+      latest = sample;
+      renderLoad();
     },
 
     hide() {

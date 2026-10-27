@@ -2,10 +2,12 @@
 /*
  * web/js/app.js
  * Rôle : l'application : porte (premier lancement ou connexion), puis la coquille (colonne de navigation, état du
- *        serveur, compte) et ses pages, en trois groupes : le serveur (tableau de bord, console, configuration), le
+ *        serveur, compte) et ses pages, en trois groupes : le serveur (tableau de bord, performances, console,
+ *        ressources, server.cfg, planification, sauvegardes, configuration), le
  *        royaume pour les comptes qui ont un rang du Conseil (joueurs, signalements, sanctions, journal, Conseil,
  *        proclamation, zones de voix, caméras), la Chancellerie (comptes). Tient l'état du serveur et la console reçus en
- *        direct, et les distribue à la page affichée. Adresse de la page dans le fragment (#joueurs).
+ *        direct, et les distribue à la page affichée avec les relevés des performances et l'avancée des sauvegardes.
+ *        Adresse de la page dans le fragment (#joueurs).
  */
 
 const App = (() => {
@@ -13,10 +15,15 @@ const App = (() => {
   const MAX_LINES = 3000;
   const STATE_TICK_MS = 1000;
 
-  // pages : groupe, droit du panneau (permission) ou du rang du Conseil (realm), vue
+  // pages : groupe, droit du panneau (permission, ou l'un de anyPermission) ou du rang du Conseil (realm), vue
   const PAGES = [
     { id: 'tableau', group: 'server', label: N.dashboard, view: DashboardView },
+    { id: 'performances', group: 'server', label: N.performance, view: PerformanceView },
     { id: 'console', group: 'server', label: N.console, permission: 'console', view: ConsoleView },
+    { id: 'ressources', group: 'server', label: N.resources, view: ResourcesView },
+    { id: 'server-cfg', group: 'server', label: N.cfg, permission: 'config', view: CfgView },
+    { id: 'planification', group: 'server', label: N.schedule, view: ScheduleView },
+    { id: 'sauvegardes', group: 'server', label: N.backups, anyPermission: ['backups', 'config'], view: BackupsView },
     { id: 'configuration', group: 'server', label: N.setup, permission: 'config', view: WizardView },
     { id: 'joueurs', group: 'realm', label: N.players, realm: 'view', view: PlayersView },
     { id: 'signalements', group: 'realm', label: N.reports, realm: 'reports', view: RealmViews.reports },
@@ -27,6 +34,7 @@ const App = (() => {
     { id: 'zones-de-voix', group: 'realm', label: N.zones, realm: 'view', view: ZonesView },
     { id: 'cameras', group: 'realm', label: N.cameras, realm: 'watch', view: CamerasView },
     { id: 'comptes', group: 'chancellery', label: N.accounts, view: AccountsView },
+    { id: 'mises-a-jour', group: 'chancellery', label: N.updates, view: UpdatesView },
   ];
   const GROUPS = ['server', 'realm', 'chancellery'];
 
@@ -56,6 +64,7 @@ const App = (() => {
   /** Page affichable pour ce compte ? (droit du rang inconnu tant que le serveur de jeu n'a pas répondu : permis) */
   function allowed(page) {
     if (page.permission && !context.can(page.permission)) return false;
+    if (page.anyPermission && !page.anyPermission.some((permission) => context.can(permission))) return false;
     if (page.group === 'realm' && !hasRealm()) return false;
     if (page.realm && GAME.loaded() && !GAME.can(page.realm)) return false;
     return true;
@@ -165,6 +174,18 @@ const App = (() => {
         CamerasView.players();
       },
       camera: (data) => CAMERA.event(data),
+      metrics: (sample) => {
+        if (currentView && currentView.metrics) currentView.metrics(sample);
+      },
+      backup: (state) => {
+        if (currentView && currentView.backup) currentView.backup(state);
+      },
+      job: (job) => {
+        if (currentView && currentView.job) currentView.job(job);
+      },
+      update: (view) => {
+        if (currentView && currentView.updates) currentView.updates(view);
+      },
     });
     clearInterval(tick);
     tick = setInterval(() => { refs.stateDetail.textContent = STRINGS.describe(status, setupDone); }, STATE_TICK_MS);
@@ -230,10 +251,19 @@ const App = (() => {
     API.onLoggedOut(() => {
       if (account) boot();
     });
-    window.addEventListener('hashchange', () => {
+    window.addEventListener('hashchange', async () => {
       if (!account) return;
       const page = pageFromHash();
-      if (page.id !== current) show(page);
+      if (page.id === current) return;
+      // une page qui retient des modifications (éditeur du server.cfg) peut refuser qu'on la quitte
+      if (currentView && currentView.leave) {
+        const leaving = current;
+        if (!(await currentView.leave())) {
+          history.replaceState(null, '', `#${leaving}`);
+          return;
+        }
+      }
+      show(pageFromHash());
     });
     boot();
   }

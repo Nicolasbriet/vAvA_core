@@ -1,0 +1,162 @@
+#!/usr/bin/env bash
+# demarrer.sh — lance la Chancellerie (panneau web du serveur vAvA) sous Linux.
+# Node.js est cherché d'abord à côté de ce fichier (node/bin/node), puis sur la machine ; absent ou trop ancien, il est
+# téléchargé depuis nodejs.org (version LTS fixée ci-dessous, empreinte SHA-256 vérifiée) dans node/.
+# Code de sortie 75 : la Chancellerie vient de se mettre à jour et demande à être relancée. Si la nouvelle version
+# s'arrête avant d'avoir démarré, l'ancienne est remise (data/updates/chancellerie-precedente) et relancée.
+# Arrêt (Ctrl+C, ou systemd) : la Chancellerie arrête d'abord FXServer proprement (personnages sauvegardés).
+#
+#   bash demarrer.sh             lance la Chancellerie dans ce terminal
+#   sudo bash demarrer.sh --service [utilisateur]
+#                                l'installe comme service systemd (lancée au démarrage de la machine, relancée si elle
+#                                tombe) ; utilisateur : celui qui la fera tourner (par défaut, celui qui a lancé sudo)
+
+set -u
+HOME_DIR="$(cd "$(dirname "$(readlink -f "$0")")" && pwd)"
+export CHANCELLERIE_HOME="$HOME_DIR"
+cd "$HOME_DIR" || exit 1
+NODE_VERSION="v22.12.0"
+NODE_MIN=18
+UPDATES="$HOME_DIR/data/updates"
+SERVICE_NAME="vava-chancellerie"
+
+say() { printf '  %s\n' "$*"; }
+
+# Service systemd ------------------------------------------------------------------------------------------------------
+
+if [ "${1:-}" = "--service" ]; then
+  if [ "$(id -u)" -ne 0 ]; then
+    say "Il faut les droits root : sudo bash demarrer.sh --service"
+    exit 1
+  fi
+  RUN_AS="${2:-${SUDO_USER:-root}}"
+  if ! id "$RUN_AS" >/dev/null 2>&1; then
+    say "Utilisateur inconnu : $RUN_AS"
+    exit 1
+  fi
+  chown -R "$RUN_AS": "$HOME_DIR"
+  cat > "/etc/systemd/system/$SERVICE_NAME.service" <<EOF
+[Unit]
+Description=La Chancellerie (panneau du serveur vAvA)
+After=network-online.target mariadb.service mysql.service
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=$RUN_AS
+WorkingDirectory=$HOME_DIR
+ExecStart=/usr/bin/env bash $HOME_DIR/demarrer.sh
+# arrêt : seul le lanceur reçoit le signal ; il le passe à la Chancellerie, qui arrête FXServer proprement
+KillMode=mixed
+KillSignal=SIGTERM
+TimeoutStopSec=90
+Restart=on-failure
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target
+EOF
+  systemctl daemon-reload
+  systemctl enable --now "$SERVICE_NAME"
+  say "Service $SERVICE_NAME installé et lancé (utilisateur $RUN_AS)."
+  say "Code d'accès du premier lancement et messages : journalctl -u $SERVICE_NAME -f"
+  say "Arrêter : sudo systemctl stop $SERVICE_NAME    Relancer : sudo systemctl restart $SERVICE_NAME"
+  exit 0
+fi
+
+# Node.js --------------------------------------------------------------------------------------------------------------
+
+node_ok() {
+  local major
+  major="$("$1" -p 'process.versions.node.split(".")[0]' 2>/dev/null)" || return 1
+  [ -n "$major" ] && [ "$major" -ge "$NODE_MIN" ]
+}
+
+fetch() {
+  if command -v curl >/dev/null 2>&1; then curl -fsSL "$1" -o "$2"
+  elif command -v wget >/dev/null 2>&1; then wget -q "$1" -O "$2"
+  else return 1
+  fi
+}
+
+download_node() {
+  local arch name base tmp expected actual
+  case "$(uname -m)" in
+    x86_64|amd64) arch="x64" ;;
+    aarch64|arm64) arch="arm64" ;;
+    *) say "Processeur $(uname -m) : installez Node.js $NODE_MIN ou plus récent vous-même."; return 1 ;;
+  esac
+  name="node-$NODE_VERSION-linux-$arch"
+  base="https://nodejs.org/dist/$NODE_VERSION"
+  say "Node.js est introuvable : téléchargement de Node.js $NODE_VERSION depuis nodejs.org…"
+  tmp="$(mktemp -d)" || return 1
+  if ! fetch "$base/$name.tar.gz" "$tmp/node.tar.gz" || ! fetch "$base/SHASUMS256.txt" "$tmp/SHASUMS256.txt"; then
+    say "Téléchargement impossible (curl ou wget, et l'accès à nodejs.org, sont nécessaires)."
+    rm -rf "$tmp"
+    return 1
+  fi
+  expected="$(grep " $name.tar.gz\$" "$tmp/SHASUMS256.txt" | awk '{print $1}')"
+  actual="$(sha256sum "$tmp/node.tar.gz" | awk '{print $1}')"
+  if [ -z "$expected" ] || [ "$expected" != "$actual" ]; then
+    say "Empreinte de Node.js incorrecte : téléchargement refusé."
+    rm -rf "$tmp"
+    return 1
+  fi
+  rm -rf "$HOME_DIR/node"
+  mkdir -p "$HOME_DIR/node"
+  tar -xzf "$tmp/node.tar.gz" -C "$HOME_DIR/node" --strip-components=1
+  rm -rf "$tmp"
+  say "Node.js est installé dans node/."
+}
+
+NODE=""
+if [ -x "$HOME_DIR/node/bin/node" ] && node_ok "$HOME_DIR/node/bin/node"; then NODE="$HOME_DIR/node/bin/node"
+elif command -v node >/dev/null 2>&1 && node_ok "$(command -v node)"; then NODE="$(command -v node)"
+elif download_node && node_ok "$HOME_DIR/node/bin/node"; then NODE="$HOME_DIR/node/bin/node"
+fi
+if [ -z "$NODE" ]; then
+  say "Node.js $NODE_MIN ou plus récent est introuvable et n'a pas pu être téléchargé."
+  say "Installez-le (https://nodejs.org/, version LTS) puis relancez."
+  exit 1
+fi
+
+# Lancement ------------------------------------------------------------------------------------------------------------
+
+CHILD=""
+STOPPING=0
+# systemd (SIGTERM) : le signal passe à la Chancellerie, qui s'arrête proprement. Ctrl+C (SIGINT) lui parvient déjà
+# directement depuis le terminal : rien à transmettre (un second signal la ferait s'arrêter net).
+on_term() {
+  STOPPING=1
+  [ -n "$CHILD" ] && kill -TERM "$CHILD" 2>/dev/null
+}
+on_int() { STOPPING=1; }
+trap on_term TERM HUP
+trap on_int INT
+
+while true; do
+  "$NODE" "$HOME_DIR/index.js" &
+  CHILD=$!
+  # wait rend la main à chaque signal reçu (code > 128) : tant que la Chancellerie vit, on l'attend encore
+  while true; do
+    wait "$CHILD"
+    CODE=$?
+    if [ "$CODE" -gt 128 ] && kill -0 "$CHILD" 2>/dev/null; then continue; fi
+    break
+  done
+  CHILD=""
+  [ "$STOPPING" -eq 1 ] && break
+  [ "$CODE" -eq 75 ] && continue
+  if [ -f "$UPDATES/chancellerie-a-verifier" ]; then
+    echo
+    say "La nouvelle version de la Chancellerie n'a pas démarré : retour à la version précédente."
+    (cd "$UPDATES/chancellerie-precedente" && find . -type f ! -name 'demarrer.sh' -exec cp -p --parents {} "$HOME_DIR" \;)
+    rm -f "$UPDATES/chancellerie-a-verifier"
+    echo "annulee" > "$UPDATES/chancellerie-annulee"
+    continue
+  fi
+  break
+done
+echo
+say "La Chancellerie est arrêtée."
+exit "$CODE"

@@ -1,7 +1,8 @@
 'use strict';
 /*
  * lib/events.js
- * Rôle : flux d'évènements vers les navigateurs connectés : état du serveur pour tous, lignes de la console pour
+ * Rôle : flux d'évènements vers les navigateurs connectés : état du serveur, relevés des performances et sauvegardes
+ *        en cours pour tous, lignes de la console pour
  *        les comptes qui ont le droit de la lire, nouvelles du royaume (signalements, joueurs) pour les comptes qui
  *        ont un rang du Conseil, caméras pour la seule session qui les a ouvertes. Un flux se ferme quand sa session
  *        expire ou se déconnecte ; leur nombre est borné (par session et au total).
@@ -66,6 +67,11 @@ module.exports = {
     server.on('line', (line) => {
       for (const client of clients) if (client.console) client.send('line', line);
     });
+  },
+
+  /** Évènement pour tous les navigateurs connectés (relevé des performances, sauvegarde en cours). */
+  broadcast(event, data) {
+    for (const client of clients) client.send(event, data);
   },
 
   /** Évènement pour une seule session (caméra). */

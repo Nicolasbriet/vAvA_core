@@ -14,7 +14,7 @@ const HOME = path.resolve(process.env.CHANCELLERIE_HOME || path.join(__dirname, 
 const DATA = path.join(HOME, 'data');
 const FILE = path.join(DATA, 'config.json');
 const GUESS_LEVELS = 4;
-const VERSION = '1.1.0';
+const VERSION = '1.2.0';
 
 const DEFAULTS = Object.freeze({
   http: { host: '127.0.0.1', port: 40120, secureCookies: false },
@@ -35,6 +35,19 @@ const DEFAULTS = Object.freeze({
   },
   // Rangs du Conseil vus au dernier passage du pont (formulaire des comptes quand le serveur est arrêté).
   game: { ranks: [] },
+  // Relevé des performances (processeur, mémoire, réseau, joueurs, ticks).
+  metrics: { intervalMs: 5000 },
+  // Heures « HH:MM » (heure de la machine) des redémarrages et des sauvegardes de la base ; avertissements des joueurs
+  // (minutes avant) et leur message ({minutes} remplacé, vide : phrase par défaut) ; échéance sautée une fois.
+  schedule: { restarts: [], warnings: [15, 5, 1], message: '', backups: [], skip: null },
+  // Sauvegardes de la base : mysqldump (vide : cherché seul) et nombre de sauvegardes gardées.
+  backups: { dumpPath: '', keep: 14 },
+  // Installation et mises à jour de vAvA : dépôt GitHub, branche suivie (channel « commits ») ou dernière release
+  // (« releases ») ; vérification à intervalle ; mise à jour appliquée au redémarrage planifié si demandé.
+  updates: {
+    repo: 'Nicolasbriet/vAvA_core', branch: 'main', channel: 'commits', autoCheck: true, checkEveryMin: 60, applyAtRestart: false,
+    api: 'https://api.github.com', codeload: 'https://codeload.github.com',
+  },
 });
 
 function isObject(value) {

@@ -31,6 +31,9 @@ const CORE_DESCRIPTIONS = {
   vava_chancellerie: 'Pont de la Chancellerie (administration du royaume depuis le web)',
 };
 
+const MANIFEST_READ_MAX = 64 * 1024;
+const MANIFEST_FIELDS = ['version', 'author', 'description'];
+
 function isDirectory(full) {
   try {
     return fs.statSync(full).isDirectory();
@@ -39,11 +42,35 @@ function isDirectory(full) {
   }
 }
 
+/** Version, auteur et description déclarés par un manifeste (`version '1.0.0'`, `author "…"`). */
+function manifestDetails(dir) {
+  const file = MANIFESTS.map((manifest) => path.join(dir, manifest)).find((candidate) => fs.existsSync(candidate));
+  const out = { version: '', author: '' };
+  if (!file) return out;
+  let text = '';
+  try {
+    const handle = fs.openSync(file, 'r');
+    const buffer = Buffer.alloc(MANIFEST_READ_MAX);
+    const size = fs.readSync(handle, buffer, 0, MANIFEST_READ_MAX, 0);
+    fs.closeSync(handle);
+    text = buffer.subarray(0, size).toString('utf8');
+  } catch (error) {
+    return out;
+  }
+  for (const field of MANIFEST_FIELDS) {
+    const match = new RegExp(`^\\s*${field}\\s*\\(?\\s*(['"])(.*?)\\1`, 'm').exec(text);
+    if (match) out[field] = match[2].slice(0, 160);
+  }
+  return out;
+}
+
 /**
- * Ressources trouvées : [{ name, category, description }], triées par nom.
+ * Ressources trouvées : [{ name, category, description }], triées par nom. `details` : version, auteur et
+ * description lus dans chaque manifeste, et dossier (relatif à resources).
  * @param {string} serverDataPath
+ * @param {{ details?: boolean }} [options]
  */
-function scan(serverDataPath) {
+function scan(serverDataPath, { details = false } = {}) {
   const root = path.join(serverDataPath || '', 'resources');
   const found = new Map();
   function walk(dir, category, depth) {
@@ -60,7 +87,13 @@ function scan(serverDataPath) {
       if (name.startsWith('[') && name.endsWith(']')) {
         walk(full, name.slice(1, -1), depth + 1);
       } else if (MANIFESTS.some((manifest) => fs.existsSync(path.join(full, manifest))) && !found.has(name)) {
-        found.set(name, { name, category: category || '', description: CORE_DESCRIPTIONS[name] || '' });
+        const resource = { name, category: category || '', description: CORE_DESCRIPTIONS[name] || '' };
+        if (details) {
+          const manifest = manifestDetails(full);
+          Object.assign(resource, { version: manifest.version, author: manifest.author, folder: path.relative(root, full) });
+          if (!resource.description) resource.description = manifest.description || '';
+        }
+        found.set(name, resource);
       }
     }
   }
@@ -77,4 +110,10 @@ function order(names) {
   return names.map((name, index) => ({ name, index })).sort((a, b) => rank(a.name) - rank(b.name) || a.index - b.index).map((e) => e.name);
 }
 
-module.exports = { scan, order, KNOWN_ORDER };
+/** Rang d'une ressource dans l'ordre de démarrage de vAvA (les inconnues après toutes les autres). */
+function rank(name) {
+  const index = KNOWN_ORDER.indexOf(name);
+  return index === -1 ? KNOWN_ORDER.length : index;
+}
+
+module.exports = { scan, order, rank, KNOWN_ORDER };

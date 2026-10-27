@@ -95,9 +95,17 @@ function actorOf(account) {
   return { label: account.name, rank: account.rank };
 }
 
+// au nom de qui la Chancellerie s'adresse aux joueurs (rang qui a le droit de proclamer)
+const ANNOUNCER = { label: 'Chancellerie', rank: 'souverain' };
+
+/** Proclamation à tous les joueurs, au nom de la Chancellerie (inscrite au journal du Conseil). */
+function proclaim(endpoint, text) {
+  return request(endpoint, 'POST', '/request', { actor: ANNOUNCER, name: 'announce', args: [text] });
+}
+
 /** Clé oubliée (FXServer arrêté) : plus aucun évènement accepté. */
 function reset() {
   token = null;
 }
 
-module.exports = { launchArgs, secrets, verify, request, actorOf, reset, HEADER };
+module.exports = { launchArgs, secrets, verify, request, actorOf, proclaim, reset, HEADER };

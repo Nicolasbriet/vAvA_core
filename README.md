@@ -21,8 +21,11 @@ Aucun framework tiers (ni ESX, ni QBCore, ni Qbox, ni ox_core).
 
 ## Installation
 
-Le plus simple est de passer par la Chancellerie : elle écrit le `server.cfg`, range les ressources dans le bon ordre
-et lance le serveur. Voir [docs/chancellerie.md](docs/chancellerie.md).
+Le plus simple est de passer par la Chancellerie : copiez seulement le dossier `chancellerie/` sur la machine et lancez
+`demarrer.sh` (Linux) ou `demarrer.bat` (Windows). Elle installe le reste (Node.js s'il manque, FXServer, oxmysql, vAvA depuis ce dépôt), crée la base,
+écrit le `server.cfg`, lance le serveur, puis propose chaque nouvelle version poussée ici et l'applique sans casser le
+serveur (réglages gardés, contrôle, retour arrière). Seul MySQL / MariaDB reste à installer soi-même.
+Voir [docs/chancellerie.md](docs/chancellerie.md).
 
 À la main : placer `vAvA_core` et chaque module dans `resources/`, puis les démarrer dans cet ordre, après
 `oxmysql` : `vAvA_core`, `vava_world`, `vava_appearance`, `vava_characters_ui`, `vava_hud`, `vava_inventory`,

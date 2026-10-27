@@ -2,8 +2,8 @@
 /*
  * web/js/ui.js
  * Rôle : briques de l'interface : création d'éléments (texte seulement, jamais de HTML), boutons, titres à
- *        lettrine, champs de formulaire, tampons, pages, mot éphémère, dialogue de confirmation (vrai ou faux) et
- *        dialogue de formulaire (valeurs saisies, ou null).
+ *        lettrine, champs de formulaire, tampons, pages, mot éphémère, dialogue de confirmation (vrai ou faux),
+ *        dialogue de formulaire (valeurs saisies, ou null) et dialogue de lecture (texte long, un seul bouton).
  */
 
 const UI = (() => {
@@ -116,14 +116,24 @@ const UI = (() => {
     }
   }
 
-  function open({ title, text, confirm: label }) {
+  function open({ title, text, confirm: label, wide = false, single = false }) {
     finish(formFields ? null : false);
     refs.dialogTitle.textContent = title;
     refs.dialogText.textContent = text || '';
     refs.dialogText.hidden = !text;
     refs.confirm.textContent = label;
     refs.cancel.textContent = STRINGS.server.cancel;
+    refs.cancel.hidden = single;
+    refs.card.classList.toggle('is-wide', wide);
     refs.dialog.hidden = false;
+  }
+
+  /** Lecture : { title, text?, body (élément), confirm } dans un dialogue large à un seul bouton → vrai une fois fermé. */
+  function reading(options) {
+    open({ ...options, wide: true, single: true });
+    refs.dialogBody.replaceChildren(options.body);
+    refs.confirm.focus();
+    return new Promise((resolve) => { resolveDialog = resolve; });
   }
 
   /** Confirmation : { title, text, confirm } → vrai si confirmé. */
@@ -230,6 +240,7 @@ const UI = (() => {
       dialogBody: document.querySelector('.dialog-body'),
       confirm: document.querySelector('[data-dialog="confirm"]'),
       cancel: document.querySelector('[data-dialog="cancel"]'),
+      card: document.querySelector('.dialog-card'),
     };
     document.querySelector('.dialog-card').addEventListener('submit', (event) => {
       event.preventDefault();
@@ -252,5 +263,5 @@ const UI = (() => {
     });
   }
 
-  return { el, button, heading, field, choice, slip, report, confirm, form, stamps, list, pager, init };
+  return { el, button, heading, field, choice, slip, report, confirm, form, reading, stamps, list, pager, init };
 })();

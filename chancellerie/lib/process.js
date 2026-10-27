@@ -58,7 +58,10 @@ function killTree(pid) {
   });
 }
 
-/** Nom de l'exécutable d'un processus vivant, ou null. */
+/**
+ * Ce qui identifie un processus vivant, ou null : le nom de son exécutable sous Windows, sa ligne de commande entière
+ * sous Linux (run.sh s'y remplace par le chargeur de FXServer, qui garde « cfx-server/FXServer » dans ses arguments).
+ */
 function imageName(pid) {
   return new Promise((resolve) => {
     if (process.platform === 'win32') {
@@ -68,7 +71,7 @@ function imageName(pid) {
       });
       return;
     }
-    fs.readFile(`/proc/${pid}/cmdline`, 'utf8', (error, text) => resolve(error ? null : path.basename(text.split('\0')[0])));
+    fs.readFile(`/proc/${pid}/cmdline`, 'utf8', (error, text) => resolve(error || !text ? null : text.split('\0').join(' ')));
   });
 }
 
@@ -197,11 +200,14 @@ class ServerProcess extends EventEmitter {
     const settings = config.get();
     const executable = settings.fxserverPath;
     const args = [...this.launchArgs(), '+exec', settings.cfgFile];
-    // un faux serveur écrit en JavaScript (tests) est lancé par Node lui-même
+    // un faux serveur écrit en JavaScript (tests) est lancé par Node lui-même ; run.sh (Linux) par sh, qu'il ait ou non
+    // le droit d'exécution (il se remplace par FXServer : le numéro de processus reste le même)
     const script = executable.toLowerCase().endsWith('.js');
+    const shell = !script && executable.endsWith('.sh');
+    const program = script ? process.execPath : shell ? '/bin/sh' : executable;
     let child;
     try {
-      child = spawn(script ? process.execPath : executable, script ? [executable, ...args] : args, {
+      child = spawn(program, script || shell ? [executable, ...args] : args, {
         cwd: settings.serverDataPath, windowsHide: true, detached: true, stdio: ['pipe', 'pipe', 'pipe'],
       });
     } catch (error) {
@@ -383,8 +389,11 @@ class ServerProcess extends EventEmitter {
     this.removePid();
     const image = await imageName(saved.pid);
     // un faux serveur des tests tourne sous Node : son nom enregistré est celui du script
-    const expected = String(saved.image || '').toLowerCase().endsWith('.js') ? path.basename(process.execPath) : saved.image;
-    if (!image || image.toLowerCase() !== String(expected).toLowerCase()) return false;
+    const expected = String(saved.image || '').toLowerCase().endsWith('.js') ? path.basename(process.execPath) : String(saved.image);
+    const same = process.platform === 'win32'
+      ? Boolean(image) && image.toLowerCase() === expected.toLowerCase()
+      : Boolean(image) && (image.includes(expected) || image.includes('cfx-server/FXServer'));
+    if (!same) return false;
     await killTree(saved.pid);
     journal.record(journal.SYSTEM, 'orphan_stopped', { pid: saved.pid });
     return true;

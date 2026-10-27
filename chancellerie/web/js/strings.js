@@ -21,7 +21,7 @@ const STRINGS = (() => {
     csrf: 'Requête refusée : rechargez la page.',
     bad_host: 'Adresse refusée : ouvrez la Chancellerie par 127.0.0.1 ou localhost.',
     server_folder_invalid: 'Ce dossier ne contient pas de dossier « resources » : ce n\'est pas un dossier de serveur.',
-    fxserver_invalid: 'FXServer.exe est introuvable à cet emplacement.',
+    fxserver_invalid: 'FXServer est introuvable à cet emplacement (run.sh sous Linux, FXServer.exe sous Windows).',
     server_running: 'Arrêtez d\'abord le serveur.',
     paths_missing: 'Choisissez d\'abord les dossiers (première étape).',
     required: 'Ce champ est obligatoire.',
@@ -36,7 +36,7 @@ const STRINGS = (() => {
     already_running: 'Le serveur est déjà lancé.',
     not_running: 'Le serveur n\'est pas lancé.',
     not_configured: 'Le serveur n\'est pas encore configuré : terminez l\'assistant.',
-    fxserver_missing: 'FXServer.exe est introuvable : vérifiez la configuration.',
+    fxserver_missing: 'FXServer est introuvable : vérifiez la configuration.',
     server_folder_missing: 'Le dossier du serveur est introuvable : vérifiez la configuration.',
     cfg_missing: 'Le server.cfg est introuvable : terminez l\'assistant.',
     spawn_failed: 'FXServer n\'a pas pu être lancé.',
@@ -83,13 +83,32 @@ const STRINGS = (() => {
     invalid_rank: 'Rang refusé.',
     too_many_accounts: 'Nombre maximal de comptes atteint.',
     bad_password: 'Mot de passe actuel incorrect.',
+    // exploitation
+    cfg_changed: 'Le server.cfg a changé depuis son ouverture (assistant, autre onglet, modification à la main) : rechargez-le avant d\'enregistrer.',
+    unknown_secret: 'Une marque « ••••secret-… •••• » ne correspond à aucun secret du fichier : remettez-la telle quelle ou saisissez la vraie valeur.',
+    unknown_backup: 'Cette sauvegarde n\'existe plus.',
+    backup_running: 'Une sauvegarde est déjà en cours.',
+    dump_tool_missing: 'mysqldump est introuvable : indiquez son chemin dans les réglages ci-dessous.',
+    dump_tool_invalid: 'Ce chemin ne désigne pas mysqldump (ou mariadb-dump).',
+    dump_failed: 'La sauvegarde de la base a échoué.',
+    no_restart_planned: 'Aucun redémarrage n\'est planifié.',
+    // installation et mises à jour
+    job_running: 'Une installation ou une mise à jour est en cours : patientez jusqu\'à sa fin.',
+    base_inside_panel: 'Choisissez un dossier hors de celui de la Chancellerie.',
+    base_unwritable: 'Ce dossier ne peut pas être créé ici.',
+    git_checkout: 'Copie suivie par git (développement) : mettez-la à jour avec git pull.',
+    db_client_missing: 'Le client mysql est introuvable sur cette machine (il est livré avec MariaDB et MySQL ; sous Linux : apt install mariadb-client). Ou créez la base vous-même.',
+    db_create_failed: 'La base n\'a pas pu être créée.',
+    install_failed: 'L\'installation a échoué (détail ci-dessous) : corrigez puis relancez-la ; ce qui est déjà en place est gardé.',
   };
 
   const fields = {
-    serverDataPath: 'Dossier du serveur', fxserverPath: 'FXServer.exe', hostname: 'Nom du serveur', projectName: 'Nom du projet',
+    serverDataPath: 'Dossier du serveur', fxserverPath: 'FXServer', hostname: 'Nom du serveur', projectName: 'Nom du projet',
     projectDesc: 'Description', maxClients: 'Places', bind: 'Adresse d\'écoute', port: 'Port', onesync: 'OneSync',
     licenseKey: 'Clé de licence', 'db.host': 'Hôte', 'db.port': 'Port', 'db.user': 'Utilisateur', 'db.database': 'Base',
     'db.password': 'Mot de passe', resources: 'Ressources', extra: 'Options avancées',
+    restarts: 'Heures des redémarrages', warnings: 'Avertissements', message: 'Message', dumpPath: 'Chemin de mysqldump',
+    keep: 'Sauvegardes gardées', times: 'Heures des sauvegardes',
   };
 
   const states = {
@@ -103,7 +122,43 @@ const STRINGS = (() => {
     relaunch_abandoned: 'Relance abandonnée', orphan_stopped: 'FXServer orphelin arrêté', command: 'Commande',
     spawn_failed: 'Lancement impossible', account_created: 'Compte créé', account_updated: 'Compte modifié',
     account_deleted: 'Compte supprimé', password_reset: 'Mot de passe remis', password_changed: 'Mot de passe changé',
+    resource_action: 'Ressource', resource_refresh: 'Dossier des ressources relu', autostart: 'Lancement au démarrage',
+    cfg_edited: 'server.cfg modifié', cfg_restored: 'server.cfg restauré', backup_started: 'Sauvegarde de la base',
+    backup_done: 'Sauvegarde terminée', backup_failed: 'Sauvegarde échouée', backup_deleted: 'Sauvegarde supprimée',
+    backup_downloaded: 'Sauvegarde téléchargée', backup_settings: 'Réglages des sauvegardes',
+    backup_schedule_updated: 'Sauvegardes planifiées', schedule_updated: 'Redémarrages planifiés',
+    restart_skipped: 'Redémarrage sauté', restart_unskipped: 'Redémarrage rétabli', scheduled_restart: 'Redémarrage planifié',
+    scheduled_restart_skipped: 'Redémarrage planifié sauté',
+    install_started: 'Installation lancée', install_done: 'Installation terminée', install_failed: 'Installation échouée',
+    update_started: 'Mise à jour lancée', update_done: 'Mise à jour terminée', update_failed: 'Mise à jour échouée',
+    update_rolled_back: 'Mise à jour annulée (retour arrière)', panel_updated: 'Chancellerie mise à jour',
+    panel_reverted: 'Chancellerie remise à sa version précédente',
+    scheduled_update: 'Mise à jour au redémarrage planifié',
   };
+
+  const UNITS = ['o', 'Ko', 'Mo', 'Go', 'To'];
+  const number = (value, digits) => value.toLocaleString('fr-FR', { minimumFractionDigits: digits, maximumFractionDigits: digits });
+
+  /** 512 o · 3,4 Mo · 1,25 Go */
+  function bytes(value) {
+    if (value === null || value === undefined) return '—';
+    let unit = 0;
+    let shown = value;
+    while (shown >= 1024 && unit < UNITS.length - 1) {
+      shown /= 1024;
+      unit += 1;
+    }
+    return `${number(shown, unit === 0 ? 0 : shown < 10 ? 2 : 1)} ${UNITS[unit]}`;
+  }
+
+  /** Débit réseau en bits par seconde : 840 kbit/s · 12,4 Mbit/s */
+  function bitrate(bytesPerSecond) {
+    if (bytesPerSecond === null || bytesPerSecond === undefined) return '—';
+    const bits = bytesPerSecond * 8;
+    if (bits >= 1e9) return `${number(bits / 1e9, 2)} Gbit/s`;
+    if (bits >= 1e6) return `${number(bits / 1e6, bits >= 1e8 ? 0 : 1)} Mbit/s`;
+    return `${number(bits / 1e3, bits >= 1e5 ? 0 : 1)} kbit/s`;
+  }
 
   function plural(count, one, many) {
     return `${count} ${count > 1 ? many : one}`;
@@ -137,8 +192,26 @@ const STRINGS = (() => {
     return STRINGS.server.since(now - status.since);
   }
 
+  const timeFormat = new Intl.DateTimeFormat('fr-FR', { hour: '2-digit', minute: '2-digit' });
+  const clockFormat = new Intl.DateTimeFormat('fr-FR', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+
+  /** « aujourd'hui à 06:00 », « demain à 06:00 », sinon la date. */
+  function when(at) {
+    const date = new Date(at);
+    const today = new Date();
+    const tomorrow = new Date();
+    tomorrow.setDate(today.getDate() + 1);
+    if (date.toDateString() === today.toDateString()) return `aujourd'hui à ${timeFormat.format(date)}`;
+    if (date.toDateString() === tomorrow.toDateString()) return `demain à ${timeFormat.format(date)}`;
+    return dateFormat.format(date);
+  }
+
   return {
-    errors, fields, states, actions, plural, duration, describe,
+    errors, fields, states, actions, plural, duration, describe, bytes, bitrate, when,
+    percent: (value) => (value === null || value === undefined ? '—' : `${number(value, value < 10 ? 1 : 0)} %`),
+    ms: (value) => (value === null || value === undefined ? '—' : `${number(value, value < 10 ? 2 : 1)} ms`),
+    time: (value) => timeFormat.format(new Date(value)),
+    clock: (value) => clockFormat.format(new Date(value)),
     date: (value) => dateFormat.format(new Date(value)),
     error(code, field) {
       const base = errors[code] || `Erreur inattendue (${code}).`;
@@ -161,6 +234,8 @@ const STRINGS = (() => {
 
     nav: {
       dashboard: 'Tableau', console: 'Console', setup: 'Configuration', logout: 'Se retirer',
+      performance: 'Performances', resources: 'Ressources', cfg: 'server.cfg', schedule: 'Planification', backups: 'Sauvegardes',
+      updates: 'Mises à jour',
       players: 'Joueurs', reports: 'Signalements', bans: 'Sanctions', logs: 'Journal du Conseil', council: 'Conseil',
       announce: 'Proclamation', zones: 'Zones de voix', cameras: 'Caméras', accounts: 'Comptes',
       groups: { server: 'Serveur', realm: 'Royaume', chancellery: 'Chancellerie' },
@@ -308,7 +383,10 @@ const STRINGS = (() => {
       name: 'Identifiant',
       password: 'Mot de passe (10 caractères au moins)',
       permissions: 'Droits du panneau',
-      permissionLabels: { server: 'Démarrer et arrêter le serveur', console: 'Lire la console et y écrire', config: 'Configurer le serveur' },
+      permissionLabels: {
+        server: 'Démarrer et arrêter le serveur, ses ressources, planifier les redémarrages', console: 'Lire la console et y écrire',
+        config: 'Configurer le serveur (assistant, server.cfg)', backups: 'Sauvegarder la base et télécharger ses sauvegardes',
+      },
       rank: 'Rang du Conseil (administration du royaume)',
       noRank: 'Aucun',
       ranksStale: 'Rangs lus au dernier démarrage du serveur de jeu.',
@@ -402,6 +480,226 @@ const STRINGS = (() => {
       setupText: 'L\'assistant pose quelques questions (dossiers, nom, clé de licence, base de données, ressources), écrit le server.cfg et lance le serveur.',
       setupButton: 'Ouvrir l\'assistant',
       ms: (value) => `${value} ms`,
+      fxCpu: 'Processeur FXServer',
+      fxMem: 'Mémoire FXServer',
+      network: 'Réseau ↓ / ↑',
+      nextRestart: 'Prochain redémarrage',
+      noRestart: 'aucun planifié',
+      skipped: 'sauté',
+      in: (ms) => `dans ${duration(ms)}`,
+      updateAvailable: (label, count) => `Une mise à jour de vAvA est disponible : ${label}${count ? ` (${plural(count, 'changement', 'changements')})` : ''}.`,
+      updateRunning: 'Une installation ou une mise à jour est en cours.',
+      updateSee: 'Voir',
+    },
+
+    job: {
+      kinds: { install: 'Installation', update: 'Mise à jour' },
+      states: { running: 'En cours', done: 'Terminée', failed: 'Échec', rolled: 'Annulée' },
+      by: (actor) => `par ${actor}`,
+      of: (a, b) => `${a} sur ${b}`,
+      done: (summary) => `Terminée : ${summary}.`,
+      errors: {
+        network: 'Internet ne répond pas (GitHub ou Cfx.re).',
+        rate_limited_remote: 'GitHub limite les demandes : réessayez dans une heure.',
+        http_404: 'Introuvable sur GitHub (dépôt, branche ou version).',
+        extract_failed: 'L\'archive n\'a pas pu être extraite.',
+        bad_archive: 'L\'archive téléchargée n\'a pas la forme attendue.',
+        artifacts_unavailable: 'Les artefacts de FXServer sont indisponibles.',
+        oxmysql_unavailable: 'oxmysql est indisponible.',
+        fxserver_invalid: 'FXServer est absent de l\'archive téléchargée.',
+        git_checkout: 'Copie suivie par git :',
+        panel_invalid: 'Nouvelle Chancellerie refusée :',
+        update_rolled_back: 'La mise à jour a été annulée :',
+        panel_reverted: 'Ancienne Chancellerie remise :',
+        backup_failed: 'Sauvegarde préalable échouée :',
+        backup_running: 'Une sauvegarde de la base était déjà en cours.',
+        dump_tool_missing: 'mysqldump est introuvable.',
+        too_large: 'Téléchargement trop volumineux.',
+      },
+    },
+
+    updates: {
+      title: 'Mises à jour',
+      installedTitle: 'Installé',
+      latestTitle: 'Sur GitHub',
+      vava: 'vAvA',
+      panel: 'Chancellerie',
+      oxmysql: 'oxmysql',
+      fxserver: 'FXServer',
+      unknown: 'inconnue (posé à la main)',
+      none: '—',
+      build: (build) => `build ${build}`,
+      version: (label, message) => `${label}${message ? ` — ${message}` : ''}`,
+      notChecked: 'Pas encore vérifié.',
+      checking: 'Vérification…',
+      check: 'Vérifier maintenant',
+      checkedAt: (at) => `Vérifié ${STRINGS.date(at)}.`,
+      upToDate: 'vAvA est à jour.',
+      available: (label) => `Nouvelle version disponible : ${label}`,
+      unknownInstalled: 'La version installée est inconnue (vAvA posé à la main) : la mise à jour compare chaque fichier et garde vos réglages modifiés.',
+      commitsTitle: (n) => `Changements (${n})`,
+      parts: 'Touché :',
+      partPanel: 'Chancellerie',
+      checkFailed: 'La vérification a échoué :',
+      apply: 'Mettre à jour',
+      applyTitle: 'Mettre à jour vAvA',
+      applyText: 'La Chancellerie télécharge la nouvelle version, sauvegarde ce qui va changer, arrête proprement le serveur, écrit la nouvelle version en gardant vos réglages modifiés, relance et vérifie que tout ce qui tournait tourne encore. Sinon, elle remet l\'ancienne version d\'elle-même.',
+      backupDb: 'Sauvegarder la base de données avant',
+      delay: 'Prévenir les joueurs et attendre',
+      delays: { 0: 'Tout de suite', 1: '1 minute', 5: '5 minutes', 10: '10 minutes' },
+      started: 'Mise à jour lancée : suivez-la ici.',
+      masterOnly: 'Seul le compte maître applique les mises à jour.',
+      blocked: 'Copie de développement suivie par git : la Chancellerie ne l\'écrase pas (utilisez git pull).',
+      jobTitle: 'Opération',
+      settings: 'Suivi',
+      channel: 'Suivre',
+      channels: { commits: 'Chaque commit de la branche', releases: 'Les releases publiées seulement' },
+      autoCheck: 'Vérifier toutes les heures',
+      applyAtRestart: 'Appliquer la mise à jour au prochain redémarrage planifié',
+      applyAtRestartHelp: 'Les joueurs sont prévenus par les avertissements de la planification.',
+      saveSettings: 'Sceller',
+      settingsSaved: 'Suivi enregistré.',
+      repo: (repo, branch) => `Dépôt : ${repo} (branche ${branch})`,
+      keptNote: 'Après une mise à jour : un réglage que vous aviez modifié est gardé, la nouvelle version est posée à côté (« config.lua.nouveau ») pour comparaison.',
+    },
+
+    performance: {
+      title: 'Performances',
+      ranges: { hour: 'Dernière heure', day: '24 heures' },
+      stopped: 'FXServer est arrêté : seules la machine et son réseau sont relevés.',
+      perfMissing: 'La durée des ticks vient de l\'adresse /perf/ de FXServer : elle apparaît quand le serveur l\'expose.',
+      collecting: 'Premiers relevés en cours…',
+      facts: { fxCpu: 'Processeur FXServer', fxMem: 'Mémoire FXServer', hostCpu: 'Processeur machine', hostMem: 'Mémoire machine', rx: 'Reçu', tx: 'Envoyé', players: 'Joueurs', tick: 'Tick principal' },
+      cpuHelp: (cores) => `part des ${cores} cœurs`,
+      memOf: (total) => `sur ${total}`,
+      charts: {
+        cpu: { title: 'Processeur', help: '100 % : tous les cœurs de la machine occupés.' },
+        memory: { title: 'Mémoire de FXServer', help: 'Mémoire vive occupée par le processus.' },
+        network: { title: 'Bande passante de la machine', help: 'Toutes les cartes réseau actives : sur un serveur dédié, c\'est surtout FXServer.' },
+        players: { title: 'Joueurs connectés', help: 'D\'après players.json ; par minute, le plus haut de la minute.' },
+        ticks: { title: 'Durée des ticks', help: 'Temps moyen d\'un tick par fil de FXServer : au-delà de 50 ms le fil principal prend du retard.' },
+      },
+      series: { fxCpu: 'FXServer', cpu: 'Machine', fxMem: 'FXServer', rx: 'Reçu', tx: 'Envoyé', players: 'Joueurs', tickMain: 'Principal', tickNetwork: 'Réseau', tickSync: 'Synchronisation' },
+      noData: 'Aucun relevé sur cette période.',
+      showTable: 'Voir en tableau',
+      hideTable: 'Voir en graphiques',
+      tableColumns: ['Heure', 'Proc. FXServer', 'Proc. machine', 'Mém. FXServer', 'Reçu', 'Envoyé', 'Joueurs', 'Tick principal'],
+    },
+
+    resources: {
+      title: 'Ressources',
+      count: (total, started) => `${plural(total, 'ressource', 'ressources')}${started === null ? '' : ` · ${started} lancée${started > 1 ? 's' : ''}`}`,
+      filter: 'Chercher une ressource…',
+      refresh: 'Relire le dossier',
+      refreshed: 'Dossier relu par le serveur (refresh).',
+      columns: ['Ressource', 'État', 'Au démarrage', ''],
+      started: 'Lancée',
+      stopped: 'Arrêtée',
+      unknown: '—',
+      outside: 'Hors du dossier resources',
+      uncategorized: 'Sans catégorie',
+      offline: 'Le serveur est arrêté : l\'état des ressources et leurs commandes reviennent quand il tourne. Le lancement au démarrage se règle quand même.',
+      notLive: 'Le serveur ne donne pas encore la liste de ses ressources lancées (info.json).',
+      noCfg: 'Pas encore de server.cfg : terminez l\'assistant pour régler le lancement au démarrage.',
+      empty: 'Aucune ressource trouvée dans le dossier resources.',
+      noMatch: 'Aucune ressource ne correspond.',
+      actions: { start: 'Démarrer', stop: 'Arrêter', restart: 'Redémarrer', ensure: 'Assurer' },
+      done: { start: 'Démarrage demandé.', stop: 'Arrêt demandé.', restart: 'Redémarrage demandé.', ensure: 'Demande envoyée.' },
+      autostartOn: (name) => `${name} sera lancée au démarrage.`,
+      autostartOff: (name) => `${name} ne sera plus lancée au démarrage.`,
+      autostartHelp: 'Ligne « ensure » du server.cfg : effet au prochain démarrage.',
+      criticalTitle: (action, name) => `${action} ${name} ?`,
+      criticalText: 'Cette ressource porte le serveur : les modules qui en dépendent s\'arrêtent avec elle, et les joueurs peuvent perdre leur partie.',
+      meta: (version, author) => [version ? `v${version}` : '', author].filter(Boolean).join(' · '),
+    },
+
+    cfg: {
+      title: 'server.cfg',
+      intro: 'Le fichier tel que FXServer le lit. Les secrets (clé de licence, mot de passe de la base, clés d\'API) ne quittent pas le serveur : ils apparaissent ici sous la forme « ••••secret-1•••• » et sont remis en place à l\'enregistrement. Laissez ces marques telles quelles, ou remplacez-les par une nouvelle valeur.',
+      backupNote: 'L\'ancien fichier est sauvegardé avant chaque écriture (page Sauvegardes). Redémarrez le serveur pour appliquer les changements.',
+      missing: 'Aucun server.cfg dans le dossier du serveur : le fichier sera créé.',
+      noPaths: 'Choisissez d\'abord les dossiers du serveur dans l\'assistant.',
+      secrets: (n) => (n ? plural(n, 'secret masqué', 'secrets masqués') : 'aucun secret masqué'),
+      save: 'Sceller le fichier',
+      revert: 'Annuler les modifications',
+      reload: 'Recharger le fichier',
+      unsaved: 'Modifications non enregistrées',
+      clean: 'À jour',
+      saved: 'server.cfg enregistré.',
+      savedRestart: 'server.cfg enregistré : redémarrez le serveur pour l\'appliquer.',
+      revertTitle: 'Annuler les modifications ?',
+      revertText: 'Le texte revient au fichier enregistré.',
+      shortcut: 'Ctrl + S : enregistrer',
+    },
+
+    backups: {
+      title: 'Sauvegardes',
+      dbTitle: 'Base de données',
+      dbIntro: 'Copie complète de la base (comptes, personnages, inventaires) par mysqldump, compressée. À faire avant toute mise à jour ; planifiée chaque jour, elle garde les plus récentes.',
+      dbNow: 'Sauvegarder maintenant',
+      dbRunning: (ms) => `Sauvegarde en cours depuis ${duration(ms)}…`,
+      dbStarted: 'Sauvegarde lancée.',
+      dbDone: (name) => `Sauvegarde terminée : ${name}.`,
+      dbFailed: (detail) => `La sauvegarde a échoué${detail ? ` : ${detail}` : '.'}`,
+      tool: (path) => `Outil : ${path}`,
+      toolMissing: 'mysqldump est introuvable sur cette machine. Il est livré avec MySQL et MariaDB (sous Linux : apt install mariadb-client) ; sinon indiquez son chemin ci-dessous.',
+      last: (ok, at) => `Dernière sauvegarde : ${ok ? 'réussie' : 'échouée'}, ${dateFormat.format(new Date(at))}.`,
+      next: (at) => `Prochaine sauvegarde planifiée : ${when(at)}.`,
+      noneScheduled: 'Aucune sauvegarde planifiée.',
+      columns: ['Fichier', 'Date', 'Taille', ''],
+      empty: 'Aucune sauvegarde de la base pour l\'instant.',
+      download: 'Télécharger',
+      remove: 'Supprimer',
+      removeTitle: 'Supprimer la sauvegarde ?',
+      removeText: (name) => `${name} sera effacée de la machine.`,
+      removed: 'Sauvegarde supprimée.',
+      settings: 'Réglages',
+      dumpPath: 'Chemin de mysqldump',
+      dumpPathHelp: 'Laissez vide pour le chercher seul (PATH ; sous Windows aussi MariaDB, MySQL, XAMPP, Laragon, WampServer). Exemple : /usr/bin/mariadb-dump',
+      keep: 'Sauvegardes gardées',
+      keepHelp: 'Les plus anciennes au-delà sont effacées après chaque sauvegarde réussie.',
+      times: 'Heures des sauvegardes',
+      timesHelp: 'Chaque jour, heure de la machine, séparées par des virgules : 05:30, 17:30. Vide : aucune.',
+      saveSettings: 'Sceller les réglages',
+      settingsSaved: 'Réglages enregistrés.',
+      restoreHint: 'Restaurer : arrêtez le serveur, puis « gunzip -c fichier.sql.gz | mysql -u utilisateur -p base » (sous Windows : décompressez avec 7-Zip et importez le .sql avec HeidiSQL).',
+      cfgTitle: 'server.cfg',
+      cfgIntro: 'Le server.cfg est sauvegardé avant chaque écriture (assistant, éditeur, ressources) : les 20 dernières versions sont gardées.',
+      cfgColumns: ['Version du', 'Taille', ''],
+      cfgEmpty: 'Aucune sauvegarde du server.cfg pour l\'instant.',
+      view: 'Lire',
+      restore: 'Restaurer',
+      viewTitle: (at) => `server.cfg du ${dateFormat.format(new Date(at))}`,
+      close: 'Fermer',
+      restoreTitle: 'Restaurer cette version ?',
+      restoreText: 'Le server.cfg actuel est sauvegardé, puis remplacé par cette version (avec ses propres secrets).',
+      restored: 'Version restaurée : redémarrez le serveur pour l\'appliquer.',
+      restoredStopped: 'Version restaurée.',
+      denied: 'Ce compte n\'a pas le droit de voir les sauvegardes.',
+    },
+
+    schedule: {
+      title: 'Planification',
+      restartsTitle: 'Redémarrages planifiés',
+      intro: 'Le serveur redémarre chaque jour aux heures choisies (heure de la machine) : personnages sauvegardés, joueurs déconnectés, puis relance. Un serveur arrêté n\'est pas lancé.',
+      next: (at) => `Prochain redémarrage : ${when(at)}`,
+      nextIn: (ms) => `dans ${duration(ms)}`,
+      skippedNote: 'Celui-ci sera sauté : le suivant aura lieu normalement.',
+      none: 'Aucun redémarrage planifié.',
+      skip: 'Sauter celui-ci',
+      unskip: 'Le rétablir',
+      skippedDone: 'Le prochain redémarrage sera sauté.',
+      unskippedDone: 'Le prochain redémarrage est rétabli.',
+      restarts: 'Heures des redémarrages',
+      restartsHelp: 'Séparées par des virgules : 06:00, 18:00. Vide : aucun redémarrage planifié.',
+      warnings: 'Prévenir les joueurs (minutes avant)',
+      warningsHelp: 'Séparées par des virgules : 15, 5, 1. Une proclamation du Conseil, au nom de la Chancellerie (vava_admin et vava_chancellerie lancés).',
+      message: 'Message aux joueurs',
+      messageHelp: 'Facultatif ; {minutes} est remplacé par le délai. Vide : « Le royaume se refermera dans 5 minutes : le serveur redémarre… »',
+      save: 'Sceller la planification',
+      saved: 'Planification enregistrée.',
+      backupsNote: (times) => (times.length ? `Sauvegardes de la base : chaque jour à ${times.join(', ')} (page Sauvegardes).` : 'Aucune sauvegarde de la base planifiée (page Sauvegardes).'),
+      denied: 'Ce compte ne peut pas planifier les redémarrages.',
     },
 
     console: {
@@ -416,16 +714,34 @@ const STRINGS = (() => {
 
     wizard: {
       title: 'Configuration du serveur',
-      steps: ['Dossiers', 'Identité', 'Licence', 'Base', 'Ressources', 'Sceau'],
+      steps: ['Installation', 'Identité', 'Licence', 'Base', 'Ressources', 'Sceau'],
+      modes: { new: 'Nouveau serveur : tout installer', existing: 'Serveur déjà en place' },
+      newIntro: 'La Chancellerie installe tout le serveur dans le dossier choisi : FXServer (le programme du serveur, depuis Cfx.re), oxmysql (accès à la base) et vAvA (depuis GitHub). Elle les tiendra ensuite à jour.',
+      base: 'Dossier du serveur',
+      baseHelp: 'Créé s\'il n\'existe pas ; on y trouvera server (FXServer) et server-data (ressources, server.cfg).',
+      willInstall: 'Sera installé :',
+      fxBuild: (build) => `FXServer, build recommandée ${build}`,
+      fxUnknown: 'FXServer, build recommandée (Cfx.re ne répond pas encore)',
+      oxmysqlItem: 'oxmysql, dernière version',
+      vavaItem: (repo) => `vAvA, dernière version de ${repo}`,
+      mariadbHint: 'Il faut aussi MariaDB (ou MySQL) sur la machine — sous Linux : apt install mariadb-server mariadb-client — : l\'étape « Base » crée la base de vAvA dedans.',
+      install: 'Installer',
+      installing: 'Installation en cours…',
+      installFailed: 'L\'installation a échoué : corrigez puis relancez-la (ce qui est déjà en place est gardé).',
+      installExisting: 'Installer ou compléter vAvA et oxmysql dans ce serveur',
+      installExistingHelp: 'Ressources posées dans resources/[vava] ; celles déjà là sont mises à niveau sans toucher à vos config.lua modifiés.',
+      dbCreate: 'Créer la base',
+      dbCreating: 'Création…',
+      dbCreated: (name) => `La base « ${name} » est prête (créée si elle n'existait pas).`,
       previous: 'Précédent',
       next: 'Suivant',
       checking: 'Vérification…',
-      pathsIntro: 'Où se trouve le serveur ? Le dossier du serveur est celui qui contient « resources » (et où le server.cfg sera écrit). FXServer.exe est le programme du serveur, téléchargé depuis les artefacts de FiveM.',
+      pathsIntro: 'Où se trouve le serveur ? Le dossier du serveur est celui qui contient « resources » (et où le server.cfg sera écrit). FXServer est le programme du serveur, téléchargé depuis les artefacts de FiveM : run.sh sous Linux, FXServer.exe sous Windows.',
       pathsRunning: 'Le serveur tourne : arrêtez-le pour changer de dossiers.',
       serverDataPath: 'Dossier du serveur',
-      serverDataPathHelp: 'Exemple : D:\\MonServeur — il doit contenir le dossier resources.',
-      fxserverPath: 'Chemin de FXServer.exe',
-      fxserverPathHelp: 'Exemple : D:\\fivemserver\\FXServer.exe',
+      serverDataPathHelp: 'Exemple : /home/fivem/server-data — il doit contenir le dossier resources.',
+      fxserverPath: 'Chemin de FXServer (run.sh sous Linux)',
+      fxserverPathHelp: 'Exemple : /home/fivem/server/run.sh (sous Windows : D:\\fivemserver\\FXServer.exe)',
       cfgFound: 'Un server.cfg existe déjà dans ce dossier : ses valeurs sont reprises, et l\'ancien fichier sera sauvegardé avant d\'être remplacé.',
       cfgNew: 'Aucun server.cfg dans ce dossier : il sera créé.',
       identityIntro: 'Ce que voient les joueurs dans la liste des serveurs.',

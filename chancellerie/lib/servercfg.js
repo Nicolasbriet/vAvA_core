@@ -4,8 +4,12 @@
  * Rôle : le server.cfg du serveur de jeu : lecture d'un fichier existant (les lignes inconnues sont gardées comme
  *        options avancées), validation d'un formulaire, écriture d'un fichier propre et commenté, sauvegarde de
  *        l'ancien (les 20 dernières). Toute valeur est nettoyée : un nom de serveur ne peut pas injecter de commande.
+ *        Pour l'éditeur du fichier brut : secrets masqués (clé de licence, mot de passe de la base, clés d'API…) et
+ *        remis à l'enregistrement, révision qui protège d'une écriture croisée ; lancement d'une ressource au
+ *        démarrage ajouté ou retiré sans réécrire le reste.
  */
 
+const crypto = require('crypto');
 const fs = require('fs');
 const path = require('path');
 const config = require('./config');
@@ -262,4 +266,136 @@ function read(file) {
   return { ...parse(fs.readFileSync(file, 'utf8')), exists: true };
 }
 
-module.exports = { parse, validate, generate, write, read, cleanExtra, DEFAULTS };
+let cache = { file: '', mtime: 0, current: null };
+
+/** Le server.cfg géré, lu (valeurs et secrets) seulement s'il a changé ; null s'il n'existe pas. */
+function current() {
+  const file = config.cfgPath();
+  let mtime = 0;
+  try {
+    mtime = fs.statSync(file).mtimeMs;
+  } catch (error) {
+    return null;
+  }
+  if (cache.file !== file || cache.mtime !== mtime) cache = { file, mtime, current: read(file) };
+  return cache.current;
+}
+
+/** Adresse du serveur de jeu d'après le server.cfg : { bind, port }, ou null. */
+function endpoint() {
+  const cfg = current();
+  return cfg ? { bind: cfg.values.bind, port: cfg.values.port } : null;
+}
+
+// Fichier brut (éditeur) ----------------------------------------------------------------------------------------------
+
+// réglages dont la valeur est un secret : masquée avant de partir vers le navigateur, remise à l'enregistrement
+const SECRET_KEY = /^(sv_licensekey|rcon_password|steam_webapikey|sv_tebexsecret)$|(password|passwd|secret|token|apikey|api_key)$/;
+const PLACEHOLDER = (index) => `••••secret-${index}••••`;
+const PLACEHOLDER_PATTERN = /••••secret-(\d+)••••/g;
+
+/** Révision d'un texte : l'éditeur la renvoie, un fichier changé entre-temps n'est pas écrasé. */
+function revision(text) {
+  return crypto.createHash('sha256').update(text).digest('hex').slice(0, 20);
+}
+
+/** Masque une valeur trouvée dans une ligne (sa dernière occurrence, après la clé). */
+function maskIn(line, value, secrets) {
+  const index = line.lastIndexOf(value);
+  if (!value || index === -1) return line;
+  secrets.push(value);
+  return line.slice(0, index) + PLACEHOLDER(secrets.length) + line.slice(index + value.length);
+}
+
+/** Mot de passe d'une chaîne oxmysql masqué dans sa ligne. */
+function maskMysql(line, value, secrets) {
+  const db = parseMysql(value);
+  if (!db || !db.password) return line;
+  if (/^mysql:\/\//i.test(value)) {
+    const needle = `:${db.password}@`;
+    const index = line.indexOf(needle);
+    if (index === -1) return line;
+    secrets.push(db.password);
+    return `${line.slice(0, index + 1)}${PLACEHOLDER(secrets.length)}${line.slice(index + needle.length - 1)}`;
+  }
+  return line.replace(/((?:^|;|")\s*(?:password|pwd|pass)\s*=\s*)([^;"]*)/i, (whole, head, secret) => {
+    if (!secret) return whole;
+    secrets.push(secret);
+    return head + PLACEHOLDER(secrets.length);
+  });
+}
+
+/**
+ * Texte du server.cfg sans ses secrets : { text, secrets } (secrets reste sur le serveur, dans l'ordre des
+ * marques « ••••secret-1•••• » laissées dans le texte).
+ */
+function mask(text) {
+  const secrets = [];
+  const lines = String(text).split('\n').map((raw) => {
+    const trimmed = raw.trim();
+    if (!trimmed || trimmed.startsWith('#') || trimmed.startsWith('//')) return raw;
+    const cmd = command(trimmed);
+    if (!cmd || !cmd.value) return raw;
+    if (cmd.key === 'mysql_connection_string') return maskMysql(raw, cmd.value, secrets);
+    if (SECRET_KEY.test(cmd.key)) return maskIn(raw, cmd.parts[cmd.parts.length - 1], secrets);
+    return raw;
+  });
+  return { text: lines.join('\n'), secrets };
+}
+
+/** Remet les secrets à la place de leurs marques ; null si une marque ne correspond à aucun secret. */
+function unmask(text, secrets) {
+  let unknown = false;
+  const out = String(text).replace(PLACEHOLDER_PATTERN, (whole, number) => {
+    const secret = secrets[Number(number) - 1];
+    if (secret === undefined) unknown = true;
+    return secret === undefined ? whole : secret;
+  });
+  return unknown ? null : out;
+}
+
+/** La ressource est-elle lancée au démarrage (ligne ensure ou start) ? */
+function isAutostart(text, name) {
+  return String(text).split(/\r?\n/).some((line) => {
+    const cmd = command(line.trim());
+    return cmd && (cmd.key === 'ensure' || cmd.key === 'start') && cmd.parts[1] === name;
+  });
+}
+
+/**
+ * Ajoute ou retire le lancement d'une ressource au démarrage, sans toucher au reste du fichier. Une ressource ajoutée
+ * prend sa place dans l'ordre attendu par vAvA (`rank`), sinon après la dernière ligne ensure.
+ * @param {(name: string) => number} rank
+ */
+function setAutostart(text, name, enabled, rank) {
+  const eol = String(text).includes('\r\n') ? '\r\n' : '\n';
+  const lines = String(text).split(/\r?\n/);
+  const isLaunch = (line) => {
+    const cmd = command(line.trim());
+    return cmd && !line.trim().startsWith('#') && (cmd.key === 'ensure' || cmd.key === 'start') ? cmd.parts[1] : null;
+  };
+  if (!enabled) return lines.filter((line) => isLaunch(line) !== name).join(eol);
+  if (lines.some((line) => isLaunch(line) === name)) return lines.join(eol);
+  let at = -1;
+  for (let i = 0; i < lines.length; i += 1) {
+    const other = isLaunch(lines[i]);
+    if (!other) continue;
+    if (rank(other) > rank(name)) {
+      at = i;
+      break;
+    }
+    at = i + 1;
+  }
+  if (at === -1) {
+    // aucune ligne de lancement : à la fin, avant les lignes vides finales
+    at = lines.length;
+    while (at > 0 && !lines[at - 1].trim()) at -= 1;
+  }
+  lines.splice(at, 0, `ensure ${name}`);
+  return lines.join(eol);
+}
+
+module.exports = {
+  parse, validate, generate, write, read, current, endpoint, cleanExtra, mask, unmask, revision, isAutostart, setAutostart,
+  DEFAULTS, BACKUPS, RESOURCE_PATTERN,
+};

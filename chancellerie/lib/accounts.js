@@ -2,7 +2,7 @@
 /*
  * lib/accounts.js
  * Rôle : comptes de la Chancellerie (data/accounts.json), comme ceux de txAdmin : identifiant et mot de passe, droits
- *        sur le panneau (serveur, console, configuration) et rang du Conseil pour administrer le royaume depuis le
+ *        sur le panneau (serveur, console, configuration, sauvegardes) et rang du Conseil pour administrer le royaume depuis le
  *        web (mêmes droits qu'en jeu, vérifiés par le Registre). Le compte maître a tous les droits du panneau et le
  *        rang de souverain. Les mots de passe sont dérivés par scrypt avec un sel aléatoire ; jamais stockés ni
  *        journalisés en clair. Les comptes vivent hors de la base de données : le panneau reste utilisable si MySQL
@@ -27,8 +27,8 @@ const PASSWORD_MAX = 200;
 const MASTER_RANK = 'souverain';
 const MAX_ACCOUNTS = 100;
 
-// Droits d'un compte sur le panneau.
-const PERMISSIONS = Object.freeze(['server', 'console', 'config']);
+// Droits d'un compte sur le panneau. « backups » : sauvegardes de la base (toutes les données des joueurs).
+const PERMISSIONS = Object.freeze(['server', 'console', 'config', 'backups']);
 
 let store = config.readJson(FILE, { accounts: [] });
 // sel factice : un identifiant inconnu coûte le même calcul qu'un vrai (aucune information par le temps de réponse)

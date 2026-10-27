@@ -1,25 +1,33 @@
 'use strict';
 /*
  * lib/status.js
- * Rôle : ce que dit le serveur de jeu lui-même, par ses adresses publiques (players.json) : joueurs connectés,
- *        réduits au numéro, au nom et à la latence (aucun identifiant ni adresse). Réponse gardée quelques
- *        secondes : plusieurs navigateurs ouverts n'interrogent pas le serveur plus souvent.
+ * Rôle : ce que dit le serveur de jeu lui-même, par ses adresses locales : joueurs connectés (players.json),
+ *        réduits au numéro, au nom et à la latence (aucun identifiant ni adresse) ; ressources lancées (info.json) ;
+ *        durée des ticks de ses fils principaux (/perf/, au format Prometheus, comme txAdmin la lit). Réponses
+ *        gardées quelques secondes : plusieurs navigateurs ouverts n'interrogent pas le serveur plus souvent.
  */
 
 const http = require('http');
 
 const CACHE_MS = 5000;
+const INFO_CACHE_MS = 2000;
 const TIMEOUT_MS = 2500;
 const BODY_MAX = 2 * 1024 * 1024;
+const RESOURCE_PATTERN = /^[A-Za-z0-9_.-]{1,64}$/;
+// fils de FXServer suivis : principal (scripts), réseau, synchronisation OneSync
+const PERF_THREADS = { svMain: 'main', svNetwork: 'network', svSync: 'sync' };
+const PERF_LINE = /^tickTime_(count|sum)\{name="(svMain|svNetwork|svSync)"\}\s+(\S+)/;
 
 let cache = { key: '', at: 0, value: null };
+let infoCache = { key: '', at: 0, value: null };
 
 /** Adresse locale du serveur de jeu : 0.0.0.0 s'interroge par 127.0.0.1. */
 function localHost(bind) {
   return !bind || bind === '0.0.0.0' ? '127.0.0.1' : bind;
 }
 
-function getJson(host, port, route) {
+/** Corps d'une réponse 200 en texte, ou null. */
+function getText(host, port, route) {
   return new Promise((resolve) => {
     const request = http.get({ host, port, path: route, timeout: TIMEOUT_MS }, (response) => {
       if (response.statusCode !== 200) {
@@ -34,17 +42,21 @@ function getJson(host, port, route) {
         if (size > BODY_MAX) request.destroy();
         else chunks.push(chunk);
       });
-      response.on('end', () => {
-        try {
-          resolve(JSON.parse(Buffer.concat(chunks).toString('utf8')));
-        } catch (error) {
-          resolve(null);
-        }
-      });
+      response.on('end', () => resolve(Buffer.concat(chunks).toString('utf8')));
+      response.on('aborted', () => resolve(null));
     });
     request.on('timeout', () => request.destroy());
     request.on('error', () => resolve(null));
   });
+}
+
+async function getJson(host, port, route) {
+  const text = await getText(host, port, route);
+  try {
+    return text === null ? null : JSON.parse(text);
+  } catch (error) {
+    return null;
+  }
 }
 
 /**
@@ -62,9 +74,44 @@ async function players(endpoint) {
   return value;
 }
 
-/** Oublie la dernière réponse (serveur arrêté ou relancé). */
-function reset() {
-  cache = { key: '', at: 0, value: null };
+/**
+ * Noms des ressources lancées, d'après info.json ; null si le serveur ne répond pas.
+ * @param {{ bind: string, port: number }} endpoint
+ */
+async function started(endpoint) {
+  const key = `${endpoint.bind}:${endpoint.port}`;
+  if (infoCache.key === key && Date.now() - infoCache.at < INFO_CACHE_MS) return infoCache.value;
+  const info = await getJson(localHost(endpoint.bind), endpoint.port, '/info.json');
+  const value = info && Array.isArray(info.resources)
+    ? info.resources.map(String).filter((name) => RESOURCE_PATTERN.test(name))
+    : null;
+  infoCache = { key, at: Date.now(), value };
+  return value;
 }
 
-module.exports = { players, reset };
+/**
+ * Compteurs cumulés des ticks : { main: { count, sum }, network, sync } (sum en secondes), ou null si /perf/ ne
+ * répond pas.
+ * @param {{ bind: string, port: number }} endpoint
+ */
+async function perf(endpoint) {
+  const text = await getText(localHost(endpoint.bind), endpoint.port, '/perf/');
+  if (!text || !text.includes('tickTime_')) return null;
+  const out = {};
+  for (const line of text.split('\n')) {
+    const match = PERF_LINE.exec(line);
+    if (!match) continue;
+    const thread = PERF_THREADS[match[2]];
+    out[thread] = out[thread] || { count: 0, sum: 0 };
+    out[thread][match[1]] = Number(match[3]) || 0;
+  }
+  return Object.keys(out).length ? out : null;
+}
+
+/** Oublie les dernières réponses (serveur arrêté ou relancé, ressource lancée ou arrêtée). */
+function reset() {
+  cache = { key: '', at: 0, value: null };
+  infoCache = { key: '', at: 0, value: null };
+}
+
+module.exports = { players, started, perf, reset };

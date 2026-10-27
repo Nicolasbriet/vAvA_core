@@ -3,8 +3,9 @@
  * index.js
  * Rôle : lancement de la Chancellerie, le panneau web du serveur vAvA (comme txAdmin). Ouvre l'interface sur
  *        http://127.0.0.1:40120, affiche le lien et, au premier lancement, le code d'accès qui permet de créer le
- *        compte maître. Une fois le serveur configuré, lance FXServer et le garde en vie. Ctrl+C (ou la fermeture
- *        de la fenêtre) arrête d'abord FXServer proprement.
+ *        compte maître. Une fois le serveur configuré, lance FXServer et le garde en vie ; relève ses performances
+ *        et tient les échéances planifiées (redémarrages, sauvegardes). Ctrl+C (ou la fermeture de la fenêtre)
+ *        arrête d'abord FXServer proprement.
  * Aucune dépendance : seulement les modules livrés avec Node.js.
  */
 
@@ -17,6 +18,12 @@ const pin = require('./lib/pin');
 const { createServer } = require('./lib/http');
 const { createRouter } = require('./lib/routes');
 const { ServerProcess } = require('./lib/process');
+const { Metrics } = require('./lib/metrics');
+const { Scheduler } = require('./lib/scheduler');
+const { Updates, RESTART_CODE } = require('./lib/updates');
+const fs = require('fs');
+const path = require('path');
+const vm = require('vm');
 
 const NODE_MAJOR_MIN = 18;
 const RULE = '═'.repeat(62);
@@ -46,6 +53,12 @@ function banner() {
   say(`${c.brass}  ${RULE}${c.reset}`);
   say(`     Ouvrez dans votre navigateur :  ${c.bright}${panelUrl()}${c.reset}`);
   if (config.get().http.host === '0.0.0.0') say(`${c.dim}     (accessible aussi depuis les autres machines, par l'adresse de celle-ci)${c.reset}`);
+  else if (process.platform !== 'win32') {
+    // serveur distant : le panneau n'écoute que la machine, on l'atteint par un tunnel SSH depuis son ordinateur
+    const { port } = config.get().http;
+    say(`${c.dim}     Depuis votre ordinateur : ssh -L ${port}:127.0.0.1:${port} utilisateur@adresse-du-serveur${c.reset}`);
+    say(`${c.dim}     puis ouvrez http://127.0.0.1:${port}/ dans votre navigateur.${c.reset}`);
+  }
   say();
 }
 
@@ -70,8 +83,11 @@ async function main() {
   events.attach(server);
   if (await server.cleanupOrphan()) say(`${colors.dim}  Un FXServer resté ouvert après un arrêt brutal a été arrêté.${colors.reset}`);
 
+  const metrics = new Metrics(server);
+  const updates = new Updates(server);
+  const scheduler = new Scheduler(server, updates);
   const settings = config.get();
-  const web = createServer({ host: settings.http.host }, createRouter(server));
+  const web = createServer({ host: settings.http.host }, createRouter(server, { metrics, scheduler, updates }));
   web.on('error', (error) => {
     if (error.code === 'EADDRINUSE') {
       say(`${colors.red}Le port ${settings.http.port} est déjà pris : une autre Chancellerie (ou txAdmin) tourne-t-elle déjà ?${colors.reset}`);
@@ -87,6 +103,9 @@ async function main() {
       pin.generate();
     }
     journal.record(journal.SYSTEM, 'panel_started');
+    metrics.start();
+    scheduler.start();
+    updates.start();
     if (settings.setupDone && settings.autoStart) {
       const result = server.start(journal.SYSTEM);
       if (!result.ok) say(`${colors.red}  FXServer n'a pas pu être lancé : ${result.error}. Voyez la Chancellerie.${colors.reset}`);
@@ -94,10 +113,13 @@ async function main() {
     } else if (!settings.setupDone) {
       say(`${colors.dim}  Le serveur n'est pas encore configuré : tout se fait depuis le navigateur.${colors.reset}`);
     }
+    // démarrée après une mise à jour d'elle-même : la mise à jour est confirmée, le contrôle du serveur se poursuit
+    updates.resume();
   });
 
   let stopping = false;
-  async function shutdown(quick) {
+  /** quick : délais raccourcis (fenêtre fermée) ; code : 75 pour que demarrer.bat relance (mise à jour). */
+  async function shutdown(quick, code = 0) {
     if (stopping) {
       // second Ctrl+C : on n'attend plus
       say(`${colors.red}  Arrêt immédiat.${colors.reset}`);
@@ -106,16 +128,44 @@ async function main() {
     stopping = true;
     say();
     say(`${colors.dim}  Arrêt de la Chancellerie${server.child ? ' : FXServer est arrêté proprement…' : '.'}${colors.reset}`);
+    scheduler.stop();
+    updates.stop();
     await server.stop(journal.SYSTEM, { quick });
+    metrics.stop();
     journal.record(journal.SYSTEM, 'panel_stopped');
     web.close();
-    process.exit(0);
+    process.exit(code);
   }
+  updates.on('restart-panel', () => {
+    say(`${colors.brass}  Mise à jour de la Chancellerie : redémarrage…${colors.reset}`);
+    shutdown(false, RESTART_CODE);
+  });
   for (const signal of STOP_SIGNALS) process.on(signal, () => shutdown(false));
   for (const signal of CLOSE_SIGNALS) process.on(signal, () => shutdown(true));
 }
 
-main().catch((error) => {
-  say(`${colors.red}Erreur au lancement de la Chancellerie : ${error.stack || error.message}${colors.reset}`);
-  process.exitCode = 1;
-});
+/**
+ * --verifier : la Chancellerie se charge-t-elle ? Tous ses modules, et le JavaScript de son interface (syntaxe).
+ * Lancé sur une nouvelle version avant de l'installer ; rien n'est démarré ni écrit.
+ */
+function verify() {
+  for (const file of fs.readdirSync(path.join(__dirname, 'lib')).filter((name) => name.endsWith('.js'))) require(path.join(__dirname, 'lib', file));
+  const web = path.join(__dirname, 'web', 'js');
+  for (const file of fs.readdirSync(web).filter((name) => name.endsWith('.js'))) new vm.Script(fs.readFileSync(path.join(web, file), 'utf8'), { filename: file });
+  if (!fs.existsSync(path.join(__dirname, 'web', 'index.html'))) throw new Error('web/index.html absent');
+  say(`Chancellerie ${config.VERSION} : chargée sans erreur.`);
+}
+
+if (process.argv.includes('--verifier')) {
+  try {
+    verify();
+  } catch (error) {
+    say(`Chancellerie invalide : ${error.stack || error.message}`);
+    process.exitCode = 1;
+  }
+} else {
+  main().catch((error) => {
+    say(`${colors.red}Erreur au lancement de la Chancellerie : ${error.stack || error.message}${colors.reset}`);
+    process.exitCode = 1;
+  });
+}

@@ -20,7 +20,7 @@ const AccountsView = (() => {
     return rank ? rank.label : name;
   };
   const rankOptions = () => [{ value: '', label: A.noRank }, ...ranks.map((r) => ({ value: r.name, label: r.label }))];
-  const permissionOptions = (checked) => ['server', 'console', 'config'].map((p) => ({ value: p, label: A.permissionLabels[p], checked: checked.includes(p) }));
+  const permissionOptions = (checked) => ['server', 'console', 'config', 'backups'].map((p) => ({ value: p, label: A.permissionLabels[p], checked: checked.includes(p) }));
 
   async function create() {
     const values = await UI.form({

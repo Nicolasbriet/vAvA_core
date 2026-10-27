@@ -5,8 +5,10 @@
  *        compte maître, rang du Conseil). Toute requête qui modifie quelque chose doit venir de la Chancellerie
  *        elle-même (en-tête et origine) ; les connexions et le code d'accès sont limités en débit. Les évènements
  *        du pont du serveur de jeu n'ont ni session ni cookie : la machine et la clé du lancement. Les secrets du
- *        server.cfg ne sortent jamais : l'interface sait seulement s'ils sont renseignés. Comptes et royaume :
- *        lib/routes-accounts.js et lib/routes-game.js.
+ *        server.cfg ne sortent jamais : l'interface sait seulement s'ils sont renseignés. Comptes, royaume et
+ *        exploitation (performances, ressources, server.cfg brut, sauvegardes, planification), installation et mises à
+ *        jour : lib/routes-accounts.js, lib/routes-game.js, lib/routes-ops.js et lib/routes-updates.js. Pendant une
+ *        installation ou une mise à jour, le serveur ne se démarre ni ne s'arrête à la main.
  */
 
 const fs = require('fs');
@@ -27,6 +29,9 @@ const { sendJson, readJson } = require('./http');
 const { redact, STATES } = require('./process');
 const { register: registerAccounts } = require('./routes-accounts');
 const { register: registerGame } = require('./routes-game');
+const { register: registerOps } = require('./routes-ops');
+const { register: registerUpdates } = require('./routes-updates');
+const jobs = require('./jobs');
 
 const COMMAND_MAX = 500;
 const PATH_MAX = 400;
@@ -50,19 +55,11 @@ const limits = {
 };
 
 let creatingMaster = false;
-let cfgCache = { file: '', mtime: 0, values: null };
 
 /** Ce que l'interface peut savoir du server.cfg (sans les secrets), relu seulement s'il a changé. */
 function cfgValues() {
-  const file = config.cfgPath();
-  let mtime = 0;
-  try {
-    mtime = fs.statSync(file).mtimeMs;
-  } catch (error) {
-    return null;
-  }
-  if (cfgCache.file !== file || cfgCache.mtime !== mtime) cfgCache = { file, mtime, values: servercfg.read(file).values };
-  return cfgCache.values;
+  const current = servercfg.current();
+  return current ? current.values : null;
 }
 
 function cookie(token, maxAge) {
@@ -107,8 +104,10 @@ function defaultSelection(found) {
 
 /**
  * @param {import('./process').ServerProcess} server
+ * @param {{ metrics: import('./metrics').Metrics, scheduler: import('./scheduler').Scheduler,
+ *   updates: import('./updates').Updates }} services
  */
-function createRouter(server) {
+function createRouter(server, { metrics, scheduler, updates }) {
   const table = new Map();
   const route = (method, pathname, options, handler) => table.set(`${method} ${pathname}`, { ...options, handler });
 
@@ -149,6 +148,10 @@ function createRouter(server) {
       maxClients: values ? values.maxClients : 0,
       port: values ? values.port : 0,
       players,
+      metrics: metrics.latest(),
+      schedule: { restartAt: scheduler.restartAt, skipped: scheduler.skipped() },
+      update: updates.last && updates.last.available ? { label: updates.last.latest ? updates.last.latest.label : '', commits: (updates.last.commits || []).length } : null,
+      job: jobs.busy() ? jobs.current() : null,
     };
   }
 
@@ -243,12 +246,14 @@ function createRouter(server) {
   route('GET', '/api/server', { auth: true }, async () => ok(await serverView()));
 
   route('POST', '/api/server/start', { auth: true, permission: 'server' }, (ctx) => {
+    if (jobs.busy()) return fail(409, 'job_running');
     const result = server.start(ctx.account.name);
     status.reset();
     return result.ok ? ok() : fail(409, result.error);
   });
 
   route('POST', '/api/server/stop', { auth: true, permission: 'server' }, (ctx) => {
+    if (jobs.busy()) return fail(409, 'job_running');
     if (!server.child && server.state !== STATES.CRASHED) return fail(409, 'not_running');
     // l'arrêt prend jusqu'à quelques dizaines de secondes : l'interface le suit par le flux d'évènements
     server.stop(ctx.account.name).catch((error) => server.system(`Arrêt : ${error.message}`));
@@ -257,6 +262,7 @@ function createRouter(server) {
   });
 
   route('POST', '/api/server/restart', { auth: true, permission: 'server' }, (ctx) => {
+    if (jobs.busy()) return fail(409, 'job_running');
     const problem = server.checkSetup();
     if (problem) return fail(409, problem);
     server.restart(ctx.account.name).catch((error) => server.system(`Redémarrage : ${error.message}`));
@@ -286,12 +292,10 @@ function createRouter(server) {
 
   // Comptes et royaume ---------------------------------------------------------------------------------------------
 
-  const endpoint = () => {
-    const values = cfgValues();
-    return values ? { bind: values.bind, port: values.port } : null;
-  };
   registerAccounts(route, { ok, fail });
-  registerGame(route, { ok, fail, endpoint, server });
+  registerGame(route, { ok, fail, endpoint: servercfg.endpoint, server });
+  registerOps(route, { ok, fail, server, metrics, scheduler });
+  registerUpdates(route, { ok, fail, server, updates });
 
   // Aiguillage -----------------------------------------------------------------------------------------------------
 

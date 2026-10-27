@@ -1,5 +1,6 @@
-# Fins de ligne normalisées dans le dépôt ; demarrer.bat garde celles de Windows
+# Fins de ligne normalisées dans le dépôt ; demarrer.bat garde celles de Windows, les scripts shell celles de Linux
 * text=auto
 *.bat text eol=crlf
+*.sh text eol=lf
 *.png binary
 *.woff2 binary

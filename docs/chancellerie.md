@@ -6,17 +6,66 @@ serveur et le lance elle-même.
 
 > Livré : premier lancement, compte maître, connexion, assistant de configuration, démarrage / arrêt / redémarrage,
 > relance après plantage, console en direct, tableau de bord ; comptes avec droits et rang du Conseil ; toute
-> l'administration du royaume depuis le web (par le pont `vava_chancellerie`) et caméras sur l'écran des joueurs.
-> À venir : gestion des ressources, édition du server.cfg et sauvegardes, redémarrages planifiés.
+> l'administration du royaume depuis le web (par le pont `vava_chancellerie`) et caméras sur l'écran des joueurs ;
+> performances (processeur, mémoire, bande passante, joueurs, ticks) ; gestion des ressources ; éditeur du
+> server.cfg ; sauvegardes du server.cfg et de la base de données ; redémarrages et sauvegardes planifiés ;
+> installation complète du serveur (FXServer, oxmysql, vAvA) et mises à jour depuis GitHub, la Chancellerie comprise.
 
 ## Installation
 
-1. Installez [Node.js](https://nodejs.org/) (version LTS, 18 ou plus récente), ou posez `node.exe` à côté de
-   `demarrer.bat`.
-2. Copiez le dossier `chancellerie/` dans le dossier du serveur (celui qui contient `resources/`), à côté de
-   `resources/` ou dedans.
-3. Arrêtez txAdmin s'il tourne : les deux se disputeraient le port 40120 et le serveur.
-4. Lancez `demarrer.bat`.
+Seule la Chancellerie s'installe à la main ; elle installe ensuite le reste (FXServer, oxmysql, vAvA).
+
+### Serveur Linux (Debian, Ubuntu…)
+
+1. Ce qu'il faut sur la machine : `curl` (ou `wget`), `tar` et `xz` (l'archive de FXServer est en `.tar.xz`), et
+   MariaDB, le seul logiciel que la Chancellerie n'installe pas :
+
+   ```sh
+   sudo apt install curl xz-utils mariadb-server mariadb-client
+   ```
+
+   Créez un utilisateur MariaDB pour vAvA (ou gardez `root`) ; la base elle-même se crée depuis l'assistant.
+
+2. Récupérez seulement la Chancellerie (sans git : une copie suivie par git ne se met pas à jour seule), dans le dossier
+   qui accueillera le serveur, par exemple `/opt/vava` :
+
+   ```sh
+   sudo mkdir -p /opt/vava && sudo chown "$USER": /opt/vava && cd /opt/vava
+   curl -L https://github.com/Nicolasbriet/vAvA_core/archive/refs/heads/main.tar.gz \
+     | tar -xz --strip-components=1 vAvA_core-main/chancellerie
+   ```
+
+3. Lancez-la : `bash chancellerie/demarrer.sh`. Sans Node.js 18 ou plus récent sur la machine, il le télécharge depuis
+   nodejs.org (version LTS fixée dans le script, empreinte SHA-256 vérifiée) dans `chancellerie/node/`.
+
+   Pour qu'elle tourne en permanence (lancée au démarrage de la machine, relancée si elle tombe), installez-la comme
+   service systemd : `sudo bash chancellerie/demarrer.sh --service`. Son code d'accès et ses messages se lisent alors
+   avec `journalctl -u vava-chancellerie -f` ; `sudo systemctl stop vava-chancellerie` l'arrête, FXServer compris,
+   proprement (personnages sauvegardés).
+
+4. Ouvrez le panneau depuis votre ordinateur. Il n'écoute que la machine elle-même (127.0.0.1) : le plus simple et le
+   plus sûr est un tunnel SSH, puis `http://127.0.0.1:40120/` dans votre navigateur :
+
+   ```sh
+   ssh -L 40120:127.0.0.1:40120 utilisateur@adresse-du-serveur
+   ```
+
+   Pour l'ouvrir sans tunnel, mettez `http.host` à `"0.0.0.0"` dans `chancellerie/data/config.json` et placez-le
+   derrière un proxy HTTPS (Caddy, nginx) avec `http.secureCookies` à `true` : sans HTTPS, les mots de passe passeraient
+   en clair sur Internet.
+
+5. Ouvrez le port du jeu dans le pare-feu, en TCP et UDP : `sudo ufw allow 30120` (jamais le port 40120 du panneau).
+
+L'assistant propose par défaut d'installer le serveur à côté de la Chancellerie : `/opt/vava/server` (FXServer,
+`run.sh`) et `/opt/vava/server-data` (ressources, server.cfg).
+
+### Windows
+
+1. Copiez le dossier `chancellerie/` où vous voulez (par exemple `D:\vAvA\chancellerie`).
+2. Arrêtez txAdmin s'il tourne : les deux se disputeraient le port 40120 et le serveur.
+3. Lancez `demarrer.bat`. Sans Node.js sur la machine, il le télécharge depuis nodejs.org (empreinte vérifiée) dans
+   `node\node.exe`, à côté de lui.
+4. Installez MariaDB ([mariadb.org](https://mariadb.org/), version LTS) si la machine n'en a pas.
 
 La fenêtre affiche :
 
@@ -36,11 +85,19 @@ La fenêtre affiche :
    passe d'au moins 10 caractères). Le code ne sert qu'une fois : il disparaît dès que le compte existe. Après cinq
    erreurs, un nouveau code est tiré et affiché.
 2. L'**assistant** pose ses questions en six étapes :
-   - **Dossiers** : le dossier du serveur (deviné s'il contient `resources/`) et le chemin de `FXServer.exe`.
+   - **Installation**, deux possibilités :
+     - **Nouveau serveur : tout installer** : choisissez un dossier (par défaut celui qui contient la Chancellerie).
+       Elle y télécharge FXServer (build recommandée par Cfx.re) dans `server\`, crée `server-data\resources\`, y pose
+       oxmysql (dernière version, `[standalone]`) et vAvA (dernière version du dépôt GitHub, `[vava]`). L'avancée se
+       suit en direct ; ensuite l'assistant continue avec les dossiers posés.
+     - **Serveur déjà en place** : le dossier du serveur (deviné s'il contient `resources/`) et le chemin de
+       `FXServer.exe` ; la case « Installer ou compléter vAvA et oxmysql » pose ce qui manque et met à niveau ce qui est
+       là, sans toucher à vos `config.lua` modifiés (voir Mises à jour).
    - **Identité** : nom affiché, nom de projet, description, places, présence dans la liste publique.
    - **Licence** : clé `cfxk_…` (portal.cfx.re), adresse et port d'écoute, OneSync.
    - **Base** : hôte, port, utilisateur, mot de passe et nom de la base d'oxmysql. Le bouton « Tester l'adresse » vérifie
-     que MySQL / MariaDB répond (sans envoyer d'identifiants).
+     que MySQL / MariaDB répond (sans envoyer d'identifiants) ; « Créer la base » la crée si elle n'existe pas (utf8mb4),
+     avec le client `mysql` livré avec MariaDB et MySQL. Les tables, elles, sont créées par vAvA à son démarrage.
    - **Ressources** : cases à cocher (catégories `[…]` comprises) et options avancées (lignes libres du server.cfg).
    - **Sceau** : relecture, puis écriture du `server.cfg` et lancement du serveur.
 3. Un `server.cfg` déjà présent est **repris** : ses valeurs remplissent l'assistant, ses lignes inconnues deviennent les
@@ -63,11 +120,119 @@ Les ressources de vAvA sont écrites dans l'ordre qu'elles attendent (`oxmysql`,
   quitte immédiatement. Si la Chancellerie est tuée brutalement, le FXServer resté seul est retrouvé et arrêté au
   lancement suivant.
 - Une fois configurée, la Chancellerie relance FXServer à chaque démarrage (`autoStart`).
+- Le **tableau** montre aussi la charge de FXServer (processeur, mémoire), le débit réseau et le prochain redémarrage
+  planifié.
+
+## Performances
+
+Un relevé toutes les 5 secondes (`metrics.intervalMs`), même serveur arrêté pour la machine :
+
+- **Processeur** : celui de FXServer et celui de la machine, en part de la machine entière (100 % : tous les cœurs).
+- **Mémoire de FXServer** (mémoire vive du processus) ; mémoire de la machine dans les chiffres du haut.
+- **Bande passante** reçue et envoyée par toutes les cartes réseau actives de la machine (sur un serveur dédié,
+  c'est surtout FXServer).
+- **Joueurs connectés** (players.json).
+- **Durée des ticks** des fils de FXServer (principal, réseau, synchronisation OneSync), lue dans son adresse
+  `/perf/` comme le fait txAdmin : au-delà de 50 ms, le fil principal prend du retard. Absente si FXServer ne
+  l'expose pas.
+
+La page **Performances** trace une courbe par mesure, sur la dernière heure (chaque relevé, en direct) ou sur 24 heures
+(moyennes par minute, gardées dans `data/metrics.json` d'un lancement à l'autre) ; les mêmes relevés se lisent en
+tableau. Sous Windows, un seul PowerShell reste ouvert à côté de la Chancellerie pour lire le processus et le réseau
+(il se ferme avec elle) ; sous Linux, tout se lit dans `/proc`.
+
+FiveM ne mesure pas côté serveur la consommation de chaque ressource : pour la trouver, la commande `profiler`
+de la console de FXServer reste l'outil (`profiler record 500` puis `profiler view`).
+
+## Ressources
+
+La page **Ressources** liste le dossier `resources` par catégorie (`[…]`), avec la version, l'auteur et la
+description de chaque manifeste, et les ressources lancées hors de ce dossier (celles du système de FXServer) :
+
+- **État** sur le serveur en marche (lancée ou arrêtée, d'après `info.json`).
+- **Démarrer**, **Redémarrer**, **Arrêter** (droit « serveur ») : les commandes `ensure`, `restart`, `stop` partent
+  dans la console, précédées de `refresh` pour qu'une ressource ajoutée soit trouvée. Arrêter ou redémarrer
+  `oxmysql`, `vAvA_core`, `vava_admin` ou `vava_chancellerie` demande confirmation.
+- **Au démarrage** (droit « configuration ») : ajoute ou retire la ligne `ensure` du server.cfg, sans toucher au reste ;
+  une ressource de vAvA prend sa place dans l'ordre attendu. Effet au prochain démarrage.
+- **Relire le dossier** : `refresh`, après avoir déposé une ressource.
+
+## server.cfg
+
+La page **server.cfg** (droit « configuration ») ouvre le fichier brut. Les secrets n'arrivent jamais dans le
+navigateur : la clé de licence, le mot de passe de la base, et toute valeur d'un réglage dont le nom finit par
+`password`, `secret`, `token`, `apikey` (ou `rcon_password`, `steam_webApiKey`, `sv_tebexSecret`) sont remplacés par
+`••••secret-1••••`, `••••secret-2••••`… La Chancellerie remet les vraies valeurs à l'enregistrement : laissez ces marques
+telles quelles, ou remplacez-les par une nouvelle valeur. Le fichier est sauvegardé avant chaque écriture ; s'il a
+changé depuis son ouverture (assistant, autre onglet, à la main), l'écriture est refusée et l'éditeur propose de le
+recharger. Ctrl + S enregistre. L'assistant reste disponible et relit le fichier tel qu'il est.
+
+## Sauvegardes
+
+- **server.cfg** (droit « configuration ») : chaque écriture (assistant, éditeur, ressources) sauvegarde l'ancien
+  fichier dans `data/backups/` (les 20 derniers). La page **Sauvegardes** les relit (sans leurs secrets) et les
+  restaure (le fichier en place est sauvegardé d'abord).
+- **Base de données** (droit « sauvegardes », qui donne accès à toutes les données des joueurs) : `mysqldump` (ou
+  `mariadb-dump`) copie toute la base, compressée en `.sql.gz` dans `data/backups/db/`. L'outil est cherché seul (PATH,
+  MariaDB, MySQL, XAMPP, Laragon, WampServer) ou désigné à la main. Identifiants lus dans le server.cfg et passés par un
+  fichier d'options effacé aussitôt : jamais sur la ligne de commande. Une sauvegarde à la fois ; « Sauvegarder
+  maintenant », heures quotidiennes planifiées, nombre gardé (14 par défaut, les plus anciennes effacées),
+  téléchargement et suppression depuis la page.
+- Restaurer la base reste un geste manuel : arrêter le serveur, décompresser le fichier, l'importer (HeidiSQL, ou
+  `mysql -u utilisateur -p base < fichier.sql`).
+
+## Planification
+
+La page **Planification** (droit « serveur ») règle les **redémarrages quotidiens** (heures de la machine) :
+personnages sauvegardés, joueurs déconnectés, relance. Les joueurs sont prévenus aux délais choisis (15, 5 et
+1 minute par défaut) par une **proclamation** du Conseil au nom de la Chancellerie (il faut `vava_admin` et
+`vava_chancellerie` lancés), avec le message choisi (`{minutes}` remplacé). Le prochain redémarrage peut être **sauté**
+une fois. Un serveur arrêté n'est jamais lancé par un redémarrage planifié ; une échéance manquée de plus de 5 minutes
+(machine en veille) est passée, pas rattrapée. Les sauvegardes planifiées de la base se règlent dans la page
+Sauvegardes.
+
+## Mises à jour
+
+La Chancellerie suit le dépôt GitHub de vAvA (`updates.repo`, branche `main`) : chaque commit poussé est une nouvelle
+version (ou seulement les releases publiées, au choix). Elle vérifie toutes les heures, et à la demande ; le tableau de
+bord annonce une mise à jour disponible, et la page **Mises à jour** montre ce qui est installé (vAvA, Chancellerie,
+oxmysql, FXServer), les changements arrivés depuis et les parties touchées.
+
+Le compte maître l'applique (« Mettre à jour »), ou la laisse s'appliquer au prochain redémarrage planifié. Déroulé :
+
+1. Téléchargement de la nouvelle version et comparaison, fichier par fichier, avec ce qui est installé.
+2. Si la Chancellerie change : sa nouvelle version doit se charger, sinon tout s'arrête là, sans rien toucher.
+3. Sauvegarde de la base (si mysqldump est là ; un échec arrête la mise à jour).
+4. Joueurs prévenus par une proclamation, le délai choisi (tout de suite, 1, 5 ou 10 minutes), puis arrêt propre du
+   serveur (personnages sauvegardés).
+5. Sauvegarde des ressources qui vont changer (`data/updates/backups/`, les 3 dernières).
+6. Écriture de la nouvelle version, qui garde ce que vous avez modifié :
+   - un fichier que vous n'avez pas touché est remplacé ; un fichier supprimé en amont est retiré ;
+   - un fichier que vous avez modifié et qui n'a pas changé en amont est gardé ;
+   - un **réglage** (`config.lua`, dossier `config/`) modifié des deux côtés est gardé, et la nouvelle version posée à
+     côté (`config.lua.nouveau`) pour que vous repreniez ses nouveautés ;
+   - un autre fichier modifié des deux côtés prend la nouvelle version, la vôtre est gardée à côté (`.local`) ;
+   - un nouveau module est posé dans `[vava]`, à activer dans la page Ressources.
+7. Relance du serveur, puis **contrôle** : en marche, sans arrêt imprévu, et toutes les ressources qui tournaient avant
+   (et prévues au server.cfg) tournent encore. Sinon : **retour arrière** automatique (ressources remises à l'identique)
+   et relance ; la page dit quelle ressource a échoué.
+
+La Chancellerie se met à jour elle-même de la même façon : ses nouveaux fichiers remplacent les anciens (gardés dans
+`data/updates/chancellerie-precedente`), puis elle redémarre (code 75, que `demarrer.sh` ou `demarrer.bat` relance) et
+termine le contrôle du serveur. Si la nouvelle version s'arrête au démarrage, le lanceur remet l'ancienne et la
+relance. `data/` et `node/` ne sont jamais touchés ; un nouveau lanceur est posé à côté (`demarrer.sh.nouveau`), celui en
+cours ne pouvant se réécrire.
+
+Une copie suivie par git (dossier de développement) n'est jamais écrasée : la page le signale, `git pull` reste l'outil.
+Sur un serveur où vAvA a été posé à la main, la version installée est inconnue : la première mise à jour garde les
+réglages qui diffèrent et remplace le reste ; les suivantes savent exactement ce qui a été modifié sur place.
 
 ## Comptes
 
 Page **Comptes** (compte maître) : créer un compte (identifiant, mot de passe), lui donner des droits sur le panneau
-(démarrer et arrêter le serveur, lire et écrire la console, configurer le serveur) et un **rang du Conseil** (gardien,
+(« serveur » : démarrer et arrêter le serveur et ses ressources, planifier les redémarrages ; « console » : la lire et
+y écrire ; « configuration » : assistant, server.cfg et ses sauvegardes ; « sauvegardes » : celles de la base) et un
+**rang du Conseil** (gardien,
 sénéchal, souverain : mêmes droits qu'en jeu, pour administrer le royaume depuis le web), lui remettre un mot de passe
 ou le supprimer. Chacun y change son propre mot de passe (l'ancien est demandé). Un mot de passe changé ou un compte
 supprimé ferme ses autres sessions. Le compte maître a tous les droits du panneau et le rang de souverain.
@@ -127,17 +292,23 @@ Pour les comptes qui ont un rang du Conseil, quand le serveur de jeu tourne avec
 
 | Fichier | Contenu |
 |---|---|
+| `demarrer.sh` | lanceur Linux (Node.js téléchargé s'il manque, relance après mise à jour, `--service` : service systemd) |
 | `demarrer.bat` | lanceur Windows |
 | `index.js` | lancement, bannière, arrêt propre |
 | `lib/config.js` | emplacements et réglages (`data/config.json`) |
 | `lib/accounts.js` · `sessions.js` · `pin.js` | comptes, sessions, code du premier lancement |
 | `lib/security.js` · `http.js` · `routes.js` · `events.js` | serveur web, API, flux en direct |
 | `lib/process.js` | FXServer : lancement, console, arrêt, relance |
-| `lib/servercfg.js` · `resources.js` · `dbprobe.js` · `status.js` | server.cfg, ressources, base, joueurs |
+| `lib/servercfg.js` · `resources.js` · `dbprobe.js` · `status.js` | server.cfg (et ses secrets masqués), ressources, base, joueurs, ressources lancées, ticks |
+| `lib/system.js` · `metrics.js` | relevés de la machine et de FXServer, historiques des performances |
+| `lib/backups.js` · `scheduler.js` | sauvegardes (server.cfg, base), redémarrages et sauvegardes planifiés |
+| `lib/routes-ops.js` | performances, ressources, server.cfg brut, sauvegardes, planification |
+| `lib/download.js` · `jobs.js` | téléchargements, extraction (tar de la machine), opération longue en cours |
+| `lib/installer.js` · `updates.js` · `routes-updates.js` | installation, fusion des mises à jour, contrôle et retour arrière, mise à jour de la Chancellerie |
 | `lib/bridge.js` · `camera.js` · `routes-game.js` | pont du serveur de jeu, caméras, royaume |
 | `lib/routes-accounts.js` | comptes du panneau |
 | `web/` | l'interface |
-| `data/` | données locales (comptes, réglages, journal, sauvegardes) — à ne jamais partager |
+| `data/` | données locales (comptes, réglages, journal, performances, sauvegardes) — à ne jamais partager |
 
 Réglages de `data/config.json` (créé au premier lancement) :
 
@@ -153,6 +324,18 @@ Réglages de `data/config.json` (créé au premier lancement) :
 | `process.runningAfterMs` | `30000` | « en marche » sans la ligne Cfx.re Nucleus |
 | `process.consoleLines` | `3000` | lignes de console gardées |
 | `game.ranks` | (lu du pont) | rangs du Conseil gardés pour le formulaire des comptes, serveur arrêté |
+| `metrics.intervalMs` | `5000` | intervalle des relevés de performances |
+| `schedule.restarts` / `warnings` / `message` | `[]` / `[15, 5, 1]` / `''` | redémarrages quotidiens, avertissements (minutes avant), message |
+| `schedule.backups` | `[]` | heures des sauvegardes quotidiennes de la base |
+| `schedule.skip` | `null` | échéance du redémarrage sauté une fois |
+| `backups.dumpPath` / `keep` | `''` / `14` | mysqldump (vide : cherché seul), sauvegardes de la base gardées |
+| `updates.repo` / `branch` | `Nicolasbriet/vAvA_core` / `main` | dépôt GitHub suivi |
+| `updates.channel` | `commits` | `commits` : chaque commit de la branche ; `releases` : les releases publiées |
+| `updates.autoCheck` / `checkEveryMin` | `true` / `60` | vérification à intervalle |
+| `updates.applyAtRestart` | `false` | appliquer la mise à jour au redémarrage planifié |
+
+`data/install.json` retient ce qui est installé (version, empreinte de chaque fichier) : c'est lui qui permet de
+distinguer vos modifications des changements en amont.
 
 ## API (pour les étapes suivantes)
 
@@ -179,3 +362,20 @@ Toutes les réponses sont `{ ok, error?, … }`. Les `POST` demandent `x-chancel
 | `POST /api/game/cameras/wall` · `players` | rang du Conseil | joueurs du mur `{ source, label, active }` ; `wall` inscrit l'ouverture au journal |
 | `POST /api/game/camera/start` · `answer` · `stop` | rang du Conseil | `{ target, quality = tile\|full }` → `{ session, label, iceServers }` ; 17 caméras par onglet au plus (un mur 4 × 4 et une vue en grand) |
 | `POST /api/bridge/event` | pont (machine et clé) | évènements du serveur de jeu |
+| `GET /api/metrics?range=hour\|day` | connecté | relevés (`samples`, `stepMs`), cœurs, dernier relevé ; flux : `metrics` à chaque relevé |
+| `GET /api/resources` | connecté | ressources (`started`, `autostart`, version, auteur…), `live` |
+| `POST /api/resources/action` | server | `{ name, action = start\|stop\|restart\|ensure }` |
+| `POST /api/resources/refresh` | server | `refresh` dans la console |
+| `POST /api/resources/autostart` | config | `{ name, enabled }` → ligne ensure du server.cfg |
+| `GET /api/cfg` · `POST /api/cfg/save` | config | `{ text, revision, secrets }` · `{ text, revision }` → `{ backup, revision, restartNeeded }` |
+| `GET /api/backups/cfg` · `GET /api/backups/cfg/view?name=` · `POST /api/backups/cfg/restore` | config | sauvegardes du server.cfg |
+| `GET /api/backups/db` · `POST /api/backups/db/create` · `delete` · `settings` | backups | sauvegardes de la base ; flux : `backup` (début, fin) |
+| `GET /api/backups/db/download?name=` | backups | le fichier `.sql.gz` en pièce jointe |
+| `GET /api/schedule` | connecté | planification et prochaines échéances |
+| `POST /api/schedule/restarts` · `skip` | server | `{ restarts, warnings, message }` · `{ skip }` |
+| `GET /api/install/options` | config | dossier proposé, build recommandée de FXServer, dépôt |
+| `POST /api/install/start` | config | `{ mode: 'new', base }` ou `{ mode: 'existing' }` (serveur arrêté) |
+| `POST /api/assistant/dbcreate` | config | `{ host, port, user, password, database }` (mot de passe vide : celui du server.cfg) |
+| `GET /api/jobs/current` | connecté | opération en cours ou dernière ; flux : `job` à chaque avancée |
+| `GET /api/updates` · `POST /api/updates/check` | connecté | installé, dernière version, changements ; flux : `update` |
+| `POST /api/updates/apply` · `settings` | compte maître | `{ backupDb, delayMin = 0\|1\|5\|10 }` · `{ channel, autoCheck, applyAtRestart }` |
