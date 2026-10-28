@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>vAvA · Agriculture</title>
+  <!--
+    web/index.html
+    Rôle : les interfaces de l'agriculture : invite près d'un emplacement, d'un puits ou d'un grenier, menu d'emplacement
+           (culture et état, avancement, humidité et fertilité, gestes : planter, arroser, fertiliser, récolter,
+           arracher), messages. Tous les textes viennent de js/strings.js ; toutes les données du jeu (messages du client
+           Lua). Dans un navigateur, web/index.html?view=menu&state=growing (ou empty, ripe, wilted, dead ; view=prompt)
+           montre chaque élément avec des données d'exemple (js/devmock.js).
+  -->
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <div id="app" class="app">
+    <div class="prompt" id="prompt" hidden>
+      <kbd class="prompt-key"></kbd>
+      <div class="prompt-body">
+        <p class="prompt-line">
+          <span class="prompt-verb"></span>
+          <span class="prompt-sep">—</span>
+          <span class="prompt-label"></span>
+          <span class="prompt-type"></span>
+        </p>
+        <p class="prompt-help" hidden></p>
+      </div>
+    </div>
+
+    <section class="menu" id="menu" hidden role="dialog" aria-modal="true" aria-labelledby="menu-title">
+      <header class="menu-bar">
+        <div class="menu-head">
+          <h2 class="menu-title" id="menu-title"></h2>
+          <p class="menu-meta"></p>
+        </div>
+        <div class="menu-actions">
+          <button type="button" class="menu-refresh"></button>
+          <button type="button" class="menu-close" aria-label="Fermer"></button>
+        </div>
+      </header>
+      <div class="menu-pane"></div>
+    </section>
+
+    <p class="hints" id="hints" hidden></p>
+    <div class="toast" role="status" aria-live="polite" hidden></div>
+  </div>
+
+  <script src="js/strings.js"></script>
+  <script src="js/devmock.js"></script>
+  <script src="js/bridge.js"></script>
+  <script src="js/ui.js"></script>
+  <script src="js/view-prompt.js"></script>
+  <script src="js/view-menu.js"></script>
+  <script src="js/app.js"></script>
+</body>
+</html>

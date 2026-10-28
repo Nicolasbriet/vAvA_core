@@ -373,8 +373,8 @@ séparateurs `'`, `-` et espace jamais en tête, en fin ni doublés).
 Ressources séparées, dans `modules/` : à copier (ou lier) dans le dossier `resources` du serveur, dans cet ordre :
 `ensure vAvA_core`, `ensure vava_world`, `ensure vava_appearance`, `ensure vava_characters_ui`, `ensure vava_hud`,
 `ensure vava_inventory`, `ensure vava_needs`, `ensure vava_health`, `ensure vava_admin`, `ensure vava_voice`,
-`ensure vava_skills`, `ensure vava_gathering`, `ensure vava_crafting`, `ensure vava_chancellerie`, puis les modules
-qui déclarent des objets et les autres modules métiers.
+`ensure vava_skills`, `ensure vava_gathering`, `ensure vava_crafting`, `ensure vava_farming`, `ensure vava_chancellerie`,
+puis les modules qui déclarent des objets.
 
 ### `vava_appearance`
 
@@ -1049,7 +1049,7 @@ Touches : `E` récolter, `O` panneau des zones. Rendu hors jeu : `web/index.html
 
 ### `vava_crafting`
 
-L'artisanat (1.0.0) : **stations** (forge, établi, métier à tisser, alambic, tannerie, fourneau, table d'arcanes)
+L'artisanat (1.1.0) : **stations** (forge, établi, métier à tisser, alambic, tannerie, fourneau, table d'arcanes)
 publiques ou privées, avec leur qualité et parfois leur combustible (forge : charbon ; fourneau : bois ; réserve
 alimentée par les joueurs), une pièce à la fois ; **recettes** à ingrédients par **palier choisi** (consommés par pile,
 les plus anciennes d'abord, échange atomique), outil requis en main, durée, XP par `vava_skills` ; **qualité** =
@@ -1072,6 +1072,7 @@ state bag global `vava_crafting:station:<id>` → `{ fuel, busy }`.
 |---|---|
 | `getStation(id)` · `getStations()` | `{ id, label, type, typeLabel, quality, busy, x, y, z, fuel?, owner? }` |
 | `setFuel(id, n)` | `true` ou `false, code` — journalisé au nom du module |
+| `addStation({ id, type, label?, x, y, z, heading?, quality?, owner?, prop? })` | `true` ou `false, code` — place une station d'un type déjà déclaré au registre (un module pose son composteur…) ; la liste des stations est publiée aux clients par le state bag `vava_crafting:stations` ; hook `vava_crafting:stationAdded` ; depuis 1.1.0 |
 | `registerAccess(kind, fn)` | branche un genre de propriétaire de station : `fn(ownerId, characterId)` → booléen (foyer, guilde…) |
 | `getRecipe(id)` · `recipesOf(type)` | définitions |
 | `getSession(joueur)` | `{ token, kind = craft \| repair, station, recipe, startedAt, durationMs }` ou `nil` |
@@ -1083,6 +1084,41 @@ station, recipe, item, instanceId, maxDurability }`).
 
 **Commande** `/artisanat stations | station <id> | carburant <id> <n>` (droit `metiers`). Touche `E` près d'une
 station. Rendu hors jeu : `web/index.html?view=menu` (ou `menu&tab=reparation`, `menu&tab=poincon`, `name`).
+
+### `vava_farming`
+
+L'agriculture (1.0.0) : **parcelles** communales ou privées (`owner = { kind = 'character', id }`, autres genres par
+`registerAccess`) faites d'emplacements en grille ; **croissance par dates** (humidité qui baisse, pousse au-dessus
+d'un seuil, pause à sec, flétrie après 6 h, morte après 18 h ; aucune boucle, republication des stades toutes les
+10 s) ; **fertilité** (coût par récolte, rotation par famille, compost, jachère) ; **qualité** de la récolte (graine ×
+0,35 + compétence × 0,35 + régularité d'arrosage × 0,15 + fertilité × 0,15 ± 5) en palier avec provenance, graines
+récupérées au même palier ; gestes semer / arroser (seau en main rempli aux puits) / fertiliser / récolter (faucille :
+plus vite) / arracher (déchets), tous validés et appliqués par le serveur après un geste chronométré ; **grenier
+commun** (conteneur `vava_inventory` conservé, ouvert ancré, dépôts et retraits journalés) ; **composteur** (type de
+station et recette ajoutés aux registres de `vava_crafting`, station placée par `addStation`). Détail, config et tests :
+`modules/vava_farming/README.md`. Demande le core 0.6.0, `vava_inventory` 1.4.0, `vava_skills` 1.0.0, `vava_gathering`
+1.0.0, `vava_crafting` 1.1.0 ; facultatifs : `vava_hud`, `vava_admin` (droit `metiers`), `vava_chat`.
+
+**Registre** `vava_farming:crops` (`{ label, family, seed, product, growMinutes, waterPerHour, fertilityCost, yield,
+xp, difficulty, stages, wilted, dead }`), rempli par la config, ouvert aux autres modules. State bag global
+`vava_farming:parcel:<id>` → `{ slots = { { crop, stage, state } } }`.
+
+| Export serveur | Retour |
+|---|---|
+| `getParcel(id)` · `getParcels()` | `{ id, label, x, y, z, count, communal, owner?, granary?, slots = { vue… } }` |
+| `getSlot(parcelle, n)` | `{ parcel, index, crop, cropLabel, state, stage, stages, progress, moisture, fertility, waterings, dryHours, plantedAt }` |
+| `getCrop(id)` | définition ou `nil` |
+| `granaryOf(parcelle)` | id du conteneur du grenier, ou `nil` |
+| `registerAccess(kind, fn)` | genre de propriétaire de parcelle : `fn(ownerId, characterId)` → booléen |
+| `getSession(joueur)` | `{ token, parcel, slot, action, startedAt, durationMs }` ou `nil` |
+
+**Hooks** : `vava_farming:acting` (`before`, annulable : `{ source, characterId, parcel, slot, action, crop? }`),
+`harvested` (`after` : `+ item, quantity, quality, tier, seeds`), `granary` (`after` : `{ parcel, action = deposit |
+withdraw, source, characterId, item, quantity }`).
+
+**Commande** `/agriculture parcelles | parcelle <id> | fertilite <id> <n> <0-100> | pousser <id> <n> | arroser <id>`
+(droit `metiers`). Touche `E` près d'un emplacement, d'un puits ou d'un grenier. Rendu hors jeu :
+`web/index.html?view=menu&state=growing` (ou `empty`, `ripe`, `wilted`, `dead`, `view=prompt`).
 
 ### `vava_chat`
 
