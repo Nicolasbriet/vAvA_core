@@ -48,7 +48,7 @@ VavaInventory.config = {
     -- en prend est regarni, ce qu'on y dépose disparaît, rien n'est écrit en base. À n'activer que sur un serveur
     -- de test : tout y est gratuit.
     catalog = {
-        enabled = false,
+        enabled = true,
         command = 'catalogue',
         label = 'Catalogue (développement)',
         width = 16, height = 10,
