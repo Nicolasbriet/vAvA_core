@@ -10,7 +10,7 @@ qui doit se passer ; si ce n'est pas le cas, notez l'étape, ce que vous avez vu
 1. **Ordre de démarrage** (`server.cfg`, ou la Chancellerie qui le fait seule) :
    `oxmysql`, `vAvA_core`, `vava_chat`, `vava_world`, `vava_appearance`, `vava_characters_ui`, `vava_hud`,
    `vava_inventory`, `vava_needs`, `vava_health`, `vava_admin`, `vava_voice`, `vava_cameras`, `vava_magic`,
-   `vava_skills`, `vava_gathering`, `vava_crafting`, `vava_farming`, `vava_chancellerie`.
+   `vava_skills`, `vava_gathering`, `vava_crafting`, `vava_farming`, `vava_codex`, `vava_chancellerie`.
 2. **Démarrage** : dans la console, chaque module doit afficher `module 'xxx' vY prêt`. Les migrations partent seules
    (`0003_play_seconds` du core, `0001_*` de chaque module). Un module refusé affiche la raison : notez-la, c'est le
    premier retour utile.
@@ -18,10 +18,14 @@ qui doit se passer ; si ce n'est pas le cas, notez l'étape, ce que vous avez vu
    une recette ou une ressource dont l'objet n'est déclaré nulle part : à me remonter.
 4. **Compte du Conseil** : console → `vava_conseil <votre compte> souverain` (le numéro de compte s'affiche à la
    connexion : `compte #n`). Vous avez alors `metiers` (via Sénéchal) et `staff`.
-5. **Objets de départ** : Registre du Conseil (`F10`) → Joueurs → vous → Donner : `hache_fer`, `pioche_fer`,
-   `faucille_fer`, `couteau_fer`, `canne_a_peche`, `seau`, `graine_ble` ×5, `graine_carotte` ×5, `charbon` ×10,
-   `compost` ×3. Ces objets donnés n'ont ni palier ni créateur : c'est voulu (ils en gagneront à l'usage ou par la
-   forge).
+5. **Objets de départ** : le plus rapide est le catalogue de développement : `catalog.enabled = true` dans
+   `vava_inventory/config.lua`, `restart vava_inventory`, puis `/catalogue` en jeu : un conteneur avec une pile de
+   chaque objet s'ouvre à côté de la besace, avec ses onglets de catégories, sa recherche et ses pages ; glissez ou
+   double-cliquez ce qu'il vous faut (il se regarnit tout seul). Sinon, Registre du Conseil (`F10`) → Joueurs → vous
+   → Donner :
+   `hache_fer`, `pioche_fer`, `faucille_fer`, `couteau_fer`, `canne_a_peche`, `seau`, `graine_ble` ×5,
+   `graine_carotte` ×5, `charbon` ×10, `compost` ×3. Dans les deux cas, ces objets n'ont ni palier ni créateur :
+   c'est voulu (ils en gagneront à l'usage ou par la forge).
 6. **Lieux d'exemple** (à remplacer ensuite par ceux du royaume), autour du point d'apparition par défaut
    (−269, −955) : Forêt de Brume (−320, −880), Mine du Val (−180, −1010), Prairie Haute (−380, −1060), Rivière Claire
    (−120, −880), stations du bourg le long de (−255, −945) → (−292, −915), champ communal (−230, −890), jardin privé

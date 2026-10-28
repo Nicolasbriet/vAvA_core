@@ -231,6 +231,44 @@ Apparition : le core remplace `spawnmanager`. Ne pas démarrer `spawnmanager`, `
 - `validator(key, data)` doit renvoyer **`true`** pour accepter ; `false, raison` ou une erreur refusent l'entrée.
 - À l'arrêt du propriétaire d'un registre, le registre disparaît avec toutes ses entrées.
 
+#### Registre des commandes `core:commands` (core 0.7.0)
+
+Le core tient un registre où **chaque module déclare ses commandes et ses touches** ; le Codex (`vava_codex`) le lit
+pour les afficher, composer leurs arguments et les lancer, et le chat pour ses suggestions. Déclarer ne remplace pas
+`RegisterCommand` : la commande reste enregistrée et contrôlée par son module. La clé est le nom de la commande
+(sans `/`, sans `+`). Convention : un fichier `server/commands.lua` par module, `VavaX.commands.declare()` appelé en
+tête du `setup`, noms tirés de la config, et `core.registry.exists('core:commands')` vérifié d'abord (core plus ancien :
+rien n'est déclaré).
+
+```lua
+core.registry.add('core:commands', 'recolte', {
+    kind = 'command',                 -- ou 'key' : une touche (RegisterKeyMapping), avec `key`
+    module = 'vava_gathering', chapter = 'Récolte',
+    label = 'Zones et nœuds de récolte', description = '…',
+    scope = 'admin',                  -- 'player' (tout le monde), 'admin' (Conseil), 'console'
+    permission = 'metiers', ace = 'metiers.admin',   -- scope admin : droit vava_admin, repli ACE
+    actions = {                       -- sous-commandes ; une action sans `id` est la forme nue
+        { id = 'zones', label = 'État des zones' },
+        { id = 'vitalite', label = 'Fixer la vitalité', args = {
+            { name = 'zone', type = 'list', list = 'zones' },
+            { name = 'vitalité', type = 'integer', min = 0, max = 100 },
+        } },
+    },
+})
+core.registry.add('core:commands', 'vava_gathering_interact', {
+    kind = 'key', scope = 'player', module = 'vava_gathering', chapter = 'Récolte',
+    label = 'Récolter (nœud proche)', key = 'E', hold = true,   -- keyDevice, keyDisplay (« Clic droit », « 1 à 5 »)
+})
+```
+
+Une commande sans sous-commande porte ses `args` directement. Types d'argument : `player` (joueur en jeu), `account`
+(numéro de compte), `integer` / `number` (bornés par `min`, `max`, `step`), `text` (`rest = true` : tout le reste de
+la ligne, en dernière position), `choice` (`choices`, libellés dans `labels`), `registry` (clés d'un registre du core,
+affichées par `labelField`, défaut `label`) et `list` : valeurs rendues par l'export **`codexList(list)`** du module
+déclarant, `{ { value, label }, … }` (zones, stations, parcelles…). `optional`, `hint`, `hidden` (commande technique)
+complètent. Le validateur refuse une touche sans `key`, `actions` et `args` ensemble, deux actions nues, une
+sous-commande en double, un `choice` sans `choices`, un `rest` ailleurs qu'en dernier texte.
+
 ### `core.rpc`
 
 ```lua
@@ -373,7 +411,7 @@ séparateurs `'`, `-` et espace jamais en tête, en fin ni doublés).
 Ressources séparées, dans `modules/` : à copier (ou lier) dans le dossier `resources` du serveur, dans cet ordre :
 `ensure vAvA_core`, `ensure vava_world`, `ensure vava_appearance`, `ensure vava_characters_ui`, `ensure vava_hud`,
 `ensure vava_inventory`, `ensure vava_needs`, `ensure vava_health`, `ensure vava_admin`, `ensure vava_voice`,
-`ensure vava_skills`, `ensure vava_gathering`, `ensure vava_crafting`, `ensure vava_farming`, `ensure vava_chancellerie`,
+`ensure vava_skills`, `ensure vava_gathering`, `ensure vava_crafting`, `ensure vava_farming`, `ensure vava_codex`, `ensure vava_chancellerie`,
 puis les modules qui déclarent des objets.
 
 ### `vava_appearance`
@@ -522,7 +560,19 @@ relâcher hors de l'inventaire pour jeter au sol.
 
 Polices de l'interface : Cinzel et EB Garamond, embarquées dans `web/fonts` (licence SIL Open Font License, textes
 joints). Pour travailler le rendu sans le jeu, ouvrir `web/index.html` dans un navigateur (`?drop=1` ajoute un sac
-au sol).
+au sol, `?catalog=1` le catalogue de développement).
+
+**Catalogue de développement** (1.5.0, `config.catalog`, désactivé par défaut) : `enabled = true` ajoute la commande
+`/catalogue [catégorie] [page]` (droit vava_admin `staff` ; sans vava_admin, ACE `vava_inventory.catalogue` ; en
+console : `catalogue <joueur> [catégorie] [page]`). Elle ouvre, à côté de la besace, un conteneur temporaire garni
+d'une pile pleine de chaque objet connu du registre, par catégorie puis libellé, découpé en pages de 16 × 10 cases.
+Son panneau porte un bandeau : onglets des catégories (avec leur compte), champ de recherche sur le nom (accents et
+casse ignorés, envoyé après une courte pause de frappe ou sur Entrée ; Échap quitte le champ, un second ferme
+l'inventaire), flèches de page ; chaque geste passe par le RPC `vava_inventory:catalog`, qui revérifie le droit et
+renvoie le panneau garni. Un double-clic ou « Prendre » met l'objet dans la besace. Ce qu'on en prend est regarni
+aussitôt (stock sans fin), ce qu'on y dépose disparaît au remplissage suivant, rien n'est écrit en base, et le
+catalogue disparaît avec le personnage. Chaque ouverture par la commande est inscrite au journal du Conseil. À
+n'activer que sur un serveur de test : le module l'annonce par un avertissement au démarrage.
 
 ### `vava_needs`
 
@@ -1120,6 +1170,46 @@ withdraw, source, characterId, item, quantity }`).
 (droit `metiers`). Touche `E` près d'un emplacement, d'un puits ou d'un grenier. Rendu hors jeu :
 `web/index.html?view=menu&state=growing` (ou `empty`, `ripe`, `wilted`, `dead`, `view=prompt`).
 
+### `vava_codex`
+
+Le Codex : toutes les commandes et toutes les touches du serveur, lues dans le registre `core:commands` (voir
+« Registre des commandes »). Ordre de démarrage : après les modules (il lit le registre à chaque ouverture, l'ordre
+n'est donc pas critique), avant `vava_chancellerie`. Dépend du core ≥ 0.7.0 ; vava_admin (rangs et droits), vava_hud
+(notifications) et vava_chat (dernières pages des commandes tapées) sont facultatifs.
+
+**Touche `F1`** (réglable par le joueur) ou `/codex` : un livre ouvert. Page de gauche : recherche (focus à
+l'ouverture, filtrage local sans aller-retour, accents et casse ignorés), index par sections — **Signets**,
+**Dernières pages**, puis les chapitres (un par module, onglets colorés sur la tranche), et pour le Conseil **Non
+décrites** (commandes des ressources vAvA enregistrées auprès du jeu mais absentes du registre, lançables en texte
+libre). Page de droite : détail de la ligne choisie, **formulaire selon le type de chaque argument** (joueur en jeu,
+clé d'un registre, liste d'un module, choix fixe, nombre, texte), **ligne composée en direct**, « Lancer ». Onglet
+**Touches** : toutes les touches par chapitre, avec la touche réellement liée par le joueur (lue dans le jeu).
+Clavier : `↑ ↓` parcourir, `Entrée` choisir puis lancer, `Tab` champ suivant, `Échap` retour puis fermer.
+
+**Ce que chacun voit** est décidé par le serveur : public → tous ; Conseil → le droit vava_admin déclaré avec la
+commande (ou tout membre du Conseil si aucun), repli ACE sans vava_admin (`ace` de la commande, sinon
+`config.staff.ace`) ; console → les membres du Conseil, en lecture seule. Une sous-commande peut porter son propre
+droit. Le Codex ne donne aucun pouvoir : la ligne est lancée par `ExecuteCommand` chez le joueur, comme si elle
+était tapée, et chaque commande garde ses propres contrôles.
+
+**Préférences par personnage** (champ `vava_codex:prefs`, visible du seul joueur) : signets (`favorites.max`),
+dernières pages (`recent.max`, sans doublon, les plus récentes en tête — depuis le Codex, et depuis le chat via
+l'export client `noteCommand(line)`), réglage « rester ouvert après Lancer » (`keepOpenDefault`). Une commande
+déclarée `ui = true` (ouvre une interface) ferme toujours le Codex d'abord ; sinon le Codex reprend le focus si
+aucune autre interface ne l'a pris.
+
+RPC : `vava_codex:open`, `options(nom, sous-commande, rang)` (valeurs d'un argument dynamique : joueurs en jeu avec
+leur nom, clés d'un registre par `labelField`, export `codexList` du module déclarant), `favorite(nom, posé)`,
+`recent(nom, sous-commande)`, `keepOpen(bool)` — schémas stricts, débits dans `config.rateLimits`.
+
+| Export | Retour |
+|---|---|
+| serveur `suggestions(source)` | `{ { name, help, params = { { name, help } } } }` : les suggestions du chat pour ce joueur (ses commandes, une par sous-commande en deux mots, sans les touches ni la console) ; `vava_chat` l'appelle avec le profil |
+| client `noteCommand(ligne)` | — : une commande tapée ailleurs (chat) est inscrite aux dernières pages ; le serveur ignore ce que le joueur ne peut pas lancer |
+
+Hors jeu : `web/index.html` dans un navigateur (`?staff=0` pour la vue d'un simple joueur) ; les listes des
+formulaires y sont simulées.
+
 ### `vava_chat`
 
 Le chat du royaume, à la place de la ressource `chat` de FiveM (`ensure vava_chat` remplace `ensure chat`, juste après
@@ -1132,6 +1222,12 @@ tests en jeu : `modules/vava_chat/README.md`. Demande le core 0.5.0 ; facultatif
 - **Compatibilité** : `chat:addMessage`, `chatMessage`, `chat:addSuggestion(s)`, `chat:removeSuggestion`, `chat:clear`
   marchent tels quels (local ou depuis le serveur). Texte brut seulement : les modèles HTML ne sont jamais interprétés.
   Les exports de l'ancienne ressource ne sont pas repris.
+- **Suggestions du registre** (1.1.0) : avec `vava_codex`, le profil du joueur apporte les suggestions décrites par le
+  registre `core:commands` (aide, paramètres nommés avec leur indication, et les sous-commandes en noms à deux mots :
+  `/metiers niveau <joueur> <compétence> <niveau>`), filtrées selon ses droits ; à nom égal elles l'emportent sur un
+  `chat:addSuggestion`. Taper `/metiers ` montre le paramètre en cours et garde ses sous-commandes proposées ; `Tab`
+  complète le nom puis la sous-commande. Toute commande tapée est signalée au Codex (`noteCommand`) pour ses
+  « dernières pages ». Sans `vava_codex`, rien ne change.
 - **Envoi** : RPC `vava_chat:send` (genre, texte, numéro de joueur | 0, conversation | 0) ; destinataires choisis par le
   serveur, jamais `-1`. Un `/mp` désigne son correspondant par un numéro de conversation jamais réutilisé.
 
