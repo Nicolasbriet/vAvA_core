@@ -19,7 +19,9 @@ VavaAdmin.config = {
         },
         {
             name = 'senechal', label = 'Sénéchal', level = 2, maxBanHours = 168,
-            permissions = { 'ban', 'inventory', 'give', 'announce', 'tools', 'spectate', 'logs', 'bans' },
+            -- metiers : zones et nœuds de récolte, stations, parcelles, correction d'une compétence (modules métiers) ;
+            -- nommer un fondateur reste réservé à `staff`
+            permissions = { 'ban', 'inventory', 'give', 'announce', 'tools', 'spectate', 'logs', 'bans', 'metiers' },
         },
         {
             name = 'souverain', label = 'Souverain', level = 3, maxBanHours = 0, permanentBans = true,

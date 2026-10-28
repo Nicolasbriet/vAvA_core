@@ -10,11 +10,11 @@ const DevMock = (() => {
   const inGame = typeof GetParentResourceName === 'function';
   const params = new URLSearchParams(window.location.search);
   const players = [
-    { source: 1, name: 'vAvA', accountId: 1, character: 'Aldric Morvan', ping: 18, rank: 'Souverain', frozen: false, downed: false },
-    { source: 3, name: 'Eloise_42', accountId: 7, character: 'Éloïse d\'Aubigné', ping: 41, rank: null, frozen: false, downed: true },
-    { source: 4, name: 'Bertrand', accountId: 9, character: 'Bertrand Dugarry', ping: 63, rank: 'Gardien', frozen: false, downed: false },
-    { source: 6, name: 'Corwin', accountId: 12, character: 'Corwin le Roux', ping: 95, rank: null, frozen: true, downed: false },
-    { source: 8, name: 'newcomer', accountId: 15, character: null, ping: 30, rank: null, frozen: false, downed: false },
+    { source: 1, name: 'vAvA', accountId: 1, character: 'Aldric Morvan', ping: 18, playSeconds: 45296, rank: 'Souverain', frozen: false, downed: false },
+    { source: 3, name: 'Eloise_42', accountId: 7, character: 'Éloïse d\'Aubigné', ping: 41, playSeconds: 2890, rank: null, frozen: false, downed: true },
+    { source: 4, name: 'Bertrand', accountId: 9, character: 'Bertrand Dugarry', ping: 63, playSeconds: 183420, rank: 'Gardien', frozen: false, downed: false },
+    { source: 6, name: 'Corwin', accountId: 12, character: 'Corwin le Roux', ping: 95, playSeconds: 0, rank: null, frozen: true, downed: false },
+    { source: 8, name: 'newcomer', accountId: 15, character: null, ping: 30, playSeconds: null, rank: null, frozen: false, downed: false },
   ];
   const detail = (source) => {
     const p = players.find((x) => x.source === source) || players[0];
@@ -64,7 +64,7 @@ const DevMock = (() => {
     window.addEventListener('DOMContentLoaded', () => {
       document.body.classList.add('dev');
       const all = ['view', 'teleport', 'freeze', 'heal', 'message', 'warn', 'kick', 'reports', 'ban', 'inventory', 'give',
-        'announce', 'tools', 'spectate', 'logs', 'bans', 'unban', 'staff'];
+        'announce', 'tools', 'spectate', 'logs', 'bans', 'metiers', 'unban', 'staff'];
       window.postMessage({ action: 'open', payload: {
         self: 1, accountId: 1, rank: { name: 'souverain', label: 'Souverain', level: 3 }, permissions: all,
         ranks: [{ name: 'gardien', label: 'Gardien', level: 1 }, { name: 'senechal', label: 'Sénéchal', level: 2 }, { name: 'souverain', label: 'Souverain', level: 3 }],
