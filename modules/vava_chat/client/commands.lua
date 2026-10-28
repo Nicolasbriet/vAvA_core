@@ -7,11 +7,13 @@
       - un texte sans commande dépend de l'onglet : hors-RP dans Général, message à son correspondant dans un
         onglet privé, au Conseil dans le sien ; rien dans Actions (un rappel de /me et /do s'affiche).
       Les commandes du chat marchent aussi depuis la console F8. Suggestions françaises de chaque commande.
+      Toute commande tapée est signalée au Codex (vava_codex, s'il est là) pour ses « dernières pages ».
     Dépendances : shared/, config.lua, client/outbox.lua, client/suggestions.lua, client/layout.lua
 ]]
 
-local type, tonumber, pairs, match, sub, lower = type, tonumber, pairs, string.match, string.sub, string.lower
-local RegisterCommand, ExecuteCommand = RegisterCommand, ExecuteCommand
+local type, tonumber, pairs, pcall, tostring, match, sub, lower = type, tonumber, pairs, pcall, tostring, string.match, string.sub, string.lower
+local RegisterCommand, ExecuteCommand, GetResourceState = RegisterCommand, ExecuteCommand, GetResourceState
+local CODEX = 'vava_codex'
 
 local outbox = VavaChat.outbox
 local suggestions = VavaChat.suggestions
@@ -81,9 +83,22 @@ local handlers = {
 --- Ligne tapée dans le chat (sans le « / » pour une commande).
 ---@param line string   commande et ses arguments
 ---@param tab string|nil
+local function noteToCodex(line)
+    return exports[CODEX]:noteCommand(line)
+end
+
+--- Le Codex inscrit la commande tapée à ses « dernières pages » ; isolé : sans lui, rien.
+---@param line string
+local function note(line)
+    if GetResourceState(CODEX) ~= 'started' then return end
+    local called, err = pcall(noteToCodex, line)
+    if not called then VavaChat.log.warn('%s.noteCommand en erreur : %s', CODEX, tostring(err)) end
+end
+
 local function runCommand(line, tab)
     local name, rest = match(line, '^([^ ]+) ?(.*)$')
     local handler = name and handlers[lower(name)]
+    if name then note(line) end
     if handler then
         handler(trim(rest), tab)
     elseif name then

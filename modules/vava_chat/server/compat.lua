@@ -3,13 +3,15 @@
     Rôle : ce que faisait la ressource « chat » de FiveM côté serveur, sans ses diffusions à tout le serveur :
       - commande inconnue (__cfx_internal:commandFallback) : un avis au seul joueur, à débit limité (la ressource
         d'origine la diffusait à tous comme un message) ;
-      - commandes du serveur permises au joueur (ACE), pour les suggestions, envoyées une fois à l'apparition.
+      - commandes du serveur permises au joueur (ACE), pour les suggestions, envoyées une fois à l'apparition ;
+      - suggestions décrites (aide et paramètres) du registre des commandes, par le Codex quand il est là.
     Dépendances : shared/, config.lua, server/core.lua
 ]]
 
-local type, ipairs, min, match = type, ipairs, math.min, string.match
-local RegisterNetEvent, CancelEvent, TriggerClientEvent, GetRegisteredCommands, IsPlayerAceAllowed, GetGameTimer =
-    RegisterNetEvent, CancelEvent, TriggerClientEvent, GetRegisteredCommands, IsPlayerAceAllowed, GetGameTimer
+local type, ipairs, pcall, min, match = type, ipairs, pcall, math.min, string.match
+local RegisterNetEvent, CancelEvent, TriggerClientEvent, GetRegisteredCommands, IsPlayerAceAllowed, GetGameTimer, GetResourceState =
+    RegisterNetEvent, CancelEvent, TriggerClientEvent, GetRegisteredCommands, IsPlayerAceAllowed, GetGameTimer, GetResourceState
+local CODEX = 'vava_codex'
 
 local text = VavaChat.text
 local cfg = VavaChat.config
@@ -67,6 +69,24 @@ function compat.commands(src)
         end
     end
     return list
+end
+
+local function codexSuggestions(src)
+    return exports[CODEX]:suggestions(src)
+end
+
+--- Suggestions décrites par le registre des commandes (aide, paramètres, sous-commandes), si le Codex est là :
+--- { { name, help, params } }. Isolé : sans lui, ou en erreur, aucune.
+---@param src integer
+---@return table[]
+function compat.suggestions(src)
+    if GetResourceState(CODEX) ~= 'started' then return {} end
+    local called, list = pcall(codexSuggestions, src)
+    if not called then
+        VavaChat.log.warn('%s.suggestions en erreur : %s', CODEX, tostring(list))
+        return {}
+    end
+    return type(list) == 'table' and list or {}
 end
 
 ---@param src integer

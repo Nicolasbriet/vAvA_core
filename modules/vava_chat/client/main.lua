@@ -63,6 +63,7 @@ local function fetchProfile()
             if transport and success and type(result) == 'table' then
                 profile = { staff = result.staff == true, rank = isText(result.rank, RANK_MAX) and result.rank or nil }
                 suggestions.setServer(result.commands)
+                suggestions.setDescribed(result.suggestions)
                 sendProfile()
                 return
             end

@@ -28,11 +28,15 @@ local TEXT = { type = 'string', max = cfg.maxBytes }
 local PLAYER = { type = 'integer', min = 0, max = 0xFFFF }
 local CHAT = { type = 'integer', min = 0, max = 0x7FFFFFFF }
 
---- Profil du joueur à l'apparition : numéro de conversation, Conseil, commandes du serveur permises.
+--- Profil du joueur à l'apparition : numéro de conversation, Conseil, commandes du serveur permises, suggestions
+--- décrites par le registre des commandes (Codex).
 local function profile(src)
     local session = sessions.get(src)
     if not session then return false, 'not_ready' end
-    return true, { chat = session.chat, staff = session.staff, rank = session.rank, commands = compat.commands(src) }
+    return true, {
+        chat = session.chat, staff = session.staff, rank = session.rank,
+        commands = compat.commands(src), suggestions = compat.suggestions(src),
+    }
 end
 
 ---@param src integer
@@ -62,6 +66,8 @@ local function adminModule(payload)
 end
 
 local function setup()
+    local declared, declareErr = VavaChat.commands.declare()
+    if not declared then return false, 'commandes : ' .. tostring(declareErr) end
     for _, def in ipairs({
         { RPC.SEND, { KIND, TEXT, PLAYER, CHAT }, limits.send, messages.send },
         { RPC.PROFILE, {}, limits.profile, profile },

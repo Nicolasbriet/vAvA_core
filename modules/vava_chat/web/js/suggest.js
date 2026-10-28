@@ -2,9 +2,10 @@
 /*
  * web/js/suggest.js
  * Rôle : suggestions de commandes sous la saisie dès qu'elle commence par « / » : celles déclarées par les
- *        ressources (aide et paramètres), puis les autres commandes permises. Une commande complète montre ses
- *        paramètres, celui en cours d'écriture en rouge, avec son aide. Tab complète, et passe à la suivante si on
- *        appuie encore.
+ *        ressources ou décrites par le registre du Codex (aide et paramètres, sous-commandes « metiers niveau »),
+ *        puis les autres commandes permises. Une commande complète montre ses paramètres, celui en cours d'écriture
+ *        en rouge, avec son aide ; ses sous-commandes restent proposées tant qu'aucun paramètre n'est écrit. Tab
+ *        complète le nom (ou la sous-commande), et passe à la suivante si on appuie encore.
  */
 
 const Suggest = (() => {
@@ -13,6 +14,8 @@ const Suggest = (() => {
   let commands = [];
   let shown = [];
   let cycle = null;
+  // noms complétables par Tab pour la saisie courante (phase du nom)
+  let completable = [];
 
   function add(entries) {
     for (const entry of entries || []) {
@@ -67,34 +70,42 @@ const Suggest = (() => {
     if (cycle && value === cycle.value) return render(cycle.list, -1, cycle.index);
     cycle = null;
     if (!value.startsWith('/')) return hide();
-    const typed = value.slice(1);
-    const space = typed.indexOf(' ');
-    const name = (space === -1 ? typed : typed.slice(0, space)).toLowerCase();
+    const typed = value.slice(1).toLowerCase();
+    const entries = catalog();
+    const lower = (entry) => entry.name.toLowerCase();
+    // phase du nom : les noms (et sous-commandes) qui commencent par la saisie
+    const starting = entries.filter((entry) => lower(entry).startsWith(typed));
+    // phase des paramètres : la saisie dépasse un nom complet ; le nom le plus long l'emporte (« metiers niveau »
+    // avant « metiers »)
+    const passed = entries.filter((entry) => typed.startsWith(`${lower(entry)} `)).sort((a, b) => b.name.length - a.name.length);
     let matches;
     let paramIndex = -1;
-    if (space === -1) {
-      // la commande exacte d'abord, puis celles qui ont une aide, puis l'ordre alphabétique
-      const rank = (entry) => (entry.name.length === name.length ? 0 : 2) + (entry.help ? 0 : 1);
-      matches = catalog()
-        .filter((entry) => entry.name.toLowerCase().startsWith(name))
-        .sort((a, b) => rank(a) - rank(b) || a.name.localeCompare(b.name));
-    } else {
-      matches = catalog().filter((entry) => entry.name.toLowerCase() === name);
+    if (passed.length) {
+      const best = passed[0];
+      const rest = typed.slice(best.name.length + 1);
       // paramètre en cours : nombre de mots après la commande (un espace final ouvre le suivant)
-      paramIndex = typed.slice(space + 1).split(' ').length - 1;
+      paramIndex = rest.split(' ').length - 1;
+      matches = [best].concat(starting.filter((entry) => entry !== best));
+      completable = starting;
+    } else {
+      // la commande exacte d'abord, puis celles qui ont une aide, puis l'ordre alphabétique
+      const rank = (entry) => (lower(entry) === typed ? 0 : 2) + (entry.help ? 0 : 1);
+      matches = starting.sort((a, b) => rank(a) - rank(b) || a.name.localeCompare(b.name));
+      completable = matches;
     }
     matches = matches.slice(0, UI.config().suggestionsMax || 6);
     if (!matches.length) return hide();
     render(matches, paramIndex, -1);
   }
 
-  /** Tab : la saisie complétée (« /commande »), ou null s'il n'y a rien à compléter. */
+  /** Tab : la saisie complétée (« /commande » ou « /commande sous-commande »), ou null s'il n'y a rien à compléter. */
   function complete(value) {
     if (cycle && cycle.value === value) {
       cycle.index = (cycle.index + 1) % cycle.list.length;
     } else {
-      if (!shown.length || value.slice(1).includes(' ')) return null;
-      cycle = { list: shown.slice(), index: 0, value: '' };
+      const candidates = completable.filter((entry) => shown.includes(entry));
+      if (!candidates.length) return null;
+      cycle = { list: candidates, index: 0, value: '' };
     }
     cycle.value = `/${cycle.list[cycle.index].name} `;
     render(cycle.list, -1, cycle.index);

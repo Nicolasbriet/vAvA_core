@@ -4,7 +4,9 @@
       - celles que les ressources déclarent (chat:addSuggestion, avec aide et paramètres), gardées ici pour être
         renvoyées si la page se recharge ;
       - les commandes permises au joueur : celles du client (relues à l'ouverture du chat, seulement si une
-        ressource a démarré ou s'est arrêtée depuis) et celles du serveur (reçues avec le profil).
+        ressource a démarré ou s'est arrêtée depuis) et celles du serveur (reçues avec le profil) ;
+      - les suggestions décrites par le registre des commandes du core (Codex), reçues avec le profil : elles
+        l'emportent sur une déclaration du même nom, et peuvent nommer une sous-commande (« metiers niveau »).
     Dépendances : shared/text.lua, config.lua, client/nui.lua
 ]]
 
@@ -28,17 +30,25 @@ VavaChat.suggestions = suggestions
 ---@type table<string, table>
 local declared = {}
 local declaredCount = 0
+---@type table<string, table>  suggestions du registre des commandes (profil), par nom
+local described = {}
 local serverCommands = {}
 local dirty = true
 
---- Nom de commande sans « / », sans espace, ou nil.
+--- Nom de commande sans « / », ou nil. `words` : des espaces simples sont admis à l'intérieur (sous-commande).
 ---@param name any
+---@param words? boolean
 ---@return string|nil
-local function commandName(name)
+local function commandName(name, words)
     if type(name) ~= 'string' then return nil end
     if sub(name, 1, 1) == '/' then name = sub(name, 2) end
     name = text.clean(name)
-    if not name or name == '' or #name > NAME_MAX or match(name, ' ') then return nil end
+    if not name or name == '' or #name > NAME_MAX then return nil end
+    if words then
+        if match(name, '^ ') or match(name, ' $') or match(name, '  ') then return nil end
+    elseif match(name, ' ') then
+        return nil
+    end
     return name
 end
 
@@ -98,6 +108,28 @@ function suggestions.remove(name)
     if nui.isReady() then nui.send('suggestion:remove', { name = name }) end
 end
 
+--- Suggestions décrites par le registre des commandes (profil) : nettoyées aux mêmes bornes, elles remplacent les
+--- précédentes du même genre et passent à la page après les déclarations, pour l'emporter à nom égal.
+---@param list any
+function suggestions.setDescribed(list)
+    described = {}
+    if type(list) ~= 'table' then return end
+    local count = 0
+    for _, raw in ipairs(list) do
+        if count >= SUGGESTIONS_MAX then break end
+        local name = type(raw) == 'table' and commandName(raw.name, true)
+        if name then
+            count = count + 1
+            described[name] = { name = name, help = label(raw.help, HELP_MAX), params = cleanParams(raw.params) }
+        end
+    end
+    if nui.isReady() then
+        local out = {}
+        for _, entry in pairs(described) do out[#out + 1] = entry end
+        nui.send('suggestions', { list = out })
+    end
+end
+
 --- Commandes du serveur permises au joueur (profil).
 ---@param list any
 function suggestions.setServer(list)
@@ -145,6 +177,8 @@ end
 nui.onReady(function()
     local list = {}
     for _, entry in pairs(declared) do list[#list + 1] = entry end
+    -- après les déclarations : à nom égal, la description du registre l'emporte
+    for _, entry in pairs(described) do list[#list + 1] = entry end
     nui.send('suggestions', { list = list })
     dirty = true
 end)

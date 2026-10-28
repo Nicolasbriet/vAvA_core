@@ -16,7 +16,7 @@ use_experimental_fxv2_oal 'yes'
 
 name 'vava_chat'
 description 'Chat vAvA : hors-RP, /me, /do, messages privés, Conseil, onglets'
-version '1.0.0'
+version '1.1.0'
 
 dependency 'vAvA_core'
 -- remplace la ressource « chat » : une ressource qui en dépend démarre avec celle-ci
@@ -50,6 +50,7 @@ server_scripts {
     'server/messages.lua',
     'server/compat.lua',
     'server/api.lua',
+    'server/commands.lua',
     'server/main.lua',
 }
 
