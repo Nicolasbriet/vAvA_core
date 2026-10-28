@@ -15,7 +15,7 @@ use_experimental_fxv2_oal 'yes'
 
 name 'vava_voice'
 description 'Chat vocal de proximité vAvA'
-version '1.1.0'
+version '1.2.0'
 
 dependency 'vAvA_core'
 
@@ -44,6 +44,7 @@ server_scripts {
     'server/links.lua',
     'server/zones.lua',
     'server/api.lua',
+    'server/commands.lua',
     'server/main.lua',
 }
 

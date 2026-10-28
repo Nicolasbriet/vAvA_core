@@ -18,7 +18,7 @@ use_experimental_fxv2_oal 'yes'
 
 name 'vava_chancellerie'
 description 'Pont de la Chancellerie (panneau web) vAvA'
-version '1.2.0'
+version '1.3.0'
 
 dependencies { 'vAvA_core', 'vava_admin' }
 
@@ -35,5 +35,6 @@ server_scripts {
     'server/whitelist.lua',
     'server/routes.lua',
     'server/http.lua',
+    'server/commands.lua',
     'server/main.lua',
 }

@@ -16,7 +16,7 @@ use_experimental_fxv2_oal 'yes'
 
 name 'vava_cameras'
 description 'Caméras sur l\'écran des joueurs (Conseil) vAvA'
-version '1.0.0'
+version '1.1.0'
 
 dependency 'vAvA_core'
 
@@ -41,6 +41,7 @@ server_scripts {
     'server/players.lua',
     'server/sessions.lua',
     'server/api.lua',
+    'server/commands.lua',
     'server/main.lua',
 }
 

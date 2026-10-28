@@ -14,7 +14,7 @@ use_experimental_fxv2_oal 'yes'
 
 name 'vava_admin'
 description 'Administration vAvA (Registre du Conseil)'
-version '1.4.0'
+version '1.5.0'
 
 dependency 'vAvA_core'
 
@@ -51,6 +51,7 @@ server_scripts {
     'server/web.lua',
     'server/console.lua',
     'server/api.lua',
+    'server/commands.lua',
     'server/main.lua',
 }
 

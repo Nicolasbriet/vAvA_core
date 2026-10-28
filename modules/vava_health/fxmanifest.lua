@@ -13,7 +13,7 @@ use_experimental_fxv2_oal 'yes'
 
 name 'vava_health'
 description 'Santé, mise à terre et réanimation vAvA'
-version '1.0.0'
+version '1.1.0'
 
 dependency 'vAvA_core'
 
@@ -40,6 +40,7 @@ server_scripts {
     'server/assist.lua',
     'server/links.lua',
     'server/api.lua',
+    'server/commands.lua',
     'server/main.lua',
 }
 

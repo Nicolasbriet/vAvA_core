@@ -47,6 +47,8 @@ local function flush()
 end
 
 local function setup()
+    local declared, declareErr = VavaCrafting.commands.declare()
+    if not declared then return false, 'commandes : ' .. tostring(declareErr) end
     local ok, err = catalog.define()
     if not ok then return false, 'catalogue : ' .. tostring(err) end
     journal.purge()

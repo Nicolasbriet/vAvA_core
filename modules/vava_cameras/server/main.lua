@@ -75,6 +75,8 @@ local function watch(src, target, quality)
 end
 
 local function setup()
+    local declared, declareErr = VavaCameras.commands.declare()
+    if not declared then return false, 'commandes : ' .. tostring(declareErr) end
     for _, def in ipairs({
         { RPC.OFFER, { SESSION, SDP }, limits.capture, sessions.offer },
         { RPC.FAILED, { SESSION, FAILURE }, limits.capture, sessions.failed },

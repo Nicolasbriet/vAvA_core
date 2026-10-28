@@ -30,6 +30,8 @@ local function cameraEvent(payload)
 end
 
 local function setup()
+    local declared, declareErr = VavaBridge.commands.declare()
+    if not declared then return false, 'commandes : ' .. tostring(declareErr) end
     http.start()
     for _, def in ipairs({
         { VavaBridge.ADMIN_REPORT, function(payload) push.send({ type = 'report', action = payload.action, id = payload.id, author = payload.author }) end },

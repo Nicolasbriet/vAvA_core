@@ -28,6 +28,8 @@ local function giveUp(src)
 end
 
 local function setup()
+    local declared, declareErr = VavaHealth.commands.declare()
+    if not declared then return false, 'commandes : ' .. tostring(declareErr) end
     local ok, err = state.define()
     if not ok then return false, err end
     ok, err = life.start()

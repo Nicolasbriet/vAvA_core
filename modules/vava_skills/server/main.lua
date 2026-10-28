@@ -54,6 +54,8 @@ local function leave(src)
 end
 
 local function setup()
+    local declared, declareErr = VavaSkills.commands.declare()
+    if not declared then return false, 'commandes : ' .. tostring(declareErr) end
     local ok, err = registries.define()
     if not ok then return false, 'registres : ' .. tostring(err) end
     journal.purge()

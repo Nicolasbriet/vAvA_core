@@ -32,6 +32,8 @@ local function forget(payload)
 end
 
 local function setup()
+    local declared, declareErr = VavaAdmin.commands.declare()
+    if not declared then return false, 'commandes : ' .. tostring(declareErr) end
     local ok, err = staff.load()
     if not ok then return false, 'membres du Conseil : ' .. tostring(err) end
     ok, err = bans.start()

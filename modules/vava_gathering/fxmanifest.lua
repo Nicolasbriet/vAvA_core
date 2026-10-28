@@ -17,7 +17,7 @@ use_experimental_fxv2_oal 'yes'
 
 name 'vava_gathering'
 description 'Récolte vAvA : zones à vitalité, nœuds, outils en main, qualité, pêche, pistes de gibier'
-version '1.0.0'
+version '1.1.0'
 
 dependency 'vAvA_core'
 dependency 'vava_inventory'
@@ -55,6 +55,7 @@ server_scripts {
     'server/fishing.lua',
     'server/admin.lua',
     'server/api.lua',
+    'server/commands.lua',
     'server/main.lua',
 }
 

@@ -71,6 +71,8 @@ local function sheetRequest(src)
 end
 
 local function setup()
+    local declared, declareErr = VavaMagic.commands.declare()
+    if not declared then return false, 'commandes : ' .. tostring(declareErr) end
     local ok, err = bridge.DefineSheet(sheets.SCHEMA)
     if not ok then return false, 'champ de fiche : ' .. tostring(err) end
     ok, err = spells.start()

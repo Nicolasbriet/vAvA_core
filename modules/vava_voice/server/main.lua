@@ -60,6 +60,8 @@ local function onSpawned(payload)
 end
 
 local function setup()
+    local declared, declareErr = VavaVoice.commands.declare()
+    if not declared then return false, 'commandes : ' .. tostring(declareErr) end
     local ok, err = zones.load()
     if not ok then return false, 'zones : ' .. tostring(err) end
     ok, err = links.start()
