@@ -143,9 +143,9 @@ core.hooks.runAfter('vava_inventory:move', payload)
 | `core:player:joined` | `{ source, accountId }` |
 | `core:player:dropped` | `{ source, accountId, reason }` — après déchargement et sauvegarde du personnage |
 | `core:character:created` | `{ source, accountId, characterId, firstName, lastName, sex }` — inventaire de départ, compte… |
-| `core:character:loaded` | `{ source, accountId, characterId }` — chargez vos données ici (avant l'apparition) |
+| `core:character:loaded` | `{ source, accountId, characterId, playSeconds }` — chargez vos données ici (avant l'apparition) |
 | `core:character:spawned` | `{ source, accountId, characterId }` — apparition confirmée par le client (chaque apparition, réanimation comprise) : le ped est en place, sa vie et sa position sont lisibles |
-| `core:character:unloading` | `{ source, accountId, characterId, reason }` — sauvez vos données ici (le core attend) |
+| `core:character:unloading` | `{ source, accountId, characterId, reason, playSeconds }` — sauvez vos données ici (le core attend) ; `playSeconds` : temps de jeu total, cette session comprise |
 | `core:character:deleted` | `{ source, accountId, characterId }` |
 | `core:character:fieldChanged` | `{ characterId, field, value }` |
 
@@ -175,7 +175,8 @@ ne sont transmis qu'aux hooks serveur : le core ne les stocke pas (seule la lice
 |---|---|
 | `defineField(name, { schema, default?, visibility? })` | `true` ou `false, err` |
 | `create(source, { firstName, lastName, sex }, initialFields?)` | `true, résumé` ou `false, code` — création par un module, avec des valeurs de champs déclarés (validées par leur schéma, sinon `invalid_fields`) |
-| `getActive(source)` | `{ id, accountId, source, firstName, lastName, sex }` ou `nil` |
+| `getActive(source)` | `{ id, accountId, source, firstName, lastName, sex, playSeconds }` ou `nil` |
+| `playSeconds(characterId)` | temps de jeu en secondes entières (temps en cours compris), ou `nil, 'not_loaded'` — compté côté serveur entre l'apparition confirmée et le déchargement, la sélection exclue ; relevé toutes les `persistence.positionSampleMs`, écrit avec le personnage (colonne `play_seconds`) ; depuis 0.6.0 |
 | `get(characterId, field)` | valeur (défaut si jamais écrite), ou `nil, 'not_loaded' \| 'unknown_field'` |
 | `set(characterId, field, value)` | `true` ou `false, err` — validé, sauvegardé, diffusé |
 | `unload(source)` | `true` ou `false, code` — retour à la sélection |
@@ -372,7 +373,7 @@ séparateurs `'`, `-` et espace jamais en tête, en fin ni doublés).
 Ressources séparées, dans `modules/` : à copier (ou lier) dans le dossier `resources` du serveur, dans cet ordre :
 `ensure vAvA_core`, `ensure vava_world`, `ensure vava_appearance`, `ensure vava_characters_ui`, `ensure vava_hud`,
 `ensure vava_inventory`, `ensure vava_needs`, `ensure vava_health`, `ensure vava_admin`, `ensure vava_voice`,
-`ensure vava_chancellerie`, puis les modules qui déclarent des objets.
+`ensure vava_skills`, `ensure vava_chancellerie`, puis les modules qui déclarent des objets et les modules métiers.
 
 ### `vava_appearance`
 
@@ -440,31 +441,69 @@ Un objet est utilisable s'il a `effects` ou `onUse` (les deux à la fois : `onUs
 effets ne s'appliquent que si l'unité est consommée). `effects` : 8 effets au plus, nombres entre −1000 et 1000. La
 fiche d'objet affiche les effets qu'elle connaît (`web/js/strings.js` → `effects`).
 
+**Objet qui se tient en main** (depuis 1.4.0) : `held = { model = 'prop_tool_fireaxe', bone?, offset?, rotation? }`
+(`bone` : os du ped, main droite par défaut ; `offset` et `rotation` : `{ x, y, z }` en mètres et degrés). Le joueur le
+prend dans l'emplacement **Mains** de son inventaire (glisser, clic droit, ou double-clic / raccourci s'il n'a pas d'autre
+usage) ; une seule pile en main, qui reste dans la besace (place et poids). Le champ public `vava_inventory:hands`
+(statebag du joueur : `{ id, item, model, bone, offset, rotation }` ou rien) fait apparaître l'accessoire chez tous les
+joueurs proches (objet local attaché au ped, aucune entité réseau). La main se vide d'elle-même quand la pile quitte la
+besace (jetée, déposée, consommée, retirée par un module).
+
+**Affichage des métadonnées** (depuis 1.4.0) : la fiche et la case d'un objet montrent les métadonnées du **contrat
+standard** — `tier` (badge et liseré de la teinte du palier ; libellés `strings.js` → `metadata.tiers`), `quality`
+(0–100), `durability` / `max_durability` (filet de solidité sous la case), `broken` (case rayée, « Brisé »), `name`
+(nom propre, remplace le libellé), `crafter_name`, `mark` (poinçon) et `crafted_at` (secondes, signature « Façonné par… »),
+`origin`, `history` (liste `{ at, kind, by?, note? }`, cinq dernières entrées, natures `strings.js` →
+`metadata.historyKinds`) — plus `lines` (`{ { label, value } }`) pour ce qu'un module veut montrer d'autre. Une clé hors
+contrat n'est pas affichée. Les modules métiers (récolte, artisanat) écrivent ces clés ; l'inventaire ne leur donne aucun
+sens au-delà de l'affichage.
+
 **Catégories** : l'interface teinte l'objet et sa fiche selon `category`. Teintes prévues : `nourriture`,
 `boisson`, `arme`, `armure`, `outil`, `materiau`, `valeur`, `soin`, `divers`. Une autre catégorie s'affiche
 telle quelle, sans teinte. **Images** : un dessin au format de l'objet (2 × 1 → rapport 2:1), fond transparent,
 ombre portée comprise dans l'image : l'interface n'applique aucun filtre.
 
+**Métadonnées** (depuis 1.4.0) : chaque pile porte un objet JSON libre (`{}` si rien), écrit par les modules : palier
+d'une matière (`tier`, `origin`), qualité et signature d'un objet d'artisan (`quality`, `crafter_name`, `durability`…).
+Règles tenues par l'inventaire :
+
+- toujours un **objet** JSON : clés texte à la racine, tables imbriquées objets ou listes sans trou, valeurs texte,
+  nombre fini ou booléen ; bornes dans `config.lua` → `metadata` (`maxEntries` par table, `maxDepth`,
+  `maxStringLength`) ; refus `invalid_metadata` ;
+- une pile ne se complète (`add`, fusion par le joueur) qu'avec des métadonnées **strictement identiques** : dix ajouts
+  de bois `{ tier = 2 }` font une pile, un bois `{ tier = 3 }` en fait une autre ;
+- un retrait **filtré** (`metadata = { tier = 2 }`) consomme les seules piles qui portent ces clés avec ces valeurs
+  (sous-ensemble : une pile `{ tier = 2, origin = 'foret' }` convient), les plus anciennes d'abord ; un retrait **par
+  instance** vise une pile précise ;
+- `setMetadata` et `patchMetadata` s'appliquent à toute la pile (toutes ses unités).
+
 **Exports serveur** (cible : un joueur, ou `{ container = id }`) :
 
 | Export | Retour |
 |---|---|
-| `add(cible, objet, quantité, métadonnées?)` | `true` ou `false, code` — tout ou rien, complète d'abord les piles existantes |
-| `remove(cible, objet, quantité)` | `true` ou `false, code` — tout ou rien |
-| `exchange(cible, retraits, ajouts)` | `true` ou `false, code` — recette, achat : rien ne change si une partie échoue |
+| `add(cible, objet, quantité, métadonnées?)` | `true` ou `false, code` — tout ou rien, complète d'abord les piles aux métadonnées identiques |
+| `remove(cible, objet, quantité, métadonnées?)` | `true` ou `false, code` — tout ou rien ; `métadonnées` filtre les piles consommées (1.4.0) |
+| `exchange(cible, retraits, ajouts)` | `true` ou `false, code` — recette, achat : rien ne change si une partie échoue. Retrait : `{ item, quantity, metadata? }` ou `{ instanceId, quantity? }` (toute la pile sans `quantity` ; 1.4.0) ; ajout : `{ item, quantity, metadata? }` |
 | `canCarry(cible, objet, quantité, métadonnées?)` | `true` ou `false, code` (`no_space`, `too_heavy`) |
-| `count(cible, objet)` | quantité totale |
-| `getItems(cible)` | liste `{ id, item, x, y, rotated, quantity, metadata }` |
-| `setMetadata(cible, idObjet, métadonnées)` | `true` ou `false, code` (`not_found`, `invalid_request`) — remplace les métadonnées d'un objet (`nil` les retire), sauvegardé et montré aux inventaires ouverts ; depuis 1.3.0 |
+| `count(cible, objet, métadonnées?)` | quantité totale, limitée aux piles portant `métadonnées` (1.4.0) |
+| `getItems(cible, filtre?)` | liste `{ id, item, x, y, rotated, quantity, metadata }`, de la plus ancienne pile à la plus récente ; `filtre` `{ item?, metadata? }` (1.4.0) |
+| `setMetadata(cible, idObjet, métadonnées)` | `true` ou `false, code` (`not_found`, `invalid_request`, `invalid_metadata`, refus d'un hook) — remplace les métadonnées d'un objet (`nil` les retire), sauvegardé et montré aux inventaires ouverts ; depuis 1.3.0 |
+| `patchMetadata(cible, idObjet, patch, retirées?)` | `true` ou `false, code` — écrit ou remplace les clés de `patch`, retire les clés listées dans `retirées`, conserve le reste (une réparation touche `durability` et `history` sans pouvoir écraser le créateur) ; depuis 1.4.0 |
 | `createContainer({ kind, ownerType?, ownerId?, width, height, maxWeight?, label? })` | id d'un conteneur conservé (coffre…) |
-| `open(source, containerId)` | ouvre un conteneur au joueur ; **l'appelant a vérifié le droit d'accès** |
+| `open(source, containerId, ancrage?)` | ouvre un conteneur au joueur ; **l'appelant a vérifié le droit d'accès**. `ancrage` `{ x, y, z, radius }` (1.4.0) : distance vérifiée côté serveur à l'ouverture (`too_far`) et à chaque opération, conteneur fermé chez le joueur qui s'éloigne (vérification toutes les `anchor.sweepMs`, seulement tant qu'un conteneur ancré est ouvert) ; `radius` ≤ `anchor.maxRadius` sinon `invalid_anchor`. **À donner pour tout conteneur qui a un lieu** (coffre, grenier, station) |
 | `containerOf(source)` | id du conteneur porté par le personnage actif d'un joueur (fouille, administration), ou `nil, code` |
+| `held(source)` | pile tenue en main par le personnage actif (`{ id, item, x, y, rotated, quantity, metadata }`), ou `nil` ; depuis 1.4.0 |
+| `hold(source, idObjet)` | `true` ou `false, code` (`not_found`, `not_holdable`, refus d'un hook) — fait prendre en main une pile de la besace, ou reposer (`0`) : outil brisé, désarmement… ; depuis 1.4.0 |
 
 **Hooks** (`before` annulable, puis `after`) : `vava_inventory:move`, `split`, `merge`, `drop`, `use`, `add`,
-`remove`. Payload : `{ source, instanceId, item, quantity, from, to }` pour les gestes du joueur,
-`{ container, removals, additions, owner }` pour les échanges. `use` transmet aussi `category` et `effects` de
-l'objet, et `consumed` en phase `after`. Un refus `false, 'raison'` est montré au joueur, dans l'interface ou en
-notification s'il utilisait un raccourci.
+`remove`, `metadata`, `hold`. Payload : `{ source, instanceId, item, quantity, from, to }` pour les gestes du joueur,
+`{ container, removals, additions, owner }` pour les échanges (les retraits y gardent leur forme, `item` ou
+`instanceId`), `{ container, instanceId, item, owner, reason = set | patch, before, after }` pour `metadata`
+(`before` et `after` sont des copies : un module peut y refuser qu'un autre touche `crafter_*`, ou journaliser les
+objets de valeur), `{ source, instanceId, item?, previous, owner? }` pour `hold` (`instanceId = 0` : reposer ; en
+phase `after` seulement, `reason = 'gone'` quand la main s'est vidée parce que la pile a quitté la besace). `use`
+transmet aussi `category` et `effects` de l'objet, et `consumed` en phase `after`. Un refus `false, 'raison'` est
+montré au joueur, dans l'interface ou en notification s'il utilisait un raccourci.
 
 **Garanties** :
 - Le serveur décide de tout : place, poids, distance d'un sac (lue côté serveur), droit d'accès.
@@ -475,9 +514,10 @@ notification s'il utilisait un raccourci.
 - Le client ne reçoit que les conteneurs qu'il a ouverts, puis leurs différences.
 
 Touches par défaut (réglables par le joueur dans Paramètres > Raccourcis > FiveM) : `I` ouvre l'inventaire,
-`1` à `5` utilisent les raccourcis. Dans l'interface : glisser pour déplacer, `R` pour pivoter, `Maj` pour
-diviser en deux, double-clic pour utiliser ou ramasser, clic droit pour les actions, relâcher hors de
-l'inventaire pour jeter au sol.
+`1` à `5` utilisent les raccourcis (un objet qui se tient en main sans autre usage y est pris ou reposé). Dans
+l'interface : glisser pour déplacer (sur la ceinture : raccourci ; sur les Mains : prendre en main), `R` pour pivoter,
+`Maj` pour diviser en deux, double-clic pour utiliser, prendre en main ou ramasser, clic droit pour les actions,
+relâcher hors de l'inventaire pour jeter au sol.
 
 Polices de l'interface : Cinzel et EB Garamond, embarquées dans `web/fonts` (licence SIL Open Font License, textes
 joints). Pour travailler le rendu sans le jeu, ouvrir `web/index.html` dans un navigateur (`?drop=1` ajoute un sac
@@ -537,13 +577,25 @@ Jauges affichées quand un personnage est en jeu ; masquées pendant la sélecti
 | `setGaugeActive(id, actif)` | `true` ou `false, code` — lueur de laiton autour du médaillon (le joueur parle, un effet est en cours…) ; depuis 1.2.0 |
 | `removeGauge(id)` | `true` ou `false, code` |
 | `notify(message, nature?)` | `true` ou `false, code` — nature `info` (défaut), `warning` ou `danger` ; texte brut, 200 caractères au plus |
+| `progress(id, { label, durationMs, cancelable? })` | `true` ou `false, code` (`invalid_id`, `invalid_options`, `busy`) — barre de progression d'une action longue (récolte, artisanat, réparation, leçon…) au centre bas de l'écran, de 0 à 100 % sur `durationMs` (entier, 250 à 120 000 ms) ; `label` texte brut, 60 caractères au plus ; **une seule à la fois** ; depuis 1.3.0 |
+| `cancelProgress(id)` | `true` ou `false, code` (`not_found`, `not_owner`) — interrompt la progression en cours ; seule la ressource qui l'a lancée le peut ; depuis 1.3.0 |
+| `currentProgress()` | `{ id, label, endsAt }` (`endsAt` : horloge `GetGameTimer`) ou `nil` ; depuis 1.3.0 |
 
-- `id` : `<ressource>:<nom>` ; un module ne gère que ses jauges, retirées à son arrêt.
+- `id` : `<ressource>:<nom>` ; un module ne gère que ses jauges et sa progression, retirées à son arrêt.
 - `icon` : image `nui://<ressource>/<chemin>` listée dans les `files` du module (aucune adresse externe).
 - `low`, `critical` (0 à 1) : paliers où l'anneau passe à l'ambre puis au rouge, avec une lueur au palier critique.
 - Les notifications GTA étant retirées, un module affiche ses messages par `notify` ; sans `vava_hud`, il revient à
   celles de GTA (c'est ce que font l'inventaire, les besoins et la santé).
-- Pour travailler le rendu sans le jeu : `web/index.html?values=0.8,0.62,0.08` dans un navigateur.
+- La barre de progression est **purement visuelle** : le serveur reste maître du temps et revérifie la durée à la fin
+  de l'action (comme l'incantation de `vava_magic`). Le HUD n'écoute aucune touche : interrompre (touche, déplacement,
+  coup reçu) est l'affaire du module, qui appelle `cancelProgress` ; `cancelable` n'ajoute qu'un indice discret sous la
+  barre (`config.lua` → `progress.cancelHint`). Le menu pause et les fondus masquent la barre sans l'interrompre ; une
+  page d'interface rechargée en cours d'action reprend à la bonne avancée.
+- Hooks client (émis par le HUD) : `vava_hud:progressDone` (`{ id }`) à la fin ; `vava_hud:progressCancelled`
+  (`{ id, reason }`) à l'interruption, `reason` = `module` (`cancelProgress`, ou arrêt de la ressource qui l'avait
+  lancée) ou `hidden` (retour à la sélection, déchargement du personnage).
+- Pour travailler le rendu sans le jeu : `web/index.html?values=0.8,0.62,0.08` dans un navigateur ; `&progress=1`
+  (barre de 8 s menée à son terme) ou `&progress=cancel` (interrompue à 60 %).
 
 ### `vava_health`
 
@@ -602,7 +654,7 @@ Rangs, droits, durées, textes : `config.lua`. Demande le core 0.5.0 (compte con
 | Rang | Droits |
 |---|---|
 | Gardien | `view`, `teleport`, `freeze`, `heal`, `message`, `warn`, `kick`, `reports`, `watch` (écran des joueurs) |
-| Sénéchal | + `ban` (7 jours au plus), `inventory`, `give`, `announce`, `tools`, `spectate`, `logs`, `bans` |
+| Sénéchal | + `ban` (7 jours au plus), `inventory`, `give`, `announce`, `tools`, `spectate`, `logs`, `bans`, `metiers` (zones et nœuds de récolte, stations, parcelles, correction d'une compétence) |
 | Souverain | + `unban`, `staff`, bans définitifs |
 
 **Amorçage** : le premier membre ne se nomme que depuis la console serveur, jamais en jeu.
@@ -870,6 +922,89 @@ Pour travailler le rendu sans le jeu : `web/index.html?view=grimoire` (ou `wheel
 `wheelearth`, `hud`, `aim`, `states`, `frost`, `mist`, `hits`, `combo`, `combos`, `composer`, `offer`, `naming`,
 `confirm`, `lueur`, `sealed`, `register`, `messages`, `broken`) dans un navigateur, servi en HTTP (les
 icônes sont des masques CSS, refusés depuis `file://`).
+
+### `vava_skills`
+
+Les compétences du royaume (1.0.0), fondation des métiers : treize compétences de 0 à 100 (Récolte : Bûcheronnage,
+Minage, Herboristerie, Pêche, Chasse · Terre : Agriculture · Transformation : Forge, Menuiserie, Tissage et couture,
+Tannerie, Alchimie, Cuisine · Savoir : Arcanes) et six rangs (Novice, Apprenti 20, Compagnon 40, Artisan 60, Maître 80,
+Grand Maître 95). Tout est en `config.lua` ; le détail des règles et la liste des tests en jeu sont dans
+`modules/vava_skills/README.md`. Demande le core 0.6.0 (temps de jeu) et `vava_inventory` 1.4.0 ; facultatifs :
+`vava_hud` (notifications), `vava_admin` (droits `metiers` et `staff`, journal du Conseil), `vava_chat` (réponses des
+commandes).
+
+- **Progression** : les modules métiers **ne calculent jamais l'XP** ; ils appellent `addXp` avec un contexte
+  (compétence, action, difficulté, XP de base) et le serveur applique tout : mode de la compétence, rendements
+  décroissants quand la difficulté est très inférieure au niveau, pénurie, bonus de mentorat, savoir commun (20 premiers
+  points libres par compétence), budget (200 points au-delà, toutes compétences confondues, à augmenter et jamais
+  baisser), rouille.
+- **Rouille** (↑ = ↓) : chaque compétence est marquée par le joueur `up` (progresse), `keep` (verrouillée : ni gain ni
+  perte) ou `down` (peut s'effacer, ne gagne pas). Au plafond, un point gagné en `up` retire un point à la compétence
+  `down` la plus haute au-dessus du savoir commun (`rust.pick` : `highest`, `recent`, `random`) ; sans compétence `down`,
+  l'XP se fige sous le seuil, rien n'est perdu.
+- **Pénurie** : compétence où moins de 2 personnages actifs (joués depuis 14 jours) atteignent Compagnon → XP × 1,5 ;
+  aucune pénurie tant que le royaume compte moins de 10 personnages actifs (`shortages.minActivePlayers`) ; recomptée
+  toutes les 30 min, affichée dans le livre et exposée pour un panneau en jeu.
+- **Mentorat** : un Maître (rang et 10 h de jeu) propose à un joueur proche (comptes différents, 3 apprentis au plus
+  par compétence, un maître par apprenti et par compétence), qui accepte dans la minute. L'apprenti gagne +50 % quand il
+  pratique à moins de 20 m de son maître qui a lui-même pratiqué la compétence depuis moins de 10 min ; le maître en
+  tire de la **Renommée** (10 % de l'XP bonifiée, 100 par jour UTC et par compétence, divisée par deux tous les 200 points
+  déjà rapportés par le même apprenti). Chacun peut rompre.
+- **Arcanes** (et toute compétence `mentoredOnly`) : aucune progression sans **son mentor** dans cette compétence à
+  moins de 30 m.
+- **Savoirs** : une recette libre se connaît par le niveau ; une recette `transmission` s'apprend par trois leçons (celui
+  qui la connaît la réalise à moins de 10 m de l'élève, qui a le niveau requis ; une heure au moins entre deux), en
+  réunissant ses fragments (savoirs perdus), ou de la main d'un fondateur. Chaque apprentissage garde son professeur :
+  la **lignée** se remonte jusqu'au fondateur.
+- **Livre des compétences** (touche `K`, réglable) : compétences et modes, budget, mentorat (propositions, maîtres,
+  apprentis, proposer à un joueur proche), savoirs et lignées, métiers en pénurie. Pour travailler le rendu sans le jeu :
+  `web/index.html?tab=competences` (ou `mentorat`, `savoirs`, `penurie`).
+- **Journal** `vava_skills_log` (180 jours) : leçons, mentorats, fondateurs, corrections, rouille, savoirs appris,
+  Arcanes refusées.
+
+**Registres** (définis par ce module ; schéma validé par le core) :
+
+```lua
+-- une compétence de plus (un module tiers) : catégorie parmi celles de la config
+core.registry.add('vava_skills:skills', 'joaillerie', { label = 'Joaillerie', category = 'transformation', order = 20 })
+-- une recette (vava_crafting, ou tout module qui enseigne un savoir)
+core.registry.add('vava_skills:recipes', 'epee_courte', {
+    label = 'Épée courte', skill = 'forge', level = 30,
+    transmission = true,                          -- ne s'apprend que par leçon, fragments ou fondateur
+    fragments = { 'page_une', 'page_deux' },      -- optionnel : fragments (objets) qui la reconstituent
+})
+```
+
+**Exports serveur** (cible : un joueur, son personnage actif ; `false/nil, code` sinon) :
+
+| Export | Retour |
+|---|---|
+| `addXp(source, { skill, source?, difficulty?, amount? })` | `true, { gained, level, rank, leveledUp, blocked? }` — `blocked` : `locked`, `no_master`, `cap`, `max` ; `false, code` : `unknown_skill`, `invalid_amount` (0 à `xp.maxPerAction`), `invalid_difficulty`, refus d'un hook |
+| `getLevel(source, skill)` | niveau, nom du rang |
+| `hasRank(source, skill, rang)` | booléen |
+| `getSkill(source, skill)` | `{ id, label, category, level, xp, xpToNext, rank, mode, renown, practicedAt, shortage?, mentoredOnly, canMentor, mentor?, apprentices }` |
+| `getSkills(source)` | liste des vues, puis `{ used, total }` (budget) |
+| `knowsRecipe(source, recette)` | booléen |
+| `recordLesson(professeur, élève, recette)` | `true, { count, required, learned }` ou `false, code` (`not_transmitted`, `teacher_unknown`, `too_young`, `same_account`, `student_level`, `too_far`, `too_soon`, `already_known`) — à appeler quand le professeur a réalisé la recette |
+| `addFragment(source, recette, fragment)` | `true, { found, total, learned }` ou `false, code` |
+| `grantRecipe(source, recette)` | `true` ou `false, code` — recette transmise donnée au nom du module appelant (journalisée) |
+| `getMentor(source, skill)` | `{ mentorshipId, characterId, name, since, online }` ou `nil` |
+| `getApprentices(source, skill)` | liste de la même forme |
+| `isMentoredNow(source, skill)` | booléen — le joueur pratique sous le bonus de son maître en ce moment |
+| `getRenown(source, skill)` | entier |
+| `getLineage(source, recette)` | `{ recipe, label, chain = { { characterId, name, learnedAt, source } } }` du joueur au fondateur |
+| `getShortages()` | `{ { skill, label, count, multiplier } }` |
+| `shortageMultiplier(skill)` | nombre (1 sans pénurie) |
+
+**Hooks** : `vava_skills:xp` (`before`, annulable : `{ source, characterId, skill, action, difficulty, amount }` — zone,
+état, objet… ; `after` : `+ gained, level, leveledUp, blocked?`), `vava_skills:levelChanged` (`after` : `{ source,
+characterId, skill, from, to, rank, reason = xp | rust | admin_set | founder }`), `vava_skills:mentorship` (`after` :
+`{ action = started | ended, mentorshipId, skill, masterId, apprenticeId, endedBy? }`), `vava_skills:recipeLearned`
+(`after` : `{ characterId, recipe, skill, source, taughtBy? }`).
+
+**Commandes** : `vava_fondateur <joueur> <compétence> <niveau> [recette ...]` (console, ou droit `staff`) nomme un
+fondateur ; `/metiers niveau <joueur> <compétence> <niveau>`, `/metiers recette <joueur> <recette>`, `/metiers voir
+<joueur>` (droit `metiers` ; sans vava_admin, ACE `metiers.admin`). Cibles : joueurs connectés avec un personnage en jeu.
 
 ### `vava_chat`
 
