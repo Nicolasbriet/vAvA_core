@@ -59,6 +59,17 @@ local function stateOf(def)
     return states[def.id]
 end
 
+--- Station ajoutée après le chargement (autre module) : état neuf, publié. Bloque le thread courant (lecture).
+---@param def vAvA.StationDefinition
+function stations.adopt(def)
+    if states[def.id] then return end
+    local capacity = def.type.fuel and def.type.fuel.capacity or 0
+    local row = bridge.db.single('SELECT `fuel` FROM `vava_crafting_stations` WHERE `station` = ?', { def.id })
+    states[def.id] = { fuel = row and min(capacity, bridge.Integer(row.fuel, 0)) or 0, busyBy = nil, published = nil, dirty = row == nil }
+    stations.publish(def)
+    stations.publishList()
+end
+
 ---@param def vAvA.StationDefinition
 function stations.publish(def)
     local state = stateOf(def)
@@ -69,8 +80,14 @@ function stations.publish(def)
     GlobalState[STATE_STATION .. def.id] = snapshot
 end
 
+--- Publie la liste des stations placées (config et modules) : les clients la dessinent.
+function stations.publishList()
+    GlobalState[VavaCrafting.STATE_STATIONS] = catalog.stationList()
+end
+
 function stations.publishAll()
     for _, def in ipairs(catalog.stations()) do stations.publish(def) end
+    stations.publishList()
 end
 
 --- Branche un genre de propriétaire (foyer, guilde…) : `fn(ownerId, characterId)` dit si le personnage a accès.

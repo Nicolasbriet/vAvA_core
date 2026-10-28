@@ -189,12 +189,23 @@ local function indexStations()
         end
         local def = {
             id = station.id, type = kind, label = station.label or kind.label, x = station.x, y = station.y, z = station.z,
-            quality = math.tointeger(station.quality) or 50, owner = owner,
+            heading = station.heading or 0.0, quality = math.tointeger(station.quality) or 50, owner = owner,
+            prop = type(station.prop) == 'string' and station.prop or nil,
         }
         stationsById[station.id] = def
         stationsOrdered[#stationsOrdered + 1] = def
     end
     return true
+end
+
+--- Stations telles que les clients les dessinent : { id, type, label, x, y, z, heading, prop }.
+---@return table[]
+function catalog.stationList()
+    local list = {}
+    for i, def in ipairs(stationsOrdered) do
+        list[i] = { id = def.id, type = def.type.id, label = def.label, x = def.x, y = def.y, z = def.z, heading = def.heading or 0.0, prop = def.prop or def.type.prop }
+    end
+    return list
 end
 
 --- Définit les registres, y verse la config, déclare objets et recettes, indexe les stations. Appelé pendant le
@@ -249,6 +260,31 @@ function catalog.define()
         end
     end
     return true
+end
+
+--- Place une station depuis un autre module (type déjà déclaré au registre). Depuis 1.1.0.
+---@param spec table  { id, type, label?, x, y, z, quality?, owner? }
+---@return vAvA.StationDefinition|nil
+---@return string|nil err
+function catalog.addStation(spec)
+    if type(spec) ~= 'table' or type(spec.id) ~= 'string' or not spec.id:find(ID_PATTERN) then return nil, 'invalid_id' end
+    if stationsById[spec.id] then return nil, 'duplicate' end
+    local kind = catalog.stationType(spec.type)
+    if not kind then return nil, 'unknown_station_type' end
+    if type(spec.x) ~= 'number' or type(spec.y) ~= 'number' or type(spec.z) ~= 'number' then return nil, 'invalid_position' end
+    local owner = nil
+    if type(spec.owner) == 'table' then
+        if type(spec.owner.kind) ~= 'string' or math.tointeger(spec.owner.id) == nil then return nil, 'invalid_owner' end
+        owner = { kind = spec.owner.kind, id = math.tointeger(spec.owner.id) }
+    end
+    local def = {
+        id = spec.id, type = kind, label = spec.label or kind.label, x = spec.x, y = spec.y, z = spec.z,
+        heading = type(spec.heading) == 'number' and spec.heading or 0.0,
+        quality = math.tointeger(spec.quality) or 50, owner = owner, prop = type(spec.prop) == 'string' and spec.prop or nil,
+    }
+    stationsById[spec.id] = def
+    stationsOrdered[#stationsOrdered + 1] = def
+    return def
 end
 
 ---@param id any

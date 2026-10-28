@@ -16,6 +16,9 @@ VavaCrafting.REGISTRY = {
 
 -- State bag global d'une station : + id → { fuel, busy }
 VavaCrafting.STATE_STATION = 'vava_crafting:station:'
+-- State bag global : liste des stations placées (config et modules), { { id, type, label, x, y, z, heading, prop } } ;
+-- le client s'y fie dès qu'elle est publiée, sa config ne servant qu'avant.
+VavaCrafting.STATE_STATIONS = 'vava_crafting:stations'
 
 -- Champ de personnage : poinçon de l'artisan (glyphe de la config), visible du seul joueur.
 VavaCrafting.MARK_FIELD = 'vava_crafting:mark'

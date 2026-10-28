@@ -1,10 +1,11 @@
 --[[
     vava_crafting/client/props.lua
-    Rôle : les stations d'artisanat dans le monde, vues du joueur : état publié par le serveur (combustible, occupée)
-           lu dans les state bags globaux, props LOCAUX (jamais réseau) créés pour les stations à portée, station la plus
-           proche à distance d'interaction. Une seule boucle lente (streaming.pollMs), active seulement quand un
-           personnage est en jeu : elle s'arrête d'elle-même à la sélection et au déchargement, et retire alors tous les
-           props.
+    Rôle : les stations d'artisanat dans le monde, vues du joueur : liste des stations publiée par le serveur (config
+           et stations ajoutées par d'autres modules, la config ne servant qu'avant la première publication), état
+           publié par le serveur (combustible, occupée) lu dans les state bags globaux, props LOCAUX (jamais réseau)
+           créés pour les stations à portée, station la plus proche à distance d'interaction. Une seule boucle lente
+           (streaming.pollMs), active seulement quand un personnage est en jeu : elle s'arrête d'elle-même à la sélection
+           et au déchargement, et retire alors tous les props.
     Dépendances : shared/constants.lua, config.lua, client/core.lua
 ]]
 
@@ -21,21 +22,35 @@ if not core then return end
 
 local cfg = VavaCrafting.config
 local streaming = cfg.streaming
-local STATE_STATION = VavaCrafting.STATE_STATION
+local STATE_STATION, STATE_STATIONS = VavaCrafting.STATE_STATION, VavaCrafting.STATE_STATIONS
 local RESOURCE = VavaCrafting.resource
 local LOAD_POLL_MS = 50
 
 local props = {}
 VavaCrafting.props = props
 
--- index de la config
-local stationsById = {}
-for _, station in ipairs(cfg.stations) do stationsById[station.id] = station end
+-- stations connues : la config d'abord, puis la liste publiée par le serveur (qui comprend celles des autres modules)
+local known, stationsById = {}, {}
+-- props affichés : id de station → { entity, model, loading }
+local shown = {}
+
+---@param list table
+local function adoptList(list)
+    known, stationsById = {}, {}
+    for _, station in ipairs(list) do
+        if type(station) == 'table' and type(station.id) == 'string' then
+            known[#known + 1] = station
+            stationsById[station.id] = station
+        end
+    end
+    -- une station disparue n'a plus de prop
+    for id in pairs(shown) do
+        if not stationsById[id] then props.remove(id) end
+    end
+end
 
 -- état connu du serveur : station → { fuel, busy }
 local states = {}
--- props affichés : id de station → { entity, model, loading }
-local shown = {}
 local running, playing = false, false
 local nearestId, nearestDistance = nil, nil
 ---@type fun(stationId: string|nil)|nil
@@ -81,8 +96,9 @@ local function remove(id)
     local entry = shown[id]
     if not entry then return end
     shown[id] = nil
-    if entry.entity and DoesEntityExist(entry.entity) then DeleteObject(entry.entity) end
+    if entry.entity and DeleteObject and DoesEntityExist(entry.entity) then DeleteObject(entry.entity) end
 end
+props.remove = remove
 
 --- Crée le prop d'une station (modèle chargé avec une attente bornée), dans son propre thread.
 ---@param station table
@@ -138,7 +154,7 @@ local function loop()
     while playing do
         local coords = GetEntityCoords(PlayerPedId())
         local bestId, bestDistance = nil, cfg.interact.distance
-        for _, station in ipairs(cfg.stations) do
+        for _, station in ipairs(known) do
             local far = distance(coords.x, coords.y, coords.z, station.x, station.y, station.z)
             reconcile(station, far)
             if far <= bestDistance then bestId, bestDistance = station.id, far end
@@ -179,6 +195,10 @@ end
 ---@param key string
 ---@param value any
 local function applyState(key, value)
+    if key == STATE_STATIONS then
+        if type(value) == 'table' then adoptList(value) end
+        return
+    end
     if sub(key, 1, #STATE_STATION) ~= STATE_STATION then return end
     local stationId = sub(key, #STATE_STATION + 1)
     if type(value) == 'table' then
@@ -192,10 +212,13 @@ end
 
 --- Suit les state bags globaux et reprend l'état déjà publié. Appelé par client/main.lua.
 function props.start()
+    adoptList(cfg.stations)
     AddStateBagChangeHandler(nil, 'global', function(_, key, value)
         if type(key) == 'string' then applyState(key, value) end
     end)
-    for _, station in ipairs(cfg.stations) do applyState(STATE_STATION .. station.id, GlobalState[STATE_STATION .. station.id]) end
+    local published = GlobalState[STATE_STATIONS]
+    if type(published) == 'table' then adoptList(published) end
+    for _, station in ipairs(known) do applyState(STATE_STATION .. station.id, GlobalState[STATE_STATION .. station.id]) end
 
     core.hooks.after('core:character:spawning', function() props.setPlaying(true) end)
     core.hooks.after('core:character:selection', function() props.setPlaying(false) end)

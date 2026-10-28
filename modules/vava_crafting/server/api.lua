@@ -31,6 +31,17 @@ exports('getStations', function()
     return list
 end)
 
+--- Place une station depuis un autre module (son type déjà déclaré au registre `vava_crafting:stations`) ; les clients
+--- la voient par le state bag et la liste publiée (`getStations`). Depuis 1.1.0.
+exports('addStation', function(spec)
+    if not VavaCrafting.ready then return false, 'not_ready' end
+    local def, err = catalog.addStation(spec)
+    if not def then return false, err end
+    stations.adopt(def)
+    VavaCrafting.core.hooks.runAfter('vava_crafting:stationAdded', { station = def.id, type = def.type.id, module = GetInvokingResource() })
+    return true
+end)
+
 --- Fixe le combustible d'une station au nom du module appelant.
 exports('setFuel', function(id, amount)
     if not VavaCrafting.ready then return false, 'not_ready' end
