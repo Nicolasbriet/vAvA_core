@@ -14,7 +14,7 @@ const MAX_DEPTH = 4;
 // ordre de démarrage attendu par vAvA ; une ressource inconnue garde la place choisie, après celles-ci
 const KNOWN_ORDER = ['chat', 'sessionmanager', 'hardcap', 'oxmysql', 'vAvA_core', 'vava_chat', 'vava_world', 'vava_appearance',
   'vava_characters_ui', 'vava_hud', 'vava_inventory', 'vava_needs', 'vava_health', 'vava_admin', 'vava_voice', 'vava_cameras', 'vava_magic',
-  'vava_skills', 'vava_gathering', 'vava_crafting', 'vava_farming', 'vava_chancellerie'];
+  'vava_skills', 'vava_gathering', 'vava_crafting', 'vava_farming', 'vava_codex', 'vava_chancellerie'];
 const CORE_DESCRIPTIONS = {
   vAvA_core: 'Le cœur du serveur (obligatoire)',
   oxmysql: 'Accès à la base de données (obligatoire)',
@@ -34,6 +34,7 @@ const CORE_DESCRIPTIONS = {
   vava_gathering: 'Récolte : zones à vitalité, nœuds, outils en main, qualité et provenance, pêche, pistes de gibier',
   vava_crafting: 'Artisanat : stations, recettes, qualité, objets signés, poinçon, baptême, réparation, leçons',
   vava_farming: 'Agriculture : parcelles, croissance par dates, humidité et fertilité, qualité, grenier commun',
+  vava_codex: 'Codex : toutes les commandes et touches du serveur, classées, cherchées, composées et lancées (F1)',
   vava_chancellerie: 'Pont de la Chancellerie (administration du royaume depuis le web)',
 };
 
