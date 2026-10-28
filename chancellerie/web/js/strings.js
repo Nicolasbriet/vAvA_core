@@ -338,11 +338,18 @@ const STRINGS = (() => {
       title: 'Joueurs',
       count: (n) => plural(n, 'âme en jeu', 'âmes en jeu'),
       empty: 'Personne n\'est connecté.',
-      columns: ['N°', 'Nom FiveM', 'Personnage', 'Rang', 'Latence'],
+      columns: ['N°', 'Nom FiveM', 'Personnage', 'Rang', 'Temps de jeu', 'Latence'],
       none: 'Choisissez un joueur dans la liste.',
       gone: 'Ce joueur vient de partir.',
       tags: { downed: 'À terre', frozen: 'Immobilisé' },
-      facts: { account: 'Compte', name: 'Nom FiveM', health: 'Vie', hunger: 'Faim', thirst: 'Soif', position: 'Position', ping: 'Latence', panel: 'Compte du panneau' },
+      facts: { account: 'Compte', name: 'Nom FiveM', health: 'Vie', hunger: 'Faim', thirst: 'Soif', position: 'Position', ping: 'Latence', playtime: 'Temps de jeu', panel: 'Compte du panneau' },
+      // temps de jeu du personnage (secondes, compté par le serveur de jeu) : « 12 h 34 », « 48 min », « — » en sélection
+      playtime: (seconds) => {
+        if (!Number.isFinite(seconds)) return '—';
+        const hours = Math.floor(seconds / 3600);
+        const minutes = Math.floor((seconds % 3600) / 60);
+        return hours ? `${hours} h ${String(minutes).padStart(2, '0')}` : `${minutes} min`;
+      },
       panelAccount: (name) => `Panneau : ${name}`,
       identifiersTitle: 'Identifiants',
       identifierLabels: { license: 'Licence', license2: 'Licence 2', fivem: 'FiveM', discord: 'Discord', steam: 'Steam', xbl: 'Xbox', live: 'Microsoft' },

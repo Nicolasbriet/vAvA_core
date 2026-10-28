@@ -14,7 +14,7 @@ const HOME = path.resolve(process.env.CHANCELLERIE_HOME || path.join(__dirname, 
 const DATA = path.join(HOME, 'data');
 const FILE = path.join(DATA, 'config.json');
 const GUESS_LEVELS = 4;
-const VERSION = '1.2.0';
+const VERSION = '1.3.0';
 
 const DEFAULTS = Object.freeze({
   http: { host: '127.0.0.1', port: 40120, secureCookies: false },

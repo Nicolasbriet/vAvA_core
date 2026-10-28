@@ -20,7 +20,14 @@ const STRINGS = Object.freeze({
     session: (n) => `Session n° ${n}`,
     account: (n) => `Compte n° ${n}`,
     ping: (ms) => `${ms} ms`,
-    labels: { name: 'Nom FiveM', account: 'Compte', session: 'Session', position: 'Position' },
+    // temps de jeu du personnage : « 12 h 34 », « 48 min », ou « — » sans personnage
+    playtime: (seconds) => {
+      if (!Number.isFinite(seconds)) return '—';
+      const hours = Math.floor(seconds / 3600);
+      const minutes = Math.floor((seconds % 3600) / 60);
+      return hours ? `${hours} h ${String(minutes).padStart(2, '0')}` : `${minutes} min`;
+    },
+    labels: { name: 'Nom FiveM', account: 'Compte', session: 'Session', playtime: 'Temps de jeu', position: 'Position' },
     vitals: { health: 'Vie', hunger: 'Faim', thirst: 'Soif' },
     warnings: 'Avertissements',
     noWarnings: 'Aucun avertissement.',

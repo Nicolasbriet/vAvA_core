@@ -2,7 +2,7 @@
     server/players/spawn.lua
     Rôle : ordres d'apparition. Le serveur décide de la position et du modèle ; l'ordre est envoyé au seul
            joueur concerné, qui l'exécute puis confirme (core:characters:spawned).
-    Dépendances : shared/init.lua, config/server.lua
+    Dépendances : shared/init.lua, config/server.lua, server/players/playtime.lua
 ]]
 
 local type = type
@@ -10,6 +10,7 @@ local HUGE = math.huge
 local TriggerClientEvent = TriggerClientEvent
 
 local EVENTS = vAvA.EVENTS
+local playtime = vAvA.playtime
 local cfg = vAvA.config.server.spawn
 
 local spawn = {}
@@ -40,7 +41,8 @@ end
 ---@param point vAvA.SpawnPoint
 ---@param withModel boolean
 local function send(character, point, withModel)
-    -- position non échantillonnée tant que le client n'a pas confirmé
+    -- position non échantillonnée et temps de jeu suspendu tant que le client n'a pas confirmé
+    playtime.pause(character)
     character.spawned = false
     TriggerClientEvent(EVENTS.SPAWN, character.source, {
         model = withModel and cfg.models[character.sex] or nil,

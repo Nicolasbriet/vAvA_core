@@ -3,12 +3,14 @@
     Rôle : position des personnages lue CÔTÉ SERVEUR (OneSync obligatoire) : le client n'envoie jamais la sienne.
     Un personnage n'est échantillonné qu'après avoir confirmé son apparition : avant, son ped peut encore être
     à l'ancien emplacement (changement de personnage) et cette position serait sauvegardée à tort.
-    Dépendances : config/server.lua
+    La même boucle relève le temps de jeu (server/players/playtime.lua) : un seul parcours des personnages actifs.
+    Dépendances : config/server.lua, server/players/playtime.lua
 ]]
 
 local CreateThread, Wait = CreateThread, Wait
 local GetPlayerPed, DoesEntityExist, GetEntityCoords, GetEntityHeading = GetPlayerPed, DoesEntityExist, GetEntityCoords, GetEntityHeading
 
+local playtime = vAvA.playtime
 local cfg = vAvA.config.server.persistence
 local EPSILON_SQUARED = cfg.positionEpsilon * cfg.positionEpsilon
 
@@ -33,14 +35,21 @@ function positions.sample(character)
     return true
 end
 
---- Lance l'échantillonnage périodique. Appelé par init.lua.
+--- Relevé périodique d'un personnage actif : position, puis temps de jeu.
+---@param character vAvA.Character
+local function survey(character)
+    positions.sample(character)
+    playtime.settle(character)
+end
+
+--- Lance les relevés périodiques (position et temps de jeu). Appelé par init.lua.
 ---@param iterate fun(fn: fun(character: vAvA.Character))  parcours des personnages actifs
 function positions.start(iterate)
     CreateThread(function()
         -- boucle lente justifiée : quelques natives par joueur actif toutes les positionSampleMs
         while true do
             Wait(cfg.positionSampleMs)
-            iterate(positions.sample)
+            iterate(survey)
         end
     end)
 end

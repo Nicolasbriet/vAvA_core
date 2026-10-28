@@ -30,7 +30,7 @@ const PlayersView = (() => {
       UI.el('span', 'entry-number', `n° ${player.source}`),
       UI.el('span', 'entry-main', null, [
         UI.el('span', 'entry-name', player.character || P.noCharacter),
-        UI.el('span', 'entry-sub', `${player.name || ''} · ${P.account(player.accountId)}`),
+        UI.el('span', 'entry-sub', `${player.name || ''} · ${P.account(player.accountId)}${Number.isFinite(player.playSeconds) ? ` · ${P.playtime(player.playSeconds)}` : ''}`),
       ]),
       UI.el('span', 'entry-tags', null, [
         player.source === ctx.session.self ? tag(P.tags.self) : null,
@@ -168,6 +168,7 @@ const PlayersView = (() => {
       fact(P.labels.name, data.name || '—'),
       fact(P.labels.account, `n° ${data.accountId}`),
       fact(P.labels.session, `n° ${data.source} · ${P.ping(data.ping)}`),
+      fact(P.labels.playtime, P.playtime(data.playSeconds)),
       data.position ? fact(P.labels.position, `${data.position.x}, ${data.position.y}, ${data.position.z}`) : null,
     ]);
     const vitals = UI.el('div', 'vitals', null, [

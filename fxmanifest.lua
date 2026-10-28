@@ -12,13 +12,14 @@ use_experimental_fxv2_oal 'yes'
 
 name 'vAvA_core'
 description 'Core RP médiéval vAvA - fondations, joueurs et personnages'
-version '0.5.0'
+version '0.6.0'
 
 dependency 'oxmysql'
 
 -- Migrations du core, appliquées au démarrage dans l'ordre de leur numéro.
 vava_migration 'server/migrations/0001_accounts.sql'
 vava_migration 'server/migrations/0002_characters.sql'
+vava_migration 'server/migrations/0003_play_seconds.sql'
 
 -- Ordre explicite (pas de glob) : chaque fichier dépend uniquement de ceux listés avant lui.
 shared_scripts {
@@ -48,6 +49,7 @@ server_scripts {
     'server/players/fields.lua',
     'server/players/sync.lua',
     'server/players/persistence.lua',
+    'server/players/playtime.lua',
     'server/players/positions.lua',
     'server/players/spawn.lua',
     'server/players/characters.lua',

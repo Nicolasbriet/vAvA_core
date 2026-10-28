@@ -9,8 +9,9 @@
                   shared/core/hooks.lua, server/core/database.lua, server/core/rpc.lua, server/players/*.lua
 ]]
 
-local type, tostring, pairs, xpcall, pcall = type, tostring, pairs, xpcall, pcall
+local type, tostring, tonumber, pairs, xpcall, pcall = type, tostring, tonumber, pairs, xpcall, pcall
 local traceback = debug.traceback
+local tointeger = math.tointeger
 local sort = table.sort
 local utf8codes = utf8.codes
 local decodeJson, encodeJson = json.decode, json.encode
@@ -23,6 +24,7 @@ local accounts = vAvA.accounts
 local fields = vAvA.fields
 local sync = vAvA.sync
 local persistence = vAvA.persistence
+local playtime = vAvA.playtime
 local positions = vAvA.positions
 local spawn = vAvA.spawn
 local cfg = vAvA.config.server.characters
@@ -36,7 +38,7 @@ local UTF8_MAX_BYTES = 4             -- octets maximum par caractère : borne r�
 local EMPTY_DATA = '{}'
 
 local SELECT_SUMMARIES_SQL = 'SELECT `id`, `first_name`, `last_name`, `sex` FROM `vava_characters` WHERE `account_id` = ? AND `deleted_at` IS NULL'
-local SELECT_CHARACTER_SQL = 'SELECT `id`, `first_name`, `last_name`, `sex`, `position_x`, `position_y`, `position_z`, `heading`, `data` '
+local SELECT_CHARACTER_SQL = 'SELECT `id`, `first_name`, `last_name`, `sex`, `position_x`, `position_y`, `position_z`, `heading`, `play_seconds`, `data` '
     .. 'FROM `vava_characters` WHERE `id` = ? AND `account_id` = ? AND `deleted_at` IS NULL'
 local INSERT_CHARACTER_SQL = 'INSERT INTO `vava_characters` (`account_id`, `first_name`, `last_name`, `sex`, `data`) VALUES (?, ?, ?, ?, ?)'
 local COUNT_NAME_SQL = 'SELECT COUNT(*) FROM `vava_characters` WHERE `first_name` = ? AND `last_name` = ? AND `deleted_at` IS NULL'
@@ -74,6 +76,8 @@ vAvA.characters = characters
 ---@field revision integer          incrémenté à chaque modification à sauvegarder
 ---@field savedRevision integer
 ---@field spawned boolean           apparition confirmée par le client
+---@field playSeconds integer       temps de jeu relevé (secondes entières), écrit en base
+---@field playMarker integer|nil    GetGameTimer du dernier relevé ; nil quand le temps ne compte pas (non apparu)
 
 ---@type table<integer, vAvA.Character>
 local activeById = {}
@@ -144,6 +148,7 @@ local function buildCharacter(session, row)
         id = row.id, accountId = session.accountId, source = session.source,
         firstName = row.first_name, lastName = row.last_name, sex = row.sex,
         position = position, data = data, revision = 0, savedRevision = 0, spawned = false,
+        playSeconds = tointeger(tonumber(row.play_seconds)) or 0,
     }
 end
 
@@ -243,7 +248,7 @@ local function selectCharacter(session, characterId)
     -- un personnage déchargé sans avoir pu être sauvegardé est plus récent que la base : il est réutilisé
     local character = persistence.takeRetry(characterId)
     if character then
-        character.source, character.spawned = session.source, false
+        character.source, character.spawned, character.playMarker = session.source, false, nil
     else
         local row, err = database.single(CORE, SELECT_CHARACTER_SQL, { characterId, session.accountId })
         if not accounts.isCurrent(session) then return false, 'no_session' end
@@ -263,7 +268,10 @@ local function selectCharacter(session, characterId)
     session.characterId = characterId
     database.update(CORE, TOUCH_CHARACTER_SQL, { characterId })
     -- les modules chargent leurs propres données avant l'apparition
-    hooks.runAfter(HOOK_LOADED, { source = session.source, accountId = session.accountId, characterId = characterId })
+    hooks.runAfter(HOOK_LOADED, {
+        source = session.source, accountId = session.accountId, characterId = characterId,
+        playSeconds = playtime.current(character),
+    })
     if not accounts.isCurrent(session) then return false, 'no_session' end
 
     session.state = 'active'
@@ -283,8 +291,10 @@ local function unload(session, reason)
     if not character then return false, 'no_character' end
     session.state = 'unloading'
     positions.sample(character)
+    playtime.pause(character)
     hooks.runAfter(HOOK_UNLOADING, {
         source = session.source, accountId = session.accountId, characterId = character.id, reason = reason,
+        playSeconds = character.playSeconds,
     })
     persistence.saveCharacter(character)
     activeById[character.id] = nil
@@ -350,6 +360,7 @@ end
 ---@field firstName string
 ---@field lastName string
 ---@field sex string
+---@field playSeconds integer  temps de jeu total, temps en cours compris
 
 --- Identité du personnage actif d'un joueur, ou nil.
 ---@param src integer
@@ -361,7 +372,18 @@ function characters.describeActive(src)
     return {
         id = character.id, accountId = character.accountId, source = character.source,
         firstName = character.firstName, lastName = character.lastName, sex = character.sex,
+        playSeconds = playtime.current(character),
     }
+end
+
+--- Temps de jeu d'un personnage chargé (secondes entières, temps en cours compris).
+---@param characterId integer
+---@return integer|nil seconds
+---@return string|nil err
+function characters.playSeconds(characterId)
+    local character = activeById[characterId]
+    if not character then return nil, 'not_loaded' end
+    return playtime.current(character)
 end
 
 --- Valeur d'un champ d'un personnage chargé.
@@ -465,6 +487,7 @@ function characters.registerRpc()
             -- une seule fois par apparition demandée par le serveur (spawn.send remet l'état à faux)
             if character.spawned then return true end
             character.spawned = true
+            playtime.begin(character)
             hooks.runAfter(HOOK_SPAWNED, { source = src, accountId = character.accountId, characterId = character.id })
             return true
         end },

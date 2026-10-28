@@ -1,8 +1,9 @@
 'use strict';
 /*
  * web/js/view-players.js
- * Rôle : la page Joueurs : joueurs connectés en direct (relus à intervalle et à chaque arrivée ou départ), fiche du
- *        joueur choisi (vie, faim, soif, position, avertissements) et ses actions selon les droits du rang : paroles,
+ * Rôle : la page Joueurs : joueurs connectés en direct (relus à intervalle et à chaque arrivée ou départ, avec le
+ *        temps de jeu du personnage), fiche du joueur choisi (vie, faim, soif, temps de jeu, position, avertissements)
+ *        et ses actions selon les droits du rang : paroles,
  *        déplacements (vers un joueur, vers un lieu, retour), soins, justice (immobiliser, expulser, bannir), biens
  *        (inventaire, don), surveillance (son écran). Chaque action est décidée et inscrite par le Registre du Conseil.
  */
@@ -96,13 +97,15 @@ const PlayersView = (() => {
         UI.el('td', null, null, [UI.el('span', 'cell-strong', player.name), panelTag(player)]),
         UI.el('td', null, null, [document.createTextNode(player.character || P.noCharacter), ...tags]),
         UI.el('td', 'cell-sub', player.rank || '—'),
+        UI.el('td', 'cell-end cell-sub', P.playtime(player.playSeconds)),
         UI.el('td', 'cell-end', P.ms(player.ping)),
       ]);
       row.addEventListener('click', () => select(player.source));
       return row;
     });
+    // les deux dernières colonnes (temps de jeu, latence) sont des nombres : alignées à droite
     refs.list.replaceChildren(UI.el('table', 'ledger is-clickable', null, [
-      UI.el('thead', null, null, [UI.el('tr', null, null, P.columns.map((c, i) => UI.el('th', i === 4 ? 'cell-end' : null, c)))]),
+      UI.el('thead', null, null, [UI.el('tr', null, null, P.columns.map((c, i) => UI.el('th', i >= 4 ? 'cell-end' : null, c)))]),
       UI.el('tbody', null, null, rows),
     ]));
   }
@@ -236,7 +239,7 @@ const PlayersView = (() => {
         fact(F.account, P.account(detail.accountId)), fact(F.name, detail.name), fact(F.health, health),
         fact(F.hunger, needs.hunger !== undefined ? percent(needs.hunger) : '—'),
         fact(F.thirst, needs.thirst !== undefined ? percent(needs.thirst) : '—'),
-        fact(F.ping, P.ms(detail.ping)), fact(F.position, position),
+        fact(F.ping, P.ms(detail.ping)), fact(F.playtime, P.playtime(detail.playSeconds)), fact(F.position, position),
         panelOf.has(detail.accountId) ? fact(F.panel, panelOf.get(detail.accountId)) : null,
       ]),
       UI.el('h4', 'section-title', P.identifiersTitle),

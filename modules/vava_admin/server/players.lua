@@ -1,9 +1,9 @@
 --[[
     vava_admin/server/players.lua
     Rôle : les joueurs vus par le Conseil : liste des connectés et fiche d'un joueur (identité du personnage, compte,
-           latence, santé, besoins, avertissements, identifiants sauf l'adresse IP). Calculées à la demande, jamais
-           envoyées en continu ; le pseudo FiveM et les identifiants ne sont lus qu'au moment de l'affichage (rien
-           n'est conservé).
+           latence, temps de jeu du personnage, santé, besoins, avertissements, identifiants sauf l'adresse IP).
+           Calculées à la demande, jamais envoyées en continu ; le pseudo FiveM et les identifiants ne sont lus qu'au
+           moment de l'affichage (rien n'est conservé).
     Dépendances : config.lua, server/core.lua, server/staff.lua, server/store.lua
 ]]
 
@@ -48,6 +48,14 @@ local function isDowned(src)
     return nil
 end
 
+--- Temps de jeu du personnage actif (secondes), ou nil : en sélection, ou core antérieur à 0.6.0.
+---@param src integer
+---@return integer|nil
+local function playSecondsOf(src)
+    local character = VavaAdmin.core.characters.getActive(src)
+    return character and character.playSeconds or nil
+end
+
 --- Joueurs connectés, pour la liste du panneau.
 ---@return table[]
 function players.list()
@@ -59,7 +67,7 @@ function players.list()
             local rank = staff.rankOfAccount(session.accountId)
             out[#out + 1] = {
                 source = src, name = GetPlayerName(src), accountId = session.accountId,
-                character = staff.characterName(src), ping = GetPlayerPing(src),
+                character = staff.characterName(src), ping = GetPlayerPing(src), playSeconds = playSecondsOf(src),
                 rank = rank and rank.label or nil, frozen = frozen[src] == true,
                 downed = session.characterId and isDowned(src) or false,
             }
@@ -97,8 +105,8 @@ function players.details(target)
     local warnings = store.warningsOf(target.accountId, WARNINGS_SHOWN) or {}
     return {
         source = src, name = GetPlayerName(src), accountId = target.accountId, characterId = target.characterId,
-        character = staff.characterName(src), ping = GetPlayerPing(src), rank = rank and rank.name or nil,
-        rankLabel = rank and rank.label or nil, frozen = frozen[src] == true,
+        character = staff.characterName(src), ping = GetPlayerPing(src), playSeconds = playSecondsOf(src),
+        rank = rank and rank.name or nil, rankLabel = rank and rank.label or nil, frozen = frozen[src] == true,
         position = coords and { x = floor(coords.x * 10) / 10, y = floor(coords.y * 10) / 10, z = floor(coords.z * 10) / 10 } or nil,
         health = healthOk and type(health) == 'table' and health or nil,
         needs = needsOk and type(needs) == 'table' and needs or nil,

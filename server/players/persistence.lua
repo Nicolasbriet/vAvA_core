@@ -22,9 +22,9 @@ local log = vAvA.logger.create('persistence')
 local CORE = vAvA.CORE_OWNER
 local SAVE_COMMAND = 'vava_saveall'
 
-local UPDATE_FULL_SQL = 'UPDATE `vava_characters` SET `position_x` = ?, `position_y` = ?, `position_z` = ?, `heading` = ?, `data` = ? WHERE `id` = ?'
+local UPDATE_FULL_SQL = 'UPDATE `vava_characters` SET `position_x` = ?, `position_y` = ?, `position_z` = ?, `heading` = ?, `play_seconds` = ?, `data` = ? WHERE `id` = ?'
 -- sans position connue (personnage jamais apparu) : aucune valeur nulle dans la liste des paramètres
-local UPDATE_DATA_SQL = 'UPDATE `vava_characters` SET `data` = ? WHERE `id` = ?'
+local UPDATE_DATA_SQL = 'UPDATE `vava_characters` SET `play_seconds` = ?, `data` = ? WHERE `id` = ?'
 
 local persistence = {}
 vAvA.persistence = persistence
@@ -50,9 +50,9 @@ local function buildQuery(character)
     end
     local p = character.position
     if p then
-        return { query = UPDATE_FULL_SQL, values = { p.x, p.y, p.z, p.heading, encoded, character.id } }
+        return { query = UPDATE_FULL_SQL, values = { p.x, p.y, p.z, p.heading, character.playSeconds, encoded, character.id } }
     end
-    return { query = UPDATE_DATA_SQL, values = { encoded, character.id } }
+    return { query = UPDATE_DATA_SQL, values = { character.playSeconds, encoded, character.id } }
 end
 
 --- Écrit immédiatement un personnage (déchargement). En cas d'échec, il est gardé pour être retenté.

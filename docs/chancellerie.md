@@ -294,8 +294,9 @@ historique). Il faut `vava_chancellerie` 1.2.0 pour la liste blanche.
 Pour les comptes qui ont un rang du Conseil, quand le serveur de jeu tourne avec la ressource `vava_chancellerie`
 (`ensure vava_chancellerie` après `vava_admin`, `vava_voice` et `vava_cameras`) :
 
-- **Joueurs** : liste en direct (numéro de connexion, nom FiveM, personnage, rang, latence, compte du panneau relié),
-  fiche (vie, faim, soif, position, avertissements, **identifiants** : license, license2, fivem, discord, steam, xbl,
+- **Joueurs** : liste en direct (numéro de connexion, nom FiveM, personnage, rang, temps de jeu du personnage, latence,
+  compte du panneau relié), fiche (vie, faim, soif, temps de jeu — compté par le serveur de jeu entre l'apparition et
+  le déchargement du personnage, core 0.6.0 —, position, avertissements, **identifiants** : license, license2, fivem, discord, steam, xbl,
   live — lus à l'instant, jamais conservés, jamais l'adresse IP — à copier, avec le profil Steam ou Discord) et
   actions : écrire, avertir, envoyer vers un joueur ou un lieu, renvoyer, soigner, nourrir, immobiliser, expulser,
   bannir, voir l'inventaire, donner un objet, **regarder l'écran**.
