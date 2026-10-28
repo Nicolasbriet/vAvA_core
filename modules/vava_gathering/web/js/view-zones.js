@@ -1,8 +1,9 @@
 'use strict';
 /*
  * web/js/view-zones.js
- * Rôle : le panneau des zones de récolte : nom, genre, vitalité (barre teintée par bande), cicatrice, distance.
- *        Construit à l'ouverture et à chaque relecture ; rien n'est animé en continu.
+ * Rôle : le panneau des zones de récolte : nom, genre, vitalité (barre teintée par bande), cicatrice, distance, bouton
+ *        qui pose le repère de la carte sur la zone. Construit à l'ouverture et à chaque relecture ; rien n'est animé
+ *        en continu.
  */
 
 const ZonesView = (() => {
@@ -16,6 +17,15 @@ const ZonesView = (() => {
   };
   const Z = STRINGS.zones;
 
+  /** Pose le repère de la carte sur la zone ; le jeu ferme alors le panneau pour laisser ouvrir la carte. */
+  async function waypoint(zone, button) {
+    button.disabled = true;
+    const result = await Bridge.post('zonesWaypoint', { zone: zone.id });
+    button.disabled = false;
+    if (result.ok) App.toast(Z.marked(zone.label || zone.id), 'info');
+    else App.toast(errorMessage(result.error), 'warning');
+  }
+
   function row(zone) {
     const band = zone.band || 'normal';
     const vitality = UI.clamp(Number(zone.vitality) || 0, 0, 100);
@@ -24,6 +34,8 @@ const ZonesView = (() => {
     const track = UI.el('div', 'zone-track', null, [fill]);
     const tags = [UI.el('span', `zone-band is-${band}`, Z.bands[band] || band)];
     if (zone.scarred) tags.push(UI.el('span', 'zone-band is-scar', Z.scarred));
+    const mark = UI.button(Z.mark, 'zone-mark', () => waypoint(zone, mark));
+    mark.title = Z.markHint;
     return UI.el('div', `zone-row${zone.scarred ? ' is-scarred' : ''}`, null, [
       UI.el('div', 'zone-main', null, [
         UI.el('div', 'zone-head', null, [
@@ -34,6 +46,7 @@ const ZonesView = (() => {
         UI.el('div', 'zone-bar', null, [track, UI.el('span', 'zone-value', Z.vitality(vitality))]),
       ]),
       UI.el('span', 'zone-distance', typeof zone.distance === 'number' ? Z.distance(zone.distance) : ''),
+      mark,
     ]);
   }
 

@@ -31,7 +31,7 @@ const CORE_DESCRIPTIONS = {
   vava_cameras: 'Écran des joueurs pour le Conseil (mur des caméras)',
   vava_magic: 'Magie : roue des sorts, mode magie, états, zones, sorts de feu, d\'eau et de terre, combinaisons, Lueur, Murmure, grimoire et registre',
   vava_skills: 'Compétences : niveaux et rangs, rouille, pénurie, mentorat et Renommée, recettes transmises et lignées (fondation des métiers)',
-  vava_gathering: 'Récolte : zones à vitalité, nœuds, outils en main, qualité et provenance, pêche, pistes de gibier',
+  vava_gathering: 'Récolte : zones à vitalité sur la carte, nœuds, outils en main, qualité et provenance, pêche, pistes de gibier',
   vava_crafting: 'Artisanat : stations, recettes, qualité, objets signés, poinçon, baptême, réparation, leçons',
   vava_farming: 'Agriculture : parcelles, croissance par dates, humidité et fertilité, qualité, grenier commun',
   vava_codex: 'Codex : toutes les commandes et touches du serveur, classées, cherchées, composées et lancées (F1)',

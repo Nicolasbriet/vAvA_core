@@ -74,6 +74,23 @@ VavaGathering.config = {
     -- Client : props des nœuds créés à portée, remplacés par le modèle « épuisé » quand la zone l'est.
     streaming = { radius = 80.0, pollMs = 1000, modelTimeoutMs = 5000 },
 
+    -- Carte : un blip par zone (icône `sprite` et couleur `colour` du jeu selon le genre, liste sur docs.fivem.net →
+    -- Blips), nommé comme elle, à courte portée (petite carte à l'approche, toujours sur la grande), et le cercle
+    -- translucide de son rayon (`ring`). Posés par le client depuis cette config : rien ne circule. Le panneau des
+    -- zones pose le repère de la carte sur une zone.
+    map = {
+        blips = true,
+        scale = 0.85,
+        ring = { show = true, alpha = 64 },         -- cercle du rayon sur la grande carte (alpha 0 à 255)
+        kinds = {
+            foret = { sprite = 141, colour = 25 },      -- gibier, vert forêt
+            mine = { sprite = 319, colour = 40 },       -- foreuse, gris sombre
+            prairie = { sprite = 496, colour = 46 },    -- feuille, or
+            eau = { sprite = 410, colour = 3 },         -- barque, bleu
+        },
+        default = { sprite = 1, colour = 0 },           -- genre sans icône : point blanc
+    },
+
     persistence = { flushMs = 10000 },  -- écriture groupée des zones et nœuds modifiés
     logRetentionDays = 90,
 

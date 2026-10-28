@@ -33,6 +33,9 @@ const STRINGS = Object.freeze({
     title: 'Zones de récolte',
     refresh: 'Relire',
     close: 'Fermer',
+    mark: 'Marquer',
+    markHint: 'Poser le repère de la carte sur cette zone',
+    marked: (label) => `Repère posé sur ${label}.`,
     empty: 'Aucune zone connue.',
     foot: 'La vitalité baisse à chaque récolte et se refait avec le temps. Une zone épuisée rend peu ; une cicatrice met longtemps à guérir.',
     kinds: { foret: 'Forêt', mine: 'Mine', prairie: 'Prairie', eau: 'Eau', gibier: 'Gibier' },
@@ -45,6 +48,7 @@ const STRINGS = Object.freeze({
   errors: {
     default: 'Action impossible.',
     unknown_node: 'Il n\'y a rien à récolter ici.',
+    unknown_zone: 'Zone inconnue.',
     too_far: 'Trop loin.',
     too_soon: 'Trop tôt.',
     expired: 'Le geste a pris trop de temps.',

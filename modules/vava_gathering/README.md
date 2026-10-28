@@ -21,6 +21,7 @@ Facultatifs : `vava_hud` (barre de progression, notifications), `vava_admin` (dr
 | Qualité | score = niveau × 0,5 + outil × 0,3 + vitalité × 0,2 + bonus de l'outil ± 8 → paliers à 20, 40, 60, 85 ; provenance écrite | `quality` |
 | Pêche | touche entre 4 et 14 s ; barre de tension 6 s, zone à tenir 35–65 % qui dérive, 60 % du temps dans la zone | `fishing` |
 | Props | créés par le client à 80 m, relus toutes les secondes | `streaming` |
+| Carte | un blip nommé par zone (icône et couleur selon le genre, courte portée) et le cercle de son rayon ; « Marquer » dans le panneau pose le repère de la carte | `map` |
 | Solidité d'un outil sans histoire | 100 au premier usage | `toolDefaults` |
 
 ### Zones et nœuds
@@ -31,6 +32,10 @@ La vitalité et les charges sont recalculées à la demande depuis leur dernièr
 est publié aux clients par deux state bags globaux (`vava_gathering:zone:<id>` : bande, cicatrice, vitalité entière ;
 `vava_gathering:node:<id>` : charges), écrits au seul changement et relus toutes les 10 s pour que les props reviennent
 quand une zone se remet.
+
+Sur la **carte**, chaque zone a son blip (icône et couleur par genre dans `map.kinds`, nom de la zone, visible sur la
+petite carte à l'approche et toujours sur la grande) et le cercle translucide de son rayon. Le client les pose depuis
+la config à l'entrée en jeu et les retire à la sélection : rien ne circule. `map.blips = false` les coupe.
 
 Les zones et nœuds livrés sont des **exemples** autour du point d'apparition par défaut, avec des modèles du jeu de base :
 à remplacer par les lieux et les props du royaume.
@@ -94,5 +99,10 @@ resource, item }`), `harvested` (after : `+ quantity, tier, band, extra? `), `zo
 7. **Pistes** : couteau en main sur une piste de lièvre → viande, parfois une peau.
 8. **Pêche** : canne en main au bord de la Rivière Claire : ligne lancée, touche, barre de tension tenue → truite ;
    relâchée → « La prise s'est échappée », aucune charge consommée.
-9. **Panneau** : touche `O` → zones, vitalité, bandes, cicatrices, distances.
-10. **Redémarrage** : `restart vava_gathering` → vitalités et charges retrouvées (écriture à l'arrêt), props recréés.
+9. **Panneau** : touche `O` → zones, vitalité, bandes, cicatrices, distances ; « Marquer » pose le repère de la carte
+   sur la zone et ferme le panneau (l'itinéraire part aussitôt).
+10. **Carte** : en jeu, un blip nommé par zone et le cercle de son rayon sur la grande carte (icônes : gibier, foreuse,
+    feuille, barque ; numéros à changer dans `map.kinds` s'ils déplaisent) ; retour à la sélection → plus aucun ;
+    `map.blips = false` → aucun.
+11. **Redémarrage** : `restart vava_gathering` → vitalités et charges retrouvées (écriture à l'arrêt), props recréés,
+    blips retirés puis reposés.

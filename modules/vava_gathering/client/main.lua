@@ -1,14 +1,15 @@
 --[[
     vava_gathering/client/main.lua
     Rôle : assemblage côté joueur : touche d'interaction (commande +/− pour l'appui et le relâchement, réglable par
-           le joueur, aucune boucle), panneau des zones (touche, RPC, interface), évènements du serveur (touche de
-           pêche, notifications par vava_hud sinon celles du jeu), retours de l'interface, fermeture au déchargement
-           du personnage.
-    Dépendances : shared/constants.lua, config.lua, client/core.lua, client/nui.lua, client/props.lua,
+           le joueur, aucune boucle), panneau des zones (touche, RPC, interface, repère de la carte posé sur une zone),
+           évènements du serveur (touche de pêche, notifications par vava_hud sinon celles du jeu), retours de
+           l'interface, fermeture au déchargement du personnage.
+    Dépendances : shared/constants.lua, config.lua, client/core.lua, client/nui.lua, client/props.lua, client/blips.lua,
                   client/interact.lua, client/fishing.lua
 ]]
 
 local type, tostring, pcall = type, tostring, pcall
+local match = string.match
 local CreateThread, RegisterNetEvent, RegisterCommand, RegisterKeyMapping = CreateThread, RegisterNetEvent, RegisterCommand, RegisterKeyMapping
 local IsPauseMenuActive, GetResourceState = IsPauseMenuActive, GetResourceState
 local BeginTextCommandThefeedPost, AddTextComponentSubstringPlayerName, EndTextCommandThefeedPostTicker =
@@ -20,10 +21,13 @@ if not core then return end
 local cfg = VavaGathering.config
 local RPC = VavaGathering.RPC
 local EVENTS = VavaGathering.EVENTS
-local nui, props, interact, fishing = VavaGathering.nui, VavaGathering.props, VavaGathering.interact, VavaGathering.fishing
+local nui, props, blips, interact, fishing =
+    VavaGathering.nui, VavaGathering.props, VavaGathering.blips, VavaGathering.interact, VavaGathering.fishing
 
 local INTERACT_COMMAND = 'vava_gathering_interact'
 local ZONES_COMMAND = 'vava_gathering_zones'
+local ID_PATTERN = VavaGathering.ID_PATTERN
+local ZONE_ID_MAX = 48
 local FEED_TEXT = 'STRING'
 local HUD = 'vava_hud'
 
@@ -109,6 +113,15 @@ nui.on('zonesRefresh', function()
     if not success then return { ok = false, error = tostring(list) } end
     return { ok = true, zones = list }
 end)
+-- repère de la carte sur une zone : le panneau se ferme pour laisser ouvrir la carte
+nui.on('zonesWaypoint', function(d)
+    local zoneId = d.zone
+    if type(zoneId) ~= 'string' or #zoneId > ZONE_ID_MAX or not match(zoneId, ID_PATTERN) or not blips.waypoint(zoneId) then
+        return { ok = false, error = 'unknown_zone' }
+    end
+    closeZones()
+    return { ok = true }
+end)
 nui.on('close', function()
     closeZones()
     return { ok = true }
@@ -121,3 +134,4 @@ core.hooks.after('core:character:unloaded', function()
 end)
 
 props.start()
+blips.start()

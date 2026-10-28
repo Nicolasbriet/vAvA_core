@@ -1059,7 +1059,7 @@ fondateur ; `/metiers niveau <joueur> <compétence> <niveau>`, `/metiers recette
 
 ### `vava_gathering`
 
-La récolte (1.0.0) : zones à **vitalité** 0–100 (plein rendement au-dessus de 60, réduit entre 60 et 25 avec chance
+La récolte (1.2.0) : zones à **vitalité** 0–100 (plein rendement au-dessus de 60, réduit entre 60 et 25 avec chance
 d'échec, **épuisée** sous 25 avec props remplacés et rendement effondré, **cicatrice** à 0 : régénération × 0,2 pendant
 la durée de la zone), nœuds à charges (arbres, filons, buissons, bancs de poissons, pistes de gibier) qui se
 régénèrent par le temps (recalcul à la demande, aucune boucle), outils **en main** (`vava_inventory:held`) du genre
@@ -1095,7 +1095,9 @@ terre sacrée, nuit, état…), `harvested` (`after` : `+ quantity, tier, band, 
 `{ zone, vitality }`), `zoneScarred` (`{ zone, scarredUntil, depletions }`), `earthReaction` (`{ zone, depletions }`).
 
 **Commande** `/recolte zones | zone <id> | noeud <id> | vitalite <zone> <0-100> | recharger <noeud>` (droit `metiers`).
-Touches : `E` récolter, `O` panneau des zones. Rendu hors jeu : `web/index.html?view=prompt` (ou `tension`, `zones`).
+Touches : `E` récolter, `O` panneau des zones (« Marquer » y pose le repère de la carte sur une zone). Carte : un blip
+nommé par zone et le cercle de son rayon, posés par le client depuis la config (`map`). Rendu hors jeu :
+`web/index.html?view=prompt` (ou `tension`, `zones`).
 
 ### `vava_crafting`
 

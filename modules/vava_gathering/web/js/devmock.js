@@ -24,6 +24,10 @@ const DevMock = (() => {
       return { ok: true };
     }
     if (name === 'zonesRefresh') return { ok: true, zones };
+    if (name === 'zonesWaypoint') {
+      post('zonesClose', {});
+      return { ok: true };
+    }
     if (name === 'close') {
       post('zonesClose', {});
       return { ok: true };
