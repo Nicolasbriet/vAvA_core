@@ -1,8 +1,9 @@
 --[[
     vava_inventory/client/main.lua
     Rôle : ouverture de l'inventaire et raccourcis (RegisterKeyMapping : touches réglables par le joueur, aucune
-           boucle), réception des états envoyés par le serveur, et relais des gestes de l'interface vers le serveur.
-    Dépendances : shared/, config.lua, client/core.lua, client/drops.lua, client/nui.lua
+           boucle), réception des états envoyés par le serveur (dont l'objet en main), et relais des gestes de
+           l'interface vers le serveur.
+    Dépendances : shared/, config.lua, client/core.lua, client/drops.lua, client/hands.lua, client/nui.lua
 ]]
 
 local type, tostring, pcall = type, tostring, pcall
@@ -18,7 +19,8 @@ local cfg = VavaInventory.config
 local RPC = VavaInventory.RPC
 local EVENTS = VavaInventory.EVENTS
 local HOTBAR_FIELD = VavaInventory.HOTBAR_FIELD
-local nui, drops = VavaInventory.nui, VavaInventory.drops
+local HANDS_FIELD = VavaInventory.HANDS_FIELD
+local nui, drops, hands = VavaInventory.nui, VavaInventory.drops, VavaInventory.hands
 
 local OPEN_COMMAND = 'vava_inventory'
 local SLOT_COMMAND = 'vava_inventory_slot_'
@@ -69,6 +71,7 @@ local function forward(name, ...)
 end
 
 drops.start()
+hands.start()
 
 RegisterNetEvent(EVENTS.SNAPSHOT, function(snapshot)
     if type(snapshot) ~= 'table' or not core.characters.current() then return end
@@ -99,6 +102,7 @@ nui.on('merge', function(d) return forward(RPC.MERGE, d.id, d.target, d.quantity
 nui.on('drop', function(d) return forward(RPC.DROP, d.id, d.quantity) end)
 nui.on('use', function(d) return forward(RPC.USE, d.id) end)
 nui.on('hotbarSet', function(d) return forward(RPC.HOTBAR_SET, d.slot, d.id) end)
+nui.on('hold', function(d) return forward(RPC.HOLD, d.id) end)
 nui.on('close', function()
     close()
     core.rpc.emit(RPC.CLOSE)
@@ -118,5 +122,10 @@ end
 
 core.hooks.after('core:character:unloaded', close)
 core.hooks.after('core:character:fieldChanged', function(change)
-    if open and change.field == HOTBAR_FIELD then nui.send('hotbar', { hotbar = change.value }) end
+    if not open then return end
+    if change.field == HOTBAR_FIELD then
+        nui.send('hotbar', { hotbar = change.value })
+    elseif change.field == HANDS_FIELD then
+        nui.send('hands', { id = type(change.value) == 'table' and change.value.id or 0 })
+    end
 end)

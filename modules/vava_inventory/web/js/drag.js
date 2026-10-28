@@ -2,9 +2,9 @@
 /*
  * web/js/drag.js
  * Rôle : glisser-déposer. Pendant le geste : copie de l'objet sous le pointeur (transform seulement), aperçu de
- *        l'emplacement (valide, impossible, fusion, raccourci, jeter), R pour pivoter, Maj pour diviser en deux.
- *        Les cartes d'occupation sont calculées une fois au début du geste ; les mises à jour suivent les images
- *        affichées (requestAnimationFrame), jamais plus.
+ *        l'emplacement (valide, impossible, fusion, raccourci, mains, jeter), R pour pivoter, Maj pour diviser en
+ *        deux. Les cartes d'occupation sont calculées une fois au début du geste ; les mises à jour suivent les
+ *        images affichées (requestAnimationFrame), jamais plus.
  */
 
 const Drag = (() => {
@@ -13,7 +13,7 @@ const Drag = (() => {
   let frameRequested = false;
 
   const clamp = (value, low, high) => Math.max(low, Math.min(high, value));
-  const sameMetadata = (a, b) => JSON.stringify(a || {}) === JSON.stringify(b || {});
+  const sameMetadata = (a, b) => Model.sameMetadata(a, b);
 
   function weightAllows(container, from, def, quantity) {
     return container === from || container.maxWeight === 0 || container.weight + def.weight * quantity <= container.maxWeight;
@@ -24,6 +24,8 @@ const Drag = (() => {
     const { x: px, y: py, shift } = drag.pointer;
     const slot = View.slotAt(px, py);
     if (slot !== null) return { kind: 'hotbar', slot };
+    // mains : seulement un objet de sa besace qui se tient en main
+    if (View.handsAt(px, py)) return { kind: 'hands', valid: Boolean(drag.def.holdable) && drag.from.id === Model.state.own };
     const hit = View.gridAt(px, py);
     if (!hit) return View.isOverInterface(px, py) ? null : { kind: 'drop' };
 
@@ -62,6 +64,7 @@ const Drag = (() => {
     drag.ghost.classList.toggle('is-invalid', Boolean(target && target.valid === false));
     if (!target) View.clearPreview();
     else if (target.kind === 'hotbar') View.highlightSlot(target.slot);
+    else if (target.kind === 'hands') View.highlightHands(target.valid);
     else if (target.kind === 'drop') View.showDropZone();
     else if (target.kind === 'merge') {
       const def = drag.def;
@@ -137,6 +140,8 @@ const Drag = (() => {
     const { item, from } = current;
     if (target.kind === 'hotbar') {
       if (from.id === Model.state.own) handlers.hotbarSet(target.slot, item.id);
+    } else if (target.kind === 'hands') {
+      if (target.valid) handlers.hold(item.id);
     } else if (target.kind === 'drop') {
       if (from.kind !== 'drop') handlers.drop(item);
     } else if (!target.valid) {

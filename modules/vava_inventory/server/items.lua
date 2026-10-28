@@ -25,9 +25,12 @@ VavaInventory.items = items
 ---@field category? string
 ---@field effects? table<string, number>  effets lus par d'autres modules à l'utilisation (faim, soif…) ; une unité consommée
 ---@field onUse? fun(source: integer, item: table): boolean?, string?  true = une unité consommée ; message optionnel
+---@field held? { model: string, bone?: integer, offset?: number[], rotation?: number[] }  l'objet se tient en main (1.4.0) : modèle attaché au ped du porteur
 
 local SIZE = { type = 'integer', min = 1, max = cfg.maxItemSize }
 local EFFECT = cfg.effects
+-- décalage et rotation d'un accessoire en main : { x, y, z } (mètres, degrés)
+local VECTOR = { type = 'array', min = 3, max = 3, items = { type = 'number', min = -360, max = 360 }, optional = true }
 
 local SCHEMA = {
     type = 'table',
@@ -46,6 +49,15 @@ local SCHEMA = {
             value = { type = 'number', min = -EFFECT.maxValue, max = EFFECT.maxValue },
         },
         onUse = { type = 'function', optional = true },
+        held = {
+            type = 'table', optional = true,
+            fields = {
+                model = { type = 'string', min = 1, max = 64 },
+                bone = { type = 'integer', min = 0, max = 65535, optional = true },
+                offset = VECTOR,
+                rotation = VECTOR,
+            },
+        },
     },
 }
 
@@ -86,7 +98,7 @@ function items.isUsable(def)
     return def.onUse ~= nil or def.effects ~= nil
 end
 
---- Définition transmissible au client (sans la fonction d'utilisation).
+--- Définition transmissible au client (sans la fonction d'utilisation ni le modèle de l'accessoire).
 ---@param name string
 ---@return table|nil
 function items.public(name)
@@ -95,6 +107,6 @@ function items.public(name)
     return {
         label = def.label, description = def.description, width = def.width, height = def.height,
         weight = def.weight, stack = def.stack, image = def.image, category = def.category,
-        effects = def.effects, usable = items.isUsable(def),
+        effects = def.effects, usable = items.isUsable(def), holdable = def.held ~= nil,
     }
 end

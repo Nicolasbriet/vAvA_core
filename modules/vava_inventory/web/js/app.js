@@ -2,7 +2,7 @@
 /*
  * web/js/app.js
  * Rôle : assemblage : messages du jeu, gestes (déplacer et fusionner sont prévus localement puis confirmés ou
- *        annulés par le serveur), menu contextuel, double-clic, raccourcis clavier.
+ *        annulés par le serveur), prendre en main ou reposer, menu contextuel, double-clic, raccourcis clavier.
  */
 
 (() => {
@@ -15,6 +15,7 @@
   function refresh(containers) {
     for (const container of uniq(containers)) View.renderContainer(container);
     View.renderHotbar();
+    View.renderHands();
   }
 
   /** Prévision locale : appliquée tout de suite, annulée si le serveur refuse. */
@@ -77,10 +78,25 @@
     hotbarSet(slot, id) {
       return plain('hotbarSet', { slot, id });
     },
+    hold(id) {
+      return plain('hold', { id });
+    },
   };
 
   function use(item) {
     return plain('use', { id: item.id });
+  }
+
+  /** Prend l'objet en main, ou le repose s'il y est déjà. */
+  function toggleHold(item) {
+    return actions.hold(Model.state.hands === item.id ? 0 : item.id);
+  }
+
+  /** Geste principal d'un objet de sa besace : utiliser, sinon tenir ou reposer. */
+  function primary(item, def) {
+    if (def.usable) return use(item);
+    if (def.holdable) return toggleHold(item);
+    return null;
   }
 
   /** Ramasser : premier emplacement libre de son inventaire. */
@@ -122,6 +138,14 @@
       }
       return;
     }
+    const handsNode = event.target.closest('.hands-slot');
+    if (handsNode) {
+      event.preventDefault();
+      if (handsNode.classList.contains('is-filled')) {
+        Menu.context(event.clientX, event.clientY, [{ label: A.release, run: () => actions.hold(0) }]);
+      }
+      return;
+    }
     const found = itemFromEvent(event);
     if (!found) return;
     event.preventDefault();
@@ -131,6 +155,10 @@
     const inOwn = container.id === Model.state.own;
     const entries = [];
     if (def && def.usable && inOwn) entries.push({ label: A.use, run: () => use(item) });
+    if (def && def.holdable && inOwn) {
+      const held = Model.state.hands === item.id;
+      entries.push({ label: held ? A.release : A.hold, run: () => toggleHold(item) });
+    }
     if (def && def.stack > 1 && item.quantity > 1) entries.push({ label: A.split, run: () => splitDialog(item, container) });
     if (container.kind === 'drop') entries.push({ label: A.pickup, run: () => pickup(item) });
     else entries.push({ label: A.drop, danger: true, run: () => actions.drop(item) });
@@ -142,14 +170,15 @@
     if (!found) return;
     const def = Model.definition(found.item.item);
     if (found.container.kind === 'drop') pickup(found.item);
-    else if (def && def.usable && found.container.id === Model.state.own) use(found.item);
+    else if (def && found.container.id === Model.state.own) primary(found.item, def);
   }
 
   function onHotbarClick(event) {
     const slotNode = event.target.closest('.hotbar-slot.is-filled');
     if (!slotNode || event.button !== 0) return;
     const found = Model.find(Number(slotNode.dataset.id));
-    if (found) use(found.item);
+    const def = found && Model.definition(found.item.item);
+    if (def) primary(found.item, def);
   }
 
   function close() {
@@ -188,6 +217,13 @@
     } else if (action === 'hotbar') {
       Model.setHotbar(payload.hotbar);
       View.renderHotbar();
+    } else if (action === 'hands') {
+      Model.setHands(payload.id);
+      // la marque « en main » vit sur l'objet et sur ses emplacements
+      const ownContainer = own();
+      if (ownContainer) View.renderContainer(ownContainer);
+      View.renderHotbar();
+      View.renderHands();
     } else if (action === 'notify') {
       Menu.toast(payload.message);
     } else if (action === 'close') {

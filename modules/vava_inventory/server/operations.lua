@@ -1,35 +1,49 @@
 --[[
     vava_inventory/server/operations.lua
-    Rôle : opérations sur les objets : déplacer, diviser, fusionner, jeter, utiliser, raccourcis, et échange
-           « tout ou rien » pour les autres modules (ajout, retrait, artisanat, boutiques).
+    Rôle : opérations sur les objets : déplacer, diviser, fusionner, jeter, utiliser, raccourcis, et pour les autres
+           modules : échange « tout ou rien » (ajout, retrait, artisanat, boutiques) et écriture des métadonnées.
     Chaque opération : validation → hook before (annulable) → revérification (un hook a pu céder la main) →
     mutation d'un bloc, sans attendre la base → journal → différences aux spectateurs → hook after.
-    Dépendances : shared/, config.lua, server/core.lua, server/items.lua, server/persistence.lua,
-                  server/containers.lua, server/viewers.lua, server/drops.lua
+    Métadonnées (1.4.0) : toujours un objet JSON (clés texte à la racine, bornes de config.metadata) ; une pile se
+    complète par égalité stricte des métadonnées ; un retrait vise un objet filtré par sous-ensemble de métadonnées,
+    ou une pile précise par son identifiant ; les piles se consomment de la plus ancienne à la plus récente.
+    Mains (1.4.0) : prendre ou reposer un objet qui se tient en main (hook `vava_inventory:hold`) ; la main se vide
+    d'elle-même quand la pile tenue quitte la besace.
+    Dépendances : shared/, config.lua, server/core.lua, server/positions.lua, server/items.lua, server/persistence.lua,
+                  server/containers.lua, server/viewers.lua, server/drops.lua, server/hands.lua
 ]]
 
-local type, pairs, ipairs, next, pcall, tostring = type, pairs, ipairs, next, pcall, tostring
+local type, pairs, ipairs, pcall, tostring, getmetatable = type, pairs, ipairs, pcall, tostring, getmetatable
 local mathType, min = math.type, math.min
+local HUGE = math.huge
 local sort = table.sort
 local TriggerClientEvent = TriggerClientEvent
 
 local grid = VavaInventory.grid
+local positions = VavaInventory.positions
 local items = VavaInventory.items
 local persistence = VavaInventory.persistence
 local containers = VavaInventory.containers
 local viewers = VavaInventory.viewers
 local drops = VavaInventory.drops
+local hands = VavaInventory.hands
 local cfg = VavaInventory.config
+local metaCfg = cfg.metadata
 local EVENTS = VavaInventory.EVENTS
+local KIND = VavaInventory.KIND
 local HOTBAR_FIELD = VavaInventory.HOTBAR_FIELD
 local MAX_QUANTITY = VavaInventory.MAX_QUANTITY
 
 local HOOK = {
     MOVE = 'vava_inventory:move', SPLIT = 'vava_inventory:split', MERGE = 'vava_inventory:merge',
     DROP = 'vava_inventory:drop', USE = 'vava_inventory:use', ADD = 'vava_inventory:add', REMOVE = 'vava_inventory:remove',
+    METADATA = 'vava_inventory:metadata', HOLD = 'vava_inventory:hold',
 }
 -- case réservée pendant la planification d'un échange
 local PLANNED = -1
+-- métadonnées d'une pile qui n'en a pas : comparées par égalité avec celles d'un ajout sans métadonnées
+local EMPTY_METADATA = {}
+local ANCHOR_KEYS = { 'x', 'y', 'z', 'radius' }
 
 local operations = {}
 VavaInventory.operations = operations
@@ -71,10 +85,79 @@ local function deepEqual(a, b)
     return true
 end
 
----@param metadata table|nil
+--- Vrai si la valeur respecte le contrat des métadonnées : objet JSON à la racine (clés texte), tables imbriquées
+--- soit objets soit listes sans trou, valeurs texte, nombre fini ou booléen, bornes de config.metadata.
+--- Une table à clés entières à la racine deviendrait une liste JSON et casserait la colonne `metadata`.
+---@param value any
+---@param depth integer  1 pour la racine
 ---@return boolean
-local function isBare(metadata)
-    return metadata == nil or next(metadata) == nil
+local function validMetadata(value, depth)
+    if type(value) ~= 'table' or getmetatable(value) ~= nil or depth > metaCfg.maxDepth then return false end
+    local count, isList = 0, nil
+    for key, item in pairs(value) do
+        count = count + 1
+        if count > metaCfg.maxEntries then return false end
+        if type(key) == 'string' then
+            if isList == true then return false end
+            isList = false
+        elseif depth > 1 and mathType(key) == 'integer' and key >= 1 then
+            if isList == false then return false end
+            isList = true
+        else
+            return false
+        end
+        local kind = type(item)
+        if kind == 'string' then
+            if #item > metaCfg.maxStringLength then return false end
+        elseif kind == 'number' then
+            if item ~= item or item == HUGE or item == -HUGE then return false end
+        elseif kind == 'table' then
+            if not validMetadata(item, depth + 1) then return false end
+        elseif kind ~= 'boolean' then
+            return false
+        end
+    end
+    if isList then
+        for i = 1, count do
+            if value[i] == nil then return false end
+        end
+    end
+    return true
+end
+
+--- Vrai si la pile porte chaque clé du filtre avec la même valeur (sous-ensemble). Sans filtre : toujours vrai.
+---@param metadata table
+---@param filter table|nil
+---@return boolean
+local function matches(metadata, filter)
+    if filter == nil then return true end
+    if type(filter) ~= 'table' then return false end
+    for key, value in pairs(filter) do
+        if not deepEqual(metadata[key], value) then return false end
+    end
+    return true
+end
+
+---@param a vAvA.ItemInstance
+---@param b vAvA.ItemInstance
+---@return boolean
+local function olderFirst(a, b)
+    return a.id < b.id
+end
+
+--- Piles d'un objet répondant au filtre, de la plus ancienne à la plus récente : l'ordre de consommation ne dépend
+--- pas du parcours d'une table.
+---@param container vAvA.Container
+---@param item string
+---@param filter table|nil
+---@return vAvA.ItemInstance[]
+local function candidates(container, item, filter)
+    local list = {}
+    for _, instance in pairs(container.items) do
+        if instance.item == item and matches(instance.metadata, filter) then list[#list + 1] = instance end
+    end
+    sort(list, olderFirst)
+    return list
 end
 
 ---@param source table
@@ -118,6 +201,11 @@ local function publish(change)
         for _, instance in ipairs(entry.set) do persistence.touch(instance, container.persisted) end
         for _, id in ipairs(entry.deleted) do persistence.forget(id) end
         viewers.publish(container, entry.set, entry.removed)
+        -- la pile tenue en main a quitté la besace : la main se vide (sync ne connaît que les besaces des joueurs)
+        local src, previous = hands.sync(container)
+        if src then
+            hooks().runAfter(HOOK.HOLD, { source = src, instanceId = 0, previous = previous, reason = 'gone' })
+        end
     end
 end
 
@@ -150,8 +238,9 @@ local function canOperate(src, container)
     local session = sessions[src]
     if session and session.containerId == container.id then return true end
     if not viewers.isViewing(src, container.id) then return false end
-    if container.kind == VavaInventory.KIND.DROP then return drops.inRange(src, container.id) end
-    return true
+    if container.kind == KIND.DROP then return drops.inRange(src, container.id) end
+    -- coffre, grenier, station : à portée de l'ancrage posé par le module qui l'a ouvert (sinon toujours vrai)
+    return viewers.inRange(src, container.id)
 end
 
 --- Objet, conteneur et définition, si le joueur peut y toucher.
@@ -192,6 +281,8 @@ end
 ---@param containerId integer
 function operations.bind(src, characterId, containerId)
     sessions[src] = { characterId = characterId, containerId = containerId }
+    local container = containers.get(containerId)
+    if container then hands.bind(src, characterId, container) end
 end
 
 ---@param src integer
@@ -199,6 +290,7 @@ end
 function operations.unbind(src)
     local session = sessions[src]
     sessions[src] = nil
+    hands.unbind(src)
     viewers.removePlayer(src)
     return session
 end
@@ -239,7 +331,7 @@ function operations.snapshot(src)
         end
     end
     TriggerClientEvent(EVENTS.SNAPSHOT, src, {
-        own = session.containerId, containers = list, hotbar = hotbarOf(session),
+        own = session.containerId, containers = list, hotbar = hotbarOf(session), hands = hands.heldId(src),
         definitions = viewers.definitionsFor(src, instances, true),
     })
 end
@@ -255,7 +347,7 @@ function operations.open(src, hintId)
     viewers.add(session.containerId, src)
     if hintId ~= 0 then
         local container = containers.get(hintId)
-        if container and container.kind == VavaInventory.KIND.DROP and drops.inRange(src, hintId) then
+        if container and container.kind == KIND.DROP and drops.inRange(src, hintId) then
             viewers.add(hintId, src)
         end
     end
@@ -263,16 +355,36 @@ function operations.open(src, hintId)
     return true
 end
 
---- Ouvre un conteneur pour un joueur, à la demande d'un module (coffre, magasin…). Le module a vérifié l'accès.
+---@param anchor any
+---@return boolean
+local function validAnchor(anchor)
+    if type(anchor) ~= 'table' then return false end
+    for _, key in ipairs(ANCHOR_KEYS) do
+        local value = anchor[key]
+        if type(value) ~= 'number' or value ~= value or value == HUGE or value == -HUGE then return false end
+    end
+    return anchor.radius > 0 and anchor.radius <= cfg.anchor.maxRadius
+end
+
+--- Ouvre un conteneur pour un joueur, à la demande d'un module (coffre, grenier, station…). Le module a vérifié le
+--- droit d'accès. Avec un ancrage `{ x, y, z, radius }` (1.4.0), la distance est vérifiée ici puis à chaque opération,
+--- et le conteneur se ferme chez le joueur qui s'en éloigne.
 ---@param src integer
 ---@param container vAvA.Container
+---@param anchor? vAvA.ContainerAnchor
 ---@return boolean ok
 ---@return string|nil code
-function operations.openContainer(src, container)
+function operations.openContainer(src, container, anchor)
     local session = sessions[src]
     if not session then return false, 'no_character' end
+    if anchor ~= nil then
+        if not validAnchor(anchor) then return false, 'invalid_anchor' end
+        if not positions.within(src, anchor.x, anchor.y, anchor.z, anchor.radius) then return false, 'too_far' end
+    end
     viewers.add(session.containerId, src)
     viewers.add(container.id, src)
+    -- après l'ajout du spectateur : un ancrage sans spectateur serait aussitôt oublié
+    if anchor ~= nil then viewers.anchor(container.id, anchor) end
     operations.snapshot(src)
     return true
 end
@@ -387,7 +499,7 @@ function operations.drop(src, instanceId, quantity)
     if not instance then return false, from end
     quantity = quantity or instance.quantity
     if not isCount(quantity) or quantity > instance.quantity then return false, 'invalid_quantity' end
-    if from.kind == VavaInventory.KIND.DROP then return false, 'already_dropped' end
+    if from.kind == KIND.DROP then return false, 'already_dropped' end
 
     local target = drops.near(src, cfg.drop.reuseDistance)
     local x, y, rotated
@@ -448,7 +560,11 @@ function operations.use(src, instanceId)
     local instance = container.items[instanceId]
     local def = instance and items.get(instance.item)
     if not def then return false, 'unknown_item' end
-    if not items.isUsable(def) then return false, 'not_usable' end
+    if not items.isUsable(def) then
+        -- un objet qui se tient en main (outil, torche) sans autre usage : l'utiliser le prend ou le repose
+        if def.held then return operations.hold(src, hands.heldId(src) == instanceId and 0 or instanceId) end
+        return false, 'not_usable'
+    end
 
     -- effets et catégorie : les modules qui appliquent les effets (faim, soif…) n'ont pas à relire le registre
     local payload = { source = src, instanceId = instanceId, item = instance.item, category = def.category, effects = def.effects }
@@ -515,44 +631,151 @@ function operations.hotbarUse(src, slot)
     return ok, code
 end
 
---- Remplace les métadonnées d'un objet (numéro d'un registre, inscription…), décidé par un module. Sauvegardé et
---- publié aux spectateurs comme toute modification.
----@param container vAvA.Container
----@param instanceId any
----@param metadata any  table, ou nil pour les retirer
+-- Mains ------------------------------------------------------------------------------------------------------------
+
+--- Prend une pile de sa besace en main (son objet doit déclarer `held`), ou repose ce qu'on tient (0). Hook
+--- `vava_inventory:hold` (before annulable : à terre, deux mains prises… ; after). `owner` : ressource à l'origine
+--- de la demande, nil pour un geste du joueur.
+---@param src integer
+---@param instanceId integer  0 pour reposer
+---@param owner? string
 ---@return boolean ok
 ---@return string|nil code
-function operations.setMetadata(container, instanceId, metadata)
-    if mathType(instanceId) ~= 'integer' or (metadata ~= nil and type(metadata) ~= 'table') then return false, 'invalid_request' end
-    local instance = container.items[instanceId]
-    if not instance then return false, 'not_found' end
-    instance.metadata = metadata and copy(metadata) or {}
+function operations.hold(src, instanceId, owner)
+    local session = sessions[src]
+    local container = session and containers.get(session.containerId)
+    if not container then return false, 'no_character' end
+    if mathType(instanceId) ~= 'integer' or instanceId < 0 then return false, 'invalid_request' end
+    local previous = hands.heldId(src)
+    local instance, def
+    if instanceId ~= 0 then
+        instance = container.items[instanceId]
+        def = instance and items.get(instance.item)
+        if not def then return false, 'not_found' end
+        if not def.held then return false, 'not_holdable' end
+    end
+    if previous == instanceId then return true end
+
+    local payload = { source = src, instanceId = instanceId, item = instance and instance.item or nil, previous = previous, owner = owner }
+    local ok, code = guarded(HOOK.HOLD, payload, { container })
+    if not ok then return false, code end
+    ok, code = hands.set(src, instance, def)
+    if not ok then return false, code end
+    hooks().runAfter(HOOK.HOLD, payload)
+    return true
+end
+
+-- Métadonnées (API des autres modules) ---------------------------------------------------------------------------
+
+--- Écrit un nouveau bloc de métadonnées sur une pile (toutes ses unités) : hook before (annulable), écriture,
+--- sauvegarde et publication aux spectateurs, hook after. `before` et `after` du payload sont des copies : un autre
+--- module peut y protéger un objet signé (créateur, qualité) ou journaliser les objets de valeur.
+---@param container vAvA.Container
+---@param instance vAvA.ItemInstance
+---@param metadata table
+---@param owner string          ressource à l'origine de l'écriture
+---@param reason 'set'|'patch'
+---@return boolean ok
+---@return string|nil code
+local function writeMetadata(container, instance, metadata, owner, reason)
+    local payload = {
+        container = container.id, instanceId = instance.id, item = instance.item, owner = owner, reason = reason,
+        before = copy(instance.metadata), after = copy(metadata),
+    }
+    local ok, code = guarded(HOOK.METADATA, payload, { container })
+    if not ok then return false, code end
+    instance.metadata = copy(metadata)
     local change = newChange()
     note(change, container, instance)
     publish(change)
+    hooks().runAfter(HOOK.METADATA, payload)
     return true
+end
+
+--- Remplace les métadonnées d'un objet (numéro d'un registre, inscription…), décidé par un module.
+---@param container vAvA.Container
+---@param instanceId any
+---@param metadata any  table (objet JSON), ou nil pour les retirer
+---@param owner string
+---@return boolean ok
+---@return string|nil code
+function operations.setMetadata(container, instanceId, metadata, owner)
+    if mathType(instanceId) ~= 'integer' then return false, 'invalid_request' end
+    if metadata ~= nil and not validMetadata(metadata, 1) then return false, 'invalid_metadata' end
+    local instance = container.items[instanceId]
+    if not instance then return false, 'not_found' end
+    return writeMetadata(container, instance, metadata or {}, owner, 'set')
+end
+
+--- Modifie une partie des métadonnées d'un objet : `patch` écrit ou remplace des clés, `removed` en retire (une
+--- clé absente d'une table Lua ne peut pas dire « retire-moi »). Le reste du bloc est conservé tel quel : une
+--- réparation touche `durability` et `history` sans jamais pouvoir écraser le créateur. Depuis 1.4.0.
+---@param container vAvA.Container
+---@param instanceId any
+---@param patch any    table de clés à écrire, ou nil
+---@param removed any  liste de clés à retirer, ou nil
+---@param owner string
+---@return boolean ok
+---@return string|nil code
+function operations.patchMetadata(container, instanceId, patch, removed, owner)
+    if mathType(instanceId) ~= 'integer' or (patch ~= nil and type(patch) ~= 'table') or (removed ~= nil and type(removed) ~= 'table') then
+        return false, 'invalid_request'
+    end
+    local instance = container.items[instanceId]
+    if not instance then return false, 'not_found' end
+    local merged = copy(instance.metadata)
+    if removed then
+        for _, key in ipairs(removed) do
+            if type(key) ~= 'string' then return false, 'invalid_request' end
+            merged[key] = nil
+        end
+    end
+    if patch then
+        for key, value in pairs(patch) do merged[key] = type(value) == 'table' and copy(value) or value end
+    end
+    if not validMetadata(merged, 1) then return false, 'invalid_metadata' end
+    return writeMetadata(container, instance, merged, owner, 'patch')
 end
 
 -- Échange tout ou rien (API des autres modules) ---------------------------------------------------------------
 
 ---@class vAvA.ItemRequest
----@field item string
----@field quantity integer
----@field metadata? table
+---@field item? string          nom de l'objet (ajout : toujours ; retrait : avec `quantity`, filtré par `metadata`)
+---@field quantity? integer     retrait par instance : toute la pile si absent
+---@field metadata? table       ajout : métadonnées de la pile ; retrait : sous-ensemble que la pile doit porter
+---@field instanceId? integer   retrait d'une pile précise (exclusif avec `item` et `metadata`)
 
 ---@param list any
----@param withMetadata boolean
 ---@return boolean
-local function validRequests(list, withMetadata)
+local function validRemovals(list)
+    if type(list) ~= 'table' then return false end
+    for _, request in ipairs(list) do
+        if type(request) ~= 'table' then return false end
+        if request.instanceId ~= nil then
+            if mathType(request.instanceId) ~= 'integer' or request.item ~= nil or request.metadata ~= nil then return false end
+            if request.quantity ~= nil and not isCount(request.quantity) then return false end
+        else
+            if not items.get(request.item) or not isCount(request.quantity) then return false end
+            if request.metadata ~= nil and not validMetadata(request.metadata, 1) then return false end
+        end
+    end
+    return true
+end
+
+---@param list any
+---@return boolean
+local function validAdditions(list)
     if type(list) ~= 'table' then return false end
     for _, request in ipairs(list) do
         if type(request) ~= 'table' or not items.get(request.item) or not isCount(request.quantity) then return false end
-        if withMetadata and request.metadata ~= nil and type(request.metadata) ~= 'table' then return false end
+        if request.metadata ~= nil and not validMetadata(request.metadata, 1) then return false end
     end
     return true
 end
 
 --- Planifie un échange sans rien modifier : retraits, fusions dans les piles existantes, nouvelles piles.
+--- Les retraits consomment les piles de la plus ancienne à la plus récente ; les ajouts complètent d'abord les piles
+--- aux métadonnées identiques (même règle que la fusion par le joueur), les plus anciennes d'abord.
 ---@param container vAvA.Container
 ---@param removals vAvA.ItemRequest[]
 ---@param additions vAvA.ItemRequest[]
@@ -560,28 +783,47 @@ end
 ---@return string|nil code
 local function plan(container, removals, additions)
     local takes, fills, places = {}, {}, {}
-    local remaining = {}
+    local remaining, takeOf = {}, {}
     local weight = container.weight
     local view = { width = container.width, height = container.height, occupancy = {} }
     for index, owner in pairs(container.occupancy) do view.occupancy[index] = owner end
 
+    -- une pile visée deux fois (par instance puis par filtre) n'a qu'une entrée de retrait
+    local function take(instance, def, quantity)
+        remaining[instance] = (remaining[instance] or instance.quantity) - quantity
+        local entry = takeOf[instance]
+        if entry then
+            entry.quantity = entry.quantity + quantity
+        else
+            entry = { instance = instance, def = def, quantity = quantity }
+            takeOf[instance] = entry
+            takes[#takes + 1] = entry
+        end
+        weight = weight - def.weight * quantity
+    end
+
     for _, request in ipairs(removals) do
-        local def = items.get(request.item)
-        local needed = request.quantity
-        for _, instance in pairs(container.items) do
-            if needed == 0 then break end
-            if instance.item == request.item then
-                local available = (remaining[instance] or instance.quantity)
-                local take = min(available, needed)
-                if take > 0 then
-                    remaining[instance] = available - take
-                    takes[#takes + 1] = { instance = instance, def = def, quantity = take }
-                    needed = needed - take
-                    weight = weight - def.weight * take
+        if request.instanceId then
+            local instance = container.items[request.instanceId]
+            local def = instance and items.get(instance.item)
+            if not def then return nil, 'missing_items' end
+            local available = remaining[instance] or instance.quantity
+            local wanted = request.quantity or available
+            if wanted > available then return nil, 'missing_items' end
+            take(instance, def, wanted)
+        else
+            local def = items.get(request.item)
+            local needed = request.quantity
+            for _, instance in ipairs(candidates(container, request.item, request.metadata)) do
+                if needed == 0 then break end
+                local amount = min(remaining[instance] or instance.quantity, needed)
+                if amount > 0 then
+                    take(instance, def, amount)
+                    needed = needed - amount
                 end
             end
+            if needed > 0 then return nil, 'missing_items' end
         end
-        if needed > 0 then return nil, 'missing_items' end
     end
     -- les piles entièrement retirées libèrent leurs cases pour les ajouts
     for instance, left in pairs(remaining) do
@@ -595,11 +837,12 @@ local function plan(container, removals, additions)
         local def = items.get(request.item)
         local left = request.quantity
         weight = weight + def.weight * left
-        if def.stack > 1 and isBare(request.metadata) then
-            for _, instance in pairs(container.items) do
+        if def.stack > 1 then
+            local wanted = request.metadata or EMPTY_METADATA
+            for _, instance in ipairs(candidates(container, request.item, nil)) do
                 if left == 0 then break end
                 local current = remaining[instance] or instance.quantity
-                if instance.item == request.item and current > 0 and isBare(instance.metadata) then
+                if current > 0 and deepEqual(instance.metadata, wanted) then
                     local extra = fills[instance] or 0
                     local room = def.stack - current - extra
                     if room > 0 then
@@ -633,7 +876,7 @@ end
 ---@return boolean ok
 ---@return string|nil code
 function operations.exchange(container, removals, additions, owner, dryRun)
-    if not validRequests(removals, false) or not validRequests(additions, true) then return false, 'invalid_request' end
+    if not validRemovals(removals) or not validAdditions(additions) then return false, 'invalid_request' end
     if dryRun then
         local planned, code = plan(container, removals, additions)
         return planned ~= nil, code
@@ -682,14 +925,39 @@ function operations.exchange(container, removals, additions, owner, dryRun)
     return true
 end
 
---- Quantité totale d'un objet dans un conteneur (hors objets sans place).
+--- Vrai si une pile répond au filtre d'un module : `{ item?, metadata? }`, `metadata` étant un sous-ensemble que la
+--- pile doit porter. Sans filtre : toujours vrai.
+---@param instance vAvA.ItemInstance
+---@param filter table|nil
+---@return boolean
+function operations.matches(instance, filter)
+    if filter == nil then return true end
+    if filter.item ~= nil and instance.item ~= filter.item then return false end
+    return matches(instance.metadata, filter.metadata)
+end
+
+--- Quantité totale d'un objet dans un conteneur (hors objets sans place), limitée aux piles portant `metadata`.
 ---@param container vAvA.Container
 ---@param item string
+---@param metadata? table  sous-ensemble de métadonnées que les piles comptées doivent porter
 ---@return integer
-function operations.count(container, item)
+function operations.count(container, item, metadata)
     local total = 0
     for _, instance in pairs(container.items) do
-        if instance.item == item then total = total + instance.quantity end
+        if instance.item == item and matches(instance.metadata, metadata) then total = total + instance.quantity end
     end
     return total
+end
+
+--- Piles d'un conteneur répondant au filtre, de la plus ancienne à la plus récente.
+---@param container vAvA.Container
+---@param filter table|nil
+---@return vAvA.ItemInstance[]
+function operations.select(container, filter)
+    local list = {}
+    for _, instance in pairs(container.items) do
+        if operations.matches(instance, filter) then list[#list + 1] = instance end
+    end
+    sort(list, olderFirst)
+    return list
 end

@@ -2,15 +2,20 @@
     vava_inventory/server/viewers.lua
     Rôle : qui regarde quel conteneur. Seuls les joueurs qui ont ouvert un conteneur en reçoivent les différences,
            et uniquement les définitions d'objets qu'ils ne connaissent pas encore. Aucun envoi à tous les joueurs.
-    Dépendances : shared/constants.lua, server/items.lua, server/containers.lua
+           Ancrages (depuis 1.4.0) : un module qui ouvre un coffre, un grenier, une station peut l'ancrer à un lieu ;
+           la distance est alors revérifiée côté serveur à chaque opération, et un balayage lent, actif seulement tant
+           qu'un conteneur ancré est ouvert, ferme le conteneur chez le joueur qui s'en éloigne.
+    Dépendances : shared/constants.lua, config.lua, server/positions.lua, server/items.lua, server/containers.lua
 ]]
 
 local pairs, ipairs, next = pairs, ipairs, next
-local TriggerClientEvent = TriggerClientEvent
+local TriggerClientEvent, CreateThread, Wait = TriggerClientEvent, CreateThread, Wait
 
+local positions = VavaInventory.positions
 local items = VavaInventory.items
 local containers = VavaInventory.containers
 local EVENTS = VavaInventory.EVENTS
+local anchorCfg = VavaInventory.config.anchor
 
 local viewers = {}
 VavaInventory.viewers = viewers
@@ -19,6 +24,60 @@ VavaInventory.viewers = viewers
 local byContainer = {}
 -- source → { containers = { [id] = true }, known = { [nom d'objet] = true } }
 local bySource = {}
+-- id de conteneur → { x, y, z, radius } : lieu auquel le module qui l'a ouvert a ancré le conteneur
+local anchors = {}
+local sweeping = false
+
+---@class vAvA.ContainerAnchor
+---@field x number
+---@field y number
+---@field z number
+---@field radius number
+
+--- Ferme un conteneur ancré chez ceux qui s'en sont éloignés. Boucle lente justifiée : une lecture de position par
+--- spectateur de conteneur ancré toutes les sweepMs ; s'arrête d'elle-même quand plus aucun conteneur ancré n'est ouvert.
+local function sweep()
+    while next(anchors) ~= nil do
+        Wait(anchorCfg.sweepMs)
+        local far = {}
+        for id, anchor in pairs(anchors) do
+            local set = byContainer[id]
+            if set then
+                for src in pairs(set) do
+                    if not positions.within(src, anchor.x, anchor.y, anchor.z, anchor.radius) then
+                        far[#far + 1] = { id = id, src = src }
+                    end
+                end
+            end
+        end
+        for _, entry in ipairs(far) do
+            viewers.remove(entry.id, entry.src)
+            TriggerClientEvent(EVENTS.CLOSED, entry.src, entry.id)
+        end
+    end
+    sweeping = false
+end
+
+--- Ancre un conteneur à un lieu. L'ancrage disparaît avec son dernier spectateur.
+---@param id integer
+---@param anchor vAvA.ContainerAnchor
+function viewers.anchor(id, anchor)
+    anchors[id] = { x = anchor.x, y = anchor.y, z = anchor.z, radius = anchor.radius }
+    if not sweeping then
+        sweeping = true
+        CreateThread(sweep)
+    end
+end
+
+--- Vrai si la distance autorise le joueur à toucher au conteneur : aucun ancrage, ou joueur à portée.
+---@param src integer
+---@param id integer
+---@return boolean
+function viewers.inRange(src, id)
+    local anchor = anchors[id]
+    if not anchor then return true end
+    return positions.within(src, anchor.x, anchor.y, anchor.z, anchor.radius)
+end
 
 ---@param src integer
 local function sessionOf(src)
@@ -48,7 +107,10 @@ function viewers.remove(id, src)
     local set = byContainer[id]
     if set then
         set[src] = nil
-        if next(set) == nil then byContainer[id] = nil end
+        if next(set) == nil then
+            byContainer[id] = nil
+            anchors[id] = nil
+        end
     end
     local session = bySource[src]
     if session then session.containers[id] = nil end
@@ -94,6 +156,7 @@ function viewers.closeContainer(id)
         TriggerClientEvent(EVENTS.CLOSED, src, id)
     end
     byContainer[id] = nil
+    anchors[id] = nil
 end
 
 --- Définitions des objets que le joueur ne connaît pas encore (marquées connues). `reset` : tout renvoyer.

@@ -3,19 +3,22 @@
     Rôle : sacs au sol. Chaque sac est un conteneur temporaire (jamais écrit en base) matérialisé par une entité réseau
            créée par le serveur : OneSync la rend visible aux seuls joueurs proches, sans diffusion maison. Son statebag
            public ne contient que l'id du conteneur. Le sac disparaît vide ou après lifetimeMs (son contenu avec).
-    Dépendances : shared/constants.lua, config.lua, server/core.lua, server/containers.lua, server/viewers.lua
+    Dépendances : shared/constants.lua, config.lua, server/core.lua, server/positions.lua, server/containers.lua,
+                  server/viewers.lua
 ]]
 
 local pairs = pairs
-local GetPlayerPed, GetEntityCoords, DoesEntityExist, DeleteEntity = GetPlayerPed, GetEntityCoords, DoesEntityExist, DeleteEntity
+local DoesEntityExist, DeleteEntity = DoesEntityExist, DeleteEntity
 local CreateObjectNoOffset, FreezeEntityPosition, GetHashKey, SetTimeout, Entity = CreateObjectNoOffset, FreezeEntityPosition, GetHashKey, SetTimeout, Entity
 
+local positions = VavaInventory.positions
 local containers = VavaInventory.containers
 local viewers = VavaInventory.viewers
 local cfg = VavaInventory.config.drop
 local KIND = VavaInventory.KIND
 local DROP_STATE = VavaInventory.DROP_STATE
 local MODEL = GetHashKey(cfg.model)
+local playerPosition = positions.of
 
 local drops = {}
 VavaInventory.drops = drops
@@ -23,23 +26,13 @@ VavaInventory.drops = drops
 -- id de conteneur → { entity, x, y, z }
 local active = {}
 
----@param src integer
----@return number|nil x, number|nil y, number|nil z
-local function playerPosition(src)
-    local ped = GetPlayerPed(src)
-    if ped == 0 or not DoesEntityExist(ped) then return nil end
-    local coords = GetEntityCoords(ped)
-    return coords.x, coords.y, coords.z
-end
-
 ---@param drop table
 ---@param x number
 ---@param y number
 ---@param z number
 ---@return number
 local function distanceSquared(drop, x, y, z)
-    local dx, dy, dz = drop.x - x, drop.y - y, drop.z - z
-    return dx * dx + dy * dy + dz * dz
+    return positions.distanceSquared(drop.x, drop.y, drop.z, x, y, z)
 end
 
 --- Retire un sac : spectateurs prévenus, entité supprimée, conteneur oublié.

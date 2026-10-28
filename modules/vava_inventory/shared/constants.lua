@@ -10,6 +10,9 @@ VavaInventory = {}
 VavaInventory.REGISTRY = 'vava_inventory:items'
 -- Champ de personnage : barre de raccourcis (identifiants d'objets, 0 = vide).
 VavaInventory.HOTBAR_FIELD = 'vava_inventory:hotbar'
+-- Champ de personnage public (statebag) : objet tenu en main, { id, item, model, bone, offset, rotation } ou rien.
+-- Chaque client en fait un accessoire local sur le ped du porteur (depuis 1.4.0).
+VavaInventory.HANDS_FIELD = 'vava_inventory:hands'
 -- Clé du statebag d'un sac au sol : identifiant de son conteneur (seule donnée publique).
 VavaInventory.DROP_STATE = 'vava_inventory:drop'
 
@@ -39,4 +42,5 @@ VavaInventory.RPC = {
     USE = 'vava_inventory:use',
     HOTBAR_SET = 'vava_inventory:hotbarSet',
     HOTBAR_USE = 'vava_inventory:hotbarUse',
+    HOLD = 'vava_inventory:hold',               -- prendre en main (id d'objet) ou reposer (0)
 }

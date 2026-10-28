@@ -27,6 +27,18 @@ VavaInventory.config = {
     maxItemSize = 8,               -- taille maximale d'un objet (cases), en largeur comme en hauteur
     -- Effets déclarés par un objet (`effects = { hunger = 35 }`), appliqués par les modules qui les lisent.
     effects = { maxEntries = 8, maxValue = 1000 },
+    -- Métadonnées portées par une pile (toujours un objet JSON) : bornes vérifiées à chaque écriture par un module.
+    -- maxEntries s'applique à chaque table (racine comme imbriquée), maxDepth compte la racine.
+    metadata = { maxEntries = 32, maxDepth = 4, maxStringLength = 256 },
+    -- Conteneurs ouverts par un module avec un ancrage (coffre, grenier, station…) : rayon maximal (m) et cadence
+    -- de la vérification d'éloignement, active seulement tant qu'un conteneur ancré est ouvert par quelqu'un.
+    anchor = { maxRadius = 25.0, sweepMs = 2000 },
+    -- Objet tenu en main (objets déclarant `held = { model, bone?, offset?, rotation? }`).
+    hands = {
+        defaultBone = 57005,       -- main droite (SKEL_R_Hand)
+        pollMs = 1000,             -- client : cadence de la boucle lente, active seulement tant qu'un accessoire est affiché
+        modelTimeoutMs = 5000,     -- client : attente maximale du chargement d'un modèle d'accessoire
+    },
     flushIntervalMs = 3000,        -- écriture groupée du journal des modifications
     hotbarSize = 5,
 

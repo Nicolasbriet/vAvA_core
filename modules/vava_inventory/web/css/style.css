@@ -1,7 +1,8 @@
 /*
  * web/css/style.css
- * Rôle : thème de l'inventaire : cuir grainé surpiqué (besace, ceinture), toile (sac au sol), cases creusées, coins de
- *        laiton, teinte par catégorie d'objet, Cinzel pour les titres et EB Garamond pour le texte (embarquées, OFL).
+ * Rôle : thème de l'inventaire : cuir grainé surpiqué (besace, ceinture, mains), toile (sac au sol), cases creusées,
+ *        coins de laiton, teinte par catégorie d'objet et par palier, marques des métadonnées (palier, solidité,
+ *        brisé, en main), Cinzel pour les titres et EB Garamond pour le texte (embarquées, OFL).
  * Performance : textures en images fixes répétées (peintes une fois), aucun flou d'arrière-plan ni filtre CSS, grille
  *        dessinée en fond (aucun élément par case), transitions sur opacity et transform seulement, copie glissée
  *        déplacée par transform.
@@ -51,6 +52,14 @@
   --card: var(--grain), linear-gradient(180deg, #2a2017, #1a130e);
   --card-shadow: 0 0 0 1px var(--edge), 0 0 0 2px rgba(var(--brass-rgb), 0.2), inset 0 1px 0 var(--highlight), 0 1.2rem 2.4rem rgba(0, 0, 0, 0.6);
 }
+
+/* Teinte par palier (métadonnée `tier` : badge et liseré) : la règle générique d'abord, les paliers 1 à 4 la
+   précisent ; un palier au-delà du cinquième garde l'or du cinquième. */
+[data-tier]:not([data-tier=""]) { --tier-rgb: 230, 190, 96; }
+[data-tier="1"] { --tier-rgb: 128, 116, 100; }
+[data-tier="2"] { --tier-rgb: 166, 152, 129; }
+[data-tier="3"] { --tier-rgb: 142, 170, 118; }
+[data-tier="4"] { --tier-rgb: 126, 164, 196; }
 
 /* Teinte par catégorie (objets, raccourcis, infobulle) ; une catégorie inconnue reste neutre. */
 [data-category="nourriture"] { --accent-rgb: 201, 146, 72; }
@@ -316,6 +325,95 @@ button { color: inherit; font: inherit; }
 }
 .item-quantity:empty { display: none; }
 
+/* Marques des métadonnées -------------------------------------------------------------------------------- */
+
+/* palier : plaque gravée en haut à gauche, liseré de la teinte du palier sur le support */
+.item-tier {
+  position: absolute;
+  top: 5px;
+  left: 5px;
+  min-width: 1.25em;
+  padding: 0 0.25em;
+  border-radius: 2px;
+  background: rgba(8, 6, 4, 0.85);
+  box-shadow: 0 0 0 1px rgba(var(--tier-rgb, var(--brass-rgb)), 0.55);
+  color: rgb(var(--tier-rgb, var(--brass-rgb)));
+  font-family: var(--font-display);
+  font-size: 0.62rem;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  line-height: 1.45;
+  text-align: center;
+  pointer-events: none;
+}
+.item-tier:empty { display: none; }
+.item[data-tier]:not([data-tier=""])::before {
+  box-shadow:
+    0 0 0 1px rgba(0, 0, 0, 0.75),
+    inset 0 0 0 1px rgba(var(--tier-rgb), 0.35),
+    inset 0 1px 0 rgba(var(--tier-rgb), 0.45),
+    0 2px 4px rgba(0, 0, 0, 0.45);
+}
+
+/* solidité : filet au pied de la case, laiton puis ambre puis sang */
+.item-durability {
+  --ratio: 1;
+  position: absolute;
+  right: 7px;
+  bottom: 4px;
+  left: 7px;
+  display: block;
+  height: 3px;
+  overflow: hidden;
+  border-radius: 2px;
+  background: rgba(0, 0, 0, 0.7);
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.6);
+  pointer-events: none;
+}
+.item-durability-fill {
+  display: block;
+  height: 100%;
+  background: linear-gradient(180deg, #e2c896, #9c7b49);
+  transform: scaleX(var(--ratio));
+  transform-origin: left;
+}
+.item-durability.is-low .item-durability-fill { background: linear-gradient(180deg, #e0a85a, #a56f2a); }
+.item-durability.is-critical .item-durability-fill { background: linear-gradient(180deg, #d77a62, #a3402f); }
+/* la quantité occupe le coin bas droit : le filet s'arrête avant elle */
+.item:has(.item-quantity:not(:empty)) .item-durability { right: 2.4rem; }
+
+/* brisé : support rayé de sang, image éteinte (opacité, aucun filtre) */
+.item.is-broken::before {
+  background:
+    repeating-linear-gradient(135deg, rgba(var(--oxblood-rgb), 0.28) 0 6px, transparent 6px 14px),
+    linear-gradient(180deg, #2a1d18, #1a1210);
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.75), inset 0 0 0 1px rgba(var(--oxblood-rgb), 0.55), 0 2px 4px rgba(0, 0, 0, 0.45);
+}
+.item.is-broken .item-art { opacity: 0.45; }
+
+/* en main : sceau de laiton en haut à droite */
+.item-held {
+  position: absolute;
+  top: 5px;
+  right: 5px;
+  display: none;
+  width: 0.9rem;
+  height: 0.9rem;
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 30%, #fbe8bb, #b48a4c 55%, #5c4220);
+  box-shadow: 0 0 0 1px #1d140b, 0 0 8px rgba(var(--brass-rgb), 0.55);
+  pointer-events: none;
+}
+.item-held::after {
+  content: "";
+  position: absolute;
+  inset: 3px;
+  border-radius: 50%;
+  background: #2a1d0c;
+}
+.is-held .item-held { display: block; }
+.is-held::before { box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.75), inset 0 0 0 1px rgba(var(--brass-rgb), 0.55), inset 0 0 12px rgba(var(--brass-rgb), 0.14), 0 2px 4px rgba(0, 0, 0, 0.45); }
+
 .item.ghost {
   position: fixed;
   top: 0;
@@ -357,12 +455,76 @@ button { color: inherit; font: inherit; }
   box-shadow: inset 0 0 0 2px var(--brass-bright), inset 0 0 18px rgba(var(--brass-rgb), 0.3);
 }
 
-/* Ceinture (raccourcis) ---------------------------------------------------------------------------------- */
+/* Ceinture (raccourcis) et mains ----------------------------------------------------------------------- */
 
-.hotbar { padding: 0.85rem 1.15rem 1.1rem; }
-.hotbar-header { display: flex; align-items: baseline; justify-content: space-between; gap: 2rem; margin-bottom: 0.95rem; }
-.hotbar-hint { margin: 0; color: var(--parchment-faint); font-size: 0.9rem; font-style: italic; }
+.hotbar { display: flex; align-items: stretch; gap: 1.25rem; padding: 0.85rem 1.15rem 1.1rem; }
+.hotbar-header,
+.hands-header { display: flex; align-items: baseline; justify-content: space-between; gap: 2rem; margin-bottom: 0.95rem; }
+.hotbar-hint,
+.hands-hint { margin: 0; color: var(--parchment-faint); font-size: 0.9rem; font-style: italic; }
 .hotbar-slots { display: flex; justify-content: center; gap: 0.6rem; }
+
+/* couture entre les mains et la ceinture */
+.hands {
+  position: relative;
+  padding-right: 1.25rem;
+  background: linear-gradient(180deg, transparent, rgba(var(--brass-rgb), 0.22) 20% 80%, transparent) right center / 1px 100% no-repeat;
+}
+.hands-header { flex-direction: column; align-items: flex-start; gap: 0.15rem; }
+.hands-title {
+  margin: 0;
+  color: var(--parchment);
+  font-family: var(--font-display);
+  font-size: 1rem;
+  font-weight: 600;
+  letter-spacing: 0.16em;
+  text-shadow: 0 1px 0 rgba(0, 0, 0, 0.8);
+  text-transform: uppercase;
+}
+.hands-hint { max-width: 9rem; line-height: 1.2; }
+
+.hands-slot {
+  --aw: 1;
+  --ah: 1;
+  --cell: 3.6rem;
+  position: relative;
+  width: 4rem;
+  height: 4rem;
+  margin: 0 auto;
+  border-radius: 4px;
+  background: url("../img/cell.svg") center / 100% 100%, rgba(6, 4, 3, 0.5);
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.75), 0 0 0 2px rgba(var(--brass-rgb), 0.14), 0 1px 0 2px rgba(255, 235, 200, 0.04);
+}
+.hands-slot.is-filled {
+  background:
+    radial-gradient(ellipse at 50% 45%, rgba(var(--accent-rgb), 0.2), transparent 72%),
+    url("../img/cell.svg") center / 100% 100%,
+    rgba(6, 4, 3, 0.5);
+  cursor: pointer;
+}
+.hands-slot::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: 4px;
+  box-shadow: inset 0 0 0 1px rgba(var(--brass-rgb), 0.75), inset 0 0 16px rgba(var(--brass-rgb), 0.2);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 120ms;
+}
+.hands-slot.is-filled:hover::after,
+.hands-slot.is-target::after { opacity: 1; }
+.hands-slot.is-refused::after {
+  background: repeating-linear-gradient(135deg, rgba(var(--oxblood-rgb), 0.32) 0 5px, rgba(var(--oxblood-rgb), 0.12) 5px 10px);
+  box-shadow: inset 0 0 0 1px rgba(var(--oxblood-rgb), 0.85);
+  opacity: 1;
+}
+.hands-slot .item-initials { --w: 1; --h: 1; position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); }
+.hands-slot .item-quantity { right: 4px; bottom: 4px; }
+.hands-slot .item-tier,
+.hotbar-slot .item-tier { top: 3px; left: 3px; }
+.hands-slot .item-held,
+.hotbar-slot .item-held { display: none; }
 
 .hotbar-slot {
   --aw: 1;
@@ -524,12 +686,70 @@ kbd {
   background: rgb(var(--accent-rgb));
   box-shadow: 0 0 6px rgba(var(--accent-rgb), 0.6);
 }
+.tooltip-subtitle { margin: 0.1rem 0 0; color: var(--parchment-muted); font-size: 0.9rem; font-style: italic; }
 .tooltip-text { margin: 0 0 0.65rem; color: rgba(236, 225, 200, 0.88); font-size: 0.95rem; font-style: italic; line-height: 1.35; }
 .tooltip-facts { display: grid; gap: 0.2rem; margin: 0; font-size: 0.9rem; }
 .tooltip-fact { display: flex; justify-content: space-between; gap: 1.5rem; }
 .tooltip-fact dt { color: var(--parchment-faint); }
 .tooltip-fact dd { margin: 0; text-align: right; font-variant-numeric: lining-nums tabular-nums; }
 .tooltip-fact small { display: block; color: var(--parchment-faint); font-size: 0.8rem; }
+.tooltip-fact.is-tier dd { color: rgb(var(--tier-rgb, var(--brass-rgb))); font-weight: 600; }
+.tooltip-fact.is-critical dd { color: #d77a62; }
+
+/* état : brisé (sang) ou en main (laiton) */
+.tooltip-state {
+  margin: 0 0 0.6rem;
+  padding: 0.3rem 0.6rem;
+  border-radius: 3px;
+  font-size: 0.9rem;
+}
+.tooltip-state.is-broken { background: rgba(var(--oxblood-rgb), 0.16); box-shadow: inset 2px 0 0 #d0705c; color: #e3a090; }
+.tooltip-state.is-held { background: rgba(var(--brass-rgb), 0.1); box-shadow: inset 2px 0 0 var(--brass-bright); color: var(--brass-bright); font-weight: 600; }
+
+/* signature de l'artisan, et son poinçon gravé */
+.tooltip-signature {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.6rem;
+  margin: 0.6rem 0 0;
+  padding-top: 0.55rem;
+  border-top: 1px solid rgba(var(--brass-rgb), 0.14);
+  color: var(--parchment-muted);
+  font-size: 0.9rem;
+  font-style: italic;
+}
+.tooltip-mark {
+  flex: none;
+  min-width: 1.6rem;
+  padding: 0 0.35rem;
+  border-radius: 2px;
+  background: rgba(0, 0, 0, 0.35);
+  box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.7), 0 0 0 1px rgba(var(--brass-rgb), 0.3);
+  color: var(--brass-bright);
+  font-family: var(--font-display);
+  font-size: 0.85rem;
+  font-style: normal;
+  font-weight: 700;
+  line-height: 1.5;
+  text-align: center;
+}
+
+/* histoire : dernières entrées, la plus récente en tête */
+.tooltip-history { margin-top: 0.6rem; padding-top: 0.55rem; border-top: 1px solid rgba(var(--brass-rgb), 0.14); }
+.tooltip-history-title {
+  margin: 0 0 0.3rem;
+  color: var(--parchment-faint);
+  font-family: var(--font-display);
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+.tooltip-history-list { margin: 0; padding: 0; list-style: none; font-size: 0.86rem; line-height: 1.35; }
+.tooltip-history-entry { color: rgba(236, 225, 200, 0.85); }
+.tooltip-history-entry + .tooltip-history-entry { margin-top: 0.15rem; }
+.tooltip-history-entry time { color: var(--parchment-faint); font-variant-numeric: lining-nums; }
 /* effets : pastilles gravées, laiton pour un gain, sang pour une perte */
 .tooltip-effects { display: flex; flex-wrap: wrap; gap: 0.35rem; margin: 0.65rem 0 0; }
 .tooltip-effect {

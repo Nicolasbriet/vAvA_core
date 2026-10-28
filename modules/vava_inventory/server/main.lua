@@ -1,6 +1,7 @@
 --[[
     vava_inventory/server/main.lua
-    Rôle : déclaration du module auprès du core et enregistrement des intentions du joueur (RPC à schéma strict).
+    Rôle : déclaration du module auprès du core (registre des objets, champs raccourcis et mains) et enregistrement
+           des intentions du joueur (RPC à schéma strict).
     Dépendances : tous les fichiers server/ du module
 ]]
 
@@ -31,6 +32,7 @@ local limits = cfg.rateLimits
 
 local RPCS = {
     { RPC.OPEN, { CONTAINER }, limits.open, operations.open },
+    { RPC.HOLD, { SLOT_CONTENT }, limits.action, function(src, id) return operations.hold(src, id) end },
     { RPC.CLOSE, {}, limits.action, function(src) operations.close(src) return true end },
     { RPC.MOVE, { INSTANCE, CONTAINER, COORD, COORD, ROTATED }, limits.action, operations.move },
     { RPC.SPLIT, { INSTANCE, QUANTITY, CONTAINER, COORD, COORD, ROTATED }, limits.action, operations.split },
@@ -55,6 +57,8 @@ local function setup()
         default = empty,
         visibility = 'owner',
     })
+    if not ok then return false, err end
+    ok, err = VavaInventory.hands.define()
     if not ok then return false, err end
 
     ok, err = containers.init()
