@@ -373,8 +373,8 @@ séparateurs `'`, `-` et espace jamais en tête, en fin ni doublés).
 Ressources séparées, dans `modules/` : à copier (ou lier) dans le dossier `resources` du serveur, dans cet ordre :
 `ensure vAvA_core`, `ensure vava_world`, `ensure vava_appearance`, `ensure vava_characters_ui`, `ensure vava_hud`,
 `ensure vava_inventory`, `ensure vava_needs`, `ensure vava_health`, `ensure vava_admin`, `ensure vava_voice`,
-`ensure vava_skills`, `ensure vava_gathering`, `ensure vava_chancellerie`, puis les modules qui déclarent des objets et
-les autres modules métiers.
+`ensure vava_skills`, `ensure vava_gathering`, `ensure vava_crafting`, `ensure vava_chancellerie`, puis les modules
+qui déclarent des objets et les autres modules métiers.
 
 ### `vava_appearance`
 
@@ -1046,6 +1046,43 @@ terre sacrée, nuit, état…), `harvested` (`after` : `+ quantity, tier, band, 
 
 **Commande** `/recolte zones | zone <id> | noeud <id> | vitalite <zone> <0-100> | recharger <noeud>` (droit `metiers`).
 Touches : `E` récolter, `O` panneau des zones. Rendu hors jeu : `web/index.html?view=prompt` (ou `tension`, `zones`).
+
+### `vava_crafting`
+
+L'artisanat (1.0.0) : **stations** (forge, établi, métier à tisser, alambic, tannerie, fourneau, table d'arcanes)
+publiques ou privées, avec leur qualité et parfois leur combustible (forge : charbon ; fourneau : bois ; réserve
+alimentée par les joueurs), une pièce à la fois ; **recettes** à ingrédients par **palier choisi** (consommés par pile,
+les plus anciennes d'abord, échange atomique), outil requis en main, durée, XP par `vava_skills` ; **qualité** =
+matériaux × 0,5 + niveau × 0,4 + station × 0,1 ± 5, plafonnée par le niveau, palier dérivé ; **objets signés**
+(`quality`, `tier`, `durability` = `max_durability`, `crafter_id`, `crafter_name` figé, `mark`, `crafted_at`,
+`history` création + 5 dernières) ou produits simples (`tier`) ; **poinçon** (glyphe parmi la config, dès Compagnon,
+champ `vava_crafting:mark`) ; **baptême** d'un chef-d'œuvre pendant 5 min ; **réparation** (25 % des ingrédients,
+solidité rendue, maximale − 5, histoire, jamais le créateur) ; **leçons** aux élèves à 10 m quand une recette
+transmise est réalisée (`vava_skills:recordLesson`). Détail, config et tests : `modules/vava_crafting/README.md`.
+Demande le core 0.6.0, `vava_inventory` 1.4.0, `vava_skills` 1.0.0, `vava_gathering` 1.0.0 ; facultatifs :
+`vava_hud`, `vava_admin` (droit `metiers`), `vava_chat`.
+
+**Registres** : `vava_crafting:stations` (types : `{ label, skills, fuel?, anim, prop }`) et `vava_crafting:recipes`
+(`{ label, skill, level, station, tool?, durationMs, difficulty, xp, signed?, signedIfQuality?, durability?,
+transmission?, fragments?, ingredients = { { item, quantity, minTier? } }, output = { item, quantity } }`), remplis par
+la config, ouverts aux autres modules ; chaque recette est aussi déclarée à `vava_skills:recipes`. État d'une station :
+state bag global `vava_crafting:station:<id>` → `{ fuel, busy }`.
+
+| Export serveur | Retour |
+|---|---|
+| `getStation(id)` · `getStations()` | `{ id, label, type, typeLabel, quality, busy, x, y, z, fuel?, owner? }` |
+| `setFuel(id, n)` | `true` ou `false, code` — journalisé au nom du module |
+| `registerAccess(kind, fn)` | branche un genre de propriétaire de station : `fn(ownerId, characterId)` → booléen (foyer, guilde…) |
+| `getRecipe(id)` · `recipesOf(type)` | définitions |
+| `getSession(joueur)` | `{ token, kind = craft \| repair, station, recipe, startedAt, durationMs }` ou `nil` |
+| `getMark(personnage)` | glyphe ou `nil` |
+
+**Hooks** : `vava_crafting:crafting` (`before`, annulable : `{ source, characterId, station, recipe, item }`),
+`crafted` (`after` : `+ quantity, quality, tier, signed, instanceId`), `repaired` (`after` : `{ source, characterId,
+station, recipe, item, instanceId, maxDurability }`).
+
+**Commande** `/artisanat stations | station <id> | carburant <id> <n>` (droit `metiers`). Touche `E` près d'une
+station. Rendu hors jeu : `web/index.html?view=menu` (ou `menu&tab=reparation`, `menu&tab=poincon`, `name`).
 
 ### `vava_chat`
 
