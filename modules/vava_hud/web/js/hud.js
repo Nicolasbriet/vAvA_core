@@ -1,20 +1,68 @@
 'use strict';
 /*
  * web/js/hud.js
- * Rôle : jauges du HUD (création, mise à jour de la valeur, du palier et de la lueur, ordre, visibilité) et notifications
- *        (empilées, retirées après leur durée ou quand elles sont trop nombreuses). Chaque jauge garde son élément ;
- *        une mise à jour ne touche que la jauge concernée.
+ * Rôle : jauges du HUD (création, mise à jour de la valeur, du palier et de la lueur, ordre, visibilité), notifications
+ *        (empilées, retirées après leur durée ou quand elles sont trop nombreuses) et barre de progression d'une action
+ *        longue (une seule : avance par une transition CSS sur la durée restante, aucune boucle par image ; fin ou
+ *        interruption annoncée par le jeu). Chaque jauge garde son élément ; une mise à jour ne touche que la jauge
+ *        concernée.
  */
 
 (() => {
   const SVG = 'http://www.w3.org/2000/svg';
   const RADIUS = 21;
   const LEAVE_MS = 260;
+  const PROGRESS_LEAVE_MS = 340;
   const root = document.getElementById('hud');
   const toasts = document.getElementById('toasts');
+  const bar = document.getElementById('progress');
+  const barLabel = bar.querySelector('.progress-label');
+  const barFill = bar.querySelector('.progress-fill');
+  const barHint = bar.querySelector('.progress-hint');
   const entries = new Map();
   // réglages des notifications, reçus à l'initialisation
   let toastRules = { durationMs: 4500, maxVisible: 4 };
+  let barTimer = null;
+
+  function progressReset() {
+    clearTimeout(barTimer);
+    barTimer = null;
+    bar.classList.remove('is-shown', 'is-leaving', 'is-done', 'is-cancelled');
+    bar.setAttribute('aria-hidden', 'true');
+    barFill.style.transition = 'none';
+    barFill.style.transform = 'scaleX(0)';
+    delete bar.dataset.id;
+  }
+
+  // la barre part de l'avancée déjà faite (page rechargée en cours d'action) et file jusqu'au bout par une seule
+  // transition sur la durée restante
+  function progressStart({ id, label, durationMs, elapsedMs = 0, cancelable, hint }) {
+    clearTimeout(barTimer);
+    barTimer = null;
+    const fraction = durationMs > 0 ? Math.min(1, Math.max(0, elapsedMs / durationMs)) : 1;
+    bar.dataset.id = id;
+    barLabel.textContent = label;
+    barHint.textContent = cancelable ? hint || '' : '';
+    bar.classList.remove('is-leaving', 'is-done', 'is-cancelled');
+    barFill.style.transition = 'none';
+    barFill.style.transform = `scaleX(${fraction})`;
+    // l'état de départ doit être appliqué avant que la transition ne parte
+    void barFill.offsetWidth;
+    barFill.style.transition = `transform ${Math.max(0, durationMs - elapsedMs)}ms linear`;
+    barFill.style.transform = 'scaleX(1)';
+    bar.setAttribute('aria-valuenow', String(Math.round(fraction * 100)));
+    bar.setAttribute('aria-label', label);
+    bar.setAttribute('aria-hidden', 'false');
+    bar.classList.add('is-shown');
+  }
+
+  function progressEnd({ id, done }) {
+    if (bar.dataset.id !== id || !bar.classList.contains('is-shown')) return;
+    barFill.style.transition = 'none';
+    if (done) barFill.style.transform = 'scaleX(1)';
+    bar.classList.add(done ? 'is-done' : 'is-cancelled', 'is-leaving');
+    barTimer = setTimeout(progressReset, PROGRESS_LEAVE_MS);
+  }
 
   function dismiss(node) {
     if (node.classList.contains('is-leaving')) return;
@@ -98,7 +146,7 @@
   }
 
   const handlers = {
-    init({ position = {}, gauges = [], visible = false, notifications }) {
+    init({ position = {}, gauges = [], visible = false, notifications, progress = null }) {
       if (notifications) toastRules = { durationMs: notifications.durationMs, maxVisible: notifications.maxVisible };
       if (position.left) root.style.setProperty('--left', position.left);
       if (position.bottom) root.style.setProperty('--bottom', position.bottom);
@@ -106,6 +154,9 @@
       root.replaceChildren();
       for (const def of gauges) define(def);
       root.classList.toggle('is-visible', Boolean(visible));
+      bar.classList.toggle('is-visible', Boolean(visible));
+      progressReset();
+      if (progress) progressStart(progress);
     },
     define,
     value({ id, value }) {
@@ -126,8 +177,12 @@
     },
     visible({ visible }) {
       root.classList.toggle('is-visible', Boolean(visible));
+      // la progression continue derrière le menu pause ou un fondu : seule son opacité suit le HUD
+      bar.classList.toggle('is-visible', Boolean(visible));
     },
     notify,
+    progress: progressStart,
+    progressEnd,
   };
 
   window.addEventListener('message', (event) => {

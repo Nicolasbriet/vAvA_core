@@ -1,9 +1,10 @@
 'use strict';
 /*
  * web/js/devmock.js
- * Rôle : jauges et notifications simulées quand la page est ouverte dans un navigateur (hors FiveM), pour travailler
- *        le rendu sans lancer le jeu. Inactif en jeu. Paramètres d'URL : ?values=0.8,0.62,0.08,0.5 (santé, faim, soif,
- *        voix) et ?talking=1 (lueur du médaillon de la voix).
+ * Rôle : jauges, notifications et progression simulées quand la page est ouverte dans un navigateur (hors FiveM), pour
+ *        travailler le rendu sans lancer le jeu. Inactif en jeu. Paramètres d'URL : ?values=0.8,0.62,0.08,0.5 (santé,
+ *        faim, soif, voix), ?talking=1 (lueur du médaillon de la voix), ?progress=1 (barre de progression de 8 s menée
+ *        à son terme) ou ?progress=cancel (interrompue à 60 %).
  */
 
 (() => {
@@ -11,7 +12,8 @@
   const icon = (resource, name) => `../../${resource}/web/icons/${name}.svg`;
   window.addEventListener('DOMContentLoaded', () => {
     document.body.classList.add('dev');
-    const values = (new URLSearchParams(window.location.search).get('values') || '0.8,0.62,0.24,0.5').split(',').map(Number);
+    const params = new URLSearchParams(window.location.search);
+    const values = (params.get('values') || '0.8,0.62,0.24,0.5').split(',').map(Number);
     const gauge = (id, label, order, value) => {
       const [resource, name] = id.split(':');
       return { id, label, icon: icon(resource, name), order, low: 0.3, critical: 0.1, value };
@@ -27,8 +29,19 @@
       visible: true,
       notifications: { durationMs: 600000, maxVisible: 4 },
     } }, '*');
-    if (new URLSearchParams(window.location.search).get('talking') === '1') {
+    if (params.get('talking') === '1') {
       window.postMessage({ action: 'active', payload: { id: 'vava_voice:voice', active: true } }, '*');
+    }
+    const progressMode = params.get('progress');
+    if (progressMode) {
+      const durationMs = 8000;
+      window.postMessage({ action: 'progress', payload: {
+        id: 'vava_gathering:chop', label: 'Vous abattez un chêne', durationMs, elapsedMs: 0,
+        cancelable: true, hint: 'Peut être interrompue',
+      } }, '*');
+      const cancelled = progressMode === 'cancel';
+      setTimeout(() => window.postMessage({ action: 'progressEnd', payload: { id: 'vava_gathering:chop', done: !cancelled } }, '*'),
+        cancelled ? durationMs * 0.6 : durationMs);
     }
     const samples = [
       ['Vous avez la gorge sèche.', 'info'],

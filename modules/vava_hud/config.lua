@@ -17,6 +17,11 @@ VavaHud.config = {
     -- Notifications (remplacent celles de GTA) : durée d'affichage, nombre à l'écran, longueur d'un message.
     notifications = { durationMs = 4500, maxVisible = 4, maxLength = 200, kinds = { info = true, warning = true, danger = true } },
 
+    -- Barre de progression d'une action longue (récolte, artisanat, réparation, leçon…), une seule à la fois :
+    -- bornes de la durée (ms), longueur du libellé, indice affiché quand l'action peut être interrompue.
+    -- Purement visuelle : le serveur reste maître du temps.
+    progress = { minDurationMs = 250, maxDurationMs = 120000, maxLabelLength = 60, cancelHint = 'Peut être interrompue' },
+
     -- Le jeu ne signale ni l'ouverture du menu pause, ni les fondus au noir, ni le retour de son interface :
     -- vérification à cet intervalle.
     pollMs = 250,

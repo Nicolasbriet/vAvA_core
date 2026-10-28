@@ -7,6 +7,11 @@
 </head>
 <body>
   <div id="hud" class="hud" aria-live="off"></div>
+  <div id="progress" class="progress" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-hidden="true">
+    <div class="progress-label"></div>
+    <div class="progress-track"><div class="progress-fill"></div></div>
+    <div class="progress-hint"></div>
+  </div>
   <div id="toasts" class="toasts" role="status" aria-live="polite"></div>
 
   <script src="js/devmock.js"></script>

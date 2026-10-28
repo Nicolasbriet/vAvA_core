@@ -1,8 +1,8 @@
 --[[
     vava_hud/fxmanifest.lua
     Rôle : affichage en jeu : retire l'interface native de GTA (minimap, HUD, notifications) et la remplace par des
-           jauges (santé, faim, soif…) et des notifications que les autres modules utilisent par exports.
-           Ressource cliente uniquement.
+           jauges (santé, faim, soif…), des notifications et une barre de progression des actions longues que les
+           autres modules utilisent par exports. Ressource cliente uniquement.
     Dépendances : vAvA_core ≥ 0.3.0 (hooks client du personnage)
 ]]
 
@@ -12,8 +12,8 @@ lua54 'yes'
 use_experimental_fxv2_oal 'yes'
 
 name 'vava_hud'
-description 'Affichage en jeu vAvA (jauges, notifications)'
-version '1.2.0'
+description 'Affichage en jeu vAvA (jauges, notifications, progression)'
+version '1.3.0'
 
 dependency 'vAvA_core'
 
@@ -34,5 +34,6 @@ client_scripts {
     'client/gauges.lua',
     'client/native.lua',
     'client/notify.lua',
+    'client/progress.lua',
     'client/main.lua',
 }
