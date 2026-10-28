@@ -164,6 +164,110 @@ button { color: inherit; font: inherit; }
 }
 .panel[data-kind="drop"]::after { inset: 6px; border-color: rgba(var(--brass-rgb), 0.12); }
 
+/* ardoise du greffier : le catalogue de développement */
+.panel[data-kind="catalog"] {
+  background:
+    var(--grain),
+    radial-gradient(ellipse 120% 80% at 50% 0%, rgba(96, 118, 124, 0.26), transparent 65%),
+    linear-gradient(180deg, #1f2527, #121617);
+}
+.panel[data-kind="catalog"]::after { inset: 6px; border-color: rgba(var(--brass-rgb), 0.12); }
+
+/* Bandeau du catalogue : onglets gravés (pastille de la teinte de la catégorie), recherche creusée, pages ---- */
+
+.panel[data-kind="catalog"] .weight-bar { display: none; }
+.catalog-bar { display: flex; flex-direction: column; gap: 0.6rem; margin-bottom: 0.85rem; }
+.catalog-tabs { display: flex; flex-wrap: wrap; gap: 0.35rem; }
+.catalog-tab {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.22rem 0.6rem 0.22rem 0.55rem;
+  border: 0;
+  border-radius: 3px;
+  background: rgba(0, 0, 0, 0.3);
+  box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.7), 0 0 0 1px rgba(var(--brass-rgb), 0.18);
+  color: var(--parchment-muted);
+  font-size: 0.9rem;
+  cursor: pointer;
+  transition: color 120ms, box-shadow 120ms;
+}
+.catalog-tab::before {
+  content: "";
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: rgb(var(--accent-rgb));
+  box-shadow: 0 0 6px rgba(var(--accent-rgb), 0.6);
+}
+.catalog-tab[data-category=""]::before { background: var(--brass); box-shadow: 0 0 6px rgba(var(--brass-rgb), 0.5); }
+.catalog-tab:hover { color: var(--parchment); box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.7), 0 0 0 1px rgba(var(--brass-rgb), 0.45); }
+.catalog-tab.is-active {
+  background: linear-gradient(180deg, rgba(var(--brass-rgb), 0.22), rgba(var(--brass-rgb), 0.08));
+  box-shadow: inset 0 1px 0 rgba(255, 240, 210, 0.1), 0 0 0 1px rgba(var(--brass-rgb), 0.7);
+  color: var(--brass-bright);
+}
+.catalog-tab-count { color: var(--parchment-faint); font-size: 0.8rem; font-variant-numeric: lining-nums tabular-nums; }
+.catalog-tab.is-active .catalog-tab-count { color: rgba(var(--brass-rgb), 0.85); }
+
+.catalog-nav { display: flex; align-items: center; gap: 0.6rem; }
+.catalog-search {
+  flex: 1;
+  min-width: 8rem;
+  min-height: 2.1rem;
+  padding: 0 0.7rem;
+  border: 0;
+  border-radius: 3px;
+  background: var(--well);
+  box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.9), 0 0 0 1px rgba(var(--brass-rgb), 0.2);
+  color: var(--parchment);
+  font: inherit;
+  font-size: 0.98rem;
+  user-select: text;
+}
+.catalog-search::placeholder { color: var(--parchment-faint); font-style: italic; }
+.catalog-search:focus { outline: none; box-shadow: inset 0 1px 3px rgba(0, 0, 0, 0.9), 0 0 0 1px var(--brass-bright); }
+.catalog-search::-webkit-search-cancel-button { margin: 0; -webkit-appearance: none; appearance: none; }
+.catalog-count { color: var(--parchment-faint); font-size: 0.9rem; font-style: italic; white-space: nowrap; }
+.catalog-page-button {
+  min-width: 1.9rem;
+  min-height: 2.1rem;
+  padding: 0 0.5rem;
+  border: 0;
+  border-radius: 3px;
+  background: linear-gradient(180deg, #33281d, #1e1710);
+  box-shadow: 0 0 0 1px var(--edge), inset 0 1px 0 rgba(255, 235, 200, 0.12), 0 2px 0 var(--edge);
+  color: var(--parchment);
+  font-family: var(--font-display);
+  font-size: 1.05rem;
+  font-weight: 700;
+  line-height: 1;
+  cursor: pointer;
+  transition: color 120ms;
+}
+.catalog-page-button:hover:not(:disabled) { color: var(--brass-bright); }
+.catalog-page-button:disabled { color: var(--parchment-faint); opacity: 0.55; cursor: default; }
+.catalog-page {
+  min-width: 3.2rem;
+  color: var(--parchment);
+  font-family: var(--font-display);
+  font-size: 0.85rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-align: center;
+  font-variant-numeric: lining-nums tabular-nums;
+}
+.grid-empty {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  margin: 0;
+  color: var(--parchment-faint);
+  font-style: italic;
+  pointer-events: none;
+}
+
 /* Panneaux ---------------------------------------------------------------------------------------------- */
 
 .panel { padding: 1.05rem 1.25rem 1.25rem; }

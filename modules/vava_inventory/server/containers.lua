@@ -313,5 +313,6 @@ function containers.describe(container)
     return {
         id = container.id, kind = container.kind, label = container.label, width = container.width, height = container.height,
         maxWeight = container.maxWeight, weight = container.weight, items = list,
+        catalog = container.catalog,   -- état du catalogue de développement (bandeau de l'interface), sinon rien
     }
 end

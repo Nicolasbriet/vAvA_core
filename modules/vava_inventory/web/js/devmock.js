@@ -2,7 +2,8 @@
 /*
  * web/js/devmock.js
  * Rôle : inventaire simulé quand la page est ouverte dans un navigateur (hors FiveM), pour travailler le rendu sans
- *        lancer le jeu. Inactif en jeu. Paramètre d'URL : ?drop=1 pour afficher aussi un sac au sol. Les images
+ *        lancer le jeu. Inactif en jeu. Paramètres d'URL : ?drop=1 pour afficher aussi un sac au sol, ?catalog=1 le
+ *        catalogue de développement. Les images
  *        viennent du module d'exemple voisin (examples/vava_example_items) quand le dépôt est complet. Les objets
  *        portent des métadonnées du contrat standard (palier, qualité, solidité, signature, histoire, brisé) et une
  *        hache est tenue en main.
@@ -59,11 +60,41 @@ const DevMock = (() => {
     id: -1, kind: 'drop', label: 'Sac au sol', width: 6, height: 4, maxWeight: 60000, weight: 0,
     items: [{ id: 7, item: 'pain', x: 0, y: 0, rotated: true, quantity: 1, metadata: {} }],
   };
+  // catalogue de développement : une pile pleine de chaque objet, par catégorie puis libellé, filtré par le bandeau
+  // (catégorie, recherche sans accents ni casse) et découpé en pages courtes pour montrer la pagination
+  const CATALOG_PER_PAGE = 6;
+  const catalogState = { category: '', page: 1, query: '' };
+  const fold = (text) => text.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase();
+  function catalogPage() {
+    const names = Object.keys(definitions).sort((a, b) => (definitions[a].category || '').localeCompare(definitions[b].category || '')
+      || definitions[a].label.localeCompare(definitions[b].label));
+    const counts = {};
+    for (const name of names) counts[definitions[name].category || ''] = (counts[definitions[name].category || ''] || 0) + 1;
+    const needle = fold(catalogState.query);
+    const kept = names.filter((name) => (!catalogState.category || (definitions[name].category || '') === catalogState.category)
+      && (!needle || fold(definitions[name].label).includes(needle) || name.includes(needle)));
+    const pages = Math.max(1, Math.ceil(kept.length / CATALOG_PER_PAGE));
+    const page = Math.min(Math.max(1, catalogState.page), pages);
+    let x = 0, y = 0;
+    const items = kept.slice((page - 1) * CATALOG_PER_PAGE, page * CATALOG_PER_PAGE).map((item, index) => {
+      const def = definitions[item];
+      if (x + def.width > 16) { x = 0; y += 4; }
+      const placed = { id: 200 + index, item, x, y, rotated: false, quantity: def.stack, metadata: {} };
+      x += def.width + 1;
+      return placed;
+    });
+    const categories = Object.keys(counts).sort((a, b) => Number(a === '') - Number(b === '') || a.localeCompare(b)).map((id) => ({ id, count: counts[id] }));
+    return {
+      id: -2, kind: 'catalog', label: 'Catalogue (développement)', width: 16, height: 10, maxWeight: 0, weight: 0, items,
+      catalog: { category: catalogState.category, page, pages, query: catalogState.query, total: kept.length, categories },
+    };
+  }
   const weigh = (container) => container.items.reduce((sum, i) => sum + definitions[i.item].weight * i.quantity, 0);
   let hands = 8;
+  const shown = { drop: false, catalog: false };
 
-  function snapshot(withDrop) {
-    const containers = [own].concat(withDrop ? [drop] : []);
+  function snapshot(withDrop, withCatalog) {
+    const containers = [own].concat(withDrop ? [drop] : [], withCatalog ? [catalogPage()] : []);
     for (const container of containers) container.weight = weigh(container);
     return { own: own.id, containers: JSON.parse(JSON.stringify(containers)), definitions, hotbar: [1, 2, 8, 0, 0], hands, closeKey: 'I' };
   }
@@ -82,14 +113,22 @@ const DevMock = (() => {
       window.postMessage({ action: 'hands', payload: { id: hands } }, '*');
       return { ok: true };
     }
+    if (name === 'catalog') {
+      // comme le serveur : la page demandée revient dans un nouvel état complet
+      Object.assign(catalogState, { category: data.category || '', page: Number(data.page) || 1, query: data.query || '' });
+      window.postMessage({ action: 'open', payload: snapshot(shown.drop, true) }, '*');
+      return { ok: true };
+    }
     return { ok: true, data };
   }
 
   if (!inGame) {
     window.addEventListener('DOMContentLoaded', () => {
       document.body.classList.add('dev');
-      const withDrop = new URLSearchParams(window.location.search).get('drop') === '1';
-      window.postMessage({ action: 'open', payload: snapshot(withDrop) }, '*');
+      const params = new URLSearchParams(window.location.search);
+      shown.drop = params.get('drop') === '1';
+      shown.catalog = params.get('catalog') === '1';
+      window.postMessage({ action: 'open', payload: snapshot(shown.drop, shown.catalog) }, '*');
     });
   }
 

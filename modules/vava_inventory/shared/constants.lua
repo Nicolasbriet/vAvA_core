@@ -16,7 +16,8 @@ VavaInventory.HANDS_FIELD = 'vava_inventory:hands'
 -- Clé du statebag d'un sac au sol : identifiant de son conteneur (seule donnée publique).
 VavaInventory.DROP_STATE = 'vava_inventory:drop'
 
-VavaInventory.KIND = { CHARACTER = 'character', DROP = 'drop' }
+-- catalog : catalogue de développement (1.5.0), temporaire, un par joueur du Conseil qui l'ouvre
+VavaInventory.KIND = { CHARACTER = 'character', DROP = 'drop', CATALOG = 'catalog' }
 
 -- Bornes de validation (protocole).
 VavaInventory.MAX_GRID = 32                 -- largeur et hauteur maximales d'un conteneur
@@ -43,4 +44,5 @@ VavaInventory.RPC = {
     HOTBAR_SET = 'vava_inventory:hotbarSet',
     HOTBAR_USE = 'vava_inventory:hotbarUse',
     HOLD = 'vava_inventory:hold',               -- prendre en main (id d'objet) ou reposer (0)
+    CATALOG = 'vava_inventory:catalog',         -- bandeau du catalogue de développement : catégorie, page, recherche
 }

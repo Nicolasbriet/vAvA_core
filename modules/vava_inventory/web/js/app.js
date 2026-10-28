@@ -161,6 +161,7 @@
     }
     if (def && def.stack > 1 && item.quantity > 1) entries.push({ label: A.split, run: () => splitDialog(item, container) });
     if (container.kind === 'drop') entries.push({ label: A.pickup, run: () => pickup(item) });
+    else if (container.kind === 'catalog') entries.push({ label: A.take, run: () => pickup(item) });
     else entries.push({ label: A.drop, danger: true, run: () => actions.drop(item) });
     Menu.context(event.clientX, event.clientY, entries);
   }
@@ -169,8 +170,52 @@
     const found = itemFromEvent(event);
     if (!found) return;
     const def = Model.definition(found.item.item);
-    if (found.container.kind === 'drop') pickup(found.item);
+    if (found.container.kind === 'drop' || found.container.kind === 'catalog') pickup(found.item);
     else if (def && found.container.id === Model.state.own) primary(found.item, def);
+  }
+
+  // Catalogue de développement : le bandeau demande une page au serveur, qui renvoie le panneau garni ------------
+
+  const SEARCH_DEBOUNCE_MS = 250;
+  let searchTimer = null;
+
+  /** Conteneur du catalogue désigné par un élément du bandeau. */
+  function catalogOf(node) {
+    const container = Model.state.containers.get(Number(node.dataset.container));
+    return container && container.catalog ? container : null;
+  }
+
+  function catalogRequest(container, changes) {
+    const state = container.catalog;
+    return plain('catalog', { category: state.category, page: state.page, query: state.query, ...changes });
+  }
+
+  function onCatalogClick(event) {
+    const tab = event.target.closest('.catalog-tab');
+    if (tab) {
+      const container = catalogOf(tab);
+      if (container) catalogRequest(container, { category: tab.dataset.category, page: 1 });
+      return;
+    }
+    const button = event.target.closest('.catalog-prev, .catalog-next');
+    if (!button || button.disabled) return;
+    const container = catalogOf(button);
+    if (container) catalogRequest(container, { page: container.catalog.page + (button.classList.contains('catalog-next') ? 1 : -1) });
+  }
+
+  /** Recherche envoyée après une courte pause de frappe (ou tout de suite : Entrée). */
+  function searchNow(input) {
+    clearTimeout(searchTimer);
+    const container = catalogOf(input);
+    const query = input.value.trim();
+    if (container && query !== container.catalog.query) catalogRequest(container, { query, page: 1 });
+  }
+
+  function onCatalogInput(event) {
+    const input = event.target.closest('.catalog-search');
+    if (!input) return;
+    clearTimeout(searchTimer);
+    searchTimer = setTimeout(() => searchNow(input), SEARCH_DEBOUNCE_MS);
   }
 
   function onHotbarClick(event) {
@@ -194,6 +239,8 @@
   app.addEventListener('contextmenu', openContextMenu);
   app.addEventListener('dblclick', onDoubleClick);
   app.addEventListener('click', onHotbarClick);
+  app.addEventListener('click', onCatalogClick);
+  app.addEventListener('input', onCatalogInput);
   app.addEventListener('pointerover', (event) => {
     if (Drag.isDragging()) return;
     const found = itemFromEvent(event);
@@ -236,9 +283,17 @@
   document.addEventListener('keydown', (event) => {
     if (app.hidden || Drag.isDragging()) return;
     const typing = event.target instanceof HTMLInputElement;
+    const searching = typing && event.target.classList.contains('catalog-search');
     if (event.key === 'Escape') {
       event.preventDefault();
-      if (!Menu.dismiss()) close();
+      // dans la recherche du catalogue : quitter le champ d'abord, fermer l'inventaire au second Échap
+      if (searching) event.target.blur();
+      else if (!Menu.dismiss()) close();
+      return;
+    }
+    if (event.key === 'Enter' && searching) {
+      event.preventDefault();
+      searchNow(event.target);
       return;
     }
     if (!typing && !Menu.isOpen() && event.key.toLowerCase() === String(Model.state.closeKey).toLowerCase()) close();

@@ -42,6 +42,19 @@ VavaInventory.config = {
     flushIntervalMs = 3000,        -- écriture groupée du journal des modifications
     hotbarSize = 5,
 
+    -- Catalogue de développement (1.5.0) : un conteneur temporaire garni d'une pile pleine de chaque objet connu,
+    -- par catégorie, découpé en pages à la taille de sa grille. `/catalogue [catégorie] [page]` en jeu (droit
+    -- `permission` de vava_admin ; sans lui, ACE `ace`), `catalogue <joueur> [catégorie] [page]` en console. Ce qu'on
+    -- en prend est regarni, ce qu'on y dépose disparaît, rien n'est écrit en base. À n'activer que sur un serveur
+    -- de test : tout y est gratuit.
+    catalog = {
+        enabled = false,
+        command = 'catalogue',
+        label = 'Catalogue (développement)',
+        width = 16, height = 10,
+        permission = 'staff', ace = 'vava_inventory.catalogue',
+    },
+
     -- Touches par défaut, modifiables par chaque joueur (Paramètres > Raccourcis > FiveM).
     keys = { open = 'I', hotbar = { '1', '2', '3', '4', '5' } },
     labels = { open = 'Ouvrir l\'inventaire', slot = 'Raccourci d\'inventaire %d' },

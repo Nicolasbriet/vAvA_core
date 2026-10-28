@@ -53,10 +53,24 @@ const Model = (() => {
     return view;
   }
 
+  /** État du catalogue de développement porté par son conteneur (bandeau : catégorie, page, recherche), ou null. */
+  function toCatalog(raw) {
+    if (!raw || typeof raw !== 'object') return null;
+    return {
+      category: typeof raw.category === 'string' ? raw.category : '',
+      page: Number(raw.page) || 1,
+      pages: Number(raw.pages) || 1,
+      query: typeof raw.query === 'string' ? raw.query : '',
+      total: Number(raw.total) || 0,
+      categories: list(raw.categories).filter((entry) => entry && typeof entry.id === 'string'),
+    };
+  }
+
   function toContainer(raw) {
     return {
       id: raw.id, kind: raw.kind, label: raw.label, width: raw.width, height: raw.height,
       maxWeight: raw.maxWeight, weight: raw.weight, items: new Map(list(raw.items).map((item) => [item.id, item])),
+      catalog: toCatalog(raw.catalog),
     };
   }
 

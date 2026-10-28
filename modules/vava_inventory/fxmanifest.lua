@@ -2,7 +2,8 @@
     vava_inventory/fxmanifest.lua
     Rôle : inventaire en grille : objets déclarés par les modules, conteneurs (personnage, sacs au sol, coffres créés
            par d'autres modules, ancrés à un lieu), opérations validées par le serveur, poids, métadonnées par pile
-           (empilement par égalité, retraits ciblés, écriture partielle), raccourcis, interface glisser-déposer.
+           (empilement par égalité, retraits ciblés, écriture partielle), raccourcis, interface glisser-déposer,
+           catalogue de développement (désactivé par défaut).
     Dépendances : vAvA_core ≥ 0.3.0, OneSync (sacs au sol en entités réseau, distances lues côté serveur)
 ]]
 
@@ -13,7 +14,7 @@ use_experimental_fxv2_oal 'yes'
 
 name 'vava_inventory'
 description 'Inventaire en grille vAvA'
-version '1.4.0'
+version '1.5.0'
 
 dependency 'vAvA_core'
 
@@ -46,8 +47,10 @@ server_scripts {
     'server/drops.lua',
     'server/hands.lua',
     'server/operations.lua',
+    'server/catalog.lua',
     'server/characters.lua',
     'server/api.lua',
+    'server/commands.lua',
     'server/main.lua',
 }
 

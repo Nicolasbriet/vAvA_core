@@ -6,7 +6,8 @@
     Dépendances : shared/, config.lua, client/core.lua, client/drops.lua, client/hands.lua, client/nui.lua
 ]]
 
-local type, tostring, pcall = type, tostring, pcall
+local type, tostring, tonumber, pcall = type, tostring, tonumber, pcall
+local tointeger = math.tointeger
 local CreateThread, RegisterNetEvent, RegisterCommand, RegisterKeyMapping = CreateThread, RegisterNetEvent, RegisterCommand, RegisterKeyMapping
 local IsPauseMenuActive, GetResourceState = IsPauseMenuActive, GetResourceState
 local BeginTextCommandThefeedPost, AddTextComponentSubstringPlayerName, EndTextCommandThefeedPostTicker =
@@ -103,6 +104,12 @@ nui.on('drop', function(d) return forward(RPC.DROP, d.id, d.quantity) end)
 nui.on('use', function(d) return forward(RPC.USE, d.id) end)
 nui.on('hotbarSet', function(d) return forward(RPC.HOTBAR_SET, d.slot, d.id) end)
 nui.on('hold', function(d) return forward(RPC.HOLD, d.id) end)
+-- bandeau du catalogue de développement : le serveur revérifie le droit et renvoie la page garnie
+nui.on('catalog', function(d)
+    local category = type(d.category) == 'string' and d.category or ''
+    local query = type(d.query) == 'string' and d.query:sub(1, 48) or ''
+    return forward(RPC.CATALOG, category, tointeger(tonumber(d.page or 0)) or 1, query)
+end)
 nui.on('close', function()
     close()
     core.rpc.emit(RPC.CLOSE)

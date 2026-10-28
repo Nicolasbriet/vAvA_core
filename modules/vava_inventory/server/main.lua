@@ -15,6 +15,7 @@ local containers = VavaInventory.containers
 local persistence = VavaInventory.persistence
 local operations = VavaInventory.operations
 local characters = VavaInventory.characters
+local catalog = VavaInventory.catalog
 local drops = VavaInventory.drops
 local cfg = VavaInventory.config
 local RPC = VavaInventory.RPC
@@ -28,6 +29,10 @@ local OPTIONAL_QUANTITY = { type = 'integer', min = 1, max = VavaInventory.MAX_Q
 local ROTATED = { type = 'boolean' }
 local SLOT = { type = 'integer', min = 1, max = cfg.hotbarSize }
 local SLOT_CONTENT = { type = 'integer', min = 0, max = MAX_ID }
+-- bandeau du catalogue de développement : catégorie ('' : toutes), page, recherche libre
+local CATEGORY = { type = 'string', min = 0, max = 32, pattern = '^[%w_]*$' }
+local PAGE = { type = 'integer', min = 1, max = 999 }
+local QUERY = { type = 'string', min = 0, max = 48 }
 local limits = cfg.rateLimits
 
 local RPCS = {
@@ -44,9 +49,12 @@ local RPCS = {
     end },
     { RPC.HOTBAR_SET, { SLOT, SLOT_CONTENT }, limits.action, operations.hotbarSet },
     { RPC.HOTBAR_USE, { SLOT }, limits.use, operations.hotbarUse },
+    { RPC.CATALOG, { CATEGORY, PAGE, QUERY }, limits.action, catalog.request },
 }
 
 local function setup()
+    local declared, declareErr = VavaInventory.commands.declare()
+    if not declared then return false, 'commandes : ' .. tostring(declareErr) end
     local ok, err = VavaInventory.items.define()
     if not ok then return false, err end
 
@@ -65,6 +73,8 @@ local function setup()
     if not ok then return false, 'identifiants d\'objets : ' .. tostring(err) end
     ok, err = characters.start()
     if not ok then return false, err end
+    ok, err = catalog.start()
+    if not ok then return false, 'catalogue : ' .. tostring(err) end
 
     for _, def in ipairs(RPCS) do
         ok, err = core.rpc.register(def[1], { args = def[2], rateLimit = def[3] }, def[4])

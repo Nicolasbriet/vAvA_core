@@ -129,6 +129,53 @@ const View = (() => {
       }
     }
     updateWeight(container);
+    if (panel.empty) panel.empty.hidden = container.items.size > 0;
+  }
+
+  /** Bandeau du catalogue de développement : onglets de catégories, recherche, pages. */
+  function buildCatalogBar(container) {
+    const C = STRINGS.catalog;
+    const state = container.catalog;
+    const containerId = String(container.id);
+    const bar = el('div', 'catalog-bar');
+    const tabs = el('div', 'catalog-tabs');
+    const tab = (id, label, count) => {
+      const button = el('button', `catalog-tab${id === state.category ? ' is-active' : ''}`);
+      button.type = 'button';
+      button.dataset.category = id;
+      button.dataset.container = containerId;
+      button.append(el('span', 'catalog-tab-label', label), el('span', 'catalog-tab-count', String(count)));
+      return button;
+    };
+    tabs.append(tab('', C.all, state.categories.reduce((sum, entry) => sum + (Number(entry.count) || 0), 0)));
+    for (const entry of state.categories) tabs.append(tab(entry.id, entry.id ? categoryLabel(entry.id) : C.uncategorized, entry.count));
+    const nav = el('div', 'catalog-nav');
+    const search = el('input', 'catalog-search');
+    search.type = 'search';
+    search.placeholder = C.search;
+    search.title = C.searchTitle;
+    search.autocomplete = 'off';
+    search.spellcheck = false;
+    search.maxLength = 48;
+    search.value = state.query;
+    search.dataset.container = containerId;
+    const pageButton = (className, text, title, disabled) => {
+      const button = el('button', `catalog-page-button ${className}`, text);
+      button.type = 'button';
+      button.title = title;
+      button.disabled = disabled;
+      button.dataset.container = containerId;
+      return button;
+    };
+    nav.append(
+      search,
+      el('span', 'catalog-count', C.count(state.total)),
+      pageButton('catalog-prev', '‹', C.prev, state.page <= 1),
+      el('span', 'catalog-page', C.page(state.page, state.pages)),
+      pageButton('catalog-next', '›', C.next, state.page >= state.pages),
+    );
+    bar.append(tabs, nav);
+    return bar;
   }
 
   function buildPanel(container) {
@@ -152,9 +199,34 @@ const View = (() => {
     const preview = el('div', 'preview');
     preview.hidden = true;
     grid.append(preview);
-    section.append(header, bar, grid);
-    panels.set(container.id, { section, grid, preview, weightCurrent, weightMax, weightFill });
+    let empty = null;
+    if (container.catalog) {
+      empty = el('p', 'grid-empty', STRINGS.catalog.empty);
+      empty.hidden = true;
+      grid.append(empty);
+      section.append(header, bar, buildCatalogBar(container), grid);
+    } else {
+      section.append(header, bar, grid);
+    }
+    panels.set(container.id, { section, grid, preview, empty, weightCurrent, weightMax, weightFill });
     return section;
+  }
+
+  /** Recherche du catalogue en cours de frappe : le serveur renvoie tout le panneau, le champ garde texte et focus. */
+  function searchState() {
+    const active = document.activeElement;
+    if (!active || !active.classList || !active.classList.contains('catalog-search')) return null;
+    return { container: Number(active.dataset.container), value: active.value, start: active.selectionStart, end: active.selectionEnd };
+  }
+
+  function restoreSearch(saved) {
+    if (!saved) return;
+    const panel = panels.get(saved.container);
+    const input = panel && panel.section.querySelector('.catalog-search');
+    if (!input) return;
+    input.value = saved.value;
+    input.focus();
+    input.setSelectionRange(saved.start, saved.end);
   }
 
   /** Emplacement (raccourci ou mains) rempli par un objet : image, quantité, marques. */
@@ -193,6 +265,7 @@ const View = (() => {
   /** Rendu complet (ouverture, conteneur ajouté ou retiré). */
   function render() {
     hideTooltip();
+    const searching = searchState();
     panels.clear();
     itemNodes.clear();
     const sections = [];
@@ -208,6 +281,7 @@ const View = (() => {
     }
     renderHotbar();
     renderHands();
+    restoreSearch(searching);
   }
 
   // Glisser-déposer ------------------------------------------------------------------------------------------

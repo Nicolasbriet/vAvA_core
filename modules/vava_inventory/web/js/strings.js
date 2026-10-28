@@ -72,7 +72,20 @@ const STRINGS = Object.freeze({
     split: 'Diviser…',
     drop: 'Jeter',
     pickup: 'Ramasser',
+    take: 'Prendre',
     clearSlot: 'Vider le raccourci',
+  },
+  // bandeau du catalogue de développement
+  catalog: {
+    all: 'Tout',
+    uncategorized: 'Sans catégorie',
+    search: 'Rechercher…',
+    searchTitle: 'Rechercher un objet par son nom',
+    page: (page, pages) => `${page} / ${pages}`,
+    prev: 'Page précédente',
+    next: 'Page suivante',
+    count: (total) => (total > 1 ? `${total} objets` : `${total} objet`),
+    empty: 'Aucun objet ne répond à cette recherche.',
   },
   split: { title: 'Diviser la pile', confirm: 'Diviser', cancel: 'Annuler', quantity: 'Quantité' },
   tooltip: {
