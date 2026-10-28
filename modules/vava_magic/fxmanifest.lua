@@ -5,7 +5,8 @@
            magie à la souris (viser, lancer, verrouiller une cible), états élémentaires (brûlure, mouillé, ralenti,
            chancelant, renversé, gelé ; immunité aux contrôles durs), zones au sol, projectiles et obstacles, sorts de feu
            (Boule de feu, Mur de flammes, Nova ardente), d'eau (Trait de glace, Vague, Brume) et de terre (Projectile de
-           roche, Secousse, Rempart), Lueur (lumière) et Murmure (messages), grimoire et registre des murmures (objets),
+           roche, Secousse, Rempart), combinaisons entre éléments (vapeur, boue, gel…), Lueur (lumière) et Murmure
+           (messages), grimoire (avec ses combinaisons découvertes) et registre des murmures (objets),
            commandes du Conseil. Le serveur décide de tout ; les effets visibles passent par des state bags posés par le
            serveur et des évènements ciblés, reçus des seuls joueurs proches.
     Dépendances : vAvA_core ≥ 0.5.0 ; facultatives : vava_inventory ≥ 1.3.0 (grimoire et registre), vava_hud
@@ -19,7 +20,7 @@ use_experimental_fxv2_oal 'yes'
 
 name 'vava_magic'
 description 'Magie vAvA : mana, progression, roue des sorts, états, sorts de feu, eau et terre, Murmure, Lueur, grimoire et registre'
-version '2.2.0'
+version '2.4.0'
 
 dependency 'vAvA_core'
 
@@ -32,6 +33,7 @@ files {
     'web/css/*.css',
     'web/js/*.js',
     'web/fonts/*.woff2',
+    'web/sounds/*.ogg',
     'web/img/*',
     'web/img/spells/*.svg',
     'web/img/elements/*.svg',
@@ -62,6 +64,7 @@ server_scripts {
     'server/obstacles.lua',
     'server/zones.lua',
     'server/grounds.lua',
+    'server/combos.lua',
     'server/projectiles.lua',
     'server/registers.lua',
     'server/sigils.lua',
@@ -99,8 +102,10 @@ client_scripts {
     'client/states.lua',
     'client/ambient.lua',
     'client/zones.lua',
+    'client/clouds.lua',
     'client/bursts.lua',
     'client/projectiles.lua',
+    'client/combos.lua',
     'client/spells/murmure.lua',
     'client/spells/lueur.lua',
     'client/spells/boule_de_feu.lua',

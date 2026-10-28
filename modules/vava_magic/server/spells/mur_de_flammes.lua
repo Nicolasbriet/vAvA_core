@@ -7,9 +7,10 @@
         largeur du niveau ; ni ses bouts ni son centre dans une zone protégée. Au-delà de `maxPerCaster` murs, le plus
         ancien du lanceur s'éteint.
       - Tant qu'elle brûle : qui s'y tient ou la traverse (même en courant entre deux vérifications) perd des points de
-        vie et repart en Brûlure, au plus une fois par `hitCooldownMs` ; jamais le lanceur. Le premier blessé rapporte
-        au lanceur le bonus d'XP du sort, si le lancer a rapporté.
-    Dépendances : shared/, config.lua, server/ (noyau, combat, states, zones)
+        vie et repart en Brûlure, au plus une fois par `hitCooldownMs` ; jamais le lanceur ; un joueur mouillé sèche
+        (combinaison : dégâts réduits, pas de brûlure). Le premier blessé rapporte au lanceur le bonus d'XP du sort,
+        si le lancer a rapporté. L'eau (vague, trait de glace) l'éteint en vapeur (combinaison).
+    Dépendances : shared/, config.lua, server/ (noyau, combat, states, zones, combos)
 ]]
 
 local tostring = tostring
@@ -20,6 +21,7 @@ local spells = VavaMagic.spells
 local combat = VavaMagic.combat
 local states = VavaMagic.states
 local zones = VavaMagic.zones
+local combos = VavaMagic.combos
 local sheets = VavaMagic.sheets
 local experience = VavaMagic.experience
 local geometry = VavaMagic.geometry
@@ -77,8 +79,9 @@ zones.define(KIND, {
         local now = GetGameTimer()
         if data.hits[victim] and now - data.hits[victim] < spellCfg.hitCooldownMs then return end
         data.hits[victim] = now
-        if not combat.damage(zone.owner, victim, NAME, data.damage, combat.KIND.ZONE, zone.ownerCharacter) then return end
-        if data.burn then
+        local hit = combos.hit(zone.owner, victim, NAME, data.damage)
+        if not combat.damage(zone.owner, victim, NAME, hit.damage, combat.KIND.ZONE, zone.ownerCharacter) then return end
+        if data.burn and hit.burn then
             states.apply(victim, 'burn', {
                 durationMs = data.burn.durationMs, tickMs = data.burn.tickMs, damage = data.burn.damage,
                 caster = zone.owner, spell = NAME,

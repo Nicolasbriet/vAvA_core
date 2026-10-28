@@ -3,12 +3,13 @@
     Rôle : grimoire (objet utilisé, ou /grimoire en secours) : sorts connus rangés par élément (ordre de la roue),
            avec icône, élément, niveau, barre d'XP, ce que le niveau permet, ce que débloque le suivant, coût en
            mana, recharge, durée d'incantation, touches choisies par le joueur ; couleur de la lumière quand le niveau
-           le permet. Pour un non-mage, les pages restent illisibles.
+           le permet ; combinaisons découvertes (déclencheur, résultat, éléments), avec le compte de celles qui
+           restent à trouver. Pour un non-mage, les pages restent illisibles.
            Construit d'après la vue de la fiche reçue du serveur et la config (aucune requête).
     Dépendances : shared/, config.lua, client/ (noyau), client/spells/lueur.lua (couleur)
 ]]
 
-local type, ipairs, tostring, sort, format, gsub = type, ipairs, tostring, table.sort, string.format, string.gsub
+local type, ipairs, pairs, tostring, sort, format, gsub = type, ipairs, pairs, tostring, table.sort, string.format, string.gsub
 local RegisterNetEvent = RegisterNetEvent
 
 local nui = VavaMagic.nui
@@ -70,6 +71,31 @@ local function pageOf(name, view)
     }
 end
 
+--- Combinaisons découvertes (ordre de la config) et nombre de celles qui restent à trouver.
+---@return table[] pages
+---@return integer hidden
+local function comboPages()
+    local discovered = {}
+    for _, id in ipairs(state.combos()) do discovered[id] = true end
+    local list, total = {}, 0
+    for id, combo in pairs(cfg.combos) do
+        total = total + 1
+        if discovered[id] then
+            local icons = {}
+            for _, key in ipairs(combo.elements or {}) do
+                local element = cfg.elements[key]
+                if element then icons[#icons + 1] = { icon = element.group, label = element.label, color = element.color } end
+            end
+            list[#list + 1] = {
+                id = id, label = combo.label, summary = combo.summary, trigger = combo.triggerText, result = combo.resultText,
+                elements = icons, order = combo.order or 1000,
+            }
+        end
+    end
+    sort(list, function(a, b) return a.order < b.order end)
+    return list, total - #list
+end
+
 function grimoire.open()
     if not state.ready() then
         messages.refuse('not_ready')
@@ -82,13 +108,14 @@ function grimoire.open()
     local view = state.view()
     local pages = {}
     for _, name in ipairs(state.knownSpells()) do pages[#pages + 1] = pageOf(name, view) end
+    local combos, hidden = comboPages()
     sort(pages, function(a, b)
         local ga, gb = GROUP_RANK[a.group] or 99, GROUP_RANK[b.group] or 99
         if ga ~= gb then return ga < gb end
         return (state.spellConfig(a.name).order or 1000) < (state.spellConfig(b.name).order or 1000)
     end)
     nui.open('grimoire', {
-        sealed = false, spells = pages, groups = cfg.wheel.groups,
+        sealed = false, spells = pages, groups = cfg.wheel.groups, combos = combos, hiddenCombos = hidden,
         controls = { wheel = keys.label('roue'), aim = keys.label('viser'), cast = keys.label('lancer') },
     })
 end

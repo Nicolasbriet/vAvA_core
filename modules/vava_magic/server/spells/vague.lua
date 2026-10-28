@@ -4,12 +4,12 @@
       - Début et fin : pas dans une zone protégée (position du lanceur lue côté serveur).
       - Fin : le cône part de la position du lanceur, dans la direction du regard envoyée par le client (normalisée ici
         ; c'est son choix de visée), de la portée et de l'ouverture du niveau. Les joueurs proches voient la vague.
-        Les zones de feu qu'elle touche s'éteignent (`extinguishes`). Les joueurs en jeu dans le cône (sauf le lanceur,
-        et pas à travers un rempart) que les sorts peuvent toucher sont repoussés (direction donnée par le serveur),
-        Mouillés, leur Brûlure noyée, et Renversés dès le niveau 4 (contrôle dur : protégés ensuite des autres). Un
-        sol mouillé reste devant le lanceur. Si elle a touché quelqu'un et que le lancer a rapporté, le lanceur gagne
-        le bonus d'XP du sort.
-    Dépendances : shared/, config.lua, server/ (noyau, combat, states, zones, grounds, obstacles)
+        Les zones qu'elle touche passent par les combinaisons (un mur de flammes s'éteint en vapeur). Les joueurs en
+        jeu dans le cône (sauf le lanceur, et pas à travers un rempart) que les sorts peuvent toucher passent aussi
+        par les combinaisons (leur Brûlure s'éteint), puis sont repoussés (direction donnée par le serveur), Mouillés,
+        et Renversés dès le niveau 4 (contrôle dur : protégés ensuite des autres). Un sol mouillé reste devant le
+        lanceur. Si elle a touché quelqu'un et que le lancer a rapporté, le lanceur gagne le bonus d'XP du sort.
+    Dépendances : shared/, config.lua, server/ (noyau, combat, states, combos, grounds, obstacles)
 ]]
 
 local ipairs, tostring, abs = ipairs, tostring, math.abs
@@ -19,7 +19,7 @@ local world = VavaMagic.world
 local spells = VavaMagic.spells
 local combat = VavaMagic.combat
 local states = VavaMagic.states
-local zones = VavaMagic.zones
+local combos = VavaMagic.combos
 local grounds = VavaMagic.grounds
 local obstacles = VavaMagic.obstacles
 local experience = VavaMagic.experience
@@ -30,8 +30,6 @@ local NAME = 'vague'
 local DIRECTION = { type = 'number', min = -1.01, max = 1.01 }
 -- écart de hauteur permis entre le lanceur et ce que touche la vague (m)
 local HEIGHT = 2.5
--- espacement des points d'une zone jugés pour l'éteindre (m)
-local SAMPLE_SPACING = 1.0
 
 ---@param ctx table
 local function begin(ctx)
@@ -42,23 +40,6 @@ end
 --- Le point est-il dans le cône de la vague ?
 local function inWave(point, apex, forward, levelCfg)
     return abs(point.z - apex.z) <= HEIGHT and geometry.inCone2d(point, apex, forward, levelCfg.range, levelCfg.halfAngle)
-end
-
---- Éteint les zones de feu que la vague touche. Renvoie leur nombre.
-local function extinguish(apex, forward, levelCfg)
-    local count = 0
-    for _, zone in ipairs(zones.list()) do
-        if spellCfg.extinguishes[zone.kind] then
-            for _, point in ipairs(zones.samples(zone, SAMPLE_SPACING)) do
-                if inWave(point, apex, forward, levelCfg) then
-                    zones.remove(zone.id, 'extinguished')
-                    count = count + 1
-                    break
-                end
-            end
-        end
-    end
-    return count
 end
 
 ---@param ctx table
@@ -74,7 +55,7 @@ local function finish(ctx, dx, dy)
         spell = NAME, caster = src, x = position.x, y = position.y, z = position.z, dx = forward.x, dy = forward.y,
         range = levelCfg.range, angle = levelCfg.halfAngle, level = ctx.level,
     })
-    local extinguished = extinguish(position, forward, levelCfg)
+    local extinguished = combos.sweep(src, NAME, function(point) return inWave(point, position, forward, levelCfg) end)
     local touched = 0
     for _, entry in ipairs(world.near(position, levelCfg.range + HEIGHT, src)) do
         local victim = entry.source
@@ -82,7 +63,7 @@ local function finish(ctx, dx, dy)
             and combat.affects(victim) then
             touched = touched + 1
             combat.react(victim, NAME)
-            states.remove(victim, 'burn')
+            combos.hit(src, victim, NAME, 0)
             states.apply(victim, 'wet', { durationMs = levelCfg.wetMs, caster = src, spell = NAME })
             local away = geometry.direction2d(position, entry.position) or forward
             TriggerClientEvent(EVENTS.PUSH, victim, away.x, away.y, levelCfg.knockback)

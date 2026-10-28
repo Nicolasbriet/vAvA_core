@@ -4,7 +4,8 @@
  * Rôle : barre de mana (bas de l'écran) avec le sort prêt dans les mains (sceau à l'icône de l'élément, nom, niveau
  *        en chiffres romains) ; réticule de visée au centre de l'écran, aux couleurs de l'élément, grisé hors de
  *        portée. La barre anime seule la remontée de la mana d'après le rythme reçu du jeu (aucun envoi périodique)
- *        et ne se montre que si la mana n'est pas pleine, en mode magie éveillé, ou juste après un sort.
+ *        et ne se montre que si la mana n'est pas pleine, en mode magie éveillé, ou juste après un sort. Mot bref
+ *        d'une combinaison réussie (« Vapeur ! ») au-dessus de la barre, qui monte, luit et s'efface.
  */
 
 const Hud = (() => {
@@ -15,9 +16,12 @@ const Hud = (() => {
   const level = document.getElementById('hud-level');
   const fill = document.getElementById('hud-fill');
   const reticleRoot = document.getElementById('reticle');
+  const comboNode = document.getElementById('hud-combo');
   // rafraîchissement de la barre tant qu'elle remonte, et délai de son effacement
   const TICK_MS = 250;
   const FADE_MS = 600;
+  // durée du mot d'une combinaison
+  const COMBO_MS = 1800;
 
   let pool = null;
   let awake = false;
@@ -25,6 +29,7 @@ const Hud = (() => {
   let enabled = false;
   let ticker = null;
   let hideTimer = null;
+  let comboTimer = null;
 
   /** Mana prédite maintenant, d'après le dernier envoi du jeu. */
   function current() {
@@ -107,6 +112,19 @@ const Hud = (() => {
     setTimeout(wake, (Number(ms) || 0) + TICK_MS);
   }
 
+  /** Combinaison réussie : { label } ; la barre se montre le temps du mot. */
+  function combo({ label }) {
+    comboNode.textContent = String(label || '');
+    clearTimeout(comboTimer);
+    comboNode.hidden = false;
+    // la même animation repart à chaque combinaison
+    comboNode.classList.remove('is-on');
+    void comboNode.offsetWidth;
+    comboNode.classList.add('is-on');
+    flash({ ms: COMBO_MS + FADE_MS });
+    comboTimer = setTimeout(() => { comboNode.hidden = true; }, COMBO_MS);
+  }
+
   function casting({ active }) {
     root.classList.toggle('is-casting', active === true);
   }
@@ -132,5 +150,5 @@ const Hud = (() => {
     reticleRoot.hidden = false;
   }
 
-  return { setMana, setSpell, setMode, flash, casting, disable, reticle, current };
+  return { setMana, setSpell, setMode, flash, combo, casting, disable, reticle, current };
 })();

@@ -1,0 +1,10 @@
+Sons personnalisés de la magie (facultatifs).
+
+Déposer ici des fichiers .ogg et les déclarer dans config.lua, section `sounds.files` :
+    files = { whoosh = 'sounds/whoosh.ogg', impact = 'sounds/impact.ogg' }
+
+Noms connus : chime (murmure reçu), whoosh (lancer d'un projectile), impact, fizzle (boule éteinte), shatter (glace
+brisée), splash (vague), crack (sol qui se fend), rumble (grondement), hiss (vapeur).
+
+Sans fichier, l'interface fabrique ces sons elle-même (Web Audio) : rien à télécharger. Le volume suit la distance
+(`sounds.hearing`). Un son natif de GTA (`sounds.native`) remplace celui de l'interface pour le nom donné.

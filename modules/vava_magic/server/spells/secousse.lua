@@ -5,11 +5,12 @@
         du royaume.
       - Fin : le sol se fend au point visé : une zone « présage » du rayon du niveau, vue des joueurs proches (anneau
         qui se resserre, poussière), le temps du `delayMs` du niveau : de quoi fuir.
-      - Au terme du présage (pas s'il est nettoyé ou arrêté) : les joueurs proches voient le sol se soulever ; ceux qui
-        se tiennent alors dans le cercle (positions serveur, jamais le lanceur) perdent des points de vie et chancellent
+      - Au terme du présage (pas s'il est nettoyé ou arrêté) : les joueurs proches voient le sol se soulever ; un sol
+        mouillé sous le cercle devient de la boue (combinaison) ; ceux qui se tiennent alors dans le cercle (positions
+        serveur, jamais le lanceur) perdent des points de vie et chancellent
         (ou sont renversés dès le niveau 4 : contrôles durs, protégés ensuite des autres). Si elle a touché quelqu'un
         et que le lancer a rapporté, le lanceur toujours là gagne le bonus d'XP du sort.
-    Dépendances : shared/, config.lua, server/ (noyau, combat, states, zones)
+    Dépendances : shared/, config.lua, server/ (noyau, combat, states, zones, combos)
 ]]
 
 local ipairs, tostring = ipairs, tostring
@@ -19,6 +20,7 @@ local spells = VavaMagic.spells
 local combat = VavaMagic.combat
 local states = VavaMagic.states
 local zones = VavaMagic.zones
+local combos = VavaMagic.combos
 local sheets = VavaMagic.sheets
 local experience = VavaMagic.experience
 local cfg = VavaMagic.config
@@ -61,6 +63,7 @@ local function strike(zone)
     world.broadcast(center, spellCfg.broadcastRadius, EVENTS.BURST, {
         spell = NAME, caster = zone.owner, x = center.x, y = center.y, z = center.z, radius = zone.radius, level = zone.level,
     })
+    combos.quake(zone)
     local ownerSheet = sheets.get(zone.owner)
     local ownerHere = ownerSheet ~= nil and ownerSheet.characterId == zone.ownerCharacter
     local touched = 0

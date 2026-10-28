@@ -7,7 +7,8 @@
         aux couleurs de la terre) et se remplit à mesure que le choc approche ; le sol craque et fume de poussière. De
         quoi fuir : le serveur ne frappe qu'au terme du présage.
       - Choc (effet instantané du serveur) : éclats de roche sur tout le cercle, caméra qui tremble pour les plus
-        proches, grondement. Moins d'éclats de loin, rien au-delà de la distance des effets.
+        proches, grondement ; le sol reste fissuré un moment. Moins d'éclats de loin, rien au-delà de la distance des
+        effets.
     Dépendances : shared/, config.lua, client/ (noyau, controls, zones, bursts)
 ]]
 
@@ -94,6 +95,7 @@ local function strike(payload)
     end
     bursts.shake(center, payload.radius * fxCfg.shake.radii, fxCfg.shake)
     bursts.sound('rumble', center)
+    zoneRender.trace({ center }, payload.radius * 2)
 end
 
 bursts.define(NAME, strike)

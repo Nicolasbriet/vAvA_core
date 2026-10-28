@@ -8,12 +8,14 @@
       - Sol mouillé (genre « wet », Vague et Brume) : reflet d'eau posé au sol, gouttes à sa naissance.
       - Les autres genres se déclarent avec `zones.define` depuis le fichier de leur sort (brume, présage d'une
         secousse).
-    Une recherche toutes les 250 ms choisit le niveau de détail ; le dessin par image (lumières, reflets, présages) ne
-    tourne que tant qu'une zone visible a quelque chose à dessiner.
+      - Traces temporaires au sol (`zones.trace`) : sol noirci quand un mur de flammes s'éteint, après une nova,
+        fissure après une secousse ; disques sombres qui s'effacent en fondu (`effects.traces`), vus de ce seul client.
+    Une recherche toutes les 250 ms choisit le niveau de détail ; le dessin par image (lumières, reflets, présages,
+    traces) ne tourne que tant qu'une zone visible ou une trace a quelque chose à dessiner.
     Dépendances : shared/, config.lua, client/fx.lua
 ]]
 
-local type, pairs, ipairs, next, floor, max, sqrt, sin, cos, pi = type, pairs, ipairs, next, math.floor, math.max, math.sqrt, math.sin, math.cos, math.pi
+local type, pairs, ipairs, next, floor, max, abs, sqrt, sin, cos, pi = type, pairs, ipairs, next, math.floor, math.max, math.abs, math.sqrt, math.sin, math.cos, math.pi
 local CreateThread, Wait, GetGameTimer, RegisterNetEvent = CreateThread, Wait, GetGameTimer, RegisterNetEvent
 local StartParticleFxLoopedAtCoord, StartParticleFxNonLoopedAtCoord, DrawMarker, GetGroundZFor_3dCoord =
     StartParticleFxLoopedAtCoord, StartParticleFxNonLoopedAtCoord, DrawMarker, GetGroundZFor_3dCoord
@@ -21,6 +23,7 @@ local StartParticleFxLoopedAtCoord, StartParticleFxNonLoopedAtCoord, DrawMarker,
 local fx = VavaMagic.fx
 local geometry = VavaMagic.geometry
 local cfg = VavaMagic.config
+local tracesCfg = cfg.effects.traces
 local EVENTS = VavaMagic.EVENTS
 local SCAN_MS = 250
 -- une zone dont la fin n'est jamais arrivée est oubliée passé ce délai
@@ -29,9 +32,13 @@ local GRACE_MS = 2000
 local FLICKER, FLICKER_SPEED = 0.18, 6.0
 -- recherche du sol sous une zone : départ au-dessus de son centre (m)
 local GROUND_PROBE = 1.5
+-- écart de hauteur où un point compte encore dans une zone (m)
+local HEIGHT = 2.5
 local MARKER_CYLINDER = 1
 -- gouttes d'un sol mouillé : sur un cercle à cette part de son rayon
 local SPLASH_SHARE = 0.6
+-- traces au sol : posées juste au-dessus du sol, épaisseur du disque
+local GROUND_OFFSET, TRACE_HEIGHT = 0.02, 0.03
 -- angle d'or (radians) : points répartis sur un disque
 local GOLDEN_ANGLE = pi * (3 - sqrt(5))
 
@@ -40,6 +47,8 @@ VavaMagic.zoneRender = zones
 
 ---@type table<integer, table>
 local active = {}
+---@type { points: table[], size: number, startedAt: integer, untilMs: integer }[]  traces au sol
+local traces = {}
 local running = false
 ---@type table<string, { start: fun(zone: table, detail: string), frame?: fun(zone: table, t: number, now: integer), stop: fun(zone: table, ended: boolean) }>
 local kinds = {}
@@ -50,6 +59,23 @@ local kinds = {}
 ---@param renderer table
 function zones.define(kind, renderer)
     kinds[kind] = renderer
+end
+
+--- Zone d'un genre contenant ce point (au sol, avec une marge de hauteur), ou nil.
+---@param point table
+---@param kind string
+---@return table|nil
+function zones.at(point, kind)
+    for _, zone in pairs(active) do
+        if zone.kind == kind and abs(point.z - zone.center.z) <= HEIGHT then
+            if zone.shape == 'line' then
+                if geometry.segmentDistance2d(point, zone.a, zone.b) <= zone.width / 2 then return zone end
+            elseif geometry.distance2d(point, zone.center) <= zone.radius then
+                return zone
+            end
+        end
+    end
+    return nil
 end
 
 --- Hauteur du sol sous le centre d'une zone (sa hauteur à elle si le sol n'est pas chargé).
@@ -100,14 +126,35 @@ local function stop(zone, ended)
     zone.detail = nil
 end
 
+--- Une image de traces : disques sombres qui pâlissent, les finies oubliées.
+---@param now integer
+---@return boolean drawn
+local function drawTraces(now)
+    local drawn = false
+    for i = #traces, 1, -1 do
+        local trace = traces[i]
+        if now >= trace.untilMs then
+            table.remove(traces, i)
+        else
+            drawn = true
+            local alpha = floor(tracesCfg.alpha * (1 - (now - trace.startedAt) / (trace.untilMs - trace.startedAt)))
+            for _, point in ipairs(trace.points) do
+                DrawMarker(MARKER_CYLINDER, point.x, point.y, point.z + GROUND_OFFSET, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
+                    trace.size, trace.size, TRACE_HEIGHT, tracesCfg.r, tracesCfg.g, tracesCfg.b, alpha, false, false, 2, false, nil, nil, false)
+            end
+        end
+    end
+    return drawn
+end
+
 local function run()
     if running then return end
     running = true
     CreateThread(function()
         local nextScan = 0
-        while next(active) do
+        while next(active) or #traces > 0 do
             local now = GetGameTimer()
-            local visible = false
+            local visible = drawTraces(now)
             if now >= nextScan then
                 nextScan = now + SCAN_MS
                 for id, zone in pairs(active) do
@@ -138,6 +185,16 @@ local function run()
         end
         running = false
     end)
+end
+
+--- Trace temporaire au sol : un disque sombre de `size` mètres à chaque point, qui s'efface en fondu.
+---@param points table[]
+---@param size? number
+function zones.trace(points, size)
+    if tracesCfg.ms <= 0 or #points == 0 then return end
+    local now = GetGameTimer()
+    traces[#traces + 1] = { points = points, size = size or tracesCfg.size, startedAt = now, untilMs = now + tracesCfg.ms }
+    run()
 end
 
 -- Mur de flammes -------------------------------------------------------------------------------------------------
@@ -191,6 +248,8 @@ zones.define('flames', {
                 end)
             end
         end
+        -- le sol reste noirci là où le mur a brûlé
+        if ended and zone.detail then zones.trace(zones.along(zone.a, zone.b, tracesCfg.spacing), zone.width * 1.2) end
     end,
 })
 
@@ -260,10 +319,11 @@ RegisterNetEvent(EVENTS.ZONE_END, function(id)
     stop(zone, true)
 end)
 
---- Arrêt du module, retour à la sélection : plus rien ne brûle.
+--- Arrêt du module, retour à la sélection : plus rien ne brûle, plus aucune trace.
 function zones.clear()
     for id, zone in pairs(active) do
         stop(zone, false)
         active[id] = nil
     end
+    traces = {}
 end

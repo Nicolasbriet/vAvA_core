@@ -34,7 +34,9 @@ VavaMagic.EVENTS = {
     ZONE = 'vava_magic:zone',               -- zone au sol { id, kind, element, spell, level, shape, … } aux joueurs proches
     ZONE_END = 'vava_magic:zoneEnd',        -- (id) zone éteinte, à ceux qui la connaissaient
     BURST = 'vava_magic:burst',             -- effet instantané { spell, caster, x, y, z, level, … } aux joueurs proches
-                                            -- (nova, vague, secousse, rempart qui se dresse ou s'effondre)
+                                            -- (nova, vague, secousse, rempart qui se dresse ou s'effondre, combinaison :
+                                            -- spell = 'combo', combo = son nom)
+    COMBO = 'vava_magic:combo',             -- (nom) au seul lanceur d'une combinaison réussie : mot bref à l'écran
 }
 
 -- Intentions du client (RPC du core). Chaque sort a en plus les siennes : BEGIN_PREFIX .. sort, FINISH_PREFIX .. sort.

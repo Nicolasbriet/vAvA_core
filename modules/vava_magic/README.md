@@ -5,11 +5,13 @@ incantation commune, **roue des sorts** (Tab) et **mode magie à la souris** (vi
 **états élémentaires** (brûlure, mouillé, ralenti, chancelant, renversé, gelé, avec immunité aux contrôles durs),
 **zones au sol**, **projectiles** et **obstacles**, sorts de feu (**Boule de feu**, **Mur de flammes**, **Nova
 ardente**), d'eau (**Trait de glace**, **Vague**, **Brume**) et de terre (**Projectile de roche**, **Secousse**,
-**Rempart**), **Lueur** et **Murmure**, grimoire et registre des murmures (objets), commandes du Conseil. Le serveur
-décide de tout ; le client affiche et demande.
+**Rempart**), **combinaisons entre éléments** (vapeur, boue, gel…) inscrites au grimoire quand on les découvre,
+**Lueur** et **Murmure**, grimoire et registre des murmures (objets), commandes du Conseil. Le serveur décide de tout ;
+le client affiche et demande.
 
-Version 2.2.0 : étapes 1 (noyau, roue, contrôles), 2 (états, zones, feu) et 3 (eau et terre) de la refonte. Les
-combinaisons d'éléments viennent ensuite.
+Version 2.4.0 : les cinq étapes de la refonte (noyau, roue et contrôles ; états, zones et feu ; eau et terre ;
+combinaisons ; finitions : traces au sol, sons par fichier ou natifs, documentation et tests). Rien n'a encore été
+joué en vrai : voir « À vérifier en jeu » et « Tests à faire en jeu ».
 
 ## Installation
 
@@ -48,16 +50,17 @@ vava_magic/
   shared/   constants.lua · text.lua (UTF-8) · progression.lua · geometry.lua
   bridge/   server.lua · client.lua                 ← seul contact avec le core et les autres modules
   server/   core · world · sheets · mana · spells · progression · combat · states (états) · obstacles (remparts…)
-            zones (au sol) · grounds (sol mouillé) · projectiles (noyau commun) · registers · sigils · casting
-            admin · api · main
+            zones (au sol) · grounds (sol mouillé) · combos (combinaisons) · projectiles (noyau commun) · registers
+            sigils · casting · admin · api · main
             spells/murmure · lueur · boule_de_feu · mur_de_flammes · nova_ardente · trait_de_glace · vague · brume
             projectile_de_roche · secousse · rempart
   client/   core · nui · state · messages · fx (budget des effets) · hud (barre de mana) · keys · aim · targeting
             casting · controls (mode magie, aperçus) · wheel (roue) · states (états sur soi) · ambient
-            zones (rendu, sol mouillé) · bursts (effets instantanés) · projectiles (vol et rendu communs)
-            sigils · grimoire · register · main
+            zones (rendu, sol mouillé) · clouds (nuées : brume, vapeur) · bursts (effets instantanés)
+            projectiles (vol et rendu communs) · combos (mot bref, effets, vapeur, boue) · sigils · grimoire
+            register · main
             spells/… (mêmes noms que côté serveur)
-  web/      index.html · css/ · js/ (dont wheel, hud, conditions) · fonts/ (OFL)
+  web/      index.html · css/ · js/ (dont wheel, hud, conditions, sound) · fonts/ (OFL) · sounds/ (.ogg facultatifs)
             img/ (runes, textures, spells/, elements/, states/) · items/ (grimoire, registre)
   sql/      0001_magic.sql
 ```
@@ -181,6 +184,8 @@ qu'aux joueurs à moins de 150 m, y compris ceux qui s'en approchent après coup
 | `mist` | Brume | Mouillé dès le niveau 3 ; on n'y voit plus guère | nappes de brume ; voile et flou à l'écran de qui s'y tient |
 | `wet` | Vague, Brume (à sa fin) | Mouillé, reposé au plus toutes les 4 s (lanceur compris) | reflet d'eau au sol, gouttes à la naissance |
 | `quake` | Secousse | aucun pendant le présage ; au terme, choc (voir plus bas) | anneau aux couleurs de la terre qui se remplit, poussière, craquement |
+| `steam` | combinaison Vapeur | légère brûlure chaque seconde ; on n'y voit plus guère | nappes blanches ; voile et flou à l'écran de qui s'y tient |
+| `mud` | combinaison Boue | Ralenti fort tant qu'on y reste | disque brun au sol, éclaboussure à la naissance |
 
 Un **obstacle** (le Rempart) coupe ce qui voudrait passer à travers lui : projectiles, vague, nova, éclats d'un impact.
 
@@ -189,7 +194,7 @@ Un **obstacle** (le Rempart) coupe ce qui voudrait passer à travers lui : proje
 | Sort | Visée | Ce qu'il fait |
 | --- | --- | --- |
 | Trait de glace | projectile rapide (cible verrouillée possible) | dégâts modestes, Ralenti (force et durée selon le niveau ; plus de course dès le niveau 4) et Mouillé |
-| Vague | cône devant soi (aperçu au sol : portée de 4 à 10 m, ouverture) | repousse (force selon le niveau), Mouillé, noie la Brûlure et les murs de flammes qu'elle touche, Renversé dès le niveau 4, laisse un sol mouillé devant soi |
+| Vague | cône devant soi (aperçu au sol : portée de 4 à 10 m, ouverture) | repousse (force selon le niveau), Mouillé, noie la Brûlure et les murs de flammes qu'elle touche (combinaisons), Renversé dès le niveau 4, laisse un sol mouillé devant soi |
 | Brume | point au sol (disque de 4 à 10 m) | brume épaisse pour la durée du niveau ; qui s'y tient n'y voit plus guère ; dès le niveau 3, Mouillé et sol mouillé à sa fin. Une nouvelle brume dissipe la précédente |
 | Projectile de roche | projectile lent et lourd (cible verrouillée possible) | gros dégâts ; Chancelant dès le niveau 3 ; au niveau 5, éclats autour de l'impact |
 | Secousse | point au sol (disque de 3 à 5 m) | le sol se fend (présage de 1,4 à 1 s : le temps de fuir), puis blessure légère et Chancelant (Renversé dès le niveau 4) pour qui s'y tient encore, jamais le lanceur |
@@ -198,6 +203,28 @@ Un **obstacle** (le Rempart) coupe ce qui voudrait passer à travers lui : proje
 Les trois projectiles partagent un noyau (`server/projectiles.lua`, `client/projectiles.lua`) : visée, cible
 verrouillée, vol, impact validé par le serveur, obstacles. Un nouveau projectile n'a qu'à déclarer son effet à l'impact
 (serveur) et sa config de rendu (`projectile`, `fx`, `light`, `sounds`).
+
+## Combinaisons entre éléments
+
+Détectées et décidées par le serveur (`server/combos.lua`) d'après `config.combos` : un **déclencheur** (un sort ou un
+élément qui touche une zone au sol d'un genre, ou un joueur dans un état) et un **résultat**. Chacune montre un mot
+bref au lanceur (« Vapeur ! »), un effet et un son aux joueurs proches, et **s'inscrit dans son grimoire la première
+fois** qu'il la déclenche (page « Combinaisons » : déclencheur, résultat, éléments ; celles qui restent sont comptées
+sans être nommées).
+
+| Combinaison | Déclencheur | Résultat |
+| --- | --- | --- |
+| Vapeur | une Vague ou un Trait de glace touche un Mur de flammes | le mur s'éteint ; un nuage de vapeur (zone `steam`) cache la vue et brûle légèrement, 7 s |
+| Dissipation | une Boule de feu traverse une Brume | la brume se dissipe (sans sol mouillé) |
+| Boue | une Secousse frappe un sol mouillé | une boue (zone `mud`) ralentit fortement, 30 s |
+| Gel | un Trait de glace touche une cible mouillée | la cible est Gelée 2,5 s (contrôle dur, immunité ensuite) ; le Mouillé est consommé |
+| Séchage | un sort de feu touche une cible mouillée | dégâts de moitié, Mouillé retiré, pas de Brûlure ce coup-ci |
+| Extinction | un sort d'eau touche une cible en Brûlure | la Brûlure s'éteint |
+| Roche ardente | un Projectile de roche traverse un Mur de flammes | le bloc s'embrase en vol (traînée de feu) ; à l'impact, dégâts de feu en plus et Brûlure |
+
+Règles de bon sens, sans combinaison : être trempé (sol mouillé, brume) éteint la Brûlure. Le bloc enflammé est prédit
+par chaque client pendant le vol (il voit les zones) ; le serveur décide de l'effet à l'impact d'après les zones que le
+trajet a traversées.
 
 ## Commandes du Conseil
 
@@ -214,7 +241,7 @@ lui, la commande vise son auteur.
 | `/magie maitrise [id]` | tous les sorts au niveau maximal (le personnage devient mage) |
 | `/magie vider [id]` | retirer tous les sorts |
 | `/magie mana [id]` · `recharges [id]` | remplir la mana · effacer les recharges et le délai global |
-| `/magie fiche [id]` | mage, sort prêt, sorts, niveaux, XP, sigils, mana |
+| `/magie fiche [id]` | mage, sort prêt, sorts, niveaux, XP, sigils, mana, combinaisons découvertes |
 | `/magie donner [id] <grimoire\|registre>` | donner un objet (un registre neuf, numéroté) |
 | `/magie nettoyer` | nettoyage d'urgence : retire du monde les effets des sorts (zones au sol, présages, remparts, orbes ancrés) |
 
@@ -232,7 +259,8 @@ lui, la commande vise son auteur.
 | `elements` | feu, eau, terre, lumière, esprit : nom, groupe de la roue, couleur, particules des mains pendant l'incantation |
 | `wheel` | groupes de l'anneau intérieur, dans l'ordre |
 | `controls` | mode magie : endormissement (20 s), allure en visant, molette, aperçu au sol |
-| `effects` | niveau de détail (complet en deçà de 30 m, rien au-delà de 150 m), plafonds de lumières et de particules, chargement et libération des ressources |
+| `effects` | niveau de détail (complet en deçà de 30 m, rien au-delà de 150 m), plafonds de lumières et de particules, chargement et libération des ressources, traces au sol (`traces` : durée, couleur, taille) |
+| `sounds` | portée des sons (60 m), fichiers .ogg qui remplacent les sons fabriqués (`files`), sons natifs de GTA (`native`) |
 | `projectiles` | contrôles communs de l'impact (axe, marge sur la cible, portée, délai, joueurs qui voient le lancer, hauteur des mains et du torse) ; un sort peut en changer dans son `hit` |
 | `spells.<sort>` | champs communs (voir plus bas) et **5 niveaux** : durée d'incantation, recharge, description, ce que le niveau débloque, valeurs propres au sort |
 | `spells.lueur.anchor` · `colors` · `render` | orbe ancré, couleurs du niveau 5, rendu (os, décalages, flottement, scintillement) |
@@ -244,11 +272,12 @@ lui, la commande vise son auteur.
 | `spells.mur_de_flammes` | portée, longueur et largeur par niveau, durée, dégâts au passage, brûlure, murs par lanceur, flammes et lumières |
 | `spells.nova_ardente` | rayon, dégâts, recul (niveau 3), brûlure (niveau 4), gerbes, anneau, éclat |
 | `spells.trait_de_glace` | vitesse, portée, dégâts, Ralenti (force, durée), Mouillé, virage ; réaction de givre (`reaction`) |
-| `spells.vague` | portée et ouverture du cône, recul, Renversé (niveau 4), Mouillé, sol mouillé, zones qu'elle éteint (`extinguishes`), gerbes |
+| `spells.vague` | portée et ouverture du cône, recul, Renversé (niveau 4), Mouillé, sol mouillé, gerbes |
 | `spells.brume` | portée, rayon, durée, épaisseur du voile (`density`), Mouillé et sol mouillé (niveau 3), filtre de GTA (`screen.timecycle`), nappes |
 | `spells.projectile_de_roche` | vitesse, portée, dégâts, Chancelant (niveau 3), éclats (niveau 5), bloc qui tournoie, tremblement à l'impact |
 | `spells.secousse` | portée, rayon, durée du présage, dégâts, contrôle infligé (Chancelant, puis Renversé), anneau, poussière, éclats, tremblement |
 | `spells.rempart` | portée, longueur, épaisseur, hauteur, blocs par segment, segments (2 au niveau 5) et angle du chevron, durée, modèle de pierre, enfoncement, montée par paliers, plafond du royaume, marges autour des joueurs et véhicules |
+| `combos` | combinaisons : déclencheur (`trigger` : spell ou element, on = zone ou target, zone ou state, projectile), résultat (`result` : remove, zone, state, consume, damageShare, noBurn, carry), textes du grimoire, mot bref, effet et son, nuée de la vapeur, rendu de la boue |
 | `combat` | dégâts entre joueurs, points de vie d'un personnage (100), zones protégées (`{ label, x, y, radius }`), journal, réaction de la victime par élément (feu, eau, glace, terre), durée du recul |
 | `sigils` · `registers` · `items` | sigils, registre (200 pages), objets |
 | `ambient` | effets vus des autres (15 m, fragments à 3 m, runes, textes) |
@@ -288,6 +317,37 @@ hauteur)` (serveur). Un genre de **zone** se déclare par `zones.define(genre, {
 
 Un autre module peut aussi ajouter un sort par le registre du core `vava_magic:spells` (voir `docs/api.md`).
 
+**Ajouter une combinaison** : une entrée dans `config.combos` suffit tant que son déclencheur et son résultat sont de
+ceux que `server/combos.lua` comprend (voir le commentaire de la config) : par exemple `{ trigger = { element = 'feu',
+on = 'zone', zone = 'mud' }, result = { remove = true } }` pour que le feu sèche la boue. Les sorts appellent le moteur
+aux bons moments : `combos.hit(lanceur, cible, sort, dégâts)` avant de blesser (il rend les dégâts ajustés et si la
+brûlure est permise), `combos.zone(ctx, zone)` quand un sort touche une zone (les projectiles le font d'eux-mêmes pour
+les zones traversées), `combos.sweep` pour un cône, `combos.quake` pour un cercle. Un nouveau genre de zone résultat
+demande son `zones.define` (serveur) et son rendu (client).
+
+## Effets et sons
+
+Chaque sort a ses couches d'effets, toutes réglées en config : mains pendant l'incantation (particules de l'élément,
+plus grandes selon le niveau, lueur), lancement (geste de relâchement, son), trajet (traînée, lumière, marqueur,
+objet qui tournoie), impact (particules, lueur, son, caméra qui tremble), effet persistant (zones, états sur les
+joueurs, vus de tous). Le niveau se devine en regardant : `levelScale` grandit les effets, les lumières suivent.
+
+**Niveau de détail** (`effects`) : complet à moins de 30 m de la caméra (toutes les particules, deux mains, lumières),
+simplifié jusqu'à 150 m (moins de points, une main, pas d'effets secondaires), rien au-delà. Plafonds de lumières par
+image (24) et de particules en boucle (40) pour que plusieurs mages restent fluides ; lots de particules et
+dictionnaires d'animation chargés à la demande (attente bornée) et libérés après une minute sans usage ; tout est
+nettoyé à l'arrêt du module et au retour à la sélection.
+
+**Traces au sol** (`effects.traces`, vues de chaque client) : sol noirci là où un mur de flammes a brûlé et sous une
+nova, fissure après une secousse ; disques sombres qui s'effacent en vingt secondes. Le sol mouillé, lui, est une
+vraie zone du serveur (il mouille).
+
+**Sons** (`sounds`) : fabriqués par l'interface (Web Audio), volume selon la distance (rien au-delà de 60 m) : carillon
+(murmure reçu), souffle (lancer), impact, boule éteinte, glace brisée, vague, craquement, grondement, sifflement.
+Pour les remplacer : déposer des `.ogg` dans `web/sounds/` et les déclarer dans `sounds.files` (`whoosh =
+'sounds/whoosh.ogg'`) ; ou déclarer un son natif de GTA dans `sounds.native` (`impact = { name = …, set = … }`, joué
+au point de l'effet). Aucun fichier n'est fourni.
+
 ## Sécurité et coût
 
 - Le serveur vérifie à chaque incantation : mage, sort connu, niveau, recharge (tenue par personnage, la reconnexion ne
@@ -318,6 +378,7 @@ Un autre module peut aussi ajouter un sort par le registre du core `vava_magic:s
 | Projectiles | ~150 o de lancer aux joueurs proches (150 m), un impact, les dégâts |
 | Vague · Secousse · Rempart | ~100 à 250 o d'effet instantané aux joueurs à moins de 120 m ; recul, réaction et états à la seule victime |
 | Brume · sol mouillé · présage | comme les zones ; Mouillé reposé au plus toutes les 4 s sur un même joueur |
+| Combinaisons | ~20 o au lanceur (mot bref), ~100 o d'effet aux joueurs à moins de 150 m ; une vue de la fiche (~200 o) à la première découverte |
 | Rempart | 2 à 6 objets réseau figés (synchronisés par OneSync), 8 déplacements à la montée et à la descente |
 
 Serveur : aucune boucle permanente (mana calculée à la demande ; écritures groupées toutes les 10 à 15 s). Client : une
@@ -354,13 +415,17 @@ lumières et de particules, rien au-delà de 150 m.
 | Secousse · Rempart : genou à terre, main au sol | `amb@world_human_gardener_plant@male@enter` · `@base` · `@exit` — **à juger** | `spells.secousse.anims`, `spells.rempart.anims` |
 | Secousse : présage · choc | marqueurs 25 (anneau) et 1 (disque), `ent_dst_dust` · `ent_dst_rocks`, `SMALL_EXPLOSION_SHAKE` | `spells.secousse.fx` |
 | Rempart : blocs de pierre | objet `prop_rock_4_c` — **à vérifier** (taille, assise, collision) ; poussière `ent_dst_rocks` | `spells.rempart.model`, `sink`, `rise` |
+| Vapeur : nappes · jets | `core` / `ent_sht_steam` (en boucle au sol — **à juger**, ponctuel) | `combos.vapeur.cloud`, `combos.vapeur.fx` |
+| Boue : éclaboussure · disque | `core` / `ent_sht_water` — **incertain** ; marqueur 1 brun | `combos.boue.fx`, `combos.boue.render` |
+| Roche ardente : traînée · impact | `core` / `ent_amb_torch_fire` · `ent_sht_flame` | `combos.roche_ardente.result.carry` |
 | Orbe | marqueur 28 (sphère) et `DrawLightWithRange` | `spells.lueur.render` |
 | Aperçu au sol | marqueurs 1 (disque) et 28 (point) | `controls.preview` |
 | Boutons de la souris | `MOUSE_BUTTON` / `MOUSE_LEFT`, `MOUSE_RIGHT`, `MOUSE_MIDDLE` ; `MOUSE_WHEEL` / `IOM_WHEEL_UP`, `IOM_WHEEL_DOWN` | `keys` |
 | Nom des touches au grimoire | `GetControlInstructionalButton` (sinon `keys.<action>.display`) | — |
 
-Les sons (carillon, souffle, impact, boule éteinte, glace brisée, vague, craquement du sol, grondement) sont fabriqués
-par l'interface (Web Audio) : à juger à l'oreille.
+Les sons (carillon, souffle, impact, boule éteinte, glace brisée, vague, craquement du sol, grondement, sifflement)
+sont fabriqués par l'interface (Web Audio) : à juger à l'oreille ; des fichiers `.ogg` ou des sons natifs de GTA les
+remplacent (`sounds`). Les noms de sons natifs ne sont pas fournis : à chercher et vérifier en jeu.
 
 Rempart : le serveur monte les blocs par 8 paliers en 0,8 s (`rise`) ; selon la fluidité de la synchronisation,
 `rise.steps = 0` les fait paraître d'un coup. Sur un sol en pente, régler `sink` (blocs enfoncés).
@@ -465,5 +530,27 @@ Deux joueurs (A et B) suffisent ; un troisième aide pour le cercle et la zone d
 - [ ] Viser B ou un véhicule : « Quelqu'un ou quelque chose occupe cet endroit ». Un second rempart fait tomber le premier ; à sa fin, il s'enfonce et disparaît.
 - [ ] `/magie nettoyer` et arrêt de la ressource : aucune pierre ne reste dans le monde.
 
+**Combinaisons** (A lance ; B subit ; `/magie fiche` compte les découvertes)
+- [ ] Vapeur : B dresse un mur de flammes, A le balaie d'une Vague (ou le traverse d'un Trait de glace) : le mur s'éteint, un nuage blanc le remplace, sifflement ; A voit « Vapeur ! » et « Une combinaison s'inscrit dans votre grimoire » (la première fois seulement). Qui se tient dans la vapeur voit flou et perd un point par seconde.
+- [ ] Dissipation : B pose une Brume, A la traverse d'une Boule de feu : la brume disparaît sur-le-champ, aucun sol mouillé.
+- [ ] Boue : A lance une Vague (sol mouillé devant lui), puis une Secousse dessus : au choc, un disque brun remplace le reflet d'eau ; B qui y marche est très ralenti pendant 30 s.
+- [ ] Gel : B mouillé (vague, sol mouillé, brume niveau 3) ; A le touche d'un Trait de glace : B est gelé 2,5 s (givre, icône), puis « Protégé » ; un second trait pendant la protection ne le gèle pas.
+- [ ] Séchage : B mouillé ; A le touche d'une Boule de feu niveau 4 : dégâts de moitié, plus mouillé, pas de brûlure. Même chose dans un Mur de flammes et sous une Nova.
+- [ ] Extinction : B en Brûlure ; A lui envoie une Vague ou un Trait de glace : la brûlure s'éteint, « Éteint ! ». B qui marche sur un sol mouillé cesse aussi de brûler (sans combinaison).
+- [ ] Roche ardente : B dresse un mur de flammes, A lance un Projectile de roche à travers : le bloc s'enflamme en vol (traînée de feu, lueur), impact en flammes, dégâts de feu en plus et B brûle.
+- [ ] Grimoire : page « Combinaisons » après les sorts, avec celles découvertes (déclencheur, résultat, deux icônes) et le compte de celles qui restent ; avant toute découverte, l'invitation à mêler les éléments.
+- [ ] `/magie nettoyer` retire aussi vapeur et boue.
+
+**Immunité aux contrôles durs**
+- [ ] Enchaîner Secousse (Chancelant), puis Projectile de roche niveau 3, puis Gel : seul le premier contrôle passe ; les suivants pendant la protection ne font que leurs dégâts ; « Protégé » 6 s après la fin du premier.
+- [ ] Pendant un Chancelant ou un Gelé, B ne peut pas incanter ; son incantation en cours se brise.
+
+**Effets, traces, sons, niveau de détail**
+- [ ] Mur de flammes éteint, Nova, Secousse : une trace sombre reste au sol et s'efface en vingt secondes.
+- [ ] Déposer un `whoosh.ogg` dans `web/sounds/` et le déclarer : il remplace le souffle fabriqué ; déclarer un son natif pour `impact` : il se joue au point d'impact.
+- [ ] Deux mages de niveaux 1 et 5 lancent le même sort côte à côte : la différence se voit (taille, lumière, particules) et s'entend.
+- [ ] S'éloigner à plus de 30 m d'un mur de flammes : moins de flammes ; à plus de 150 m : plus rien ; revenir : tout revient.
+- [ ] Arrêt de la ressource en pleine action (`restart vava_magic`) : plus aucune particule, lumière, voile ni pierre ne reste ; les joueurs gelés sont libres ; à son retour, les fiches sont intactes.
+
 **Performance**
-- [ ] `resmon` : `vava_magic` à ~0,00 ms au repos, quelques centièmes pendant une incantation ou une lumière proche ; une brume ou un sol mouillé proches restent à quelques centièmes.
+- [ ] `resmon` : `vava_magic` à ~0,00 ms au repos, quelques centièmes pendant une incantation ou une lumière proche ; une brume, une vapeur ou un sol mouillé proches restent à quelques centièmes.

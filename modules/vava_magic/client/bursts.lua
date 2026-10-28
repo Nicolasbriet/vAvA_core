@@ -2,18 +2,20 @@
     vava_magic/client/bursts.lua
     Rôle : effets instantanés annoncés par le serveur aux seuls joueurs proches (nova, vague, secousse qui frappe,
            rempart qui se dresse ou s'effondre). Chaque sort déclare son rendu (`bursts.define`) ; ce fichier vérifie
-           l'envoi et le lui confie. Outils communs : son selon la distance, tremblement de la caméra des plus proches.
+           l'envoi et le lui confie. Outils communs : son selon la distance (de l'interface, ou natif de GTA quand la
+           config en déclare un), tremblement de la caméra des plus proches.
     Dépendances : shared/, config.lua, client/nui.lua
 ]]
 
 local type = type
 local max = math.max
-local RegisterNetEvent, PlayerPedId, GetEntityCoords, ShakeGameplayCam = RegisterNetEvent, PlayerPedId, GetEntityCoords, ShakeGameplayCam
+local RegisterNetEvent, PlayerPedId, GetEntityCoords, ShakeGameplayCam, PlaySoundFromCoord =
+    RegisterNetEvent, PlayerPedId, GetEntityCoords, ShakeGameplayCam, PlaySoundFromCoord
 
 local nui = VavaMagic.nui
 local geometry = VavaMagic.geometry
+local soundsCfg = VavaMagic.config.sounds
 local EVENTS = VavaMagic.EVENTS
-local HEARING_DISTANCE = 60.0  -- au-delà, plus aucun son
 
 local bursts = {}
 VavaMagic.bursts = bursts
@@ -35,11 +37,18 @@ function bursts.distance(point)
     return geometry.distance(GetEntityCoords(PlayerPedId()), point)
 end
 
---- Son de la page, plus faible avec la distance (rien au-delà de 60 m).
----@param name string
+--- Son d'un effet : natif de GTA au point même si la config en déclare un (`sounds.native`), sinon celui de la page,
+--- plus faible avec la distance (rien au-delà de `sounds.hearing`).
+---@param name string|nil
 ---@param point table
 function bursts.sound(name, point)
-    local volume = max(0, 1 - bursts.distance(point) / HEARING_DISTANCE)
+    if not name then return end
+    local native = soundsCfg.native[name]
+    if native then
+        PlaySoundFromCoord(-1, native.name, point.x, point.y, point.z, native.set, false, 0, false)
+        return
+    end
+    local volume = max(0, 1 - bursts.distance(point) / soundsCfg.hearing)
     if volume > 0 then nui.send('sound', { name = name, volume = volume }) end
 end
 

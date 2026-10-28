@@ -797,14 +797,17 @@ navigateur ; chaque case est une vraie connexion WebRTC locale filmant une scèn
 
 ### `vava_magic`
 
-La magie (2.2.0) : fiche magie par personnage (champ privé `vava_magic:sheet` : mage ou non, sorts et leur XP, sort
+La magie (2.4.0) : fiche magie par personnage (champ privé `vava_magic:sheet` : mage ou non, sorts et leur XP, sort
 prêt dans les mains, combinaisons découvertes, sigils gardés, sigil unique dans tout le royaume), mana (100, +3 toutes
 les 5 s, jamais sauvegardée) et sa barre, 5 niveaux par sort, incantation commune avec délai global (1 s), roue des
 sorts (Tab) et mode magie à la souris (clic droit viser, clic gauche lancer, clic molette verrouiller), états
 élémentaires (brûlure, mouillé, ralenti, chancelant, renversé, gelé ; immunité de 6 s aux contrôles durs), zones au sol
 tenues par le serveur (flammes, brume, sol mouillé, présage), obstacles (rempart), sorts de feu (**Boule de feu**, **Mur
 de flammes**, **Nova ardente**), d'eau (**Trait de glace**, **Vague**, **Brume**) et de terre (**Projectile de roche**,
-**Secousse**, **Rempart**), **Lueur** et **Murmure**, grimoire et registre (objets), commandes du Conseil (`/magie`, numéro de joueur facultatif). Tout le détail, la config et la liste des tests en jeu :
+**Secousse**, **Rempart**), combinaisons entre éléments décidées par le serveur d'après `config.combos` (vapeur,
+dissipation, boue, gel, séchage, extinction, roche ardente ; inscrites au grimoire à la première découverte,
+`discoveredCombos` de la fiche), **Lueur** et **Murmure**, grimoire et registre (objets), traces au sol, sons fabriqués
+par l'interface ou remplacés par des fichiers `.ogg` et des sons natifs (`config.sounds`), commandes du Conseil (`/magie`, numéro de joueur facultatif). Tout le détail, la config et la liste des tests en jeu :
 `modules/vava_magic/README.md`. Demande le core 0.5.0 ; facultatifs : `vava_inventory` ≥ 1.3.0 (objets), `vava_hud`
 (notifications), `vava_health` (blessures, à terre), `vava_admin` (droit `tools` et journal ; sans lui, ACE
 `magie.admin`).
@@ -815,7 +818,8 @@ de flammes**, **Nova ardente**), d'eau (**Trait de glace**, **Vague**, **Brume**
   revérifie à la fin la durée, le déplacement et la vie (lus côté serveur) ; la mana est réservée avant l'effet, rendue
   si le sort refuse. Recharges tenues par personnage. Effets vus des autres : state bags posés par le serveur sur le
   ped (`vava_magic:casting`, `glow`, `light`, `conditions`) ou sur l'objet d'un orbe ancré (`vava_magic:orb`) ;
-  évènements ciblés aux seuls joueurs proches (`vava_magic:projectile`, `projectileEnd`, `zone`, `zoneEnd`, `burst`).
+  évènements ciblés aux seuls joueurs proches (`vava_magic:projectile`, `projectileEnd`, `zone`, `zoneEnd`, `burst`) ;
+  `vava_magic:combo` (nom) au seul lanceur d'une combinaison réussie.
 - **Murmure** : fragments envoyés aux seuls joueurs à moins de 3 m ; registre des murmures en base sous le numéro porté
   par l'objet (métadonnée `registre`), l'historique suit l'objet.
 - **Projectiles** (Boule de feu, Trait de glace, Projectile de roche, même noyau) : impact signalé par le client du
@@ -863,8 +867,8 @@ contrôles de l'incantation. Côté client, le module externe appelle lui-même 
 animation (`VavaMagic.casting.start` n'existe qu'à l'intérieur de vava_magic).
 
 Pour travailler le rendu sans le jeu : `web/index.html?view=grimoire` (ou `wheel`, `wheelfire`, `wheelwater`,
-`wheelearth`, `hud`, `aim`, `states`, `frost`, `mist`, `hits`, `composer`, `offer`, `naming`, `confirm`, `lueur`, `sealed`,
-`register`, `messages`, `broken`) dans un navigateur, servi en HTTP (les
+`wheelearth`, `hud`, `aim`, `states`, `frost`, `mist`, `hits`, `combo`, `combos`, `composer`, `offer`, `naming`,
+`confirm`, `lueur`, `sealed`, `register`, `messages`, `broken`) dans un navigateur, servi en HTTP (les
 icônes sont des masques CSS, refusés depuis `file://`).
 
 ### `vava_chat`

@@ -10,9 +10,11 @@
       - Impact : signalé par le client du lanceur (rayon le long de la trajectoire), validé ici : lancer à lui, pas
         encore résolu ; point dans la portée et dans l'axe du lancer (virage permis compris) ; délai cohérent avec la
         vitesse ; cible réelle près du point annoncé ; un obstacle (rempart) sur le trajet arrête le projectile là où
-        il se dresse. Le sort décide ensuite de l'effet (`onImpact`) : dégâts, états, éclats autour (jamais à
-        travers un obstacle), bonus d'XP d'un sort qui touche.
-    Dépendances : shared/, config.lua, server/ (noyau, combat, obstacles)
+        il se dresse. Les zones au sol traversées passent par les combinaisons (une boule de feu dissipe la brume,
+        un trait de glace fait fumer un mur de flammes, une roche s'y embrase et emporte le feu jusqu'à l'impact).
+        Le sort décide ensuite de l'effet (`onImpact`) : dégâts, états, éclats autour (jamais à travers un
+        obstacle), bonus d'XP d'un sort qui touche ; puis l'effet emporté s'applique à la cible.
+    Dépendances : shared/, config.lua, server/ (noyau, combat, states, zones, combos, obstacles)
 ]]
 
 local ipairs, pairs, setmetatable = ipairs, pairs, setmetatable
@@ -23,6 +25,9 @@ local bridge = VavaMagic.bridge
 local world = VavaMagic.world
 local spells = VavaMagic.spells
 local combat = VavaMagic.combat
+local states = VavaMagic.states
+local zones = VavaMagic.zones
+local combos = VavaMagic.combos
 local obstacles = VavaMagic.obstacles
 local experience = VavaMagic.experience
 local geometry = VavaMagic.geometry
@@ -62,6 +67,7 @@ VavaMagic.projectiles = projectiles
 ---@field resolved boolean
 ---@field rewarded boolean  le lancer a rapporté de l'XP : un impact sur une cible rapporte le bonus
 ---@field bonus boolean     bonus déjà accordé
+---@field carry table|nil   effet emporté par une combinaison sur le trajet (dégâts, brûlure)
 
 ---@type table<integer, vAvA.MagicLaunch>
 local launches = {}
@@ -136,9 +142,9 @@ function projectiles.splash(launch, point, except, radius, points)
     local touched = {}
     for _, entry in ipairs(world.near(point, radius)) do
         local victim = entry.source
-        if victim ~= launch.source and victim ~= except and not obstacles.blocked(point, entry.position)
-            and combat.damage(launch.source, victim, launch.spell, points, combat.KIND.ZONE) then
-            touched[#touched + 1] = victim
+        if victim ~= launch.source and victim ~= except and not obstacles.blocked(point, entry.position) then
+            local hit = combos.hit(launch.source, victim, launch.spell, points)
+            if combat.damage(launch.source, victim, launch.spell, hit.damage, combat.KIND.ZONE) then touched[#touched + 1] = victim end
         end
     end
     return touched
@@ -164,7 +170,21 @@ local function impact(src, id, target, x, y, z)
         if not position or geometry.distance(position, point) > def.hit.targetMargin then return false, 'invalid_impact' end
     end
     world.broadcast(point, def.hit.broadcastRadius, EVENTS.PROJECTILE_END, id, point.x, point.y, point.z, launch.spell)
+    -- zones traversées en vol : combinaisons (l'effet emporté s'applique après celui du sort)
+    for _, zone in ipairs(zones.crossedBy(launch.origin, point)) do
+        local result = combos.zone({ caster = src, spell = launch.spell, point = point, projectile = launch }, zone)
+        if result and result.carry then launch.carry = result.carry end
+    end
     def.onImpact(launch, target, point)
+    local carry = launch.carry
+    if carry and target ~= 0 then
+        local hit = combos.hit(src, target, launch.spell, carry.damage or 0, 'feu')
+        if combat.damage(src, target, launch.spell, hit.damage, combat.KIND.IMPACT) and hit.burn and carry.burn then
+            states.apply(target, 'burn', {
+                durationMs = carry.burn.durationMs, tickMs = carry.burn.tickMs, damage = carry.burn.damage, caster = src, spell = launch.spell,
+            })
+        end
+    end
     return true
 end
 

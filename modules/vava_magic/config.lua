@@ -2,8 +2,8 @@
     vava_magic/config.lua
     Rôle : configuration de la magie (lue par le client et le serveur) : mana, progression, incantation, éléments et
            roue des sorts, contrôles du mode magie, effets (budget et niveau de détail), projectiles, sorts et leurs
-           niveaux, états, zones, combat, sigils, registre, objets, touches, commandes, limites de débit, et TOUS les
-           textes vus par les joueurs (l'interface reçoit les siens d'ici).
+           niveaux, états, zones, combinaisons entre éléments, combat, sigils, registre, objets, touches, commandes,
+           limites de débit, et TOUS les textes vus par les joueurs (l'interface reçoit les siens d'ici).
     Ajouter un sort : créer server/spells/<nom>.lua et client/spells/<nom>.lua, les lister dans le fxmanifest, et
            déclarer ici spells.<nom> (mêmes champs communs que les sorts ci-dessous) ; la roue, le grimoire et les
            commandes du Conseil le prennent d'eux-mêmes. Son icône : web/img/spells/<icon>.svg.
@@ -98,6 +98,25 @@ VavaMagic.config = {
         maxLooped = 40,          -- particules en boucle actives en même temps
         assetLoadMs = 3000,      -- attente du chargement d'un lot de particules
         releaseMs = 60000,       -- un lot inutilisé depuis ce délai est libéré
+        -- traces temporaires au sol, vues de chaque client : sol noirci après le feu (mur, nova), fissure après la
+        -- secousse ; disques sombres qui s'effacent en fondu (ms = 0 : aucune)
+        traces = { ms = 20000, alpha = 90, r = 38, g = 28, b = 20, spacing = 1.2, size = 1.4 },
+    },
+
+    -- Sons. Ceux de l'interface sont fabriqués à la volée (Web Audio) : chime (murmure reçu), whoosh (lancer), impact,
+    -- fizzle (boule éteinte), shatter (glace brisée), splash (vague), crack (sol qui se fend), rumble (grondement), hiss
+    -- (vapeur). Un fichier .ogg déposé dans web/sounds/ et déclaré dans `files` remplace le son fabriqué du même nom
+    -- (volume selon la distance, plusieurs lectures à la fois). Un son natif de GTA déclaré dans `native` ({ name, set },
+    -- joué au point de l'effet par PlaySoundFromCoord) remplace le son de l'interface. Aucun fichier n'est fourni :
+    -- tout fonctionne sans. Noms des sons natifs À VÉRIFIER EN JEU.
+    sounds = {
+        hearing = 60.0,  -- au-delà de cette distance, plus rien ne s'entend (m)
+        files = {
+            -- whoosh = 'sounds/whoosh.ogg',
+        },
+        native = {
+            -- impact = { name = 'Explosion_Shake', set = 'HUD_FRONTEND_DEFAULT_SOUNDSET' },
+        },
     },
 
     -- Projectiles (boule de feu, trait de glace, projectile de roche) : contrôles du serveur à l'impact, communs à
@@ -431,8 +450,6 @@ VavaMagic.config = {
                 },
             },
             broadcastRadius = 120.0,  -- joueurs qui voient la vague
-            -- éteint les zones de ces genres qu'elle touche (et la Brûlure de ceux qu'elle frappe)
-            extinguishes = { flames = true },
             fx = { asset = 'core', splash = 'ent_sht_water', rows = 4, perRow = 5, scale = 1.4, sweepMs = 450 },
         },
 
@@ -880,6 +897,95 @@ VavaMagic.config = {
         fx = { asset = 'core', splash = 'ent_sht_water', points = 5, scale = 0.8 },
     },
 
+    -- Combinaisons entre éléments, détectées et décidées par le serveur (server/combos.lua). Chacune :
+    --   trigger : ce qui touche quoi. `spell` (un sort précis) ou `element` (tout sort de cet élément) ; `on` = 'zone'
+    --     (le sort touche une zone au sol du genre `zone`) ou 'target' (il touche un joueur dans l'état `state`) ;
+    --     `projectile` : seulement sur le trajet d'un projectile.
+    --   result : `remove` (la zone touchée s'éteint), `zone` (une zone de ce genre naît à sa place : steam, mud),
+    --     `state` (état posé sur la cible, soumis à l'immunité), `consume` (état retiré), `damageShare` (part des
+    --     dégâts gardée), `noBurn` (pas de brûlure ce coup-ci), `carry` (le projectile emporte l'effet jusqu'à
+    --     l'impact : dégâts bonus, brûlure, traînée de feu).
+    --   label, notify (mot bref montré au lanceur), summary, triggerText, resultText : textes du grimoire, où la
+    --     combinaison s'inscrit la première fois que le joueur la déclenche ; elements : icônes du grimoire.
+    --   fx, sound : effet et son vus des joueurs proches (false : aucun).
+    -- Ajouter une combinaison : une entrée ici suffit si son déclencheur et son résultat sont de ces sortes.
+    combos = {
+        vapeur = {
+            order = 1, label = 'Vapeur', notify = 'Vapeur !', elements = { 'eau', 'feu' },
+            summary = 'L\'eau jetée sur les flammes les étouffe en un nuage brûlant.',
+            triggerText = 'Une vague ou un trait de glace touche un mur de flammes.',
+            resultText = 'Le mur s\'éteint et laisse un nuage de vapeur qui cache la vue et brûle légèrement ceux qui s\'y tiennent.',
+            trigger = { element = 'eau', on = 'zone', zone = 'flames' },
+            result = { remove = true, zone = 'steam', element = 'eau', durationMs = 7000, damage = 1, tickMs = 1000, density = 0.6 },
+            fx = { asset = 'core', name = 'ent_sht_steam', scale = 2.5, points = 6 }, sound = 'hiss',
+            -- nappes de vapeur (voir `spells.brume.fx`) et flou à l'écran de qui s'y tient
+            cloud = { asset = 'core', cloud = 'ent_sht_steam', spacing = 3.0, maxPoints = 10, reducedPoints = 4, scale = 1.8 },
+            screen = { timecycle = 'hud_def_blur' },
+        },
+        dissipation = {
+            order = 2, label = 'Dissipation', notify = 'Dissipée !', elements = { 'feu', 'eau' },
+            summary = 'Le feu qui traverse la brume la chasse d\'un souffle.',
+            triggerText = 'Une boule de feu traverse une brume.',
+            resultText = 'La brume se dissipe aussitôt.',
+            trigger = { element = 'feu', on = 'zone', zone = 'mist', projectile = true },
+            result = { remove = true },
+            fx = { asset = 'core', name = 'ent_sht_steam', scale = 1.5, points = 8 }, sound = 'whoosh',
+        },
+        boue = {
+            order = 3, label = 'Boue', notify = 'Boue !', elements = { 'terre', 'eau' },
+            summary = 'La terre remuée sous l\'eau devient un bourbier.',
+            triggerText = 'Une secousse frappe un sol mouillé.',
+            resultText = 'Une boue épaisse s\'étale et ralentit fortement ceux qui s\'y enfoncent, trente secondes durant.',
+            trigger = { spell = 'secousse', on = 'zone', zone = 'wet' },
+            result = { remove = true, zone = 'mud', element = 'terre', durationMs = 30000, slow = { strength = 0.6, durationMs = 1500 } },
+            fx = { asset = 'core', name = 'ent_sht_water', scale = 1.2, points = 6 }, sound = 'splash',
+            render = { r = 96, g = 66, b = 34, alpha = 150, height = 0.05, groundOffset = 0.02 },
+        },
+        gel = {
+            order = 4, label = 'Gel', notify = 'Gelé !', elements = { 'eau', 'eau' },
+            summary = 'La glace prend sur un corps trempé.',
+            triggerText = 'Un trait de glace touche une cible mouillée.',
+            resultText = 'La cible est gelée sur place (contrôle dur : elle en est protégée ensuite).',
+            trigger = { spell = 'trait_de_glace', on = 'target', state = 'wet' },
+            result = { state = 'frozen', durationMs = 2500, consume = 'wet' },
+            fx = { asset = 'core', name = 'ent_sht_steam', scale = 1.0, points = 3 }, sound = 'shatter',
+        },
+        sechage = {
+            order = 5, label = 'Séchage', notify = 'Séché !', elements = { 'feu', 'eau' },
+            summary = 'Le feu s\'étouffe sur un corps trempé, qui en ressort sec.',
+            triggerText = 'Un sort de feu touche une cible mouillée.',
+            resultText = 'Les dégâts du feu sont réduits de moitié, la cible n\'est plus mouillée, et elle ne prend pas feu ce coup-ci.',
+            trigger = { element = 'feu', on = 'target', state = 'wet' },
+            result = { damageShare = 0.5, consume = 'wet', noBurn = true },
+            fx = { asset = 'core', name = 'ent_sht_steam', scale = 1.2, points = 3 }, sound = 'hiss',
+        },
+        extinction = {
+            order = 6, label = 'Extinction', notify = 'Éteint !', elements = { 'eau', 'feu' },
+            summary = 'L\'eau noie les flammes qui mordaient encore.',
+            triggerText = 'Un sort d\'eau touche une cible en brûlure.',
+            resultText = 'La brûlure s\'éteint.',
+            trigger = { element = 'eau', on = 'target', state = 'burn' },
+            result = { consume = 'burn' },
+            fx = { asset = 'core', name = 'ent_sht_steam', scale = 1.2, points = 3 }, sound = 'hiss',
+        },
+        roche_ardente = {
+            order = 7, label = 'Roche ardente', notify = 'Roche ardente !', elements = { 'terre', 'feu' },
+            summary = 'La pierre qui traverse les flammes s\'embrase et frappe comme un brandon.',
+            triggerText = 'Un projectile de roche traverse un mur de flammes.',
+            resultText = 'Le bloc enflammé inflige des dégâts de feu en plus et laisse sa cible en brûlure.',
+            trigger = { spell = 'projectile_de_roche', on = 'zone', zone = 'flames', projectile = true },
+            result = {
+                carry = {
+                    damage = 8, burn = { durationMs = 3000, tickMs = 1000, damage = 2 },
+                    -- rendu du bloc enflammé, vu de tous (le client le prédit en vol, le serveur décide à l'impact)
+                    asset = 'core', trail = 'ent_amb_torch_fire', trailScale = 0.8, impact = 'ent_sht_flame', impactScale = 1.2,
+                    light = { r = 255, g = 140, b = 40, range = 5.0, intensity = 5.0 }, sound = 'whoosh',
+                },
+            },
+            fx = false, sound = false,
+        },
+    },
+
     -- Combat entre joueurs. Dégâts des sorts en points de vie, sur `healthPoints` pour un personnage en pleine santé.
     combat = {
         pvp = true, -- false : les sorts offensifs se voient et se lancent, mais ne blessent personne
@@ -1096,6 +1202,7 @@ VavaMagic.config = {
             immune = 'Vous reprenez pied : plus rien ne vous déséquilibre un moment.',
             selected = 'Sort prêt : %s.',
             deselected = 'Vous rangez votre magie.',
+            comboDiscovered = 'Une combinaison s\'inscrit dans votre grimoire : %s.',
         },
         chat = {
             prefix = 'Arcanes',
@@ -1120,6 +1227,7 @@ VavaMagic.config = {
             sheetSpell = '— %s : niveau %d (%d XP)',
             sheetNoSpell = '— aucun sort',
             sheetSigils = 'Sigils gardés : %d · mana : %d / %d',
+            sheetCombos = 'Combinaisons découvertes : %d / %d',
             yes = 'oui',
             no = 'non',
             none = 'aucun',
@@ -1152,7 +1260,7 @@ VavaMagic.config = {
                 cancel = 'Annuler', deselect = 'Ranger la magie', cost = '%d', cooldown = '%d s', noSpell = 'Aucun sort',
                 level = 'Niveau %d',
             },
-            -- barre de mana et sort prêt
+            -- barre de mana et sort prêt ; `combo` : mot bref d'une combinaison réussie (le texte vient de `combos`)
             hud = { mana = 'Mana', asleep = 'Mains au repos' },
             -- états montrés au joueur affecté
             states = {
@@ -1191,6 +1299,10 @@ VavaMagic.config = {
                 element = 'Élément : %s', lock = 'Verrouiller : %s', controls = 'Roue : %s · viser : %s · lancer : %s',
                 current = 'Ce que vous savez', next = 'Au niveau suivant', sigils = 'Sigils mémorisables : %d',
                 colors = 'Couleur de la lumière', close = 'Fermer',
+                -- page des combinaisons : seules les découvertes s'y lisent
+                combos = 'Combinaisons', comboTrigger = 'Déclencheur', comboResult = 'Résultat', comboElements = 'Éléments : %s',
+                combosHidden = '%d combinaison(s) restent à découvrir.',
+                combosNone = 'Aucune combinaison découverte : mêlez les éléments, et ces pages s\'écriront d\'elles-mêmes.',
             },
             register = {
                 title = 'Registre des murmures', empty = 'Ce registre est vierge.', sent = 'À %s', received = 'De %s',

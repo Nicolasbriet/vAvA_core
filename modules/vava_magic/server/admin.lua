@@ -247,6 +247,7 @@ handlers[actions.sheet] = function(src, target)
     end
     if known == 0 then lines[#lines + 1] = chat.sheetNoSpell end
     lines[#lines + 1] = chat.sheetSigils:format(#sheet.sigils, mana.current(target), mana.MAX)
+    lines[#lines + 1] = chat.sheetCombos:format(#sheet.discoveredCombos, #VavaMagic.combos.all())
     reply(src, lines)
     bridge.AdminLog(src, logs.sheet, details(target))
     return true, true

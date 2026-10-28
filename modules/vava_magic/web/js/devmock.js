@@ -40,6 +40,9 @@ window.DevMock = (() => {
       cost: 'Mana : %d', cooldown: 'Recharge : %s s', cast: 'Incantation : %s s', instant: 'Incantation : instantanée',
       element: 'Élément : %s', lock: 'Verrouiller : %s', controls: 'Roue : %s · viser : %s · lancer : %s',
       current: 'Ce que vous savez', next: 'Au niveau suivant',
+      combos: 'Combinaisons', comboTrigger: 'Déclencheur', comboResult: 'Résultat', comboElements: 'Éléments : %s',
+      combosHidden: '%d combinaison(s) restent à découvrir.',
+      combosNone: 'Aucune combinaison découverte : mêlez les éléments, et ces pages s\'écriront d\'elles-mêmes.',
       sigils: 'Sigils mémorisables : %d', colors: 'Couleur de la lumière', close: 'Fermer',
     },
     wheel: { cancel: 'Annuler', deselect: 'Ranger la magie', cost: '%d', cooldown: '%d s', noSpell: 'Aucun sort', level: 'Niveau %d' },
@@ -104,6 +107,20 @@ window.DevMock = (() => {
     },
   ];
   const CONTROLS = { wheel: 'Tab', aim: 'Clic droit', cast: 'Clic gauche' };
+  const COMBOS = [
+    {
+      id: 'vapeur', label: 'Vapeur', summary: 'L\'eau jetée sur les flammes les étouffe en un nuage brûlant.',
+      trigger: 'Une vague ou un trait de glace touche un mur de flammes.',
+      result: 'Le mur s\'éteint et laisse un nuage de vapeur qui cache la vue et brûle légèrement ceux qui s\'y tiennent.',
+      elements: [{ icon: 'eau', label: 'Eau', color: WATER }, { icon: 'feu', label: 'Feu', color: FIRE }],
+    },
+    {
+      id: 'boue', label: 'Boue', summary: 'La terre remuée sous l\'eau devient un bourbier.',
+      trigger: 'Une secousse frappe un sol mouillé.',
+      result: 'Une boue épaisse s\'étale et ralentit fortement ceux qui s\'y enfoncent, trente secondes durant.',
+      elements: [{ icon: 'terre', label: 'Terre', color: EARTH }, { icon: 'eau', label: 'Eau', color: WATER }],
+    },
+  ];
   const WHEEL = {
     selected: 'boule_de_feu', releaseKey: 'TAB',
     groups: [
@@ -140,7 +157,7 @@ window.DevMock = (() => {
     offer: () => Bridge.emit('modal:offer', { id: 3, seconds: 30, nameMax: 24 }),
     naming: () => Bridge.emit('modal:naming', { id: 3, seconds: 30, nameMax: 24 }),
     confirm: () => Bridge.emit('modal:confirm', { kind: 'scramble', cost: 60 }),
-    grimoire: () => Bridge.emit('modal:grimoire', { sealed: false, spells: SPELLS, groups: GROUPS, controls: CONTROLS }),
+    grimoire: () => Bridge.emit('modal:grimoire', { sealed: false, spells: SPELLS, groups: GROUPS, controls: CONTROLS, combos: COMBOS, hiddenCombos: 5 }),
     sealed: () => Bridge.emit('modal:grimoire', { sealed: true }),
     register: () => Bridge.emit('modal:register', { id: 7, pages: PAGES, count: 3, max: 200 }),
     cast: () => Bridge.emit('cast:start', { label: 'Murmure', ms: 6000 }),
@@ -174,6 +191,8 @@ window.DevMock = (() => {
     },
   };
   SCENES.lueur = () => { SCENES.grimoire(); document.querySelectorAll('#view-grimoire .entry')[1].click(); };
+  SCENES.combos = () => { SCENES.grimoire(); document.querySelector('#view-grimoire .entry.is-combo').click(); };
+  SCENES.combo = () => { SCENES.hud(); Bridge.emit('combo', { label: 'Vapeur !' }); };
   SCENES.wheelfire = () => {
     SCENES.wheel();
     const rect = document.getElementById('wheel').getBoundingClientRect();

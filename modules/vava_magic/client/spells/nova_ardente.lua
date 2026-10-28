@@ -3,9 +3,10 @@
     Rôle : sort Nova ardente côté client : clic gauche en mode magie = incantation (aperçu au sol de son rayon autour
            du lanceur pendant la visée). Le serveur décide qui est touché ; les joueurs proches voient la nova :
            gerbes de flammes en cercle au rayon du niveau, éclat de lumière, anneau de feu qui s'élargit, sol qui
-           tremble sous les plus proches. Plus le niveau est haut, plus la gerbe est grande. Rien au-delà de la
-           distance des effets ; la boucle par image ne vit que le temps de l'éclat (une demi-seconde).
-    Dépendances : shared/, config.lua, client/ (noyau, bursts)
+           tremble sous les plus proches ; la terre reste noircie un moment. Plus le niveau est haut, plus la gerbe est
+           grande. Rien au-delà de la distance des effets ; la boucle par image ne vit que le temps de l'éclat (une
+           demi-seconde).
+    Dépendances : shared/, config.lua, client/ (noyau, zones, bursts)
 ]]
 
 local sin, cos, pi, min, max, floor = math.sin, math.cos, math.pi, math.min, math.max, math.floor
@@ -15,11 +16,14 @@ local StartParticleFxNonLoopedAtCoord, DrawMarker = StartParticleFxNonLoopedAtCo
 local fx = VavaMagic.fx
 local casting = VavaMagic.casting
 local controls = VavaMagic.controls
+local zoneRender = VavaMagic.zoneRender
 local bursts = VavaMagic.bursts
 local spellCfg = VavaMagic.config.spells.nova_ardente
 local fxCfg = spellCfg.fx
 local lightCfg = spellCfg.light
 local NAME = 'nova_ardente'
+-- le serveur annonce la position du lanceur ; la trace se pose à ses pieds
+local FEET = VavaMagic.config.controls.preview.feetOffset
 -- part du rayon où naissent les gerbes, hauteur de l'anneau au-dessus du sol
 local BURST_SHARE = 0.85
 local RING_HEIGHT = 0.05
@@ -56,6 +60,7 @@ local function show(payload)
     end)
     bursts.shake(center, radius * SHAKE_RADII, SHAKE)
     bursts.sound('impact', center)
+    zoneRender.trace({ { x = center.x, y = center.y, z = center.z - FEET } }, radius * 2)
     CreateThread(function()
         local started = GetGameTimer()
         local duration = max(fxCfg.ringMs, lightCfg.flashMs)

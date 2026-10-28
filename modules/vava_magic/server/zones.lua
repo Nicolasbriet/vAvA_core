@@ -9,6 +9,7 @@
       - Chaque zone n'est envoyée qu'aux joueurs à moins de `zones.syncRadius`, y compris à ceux qui s'en approchent
         après sa naissance ; sa fin n'est envoyée qu'à ceux qui la connaissent. Jamais à tout le serveur.
       - Plafond pour tout le royaume ; nettoyage d'urgence du Conseil ; départ d'un joueur oublié de toutes les zones.
+      - Pour les combinaisons : zones touchées par un trajet (projectile), zones recouvertes par un cercle (secousse).
     Dépendances : shared/, config.lua, server/core.lua, bridge/server.lua, server/world.lua, server/spells.lua,
                   server/combat.lua
 ]]
@@ -109,6 +110,50 @@ function zones.crossed(zone, from, to)
     local z = (zone.a.z + zone.b.z) / 2
     if abs(to.z - z) > HEIGHT then return false end
     return geometry.segmentsCross2d(from, to, zone.a, zone.b)
+end
+
+--- Zones qu'un trajet [from, to] touche (ligne traversée ou un bout dedans ; cercle à moins de son rayon du trajet),
+--- de la plus ancienne à la plus récente.
+---@param from table
+---@param to table
+---@return vAvA.MagicZone[]
+function zones.crossedBy(from, to)
+    local found = {}
+    local z = (from.z + to.z) / 2
+    for _, zone in pairs(active) do
+        if abs(z - zone.center.z) <= HEIGHT then
+            local touched
+            if zone.shape == zones.LINE then
+                touched = geometry.crossing2d(from, to, zone.a, zone.b) ~= nil or zones.contains(zone, from) or zones.contains(zone, to)
+            else
+                touched = geometry.segmentDistance2d(zone.center, from, to) <= zone.radius
+            end
+            if touched then found[#found + 1] = zone end
+        end
+    end
+    sort(found, function(a, b) return a.id < b.id end)
+    return found
+end
+
+--- Zones qu'un cercle au sol recouvre (au moins en partie), de la plus ancienne à la plus récente.
+---@param center table
+---@param radius number
+---@return vAvA.MagicZone[]
+function zones.touching(center, radius)
+    local found = {}
+    for _, zone in pairs(active) do
+        if abs(center.z - zone.center.z) <= HEIGHT then
+            local touched
+            if zone.shape == zones.LINE then
+                touched = geometry.segmentDistance2d(center, zone.a, zone.b) <= radius + zone.width / 2
+            else
+                touched = geometry.distance2d(center, zone.center) <= radius + zone.radius
+            end
+            if touched then found[#found + 1] = zone end
+        end
+    end
+    sort(found, function(a, b) return a.id < b.id end)
+    return found
 end
 
 --- Point visé par un sort au sol (mur, brume, secousse, rempart), revérifié au début de l'incantation : lanceur et

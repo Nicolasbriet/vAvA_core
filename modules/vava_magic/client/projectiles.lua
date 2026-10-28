@@ -9,7 +9,9 @@
         sort (`projectile`, `fx`, `light`, `sounds`) : objet local porteur (caché, ou visible et qui tournoie),
         traînée, marqueur, lumière ; il s'incurve vers la cible verrouillée si le serveur le permet (virage borné par
         seconde). Seul le client du lanceur lance un rayon le long de la trajectoire (un rempart l'arrête aussi) et
-        signale l'impact au serveur, qui le valide avant tout effet.
+        signale l'impact au serveur, qui le valide avant tout effet. Un projectile qui traverse une zone au sol dont
+        une combinaison le charge (roche dans un mur de flammes) change d'aspect en vol, d'après `config.combos` :
+        prédiction locale, le serveur décide de l'effet à l'impact.
       - Impact validé : particules, lueur, son, caméra qui tremble près d'un impact lourd, à l'endroit annoncé par le
         serveur, chez tous.
     Effets selon le niveau (taille, lumière) et la distance (rien au-delà de `effects.maxDistance`), dans les plafonds
@@ -17,7 +19,7 @@
     Dépendances : shared/, config.lua, client/ (noyau, fx, controls, targeting)
 ]]
 
-local pairs, next, type, min, max, sqrt, acos, deg = pairs, next, type, math.min, math.max, math.sqrt, math.acos, math.deg
+local pairs, ipairs, next, type, min, max, sqrt, acos, deg = pairs, ipairs, next, type, math.min, math.max, math.sqrt, math.acos, math.deg
 local GetHeadingFromVector_2d, SetEntityHeading, GetEntityForwardVector = GetHeadingFromVector_2d, SetEntityHeading, GetEntityForwardVector
 local CreateThread, Wait, GetGameTimer, GetFrameTime, RegisterNetEvent = CreateThread, Wait, GetGameTimer, GetFrameTime, RegisterNetEvent
 local PlayerId, PlayerPedId, GetPlayerServerId, GetPlayerFromServerId, GetPlayerPed = PlayerId, PlayerPedId, GetPlayerServerId, GetPlayerFromServerId, GetPlayerPed
@@ -30,11 +32,12 @@ local StartParticleFxLoopedOnEntity, StartParticleFxNonLoopedAtCoord, DrawMarker
 local StartShapeTestCapsule, GetShapeTestResult = StartShapeTestCapsule, GetShapeTestResult
 
 local core = VavaMagic.core
-local nui = VavaMagic.nui
 local bridge = VavaMagic.bridge
 local casting = VavaMagic.casting
 local controls = VavaMagic.controls
 local fx = VavaMagic.fx
+local zoneRender = VavaMagic.zoneRender
+local bursts = VavaMagic.bursts
 local targeting = VavaMagic.targeting
 local geometry = VavaMagic.geometry
 local cfg = VavaMagic.config
@@ -47,7 +50,6 @@ local SHAPE_TEST_OPTIONS = 7
 local SHAPE_TEST_DONE = 2
 local FLASH_MS = 300           -- lueur d'un impact
 local ENDED_MEMORY_MS = 10000  -- un impact déjà montré n'est pas montré deux fois
-local HEARING_DISTANCE = 60.0  -- au-delà, plus aucun son
 local LIGHT_SIZE_SHARE = 0.8   -- la lumière du projectile suit sa taille
 local CHEST_BONE = 24818       -- SKEL_Spine3 : un projectile qui s'incurve vise le torse
 local MARKER_SPHERE = 28
@@ -55,7 +57,7 @@ local MARKER_SPHERE = 28
 local projectiles = {}
 VavaMagic.projectiles = projectiles
 
----@type table<string, { config: table, model: integer|nil }>  sorts déclarés par leur fichier client
+---@type table<string, { config: table, model: integer|nil, carries: table[] }>  sorts déclarés par leur fichier client
 local defs = {}
 ---@type table<integer, table>  vols en cours
 local flights = {}
@@ -74,19 +76,18 @@ end
 ---@param y number
 ---@param z number
 local function sound(name, x, y, z)
-    if not name then return end
-    local distance = geometry.distance(GetEntityCoords(PlayerPedId()), { x = x, y = y, z = z })
-    local volume = max(0, 1 - distance / HEARING_DISTANCE)
-    if volume > 0 then nui.send('sound', { name = name, volume = volume }) end
+    bursts.sound(name, { x = x, y = y, z = z })
 end
 
---- Particules, lueur, son et tremblement d'un impact (rien au-delà de la distance des effets).
+--- Particules, lueur, son et tremblement d'un impact (rien au-delà de la distance des effets). `carry` : effet
+--- emporté par une combinaison (flammes d'une roche ardente), qui s'ajoute.
 ---@param def table
 ---@param x number
 ---@param y number
 ---@param z number
 ---@param size number
-local function impactAt(def, x, y, z, size)
+---@param carry? table
+local function impactAt(def, x, y, z, size, carry)
     local spellCfg = def.config
     local fxCfg = spellCfg.fx
     if not fx.detail({ x = x, y = y, z = z }) then return end
@@ -95,7 +96,13 @@ local function impactAt(def, x, y, z, size)
             StartParticleFxNonLoopedAtCoord(fxCfg.impact, x, y, z, 0.0, 0.0, 0.0, (fxCfg.impactScale or 1.0) * size, false, false, false)
         end)
     end
-    if spellCfg.light then flashes[#flashes + 1] = { light = spellCfg.light, x = x, y = y, z = z, untilMs = GetGameTimer() + FLASH_MS, size = size } end
+    if carry and carry.impact then
+        fx.oneShot(carry.asset, function()
+            StartParticleFxNonLoopedAtCoord(carry.impact, x, y, z, 0.0, 0.0, 0.0, (carry.impactScale or 1.0) * size, false, false, false)
+        end)
+    end
+    local light = (carry and carry.light) or spellCfg.light
+    if light then flashes[#flashes + 1] = { light = light, x = x, y = y, z = z, untilMs = GetGameTimer() + FLASH_MS, size = size } end
     local shake = fxCfg.shake
     if shake and geometry.distance(GetEntityCoords(PlayerPedId()), { x = x, y = y, z = z }) <= shake.radius then
         ShakeGameplayCam(shake.name, shake.amplitude)
@@ -111,7 +118,7 @@ local function land(flight, point)
     if flight.object and DoesEntityExist(flight.object) then DeleteObject(flight.object) end
     if point then
         ended[flight.id] = GetGameTimer()
-        impactAt(flight.def, point.x, point.y, point.z, flight.size)
+        impactAt(flight.def, point.x, point.y, point.z, flight.size, flight.carry)
     end
 end
 
@@ -146,6 +153,22 @@ local function steer(flight, dt)
     flight.dx, flight.dy, flight.dz = x / length, y / length, z / length
 end
 
+--- Le projectile entre dans une zone qui le charge (combinaison) : il change d'aspect pour le reste du vol.
+---@param flight table
+---@param carry table
+local function ignite(flight, carry)
+    flight.carry = carry
+    fx.stopLooped(flight.trail)
+    flight.trail = nil
+    if flight.object and carry.trail then
+        flight.trail = fx.startLooped(carry.asset, function()
+            return StartParticleFxLoopedOnEntity(carry.trail, flight.object, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, (carry.trailScale or 1.0) * flight.size, false, false, false)
+        end)
+    end
+    local at = flight.position
+    sound(carry.sound, at.x, at.y, at.z)
+end
+
 --- Une image de vol pour un projectile.
 local function advance(flight, dt)
     if flight.test then
@@ -172,6 +195,14 @@ local function advance(flight, dt)
         end
         flight.position = to
         flight.travelled = flight.travelled + step
+        if not flight.carry then
+            for _, entry in ipairs(flight.def.carries) do
+                if zoneRender.at(to, entry.zone) then
+                    ignite(flight, entry.carry)
+                    break
+                end
+            end
+        end
         if flight.object then
             SetEntityCoordsNoOffset(flight.object, to.x, to.y, to.z, false, false, false)
             if projectileCfg.spin then
@@ -187,7 +218,7 @@ local function advance(flight, dt)
         DrawMarker(MARKER_SPHERE, at.x, at.y, at.z, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, size, size, size,
             marker.r, marker.g, marker.b, marker.alpha, false, false, 2, false, nil, nil, false)
     end
-    local light = spellCfg.light
+    local light = (flight.carry and flight.carry.light) or spellCfg.light
     if light then
         fx.light(at.x, at.y, at.z, light.r, light.g, light.b, light.range * flight.size * LIGHT_SIZE_SHARE, light.intensity * flight.glow)
     end
@@ -332,7 +363,15 @@ end
 ---@param name string
 function projectiles.define(name)
     local spellCfg = cfg.spells[name]
-    local def = { config = spellCfg, model = spellCfg.projectile.model and GetHashKey(spellCfg.projectile.model) or nil }
+    local def = { config = spellCfg, model = spellCfg.projectile.model and GetHashKey(spellCfg.projectile.model) or nil, carries = {} }
+    -- combinaisons qui chargent ce projectile sur son trajet (zone au sol → effet emporté)
+    for _, combo in pairs(cfg.combos) do
+        local t = combo.trigger
+        if t.on == 'zone' and t.projectile and (t.spell == name or (t.spell == nil and t.element == spellCfg.element)) and combo.result.carry then
+            def.carries[#def.carries + 1] = { zone = t.zone, carry = combo.result.carry }
+            fx.ptfxReady(combo.result.carry.asset)
+        end
+    end
     defs[name] = def
     if def.model then RequestModel(def.model) end
     fx.ptfxReady(spellCfg.fx.asset)

@@ -8,7 +8,10 @@
 (() => {
   const MODALS = ['composer', 'offer', 'naming', 'confirm', 'grimoire', 'register'];
 
-  Bridge.on('init', (payload) => UI.setTexts(payload.texts));
+  Bridge.on('init', (payload) => {
+    UI.setTexts(payload.texts);
+    Sound.setFiles(payload.sounds);
+  });
   Bridge.on('cast:start', (payload) => Castbar.start(payload));
   Bridge.on('cast:end', () => Castbar.done());
   Bridge.on('cast:interrupted', () => Castbar.broken());
@@ -21,6 +24,7 @@
   Bridge.on('hud:flash', (payload) => Hud.flash(payload));
   Bridge.on('hud:casting', (payload) => Hud.casting(payload));
   Bridge.on('hud:hide', () => Hud.disable());
+  Bridge.on('combo', (payload) => Hud.combo(payload));
   Bridge.on('reticle', (payload) => Hud.reticle(payload));
   Bridge.on('states', (payload) => Conditions.set(payload));
   Bridge.on('screen', (payload) => Conditions.screen(payload));

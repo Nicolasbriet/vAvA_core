@@ -83,7 +83,7 @@ end
 
 nui.on('ready', function()
     ready = true
-    SendNUIMessage({ action = 'init', payload = { texts = VavaMagic.config.texts.ui } })
+    SendNUIMessage({ action = 'init', payload = { texts = VavaMagic.config.texts.ui, sounds = VavaMagic.config.sounds.files } })
     for _, message in ipairs(pending) do SendNUIMessage(message) end
     pending = {}
     return { ok = true }

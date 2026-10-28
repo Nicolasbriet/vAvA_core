@@ -3,11 +3,15 @@
  * web/js/sound.js
  * Rôle : sons de la magie, fabriqués à la volée (Web Audio) : aucun fichier à télécharger. Carillon d'un murmure
  *        reçu, souffle d'un projectile, impact, boule qui s'éteint, glace qui se brise, vague, craquement du sol,
- *        grondement. Volume donné par le jeu (distance).
+ *        grondement, sifflement de la vapeur. Volume donné par le jeu (distance). Un fichier déclaré dans la config
+ *        (`sounds.files`, reçu à l'initialisation) remplace le son fabriqué du même nom.
  */
 
 const Sound = (() => {
   let context = null;
+  // fichiers déclarés par la config (nom → chemin dans web/), et leur premier chargement
+  let files = {};
+  const loaded = {};
 
   function audio() {
     if (!context) {
@@ -137,6 +141,15 @@ const Sound = (() => {
       thump.start();
       thump.stop(ctx.currentTime + 1.3);
     },
+    hiss(ctx, volume) {
+      const source = noise(ctx, 1.0);
+      const filter = ctx.createBiquadFilter();
+      filter.type = 'highpass';
+      filter.frequency.value = 1500;
+      source.connect(filter);
+      filter.connect(envelope(ctx, volume * 0.4, 0.03, 0.9));
+      source.start();
+    },
     fizzle(ctx, volume) {
       const source = noise(ctx, 0.5);
       const filter = ctx.createBiquadFilter();
@@ -148,12 +161,43 @@ const Sound = (() => {
     },
   };
 
+  /** Fichiers de la config : { nom: 'sounds/<fichier>.ogg' }. */
+  function setFiles(map) {
+    files = map && typeof map === 'object' ? map : {};
+  }
+
+  /** D'où vient un son : 'file' (fichier déclaré), 'synth' (fabriqué), ou null (inconnu). */
+  function source(name) {
+    if (files[name]) return 'file';
+    if (voices[name]) return 'synth';
+    return null;
+  }
+
+  function playFile(name, volume) {
+    let base = loaded[name];
+    if (!base) {
+      base = new Audio(new URL(files[name], document.baseURI).href);
+      base.preload = 'auto';
+      loaded[name] = base;
+    }
+    // une copie par lecture : plusieurs sons semblables peuvent se chevaucher
+    const node = base.cloneNode();
+    node.volume = Math.min(1, volume);
+    const played = node.play();
+    if (played && typeof played.catch === 'function') played.catch(() => {});
+  }
+
   function play(name, volume = 1) {
+    if (!(volume > 0)) return;
+    if (files[name]) {
+      playFile(name, volume);
+      return;
+    }
     const voice = voices[name];
     const ctx = voice && audio();
-    if (!ctx || !(volume > 0)) return;
+    if (!ctx) return;
     voice(ctx, Math.min(1, volume));
   }
 
-  return { play };
+  return { play, setFiles, source };
 })();

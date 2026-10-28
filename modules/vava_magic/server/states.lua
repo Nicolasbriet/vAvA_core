@@ -7,7 +7,7 @@
       - Contrôles durs (Chancelant, Renversé, Gelé) : impossible d'incanter, une incantation en cours se brise. Dès
         qu'un contrôle dur touche, la cible est protégée des autres jusqu'à `hardImmunityMs` après sa fin (règle
         d'équité : aucun enchaînement) ; les dégâts, eux, s'appliquent toujours.
-      - Gelé : le ped est aussi figé par le serveur.
+      - Gelé : le ped est aussi figé par le serveur. Mouillé : la Brûlure s'éteint.
       - Hook `vava_magic:stateApplying` (before) : un autre module peut refuser un état (résistance, objet…).
     Dépendances : shared/, config.lua, server/core.lua, bridge/server.lua, server/world.lua, server/combat.lua
 ]]
@@ -161,6 +161,8 @@ function states.apply(src, name, opts)
         }
     end
     entry.conditions[name] = condition
+    -- trempé, on ne brûle plus (la combinaison Extinction, elle, crédite le lanceur d'un sort d'eau)
+    if name == 'wet' and entry.conditions.burn then finish(src, 'burn') end
     if HARD[name] then
         entry.immuneUntil = untilMs + cfg.hardImmunityMs
         local cast = VavaMagic.casting.current(src)
