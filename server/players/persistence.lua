@@ -150,4 +150,9 @@ function persistence.start(iterate)
             end
         end)
     end, true)
+    local declared, declareErr = vAvA.commands.declare(SAVE_COMMAND, {
+        kind = 'command', scope = 'console', label = 'Sauvegarder tous les personnages',
+        description = 'Écrit en base les personnages modifiés depuis la dernière sauvegarde ; à lancer avant un arrêt du serveur.',
+    })
+    if not declared then log.warn('%s non déclarée au registre des commandes : %s', SAVE_COMMAND, tostring(declareErr)) end
 end
