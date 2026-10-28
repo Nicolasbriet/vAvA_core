@@ -373,7 +373,8 @@ séparateurs `'`, `-` et espace jamais en tête, en fin ni doublés).
 Ressources séparées, dans `modules/` : à copier (ou lier) dans le dossier `resources` du serveur, dans cet ordre :
 `ensure vAvA_core`, `ensure vava_world`, `ensure vava_appearance`, `ensure vava_characters_ui`, `ensure vava_hud`,
 `ensure vava_inventory`, `ensure vava_needs`, `ensure vava_health`, `ensure vava_admin`, `ensure vava_voice`,
-`ensure vava_skills`, `ensure vava_chancellerie`, puis les modules qui déclarent des objets et les modules métiers.
+`ensure vava_skills`, `ensure vava_gathering`, `ensure vava_chancellerie`, puis les modules qui déclarent des objets et
+les autres modules métiers.
 
 ### `vava_appearance`
 
@@ -1005,6 +1006,46 @@ characterId, skill, from, to, rank, reason = xp | rust | admin_set | founder }`)
 **Commandes** : `vava_fondateur <joueur> <compétence> <niveau> [recette ...]` (console, ou droit `staff`) nomme un
 fondateur ; `/metiers niveau <joueur> <compétence> <niveau>`, `/metiers recette <joueur> <recette>`, `/metiers voir
 <joueur>` (droit `metiers` ; sans vava_admin, ACE `metiers.admin`). Cibles : joueurs connectés avec un personnage en jeu.
+
+### `vava_gathering`
+
+La récolte (1.0.0) : zones à **vitalité** 0–100 (plein rendement au-dessus de 60, réduit entre 60 et 25 avec chance
+d'échec, **épuisée** sous 25 avec props remplacés et rendement effondré, **cicatrice** à 0 : régénération × 0,2 pendant
+la durée de la zone), nœuds à charges (arbres, filons, buissons, bancs de poissons, pistes de gibier) qui se
+régénèrent par le temps (recalcul à la demande, aucune boucle), outils **en main** (`vava_inventory:held`) du genre
+requis, non brisés, usés par `patchMetadata` (brisés à 0), qualité de la récolte (niveau, outil, vitalité, aléa) en
+palier 1–5 et provenance sur la pile (`{ tier, origin }`), pêche à la barre de tension, réaction de la terre aux
+épuisements répétés, commandes du Conseil. L'XP passe par `vava_skills:addXp`. Tout le détail, la config et les tests en
+jeu : `modules/vava_gathering/README.md`. Demande le core 0.6.0, `vava_inventory` 1.4.0 et `vava_skills` 1.0.0 ;
+facultatifs : `vava_hud`, `vava_admin` (droit `metiers`), `vava_chat`.
+
+- **Données** en `config.lua` : zones (centre, rayon, coût, régénération, cicatrice), nœuds (position, ressource, charges,
+  délai, props normal et épuisé — tous les nœuds ont un prop créé par le client), ressources (objet, compétence, outil,
+  difficulté, XP, fourchette, durée, animation, pièce supplémentaire), outils, objets déclarés à l'inventaire. Les zones
+  livrées sont des exemples.
+- **État** publié par state bags globaux : `vava_gathering:zone:<id>` → `{ band, scarred, vitality }`,
+  `vava_gathering:node:<id>` → charges ; écrits au seul changement, relus toutes les 10 s.
+- **Serveur maître** : distance lue côté serveur au début et à la fin, durée revérifiée, jeton par geste, cooldown,
+  une récolte à la fois ; pour la pêche, seul « a tenu la tension » est déclaratif.
+
+**Registre** `vava_gathering:tools` (objet → `{ kind, power, yieldBonus?, qualityBonus?, wear? }`) : rempli par la
+config, ouvert aux autres modules (une hache d'artisan de phase 3 s'y déclare, ou hérite du genre de son objet).
+
+| Export serveur | Retour |
+|---|---|
+| `getZone(id)` | `{ id, label, kind, vitality, band, scarred, x, y, z, radius }` ou `nil, code` |
+| `getZones()` | liste, dans l'ordre de la config |
+| `setVitality(id, valeur)` | `true` ou `false, code` — 0 à 100, lève la cicatrice si > 0 ; journalisé au nom du module |
+| `nodeState(id)` | `{ id, zone, resource, charges, max }` |
+| `getResource(id)` · `getTool(objet)` | définitions, ou `nil` |
+| `getSession(joueur)` | `{ token, node, resource, kind, startedAt, durationMs }` ou `nil` |
+
+**Hooks** : `vava_gathering:harvesting` (`before`, annulable : `{ source, characterId, node, zone, resource, item }` —
+terre sacrée, nuit, état…), `harvested` (`after` : `+ quantity, tier, band, extra?`), `zoneDepleted` (`after` :
+`{ zone, vitality }`), `zoneScarred` (`{ zone, scarredUntil, depletions }`), `earthReaction` (`{ zone, depletions }`).
+
+**Commande** `/recolte zones | zone <id> | noeud <id> | vitalite <zone> <0-100> | recharger <noeud>` (droit `metiers`).
+Touches : `E` récolter, `O` panneau des zones. Rendu hors jeu : `web/index.html?view=prompt` (ou `tension`, `zones`).
 
 ### `vava_chat`
 

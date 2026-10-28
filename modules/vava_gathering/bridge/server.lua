@@ -1,0 +1,244 @@
+--[[
+    vava_gathering/bridge/server.lua
+    Rôle : SEUL point de contact, côté serveur, entre la récolte et le core / les autres modules : personnage et compte,
+           position lue côté serveur, inventaire (objet en main, place, ajout, usure par métadonnées, déclaration des
+           objets), compétences (XP, niveau), droits et journal du Conseil, notifications, chat, base de données.
+           Chaque appel à une autre ressource est isolé : un module absent ou en erreur ne retire que la fonction
+           concernée.
+    Dépendances : shared/constants.lua, config.lua, server/core.lua
+]]
+
+local type, pairs, pcall, tostring, tonumber = type, pairs, pcall, tostring, tonumber
+local mathType = math.type
+local pack, unpack, concat = table.pack, table.unpack, table.concat
+local GetResourceState, TriggerClientEvent, IsPlayerAceAllowed = GetResourceState, TriggerClientEvent, IsPlayerAceAllowed
+local GetPlayerPed, DoesEntityExist, GetEntityCoords = GetPlayerPed, DoesEntityExist, GetEntityCoords
+
+local core = VavaGathering.core
+if not core then return end
+
+local cfg = VavaGathering.config
+local EVENTS = VavaGathering.EVENTS
+local CONSOLE = 0
+local INVENTORY, SKILLS, ADMIN, CHAT = 'vava_inventory', 'vava_skills', 'vava_admin', 'vava_chat'
+local ITEMS_REGISTRY = 'vava_inventory:items'
+
+local Bridge = {}
+VavaGathering.bridge = Bridge
+
+local function invoke(resource, fn, ...)
+    local target = exports[resource]
+    return target[fn](target, ...)
+end
+
+--- Export d'une autre ressource, isolé. Renvoie `called` (appel réussi) puis ses valeurs.
+---@return boolean called
+local function call(resource, fn, ...)
+    if GetResourceState(resource) ~= 'started' then return false end
+    local results = pack(pcall(invoke, resource, fn, ...))
+    if not results[1] then
+        VavaGathering.log.warn('%s.%s en erreur : %s', resource, fn, tostring(results[2]))
+        return false
+    end
+    return true, unpack(results, 2, results.n)
+end
+
+-- Personnage ----------------------------------------------------------------------------------------------------
+
+--- Personnage actif d'un joueur ({ id, accountId, firstName, lastName, playSeconds }) ou nil.
+---@param source integer
+---@return table|nil
+function Bridge.GetCharacter(source)
+    local session = core.players.get(source)
+    if not session or session.state ~= 'active' then return nil end
+    return core.characters.getActive(source)
+end
+
+---@param source integer
+---@return integer|nil
+function Bridge.GetCharacterId(source)
+    local character = Bridge.GetCharacter(source)
+    return character and character.id or nil
+end
+
+---@param source integer
+---@return integer|nil
+function Bridge.GetAccountId(source)
+    local session = core.players.get(source)
+    return session and session.accountId or nil
+end
+
+---@param source integer
+---@return string|nil
+function Bridge.GetCharacterName(source)
+    local character = Bridge.GetCharacter(source)
+    return character and (character.firstName .. ' ' .. character.lastName) or nil
+end
+
+--- Position du joueur lue côté serveur, ou nil s'il n'a pas de ped.
+---@param source integer
+---@return number|nil x, number|nil y, number|nil z
+function Bridge.Position(source)
+    local ped = GetPlayerPed(source)
+    if ped == 0 or not DoesEntityExist(ped) then return nil end
+    local coords = GetEntityCoords(ped)
+    return coords.x, coords.y, coords.z
+end
+
+-- Inventaire ------------------------------------------------------------------------------------------------------
+
+--- Pile tenue en main ({ id, item, quantity, metadata }) ou nil.
+---@param source integer
+---@return table|nil
+function Bridge.Held(source)
+    local called, instance = call(INVENTORY, 'held', source)
+    return called and type(instance) == 'table' and instance or nil
+end
+
+---@return boolean ok
+---@return string|nil code
+function Bridge.CanCarry(source, item, quantity, metadata)
+    local called, ok, code = call(INVENTORY, 'canCarry', source, item, quantity, metadata)
+    if not called then return false, 'inventory_unavailable' end
+    return ok == true, code
+end
+
+---@return boolean ok
+---@return string|nil code
+function Bridge.Add(source, item, quantity, metadata)
+    local called, ok, code = call(INVENTORY, 'add', source, item, quantity, metadata)
+    if not called then return false, 'inventory_unavailable' end
+    return ok == true, code
+end
+
+--- Écrit ou remplace des clés de métadonnées d'une pile du joueur (solidité d'un outil).
+---@return boolean ok
+function Bridge.PatchMetadata(source, instanceId, patch)
+    local called, ok = call(INVENTORY, 'patchMetadata', source, instanceId, patch)
+    return called and ok == true
+end
+
+--- Déclare un objet à l'inventaire s'il ne l'est pas déjà (le registre peut ne pas exister tant que l'inventaire
+--- n'est pas prêt : rappelé à sa mise en route).
+---@param name string
+---@param definition table
+---@return boolean declared
+function Bridge.DeclareItem(name, definition)
+    local registry = core.registry
+    if not registry.exists(ITEMS_REGISTRY) or registry.has(ITEMS_REGISTRY, name) then return false end
+    local ok, err = registry.add(ITEMS_REGISTRY, name, definition)
+    if not ok then VavaGathering.log.warn("objet '%s' non déclaré : %s", name, tostring(err)) end
+    return ok == true
+end
+
+--- Vrai si l'objet est connu de l'inventaire (déclaré par ce module ou un autre).
+---@param name string
+---@return boolean
+function Bridge.ItemExists(name)
+    return core.registry.exists(ITEMS_REGISTRY) and core.registry.has(ITEMS_REGISTRY, name)
+end
+
+-- Compétences -----------------------------------------------------------------------------------------------------
+
+--- XP avec contexte ; `true, { gained, level, rank, leveledUp, blocked? }`.
+---@return boolean ok
+---@return table|string result
+function Bridge.AddXp(source, ctx)
+    local called, ok, result = call(SKILLS, 'addXp', source, ctx)
+    if not called then return false, 'skills_unavailable' end
+    return ok == true, result
+end
+
+--- Niveau d'une compétence (0 si inconnu).
+---@param source integer
+---@param skill string
+---@return integer
+function Bridge.GetLevel(source, skill)
+    local called, level = call(SKILLS, 'getLevel', source, skill)
+    return (called and mathType(level) == 'integer') and level or 0
+end
+
+-- Conseil ---------------------------------------------------------------------------------------------------------
+
+---@param source integer
+---@param permission string
+---@return boolean
+function Bridge.IsAllowed(source, permission)
+    if source == CONSOLE then return true end
+    if GetResourceState(ADMIN) == 'started' then
+        local called, allowed = call(ADMIN, 'can', source, permission)
+        return called and allowed == true
+    end
+    return IsPlayerAceAllowed(source, cfg.admin.ace) == true
+end
+
+---@param source integer
+---@param label string
+---@param details table
+function Bridge.AdminLog(source, label, details)
+    local called, ok, err = false, nil, nil
+    if source ~= CONSOLE then called, ok, err = call(ADMIN, 'log', source, label, details) end
+    if not called or ok ~= true then
+        local parts = {}
+        for key, value in pairs(details) do parts[#parts + 1] = key .. '=' .. tostring(value) end
+        VavaGathering.log.info('%s (par %d) : %s%s', label, source, concat(parts, ', '), called and (' — journal refusé : ' .. tostring(err)) or '')
+    end
+end
+
+-- Messages --------------------------------------------------------------------------------------------------------
+
+---@param source integer
+---@param message string
+---@param kind? string
+function Bridge.Notify(source, message, kind)
+    if source == CONSOLE then
+        print(('[%s] %s'):format(VavaGathering.resource, message))
+        return
+    end
+    TriggerClientEvent(EVENTS.NOTIFY, source, message, kind or 'info')
+end
+
+---@param source integer
+---@param text string
+function Bridge.Chat(source, text)
+    if source == CONSOLE then
+        print(('[%s] %s'):format(VavaGathering.resource, text))
+        return
+    end
+    local called = call(CHAT, 'addMessage', source, { text = text })
+    if not called then Bridge.Notify(source, text) end
+end
+
+-- Base de données -------------------------------------------------------------------------------------------------
+
+Bridge.db = {
+    query = function(sql, params) return core.db.query(sql, params) end,
+    single = function(sql, params) return core.db.single(sql, params) end,
+    scalar = function(sql, params) return core.db.scalar(sql, params) end,
+    insert = function(sql, params) return core.db.insert(sql, params) end,
+    update = function(sql, params) return core.db.update(sql, params) end,
+    transaction = function(queries) return core.db.transaction(queries) end,
+}
+
+--- Entier lu en base, ou `default`.
+---@param value any
+---@param default integer
+---@return integer
+function Bridge.Integer(value, default)
+    local number = tonumber(value)
+    if number == nil then return default end
+    return math.tointeger(number) or default
+end
+
+--- Nombre lu en base (DECIMAL en texte), ou `default`.
+---@param value any
+---@param default number
+---@return number
+function Bridge.Number(value, default)
+    local number = tonumber(value)
+    if number == nil then return default end
+    return number
+end
+
+Bridge.CONSOLE = CONSOLE
+Bridge.INVENTORY = INVENTORY
