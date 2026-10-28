@@ -64,6 +64,8 @@ window.DevMock = (() => {
     { name: 'flamme', label: 'Flamme', r: 255, g: 140, b: 60 }, { name: 'arcane', label: 'Arcane', r: 190, g: 150, b: 255 },
   ];
   const FIRE = { r: 255, g: 132, b: 52 };
+  const WATER = { r: 96, g: 176, b: 255 };
+  const EARTH = { r: 200, g: 156, b: 98 };
   const LIGHT = { r: 255, g: 224, b: 150 };
   const SPIRIT = { r: 190, g: 164, b: 255 };
   const GROUPS = [
@@ -76,6 +78,17 @@ window.DevMock = (() => {
       icon: 'boule_de_feu', element: 'Feu', group: 'feu', color: FIRE,
       description: 'Plus brûlante et plus lointaine (vingt-six mètres) ; elle ne s\'éteint plus qu\'une fois sur dix.',
       next: 'Votre boule de feu éclate à l\'impact et touche ceux qui entourent la cible.', cost: 13, cooldown: '3,5', lock: 'Clic molette',
+    },
+    {
+      name: 'trait_de_glace', label: 'Trait de glace', summary: 'Darder un éclat de glace qui transit l\'adversaire et alourdit ses pas.', level: 3, xp: 380, from: 300, to: 700,
+      icon: 'trait_de_glace', element: 'Eau', group: 'eau', color: WATER,
+      description: 'Trente-deux mètres de portée ; la cible perd un tiers de son allure trois secondes.',
+      next: 'Votre trait empêche de courir et s\'incurve vers la cible verrouillée.', cost: 10, cooldown: '2,5', lock: 'Clic molette',
+    },
+    {
+      name: 'rempart', label: 'Rempart', summary: 'Faire surgir du sol un mur de pierre qui arrête les pas et les sorts.', level: 5, xp: 1500, from: 1500,
+      icon: 'rempart', element: 'Terre', group: 'terre', color: EARTH,
+      description: 'Deux pans de quatre mètres en chevron, qui couvrent aussi vos flancs, seize secondes durant.', cost: 17, cooldown: '15', cast: '1',
     },
     {
       name: 'lueur', label: 'Lueur', summary: 'Faire naître la lumière, au creux de la main puis en orbe.', level: 5, xp: 1500, from: 1500,
@@ -98,6 +111,16 @@ window.DevMock = (() => {
         { name: 'boule_de_feu', label: 'Boule de feu', icon: 'boule_de_feu', level: 2, cost: 13, cooldown: 0, color: FIRE },
         { name: 'mur_de_flammes', label: 'Mur de flammes', icon: 'mur_de_flammes', level: 1, cost: 24, cooldown: 0, color: FIRE },
         { name: 'nova_ardente', label: 'Nova ardente', icon: 'nova_ardente', level: 3, cost: 24, cooldown: 6000, color: FIRE },
+      ] },
+      { id: 'eau', label: 'Eau', icon: 'eau', spells: [
+        { name: 'trait_de_glace', label: 'Trait de glace', icon: 'trait_de_glace', level: 3, cost: 10, cooldown: 0, color: WATER },
+        { name: 'vague', label: 'Vague', icon: 'vague', level: 2, cost: 23, cooldown: 0, color: WATER },
+        { name: 'brume', label: 'Brume', icon: 'brume', level: 4, cost: 15, cooldown: 7000, color: WATER },
+      ] },
+      { id: 'terre', label: 'Terre', icon: 'terre', spells: [
+        { name: 'projectile_de_roche', label: 'Projectile de roche', icon: 'projectile_de_roche', level: 1, cost: 18, cooldown: 0, color: EARTH },
+        { name: 'secousse', label: 'Secousse', icon: 'secousse', level: 4, cost: 17, cooldown: 0, color: EARTH },
+        { name: 'rempart', label: 'Rempart', icon: 'rempart', level: 5, cost: 17, cooldown: 12000, color: EARTH },
       ] },
       { id: 'utilitaires', label: 'Utilitaires', icon: 'utilitaires', spells: [
         { name: 'lueur', label: 'Lueur', icon: 'lueur', level: 5, cost: 5, cooldown: 0, color: LIGHT },
@@ -156,6 +179,29 @@ window.DevMock = (() => {
     const rect = document.getElementById('wheel').getBoundingClientRect();
     window.dispatchEvent(new MouseEvent('mousemove', { clientX: rect.left + rect.width * 0.5, clientY: rect.top + rect.height * 0.32 }));
     window.dispatchEvent(new MouseEvent('mousemove', { clientX: rect.left + rect.width * 0.5, clientY: rect.top + rect.height * 0.1 }));
+  };
+  // survol d'un groupe de la roue : angle du groupe (radians, 0 en haut, sens des aiguilles d'une montre ; cinq
+  // entrées : quatre groupes et « ranger »)
+  const hoverGroup = (angle) => {
+    SCENES.wheel();
+    const rect = document.getElementById('wheel').getBoundingClientRect();
+    const cx = rect.left + rect.width / 2, cy = rect.top + rect.height / 2;
+    for (const share of [0.18, 0.4]) {
+      window.dispatchEvent(new MouseEvent('mousemove', {
+        clientX: cx + Math.sin(angle) * rect.width * share, clientY: cy - Math.cos(angle) * rect.height * share,
+      }));
+    }
+  };
+  SCENES.wheelwater = () => hoverGroup((2 * Math.PI) / 5);
+  SCENES.wheelearth = () => hoverGroup((4 * Math.PI) / 5);
+  SCENES.mist = () => {
+    SCENES.hud();
+    Bridge.emit('states', { list: [{ name: 'wet', ms: 9000 }] });
+    Bridge.emit('screen:mist', { density: 0.85 });
+  };
+  SCENES.hits = () => {
+    SCENES.hud();
+    ['water', 'frost', 'earth'].forEach((kind, index) => setTimeout(() => Bridge.emit('screen:hit', { kind }), index * 700));
   };
   SCENES.messages = () => { SCENES.murmur(); SCENES.unknown(); SCENES.cast(); };
   SCENES.all = () => { SCENES.messages(); SCENES.grimoire(); };

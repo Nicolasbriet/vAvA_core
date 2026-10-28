@@ -5,31 +5,28 @@
            gerbes de flammes en cercle au rayon du niveau, éclat de lumière, anneau de feu qui s'élargit, sol qui
            tremble sous les plus proches. Plus le niveau est haut, plus la gerbe est grande. Rien au-delà de la
            distance des effets ; la boucle par image ne vit que le temps de l'éclat (une demi-seconde).
-    Dépendances : shared/, config.lua, client/ (noyau)
+    Dépendances : shared/, config.lua, client/ (noyau, bursts)
 ]]
 
-local type, sin, cos, pi, min, max, floor = type, math.sin, math.cos, math.pi, math.min, math.max, math.floor
-local CreateThread, Wait, GetGameTimer, RegisterNetEvent = CreateThread, Wait, GetGameTimer, RegisterNetEvent
-local PlayerPedId, GetEntityCoords, StartParticleFxNonLoopedAtCoord, DrawMarker, ShakeGameplayCam =
-    PlayerPedId, GetEntityCoords, StartParticleFxNonLoopedAtCoord, DrawMarker, ShakeGameplayCam
+local sin, cos, pi, min, max, floor = math.sin, math.cos, math.pi, math.min, math.max, math.floor
+local CreateThread, Wait, GetGameTimer = CreateThread, Wait, GetGameTimer
+local StartParticleFxNonLoopedAtCoord, DrawMarker = StartParticleFxNonLoopedAtCoord, DrawMarker
 
-local nui = VavaMagic.nui
 local fx = VavaMagic.fx
 local casting = VavaMagic.casting
 local controls = VavaMagic.controls
-local geometry = VavaMagic.geometry
+local bursts = VavaMagic.bursts
 local spellCfg = VavaMagic.config.spells.nova_ardente
 local fxCfg = spellCfg.fx
 local lightCfg = spellCfg.light
-local EVENTS = VavaMagic.EVENTS
 local NAME = 'nova_ardente'
 -- part du rayon où naissent les gerbes, hauteur de l'anneau au-dessus du sol
 local BURST_SHARE = 0.85
 local RING_HEIGHT = 0.05
 local RING_ALPHA = 220
--- joueurs proches dont la caméra tremble (en rayons de la nova), et la force du tremblement
-local SHAKE_RADII, SHAKE_AMPLITUDE = 2.0, 0.25
-local HEARING_DISTANCE = 60.0
+-- joueurs proches dont la caméra tremble (en rayons de la nova), et le tremblement
+local SHAKE_RADII = 2.0
+local SHAKE = { name = 'SMALL_EXPLOSION_SHAKE', amplitude = 0.25 }
 
 --- Clic gauche en mode magie (ou /lancer) : la nova se libère autour du lanceur.
 local function cast()
@@ -39,6 +36,7 @@ end
 --- La nova vue par un joueur proche : gerbes en cercle, éclat, anneau qui s'élargit.
 ---@param payload table
 local function show(payload)
+    if not bursts.isNumber(payload.radius) then return end
     local center = { x = payload.x, y = payload.y, z = payload.z }
     local detail = fx.detail(center)
     if not detail then return end
@@ -56,10 +54,8 @@ local function show(payload)
     fx.oneShot(fxCfg.asset, function()
         StartParticleFxNonLoopedAtCoord(fxCfg.burst, center.x, center.y, center.z, 0.0, 0.0, 0.0, scale * 1.5, false, false, false)
     end)
-    local me = GetEntityCoords(PlayerPedId())
-    local distance = geometry.distance(me, center)
-    if distance <= radius * SHAKE_RADII then ShakeGameplayCam('SMALL_EXPLOSION_SHAKE', SHAKE_AMPLITUDE) end
-    if distance <= HEARING_DISTANCE then nui.send('sound', { name = 'impact', volume = max(0, 1 - distance / HEARING_DISTANCE) }) end
+    bursts.shake(center, radius * SHAKE_RADII, SHAKE)
+    bursts.sound('impact', center)
     CreateThread(function()
         local started = GetGameTimer()
         local duration = max(fxCfg.ringMs, lightCfg.flashMs)
@@ -77,10 +73,6 @@ local function show(payload)
     end)
 end
 
-RegisterNetEvent(EVENTS.NOVA, function(payload)
-    if type(payload) ~= 'table' or type(payload.x) ~= 'number' or type(payload.y) ~= 'number' or type(payload.z) ~= 'number'
-        or type(payload.radius) ~= 'number' then return end
-    show(payload)
-end)
+bursts.define(NAME, show)
 
 controls.register(NAME, { cast = cast })

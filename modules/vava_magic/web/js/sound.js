@@ -2,7 +2,8 @@
 /*
  * web/js/sound.js
  * Rôle : sons de la magie, fabriqués à la volée (Web Audio) : aucun fichier à télécharger. Carillon d'un murmure
- *        reçu, souffle d'une boule de feu, impact, boule qui s'éteint. Volume donné par le jeu (distance).
+ *        reçu, souffle d'un projectile, impact, boule qui s'éteint, glace qui se brise, vague, craquement du sol,
+ *        grondement. Volume donné par le jeu (distance).
  */
 
 const Sound = (() => {
@@ -75,6 +76,66 @@ const Sound = (() => {
       thump.connect(envelope(ctx, volume * 0.6, 0.005, 0.45));
       thump.start();
       thump.stop(ctx.currentTime + 0.5);
+    },
+    shatter(ctx, volume) {
+      const source = noise(ctx, 0.35);
+      const filter = ctx.createBiquadFilter();
+      filter.type = 'highpass';
+      filter.frequency.value = 3200;
+      source.connect(filter);
+      filter.connect(envelope(ctx, volume * 0.45, 0.002, 0.3));
+      source.start();
+      [2637, 3520, 4186].forEach((frequency, index) => {
+        const osc = ctx.createOscillator();
+        osc.type = 'triangle';
+        osc.frequency.value = frequency;
+        osc.connect(envelope(ctx, volume * (0.12 / (index + 1)), 0.002, 0.35 + index * 0.1));
+        osc.start(ctx.currentTime + index * 0.03);
+        osc.stop(ctx.currentTime + 0.7);
+      });
+    },
+    splash(ctx, volume) {
+      const source = noise(ctx, 1.2);
+      const filter = ctx.createBiquadFilter();
+      filter.type = 'lowpass';
+      filter.Q.value = 0.8;
+      filter.frequency.setValueAtTime(2400, ctx.currentTime);
+      filter.frequency.exponentialRampToValueAtTime(300, ctx.currentTime + 1.1);
+      source.connect(filter);
+      filter.connect(envelope(ctx, volume * 0.6, 0.06, 1.05));
+      source.start();
+    },
+    crack(ctx, volume) {
+      const source = noise(ctx, 0.25);
+      const filter = ctx.createBiquadFilter();
+      filter.type = 'bandpass';
+      filter.Q.value = 2.5;
+      filter.frequency.value = 1400;
+      source.connect(filter);
+      filter.connect(envelope(ctx, volume * 0.55, 0.001, 0.2));
+      source.start();
+      const low = ctx.createOscillator();
+      low.type = 'sine';
+      low.frequency.setValueAtTime(70, ctx.currentTime);
+      low.connect(envelope(ctx, volume * 0.35, 0.01, 0.8));
+      low.start();
+      low.stop(ctx.currentTime + 0.9);
+    },
+    rumble(ctx, volume) {
+      const source = noise(ctx, 1.6);
+      const filter = ctx.createBiquadFilter();
+      filter.type = 'lowpass';
+      filter.frequency.value = 220;
+      source.connect(filter);
+      filter.connect(envelope(ctx, volume * 0.9, 0.04, 1.5));
+      source.start();
+      const thump = ctx.createOscillator();
+      thump.type = 'sine';
+      thump.frequency.setValueAtTime(55, ctx.currentTime);
+      thump.frequency.exponentialRampToValueAtTime(30, ctx.currentTime + 1.2);
+      thump.connect(envelope(ctx, volume * 0.7, 0.02, 1.2));
+      thump.start();
+      thump.stop(ctx.currentTime + 1.3);
     },
     fizzle(ctx, volume) {
       const source = noise(ctx, 0.5);

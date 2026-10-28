@@ -1,15 +1,15 @@
 --[[
     vava_magic/server/world.lua
     Rôle : le monde vu par le serveur (OneSync) : ped et position d'un joueur lus côté serveur, vie, véhicule, joueurs
-           en jeu proches d'un point et envoi d'un évènement à eux seuls, ped figé (gel), state bags posés sur le ped
-           d'un joueur (répliqués aux seuls joueurs proches, jamais à tout le serveur).
+           en jeu et véhicules proches d'un point, envoi d'un évènement aux seuls joueurs proches, ped figé (gel),
+           state bags posés sur le ped d'un joueur (répliqués aux seuls joueurs proches, jamais à tout le serveur).
     Dépendances : shared/constants.lua, server/core.lua, bridge/server.lua
 ]]
 
 local ipairs, pairs, sort = ipairs, pairs, table.sort
 local GetPlayerPed, GetEntityCoords, DoesEntityExist, GetVehiclePedIsIn, GetEntityHealth, Entity =
     GetPlayerPed, GetEntityCoords, DoesEntityExist, GetVehiclePedIsIn, GetEntityHealth, Entity
-local FreezeEntityPosition, TriggerClientEvent = FreezeEntityPosition, TriggerClientEvent
+local FreezeEntityPosition, TriggerClientEvent, GetAllVehicles = FreezeEntityPosition, TriggerClientEvent, GetAllVehicles
 
 local bridge = VavaMagic.bridge
 local geometry = VavaMagic.geometry
@@ -69,6 +69,23 @@ function world.near(point, radius, except)
         end
     end
     sort(found, function(a, b) return a.distance < b.distance end)
+    return found
+end
+
+--- Positions des véhicules à moins de `radius` mètres d'un point (lues côté serveur : il n'en est aucun dont un
+--- client puisse cacher la présence).
+---@param point table
+---@param radius number
+---@return table[]
+function world.vehiclesNear(point, radius)
+    local found = {}
+    for _, vehicle in ipairs(GetAllVehicles()) do
+        if DoesEntityExist(vehicle) then
+            local coords = GetEntityCoords(vehicle)
+            local position = { x = coords.x, y = coords.y, z = coords.z }
+            if geometry.distance(point, position) <= radius then found[#found + 1] = position end
+        end
+    end
     return found
 end
 

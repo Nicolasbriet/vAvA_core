@@ -413,6 +413,32 @@ button { color: inherit; font: inherit; }
   box-shadow: inset 0 0 6vw rgba(190, 225, 255, 0.45);
   animation: appear 400ms ease both;
 }
+/* voile de la brume : deux nappes qui dérivent en sens contraire, plus épaisses selon le niveau (--density) */
+.screen-mist {
+  --density: 0.8;
+  position: fixed;
+  inset: 0;
+  overflow: hidden;
+  pointer-events: none;
+  background: radial-gradient(ellipse 70% 60% at 50% 55%, rgba(226, 232, 236, calc(var(--density) * 0.55)), rgba(214, 222, 228, calc(var(--density) * 0.92)) 75%);
+  animation: appear 900ms ease both;
+}
+.screen-mist::before,
+.screen-mist::after {
+  position: absolute;
+  inset: -20%;
+  content: '';
+  opacity: var(--density);
+  background:
+    radial-gradient(ellipse 38% 26% at 22% 38%, rgba(240, 244, 247, 0.75), transparent 70%),
+    radial-gradient(ellipse 34% 30% at 70% 62%, rgba(232, 238, 242, 0.7), transparent 72%),
+    radial-gradient(ellipse 30% 22% at 48% 18%, rgba(244, 247, 249, 0.6), transparent 70%);
+  animation: mist-drift 14s ease-in-out infinite alternate;
+}
+.screen-mist::after { animation: mist-drift-back 19s ease-in-out infinite alternate; }
+@keyframes mist-drift { from { transform: translate(-6%, -2%); } to { transform: translate(6%, 3%); } }
+@keyframes mist-drift-back { from { transform: translate(5%, 2%) scaleX(-1); } to { transform: translate(-5%, -3%) scaleX(-1); } }
+
 /* éclat bref d'un coup reçu */
 .screen-hit {
   position: fixed;
@@ -421,6 +447,9 @@ button { color: inherit; font: inherit; }
   opacity: 0;
 }
 .screen-hit.is-burn { box-shadow: inset 0 0 10vw rgba(255, 96, 30, 0.6); }
+.screen-hit.is-water { box-shadow: inset 0 0 10vw rgba(70, 150, 235, 0.55); }
+.screen-hit.is-frost { box-shadow: inset 0 0 9vw rgba(205, 236, 255, 0.7), inset 0 0 2vw rgba(255, 255, 255, 0.45); }
+.screen-hit.is-earth { box-shadow: inset 0 0 11vw rgba(120, 84, 44, 0.65); }
 .screen-hit.is-on { animation: hit-flash 320ms ease-out both; }
 @keyframes hit-flash { from { opacity: 1; } to { opacity: 0; } }
 

@@ -39,6 +39,9 @@ VavaMagic.states = states
 
 ---@type table<integer, { conditions: table<string, vAvA.MagicCondition>, immuneUntil: integer, token: integer }>
 local players = {}
+-- numéro de chaque pose d'état, jamais réutilisé (même après le départ d'un joueur) : une minuterie d'un état
+-- oublié ne peut pas se prendre pour une minuterie d'aujourd'hui
+local lastToken = 0
 
 ---@param src integer
 ---@return table
@@ -148,7 +151,8 @@ function states.apply(src, name, opts)
     elseif current then
         untilMs = max(untilMs, current.untilMs)
     end
-    entry.token = entry.token + 1
+    lastToken = lastToken + 1
+    entry.token = lastToken
     local condition = { untilMs = untilMs, token = entry.token, strength = name == 'slow' and opts.strength or nil }
     if name == 'burn' then
         condition.burn = {

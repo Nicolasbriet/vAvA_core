@@ -1,13 +1,13 @@
 --[[
     vava_magic/config.lua
     Rôle : configuration de la magie (lue par le client et le serveur) : mana, progression, incantation, éléments et
-           roue des sorts, contrôles du mode magie, sorts et leurs niveaux, effets (budget et niveau de détail),
-           sigils, registre, objets, combat, touches, commandes, limites de débit, et TOUS les textes vus par les
-           joueurs (l'interface reçoit les siens d'ici).
+           roue des sorts, contrôles du mode magie, effets (budget et niveau de détail), projectiles, sorts et leurs
+           niveaux, états, zones, combat, sigils, registre, objets, touches, commandes, limites de débit, et TOUS les
+           textes vus par les joueurs (l'interface reçoit les siens d'ici).
     Ajouter un sort : créer server/spells/<nom>.lua et client/spells/<nom>.lua, les lister dans le fxmanifest, et
            déclarer ici spells.<nom> (mêmes champs communs que les sorts ci-dessous) ; la roue, le grimoire et les
            commandes du Conseil le prennent d'eux-mêmes. Son icône : web/img/spells/<icon>.svg.
-    Animations et particules : noms tirés de GTA V, À VÉRIFIER EN JEU (voir README).
+    Animations, particules et objets : noms tirés de GTA V, À VÉRIFIER EN JEU (voir README).
     Dépendances : shared/constants.lua
 ]]
 
@@ -100,6 +100,20 @@ VavaMagic.config = {
         releaseMs = 60000,       -- un lot inutilisé depuis ce délai est libéré
     },
 
+    -- Projectiles (boule de feu, trait de glace, projectile de roche) : contrôles du serveur à l'impact, communs à
+    -- tous (positions lues côté serveur) ; un sort peut en changer certains dans son propre `hit`.
+    projectiles = {
+        angleDeg = 25,           -- écart permis entre la direction du lancer et le point d'impact
+        targetMargin = 2.5,      -- mètres entre le point d'impact annoncé et la cible
+        rangeMargin = 2.0,       -- mètres au-delà de la portée
+        timeMarginMs = 450,      -- avance permise sur le temps de vol (latence)
+        broadcastRadius = 150.0, -- joueurs qui voient le lancer
+        launchGraceMs = 3000,    -- délai d'un impact après la fin du vol
+        originHeight = 0.6,      -- hauteur des mains au-dessus de la position du ped
+        targetHeight = 0.3,      -- cible verrouillée : visée au torse, au-dessus de la position du ped
+        handBone = 57005,        -- SKEL_R_Hand : le projectile part de la main droite
+    },
+
     -- Sorts. Champs communs :
     --   order (grimoire et roue), label, summary, element (clé de `elements`), type (projectile, zone, utilitaire),
     --   icon (web/img/spells/<icon>.svg), baseCost, xp (succès), hitXp (bonus quand le sort touche une cible),
@@ -168,24 +182,16 @@ VavaMagic.config = {
                 },
             },
             burnEnabled = true,   -- brûlure du niveau 4 (false : jamais de dégâts sur la durée)
-            -- contrôles du serveur à l'impact (positions lues côté serveur)
-            hit = {
-                angleDeg = 25,           -- écart permis entre la direction du lancer et la cible
-                targetMargin = 2.5,      -- mètres entre le point d'impact annoncé et la cible
-                rangeMargin = 2.0,       -- mètres au-delà de la portée
-                timeMarginMs = 450,      -- avance permise sur le temps de vol (latence)
-                broadcastRadius = 150.0, -- joueurs qui voient le lancer
-                launchGraceMs = 3000,    -- délai d'un impact après la fin du vol
-                originHeight = 0.6,      -- hauteur des mains au-dessus de la position du ped
-                targetHeight = 0.3,      -- cible verrouillée : visée au torse, au-dessus de la position du ped
-            },
+            -- rendu du vol (voir client/projectiles.lua) : objet porteur (caché, seules ses particules se voient),
+            -- rayon du test de collision, traînée, impact, extinction, lumière, sons
+            projectile = { model = 'prop_golf_ball', visible = false, radius = 0.25 },
             fx = {
                 asset = 'core',
                 trail = 'ent_amb_torch_fire', impact = 'ent_sht_flame', fizzle = 'ent_sht_steam',
                 impactScale = 1.2, fizzleScale = 0.8,
             },
             light = { r = 255, g = 140, b = 40, range = 6.0, intensity = 6.0 },
-            projectile = { model = 'prop_golf_ball', handBone = 57005, radius = 0.25 },
+            sounds = { launch = 'whoosh', impact = 'impact', fizzle = 'fizzle' },
         },
 
         mur_de_flammes = {
@@ -304,6 +310,391 @@ VavaMagic.config = {
             broadcastRadius = 120.0,  -- joueurs qui voient la nova
             fx = { asset = 'core', burst = 'ent_sht_flame', points = 12, scale = 1.4, ring = 25, ringMs = 450 },
             light = { r = 255, g = 132, b = 44, range = 9.0, intensity = 9.0, flashMs = 450 },
+        },
+
+        trait_de_glace = {
+            order = 4,
+            label = 'Trait de glace',
+            summary = 'Darder un éclat de glace qui transit l\'adversaire et alourdit ses pas.',
+            element = 'eau',
+            type = 'projectile',
+            icon = 'trait_de_glace',
+            baseCost = 12,
+            xp = 20,
+            hitXp = 10,
+            moveSpeed = 1.2,
+            lockOn = true,
+            reaction = 'glace',   -- réaction de la cible (`combat.reactions`) : givre plutôt qu'éclaboussure
+            aim = { kind = 'projectile' },
+            anims = {
+                start = { dict = 'anim@mp_player_intupperknuckle_crunch', clip = 'enter', flag = 48, ms = 200 },
+                loop = { dict = 'anim@mp_player_intupperknuckle_crunch', clip = 'idle_a', flag = 49 },
+                release = { dict = 'weapons@projectile@grenade_str', clip = 'throw_m_fb_stand', flag = 48, ms = 700 },
+            },
+            ambientText = 'condense entre ses doigts un éclat de givre',
+            levelScale = { 0.8, 0.9, 1.0, 1.1, 1.25 },
+            -- speed (m/s) · range (m) · damage (points de vie) · size · slow (Ralenti : force, part de l'allure
+            -- retirée, et durée) · wetMs (durée de Mouillé) · homing (degrés par seconde vers la cible verrouillée)
+            levels = {
+                {
+                    castMs = 300, cooldownMs = 3000, speed = 30.0, range = 25.0, damage = 5, size = 0.7,
+                    slow = { strength = 0.25, durationMs = 2000 }, wetMs = 8000, homing = 0,
+                    description = 'Un éclat de glace rapide qui mord à peine, mais alourdit les pas de la cible deux secondes et la laisse trempée.',
+                    unlock = 'Vous savez darder un trait de glace.',
+                },
+                {
+                    castMs = 280, cooldownMs = 2800, speed = 33.0, range = 28.0, damage = 6, size = 0.8,
+                    slow = { strength = 0.3, durationMs = 2500 }, wetMs = 9000, homing = 0,
+                    description = 'Plus vif et plus froid : la cible ralentit davantage, deux secondes et demie.',
+                    unlock = 'Votre trait de glace ralentit plus fort et plus longtemps.',
+                },
+                {
+                    castMs = 250, cooldownMs = 2500, speed = 36.0, range = 32.0, damage = 8, size = 0.9,
+                    slow = { strength = 0.35, durationMs = 3000 }, wetMs = 10000, homing = 0,
+                    description = 'Trente-deux mètres de portée ; la cible perd un tiers de son allure trois secondes.',
+                    unlock = 'Votre trait porte plus loin et mord davantage.',
+                },
+                {
+                    castMs = 220, cooldownMs = 2200, speed = 40.0, range = 36.0, damage = 10, size = 1.0,
+                    slow = { strength = 0.45, durationMs = 3500 }, wetMs = 12000, homing = 20,
+                    description = 'La cible ne peut plus courir, trois secondes et demie ; le trait s\'incurve un peu vers la cible verrouillée.',
+                    unlock = 'Votre trait empêche de courir et s\'incurve vers la cible verrouillée.',
+                },
+                {
+                    castMs = 200, cooldownMs = 2000, speed = 45.0, range = 40.0, damage = 12, size = 1.15,
+                    slow = { strength = 0.5, durationMs = 4000 }, wetMs = 14000, homing = 40,
+                    description = 'Un dard de givre à quarante mètres, qui transit sa cible quatre secondes et la suit de près.',
+                    unlock = 'Votre trait de glace atteint sa pleine morsure.',
+                },
+            },
+            projectile = { model = 'prop_golf_ball', visible = false, radius = 0.2, marker = { r = 200, g = 236, b = 255, alpha = 220, size = 0.16 } },
+            fx = {
+                asset = 'core', trail = 'ent_sht_steam', impact = 'ent_sht_water',
+                trailScale = 0.6, impactScale = 1.0,
+            },
+            light = { r = 150, g = 210, b = 255, range = 4.0, intensity = 4.0 },
+            sounds = { launch = 'whoosh', impact = 'shatter' },
+        },
+
+        vague = {
+            order = 5,
+            label = 'Vague',
+            summary = 'Lever une vague qui balaie tout devant soi, éteint les flammes et détrempe le sol.',
+            element = 'eau',
+            type = 'zone',
+            icon = 'vague',
+            baseCost = 26,
+            xp = 25,
+            hitXp = 10,
+            -- cône devant le lanceur, dans la direction du regard (aperçu au sol : sa portée et son ouverture)
+            aim = { kind = 'self', shape = 'cone', radius = 'range', angle = 'halfAngle' },
+            -- corps entier : bras levés, puis poussés devant soi
+            anims = {
+                start = { dict = 'anim@mp_player_intuppersurrender', clip = 'enter', flag = 0, ms = 400 },
+                loop = { dict = 'anim@mp_player_intuppersurrender', clip = 'idle_a', flag = 1 },
+                release = { dict = 'anim@mp_player_intcelebrationmale@bro_love', clip = 'bro_love', flag = 0, ms = 700 },
+            },
+            ambientText = 'rassemble l\'eau de l\'air entre ses bras',
+            levelScale = { 0.8, 0.9, 1.0, 1.15, 1.35 },
+            -- range (m) · halfAngle (demi-ouverture du cône, degrés) · knockback (m/s du recul) · knockdownMs (Renversé,
+            -- 0 : aucun) · wetMs (Mouillé) · groundMs (sol mouillé laissé devant soi, 0 : aucun)
+            levels = {
+                {
+                    castMs = 1000, cooldownMs = 12000, range = 4.0, halfAngle = 30, knockback = 3.0, knockdownMs = 0,
+                    wetMs = 10000, groundMs = 6000,
+                    description = 'Une vague de quatre mètres qui repousse, trempe et éteint les flammes devant vous.',
+                    unlock = 'Vous savez lever une vague.',
+                },
+                {
+                    castMs = 950, cooldownMs = 11000, range = 5.5, halfAngle = 32, knockback = 4.0, knockdownMs = 0,
+                    wetMs = 11000, groundMs = 7000,
+                    description = 'Cinq mètres et demi d\'eau, qui repoussent plus fort.',
+                    unlock = 'Votre vague porte plus loin et repousse plus fort.',
+                },
+                {
+                    castMs = 900, cooldownMs = 10000, range = 7.0, halfAngle = 35, knockback = 5.0, knockdownMs = 0,
+                    wetMs = 12000, groundMs = 8000,
+                    description = 'Sept mètres, plus larges ; le sol reste trempé plus longtemps.',
+                    unlock = 'Votre vague s\'élargit et détrempe le sol plus longtemps.',
+                },
+                {
+                    castMs = 850, cooldownMs = 9000, range = 8.5, halfAngle = 38, knockback = 6.0, knockdownMs = 1500,
+                    wetMs = 13000, groundMs = 10000,
+                    description = 'Huit mètres et demi : ceux qu\'elle frappe sont renversés.',
+                    unlock = 'Votre vague renverse ceux qu\'elle frappe.',
+                },
+                {
+                    castMs = 800, cooldownMs = 8000, range = 10.0, halfAngle = 40, knockback = 7.0, knockdownMs = 1800,
+                    wetMs = 14000, groundMs = 12000,
+                    description = 'Un raz-de-marée de dix mètres, qui renverse, noie les flammes et laisse un sol ruisselant.',
+                    unlock = 'Votre vague atteint dix mètres et sa pleine force.',
+                },
+            },
+            broadcastRadius = 120.0,  -- joueurs qui voient la vague
+            -- éteint les zones de ces genres qu'elle touche (et la Brûlure de ceux qu'elle frappe)
+            extinguishes = { flames = true },
+            fx = { asset = 'core', splash = 'ent_sht_water', rows = 4, perRow = 5, scale = 1.4, sweepMs = 450 },
+        },
+
+        brume = {
+            order = 6,
+            label = 'Brume',
+            summary = 'Faire monter une brume épaisse où nul ne voit plus à deux pas.',
+            element = 'eau',
+            type = 'zone',
+            icon = 'brume',
+            baseCost = 22,
+            xp = 20,
+            hitXp = 5,
+            aim = { kind = 'point', shape = 'circle', radius = 'radius' },
+            anims = {
+                start = { dict = 'anim@mp_player_intuppersurrender', clip = 'enter', flag = 0, ms = 400 },
+                loop = { dict = 'anim@mp_player_intuppersurrender', clip = 'idle_a', flag = 1 },
+                release = { dict = 'anim@mp_player_intuppersurrender', clip = 'exit', flag = 0, ms = 600 },
+            },
+            ambientText = 'souffle une haleine blanche qui roule au sol',
+            levelScale = { 0.8, 0.9, 1.0, 1.15, 1.3 },
+            -- reach (m) · radius (m) · durationMs · density (voile à l'écran de qui s'y tient, 0 à 1) · wetMs
+            -- (Mouillé de qui s'y tient, 0 : aucun) · groundMs (sol mouillé laissé à sa fin, 0 : aucun)
+            levels = {
+                {
+                    castMs = 1500, cooldownMs = 15000, reach = 15.0, radius = 4.0, durationMs = 8000, density = 0.7,
+                    wetMs = 0, groundMs = 0,
+                    description = 'Une brume de quatre mètres, huit secondes durant : qui s\'y tient n\'y voit plus guère.',
+                    unlock = 'Vous savez faire monter la brume.',
+                },
+                {
+                    castMs = 1400, cooldownMs = 14000, reach = 16.0, radius = 5.5, durationMs = 10000, density = 0.75,
+                    wetMs = 0, groundMs = 0,
+                    description = 'Cinq mètres et demi de brume, dix secondes.',
+                    unlock = 'Votre brume s\'étend et dure plus longtemps.',
+                },
+                {
+                    castMs = 1300, cooldownMs = 13000, reach = 18.0, radius = 7.0, durationMs = 12000, density = 0.8,
+                    wetMs = 8000, groundMs = 8000,
+                    description = 'Une brume lourde de sept mètres qui trempe ceux qui s\'y tiennent et laisse le sol mouillé.',
+                    unlock = 'Votre brume trempe ceux qu\'elle enveloppe et laisse le sol mouillé.',
+                },
+                {
+                    castMs = 1200, cooldownMs = 12000, reach = 20.0, radius = 8.5, durationMs = 14000, density = 0.85,
+                    wetMs = 10000, groundMs = 10000,
+                    description = 'Huit mètres et demi, quatorze secondes : un banc de brume où l\'on se perd.',
+                    unlock = 'Votre brume s\'épaissit encore.',
+                },
+                {
+                    castMs = 1100, cooldownMs = 11000, reach = 22.0, radius = 10.0, durationMs = 16000, density = 0.9,
+                    wetMs = 12000, groundMs = 12000,
+                    description = 'Un brouillard de dix mètres, seize secondes durant, où nul ne voit sa propre main.',
+                    unlock = 'Votre brume atteint sa pleine épaisseur.',
+                },
+            },
+            maxPerCaster = 1,          -- une nouvelle brume dissipe la précédente
+            heightMargin = 6.0,        -- écart de hauteur permis entre le lanceur et le point visé (m)
+            refreshMs = 4000,          -- Mouillé reposé au plus à cet intervalle sur un même joueur (réseau)
+            -- à l'écran de qui s'y tient : voile de la page, et filtre de GTA ('' : aucun) à la force de `density`
+            screen = { timecycle = 'hud_def_blur' },
+            -- nappes réparties sur le disque : une par carré de `spacing` mètres de côté, au plus `maxPoints` (de près)
+            -- ou `reducedPoints` (de loin)
+            fx = { asset = 'core', cloud = 'exp_grd_bzgas_smoke', spacing = 5.0, maxPoints = 12, reducedPoints = 5, scale = 1.5 },
+        },
+
+        projectile_de_roche = {
+            order = 7,
+            label = 'Projectile de roche',
+            summary = 'Arracher un bloc au sol et le projeter de toutes ses forces.',
+            element = 'terre',
+            type = 'projectile',
+            icon = 'projectile_de_roche',
+            baseCost = 18,
+            xp = 22,
+            hitXp = 10,
+            moveSpeed = 0.8,
+            lockOn = true,
+            aim = { kind = 'projectile' },
+            anims = {
+                start = { dict = 'anim@mp_player_intupperknuckle_crunch', clip = 'enter', flag = 48, ms = 300 },
+                loop = { dict = 'anim@mp_player_intupperknuckle_crunch', clip = 'idle_a', flag = 49 },
+                release = { dict = 'weapons@projectile@grenade_str', clip = 'throw_m_fb_stand', flag = 48, ms = 900 },
+            },
+            ambientText = 'arrache au sol un bloc de pierre qui flotte entre ses mains',
+            levelScale = { 0.85, 0.9, 1.0, 1.1, 1.25 },
+            -- speed (m/s, lent : on peut l'esquiver) · range (m) · damage (points de vie) · size · staggerMs
+            -- (Chancelant, 0 : aucun) · aoeRadius/aoeShare (éclats autour de l'impact) · homing
+            levels = {
+                {
+                    castMs = 500, cooldownMs = 4000, speed = 12.0, range = 18.0, damage = 14, size = 0.8,
+                    staggerMs = 0, aoeRadius = 0, aoeShare = 0, homing = 0,
+                    description = 'Un bloc lourd et lent, qui frappe fort qui ne l\'esquive pas. Portée : dix-huit mètres.',
+                    unlock = 'Vous savez projeter un bloc de roche.',
+                },
+                {
+                    castMs = 470, cooldownMs = 3800, speed = 13.0, range = 20.0, damage = 17, size = 0.9,
+                    staggerMs = 0, aoeRadius = 0, aoeShare = 0, homing = 0,
+                    description = 'Un bloc plus gros, à vingt mètres.',
+                    unlock = 'Votre roche frappe plus fort.',
+                },
+                {
+                    castMs = 440, cooldownMs = 3500, speed = 14.0, range = 22.0, damage = 20, size = 1.0,
+                    staggerMs = 1200, aoeRadius = 0, aoeShare = 0, homing = 0,
+                    description = 'Le choc fait chanceler la cible : elle ne peut plus incanter un instant.',
+                    unlock = 'Votre roche fait chanceler ceux qu\'elle frappe.',
+                },
+                {
+                    castMs = 400, cooldownMs = 3200, speed = 15.0, range = 25.0, damage = 23, size = 1.1,
+                    staggerMs = 1500, aoeRadius = 0, aoeShare = 0, homing = 0,
+                    description = 'Vingt-cinq mètres, et un déséquilibre plus long.',
+                    unlock = 'Votre roche porte plus loin et ébranle plus longtemps.',
+                },
+                {
+                    castMs = 360, cooldownMs = 3000, speed = 16.0, range = 28.0, damage = 26, size = 1.25,
+                    staggerMs = 1800, aoeRadius = 2.5, aoeShare = 0.5, homing = 0,
+                    description = 'Un rocher qui éclate à l\'impact : ses éclats blessent ceux qui se tiennent à deux pas et demi.',
+                    unlock = 'Votre roche éclate à l\'impact et blesse ceux qui entourent la cible.',
+                },
+            },
+            -- objet vu en vol, qui tournoie (degrés par seconde ; modèle de GTA à vérifier) ; tremblement de la caméra
+            -- des joueurs proches de l'impact
+            projectile = { model = 'prop_rock_1_b', visible = true, radius = 0.35, spin = 240.0 },
+            fx = {
+                asset = 'core', trail = 'ent_dst_dust', impact = 'ent_dst_rocks',
+                trailScale = 0.5, impactScale = 1.2,
+                shake = { name = 'SMALL_EXPLOSION_SHAKE', amplitude = 0.15, radius = 12.0 },
+            },
+            light = false,
+            sounds = { launch = 'whoosh', impact = 'impact' },
+        },
+
+        secousse = {
+            order = 8,
+            label = 'Secousse',
+            summary = 'Fendre le sol sous les pieds de l\'adversaire, qui vacille et tombe.',
+            element = 'terre',
+            type = 'zone',
+            icon = 'secousse',
+            baseCost = 24,
+            xp = 22,
+            hitXp = 10,
+            aim = { kind = 'point', shape = 'circle', radius = 'radius' },
+            -- corps entier : un genou à terre, la main frappe le sol
+            anims = {
+                start = { dict = 'amb@world_human_gardener_plant@male@enter', clip = 'enter', flag = 0, ms = 700 },
+                loop = { dict = 'amb@world_human_gardener_plant@male@base', clip = 'base', flag = 1 },
+                release = { dict = 'amb@world_human_gardener_plant@male@exit', clip = 'exit', flag = 0, ms = 900 },
+            },
+            ambientText = 'pose la main au sol, qui se met à gronder',
+            levelScale = { 0.8, 0.9, 1.0, 1.15, 1.3 },
+            -- reach (m) · radius (m) · delayMs (le sol se fend et gronde avant de frapper : le temps de fuir) ·
+            -- damage (points de vie) · control (contrôle infligé : stagger ou knockdown) · controlMs
+            levels = {
+                {
+                    castMs = 1200, cooldownMs = 14000, reach = 14.0, radius = 3.0, delayMs = 1400, damage = 4,
+                    control = 'stagger', controlMs = 1200,
+                    description = 'Le sol se fend sur trois mètres et, après un grondement, ébranle ceux qui s\'y tiennent.',
+                    unlock = 'Vous savez faire trembler le sol.',
+                },
+                {
+                    castMs = 1100, cooldownMs = 13000, reach = 15.0, radius = 3.5, delayMs = 1300, damage = 5,
+                    control = 'stagger', controlMs = 1400,
+                    description = 'Trois mètres et demi, et un grondement plus bref.',
+                    unlock = 'Votre secousse s\'élargit et frappe plus vite.',
+                },
+                {
+                    castMs = 1000, cooldownMs = 12000, reach = 16.0, radius = 4.0, delayMs = 1200, damage = 6,
+                    control = 'stagger', controlMs = 1500,
+                    description = 'Quatre mètres ; ceux qu\'elle ébranle chancellent plus longtemps.',
+                    unlock = 'Votre secousse ébranle plus longtemps.',
+                },
+                {
+                    castMs = 950, cooldownMs = 11000, reach = 18.0, radius = 4.5, delayMs = 1100, damage = 7,
+                    control = 'knockdown', controlMs = 1500,
+                    description = 'Le sol se dérobe : ceux qui s\'y tiennent sont renversés.',
+                    unlock = 'Votre secousse renverse ceux qu\'elle frappe.',
+                },
+                {
+                    castMs = 900, cooldownMs = 10000, reach = 20.0, radius = 5.0, delayMs = 1000, damage = 8,
+                    control = 'knockdown', controlMs = 1800,
+                    description = 'Cinq mètres de terre qui se soulève en une seconde à peine, et jette tout le monde au sol.',
+                    unlock = 'Votre secousse atteint sa pleine violence.',
+                },
+            },
+            heightMargin = 6.0,        -- écart de hauteur permis entre le lanceur et le point visé (m)
+            broadcastRadius = 120.0,   -- joueurs qui voient le sol se soulever
+            -- présage au sol (anneau qui se resserre, poussière) puis choc : éclats de roche, caméra qui tremble
+            fx = {
+                asset = 'core', dust = 'ent_dst_dust', burst = 'ent_dst_rocks', dustPoints = 6, burstPoints = 8,
+                scale = 1.2, ring = 25, ringAlpha = 200, fillAlpha = 70,
+                shake = { name = 'SMALL_EXPLOSION_SHAKE', amplitude = 0.3, radii = 2.5 },
+            },
+            color = { r = 200, g = 156, b = 98 },
+        },
+
+        rempart = {
+            order = 9,
+            label = 'Rempart',
+            summary = 'Faire surgir du sol un mur de pierre qui arrête les pas et les sorts.',
+            element = 'terre',
+            type = 'utilitaire',
+            icon = 'rempart',
+            baseCost = 28,
+            xp = 25,
+            hitXp = 0,
+            -- face au lanceur, au point visé (aperçu au sol : sa longueur, sa largeur, ses deux bras au niveau 5)
+            aim = { kind = 'point', shape = 'line', length = 'length', width = 'width', segments = 'segments', bend = 'bendDeg' },
+            anims = {
+                start = { dict = 'amb@world_human_gardener_plant@male@enter', clip = 'enter', flag = 0, ms = 700 },
+                loop = { dict = 'amb@world_human_gardener_plant@male@base', clip = 'base', flag = 1 },
+                release = { dict = 'anim@mp_player_intuppersurrender', clip = 'enter', flag = 0, ms = 700 },
+            },
+            ambientText = 'enfonce les mains dans la terre, qui se met à remuer',
+            levelScale = { 1.0, 1.0, 1.0, 1.0, 1.0 },
+            -- reach (m) · length (m d'un segment) · width (épaisseur, m) · height (m : ce qui passe au-dessus n'est pas
+            -- arrêté) · pieces (blocs par segment) · segments (1, ou 2 : un chevron) · durationMs
+            levels = {
+                {
+                    castMs = 1400, cooldownMs = 15000, reach = 10.0, length = 3.0, width = 1.2, height = 1.8, pieces = 2,
+                    segments = 1, durationMs = 8000,
+                    description = 'Un mur de pierre de trois mètres surgit du sol, huit secondes durant.',
+                    unlock = 'Vous savez faire surgir un rempart.',
+                },
+                {
+                    castMs = 1300, cooldownMs = 15000, reach = 11.0, length = 4.0, width = 1.2, height = 2.0, pieces = 3,
+                    segments = 1, durationMs = 10000,
+                    description = 'Quatre mètres de pierre, dix secondes.',
+                    unlock = 'Votre rempart s\'allonge et tient plus longtemps.',
+                },
+                {
+                    castMs = 1200, cooldownMs = 15000, reach = 12.0, length = 5.0, width = 1.3, height = 2.2, pieces = 3,
+                    segments = 1, durationMs = 12000,
+                    description = 'Cinq mètres, plus haut : il arrête aussi ce qu\'on jette par-dessus.',
+                    unlock = 'Votre rempart s\'élève plus haut.',
+                },
+                {
+                    castMs = 1100, cooldownMs = 15000, reach = 13.0, length = 6.0, width = 1.4, height = 2.4, pieces = 4,
+                    segments = 1, durationMs = 14000,
+                    description = 'Six mètres de muraille, quatorze secondes durant.',
+                    unlock = 'Votre rempart barre six mètres.',
+                },
+                {
+                    castMs = 1000, cooldownMs = 15000, reach = 14.0, length = 4.0, width = 1.4, height = 2.4, pieces = 3,
+                    segments = 2, durationMs = 16000,
+                    description = 'Deux pans de quatre mètres en chevron, qui couvrent aussi vos flancs, seize secondes durant.',
+                    unlock = 'Votre rempart se dresse en deux pans qui couvrent vos flancs.',
+                },
+            },
+            bendDeg = 25,              -- deux segments : chaque bras se rabat d'autant vers le lanceur
+            model = 'prop_rock_4_c',   -- bloc de pierre de GTA (à vérifier en jeu : taille, assise)
+            sink = 0.3,                -- blocs enfoncés d'autant dans le sol (terrain en pente)
+            rise = { ms = 800, steps = 8, depth = 2.5 },  -- montée du sol (pas du serveur), et descente à la fin
+            maxPerCaster = 1,          -- un nouveau rempart fait tomber le précédent
+            maxPieces = 48,            -- blocs debout dans tout le royaume
+            heightMargin = 4.0,        -- écart de hauteur permis entre le lanceur et le point visé (m)
+            -- jamais sur un joueur ni sur un véhicule (marges autour de la ligne du mur, en mètres)
+            placement = { playerMargin = 0.8, vehicleMargin = 2.5, heightMargin = 3.0 },
+            broadcastRadius = 120.0,
+            fx = {
+                asset = 'core', dust = 'ent_dst_rocks', scale = 1.3,
+                shake = { name = 'SMALL_EXPLOSION_SHAKE', amplitude = 0.12, radius = 15.0 },
+            },
         },
 
         lueur = {
@@ -476,18 +867,30 @@ VavaMagic.config = {
         burnLight = { r = 255, g = 140, b = 40, range = 3.0, intensity = 3.0 },
     },
 
-    -- Zones au sol (mur de flammes ; plus tard brume, sol mouillé, boue, vapeur), décidées par le serveur : forme,
-    -- position, élément, fin. Le serveur vérifie toutes les `tickMs` qui s'y trouve (ou les a traversées) ; chaque
+    -- Zones au sol (mur de flammes, brume, sol mouillé, présage d'une secousse ; plus tard boue, vapeur), décidées
+    -- par le serveur : forme, position, élément, fin. Le serveur vérifie toutes les `tickMs` qui s'y trouve (ou les a traversées) ; chaque
     -- zone n'est envoyée qu'aux joueurs à moins de `syncRadius`, y compris ceux qui s'en approchent après coup.
     zones = { tickMs = 500, syncRadius = 150.0, maxActive = 60 },
+
+    -- Sol mouillé (laissé par la Vague et la Brume) : qui s'y tient est Mouillé, reposé au plus toutes les
+    -- `refreshMs` sur un même joueur ; reflet d'eau au sol et gouttes à sa naissance.
+    wetGround = {
+        wetMs = 6000, refreshMs = 4000,
+        render = { r = 70, g = 110, b = 150, alpha = 55, height = 0.03, groundOffset = 0.02 },
+        fx = { asset = 'core', splash = 'ent_sht_water', points = 5, scale = 0.8 },
+    },
 
     -- Combat entre joueurs. Dégâts des sorts en points de vie, sur `healthPoints` pour un personnage en pleine santé.
     combat = {
         pvp = true, -- false : les sorts offensifs se voient et se lancent, mais ne blessent personne
         healthPoints = 100,
-        -- réaction de la cible touchée : geste bref (haut du corps) et effet d'écran selon l'élément
+        -- réaction de la cible touchée : geste bref (haut du corps) et effet d'écran, selon l'élément du sort (ou son
+        -- champ `reaction`)
         reactions = {
             feu = { anim = { dict = 'anim@mp_player_intupperface_palm', clip = 'idle_a', flag = 48, ms = 700 }, screen = 'burn' },
+            eau = { anim = { dict = 'anim@mp_player_intupperface_palm', clip = 'idle_a', flag = 48, ms = 600 }, screen = 'water' },
+            glace = { anim = { dict = 'anim@mp_player_intupperface_palm', clip = 'idle_a', flag = 48, ms = 500 }, screen = 'frost' },
+            terre = { anim = { dict = 'anim@mp_player_intupperface_palm', clip = 'idle_a', flag = 48, ms = 700 }, screen = 'earth' },
         },
         knockbackMs = 250,  -- durée de la poussée d'un recul
         -- zones où l'on ne lance aucun sort offensif (cercle au sol, en mètres) et où personne n'en est blessé :
@@ -634,13 +1037,15 @@ VavaMagic.config = {
             anchor_limit = 'Trop d\'orbes brillent déjà dans le royaume.',
             no_light = 'Aucune lueur à éteindre.',
             unknown_color = 'Cette couleur vous est inconnue.',
-            no_launch = 'Cette boule de feu n\'existe plus.',
+            no_launch = 'Ce projectile n\'existe plus.',
             no_lock_target = 'Aucune cible en vue.',
             staggered = 'Vous chancelez : impossible d\'incanter.',
             knocked = 'Vous êtes renversé : impossible d\'incanter.',
             frozen = 'Le gel vous fige : impossible d\'incanter.',
             no_point = 'Visez le sol, à portée.',
             zone_limit = 'Trop de sortilèges marquent déjà le sol du royaume.',
+            blocked_spot = 'Quelqu\'un ou quelque chose occupe cet endroit : la pierre ne peut s\'y dresser.',
+            rampart_limit = 'Trop de remparts se dressent déjà dans le royaume.',
             invalid_target = 'Votre cible vous échappe.',
             invalid_impact = 'Impact refusé.',
             nobody_near = 'Personne ne se tient assez près de vous.',

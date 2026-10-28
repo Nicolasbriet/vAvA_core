@@ -18,8 +18,9 @@ VavaMagic.EVENTS = {
     SIGIL_OFFER = 'vava_magic:sigilOffered', -- (idOffre, secondes) : on vous tend un sigil
     SIGIL_NAMING = 'vava_magic:sigilNaming', -- (idOffre, secondes) : nommer le sigil reçu en retour
     SIGIL_CLOSED = 'vava_magic:sigilClosed', -- (idOffre) offre close (expirée, refusée, conclue)
-    FIREBALL = 'vava_magic:fireball',       -- lancer { id, caster, dx, dy, dz, speed, range, level, fizzle? }
-    FIREBALL_END = 'vava_magic:fireballEnd', -- (id, x, y, z) impact validé par le serveur
+    PROJECTILE = 'vava_magic:projectile',   -- lancer { id, spell, caster, dx, dy, dz, speed, range, level, fizzle?,
+                                            -- target?, homing? } aux joueurs proches
+    PROJECTILE_END = 'vava_magic:projectileEnd', -- (id, x, y, z, sort) impact validé par le serveur
     TARGETED = 'vava_magic:targeted',       -- () à la seule cible verrouillée d'un sort d'attaque : un frisson
     DAMAGE = 'vava_magic:damage',           -- (part de vie) sans vava_health : la victime applique la blessure
     GRIMOIRE = 'vava_magic:openGrimoire',   -- grimoire utilisé
@@ -32,7 +33,8 @@ VavaMagic.EVENTS = {
     PUSH = 'vava_magic:push',               -- (dx, dy, vitesse) à la seule victime d'un recul
     ZONE = 'vava_magic:zone',               -- zone au sol { id, kind, element, spell, level, shape, … } aux joueurs proches
     ZONE_END = 'vava_magic:zoneEnd',        -- (id) zone éteinte, à ceux qui la connaissaient
-    NOVA = 'vava_magic:nova',               -- { caster, x, y, z, radius, level } aux joueurs proches
+    BURST = 'vava_magic:burst',             -- effet instantané { spell, caster, x, y, z, level, … } aux joueurs proches
+                                            -- (nova, vague, secousse, rempart qui se dresse ou s'effondre)
 }
 
 -- Intentions du client (RPC du core). Chaque sort a en plus les siennes : BEGIN_PREFIX .. sort, FINISH_PREFIX .. sort.
@@ -49,7 +51,7 @@ VavaMagic.RPC = {
     SIGIL_SCRAMBLE = 'vava_magic:sigilScramble',
     LIGHT_OFF = 'vava_magic:lightOff',
     LIGHT_COLOR = 'vava_magic:lightColor',
-    FIREBALL_IMPACT = 'vava_magic:fireballImpact',
+    PROJECTILE_IMPACT = 'vava_magic:projectileImpact', -- (lancer, cible, x, y, z) impact vu par le client du lanceur
     REGISTER_TEAR = 'vava_magic:registerTear',
 }
 VavaMagic.BEGIN_PREFIX = 'vava_magic:begin:'
@@ -91,6 +93,8 @@ VavaMagic.DIRECTION = { SENT = 1, RECEIVED = 2 }
 VavaMagic.SPELL_TYPES = { projectile = true, zone = true, utilitaire = true }
 VavaMagic.CONDITION_NAMES = { burn = true, wet = true, slow = true, stagger = true, knockdown = true, frozen = true }
 VavaMagic.AIM_KINDS = { projectile = true, point = true, self = true, none = true }
+-- formes de l'aperçu au sol : disque, ligne (un ou deux segments), cône devant le lanceur
+VavaMagic.AIM_SHAPES = { circle = true, line = true, cone = true }
 
 -- Liens avec les autres modules (par leurs exports, hooks et registres) : isolés dans bridge/.
 VavaMagic.LINKS = {

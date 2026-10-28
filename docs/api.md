@@ -797,13 +797,14 @@ navigateur ; chaque case est une vraie connexion WebRTC locale filmant une scèn
 
 ### `vava_magic`
 
-La magie (2.1.0) : fiche magie par personnage (champ privé `vava_magic:sheet` : mage ou non, sorts et leur XP, sort
+La magie (2.2.0) : fiche magie par personnage (champ privé `vava_magic:sheet` : mage ou non, sorts et leur XP, sort
 prêt dans les mains, combinaisons découvertes, sigils gardés, sigil unique dans tout le royaume), mana (100, +3 toutes
 les 5 s, jamais sauvegardée) et sa barre, 5 niveaux par sort, incantation commune avec délai global (1 s), roue des
 sorts (Tab) et mode magie à la souris (clic droit viser, clic gauche lancer, clic molette verrouiller), états
 élémentaires (brûlure, mouillé, ralenti, chancelant, renversé, gelé ; immunité de 6 s aux contrôles durs), zones au sol
-tenues par le serveur, sorts **Boule de feu**, **Mur de flammes**, **Nova ardente**, **Lueur** et **Murmure**, grimoire
-et registre (objets), commandes du Conseil (`/magie`, numéro de joueur facultatif). Tout le détail, la config et la liste des tests en jeu :
+tenues par le serveur (flammes, brume, sol mouillé, présage), obstacles (rempart), sorts de feu (**Boule de feu**, **Mur
+de flammes**, **Nova ardente**), d'eau (**Trait de glace**, **Vague**, **Brume**) et de terre (**Projectile de roche**,
+**Secousse**, **Rempart**), **Lueur** et **Murmure**, grimoire et registre (objets), commandes du Conseil (`/magie`, numéro de joueur facultatif). Tout le détail, la config et la liste des tests en jeu :
 `modules/vava_magic/README.md`. Demande le core 0.5.0 ; facultatifs : `vava_inventory` ≥ 1.3.0 (objets), `vava_hud`
 (notifications), `vava_health` (blessures, à terre), `vava_admin` (droit `tools` et journal ; sans lui, ACE
 `magie.admin`).
@@ -813,12 +814,16 @@ et registre (objets), commandes du Conseil (`/magie`, numéro de joueur facultat
 - **Incantation** : RPC `vava_magic:begin:<sort>` puis `vava_magic:finish:<sort>` (numéro d'incantation). Le serveur
   revérifie à la fin la durée, le déplacement et la vie (lus côté serveur) ; la mana est réservée avant l'effet, rendue
   si le sort refuse. Recharges tenues par personnage. Effets vus des autres : state bags posés par le serveur sur le
-  ped (`vava_magic:casting`, `glow`, `light`, `burn`) ou sur l'objet d'un orbe ancré (`vava_magic:orb`).
+  ped (`vava_magic:casting`, `glow`, `light`, `conditions`) ou sur l'objet d'un orbe ancré (`vava_magic:orb`) ;
+  évènements ciblés aux seuls joueurs proches (`vava_magic:projectile`, `projectileEnd`, `zone`, `zoneEnd`, `burst`).
 - **Murmure** : fragments envoyés aux seuls joueurs à moins de 3 m ; registre des murmures en base sous le numéro porté
   par l'objet (métadonnée `registre`), l'historique suit l'objet.
-- **Boule de feu** : impact signalé par le client du lanceur, validé par le serveur (portée, axe, délai, cible réelle,
-  zones protégées) avant les dégâts (en points de vie sur `combat.healthPoints`), appliqués par `vava_health:damage` ;
-  bonus d'XP au toucher si le lancer a rapporté ; journal `vava_magic_damage_log`.
+- **Projectiles** (Boule de feu, Trait de glace, Projectile de roche, même noyau) : impact signalé par le client du
+  lanceur (RPC `vava_magic:projectileImpact`), validé par le serveur (portée, axe, délai, cible réelle, zones protégées,
+  rempart sur le trajet) avant les dégâts (en points de vie sur `combat.healthPoints`), appliqués par
+  `vava_health:damage` ; bonus d'XP au toucher si le lancer a rapporté ; journal `vava_magic_damage_log`.
+- **Rempart** : blocs de pierre créés par le serveur (objets réseau figés), jamais sur un joueur ni un véhicule,
+  retirés à leur fin, à l'arrêt du module et par `/magie nettoyer`.
 - **Verrouillage** (sorts `lockOn`) : clic molette côté client (lu par `Bridge.GetLockedTarget`) ; la cible part avec le début de l'incantation, revérifiée
   par le serveur, qui prévient la seule cible (évènement `vava_magic:targeted`) et calcule lui-même la direction ;
   virage vers la cible aux niveaux 4 et 5 (`homing`, pris en compte dans le contrôle d'axe de l'impact).
@@ -857,8 +862,9 @@ Le noyau ouvre ses RPC (`vava_magic:begin:echo`, `vava_magic:finish:echo`), tien
 contrôles de l'incantation. Côté client, le module externe appelle lui-même ces deux RPC et gère sa barre et son
 animation (`VavaMagic.casting.start` n'existe qu'à l'intérieur de vava_magic).
 
-Pour travailler le rendu sans le jeu : `web/index.html?view=grimoire` (ou `wheel`, `hud`, `aim`, `composer`, `offer`,
-`naming`, `confirm`, `lueur`, `sealed`, `register`, `messages`, `broken`) dans un navigateur, servi en HTTP (les
+Pour travailler le rendu sans le jeu : `web/index.html?view=grimoire` (ou `wheel`, `wheelfire`, `wheelwater`,
+`wheelearth`, `hud`, `aim`, `states`, `frost`, `mist`, `hits`, `composer`, `offer`, `naming`, `confirm`, `lueur`, `sealed`,
+`register`, `messages`, `broken`) dans un navigateur, servi en HTTP (les
 icônes sont des masques CSS, refusés depuis `file://`).
 
 ### `vava_chat`

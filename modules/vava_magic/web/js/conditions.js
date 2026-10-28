@@ -3,7 +3,9 @@
  * web/js/conditions.js
  * Rôle : états élémentaires du joueur (bas de l'écran, à droite de la barre de mana) : une icône par état, aux
  *        couleurs de son élément, avec ses secondes restantes ; « Protégé » après un contrôle dur. Effets d'écran :
- *        bord rougi qui palpite tant que l'on brûle, givre sur les bords quand on est gelé, éclat bref à chaque coup.
+ *        bord rougi qui palpite tant que l'on brûle, givre sur les bords quand on est gelé, éclat bref à chaque coup
+ *        (couleur de l'élément), voile blanc qui dérive tant que l'on se tient dans une brume (plus épais selon le
+ *        niveau du sort).
  *        Seul le compte à rebours se met à jour (deux fois par seconde), et seulement s'il reste un état.
  */
 
@@ -12,6 +14,7 @@ const Conditions = (() => {
   const burn = document.getElementById('screen-burn');
   const frost = document.getElementById('screen-frost');
   const hit = document.getElementById('screen-hit');
+  const mistNode = document.getElementById('screen-mist');
   const TICK_MS = 500;
   const HIT_MS = 320;
   // teinte de chaque état (couleur de son élément)
@@ -76,5 +79,12 @@ const Conditions = (() => {
     hitTimer = setTimeout(() => { hit.hidden = true; }, HIT_MS);
   }
 
-  return { set, screen, flash };
+  /** Voile de brume : { density } de 0 (aucun) à 1. */
+  function mist({ density }) {
+    const value = Math.max(0, Math.min(1, Number(density) || 0));
+    mistNode.style.setProperty('--density', `${value}`);
+    mistNode.hidden = value === 0;
+  }
+
+  return { set, screen, flash, mist };
 })();

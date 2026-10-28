@@ -3,13 +3,14 @@
     Rôle : blessures infligées par les sorts, décidées par le serveur : dégâts en points de vie (sur
            `combat.healthPoints`), entre joueurs activés ou non, zones protégées (personne n'y est blessé), application
            par le bridge (vava_health), et journal des dégâts pour le Conseil (lanceur, cible, dégâts, position),
-           écrit en base par lots. La victime d'un impact ou d'une zone reçoit l'élément du sort (geste de réaction,
-           effet d'écran) ; une brûlure qui dure n'en envoie pas à chaque morsure.
+           écrit en base par lots. La victime d'un impact ou d'une zone reçoit la réaction du sort (son élément, ou son
+           champ `reaction` : geste, effet d'écran) ; une brûlure qui dure n'en envoie pas à chaque morsure. Un sort
+           offensif sans dégâts (recul, état) demande d'abord si la cible peut être touchée (`combat.affects`).
     Dépendances : shared/, config.lua, server/core.lua, bridge/server.lua, server/world.lua
 ]]
 
 local ipairs, tostring, min = ipairs, tostring, math.min
-local time, rep, concat, move = os.time, string.rep, table.concat, table.move
+local time, rep, move = os.time, string.rep, table.move
 local SetTimeout, TriggerClientEvent = SetTimeout, TriggerClientEvent
 
 local bridge = VavaMagic.bridge
@@ -35,6 +36,25 @@ local queue = {}
 ---@return boolean
 function combat.protected(point)
     return geometry.protectedZone(point) ~= nil
+end
+
+--- Un sort offensif peut-il toucher ce joueur ? (dégâts entre joueurs activés, personnage en jeu, hors zone
+--- protégée) Renvoie sa position lue côté serveur, ou nil.
+---@param target integer
+---@return table|nil
+function combat.affects(target)
+    if not cfg.pvp or not bridge.GetCharacterId(target) then return nil end
+    local position = world.position(target)
+    if not position or combat.protected(position) then return nil end
+    return position
+end
+
+--- La victime d'un sort réagit : geste bref et effet d'écran selon le sort (son élément, ou son champ `reaction`).
+---@param target integer
+---@param spell string
+function combat.react(target, spell)
+    local def = VavaMagic.spells.get(spell)
+    if def then TriggerClientEvent(EVENTS.HIT, target, def.config.reaction or def.config.element) end
 end
 
 --- Écrit en base les dégâts en attente (une requête par lot).
@@ -77,10 +97,7 @@ function combat.damage(caster, target, spell, points, kind, casterCharacter)
         time(), spell, casterCharacter or bridge.GetCharacterId(caster) or 0, targetCharacter, kind, points, position.x, position.y, position.z,
     }
     if #queue >= cfg.log.batch then combat.flush() end
-    if kind ~= combat.KIND.BURN then
-        local def = VavaMagic.spells.get(spell)
-        if def then TriggerClientEvent(EVENTS.HIT, target, def.config.element) end
-    end
+    if kind ~= combat.KIND.BURN then combat.react(target, spell) end
     return true
 end
 

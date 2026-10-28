@@ -1,27 +1,33 @@
 --[[
     vava_magic/server/zones.lua
-    Rôle : zones au sol des sorts (mur de flammes ; plus tard brume, sol mouillé, boue, vapeur), décidées par le
-           serveur : genre, élément, forme (ligne avec une largeur, ou cercle), lanceur, fin.
+    Rôle : zones au sol des sorts (mur de flammes, brume, sol mouillé, présage d'une secousse ; plus tard boue,
+           vapeur), décidées par le serveur : genre, élément, forme (ligne avec une largeur, ou cercle), lanceur, fin.
       - Tant qu'il en existe, le serveur vérifie toutes les `zones.tickMs` les joueurs en jeu proches : dedans, ou qui
         ont traversé une ligne depuis la vérification précédente (un joueur qui court ne passe pas entre deux), et
-        appelle le genre de la zone (`zones.define`), qui décide de l'effet (dégâts, état…).
+        appelle le genre de la zone (`zones.define`), qui décide de l'effet (dégâts, état…) ; un genre peut n'agir
+        qu'à la fin de sa zone (présage).
       - Chaque zone n'est envoyée qu'aux joueurs à moins de `zones.syncRadius`, y compris à ceux qui s'en approchent
         après sa naissance ; sa fin n'est envoyée qu'à ceux qui la connaissent. Jamais à tout le serveur.
       - Plafond pour tout le royaume ; nettoyage d'urgence du Conseil ; départ d'un joueur oublié de toutes les zones.
-    Dépendances : shared/, config.lua, server/core.lua, bridge/server.lua, server/world.lua, server/spells.lua
+    Dépendances : shared/, config.lua, server/core.lua, bridge/server.lua, server/world.lua, server/spells.lua,
+                  server/combat.lua
 ]]
 
-local pairs, ipairs, abs, max, sort = pairs, ipairs, math.abs, math.max, table.sort
+local pairs, ipairs, abs, max, floor, sin, cos, pi, sort = pairs, ipairs, math.abs, math.max, math.floor, math.sin, math.cos, math.pi, table.sort
 local GetGameTimer, SetTimeout, TriggerClientEvent = GetGameTimer, SetTimeout, TriggerClientEvent
 
 local bridge = VavaMagic.bridge
 local world = VavaMagic.world
 local spells = VavaMagic.spells
+local combat = VavaMagic.combat
 local geometry = VavaMagic.geometry
 local cfg = VavaMagic.config.zones
+local moveMargin = VavaMagic.config.casting.moveMargin
 local EVENTS = VavaMagic.EVENTS
 -- hauteur au-dessus et au-dessous de la zone où un joueur compte comme dedans (m)
 local HEIGHT = 2.5
+-- points d'un cercle pris pour juger s'il touche une autre forme (sur son bord)
+local CIRCLE_SAMPLES = 8
 
 local zones = {}
 VavaMagic.zones = zones
@@ -51,10 +57,11 @@ zones.LINE, zones.CIRCLE = 'line', 'circle'
 local active = {}
 local count, lastId = 0, 0
 local ticking = false
----@type table<string, { onTick: fun(zone: vAvA.MagicZone, src: integer, position: table), onEnd?: fun(zone: vAvA.MagicZone, reason: string) }>
+---@type table<string, { onTick?: fun(zone: vAvA.MagicZone, src: integer, position: table), onEnd?: fun(zone: vAvA.MagicZone, reason: string) }>
 local kinds = {}
 
---- Genre de zone : `onTick(zone, joueur, position)` pour chaque joueur dedans à une vérification, `onEnd(zone, raison)`.
+--- Genre de zone : `onTick(zone, joueur, position)` pour chaque joueur dedans à une vérification (facultatif),
+--- `onEnd(zone, raison)` à sa fin (expired, replaced, extinguished, cleanup, stopped, removed…).
 ---@param kind string
 ---@param handlers table
 function zones.define(kind, handlers)
@@ -104,6 +111,46 @@ function zones.crossed(zone, from, to)
     return geometry.segmentsCross2d(from, to, zone.a, zone.b)
 end
 
+--- Point visé par un sort au sol (mur, brume, secousse, rempart), revérifié au début de l'incantation : lanceur et
+--- point hors zone protégée, point à portée du niveau depuis la position du lanceur lue côté serveur (marge des
+--- positions réseau), écart de hauteur borné. Renvoie le point, ou nil et un code de refus.
+---@param ctx table  contexte de l'incantation (origin)
+---@param reach number
+---@param heightMargin number
+---@return table|nil point
+---@return string|nil code
+function zones.aimed(ctx, x, y, z, reach, heightMargin)
+    if combat.protected(ctx.origin) then return nil, 'protected_zone' end
+    local point = { x = x, y = y, z = z }
+    if geometry.distance2d(ctx.origin, point) > reach + moveMargin then return nil, 'too_far' end
+    if abs(point.z - ctx.origin.z) > heightMargin then return nil, 'no_point' end
+    if combat.protected(point) then return nil, 'protected_zone' end
+    return point
+end
+
+--- Points d'une zone pour juger si elle touche une autre forme : le long de la ligne (au plus `spacing` mètres
+--- entre deux), ou le centre et le bord du cercle.
+---@param zone vAvA.MagicZone
+---@param spacing number
+---@return table[]
+function zones.samples(zone, spacing)
+    local points = {}
+    if zone.shape == zones.LINE then
+        local steps = max(1, floor(geometry.distance2d(zone.a, zone.b) / spacing + 0.5))
+        for i = 0, steps do
+            local t = i / steps
+            points[#points + 1] = { x = zone.a.x + (zone.b.x - zone.a.x) * t, y = zone.a.y + (zone.b.y - zone.a.y) * t, z = zone.center.z }
+        end
+        return points
+    end
+    points[1] = zone.center
+    for i = 1, CIRCLE_SAMPLES do
+        local angle = i / CIRCLE_SAMPLES * 2 * pi
+        points[#points + 1] = { x = zone.center.x + cos(angle) * zone.radius, y = zone.center.y + sin(angle) * zone.radius, z = zone.center.z }
+    end
+    return points
+end
+
 ---@param zone vAvA.MagicZone
 ---@param src integer
 local function show(zone, src)
@@ -126,7 +173,7 @@ local function tick()
             if distance <= zone.radius + HEIGHT * 2 then
                 local from = zone.last[src]
                 zone.last[src] = position
-                if handler and (zones.contains(zone, position) or (from and zones.crossed(zone, from, position))) then
+                if handler and handler.onTick and (zones.contains(zone, position) or (from and zones.crossed(zone, from, position))) then
                     handler.onTick(zone, src, position)
                 end
             else

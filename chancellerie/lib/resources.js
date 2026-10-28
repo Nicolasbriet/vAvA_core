@@ -29,7 +29,7 @@ const CORE_DESCRIPTIONS = {
   vava_world: 'Carte sans PNJ ni véhicules',
   vava_voice: 'Chat vocal de proximité',
   vava_cameras: 'Écran des joueurs pour le Conseil (mur des caméras)',
-  vava_magic: 'Magie : roue des sorts, mode magie, états, zones, sorts de feu, Lueur, Murmure, grimoire et registre',
+  vava_magic: 'Magie : roue des sorts, mode magie, états, zones, sorts de feu, d\'eau et de terre, Lueur, Murmure, grimoire et registre',
   vava_chancellerie: 'Pont de la Chancellerie (administration du royaume depuis le web)',
 };
 

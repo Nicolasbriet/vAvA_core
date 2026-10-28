@@ -2,17 +2,21 @@
     vava_magic/client/zones.lua
     Rôle : rendu des zones au sol envoyées par le serveur (qui seul en décide : forme, fin, effets sur les joueurs).
       - Mur de flammes (genre « flames ») : flammes en boucle le long de la ligne, serrées de près, espacées de loin,
-        rien au-delà de la distance des effets ; embrasement à la naissance, fumée à l'extinction ; lumières
-        dynamiques le long du mur, qui éclairent le décor et les personnages (dans les plafonds de client/fx.lua).
-      - Les zones d'autres genres (étapes suivantes) se déclarent avec `zones.define`.
-    Une recherche toutes les 250 ms choisit le niveau de détail ; le dessin par image (lumières) ne tourne que tant
-    qu'une zone est visible.
+        rien au-delà de la distance des effets ; embrasement à la naissance, fumée à l'extinction (ou noyé par une
+        vague) ; lumières dynamiques le long du mur, qui éclairent le décor et les personnages (dans les plafonds de
+        client/fx.lua).
+      - Sol mouillé (genre « wet », Vague et Brume) : reflet d'eau posé au sol, gouttes à sa naissance.
+      - Les autres genres se déclarent avec `zones.define` depuis le fichier de leur sort (brume, présage d'une
+        secousse).
+    Une recherche toutes les 250 ms choisit le niveau de détail ; le dessin par image (lumières, reflets, présages) ne
+    tourne que tant qu'une zone visible a quelque chose à dessiner.
     Dépendances : shared/, config.lua, client/fx.lua
 ]]
 
-local type, pairs, ipairs, next, floor, max, sin = type, pairs, ipairs, next, math.floor, math.max, math.sin
+local type, pairs, ipairs, next, floor, max, sqrt, sin, cos, pi = type, pairs, ipairs, next, math.floor, math.max, math.sqrt, math.sin, math.cos, math.pi
 local CreateThread, Wait, GetGameTimer, RegisterNetEvent = CreateThread, Wait, GetGameTimer, RegisterNetEvent
-local StartParticleFxLoopedAtCoord, StartParticleFxNonLoopedAtCoord = StartParticleFxLoopedAtCoord, StartParticleFxNonLoopedAtCoord
+local StartParticleFxLoopedAtCoord, StartParticleFxNonLoopedAtCoord, DrawMarker, GetGroundZFor_3dCoord =
+    StartParticleFxLoopedAtCoord, StartParticleFxNonLoopedAtCoord, DrawMarker, GetGroundZFor_3dCoord
 
 local fx = VavaMagic.fx
 local geometry = VavaMagic.geometry
@@ -23,6 +27,13 @@ local SCAN_MS = 250
 local GRACE_MS = 2000
 -- scintillement des flammes (amplitude, vitesse)
 local FLICKER, FLICKER_SPEED = 0.18, 6.0
+-- recherche du sol sous une zone : départ au-dessus de son centre (m)
+local GROUND_PROBE = 1.5
+local MARKER_CYLINDER = 1
+-- gouttes d'un sol mouillé : sur un cercle à cette part de son rayon
+local SPLASH_SHARE = 0.6
+-- angle d'or (radians) : points répartis sur un disque
+local GOLDEN_ANGLE = pi * (3 - sqrt(5))
 
 local zones = {}
 VavaMagic.zoneRender = zones
@@ -30,14 +41,41 @@ VavaMagic.zoneRender = zones
 ---@type table<integer, table>
 local active = {}
 local running = false
----@type table<string, { start: fun(zone: table, detail: string), lights?: fun(zone: table, t: number), stop: fun(zone: table, ended: boolean) }>
+---@type table<string, { start: fun(zone: table, detail: string), frame?: fun(zone: table, t: number, now: integer), stop: fun(zone: table, ended: boolean) }>
 local kinds = {}
 
---- Rendu d'un genre de zone.
+--- Rendu d'un genre de zone : `start(zone, détail)` quand elle devient visible (ou change de niveau de détail),
+--- `frame(zone, t, now)` à chaque image tant qu'elle l'est (facultatif), `stop(zone, finie)`.
 ---@param kind string
 ---@param renderer table
 function zones.define(kind, renderer)
     kinds[kind] = renderer
+end
+
+--- Hauteur du sol sous le centre d'une zone (sa hauteur à elle si le sol n'est pas chargé).
+---@param zone table
+---@return number
+function zones.groundZ(zone)
+    local c = zone.center
+    local found, z = GetGroundZFor_3dCoord(c.x, c.y, c.z + GROUND_PROBE, false)
+    if found == true or found == 1 then return z end
+    return c.z
+end
+
+--- `count` points répartis régulièrement sur un disque (spirale à l'angle d'or : ni trous ni amas), au niveau `z`.
+---@param center table
+---@param radius number
+---@param count integer
+---@param z number
+---@return table[]
+function zones.spread(center, radius, count, z)
+    local points = {}
+    for i = 1, count do
+        local distance = radius * sqrt((i - 0.5) / count)
+        local angle = i * GOLDEN_ANGLE
+        points[i] = { x = center.x + cos(angle) * distance, y = center.y + sin(angle) * distance, z = z }
+    end
+    return points
 end
 
 --- Points le long d'une ligne, espacés d'au plus `spacing` mètres (les deux bouts compris).
@@ -90,12 +128,12 @@ local function run()
             local t = now / 1000.0
             for _, zone in pairs(active) do
                 local renderer = kinds[zone.kind]
-                if zone.detail and renderer and renderer.lights then
+                if zone.detail and renderer and renderer.frame then
                     visible = true
-                    renderer.lights(zone, t)
+                    renderer.frame(zone, t, now)
                 end
             end
-            -- boucle par image justifiée : seulement tant qu'une zone visible éclaire
+            -- boucle par image justifiée : seulement tant qu'une zone visible a quelque chose à dessiner
             Wait(visible and 0 or SCAN_MS)
         end
         running = false
@@ -135,7 +173,7 @@ zones.define('flames', {
         local light = spellCfg.light
         zone.lightPoints = zones.along(zone.a, zone.b, geometry.distance2d(zone.a, zone.b) / max(1, light.count - 1))
     end,
-    lights = function(zone, t)
+    frame = function(zone, t)
         local light = spellOf(zone).light
         for index, point in ipairs(zone.lightPoints or {}) do
             local flicker = 1 + FLICKER * sin(t * FLICKER_SPEED + index * 1.7)
@@ -154,6 +192,34 @@ zones.define('flames', {
             end
         end
     end,
+})
+
+-- Sol mouillé ------------------------------------------------------------------------------------------------------
+
+local wetCfg = cfg.wetGround
+
+zones.define('wet', {
+    start = function(zone, detail)
+        zone.groundZ = zone.groundZ or zones.groundZ(zone)
+        -- gouttes : seulement à la naissance du sol mouillé, vu de près
+        if zone.splashed or detail ~= fx.FULL then return end
+        zone.splashed = true
+        local splash = wetCfg.fx
+        for i = 1, splash.points do
+            local angle = i / splash.points * 2 * pi
+            local x, y = zone.center.x + cos(angle) * zone.radius * SPLASH_SHARE, zone.center.y + sin(angle) * zone.radius * SPLASH_SHARE
+            fx.oneShot(splash.asset, function()
+                StartParticleFxNonLoopedAtCoord(splash.splash, x, y, zone.groundZ, 0.0, 0.0, 0.0, splash.scale, false, false, false)
+            end)
+        end
+    end,
+    frame = function(zone)
+        local render = wetCfg.render
+        local size = zone.radius * 2
+        DrawMarker(MARKER_CYLINDER, zone.center.x, zone.center.y, zone.groundZ + render.groundOffset, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0,
+            size, size, render.height, render.r, render.g, render.b, render.alpha, false, false, 2, false, nil, nil, false)
+    end,
+    stop = function() end,
 })
 
 -- Évènements du serveur -------------------------------------------------------------------------------------------

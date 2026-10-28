@@ -25,6 +25,7 @@
   Bridge.on('states', (payload) => Conditions.set(payload));
   Bridge.on('screen', (payload) => Conditions.screen(payload));
   Bridge.on('screen:hit', (payload) => Conditions.flash(payload));
+  Bridge.on('screen:mist', (payload) => Conditions.mist(payload));
   Bridge.on('wheel:open', (payload) => Wheel.show(payload));
   Bridge.on('wheel:release', () => Wheel.choose());
   Bridge.on('wheel:close', () => Wheel.close());

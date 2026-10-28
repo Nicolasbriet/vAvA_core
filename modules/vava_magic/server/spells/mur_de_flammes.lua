@@ -37,12 +37,8 @@ end
 
 ---@param ctx table
 local function begin(ctx, x, y, z)
-    if protected(ctx.origin) then return false, 'protected_zone' end
-    local point = { x = x, y = y, z = z }
-    local levelCfg = spellCfg.levels[ctx.level]
-    if geometry.distance2d(ctx.origin, point) > levelCfg.reach + cfg.casting.moveMargin then return false, 'too_far' end
-    if math.abs(point.z - ctx.origin.z) > spellCfg.heightMargin then return false, 'no_point' end
-    if protected(point) then return false, 'protected_zone' end
+    local point, code = zones.aimed(ctx, x, y, z, spellCfg.levels[ctx.level].reach, spellCfg.heightMargin)
+    if not point then return false, code end
     if zones.count() >= cfg.zones.maxActive then return false, 'zone_limit' end
     return true, { point = point }
 end
@@ -54,12 +50,10 @@ local function finish(ctx)
     if not position then return false, 'no_position' end
     local levelCfg = spellCfg.levels[ctx.level]
     local point = ctx.data.point
-    local forward = geometry.direction2d(position, point) or geometry.direction2d(ctx.origin, point)
-    if not forward then return false, 'no_point' end
     -- la ligne barre le chemin : perpendiculaire au regard du lanceur
-    local half = levelCfg.length / 2
-    local a = { x = point.x - forward.y * half, y = point.y + forward.x * half, z = point.z }
-    local b = { x = point.x + forward.y * half, y = point.y - forward.x * half, z = point.z }
+    local segments = geometry.wallSegments(position, point, levelCfg.length) or geometry.wallSegments(ctx.origin, point, levelCfg.length)
+    if not segments then return false, 'no_point' end
+    local a, b = segments[1].a, segments[1].b
     if protected(a) or protected(b) or protected(point) then return false, 'protected_zone' end
     local sheet = sheets.get(src)
     local own = sheet and zones.ofCharacter(sheet.characterId, KIND) or {}

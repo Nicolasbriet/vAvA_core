@@ -7,8 +7,8 @@
         actif, il coupe à chaque image l'attaque, la visée et le changement d'arme de GTA (seule boucle par image du
         fichier) ; endormi, rien ne tourne. Sortir une arme ou monter en véhicule le coupe, le sort reste choisi.
       - Clic droit maintenu : visée (réticule aux couleurs de l'élément, grisé hors de portée ; allure un peu
-        ralentie ; aperçu au sol du point, du disque ou de la ligne visés, ou du rayon autour de soi pour une zone
-        centrée sur le lanceur). Clic gauche : le sort fait son geste (chaque sort
+        ralentie ; aperçu au sol du point, du disque ou de la ligne visés — un ou deux segments —, du rayon autour de
+        soi pour une zone centrée sur le lanceur, ou du cône devant lui). Clic gauche : le sort fait son geste (chaque sort
         déclare le sien, `controls.register`). Molette : sort suivant ou précédent du même élément.
     Le serveur revérifie tout : la visée n'est qu'une proposition.
     Dépendances : shared/, config.lua, client/core.lua, bridge/client.lua, client/nui.lua, client/state.lua,
@@ -16,6 +16,7 @@
 ]]
 
 local ipairs, sort, concat, lower = ipairs, table.sort, table.concat, string.lower
+local sin, cos, rad, atan = math.sin, math.cos, math.rad, math.atan
 local CreateThread, Wait, GetGameTimer = CreateThread, Wait, GetGameTimer
 local PlayerPedId, GetEntityCoords, GetSelectedPedWeapon, IsPedInAnyVehicle, IsPedRagdoll, IsPedFalling, IsEntityDead =
     PlayerPedId, GetEntityCoords, GetSelectedPedWeapon, IsPedInAnyVehicle, IsPedRagdoll, IsPedFalling, IsEntityDead
@@ -49,6 +50,8 @@ local AIM_OPTIONS = 4
 local PROBE_DONE, PROBE_INVALID = 2, 0
 local MARKER_SPHERE, MARKER_CYLINDER = 28, 1
 local OUT_OF_RANGE = { r = 140, g = 140, b = 140 }
+-- triangles de l'aperçu d'un cône
+local CONE_SLICES = 10
 
 local controls = {}
 VavaMagic.controls = controls
@@ -72,6 +75,22 @@ function controls.register(name, controller)
     controllers[name] = controller
 end
 
+--- Geste d'un sort posé au sol (mur, brume, secousse, rempart) : le point visé part au début de l'incantation ; sans
+--- visée, ou trop loin, rien ne part. Le serveur revérifie le point.
+---@param name string
+function controls.registerPoint(name)
+    controls.register(name, {
+        cast = function(info)
+            if not info.aiming or not info.point or not info.inRange then
+                messages.refuse('no_point')
+                return
+            end
+            local point = info.point
+            casting.start(name, { args = { point.x, point.y, point.z }, count = 3 })
+        end,
+    })
+end
+
 local function touch()
     lastActivity = GetGameTimer()
 end
@@ -83,8 +102,8 @@ local function wheelOpen()
     return wheel ~= nil and wheel.isOpen()
 end
 
---- Visée du sort à son niveau : { kind, range, shape, radius, length, width, color } ; nil s'il ne se vise pas
---- (encore).
+--- Visée du sort à son niveau : { kind, range, shape, radius, length, width, segments, bend, angle, color } ; nil
+--- s'il ne se vise pas (encore).
 ---@param name string|nil
 ---@return table|nil
 function controls.aimOf(name)
@@ -98,7 +117,9 @@ function controls.aimOf(name)
     return {
         kind = spec.kind, range = spec.reach or levelCfg.reach or levelCfg.range or 0, shape = spec.shape,
         radius = spec.radius and levelCfg[spec.radius] or nil, length = spec.length and levelCfg[spec.length] or nil,
-        width = spec.width and levelCfg[spec.width] or nil, color = element and element.color,
+        width = spec.width and levelCfg[spec.width] or nil, segments = spec.segments and levelCfg[spec.segments] or nil,
+        bend = spec.bend and spellCfg[spec.bend] or nil, angle = spec.angle and levelCfg[spec.angle] or nil,
+        color = element and element.color,
     }
 end
 
@@ -146,16 +167,44 @@ local function groundQuad(c1, c2, c3, c4, color, alpha)
     end
 end
 
---- Ligne au sol perpendiculaire au regard (mur de flammes) : longueur et largeur du niveau.
+--- Ligne au sol face au regard (mur de flammes, rempart) : un segment, ou deux bras en chevron, de la longueur et de
+--- la largeur du niveau (calculés comme le serveur le fera).
 local function lineAt(body, point, spec, color)
-    local forward = geometry.direction2d(body, point)
-    if not forward or not spec.length or not spec.width then return end
-    local half, depth = spec.length / 2, (spec.width or 1.0) / 2
+    if not spec.length or not spec.width then return end
+    local segments = geometry.wallSegments(body, point, spec.length, spec.segments, spec.bend)
+    if not segments then return end
+    local depth = spec.width / 2
     local z = point.z + preview.groundOffset
-    local function corner(side, ahead)
-        return { x = point.x - forward.y * half * side + forward.x * depth * ahead, y = point.y + forward.x * half * side + forward.y * depth * ahead, z = z }
+    for _, segment in ipairs(segments) do
+        local along = geometry.direction2d(segment.a, segment.b)
+        if along then
+            local nx, ny = -along.y * depth, along.x * depth
+            local a, b = segment.a, segment.b
+            groundQuad({ x = a.x + nx, y = a.y + ny, z = z }, { x = b.x + nx, y = b.y + ny, z = z },
+                { x = b.x - nx, y = b.y - ny, z = z }, { x = a.x - nx, y = a.y - ny, z = z }, color, preview.alpha)
+        end
     end
-    groundQuad(corner(1, -1), corner(-1, -1), corner(-1, 1), corner(1, 1), color, preview.alpha)
+end
+
+--- Cône au sol devant le lanceur (vague) : portée et demi-ouverture du niveau, dans la direction du regard.
+local function coneAt(feet, spec, color)
+    if not spec.radius or not spec.angle then return end
+    local forward = geometry.direction2d({ x = 0, y = 0 }, aim.direction())
+    if not forward then return end
+    local z = feet.z + preview.groundOffset
+    local base, half = atan(forward.y, forward.x), rad(spec.angle)
+    local previous = nil
+    for i = 0, CONE_SLICES do
+        local angle = base - half + (2 * half) * i / CONE_SLICES
+        local edge = { x = feet.x + cos(angle) * spec.radius, y = feet.y + sin(angle) * spec.radius, z = z }
+        if previous then
+            DrawPoly(feet.x, feet.y, z, previous.x, previous.y, z, edge.x, edge.y, z, color.r, color.g, color.b, preview.alpha)
+            DrawPoly(edge.x, edge.y, z, previous.x, previous.y, z, feet.x, feet.y, z, color.r, color.g, color.b, preview.alpha)
+            DrawLine(previous.x, previous.y, z, edge.x, edge.y, z, color.r, color.g, color.b, 255)
+        end
+        if i == 0 or i == CONE_SLICES then DrawLine(feet.x, feet.y, z, edge.x, edge.y, z, color.r, color.g, color.b, 255) end
+        previous = edge
+    end
 end
 
 --- Disque au sol (zone en cercle, ou rayon autour de soi).
@@ -172,11 +221,15 @@ local function aimFrame(ped, spec)
     local body = GetEntityCoords(ped)
     DisableControlAction(0, CONTROL_SPRINT, true)
     SetPedMaxMoveBlendRatio(ped, controlsCfg.aimMoveBlend)
-    -- zone centrée sur le lanceur : pas de sonde, l'aperçu suit ses pieds
+    -- zone centrée sur le lanceur (ou cône devant lui) : pas de sonde, l'aperçu suit ses pieds
     if spec.kind == 'self' then
         aimed.point, aimed.hit, aimed.inRange = { x = body.x, y = body.y, z = body.z - preview.feetOffset }, true, true
         reticle(nil, false)
-        if spec.radius then circleAt(aimed.point, spec.radius, spec.color) end
+        if spec.shape == 'cone' then
+            coneAt(aimed.point, spec, spec.color)
+        elseif spec.radius then
+            circleAt(aimed.point, spec.radius, spec.color)
+        end
         return
     end
     if probe then

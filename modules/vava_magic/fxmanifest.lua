@@ -3,8 +3,9 @@
     Rôle : magie du royaume : fiche magie par personnage (mage ou non, sorts et leur XP, sort prêt dans les mains,
            sigils), mana et sa barre, progression sur 5 niveaux, incantation commune, roue des sorts (Tab) et mode
            magie à la souris (viser, lancer, verrouiller une cible), états élémentaires (brûlure, mouillé, ralenti,
-           chancelant, renversé, gelé ; immunité aux contrôles durs), zones au sol, sorts de feu (Boule de feu, Mur de
-           flammes, Nova ardente), Lueur (lumière) et Murmure (messages), grimoire et registre des murmures (objets),
+           chancelant, renversé, gelé ; immunité aux contrôles durs), zones au sol, projectiles et obstacles, sorts de feu
+           (Boule de feu, Mur de flammes, Nova ardente), d'eau (Trait de glace, Vague, Brume) et de terre (Projectile de
+           roche, Secousse, Rempart), Lueur (lumière) et Murmure (messages), grimoire et registre des murmures (objets),
            commandes du Conseil. Le serveur décide de tout ; les effets visibles passent par des state bags posés par le
            serveur et des évènements ciblés, reçus des seuls joueurs proches.
     Dépendances : vAvA_core ≥ 0.5.0 ; facultatives : vava_inventory ≥ 1.3.0 (grimoire et registre), vava_hud
@@ -17,8 +18,8 @@ lua54 'yes'
 use_experimental_fxv2_oal 'yes'
 
 name 'vava_magic'
-description 'Magie vAvA : mana, progression, Murmure, Lueur, Boule de feu, grimoire et registre'
-version '2.1.0'
+description 'Magie vAvA : mana, progression, roue des sorts, états, sorts de feu, eau et terre, Murmure, Lueur, grimoire et registre'
+version '2.2.0'
 
 dependency 'vAvA_core'
 
@@ -58,7 +59,10 @@ server_scripts {
     'server/progression.lua',
     'server/combat.lua',
     'server/states.lua',
+    'server/obstacles.lua',
     'server/zones.lua',
+    'server/grounds.lua',
+    'server/projectiles.lua',
     'server/registers.lua',
     'server/sigils.lua',
     'server/casting.lua',
@@ -67,6 +71,12 @@ server_scripts {
     'server/spells/boule_de_feu.lua',
     'server/spells/mur_de_flammes.lua',
     'server/spells/nova_ardente.lua',
+    'server/spells/trait_de_glace.lua',
+    'server/spells/vague.lua',
+    'server/spells/brume.lua',
+    'server/spells/projectile_de_roche.lua',
+    'server/spells/secousse.lua',
+    'server/spells/rempart.lua',
     'server/admin.lua',
     'server/api.lua',
     'server/main.lua',
@@ -89,11 +99,19 @@ client_scripts {
     'client/states.lua',
     'client/ambient.lua',
     'client/zones.lua',
+    'client/bursts.lua',
+    'client/projectiles.lua',
     'client/spells/murmure.lua',
     'client/spells/lueur.lua',
     'client/spells/boule_de_feu.lua',
     'client/spells/mur_de_flammes.lua',
     'client/spells/nova_ardente.lua',
+    'client/spells/trait_de_glace.lua',
+    'client/spells/vague.lua',
+    'client/spells/brume.lua',
+    'client/spells/projectile_de_roche.lua',
+    'client/spells/secousse.lua',
+    'client/spells/rempart.lua',
     'client/sigils.lua',
     'client/grimoire.lua',
     'client/register.lua',

@@ -1,11 +1,12 @@
 --[[
     vava_magic/shared/geometry.lua
     Rôle : calculs de positions communs au serveur et au client (tables { x, y, z } ou vecteurs) : distances, angle
-           entre deux directions, zones protégées, distance à un segment et croisement de segments (zones en ligne).
+           entre deux directions, zones protégées, distance à un segment et croisement de segments (zones en ligne),
+           cône au sol (vague), cap de GTA, segments d'un mur (rempart).
     Dépendances : shared/constants.lua, config.lua
 ]]
 
-local sqrt, acos, deg = math.sqrt, math.acos, math.deg
+local sqrt, acos, deg, atan, rad, cos, sin = math.sqrt, math.acos, math.deg, math.atan, math.rad, math.cos, math.sin
 local ipairs = ipairs
 
 local ZONES = VavaMagic.config.combat.protectedZones
@@ -91,4 +92,71 @@ function geometry.direction2d(a, b)
     local length = sqrt(dx * dx + dy * dy)
     if length < 1e-6 then return nil end
     return { x = dx / length, y = dy / length }
+end
+
+--- Paramètre t (0 à 1, le long de [p, q]) où le segment [p, q] coupe le segment [a, b] au sol (2D), ou nil.
+---@return number|nil
+function geometry.crossing2d(p, q, a, b)
+    local rx, ry = q.x - p.x, q.y - p.y
+    local sx, sy = b.x - a.x, b.y - a.y
+    local denom = rx * sy - ry * sx
+    if denom > -1e-9 and denom < 1e-9 then return nil end
+    local apx, apy = a.x - p.x, a.y - p.y
+    local t = (apx * sy - apy * sx) / denom
+    local u = (apx * ry - apy * rx) / denom
+    if t < 0 or t > 1 or u < 0 or u > 1 then return nil end
+    return t
+end
+
+--- Le point est-il dans le cône au sol (2D) parti de `apex` dans la direction unitaire `forward`, de portée `range`
+--- et de demi-ouverture `halfAngleDeg` ? Un point tout contre la pointe compte comme dedans.
+---@return boolean
+function geometry.inCone2d(point, apex, forward, range, halfAngleDeg)
+    local dx, dy = point.x - apex.x, point.y - apex.y
+    local distance = sqrt(dx * dx + dy * dy)
+    if distance > range then return false end
+    if distance < 0.5 then return true end
+    local dot = (dx * forward.x + dy * forward.y) / distance
+    if dot > 1 then dot = 1 elseif dot < -1 then dot = -1 end
+    return deg(acos(dot)) <= halfAngleDeg
+end
+
+--- Cap de GTA (degrés, 0 vers le nord, sens inverse des aiguilles d'une montre) d'une direction au sol.
+---@return number
+function geometry.heading(dx, dy)
+    local heading = deg(atan(-dx, dy))
+    if heading < 0 then heading = heading + 360 end
+    return heading
+end
+
+--- Segments d'un mur dressé au point visé, face à `from` : un segment de `length` mètres perpendiculaire au regard,
+--- ou deux bras de `length` mètres partis du point visé et rabattus de `bendDeg` vers `from` (un chevron qui
+--- couvre aussi les flancs). Renvoie { { a, b } }, ou nil si `from` et le point sont confondus.
+---@param from table
+---@param point table
+---@param length number
+---@param segments? integer  1 (défaut) ou 2
+---@param bendDeg? number
+---@return table[]|nil
+function geometry.wallSegments(from, point, length, segments, bendDeg)
+    local forward = geometry.direction2d(from, point)
+    if not forward then return nil end
+    local z = point.z
+    if (segments or 1) < 2 then
+        local half = length / 2
+        return { {
+            a = { x = point.x - forward.y * half, y = point.y + forward.x * half, z = z },
+            b = { x = point.x + forward.y * half, y = point.y - forward.x * half, z = z },
+        } }
+    end
+    local bend = rad(bendDeg or 0)
+    local side, back = cos(bend) * length, sin(bend) * length
+    local list = {}
+    for _, sign in ipairs({ 1, -1 }) do
+        list[#list + 1] = {
+            a = { x = point.x, y = point.y, z = z },
+            b = { x = point.x - forward.y * side * sign - forward.x * back, y = point.y + forward.x * side * sign - forward.y * back, z = z },
+        }
+    end
+    return list
 end

@@ -25,7 +25,7 @@ local wheel = VavaMagic.wheel
 local ambient = VavaMagic.ambient
 local conditions = VavaMagic.conditions
 local zoneRender = VavaMagic.zoneRender
-local fireball = VavaMagic.fireball
+local projectiles = VavaMagic.projectiles
 local targeting = VavaMagic.targeting
 local keys = VavaMagic.keys
 local cfg = VavaMagic.config
@@ -106,7 +106,7 @@ AddEventHandler('onResourceStop', function(resource)
     if resource ~= VavaMagic.resource then return end
     casting.reset()
     controls.sleep()
-    fireball.stop()
+    projectiles.stop()
     conditions.reset()
     zoneRender.clear()
     ambient.stop()
