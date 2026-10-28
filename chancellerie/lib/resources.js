@@ -36,6 +36,11 @@ const CORE_DESCRIPTIONS = {
   vava_farming: 'Agriculture : parcelles, croissance par dates, humidité et fertilité, qualité, grenier commun',
   vava_codex: 'Codex : toutes les commandes et touches du serveur, classées, cherchées, composées et lancées (F1)',
   vava_chancellerie: 'Pont de la Chancellerie (administration du royaume depuis le web)',
+  // outils de développement ([vava-dev]) : à n'activer que sur un serveur de test
+  vava_example: 'Exemple (dev) : module minimal, modèle pour en écrire un',
+  vava_example_items: 'Exemple (dev) : objets d\'inventaire avec leurs images',
+  vava_dev_characters: 'Outil de test (dev) : /perso, /respawn, /objet, /besoins, /vie, /aterre — aucun contrôle',
+  vava_anim_test: 'Outil de test (dev) : animations personnalisées (.ycd dans stream/), /anim, /epee — aucun contrôle',
 };
 
 const MANIFEST_READ_MAX = 64 * 1024;

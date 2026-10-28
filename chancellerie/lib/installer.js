@@ -3,7 +3,8 @@
  * lib/installer.js
  * Rôle : poser vAvA sur le disque et l'y tenir à jour sans rien casser.
  *        - Disposition du dépôt : la racine est la ressource vAvA_core (sans modules/, examples/, chancellerie/,
- *          docs/), chaque dossier de modules/ une ressource, chancellerie/ la Chancellerie elle-même.
+ *          docs/), chaque dossier de modules/ une ressource ([vava]), chaque dossier d'examples/ une ressource
+ *          d'outils de développement ([vava-dev], posée mais jamais lancée d'office), chancellerie/ la Chancellerie.
  *        - Fusion à trois voies, fichier par fichier : la version installée (empreintes gardées dans
  *          data/install.json), celle du disque, la nouvelle. Un fichier que personne n'a touché est remplacé ; un
  *          fichier modifié sur place et inchangé en amont est gardé ; modifié des deux côtés, un fichier de réglages
@@ -35,6 +36,9 @@ const PANEL_REVERTED = path.join(UPDATES, 'chancellerie-annulee');
 const BACKUPS_KEPT = 3;
 const CORE = 'vAvA_core';
 const CATEGORY = '[vava]';
+// exemples et outils de développement du dépôt : posés dans leur propre catégorie, à activer à la main
+const DEV_CATEGORY = '[vava-dev]';
+const RESOURCE_FOLDERS = [{ dir: 'modules', category: CATEGORY }, { dir: 'examples', category: DEV_CATEGORY }];
 const ROOT_EXCLUDED = new Set(['modules', 'examples', 'chancellerie', 'docs', '.github', '.git', '.gitignore', '.gitattributes']);
 // dans le dossier de la Chancellerie : jamais touchés par une mise à jour
 const PANEL_KEPT = new Set(['data', 'node', 'node.exe']);
@@ -71,29 +75,33 @@ function userOwned(relative) {
  */
 function layout(root) {
   if (!fs.existsSync(path.join(root, 'fxmanifest.lua'))) throw dl.failure('bad_archive', 'fxmanifest.lua absent à la racine du dépôt');
-  const list = [{ name: CORE, dir: root, skip: (relative) => ROOT_EXCLUDED.has(relative.split('/')[0]) }];
-  const modules = path.join(root, 'modules');
-  let names = [];
-  try {
-    names = fs.readdirSync(modules, { withFileTypes: true }).filter((e) => e.isDirectory()).map((e) => e.name).sort();
-  } catch (error) {
-    names = [];
-  }
-  for (const name of names) {
-    if (fs.existsSync(path.join(modules, name, 'fxmanifest.lua'))) list.push({ name, dir: path.join(modules, name), skip: (r) => r.split('/')[0] === '.git' });
+  const list = [{ name: CORE, dir: root, category: CATEGORY, skip: (relative) => ROOT_EXCLUDED.has(relative.split('/')[0]) }];
+  for (const folder of RESOURCE_FOLDERS) {
+    const base = path.join(root, folder.dir);
+    let names = [];
+    try {
+      names = fs.readdirSync(base, { withFileTypes: true }).filter((e) => e.isDirectory()).map((e) => e.name).sort();
+    } catch (error) {
+      names = [];
+    }
+    for (const name of names) {
+      if (fs.existsSync(path.join(base, name, 'fxmanifest.lua'))) {
+        list.push({ name, dir: path.join(base, name), category: folder.category, skip: (r) => r.split('/')[0] === '.git' });
+      }
+    }
   }
   const panel = path.join(root, 'chancellerie');
   return { resources: list, panel: fs.existsSync(path.join(panel, 'index.js')) ? panel : null };
 }
 
-/** Dossier d'une ressource sur le disque : celui de l'installation, sinon celui trouvé, sinon [vava]/nom. */
-function targetOf(name, serverDataPath, installed, found) {
+/** Dossier d'une ressource sur le disque : celui de l'installation, sinon celui trouvé, sinon <catégorie>/nom. */
+function targetOf(name, serverDataPath, installed, found, category = CATEGORY) {
   const root = resourcesRoot(serverDataPath);
   const known = installed.resources[name] && installed.resources[name].folder;
   if (known && fs.existsSync(path.join(root, known))) return path.join(root, known);
   const scanned = found.find((r) => r.name === name);
   if (scanned) return path.join(root, scanned.folder);
-  return path.join(root, CATEGORY, name);
+  return path.join(root, category, name);
 }
 
 /** `.git` dans ce dossier ou l'un de ses deux parents ? */
@@ -174,7 +182,7 @@ function planResources(root, serverDataPath) {
   const installed = state();
   const found = resources.scan(serverDataPath, { details: true });
   return layout(root).resources.map((resource) => {
-    const target = targetOf(resource.name, serverDataPath, installed, found);
+    const target = targetOf(resource.name, serverDataPath, installed, found, resource.category);
     const incoming = dl.hashTree(resource.dir, resource.skip);
     const baseline = installed.resources[resource.name] ? installed.resources[resource.name].files : null;
     return { name: resource.name, source: resource.dir, target, incoming, plan: plan(target, incoming, baseline), isNew: !fs.existsSync(target) };

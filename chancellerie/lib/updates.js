@@ -41,12 +41,12 @@ const RESTART_CODE = 75;
 const delay = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 const firstLine = (text) => String(text || '').split('\n')[0].slice(0, 200);
 
-/** Partie du dépôt touchée par un fichier : nom d'un module, vAvA_core, chancellerie, ou null (docs, exemples). */
+/** Partie du dépôt touchée par un fichier : nom d'un module ou d'un exemple, vAvA_core, chancellerie, ou null (docs). */
 function partOf(file) {
   const [head, second] = file.split('/');
   if (head === 'chancellerie') return 'chancellerie';
-  if (head === 'modules') return second || null;
-  if (['docs', 'examples', '.github'].includes(head) || head.startsWith('.')) return null;
+  if (head === 'modules' || head === 'examples') return second || null;
+  if (['docs', '.github'].includes(head) || head.startsWith('.')) return null;
   return installer.CORE;
 }
 
