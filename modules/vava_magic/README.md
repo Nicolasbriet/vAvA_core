@@ -168,7 +168,7 @@ personnage) ; le joueur affecté voit leurs icônes et leurs secondes à droite 
 | Ralenti | allure réduite (jamais cumulé : le plus fort l'emporte), course interdite au-delà de la moitié |
 | Chancelant | démarche titubante, caméra qui tangue, **impossible d'incanter** |
 | Renversé | chute courte (ragdoll), impossible d'incanter |
-| Gelé | immobilisé (le serveur fige aussi le personnage ; à la fin, il reste figé s'il est immobilisé par le Registre du Conseil), givre au bord de l'écran, impossible d'incanter |
+| Gelé | immobilisé (le serveur seul fige le personnage et le libère ; à la fin, il reste figé s'il est immobilisé par le Registre du Conseil), course, saut, attaque et visée coupées, givre au bord de l'écran, impossible d'incanter |
 
 **Règle d'équité** : dès qu'un contrôle dur (Chancelant, Renversé, Gelé) touche, la cible est protégée des autres
 jusqu'à 6 s après sa fin (`states.hardImmunityMs`) : aucun enchaînement. Les dégâts s'appliquent toujours. Un contrôle
@@ -178,7 +178,8 @@ ni état, ni recul (Vague, sol mouillé, brume, boue l'ignorent). Le hook `vava_
 module de refuser un état.
 
 Dans GTA, l'allure et la chute d'un personnage sont calculées par le jeu de son joueur : un tricheur pourrait ignorer
-un Ralenti ou une chute. Le Gelé est aussi imposé par le serveur ; l'impossibilité d'incanter est décidée par lui.
+un Ralenti ou une chute. Le Gelé, lui, est imposé par le serveur seul (le client ne fige ni ne libère jamais le
+personnage) ; l'impossibilité d'incanter est décidée par lui.
 
 ## Zones au sol
 
