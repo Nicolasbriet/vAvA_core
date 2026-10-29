@@ -29,7 +29,15 @@ const readline = require('readline');
 const vm = require('vm');
 
 const NODE_MAJOR_MIN = 18;
-const RULE = '═'.repeat(62);
+// l'enseigne du lancement : « CHANCELLERIE » en lettres de console (police figlet Small)
+const TITLE_ART = [
+  '  ___  _  _    _    _  _   ___  ___  _     _     ___  ___  ___  ___',
+  ' / __|| || |  /_\\  | \\| | / __|| __|| |   | |   | __|| _ \\|_ _|| __|',
+  '| (__ | __ | / _ \\ | .` || (__ | _| | |__ | |__ | _| |   / | | | _|',
+  ' \\___||_||_|/_/ \\_\\|_|\\_| \\___||___||____||____||___||_|_\\|___||___|',
+];
+const TITLE_WIDTH = Math.max(...TITLE_ART.map((line) => line.length));
+const RULE = '═'.repeat(TITLE_WIDTH);
 // fermeture de la fenêtre : Windows laisse une dizaine de secondes avant de tout couper
 const CLOSE_SIGNALS = ['SIGHUP'];
 const STOP_SIGNALS = ['SIGINT', 'SIGTERM', 'SIGBREAK'];
@@ -54,10 +62,20 @@ function panelUrl() {
 
 function banner() {
   const c = colors;
+  // l'enseigne en grandes lettres, sauf dans une console trop étroite pour elle (titre sur une ligne)
+  const columns = process.stdout.columns;
+  const wide = !(columns > 0) || columns >= TITLE_WIDTH + 2;
+  const rule = wide ? RULE : '═'.repeat(Math.max(10, columns - 4));
   say();
-  say(`${c.brass}  ${RULE}${c.reset}`);
-  say(`${c.bright}     La Chancellerie${c.reset}${c.dim}  ·  panneau du serveur vAvA  ·  v${config.VERSION}${c.reset}`);
-  say(`${c.brass}  ${RULE}${c.reset}`);
+  say(`${c.brass}  ${rule}${c.reset}`);
+  if (wide) {
+    for (const line of TITLE_ART) say(`${c.bright}  ${line}${c.reset}`);
+    say(`${c.brass}  ${rule}${c.reset}`);
+    say(`${c.dim}     panneau du serveur vAvA  ·  v${config.VERSION}${c.reset}`);
+  } else {
+    say(`${c.bright}     La Chancellerie${c.reset}${c.dim}  ·  panneau du serveur vAvA  ·  v${config.VERSION}${c.reset}`);
+    say(`${c.brass}  ${rule}${c.reset}`);
+  }
   say(`     Ouvrez dans votre navigateur :  ${c.bright}${panelUrl()}${c.reset}`);
   if (config.get().http.host === '0.0.0.0') say(`${c.dim}     (accessible aussi depuis les autres machines, par l'adresse de celle-ci)${c.reset}`);
   else if (process.platform !== 'win32') {
