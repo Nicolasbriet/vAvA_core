@@ -17,7 +17,7 @@ local type, pairs, ipairs, pcall, tostring, getmetatable = type, pairs, ipairs, 
 local mathType, min = math.type, math.min
 local HUGE = math.huge
 local sort = table.sort
-local TriggerClientEvent = TriggerClientEvent
+local TriggerClientEvent, GetGameTimer = TriggerClientEvent, GetGameTimer
 
 local grid = VavaInventory.grid
 local positions = VavaInventory.positions
@@ -51,6 +51,7 @@ VavaInventory.operations = operations
 ---@class vAvA.InventorySession
 ---@field characterId integer
 ---@field containerId integer
+---@field closeFlushAt? integer  dernière écriture demandée par une fermeture (GetGameTimer)
 
 ---@type table<integer, vAvA.InventorySession>
 local sessions = {}
@@ -178,7 +179,7 @@ end
 ---@param container vAvA.Container
 ---@param instance? vAvA.ItemInstance  objet modifié ou arrivé
 ---@param removedId? integer           objet parti de ce conteneur
----@param deleted? boolean             l'objet parti n'existe plus
+---@param deleted? vAvA.ItemInstance   l'objet parti, quand il n'existe plus (consommé, fusionné, retiré)
 local function note(change, container, instance, removedId, deleted)
     local entry = change.entries[container]
     if not entry then
@@ -189,7 +190,7 @@ local function note(change, container, instance, removedId, deleted)
     if instance then entry.set[#entry.set + 1] = instance end
     if removedId then
         entry.removed[#entry.removed + 1] = removedId
-        if deleted then entry.deleted[#entry.deleted + 1] = removedId end
+        if deleted then entry.deleted[#entry.deleted + 1] = deleted end
     end
 end
 
@@ -199,7 +200,8 @@ local function publish(change)
         local entry = change.entries[container]
         container.revision = container.revision + 1
         for _, instance in ipairs(entry.set) do persistence.touch(instance, container.persisted) end
-        for _, id in ipairs(entry.deleted) do persistence.forget(id) end
+        -- l'objet lui-même : il ne s'efface de la base que s'il a peut-être sa ligne (pas une pile née au catalogue)
+        for _, instance in ipairs(entry.deleted) do persistence.forget(instance) end
         viewers.publish(container, entry.set, entry.removed)
         -- la pile tenue en main a quitté la besace : la main se vide (sync ne connaît que les besaces des joueurs)
         local src, previous = hands.sync(container)
@@ -393,7 +395,14 @@ end
 function operations.close(src)
     local session = sessions[src]
     viewers.removePlayer(src)
-    if session then persistence.flushSoon() end
+    if not session then return end
+    -- écriture à la fermeture au plus une fois par flushIntervalMs et par joueur : un client qui alterne geste et
+    -- fermeture ne force pas une transaction à chaque fois ; l'écriture groupée régulière rattrape le reste, et le
+    -- déchargement du personnage écrit toujours tout
+    local now = GetGameTimer()
+    if session.closeFlushAt and now - session.closeFlushAt < cfg.flushIntervalMs then return end
+    session.closeFlushAt = now
+    persistence.flushSoon()
 end
 
 -- Opérations du joueur ---------------------------------------------------------------------------------------
@@ -480,7 +489,7 @@ function operations.merge(src, sourceId, targetId, quantity)
     local change = newChange()
     if source.quantity == 0 then
         containers.detach(from, source, def)
-        note(change, from, nil, sourceId, true)
+        note(change, from, nil, sourceId, source)
     else
         note(change, from, source)
     end
@@ -594,7 +603,7 @@ function operations.use(src, instanceId)
         local change = newChange()
         if instance.quantity == 0 then
             containers.detach(container, instance, def)
-            note(change, container, nil, instanceId, true)
+            note(change, container, nil, instanceId, instance)
         else
             note(change, container, instance)
         end
@@ -909,7 +918,7 @@ function operations.exchange(container, removals, additions, owner, dryRun)
         containers.adjust(container, instance, take.def, -take.quantity)
         if instance.quantity == 0 then
             containers.detach(container, instance, take.def)
-            note(change, container, nil, instance.id, true)
+            note(change, container, nil, instance.id, instance)
         end
     end
     for instance, extra in pairs(planned.fills) do

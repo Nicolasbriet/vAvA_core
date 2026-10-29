@@ -102,7 +102,9 @@ AddEventHandler('onResourceStop', function(resource)
     if resource ~= VavaInventory.resource then return end
     -- les sacs sont des entités du monde : ils ne doivent pas survivre au module
     drops.clear()
-    local pending = persistence.pending()
+    -- dernière écriture, sans en attendre la fin ; refusée pendant une écriture en cours (ou par un core qui tient déjà
+    -- le module pour arrêté) : ce qui reste est signalé
+    local pending = persistence.flushOnStop()
     if pending > 0 then
         core.log.warn('%d objet(s) d\'inventaire non écrits à l\'arrêt (écriture toutes les %d ms)', pending, cfg.flushIntervalMs)
     end

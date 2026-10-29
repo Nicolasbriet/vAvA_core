@@ -568,7 +568,9 @@ montré au joueur, dans l'interface ou en notification s'il utilisait un raccour
 - Le serveur décide de tout : place, poids, distance d'un sac (lue côté serveur), droit d'accès.
 - Chaque opération s'exécute d'un bloc en mémoire, sans attendre la base : pas de duplication par concurrence.
   Les identifiants d'objets sont attribués en mémoire (**un seul serveur par base de données**).
-- Écriture groupée toutes les 3 s et à chaque fermeture ou déchargement. Les sacs au sol ne survivent pas à un
+- Écriture groupée toutes les 3 s, et aussitôt au déchargement d'un personnage ; à la fermeture d'un inventaire, au
+  plus une fois toutes les 3 s par joueur (1.6.1) ; à l'arrêt du module, une dernière écriture lancée sans attendre
+  (signalée en console si elle n'a pas pu partir). Les sacs au sol ne survivent pas à un
   redémarrage (ni leur contenu).
 - Sacs au sol plafonnés (1.6.0) : au plus `config.drop.maxPerPlayer` (10) sacs posés par un même personnage et
   `config.drop.maxTotal` (300) sur le serveur ; un sac compte jusqu'à sa disparition (vidé, expiré), même après le
@@ -594,8 +596,9 @@ Son panneau porte un bandeau : onglets des catégories (avec leur compte), champ
 casse ignorés, envoyé après une courte pause de frappe ou sur Entrée ; Échap quitte le champ, un second ferme
 l'inventaire), flèches de page ; chaque geste passe par le RPC `vava_inventory:catalog`, qui revérifie le droit et
 renvoie le panneau garni. Un double-clic ou « Prendre » met l'objet dans la besace. Ce qu'on en prend est regarni
-aussitôt (stock sans fin), ce qu'on y dépose disparaît au remplissage suivant, rien n'est écrit en base, et le
-catalogue disparaît avec le personnage. Chaque ouverture par la commande est inscrite au journal du Conseil. À
+aussitôt (stock sans fin), ce qu'on y dépose disparaît au remplissage suivant, rien n'est écrit en base (pas même aux
+changements de page, 1.6.1 : un objet pris s'écrit comme tout objet de la besace, un objet de la besace déposé est
+effacé de la base), et le catalogue disparaît avec le personnage. Chaque ouverture par la commande est inscrite au journal du Conseil. À
 n'activer que sur un serveur de test : le module l'annonce par un avertissement au démarrage.
 
 ### `vava_needs`

@@ -1,9 +1,14 @@
 --[[
     vava_inventory/server/persistence.lua
     Rôle : journal des modifications et écriture groupée. Chaque mutation note l'état final d'un objet (à écrire ou à
-           supprimer) ; le journal part en UNE transaction toutes les flushIntervalMs, et immédiatement à la fermeture
-           d'un inventaire ou au déchargement d'un personnage. Un échange entre deux conteneurs est donc toujours
-           écrit d'un bloc. Les écritures sont sérialisées : une écriture immédiate attend celle en cours.
+           supprimer) ; le journal part en UNE transaction toutes les flushIntervalMs, et aussitôt au déchargement d'un
+           personnage, à la fermeture d'un inventaire (au plus une fois par flushIntervalMs et par joueur : voir
+           operations.close) et à l'arrêt du module (sauf pendant une écriture en cours). Un échange entre deux
+           conteneurs est donc toujours écrit d'un bloc. Les écritures sont sérialisées : une écriture immédiate attend
+           celle en cours.
+           Chaque objet sait s'il a peut-être sa ligne en base (`stored` : lu en base, ou écriture envoyée, jusqu'à un
+           effacement validé). Celui qui n'en a pas (né dans le catalogue ou un sac, repris avant toute écriture)
+           n'écrit rien quand il quitte les conteneurs conservés : le catalogue ne touche jamais la base.
     Dépendances : config.lua, server/core.lua
 ]]
 
@@ -23,22 +28,32 @@ local EMPTY_METADATA = '{}'
 local persistence = {}
 VavaInventory.persistence = persistence
 
--- id d'objet → { instance = objet } (à écrire) ou { delete = true } ; seul le dernier état compte
+-- id d'objet → { instance = objet } (à écrire) ou { instance = objet, delete = true } (à effacer) ; seul le dernier
+-- état compte
 local journal = {}
 -- dernière écriture en file : chacune attend la précédente
 local queueTail = nil
 
---- Note l'état d'un objet. Un objet placé dans un conteneur non conservé (sac au sol) est supprimé de la base.
+--- Note la disparition d'un objet de la base (consommé, retiré, ou parti dans un conteneur non conservé). S'il n'y a
+--- jamais eu sa ligne, rien n'est à effacer, et une écriture encore en attente n'a plus lieu d'être.
+---@param instance vAvA.ItemInstance
+function persistence.forget(instance)
+    if instance.stored then
+        journal[instance.id] = { instance = instance, delete = true }
+    else
+        journal[instance.id] = nil
+    end
+end
+
+--- Note l'état d'un objet. Un objet placé dans un conteneur non conservé (sac au sol, catalogue) quitte la base.
 ---@param instance vAvA.ItemInstance
 ---@param persisted boolean  le conteneur de l'objet est conservé en base
 function persistence.touch(instance, persisted)
-    journal[instance.id] = persisted and { instance = instance } or { delete = true }
-end
-
---- Note la disparition d'un objet (consommé, retiré).
----@param id integer
-function persistence.forget(id)
-    journal[id] = { delete = true }
+    if persisted then
+        journal[instance.id] = { instance = instance }
+    else
+        persistence.forget(instance)
+    end
 end
 
 ---@param metadata table|nil
@@ -58,23 +73,31 @@ local function write()
     local queries = {}
     for id, entry in pairs(batch) do
         local instance = entry.instance
-        if instance then
+        if entry.delete then
+            queries[#queries + 1] = { query = DELETE_SQL, values = { id } }
+        else
+            -- envoyée avant toute attente : l'objet a désormais peut-être sa ligne, un retrait devra l'effacer
+            instance.stored = true
             queries[#queries + 1] = { query = UPSERT_SQL, values = {
                 instance.id, instance.containerId, instance.item, instance.x, instance.y,
                 instance.rotated and 1 or 0, instance.quantity, encodeMetadata(instance.metadata),
             } }
-        else
-            queries[#queries + 1] = { query = DELETE_SQL, values = { id } }
         end
     end
     local ok, err = VavaInventory.core.db.transaction(queries)
     if not ok then
-        -- rien n'est perdu : les entrées remises en file, sauf celles remplacées par une modification plus récente
+        -- rien n'est perdu : les entrées remises en file, sauf celles remplacées par une modification plus récente ;
+        -- un effacement en échec laisse `stored` vrai (la ligne existe encore)
         for id, entry in pairs(batch) do
             if journal[id] == nil then journal[id] = entry end
         end
         VavaInventory.log.error('écriture de l\'inventaire en échec (%d objet(s)), nouvel essai : %s', #queries, tostring(err))
         return false, err
+    end
+    -- effacements validés : plus de ligne. Les écritures étant sérialisées, aucune autre n'a pu en recréer une entre-temps
+    -- (une écriture notée pendant l'attente remettra `stored` en partant)
+    for _, entry in pairs(batch) do
+        if entry.delete then entry.instance.stored = nil end
     end
     return true
 end
@@ -97,6 +120,18 @@ end
 --- Écriture sans attendre le résultat (fermeture d'inventaire).
 function persistence.flushSoon()
     CreateThread(persistence.flush)
+end
+
+--- Arrêt du module : dernière écriture, lancée sans pouvoir en attendre la fin (la ressource s'arrête). Jamais pendant
+--- une écriture en cours : deux transactions croisées pourraient écrire un état plus ancien après le plus récent.
+--- Renvoie le nombre d'objets restés sans écriture (0 : rien à écrire, ou écriture partie).
+---@return integer
+function persistence.flushOnStop()
+    if next(journal) == nil then return 0 end
+    if queueTail then return persistence.pending() end
+    -- peut ne jamais rendre la main (la ressource s'arrête pendant l'attente) : la transaction est déjà partie
+    persistence.flush()
+    return persistence.pending()
 end
 
 --- Nombre d'objets en attente d'écriture.

@@ -44,7 +44,9 @@ VavaInventory.config = {
         pollMs = 1000,             -- client : cadence de la boucle lente, active seulement tant qu'un accessoire est affiché
         modelTimeoutMs = 5000,     -- client : attente maximale du chargement d'un modèle d'accessoire
     },
-    flushIntervalMs = 3000,        -- écriture groupée du journal des modifications
+    -- écriture groupée du journal des modifications ; aussi l'écart minimal entre deux écritures déclenchées par les
+    -- fermetures d'inventaire d'un même joueur (le déchargement du personnage écrit toujours aussitôt)
+    flushIntervalMs = 3000,
     hotbarSize = 5,
 
     -- Catalogue de développement (1.5.0) : un conteneur temporaire garni d'une pile pleine de chaque objet connu,

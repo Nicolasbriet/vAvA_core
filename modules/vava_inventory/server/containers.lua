@@ -37,6 +37,7 @@ VavaInventory.containers = containers
 ---@field rotated boolean
 ---@field quantity integer
 ---@field metadata table
+---@field stored? boolean   a peut-être sa ligne en base (lu en base, ou écriture envoyée) : tenu par persistence.lua
 
 ---@class vAvA.Container : vAvA.Grid
 ---@field id integer              négatif pour un conteneur temporaire (sac au sol)
@@ -197,7 +198,7 @@ function containers.load(id)
         if instanceId and x and y and quantity then
             place(container, {
                 id = instanceId, item = r.item, x = x, y = y, rotated = toInteger(r.rotated) == 1 or r.rotated == true,
-                quantity = quantity, metadata = decodeMetadata(r.metadata), containerId = id,
+                quantity = quantity, metadata = decodeMetadata(r.metadata), containerId = id, stored = true,
             })
         else
             VavaInventory.log.error('conteneur #%d : ligne d\'objet illisible ignorée (id %s)', id, tostring(r.id))
