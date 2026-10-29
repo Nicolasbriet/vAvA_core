@@ -18,15 +18,17 @@
     View.renderHands();
   }
 
-  /** Prévision locale : appliquée tout de suite, annulée si le serveur refuse. */
+  /** Prévision locale : appliquée tout de suite, annulée si le serveur refuse (sans perdre ce que le serveur a envoyé
+   *  pendant l'attente : voir Model.restore). */
   async function predicted(containers, apply, request) {
     const saved = Model.save(uniq(containers));
     apply();
     refresh(containers);
     const result = await request();
-    if (!result.ok) {
-      Model.restore(saved);
-      refresh(containers);
+    if (result.ok) {
+      Model.release(saved);
+    } else {
+      if (Model.restore(saved)) refresh(containers);
       Menu.toast(errorMessage(result.error));
     }
     return result;
@@ -296,6 +298,8 @@
       searchNow(event.target);
       return;
     }
-    if (!typing && !Menu.isOpen() && event.key.toLowerCase() === String(Model.state.closeKey).toLowerCase()) close();
+    // touche choisie par le joueur pour ouvrir l'inventaire ('' si le jeu ne l'a pas fait connaître : Échap seul)
+    const closeKey = String(Model.state.closeKey || '').toLowerCase();
+    if (closeKey && !typing && !Menu.isOpen() && event.key.toLowerCase() === closeKey) close();
   });
 })();

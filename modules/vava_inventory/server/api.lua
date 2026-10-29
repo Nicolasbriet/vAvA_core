@@ -135,7 +135,8 @@ end)
 exports('hold', function(source, instanceId)
     if not VavaInventory.ready then return false, 'not_ready' end
     if mathType(source) ~= 'integer' then return false, 'invalid_target' end
-    return operations.hold(source, instanceId, GetInvokingResource())
+    local ok, code = operations.hold(source, instanceId, GetInvokingResource())
+    return ok, code
 end)
 
 --- Ouvre un conteneur à un joueur. L'appelant a vérifié le droit d'accès (propriétaire, clé…). Avec `anchor`

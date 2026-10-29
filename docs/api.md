@@ -577,8 +577,14 @@ montré au joueur, dans l'interface ou en notification s'il utilisait un raccour
   départ de son auteur. Au-delà, le jet qui poserait un nouveau sac est refusé (`too_many_drops`) ; remplir un sac
   existant reste possible.
 - Le client ne reçoit que les conteneurs qu'il a ouverts, puis leurs différences.
+- Pile d'un objet sans définition au chargement d'un conteneur (module arrêté, ou pas encore redéclaré après un
+  `restart vava_inventory`) : gardée à part, sa ligne en base intacte, puis replacée dès que l'objet est déclaré
+  (1.6.3) : à sa place d'origine si elle est libre, sinon à la première place libre ; sans place, elle reste à part.
+  Aucune pile n'est recouverte. Une pile tenue en main ainsi gardée à part retrouve la main à son retour. Redéclarer
+  ses objets à l'annonce `core:module:ready` de `vava_inventory` suffit donc à tout rendre aux joueurs en jeu.
 
-Touches par défaut (réglables par le joueur dans Paramètres > Raccourcis > FiveM) : `I` ouvre l'inventaire,
+Touches par défaut (réglables par le joueur dans Paramètres > Raccourcis > FiveM) : `I` ouvre l'inventaire, et la
+touche choisie pour l'ouvrir le ferme aussi (1.6.3 ; `Échap` toujours),
 `1` à `5` utilisent les raccourcis (un objet qui se tient en main sans autre usage y est pris ou reposé). Dans
 l'interface : glisser pour déplacer (sur la ceinture : raccourci ; sur les Mains : prendre en main), `R` pour pivoter,
 `Maj` pour diviser en deux, double-clic pour utiliser, prendre en main ou ramasser, clic droit pour les actions,

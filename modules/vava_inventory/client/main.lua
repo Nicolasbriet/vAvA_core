@@ -1,15 +1,17 @@
 --[[
     vava_inventory/client/main.lua
     Rôle : ouverture de l'inventaire et raccourcis (RegisterKeyMapping : touches réglables par le joueur, aucune
-           boucle), réception des états envoyés par le serveur (dont l'objet en main), et relais des gestes de
-           l'interface vers le serveur.
+           boucle ; la touche choisie pour ouvrir ferme aussi l'interface), réception des états envoyés par le serveur
+           (dont l'objet en main), et relais des gestes de l'interface vers le serveur.
     Dépendances : shared/, config.lua, client/core.lua, client/drops.lua, client/hands.lua, client/nui.lua
 ]]
 
 local type, tostring, tonumber, pcall = type, tostring, tonumber, pcall
 local tointeger = math.tointeger
+local match = string.match
 local CreateThread, RegisterNetEvent, RegisterCommand, RegisterKeyMapping = CreateThread, RegisterNetEvent, RegisterCommand, RegisterKeyMapping
 local IsPauseMenuActive, GetResourceState = IsPauseMenuActive, GetResourceState
+local GetControlInstructionalButton, GetHashKey = GetControlInstructionalButton, GetHashKey
 local BeginTextCommandThefeedPost, AddTextComponentSubstringPlayerName, EndTextCommandThefeedPostTicker =
     BeginTextCommandThefeedPost, AddTextComponentSubstringPlayerName, EndTextCommandThefeedPostTicker
 
@@ -27,8 +29,30 @@ local OPEN_COMMAND = 'vava_inventory'
 local SLOT_COMMAND = 'vava_inventory_slot_'
 local FEED_TEXT = 'STRING'
 local HUD = 'vava_hud'
+-- bit qui désigne, pour GTA, une commande liée par RegisterKeyMapping
+local MAPPED_COMMAND = 0x80000000
+local UINT32 = 0xFFFFFFFF
+-- Touches que GTA montre par une icône (« b_… ») et non par leur texte (« t_I ») → nom lu par l'interface
+-- (`KeyboardEvent.key`). Codes des boutons d'instruction de GTA, à confirmer en jeu (test 1-6) ; une touche absente
+-- d'ici ne ferme pas l'inventaire (Échap le fait toujours). Les touches de modification n'y sont pas : Maj sert à
+-- diviser une pile en glissant.
+local ICON_KEYS = {
+    b_1002 = 'Tab', b_1003 = 'Enter', b_1004 = 'Backspace', b_1012 = 'CapsLock', b_2000 = ' ',
+    b_170 = 'F1', b_171 = 'F2', b_172 = 'F3', b_173 = 'F4', b_174 = 'F5', b_175 = 'F6',
+    b_176 = 'F7', b_177 = 'F8', b_178 = 'F9', b_179 = 'F10', b_180 = 'F11', b_181 = 'F12',
+}
 
 local open = false
+
+--- Touche que le joueur a choisie pour ouvrir l'inventaire (Paramètres > Raccourcis > FiveM), sous le nom que lit
+--- l'interface : le texte que GTA en montre (« I »), ou le nom d'une touche à icône connue (« Tab ») ; '' si elle
+--- n'est pas reconnue (alors seul Échap ferme, jamais une touche qui n'ouvre pas).
+---@return string
+local function closeKey()
+    local button = GetControlInstructionalButton(0, (GetHashKey(OPEN_COMMAND) | MAPPED_COMMAND) & UINT32, true)
+    if type(button) ~= 'string' then return '' end
+    return match(button, '^t_(.+)$') or ICON_KEYS[button] or ''
+end
 
 local function hudNotify(message)
     return exports[HUD]:notify(message)
@@ -76,7 +100,8 @@ hands.start()
 
 RegisterNetEvent(EVENTS.SNAPSHOT, function(snapshot)
     if type(snapshot) ~= 'table' or not core.characters.current() then return end
-    snapshot.closeKey = cfg.keys.open
+    -- relue à chaque ouverture : un changement de touche s'applique sans redémarrage
+    snapshot.closeKey = closeKey()
     nui.send('open', snapshot)
     if not open then
         open = true

@@ -2,12 +2,17 @@
 /*
  * web/js/model.js
  * Rôle : état de l'inventaire côté interface (conteneurs ouverts, définitions, raccourcis, objet en main), mis à jour
- *        par les différences du serveur. Sauvegarde et restauration pour annuler un geste prévu que le serveur refuse.
+ *        par les différences du serveur. Sauvegarde et restauration pour annuler un geste prévu que le serveur refuse :
+ *        la copie d'avant le geste reçoit aussi les différences arrivées pendant l'attente (geste d'un autre joueur),
+ *        qu'un refus n'efface donc pas (1.6.3).
  *        Lecture des métadonnées d'une pile (contrat standard : palier, qualité, solidité, signature…).
  */
 
 const Model = (() => {
-  const state = { own: null, order: [], containers: new Map(), definitions: {}, hotbar: [], hands: 0, closeKey: 'I' };
+  // closeKey : touche choisie par le joueur pour ouvrir l'inventaire, qui le ferme aussi ('' : Échap seul)
+  const state = { own: null, order: [], containers: new Map(), definitions: {}, hotbar: [], hands: 0, closeKey: '' };
+  // copies des conteneurs d'avant chaque geste prévu encore sans réponse du serveur, dans l'ordre des gestes
+  const pending = new Set();
 
   /** msgpack transmet une liste vide comme un objet vide : toujours une vraie liste. */
   const list = (value) => (Array.isArray(value) ? value : Object.values(value || {}));
@@ -85,7 +90,9 @@ const Model = (() => {
     state.definitions = { ...snapshot.definitions };
     state.hotbar = list(snapshot.hotbar);
     state.hands = Number(snapshot.hands) || 0;
-    if (snapshot.closeKey) state.closeKey = snapshot.closeKey;
+    state.closeKey = typeof snapshot.closeKey === 'string' ? snapshot.closeKey : '';
+    // un état complet fait foi : un refus arrivé ensuite n'a plus rien à remettre
+    pending.clear();
   }
 
   /** Applique une différence ; renvoie le conteneur concerné (ou null s'il n'est pas ouvert). */
@@ -93,13 +100,27 @@ const Model = (() => {
     const container = state.containers.get(delta.container);
     if (!container) return null;
     Object.assign(state.definitions, delta.definitions || {});
-    for (const id of list(delta.removed)) container.items.delete(id);
-    for (const item of list(delta.set)) {
+    const removed = list(delta.removed);
+    const set = list(delta.set);
+    for (const id of removed) container.items.delete(id);
+    for (const item of set) {
       // l'objet a pu changer de conteneur : un seul exemplaire affiché
       for (const other of state.containers.values()) if (other !== container) other.items.delete(item.id);
       container.items.set(item.id, item);
     }
     container.weight = delta.weight;
+    // la même différence dans les copies des gestes en attente : un refus remettra l'état du serveur, ce geste compris
+    for (const saved of pending) {
+      for (const entry of saved) {
+        if (entry.container === container) {
+          for (const id of removed) entry.items.delete(id);
+          for (const item of set) entry.items.set(item.id, { ...item });
+          entry.weight = delta.weight;
+        } else {
+          for (const item of set) entry.items.delete(item.id);
+        }
+      }
+    }
     return container;
   }
 
@@ -119,19 +140,46 @@ const Model = (() => {
 
   const definition = (name) => state.definitions[name];
 
-  /** Copie des conteneurs touchés par un geste prévu. */
+  const copyItems = (items) => new Map([...items].map(([id, item]) => [id, { ...item }]));
+
+  /** Copie des conteneurs touchés par un geste prévu, tenue à jour par les différences jusqu'à la réponse du serveur
+   *  (release ou restore). */
   function save(containers) {
-    return containers.map((container) => ({
-      container, weight: container.weight,
-      items: new Map([...container.items].map(([id, item]) => [id, { ...item }])),
-    }));
+    const saved = containers.map((container) => ({ container, weight: container.weight, items: copyItems(container.items) }));
+    pending.add(saved);
+    return saved;
   }
 
+  /** Geste accepté : les différences du serveur ont déjà remplacé la prévision, la copie n'a plus d'usage. */
+  function release(saved) {
+    pending.delete(saved);
+  }
+
+  /** Geste refusé : remet ses conteneurs dans l'état d'avant lui, différences reçues depuis comprises. Les copies des
+   *  gestes prévus après lui contenaient sa prévision : elles repartent de cet état. Faux si la copie n'a plus cours
+   *  (un état complet est arrivé entre-temps et fait foi). */
   function restore(saved) {
+    if (!pending.has(saved)) return false;
+    let later = false;
+    for (const other of pending) {
+      if (other === saved) {
+        later = true;
+      } else if (later) {
+        for (const entry of other) {
+          const base = saved.find((candidate) => candidate.container === entry.container);
+          if (base) {
+            entry.items = copyItems(base.items);
+            entry.weight = base.weight;
+          }
+        }
+      }
+    }
+    pending.delete(saved);
     for (const entry of saved) {
       entry.container.items = entry.items;
       entry.container.weight = entry.weight;
     }
+    return true;
   }
 
   function setHotbar(value) {
@@ -149,7 +197,7 @@ const Model = (() => {
   }
 
   return {
-    state, list, load, applyDelta, removeContainer, find, definition, save, restore, setHotbar, setHands, heldItem,
+    state, list, load, applyDelta, removeContainer, find, definition, save, release, restore, setHotbar, setHands, heldItem,
     metadataOf, sameMetadata, describe,
   };
 })();

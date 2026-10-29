@@ -5,6 +5,8 @@
            { id, item, model, bone, offset, rotation }, dont chaque client fait un accessoire local sur le ped du
            porteur. La main se vide d'elle-même dès que la pile quitte la besace (jetée, déposée, consommée, retirée
            par un module) : operations.lua appelle `sync` après chaque modification d'un conteneur de personnage.
+           Une pile tenue gardée à part au chargement faute de définition est attendue, puis rendue à la main à son
+           retour (`restore`, 1.6.3).
            Le statebag d'un joueur pouvant être écrit par son propre client, la liste des objets tenables (accessoire
            déclaré de chacun) est publiée dans GlobalState, que seul le serveur écrit : chaque client n'affiche que ce
            qui y correspond. Elle suit le registre des objets.
@@ -46,6 +48,7 @@ hands.SCHEMA = {
 ---@field characterId integer
 ---@field containerId integer
 ---@field instanceId integer  0 : mains vides
+---@field awaitedId? integer  pile tenue gardée à part au chargement, faute de définition : rendue à la main à son retour
 
 ---@type table<integer, vAvA.HandsState>
 local bySource = {}
@@ -116,7 +119,9 @@ end
 
 --- Personnage arrivé : relit sa main. La pile doit encore être dans la besace et son objet se tenir en main (la
 --- définition a pu changer, l'objet a pu être retiré hors ligne), sinon la main est vidée. Le champ suit toujours la
---- définition courante (modèle, os).
+--- définition courante (modèle, os). Exception (1.6.3) : une pile gardée à part faute de définition (module qui ne
+--- l'a pas encore redéclarée après un redémarrage de l'inventaire) existe toujours ; la main l'attend, champ inchangé
+--- (aucun client n'en montre l'accessoire tant que l'objet n'est pas déclaré tenable), et la reprend à son retour.
 ---@param src integer
 ---@param characterId integer
 ---@param container vAvA.Container
@@ -125,14 +130,42 @@ function hands.bind(src, characterId, container)
     bySource[src] = state
     byContainer[container.id] = src
     local stored = characters().get(characterId, HANDS_FIELD)
-    local instance = type(stored) == 'table' and container.items[stored.id]
+    local storedId = type(stored) == 'table' and stored.id
+    local instance = storedId and container.items[storedId]
     local def = instance and items.get(instance.item)
     if def and def.held then
         state.instanceId = instance.id
         characters().set(characterId, HANDS_FIELD, describe(instance, def))
+        return
+    end
+    local aside = storedId and not instance and containers.aside(container, storedId)
+    if aside and not items.get(aside.item) then
+        state.awaitedId = aside.id
     elseif stored ~= nil then
         characters().set(characterId, HANDS_FIELD, nil)
     end
+end
+
+--- Définition arrivée pour des piles gardées à part dans une besace (voir containers.returnAside) : la main qui
+--- attendait l'une d'elles la reprend si elle est replacée et se tient toujours en main ; sinon elle se vide, comme au
+--- chargement (pile restée à part faute de place alors que son objet est connu, objet qui ne se tient plus en main).
+--- Elle n'attend encore que si la définition de sa pile manque toujours. Le champ écrit repart vers les clients.
+---@param container vAvA.Container
+function hands.restore(container)
+    local src = byContainer[container.id]
+    local state = src and bySource[src]
+    if not state or not state.awaitedId then return end
+    local instance = container.items[state.awaitedId]
+    if not instance then
+        local aside = containers.aside(container, state.awaitedId)
+        if aside and not items.get(aside.item) then return end
+        -- toujours à part faute de place : aucun client ne doit montrer un accessoire que le serveur ne tient pas
+        hands.set(src, nil)
+        return
+    end
+    local def = items.get(instance.item)
+    -- hands.set efface l'attente une fois le champ écrit
+    hands.set(src, def and def.held and instance or nil, def)
 end
 
 ---@param src integer
@@ -174,6 +207,8 @@ function hands.set(src, instance, def)
     local ok, err = characters().set(state.characterId, HANDS_FIELD, instance and describe(instance, def) or nil)
     if not ok then return false, err end
     state.instanceId = instance and instance.id or 0
+    -- une main écrite n'attend plus rien
+    state.awaitedId = nil
     return true
 end
 

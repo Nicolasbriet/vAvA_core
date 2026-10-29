@@ -65,7 +65,7 @@ connecté et apparu.
 | 1 | `I`. | L'inventaire s'ouvre : consultation seulement. |
 | 2 | Déplacer un objet dans la besace, diviser une pile, jeter un objet au sol. | Chaque geste refusé dans l'inventaire : « Vous êtes à terre. » ; rien ne bouge. |
 | 3 | Double-clic sur une miche, sur une bande ; inventaire fermé, touche `1`. | « Vous êtes à terre. » (notification pour le raccourci) ; rien n'est consommé. |
-| 4 | Double-clic sur la hache (prendre en main) ; si un objet était déjà en main, Mains → Reposer. | « Vous êtes à terre. » pour les deux. Un outil placé en raccourci (`1` à `5`) est refusé sans aucun message (écart signalé). |
+| 4 | Double-clic sur la hache (prendre en main) ; si un objet était déjà en main, Mains → Reposer. | « Vous êtes à terre. » pour les deux. Un outil placé en raccourci (`1` à `5`) : même refus, notifié « Vous êtes à terre. » (`vava_inventory` 1.6.3). |
 | 5 | `G`. | Rien : on ne relève personne en étant à terre. |
 | 6 | Personnage mage, sort choisi dans la roue (`Tab`) : clic gauche. | « Vous êtes à terre. » |
 | 7 | **(2 joueurs)** Touche de portée de la voix `Z` (marquée W sur un clavier AZERTY). | Seules Chuchoter (1,5 m) et Parler (5 m) restent ; la portée d'avant revient au réveil ou au lieu de soins. |
