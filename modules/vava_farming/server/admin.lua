@@ -62,7 +62,7 @@ local function command(source, args)
             slots.publish(parcel)
             journal.write('admin_set', { parcel = parcel.id, slot = index, accountId = accountId, details = { fertility = value } })
             bridge.AdminLog(source, 'Fertilité fixée', { parcelle = parcel.id, emplacement = index, fertilite = value })
-            bridge.Chat(source, format('%s n° %d : fertilité %d %%.', parcel.label, index, value))
+            bridge.Chat(source, format('%s n° %d : fertilité %g %%.', parcel.label, index, value))
         elseif action == 'pousser' then
             local parcel = catalog.parcel(args[2])
             local index = tointeger(tonumber(args[3]))
