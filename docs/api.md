@@ -1144,7 +1144,7 @@ nommé par zone et le cercle de son rayon, posés par le client depuis la config
 
 ### `vava_crafting`
 
-L'artisanat (1.2.1) : **stations** (forge, établi, métier à tisser, alambic, tannerie, fourneau, table d'arcanes)
+L'artisanat (1.2.2) : **stations** (forge, établi, métier à tisser, alambic, tannerie, fourneau, table d'arcanes)
 publiques ou privées, avec leur qualité et parfois leur combustible (forge : charbon ; fourneau : bois ; réserve
 alimentée par les joueurs), une pièce à la fois ; **recettes** à ingrédients par **palier choisi** (consommés par pile,
 les plus anciennes d'abord, échange atomique), outil requis en main, durée, XP par `vava_skills` ; **qualité** =
@@ -1153,7 +1153,10 @@ matériaux × 0,5 + niveau × 0,4 + station × 0,1 ± 5, plafonnée par le nivea
 `history` création + 5 dernières) ou produits simples (`tier`) ; **poinçon** (glyphe parmi la config, dès Compagnon,
 champ `vava_crafting:mark`) ; **baptême** d'un chef-d'œuvre pendant 5 min ; **réparation** (25 % des ingrédients,
 solidité rendue, maximale − 5, histoire, jamais le créateur) ; **leçons** aux élèves à 10 m quand une recette
-transmise est réalisée (`vava_skills:recordLesson`). Détail, config et tests : `modules/vava_crafting/README.md`.
+transmise est réalisée (`vava_skills:recordLesson`). Une pièce ou une réparation commencée occupe la station jusqu'à
+sa fin, son annulation, ou au plus 2 min (ou sa durée + 30 s si c'est plus long, `interact.expireMarginMs`) ; finie
+trop loin, elle est abandonnée (rien n'est consommé) et la station libérée aussitôt. Détail, config et tests :
+`modules/vava_crafting/README.md`.
 Demande le core 0.6.0, `vava_inventory` 1.4.0, `vava_skills` 1.0.0, `vava_gathering` 1.0.0 ; facultatifs :
 `vava_hud`, `vava_admin` (droit `metiers`), `vava_chat`.
 
@@ -1182,15 +1185,20 @@ station. Rendu hors jeu : `web/index.html?view=menu` (ou `menu&tab=reparation`, 
 
 ### `vava_farming`
 
-L'agriculture (1.1.2) : **parcelles** communales ou privées (`owner = { kind = 'character', id }`, autres genres par
+L'agriculture (1.2.0) : **parcelles** communales ou privées (`owner = { kind = 'character', id }`, autres genres par
 `registerAccess`) faites d'emplacements en grille ; **croissance par dates** (humidité qui baisse, pousse au-dessus
 d'un seuil, pause à sec, flétrie après 6 h, morte après 18 h ; aucune boucle, republication des stades toutes les
 10 s) ; **fertilité** (coût par récolte, rotation par famille, compost, jachère) ; **qualité** de la récolte (graine ×
 0,35 + compétence × 0,35 + régularité d'arrosage × 0,15 + fertilité × 0,15 ± 5) en palier avec provenance, graines
 récupérées au même palier ; gestes semer / arroser (seau en main rempli aux puits) / fertiliser / récolter (faucille :
-plus vite) / arracher (déchets), tous validés et appliqués par le serveur après un geste chronométré ; **grenier
+plus vite) / arracher (déchets), tous validés et appliqués par le serveur après un geste chronométré (fini trop loin,
+le geste est abandonné ; un emplacement qui vient de donner ou de consommer des objets — semis, récolte, compost,
+arrachage — est écrit aussitôt, le reste par lots) ; **grenier
 commun** (conteneur `vava_inventory` conservé, ouvert ancré à qui a accès à la parcelle — communale : tous ; privée :
-son propriétaire ou le genre branché par `registerAccess` —, dépôts et retraits journalés) ; **composteur** (type de
+son propriétaire ou le genre branché par `registerAccess` —, dépôts et retraits journalés par minute : une ligne par
+minute, grenier, personnage, objet et sens, quantités additionnées, attente bornée par `persistence.granaryLogMax` ;
+migration 0002 : colonne `minute` et clé unique, les lignes d'avant restent une par geste ; hook `granary` toujours
+par geste) ; **composteur** (type de
 station et recette ajoutés aux registres de `vava_crafting`, station placée par `addStation`). Détail, config et tests :
 `modules/vava_farming/README.md`. Demande le core 0.6.0, `vava_inventory` 1.4.0, `vava_skills` 1.0.0, `vava_gathering`
 1.0.0, `vava_crafting` 1.1.0 ; facultatifs : `vava_hud`, `vava_admin` (droit `metiers`), `vava_chat`.

@@ -54,7 +54,8 @@ VavaCrafting.config = {
     interact = {
         distance = 2.5,
         serverTolerance = 1.5,
-        expireMs = 120000,          -- une pièce commencée et jamais finie libère la station
+        expireMs = 120000,          -- une pièce commencée et jamais finie libère la station au bout de ce délai…
+        expireMarginMs = 30000,     -- … ou de sa durée + cette marge, si c'est plus long (recette de plus de 90 s)
         finishToleranceMs = 400,
         moveCancel = 1.5,
     },

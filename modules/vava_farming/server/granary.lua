@@ -3,8 +3,8 @@
     Rôle : greniers communs : un conteneur conservé de l'inventaire par parcelle qui en déclare un (créé au premier
            démarrage, retrouvé ensuite), ouvert au joueur qui a accès à la parcelle (communale : tous ; privée : son
            propriétaire), à portée du grenier, avec un ancrage (la distance est alors tenue par l'inventaire), dépôts et
-           retraits journalés d'après les hooks de l'inventaire (déplacer, diviser, fusionner, jeter) qui passent par le
-           conteneur. Hook `vava_farming:granary` (after).
+           retraits d'après les hooks de l'inventaire (déplacer, diviser, fusionner, jeter) qui passent par le
+           conteneur : hook `vava_farming:granary` (after) à chaque geste, journal regroupé par minute (journal.lua).
     Dépendances : shared/, config.lua, server/core.lua, bridge/server.lua, server/journal.lua, server/catalog.lua,
                   server/slots.lua (accès)
 ]]

@@ -3,10 +3,12 @@
     Rôle : la fabrication décidée par le serveur. Menu d'une station (recettes connues de ce type, paliers possédés par
            ingrédient, réparables, poinçon, règles pour l'aperçu). Début : station à portée et accessible, libre,
            recette connue et au niveau, outil en main du bon genre, combustible, paliers choisis valides et possédés,
-           place, hook annulable ; jeton, station occupée. Fin : durée et distance revérifiées, outil et combustible,
-           piles relues et consommées par instance (le palier choisi, les plus anciennes d'abord), qualité (matériaux,
-           niveau, station, aléa, plafonnée), palier, objet signé ou produit simple, échange atomique, combustible,
-           XP, leçons aux élèves présents (recette transmise), baptême possible d'un chef-d'œuvre, journal, hooks.
+           place, hook annulable ; jeton, station occupée (jusqu'à la fin, l'annulation, ou l'oubli après 2 min ou la
+           durée de la pièce + une marge). Fin : durée revérifiée, distance (trop loin : pièce abandonnée, station
+           libérée), outil et combustible, piles relues et consommées par instance (le palier choisi, les plus
+           anciennes d'abord), qualité (matériaux, niveau, station, aléa, plafonnée), palier, objet signé ou produit
+           simple, échange atomique, combustible, XP, leçons aux élèves présents (recette transmise), baptême possible
+           d'un chef-d'œuvre, journal, hooks.
            Les sessions (création et réparation) vivent ici ; repair.lua s'y branche.
     Dépendances : shared/, config.lua, server/core.lua, bridge/server.lua, server/journal.lua, server/catalog.lua,
                   server/stations.lua, server/signature.lua ; server/repair.lua (lié à l'exécution)
@@ -231,7 +233,8 @@ function crafting.session(src)
     return sessions[src]
 end
 
---- Ouvre une session (création ou réparation) : jeton, station occupée, oubli programmé.
+--- Ouvre une session (création ou réparation) : jeton, station occupée, oubli programmé (délai de la config, ou durée
+--- du geste + marge pour une longue recette, qui doit pouvoir finir).
 ---@param src integer
 ---@param fields table
 ---@return vAvA.CraftSession
@@ -240,7 +243,7 @@ function crafting.open(src, fields)
     fields.token, fields.source, fields.startedAt = lastToken, src, GetGameTimer()
     sessions[src] = fields
     stations.setBusy(fields.station, src)
-    SetTimeout(interact.expireMs, function()
+    SetTimeout(max(interact.expireMs, fields.durationMs + interact.expireMarginMs), function()
         if sessions[src] == fields then crafting.release(src) end
     end)
     return fields
@@ -389,7 +392,11 @@ end
 ---@return table|string result
 local function finishCraft(session)
     local src, def, recipe = session.source, session.station, session.recipe
-    if not stations.near(src, def) then return false, 'too_far' end
+    -- trop loin à la fin : la pièce est abandonnée (rien n'est encore consommé), la station libérée aussitôt
+    if not stations.near(src, def) then
+        crafting.release(src)
+        return false, 'too_far'
+    end
     local _, toolErr = toolCheck(src, recipe)
     if toolErr then
         crafting.release(src)

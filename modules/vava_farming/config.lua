@@ -60,7 +60,9 @@ VavaFarming.config = {
     },
 
     streaming = { radius = 80.0, pollMs = 1000, modelTimeoutMs = 5000 },
-    persistence = { flushMs = 10000 },
+    -- écriture groupée ; journal du grenier en attente (lignes par minute) borné à granaryLogMax : plein, il s'écrit
+    -- aussitôt, et ce qui ne tient plus pendant une panne de la base est perdu (signalé)
+    persistence = { flushMs = 10000, granaryLogMax = 2000 },
     logRetentionDays = 90,
     logTier = 4,
 

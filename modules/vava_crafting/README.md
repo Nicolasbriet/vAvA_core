@@ -24,6 +24,7 @@ Ordre de démarrage : après `vAvA_core` (≥ 0.6.0), `vava_inventory` (≥ 1.4.
 | Histoire | création + 5 dernières entrées | `history` |
 | Réparation | 25 % des ingrédients (arrondi au-dessus), solidité rendue, solidité maximale − 5, niveau ≥ moitié de la recette, XP 25 %, 4 s | `repair` |
 | Durée | base × (1 − niveau × 0,004), 1,5 s au moins | `duration` |
+| Station tenue | une pièce jamais finie libère la station après 2 min, ou après sa durée + 30 s si c'est plus long | `interact.expireMs`, `interact.expireMarginMs` |
 | Leçons | élèves à 10 m qui ont le niveau, recette `transmission` | `lessons` |
 | Combustible | forge : charbon ; fourneau : bois de pin ; 1 par pièce, réserve 20 | `stationTypes[].fuel` |
 | Journal | pièces Excellent+ (palier ≥ 4), réparations, baptêmes, leçons, Conseil ; 180 jours | `logTier`, `logRetentionDays` |
@@ -55,16 +56,17 @@ sans outil, puis la forge s'ouvre.
 2. Façonner → le serveur vérifie : station à portée, accessible et libre ; recette connue, au niveau ; outil en main du
    bon genre, non brisé ; combustible ; paliers choisis valides et possédés ; place ; hook `vava_crafting:crafting`.
 3. Geste et barre du HUD ; se déplacer interrompt.
-4. Fin : durée et distance revérifiées, outil et combustible, piles relues et **consommées par instance** au palier
-   choisi, qualité tirée, objet signé (`quality`, `tier`, `durability`, `max_durability`, `crafter_id`,
-   `crafter_name`, `mark`, `crafted_at`, `history`) ou produit simple (`tier`), **échange atomique**, combustible,
-   XP, leçons, baptême proposé pour un chef-d'œuvre, journal, hook `crafted`.
+4. Fin : durée et distance revérifiées (trop loin : la pièce est abandonnée, rien n'est consommé, la station est
+   libérée aussitôt), outil et combustible, piles relues et **consommées par instance** au palier choisi, qualité
+   tirée, objet signé (`quality`, `tier`, `durability`, `max_durability`, `crafter_id`, `crafter_name`, `mark`,
+   `crafted_at`, `history`) ou produit simple (`tier`), **échange atomique**, combustible, XP, leçons, baptême proposé
+   pour un chef-d'œuvre, journal, hook `crafted`.
 
 ### Réparation
 
 Depuis le menu, sur un objet signé usé ou brisé dont la recette est servie par la station : une part des ingrédients,
 la solidité revient à une maximale réduite de 5, l'histoire garde « réparation par … », `broken` disparaît ; le
-créateur n'est jamais touché.
+créateur n'est jamais touché. Finir trop loin abandonne la réparation (rien n'est consommé) et libère la station.
 
 ## Base de données (sql/0001_crafting.sql)
 

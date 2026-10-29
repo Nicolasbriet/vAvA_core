@@ -143,7 +143,11 @@ end
 ---@return table|string result
 function repair.finish(session)
     local src, def, recipe = session.source, session.station, session.recipe
-    if not stations.near(src, def) then return false, 'too_far' end
+    -- trop loin à la fin : la réparation est abandonnée (rien n'est encore consommé), la station libérée aussitôt
+    if not stations.near(src, def) then
+        crafting.release(src)
+        return false, 'too_far'
+    end
     local instance
     for _, candidate in ipairs(bridge.Items(src)) do
         if candidate.id == session.instanceId then instance = candidate end

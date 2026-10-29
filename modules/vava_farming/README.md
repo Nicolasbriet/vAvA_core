@@ -21,12 +21,12 @@ Ordre de démarrage : après `vAvA_core` (≥ 0.6.0), `vava_inventory` (≥ 1.4.
 | Qualité | graine × 0,35 + compétence × 0,35 + régularité × 0,15 + fertilité × 0,15 ± 5 → paliers 20 / 40 / 60 / 85 ; provenance = nom de la parcelle | `quality` |
 | Régularité | 100 − 100 × heures de sécheresse ÷ durée de croissance | — |
 | Graines | chance 30 % + 0,5 %/niveau (≤ 90 %), 1 à 2 graines au palier de la récolte | `seeds` |
-| Gestes | semer 3 s, arroser 2,5 s, fertiliser 2,5 s, récolter 4,5 s (× 0,6 avec une faucille en main), arracher 3 s ; XP du semis = 25 % de celle de la culture | `actions`, `quality.plantXpShare` |
+| Gestes | semer 3 s, arroser 2,5 s, fertiliser 2,5 s, récolter 4,5 s (× 0,6 avec une faucille en main), arracher 3 s ; XP du semis = 25 % de celle de la culture ; finir trop loin abandonne le geste (rien n'est consommé) | `actions`, `quality.plantXpShare` |
 | Seau | 5 charges, rempli aux puits ; tenu en main | `bucket`, `wells` |
 | Déchets | une plante flétrie ou morte arrachée rend 1 à 2 déchets végétaux | `compost.waste` |
 | Composteur | type de station + recette (3 déchets → 1 compost, Agriculture) ajoutés à `vava_crafting`, station placée par `addStation` | `composter` |
 | Cultures de départ | blé 90 min, carotte 30, chou 45, lin 60 (durées d'essai) | `crops` |
-| Journal | plantations, récoltes Excellent+, arrachages, Conseil ; grenier ; 90 jours | `logTier`, `logRetentionDays` |
+| Journal | plantations, récoltes Excellent+, arrachages, Conseil ; grenier (une ligne par minute, personnage, objet et sens) ; 90 jours | `logTier`, `logRetentionDays`, `persistence.granaryLogMax` |
 
 ### Parcelles et emplacements
 
@@ -44,13 +44,20 @@ Un conteneur conservé de l'inventaire (`kind = 'granary'`) par parcelle qui en 
 ouvert au joueur qui a accès à la parcelle (communale : tous ; privée : son propriétaire, ou le genre branché par
 `registerAccess`) et se tient à portée du grenier, avec un **ancrage** : l'inventaire revérifie la distance à chaque
 geste et ferme le grenier chez qui s'éloigne. Les dépôts et retraits (déplacer, diviser, fusionner, jeter) sont
-journalés dans `vava_farming_granary_log` et publiés par le hook `vava_farming:granary`. La récolte d'une parcelle
-communale va dans la besace du récolteur, qui la dépose au grenier.
+publiés geste par geste par le hook `vava_farming:granary` et journalés dans `vava_farming_granary_log`, **regroupés
+par minute** : une ligne par minute, grenier, personnage, objet et sens (`deposit` | `withdraw`), quantités
+additionnées, `at` = début de la minute. Ces lignes attendent en mémoire (au plus `persistence.granaryLogMax` ; pleine,
+l'attente s'écrit aussitôt, et ce qui n'y tient plus pendant une panne de la base est perdu et signalé) et partent avec
+l'écriture groupée et à l'arrêt ; une même minute écrite en plusieurs fois reste une seule ligne. Les lignes écrites
+avant la migration 0002 (une par geste, `minute` nul) restent telles quelles. La récolte d'une parcelle communale va
+dans la besace du récolteur, qui la dépose au grenier.
 
-## Base de données (sql/0001_farming.sql)
+## Base de données (sql/0001_farming.sql, 0002_granary_log_minute.sql)
 
-`vava_farming_slots`, `vava_farming_granaries`, `vava_farming_granary_log`, `vava_farming_log`. Écriture groupée toutes
-les 10 s et à l'arrêt.
+`vava_farming_slots`, `vava_farming_granaries`, `vava_farming_granary_log` (colonne `minute` et clé unique minute,
+grenier, personnage, objet, sens depuis 0002), `vava_farming_log`. Écriture groupée toutes les 10 s et à l'arrêt ; un
+emplacement qui vient de donner ou de consommer des objets (semis, récolte, compost, arrachage) est écrit **aussitôt**,
+pour qu'un crash ne le rende pas tel qu'avant (récolte rejouée), une seule écriture à la fois par emplacement.
 
 ## API
 
@@ -81,7 +88,7 @@ withdraw, source, characterId, item, quantity }`). Détail : `docs/api.md`.
 6. **Compost** : 3 déchets au composteur du champ (station de l'artisanat ajoutée par ce module) → compost ;
    Fertiliser + 25.
 7. **Grenier** : `E` près du grenier → l'inventaire s'ouvre sur le conteneur ; déposer, s'éloigner → il se ferme ;
-   `vava_farming_granary_log` garde dépôts et retraits.
+   `vava_farming_granary_log` garde dépôts et retraits, une ligne par minute, personnage, objet et sens.
 8. **Privé** : le jardin de la config appartient au personnage n° 1 ; un autre lit « ne vous appartient pas » (sur ses
    emplacements comme sur son grenier s'il en déclare un).
 9. **Redémarrage** : `restart vava_farming` → emplacements retrouvés, croissance rattrapée d'après les dates.

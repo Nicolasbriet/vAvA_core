@@ -3,15 +3,16 @@
     Rôle : état des emplacements, tenu par le serveur : chargé au démarrage, avancé à la demande par les règles pures de
            shared/growth.lua (aucune boucle de croissance), publié aux clients par un state bag par parcelle (culture,
            stade, état de chaque emplacement) écrit au seul changement et relu toutes les 10 s pour que les plantes
-           poussent sous les yeux, écrit par lots. Accès aux parcelles privées par genre de propriétaire (personnage ;
-           d'autres se branchent par registerAccess).
+           poussent sous les yeux, écrit par lots — et aussitôt, emplacement par emplacement, après un geste qui donne
+           ou consomme des objets. Accès aux parcelles privées par genre de propriétaire (personnage ; d'autres se
+           branchent par registerAccess).
     Dépendances : shared/, config.lua, server/core.lua, bridge/server.lua, server/catalog.lua
 ]]
 
-local pairs, ipairs = pairs, ipairs
+local pairs, ipairs, tostring = pairs, ipairs, tostring
 local floor, min, max = math.floor, math.min, math.max
 local time = os.time
-local GlobalState = GlobalState
+local GlobalState, CreateThread = GlobalState, CreateThread
 
 local bridge = VavaFarming.bridge
 local catalog = VavaFarming.catalog
@@ -30,7 +31,8 @@ local slots = {}
 VavaFarming.slots = slots
 
 -- parcelle → index → état (voir vAvA.SlotState dans shared/growth.lua) + dirty (true : à écrire ; WRITING : écriture
--- en cours, qu'une modification pendant l'attente remplace par true)
+-- en cours, qu'une modification pendant l'attente remplace par true), inflight (une écriture en route), urgent (écrire
+-- aussitôt quand elle se termine)
 local states = {}
 local WRITING = 'writing'
 -- `waterings` est un SMALLINT UNSIGNED : une plante mûre arrosée sans fin ne doit pas faire échouer toute l'écriture
@@ -224,29 +226,100 @@ function slots.ripen(slot, crop)
     slot.growth, slot.wilted, slot.dead, slot.dirty = crop.growMinutes * 60, false, false, true
 end
 
+-- Écriture --------------------------------------------------------------------------------------------------------------
+-- Deux chemins : l'écriture groupée (toutes les flushMs : humidité, croissance, arrosage…) et l'écriture immédiate d'un
+-- emplacement qui vient de donner ou de consommer des objets (semis, récolte, compost, arrachage), pour qu'un crash
+-- avant l'écriture groupée ne le rende pas tel qu'avant (récolte rejouée). Une seule écriture à la fois par emplacement
+-- (`inflight`) : la base garde toujours la dernière ; une écriture immédiate demandée pendant une autre (`urgent`) part
+-- dès que celle-ci se termine.
+
+---@param parcelId string
+---@param index integer
+---@param slot table
+---@return table values
+local function valuesOf(parcelId, index, slot)
+    return {
+        parcelId, index, slot.crop, slot.seedTier, slot.plantedAt, slot.growth, floor(slot.moisture * 100 + 0.5) / 100,
+        floor(slot.fertility * 100 + 0.5) / 100, slot.drySince, floor(slot.dryHours * 1000 + 0.5) / 1000, min(slot.waterings, MAX_WATERINGS),
+        slot.wilted and 1 or 0, slot.dead and 1 or 0, slot.lastFamily, slot.updatedAt,
+    }
+end
+
+local writeNow
+
+--- Fin d'une écriture d'un emplacement : réussie, il est propre s'il est resté tel qu'écrit ; en échec, il reste à
+--- écrire (l'écriture groupée le reprend). Une écriture immédiate demandée pendant l'attente part maintenant.
+---@param parcelId string
+---@param index integer
+---@param slot table
+---@param ok boolean
+local function written(parcelId, index, slot, ok)
+    slot.inflight = nil
+    if ok and slot.dirty == WRITING then slot.dirty = false end
+    local urgent = slot.urgent
+    slot.urgent = nil
+    if urgent and slot.dirty then writeNow(parcelId, index, slot) end
+end
+
+--- Écrit un emplacement tout de suite, dans son propre thread (l'appelant ne cède jamais la main). Valeurs relevées
+--- avant le départ : une modification pendant l'attente le remarque à écrire.
+---@param parcelId string
+---@param index integer
+---@param slot table
+writeNow = function(parcelId, index, slot)
+    slot.dirty, slot.inflight, slot.urgent = WRITING, true, nil
+    local values = valuesOf(parcelId, index, slot)
+    CreateThread(function()
+        local _, err = bridge.db.update(UPSERT_SQL, values)
+        if err then
+            VavaFarming.log.warn("emplacement %s n° %d non écrit aussitôt (repris par l'écriture groupée) : %s", parcelId, index, tostring(err))
+        end
+        written(parcelId, index, slot, err == nil)
+    end)
+end
+
+--- L'emplacement vient de donner ou de consommer des objets : il est écrit aussitôt (ou dès que l'écriture déjà en
+--- route se termine).
+---@param parcel vAvA.ParcelDefinition
+---@param index integer
+function slots.writeNow(parcel, index)
+    local list = states[parcel.id]
+    local slot = list and list[index]
+    if not slot then return end
+    if slot.inflight then
+        slot.urgent = true
+        return
+    end
+    writeNow(parcel.id, index, slot)
+end
+
 --- Requêtes des emplacements à écrire, marqués « en cours d'écriture » : l'écriture cède la main, et un geste joué
---- pendant l'attente (récolte, semis…) les marque de nouveau à écrire au lieu d'être effacé par `markClean`.
+--- pendant l'attente les marque de nouveau à écrire au lieu d'être effacé. Un emplacement dont une écriture est déjà
+--- en route attend le passage suivant. Renvoie le lot, à rendre à `markClean` (réussite) ou `markFailed` (échec).
 ---@param queries table[]
+---@return table[] batch
 function slots.collect(queries)
+    local batch = {}
     for parcelId, list in pairs(states) do
         for index, slot in ipairs(list) do
-            if slot.dirty then
-                slot.dirty = WRITING
-                queries[#queries + 1] = { query = UPSERT_SQL, values = {
-                    parcelId, index, slot.crop, slot.seedTier, slot.plantedAt, slot.growth, floor(slot.moisture * 100 + 0.5) / 100,
-                    floor(slot.fertility * 100 + 0.5) / 100, slot.drySince, floor(slot.dryHours * 1000 + 0.5) / 1000, min(slot.waterings, MAX_WATERINGS),
-                    slot.wilted and 1 or 0, slot.dead and 1 or 0, slot.lastFamily, slot.updatedAt,
-                } }
+            if slot.dirty and not slot.inflight then
+                slot.dirty, slot.inflight = WRITING, true
+                batch[#batch + 1] = { parcelId, index, slot }
+                queries[#queries + 1] = { query = UPSERT_SQL, values = valuesOf(parcelId, index, slot) }
             end
         end
     end
+    return batch
 end
 
---- Écriture réussie : seuls les emplacements restés tels qu'écrits sont propres (en échec, ils restent à écrire).
-function slots.markClean()
-    for _, list in pairs(states) do
-        for _, slot in ipairs(list) do
-            if slot.dirty == WRITING then slot.dirty = false end
-        end
-    end
+--- Écriture groupée réussie : seuls les emplacements restés tels qu'écrits sont propres.
+---@param batch table[]|nil
+function slots.markClean(batch)
+    for _, entry in ipairs(batch or {}) do written(entry[1], entry[2], entry[3], true) end
+end
+
+--- Écriture groupée en échec : les emplacements restent à écrire.
+---@param batch table[]|nil
+function slots.markFailed(batch)
+    for _, entry in ipairs(batch or {}) do written(entry[1], entry[2], entry[3], false) end
 end

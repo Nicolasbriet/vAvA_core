@@ -2,9 +2,10 @@
     vava_farming/server/actions.lua
     Rôle : les gestes du cultivateur décidés par le serveur : menu d'un emplacement ; début d'un geste (parcelle et
            emplacement à portée, accès, geste possible dans l'état présent, graines au palier choisi, seau en main avec
-           des charges, compost, plante mûre, place ; hook annulable ; jeton, durée) ; fin du geste (durée et distance
-           revérifiées, puis application : semis, arrosage, compost, récolte avec qualité, provenance, graines
-           récupérées et XP, arrachage avec déchets) ; remplissage du seau au puits. Une seule action à la fois par
+           des charges, compost, plante mûre, place ; hook annulable ; jeton, durée) ; fin du geste (durée revérifiée,
+           distance — trop loin, le geste est abandonné —, puis application : semis, arrosage, compost, récolte avec
+           qualité, provenance, graines récupérées et XP, arrachage avec déchets ; l'emplacement d'un geste qui donne ou
+           consomme des objets est écrit aussitôt) ; remplissage du seau au puits. Une seule action à la fois par
            joueur.
     Dépendances : shared/, config.lua, server/core.lua, bridge/server.lua, server/journal.lua, server/catalog.lua,
                   server/slots.lua
@@ -357,8 +358,9 @@ function actions.finish(src, token)
     if not session or session.token ~= token then return false, 'not_found' end
     if GetGameTimer() - session.startedAt < session.durationMs - interact.finishToleranceMs then return false, 'too_soon' end
     local parcel, index, action = session.parcel, session.index, session.action
-    if not nearSlot(src, parcel, index) then return false, 'too_far' end
+    -- la session tombe dans tous les cas : trop loin, le geste est abandonné (rien n'est encore consommé)
     sessions[src] = nil
+    if not nearSlot(src, parcel, index) then return false, 'too_far' end
     local now = time()
     local slot = slots.get(parcel, index)
     local planted = slot.crop and catalog.crop(slot.crop) or nil
@@ -373,6 +375,7 @@ function actions.finish(src, token)
         end
         if not bridge.Exchange(src, { removal }, {}) then return false, 'missing_items' end
         slots.plant(slot, crop, session.tier, now)
+        slots.writeNow(parcel, index)
         bridge.AddXp(src, { skill = 'agriculture', source = crop.id .. ':plant', difficulty = crop.difficulty, amount = max(1, floor(crop.xp * cfg.quality.plantXpShare)) })
         journal.write('planted', { parcel = parcel.id, slot = index, characterId = session.characterId, item = crop.seed, details = { tier = session.tier } })
         bridge.Notify(src, format(messages.planted, crop.label), 'info')
@@ -392,6 +395,7 @@ function actions.finish(src, token)
             return false, 'missing_items'
         end
         slots.fertilize(slot)
+        slots.writeNow(parcel, index)
         bridge.Notify(src, format(messages.fertilized, floor(slot.fertility + 0.5)), 'info')
         return true, { action = action, slot = settle(src, parcel, index) }
     elseif action == ACTIONS.HARVEST then
@@ -415,6 +419,7 @@ function actions.finish(src, token)
             if not bridge.Add(src, planted.seed, seedsBack, { tier = tier }) then seedsBack = 0 end
         end
         slots.harvest(slot, planted, now)
+        slots.writeNow(parcel, index)
         bridge.AddXp(src, { skill = 'agriculture', source = planted.id, difficulty = planted.difficulty, amount = planted.xp })
         local productLabel = catalog.itemLabel(planted.product)
         bridge.Notify(src, format(messages.harvested, planted.label, quantity, productLabel, tierLabel(tier)), 'info')
@@ -435,6 +440,7 @@ function actions.finish(src, token)
             if not bridge.Add(src, cfg.compost.waste.item, waste) then waste = 0 end
         end
         slots.clear(slot, now)
+        slots.writeNow(parcel, index)
         journal.write('cleared', { parcel = parcel.id, slot = index, characterId = session.characterId, item = planted.id, details = { waste = waste } })
         bridge.Notify(src, waste > 0 and format(messages.clearedWaste, waste) or messages.cleared, 'info')
         return true, { action = action, slot = settle(src, parcel, index), item = waste > 0 and cfg.compost.waste.item or nil, quantity = waste > 0 and waste or nil }

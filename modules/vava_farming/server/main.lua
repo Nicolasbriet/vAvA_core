@@ -2,7 +2,8 @@
     vava_farming/server/main.lua
     Rôle : déclaration du module auprès du core : catalogue (registre des cultures, objets, composteur), journal, état
            des emplacements, greniers, intentions du client (RPC à schéma strict et débit limité), joueurs partis,
-           boucle lente d'écriture et de republication (les plantes poussent), commande du Conseil.
+           boucle lente d'écriture (emplacements, journal du grenier ; aussi à l'arrêt) et de republication (les plantes
+           poussent), commande du Conseil.
     Dépendances : tous les fichiers server/ du module
 ]]
 
@@ -31,18 +32,23 @@ local CROP = { type = 'string', max = 32, pattern = '^[%l%d_]*$' }   -- '' quand
 local TIER = { type = 'integer', min = 0, max = VavaFarming.MAX_TIER }
 local TOKEN = { type = 'integer', min = 1, max = VavaFarming.MAX_TOKEN }
 
---- Écrit l'état modifié et republie ce qui a changé avec le temps. Bloque le thread courant.
+--- Écrit l'état modifié et le journal du grenier en attente, en une seule transaction (à l'arrêt, FiveM ne reprend pas
+--- un thread qui attend : seule la première requête lancée part), et republie ce qui a changé avec le temps. Bloque le
+--- thread courant.
 local function flush()
     slots.tick()
     local queries = {}
-    slots.collect(queries)
+    local batch = slots.collect(queries)
+    local logBatch = journal.collectGranary(queries)
     if #queries == 0 then return end
     local ok, err = bridge.db.transaction(queries)
-    if not ok then
-        VavaFarming.log.error('écriture des emplacements en échec (%d requête(s)), nouvel essai au prochain passage : %s', #queries, tostring(err))
-        return
+    if ok then
+        slots.markClean(batch)
+    else
+        slots.markFailed(batch)
+        VavaFarming.log.error('écriture des emplacements et du journal du grenier en échec (%d requête(s)), nouvel essai au prochain passage : %s', #queries, tostring(err))
     end
-    slots.markClean()
+    journal.granaryWritten(logBatch, ok == true)
 end
 
 local function setup()

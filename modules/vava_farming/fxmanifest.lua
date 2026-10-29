@@ -18,7 +18,7 @@ use_experimental_fxv2_oal 'yes'
 
 name 'vava_farming'
 description 'Agriculture vAvA : parcelles, croissance par dates, humidité et fertilité, qualité, grenier commun'
-version '1.1.2'
+version '1.2.0'
 
 dependency 'vAvA_core'
 dependency 'vava_inventory'
@@ -27,6 +27,7 @@ dependency 'vava_gathering'
 dependency 'vava_crafting'
 
 vava_migration 'sql/0001_farming.sql'
+vava_migration 'sql/0002_granary_log_minute.sql'
 
 ui_page 'web/index.html'
 
