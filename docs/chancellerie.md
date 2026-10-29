@@ -144,6 +144,11 @@ La page **Performances** trace une courbe par mesure, sur la dernière heure (ch
 tableau. Sous Windows, un seul PowerShell reste ouvert à côté de la Chancellerie pour lire le processus et le réseau
 (il se ferme avec elle) ; sous Linux, tout se lit dans `/proc`.
 
+**Joueurs** : FXServer ne donne les vrais joueurs de `players.json` (nom, numéro, latence) qu'à qui présente son jeton
+`sv_playersToken` ; sans lui, chacun s'appelle « Player », numéro 0, latence 0. La Chancellerie tire un jeton à chaque
+lancement et le passe à FXServer sur la ligne de commande (jamais dans le `server.cfg`, masqué dans la console). Si le
+`server.cfg` fixe son propre `sv_playersToken`, c'est lui qu'elle utilise.
+
 FiveM ne mesure pas côté serveur la consommation de chaque ressource : pour la trouver, la commande `profiler`
 de la console de FXServer reste l'outil (`profiler record 500` puis `profiler view`).
 

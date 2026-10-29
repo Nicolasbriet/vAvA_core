@@ -98,7 +98,7 @@ function parseMysql(value) {
  */
 function parse(text) {
   const values = JSON.parse(JSON.stringify(DEFAULTS));
-  const secrets = { licenseKey: '', dbPassword: '' };
+  const secrets = { licenseKey: '', dbPassword: '', playersToken: '' };
   const extra = [];
   let endpointSeen = false;
   for (const raw of String(text).split(/\r?\n/)) {
@@ -137,6 +137,11 @@ function parse(text) {
       case 'ensure':
       case 'start':
         if (cmd.parts[1] && !values.resources.includes(cmd.parts[1])) values.resources.push(cmd.parts[1]);
+        break;
+      // jeton de players.json posé à la main : la ligne reste telle quelle, la Chancellerie s'en sert pour lire les joueurs
+      case 'sv_playerstoken':
+        secrets.playersToken = cmd.value;
+        extra.push(raw);
         break;
       default:
         extra.push(raw);
@@ -262,7 +267,7 @@ function write(file, text) {
 }
 
 function read(file) {
-  if (!file || !fs.existsSync(file)) return { values: JSON.parse(JSON.stringify(DEFAULTS)), secrets: { licenseKey: '', dbPassword: '' }, exists: false };
+  if (!file || !fs.existsSync(file)) return { values: JSON.parse(JSON.stringify(DEFAULTS)), secrets: { licenseKey: '', dbPassword: '', playersToken: '' }, exists: false };
   return { ...parse(fs.readFileSync(file, 'utf8')), exists: true };
 }
 

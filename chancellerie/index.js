@@ -15,6 +15,7 @@ const bridge = require('./lib/bridge');
 const events = require('./lib/events');
 const journal = require('./lib/journal');
 const pin = require('./lib/pin');
+const status = require('./lib/status');
 const { createServer } = require('./lib/http');
 const { createRouter } = require('./lib/routes');
 const { ServerProcess } = require('./lib/process');
@@ -84,8 +85,11 @@ async function main() {
     return;
   }
   config.ensureData();
-  // la clé du pont part avec FXServer à chaque lancement, et reste masquée dans sa console
-  const server = new ServerProcess({ launchArgs: bridge.launchArgs, secrets: bridge.secrets });
+  // la clé du pont et le jeton de players.json partent avec FXServer à chaque lancement, et restent masqués dans sa console
+  const server = new ServerProcess({
+    launchArgs: () => [...bridge.launchArgs(), ...status.launchArgs()],
+    secrets: () => [...bridge.secrets(), ...status.secrets()],
+  });
   events.attach(server);
   if (await server.cleanupOrphan()) say(`${colors.dim}  Un FXServer resté ouvert après un arrêt brutal a été arrêté.${colors.reset}`);
 
