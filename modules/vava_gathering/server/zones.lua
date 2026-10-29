@@ -4,8 +4,9 @@
            heure, ralentie pendant une cicatrice), consommée par chaque récolte réussie, bandes (plein, réduit, épuisée),
            cicatrice à 0, épuisements répétés (réaction de la terre). État publié aux clients par un state bag global
            (bande, cicatrice, vitalité entière), écrit au seul changement ; relu et republié au passage de la boucle
-           lente d'écriture pour que les props reviennent quand la zone se remet. Hooks `vava_gathering:zoneDepleted`,
-           `zoneScarred`, `earthReaction` (after).
+           lente d'écriture pour que les props reviennent quand la zone se remet ; écriture groupée sans perte (un
+           changement pendant l'écriture reste à écrire). Hooks `vava_gathering:zoneDepleted`, `zoneScarred`,
+           `earthReaction` (after).
     Dépendances : shared/constants.lua, config.lua, server/core.lua, bridge/server.lua, server/journal.lua,
                   server/catalog.lua
 ]]
@@ -45,10 +46,11 @@ VavaGathering.zones = zones
 ---@field depletions integer
 ---@field lastDepletionAt integer|nil
 ---@field published { band: string, scarred: boolean, vitality: integer }|nil
----@field dirty boolean
+---@field dirty boolean|'writing'  true : à écrire ; WRITING : écriture en cours (un changement pendant l'attente → true)
 
 ---@type table<string, vAvA.ZoneState>
 local states = {}
+local WRITING = 'writing'
 
 ---@param now integer
 ---@return vAvA.ZoneState
@@ -209,10 +211,13 @@ function zones.tick()
     end
 end
 
+--- Requêtes des zones à écrire, marquées « en cours d'écriture » : l'écriture cède la main, et une récolte pendant
+--- l'attente les marque de nouveau à écrire au lieu d'être effacée par `markClean`.
 ---@param queries table[]
 function zones.collect(queries)
     for id, state in pairs(states) do
         if state.dirty then
+            state.dirty = WRITING
             queries[#queries + 1] = { query = UPSERT_SQL, values = {
                 id, floor(state.vitality * 100 + 0.5) / 100, state.updatedAt, state.scarredUntil, state.depletions, state.lastDepletionAt,
             } }
@@ -220,6 +225,9 @@ function zones.collect(queries)
     end
 end
 
+--- Écriture réussie : seules les zones restées telles qu'écrites sont propres (en échec, elles restent à écrire).
 function zones.markClean()
-    for _, state in pairs(states) do state.dirty = false end
+    for _, state in pairs(states) do
+        if state.dirty == WRITING then state.dirty = false end
+    end
 end

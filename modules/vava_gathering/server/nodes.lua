@@ -1,8 +1,9 @@
 --[[
     vava_gathering/server/nodes.lua
     Rôle : charges des nœuds, tenues par le serveur : recalculées à la demande depuis `updatedAt` (une charge rendue
-           toutes les `regenMs`, le reste du délai conservé), consommées par chaque récolte réussie, publiées aux
-           clients par un state bag global (entier), écrit au seul changement.
+           toutes les `regenMs`, le reste du délai conservé), prises par une récolte avant toute attente et rendues si
+           elle n'aboutit pas, publiées aux clients par un state bag global (entier), écrit au seul changement.
+           Écriture groupée sans perte : un changement pendant l'écriture reste à écrire.
     Dépendances : shared/constants.lua, config.lua, server/core.lua, bridge/server.lua, server/catalog.lua
 ]]
 
@@ -26,10 +27,11 @@ VavaGathering.nodes = nodes
 ---@field charges integer
 ---@field updatedAt integer   début du délai de la prochaine charge (plein : maintenant)
 ---@field published integer|nil
----@field dirty boolean
+---@field dirty boolean|'writing'  true : à écrire ; WRITING : écriture en cours (un changement pendant l'attente → true)
 
 ---@type table<string, vAvA.NodeState>
 local states = {}
+local WRITING = 'writing'
 
 --- Charge l'état de tous les nœuds de la config (plein pour un nœud jamais vu). Bloque le thread courant.
 ---@return boolean ok
@@ -104,6 +106,21 @@ function nodes.consume(def)
     return true
 end
 
+--- Rend une charge prise par une récolte qui n'a pas abouti (besace pleine), sans dépasser le maximum.
+---@param def vAvA.NodeDefinition
+function nodes.restore(def)
+    local state = states[def.id]
+    if not state then return end
+    local now = time()
+    nodes.refresh(def, state, now)
+    if state.charges >= def.charges then return end
+    state.charges = state.charges + 1
+    -- de nouveau plein : le délai de la prochaine charge partira de la prochaine consommation
+    if state.charges >= def.charges then state.updatedAt = now end
+    state.dirty = true
+    nodes.publish(def, state)
+end
+
 --- Remet un nœud à plein (Conseil).
 ---@param def vAvA.NodeDefinition
 function nodes.recharge(def)
@@ -130,16 +147,22 @@ function nodes.tick()
     end
 end
 
+--- Requêtes des nœuds à écrire, marqués « en cours d'écriture » : l'écriture cède la main, et une récolte pendant
+--- l'attente les marque de nouveau à écrire au lieu d'être effacée par `markClean`.
 ---@param queries table[]
 function nodes.collect(queries)
     for id, state in pairs(states) do
         if state.dirty then
+            state.dirty = WRITING
             local def = catalog.node(id)
             queries[#queries + 1] = { query = UPSERT_SQL, values = { id, def.zone.id, state.charges, state.updatedAt } }
         end
     end
 end
 
+--- Écriture réussie : seuls les nœuds restés tels qu'écrits sont propres (en échec, ils restent à écrire).
 function nodes.markClean()
-    for _, state in pairs(states) do state.dirty = false end
+    for _, state in pairs(states) do
+        if state.dirty == WRITING then state.dirty = false end
+    end
 end

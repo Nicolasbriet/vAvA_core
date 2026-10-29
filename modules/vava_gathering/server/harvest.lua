@@ -2,10 +2,10 @@
     vava_gathering/server/harvest.lua
     Rôle : la récolte décidée par le serveur. Début : personnage, nœud, distance (lue côté serveur), charges, outil
            en main du bon genre et non brisé, place dans la besace, cooldown, hook annulable ; une seule récolte à la
-           fois par joueur, jeton par geste, oubliée si jamais finie. Fin : durée et distance revérifiées, outil toujours
-           en main et usé, échec selon la bande, rendement, palier et provenance sur la pile, charge et vitalité
-           consommées, XP demandée à vava_skills, pièce supplémentaire (peau), hooks. La pêche partage la fin
-           (fishing.lua).
+           fois par joueur, jeton par geste, oubliée si jamais finie. Fin : jeton consommé, durée et distance
+           revérifiées, outil toujours en main et usé, échec selon la bande, charge prise avant toute attente (rendue si
+           la besace refuse), rendement, palier et provenance sur la pile, vitalité consommée, XP demandée à
+           vava_skills, pièce supplémentaire (peau), hooks. La pêche partage la fin (fishing.lua).
     Dépendances : shared/, config.lua, server/core.lua, bridge/server.lua, server/catalog.lua, server/zones.lua,
                   server/nodes.lua, server/quality.lua ; server/fishing.lua (lié à l'exécution)
 ]]
@@ -210,11 +210,18 @@ function harvest.succeed(session)
     zones.refresh(zone, state)
     local band = zones.band(state)
     local effects = zones.effects(state)
-    -- cooldown posé avant l'usure (le hook des métadonnées peut céder la main) ; l'outil s'use même quand la terre se
-    -- refuse
+    -- cooldown posé avant l'usure (le hook des métadonnées peut céder la main)
     lastFinish[src] = GetGameTimer()
+    -- la charge est prise avant le premier appel qui peut céder la main (usure, ajout, XP) : de deux joueurs qui
+    -- finissent le même dernier coup, un seul est servi ; une terre qui se refuse n'en prend aucune
+    local failed = quality.failed(effects)
+    if not failed and not nodes.consume(node) then
+        bridge.Notify(src, messages.noCharges, 'info')
+        return false, 'no_charges'
+    end
+    -- l'outil s'use même quand la terre se refuse
     if held then wear(session, held) end
-    if quality.failed(effects) then
+    if failed then
         bridge.Notify(src, messages.failed, 'warning')
         return false, 'failed'
     end
@@ -226,10 +233,11 @@ function harvest.succeed(session)
     if cfg.quality.origin then metadata.origin = zone.label end
     local ok = bridge.Add(src, resource.item, amount, metadata)
     if not ok then
+        -- besace pleine : la charge prise est rendue
+        nodes.restore(node)
         bridge.Notify(src, messages.noSpace, 'warning')
         return false, 'no_space'
     end
-    nodes.consume(node)
     zones.consume(zone, zone.cost, src)
     local extra
     if resource.extra and random() < resource.extra.chance then

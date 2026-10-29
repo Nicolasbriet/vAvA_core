@@ -1007,7 +1007,7 @@ icônes sont des masques CSS, refusés depuis `file://`).
 
 ### `vava_skills`
 
-Les compétences du royaume (1.1.1), fondation des métiers : treize compétences de 0 à 100 (Récolte : Bûcheronnage,
+Les compétences du royaume (1.1.2), fondation des métiers : treize compétences de 0 à 100 (Récolte : Bûcheronnage,
 Minage, Herboristerie, Pêche, Chasse · Terre : Agriculture · Transformation : Forge, Menuiserie, Tissage et couture,
 Tannerie, Alchimie, Cuisine · Savoir : Arcanes) et six rangs (Novice, Apprenti 20, Compagnon 40, Artisan 60, Maître 80,
 Grand Maître 95). Tout est en `config.lua` ; le détail des règles et la liste des tests en jeu sont dans
@@ -1090,7 +1090,7 @@ fondateur ; `/metiers niveau <joueur> <compétence> <niveau>`, `/metiers recette
 
 ### `vava_gathering`
 
-La récolte (1.2.1) : zones à **vitalité** 0–100 (plein rendement au-dessus de 60, réduit entre 60 et 25 avec chance
+La récolte (1.2.2) : zones à **vitalité** 0–100 (plein rendement au-dessus de 60, réduit entre 60 et 25 avec chance
 d'échec, **épuisée** sous 25 avec props remplacés et rendement effondré, **cicatrice** à 0 : régénération × 0,2 pendant
 la durée de la zone), nœuds à charges (arbres, filons, buissons, bancs de poissons, pistes de gibier) qui se
 régénèrent par le temps (recalcul à la demande, aucune boucle), outils **en main** (`vava_inventory:held`) du genre

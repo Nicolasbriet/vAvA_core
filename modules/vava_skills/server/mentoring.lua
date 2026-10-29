@@ -4,8 +4,9 @@
            l'apprenti accepte dans le délai ; chacun peut rompre. L'apprenti gagne un bonus d'XP quand il pratique près
            de son maître qui a lui-même pratiqué récemment ; le maître en tire de la Renommée (part de l'XP, plafond
            journalier, rendement décroissant sur un même apprenti). Les propositions vivent en mémoire et expirent ;
-           les mentorats sont écrits aussitôt (début, fin) et leurs compteurs par lots avec les fiches. Hook
-           `vava_skills:mentorship` (after : started | ended) ; évènements et notifications aux deux parties.
+           les mentorats sont écrits aussitôt (début, fin) et leurs compteurs par lots avec les fiches (un changement
+           pendant l'écriture reste à écrire). Hook `vava_skills:mentorship` (after : started | ended) ; évènements et
+           notifications aux deux parties.
     Dépendances : shared/, config.lua, server/core.lua, bridge/server.lua, server/journal.lua, server/registries.lua,
                   server/sheets.lua
 ]]
@@ -47,9 +48,11 @@ VavaSkills.mentoring = mentoring
 ---@type table<integer, vAvA.MentorProposal>
 local proposals = {}
 local lastProposalId = 0
--- mentorats dont les compteurs ont changé depuis la dernière écriture
+-- mentorats dont les compteurs ont changé depuis la dernière écriture ; leur champ `dirty` vaut true (à écrire) ou
+-- WRITING (écriture en cours, qu'un gain pendant l'attente remplace par true)
 ---@type table<integer, vAvA.Mentorship>
 local dirty = {}
+local WRITING = 'writing'
 -- acceptations en cours d'écriture (la base fait attendre) : leurs places sont tenues jusqu'au rattachement, pour que
 -- deux réponses simultanées ne dépassent ni le nombre d'apprentis d'un maître ni le maître unique d'un apprenti.
 -- 'master:<personnage>:<compétence>' → nombre ; 'apprentice:<personnage>:<compétence>' → 1
@@ -116,6 +119,7 @@ end
 ---@param gained integer
 function mentoring.onApprenticeXp(mentorship, master, skill, gained)
     mentorship.xpGranted = mentorship.xpGranted + gained
+    mentorship.dirty = true
     dirty[mentorship.id] = mentorship
     local renown = cfg.renown
     local entry = sheets.entry(master, skill, true)
@@ -382,13 +386,22 @@ end
 
 -- Persistance des compteurs (avec les fiches) --------------------------------------------------------------------
 
+--- Requêtes des compteurs à écrire, marqués « en cours d'écriture » : l'écriture cède la main, et un gain de
+--- l'apprenti pendant l'attente les marque de nouveau à écrire au lieu d'être effacé par `markClean`.
 ---@param queries table[]
 function mentoring.collectQueries(queries)
     for _, mentorship in pairs(dirty) do
+        mentorship.dirty = WRITING
         queries[#queries + 1] = { query = COUNTERS_SQL, values = { mentorship.xpGranted, mentorship.renownGranted, mentorship.id } }
     end
 end
 
+--- Écriture réussie : seuls les compteurs restés tels qu'écrits sont propres (en échec, ils restent à écrire).
 function mentoring.markClean()
-    dirty = {}
+    for id, mentorship in pairs(dirty) do
+        if mentorship.dirty == WRITING then
+            mentorship.dirty = false
+            dirty[id] = nil
+        end
+    end
 end

@@ -3,8 +3,8 @@
     Rôle : fiches de compétences des personnages en jeu, source de vérité pendant la partie : niveaux, XP, modes,
            Renommée, dernière pratique ; recettes transmises connues ; leçons en cours ; mentorats en cours (comme maître
            et comme apprenti). Chargées à l'arrivée du personnage (avant l'apparition), écrites par lots toutes les
-           `persistence.flushMs` si elles ont changé, et aussitôt au départ. Vues pour le client (une compétence, la
-           fiche entière).
+           `persistence.flushMs` si elles ont changé (un changement pendant l'écriture reste à écrire), et aussitôt au
+           départ. Vues pour le client (une compétence, la fiche entière).
     Dépendances : shared/, config.lua, server/core.lua, bridge/server.lua, server/registries.lua
 ]]
 
@@ -41,7 +41,7 @@ VavaSkills.sheets = sheets
 ---@field renownDay integer      jour UTC du dernier gain de Renommée
 ---@field renownDayGained integer
 ---@field practicedAt integer    secondes, 0 jamais
----@field dirty boolean
+---@field dirty boolean|'writing' true : à écrire ; 'writing' : écriture en cours (un changement pendant l'attente → true)
 
 ---@class vAvA.Mentorship
 ---@field id integer
@@ -52,7 +52,7 @@ VavaSkills.sheets = sheets
 ---@field xpGranted integer
 ---@field renownGranted integer
 ---@field pairRenown integer     Renommée déjà rapportée par cet apprenti à ce maître (tous mentorats confondus)
----@field dirty boolean
+---@field dirty boolean|'writing' compteurs : true à écrire, 'writing' écriture en cours (mentoring.lua)
 
 ---@class vAvA.SkillSheet
 ---@field characterId integer
@@ -73,6 +73,8 @@ local byCharacter = {}
 -- mentorats en cours partagés entre les deux fiches : id → enregistrement (une seule copie, dirty commun)
 ---@type table<integer, vAvA.Mentorship>
 local mentorships = {}
+-- marque d'une compétence en cours d'écriture (voir `collect`)
+local WRITING = 'writing'
 
 local integer = bridge.Integer
 
@@ -340,12 +342,15 @@ end
 
 -- Persistance -----------------------------------------------------------------------------------------------------
 
+--- Requêtes des compétences à écrire, marquées « en cours d'écriture » : l'écriture cède la main, et un gain pendant
+--- l'attente les marque de nouveau à écrire au lieu d'être effacé par `clean`.
 ---@param sheet vAvA.SkillSheet
 ---@param queries table[]
 ---@param now integer
 local function collect(sheet, queries, now)
     for skill, entry in pairs(sheet.skills) do
         if entry.dirty then
+            entry.dirty = WRITING
             queries[#queries + 1] = { query = UPSERT_SKILL_SQL, values = {
                 sheet.characterId, skill, entry.level, entry.xp, entry.mode, entry.renown, entry.renownDay, entry.renownDayGained,
                 entry.practicedAt, now,
@@ -354,9 +359,12 @@ local function collect(sheet, queries, now)
     end
 end
 
+--- Écriture réussie : seules les compétences restées telles qu'écrites sont propres (en échec, elles restent à écrire).
 ---@param sheet vAvA.SkillSheet
 local function clean(sheet)
-    for _, entry in pairs(sheet.skills) do entry.dirty = false end
+    for _, entry in pairs(sheet.skills) do
+        if entry.dirty == WRITING then entry.dirty = false end
+    end
 end
 
 --- Écrit les fiches modifiées (et les mentorats modifiés) en une transaction. Bloque le thread courant.
