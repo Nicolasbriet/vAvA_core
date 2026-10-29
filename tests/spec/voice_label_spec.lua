@@ -56,4 +56,24 @@ describe('vava_voice nom de zone', function()
         assert.falsy(('Tri\tbune'):find(label.PATTERN))
         assert.falsy((''):find(label.PATTERN))
     end)
+
+    it('donne au core un schéma réseau valide : tout nom permis passe la barrière du RPC', function()
+        local permis, depasse = string.rep('é', 40), string.rep('é', 41)
+        helper.loadAll({ 'shared/init.lua', 'config/shared.lua', 'shared/lib/schema.lua', 'config/server.lua' })
+        local schema = vAvA.lib.schema
+        local bounds = vAvA.config.server.schema
+        -- mêmes options que NET_SCHEMA dans server/core/rpc.lua ; même définition que LABEL dans server/main.lua
+        local compiled, err = schema.compile({ type = 'string', min = 1, max = label.BYTES_MAX, pattern = label.PATTERN }, {
+            net = true, maxStringLength = bounds.maxStringLength,
+            maxArrayLength = bounds.maxArrayLength, maxMapEntries = bounds.maxMapEntries,
+        })
+        assert(compiled, err)
+        assert.is_true((schema.validate(compiled, permis)))
+        assert.is_true((schema.validate(compiled, string.rep('\u{1F56F}', 40))))
+        -- 41 signes passent la barrière en octets : c'est le compte en signes du serveur qui les refuse
+        assert.is_true((schema.validate(compiled, depasse)))
+        assert.is_nil((label.clean(depasse)))
+        assert.is_false((schema.validate(compiled, string.rep('a', label.BYTES_MAX + 1))))
+        assert.is_false((schema.validate(compiled, 'Tri\tbune')))
+    end)
 end)
