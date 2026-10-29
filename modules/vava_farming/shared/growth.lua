@@ -2,7 +2,8 @@
     vava_farming/shared/growth.lua
     Rôle : règles pures de la croissance, partagées par le client (affichage) et le serveur (décision) : avancée d'un
            emplacement d'après le temps écoulé (humidité qui baisse, croissance tant que la terre est humide, pause,
-           flétrissement puis mort quand elle est sèche, jachère qui rend de la fertilité), stade et état, régularité
+           flétrissement puis mort quand elle est sèche, jachère qui rend de la fertilité ; saison de vava_time qui
+           accélère ou ralentit la pousse et le dessèchement), stade et état, régularité
            d'arrosage, qualité d'une récolte. Aucun état : les fonctions reçoivent et rendent des tables.
     Dépendances : shared/constants.lua, config.lua
 ]]
@@ -34,11 +35,15 @@ VavaFarming.growth = growth
 ---@field lastFamily string|nil
 ---@field updatedAt integer
 
---- Applique le temps écoulé depuis `updatedAt` à l'emplacement (modifié en place).
+--- Applique le temps écoulé depuis `updatedAt` à l'emplacement (modifié en place). `season` (vava_time, facultatif) :
+--- `growth` multiplie la vitesse de pousse, `drying` celle à laquelle la terre sèche ; sans saison, rien ne change.
+--- Avec une saison, la croissance garde ses fractions de seconde (une pousse lente appliquée toutes les 10 s ne perd
+--- rien à l'arrondi) ; elle est écrite entière en base.
 ---@param slot vAvA.SlotState
 ---@param crop table|nil  définition de la culture plantée
 ---@param now integer
-function growth.advance(slot, crop, now)
+---@param season? { growth: number|nil, drying: number|nil }
+function growth.advance(slot, crop, now, season)
     local elapsed = now - slot.updatedAt
     if elapsed <= 0 then return end
     if not slot.crop or not crop then
@@ -51,11 +56,16 @@ function growth.advance(slot, crop, now)
         slot.updatedAt = now
         return
     end
-    local rate = crop.waterPerHour / 3600
-    local wetTime = slot.moisture > g.moistureThreshold and (slot.moisture - g.moistureThreshold) / rate or 0
+    local speed = season and season.growth or 1
+    local rate = crop.waterPerHour / 3600 * (season and season.drying or 1)
+    local wetTime = 0
+    if slot.moisture > g.moistureThreshold then
+        -- une terre qui ne sèche pas (saison à 0) reste humide tout le temps écoulé
+        wetTime = rate > 0 and (slot.moisture - g.moistureThreshold) / rate or elapsed
+    end
     local grown = min(elapsed, wetTime)
-    if not slot.wilted and grown > 0 then
-        slot.growth = min(crop.growMinutes * 60, slot.growth + floor(grown))
+    if not slot.wilted and grown > 0 and speed > 0 then
+        slot.growth = min(crop.growMinutes * 60, slot.growth + (season and grown * speed or floor(grown)))
     end
     slot.moisture = max(0, slot.moisture - rate * elapsed)
     local dry = elapsed - wetTime

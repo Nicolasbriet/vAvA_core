@@ -226,7 +226,7 @@ function harvest.succeed(session)
         return false, 'failed'
     end
 
-    local amount = quality.yield(resource, session.tool, effects)
+    local amount = quality.yield(resource, session.tool, effects, bridge.SeasonFactor('yield', resource.skill))
     local score = quality.score(session.level, quality.toolQuality(held), state.vitality, session.tool and session.tool.qualityBonus or 0)
     local tier = quality.tier(score, effects.tierMalus)
     local metadata = { tier = tier }

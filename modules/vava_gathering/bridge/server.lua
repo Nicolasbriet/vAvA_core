@@ -2,7 +2,8 @@
     vava_gathering/bridge/server.lua
     Rôle : SEUL point de contact, côté serveur, entre la récolte et le core / les autres modules : personnage et compte,
            position lue côté serveur, inventaire (objet en main, place, ajout, usure par métadonnées, déclaration des
-           objets), compétences (XP, niveau), droits et journal du Conseil, notifications, chat, base de données.
+           objets), compétences (XP, niveau), droits et journal du Conseil, notifications, chat, saison du royaume
+           (vava_time, facultatif), base de données.
            Chaque appel à une autre ressource est isolé : un module absent ou en erreur ne retire que la fonction
            concernée.
     Dépendances : shared/constants.lua, config.lua, server/core.lua
@@ -13,6 +14,7 @@ local mathType = math.type
 local pack, unpack, concat = table.pack, table.unpack, table.concat
 local GetResourceState, TriggerClientEvent, IsPlayerAceAllowed = GetResourceState, TriggerClientEvent, IsPlayerAceAllowed
 local GetPlayerPed, DoesEntityExist, GetEntityCoords = GetPlayerPed, DoesEntityExist, GetEntityCoords
+local GetGameTimer = GetGameTimer
 
 local core = VavaGathering.core
 if not core then return end
@@ -207,6 +209,38 @@ function Bridge.Chat(source, text)
     end
     local called = call(CHAT, 'addMessage', source, { text = text })
     if not called then Bridge.Notify(source, text) end
+end
+
+-- Saisons (vava_time, facultatif) ---------------------------------------------------------------------------------
+
+local TIME = 'vava_time'
+-- la saison change au plus une fois par jour : relue toutes les 5 s au plus (les nœuds sont relus toutes les 10 s)
+local SEASON_CACHE_MS = 5000
+local seasonId, seasonReadAt = nil, nil
+
+--- Saison du royaume, ou nil (vava_time absent, arrêté ou pas encore prêt).
+---@return string|nil
+function Bridge.Season()
+    local now = GetGameTimer()
+    if seasonReadAt and now - seasonReadAt < SEASON_CACHE_MS then return seasonId end
+    local called, season = call(TIME, 'getSeason')
+    seasonId = called and type(season) == 'string' and season or nil
+    seasonReadAt = now
+    return seasonId
+end
+
+--- Facteur de la saison pour une compétence (config.seasons) : `kind` = regen (repousse des charges) ou yield (unités
+--- récoltées). 1 sans vava_time, sans saison ou sans réglage ; jamais négatif.
+---@param kind 'regen'|'yield'
+---@param skill string
+---@return number
+function Bridge.SeasonFactor(kind, skill)
+    local season = Bridge.Season()
+    local byKind = season and cfg.seasons and cfg.seasons[kind]
+    local bySeason = byKind and byKind[season]
+    local factor = bySeason and bySeason[skill]
+    if type(factor) ~= 'number' or factor ~= factor or factor < 0 then return 1 end
+    return factor
 end
 
 -- Base de données -------------------------------------------------------------------------------------------------

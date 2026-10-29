@@ -16,6 +16,16 @@ VavaFarming.config = {
     -- wiltAfterHours de sécheresse continue, meurt après dieAfterHours. Arroser une plante flétrie la fait repartir.
     growth = { moistureThreshold = 20, wiltAfterHours = 6, dieAfterHours = 18 },
 
+    -- Saisons du royaume (vava_time, facultatif : sans lui, aucun effet). `growth` multiplie la vitesse de pousse,
+    -- `drying` celle à laquelle la terre sèche (1 : sans effet ; 0 : arrêt). L'hiver ralentit sans tuer (pas de gel) ;
+    -- l'été assoiffe : il faut arroser plus souvent. Une saison absente de la liste est sans effet.
+    seasons = {
+        printemps = { growth = 1.25, drying = 1.0 },
+        ete = { growth = 1.0, drying = 1.5 },
+        automne = { growth = 0.75, drying = 0.75 },
+        hiver = { growth = 0.25, drying = 0.5 },
+    },
+
     -- Fertilité (0–100 par emplacement) : rendue par la jachère (par jour vide), le compost, la rotation (famille
     -- différente de la culture précédente) ; pénalité quand on replante la même famille.
     fertility = { fallowPerDay = 10, compostBonus = 25, rotationBonus = 10, sameFamilyPenalty = 10, initial = 80 },

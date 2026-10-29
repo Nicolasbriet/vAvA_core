@@ -1,7 +1,7 @@
 --[[
     vava_gathering/server/quality.lua
     Rôle : règles pures d'une récolte : durée du geste (ressource, outil, niveau), score de qualité (niveau, outil,
-           vitalité, aléa) et palier, rendement (ressource, outil, bande), échec selon la bande. Aucun état.
+           vitalité, aléa) et palier, rendement (ressource, outil, bande, saison), échec selon la bande. Aucun état.
     Dépendances : config.lua
 ]]
 
@@ -59,14 +59,16 @@ function quality.tier(score, malus)
     return max(1, tier - (malus or 0))
 end
 
---- Unités produites : tirage dans la fourchette, bonus de l'outil, part de la bande ; au moins une.
+--- Unités produites : tirage dans la fourchette, bonus de l'outil, part de la bande, facteur de la saison (vava_time,
+--- 1 sans lui) ; au moins une.
 ---@param resource vAvA.ResourceDefinition
 ---@param tool vAvA.ToolDefinition|nil
 ---@param effects table
+---@param season? number
 ---@return integer
-function quality.yield(resource, tool, effects)
+function quality.yield(resource, tool, effects, season)
     local base = random(resource.yield[1], resource.yield[2]) + (tool and tool.yieldBonus or 0)
-    return max(1, floor(base * effects.yield + 0.5))
+    return max(1, floor(base * effects.yield * (season or 1) + 0.5))
 end
 
 --- La terre se refuse-t-elle ? (chance d'échec de la bande)

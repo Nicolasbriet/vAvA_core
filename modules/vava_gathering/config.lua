@@ -29,6 +29,21 @@ VavaGathering.config = {
     -- épuisements répétés (cicatrices) dans la fenêtre → hook vava_gathering:earthReaction (contenu plus tard)
     earthReaction = { depletions = 3, windowDays = 7 },
 
+    -- Saisons du royaume (vava_time, facultatif : sans lui, aucun effet). Facteurs par saison et par compétence de la
+    -- ressource : `regen` vitesse à laquelle les nœuds rendent leurs charges (0 : rien ne repousse et le temps ne
+    -- compte pas), `yield` unités récoltées (au moins une). Absent : 1. Le minage ne dépend d'aucune saison.
+    seasons = {
+        regen = {
+            printemps = { herboristerie = 1.25, chasse = 1.25, peche = 1.25 },
+            automne = { herboristerie = 0.75, chasse = 1.25 },
+            hiver = { herboristerie = 0.25, peche = 0.5, chasse = 0.5, bucheronnage = 0.75 },
+        },
+        yield = {
+            automne = { chasse = 1.25 },
+            hiver = { herboristerie = 0.5 },
+        },
+    },
+
     interact = {
         distance = 2.5,             -- distance maximale au nœud (m) pour l'invite côté client
         serverTolerance = 1.5,      -- marge ajoutée côté serveur (centre du prop, latence) : distance + tolérance

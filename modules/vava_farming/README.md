@@ -10,13 +10,15 @@ demande l'XP à `vava_skills`.
 
 Ordre de démarrage : après `vAvA_core` (≥ 0.6.0), `vava_inventory` (≥ 1.4.0), `vava_skills` (≥ 1.0.0),
 `vava_gathering` (≥ 1.0.0 : faucille) et `vava_crafting` (≥ 1.1.0 : composteur). Facultatifs : `vava_hud`,
-`vava_admin` (droit `metiers`), `vava_chat`.
+`vava_admin` (droit `metiers`), `vava_chat`, `vava_time` (saisons : vitesse de pousse et de dessèchement, lues par
+l'export `getSeason`).
 
 ## Règles (config.lua)
 
 | Règle | Défaut | Clé |
 |---|---|---|
 | Croissance | pousse si humidité > 20 ; à sec : pause, flétrie après 6 h, morte après 18 h ; arroser une flétrie la fait repartir | `growth` |
+| Saisons (`vava_time`, facultatif) | pousse × 1,25 au printemps, × 1 l'été, × 0,75 l'automne, × 0,25 l'hiver ; la terre sèche × 1 au printemps, × 1,5 l'été (arroser plus souvent), × 0,75 l'automne, × 0,5 l'hiver ; pas de gel : l'hiver ralentit sans tuer. Sans `vava_time` : aucun effet | `seasons` |
 | Fertilité | 80 au départ ; − coût de la culture par récolte ; même famille − 10, famille différente + 10 ; compost + 25 ; jachère + 10 par jour vide | `fertility`, `crops[].fertilityCost`, `crops[].family` |
 | Qualité | graine × 0,35 + compétence × 0,35 + régularité × 0,15 + fertilité × 0,15 ± 5 → paliers 20 / 40 / 60 / 85 ; provenance = nom de la parcelle | `quality` |
 | Régularité | 100 − 100 × heures de sécheresse ÷ durée de croissance | — |
@@ -92,3 +94,6 @@ withdraw, source, characterId, item, quantity }`). Détail : `docs/api.md`.
 8. **Privé** : le jardin de la config appartient au personnage n° 1 ; un autre lit « ne vous appartient pas » (sur ses
    emplacements comme sur son grenier s'il en déclare un).
 9. **Redémarrage** : `restart vava_farming` → emplacements retrouvés, croissance rattrapée d'après les dates.
+10. **Saisons** (`vava_time`) : voir `docs/tests/temps.md` (section des métiers) — en hiver, une culture met quatre fois
+    plus longtemps et la terre sèche deux fois moins vite ; l'été, elle sèche une fois et demie plus vite ;
+    `stop vava_time` → plus aucun effet.

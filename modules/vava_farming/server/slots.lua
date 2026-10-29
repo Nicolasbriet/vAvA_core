@@ -111,7 +111,7 @@ function slots.get(parcel, index)
     local list = states[parcel.id]
     local slot = list and list[index]
     if not slot then return nil end
-    growth.advance(slot, slot.crop and catalog.crop(slot.crop) or nil, time())
+    growth.advance(slot, slot.crop and catalog.crop(slot.crop) or nil, time(), bridge.SeasonEffects())
     return slot
 end
 
@@ -157,10 +157,11 @@ end
 --- Relit et republie toutes les parcelles (passage de la boucle lente) : les plantes poussent sans qu'on y touche.
 function slots.tick()
     local now = time()
+    local season = bridge.SeasonEffects()
     for _, parcel in ipairs(catalog.parcels()) do
         for index = 1, parcel.count do
             local slot = states[parcel.id][index]
-            growth.advance(slot, slot.crop and catalog.crop(slot.crop) or nil, now)
+            growth.advance(slot, slot.crop and catalog.crop(slot.crop) or nil, now, season)
         end
         slots.publish(parcel)
     end
@@ -238,8 +239,9 @@ end
 ---@param slot table
 ---@return table values
 local function valuesOf(parcelId, index, slot)
+    -- croissance entière en base (en mémoire, une saison lui laisse ses fractions de seconde)
     return {
-        parcelId, index, slot.crop, slot.seedTier, slot.plantedAt, slot.growth, floor(slot.moisture * 100 + 0.5) / 100,
+        parcelId, index, slot.crop, slot.seedTier, slot.plantedAt, floor(slot.growth), floor(slot.moisture * 100 + 0.5) / 100,
         floor(slot.fertility * 100 + 0.5) / 100, slot.drySince, floor(slot.dryHours * 1000 + 0.5) / 1000, min(slot.waterings, MAX_WATERINGS),
         slot.wilted and 1 or 0, slot.dead and 1 or 0, slot.lastFamily, slot.updatedAt,
     }

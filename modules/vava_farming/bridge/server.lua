@@ -4,7 +4,7 @@
            compte, position lue côté serveur, inventaire (objet en main, piles, comptage, échange atomique, ajout, retrait,
            métadonnées, conteneurs conservés et leur ouverture ancrée, déclaration des objets), compétences (XP, niveau),
            artisanat (type de station, recette et station du composteur), droits et journal du Conseil, notifications,
-           chat, base. Chaque appel à une autre ressource est isolé.
+           chat, saison du royaume (vava_time, facultatif), base. Chaque appel à une autre ressource est isolé.
     Dépendances : shared/constants.lua, config.lua, server/core.lua
 ]]
 
@@ -13,6 +13,7 @@ local mathType = math.type
 local pack, unpack, concat = table.pack, table.unpack, table.concat
 local GetResourceState, TriggerClientEvent, IsPlayerAceAllowed = GetResourceState, TriggerClientEvent, IsPlayerAceAllowed
 local GetPlayerPed, DoesEntityExist, GetEntityCoords = GetPlayerPed, DoesEntityExist, GetEntityCoords
+local GetGameTimer = GetGameTimer
 
 local core = VavaFarming.core
 if not core then return end
@@ -271,6 +272,31 @@ function Bridge.Chat(source, text)
     end
     local called = call(CHAT, 'addMessage', source, { text = text })
     if not called then Bridge.Notify(source, text) end
+end
+
+-- Saisons (vava_time, facultatif) ---------------------------------------------------------------------------------
+
+local TIME = 'vava_time'
+-- la saison change au plus une fois par jour : relue toutes les 5 s au plus (la boucle des parcelles passe toutes les 10 s)
+local SEASON_CACHE_MS = 5000
+local seasonId, seasonReadAt = nil, nil
+
+--- Saison du royaume, ou nil (vava_time absent, arrêté ou pas encore prêt).
+---@return string|nil
+function Bridge.Season()
+    local now = GetGameTimer()
+    if seasonReadAt and now - seasonReadAt < SEASON_CACHE_MS then return seasonId end
+    local called, season = call(TIME, 'getSeason')
+    seasonId = called and type(season) == 'string' and season or nil
+    seasonReadAt = now
+    return seasonId
+end
+
+--- Effets de la saison sur les cultures, `{ growth, drying }` de config.seasons, ou nil (aucun effet).
+---@return table|nil
+function Bridge.SeasonEffects()
+    local season = Bridge.Season()
+    return season and cfg.seasons and cfg.seasons[season] or nil
 end
 
 -- Base de données -------------------------------------------------------------------------------------------------
