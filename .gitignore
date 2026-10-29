@@ -13,3 +13,9 @@ node_modules/
 Thumbs.db
 desktop.ini
 .DS_Store
+
+# Boucle des agents (scripts/agents/boucle.sh) : journaux locaux et fichier d'arrêt
+.agents/
+STOP
+# Lua, luacheck et busted sous Windows (scripts/outils-windows.sh)
+.outils/

@@ -1,0 +1,127 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<title>Atelier de la récolte : placer des points</title>
+</head>
+<body>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600;700&amp;family=EB+Garamond:ital,wght@0,400;0,500;0,600;1,400&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+a{color:#8e2c1d}a:hover{color:#5f1d13}
+.kc{display:inline-flex;align-items:center;justify-content:center;min-width:30px;height:30px;padding:0 8px;box-sizing:border-box;border:1px solid #dcc08a;border-bottom-width:3px;border-radius:5px;background:#2b2017;color:#f4e8cc;font-family:Cinzel,Georgia,serif;font-size:13px;font-weight:600}
+.kh{display:flex;align-items:center;gap:8px;color:#ece1c8;font-size:16px}
+.lb{font-family:Cinzel,Georgia,serif;font-size:13px;font-weight:600;letter-spacing:.04em;color:#4a3826}
+.hp{font-size:14px;color:#5a4633;line-height:1.35}
+.inp{height:40px;box-sizing:border-box;border:1px solid #b39463;border-radius:5px;background:#f4e8cc;padding:0 12px;font:inherit;font-size:16px;color:#2b1d12;width:100%}
+.seg{display:flex;border:1px solid #b39463;border-radius:6px;overflow:hidden}
+.seg button{flex:1;height:40px;border:0;border-right:1px solid #c9ad80;background:#f4e8cc;font:inherit;font-size:15px;color:#2b1d12;cursor:pointer}
+.seg button:last-child{border-right:0}
+.seg .on{background:#3f5a33;color:#f4e8cc;font-weight:600}
+.row{display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid #d3bb8f}
+.ib{width:34px;height:34px;border-radius:5px;border:1px solid #b39463;background:#f4e8cc;display:flex;align-items:center;justify-content:center;cursor:pointer;color:#2b1d12}
+.pin{position:absolute;transform:translate(-50%,-100%);background:rgba(36,26,18,.92);border:1px solid #b39463;color:#f4e8cc;border-radius:5px;padding:4px 9px;font-size:14px;white-space:nowrap}
+</style>
+<div style="width:1440px;height:900px;position:relative;overflow:hidden;font-family:'EB Garamond',Georgia,serif;color:#2b1d12;background:#1d2219">
+  <svg aria-hidden="true" width="1440" height="900" viewBox="0 0 1440 900" style="position:absolute;inset:0">
+    <defs><linearGradient id="s2" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#6d8796"></stop><stop offset="1" stop-color="#c9b38e"></stop></linearGradient></defs>
+    <rect width="1440" height="420" fill="url(#s2)"></rect>
+    <path d="M0 400 L200 330 L420 380 L640 300 L880 370 L1100 320 L1440 380 L1440 900 L0 900Z" fill="#5d6b4a"></path>
+    <rect y="410" width="1440" height="490" fill="#4c5a3a"></rect>
+    <g fill="#33402a"><path d="M40 420 l30-110 30 110z"></path><path d="M110 425 l26-90 26 90z"></path><path d="M880 410 l28-100 28 100z"></path><path d="M930 418 l22-80 22 80z"></path></g>
+    <ellipse cx="500" cy="640" rx="430" ry="165" fill="#dcc08a" fill-opacity=".12" stroke="#dcc08a" stroke-width="3" stroke-dasharray="14 10"></ellipse>
+    <circle cx="500" cy="640" r="6" fill="#dcc08a"></circle>
+    <g>
+      <rect x="236" y="500" width="14" height="70" fill="#4a3424"></rect><circle cx="243" cy="480" r="46" fill="#2f4a26"></circle>
+      <rect x="470" y="470" width="12" height="60" fill="#4a3424"></rect><circle cx="476" cy="452" r="40" fill="#34502a"></circle>
+      <rect x="690" y="520" width="14" height="66" fill="#4a3424"></rect><path d="M697 440 l-40 90 h80z" fill="#29402a"></path>
+      <rect x="330" y="690" width="18" height="34" fill="#4a3424"></rect><ellipse cx="339" cy="690" rx="22" ry="6" fill="#6a4d33"></ellipse>
+    </g>
+    <g opacity=".72">
+      <ellipse cx="610" cy="760" rx="46" ry="16" fill="none" stroke="#7fc46a" stroke-width="3"></ellipse>
+      <rect x="603" y="690" width="14" height="70" fill="#d8e8c8"></rect><circle cx="610" cy="668" r="44" fill="#d8e8c8"></circle>
+    </g>
+  </svg>
+
+  <div class="pin" style="left:243px;top:420px">Chêne 1 <span style="color:#dcc08a">3/3</span></div>
+  <div class="pin" style="left:476px;top:398px">Chêne 2 <span style="color:#dcc08a">2/3</span></div>
+  <div class="pin" style="left:697px;top:426px">Pin 1 <span style="color:#dcc08a">4/4</span></div>
+  <div class="pin" style="left:339px;top:676px">Chêne 3 <span style="color:#e8a48f">épuisé</span></div>
+  <div class="pin" style="left:610px;top:612px;border-color:#7fc46a;background:rgba(32,52,26,.94)">Chêne 4, emplacement valide</div>
+  <div style="position:absolute;left:500px;top:668px;transform:translateX(-50%);color:#f4e8cc;font-family:Cinzel,Georgia,serif;font-size:15px;text-shadow:0 1px 3px #000">Forêt de Brume, rayon 120 m</div>
+
+  <div style="position:absolute;left:24px;top:24px;display:flex;align-items:center;gap:14px;background:rgba(36,26,18,.94);border:1px solid #b39463;border-radius:8px;padding:10px 16px;color:#ece1c8">
+    <a href="Main.html" aria-label="Retour à l'Atelier" style="display:flex;align-items:center;justify-content:center;width:34px;height:34px;border:1px solid #b39463;border-radius:50%;color:#ece1c8"><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 5l-7 7 7 7"></path></svg></a>
+    <span style="display:flex;flex-direction:column"><span style="font-family:Cinzel,Georgia,serif;font-weight:600;font-size:16px">Atelier de la récolte</span><span style="font-size:14px;color:#dcc08a">Mode édition : les cercles et étiquettes ne sont visibles que par vous</span></span>
+  </div>
+
+  <div style="position:absolute;left:24px;bottom:24px;width:944px;display:flex;justify-content:center">
+    <div style="display:flex;gap:22px;align-items:center;background:rgba(36,26,18,.94);border:1px solid #b39463;border-radius:8px;padding:10px 20px">
+      <span class="kh"><span class="kc">Clic</span>Poser ici</span>
+      <span class="kh"><span class="kc">Molette</span>Tourner</span>
+      <span class="kh"><span class="kc">Maj</span>Placement précis</span>
+      <span class="kh"><span class="kc">Clic droit</span>Choisir un point</span>
+      <span class="kh"><span class="kc">Ctrl</span><span class="kc">Z</span>Annuler</span>
+      <span class="kh"><span class="kc">Échap</span>Quitter</span>
+    </div>
+  </div>
+
+  <aside style="position:absolute;right:24px;top:24px;bottom:24px;width:448px;box-sizing:border-box;padding:8px;background:#241a12;border:1px solid #b39463;border-radius:10px;box-shadow:0 14px 40px rgba(0,0,0,.5)">
+    <div style="height:100%;box-sizing:border-box;background:#e9d8b4;border-radius:6px;display:flex;flex-direction:column">
+      <div style="padding:18px 22px 14px;border-bottom:1px solid #c9ad80;display:flex;flex-direction:column;gap:12px">
+        <div style="display:flex;align-items:baseline;justify-content:space-between">
+          <h1 style="margin:0;font-family:Cinzel,Georgia,serif;font-size:22px">Forêt de Brume</h1>
+          <span style="font-size:13px;padding:2px 9px;border-radius:10px;background:#efe0bf;color:#6b4a14">Brouillon</span>
+        </div>
+        <ol style="list-style:none;margin:0;padding:0;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:6px">
+          <li style="display:flex;align-items:center;gap:7px;font-size:15px;color:#3f5a33"><span style="width:24px;height:24px;border-radius:50%;background:#3f5a33;color:#f4e8cc;display:flex;align-items:center;justify-content:center;font-size:13px">✓</span>La zone</li>
+          <li style="display:flex;align-items:center;gap:7px;font-size:15px;font-weight:600"><span style="width:24px;height:24px;border-radius:50%;background:#2b1d12;color:#f4e8cc;display:flex;align-items:center;justify-content:center;font-size:13px">2</span>Les points</li>
+          <li style="display:flex;align-items:center;gap:7px;font-size:15px;color:#5a4633"><span style="width:24px;height:24px;border-radius:50%;border:1px solid #8f7a5f;display:flex;align-items:center;justify-content:center;font-size:13px">3</span>Publier</li>
+        </ol>
+      </div>
+
+      <div style="flex:1;overflow:hidden;padding:16px 22px;display:flex;flex-direction:column;gap:16px">
+        <section style="display:flex;flex-direction:column;gap:10px;padding:14px;border:1px solid #b39463;border-radius:8px;background:#efe2c3">
+          <h2 style="margin:0;font-family:Cinzel,Georgia,serif;font-size:16px">Prochain point à poser</h2>
+          <div style="display:flex;flex-direction:column;gap:5px">
+            <span class="lb">Ressource</span>
+            <div class="seg"><button class="on">Chêne</button><button>Pin</button><button>Autre…</button></div>
+          </div>
+          <div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px">
+            <label style="display:flex;flex-direction:column;gap:5px"><span class="lb">Récoltes avant repos</span><input class="inp" type="number" value="3"></label>
+            <label style="display:flex;flex-direction:column;gap:5px"><span class="lb">Repousse d'une récolte</span><input class="inp" type="text" value="10 minutes"></label>
+          </div>
+          <p class="hp" style="margin:0">Apparence : chêne de GTA, modèle provisoire. Il sera remplacé automatiquement quand le modèle médiéval sera ajouté.</p>
+        </section>
+
+        <section style="display:flex;flex-direction:column;gap:2px;min-height:0">
+          <div style="display:flex;justify-content:space-between;align-items:baseline;margin-bottom:4px">
+            <h2 style="margin:0;font-family:Cinzel,Georgia,serif;font-size:16px">Points de la zone</h2>
+            <span class="hp">5 points, dont 1 nouveau</span>
+          </div>
+          <div class="row"><span style="flex:1;font-size:16px">Chêne 1</span><span class="hp">3 récoltes</span><button class="ib" aria-label="Aller à Chêne 1"><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 21s-7-6-7-11a7 7 0 0114 0c0 5-7 11-7 11z"></path><circle cx="12" cy="10" r="2.5"></circle></svg></button><button class="ib" aria-label="Retirer Chêne 1"><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 7h14M10 7V4h4v3M7 7l1 13h8l1-13"></path></svg></button></div>
+          <div class="row"><span style="flex:1;font-size:16px">Chêne 2</span><span class="hp">3 récoltes</span><button class="ib" aria-label="Aller à Chêne 2"><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 21s-7-6-7-11a7 7 0 0114 0c0 5-7 11-7 11z"></path><circle cx="12" cy="10" r="2.5"></circle></svg></button><button class="ib" aria-label="Retirer Chêne 2"><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 7h14M10 7V4h4v3M7 7l1 13h8l1-13"></path></svg></button></div>
+          <div class="row"><span style="flex:1;font-size:16px">Pin 1</span><span class="hp">4 récoltes</span><button class="ib" aria-label="Aller à Pin 1"><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 21s-7-6-7-11a7 7 0 0114 0c0 5-7 11-7 11z"></path><circle cx="12" cy="10" r="2.5"></circle></svg></button><button class="ib" aria-label="Retirer Pin 1"><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 7h14M10 7V4h4v3M7 7l1 13h8l1-13"></path></svg></button></div>
+          <div class="row"><span style="flex:1;font-size:16px">Chêne 3</span><span class="hp">3 récoltes</span><button class="ib" aria-label="Aller à Chêne 3"><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 21s-7-6-7-11a7 7 0 0114 0c0 5-7 11-7 11z"></path><circle cx="12" cy="10" r="2.5"></circle></svg></button><button class="ib" aria-label="Retirer Chêne 3"><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 7h14M10 7V4h4v3M7 7l1 13h8l1-13"></path></svg></button></div>
+          <div class="row" style="background:#dbe6cf;margin:0 -8px;padding:8px"><span style="flex:1;font-size:16px;font-weight:600">Chêne 4 <span style="font-weight:400;color:#3f5a33">nouveau</span></span><span class="hp">3 récoltes</span><button class="ib" aria-label="Aller à Chêne 4"><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 21s-7-6-7-11a7 7 0 0114 0c0 5-7 11-7 11z"></path><circle cx="12" cy="10" r="2.5"></circle></svg></button><button class="ib" aria-label="Retirer Chêne 4"><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 7h14M10 7V4h4v3M7 7l1 13h8l1-13"></path></svg></button></div>
+        </section>
+
+        <details style="border-top:1px solid #c9ad80;padding-top:10px">
+          <summary style="cursor:pointer;font-family:Cinzel,Georgia,serif;font-size:15px">Réglages de la zone</summary>
+          <p class="hp" style="margin:8px 0 0">Type, rayon, vitesse à laquelle la terre se repose, durée d'une cicatrice.</p>
+        </details>
+      </div>
+
+      <footer style="padding:14px 22px 18px;border-top:1px solid #c9ad80;display:flex;flex-direction:column;gap:10px">
+        <div style="display:flex;gap:10px">
+          <button style="flex:1;height:46px;border:1px solid #b39463;border-radius:6px;background:#f4e8cc;font:inherit;font-size:16px;color:#2b1d12;cursor:pointer">Tester la récolte</button>
+          <button style="flex:1;height:46px;border:1px solid #2f4426;border-radius:6px;background:#3f5a33;font-family:Cinzel,Georgia,serif;font-weight:600;font-size:15px;color:#f4e8cc;cursor:pointer">Publier la zone</button>
+        </div>
+        <p class="hp" style="margin:0;text-align:center">Publier rend les nouveaux points visibles aux joueurs proches.</p>
+      </footer>
+    </div>
+  </aside>
+</div>
+</body>
+</html>

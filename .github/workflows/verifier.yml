@@ -1,0 +1,20 @@
+name: Vérification
+on:
+  push:
+    branches: [ main, 'agents/**' ]
+  pull_request:
+jobs:
+  verifier:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - name: Lua 5.4, luacheck, busted
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y -qq lua5.4 liblua5.4-dev luarocks
+          sudo luarocks --lua-version 5.4 install luacheck
+          sudo luarocks --lua-version 5.4 install busted
+      - name: Vérifier tout le dépôt
+        run: ./scripts/verifier.sh --tout

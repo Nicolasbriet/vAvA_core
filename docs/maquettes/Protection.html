@@ -1,0 +1,95 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<title>Atelier de la magie : un sort de protection</title>
+</head>
+<body>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600;700&amp;family=EB+Garamond:ital,wght@0,400;0,500;0,600;1,400&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+a{color:#8e2c1d}a:hover{color:#5f1d13}
+.lb{font-family:Cinzel,Georgia,serif;font-size:13px;font-weight:600;letter-spacing:.04em;color:#4a3826}
+.hp{font-size:14px;color:#5a4633;line-height:1.35}
+.inp{height:38px;box-sizing:border-box;border:1px solid #b39463;border-radius:5px;background:#f4e8cc;padding:0 12px;font:inherit;font-size:16px;color:#2b1d12;width:100%;text-align:left;cursor:pointer}
+.gr{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:4px}
+.gr button{height:36px;border:1px solid #c9ad80;border-radius:5px;background:#f4e8cc;font:inherit;font-size:14px;color:#2b1d12;cursor:pointer;padding:0 4px}
+.gr .on{background:#3c5a6e;border-color:#2e4757;color:#f4e8cc;font-weight:600}
+.sl{display:flex;flex-direction:column;gap:2px}
+.sl .t{display:flex;justify-content:space-between;align-items:baseline}
+.sl .v{font-size:15px;font-weight:600}
+input[type=range]{width:100%;accent-color:#3c5a6e;height:20px;margin:0}
+.ef{display:flex;align-items:center;gap:10px;padding:8px 10px;border:1px solid #c9ad80;border-radius:6px;background:#f4e8cc}
+.ef .ic{flex:none;width:32px;height:32px;border-radius:50%;display:flex;align-items:center;justify-content:center;color:#f4e8cc}
+.ef .tx{flex:1;display:flex;flex-direction:column;min-width:0}
+.ef .n{font-weight:600;font-size:16px}
+.ef .d{font-size:14px;color:#5a4633}
+.ib{width:32px;height:32px;border-radius:5px;border:1px solid #b39463;background:#efe2c3;display:flex;align-items:center;justify-content:center;cursor:pointer;color:#2b1d12;flex:none}
+.col{flex:1;display:flex;flex-direction:column;gap:7px;min-width:0}
+.ch{font-family:Cinzel,Georgia,serif;font-size:14px;font-weight:600;color:#dcc08a}
+.ly{display:flex;align-items:center;gap:8px;padding:7px 9px;border:1px solid #5a4633;border-radius:6px;background:#2b2017;font-size:14px;color:#ece1c8;line-height:1.25}
+.ly.on{border-color:#7cc0f0;background:#1f2a33}
+.ad{height:34px;border:1px dashed #8f7a5f;border-radius:6px;background:transparent;color:#cbb994;font:inherit;font-size:14px;cursor:pointer}
+.tg{padding:4px 10px;border-radius:12px;font-size:13px;white-space:nowrap}
+.pk{display:flex;align-items:center;gap:8px;width:100%;padding:4px 8px;border:0;border-radius:5px;background:transparent;font:inherit;font-size:15px;color:#2b1d12;text-align:left;cursor:pointer}
+.pk:hover{background:#efe2c3}
+.pk .dot{width:10px;height:10px;border-radius:50%;flex:none}
+</style>
+<div style="width:1440px;height:900px;position:relative;overflow:hidden;font-family:'EB Garamond',Georgia,serif;color:#2b1d12;background:#5f6a66">
+  <svg aria-hidden="true" width="1440" height="900" viewBox="0 0 1440 900" style="position:absolute;inset:0">
+    <defs><linearGradient id="s6" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#5f7586"></stop><stop offset="1" stop-color="#b9b3a2"></stop></linearGradient>
+    <radialGradient id="dome" cx=".5" cy=".6" r=".6"><stop offset="0" stop-color="#d8f0ff" stop-opacity=".05"></stop><stop offset=".8" stop-color="#9fd0f3" stop-opacity=".28"></stop><stop offset="1" stop-color="#e3f6ff" stop-opacity=".7"></stop></radialGradient></defs>
+    <rect width="1440" height="900" fill="url(#s6)"></rect>
+    <path d="M0 400 L300 340 L600 390 L900 330 L1440 380 L1440 900 L0 900Z" fill="#7d8a86"></path>
+    <rect y="430" width="1440" height="470" fill="#8a8170"></rect>
+    <g stroke="#cfc6d6" stroke-width="15" stroke-linecap="round" fill="none"><path d="M240 440 L240 505"></path><path d="M240 505 L220 556"></path><path d="M240 505 L262 554"></path><path d="M240 456 L300 440"></path><path d="M240 456 L214 490"></path></g>
+    <path d="M222 430 L240 390 L258 430 Z" fill="#3c5a6e"></path><circle cx="240" cy="422" r="16" fill="#cfc6d6"></circle>
+    <path d="M305 438 L600 470" stroke="#bfe3ff" stroke-width="4" stroke-dasharray="3 7" stroke-linecap="round"></path>
+    <ellipse cx="660" cy="566" rx="54" ry="15" fill="#000" fill-opacity=".25"></ellipse>
+    <g stroke="#d8c7a8" stroke-width="15" stroke-linecap="round" fill="none"><path d="M660 450 L660 512"></path><path d="M660 512 L640 562"></path><path d="M660 512 L682 560"></path><path d="M660 468 L632 502"></path><path d="M660 468 L690 500"></path></g>
+    <circle cx="660" cy="430" r="16" fill="#d8c7a8"></circle>
+    <path d="M560 566 A100 150 0 0 1 760 566 Z" fill="url(#dome)" stroke="#e3f6ff" stroke-width="2"></path>
+    <ellipse cx="660" cy="566" rx="100" ry="26" fill="none" stroke="#e3f6ff" stroke-width="2" opacity=".8"></ellipse>
+    <g fill="#e3f6ff" opacity=".9"><path d="M590 470 l6-14 6 14z"></path><path d="M720 450 l5-12 5 12z"></path><path d="M745 520 l5-12 5 12z"></path></g>
+  </svg>
+  <div style="position:absolute;left:660px;top:380px;transform:translateX(-50%);background:rgba(28,34,44,.92);border:1px solid #9fd0f3;color:#e3f1fb;border-radius:5px;padding:4px 9px;font-size:14px">Allié protégé : bouclier 25, 10 s</div>
+  <div style="position:absolute;left:240px;top:340px;transform:translateX(-50%);background:rgba(28,34,44,.92);border:1px solid #9fd0f3;color:#e3f1fb;border-radius:5px;padding:4px 9px;font-size:14px">Lanceur</div>
+  <div style="position:absolute;left:24px;top:24px;display:flex;align-items:center;gap:14px;background:rgba(36,26,18,.94);border:1px solid #b39463;border-radius:8px;padding:10px 16px;color:#ece1c8">
+    <a href="Main.html" aria-label="Retour à l'Atelier" style="display:flex;align-items:center;justify-content:center;width:34px;height:34px;border:1px solid #b39463;border-radius:50%;color:#ece1c8"><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 5l-7 7 7 7"></path></svg></a>
+    <span style="display:flex;flex-direction:column"><span style="font-family:Cinzel,Georgia,serif;font-weight:600;font-size:16px">Atelier de la magie</span><span style="font-size:14px;color:#9fd0f3">Mode essai : vous seul pouvez lancer ce sort</span></span>
+  </div>
+  <section aria-label="Effets visibles" style="position:absolute;left:24px;right:496px;bottom:24px;box-sizing:border-box;background:rgba(36,26,18,.95);border:1px solid #b39463;border-radius:10px;padding:14px 18px;display:flex;flex-direction:column;gap:10px">
+    <div style="display:flex;justify-content:space-between;align-items:baseline;gap:16px"><h2 style="margin:0;font-family:Cinzel,Georgia,serif;font-size:17px;color:#f4e8cc;white-space:nowrap">Ce que l'on voit</h2><span style="font-size:14px;color:#cbb994;text-align:right">Un bouclier a quatre moments : le lancement, sa présence sur la cible, sa rupture et sa fin normale.</span></div>
+    <div style="display:flex;gap:12px"><div class="col"><span class="ch">Lancement</span><div class="ly"><svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#dcc08a" stroke-width="2" style="flex:none"><circle cx="12" cy="12" r="3"></circle><path d="M12 2v4M12 18v4M2 12h4M18 12h4"></path></svg>Givre aux mains</div><div class="ly"><svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#dcc08a" stroke-width="2" style="flex:none"><path d="M11 5L6 9H3v6h3l5 4z"></path><path d="M16 9a4 4 0 010 6"></path></svg>Son : cristal</div></div><div class="col"><span class="ch">Sur la cible</span><div class="ly on"><svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#dcc08a" stroke-width="2" style="flex:none"><circle cx="12" cy="9" r="3"></circle><path d="M5 20c1-4 4-6 7-6s6 2 7 6"></path><path d="M3 12a9 9 0 0118 0" stroke-dasharray="2 3"></path></svg>Dôme de givre autour de la personne</div><div class="ly on"><svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#dcc08a" stroke-width="2" style="flex:none"><path d="M9 18h6M10 21h4M12 3a6 6 0 00-4 10.5V16h8v-2.5A6 6 0 0012 3z"></path></svg>Lueur bleu pâle, 2 m</div><button class="ad">Ajouter</button></div><div class="col"><span class="ch">Quand il se brise</span><div class="ly"><svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#dcc08a" stroke-width="2" style="flex:none"><circle cx="12" cy="12" r="3"></circle><path d="M12 2v4M12 18v4M2 12h4M18 12h4"></path></svg>Éclats de glace</div><div class="ly"><svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#dcc08a" stroke-width="2" style="flex:none"><path d="M11 5L6 9H3v6h3l5 4z"></path><path d="M16 9a4 4 0 010 6"></path></svg>Son : verre brisé</div><button class="ad">Ajouter</button></div><div class="col"><span class="ch">À la fin</span><div class="ly"><svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#dcc08a" stroke-width="2" style="flex:none"><circle cx="12" cy="12" r="3"></circle><path d="M12 2v4M12 18v4M2 12h4M18 12h4"></path></svg>Le dôme fond en brume</div><button class="ad">Ajouter</button></div></div></section>
+  <aside style="position:absolute;right:24px;top:24px;bottom:24px;width:448px;box-sizing:border-box;padding:8px;background:#241a12;border:1px solid #b39463;border-radius:10px;box-shadow:0 14px 40px rgba(0,0,0,.5)">
+    <div style="height:100%;box-sizing:border-box;background:#e9d8b4;border-radius:6px;display:flex;flex-direction:column">
+      <div style="padding:16px 22px 10px;border-bottom:1px solid #c9ad80;display:flex;flex-direction:column;gap:3px">
+        <div style="display:flex;justify-content:space-between;align-items:baseline"><h1 style="margin:0;font-family:Cinzel,Georgia,serif;font-size:22px">Égide de givre</h1><span class="tg" style="background:#d6e0e6;color:#2e4757">Essai, version 1</span></div>
+        <span class="hp">Eau, niveau 2 de la voie des marées</span></div>
+      <div style="flex:1;overflow:hidden;padding:12px 22px;display:flex;flex-direction:column;gap:11px">
+        <div style="display:flex;flex-direction:column;gap:5px"><span class="lb">Comment il part</span><div class="gr"><button class="">Projectile</button><button class="">Zone au sol</button><button class="">Autour de soi</button><button class="">Mur</button><button class="">Sur soi</button><button class="on">Sur une cible</button><button class="">Au contact</button><button class="">Rayon</button></div></div>
+        <div style="display:flex;flex-direction:column;gap:5px"><span class="lb">Qui il touche</span><div class="gr"><button class="">Ennemis</button><button class="on">Alliés</button><button class="">Tous</button><button class="">Soi seul</button></div></div>
+        <div style="display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px 12px">
+          <div class="sl"><div class="t"><span class="lb">Portée</span><span class="v">15 m</span></div><input type="range" min="0" max="60" step="1" value="15" aria-label="Portée"></div><div class="sl"><div class="t"><span class="lb">Mana</span><span class="v">30</span></div><input type="range" min="0" max="100" step="1" value="30" aria-label="Mana"></div><div class="sl"><div class="t"><span class="lb">Incantation</span><span class="v">1,2 s</span></div><input type="range" min="0" max="3" step="0.1" value="1.2" aria-label="Incantation"></div><div class="sl"><div class="t"><span class="lb">Recharge</span><span class="v">20 s</span></div><input type="range" min="0" max="60" step="1" value="20" aria-label="Recharge"></div>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:6px;border-top:1px solid #c9ad80;padding-top:10px">
+          <div style="display:flex;justify-content:space-between;align-items:baseline"><span style="font-family:Cinzel,Georgia,serif;font-weight:600;font-size:16px">Ce que fait le sort</span><span class="hp">pendant 10 s</span></div>
+          <div class="ef"><span class="ic" style="background:#3c5a6e"><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M12 3l8 3v6c0 5-3.5 8-8 9-4.5-1-8-4-8-9V6z"></path></svg></span><span class="tx"><span class="n">Bouclier</span><span class="d">Absorbe 25 dégâts, puis se brise</span></span><button class="ib" aria-label="Modifier Bouclier"><svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 20h4L19 9l-4-4L4 16z"></path></svg></button><button class="ib" aria-label="Retirer Bouclier"><svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 7h14M10 7V4h4v3M7 7l1 13h8l1-13"></path></svg></button></div>
+          <div class="ef"><span class="ic" style="background:#3c5a6e"><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M12 3l8 3v6c0 5-3.5 8-8 9-4.5-1-8-4-8-9V6z"></path></svg></span><span class="tx"><span class="n">Résistance au feu</span><span class="d">Dégâts de feu réduits de 40 %</span></span><button class="ib" aria-label="Modifier Résistance au feu"><svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 20h4L19 9l-4-4L4 16z"></path></svg></button><button class="ib" aria-label="Retirer Résistance au feu"><svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 7h14M10 7V4h4v3M7 7l1 13h8l1-13"></path></svg></button></div>
+          <div class="ef"><span class="ic" style="background:#2e4757"><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2"><path d="M12 3v18M3 12h18M6 6l12 12M18 6L6 18"></path></svg></span><span class="tx"><span class="n">Morsure du froid</span><span class="d">Ralentit l'attaquant pendant 2 s</span><span class="d" style="color:#2e4757;font-style:italic">Quand le porteur est frappé au corps à corps</span></span><button class="ib" aria-label="Modifier Morsure du froid"><svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 20h4L19 9l-4-4L4 16z"></path></svg></button><button class="ib" aria-label="Retirer Morsure du froid"><svg aria-hidden="true" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M5 7h14M10 7V4h4v3M7 7l1 13h8l1-13"></path></svg></button></div>
+          <button style="height:40px;border:1px solid #2b1d12;border-radius:6px;background:#2b1d12;color:#f4e8cc;font:inherit;font-size:15px;cursor:pointer">Ajouter un effet</button>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:5px;padding:10px 12px;border:1px solid #b39463;border-radius:6px;background:#efe2c3">
+          <span class="lb">Si la cible a déjà une protection</span>
+          <div class="gr" style="grid-template-columns:repeat(3,minmax(0,1fr))"><button class="on">Garder la plus forte</button><button>Remplacer</button><button>Refuser</button></div>
+          <span class="hp">Un personnage porte au plus 3 renforts à la fois, tous sorts confondus.</span>
+        </div>
+      </div>
+      <footer style="padding:12px 22px 16px;border-top:1px solid #c9ad80;display:flex;gap:10px">
+        <button style="flex:1;height:44px;border:1px solid #b39463;border-radius:6px;background:#f4e8cc;font:inherit;font-size:16px;color:#2b1d12;cursor:pointer">Historique</button>
+        <button style="flex:1.4;height:44px;border:1px solid #2f4426;border-radius:6px;background:#3f5a33;font-family:Cinzel,Georgia,serif;font-weight:600;font-size:15px;color:#f4e8cc;cursor:pointer">Publier pour les mages</button></footer>
+  </div></aside>
+</div>
+</body>
+</html>

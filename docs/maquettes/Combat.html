@@ -1,0 +1,113 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<title>Atelier du combat : une technique</title>
+</head>
+<body>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600;700&amp;family=EB+Garamond:ital,wght@0,400;0,500;0,600;1,400&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+a{color:#8e2c1d}a:hover{color:#5f1d13}
+.lb{font-family:Cinzel,Georgia,serif;font-size:13px;font-weight:600;letter-spacing:.04em;color:#4a3826}
+.hp{font-size:14px;color:#5a4633;line-height:1.35}
+.inp{height:40px;box-sizing:border-box;border:1px solid #b39463;border-radius:5px;background:#f4e8cc;padding:0 12px;font:inherit;font-size:16px;color:#2b1d12;width:100%}
+.seg{display:flex;border:1px solid #b39463;border-radius:6px;overflow:hidden}
+.seg button{flex:1;height:38px;border:0;border-right:1px solid #c9ad80;background:#f4e8cc;font:inherit;font-size:15px;color:#2b1d12;cursor:pointer}
+.seg button:last-child{border-right:0}
+.seg .on{background:#2b1d12;color:#f4e8cc;font-weight:600}
+.sl{display:flex;flex-direction:column;gap:4px}
+.sl .t{display:flex;justify-content:space-between;align-items:baseline}
+.sl .v{font-size:16px;font-weight:600}
+input[type=range]{width:100%;accent-color:#8e2c1d;height:24px;margin:0}
+.sw{display:flex;align-items:center;justify-content:space-between;gap:10px;font-size:16px;padding:6px 0}
+.sw input{width:22px;height:22px;accent-color:#3f5a33}
+.cb{width:40px;height:40px;border-radius:50%;border:1px solid #b39463;background:#2b2017;color:#f4e8cc;display:flex;align-items:center;justify-content:center;cursor:pointer}
+</style>
+<div style="width:1440px;height:900px;position:relative;overflow:hidden;font-family:'EB Garamond',Georgia,serif;color:#2b1d12;background:#3b3324">
+  <svg aria-hidden="true" width="1440" height="900" viewBox="0 0 1440 900" style="position:absolute;inset:0">
+    <rect width="1440" height="380" fill="#8a9aa3"></rect>
+    <rect y="200" width="1440" height="180" fill="#6c6150"></rect>
+    <g fill="#584e3f"><rect x="0" y="230" width="1440" height="10"></rect><rect x="80" y="200" width="14" height="190"></rect><rect x="330" y="200" width="14" height="190"></rect><rect x="580" y="200" width="14" height="190"></rect><rect x="830" y="200" width="14" height="190"></rect></g>
+    <rect y="380" width="1440" height="520" fill="#7d6a4c"></rect>
+    <path d="M440 600 L760 470 A360 140 0 0 1 820 640 Z" fill="#8e2c1d" fill-opacity=".28" stroke="#c45a43" stroke-width="3"></path>
+    <ellipse cx="440" cy="600" rx="60" ry="18" fill="#000" fill-opacity=".25"></ellipse>
+    <g stroke="#d9cdb6" stroke-width="16" stroke-linecap="round" fill="none">
+      <path d="M440 470 L440 545"></path><path d="M440 545 L410 600"></path><path d="M440 545 L475 598"></path><path d="M440 488 L495 452"></path><path d="M440 488 L405 520"></path>
+    </g>
+    <circle cx="440" cy="448" r="20" fill="#d9cdb6"></circle>
+    <path d="M495 452 L590 392" stroke="#e8edf0" stroke-width="6" stroke-linecap="round"></path>
+    <path d="M500 380 Q640 360 700 470" fill="none" stroke="#f4e8cc" stroke-width="3" stroke-dasharray="8 8" opacity=".8"></path>
+    <g><rect x="726" y="470" width="12" height="120" fill="#5c4630"></rect><ellipse cx="732" cy="470" rx="26" ry="38" fill="#c4a65f"></ellipse><ellipse cx="732" cy="590" rx="30" ry="9" fill="#000" fill-opacity=".2"></ellipse></g>
+  </svg>
+  <div style="position:absolute;left:770px;top:440px;background:rgba(36,26,18,.92);border:1px solid #c45a43;color:#f4e8cc;border-radius:5px;padding:4px 9px;font-size:14px">Mannequin dans la zone : touché</div>
+  <div style="position:absolute;left:560px;top:612px;color:#f4e8cc;font-size:15px;font-family:Cinzel,Georgia,serif;text-shadow:0 1px 3px #000">Portée 2,2 m, angle 70°</div>
+
+  <div style="position:absolute;left:24px;top:24px;display:flex;align-items:center;gap:14px;background:rgba(36,26,18,.94);border:1px solid #b39463;border-radius:8px;padding:10px 16px;color:#ece1c8">
+    <a href="Main.html" aria-label="Retour à l'Atelier" style="display:flex;align-items:center;justify-content:center;width:34px;height:34px;border:1px solid #b39463;border-radius:50%;color:#ece1c8"><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M15 5l-7 7 7 7"></path></svg></a>
+    <span style="display:flex;flex-direction:column"><span style="font-family:Cinzel,Georgia,serif;font-weight:600;font-size:16px">Atelier du combat</span><span style="font-size:14px;color:#dcc08a">Aperçu sur vous, sans dégâts réels</span></span>
+  </div>
+
+  <section aria-label="Frise de la technique" style="position:absolute;left:24px;right:496px;bottom:24px;box-sizing:border-box;background:rgba(36,26,18,.95);border:1px solid #b39463;border-radius:10px;padding:16px 20px;color:#ece1c8;display:flex;flex-direction:column;gap:12px">
+    <div style="display:flex;align-items:center;gap:12px">
+      <button class="cb" aria-label="Rejouer depuis le début"><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 5v14M18 5l-9 7 9 7z"></path></svg></button>
+      <button class="cb" aria-label="Pause" style="width:46px;height:46px;background:#8e2c1d;border-color:#c45a43"><svg aria-hidden="true" width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="5" width="4" height="14"></rect><rect x="14" y="5" width="4" height="14"></rect></svg></button>
+      <div style="display:flex;border:1px solid #b39463;border-radius:6px;overflow:hidden">
+        <button style="height:36px;padding:0 12px;border:0;background:#2b2017;color:#ece1c8;font:inherit;font-size:15px">×0,25</button>
+        <button style="height:36px;padding:0 12px;border:0;border-left:1px solid #5a4633;background:#dcc08a;color:#2b1d12;font:inherit;font-size:15px;font-weight:600">×0,5</button>
+        <button style="height:36px;padding:0 12px;border:0;border-left:1px solid #5a4633;background:#2b2017;color:#ece1c8;font:inherit;font-size:15px">×1</button>
+      </div>
+      <label style="display:flex;align-items:center;gap:8px;font-size:15px"><input type="checkbox" checked style="width:20px;height:20px;accent-color:#dcc08a">En boucle</label>
+      <span style="margin-left:auto;font-family:Cinzel,Georgia,serif;font-size:15px">400 ms sur 900 ms</span>
+    </div>
+    <div style="position:relative;height:74px">
+      <div style="position:absolute;left:0;right:0;top:0;height:46px;display:flex;border-radius:6px;overflow:hidden;border:1px solid #5a4633">
+        <div style="flex:320;background:#a8823a;color:#1c140d;display:flex;flex-direction:column;justify-content:center;padding:0 12px"><span style="font-weight:600;font-size:15px">Préparation</span><span style="font-size:13px">320 ms, on peut être interrompu</span></div>
+        <div style="flex:160;background:#8e2c1d;color:#f4e8cc;display:flex;flex-direction:column;justify-content:center;padding:0 10px;border-left:3px solid #f4e8cc;border-right:3px solid #f4e8cc"><span style="font-weight:600;font-size:15px">Frappe</span><span style="font-size:13px">160 ms, le coup touche</span></div>
+        <div style="flex:420;background:#3c5a6e;color:#f4e8cc;display:flex;flex-direction:column;justify-content:center;padding:0 12px"><span style="font-weight:600;font-size:15px">Récupération</span><span style="font-size:13px">420 ms, on est vulnérable</span></div>
+      </div>
+      <div style="position:absolute;left:44.4%;top:-6px;width:2px;height:58px;background:#f4e8cc"></div>
+      <div style="position:absolute;left:44.4%;top:-12px;width:12px;height:12px;margin-left:-5px;background:#f4e8cc;transform:rotate(45deg)"></div>
+      <div style="position:absolute;left:0;right:0;top:54px;display:flex;justify-content:space-between;font-size:13px;color:#cbb994"><span>0</span><span>150</span><span>300</span><span>450</span><span>600</span><span>750</span><span>900 ms</span></div>
+    </div>
+    <p style="margin:0;font-size:14px;color:#cbb994">Glissez les bords des phases pour régler le timing. L'aperçu se met à jour aussitôt.</p>
+  </section>
+
+  <aside style="position:absolute;right:24px;top:24px;bottom:24px;width:448px;box-sizing:border-box;padding:8px;background:#241a12;border:1px solid #b39463;border-radius:10px;box-shadow:0 14px 40px rgba(0,0,0,.5)">
+    <div style="height:100%;box-sizing:border-box;background:#e9d8b4;border-radius:6px;display:flex;flex-direction:column">
+      <div style="padding:18px 22px 12px;border-bottom:1px solid #c9ad80;display:flex;flex-direction:column;gap:4px">
+        <div style="display:flex;justify-content:space-between;align-items:baseline"><h1 style="margin:0;font-family:Cinzel,Georgia,serif;font-size:22px">Taille descendante</h1><span style="font-size:13px;padding:2px 9px;border-radius:10px;background:#efe0bf;color:#6b4a14">Brouillon</span></div>
+        <span class="hp">Style : épée à une main</span>
+      </div>
+      <div style="flex:1;overflow:hidden;padding:14px 22px;display:flex;flex-direction:column;gap:14px">
+        <div style="display:flex;flex-direction:column;gap:5px"><span class="lb">Type de technique</span>
+          <div class="seg"><button class="on">Attaque légère</button><button>Lourde</button><button>Parade</button><button>Esquive</button></div>
+        </div>
+        <div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px">
+          <div style="display:flex;flex-direction:column;gap:5px"><span class="lb">Geste</span><button class="inp" style="text-align:left;cursor:pointer">Épée, frappe haute</button></div>
+          <div style="display:flex;flex-direction:column;gap:5px"><span class="lb">Arme en main</span><button class="inp" style="text-align:left;cursor:pointer">Épée courte</button></div>
+        </div>
+        <p class="hp" style="margin:-6px 0 0">Le geste vient de l'Atelier des gestes. L'arme utilise un modèle provisoire.</p>
+        <div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px 16px">
+          <div class="sl"><div class="t"><span class="lb">Portée</span><span class="v">2,2 m</span></div><input type="range" min="1" max="4" step="0.1" value="2.2" aria-label="Portée"></div>
+          <div class="sl"><div class="t"><span class="lb">Angle</span><span class="v">70°</span></div><input type="range" min="10" max="180" value="70" aria-label="Angle"></div>
+          <div class="sl"><div class="t"><span class="lb">Dégâts</span><span class="v">× 1,0</span></div><input type="range" min="0.5" max="2" step="0.1" value="1" aria-label="Dégâts"></div>
+          <div class="sl"><div class="t"><span class="lb">Endurance</span><span class="v">12</span></div><input type="range" min="0" max="40" value="12" aria-label="Endurance"></div>
+        </div>
+        <div style="border-top:1px solid #c9ad80;padding-top:6px">
+          <label class="sw">Peut être paré<input type="checkbox" checked></label>
+          <label class="sw">Fait chanceler la cible<input type="checkbox"></label>
+          <label class="sw">Enchaînable avec une autre attaque<input type="checkbox" checked></label>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:5px"><span class="lb">Pour l'apprendre</span><div class="inp" style="display:flex;align-items:center">Armes à une main, rang Apprenti (20)</div></div>
+      </div>
+      <footer style="padding:14px 22px 18px;border-top:1px solid #c9ad80;display:flex;gap:10px">
+        <button style="flex:1;height:46px;border:1px solid #b39463;border-radius:6px;background:#f4e8cc;font:inherit;font-size:16px;color:#2b1d12;cursor:pointer">Essayer contre un mannequin</button>
+        <button style="flex:1;height:46px;border:1px solid #2f4426;border-radius:6px;background:#3f5a33;font-family:Cinzel,Georgia,serif;font-weight:600;font-size:15px;color:#f4e8cc;cursor:pointer">Publier</button>
+      </footer>
+    </div>
+  </aside>
+</div>
+</body>
+</html>

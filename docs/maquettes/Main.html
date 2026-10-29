@@ -1,0 +1,97 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<title>Accueil de l'Atelier du Conseil</title>
+</head>
+<body>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600;700&amp;family=EB+Garamond:ital,wght@0,400;0,500;0,600;1,400&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+a{color:#8e2c1d}a:hover{color:#5f1d13}
+.ent{display:flex;gap:14px;align-items:flex-start;padding:12px 14px;border:1px solid transparent;border-radius:6px;background:transparent;text-align:left;font:inherit;color:inherit;cursor:pointer;width:100%}
+.ent:hover{border-color:#b39463;background:#f4e8cc}
+.ico{width:40px;height:40px;flex:none;border-radius:50%;border:1px solid #a8823a;display:flex;align-items:center;justify-content:center;color:#2b1d12;background:#f4e8cc}
+.nm{font-family:Cinzel,Georgia,serif;font-weight:600;font-size:16px;color:#2b1d12}
+.ds{font-size:15px;line-height:1.35;color:#5a4633}
+.tag{font-size:13px;padding:1px 8px;border-radius:10px;white-space:nowrap}
+.grp{font-family:Cinzel,Georgia,serif;font-size:14px;letter-spacing:.06em;color:#6b5640;margin:0 0 4px 14px}
+.jr{display:flex;flex-direction:column;gap:2px;padding:10px 0;border-bottom:1px solid #c9ad80}
+</style>
+<div style="width:1440px;height:900px;position:relative;overflow:hidden;font-family:'EB Garamond',Georgia,serif;color:#2b1d12;background:#15100b">
+  <svg aria-hidden="true" width="1440" height="900" viewBox="0 0 1440 900" style="position:absolute;inset:0">
+    <defs><linearGradient id="sky" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#3a4552"></stop><stop offset="1" stop-color="#7a6248"></stop></linearGradient></defs>
+    <rect width="1440" height="900" fill="url(#sky)"></rect>
+    <path d="M0 560 L180 470 L360 540 L560 440 L760 530 L980 450 L1200 520 L1440 460 L1440 900 L0 900Z" fill="#2c3326"></path>
+    <path d="M0 650 L240 600 L520 660 L820 590 L1100 650 L1440 610 L1440 900 L0 900Z" fill="#1d2219"></path>
+    <rect width="1440" height="900" fill="#0b0805" opacity=".62"></rect>
+  </svg>
+
+  <div style="position:absolute;left:120px;top:60px;width:1200px;height:780px;box-sizing:border-box;padding:10px;background:#241a12;border:1px solid #b39463;border-radius:10px;box-shadow:0 20px 60px rgba(0,0,0,.55)">
+    <div style="height:100%;box-sizing:border-box;background:#e9d8b4;border-radius:6px;display:flex;flex-direction:column">
+      <header style="display:flex;align-items:center;gap:24px;padding:26px 34px 20px;border-bottom:1px solid #c9ad80">
+        <div style="display:flex;flex-direction:column;gap:4px;flex:1">
+          <h1 style="margin:0;font-family:Cinzel,Georgia,serif;font-weight:700;font-size:32px;color:#2b1d12">L'Atelier du Conseil</h1>
+          <p style="margin:0;font-size:17px;color:#5a4633">Créez et modifiez le royaume en jeu, sans redémarrer le serveur. Chaque changement est inscrit au journal.</p>
+        </div>
+        <label style="display:flex;align-items:center;gap:10px;background:#f4e8cc;border:1px solid #b39463;border-radius:6px;padding:0 14px;height:44px;width:300px">
+          <svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#6b5640" stroke-width="2"><circle cx="11" cy="11" r="7"></circle><path d="M20 20l-4-4"></path></svg>
+          <span style="position:absolute;left:-9999px">Rechercher</span>
+          <input type="search" placeholder="Chercher un lieu, un sort, un geste…" style="border:0;background:transparent;font:inherit;font-size:16px;color:#2b1d12;outline:none;width:100%">
+        </label>
+        <button aria-label="Fermer l'Atelier" style="width:44px;height:44px;border-radius:50%;border:1px solid #b39463;background:#f4e8cc;cursor:pointer;display:flex;align-items:center;justify-content:center"><svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#2b1d12" stroke-width="2"><path d="M6 6l12 12M18 6L6 18"></path></svg></button>
+      </header>
+
+      <div style="flex:1;display:flex;min-height:0">
+        <main style="flex:1;padding:22px 26px;display:flex;flex-direction:column;gap:18px;overflow:hidden">
+          <section>
+            <h2 class="grp">Le monde</h2>
+            <div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:4px">
+              <button class="ent"><span class="ico"><svg aria-hidden="true" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M12 3c-3 0-5 2.5-5 5 0 1 .3 2 .8 2.7C6.6 11.5 6 12.7 6 14c0 2.5 2.7 4 6 4s6-1.5 6-4c0-1.3-.6-2.5-1.8-3.3.5-.7.8-1.7.8-2.7 0-2.5-2-5-5-5z"></path><path d="M12 18v3"></path></svg></span><span style="display:flex;flex-direction:column;gap:3px;flex:1"><span style="display:flex;justify-content:space-between;gap:8px"><span class="nm">Récolte</span><span class="tag" style="background:#d9e2cf;color:#2f4426">4 zones</span></span><span class="ds">Forêts, mines, prairies et coins de pêche, arbres et filons un par un.</span></span></button>
+              <button class="ent"><span class="ico"><svg aria-hidden="true" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M12 21V8"></path><path d="M12 12c-2-.5-3.5-2-4-4 2 .3 3.5 1.5 4 4zM12 12c2-.5 3.5-2 4-4-2 .3-3.5 1.5-4 4zM12 16c-2-.5-3.5-2-4-4 2 .3 3.5 1.5 4 4zM12 16c2-.5 3.5-2 4-4-2 .3-3.5 1.5-4 4zM12 8c-1-1-1-3 0-5 1 2 1 4 0 5z"></path></svg></span><span style="display:flex;flex-direction:column;gap:3px;flex:1"><span class="nm">Agriculture</span><span class="ds">Parcelles communales ou privées, puits, greniers et composteurs.</span></span></button>
+              <button class="ent"><span class="ico"><svg aria-hidden="true" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M3 9h13c0 3-2 5-5 5H8"></path><path d="M16 9h3c0 2-1 3-3 3"></path><path d="M9 14l-1 5h8l-1-5"></path></svg></span><span style="display:flex;flex-direction:column;gap:3px;flex:1"><span class="nm">Artisanat</span><span class="ds">Forges, établis, métiers à tisser : où ils sont, ce qu'on peut y faire.</span></span></button>
+              <button class="ent"><span class="ico"><svg aria-hidden="true" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M6 21V5a2 2 0 012-2h8a2 2 0 012 2v16"></path><path d="M4 21h16"></path><circle cx="14.5" cy="12" r="1"></circle></svg></span><span style="display:flex;flex-direction:column;gap:3px;flex:1"><span style="display:flex;justify-content:space-between;gap:8px"><span class="nm">Portes et clés</span><span class="tag" style="background:#e6d3b0;color:#5a4633">Bientôt</span></span><span class="ds">Viser une porte, la déclarer, la verrouiller, créer ses clés.</span></span></button>
+            </div>
+          </section>
+          <section>
+            <h2 class="grp">La société</h2>
+            <div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:4px">
+              <button class="ent"><span class="ico"><svg aria-hidden="true" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M6 3v18"></path><path d="M6 4h12l-3 4 3 4H6"></path></svg></span><span style="display:flex;flex-direction:column;gap:3px;flex:1"><span class="nm">Confréries</span><span class="ds">La Garde, les Guérisseurs, les guildes : grades, droits, coffres, lieux.</span></span></button>
+              <button class="ent"><span class="ico"><svg aria-hidden="true" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M3 11l9-7 9 7"></path><path d="M5 10v10h14V10"></path><path d="M10 20v-5h4v5"></path></svg></span><span style="display:flex;flex-direction:column;gap:3px;flex:1"><span style="display:flex;justify-content:space-between;gap:8px"><span class="nm">Logis</span><span class="tag" style="background:#e6d3b0;color:#5a4633">Bientôt</span></span><span class="ds">Maisons et chambres attribuées par le Conseil, coffres privés.</span></span></button>
+            </div>
+          </section>
+          <section>
+            <h2 class="grp">Les arts</h2>
+            <div style="display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:4px">
+              <button class="ent"><span class="ico"><svg aria-hidden="true" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><circle cx="12" cy="4.5" r="1.8"></circle><path d="M12 7v7M12 14l-3 7M12 14l3 7M7 10l5-1 5 2"></path></svg></span><span style="display:flex;flex-direction:column;gap:3px;flex:1"><span class="nm">Gestes</span><span class="ds">Animations et accessoires pour les émotes et les métiers.</span></span></button>
+              <button class="ent"><span class="ico"><svg aria-hidden="true" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M4 20L16 8l2-4-4 2L4 18"></path><path d="M20 20L8 8 6 4l4 2 10 12"></path></svg></span><span style="display:flex;flex-direction:column;gap:3px;flex:1"><span class="nm">Techniques de combat</span><span class="ds">Coups, parades, esquives : animation, timing et zone touchée.</span></span></button>
+              <button class="ent"><span class="ico"><svg aria-hidden="true" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M12 3l1.8 5.2L19 10l-5.2 1.8L12 17l-1.8-5.2L5 10l5.2-1.8z"></path><path d="M19 17l.7 2 2 .7-2 .7-.7 2-.7-2-2-.7 2-.7z"></path></svg></span><span style="display:flex;flex-direction:column;gap:3px;flex:1"><span class="nm">Effets</span><span class="ds">Particules, lumières et sons réutilisables partout.</span></span></button>
+              <button class="ent"><span class="ico"><svg aria-hidden="true" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.6"><path d="M12 21c-4 0-6-2.5-6-6 0-4 4-6 4-11 3 2 4 5 4 7 1-1 1.5-2 1.5-3 2 2 2.5 4 2.5 7 0 3.5-2 6-6 6z"></path></svg></span><span style="display:flex;flex-direction:column;gap:3px;flex:1"><span style="display:flex;justify-content:space-between;gap:8px"><span class="nm">Sorts</span><span class="tag" style="background:#d6e0e6;color:#2e4757">1 en essai</span></span><span class="ds">Assembler un sort : type, valeurs, geste et effets.</span></span></button>
+            </div>
+          </section>
+        </main>
+
+        <aside style="width:340px;flex:none;border-left:1px solid #c9ad80;padding:22px 26px;display:flex;flex-direction:column;gap:22px;background:#e3cfa6">
+          <section style="display:flex;flex-direction:column;gap:10px">
+            <h2 style="margin:0;font-family:Cinzel,Georgia,serif;font-size:17px">Vos brouillons</h2>
+            <div style="display:flex;flex-direction:column;gap:8px">
+              <a href="Sort.html" style="display:flex;justify-content:space-between;align-items:center;gap:10px;padding:10px 12px;background:#f4e8cc;border:1px solid #b39463;border-radius:6px;text-decoration:none;color:#2b1d12"><span style="display:flex;flex-direction:column"><span style="font-weight:600;font-size:16px">Flamme bleue</span><span style="font-size:14px;color:#5a4633">Sort en essai, vous seul pouvez le lancer</span></span><span class="tag" style="background:#d6e0e6;color:#2e4757">Essai</span></a>
+              <a href="Recolte.html" style="display:flex;justify-content:space-between;align-items:center;gap:10px;padding:10px 12px;background:#f4e8cc;border:1px solid #b39463;border-radius:6px;text-decoration:none;color:#2b1d12"><span style="display:flex;flex-direction:column"><span style="font-weight:600;font-size:16px">Forêt de Brume</span><span style="font-size:14px;color:#5a4633">2 points ajoutés, pas encore publiés</span></span><span class="tag" style="background:#efe0bf;color:#6b4a14">Brouillon</span></a>
+            </div>
+          </section>
+          <section style="display:flex;flex-direction:column;gap:4px;min-height:0">
+            <h2 style="margin:0 0 4px;font-family:Cinzel,Georgia,serif;font-size:17px">Journal du Conseil</h2>
+            <div class="jr"><span style="font-size:16px">A publié la station <strong>Forge du bourg</strong></span><span style="font-size:14px;color:#5a4633">[Membre du Conseil], il y a 12 min</span></div>
+            <div class="jr"><span style="font-size:16px">A déplacé <strong>Puits communal</strong> de 4 m</span><span style="font-size:14px;color:#5a4633">[Membre du Conseil], il y a 1 h</span></div>
+            <div class="jr"><span style="font-size:16px">A ajouté le grade <strong>Sergent</strong> à la Garde</span><span style="font-size:14px;color:#5a4633">[Membre du Conseil], hier</span></div>
+            <a href="#" style="font-size:15px;margin-top:6px">Tout le journal</a>
+          </section>
+          <p style="margin:auto 0 0;font-size:14px;line-height:1.4;color:#5a4633">Chaque atelier n'apparaît qu'aux rangs qui y ont droit. Un Sénéchal ne voit que le monde ; un Souverain voit tout.</p>
+        </aside>
+      </div>
+    </div>
+  </div>
+</div>
+</body>
+</html>

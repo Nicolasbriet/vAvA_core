@@ -1,0 +1,71 @@
+# Sécurité, optimisation et bande passante
+
+Document de référence des agents `vava-securite` et `vava-reseau-perf`. Les règles courtes sont dans `CLAUDE.md` ;
+ici, le pourquoi, les seuils et l'état des lieux.
+
+## Objectifs chiffrés (à mesurer en phase 1, à tenir ensuite)
+
+| Mesure | Cible |
+|---|---|
+| resmon de chaque ressource client au repos (personnage debout, rien d'ouvert) | ≤ 0,02 ms |
+| resmon pendant une action (récolte, incantation, interface ouverte) | ≤ 0,15 ms |
+| Évènements serveur → client reçus par un joueur immobile seul dans une zone calme | ≈ 0 par minute hors besoins/HUD |
+| Données téléchargées à la première connexion (hors oxmysql) | à mesurer, puis − 30 % après mutualisation |
+| Écran de chargement (tous fichiers) | ≤ 1,5 Mo |
+| Temps d'un RPC courant côté serveur | ≤ 2 ms ; requêtes SQL ≤ `slowQueryMs` |
+
+## Modèle de menace
+
+Un joueur malveillant contrôle entièrement son client : il exécute du Lua arbitraire, appelle n'importe quel RPC
+avec n'importe quels arguments, rejoue des requêtes, ment sur sa position et sur ce qu'il voit, ouvre les outils de
+développement de la NUI. Il ne contrôle pas le serveur ni la base. Tout ce qui a de la valeur (objets, XP, santé,
+droits, positions de stockage) est donc décidé et vérifié côté serveur.
+
+Scénarios à fermer pour chaque fonctionnalité : duplication par requêtes simultanées ; action à distance ; action
+en étant mort, ligoté ou en échange ; spam ; arguments hors bornes (négatifs, NaN, chaînes géantes, tables
+imbriquées) ; déconnexion au milieu d'un échange ; injection HTML dans les noms affichés ; contournement d'un droit
+du Conseil par appel direct du RPC.
+
+## Bande passante : règles détaillées
+
+1. **Ciblage.** Un évènement a un destinataire calculé par le serveur : le joueur concerné, les participants d'une
+   interaction, ou les joueurs dans un rayon (portée de vue ou d'ouïe définie en config). Jamais `-1`.
+2. **GlobalState.** Toute écriture est envoyée à **tous** les joueurs connectés. Acceptable : heure du royaume,
+   saison, météo, quelques drapeaux. Non acceptable : l'état de chaque nœud de récolte, parcelle ou station quand il
+   y en a des dizaines et qu'il change à chaque action.
+3. **Données de zone.** Modèle recommandé : le client entre dans le rayon d'une zone → il la demande (RPC limité) →
+   le serveur l'inscrit comme « abonné » à la zone et lui envoie l'état → ensuite il ne reçoit que les différences
+   tant qu'il est abonné → le serveur le désabonne quand il s'éloigne (vérifié côté serveur) ou se déconnecte.
+4. **Différences.** On envoie `{ id, champ = nouvelle valeur }`, pas l'objet complet.
+5. **Gros volumes** (catalogue, journal, liste de recettes) : envoyés une fois à la demande, mis en cache côté
+   client avec une version, renvoyés seulement si la version change ; `TriggerLatentClientEvent` au-delà de
+   quelques Ko.
+6. **Fichiers web.** Une ressource commune (`vava_ui`) porte polices, textures et icônes partagées, référencées par
+   `nui://vava_ui/…` ; chaque module ne garde que ses propres fichiers.
+
+## État des lieux (lecture du dépôt, octobre 2026)
+
+Points solides déjà en place :
+- Une seule porte d'entrée réseau : `server/core/rpc.lua` (seul `RegisterNetEvent` serveur du core), avec schémas
+  bornés obligatoires, limites de débit par joueur dont les clés sont choisies par le serveur, plafond de requêtes
+  simultanées.
+- SQL centralisé dans `server/core/database.lua`, paramétré, requêtes lentes signalées. Aucune requête concaténée
+  avec une valeur trouvée.
+- Un seul `TriggerClientEvent(…, -1, …)` : l'annonce du Conseil (`vava_admin/server/requests.lua`), rare et
+  réservée à un droit, inscrite dans `scripts/audit-exceptions.txt` ; les évènements de magie sont ciblés.
+- Modules isolés par leur `bridge/` : un module absent ne fait pas tomber les autres.
+
+Points à traiter (tâches de la phase 1) :
+- **GlobalState pour des états locaux** : `vava_gathering` (zones et nœuds), `vava_farming` (parcelles),
+  `vava_crafting` (stations). Chaque changement part chez tous les joueurs. Coût faible à 10 joueurs, à mesurer et à
+  passer au modèle « abonnement de zone » avant d'ouvrir.
+- **13 fichiers clients contiennent `Wait(0)`** (`vava_magic` en majorité, `vava_voice`, `vava_chat/overhead`,
+  `vava_admin/tools`, `client/players/spawn.lua`) : vérifier que chaque boucle ne tourne que pendant un état actif.
+- **Environ 3 Mo de fichiers web dupliqués** : 50 polices WOFF2 (1,8 Mo) et les textures `grain.png`/`paper.png`
+  (1,1 Mo) copiées dans une quinzaine de ressources, téléchargées autant de fois à la première connexion.
+- **Boucles `GetPlayers()`** dans 13 fichiers serveur : vérifier celles qui envoient des évènements.
+- `vava_chat/server/compat.lua` enregistre un évènement réseau hors RPC (repli de commande) : vérifier sa limite
+  de débit et ses bornes.
+- La magie n'a jamais été jouée en vrai (README de `vava_magic`) : c'est le module le plus risqué en performance
+  (projectiles, effets, zones).
+- Pas de tests ni de lint avant ce kit : base de départ de **14 avertissements luacheck mineurs** (relevés le 29 octobre 2026).

@@ -1,0 +1,24 @@
+-- Lint de vAvA (Lua 5.4 / FiveM). Lancé par scripts/verifier.sh et la CI.
+-- Les natives FiveM sont des milliers de globales en CamelCase : luacheck ne sait pas les lister par motif,
+-- donc l'accès aux globales non définies (113) est ignoré. Ce qui reste vérifié compte : erreurs de syntaxe,
+-- variables inutilisées, masquage, globales ÉCRITES par erreur (111/112), code mort, boucles vides.
+std = 'lua54'
+max_line_length = 120
+codes = true
+ignore = {
+    '113',          -- accès à une globale non définie (natives FiveM)
+    '212/self',     -- self inutilisé dans les méthodes
+    '631',          -- longueur de ligne gérée par max_line_length
+}
+-- Globales qu'une ressource a le droit de créer : sa table de module, et rien d'autre.
+globals = {
+    'vAvA',
+    'VavaAdmin', 'VavaAppearance', 'VavaCameras', 'VavaChancellerie', 'VavaCharactersUi', 'VavaChat',
+    'VavaCodex', 'VavaCrafting', 'VavaFarming', 'VavaGathering', 'VavaHealth', 'VavaHud', 'VavaInventory',
+    'VavaMagic', 'VavaNeeds', 'VavaSkills', 'VavaVoice', 'VavaWorld',
+    'VavaBridge', 'VavaExample', 'VavaAnimTest', 'VavaDevCharacters',
+    'exports',
+}
+exclude_files = { 'chancellerie/**', '**/web/**', 'tests/**' }
+files['**/fxmanifest.lua'] = { ignore = { '111', '112', '113', '611', '612' }, allow_defined_top = true }
+files['**/config.lua'] = { max_line_length = 160 }
