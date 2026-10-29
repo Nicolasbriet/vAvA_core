@@ -4,16 +4,17 @@
       - Une boucle lit la vie de chaque joueur apparu (une native par joueur, aucun message du client) : sous le
         seuil, le joueur est mis à terre, avec la cause et l'auteur lus côté serveur.
       - À terre : temps compté, retour automatique au lieu de soins à échéance ; un client qui se relève seul est
-        remis à terre (seul le serveur relève).
+        remis à terre (seul le serveur relève), journalisé une fois par mise à terre.
       - Vie enregistrée dans le personnage à intervalle régulier et au déchargement (déconnexion comprise : se
-        déconnecter à terre ne sert à rien).
+        déconnecter à terre ne sert à rien). Au départ, la vie est relue avec la même règle si le ped est encore
+        lisible : un coup mortel reçu juste avant de partir met à terre.
       - Soins, blessures, réanimation et retour au lieu de soins pour les autres fichiers et l'API.
     Dépendances : shared/constants.lua, config.lua, server/core.lua, server/state.lua (server/assist.lua à l'exécution)
 ]]
 
 local ipairs, pairs, tonumber, tostring = ipairs, pairs, tonumber, tostring
 local abs, huge = math.abs, math.huge
-local GetGameTimer, GetPlayers, GetPlayerPed = GetGameTimer, GetPlayers, GetPlayerPed
+local GetGameTimer, GetPlayers, GetPlayerPed, DoesEntityExist = GetGameTimer, GetPlayers, GetPlayerPed, DoesEntityExist
 local GetEntityHealth, GetEntityMaxHealth, GetEntityCoords = GetEntityHealth, GetEntityMaxHealth, GetEntityCoords
 local GetPedCauseOfDeath, GetPedSourceOfDeath = GetPedCauseOfDeath, GetPedSourceOfDeath
 local TriggerClientEvent, CreateThread, Wait = TriggerClientEvent, CreateThread, Wait
@@ -23,6 +24,9 @@ local cfg = VavaHealth.config
 local EVENTS = VavaHealth.EVENTS
 local HOOKS = VavaHealth.HOOKS
 local DOWN = cfg.downThreshold
+-- départ lu avant les autres abonnés : le ped n'est lisible qu'un temps, et un abonné précédent pourrait attendre la
+-- base (l'inventaire écrit au déchargement)
+local UNLOADING_PRIORITY = 10
 
 local life = {}
 VavaHealth.life = life
@@ -36,6 +40,7 @@ VavaHealth.life = life
 ---@field downedFor integer
 ---@field sampledAt integer
 ---@field resentAt integer
+---@field reported boolean|nil  relevé seul déjà journalisé pour cette mise à terre
 ---@field saved vAvA.HealthState  dernière valeur écrite dans le personnage
 
 ---@type table<integer, vAvA.HealthEntry>
@@ -131,7 +136,7 @@ function life.down(src, reason, cause, killer)
     if not entry then return false, 'no_character' end
     if entry.downed then return false, 'already_downed' end
     local now = GetGameTimer()
-    entry.downed, entry.downedFor, entry.health = true, 0, 0
+    entry.downed, entry.downedFor, entry.health, entry.reported = true, 0, 0, false
     entry.sampledAt, entry.resentAt, entry.graceUntil = now, now, now + cfg.graceMs
     persist(entry)
     assist().cancelFor(src)
@@ -241,7 +246,11 @@ local function check(src, entry, now, elapsed)
         end
         if now >= entry.graceUntil and GetEntityHealth(ped) > DOWN and now - entry.resentAt >= cfg.downed.resendMs then
             entry.resentAt = now
-            VavaHealth.log.warn('joueur %d debout sans avoir été relevé : remis à terre', src)
+            -- remis à terre à chaque fois, journalisé une seule fois par mise à terre
+            if not entry.reported then
+                entry.reported = true
+                VavaHealth.log.warn('joueur %d debout sans avoir été relevé : remis à terre', src)
+            end
             TriggerClientEvent(EVENTS.DOWN, src)
         end
         return
@@ -304,11 +313,30 @@ local function onSpawned(src)
     entry.spawned, entry.graceUntil, entry.sampledAt = true, now + cfg.graceMs, now
 end
 
+--- Ped d'un joueur, s'il existe encore (au départ, il peut déjà avoir été retiré).
+---@param src integer
+---@return integer|nil
+local function readablePed(src)
+    local ped = GetPlayerPed(src)
+    if ped == 0 or not DoesEntityExist(ped) then return nil end
+    return ped
+end
+
+--- Départ du personnage (déconnexion comprise). Si le ped est encore lisible, la vie est relue avec la règle de la
+--- boucle : un coup mortel reçu depuis la dernière lecture met à terre, au lieu d'être sauvé debout. Ped retiré, ou
+--- lecture pas encore fiable (délai de grâce) : la dernière valeur connue est gardée, rien n'est supposé.
 ---@param src integer
 local function onUnloading(src)
     local entry = entries[src]
     if not entry then return end
-    entry.health = currentHealth(src, entry)
+    local ped = entry.spawned and not entry.downed and GetGameTimer() >= entry.graceUntil and readablePed(src)
+    if ped then
+        if GetEntityHealth(ped) <= DOWN then
+            life.down(src, 'death', GetPedCauseOfDeath(ped), killerOf(src, ped))
+        else
+            entry.health = ratioOf(ped)
+        end
+    end
     persist(entry)
     assist().cancelFor(src)
     entries[src] = nil
@@ -332,12 +360,12 @@ end
 ---@return string|nil err
 function life.start()
     local hooks = VavaHealth.core.hooks
-    for name, handler in pairs({
-        ['core:character:loaded'] = function(payload) onLoaded(payload.source, payload.characterId) end,
-        ['core:character:spawned'] = function(payload) onSpawned(payload.source) end,
-        ['core:character:unloading'] = function(payload) onUnloading(payload.source) end,
+    for _, def in ipairs({
+        { 'core:character:loaded', function(payload) onLoaded(payload.source, payload.characterId) end },
+        { 'core:character:spawned', function(payload) onSpawned(payload.source) end },
+        { 'core:character:unloading', function(payload) onUnloading(payload.source) end, UNLOADING_PRIORITY },
     }) do
-        local id, err = hooks.after(name, handler)
+        local id, err = hooks.after(def[1], def[2], def[3])
         if not id then return false, err end
     end
 

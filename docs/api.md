@@ -682,6 +682,8 @@ touches et messages : `config.lua`. Demande le core 0.4.0 (hook `core:character:
   lit « Quelqu'un vous relève » : son nom n'est pas révélé.
 - **Rendre l'âme** (touche E maintenue 3 s) : après 3 minutes à terre ; porté au lieu de soins le plus proche avec 50 %.
   D'office au bout de 10 minutes. Se déconnecter à terre ne sert à rien : on revient à terre, avec le temps restant.
+  Se déconnecter juste après un coup mortel non plus : la vie est relue au départ si le jeu la donne encore (sinon la
+  dernière lecture est gardée).
 
 **Exports serveur** (cible : un joueur, son personnage actif) :
 
@@ -699,7 +701,8 @@ Codes : `not_ready`, `invalid_target`, `no_character`, `invalid_amount`, `invali
 
 **Hooks** :
 - `vava_health:downed` (`after`) : `{ source, characterId, reason, cause?, killer? }` — `reason` = `death` (vie lue sous
-  le seuil, `cause` = arme GTA) ou `api` ; `killer` = joueur à l'origine, s'il y en a un ;
+  le seuil, `cause` = arme GTA) ou `api` ; `killer` = joueur à l'origine, s'il y en a un ; aussi émis au départ du
+  joueur quand un coup mortel y est lu (`reason = death`, la source est alors en train de partir) ;
 - `vava_health:reviving` (`before`, annulable) : `{ source, target }` — exiger un métier, un objet… ; la raison du refus
   est montrée au joueur ;
 - `vava_health:revived` (`after`) : `{ source, characterId, reason, by? }` ;
