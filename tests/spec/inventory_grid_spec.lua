@@ -158,3 +158,226 @@ describe('vava_inventory grid.planReturn', function()
         assert.is_true(#placed >= 1)
     end)
 end)
+
+-- Géométrie des grilles d'inventaire (modules/vava_inventory/shared/grid.lua). Le module n'a pas de README ; valeurs
+-- documentées : docs/api.md (section vava_inventory : objet de `width` × `height` cases, pivotable en jeu) et
+-- l'en-tête de grid.lua (coordonnées en cases à partir de 0, origine en haut à gauche ; recherche de place ligne par
+-- ligne, d'abord dans le sens normal puis pivoté). Grilles de config.lua : besace 10 × 6, sac au sol 6 × 4.
+
+describe('vava_inventory grid', function()
+    local grid, cfg
+
+    before_each(function()
+        helper.reset()
+        helper.loadAll({
+            'modules/vava_inventory/shared/constants.lua',
+            'modules/vava_inventory/config.lua',
+            'modules/vava_inventory/shared/grid.lua',
+        })
+        grid = VavaInventory.grid
+        cfg = VavaInventory.config
+    end)
+
+    local function container(width, height)
+        return { width = width, height = height, occupancy = {} }
+    end
+
+    local function besace()
+        return container(cfg.character.width, cfg.character.height)
+    end
+
+    local function count(t)
+        local n = 0
+        for _ in pairs(t) do n = n + 1 end
+        return n
+    end
+
+    it('reprend les grilles de la config dans les bornes du protocole', function()
+        assert.equal(10, cfg.character.width)
+        assert.equal(6, cfg.character.height)
+        for _, size in ipairs({ cfg.character, cfg.drop, cfg.catalog }) do
+            assert.is_true(size.width <= VavaInventory.MAX_GRID and size.height <= VavaInventory.MAX_GRID)
+        end
+    end)
+
+    describe('emprise', function()
+        it('échange largeur et hauteur quand l’objet est pivoté', function()
+            local w, h = grid.footprint({ width = 2, height = 1 }, false)
+            assert.equal(2, w)
+            assert.equal(1, h)
+            w, h = grid.footprint({ width = 2, height = 1 }, true)
+            assert.equal(1, w)
+            assert.equal(2, h)
+        end)
+    end)
+
+    describe('fits', function()
+        it('accepte un objet qui touche le bord droit ou bas de la grille', function()
+            local c = besace()
+            assert.is_true(grid.fits(c, 1, 1, 9, 5))
+            assert.is_true(grid.fits(c, 10, 6, 0, 0))
+            assert.is_true(grid.fits(c, 1, 4, 0, 2))
+        end)
+
+        it('refuse un objet qui déborde ou part d’une coordonnée négative', function()
+            local c = besace()
+            assert.is_false(grid.fits(c, 1, 1, 10, 5))
+            assert.is_false(grid.fits(c, 1, 1, 9, 6))
+            assert.is_false(grid.fits(c, 2, 1, 9, 0))
+            assert.is_false(grid.fits(c, 1, 4, 0, 3))
+            assert.is_false(grid.fits(c, 1, 1, -1, 0))
+            assert.is_false(grid.fits(c, 1, 1, 0, -1))
+            assert.is_false(grid.fits(c, 11, 1, 0, 0))
+        end)
+
+        it('refuse de chevaucher un autre objet', function()
+            local c = besace()
+            grid.mark(c, 2, 2, 2, 1, 7)
+            assert.is_false(grid.fits(c, 1, 1, 3, 2))
+            assert.is_false(grid.fits(c, 2, 2, 1, 0))
+            assert.is_true(grid.fits(c, 1, 1, 4, 1))
+            assert.is_true(grid.fits(c, 2, 1, 2, 3))
+        end)
+
+        it('ignore l’objet déplacé lui-même (ignoreId), pas les autres', function()
+            local c = besace()
+            grid.mark(c, 2, 2, 2, 1, 7)
+            grid.mark(c, 1, 1, 4, 1, 8)
+            assert.is_false(grid.fits(c, 2, 2, 3, 1, 7))                -- toucherait l'objet 8
+            assert.is_true(grid.fits(c, 2, 2, 2, 2, 7))                 -- glisse d'une case sur lui-même
+            assert.is_false(grid.fits(c, 2, 2, 2, 2, 8))
+        end)
+
+        it('refuse une case réservée', function()
+            local c = besace()
+            local reserved = {}
+            grid.reserve(reserved, c, 1, 1, 3, 0)
+            assert.is_false(grid.fits(c, 1, 1, 3, 0, nil, reserved))
+            assert.is_true(grid.fits(c, 1, 1, 3, 0))
+        end)
+    end)
+
+    describe('mark, unmark et reserve', function()
+        it('numérote les cases ligne par ligne : y × largeur + x', function()
+            local c = besace()
+            grid.mark(c, 2, 2, 3, 1, 5)
+            assert.same({ [13] = 5, [14] = 5, [23] = 5, [24] = 5 }, c.occupancy)
+        end)
+
+        it('ne retire que les cases de l’objet visé', function()
+            local c = besace()
+            grid.mark(c, 2, 1, 0, 0, 1)
+            grid.mark(c, 1, 1, 1, 0, 2)                 -- recouvre une case de l'objet 1 (état incohérent simulé)
+            grid.unmark(c, 2, 1, 0, 0, 1)
+            assert.same({ [1] = 2 }, c.occupancy)
+        end)
+
+        it('réserve des cases dans une table à part, sans toucher la grille', function()
+            local c = besace()
+            local reserved = {}
+            grid.reserve(reserved, c, 3, 1, 7, 5)
+            assert.same({ [57] = true, [58] = true, [59] = true }, reserved)
+            assert.equal(0, count(c.occupancy))
+        end)
+    end)
+
+    describe('findSpace', function()
+        it('rend le coin haut gauche d’une grille vide, sans pivoter', function()
+            local x, y, rotated = grid.findSpace(besace(), { width = 2, height = 1 })
+            assert.equal(0, x)
+            assert.equal(0, y)
+            assert.is_false(rotated)
+        end)
+
+        it('cherche ligne par ligne, de gauche à droite', function()
+            local c = container(4, 3)
+            grid.mark(c, 3, 1, 0, 0, 1)                 -- ligne 0 : seule la case 3 reste libre
+            local x, y = grid.findSpace(c, { width = 1, height = 1 })
+            assert.equal(3, x)
+            assert.equal(0, y)
+            x, y = grid.findSpace(c, { width = 2, height = 1 })
+            assert.equal(0, x)
+            assert.equal(1, y)
+        end)
+
+        it('préfère le sens normal plus bas au sens pivoté plus haut', function()
+            local c = container(4, 4)
+            for row = 0, 2 do
+                grid.mark(c, 1, 1, 1, row, 10 + row)
+                grid.mark(c, 1, 1, 3, row, 20 + row)
+            end
+            local x, y, rotated = grid.findSpace(c, { width = 2, height = 1 })
+            assert.equal(0, x)
+            assert.equal(3, y)
+            assert.is_false(rotated)
+        end)
+
+        it('pivote l’objet quand il ne tient que pivoté', function()
+            local c = container(3, 5)
+            local x, y, rotated = grid.findSpace(c, { width = 4, height = 1 })
+            assert.equal(0, x)
+            assert.equal(0, y)
+            assert.is_true(rotated)
+        end)
+
+        it('rend nil quand l’objet ne tient dans aucun sens (8 × 1 dans un sac au sol de 6 × 4)', function()
+            assert.is_nil(grid.findSpace(container(cfg.drop.width, cfg.drop.height), { width = 8, height = 1 }))
+        end)
+
+        it('rend nil pour un objet carré qui ne tient pas', function()
+            local c = container(3, 3)
+            grid.mark(c, 1, 1, 1, 1, 9)
+            assert.is_nil(grid.findSpace(c, { width = 2, height = 2 }))
+        end)
+
+        it('tient compte des cases réservées', function()
+            local c = container(3, 1)
+            local reserved = {}
+            grid.reserve(reserved, c, 1, 1, 0, 0)
+            local x = grid.findSpace(c, { width = 1, height = 1 }, reserved)
+            assert.equal(1, x)
+        end)
+
+        it('remplit la besace de 60 objets d’une case, pas d’un de plus', function()
+            local c = besace()
+            local def = { width = 1, height = 1 }
+            for id = 1, cfg.character.width * cfg.character.height do
+                local x, y, rotated = grid.findSpace(c, def)
+                assert.is_number(x, 'objet ' .. id)
+                local w, h = grid.footprint(def, rotated)
+                grid.mark(c, w, h, x, y, id)
+            end
+            assert.equal(60, count(c.occupancy))
+            assert.is_nil(grid.findSpace(c, def))
+        end)
+
+        it('docs/tests/inventaire.md § 3 : dix vestes de cuir (2 × 3) se rangent cinq par rangée sur deux rangées', function()
+            local c = besace()
+            local veste = { width = 2, height = 3 }
+            for id = 1, 10 do
+                local x, y, rotated = grid.findSpace(c, veste)
+                assert.equal(((id - 1) % 5) * 2, x, 'veste ' .. id)
+                assert.equal(id <= 5 and 0 or 3, y, 'veste ' .. id)
+                assert.is_false(rotated)
+                grid.mark(c, 2, 3, x, y, id)
+            end
+            assert.equal(60, count(c.occupancy))           -- grille pleine
+            assert.is_nil(grid.findSpace(c, veste))         -- onzième veste : pas de place
+            assert.is_nil(grid.findSpace(c, { width = 1, height = 1 }))
+        end)
+
+        it('place plusieurs objets d’un coup grâce aux réservations, puis refuse le suivant', function()
+            local c = besace()
+            local reserved = {}
+            local half = { width = 5, height = 6 }
+            for _ = 1, 2 do
+                local x, y, rotated = grid.findSpace(c, half, reserved)
+                assert.is_number(x)
+                local w, h = grid.footprint(half, rotated)
+                grid.reserve(reserved, c, w, h, x, y)
+            end
+            assert.is_nil(grid.findSpace(c, { width = 1, height = 1 }, reserved))
+            assert.equal(0, count(c.occupancy))         -- rien n'est encore marqué
+        end)
+    end)
+end)

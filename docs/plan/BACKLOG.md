@@ -33,7 +33,7 @@ correction sauvage. Un problème **BLOQUANT** remonté par un audit devient une 
 - Critères : chaque règle du tableau « Schémas » de `docs/api.md` a au moins un test positif et un négatif.
 
 ### T-003 — Tests unitaires des modules métiers et magie
-- Agent : vava-testeur · Dépend de : T-002 · Statut : à faire
+- Agent : vava-testeur · Dépend de : T-002 · Statut : à tester en jeu
 - Logique pure de `vava_crafting/shared/quality.lua`, `vava_farming/shared/growth.lua` et `geometry.lua`,
   `vava_gathering/shared/geometry.lua`, `vava_skills/shared/progression.lua` (compléter), `vava_magic/shared/*`,
   `vava_inventory/shared/grid.lua`. Vérifier les valeurs documentées dans chaque README.
