@@ -3,6 +3,8 @@
     Rôle : sacs au sol. Chaque sac est un conteneur temporaire (jamais écrit en base) matérialisé par une entité réseau
            créée par le serveur : OneSync la rend visible aux seuls joueurs proches, sans diffusion maison. Son statebag
            public ne contient que l'id du conteneur. Le sac disparaît vide ou après lifetimeMs (son contenu avec).
+           Plafonds (config.drop) : sacs encore au sol posés par un même personnage (maxPerPlayer), et sur tout le
+           serveur (maxTotal) ; un sac compte de sa pose à sa disparition, que son auteur soit encore là ou non.
     Dépendances : shared/constants.lua, config.lua, server/core.lua, server/positions.lua, server/containers.lua,
                   server/viewers.lua
 ]]
@@ -23,8 +25,11 @@ local playerPosition = positions.of
 local drops = {}
 VavaInventory.drops = drops
 
--- id de conteneur → { entity, x, y, z }
+-- id de conteneur → { entity, x, y, z, owner }
 local active = {}
+-- personnage → nombre de ses sacs encore au sol (entrée retirée à zéro) ; nombre de sacs au sol sur le serveur
+local perOwner = {}
+local total = 0
 
 ---@param drop table
 ---@param x number
@@ -41,31 +46,40 @@ function drops.remove(id)
     local drop = active[id]
     if not drop then return end
     active[id] = nil
+    total = total - 1
+    local left = perOwner[drop.owner] - 1
+    perOwner[drop.owner] = left > 0 and left or nil
     viewers.closeContainer(id)
     if DoesEntityExist(drop.entity) then DeleteEntity(drop.entity) end
     containers.unload(id)
 end
 
---- Crée un sac aux pieds du joueur. Synchrone.
+--- Crée un sac aux pieds du joueur, posé par le personnage `owner`, dans la limite des plafonds. Synchrone.
 ---@param src integer
+---@param owner integer  personnage qui pose le sac
 ---@return vAvA.Container|nil
-function drops.create(src)
+---@return string|nil code  too_many_drops (plafond atteint), drop_failed
+function drops.create(src, owner)
+    if owner == nil then return nil, 'drop_failed' end
+    if total >= cfg.maxTotal or (perOwner[owner] or 0) >= cfg.maxPerPlayer then return nil, 'too_many_drops' end
     local x, y, z = playerPosition(src)
-    if not x then return nil end
+    if not x then return nil, 'drop_failed' end
     local container = containers.createTransient({
         kind = KIND.DROP, width = cfg.width, height = cfg.height, maxWeight = cfg.maxWeight, label = cfg.label,
     })
-    if not container then return nil end
+    if not container then return nil, 'drop_failed' end
     local groundZ = z - cfg.groundOffset
     local entity = CreateObjectNoOffset(MODEL, x, y, groundZ, true, true, false)
     if entity == 0 then
         containers.unload(container.id)
-        return nil
+        return nil, 'drop_failed'
     end
     FreezeEntityPosition(entity, true)
     Entity(entity).state:set(DROP_STATE, container.id, true)
-    local drop = { entity = entity, x = x, y = y, z = groundZ }
+    local drop = { entity = entity, x = x, y = y, z = groundZ, owner = owner }
     active[container.id] = drop
+    total = total + 1
+    perOwner[owner] = (perOwner[owner] or 0) + 1
     SetTimeout(cfg.lifetimeMs, function()
         if active[container.id] == drop then drops.remove(container.id) end
     end)

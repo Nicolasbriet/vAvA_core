@@ -1,7 +1,7 @@
 --[[
     vava_inventory/server/main.lua
-    Rôle : déclaration du module auprès du core (registre des objets, champs raccourcis et mains) et enregistrement
-           des intentions du joueur (RPC à schéma strict).
+    Rôle : déclaration du module auprès du core (registre des objets, champs raccourcis et mains, liste publiée des
+           objets tenables) et enregistrement des intentions du joueur (RPC à schéma strict).
     Dépendances : tous les fichiers server/ du module
 ]]
 
@@ -68,6 +68,8 @@ local function setup()
     if not ok then return false, err end
     ok, err = VavaInventory.hands.define()
     if not ok then return false, err end
+    ok, err = VavaInventory.hands.start()
+    if not ok then return false, 'objets tenables : ' .. tostring(err) end
 
     ok, err = containers.init()
     if not ok then return false, 'identifiants d\'objets : ' .. tostring(err) end

@@ -5,10 +5,14 @@
            réseau, au ped du porteur. Une boucle lente ne tourne que tant qu'au moins un joueur tient quelque chose :
            elle attache ce qui attend son ped (joueur lointain, modèle en cours de chargement), rattache ce que le jeu
            a détaché (réapparition, changement de modèle) et retire les accessoires des joueurs partis.
+           Le statebag d'un joueur peut avoir été écrit par son propre client : rien n'est affiché si sa valeur ne
+           correspond pas exactement (modèle, os, décalage, rotation) à un objet déclaré tenable, d'après la liste que
+           le serveur publie dans GlobalState (que seul le serveur écrit).
     Dépendances : shared/constants.lua, config.lua, client/core.lua
 ]]
 
 local type, tonumber, pairs, next = type, tonumber, pairs, next
+local abs, tointeger = math.abs, math.tointeger
 local match, concat = string.match, table.concat
 local CreateThread, Wait, GetGameTimer, AddEventHandler = CreateThread, Wait, GetGameTimer, AddEventHandler
 local AddStateBagChangeHandler, GetPlayerFromServerId, GetActivePlayers, GetPlayerServerId, NetworkIsPlayerActive =
@@ -21,8 +25,11 @@ local GetCurrentResourceName = GetCurrentResourceName
 
 local cfg = VavaInventory.config.hands
 local HANDS_FIELD = VavaInventory.HANDS_FIELD
+local HELD_MODELS = VavaInventory.HELD_MODELS
 local RESOURCE = GetCurrentResourceName()
 local NO_PLAYER = -1
+-- écart toléré entre le placement du champ et celui de la déclaration (mètres, degrés)
+local EPSILON = 0.001
 
 local hands = {}
 VavaInventory.hands = hands
@@ -32,19 +39,42 @@ local wanted = {}
 -- numéro serveur → { entity, key, loading } : accessoire affiché, ou en cours de création
 local shown = {}
 local running = false
+-- objet → accessoire déclaré { model, bone, offset, rotation }, publié par le serveur : seule source de confiance
+local declared = {}
 
----@param value table
+---@param prop table  accessoire vérifié (voir trusted)
 ---@return string
-local function keyOf(value)
-    local o, r = value.offset or {}, value.rotation or {}
-    return concat({ value.id, value.model, value.bone, o[1], o[2], o[3], r[1], r[2], r[3] }, '|')
+local function keyOf(prop)
+    local o, r = prop.offset, prop.rotation
+    return concat({ prop.id, prop.model, prop.bone, o[1], o[2], o[3], r[1], r[2], r[3] }, '|')
 end
 
+--- Vrai si `value` est un vecteur { x, y, z } égal (à EPSILON près) à `reference`. NaN n'est égal à rien.
 ---@param value any
+---@param reference any
 ---@return boolean
-local function validValue(value)
-    return type(value) == 'table' and type(value.model) == 'string' and type(value.bone) == 'number'
-        and type(value.offset) == 'table' and type(value.rotation) == 'table'
+local function sameVector(value, reference)
+    if type(value) ~= 'table' or type(reference) ~= 'table' then return false end
+    for i = 1, 3 do
+        local a, b = value[i], reference[i]
+        if type(a) ~= 'number' or type(b) ~= 'number' or not (abs(a - b) <= EPSILON) then return false end
+    end
+    return true
+end
+
+--- Accessoire à montrer pour la valeur du champ d'un joueur, ou nil si elle ne correspond pas exactement à l'objet
+--- déclaré tenable qu'elle nomme. Modèle, os et placement viennent alors de la déclaration, jamais du champ.
+---@param value table
+---@return table|nil prop  { id, model, bone, offset, rotation }
+local function trusted(value)
+    local id = type(value.id) == 'number' and tointeger(value.id)
+    local prop = type(value.item) == 'string' and declared[value.item]
+    if not id or type(prop) ~= 'table' or type(prop.model) ~= 'string' or type(prop.bone) ~= 'number' then return nil end
+    if value.model ~= prop.model or value.bone ~= prop.bone
+        or not sameVector(value.offset, prop.offset) or not sameVector(value.rotation, prop.rotation) then
+        return nil
+    end
+    return { id = id, model = prop.model, bone = prop.bone, offset = prop.offset, rotation = prop.rotation }
 end
 
 ---@param serverId integer
@@ -58,7 +88,7 @@ end
 --- Crée et attache l'accessoire au ped (modèle chargé avec une attente bornée). Dans son propre thread.
 ---@param serverId integer
 ---@param ped integer
----@param value table
+---@param value table  accessoire vérifié (voir trusted)
 local function attach(serverId, ped, value)
     local entry = { entity = nil, key = keyOf(value), loading = true }
     shown[serverId] = entry
@@ -99,7 +129,9 @@ local function reconcile(serverId)
     local value = wanted[serverId]
     local player = GetPlayerFromServerId(serverId)
     local ped = player ~= NO_PLAYER and GetPlayerPed(player) or 0
-    if not value or ped == 0 or not DoesEntityExist(ped) then
+    -- valeur qui ne correspond à aucun objet déclaré tenable : rien d'affiché (elle est relue si la liste change)
+    local prop = value and trusted(value)
+    if not prop or ped == 0 or not DoesEntityExist(ped) then
         remove(serverId)
         if value and player == NO_PLAYER then wanted[serverId] = nil end
         return
@@ -107,13 +139,14 @@ local function reconcile(serverId)
     local entry = shown[serverId]
     if entry then
         if entry.loading then return end
+        local key = keyOf(prop)
         -- toujours là et toujours accroché à ce ped : rien à faire
-        if entry.key == keyOf(value) and entry.entity and DoesEntityExist(entry.entity) and IsEntityAttachedToEntity(entry.entity, ped) then return end
+        if entry.key == key and entry.entity and DoesEntityExist(entry.entity) and IsEntityAttachedToEntity(entry.entity, ped) then return end
         -- modèle inconnu : on n'insiste pas tant que la valeur est la même
-        if entry.key == keyOf(value) and not entry.entity then return end
+        if entry.key == key and not entry.entity then return end
         remove(serverId)
     end
-    attach(serverId, ped, value)
+    attach(serverId, ped, prop)
 end
 
 --- Boucle lente justifiée : une poignée de natives par joueur qui tient quelque chose, toutes les pollMs ; s'arrête
@@ -129,11 +162,7 @@ end
 ---@param serverId integer
 ---@param value any
 local function setWanted(serverId, value)
-    if validValue(value) then
-        wanted[serverId] = value
-    else
-        wanted[serverId] = nil
-    end
+    wanted[serverId] = type(value) == 'table' and value or nil
     reconcile(serverId)
     if wanted[serverId] and not running then
         running = true
@@ -141,8 +170,17 @@ local function setWanted(serverId, value)
     end
 end
 
+--- Nouvelle liste des objets tenables : chaque accessoire est revérifié (déclaration retirée, ou arrivée après le champ).
+---@param list any
+local function setDeclared(list)
+    declared = type(list) == 'table' and list or {}
+    for serverId in pairs(wanted) do reconcile(serverId) end
+end
+
 --- Suit les statebags des joueurs et reprend ce que tiennent les joueurs déjà présents. Appelé par client/main.lua.
 function hands.start()
+    declared = type(GlobalState[HELD_MODELS]) == 'table' and GlobalState[HELD_MODELS] or {}
+    AddStateBagChangeHandler(HELD_MODELS, 'global', function(_, _, list) setDeclared(list) end)
     AddStateBagChangeHandler(HANDS_FIELD, nil, function(bagName, _, value)
         local serverId = tonumber(match(bagName, '^player:(%d+)$'))
         if serverId then setWanted(serverId, value) end

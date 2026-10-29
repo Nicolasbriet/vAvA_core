@@ -507,8 +507,12 @@ function operations.drop(src, instanceId, quantity)
         x, y, rotated = grid.findSpace(target, def)
     end
     if not x then
-        target = drops.create(src)
-        if not target then return false, 'drop_failed' end
+        -- nouveau sac, compté au personnage (plafonds par personnage et du serveur) : refusé, l'objet reste où il est
+        local session = sessions[src]
+        if not session then return false, 'no_character' end
+        local code
+        target, code = drops.create(src, session.characterId)
+        if not target then return false, code or 'drop_failed' end
         x, y, rotated = grid.findSpace(target, def)
         if not x or (target.maxWeight > 0 and def.weight * quantity > target.maxWeight) then
             drops.cleanup(target)

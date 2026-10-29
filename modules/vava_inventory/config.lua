@@ -20,6 +20,11 @@ VavaInventory.config = {
         interactDistance = 2.5,    -- distance maximale (m), vérifiée côté serveur à chaque opération
         groundOffset = 0.98,       -- hauteur du centre du ped au-dessus du sol
         reuseDistance = 1.5,       -- jeter près d'un sac existant le remplit plutôt que d'en créer un autre
+        -- Plafonds des sacs encore au sol (entités réseau) : posés par un même personnage, et sur tout le serveur.
+        -- Au-delà, un jet qui poserait un nouveau sac est refusé ; remplir un sac existant reste possible. Un sac
+        -- compte jusqu'à sa disparition (vidé, expiré), même si son auteur a quitté le jeu.
+        maxPerPlayer = 10,
+        maxTotal = 300,
         stateWaitMs = 2000,        -- client : attente maximale de l'entité locale d'un sac signalé par statebag
         statePollMs = 100,
     },

@@ -480,7 +480,10 @@ core.registry.add('vava_inventory:items', 'parchemin', {
 ```
 
 Un objet est utilisable s'il a `effects` ou `onUse` (les deux à la fois : `onUse` décide de la consommation, les
-effets ne s'appliquent que si l'unité est consommée). `effects` : 8 effets au plus, nombres entre −1000 et 1000. La
+effets ne s'appliquent que si l'unité est consommée). **`onUse` ne doit pas céder la main** (pas de `Wait`, d'attente
+de la base ni d'export qui attend) : l'objet pourrait être jeté ou consommé entre-temps, et ce que la fonction a déjà
+fait resterait acquis sans unité retirée ; un geste qui dure se lance dans son propre thread (`CreateThread`), comme le
+fait vava_magic. `effects` : 8 effets au plus, nombres entre −1000 et 1000. La
 fiche d'objet affiche les effets qu'elle connaît (`web/js/strings.js` → `effects`).
 
 **Objet qui se tient en main** (depuis 1.4.0) : `held = { model = 'prop_tool_fireaxe', bone?, offset?, rotation? }`
@@ -489,7 +492,11 @@ prend dans l'emplacement **Mains** de son inventaire (glisser, clic droit, ou do
 usage) ; une seule pile en main, qui reste dans la besace (place et poids). Le champ public `vava_inventory:hands`
 (statebag du joueur : `{ id, item, model, bone, offset, rotation }` ou rien) fait apparaître l'accessoire chez tous les
 joueurs proches (objet local attaché au ped, aucune entité réseau). La main se vide d'elle-même quand la pile quitte la
-besace (jetée, déposée, consommée, retirée par un module).
+besace (jetée, déposée, consommée, retirée par un module). Un client pouvant écrire le statebag de son joueur,
+l'accessoire n'apparaît (1.6.0) que si cette valeur correspond exactement (modèle, os, décalage, rotation) à la
+déclaration `held` de l'objet, publiée par le serveur dans `GlobalState['vava_inventory:heldModels']`
+(`{ [objet] = { model, bone, offset, rotation } }`, valeurs par défaut comprises ; clé interne, que les modules
+n'écrivent pas).
 
 **Affichage des métadonnées** (depuis 1.4.0) : la fiche et la case d'un objet montrent les métadonnées du **contrat
 standard** — `tier` (badge et liseré de la teinte du palier ; libellés `strings.js` → `metadata.tiers`), `quality`
@@ -555,6 +562,10 @@ montré au joueur, dans l'interface ou en notification s'il utilisait un raccour
   Les identifiants d'objets sont attribués en mémoire (**un seul serveur par base de données**).
 - Écriture groupée toutes les 3 s et à chaque fermeture ou déchargement. Les sacs au sol ne survivent pas à un
   redémarrage (ni leur contenu).
+- Sacs au sol plafonnés (1.6.0) : au plus `config.drop.maxPerPlayer` (10) sacs posés par un même personnage et
+  `config.drop.maxTotal` (300) sur le serveur ; un sac compte jusqu'à sa disparition (vidé, expiré), même après le
+  départ de son auteur. Au-delà, le jet qui poserait un nouveau sac est refusé (`too_many_drops`) ; remplir un sac
+  existant reste possible.
 - Le client ne reçoit que les conteneurs qu'il a ouverts, puis leurs différences.
 
 Touches par défaut (réglables par le joueur dans Paramètres > Raccourcis > FiveM) : `I` ouvre l'inventaire,

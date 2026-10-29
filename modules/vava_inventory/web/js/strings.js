@@ -117,6 +117,7 @@ const STRINGS = Object.freeze({
     too_far: 'Trop loin.',
     invalid_metadata: 'Inscription refusée.',
     drop_failed: 'Impossible de poser un sac ici.',
+    too_many_drops: 'Trop de sacs au sol.',
     already_dropped: 'Cet objet est déjà au sol.',
     rate_limited: 'Doucement…',
     timeout: 'Le serveur ne répond pas.',
