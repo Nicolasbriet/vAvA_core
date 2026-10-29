@@ -338,7 +338,7 @@ kbd, .badge-key, .row-keycap {
 .field { position: relative; display: grid; gap: 0.3rem; }
 .field-head { display: flex; align-items: baseline; gap: 0.5rem; }
 .field-name { font-family: var(--font-display); font-size: 0.78rem; font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase; color: var(--ink-muted); }
-.field-optional { color: var(--ink-faint); font-size: 0.82rem; font-style: italic; }
+.field-optional, .field-bounds { color: var(--ink-faint); font-size: 0.82rem; font-style: italic; }
 .field-hint { margin: 0; color: var(--ink-faint); font-size: 0.86rem; font-style: italic; }
 .field-input, .field-number {
   min-height: 2.3rem;
@@ -352,7 +352,7 @@ kbd, .badge-key, .row-keycap {
   font-size: 1.02rem;
   user-select: text;
 }
-.field-input::placeholder { color: var(--ink-faint); font-style: italic; }
+.field-input::placeholder, .field-number::placeholder { color: var(--ink-faint); font-style: italic; }
 .field-input:focus, .field-number:focus { outline: none; box-shadow: inset 0 1px 3px rgba(40, 26, 10, 0.45), inset 0 0 0 1px var(--brass); }
 .field-row { display: flex; align-items: center; gap: 0.8rem; }
 .field-number { width: 5.2rem; text-align: center; font-weight: 600; font-variant-numeric: lining-nums tabular-nums; }
@@ -360,6 +360,8 @@ kbd, .badge-key, .row-keycap {
 .field-range { flex: 1; height: 1.4rem; margin: 0; background: transparent; -webkit-appearance: none; appearance: none; }
 .field-range::-webkit-slider-runnable-track { height: 6px; border-radius: 3px; background: rgba(60, 40, 18, 0.25); box-shadow: inset 0 1px 2px rgba(40, 26, 10, 0.6); }
 .field-range::-webkit-slider-thumb { width: 1.05rem; height: 1.05rem; margin-top: calc(3px - 0.525rem); border-radius: 50%; background: radial-gradient(circle at 35% 30%, #fbe8bb, #b48a4c 55%, #5c4220); box-shadow: 0 0 0 1px #1d140b, 0 2px 4px rgba(0, 0, 0, 0.5); cursor: pointer; -webkit-appearance: none; }
+/* nombre encore à choisir : le curseur n'indique aucune valeur, seulement où commencer */
+.field-range.is-unset::-webkit-slider-thumb { background: rgba(255, 250, 238, 0.9); box-shadow: 0 0 0 1px var(--ink-faint), 0 1px 2px rgba(0, 0, 0, 0.25); }
 
 .chips { display: flex; flex-wrap: wrap; gap: 0.35rem; }
 .chip {

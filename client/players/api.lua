@@ -3,6 +3,8 @@
     Rôle : bloc characters de l'API client v1 (ajout rétrocompatible via api.extend). Base d'un futur écran de
            sélection : chaque fonction est une intention envoyée au serveur, qui valide et décide.
     Retours des fonctions RPC : ok (transport), puis la réponse du serveur (succès, résultat ou code).
+    list() : ok, succès, personnages, maximum par compte, règles de nom { minLength, maxLength, letters,
+    separators } (0.7.6, tirées de config/server.lua : une interface vérifie la saisie comme le serveur).
     Dépendances : shared/core/api.lua, client/core/rpc.lua, client/players/session.lua, client/players/spawn.lua
 ]]
 

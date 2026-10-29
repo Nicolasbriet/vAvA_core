@@ -8,7 +8,8 @@
       - invisibilité, invulnérabilité : bascules, sans boucle ;
       - repère de la carte : sol cherché à quelques hauteurs, borné ;
       - observation : le membre, invisible et sans collision, est placé sous le joueur (OneSync ne transmet que les
-        entités proches) et recalé une fois par seconde ; il revient à sa place à la fin.
+        entités proches) et recalé une fois par seconde ; il revient à sa place à la fin. S'il quitte le jeu avant,
+        le serveur le replace à sa prochaine apparition (server/spectate.lua), jamais sous terre.
     Dépendances : config.lua, client/core.lua
 ]]
 

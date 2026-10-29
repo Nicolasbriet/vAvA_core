@@ -24,6 +24,8 @@
     }
     show('selection');
     Selection.render(result);
+    // règles de nom du serveur, arrivées avec la liste : l'éditeur vérifie la saisie comme lui
+    Creator.setNameRules(result.nameRules);
   }
 
   Feedback.init();

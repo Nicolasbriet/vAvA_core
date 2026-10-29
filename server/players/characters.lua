@@ -60,6 +60,12 @@ local HOOK_SPAWNED = 'core:character:spawned'
 
 local NAME_LETTERS = str.codepointSet(nameCfg.letters)
 local NAME_SEPARATORS = str.codepointSet(nameCfg.separators)
+-- Règles de nom envoyées avec la liste des personnages (0.7.6) : config/server.lua ne part jamais chez les clients,
+-- et une interface de création vérifie ainsi la saisie comme le serveur, sans en garder une copie écrite en dur.
+local NAME_RULES = {
+    minLength = nameCfg.minLength, maxLength = nameCfg.maxLength,
+    letters = nameCfg.letters, separators = nameCfg.separators,
+}
 local SEXES = {}
 for _, sex in pairs(cfg.sexes) do SEXES[sex] = true end
 
@@ -547,8 +553,9 @@ function characters.registerRpc()
         { RPC.LIST, {}, limits.list, function(src)
             local session = accounts.get(src)
             if not session then return false, 'no_session' end
-            -- le maximum permet à une interface d'afficher les emplacements libres sans connaître la config
-            return true, summariesOf(session), cfg.maxPerAccount
+            -- le maximum et les règles de nom permettent à une interface d'afficher les emplacements libres et de
+            -- vérifier un nom sans connaître la config (le serveur revérifie tout à la création)
+            return true, summariesOf(session), cfg.maxPerAccount, NAME_RULES
         end },
         { RPC.CREATE, { nameArg, nameArg, { type = 'string', enum = cfg.sexes } }, limits.create, function(src, firstName, lastName, sex)
             return withSession(src, 'joined', create, firstName, lastName, sex)

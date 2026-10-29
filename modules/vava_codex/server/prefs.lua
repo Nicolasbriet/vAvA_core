@@ -2,18 +2,21 @@
     vava_codex/server/prefs.lua
     Rôle : préférences du Codex par personnage, dans un champ de personnage du core (écrit en base avec lui, visible
            du seul joueur) : signets (favoris, bornés), dernières pages (commandes lancées, les plus récentes en tête,
-           sans doublon), réglage « rester ouvert après Lancer ».
-    Dépendances : shared/constants.lua, config.lua, server/core.lua, bridge/server.lua
+           sans doublon), réglage « rester ouvert après Lancer ». Un maximum abaissé dans la config tronque les
+           listes (shared/prefs.lua) au lieu de bloquer les écritures.
+    Dépendances : shared/constants.lua, config.lua, shared/prefs.lua, server/core.lua, bridge/server.lua
 ]]
 
-local ipairs, type = ipairs, type
+local ipairs = ipairs
 local time = os.time
 
 local core = VavaCodex.core
 local bridge = VavaCodex.bridge
 local cfg = VavaCodex.config
+local fitPrefs = VavaCodex.fitPrefs
 local FIELD = VavaCodex.PREFS_FIELD
 local MAX_NAME, MAX_ACTION = VavaCodex.MAX_NAME, VavaCodex.MAX_ACTION
+local LIMITS = { favorites = cfg.favorites.max, recent = cfg.recent.max }
 
 local prefs = {}
 VavaCodex.prefs = prefs
@@ -48,7 +51,8 @@ function prefs.define()
     })
 end
 
---- Préférences du joueur (copie défensive : les tableaux reviennent toujours comme des listes).
+--- Préférences du joueur (copie défensive : les tableaux reviennent toujours comme des listes), ramenées aux
+--- maximums actuels : une config abaissée tronque les listes et la prochaine écriture enregistre la version courte.
 ---@param src integer
 ---@return table|nil prefs
 ---@return integer|nil characterId
@@ -56,12 +60,7 @@ function prefs.get(src)
     local characterId = bridge.GetCharacterId(src)
     if not characterId then return nil end
     local value = core.characters.get(characterId, FIELD)
-    if type(value) ~= 'table' then value = default() end
-    local out = default()
-    for i, name in ipairs(value.favorites or {}) do out.favorites[i] = name end
-    for i, entry in ipairs(value.recent or {}) do out.recent[i] = { name = entry.name, action = entry.action, at = entry.at } end
-    if type(value.keepOpen) == 'boolean' then out.keepOpen = value.keepOpen end
-    return out, characterId
+    return fitPrefs(value, LIMITS, cfg.keepOpenDefault), characterId
 end
 
 ---@param src integer

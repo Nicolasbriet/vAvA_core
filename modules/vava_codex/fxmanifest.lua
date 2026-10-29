@@ -16,7 +16,7 @@ use_experimental_fxv2_oal 'yes'
 
 name 'vava_codex'
 description 'Codex vAvA : toutes les commandes et touches du serveur, classées, cherchées, composées et lancées'
-version '1.1.1'
+version '1.1.2'
 
 dependency 'vAvA_core'
 
@@ -40,6 +40,7 @@ server_scripts {
     'server/core.lua',
     'bridge/server.lua',
     'server/catalog.lua',
+    'shared/prefs.lua',          -- logique pure, servie au seul serveur (testée hors jeu : tests/spec)
     'server/prefs.lua',
     'server/suggestions.lua',
     'server/commands.lua',

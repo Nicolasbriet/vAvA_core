@@ -1,6 +1,6 @@
 # Registre du Conseil — procédure de test en jeu
 
-Procédure pour vérifier en jeu `vava_admin` 1.5.0 : le Conseil et ses trois rangs, le Registre du Conseil (`F10` ou
+Procédure pour vérifier en jeu `vava_admin` 1.5.2 : le Conseil et ses trois rangs, le Registre du Conseil (`F10` ou
 `/conseil`), les signalements, les bans et le journal. Le point capital est la section 3 : **un droit refusé l'est par
 le serveur**, pas seulement par l'interface. Comptez une heure et demie ; presque tout se joue à deux, marqué
 **(2 joueurs)**. Un test se cite « registre 3-4 ». Préparation commune, mesure du resmon et remontée des écarts :
@@ -47,7 +47,7 @@ Rangs cumulatifs (`config.lua` → `ranks`) : Gardien `view`, `teleport`, `freez
 | # | Faire | Attendu |
 |---|---|---|
 | 1 | **(2 joueurs)** B hors du Conseil : `F10`, `/conseil`, `F2`. | Rien ne s'ouvre, aucun message. |
-| 2 | `vava_conseil <B> gardien` ; B : `F10`. | Sceau « Gardien » ; onglets **Joueurs** et **Signalements** seulement. |
+| 2 | `vava_conseil <B> gardien` ; B : `F10`. | Sceau « Gardien » ; onglets **Joueurs**, **Signalements** et **Outils** — ce dernier avec le seul « Mur des caméras » (`vava_cameras` démarré, droit `watch`), sans leviers ni repère ni position (droit `tools`). Sans `vava_cameras` : Joueurs et Signalements seulement. |
 | 3 | B Gardien : fiche de A. | Déplacements : Rejoindre, Amener, Renvoyer, Immobiliser ; Soins : Soigner, Nourrir ; Paroles : Écrire, Avertir ; Justice : Expulser. Ni Observer, ni Fouiller, ni Donner, ni Bannir, ni groupe Conseil. Sur sa propre fiche : Renvoyer, Soigner, Nourrir seulement. |
 | 4 | `vava_conseil <B> senechal` ; B ferme et rouvre le Registre. | Onglets Joueurs, Signalements, Sanctions, Journal, Outils, Proclamation. Fiche de A : en plus Observer, Fouiller, Donner, Bannir. « Bannir » propose 1 heure, 6 heures, 1 jour, 3 jours, 7 jours (1 heure présélectionnée). |
 | 5 | A (Souverain) : `F10`, fiche de B. | Les sept onglets, dans l'ordre Joueurs, Signalements, Sanctions, Journal, Conseil, Outils, Proclamation. « Bannir » propose en plus 30 jours et Définitif. Groupe « Conseil » : « Rang au Conseil » (Aucun rang, Gardien, Sénéchal ; jamais Souverain) et « Nommer ». |
@@ -83,7 +83,7 @@ pas le Registre entre le changement de rang et le clic.
 |---|---|---|
 | 1 | A : `F10` → Joueurs. | « Âmes présentes », « 2 âmes ». Chaque ligne : « n° <session> », nom du personnage (« En sélection de personnage » s'il n'en a pas), « <nom FiveM> · Compte n° <n> · <temps de jeu> », étiquettes « Vous », rang, « À terre », « Immobilisé ». |
 | 2 | Chercher une partie du nom de B, puis son numéro de session, puis son numéro de compte. | La liste filtre à chaque lettre ; sans correspondance : « Personne ne correspond. ». |
-| 3 | Cliquer B. | Fiche : nom et étiquettes ; Nom FiveM ; Compte « n° <B> » ; Session « n° <idB> · <ping> ms » ; Temps de jeu (« 48 min », « 1 h 05 ») ; Position x, y, z à une décimale ; jauges Vie, Faim, Soif en % ; actions par groupe ; « Avertissements » : « Aucun avertissement. ». |
+| 3 | Cliquer B. | Fiche : nom et étiquettes ; Nom FiveM ; Compte « n° <B> » ; Session « n° <idB> · <ping> ms » ; Temps de jeu (« 48 min », « 1 h 05 ») ; Position x, y, z à une décimale ; jauges Vie, Faim, Soif en % ; actions par groupe ; « Avertissements » : « Aucun avertissement. ». Aucun identifiant (license, Discord, Steam…) : ils ne partent qu'à la Chancellerie, qui les affiche (facultatif : outils de développement de la page, `nui_devtools` dans `F8`, onglet Réseau, réponse de `request` : pas de champ `identifiers`). |
 | 4 | Fermer, rouvrir. | B reste choisi et sa fiche est relue. |
 
 ## 5. Déplacer et immobiliser (2 joueurs)
@@ -173,7 +173,7 @@ Sénéchal et au-dessus (droit `tools`).
 | 4 | A : `F10`. | L'observation cesse : A revient à sa place et à son orientation, visible ; bandeau disparu ; le Registre ne s'ouvre pas (un second `F10` l'ouvre). |
 | 5 | Observer B, puis B se déconnecte. | Dans la seconde, l'observation cesse d'elle-même et A revient à sa place. |
 | 6 | Écran des joueurs (droit `watch`, tout le Conseil, sans règle de rang) : `vava_conseil <B> gardien` ; B : `/cameras`. | Le mur s'ouvre (joueurs connectés, B exclu, disposition 3 × 3 par défaut) ; B peut regarder l'écran de A bien que A soit Souverain. Journal « Mur des caméras ouvert ». |
-| 7 | B Gardien : `F10`. | Pas d'onglet Outils, donc pas de « Mur des caméras » dans le Registre : `/cameras` est son seul accès (voir le compte rendu). |
+| 7 | B Gardien : `F10` → Outils → « Mur des caméras » → « Ouvrir ». | L'onglet Outils ne montre que cet outil (pas de titre « Outils des modules », aucun levier) ; le Registre se ferme et le mur s'ouvre, comme par `/cameras`. |
 | 8 | `vava_conseil <B> aucun` ; B : `/cameras`. | Rien. |
 
 ## 11. Proclamation, journal, Conseil
@@ -193,7 +193,9 @@ Sénéchal et au-dessus (droit `tools`).
 |---|---|---|
 | 1 | Dialogue « Avertir » ouvert pour B ; B quitte ; valider. | « Ce joueur n'est plus là. » ; rien en base. |
 | 2 | B immobilisé quitte puis revient. | B bouge librement ; plus d'étiquette « Immobilisé » (à confirmer : nouveau personnage, nouveau ped non figé). |
-| 3 | A observe B et quitte le jeu pendant l'observation ; revient. | A réapparaît à l'endroit d'où il observait, à la surface (à confirmer : la position est relevée par le serveur sur le corps caché 12 m sous B). |
+| 3 | A note sa position (Registre → sa fiche), observe B, quitte le jeu pendant l'observation (`F8` → `disconnect`) ; revient et « Jouer ». | Après l'apparition, un second fondu replace A à la position notée (à 1 m près), au sol, avec son orientation ; jamais sous terre ni près de B. Console : `personnage n° <M> replacé là où il a commencé une observation`. En base, avant le retour : clé `vava_admin:spectateReturn` remplie dans `vava_characters.data` ; après : vide (`{}` ou `[]`). Entre les deux fondus, A peut entrevoir un instant l'endroit relevé sous B (à confirmer). |
+| 3b | A observe B, termine par `F10`, puis quitte et revient. | A réapparaît simplement à sa dernière position, sans second fondu : la place gardée a été effacée à la fin de l'observation. |
+| 3c | A observe B ; `/perso quitter` (outil de développement, § 0 de `personnage.md`) pendant l'observation ; rejouer le même personnage. | Comme 3 : replacé à sa position d'avant l'observation. |
 | 4 | A en vol libre haut dans le ciel quitte ; revient. | Le vol libre est coupé ; A réapparaît à sa dernière position relevée (à confirmer : en l'air, il tombe). |
 | 5 | Pendant que A observe B, console : `vava_ban <B> 1 essai` (le Registre ne s'ouvre pas pendant une observation) ; puis `vava_unban <B>`. | B expulsé ; l'observation de A cesse et A revient à sa place. |
 
@@ -201,13 +203,14 @@ Sénéchal et au-dessus (droit `tools`).
 
 | # | Faire | Attendu |
 |---|---|---|
-| 1 | A en vol libre avec le Registre ouvert, B immobilisé, un signalement ouvert. Console : `restart vava_admin`. | Console : `module 'vava_admin' v1.5.0 prêt`. Chez A : Registre fermé, souris rendue au jeu, vol libre coupé (A visible, retombe). |
+| 1 | A en vol libre avec le Registre ouvert, B immobilisé, un signalement ouvert. Console : `restart vava_admin`. | Console : `arrêt : 1 joueur(s) immobilisé(s) libéré(s)` puis `module 'vava_admin' v1.5.2 prêt`. Chez A : Registre fermé, souris rendue au jeu, vol libre coupé (A visible, retombe). Chez B : il peut de nouveau bouger, avec « Vous pouvez de nouveau bouger. » (à confirmer : le message part pendant l'arrêt du module chez B ; s'il manque, seul le mouvement compte). |
 | 2 | A : `F10`, `F2` sans se reconnecter. | Tous deux fonctionnent. Rangs, bans, avertissements et journal intacts (base). |
 | 3 | Signalements. | Vide : les signalements vivent en mémoire ; le suivant repart au n° 1 et le délai d'une minute de B est remis à zéro. |
-| 4 | Fiche de B (immobilisé avant le redémarrage). | B reste figé mais la fiche ne dit plus « Immobilisé » et propose « Immobiliser » (à confirmer) ; « Immobiliser » puis « Libérer » le délivre. |
+| 4 | Fiche de B (immobilisé avant le redémarrage). | B est libre et la fiche le dit : pas d'étiquette « Immobilisé », bouton « Immobiliser ». État cohérent ; à immobiliser de nouveau si besoin. |
 | 5 | « Renvoyer » sur B déplacé avant le redémarrage. | « Aucune position où le renvoyer. ». |
 | 6 | Outils. | « Mur des caméras » et « Zones de voix » sont revenus (les modules se réinscrivent). |
-| 7 | A observe B ; `restart vava_admin`. | L'observation cesse ; A revient à sa place, visible. |
+| 7 | A observe B ; `restart vava_admin`. Puis A quitte et revient. | L'observation cesse ; A revient à sa place, visible. Au retour, aucun second fondu : la place gardée de A a été effacée au redémarrage du module. |
+| 8 | `stop vava_admin` avec B immobilisé, attendre, `start vava_admin`. | B libéré dès l'arrêt ; personne ne reste figé pendant que le Registre est absent. |
 
 ## 14. Tentatives de triche simples
 
@@ -241,12 +244,18 @@ Sénéchal et au-dessus (droit `tools`).
   (`logRetentionDays`). Exemple : `SELECT created_at, actor_label, action, target_label, details FROM vava_admin_logs
   ORDER BY id DESC LIMIT 20;`
 - Les signalements ne sont pas en base (mémoire) : seules leur prise en charge et leur clôture laissent une trace au
-  journal.
+  journal ; l'état « immobilisé » non plus (libéré à l'arrêt du module).
+- `vava_characters.data`, clé `vava_admin:spectateReturn` : vide hors observation ; pendant une observation (ou après
+  un départ en pleine observation, jusqu'au retour), `{ x, y, z, heading }` de la place d'où le membre est parti.
+  `SELECT id, JSON_EXTRACT(data, '$."vava_admin:spectateReturn"') FROM vava_characters WHERE id = <M>;`
 
 ## 17. Ce que je ne peux pas avoir vérifié hors jeu
 
 - Le rendu du livre dans CEF (sceaux, cachets des durées, bandeaux) : `web/index.html?tab=players` (ou `reports`,
-  `bans`, `logs`, `staff`, `tools`, `announce`), avec `&dialog=ban`, `&proclaim=1` ou `&watch=1`, dans un navigateur.
+  `bans`, `logs`, `staff`, `tools`, `announce`), avec `&dialog=ban`, `&proclaim=1` ou `&watch=1`, dans un navigateur ;
+  `&rank=gardien` montre le Registre d'un Gardien (Outils avec le seul mur des caméras).
+- Le retour d'un observateur parti (12-3) : second fondu juste après l'apparition, et ce qu'on voit entre les deux.
+- Le message « Vous pouvez de nouveau bouger. » envoyé pendant l'arrêt du module (13-1).
 - Les natives serveur sur le ped d'un autre joueur (`SetEntityCoords`, `FreezeEntityPosition`) sous OneSync.
 - L'invisibilité vue des autres pendant le vol libre (`SetEntityVisible` + `SetEntityLocallyVisible`) et le mode
   spectateur (`NetworkSetInSpectatorMode`, attente de 3 s que le joueur observé soit transmis).

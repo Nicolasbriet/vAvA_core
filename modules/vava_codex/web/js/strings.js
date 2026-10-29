@@ -28,6 +28,9 @@ const STRINGS = Object.freeze({
     consoleOnly: 'Cette commande ne se lance que depuis la console du serveur ; elle est montrée pour mémoire.',
     missing: (name) => `Il manque « ${name} ».`,
     optional: 'facultatif',
+    // bornes d'un nombre, à côté de son nom ; champ vide tant que le joueur n'a rien choisi
+    bounds: (min, max) => `de ${String(min).replace('.', ',')} à ${String(max).replace('.', ',')}`,
+    unset: '—',
     favorite: 'Mettre en signet',
     unfavorite: 'Retirer le signet',
     keyNote: 'Chaque touche se change dans Paramètres › Raccourcis › FiveM. Le Codex montre la vôtre.',

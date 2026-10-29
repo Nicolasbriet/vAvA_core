@@ -13,7 +13,7 @@ use_experimental_fxv2_oal 'yes'
 
 name 'vava_appearance'
 description 'Apparence des personnages vAvA'
-version '1.0.0'
+version '1.0.1'
 
 dependency 'vAvA_core'
 

@@ -17,9 +17,6 @@ const Creator = (() => {
   const MAKEUP_OVERLAYS = [4, 5, 8];
   const ARMS_COMPONENT = 3;               // ajusté à la main : un tirage aléatoire crée des manques visibles
   const NATURAL_EYE_COLORS = 8;           // teintes 1 à 8 : couleurs naturelles du jeu
-  const NAME_MIN = 2;
-  const NAME_MAX = 24;
-  const NAME_PATTERN = /^\p{L}+(?:[ '-]\p{L}+)*$/u;
   const ROTATE_SENSITIVITY = 0.45;        // degrés par pixel glissé
   const ROTATE_KEY_STEP = 15;
 
@@ -43,10 +40,45 @@ const Creator = (() => {
   const limitOf = (list, id) => byId(list, id) || { drawables: 0, styles: 0, colorType: 0 };
   const styleCount = (id) => limitOf(state.limits.overlays, id).styles;
 
+  // Règles de nom du serveur (characters.name du core, reçues avec la liste des personnages) : la saisie est vérifiée
+  // comme le serveur la vérifiera. Sans elles (core antérieur à 0.7.6), seul le serveur juge : tout nom non vide passe.
+  let nameRules = null;
+
+  /** Retient les règles reçues du jeu ({ minLength, maxLength, letters, separators }) ; illisibles : ignorées. */
+  function setNameRules(rules) {
+    const readable = rules && Number.isInteger(rules.minLength) && Number.isInteger(rules.maxLength)
+      && typeof rules.letters === 'string' && typeof rules.separators === 'string';
+    nameRules = readable ? {
+      min: rules.minLength, max: rules.maxLength,
+      letters: new Set(Array.from(rules.letters)), separators: Array.from(rules.separators),
+    } : null;
+  }
+
+  /** Même contrôle que le serveur : longueur en caractères, chaque caractère pris dans les lettres ou les séparateurs,
+   *  un séparateur jamais en tête, en fin ni doublé. */
   function validName(value) {
-    const trimmed = value.trim();
-    const length = Array.from(trimmed).length;
-    return length >= NAME_MIN && length <= NAME_MAX && NAME_PATTERN.test(trimmed);
+    const characters = Array.from(value.trim());
+    if (!nameRules) return characters.length > 0;
+    if (characters.length < nameRules.min || characters.length > nameRules.max) return false;
+    let afterSeparator = true;   // interdit un séparateur en tête
+    for (const character of characters) {
+      if (nameRules.separators.includes(character)) {
+        if (afterSeparator) return false;
+        afterSeparator = true;
+      } else if (nameRules.letters.has(character)) {
+        afterSeparator = false;
+      } else {
+        return false;
+      }
+    }
+    return !afterSeparator;
+  }
+
+  /** Rappel de la règle sous le champ, tiré des règles reçues. */
+  function nameHint() {
+    if (!nameRules) return '';
+    const S = STRINGS.identity;
+    return S.nameHint(nameRules.min, nameRules.max, nameRules.separators.map((s) => S.separatorNames[s] || `« ${s} »`));
   }
 
   const identityValid = () => validName(state.firstName) && validName(state.lastName);
@@ -186,7 +218,7 @@ const Creator = (() => {
     const S = STRINGS.identity;
     const nameField = (key, label, hint) => {
       const field = UI.textField({
-        label, value: state[key], maxLength: NAME_MAX, hint,
+        label, value: state[key], maxLength: nameRules ? nameRules.max : undefined, hint,
         onInput: (value) => {
           state[key] = value;
           field.setError(value.trim() && !validName(value) ? S.nameInvalid : '');
@@ -198,7 +230,7 @@ const Creator = (() => {
     };
     // la règle n'est rappelée qu'une fois, sous le second champ
     const first = nameField('firstName', S.firstName, '');
-    const last = nameField('lastName', S.lastName, S.nameHint);
+    const last = nameField('lastName', S.lastName, nameHint());
     const sex = UI.segmented({
       label: S.sex, value: state.sex, onChange: changeSex,
       options: [{ value: 'm', label: STRINGS.sexes.m }, { value: 'f', label: STRINGS.sexes.f }],
@@ -513,5 +545,5 @@ const Creator = (() => {
     selectTab(tab || 'identity');
   }
 
-  return { init, open, cancel, rotateBy };
+  return { init, open, cancel, rotateBy, setNameRules };
 })();

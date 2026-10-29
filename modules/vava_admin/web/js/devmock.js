@@ -3,7 +3,7 @@
  * web/js/devmock.js
  * Rôle : registre simulé quand la page est ouverte dans un navigateur (hors FiveM), pour travailler le rendu sans
  *        lancer le jeu. Inactif en jeu. Paramètres d'URL : ?tab=players|reports|bans|logs|staff|tools|announce,
- *        &dialog=ban, &proclaim=1, &watch=1.
+ *        &dialog=ban, &proclaim=1, &watch=1, &rank=gardien (Registre d'un Gardien).
  */
 
 const DevMock = (() => {
@@ -63,13 +63,18 @@ const DevMock = (() => {
   if (!inGame) {
     window.addEventListener('DOMContentLoaded', () => {
       document.body.classList.add('dev');
-      const all = ['view', 'teleport', 'freeze', 'heal', 'message', 'warn', 'kick', 'reports', 'ban', 'inventory', 'give',
-        'announce', 'tools', 'spectate', 'logs', 'bans', 'metiers', 'unban', 'staff'];
+      const guardian = ['view', 'teleport', 'freeze', 'heal', 'message', 'warn', 'kick', 'reports', 'watch'];
+      const all = [...guardian, 'ban', 'inventory', 'give', 'announce', 'tools', 'spectate', 'logs', 'bans', 'metiers', 'unban', 'staff'];
+      const cameras = { key: 'vava_cameras:wall', label: 'Mur des caméras', hint: 'L\'écran de tous les joueurs connectés, en grille ; un clic l\'ouvre en grand.' };
+      const voice = { key: 'vava_voice:zones', label: 'Zones de voix', hint: 'Lieux où la voix porte plus ou moins loin.' };
+      // ?rank=gardien : le Registre d'un Gardien (droit watch sans tools : seul le mur des caméras dans Outils)
+      const asGuardian = params.get('rank') === 'gardien';
       window.postMessage({ action: 'open', payload: {
-        self: 1, accountId: 1, rank: { name: 'souverain', label: 'Souverain', level: 3 }, permissions: all,
+        self: 1, accountId: 1, permissions: asGuardian ? guardian : all,
+        rank: asGuardian ? { name: 'gardien', label: 'Gardien', level: 1 } : { name: 'souverain', label: 'Souverain', level: 3 },
         ranks: [{ name: 'gardien', label: 'Gardien', level: 1 }, { name: 'senechal', label: 'Sénéchal', level: 2 }, { name: 'souverain', label: 'Souverain', level: 3 }],
-        banDurations: [1, 6, 24, 72, 168, 720, 0], pageSize: 50, tools: { noclip: false, invisible: true, godmode: false },
-        moduleTools: [{ key: 'vava_voice:zones', label: 'Zones de voix', hint: 'Lieux où la voix porte plus ou moins loin.' }],
+        banDurations: asGuardian ? [] : [1, 6, 24, 72, 168, 720, 0], pageSize: 50, tools: { noclip: false, invisible: !asGuardian, godmode: false },
+        moduleTools: asGuardian ? [cameras] : [cameras, voice],
       } }, '*');
       const tab = params.get('tab');
       setTimeout(() => {

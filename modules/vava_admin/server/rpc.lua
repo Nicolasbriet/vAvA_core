@@ -3,15 +3,16 @@
     Rôle : intentions du Registre en jeu, en RPC à schéma strict et à débit limité : chaque demande du catalogue qui
            a un sens en jeu devient une RPC réservée à son droit (le membre est retrouvé par son numéro de joueur, son
            rang relu à chaque appel). Le panneau n'affiche que ce que le rang permet, mais ce n'est qu'un confort.
-           Plus le signalement, ouvert à tous les joueurs.
+           Plus deux intentions ouvertes à tous les joueurs : le signalement, et la fin d'une observation.
     Dépendances : shared/constants.lua, config.lua, server/core.lua, server/staff.lua, server/reports.lua,
-                  server/requests.lua
+                  server/spectate.lua, server/requests.lua
 ]]
 
 local pairs = pairs
 
 local staff = VavaAdmin.staff
 local reports = VavaAdmin.reports
+local spectate = VavaAdmin.spectate
 local requests = VavaAdmin.requests
 local limits = VavaAdmin.config.rateLimits
 local PREFIX = VavaAdmin.PREFIX
@@ -56,6 +57,10 @@ function rpc.start()
             if not ok then return false, err end
         end
     end
+    -- ouvert à tous les joueurs : fin d'une observation (n'efface que la place gardée du personnage de l'appelant,
+    -- même si son rang a changé entre-temps ; sans observation, il n'y a rien à effacer)
+    local ok, err = register('spectateEnd', {}, limits.read, function(src) return spectate.finish(src) end)
+    if not ok then return false, err end
     -- ouvert à tous les joueurs : /signaler
     return register('report', { TEXT }, limits.report, function(src, text) return reports.create(src, text) end)
 end
