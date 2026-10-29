@@ -530,7 +530,7 @@ Règles tenues par l'inventaire :
 | `patchMetadata(cible, idObjet, patch, retirées?)` | `true` ou `false, code` — écrit ou remplace les clés de `patch`, retire les clés listées dans `retirées`, conserve le reste (une réparation touche `durability` et `history` sans pouvoir écraser le créateur) ; depuis 1.4.0 |
 | `createContainer({ kind, ownerType?, ownerId?, width, height, maxWeight?, label? })` | id d'un conteneur conservé (coffre…) |
 | `open(source, containerId, ancrage?)` | ouvre un conteneur au joueur ; **l'appelant a vérifié le droit d'accès**. `ancrage` `{ x, y, z, radius }` (1.4.0) : distance vérifiée côté serveur à l'ouverture (`too_far`) et à chaque opération, conteneur fermé chez le joueur qui s'éloigne (vérification toutes les `anchor.sweepMs`, seulement tant qu'un conteneur ancré est ouvert) ; `radius` ≤ `anchor.maxRadius` sinon `invalid_anchor`. **À donner pour tout conteneur qui a un lieu** (coffre, grenier, station) |
-| `containerOf(source)` | id du conteneur porté par le personnage actif d'un joueur (fouille, administration), ou `nil, code` |
+| `containerOf(source)` | id du conteneur porté par le personnage actif d'un joueur (fouille, administration), ou `nil, code` ; ouvert chez un autre joueur, il s'y ferme quand son porteur quitte le jeu ou change de personnage |
 | `held(source)` | pile tenue en main par le personnage actif (`{ id, item, x, y, rotated, quantity, metadata }`), ou `nil` ; depuis 1.4.0 |
 | `hold(source, idObjet)` | `true` ou `false, code` (`not_found`, `not_holdable`, refus d'un hook) — fait prendre en main une pile de la besace, ou reposer (`0`) : outil brisé, désarmement… ; depuis 1.4.0 |
 
@@ -541,7 +541,9 @@ Règles tenues par l'inventaire :
 (`before` et `after` sont des copies : un module peut y refuser qu'un autre touche `crafter_*`, ou journaliser les
 objets de valeur), `{ source, instanceId, item?, previous, owner? }` pour `hold` (`instanceId = 0` : reposer ; en
 phase `after` seulement, `reason = 'gone'` quand la main s'est vidée parce que la pile a quitté la besace). `use`
-transmet aussi `category` et `effects` de l'objet, et `consumed` en phase `after`. Un refus `false, 'raison'` est
+transmet aussi `category` et `effects` de l'objet, et `consumed` en phase `after` (vrai seulement si une unité a
+réellement été retirée : un `onUse` qui cède la main peut voir l'objet jeté ou consommé entre-temps, alors aucun effet
+n'est à appliquer). Un refus `false, 'raison'` est
 montré au joueur, dans l'interface ou en notification s'il utilisait un raccourci.
 
 **Garanties** :

@@ -2,10 +2,12 @@
     vava_inventory/server/characters.lua
     Rôle : inventaire du personnage, branché sur les hooks du core :
       created   → conteneur créé avec les objets de départ ;
-      loaded    → conteneur chargé avant l'apparition (créé s'il manque : personnage antérieur au module) ;
-      unloading → inventaire fermé, journal écrit, conteneur libéré (aussi à la déconnexion).
+      loaded    → conteneur chargé avant l'apparition (créé s'il manque : personnage antérieur au module), lié au
+                  joueur s'il joue toujours ce personnage une fois les requêtes faites ;
+      unloading → inventaire fermé (chez son porteur et chez ceux qui le regardaient), journal écrit, conteneur
+                  libéré (aussi à la déconnexion).
     Dépendances : shared/, config.lua, server/core.lua, server/persistence.lua, server/containers.lua,
-                  server/operations.lua
+                  server/viewers.lua, server/operations.lua
 ]]
 
 local tostring, tonumber, pairs, ipairs = tostring, tonumber, pairs, ipairs
@@ -13,6 +15,7 @@ local GetPlayers = GetPlayers
 
 local persistence = VavaInventory.persistence
 local containers = VavaInventory.containers
+local viewers = VavaInventory.viewers
 local operations = VavaInventory.operations
 local cfg = VavaInventory.config
 local KIND = VavaInventory.KIND
@@ -66,12 +69,20 @@ local function onLoaded(payload)
         VavaInventory.log.error('inventaire du personnage #%d non chargé : %s', payload.characterId, tostring(err))
         return
     end
+    -- parti pendant les requêtes : son déchargement est déjà passé sans rien trouver à délier, et ce numéro de joueur
+    -- ne doit pas garder une besace (un nouveau venu pourrait le recevoir). Le conteneur reste en mémoire, repris tel
+    -- quel au prochain chargement du personnage.
+    local character = VavaInventory.core.characters.getActive(payload.source)
+    if not character or character.id ~= payload.characterId then return end
     operations.bind(payload.source, payload.characterId, container.id)
 end
 
 local function onUnloading(payload)
     local session = operations.unbind(payload.source)
     if not session then return end
+    -- fermé aussi chez ceux qui le regardaient (Conseil, fouille) avant l'écriture, qui cède la main : rien n'en sort
+    -- pendant qu'il quitte la mémoire, et un rechargement ne leur rend pas l'accès
+    viewers.closeContainer(session.containerId)
     persistence.flush()
     containers.unload(session.containerId)
 end

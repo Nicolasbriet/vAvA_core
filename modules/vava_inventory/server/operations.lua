@@ -584,6 +584,7 @@ function operations.use(src, instanceId)
     end
     if type(message) == 'string' then notify(src, message) end
     -- la fonction a pu céder la main : l'objet doit toujours être là pour être consommé
+    local consumed = false
     if consume == true and container.items[instanceId] == instance and containers.get(container.id) == container then
         containers.adjust(container, instance, def, -1)
         local change = newChange()
@@ -594,8 +595,11 @@ function operations.use(src, instanceId)
             note(change, container, instance)
         end
         publish(change)
+        consumed = true
     end
-    payload.consumed = consume == true
+    -- ce qui a eu lieu, pas ce que la fonction voulait : objet jeté ou consommé par une autre demande pendant l'attente,
+    -- aucune unité retirée, donc aucun effet (faim, soin) à appliquer
+    payload.consumed = consumed
     hooks().runAfter(HOOK.USE, payload)
     return true
 end

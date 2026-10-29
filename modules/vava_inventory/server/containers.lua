@@ -187,10 +187,10 @@ function containers.load(id)
 
     local container = newContainer(row.id, row.kind, row.owner_type, row.owner_id, row.width, row.height, row.max_weight, row.label, true)
     local own = cfg.character
-    if row.kind == KIND.CHARACTER and (row.width ~= own.width or row.height ~= own.height or row.max_weight ~= own.maxWeight) then
+    local resized = row.kind == KIND.CHARACTER and (row.width ~= own.width or row.height ~= own.height or row.max_weight ~= own.maxWeight)
+    if resized then
         -- la grille du personnage suit la configuration ; les objets hors grille cherchent une nouvelle place
         container.width, container.height, container.maxWeight = own.width, own.height, own.maxWeight
-        db().update(UPDATE_SIZE_SQL, { own.width, own.height, own.maxWeight, id })
     end
     for _, r in ipairs(rows) do
         local instanceId, x, y, quantity = toInteger(r.id), toInteger(r.x), toInteger(r.y), toInteger(r.quantity)
@@ -204,6 +204,9 @@ function containers.load(id)
         end
     end
     byId[id] = container
+    -- écriture après l'inscription en mémoire : elle cède la main, et un chargement concurrent doit trouver ce
+    -- conteneur plutôt que d'en bâtir un second avec les mêmes objets
+    if resized then db().update(UPDATE_SIZE_SQL, { own.width, own.height, own.maxWeight, id }) end
     return container
 end
 
