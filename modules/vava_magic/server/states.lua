@@ -8,13 +8,14 @@
         qu'un contrôle dur touche, la cible est protégée des autres jusqu'à `hardImmunityMs` après sa fin (règle
         d'équité : aucun enchaînement) ; les dégâts, eux, s'appliquent toujours.
       - Gelé : le ped est figé par le serveur seul (le client ne fait que couper ses commandes) ; à la fin du gel, au
-        départ ou à l'arrêt du module, il reste figé s'il est immobilisé par le Conseil (world.freeze). Mouillé : la
-        Brûlure s'éteint.
+        départ ou à l'arrêt du module, il reste figé s'il est immobilisé par le Conseil (world.freeze) ; « Libérer »
+        du Registre pendant un gel relâche son ped, le serveur le refige aussitôt jusqu'à la fin du gel. Mouillé :
+        la Brûlure s'éteint.
       - Hook `vava_magic:stateApplying` (before) : un autre module peut refuser un état (résistance, objet…).
     Dépendances : shared/, config.lua, server/core.lua, bridge/server.lua, server/world.lua, server/combat.lua
 ]]
 
-local pairs, ipairs, type, max = pairs, ipairs, type, math.max
+local pairs, ipairs, type, tostring, max = pairs, ipairs, type, tostring, math.max
 local GetGameTimer, SetTimeout, TriggerClientEvent = GetGameTimer, SetTimeout, TriggerClientEvent
 
 local core = VavaMagic.core
@@ -232,7 +233,8 @@ function states.clearAll()
     for src in pairs(players) do states.clear(src) end
 end
 
---- Empêchement d'incanter pendant un contrôle dur. Appelé pendant le setup du module.
+--- Empêchement d'incanter pendant un contrôle dur, et Gel qui survit à « Libérer » du Registre. Appelé pendant le
+--- setup du module.
 function states.start()
     VavaMagic.casting.addBlocker(function(src)
         local entry = players[src]
@@ -242,5 +244,12 @@ function states.start()
         end
         return nil
     end)
+    -- « Libérer » (ou toute action du Conseil sur un joueur gelé) a pu relâcher le ped : refigé sur-le-champ, le gel
+    -- dure jusqu'à sa fin ; sans le Registre, plus rien ne le retient ensuite (world.freeze)
+    local ok, err = bridge.OnCouncilAction(function(payload)
+        local target = payload.target and payload.target.source
+        if target and states.has(target, 'frozen') then world.freeze(target, true) end
+    end)
+    if not ok then VavaMagic.log.warn('actions du Conseil non suivies : %s', tostring(err)) end
 end
 

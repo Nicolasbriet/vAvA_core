@@ -113,6 +113,17 @@ function Bridge.IsHeldByCouncil(source)
     return called and frozen == true
 end
 
+--- Prévient `handler` après chaque action du Conseil (hook `vava_admin:action` : { actor, action, target?, details }),
+--- pour garder figé celui que la magie gèle quand « Libérer » du Registre relâche son ped.
+---@param handler fun(payload: table)
+---@return boolean ok
+---@return string|nil err
+function Bridge.OnCouncilAction(handler)
+    local id, err = core.hooks.after(LINKS.ADMIN .. ':action', handler)
+    if not id then return false, err end
+    return true
+end
+
 -- Notifications ---------------------------------------------------------------------------------------------------
 
 --- Message à un joueur ; nature : info (défaut), success, warning, danger.

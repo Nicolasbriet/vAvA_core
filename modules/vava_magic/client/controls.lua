@@ -346,6 +346,24 @@ function controls.select(name)
     return true
 end
 
+--- Cible verrouillée à transmettre pour un lancer sans visée : celle du verrou si c'est le sort prêt (le verrou suit
+--- sa portée) ; pour un autre sort nommé, seulement s'il se verrouille et l'atteint (le serveur juge à la portée du
+--- sort lancé : une cible trop loin lui ferait répondre « Votre cible vous échappe. ») ; sinon aucune, le sort part
+--- droit devant.
+---@param name string
+---@return integer|nil
+local function lockedTargetFor(name)
+    local target = bridge.GetLockedTarget()
+    if not target or name == state.selected() then return target end
+    local spellCfg, level = state.spellConfig(name), state.level(name)
+    local levelCfg = spellCfg and spellCfg.lockOn and level and spellCfg.levels[level]
+    local targeting = VavaMagic.targeting
+    local ped = levelCfg and targeting and targeting.ped()
+    if not ped or ped == 0 then return nil end
+    if geometry.distance(GetEntityCoords(PlayerPedId()), GetEntityCoords(ped)) > (levelCfg.range or 0) then return nil end
+    return target
+end
+
 --- Lance le sort choisi (ou `name`) sans passer par le mode magie : commande de secours, sans visée. Mains vides,
 --- comme le mode magie : une arme sortie l'empêche.
 ---@param name string|nil
@@ -364,7 +382,7 @@ function controls.castNow(name)
         messages.refuse('armed')
         return
     end
-    controller.cast({ aiming = false, inRange = false, direction = aim.direction(), target = bridge.GetLockedTarget() })
+    controller.cast({ aiming = false, inRange = false, direction = aim.direction(), target = lockedTargetFor(name) })
 end
 
 --- Sorts connus du même groupe de la roue, dans l'ordre.
