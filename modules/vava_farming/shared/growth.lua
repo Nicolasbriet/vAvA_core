@@ -33,6 +33,7 @@ VavaFarming.growth = growth
 ---@field wilted boolean
 ---@field dead boolean
 ---@field lastFamily string|nil
+---@field covered boolean       couvert contre le gel jusqu'à la récolte
 ---@field updatedAt integer
 
 --- Applique le temps écoulé depuis `updatedAt` à l'emplacement (modifié en place). `season` (vava_time, facultatif) :
@@ -82,6 +83,15 @@ function growth.advance(slot, crop, now, season)
         slot.drySince = nil
     end
     slot.updatedAt = now
+end
+
+--- Le gel d'une nuit d'hiver (vava_time) tue-t-il la plante de cet emplacement ? Oui si elle est plantée et vivante,
+--- sans couverture, et d'une culture qui ne résiste pas au froid (`frostHardy`).
+---@param slot vAvA.SlotState
+---@param crop table|nil  définition de la culture plantée
+---@return boolean
+function growth.frostKills(slot, crop)
+    return slot.crop ~= nil and crop ~= nil and not slot.dead and slot.covered ~= true and crop.frostHardy ~= true
 end
 
 --- Arrosage : humidité pleine, une plante flétrie reprend.

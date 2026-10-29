@@ -4,8 +4,9 @@
            emplacement à portée, accès, geste possible dans l'état présent, graines au palier choisi, seau en main avec
            des charges, compost, plante mûre, place ; hook annulable ; jeton, durée) ; fin du geste (durée revérifiée,
            distance — trop loin, le geste est abandonné —, puis application : semis, arrosage, compost, récolte avec
-           qualité, provenance, graines récupérées et XP, arrachage avec déchets ; l'emplacement d'un geste qui donne ou
-           consomme des objets est écrit aussitôt) ; remplissage du seau au puits. Une seule action à la fois par
+           qualité, provenance, graines récupérées et XP, arrachage avec déchets, couverture contre le gel (objet de
+           config.frost.cover consommé) ; l'emplacement d'un geste qui donne ou consomme des objets est écrit aussitôt) ;
+           remplissage du seau au puits. Une seule action à la fois par
            joueur ; aucune à terre (vava_health) : ni menu, ni début, ni fin, ni puits.
     Dépendances : shared/, config.lua, server/core.lua, bridge/server.lua, server/journal.lua, server/catalog.lua,
                   server/slots.lua
@@ -174,12 +175,15 @@ function actions.menu(src, parcelId, index)
     sort(seeds, function(a, b) return a.label < b.label end)
     local bucket, charges = bucketOf(src)
     local compost = bridge.Count(src, cfg.compost.item)
+    local coverSpec = cfg.frost.cover
+    local coverCount = coverSpec.item == cfg.compost.item and compost or bridge.Count(src, coverSpec.item)
     return true, {
         parcel = { id = parcel.id, label = parcel.label, communal = parcel.owner == nil },
         slot = slots.view(parcel, index),
         seeds = seeds,
         bucket = { held = bucket ~= nil, charges = charges },
         compost = compost,
+        cover = { item = coverSpec.item, label = catalog.itemLabel(coverSpec.item), quantity = coverSpec.quantity, count = coverCount },
         sickle = hasSickle(src),
         actions = {
             plant = crop == nil and #seeds > 0,
@@ -187,6 +191,8 @@ function actions.menu(src, parcelId, index)
             fertilize = compost > 0,
             harvest = state == STATES.RIPE,
             clear = crop ~= nil,
+            cover = crop ~= nil and state ~= STATES.DEAD and not slot.covered and not crop.frostHardy
+                and coverCount >= coverSpec.quantity,
         },
         rules = { moistureThreshold = cfg.growth.moistureThreshold, tierLabels = cfg.quality.tierLabels },
         now = time(),
@@ -314,6 +320,28 @@ function actions.begin(src, parcelId, index, action, cropId, tier)
         if not planted then
             bridge.Notify(src, messages.empty, 'info')
             return false, 'empty'
+        end
+        crop = planted
+    elseif action == ACTIONS.COVER then
+        if not planted then
+            bridge.Notify(src, messages.empty, 'info')
+            return false, 'empty'
+        end
+        if state == STATES.DEAD then
+            bridge.Notify(src, messages.dead, 'info')
+            return false, 'dead'
+        end
+        if slot.covered then
+            bridge.Notify(src, messages.alreadyCovered, 'info')
+            return false, 'covered'
+        end
+        if planted.frostHardy then
+            bridge.Notify(src, format(messages.frostHardy, planted.label), 'info')
+            return false, 'frost_hardy'
+        end
+        if bridge.Count(src, cfg.frost.cover.item) < cfg.frost.cover.quantity then
+            bridge.Notify(src, messages.noCover, 'warning')
+            return false, 'no_cover'
         end
         crop = planted
     end
@@ -447,6 +475,19 @@ function actions.finish(src, token)
         journal.write('cleared', { parcel = parcel.id, slot = index, characterId = session.characterId, item = planted.id, details = { waste = waste } })
         bridge.Notify(src, waste > 0 and format(messages.clearedWaste, waste) or messages.cleared, 'info')
         return true, { action = action, slot = settle(src, parcel, index), item = waste > 0 and cfg.compost.waste.item or nil, quantity = waste > 0 and waste or nil }
+    elseif action == ACTIONS.COVER then
+        -- l'état a pu changer pendant le geste (gel tombé, autre joueur, arrachage)
+        if not planted or slot.dead or slot.covered or planted.frostHardy then return false, 'not_found' end
+        local cover = cfg.frost.cover
+        if not bridge.Exchange(src, { { item = cover.item, quantity = cover.quantity } }, {}) then
+            bridge.Notify(src, messages.noCover, 'warning')
+            return false, 'missing_items'
+        end
+        slots.cover(slot)
+        slots.writeNow(parcel, index)
+        journal.write('covered', { parcel = parcel.id, slot = index, characterId = session.characterId, item = cover.item, details = { crop = planted.id } })
+        bridge.Notify(src, messages.covered, 'info')
+        return true, { action = action, slot = settle(src, parcel, index) }
     end
     return false, 'not_found'
 end

@@ -30,6 +30,7 @@ dependency 'vava_crafting'
 
 vava_migration 'sql/0001_farming.sql'
 vava_migration 'sql/0002_granary_log_minute.sql'
+vava_migration 'sql/0003_slot_cover.sql'
 
 ui_page 'web/index.html'
 

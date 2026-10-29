@@ -33,6 +33,7 @@ local CROP_SCHEMA = {
         stages = { type = 'array', min = 1, max = 8, items = { type = 'string', min = 1, max = 64 } },
         wilted = { type = 'string', min = 1, max = 64 },
         dead = { type = 'string', min = 1, max = 64 },
+        frostHardy = { type = 'boolean', optional = true },
     },
 }
 
@@ -69,7 +70,7 @@ local function rebuildCrops()
             id = id, label = data.label, family = data.family, seed = data.seed, product = data.product,
             growMinutes = data.growMinutes, waterPerHour = data.waterPerHour, fertilityCost = data.fertilityCost,
             yield = { data.yield[1], data.yield[2] }, xp = data.xp, difficulty = data.difficulty,
-            stages = data.stages, wilted = data.wilted, dead = data.dead,
+            stages = data.stages, wilted = data.wilted, dead = data.dead, frostHardy = data.frostHardy == true,
         }
     end
 end
