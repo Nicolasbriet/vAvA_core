@@ -49,7 +49,8 @@ délai avant de pouvoir rendre l'âme, délai avant d'être porté au lieu de so
 a choisie dans ses raccourcis), barre quand quelqu'un le relève (son nom n'est jamais montré). À terre :
 
 - aucun geste sur les objets (déplacer, diviser, jeter, utiliser, prendre en main ; un module peut encore faire reposer
-  l'objet tenu) ; faim et soif figées ;
+  l'objet tenu) ; l'inventaire ouvert à la chute (grenier, coffre, fouille, sac au sol) se ferme aussitôt (export
+  `close` de l'inventaire 1.6.4, appel isolé) et se rouvre comme d'habitude une fois relevé ; faim et soif figées ;
 - ni récolte, ni artisanat, ni agriculture : ces modules refusent côté serveur et taisent leur invite (`E` ne sert
   plus qu'à rendre l'âme) ;
 - aucun sort ne le touche (ni dégâts, ni état, ni recul) ; il ne peut pas incanter ;
@@ -104,6 +105,6 @@ La procédure complète est `docs/tests/sante.md`. En priorité :
 5. **Redémarrages** : `restart vava_health` ou `restart vava_hud` à terre → médaillon Santé vide, rouge, de retour dans
    la demi-seconde.
 6. **Métiers** : à terre près d'un arbre, d'une station ou d'une parcelle → aucune invite ; `E` ne fait que rendre
-   l'âme.
+   l'âme. Grenier ouvert à la chute → l'inventaire se ferme aussitôt, rien n'est déplacé (`metiers` 5-13).
 7. **Rendu de l'écran** : `web/index.html?state=downed` (ou `ready`, `patient`, `holding`, `assist`) dans un
    navigateur.

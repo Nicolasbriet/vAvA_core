@@ -5,6 +5,7 @@
     « tout ou rien ». Les fonctions qui chargent un conteneur bloquent le thread de l'appelant.
     Depuis 1.4.0 : retraits et comptages filtrés par métadonnées ou par instance, écriture partielle des métadonnées
     (patchMetadata), filtre de getItems, ancrage d'un conteneur ouvert à un lieu (open), objet tenu en main (held, hold).
+    Depuis 1.6.4 : fermeture chez un joueur (close).
     Dépendances : server/core.lua, server/containers.lua, server/operations.lua
 ]]
 
@@ -146,4 +147,13 @@ exports('open', function(source, containerId, anchor)
     local container, code = resolve({ container = containerId })
     if not container then return false, code end
     return operations.openContainer(source, container, anchor)
+end)
+
+--- Ferme chez un joueur tout ce qu'il regarde (son interface se ferme : mise à terre…) ou, avec `containerId`, ce seul
+--- conteneur (accès retiré à un grenier, un coffre). Depuis 1.6.4.
+exports('close', function(source, containerId)
+    if not VavaInventory.ready then return false, 'not_ready' end
+    if mathType(source) ~= 'integer' then return false, 'invalid_target' end
+    if containerId ~= nil and mathType(containerId) ~= 'integer' then return false, 'invalid_request' end
+    return operations.closeAt(source, containerId)
 end)

@@ -417,6 +417,28 @@ function operations.openContainer(src, container, anchor)
     return true
 end
 
+--- Fermeture demandée par un module (export `close`, 1.6.4) : tout ce que le joueur regarde, son interface comprise
+--- (mise à terre…), ou un seul conteneur (accès retiré à un grenier, un coffre). Sa propre besace vaut tout fermer.
+---@param src integer
+---@param containerId integer|nil
+---@return boolean ok
+---@return string|nil code  not_open : rien de tel n'était ouvert
+function operations.closeAt(src, containerId)
+    local session = sessions[src]
+    if containerId == nil or (session and session.containerId == containerId) then
+        local wasOpen = #viewers.containersOf(src) > 0
+        operations.close(src)
+        -- l'ordre part même sans conteneur connu ouvert : une interface restée ouverte côté client se ferme aussi
+        TriggerClientEvent(EVENTS.DISMISS, src)
+        if not wasOpen then return false, 'not_open' end
+        return true
+    end
+    if not viewers.isViewing(src, containerId) then return false, 'not_open' end
+    viewers.remove(containerId, src)
+    TriggerClientEvent(EVENTS.CLOSED, src, containerId)
+    return true
+end
+
 ---@param src integer
 function operations.close(src)
     local session = sessions[src]

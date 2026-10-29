@@ -142,6 +142,17 @@ function persistence.pending()
     return count
 end
 
+--- Vrai si un objet de ce conteneur attend encore une écriture ou un effacement (un objet retiré garde le numéro du
+--- conteneur qu'il a quitté).
+---@param containerId integer
+---@return boolean
+function persistence.pendingFor(containerId)
+    for _, entry in pairs(journal) do
+        if entry.instance.containerId == containerId then return true end
+    end
+    return false
+end
+
 --- Lance l'écriture périodique. Appelé pendant le setup du module.
 function persistence.start()
     CreateThread(function()

@@ -71,7 +71,7 @@ connecté et apparu.
 | 6 | Personnage mage, sort choisi dans la roue (`Tab`) : clic gauche. | « Vous êtes à terre. » |
 | 7 | **(2 joueurs)** Touche de portée de la voix `Z` (marquée W sur un clavier AZERTY). | Seules Chuchoter (1,5 m) et Parler (5 m) restent ; la portée d'avant revient au réveil ou au lieu de soins. |
 | 8 | Faim et soif. | Figées (§ 7-1). |
-| 9 | Hache en main près d'un chêne de la Forêt de Brume (métiers 3.2) : `/aterre`, puis `E`. Même chose près du fourneau, d'un emplacement de champ, d'un puits, d'un grenier. | L'invite des métiers disparaît dans la seconde ; `E` ne fait que rendre l'âme (« Pas encore : tenez bon. » avant le délai) : aucune récolte, aucun menu, aucun geste, aucun message des métiers. Relevé, l'invite revient. |
+| 9 | Hache en main près d'un chêne de la Forêt de Brume (métiers 3.2) : `/aterre`, puis `E`. Même chose près du fourneau, d'un emplacement de champ, d'un puits, d'un grenier. | L'invite des métiers disparaît dans la seconde ; `E` ne fait que rendre l'âme (« Pas encore : tenez bon. » avant le délai) : aucune récolte, aucun menu, aucun geste, aucun message des métiers. Relevé, l'invite revient. Un grenier, un coffre, une fouille ou un sac ouvert à la chute se ferme aussitôt (`metiers` 5-13). |
 | 10 | Hache en main, lancer une récolte (barre en cours), puis `/aterre` avant la fin. | Rien de pris, la charge du nœud reste : le serveur refuse la fin (« Vous êtes à terre. » à la fin de la barre), ou le geste s'interrompt si le corps a glissé en tombant. Même chose pendant une pièce au fourneau (station libérée, rien consommé) et pendant un semis. |
 
 ## 4. Rendre l'âme et lieu de soins

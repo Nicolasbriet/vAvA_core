@@ -564,6 +564,7 @@ Règles tenues par l'inventaire :
 | `createContainer({ kind, ownerType?, ownerId?, width, height, maxWeight?, label? })` | id d'un conteneur conservé (coffre…) |
 | `open(source, containerId, ancrage?)` | ouvre un conteneur au joueur ; **l'appelant a vérifié le droit d'accès**. `ancrage` `{ x, y, z, radius }` (1.4.0) : distance vérifiée côté serveur à l'ouverture (`too_far`) et à chaque opération, conteneur fermé chez le joueur qui s'éloigne (vérification toutes les `anchor.sweepMs`, seulement tant qu'un conteneur ancré est ouvert) ; `radius` ≤ `anchor.maxRadius` sinon `invalid_anchor`. **À donner pour tout conteneur qui a un lieu** (coffre, grenier, station) |
 | `containerOf(source)` | id du conteneur porté par le personnage actif d'un joueur (fouille, administration), ou `nil, code` ; ouvert chez un autre joueur, il s'y ferme quand son porteur quitte le jeu ou change de personnage |
+| `close(source, containerId?)` | `true` ou `false, code` (`not_open`, `invalid_target`) — ferme chez un joueur tout ce qu'il regarde, son interface comprise (`vava_health` l'appelle à la mise à terre) ou, avec `containerId`, ce seul conteneur (accès retiré à un grenier, un coffre) ; depuis 1.6.4 |
 | `held(source)` | pile tenue en main par le personnage actif (`{ id, item, x, y, rotated, quantity, metadata }`), ou `nil` ; depuis 1.4.0 |
 | `hold(source, idObjet)` | `true` ou `false, code` (`not_found`, `not_holdable`, refus d'un hook) — fait prendre en main une pile de la besace, ou reposer (`0`) : outil brisé, désarmement… ; depuis 1.4.0 |
 
@@ -592,6 +593,10 @@ montré au joueur, dans l'interface ou en notification s'il utilisait un raccour
   départ de son auteur. Au-delà, le jet qui poserait un nouveau sac est refusé (`too_many_drops`) ; remplir un sac
   existant reste possible.
 - Le client ne reçoit que les conteneurs qu'il a ouverts, puis leurs différences.
+- Déchargement d'un personnage (1.6.4) : ce qu'un module note sur sa besace, par son numéro de conteneur, pendant
+  l'écriture qui précède le déchargement (objet retiré…) part aussi avant que le conteneur quitte la mémoire ; et un
+  conteneur relu en base dont des écritures attendent encore les fait partir d'abord. Un retour du personnage dans
+  les 3 s ne fait donc jamais revenir un objet retiré.
 - Pile d'un objet sans définition au chargement d'un conteneur (module arrêté, ou pas encore redéclaré après un
   `restart vava_inventory`) : gardée à part, sa ligne en base intacte, puis replacée dès que l'objet est déclaré
   (1.6.3) : à sa place d'origine si elle est libre, sinon à la première place libre ; sans place, elle reste à part.
@@ -712,7 +717,8 @@ touches et messages : `config.lua`. Demande le core 0.4.0 (hook `core:character:
   serveur ordonne toujours au client de coucher son ped (vie GTA 0) : ce que GTA fait d'une vie posée exactement sur
   le seuil ne compte pas (règle pure : `shared/vitality.lua`). Le joueur reste au sol, l'écran « wasted » de GTA est
   remplacé par l'écran « Vous êtes à terre », qui montre la touche « rendre l'âme » choisie par le joueur. À terre :
-  aucun geste sur les objets (prendre en main compris ; un module peut encore faire reposer l'objet tenu), faim et
+  aucun geste sur les objets (prendre en main compris ; un module peut encore faire reposer l'objet tenu), l'inventaire
+  ouvert se ferme à la chute (grenier, coffre, fouille, sac ; export `close` de l'inventaire 1.6.4, 1.1.4), faim et
   soif figées, ni récolte, ni artisanat, ni agriculture (refusés par ces modules), aucun effet des sorts ; un ped resté
   au seuil ou au-dessus (client qui se relève seul) est remis à terre.
 - **Relever** (touche G par défaut) : le serveur choisit la personne à terre la plus proche (2 m, positions lues côté

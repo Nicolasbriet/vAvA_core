@@ -11,7 +11,7 @@ lua54 'yes'
 
 name 'vava_example_items'
 description 'Objets d\'exemple vAvA'
-version '1.1.0'
+version '1.1.1'
 
 dependencies {
     'vAvA_core',

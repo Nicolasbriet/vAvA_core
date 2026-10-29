@@ -117,6 +117,9 @@ RegisterNetEvent(EVENTS.CLOSED, function(containerId)
     if open then nui.send('containerClosed', { id = containerId }) end
 end)
 
+-- fermeture ordonnée par le serveur (export `close` : mise à terre…) : comme la touche de fermeture
+RegisterNetEvent(EVENTS.DISMISS, close)
+
 RegisterNetEvent(EVENTS.NOTIFY, function(message)
     if type(message) ~= 'string' then return end
     if open then nui.send('notify', { message = message }) else feed(message) end
