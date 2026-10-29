@@ -105,6 +105,31 @@ marqués « décision » attendent le porteur du projet : ne pas les coder sans 
 - Dérouler toutes les procédures de `docs/tests/`, noter chaque écart en tâche de correction (phase 0), mesurer le
   resmon de chaque ressource au repos et en action, noter le poids téléchargé à la première connexion.
 
+### Points relevés pendant T-002 à T-008 — à planifier par le porteur du projet
+
+Ce ne sont **pas** des tâches : aucun agent ne les prend tant que le porteur du projet ne les a pas placés dans une
+phase. Détail dans les rapports cités.
+- Sécurité, à vérifier en premier par T-010 : un module qui retire un objet d'une besace par son numéro de conteneur
+  pendant l'écriture qui suit un déchargement pourrait dupliquer l'objet si le personnage revient dans les 3 s
+  (`vava_inventory/server/characters.lua:80`, relecture de T-005).
+- Vie GTA tenue par le client : un client modifié qui ignore `vava_health:set` ignore les dégâts des sorts ; à régler
+  avec la chaîne de dégâts T-110 (rapport T-006).
+- Core : le journal des dégâts de la magie écrit à l'arrêt dépend de l'ordre d'arrêt entre le core et le module
+  (lignes perdues mais signalées) ; différer d'un tour le retrait du module dans le core (rapport T-006).
+- Core : `rpc.lua` ne convertit `3.0` en `3` que pour les arguments de premier niveau ; une définition de schéma
+  cyclique fait lever `compile` ; tests de `rpc.lua`, `ratelimit.lua`, `registry.lua`, `modules.lua` (rapport T-002).
+- Inventaire : un export pour fermer un conteneur chez un joueur (le grenier resté ouvert pendant une mise à terre
+  reste consultable, sans dépôt ni retrait possible) ; `examples/vava_example_items` ne redéclare pas ses objets
+  quand l'inventaire redémarre (rapports T-005 et T-006).
+- Magie : « Libérer » du Registre pendant un Gel libère le ped ; `/lancer <autre sort>` peut répondre « Votre cible
+  vous échappe. » si ce sort porte moins loin que le sort prêt ; **décision** : Trait de glace N4 annoncé « ne peut
+  plus courir » alors que sa force (0,45) reste sous le seuil (0,5) — monter la force ou corriger les textes.
+- Agriculture : `/agriculture pousser` laisse la sécheresse en place (la plante redevient flétrie ou morte) ; heures
+  sèches d'une plante morte affichées au-delà de sa mort ; **décision** : le modèle « mûr » s'affiche dès 2/3 de la
+  croissance (la moitié pour la carotte et le chou) alors que la récolte n'est possible qu'à 100 % (rapport T-003).
+- Voix : un nom refusé pour un caractère invisible répond « Donnez un nom au lieu. » ; chaque changement de zone
+  part à tous les joueurs (à revoir avec T-014) (rapport T-008).
+
 ## Phase 1 — Sécurité, performance, réseau
 
 ### T-010 — Audit sécurité de tout le dépôt
