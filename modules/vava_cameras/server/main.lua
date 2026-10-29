@@ -2,12 +2,13 @@
     vava_cameras/server/main.lua
     Rôle : déclaration du module auprès du core : intentions des clients en RPC à schéma strict et à débit limité
            (joueur filmé : offre, abandon ; membre du Conseil en jeu : mur, joueurs, caméra, réponse, fermeture), droit
-           revérifié à chaque demande du membre, journal (ouverture du mur, vue en grand), caméras éteintes quand le
-           joueur filmé ou son spectateur quitte le jeu.
+           revérifié à chaque demande du membre et quand son rang change, journal (ouverture du mur, vue en grand),
+           caméras éteintes quand le joueur filmé ou son spectateur quitte le jeu, ou que le spectateur perd le droit.
     Dépendances : tous les fichiers server/ du module
 ]]
 
-local ipairs, tostring = ipairs, tostring
+local ipairs, tostring, type = ipairs, tostring, type
+local CreateThread = CreateThread
 
 local core = VavaCameras.core
 if not core then return end
@@ -19,6 +20,7 @@ local cfg = VavaCameras.config
 local limits = cfg.rateLimits
 local messages = cfg.messages
 local RPC = VavaCameras.RPC
+local ADMIN = VavaCameras.ADMIN
 
 local LENGTH = VavaCameras.SESSION_LENGTH
 local SESSION = { type = 'string', min = LENGTH, max = LENGTH, pattern = VavaCameras.SESSION_PATTERN }
@@ -74,6 +76,20 @@ local function watch(src, target, quality)
     return true, { session = result, label = label }
 end
 
+--- Rang donné ou retiré (vava_admin) : si le membre visé n'a plus le droit de regarder, ses caméras s'éteignent
+--- (sinon elles resteraient ouvertes jusqu'à leur durée maximale).
+---@param payload table
+local function adminAction(payload)
+    if not ADMIN.STAFF_ACTIONS[payload.action] or type(payload.target) ~= 'table' then return end
+    local src = payload.target.source
+        or (payload.target.accountId and core.players.getByAccount(payload.target.accountId))
+    if not src then return end
+    -- relu au tick suivant : vava_admin a fini d'enregistrer le rang
+    CreateThread(function()
+        if not links.canWatch(src) then sessions.revoke(src) end
+    end)
+end
+
 local function setup()
     local declared, declareErr = VavaCameras.commands.declare()
     if not declared then return false, 'commandes : ' .. tostring(declareErr) end
@@ -97,6 +113,7 @@ local function setup()
         -- personnage déchargé (retour à la sélection, ou départ : le déchargement vient alors en premier)
         { 'core:character:unloading', function(payload) sessions.forget(payload.source, 'left_game') end },
         { 'core:player:dropped', function(payload) sessions.forget(payload.source, 'dropped') end },
+        { ADMIN.ACTION, adminAction },
     }) do
         local id, err = core.hooks.after(def[1], def[2])
         if not id then return false, err end

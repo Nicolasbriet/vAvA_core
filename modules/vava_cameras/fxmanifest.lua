@@ -16,7 +16,7 @@ use_experimental_fxv2_oal 'yes'
 
 name 'vava_cameras'
 description 'Caméras sur l\'écran des joueurs (Conseil) vAvA'
-version '1.1.0'
+version '1.1.1'
 
 dependency 'vAvA_core'
 

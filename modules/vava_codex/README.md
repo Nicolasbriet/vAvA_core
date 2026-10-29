@@ -46,5 +46,6 @@ ACE déclarés avec les commandes), `vava_hud` (notifications), `vava_chat` (der
    ouvre une interface (`/conseil`, `/grimoire`, `/catalogue`…), qui le ferme d'abord.
 8. Onglet Touches : toutes les touches par chapitre ; cliquer une touche montre son cabochon en grand.
 9. Taper une commande dans le chat (`/me …`) : elle apparaît dans « Dernières pages » à la prochaine ouverture (greffe
-   vava_chat).
+   vava_chat). Taper deux fois `/mp <n°> …` : une seule ligne « Message privé » (seule une sous-commande déclarée,
+   comme `/metiers niveau …`, est retenue ; rien du message n'est gardé).
 10. Se déconnecter puis revenir : signets, dernières pages et réglage retrouvés (champ de personnage).

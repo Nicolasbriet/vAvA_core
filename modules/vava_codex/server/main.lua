@@ -44,11 +44,12 @@ local function favorite(src, name, on)
     return true, current.favorites
 end
 
---- Une commande vient d'être lancée (depuis le Codex ou tapée dans le chat) : dernières pages.
+--- Une commande vient d'être lancée (depuis le Codex ou tapée dans le chat) : dernières pages. Seule une
+--- sous-commande déclarée est gardée : tapé dans le chat, le second mot n'est souvent qu'un argument (« /mp 12 … »).
 local function recent(src, name, action)
-    local ok, code = catalog.canRun(src, name)
+    local ok, code, known = catalog.canRun(src, name, action)
     if not ok then return false, code end
-    local accepted, err, current = prefs.pushRecent(src, name, action ~= '' and action or nil)
+    local accepted, err, current = prefs.pushRecent(src, name, known)
     if not accepted then return false, err end
     return true, current.recent
 end

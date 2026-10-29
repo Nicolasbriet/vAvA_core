@@ -878,7 +878,8 @@ regarde en jeu), `vava_chancellerie` ≥ 1.1.0 (caméras depuis le web). Qualit�
   reste. Liste des joueurs relue toutes les 5 s, mur ouvert seulement ; caméra perdue retentée après 10 s.
 - **Limites** : 6 caméras par joueur filmé, 96 en tout, 2 h au plus ; sans réponse du spectateur en 30 s, la caméra
   s'éteint. Elle s'éteint aussi quand le joueur filmé n'est plus en jeu (sélection, départ) ou que son spectateur ferme
-  le mur, revient à la sélection ou part.
+  le mur, revient à la sélection, part, ou perd le droit de regarder (rang donné ou retiré, relu au hook
+  `vava_admin:action` ; son mur affiche « Droit refusé »).
 - **Journal** du Conseil : l'ouverture du mur et chaque vue en grand (les cases d'un mur sont couvertes par
   l'ouverture). Le joueur n'est pas prévenu : à mentionner dans le règlement du serveur.
 - **Sécurité** : chaque demande du membre est une RPC à schéma strict et à débit limité, droit revérifié à chaque
@@ -1205,7 +1206,9 @@ aucune autre interface ne l'a pris.
 
 RPC : `vava_codex:open`, `options(nom, sous-commande, rang)` (valeurs d'un argument dynamique : joueurs en jeu avec
 leur nom, clés d'un registre par `labelField`, export `codexList` du module déclarant), `favorite(nom, posé)`,
-`recent(nom, sous-commande)`, `keepOpen(bool)` — schémas stricts, débits dans `config.rateLimits`.
+`recent(nom, sous-commande)`, `keepOpen(bool)` — schémas stricts, débits dans `config.rateLimits`. Une sous-commande
+à droit propre est refusée (`refused`) à qui n'a pas ce droit, pour ses valeurs (`options`) comme pour les dernières
+pages ; `recent` ne retient que le nom et une sous-commande déclarée, jamais le reste de la ligne tapée.
 
 | Export | Retour |
 |---|---|

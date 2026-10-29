@@ -1,9 +1,10 @@
 --[[
     vava_codex/server/catalog.lua
     Rôle : lecture du registre `core:commands` pour un joueur : entrées qu'il a le droit de voir (public, droit du
-           Conseil, console en lecture seule), chapitres, commandes des ressources vAvA enregistrées auprès du jeu
-           mais non décrites (Conseil), et valeurs proposées pour un argument (joueurs en jeu, clés d'un registre,
-           liste d'un module). Tout est recalculé à la demande : le registre vit en mémoire dans le core.
+           Conseil, console en lecture seule ; une sous-commande à droit propre n'est ouverte qu'avec ce droit),
+           chapitres, commandes des ressources vAvA enregistrées auprès du jeu mais non décrites (Conseil), et valeurs
+           proposées pour un argument (joueurs en jeu, clés d'un registre, liste d'un module). Tout est recalculé à la
+           demande : le registre vit en mémoire dans le core.
     Dépendances : shared/constants.lua, config.lua, server/core.lua, bridge/server.lua
 ]]
 
@@ -36,6 +37,26 @@ local function wireArgs(args)
     return out
 end
 
+--- Sous-commande désignée d'une entrée ('' : forme nue), ou nil.
+---@param def table
+---@param actionId string
+---@return table|nil
+local function actionOf(def, actionId)
+    for _, action in ipairs(def.actions or {}) do
+        if (action.id or '') == actionId then return action end
+    end
+    return nil
+end
+
+--- Sous-commande ouverte au joueur : sans droit propre, ou avec ce droit (repli ACE de la commande sans vava_admin).
+---@param src integer
+---@param def table
+---@param action table
+---@return boolean
+local function actionAllowed(src, def, action)
+    return not action.permission or bridge.Can(src, action.permission, def.ace)
+end
+
 --- Représentation réseau d'une entrée pour un joueur : seules les sous-commandes qu'il peut lancer.
 ---@param name string
 ---@param def table
@@ -46,7 +67,7 @@ local function wire(name, def, src)
     if def.actions then
         actions = {}
         for _, action in ipairs(def.actions) do
-            if not action.permission or bridge.Can(src, action.permission, def.ace) then
+            if actionAllowed(src, def, action) then
                 actions[#actions + 1] = { id = action.id, label = action.label, description = action.description, args = wireArgs(action.args) }
             end
         end
@@ -133,39 +154,46 @@ function catalog.undeclared()
     return out
 end
 
---- Le joueur peut-il lancer (ou noter dans ses dernières pages) cette commande ?
+--- Le joueur peut-il lancer (ou noter dans ses dernières pages) cette commande ? `actionId` : le mot qui suit le
+--- nom ; s'il désigne une sous-commande déclarée, son droit propre est vérifié et il est rendu, sinon ce n'était qu'un
+--- argument (rien n'est rendu).
 ---@param src integer
 ---@param name string
+---@param actionId? string
 ---@return boolean ok
 ---@return string|nil code  unknown | refused | console
-function catalog.canRun(src, name)
+---@return string|nil action  sous-commande reconnue
+function catalog.canRun(src, name, actionId)
     local def = core.registry.get(REGISTRY, name)
     if not def then
+        -- non décrite : lançable par le Conseil seul ; pour un autre joueur, inutile de parcourir les commandes du jeu
+        if not bridge.IsStaff(src) then return false, 'unknown' end
         for _, command in ipairs(catalog.undeclared()) do
-            if command.name == name then return bridge.IsStaff(src), 'refused' end
+            if command.name == name then return true end
         end
         return false, 'unknown'
     end
     local staff = bridge.IsStaff(src)
     if not visible(def, src, staff) then return false, 'refused' end
     if def.scope == 'console' then return false, 'console' end
-    return true
+    local action = actionId and actionId ~= '' and actionOf(def, actionId) or nil
+    if action and not actionAllowed(src, def, action) then return false, 'refused' end
+    return true, nil, action and actionId or nil
 end
 
---- Argument désigné d'une entrée : par sous-commande ('' : forme nue) et rang.
+--- Argument désigné d'une entrée : par sous-commande ('' : forme nue) et rang ; rend aussi la sous-commande.
 ---@param def table
 ---@param actionId string
 ---@param index integer
----@return table|nil
+---@return table|nil arg
+---@return table|nil action
 local function argumentOf(def, actionId, index)
-    local args = def.args
+    local args, action = def.args, nil
     if def.actions then
-        args = nil
-        for _, action in ipairs(def.actions) do
-            if (action.id or '') == actionId then args = action.args break end
-        end
+        action = actionOf(def, actionId)
+        args = action and action.args
     end
-    return args and args[index] or nil
+    return args and args[index] or nil, action
 end
 
 --- Valeurs proposées pour un argument dynamique : joueurs en jeu, clés d'un registre du core, liste d'un module.
@@ -179,7 +207,9 @@ function catalog.options(src, name, actionId, index)
     local def = core.registry.get(REGISTRY, name)
     if not def then return false, 'unknown' end
     if not visible(def, src, bridge.IsStaff(src)) then return false, 'refused' end
-    local arg = argumentOf(def, actionId, index)
+    local arg, action = argumentOf(def, actionId, index)
+    -- sous-commande à droit propre : ses valeurs ne vont qu'à qui peut la lancer (comme dans l'index)
+    if action and not actionAllowed(src, def, action) then return false, 'refused' end
     if not arg then return false, 'invalid_request' end
     local out = {}
     if arg.type == 'player' then

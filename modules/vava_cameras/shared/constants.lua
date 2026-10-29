@@ -49,4 +49,7 @@ VavaCameras.ADMIN = {
     READY = 'vava_admin:toolsReady',
     OPENED = 'vava_admin:toolOpened',
     TOOL = 'vava_cameras:wall',
+    -- actions du Conseil : un rang donné ou retiré fait relire le droit de regarder du membre visé
+    ACTION = 'vava_admin:action',
+    STAFF_ACTIONS = { staffGrant = true, staffRevoke = true },
 }

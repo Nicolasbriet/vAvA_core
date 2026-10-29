@@ -4,7 +4,8 @@
            numéro de joueur) ou la Chancellerie (par son pont). Le serveur relaie la négociation WebRTC dans les deux
            sens et vérifie que chaque message vient du bon bout ; l'image, elle, va directement du jeu du joueur au
            spectateur. Limites : spectateurs par joueur, caméras en tout, durée maximale. Une caméra s'éteint quand le
-           joueur filmé part ou revient à la sélection, quand son spectateur la ferme ou part.
+           joueur filmé part ou revient à la sélection, quand son spectateur la ferme, part ou perd le droit de
+           regarder.
     Dépendances : shared/constants.lua, config.lua, server/core.lua, server/players.lua
 ]]
 
@@ -175,6 +176,14 @@ end
 function sessions.closeViewer(src)
     for id, camera in pairs(list) do
         if camera.viewer.kind == 'game' and camera.viewer.source == src then finish(id, 'stopped', false) end
+    end
+end
+
+--- Un membre en jeu n'a plus le droit de regarder (rang retiré) : ses caméras s'éteignent, son mur l'affiche.
+---@param src integer
+function sessions.revoke(src)
+    for id, camera in pairs(list) do
+        if camera.viewer.kind == 'game' and camera.viewer.source == src then finish(id, 'forbidden', true) end
     end
 end
 
