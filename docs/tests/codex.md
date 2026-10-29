@@ -1,8 +1,8 @@
 # Le Codex — procédure de test en jeu
 
-Procédure pour vérifier en jeu `vava_codex` 1.1.0 : toutes les commandes et toutes les touches du serveur dans un
+Procédure pour vérifier en jeu `vava_codex` 1.1.2 : toutes les commandes et toutes les touches du serveur dans un
 livre (`F1` ou `/codex`), la recherche, les formulaires selon le type de chaque argument, « Lancer », ce que chacun
-voit selon ses droits, les signets, les dernières pages et la greffe du chat. Elle reprend les dix tests de la section
+voit selon ses droits, les signets, les dernières pages et la greffe du chat. Elle reprend les onze tests de la section
 « Tests en jeu » du README (repérés « README n ») et les complète d'après le code. Comptez trois quarts d'heure ; les
 tests à deux joueurs sont marqués **(2 joueurs)**. Un test se cite « codex 3-4 ». Préparation commune, mesure du
 resmon et remontée des écarts : [LISEZMOI.md](LISEZMOI.md).
@@ -16,13 +16,12 @@ resmon et remontée des écarts : [LISEZMOI.md](LISEZMOI.md).
    compétences), `vava_magic` (choix fixe), `vava_chat` (greffe des dernières pages), `vava_admin` (droits), `vava_hud`
    (notifications). Le Codex démarre après eux et avant `vava_chancellerie`.
 3. **Réglages pour aller vite** (facultatif, `modules/vava_codex/config.lua` puis `restart vava_codex`, à remettre
-   après) : `favorites.max = 2` (défaut `24`) pour atteindre la limite des signets, **seulement sur un personnage qui
-   n'en a pas plus de deux** (sinon chaque « Lancer » et chaque signet répondent « Action impossible. » : voir le
-   compte rendu) ; `recent.max = 3` (défaut `12`) pour voir les dernières pages se tasser. Le Codex n'a aucun délai à
-   raccourcir.
-4. **Attention aux valeurs par défaut** : un champ numérique obligatoire part à 0 et compte comme rempli. Lancer
-   `/recolte vitalite <zone>` sans toucher au curseur met la zone à 0 (cicatrice) ; lancer `/metiers niveau` sans
-   toucher au niveau le remet à 0. Les tests ci-dessous disent quelle valeur régler.
+   après) : `favorites.max = 2` (défaut `24`) pour atteindre la limite des signets (un personnage qui en a déjà plus
+   voit ses signets ramenés aux deux premiers : test 5-7) ; `recent.max = 3` (défaut `12`) pour voir les dernières
+   pages se tasser. Le Codex n'a aucun délai à raccourcir.
+4. **Nombres** : un champ numérique n'a aucune valeur d'office (1.1.2). Obligatoire, il manque tant qu'il n'est pas
+   choisi (curseur déplacé ou valeur tapée) : `/recolte vitalite <zone>` ou `/metiers niveau` ne partent jamais avec un
+   0 que personne n'a choisi.
 
 ## 1. Ouvrir et fermer (README 1)
 
@@ -41,7 +40,7 @@ resmon et remontée des écarts : [LISEZMOI.md](LISEZMOI.md).
 |---|---|---|
 | 1 | Sans recherche, chapitre « Tout ». | Sections « Signets » et « Dernières pages » (si elles ont des lignes), puis un chapitre par module (« Agriculture », « Chat », « Conseil »…). Chaque ligne : la syntaxe (`/recolte vitalite <zone> <vitalité>`), les sceaux (« Conseil », « Console », cabochon de la touche liée, « interface »), le libellé (« Zones et nœuds de récolte › Fixer la vitalité d'une zone »). |
 | 2 | Taper `recolte`, puis `RÉCOLTE`. | Mêmes résultats sous « Résultats » (accents et casse ignorés), filtrés à chaque lettre sans attente ; la première ligne est choisie d'office et son détail s'affiche. |
-| 3 | Taper `vital`. | Deux résultats : « … › État des zones » (sa description parle de vitalité) puis « … › Fixer la vitalité d'une zone » ; la première est choisie d'office, `↓` choisit la seconde. Le README annonce l'inverse : voir le compte rendu. Taper `vitalité d'une` ne garde que la seconde. |
+| 3 | Taper `vital`. | Deux résultats : « … › État des zones » (sa description parle de vitalité) puis « … › Fixer la vitalité d'une zone » ; la première est choisie d'office, `↓` choisit la seconde (comme le dit le README, test 4). Taper `vitalité d'une` ne garde que la seconde. |
 | 4 | `Échap` dans la recherche remplie, puis `Échap`. | Le premier vide la recherche ; le second ferme le livre. |
 | 5 | Cliquer « Récolte » sur la tranche, puis « Tout ». | Seules les lignes de la récolte, sans Signets ni Dernières pages ; « Tout » rend l'index complet. |
 | 6 | `↑` `↓` dans l'index ; puis taper une lettre alors que le curseur est ailleurs. | La sélection suit l'ordre affiché ; la lettre ramène dans la recherche. |
@@ -51,11 +50,12 @@ resmon et remontée des écarts : [LISEZMOI.md](LISEZMOI.md).
 | # | Faire | Attendu |
 |---|---|---|
 | 1 | A : choisir `/recolte vitalite`, `Entrée`. | Détail : « Récolte », titre, « 0 marque une cicatrice, 100 remet la zone à neuf. », « Syntaxe », le formulaire, « Ligne lancée », « Mettre en signet », « Lancer ». Le curseur passe dans « zone » ; la liste des zones arrive du serveur : vrais noms (« Forêt de Brume ») avec l'identifiant en petit (`foret_brume`) ; taper filtre la liste. |
-| 2 | `↓` puis `Entrée` dans la liste, puis `Tab`. | La zone est choisie ; champ « vitalité » : curseur et nombre bornés 0 à 100, à 0 d'office ; la ligne s'écrit en direct : `/recolte vitalite foret_brume 0`. |
-| 3 | Régler la vitalité à 100, `Entrée`. | Chat : « Forêt de Brume : vitalité 100 %. » ; mot « Lancé : /recolte vitalite foret_brume 100 » ; la ligne monte en tête des Dernières pages ; Registre → Journal : « Vitalité fixée ». |
-| 4 | Taper `150` dans le nombre, « Lancer ». | Le curseur se cale à 100 mais la ligne porte 150 ; la commande refuse elle-même : chat « usage : /recolte zones \| zone <id> \| noeud <id> \| vitalite <zone> <0-100> \| recharger <noeud> ». |
+| 2 | `↓` puis `Entrée` dans la liste, puis `Tab`. | La zone est choisie ; champ « vitalité » « de 0 à 100 » : nombre vide (« — »), curseur pâle à gauche, rien choisi ; la ligne s'écrit en direct : `/recolte vitalite foret_brume` ; « Il manque « vitalité ». » et « Lancer » grisé ; `Entrée` ne lance rien. |
+| 3 | Régler la vitalité à 100, `Entrée`. | Le curseur reprend sa couleur ; chat : « Forêt de Brume : vitalité 100 %. » ; mot « Lancé : /recolte vitalite foret_brume 100 » ; la ligne monte en tête des Dernières pages ; Registre → Journal : « Vitalité fixée ». |
+| 4 | Taper `150` dans le nombre ; puis `Tab` ; puis taper `42,7` ; puis vider le nombre. | `150` : la ligne porte déjà 100 et le curseur se cale à 100 ; en quittant le champ, il affiche 100. `42,7` : la ligne porte 43 (entier arrondi). Vidé : « Il manque « vitalité ». » de nouveau, « Lancer » grisé. Une valeur choisie au curseur, 0 compris, part telle quelle. |
 | 5 | Vider le champ « zone ». | « Il manque « zone ». » sous la ligne ; « Lancer » grisé ; `Entrée` ne lance rien. |
-| 6 | `/metiers niveau` (README 5). | « joueur » : tous les joueurs en jeu, « Prénom Nom (n° X) », triés par nom ; « compétence » : les compétences du registre par leur nom ; « niveau » 0 à 100 (`levels.max`) ; ligne `/metiers niveau <n°> <compétence> 0` en direct. Ne pas lancer (le niveau reviendrait à 0) : lancer plutôt `/metiers voir`, qui écrit la fiche dans le chat. |
+| 6 | `/metiers niveau` (README 5). | « joueur » : tous les joueurs en jeu, « Prénom Nom (n° X) », triés par nom ; « compétence » : les compétences du registre par leur nom ; « niveau » « de 0 à 100 » (`levels.max`), vide d'office ; ligne `/metiers niveau <n°> <compétence>` en direct, « Il manque « niveau ». » et « Lancer » grisé tant que le niveau n'est pas choisi. Pour ne rien changer, lancer plutôt `/metiers voir`, qui écrit la fiche dans le chat. |
+| 6b | `/catalogue` (A), sans toucher à « page » (facultatif) ; puis taper `0` dans « page ». | Sans valeur : ligne `/catalogue`, « Lancer » actif (un facultatif vide est omis). `0` : la ligne porte `/catalogue 1` (borne `min`). |
 | 7 | Choix fixe : `/magie donner`. | « joueur » marqué « facultatif », aide « sinon vous-même » ; « objet » en pastilles « grimoire » et « registre » ; avant le choix : « Il manque « objet ». ». Pastille « grimoire », joueur vide : ligne `/magie donner grimoire` ; « Lancer » met un grimoire dans votre besace. |
 | 8 | Choix avec libellés : `vava_conseil` (commande de console). | « compte » en texte libre ; « rang » en pastilles Gardien, Sénéchal, Souverain, Révoquer ; « Lancer » grisé et « Cette commande ne se lance que depuis la console du serveur ; elle est montrée pour mémoire. ». |
 | 9 | Texte : `/me`, écrire « tire son épée ». | Aide « ex. : tire son épée » ; ligne `/me tire son épée` ; « Lancer » : l'action paraît dans le chat. |
@@ -90,6 +90,7 @@ Le serveur décide de ce que chacun voit, à chaque ouverture ; et il revérifie
 | 4 | Signet sur une commande de console (`vava_saveall`). | Accepté : elle est montrée pour mémoire. |
 | 5 | Poser des signets jusqu'à `favorites.max` (24, ou 2 avec le réglage du § 0), puis un de plus. | Mot « Vous avez atteint le nombre de signets permis : retirez-en un. » ; aucun ruban de plus. |
 | 6 | « Retirer le signet ». | Le ruban disparaît, la section « Signets » aussi s'il n'en reste aucun. |
+| 7 | Personnage avec quatre signets et cinq dernières pages ; `favorites.max = 2`, `recent.max = 3`, `restart vava_codex` ; `F1`, puis lancer `/sigils`, poser et retirer un signet. | Deux rubans (les deux premiers posés), trois Dernières pages (les plus récentes) ; « Lancer », signet et réglage fonctionnent, aucun « Action impossible. ». En base, après la sauvegarde du personnage : deux signets et trois dernières pages. Remettre les valeurs par défaut. |
 
 ## 6. Dernières pages et greffe du chat (README 9)
 
@@ -101,7 +102,7 @@ Le serveur décide de ce que chacun voit, à chaque ouverture ; et il revérifie
 | 4 | A : `/metiers voir <idA>` puis `/chat reinit` dans le chat ; rouvrir. | Deux lignes distinctes : « Compétences d'un joueur › Lire la fiche » et « Réglages du chat › Remettre le chat à sa place » (sous-commandes déclarées). |
 | 5 | Dans `F8` : `me test` ; rouvrir. | N'entre pas aux Dernières pages : seul le chat les signale. |
 | 6 | **(2 joueurs)** B hors du Conseil : `/recolte zones` dans le chat ; rouvrir. | Rien dans le chat (la commande se tait devant qui n'a pas le droit) ; rien aux Dernières pages (le serveur ignore ce que B ne peut pas lancer). |
-| 7 | Lancer treize commandes différentes (quatre avec `recent.max = 3`) ; rouvrir. | Douze lignes (trois) au plus, sans doublon ; la plus ancienne est sortie. Pendant la même ouverture, le livre peut en montrer jusqu'à douze même avec `recent.max = 3` (voir le compte rendu). |
+| 7 | Lancer treize commandes différentes (quatre avec `recent.max = 3`) ; rouvrir. | Douze lignes (trois) au plus, sans doublon ; la plus ancienne est sortie. Pendant la même ouverture aussi, jamais plus que `recent.max` : la page suit la config. |
 
 ## 7. « Rester ouvert après Lancer » (README 7)
 
@@ -131,7 +132,7 @@ Le serveur décide de ce que chacun voit, à chaque ouverture ; et il revérifie
 
 | # | Faire | Attendu |
 |---|---|---|
-| 1 | Livre ouvert : `restart vava_codex`. | Le livre disparaît ; console `module 'vava_codex' v1.1.0 prêt` ; souris et clavier reviennent au jeu (à confirmer : le module ne rend pas lui-même la main à l'arrêt). `F1` rouvre ; signets, Dernières pages et réglage intacts. |
+| 1 | Livre ouvert : `restart vava_codex` (README 11). | Le livre disparaît ; console `module 'vava_codex' v1.1.2 prêt` ; souris et clavier reviennent au jeu aussitôt (le module rend la main à l'arrêt). `F1` rouvre ; signets, Dernières pages et réglage intacts. |
 | 2 | `stop vava_codex` ; `F1` ; `/me essai` dans le chat ; `start vava_codex` ; `F1`. | `F1` sans effet pendant l'arrêt ; `/me` ne figure pas aux Dernières pages. |
 | 3 | `stop vava_admin` ; A : `F1`. | Plus de chapitre « Conseil » (ses entrées partent avec le module, `/signaler` compris), plus aucune commande du Conseil ni de la console, sauf si A a l'ACE `vava_codex.staff` ou l'ACE propre à la commande (`metiers.admin`…). |
 | 4 | `start vava_admin` ; A : `F1`. | Tout revient sans redémarrer le Codex. |
@@ -144,7 +145,7 @@ Le serveur décide de ce que chacun voit, à chaque ouverture ; et il revérifie
 | 2 | Case cochée, `/sigils` choisi : garder `Entrée` enfoncée. | La commande part à chaque répétition puis « Doucement… » et elle ne part plus (dix d'affilée, puis deux par seconde : `rateLimits.prefs`). |
 | 3 | « Mettre en signet » / « Retirer le signet » quinze fois très vite. | « Doucement… » au-delà d'une dizaine. |
 | 4 | **(2 joueurs)** B hors du Conseil tape `/vava_kick <idA> essai` dans le chat. | Rien : la commande ne vaut qu'en console ; elle n'entre pas aux Dernières pages. |
-| 5 | Valeur hors bornes dans un formulaire | Voir 3-4 : la commande lancée garde ses propres contrôles. |
+| 5 | Valeur hors bornes dans un formulaire | Voir 3-4 : la valeur part ramenée dans les bornes de l'argument ; tapée à la main dans le chat, la commande garde ses propres contrôles. |
 | 6 | À terre (`vava_health`) : `F1`. | Le Codex s'ouvre (à confirmer) ; chaque commande lancée garde ses propres refus. |
 
 ## 12. Resmon

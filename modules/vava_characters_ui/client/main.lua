@@ -2,15 +2,16 @@
     vava_characters_ui/client/main.lua
     Rôle : cycle de vie de l'écran de personnages et traitement des retours de l'interface.
       fermé → sélection (hook core:character:selection) ⇄ création → fermé (hook core:character:loaded)
-    Le serveur reste maître : liste, création, sélection et suppression sont des intentions validées par le core.
+    Le serveur reste maître : liste, création, sélection et suppression sont des intentions validées par le core ;
+    les règles de nom viennent de lui (avec la liste). À l'arrêt de la ressource, tout ce qu'elle a posé est retiré.
     Dépendances : config.lua, client/core.lua, client/camera.lua, client/preview.lua, client/nui.lua
 ]]
 
 local type, tostring = type, tostring
 local mathType = math.type
-local CreateThread = CreateThread
+local CreateThread, AddEventHandler, GetCurrentResourceName = CreateThread, AddEventHandler, GetCurrentResourceName
 local SetFocusPosAndVel, ClearFocus, RequestCollisionAtCoord, ClearAreaOfPeds = SetFocusPosAndVel, ClearFocus, RequestCollisionAtCoord, ClearAreaOfPeds
-local DisplayRadar, DoScreenFadeIn = DisplayRadar, DoScreenFadeIn
+local DisplayRadar, DoScreenFadeIn, DoScreenFadeOut = DisplayRadar, DoScreenFadeIn, DoScreenFadeOut
 
 local ui = VavaCharactersUi
 local core = ui.core
@@ -19,6 +20,7 @@ local cfg = ui.config
 local nui, camera, preview, appearance = ui.nui, ui.camera, ui.preview, ui.appearance
 
 local CLEAR_ALL_PEDS = 1
+local RESOURCE = GetCurrentResourceName()
 
 ---@alias UiState 'closed'|'selection'|'creator'
 ---@type UiState
@@ -44,11 +46,12 @@ local function serverResult(ok, success, result)
     return { ok = true, result = result }
 end
 
+--- Liste du compte, emplacements, et règles de nom du serveur (core ≥ 0.8.0 ; sans elles, seul le serveur juge).
 ---@return table
 local function listCharacters()
-    local ok, success, characters, max = core.characters.list()
+    local ok, success, characters, max, nameRules = core.characters.list()
     if not ok or not success then return serverResult(ok, success, characters) end
-    return { ok = true, characters = characters, max = max }
+    return { ok = true, characters = characters, max = max, nameRules = type(nameRules) == 'table' and nameRules or nil }
 end
 
 local function prepareScene()
@@ -205,6 +208,20 @@ end)
 
 core.hooks.after('core:character:selection', open)
 core.hooks.after('core:character:loaded', close)
+
+-- Arrêt de la ressource écran ouvert : rien ne doit lui survivre (ped d'aperçu, caméra scriptée, mise au point de la
+-- carte, radar caché, souris et clavier pris). L'écran redevient noir, comme l'attente de sélection du core : un
+-- redémarrage rouvre la sélection (plus bas), un arrêt laisse le joueur dans l'attente.
+AddEventHandler('onClientResourceStop', function(resource)
+    if resource ~= RESOURCE or state == 'closed' then return end
+    state = 'closed'
+    nui.setFocus(false)
+    preview.destroy()
+    camera.close()
+    ClearFocus()
+    DisplayRadar(true)
+    DoScreenFadeOut(0)
+end)
 
 -- ressource démarrée après la mise en attente du joueur (redémarrage en cours de session)
 if core.characters.awaitingSelection() then open() end

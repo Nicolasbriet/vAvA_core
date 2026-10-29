@@ -14,7 +14,7 @@ use_experimental_fxv2_oal 'yes'
 
 name 'vava_admin'
 description 'Administration vAvA (Registre du Conseil)'
-version '1.6.0'
+version '1.7.0'
 
 dependency 'vAvA_core'
 
@@ -45,6 +45,7 @@ server_scripts {
     'server/bans.lua',
     'server/reports.lua',
     'server/players.lua',
+    'server/spectate.lua',
     'server/actions.lua',
     'server/requests.lua',
     'server/rpc.lua',

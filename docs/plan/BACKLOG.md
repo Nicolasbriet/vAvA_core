@@ -76,10 +76,10 @@ marqués « décision » attendent le porteur du projet : ne pas les coder sans 
   Conseil à terre qui se relève lui-même ; Brume et Rempart en zone protégée.
 
 ### T-007 — Codex, Registre et personnage
-- Agents : vava-dev-lua + vava-dev-nui · Dépend de : — · Statut : à faire
+- Agents : vava-dev-lua + vava-dev-nui · Dépend de : — · Statut : à tester en jeu
 - C1 : un nombre obligatoire du Codex doit être choisi (pas de 0 d'office) ; valeur bornée et arrondie.
 - Codex : un maximum de favoris ou de dernières pages abaissé tronque au lieu de bloquer « Lancer » ; `recent.max`
-  lu au lieu de 12 ; main rendue à l'arrêt ; suggestions du chat à jour après un changement de rang.
+  lu au lieu de 12 ; main rendue à l'arrêt.
 - Registre : outil des caméras visible avec le droit `watch` ; état « immobilisé » cohérent après un redémarrage ;
   identifiants (license, discord, steam) plus envoyés à l'interface ; observateur qui part : jamais rendu sous terre.
 - Personnage : règles de nom de l'interface tirées de la config du serveur (peut toucher le core : cette tâche

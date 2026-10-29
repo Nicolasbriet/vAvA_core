@@ -35,8 +35,11 @@
     ]);
   }
 
+  /** Une page s'affiche si le rang a son droit ; une page peut préciser sa propre règle (Outils : outils de module). */
+  const allowed = (view) => (view.visible ? view.visible(ctx) : ctx.can(view.permission));
+
   async function goTo(id, options) {
-    const view = VIEWS.find((v) => v.id === id && ctx.can(v.permission));
+    const view = VIEWS.find((v) => v.id === id && allowed(v));
     if (!view) return;
     current = view;
     for (const ribbon of ribbons.children) ribbon.classList.toggle('is-active', ribbon.dataset.tab === id);
@@ -47,7 +50,7 @@
   }
 
   function buildRibbons() {
-    const shown = VIEWS.filter((view) => ctx.can(view.permission));
+    const shown = VIEWS.filter(allowed);
     ribbons.replaceChildren(...shown.map((view, index) => {
       const ribbon = UI.el('button', `ribbon ribbon-${index % 4}`, STRINGS.tabs[view.id]);
       ribbon.type = 'button';

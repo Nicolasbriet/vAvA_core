@@ -389,7 +389,7 @@ Base d'un écran de sélection. Chaque fonction RPC renvoie `ok` (transport), pu
 |---|---|
 | `current()` | `{ id, firstName, lastName, sex, fields }` du personnage actif, ou `nil` (local, sans appel réseau) |
 | `awaitingSelection()` | `true` si le joueur attend de choisir un personnage (local) |
-| `list()` | liste `{ id, firstName, lastName, sex }` des personnages du compte, puis le maximum par compte |
+| `list()` | liste `{ id, firstName, lastName, sex }` des personnages du compte, puis le maximum par compte, puis les règles de nom `{ minLength, maxLength, letters, separators }` (0.8.0) |
 | `create(firstName, lastName, sex)` | résumé du personnage créé |
 | `select(characterId)` | — ; le personnage arrive ensuite par le hook `core:character:loaded` |
 | `unload()` | — ; retour à l'écran noir de sélection |
@@ -415,7 +415,9 @@ gardée et écrite au cycle suivant. Avec `characters.uniqueNames = true`, l'uni
 `name_taken`. Pas d'index unique : des homonymes déjà en base sont conservés.
 
 Noms : `characters.name` dans `config/server.lua` (longueur en caractères, lettres accentuées autorisées,
-séparateurs `'`, `-` et espace jamais en tête, en fin ni doublés).
+séparateurs `'`, `-` et espace jamais en tête, en fin ni doublés). Depuis 0.8.0, ces règles partent avec `list()` :
+une interface de création vérifie la saisie comme le serveur (espaces de bord retirés, longueur comptée en caractères,
+chaque caractère pris dans `letters` ou dans `separators`) sans en garder de copie ; le serveur revérifie à la création.
 
 ## Modules officiels
 
@@ -454,14 +456,20 @@ Format (listes pures et tables nommées uniquement, pour une sérialisation sans
 - Modifier l'apparence d'un personnage chargé : `core.characters.set(id, 'vava_appearance:data', appearance)`
   côté serveur ; le client concerné la réapplique.
 - Vêtements proposés et apparences de départ : `config.lua` (`components`, `props`, `defaults`). Les packs
-  médiévaux ne demanderont que ces réglages.
+  médiévaux ne demanderont que ces réglages. Règles, installation et vérifications en jeu :
+  `modules/vava_appearance/README.md`.
 
 ### `vava_characters_ui`
 
 Écran de sélection et éditeur de création (NUI, sans framework). S'ouvre sur `core:character:selection`, se ferme
 sur `core:character:loaded`. Aperçu sur un ped **local** (invisible des autres joueurs). Scène et caméras :
-`config.lua`. Pour travailler le rendu sans le jeu, ouvrir `web/index.html` dans un navigateur
-(`?screen=creator&tab=hair&sex=f`) : des données simulées remplacent le jeu.
+`config.lua` ; la scène est distincte du point d'apparition du core (sinon les nouveaux arrivants entreraient dans la
+scène de ceux qui créent) et reste provisoire (`-- PLACEHOLDER`). Les noms sont vérifiés à la saisie avec les règles
+du serveur (`characters.name`, reçues avec la liste des personnages, core ≥ 0.8.0) ; le serveur revérifie à la
+création. À l'arrêt de la ressource écran ouvert, ped d'aperçu, caméra, mise au point de la carte, radar et focus sont
+rendus, et l'écran redevient noir comme l'attente de sélection. Détails : `modules/vava_characters_ui/README.md`. Pour
+travailler le rendu sans le jeu, ouvrir `web/index.html` dans un navigateur (`?screen=creator&tab=hair&sex=f`) : des
+données simulées remplacent le jeu.
 
 ### `vava_inventory`
 
@@ -771,14 +779,24 @@ voulu (l'écran des joueurs non plus, voir plus bas).
   le rang. Le panneau n'affiche que ce que le rang permet : simple confort.
 - Toute action (panneau, console, module) est écrite au journal (`vava_admin_logs`, 90 jours) et publiée par le hook
   `vava_admin:action` (`after` : `{ actor = { accountId, label, rank }, action, target?, details }`).
-- Les données des joueurs ne partent qu'au personnel, et à la demande ; le pseudo FiveM n'est jamais enregistré.
+- Les données des joueurs ne partent qu'au personnel, et à la demande ; le pseudo FiveM n'est jamais enregistré. Les
+  identifiants d'un joueur (license, discord, steam…, jamais l'adresse IP) ne partent qu'à la Chancellerie, qui les
+  affiche : la fiche du Registre en jeu ne les reçoit pas (1.7.0).
 - Bans par compte, vérifiés au hook `core:player:connecting` : un banni voit le motif, la fin et le numéro du ban.
   Aucun compte n'est créé pour une connexion refusée.
-- Déplacer et immobiliser passent par les natives serveur (OneSync). Le vol libre est la seule boucle par image du
-  module, active seulement pendant son usage ; l'observation place le membre, invisible, sous le joueur observé.
+- Déplacer et immobiliser passent par les natives serveur (OneSync). L'état « immobilisé » vit en mémoire : à l'arrêt
+  (ou au redémarrage) du module, chaque joueur immobilisé est libéré et prévenu, jamais laissé figé sans Registre pour
+  le libérer (1.7.0). Le vol libre est la seule boucle par image du module, active seulement pendant son usage ;
+  l'observation place le membre, invisible, sous le joueur observé. Sa place de départ, lue par le serveur quand
+  l'observation est accordée, est gardée dans le champ privé `vava_admin:spectateReturn` de son personnage. Chaque
+  observation reçoit un numéro ; seule la fin de la dernière (RPC `vava_admin:spectateEnd(numéro)`, entier borné)
+  efface la place, et une observation remplacée n'annonce pas sa fin. S'il part avant, la place est marquée « parti »
+  au déchargement ; à son retour, il y est replacé dès l'apparition confirmée de ce même personnage, et la place n'est
+  effacée qu'une fois le replacement accordé (redémarrage du module compris) : jamais sous terre (1.7.0).
 - Vol libre d'une touche (F2 par défaut, réglable dans les raccourcis FiveM) : chaque appui est accordé par le serveur
   (droit `tools`, inscrit au journal) ; sans droit, la touche ne fait rien. Pendant le vol, le membre est invisible
-  des autres joueurs (il se voit lui-même) et retrouve ensuite sa visibilité d'avant.
+  des autres joueurs (il se voit lui-même) et retrouve ensuite sa visibilité d'avant, arrêt du module compris
+  (collision, gravité et vulnérabilité rétablies sur-le-champ).
 
 **Exports serveur** :
 
@@ -794,7 +812,9 @@ voulu (l'écran des joueurs non plus, voir plus bas).
 
 **Outils des modules** (depuis 1.1.0) : un module ajoute un bouton à la page Outils du Registre par le registre du core
 `vava_admin:tools` — clé `<ressource>:<nom>`, `{ label, hint?, permission }` (un droit des rangs). Le bouton n'apparaît
-qu'aux membres qui ont ce droit ; un clic revérifie le droit côté serveur, ferme le Registre et déclenche chez ce
+qu'aux membres qui ont ce droit, même sans le droit `tools` des outils du Registre : la page Outils s'affiche dès
+qu'un outil y est ouvert au membre (le Gardien y trouve le mur des caméras, droit `watch`), avec les seuls outils de
+modules s'il n'a pas `tools` (1.7.0). Un clic revérifie le droit côté serveur, ferme le Registre et déclenche chez ce
 membre le hook client `vava_admin:toolOpened` (`{ key }`) : le module ouvre alors son interface et **revérifie chaque
 action côté serveur**. Le Registre déclenche le hook serveur `vava_admin:toolsReady` quand son registre est prêt
 (démarrage ou redémarrage : les entrées d'avant ont disparu avec lui) : y rajouter son outil.
@@ -921,7 +941,8 @@ Le gibier d'une future chasse sera créé par son module : la population du jeu 
 ### `vava_cameras`
 
 L'écran des joueurs, pour le Conseil : tout membre (droit `watch` de vava_admin, sans règle de rang) regarde tout le
-monde, en jeu (**mur des caméras** : outil du Registre ou `/cameras`) ou depuis la Chancellerie (par son pont).
+monde, en jeu (**mur des caméras** : page Outils du Registre — Gardien compris depuis vava_admin 1.7.0, qui l'ouvre
+avec le seul droit `watch` — ou `/cameras`) ou depuis la Chancellerie (par son pont).
 Demande le core 0.5.0 ; facultatifs : `vava_admin` ≥ 1.2.0 (droit, journal, outil du Registre ; sans lui, personne ne
 regarde en jeu), `vava_chancellerie` ≥ 1.1.0 (caméras depuis le web). Qualités, limites, adresse STUN : `config.lua`.
 
@@ -1276,7 +1297,11 @@ décrites** (commandes des ressources vAvA enregistrées auprès du jeu mais abs
 libre). Page de droite : détail de la ligne choisie, **formulaire selon le type de chaque argument** (joueur en jeu,
 clé d'un registre, liste d'un module, choix fixe, nombre, texte), **ligne composée en direct**, « Lancer ». Onglet
 **Touches** : toutes les touches par chapitre, avec la touche réellement liée par le joueur (lue dans le jeu).
-Clavier : `↑ ↓` parcourir, `Entrée` choisir puis lancer, `Tab` champ suivant, `Échap` retour puis fermer.
+Clavier : `↑ ↓` parcourir, `Entrée` choisir puis lancer, `Tab` champ suivant, `Échap` retour puis fermer. Un
+argument nombre (`integer`, `number`) n'a **aucune valeur d'office** (1.1.2) : obligatoire, il manque tant que le
+joueur ne l'a pas choisi (curseur déplacé ou valeur tapée) ; la valeur tapée part bornée par `min` et `max`, arrondie
+au `step` (compté depuis `min`) et à l'entier pour un `integer`. Si la ressource s'arrête livre ouvert, souris et
+clavier sont rendus au jeu.
 
 **Ce que chacun voit** est décidé par le serveur : public → tous ; Conseil → le droit vava_admin déclaré avec la
 commande (ou tout membre du Conseil si aucun), repli ACE sans vava_admin (`ace` de la commande, sinon
@@ -1286,7 +1311,9 @@ droit. Le Codex ne donne aucun pouvoir : la ligne est lancée par `ExecuteComman
 
 **Préférences par personnage** (champ `vava_codex:prefs`, visible du seul joueur) : signets (`favorites.max`),
 dernières pages (`recent.max`, sans doublon, les plus récentes en tête — depuis le Codex, et depuis le chat via
-l'export client `noteCommand(line)`), réglage « rester ouvert après Lancer » (`keepOpenDefault`). Une commande
+l'export client `noteCommand(line)`), réglage « rester ouvert après Lancer » (`keepOpenDefault`). Un maximum abaissé
+dans la config tronque les listes déjà enregistrées (premiers signets, dernières pages les plus récentes) à la
+lecture, et la prochaine écriture garde la version courte : rien n'est bloqué (1.1.2). Une commande
 déclarée `ui = true` (ouvre une interface) ferme toujours le Codex d'abord ; sinon le Codex reprend le focus si
 aucune autre interface ne l'a pris.
 

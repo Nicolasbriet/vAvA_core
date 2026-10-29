@@ -80,7 +80,7 @@ local function actorOf(spec)
     if type(spec) ~= 'table' or type(spec.label) ~= 'string' or #spec.label == 0 or #spec.label > LABEL_MAX then return nil end
     local rank = type(spec.rank) == 'string' and ranks.get(spec.rank)
     if not rank then return nil end
-    return { source = nil, accountId = nil, rank = rank, label = cfg.actorLabel:format(spec.label) }
+    return { source = nil, accountId = nil, rank = rank, label = cfg.actorLabel:format(spec.label), web = true }
 end
 
 --- Demande du panneau : (acteur, nom, arguments) → true, résultat | false, code.

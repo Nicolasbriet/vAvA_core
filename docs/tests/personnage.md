@@ -1,8 +1,8 @@
 # Connexion et personnage — procédure de test en jeu
 
 Procédure pour vérifier en jeu l'arrivée d'un joueur et la vie de ses personnages : compte, création, apparence,
-sélection, suppression, reconnexion, position, sauvegarde et temps de jeu. Modules : `vAvA_core` 0.7.3,
-`vava_appearance` 1.0.0, `vava_characters_ui` 1.0.0, et l'outil de développement `vava_dev_characters` 1.2.0. Comptez
+sélection, suppression, reconnexion, position, sauvegarde et temps de jeu. Modules : `vAvA_core` 0.8.0,
+`vava_appearance` 1.0.1, `vava_characters_ui` 1.0.1, et l'outil de développement `vava_dev_characters` 1.2.0. Comptez
 une heure et demie seul, une demi-heure de plus pour les tests marqués **(2 joueurs)**. Un test se cite
 « personnage 4-2 ».
 
@@ -43,17 +43,18 @@ une heure et demie seul, une demi-heure de plus pour les tests marqués **(2 jou
 | 3 | `Échap`, clics hors des cartes. | Rien : on ne quitte cet écran qu'en jouant un personnage. |
 | 4 | `F8` → `disconnect`, puis revenir. | Aucune ligne `nouveau compte` ; même compte `N` ; `last_seen_at` mis à jour (à l'arrivée et au départ). |
 | 5 | **(2 joueurs)** B reste sur la sélection ; A ouvre le Registre (`F10`) → Joueurs. | Ligne de B : « En sélection de personnage », « <pseudo FiveM> · Compte n° N », sans temps de jeu ; dans sa fiche, Temps de jeu « — ». |
-| 6 | (Facultatif) Se connecter juste après le lancement du serveur, avant la ligne `vAvA_core v0.7.3 prêt (API v1)`. | « Le serveur démarre, merci de patienter… », puis entrée normale dès que le core est prêt. Au-delà de 60 s (`players.coreWaitTimeoutMs`) : « Le serveur démarre, réessayez dans un instant. » |
+| 6 | (Facultatif) Se connecter juste après le lancement du serveur, avant la ligne `vAvA_core v0.8.0 prêt (API v1)`. | « Le serveur démarre, merci de patienter… », puis entrée normale dès que le core est prêt. Au-delà de 60 s (`players.coreWaitTimeoutMs`) : « Le serveur démarre, réessayez dans un instant. » |
 
 ## 2. Création — identité, noms, nombre maximal
 
 | # | Faire | Attendu |
 |---|---|---|
-| 1 | Cliquer « Nouveau personnage ». | Éditeur « Nouveau personnage », « Étape 1 / 7 » ; onglets Identité, Héritage, Visage, Cheveux, Peau, Maquillage, Tenue ; ped masculin à droite, vue « Silhouette » ; légende « Glisser pivoter · Q vers la gauche · E vers la droite » ; curseur dans le champ Prénom ; « Créer le personnage » grisé. |
-| 2 | Prénom `Aldric`, Nom `Morvan`. | Bouton actif. Sous le Nom : « 2 à 24 lettres. Espace, apostrophe et trait d'union autorisés entre deux lettres. » |
+| 1 | Cliquer « Nouveau personnage ». | Éditeur « Nouveau personnage », « Étape 1 / 7 » ; onglets Identité, Héritage, Visage, Cheveux, Peau, Maquillage, Tenue ; ped masculin à droite, vue « Silhouette », posé au sol dans la scène provisoire (piste de McKenzie, Grapeseed : `scene` de `vava_characters_ui/config.lua`), cadré par la caméra (à confirmer : cadrage des trois vues à cet endroit) ; légende « Glisser pivoter · Q vers la gauche · E vers la droite » ; curseur dans le champ Prénom ; « Créer le personnage » grisé. |
+| 2 | Prénom `Aldric`, Nom `Morvan`. | Bouton actif. Sous le Nom : « 2 à 24 lettres. Espace, apostrophe et trait d'union autorisés entre deux lettres. » : ce rappel est tiré de `characters.name` du core (reçu avec la liste), pas écrit dans l'interface. |
 | 3 | Essayer tour à tour : `A` ; `Jean2` ; `-Jean` ; `Jean-` ; `Jean--Pierre` ; `Jean  Pierre` (deux espaces) ; `d’Aubigné` (apostrophe typographique). | « Ce nom n'est pas valide. » sous le champ, bouton grisé. |
 | 4 | `Jean-Pierre`, `d'Aubigné`, `Le Roux`, `Éloïse`, `Œdipe` ; un nom de 24 lettres ; ` Jean ` (espaces autour). | Acceptés. Le champ refuse la 25e lettre. Les espaces de bord sont retirés à l'enregistrement. |
-| 5 | Prénom `Łucja` (ou `Weiß`), puis « Créer le personnage » → « Créer ». | Le champ l'accepte, le serveur le refuse : « Ce nom n'est pas valide. », retour sur Identité, rien en base (`Ł` et `ß` sont hors de `characters.name.letters`). |
+| 5 | Prénom `Łucja` (ou `Weiß`). | Refusé dès la saisie : « Ce nom n'est pas valide. », bouton grisé (`Ł` et `ß` sont hors de `characters.name.letters`, que l'interface reçoit du serveur). |
+| 5b | (Facultatif, redémarrage du serveur) `characters.name.maxLength = 12` et retirer `-` de `separators` dans `config/server.lua` ; rouvrir l'éditeur. Remettre ensuite. | « 2 à 12 lettres. Espace et apostrophe autorisés entre deux lettres. » ; `Jean-Pierre` refusé à la saisie ; le champ s'arrête à 12 lettres. |
 | 6 | Sexe : « Femme » sans rien avoir modifié ; puis modifier un trait (Visage) et revenir à « Homme ». | Premier changement sans confirmation (ped féminin). Second : « Changer de sexe ? » / « L'apparence sera réinitialisée. », boutons « Changer » et « Continuer » ; après « Changer », apparence de départ du nouveau sexe, prénom et nom conservés. |
 | 7 | « Créer le personnage », puis « Continuer ». | « Créer ce personnage ? » / « Aldric Morvan rejoindra le royaume. Son nom ne pourra plus être modifié. » ; « Continuer » ramène à l'éditeur, rien n'est créé. |
 | 8 | « Créer le personnage », puis « Créer ». | « Création… », l'écran se ferme, fondu ; apparition au point par défaut (−269,4 ; −955,3 ; 31,2), cap 205,8, avec l'apparence choisie. Console : `[vAvA][INFO][characters] compte #N : personnage #M créé`. En base : `first_name`, `last_name`, `sex`, `data` avec la clé `vava_appearance:data`, `play_seconds` 0, positions vides jusqu'à la première sauvegarde (§ 6). |
@@ -78,7 +79,7 @@ une heure et demie seul, une demi-heure de plus pour les tests marqués **(2 jou
 | 9 | Créer (2-8) et comparer avec l'aperçu. | Personnage identique en jeu ; aucun ped par défaut visible avant l'apparence (elle est posée écran noir). |
 | 10 | Se reconnecter et jouer ce personnage. | Apparence identique. |
 | 11 | **(2 joueurs)** A regarde B en jeu. | A voit B tel que B s'est créé (visage, cheveux, tenue). |
-| 12 | **(2 joueurs)** A se tient au point d'apparition par défaut pendant que B crée un personnage. | A ne voit pas le ped d'aperçu de B (ped local). B voit A dans sa scène, placée au même endroit (`scene` de `vava_characters_ui/config.lua` = `spawn.defaultPoint` du core) (à confirmer). |
+| 12 | **(2 joueurs)** A se tient au point d'apparition par défaut pendant que B crée un personnage ; puis A va à la scène de création (piste de McKenzie, Grapeseed). | Au point d'apparition, A n'entre pas dans la scène de B : elle est ailleurs. À la scène, A ne voit pas le ped d'aperçu de B (ped local) ; B, lui, voit A passer derrière son aperçu : c'est pourquoi la scène doit rester un lieu où personne ne va (provisoire, `-- PLACEHOLDER`). |
 
 ## 4. Sélection et suppression
 
@@ -151,8 +152,9 @@ Les commandes se tapent dans la console du serveur.
 |---|---|---|
 | 1 | En jeu : `restart vava_characters_ui`. | Rien de visible. Ensuite `/perso quitter` : l'écran de sélection s'ouvre normalement. |
 | 2 | Sur la sélection : `restart vava_characters_ui`. | L'écran disparaît puis revient avec la liste (la ressource rouvre l'écran quand le joueur attend un personnage), souris et clavier rendus à l'interface. |
-| 3 | Dans l'éditeur : `restart vava_characters_ui`. | Retour à la sélection, choix perdus. Le ped d'aperçu de l'ancienne instance ne doit plus être visible dans la scène (à confirmer : le module ne le retire pas lui-même à l'arrêt). |
-| 4 | En jeu : `restart vava_appearance`. | Console : `[vAvA][INFO][modules] module 'vava_appearance' arrêté`, puis `module 'vava_appearance' v1.0.0 prêt`. Le ped garde son apparence. FiveM arrête aussi `vava_characters_ui`, qui en dépend (à confirmer dans la console) : `ensure vava_characters_ui`. Puis `/respawn` : apparence réappliquée, identique ; reconnexion : identique (la valeur reste dans `data` pendant l'arrêt). |
+| 3 | Dans l'éditeur : `restart vava_characters_ui`. | Un instant d'écran noir, puis retour à la sélection, choix perdus. Le ped d'aperçu de l'ancienne instance a disparu (le module le retire à l'arrêt, avec sa caméra et le radar caché) : un seul ped dans la scène dès qu'on rouvre l'éditeur. |
+| 3b | Dans l'éditeur : `stop vava_characters_ui`, attendre, `start vava_characters_ui`. | À l'arrêt : écran noir, souris et clavier rendus au jeu, aucune caméra figée ni ped d'aperçu (comme l'attente de sélection du core). Au démarrage : la sélection revient avec la liste. |
+| 4 | En jeu : `restart vava_appearance`. | Console : `[vAvA][INFO][modules] module 'vava_appearance' arrêté`, puis `module 'vava_appearance' v1.0.1 prêt`. Le ped garde son apparence. FiveM arrête aussi `vava_characters_ui`, qui en dépend (à confirmer dans la console) : `ensure vava_characters_ui`. Puis `/respawn` : apparence réappliquée, identique ; reconnexion : identique (la valeur reste dans `data` pendant l'arrêt). |
 | 5 | Dans l'éditeur : `restart vava_appearance`, puis `ensure vava_characters_ui`. | L'éditeur disparaît, puis la sélection revient ; une création aboutit normalement (RPC `vava_appearance:create` de nouveau enregistré). |
 | 6 | **(2 joueurs)** B est sur la sélection quand A lance `restart vava_characters_ui`. | B retrouve son écran avec sa liste ; A, en jeu, ne voit rien changer. |
 
@@ -188,11 +190,14 @@ SELECT JSON_EXTRACT(data, '$."vava_appearance:data".hair') FROM vava_characters 
 
 - Le rendu de l'interface dans CEF (polices, cadres, fenêtres) : `modules/vava_characters_ui/web/index.html` s'ouvre
   dans un navigateur avec des données simulées (`?screen=creator&tab=hair&sex=f`).
-- Le placement des caméras et du ped d'aperçu (sol trouvé sous la scène, ped à droite, panneau à gauche) : la
-  scène de la config est un emplacement provisoire.
+- Le placement des caméras et du ped d'aperçu (sol trouvé sous la scène, ped à droite, panneau à gauche) à la
+  nouvelle scène provisoire (piste de McKenzie, Grapeseed : coordonnées vanilla reprises de mémoire, jamais vues en
+  jeu) : 2-1 et 3-12 le disent ; si le sol ou le cadrage est faux, seule `scene` change.
+- La règle des noms côté interface a été comparée hors jeu (sous jsdom) aux cas de 2-3 à 2-5 ; reste à la voir en
+  jeu, avec les règles réellement reçues du serveur.
 - La synchronisation de l'apparence vers les autres joueurs, assurée par le jeu et non par le module (3-11).
-- Le comportement de FiveM à l'arrêt d'une ressource : arrêt des ressources dépendantes (9-4), libération du focus,
-  de la caméra scriptée et du ped local (9-2, 9-3).
+- Le comportement de FiveM à l'arrêt d'une ressource : arrêt des ressources dépendantes (9-4) ; le module rend
+  lui-même focus, caméra scriptée et ped local (9-2, 9-3, 9-3b), à voir en jeu.
 - La lisibilité du ped au moment du départ (5-3), le délai de FXServer avant de constater le départ d'un client tué
   (7-3), l'ouverture de `F8` par-dessus l'écran de sélection (§ 0.2).
 

@@ -1,13 +1,13 @@
 --[[
     vava_admin/server/main.lua
     Rôle : déclaration du module auprès du core : membres du Conseil chargés, journal purgé, bans vérifiés à la
-           connexion, intentions du panneau, outils des autres modules, commandes de la console, oubli des joueurs
-           partis.
+           connexion, retour des membres partis en pleine observation, intentions du panneau, outils des autres
+           modules, commandes de la console, oubli des joueurs partis ; à l'arrêt, les joueurs immobilisés sont libérés.
     Dépendances : tous les fichiers server/ du module
 ]]
 
 local tostring = tostring
-local CreateThread = CreateThread
+local CreateThread, AddEventHandler = CreateThread, AddEventHandler
 
 local core = VavaAdmin.core
 if not core then return end
@@ -17,6 +17,7 @@ local staff = VavaAdmin.staff
 local bans = VavaAdmin.bans
 local reports = VavaAdmin.reports
 local players = VavaAdmin.players
+local spectate = VavaAdmin.spectate
 local actions = VavaAdmin.actions
 local rpc = VavaAdmin.rpc
 local extensions = VavaAdmin.extensions
@@ -29,6 +30,7 @@ local function forget(payload)
     players.forget(src)
     actions.forget(src)
     reports.forget(src)
+    spectate.forget(src)
 end
 
 local function setup()
@@ -38,6 +40,8 @@ local function setup()
     if not ok then return false, 'membres du Conseil : ' .. tostring(err) end
     ok, err = bans.start()
     if not ok then return false, err end
+    ok, err = spectate.start()
+    if not ok then return false, 'retour des observations : ' .. tostring(err) end
     local id
     id, err = core.hooks.after('core:player:dropped', forget)
     if not id then return false, err end
@@ -57,6 +61,13 @@ local function setup()
     VavaAdmin.ready = true
     return true
 end
+
+-- Arrêt (ou redémarrage) du module : personne ne reste immobilisé sans Registre pour le libérer.
+AddEventHandler('onResourceStop', function(resource)
+    if resource ~= VavaAdmin.resource then return end
+    local released = actions.releaseAll()
+    if released > 0 then core.log.info('arrêt : %d joueur(s) immobilisé(s) libéré(s)', released) end
+end)
 
 local registered, registerErr = core.modules.register({
     version = GetResourceMetadata(VavaAdmin.resource, 'version', 0),

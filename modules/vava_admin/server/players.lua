@@ -1,9 +1,10 @@
 --[[
     vava_admin/server/players.lua
     Rôle : les joueurs vus par le Conseil : liste des connectés et fiche d'un joueur (identité du personnage, compte,
-           latence, temps de jeu du personnage, santé, besoins, avertissements, identifiants sauf l'adresse IP).
-           Calculées à la demande, jamais envoyées en continu ; le pseudo FiveM et les identifiants ne sont lus qu'au
-           moment de l'affichage (rien n'est conservé).
+           latence, temps de jeu du personnage, santé, besoins, avertissements ; identifiants sauf l'adresse IP pour la
+           seule Chancellerie). Calculées à la demande, jamais envoyées en continu ; le pseudo FiveM et les
+           identifiants ne sont lus qu'au moment de l'affichage (rien n'est conservé). État « immobilisé » en mémoire,
+           levé pour tous à l'arrêt du module (server/actions.lua).
     Dépendances : config.lua, server/core.lua, server/staff.lua, server/store.lua
 ]]
 
@@ -92,10 +93,12 @@ local function identifiersOf(src)
     return out
 end
 
---- Fiche d'un joueur.
+--- Fiche d'un joueur. Les identifiants (license, discord, steam…) ne sont joints que pour la Chancellerie, qui les
+--- affiche : le Registre en jeu ne les montre pas, ils ne partent donc jamais vers le jeu d'un membre du Conseil.
 ---@param target vAvA.AdminTarget
+---@param withIdentifiers? boolean
 ---@return table
-function players.details(target)
+function players.details(target, withIdentifiers)
     local src = target.source
     local ped = GetPlayerPed(src)
     local coords = ped ~= 0 and GetEntityCoords(ped)
@@ -111,7 +114,7 @@ function players.details(target)
         health = healthOk and type(health) == 'table' and health or nil,
         needs = needsOk and type(needs) == 'table' and needs or nil,
         warnings = warnings,
-        identifiers = identifiersOf(src),
+        identifiers = withIdentifiers and identifiersOf(src) or nil,
     }
 end
 

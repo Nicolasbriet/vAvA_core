@@ -4,7 +4,8 @@
            boucle) ou /codex, contenu demandé au serveur à chaque ouverture (touches du joueur résolues ici), gestes
            de l'interface relayés au serveur (RPC à schéma strict), lancement d'une commande composée par
            ExecuteCommand (une commande du serveur y arrive comme si elle était tapée), export `noteCommand` pour que
-           le chat inscrive aux dernières pages ce que le joueur tape lui-même.
+           le chat inscrive aux dernières pages ce que le joueur tape lui-même. Souris et clavier rendus au jeu si la
+           ressource s'arrête livre ouvert.
     Dépendances : shared/constants.lua, config.lua, client/core.lua, client/nui.lua, client/keys.lua
 ]]
 
@@ -12,6 +13,7 @@ local type, tostring, pcall, ipairs = type, tostring, pcall, ipairs
 local pack, unpack = table.pack, table.unpack
 local match, sub = string.match, string.sub
 local CreateThread, Wait, RegisterNetEvent, RegisterCommand, RegisterKeyMapping = CreateThread, Wait, RegisterNetEvent, RegisterCommand, RegisterKeyMapping
+local AddEventHandler, GetCurrentResourceName = AddEventHandler, GetCurrentResourceName
 local IsPauseMenuActive, GetResourceState, ExecuteCommand, IsNuiFocused = IsPauseMenuActive, GetResourceState, ExecuteCommand, IsNuiFocused
 local BeginTextCommandThefeedPost, AddTextComponentSubstringPlayerName, EndTextCommandThefeedPostTicker =
     BeginTextCommandThefeedPost, AddTextComponentSubstringPlayerName, EndTextCommandThefeedPostTicker
@@ -25,6 +27,7 @@ local EVENTS = VavaCodex.EVENTS
 local MAX_LINE = VavaCodex.MAX_LINE
 local nui, keys = VavaCodex.nui, VavaCodex.keys
 
+local RESOURCE = GetCurrentResourceName()
 local FEED_TEXT = 'STRING'
 local HUD = 'vava_hud'
 -- après « Lancer » en restant ouvert : délai avant de reprendre le focus si aucune autre interface ne l'a pris
@@ -66,6 +69,15 @@ local function resolveKeys(entries)
     end
 end
 
+--- Complète le contenu reçu du serveur avant de l'envoyer à la page : touches du joueur, touche de fermeture, nombre
+--- de dernières pages gardées (la page tient sa liste à jour entre deux ouvertures, à la même borne que le serveur).
+---@param payload table
+local function decorate(payload)
+    resolveKeys(payload.entries or {})
+    payload.closeKey = cfg.keys.open
+    payload.recentMax = cfg.recent.max
+end
+
 --- Ouvre le Codex : le contenu est demandé au serveur, puis affiché. Rien n'est ouvert s'il manque.
 local function openCodex()
     if open or not core.characters.current() or IsPauseMenuActive() then return end
@@ -77,8 +89,7 @@ local function openCodex()
             return
         end
         if open or not core.characters.current() or IsPauseMenuActive() then return end
-        resolveKeys(payload.entries or {})
-        payload.closeKey = cfg.keys.open
+        decorate(payload)
         keepOpen = payload.prefs and payload.prefs.keepOpen ~= false
         open = true
         nui.send('open', payload)
@@ -152,10 +163,7 @@ end)
 nui.on('run', run)
 nui.on('refresh', function()
     return forward(RPC.OPEN, function(r, payload)
-        if type(payload) == 'table' then
-            resolveKeys(payload.entries or {})
-            payload.closeKey = cfg.keys.open
-        end
+        if type(payload) == 'table' then decorate(payload) end
         r.payload = payload
     end)
 end)
@@ -168,6 +176,13 @@ RegisterCommand(cfg.command, toggle, false)
 RegisterKeyMapping(cfg.command, cfg.labels.open, 'keyboard', cfg.keys.open)
 
 core.hooks.after('core:character:unloaded', close)
+
+-- Arrêt de la ressource livre ouvert : la page disparaît avec elle, mais la souris et le clavier resteraient pris.
+AddEventHandler('onClientResourceStop', function(resource)
+    if resource ~= RESOURCE or not open then return end
+    open = false
+    nui.setFocus(false)
+end)
 
 --- Une commande tapée ailleurs (chat) : inscrite aux dernières pages. `line` sans son « / » ; le serveur ignore ce
 --- qu'il ne connaît pas ou ce que le joueur n'a pas le droit de lancer.
