@@ -105,30 +105,36 @@ marqués « décision » attendent le porteur du projet : ne pas les coder sans 
 - Dérouler toutes les procédures de `docs/tests/`, noter chaque écart en tâche de correction (phase 0), mesurer le
   resmon de chaque ressource au repos et en action, noter le poids téléchargé à la première connexion.
 
-### Points relevés pendant T-002 à T-008 — à planifier par le porteur du projet
+### Suites des points relevés pendant T-002 à T-008 — Statut : à tester en jeu
 
-Ce ne sont **pas** des tâches : aucun agent ne les prend tant que le porteur du projet ne les a pas placés dans une
-phase. Détail dans les rapports cités.
-- Sécurité, à vérifier en premier par T-010 : un module qui retire un objet d'une besace par son numéro de conteneur
-  pendant l'écriture qui suit un déchargement pourrait dupliquer l'objet si le personnage revient dans les 3 s
-  (`vava_inventory/server/characters.lua:80`, relecture de T-005).
-- Vie GTA tenue par le client : un client modifié qui ignore `vava_health:set` ignore les dégâts des sorts ; à régler
-  avec la chaîne de dégâts T-110 (rapport T-006).
-- Core : le journal des dégâts de la magie écrit à l'arrêt dépend de l'ordre d'arrêt entre le core et le module
-  (lignes perdues mais signalées) ; différer d'un tour le retrait du module dans le core (rapport T-006).
-- Core : `rpc.lua` ne convertit `3.0` en `3` que pour les arguments de premier niveau ; une définition de schéma
-  cyclique fait lever `compile` ; tests de `rpc.lua`, `ratelimit.lua`, `registry.lua`, `modules.lua` (rapport T-002).
-- Inventaire : un export pour fermer un conteneur chez un joueur (le grenier resté ouvert pendant une mise à terre
-  reste consultable, sans dépôt ni retrait possible) ; `examples/vava_example_items` ne redéclare pas ses objets
-  quand l'inventaire redémarre (rapports T-005 et T-006).
-- Magie : « Libérer » du Registre pendant un Gel libère le ped ; `/lancer <autre sort>` peut répondre « Votre cible
-  vous échappe. » si ce sort porte moins loin que le sort prêt ; **décision** : Trait de glace N4 annoncé « ne peut
-  plus courir » alors que sa force (0,45) reste sous le seuil (0,5) — monter la force ou corriger les textes.
-- Agriculture : `/agriculture pousser` laisse la sécheresse en place (la plante redevient flétrie ou morte) ; heures
-  sèches d'une plante morte affichées au-delà de sa mort ; **décision** : le modèle « mûr » s'affiche dès 2/3 de la
-  croissance (la moitié pour la carotte et le chou) alors que la récolte n'est possible qu'à 100 % (rapport T-003).
-- Voix : un nom refusé pour un caractère invisible répond « Donnez un nom au lieu. » ; chaque changement de zone
-  part à tous les joueurs (à revoir avec T-014) (rapport T-008).
+Points des rapports T-002 à T-008, traités le 29 octobre 2026 par le porteur du projet hors de la boucle des agents
+(un commit par module, tests unitaires verts, audit statique passé). À dérouler pendant T-009 :
+- **Inventaire 1.6.4** (sécurité, relecture de T-005) : ce qu'un module note sur une besace par son numéro de
+  conteneur pendant l'écriture qui précède le déchargement part aussi avant la sortie de mémoire, et un conteneur relu
+  en base dont des écritures attendent les fait partir d'abord (plus d'objet retiré qui revient si le personnage
+  reparaît dans les 3 s). Export `close(source, conteneur?)` (interface fermée, évènement `vava_inventory:dismiss`) ;
+  **santé 1.1.4** ferme l'inventaire ouvert à la mise à terre ; **vava_example_items 1.1.1** redéclare ses objets au
+  redémarrage de l'inventaire. Procédures : inventaire 14-7, métiers 5-13, santé 3-9.
+- **Core 0.8.1** : définition de schéma cyclique refusée à la compilation ; entiers arrivés en flottant convertis à
+  tout niveau (champs de table, listes, maps) dans les arguments et les retours client ; module retiré au **tour
+  suivant** son arrêt (état `stopping` : il garde `core.db` pour les dernières écritures de son `onResourceStop`, le
+  journal des dégâts de la magie n'est plus perdu). Tests de `rpc.lua`, `ratelimit.lua`, `registry.lua`,
+  `modules.lua` (72 tests).
+- **Magie 2.6.3** : « Libérer » du Registre pendant un Gel ne relâche plus le ped avant la fin du gel (le serveur le
+  refige sur l'action du Conseil) ; `/lancer <sort>` ne transmet la cible verrouillée que si le sort nommé la vise et
+  l'atteint, sinon il part droit devant ; **décision prise** : textes du Trait de glace corrigés (la course n'est
+  coupée qu'au N5 ; la force du N4 reste 0,45, la progression garde une marche entre N4 et N5). Procédure : magie 2-21,
+  6.1-2 et 3, 9-11 bis.
+- **Agriculture 1.2.3** : `/agriculture pousser` arrose la terre (la plante ne reflétrit plus dans la foulée) ; les
+  heures sèches s'arrêtent à la mort, calculées en une fois ou peu à peu ; **décision prise** : le dernier modèle de
+  `stages` est réservé à la plante mûre (100 %, quand la récolte est possible), les autres se partagent la croissance
+  à parts égales. Procédure : métiers 5-3 et 5-5.
+- **Voix 1.2.2** : un nom refusé pour un signe de contrôle ou invisible répond « Ce nom contient des signes
+  illisibles. » (code `label_unreadable` ; la Chancellerie montre son message générique tant que ses textes ne le
+  connaissent pas : à ajouter à `chancellerie/web/js/strings.js` lors d'une prochaine version du panneau).
+  Procédure : voix 3-18.
+
+Reportés dans leur tâche : la vie GTA tenue par le client → T-110 ; la diffusion des zones de voix à tous → T-014.
 
 ## Phase 1 — Sécurité, performance, réseau
 
@@ -163,6 +169,9 @@ phase. Détail dans les rapports cités.
 - Service générique : un module déclare des zones (centre, rayon) ; le serveur tient la liste des joueurs abonnés
   à chaque zone (entrée demandée par le client, sortie vérifiée côté serveur, nettoyage à la déconnexion) ;
   `publish(zone, différence)` n'envoie qu'aux abonnés. Voir le modèle de `SECURITE_RESEAU.md`.
+- Y reprendre les zones de voix (`vava_voice/server/zones.lua`) : chaque création, modification ou suppression part
+  aujourd'hui à tous les joueurs (`EVERYONE`, seul envoi à tous du module, documenté comme voulu : rare et petit) ;
+  avec les abonnements, n'envoyer qu'aux joueurs à portée de la zone (rapport T-008).
 
 ### T-015 — Récolte : GlobalState → abonnements de zone
 - Agent : vava-dev-lua · Dépend de : T-014 · Statut : à faire
@@ -280,6 +289,10 @@ seulement l'éditeur (phase 6).
 - Agents : vava-architecte → vava-dev-lua · Dépend de : — · Statut : à faire
 - Export serveur `vava_health:hit(target, paquet)`, registre de modificateurs ordonnés, hooks `vava_health:hit` ;
   annulation des dégâts natifs de GTA entre joueurs.
+- La vie GTA appartient au client : `vava_health:set` (soin, blessure, dégâts des sorts appliqués par
+  `vava_health:damage`) est appliqué par le client, et un client modifié qui l'ignore ignore les dégâts des sorts (le
+  serveur ne relit la vie que pour mettre à terre). La chaîne doit tenir la vie côté serveur (ou la revérifier après
+  chaque coup) pour qu'aucun client ne puisse refuser un dégât (rapport T-006).
 - Critères : tests unitaires de l'ordre des modificateurs ; aucun dégât entre joueurs possible hors de la chaîne.
 
 ### T-111 — Armes de corps à corps
