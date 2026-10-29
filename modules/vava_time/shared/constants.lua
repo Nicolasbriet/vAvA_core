@@ -28,6 +28,8 @@ VavaTime.HOOKS = {
     DAY = 'vava_time:dayChanged',         -- { season, day, year }
     WEATHER = 'vava_time:weatherChanged', -- { weather, previous, forced, frozen, by }
     CLOCK = 'vava_time:clockChanged',     -- { shift, frozen, by }
+    FROST_WARNING = 'vava_time:frostWarning', -- { season, day, year, warnHour, hour } : au soir d'une nuit de gel
+    FROST = 'vava_time:frost',            -- { season, day, year, warnHour, hour } : le gel tombe (tombée de la nuit)
 }
 
 -- Actions du Conseil.

@@ -1,11 +1,12 @@
 --[[
     vava_time/fxmanifest.lua
     Rôle : le temps du royaume, le même pour tous les joueurs : heure de Paris (heure d'été comprise) au rythme réel,
-           calendrier et saisons (vrai calendrier ou cycle plus rapide), météo en cycle pondéré par saison avec
-           transitions douces, aucune neige hors de l'hiver. Le Conseil décale ou fige l'heure et impose ou fige un
-           ciel, depuis l'outil « Ciel et heure » du Registre, /ciel ou la Chancellerie ; état gardé en base. Les
-           saisons sont lues par l'agriculture et la récolte (exports). Le serveur décide de tout et publie trois petites
-           valeurs par GlobalState ; le client fait avancer l'horloge du jeu seul et suit les transitions du ciel.
+           saisons de quatorze jours (ou vrai calendrier), ciel pondéré par saison avec transitions douces, aucune neige
+           hors de l'hiver, nuits de gel en hiver. Le Conseil décale ou fige l'heure et impose ou fige un ciel, depuis
+           l'outil « Ciel et heure » du Registre, /ciel ou la Chancellerie, avec un débit commun ; état gardé en base.
+           Les saisons et le gel sont lus par l'agriculture et la récolte (export, hooks). Le serveur décide de tout et
+           publie trois petites valeurs par GlobalState ; le client fait avancer l'horloge du jeu seul et suit les
+           transitions du ciel.
     Dépendances : vAvA_core ≥ 0.7.0 ; facultatives : vava_admin (droits, outil du Registre, journal), vava_hud
                   (notifications), vava_chancellerie (actions depuis le web)
 ]]
@@ -39,6 +40,7 @@ shared_scripts {
     'config.lua',
     'shared/calendar.lua',
     'shared/weather.lua',
+    'shared/frost.lua',
 }
 
 server_scripts {
@@ -48,6 +50,7 @@ server_scripts {
     'server/clock.lua',
     'server/seasons.lua',
     'server/sky.lua',
+    'server/frost.lua',
     'server/council.lua',
     'server/api.lua',
     'server/commands.lua',

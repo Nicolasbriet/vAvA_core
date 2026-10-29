@@ -3,7 +3,7 @@
     Rôle : déclaration du module auprès du core : état relu en base, date, heure et ciel publiés, intentions du client
            en RPC à schéma strict et à débit limité (heure du serveur pour tous ; vue et décisions de l'outil « Ciel et
            heure », droit du Conseil revérifié et journal), outil ajouté au Registre, boucle lente (fin d'un ciel,
-           changement de jour ou de saison). À l'arrêt, l'état partagé est retiré.
+           changement de jour ou de saison, nuits de gel). À l'arrêt, l'état partagé est retiré.
     Dépendances : tous les fichiers server/ du module
 ]]
 
@@ -19,6 +19,7 @@ local store = VavaTime.store
 local clock = VavaTime.clock
 local seasons = VavaTime.seasons
 local sky = VavaTime.sky
+local frost = VavaTime.frost
 local council = VavaTime.council
 local rules = VavaTime.weatherRules
 local cfg = VavaTime.config
@@ -85,12 +86,16 @@ local function setup()
     sky.publish()
     -- état écrit tel que repris (premier démarrage : la ligne est créée)
     store.save()
+    -- nuit de gel du jour tirée tout de suite (ce qui est déjà passé aujourd'hui ne se rejoue pas)
+    frost.tick(seasons.current(), clock.seconds(now))
     CreateThread(function()
         while true do
             Wait(cfg.server.tickMs)
             local tick = time()
             seasons.refresh(tick)
-            sky.tick(tick, seasons.current().season)
+            local date = seasons.current()
+            sky.tick(tick, date.season)
+            frost.tick(date, clock.seconds(tick))
         end
     end)
     return true

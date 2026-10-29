@@ -132,7 +132,8 @@ describe('vava_time calendrier', function()
             assert.same({ 15, 20, 5 }, { calendar.hms(15 * HOUR + 20 * 60 + 5.9) })
             assert.same({ 0, 0, 0 }, { calendar.hms(DAY) })
             assert.equal('la nuit', calendar.moment(3))
-            assert.equal('l\'aube', calendar.moment(5))
+            assert.equal('la nuit', calendar.moment(5))
+            assert.equal('l\'aube', calendar.moment(6))
             assert.equal('midi', calendar.moment(12))
             assert.equal('l\'après-midi', calendar.moment(15))
             assert.equal('la nuit', calendar.moment(23))
@@ -169,9 +170,40 @@ describe('vava_time calendrier', function()
         end)
 
         it('prend la date à Paris, pas à l\'UTC', function()
+            local real = { mode = 'real', firstYear = 2026, starts = cfg.calendar.starts, seasons = cfg.calendar.seasons }
             -- 29 octobre 2026, 23:30 UTC = 30 octobre, 00:30 à Paris
-            local result = calendar.date(calendar.daysFromCivil(2026, 10, 29) * DAY + 23 * HOUR + 1800)
+            local result = calendar.date(calendar.daysFromCivil(2026, 10, 29) * DAY + 23 * HOUR + 1800, real)
             assert.same({ 'automne', 39, 1 }, { result.season, result.day, result.year })
+        end)
+    end)
+
+    describe('calendrier par défaut : saisons de quatorze jours', function()
+        -- origin : lundi 26 octobre 2026, minuit à Paris (heure d'hiver : 23:00 UTC la veille), printemps de l'an 1
+        local function at(days)
+            local origin = calendar.daysFromCivil(2026, 10, 26) * DAY - HOUR
+            local result = calendar.date(origin + days * DAY)
+            return { result.season, result.day, result.year }
+        end
+
+        it('suit le cycle de la config, ancré sur une date fixe', function()
+            assert.equal('cycle', cfg.calendar.mode)
+            assert.equal(14, calendar.seasonLength())
+            assert.same({ 'printemps', 1, 1 }, at(0))
+            assert.same({ 'printemps', 4, 1 }, { calendar.date(UTC_2026_10_29_14H).season, calendar.date(UTC_2026_10_29_14H).day, 1 })
+            assert.same({ 'printemps', 14, 1 }, at(13.5))
+            assert.same({ 'ete', 1, 1 }, at(14))
+            assert.same({ 'automne', 1, 1 }, at(28))
+            assert.same({ 'hiver', 14, 1 }, at(55.9))
+        end)
+
+        it('change d\'an à chaque nouveau printemps : une année dure huit semaines', function()
+            assert.same({ 'printemps', 1, 2 }, at(56))
+            assert.same({ 'printemps', 1, 3 }, at(112))
+            assert.same({ 'printemps', 1, 1 }, at(-30))
+        end)
+
+        it('n\'a pas de durée fixe au vrai calendrier', function()
+            assert.is_nil(calendar.seasonLength({ mode = 'real' }))
         end)
     end)
 
@@ -225,7 +257,8 @@ describe('vava_time calendrier', function()
         end)
 
         it('donne la date seule pour les interfaces', function()
-            assert.equal('38e jour de la saison des brumes (automne), an 1', calendar.dateText({ season = 'automne', day = 38, year = 1 }))
+            assert.equal('38e jour de la saison des brumes (automne), an 1 du royaume', calendar.dateText({ season = 'automne', day = 38, year = 1 }))
+            assert.equal('an 3 du royaume', calendar.yearText(3))
         end)
     end)
 end)

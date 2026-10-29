@@ -150,38 +150,48 @@ local function report(result, text)
     if open then nui.send('state', { view = result.result }) end
 end
 
---- /ciel <sous-commande> [arguments]. Bloque le thread courant.
+--- Ligne d'usage de /ciel, avec les noms de la config.
+---@return string
+local function usage()
+    local commands = cfg.commands
+    local names = commands.actions
+    return format(messages.usage, commands.council, names.set, names.shift, names.freeze, names.resume, names.real,
+        names.impose, commands.holdWord, names.hold, names.release)
+end
+
+--- /ciel <sous-commande> [arguments] ; noms des sous-commandes dans config.commands. Bloque le thread courant.
 ---@param args string[]
 function tool.command(args)
+    local names = cfg.commands.actions
     local sub = args[1]
     local action, value
-    if sub == 'heure' then
+    if sub == names.set then
         local hour, minute = integer(args[2]), integer(args[3] or 0)
         if hour and minute then action, value = 'set', hour * 60 + minute end
-    elseif sub == 'decaler' then
+    elseif sub == names.shift then
         local hours = integer(args[2])
         if hours then action, value = 'shift', hours * 60 end
-    elseif sub == 'figer' then
+    elseif sub == names.freeze then
         action, value = 'freeze', 0
-    elseif sub == 'reprendre' then
+    elseif sub == names.resume then
         action, value = 'resume', 0
-    elseif sub == 'reelle' then
+    elseif sub == names.real then
         action, value = 'real', 0
     end
     if action then
         report(tool.clock(action, value), function(view) return format(CLOCK_DONE[action], hourText(view.clock.seconds)) end)
         return
     end
-    if sub == 'meteo' and args[2] then
-        report(tool.weather('impose', args[2], args[3] == 'figer'), function(view)
+    if sub == names.impose and args[2] then
+        report(tool.weather('impose', args[2], args[3] == cfg.commands.holdWord), function(view)
             return format(view.weather.frozen and messages.weatherFrozen or messages.weatherImposed, view.weather.label)
         end)
-    elseif sub == 'garder' then
+    elseif sub == names.hold then
         report(tool.weather('freeze'), function(view) return format(messages.weatherFrozen, view.weather.label) end)
-    elseif sub == 'cycle' then
+    elseif sub == names.release then
         report(tool.weather('release'), function() return messages.weatherReleased end)
     else
-        notify(messages.usage, 'info')
+        notify(usage(), 'info')
     end
 end
 

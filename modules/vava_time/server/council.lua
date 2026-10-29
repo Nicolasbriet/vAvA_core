@@ -1,17 +1,19 @@
 --[[
     vava_time/server/council.lua
     Rôle : les décisions du Conseil, communes au Registre en jeu (RPC) et à la Chancellerie (exports web du pont) :
-           valeurs revalidées action par action, état changé, publié et écrit, hook ; rend la vue des interfaces, le
-           libellé et les détails du journal (inscrits par l'appelant : vava_admin.log en jeu, webLog par le pont).
-           Le droit est vérifié avant d'arriver ici (RPC gardé, ou pont auprès du Registre).
+           valeurs revalidées action par action, débit commun à toutes les décisions (jeu et web : chaque décision
+           publie à tous les joueurs), état changé, publié et écrit, hook ; rend la vue des interfaces, le libellé et
+           les détails du journal (inscrits par l'appelant : vava_admin.log en jeu, webLog par le pont). Le droit est
+           vérifié avant d'arriver ici (RPC gardé, ou pont auprès du Registre).
     Dépendances : shared/, config.lua, server/core.lua, server/store.lua, server/clock.lua, server/seasons.lua,
-                  server/sky.lua
+                  server/sky.lua, server/frost.lua
 ]]
 
 local ipairs, type, mathType = ipairs, type, math.type
-local floor, abs = math.floor, math.abs
+local floor, abs, min = math.floor, math.abs, math.min
 local format = string.format
 local time = os.time
+local GetGameTimer = GetGameTimer
 
 local calendar = VavaTime.calendar
 local rules = VavaTime.weatherRules
@@ -19,11 +21,27 @@ local store = VavaTime.store
 local clock = VavaTime.clock
 local seasons = VavaTime.seasons
 local sky = VavaTime.sky
+local frost = VavaTime.frost
 local cfg = VavaTime.config
 local messages = cfg.messages
 local HOOK_CLOCK = VavaTime.HOOKS.CLOCK
 local DAY_MINUTES = VavaTime.DAY_MINUTES
 local MAX_SHIFT_MINUTES = cfg.clock.maxShiftMinutes
+local RATE = cfg.council.rate
+
+-- seau commun des décisions : plein au démarrage, `refillPerSecond` jetons rendus par seconde
+local tokens, refilledAt = RATE.capacity, nil
+
+--- Prend un jeton pour une décision ; faux si le Conseil décide trop vite (jeu et Chancellerie confondus).
+---@return boolean
+local function take()
+    local now = GetGameTimer()
+    if refilledAt then tokens = min(RATE.capacity, tokens + (now - refilledAt) / 1000 * RATE.refillPerSecond) end
+    refilledAt = now
+    if tokens < 1 then return false end
+    tokens = tokens - 1
+    return true
+end
 
 local CLOCK_ACTIONS, WEATHER_ACTIONS = {}, {}
 for _, action in ipairs(VavaTime.CLOCK_ACTIONS) do CLOCK_ACTIONS[action] = true end
@@ -68,8 +86,9 @@ function council.view(now)
         },
         calendar = {
             season = date.season, label = info.label, name = info.name, day = date.day, year = date.year,
-            text = calendar.dateText(date),
+            yearText = calendar.yearText(date.year), text = calendar.dateText(date), length = calendar.seasonLength(),
         },
+        frost = frost.view(),
         weather = sky.view(now, date.season),
         weathers = weathers,
         limits = { maxShiftMinutes = MAX_SHIFT_MINUTES },
@@ -101,6 +120,7 @@ function council.clock(action, value, by)
     if type(action) ~= 'string' or not CLOCK_ACTIONS[action] or not validClockValue(action, value) then
         return false, 'invalid_value'
     end
+    if not take() then return false, 'rate_limited' end
     local now = time()
     local ok, changed = clock.apply(action, value * 60, now)
     if not ok then return false, changed end
@@ -132,11 +152,12 @@ function council.weather(action, weather, hold, by)
     if not VavaTime.ready then return false, 'not_ready' end
     if type(action) ~= 'string' or not WEATHER_ACTIONS[action] then return false, 'invalid_value' end
     if hold ~= nil and type(hold) ~= 'boolean' then return false, 'invalid_value' end
+    if action == 'impose' and (type(weather) ~= 'string' or not rules.get(weather)) then return false, 'unknown_weather' end
+    if not take() then return false, 'rate_limited' end
     local now = time()
     local season = seasons.current().season
     local changed
     if action == 'impose' then
-        if type(weather) ~= 'string' or not rules.get(weather) then return false, 'unknown_weather' end
         changed = sky.impose(weather, hold == true, now, by)
     elseif action == 'freeze' then
         changed = sky.freeze(now, by)

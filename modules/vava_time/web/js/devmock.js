@@ -3,18 +3,19 @@
  * web/js/devmock.js
  * Rôle : aperçu de l'outil dans un navigateur, sans le jeu : fond de ciel, état d'exemple, décisions simulées (même
  *        sens que le serveur : mettre l'heure, décaler, figer, reprendre, heure réelle ; imposer, figer, rendre le ciel).
- *        Inactif en jeu. Paramètres d'URL : ?frozen=1 (heure figée), ?forced=1 (ciel imposé et figé),
+ *        Inactif en jeu. Paramètres d'URL : ?frozen=1 (heure figée), ?forced=1 (ciel imposé et figé), ?struck=1 (gel tombé),
  *        ?refused=1 (chaque décision refusée).
  */
 
 const DevMock = (() => {
   const DAY = 86400;
   const params = new URLSearchParams(location.search);
+  // ciels de l'hiver (saison de l'exemple)
   const WEATHERS = [
     ['clair', 'Ciel clair', true], ['soleil', 'Grand soleil', false], ['nuages', 'Nuages épars', true],
-    ['couvert', 'Ciel couvert', true], ['eclaircies', 'Éclaircies', true], ['pluie', 'Pluie', true], ['orage', 'Orage', true],
-    ['brume', 'Brume de chaleur', true], ['brouillard', 'Brouillard', true], ['neige_legere', 'Neige légère', false],
-    ['neige', 'Neige', false], ['tempete', 'Tempête de neige', false], ['neige_au_sol', 'Neige au sol', false],
+    ['couvert', 'Ciel couvert', true], ['eclaircies', 'Éclaircies', false], ['pluie', 'Pluie', true], ['orage', 'Orage', false],
+    ['brume', 'Brume', false], ['brouillard', 'Brouillard', true], ['neige_legere', 'Neige légère', true],
+    ['neige', 'Neige', true], ['tempete', 'Tempête de neige', true], ['neige_au_sol', 'Neige au sol', false],
   ].map(([id, label, inSeason]) => ({ id, label, inSeason }));
   const labelOf = (id) => (WEATHERS.find((w) => w.id === id) || { label: id }).label;
 
@@ -44,7 +45,11 @@ const DevMock = (() => {
     const current = WEATHERS.find((w) => w.id === state.weather);
     return {
       clock: { seconds, real, shift: state.shift, frozen: state.frozen !== false },
-      calendar: { season: 'automne', label: 'automne', name: 'saison des brumes', day: 38, year: 1, text: '38e jour de la saison des brumes (automne), an 1' },
+      calendar: {
+        season: 'hiver', label: 'hiver', name: 'saison des frimas', day: 4, year: 1, yearText: 'an 1 du royaume',
+        text: '4e jour de la saison des frimas (hiver), an 1 du royaume', length: 14,
+      },
+      frost: { tonight: true, warned: true, struck: Boolean(params.get('struck')), warnHour: 17, hour: 21 },
       weather: {
         id: state.weather, label: current.label, from: state.from, fromLabel: labelOf(state.from), fading: false,
         forced: state.forced, frozen: state.weatherFrozen,

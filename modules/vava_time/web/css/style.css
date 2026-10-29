@@ -205,7 +205,8 @@ input { color: inherit; font: inherit; }
 /* Calendrier --------------------------------------------------------------------------------------------------- */
 
 .date { margin: 0; font-size: 1.12rem; line-height: 1.35; }
-.date-season { color: var(--ink-muted); font-style: italic; }
+.date-season { margin: 0.2rem 0 0; color: var(--ink-muted); font-style: italic; }
+.date-frost { margin: 0.4rem 0 0; color: var(--rubric); font-weight: 600; }
 
 /* Ciel --------------------------------------------------------------------------------------------------------- */
 

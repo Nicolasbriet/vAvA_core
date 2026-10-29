@@ -10,7 +10,7 @@
     Dépendances : shared/, config.lua, client/core.lua
 ]]
 
-local type, floor, min = type, math.floor, math.min
+local type, ipairs, floor = type, ipairs, math.floor
 local GetGameTimer, CreateThread, Wait, GlobalState = GetGameTimer, CreateThread, Wait, GlobalState
 local NetworkOverrideClockMillisecondsPerGameMinute, NetworkOverrideClockTime, NetworkClearClockTimeOverride, PauseClock =
     NetworkOverrideClockMillisecondsPerGameMinute, NetworkOverrideClockTime, NetworkClearClockTimeOverride, PauseClock
@@ -123,24 +123,31 @@ function world.applyWeather(state)
 end
 
 --- Première application : heure du serveur demandée, ciel posé aussitôt (transition en cours reprise si l'heure est
---- connue, sinon ciel visé sans transition), horloge recalée dès que l'heure arrive (essais espacés tant que le module
---- serveur n'est pas prêt).
-function world.start()
-    if syncing then return end
+--- connue, sinon ciel visé sans transition), horloge recalée dès que l'heure arrive. Le module serveur pas encore prêt :
+--- un essai par délai de `client.retryMs`, puis plus rien ; la publication de l'heure par le serveur (son démarrage)
+--- relance la demande (client/main.lua) avec l'heure publiée (dans un gestionnaire d'état partagé, GlobalState rend
+--- encore l'ancienne valeur).
+---@param clockState? table vava_time:clock reçu
+function world.start(clockState)
+    if syncing or epoch then return end
     syncing = true
     CreateThread(function()
         local synced = world.sync()
         world.applyWeather()
-        local delays = cfg.client.retryMs
-        local attempt = 0
-        while not synced do
-            attempt = attempt + 1
-            Wait(delays[min(attempt, #delays)])
+        for _, delay in ipairs(cfg.client.retryMs) do
+            if synced then break end
+            Wait(delay)
             synced = world.sync()
         end
         syncing = false
-        world.applyClock()
+        if synced then world.applyClock(clockState) end
     end)
+end
+
+--- Vrai une fois l'heure du serveur connue.
+---@return boolean
+function world.synced()
+    return epoch ~= nil
 end
 
 --- Heure du serveur redemandée quand la dernière réponse est trop ancienne (appelé par le recalage lent).

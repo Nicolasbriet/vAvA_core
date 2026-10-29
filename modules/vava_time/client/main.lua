@@ -2,7 +2,8 @@
     vava_time/client/main.lua
     Rôle : assemblage côté joueur :
       - au démarrage (connexion, ou ressource relancée) : heure du serveur, ciel et horloge appliqués ;
-      - état partagé (GlobalState) qui change : horloge recalée, transition du ciel, outil du Conseil à jour ;
+      - état partagé (GlobalState) qui change : horloge recalée, transition du ciel, outil du Conseil à jour, nouvelle
+        saison annoncée au joueur en jeu (lue sur l'état partagé, aucun envoi de plus) ;
       - recalage lent de l'horloge (une minute, calcul local, aucun réseau) et heure du serveur redemandée de loin en
         loin ;
       - /date : l'heure, le jour, la saison et le ciel en mots du jeu (lus sans réseau) ; /ciel et l'outil du Registre ;
@@ -53,7 +54,10 @@ tool.setNotifier(feed)
 -- État partagé ------------------------------------------------------------------------------------------------------
 
 AddStateBagChangeHandler(STATE.CLOCK, 'global', function(_, _, value)
-    if type(value) == 'table' then world.applyClock(value) end
+    if type(value) == 'table' then
+        -- le serveur publie l'heure : il est prêt, l'heure du serveur peut être demandée si elle manque encore
+        if world.synced() then world.applyClock(value) else world.start(value) end
+    end
     tool.changed()
 end)
 
@@ -62,7 +66,15 @@ AddStateBagChangeHandler(STATE.WEATHER, 'global', function(_, _, value)
     tool.changed()
 end)
 
-AddStateBagChangeHandler(STATE.CALENDAR, 'global', function()
+-- saison connue chez ce joueur : son changement est annoncé (rien à l'arrivée ni au redémarrage du module)
+local knownSeason = type(GlobalState[STATE.CALENDAR]) == 'table' and GlobalState[STATE.CALENDAR].season or nil
+
+AddStateBagChangeHandler(STATE.CALENDAR, 'global', function(_, _, value)
+    if type(value) == 'table' and type(value.season) == 'string' then
+        local text = knownSeason and value.season ~= knownSeason and cfg.messages.seasonStart[value.season]
+        knownSeason = value.season
+        if text and core.characters.current() then feed(text, 'info') end
+    end
     tool.changed()
 end)
 

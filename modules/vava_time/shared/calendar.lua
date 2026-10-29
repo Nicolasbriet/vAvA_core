@@ -234,13 +234,32 @@ function calendar.seasonInfo(season, cal)
     return cal.seasons[season] or { label = season, name = season }
 end
 
---- « Le 39e jour de la saison des brumes (automne), an 1 du royaume » sans l'heure : pour les interfaces.
----@param date vAvA.TimeDate
----@param cal? table
+--- « an 1 du royaume » (config.messages.year : l'ère n'est écrite qu'à cet endroit).
+---@param year integer
+---@param messages? table config.messages
 ---@return string
-function calendar.dateText(date, cal)
+function calendar.yearText(year, messages)
+    return (messages or cfg.messages).year:format(year)
+end
+
+--- « 39e jour de la saison des brumes (automne), an 1 du royaume », sans l'heure : pour /date et les interfaces.
+---@param date vAvA.TimeDate
+---@param cal? table config.calendar
+---@param messages? table config.messages
+---@return string
+function calendar.dateText(date, cal, messages)
+    messages = messages or cfg.messages
     local info = calendar.seasonInfo(date.season, cal)
-    return ('%s jour de la %s (%s), an %d'):format(calendar.ordinal(date.day), info.name, info.label, date.year)
+    return messages.dateText:format(calendar.ordinal(date.day), info.name, info.label, calendar.yearText(date.year, messages))
+end
+
+--- Jours d'une saison en mode cycle (nil au vrai calendrier, où elles n'ont pas toutes la même durée).
+---@param cal? table config.calendar
+---@return number|nil
+function calendar.seasonLength(cal)
+    cal = cal or cfg.calendar
+    if cal.mode == 'cycle' then return cal.cycle.seasonDays end
+    return nil
 end
 
 --- Texte de /date : heure, jour, saison, an, moment du jour et ciel ; une phrase de plus si l'heure est figée.
@@ -255,9 +274,8 @@ function calendar.describe(seconds, frozen, date, phrase, cal, messages)
     cal = cal or cfg.calendar
     messages = messages or cfg.messages
     local hour, minute = calendar.hms(seconds)
-    local info = calendar.seasonInfo(date.season, cal)
-    local text = messages.date:format(messages.hour:format(hour, minute), calendar.ordinal(date.day), info.name, info.label,
-        date.year, calendar.moment(hour, cal.moments), phrase)
+    local text = messages.date:format(messages.hour:format(hour, minute), calendar.dateText(date, cal, messages),
+        calendar.moment(hour, cal.moments), phrase)
     if frozen then text = text .. ' ' .. messages.frozen end
     return text
 end

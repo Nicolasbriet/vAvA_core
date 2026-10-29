@@ -87,7 +87,11 @@ local function change(id, fade, now, forced, frozen, by)
     local previous = state.id
     local same = id == previous and forced == state.forced and frozen == state.frozen
     state.untilAt = now + rules.duration(id, random)
-    if same then return false end
+    if same then
+        -- le même ciel continue : seule sa fin prévue change, gardée pour un redémarrage
+        store.save()
+        return false
+    end
     if id ~= previous then
         state.from, state.at, state.fade = previous, now, fade
     end
@@ -114,6 +118,7 @@ function sky.tick(now, season)
             VavaTime.log.warn('aucun ciel de la saison « %s » dans la config : le ciel reste tel quel', season)
         end
         state.untilAt = now + rules.duration(state.id, random)
+        store.save()
         return
     end
     change(id, wcfg.fadeSeconds, now, false, false, 'cycle')

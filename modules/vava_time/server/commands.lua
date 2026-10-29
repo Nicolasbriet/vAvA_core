@@ -23,26 +23,27 @@ local function entries()
         labels[def.id] = def.label
     end
     local maxHours = cfg.clock.maxShiftMinutes // 60
+    local names, hold = cfg.commands.actions, cfg.commands.holdWord
     return {
         [cfg.commands.date] = { kind = 'command', scope = 'player', label = 'Date et heure du royaume',
             description = 'L\'heure, le jour, la saison et le ciel du royaume, en quelques mots.' },
         [cfg.commands.council] = { kind = 'command', scope = 'admin', permission = cfg.council.permission, ui = true,
             label = cfg.tool.label,
-            description = 'Décaler ou figer l\'heure du royaume, imposer un ciel, rendre la main à l\'heure réelle et au cycle.',
+            description = 'Décaler ou figer l\'heure du royaume, imposer un ciel, rendre l\'heure réelle et le ciel à son cours.',
             actions = {
                 { label = 'Ouvrir « Ciel et heure »', description = 'L\'outil du Conseil, comme depuis le Registre.' },
-                { id = 'heure', label = 'Mettre l\'heure', description = 'L\'heure du royaume repart de là, au rythme réel (ou reste figée).',
+                { id = names.set, label = 'Mettre l\'heure', description = 'L\'heure du royaume repart de là, au rythme réel (ou reste figée).',
                     args = { { name = 'heures', type = 'integer', min = 0, max = 23 }, { name = 'minutes', type = 'integer', min = 0, max = 59, optional = true } } },
-                { id = 'decaler', label = 'Décaler l\'heure', description = 'Avance ou recule l\'heure du royaume.',
+                { id = names.shift, label = 'Décaler l\'heure', description = 'Avance ou recule l\'heure du royaume.',
                     args = { { name = 'heures', type = 'integer', min = -maxHours, max = maxHours } } },
-                { id = 'figer', label = 'Figer l\'heure' },
-                { id = 'reprendre', label = 'Laisser le temps reprendre', description = 'L\'heure repart de là où elle était figée.' },
-                { id = 'reelle', label = 'Rendre l\'heure réelle', description = 'Heure de Paris, sans décalage ni gel.' },
-                { id = 'meteo', label = 'Imposer un ciel', description = 'Le ciel change en quelques secondes ; « figer » l\'y garde.',
+                { id = names.freeze, label = 'Figer l\'heure' },
+                { id = names.resume, label = 'Laisser le temps reprendre', description = 'L\'heure repart de là où elle était figée.' },
+                { id = names.real, label = 'Rendre l\'heure réelle', description = 'Heure de Paris, sans décalage ni gel.' },
+                { id = names.impose, label = 'Imposer un ciel', description = 'Le ciel change en quelques secondes ; « ' .. hold .. ' » l\'y garde.',
                     args = { { name = 'ciel', type = 'choice', choices = choices, labels = labels },
-                        { name = 'figer', type = 'choice', choices = { 'figer' }, labels = { figer = 'le figer' }, optional = true } } },
-                { id = 'garder', label = 'Figer le ciel', description = 'Le ciel actuel ne change plus.' },
-                { id = 'cycle', label = 'Rendre le ciel au cycle', description = 'Le ciel reprend son cours selon la saison.' },
+                        { name = hold, type = 'choice', choices = { hold }, labels = { [hold] = 'le figer' }, optional = true } } },
+                { id = names.hold, label = 'Figer le ciel', description = 'Le ciel actuel ne change plus.' },
+                { id = names.release, label = 'Rendre le ciel à son cours', description = 'Le ciel reprend son cours selon la saison.' },
             } },
     }
 end

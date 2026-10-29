@@ -1,7 +1,7 @@
 --[[
     vava_time/server/api.lua
     Rôle : exports serveur pour les autres modules : saison (lue par l'agriculture et la récolte), date du royaume,
-           heure du royaume, ciel ; état et décisions du Conseil depuis le panneau web, par sa seule ressource-pont
+           heure du royaume, nuit de gel, ciel ; état et décisions du Conseil depuis le panneau web, par sa seule ressource-pont
            (droit vérifié et journal tenu par le pont auprès de vava_admin).
     Dépendances : shared/, config.lua, server/core.lua, server/clock.lua, server/seasons.lua, server/sky.lua,
                   server/council.lua
@@ -40,6 +40,12 @@ exports('getClock', function()
     local hour, minute = calendar.hms(seconds)
     local state = clock.state()
     return { hour = hour, minute = minute, seconds = seconds, frozen = state.frozen ~= false, shift = state.shift }
+end)
+
+--- Nuit de gel du jour : { tonight, warned, struck, warnHour, hour }, ou nil.
+exports('getFrost', function()
+    if not VavaTime.ready then return nil end
+    return VavaTime.frost.view()
 end)
 
 --- Ciel du royaume : { id, label, forced, frozen }, ou nil.

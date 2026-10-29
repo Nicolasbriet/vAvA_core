@@ -170,9 +170,16 @@ const App = (() => {
   }
 
   function calendarSection() {
+    const cal = view.calendar;
+    const frost = view.frost || {};
+    let frostText = null;
+    if (frost.tonight && frost.struck) frostText = S.calendar.frostStruck;
+    else if (frost.tonight) frostText = S.calendar.frost(Number(frost.hour) || 0);
     return el('section', 'section', null, [
       heading(S.calendar.title),
-      el('p', 'date', view.calendar.text),
+      el('p', 'date', cal.text),
+      Number(cal.length) > 0 ? el('p', 'date-season', S.calendar.length(Number(cal.length))) : null,
+      frostText ? el('p', 'date-frost', frostText) : null,
       el('p', 'hint', S.calendar.hint),
     ]);
   }
