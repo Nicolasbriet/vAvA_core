@@ -42,8 +42,10 @@ local BOOL = { type = 'boolean' }
 ---@param src integer
 ---@param characterId integer
 local function arrive(src, characterId)
-    if not sheets.load(src, characterId) then
-        VavaMagic.log.error('fiche magie du personnage %d non chargée', characterId)
+    local ok, code = sheets.load(src, characterId)
+    if not ok then
+        -- parti pendant la lecture : rien à signaler
+        if code ~= 'left' then VavaMagic.log.error('fiche magie du personnage %d non chargée', characterId) end
         return
     end
     if sheets.get(src).isMage then mana.start(src) end

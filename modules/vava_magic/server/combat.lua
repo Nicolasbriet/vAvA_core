@@ -6,12 +6,14 @@
            écrit en base par lots. La victime d'un impact ou d'une zone reçoit la réaction du sort (son élément, ou son
            champ `reaction` : geste, effet d'écran) ; une brûlure qui dure n'en envoie pas à chaque morsure. Un sort
            offensif sans dégâts (recul, état) demande d'abord si la cible peut être touchée (`combat.affects`).
+           Un lot plein du journal s'écrit dans son propre thread : celui qui blesse (vérification des zones, morsure
+           d'une brûlure, impact) n'attend jamais la base au milieu de son travail.
     Dépendances : shared/, config.lua, server/core.lua, bridge/server.lua, server/world.lua
 ]]
 
 local ipairs, tostring, min = ipairs, tostring, math.min
 local time, rep, move = os.time, string.rep, table.move
-local SetTimeout, TriggerClientEvent = SetTimeout, TriggerClientEvent
+local SetTimeout, CreateThread, TriggerClientEvent = SetTimeout, CreateThread, TriggerClientEvent
 
 local bridge = VavaMagic.bridge
 local world = VavaMagic.world
@@ -30,6 +32,8 @@ VavaMagic.combat = combat
 combat.KIND = { IMPACT = 'impact', ZONE = 'zone', BURN = 'brulure' }
 
 local queue = {}
+-- écriture d'un lot plein déjà demandée (un seul thread à la fois)
+local scheduled = false
 
 --- Point dans une zone protégée ?
 ---@param point table
@@ -96,7 +100,15 @@ function combat.damage(caster, target, spell, points, kind, casterCharacter)
     queue[#queue + 1] = {
         time(), spell, casterCharacter or bridge.GetCharacterId(caster) or 0, targetCharacter, kind, points, position.x, position.y, position.z,
     }
-    if #queue >= cfg.log.batch then combat.flush() end
+    -- lot plein : écrit à part ; l'appelant peut parcourir les zones, qu'une attente de la base laisserait changer
+    -- sous lui (parcours rompu, vérification des zones arrêtée pour de bon)
+    if #queue >= cfg.log.batch and not scheduled then
+        scheduled = true
+        CreateThread(function()
+            scheduled = false
+            combat.flush()
+        end)
+    end
     if kind ~= combat.KIND.BURN then combat.react(target, spell) end
     return true
 end

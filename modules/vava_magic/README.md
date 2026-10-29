@@ -363,7 +363,9 @@ au point de l'effet). Aucun fichier n'est fourni.
 - Ce que la Brume cache se joue à l'écran de chacun : un tricheur pourrait ôter le voile (effet cosmétique, comme
   l'allure d'un Ralenti).
 - Fragments du Murmure : envoyés par le serveur aux seuls joueurs à moins de 3 m ; jamais dans un state bag.
-- Un client peut écrire dans le state bag de son propre ped : au pire un effet cosmétique, sans aucune incidence.
+- Un client peut écrire dans le state bag de son propre ped (ou d'un objet à lui) : au pire un effet cosmétique, sans
+  aucune incidence. Le serveur n'en lit aucun ; une lumière (Lueur, orbe) n'est dessinée chez les autres que si
+  chacun de ses champs est un nombre dans les bornes de la config.
 
 | Fonction | Réseau |
 | --- | --- |

@@ -12,7 +12,8 @@
         avec la lueur des flammes ; seulement la brûlure de loin, rien au-delà de la distance des effets.
     Les state bags sont suivis par gestionnaires de changement ; une recherche toutes les 250 ms retient ce qui est à
     portée, et le dessin par image ne tourne que s'il y a quelque chose à dessiner. Lumières et particules passent
-    par les plafonds de client/fx.lua.
+    par les plafonds de client/fx.lua. Un client peut écrire les state bags de ses propres entités : une lumière n'est
+    retenue que si chacun de ses champs est un nombre dans les bornes de la config.
     Dépendances : shared/, config.lua, client/state.lua, client/fx.lua
 ]]
 
@@ -49,6 +50,15 @@ local SCALE_DISTANCE = 5.0           -- en deçà, textes et runes à leur taill
 local MIN_SCALE = 0.45
 local HAND_LIGHT_RANGE = 2.0         -- lueur de l'élément dans les mains pendant l'incantation (mètres, au niveau 1)
 local HAND_LIGHT_INTENSITY = 3.0
+local COLOR_MAX = 255
+
+-- bornes d'une lumière lue dans un state bag : ce que le serveur peut y poser (niveaux de la Lueur)
+local LIGHT_RANGE_MAX, LIGHT_INTENSITY_MAX, LIGHT_FLICKER_MAX = 0, 0, 0
+for _, level in ipairs(cfg.spells.lueur.levels) do
+    LIGHT_RANGE_MAX = max(LIGHT_RANGE_MAX, level.range)
+    LIGHT_INTENSITY_MAX = max(LIGHT_INTENSITY_MAX, level.intensity)
+    LIGHT_FLICKER_MAX = max(LIGHT_FLICKER_MAX, level.flicker)
+end
 
 local ambient = {}
 VavaMagic.ambient = ambient
@@ -97,6 +107,26 @@ for key, list in pairs(tracked) do
     AddStateBagChangeHandler(key, nil, function(bagName, _, value)
         if value == nil then list[bagName] = nil else list[bagName] = { value = value, since = GetGameTimer() } end
     end)
+end
+
+---@param value any
+---@param high number
+---@return boolean
+local function bounded(value, high)
+    return type(value) == 'number' and value >= 0 and value <= high
+end
+
+--- Lumière d'un state bag (lumière portée, orbe ancré), ou nil si un champ manque ou sort des bornes : un client peut
+--- écrire ceux de ses propres entités, et une valeur fausse ferait tomber le dessin de tous les effets proches.
+---@param value any
+---@return table|nil
+local function lightOf(value)
+    if type(value) ~= 'table' or not bounded(value.r, COLOR_MAX) or not bounded(value.g, COLOR_MAX)
+        or not bounded(value.b, COLOR_MAX) or not bounded(value.range, LIGHT_RANGE_MAX)
+        or not bounded(value.intensity, LIGHT_INTENSITY_MAX) or not bounded(value.flicker, LIGHT_FLICKER_MAX) then
+        return nil
+    end
+    return value
 end
 
 --- Bruit fluide de -1 à 1 (somme de sinus), décalé par une phase propre à chaque lumière.
@@ -251,14 +281,14 @@ local function scan()
     end
     for bagName, entry in pairs(tracked[STATES.LIGHT]) do
         local ped = entityOf(tracked[STATES.LIGHT], bagName, entry, now)
-        if ped and type(entry.value) == 'table' and geometry.distance(origin, GetEntityCoords(ped)) <= lightCfg.distance then
+        if ped and lightOf(entry.value) and geometry.distance(origin, GetEntityCoords(ped)) <= lightCfg.distance then
             found.lights[#found.lights + 1] = { entity = ped, value = entry.value, phase = (ped % 97) * 0.37 }
             any = true
         end
     end
     for bagName, entry in pairs(tracked[STATES.ORB]) do
         local orb = entityOf(tracked[STATES.ORB], bagName, entry, now)
-        if orb and type(entry.value) == 'table' then
+        if orb and lightOf(entry.value) then
             if not hidden[orb] then
                 SetEntityVisible(orb, false, false)
                 SetEntityCollision(orb, false, false)

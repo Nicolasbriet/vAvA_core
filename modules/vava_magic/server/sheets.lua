@@ -4,7 +4,8 @@
            prêt dans les mains (choisi dans la roue), combinaisons d'éléments découvertes, sigils gardés (contacts du
            Murmure), sigil du personnage, couleur de lumière, dernier registre ouvert.
       - Chargée à l'arrivée du personnage (une neuve s'il n'en a jamais eu) ; son sigil est unique dans tout le
-        royaume (table vava_magic_sigils), tiré au hasard la première fois.
+        royaume (table vava_magic_sigils), tiré au hasard la première fois. Rien n'est gardé d'un joueur parti
+        pendant la lecture (son départ est déjà passé).
       - Gardée en mémoire ; écrite dans le personnage au plus toutes les `persistence.flushMs` si elle a changé,
         et aussitôt au départ (le core la sauvegarde en base avec le personnage).
       - Index des sigils des joueurs en jeu, pour délivrer un murmure sans requête.
@@ -82,6 +83,8 @@ sheets.SCHEMA = {
 local loaded = {}
 ---@type table<string, integer>  sigil → source du joueur en jeu
 local bySigil = {}
+---@type table<integer, integer>  joueur → personnage dont la fiche se charge (lecture du sigil en cours)
+local loading = {}
 
 ---@param value any
 ---@return integer|nil
@@ -158,9 +161,14 @@ end
 ---@param src integer
 ---@param characterId integer
 ---@return boolean ok
+---@return string|nil code  'left' : le joueur est parti pendant la lecture
 function sheets.load(src, characterId)
+    loading[src] = characterId
     local sheet = sanitize(bridge.LoadSheet(characterId))
     local sigil = ensureSigil(characterId, sheet.sigil)
+    -- parti pendant la lecture (déconnexion, retour à la sélection) : son départ est déjà passé, rien n'est gardé
+    if loading[src] ~= characterId then return false, 'left' end
+    loading[src] = nil
     if not sigil then return false end
     local changed = sheet.sigil ~= sigil
     sheet.sigil = sigil
@@ -294,6 +302,7 @@ end
 --- Départ du personnage : fiche écrite, puis oubliée.
 ---@param src integer
 function sheets.unload(src)
+    loading[src] = nil
     local sheet = loaded[src]
     if not sheet then return end
     sheets.save(src)
