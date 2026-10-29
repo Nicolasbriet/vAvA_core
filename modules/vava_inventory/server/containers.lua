@@ -1,7 +1,8 @@
 --[[
     vava_inventory/server/containers.lua
     Rôle : conteneurs en mémoire (source de vérité pendant le jeu) : chargement, création, carte d'occupation,
-           poids, index objet → conteneur, attribution des identifiants d'objets.
+           poids, index objet → conteneur, attribution des identifiants d'objets, piles gardées à part et leur retour
+           quand la définition de leur objet arrive au registre (1.6.3).
     Les identifiants sont attribués en mémoire à partir du maximum lu au démarrage (un seul serveur par base) :
     aucune opération n'attend la base, donc aucune ne peut être entrelacée avec une autre.
     Dépendances : shared/, config.lua, server/core.lua, server/items.lua, server/persistence.lua
@@ -9,6 +10,7 @@
 
 local type, pairs, ipairs, tostring, tonumber, pcall, next = type, pairs, ipairs, tostring, tonumber, pcall, next
 local mathType, tointeger = math.type, math.tointeger
+local sort = table.sort
 local decodeJson = json.decode
 
 local grid = VavaInventory.grid
@@ -56,6 +58,9 @@ VavaInventory.containers = containers
 local byId = {}
 ---@type table<integer, vAvA.Container>
 local ownerOf = {}
+-- nom d'objet → { [id de conteneur] = true } : conteneurs en mémoire qui gardent à part des piles de cet objet
+---@type table<string, table<integer, true>>
+local asideByItem = {}
 local nextTransientId = -1
 local lastInstanceId = 0
 
@@ -93,6 +98,13 @@ local function decodeMetadata(raw)
     if type(raw) ~= 'string' or raw == '' then return {} end
     local ok, decoded = pcall(decodeJson, raw)
     return ok and type(decoded) == 'table' and decoded or {}
+end
+
+---@param a vAvA.ItemInstance
+---@param b vAvA.ItemInstance
+---@return boolean
+local function olderFirst(a, b)
+    return a.id < b.id
 end
 
 --- Lit le dernier identifiant d'objet utilisé. À appeler une fois, pendant le setup.
@@ -149,6 +161,28 @@ function containers.adjust(container, instance, def, delta)
     container.weight = container.weight + def.weight * delta
 end
 
+--- Garde une pile à part, telle quelle (sa ligne en base ne change pas), et note le conteneur pour son objet.
+---@param container vAvA.Container
+---@param instance vAvA.ItemInstance
+local function setAside(container, instance)
+    container.misplaced[#container.misplaced + 1] = instance
+    local set = asideByItem[instance.item]
+    if not set then
+        set = {}
+        asideByItem[instance.item] = set
+    end
+    set[container.id] = true
+end
+
+---@param item string
+---@param id integer
+local function forgetAside(item, id)
+    local set = asideByItem[item]
+    if not set then return end
+    set[id] = nil
+    if next(set) == nil then asideByItem[item] = nil end
+end
+
 ---@param container vAvA.Container
 ---@param instance vAvA.ItemInstance
 local function place(container, instance)
@@ -167,9 +201,73 @@ local function place(container, instance)
             return
         end
     end
-    container.misplaced[#container.misplaced + 1] = instance
+    setAside(container, instance)
     VavaInventory.log.warn("conteneur #%d : objet #%d (%s) sans place ou sans définition, conservé à part",
         container.id, instance.id, tostring(instance.item))
+end
+
+---@class vAvA.ReturnedItems
+---@field container vAvA.Container
+---@field placed vAvA.ItemInstance[]
+
+--- Définition d'un objet (re)venue au registre : ses piles mises de côté dans les conteneurs en mémoire reprennent
+--- leur place d'origine si elle est libre, sinon la première place libre (alors notée pour l'écriture) ; sans place,
+--- elles restent à part, sans rien perdre (leur ligne en base n'a pas changé). Rien n'est recouvert : la carte
+--- d'occupation fait foi. Synchrone, sans écriture en base : l'appelant publie (révision, spectateurs, main).
+--- Cas type : `restart vava_inventory`, dont les besaces sont rechargées avant que les autres modules ne redéclarent
+--- leurs objets (1.6.3).
+---@param name string
+---@return vAvA.ReturnedItems[]
+function containers.returnAside(name)
+    local result = {}
+    local set = asideByItem[name]
+    local def = set and items.get(name)
+    if not def then return result end
+    local ids = {}
+    for id in pairs(set) do ids[#ids + 1] = id end
+    for _, id in ipairs(ids) do
+        local container = byId[id]
+        if not container then
+            forgetAside(name, id)
+        else
+            local wanted, kept = {}, {}
+            for _, instance in ipairs(container.misplaced) do
+                if instance.item == name then wanted[#wanted + 1] = instance else kept[#kept + 1] = instance end
+            end
+            -- la plus ancienne d'abord : l'ordre ne dépend pas du chargement
+            sort(wanted, olderFirst)
+            local planned, left = grid.planReturn(container, wanted, def)
+            local placed = {}
+            for _, entry in ipairs(planned) do
+                local instance = entry.instance
+                instance.x, instance.y, instance.rotated = entry.x, entry.y, entry.rotated
+                containers.attach(container, instance, def)
+                -- à sa place d'origine, sa ligne en base est déjà juste
+                if entry.moved then persistence.touch(instance, container.persisted) end
+                placed[#placed + 1] = instance
+            end
+            for _, instance in ipairs(left) do kept[#kept + 1] = instance end
+            container.misplaced = kept
+            if #left == 0 then forgetAside(name, id) end
+            if #placed > 0 then
+                result[#result + 1] = { container = container, placed = placed }
+                VavaInventory.log.info("conteneur #%d : %d pile(s) de '%s' replacée(s)%s", id, #placed, name,
+                    #left > 0 and (', ' .. #left .. ' toujours sans place') or '')
+            end
+        end
+    end
+    return result
+end
+
+--- Pile gardée à part dans un conteneur, ou nil.
+---@param container vAvA.Container
+---@param instanceId integer
+---@return vAvA.ItemInstance|nil
+function containers.aside(container, instanceId)
+    for _, instance in ipairs(container.misplaced) do
+        if instance.id == instanceId then return instance end
+    end
+    return nil
 end
 
 --- Charge un conteneur conservé (ou renvoie celui déjà en mémoire). Bloque le thread courant.
@@ -289,6 +387,7 @@ function containers.unload(id)
     local container = byId[id]
     if not container then return end
     for instanceId in pairs(container.items) do ownerOf[instanceId] = nil end
+    for _, instance in ipairs(container.misplaced) do forgetAside(instance.item, id) end
     byId[id] = nil
 end
 

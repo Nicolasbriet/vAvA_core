@@ -1,6 +1,7 @@
 --[[
     vava_inventory/shared/grid.lua
-    Rôle : géométrie pure des grilles : emprise d'un objet (pivoté ou non), collisions, marquage, recherche de place.
+    Rôle : géométrie pure des grilles : emprise d'un objet (pivoté ou non), collisions, marquage, recherche de place,
+           places rendues aux piles mises de côté (1.6.3).
     Un conteneur tient une carte d'occupation (index de case → identifiant d'objet) : vérifier une place coûte
     la surface de l'objet, pas celle de la grille. Coordonnées en cases, origine en haut à gauche, à partir de 0.
     Dépendances : shared/constants.lua
@@ -113,4 +114,46 @@ function grid.findSpace(container, def, reserved)
         if def.width == def.height then break end
     end
     return nil
+end
+
+---@class vAvA.GridReturn
+---@field instance table   la pile mise de côté
+---@field x integer
+---@field y integer
+---@field rotated boolean
+---@field moved boolean     vrai si ce n'est pas sa place d'origine
+
+--- Places à rendre à des piles d'un même objet mises de côté (définition absente au chargement), sans rien modifier.
+--- D'abord, chaque pile dont la place d'origine est libre la reprend ; ensuite seulement, les autres prennent la
+--- première place libre : une pile replacée ailleurs ne prend jamais la place d'origine libre d'une autre pile de la
+--- liste. La carte d'occupation fait foi (aucune pile n'est recouverte) et chaque place rendue est réservée pour les
+--- suivantes.
+---@param container vAvA.Grid
+---@param instances { x: integer, y: integer, rotated: boolean }[]  par ordre de priorité (la plus ancienne d'abord)
+---@param def { width: integer, height: integer }
+---@return vAvA.GridReturn[] placed
+---@return table[] left  piles sans place, dans l'ordre reçu
+function grid.planReturn(container, instances, def)
+    local reserved, placed, others, left = {}, {}, {}, {}
+    for _, instance in ipairs(instances) do
+        local rotated = instance.rotated == true
+        local w, h = grid.footprint(def, rotated)
+        if grid.fits(container, w, h, instance.x, instance.y, nil, reserved) then
+            grid.reserve(reserved, container, w, h, instance.x, instance.y)
+            placed[#placed + 1] = { instance = instance, x = instance.x, y = instance.y, rotated = rotated, moved = false }
+        else
+            others[#others + 1] = instance
+        end
+    end
+    for _, instance in ipairs(others) do
+        local x, y, rotated = grid.findSpace(container, def, reserved)
+        if x then
+            local w, h = grid.footprint(def, rotated)
+            grid.reserve(reserved, container, w, h, x, y)
+            placed[#placed + 1] = { instance = instance, x = x, y = y, rotated = rotated, moved = true }
+        else
+            left[#left + 1] = instance
+        end
+    end
+    return placed, left
 end

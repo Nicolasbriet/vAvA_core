@@ -9,6 +9,7 @@
     ou une pile précise par son identifiant ; les piles se consomment de la plus ancienne à la plus récente.
     Mains (1.4.0) : prendre ou reposer un objet qui se tient en main (hook `vava_inventory:hold`) ; la main se vide
     d'elle-même quand la pile tenue quitte la besace.
+    Piles gardées à part (1.6.3) : replacées dès que la définition de leur objet arrive au registre.
     Dépendances : shared/, config.lua, server/core.lua, server/positions.lua, server/items.lua, server/persistence.lua,
                   server/containers.lua, server/viewers.lua, server/drops.lua, server/hands.lua
 ]]
@@ -31,8 +32,12 @@ local cfg = VavaInventory.config
 local metaCfg = cfg.metadata
 local EVENTS = VavaInventory.EVENTS
 local KIND = VavaInventory.KIND
+local REGISTRY = VavaInventory.REGISTRY
 local HOTBAR_FIELD = VavaInventory.HOTBAR_FIELD
 local MAX_QUANTITY = VavaInventory.MAX_QUANTITY
+-- retour des piles gardées à part : après les abonnés de priorité par défaut (100) de `core:registry:added`, dont
+-- l'invalidation du cache des définitions (items.lua)
+local RETURN_PRIORITY = 200
 
 local HOOK = {
     MOVE = 'vava_inventory:move', SPLIT = 'vava_inventory:split', MERGE = 'vava_inventory:merge',
@@ -232,6 +237,15 @@ end
 
 -- Accès -----------------------------------------------------------------------------------------------------
 
+--- Vrai si le joueur a ce conteneur sous les yeux : sa besace, ou un conteneur qu'il a ouvert.
+---@param src integer
+---@param container vAvA.Container
+---@return boolean
+local function sees(src, container)
+    local session = sessions[src]
+    return (session ~= nil and session.containerId == container.id) or viewers.isViewing(src, container.id)
+end
+
 ---@param src integer
 ---@param container vAvA.Container|nil
 ---@return boolean
@@ -251,7 +265,9 @@ end
 ---@return vAvA.ItemDefinition|nil def
 local function resolve(src, instanceId)
     local container = containers.ofInstance(instanceId)
-    if not container then return nil, 'not_found' end
+    -- parti dans un conteneur que le joueur n'a pas sous les yeux (un autre l'a pris) : pour lui, il n'est plus là ;
+    -- « hors de portée » reste pour un conteneur ouvert dont il s'est éloigné
+    if not container or not sees(src, container) then return nil, 'not_found' end
     if not canOperate(src, container) then return nil, 'no_access' end
     local instance = container.items[instanceId]
     local def = instance and items.get(instance.item)
@@ -568,13 +584,19 @@ end
 ---@return string|nil code
 function operations.use(src, instanceId)
     local session = sessions[src]
+    if not session then return false, 'no_access' end
     local container = containers.ofInstance(instanceId)
-    if not session or not container or container.id ~= session.containerId then return false, 'no_access' end
+    if not container or container.id ~= session.containerId then
+        -- parti de sa besace (pris par un autre, consommé) : il n'est plus là ; dans un sac ou un coffre ouvert, on ne
+        -- l'utilise pas sans l'avoir pris
+        return false, (container and viewers.isViewing(src, container.id)) and 'no_access' or 'not_found'
+    end
     local instance = container.items[instanceId]
     local def = instance and items.get(instance.item)
     if not def then return false, 'unknown_item' end
     if not items.isUsable(def) then
-        -- un objet qui se tient en main (outil, torche) sans autre usage : l'utiliser le prend ou le repose
+        -- un objet qui se tient en main (outil, torche) sans autre usage : l'utiliser le prend ou le repose ; le refus
+        -- rédigé par un module (à terre…) suit, comme pour une utilisation (troisième valeur, voir hold)
         if def.held then return operations.hold(src, hands.heldId(src) == instanceId and 0 or instanceId) end
         return false, 'not_usable'
     end
@@ -658,6 +680,7 @@ end
 ---@param owner? string
 ---@return boolean ok
 ---@return string|nil code
+---@return boolean|nil readable  vrai quand `code` est un refus rédigé par un module, à montrer tel quel au joueur
 function operations.hold(src, instanceId, owner)
     local session = sessions[src]
     local container = session and containers.get(session.containerId)
@@ -675,10 +698,43 @@ function operations.hold(src, instanceId, owner)
 
     local payload = { source = src, instanceId = instanceId, item = instance and instance.item or nil, previous = previous, owner = owner }
     local ok, code = guarded(HOOK.HOLD, payload, { container })
-    if not ok then return false, code end
+    -- troisième valeur : refus rédigé par un module (à terre…), notifié par la ceinture comme une utilisation
+    if not ok then return false, code, code ~= 'refused' and code ~= 'conflict' end
     ok, code = hands.set(src, instance, def)
     if not ok then return false, code end
     hooks().runAfter(HOOK.HOLD, payload)
+    return true
+end
+
+-- Piles gardées à part (1.6.3) -------------------------------------------------------------------------------------
+
+--- Définition d'objet arrivée au registre : ses piles gardées à part dans les conteneurs en mémoire reprennent place
+--- (containers.returnAside), la révision de chaque conteneur touché monte (une opération qui attendait un hook est
+--- refusée en conflit au lieu de poser un objet sur une case reprise), ceux qui le regardent reçoivent la différence,
+--- et une main qui attendait l'une de ces piles la retrouve. Aucune attente : tout se fait d'un bloc.
+---@param name string
+function operations.returnAside(name)
+    for _, entry in ipairs(containers.returnAside(name)) do
+        local container = entry.container
+        container.revision = container.revision + 1
+        viewers.publish(container, entry.placed, {})
+        local src = hands.restore(container)
+        -- besace ouverte pendant l'attente : son emplacement Mains montre une main vide, et le champ, inchangé, ne
+        -- repart pas vers le client ; l'état de ce seul joueur est renvoyé (au plus une fois par redémarrage)
+        if src and viewers.isViewing(src, container.id) then operations.snapshot(src) end
+    end
+end
+
+--- Branche le retour des piles gardées à part sur le registre des objets. Appelé pendant le setup du module, après
+--- items.define. Cas type : après `restart vava_inventory`, les besaces des joueurs en jeu sont rechargées avant que
+--- récolte, artisanat, agriculture ou magie ne redéclarent leurs objets (à l'annonce `core:module:ready`).
+---@return boolean ok
+---@return string|nil err
+function operations.start()
+    local id, err = hooks().after('core:registry:added', function(payload)
+        if payload.registry == REGISTRY and type(payload.key) == 'string' then operations.returnAside(payload.key) end
+    end, RETURN_PRIORITY)
+    if not id then return false, err end
     return true
 end
 

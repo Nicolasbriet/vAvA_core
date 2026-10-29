@@ -51,7 +51,7 @@ de `docs/tests/` qui décrivaient le défaut, et les README ou `docs/api.md` qui
 marqués « décision » attendent le porteur du projet : ne pas les coder sans sa réponse.
 
 ### T-005 — Inventaire : redémarrage, affichage et messages
-- Agents : vava-dev-lua + vava-dev-nui · Dépend de : — · Statut : à faire
+- Agents : vava-dev-lua + vava-dev-nui · Dépend de : — · Statut : à tester en jeu
 - I1 : après `restart vava_inventory`, les objets d'autres modules mis de côté au chargement des besaces sont
   replacés dès que leur définition revient, main comprise, sans jamais perdre ni recouvrir une pile.
 - Interface : un refus du serveur n'efface pas les changements arrivés entre-temps (geste d'un autre joueur).
