@@ -143,7 +143,9 @@ Un sort d'attaque (`lockOn = true` dans sa config : les trois projectiles) peut 
   rouge tourne sous lui, vu du seul lanceur. Un nouveau clic passe à la cible suivante, le clic maintenu relâche.
 - Le verrou saute si la cible sort de portée, de vue (une seconde), meurt, ou après 20 s sans attaque.
 - La cible part avec le début de l'incantation. Le serveur la revérifie (joueur en jeu, à portée, hors zone
-  protégée) et **prévient la cible seule** : le bord de son écran rougit (« Un frisson vous parcourt… »).
+  protégée) et, une fois l'incantation acceptée (mana, recharges, contrôles passés), **prévient la cible seule** : le
+  bord de son écran rougit (« Un frisson vous parcourt… »), au plus une fois toutes les 3 s par lanceur
+  (`targeting.warnIntervalMs`) : ni une incantation refusée, ni des débuts annulés en rafale ne la font frissonner.
 - À la fin, le serveur calcule lui-même la direction vers la cible. Niveaux 1 à 3 : le projectile part droit vers
   elle, on peut encore l'esquiver. Niveaux 4 et 5 : la Boule de feu s'incurve vers elle pendant son vol (35 puis 70
   degrés par seconde, `levels[].homing`), le Trait de glace un peu (20 puis 40) ; le Projectile de roche, lent, jamais.
@@ -185,7 +187,7 @@ qu'aux joueurs à moins de 150 m, y compris ceux qui s'en approchent après coup
 | `wet` | Vague, Brume (à sa fin) | Mouillé, reposé au plus toutes les 4 s (lanceur compris) | reflet d'eau au sol, gouttes à la naissance |
 | `quake` | Secousse | aucun pendant le présage ; au terme, choc (voir plus bas) | anneau aux couleurs de la terre qui se remplit, poussière, craquement |
 | `steam` | combinaison Vapeur | légère brûlure chaque seconde ; on n'y voit plus guère | nappes blanches ; voile et flou à l'écran de qui s'y tient |
-| `mud` | combinaison Boue | Ralenti fort tant qu'on y reste | disque brun au sol, éclaboussure à la naissance |
+| `mud` | combinaison Boue | Ralenti fort tant qu'on y reste (reposé toutes les 2 s, sans trou ; 1 à 3 s encore à la sortie) | disque brun au sol, éclaboussure à la naissance |
 
 Un **obstacle** (le Rempart) coupe ce qui voudrait passer à travers lui : projectiles, vague, nova, éclats d'un impact.
 
@@ -265,7 +267,7 @@ lui, la commande vise son auteur.
 | `spells.<sort>` | champs communs (voir plus bas) et **5 niveaux** : durée d'incantation, recharge, description, ce que le niveau débloque, valeurs propres au sort |
 | `spells.lueur.anchor` · `colors` · `render` | orbe ancré, couleurs du niveau 5, rendu (os, décalages, flottement, scintillement) |
 | `spells.<projectile>.projectile` · `fx` · `light` · `sounds` | rendu du vol : objet porteur (caché ou visible, qui tournoie), rayon du test de collision, marqueur, traînée, impact, tremblement, lumière, sons |
-| `targeting` | verrouillage des sorts d'attaque : cône, clic long, délais, marge, frisson, anneau |
+| `targeting` | verrouillage des sorts d'attaque : cône, clic long, délais, marge, frisson (durée, intervalle par lanceur et par cible), anneau |
 | `states` | contrôles durs et immunité (6 s), durées par défaut, allure minimale, démarche et tremblement du chancelant, particules de chaque état |
 | `zones` | vérification (500 ms), distance d'envoi (150 m), plafond du royaume (60) |
 | `wetGround` | sol mouillé : durée du Mouillé, intervalle de repose, reflet au sol, gouttes |
@@ -278,8 +280,8 @@ lui, la commande vise son auteur.
 | `spells.secousse` | portée, rayon, durée du présage, dégâts, contrôle infligé (Chancelant, puis Renversé), anneau, poussière, éclats, tremblement |
 | `spells.rempart` | portée, longueur, épaisseur, hauteur, blocs par segment, segments (2 au niveau 5) et angle du chevron, durée, modèle de pierre, enfoncement, montée par paliers, plafond du royaume, marges autour des joueurs et véhicules |
 | `combos` | combinaisons : déclencheur (`trigger` : spell ou element, on = zone ou target, zone ou state, projectile), résultat (`result` : remove, zone, state, consume, damageShare, noBurn, carry), textes du grimoire, mot bref, effet et son, nuée de la vapeur, rendu de la boue |
-| `combat` | dégâts entre joueurs, points de vie d'un personnage (100), zones protégées (`{ label, x, y, radius }`), journal, réaction de la victime par élément (feu, eau, glace, terre), durée du recul |
-| `sigils` · `registers` · `items` | sigils, registre (200 pages), objets |
+| `combat` | dégâts entre joueurs, points de vie d'un personnage (100), zones protégées (`{ label, x, y, radius }`), journal (lots, rétention : `log.retentionDays`, 30 jours), réaction de la victime par élément (feu, eau, glace, terre), durée du recul |
+| `sigils` · `registers` · `items` | sigils (dont le délai après un refus, `refusedMs` : 60 s), registre (200 pages), objets |
 | `ambient` | effets vus des autres (15 m, fragments à 3 m, runes, textes) |
 | `admin` · `keys` · `commands` · `rateLimits` | droits, touches et boutons, commandes, limites de débit |
 | `texts` | **tous** les textes vus par les joueurs (refus, messages, chat, journal, interface) |
@@ -297,8 +299,10 @@ effets par niveau). Les dégâts sont en **points de vie** (sur `combat.healthPo
 
 1. `server/spells/<nom>.lua` : `VavaMagic.spells.register('<nom>', { config, beginArgs, finishArgs, begin, finish })`.
    `begin(ctx, …)` valide et prépare (`true, données[, coût]` ou `false, code`) ; `finish(ctx, …)` produit l'effet et
-   rend `{ success, refund?, result?, rewarded? }`. Intentions propres : `spells.addRpc` ; ménage : `spells.onLeave`,
-   `onStop` ; nettoyage d'urgence du Conseil : `spells.onCleanup`.
+   rend `{ success, refund?, result?, rewarded? }`. Facultatif : `started(ctx)`, appelé une fois l'incantation
+   acceptée (mana, recharges, contrôles passés), pour ce qui ne doit être annoncé qu'alors (frisson de la cible).
+   Intentions propres : `spells.addRpc` ; ménage : `spells.onLeave`, `onStop` ; nettoyage d'urgence du Conseil :
+   `spells.onCleanup`.
 2. `client/spells/<nom>.lua` : son geste au clic gauche, `VavaMagic.controls.register('<nom>', { cast = function(info) … end })`
    (`info` : `aiming`, `point`, `inRange`, `direction`, `target`), qui appelle
    `VavaMagic.casting.start('<nom>', { args, finishArgs, beforeRelease, onFinish })`.
@@ -379,7 +383,7 @@ au point de l'effet). Aucun fichier n'est fourni.
 | Lueur | ~100 o à l'allumage et à l'extinction ; un objet réseau par orbe ancré |
 | Projectiles | ~150 o de lancer aux joueurs proches (150 m), un impact, les dégâts |
 | Vague · Secousse · Rempart | ~100 à 250 o d'effet instantané aux joueurs à moins de 120 m ; recul, réaction et états à la seule victime |
-| Brume · sol mouillé · présage | comme les zones ; Mouillé reposé au plus toutes les 4 s sur un même joueur |
+| Brume · sol mouillé · présage · boue | comme les zones ; Mouillé reposé au plus toutes les 4 s, Ralenti de la boue toutes les 2 s, sur un même joueur |
 | Combinaisons | ~20 o au lanceur (mot bref), ~100 o d'effet aux joueurs à moins de 150 m ; une vue de la fiche (~200 o) à la première découverte |
 | Rempart | 2 à 6 objets réseau figés (synchronisés par OneSync), 8 déplacements à la montée et à la descente |
 
@@ -466,7 +470,7 @@ Deux joueurs (A et B) suffisent ; un troisième aide pour le cercle et la zone d
 - [ ] Niveau 5 : couleur choisie dans le grimoire, appliquée à la lumière allumée.
 
 **Sigils et Murmure**
-- [ ] A et B face à face, `/sigil offrir` : B nomme A, coche « confier le mien », A nomme B. Sans réponse 30 s : offre close. Trop loin : refusé.
+- [ ] A et B face à face, `/sigil offrir` : B nomme A, coche « confier le mien », A nomme B. Sans réponse 30 s : offre close. Trop loin : refusé. B refuse : A ne peut lui retendre son sigil qu'au bout de 60 s (message avec les secondes restantes) ; B peut toujours tendre le sien à A.
 - [ ] À sens unique : B murmure à A qui ne le connaît pas → « Une présence inconnue ».
 - [ ] A, Murmure prêt, clic gauche : le parchemin s'ouvre (contacts, compteur de signes, envoi). Pendant l'incantation : B à moins de 3 m lit des mots dorés au-dessus des mains de A ; à 5 m, seulement des runes.
 - [ ] B reçoit le parchemin, entend le carillon ; un témoin voit « ses yeux s'illuminent ». Niveau 1 : certains mots arrivent en « … ».
@@ -487,7 +491,7 @@ Deux joueurs (A et B) suffisent ; un troisième aide pour le cercle et la zone d
 - [ ] Niveau 1 à 3 : B esquive en se décalant. Niveau 4-5 (`/magie niveau <A> boule_de_feu 5`) : la boule s'incurve et le rattrape.
 - [ ] Niveau 3 : un voisin de B est touché aussi (moins fort). Niveau 4 : B brûle quelques secondes.
 - [ ] Zone protégée (`combat.protectedZones`) : impossible d'y lancer, personne n'y est blessé. `combat.pvp = false` : aucun dégât.
-- [ ] Table `vava_magic_damage_log` : lanceur, cible, dégâts, position.
+- [ ] Table `vava_magic_damage_log` : lanceur, cible, dégâts, position. Les lignes de plus de 30 jours sont retirées au démarrage du module (message en console s'il y en avait), puis chaque jour.
 
 **États (avec `/magie` et un test du Conseil, ou les sorts)**
 - [ ] Brûlure (Boule de feu niveau 4, Mur, Nova niveau 4) : flammes sur la victime vues de tous, icône et secondes chez elle, bord de l'écran rougi, dégâts chaque seconde, puis plus rien.

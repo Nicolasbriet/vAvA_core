@@ -2,7 +2,9 @@
     vava_magic/server/projectiles.lua
     Rôle : noyau commun des projectiles (boule de feu, trait de glace, projectile de roche), décidé par le serveur.
       - Début : impossible dans une zone protégée. Cible verrouillée (facultative) revérifiée : joueur en jeu, pas
-        soi-même, à portée du niveau, hors zone protégée (positions serveur) ; elle seule est prévenue (un frisson).
+        soi-même, à portée du niveau, hors zone protégée (positions serveur) ; elle seule est prévenue (un frisson),
+        une fois l'incantation acceptée (mana, recharges, contrôles passés), au plus une fois toutes les
+        `targeting.warnIntervalMs` par lanceur et par cible (un début suivi d'une annulation n'en renvoie pas).
       - Fin : vers la cible verrouillée, la direction est calculée ici (le client n'a pas son mot à dire) ; sans
         cible (ou si elle s'est échappée), celle de la caméra envoyée par le client, normalisée ici. Un sort peut
         échouer à ce moment (`fizzle`) ; sinon le lancer est noté (origine = position du lanceur lue côté serveur),
@@ -74,6 +76,23 @@ local launches = {}
 local nextLaunch = 0
 ---@type table<string, { config: table, hit: table, onImpact: function }>
 local defs = {}
+---@type table<integer, table<integer, integer>>  lanceur → cible → dernier frisson envoyé
+local warned = {}
+
+--- Frisson à la cible verrouillée d'une incantation acceptée, au plus une fois par intervalle pour ce couple.
+---@param src integer
+---@param target integer
+local function warn(src, target)
+    local now = GetGameTimer()
+    local byTarget = warned[src]
+    if not byTarget then
+        byTarget = {}
+        warned[src] = byTarget
+    end
+    if byTarget[target] and now - byTarget[target] < targetingCfg.warnIntervalMs then return end
+    byTarget[target] = now
+    TriggerClientEvent(EVENTS.TARGETED, target)
+end
 
 --- Contrôles du serveur d'un sort : ceux de `projectiles`, sauf ceux que le sort change dans son `hit`.
 ---@param spellCfg table
@@ -205,9 +224,13 @@ function projectiles.register(name, spellCfg, handlers)
         if combat.protected(ctx.origin) then return false, 'protected_zone' end
         if not target then return true, {} end
         if not lockedPosition(ctx.source, target, ctx.origin, spellCfg.levels[ctx.level], hit) then return false, 'invalid_target' end
-        -- la cible sent la menace : elle a la durée de l'incantation pour réagir
-        TriggerClientEvent(EVENTS.TARGETED, target)
         return true, { target = target }
+    end
+
+    --- Incantation acceptée : la cible sent la menace, elle a la durée de l'incantation pour réagir.
+    ---@param ctx table
+    local function started(ctx)
+        if ctx.data.target then warn(ctx.source, ctx.data.target) end
     end
 
     ---@param ctx table
@@ -257,6 +280,7 @@ function projectiles.register(name, spellCfg, handlers)
         beginArgs = { { type = 'integer', min = 1, max = 65535, optional = true } },
         finishArgs = { DIRECTION, DIRECTION, DIRECTION },
         begin = begin,
+        started = started,
         finish = finish,
     })
 end
@@ -267,4 +291,6 @@ spells.onLeave(function(src)
     for id, launch in pairs(launches) do
         if launch.source == src then launches[id] = nil end
     end
+    warned[src] = nil
+    for _, byTarget in pairs(warned) do byTarget[src] = nil end
 end)

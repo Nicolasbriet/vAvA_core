@@ -4,7 +4,8 @@
       - Début (RPC du sort) : fiche chargée, mage, sort connu, une seule incantation à la fois, pas à terre ni en
         véhicule, empêchements des autres fichiers (état « chancelant »…), délai global entre deux sorts, temps de
         recharge du sort, hook `vava_magic:castStarting` (annulable), validation propre au sort, mana. Position et vie
-        du lanceur notées (lues côté serveur) ; state bag « incantation » (sort et niveau) sur son ped.
+        du lanceur notées (lues côté serveur) ; state bag « incantation » (sort et niveau) sur son ped ; le sort est
+        prévenu que l'incantation est acceptée (`started` : frisson de la cible verrouillée…).
       - Fin (RPC du sort) : durée écoulée, déplacement (positions serveur) et vie (une blessure interrompt les sorts
         qui le disent, `interruptOnHurt`) revérifiés.
         La mana est réservée avant l'effet du sort : rendue en entier s'il refuse, en partie s'il le dit (échec
@@ -223,6 +224,8 @@ function casting.begin(src, name, ...)
     }
     casts[src] = cast
     world.setState(src, STATES.CASTING, { spell = name, level = level })
+    -- incantation acceptée (mana, recharges, contrôles passés) : ce que le sort annonce seulement maintenant
+    if def.started then invoke(def.started, contextOf(src, cast)) end
     SetTimeout(duration + cfg.graceMs, function()
         if casts[src] == cast and not cast.finishing then casting.abort(src, 'expired', true) end
     end)

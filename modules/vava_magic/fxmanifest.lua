@@ -20,7 +20,7 @@ use_experimental_fxv2_oal 'yes'
 
 name 'vava_magic'
 description 'Magie vAvA : mana, progression, roue des sorts, états, sorts de feu, eau et terre, Murmure, Lueur, grimoire et registre'
-version '2.5.1'
+version '2.6.0'
 
 dependency 'vAvA_core'
 

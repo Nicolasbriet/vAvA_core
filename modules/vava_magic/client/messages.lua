@@ -8,6 +8,8 @@ local type, tostring = type, tostring
 
 local bridge = VavaMagic.bridge
 local errors = VavaMagic.config.texts.errors
+-- codes dont le texte porte les secondes restantes (`extra`)
+local WITH_SECONDS = { cooldown = true, offer_refused = true }
 
 local messages = {}
 VavaMagic.messages = messages
@@ -19,7 +21,7 @@ VavaMagic.messages = messages
 function messages.error(code, extra)
     local textOf = type(code) == 'string' and errors[code]
     if not textOf then return errors.unknown:format(tostring(code)) end
-    if code == 'cooldown' then return textOf:format(type(extra) == 'number' and extra or 0) end
+    if WITH_SECONDS[code] then return textOf:format(type(extra) == 'number' and extra or 0) end
     return textOf
 end
 

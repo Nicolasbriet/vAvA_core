@@ -7,13 +7,14 @@
         à l'immunité) ou retiré (séchage, extinction), dégâts réduits, brûlure empêchée ce coup-ci.
       - `combos.quake(zone)` : une secousse frappe : les sols mouillés qu'elle recouvre deviennent de la boue.
       - Zones nées des combinaisons : « steam » (légères brûlures à qui s'y tient, vue cachée côté client) et « mud »
-        (ralenti fort tant qu'on y reste).
+        (ralenti fort tant qu'on y reste : reposé au plus toutes les `slow.refreshMs` sur un même joueur, chaque pose
+        couvrant l'intervalle jusqu'à la suivante, plus `slow.durationMs` moins une vérification).
       - Une combinaison réussie s'inscrit dans le grimoire du lanceur la première fois (fiche), lui montre un mot bref
         (évènement ciblé), et se voit des joueurs proches (effet instantané).
     Dépendances : shared/, config.lua, server/ (noyau, sheets, states, zones, combat, world)
 ]]
 
-local ipairs, pairs, sort = ipairs, pairs, table.sort
+local ipairs, pairs, sort, max = ipairs, pairs, table.sort, math.max
 local GetGameTimer, TriggerClientEvent = GetGameTimer, TriggerClientEvent
 
 local bridge = VavaMagic.bridge
@@ -96,7 +97,7 @@ local function replace(combo, result, touched, caster)
     if result.zone == STEAM then
         data = { damage = result.damage or 0, tickMs = result.tickMs or 1000, hits = {} }
     elseif result.zone == MUD then
-        data = { slow = result.slow }
+        data = { slow = result.slow, applied = {} }
     end
     zones.create({
         kind = result.zone, spell = combo.id, element = result.element or 'eau', level = 1, owner = caster, shape = zones.CIRCLE,
@@ -200,7 +201,16 @@ zones.define(STEAM, {
 zones.define(MUD, {
     onTick = function(zone, victim)
         local slow = zone.data.slow
-        if not slow or not combat.affects(victim) then return end
-        states.apply(victim, 'slow', { durationMs = slow.durationMs, strength = slow.strength, caster = zone.owner, spell = zone.spell })
+        if not slow then return end
+        local applied = zone.data.applied
+        local refresh = slow.refreshMs or 0
+        local now = GetGameTimer()
+        if applied[victim] and now - applied[victim] < refresh then return end
+        if not combat.affects(victim) then return end
+        applied[victim] = now
+        -- la pose tient jusqu'à la suivante (aucun trou dans la boue) ; à la sortie, il en reste au moins
+        -- `durationMs` moins une vérification, comme lorsqu'elle était reposée à chaque vérification
+        local duration = slow.durationMs + max(0, refresh - cfg.zones.tickMs)
+        states.apply(victim, 'slow', { durationMs = duration, strength = slow.strength, caster = zone.owner, spell = zone.spell })
     end,
 })

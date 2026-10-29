@@ -3,7 +3,8 @@
     Rôle : catalogue des sorts. Chaque sort du module se déclare depuis son fichier (server/spells/<nom>.lua) avec
            `spells.register` ; un autre module en ajoute un par le registre du core `vava_magic:spells` (clé = nom du
            sort), sans toucher au noyau. Un sort fournit sa config (label, niveaux…), les schémas de ses arguments et
-           ses fonctions `begin` (validation au début de l'incantation), `finish` (effet à la fin) et `cancel`.
+           ses fonctions `begin` (validation au début de l'incantation), `finish` (effet à la fin) et `cancel` ; un sort
+           du module peut aussi fournir `started` (incantation acceptée : tous les contrôles passés, mana comprise).
            Les RPC de chaque sort (début et fin) sont ouvertes par server/casting.lua. Un sort du module peut aussi
            déclarer ses intentions propres (`addRpc`, ouvertes au démarrage) et son ménage au départ d'un joueur
            (`onLeave`) ou à l'arrêt du module (`onStop`) : main.lua n'a jamais à changer pour un nouveau sort.
@@ -35,6 +36,7 @@ VavaMagic.spells = spells
 ---@field begin fun(ctx: table, ...): boolean, any
 ---@field finish fun(ctx: table, ...): table|false, string|nil
 ---@field cancel? fun(ctx: table)
+---@field started? fun(ctx: table)  incantation acceptée (sorts du module seulement)
 
 ---@type table<string, vAvA.MagicSpell>
 local defs = {}
@@ -88,7 +90,7 @@ function spells.register(name, def, owner)
     defs[name] = {
         name = name, owner = owner or RESOURCE, config = def.config,
         beginArgs = def.beginArgs or {}, finishArgs = def.finishArgs or {},
-        begin = def.begin, finish = def.finish, cancel = def.cancel,
+        begin = def.begin, finish = def.finish, cancel = def.cancel, started = def.started,
     }
     if VavaMagic.ready then return VavaMagic.casting.expose(name) end
     return true

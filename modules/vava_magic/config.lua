@@ -858,6 +858,7 @@ VavaMagic.config = {
         lostChecks = 4,        -- vérifications de suite sans la voir avant de la perdre (1 s)
         rangeMargin = 2.0,     -- marge sur la portée, côté client comme serveur
         warnMs = 2200,         -- durée du frisson chez la cible (bord de l'écran qui rougit)
+        warnIntervalMs = 3000, -- un frisson au plus par lanceur et par cible pendant ce délai (incantation acceptée)
         -- anneau sous la cible, vu du seul lanceur
         ring = { marker = 25, size = 1.2, r = 200, g = 64, b = 40, alpha = 210, groundOffset = 0.95, spin = 90.0 },
     },
@@ -937,7 +938,10 @@ VavaMagic.config = {
             triggerText = 'Une secousse frappe un sol mouillé.',
             resultText = 'Une boue épaisse s\'étale et ralentit fortement ceux qui s\'y enfoncent, trente secondes durant.',
             trigger = { spell = 'secousse', on = 'zone', zone = 'wet' },
-            result = { remove = true, zone = 'mud', element = 'terre', durationMs = 30000, slow = { strength = 0.6, durationMs = 1500 } },
+            -- Ralenti reposé au plus toutes les `refreshMs` sur qui s'y tient, sans trou : chaque pose dure `durationMs`
+            -- + `refreshMs` − une vérification des zones ; à la sortie, il en reste de `durationMs` à `durationMs` +
+            -- `refreshMs`, moins une vérification (1 à 3 s ici)
+            result = { remove = true, zone = 'mud', element = 'terre', durationMs = 30000, slow = { strength = 0.6, durationMs = 1500, refreshMs = 2000 } },
             fx = { asset = 'core', name = 'ent_sht_water', scale = 1.2, points = 6 }, sound = 'splash',
             render = { r = 96, g = 66, b = 34, alpha = 150, height = 0.05, groundOffset = 0.02 },
         },
@@ -1002,8 +1006,9 @@ VavaMagic.config = {
         -- zones où l'on ne lance aucun sort offensif (cercle au sol, en mètres) et où personne n'en est blessé :
         -- { label = 'Chapelle de la Grâce', x = 0.0, y = 0.0, radius = 40.0 },
         protectedZones = {},
-        -- journal des dégâts infligés par les sorts (pour le Conseil) : écrit par lots en base
-        log = { flushMs = 10000, batch = 50 },
+        -- journal des dégâts infligés par les sorts (pour le Conseil) : écrit par lots en base ; les lignes plus
+        -- anciennes que `retentionDays` jours sont retirées au démarrage du module, puis une fois par jour (0 : jamais)
+        log = { flushMs = 10000, batch = 50, retentionDays = 30 },
     },
 
     -- Sigils : chaque personnage en a un, mage ou non.
@@ -1016,6 +1021,7 @@ VavaMagic.config = {
         offerRange = 3.0,      -- échange face à face (mètres)
         rangeMargin = 0.5,
         offerMs = 30000,       -- délai pour accepter ou refuser
+        refusedMs = 60000,     -- après un refus, délai avant de tendre de nouveau son sigil au même joueur
         retries = 5,           -- tirages d'un sigil libre
         scramble = { cost = 60, cooldownMs = 21600000 }, -- brouiller (mage connaissant le sort) : 6 h de recharge
     },
@@ -1156,6 +1162,7 @@ VavaMagic.config = {
             invalid_impact = 'Impact refusé.',
             nobody_near = 'Personne ne se tient assez près de vous.',
             offer_pending = 'Un sigil attend déjà une réponse.',
+            offer_refused = 'Cette personne vient de refuser votre sigil : attendez %d s avant de le lui tendre à nouveau.',
             no_offer = 'Cette offre n\'existe plus.',
             sigils_full = 'Votre mémoire ne peut garder davantage de sigils.',
             their_sigils_full = 'Sa mémoire ne peut garder davantage de sigils.',

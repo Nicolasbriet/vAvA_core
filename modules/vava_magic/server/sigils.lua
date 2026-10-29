@@ -3,7 +3,8 @@
     Rôle : sigils (contacts du Murmure), décidés par le serveur.
       - Échange face à face : le joueur tend son sigil au plus proche (3 m, positions lues côté serveur), qui accepte
         en le nommant ou refuse dans les 30 s ; distance revérifiée à l'acceptation. À sens unique par défaut :
-        l'autre peut confier le sien en retour, que le premier nomme à son tour.
+        l'autre peut confier le sien en retour, que le premier nomme à son tour. Après un refus, le donneur attend
+        `sigils.refusedMs` avant de tendre de nouveau son sigil au même joueur (oublié au départ de l'un ou l'autre).
       - Mage ou non, chacun donne et reçoit des sigils ; le nombre gardé dépend du niveau du Murmure.
       - Liste, renommer, oublier ; brouiller son sigil (mage connaissant le Murmure, mana, longue recharge gardée
         dans la fiche) : ceux qui connaissaient l'ancien perdent le lien, sa propre liste reste.
@@ -11,7 +12,7 @@
                   server/mana.lua
 ]]
 
-local ipairs = ipairs
+local ipairs, pairs = ipairs, pairs
 local ceil = math.ceil
 local time = os.time
 local GetGameTimer, SetTimeout, TriggerClientEvent = GetGameTimer, SetTimeout, TriggerClientEvent
@@ -42,7 +43,34 @@ VavaMagic.sigils = sigils
 local offers = {}
 ---@type table<integer, integer>  joueur → offre en cours (donneur ou receveur)
 local byPlayer = {}
+---@type table<integer, table<integer, integer>>  donneur → receveur qui l'a refusé → fin du délai
+local refusals = {}
 local nextOffer = 0
+
+--- Le receveur refuse : le donneur ne pourra lui retendre son sigil qu'après le délai.
+---@param offer vAvA.SigilOffer
+local function refused(offer)
+    local byReceiver = refusals[offer.from]
+    if not byReceiver then
+        byReceiver = {}
+        refusals[offer.from] = byReceiver
+    end
+    byReceiver[offer.to] = GetGameTimer() + cfg.refusedMs
+end
+
+--- Millisecondes avant que `src` puisse retendre son sigil à `target` (0 : rien ne l'en empêche).
+---@param src integer
+---@param target integer
+---@return integer
+local function refusedLeft(src, target)
+    local byReceiver = refusals[src]
+    local untilMs = byReceiver and byReceiver[target]
+    if not untilMs then return 0 end
+    local left = untilMs - GetGameTimer()
+    if left > 0 then return left end
+    byReceiver[target] = nil
+    return 0
+end
 
 --- Liste des contacts : { contacts = { { index, name } }, limit }.
 ---@param src integer
@@ -109,6 +137,7 @@ end
 ---@param src integer
 ---@return boolean ok
 ---@return string|nil code
+---@return integer|nil seconds  délai restant après un refus de ce joueur
 function sigils.offer(src)
     if not sheets.get(src) then return false, 'not_ready' end
     if byPlayer[src] then return false, 'offer_pending' end
@@ -117,6 +146,8 @@ function sigils.offer(src)
     local nearest = world.near(position, cfg.offerRange, src)[1]
     if not nearest or not sheets.get(nearest.source) then return false, 'nobody_near' end
     local target = nearest.source
+    local left = refusedLeft(src, target)
+    if left > 0 then return false, 'offer_refused', ceil(left / MS_PER_SECOND) end
     if byPlayer[target] then return false, 'offer_pending' end
     nextOffer = nextOffer + 1
     local offer = { id = nextOffer, from = src, to = target, stage = 'offer', expiresAt = 0 }
@@ -139,6 +170,7 @@ function sigils.answer(src, offerId, accept, name, giveBack)
     local offer = offers[offerId]
     if not offer or offer.stage ~= 'offer' or offer.to ~= src then return false, 'no_offer' end
     if not accept then
+        refused(offer)
         bridge.Notify(offer.from, notify.sigilRefused, 'warning')
         close(offer)
         return true
@@ -263,9 +295,11 @@ function sigils.scramble(src)
     return true
 end
 
---- Départ du joueur : ses offres en cours sont closes.
+--- Départ du joueur : ses offres en cours sont closes, les refus qui le concernent oubliés.
 ---@param src integer
 function sigils.forgetPlayer(src)
     local id = byPlayer[src]
     if id and offers[id] then close(offers[id]) end
+    refusals[src] = nil
+    for _, byReceiver in pairs(refusals) do byReceiver[src] = nil end
 end

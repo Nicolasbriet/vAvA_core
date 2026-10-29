@@ -7,13 +7,14 @@
            champ `reaction` : geste, effet d'écran) ; une brûlure qui dure n'en envoie pas à chaque morsure. Un sort
            offensif sans dégâts (recul, état) demande d'abord si la cible peut être touchée (`combat.affects`).
            Un lot plein du journal s'écrit dans son propre thread : celui qui blesse (vérification des zones, morsure
-           d'une brûlure, impact) n'attend jamais la base au milieu de son travail.
+           d'une brûlure, impact) n'attend jamais la base au milieu de son travail. Les lignes plus anciennes que
+           `combat.log.retentionDays` sont retirées au démarrage du module puis une fois par jour, par lots bornés.
     Dépendances : shared/, config.lua, server/core.lua, bridge/server.lua, server/world.lua
 ]]
 
-local ipairs, tostring, min = ipairs, tostring, math.min
+local ipairs, tostring, tonumber, min, floor = ipairs, tostring, tonumber, math.min, math.floor
 local time, rep, move = os.time, string.rep, table.move
-local SetTimeout, CreateThread, TriggerClientEvent = SetTimeout, CreateThread, TriggerClientEvent
+local SetTimeout, CreateThread, Wait, TriggerClientEvent = SetTimeout, CreateThread, Wait, TriggerClientEvent
 
 local bridge = VavaMagic.bridge
 local world = VavaMagic.world
@@ -25,6 +26,12 @@ local INSERT = 'INSERT INTO `vava_magic_damage_log` (`at`, `spell`, `caster_id`,
 local ROW = '(?, ?, ?, ?, ?, ?, ?, ?, ?)'
 -- au-delà, les lignes en attente d'une base qui ne répond pas sont abandonnées (journal en console)
 local QUEUE_MAX = 500
+-- purge des lignes anciennes : par lots bornés (index sur `at`), une courte pause entre deux lots, une fois par jour
+local PURGE = 'DELETE FROM `vava_magic_damage_log` WHERE `at` < ? LIMIT ?'
+local PURGE_BATCH = 5000
+local PURGE_PAUSE_MS = 1000
+local SECONDS_PER_DAY = 86400
+local DAY_MS = SECONDS_PER_DAY * 1000
 
 local combat = {}
 VavaMagic.combat = combat
@@ -113,11 +120,41 @@ function combat.damage(caster, target, spell, points, kind, casterCharacter)
     return true
 end
 
---- Écriture régulière du journal. Appelé pendant le setup du module.
+--- Retire du journal les lignes plus anciennes que `log.retentionDays` jours, par lots bornés. Bloque le thread
+--- appelant (base de données). Renvoie le nombre de lignes retirées.
+---@return integer
+function combat.purge()
+    local days = cfg.log.retentionDays
+    if not days or days <= 0 then return 0 end
+    local cutoff = time() - floor(days * SECONDS_PER_DAY)
+    local removed = 0
+    while true do
+        local affected, err = bridge.db.update(PURGE, { cutoff, PURGE_BATCH })
+        if err then
+            VavaMagic.log.warn('journal des dégâts non purgé : %s', tostring(err))
+            break
+        end
+        affected = tonumber(affected) or 0
+        removed = removed + affected
+        -- lot incomplet : plus rien d'aussi ancien
+        if affected < PURGE_BATCH then break end
+        Wait(PURGE_PAUSE_MS)
+    end
+    if removed > 0 then VavaMagic.log.info('journal des dégâts : %d ligne(s) de plus de %d jours retirée(s)', removed, days) end
+    return removed
+end
+
+--- Écriture régulière du journal ; purge au démarrage, puis une fois par jour. Appelé pendant le setup du module.
 function combat.start()
     local function loop()
         combat.flush()
         SetTimeout(cfg.log.flushMs, loop)
     end
     SetTimeout(cfg.log.flushMs, loop)
+    local function daily()
+        combat.purge()
+        SetTimeout(DAY_MS, daily)
+    end
+    -- dans son propre thread : le setup n'attend pas la base
+    CreateThread(daily)
 end

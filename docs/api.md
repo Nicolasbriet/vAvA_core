@@ -937,7 +937,7 @@ navigateur ; chaque case est une vraie connexion WebRTC locale filmant une scèn
 
 ### `vava_magic`
 
-La magie (2.4.0) : fiche magie par personnage (champ privé `vava_magic:sheet` : mage ou non, sorts et leur XP, sort
+La magie (2.6.0) : fiche magie par personnage (champ privé `vava_magic:sheet` : mage ou non, sorts et leur XP, sort
 prêt dans les mains, combinaisons découvertes, sigils gardés, sigil unique dans tout le royaume), mana (100, +3 toutes
 les 5 s, jamais sauvegardée) et sa barre, 5 niveaux par sort, incantation commune avec délai global (1 s), roue des
 sorts (Tab) et mode magie à la souris (clic droit viser, clic gauche lancer, clic molette verrouiller), états
@@ -961,15 +961,21 @@ par l'interface ou remplacés par des fichiers `.ogg` et des sons natifs (`confi
   évènements ciblés aux seuls joueurs proches (`vava_magic:projectile`, `projectileEnd`, `zone`, `zoneEnd`, `burst`) ;
   `vava_magic:combo` (nom) au seul lanceur d'une combinaison réussie.
 - **Murmure** : fragments envoyés aux seuls joueurs à moins de 3 m ; registre des murmures en base sous le numéro porté
-  par l'objet (métadonnée `registre`), l'historique suit l'objet.
+  par l'objet (métadonnée `registre`), l'historique suit l'objet. Sigils : après un refus, le donneur attend
+  `sigils.refusedMs` (60 s) avant de retendre son sigil au même joueur (`vava_magic:sigilOffer` répond alors
+  `false, 'offer_refused', secondes`). Boue : Ralenti reposé au plus toutes les 2 s
+  (`combos.boue.result.slow.refreshMs`), chaque pose couvrant l'intervalle ; 1 à 3 s encore à la sortie.
 - **Projectiles** (Boule de feu, Trait de glace, Projectile de roche, même noyau) : impact signalé par le client du
   lanceur (RPC `vava_magic:projectileImpact`), validé par le serveur (portée, axe, délai, cible réelle, zones protégées,
   rempart sur le trajet) avant les dégâts (en points de vie sur `combat.healthPoints`), appliqués par
-  `vava_health:damage` ; bonus d'XP au toucher si le lancer a rapporté ; journal `vava_magic_damage_log`.
+  `vava_health:damage` ; bonus d'XP au toucher si le lancer a rapporté ; journal `vava_magic_damage_log`, purgé des
+  lignes de plus de `combat.log.retentionDays` jours (30) au démarrage puis chaque jour.
 - **Rempart** : blocs de pierre créés par le serveur (objets réseau figés), jamais sur un joueur ni un véhicule,
   retirés à leur fin, à l'arrêt du module et par `/magie nettoyer`.
 - **Verrouillage** (sorts `lockOn`) : clic molette côté client (lu par `Bridge.GetLockedTarget`) ; la cible part avec le début de l'incantation, revérifiée
-  par le serveur, qui prévient la seule cible (évènement `vava_magic:targeted`) et calcule lui-même la direction ;
+  par le serveur, qui prévient la seule cible (évènement `vava_magic:targeted`, une fois l'incantation acceptée — mana,
+  recharges, contrôles —, au plus une fois toutes les 3 s par lanceur et par cible, `targeting.warnIntervalMs`) et
+  calcule lui-même la direction ;
   virage vers la cible aux niveaux 4 et 5 (`homing`, pris en compte dans le contrôle d'axe de l'impact).
 
 | Export serveur | Retour |
