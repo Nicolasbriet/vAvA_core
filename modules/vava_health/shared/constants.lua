@@ -37,6 +37,8 @@ VavaHealth.HOOKS = {
 -- Hooks d'autres modules écoutés (tous facultatifs).
 VavaHealth.INVENTORY_HOOKS = { 'vava_inventory:move', 'vava_inventory:split', 'vava_inventory:merge', 'vava_inventory:drop', 'vava_inventory:use' }
 VavaHealth.INVENTORY_USE = 'vava_inventory:use'
+-- prendre en main ou reposer (inventaire 1.4.0) : payload.owner nil pour un geste du joueur
+VavaHealth.INVENTORY_HOLD = 'vava_inventory:hold'
 VavaHealth.NEEDS_DECAY = 'vava_needs:decay'
 -- Effet d'objet lu par le module (`effects = { health = 20 }` : +20 % de la vie).
 VavaHealth.EFFECT = 'health'

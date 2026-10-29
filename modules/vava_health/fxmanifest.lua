@@ -13,7 +13,7 @@ use_experimental_fxv2_oal 'yes'
 
 name 'vava_health'
 description 'Santé, mise à terre et réanimation vAvA'
-version '1.1.0'
+version '1.1.1'
 
 dependency 'vAvA_core'
 

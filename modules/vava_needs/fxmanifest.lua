@@ -12,7 +12,7 @@ use_experimental_fxv2_oal 'yes'
 
 name 'vava_needs'
 description 'Faim et soif vAvA'
-version '1.1.0'
+version '1.1.1'
 
 dependency 'vAvA_core'
 

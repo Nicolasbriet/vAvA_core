@@ -56,6 +56,14 @@ function decay.track(src, characterId)
     tracked[src] = { characterId = characterId, lastAt = GetGameTimer(), samples = 0, running = 0, busyUntil = 0, modifiers = {} }
 end
 
+--- Personnage chargé. Un abonné précédent a pu céder la main (lecture en base) : un joueur parti entre-temps a déjà
+--- été déchargé, son suivi ne doit pas renaître (entrée orpheline : baisse en double au retour du personnage).
+---@param payload table  { source, characterId }
+local function onLoaded(payload)
+    local character = VavaNeeds.core.characters.getActive(payload.source)
+    if character and character.id == payload.characterId then decay.track(payload.source, payload.characterId) end
+end
+
 ---@param src integer
 function decay.untrack(src)
     tracked[src] = nil
@@ -194,7 +202,7 @@ end
 ---@return string|nil err
 function decay.start()
     local hooks = VavaNeeds.core.hooks
-    local id, err = hooks.after('core:character:loaded', function(payload) decay.track(payload.source, payload.characterId) end)
+    local id, err = hooks.after('core:character:loaded', onLoaded)
     if not id then return false, err end
     id, err = hooks.after('core:character:unloading', function(payload) decay.untrack(payload.source) end)
     if not id then return false, err end

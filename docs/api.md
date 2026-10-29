@@ -659,8 +659,8 @@ touches et messages : `config.lua`. Demande le core 0.4.0 (hook `core:character:
   si l'on n'est pas blessé) ou en se faisant relever.
 - **Mise à terre** : décidée par le serveur, qui lit la vie de chaque joueur apparu toutes les 500 ms (le client n'a
   rien à déclarer) ; cause et auteur lus côté serveur. Le joueur reste au sol, l'écran « wasted » de GTA est remplacé
-  par l'écran « Vous êtes à terre ». À terre : aucun geste sur les objets, faim et soif figées ; un client qui se
-  relève seul est remis à terre.
+  par l'écran « Vous êtes à terre ». À terre : aucun geste sur les objets (prendre en main compris ; un module peut
+  encore faire reposer l'objet tenu), faim et soif figées ; un client qui se relève seul est remis à terre.
 - **Relever** (touche G par défaut) : le serveur choisit la personne à terre la plus proche (2 m, positions lues côté
   serveur, rien n'est diffusé) ; geste de 8 s, distance revérifiée à la fin ; relevé avec 25 %. La personne à terre
   lit « Quelqu'un vous relève » : son nom n'est pas révélé.

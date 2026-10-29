@@ -287,6 +287,15 @@ function life.track(src, characterId)
     }
 end
 
+--- Personnage chargé. Un abonné précédent a pu céder la main (lecture en base) : un joueur parti entre-temps a déjà
+--- été déchargé, son suivi ne doit pas renaître (entrée orpheline jamais retirée).
+---@param src integer
+---@param characterId integer
+local function onLoaded(src, characterId)
+    local character = VavaHealth.core.characters.getActive(src)
+    if character and character.id == characterId then life.track(src, characterId) end
+end
+
 ---@param src integer
 local function onSpawned(src)
     local entry = entries[src]
@@ -324,7 +333,7 @@ end
 function life.start()
     local hooks = VavaHealth.core.hooks
     for name, handler in pairs({
-        ['core:character:loaded'] = function(payload) life.track(payload.source, payload.characterId) end,
+        ['core:character:loaded'] = function(payload) onLoaded(payload.source, payload.characterId) end,
         ['core:character:spawned'] = function(payload) onSpawned(payload.source) end,
         ['core:character:unloading'] = function(payload) onUnloading(payload.source) end,
     }) do
