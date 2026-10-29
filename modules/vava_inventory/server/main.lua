@@ -37,7 +37,10 @@ local limits = cfg.rateLimits
 
 local RPCS = {
     { RPC.OPEN, { CONTAINER }, limits.open, operations.open },
-    { RPC.HOLD, { SLOT_CONTENT }, limits.action, function(src, id) return operations.hold(src, id) end },
+    { RPC.HOLD, { SLOT_CONTENT }, limits.action, function(src, id)
+        local ok, code = operations.hold(src, id)
+        return ok, code
+    end },
     { RPC.CLOSE, {}, limits.action, function(src) operations.close(src) return true end },
     { RPC.MOVE, { INSTANCE, CONTAINER, COORD, COORD, ROTATED }, limits.action, operations.move },
     { RPC.SPLIT, { INSTANCE, QUANTITY, CONTAINER, COORD, COORD, ROTATED }, limits.action, operations.split },
@@ -57,6 +60,9 @@ local function setup()
     if not declared then return false, 'commandes : ' .. tostring(declareErr) end
     local ok, err = VavaInventory.items.define()
     if not ok then return false, err end
+    -- avant le chargement des besaces : une pile gardée à part faute de définition revient dès que son objet est déclaré
+    ok, err = operations.start()
+    if not ok then return false, 'retour des piles gardées à part : ' .. tostring(err) end
 
     local empty = {}
     for i = 1, cfg.hotbarSize do empty[i] = 0 end

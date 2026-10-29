@@ -2,7 +2,8 @@
     vava_farming/server/granary.lua
     Rôle : greniers communs : un conteneur conservé de l'inventaire par parcelle qui en déclare un (créé au premier
            démarrage, retrouvé ensuite), ouvert au joueur qui a accès à la parcelle (communale : tous ; privée : son
-           propriétaire), à portée du grenier, avec un ancrage (la distance est alors tenue par l'inventaire), dépôts et
+           propriétaire), pas à terre, à portée du grenier, avec un ancrage (la distance est alors tenue par
+           l'inventaire), dépôts et
            retraits d'après les hooks de l'inventaire (déplacer, diviser, fusionner, jeter) qui passent par le
            conteneur : hook `vava_farming:granary` (after) à chaque geste, journal regroupé par minute (journal.lua).
     Dépendances : shared/, config.lua, server/core.lua, bridge/server.lua, server/journal.lua, server/catalog.lua,
@@ -81,6 +82,7 @@ end
 function granary.open(src, parcel)
     local characterId = bridge.GetCharacterId(src)
     if not characterId then return false, 'no_character' end
+    if bridge.IsDowned(src) then return false, 'downed' end
     local spec = parcel.granary
     local id = containers[parcel.id]
     if not spec or not id then return false, 'no_granary' end

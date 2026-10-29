@@ -58,7 +58,15 @@ const STRINGS = Object.freeze({
     firstName: 'Prénom',
     lastName: 'Nom',
     sex: 'Sexe',
-    nameHint: '2 à 24 lettres. Espace, apostrophe et trait d\'union autorisés entre deux lettres.',
+    // règle rappelée sous le champ, d'après les règles du serveur : « 2 à 24 lettres. Espace, apostrophe et trait
+    // d'union autorisés entre deux lettres. »
+    nameHint: (min, max, separators) => {
+      const length = `${min} à ${max} lettres.`;
+      if (separators.length === 0) return length;
+      const list = separators.length === 1 ? separators[0] : `${separators.slice(0, -1).join(', ')} et ${separators[separators.length - 1]}`;
+      return `${length} ${list.charAt(0).toUpperCase()}${list.slice(1)} ${separators.length > 1 ? 'autorisés' : 'autorisé'} entre deux lettres.`;
+    },
+    separatorNames: { ' ': 'espace', '\'': 'apostrophe', '-': 'trait d\'union' },
     nameInvalid: 'Ce nom n\'est pas valide.',
   },
   heritage: {

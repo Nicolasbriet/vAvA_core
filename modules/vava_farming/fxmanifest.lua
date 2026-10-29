@@ -10,7 +10,7 @@
            joue les gestes.
     Dépendances : vAvA_core ≥ 0.6.0, vava_inventory ≥ 1.4.0, vava_skills ≥ 1.0.0, vava_gathering ≥ 1.0.0 (faucille),
                   vava_crafting ≥ 1.1.0 (composteur) ; facultatifs : vava_hud, vava_admin (droit metiers), vava_chat,
-                  vava_time (saisons)
+                  vava_health (aucun geste à terre), vava_time (saisons)
 ]]
 
 fx_version 'cerulean'

@@ -128,10 +128,11 @@ define('open', 'view', {}, limits.read, GAME, function(actor)
 end)
 define('session', 'view', {}, limits.read, WEB, function(actor) return true, sessionOf(actor) end)
 define('players', 'view', {}, limits.read, BOTH, function() return true, players.list() end)
-define('player', 'view', { TARGET }, limits.read, BOTH, function(_, targetId)
+define('player', 'view', { TARGET }, limits.read, BOTH, function(actor, targetId)
     local target, code = players.resolve(targetId)
     if not target then return false, code end
-    return true, players.details(target)
+    -- identifiants : panneau web seulement (il les affiche) ; jamais vers le jeu d'un membre
+    return true, players.details(target, actor.web == true)
 end)
 define('reports', 'reports', {}, limits.read, BOTH, function() return true, reports.list() end)
 define('reportClaim', 'reports', { REPORT_ID }, limits.action, BOTH, function(actor, id)

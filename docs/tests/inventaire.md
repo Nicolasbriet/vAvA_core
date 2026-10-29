@@ -1,6 +1,6 @@
 # Inventaire — procédure de test en jeu
 
-Procédure pour vérifier en jeu `vava_inventory` 1.6.1 : besace, grille, poids, piles, ceinture, objets utilisés, sacs
+Procédure pour vérifier en jeu `vava_inventory` 1.6.3 : besace, grille, poids, piles, ceinture, objets utilisés, sacs
 au sol, conteneur ancré (grenier), catalogue de développement, et ce qui se joue à deux. Comptez une heure et demie
 seul, une demi-heure de plus à deux ; les tests à deux joueurs sont marqués **(2 joueurs)**. L'emplacement **Mains**
 et l'affichage des métadonnées (palier, provenance, signature, solidité) sont déjà dans [metiers.md](metiers.md),
@@ -9,7 +9,7 @@ section 1.1 : ne pas les refaire ici. Préparation commune, consoles, resmon et 
 
 ## 0. Préparation
 
-1. **Démarrage** : la console du serveur affiche `module 'vava_inventory' v1.6.1 prêt`, précédé de l'avertissement
+1. **Démarrage** : la console du serveur affiche `module 'vava_inventory' v1.6.3 prêt`, précédé de l'avertissement
    `catalogue de développement activé (/catalogue) : …` (attendu sur ce dépôt).
 2. **Les deux joueurs** : A, vous, Souverain ; B, le second, sans droit. Seul A agit depuis le Registre (`F10`).
 3. **Objets** : tout se prend au catalogue (`/catalogue`, double-clic), section par section. Ce qu'on dépose dans le
@@ -20,8 +20,8 @@ section 1.1 : ne pas les refaire ici. Préparation commune, consoles, resmon et 
    Registre → Déplacer vers un lieu.
 5. **Réglages pour aller vite** (`vava_inventory/config.lua`, à remettre ensuite) : `drop.lifetimeMs = 60000`
    (défaut `600000`, 10 min) pour 8-8 ; `drop.maxPerPlayer = 2` (défaut `10`) pour 8-9. Les appliquer par
-   `restart vava_inventory` **sans personnage en jeu**, ou se reconnecter juste après (voir 14-2). Ne pas toucher
-   `character` (taille et poids de la besace) : ils sont réécrits en base à chaque besace chargée.
+   `restart vava_inventory`, personnages en jeu ou non (les besaces se rechargent complètes : voir 14-2). Ne pas
+   toucher `character` (taille et poids de la besace) : ils sont réécrits en base à chaque besace chargée.
 6. **Base** : le numéro de votre besace sert au § 16 :
    `SELECT id FROM vava_inventory_containers WHERE kind = 'character' AND owner_id = '<n° du personnage>'`.
 
@@ -34,7 +34,7 @@ section 1.1 : ne pas les refaire ici. Préparation commune, consoles, resmon et 
 | 3 | Clic droit sur un objet, puis `Échap` deux fois. | Le premier ferme le menu seul, le second l'inventaire. |
 | 4 | `I` pendant la sélection de personnage, puis menu pause ouvert. | Rien ne s'ouvre. |
 | 5 | Inventaire ouvert, essayer de marcher. | Le personnage ne bouge pas : l'interface prend le clavier (à confirmer). D'où les éloignements faits par un tiers au § 11. |
-| 6 | Paramètres → Raccourcis → FiveM : « Ouvrir l'inventaire » sur `Tab`. `Tab`, puis `Tab` dans l'interface, puis `I`. | `Tab` ouvre ; dans l'interface, `Tab` ne ferme pas et `I` ferme (écart relevé : la touche de fermeture vient de la config, pas du réglage du joueur). Remettre `I`. |
+| 6 | Paramètres → Raccourcis → FiveM : « Ouvrir l'inventaire » sur `Tab`. `Tab` ; dans l'interface, `I`, puis `Tab`. Recommencer avec `K`, puis `F5`. | `Tab` ouvre ; dans l'interface, `I` ne fait rien et `Tab` ferme : la touche de fermeture suit celle choisie pour ouvrir, relue à chaque ouverture. Même chose avec `K` et `F5`. À confirmer pour `Tab` et `F5`, que le jeu désigne par un code d'icône traduit par l'inventaire : s'ils ne ferment pas, le noter (seul `Échap` ferme alors, jamais `I`). `Échap` ferme toujours. Remettre `I`. |
 
 ## 2. Grille et déplacement
 
@@ -122,7 +122,7 @@ Besace vide au départ.
 | 5 | Glisser la dernière pile du sac vers une case précise. | Posée là ; le sac vidé disparaît, prop et panneau. |
 | 6 | Jeter, fermer, s'écarter de 3 m, `I` ; puis revenir à 2 m, `I`. | À 3 m, la besace seule (2,5 m au plus, vérifiés par le serveur) ; à 2 m, le sac s'ouvre avec elle. |
 | 7 | À 2 m de ce sac, jeter. | Un second sac est posé (le premier est à plus de 1,5 m) ; les deux panneaux restent ouverts. |
-| 8 | Attendre 10 min après la pose d'un sac (1 min avec le réglage), son panneau ouvert. | Le sac disparaît avec son contenu ; son panneau se ferme. Le délai court depuis la pose, pas depuis le dernier dépôt. |
+| 8 | Attendre 10 min après la pose d'un sac (1 min avec le réglage), son panneau ouvert. | Le sac disparaît avec son contenu ; son panneau se ferme. Le délai court depuis la pose, pas depuis le dernier dépôt. Un objet lâché sur le sac à l'instant où il disparaît : « Cet objet n'est plus là. », l'objet reste dans la besace. |
 | 9 | Poser des sacs à plus de 1,5 m les uns des autres jusqu'au plafond (10, ou 2 avec le réglage), puis un de plus. | « Trop de sacs au sol. » ; l'objet reste dans la besace. Jeter à moins de 1,5 m d'un sac existant reste possible. |
 
 ## 9. Conteneur ancré : le grenier
@@ -162,21 +162,21 @@ A et B au grenier commun, chacun `E`.
 | 1 | **(2 joueurs)** A dépose une pile de charbon au grenier. | Elle apparaît aussitôt chez B ; le poids du grenier change chez les deux. |
 | 2 | **(2 joueurs)** B reprend cette pile. | Elle disparaît du grenier chez A. |
 | 3 | **(2 joueurs)** A et B déplacent chacun un objet différent du grenier au même moment. | Les deux gestes passent. |
-| 4 | **(2 joueurs)** Au même signal, A et B lâchent chacun un objet de leur besace sur les mêmes cases libres du grenier. | Un seul passe ; l'autre lit « Pas assez de place. » et son objet revient dans sa besace. |
-| 5 | **(2 joueurs)** Au même signal, A et B tirent la même pile du grenier dans leur besace. | Une seule besace la reçoit ; l'autre lit « Hors de portée. » (la pile est dans une besace qu'il ne regarde pas), ou « Cet objet n'est plus là. » si le gagnant l'a fondue dans une pile, et son aperçu revient en arrière. |
-| 6 | **(2 joueurs)** A déplace une pile dans le grenier pendant que B la tire dans sa besace. | Selon l'ordre d'arrivée au serveur : B la reçoit et A la voit partir, ou A lit « Hors de portée. ». Jamais deux exemplaires. |
-| 7 | **(2 joueurs)** B, grenier ouvert. A, à plus de 10 m : Registre → Joueurs → B → Amener. | Chez B, le panneau du grenier se ferme en 2 s au plus (rayon 3,5 m : 2 m d'interaction et 1,5 m de tolérance) ; la besace reste ouverte. Un geste sur le grenier avant la fermeture : « Hors de portée. ». Revenu, `E` le rouvre. |
+| 4 | **(2 joueurs)** Au même signal, A et B lâchent chacun un objet de leur besace sur les mêmes cases libres du grenier. | Un seul passe ; l'autre lit « Pas assez de place. » et son objet revient dans sa besace, tandis que l'objet du gagnant reste affiché chez lui, dans le grenier, sur les cases disputées. |
+| 5 | **(2 joueurs)** Au même signal, A et B tirent la même pile du grenier dans leur besace. | Une seule besace la reçoit ; l'autre lit « Cet objet n'est plus là. » (la pile est dans une besace qu'il ne regarde pas, ou fondue dans une pile), son aperçu revient en arrière et la pile ne réapparaît pas dans le grenier chez lui. |
+| 6 | **(2 joueurs)** A déplace une pile dans le grenier pendant que B la tire dans sa besace. | Selon l'ordre d'arrivée au serveur : B la reçoit et A la voit partir, ou A lit « Cet objet n'est plus là. » et ne la voit plus dans le grenier. Jamais deux exemplaires. |
+| 7 | **(2 joueurs)** B, grenier ouvert. A, à plus de 10 m : Registre → Joueurs → B → Amener. | Chez B, le panneau du grenier se ferme en 2 s au plus (rayon 3,5 m : 2 m d'interaction et 1,5 m de tolérance) ; la besace reste ouverte. Un geste sur le grenier avant la fermeture : « Hors de portée. » ; un objet lâché sur le grenier à l'instant où il se ferme (déjà fermé par le serveur) : « Cet objet n'est plus là. » et l'objet revient dans la besace. Revenu, `E` le rouvre. |
 | 8 | **(2 joueurs)** A jette une pile. | B voit le sac au sol ; `I` à moins de 2,5 m : le panneau du sac s'ouvre aussi chez lui. |
-| 9 | **(2 joueurs)** Au même signal, A et B double-cliquent la même pile du sac. | Un seul la reçoit ; l'autre lit « Hors de portée. ». Si le sac est vidé, il disparaît chez les deux, prop et panneau. |
+| 9 | **(2 joueurs)** Au même signal, A et B double-cliquent la même pile du sac. | Un seul la reçoit ; l'autre lit « Cet objet n'est plus là. » et ne la voit ni dans sa besace ni dans le sac. Si le sac est vidé, il disparaît chez les deux, prop et panneau. |
 | 10 | **(2 joueurs)** B, sac ouvert. A : Registre → B → Amener. | Chez B, le panneau du sac reste affiché (un sac ne se ferme pas à distance), mais tout geste sur lui : « Hors de portée. ». |
 | 11 | **(2 joueurs)** B, besace ouverte, hache en main. A : Registre → Joueurs → B → Fouiller (fermer le Registre s'il reste devant). | Chez A, un second panneau « Besace », celle de B, quelle que soit la distance. A prend une pile : elle disparaît chez B en direct. A prend la hache : la main de B se vide. |
 | 12 | **(2 joueurs)** B : `/catalogue`. | Notification « Le catalogue est réservé au Conseil. » ; le catalogue de A n'apparaît que chez A. |
 | 13 | **(2 joueurs)** Après chacun de ces tests, chacun ferme et rouvre. | Même affichage qu'avant la réouverture, chaque objet en un seul exemplaire (et en base, § 16). |
 
-**Écart possible, lu dans le code** (tests 4 à 6 et 9) : quand le serveur refuse un geste, l'interface du perdant remet
-l'état d'avant son geste, y compris un objet que l'autre vient de prendre ou de poser. Un objet peut alors rester
-affiché à tort, ou manquer, jusqu'à la réouverture ; le toucher donne « Hors de portée. » ou « Pas assez de place. ».
-Si cela arrive, le noter avec le numéro du test.
+**À regarder dans les tests 4 à 6 et 9** (1.6.3) : quand le serveur refuse un geste, l'interface du perdant ne remet
+en arrière que son propre geste ; ce que l'autre vient de prendre ou de poser reste affiché tel que le serveur l'a
+envoyé pendant l'attente. Après chaque refus, le perdant ferme et rouvre : l'affichage ne doit pas changer. Un objet
+affiché à tort ou manquant jusqu'à la réouverture est un écart : le noter avec le numéro du test.
 
 ## 12. Tentatives de triche
 
@@ -187,7 +187,7 @@ Si cela arrive, le noter avec le numéro du test.
 | 3 | Même chose avec `1`, carotte en raccourci, inventaire fermé. | Une seule mangée, notifications « Vous n'avez pas encore fini. » ; au-delà de la rafale, plus rien, et `limite dépassée sur vava_inventory:hotbarUse` en console. |
 | 4 | Glisser sur Mains une pierre, puis une hache prise dans un sac ou au catalogue. | L'emplacement marque le refus ; rien ne se passe. |
 | 5 | Se faire mettre à terre (chute d'un toit, ou coups de B), puis `I`. | La besace s'ouvre ; tout geste (déplacer, diviser, fusionner, jeter, utiliser, prendre en main, prendre au catalogue) : « Vous êtes à terre. ». Registre → vous → Soigner pour se relever. |
-| 6 | À terre, inventaire fermé : `1` avec une carotte en raccourci, puis avec la hache. | Carotte : notification « Vous êtes à terre. ». Hache : rien, sans message (écart relevé : le refus d'une prise en main par raccourci n'est pas notifié). |
+| 6 | À terre, inventaire fermé : `1` avec une carotte en raccourci, puis avec la hache (en main, puis reposée avant la chute). | Carotte : notification « Vous êtes à terre. ». Hache : la même notification, qu'il s'agisse de la prendre ou de la reposer ; la main ne change pas. |
 | 7 | Ouvrir la besace à 3 m d'un sac, puis prendre dans un sac après en avoir été éloigné (11-10). | Le sac ne s'ouvre pas ; « Hors de portée. ». |
 
 ## 13. Déconnexion
@@ -205,11 +205,13 @@ Si cela arrive, le noter avec le numéro du test.
 
 | # | Faire | Attendu |
 |---|---|---|
-| 1 | Besace ouverte, hache en main, carotte sur la ceinture, un sac posé à côté, catalogue ouvert ; B au grenier. Console : `restart vava_inventory`. | Les interfaces d'inventaire disparaissent chez A et B, la main est rendue au jeu (à confirmer) ; l'accessoire en main disparaît ; le sac disparaît avec son contenu (voulu : les sacs ne sont pas conservés). Console : `registre 'vava_inventory:items' supprimé avec son propriétaire 'vava_inventory' : n entrée(s) d'autres modules perdue(s)`, `module 'vava_inventory' arrêté : vava_crafting, vava_farming, vava_gathering, vava_skills en dépend(ent)…`, puis `module 'vava_inventory' v1.6.1 prêt` et l'avertissement du catalogue. `vava_skills`, `vava_gathering`, `vava_crafting`, `vava_farming` tournent toujours (à confirmer : FXServer peut arrêter ce qui déclare `dependency 'vava_inventory'` ; sinon `ensure`). `n objet(s) d'inventaire non écrits à l'arrêt` signale une écriture perdue : à noter. |
-| 2 | `I`. | Attendu : la besace avec tout son contenu, la ceinture garnie. **Écart probable, lu dans le code** : besace et ceinture vides, et en console `conteneur #n : objet #m (…) sans place ou sans définition, conservé à part` pour chaque pile. Les besaces des personnages en jeu sont rechargées pendant le démarrage du module, avant que les métiers et la magie redéclarent leurs objets. Dans ce cas, **ne rien ranger** dans la besace vide (les piles qui reviendront chercheraient une autre place, et resteraient invisibles faute d'en trouver) et passer au 3. |
-| 3 | Se reconnecter. | Tout revient à sa place : les lignes de `vava_inventory_items` n'ont pas bougé. Si l'écart du 2 a eu lieu, la hache n'est plus en main (main vidée faute d'avoir retrouvé la pile) : la reprendre. |
+| 1 | Besace ouverte, hache en main, carotte sur la ceinture, un sac posé à côté, catalogue ouvert ; B au grenier. Console : `restart vava_inventory`. | Les interfaces d'inventaire disparaissent chez A et B, la main est rendue au jeu (à confirmer) ; l'accessoire en main disparaît ; le sac disparaît avec son contenu (voulu : les sacs ne sont pas conservés). Console : `registre 'vava_inventory:items' supprimé avec son propriétaire 'vava_inventory' : n entrée(s) d'autres modules perdue(s)`, `module 'vava_inventory' arrêté : vava_crafting, vava_farming, vava_gathering, vava_skills en dépend(ent)…`, puis `module 'vava_inventory' v1.6.3 prêt` et l'avertissement du catalogue. `vava_skills`, `vava_gathering`, `vava_crafting`, `vava_farming` tournent toujours (à confirmer : FXServer peut arrêter ce qui déclare `dependency 'vava_inventory'` ; sinon `ensure`). `n objet(s) d'inventaire non écrits à l'arrêt` signale une écriture perdue : à noter. |
+| 2 | `I`. | La besace avec tout son contenu, chaque pile à sa place d'avant le redémarrage, la ceinture garnie ; la hache toujours en main (emplacement Mains), son accessoire de nouveau visible chez A et chez B. Console : pendant le démarrage, `conteneur #n : objet #m (…) sans place ou sans définition, conservé à part` pour chaque pile d'un objet des métiers ou de la magie (leurs besaces sont rechargées avant que ces modules redéclarent leurs objets), puis, dès leur redéclaration, `conteneur #n : k pile(s) de '…' replacée(s)` pour chaque objet. Une ligne `… toujours sans place` ou une pile manquante est un écart à noter. |
+| 3 | Fermer, attendre 3 s ; en base, `SELECT id, item, x, y, rotated, quantity FROM vava_inventory_items WHERE container_id = <n° de la besace>` (relevé aussi avant le 1). Puis se reconnecter. | Mêmes lignes qu'avant le redémarrage (une pile replacée ailleurs que sa place d'origine a ses nouvelles `x`, `y`) ; l'écran correspond. Après reconnexion, tout est au même endroit, hache en main. |
 | 4 | `/catalogue` ; B : `E` au grenier. | Le catalogue fonctionne ; le grenier se rouvre avec son contenu, relu en base. |
-| 5 | `restart vava_inventory` avec tous les joueurs à la sélection de personnage, puis choisir son personnage. | Besace complète : elle se charge à la sélection, quand les objets sont déjà déclarés. C'est la façon sûre d'appliquer un réglage. |
+| 5 | `restart vava_inventory` avec tous les joueurs à la sélection de personnage, puis choisir son personnage. | Besace complète : elle se charge à la sélection, quand les objets sont déjà déclarés. |
+| 6 | **(2 joueurs)** A et B en jeu, chacun avec des objets des métiers (bûches à palier, charbon, hache en main pour A, pioche sur la ceinture de B) ; relever leurs besaces en base (3). Console : `restart vava_inventory` ; dès `module 'vava_inventory' v1.6.3 prêt`, A et B ouvrent leur besace (`I`). | Chez chacun, tout revient sans reconnexion, en un seul exemplaire ; aucun objet perdu ni recouvert (deux piles jamais sur les mêmes cases) ; la hache en main de A, la pioche sur la ceinture de B. En base : mêmes piles qu'avant, aux mêmes quantités. |
+| 7 | Une miche et une bande de lin (`vava_example_items`) dans la besace ; `restart vava_inventory` ; `I` ; puis console : `restart vava_example_items` ; `I`. | Après le premier redémarrage, la miche et la bande manquent (gardées à part, rien d'effacé en base) : ce module d'exemple ne redéclare ses objets qu'à son propre démarrage. Après le second, elles reviennent à leur place, sans reconnexion. |
 
 ## 15. Resmon
 
@@ -262,3 +264,11 @@ toutes les 3 s, le contrôle d'éloignement des conteneurs ancrés toutes les 2 
 - Ce que fait FXServer des ressources qui déclarent `dependency 'vava_inventory'` quand on le redémarre (14-1).
 - Le Registre et l'inventaire ouverts ensemble à la fouille (11-11) : lequel garde le clavier.
 - Les limites de débit atteintes à la main (12-1 à 12-3).
+- Le nom que le jeu donne à une touche choisie par le joueur (1-6) : le texte des touches ordinaires (« I », « K »)
+  est sûr, les codes d'icône de `Tab`, `Entrée`, `Espace` et des touches `F1` à `F12` (`client/main.lua`, `ICON_KEYS`)
+  sont à confirmer.
+- Le retour des piles après `restart vava_inventory` est vérifié hors jeu sur un faux core (harnais) : l'ordre réel des
+  redéclarations (récolte, artisanat, agriculture, magie) et l'accessoire revenu en main restent à voir (14-2, 14-6).
+- Un client modifié qui vise le conteneur d'un autre (déplacer ou diviser vers un numéro de besace, de coffre ou de sac
+  qu'il n'a pas ouvert) reçoit « Cet objet n'est plus là. », que ce conteneur existe ou non (vérifié hors jeu) ;
+  « Hors de portée. » ne répond qu'à un conteneur ouvert dont on s'est éloigné.

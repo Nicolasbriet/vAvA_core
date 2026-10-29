@@ -26,6 +26,9 @@ VavaAdmin.HOOKS = {
 -- Coordonnées acceptées pour un déplacement (mètres, au-delà de la carte de GTA).
 VavaAdmin.MAX_COORD = 20000
 
+-- Champ privé du personnage d'un membre qui observe : sa place d'avant l'observation (server/spectate.lua).
+VavaAdmin.SPECTATE_FIELD = 'vava_admin:spectateReturn'
+
 -- Registre du core des outils ajoutés par les modules : clé `<ressource>:<nom>`, { label, hint?, permission }.
 VavaAdmin.REGISTRY_TOOLS = 'vava_admin:tools'
 VavaAdmin.TOOL_LIMITS = { label = 40, hint = 160, entries = 32, key = 64 }

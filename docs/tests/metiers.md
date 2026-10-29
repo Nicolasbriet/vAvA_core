@@ -103,6 +103,7 @@ la fin, sang à l'interruption. Hors jeu : `modules/vava_hud/web/index.html?prog
 | 7 | `/recolte vitalite foret_brume 20`. | Props remplacés par des souches (bande épuisée), rendement effondré, échecs fréquents (« la terre est fatiguée »). |
 | 8 | `/recolte vitalite foret_brume 0`. | « cicatrice » ; `vava_gathering_log` : `scarred` ; `/recolte zone foret_brume` montre la cicatrice ; `/recolte vitalite foret_brume 100` lève tout. |
 | 9 | `/recolte recharger foret_brume_chene_1`. | Charges à plein. |
+| 10 | Hache en main près d'un chêne : `/aterre` (outil `vava_dev_characters`), puis `E` ; relevé, lancer une récolte et `/aterre` pendant la barre. | À terre : l'invite disparaît, `E` ne fait que rendre l'âme (aucune récolte, aucun message de la récolte). Tombé pendant le geste : rien de pris, charge intacte (« Vous êtes à terre. » à la fin de la barre, ou geste interrompu si le corps a glissé en tombant). |
 
 ### 3.3 Pêche
 
@@ -125,11 +126,12 @@ la fin, sang à l'interruption. Hors jeu : `modules/vava_hud/web/index.html?prog
 | 5 | Établi : « Marteau de forge ». | Objet **signé** : fiche avec créateur, date, histoire « Création » ; Grossier à bas niveau. |
 | 6 | Forge : « Hache de bûcheron » sans marteau en main. | « Il vous faut un marteau de forge en main ». Marteau en main → hache signée. |
 | 7 | Onglet Poinçon sous Compagnon. | Verrouillé. `/metiers niveau <vous> forge 40` → choisir un glyphe → il apparaît sur la pièce suivante. |
-| 8 | Chef-d'œuvre : `/metiers niveau <vous> minage 100` et `forge 100`, minerai pris dans une zone à pleine vitalité avec une pioche neuve (palier Excellent ou mieux), lingots, puis Épée courte. | Qualité ≥ 85 → notification « Un chef-d'œuvre ! » et boîte de baptême ; le nom choisi apparaît sur la fiche. « Plus tard » : la station repropose le baptême tant que 5 min ne sont pas passées, plus après. À l'inverse, des matières de palier 5 à bas niveau donnent une qualité plafonnée au niveau. |
+| 8 | Chef-d'œuvre : `/metiers niveau <vous> minage 100`, `bucheronnage 100` et `forge 100` ; minerai et chêne pris dans des zones à pleine vitalité avec des outils neufs ; garder les piles **Chef-d'œuvre** (palier 5), en faire des lingots Chef-d'œuvre, puis l'Épée courte en choisissant le palier 5 pour chaque ingrédient (l'aperçu du menu l'annonce). | Toutes les matières au palier 5 : qualité de 86 à 96 → notification « Un chef-d'œuvre ! » et boîte de baptême ; le nom choisi apparaît sur la fiche. Avec des lingots tirés d'un minerai Excellent, ce n'est pas garanti (environ 40 % avec du chêne Chef-d'œuvre, jamais avec du chêne Grossier) : normal, la formule le veut. « Plus tard » : la station repropose le baptême tant que 5 min ne sont pas passées, plus après. À l'inverse, des matières de palier 5 à bas niveau donnent une qualité plafonnée au niveau. |
 | 9 | Hache brisée (la solidité baisse de 2 par coupe : 50 coupes, ou `wear = 50` sur `hache_fer` dans `vava_gathering/config.lua` le temps du test) → onglet Réparation à la forge. | Coût 25 % des ingrédients arrondi au-dessus (1 lingot, 1 bûche), bouton ; après le geste : 95 / 95, plus brisée, histoire « Réparation par … », créateur intact. Une hache réparée deux fois : 90 / 90. |
 | 10 | **(2 joueurs)** L'autre lance une pièce à la même forge. | « Quelqu'un travaille déjà ici ». |
 | 11 | Station avec `owner = { kind = 'character', id = <autre> }` dans la config. | « ne vous appartient pas ». |
 | 12 | `/artisanat station forge_bourg`, `/artisanat carburant forge_bourg 20`. | État et recettes dans le chat ; combustible fixé. |
+| 13 | Près du fourneau : `/aterre`, puis `E` ; relevé, lancer une pièce et `/aterre` pendant la barre. | À terre : ni invite ni menu, `E` ne fait que rendre l'âme. Tombé pendant la pièce : rien de consommé, station libérée (« Vous êtes à terre. » à la fin de la barre, ou geste interrompu si le corps a glissé) ; un autre joueur peut s'en servir aussitôt. |
 
 ## 5. Agriculture — `vava_farming`
 
@@ -146,6 +148,8 @@ la fin, sang à l'interruption. Hors jeu : `modules/vava_hud/web/index.html?prog
 | 9 | Jardin privé (propriétaire n° 1 dans la config). | Un autre personnage lit « ne vous appartient pas ». |
 | 10 | `/agriculture parcelle champ_communal`, `/agriculture arroser champ_communal`. | État des emplacements ; tout arrosé. |
 | 11 | `restart vava_farming`. | Emplacements retrouvés, croissance rattrapée d'après les dates. |
+| 12 | Près d'un emplacement, puis d'un puits, puis du grenier : `/aterre`, puis `E` ; relevé, lancer un semis et `/aterre` pendant la barre. | À terre : ni invite, ni menu, ni seau rempli, ni grenier ouvert ; `E` ne fait que rendre l'âme. Tombé pendant le semis : graine gardée, emplacement inchangé (« Vous êtes à terre. » à la fin de la barre, ou geste interrompu si le corps a glissé). |
+| 13 | Grenier ouvert (`E`), un objet en main de souris : se faire mettre à terre (`/aterre`), puis tenter un dépôt, un retrait, une division, un jet au sol. | Le grenier reste affiché (l'inventaire n'offre aucun moyen de le fermer pour un module), en consultation seulement : chaque geste est refusé, « Vous êtes à terre. » ; rien ne bouge, aucune ligne dans `vava_farming_granary_log`. Relevé, les gestes reprennent ; s'éloigner de plus de 4 m le ferme comme d'habitude. |
 
 ## 6. Ce qu'il faut regarder dans la base
 

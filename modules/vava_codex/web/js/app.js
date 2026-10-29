@@ -28,7 +28,7 @@
     // la commande vient d'être lancée : en tête des dernières pages, sans attendre le serveur
     const recent = Model.state.prefs.recent.filter((entry) => entry.name !== row.entry.name || (entry.action || '') !== (row.action ? row.action.id || '' : ''));
     recent.unshift({ name: row.entry.name, action: row.action ? row.action.id || undefined : undefined, at: Math.floor(Date.now() / 1000) });
-    Model.state.prefs.recent = recent.slice(0, 12);
+    Model.state.prefs.recent = recent.slice(0, Model.state.recentMax);
     if (result.closed) {
       app.hidden = true;
     } else {

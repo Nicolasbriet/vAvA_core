@@ -84,9 +84,24 @@ local function cast(info)
     lueur.anchor(point)
 end
 
+--- Couleur de la config ? Le serveur n'en accepte pas d'autre (liste fermée du schéma de la demande) : un nom inconnu
+--- reçoit ici le texte prévu, au lieu d'un refus de forme.
+---@param name string
+---@return boolean
+local function knownColor(name)
+    for _, color in ipairs(spellCfg.colors) do
+        if color.name == name then return true end
+    end
+    return false
+end
+
 --- Couleur de la lumière (niveau 5).
 ---@param name string
 function lueur.setColor(name)
+    if not knownColor(name) then
+        messages.refuse('unknown_color')
+        return
+    end
     CreateThread(function()
         local transport, success, code = core.rpc.call(RPC.LIGHT_COLOR, name)
         if not transport or not success then messages.refuse(transport and code or success) end

@@ -10,8 +10,8 @@ demande l'XP à `vava_skills`.
 
 Ordre de démarrage : après `vAvA_core` (≥ 0.6.0), `vava_inventory` (≥ 1.4.0), `vava_skills` (≥ 1.0.0),
 `vava_gathering` (≥ 1.0.0 : faucille) et `vava_crafting` (≥ 1.1.0 : composteur). Facultatifs : `vava_hud`,
-`vava_admin` (droit `metiers`), `vava_chat`, `vava_time` (saisons : vitesse de pousse et de dessèchement, lues par
-l'export `getSeason`).
+`vava_admin` (droit `metiers`), `vava_chat`, `vava_health` (aucun geste à terre), `vava_time` (saisons : vitesse de
+pousse et de dessèchement, lues par l'export `getSeason`).
 
 ## Règles (config.lua)
 
@@ -94,6 +94,9 @@ withdraw, source, characterId, item, quantity }`). Détail : `docs/api.md`.
 8. **Privé** : le jardin de la config appartient au personnage n° 1 ; un autre lit « ne vous appartient pas » (sur ses
    emplacements comme sur son grenier s'il en déclare un).
 9. **Redémarrage** : `restart vava_farming` → emplacements retrouvés, croissance rattrapée d'après les dates.
-10. **Saisons** (`vava_time`) : voir `docs/tests/temps.md` (section des métiers) — en hiver, une culture met quatre fois
+10. **À terre** (`vava_health`) : près d'un emplacement, d'un puits ou d'un grenier, se faire mettre à terre →
+    l'invite disparaît, `E` ne sert qu'à rendre l'âme. Tombé pendant un geste : rien n'est appliqué (« Vous êtes à
+    terre. »).
+11. **Saisons** (`vava_time`) : voir `docs/tests/temps.md` (section des métiers) — en hiver, une culture met quatre fois
     plus longtemps et la terre sèche deux fois moins vite ; l'été, elle sèche une fois et demie plus vite ;
     `stop vava_time` → plus aucun effet.

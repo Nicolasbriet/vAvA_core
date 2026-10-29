@@ -57,6 +57,8 @@ vAvA.config.server = {
         maxPerAccount = 3,
         uniqueNames = false,  -- true : un même prénom + nom ne peut exister qu'une fois (hors supprimés)
         sexes = { 'm', 'f' },
+        -- Règles des prénoms et noms. Exception à « jamais envoyé aux clients » : elles partent avec la liste des
+        -- personnages, pour que l'interface de création vérifie la saisie comme le serveur (qui revérifie tout).
         name = {
             minLength = 2,    -- en caractères, accents compris
             maxLength = 24,

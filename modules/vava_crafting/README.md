@@ -9,7 +9,7 @@ créateur figé, poinçon, baptême d'un chef-d'œuvre, histoire des réparation
 
 Ordre de démarrage : après `vAvA_core` (≥ 0.6.0), `vava_inventory` (≥ 1.4.0), `vava_skills` (≥ 1.0.0) et
 `vava_gathering` (≥ 1.0.0 : matières et outils de base). Facultatifs : `vava_hud`, `vava_admin` (droit `metiers`),
-`vava_chat`.
+`vava_chat`, `vava_health` (aucun artisanat à terre).
 
 ## Règles (config.lua)
 
@@ -104,3 +104,5 @@ Détail : `docs/api.md`.
    brisée, histoire « Réparation par … », créateur intact.
 9. **Occupation** : deux joueurs sur la même station → le second lit « Quelqu'un travaille déjà ici ».
 10. **Privée** : station avec `owner = { kind = 'character', id = n }` → les autres lisent « ne vous appartient pas ».
+11. **À terre** (`vava_health`) : près d'une station, se faire mettre à terre → l'invite disparaît, `E` ne sert qu'à
+    rendre l'âme. Tombé pendant une pièce : rien n'est consommé, la station est libérée (« Vous êtes à terre. »).

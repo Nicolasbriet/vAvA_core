@@ -2,8 +2,9 @@
     vava_magic/client/states.lua
     Rôle : états élémentaires du joueur local, d'après le serveur (qui décide de tout) :
       - icônes et minuteries dans la page, effets d'écran (bord rougi par la brûlure, givre au gel) ;
-      - ce qui touche à son ped (sa vie et son mouvement lui appartiennent dans GTA) : allure bridée (Ralenti), figé
-        (Gelé, le serveur le fige aussi), démarche chancelante et caméra qui tangue (Chancelant), chute (Renversé) ;
+      - ce qui touche à son ped (sa vie et son mouvement lui appartiennent dans GTA) : allure bridée (Ralenti), course,
+        saut, attaque et visée coupées (Gelé : le serveur seul fige le ped et le libère, en tenant compte du Registre
+        du Conseil), démarche chancelante et caméra qui tangue (Chancelant), chute (Renversé) ;
       - impossible d'incanter pendant un contrôle dur (pré-vérification : le serveur refuse de toute façon) ;
       - réactions : geste bref et effet d'écran à chaque coup (selon l'élément du sort), recul d'une nova.
     La boucle par image ne tourne que tant que le joueur est ralenti, gelé ou chancelant, ou pendant un recul.
@@ -14,8 +15,7 @@ local type, ipairs, pairs, max = type, ipairs, pairs, math.max
 local CreateThread, Wait, GetGameTimer, RegisterNetEvent = CreateThread, Wait, GetGameTimer, RegisterNetEvent
 local PlayerPedId, IsPedRagdoll, IsEntityDead, GetEntityVelocity, SetEntityVelocity =
     PlayerPedId, IsPedRagdoll, IsEntityDead, GetEntityVelocity, SetEntityVelocity
-local SetPedMoveRateOverride, DisableControlAction, FreezeEntityPosition, SetPedToRagdoll =
-    SetPedMoveRateOverride, DisableControlAction, FreezeEntityPosition, SetPedToRagdoll
+local SetPedMoveRateOverride, DisableControlAction, SetPedToRagdoll = SetPedMoveRateOverride, DisableControlAction, SetPedToRagdoll
 local RequestAnimSet, HasAnimSetLoaded, SetPedMovementClipset, ResetPedMovementClipset, ShakeGameplayCam, StopGameplayCamShaking =
     RequestAnimSet, HasAnimSetLoaded, SetPedMovementClipset, ResetPedMovementClipset, ShakeGameplayCam, StopGameplayCamShaking
 
@@ -95,15 +95,14 @@ local function stagger()
     ShakeGameplayCam(statesCfg.stagger.shake, statesCfg.stagger.shakeAmplitude)
 end
 
---- Un état commence (`started`) ou finit sur le ped local.
+--- Un état commence (`started`) ou finit sur le ped local. Le Gelé ne fige ni ne libère rien ici : le serveur seul fige
+--- le ped et le libère (jamais s'il est immobilisé par le Conseil) ; ici, seules les commandes sont coupées (boucle).
 ---@param name string
 ---@param started boolean
 ---@param ms integer
 local function toggle(name, started, ms)
     local ped = PlayerPedId()
-    if name == 'frozen' then
-        FreezeEntityPosition(ped, started)
-    elseif name == 'stagger' then
+    if name == 'stagger' then
         if started then
             stagger()
         else
@@ -145,7 +144,7 @@ function conditions.set(timers)
     if needsLoop() then run() end
 end
 
---- Départ du personnage, arrêt du module : tout revient à la normale.
+--- Départ du personnage, arrêt du module : tout revient à la normale (sauf le ped figé, que seul le serveur libère).
 function conditions.reset()
     conditions.set({})
     pushUntil = 0

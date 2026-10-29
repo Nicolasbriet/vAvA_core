@@ -8,7 +8,8 @@
       - invisibilité, invulnérabilité : bascules, sans boucle ;
       - repère de la carte : sol cherché à quelques hauteurs, borné ;
       - observation : le membre, invisible et sans collision, est placé sous le joueur (OneSync ne transmet que les
-        entités proches) et recalé une fois par seconde ; il revient à sa place à la fin.
+        entités proches) et recalé une fois par seconde ; il revient à sa place à la fin. S'il quitte le jeu avant,
+        le serveur le replace à sa prochaine apparition (server/spectate.lua), jamais sous terre.
     Dépendances : config.lua, client/core.lua
 ]]
 
@@ -78,34 +79,47 @@ local function moved(entity, speed)
     SetEntityHeading(entity, rot.z)
 end
 
+-- vol en cours : { ped, vehicle, entity } (entité déplacée : le véhicule s'il y en a un, sinon le ped)
+local flight = nil
+
+--- Fin du vol libre : l'entité retrouve collision, gravité, vulnérabilité et visibilité d'avant. Synchrone, et non au
+--- bout du fil du vol : à l'arrêt de la ressource, ce fil ne tourne plus et l'entité resterait figée et invisible.
+local function stopNoclip()
+    local session = flight
+    if not session then return end
+    flight = nil
+    SetEntityCollision(session.entity, true, true)
+    FreezeEntityPosition(session.entity, false)
+    SetEntityInvincible(session.entity, state.godmode)
+    if session.vehicle ~= 0 then SetEntityVisible(session.vehicle, true, false) end
+    applyVisibility()
+end
+
 local function startNoclip()
+    local ped = PlayerPedId()
+    local vehicle = GetVehiclePedIsIn(ped, false)
+    local session = { ped = ped, vehicle = vehicle, entity = vehicle ~= 0 and vehicle or ped }
+    flight = session
+    SetEntityCollision(session.entity, false, false)
+    FreezeEntityPosition(session.entity, true)
+    SetEntityInvincible(session.entity, true)
+    -- invisible des autres pendant le vol (le véhicule aussi, s'il y en a un)
+    applyVisibility()
+    if vehicle ~= 0 then SetEntityVisible(vehicle, false, false) end
     CreateThread(function()
-        local ped = PlayerPedId()
-        local vehicle = GetVehiclePedIsIn(ped, false)
-        local entity = vehicle ~= 0 and vehicle or ped
-        SetEntityCollision(entity, false, false)
-        FreezeEntityPosition(entity, true)
-        SetEntityInvincible(entity, true)
-        -- invisible des autres pendant le vol (le véhicule aussi, s'il y en a un)
-        applyVisibility()
-        if vehicle ~= 0 then SetEntityVisible(vehicle, false, false) end
         local speeds = cfg.noclip
-        while state.noclip do
+        while flight == session do
             -- exception à la règle « aucune boucle par image » : lecture des touches, seulement pendant le vol
             Wait(0)
+            if flight ~= session then break end
             -- le membre se voit lui-même : l'invisibilité ne vaut que pour les autres
             SetEntityLocallyVisible(ped)
             if vehicle ~= 0 then SetEntityLocallyVisible(vehicle) end
             local speed = speeds.speed
             if IsControlPressed(0, CONTROL.fast) then speed = speeds.fastSpeed end
             if IsControlPressed(0, CONTROL.slow) then speed = speeds.slowSpeed end
-            moved(entity, speed)
+            moved(session.entity, speed)
         end
-        SetEntityCollision(entity, true, true)
-        FreezeEntityPosition(entity, false)
-        SetEntityInvincible(entity, state.godmode)
-        if vehicle ~= 0 then SetEntityVisible(vehicle, true, false) end
-        applyVisibility()
     end)
 end
 
@@ -116,7 +130,7 @@ function tools.set(name, enabled)
     if state[name] == nil or state[name] == enabled then return end
     state[name] = enabled
     if name == 'noclip' then
-        if enabled then startNoclip() end
+        if enabled then startNoclip() else stopNoclip() end
     elseif name == 'invisible' then
         applyVisibility()
     elseif name == 'godmode' then
@@ -130,7 +144,8 @@ function tools.reapply()
     if state.invisible then applyVisibility() end
 end
 
---- Coupe tout (personnage déchargé, module arrêté).
+--- Coupe tout (personnage déchargé, module arrêté), sur-le-champ : le vol libre est défait ici même (stopNoclip), pas
+--- par son fil, qui ne tourne plus quand la ressource s'arrête.
 function tools.reset()
     tools.stopSpectate()
     for _, name in ipairs({ 'noclip', 'invisible', 'godmode' }) do tools.set(name, false) end
@@ -183,11 +198,29 @@ local function anchor(x, y, z)
     SetEntityCoordsNoOffset(PlayerPedId(), x, y, z - cfg.spectate.anchorDepth, false, false, false)
 end
 
---- Observe un joueur : { source, label, x, y, z } (accordé par le serveur). Renvoie faux s'il n'a pas pu être reçu.
+--- Ramène le membre à sa place d'avant une observation, visible et solide, sans rien annoncer.
+---@param session table
+local function returnToPlace(session)
+    NetworkSetInSpectatorMode(false, PlayerPedId())
+    local ped = PlayerPedId()
+    SetEntityCoordsNoOffset(ped, session.back.x, session.back.y, session.back.z, false, false, false)
+    SetEntityHeading(ped, session.heading)
+    SetEntityCollision(ped, not state.noclip, true)
+    FreezeEntityPosition(ped, state.noclip)
+    SetEntityInvincible(ped, state.godmode)
+    applyVisibility()
+end
+
+--- Observe un joueur : { source, label, x, y, z, session } (accordé par le serveur). Une observation déjà en cours est
+--- remplacée sans que sa fin soit annoncée : le serveur garde alors la place de départ pour celle qui commence.
 ---@param target table
----@param onEnd fun()  appelé à la fin de l'observation (retour, joueur parti)
+---@param onEnd fun()  appelé à la fin de l'observation (retour, joueur parti), jamais quand elle est remplacée
 function tools.spectate(target, onEnd)
-    tools.stopSpectate()
+    local previous = spectating
+    if previous then
+        spectating = nil
+        returnToPlace(previous)
+    end
     local ped = PlayerPedId()
     local session = {
         target = target.source, label = target.label, back = GetEntityCoords(ped), heading = GetEntityHeading(ped), onEnd = onEnd,
@@ -229,17 +262,11 @@ function tools.isSpectating()
     return spectating ~= nil
 end
 
+--- Fin de l'observation en cours : retour à sa place, puis fin annoncée (onEnd).
 function tools.stopSpectate()
     local session = spectating
     if not session then return end
     spectating = nil
-    NetworkSetInSpectatorMode(false, PlayerPedId())
-    local ped = PlayerPedId()
-    SetEntityCoordsNoOffset(ped, session.back.x, session.back.y, session.back.z, false, false, false)
-    SetEntityHeading(ped, session.heading)
-    SetEntityCollision(ped, not state.noclip, true)
-    FreezeEntityPosition(ped, state.noclip)
-    SetEntityInvincible(ped, state.godmode)
-    applyVisibility()
+    returnToPlace(session)
     if session.onEnd then session.onEnd() end
 end

@@ -3,12 +3,13 @@
     Rôle : effets des besoins sur le joueur local, déduits des valeurs reçues (aucun échange réseau en plus) :
       - message au franchissement d'un palier vers le bas (bas, critique, épuisé), par vava_hud si présent ;
       - endurance maximale réduite tant qu'un besoin est critique (native persistante : aucune boucle) ;
-      - perte de vie demandée par le serveur (plancher configuré tant qu'aucun module ne gère la mise à terre) ;
+      - perte de vie demandée par le serveur (plancher configuré tant qu'aucun module ne gère la mise à terre ; avec
+        lui, la dernière perte couche le ped) ;
       - geste de consommation (animation du haut du corps, sans accessoire).
-    Dépendances : shared/constants.lua, config.lua, client/core.lua
+    Dépendances : shared/constants.lua, config.lua, shared/starvation.lua, client/core.lua
 ]]
 
-local ipairs, ceil, max = ipairs, math.ceil, math.max
+local ipairs = ipairs
 local CreateThread, Wait, GetGameTimer, GetResourceState = CreateThread, Wait, GetGameTimer, GetResourceState
 local PlayerId, PlayerPedId, IsEntityDead = PlayerId, PlayerPedId, IsEntityDead
 local GetEntityHealth, GetEntityMaxHealth, SetEntityHealth = GetEntityHealth, GetEntityMaxHealth, SetEntityHealth
@@ -16,6 +17,7 @@ local GetPlayerMaxStamina, SetPlayerMaxStamina = GetPlayerMaxStamina, SetPlayerM
 local RequestAnimDict, HasAnimDictLoaded, RemoveAnimDict, TaskPlayAnim = RequestAnimDict, HasAnimDictLoaded, RemoveAnimDict, TaskPlayAnim
 
 local cfg = VavaNeeds.config
+local starvation = VavaNeeds.starvation
 local thresholds = cfg.thresholds
 local health = cfg.health
 local animation = cfg.animation
@@ -98,17 +100,15 @@ end
 -- Vie et gestes --------------------------------------------------------------------------------------------------
 
 --- Perte de vie d'un besoin épuisé. Sans système de mise à terre, jamais sous le plancher (part de la vie au-dessus
---- du seuil de mise à terre) ; avec vava_health, le joueur peut tomber, puis être relevé.
+--- du seuil de mise à terre) ; avec vava_health, le joueur peut tomber, puis être relevé : la perte qui atteint le
+--- seuil couche le ped franchement (vie GTA à 0, shared/starvation.lua).
 ---@param amount number
 function effects.starve(amount)
     local ped = PlayerPedId()
     if IsEntityDead(ped) then return end
-    local down = health.downThreshold
-    local floorRatio = GetResourceState(DEATH_SYSTEM) == 'started' and 0 or health.floor
-    local minimum = ceil(down + floorRatio * (GetEntityMaxHealth(ped) - down))
-    local current = GetEntityHealth(ped)
-    if current <= minimum then return end
-    SetEntityHealth(ped, max(minimum, current - amount))
+    local target = starvation.health(GetEntityHealth(ped), amount, GetEntityMaxHealth(ped), health.downThreshold,
+        health.floor, GetResourceState(DEATH_SYSTEM) == 'started')
+    if target then SetEntityHealth(ped, target) end
 end
 
 --- Joue un geste de consommation (manger, boire). Le chargement de l'animation est borné dans le temps.

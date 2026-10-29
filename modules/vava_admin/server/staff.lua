@@ -21,6 +21,7 @@ VavaAdmin.staff = staff
 ---@field accountId integer|nil
 ---@field rank vAvA.AdminRank
 ---@field label string           nom au journal : « Sénéchal Aldric Morvan »
+---@field web? boolean          compte du panneau web (Chancellerie), posé par server/web.lua
 
 ---@type table<integer, string>  compte → nom du rang
 local members = {}

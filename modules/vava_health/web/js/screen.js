@@ -66,7 +66,9 @@
     init({ giveUpKey }) {
       if (giveUpKey) refs.giveUpKey.textContent = giveUpKey;
     },
-    downed({ giveUpInMs, autoInMs }) {
+    downed({ giveUpInMs, autoInMs, giveUpKey }) {
+      // touche choisie par le joueur dans ses raccourcis, relue par le jeu à chaque affichage
+      if (giveUpKey) refs.giveUpKey.textContent = giveUpKey;
       const now = performance.now();
       giveUpAt = now + giveUpInMs;
       autoAt = now + autoInMs;

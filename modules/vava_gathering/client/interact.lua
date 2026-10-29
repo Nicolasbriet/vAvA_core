@@ -3,8 +3,8 @@
     Rôle : le geste de récolte côté joueur. Invite près d'un nœud (verbe, ressource, charges, outil à tenir), demande au
            serveur (begin), animation et barre de progression du HUD pendant la durée annoncée, fin du geste (finish)
            ou interruption (cancel : nouvel appui, déplacement). Pour un nœud d'eau, la ligne est lancée et c'est
-           client/fishing.lua qui prend la suite à la touche. Le client ne décide de rien : il montre, joue et demande ;
-           le serveur notifie les résultats.
+           client/fishing.lua qui prend la suite à la touche. À terre (vava_health), ni invite ni demande. Le client
+           ne décide de rien : il montre, joue et demande ; le serveur notifie les résultats.
     Dépendances : shared/constants.lua, config.lua, shared/geometry.lua, client/core.lua, client/nui.lua,
                   client/props.lua
 ]]
@@ -25,6 +25,7 @@ local props = VavaGathering.props
 local RPC = VavaGathering.RPC
 
 local HUD = 'vava_hud'
+local HEALTH = 'vava_health'
 local PROGRESS_ID = 'vava_gathering:harvest'
 -- champ public de l'inventaire : ce que le joueur tient (objet et modèle)
 local HANDS_STATE = 'vava_inventory:hands'
@@ -98,6 +99,20 @@ end
 
 -- Invite ------------------------------------------------------------------------------------------------------------
 
+local function healthState()
+    return exports[HEALTH]:get()
+end
+
+--- Le joueur local est-il à terre ? (export client de vava_health, lu à l'appui et à l'invite, donc au rythme de la
+--- boucle des props et seulement près d'un nœud) Module absent ou en erreur : pas à terre. À terre, la touche ne sert
+--- qu'à rendre l'âme ; le serveur refuse de toute façon.
+---@return boolean
+local function isDowned()
+    if GetResourceState(HEALTH) ~= 'started' then return false end
+    local called, health = pcall(healthState)
+    return called and type(health) == 'table' and health.downed == true
+end
+
 --- L'objet en main est-il un outil du genre demandé ? (vrai si la ressource n'en demande aucun)
 ---@param resource table
 ---@return boolean
@@ -114,7 +129,7 @@ end
 function interact.refreshPrompt(nodeId)
     local node = nodeId and props.node(nodeId)
     local resource = node and props.resource(node)
-    if not node or not resource or session then
+    if not node or not resource or session or isDowned() then
         if lastPrompt ~= '' then
             lastPrompt = ''
             nui.send('prompt', { hidden = true })
@@ -270,9 +285,11 @@ function interact.begin(nodeId)
 end
 
 --- Appui sur la touche : un geste en cours est interrompu (la ligne est remontée), sinon la récolte commence.
---- Pendant la barre de tension, l'appui tend la ligne : fishing.lua le reçoit.
+--- Pendant la barre de tension, l'appui tend la ligne : fishing.lua le reçoit. À terre, rien : la touche sert à
+--- rendre l'âme.
 ---@return boolean handledByFishing
 function interact.press()
+    if isDowned() then return false end
     if session then
         if session.tension then return true end
         interact.cancel()

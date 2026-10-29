@@ -12,6 +12,12 @@ const DevMock = (() => {
     { id: 3, firstName: 'Éloïse', lastName: 'd\'Aubigné', sex: 'f' },
     { id: 7, firstName: 'Aldric', lastName: 'Morvan', sex: 'm' },
   ];
+  // règles de nom envoyées par le core avec la liste (valeurs par défaut de config/server.lua)
+  const nameRules = {
+    minLength: 2, maxLength: 24, separators: ' \'-',
+    letters: 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZàâäáãåæçéèêëíìîïñóòôöõøœúùûüýÿÀÂÄÁÃÅÆÇÉÈÊËÍÌÎÏÑÓÒÔÖÕØŒÚÙÛÜÝŸ',
+  };
+  const listed = () => ({ ok: true, characters, max: 3, nameRules });
   const OVERLAY_IDS = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10];
   const COLOR_TYPES = { 1: 1, 2: 1, 10: 1, 5: 2, 8: 2 };
 
@@ -47,7 +53,7 @@ const DevMock = (() => {
     await delay(name === 'preview' || name === 'rotate' ? 0 : 120);
     switch (name) {
       case 'list':
-        return { ok: true, characters, max: 3 };
+        return listed();
       case 'startCreator':
       case 'setSex': {
         const sex = data.sex === 'f' ? 'f' : 'm';
@@ -57,11 +63,11 @@ const DevMock = (() => {
       case 'textures':
         return { ok: true, textures: 8 };
       case 'cancelCreator':
-        return { ok: true, characters, max: 3 };
+        return listed();
       case 'delete': {
         const index = characters.findIndex((c) => c.id === data.id);
         if (index >= 0) characters.splice(index, 1);
-        return { ok: true, characters, max: 3 };
+        return listed();
       }
       case 'create':
         characters.push({ id: 9, firstName: data.firstName, lastName: data.lastName, sex: data.sex });
@@ -74,7 +80,7 @@ const DevMock = (() => {
   if (!inGame) {
     window.addEventListener('DOMContentLoaded', () => {
       document.body.classList.add('dev');
-      window.postMessage({ action: 'open', payload: { ok: true, characters, max: 3 } }, '*');
+      window.postMessage({ action: 'open', payload: listed() }, '*');
     });
   }
 

@@ -106,6 +106,7 @@ const STRINGS = Object.freeze({
     too_soon: 'Trop tôt.',
     expired: 'Le délai est passé.',
     not_found: 'Ce geste n\'est plus en cours.',
+    downed: 'Vous êtes à terre.',
     not_repairable: 'Cet objet ne se répare pas.',
     intact: 'Cet objet n\'a pas besoin de réparation.',
     no_fuel_station: 'Cette station ne brûle rien.',

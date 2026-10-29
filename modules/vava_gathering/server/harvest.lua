@@ -1,11 +1,12 @@
 --[[
     vava_gathering/server/harvest.lua
-    Rôle : la récolte décidée par le serveur. Début : personnage, nœud, distance (lue côté serveur), charges, outil
-           en main du bon genre et non brisé, place dans la besace, cooldown, hook annulable ; une seule récolte à la
-           fois par joueur, jeton par geste, oubliée si jamais finie. Fin : jeton consommé, durée et distance
-           revérifiées, outil toujours en main et usé, échec selon la bande, charge prise avant toute attente (rendue si
-           la besace refuse), rendement, palier et provenance sur la pile, vitalité consommée, XP demandée à
-           vava_skills, pièce supplémentaire (peau), hooks. La pêche partage la fin (fishing.lua).
+    Rôle : la récolte décidée par le serveur. Début : personnage, pas à terre (vava_health), nœud, distance (lue côté
+           serveur), charges, outil en main du bon genre et non brisé, place dans la besace, cooldown, hook annulable ;
+           une seule récolte à la fois par joueur, jeton par geste, oubliée si jamais finie. Fin : jeton consommé,
+           durée et distance revérifiées, toujours pas à terre, outil toujours en main et usé, échec selon la bande,
+           charge prise avant toute attente (rendue si la besace refuse), rendement, palier et provenance sur la pile,
+           vitalité consommée, XP demandée à vava_skills, pièce supplémentaire (peau), hooks. La pêche partage la fin
+           (fishing.lua).
     Dépendances : shared/, config.lua, server/core.lua, bridge/server.lua, server/catalog.lua, server/zones.lua,
                   server/nodes.lua, server/quality.lua ; server/fishing.lua (lié à l'exécution)
 ]]
@@ -96,6 +97,7 @@ end
 function harvest.begin(src, nodeId)
     local characterId = bridge.GetCharacterId(src)
     if not characterId then return false, 'no_character' end
+    if bridge.IsDowned(src) then return false, 'downed' end
     local node = catalog.node(nodeId)
     if not node then return false, 'unknown_node' end
     if sessions[src] then return false, 'busy' end
@@ -194,6 +196,8 @@ function harvest.succeed(session)
     -- jeton consommé avant le premier appel qui peut céder la main (hooks de l'inventaire et des compétences) : une
     -- seconde demande avec le même jeton ne trouve plus rien à finir
     sessions[src] = nil
+    -- tombé pendant le geste : rien n'est pris
+    if bridge.IsDowned(src) then return false, 'downed' end
     if nodes.charges(node) <= 0 then
         bridge.Notify(src, messages.noCharges, 'info')
         return false, 'no_charges'

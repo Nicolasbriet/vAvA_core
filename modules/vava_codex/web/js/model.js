@@ -11,6 +11,7 @@ const Model = (() => {
   const state = {
     entries: [], byName: new Map(), chapters: [], undeclared: [], staff: false,
     prefs: { favorites: [], recent: [], keepOpen: true }, closeKey: 'F1',
+    recentMax: 12,   // dernières pages gardées : `recent.max` de la config, reçu à l'ouverture
     tab: 'commands', chapter: '', query: '', selected: null, rows: [],
   };
 
@@ -32,6 +33,7 @@ const Model = (() => {
     state.staff = payload.staff === true;
     state.prefs = normalizePrefs(payload.prefs);
     if (payload.closeKey) state.closeKey = payload.closeKey;
+    if (Number.isInteger(payload.recentMax) && payload.recentMax > 0) state.recentMax = payload.recentMax;
     if (state.chapter && !state.chapters.some((chapter) => chapter.id === state.chapter)) state.chapter = '';
     rebuild();
   }

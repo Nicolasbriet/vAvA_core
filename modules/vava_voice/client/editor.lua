@@ -4,10 +4,12 @@
            accorde l'ouverture puis revérifie chaque action ; le client ne fait que montrer. Tant qu'il est ouvert,
            les zones proches sont dessinées en cylindres transparents (teinte selon l'effet) et l'aperçu suit les
            réglages en direct : la boucle par image ne vit que le temps de l'édition, chez le seul membre du Conseil.
+           Un enregistrement à la fois (pas de double envoi) ; focus rendu si la ressource s'arrête éditeur ouvert.
     Dépendances : shared/constants.lua, config.lua, client/core.lua, client/nui.lua, client/zones.lua
 ]]
 
 local type, pairs, sort, floor, tointeger, tostring = type, pairs, table.sort, math.floor, math.tointeger, tostring
+local pcall, error = pcall, error
 local CreateThread, Wait = CreateThread, Wait
 local PlayerPedId, GetEntityCoords, DrawMarker = PlayerPedId, GetEntityCoords, DrawMarker
 
@@ -22,6 +24,8 @@ VavaVoice.editor = editor
 
 local open = false
 local opening = false
+-- enregistrement en cours : un second « Sceller » attend la réponse du premier
+local saving = false
 local canTeleport = false
 -- aperçu : zone en cours de création (id nil) ou de modification, avec les réglages de l'interface
 ---@type table|nil
@@ -117,6 +121,14 @@ function editor.close()
     nui.setFocus(false)
 end
 
+--- Arrêt de la ressource : l'interface disparaît avec elle, seul le focus est à rendre (éditeur ouvert seulement).
+function editor.release()
+    if not open then return end
+    open = false
+    preview = nil
+    nui.setFocus(false)
+end
+
 --- Demande l'ouverture au serveur (rien ne se passe sans le droit du Conseil).
 function editor.open()
     if open or opening or not nui.isReady() or not core.characters.current() then return end
@@ -133,7 +145,7 @@ function editor.open()
         limits = {
             radius = cfg.radius, height = cfg.height, multipliers = cfg.multipliers,
             defaultMultiplier = cfg.defaultMultiplier, labelMax = cfg.labelMax, max = cfg.max,
-            ranges = VavaVoice.config.ranges,
+            ranges = VavaVoice.config.ranges, baseOffset = cfg.baseOffset,
         },
     })
     nui.setFocus(true)
@@ -193,17 +205,23 @@ nui.on('cancel', function()
     return { ok = true }
 end)
 
+--- Enregistrement demandé au serveur : modification si `id`, création sinon.
+---@return table
+local function store(data, settings, id)
+    if id then
+        return answer(core.rpc.call(RPC.UPDATE, id, data.label, settings.radius, settings.height, settings.multiplier, data.moveHere == true))
+    end
+    return answer(core.rpc.call(RPC.CREATE, data.label, settings.radius, settings.height, settings.multiplier))
+end
+
 nui.on('save', function(data)
     if not open then return { ok = false, error = 'closed' } end
+    if saving then return { ok = false, error = 'busy' } end
     if type(data.label) ~= 'string' then return { ok = false, error = 'invalid_label' } end
-    local settings = settingsOf(data)
-    local id = tointeger(data.id)
-    local result
-    if id then
-        result = answer(core.rpc.call(RPC.UPDATE, id, data.label, settings.radius, settings.height, settings.multiplier, data.moveHere == true))
-    else
-        result = answer(core.rpc.call(RPC.CREATE, data.label, settings.radius, settings.height, settings.multiplier))
-    end
+    saving = true
+    local called, result = pcall(store, data, settingsOf(data), tointeger(data.id))
+    saving = false
+    if not called then error(result, 0) end
     if result.ok then preview = nil end
     return result
 end)

@@ -82,6 +82,21 @@ const PlayersView = (() => {
     if (UI.report(result, success)) await select(selected, true);
   }
 
+  /** Bouton dont la demande ne repart pas tant que sa réponse n'est pas arrivée (Observer : un double clic ouvrirait
+   *  deux observations). */
+  function once(label, run) {
+    const node = UI.button(label, async () => {
+      if (node.disabled) return;
+      node.disabled = true;
+      try {
+        await run();
+      } finally {
+        node.disabled = false;
+      }
+    });
+    return node;
+  }
+
   async function withDialog(name, spec, toArgs) {
     const values = await UI.dialog(spec);
     if (values) await act(name, toArgs(values));
@@ -100,7 +115,7 @@ const PlayersView = (() => {
       can('teleport') && !self && UI.button(A.reach, () => act('reach')),
       can('teleport') && !self && UI.button(A.bring, () => act('bring')),
       can('teleport') && UI.button(A.sendBack, () => act('sendBack')),
-      can('spectate') && !self && UI.button(A.spectate, () => act('spectate', [], null)),
+      can('spectate') && !self && once(A.spectate, () => act('spectate', [], null)),
       can('freeze') && !self && UI.button(data.frozen ? A.unfreeze : A.freeze, () => act('freeze', [!data.frozen])),
     ]);
     group(P.groups.care, [

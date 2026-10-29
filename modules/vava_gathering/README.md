@@ -8,7 +8,8 @@ palier et sa provenance. Le serveur décide de tout et demande l'XP à `vava_ski
 
 Ordre de démarrage : après `vAvA_core` (≥ 0.6.0), `vava_inventory` (≥ 1.4.0) et `vava_skills` (≥ 1.0.0).
 Facultatifs : `vava_hud` (barre de progression, notifications), `vava_admin` (droit `metiers`), `vava_chat`,
-`vava_time` (saisons : repousse des nœuds et quantité récoltée, lues par l'export `getSeason`).
+`vava_health` (aucune récolte à terre), `vava_time` (saisons : repousse des nœuds et quantité récoltée, lues par
+l'export `getSeason`).
 
 ## Règles (config.lua)
 
@@ -108,5 +109,7 @@ resource, item }`), `harvested` (after : `+ quantity, tier, band, extra? `), `zo
     `map.blips = false` → aucun.
 11. **Redémarrage** : `restart vava_gathering` → vitalités et charges retrouvées (écriture à l'arrêt), props recréés,
     blips retirés puis reposés.
-12. **Saisons** (`vava_time`) : voir `docs/tests/temps.md` (section des métiers) — en hiver, la sauge vidée revient
+12. **À terre** (`vava_health`) : près d'un chêne, hache en main, se faire mettre à terre → l'invite disparaît ; `E` ne
+    sert qu'à rendre l'âme. Tombé pendant le geste : rien n'est pris, aucune charge consommée (« Vous êtes à terre. »).
+13. **Saisons** (`vava_time`) : voir `docs/tests/temps.md` (section des métiers) — en hiver, la sauge vidée revient
     quatre fois moins vite et la récolte d'herbes est divisée par deux ; `stop vava_time` → plus aucun effet.

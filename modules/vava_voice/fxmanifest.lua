@@ -15,7 +15,7 @@ use_experimental_fxv2_oal 'yes'
 
 name 'vava_voice'
 description 'Chat vocal de proximité vAvA'
-version '1.2.0'
+version '1.2.1'
 
 dependency 'vAvA_core'
 
@@ -35,6 +35,7 @@ files {
 shared_scripts {
     'shared/constants.lua',
     'config.lua',
+    'shared/label.lua',
 }
 
 server_scripts {

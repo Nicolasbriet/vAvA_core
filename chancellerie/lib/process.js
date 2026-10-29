@@ -77,13 +77,15 @@ function imageName(pid) {
 
 class ServerProcess extends EventEmitter {
   /**
-   * @param {{ launchArgs?: () => string[], secrets?: () => string[] }} [options]  arguments ajoutés au lancement (clé du
-   *        pont), secrets à masquer dans la console
+   * @param {{ launchArgs?: () => string[], secrets?: () => string[], prepare?: () => string[] }} [options]  arguments
+   *        ajoutés au lancement (clé du pont), secrets à masquer dans la console, préparatifs juste avant chaque
+   *        lancement (server.cfg complété) qui renvoient leurs messages pour la console
    */
   constructor(options = {}) {
     super();
     this.launchArgs = options.launchArgs || (() => []);
     this.secrets = options.secrets || (() => []);
+    this.prepare = options.prepare || (() => []);
     this.state = STATES.STOPPED;
     this.since = Date.now();
     this.child = null;
@@ -197,6 +199,7 @@ class ServerProcess extends EventEmitter {
     if (problem) return { ok: false, error: problem };
     this.cancelRelaunch();
     if (actor !== journal.SYSTEM) this.crashes = [];
+    for (const note of this.prepare()) this.system(note);
     const settings = config.get();
     const executable = settings.fxserverPath;
     const args = [...this.launchArgs(), '+exec', settings.cfgFile];

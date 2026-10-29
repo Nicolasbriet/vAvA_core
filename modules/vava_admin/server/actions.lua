@@ -5,7 +5,7 @@
            natives serveur (OneSync) : rien n'est demandé au client. Les modules administrés (santé, besoins,
            inventaire) sont appelés de façon isolée et restent facultatifs.
     Dépendances : shared/constants.lua, config.lua, server/core.lua, server/ranks.lua, server/store.lua,
-                  server/bans.lua, server/players.lua
+                  server/bans.lua, server/players.lua, server/spectate.lua
 ]]
 
 local type, pairs, ipairs, tonumber, tostring, sort = type, pairs, ipairs, tonumber, tostring, table.sort
@@ -17,6 +17,7 @@ local ranks = VavaAdmin.ranks
 local store = VavaAdmin.store
 local bans = VavaAdmin.bans
 local players = VavaAdmin.players
+local spectate = VavaAdmin.spectate
 local call = VavaAdmin.call
 local cfg = VavaAdmin.config
 local messages = cfg.messages
@@ -117,6 +118,22 @@ function actions.freeze(_, target, state)
     players.frozen[target.source] = state or nil
     tell(target.source, state and messages.frozen or messages.unfrozen, state and 'warning' or 'info')
     return true, nil, { etat = state and 'immobilisé' or 'libéré' }
+end
+
+--- Arrêt du module : chaque joueur immobilisé par le Conseil est libéré. L'état « immobilisé » ne vit qu'en mémoire :
+--- un joueur laissé figé après l'arrêt serait sans recours (aucun Registre pour le libérer, fiche « libre » au
+--- redémarrage). Renvoie le nombre de joueurs libérés.
+---@return integer
+function actions.releaseAll()
+    local count = 0
+    for src in pairs(players.frozen) do
+        local ped = GetPlayerPed(src)
+        if ped ~= 0 then FreezeEntityPosition(ped, false) end
+        tell(src, messages.unfrozen, 'info')
+        count = count + 1
+    end
+    for src in pairs(players.frozen) do players.frozen[src] = nil end
+    return count
 end
 
 -- Soins ----------------------------------------------------------------------------------------------------------
@@ -241,12 +258,16 @@ function actions.give(_, target, item, quantity)
     return true, nil, { objet = item, quantite = quantity }
 end
 
---- Observation : le client de l'acteur fait le reste (il doit s'approcher pour recevoir le joueur, OneSync).
+--- Observation : le client de l'acteur fait le reste (il doit s'approcher pour recevoir le joueur, OneSync). Sa place
+--- de départ est gardée par le serveur, au cas où il partirait avant la fin ; le numéro rendu (`session`) est celui
+--- que le client renvoie pour annoncer la fin de cette observation-là (server/spectate.lua).
 function actions.spectate(actor, target)
     if not actor.source then return false, 'no_body' end
     local coords = coordsOf(target.source)
     if not coords then return false, 'no_ped' end
-    return true, { source = target.source, label = target.label, x = coords.x, y = coords.y, z = coords.z }
+    local session = spectate.begin(actor.source)
+    if not session then return false, 'no_character' end
+    return true, { source = target.source, label = target.label, x = coords.x, y = coords.y, z = coords.z, session = session }
 end
 
 --- Le joueur parti : sa position mémorisée ne sert plus.

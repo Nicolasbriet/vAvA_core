@@ -8,7 +8,7 @@
            portée, pose les blips des zones sur la carte, montre l'invite, joue le geste et la barre de tension.
     Dépendances : vAvA_core ≥ 0.6.0, vava_inventory ≥ 1.4.0 (objets, mains, métadonnées), vava_skills ≥ 1.0.0 (XP) ;
                   facultatifs : vava_hud (barre de progression, notifications), vava_admin (droit metiers), vava_chat,
-                  vava_time (saisons : repousse des nœuds, quantité récoltée)
+                  vava_health (aucune récolte à terre), vava_time (saisons : repousse des nœuds, quantité récoltée)
 ]]
 
 fx_version 'cerulean'

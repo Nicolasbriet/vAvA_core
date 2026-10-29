@@ -389,7 +389,7 @@ Base d'un écran de sélection. Chaque fonction RPC renvoie `ok` (transport), pu
 |---|---|
 | `current()` | `{ id, firstName, lastName, sex, fields }` du personnage actif, ou `nil` (local, sans appel réseau) |
 | `awaitingSelection()` | `true` si le joueur attend de choisir un personnage (local) |
-| `list()` | liste `{ id, firstName, lastName, sex }` des personnages du compte, puis le maximum par compte |
+| `list()` | liste `{ id, firstName, lastName, sex }` des personnages du compte, puis le maximum par compte, puis les règles de nom `{ minLength, maxLength, letters, separators }` (0.8.0) |
 | `create(firstName, lastName, sex)` | résumé du personnage créé |
 | `select(characterId)` | — ; le personnage arrive ensuite par le hook `core:character:loaded` |
 | `unload()` | — ; retour à l'écran noir de sélection |
@@ -415,15 +415,19 @@ gardée et écrite au cycle suivant. Avec `characters.uniqueNames = true`, l'uni
 `name_taken`. Pas d'index unique : des homonymes déjà en base sont conservés.
 
 Noms : `characters.name` dans `config/server.lua` (longueur en caractères, lettres accentuées autorisées,
-séparateurs `'`, `-` et espace jamais en tête, en fin ni doublés).
+séparateurs `'`, `-` et espace jamais en tête, en fin ni doublés). Depuis 0.8.0, ces règles partent avec `list()` :
+une interface de création vérifie la saisie comme le serveur (espaces de bord retirés, longueur comptée en caractères,
+chaque caractère pris dans `letters` ou dans `separators`) sans en garder de copie ; le serveur revérifie à la création.
 
 ## Modules officiels
 
-Ressources séparées, dans `modules/` : à copier (ou lier) dans le dossier `resources` du serveur, dans cet ordre :
-`ensure vAvA_core`, `ensure vava_world`, `ensure vava_time`, `ensure vava_appearance`, `ensure vava_characters_ui`, `ensure vava_hud`,
-`ensure vava_inventory`, `ensure vava_needs`, `ensure vava_health`, `ensure vava_admin`, `ensure vava_voice`,
-`ensure vava_skills`, `ensure vava_gathering`, `ensure vava_crafting`, `ensure vava_farming`, `ensure vava_codex`, `ensure vava_chancellerie`,
-puis les modules qui déclarent des objets.
+Ressources séparées, dans `modules/` : à copier (ou lier) dans le dossier `resources` du serveur, dans cet ordre (le
+même que `README.md` à la racine, et celui qu'écrit la Chancellerie) :
+`ensure oxmysql`, `ensure vAvA_core`, `ensure vava_chat` (à la place de `ensure chat`), `ensure vava_world`,
+`ensure vava_time`, `ensure vava_appearance`, `ensure vava_characters_ui`, `ensure vava_hud`, `ensure vava_inventory`,
+`ensure vava_needs`, `ensure vava_health`, `ensure vava_admin`, `ensure vava_voice`, `ensure vava_cameras`,
+`ensure vava_magic`, `ensure vava_skills`, `ensure vava_gathering`, `ensure vava_crafting`, `ensure vava_farming`,
+`ensure vava_codex`, `ensure vava_chancellerie`, puis les modules qui déclarent des objets.
 
 ### `vava_appearance`
 
@@ -452,14 +456,20 @@ Format (listes pures et tables nommées uniquement, pour une sérialisation sans
 - Modifier l'apparence d'un personnage chargé : `core.characters.set(id, 'vava_appearance:data', appearance)`
   côté serveur ; le client concerné la réapplique.
 - Vêtements proposés et apparences de départ : `config.lua` (`components`, `props`, `defaults`). Les packs
-  médiévaux ne demanderont que ces réglages.
+  médiévaux ne demanderont que ces réglages. Règles, installation et vérifications en jeu :
+  `modules/vava_appearance/README.md`.
 
 ### `vava_characters_ui`
 
 Écran de sélection et éditeur de création (NUI, sans framework). S'ouvre sur `core:character:selection`, se ferme
 sur `core:character:loaded`. Aperçu sur un ped **local** (invisible des autres joueurs). Scène et caméras :
-`config.lua`. Pour travailler le rendu sans le jeu, ouvrir `web/index.html` dans un navigateur
-(`?screen=creator&tab=hair&sex=f`) : des données simulées remplacent le jeu.
+`config.lua` ; la scène est distincte du point d'apparition du core (sinon les nouveaux arrivants entreraient dans la
+scène de ceux qui créent) et reste provisoire (`-- PLACEHOLDER`). Les noms sont vérifiés à la saisie avec les règles
+du serveur (`characters.name`, reçues avec la liste des personnages, core ≥ 0.8.0) ; le serveur revérifie à la
+création. À l'arrêt de la ressource écran ouvert, ped d'aperçu, caméra, mise au point de la carte, radar et focus sont
+rendus, et l'écran redevient noir comme l'attente de sélection. Détails : `modules/vava_characters_ui/README.md`. Pour
+travailler le rendu sans le jeu, ouvrir `web/index.html` dans un navigateur (`?screen=creator&tab=hair&sex=f`) : des
+données simulées remplacent le jeu.
 
 ### `vava_inventory`
 
@@ -577,8 +587,14 @@ montré au joueur, dans l'interface ou en notification s'il utilisait un raccour
   départ de son auteur. Au-delà, le jet qui poserait un nouveau sac est refusé (`too_many_drops`) ; remplir un sac
   existant reste possible.
 - Le client ne reçoit que les conteneurs qu'il a ouverts, puis leurs différences.
+- Pile d'un objet sans définition au chargement d'un conteneur (module arrêté, ou pas encore redéclaré après un
+  `restart vava_inventory`) : gardée à part, sa ligne en base intacte, puis replacée dès que l'objet est déclaré
+  (1.6.3) : à sa place d'origine si elle est libre, sinon à la première place libre ; sans place, elle reste à part.
+  Aucune pile n'est recouverte. Une pile tenue en main ainsi gardée à part retrouve la main à son retour. Redéclarer
+  ses objets à l'annonce `core:module:ready` de `vava_inventory` suffit donc à tout rendre aux joueurs en jeu.
 
-Touches par défaut (réglables par le joueur dans Paramètres > Raccourcis > FiveM) : `I` ouvre l'inventaire,
+Touches par défaut (réglables par le joueur dans Paramètres > Raccourcis > FiveM) : `I` ouvre l'inventaire, et la
+touche choisie pour l'ouvrir le ferme aussi (1.6.3 ; `Échap` toujours),
 `1` à `5` utilisent les raccourcis (un objet qui se tient en main sans autre usage y est pris ou reposé). Dans
 l'interface : glisser pour déplacer (sur la ceinture : raccourci ; sur les Mains : prendre en main), `R` pour pivoter,
 `Maj` pour diviser en deux, double-clic pour utiliser, prendre en main ou ramasser, clic droit pour les actions,
@@ -611,11 +627,13 @@ avec le personnage. Les besoins, durées, paliers, messages et gestes sont dans 
   en 4 h de jeu, soif en 3 h ; × 1,5 pour la part du temps passée à courir (vitesse lue côté serveur ; un véhicule
   ne compte pas). Aucune baisse hors connexion ni pendant la sélection.
 - **Paliers** : sous 30, un message ; sous 10, un message et l'endurance maximale réduite ; à 0, perte de vie à chaque
-  passage (2 points pour la faim, 4 pour la soif). Avec `vava_health`, le joueur finit à terre (puis peut être
-  relevé) et la baisse s'arrête tant qu'il y est ; sans lui, la vie ne descend jamais sous `health.floor` (10 % de la
-  vie au-dessus du seuil de mise à terre), pour que personne ne reste mort sans recours.
-- **Manger, boire** : objets de l'inventaire déclarant `effects = { hunger = …, thirst = … }`. Refusés au-delà de 95
-  (« Vous n'avez plus faim. ») et pendant le geste en cours (3 s). Geste selon la catégorie (`nourriture` : manger,
+  passage (2 points pour la faim, 4 pour la soif). Avec `vava_health`, le joueur finit à terre (la perte qui atteint
+  le seuil couche le ped, vie GTA 0 : `shared/starvation.lua`), puis peut être relevé, et la baisse s'arrête tant
+  qu'il y est ; sans lui, la vie ne descend jamais sous `health.floor` (10 % de la vie au-dessus du seuil de mise à
+  terre), pour que personne ne reste mort sans recours. Détail et tests en jeu : `modules/vava_needs/README.md`.
+- **Manger, boire** : objets de l'inventaire déclarant `effects = { hunger = …, thirst = … }`. Refusés dès 95 (à 95 et
+  au-dessus pour chaque besoin que l'objet remplit : « Vous n'avez plus faim. ») et pendant le geste en cours (3 s).
+  Geste selon la catégorie (`nourriture` : manger,
   `boisson` : boire), sans accessoire en main. Un objet portant aussi l'effet d'un autre module n'est jamais refusé
   pour cause de satiété.
 - **Réseau** : un envoi par joueur et par minute (son champ), à lui seul ; aucun RPC (l'utilisation d'un objet passe
@@ -685,9 +703,13 @@ touches et messages : `config.lua`. Demande le core 0.4.0 (hook `core:character:
   récupération automatique de GTA est coupée : on se soigne par objets (`effects = { health = 20 }` : +20 %, refusé
   si l'on n'est pas blessé) ou en se faisant relever.
 - **Mise à terre** : décidée par le serveur, qui lit la vie de chaque joueur apparu toutes les 500 ms (le client n'a
-  rien à déclarer) ; cause et auteur lus côté serveur. Le joueur reste au sol, l'écran « wasted » de GTA est remplacé
-  par l'écran « Vous êtes à terre ». À terre : aucun geste sur les objets (prendre en main compris ; un module peut
-  encore faire reposer l'objet tenu), faim et soif figées ; un client qui se relève seul est remis à terre.
+  rien à déclarer) ; cause et auteur lus côté serveur. Au seuil (vie GTA 100) ou dessous, le joueur est à terre, et le
+  serveur ordonne toujours au client de coucher son ped (vie GTA 0) : ce que GTA fait d'une vie posée exactement sur
+  le seuil ne compte pas (règle pure : `shared/vitality.lua`). Le joueur reste au sol, l'écran « wasted » de GTA est
+  remplacé par l'écran « Vous êtes à terre », qui montre la touche « rendre l'âme » choisie par le joueur. À terre :
+  aucun geste sur les objets (prendre en main compris ; un module peut encore faire reposer l'objet tenu), faim et
+  soif figées, ni récolte, ni artisanat, ni agriculture (refusés par ces modules), aucun effet des sorts ; un ped resté
+  au seuil ou au-dessus (client qui se relève seul) est remis à terre.
 - **Relever** (touche G par défaut) : le serveur choisit la personne à terre la plus proche (2 m, positions lues côté
   serveur, rien n'est diffusé) ; geste de 8 s, distance revérifiée à la fin ; relevé avec 25 %. La personne à terre
   lit « Quelqu'un vous relève » : son nom n'est pas révélé.
@@ -701,7 +723,7 @@ touches et messages : `config.lua`. Demande le core 0.4.0 (hook `core:character:
 | Export | Retour |
 |---|---|
 | `get(source)` | `{ health, downed, downedFor }` ou `nil, code` — `health` lue côté serveur |
-| `isDowned(source)` | booléen |
+| `isDowned(source)` | booléen — à appeler (isolé, `pcall`) par tout module qui refuse une action à terre, plutôt que de recopier la règle ; module absent : pas à terre |
 | `setHealth(source, vie)` | `true` ou `false, code` — de 0 à 1 ; 0 fait tomber |
 | `heal(source, part)` / `damage(source, part)` | `true` ou `false, code` — à partir de la vie actuelle |
 | `down(source, cause?)` | `true` ou `false, code` — mise à terre décidée par un module (`cause` libre : 'piege'…) |
@@ -720,9 +742,11 @@ Codes : `not_ready`, `invalid_target`, `no_character`, `invalid_amount`, `invali
 - `vava_health:respawned` (`after`) : `{ source, characterId, reason, point }` — `reason` = `choice` (il a rendu l'âme)
   ou `timeout` ; point d'appui des pénalités à venir.
 
-**Export client** : `get()` — `{ health, downed }` du joueur local, ou `nil`.
+**Export client** : `get()` — `{ health, downed }` du joueur local, ou `nil` (les métiers le lisent pour taire leur
+invite à terre).
 
 Pour travailler le rendu sans le jeu : `web/index.html?state=downed` (ou `ready`, `patient`, `holding`, `assist`).
+Détail et tests en jeu : `modules/vava_health/README.md`.
 
 ### `vava_admin`
 
@@ -730,7 +754,10 @@ Administration du royaume : le **Conseil** (rangs et droits), le panneau **Regis
 réglable), les bans vérifiés à la connexion, le journal des actions, les signalements des joueurs (`/signaler`).
 Rangs, droits, durées, textes : `config.lua`. Demande le core 0.5.0 (compte connu transmis au hook de connexion).
 
-**Rangs** (cumulatifs ; on n'agit jamais sur un membre de rang égal ou supérieur) :
+**Rangs** (cumulatifs). Les actions qui contraignent un joueur (amener à soi, renvoyer, déplacer, immobiliser,
+avertir, expulser, bannir, fouiller, observer) ne visent jamais un membre de rang égal ou supérieur. Rejoindre,
+Soigner, Nourrir, Écrire et Donner l'aident ou ne le touchent pas : elles ne sont pas protégées par le rang, et c'est
+voulu (l'écran des joueurs non plus, voir plus bas).
 
 | Rang | Droits |
 |---|---|
@@ -752,14 +779,24 @@ Rangs, droits, durées, textes : `config.lua`. Demande le core 0.5.0 (compte con
   le rang. Le panneau n'affiche que ce que le rang permet : simple confort.
 - Toute action (panneau, console, module) est écrite au journal (`vava_admin_logs`, 90 jours) et publiée par le hook
   `vava_admin:action` (`after` : `{ actor = { accountId, label, rank }, action, target?, details }`).
-- Les données des joueurs ne partent qu'au personnel, et à la demande ; le pseudo FiveM n'est jamais enregistré.
+- Les données des joueurs ne partent qu'au personnel, et à la demande ; le pseudo FiveM n'est jamais enregistré. Les
+  identifiants d'un joueur (license, discord, steam…, jamais l'adresse IP) ne partent qu'à la Chancellerie, qui les
+  affiche : la fiche du Registre en jeu ne les reçoit pas (1.7.0).
 - Bans par compte, vérifiés au hook `core:player:connecting` : un banni voit le motif, la fin et le numéro du ban.
   Aucun compte n'est créé pour une connexion refusée.
-- Déplacer et immobiliser passent par les natives serveur (OneSync). Le vol libre est la seule boucle par image du
-  module, active seulement pendant son usage ; l'observation place le membre, invisible, sous le joueur observé.
+- Déplacer et immobiliser passent par les natives serveur (OneSync). L'état « immobilisé » vit en mémoire : à l'arrêt
+  (ou au redémarrage) du module, chaque joueur immobilisé est libéré et prévenu, jamais laissé figé sans Registre pour
+  le libérer (1.7.0). Le vol libre est la seule boucle par image du module, active seulement pendant son usage ;
+  l'observation place le membre, invisible, sous le joueur observé. Sa place de départ, lue par le serveur quand
+  l'observation est accordée, est gardée dans le champ privé `vava_admin:spectateReturn` de son personnage. Chaque
+  observation reçoit un numéro ; seule la fin de la dernière (RPC `vava_admin:spectateEnd(numéro)`, entier borné)
+  efface la place, et une observation remplacée n'annonce pas sa fin. S'il part avant, la place est marquée « parti »
+  au déchargement ; à son retour, il y est replacé dès l'apparition confirmée de ce même personnage, et la place n'est
+  effacée qu'une fois le replacement accordé (redémarrage du module compris) : jamais sous terre (1.7.0).
 - Vol libre d'une touche (F2 par défaut, réglable dans les raccourcis FiveM) : chaque appui est accordé par le serveur
   (droit `tools`, inscrit au journal) ; sans droit, la touche ne fait rien. Pendant le vol, le membre est invisible
-  des autres joueurs (il se voit lui-même) et retrouve ensuite sa visibilité d'avant.
+  des autres joueurs (il se voit lui-même) et retrouve ensuite sa visibilité d'avant, arrêt du module compris
+  (collision, gravité et vulnérabilité rétablies sur-le-champ).
 
 **Exports serveur** :
 
@@ -768,13 +805,16 @@ Rangs, droits, durées, textes : `config.lua`. Demande le core 0.5.0 (compte con
 | `isStaff(source)` | booléen |
 | `can(source, droit)` | booléen |
 | `rankOf(source)` | `{ name, label, level }` ou `nil` |
+| `isFrozen(source)` | booléen — immobilisé par le Conseil (Registre) ; lecture seule : un module qui fige et libère un ped (gel d'un sort) ne libère pas celui que le Conseil retient ; depuis 1.6.0 |
 | `ban(compte, heures, motif)` | `true, n° du ban` ou `false, code` — au journal sous le nom du module appelant |
 | `kick(source, motif)` | `true` ou `false, code` |
 | `log(source, libellé, détails?)` | `true` ou `false, code` — inscrit au journal une action d'un membre du Conseil faite dans un module (libellé lu tel quel, 32 caractères ; détails `{ clé = texte ou nombre }`, 8 au plus) ; depuis 1.1.0 |
 
 **Outils des modules** (depuis 1.1.0) : un module ajoute un bouton à la page Outils du Registre par le registre du core
 `vava_admin:tools` — clé `<ressource>:<nom>`, `{ label, hint?, permission }` (un droit des rangs). Le bouton n'apparaît
-qu'aux membres qui ont ce droit ; un clic revérifie le droit côté serveur, ferme le Registre et déclenche chez ce
+qu'aux membres qui ont ce droit, même sans le droit `tools` des outils du Registre : la page Outils s'affiche dès
+qu'un outil y est ouvert au membre (le Gardien y trouve le mur des caméras, droit `watch`), avec les seuls outils de
+modules s'il n'a pas `tools` (1.7.0). Un clic revérifie le droit côté serveur, ferme le Registre et déclenche chez ce
 membre le hook client `vava_admin:toolOpened` (`{ key }`) : le module ouvre alors son interface et **revérifie chaque
 action côté serveur**. Le Registre déclenche le hook serveur `vava_admin:toolsReady` quand son registre est prêt
 (démarrage ou redémarrage : les entrées d'avant ont disparu avec lui) : y rajouter son outil.
@@ -794,8 +834,8 @@ Chancellerie. Chaque demande déclare son droit, son schéma et où elle a un se
 soi, observer, outils, fouiller en ouvrant l'inventaire), au web seulement (`moveToPlayer`, `moveToCoords`,
 `inventoryView` en lecture, `watchScreen`) ou les deux. Un compte du panneau agit comme un membre du rang que lui a
 donné le compte maître, sans personnage : mêmes droits, mêmes contrôles de cible et de rang, journal au nom de
-« Chancellerie : <compte> ». Seule exception à la règle du rang : l'écran des joueurs (droit `watch`, tout le Conseil),
-que chacun regarde chez tout le monde, membres du Conseil de tout rang compris. Exports réservés à la ressource-pont (`config.web.bridge`, `vava_chancellerie`) :
+« Chancellerie : <compte> ». Outre les actions qui aident (plus haut), l'écran des joueurs échappe aussi à la règle du
+rang (droit `watch`, tout le Conseil) : chacun le regarde chez tout le monde, membres du Conseil de tout rang compris. Exports réservés à la ressource-pont (`config.web.bridge`, `vava_chancellerie`) :
 
 | Export | Retour |
 |---|---|
@@ -816,7 +856,10 @@ Chat vocal de proximité, sur la voix intégrée à FiveM (Mumble de FXServer, s
 Portées, touche, zones, textes : `config.lua`. Demande le core 0.5.0 ; facultatifs : `vava_hud` ≥ 1.2.0 (médaillon),
 `vava_health` (portée à terre), `vava_admin` ≥ 1.1.0 (zones de voix).
 
-À poser dans le `server.cfg` (son 3D du jeu, voix envoyée aux seuls joueurs à portée) :
+À poser dans le `server.cfg` (son 3D du jeu, voix envoyée aux seuls joueurs à portée), par `setr` (un `set` n'est pas
+transmis aux joueurs) ; la Chancellerie (1.4.2) les écrit d'elle-même, et les ajoute avant chaque lancement à un
+`server.cfg` qui ne les pose pas par `setr` (une valeur posée est gardée ; fichier qui inclut d'autres fichiers par
+`exec`, ou qui n'est pas en UTF-8 : rien d'écrit, un avertissement — voir `docs/chancellerie.md`) :
 
 ```
 setr voice_useNativeAudio true
@@ -831,18 +874,26 @@ setr voice_useSendingRangeOnly true
 - **Repères** : médaillon « Voix » dans le HUD (un quart par portée), qui s'illumine quand le joueur parle ; cercle au sol
   à la distance de la voix pendant 1,5 s, au seul changement de portée, vu du seul joueur.
 - **Hors du jeu** (sélection, chargement) : micro coupé par le serveur (`MumbleSetPlayerMuted`, rien à contourner) et
-  joueur hors de tout salon : il n'entend personne. Le micro s'ouvre à l'apparition confirmée du personnage.
+  joueur hors de tout salon : il n'entend personne. Le micro s'ouvre à l'apparition confirmée du personnage. À l'arrêt
+  du module (1.2.1), aucun micro n'est rendu : un joueur en sélection reste muet pendant un `restart` ; un arrêt sans
+  redémarrage le laisse muet jusqu'à sa reconnexion.
 - **À terre** (`vava_health`) : Chuchoter et Parler seulement ; la portée d'avant revient après la réanimation. Relu à
   chaque apparition (déconnecté puis reconnecté à terre : toujours limité).
 - **Zones de voix** : lieux où la voix porte plus (tribune, place : ×1,5 à ×3) ou moins loin (bibliothèque, crypte :
-  ×0,5, ×0,75) ; cylindre centré sur les pieds de qui le crée (rayon et hauteur, pour séparer les étages). Si des zones
-  se chevauchent, la plus petite l'emporte. Créées en jeu par le Conseil (droit `tools`) : outil « Zones de voix » du
-  Registre ou `/zonesvoix`. L'éditeur dessine les zones proches dans le monde (teinte selon l'effet) et l'aperçu suit
-  les réglages ; centre lu côté serveur, valeurs bornées, chaque action revérifiée et inscrite au journal du Registre.
-  « S'y rendre » demande le droit `teleport`. Gardées en base (`vava_voice_zones`, 200 au plus).
+  ×0,5, ×0,75) ; cylindre centré sur la position de qui le crée : hauteur comptée depuis ses hanches, la zone descend
+  aussi d'un mètre sous elles (`zones.baseOffset`), de quoi séparer les étages. Si des zones se chevauchent, la plus
+  petite l'emporte. Créées en jeu par le Conseil (droit `tools`) : outil « Zones de voix » du Registre ou
+  `/zonesvoix`. L'éditeur dessine les zones proches dans le monde (teinte selon l'effet) et l'aperçu suit les
+  réglages ; nom de 40 signes (un « é » compte pour un, dans le champ comme sur le serveur : 160 octets au plus sur le
+  réseau), centre lu côté serveur, valeurs bornées, un seul enregistrement à la fois, chaque action revérifiée et
+  inscrite au journal du Registre. « S'y rendre » demande le droit `teleport`. Gardées en base (`vava_voice_zones`,
+  200 au plus). Module arrêté éditeur ouvert : clavier et souris rendus au jeu.
 - **Fonctionnement** : chaque joueur en jeu écoute son propre salon (`1000 + numéro de joueur`) ; sa parole part vers
   les salons des seuls joueurs à portée, recalculés toutes les 250 ms (Mumble n'est sollicité que si la liste change).
-  Aucune boucle par image, sauf pendant le cercle au sol et l'éditeur ouvert.
+  La liste des zones est demandée par le client (RPC `vava_voice:zones`) à l'apparition et au redémarrage du module,
+  avec quelques essais si le serveur n'est pas prêt ; le serveur renvoie au passage la limite de portée du moment
+  (évènement `vava_voice:limit`, au seul demandeur, s'il est en jeu). Aucune boucle par image, sauf pendant le cercle
+  au sol et l'éditeur ouvert.
 - **Limite** : la portée est réglée par le client, comme toute voix FiveM ; un client modifié pourrait l'agrandir.
   FXServer n'a pas non plus de contrôle d'accès aux salons Mumble : un client modifié peut rejoindre le salon d'un
   autre joueur (et entendre ce qui se dit près de lui) ou viser tous les salons (parler à tout le serveur), hors de
@@ -855,7 +906,7 @@ setr voice_useSendingRangeOnly true
 | `limitRange(source, raison, maximum)` | `true` ou `false, code` — portée limitée au numéro `maximum` (1 = Chuchoter) pour cette raison (préfixée par la ressource appelante) ; la plus basse des limites s'applique |
 | `releaseRange(source, raison)` | `true` ou `false, code` |
 | `getZones()` | liste `{ id, label, x, y, z, radius, height, multiplier }` |
-| `webUpdateZone(id, nom, rayon, hauteur, effet)` | `true, zone, détails` ou `false, code` — pont de la Chancellerie seulement (1.1.0) ; sans recentrage |
+| `webUpdateZone(id, nom, rayon, hauteur, effet)` | `true, zone, détails` ou `false, code` — pont de la Chancellerie seulement (1.1.0) ; sans recentrage ; nom refusé par `invalid_label` ou `label_too_long` (40 signes, 1.2.1) |
 | `webDeleteZone(id)` | `true, nil, détails` ou `false, code` — pont de la Chancellerie seulement (1.1.0) |
 
 | Export client | Retour |
@@ -949,7 +1000,8 @@ par saison dans sa propre config : `vava_time` absent ou arrêté = aucun effet.
 ### `vava_cameras`
 
 L'écran des joueurs, pour le Conseil : tout membre (droit `watch` de vava_admin, sans règle de rang) regarde tout le
-monde, en jeu (**mur des caméras** : outil du Registre ou `/cameras`) ou depuis la Chancellerie (par son pont).
+monde, en jeu (**mur des caméras** : page Outils du Registre — Gardien compris depuis vava_admin 1.7.0, qui l'ouvre
+avec le seul droit `watch` — ou `/cameras`) ou depuis la Chancellerie (par son pont).
 Demande le core 0.5.0 ; facultatifs : `vava_admin` ≥ 1.2.0 (droit, journal, outil du Registre ; sans lui, personne ne
 regarde en jeu), `vava_chancellerie` ≥ 1.1.0 (caméras depuis le web). Qualités, limites, adresse STUN : `config.lua`.
 
@@ -996,7 +1048,7 @@ navigateur ; chaque case est une vraie connexion WebRTC locale filmant une scèn
 
 ### `vava_magic`
 
-La magie (2.6.1) : fiche magie par personnage (champ privé `vava_magic:sheet` : mage ou non, sorts et leur XP, sort
+La magie (2.6.2) : fiche magie par personnage (champ privé `vava_magic:sheet` : mage ou non, sorts et leur XP, sort
 prêt dans les mains, combinaisons découvertes, sigils gardés, sigil unique dans tout le royaume), mana (100, +3 toutes
 les 5 s, jamais sauvegardée) et sa barre, 5 niveaux par sort, incantation commune avec délai global (1 s), roue des
 sorts (Tab) et mode magie à la souris (clic droit viser, clic gauche lancer, clic molette verrouiller), états
@@ -1008,8 +1060,9 @@ dissipation, boue, gel, séchage, extinction, roche ardente ; inscrites au grimo
 `discoveredCombos` de la fiche), **Lueur** et **Murmure**, grimoire et registre (objets), traces au sol, sons fabriqués
 par l'interface ou remplacés par des fichiers `.ogg` et des sons natifs (`config.sounds`), commandes du Conseil (`/magie`, numéro de joueur facultatif). Tout le détail, la config et la liste des tests en jeu :
 `modules/vava_magic/README.md`. Demande le core 0.5.0 ; facultatifs : `vava_inventory` ≥ 1.3.0 (objets), `vava_hud`
-(notifications), `vava_health` (blessures, à terre), `vava_admin` (droit `tools` et journal ; sans lui, ACE
-`magie.admin`).
+(notifications), `vava_health` (blessures, à terre : un joueur à terre ne subit plus aucun effet des sorts — ni
+Mouillé, ni recul, ni Renversé, ni Ralenti), `vava_admin` (droit `tools` et journal ; sans lui, ACE `magie.admin` ;
+≥ 1.6.0 : la fin d'un Gel ne libère pas un joueur immobilisé par le Registre).
 
 - **Bridge** : `bridge/server.lua` et `bridge/client.lua` sont les seuls fichiers qui appellent le core et les autres
   modules ; les réécrire suffit pour un autre core (avec un équivalent de `core.rpc`).
@@ -1027,11 +1080,13 @@ par l'interface ou remplacés par des fichiers `.ogg` et des sons natifs (`confi
 - **Projectiles** (Boule de feu, Trait de glace, Projectile de roche, même noyau) : impact signalé par le client du
   lanceur (RPC `vava_magic:projectileImpact`), validé par le serveur (portée, axe, délai, cible réelle, zones protégées,
   rempart sur le trajet) avant les dégâts (en points de vie sur `combat.healthPoints`), appliqués par
-  `vava_health:damage` ; bonus d'XP au toucher si le lancer a rapporté ; journal `vava_magic_damage_log`, purgé des
-  lignes de plus de `combat.log.retentionDays` jours (30) au démarrage puis chaque jour.
+  `vava_health:damage` ; bonus d'XP au toucher si le lancer a rapporté ; journal `vava_magic_damage_log`, écrit par
+  lots, en entier à l'arrêt du module (une seule requête), purgé des lignes de plus de `combat.log.retentionDays`
+  jours (30) au démarrage puis chaque jour.
 - **Rempart** : blocs de pierre créés par le serveur (objets réseau figés), jamais sur un joueur ni un véhicule,
   retirés à leur fin, à l'arrêt du module et par `/magie nettoyer`.
-- **Verrouillage** (sorts `lockOn`) : clic molette côté client (lu par `Bridge.GetLockedTarget`) ; la cible part avec le début de l'incantation, revérifiée
+- **Verrouillage** (sorts `lockOn`) : clic molette côté client (lu par `Bridge.GetLockedTarget`), à la portée du sort
+  prêt dans les mains (celle que le serveur juge) ; la cible part avec le début de l'incantation, revérifiée
   par le serveur, qui prévient la seule cible (évènement `vava_magic:targeted`, une fois l'incantation acceptée — mana,
   recharges, contrôles —, au plus une fois toutes les 3 s par lanceur et par cible, `targeting.warnIntervalMs`) et
   calcule lui-même la direction ;
@@ -1169,7 +1224,7 @@ requis, non brisés, usés par `patchMetadata` (brisés à 0), qualité de la r�
 palier 1–5 et provenance sur la pile (`{ tier, origin }`), pêche à la barre de tension, réaction de la terre aux
 épuisements répétés, commandes du Conseil. L'XP passe par `vava_skills:addXp`. Tout le détail, la config et les tests en
 jeu : `modules/vava_gathering/README.md`. Demande le core 0.6.0, `vava_inventory` 1.4.0 et `vava_skills` 1.0.0 ;
-facultatifs : `vava_hud`, `vava_admin` (droit `metiers`), `vava_chat`, `vava_time` (saisons).
+facultatifs : `vava_hud`, `vava_admin` (droit `metiers`), `vava_chat`, `vava_health` (à terre), `vava_time` (saisons).
 
 - **Données** en `config.lua` : zones (centre, rayon, coût, régénération, cicatrice), nœuds (position, ressource, charges,
   délai, props normal et épuisé — tous les nœuds ont un prop créé par le client), ressources (objet, compétence, outil,
@@ -1178,7 +1233,8 @@ facultatifs : `vava_hud`, `vava_admin` (droit `metiers`), `vava_chat`, `vava_tim
 - **État** publié par state bags globaux : `vava_gathering:zone:<id>` → `{ band, scarred, vitality }`,
   `vava_gathering:node:<id>` → charges ; écrits au seul changement, relus toutes les 10 s.
 - **Serveur maître** : distance lue côté serveur au début et à la fin, durée revérifiée, jeton par geste, cooldown,
-  une récolte à la fois ; pour la pêche, seul « a tenu la tension » est déclaratif.
+  une récolte à la fois ; pour la pêche, seul « a tenu la tension » est déclaratif. À terre (`vava_health:isDowned`,
+  lu par le bridge), ni début ni fin (code `downed`) ; côté client, ni invite ni demande.
 - **Saisons** (1.3.0) : la saison de `vava_time` (export `getSeason`, lu par le bridge, gardée 5 s) donne deux facteurs
   par compétence de la ressource, réglés dans `config.seasons` : `regen` (vitesse à laquelle les nœuds rendent leurs
   charges ; 0 : rien ne repousse et le temps ne s'accumule pas) et `yield` (unités récoltées, au moins une). Par défaut :
@@ -1208,7 +1264,7 @@ nommé par zone et le cercle de son rayon, posés par le client depuis la config
 
 ### `vava_crafting`
 
-L'artisanat (1.2.2) : **stations** (forge, établi, métier à tisser, alambic, tannerie, fourneau, table d'arcanes)
+L'artisanat (1.2.3) : **stations** (forge, établi, métier à tisser, alambic, tannerie, fourneau, table d'arcanes)
 publiques ou privées, avec leur qualité et parfois leur combustible (forge : charbon ; fourneau : bois ; réserve
 alimentée par les joueurs), une pièce à la fois ; **recettes** à ingrédients par **palier choisi** (consommés par pile,
 les plus anciennes d'abord, échange atomique), outil requis en main, durée, XP par `vava_skills` ; **qualité** =
@@ -1219,10 +1275,11 @@ champ `vava_crafting:mark`) ; **baptême** d'un chef-d'œuvre pendant 5 min ; **
 solidité rendue, maximale − 5, histoire, jamais le créateur) ; **leçons** aux élèves à 10 m quand une recette
 transmise est réalisée (`vava_skills:recordLesson`). Une pièce ou une réparation commencée occupe la station jusqu'à
 sa fin, son annulation, ou au plus 2 min (ou sa durée + 30 s si c'est plus long, `interact.expireMarginMs`) ; finie
-trop loin, elle est abandonnée (rien n'est consommé) et la station libérée aussitôt. Détail, config et tests :
-`modules/vava_crafting/README.md`.
+trop loin ou à terre, elle est abandonnée (rien n'est consommé) et la station libérée aussitôt. À terre
+(`vava_health:isDowned`, lu par le bridge) : ni menu, ni pièce, ni réparation, ni combustible (code `downed`). Détail,
+config et tests : `modules/vava_crafting/README.md`.
 Demande le core 0.6.0, `vava_inventory` 1.4.0, `vava_skills` 1.0.0, `vava_gathering` 1.0.0 ; facultatifs :
-`vava_hud`, `vava_admin` (droit `metiers`), `vava_chat`.
+`vava_hud`, `vava_admin` (droit `metiers`), `vava_chat`, `vava_health` (à terre).
 
 **Registres** : `vava_crafting:stations` (types : `{ label, skills, fuel?, anim, prop }`) et `vava_crafting:recipes`
 (`{ label, skill, level, station, tool?, durationMs, difficulty, xp, signed?, signedIfQuality?, durability?,
@@ -1255,8 +1312,9 @@ d'un seuil, pause à sec, flétrie après 6 h, morte après 18 h ; aucune boucle
 10 s) ; **fertilité** (coût par récolte, rotation par famille, compost, jachère) ; **qualité** de la récolte (graine ×
 0,35 + compétence × 0,35 + régularité d'arrosage × 0,15 + fertilité × 0,15 ± 5) en palier avec provenance, graines
 récupérées au même palier ; gestes semer / arroser (seau en main rempli aux puits) / fertiliser / récolter (faucille :
-plus vite) / arracher (déchets), tous validés et appliqués par le serveur après un geste chronométré (fini trop loin,
-le geste est abandonné ; un emplacement qui vient de donner ou de consommer des objets — semis, récolte, compost,
+plus vite) / arracher (déchets), tous validés et appliqués par le serveur après un geste chronométré (fini trop loin
+ou à terre, le geste est abandonné ; à terre, `vava_health:isDowned` lu par le bridge : ni menu, ni geste, ni puits,
+ni grenier, code `downed` ; un emplacement qui vient de donner ou de consommer des objets — semis, récolte, compost,
 arrachage — est écrit aussitôt, le reste par lots) ; **grenier
 commun** (conteneur `vava_inventory` conservé, ouvert ancré à qui a accès à la parcelle — communale : tous ; privée :
 son propriétaire ou le genre branché par `registerAccess` —, dépôts et retraits journalés par minute : une ligne par
@@ -1265,14 +1323,14 @@ migration 0002 : colonne `minute` et clé unique, les lignes d'avant restent une
 par geste) ; **composteur** (type de
 station et recette ajoutés aux registres de `vava_crafting`, station placée par `addStation`). Détail, config et tests :
 `modules/vava_farming/README.md`. Demande le core 0.6.0, `vava_inventory` 1.4.0, `vava_skills` 1.0.0, `vava_gathering`
-1.0.0, `vava_crafting` 1.1.0 ; facultatifs : `vava_hud`, `vava_admin` (droit `metiers`), `vava_chat`, `vava_time`
-(saisons).
+1.0.0, `vava_crafting` 1.1.0 ; facultatifs : `vava_hud`, `vava_admin` (droit `metiers`), `vava_chat`, `vava_health`
+(à terre), `vava_time` (saisons).
 
 **Saisons** (1.3.0) : la saison de `vava_time` (export `getSeason`, lu par le bridge, gardée 5 s) règle, par
 `config.seasons`, la vitesse de pousse (`growth` : printemps × 1,25, été × 1, automne × 0,75, hiver × 0,25) et celle à
 laquelle la terre sèche (`drying` : × 1 ; × 1,5 ; × 0,75 ; × 0,5). L'hiver ralentit sans tuer (pas de gel). La
 croissance garde ses fractions de seconde en mémoire et s'écrit entière en base. `vava_time` absent : aucun effet,
-croissance identique à 1.2.1.
+croissance identique à la 1.2.2.
 
 **Registre** `vava_farming:crops` (`{ label, family, seed, product, growMinutes, waterPerHour, fertilityCost, yield,
 xp, difficulty, stages, wilted, dead }`), rempli par la config, ouvert aux autres modules. State bag global
@@ -1309,7 +1367,11 @@ décrites** (commandes des ressources vAvA enregistrées auprès du jeu mais abs
 libre). Page de droite : détail de la ligne choisie, **formulaire selon le type de chaque argument** (joueur en jeu,
 clé d'un registre, liste d'un module, choix fixe, nombre, texte), **ligne composée en direct**, « Lancer ». Onglet
 **Touches** : toutes les touches par chapitre, avec la touche réellement liée par le joueur (lue dans le jeu).
-Clavier : `↑ ↓` parcourir, `Entrée` choisir puis lancer, `Tab` champ suivant, `Échap` retour puis fermer.
+Clavier : `↑ ↓` parcourir, `Entrée` choisir puis lancer, `Tab` champ suivant, `Échap` retour puis fermer. Un
+argument nombre (`integer`, `number`) n'a **aucune valeur d'office** (1.1.2) : obligatoire, il manque tant que le
+joueur ne l'a pas choisi (curseur déplacé ou valeur tapée) ; la valeur tapée part bornée par `min` et `max`, arrondie
+au `step` (compté depuis `min`) et à l'entier pour un `integer`. Si la ressource s'arrête livre ouvert, souris et
+clavier sont rendus au jeu.
 
 **Ce que chacun voit** est décidé par le serveur : public → tous ; Conseil → le droit vava_admin déclaré avec la
 commande (ou tout membre du Conseil si aucun), repli ACE sans vava_admin (`ace` de la commande, sinon
@@ -1319,7 +1381,9 @@ droit. Le Codex ne donne aucun pouvoir : la ligne est lancée par `ExecuteComman
 
 **Préférences par personnage** (champ `vava_codex:prefs`, visible du seul joueur) : signets (`favorites.max`),
 dernières pages (`recent.max`, sans doublon, les plus récentes en tête — depuis le Codex, et depuis le chat via
-l'export client `noteCommand(line)`), réglage « rester ouvert après Lancer » (`keepOpenDefault`). Une commande
+l'export client `noteCommand(line)`), réglage « rester ouvert après Lancer » (`keepOpenDefault`). Un maximum abaissé
+dans la config tronque les listes déjà enregistrées (premiers signets, dernières pages les plus récentes) à la
+lecture, et la prochaine écriture garde la version courte : rien n'est bloqué (1.1.2). Une commande
 déclarée `ui = true` (ouvre une interface) ferme toujours le Codex d'abord ; sinon le Codex reprend le focus si
 aucune autre interface ne l'a pris.
 
@@ -1359,7 +1423,9 @@ tests en jeu : `modules/vava_chat/README.md`. Demande le core 0.5.0 ; facultatif
   `/metiers niveau <joueur> <compétence> <niveau>`), filtrées selon ses droits ; à nom égal elles l'emportent sur un
   `chat:addSuggestion`. Taper `/metiers ` montre le paramètre en cours et garde ses sous-commandes proposées ; `Tab`
   complète le nom puis la sous-commande. Toute commande tapée est signalée au Codex (`noteCommand`) pour ses
-  « dernières pages ». Sans `vava_codex`, rien ne change.
+  « dernières pages ». Sans `vava_codex`, rien ne change. Depuis 1.1.1, un rang donné ou retiré en cours de partie met
+  les suggestions à jour sans reconnexion (le serveur prévient le seul joueur visé, qui redemande son profil), et
+  `/staff` n'est suggéré qu'aux membres du Conseil.
 - **Envoi** : RPC `vava_chat:send` (genre, texte, numéro de joueur | 0, conversation | 0) ; destinataires choisis par le
   serveur, jamais `-1`. Un `/mp` désigne son correspondant par un numéro de conversation jamais réutilisé.
 
@@ -1368,7 +1434,8 @@ tests en jeu : `modules/vava_chat/README.md`. Demande le core 0.5.0 ; facultatif
 | `addMessage(cible, message)` | `true` ou `false, code` — `cible` : joueur connecté, ou `-1` pour tous les joueurs en jeu ; `message` : texte, `{ author?, text, color? }` ou `{ args, color? }` |
 
 **Hooks** : `vava_chat:sending` (`before`, annulable : `{ source, characterId, kind, text, target? }` — sourdine,
-prison… ; la raison du refus est montrée au joueur), `vava_chat:sent` (`after` : `+ recipients`).
+prison… ; la raison du refus est montrée au joueur), `vava_chat:sent` (`after` : `+ recipients`, nombre de joueurs
+qui l'ont reçu : auteur compris, sauf pour un `/mp`, qui vaut 1).
 
 ### `vava_chancellerie`
 

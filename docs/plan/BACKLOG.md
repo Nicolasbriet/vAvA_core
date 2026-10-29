@@ -33,7 +33,7 @@ correction sauvage. Un problème **BLOQUANT** remonté par un audit devient une 
 - Critères : chaque règle du tableau « Schémas » de `docs/api.md` a au moins un test positif et un négatif.
 
 ### T-003 — Tests unitaires des modules métiers et magie
-- Agent : vava-testeur · Dépend de : T-002 · Statut : à faire
+- Agent : vava-testeur · Dépend de : T-002 · Statut : à tester en jeu
 - Logique pure de `vava_crafting/shared/quality.lua`, `vava_farming/shared/growth.lua` et `geometry.lua`,
   `vava_gathering/shared/geometry.lua`, `vava_skills/shared/progression.lua` (compléter), `vava_magic/shared/*`,
   `vava_inventory/shared/grid.lua`. Vérifier les valeurs documentées dans chaque README.
@@ -51,7 +51,7 @@ de `docs/tests/` qui décrivaient le défaut, et les README ou `docs/api.md` qui
 marqués « décision » attendent le porteur du projet : ne pas les coder sans sa réponse.
 
 ### T-005 — Inventaire : redémarrage, affichage et messages
-- Agents : vava-dev-lua + vava-dev-nui · Dépend de : — · Statut : à faire
+- Agents : vava-dev-lua + vava-dev-nui · Dépend de : — · Statut : à tester en jeu
 - I1 : après `restart vava_inventory`, les objets d'autres modules mis de côté au chargement des besaces sont
   replacés dès que leur définition revient, main comprise, sans jamais perdre ni recouvrir une pile.
 - Interface : un refus du serveur n'efface pas les changements arrivés entre-temps (geste d'un autre joueur).
@@ -61,7 +61,7 @@ marqués « décision » attendent le porteur du projet : ne pas les coder sans 
   dans la procédure ; versions montées.
 
 ### T-006 — À terre, santé, besoins et magie
-- Agent : vava-dev-lua · Dépend de : — · Statut : à faire
+- Agent : vava-dev-lua · Dépend de : — · Statut : à tester en jeu
 - S1 : la mise à terre couche le ped même quand sa vie GTA vaut exactement 100 (faim, soif, sort, `/vie 0`).
 - S2 : aucune action de récolte, d'artisanat ou d'agriculture à terre, refusée par le serveur avec l'export
   existant `vava_health:isDowned` (pas de copie de la règle) ; `E` ne fait plus que rendre l'âme à terre.
@@ -76,10 +76,10 @@ marqués « décision » attendent le porteur du projet : ne pas les coder sans 
   Conseil à terre qui se relève lui-même ; Brume et Rempart en zone protégée.
 
 ### T-007 — Codex, Registre et personnage
-- Agents : vava-dev-lua + vava-dev-nui · Dépend de : — · Statut : à faire
+- Agents : vava-dev-lua + vava-dev-nui · Dépend de : — · Statut : à tester en jeu
 - C1 : un nombre obligatoire du Codex doit être choisi (pas de 0 d'office) ; valeur bornée et arrondie.
 - Codex : un maximum de favoris ou de dernières pages abaissé tronque au lieu de bloquer « Lancer » ; `recent.max`
-  lu au lieu de 12 ; main rendue à l'arrêt ; suggestions du chat à jour après un changement de rang.
+  lu au lieu de 12 ; main rendue à l'arrêt.
 - Registre : outil des caméras visible avec le droit `watch` ; état « immobilisé » cohérent après un redémarrage ;
   identifiants (license, discord, steam) plus envoyés à l'interface ; observateur qui part : jamais rendu sous terre.
 - Personnage : règles de nom de l'interface tirées de la config du serveur (peut toucher le core : cette tâche
@@ -89,13 +89,14 @@ marqués « décision » attendent le porteur du projet : ne pas les coder sans 
 - Décisions : `core:characters:create` ouvert aux clients ; revenir à la sélection sans se reconnecter.
 
 ### T-008 — Voix, chat et Chancellerie
-- Agents : vava-dev-lua + vava-dev-nui · Dépend de : — · Statut : à faire
+- Agents : vava-dev-lua + vava-dev-nui · Dépend de : — · Statut : à tester en jeu
 - V1 : le `server.cfg` écrit par la Chancellerie contient `setr voice_useNativeAudio true` et
   `setr voice_useSendingRangeOnly true` (cette tâche autorise à toucher `chancellerie/`).
 - Voix : nom de zone borné de façon cohérente entre le champ (signes) et le schéma (octets) ; pas de double envoi
   par `Entrée` ; focus rendu à l'arrêt ; zones et limite « à terre » redemandées après un redémarrage ; personne en
   sélection ne s'entend pendant un `restart`.
 - Chat : README remis d'accord (test 9, `recipients`) ; `/staff` suggéré au seul Conseil.
+- Chat (repris de T-007) : suggestions du chat à jour après un changement de rang du Conseil, sans reconnexion.
 - README à écrire : `vava_voice`, `vava_cameras`, `vava_chancellerie`.
 - `docs/api.md` : ordre de démarrage complet, refus des besoins « dès 95 », actions non protégées par le rang.
 
@@ -103,6 +104,31 @@ marqués « décision » attendent le porteur du projet : ne pas les coder sans 
 - Dépend de : T-001, T-004, T-005 à T-008 · Statut : à faire
 - Dérouler toutes les procédures de `docs/tests/`, noter chaque écart en tâche de correction (phase 0), mesurer le
   resmon de chaque ressource au repos et en action, noter le poids téléchargé à la première connexion.
+
+### Points relevés pendant T-002 à T-008 — à planifier par le porteur du projet
+
+Ce ne sont **pas** des tâches : aucun agent ne les prend tant que le porteur du projet ne les a pas placés dans une
+phase. Détail dans les rapports cités.
+- Sécurité, à vérifier en premier par T-010 : un module qui retire un objet d'une besace par son numéro de conteneur
+  pendant l'écriture qui suit un déchargement pourrait dupliquer l'objet si le personnage revient dans les 3 s
+  (`vava_inventory/server/characters.lua:80`, relecture de T-005).
+- Vie GTA tenue par le client : un client modifié qui ignore `vava_health:set` ignore les dégâts des sorts ; à régler
+  avec la chaîne de dégâts T-110 (rapport T-006).
+- Core : le journal des dégâts de la magie écrit à l'arrêt dépend de l'ordre d'arrêt entre le core et le module
+  (lignes perdues mais signalées) ; différer d'un tour le retrait du module dans le core (rapport T-006).
+- Core : `rpc.lua` ne convertit `3.0` en `3` que pour les arguments de premier niveau ; une définition de schéma
+  cyclique fait lever `compile` ; tests de `rpc.lua`, `ratelimit.lua`, `registry.lua`, `modules.lua` (rapport T-002).
+- Inventaire : un export pour fermer un conteneur chez un joueur (le grenier resté ouvert pendant une mise à terre
+  reste consultable, sans dépôt ni retrait possible) ; `examples/vava_example_items` ne redéclare pas ses objets
+  quand l'inventaire redémarre (rapports T-005 et T-006).
+- Magie : « Libérer » du Registre pendant un Gel libère le ped ; `/lancer <autre sort>` peut répondre « Votre cible
+  vous échappe. » si ce sort porte moins loin que le sort prêt ; **décision** : Trait de glace N4 annoncé « ne peut
+  plus courir » alors que sa force (0,45) reste sous le seuil (0,5) — monter la force ou corriger les textes.
+- Agriculture : `/agriculture pousser` laisse la sécheresse en place (la plante redevient flétrie ou morte) ; heures
+  sèches d'une plante morte affichées au-delà de sa mort ; **décision** : le modèle « mûr » s'affiche dès 2/3 de la
+  croissance (la moitié pour la carotte et le chou) alors que la récolte n'est possible qu'à 100 % (rapport T-003).
+- Voix : un nom refusé pour un caractère invisible répond « Donnez un nom au lieu. » ; chaque changement de zone
+  part à tous les joueurs (à revoir avec T-014) (rapport T-008).
 
 ## Phase 1 — Sécurité, performance, réseau
 

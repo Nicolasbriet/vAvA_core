@@ -1,11 +1,13 @@
 --[[
     vava_voice/server/zones.lua
     Rôle : zones de voix, gardées en mémoire après une lecture au démarrage. Création, modification, suppression par
-           le Conseil : valeurs ramenées aux bornes et au pas de la configuration, centre lu côté serveur (position du
-           membre du Conseil, jamais envoyée par son client), écriture en base avant toute diffusion, journal.
+           le Conseil : nom compté en signes (shared/label.lua), valeurs ramenées aux bornes et au pas de la
+           configuration, centre lu côté serveur (position du membre du Conseil, jamais envoyée par son client),
+           écriture en base avant toute diffusion, journal.
            Chaque changement part à tous les joueurs : rare, petit, et chaque client en a besoin pour savoir où il se
            trouve (seul envoi à tous du module).
-    Dépendances : shared/constants.lua, config.lua, server/core.lua, server/store.lua, server/links.lua
+    Dépendances : shared/constants.lua, config.lua, shared/label.lua, server/core.lua, server/store.lua,
+                  server/links.lua
 ]]
 
 local pairs, ipairs, tostring, sort, floor = pairs, ipairs, tostring, table.sort, math.floor
@@ -13,6 +15,7 @@ local GetPlayerPed, GetEntityCoords, TriggerClientEvent = GetPlayerPed, GetEntit
 
 local store = VavaVoice.store
 local links = VavaVoice.links
+local names = VavaVoice.label
 local cfg = VavaVoice.config.zones
 local messages = VavaVoice.config.messages
 local EVENTS = VavaVoice.EVENTS
@@ -49,15 +52,6 @@ end
 
 local function round(value)
     return floor(value * COORD_PRECISION + 0.5) / COORD_PRECISION
-end
-
---- Libellé sans espaces superflus ; nil s'il est vide.
----@param label string
----@return string|nil
-local function clean(label)
-    local text = label:gsub('%s+', ' '):match('^%s*(.-)%s*$')
-    if text == '' then return nil end
-    return text
 end
 
 --- Position du membre du Conseil, lue par le serveur.
@@ -129,8 +123,8 @@ end
 ---@return vAvA.VoiceZone|string result
 function zones.create(src, label, radius, height, multiplier)
     if count >= cfg.max then return false, 'too_many_zones' end
-    local name = clean(label)
-    if not name then return false, 'invalid_label' end
+    local name, nameErr = names.clean(label)
+    if not name then return false, nameErr end
     local position = positionOf(src)
     if not position then return false, 'no_position' end
     local zone = {
@@ -162,8 +156,8 @@ end
 local function edit(id, label, radius, height, multiplier, position)
     local current = list[id]
     if not current then return false, 'unknown_zone' end
-    local name = clean(label)
-    if not name then return false, 'invalid_label' end
+    local name, nameErr = names.clean(label)
+    if not name then return false, nameErr end
     local zone = copy(current)
     zone.label, zone.radius, zone.height, zone.multiplier = name, snap(radius, cfg.radius), snap(height, cfg.height), multiplier
     if position then zone.x, zone.y, zone.z = position.x, position.y, position.z end
