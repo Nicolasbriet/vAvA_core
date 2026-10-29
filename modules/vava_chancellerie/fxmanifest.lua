@@ -2,13 +2,14 @@
     vava_chancellerie/fxmanifest.lua
     Rôle : pont entre la Chancellerie (panneau web, programme à part) et le serveur de jeu. Reçoit ses demandes par
            l'adresse HTTP du serveur (machine locale et clé tirée à chaque lancement seulement) et les fait exécuter
-           par le Registre du Conseil (vava_admin), les zones de voix (vava_voice) et les caméras (vava_cameras) au
-           nom du compte du panneau ; prévient la Chancellerie en direct (signalements, arrivées et départs, caméras).
+           par le Registre du Conseil (vava_admin), les zones de voix (vava_voice), les caméras (vava_cameras) et le
+           ciel et l'heure (vava_time) au nom du compte du panneau ; prévient la Chancellerie en direct (signalements,
+           arrivées et départs, caméras).
            Relie un compte du panneau à son joueur (code tapé en jeu) et applique en jeu le rang du compte relié ;
            liste blanche Discord à la connexion des joueurs.
            Serveur seulement : le seul message aux joueurs est le résultat de leur liaison (affiché par vava_admin).
     Dépendances : vAvA_core ≥ 0.5.0, vava_admin ≥ 1.3.0 ; facultatives : vava_voice ≥ 1.1.0 (zones de voix),
-                  vava_cameras ≥ 1.0.0 (écran des joueurs)
+                  vava_cameras ≥ 1.0.0 (écran des joueurs), vava_time ≥ 1.0.0 (ciel et heure)
 ]]
 
 fx_version 'cerulean'
@@ -18,7 +19,7 @@ use_experimental_fxv2_oal 'yes'
 
 name 'vava_chancellerie'
 description 'Pont de la Chancellerie (panneau web) vAvA'
-version '1.3.1'
+version '1.4.0'
 
 dependencies { 'vAvA_core', 'vava_admin' }
 
@@ -34,6 +35,7 @@ server_scripts {
     'server/link.lua',
     'server/whitelist.lua',
     'server/routes.lua',
+    'server/time.lua',
     'server/http.lua',
     'server/commands.lua',
     'server/main.lua',

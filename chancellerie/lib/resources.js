@@ -12,7 +12,7 @@ const path = require('path');
 const MANIFESTS = ['fxmanifest.lua', '__resource.lua'];
 const MAX_DEPTH = 4;
 // ordre de démarrage attendu par vAvA ; une ressource inconnue garde la place choisie, après celles-ci
-const KNOWN_ORDER = ['chat', 'sessionmanager', 'hardcap', 'oxmysql', 'vAvA_core', 'vava_chat', 'vava_world', 'vava_appearance',
+const KNOWN_ORDER = ['chat', 'sessionmanager', 'hardcap', 'oxmysql', 'vAvA_core', 'vava_chat', 'vava_world', 'vava_time', 'vava_appearance',
   'vava_characters_ui', 'vava_hud', 'vava_inventory', 'vava_needs', 'vava_health', 'vava_admin', 'vava_voice', 'vava_cameras', 'vava_magic',
   'vava_skills', 'vava_gathering', 'vava_crafting', 'vava_farming', 'vava_codex', 'vava_chancellerie'];
 const CORE_DESCRIPTIONS = {
@@ -27,6 +27,7 @@ const CORE_DESCRIPTIONS = {
   vava_health: 'Santé, mise à terre, réanimation',
   vava_admin: 'Registre du Conseil (administration en jeu)',
   vava_world: 'Carte sans PNJ ni véhicules',
+  vava_time: 'Ciel et heure du royaume : heure de Paris, saisons, météo, décisions du Conseil',
   vava_voice: 'Chat vocal de proximité',
   vava_cameras: 'Écran des joueurs pour le Conseil (mur des caméras)',
   vava_magic: 'Magie : roue des sorts, mode magie, états, zones, sorts de feu, d\'eau et de terre, combinaisons, Lueur, Murmure, grimoire et registre',
