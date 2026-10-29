@@ -1,8 +1,9 @@
 --[[
     vava_gathering/bridge/server.lua
     Rôle : SEUL point de contact, côté serveur, entre la récolte et le core / les autres modules : personnage et compte,
-           position lue côté serveur, inventaire (objet en main, place, ajout, usure par métadonnées, déclaration des
-           objets), compétences (XP, niveau), droits et journal du Conseil, notifications, chat, base de données.
+           position lue côté serveur, santé (à terre), inventaire (objet en main, place, ajout, usure par métadonnées,
+           déclaration des objets), compétences (XP, niveau), droits et journal du Conseil, notifications, chat, base de
+           données.
            Chaque appel à une autre ressource est isolé : un module absent ou en erreur ne retire que la fonction
            concernée.
     Dépendances : shared/constants.lua, config.lua, server/core.lua
@@ -20,7 +21,7 @@ if not core then return end
 local cfg = VavaGathering.config
 local EVENTS = VavaGathering.EVENTS
 local CONSOLE = 0
-local INVENTORY, SKILLS, ADMIN, CHAT = 'vava_inventory', 'vava_skills', 'vava_admin', 'vava_chat'
+local INVENTORY, SKILLS, ADMIN, CHAT, HEALTH = 'vava_inventory', 'vava_skills', 'vava_admin', 'vava_chat', 'vava_health'
 local ITEMS_REGISTRY = 'vava_inventory:items'
 
 local Bridge = {}
@@ -83,6 +84,16 @@ function Bridge.Position(source)
     if ped == 0 or not DoesEntityExist(ped) then return nil end
     local coords = GetEntityCoords(ped)
     return coords.x, coords.y, coords.z
+end
+
+-- Santé -----------------------------------------------------------------------------------------------------------
+
+--- Vrai si le joueur est à terre (règle de vava_health) ; module absent ou en erreur : pas à terre.
+---@param source integer
+---@return boolean
+function Bridge.IsDowned(source)
+    local called, downed = call(HEALTH, 'isDowned', source)
+    return called and downed == true
 end
 
 -- Inventaire ------------------------------------------------------------------------------------------------------

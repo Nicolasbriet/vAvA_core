@@ -1,10 +1,11 @@
 --[[
     vava_crafting/bridge/server.lua
     Rôle : SEUL point de contact, côté serveur, entre l'artisanat et le core / les autres modules : personnage et
-           compte, position lue côté serveur, joueurs à portée (leçons), inventaire (objet en main, piles et leurs
-           métadonnées, comptage par palier, échange atomique, écriture partielle des métadonnées, déclaration des
-           objets), compétences (XP, niveau, rang, recette connue, leçon, registre des recettes), libellés des
-           compétences, poinçon (champ de personnage), droits et journal du Conseil, notifications, chat, base.
+           compte, position lue côté serveur, joueurs à portée (leçons), santé (à terre), inventaire (objet en main,
+           piles et leurs métadonnées, comptage par palier, échange atomique, écriture partielle des métadonnées,
+           déclaration des objets), compétences (XP, niveau, rang, recette connue, leçon, registre des recettes),
+           libellés des compétences, poinçon (champ de personnage), droits et journal du Conseil, notifications, chat,
+           base.
            Chaque appel à une autre ressource est isolé.
     Dépendances : shared/constants.lua, config.lua, server/core.lua
 ]]
@@ -22,7 +23,7 @@ local cfg = VavaCrafting.config
 local EVENTS = VavaCrafting.EVENTS
 local MARK_FIELD = VavaCrafting.MARK_FIELD
 local CONSOLE = 0
-local INVENTORY, SKILLS, ADMIN, CHAT = 'vava_inventory', 'vava_skills', 'vava_admin', 'vava_chat'
+local INVENTORY, SKILLS, ADMIN, CHAT, HEALTH = 'vava_inventory', 'vava_skills', 'vava_admin', 'vava_chat', 'vava_health'
 local ITEMS_REGISTRY = 'vava_inventory:items'
 local SKILLS_REGISTRY = 'vava_skills:skills'
 local SKILL_RECIPES_REGISTRY = 'vava_skills:recipes'
@@ -105,6 +106,16 @@ function Bridge.PlayersNear(source, radius)
         end
     end
     return list
+end
+
+-- Santé -----------------------------------------------------------------------------------------------------------
+
+--- Vrai si le joueur est à terre (règle de vava_health) ; module absent ou en erreur : pas à terre.
+---@param source integer
+---@return boolean
+function Bridge.IsDowned(source)
+    local called, downed = call(HEALTH, 'isDowned', source)
+    return called and downed == true
 end
 
 -- Inventaire ------------------------------------------------------------------------------------------------------

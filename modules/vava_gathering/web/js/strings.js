@@ -55,6 +55,7 @@ const STRINGS = Object.freeze({
     not_found: 'Ce geste n\'est plus en cours.',
     busy: 'Vous êtes déjà occupé.',
     cooldown: 'Reprenez votre souffle un instant.',
+    downed: 'Vous êtes à terre.',
     no_character: 'Aucun personnage en jeu.',
     rate_limited: 'Doucement…',
     timeout: 'Le serveur ne répond pas.',

@@ -5,7 +5,8 @@
       - apparition : réglages de mort, vie enregistrée appliquée, ou ped recouché s'il était à terre ;
       - mise à terre (lue par le serveur) : écran à terre, effets de mort de GTA coupés ;
       - relève, retour au lieu de soins, soins et blessures : ordres du serveur ;
-      - jauge « Santé » : vie lue localement à intervalle régulier, envoyée à vava_hud seulement quand elle change.
+      - jauge « Santé » : vie lue localement à intervalle régulier (0 à terre), envoyée à vava_hud seulement quand elle
+        change ; redéclarée après un redémarrage, à terre compris.
     Dépendances : shared/, config.lua, tous les fichiers client/ du module
 ]]
 
@@ -47,7 +48,8 @@ local function showDowned()
     local downed = cfg.downed
     local since = status.downedFor + (GetGameTimer() - status.receivedAt)
     local giveUpIn, autoIn = downed.giveUpAfterMs - since, downed.autoRespawnMs - since
-    screen.downed(giveUpIn > 0 and giveUpIn or 0, autoIn > 0 and autoIn or 0)
+    -- touche relue à chaque affichage : le joueur a pu la changer dans ses raccourcis
+    screen.downed(giveUpIn > 0 and giveUpIn or 0, autoIn > 0 and autoIn or 0, keys.giveUpLabel())
 end
 
 ---@param value number
@@ -164,10 +166,12 @@ AddEventHandler('onClientResourceStart', function(resource)
     shownGauge = nil
 end)
 
+-- à terre, la jauge reste à 0 sans lire le ped : elle revient d'elle-même après un redémarrage de ce module ou de
+-- vava_hud (aucun envoi tant qu'elle ne change pas)
 CreateThread(function()
     while true do
         Wait(cfg.client.gaugePollMs)
-        if playing and not status.downed then gauge(body.ratio()) end
+        if playing then gauge(status.downed and 0 or body.ratio()) end
     end
 end)
 

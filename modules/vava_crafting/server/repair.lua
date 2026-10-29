@@ -3,7 +3,8 @@
     Rôle : la réparation d'un objet signé, à une station qui sert la compétence de sa recette, par un artisan du niveau
            requis : une part des ingrédients de la recette est consommée, la solidité est rendue mais la solidité
            maximale baisse à chaque fois, l'histoire de l'objet garde la réparation et son auteur, l'objet n'est plus
-           brisé ; le créateur n'est jamais touché. Petite XP, journal, hook `vava_crafting:repaired`.
+           brisé ; le créateur n'est jamais touché. Petite XP, journal, hook `vava_crafting:repaired`. Jamais à terre
+           (vava_health).
     Dépendances : shared/, config.lua, server/core.lua, bridge/server.lua, server/journal.lua, server/catalog.lua,
                   server/stations.lua, server/signature.lua, server/crafting.lua
 ]]
@@ -98,6 +99,7 @@ end
 function repair.begin(src, stationId, instanceId)
     local characterId = bridge.GetCharacterId(src)
     if not characterId then return false, 'no_character' end
+    if bridge.IsDowned(src) then return false, 'downed' end
     local def = catalog.station(stationId)
     if not def then return false, 'unknown_station' end
     if crafting.session(src) then return false, 'busy' end

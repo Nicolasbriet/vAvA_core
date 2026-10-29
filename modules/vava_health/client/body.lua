@@ -1,13 +1,12 @@
 --[[
     vava_health/client/body.lua
-    Rôle : le ped du joueur local : vie fixée (0 à 1), mise à terre, relève sur place, réglages de mort de GTA (pas de
-           fondu ni de retour automatique à l'hôpital, pas de récupération automatique de la vie) et geste pour
-           relever quelqu'un. Les réglages sont des bascules (aucune boucle) ; le changement de modèle en remet
-           certains à zéro : ils sont réappliqués à chaque apparition.
-    Dépendances : shared/constants.lua, config.lua, client/core.lua
+    Rôle : le ped du joueur local : vie fixée (0 à 1), mise à terre (vie GTA à 0, jamais arrêtée sur le seuil), relève
+           sur place, réglages de mort de GTA (pas de fondu ni de retour automatique à l'hôpital, pas de récupération
+           automatique de la vie) et geste pour relever quelqu'un. Les réglages sont des bascules (aucune boucle) ; le
+           changement de modèle en remet certains à zéro : ils sont réappliqués à chaque apparition.
+    Dépendances : shared/constants.lua, config.lua, shared/vitality.lua, client/core.lua
 ]]
 
-local ceil = math.ceil
 local CreateThread, Wait, GetGameTimer, SetTimeout = CreateThread, Wait, GetGameTimer, SetTimeout
 local PlayerId, PlayerPedId, IsEntityDead = PlayerId, PlayerPedId, IsEntityDead
 local GetEntityHealth, GetEntityMaxHealth, SetEntityHealth = GetEntityHealth, GetEntityMaxHealth, SetEntityHealth
@@ -20,6 +19,7 @@ local RequestAnimDict, HasAnimDictLoaded, RemoveAnimDict = RequestAnimDict, HasA
 local TaskPlayAnim, StopAnimTask = TaskPlayAnim, StopAnimTask
 
 local cfg = VavaHealth.config
+local vitality = VavaHealth.vitality
 local animation = cfg.client.animation
 local gesture = cfg.assist.gesture
 local DOWN = cfg.downThreshold
@@ -40,22 +40,24 @@ function body.ratio()
     return value
 end
 
---- Fixe la vie (0 à 1) d'un ped debout ; 0 le fait tomber.
+--- Couche le ped (mise à terre décidée par le serveur) : vie GTA à 0, qu'il soit debout ou déjà tombé. Un ped laissé
+--- exactement au seuil peut rester debout selon GTA ; à 0, il tombe toujours, et le serveur le lit couché.
+function body.kill()
+    local ped = PlayerPedId()
+    if GetEntityHealth(ped) > 0 then SetEntityHealth(ped, 0) end
+end
+
+--- Fixe la vie (0 à 1) d'un ped debout ; 0 le fait tomber (couché aussitôt, sans s'arrêter sur le seuil).
 ---@param ratio number
 function body.apply(ratio)
     local ped = PlayerPedId()
     if IsEntityDead(ped) then return end
-    local maxHealth = GetEntityMaxHealth(ped)
-    local health = DOWN + ceil(ratio * (maxHealth - DOWN))
-    -- une vie non nulle doit laisser le ped debout
-    if ratio > 0 and health <= DOWN then health = DOWN + 1 end
+    local health = vitality.toGame(ratio, GetEntityMaxHealth(ped), DOWN)
+    if health == 0 then
+        body.kill()
+        return
+    end
     SetEntityHealth(ped, health)
-end
-
---- Couche le ped (mise à terre décidée par le serveur).
-function body.kill()
-    local ped = PlayerPedId()
-    if not IsEntityDead(ped) then SetEntityHealth(ped, 0) end
 end
 
 --- Coupe les effets de mort de GTA (écran voilé), une fois qu'ils ont démarré.

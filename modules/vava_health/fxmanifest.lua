@@ -13,7 +13,7 @@ use_experimental_fxv2_oal 'yes'
 
 name 'vava_health'
 description 'Santé, mise à terre et réanimation vAvA'
-version '1.1.2'
+version '1.1.3'
 
 dependency 'vAvA_core'
 
@@ -31,6 +31,7 @@ files {
 shared_scripts {
     'shared/constants.lua',
     'config.lua',
+    'shared/vitality.lua',
 }
 
 server_scripts {

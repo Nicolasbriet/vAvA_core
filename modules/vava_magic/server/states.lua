@@ -7,7 +7,9 @@
       - Contrôles durs (Chancelant, Renversé, Gelé) : impossible d'incanter, une incantation en cours se brise. Dès
         qu'un contrôle dur touche, la cible est protégée des autres jusqu'à `hardImmunityMs` après sa fin (règle
         d'équité : aucun enchaînement) ; les dégâts, eux, s'appliquent toujours.
-      - Gelé : le ped est aussi figé par le serveur. Mouillé : la Brûlure s'éteint.
+      - Gelé : le ped est figé par le serveur seul (le client ne fait que couper ses commandes) ; à la fin du gel, au
+        départ ou à l'arrêt du module, il reste figé s'il est immobilisé par le Conseil (world.freeze). Mouillé : la
+        Brûlure s'éteint.
       - Hook `vava_magic:stateApplying` (before) : un autre module peut refuser un état (résistance, objet…).
     Dépendances : shared/, config.lua, server/core.lua, bridge/server.lua, server/world.lua, server/combat.lua
 ]]

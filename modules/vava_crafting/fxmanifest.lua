@@ -8,7 +8,7 @@
            décide de tout ; le client crée les props des stations, montre l'invite et le menu, joue le geste.
     Dépendances : vAvA_core ≥ 0.6.0, vava_inventory ≥ 1.4.0 (échange atomique, mains, métadonnées), vava_skills ≥ 1.0.0
                   (recettes, XP, leçons), vava_gathering ≥ 1.0.0 (matières et outils de base) ; facultatifs : vava_hud,
-                  vava_admin (droit metiers), vava_chat
+                  vava_admin (droit metiers), vava_chat, vava_health (aucun artisanat à terre)
 ]]
 
 fx_version 'cerulean'
@@ -18,7 +18,7 @@ use_experimental_fxv2_oal 'yes'
 
 name 'vava_crafting'
 description 'Artisanat vAvA : stations, recettes, qualité, objets signés, réparation, leçons'
-version '1.2.2'
+version '1.2.3'
 
 dependency 'vAvA_core'
 dependency 'vava_inventory'

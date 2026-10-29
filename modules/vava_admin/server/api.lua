@@ -1,8 +1,8 @@
 --[[
     vava_admin/server/api.lua
     Rôle : exports serveur pour les autres modules (anti-triche, métiers, panneau web à venir) : savoir si un joueur
-           siège au Conseil et avec quels droits, bannir ou expulser au nom d'un module (inscrit au journal),
-           inscrire au journal une action faite par un membre dans un module.
+           siège au Conseil et avec quels droits, s'il est immobilisé par le Conseil, bannir ou expulser au nom d'un
+           module (inscrit au journal), inscrire au journal une action faite par un membre dans un module.
     Dépendances : config.lua, server/core.lua, server/ranks.lua, server/staff.lua, server/players.lua,
                   server/actions.lua, server/audit.lua
 ]]
@@ -42,6 +42,12 @@ exports('rankOf', function(src)
     local actor = VavaAdmin.ready and staff.actorOf(src)
     if not actor then return nil end
     return { name = actor.rank.name, label = actor.rank.label, level = actor.rank.level }
+end)
+
+--- Vrai si le Conseil a immobilisé ce joueur (Registre → Immobiliser). Lecture seule : un module qui fige et libère
+--- un ped (gel d'un sort…) ne rend pas libre celui que le Conseil retient.
+exports('isFrozen', function(src)
+    return players.frozen[src] == true
 end)
 
 --- Bannit un compte (0 heure = définitif). Un joueur connecté sur ce compte est expulsé.

@@ -2,10 +2,12 @@
     vava_magic/client/targeting.lua
     Rôle : verrouillage d'une cible pour les sorts d'attaque (config `lockOn`), commun à tous.
       - Clic molette (réglable) : clic court = verrouiller le joueur le plus proche du centre de l'écran, à portée
-        du sort d'attaque connu et en vue ; nouveau clic = cible suivante ; clic maintenu = relâcher.
-      - Le verrou saute hors de portée, hors de vue (quelques vérifications de suite), cible morte, ou sans attaque
-        depuis un moment. Un anneau sous la cible n'est vu que du lanceur : rien ne passe par le réseau. C'est la
-        seule boucle par image du fichier, et seulement tant qu'une cible est verrouillée.
+        du sort prêt dans les mains (un sort d'attaque) et en vue ; nouveau clic = cible suivante ; clic maintenu =
+        relâcher.
+      - Le verrou saute hors de portée du sort prêt (un autre sort préparé compte dès la vérification suivante),
+        hors de vue (quelques vérifications de suite), cible morte, ou sans attaque depuis un moment. Un anneau sous
+        la cible n'est vu que du lanceur : rien ne passe par le réseau. C'est la seule boucle par image du fichier,
+        et seulement tant qu'une cible est verrouillée.
       - Cible prévenue par le serveur (au début de l'incantation) : le bord de son écran rougit un instant.
     Le serveur revérifie la cible au lancer : ceci n'est qu'une proposition. Les sorts la lisent par le bridge
     (Bridge.GetLockedTarget).
@@ -41,18 +43,17 @@ local locked = nil
 local pressedAt = nil
 local watching = false
 
---- Portée du sort d'attaque connu qui porte le plus loin (0 : aucun sort d'attaque).
+--- Portée du sort prêt dans les mains, s'il se lance sur une cible verrouillée (0 sinon) : le serveur juge la cible à
+--- la portée du sort lancé, le verrou suit la même (un autre sort préparé compte dès la vérification suivante).
 ---@return number
 local function lockRange()
-    local best = 0
-    if not state.isMage() then return best end
-    for _, name in ipairs(state.knownSpells()) do
-        local spellCfg = state.spellConfig(name)
-        local level = state.level(name)
-        local range = spellCfg.lockOn and level and spellCfg.levels[level].range
-        if range and range > best then best = range end
-    end
-    return best
+    if not state.isMage() then return 0 end
+    local name = state.selected()
+    local spellCfg = name and state.spellConfig(name)
+    local level = name and state.level(name)
+    if not spellCfg or not spellCfg.lockOn or not level then return 0 end
+    local levelCfg = spellCfg.levels[level]
+    return levelCfg and levelCfg.range or 0
 end
 
 --- Joueurs verrouillables, du plus proche du centre de l'écran au plus excentré.

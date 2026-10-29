@@ -1,7 +1,8 @@
 --[[
     vava_health/client/screen.lua
     Rôle : pont vers l'écran « à terre » (page NUI chargée en arrière-plan, sans focus : le jeu garde les touches).
-           Rien n'est envoyé avant que la page se dise prête ; elle reçoit alors l'état en cours.
+           Rien n'est envoyé avant que la page se dise prête ; elle reçoit alors l'état en cours, avec la touche
+           « rendre l'âme » du joueur (celle de la config n'est qu'un repli à l'ouverture de la page).
     Dépendances : config.lua, client/core.lua
 ]]
 
@@ -23,8 +24,9 @@ end
 --- Affiche (ou met à jour) l'écran à terre.
 ---@param giveUpInMs integer  délai avant de pouvoir rendre l'âme
 ---@param autoInMs integer    délai avant d'être porté au lieu de soins
-function screen.downed(giveUpInMs, autoInMs)
-    current = { giveUpInMs = giveUpInMs, autoInMs = autoInMs }
+---@param giveUpKey string    touche « rendre l'âme » du joueur, telle qu'il l'a choisie
+function screen.downed(giveUpInMs, autoInMs, giveUpKey)
+    current = { giveUpInMs = giveUpInMs, autoInMs = autoInMs, giveUpKey = giveUpKey }
     send('downed', current)
 end
 

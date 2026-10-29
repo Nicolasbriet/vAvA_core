@@ -1,15 +1,19 @@
 --[[
     vava_health/server/life.lua
     Rôle : vie des personnages en jeu, décidée par le serveur.
-      - Une boucle lit la vie de chaque joueur apparu (une native par joueur, aucun message du client) : sous le
-        seuil, le joueur est mis à terre, avec la cause et l'auteur lus côté serveur.
-      - À terre : temps compté, retour automatique au lieu de soins à échéance ; un client qui se relève seul est
-        remis à terre (seul le serveur relève), journalisé une fois par mise à terre.
+      - Une boucle lit la vie de chaque joueur apparu (une native par joueur, aucun message du client) : au seuil ou
+        sous lui, le joueur est mis à terre, avec la cause et l'auteur lus côté serveur.
+      - Toute mise à terre ordonne au client de coucher son ped (vie GTA à 0) : ce que GTA fait d'une vie posée
+        exactement sur le seuil (100) ne compte plus, le personnage ne reste jamais debout sous l'écran à terre.
+      - À terre : temps compté, retour automatique au lieu de soins à échéance ; un ped resté au seuil ou au-dessus
+        (client qui se relève seul, ordre perdu) est remis à terre (seul le serveur relève), journalisé une fois par
+        mise à terre.
       - Vie enregistrée dans le personnage à intervalle régulier et au déchargement (déconnexion comprise : se
         déconnecter à terre ne sert à rien). Au départ, la vie est relue avec la même règle si le ped est encore
         lisible : un coup mortel reçu juste avant de partir met à terre.
       - Soins, blessures, réanimation et retour au lieu de soins pour les autres fichiers et l'API.
-    Dépendances : shared/constants.lua, config.lua, server/core.lua, server/state.lua (server/assist.lua à l'exécution)
+    Dépendances : shared/constants.lua, config.lua, shared/vitality.lua, server/core.lua, server/state.lua
+                  (server/assist.lua à l'exécution)
 ]]
 
 local ipairs, pairs, tonumber, tostring = ipairs, pairs, tonumber, tostring
@@ -20,6 +24,7 @@ local GetPedCauseOfDeath, GetPedSourceOfDeath = GetPedCauseOfDeath, GetPedSource
 local TriggerClientEvent, CreateThread, Wait = TriggerClientEvent, CreateThread, Wait
 
 local state = VavaHealth.state
+local vitality = VavaHealth.vitality
 local cfg = VavaHealth.config
 local EVENTS = VavaHealth.EVENTS
 local HOOKS = VavaHealth.HOOKS
@@ -123,8 +128,9 @@ end
 
 -- Transitions ------------------------------------------------------------------------------------------------
 
---- Met un joueur à terre. `reason` : death (vie lue sous le seuil) ou api (décision d'un module : le client couche
---- son ped).
+--- Met un joueur à terre. `reason` : death (vie lue au seuil ou sous lui) ou api (décision d'un module). Dans les deux
+--- cas le client couche son ped (vie GTA à 0) : une vie lue exactement au seuil peut être celle d'un ped que GTA
+--- laisse debout.
 ---@param src integer
 ---@param reason string
 ---@param cause? integer|string
@@ -140,7 +146,7 @@ function life.down(src, reason, cause, killer)
     entry.sampledAt, entry.resentAt, entry.graceUntil = now, now, now + cfg.graceMs
     persist(entry)
     assist().cancelFor(src)
-    if reason ~= 'death' then TriggerClientEvent(EVENTS.DOWN, src) end
+    TriggerClientEvent(EVENTS.DOWN, src)
     VavaHealth.core.hooks.runAfter(HOOKS.DOWNED, {
         source = src, characterId = entry.characterId, reason = reason, cause = cause, killer = killer,
     })
@@ -244,7 +250,10 @@ local function check(src, entry, now, elapsed)
             entry.sampledAt = now
             persist(entry)
         end
-        if now >= entry.graceUntil and GetEntityHealth(ped) > DOWN and now - entry.resentAt >= cfg.downed.resendMs then
+        -- un ped couché par le client lit 0 : au seuil ou au-dessus, il n'a pas été couché (le seuil compris, puisque
+        -- GTA peut y laisser un ped debout)
+        if now >= entry.graceUntil and not vitality.laidDown(GetEntityHealth(ped), DOWN)
+            and now - entry.resentAt >= cfg.downed.resendMs then
             entry.resentAt = now
             -- remis à terre à chaque fois, journalisé une seule fois par mise à terre
             if not entry.reported then
@@ -257,7 +266,7 @@ local function check(src, entry, now, elapsed)
     end
 
     if now < entry.graceUntil then return end
-    if GetEntityHealth(ped) <= DOWN then
+    if vitality.fallen(GetEntityHealth(ped), DOWN) then
         life.down(src, 'death', GetPedCauseOfDeath(ped), killerOf(src, ped))
         return
     end
@@ -331,7 +340,7 @@ local function onUnloading(src)
     if not entry then return end
     local ped = entry.spawned and not entry.downed and GetGameTimer() >= entry.graceUntil and readablePed(src)
     if ped then
-        if GetEntityHealth(ped) <= DOWN then
+        if vitality.fallen(GetEntityHealth(ped), DOWN) then
             life.down(src, 'death', GetPedCauseOfDeath(ped), killerOf(src, ped))
         else
             entry.health = ratioOf(ped)

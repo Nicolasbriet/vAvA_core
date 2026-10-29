@@ -1,6 +1,6 @@
 # Santé — procédure de test en jeu
 
-Procédure pour vérifier en jeu `vava_health` 1.1.2 : vie conservée, blessures, mise à terre décidée par le serveur,
+Procédure pour vérifier en jeu `vava_health` 1.1.3 : vie conservée, blessures, mise à terre décidée par le serveur,
 relève par un autre joueur, retour au lieu de soins, soins par objets et par le Conseil, et ses liens avec les
 besoins, l'inventaire, la voix et la magie. Comptez 1 h 15, dont 30 min à deux ; les tests à deux joueurs sont marqués
 **(2 joueurs)**. Un test se cite « sante 5-3 ». Le ligotage n'existe pas encore : il n'est pas testé.
@@ -57,6 +57,7 @@ connecté et apparu.
 | 3 | Attendre 1 min en regardant le décompte. | Décompte régulier ; il se recale toutes les 10 s sur le serveur (un saut d'une seconde au plus). |
 | 4 | Registre (`F10`, il s'ouvre à terre) → Joueurs → vous. | Étiquette « À terre », Vie 0 %. |
 | 5 | Codex (`F1`) → chapitre « Santé ». | « Relever une personne à terre » (`G`) et « Rendre l'âme (à terre, maintenir) » (`E`). |
+| 6 | Se faire relever (Registre, § 6-2) ; `/vie 60`, puis `/vie 0`. | Le personnage s'effondre aussitôt et reste au sol, sous l'écran à terre (le client le couche à une vie GTA de 0, jamais au seuil de 100) ; médaillon vide, rouge ; `/vie` → « à terre ». Jamais debout sous l'écran à terre : à me remonter s'il l'est. |
 
 ## 3. Ce qui est bloqué à terre
 
@@ -70,18 +71,20 @@ connecté et apparu.
 | 6 | Personnage mage, sort choisi dans la roue (`Tab`) : clic gauche. | « Vous êtes à terre. » |
 | 7 | **(2 joueurs)** Touche de portée de la voix `Z` (marquée W sur un clavier AZERTY). | Seules Chuchoter (1,5 m) et Parler (5 m) restent ; la portée d'avant revient au réveil ou au lieu de soins. |
 | 8 | Faim et soif. | Figées (§ 7-1). |
-| 9 | Hache en main près d'un chêne de la Forêt de Brume (métiers 3.2) : `/aterre`, puis `E`. | D'après le code, rien ne l'interdit : aucun module métier ne lit l'état à terre, et `E` est aussi la touche « rendre l'âme ». Noter si la récolte démarre ; même question au fourneau (`E`) et sur une parcelle (`E`). Écart signalé. |
+| 9 | Hache en main près d'un chêne de la Forêt de Brume (métiers 3.2) : `/aterre`, puis `E`. Même chose près du fourneau, d'un emplacement de champ, d'un puits, d'un grenier. | L'invite des métiers disparaît dans la seconde ; `E` ne fait que rendre l'âme (« Pas encore : tenez bon. » avant le délai) : aucune récolte, aucun menu, aucun geste, aucun message des métiers. Relevé, l'invite revient. |
+| 10 | Hache en main, lancer une récolte (barre en cours), puis `/aterre` avant la fin. | Rien de pris, la charge du nœud reste : le serveur refuse la fin (« Vous êtes à terre. » à la fin de la barre), ou le geste s'interrompt si le corps a glissé en tombant. Même chose pendant une pièce au fourneau (station libérée, rien consommé) et pendant un semis. |
 
 ## 4. Rendre l'âme et lieu de soins
 
 | # | Faire | Attendu |
 |---|---|---|
 | 1 | À terre, `E` avant la fin du premier décompte. | « Pas encore : tenez bon. » à chaque appui, rien d'autre. |
-| 2 | Attendre que le décompte arrive à 0:00. | La ligne « Vous pourrez rendre l'âme dans … » cède la place à la touche `E` et « Maintenir pour rendre l'âme » ; « Porté au lieu de soins dans 7:00 » continue. |
+| 2 | Attendre que le décompte arrive à 0:00. | La ligne « Vous pourrez rendre l'âme dans … » cède la place à la touche `E` (celle du joueur) et « Maintenir pour rendre l'âme » ; « Porté au lieu de soins dans 7:00 » continue. |
 | 3 | Maintenir `E` une seconde, puis lâcher. | Le trait sous la touche se remplit, puis se vide au relâchement ; rien ne se passe. |
 | 4 | Maintenir `E` 3 s. | Fondu, apparition debout au lieu de soins le plus proche (298.6, −584.5 depuis le bourg) ; « On vous a porté jusqu'au lieu de soins. » ; Santé 50 % ; écran levé ; plus d'étiquette « À terre » au Registre. |
 | 5 | Retomber et ne rien faire jusqu'au bout du second décompte. | À 0:00 : porté au lieu de soins, même message, 50 %. |
 | 6 | Au lieu de soins : `/vie`, puis quitter et revenir. | « vie 50 % » ; au retour, debout au lieu de soins, 50 %. |
+| 7 | Paramètres → Raccourcis → FiveM : « Rendre l'âme (à terre, maintenir) » sur `R` ; retomber à terre (réglage court, § 0.6). | L'encart montre `R` dès l'écran à terre ; maintenir `R` 3 s porte au lieu de soins. Remettre `E`. |
 
 ## 5. Relever un autre joueur (2 joueurs)
 
@@ -142,9 +145,9 @@ aussi. Soigner relève à 100 % un joueur à terre, ou rend toute sa vie à un j
 | # | Faire | Attendu |
 |---|---|---|
 | 1 | Debout à 60 % : console `restart vava_health`. | Médaillon Santé absent un instant, puis de retour à 60 % ; toujours aucune récupération de vie. |
-| 2 | À terre : `restart vava_health`. | L'écran à terre disparaît puis revient ; toujours à terre ; décomptes repris d'après le dernier enregistrement (10 s en arrière au plus, le temps de l'arrêt non compté) ; inventaire toujours refusé. Le médaillon Santé ne revient qu'au réveil (écart signalé). |
+| 2 | À terre : `restart vava_health`. | L'écran à terre disparaît puis revient ; toujours à terre ; décomptes repris d'après le dernier enregistrement (10 s en arrière au plus, le temps de l'arrêt non compté) ; inventaire toujours refusé. Médaillon Santé de retour dans la demi-seconde, vide et rouge. |
 | 3 | **(2 joueurs)** Pendant une relève : `restart vava_health`. | La relève est perdue : bandeau et barres disparaissent, l'animation de A s'achève d'elle-même, B reste à terre. Un nouvel appui sur `G` relance une relève complète de 8 s. |
-| 4 | Debout : `restart vava_hud`. | Médaillon Santé de retour en moins d'une demi-seconde. |
+| 4 | Debout, puis à terre : `restart vava_hud`. | Médaillon Santé de retour en moins d'une demi-seconde (vide et rouge à terre). |
 | 5 | Après un `restart`, `/vie`. | Si la commande ne répond plus, `ensure vava_dev_characters` (il dépend de `vava_health` : à confirmer). |
 
 ## 10. Tentatives de triche
@@ -183,10 +186,11 @@ FROM vava_admin_logs WHERE action IN ('heal', 'feed') ORDER BY id DESC LIMIT 10;
 
 ## 12. Ce que je ne peux pas avoir vérifié hors jeu
 
-- **Le seuil exact, à regarder en premier** : `/vie 0`, la dernière perte de faim ou de soif et un sort qui vide la vie
-  fixent la vie GTA à 100 (le seuil `downThreshold`), pas à 0. Le ped doit s'effondrer à cette valeur. S'il reste
-  debout, le serveur le compte à terre (il lit « 100 ou moins ») sans jamais le recoucher (il ne recouche qu'une vie
-  au-dessus de 100) : l'écran à terre s'afficherait sur un personnage debout.
+- **Le seuil, à regarder en premier** : `/vie 0`, la dernière perte de faim ou de soif et un sort qui vide la vie
+  couchent maintenant le ped à une vie GTA de 0 ; toute mise à terre envoie l'ordre de le coucher, et un ped resté au
+  seuil (100) ou au-dessus est recouché toutes les 5 s. Ce que GTA fait à 100 ne compte donc plus ; à confirmer en jeu
+  (2-6, 7-2) : le personnage tombe aussitôt et ne se relève jamais seul. Une ligne `joueur N debout sans avoir été
+  relevé : remis à terre` dans la console du serveur, sans client modifié, est à me remonter.
 - Les réglages de mort de GTA (`PauseDeathArrestRestart`, `IgnoreNextRestart`, `SetFadeOutAfterDeath`) : aucun retour
   automatique, aucun fondu.
 - La relève sur place (`NetworkResurrectLocalPlayer`) : même endroit, sans décalage ni chute.
@@ -195,7 +199,7 @@ FROM vava_admin_logs WHERE action IN ('heal', 'feed') ORDER BY id DESC LIMIT 10;
 - La remise à terre d'un client qui se relève seul (toutes les 5 s ; une ligne `joueur N debout sans avoir été relevé :
   remis à terre` par mise à terre dans la console du serveur) : il faut un client modifié pour la provoquer.
 - L'objet tenu avant la chute reste-t-il visible en main, couché avec le corps ?
-- La touche affichée sur l'écran à terre est celle de la config (`E`), même si le joueur l'a changée dans ses
-  raccourcis FiveM.
+- La touche affichée sur l'écran à terre est lue par `GetControlInstructionalButton` (comme le Codex) : sûre pour une
+  lettre ; pour une touche sans lettre (souris, pavé), l'écran revient à celle de la config (4-7).
 - Le rendu de l'écran : `modules/vava_health/web/index.html?state=downed` (ou `ready`, `patient`, `holding`, `assist`)
   dans un navigateur.

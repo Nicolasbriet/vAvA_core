@@ -1,6 +1,6 @@
 # Magie d'Eldoria — procédure de test en jeu
 
-Procédure pour vérifier en jeu `vava_magic` 2.6.0 : fiche et commandes du Conseil, roue et mode magie, incantation,
+Procédure pour vérifier en jeu `vava_magic` 2.6.2 : fiche et commandes du Conseil, roue et mode magie, incantation,
 mana, verrouillage, les onze sorts, états élémentaires, zones au sol, combinaisons, effets et sons, triche,
 déconnexions, redémarrage et resmon. Le module n'a encore jamais été joué : chaque écart compte, même petit. Comptez
 trois heures seul et une heure et demie à plusieurs ; les tests à deux sont marqués **(2 joueurs)**, ceux qui
@@ -15,7 +15,7 @@ Aucun sort ne s'apprend en jeu : seul le Conseil en donne (`/magie`) ; le grimoi
 
 1. **Commune** : ordre de démarrage, compte du Conseil, objets, consoles, mesure du resmon et remontée des problèmes :
    voir [LISEZMOI.md](LISEZMOI.md).
-2. **Démarrage** : la console du serveur affiche `module 'vava_magic' v2.6.0 prêt`. La migration `sql/0001_magic.sql`
+2. **Démarrage** : la console du serveur affiche `module 'vava_magic' v2.6.2 prêt`. La migration `sql/0001_magic.sql`
    crée `vava_magic_sigils`, `vava_magic_registers`, `vava_magic_register_pages` et `vava_magic_damage_log`. Une ligne
    `… non déclaré(e) : …` (un sort refusé au chargement) ou `sort en erreur` est à me remonter telle quelle.
 3. **Rôles** : A, membre du Conseil (droit `tools` : Sénéchal ou Souverain) ; B, second joueur sans droits ; C,
@@ -79,7 +79,7 @@ Aucun sort ne s'apprend en jeu : seul le Conseil en donne (`/magie`) ; le grimoi
 | 12 | Console du serveur : `magie tous <B>`, `magie fiche <B>`, puis `magie fiche` sans numéro. | Réponses dans la console, préfixées `[vava_magic]` ; sans numéro : « Aucun personnage en jeu sous ce numéro. » |
 | 13 | Registre du Conseil (`F10`) → journal ; Chancellerie. | Une ligne par commande : « Magie : mage », « Magie : sort appris », « Magie : niveau de sort », « Magie : XP de sort », « Magie : tous les sorts », « Magie : maîtrise de tout », « Magie : sorts retirés », « Magie : mana remplie », « Magie : recharges effacées », « Magie : fiche consultée », « Magie : objet donné », « Magie : nettoyage du monde », avec joueur et personnage. Depuis la console : ligne dans la console du serveur. |
 | 14 | **(2 joueurs)** B incante une Lueur N1 ; A : `/magie mage <B> non`. | Chez B : incantation brisée (« La magie ne vous a jamais répondu. »), « La magie s'est retirée de vous. », barre de mana retirée ; Tab n'ouvre plus rien. `/magie mage <B> oui` : mana pleine. |
-| 15 | B : `/magie mage <B> non` (par A), puis `/magie apprendre <B> lueur`. | B : « Un savoir nouveau s'éveille en vous : Lueur. » ; Tab n'ouvre rien ; `/lancer lueur` : « La magie ne vous a jamais répondu. » ; le grimoire reste scellé. Remettre B mage. |
+| 15 | B : `/magie mage <B> non` (par A), puis `/magie apprendre <B> lueur` ; B : `/sort lueur` ; A : `/magie mana <B>`. | B : « Un savoir nouveau s'éveille en vous : Lueur. » ; Tab n'ouvre rien ; `/lancer lueur` et `/sort lueur` : « La magie ne vous a jamais répondu. » (jamais « Sort prêt ») ; le grimoire reste scellé. A, dans le chat : « Ce personnage n'est pas mage. » (aucun code brut ; la console du serveur garde `not_mage`). Remettre B mage. |
 | 16 | B, mage, utilise le Grimoire (inventaire) ou tape `/grimoire`. | Pages rangées par groupe (Feu, Eau, Terre, Utilitaires) ; par sort : icône, « Élément : Feu », « Niveau 1 », « 0 / 100 XP », description du niveau, « Au niveau suivant » et ce qu'il débloque, « Mana : 14 », « Recharge : 4 s », « Incantation : instantanée » (Boule de feu, Trait de glace ; Projectile de roche N1 : « 0,5 s »), « Incantation : 2,5 s » pour la Lueur N1, « Verrouiller : Clic molette » pour les trois projectiles, « Roue : Tab · viser : Clic droit · lancer : Clic gauche » (nom de la touche Tab tel que GTA le donne, à confirmer) ; Murmure : « Sigils mémorisables : 10 ». Au N5 : « Maîtrise achevée », « 1500 XP ». |
 | 17 | C (non mage) : `/magie donner <C> grimoire`, puis l'utiliser. | « Les pages restent illisibles : les signes se dérobent à votre regard, comme si le livre refusait de vous parler. » |
 
@@ -129,18 +129,18 @@ Aucun sort ne s'apprend en jeu : seul le Conseil en donne (`/magie`) ; le grimoi
 
 | # | Faire | Attendu |
 |---|---|---|
-| 1 | **(2 joueurs)** A (Boule de feu N1 connue) regarde B à 10 m : clic molette. | Anneau rouge qui tourne sous B, vu de A seul. |
+| 1 | **(2 joueurs)** A (Boule de feu N1 prête dans les mains) regarde B à 10 m : clic molette. | Anneau rouge qui tourne sous B, vu de A seul. |
 | 2 | **(3 joueurs)** B et C devant A ; clic molette, puis encore. | L'anneau passe de l'un à l'autre (du plus proche du centre de l'écran au plus excentré, dans un cône de 25°). |
 | 3 | Clic molette maintenu au moins 0,6 s. | Verrou relâché. |
-| 4 | A connaît tous les sorts au N1 : clic molette sans personne devant, ou B à 30 m. | « Aucune cible en vue. » La portée prise est celle du sort d'attaque connu qui porte le plus loin : 25 m (Trait de glace N1). |
-| 5 | B passe derrière un mur ; puis B s'éloigne à plus de 27 m. | Verrou perdu après une seconde sans le voir ; perdu aussi au-delà de cette portée plus 2 m. |
+| 4 | A connaît tous les sorts au N1, Boule de feu prête : clic molette sans personne devant, ou B à 23 m ; puis Trait de glace prêt, B à 23 m ; puis Brume prête. | « Aucune cible en vue. » deux fois (la portée prise est celle du sort prêt : 20 m pour la Boule de feu N1) ; Trait de glace prêt (25 m) : B se verrouille ; Brume prête (pas un sort d'attaque) : le clic molette ne fait rien. |
+| 5 | Trait de glace N1 prêt, B verrouillé : B passe derrière un mur ; puis B s'éloigne à plus de 27 m ; enfin, B verrouillé à 23 m, préparer la Boule de feu (molette ou `/sort`). | Verrou perdu après une seconde sans le voir ; perdu aussi au-delà de la portée du sort prêt plus 2 m ; perdu dans le quart de seconde quand le sort prêt porte moins loin (22 m pour la Boule de feu N1). |
 | 6 | Verrouiller B, ne rien lancer pendant 20 s (`targeting.idleMs`). | Verrou relâché. |
 | 7 | **(2 joueurs)** Boule de feu N1 sur B verrouillé, A regardant ailleurs. | Dès le début de l'incantation, chez B seul : bord de l'écran rougi 2,2 s et « Un frisson vous parcourt… » ; au jet, A se tourne vers B ; la boule part droit sur B. |
 | 8 | B se décale pendant le vol (N1 : 14 m/s). | La boule garde sa ligne : B l'esquive. |
 | 9 | `/magie niveau boule_de_feu 5`, même chose ; puis N4 ; puis Trait de glace N4 et N5 ; puis Projectile de roche N5. | Boule : s'incurve vers B et le rattrape (70°/s au N5, 35°/s au N4) ; Trait : un peu (20°/s au N4, 40°/s au N5) ; Projectile de roche : jamais. |
 | 10 | A lance une Boule de feu puis un Trait de glace sur B en moins de 3 s. | Un seul frisson (au plus un toutes les 3 s par lanceur et par cible). |
 | 11 | A, sans mana, lance sur B verrouillé. | « Votre mana est trop faible. » ; B ne frissonne pas. |
-| 12 | A connaît Boule de feu N5 (45 m) et Projectile de roche N1 (18 m) : verrouiller B à 35 m, lancer la roche. | « Votre cible vous échappe. », rien n'est consommé (le serveur juge la portée du sort lancé, le verrou celle du sort qui porte le plus loin). |
+| 12 | A connaît Boule de feu N5 (45 m) et Projectile de roche N1 (18 m) : Boule de feu prête, verrouiller B à 35 m ; préparer la roche, la lancer ; puis, roche prête, clic molette vers B à 35 m. | Le verrou saute dès que la roche est prête (B hors de sa portée) : le bloc part droit devant, sans « Votre cible vous échappe. » ; roche prête, B à 35 m : « Aucune cible en vue. » (verrou et serveur jugent la même portée : celle du sort prêt). |
 | 13 | Projectile de roche N1 sur B verrouillé à 19 m ; B recule de 3 m pendant l'incantation. | Le bloc part là où A vise (droit devant sans viser), sans suivre B. |
 
 ## 5. Sorts de feu
@@ -347,7 +347,7 @@ Recharge : 4 s à tous les niveaux.
 | 5 | N4 : viser plus loin que 8 m ; N3 : `/lueur ancrer`. | « C'est trop loin. » ; « Votre maîtrise de ce sort ne va pas encore jusque-là. » |
 | 6 | N5 : grimoire → « Couleur de la lumière » → Clair de lune ; puis `/lueur couleur sylve` ; puis `/lueur couleur`. | « Votre lumière prend la couleur « Clair de lune ». », appliquée à la lumière allumée ; idem « Sylve » ; « Couleurs : ambre, lune, aube, sylve, flamme, arcane ». |
 | 7 | N4 : `/lueur couleur lune`. | « Votre maîtrise de ce sort ne va pas encore jusque-là. » |
-| 8 | `/lueur couleur rouge`. | « La magie se dérobe (invalid_args). » (le texte prévu, « Cette couleur vous est inconnue. », n'est jamais atteint : à me remonter). |
+| 8 | `/lueur couleur rouge`. | « Cette couleur vous est inconnue. » ; rien ne part au serveur, la lumière garde sa couleur. |
 | 9 | `/lueur danse`. | « Usage : /lueur [ancrer \| couleur <nom> \| eteindre \| dissiper] » |
 
 ### 8.2 Murmure, sigils et registre
@@ -390,11 +390,12 @@ Ralenti (Trait, Boue) ; Chancelant (Secousse N1-N3, Roche N3+) ; Renversé (Vagu
 | 4 | **(2 joueurs)** B Ralenti. | Icône « Ralenti » ; allure à (1 − force), jamais sous 35 % ; course coupée à partir d'une force de 50 %. |
 | 5 | **(2 joueurs)** B Chancelant. | Démarche ivre, caméra qui tangue, ni course ni saut, poussière sur lui ; s'il incante : « Vous chancelez : impossible d'incanter. » |
 | 6 | **(2 joueurs)** B Renversé. | Chute (ragdoll) de la durée du contrôle ; s'il incante : « Vous êtes renversé : impossible d'incanter. » |
-| 7 | **(2 joueurs)** B Gelé (11-6). | Figé sur place (le serveur fige aussi le personnage), ni course, ni saut, ni attaque, ni visée ; givre au bord de l'écran, vapeur sur lui ; s'il incante : « Le gel vous fige : impossible d'incanter. » |
+| 7 | **(2 joueurs)** B Gelé (11-6). | Figé sur place (par le serveur seul), ni course, ni saut, ni attaque, ni visée ; givre au bord de l'écran, vapeur sur lui ; s'il incante : « Le gel vous fige : impossible d'incanter. » |
 | 8 | **(2 joueurs)** B incante une Lueur ; A le fait chanceler (Secousse) ou le renverse (Vague N4). | Incantation de B brisée : « Vous chancelez : impossible d'incanter. » ou « Vous êtes renversé : … » (« La douleur brise votre concentration. » ou « Votre chute brise l'incantation. » si son client le voit le premier) ; mana de B inchangée. |
 | 9 | **(2 joueurs)** A touche B d'un Trait de glace (Mouillé 8 s), puis lance une Secousse N1 sur lui (Chancelant 1,2 s), aussitôt un Projectile de roche N3, puis un second Trait de glace. | Seul le chancellement passe ; la roche fait ses −20 sans faire chanceler ; le second trait blesse, ralentit et mouille, sans geler (pas de « Gelé ! ») ; l'icône « Protégé » paraît à la fin du chancellement et dure 6 s ; après elle, un contrôle repasse. |
 | 10 | **(2 joueurs)** Pendant « Protégé » : Boule de feu N4, Trait de glace. | Brûlure, Ralenti et Mouillé s'appliquent (seuls les contrôles durs sont bloqués). |
-| 11 | **(2 joueurs)** A immobilise B depuis le Registre du Conseil, puis le gèle (Gel). | À la fin du gel, B est libre de nouveau (le gel libère le personnage sans tenir compte du Registre) : à me remonter s'il bouge. |
+| 11 | **(2 joueurs)** A immobilise B depuis le Registre du Conseil, puis le gèle (Gel) ; B essaie de marcher pendant le gel et après sa fin ; à la fin, A libère B depuis le Registre. | Pendant le gel comme après (icône et givre partis), B reste figé sur place : ni ses touches de déplacement, ni la fin du gel ne le libèrent (le client ne fige ni ne libère plus rien ; le serveur ne libère pas un joueur retenu par le Conseil) ; étiquette « Immobilisé » toujours au Registre. « Libérer » le délivre. S'il bouge avant « Libérer », c'est à me remonter. |
+| 12 | **(2 joueurs)** Sans le Registre : geler B (Gel) ; B essaie de marcher pendant le gel, puis après. | Figé pendant les 2,5 s (le serveur seul fige le personnage), libre dès la fin du gel. S'il marche pendant le gel, c'est à me remonter. |
 
 ## 10. Zones au sol et ce que voit un témoin
 
@@ -468,13 +469,13 @@ simplement rien. Le réglage à corriger est entre parenthèses.
 | 2 | Console `F8` : `lueur eteindre`, puis flèche haut + Entrée une dizaine de fois très vite. | Après six environ : « Doucement : laissez la magie respirer. » (6 demandes d'avance, une de plus par seconde). Même chose avec `sigils`. |
 | 3 | Réglage `cooldownMs = 120000` du Rempart N1 : le lancer, se déconnecter, revenir en moins de deux minutes, le relancer. | La roue ne le grise pas (le client a oublié), mais le serveur refuse : « Le sort n'est pas encore prêt (n s). » |
 | 4 | **(2 joueurs)** A met B à terre (sorts jusqu'à 0 de vie). B : clic gauche, puis `/lancer`. | Clic gauche sans effet ; « Vous êtes à terre. » |
-| 5 | **(2 joueurs)** A lance une Boule de feu sur B à terre ; puis une Vague. | Boule : B ne perd rien, ne brûle pas, aucune ligne au journal. Vague : B est encore mouillé, poussé, et renversé au N4 (le serveur ne vérifie pas l'état à terre pour ces effets) : à juger. |
+| 5 | **(2 joueurs)** A lance une Boule de feu sur B à terre ; puis une Vague N4 ; puis un Trait de glace ; puis il pose une Brume N3 sur B, un sol mouillé (Vague devant B), une boue (Secousse sur ce sol). | Boule : B ne perd rien, ne brûle pas, aucune ligne au journal. Vague, Trait, Brume, sol mouillé, boue : B n'est ni mouillé, ni poussé, ni renversé, ni ralenti (aucune icône, aucun geste de réaction) ; A ne gagne pas le bonus d'XP du toucher. Relevé, B subit de nouveau les sorts. |
 | 6 | En véhicule : `/lancer`. | « Impossible d'incanter ainsi installé. » |
 | 7 | Hors de portée (tous les sorts au N1) : Boule de feu sur B à 25 m ; Mur de flammes visé à 15 m ; verrouiller B à 30 m. | La boule disparaît à 20 m sans dégât ; « Visez le sol, à portée. » ; « Aucune cible en vue. » |
 | 8 | Sans mana : `/magie mana` puis cinq Murs de flammes N1 (`/magie recharges` entre chaque). | Quatre murs (24 chacun), le cinquième : « Votre mana est trop faible. », rien consommé. |
 | 9 | **(2 joueurs)** B chancelant, renversé ou gelé : clic gauche, `/lancer`. | « Vous chancelez : … », « Vous êtes renversé : … », « Le gel vous fige : … ». |
-| 10 | Arme en main : `/lancer`. | Le sort part quand même (la commande de secours ne vérifie pas les mains vides) : à juger. |
-| 11 | Un non-mage sans sort (C, ou B après `/magie mage <B> non` et `/magie vider <B>`) : `/lancer boule_de_feu`, Tab, `/sigil brouiller`. | « Vous ignorez ce sort. » ; rien ; « La magie ne vous a jamais répondu. » |
+| 10 | Arme en main : `/lancer` ; ranger l'arme, `/lancer`. | « Il vous faut les mains libres pour incanter : rangez votre arme. », rien ne part ; arme rangée, le sort part. |
+| 11 | Un non-mage sans sort (C, ou B après `/magie mage <B> non` et `/magie vider <B>`) : `/lancer boule_de_feu`, Tab, `/sigil brouiller`, `/sort boule_de_feu`. | « Vous ignorez ce sort. » ; rien ; « La magie ne vous a jamais répondu. » deux fois (jamais « Sort prêt »). |
 | 12 | B, hors du Conseil : `/magie maitrise`. | « Ces commandes sont réservées au Conseil. » |
 
 ## 14. Déconnexion et redémarrage
@@ -486,8 +487,9 @@ simplement rien. Le réglage à corriger est entre parenthèses.
 | 3 | **(2 joueurs)** B se déconnecte en Brûlure ; recommencer dans une boue. | Plus de ligne `brulure` au journal pour B ; rien ne reste à son retour. |
 | 4 | **(2 joueurs)** A dresse un mur long (réglage), un Rempart N5, un orbe ancré, allume une Lueur, puis se déconnecte (`F8` → `quit`). | Le mur brûle jusqu'à sa fin et blesse encore B (journal au nom du personnage de A) ; le rempart tombe à son heure (16 s) ; l'orbe et la Lueur disparaissent aussitôt. |
 | 5 | **(2 joueurs)** A se déconnecte pendant qu'une offre de sigil attend la réponse de B. | La fenêtre de B se ferme. |
-| 6 | **(2 joueurs)** `restart vava_magic` (tapé d'avance dans la console du serveur) avec : un mur long actif, B dans une brume (voile), un rempart debout, B gelé (réglage), un présage de Secousse en cours, un orbe ancré, A en pleine incantation. | Tout disparaît sur-le-champ chez tous : flammes, lumières, brume et voile, filtre flou, pierres, orbe ; B est libre ; l'incantation de A s'éteint sans rien consommer ; le présage ne frappe pas. Au retour, `module 'vava_magic' v2.6.0 prêt` ; `/magie fiche` : fiches intactes (sorts, XP, sigils, sort prêt) ; mana pleine ; recharges effacées ; aucune pierre ni zone ne reparaît. |
-| 7 | Même redémarrage juste après quelques coups. | Les dégâts des dix dernières secondes sont au journal (`vava_magic_damage_log`) ; à confirmer : au plus 50 lignes sont écrites à l'arrêt. |
+| 6 | **(2 joueurs)** `restart vava_magic` (tapé d'avance dans la console du serveur) avec : un mur long actif, B dans une brume (voile), un rempart debout, B gelé (réglage), un présage de Secousse en cours, un orbe ancré, A en pleine incantation. | Tout disparaît sur-le-champ chez tous : flammes, lumières, brume et voile, filtre flou, pierres, orbe ; B est libre (libéré par le serveur à l'arrêt) ; l'incantation de A s'éteint sans rien consommer ; le présage ne frappe pas. Au retour, `module 'vava_magic' v2.6.2 prêt` ; `/magie fiche` : fiches intactes (sorts, XP, sigils, sort prêt) ; mana pleine ; recharges effacées ; aucune pierre ni zone ne reparaît. |
+| 6 bis | **(2 joueurs)** Réglage `combos.gel.result.durationMs = 30000` : A immobilise B depuis le Registre, puis le gèle ; pendant le gel, `restart vava_magic` ; au retour, B essaie de marcher ; enfin A « Libérer ». | B perd l'icône et le givre, mais reste figé au redémarrage et après (retenu par le Conseil) ; étiquette « Immobilisé » toujours au Registre ; « Libérer » le délivre. Même essai avec B gelé sans le Registre : libre dès l'arrêt du module (14-6). |
+| 7 | Même redémarrage juste après quelques coups ; puis réglage `combat.log = { flushMs = 600000, batch = 500, retentionDays = 30 }` (rien n'est écrit avant 500 lignes ou 10 min), une soixantaine de coups (Murs de flammes sur B, brûlures), compter les lignes de B, `restart vava_magic`, recompter. | Tous les dégâts sont au journal (`vava_magic_damage_log`), au-delà de 50 lignes : à l'arrêt, tout ce qui attend part en une seule requête. Aucune ligne `journal des dégâts non écrit` dans la console. Remettre le réglage. |
 | 8 | `restart vava_inventory`, puis utiliser le grimoire et le registre. | Les deux objets fonctionnent encore (redéclarés au retour de l'inventaire). |
 | 9 | `restart vava_chat`. | Les suggestions `/sort`, `/lancer`, `/lueur`, `/murmure`, `/sigil`… reviennent (et `/magie` pour A). |
 
@@ -512,7 +514,7 @@ le personnage, ou près d'une lumière, d'une zone qui dessine ou d'une trace.
 
 - `vava_magic_damage_log` : `at`, `spell`, `caster_id` et `target_id` (personnages), `kind` (`impact`, `zone`,
   `brulure`), `damage` en points de vie (`8.000` pour −8), position de la cible. Écrit par lots toutes les 10 s, ou dès
-  50 lignes. Les lignes de plus de 30 jours sont retirées au démarrage puis chaque jour : vieillir une ligne
+  50 lignes, et en entier à l'arrêt du module. Les lignes de plus de 30 jours sont retirées au démarrage puis chaque jour : vieillir une ligne
   (`UPDATE vava_magic_damage_log SET at = at - 31*86400 WHERE id = <n>`), `restart vava_magic`, la console affiche
   `journal des dégâts : 1 ligne(s) de plus de 30 jours retirée(s)`.
 - `vava_magic_sigils` : un sigil de 12 signes par personnage, mage ou non ; changé par `/sigil brouiller`.

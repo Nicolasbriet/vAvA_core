@@ -133,17 +133,17 @@ bridge.RegisterUsableItem(cfg.items.grimoire.name, cfg.items.grimoire, function(
     TriggerClientEvent(EVENTS.GRIMOIRE, src)
 end)
 
--- arrêt du module : fiches écrites, effets retirés des peds, orbes supprimés, journal des dégâts vidé
+-- arrêt du module : fiches écrites, effets retirés des peds, orbes supprimés, journal des dégâts écrit en entier
 AddEventHandler('onResourceStop', function(resource)
     if resource ~= VavaMagic.resource or not VavaMagic.ready then return end
     for src in pairs(sheets.all()) do
         sheets.save(src)
         world.clearStates(src)
     end
-    -- un joueur gelé est libéré
+    -- un joueur gelé est libéré (sauf s'il est immobilisé par le Conseil)
     states.clearAll()
     spells.stop()
-    combat.flush()
+    combat.flushAll()
 end)
 
 local registered, registerErr = core.modules.register({

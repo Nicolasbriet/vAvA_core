@@ -1,10 +1,10 @@
 --[[
     vava_farming/bridge/server.lua
     Rôle : SEUL point de contact, côté serveur, entre l'agriculture et le core / les autres modules : personnage et
-           compte, position lue côté serveur, inventaire (objet en main, piles, comptage, échange atomique, ajout, retrait,
-           métadonnées, conteneurs conservés et leur ouverture ancrée, déclaration des objets), compétences (XP, niveau),
-           artisanat (type de station, recette et station du composteur), droits et journal du Conseil, notifications,
-           chat, base. Chaque appel à une autre ressource est isolé.
+           compte, position lue côté serveur, santé (à terre), inventaire (objet en main, piles, comptage, échange
+           atomique, ajout, retrait, métadonnées, conteneurs conservés et leur ouverture ancrée, déclaration des
+           objets), compétences (XP, niveau), artisanat (type de station, recette et station du composteur), droits
+           et journal du Conseil, notifications, chat, base. Chaque appel à une autre ressource est isolé.
     Dépendances : shared/constants.lua, config.lua, server/core.lua
 ]]
 
@@ -21,6 +21,7 @@ local cfg = VavaFarming.config
 local EVENTS = VavaFarming.EVENTS
 local CONSOLE = 0
 local INVENTORY, SKILLS, CRAFTING, ADMIN, CHAT = 'vava_inventory', 'vava_skills', 'vava_crafting', 'vava_admin', 'vava_chat'
+local HEALTH = 'vava_health'
 local ITEMS_REGISTRY = 'vava_inventory:items'
 local STATIONS_REGISTRY = 'vava_crafting:stations'
 local RECIPES_REGISTRY = 'vava_crafting:recipes'
@@ -82,6 +83,16 @@ function Bridge.Position(source)
     if ped == 0 or not DoesEntityExist(ped) then return nil end
     local coords = GetEntityCoords(ped)
     return coords.x, coords.y, coords.z
+end
+
+-- Santé -----------------------------------------------------------------------------------------------------------
+
+--- Vrai si le joueur est à terre (règle de vava_health) ; module absent ou en erreur : pas à terre.
+---@param source integer
+---@return boolean
+function Bridge.IsDowned(source)
+    local called, downed = call(HEALTH, 'isDowned', source)
+    return called and downed == true
 end
 
 -- Inventaire ------------------------------------------------------------------------------------------------------
