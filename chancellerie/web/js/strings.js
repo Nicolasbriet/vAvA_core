@@ -134,6 +134,7 @@ const STRINGS = (() => {
     account_deleted: 'Compte supprimé', password_reset: 'Mot de passe remis', password_changed: 'Mot de passe changé',
     resource_action: 'Ressource', resource_refresh: 'Dossier des ressources relu', autostart: 'Lancement au démarrage',
     cfg_edited: 'server.cfg modifié', cfg_restored: 'server.cfg restauré', cfg_completed: 'server.cfg complété',
+    cfg_check: 'server.cfg à vérifier (voix)',
     backup_started: 'Sauvegarde de la base',
     backup_done: 'Sauvegarde terminée', backup_failed: 'Sauvegarde échouée', backup_deleted: 'Sauvegarde supprimée',
     backup_downloaded: 'Sauvegarde téléchargée', backup_settings: 'Réglages des sauvegardes',

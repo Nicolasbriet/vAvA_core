@@ -189,10 +189,25 @@ recharger. Ctrl + S enregistre. L'assistant reste disponible et relit le fichier
 
 Le chat vocal (`vava_voice`) exige deux réglages : `setr voice_useNativeAudio true` et
 `setr voice_useSendingRangeOnly true`. L'assistant les écrit dans une section « Voix » (1.4.2). Avant chaque lancement
-de FXServer, un `server.cfg` qui ne les fixe pas (serveur installé avant la 1.4.2, fichier écrit à la main) en est
-complété, juste avant les lignes `ensure`, sans que rien d'autre ne change : l'ancien fichier est sauvegardé, la console
-et le journal le disent (« server.cfg complété »). Une valeur déjà posée, même `false`, est toujours gardée : c'est le
-moyen de s'en passer. Un réglage posé dans un fichier inclus par `exec` n'est pas vu.
+de FXServer, un `server.cfg` qui ne les pose pas par `setr` (serveur installé avant la 1.4.2, fichier écrit à la main)
+en est complété, juste avant les lignes `ensure`, sans que rien d'autre ne change (encodage, BOM, fins de ligne
+gardés) : l'ancien fichier est sauvegardé, la console et le journal le disent (« server.cfg complété »).
+
+- Une valeur posée par `setr`, même `false`, est toujours gardée : c'est le moyen de s'en passer.
+- Un `set` ou un `sets` n'est jamais doublé, mais signalé (« remplacez set par setr ») : sans `setr`, les joueurs ne
+  reçoivent pas le réglage.
+- Rien n'est écrit, avec un avertissement en console et au journal (« server.cfg à vérifier ») : si le fichier inclut
+  d'autres fichiers (`exec` : les réglages de la voix sont à vérifier dans les fichiers inclus), si une ligne à
+  plusieurs commandes séparées par `;` touche la voix, s'il n'est pas enregistré en UTF-8, ou s'il ne peut pas être
+  écrit (lecture seule). Les avertissements ne citent que des numéros de ligne, jamais leur contenu.
+- Un fichier resté tel quel depuis un échec ou un avertissement n'est pas retenté : le modifier (ou relancer la
+  Chancellerie) en provoque un nouvel essai.
+
+Toutes les écritures du `server.cfg` (assistant, éditeur, lancement au démarrage, restauration, voix) prennent le même
+chemin : droit d'écriture vérifié d'abord, nouveau contenu dans un fichier temporaire au nom unique (mêmes droits que
+l'ancien) renommé à sa place, sauvegarde de l'ancien prise juste avant et retirée si l'écriture échoue, anciennes
+sauvegardes effacées seulement après un succès. Un `server.cfg` qui est un lien symbolique reste un lien : c'est sa
+cible qui est écrite.
 
 ## Sauvegardes
 

@@ -50,6 +50,36 @@ describe('vava_voice nom de zone', function()
         assert.equal('invalid_label', code)
     end)
 
+    it('refuse les contrôles C1 et les caractères invisibles qui trompent la lecture', function()
+        local invisibles = {
+            '\u{80}', '\u{85}', '\u{9F}',            -- contrôles C1
+            '\u{200B}', '\u{200C}', '\u{200D}',      -- largeur nulle
+            '\u{200E}', '\u{200F}',                  -- LRM, RLM
+            '\u{2028}', '\u{2029}',                  -- séparateurs de ligne et de paragraphe
+            '\u{202A}', '\u{202E}',                  -- enchâssements, RLO
+            '\u{2066}', '\u{2069}',                  -- isolats
+            '\u{FEFF}',                              -- BOM
+        }
+        for _, sign in ipairs(invisibles) do
+            local refused, code = label.clean('Tri' .. sign .. 'bune')
+            assert.is_nil(refused, ('U+%04X accepté'):format(utf8.codepoint(sign)))
+            assert.equal('invalid_label', code)
+        end
+        -- voisins permis : tiret insécable, espace fine, guillemets
+        assert.equal('Tour\u{2011}Nord', label.clean('Tour\u{2011}Nord'))
+        assert.equal('Place\u{202F}royale', label.clean('Place\u{202F}royale'))
+        assert.equal('« Tribune »', label.clean('« Tribune »'))
+    end)
+
+    it('compte l\'espace insécable comme une espace pour un nom vide, et la garde ailleurs', function()
+        for _, value in ipairs({ '\u{A0}', '\u{A0}\u{A0}', ' \u{A0} ' }) do
+            local refused, code = label.clean(value)
+            assert.is_nil(refused)
+            assert.equal('invalid_label', code)
+        end
+        assert.equal('Salle\u{A0}haute', label.clean('Salle\u{A0}haute'))
+    end)
+
     it('fournit au schéma du RPC un motif ancré qui refuse les caractères de contrôle', function()
         assert.truthy(('Tribune'):find(label.PATTERN))
         assert.truthy(('Chapelle des évêques'):find(label.PATTERN))

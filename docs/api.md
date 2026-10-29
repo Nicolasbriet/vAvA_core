@@ -821,9 +821,10 @@ Chat vocal de proximité, sur la voix intégrée à FiveM (Mumble de FXServer, s
 Portées, touche, zones, textes : `config.lua`. Demande le core 0.5.0 ; facultatifs : `vava_hud` ≥ 1.2.0 (médaillon),
 `vava_health` (portée à terre), `vava_admin` ≥ 1.1.0 (zones de voix).
 
-À poser dans le `server.cfg` (son 3D du jeu, voix envoyée aux seuls joueurs à portée) ; la Chancellerie (1.4.2) les
-écrit d'elle-même, et les ajoute avant chaque lancement à un `server.cfg` qui ne les fixe pas (une valeur posée est
-gardée) :
+À poser dans le `server.cfg` (son 3D du jeu, voix envoyée aux seuls joueurs à portée), par `setr` (un `set` n'est pas
+transmis aux joueurs) ; la Chancellerie (1.4.2) les écrit d'elle-même, et les ajoute avant chaque lancement à un
+`server.cfg` qui ne les pose pas par `setr` (une valeur posée est gardée ; fichier qui inclut d'autres fichiers par
+`exec`, ou qui n'est pas en UTF-8 : rien d'écrit, un avertissement — voir `docs/chancellerie.md`) :
 
 ```
 setr voice_useNativeAudio true

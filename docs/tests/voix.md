@@ -18,8 +18,9 @@ casque : **A**, membre du Conseil, et **B**, simple joueur. Un test se cite « v
    ```
 
    La Chancellerie (1.4.2) les écrit d'elle-même (section « Voix ») et les ajoute, avant le lancement de FXServer, à un
-   `server.cfg` qui ne les fixe pas : console et journal de la Chancellerie disent « server.cfg complété ». Serveur
-   lancé sans elle : les ajouter à la main. Sans elles, les tests 2-5, 2-6 et la section 4 ne mesurent pas le
+   `server.cfg` qui ne les pose pas par `setr` : console et journal de la Chancellerie disent « server.cfg complété ».
+   Si elle avertit à la place (« server.cfg à vérifier » : `exec`, `set` au lieu de `setr`, fichier qui n'est pas en
+   UTF-8 ou en lecture seule), corriger à la main. Serveur lancé sans elle : les ajouter à la main. Sans elles, les tests 2-5, 2-6 et la section 4 ne mesurent pas le
    comportement voulu.
 3. **Chaque joueur** : chat vocal activé dans les réglages du jeu (Paramètres > Chat vocal), micro choisi, casque (sans
    casque, la voix de l'un repart dans le micro de l'autre). On parle en maintenant `N` (touche de GTA par défaut).
@@ -136,7 +137,7 @@ Tribune vaut ×2, rayon 3 m, hauteur 6 m (après 3-10) ; A se tient en son centr
 | 2 | Éditeur ouvert : `restart vava_voice`. | Le panneau disparaît, la souris et le clavier reviennent au jeu (le module rend le focus à son arrêt). |
 | 3 | A et B tous deux sur l'écran de sélection (se reconnecter) ; console du serveur : `restart vava_voice` ; ils parlent avant, pendant et après le redémarrage. | Ni l'un ni l'autre n'entend rien à aucun moment : à son arrêt, le module ne rend pas le micro des joueurs hors du jeu ; une fois prêt, il les tient toujours coupés. À l'apparition, la voix revient. |
 | 4 | Redémarrer tout le serveur. | Les zones sont toujours là : liste de l'éditeur, cylindres, effet en jeu. |
-| 5 | B sur l'écran de sélection ; console : `stop vava_voice` (sans `start`) ; B choisit son personnage et parle près de A. | Personne n'entend B : un arrêt sans redémarrage laisse muet, jusqu'à sa reconnexion, un joueur qui était hors du jeu (choix de 1.2.1, voir le rapport T-008). Console : `start vava_voice` ; B, déjà en jeu, est de nouveau entendu sans reconnexion. |
+| 5 | B sur l'écran de sélection ; console : `stop vava_voice` (sans `start`) ; B choisit son personnage et parle près de A. | Personne n'entend B : après un `stop` sans redémarrage, ou un redémarrage dont le setup échoue (console : déclaration refusée, pas de « prêt »), les joueurs alors en sélection restent muets jusqu'à leur reconnexion, même en jeu (choix de 1.2.1, voir le rapport T-008). Console : `start vava_voice`, « prêt » ; B, déjà en jeu, est de nouveau entendu sans reconnexion. |
 
 ## 9. Ce qu'il faut regarder dans la base
 

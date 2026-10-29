@@ -16,8 +16,10 @@ Ordre de démarrage : après `vava_admin`, avant `vava_cameras` (ordre complet :
    setr voice_useSendingRangeOnly true
    ```
 
-   La Chancellerie (1.4.2) les écrit d'elle-même, et les ajoute avant chaque lancement de FXServer à un `server.cfg`
-   qui ne les fixe pas ; une valeur déjà posée, même autre, est gardée.
+   Par `setr` : un `set` n'est pas transmis aux joueurs. La Chancellerie (1.4.2) les écrit d'elle-même, et les ajoute
+   avant chaque lancement de FXServer à un `server.cfg` qui ne les pose pas par `setr` ; une valeur posée est gardée.
+   Si le fichier inclut d'autres fichiers (`exec`) ou n'est pas en UTF-8, elle n'écrit rien et avertit : vérifier à la
+   main (`docs/chancellerie.md`).
 3. `ensure vava_voice` après `ensure vava_admin`. La table `vava_voice_zones` est créée par le core au premier
    démarrage (migration `sql/0001_voice_zones.sql`, jamais rejouée).
 4. Chaque joueur active le chat vocal dans les réglages du jeu (Paramètres > Chat vocal) et parle avec la touche de GTA
@@ -73,7 +75,8 @@ moins, beiges à ×1, dorés au-delà).
   ses hanches (la position du personnage) ; la zone descend aussi d'un mètre sous elles (`zones.baseOffset`), jusqu'au
   sol : une zone de 2 m au rez-de-chaussée ne déborde pas à l'étage.
 - **Nom** : 40 signes au plus — un « é » ou un emoji compte pour un, dans le champ comme sur le serveur ; les espaces
-  en trop sont retirés.
+  en trop sont retirés. Refusés : un nom fait d'espaces (insécables comprises), les caractères de contrôle et les
+  caractères invisibles qui tromperaient la lecture (largeur nulle, marques de sens d'écriture, BOM).
 - **Réglages** : rayon, hauteur, effet ; l'aperçu suit en direct, avec les quatre portées avant et après l'effet.
 - **Modifier** une zone (la cliquer dans la liste), la **recentrer** là où l'on se tient, **S'y rendre** (droit
   `teleport`), **Supprimer** (deux clics).
@@ -115,9 +118,10 @@ exports.vava_voice:releaseRange(source, 'baillon')
   son client redemande la liste des zones.
 - Aucune boucle par image au repos (relevés toutes les 150, 250 et 500 ms) ; une boucle par image seulement pendant le
   cercle au sol (1,5 s) et l'éditeur ouvert, chez le seul membre du Conseil.
-- Arrêt du module : aucun micro n'est rendu. Un joueur en sélection reste muet pendant un `restart` ; un arrêt sans
-  redémarrage le laisse muet jusqu'à sa reconnexion (ou, si le module revient, jusqu'à son apparition). Éditeur ouvert,
-  le clavier et la souris reviennent au jeu.
+- Arrêt du module : aucun micro n'est rendu. Un joueur en sélection reste muet pendant un `restart`. Après un `stop`
+  sans redémarrage, ou un redémarrage dont le setup échoue (le module ne devient jamais prêt), les joueurs alors en
+  sélection restent muets jusqu'à leur reconnexion, même une fois leur personnage en jeu ; si le module revient prêt,
+  ceux déjà en jeu retrouvent la voix sans reconnexion. Éditeur ouvert, le clavier et la souris reviennent au jeu.
 
 ## Arborescence
 
