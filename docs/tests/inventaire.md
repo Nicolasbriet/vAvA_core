@@ -122,7 +122,7 @@ Besace vide au départ.
 | 5 | Glisser la dernière pile du sac vers une case précise. | Posée là ; le sac vidé disparaît, prop et panneau. |
 | 6 | Jeter, fermer, s'écarter de 3 m, `I` ; puis revenir à 2 m, `I`. | À 3 m, la besace seule (2,5 m au plus, vérifiés par le serveur) ; à 2 m, le sac s'ouvre avec elle. |
 | 7 | À 2 m de ce sac, jeter. | Un second sac est posé (le premier est à plus de 1,5 m) ; les deux panneaux restent ouverts. |
-| 8 | Attendre 10 min après la pose d'un sac (1 min avec le réglage), son panneau ouvert. | Le sac disparaît avec son contenu ; son panneau se ferme. Le délai court depuis la pose, pas depuis le dernier dépôt. |
+| 8 | Attendre 10 min après la pose d'un sac (1 min avec le réglage), son panneau ouvert. | Le sac disparaît avec son contenu ; son panneau se ferme. Le délai court depuis la pose, pas depuis le dernier dépôt. Un objet lâché sur le sac à l'instant où il disparaît : « Cet objet n'est plus là. », l'objet reste dans la besace. |
 | 9 | Poser des sacs à plus de 1,5 m les uns des autres jusqu'au plafond (10, ou 2 avec le réglage), puis un de plus. | « Trop de sacs au sol. » ; l'objet reste dans la besace. Jeter à moins de 1,5 m d'un sac existant reste possible. |
 
 ## 9. Conteneur ancré : le grenier
@@ -165,7 +165,7 @@ A et B au grenier commun, chacun `E`.
 | 4 | **(2 joueurs)** Au même signal, A et B lâchent chacun un objet de leur besace sur les mêmes cases libres du grenier. | Un seul passe ; l'autre lit « Pas assez de place. » et son objet revient dans sa besace, tandis que l'objet du gagnant reste affiché chez lui, dans le grenier, sur les cases disputées. |
 | 5 | **(2 joueurs)** Au même signal, A et B tirent la même pile du grenier dans leur besace. | Une seule besace la reçoit ; l'autre lit « Cet objet n'est plus là. » (la pile est dans une besace qu'il ne regarde pas, ou fondue dans une pile), son aperçu revient en arrière et la pile ne réapparaît pas dans le grenier chez lui. |
 | 6 | **(2 joueurs)** A déplace une pile dans le grenier pendant que B la tire dans sa besace. | Selon l'ordre d'arrivée au serveur : B la reçoit et A la voit partir, ou A lit « Cet objet n'est plus là. » et ne la voit plus dans le grenier. Jamais deux exemplaires. |
-| 7 | **(2 joueurs)** B, grenier ouvert. A, à plus de 10 m : Registre → Joueurs → B → Amener. | Chez B, le panneau du grenier se ferme en 2 s au plus (rayon 3,5 m : 2 m d'interaction et 1,5 m de tolérance) ; la besace reste ouverte. Un geste sur le grenier avant la fermeture : « Hors de portée. ». Revenu, `E` le rouvre. |
+| 7 | **(2 joueurs)** B, grenier ouvert. A, à plus de 10 m : Registre → Joueurs → B → Amener. | Chez B, le panneau du grenier se ferme en 2 s au plus (rayon 3,5 m : 2 m d'interaction et 1,5 m de tolérance) ; la besace reste ouverte. Un geste sur le grenier avant la fermeture : « Hors de portée. » ; un objet lâché sur le grenier à l'instant où il se ferme (déjà fermé par le serveur) : « Cet objet n'est plus là. » et l'objet revient dans la besace. Revenu, `E` le rouvre. |
 | 8 | **(2 joueurs)** A jette une pile. | B voit le sac au sol ; `I` à moins de 2,5 m : le panneau du sac s'ouvre aussi chez lui. |
 | 9 | **(2 joueurs)** Au même signal, A et B double-cliquent la même pile du sac. | Un seul la reçoit ; l'autre lit « Cet objet n'est plus là. » et ne la voit ni dans sa besace ni dans le sac. Si le sac est vidé, il disparaît chez les deux, prop et panneau. |
 | 10 | **(2 joueurs)** B, sac ouvert. A : Registre → B → Amener. | Chez B, le panneau du sac reste affiché (un sac ne se ferme pas à distance), mais tout geste sur lui : « Hors de portée. ». |
@@ -269,3 +269,6 @@ toutes les 3 s, le contrôle d'éloignement des conteneurs ancrés toutes les 2 
   sont à confirmer.
 - Le retour des piles après `restart vava_inventory` est vérifié hors jeu sur un faux core (harnais) : l'ordre réel des
   redéclarations (récolte, artisanat, agriculture, magie) et l'accessoire revenu en main restent à voir (14-2, 14-6).
+- Un client modifié qui vise le conteneur d'un autre (déplacer ou diviser vers un numéro de besace, de coffre ou de sac
+  qu'il n'a pas ouvert) reçoit « Cet objet n'est plus là. », que ce conteneur existe ou non (vérifié hors jeu) ;
+  « Hors de portée. » ne répond qu'à un conteneur ouvert dont on s'est éloigné.

@@ -201,9 +201,11 @@ end
 
 ---@param change table
 local function publish(change)
+    -- toutes les révisions d'abord : un hook `after` appelé plus bas peut céder la main, et une opération qui attend
+    -- un hook doit déjà voir changé chaque conteneur de cette modification
+    for _, container in ipairs(change.order) do container.revision = container.revision + 1 end
     for _, container in ipairs(change.order) do
         local entry = change.entries[container]
-        container.revision = container.revision + 1
         for _, instance in ipairs(entry.set) do persistence.touch(instance, container.persisted) end
         -- l'objet lui-même : il ne s'efface de la base que s'il a peut-être sa ligne (pas une pile née au catalogue)
         for _, instance in ipairs(entry.deleted) do persistence.forget(instance) end
@@ -233,6 +235,14 @@ local function guarded(hook, payload, involved)
         if container.revision ~= revisions[i] or containers.get(container.id) ~= container then return false, 'conflict' end
     end
     return true
+end
+
+--- Vrai si un refus venu de `guarded` est rédigé par un module, à montrer tel quel au joueur : ni le refus générique
+--- (`refused`, abonné en erreur compris), ni un conflit, ni `cancelled` (abonné qui annule sans donner de raison).
+---@param code string|nil
+---@return boolean
+local function isReadable(code)
+    return code ~= 'refused' and code ~= 'conflict' and code ~= 'cancelled'
 end
 
 -- Accès -----------------------------------------------------------------------------------------------------
@@ -429,7 +439,9 @@ function operations.move(src, instanceId, toId, x, y, rotated)
     local instance, from, def = resolve(src, instanceId)
     if not instance then return false, from end
     local to = containers.get(toId)
-    if not canOperate(src, to) then return false, to and 'no_access' or 'not_found' end
+    -- conteneur que le joueur n'a pas sous les yeux : même réponse qu'il existe ou non (rien à deviner de l'extérieur)
+    if not to or not sees(src, to) then return false, 'not_found' end
+    if not canOperate(src, to) then return false, 'no_access' end
     local ok, code = checkPlacement(def, from, to, x, y, rotated, instance.quantity, to == from and instanceId or nil)
     if not ok then return false, code end
 
@@ -457,7 +469,8 @@ function operations.split(src, instanceId, quantity, toId, x, y, rotated)
     if def.stack <= 1 then return false, 'not_stackable' end
     if not isCount(quantity) or quantity >= instance.quantity then return false, 'invalid_quantity' end
     local to = containers.get(toId)
-    if not canOperate(src, to) then return false, to and 'no_access' or 'not_found' end
+    if not to or not sees(src, to) then return false, 'not_found' end
+    if not canOperate(src, to) then return false, 'no_access' end
     local ok, code = checkPlacement(def, from, to, x, y, rotated, quantity, nil)
     if not ok then return false, code end
 
@@ -605,7 +618,7 @@ function operations.use(src, instanceId)
     local payload = { source = src, instanceId = instanceId, item = instance.item, category = def.category, effects = def.effects }
     local ok, code = guarded(HOOK.USE, payload, { container })
     -- troisième valeur : refus rédigé par un module, à montrer au joueur
-    if not ok then return false, code, code ~= 'refused' and code ~= 'conflict' end
+    if not ok then return false, code, isReadable(code) end
 
     -- sans fonction d'utilisation, l'objet n'a que des effets : une unité est consommée
     local consume, message = true, nil
@@ -699,7 +712,7 @@ function operations.hold(src, instanceId, owner)
     local payload = { source = src, instanceId = instanceId, item = instance and instance.item or nil, previous = previous, owner = owner }
     local ok, code = guarded(HOOK.HOLD, payload, { container })
     -- troisième valeur : refus rédigé par un module (à terre…), notifié par la ceinture comme une utilisation
-    if not ok then return false, code, code ~= 'refused' and code ~= 'conflict' end
+    if not ok then return false, code, isReadable(code) end
     ok, code = hands.set(src, instance, def)
     if not ok then return false, code end
     hooks().runAfter(HOOK.HOLD, payload)
@@ -709,19 +722,16 @@ end
 -- Piles gardées à part (1.6.3) -------------------------------------------------------------------------------------
 
 --- Définition d'objet arrivée au registre : ses piles gardées à part dans les conteneurs en mémoire reprennent place
---- (containers.returnAside), la révision de chaque conteneur touché monte (une opération qui attendait un hook est
---- refusée en conflit au lieu de poser un objet sur une case reprise), ceux qui le regardent reçoivent la différence,
---- et une main qui attendait l'une de ces piles la retrouve. Aucune attente : tout se fait d'un bloc.
+--- (containers.returnAside, qui fait aussitôt monter la révision de chaque conteneur touché : une opération qui
+--- attendait un hook est refusée en conflit au lieu de poser un objet sur une case reprise), ceux qui le regardent
+--- reçoivent la différence, puis toute main qui attendait une pile de cet objet est réglée : reprise si la pile est
+--- replacée, vidée si elle reste à part faute de place. Le champ de la main, toujours réécrit, repart vers le client
+--- (emplacement Mains de l'interface ouverte) et vers les joueurs proches (accessoire). Aucune attente.
 ---@param name string
 function operations.returnAside(name)
     for _, entry in ipairs(containers.returnAside(name)) do
-        local container = entry.container
-        container.revision = container.revision + 1
-        viewers.publish(container, entry.placed, {})
-        local src = hands.restore(container)
-        -- besace ouverte pendant l'attente : son emplacement Mains montre une main vide, et le champ, inchangé, ne
-        -- repart pas vers le client ; l'état de ce seul joueur est renvoyé (au plus une fois par redémarrage)
-        if src and viewers.isViewing(src, container.id) then operations.snapshot(src) end
+        if #entry.placed > 0 then viewers.publish(entry.container, entry.placed, {}) end
+        hands.restore(entry.container)
     end
 end
 

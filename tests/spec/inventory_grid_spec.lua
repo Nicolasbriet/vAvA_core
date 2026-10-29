@@ -106,6 +106,27 @@ describe('vava_inventory grid.planReturn', function()
         assert.equal(3, left[2].id)
     end)
 
+    it('après une première recherche vaine, les piles restantes vont à part sans nouvelle recherche', function()
+        local g = newGrid(3, 1)
+        grid.mark(g, 1, 1, 0, 0, 97)
+        local searches = 0
+        local findSpace = grid.findSpace
+        grid.findSpace = function(...)
+            searches = searches + 1
+            return findSpace(...)
+        end
+        -- place d'origine prise pour toutes : la première trouve (1,0), la deuxième (2,0), puis plus rien
+        local list = {}
+        for id = 1, 50 do list[id] = pile(id, 0, 0) end
+        local placed, left = grid.planReturn(g, list, ONE)
+        grid.findSpace = findSpace
+        assert.equal(2, #placed)
+        assert.equal(48, #left)
+        assert.equal(3, left[1].id)
+        assert.equal(50, left[48].id)
+        assert.equal(3, searches)
+    end)
+
     it('ne modifie ni la grille ni les piles', function()
         local g = newGrid(3, 3)
         grid.mark(g, 1, 1, 0, 0, 99)

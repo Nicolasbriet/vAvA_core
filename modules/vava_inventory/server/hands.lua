@@ -146,21 +146,26 @@ function hands.bind(src, characterId, container)
     end
 end
 
---- Piles revenues dans une besace (voir containers.returnAside) : la main qui attendait l'une d'elles la reprend si
---- son objet se tient toujours en main, sinon se vide. Rien tant que la pile attendue reste à part.
+--- Définition arrivée pour des piles gardées à part dans une besace (voir containers.returnAside) : la main qui
+--- attendait l'une d'elles la reprend si elle est replacée et se tient toujours en main ; sinon elle se vide, comme au
+--- chargement (pile restée à part faute de place alors que son objet est connu, objet qui ne se tient plus en main).
+--- Elle n'attend encore que si la définition de sa pile manque toujours. Le champ écrit repart vers les clients.
 ---@param container vAvA.Container
----@return integer|nil src  le joueur dont la main a retrouvé sa pile
 function hands.restore(container)
     local src = byContainer[container.id]
     local state = src and bySource[src]
-    if not state or not state.awaitedId then return nil end
+    if not state or not state.awaitedId then return end
     local instance = container.items[state.awaitedId]
-    if not instance then return nil end
+    if not instance then
+        local aside = containers.aside(container, state.awaitedId)
+        if aside and not items.get(aside.item) then return end
+        -- toujours à part faute de place : aucun client ne doit montrer un accessoire que le serveur ne tient pas
+        hands.set(src, nil)
+        return
+    end
     local def = items.get(instance.item)
-    local held = def and def.held and instance or nil
     -- hands.set efface l'attente une fois le champ écrit
-    if hands.set(src, held, def) and held then return src end
-    return nil
+    hands.set(src, def and def.held and instance or nil, def)
 end
 
 ---@param src integer

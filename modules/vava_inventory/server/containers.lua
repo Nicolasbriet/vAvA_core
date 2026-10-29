@@ -208,14 +208,16 @@ end
 
 ---@class vAvA.ReturnedItems
 ---@field container vAvA.Container
----@field placed vAvA.ItemInstance[]
+---@field placed vAvA.ItemInstance[]  piles replacées (peut être vide)
+---@field left vAvA.ItemInstance[]    piles de cet objet toujours à part, faute de place
 
 --- Définition d'un objet (re)venue au registre : ses piles mises de côté dans les conteneurs en mémoire reprennent
 --- leur place d'origine si elle est libre, sinon la première place libre (alors notée pour l'écriture) ; sans place,
 --- elles restent à part, sans rien perdre (leur ligne en base n'a pas changé). Rien n'est recouvert : la carte
---- d'occupation fait foi. Synchrone, sans écriture en base : l'appelant publie (révision, spectateurs, main).
---- Cas type : `restart vava_inventory`, dont les besaces sont rechargées avant que les autres modules ne redéclarent
---- leurs objets (1.6.3).
+--- d'occupation fait foi. La révision d'un conteneur monte aussitôt ses piles placées, avant toute publication.
+--- Synchrone, sans écriture en base : l'appelant publie (spectateurs, main). Rend chaque conteneur qui gardait à part
+--- une pile de cet objet, replacée ou non. Cas type : `restart vava_inventory`, dont les besaces sont rechargées avant
+--- que les autres modules ne redéclarent leurs objets (1.6.3).
 ---@param name string
 ---@return vAvA.ReturnedItems[]
 function containers.returnAside(name)
@@ -250,10 +252,15 @@ function containers.returnAside(name)
             container.misplaced = kept
             if #left == 0 then forgetAside(name, id) end
             if #placed > 0 then
-                result[#result + 1] = { container = container, placed = placed }
+                -- tout de suite : une opération qui attend un hook voit le conteneur changé, quoi qu'il arrive ensuite
+                container.revision = container.revision + 1
                 VavaInventory.log.info("conteneur #%d : %d pile(s) de '%s' replacée(s)%s", id, #placed, name,
                     #left > 0 and (', ' .. #left .. ' toujours sans place') or '')
+            elseif #left > 0 then
+                VavaInventory.log.warn("conteneur #%d : %d pile(s) de '%s' toujours sans place, conservée(s) à part",
+                    id, #left, name)
             end
+            result[#result + 1] = { container = container, placed = placed, left = left }
         end
     end
     return result

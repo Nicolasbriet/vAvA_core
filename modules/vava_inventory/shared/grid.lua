@@ -127,7 +127,8 @@ end
 --- D'abord, chaque pile dont la place d'origine est libre la reprend ; ensuite seulement, les autres prennent la
 --- première place libre : une pile replacée ailleurs ne prend jamais la place d'origine libre d'une autre pile de la
 --- liste. La carte d'occupation fait foi (aucune pile n'est recouverte) et chaque place rendue est réservée pour les
---- suivantes.
+--- suivantes. Une fois qu'aucune place n'est trouvée, les piles restantes vont à part sans nouvelle recherche : elles
+--- ont la même taille et les cases libres ne font que diminuer.
 ---@param container vAvA.Grid
 ---@param instances { x: integer, y: integer, rotated: boolean }[]  par ordre de priorité (la plus ancienne d'abord)
 ---@param def { width: integer, height: integer }
@@ -145,13 +146,16 @@ function grid.planReturn(container, instances, def)
             others[#others + 1] = instance
         end
     end
+    local full = false
     for _, instance in ipairs(others) do
-        local x, y, rotated = grid.findSpace(container, def, reserved)
+        local x, y, rotated
+        if not full then x, y, rotated = grid.findSpace(container, def, reserved) end
         if x then
             local w, h = grid.footprint(def, rotated)
             grid.reserve(reserved, container, w, h, x, y)
             placed[#placed + 1] = { instance = instance, x = x, y = y, rotated = rotated, moved = true }
         else
+            full = true
             left[#left + 1] = instance
         end
     end
