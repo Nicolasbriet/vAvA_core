@@ -6,7 +6,7 @@
 ]]
 
 local type, pairs, next, tostring, pcall, getmetatable = type, pairs, next, tostring, pcall, getmetatable
-local mathType = math.type
+local mathType, tointeger = math.type, math.tointeger
 local format, find = string.format, string.find
 local HUGE = math.huge
 
@@ -171,7 +171,9 @@ validateNode = function(node, value)
     elseif kind == 'number' or kind == 'integer' then
         if valueType ~= 'number' then return false, 'nombre attendu' end
         if value ~= value or value == HUGE or value == -HUGE then return false, 'nombre non fini' end
-        if kind == 'integer' and mathType(value) ~= 'integer' and value % 1 ~= 0 then
+        -- un flottant n'est accepté que s'il a un équivalent entier : 3.0 oui ; 1e300 ou 2^63, entiers en apparence
+        -- (x % 1 == 0) mais hors des entiers Lua, non (le RPC les convertirait en nil)
+        if kind == 'integer' and mathType(value) ~= 'integer' and tointeger(value) == nil then
             return false, 'entier attendu'
         end
         if node.min and value < node.min then return false, format('valeur < %s', node.min) end

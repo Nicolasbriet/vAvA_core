@@ -4,6 +4,7 @@
            suppression douce, champs. Machine d'états par session :
              joined → loading → active → unloading → joined   (connecting est géré par accounts.lua)
            Une seule action à la fois par session (verrou busy) : spam et duplication de sélection impossibles.
+           La fermeture d'une session (déconnexion) attend la fin de l'action en cours avant de décharger.
     Les intentions du client passent par les RPC core:characters:* ; le serveur valide et décide de tout.
     Dépendances : shared/init.lua, config/server.lua, shared/lib/string.lua, shared/core/logger.lua,
                   shared/core/hooks.lua, server/core/database.lua, server/core/rpc.lua, server/players/*.lua
@@ -15,6 +16,7 @@ local tointeger = math.tointeger
 local sort = table.sort
 local utf8codes = utf8.codes
 local decodeJson, encodeJson = json.decode, json.encode
+local newPromise, await = promise.new, Citizen.Await
 
 local str = vAvA.lib.string
 local hooks = vAvA.hooks
@@ -166,6 +168,12 @@ local function withSession(src, expectedState, action, ...)
     session.busy = true
     local called, ok, result = xpcall(action, traceback, session, ...)
     session.busy = false
+    -- une fermeture de session attendait la fin de l'action (characters.handleClose) : elle reprend la main
+    local idle = session.idle
+    if idle then
+        session.idle = nil
+        idle:resolve(true)
+    end
     if not called then
         log.error('action personnage en erreur (compte #%s) : %s', tostring(session.accountId), tostring(ok))
         return false, 'server_error'
@@ -243,6 +251,9 @@ end
 ---@return string|nil code
 local function selectCharacter(session, characterId)
     if not session.characters[characterId] then return false, 'not_owner' end
+    -- encore chargé : la session précédente du compte (reconnexion rapide) termine son déchargement et sa
+    -- sauvegarde ; le recharger maintenant lirait la base avant cette sauvegarde, puis serait retiré par elle
+    if activeById[characterId] then return false, 'busy' end
     session.state = 'loading'
 
     -- un personnage déchargé sans avoir pu être sauvegardé est plus récent que la base : il est réutilisé
@@ -340,9 +351,19 @@ function characters.prepareSession(session)
 end
 
 --- Fermeture d'une session (déconnexion, session fantôme) : décharge le personnage actif s'il y en a un.
+--- Une action en cours (sélection, déchargement…) se termine d'abord : elle s'interrompt d'elle-même à sa
+--- prochaine vérification (session fermée). Sans cette attente, un déchargement en cours serait rejoué
+--- (hooks unloading en double) et des modules chargeraient leurs données après le déchargement.
+--- Bloque le thread courant.
 ---@param session vAvA.Session
 ---@param reason string
 function characters.handleClose(session, reason)
+    -- boucle : une autre action (lancée par un module) a pu commencer entre la fin de la précédente et la reprise
+    while session.busy do
+        local idle = session.idle or newPromise()
+        session.idle = idle
+        await(idle)
+    end
     if session.characterId and activeById[session.characterId] then
         unload(session, reason)
     end

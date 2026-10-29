@@ -44,6 +44,7 @@ vAvA.accounts = accounts
 ---@field state vAvA.SessionState
 ---@field openedAt integer
 ---@field busy boolean                une action de personnage est en cours : les autres sont refusées
+---@field idle table|nil              promesse résolue à la fin de l'action en cours (fermeture qui l'attend)
 ---@field closing boolean
 ---@field characters table<integer, table>  résumés des personnages du compte (id → résumé)
 ---@field characterId integer|nil

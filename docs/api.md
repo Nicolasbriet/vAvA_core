@@ -44,7 +44,7 @@ Utilisés par les arguments de RPC, les retours client et les entrées de regist
 
 | Champ | Types concernés | Effet |
 |---|---|---|
-| `type` | tous | `string`, `number`, `integer`, `boolean`, `table`, `array`, `map`, `function`, `any` |
+| `type` | tous | `string`, `number`, `integer`, `boolean`, `table`, `array`, `map`, `function`, `any` ; `integer` n'accepte un flottant que s'il a un équivalent entier Lua (`3.0` oui, `1e300` non) |
 | `optional` | tous | `nil` accepté |
 | `min` / `max` | string (longueur), number/integer (valeur), array/map (nombre d'éléments) | bornes incluses |
 | `pattern` | string | motif Lua (ancrer avec `^` et `$`) |
@@ -401,7 +401,10 @@ Hooks client (locaux, émis par le core) :
 
 Codes de refus : `no_session`, `busy`, `wrong_state`, `not_owner`, `not_found`, `too_many_characters`,
 `invalid_name`, `invalid_sex`, `name_taken`, `refused`, `db_error`, `corrupted_data`, `no_character`, ou la
-raison donnée par un hook `before`.
+raison donnée par un hook `before`. `busy` vaut aussi pour la sélection d'un personnage qui termine encore son
+déchargement d'une session précédente (reconnexion rapide) : il suffit de réessayer. Une déconnexion attend la fin de
+l'action de personnage en cours avant de décharger ; une modification faite pendant l'écriture du déchargement est
+gardée et écrite au cycle suivant.
 
 Noms : `characters.name` dans `config/server.lua` (longueur en caractères, lettres accentuées autorisées,
 séparateurs `'`, `-` et espace jamais en tête, en fin ni doublés).

@@ -5,7 +5,9 @@
       - cycle périodique : une seule transaction pour tous les personnages modifiés ;
       - déchargement : écriture immédiate du personnage ;
       - échec d'écriture : le personnage est gardé et retenté à chaque cycle, et réutilisé s'il est resélectionné
-        (ses données, plus récentes que la base, ne sont jamais perdues).
+        (ses données, plus récentes que la base, ne sont jamais perdues) ;
+      - les écritures ne se croisent jamais : une sauvegarde groupée en cours est attendue par les autres, sans quoi
+        sa révision (plus ancienne) pourrait être écrite en base après celle d'un déchargement.
     FiveM n'attend pas les écritures en cours à l'arrêt du serveur : lancer vava_saveall avant quit.
     Dépendances : config/server.lua, shared/core/logger.lua, server/core/database.lua
 ]]
@@ -14,6 +16,7 @@ local pcall, xpcall, pairs, tostring = pcall, xpcall, pairs, tostring
 local traceback = debug.traceback
 local encodeJson = json.encode
 local CreateThread, Wait, RegisterCommand = CreateThread, Wait, RegisterCommand
+local newPromise, await = promise.new, Citizen.Await
 
 local database = vAvA.database
 local cfg = vAvA.config.server.persistence
@@ -33,6 +36,13 @@ vAvA.persistence = persistence
 local retry = {}
 ---@type fun(fn: fun(character: vAvA.Character))
 local forEachActive = function() end
+-- promesse de la sauvegarde groupée en cours (nil sinon), résolue à sa fin
+local flushing = nil
+
+--- Attend la fin de la sauvegarde groupée en cours, s'il y en a une. Bloque le thread courant.
+local function awaitFlush()
+    while flushing do await(flushing) end
+end
 
 ---@param character vAvA.Character
 ---@return boolean
@@ -60,6 +70,8 @@ end
 ---@param character vAvA.Character
 ---@return boolean saved
 function persistence.saveCharacter(character)
+    -- la transaction en cours peut contenir une révision plus ancienne de ce personnage : elle passe d'abord
+    awaitFlush()
     if not isDirty(character) then return true end
     local query = buildQuery(character)
     if not query then return false end
@@ -71,15 +83,19 @@ function persistence.saveCharacter(character)
         return false
     end
     character.savedRevision = revision
-    if not isDirty(character) then retry[character.id] = nil end
+    -- modifié pendant l'écriture (le personnage est encore chargé) : gardé pour le prochain cycle, sinon cette
+    -- modification serait perdue avec lui
+    if isDirty(character) then
+        retry[character.id] = character
+    else
+        retry[character.id] = nil
+    end
     return true
 end
 
---- Sauvegarde groupée de tous les personnages modifiés (actifs et en attente de nouvel essai).
---- Bloque le thread courant.
 ---@return boolean ok
 ---@return integer|string countOrErr
-function persistence.saveAll()
+local function saveDirty()
     local queries, saved = {}, {}
     local function consider(character)
         if not isDirty(character) then return end
@@ -106,6 +122,23 @@ function persistence.saveAll()
         if retry[character.id] == character and not isDirty(character) then retry[character.id] = nil end
     end
     return true, #queries
+end
+
+--- Sauvegarde groupée de tous les personnages modifiés (actifs et en attente de nouvel essai).
+--- Une seule à la fois (cycle et vava_saveall) ; les écritures de déchargement attendent sa fin.
+--- Bloque le thread courant.
+---@return boolean ok
+---@return integer|string countOrErr
+function persistence.saveAll()
+    awaitFlush()
+    local done = newPromise()
+    flushing = done
+    local called, ok, result = xpcall(saveDirty, traceback)
+    -- libérée quoi qu'il arrive : une erreur ne doit jamais bloquer les sauvegardes suivantes
+    flushing = nil
+    done:resolve(true)
+    if not called then error(ok, 0) end
+    return ok, result
 end
 
 --- Récupère un personnage déchargé mais non sauvegardé : ses données priment sur la base.
