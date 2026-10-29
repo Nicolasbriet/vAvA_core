@@ -19,3 +19,5 @@ desktop.ini
 STOP
 # Lua, luacheck et busted sous Windows (scripts/outils-windows.sh)
 .outils/
+# Copies de travail des agents (git worktree)
+.claude/worktrees/

@@ -21,6 +21,8 @@ local KNOWN_TYPES = {
 local SERVER_ONLY_TYPES = { any = true, ['function'] = true }
 local ENUM_TYPES = { string = true, number = true, integer = true }
 local MAP_KEY_TYPES = { string = true, integer = true }
+-- types dont min et max comptent quelque chose (octets d'une chaîne, éléments d'une liste ou d'une map)
+local LENGTH_TYPES = { string = true, array = true, map = true }
 local NO_OPTIONS = {}
 
 ---@class vAvA.SchemaDefinition
@@ -74,11 +76,23 @@ compileNode = function(def, options, path)
     if def.max ~= nil and type(def.max) ~= 'number' then
         return nil, format('%s : max doit être un nombre', path)
     end
+    if def.min ~= def.min or def.max ~= def.max then
+        return nil, format('%s : min et max ne peuvent pas valoir NaN', path)
+    end
     if def.min and def.max and def.min > def.max then
         return nil, format('%s : min > max', path)
     end
+    -- longueur d'une chaîne, nombre d'éléments d'une liste ou d'une map : des entiers (2.0 admis), sinon les messages
+    -- de refus en %d lèveraient pendant la validation
+    if LENGTH_TYPES[kind]
+        and ((def.min ~= nil and tointeger(def.min) == nil) or (def.max ~= nil and tointeger(def.max) == nil)) then
+        return nil, format('%s : min et max sont des nombres entiers pour le type %s', path, kind)
+    end
 
     local node = { type = kind, optional = def.optional == true, min = def.min, max = def.max }
+    if LENGTH_TYPES[kind] then
+        node.min, node.max = def.min and tointeger(def.min), def.max and tointeger(def.max)
+    end
 
     if kind == 'string' then
         if def.pattern ~= nil then
@@ -130,7 +144,10 @@ compileNode = function(def, options, path)
             return nil, format('%s : enum réservé aux types string, number et integer (liste attendue)', path)
         end
         local set = {}
-        for _, allowed in pairs(def.enum) do set[allowed] = true end
+        for _, allowed in pairs(def.enum) do
+            if allowed ~= allowed then return nil, format('%s : NaN interdit dans enum', path) end
+            set[allowed] = true
+        end
         if next(set) == nil then
             return nil, format('%s : enum vide', path)
         end
@@ -291,12 +308,15 @@ function schema.validateList(compiledList, values, count)
     if type(values) ~= 'table' or getmetatable(values) ~= nil then
         return false, 'liste de valeurs attendue'
     end
-    for i = 1, max do
-        local value = values[i]
-        if i > count and value ~= nil then
-            return false, format('#%d : valeur au-delà du nombre annoncé', i)
+    -- seules les clés 1 à count sont admises : la boucle s'arrête à la première clé en trop, après count + 1 tours au
+    -- plus, même sur une table géante
+    for key in pairs(values) do
+        if mathType(key) ~= 'integer' or key < 1 or key > count then
+            return false, format('#%s : valeur au-delà du nombre annoncé', tostring(key))
         end
-        local ok, err = validateNode(compiledList[i], value)
+    end
+    for i = 1, max do
+        local ok, err = validateNode(compiledList[i], values[i])
         if not ok then return false, format('#%d : %s', i, err) end
     end
     return true
