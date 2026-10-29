@@ -161,7 +161,10 @@ core.hooks.runAfter('vava_inventory:move', payload)
 ne sont transmis qu'aux hooks serveur : le core ne les stocke pas (seule la license l'est, comme clé de compte).
 Une connexion pendant le démarrage du core attend au plus `players.coreWaitTimeoutMs` (60 s par défaut, 0.7.2), puis
 reçoit `players.messages.stillStarting` (« réessayez dans un instant ») ; les modules, eux, attendent le core sans
-limite.
+limite. Une connexion acceptée puis abandonnée pendant le chargement (FiveM fermé) libère sa license dès que FXServer
+ne connaît plus son identifiant temporaire (0.7.3) : relevé toutes les `players.connectCheckMs` (5 s), license libérée
+après deux relevés manquants, au plus tard après `players.connectTimeoutMs` (120 s). Un joueur qui charge
+normalement n'est jamais concerné.
 
 ### `core.players`
 

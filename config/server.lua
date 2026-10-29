@@ -37,7 +37,9 @@ vAvA.config.server = {
     },
 
     players = {
-        connectTimeoutMs = 120000,  -- au-delà, une connexion acceptée mais jamais finalisée libère sa session
+        connectTimeoutMs = 120000,  -- au-delà, une connexion acceptée mais jamais finalisée libère sa session (filet)
+        connectCheckMs = 5000,      -- vérification qu'une connexion acceptée existe encore côté FXServer (abandon :
+                                    -- licence libérée après deux relevés manquants, sans attendre connectTimeoutMs)
         coreWaitTimeoutMs = 60000,  -- attente maximale du démarrage du core par une connexion (base injoignable…)
         -- Messages affichés au joueur pendant la connexion.
         messages = {

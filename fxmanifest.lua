@@ -12,7 +12,7 @@ use_experimental_fxv2_oal 'yes'
 
 name 'vAvA_core'
 description 'Core RP médiéval vAvA - fondations, joueurs et personnages'
-version '0.7.2'
+version '0.7.3'
 
 dependency 'oxmysql'
 
