@@ -419,11 +419,13 @@ séparateurs `'`, `-` et espace jamais en tête, en fin ni doublés).
 
 ## Modules officiels
 
-Ressources séparées, dans `modules/` : à copier (ou lier) dans le dossier `resources` du serveur, dans cet ordre :
-`ensure vAvA_core`, `ensure vava_world`, `ensure vava_appearance`, `ensure vava_characters_ui`, `ensure vava_hud`,
-`ensure vava_inventory`, `ensure vava_needs`, `ensure vava_health`, `ensure vava_admin`, `ensure vava_voice`,
-`ensure vava_skills`, `ensure vava_gathering`, `ensure vava_crafting`, `ensure vava_farming`, `ensure vava_codex`, `ensure vava_chancellerie`,
-puis les modules qui déclarent des objets.
+Ressources séparées, dans `modules/` : à copier (ou lier) dans le dossier `resources` du serveur, dans cet ordre (le
+même que `README.md` à la racine, et celui qu'écrit la Chancellerie) :
+`ensure oxmysql`, `ensure vAvA_core`, `ensure vava_chat` (à la place de `ensure chat`), `ensure vava_world`,
+`ensure vava_appearance`, `ensure vava_characters_ui`, `ensure vava_hud`, `ensure vava_inventory`, `ensure vava_needs`,
+`ensure vava_health`, `ensure vava_admin`, `ensure vava_voice`, `ensure vava_cameras`, `ensure vava_magic`,
+`ensure vava_skills`, `ensure vava_gathering`, `ensure vava_crafting`, `ensure vava_farming`, `ensure vava_codex`,
+`ensure vava_chancellerie`, puis les modules qui déclarent des objets.
 
 ### `vava_appearance`
 
@@ -614,8 +616,8 @@ avec le personnage. Les besoins, durées, paliers, messages et gestes sont dans 
   passage (2 points pour la faim, 4 pour la soif). Avec `vava_health`, le joueur finit à terre (puis peut être
   relevé) et la baisse s'arrête tant qu'il y est ; sans lui, la vie ne descend jamais sous `health.floor` (10 % de la
   vie au-dessus du seuil de mise à terre), pour que personne ne reste mort sans recours.
-- **Manger, boire** : objets de l'inventaire déclarant `effects = { hunger = …, thirst = … }`. Refusés au-delà de 95
-  (« Vous n'avez plus faim. ») et pendant le geste en cours (3 s). Geste selon la catégorie (`nourriture` : manger,
+- **Manger, boire** : objets de l'inventaire déclarant `effects = { hunger = …, thirst = … }`. Refusés dès 95 (à 95 et
+  au-dessus pour chaque besoin que l'objet remplit : « Vous n'avez plus faim. ») et pendant le geste en cours (3 s). Geste selon la catégorie (`nourriture` : manger,
   `boisson` : boire), sans accessoire en main. Un objet portant aussi l'effet d'un autre module n'est jamais refusé
   pour cause de satiété.
 - **Réseau** : un envoi par joueur et par minute (son champ), à lui seul ; aucun RPC (l'utilisation d'un objet passe
@@ -730,7 +732,10 @@ Administration du royaume : le **Conseil** (rangs et droits), le panneau **Regis
 réglable), les bans vérifiés à la connexion, le journal des actions, les signalements des joueurs (`/signaler`).
 Rangs, droits, durées, textes : `config.lua`. Demande le core 0.5.0 (compte connu transmis au hook de connexion).
 
-**Rangs** (cumulatifs ; on n'agit jamais sur un membre de rang égal ou supérieur) :
+**Rangs** (cumulatifs). Les actions qui contraignent un joueur (amener à soi, renvoyer, déplacer, immobiliser,
+avertir, expulser, bannir, fouiller, observer) ne visent jamais un membre de rang égal ou supérieur. Rejoindre,
+Soigner, Nourrir, Écrire et Donner l'aident ou ne le touchent pas : elles ne sont pas protégées par le rang, et c'est
+voulu (l'écran des joueurs non plus, voir plus bas).
 
 | Rang | Droits |
 |---|---|
@@ -794,8 +799,8 @@ Chancellerie. Chaque demande déclare son droit, son schéma et où elle a un se
 soi, observer, outils, fouiller en ouvrant l'inventaire), au web seulement (`moveToPlayer`, `moveToCoords`,
 `inventoryView` en lecture, `watchScreen`) ou les deux. Un compte du panneau agit comme un membre du rang que lui a
 donné le compte maître, sans personnage : mêmes droits, mêmes contrôles de cible et de rang, journal au nom de
-« Chancellerie : <compte> ». Seule exception à la règle du rang : l'écran des joueurs (droit `watch`, tout le Conseil),
-que chacun regarde chez tout le monde, membres du Conseil de tout rang compris. Exports réservés à la ressource-pont (`config.web.bridge`, `vava_chancellerie`) :
+« Chancellerie : <compte> ». Outre les actions qui aident (plus haut), l'écran des joueurs échappe aussi à la règle du
+rang (droit `watch`, tout le Conseil) : chacun le regarde chez tout le monde, membres du Conseil de tout rang compris. Exports réservés à la ressource-pont (`config.web.bridge`, `vava_chancellerie`) :
 
 | Export | Retour |
 |---|---|
@@ -816,7 +821,9 @@ Chat vocal de proximité, sur la voix intégrée à FiveM (Mumble de FXServer, s
 Portées, touche, zones, textes : `config.lua`. Demande le core 0.5.0 ; facultatifs : `vava_hud` ≥ 1.2.0 (médaillon),
 `vava_health` (portée à terre), `vava_admin` ≥ 1.1.0 (zones de voix).
 
-À poser dans le `server.cfg` (son 3D du jeu, voix envoyée aux seuls joueurs à portée) :
+À poser dans le `server.cfg` (son 3D du jeu, voix envoyée aux seuls joueurs à portée) ; la Chancellerie (1.4.2) les
+écrit d'elle-même, et les ajoute avant chaque lancement à un `server.cfg` qui ne les fixe pas (une valeur posée est
+gardée) :
 
 ```
 setr voice_useNativeAudio true
@@ -831,18 +838,26 @@ setr voice_useSendingRangeOnly true
 - **Repères** : médaillon « Voix » dans le HUD (un quart par portée), qui s'illumine quand le joueur parle ; cercle au sol
   à la distance de la voix pendant 1,5 s, au seul changement de portée, vu du seul joueur.
 - **Hors du jeu** (sélection, chargement) : micro coupé par le serveur (`MumbleSetPlayerMuted`, rien à contourner) et
-  joueur hors de tout salon : il n'entend personne. Le micro s'ouvre à l'apparition confirmée du personnage.
+  joueur hors de tout salon : il n'entend personne. Le micro s'ouvre à l'apparition confirmée du personnage. À l'arrêt
+  du module (1.2.1), aucun micro n'est rendu : un joueur en sélection reste muet pendant un `restart` ; un arrêt sans
+  redémarrage le laisse muet jusqu'à sa reconnexion.
 - **À terre** (`vava_health`) : Chuchoter et Parler seulement ; la portée d'avant revient après la réanimation. Relu à
   chaque apparition (déconnecté puis reconnecté à terre : toujours limité).
 - **Zones de voix** : lieux où la voix porte plus (tribune, place : ×1,5 à ×3) ou moins loin (bibliothèque, crypte :
-  ×0,5, ×0,75) ; cylindre centré sur les pieds de qui le crée (rayon et hauteur, pour séparer les étages). Si des zones
-  se chevauchent, la plus petite l'emporte. Créées en jeu par le Conseil (droit `tools`) : outil « Zones de voix » du
-  Registre ou `/zonesvoix`. L'éditeur dessine les zones proches dans le monde (teinte selon l'effet) et l'aperçu suit
-  les réglages ; centre lu côté serveur, valeurs bornées, chaque action revérifiée et inscrite au journal du Registre.
-  « S'y rendre » demande le droit `teleport`. Gardées en base (`vava_voice_zones`, 200 au plus).
+  ×0,5, ×0,75) ; cylindre centré sur la position de qui le crée : hauteur comptée depuis ses hanches, la zone descend
+  aussi d'un mètre sous elles (`zones.baseOffset`), de quoi séparer les étages. Si des zones se chevauchent, la plus
+  petite l'emporte. Créées en jeu par le Conseil (droit `tools`) : outil « Zones de voix » du Registre ou
+  `/zonesvoix`. L'éditeur dessine les zones proches dans le monde (teinte selon l'effet) et l'aperçu suit les
+  réglages ; nom de 40 signes (un « é » compte pour un, dans le champ comme sur le serveur : 160 octets au plus sur le
+  réseau), centre lu côté serveur, valeurs bornées, un seul enregistrement à la fois, chaque action revérifiée et
+  inscrite au journal du Registre. « S'y rendre » demande le droit `teleport`. Gardées en base (`vava_voice_zones`,
+  200 au plus). Module arrêté éditeur ouvert : clavier et souris rendus au jeu.
 - **Fonctionnement** : chaque joueur en jeu écoute son propre salon (`1000 + numéro de joueur`) ; sa parole part vers
   les salons des seuls joueurs à portée, recalculés toutes les 250 ms (Mumble n'est sollicité que si la liste change).
-  Aucune boucle par image, sauf pendant le cercle au sol et l'éditeur ouvert.
+  La liste des zones est demandée par le client (RPC `vava_voice:zones`) à l'apparition et au redémarrage du module,
+  avec quelques essais si le serveur n'est pas prêt ; le serveur renvoie au passage la limite de portée du moment
+  (évènement `vava_voice:limit`, au seul demandeur, s'il est en jeu). Aucune boucle par image, sauf pendant le cercle
+  au sol et l'éditeur ouvert.
 - **Limite** : la portée est réglée par le client, comme toute voix FiveM ; un client modifié pourrait l'agrandir.
   FXServer n'a pas non plus de contrôle d'accès aux salons Mumble : un client modifié peut rejoindre le salon d'un
   autre joueur (et entendre ce qui se dit près de lui) ou viser tous les salons (parler à tout le serveur), hors de
@@ -855,7 +870,7 @@ setr voice_useSendingRangeOnly true
 | `limitRange(source, raison, maximum)` | `true` ou `false, code` — portée limitée au numéro `maximum` (1 = Chuchoter) pour cette raison (préfixée par la ressource appelante) ; la plus basse des limites s'applique |
 | `releaseRange(source, raison)` | `true` ou `false, code` |
 | `getZones()` | liste `{ id, label, x, y, z, radius, height, multiplier }` |
-| `webUpdateZone(id, nom, rayon, hauteur, effet)` | `true, zone, détails` ou `false, code` — pont de la Chancellerie seulement (1.1.0) ; sans recentrage |
+| `webUpdateZone(id, nom, rayon, hauteur, effet)` | `true, zone, détails` ou `false, code` — pont de la Chancellerie seulement (1.1.0) ; sans recentrage ; nom refusé par `invalid_label` ou `label_too_long` (40 signes, 1.2.1) |
 | `webDeleteZone(id)` | `true, nil, détails` ou `false, code` — pont de la Chancellerie seulement (1.1.0) |
 
 | Export client | Retour |
@@ -1288,7 +1303,9 @@ tests en jeu : `modules/vava_chat/README.md`. Demande le core 0.5.0 ; facultatif
   `/metiers niveau <joueur> <compétence> <niveau>`), filtrées selon ses droits ; à nom égal elles l'emportent sur un
   `chat:addSuggestion`. Taper `/metiers ` montre le paramètre en cours et garde ses sous-commandes proposées ; `Tab`
   complète le nom puis la sous-commande. Toute commande tapée est signalée au Codex (`noteCommand`) pour ses
-  « dernières pages ». Sans `vava_codex`, rien ne change.
+  « dernières pages ». Sans `vava_codex`, rien ne change. Depuis 1.1.1, un rang donné ou retiré en cours de partie met
+  les suggestions à jour sans reconnexion (le serveur prévient le seul joueur visé, qui redemande son profil), et
+  `/staff` n'est suggéré qu'aux membres du Conseil.
 - **Envoi** : RPC `vava_chat:send` (genre, texte, numéro de joueur | 0, conversation | 0) ; destinataires choisis par le
   serveur, jamais `-1`. Un `/mp` désigne son correspondant par un numéro de conversation jamais réutilisé.
 
@@ -1297,7 +1314,8 @@ tests en jeu : `modules/vava_chat/README.md`. Demande le core 0.5.0 ; facultatif
 | `addMessage(cible, message)` | `true` ou `false, code` — `cible` : joueur connecté, ou `-1` pour tous les joueurs en jeu ; `message` : texte, `{ author?, text, color? }` ou `{ args, color? }` |
 
 **Hooks** : `vava_chat:sending` (`before`, annulable : `{ source, characterId, kind, text, target? }` — sourdine,
-prison… ; la raison du refus est montrée au joueur), `vava_chat:sent` (`after` : `+ recipients`).
+prison… ; la raison du refus est montrée au joueur), `vava_chat:sent` (`after` : `+ recipients`, nombre de joueurs
+qui l'ont reçu : auteur compris, sauf pour un `/mp`, qui vaut 1).
 
 ### `vava_chancellerie`
 

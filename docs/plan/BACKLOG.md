@@ -89,13 +89,14 @@ marqués « décision » attendent le porteur du projet : ne pas les coder sans 
 - Décisions : `core:characters:create` ouvert aux clients ; revenir à la sélection sans se reconnecter.
 
 ### T-008 — Voix, chat et Chancellerie
-- Agents : vava-dev-lua + vava-dev-nui · Dépend de : — · Statut : à faire
+- Agents : vava-dev-lua + vava-dev-nui · Dépend de : — · Statut : à tester en jeu
 - V1 : le `server.cfg` écrit par la Chancellerie contient `setr voice_useNativeAudio true` et
   `setr voice_useSendingRangeOnly true` (cette tâche autorise à toucher `chancellerie/`).
 - Voix : nom de zone borné de façon cohérente entre le champ (signes) et le schéma (octets) ; pas de double envoi
   par `Entrée` ; focus rendu à l'arrêt ; zones et limite « à terre » redemandées après un redémarrage ; personne en
   sélection ne s'entend pendant un `restart`.
 - Chat : README remis d'accord (test 9, `recipients`) ; `/staff` suggéré au seul Conseil.
+- Chat (repris de T-007) : suggestions du chat à jour après un changement de rang du Conseil, sans reconnexion.
 - README à écrire : `vava_voice`, `vava_cameras`, `vava_chancellerie`.
 - `docs/api.md` : ordre de démarrage complet, refus des besoins « dès 95 », actions non protégées par le rang.
 

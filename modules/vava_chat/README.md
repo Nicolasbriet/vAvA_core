@@ -77,7 +77,7 @@ repris : utiliser l'export ci-dessous ou les hooks.
 | Hook | Phase | Payload |
 | --- | --- | --- |
 | `vava_chat:sending` | `before` (annulable) | `{ source, characterId, kind, text, target? }` — `kind` : `ooc`, `me`, `do`, `mp`, `staff` ; `target` : source du destinataire d'un `/mp`. Renvoyer `false, 'raison'` refuse le message (sourdine, prison…) : le joueur voit la raison |
-| `vava_chat:sent` | `after` | le même, plus `recipients` (nombre de joueurs qui l'ont reçu, auteur compris) |
+| `vava_chat:sent` | `after` | le même, plus `recipients` : nombre de joueurs qui l'ont reçu, auteur compris pour `/ooc`, `/me`, `/do` et `/staff` ; pour un `/mp`, 1 (le destinataire : la copie de l'expéditeur n'est pas comptée) |
 
 Une commande inconnue répond « Commande inconnue : /… » au seul joueur (l'ancienne ressource la diffusait à tous).
 
@@ -124,7 +124,9 @@ Une page de lecture dans la Chancellerie viendra dans un second temps.
   interprété. Au-dessus de la tête, les codes de GTA (`~r~`…) sont retirés.
 - Aucune boucle par image au repos : visibilité relue toutes les 300 ms ; le texte au-dessus des têtes n'est dessiné
   que tant qu'un `/me` ou `/do` récent est à portée (ligne de vue relue toutes les 300 ms).
-- Le profil (Conseil, commandes du serveur) part une fois à l'apparition, puis seulement quand un rang change.
+- Le profil (Conseil, commandes du serveur, suggestions selon les droits) est demandé une fois à l'apparition. Quand un
+  rang change, le serveur prévient le seul joueur visé, qui le redemande : onglet Conseil, `/staff` et suggestions du
+  Conseil suivent, sans reconnexion. `/staff` n'est suggéré qu'aux membres du Conseil.
 
 ## Arborescence
 
@@ -156,9 +158,14 @@ Pour travailler le rendu sans le jeu : `web/index.html?view=open` (ou `passive`,
    B répond dans l'onglet sans commande, puis A répond avec `/r`.
 6. B se déconnecte : l'onglet de A se grise et sa saisie se ferme.
 7. Un membre du Conseil voit l'onglet Conseil et l'insigne sur ses messages hors-RP ; `/staff` n'atteint que le
-   Conseil ; un joueur sans rang reçoit « Ce canal est réservé au Conseil ».
+   Conseil ; un joueur sans rang ne se voit pas suggérer `/staff` et, s'il le tape, reçoit « Ce canal est réservé au
+   Conseil ». Nommé au Conseil en cours de partie (`vava_conseil <compte> gardien`), il a l'onglet, `/staff` et les
+   suggestions de son rang sans se reconnecter ; révoqué, il les perd de même.
 8. Déplacer la fenêtre par son bandeau, l'agrandir par son coin, se reconnecter : elle est à la même place.
    `/chat reinit` la remet en place.
-9. `/m` puis Tab : complète `/me`, encore Tab : `/mp`. `/commandeinconnue` : « Commande inconnue » pour soi seul.
+9. Joueur sans rang (ou Gardien) : `/m` puis Tab complète `/me`, encore Tab : `/mp`. Chez un membre du Conseil qui a
+   le droit `tools` (Sénéchal et au-dessus, avec le Codex), les six suggestions de `/m` sont `/magie` et ses premières
+   sous-commandes, décrites elles aussi et premières dans l'ordre alphabétique : Tab tourne entre elles ; taper `/me`
+   avant Tab. `/commandeinconnue` : « Commande inconnue » pour soi seul.
 10. Les messages de la magie (`/magie`, grimoire) arrivent dans Général.
 11. Dans la base, `vava_chat_logs` contient les `/ooc`, `/mp` et `/staff`, pas les `/me` ni les `/do`.

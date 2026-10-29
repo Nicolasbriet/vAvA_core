@@ -15,6 +15,7 @@ const bridge = require('./lib/bridge');
 const events = require('./lib/events');
 const journal = require('./lib/journal');
 const pin = require('./lib/pin');
+const servercfg = require('./lib/servercfg');
 const status = require('./lib/status');
 const { createServer } = require('./lib/http');
 const { createRouter } = require('./lib/routes');
@@ -87,6 +88,23 @@ function banner() {
   say();
 }
 
+/**
+ * Avant chaque lancement de FXServer : le server.cfg reçoit les réglages qu'exige vAvA s'il ne les fixe pas (serveur
+ * installé avant eux, fichier écrit à la main), sans rien changer d'autre. Renvoie les messages pour la console.
+ * @returns {string[]}
+ */
+function completeCfg() {
+  try {
+    const done = servercfg.complete(config.cfgPath());
+    if (done.error) return [`server.cfg non complété (${done.error}) : ajoutez-y ${done.missing.join(' et ')}.`];
+    if (!done.added.length) return [];
+    journal.record(journal.SYSTEM, 'cfg_completed', { lignes: done.added.join(' · '), backup: done.backup });
+    return [`server.cfg complété des réglages qu'exige la voix : ${done.added.join(' · ')}.`];
+  } catch (error) {
+    return [`server.cfg non vérifié : ${error.message}`];
+  }
+}
+
 function announcePin(code) {
   const c = colors;
   say(`${c.brass}  ── Premier lancement ──${c.reset}`);
@@ -103,10 +121,12 @@ async function main() {
     return;
   }
   config.ensureData();
-  // la clé du pont et le jeton de players.json partent avec FXServer à chaque lancement, et restent masqués dans sa console
+  // la clé du pont et le jeton de players.json partent avec FXServer à chaque lancement, et restent masqués dans sa console ;
+  // le server.cfg est complété juste avant, s'il lui manque un réglage exigé
   const server = new ServerProcess({
     launchArgs: () => [...bridge.launchArgs(), ...status.launchArgs()],
     secrets: () => [...bridge.secrets(), ...status.secrets()],
+    prepare: completeCfg,
   });
   events.attach(server);
   if (await server.cleanupOrphan()) say(`${colors.dim}  Un FXServer resté ouvert après un arrêt brutal a été arrêté.${colors.reset}`);

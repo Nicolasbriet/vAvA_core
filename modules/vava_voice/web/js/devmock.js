@@ -15,7 +15,7 @@ const DevMock = (() => {
   const LIMITS = {
     radius: { min: 2, max: 60, default: 10, step: 0.5 },
     height: { min: 2, max: 30, default: 6, step: 0.5 },
-    multipliers: [0.5, 0.75, 1, 1.5, 2, 3], defaultMultiplier: 2, labelMax: 40, max: 200,
+    multipliers: [0.5, 0.75, 1, 1.5, 2, 3], defaultMultiplier: 2, labelMax: 40, max: 200, baseOffset: 1,
     ranges: [
       { name: 'whisper', label: 'Chuchoter', distance: 1.5 },
       { name: 'talk', label: 'Parler', distance: 5 },

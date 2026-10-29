@@ -1,9 +1,9 @@
 # Voix — procédure de test en jeu
 
-Procédure pour vérifier en jeu `vava_voice` 1.2.0 : les quatre portées, le médaillon et le cercle au sol, le silence
-hors du jeu, la portée réduite à terre, les zones de voix et leur éditeur, leur persistance, le redémarrage. Le module
-n'a pas de README : son `config.lua` et son code font foi (résumé dans `docs/api.md`). Comptez une heure ; presque tout
-se fait à deux, au casque : **A**, membre du Conseil, et **B**, simple joueur. Un test se cite « voix 3-4 ».
+Procédure pour vérifier en jeu `vava_voice` 1.2.1 : les quatre portées, le médaillon et le cercle au sol, le silence
+hors du jeu, la portée réduite à terre, les zones de voix et leur éditeur, leur persistance, le redémarrage. Règles et
+réglages : `modules/vava_voice/README.md` (et `docs/api.md`). Comptez une heure ; presque tout se fait à deux, au
+casque : **A**, membre du Conseil, et **B**, simple joueur. Un test se cite « voix 3-4 ».
 
 ## 0. Préparation
 
@@ -17,11 +17,13 @@ se fait à deux, au casque : **A**, membre du Conseil, et **B**, simple joueur. 
    setr voice_useSendingRangeOnly true
    ```
 
-   La Chancellerie ne les écrit pas d'elle-même : les ajouter dans ses options avancées. Sans elles, les tests 2-5,
-   2-6 et la section 4 ne mesurent pas le comportement voulu.
+   La Chancellerie (1.4.2) les écrit d'elle-même (section « Voix ») et les ajoute, avant le lancement de FXServer, à un
+   `server.cfg` qui ne les fixe pas : console et journal de la Chancellerie disent « server.cfg complété ». Serveur
+   lancé sans elle : les ajouter à la main. Sans elles, les tests 2-5, 2-6 et la section 4 ne mesurent pas le
+   comportement voulu.
 3. **Chaque joueur** : chat vocal activé dans les réglages du jeu (Paramètres > Chat vocal), micro choisi, casque (sans
    casque, la voix de l'un repart dans le micro de l'autre). On parle en maintenant `N` (touche de GTA par défaut).
-4. **Démarrage** : la console du serveur affiche `module 'vava_voice' v1.2.0 prêt` ; la table `vava_voice_zones` est
+4. **Démarrage** : la console du serveur affiche `module 'vava_voice' v1.2.1 prêt` ; la table `vava_voice_zones` est
    créée au premier démarrage (migration `sql/0001_voice_zones.sql`). En jeu, médaillon « Voix » dans le HUD.
 5. **Joueurs** : A Souverain (`vava_conseil <compte de A> souverain` : droits `tools` et `teleport`), B sans rang.
 6. **Touche de portée** : `W` sur un clavier AZERTY (FiveM la nomme `Z`, d'après sa place sur un clavier QWERTY) ;
@@ -65,10 +67,10 @@ A parle (`N`), B écoute, sauf mention.
 |---|---|---|
 | 1 | Registre (`F10`) → Outils → « Outils des modules » → « Zones de voix » (« Lieux où la voix porte plus loin (tribune, place du marché) ou moins (bibliothèque, crypte). ») → Ouvrir. | Le Registre se ferme ; le panneau « Zones de voix » s'ouvre sur le côté droit, le monde reste visible : « Les zones proches sont dessinées autour de vous. Quand des zones se chevauchent, la plus petite l'emporte. », « 0 / 200 zones », bouton « Nouvelle zone ici », « Aucune zone pour l'instant. Placez-vous au centre du lieu, puis créez-la. ». Souris libre, personnage immobile. |
 | 2 | `Échap`, puis `/zonesvoix`. | Le panneau se ferme ; la commande le rouvre. |
-| 3 | « Nouvelle zone ici ». | « Nouvelle zone », « Centrée sur l'endroit où vous vous tenez. », « Nom du lieu », Rayon 10 m, Hauteur 6 m (« Depuis vos pieds : séparez les étages. »), six cachets de « ×0,5 Très feutrée » à « ×3 Porte très loin », « ×2 Porte loin » choisi, et « Chuchoter : 1,5 m → 3 m », « Parler : 5 m → 10 m », « Crier : 15 m → 30 m », « Déclamer : 25 m → 50 m ». Dans le monde : un cylindre doré translucide de 10 m de rayon centré sur A, du sol à 7 m environ. |
+| 3 | « Nouvelle zone ici ». | « Nouvelle zone », « Centrée sur l'endroit où vous vous tenez. », « Nom du lieu », Rayon 10 m, Hauteur 6 m (« Comptée depuis vos hanches ; la zone descend aussi de 1 m sous elles. Séparez ainsi les étages. »), six cachets de « ×0,5 Très feutrée » à « ×3 Porte très loin », « ×2 Porte loin » choisi, et « Chuchoter : 1,5 m → 3 m », « Parler : 5 m → 10 m », « Crier : 15 m → 30 m », « Déclamer : 25 m → 50 m ». Dans le monde : un cylindre doré translucide de 10 m de rayon centré sur A, du sol à 7 m environ. |
 | 4 | Faire glisser Rayon et Hauteur ; choisir ×0,5, puis ×1, puis ×3. | Le cylindre suit en direct (rayon de 2 à 60 m, hauteur de 2 à 30 m, par pas de 0,5) ; bleuté pour ×0,5 et ×0,75, beige pour ×1, doré au-delà ; les quatre lignes de portée suivent l'effet. |
 | 5 | « Sceller » sans nom. | « Donnez un nom au lieu. » |
-| 6 | Nom `Chapelle des évêques et crypte du prieur` (40 signes, 42 octets), « Sceller ». | « Valeurs refusées. » ; console du serveur : « joueur <n> : arguments refusés pour 'vava_voice:zoneCreate' (…) ». Défaut : le champ laisse taper 40 signes mais la borne est de 40 octets (un nom accentué de 38 signes, `Chapelle des évêques, crypte du prieur`, passe). |
+| 6 | Nom `Chapelle des évêques et crypte du prieur` (40 signes, 42 octets), « Sceller » ; puis tenter d'y ajouter un 41e signe. | « Zone « Chapelle des évêques et crypte du prieur » scellée. » : le champ et le serveur comptent tous deux en signes (un « é » pour un). Le champ refuse le 41e signe. Supprimer ensuite cette zone. |
 | 7 | Nom `Tribune`, rayon 10, effet ×2, `Entrée`. | « Zone « Tribune » scellée. » ; retour à la liste : « Tribune », « ×2 · rayon 10 m · hauteur 6 m », « ici » ; « 1 / 200 zones ». |
 | 8 | `Échap` dans un formulaire ; `Échap` dans la liste. | Le premier ramène à la liste (l'aperçu disparaît) ; le second ferme le panneau. |
 | 9 | Registre → Journal. | « Zone de voix créée » au nom de A : zone Tribune, rayon 10, hauteur 6, effet 2. |
@@ -77,7 +79,7 @@ A parle (`N`), B écoute, sauf mention.
 | 12 | « Nouvelle zone ici », nom `<b>Essai</b> & <img src=x>`, « Sceller ». | Le nom s'affiche tel quel, balises comprises, dans la liste et dans le message « Zone « … » scellée. ». |
 | 13 | Cliquer cette zone, « Supprimer », puis « Confirmer la suppression ». | Le premier clic change le bouton en « Confirmer la suppression » ; le second : « Zone « <b>Essai</b> & <img src=x> » supprimée. », la zone quitte la liste et le monde ; journal « Zone de voix supprimée ». |
 | 14 | S'éloigner à plus de 150 m, rouvrir, cliquer Tribune, « S'y rendre », puis « Annuler ». | Tribune n'est pas dessinée de si loin ; la liste dit « à N m ». Après « S'y rendre » : A est au centre, « Vous voici au centre de la zone. » ; de retour à la liste, Tribune est « ici ». |
-| 15 | « Nouvelle zone ici », nom `Doublon`, puis deux fois `Entrée` très vite. | Une seule zone « Doublon » (à confirmer : `Entrée` dans le champ du nom renvoie la demande sans attendre la première réponse ; deux lignes « Doublon » en base signaleraient ce défaut). Supprimer ensuite « Doublon ». |
+| 15 | « Nouvelle zone ici », nom `Doublon`, puis deux fois `Entrée` très vite (ou `Entrée` maintenu). | Une seule zone « Doublon », un seul message « scellée » : tant que la première demande n'a pas répondu, ni `Entrée` ni « Sceller » ne renvoient rien. Une seule ligne « Doublon » en base. Supprimer ensuite « Doublon ». |
 | 16 | « Nouvelle zone ici », nom `Perdue`, sans sceller ; quitter le jeu ; revenir et rouvrir. | Aucune zone « Perdue » : rien n'est écrit avant « Sceller ». |
 | 17 | `zones.max = 1` (§ 0-8), `restart vava_voice`, Tribune seule ; rouvrir. Remettre `200` ensuite et redémarrer le module. | « 1 / 1 zones » ; « Nouvelle zone ici » grisé. |
 
@@ -114,7 +116,7 @@ Tribune vaut ×2, rayon 3 m, hauteur 6 m (après 3-10) ; A se tient en son centr
 | 2 | A, à terre : `W` plusieurs fois. | Alterne Chuchoter (cercle de 1,5 m) et Parler (5 m), jamais au-delà. |
 | 3 | B relève A (`G` à moins de 2 m, 8 s). | A retrouve Crier (médaillon aux trois quarts), sans cercle ; B l'entend de nouveau à 10 m. |
 | 4 | A de nouveau à terre choisit Chuchoter, puis rend l'âme (maintenir `E` 3 s, permis après `downed.giveUpAfterMs`). | Au lieu de soins, A retrouve Crier : le choix fait à terre est oublié. |
-| 5 | A, à terre : console `restart vava_voice`. | Après le redémarrage, toujours limité à Parler : le serveur relit l'état de santé et renvoie la limite (à confirmer : envoyée une seule fois au démarrage du serveur, elle peut arriver avant que le client ait redémarré ; A pourrait alors repasser en Crier). |
+| 5 | A, à terre : console `restart vava_voice`. | Après le redémarrage, toujours limité à Parler (`W` : jamais au-delà) : le serveur relit l'état de santé, et le client, en redemandant la liste des zones à son redémarrage, reçoit de nouveau la limite du moment. |
 | 6 | A, à terre, quitte le jeu et revient. | Toujours limité à Parler si vava_health le remet à terre à son retour (voir [sante.md](sante.md)). |
 
 ## 7. Tentatives de triche
@@ -130,10 +132,11 @@ Tribune vaut ×2, rayon 3 m, hauteur 6 m (après 3-10) ; A se tient en son centr
 
 | # | Faire | Attendu |
 |---|---|---|
-| 1 | A et B se parlent, A dans Tribune (×2) ; console du serveur : `restart vava_voice`. | Voix coupée un instant puis revenue sans reconnexion ; console `module 'vava_voice' v1.2.0 prêt` ; médaillon revenu à la même portée ; dans Tribune, `W` quatre fois : le cercle montre toujours l'effet (à confirmer : les zones ne sont demandées qu'une fois au démarrage du client, sans nouvel essai). |
-| 2 | Éditeur ouvert : `restart vava_voice`. | Le panneau disparaît et la souris revient au jeu (à confirmer : le module ne rend pas lui-même le clavier à l'arrêt). |
-| 3 | B sur l'écran de sélection pendant `restart vava_voice`, il parle. | Aucun joueur en jeu ne l'entend, avant comme après ; une fois le module prêt, son micro est de nouveau coupé par le serveur. |
+| 1 | A et B se parlent, A dans Tribune (×2) ; console du serveur : `restart vava_voice`. | Voix coupée un instant puis revenue sans reconnexion ; console `module 'vava_voice' v1.2.1 prêt` ; médaillon revenu à la même portée ; dans Tribune, `W` quatre fois : le cercle montre toujours l'effet (le client redemande la liste des zones à son redémarrage, et réessaie toutes les 2 s, cinq fois au plus, si le serveur n'est pas encore prêt). |
+| 2 | Éditeur ouvert : `restart vava_voice`. | Le panneau disparaît, la souris et le clavier reviennent au jeu (le module rend le focus à son arrêt). |
+| 3 | A et B tous deux sur l'écran de sélection (se reconnecter) ; console du serveur : `restart vava_voice` ; ils parlent avant, pendant et après le redémarrage. | Ni l'un ni l'autre n'entend rien à aucun moment : à son arrêt, le module ne rend pas le micro des joueurs hors du jeu ; une fois prêt, il les tient toujours coupés. À l'apparition, la voix revient. |
 | 4 | Redémarrer tout le serveur. | Les zones sont toujours là : liste de l'éditeur, cylindres, effet en jeu. |
+| 5 | B sur l'écran de sélection ; console : `stop vava_voice` (sans `start`) ; B choisit son personnage et parle près de A. | Personne n'entend B : un arrêt sans redémarrage laisse muet, jusqu'à sa reconnexion, un joueur qui était hors du jeu (choix de 1.2.1, voir le rapport T-008). Console : `start vava_voice` ; B, déjà en jeu, est de nouveau entendu sans reconnexion. |
 
 ## 9. Ce qu'il faut regarder dans la base
 
@@ -161,10 +164,11 @@ SELECT `id`, `label`, `x`, `y`, `z`, `radius`, `height`, `multiplier`, `updated_
 
 - Le comportement réel des natives Mumble : distance d'écoute réglée par `MumbleSetTalkerProximity` sous
   `voice_useSendingRangeOnly` (2-5, 2-6), endroit exact où la voix s'éteint dans la marge de 2 m, atténuation du son 3D.
-- L'état de la cible vocale pendant les quelques secondes où le module est arrêté (8-1).
+- L'état de la cible vocale pendant les quelques secondes où le module est arrêté (8-1), et le silence des joueurs en
+  sélection pendant ce temps (8-3).
 - La reprise du clavier quand le module s'arrête éditeur ouvert (8-2) ; après un redémarrage, l'arrivée de la liste
-  des zones (8-1) et de la limite « à terre » (6-5), toutes deux envoyées une seule fois.
-- L'envoi double par `Entrée` dans l'éditeur (3-15).
+  des zones (8-1) et de la limite « à terre » (6-5), désormais redemandées par le client.
+- Le seul envoi par `Entrée` dans l'éditeur (3-15) et la saisie d'un nom accentué de 40 signes dans CEF (3-6).
 - L'aspect du cercle au sol (marqueur 25, posé 0,95 m sous la position du personnage) et des cylindres (marqueur 1).
 - Le rendu de l'éditeur et du médaillon dans CEF : `modules/vava_voice/web/index.html` (ou `?zone=1` pour le
   formulaire) et `modules/vava_hud/web/index.html?values=0.8,0.6,0.3,0.75&talking=1` s'ouvrent dans un navigateur.

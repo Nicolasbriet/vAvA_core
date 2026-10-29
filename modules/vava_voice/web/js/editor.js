@@ -4,7 +4,8 @@
  * Rôle : l'éditeur des zones de voix, panneau de parchemin sur le côté (le monde reste visible : les zones y sont
  *        dessinées). Liste des zones (des plus proches aux plus lointaines), création centrée sur le membre du
  *        Conseil, modification (nom, rayon, hauteur, effet, recentrage), déplacement, suppression confirmée. Chaque
- *        réglage met à jour l'aperçu dans le monde ; chaque action est décidée par le serveur.
+ *        réglage met à jour l'aperçu dans le monde ; chaque action est décidée par le serveur. Le nom se compte en
+ *        signes, comme sur le serveur ; un seul « Sceller » à la fois.
  */
 
 (() => {
@@ -122,15 +123,20 @@
   }
 
   async function save() {
+    const { form } = state;
+    // une demande à la fois : Entrée répété (ou maintenu) pendant l'attente ne scelle pas une seconde zone
+    if (!form || form.saving) return;
     const data = values();
     if (!data.label) {
       slip(S.error('invalid_label'));
-      state.form.name.focus();
+      form.name.focus();
       return;
     }
-    state.form.saveButton.disabled = true;
+    form.saving = true;
+    form.saveButton.disabled = true;
     const result = await Bridge.post('save', data);
-    if (state.form) state.form.saveButton.disabled = false;
+    form.saving = false;
+    if (state.form === form) form.saveButton.disabled = false;
     if (report(result, S.saved(data.label))) renderList();
   }
 
@@ -155,17 +161,25 @@
     if (!report(started)) return;
     const name = el('input', 'field-input');
     name.type = 'text';
-    name.maxLength = limits.labelMax;
+    // le serveur compte le nom en signes (un « é » ou un emoji pour un) ; maxLength compte en unités UTF-16 (un
+    // emoji pour deux) : il ne sert que de garde, la saisie est ramenée au nombre de signes permis
+    name.maxLength = limits.labelMax * 2;
     name.placeholder = S.namePlaceholder;
     name.value = zone ? zone.label : '';
     name.id = 'field-name';
+    name.addEventListener('input', () => {
+      const signs = Array.from(name.value);
+      if (signs.length > limits.labelMax) name.value = signs.slice(0, limits.labelMax).join('');
+    });
     name.addEventListener('keydown', (event) => {
-      if (event.key === 'Enter') save();
+      if (event.key !== 'Enter') return;
+      event.preventDefault();
+      save();
     });
     const nameLabel = el('label', 'field-label', S.name);
     nameLabel.htmlFor = 'field-name';
     const radius = slider(S.radius, limits.radius, zone ? zone.radius : limits.radius.default);
-    const height = slider(S.height, limits.height, zone ? zone.height : limits.height.default, S.heightHint);
+    const height = slider(S.height, limits.height, zone ? zone.height : limits.height.default, S.heightHint(limits.baseOffset));
     const stamps = el('div', 'stamps');
     stamps.setAttribute('role', 'radiogroup');
     for (const multiplier of list(limits.multipliers)) {

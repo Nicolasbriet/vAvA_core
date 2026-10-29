@@ -6,7 +6,9 @@
       - les commandes permises au joueur : celles du client (relues à l'ouverture du chat, seulement si une
         ressource a démarré ou s'est arrêtée depuis) et celles du serveur (reçues avec le profil) ;
       - les suggestions décrites par le registre des commandes du core (Codex), reçues avec le profil : elles
-        l'emportent sur une déclaration du même nom, et peuvent nommer une sous-commande (« metiers niveau »).
+        l'emportent sur une déclaration du même nom, et peuvent nommer une sous-commande (« metiers niveau ») ; un
+        nouveau profil (rang changé) les remplace : celles qui ne sont plus permises s'effacent ;
+      - les commandes réservées au Conseil (/staff) : proposées à ses seuls membres.
     Dépendances : shared/text.lua, config.lua, client/nui.lua
 ]]
 
@@ -32,6 +34,9 @@ local declared = {}
 local declaredCount = 0
 ---@type table<string, table>  suggestions du registre des commandes (profil), par nom
 local described = {}
+---@type table<string, table>  suggestions réservées au Conseil (aide et paramètres), déclarées pour ses seuls membres
+local reserved = {}
+local staffView = false
 local serverCommands = {}
 local dirty = true
 
@@ -73,9 +78,11 @@ local function cleanParams(params)
     return list
 end
 
+--- Commande cachée de la liste : motif de la config, ou commande du Conseil chez qui n'en est pas.
 ---@param name string
 ---@return boolean
 local function hidden(name)
+    if reserved[name] and not staffView then return true end
     for _, pattern in ipairs(LIST.hidden) do
         if match(name, pattern) then return true end
     end
@@ -108,26 +115,61 @@ function suggestions.remove(name)
     if nui.isReady() then nui.send('suggestion:remove', { name = name }) end
 end
 
+--- Suggestion réservée au Conseil : déclarée chez ses seuls membres, et cachée aux autres de la liste des commandes
+--- (la commande du chat existe chez tous ; le serveur refuse qui n'est pas du Conseil).
+---@param name any
+---@param help any
+---@param params any
+function suggestions.reserve(name, help, params)
+    name = commandName(name)
+    if not name then return end
+    reserved[name] = { help = help, params = params }
+    if staffView then suggestions.add(name, help, params) end
+end
+
+--- Membre du Conseil ou non (profil) : ses suggestions réservées paraissent ou s'effacent.
+---@param staff boolean
+function suggestions.setStaff(staff)
+    staff = staff == true
+    if staff == staffView then return end
+    staffView = staff
+    for name, entry in pairs(reserved) do
+        if staff then suggestions.add(name, entry.help, entry.params) else suggestions.remove(name) end
+    end
+    dirty = true
+end
+
 --- Suggestions décrites par le registre des commandes (profil) : nettoyées aux mêmes bornes, elles remplacent les
---- précédentes du même genre et passent à la page après les déclarations, pour l'emporter à nom égal.
+--- précédentes et passent à la page après les déclarations, pour l'emporter à nom égal. Une suggestion qui n'est plus
+--- décrite (rang retiré) s'efface de la page, ou rend la place à la déclaration du même nom.
 ---@param list any
 function suggestions.setDescribed(list)
+    local previous = described
     described = {}
-    if type(list) ~= 'table' then return end
-    local count = 0
-    for _, raw in ipairs(list) do
-        if count >= SUGGESTIONS_MAX then break end
-        local name = type(raw) == 'table' and commandName(raw.name, true)
-        if name then
-            count = count + 1
-            described[name] = { name = name, help = label(raw.help, HELP_MAX), params = cleanParams(raw.params) }
+    if type(list) == 'table' then
+        local count = 0
+        for _, raw in ipairs(list) do
+            if count >= SUGGESTIONS_MAX then break end
+            local name = type(raw) == 'table' and commandName(raw.name, true)
+            if name then
+                count = count + 1
+                described[name] = { name = name, help = label(raw.help, HELP_MAX), params = cleanParams(raw.params) }
+            end
         end
     end
-    if nui.isReady() then
-        local out = {}
-        for _, entry in pairs(described) do out[#out + 1] = entry end
-        nui.send('suggestions', { list = out })
+    if not nui.isReady() then return end
+    local out = {}
+    for name in pairs(previous) do
+        if not described[name] then
+            if declared[name] then
+                out[#out + 1] = declared[name]
+            else
+                nui.send('suggestion:remove', { name = name })
+            end
+        end
     end
+    for _, entry in pairs(described) do out[#out + 1] = entry end
+    if #out > 0 then nui.send('suggestions', { list = out }) end
 end
 
 --- Commandes du serveur permises au joueur (profil).
@@ -166,7 +208,7 @@ function suggestions.refresh()
     end
     for _, name in ipairs(serverCommands) do
         if #names >= LIST.max then break end
-        if not seen[name] then
+        if not seen[name] and not hidden(name) then
             seen[name] = true
             names[#names + 1] = name
         end

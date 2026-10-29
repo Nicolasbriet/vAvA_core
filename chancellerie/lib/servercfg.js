@@ -4,6 +4,8 @@
  * Rôle : le server.cfg du serveur de jeu : lecture d'un fichier existant (les lignes inconnues sont gardées comme
  *        options avancées), validation d'un formulaire, écriture d'un fichier propre et commenté, sauvegarde de
  *        l'ancien (les 20 dernières). Toute valeur est nettoyée : un nom de serveur ne peut pas injecter de commande.
+ *        Réglages qu'exige vAvA (voix de vava_voice) : écrits dans chaque fichier, et ajoutés à un fichier existant
+ *        qui ne les fixe pas, sans toucher au reste ; une valeur déjà posée (même autre) est toujours gardée.
  *        Pour l'éditeur du fichier brut : secrets masqués (clé de licence, mot de passe de la base, clés d'API…) et
  *        remis à l'enregistrement, révision qui protège d'une écriture croisée ; lancement d'une ressource au
  *        démarrage ajouté ou retiré sans réécrire le reste.
@@ -26,6 +28,13 @@ const RESOURCE_PATTERN = /^[A-Za-z0-9_.-]{1,64}$/;
 // commandes que le formulaire gère : retirées des options avancées pour ne jamais être en double
 const MANAGED = new Set(['endpoint_add_tcp', 'endpoint_add_udp', 'sv_hostname', 'sv_projectname', 'sv_projectdesc', 'sv_maxclients',
   'sv_licensekey', 'mysql_connection_string', 'onesync', 'sv_master1', 'sv_endpointprivacy', 'ensure', 'start']);
+
+// réglages qu'exige vava_voice (docs/api.md) : son 3D du jeu, voix envoyée aux seuls joueurs à portée
+const REQUIRED_TITLE = '## Voix (vava_voice) : son 3D du jeu, voix envoyée aux seuls joueurs à portée';
+const REQUIRED = Object.freeze([
+  { key: 'voice_usenativeaudio', line: 'setr voice_useNativeAudio true' },
+  { key: 'voice_usesendingrangeonly', line: 'setr voice_useSendingRangeOnly true' },
+]);
 
 const DEFAULTS = Object.freeze({
   bind: '0.0.0.0', port: 30120, listed: true, hostname: 'Serveur vAvA', projectName: '', projectDesc: '',
@@ -217,6 +226,69 @@ function cleanExtra(extra) {
   }).join('\n').trim();
 }
 
+/** Commande d'une ligne active (ni vide ni commentaire), ou null. */
+function activeCommand(line) {
+  const trimmed = line.trim();
+  if (!trimmed || trimmed.startsWith('#') || trimmed.startsWith('//')) return null;
+  return command(trimmed);
+}
+
+/** Réglages exigés qu'un texte ne fixe nulle part (quelle que soit la valeur qu'il leur donne). */
+function missingRequired(text) {
+  const keys = new Set();
+  for (const line of String(text).split(/\r?\n/)) {
+    const cmd = activeCommand(line);
+    if (cmd) keys.add(cmd.key);
+  }
+  return REQUIRED.filter((entry) => !keys.has(entry.key));
+}
+
+/**
+ * Texte complété des réglages exigés qui lui manquent, placés avant les lancements de ressources (et leur titre),
+ * sinon à la fin ; le reste est intact. Renvoie { text, added } (lignes ajoutées, vide si rien ne manquait).
+ */
+function withRequired(text) {
+  const missing = missingRequired(text);
+  if (!missing.length) return { text: String(text), added: [] };
+  const eol = String(text).includes('\r\n') ? '\r\n' : '\n';
+  const lines = String(text).split(/\r?\n/);
+  let at = lines.findIndex((line) => {
+    const cmd = activeCommand(line);
+    return cmd && (cmd.key === 'ensure' || cmd.key === 'start');
+  });
+  if (at === -1) {
+    at = lines.length;
+    while (at > 0 && !lines[at - 1].trim()) at -= 1;
+    lines.splice(at, 0, '', REQUIRED_TITLE, ...missing.map((entry) => entry.line));
+  } else {
+    while (at > 0 && lines[at - 1].trim().startsWith('#')) at -= 1;
+    const spacer = at > 0 && lines[at - 1].trim() ? [''] : [];
+    lines.splice(at, 0, ...spacer, REQUIRED_TITLE, ...missing.map((entry) => entry.line), '');
+  }
+  return { text: lines.join(eol), added: missing.map((entry) => entry.line) };
+}
+
+/**
+ * Complète le server.cfg en place des réglages exigés qui lui manquent (serveur installé avant eux, fichier écrit à la
+ * main) : l'ancien est sauvegardé, rien d'autre ne change. Fichier absent : rien.
+ * @returns {{ added: string[], backup?: string|null, error?: string, missing?: string[] }}
+ */
+function complete(file) {
+  let text;
+  try {
+    text = fs.readFileSync(file, 'utf8');
+  } catch (error) {
+    return { added: [] };
+  }
+  const next = withRequired(text);
+  if (!next.added.length) return { added: [] };
+  try {
+    return { added: next.added, backup: write(file, next.text) };
+  } catch (error) {
+    return { added: [], error: error.code || error.message, missing: next.added };
+  }
+}
+
 /** Texte complet du server.cfg. */
 function generate(values, secrets) {
   const connection = connectionString(values.db, secrets.dbPassword);
@@ -244,6 +316,9 @@ function generate(values, secrets) {
     `set mysql_connection_string ${quoted(connection)}`,
   ];
   const extra = cleanExtra(values.extra);
+  // un réglage exigé déjà posé dans les options avancées y reste, avec sa valeur
+  const required = missingRequired(extra);
+  if (required.length) lines.push('', REQUIRED_TITLE, ...required.map((entry) => entry.line));
   if (extra) lines.push('', '## Options avancées', extra);
   lines.push('', '## Ressources (dans l\'ordre de démarrage)', ...values.resources.map((name) => `ensure ${name}`), '');
   return lines.join('\n');
@@ -402,5 +477,5 @@ function setAutostart(text, name, enabled, rank) {
 
 module.exports = {
   parse, validate, generate, write, read, current, endpoint, cleanExtra, mask, unmask, revision, isAutostart, setAutostart,
-  DEFAULTS, BACKUPS, RESOURCE_PATTERN,
+  missingRequired, withRequired, complete, DEFAULTS, BACKUPS, RESOURCE_PATTERN, REQUIRED,
 };

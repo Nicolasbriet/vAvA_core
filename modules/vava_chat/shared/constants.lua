@@ -10,14 +10,14 @@ VavaChat = {}
 VavaChat.EVENTS = {
     MESSAGE = 'vava_chat:message', -- message reçu { kind, id, name, text, chat?, out?, staff?, rank? }
     GONE = 'vava_chat:gone',       -- (conversation) : un correspondant est parti, son onglet se grise
-    PROFILE = 'vava_chat:profile', -- { staff, rank? } : droits du Conseil changés en cours de partie
+    PROFILE = 'vava_chat:profile', -- { staff, rank? } : droits du Conseil changés ; le client redemande son profil
     NOTICE = 'vava_chat:notice',   -- (code, détail?) : avis du serveur au seul joueur (commande inconnue…)
 }
 
 -- Intentions du client (RPC du core). 0 tient lieu de « rien » pour les numéros (jamais de trou dans les arguments).
 VavaChat.RPC = {
     SEND = 'vava_chat:send',       -- (genre, texte, numéro de joueur | 0, conversation | 0)
-    PROFILE = 'vava_chat:profile', -- à l'apparition : { chat, staff, rank?, commands }
+    PROFILE = 'vava_chat:profile', -- apparition, redémarrage, rang changé : { chat, staff, rank?, commands, suggestions }
 }
 
 -- Genres de message. SYSTEM : messages des autres ressources et du royaume (jamais envoyé par un joueur).

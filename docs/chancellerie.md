@@ -187,6 +187,13 @@ telles quelles, ou remplacez-les par une nouvelle valeur. Le fichier est sauvega
 changé depuis son ouverture (assistant, autre onglet, à la main), l'écriture est refusée et l'éditeur propose de le
 recharger. Ctrl + S enregistre. L'assistant reste disponible et relit le fichier tel qu'il est.
 
+Le chat vocal (`vava_voice`) exige deux réglages : `setr voice_useNativeAudio true` et
+`setr voice_useSendingRangeOnly true`. L'assistant les écrit dans une section « Voix » (1.4.2). Avant chaque lancement
+de FXServer, un `server.cfg` qui ne les fixe pas (serveur installé avant la 1.4.2, fichier écrit à la main) en est
+complété, juste avant les lignes `ensure`, sans que rien d'autre ne change : l'ancien fichier est sauvegardé, la console
+et le journal le disent (« server.cfg complété »). Une valeur déjà posée, même `false`, est toujours gardée : c'est le
+moyen de s'en passer. Un réglage posé dans un fichier inclus par `exec` n'est pas vu.
+
 ## Sauvegardes
 
 - **server.cfg** (droit « configuration ») : chaque écriture (assistant, éditeur, ressources) sauvegarde l'ancien
