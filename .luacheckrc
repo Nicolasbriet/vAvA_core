@@ -15,7 +15,7 @@ globals = {
     'vAvA',
     'VavaAdmin', 'VavaAppearance', 'VavaCameras', 'VavaChancellerie', 'VavaCharactersUi', 'VavaChat',
     'VavaCodex', 'VavaCrafting', 'VavaFarming', 'VavaGathering', 'VavaHealth', 'VavaHud', 'VavaInventory',
-    'VavaMagic', 'VavaNeeds', 'VavaSkills', 'VavaVoice', 'VavaWorld',
+    'VavaMagic', 'VavaNeeds', 'VavaSkills', 'VavaTime', 'VavaVoice', 'VavaWorld',
     'VavaBridge', 'VavaExample', 'VavaAnimTest', 'VavaDevCharacters',
     'exports',
 }
