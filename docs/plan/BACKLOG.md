@@ -101,7 +101,10 @@ marqués « décision » attendent le porteur du projet : ne pas les coder sans 
 - `docs/api.md` : ordre de démarrage complet, refus des besoins « dès 95 », actions non protégées par le rang.
 
 ### T-009 — PORTE : première session de test complète — **HUMAIN**
-- Dépend de : T-001, T-004, T-005 à T-008 · Statut : à faire
+- Dépend de : T-001, T-004, T-005 à T-008 · Statut : validée
+- Validée le 29 octobre 2026 par le porteur du projet : la phase 1 est ouverte. Les procédures de `docs/tests/` restent
+  la référence pour chaque écart rencontré ensuite (tâche de correction en tête de la phase en cours), et les
+  mesures de resmon et de poids téléchargé se prennent à la porte T-019.
 - Dérouler toutes les procédures de `docs/tests/`, noter chaque écart en tâche de correction (phase 0), mesurer le
   resmon de chaque ressource au repos et en action, noter le poids téléchargé à la première connexion.
 
