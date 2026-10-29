@@ -83,6 +83,7 @@ A parle (`N`), B écoute, sauf mention.
 | 15 | « Nouvelle zone ici », nom `Doublon`, puis deux fois `Entrée` très vite (ou `Entrée` maintenu). | Une seule zone « Doublon », un seul message « scellée » : tant que la première demande n'a pas répondu, ni `Entrée` ni « Sceller » ne renvoient rien. Une seule ligne « Doublon » en base. Supprimer ensuite « Doublon ». |
 | 16 | « Nouvelle zone ici », nom `Perdue`, sans sceller ; quitter le jeu ; revenir et rouvrir. | Aucune zone « Perdue » : rien n'est écrit avant « Sceller ». |
 | 17 | `zones.max = 1` (§ 0-8), `restart vava_voice`, Tribune seule ; rouvrir. Remettre `200` ensuite et redémarrer le module. | « 1 / 1 zones » ; « Nouvelle zone ici » grisé. |
+| 18 | « Nouvelle zone ici », nom `Tri` + un caractère invisible (U+200B, collé depuis un éditeur de texte) + `bune`, « Sceller ». | « Ce nom contient des signes illisibles. » (et non « Donnez un nom au lieu. ») ; rien n'est écrit. |
 
 ## 4. Zones : ce qu'on entend **(2 joueurs)**
 

@@ -15,7 +15,7 @@ use_experimental_fxv2_oal 'yes'
 
 name 'vava_voice'
 description 'Chat vocal de proximité vAvA'
-version '1.2.1'
+version '1.2.2'
 
 dependency 'vAvA_core'
 

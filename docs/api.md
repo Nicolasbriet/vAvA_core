@@ -917,7 +917,7 @@ setr voice_useSendingRangeOnly true
 | `limitRange(source, raison, maximum)` | `true` ou `false, code` — portée limitée au numéro `maximum` (1 = Chuchoter) pour cette raison (préfixée par la ressource appelante) ; la plus basse des limites s'applique |
 | `releaseRange(source, raison)` | `true` ou `false, code` |
 | `getZones()` | liste `{ id, label, x, y, z, radius, height, multiplier }` |
-| `webUpdateZone(id, nom, rayon, hauteur, effet)` | `true, zone, détails` ou `false, code` — pont de la Chancellerie seulement (1.1.0) ; sans recentrage ; nom refusé par `invalid_label` ou `label_too_long` (40 signes, 1.2.1) |
+| `webUpdateZone(id, nom, rayon, hauteur, effet)` | `true, zone, détails` ou `false, code` — pont de la Chancellerie seulement (1.1.0) ; sans recentrage ; nom refusé par `invalid_label` (vide), `label_unreadable` (signe de contrôle ou invisible, 1.2.2) ou `label_too_long` (40 signes, 1.2.1) |
 | `webDeleteZone(id)` | `true, nil, détails` ou `false, code` — pont de la Chancellerie seulement (1.1.0) |
 
 | Export client | Retour |

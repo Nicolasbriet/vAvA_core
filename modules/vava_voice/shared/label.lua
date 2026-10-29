@@ -36,13 +36,14 @@ label.PATTERN = '^[^\0-\31\127]+$'
 --- Nom nettoyé, ou nil et la raison du refus.
 ---@param value any
 ---@return string|nil name
----@return string|nil code  'invalid_label' (vide, illisible, caractère de contrôle ou invisible) ou 'label_too_long'
+---@return string|nil code  'invalid_label' (vide ou illisible), 'label_unreadable' (caractère de contrôle ou invisible
+---                         qui tromperait la lecture ; 1.2.2) ou 'label_too_long'
 function label.clean(value)
-    if type(value) ~= 'string' or #value > label.BYTES_MAX or find(value, CONTROLS) or not utf8len(value) then
-        return nil, 'invalid_label'
-    end
+    if type(value) ~= 'string' or not utf8len(value) then return nil, 'invalid_label' end
+    if #value > label.BYTES_MAX then return nil, 'label_too_long' end
+    if find(value, CONTROLS) then return nil, 'label_unreadable' end
     for _, pattern in ipairs(INVISIBLES) do
-        if find(value, pattern) then return nil, 'invalid_label' end
+        if find(value, pattern) then return nil, 'label_unreadable' end
     end
     local text = gsub(value, ' +', ' ')
     text = gsub(text, '^ ', '')

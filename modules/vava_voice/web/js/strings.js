@@ -51,6 +51,7 @@ const STRINGS = (() => {
       forbidden: 'Votre rang ne le permet pas.',
       too_many_zones: 'Le nombre maximal de zones est atteint.',
       invalid_label: 'Donnez un nom au lieu.',
+      label_unreadable: 'Ce nom contient des signes illisibles.',
       label_too_long: 'Ce nom est trop long.',
       busy: 'Un instant : la demande précédente n\'a pas encore abouti.',
       unknown_zone: 'Cette zone n\'existe plus.',
