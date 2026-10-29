@@ -13,7 +13,7 @@
     Dépendances : config.lua
 ]]
 
-local tostring, tonumber, ipairs, type = tostring, tonumber, ipairs, type
+local tonumber, ipairs = tonumber, ipairs
 local tointeger = math.tointeger
 local format, concat = string.format, table.concat
 local CreateThread, Wait, RegisterCommand, TriggerEvent, AddEventHandler = CreateThread, Wait, RegisterCommand, TriggerEvent, AddEventHandler

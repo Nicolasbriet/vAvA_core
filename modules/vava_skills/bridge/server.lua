@@ -7,7 +7,7 @@
     Dépendances : shared/constants.lua, config.lua, server/core.lua
 ]]
 
-local type, pairs, ipairs, pcall, tostring, tonumber = type, pairs, ipairs, pcall, tostring, tonumber
+local pairs, ipairs, pcall, tostring, tonumber = pairs, ipairs, pcall, tostring, tonumber
 local mathType = math.type
 local pack, unpack, concat = table.pack, table.unpack, table.concat
 local rep = string.rep

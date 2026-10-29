@@ -7,7 +7,7 @@
     Dépendances : shared/init.lua, server/core/registry.lua
 ]]
 
-local ipairs, type = ipairs, type
+local ipairs = ipairs
 local format = string.format
 
 local registry = vAvA.registry

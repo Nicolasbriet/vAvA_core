@@ -14,7 +14,7 @@ lua54 'yes'
 
 name 'vava_anim_test'
 description 'Test des animations personnalisées vAvA (.ycd dans stream/)'
-version '1.0.0'
+version '1.0.1'
 
 shared_script 'config.lua'
 server_script 'server/main.lua'

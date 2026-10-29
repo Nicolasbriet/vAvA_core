@@ -79,9 +79,9 @@ local function postNote(source, noteType, content)
 end
 
 --- Commande console/admin : interroge un client et valide sa réponse (valeur déclarée, donc non fiable).
----@param source integer
+---@param _ integer  numéro du joueur, inutile ici
 ---@param args string[]
-local function pingCommand(source, args)
+local function pingCommand(_, args)
     local target = tointeger(tonumber(args[1]))
     if not target then
         log.warn('usage : example_ping <id joueur>')

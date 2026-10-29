@@ -81,7 +81,7 @@ local hands = {}
 local hidden = {}
 
 -- texture des runes, chargée depuis le fichier de la ressource
-local runesReady = false
+local runesReady
 do
     local txd = CreateRuntimeTxd(amb.runes.txd)
     runesReady = CreateRuntimeTextureFromImage(txd, amb.runes.texture, amb.runes.file) ~= 0

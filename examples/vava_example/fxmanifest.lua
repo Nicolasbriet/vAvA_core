@@ -11,7 +11,7 @@ lua54 'yes'
 
 name 'vava_example'
 description "Module d'exemple vAvA"
-version '1.1.0'
+version '1.1.1'
 
 dependency 'vAvA_core'
 

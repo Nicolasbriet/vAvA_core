@@ -155,12 +155,13 @@ end
 ---@return number
 function growth.fertilityAfterHarvest(fertility, crop, lastFamily)
     local value = fertility - crop.fertilityCost
-    if lastFamily == nil then
-        -- première culture : ni bonus ni pénalité
-    elseif lastFamily == crop.family then
-        value = value - f.sameFamilyPenalty
-    else
-        value = value + f.rotationBonus
+    -- première culture (lastFamily nil) : ni bonus ni pénalité, même pour une culture sans famille
+    if lastFamily ~= nil then
+        if lastFamily == crop.family then
+            value = value - f.sameFamilyPenalty
+        else
+            value = value + f.rotationBonus
+        end
     end
     return min(100, max(0, value))
 end

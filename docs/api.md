@@ -937,7 +937,7 @@ navigateur ; chaque case est une vraie connexion WebRTC locale filmant une scèn
 
 ### `vava_magic`
 
-La magie (2.6.0) : fiche magie par personnage (champ privé `vava_magic:sheet` : mage ou non, sorts et leur XP, sort
+La magie (2.6.1) : fiche magie par personnage (champ privé `vava_magic:sheet` : mage ou non, sorts et leur XP, sort
 prêt dans les mains, combinaisons découvertes, sigils gardés, sigil unique dans tout le royaume), mana (100, +3 toutes
 les 5 s, jamais sauvegardée) et sa barre, 5 niveaux par sort, incantation commune avec délai global (1 s), roue des
 sorts (Tab) et mode magie à la souris (clic droit viser, clic gauche lancer, clic molette verrouiller), états
@@ -1019,7 +1019,7 @@ icônes sont des masques CSS, refusés depuis `file://`).
 
 ### `vava_skills`
 
-Les compétences du royaume (1.1.2), fondation des métiers : treize compétences de 0 à 100 (Récolte : Bûcheronnage,
+Les compétences du royaume (1.1.3), fondation des métiers : treize compétences de 0 à 100 (Récolte : Bûcheronnage,
 Minage, Herboristerie, Pêche, Chasse · Terre : Agriculture · Transformation : Forge, Menuiserie, Tissage et couture,
 Tannerie, Alchimie, Cuisine · Savoir : Arcanes) et six rangs (Novice, Apprenti 20, Compagnon 40, Artisan 60, Maître 80,
 Grand Maître 95). Tout est en `config.lua` ; le détail des règles et la liste des tests en jeu sont dans
@@ -1102,7 +1102,7 @@ fondateur ; `/metiers niveau <joueur> <compétence> <niveau>`, `/metiers recette
 
 ### `vava_gathering`
 
-La récolte (1.2.2) : zones à **vitalité** 0–100 (plein rendement au-dessus de 60, réduit entre 60 et 25 avec chance
+La récolte (1.2.3) : zones à **vitalité** 0–100 (plein rendement au-dessus de 60, réduit entre 60 et 25 avec chance
 d'échec, **épuisée** sous 25 avec props remplacés et rendement effondré, **cicatrice** à 0 : régénération × 0,2 pendant
 la durée de la zone), nœuds à charges (arbres, filons, buissons, bancs de poissons, pistes de gibier) qui se
 régénèrent par le temps (recalcul à la demande, aucune boucle), outils **en main** (`vava_inventory:held`) du genre
@@ -1185,7 +1185,7 @@ station. Rendu hors jeu : `web/index.html?view=menu` (ou `menu&tab=reparation`, 
 
 ### `vava_farming`
 
-L'agriculture (1.2.0) : **parcelles** communales ou privées (`owner = { kind = 'character', id }`, autres genres par
+L'agriculture (1.2.1) : **parcelles** communales ou privées (`owner = { kind = 'character', id }`, autres genres par
 `registerAccess`) faites d'emplacements en grille ; **croissance par dates** (humidité qui baisse, pousse au-dessus
 d'un seuil, pause à sec, flétrie après 6 h, morte après 18 h ; aucune boucle, republication des stades toutes les
 10 s) ; **fertilité** (coût par récolte, rotation par famille, compost, jachère) ; **qualité** de la récolte (graine ×

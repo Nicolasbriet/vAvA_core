@@ -8,7 +8,7 @@
     Dépendances : shared/constants.lua, config.lua, server/core.lua
 ]]
 
-local type, pairs, ipairs, pcall, tostring = type, pairs, ipairs, pcall, tostring
+local type, ipairs, pcall, tostring = type, ipairs, pcall, tostring
 local mathType = math.type
 local pack, unpack = table.pack, table.unpack
 local GetResourceState, TriggerClientEvent, IsPlayerAceAllowed = GetResourceState, TriggerClientEvent, IsPlayerAceAllowed

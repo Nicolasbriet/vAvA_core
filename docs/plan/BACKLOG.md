@@ -20,7 +20,7 @@ correction sauvage. Un problème **BLOQUANT** remonté par un audit devient une 
 ## Phase 0 — Socle
 
 ### T-001 — Lint propre et CI
-- Agent : vava-dev-lua · Dépend de : — · Statut : à faire
+- Agent : vava-dev-lua · Dépend de : — · Statut : à tester en jeu
 - Corriger les 14 avertissements luacheck relevés le 29 octobre 2026 (variables inutilisées, masquages, branche
   vide, affectation écrasée) sans changer le comportement. Vérifier que `.github/workflows/verifier.yml` passe.
 - Critères : `luacheck .` sans avertissement ; versions des modules touchés montées en correctif.

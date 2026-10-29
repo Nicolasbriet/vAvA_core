@@ -102,9 +102,9 @@ end
 --- Blessure sur le ped local, sur ordre du seul serveur, quand vava_health manque : `part` de la vie (0 à 1),
 --- au-dessus du seuil où GTA met à terre.
 ---@param part number
----@param attacker? integer  numéro serveur du lanceur
----@param spell? string
-function Bridge.ApplyMagicDamage(part, attacker, spell)
+---@param _attacker? integer  numéro serveur du lanceur (pour un autre core)
+---@param _spell? string  sort lancé (pour un autre core)
+function Bridge.ApplyMagicDamage(part, _attacker, _spell)
     local ped = PlayerPedId()
     local amount = floor(part * (GetEntityMaxHealth(ped) - DOWN_THRESHOLD) + 0.5)
     if amount > 0 and GetEntityHealth(ped) > 0 then ApplyDamageToPed(ped, amount, false) end

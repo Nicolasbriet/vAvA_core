@@ -109,7 +109,7 @@ end
 
 ---@return boolean ok
 ---@return string|nil code
-function reports.close(actor, id)
+function reports.close(_, id)
     local report = open[id]
     if not report then return false, 'not_found' end
     open[id] = nil

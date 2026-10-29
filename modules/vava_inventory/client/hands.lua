@@ -57,7 +57,8 @@ local function sameVector(value, reference)
     if type(value) ~= 'table' or type(reference) ~= 'table' then return false end
     for i = 1, 3 do
         local a, b = value[i], reference[i]
-        if type(a) ~= 'number' or type(b) ~= 'number' or not (abs(a - b) <= EPSILON) then return false end
+        -- `not (… <= EPSILON)` et non `> EPSILON` : avec NaN, la comparaison est fausse et le vecteur refusé
+        if type(a) ~= 'number' or type(b) ~= 'number' or not (abs(a - b) <= EPSILON) then return false end -- luacheck: ignore 581
     end
     return true
 end
