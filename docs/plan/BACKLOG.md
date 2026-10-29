@@ -39,14 +39,68 @@ correction sauvage. Un problème **BLOQUANT** remonté par un audit devient une 
   `vava_inventory/shared/grid.lua`. Vérifier les valeurs documentées dans chaque README.
 
 ### T-004 — Procédures de test en jeu manquantes
-- Agent : vava-testeur · Dépend de : — · Statut : à faire
+- Agent : vava-testeur · Dépend de : — · Statut : à tester en jeu
 - Écrire `docs/tests/` pour : connexion et personnage (création, sélection, suppression, reconnexion, position),
   inventaire (y compris 2 joueurs et conteneurs), besoins, santé (mort, aide, réveil), chat, voix, magie (reprendre
   la section « Tests à faire en jeu » de son README), Registre du Conseil, Codex. Déplacer `docs/tests-metiers.md`
   dans `docs/tests/metiers.md` (en laissant un renvoi).
 
+Les tâches T-005 à T-008 corrigent les anomalies relevées par T-004 (détail, fichiers et lignes dans
+`docs/plan/rapports/T-004.md`) avant la session de test T-009. Chacune met aussi à jour les attendus des procédures
+de `docs/tests/` qui décrivaient le défaut, et les README ou `docs/api.md` qui contredisaient le code. Les points
+marqués « décision » attendent le porteur du projet : ne pas les coder sans sa réponse.
+
+### T-005 — Inventaire : redémarrage, affichage et messages
+- Agents : vava-dev-lua + vava-dev-nui · Dépend de : — · Statut : à faire
+- I1 : après `restart vava_inventory`, les objets d'autres modules mis de côté au chargement des besaces sont
+  replacés dès que leur définition revient, main comprise, sans jamais perdre ni recouvrir une pile.
+- Interface : un refus du serveur n'efface pas les changements arrivés entre-temps (geste d'un autre joueur).
+- Messages : « Cet objet n'est plus là. » quand un autre l'a pris ; refus d'un objet tenable par la ceinture
+  notifié ; la touche de fermeture suit celle que le joueur a choisie pour l'ouverture.
+- Critères : test du replacement (logique pure ou harnais) ; `restart vava_inventory` à 2 joueurs sans objet perdu
+  dans la procédure ; versions montées.
+
+### T-006 — À terre, santé, besoins et magie
+- Agent : vava-dev-lua · Dépend de : — · Statut : à faire
+- S1 : la mise à terre couche le ped même quand sa vie GTA vaut exactement 100 (faim, soif, sort, `/vie 0`).
+- S2 : aucune action de récolte, d'artisanat ou d'agriculture à terre, refusée par le serveur avec l'export
+  existant `vava_health:isDowned` (pas de copie de la règle) ; `E` ne fait plus que rendre l'âme à terre.
+- M1 : un joueur à terre n'est plus mouillé, poussé ni renversé par la magie (Vague, sol mouillé, brume, boue).
+- M2 : la fin d'un Gel ne libère pas un joueur immobilisé par le Registre.
+- Santé : médaillon rendu après un redémarrage à terre ; l'écran affiche la touche du joueur.
+- Magie : verrou de cible à la portée du sort prêt ; `/lancer` refusé arme en main ; `/sort` chez un non-mage ne dit
+  plus « Sort prêt » ; journal des dégâts entièrement écrit à l'arrêt ; messages du Conseil et `/lueur couleur`
+  en français.
+- README à écrire : `vava_needs`, `vava_health` ; README de `vava_magic` à remettre d'accord avec le code.
+- Décisions : délai entre deux soins ; objets consommés quand `vava_needs` ou `vava_health` est arrêté ; membre du
+  Conseil à terre qui se relève lui-même ; Brume et Rempart en zone protégée.
+
+### T-007 — Codex, Registre et personnage
+- Agents : vava-dev-lua + vava-dev-nui · Dépend de : — · Statut : à faire
+- C1 : un nombre obligatoire du Codex doit être choisi (pas de 0 d'office) ; valeur bornée et arrondie.
+- Codex : un maximum de favoris ou de dernières pages abaissé tronque au lieu de bloquer « Lancer » ; `recent.max`
+  lu au lieu de 12 ; main rendue à l'arrêt ; suggestions du chat à jour après un changement de rang.
+- Registre : outil des caméras visible avec le droit `watch` ; état « immobilisé » cohérent après un redémarrage ;
+  identifiants (license, discord, steam) plus envoyés à l'interface ; observateur qui part : jamais rendu sous terre.
+- Personnage : règles de nom de l'interface tirées de la config du serveur (peut toucher le core : cette tâche
+  l'autorise) ; nettoyage à l'arrêt de `vava_characters_ui` ; scène de création distincte du point d'apparition
+  (`-- PLACEHOLDER`).
+- README à écrire : `vava_appearance`, `vava_characters_ui` ; README de `vava_codex` (test 4) corrigé.
+- Décisions : `core:characters:create` ouvert aux clients ; revenir à la sélection sans se reconnecter.
+
+### T-008 — Voix, chat et Chancellerie
+- Agents : vava-dev-lua + vava-dev-nui · Dépend de : — · Statut : à faire
+- V1 : le `server.cfg` écrit par la Chancellerie contient `setr voice_useNativeAudio true` et
+  `setr voice_useSendingRangeOnly true` (cette tâche autorise à toucher `chancellerie/`).
+- Voix : nom de zone borné de façon cohérente entre le champ (signes) et le schéma (octets) ; pas de double envoi
+  par `Entrée` ; focus rendu à l'arrêt ; zones et limite « à terre » redemandées après un redémarrage ; personne en
+  sélection ne s'entend pendant un `restart`.
+- Chat : README remis d'accord (test 9, `recipients`) ; `/staff` suggéré au seul Conseil.
+- README à écrire : `vava_voice`, `vava_cameras`, `vava_chancellerie`.
+- `docs/api.md` : ordre de démarrage complet, refus des besoins « dès 95 », actions non protégées par le rang.
+
 ### T-009 — PORTE : première session de test complète — **HUMAIN**
-- Dépend de : T-001, T-004 · Statut : à faire
+- Dépend de : T-001, T-004, T-005 à T-008 · Statut : à faire
 - Dérouler toutes les procédures de `docs/tests/`, noter chaque écart en tâche de correction (phase 0), mesurer le
   resmon de chaque ressource au repos et en action, noter le poids téléchargé à la première connexion.
 

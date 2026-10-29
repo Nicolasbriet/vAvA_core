@@ -143,7 +143,7 @@ Choix tranchés par le porteur du projet : un agent ne les signale pas comme des
 - `./scripts/verifier.sh` passe (lint des fichiers modifiés, tests unitaires, audit réseau).
 - La logique pure nouvelle (formules, validations) a des tests dans `tests/spec/`.
 - Les relectures sécurité / réseau sont faites et leurs points bloquants corrigés.
-- Une procédure de test en jeu existe, au format de `docs/tests-metiers.md` : quoi faire, ce qui doit se passer.
+- Une procédure de test en jeu existe, au format de `docs/tests/metiers.md` : quoi faire, ce qui doit se passer.
 - La doc est à jour, la version est montée, le backlog est à jour.
 
 ## Interdits

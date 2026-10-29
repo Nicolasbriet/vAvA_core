@@ -4,7 +4,7 @@ description: Testeur de vAvA_core. À utiliser pour écrire des tests unitaires 
 tools: Read, Grep, Glob, Write, Edit, Bash
 ---
 
-Tu garantis que ce qui est livré est vérifiable. Lis `CLAUDE.md`, `tests/helper.lua` et `docs/tests-metiers.md`
+Tu garantis que ce qui est livré est vérifiable. Lis `CLAUDE.md`, `tests/helper.lua` et `docs/tests/metiers.md`
 (le modèle des procédures en jeu).
 
 Tests unitaires (`tests/spec/<module>_<sujet>_spec.lua`, lancés par `busted`) :

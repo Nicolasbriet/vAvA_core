@@ -1,0 +1,175 @@
+# Le Codex — procédure de test en jeu
+
+Procédure pour vérifier en jeu `vava_codex` 1.1.0 : toutes les commandes et toutes les touches du serveur dans un
+livre (`F1` ou `/codex`), la recherche, les formulaires selon le type de chaque argument, « Lancer », ce que chacun
+voit selon ses droits, les signets, les dernières pages et la greffe du chat. Elle reprend les dix tests de la section
+« Tests en jeu » du README (repérés « README n ») et les complète d'après le code. Comptez trois quarts d'heure ; les
+tests à deux joueurs sont marqués **(2 joueurs)**. Un test se cite « codex 3-4 ». Préparation commune, mesure du
+resmon et remontée des écarts : [LISEZMOI.md](LISEZMOI.md).
+
+## 0. Préparation
+
+1. **Deux joueurs** : **A** (vous, Souverain par la préparation commune) et **B** (second client, hors du Conseil),
+   chacun avec un personnage. `<B>` est le numéro de compte de B, `<idA>` le numéro de session de A (Registre →
+   Joueurs, « n° » en tête de ligne).
+2. **Modules dont les formulaires servent d'exemple** : `vava_gathering` (liste des zones), `vava_skills` (registre des
+   compétences), `vava_magic` (choix fixe), `vava_chat` (greffe des dernières pages), `vava_admin` (droits), `vava_hud`
+   (notifications). Le Codex démarre après eux et avant `vava_chancellerie`.
+3. **Réglages pour aller vite** (facultatif, `modules/vava_codex/config.lua` puis `restart vava_codex`, à remettre
+   après) : `favorites.max = 2` (défaut `24`) pour atteindre la limite des signets, **seulement sur un personnage qui
+   n'en a pas plus de deux** (sinon chaque « Lancer » et chaque signet répondent « Action impossible. » : voir le
+   compte rendu) ; `recent.max = 3` (défaut `12`) pour voir les dernières pages se tasser. Le Codex n'a aucun délai à
+   raccourcir.
+4. **Attention aux valeurs par défaut** : un champ numérique obligatoire part à 0 et compte comme rempli. Lancer
+   `/recolte vitalite <zone>` sans toucher au curseur met la zone à 0 (cicatrice) ; lancer `/metiers niveau` sans
+   toucher au niveau le remet à 0. Les tests ci-dessous disent quelle valeur régler.
+
+## 1. Ouvrir et fermer (README 1)
+
+| # | Faire | Attendu |
+|---|---|---|
+| 1 | `F1`. | Le livre « Codex » s'ouvre : onglets Commandes et Touches ; curseur dans la recherche (« Rechercher une commande… ») ; « N entrées » ; l'index à gauche ; à droite « Choisissez une commande à gauche, ou tapez pour chercher. » ; sur la tranche « Tout » puis un onglet par chapitre ; en bas « Rester ouvert après « Lancer » », coché (`keepOpenDefault = true`) ; légende sous le livre : `↑ ↓` parcourir, `Entrée` choisir, lancer, `Tab` champ suivant, `Échap` retour, fermer. |
+| 2 | `Échap`. | Le livre se ferme ; souris et clavier reviennent au jeu. |
+| 3 | `/codex` dans le chat. | Le livre s'ouvre. |
+| 4 | Livre ouvert : `F1`. | Rien : le livre a le clavier ; on le ferme par `Échap` (à confirmer). |
+| 5 | Menu pause ouvert, ou pendant la sélection de personnage : `F1`. | Rien ne s'ouvre. |
+| 6 | Paramètres › Raccourcis › FiveM → « Ouvrir le Codex (commandes et touches) » → `J`. Puis `J`, `F1`, onglet Touches. | `J` ouvre le Codex, `F1` non ; dans Touches, « Ouvrir le Codex » porte `J`, son détail dit « Par défaut : F1 ». Prendre une lettre : pour une touche spéciale, le Codex peut montrer le défaut (à confirmer). Remettre `F1`. |
+
+## 2. Recherche et index (README 4)
+
+| # | Faire | Attendu |
+|---|---|---|
+| 1 | Sans recherche, chapitre « Tout ». | Sections « Signets » et « Dernières pages » (si elles ont des lignes), puis un chapitre par module (« Agriculture », « Chat », « Conseil »…). Chaque ligne : la syntaxe (`/recolte vitalite <zone> <vitalité>`), les sceaux (« Conseil », « Console », cabochon de la touche liée, « interface »), le libellé (« Zones et nœuds de récolte › Fixer la vitalité d'une zone »). |
+| 2 | Taper `recolte`, puis `RÉCOLTE`. | Mêmes résultats sous « Résultats » (accents et casse ignorés), filtrés à chaque lettre sans attente ; la première ligne est choisie d'office et son détail s'affiche. |
+| 3 | Taper `vital`. | Deux résultats : « … › État des zones » (sa description parle de vitalité) puis « … › Fixer la vitalité d'une zone » ; la première est choisie d'office, `↓` choisit la seconde. Le README annonce l'inverse : voir le compte rendu. Taper `vitalité d'une` ne garde que la seconde. |
+| 4 | `Échap` dans la recherche remplie, puis `Échap`. | Le premier vide la recherche ; le second ferme le livre. |
+| 5 | Cliquer « Récolte » sur la tranche, puis « Tout ». | Seules les lignes de la récolte, sans Signets ni Dernières pages ; « Tout » rend l'index complet. |
+| 6 | `↑` `↓` dans l'index ; puis taper une lettre alors que le curseur est ailleurs. | La sélection suit l'ordre affiché ; la lettre ramène dans la recherche. |
+
+## 3. Formulaires, ligne composée, « Lancer » (README 4, 5)
+
+| # | Faire | Attendu |
+|---|---|---|
+| 1 | A : choisir `/recolte vitalite`, `Entrée`. | Détail : « Récolte », titre, « 0 marque une cicatrice, 100 remet la zone à neuf. », « Syntaxe », le formulaire, « Ligne lancée », « Mettre en signet », « Lancer ». Le curseur passe dans « zone » ; la liste des zones arrive du serveur : vrais noms (« Forêt de Brume ») avec l'identifiant en petit (`foret_brume`) ; taper filtre la liste. |
+| 2 | `↓` puis `Entrée` dans la liste, puis `Tab`. | La zone est choisie ; champ « vitalité » : curseur et nombre bornés 0 à 100, à 0 d'office ; la ligne s'écrit en direct : `/recolte vitalite foret_brume 0`. |
+| 3 | Régler la vitalité à 100, `Entrée`. | Chat : « Forêt de Brume : vitalité 100 %. » ; mot « Lancé : /recolte vitalite foret_brume 100 » ; la ligne monte en tête des Dernières pages ; Registre → Journal : « Vitalité fixée ». |
+| 4 | Taper `150` dans le nombre, « Lancer ». | Le curseur se cale à 100 mais la ligne porte 150 ; la commande refuse elle-même : chat « usage : /recolte zones \| zone <id> \| noeud <id> \| vitalite <zone> <0-100> \| recharger <noeud> ». |
+| 5 | Vider le champ « zone ». | « Il manque « zone ». » sous la ligne ; « Lancer » grisé ; `Entrée` ne lance rien. |
+| 6 | `/metiers niveau` (README 5). | « joueur » : tous les joueurs en jeu, « Prénom Nom (n° X) », triés par nom ; « compétence » : les compétences du registre par leur nom ; « niveau » 0 à 100 (`levels.max`) ; ligne `/metiers niveau <n°> <compétence> 0` en direct. Ne pas lancer (le niveau reviendrait à 0) : lancer plutôt `/metiers voir`, qui écrit la fiche dans le chat. |
+| 7 | Choix fixe : `/magie donner`. | « joueur » marqué « facultatif », aide « sinon vous-même » ; « objet » en pastilles « grimoire » et « registre » ; avant le choix : « Il manque « objet ». ». Pastille « grimoire », joueur vide : ligne `/magie donner grimoire` ; « Lancer » met un grimoire dans votre besace. |
+| 8 | Choix avec libellés : `vava_conseil` (commande de console). | « compte » en texte libre ; « rang » en pastilles Gardien, Sénéchal, Souverain, Révoquer ; « Lancer » grisé et « Cette commande ne se lance que depuis la console du serveur ; elle est montrée pour mémoire. ». |
+| 9 | Texte : `/me`, écrire « tire son épée ». | Aide « ex. : tire son épée » ; ligne `/me tire son épée` ; « Lancer » : l'action paraît dans le chat. |
+| 10 | Commande qui ouvre une interface (sceau « interface ») : `/conseil`. | Le Codex se ferme d'abord, puis le Registre du Conseil s'ouvre. |
+| 11 | Double-clic sur une ligne sans argument : `/sigils`. | Lancée aussitôt ; réponse de la magie dans le chat. |
+
+## 4. Ce que chacun voit (2 joueurs, README 2, 3, 5)
+
+Le serveur décide de ce que chacun voit, à chaque ouverture ; et il revérifie le droit au moment de « Lancer ».
+
+| # | Faire | Attendu |
+|---|---|---|
+| 1 | B (hors du Conseil) : `F1`. | Commandes publiques (Chat, Magie, Chancellerie, `/codex`, et `/signaler` seul sous « Conseil ») et touches. Aucun sceau « Conseil » ni « Console », pas de « Non décrites », ni chapitre « Caméras » ni « Core ». Touches : ni `F10` ni `F2`. |
+| 2 | A (Souverain) : `F1`. | En plus, sous le sceau « Conseil » : `/conseil` (cabochon `F10`, « interface »), `/staff`, `/cameras`, `/recolte`, `/metiers`, `/artisanat`, `/agriculture`, `/magie`, `/zonesvoix`, `/catalogue`. Sous le sceau « Console », non lançables : `vava_conseil`, `vava_ban`, `vava_unban`, `vava_kick` (Conseil), `vava_fondateur` (Compétences), `vava_saveall` (Core). Touches : en plus `F10` et `F2` « Vol libre (Conseil) ». |
+| 3 | Console : `vava_conseil <B> gardien` ; B rouvre le Codex. | B voit `/conseil`, `/staff`, `/cameras` et les commandes de console ; ni `/recolte`, `/metiers`, `/artisanat`, `/agriculture` (droit `metiers`), ni `/magie`, `/zonesvoix`, `F2` (droit `tools`), ni `/catalogue` (droit `staff`). |
+| 4 | `vava_conseil <B> senechal` ; B rouvre. | En plus les commandes `metiers` et `tools`, et `F2` dans Touches ; toujours pas `/catalogue`. |
+| 5 | B (Sénéchal) lance `/recolte zones` depuis le Codex. | Les zones s'écrivent dans son chat ; la ligne entre dans ses Dernières pages. |
+| 6 | **Refus du serveur** : B rouvre le Codex, choisit `/recolte zones` et laisse le livre ouvert. Console : `vava_conseil <B> aucun`. B : « Lancer ». | Mot « Cette commande ne vous est pas ouverte. » ; rien dans le chat : la ligne n'est pas lancée. |
+| 7 | `vava_conseil <B> senechal`, B rouvre et choisit `/recolte vitalite` sans entrer dans « zone ». Console : `vava_conseil <B> aucun`. B entre dans « zone ». | Aucune liste : le serveur refuse les valeurs. Une zone tapée à la main reste possible, mais « Lancer » est refusé comme en 6. |
+| 8 | B (hors du Conseil) rouvre le Codex. Puis `vava_conseil <B> senechal` et B rouvre encore. | D'abord plus rien du Conseil, et `/recolte` absent des Dernières pages ; ensuite `/recolte zones` y revient : la ligne était gardée, seul l'affichage est filtré. `vava_conseil <B> aucun` ensuite. |
+| 9 | `/mp` chez B, champ « joueur », A à 10 m (README 5). | La liste ne propose que B lui-même (et les joueurs à 5 m au plus, `players.nearbyRadius`, même instance) ; A n'y est pas. Taper `<idA>` à la main, un message, « Lancer » : le message part. |
+| 10 | A s'approche à 3 m de B ; B ferme et rouvre le Codex, `/mp`. | A est proposé (valeurs relues à chaque ouverture). Chez A (Conseil) : tous les joueurs en jeu, à toute distance. |
+| 11 | « Non décrites » (README 3) : A, chapitre « Tout », sans recherche. | En bas de l'index, section « Non décrites » (au survol : « Enregistrées auprès du jeu, pas encore décrites au registre : lançables en texte libre. ») pour chaque commande serveur d'une ressource `vava…` ou `vAvA…` absente du registre, avec un seul champ « arguments » facultatif. Aujourd'hui tous les modules déclarent leurs commandes serveur : la section est absente, c'est attendu. Pour la voir : démarrer la ressource d'exemple `vava_example` si elle est installée (commande `example_ping`) (à confirmer). Chez B : jamais. |
+
+## 5. Signets (README 6)
+
+| # | Faire | Attendu |
+|---|---|---|
+| 1 | Détail de `/recolte zones` → « Mettre en signet ». | Un ruban « /recolte » apparaît en haut du livre ; le bouton devient « Retirer le signet » ; la section « Signets » apparaît en tête et liste toutes les sous-commandes de `/recolte` (le signet vaut pour la commande), chacune marquée ❧. |
+| 2 | Cliquer le ruban depuis un autre chapitre, avec une recherche en cours. | Onglet Commandes, recherche et chapitre remis à zéro, première sous-commande de `/recolte` choisie. |
+| 3 | Onglet Touches → « Chat : écrire » → « Mettre en signet ». Revenir à Commandes, cliquer le ruban. | Le ruban porte « Chat : écrire » ; le clic rouvre l'onglet Touches sur cette touche. |
+| 4 | Signet sur une commande de console (`vava_saveall`). | Accepté : elle est montrée pour mémoire. |
+| 5 | Poser des signets jusqu'à `favorites.max` (24, ou 2 avec le réglage du § 0), puis un de plus. | Mot « Vous avez atteint le nombre de signets permis : retirez-en un. » ; aucun ruban de plus. |
+| 6 | « Retirer le signet ». | Le ruban disparaît, la section « Signets » aussi s'il n'en reste aucun. |
+
+## 6. Dernières pages et greffe du chat (README 9)
+
+| # | Faire | Attendu |
+|---|---|---|
+| 1 | Lancer `/sigils` puis `/me salue` depuis le Codex. | Aussitôt en tête des Dernières pages, la plus récente d'abord. |
+| 2 | Fermer ; taper `/me lève son verre` dans le chat ; rouvrir. | `/me <action>` en tête des Dernières pages. |
+| 3 | Taper deux fois `/mp <idA> bonjour` dans le chat ; rouvrir. | Une seule ligne « Message privé » ; rien du message n'est gardé. |
+| 4 | A : `/metiers voir <idA>` puis `/chat reinit` dans le chat ; rouvrir. | Deux lignes distinctes : « Compétences d'un joueur › Lire la fiche » et « Réglages du chat › Remettre le chat à sa place » (sous-commandes déclarées). |
+| 5 | Dans `F8` : `me test` ; rouvrir. | N'entre pas aux Dernières pages : seul le chat les signale. |
+| 6 | **(2 joueurs)** B hors du Conseil : `/recolte zones` dans le chat ; rouvrir. | Rien dans le chat (la commande se tait devant qui n'a pas le droit) ; rien aux Dernières pages (le serveur ignore ce que B ne peut pas lancer). |
+| 7 | Lancer treize commandes différentes (quatre avec `recent.max = 3`) ; rouvrir. | Douze lignes (trois) au plus, sans doublon ; la plus ancienne est sortie. Pendant la même ouverture, le livre peut en montrer jusqu'à douze même avec `recent.max = 3` (voir le compte rendu). |
+
+## 7. « Rester ouvert après Lancer » (README 7)
+
+| # | Faire | Attendu |
+|---|---|---|
+| 1 | Décocher ; lancer `/sigils`. | Le livre se ferme et la commande part. Rouvrir : la case est décochée. |
+| 2 | Cocher ; lancer `/sigils`. | Le livre reste ouvert, mot « Lancé : /sigils », et garde le clavier. |
+| 3 | Case cochée ; lancer `/conseil` (A). | Le livre se ferme d'abord, le Registre s'ouvre : une commande « interface » ferme toujours le Codex. |
+
+## 8. Onglet Touches (README 8)
+
+| # | Faire | Attendu |
+|---|---|---|
+| 1 | Onglet Touches. | Recherche « Rechercher une touche… » ; une ligne par touche (cabochon et libellé) chapitre par chapitre, y compris les commandes liées à une touche (`/codex` `F1`, `/conseil` `F10` pour A) ; sceau « maintenir » sur les touches à maintenir (« Chat : écrire » `T`, « Récolter (nœud proche) » `E`, roue des sorts `Tab`). |
+| 2 | Cliquer « Chat : écrire ». | Cabochon en grand, « Par défaut : T », « À maintenir : agit à l'appui et au relâchement. », « Chaque touche se change dans Paramètres › Raccourcis › FiveM. Le Codex montre la vôtre. », bouton de signet ; pas de « Lancer », `Entrée` ne fait rien. |
+| 3 | Chercher `tab`, puis `F10`. | La recherche porte aussi sur la touche affichée. |
+
+## 9. Par personnage, déconnexion (README 10)
+
+| # | Faire | Attendu |
+|---|---|---|
+| 1 | Poser deux signets, lancer deux commandes, décocher « Rester ouvert » ; se déconnecter et revenir sur le même personnage. | Signets, Dernières pages et réglage retrouvés. |
+| 2 | Poser un signet et quitter dans les deux secondes ; revenir. | Le signet est là (le personnage est écrit au départ). |
+| 3 | Revenir sur un autre personnage du même compte. | Ses propres préférences : aucun signet, aucune dernière page, case cochée. |
+
+## 10. Redémarrages
+
+| # | Faire | Attendu |
+|---|---|---|
+| 1 | Livre ouvert : `restart vava_codex`. | Le livre disparaît ; console `module 'vava_codex' v1.1.0 prêt` ; souris et clavier reviennent au jeu (à confirmer : le module ne rend pas lui-même la main à l'arrêt). `F1` rouvre ; signets, Dernières pages et réglage intacts. |
+| 2 | `stop vava_codex` ; `F1` ; `/me essai` dans le chat ; `start vava_codex` ; `F1`. | `F1` sans effet pendant l'arrêt ; `/me` ne figure pas aux Dernières pages. |
+| 3 | `stop vava_admin` ; A : `F1`. | Plus de chapitre « Conseil » (ses entrées partent avec le module, `/signaler` compris), plus aucune commande du Conseil ni de la console, sauf si A a l'ACE `vava_codex.staff` ou l'ACE propre à la commande (`metiers.admin`…). |
+| 4 | `start vava_admin` ; A : `F1`. | Tout revient sans redémarrer le Codex. |
+
+## 11. Tentatives de triche simples
+
+| # | Faire | Attendu |
+|---|---|---|
+| 1 | `F1` puis `Échap`, six fois très vite. | Vers la quatrième ouverture : notification « Le Codex est indisponible pour le moment. » (trois ouvertures d'affilée, puis une toutes les deux secondes : `rateLimits.open`) ; un instant après, `F1` rouvre. |
+| 2 | Case cochée, `/sigils` choisi : garder `Entrée` enfoncée. | La commande part à chaque répétition puis « Doucement… » et elle ne part plus (dix d'affilée, puis deux par seconde : `rateLimits.prefs`). |
+| 3 | « Mettre en signet » / « Retirer le signet » quinze fois très vite. | « Doucement… » au-delà d'une dizaine. |
+| 4 | **(2 joueurs)** B hors du Conseil tape `/vava_kick <idA> essai` dans le chat. | Rien : la commande ne vaut qu'en console ; elle n'entre pas aux Dernières pages. |
+| 5 | Valeur hors bornes dans un formulaire | Voir 3-4 : la commande lancée garde ses propres contrôles. |
+| 6 | À terre (`vava_health`) : `F1`. | Le Codex s'ouvre (à confirmer) ; chaque commande lancée garde ses propres refus. |
+
+## 12. Resmon
+
+| Situation | Attendu (`resmon 1`, ligne `vava_codex`) |
+|---|---|
+| Au repos, livre fermé | 0,02 ms au plus (aucune boucle : 0,00 attendu). |
+| Livre ouvert, recherche, formulaires | 0,02 ms au plus côté Lua : tout se fait dans la page ; 0,15 ms au plus au moment de « Lancer ». |
+
+## 13. Ce qu'il faut regarder dans la base
+
+- Les préférences vivent dans le personnage : `vava_characters.data`, clé `vava_codex:prefs` (`favorites`, `recent`
+  avec `name`, `action`, `at`, et `keepOpen`). Exemple : `SELECT id, JSON_EXTRACT(data, '$."vava_codex:prefs"') FROM
+  vava_characters WHERE id = <n>;`
+- Écrites avec le personnage : sauvegarde groupée toutes les 5 min (`saveIntervalMs` du core), au départ du joueur, ou
+  `vava_saveall` en console.
+- `vava_admin_logs` : les commandes lancées depuis le Codex y laissent la trace que laisse leur module (« Vitalité
+  fixée »…) ; le Codex lui-même n'écrit rien.
+
+## 14. Ce que je ne peux pas avoir vérifié hors jeu
+
+- Le rendu du livre dans CEF (polices, rubans, onglets de tranche) : `web/index.html` dans un navigateur, `?staff=0`
+  pour la vue d'un simple joueur ; les listes y sont simulées.
+- La touche réellement liée lue par `GetControlInstructionalButton` : sûre pour une lettre, incertaine pour une touche
+  de fonction ou spéciale (repli sur la touche par défaut).
+- Le retour du clavier au Codex 150 ms après « Lancer » (`IsNuiFocused`) quand une commande affiche quelque chose.
+- `ExecuteCommand` d'une commande du serveur depuis le client (elle doit arriver comme si elle était tapée).
+- Le focus après l'arrêt de la ressource livre ouvert (10-1).
