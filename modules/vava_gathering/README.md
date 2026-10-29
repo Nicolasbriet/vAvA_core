@@ -7,7 +7,8 @@ la qualité de ce qu'on ramasse dépend de la compétence, de l'outil et de la s
 palier et sa provenance. Le serveur décide de tout et demande l'XP à `vava_skills`.
 
 Ordre de démarrage : après `vAvA_core` (≥ 0.6.0), `vava_inventory` (≥ 1.4.0) et `vava_skills` (≥ 1.0.0).
-Facultatifs : `vava_hud` (barre de progression, notifications), `vava_admin` (droit `metiers`), `vava_chat`.
+Facultatifs : `vava_hud` (barre de progression, notifications), `vava_admin` (droit `metiers`), `vava_chat`,
+`vava_health` (aucune récolte à terre).
 
 ## Règles (config.lua)
 
@@ -106,3 +107,5 @@ resource, item }`), `harvested` (after : `+ quantity, tier, band, extra? `), `zo
     `map.blips = false` → aucun.
 11. **Redémarrage** : `restart vava_gathering` → vitalités et charges retrouvées (écriture à l'arrêt), props recréés,
     blips retirés puis reposés.
+12. **À terre** (`vava_health`) : près d'un chêne, hache en main, se faire mettre à terre → l'invite disparaît ; `E` ne
+    sert qu'à rendre l'âme. Tombé pendant le geste : rien n'est pris, aucune charge consommée (« Vous êtes à terre. »).

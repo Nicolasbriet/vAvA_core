@@ -1,7 +1,8 @@
 --[[
     vava_magic/server/world.lua
     Rôle : le monde vu par le serveur (OneSync) : ped et position d'un joueur lus côté serveur, vie, véhicule, joueurs
-           en jeu et véhicules proches d'un point, envoi d'un évènement aux seuls joueurs proches, ped figé (gel),
+           en jeu et véhicules proches d'un point, envoi d'un évènement aux seuls joueurs proches, ped figé (gel ;
+           jamais libéré s'il est immobilisé par le Conseil),
            state bags posés sur le ped d'un joueur (répliqués aux seuls joueurs proches, jamais à tout le serveur).
     Dépendances : shared/constants.lua, server/core.lua, bridge/server.lua
 ]]
@@ -89,12 +90,15 @@ function world.vehiclesNear(point, radius)
     return found
 end
 
---- Fige (ou libère) le ped d'un joueur, côté serveur (état « gelé »).
+--- Fige (ou libère) le ped d'un joueur, côté serveur (état « gelé »). Un joueur immobilisé par le Conseil (Registre)
+--- reste figé : la fin d'un gel ne rend pas libre celui que le Conseil retient.
 ---@param src integer
 ---@param frozen boolean
 function world.freeze(src, frozen)
     local ped = world.ped(src)
-    if ped then FreezeEntityPosition(ped, frozen) end
+    if not ped then return end
+    if not frozen and bridge.IsHeldByCouncil(src) then return end
+    FreezeEntityPosition(ped, frozen)
 end
 
 --- Envoie un évènement aux joueurs en jeu proches d'un point.

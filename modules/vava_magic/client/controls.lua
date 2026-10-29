@@ -346,7 +346,8 @@ function controls.select(name)
     return true
 end
 
---- Lance le sort choisi (ou `name`) sans passer par le mode magie : commande de secours, sans visée.
+--- Lance le sort choisi (ou `name`) sans passer par le mode magie : commande de secours, sans visée. Mains vides,
+--- comme le mode magie : une arme sortie l'empêche.
 ---@param name string|nil
 function controls.castNow(name)
     name = name or state.selected()
@@ -357,6 +358,10 @@ function controls.castNow(name)
     local controller = controllers[name]
     if not controller or not state.level(name) then
         messages.refuse('unknown_spell')
+        return
+    end
+    if GetSelectedPedWeapon(PlayerPedId()) ~= UNARMED then
+        messages.refuse('armed')
         return
     end
     controller.cast({ aiming = false, inRange = false, direction = aim.direction(), target = bridge.GetLockedTarget() })
@@ -439,8 +444,13 @@ local function spellNamed(word)
     return nil
 end
 
--- /sort <nom> | aucun : choisir le sort prêt sans la roue (secours)
+-- /sort <nom> | aucun : choisir le sort prêt sans la roue (secours). Un non-mage n'a pas de sort prêt : le serveur le
+-- refuserait, rien n'est annoncé.
 keys.command(cfg.commands.sort, cfg.texts.suggestions.sort, function(args)
+    if not state.isMage() then
+        messages.refuse('not_mage')
+        return
+    end
     local word = concat(args, ' ')
     if lower(word) == cfg.commands.none then
         controls.select(nil)
@@ -454,7 +464,10 @@ keys.command(cfg.commands.sort, cfg.texts.suggestions.sort, function(args)
         bridge.ChatLines({ cfg.texts.chat.spellUsage:format(concat(labels, ', ')) })
         return
     end
-    controls.select(name)
+    if not controls.select(name) then
+        messages.refuse('unknown_spell')
+        return
+    end
     bridge.Notify(cfg.texts.notify.selected:format(state.spellConfig(name).label), 'info')
 end)
 

@@ -5,10 +5,12 @@
            par le bridge (vava_health), et journal des dégâts pour le Conseil (lanceur, cible, dégâts, position),
            écrit en base par lots. La victime d'un impact ou d'une zone reçoit la réaction du sort (son élément, ou son
            champ `reaction` : geste, effet d'écran) ; une brûlure qui dure n'en envoie pas à chaque morsure. Un sort
-           offensif sans dégâts (recul, état) demande d'abord si la cible peut être touchée (`combat.affects`).
+           offensif sans dégâts (recul, état) demande d'abord si la cible peut être touchée (`combat.affects` : jamais
+           un joueur à terre).
            Un lot plein du journal s'écrit dans son propre thread : celui qui blesse (vérification des zones, morsure
-           d'une brûlure, impact) n'attend jamais la base au milieu de son travail. Les lignes plus anciennes que
-           `combat.log.retentionDays` sont retirées au démarrage du module puis une fois par jour, par lots bornés.
+           d'une brûlure, impact) n'attend jamais la base au milieu de son travail. À l'arrêt du module, tout ce qui
+           attend part en une seule requête. Les lignes plus anciennes que `combat.log.retentionDays` sont retirées
+           au démarrage du module puis une fois par jour, par lots bornés.
     Dépendances : shared/, config.lua, server/core.lua, bridge/server.lua, server/world.lua
 ]]
 
@@ -26,6 +28,9 @@ local INSERT = 'INSERT INTO `vava_magic_damage_log` (`at`, `spell`, `caster_id`,
 local ROW = '(?, ?, ?, ?, ?, ?, ?, ?, ?)'
 -- au-delà, les lignes en attente d'une base qui ne répond pas sont abandonnées (journal en console)
 local QUEUE_MAX = 500
+-- arrêt du module : une seule requête pour tout ce qui attend, dans la limite des paramètres d'une requête préparée
+-- (65 535 pour MySQL et MariaDB, 9 par ligne)
+local STOP_ROWS = 65535 // 9
 -- purge des lignes anciennes : par lots bornés (index sur `at`), une courte pause entre deux lots, une fois par jour
 local PURGE = 'DELETE FROM `vava_magic_damage_log` WHERE `at` < ? LIMIT ?'
 local PURGE_BATCH = 5000
@@ -50,13 +55,16 @@ function combat.protected(point)
 end
 
 --- Un sort offensif peut-il toucher ce joueur ? (dégâts entre joueurs activés, personnage en jeu, hors zone
---- protégée) Renvoie sa position lue côté serveur, ou nil.
+--- protégée, pas à terre : un corps au sol n'est ni mouillé, ni poussé, ni renversé) Renvoie sa position lue côté
+--- serveur, ou nil.
 ---@param target integer
 ---@return table|nil
 function combat.affects(target)
     if not cfg.pvp or not bridge.GetCharacterId(target) then return nil end
     local position = world.position(target)
     if not position or combat.protected(position) then return nil end
+    -- en dernier : un appel à vava_health, seulement pour qui serait touché
+    if bridge.IsDowned(target) then return nil end
     return position
 end
 
@@ -68,10 +76,12 @@ function combat.react(target, spell)
     if def then TriggerClientEvent(EVENTS.HIT, target, def.config.reaction or def.config.element) end
 end
 
---- Écrit en base les dégâts en attente (une requête par lot).
-function combat.flush()
+--- Écrit en base au plus `limit` lignes en attente, les plus anciennes, en une requête ; refusée, elles reviennent en
+--- attente (dans la limite de QUEUE_MAX).
+---@param limit integer
+local function write(limit)
     if #queue == 0 then return end
-    local count = min(#queue, cfg.log.batch)
+    local count = min(#queue, limit)
     local rows = move(queue, 1, count, 1, {})
     local remaining = {}
     move(queue, count + 1, #queue, 1, remaining)
@@ -86,6 +96,20 @@ function combat.flush()
         VavaMagic.log.warn('journal des dégâts non écrit (%d lignes) : %s', count, tostring(err))
         if #queue + count <= QUEUE_MAX then move(rows, 1, count, #queue + 1, queue) end
     end
+end
+
+--- Écrit en base un lot de dégâts en attente (une requête, `log.batch` lignes au plus).
+function combat.flush()
+    write(cfg.log.batch)
+end
+
+--- Arrêt du module : tout le journal en attente part, en une seule requête (rien ne dépend d'un thread repris entre
+--- deux attentes de la base pendant que la ressource s'arrête).
+function combat.flushAll()
+    if #queue > STOP_ROWS then
+        VavaMagic.log.warn('journal des dégâts : %d ligne(s) au-delà de %d non écrite(s) à l\'arrêt', #queue - STOP_ROWS, STOP_ROWS)
+    end
+    write(STOP_ROWS)
 end
 
 --- Blesse un joueur au nom d'un sort, puis l'inscrit au journal. Renvoie vrai si la blessure est appliquée.

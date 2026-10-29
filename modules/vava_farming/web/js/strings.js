@@ -95,6 +95,7 @@ const STRINGS = Object.freeze({
     missing_items: 'Il vous manque quelque chose.',
     full: 'Le seau est déjà plein.',
     busy: 'Un geste est déjà en cours.',
+    downed: 'Vous êtes à terre.',
     too_far: 'Trop loin.',
     too_soon: 'Trop tôt.',
     not_found: 'Ce geste n\'est plus en cours.',

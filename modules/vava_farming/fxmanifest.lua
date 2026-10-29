@@ -8,7 +8,8 @@
            demande l'XP à vava_skills ; le client crée les props des plantes selon leur stade, montre l'invite et le menu,
            joue les gestes.
     Dépendances : vAvA_core ≥ 0.6.0, vava_inventory ≥ 1.4.0, vava_skills ≥ 1.0.0, vava_gathering ≥ 1.0.0 (faucille),
-                  vava_crafting ≥ 1.1.0 (composteur) ; facultatifs : vava_hud, vava_admin (droit metiers), vava_chat
+                  vava_crafting ≥ 1.1.0 (composteur) ; facultatifs : vava_hud, vava_admin (droit metiers), vava_chat,
+                  vava_health (aucun geste à terre)
 ]]
 
 fx_version 'cerulean'
@@ -18,7 +19,7 @@ use_experimental_fxv2_oal 'yes'
 
 name 'vava_farming'
 description 'Agriculture vAvA : parcelles, croissance par dates, humidité et fertilité, qualité, grenier commun'
-version '1.2.1'
+version '1.2.2'
 
 dependency 'vAvA_core'
 dependency 'vava_inventory'

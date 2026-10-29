@@ -7,7 +7,8 @@
            cooldown, durée, rendement, charges, vitalité) et appelle vava_skills pour l'XP ; le client crée les props à
            portée, pose les blips des zones sur la carte, montre l'invite, joue le geste et la barre de tension.
     Dépendances : vAvA_core ≥ 0.6.0, vava_inventory ≥ 1.4.0 (objets, mains, métadonnées), vava_skills ≥ 1.0.0 (XP) ;
-                  facultatifs : vava_hud (barre de progression, notifications), vava_admin (droit metiers), vava_chat
+                  facultatifs : vava_hud (barre de progression, notifications), vava_admin (droit metiers), vava_chat,
+                  vava_health (aucune récolte à terre)
 ]]
 
 fx_version 'cerulean'
@@ -17,7 +18,7 @@ use_experimental_fxv2_oal 'yes'
 
 name 'vava_gathering'
 description 'Récolte vAvA : zones à vitalité sur la carte, nœuds, outils en main, qualité, pêche, pistes de gibier'
-version '1.2.3'
+version '1.2.4'
 
 dependency 'vAvA_core'
 dependency 'vava_inventory'

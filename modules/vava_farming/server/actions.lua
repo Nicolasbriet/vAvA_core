@@ -6,7 +6,7 @@
            distance — trop loin, le geste est abandonné —, puis application : semis, arrosage, compost, récolte avec
            qualité, provenance, graines récupérées et XP, arrachage avec déchets ; l'emplacement d'un geste qui donne ou
            consomme des objets est écrit aussitôt) ; remplissage du seau au puits. Une seule action à la fois par
-           joueur.
+           joueur ; aucune à terre (vava_health) : ni menu, ni début, ni fin, ni puits.
     Dépendances : shared/, config.lua, server/core.lua, bridge/server.lua, server/journal.lua, server/catalog.lua,
                   server/slots.lua
 ]]
@@ -153,6 +153,7 @@ end
 function actions.menu(src, parcelId, index)
     local characterId = bridge.GetCharacterId(src)
     if not characterId then return false, 'no_character' end
+    if bridge.IsDowned(src) then return false, 'downed' end
     local parcel = catalog.parcel(parcelId)
     if not parcel then return false, 'unknown_parcel' end
     if mathType(index) ~= 'integer' or index < 1 or index > parcel.count then return false, 'unknown_slot' end
@@ -226,6 +227,7 @@ end
 function actions.begin(src, parcelId, index, action, cropId, tier)
     local characterId = bridge.GetCharacterId(src)
     if not characterId then return false, 'no_character' end
+    if bridge.IsDowned(src) then return false, 'downed' end
     local parcel = catalog.parcel(parcelId)
     if not parcel then return false, 'unknown_parcel' end
     if mathType(index) ~= 'integer' or index < 1 or index > parcel.count then return false, 'unknown_slot' end
@@ -358,8 +360,9 @@ function actions.finish(src, token)
     if not session or session.token ~= token then return false, 'not_found' end
     if GetGameTimer() - session.startedAt < session.durationMs - interact.finishToleranceMs then return false, 'too_soon' end
     local parcel, index, action = session.parcel, session.index, session.action
-    -- la session tombe dans tous les cas : trop loin, le geste est abandonné (rien n'est encore consommé)
+    -- la session tombe dans tous les cas : à terre ou trop loin, le geste est abandonné (rien n'est encore consommé)
     sessions[src] = nil
+    if bridge.IsDowned(src) then return false, 'downed' end
     if not nearSlot(src, parcel, index) then return false, 'too_far' end
     local now = time()
     local slot = slots.get(parcel, index)
@@ -455,6 +458,7 @@ end
 ---@return table|string result  { charges } ou code
 function actions.fill(src, wellId)
     if not bridge.GetCharacterId(src) then return false, 'no_character' end
+    if bridge.IsDowned(src) then return false, 'downed' end
     local well = catalog.well(wellId)
     if not well then return false, 'unknown_well' end
     local x, y, z = bridge.Position(src)

@@ -2,13 +2,15 @@
     vava_health/client/keys.lua
     Rôle : touches réglables par le joueur (RegisterKeyMapping, aucune boucle) :
       - relever : intention envoyée au serveur, qui choisit la personne à terre la plus proche ;
-      - rendre l'âme : touche à maintenir (appui et relâchement, sans boucle), puis intention envoyée.
+      - rendre l'âme : touche à maintenir (appui et relâchement, sans boucle), puis intention envoyée ; la touche
+        choisie par le joueur est relue pour l'écran à terre.
     Dépendances : shared/constants.lua, config.lua, client/core.lua, client/screen.lua, client/hud.lua
 ]]
 
-local type, tostring = type, tostring
+local type, tostring, match = type, tostring, string.match
 local CreateThread, SetTimeout, GetGameTimer = CreateThread, SetTimeout, GetGameTimer
 local RegisterCommand, RegisterKeyMapping = RegisterCommand, RegisterKeyMapping
+local GetControlInstructionalButton, GetHashKey = GetControlInstructionalButton, GetHashKey
 
 local core = VavaHealth.core
 local cfg = VavaHealth.config
@@ -17,6 +19,9 @@ local screen, hud = VavaHealth.screen, VavaHealth.hud
 
 local ASSIST_COMMAND = 'vava_health_assist'
 local GIVE_UP_COMMAND = 'vava_health_giveup'
+-- bit qui désigne, pour GTA, une commande liée par RegisterKeyMapping
+local MAPPED_COMMAND = 0x80000000
+local UINT32 = 0xFFFFFFFF
 
 local keys = {}
 VavaHealth.keys = keys
@@ -79,3 +84,12 @@ RegisterKeyMapping('+' .. GIVE_UP_COMMAND, cfg.labels.giveUp, 'keyboard', cfg.ke
 
 --- Relâche le maintien en cours (relevé, porté au lieu de soins).
 keys.release = release
+
+--- Touche « rendre l'âme » choisie par le joueur (Paramètres > Raccourcis > FiveM), telle que GTA l'affiche (« E ») ;
+--- celle de la config si le jeu ne donne pas une lettre.
+---@return string
+function keys.giveUpLabel()
+    local button = GetControlInstructionalButton(0, (GetHashKey('+' .. GIVE_UP_COMMAND) | MAPPED_COMMAND) & UINT32, true)
+    local letter = type(button) == 'string' and match(button, '^t_(.+)$')
+    return letter or cfg.keys.giveUp
+end

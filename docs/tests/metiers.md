@@ -103,6 +103,7 @@ la fin, sang à l'interruption. Hors jeu : `modules/vava_hud/web/index.html?prog
 | 7 | `/recolte vitalite foret_brume 20`. | Props remplacés par des souches (bande épuisée), rendement effondré, échecs fréquents (« la terre est fatiguée »). |
 | 8 | `/recolte vitalite foret_brume 0`. | « cicatrice » ; `vava_gathering_log` : `scarred` ; `/recolte zone foret_brume` montre la cicatrice ; `/recolte vitalite foret_brume 100` lève tout. |
 | 9 | `/recolte recharger foret_brume_chene_1`. | Charges à plein. |
+| 10 | Hache en main près d'un chêne : `/aterre` (outil `vava_dev_characters`), puis `E` ; relevé, lancer une récolte et `/aterre` pendant la barre. | À terre : l'invite disparaît, `E` ne fait que rendre l'âme (aucune récolte, aucun message de la récolte). Tombé pendant le geste : rien de pris, charge intacte (« Vous êtes à terre. » à la fin de la barre, ou geste interrompu si le corps a glissé en tombant). |
 
 ### 3.3 Pêche
 
@@ -130,6 +131,7 @@ la fin, sang à l'interruption. Hors jeu : `modules/vava_hud/web/index.html?prog
 | 10 | **(2 joueurs)** L'autre lance une pièce à la même forge. | « Quelqu'un travaille déjà ici ». |
 | 11 | Station avec `owner = { kind = 'character', id = <autre> }` dans la config. | « ne vous appartient pas ». |
 | 12 | `/artisanat station forge_bourg`, `/artisanat carburant forge_bourg 20`. | État et recettes dans le chat ; combustible fixé. |
+| 13 | Près du fourneau : `/aterre`, puis `E` ; relevé, lancer une pièce et `/aterre` pendant la barre. | À terre : ni invite ni menu, `E` ne fait que rendre l'âme. Tombé pendant la pièce : rien de consommé, station libérée (« Vous êtes à terre. » à la fin de la barre, ou geste interrompu si le corps a glissé) ; un autre joueur peut s'en servir aussitôt. |
 
 ## 5. Agriculture — `vava_farming`
 
@@ -146,6 +148,7 @@ la fin, sang à l'interruption. Hors jeu : `modules/vava_hud/web/index.html?prog
 | 9 | Jardin privé (propriétaire n° 1 dans la config). | Un autre personnage lit « ne vous appartient pas ». |
 | 10 | `/agriculture parcelle champ_communal`, `/agriculture arroser champ_communal`. | État des emplacements ; tout arrosé. |
 | 11 | `restart vava_farming`. | Emplacements retrouvés, croissance rattrapée d'après les dates. |
+| 12 | Près d'un emplacement, puis d'un puits, puis du grenier : `/aterre`, puis `E` ; relevé, lancer un semis et `/aterre` pendant la barre. | À terre : ni invite, ni menu, ni seau rempli, ni grenier ouvert ; `E` ne fait que rendre l'âme. Tombé pendant le semis : graine gardée, emplacement inchangé (« Vous êtes à terre. » à la fin de la barre, ou geste interrompu si le corps a glissé). |
 
 ## 6. Ce qu'il faut regarder dans la base
 

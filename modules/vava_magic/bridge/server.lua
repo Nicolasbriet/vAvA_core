@@ -104,6 +104,15 @@ function Bridge.AdminLog(source, label, details)
     end
 end
 
+--- Vrai si le Conseil a immobilisé ce joueur (Registre, vava_admin ≥ 1.6.0) : la fin d'un gel ne le libère pas.
+--- vava_admin absent ou en erreur : non.
+---@param source integer
+---@return boolean
+function Bridge.IsHeldByCouncil(source)
+    local called, frozen = call(LINKS.ADMIN, 'isFrozen', source)
+    return called and frozen == true
+end
+
 -- Notifications ---------------------------------------------------------------------------------------------------
 
 --- Message à un joueur ; nature : info (défaut), success, warning, danger.

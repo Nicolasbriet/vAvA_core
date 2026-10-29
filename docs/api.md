@@ -611,9 +611,10 @@ avec le personnage. Les besoins, durées, paliers, messages et gestes sont dans 
   en 4 h de jeu, soif en 3 h ; × 1,5 pour la part du temps passée à courir (vitesse lue côté serveur ; un véhicule
   ne compte pas). Aucune baisse hors connexion ni pendant la sélection.
 - **Paliers** : sous 30, un message ; sous 10, un message et l'endurance maximale réduite ; à 0, perte de vie à chaque
-  passage (2 points pour la faim, 4 pour la soif). Avec `vava_health`, le joueur finit à terre (puis peut être
-  relevé) et la baisse s'arrête tant qu'il y est ; sans lui, la vie ne descend jamais sous `health.floor` (10 % de la
-  vie au-dessus du seuil de mise à terre), pour que personne ne reste mort sans recours.
+  passage (2 points pour la faim, 4 pour la soif). Avec `vava_health`, le joueur finit à terre (la perte qui atteint
+  le seuil couche le ped, vie GTA 0 : `shared/starvation.lua`), puis peut être relevé, et la baisse s'arrête tant
+  qu'il y est ; sans lui, la vie ne descend jamais sous `health.floor` (10 % de la vie au-dessus du seuil de mise à
+  terre), pour que personne ne reste mort sans recours. Détail et tests en jeu : `modules/vava_needs/README.md`.
 - **Manger, boire** : objets de l'inventaire déclarant `effects = { hunger = …, thirst = … }`. Refusés au-delà de 95
   (« Vous n'avez plus faim. ») et pendant le geste en cours (3 s). Geste selon la catégorie (`nourriture` : manger,
   `boisson` : boire), sans accessoire en main. Un objet portant aussi l'effet d'un autre module n'est jamais refusé
@@ -685,9 +686,13 @@ touches et messages : `config.lua`. Demande le core 0.4.0 (hook `core:character:
   récupération automatique de GTA est coupée : on se soigne par objets (`effects = { health = 20 }` : +20 %, refusé
   si l'on n'est pas blessé) ou en se faisant relever.
 - **Mise à terre** : décidée par le serveur, qui lit la vie de chaque joueur apparu toutes les 500 ms (le client n'a
-  rien à déclarer) ; cause et auteur lus côté serveur. Le joueur reste au sol, l'écran « wasted » de GTA est remplacé
-  par l'écran « Vous êtes à terre ». À terre : aucun geste sur les objets (prendre en main compris ; un module peut
-  encore faire reposer l'objet tenu), faim et soif figées ; un client qui se relève seul est remis à terre.
+  rien à déclarer) ; cause et auteur lus côté serveur. Au seuil (vie GTA 100) ou dessous, le joueur est à terre, et le
+  serveur ordonne toujours au client de coucher son ped (vie GTA 0) : ce que GTA fait d'une vie posée exactement sur
+  le seuil ne compte pas (règle pure : `shared/vitality.lua`). Le joueur reste au sol, l'écran « wasted » de GTA est
+  remplacé par l'écran « Vous êtes à terre », qui montre la touche « rendre l'âme » choisie par le joueur. À terre :
+  aucun geste sur les objets (prendre en main compris ; un module peut encore faire reposer l'objet tenu), faim et
+  soif figées, ni récolte, ni artisanat, ni agriculture (refusés par ces modules), aucun effet des sorts ; un ped resté
+  au seuil ou au-dessus (client qui se relève seul) est remis à terre.
 - **Relever** (touche G par défaut) : le serveur choisit la personne à terre la plus proche (2 m, positions lues côté
   serveur, rien n'est diffusé) ; geste de 8 s, distance revérifiée à la fin ; relevé avec 25 %. La personne à terre
   lit « Quelqu'un vous relève » : son nom n'est pas révélé.
@@ -701,7 +706,7 @@ touches et messages : `config.lua`. Demande le core 0.4.0 (hook `core:character:
 | Export | Retour |
 |---|---|
 | `get(source)` | `{ health, downed, downedFor }` ou `nil, code` — `health` lue côté serveur |
-| `isDowned(source)` | booléen |
+| `isDowned(source)` | booléen — à appeler (isolé, `pcall`) par tout module qui refuse une action à terre, plutôt que de recopier la règle ; module absent : pas à terre |
 | `setHealth(source, vie)` | `true` ou `false, code` — de 0 à 1 ; 0 fait tomber |
 | `heal(source, part)` / `damage(source, part)` | `true` ou `false, code` — à partir de la vie actuelle |
 | `down(source, cause?)` | `true` ou `false, code` — mise à terre décidée par un module (`cause` libre : 'piege'…) |
@@ -720,9 +725,11 @@ Codes : `not_ready`, `invalid_target`, `no_character`, `invalid_amount`, `invali
 - `vava_health:respawned` (`after`) : `{ source, characterId, reason, point }` — `reason` = `choice` (il a rendu l'âme)
   ou `timeout` ; point d'appui des pénalités à venir.
 
-**Export client** : `get()` — `{ health, downed }` du joueur local, ou `nil`.
+**Export client** : `get()` — `{ health, downed }` du joueur local, ou `nil` (les métiers le lisent pour taire leur
+invite à terre).
 
 Pour travailler le rendu sans le jeu : `web/index.html?state=downed` (ou `ready`, `patient`, `holding`, `assist`).
+Détail et tests en jeu : `modules/vava_health/README.md`.
 
 ### `vava_admin`
 
@@ -768,6 +775,7 @@ Rangs, droits, durées, textes : `config.lua`. Demande le core 0.5.0 (compte con
 | `isStaff(source)` | booléen |
 | `can(source, droit)` | booléen |
 | `rankOf(source)` | `{ name, label, level }` ou `nil` |
+| `isFrozen(source)` | booléen — immobilisé par le Conseil (Registre) ; lecture seule : un module qui fige et libère un ped (gel d'un sort) ne libère pas celui que le Conseil retient ; depuis 1.6.0 |
 | `ban(compte, heures, motif)` | `true, n° du ban` ou `false, code` — au journal sous le nom du module appelant |
 | `kick(source, motif)` | `true` ou `false, code` |
 | `log(source, libellé, détails?)` | `true` ou `false, code` — inscrit au journal une action d'un membre du Conseil faite dans un module (libellé lu tel quel, 32 caractères ; détails `{ clé = texte ou nombre }`, 8 au plus) ; depuis 1.1.0 |
@@ -937,7 +945,7 @@ navigateur ; chaque case est une vraie connexion WebRTC locale filmant une scèn
 
 ### `vava_magic`
 
-La magie (2.6.1) : fiche magie par personnage (champ privé `vava_magic:sheet` : mage ou non, sorts et leur XP, sort
+La magie (2.6.2) : fiche magie par personnage (champ privé `vava_magic:sheet` : mage ou non, sorts et leur XP, sort
 prêt dans les mains, combinaisons découvertes, sigils gardés, sigil unique dans tout le royaume), mana (100, +3 toutes
 les 5 s, jamais sauvegardée) et sa barre, 5 niveaux par sort, incantation commune avec délai global (1 s), roue des
 sorts (Tab) et mode magie à la souris (clic droit viser, clic gauche lancer, clic molette verrouiller), états
@@ -949,8 +957,9 @@ dissipation, boue, gel, séchage, extinction, roche ardente ; inscrites au grimo
 `discoveredCombos` de la fiche), **Lueur** et **Murmure**, grimoire et registre (objets), traces au sol, sons fabriqués
 par l'interface ou remplacés par des fichiers `.ogg` et des sons natifs (`config.sounds`), commandes du Conseil (`/magie`, numéro de joueur facultatif). Tout le détail, la config et la liste des tests en jeu :
 `modules/vava_magic/README.md`. Demande le core 0.5.0 ; facultatifs : `vava_inventory` ≥ 1.3.0 (objets), `vava_hud`
-(notifications), `vava_health` (blessures, à terre), `vava_admin` (droit `tools` et journal ; sans lui, ACE
-`magie.admin`).
+(notifications), `vava_health` (blessures, à terre : un joueur à terre ne subit plus aucun effet des sorts — ni
+Mouillé, ni recul, ni Renversé, ni Ralenti), `vava_admin` (droit `tools` et journal ; sans lui, ACE `magie.admin` ;
+≥ 1.6.0 : la fin d'un Gel ne libère pas un joueur immobilisé par le Registre).
 
 - **Bridge** : `bridge/server.lua` et `bridge/client.lua` sont les seuls fichiers qui appellent le core et les autres
   modules ; les réécrire suffit pour un autre core (avec un équivalent de `core.rpc`).
@@ -968,11 +977,13 @@ par l'interface ou remplacés par des fichiers `.ogg` et des sons natifs (`confi
 - **Projectiles** (Boule de feu, Trait de glace, Projectile de roche, même noyau) : impact signalé par le client du
   lanceur (RPC `vava_magic:projectileImpact`), validé par le serveur (portée, axe, délai, cible réelle, zones protégées,
   rempart sur le trajet) avant les dégâts (en points de vie sur `combat.healthPoints`), appliqués par
-  `vava_health:damage` ; bonus d'XP au toucher si le lancer a rapporté ; journal `vava_magic_damage_log`, purgé des
-  lignes de plus de `combat.log.retentionDays` jours (30) au démarrage puis chaque jour.
+  `vava_health:damage` ; bonus d'XP au toucher si le lancer a rapporté ; journal `vava_magic_damage_log`, écrit par
+  lots, en entier à l'arrêt du module (une seule requête), purgé des lignes de plus de `combat.log.retentionDays`
+  jours (30) au démarrage puis chaque jour.
 - **Rempart** : blocs de pierre créés par le serveur (objets réseau figés), jamais sur un joueur ni un véhicule,
   retirés à leur fin, à l'arrêt du module et par `/magie nettoyer`.
-- **Verrouillage** (sorts `lockOn`) : clic molette côté client (lu par `Bridge.GetLockedTarget`) ; la cible part avec le début de l'incantation, revérifiée
+- **Verrouillage** (sorts `lockOn`) : clic molette côté client (lu par `Bridge.GetLockedTarget`), à la portée du sort
+  prêt dans les mains (celle que le serveur juge) ; la cible part avec le début de l'incantation, revérifiée
   par le serveur, qui prévient la seule cible (évènement `vava_magic:targeted`, une fois l'incantation acceptée — mana,
   recharges, contrôles —, au plus une fois toutes les 3 s par lanceur et par cible, `targeting.warnIntervalMs`) et
   calcule lui-même la direction ;
@@ -1102,7 +1113,7 @@ fondateur ; `/metiers niveau <joueur> <compétence> <niveau>`, `/metiers recette
 
 ### `vava_gathering`
 
-La récolte (1.2.3) : zones à **vitalité** 0–100 (plein rendement au-dessus de 60, réduit entre 60 et 25 avec chance
+La récolte (1.2.4) : zones à **vitalité** 0–100 (plein rendement au-dessus de 60, réduit entre 60 et 25 avec chance
 d'échec, **épuisée** sous 25 avec props remplacés et rendement effondré, **cicatrice** à 0 : régénération × 0,2 pendant
 la durée de la zone), nœuds à charges (arbres, filons, buissons, bancs de poissons, pistes de gibier) qui se
 régénèrent par le temps (recalcul à la demande, aucune boucle), outils **en main** (`vava_inventory:held`) du genre
@@ -1110,7 +1121,7 @@ requis, non brisés, usés par `patchMetadata` (brisés à 0), qualité de la r�
 palier 1–5 et provenance sur la pile (`{ tier, origin }`), pêche à la barre de tension, réaction de la terre aux
 épuisements répétés, commandes du Conseil. L'XP passe par `vava_skills:addXp`. Tout le détail, la config et les tests en
 jeu : `modules/vava_gathering/README.md`. Demande le core 0.6.0, `vava_inventory` 1.4.0 et `vava_skills` 1.0.0 ;
-facultatifs : `vava_hud`, `vava_admin` (droit `metiers`), `vava_chat`.
+facultatifs : `vava_hud`, `vava_admin` (droit `metiers`), `vava_chat`, `vava_health` (à terre).
 
 - **Données** en `config.lua` : zones (centre, rayon, coût, régénération, cicatrice), nœuds (position, ressource, charges,
   délai, props normal et épuisé — tous les nœuds ont un prop créé par le client), ressources (objet, compétence, outil,
@@ -1119,7 +1130,8 @@ facultatifs : `vava_hud`, `vava_admin` (droit `metiers`), `vava_chat`.
 - **État** publié par state bags globaux : `vava_gathering:zone:<id>` → `{ band, scarred, vitality }`,
   `vava_gathering:node:<id>` → charges ; écrits au seul changement, relus toutes les 10 s.
 - **Serveur maître** : distance lue côté serveur au début et à la fin, durée revérifiée, jeton par geste, cooldown,
-  une récolte à la fois ; pour la pêche, seul « a tenu la tension » est déclaratif.
+  une récolte à la fois ; pour la pêche, seul « a tenu la tension » est déclaratif. À terre (`vava_health:isDowned`,
+  lu par le bridge), ni début ni fin (code `downed`) ; côté client, ni invite ni demande.
 
 **Registre** `vava_gathering:tools` (objet → `{ kind, power, yieldBonus?, qualityBonus?, wear? }`) : rempli par la
 config, ouvert aux autres modules (une hache d'artisan de phase 3 s'y déclare, ou hérite du genre de son objet).
@@ -1144,7 +1156,7 @@ nommé par zone et le cercle de son rayon, posés par le client depuis la config
 
 ### `vava_crafting`
 
-L'artisanat (1.2.2) : **stations** (forge, établi, métier à tisser, alambic, tannerie, fourneau, table d'arcanes)
+L'artisanat (1.2.3) : **stations** (forge, établi, métier à tisser, alambic, tannerie, fourneau, table d'arcanes)
 publiques ou privées, avec leur qualité et parfois leur combustible (forge : charbon ; fourneau : bois ; réserve
 alimentée par les joueurs), une pièce à la fois ; **recettes** à ingrédients par **palier choisi** (consommés par pile,
 les plus anciennes d'abord, échange atomique), outil requis en main, durée, XP par `vava_skills` ; **qualité** =
@@ -1155,10 +1167,11 @@ champ `vava_crafting:mark`) ; **baptême** d'un chef-d'œuvre pendant 5 min ; **
 solidité rendue, maximale − 5, histoire, jamais le créateur) ; **leçons** aux élèves à 10 m quand une recette
 transmise est réalisée (`vava_skills:recordLesson`). Une pièce ou une réparation commencée occupe la station jusqu'à
 sa fin, son annulation, ou au plus 2 min (ou sa durée + 30 s si c'est plus long, `interact.expireMarginMs`) ; finie
-trop loin, elle est abandonnée (rien n'est consommé) et la station libérée aussitôt. Détail, config et tests :
-`modules/vava_crafting/README.md`.
+trop loin ou à terre, elle est abandonnée (rien n'est consommé) et la station libérée aussitôt. À terre
+(`vava_health:isDowned`, lu par le bridge) : ni menu, ni pièce, ni réparation, ni combustible (code `downed`). Détail,
+config et tests : `modules/vava_crafting/README.md`.
 Demande le core 0.6.0, `vava_inventory` 1.4.0, `vava_skills` 1.0.0, `vava_gathering` 1.0.0 ; facultatifs :
-`vava_hud`, `vava_admin` (droit `metiers`), `vava_chat`.
+`vava_hud`, `vava_admin` (droit `metiers`), `vava_chat`, `vava_health` (à terre).
 
 **Registres** : `vava_crafting:stations` (types : `{ label, skills, fuel?, anim, prop }`) et `vava_crafting:recipes`
 (`{ label, skill, level, station, tool?, durationMs, difficulty, xp, signed?, signedIfQuality?, durability?,
@@ -1185,14 +1198,15 @@ station. Rendu hors jeu : `web/index.html?view=menu` (ou `menu&tab=reparation`, 
 
 ### `vava_farming`
 
-L'agriculture (1.2.1) : **parcelles** communales ou privées (`owner = { kind = 'character', id }`, autres genres par
+L'agriculture (1.2.2) : **parcelles** communales ou privées (`owner = { kind = 'character', id }`, autres genres par
 `registerAccess`) faites d'emplacements en grille ; **croissance par dates** (humidité qui baisse, pousse au-dessus
 d'un seuil, pause à sec, flétrie après 6 h, morte après 18 h ; aucune boucle, republication des stades toutes les
 10 s) ; **fertilité** (coût par récolte, rotation par famille, compost, jachère) ; **qualité** de la récolte (graine ×
 0,35 + compétence × 0,35 + régularité d'arrosage × 0,15 + fertilité × 0,15 ± 5) en palier avec provenance, graines
 récupérées au même palier ; gestes semer / arroser (seau en main rempli aux puits) / fertiliser / récolter (faucille :
-plus vite) / arracher (déchets), tous validés et appliqués par le serveur après un geste chronométré (fini trop loin,
-le geste est abandonné ; un emplacement qui vient de donner ou de consommer des objets — semis, récolte, compost,
+plus vite) / arracher (déchets), tous validés et appliqués par le serveur après un geste chronométré (fini trop loin
+ou à terre, le geste est abandonné ; à terre, `vava_health:isDowned` lu par le bridge : ni menu, ni geste, ni puits,
+ni grenier, code `downed` ; un emplacement qui vient de donner ou de consommer des objets — semis, récolte, compost,
 arrachage — est écrit aussitôt, le reste par lots) ; **grenier
 commun** (conteneur `vava_inventory` conservé, ouvert ancré à qui a accès à la parcelle — communale : tous ; privée :
 son propriétaire ou le genre branché par `registerAccess` —, dépôts et retraits journalés par minute : une ligne par
@@ -1201,7 +1215,8 @@ migration 0002 : colonne `minute` et clé unique, les lignes d'avant restent une
 par geste) ; **composteur** (type de
 station et recette ajoutés aux registres de `vava_crafting`, station placée par `addStation`). Détail, config et tests :
 `modules/vava_farming/README.md`. Demande le core 0.6.0, `vava_inventory` 1.4.0, `vava_skills` 1.0.0, `vava_gathering`
-1.0.0, `vava_crafting` 1.1.0 ; facultatifs : `vava_hud`, `vava_admin` (droit `metiers`), `vava_chat`.
+1.0.0, `vava_crafting` 1.1.0 ; facultatifs : `vava_hud`, `vava_admin` (droit `metiers`), `vava_chat`, `vava_health`
+(à terre).
 
 **Registre** `vava_farming:crops` (`{ label, family, seed, product, growMinutes, waterPerHour, fertilityCost, yield,
 xp, difficulty, stages, wilted, dead }`), rempli par la config, ouvert aux autres modules. State bag global

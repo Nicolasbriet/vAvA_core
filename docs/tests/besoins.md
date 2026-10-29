@@ -1,7 +1,7 @@
 # Besoins — procédure de test en jeu
 
-Procédure pour vérifier en jeu `vava_needs` 1.1.1 (faim et soif) avec ses voisins : médaillons de `vava_hud` 1.3.0,
-objets de `vava_inventory` 1.6.1, mise à terre de `vava_health` 1.1.2, Registre du Conseil. Le module n'a ni
+Procédure pour vérifier en jeu `vava_needs` 1.1.2 (faim et soif) avec ses voisins : médaillons de `vava_hud` 1.3.0,
+objets de `vava_inventory` 1.6.1, mise à terre de `vava_health` 1.1.3, Registre du Conseil. Le module n'a ni
 commande ni RPC : la faim et la soif ne changent que par le temps, les objets, le Registre et l'API des autres modules.
 Comptez 45 minutes seul avec les outils de test (§ 0.2) ; les tests à deux joueurs sont marqués **(2 joueurs)**. Un
 test se cite « besoins 3-4 ».
@@ -96,7 +96,7 @@ sont épuisés ; aucun message à chaque perte. Avec `vava_health` (le cas du se
 |---|---|---|
 | 1 | `/besoins 0 100`. | « Vous mourez de faim. » (notification rouge), une fois ; anneau Faim vide. Santé −2 % à chaque passage. |
 | 2 | `/besoins 100 0`, puis `/besoins 0 0`. | « Vous mourez de soif. », Santé −4 % par passage ; puis « Vous mourez de faim. » de nouveau (nouvelle descente), −6 % par passage. La vie ne remonte jamais seule. |
-| 3 | `/vie 20`, `/besoins 0 0`, attendre immobile. | Santé 14, 8, 2 %, puis le personnage tombe au 4e passage (4 min au plus) : écran « Vous êtes à terre » (santé 2). La dernière perte fixe la vie GTA exactement au seuil de 100 : noter s'il reste debout sous l'écran à terre (à confirmer). |
+| 3 | `/vie 20`, `/besoins 0 0`, attendre immobile. | Santé 14, 8, 2 %, puis le personnage tombe au 4e passage (4 min au plus) : écran « Vous êtes à terre » (santé 2). La dernière perte couche le ped (vie GTA 0, jamais le seuil de 100) : il s'effondre aussitôt et reste au sol ; debout sous l'écran à terre, c'est à me remonter. |
 | 4 | À terre : `/besoins`, puis encore 3 min plus tard. | « faim 0.0 · soif 0.0 » les deux fois ; la Santé ne bouge plus. |
 | 5 | Registre → vous → Soigner. | Relevé sur place, Santé 100 % ; les pertes reprennent au passage suivant (−6 %). |
 | 6 | Registre → vous → Nourrir. | Faim et Soif à 100, anneaux pleins ; plus aucune perte. |
@@ -166,7 +166,7 @@ FROM vava_characters WHERE deleted_at IS NULL;
   la console du client.
 - L'effet réel de `SetPlayerMaxStamina` à 35 % sur la course (§ 2-3).
 - Le seuil de course (4 m/s horizontaux) : le trot par défaut compte-t-il ? Le § 1-4 le montrera.
-- La dernière perte de vie à 0 fixe la vie GTA à 100 exactement (seuil de mise à terre de `vava_health`) : le ped doit
-  s'effondrer à cette valeur (§ 4-3).
+- La dernière perte de vie à 0 couche le ped à une vie GTA de 0 (avec `vava_health`), au lieu de le poser au seuil de
+  100 où GTA pourrait le laisser debout ; et `vava_health` recouche de toute façon un ped resté au seuil (§ 4-3).
 - Le rendu des médaillons et des notifications : `modules/vava_hud/web/index.html?values=0.8,0.62,0.08` dans un
   navigateur.

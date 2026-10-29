@@ -9,9 +9,10 @@ ardente**), d'eau (**Trait de glace**, **Vague**, **Brume**) et de terre (**Proj
 **Lueur** et **Murmure**, grimoire et registre des murmures (objets), commandes du Conseil. Le serveur décide de tout ;
 le client affiche et demande.
 
-Version 2.4.0 : les cinq étapes de la refonte (noyau, roue et contrôles ; états, zones et feu ; eau et terre ;
-combinaisons ; finitions : traces au sol, sons par fichier ou natifs, documentation et tests). Rien n'a encore été
-joué en vrai : voir « À vérifier en jeu » et « Tests à faire en jeu ».
+Version 2.6.2 : les cinq étapes de la refonte (noyau, roue et contrôles ; états, zones et feu ; eau et terre ;
+combinaisons ; finitions : traces au sol, sons par fichier ou natifs, documentation et tests), puis leurs correctifs.
+Rien n'a encore été joué en vrai : voir « À vérifier en jeu », « Tests à faire en jeu » et la procédure complète
+`docs/tests/magie.md`.
 
 ## Installation
 
@@ -38,8 +39,8 @@ joué en vrai : voir « À vérifier en jeu » et « Tests à faire en jeu ».
 | `vAvA_core` ≥ 0.5.0 | personnages, RPC, hooks, base, journal | obligatoire |
 | `vava_inventory` ≥ 1.3.0 | grimoire et registre (objets, métadonnées) | pas d'objets ; `/grimoire` reste |
 | `vava_hud` | notifications | notifications de GTA (la barre de mana est celle du module) |
-| `vava_health` | blessures, état « à terre » | la victime applique la blessure elle-même |
-| `vava_admin` | droits et journal du Conseil | permission ACE `magie.admin`, journal en console |
+| `vava_health` | blessures, état « à terre » (aucun sort ne touche un joueur à terre) | la victime applique la blessure elle-même |
+| `vava_admin` | droits et journal du Conseil ; ≥ 1.6.0 : la fin d'un Gel ne libère pas un joueur immobilisé par le Registre | permission ACE `magie.admin`, journal en console |
 | `vava_chat` | réponses des commandes et suggestions (évènements `chat:*`, aussi ceux de la ressource « chat » de FiveM) | touches seulement |
 
 ## Arborescence
@@ -126,8 +127,8 @@ Commandes de secours (chat) :
 
 | Commande | Action |
 | --- | --- |
-| `/sort <nom>` · `/sort aucun` | préparer un sort sans la roue, ou ranger la magie |
-| `/lancer [sort]` | lancer le sort prêt (ou celui nommé), sans visée |
+| `/sort <nom>` · `/sort aucun` | préparer un sort sans la roue, ou ranger la magie (un non-mage : « La magie ne vous a jamais répondu. ») |
+| `/lancer [sort]` | lancer le sort prêt (ou celui nommé), sans visée ; mains vides, comme le mode magie (arme sortie : refusé) |
 | `/murmure` · `/murmure 1,3 <message>` | ouvrir le parchemin, ou envoyer directement |
 | `/lueur` · `ancrer` · `couleur <nom>` · `eteindre` · `dissiper` | Lueur : allumer, ancrer là où l'on regarde (niveau 4), couleur (niveau 5), éteindre, dissiper ses orbes |
 | `/grimoire` | ouvrir le grimoire (l'objet l'ouvre aussi) |
@@ -139,9 +140,12 @@ Le registre s'ouvre en l'utilisant dans l'inventaire.
 
 Un sort d'attaque (`lockOn = true` dans sa config : les trois projectiles) peut viser un joueur verrouillé :
 
-- **Clic molette** verrouille le joueur le plus proche du centre de l'écran, à portée du sort et en vue ; un anneau
-  rouge tourne sous lui, vu du seul lanceur. Un nouveau clic passe à la cible suivante, le clic maintenu relâche.
-- Le verrou saute si la cible sort de portée, de vue (une seconde), meurt, ou après 20 s sans attaque.
+- **Clic molette** verrouille le joueur le plus proche du centre de l'écran, à portée du **sort prêt dans les mains**
+  (un sort d'attaque : sinon, rien) et en vue ; un anneau rouge tourne sous lui, vu du seul lanceur. Un nouveau clic
+  passe à la cible suivante, le clic maintenu relâche.
+- Le verrou saute si la cible sort de portée du sort prêt (préparer un sort qui porte moins loin, ou qui ne verrouille
+  pas, compte aussitôt), de vue (une seconde), meurt, ou après 20 s sans attaque. Le serveur juge la cible à la portée
+  du sort lancé : les deux s'accordent.
 - La cible part avec le début de l'incantation. Le serveur la revérifie (joueur en jeu, à portée, hors zone
   protégée) et, une fois l'incantation acceptée (mana, recharges, contrôles passés), **prévient la cible seule** : le
   bord de son écran rougit (« Un frisson vous parcourt… »), au plus une fois toutes les 3 s par lanceur
@@ -164,12 +168,14 @@ personnage) ; le joueur affecté voit leurs icônes et leurs secondes à droite 
 | Ralenti | allure réduite (jamais cumulé : le plus fort l'emporte), course interdite au-delà de la moitié |
 | Chancelant | démarche titubante, caméra qui tangue, **impossible d'incanter** |
 | Renversé | chute courte (ragdoll), impossible d'incanter |
-| Gelé | immobilisé (le serveur fige aussi le personnage), givre au bord de l'écran, impossible d'incanter |
+| Gelé | immobilisé (le serveur fige aussi le personnage ; à la fin, il reste figé s'il est immobilisé par le Registre du Conseil), givre au bord de l'écran, impossible d'incanter |
 
 **Règle d'équité** : dès qu'un contrôle dur (Chancelant, Renversé, Gelé) touche, la cible est protégée des autres
 jusqu'à 6 s après sa fin (`states.hardImmunityMs`) : aucun enchaînement. Les dégâts s'appliquent toujours. Un contrôle
 dur brise l'incantation en cours. « Renversé » plutôt qu'« À terre » : ce mot désigne déjà, chez vava_health, un
-personnage hors de combat. Le hook `vava_magic:stateApplying` permet à un autre module de refuser un état.
+personnage hors de combat. Un joueur **à terre** n'est la cible d'aucun sort : ni dégâts (refusés par vava_health),
+ni état, ni recul (Vague, sol mouillé, brume, boue l'ignorent). Le hook `vava_magic:stateApplying` permet à un autre
+module de refuser un état.
 
 Dans GTA, l'allure et la chute d'un personnage sont calculées par le jeu de son joueur : un tricheur pourrait ignorer
 un Ralenti ou une chute. Le Gelé est aussi imposé par le serveur ; l'impossibilité d'incanter est décidée par lui.
@@ -195,7 +201,7 @@ Un **obstacle** (le Rempart) coupe ce qui voudrait passer à travers lui : proje
 
 | Sort | Visée | Ce qu'il fait |
 | --- | --- | --- |
-| Trait de glace | projectile rapide (cible verrouillée possible) | dégâts modestes, Ralenti (force et durée selon le niveau ; plus de course dès le niveau 4) et Mouillé |
+| Trait de glace | projectile rapide (cible verrouillée possible) | dégâts modestes, Ralenti (force et durée selon le niveau : 25 % au niveau 1, 45 % au niveau 4, 50 % au niveau 5 ; plus de course au niveau 5 seulement, la course étant coupée à partir de 50 %) et Mouillé |
 | Vague | cône devant soi (aperçu au sol : portée de 4 à 10 m, ouverture) | repousse (force selon le niveau), Mouillé, noie la Brûlure et les murs de flammes qu'elle touche (combinaisons), Renversé dès le niveau 4, laisse un sol mouillé devant soi |
 | Brume | point au sol (disque de 4 à 10 m) | brume épaisse pour la durée du niveau ; qui s'y tient n'y voit plus guère ; dès le niveau 3, Mouillé et sol mouillé à sa fin. Une nouvelle brume dissipe la précédente |
 | Projectile de roche | projectile lent et lourd (cible verrouillée possible) | gros dégâts ; Chancelant dès le niveau 3 ; au niveau 5, éclats autour de l'impact |
@@ -219,7 +225,7 @@ sans être nommées).
 | Vapeur | une Vague ou un Trait de glace touche un Mur de flammes | le mur s'éteint ; un nuage de vapeur (zone `steam`) cache la vue et brûle légèrement, 7 s |
 | Dissipation | une Boule de feu traverse une Brume | la brume se dissipe (sans sol mouillé) |
 | Boue | une Secousse frappe un sol mouillé | une boue (zone `mud`) ralentit fortement, 30 s |
-| Gel | un Trait de glace touche une cible mouillée | la cible est Gelée 2,5 s (contrôle dur, immunité ensuite) ; le Mouillé est consommé |
+| Gel | un Trait de glace touche une cible mouillée | la cible est Gelée 2,5 s (contrôle dur, immunité ensuite) ; le Mouillé est consommé, puis le trait la mouille de nouveau aussitôt (son effet ordinaire) |
 | Séchage | un sort de feu touche une cible mouillée | dégâts de moitié, Mouillé retiré, pas de Brûlure ce coup-ci |
 | Extinction | un sort d'eau touche une cible en Brûlure | la Brûlure s'éteint |
 | Roche ardente | un Projectile de roche traverse un Mur de flammes | le bloc s'embrase en vol (traînée de feu) ; à l'impact, dégâts de feu en plus et Brûlure |
@@ -232,7 +238,8 @@ trajet a traversées.
 
 Droit `tools` de vava_admin (Sénéchal et Souverain), réglable (`config.admin.permission`) ; aussi depuis la console du
 serveur. Chaque commande est inscrite au journal du Registre du Conseil. **Le numéro de joueur est facultatif** : sans
-lui, la commande vise son auteur.
+lui, la commande vise son auteur. Un échec répond en français (« Ce personnage n'est pas mage. », « Sa besace n'a
+plus la place. »… `texts.chat.adminErrors`) ; le code brut ne va qu'à la console du serveur.
 
 | Commande | Effet |
 | --- | --- |
@@ -355,7 +362,8 @@ au point de l'effet). Aucun fichier n'est fourni.
 ## Sécurité et coût
 
 - Le serveur vérifie à chaque incantation : mage, sort connu, niveau, recharge (tenue par personnage, la reconnexion ne
-  l'efface pas), mana, une seule incantation, pas à terre ni en véhicule, puis à la fin : durée écoulée, déplacement
+  l'efface pas), mana, une seule incantation, pas à terre ni en véhicule (la cible non plus : un joueur à terre ne
+  subit aucun sort), puis à la fin : durée écoulée, déplacement
   et vie lus côté serveur. Interrompue : rien n'est consommé.
 - Projectiles : un seul impact par lancer, point d'impact dans la portée et dans l'axe annoncé, délai cohérent avec la
   vitesse, cible réelle près du point (position serveur), zones protégées ; un rempart sur le trajet l'arrête là, quoi
@@ -441,7 +449,7 @@ Rempart : le serveur monte les blocs par 8 paliers en 0,8 s (`rise`) ; selon la 
 Deux joueurs (A et B) suffisent ; un troisième aide pour le cercle et la zone d'effet.
 
 **Fiche, Conseil, grimoire**
-- [ ] `/magie fiche <A>` : non mage, sigil présent ; `/magie mage <A> oui` → message « La magie s'éveille », barre de mana absente tant qu'elle est pleine.
+- [ ] `/magie fiche <A>` : « Mage : non », « Sigils gardés : 0 » (la fiche ne montre pas le sigil : son propre sigil, de 12 signes, est en base, `vava_magic_sigils`) ; `/magie mage <A> oui` → message « La magie s'éveille », barre de mana absente tant qu'elle est pleine.
 - [ ] `/magie tous <A>` (puis `/magie tous` sans numéro, sur soi) ; `/magie donner <A> grimoire` puis l'utiliser : sorts rangés par élément, icônes, niveau I, XP, recharge, incantation, touches de la roue.
 - [ ] `/magie maitrise`, `/magie vider`, `/magie recharges`, `/magie nettoyer` (orbe ancré disparu).
 - [ ] B (non mage) ouvre un grimoire : pages illisibles. Un joueur hors du Conseil tape `/magie` : refusé.
@@ -491,7 +499,7 @@ Deux joueurs (A et B) suffisent ; un troisième aide pour le cercle et la zone d
 - [ ] Niveau 1 à 3 : B esquive en se décalant. Niveau 4-5 (`/magie niveau <A> boule_de_feu 5`) : la boule s'incurve et le rattrape.
 - [ ] Niveau 3 : un voisin de B est touché aussi (moins fort). Niveau 4 : B brûle quelques secondes.
 - [ ] Zone protégée (`combat.protectedZones`) : impossible d'y lancer, personne n'y est blessé. `combat.pvp = false` : aucun dégât.
-- [ ] Table `vava_magic_damage_log` : lanceur, cible, dégâts, position. Les lignes de plus de 30 jours sont retirées au démarrage du module (message en console s'il y en avait), puis chaque jour.
+- [ ] Table `vava_magic_damage_log` : lanceur, cible, dégâts, position ; écrite par lots, et en entier à l'arrêt du module. Les lignes de plus de 30 jours sont retirées au démarrage du module (message en console s'il y en avait), puis chaque jour.
 
 **États (avec `/magie` et un test du Conseil, ou les sorts)**
 - [ ] Brûlure (Boule de feu niveau 4, Mur, Nova niveau 4) : flammes sur la victime vues de tous, icône et secondes chez elle, bord de l'écran rougi, dégâts chaque seconde, puis plus rien.
@@ -511,7 +519,7 @@ Deux joueurs (A et B) suffisent ; un troisième aide pour le cercle et la zone d
 
 **Trait de glace**
 - [ ] A vise B et lance : éclat blanc rapide, traînée de vapeur, lueur bleutée ; B blessé un peu, icônes Ralenti et Mouillé, il marche moins vite, givre bref à l'écran.
-- [ ] Niveau 4 : B ne peut plus courir ; verrouillé, le trait s'incurve un peu vers lui.
+- [ ] Niveau 4 : B court encore (Ralenti 45 %) ; verrouillé, le trait s'incurve un peu vers lui. Niveau 5 : B ne peut plus courir.
 
 **Vague**
 - [ ] Clic droit : cône bleu au sol devant soi, qui suit le regard. Clic gauche : gerbes d'eau qui balaient le cône, son de vague ; B devant est repoussé et mouillé ; C derrière, rien.

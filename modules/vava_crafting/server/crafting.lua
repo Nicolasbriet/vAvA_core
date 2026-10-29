@@ -1,8 +1,10 @@
 --[[
     vava_crafting/server/crafting.lua
-    Rôle : la fabrication décidée par le serveur. Menu d'une station (recettes connues de ce type, paliers possédés par
-           ingrédient, réparables, poinçon, règles pour l'aperçu). Début : station à portée et accessible, libre,
-           recette connue et au niveau, outil en main du bon genre, combustible, paliers choisis valides et possédés,
+    Rôle : la fabrication décidée par le serveur. Rien à terre (vava_health) : ni menu, ni début, ni fin (pièce
+           abandonnée, station libérée), ni combustible. Menu d'une station (recettes connues de ce type, paliers
+           possédés par ingrédient, réparables, poinçon, règles pour l'aperçu). Début : station à portée et
+           accessible, libre, recette connue et au niveau, outil en main du bon genre, combustible, paliers choisis
+           valides et possédés,
            place, hook annulable ; jeton, station occupée (jusqu'à la fin, l'annulation, ou l'oubli après 2 min ou la
            durée de la pièce + une marge). Fin : durée revérifiée, distance (trop loin : pièce abandonnée, station
            libérée), outil et combustible, piles relues et consommées par instance (le palier choisi, les plus
@@ -189,6 +191,7 @@ end
 function crafting.menu(src, stationId)
     local characterId = bridge.GetCharacterId(src)
     if not characterId then return false, 'no_character' end
+    if bridge.IsDowned(src) then return false, 'downed' end
     local def = catalog.station(stationId)
     if not def then return false, 'unknown_station' end
     if not stations.near(src, def) then return false, 'too_far' end
@@ -325,6 +328,7 @@ end
 function crafting.begin(src, stationId, recipeId, choices)
     local characterId = bridge.GetCharacterId(src)
     if not characterId then return false, 'no_character' end
+    if bridge.IsDowned(src) then return false, 'downed' end
     local def = catalog.station(stationId)
     if not def then return false, 'unknown_station' end
     if sessions[src] then return false, 'busy' end
@@ -478,6 +482,11 @@ function crafting.finish(src, token)
     local session = sessions[src]
     if not session or session.token ~= token then return false, 'not_found' end
     if GetGameTimer() - session.startedAt < session.durationMs - interact.finishToleranceMs then return false, 'too_soon' end
+    -- tombé pendant le geste : abandonné (rien n'est encore consommé), la station libérée aussitôt
+    if bridge.IsDowned(src) then
+        crafting.release(src)
+        return false, 'downed'
+    end
     if session.kind == 'repair' then return VavaCrafting.repair.finish(session) end
     return finishCraft(session)
 end
@@ -491,6 +500,7 @@ end
 function crafting.fuel(src, stationId, quantity)
     local characterId = bridge.GetCharacterId(src)
     if not characterId then return false, 'no_character' end
+    if bridge.IsDowned(src) then return false, 'downed' end
     local def = catalog.station(stationId)
     if not def then return false, 'unknown_station' end
     local fuel = def.type.fuel

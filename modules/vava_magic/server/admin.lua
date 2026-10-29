@@ -305,7 +305,9 @@ local function run(src, args)
     elseif result == 'invalid' then
         reply(src, { chat.adminUsage })
     else
-        reply(src, { chat.adminFailed:format(tostring(result)) })
+        -- en français pour le Conseil ; le code brut reste dans la console du serveur
+        VavaMagic.log.info('/%s %s : échec (%s)', commands.admin, action, tostring(result))
+        reply(src, { chat.adminErrors[result] or chat.adminFailed })
     end
 end
 
