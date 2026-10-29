@@ -881,8 +881,9 @@ select.field-input option { background: var(--paper-light); color: var(--ink); }
 
 /* charge du moment : fils de FXServer, cœurs réservés au conteneur (rouge au-delà de 90 %) */
 .load-list { display: grid; gap: 0.45rem; margin: 0.35rem 0 0; padding: 0; list-style: none; }
-.load-row { display: grid; grid-template-columns: minmax(7rem, 13rem) minmax(0, 1fr) 3.6rem; align-items: center; gap: 0.8rem; font-size: 0.95rem; }
+.load-row { display: grid; grid-template-columns: minmax(8rem, 17rem) minmax(0, 1fr) 3.6rem; align-items: center; gap: 0.8rem; font-size: 0.95rem; }
 .load-name { overflow: hidden; color: var(--ink); text-overflow: ellipsis; white-space: nowrap; }
+.load-technical { color: var(--ink-muted); }
 .load-bar { position: relative; height: 0.55rem; overflow: hidden; border-radius: 2px; background: rgba(var(--ink-rgb), 0.12); box-shadow: inset 0 0 0 1px rgba(var(--ink-rgb), 0.15); }
 .load-fill { position: absolute; inset: 0 auto 0 0; background: var(--series-2); transition: width 240ms var(--ease); }
 .load-fill.is-high { background: var(--series-1); }

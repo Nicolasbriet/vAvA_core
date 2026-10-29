@@ -138,8 +138,10 @@ Un relevé toutes les 5 secondes (`metrics.intervalMs`), même serveur arrêté 
 - **Durée des ticks** des fils de FXServer (principal, réseau, synchronisation OneSync), lue dans son adresse
   `/perf/` comme le fait txAdmin : au-delà de 50 ms, le fil principal prend du retard. Absente si FXServer ne
   l'expose pas.
-- **Fils de FXServer** les plus chargés au dernier relevé, en part d'un cœur (nom posé par FXServer, sinon son
-  numéro) : un fil à 100 % sature son cœur, le serveur prend du retard même si le processeur global reste bas.
+- **Fils de FXServer** qui ont travaillé au dernier relevé (les plus chargés), en part d'un cœur : un fil à 100 %
+  sature son cœur, le serveur prend du retard même si le processeur global reste bas. Les boucles de FXServer sont
+  nommées comme les ticks — Principal (scripts), Réseau, Synchronisation — avec leur nom technique (`luv_svMain`…) ;
+  un fil sans nom à lui s'affiche par son numéro.
 
 **Chez un hébergeur** (conteneur Docker, Pterodactyl, Podman…), Node voit la machine entière (la node) et non la part du
 serveur : la Chancellerie lit alors les **cgroups** du conteneur (v2, ou v1 sur les machines anciennes) et tout est

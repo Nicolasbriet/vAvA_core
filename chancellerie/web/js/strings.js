@@ -734,10 +734,13 @@ const STRINGS = (() => {
       },
       threads: {
         title: 'Fils de FXServer',
-        help: 'Les plus chargés au dernier relevé, en part d\'un cœur : un fil à 100 % sature son cœur, le serveur prend du retard.',
-        name: (thread) => thread.name || (thread.main ? `Fil de lancement (${thread.id})` : `Fil ${thread.id}`),
+        help: 'Ceux qui ont travaillé au dernier relevé, en part d\'un cœur : un fil à 100 % sature son cœur, le serveur prend du retard.',
+        // boucles de FXServer (« luv_<nom> » sous Linux, « UV loop: <nom> » sous Windows), mêmes mots que les ticks
+        loops: { svMain: 'Principal (scripts)', svNetwork: 'Réseau', svSync: 'Synchronisation' },
+        unnamed: (thread) => (thread.main ? `Fil de lancement (${thread.id})` : `Fil ${thread.id}`),
         none: 'FXServer est arrêté.',
         waiting: 'Premier relevé des fils en cours…',
+        idle: 'Aucun fil n\'a travaillé au dernier relevé.',
       },
       reserved: {
         title: 'Cœurs réservés',

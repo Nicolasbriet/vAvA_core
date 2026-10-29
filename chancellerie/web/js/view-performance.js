@@ -74,24 +74,38 @@ const PerformanceView = (() => {
     refs.notes.replaceChildren(...notes.map((text) => UI.el('p', 'hint', text)));
   }
 
-  /** Une ligne de charge : nom, barre, pourcentage (rouge au-delà de 90 %). */
-  function loadRow(label, value) {
+  /** Une ligne de charge : nom (et nom technique), barre, pourcentage (rouge au-delà de 90 %). */
+  function loadRow(label, value, technical) {
     const fill = UI.el('span', `load-fill${value >= HIGH_LOAD ? ' is-high' : ''}`);
     fill.style.width = `${value === null || value === undefined ? 0 : Math.min(100, value)}%`;
+    const name = UI.el('span', 'load-name', label, technical ? [UI.el('span', 'load-technical', ` · ${technical}`)] : null);
+    name.title = technical ? `${label} · ${technical}` : label;
     return UI.el('li', 'load-row', null, [
-      UI.el('span', 'load-name', label),
+      name,
       UI.el('span', 'load-bar', null, [fill]),
       UI.el('span', 'load-value', STRINGS.percent(value)),
     ]);
   }
 
-  /** Détail du moment : fils de FXServer les plus chargés, cœurs réservés au conteneur (s'il y en a). */
+  /** Nom d'un fil : en français pour les boucles connues de FXServer (avec leur nom technique), sinon le sien. */
+  function threadRow(thread) {
+    const T = P.threads;
+    if (!thread.name) return loadRow(T.unnamed(thread), thread.cpu);
+    const loop = /^(?:luv_|UV loop: )(.+)$/.exec(thread.name);
+    const known = loop ? T.loops[loop[1]] : /^\[Cfx\] Server Th/.test(thread.name) ? T.loops.svMain : null;
+    return known ? loadRow(known, thread.cpu, thread.name) : loadRow(thread.name, thread.cpu);
+  }
+
+  /** Détail du moment : fils de FXServer qui ont travaillé, cœurs réservés au conteneur (s'il y en a). */
   function renderDetails() {
     const T = P.threads;
+    // un fil à 0 % (au dixième près) n'a rien fait depuis le relevé précédent : il n'apprend rien
+    const working = latest && Array.isArray(latest.busiest) ? latest.busiest.filter((thread) => thread.cpu > 0) : [];
     let body;
     if (latest && latest.fxMem === null) body = UI.el('p', 'empty', T.none);
     else if (!latest || !Array.isArray(latest.busiest) || !latest.busiest.length) body = UI.el('p', 'empty', T.waiting);
-    else body = UI.el('ul', 'load-list', null, latest.busiest.map((thread) => loadRow(T.name(thread), thread.cpu)));
+    else if (!working.length) body = UI.el('p', 'empty', T.idle);
+    else body = UI.el('ul', 'load-list', null, working.map(threadRow));
     const cards = [UI.el('section', 'chart-card', null, [UI.el('h3', 'section-title', T.title), UI.el('p', 'chart-help', T.help), body])];
     if (latest && Array.isArray(latest.coreLoads) && latest.coreLoads.length) {
       const R = P.reserved;
