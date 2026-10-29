@@ -1274,7 +1274,8 @@ station et recette ajoutés aux registres de `vava_crafting`, station placée pa
 (à terre).
 
 **Registre** `vava_farming:crops` (`{ label, family, seed, product, growMinutes, waterPerHour, fertilityCost, yield,
-xp, difficulty, stages, wilted, dead }`), rempli par la config, ouvert aux autres modules. State bag global
+xp, difficulty, stages, wilted, dead }` ; `stages` : modèles par stade, le dernier réservé à la plante mûre), rempli par la
+config, ouvert aux autres modules. State bag global
 `vava_farming:parcel:<id>` → `{ slots = { { crop, stage, state } } }`.
 
 | Export serveur | Retour |

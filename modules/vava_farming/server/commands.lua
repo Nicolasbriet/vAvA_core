@@ -31,7 +31,7 @@ local function entries()
                 { id = 'parcelles', label = 'État des parcelles', description = 'Toutes les parcelles et leurs emplacements occupés, dans le chat.' },
                 { id = 'parcelle', label = 'Détail d\'une parcelle', args = { parcel } },
                 { id = 'fertilite', label = 'Fixer la fertilité d\'un emplacement', args = { parcel, slot, { name = 'fertilité', type = 'integer', min = 0, max = 100 } } },
-                { id = 'pousser', label = 'Faire mûrir un emplacement', description = 'Porte la plante à maturité sur-le-champ.', args = { parcel, slot } },
+                { id = 'pousser', label = 'Faire mûrir un emplacement', description = 'Porte la plante à maturité sur-le-champ, terre arrosée.', args = { parcel, slot } },
                 { id = 'arroser', label = 'Arroser toute la parcelle', args = { parcel } },
             } },
     }

@@ -37,6 +37,9 @@ date de semis, croissance effective, humidité, fertilité, sécheresse (depuis 
 flétri, mort, famille précédente, date du dernier calcul. **Aucune boucle de croissance** : tout est recalculé quand
 on touche l'emplacement ; la boucle lente de 10 s republie seulement les stades qui ont changé (state bag
 `vava_farming:parcel:<id>` : culture, stade, état de chaque emplacement), pour que les plantes poussent sous les yeux.
+Les modèles de `stages` se partagent la croissance à parts égales, sauf le dernier, réservé à la plante mûre : il
+n'apparaît qu'à 100 %, quand « mûr » s'affiche et que la récolte est possible (1.2.3). Les heures de sécheresse d'une
+plante s'arrêtent à sa mort.
 
 ### Grenier commun
 
@@ -70,14 +73,15 @@ withdraw, source, characterId, item, quantity }`). Détail : `docs/api.md`.
 ## Conseil (droit `metiers`)
 
 `/agriculture parcelles` · `/agriculture parcelle <id>` · `/agriculture fertilite <id> <n> <0-100>` ·
-`/agriculture pousser <id> <n>` (mûrit) · `/agriculture arroser <id>`.
+`/agriculture pousser <id> <n>` (mûrit et arrose la terre) · `/agriculture arroser <id>`.
 
 ## Tests en jeu
 
 1. **Semis** : graines de blé (deux paliers) → l'emplacement libre du champ communal propose Planter, le palier se
    choisit ; la graine du palier choisi est consommée ; XP d'Agriculture.
-2. **Pousse** : la plante avance de stade sans qu'on y touche (state bag relu toutes les 10 s) ; `/agriculture
-   pousser champ_communal 1` mûrit d'un coup.
+2. **Pousse** : la plante avance de stade sans qu'on y touche (state bag relu toutes les 10 s), le modèle mûr
+   n'apparaissant qu'à 100 % ; `/agriculture pousser champ_communal 1` mûrit d'un coup, terre arrosée (la plante
+   ne reflétrit pas dans la foulée).
 3. **Arrosage** : seau en main vide → « remplissez-le » ; au puits, `E` remplit (5 charges) ; arroser remet l'humidité
    à 100 et consomme une charge.
 4. **Sécheresse** : laisser une plante à sec (ou abaisser `wiltAfterHours`) → flétrie (prop), arroser la fait repartir ;

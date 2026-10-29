@@ -139,9 +139,9 @@ la fin, sang à l'interruption. Hors jeu : `modules/vava_hud/web/index.html?prog
 |---|---|---|
 | 1 | Champ communal, près d'un emplacement libre, `E`. | Menu : « Emplacement libre », Planter actif si graines, autres gestes grisés avec la raison. |
 | 2 | Planter du blé (choisir le palier si plusieurs). | Geste, semis, prop de semis, graine du palier consommée, XP d'Agriculture (petite). |
-| 3 | Attendre (ou `/agriculture pousser champ_communal 1`). | Le prop change de stade sans rien toucher ; « mûr » dans l'invite. |
+| 3 | Attendre (ou `/agriculture pousser champ_communal 1`). | Le prop change de stade sans rien toucher ; le dernier modèle n'apparaît qu'à 100 %, en même temps que « mûr » dans l'invite (blé : semis, pousse jusqu'à 50 %, plant jusqu'à 100 %, puis mûr). `pousser` arrose aussi la terre : une plante sèche ainsi mûrie ne reflétrit pas dans la foulée. |
 | 4 | Seau en main vide → Arroser. | « remplissez-le à un puits ». Au puits, `E` → 5 charges ; Arroser → humidité 100, charge − 1. |
-| 5 | Laisser une plante sans eau (réglages du § 0.7). | Flétrie (prop), arroser la fait repartir ; plus longtemps → morte : seul Arracher reste, qui rend des déchets végétaux. |
+| 5 | Laisser une plante sans eau (réglages du § 0.7). | Flétrie (prop), arroser la fait repartir ; plus longtemps → morte : seul Arracher reste, qui rend des déchets végétaux ; ses heures sèches (menu) ne montent plus après la mort. |
 | 6 | Récolter à la main, puis une autre à la faucille. | Plus rapide à la faucille ; produit au palier avec « Champ communal » ; parfois des graines du même palier ; fertilité en baisse ; replanter la même famille coûte 10 de plus, une autre rend 10. |
 | 7 | 3 déchets au composteur du champ (station de l'artisanat), puis Fertiliser. | Compost produit ; fertilité + 25. |
 | 8 | `E` près du grenier. | L'inventaire s'ouvre sur « Grenier commun » ; déposer, s'éloigner de 4 m → il se ferme ; `vava_farming_granary_log` : dépôt / retrait. |
