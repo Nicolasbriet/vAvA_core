@@ -1,6 +1,6 @@
 # Chat — procédure de test en jeu
 
-Procédure pour vérifier en jeu `vava_chat` 1.1.0 : la fenêtre, le hors-RP, `/me` et `/do` (dans le chat et au-dessus
+Procédure pour vérifier en jeu `vava_chat` 1.1.1 : la fenêtre, le hors-RP, `/me` et `/do` (dans le chat et au-dessus
 de la tête), les messages privés, le canal du Conseil, les suggestions de commandes, les limites, le journal de
 modération et le redémarrage. Comptez une heure ; presque tout se fait à deux : **A**, membre du Conseil, et **B**,
 simple joueur. Un test se cite « chat 3-4 » (section 3, ligne 4).
@@ -9,7 +9,7 @@ simple joueur. Un test se cite « chat 3-4 » (section 3, ligne 4).
 
 1. **Commun** : ordre de démarrage, compte du Conseil, consoles, mesure du resmon et remontée des écarts :
    [LISEZMOI.md](LISEZMOI.md).
-2. **Démarrage** : la console du serveur affiche `module 'vava_chat' v1.1.0 prêt`. Le `server.cfg` ne contient plus
+2. **Démarrage** : la console du serveur affiche `module 'vava_chat' v1.1.1 prêt`. Le `server.cfg` ne contient plus
    `ensure chat` (sinon deux chats s'affichent).
 3. **Joueurs** : A Souverain (`vava_conseil <compte de A> souverain`), B sans rang. Le numéro de joueur (« n° ») paraît
    entre crochets devant le nom dans toute ligne hors-RP : faites écrire un mot à chacun pour noter les deux numéros.
@@ -81,12 +81,12 @@ A et B face à face, à 10 m environ (dans le cercle Crier de A), sauf mention.
 |---|---|---|
 | 1 | A ouvre l'onglet Conseil et écrit `Réunion ce soir` sans commande. | Saisie étiquetée « Conseil », texte d'attente « Au Conseil… ». Chez A, dans Général et Conseil : étiquette « Conseil », rang « Souverain » (en capitales), « · [n°] Prénom Nom : Réunion ce soir ». B ne reçoit rien. |
 | 2 | A : `/staff test` depuis Général. | La même ligne. |
-| 3 | B : `/staff bonjour`. | « — Ce canal est réservé au Conseil. » ; B n'a pas d'onglet Conseil, mais la suggestion `/staff` lui est proposée (déclarée pour tous). |
-| 4 | Console du serveur : `vava_conseil <compte de B> gardien`. | Sans reconnexion, l'onglet Conseil apparaît chez B ; ses lignes hors-RP portent l'insigne « Conseil ». |
+| 3 | B : `/st`, puis `/staff bonjour`. | Aucune suggestion `/staff` (elle n'est proposée qu'au Conseil) ; puis « — Ce canal est réservé au Conseil. » ; B n'a pas d'onglet Conseil. |
+| 4 | Console du serveur : `vava_conseil <compte de B> gardien` ; B tape `/st`. | Sans reconnexion, l'onglet Conseil apparaît chez B ; ses lignes hors-RP portent l'insigne « Conseil » ; `/staff` lui est maintenant suggéré. |
 | 5 | B : `/staff me voici`. | Reçu par A et B, rang « Gardien ». |
-| 6 | Console : `vava_conseil <compte de B> souverain` ; B tape `/met`. | Ni aide ni sous-commande (au plus `/metiers` nu, voir 5-7) : les suggestions décrites par le Codex ne sont redemandées qu'à l'apparition du personnage. Après une reconnexion, B a celles de 5-4. |
-| 7 | Console : `vava_conseil <compte de B> aucun`. | L'onglet Conseil disparaît chez B ; `/staff` lui est de nouveau refusé. |
-| 8 | En fin de séance : `stop vava_admin`, puis `start vava_admin`. | À l'arrêt, l'onglet Conseil de A disparaît (sans vava_admin, le canal suit la seule permission ACE `vava_chat.staff`) ; au redémarrage, il revient sans reconnexion. Relancer ensuite ce qui s'est arrêté avec lui (`ensure vava_chancellerie`…). |
+| 6 | Console : `vava_conseil <compte de B> souverain` ; B tape `/met`. | Sans reconnexion, les suggestions de 5-4 : `/metiers` avec son aide, puis `/metiers niveau`, `/metiers recette`, `/metiers voir` (le serveur prévient B du rang changé ; son chat redemande alors son profil). |
+| 7 | Console : `vava_conseil <compte de B> aucun` ; B tape `/met`, puis `/st`. | L'onglet Conseil disparaît chez B ; `/metiers` redevient seul, sans aide ni sous-commande (comme 5-7) ; `/staff` n'est plus suggéré, et lui est de nouveau refusé. |
+| 8 | En fin de séance : `stop vava_admin`, puis `start vava_admin`. | À l'arrêt, l'onglet Conseil de A disparaît (sans vava_admin, le canal suit la seule permission ACE `vava_chat.staff`), et avec lui `/staff` et les suggestions du Conseil ; au redémarrage, tout revient sans reconnexion. Relancer ensuite ce qui s'est arrêté avec lui (`ensure vava_chancellerie`…). |
 
 Les proclamations du Registre (`F10` → Proclamation) ne passent pas par le chat : c'est une bannière de vava_admin,
 testée dans [registre.md](registre.md).
@@ -138,7 +138,7 @@ testée dans [registre.md](registre.md).
 
 | # | Faire | Attendu |
 |---|---|---|
-| 1 | A chat ouvert, B en jeu : console du serveur `restart vava_chat`. | Chez A, le curseur disparaît et le personnage bouge ; console `module 'vava_chat' v1.1.0 prêt`. Le chat revient fermé, à la place choisie, fils et onglets privés vidés ; l'onglet Conseil revient chez A ; `T` ouvre. |
+| 1 | A chat ouvert, B en jeu : console du serveur `restart vava_chat`. | Chez A, le curseur disparaît et le personnage bouge ; console `module 'vava_chat' v1.1.1 prêt`. Le chat revient fermé, à la place choisie, fils et onglets privés vidés ; l'onglet Conseil revient chez A ; `T` ouvre. |
 | 2 | Aussitôt après : A et B échangent hors-RP, `/me`, `/mp`. | Tout marche sans reconnexion, mêmes numéros de joueur. `/r` avant tout nouveau message privé : « — Personne à qui répondre. » |
 | 3 | A : `/met`. | Mêmes suggestions qu'avant (profil redemandé au redémarrage). |
 | 4 | Pendant qu'un `/me` s'affiche au-dessus d'une tête : `restart vava_chat`. | Le texte disparaît et ne revient pas. |

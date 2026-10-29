@@ -14,7 +14,7 @@ VavaVoice.EVENTS = {
 
 -- Intentions du client (RPC du core).
 VavaVoice.RPC = {
-    ZONES = 'vava_voice:zones',         -- liste des zones (à l'apparition)
+    ZONES = 'vava_voice:zones',         -- liste des zones (apparition, redémarrage) ; la limite repart par LIMIT
     EDITOR = 'vava_voice:editor',       -- ouvrir l'éditeur (droit du Conseil)
     CREATE = 'vava_voice:zoneCreate',   -- nouvelle zone centrée sur le membre du Conseil
     UPDATE = 'vava_voice:zoneUpdate',

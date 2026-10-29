@@ -15,6 +15,7 @@ const bridge = require('./lib/bridge');
 const events = require('./lib/events');
 const journal = require('./lib/journal');
 const pin = require('./lib/pin');
+const servercfg = require('./lib/servercfg');
 const status = require('./lib/status');
 const { createServer } = require('./lib/http');
 const { createRouter } = require('./lib/routes');
@@ -87,6 +88,45 @@ function banner() {
   say();
 }
 
+/** Avertissement du complément du server.cfg en une phrase (numéros de ligne seulement : une ligne peut porter un secret). */
+function cfgWarning(warning) {
+  if (warning.code === 'exec') return `réglages de la voix à vérifier dans les fichiers inclus (exec, ligne ${warning.line}) ; rien n'est écrit`;
+  if (warning.code === 'ambiguous') return `ligne ${warning.line} à plusieurs commandes (;) qui touche la voix : à vérifier, rien n'est écrit`;
+  return `remplacez set par setr pour ${warning.key} (ligne ${warning.line}) : sans setr, les joueurs ne reçoivent pas le réglage`;
+}
+
+/** Échec du complément du server.cfg en une phrase. */
+function cfgError(done) {
+  const missing = done.missing && done.missing.length ? ` ; ajoutez-y vous-même ${done.missing.join(' et ')}` : '';
+  // un fichier inchangé n'est pas retenté : le modifier (ou relancer la Chancellerie) en provoque un nouvel essai
+  if (done.error === 'encoding') return `server.cfg non complété : il n'est pas enregistré en UTF-8, rien n'est écrit${missing}.`;
+  return `server.cfg non complété (${done.error}), rien n'est écrit${missing} ; nouvel essai quand il change ou au prochain lancement de la Chancellerie.`;
+}
+
+/**
+ * Avant chaque lancement de FXServer : le server.cfg reçoit les réglages qu'exige vAvA s'il ne les pose pas (serveur
+ * installé avant eux, fichier écrit à la main), sans rien changer d'autre. Un fichier douteux ou illisible n'est pas
+ * touché : un avertissement, inscrit au journal une fois par état du fichier. Renvoie les messages pour la console.
+ * @returns {string[]}
+ */
+function completeCfg() {
+  try {
+    const done = servercfg.complete(config.cfgPath());
+    const notes = done.warnings.map((warning) => `server.cfg : ${cfgWarning(warning)}.`);
+    if (done.error) notes.push(cfgError(done));
+    if (done.added.length) {
+      journal.record(journal.SYSTEM, 'cfg_completed', { lignes: done.added.join(' · '), backup: done.backup });
+      notes.push(`server.cfg complété des réglages qu'exige la voix : ${done.added.join(' · ')}.`);
+    }
+    if ((done.error || done.warnings.length) && !done.repeated) {
+      journal.record(journal.SYSTEM, 'cfg_check', { motif: done.error || done.warnings.map((w) => `${w.code} (ligne ${w.line})`).join(', ') });
+    }
+    return notes;
+  } catch (error) {
+    return [`server.cfg non vérifié : ${error.message}`];
+  }
+}
+
 function announcePin(code) {
   const c = colors;
   say(`${c.brass}  ── Premier lancement ──${c.reset}`);
@@ -103,10 +143,12 @@ async function main() {
     return;
   }
   config.ensureData();
-  // la clé du pont et le jeton de players.json partent avec FXServer à chaque lancement, et restent masqués dans sa console
+  // la clé du pont et le jeton de players.json partent avec FXServer à chaque lancement, et restent masqués dans sa console ;
+  // le server.cfg est complété juste avant, s'il lui manque un réglage exigé
   const server = new ServerProcess({
     launchArgs: () => [...bridge.launchArgs(), ...status.launchArgs()],
     secrets: () => [...bridge.secrets(), ...status.secrets()],
+    prepare: completeCfg,
   });
   events.attach(server);
   if (await server.cleanupOrphan()) say(`${colors.dim}  Un FXServer resté ouvert après un arrêt brutal a été arrêté.${colors.reset}`);

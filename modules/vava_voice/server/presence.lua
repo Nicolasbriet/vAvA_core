@@ -3,12 +3,13 @@
     Rôle : qui peut parler, décidé par le serveur. Micro coupé par FXServer (MumbleSetPlayerMuted, rien à contourner
            côté client) tant que le personnage n'est pas apparu : sélection, chargement, retour à la sélection.
            Limites de portée par raison (à terre, décision d'un module) : la plus basse s'applique et part au seul
-           joueur concerné ; son client la respecte (la portée est réglée côté client, comme toute voix FiveM).
+           joueur concerné ; son client la respecte (la portée est réglée côté client, comme toute voix FiveM). Le
+           client qui redémarre la redemande (avec la liste des zones) : celle du démarrage a pu lui échapper.
     Dépendances : shared/constants.lua, config.lua, server/core.lua
 ]]
 
-local pairs, ipairs, tonumber = pairs, ipairs, tonumber
-local GetPlayers, TriggerClientEvent, MumbleSetPlayerMuted = GetPlayers, TriggerClientEvent, MumbleSetPlayerMuted
+local pairs = pairs
+local TriggerClientEvent, MumbleSetPlayerMuted = TriggerClientEvent, MumbleSetPlayerMuted
 
 local EVENTS = VavaVoice.EVENTS
 local NO_LIMIT = VavaVoice.NO_LIMIT
@@ -85,11 +86,9 @@ function presence.release(src, reason)
     if active[src] then sendLimit(src) end
 end
 
---- Module arrêté : la voix de FiveM reprend son fonctionnement ordinaire, plus aucun micro coupé par nous.
-function presence.releaseAll()
-    for _, id in ipairs(GetPlayers()) do
-        local src = tonumber(id)
-        if src then MumbleSetPlayerMuted(src, false) end
-    end
-    active, limits = {}, {}
+--- Le client redemande son état (apparition, redémarrage du module) : la limite du moment lui est renvoyée s'il est en
+--- jeu ; sinon, elle partira à son apparition.
+---@param src integer
+function presence.resend(src)
+    if active[src] then sendLimit(src) end
 end

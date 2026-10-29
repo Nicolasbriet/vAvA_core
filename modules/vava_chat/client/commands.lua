@@ -6,7 +6,8 @@
         serveur) ;
       - un texte sans commande dépend de l'onglet : hors-RP dans Général, message à son correspondant dans un
         onglet privé, au Conseil dans le sien ; rien dans Actions (un rappel de /me et /do s'affiche).
-      Les commandes du chat marchent aussi depuis la console F8. Suggestions françaises de chaque commande.
+      Les commandes du chat marchent aussi depuis la console F8. Suggestions françaises de chaque commande (/staff
+      pour le seul Conseil).
       Toute commande tapée est signalée au Codex (vava_codex, s'il est là) pour ses « dernières pages ».
     Dépendances : shared/, config.lua, client/outbox.lua, client/suggestions.lua, client/layout.lua
 ]]
@@ -133,7 +134,11 @@ for name, handler in pairs(handlers) do
     end, false)
 end
 
+-- /staff n'est suggéré qu'au Conseil (profil) ; les autres commandes du chat à tous
 for key, name in pairs(COMMANDS) do
     local suggestion = texts.suggestions[key]
-    if suggestion then suggestions.add(name, suggestion.help, suggestion.params) end
+    if suggestion then
+        local declare = key == 'staff' and suggestions.reserve or suggestions.add
+        declare(name, suggestion.help, suggestion.params)
+    end
 end

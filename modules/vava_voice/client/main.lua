@@ -1,11 +1,13 @@
 --[[
     vava_voice/client/main.lua
     Rôle : assemblage côté client :
-      - en jeu (apparition du personnage) : salon vocal rejoint, portée appliquée, médaillon, zones reçues ; hors du
-        jeu (sélection) : plus de voix ni de médaillon, éditeur fermé ;
+      - en jeu (apparition du personnage, ou module redémarré en cours de partie) : salon vocal rejoint, portée
+        appliquée, médaillon, zones demandées au serveur (avec quelques essais, la limite de portée revient au
+        passage) ; hors du jeu (sélection) : plus de voix ni de médaillon, éditeur fermé ;
       - touche de portée (réglable), commande de l'éditeur, outil du Registre ;
       - à intervalle : joueurs à portée, lueur du médaillon quand le joueur parle, zone de voix où il se trouve ;
-      - ordres du serveur : limite de portée, zones changées.
+      - ordres du serveur : limite de portée, zones changées ;
+      - arrêt de la ressource éditeur ouvert : clavier et souris rendus au jeu.
     Dépendances : shared/, config.lua, tous les fichiers client/ du module
 ]]
 
@@ -26,14 +28,25 @@ local hud, mumble, zones, range, editor = VavaVoice.hud, VavaVoice.mumble, VavaV
 
 local playing = false
 local talking = false
+-- numéro de la demande des zones : une demande plus ancienne s'arrête d'elle-même
+local fetching = 0
 
---- Liste des zones, demandée au serveur à chaque apparition.
-local function fetchZones()
-    local ok, success, list = core.rpc.call(RPC.ZONES)
-    if ok and success then
-        zones.replace(list)
-        editor.refresh()
+--- Liste des zones, demandée au serveur à chaque apparition et au redémarrage du module ; le serveur renvoie au passage
+--- la limite de portée du moment. Nouvel essai si le module du serveur n'est pas encore prêt (RPC inconnu, délai).
+---@param run integer
+local function fetchZones(run)
+    for _ = 1, cfg.client.syncTries do
+        if run ~= fetching or not playing then return end
+        local ok, success, list = core.rpc.call(RPC.ZONES)
+        if run ~= fetching or not playing then return end
+        if ok and success then
+            zones.replace(list)
+            editor.refresh()
+            return
+        end
+        Wait(cfg.client.syncRetryMs)
     end
+    VavaVoice.log.warn('zones de voix non reçues : elles seront redemandées à la prochaine apparition')
 end
 
 local function start()
@@ -41,7 +54,9 @@ local function start()
     playing = true
     mumble.enable()
     range.apply(false)
-    CreateThread(fetchZones)
+    fetching = fetching + 1
+    local run = fetching
+    CreateThread(function() fetchZones(run) end)
 end
 
 local function stop()
@@ -93,6 +108,11 @@ AddEventHandler('onClientResourceStart', function(resource)
         range.apply(false)
         hud.setActive(talking)
     end
+end)
+
+-- arrêt du module éditeur ouvert : l'interface disparaît avec lui, le clavier et la souris reviennent au jeu
+AddEventHandler('onClientResourceStop', function(resource)
+    if resource == VavaVoice.resource then editor.release() end
 end)
 
 -- joueurs à portée

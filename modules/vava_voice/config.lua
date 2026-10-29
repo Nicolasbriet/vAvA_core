@@ -40,6 +40,9 @@ VavaVoice.config = {
         channelBase = 1000,      -- salon d'un joueur en jeu : base + son numéro de joueur
         idleChannel = 0,         -- salon racine : hors du jeu (sélection), personne ne parle à personne
         rangeKvp = 'range',      -- portée choisie, gardée sur la machine du joueur
+        -- liste des zones demandée à l'apparition et au redémarrage du module : essais si le serveur n'est pas prêt
+        syncTries = 5,
+        syncRetryMs = 2000,
     },
 
     -- Cercle au sol au changement de portée (vu du seul joueur) : marqueur « cercle fin », couleur laiton.
@@ -53,14 +56,15 @@ VavaVoice.config = {
         thickness = 1.0,
     },
 
-    -- Zones de voix : cylindre centré sur les pieds du membre du Conseil, effet sur toutes les portées. Si des zones
-    -- se chevauchent, la plus petite l'emporte (la plus précise).
+    -- Zones de voix : cylindre centré sur la position du membre du Conseil (ses hanches) : la hauteur se compte de là,
+    -- et la zone descend de baseOffset sous ce centre. Effet sur toutes les portées. Si des zones se chevauchent, la
+    -- plus petite l'emporte (la plus précise).
     zones = {
         permission = 'tools',            -- droit vava_admin pour créer, modifier, supprimer
         teleportPermission = 'teleport', -- droit vava_admin pour « S'y rendre »
         command = 'zonesvoix',
         max = 200,
-        labelMax = 40,
+        labelMax = 40,                   -- signes du nom (un « é » compte pour un)
         radius = { min = 2.0, max = 60.0, default = 10.0, step = 0.5 },
         height = { min = 2.0, max = 30.0, default = 6.0, step = 0.5 },
         multipliers = { 0.5, 0.75, 1.0, 1.5, 2.0, 3.0 },
