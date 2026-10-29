@@ -57,9 +57,13 @@ end
 
 local compileNode
 
+-- définitions en cours de compilation, de la racine au nœud courant : une définition qui se contient elle-même,
+-- directement ou non, bouclerait sans fin ; une même table reprise à deux endroits distincts reste permise
+local compiling = {}
+
 ---@return table|nil node
 ---@return string|nil err
-compileNode = function(def, options, path)
+local function compileBody(def, options, path)
     if type(def) ~= 'table' then
         return nil, format('%s : définition attendue (table)', path)
     end
@@ -157,6 +161,18 @@ compileNode = function(def, options, path)
     return node
 end
 
+compileNode = function(def, options, path)
+    if type(def) == 'table' then
+        if compiling[def] then
+            return nil, format('%s : définition cyclique (une définition se contient elle-même)', path)
+        end
+        compiling[def] = true
+    end
+    local node, err = compileBody(def, options, path)
+    if type(def) == 'table' then compiling[def] = nil end
+    return node, err
+end
+
 local validateNode
 
 -- Les messages d'erreur ne sont construits qu'en cas d'échec : le chemin nominal n'alloue aucune chaîne.
@@ -249,6 +265,33 @@ validateNode = function(node, value)
     return true
 end
 
+local normalizeNode
+
+--- Ramène aux entiers Lua les flottants à valeur entière d'une valeur déjà validée, partout où le schéma dit
+--- `integer` : scalaire, champ de table, élément de liste, valeur de map (une clé de map 3.0 est déjà la clé 3 :
+--- Lua normalise les clés). Les tables sont modifiées en place ; la valeur rendue est celle à garder.
+normalizeNode = function(node, value)
+    local kind = node.type
+    if kind == 'integer' then
+        if mathType(value) == 'float' then return tointeger(value) end
+        return value
+    end
+    if type(value) ~= 'table' then return value end
+    if kind == 'table' then
+        for name, field in pairs(node.fields) do
+            local item = value[name]
+            if item ~= nil then value[name] = normalizeNode(field, item) end
+        end
+    elseif kind == 'array' then
+        local items = node.items
+        for i = 1, #value do value[i] = normalizeNode(items, value[i]) end
+    elseif kind == 'map' then
+        local valueNode = node.value
+        for key, item in pairs(value) do value[key] = normalizeNode(valueNode, item) end
+    end
+    return value
+end
+
 --- Compile une définition de schéma.
 ---@param definition vAvA.SchemaDefinition
 ---@param options? vAvA.SchemaCompileOptions
@@ -290,6 +333,25 @@ end
 ---@return string|nil err
 function schema.validate(compiled, value)
     return validateNode(compiled, value)
+end
+
+--- Normalise une valeur **déjà validée** : chaque entier arrivé en flottant (3.0, JSON d'une interface) devient un
+--- entier Lua, à tout niveau. Renvoie la valeur à garder (les tables sont modifiées en place).
+---@param compiled table
+---@param value any
+---@return any
+function schema.normalize(compiled, value)
+    return normalizeNode(compiled, value)
+end
+
+--- Normalise en place une liste de valeurs acceptée par validateList.
+---@param compiledList table[]
+---@param values table
+---@param count integer
+function schema.normalizeList(compiledList, values, count)
+    for i = 1, count do
+        if values[i] ~= nil then values[i] = normalizeNode(compiledList[i], values[i]) end
+    end
 end
 
 --- Valide une liste de valeurs reçue du réseau contre une liste de schémas compilés.

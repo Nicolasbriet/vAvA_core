@@ -44,7 +44,7 @@ Utilisés par les arguments de RPC, les retours client et les entrées de regist
 
 | Champ | Types concernés | Effet |
 |---|---|---|
-| `type` | tous | `string`, `number`, `integer`, `boolean`, `table`, `array`, `map`, `function`, `any` ; `integer` n'accepte un flottant que s'il a un équivalent entier Lua (`3.0` oui, `1e300` non) |
+| `type` | tous | `string`, `number`, `integer`, `boolean`, `table`, `array`, `map`, `function`, `any` ; `integer` n'accepte un flottant que s'il a un équivalent entier Lua (`3.0` oui, `1e300` non), et un RPC le convertit en entier avant le handler, à tout niveau (argument, champ de table, élément de liste, valeur de map ; 0.8.1) |
 | `optional` | tous | `nil` accepté |
 | `min` / `max` | string (longueur en octets), number/integer (valeur), array/map (nombre d'éléments) | bornes incluses ; entières pour string, array et map ; jamais `NaN` |
 | `pattern` | string | motif Lua (ancrer avec `^` et `$`) |
@@ -54,6 +54,8 @@ Utilisés par les arguments de RPC, les retours client et les entrées de regist
 | `key` / `value` | map | schémas des clés (string ou integer) et des valeurs |
 
 `function` accepte une fonction locale ou venant d'une autre ressource (callbacks d'entrées de registre).
+Une définition qui se contient elle-même, directement ou non (`def.items = def`), est refusée à la compilation (0.8.1) ;
+une même table de définition reprise à plusieurs endroits distincts reste permise.
 
 Pour une **entrée réseau** : `any`, `function` et `strict = false` sont refusés, et les chaînes, listes et maps sans `max`
 reçoivent la borne de `config/server.lua` (`schema.*`). `NaN` et `±inf` sont toujours refusés.
@@ -92,6 +94,9 @@ declared → waiting → migrating → starting (setup) → ready
   `modules.dependencyTimeoutMs`). Échec immédiat si la ressource dépendante est absente ou arrêtée, si sa version
   est insuffisante, ou en cas de dépendance circulaire.
 - Déclarer aussi les dépendances dans le fxmanifest (`dependency 'vava_inventory'`) pour l'ordre de démarrage.
+- À l'arrêt de sa ressource, un module passe par `stopping` et ne disparaît qu'au **tour suivant** (0.8.1) : son propre
+  gestionnaire `onResourceStop` garde l'API (`core.db` pour un journal, par exemple), quel que soit l'ordre des
+  gestionnaires d'arrêt entre le core et lui. Une ressource redémarrée dans le même tour se redéclare sans attendre.
 - **Toute l'API (hors `log`, `modules` et `version`) est refusée tant que le module n'est pas en `starting` ou
   `ready`** : enregistrer hooks, registres et RPC dans `setup`.
 

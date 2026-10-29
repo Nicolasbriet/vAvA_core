@@ -645,3 +645,84 @@ describe('vAvA.lib.schema', function()
         end)
     end)
 end)
+
+-- 0.8.1 : définitions cycliques refusées à la compilation ; entiers arrivés en flottant normalisés à tout niveau.
+describe('vAvA.lib.schema (0.8.1)', function()
+    local schema
+
+    before_each(function()
+        helper.reset()
+        helper.loadAll({ 'shared/init.lua', 'config/shared.lua', 'shared/lib/schema.lua', 'config/server.lua' })
+        schema = vAvA.lib.schema
+    end)
+
+    describe('définitions cycliques', function()
+        it('refuse une définition qui se contient elle-même, sans déborder la pile', function()
+            local def = { type = 'array' }
+            def.items = def
+            local compiled, err = schema.compile(def)
+            assert.is_nil(compiled)
+            assert.matches('cyclique', err)
+        end)
+
+        it('refuse un cycle indirect (table → map → la même table)', function()
+            local a = { type = 'table', fields = {} }
+            local b = { type = 'map', key = { type = 'string' }, value = a }
+            a.fields.child = b
+            local compiled, err = schema.compile(a)
+            assert.is_nil(compiled)
+            assert.matches('cyclique', err)
+            local list, listErr = schema.compileList({ { type = 'integer' }, b }, nil, 'args')
+            assert.is_nil(list)
+            assert.matches('cyclique', listErr)
+        end)
+
+        it('permet une même définition reprise à plusieurs endroits distincts, et repart d’un état propre', function()
+            local id = { type = 'integer', min = 1 }
+            assert.is_not_nil(schema.compile({ type = 'table', fields = { from = id, to = id, list = { type = 'array', items = id } } }))
+            local def = { type = 'array' }
+            def.items = def
+            assert.is_nil(schema.compile(def))
+            assert.is_not_nil(schema.compile({ type = 'array', items = id }))
+            assert.is_not_nil(schema.compile(id))
+        end)
+    end)
+
+    describe('normalize', function()
+        it('convertit les entiers arrivés en flottant à tout niveau, en place, et laisse les nombres', function()
+            local compiled = schema.compile({ type = 'table', fields = {
+                n = { type = 'integer' },
+                x = { type = 'number' },
+                list = { type = 'array', items = { type = 'integer' } },
+                map = { type = 'map', key = { type = 'string' }, value = { type = 'integer' } },
+                deep = { type = 'table', fields = { k = { type = 'integer', optional = true } } },
+            } })
+            local value = { n = 3.0, x = 2.0, list = { 1.0, 2 }, map = { a = 5.0 }, deep = {} }
+            assert.is_true(schema.validate(compiled, value))
+            local out = schema.normalize(compiled, value)
+            assert.equal(value, out)
+            assert.equal('integer', math.type(value.n))
+            assert.equal('float', math.type(value.x))
+            assert.equal('integer', math.type(value.list[1]))
+            assert.equal('integer', math.type(value.list[2]))
+            assert.equal('integer', math.type(value.map.a))
+            assert.is_nil(value.deep.k)
+        end)
+
+        it('normalise un scalaire, une liste d’arguments et une map à clés entières', function()
+            assert.equal('integer', math.type(schema.normalize(schema.compile({ type = 'integer' }), 4.0)))
+            assert.equal('float', math.type(schema.normalize(schema.compile({ type = 'number' }), 4.0)))
+            local list = schema.compileList({ { type = 'integer' }, { type = 'string' }, { type = 'integer', optional = true } }, nil, 'args')
+            local values = { 1.0, 'a' }
+            schema.normalizeList(list, values, 2)
+            assert.equal('integer', math.type(values[1]))
+            assert.equal('a', values[2])
+            assert.is_nil(values[3])
+            local map = schema.compile({ type = 'map', key = { type = 'integer' }, value = { type = 'integer' } })
+            local table = { [2] = 8.0 }
+            assert.is_true(schema.validate(map, table))
+            schema.normalize(map, table)
+            assert.equal('integer', math.type(table[2]))
+        end)
+    end)
+end)
