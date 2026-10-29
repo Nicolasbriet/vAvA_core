@@ -28,10 +28,11 @@ VavaCrafting.stations = stations
 ---@field fuel integer
 ---@field busyBy integer|nil     joueur qui travaille
 ---@field published { fuel: integer, busy: boolean }|nil
----@field dirty boolean
+---@field dirty boolean|string   true : à écrire ; WRITING : écriture en cours (une modification pendant l'attente remet true)
 
 ---@type table<string, vAvA.StationState>
 local states = {}
+local WRITING = 'writing'
 -- genre de propriétaire → fun(ownerId, characterId): boolean
 local accessors = {
     character = function(ownerId, characterId) return ownerId == characterId end,
@@ -198,16 +199,24 @@ function stations.view(def)
     }
 end
 
+--- Requêtes des réserves à écrire, marquées « en cours d'écriture » : l'écriture cède la main, et du combustible
+--- ajouté ou brûlé pendant l'attente les marque de nouveau à écrire au lieu d'être effacé par `markClean`.
 ---@param queries table[]
 function stations.collect(queries)
     local now = time()
     for id, state in pairs(states) do
-        if state.dirty then queries[#queries + 1] = { query = UPSERT_SQL, values = { id, state.fuel, now } } end
+        if state.dirty then
+            state.dirty = WRITING
+            queries[#queries + 1] = { query = UPSERT_SQL, values = { id, state.fuel, now } }
+        end
     end
 end
 
+--- Écriture réussie : seules les réserves restées telles qu'écrites sont propres (en échec, elles restent à écrire).
 function stations.markClean()
-    for _, state in pairs(states) do state.dirty = false end
+    for _, state in pairs(states) do
+        if state.dirty == WRITING then state.dirty = false end
+    end
 end
 
 --- Joueur parti : il n'occupe plus rien.

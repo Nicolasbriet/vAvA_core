@@ -41,10 +41,11 @@ on touche l'emplacement ; la boucle lente de 10 s republie seulement les stades 
 ### Grenier commun
 
 Un conteneur conservé de l'inventaire (`kind = 'granary'`) par parcelle qui en déclare un, créé au premier démarrage,
-ouvert au joueur à portée du grenier avec un **ancrage** : l'inventaire revérifie la distance à chaque geste et ferme le
-grenier chez qui s'éloigne. Les dépôts et retraits (déplacer, diviser, fusionner, jeter) sont journalés dans
-`vava_farming_granary_log` et publiés par le hook `vava_farming:granary`. La récolte d'une parcelle communale va dans
-la besace du récolteur, qui la dépose au grenier.
+ouvert au joueur qui a accès à la parcelle (communale : tous ; privée : son propriétaire, ou le genre branché par
+`registerAccess`) et se tient à portée du grenier, avec un **ancrage** : l'inventaire revérifie la distance à chaque
+geste et ferme le grenier chez qui s'éloigne. Les dépôts et retraits (déplacer, diviser, fusionner, jeter) sont
+journalés dans `vava_farming_granary_log` et publiés par le hook `vava_farming:granary`. La récolte d'une parcelle
+communale va dans la besace du récolteur, qui la dépose au grenier.
 
 ## Base de données (sql/0001_farming.sql)
 
@@ -81,5 +82,6 @@ withdraw, source, characterId, item, quantity }`). Détail : `docs/api.md`.
    Fertiliser + 25.
 7. **Grenier** : `E` près du grenier → l'inventaire s'ouvre sur le conteneur ; déposer, s'éloigner → il se ferme ;
    `vava_farming_granary_log` garde dépôts et retraits.
-8. **Privé** : le jardin de la config appartient au personnage n° 1 ; un autre lit « ne vous appartient pas ».
+8. **Privé** : le jardin de la config appartient au personnage n° 1 ; un autre lit « ne vous appartient pas » (sur ses
+   emplacements comme sur son grenier s'il en déclare un).
 9. **Redémarrage** : `restart vava_farming` → emplacements retrouvés, croissance rattrapée d'après les dates.

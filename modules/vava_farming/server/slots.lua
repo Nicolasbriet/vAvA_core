@@ -29,8 +29,12 @@ local UPSERT_SQL = 'INSERT INTO `vava_farming_slots` (`parcel`, `slot`, `crop`, 
 local slots = {}
 VavaFarming.slots = slots
 
--- parcelle → index → état (voir vAvA.SlotState dans shared/growth.lua) + dirty
+-- parcelle → index → état (voir vAvA.SlotState dans shared/growth.lua) + dirty (true : à écrire ; WRITING : écriture
+-- en cours, qu'une modification pendant l'attente remplace par true)
 local states = {}
+local WRITING = 'writing'
+-- `waterings` est un SMALLINT UNSIGNED : une plante mûre arrosée sans fin ne doit pas faire échouer toute l'écriture
+local MAX_WATERINGS = 65535
 -- parcelle → dernière publication (clé de comparaison)
 local published = {}
 local accessors = {
@@ -220,14 +224,17 @@ function slots.ripen(slot, crop)
     slot.growth, slot.wilted, slot.dead, slot.dirty = crop.growMinutes * 60, false, false, true
 end
 
+--- Requêtes des emplacements à écrire, marqués « en cours d'écriture » : l'écriture cède la main, et un geste joué
+--- pendant l'attente (récolte, semis…) les marque de nouveau à écrire au lieu d'être effacé par `markClean`.
 ---@param queries table[]
 function slots.collect(queries)
     for parcelId, list in pairs(states) do
         for index, slot in ipairs(list) do
             if slot.dirty then
+                slot.dirty = WRITING
                 queries[#queries + 1] = { query = UPSERT_SQL, values = {
                     parcelId, index, slot.crop, slot.seedTier, slot.plantedAt, slot.growth, floor(slot.moisture * 100 + 0.5) / 100,
-                    floor(slot.fertility * 100 + 0.5) / 100, slot.drySince, floor(slot.dryHours * 1000 + 0.5) / 1000, slot.waterings,
+                    floor(slot.fertility * 100 + 0.5) / 100, slot.drySince, floor(slot.dryHours * 1000 + 0.5) / 1000, min(slot.waterings, MAX_WATERINGS),
                     slot.wilted and 1 or 0, slot.dead and 1 or 0, slot.lastFamily, slot.updatedAt,
                 } }
             end
@@ -235,8 +242,11 @@ function slots.collect(queries)
     end
 end
 
+--- Écriture réussie : seuls les emplacements restés tels qu'écrits sont propres (en échec, ils restent à écrire).
 function slots.markClean()
     for _, list in pairs(states) do
-        for _, slot in ipairs(list) do slot.dirty = false end
+        for _, slot in ipairs(list) do
+            if slot.dirty == WRITING then slot.dirty = false end
+        end
     end
 end

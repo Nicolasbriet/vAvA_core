@@ -1,10 +1,12 @@
 --[[
     vava_farming/server/granary.lua
-    Rôle : greniers communs : un conteneur conservé de l'inventaire par parcelle communale qui en déclare un (créé au
-           premier démarrage, retrouvé ensuite), ouvert au joueur à portée du grenier avec un ancrage (la distance est
-           alors tenue par l'inventaire), dépôts et retraits journalés d'après les hooks de l'inventaire (déplacer,
-           diviser, fusionner, jeter) qui passent par le conteneur. Hook `vava_farming:granary` (after).
-    Dépendances : shared/, config.lua, server/core.lua, bridge/server.lua, server/journal.lua, server/catalog.lua
+    Rôle : greniers communs : un conteneur conservé de l'inventaire par parcelle qui en déclare un (créé au premier
+           démarrage, retrouvé ensuite), ouvert au joueur qui a accès à la parcelle (communale : tous ; privée : son
+           propriétaire), à portée du grenier, avec un ancrage (la distance est alors tenue par l'inventaire), dépôts et
+           retraits journalés d'après les hooks de l'inventaire (déplacer, diviser, fusionner, jeter) qui passent par le
+           conteneur. Hook `vava_farming:granary` (after).
+    Dépendances : shared/, config.lua, server/core.lua, bridge/server.lua, server/journal.lua, server/catalog.lua,
+                  server/slots.lua (accès)
 ]]
 
 local ipairs, tostring = ipairs, tostring
@@ -15,6 +17,7 @@ local core = VavaFarming.core
 local bridge = VavaFarming.bridge
 local journal = VavaFarming.journal
 local catalog = VavaFarming.catalog
+local slots = VavaFarming.slots
 local geometry = VavaFarming.geometry
 local cfg = VavaFarming.config
 local messages = cfg.messages
@@ -69,15 +72,22 @@ function granary.containerOf(parcelId)
     return containers[parcelId]
 end
 
---- Ouvre le grenier au joueur à portée (ancrage : l'inventaire revérifie la distance à chaque geste).
+--- Ouvre le grenier au joueur qui a accès à la parcelle et se tient à portée (ancrage : l'inventaire revérifie la
+--- distance à chaque geste). L'inventaire laisse le droit d'accès à l'appelant.
 ---@param src integer
 ---@param parcel vAvA.ParcelDefinition
 ---@return boolean ok
 ---@return string|nil code
 function granary.open(src, parcel)
+    local characterId = bridge.GetCharacterId(src)
+    if not characterId then return false, 'no_character' end
     local spec = parcel.granary
     local id = containers[parcel.id]
     if not spec or not id then return false, 'no_granary' end
+    if not slots.canAccess(parcel, characterId) then
+        bridge.Notify(src, messages.noAccess, 'warning')
+        return false, 'no_access'
+    end
     local x, y, z = bridge.Position(src)
     local reach = cfg.interact.distance + cfg.interact.serverTolerance
     if not x or not geometry.within(x, y, z, spec.x, spec.y, spec.z, reach) then return false, 'too_far' end

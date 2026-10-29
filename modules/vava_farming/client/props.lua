@@ -35,6 +35,16 @@ VavaFarming.props = props
 local parcelsById, wellsById = {}, {}
 for _, parcel in ipairs(cfg.parcels) do parcelsById[parcel.id] = parcel end
 for _, well in ipairs(cfg.wells) do wellsById[well.id] = well end
+-- emplacements de chaque parcelle (clé du prop, position), calculés une fois : la config ne change pas en jeu
+local spotsOf = {}
+for _, parcel in ipairs(cfg.parcels) do
+    local spots = {}
+    for index = 1, geometry.slotCount(parcel) do
+        local x, y, z = geometry.slotPosition(parcel, index)
+        spots[index] = { key = 'slot:' .. parcel.id .. ':' .. index, x = x, y = y, z = z }
+    end
+    spotsOf[parcel.id] = spots
+end
 
 ---@class vAvA.SlotView
 ---@field crop string|nil
@@ -160,7 +170,8 @@ local function reconcile(key, model, far, x, y, z, heading)
 end
 
 --- Boucle lente justifiée : une distance par cible toutes les pollMs, seulement quand un personnage est en jeu. Les
---- emplacements d'une parcelle ne sont parcourus que si la parcelle elle-même est à portée.
+--- emplacements d'une parcelle ne sont mesurés que si la parcelle elle-même est à portée ; sinon, seuls ses props
+--- encore affichés sont retirés.
 local function loop()
     while playing do
         local coords = GetEntityCoords(PlayerPedId())
@@ -170,13 +181,15 @@ local function loop()
             local extent = max(parcel.rows, parcel.cols) * parcel.spacing
             local center = geometry.distance(px, py, pz, parcel.x, parcel.y, parcel.z)
             local inRange = center <= streaming.radius + extent
-            for index = 1, geometry.slotCount(parcel) do
-                local key = 'slot:' .. parcel.id .. ':' .. index
-                local x, y, z = geometry.slotPosition(parcel, index)
-                local far = inRange and geometry.distance(px, py, pz, x, y, z) or (streaming.radius + 1)
-                reconcile(key, inRange and modelFor(props.slot(parcel.id, index)) or nil, far, x, y, z, parcel.heading)
-                if far <= bestDistance then
-                    best, bestDistance = { kind = 'slot', parcel = parcel.id, index = index, distance = far }, far
+            for index, spot in ipairs(spotsOf[parcel.id]) do
+                if inRange then
+                    local far = geometry.distance(px, py, pz, spot.x, spot.y, spot.z)
+                    reconcile(spot.key, modelFor(props.slot(parcel.id, index)), far, spot.x, spot.y, spot.z, parcel.heading)
+                    if far <= bestDistance then
+                        best, bestDistance = { kind = 'slot', parcel = parcel.id, index = index, distance = far }, far
+                    end
+                elseif shown[spot.key] then
+                    remove(spot.key)
                 end
             end
             if parcel.granary then
