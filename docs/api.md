@@ -159,6 +159,9 @@ core.hooks.runAfter('vava_inventory:move', payload)
 
 `source` dans `core:player:connecting` est l'identifiant **temporaire** de connexion. La `license` et le pseudo
 ne sont transmis qu'aux hooks serveur : le core ne les stocke pas (seule la license l'est, comme clé de compte).
+Une connexion pendant le démarrage du core attend au plus `players.coreWaitTimeoutMs` (60 s par défaut, 0.7.2), puis
+reçoit `players.messages.stillStarting` (« réessayez dans un instant ») ; les modules, eux, attendent le core sans
+limite.
 
 ### `core.players`
 
@@ -404,7 +407,9 @@ Codes de refus : `no_session`, `busy`, `wrong_state`, `not_owner`, `not_found`, 
 raison donnée par un hook `before`. `busy` vaut aussi pour la sélection d'un personnage qui termine encore son
 déchargement d'une session précédente (reconnexion rapide) : il suffit de réessayer. Une déconnexion attend la fin de
 l'action de personnage en cours avant de décharger ; une modification faite pendant l'écriture du déchargement est
-gardée et écrite au cycle suivant.
+gardée et écrite au cycle suivant. Avec `characters.uniqueNames = true`, l'unicité ignore la casse et les accents
+(collation de la base) et deux créations simultanées du même nom sont départagées (0.7.2) : la seconde reçoit
+`name_taken`. Pas d'index unique : des homonymes déjà en base sont conservés.
 
 Noms : `characters.name` dans `config/server.lua` (longueur en caractères, lettres accentuées autorisées,
 séparateurs `'`, `-` et espace jamais en tête, en fin ni doublés).

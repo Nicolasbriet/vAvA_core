@@ -365,10 +365,16 @@ function modules.isCoreReady()
 end
 
 --- Attend la fin du démarrage du core (connexion d'un joueur pendant le boot). Bloque le thread courant.
----@return boolean ready  false si le core a échoué
-function modules.awaitCore()
-    if coreState == 'booting' then waitFor(CORE_OWNER) end
-    return coreState == 'ready'
+--- Bornée : chaque tentative de connexion ajoute une attente, qui ne doit pas durer indéfiniment si le démarrage
+--- reste bloqué (base injoignable). Les modules, eux, attendent le core sans limite (start) : leur nombre est
+--- fixe, et un module en échec le resterait jusqu'au redémarrage alors que le core finit par démarrer.
+---@param timeoutMs integer
+---@return boolean ready
+---@return string|nil reason  'failed' (le core a échoué) ou 'timeout' (toujours en démarrage)
+function modules.awaitCore(timeoutMs)
+    if coreState == 'booting' then waitFor(CORE_OWNER, timeoutMs) end
+    if coreState == 'ready' then return true end
+    return false, coreState == 'failed' and 'failed' or 'timeout'
 end
 
 ---@param reason string

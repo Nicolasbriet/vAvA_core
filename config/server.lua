@@ -38,10 +38,12 @@ vAvA.config.server = {
 
     players = {
         connectTimeoutMs = 120000,  -- au-delà, une connexion acceptée mais jamais finalisée libère sa session
+        coreWaitTimeoutMs = 60000,  -- attente maximale du démarrage du core par une connexion (base injoignable…)
         -- Messages affichés au joueur pendant la connexion.
         messages = {
             checking = 'Vérification de votre compte…',
             starting = 'Le serveur démarre, merci de patienter…',
+            stillStarting = 'Le serveur démarre, réessayez dans un instant.',  -- attente dépassée (coreWaitTimeoutMs)
             noLicense = 'Licence Rockstar introuvable : relancez FiveM en étant connecté à votre compte.',
             alreadyConnected = 'Ce compte est déjà connecté au serveur.',
             refused = 'Connexion refusée.',

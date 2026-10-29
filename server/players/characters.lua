@@ -5,6 +5,7 @@
              joined → loading → active → unloading → joined   (connecting est géré par accounts.lua)
            Une seule action à la fois par session (verrou busy) : spam et duplication de sélection impossibles.
            La fermeture d'une session (déconnexion) attend la fin de l'action en cours avant de décharger.
+           Noms uniques (option) : le nom est réservé en mémoire pendant toute sa création (créations simultanées).
     Les intentions du client passent par les RPC core:characters:* ; le serveur valide et décide de tout.
     Dépendances : shared/init.lua, config/server.lua, shared/lib/string.lua, shared/core/logger.lua,
                   shared/core/hooks.lua, server/core/database.lua, server/core/rpc.lua, server/players/*.lua
@@ -13,8 +14,9 @@
 local type, tostring, tonumber, pairs, xpcall, pcall = type, tostring, tonumber, pairs, xpcall, pcall
 local traceback = debug.traceback
 local tointeger = math.tointeger
-local sort = table.sort
-local utf8codes = utf8.codes
+local sort, concat = table.sort, table.concat
+local lower = string.lower
+local utf8codes, utf8char = utf8.codes, utf8.char
 local decodeJson, encodeJson = json.decode, json.encode
 local newPromise, await = promise.new, Citizen.Await
 
@@ -61,6 +63,19 @@ local NAME_SEPARATORS = str.codepointSet(nameCfg.separators)
 local SEXES = {}
 for _, sex in pairs(cfg.sexes) do SEXES[sex] = true end
 
+-- Repli d'un nom pour la réservation des noms uniques : casse et accents ignorés, comme la vérification en base
+-- (collation utf8mb4_unicode_ci de vava_characters : « Jéan » = « JEAN », « æ » = « ae »). Couvre les lettres de la
+-- config par défaut ; une lettre ajoutée hors de cette table n'est repliée qu'en casse ASCII (la base tranche ensuite).
+local FOLDED = {}
+for base, variants in pairs({
+    a = 'àâäáãåÀÂÄÁÃÅ', c = 'çÇ', e = 'éèêëÉÈÊË', i = 'íìîïÍÌÎÏ', n = 'ñÑ', o = 'óòôöõøÓÒÔÖÕØ',
+    u = 'úùûüÚÙÛÜ', y = 'ýÿÝŸ', ae = 'æÆ', oe = 'œŒ',
+}) do
+    for _, code in utf8codes(variants) do FOLDED[code] = base end
+end
+-- noms (repliés) dont la création est en cours : clé → true, retirée à la fin de la création quoi qu'il arrive
+local reservedNames = {}
+
 local characters = {}
 vAvA.characters = characters
 
@@ -105,6 +120,24 @@ local function validateName(value)
     end
     if afterSeparator then return nil end
     return value
+end
+
+---@param name string  nom déjà validé (UTF-8 valide, bords retirés)
+---@return string
+local function foldName(name)
+    local parts = {}
+    for _, code in utf8codes(name) do
+        parts[#parts + 1] = FOLDED[code] or lower(utf8char(code))
+    end
+    return concat(parts)
+end
+
+--- Clé de réservation d'un prénom + nom (le saut de ligne ne peut figurer dans aucun nom valide).
+---@param firstName string
+---@param lastName string
+---@return string
+local function nameKey(firstName, lastName)
+    return foldName(firstName) .. '\n' .. foldName(lastName)
 end
 
 --- Raison de refus transmise au client : celle d'un module si elle est explicite, sinon un code générique.
@@ -202,6 +235,44 @@ local function encodeInitialFields(initialFields)
     return encoded
 end
 
+--- Création d'un personnage déjà validé : hooks, écriture, résumé. Bloque le thread courant.
+---@param session vAvA.Session
+---@param firstName string
+---@param lastName string
+---@param sex string
+---@param data string  champs initiaux sérialisés
+---@return boolean ok
+---@return vAvA.CharacterSummary|string result
+local function insertCharacter(session, firstName, lastName, sex, data)
+    local allowed, reason = hooks.runBefore(HOOK_CREATING, {
+        source = session.source, accountId = session.accountId, firstName = firstName, lastName = lastName, sex = sex,
+    })
+    if not allowed then return false, publicReason(reason) end
+    if not accounts.isCurrent(session) then return false, 'no_session' end
+
+    local id, err = database.insert(CORE, INSERT_CHARACTER_SQL, { session.accountId, firstName, lastName, sex, data })
+    if err then return false, 'db_error' end
+
+    local summary = { id = id, firstName = firstName, lastName = lastName, sex = sex }
+    session.characters[id] = summary
+    log.info('compte #%d : personnage #%d créé', session.accountId, id)
+    hooks.runAfter(HOOK_CREATED, {
+        source = session.source, accountId = session.accountId, characterId = id,
+        firstName = firstName, lastName = lastName, sex = sex,
+    })
+    return true, summary
+end
+
+--- Création avec noms uniques : vérification en base, puis création. Appelée sous réservation du nom.
+---@return boolean ok
+---@return vAvA.CharacterSummary|string result
+local function insertUnique(session, firstName, lastName, sex, data)
+    local taken, err = database.scalar(CORE, COUNT_NAME_SQL, { firstName, lastName })
+    if err then return false, 'db_error' end
+    if taken > 0 then return false, 'name_taken' end
+    return insertCharacter(session, firstName, lastName, sex, data)
+end
+
 ---@param session vAvA.Session
 ---@param firstName any
 ---@param lastName any
@@ -220,29 +291,19 @@ local function create(session, firstName, lastName, sex, initialFields)
     local data, fieldsErr = encodeInitialFields(initialFields)
     if not data then return false, fieldsErr end
 
-    if cfg.uniqueNames then
-        local taken, err = database.scalar(CORE, COUNT_NAME_SQL, { firstName, lastName })
-        if err then return false, 'db_error' end
-        if taken > 0 then return false, 'name_taken' end
-    end
+    if not cfg.uniqueNames then return insertCharacter(session, firstName, lastName, sex, data) end
 
-    local allowed, reason = hooks.runBefore(HOOK_CREATING, {
-        source = session.source, accountId = session.accountId, firstName = firstName, lastName = lastName, sex = sex,
-    })
-    if not allowed then return false, publicReason(reason) end
-    if not accounts.isCurrent(session) then return false, 'no_session' end
-
-    local id, err = database.insert(CORE, INSERT_CHARACTER_SQL, { session.accountId, firstName, lastName, sex, data })
-    if err then return false, 'db_error' end
-
-    local summary = { id = id, firstName = firstName, lastName = lastName, sex = sex }
-    session.characters[id] = summary
-    log.info('compte #%d : personnage #%d créé', session.accountId, id)
-    hooks.runAfter(HOOK_CREATED, {
-        source = session.source, accountId = session.accountId, characterId = id,
-        firstName = firstName, lastName = lastName, sex = sex,
-    })
-    return true, summary
+    -- COUNT puis INSERT ne sont pas atomiques : sans réservation, deux créations simultanées (deux comptes) du même
+    -- nom passeraient toutes deux la vérification. FXServer est un seul processus : une réservation en mémoire,
+    -- prise avant toute attente, suffit ; une création simultanée du même nom reçoit name_taken.
+    local key = nameKey(firstName, lastName)
+    if reservedNames[key] then return false, 'name_taken' end
+    reservedNames[key] = true
+    local called, ok, result = xpcall(insertUnique, traceback, session, firstName, lastName, sex, data)
+    -- libérée quoi qu'il arrive (succès, refus, erreur) : une fois le personnage écrit, la base fait foi
+    reservedNames[key] = nil
+    if not called then error(ok, 0) end
+    return ok, result
 end
 
 ---@param session vAvA.Session

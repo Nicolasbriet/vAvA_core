@@ -161,8 +161,11 @@ local function onConnecting(name, _, deferrals)
 
     if not modules.isCoreReady() then
         deferrals.update(messages.starting)
-        if not modules.awaitCore() then
-            deferrals.done(messages.unavailable)
+        -- attente bornée : passé le délai, la tentative se termine (le joueur réessaie) au lieu de rester en suspens
+        -- et de reprendre bien plus tard, licence bloquée, alors que le joueur est peut-être déjà reparti
+        local ready, reason = modules.awaitCore(cfg.coreWaitTimeoutMs)
+        if not ready then
+            deferrals.done(reason == 'timeout' and messages.stillStarting or messages.unavailable)
             return
         end
     end
