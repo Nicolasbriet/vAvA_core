@@ -52,7 +52,8 @@ function str.sanitize(value, maxLength)
     if #text > maxLength then
         text = sub(text, 1, maxLength) .. '…'
     end
-    text = gsub(text, '%^%d', '')
+    -- « ^^11 » : retirer « ^1 » laisserait « ^1 » ; la suite entière de ^ part avec le chiffre
+    text = gsub(text, '%^+%d', '')
     text = gsub(text, '%c', ' ')
     return text
 end

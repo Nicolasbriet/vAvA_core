@@ -46,9 +46,9 @@ Utilisés par les arguments de RPC, les retours client et les entrées de regist
 |---|---|---|
 | `type` | tous | `string`, `number`, `integer`, `boolean`, `table`, `array`, `map`, `function`, `any` ; `integer` n'accepte un flottant que s'il a un équivalent entier Lua (`3.0` oui, `1e300` non) |
 | `optional` | tous | `nil` accepté |
-| `min` / `max` | string (longueur), number/integer (valeur), array/map (nombre d'éléments) | bornes incluses |
+| `min` / `max` | string (longueur en octets), number/integer (valeur), array/map (nombre d'éléments) | bornes incluses ; entières pour string, array et map ; jamais `NaN` |
 | `pattern` | string | motif Lua (ancrer avec `^` et `$`) |
-| `enum` | string, number, integer | liste des valeurs autorisées |
+| `enum` | string, number, integer | liste des valeurs autorisées (sans `NaN`) |
 | `fields` / `strict` | table | champs attendus ; `strict` (défaut `true`) refuse les clés inconnues |
 | `items` | array | schéma de chaque élément |
 | `key` / `value` | map | schémas des clés (string ou integer) et des valeurs |

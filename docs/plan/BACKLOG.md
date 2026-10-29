@@ -26,7 +26,7 @@ correction sauvage. Un problème **BLOQUANT** remonté par un audit devient une 
 - Critères : `luacheck .` sans avertissement ; versions des modules touchés montées en correctif.
 
 ### T-002 — Tests unitaires du core
-- Agent : vava-testeur · Dépend de : — · Statut : à faire
+- Agent : vava-testeur · Dépend de : — · Statut : à tester en jeu
 - Tester `shared/lib/schema.lua` en priorité (c'est la barrière de sécurité de chaque RPC : bornes, NaN, ±inf,
   tables imbriquées, clés inconnues, chaînes trop longues, entrée réseau vs locale), puis `string.lua`, `table.lua`,
   `pending.lua`, `hooks.lua`.

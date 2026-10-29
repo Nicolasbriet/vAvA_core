@@ -9,7 +9,21 @@ local helper = {}
 
 local ROOT = os.getenv('VAVA_ROOT') or '.'
 
--- natives appelées au chargement des fichiers partagés
+-- Minuteries posées par SetTimeout depuis le dernier reset : { ms, fn }. Rien ne les déclenche tout seul,
+-- un test appelle lui-même helper.timers[i].fn() pour simuler l'échéance.
+helper.timers = {}
+
+--- Promesse du runtime FiveM réduite à l'essentiel : une seule résolution, gardée telle quelle.
+local function newPromise()
+    local p = { resolved = false }
+    function p:resolve(value)
+        if self.resolved then return end
+        self.resolved, self.value = true, value
+    end
+    return p
+end
+
+-- natives et objets du runtime FiveM lus au chargement des fichiers partagés
 local stubs = {
     GetCurrentResourceName = function() return 'vAvA_core' end,
     GetResourceMetadata = function() return '0.0.0' end,
@@ -17,11 +31,22 @@ local stubs = {
     GetGameTimer = function() return math.floor(os.clock() * 1000) end,
     Wait = function() end,
     CreateThread = function(fn) fn() end,
+    -- shared/lib/pending.lua
+    SetTimeout = function(ms, fn) helper.timers[#helper.timers + 1] = { ms = ms, fn = fn } end,
+    promise = { new = newPromise },
+    Citizen = {
+        -- hors jeu il n'y a pas de planificateur : attendre une promesse non résolue est une erreur du test
+        Await = function(p)
+            if not p.resolved then error('doublure Citizen.Await : promesse non résolue', 2) end
+            return p.value
+        end,
+    },
 }
 
 --- Remet l'environnement global à zéro puis pose les doublures.
 function helper.reset()
     vAvA = nil
+    helper.timers = {}
     for name, fn in pairs(stubs) do _G[name] = fn end
 end
 
