@@ -17,7 +17,7 @@ use_experimental_fxv2_oal 'yes'
 
 name 'vava_skills'
 description 'Compétences vAvA : niveaux, rangs, rouille, pénurie, mentorat, Renommée, recettes transmises, lignées'
-version '1.1.0'
+version '1.1.1'
 
 dependency 'vAvA_core'
 dependency 'vava_inventory'

@@ -34,6 +34,14 @@ local PROPOSAL = { type = 'integer', min = 1, max = VavaSkills.MAX_PROPOSAL_ID }
 local MENTORSHIP = { type = 'integer', min = 1, max = VavaSkills.MAX_ID }
 local BOOL = { type = 'boolean' }
 
+--- Départ du personnage : propositions oubliées, fiche écrite puis libérée.
+---@param src integer
+local function leave(src)
+    mentoring.forget(src)
+    experience.forget(src)
+    sheets.unload(src)
+end
+
 --- Personnage arrivé : fiche chargée (bloque le thread du core le temps des lectures).
 ---@param src integer
 local function arrive(src)
@@ -42,15 +50,11 @@ local function arrive(src)
     if sheets.get(src) then return end
     if not sheets.load(src, character) then
         VavaSkills.log.error('fiche de compétences du personnage %d non chargée', character.id)
+        return
     end
-end
-
---- Départ du personnage : propositions oubliées, fiche écrite puis libérée.
----@param src integer
-local function leave(src)
-    mentoring.forget(src)
-    experience.forget(src)
-    sheets.unload(src)
+    -- le joueur a pu partir pendant les lectures (son départ n'avait alors rien à libérer) : fiche aussitôt oubliée
+    local current = core.characters.getActive(src)
+    if not current or current.id ~= character.id then leave(src) end
 end
 
 local function setup()

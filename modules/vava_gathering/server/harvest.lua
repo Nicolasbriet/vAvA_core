@@ -191,8 +191,10 @@ function harvest.succeed(session)
     local src, node, resource = session.source, session.node, session.resource
     local zone = node.zone
     if not nearNode(src, node) then return false, 'too_far' end
+    -- jeton consommé avant le premier appel qui peut céder la main (hooks de l'inventaire et des compétences) : une
+    -- seconde demande avec le même jeton ne trouve plus rien à finir
+    sessions[src] = nil
     if nodes.charges(node) <= 0 then
-        sessions[src] = nil
         bridge.Notify(src, messages.noCharges, 'info')
         return false, 'no_charges'
     end
@@ -200,7 +202,6 @@ function harvest.succeed(session)
     if resource.tool then
         held = bridge.Held(src)
         if not held or held.id ~= session.heldId then
-            sessions[src] = nil
             bridge.Notify(src, format(messages.noTool, toolLabel(resource.tool)), 'warning')
             return false, 'no_tool'
         end
@@ -209,11 +210,11 @@ function harvest.succeed(session)
     zones.refresh(zone, state)
     local band = zones.band(state)
     local effects = zones.effects(state)
-    -- l'outil s'use même quand la terre se refuse
-    if held then wear(session, held) end
+    -- cooldown posé avant l'usure (le hook des métadonnées peut céder la main) ; l'outil s'use même quand la terre se
+    -- refuse
     lastFinish[src] = GetGameTimer()
+    if held then wear(session, held) end
     if quality.failed(effects) then
-        sessions[src] = nil
         bridge.Notify(src, messages.failed, 'warning')
         return false, 'failed'
     end
@@ -225,7 +226,6 @@ function harvest.succeed(session)
     if cfg.quality.origin then metadata.origin = zone.label end
     local ok = bridge.Add(src, resource.item, amount, metadata)
     if not ok then
-        sessions[src] = nil
         bridge.Notify(src, messages.noSpace, 'warning')
         return false, 'no_space'
     end
@@ -238,7 +238,6 @@ function harvest.succeed(session)
         end
     end
     bridge.AddXp(src, { skill = resource.skill, source = resource.id, difficulty = resource.difficulty, amount = resource.xp })
-    sessions[src] = nil
 
     local itemLabel = catalog.itemLabel(resource.item)
     bridge.Notify(src, format(messages.harvested, resource.label, amount, itemLabel, tierLabel(tier)), 'info')

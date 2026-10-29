@@ -110,14 +110,20 @@ function lessons.recordLesson(teacherSrc, studentSrc, recipe)
     if student.recipes[def.id] then return false, 'already_known' end
     if sheets.level(student, def.skill) < def.level then return false, 'student_level' end
     if not bridge.Within(teacherSrc, studentSrc, lessonCfg.radius) then return false, 'too_far' end
-    local progress = student.lessons[def.id] or { count = 0, lastAt = 0 }
+    local previous = student.lessons[def.id]
+    local progress = previous or { count = 0, lastAt = 0 }
     local now = time()
     if progress.count > 0 and now - progress.lastAt < lessonCfg.minIntervalMs // 1000 then return false, 'too_soon' end
 
     local number = progress.count + 1
+    -- tenue avant l'écriture (la base fait attendre) : une leçon simultanée d'un autre professeur trouve le délai en cours
+    local reserved = { count = number, lastAt = now }
+    student.lessons[def.id] = reserved
     local _, err = bridge.db.insert(INSERT_LESSON_SQL, { def.id, student.characterId, teacher.characterId, now, number })
-    if err then return false, 'db_error' end
-    student.lessons[def.id] = { count = number, lastAt = now }
+    if err then
+        if student.lessons[def.id] == reserved then student.lessons[def.id] = previous end
+        return false, 'db_error'
+    end
     student.names[teacher.characterId], teacher.names[student.characterId] = teacher.name, student.name
     journal.write('lesson', { actorId = teacher.characterId, targetId = student.characterId, recipe = def.id, details = { number = number, required = lessonCfg.required } })
     TriggerClientEvent(EVENTS.LESSON, teacherSrc, { recipe = def.id, label = def.label, count = number, required = lessonCfg.required, role = 'teacher', other = { name = student.name } })

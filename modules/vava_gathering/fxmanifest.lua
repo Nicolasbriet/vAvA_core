@@ -17,7 +17,7 @@ use_experimental_fxv2_oal 'yes'
 
 name 'vava_gathering'
 description 'Récolte vAvA : zones à vitalité sur la carte, nœuds, outils en main, qualité, pêche, pistes de gibier'
-version '1.2.0'
+version '1.2.1'
 
 dependency 'vAvA_core'
 dependency 'vava_inventory'

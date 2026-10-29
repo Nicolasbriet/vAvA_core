@@ -50,6 +50,11 @@ local lastProposalId = 0
 -- mentorats dont les compteurs ont changé depuis la dernière écriture
 ---@type table<integer, vAvA.Mentorship>
 local dirty = {}
+-- acceptations en cours d'écriture (la base fait attendre) : leurs places sont tenues jusqu'au rattachement, pour que
+-- deux réponses simultanées ne dépassent ni le nombre d'apprentis d'un maître ni le maître unique d'un apprenti.
+-- 'master:<personnage>:<compétence>' → nombre ; 'apprentice:<personnage>:<compétence>' → 1
+---@type table<string, integer>
+local accepting = {}
 
 ---@param src integer
 ---@param payload table
@@ -245,16 +250,27 @@ function mentoring.answer(src, proposalId, accept)
         return false, 'not_found'
     end
     if not bridge.Within(proposal.masterSrc, src, cfg.proposalRadius) then return false, 'too_far' end
-    -- l'état a pu changer depuis la proposition
-    if apprentice.mentors[proposal.skill] or apprenticeCount(master, proposal.skill) >= cfg.maxApprentices then
+    -- l'état a pu changer depuis la proposition, y compris par une autre acceptation en cours d'écriture
+    local masterKey = format('master:%d:%s', master.characterId, proposal.skill)
+    local apprenticeKey = format('apprentice:%d:%s', apprentice.characterId, proposal.skill)
+    if apprentice.mentors[proposal.skill] or accepting[apprenticeKey]
+        or apprenticeCount(master, proposal.skill) + (accepting[masterKey] or 0) >= cfg.maxApprentices then
         dropProposal(proposal, 'gone')
         return false, 'not_found'
     end
     proposals[proposal.id] = nil
+    accepting[masterKey] = (accepting[masterKey] or 0) + 1
+    accepting[apprenticeKey] = 1
+    local function release()
+        local left = accepting[masterKey] - 1
+        accepting[masterKey] = left > 0 and left or nil
+        accepting[apprenticeKey] = nil
+    end
 
     local startedAt = time()
     local id, err = bridge.db.insert(INSERT_SQL, { proposal.skill, master.characterId, apprentice.characterId, startedAt })
     if not id then
+        release()
         VavaSkills.log.error('mentorat non écrit : %s', tostring(err))
         return false, 'db_error'
     end
@@ -266,6 +282,8 @@ function mentoring.answer(src, proposalId, accept)
     local pair = bridge.db.scalar('SELECT COALESCE(SUM(`renown_granted`), 0) FROM `vava_skills_mentorships` WHERE `master_id` = ? AND `apprentice_id` = ? AND `skill` = ?',
         { master.characterId, apprentice.characterId, proposal.skill })
     mentorship.pairRenown = bridge.Integer(pair, 0)
+    -- plus d'attente d'ici au rattachement : les places tenues deviennent le mentorat
+    release()
     sheets.attachMentorship(master, mentorship)
     sheets.attachMentorship(apprentice, mentorship)
     master.names[apprentice.characterId], apprentice.names[master.characterId] = apprentice.name, master.name

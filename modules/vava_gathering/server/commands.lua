@@ -62,9 +62,9 @@ function commands.list(name)
     if name == 'zones' then
         for _, def in ipairs(catalog.zones()) do out[#out + 1] = { value = def.id, label = def.label } end
     elseif name == 'nodes' then
-        for _, def in ipairs(catalog.nodes()) do
-            local resource, zone = catalog.resource(def.resource), catalog.zone(def.zone)
-            out[#out + 1] = { value = def.id, label = format('%s — %s', resource and resource.label or def.resource, zone and zone.label or def.zone) }
+        -- nœuds par identifiant (table à clés) ; leur ressource et leur zone sont déjà résolues par le catalogue
+        for _, def in pairs(catalog.nodes()) do
+            out[#out + 1] = { value = def.id, label = format('%s — %s', def.resource.label, def.zone.label) }
         end
     end
     sort(out, function(a, b) return a.label < b.label end)

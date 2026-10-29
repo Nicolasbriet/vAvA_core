@@ -58,7 +58,7 @@ local function command(source, args)
             if not def or not value or value < 0 or value > 100 then return usage(source) end
             zones.setVitality(def, value, { source = source, accountId = bridge.GetAccountId(source) })
             bridge.AdminLog(source, 'Vitalité fixée', { zone = def.id, vitalite = value })
-            bridge.Chat(source, format('%s : vitalité %d %%.', def.label, value))
+            bridge.Chat(source, format('%s : vitalité %g %%.', def.label, value))
         elseif action == 'recharger' then
             local def = catalog.node(args[2])
             if not def then return usage(source) end
