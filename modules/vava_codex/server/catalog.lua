@@ -3,8 +3,8 @@
     Rôle : lecture du registre `core:commands` pour un joueur : entrées qu'il a le droit de voir (public, droit du
            Conseil, console en lecture seule ; une sous-commande à droit propre n'est ouverte qu'avec ce droit),
            chapitres, commandes des ressources vAvA enregistrées auprès du jeu mais non décrites (Conseil), et valeurs
-           proposées pour un argument (joueurs en jeu, clés d'un registre, liste d'un module). Tout est recalculé à la
-           demande : le registre vit en mémoire dans le core.
+           proposées pour un argument (joueurs en jeu : tous pour le Conseil, les seuls proches sinon ; clés d'un
+           registre, liste d'un module). Tout est recalculé à la demande : le registre vit en mémoire dans le core.
     Dépendances : shared/constants.lua, config.lua, server/core.lua, bridge/server.lua
 ]]
 
@@ -196,7 +196,8 @@ local function argumentOf(def, actionId, index)
     return args and args[index] or nil, action
 end
 
---- Valeurs proposées pour un argument dynamique : joueurs en jeu, clés d'un registre du core, liste d'un module.
+--- Valeurs proposées pour un argument dynamique : joueurs en jeu (hors du Conseil, les seuls proches), clés d'un
+--- registre du core, liste d'un module.
 ---@param src integer
 ---@param name string
 ---@param actionId string
@@ -206,14 +207,17 @@ end
 function catalog.options(src, name, actionId, index)
     local def = core.registry.get(REGISTRY, name)
     if not def then return false, 'unknown' end
-    if not visible(def, src, bridge.IsStaff(src)) then return false, 'refused' end
+    local staff = bridge.IsStaff(src)
+    if not visible(def, src, staff) then return false, 'refused' end
     local arg, action = argumentOf(def, actionId, index)
     -- sous-commande à droit propre : ses valeurs ne vont qu'à qui peut la lancer (comme dans l'index)
     if action and not actionAllowed(src, def, action) then return false, 'refused' end
     if not arg then return false, 'invalid_request' end
     local out = {}
     if arg.type == 'player' then
-        for _, player in ipairs(bridge.ActivePlayers()) do
+        -- hors du Conseil, les noms des seuls joueurs à portée de voix : jamais la liste de tout le royaume
+        local players = staff and bridge.ActivePlayers() or bridge.NearbyPlayers(src, cfg.players.nearbyRadius)
+        for _, player in ipairs(players) do
             out[#out + 1] = { value = tostring(player.source), label = ('%s (n° %d)'):format(player.name, player.source) }
         end
     elseif arg.type == 'registry' then

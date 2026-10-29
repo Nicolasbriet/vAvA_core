@@ -18,7 +18,7 @@ use_experimental_fxv2_oal 'yes'
 
 name 'vava_chancellerie'
 description 'Pont de la Chancellerie (panneau web) vAvA'
-version '1.3.0'
+version '1.3.1'
 
 dependencies { 'vAvA_core', 'vava_admin' }
 

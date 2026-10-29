@@ -2,8 +2,8 @@
     vava_chancellerie/server/main.lua
     Rôle : déclaration du module auprès du core : écoute HTTP du pont, évènements relayés à la Chancellerie
            (signalements, arrivées et départs des joueurs, offres et fins des caméras regardées depuis le web, arrêt du
-           module des caméras, pont prêt : la Chancellerie applique alors les rangs des comptes reliés) ; commande de
-           liaison d'un compte du panneau.
+           module des caméras, rang du Conseil changé : elle revérifie le droit de chaque compte qui regarde, pont
+           prêt : elle applique alors les rangs des comptes reliés) ; commande de liaison d'un compte du panneau.
     Dépendances : tous les fichiers server/ du module
 ]]
 
@@ -29,6 +29,13 @@ local function cameraEvent(payload)
     end
 end
 
+--- Rang du Conseil donné ou retiré (en jeu, à la console, ou pour un compte relié au panneau) : la Chancellerie
+--- revérifie le droit de regarder de chaque compte dont les caméras sont ouvertes, avec son rang actuel.
+---@param payload table
+local function staffChanged(payload)
+    if type(payload) == 'table' and VavaBridge.STAFF_ACTIONS[payload.action] then push.send({ type = 'camera', recheck = true }) end
+end
+
 local function setup()
     local declared, declareErr = VavaBridge.commands.declare()
     if not declared then return false, 'commandes : ' .. tostring(declareErr) end
@@ -36,6 +43,7 @@ local function setup()
     for _, def in ipairs({
         { VavaBridge.ADMIN_REPORT, function(payload) push.send({ type = 'report', action = payload.action, id = payload.id, author = payload.author }) end },
         { VavaBridge.CAMERAS_WEB, cameraEvent },
+        { VavaBridge.ADMIN_ACTION, staffChanged },
         { 'core:player:joined', function() push.send({ type = 'players' }) end },
         { 'core:player:dropped', function() push.send({ type = 'players' }) end },
     }) do

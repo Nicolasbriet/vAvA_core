@@ -1,7 +1,8 @@
 --[[
     vava_codex/bridge/server.lua
     Rôle : SEUL point de contact, côté serveur, entre le Codex et le core / les autres modules : personnage et
-           joueurs en jeu, rangs et droits du Conseil (vava_admin, sinon ACE), listes de valeurs des modules
+           joueurs en jeu (tous, ou les seuls proches d'un joueur, positions lues par le serveur), rangs et droits du
+           Conseil (vava_admin, sinon ACE), listes de valeurs des modules
            (export codexList), commandes enregistrées auprès du jeu, notifications. Chaque appel à une autre
            ressource est isolé : un module absent ou en erreur ne retire que la fonction concernée.
     Dépendances : shared/constants.lua, config.lua, server/core.lua
@@ -12,6 +13,7 @@ local mathType = math.type
 local pack, unpack = table.pack, table.unpack
 local GetResourceState, TriggerClientEvent, IsPlayerAceAllowed = GetResourceState, TriggerClientEvent, IsPlayerAceAllowed
 local GetPlayers, GetRegisteredCommands = GetPlayers, GetRegisteredCommands
+local GetPlayerPed, GetEntityCoords, GetPlayerRoutingBucket = GetPlayerPed, GetEntityCoords, GetPlayerRoutingBucket
 
 local core = VavaCodex.core
 if not core then return end
@@ -60,17 +62,45 @@ function Bridge.GetCharacterId(source)
     return character and character.id or nil
 end
 
---- Joueurs en jeu avec un personnage : { { source, name } }, triés par nom.
+--- Joueurs en jeu avec un personnage, retenus par `keep(src)` s'il est donné : { { source, name } }, triés par nom.
+---@param keep? fun(src: integer): boolean
 ---@return { source: integer, name: string }[]
-function Bridge.ActivePlayers()
+local function activePlayers(keep)
     local list = {}
     for _, id in ipairs(GetPlayers()) do
         local src = tonumber(id)
-        local character = src and Bridge.GetCharacter(src)
+        local character = src and (not keep or keep(src)) and Bridge.GetCharacter(src)
         if character then list[#list + 1] = { source = src, name = (character.firstName .. ' ' .. (character.lastName or '')):gsub('%s+$', '') } end
     end
     table.sort(list, function(a, b) return a.name < b.name end)
     return list
+end
+
+--- Joueurs en jeu avec un personnage : { { source, name } }, triés par nom.
+---@return { source: integer, name: string }[]
+function Bridge.ActivePlayers()
+    return activePlayers(nil)
+end
+
+--- Joueurs en jeu à moins de `radius` mètres de `source`, dans la même instance (positions lues par le serveur ; lui
+--- compris) : même forme que ActivePlayers. La distance est vue d'abord : aucun personnage lu pour un joueur loin.
+--- Sans position de `source` (chargement) : aucun.
+---@param source integer
+---@param radius number
+---@return { source: integer, name: string }[]
+function Bridge.NearbyPlayers(source, radius)
+    local ped = GetPlayerPed(source)
+    if not ped or ped == 0 then return {} end
+    local origin = GetEntityCoords(ped)
+    local bucket = GetPlayerRoutingBucket(source)
+    local limit = radius * radius
+    return activePlayers(function(src)
+        local other = GetPlayerPed(src)
+        if not other or other == 0 or GetPlayerRoutingBucket(src) ~= bucket then return false end
+        local coords = GetEntityCoords(other)
+        local dx, dy, dz = coords.x - origin.x, coords.y - origin.y, coords.z - origin.z
+        return dx * dx + dy * dy + dz * dz <= limit
+    end)
 end
 
 -- Conseil ---------------------------------------------------------------------------------------------------------

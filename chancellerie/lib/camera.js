@@ -5,11 +5,15 @@
  *        l'a ouverte : elle seule reçoit l'offre du joueur filmé et peut répondre ou l'arrêter. Une session regarde
  *        au plus un mur complet (seize cases) et une vue en grand. La Chancellerie ne relaie que la négociation
  *        WebRTC ; l'image va directement du jeu du joueur au navigateur. Les caméras d'une session s'éteignent quand
- *        son dernier flux d'évènements se ferme (onglet fermé, déconnexion).
+ *        son dernier flux d'évènements se ferme (onglet fermé, déconnexion) ; celles d'un compte qui perd le droit de
+ *        regarder s'éteignent quand un rang du Conseil change (le pont le signale ; chaque compte qui regarde est
+ *        revérifié avec son rang actuel, comme en jeu).
  */
 
+const accounts = require('./accounts');
 const bridge = require('./bridge');
 const events = require('./events');
+const servercfg = require('./servercfg');
 
 // un mur 4 × 4 et une vue en grand
 const MAX_PER_SESSION = 17;
@@ -73,10 +77,47 @@ function clear(reason = 'server_stopped') {
   cameras.clear();
 }
 
-/** Évènement du pont : offre à transmettre, fin d'une caméra, ou module des caméras arrêté. */
+/** Le compte n'a plus le droit de regarder : ses caméras s'éteignent, navigateur et jeu prévenus. */
+function revoke(endpoint, name) {
+  for (const [session, camera] of cameras) {
+    if (camera.account !== name) continue;
+    cameras.delete(session);
+    events.sendTo(camera.token, 'camera', { session, ended: 'forbidden' });
+    bridge.request(endpoint, 'POST', '/camera/stop', { session });
+  }
+}
+
+/**
+ * Un rang du Conseil a changé (en jeu, ou dans le panneau) : chaque compte qui regarde est revérifié avec son rang
+ * actuel. Compte supprimé ou sans rang : ses caméras s'éteignent ; sinon le Registre dit s'il garde le droit (liste des
+ * joueurs, sans journal). Pont injoignable : rien ne change (l'arrêt du serveur éteint tout de lui-même). Ne lève
+ * jamais : appelée sans attendre son résultat.
+ */
+async function recheck() {
+  try {
+    const endpoint = servercfg.endpoint();
+    const names = new Set([...cameras.values()].map((camera) => camera.account));
+    for (const name of names) {
+      const account = accounts.get(name);
+      if (account && account.rank) {
+        const result = await bridge.request(endpoint, 'POST', '/cameras/players', { actor: bridge.actorOf(account) });
+        if (result.ok || result.error !== 'forbidden') continue;
+      }
+      revoke(endpoint, name);
+    }
+  } catch (error) {
+    console.error(`[Chancellerie] revérification des caméras en erreur : ${error.stack || error.message}`);
+  }
+}
+
+/** Évènement du pont : offre à transmettre, fin d'une caméra, module des caméras arrêté, ou droits à revérifier. */
 function incoming(event) {
   if (event.reset === true) {
     clear('stopped');
+    return;
+  }
+  if (event.recheck === true) {
+    recheck();
     return;
   }
   const camera = typeof event.session === 'string' && cameras.get(event.session);
@@ -96,4 +137,4 @@ function closeSession(endpoint, token) {
   for (const [session] of ownedBy(token)) stop(endpoint, token, session);
 }
 
-module.exports = { players, start, answer, stop, incoming, closeSession, clear, count: () => cameras.size };
+module.exports = { players, start, answer, stop, incoming, closeSession, clear, recheck, count: () => cameras.size };

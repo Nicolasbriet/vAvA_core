@@ -15,3 +15,6 @@ VavaBridge.ADMIN_REPORT = 'vava_admin:report'
 VavaBridge.ADMIN_NOTIFY = 'vava_admin:notify'
 -- offres et fins des caméras regardées depuis le web
 VavaBridge.CAMERAS_WEB = 'vava_cameras:web'
+-- actions du Conseil : un rang donné ou retiré fait revérifier les caméras du web
+VavaBridge.ADMIN_ACTION = 'vava_admin:action'
+VavaBridge.STAFF_ACTIONS = { staffGrant = true, staffRevoke = true }

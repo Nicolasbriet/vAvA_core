@@ -18,8 +18,8 @@ ACE déclarés avec les commandes), `vava_hud` (notifications), `vava_chat` (der
 
 | Fichier | Rôle |
 | --- | --- |
-| `config.lua` | touche (`F1`) et commande (`/codex`), bornes des signets et dernières pages, commandes non décrites, ACE, débits, textes |
-| `bridge/server.lua` | seul point de contact avec le core et les modules : joueurs, Conseil, exports `codexList`, commandes du jeu |
+| `config.lua` | touche (`F1`) et commande (`/codex`), bornes des signets et dernières pages, commandes non décrites, ACE, rayon des joueurs proposés hors du Conseil (`players.nearbyRadius`), débits, textes |
+| `bridge/server.lua` | seul point de contact avec le core et les modules : joueurs (tous, ou les seuls proches), Conseil, exports `codexList`, commandes du jeu |
 | `server/catalog.lua` | entrées visibles d'un joueur, chapitres, non décrites, valeurs d'un argument |
 | `server/prefs.lua` | champ de personnage : signets, dernières pages, réglage |
 | `server/main.lua` | déclaration du module, RPC |
@@ -40,6 +40,8 @@ ACE déclarés avec les commandes), `vava_hud` (notifications), `vava_chat` (der
    répond, la ligne monte dans « Dernières pages ».
 5. `/metiers niveau` : la liste des joueurs en jeu porte les noms de personnage ; la liste des compétences vient du
    registre ; le niveau est borné 0–100 ; la ligne composée s'écrit en direct.
+   En simple joueur, `/mp` : la liste ne propose que les joueurs à moins de 5 m (`players.nearbyRadius`), dans la même
+   instance ; un joueur plus loin n'y est pas, mais son numéro tapé à la main reste accepté. Au Conseil : tous.
 6. Signet depuis le détail : un ruban apparaît en haut du livre ; cliquer le ruban ouvre la commande ; au-delà de
    `favorites.max`, refus propre.
 7. Réglage « Rester ouvert » décoché : « Lancer » ferme le Codex. Coché : il reste ouvert, sauf pour une commande qui

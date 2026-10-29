@@ -819,7 +819,10 @@ setr voice_useSendingRangeOnly true
   les salons des seuls joueurs à portée, recalculés toutes les 250 ms (Mumble n'est sollicité que si la liste change).
   Aucune boucle par image, sauf pendant le cercle au sol et l'éditeur ouvert.
 - **Limite** : la portée est réglée par le client, comme toute voix FiveM ; un client modifié pourrait l'agrandir.
-  Le serveur impose ce qu'il peut imposer : la coupure du micro.
+  FXServer n'a pas non plus de contrôle d'accès aux salons Mumble : un client modifié peut rejoindre le salon d'un
+  autre joueur (et entendre ce qui se dit près de lui) ou viser tous les salons (parler à tout le serveur), hors de
+  toute portée. Aucune parade technique fiable, comme pour toutes les voix FiveM : à traiter par le règlement du
+  serveur et la modération. Le serveur impose ce qu'il peut imposer : la coupure du micro hors du jeu.
 
 | Export serveur | Retour |
 |---|---|
@@ -882,7 +885,10 @@ regarde en jeu), `vava_chancellerie` ≥ 1.1.0 (caméras depuis le web). Qualit�
 - **Limites** : 6 caméras par joueur filmé, 96 en tout, 2 h au plus ; sans réponse du spectateur en 30 s, la caméra
   s'éteint. Elle s'éteint aussi quand le joueur filmé n'est plus en jeu (sélection, départ) ou que son spectateur ferme
   le mur, revient à la sélection, part, ou perd le droit de regarder (rang donné ou retiré, relu au hook
-  `vava_admin:action` ; son mur affiche « Droit refusé »).
+  `vava_admin:action` ; son mur affiche « Droit refusé »). Depuis le web, à chaque rang donné ou retiré, le pont
+  demande à la Chancellerie de revérifier chaque compte qui regarde, avec son rang actuel : sans le droit (ou compte
+  supprimé), ses caméras s'éteignent (« Droit refusé » dans le navigateur, capture arrêtée en jeu). Un rang changé
+  dans le panneau (compte relié ou non) fait la même revérification.
 - **Journal** du Conseil : l'ouverture du mur et chaque vue en grand (les cases d'un mur sont couvertes par
   l'ouverture). Le joueur n'est pas prévenu : à mentionner dans le règlement du serveur.
 - **Sécurité** : chaque demande du membre est une RPC à schéma strict et à débit limité, droit revérifié à chaque
@@ -1213,6 +1219,11 @@ leur nom, clés d'un registre par `labelField`, export `codexList` du module dé
 à droit propre est refusée (`refused`) à qui n'a pas ce droit, pour ses valeurs (`options`) comme pour les dernières
 pages ; `recent` ne retient que le nom et une sous-commande déclarée, jamais le reste de la ligne tapée.
 
+**Arguments « joueur »** (dont `/mp`) : le Conseil reçoit tous les joueurs en jeu ; les autres, les seuls joueurs à
+portée de voix (lui compris) — positions lues par le serveur, même instance (routing bucket), rayon
+`config.players.nearbyRadius` (5 m par défaut : la portée « Parler » de vava_voice, recopiée sans en dépendre). Taper
+un numéro à la main reste possible.
+
 | Export | Retour |
 |---|---|
 | serveur `suggestions(source)` | `{ { name, help, params = { { name, help } } } }` : les suggestions du chat pour ce joueur (ses commandes, une par sous-commande en deux mots, sans les touches ni la console) ; `vava_chat` l'appelle avec le profil |
@@ -1266,4 +1277,6 @@ vava_cameras 1.0.0 pour l'écran des joueurs.
   le seul droit, l'ouverture du mur étant inscrite au journal (« Mur des caméras ouvert »). Routes : `/cameras/wall`,
   `/cameras/players`, `/camera/start` (`{ actor, target, quality }`), `/camera/answer`, `/camera/stop`.
 - **Évènements** vers la Chancellerie (requête HTTP locale, avec la clé) : signalements, arrivées et départs des joueurs,
-  offre et fin des caméras du web (hook `vava_cameras:web`), arrêt du module des caméras (`{ type = 'camera', reset }`).
+  offre et fin des caméras du web (hook `vava_cameras:web`), arrêt du module des caméras (`{ type = 'camera', reset }`),
+  rang du Conseil donné ou retiré (`{ type = 'camera', recheck }`, 1.3.1 : la Chancellerie revérifie le droit de chaque
+  compte qui regarde).

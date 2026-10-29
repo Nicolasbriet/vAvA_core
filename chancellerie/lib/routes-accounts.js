@@ -4,11 +4,12 @@
  * Rôle : comptes du panneau. Le compte maître crée, règle (droits du panneau, rang du Conseil), remet un mot de passe
  *        et supprime les autres comptes ; chacun change son propre mot de passe (l'ancien exigé). Un mot de passe
  *        changé ou un compte supprimé ferme ses autres sessions. Chacun relie son compte à son joueur (code à taper en
- *        jeu) ou l'en délie, le maître pour tous ; le rang d'un compte relié suit en jeu. Tout est inscrit au journal,
- *        sans mot de passe.
+ *        jeu) ou l'en délie, le maître pour tous ; le rang d'un compte relié suit en jeu, et les caméras regardées
+ *        depuis le web suivent le rang changé. Tout est inscrit au journal, sans mot de passe.
  */
 
 const accounts = require('./accounts');
+const camera = require('./camera');
 const events = require('./events');
 const journal = require('./journal');
 const links = require('./links');
@@ -41,6 +42,8 @@ function register(route, { ok, fail }) {
     journal.record(ctx.account.name, 'account_updated', { compte: result.account.name, rang: result.account.rank || '—' });
     // compte relié : son nouveau rang s'applique aussi en jeu
     links.sync(result.account, ctx.account.name);
+    // ses caméras regardées depuis le web suivent son nouveau rang (compte relié ou non)
+    camera.recheck();
     return ok({ account: result.account });
   });
 

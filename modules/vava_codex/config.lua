@@ -24,6 +24,11 @@ VavaCodex.config = {
     -- Sans vava_admin : qui est du Conseil (permission ACE). Avec lui : ses rangs et ses droits.
     staff = { ace = 'vava_codex.staff' },
 
+    -- Arguments « joueur » (dont /mp) : hors du Conseil, seuls les joueurs proches sont proposés, à portée de voix
+    -- (mètres ; positions lues par le serveur, même instance). Défaut : la portée « Parler » de vava_voice (5 m), à
+    -- ajuster ici si elle change. Le Conseil a la liste complète ; un numéro tapé à la main reste permis.
+    players = { nearbyRadius = 5.0 },
+
     -- Après « Lancer » : rester ouvert, sauf réglage contraire du joueur ; une commande qui ouvre une interface
     -- (`ui = true` dans sa déclaration) ferme toujours le Codex d'abord.
     keepOpenDefault = true,
