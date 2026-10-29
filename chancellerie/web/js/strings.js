@@ -699,24 +699,56 @@ const STRINGS = (() => {
     performance: {
       title: 'Performances',
       ranges: { hour: 'Dernière heure', day: '24 heures' },
-      stopped: 'FXServer est arrêté : seules la machine et son réseau sont relevés.',
+      // la portée : 'machine' (machine dédiée, Windows) ou 'container' (chez un hébergeur : l'allocation du conteneur)
+      stopped: {
+        machine: 'FXServer est arrêté : seules la machine et son réseau sont relevés.',
+        container: 'FXServer est arrêté : seuls le conteneur et son réseau sont relevés.',
+      },
       perfMissing: 'La durée des ticks vient de l\'adresse /perf/ de FXServer : elle apparaît quand le serveur l\'expose.',
       collecting: 'Premiers relevés en cours…',
-      facts: { fxCpu: 'Processeur FXServer', fxMem: 'Mémoire FXServer', hostCpu: 'Processeur machine', hostMem: 'Mémoire machine', rx: 'Reçu', tx: 'Envoyé', players: 'Joueurs', tick: 'Tick principal' },
-      cpuHelp: (cores) => `part des ${cores} cœurs`,
+      facts: {
+        fxCpu: 'Processeur FXServer', fxMem: 'Mémoire FXServer',
+        hostCpu: { machine: 'Processeur machine', container: 'Processeur conteneur' },
+        hostMem: { machine: 'Mémoire machine', container: 'Mémoire conteneur' },
+        throttled: 'Bridé', rx: 'Reçu', tx: 'Envoyé', players: 'Joueurs', tick: 'Tick principal',
+      },
+      cpuHelp: (cores, scope) => `part des ${cores.toLocaleString('fr-FR', { maximumFractionDigits: 2 })} cœurs${scope === 'container' ? ' du conteneur' : ''}`,
+      throttledHelp: 'du temps à sa limite',
       memOf: (total) => `sur ${total}`,
       charts: {
-        cpu: { title: 'Processeur', help: '100 % : tous les cœurs de la machine occupés.' },
+        cpu: {
+          title: 'Processeur', help: '100 % : tous les cœurs de la machine occupés.',
+          container: { help: (cores) => `100 % : toute l'allocation du conteneur occupée (${cores.toLocaleString('fr-FR', { maximumFractionDigits: 2 })} cœurs). Bridé : part du temps où il a buté sur sa limite — le serveur ralentit.` },
+        },
         memory: { title: 'Mémoire de FXServer', help: 'Mémoire vive occupée par le processus.' },
-        network: { title: 'Bande passante de la machine', help: 'Toutes les cartes réseau actives : sur un serveur dédié, c\'est surtout FXServer.' },
+        network: {
+          title: 'Bande passante de la machine', help: 'Toutes les cartes réseau actives : sur un serveur dédié, c\'est surtout FXServer.',
+          container: { title: 'Bande passante du conteneur', help: 'Les cartes réseau du conteneur : c\'est surtout FXServer.' },
+        },
         players: { title: 'Joueurs connectés', help: 'D\'après players.json ; par minute, le plus haut de la minute.' },
         ticks: { title: 'Durée des ticks', help: 'Temps moyen d\'un tick par fil de FXServer : au-delà de 50 ms le fil principal prend du retard.' },
       },
-      series: { fxCpu: 'FXServer', cpu: 'Machine', fxMem: 'FXServer', rx: 'Reçu', tx: 'Envoyé', players: 'Joueurs', tickMain: 'Principal', tickNetwork: 'Réseau', tickSync: 'Synchronisation' },
+      series: {
+        fxCpu: 'FXServer', cpu: { machine: 'Machine', container: 'Conteneur' }, throttled: 'Bridé', fxMem: 'FXServer', rx: 'Reçu', tx: 'Envoyé',
+        players: 'Joueurs', tickMain: 'Principal', tickNetwork: 'Réseau', tickSync: 'Synchronisation',
+      },
+      threads: {
+        title: 'Fils de FXServer',
+        help: 'Les plus chargés au dernier relevé, en part d\'un cœur : un fil à 100 % sature son cœur, le serveur prend du retard.',
+        name: (thread) => thread.name || (thread.main ? `Fil de lancement (${thread.id})` : `Fil ${thread.id}`),
+        none: 'FXServer est arrêté.',
+        waiting: 'Premier relevé des fils en cours…',
+      },
+      reserved: {
+        title: 'Cœurs réservés',
+        help: 'Les cœurs de la machine réservés au conteneur par l\'hébergeur, et leur charge (tout ce qui y tourne).',
+        core: (id) => `Cœur ${id}`,
+      },
       noData: 'Aucun relevé sur cette période.',
       showTable: 'Voir en tableau',
       hideTable: 'Voir en graphiques',
-      tableColumns: ['Heure', 'Proc. FXServer', 'Proc. machine', 'Mém. FXServer', 'Reçu', 'Envoyé', 'Joueurs', 'Tick principal'],
+      tableColumns: (scope) => ['Heure', 'Proc. FXServer', scope === 'container' ? 'Proc. conteneur' : 'Proc. machine',
+        ...(scope === 'container' ? ['Bridé'] : []), 'Mém. FXServer', 'Reçu', 'Envoyé', 'Joueurs', 'Tick principal'],
     },
 
     resources: {

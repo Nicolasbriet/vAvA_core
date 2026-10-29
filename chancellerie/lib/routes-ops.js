@@ -17,7 +17,7 @@ const journal = require('./journal');
 const resources = require('./resources');
 const servercfg = require('./servercfg');
 const status = require('./status');
-const { cores } = require('./metrics');
+const { cores, scope } = require('./metrics');
 const { STATES } = require('./process');
 const { validateRestarts, validateBackupTimes } = require('./scheduler');
 
@@ -49,7 +49,8 @@ function register(route, { ok, fail, server, metrics, scheduler }) {
 
   route('GET', '/api/metrics', { auth: true }, (ctx) => ok({
     ...metrics.history(query(ctx.req, 'range') === 'day' ? 'day' : 'hour'),
-    cores: cores(),
+    cores: Math.round(cores() * 100) / 100,
+    scope: scope(),
     latest: metrics.latest(),
   }));
 

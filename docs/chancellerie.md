@@ -138,11 +138,21 @@ Un relevé toutes les 5 secondes (`metrics.intervalMs`), même serveur arrêté 
 - **Durée des ticks** des fils de FXServer (principal, réseau, synchronisation OneSync), lue dans son adresse
   `/perf/` comme le fait txAdmin : au-delà de 50 ms, le fil principal prend du retard. Absente si FXServer ne
   l'expose pas.
+- **Fils de FXServer** les plus chargés au dernier relevé, en part d'un cœur (nom posé par FXServer, sinon son
+  numéro) : un fil à 100 % sature son cœur, le serveur prend du retard même si le processeur global reste bas.
+
+**Chez un hébergeur** (conteneur Docker, Pterodactyl, Podman…), Node voit la machine entière (la node) et non la part du
+serveur : la Chancellerie lit alors les **cgroups** du conteneur (v2, ou v1 sur les machines anciennes) et tout est
+rapporté à son allocation. Processeur du conteneur et de FXServer en part de cette allocation (100 % : toute
+l'allocation, par exemple 4 cœurs) ; **bridé** : part du temps où le conteneur a buté sur son quota (le serveur
+ralentit) ; mémoire du conteneur sur sa limite, comptée comme Docker et Pterodactyl (sans le cache de fichiers
+inactif) ; bande passante des cartes du conteneur. Si l'hébergeur a **réservé des cœurs** au conteneur (champ
+« Threads » de Pterodactyl), la charge de chacun s'affiche aussi. Hors conteneur, rien ne change.
 
 La page **Performances** trace une courbe par mesure, sur la dernière heure (chaque relevé, en direct) ou sur 24 heures
 (moyennes par minute, gardées dans `data/metrics.json` d'un lancement à l'autre) ; les mêmes relevés se lisent en
-tableau. Sous Windows, un seul PowerShell reste ouvert à côté de la Chancellerie pour lire le processus et le réseau
-(il se ferme avec elle) ; sous Linux, tout se lit dans `/proc`.
+tableau. Sous Windows, un seul PowerShell reste ouvert à côté de la Chancellerie pour lire le processus, ses fils et le
+réseau (il se ferme avec elle) ; sous Linux, tout se lit dans `/proc` et `/sys/fs/cgroup`.
 
 **Joueurs** : FXServer ne donne les vrais joueurs de `players.json` (nom, numéro, latence) qu'à qui présente son jeton
 `sv_playersToken` ; sans lui, chacun s'appelle « Player », numéro 0, latence 0. La Chancellerie tire un jeton à chaque

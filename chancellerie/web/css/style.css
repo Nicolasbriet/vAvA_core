@@ -878,6 +878,15 @@ select.field-input option { background: var(--paper-light); color: var(--ink); }
 .chart-dot.series-1 { fill: var(--series-1); }
 .chart-dot.series-2 { fill: var(--series-2); }
 .chart-dot.series-3 { fill: var(--series-3); }
+
+/* charge du moment : fils de FXServer, cœurs réservés au conteneur (rouge au-delà de 90 %) */
+.load-list { display: grid; gap: 0.45rem; margin: 0.35rem 0 0; padding: 0; list-style: none; }
+.load-row { display: grid; grid-template-columns: minmax(7rem, 13rem) minmax(0, 1fr) 3.6rem; align-items: center; gap: 0.8rem; font-size: 0.95rem; }
+.load-name { overflow: hidden; color: var(--ink); text-overflow: ellipsis; white-space: nowrap; }
+.load-bar { position: relative; height: 0.55rem; overflow: hidden; border-radius: 2px; background: rgba(var(--ink-rgb), 0.12); box-shadow: inset 0 0 0 1px rgba(var(--ink-rgb), 0.15); }
+.load-fill { position: absolute; inset: 0 auto 0 0; background: var(--series-2); transition: width 240ms var(--ease); }
+.load-fill.is-high { background: var(--series-1); }
+.load-value { color: var(--ink); font-weight: 600; text-align: right; font-variant-numeric: lining-nums tabular-nums; }
 .chart-hit { cursor: crosshair; }
 .chart-tooltip {
   position: absolute;

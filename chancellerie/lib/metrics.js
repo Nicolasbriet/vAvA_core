@@ -1,11 +1,13 @@
 'use strict';
 /*
  * lib/metrics.js
- * Rôle : les performances du serveur, relevées à intervalle fixe : processeur et mémoire de la machine et de
- *        FXServer, débit réseau (reçu, envoyé), joueurs connectés, durée moyenne des ticks des fils de FXServer
- *        (principal, réseau, synchronisation). Deux historiques : la dernière heure à chaque relevé (en mémoire), les
- *        dernières 24 heures en moyennes par minute (écrites dans data/metrics.json, reprises au lancement). Chaque
- *        relevé est diffusé aux navigateurs ouverts.
+ * Rôle : les performances du serveur, relevées à intervalle fixe : processeur et mémoire de la machine (ou du
+ *        conteneur chez un hébergeur, avec son temps bridé) et de FXServer, débit réseau (reçu, envoyé), joueurs
+ *        connectés, durée moyenne des ticks des fils de FXServer (principal, réseau, synchronisation). Deux
+ *        historiques : la dernière heure à chaque relevé (en mémoire), les dernières 24 heures en moyennes par minute
+ *        (écrites dans data/metrics.json, reprises au lancement). Chaque relevé est diffusé aux navigateurs ouverts,
+ *        avec son détail du moment (fils de FXServer les plus chargés, cœurs réservés), qui n'entre pas dans les
+ *        historiques.
  */
 
 const EventEmitter = require('events');
@@ -51,6 +53,7 @@ function summarize(minute, samples) {
     tx: round(mean(samples, (s) => s.tx), 0),
     fxCpu: round(mean(samples, (s) => s.fxCpu)),
     fxMem: round(mean(samples, (s) => s.fxMem), 0),
+    throttled: round(mean(samples, (s) => s.throttled)),
     players: players.length ? Math.max(...players) : null,
     tickMain: round(mean(samples, (s) => s.tickMain), 2),
     tickNetwork: round(mean(samples, (s) => s.tickNetwork), 2),
@@ -68,6 +71,7 @@ class Metrics extends EventEmitter {
     this.pending = [];
     this.pendingMinute = null;
     this.lastPerf = null;
+    this.current = null;
     this.timer = null;
     this.saveTimer = null;
     this.busy = false;
@@ -148,6 +152,7 @@ class Metrics extends EventEmitter {
         fxCpu: machine.fxserver ? round(machine.fxserver.cpu) : null,
         fxMem: machine.fxserver ? machine.fxserver.memory : null,
         fxThreads: machine.fxserver ? machine.fxserver.threads : null,
+        throttled: round(machine.throttled),
         players: Array.isArray(players) ? players.length : null,
         tickMain: ticks ? round(ticks.main, 2) : null,
         tickNetwork: ticks ? round(ticks.network, 2) : null,
@@ -155,7 +160,17 @@ class Metrics extends EventEmitter {
         state: server.state,
       };
       this.push(sample);
-      this.emit('sample', sample);
+      // le détail du moment (portée, fils de FXServer, cœurs réservés) part en direct sans entrer dans les historiques
+      this.current = {
+        ...sample,
+        scope: machine.scope,
+        capacity: round(machine.capacity, 2),
+        busiest: machine.fxserver && machine.fxserver.busiest
+          ? machine.fxserver.busiest.map((t) => ({ id: t.id, name: t.name, main: t.main, cpu: round(t.cpu) }))
+          : null,
+        coreLoads: machine.cores ? machine.cores.map((c) => ({ id: c.id, cpu: round(c.cpu) })) : null,
+      };
+      this.emit('sample', this.current);
     } catch (error) {
       console.error(`[Chancellerie] relevé des performances en erreur : ${error.stack || error.message}`);
     } finally {
@@ -189,9 +204,10 @@ class Metrics extends EventEmitter {
     return { range: 'hour', stepMs: this.intervalMs(), samples: [...this.recent] };
   }
 
+  /** Dernier relevé, avec son détail du moment (portée, fils de FXServer, cœurs réservés). */
   latest() {
-    return this.recent.length ? this.recent[this.recent.length - 1] : null;
+    return this.current;
   }
 }
 
-module.exports = { Metrics, cores: system.cores };
+module.exports = { Metrics, cores: system.cores, scope: system.scope };
