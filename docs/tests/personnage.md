@@ -1,7 +1,7 @@
 # Connexion et personnage — procédure de test en jeu
 
 Procédure pour vérifier en jeu l'arrivée d'un joueur et la vie de ses personnages : compte, création, apparence,
-sélection, suppression, reconnexion, position, sauvegarde et temps de jeu. Modules : `vAvA_core` 0.7.6,
+sélection, suppression, reconnexion, position, sauvegarde et temps de jeu. Modules : `vAvA_core` 0.8.0,
 `vava_appearance` 1.0.1, `vava_characters_ui` 1.0.1, et l'outil de développement `vava_dev_characters` 1.2.0. Comptez
 une heure et demie seul, une demi-heure de plus pour les tests marqués **(2 joueurs)**. Un test se cite
 « personnage 4-2 ».
@@ -43,7 +43,7 @@ une heure et demie seul, une demi-heure de plus pour les tests marqués **(2 jou
 | 3 | `Échap`, clics hors des cartes. | Rien : on ne quitte cet écran qu'en jouant un personnage. |
 | 4 | `F8` → `disconnect`, puis revenir. | Aucune ligne `nouveau compte` ; même compte `N` ; `last_seen_at` mis à jour (à l'arrivée et au départ). |
 | 5 | **(2 joueurs)** B reste sur la sélection ; A ouvre le Registre (`F10`) → Joueurs. | Ligne de B : « En sélection de personnage », « <pseudo FiveM> · Compte n° N », sans temps de jeu ; dans sa fiche, Temps de jeu « — ». |
-| 6 | (Facultatif) Se connecter juste après le lancement du serveur, avant la ligne `vAvA_core v0.7.6 prêt (API v1)`. | « Le serveur démarre, merci de patienter… », puis entrée normale dès que le core est prêt. Au-delà de 60 s (`players.coreWaitTimeoutMs`) : « Le serveur démarre, réessayez dans un instant. » |
+| 6 | (Facultatif) Se connecter juste après le lancement du serveur, avant la ligne `vAvA_core v0.8.0 prêt (API v1)`. | « Le serveur démarre, merci de patienter… », puis entrée normale dès que le core est prêt. Au-delà de 60 s (`players.coreWaitTimeoutMs`) : « Le serveur démarre, réessayez dans un instant. » |
 
 ## 2. Création — identité, noms, nombre maximal
 

@@ -389,7 +389,7 @@ Base d'un écran de sélection. Chaque fonction RPC renvoie `ok` (transport), pu
 |---|---|
 | `current()` | `{ id, firstName, lastName, sex, fields }` du personnage actif, ou `nil` (local, sans appel réseau) |
 | `awaitingSelection()` | `true` si le joueur attend de choisir un personnage (local) |
-| `list()` | liste `{ id, firstName, lastName, sex }` des personnages du compte, puis le maximum par compte, puis les règles de nom `{ minLength, maxLength, letters, separators }` (0.7.6) |
+| `list()` | liste `{ id, firstName, lastName, sex }` des personnages du compte, puis le maximum par compte, puis les règles de nom `{ minLength, maxLength, letters, separators }` (0.8.0) |
 | `create(firstName, lastName, sex)` | résumé du personnage créé |
 | `select(characterId)` | — ; le personnage arrive ensuite par le hook `core:character:loaded` |
 | `unload()` | — ; retour à l'écran noir de sélection |
@@ -415,7 +415,7 @@ gardée et écrite au cycle suivant. Avec `characters.uniqueNames = true`, l'uni
 `name_taken`. Pas d'index unique : des homonymes déjà en base sont conservés.
 
 Noms : `characters.name` dans `config/server.lua` (longueur en caractères, lettres accentuées autorisées,
-séparateurs `'`, `-` et espace jamais en tête, en fin ni doublés). Depuis 0.7.6, ces règles partent avec `list()` :
+séparateurs `'`, `-` et espace jamais en tête, en fin ni doublés). Depuis 0.8.0, ces règles partent avec `list()` :
 une interface de création vérifie la saisie comme le serveur (espaces de bord retirés, longueur comptée en caractères,
 chaque caractère pris dans `letters` ou dans `separators`) sans en garder de copie ; le serveur revérifie à la création.
 
@@ -463,7 +463,7 @@ Format (listes pures et tables nommées uniquement, pour une sérialisation sans
 sur `core:character:loaded`. Aperçu sur un ped **local** (invisible des autres joueurs). Scène et caméras :
 `config.lua` ; la scène est distincte du point d'apparition du core (sinon les nouveaux arrivants entreraient dans la
 scène de ceux qui créent) et reste provisoire (`-- PLACEHOLDER`). Les noms sont vérifiés à la saisie avec les règles
-du serveur (`characters.name`, reçues avec la liste des personnages, core ≥ 0.7.6) ; le serveur revérifie à la
+du serveur (`characters.name`, reçues avec la liste des personnages, core ≥ 0.8.0) ; le serveur revérifie à la
 création. À l'arrêt de la ressource écran ouvert, ped d'aperçu, caméra, mise au point de la carte, radar et focus sont
 rendus, et l'écran redevient noir comme l'attente de sélection. Détails : `modules/vava_characters_ui/README.md`. Pour
 travailler le rendu sans le jeu, ouvrir `web/index.html` dans un navigateur (`?screen=creator&tab=hair&sex=f`) : des
@@ -769,12 +769,15 @@ Rangs, droits, durées, textes : `config.lua`. Demande le core 0.5.0 (compte con
   (ou au redémarrage) du module, chaque joueur immobilisé est libéré et prévenu, jamais laissé figé sans Registre pour
   le libérer (1.5.2). Le vol libre est la seule boucle par image du module, active seulement pendant son usage ;
   l'observation place le membre, invisible, sous le joueur observé. Sa place de départ, lue par le serveur quand
-  l'observation est accordée, est gardée dans le champ privé `vava_admin:spectateReturn` de son personnage et effacée
-  à la fin de l'observation (RPC `vava_admin:spectateEnd`, schéma vide) ; s'il part avant, il y est replacé dès sa
-  prochaine apparition, jamais sous terre (1.5.2).
+  l'observation est accordée, est gardée dans le champ privé `vava_admin:spectateReturn` de son personnage. Chaque
+  observation reçoit un numéro ; seule la fin de la dernière (RPC `vava_admin:spectateEnd(numéro)`, entier borné)
+  efface la place, et une observation remplacée n'annonce pas sa fin. S'il part avant, la place est marquée « parti »
+  au déchargement ; à son retour, il y est replacé dès l'apparition confirmée de ce même personnage, et la place n'est
+  effacée qu'une fois le replacement accordé (redémarrage du module compris) : jamais sous terre (1.5.2).
 - Vol libre d'une touche (F2 par défaut, réglable dans les raccourcis FiveM) : chaque appui est accordé par le serveur
   (droit `tools`, inscrit au journal) ; sans droit, la touche ne fait rien. Pendant le vol, le membre est invisible
-  des autres joueurs (il se voit lui-même) et retrouve ensuite sa visibilité d'avant.
+  des autres joueurs (il se voit lui-même) et retrouve ensuite sa visibilité d'avant, arrêt du module compris
+  (collision, gravité et vulnérabilité rétablies sur-le-champ).
 
 **Exports serveur** :
 

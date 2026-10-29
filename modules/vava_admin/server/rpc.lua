@@ -19,6 +19,7 @@ local PREFIX = VavaAdmin.PREFIX
 local GAME = 'game'
 
 local TEXT = { type = 'string', min = 1, max = VavaAdmin.MAX_TEXT }
+local SESSION = { type = 'integer', min = 1, max = VavaAdmin.MAX_ID }   -- numéro d'une observation (server/spectate.lua)
 
 local rpc = {}
 VavaAdmin.rpc = rpc
@@ -57,9 +58,9 @@ function rpc.start()
             if not ok then return false, err end
         end
     end
-    -- ouvert à tous les joueurs : fin d'une observation (n'efface que la place gardée du personnage de l'appelant,
-    -- même si son rang a changé entre-temps ; sans observation, il n'y a rien à effacer)
-    local ok, err = register('spectateEnd', {}, limits.read, function(src) return spectate.finish(src) end)
+    -- ouvert à tous les joueurs : fin de l'observation n° session (n'efface que la place gardée du personnage de
+    -- l'appelant, et seulement pour sa dernière observation, même si son rang a changé entre-temps)
+    local ok, err = register('spectateEnd', { SESSION }, limits.read, function(src, session) return spectate.finish(src, session) end)
     if not ok then return false, err end
     -- ouvert à tous les joueurs : /signaler
     return register('report', { TEXT }, limits.report, function(src, text) return reports.create(src, text) end)

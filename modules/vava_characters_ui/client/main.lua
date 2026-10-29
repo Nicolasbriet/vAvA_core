@@ -46,7 +46,7 @@ local function serverResult(ok, success, result)
     return { ok = true, result = result }
 end
 
---- Liste du compte, emplacements, et règles de nom du serveur (core ≥ 0.7.6 ; sans elles, seul le serveur juge).
+--- Liste du compte, emplacements, et règles de nom du serveur (core ≥ 0.8.0 ; sans elles, seul le serveur juge).
 ---@return table
 local function listCharacters()
     local ok, success, characters, max, nameRules = core.characters.list()

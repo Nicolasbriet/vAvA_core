@@ -2,7 +2,7 @@
     vava_characters_ui/fxmanifest.lua
     Rôle : écran de sélection et éditeur de création de personnage (NUI). Ressource cliente uniquement : chaque
            action est une intention envoyée au serveur via l'API du core et de vava_appearance.
-    Dépendances : vAvA_core ≥ 0.3.0 (règles de nom du serveur : ≥ 0.7.6), vava_appearance
+    Dépendances : vAvA_core ≥ 0.3.0 (règles de nom du serveur : ≥ 0.8.0), vava_appearance
 ]]
 
 fx_version 'cerulean'

@@ -6,7 +6,7 @@ avec un aperçu en direct. Ressource **cliente uniquement** : la liste, la créa
 des intentions envoyées au serveur, qui décide de tout ; l'apparence passe par `vava_appearance`.
 
 Ordre de démarrage : après `vAvA_core` et `vava_appearance` (dépendance déclarée : l'arrêter arrête aussi cet écran).
-Core ≥ 0.3.0 ; ≥ 0.7.6 pour vérifier les noms à la saisie avec les règles du serveur (sans elles, seul le serveur juge
+Core ≥ 0.3.0 ; ≥ 0.8.0 pour vérifier les noms à la saisie avec les règles du serveur (sans elles, seul le serveur juge
 et un nom refusé l'est à la création).
 
 ## Ce que fait le joueur

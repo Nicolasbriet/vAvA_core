@@ -60,7 +60,7 @@ local HOOK_SPAWNED = 'core:character:spawned'
 
 local NAME_LETTERS = str.codepointSet(nameCfg.letters)
 local NAME_SEPARATORS = str.codepointSet(nameCfg.separators)
--- Règles de nom envoyées avec la liste des personnages (0.7.6) : config/server.lua ne part jamais chez les clients,
+-- Règles de nom envoyées avec la liste des personnages (0.8.0) : config/server.lua ne part jamais chez les clients,
 -- et une interface de création vérifie ainsi la saisie comme le serveur, sans en garder une copie écrite en dur.
 local NAME_RULES = {
     minLength = nameCfg.minLength, maxLength = nameCfg.maxLength,

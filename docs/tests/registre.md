@@ -193,9 +193,11 @@ Sénéchal et au-dessus (droit `tools`).
 |---|---|---|
 | 1 | Dialogue « Avertir » ouvert pour B ; B quitte ; valider. | « Ce joueur n'est plus là. » ; rien en base. |
 | 2 | B immobilisé quitte puis revient. | B bouge librement ; plus d'étiquette « Immobilisé » (à confirmer : nouveau personnage, nouveau ped non figé). |
-| 3 | A note sa position (Registre → sa fiche), observe B, quitte le jeu pendant l'observation (`F8` → `disconnect`) ; revient et « Jouer ». | Après l'apparition, un second fondu replace A à la position notée (à 1 m près), au sol, avec son orientation ; jamais sous terre ni près de B. Console : `personnage n° <M> replacé là où il a commencé une observation`. En base, avant le retour : clé `vava_admin:spectateReturn` remplie dans `vava_characters.data` ; après : vide (`{}` ou `[]`). Entre les deux fondus, A peut entrevoir un instant l'endroit relevé sous B (à confirmer). |
+| 3 | A note sa position (Registre → sa fiche), observe B, quitte le jeu pendant l'observation (`F8` → `disconnect`) ; revient et « Jouer ». | Après l'apparition, un second fondu replace A à la position notée (à 1 m près), au sol, avec son orientation ; jamais sous terre ni près de B. Console : `personnage n° <M> replacé là où il a commencé une observation`. En base, avant le retour : clé `vava_admin:spectateReturn` de `vava_characters.data` remplie, avec `"departed": true` ; après : vide (`{}` ou `[]`). Entre les deux fondus, A peut entrevoir un instant l'endroit relevé sous B (à confirmer). |
 | 3b | A observe B, termine par `F10`, puis quitte et revient. | A réapparaît simplement à sa dernière position, sans second fondu : la place gardée a été effacée à la fin de l'observation. |
 | 3c | A observe B ; `/perso quitter` (outil de développement, § 0 de `personnage.md`) pendant l'observation ; rejouer le même personnage. | Comme 3 : replacé à sa position d'avant l'observation. |
+| 3d | A note sa position ; fiche de B → **double clic** (ou clics rapides) sur « Observer » ; puis quitter le jeu pendant l'observation ; revenir et « Jouer ». | Le bouton se grise dès le premier clic : une seule observation, une seule ligne « a observé » au Journal. Au retour, comme 3 : A est replacé à la position notée, jamais sous B ni sous terre. |
+| 3e | A observe B ; `/perso quitter`, puis choisir **un autre** personnage du même compte (sans « Jouer » le premier entre-temps). | Le second personnage apparaît à sa propre place, sans second fondu ; en rejouant ensuite le premier, il est replacé à sa position d'avant l'observation. |
 | 4 | A en vol libre haut dans le ciel quitte ; revient. | Le vol libre est coupé ; A réapparaît à sa dernière position relevée (à confirmer : en l'air, il tombe). |
 | 5 | Pendant que A observe B, console : `vava_ban <B> 1 essai` (le Registre ne s'ouvre pas pendant une observation) ; puis `vava_unban <B>`. | B expulsé ; l'observation de A cesse et A revient à sa place. |
 
@@ -211,6 +213,8 @@ Sénéchal et au-dessus (droit `tools`).
 | 6 | Outils. | « Mur des caméras » et « Zones de voix » sont revenus (les modules se réinscrivent). |
 | 7 | A observe B ; `restart vava_admin`. Puis A quitte et revient. | L'observation cesse ; A revient à sa place, visible. Au retour, aucun second fondu : la place gardée de A a été effacée au redémarrage du module. |
 | 8 | `stop vava_admin` avec B immobilisé, attendre, `start vava_admin`. | B libéré dès l'arrêt ; personne ne reste figé pendant que le Registre est absent. |
+| 9 | **(2 joueurs)** A en vol libre (`F2`), en l'air au-dessus d'un toit, outils Invisibilité et Invulnérabilité **inactifs** ; console : `restart vava_admin`. Puis A essaie de traverser un mur ; B frappe A. Recommencer à bord d'un véhicule. | Aussitôt l'arrêt : A retombe (plus figé), ne traverse plus les murs, B le voit de nouveau, et A perd de la vie quand B le frappe ; à bord, le véhicule redevient visible et solide. Rien n'attend la fin du fil du vol, qui ne tourne plus. |
+| 10 | A en vol libre avec Invisibilité **active** ; `restart vava_admin`. | Le vol est défait (A retombe, solide) ; l'invisibilité est coupée aussi par l'arrêt : A redevient visible pour B. |
 
 ## 14. Tentatives de triche simples
 
@@ -245,8 +249,9 @@ Sénéchal et au-dessus (droit `tools`).
   ORDER BY id DESC LIMIT 20;`
 - Les signalements ne sont pas en base (mémoire) : seules leur prise en charge et leur clôture laissent une trace au
   journal ; l'état « immobilisé » non plus (libéré à l'arrêt du module).
-- `vava_characters.data`, clé `vava_admin:spectateReturn` : vide hors observation ; pendant une observation (ou après
-  un départ en pleine observation, jusqu'au retour), `{ x, y, z, heading }` de la place d'où le membre est parti.
+- `vava_characters.data`, clé `vava_admin:spectateReturn` : vide hors observation ; pendant une observation,
+  `{ x, y, z, heading }` de la place d'où le membre est parti ; après un départ en pleine observation, la même place
+  avec `departed = true`, jusqu'au replacement réussi à son retour.
   `SELECT id, JSON_EXTRACT(data, '$."vava_admin:spectateReturn"') FROM vava_characters WHERE id = <M>;`
 
 ## 17. Ce que je ne peux pas avoir vérifié hors jeu

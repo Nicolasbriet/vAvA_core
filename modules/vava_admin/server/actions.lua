@@ -259,13 +259,15 @@ function actions.give(_, target, item, quantity)
 end
 
 --- Observation : le client de l'acteur fait le reste (il doit s'approcher pour recevoir le joueur, OneSync). Sa place
---- de départ est gardée par le serveur, au cas où il partirait avant la fin (server/spectate.lua).
+--- de départ est gardée par le serveur, au cas où il partirait avant la fin ; le numéro rendu (`session`) est celui
+--- que le client renvoie pour annoncer la fin de cette observation-là (server/spectate.lua).
 function actions.spectate(actor, target)
     if not actor.source then return false, 'no_body' end
     local coords = coordsOf(target.source)
     if not coords then return false, 'no_ped' end
-    spectate.begin(actor.source)
-    return true, { source = target.source, label = target.label, x = coords.x, y = coords.y, z = coords.z }
+    local session = spectate.begin(actor.source)
+    if not session then return false, 'no_character' end
+    return true, { source = target.source, label = target.label, x = coords.x, y = coords.y, z = coords.z, session = session }
 end
 
 --- Le joueur parti : sa position mémorisée ne sert plus.

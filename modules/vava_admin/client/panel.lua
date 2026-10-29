@@ -7,7 +7,7 @@
     Dépendances : shared/constants.lua, config.lua, client/core.lua, client/nui.lua, client/notify.lua, client/tools.lua
 ]]
 
-local type, tostring, unpack = type, tostring, table.unpack
+local type, tostring, unpack, mathType = type, tostring, table.unpack, math.type
 
 local core = VavaAdmin.core
 local nui, notify, tools = VavaAdmin.nui, VavaAdmin.notify, VavaAdmin.tools
@@ -64,10 +64,11 @@ local function after(name, args, result)
         return { ok = true, result = tools.state() }
     end
     if name == 'spectate' and type(result) == 'table' then
+        local session = mathType(result.session) == 'integer' and result.session or nil
         tools.spectate(result, function()
             nui.send('spectate', { active = false })
-            -- revenu à sa place : le serveur n'a plus à garder celle d'avant l'observation (server/spectate.lua)
-            core.rpc.emit(PREFIX .. 'spectateEnd')
+            -- revenu à sa place : le serveur n'a plus à garder celle d'avant cette observation-là (server/spectate.lua)
+            if session then core.rpc.emit(PREFIX .. 'spectateEnd', session) end
         end)
         nui.send('spectate', { active = true, label = result.label, key = VavaAdmin.config.keys.open })
     end

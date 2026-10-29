@@ -41,7 +41,7 @@ const Creator = (() => {
   const styleCount = (id) => limitOf(state.limits.overlays, id).styles;
 
   // Règles de nom du serveur (characters.name du core, reçues avec la liste des personnages) : la saisie est vérifiée
-  // comme le serveur la vérifiera. Sans elles (core antérieur à 0.7.6), seul le serveur juge : tout nom non vide passe.
+  // comme le serveur la vérifiera. Sans elles (core antérieur à 0.8.0), seul le serveur juge : tout nom non vide passe.
   let nameRules = null;
 
   /** Retient les règles reçues du jeu ({ minLength, maxLength, letters, separators }) ; illisibles : ignorées. */
