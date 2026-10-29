@@ -391,9 +391,11 @@ seulement l'éditeur (phase 6).
 ## Phase 8 — Monde
 
 ### T-050 — Temps, saisons, météo `vava_time`
-- Agents : vava-architecte → vava-dev-lua · Dépend de : — · Statut : à faire
+- Agents : vava-architecte → vava-dev-lua · Dépend de : — · Statut : à tester en jeu
 - Heure du royaume et calendrier (GlobalState : usage légitime), saisons qui modulent la croissance de
   `vava_farming` et les ressources de `vava_gathering` (hooks), météo cohérente avec la saison.
+- Avancée en phase 0 à la demande du porteur du projet ; contrôle par le Registre et la Chancellerie.
+- Spec : `docs/plan/specs/T-050.md` · rapport : `docs/plan/rapports/T-050.md` · test en jeu : `docs/tests/temps.md`.
 
 ### T-051 — Montures, squelette `vava_mounts`
 - Agents : vava-architecte → vava-dev-lua · Dépend de : T-043 · Statut : à faire

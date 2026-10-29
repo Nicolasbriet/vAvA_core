@@ -420,7 +420,7 @@ séparateurs `'`, `-` et espace jamais en tête, en fin ni doublés).
 ## Modules officiels
 
 Ressources séparées, dans `modules/` : à copier (ou lier) dans le dossier `resources` du serveur, dans cet ordre :
-`ensure vAvA_core`, `ensure vava_world`, `ensure vava_appearance`, `ensure vava_characters_ui`, `ensure vava_hud`,
+`ensure vAvA_core`, `ensure vava_world`, `ensure vava_time`, `ensure vava_appearance`, `ensure vava_characters_ui`, `ensure vava_hud`,
 `ensure vava_inventory`, `ensure vava_needs`, `ensure vava_health`, `ensure vava_admin`, `ensure vava_voice`,
 `ensure vava_skills`, `ensure vava_gathering`, `ensure vava_crafting`, `ensure vava_farming`, `ensure vava_codex`, `ensure vava_chancellerie`,
 puis les modules qui déclarent des objets.
@@ -887,6 +887,65 @@ aussi, retirer la scène de `config.audio.scenes`. Réglages : `config.lua`.
 
 Le gibier d'une future chasse sera créé par son module : la population du jeu n'en fournit plus.
 
+### `vava_time`
+
+L'heure, les saisons et le ciel du royaume (1.0.0), les mêmes pour tous les joueurs. Demande le core 0.7.0 (registre des
+commandes) ; facultatifs : `vava_admin` (droit `tools`, outil du Registre, journal ; sans lui, personne ne règle rien),
+`vava_hud` (notifications), `vava_chancellerie` ≥ 1.4.0 (page Ciel et heure). Ordre de démarrage : juste après
+`vava_world`. Détail, config et tests : `modules/vava_time/README.md` et `docs/tests/temps.md`.
+
+- **Heure** : celle de Paris (heure d'été du dernier dimanche de mars au dernier dimanche d'octobre, à 01:00 UTC),
+  calculée depuis l'heure UTC du serveur, au rythme réel (une minute du jeu = une minute). Le Conseil la décale (± 12 h),
+  la met à une heure voulue, la fige, la laisse reprendre (depuis l'heure figée) ou rend l'heure réelle.
+- **Calendrier** : vrai calendrier (printemps 20 mars, été 21 juin, automne 22 septembre, hiver 21 décembre, heure de
+  Paris ; l'an 1 commence au printemps 2026) ou cycle de `calendar.cycle.seasonDays` jours réels par saison. La date et
+  la saison suivent l'heure réelle, pas le décalage du Conseil. `/date` la donne en mots du jeu.
+- **Ciel** : cycle pondéré par saison (successeurs plausibles, durées de 25 à 50 min, transition de 90 s) ; aucune neige
+  hors de l'hiver ; « neige au sol » jamais tirée par le cycle. Le Conseil impose un ciel (transition de 20 s ; il dure le
+  temps d'un ciel puis le cycle reprend, même hors saison), le fige, ou rend la main au cycle.
+- **Conseil** : outil « Ciel et heure » (registre `vava_admin:tools`, clé `vava_time:ciel`, droit `tools`) et `/ciel`
+  (`heure`, `decaler`, `figer`, `reprendre`, `reelle`, `meteo`, `garder`, `cycle`). Chaque décision est revérifiée,
+  publiée, écrite en base (`vava_time_state`) et inscrite au journal du Registre si elle change quelque chose.
+
+**GlobalState** (petit, rare, utile à tous ; retiré à l'arrêt du module) :
+
+| Clé | Valeur | Écrite |
+|---|---|---|
+| `vava_time:clock` | `{ shift, frozen }` — décalage (s) sur l'heure de Paris ; seconde du jour figée, ou `false` | démarrage, décision sur l'heure |
+| `vava_time:weather` | `{ id, from, at, fade, forced, frozen }` — ciel visé, ciel d'avant, début de la transition (secondes UTC du serveur), durée (s), imposé, figé | démarrage, chaque ciel (25 à 50 min), décision |
+| `vava_time:calendar` | `{ season, day, year }` | démarrage, changement de jour |
+
+**RPC** : `vava_time:sync` (`{}` → secondes UTC du serveur ; à l'arrivée puis toutes les 30 min ; 6, 0,1/s),
+`vava_time:open` (`{}` → vue de l'outil ; droit `tools` ; 5, 1/s), `vava_time:clock` (`action` ∈ `set`, `shift`,
+`freeze`, `resume`, `real` ; `value` entier −1440…1440 : minute du jour pour `set`, minutes à ajouter pour `shift`
+(± 720, jamais 0), sinon 0 ; 6, 0,5/s), `vava_time:weather` (`action` ∈ `impose`, `freeze`, `release` ; ciel de la
+config, pour `impose` ; `hold` booléen ; 6, 0,5/s). Codes : `forbidden`, `invalid_value`, `unknown_weather`, `not_ready`.
+
+| Export serveur | Retour |
+|---|---|
+| `getSeason()` | `printemps`, `ete`, `automne`, `hiver`, ou `nil` avant le démarrage — lu par `vava_farming` et `vava_gathering` |
+| `getCalendar()` | `{ season, label, name, day, year, text }` |
+| `getClock()` | `{ hour, minute, seconds, frozen, shift }` |
+| `getWeather()` | `{ id, label, forced, frozen }` |
+| `webState()` | `true, vue` ou `false, code` — pont de la Chancellerie seulement |
+| `webClock(action, minutes)` · `webWeather(action, ciel?, figer?)` | `true, vue, libellé du journal (nil : rien n'a changé), détails` ou `false, code` — pont seulement, mêmes règles que les RPC (droit vérifié par le pont auprès du Registre) |
+
+La vue : `{ clock = { seconds, real, shift, frozen }, calendar = { season, label, name, day, year, text }, weather = { id,
+label, from, fromLabel, fading, forced, frozen, endsIn, inSeason }, weathers = { { id, label, inSeason } }, limits }`.
+
+| Export client | Retour |
+|---|---|
+| `getClock()` | `{ hour, minute, frozen }`, ou `nil` avant la première réponse du serveur |
+| `getSeason()` · `getWeather()` | identifiant, ou `nil` |
+
+**Hooks** (serveur, `after`) : `vava_time:seasonChanged` (`{ season, previous, day, year }`), `vava_time:dayChanged`
+(`{ season, day, year }`), `vava_time:weatherChanged` (`{ weather, previous, forced, frozen, by }`),
+`vava_time:clockChanged` (`{ shift, frozen, by }`) ; `by` : `cycle`, `council` ou `web`.
+
+Un module lit la saison par son `bridge/server.lua` (appel isolé, saison gardée quelques secondes) et garde ses réglages
+par saison dans sa propre config : `vava_time` absent ou arrêté = aucun effet. Rendu hors jeu de l'outil :
+`web/index.html` (`?frozen=1`, `?forced=1`, `?refused=1`).
+
 ### `vava_cameras`
 
 L'écran des joueurs, pour le Conseil : tout membre (droit `watch` de vava_admin, sans règle de rang) regarde tout le
@@ -1102,7 +1161,7 @@ fondateur ; `/metiers niveau <joueur> <compétence> <niveau>`, `/metiers recette
 
 ### `vava_gathering`
 
-La récolte (1.2.3) : zones à **vitalité** 0–100 (plein rendement au-dessus de 60, réduit entre 60 et 25 avec chance
+La récolte (1.3.0) : zones à **vitalité** 0–100 (plein rendement au-dessus de 60, réduit entre 60 et 25 avec chance
 d'échec, **épuisée** sous 25 avec props remplacés et rendement effondré, **cicatrice** à 0 : régénération × 0,2 pendant
 la durée de la zone), nœuds à charges (arbres, filons, buissons, bancs de poissons, pistes de gibier) qui se
 régénèrent par le temps (recalcul à la demande, aucune boucle), outils **en main** (`vava_inventory:held`) du genre
@@ -1110,7 +1169,7 @@ requis, non brisés, usés par `patchMetadata` (brisés à 0), qualité de la r�
 palier 1–5 et provenance sur la pile (`{ tier, origin }`), pêche à la barre de tension, réaction de la terre aux
 épuisements répétés, commandes du Conseil. L'XP passe par `vava_skills:addXp`. Tout le détail, la config et les tests en
 jeu : `modules/vava_gathering/README.md`. Demande le core 0.6.0, `vava_inventory` 1.4.0 et `vava_skills` 1.0.0 ;
-facultatifs : `vava_hud`, `vava_admin` (droit `metiers`), `vava_chat`.
+facultatifs : `vava_hud`, `vava_admin` (droit `metiers`), `vava_chat`, `vava_time` (saisons).
 
 - **Données** en `config.lua` : zones (centre, rayon, coût, régénération, cicatrice), nœuds (position, ressource, charges,
   délai, props normal et épuisé — tous les nœuds ont un prop créé par le client), ressources (objet, compétence, outil,
@@ -1120,6 +1179,11 @@ facultatifs : `vava_hud`, `vava_admin` (droit `metiers`), `vava_chat`.
   `vava_gathering:node:<id>` → charges ; écrits au seul changement, relus toutes les 10 s.
 - **Serveur maître** : distance lue côté serveur au début et à la fin, durée revérifiée, jeton par geste, cooldown,
   une récolte à la fois ; pour la pêche, seul « a tenu la tension » est déclaratif.
+- **Saisons** (1.3.0) : la saison de `vava_time` (export `getSeason`, lu par le bridge, gardée 5 s) donne deux facteurs
+  par compétence de la ressource, réglés dans `config.seasons` : `regen` (vitesse à laquelle les nœuds rendent leurs
+  charges ; 0 : rien ne repousse et le temps ne s'accumule pas) et `yield` (unités récoltées, au moins une). Par défaut :
+  herbes lentes et maigres en hiver, gibier abondant à l'automne, poissons au printemps, minage sans saison.
+  `vava_time` absent : facteur 1.
 
 **Registre** `vava_gathering:tools` (objet → `{ kind, power, yieldBonus?, qualityBonus?, wear? }`) : rempli par la
 config, ouvert aux autres modules (une hache d'artisan de phase 3 s'y déclare, ou hérite du genre de son objet).
@@ -1185,7 +1249,7 @@ station. Rendu hors jeu : `web/index.html?view=menu` (ou `menu&tab=reparation`, 
 
 ### `vava_farming`
 
-L'agriculture (1.2.1) : **parcelles** communales ou privées (`owner = { kind = 'character', id }`, autres genres par
+L'agriculture (1.3.0) : **parcelles** communales ou privées (`owner = { kind = 'character', id }`, autres genres par
 `registerAccess`) faites d'emplacements en grille ; **croissance par dates** (humidité qui baisse, pousse au-dessus
 d'un seuil, pause à sec, flétrie après 6 h, morte après 18 h ; aucune boucle, republication des stades toutes les
 10 s) ; **fertilité** (coût par récolte, rotation par famille, compost, jachère) ; **qualité** de la récolte (graine ×
@@ -1201,7 +1265,14 @@ migration 0002 : colonne `minute` et clé unique, les lignes d'avant restent une
 par geste) ; **composteur** (type de
 station et recette ajoutés aux registres de `vava_crafting`, station placée par `addStation`). Détail, config et tests :
 `modules/vava_farming/README.md`. Demande le core 0.6.0, `vava_inventory` 1.4.0, `vava_skills` 1.0.0, `vava_gathering`
-1.0.0, `vava_crafting` 1.1.0 ; facultatifs : `vava_hud`, `vava_admin` (droit `metiers`), `vava_chat`.
+1.0.0, `vava_crafting` 1.1.0 ; facultatifs : `vava_hud`, `vava_admin` (droit `metiers`), `vava_chat`, `vava_time`
+(saisons).
+
+**Saisons** (1.3.0) : la saison de `vava_time` (export `getSeason`, lu par le bridge, gardée 5 s) règle, par
+`config.seasons`, la vitesse de pousse (`growth` : printemps × 1,25, été × 1, automne × 0,75, hiver × 0,25) et celle à
+laquelle la terre sèche (`drying` : × 1 ; × 1,5 ; × 0,75 ; × 0,5). L'hiver ralentit sans tuer (pas de gel). La
+croissance garde ses fractions de seconde en mémoire et s'écrit entière en base. `vava_time` absent : aucun effet,
+croissance identique à 1.2.1.
 
 **Registre** `vava_farming:crops` (`{ label, family, seed, product, growMinutes, waterPerHour, fertilityCost, yield,
 xp, difficulty, stages, wilted, dead }`), rempli par la config, ouvert aux autres modules. State bag global
@@ -1303,7 +1374,7 @@ prison… ; la raison du refus est montrée au joueur), `vava_chat:sent` (`after
 
 Le pont entre la Chancellerie (panneau web, programme à part : voir `docs/chancellerie.md`) et le serveur de jeu.
 Serveur seulement (rien n'est envoyé aux joueurs). Demande vava_admin 1.2.0 ; vava_voice 1.1.0 pour les zones de voix,
-vava_cameras 1.0.0 pour l'écran des joueurs.
+vava_cameras 1.0.0 pour l'écran des joueurs, vava_time 1.0.0 pour le ciel et l'heure (1.4.0).
 
 - **Entrée** : l'adresse HTTP du serveur de jeu (`http://127.0.0.1:<port>/vava_chancellerie/…`). N'accepte que les
   requêtes venues de la machine elle-même, portant la clé tirée par la Chancellerie à chaque lancement de FXServer et
@@ -1311,6 +1382,10 @@ vava_cameras 1.0.0 pour l'écran des joueurs.
   (serveur lancé sans la Chancellerie), le pont reste fermé.
 - **Demandes** : passées telles quelles au Registre (`webRequest`), qui vérifie tout et tient le journal ; zones de voix
   lues, modifiées et supprimées auprès de vava_voice, droit vérifié et journal tenu par le Registre.
+- **Ciel et heure** (1.4.0, `server/time.lua`) : demandes `time` (droit `view`), `timeClock` (`{ action, minutes }`) et
+  `timeWeather` (`{ action, ciel?, figer? }`, droit `tools`), transmises à `webState`, `webClock` et `webWeather` de
+  vava_time ; droit vérifié par `webCan`, décision inscrite par `webLog` si elle change quelque chose. Code
+  `time_unavailable` si vava_time n'est pas lancé. Un fichier du pont ajoute ses demandes à `routes.requests`.
 - **Caméras** (1.1.0) : ouvertes auprès de vava_cameras une fois le droit `watch` accordé — la vue en grand par la
   demande « écran du joueur » du Registre (`watchScreen` : cible vérifiée, inscrite au journal), les cases d'un mur sur
   le seul droit, l'ouverture du mur étant inscrite au journal (« Mur des caméras ouvert »). Routes : `/cameras/wall`,
