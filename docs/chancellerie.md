@@ -257,7 +257,8 @@ Le compte maître l'applique (« Mettre à jour »), ou la laisse s'appliquer au
    - un nouveau module est posé dans `[vava]`, à activer dans la page Ressources. Le chat `vava_chat` remplace la
      ressource `chat` de FiveM : activer `vava_chat` et couper `chat` au même endroit. `vava_ui` (polices et textures
      communes des interfaces, 1.6.2) démarre de lui-même avec les modules qui en dépendent ; l'activer le place juste
-     après `vAvA_core` ;
+     après `vAvA_core`. L'écran de chargement `vava_loading` (1.8.1), lui, ne démarre que s'il est activé : il se
+     place juste après `vava_ui` ;
    - les exemples et outils de développement du dépôt (`examples/`) sont posés dans `[vava-dev]`, jamais lancés
      d'office : à activer seulement sur un serveur de test (ils n'ont aucun contrôle d'administration).
 7. Relance du serveur, puis **contrôle** : en marche, sans arrêt imprévu, et toutes les ressources qui tournaient avant
