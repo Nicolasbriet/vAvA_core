@@ -6,7 +6,7 @@
     Dépendances : shared/lib/string.lua, shared/lib/schema.lua
 ]]
 
-local type, tostring, pairs = type, tostring, pairs
+local type, tostring, pairs, pcall = type, tostring, pairs, pcall
 local format = string.format
 
 local str = vAvA.lib.string
@@ -28,6 +28,8 @@ vAvA.fields = fields
 
 ---@type table<string, vAvA.FieldDefinition>
 local definitions = {}
+-- appelé à chaque déclaration d'un champ public (garde du statebag, server/players/sync.lua)
+local publicListener
 
 ---@class vAvA.FieldOptions
 ---@field schema vAvA.SchemaDefinition
@@ -61,6 +63,8 @@ function fields.define(owner, name, options)
         if not valid then return false, 'valeur par défaut invalide : ' .. defaultErr end
     end
     definitions[name] = { owner = owner, name = name, schema = compiled, default = options.default, visibility = visibility }
+    -- isolé : une déclaration acceptée ne lève jamais d'erreur
+    if visibility == 'public' and publicListener then pcall(publicListener, name) end
     return true
 end
 
@@ -122,6 +126,20 @@ function fields.forEachPublic(fn)
     for name, def in pairs(definitions) do
         if def.visibility == 'public' then fn(name, def) end
     end
+end
+
+--- Vrai si le champ est déclaré public (répliqué par statebag).
+---@param name any
+---@return boolean
+function fields.isPublic(name)
+    local def = definitions[name]
+    return def ~= nil and def.visibility == 'public'
+end
+
+--- Fonction appelée avec le nom de chaque champ public déclaré à partir de maintenant (une seule à la fois).
+---@param fn fun(name: string)|nil
+function fields.setPublicListener(fn)
+    publicListener = fn
 end
 
 --- Retire les définitions d'un propriétaire arrêté. Les valeurs restent dans data et sont toujours sauvegardées :

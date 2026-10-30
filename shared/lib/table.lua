@@ -1,11 +1,11 @@
 --[[
     shared/lib/table.lua
-    Rôle : utilitaires purs sur les tables (copie de liste, retrait, clés triées).
+    Rôle : utilitaires purs sur les tables (copie de liste, retrait, égalité de valeur, clés triées).
     Dépendances : shared/init.lua
 ]]
 
 local move, sort, remove = table.move, table.sort, table.remove
-local pairs, tostring = pairs, tostring
+local pairs, tostring, type, next, rawget, rawequal = pairs, tostring, type, next, rawget, rawequal
 
 local tbl = {}
 vAvA.lib.table = tbl
@@ -30,6 +30,33 @@ function tbl.removeValue(list, value)
         end
     end
     return false
+end
+
+--- Égalité de valeur : nombres, chaînes et booléens par ==, tables clé à clé, sans tenir compte des métatables.
+--- Sert à comparer une valeur reçue du réseau (copie désérialisée) à celle que l'on a envoyée. Au-delà de maxDepth
+--- niveaux de tables imbriquées, les valeurs sont jugées différentes : une donnée forgée trop profonde ne coûte
+--- jamais une récursion sans fin.
+---@param a any
+---@param b any
+---@param maxDepth? integer  défaut 16
+---@return boolean
+function tbl.deepEqual(a, b, maxDepth)
+    if rawequal(a, b) then return true end
+    if type(a) ~= 'table' or type(b) ~= 'table' then
+        if type(a) == 'table' or type(b) == 'table' then return false end
+        return a == b
+    end
+    local depth = maxDepth or 16
+    if depth <= 0 then return false end
+    for key, value in next, a do
+        local other = rawget(b, key)
+        if other == nil or not tbl.deepEqual(value, other, depth - 1) then return false end
+    end
+    -- une clé de plus d'un côté : la première absente de l'autre suffit, sans compter toute la table
+    for key in next, b do
+        if rawget(a, key) == nil then return false end
+    end
+    return true
 end
 
 --- Clés d'une table, triées par représentation textuelle (ordre stable pour les logs et les listings).

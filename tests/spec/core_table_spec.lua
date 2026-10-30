@@ -55,6 +55,60 @@ describe('vAvA.lib.table', function()
         end)
     end)
 
+    -- garde des champs publics (server/players/sync.lua) : valeur relue du statebag comparée à celle publiée
+    describe('deepEqual', function()
+        it('compare les valeurs simples par ==, un entier égal à son flottant', function()
+            assert.is_true(tbl.deepEqual(nil, nil))
+            assert.is_true(tbl.deepEqual('a', 'a'))
+            assert.is_true(tbl.deepEqual(3, 3.0))
+            assert.is_true(tbl.deepEqual(false, false))
+            assert.is_false(tbl.deepEqual(nil, false))
+            assert.is_false(tbl.deepEqual(1, '1'))
+            assert.is_false(tbl.deepEqual(0 / 0, 0 / 0))
+        end)
+
+        it('compare deux tables clé à clé, imbriquées comprises, sans regarder leur identité', function()
+            local a = { id = 3, item = 'hache', offset = { x = 0.1, y = 0, z = -0.02 }, list = { 1, 2 } }
+            local b = { id = 3, item = 'hache', offset = { x = 0.1, y = 0, z = -0.02 }, list = { 1.0, 2.0 } }
+            assert.is_true(tbl.deepEqual(a, b))
+            assert.is_true(tbl.deepEqual({}, {}))
+        end)
+
+        it('voit une clé en plus ou en moins de chaque côté, et une valeur différente en profondeur', function()
+            assert.is_false(tbl.deepEqual({ a = 1 }, { a = 1, b = 2 }))
+            assert.is_false(tbl.deepEqual({ a = 1, b = 2 }, { a = 1 }))
+            assert.is_false(tbl.deepEqual({ 1, 2, 3 }, { 1, 2 }))
+            assert.is_false(tbl.deepEqual({ o = { x = 1 } }, { o = { x = 2 } }))
+            assert.is_false(tbl.deepEqual({ o = { x = 1 } }, { o = 'x' }))
+            assert.is_false(tbl.deepEqual({}, nil))
+            assert.is_false(tbl.deepEqual('a', { 'a' }))
+        end)
+
+        it('juge différentes deux tables imbriquées au-delà de la profondeur permise', function()
+            local function nest(depth)
+                local root = {}
+                local node = root
+                for _ = 1, depth do
+                    node.next = {}
+                    node = node.next
+                end
+                return root
+            end
+            assert.is_true(tbl.deepEqual(nest(3), nest(3), 4))
+            assert.is_false(tbl.deepEqual(nest(4), nest(4), 4))
+            assert.is_false(tbl.deepEqual(nest(100), nest(100)))   -- 16 niveaux par défaut
+            assert.is_true(tbl.deepEqual(nest(15), nest(15)))
+        end)
+
+        it('ignore les métatables (__eq, __index, __pairs)', function()
+            local trap = { __eq = function() return true end, __index = function() return 1 end, __pairs = error }
+            local a = setmetatable({ x = 1 }, trap)
+            local b = setmetatable({ y = 1 }, trap)
+            assert.is_false(tbl.deepEqual(a, b))
+            assert.is_true(tbl.deepEqual(a, { x = 1 }))
+        end)
+    end)
+
     describe('sortedKeys', function()
         it('trie les clés par représentation textuelle', function()
             assert.same({ 'ble', 'orge', 'seigle' }, tbl.sortedKeys({ seigle = 1, ble = 2, orge = 3 }))

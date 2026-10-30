@@ -216,6 +216,21 @@ core.characters.set(character.id, 'mon_module:reputation', reputation + 5)
 - Seuls les personnages **chargés** sont accessibles ; un `set` identique à la valeur actuelle ne coûte rien.
 - À l'arrêt du module, sa définition disparaît mais les valeurs restent dans `data` et réapparaissent à son
   redémarrage.
+- Rien ne part vers un joueur pour un personnage qui n'est plus le sien (0.9.0) : un `set` fait pendant le hook
+  `core:character:loaded` part avec l'envoi complet qui suit ; après le déchargement ou le départ du joueur (hook
+  `core:character:unloading` compris), la valeur est enregistrée mais n'est plus envoyée, ni par event ni par statebag.
+
+**Champ `public` : la valeur lue sur un client n'est pas authentique.** Le statebag d'un joueur peut être réécrit par
+son propre client, et les autres clients voient alors la valeur forgée. Le serveur ne relit jamais ce statebag (il
+fait foi par `characters.get`) et, depuis 0.9.0, garde les champs publics : à chaque changement d'un champ public
+qu'il voit sur le statebag d'un joueur et qui diffère de la valeur qu'il a publiée, il remet la sienne après
+`sync.publicGuardDelayMs` (250 ms ; les réécritures d'un même joueur dans ce délai ne coûtent qu'une remise) et le
+signale en console (`[sync] joueur N : champ(s) public(s) réécrit(s) par son client`). Entre la réécriture et la
+remise, les autres clients voient la valeur forgée ; si le serveur ne voit pas la réécriture, elle reste. Un client
+ne décide donc jamais rien d'après `Player(x).state[champ]` d'un autre joueur, sinon de ce qui ne se voit que chez
+lui ; il le recoupe avec une donnée publiée par le serveur ailleurs (comme `vava_inventory:hands` avec
+`GlobalState['vava_inventory:heldModels']`). Les statebags qu'un module pose lui-même (entité, joueur) ne sont pas
+gardés par le core : même règle.
 
 Persistance et positions :
 
@@ -298,17 +313,26 @@ end)
 - Contrôles avant le handler : source réseau, limite globale du joueur, RPC connu, limite du RPC, nombre de
   requêtes simultanées du joueur, schéma des arguments.
 - Le handler reçoit `source` puis les arguments validés. Ses valeurs de retour sont envoyées **au seul
-  joueur appelant**.
+  joueur appelant**, et seulement s'il est toujours là : un joueur parti pendant un handler lent (attente de la base)
+  ne reçoit rien, pas plus que celui qui aurait repris son numéro entre-temps (0.9.0).
 
 | Fonction | Retour |
 |---|---|
 | `register(name, options, handler)` | `true` ou `false, err` |
 | `unregister(name)` | `true` ou `false, err` |
-| `callClient(target, name, ...)` | `true, ...valeurs` ou `false, code` |
-| `callClientWith({ timeout?, returns? }, target, name, ...)` | idem, avec timeout et schéma de retour |
+| `callClient(target, name, ...)` | `true` ou `false, code` — ordre sans valeur de retour : une réponse qui en porte est refusée (`invalid_response`) |
+| `callClientWith({ timeout?, returns }, target, name, ...)` | `true, ...valeurs` ou `false, code` — `returns` **obligatoire** (`{}` si aucune valeur attendue), sinon `invalid_options` sans rien envoyer |
 
-Ce que renvoie un client est **déclaratif et non fiable** : toujours fournir `returns` et ne jamais s'en servir
-comme source de vérité.
+```lua
+local ok, timer = core.rpc.callClientWith({
+    timeout = 5000,
+    returns = { { type = 'integer', min = 0 } },
+}, source, 'vava_example:ping')
+```
+
+Ce que renvoie un client est **déclaratif et non fiable** : depuis 0.9.0, aucune valeur non décrite ne remonte
+(`returns` est exigé comme `args` l'est pour un RPC, avec les mêmes bornes réseau) ; une valeur validée ne sert
+jamais de source de vérité.
 
 #### Codes d'erreur RPC
 
@@ -321,10 +345,10 @@ comme source de vérité.
 | `invalid_args` | arguments refusés par le schéma (détail dans la console serveur uniquement) |
 | `server_error` | le handler serveur a levé une erreur (détail dans la console serveur uniquement) |
 | `saturated` | trop d'appels en attente |
-| `invalid_target` / `invalid_name` / `invalid_options` | appel mal formé |
+| `invalid_target` / `invalid_name` / `invalid_options` | appel mal formé (`invalid_options` : timeout hors bornes, `returns` absent, refusé ou de plus de `rpc.maxReturns` = 16 valeurs ; détail dans la console serveur) |
 | `dropped` | joueur déconnecté pendant l'attente |
 | `owner_stopped` | ressource appelante arrêtée pendant l'attente |
-| `client_error` / `invalid_response` | le client a échoué ou a renvoyé des valeurs refusées par `returns` |
+| `client_error` / `invalid_response` | le client a échoué ou a renvoyé des valeurs refusées par `returns` (toute valeur pour `callClient`) |
 
 ### `core.db`
 
@@ -374,7 +398,7 @@ local core = exports.vAvA_core:getApi(1)
 | `rpc.call(name, ...)` | `true, ...valeurs du handler` ou `false, code` |
 | `rpc.callWith({ timeout? }, name, ...)` | idem |
 | `rpc.emit(name, ...)` | `true` — intention sans réponse, mêmes contrôles côté serveur |
-| `rpc.register(name, handler)` | `true` ou `false, err` — handler appelable par `callClient` |
+| `rpc.register(name, handler)` | `true` ou `false, err` — handler appelable par `callClient` ; il renvoie exactement ce que décrit le `returns` de l'appel serveur (rien du tout pour `callClient`, pas même `nil`), sinon le serveur reçoit `invalid_response` |
 | `rpc.unregister(name)` | `true` ou `false, err` |
 
 `rpc.call` distingue le **transport** (premier retour) de la **réponse métier** (retours suivants) :
