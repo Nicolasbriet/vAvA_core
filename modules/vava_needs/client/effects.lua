@@ -3,8 +3,9 @@
     Rôle : effets des besoins sur le joueur local, déduits des valeurs reçues (aucun échange réseau en plus) :
       - message au franchissement d'un palier vers le bas (bas, critique, épuisé), par vava_hud si présent ;
       - endurance maximale réduite tant qu'un besoin est critique (native persistante : aucune boucle) ;
-      - perte de vie demandée par le serveur (plancher configuré tant qu'aucun module ne gère la mise à terre ; avec
-        lui, la dernière perte couche le ped) ;
+      - perte de vie demandée par le serveur, seulement quand vava_health ne tourne pas (repli : avec lui, le serveur
+        l'applique lui-même) ; plancher configuré tant qu'aucun module ne gère la mise à terre ; si vava_health
+        démarre entre l'envoi et l'arrivée, la dernière perte couche le ped ;
       - geste de consommation (animation du haut du corps, sans accessoire).
     Dépendances : shared/constants.lua, config.lua, shared/starvation.lua, client/core.lua
 ]]
@@ -99,9 +100,10 @@ end
 
 -- Vie et gestes --------------------------------------------------------------------------------------------------
 
---- Perte de vie d'un besoin épuisé. Sans système de mise à terre, jamais sous le plancher (part de la vie au-dessus
---- du seuil de mise à terre) ; avec vava_health, le joueur peut tomber, puis être relevé : la perte qui atteint le
---- seuil couche le ped franchement (vie GTA à 0, shared/starvation.lua).
+--- Perte de vie d'un besoin épuisé, repli quand le serveur n'a pas vava_health (avec lui, il l'applique lui-même).
+--- Sans système de mise à terre, jamais sous le plancher (part de la vie au-dessus du seuil de mise à terre) ; si
+--- vava_health tourne déjà ici (démarré entre l'envoi et l'arrivée), la perte qui atteint le seuil couche le ped
+--- franchement (vie GTA à 0, shared/starvation.lua).
 ---@param amount number
 function effects.starve(amount)
     local ped = PlayerPedId()
