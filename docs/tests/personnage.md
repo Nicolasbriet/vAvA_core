@@ -70,7 +70,7 @@ une heure et demie seul, une demi-heure de plus pour les tests marqués **(2 jou
 | # | Faire | Attendu |
 |---|---|---|
 | 1 | Se connecter avec un compte jamais venu. | Pendant la connexion, FiveM affiche « Vérification de votre compte… » (bref). Console du serveur : `[vAvA][INFO][accounts] nouveau compte #N` — c'est ce `N` que demande `vava_conseil`. `vava_accounts` : une ligne `N` avec `license:…`, `created_at`, `last_seen_at` ; aucune autre colonne (ni IP, ni pseudo). |
-| 2 | Attendre la fin du chargement. | Fondu au noir, puis « Registre des âmes », « Choisissez qui vous serez » : trois cartes « Nouveau personnage » / « Emplacement libre », « 3 emplacements libres ». Ni chat, ni jauges, ni radar. Le numéro de compte n'est pas montré au joueur. |
+| 2 | Attendre la fin du chargement. | Avec `vava_loading` : l'éclair de l'écran de chargement se dissout sur la sélection, sans image noire ([chargement.md](chargement.md) § 3) ; sans lui : fondu au noir. Puis « Registre des âmes », « Choisissez qui vous serez » : trois cartes « Nouveau personnage » / « Emplacement libre », « 3 emplacements libres ». Ni chat, ni jauges, ni radar. Le numéro de compte n'est pas montré au joueur. |
 | 3 | `Échap`, clics hors des cartes. | Rien : on ne quitte cet écran qu'en jouant un personnage. |
 | 4 | `F8` → `disconnect`, puis revenir. | Aucune ligne `nouveau compte` ; même compte `N` ; `last_seen_at` mis à jour (à l'arrivée et au départ). |
 | 5 | **(2 joueurs)** B reste sur la sélection ; A ouvre le Registre (`F10`) → Joueurs. | Ligne de B : « En sélection de personnage », « <pseudo FiveM> · Compte n° N », sans temps de jeu ; dans sa fiche, Temps de jeu « — ». |

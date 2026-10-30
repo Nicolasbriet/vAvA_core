@@ -725,11 +725,17 @@ Hooks client (locaux, émis par le core) :
 
 | Nom | Payload | Moment |
 |---|---|---|
-| `core:character:selection` | `{}` | le joueur est mis en attente (écran noir) : une interface de sélection prend la main |
+| `core:character:selection` | `{}` | le joueur est mis en attente (écran noir) : une interface de sélection prend la main ; depuis 0.13.0, à la **première** mise en attente, l'écran de chargement n'est plus fermé si `spawn.loadingScreen.resource` tourne (ci-dessous) |
 | `core:character:loaded` | le personnage | données reçues, avant l'apparition |
 | `core:character:spawning` | `{ modelChanged }` | ped placé, écran encore noir : appliquer l'apparence ici |
 | `core:character:fieldChanged` | `{ field, value }` | champ `owner`/`public` modifié |
 | `core:character:unloaded` | `{ id }` | retour à la sélection |
+
+Écran de chargement (0.13.0, `config/shared.lua` → `spawn.loadingScreen`) : à la première mise en attente, si la
+ressource `resource` (défaut `vava_loading`) est démarrée, le core fait son fondu au noir **sous** l'écran de chargement
+et lui en laisse la fermeture (`ShutdownLoadingScreenNui`), qu'il fait lui-même au plus tard `maxHoldMs` (30 s) plus
+tard ; `resource = ''` ou ressource arrêtée : fermeture aussitôt (comportement de 0.12.0). L'apparition d'un personnage
+ferme toujours l'écran. Les mises en attente suivantes (retour à la sélection) ne changent pas.
 
 Codes de refus : `no_session`, `busy`, `wrong_state`, `not_owner`, `not_found`, `too_many_characters`,
 `invalid_name`, `invalid_sex`, `name_taken`, `refused`, `db_error`, `corrupted_data`, `no_character`, ou la
@@ -749,11 +755,12 @@ chaque caractère pris dans `letters` ou dans `separators`) sans en garder de co
 
 Ressources séparées, dans `modules/` : à copier (ou lier) dans le dossier `resources` du serveur, dans cet ordre (le
 même que `README.md` à la racine, et celui qu'écrit la Chancellerie) :
-`ensure oxmysql`, `ensure vAvA_core`, `ensure vava_ui`, `ensure vava_chat` (à la place de `ensure chat`),
-`ensure vava_world`, `ensure vava_time`, `ensure vava_appearance`, `ensure vava_characters_ui`, `ensure vava_hud`,
-`ensure vava_inventory`, `ensure vava_needs`, `ensure vava_health`, `ensure vava_admin`, `ensure vava_voice`,
-`ensure vava_cameras`, `ensure vava_magic`, `ensure vava_skills`, `ensure vava_gathering`, `ensure vava_crafting`,
-`ensure vava_farming`, `ensure vava_codex`, `ensure vava_chancellerie`, puis les modules qui déclarent des objets.
+`ensure oxmysql`, `ensure vAvA_core`, `ensure vava_ui`, `ensure vava_loading`, `ensure vava_chat` (à la place de
+`ensure chat`), `ensure vava_world`, `ensure vava_time`, `ensure vava_appearance`, `ensure vava_characters_ui`,
+`ensure vava_hud`, `ensure vava_inventory`, `ensure vava_needs`, `ensure vava_health`, `ensure vava_admin`,
+`ensure vava_voice`, `ensure vava_cameras`, `ensure vava_magic`, `ensure vava_skills`, `ensure vava_gathering`,
+`ensure vava_crafting`, `ensure vava_farming`, `ensure vava_codex`, `ensure vava_chancellerie`, puis les modules qui
+déclarent des objets.
 
 ### `vava_ui`
 
@@ -781,6 +788,29 @@ Adopté par les quinze interfaces (T-012) : `vava_hud` 1.4.0 (pilote), `vava_hea
 jeu (`web/index.html?…` dans un navigateur, depuis le dépôt) passe par la ligne ci-dessus, qui charge
 `web/dev/devmock.js`. Garde-fous : `tests/spec/ui_shared_spec.lua` (chaque page) et `scripts/audit-reseau.sh`
 (BLOQUANT : police ou texture commune hors de `vava_ui`, `devmock.js` livré, motif `files` qui couvrirait `web/dev/`).
+
+### `vava_loading`
+
+Écran de chargement d'Eldoria (`loadscreen`, `loadscreen_manual_shutdown`, `loadscreen_cursor`) : progression réelle
+sur six feux, puis passage sans écran noir à la sélection. Ressource cliente uniquement : **aucun RPC, aucun évènement,
+aucun state bag, aucun hook émis, aucun export**. Contrat (règles complètes : `modules/vava_loading/README.md`) :
+
+- **Ordre** : `ensure vava_loading` juste après `vava_ui`, pour que son script client tourne avant celui de
+  `vava_characters_ui` ; s'il tourne après (redémarrage), l'export `isShown()` de la sélection rattrape le hook manqué.
+- **Core** ≥ 0.13.0 : `spawn.loadingScreen` (§ `core.characters` client) ne ferme plus l'écran à la première mise en
+  attente quand `vava_loading` est démarré ; filet du core à 30 s.
+- **Écoute** les hooks client `core:character:selection` (attente, filet de 20 s), `core:character:loaded` (fermeture
+  immédiate) et `vava_characters_ui:shown` (passage) ; nommés dans `config.lua` (`selection.*`) pour un autre écran de
+  sélection.
+- **Messages locaux** à la page (`SendLoadingScreenMessage`, aucun réseau, ≤ 80 octets) : `vava_loading:resources`
+  (script client lancé), `vava_loading:waiting` (mise en attente), `vava_loading:handoff` `{ ms }` (sélection affichée :
+  éclair de `ms` millisecondes, bornées de 300 à 5 000, puis `ShutdownLoadingScreenNui`). La page lit aussi les messages
+  du jeu (`loadProgress`, fonctions d'initialisation, fichiers de données) et ignore tout le reste.
+- **Fichiers de la page** : textes dans `web/js/strings.js` (seul fichier touché par T-021), rythmes, seuils des feux,
+  effets, musique et journal dans `web/js/config.js` ; jamais d'image ni de ressource externe ; polices embarquées
+  (exception d'audit `modules/vava_loading/web/fonts/`).
+- **Poids** : ≈ 216 Ko livrés (1.0.0), plafond 300 Ko (700 Ko avec une musique, test unitaire) ; dossier entier ≤ 1,5 Mo
+  (`scripts/audit-reseau.sh`).
 
 ### `vava_appearance`
 
@@ -823,6 +853,10 @@ création. À l'arrêt de la ressource écran ouvert, ped d'aperçu, caméra, mi
 rendus, et l'écran redevient noir comme l'attente de sélection. Détails : `modules/vava_characters_ui/README.md`. Pour
 travailler le rendu sans le jeu, ouvrir `web/index.html` dans un navigateur (`?screen=creator&tab=hair&sex=f`) : des
 données simulées remplacent le jeu.
+
+1.2.0 : hook client `vava_characters_ui:shown` (`{}`, à la fin de l'ouverture : scène, caméra, liste, page et focus en
+place, fondu d'entrée lancé ; une fois par ouverture) et export client `isShown()` (`true` de la fin de l'ouverture à la
+fermeture), lus par `vava_loading` pour passer à la sélection sans écran noir.
 
 ### `vava_inventory`
 

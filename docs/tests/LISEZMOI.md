@@ -8,6 +8,7 @@ main. Chaque procédure dit quoi faire et ce qui doit se passer ; les tests à d
 
 | Fichier | Ce qu'elle couvre | Modules |
 |---|---|---|
+| [chargement.md](chargement.md) | Écran de chargement : ouverture, six feux de la progression réelle, passage sans écran noir à la sélection, filets, coût | `vava_loading`, `vAvA_core`, `vava_characters_ui` |
 | [personnage.md](personnage.md) | Connexion, création, sélection, suppression, reconnexion, position | `vAvA_core`, `vava_characters_ui`, `vava_appearance` |
 | [inventaire.md](inventaire.md) | Besace, ceinture, mains, sol, conteneurs, à deux | `vava_inventory` |
 | [besoins.md](besoins.md) | Faim, soif | `vava_needs` |
@@ -25,13 +26,13 @@ main. Chaque procédure dit quoi faire et ce qui doit se passer ; les tests à d
 | [zones.md](zones.md) | Abonnements de zone : zones envoyées aux seuls joueurs proches, `/vava_reseau zones`, zones de voix et leur éditeur, coût du passage | `vAvA_core`, `vava_voice` |
 | [developpement.md](developpement.md) | Outils de développement : rien sans `vava_env`, réservés et journalisés avec | `vava_dev_characters`, `vava_example`, `vava_example_items`, `vava_anim_test` |
 
-Ordre conseillé : interfaces (§ 0, pilote du HUD, puis § 1 à 6), personnage, inventaire, besoins, santé, chat, voix,
+Ordre conseillé : interfaces (§ 0, pilote du HUD, puis § 1 à 6), chargement, personnage, inventaire, besoins, santé, chat, voix,
 registre, Codex, réseau, zones, métiers, temps, magie. Chaque procédure s'appuie sur ce que les précédentes ont validé.
 
 ## Préparation commune
 
 1. **Ordre de démarrage** (`server.cfg`, ou la Chancellerie qui le fait seule), après `oxmysql` : `vAvA_core`, `vava_ui`,
-   `vava_chat`, `vava_world`, `vava_time`, `vava_appearance`, `vava_characters_ui`, `vava_hud`, `vava_inventory`, `vava_needs`,
+   `vava_loading`, `vava_chat`, `vava_world`, `vava_time`, `vava_appearance`, `vava_characters_ui`, `vava_hud`, `vava_inventory`, `vava_needs`,
    `vava_health`, `vava_admin`, `vava_voice`, `vava_cameras`, `vava_magic`, `vava_skills`, `vava_gathering`,
    `vava_crafting`, `vava_farming`, `vava_codex`, `vava_chancellerie`.
 2. **Démarrage** : dans la console du serveur, chaque module affiche `module 'xxx' vY prêt` ; les migrations partent
