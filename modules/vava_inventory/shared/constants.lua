@@ -10,11 +10,14 @@ VavaInventory = {}
 VavaInventory.REGISTRY = 'vava_inventory:items'
 -- Champ de personnage : barre de raccourcis (identifiants d'objets, 0 = vide).
 VavaInventory.HOTBAR_FIELD = 'vava_inventory:hotbar'
--- Champ de personnage public (statebag) : objet tenu en main, { id, item, model, bone, offset, rotation } ou rien.
--- Chaque client en fait un accessoire local sur le ped du porteur (depuis 1.4.0).
+-- Champ de personnage `owner` : objet tenu en main, { id, item } ou rien ; envoyé au seul joueur, gardé en base
+-- (1.7.0 ; champ public jusqu'en 1.6.x).
 VavaInventory.HANDS_FIELD = 'vava_inventory:hands'
+-- Statebag du ped du porteur, écrit par le serveur (1.7.0) : { id, item } ou rien. Répliqué aux seuls joueurs qui ont
+-- ce ped à portée ; chacun en fait un accessoire local.
+VavaInventory.HELD_STATE = 'vava_inventory:inHand'
 -- GlobalState (écrit par le seul serveur) : objet → accessoire déclaré { model, bone, offset, rotation }, valeurs par
--- défaut comprises. Un client n'affiche l'objet tenu par un joueur que si son champ correspond à l'une de ces entrées.
+-- défaut comprises. Un client n'affiche l'objet tenu par un joueur que s'il est l'une de ces entrées, avec ce placement.
 VavaInventory.HELD_MODELS = 'vava_inventory:heldModels'
 -- Clé du statebag d'un sac au sol : identifiant de son conteneur (seule donnée publique).
 VavaInventory.DROP_STATE = 'vava_inventory:drop'

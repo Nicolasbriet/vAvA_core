@@ -4,7 +4,8 @@
            par d'autres modules, ancrés à un lieu), opérations validées par le serveur, poids, métadonnées par pile
            (empilement par égalité, retraits ciblés, écriture partielle), raccourcis, interface glisser-déposer,
            catalogue de développement (désactivé par défaut).
-    Dépendances : vAvA_core ≥ 0.3.0, OneSync (sacs au sol en entités réseau, distances lues côté serveur)
+    Dépendances : vAvA_core ≥ 0.3.0, OneSync (sacs au sol en entités réseau, objet en main sur le statebag du ped,
+                 distances lues côté serveur)
 ]]
 
 fx_version 'cerulean'
@@ -14,7 +15,7 @@ use_experimental_fxv2_oal 'yes'
 
 name 'vava_inventory'
 description 'Inventaire en grille vAvA'
-version '1.6.4'
+version '1.7.0'
 
 dependency 'vAvA_core'
 
@@ -35,6 +36,7 @@ shared_scripts {
     'shared/constants.lua',
     'config.lua',
     'shared/grid.lua',
+    'shared/held.lua',
 }
 
 server_scripts {
@@ -45,6 +47,7 @@ server_scripts {
     'server/containers.lua',
     'server/viewers.lua',
     'server/drops.lua',
+    'server/pedstate.lua',
     'server/hands.lua',
     'server/operations.lua',
     'server/catalog.lua',

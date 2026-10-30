@@ -1,23 +1,26 @@
 --[[
     vava_inventory/server/hands.lua
     Rôle : objet tenu en main par un personnage (1.4.0). C'est une référence vers une pile de sa besace (elle y garde
-           sa place et son poids), publiée par le champ public `vava_inventory:hands` :
-           { id, item, model, bone, offset, rotation }, dont chaque client fait un accessoire local sur le ped du
-           porteur. La main se vide d'elle-même dès que la pile quitte la besace (jetée, déposée, consommée, retirée
-           par un module) : operations.lua appelle `sync` après chaque modification d'un conteneur de personnage.
-           Une pile tenue gardée à part au chargement faute de définition est attendue, puis rendue à la main à son
-           retour (`restore`, 1.6.3).
-           Le statebag d'un joueur pouvant être écrit par son propre client, la liste des objets tenables (accessoire
-           déclaré de chacun) est publiée dans GlobalState, que seul le serveur écrit : chaque client n'affiche que ce
-           qui y correspond. Elle suit le registre des objets.
-    Dépendances : shared/constants.lua, config.lua, server/core.lua, server/items.lua, server/containers.lua
+           sa place et son poids), notée { id, item } dans le champ `owner` `vava_inventory:hands` (envoyé au seul
+           joueur, gardé en base) et publiée sur le statebag du ped du porteur (server/pedstate.lua, 1.7.0), dont
+           chaque client qui voit ce ped fait un accessoire local. La main se vide d'elle-même dès que la pile quitte
+           la besace (jetée, déposée, consommée, retirée par un module) : operations.lua appelle `sync` après chaque
+           modification d'un conteneur de personnage. Une pile tenue gardée à part au chargement faute de définition
+           est attendue, puis rendue à la main à son retour (`restore`, 1.6.3).
+           Le placement de chaque accessoire (modèle, os, décalage, rotation) n'est jamais publié avec la main : la
+           liste des objets tenables est publiée dans GlobalState, que seul le serveur écrit, une fois par tick au plus,
+           et chaque client n'affiche qu'un objet qui y figure. Elle suit le registre des objets.
+    Dépendances : shared/constants.lua, shared/held.lua, config.lua, server/core.lua, server/items.lua,
+                  server/containers.lua, server/pedstate.lua
 ]]
 
-local type, pairs = type, pairs
-local GlobalState = GlobalState
+local type, pairs, ipairs, tonumber = type, pairs, ipairs, tonumber
+local GlobalState, SetTimeout, GetPlayers, Player = GlobalState, SetTimeout, GetPlayers, Player
 
 local items = VavaInventory.items
 local containers = VavaInventory.containers
+local held = VavaInventory.held
+local pedState = VavaInventory.pedState
 local cfg = VavaInventory.config.hands
 local HANDS_FIELD = VavaInventory.HANDS_FIELD
 local HELD_MODELS = VavaInventory.HELD_MODELS
@@ -26,21 +29,17 @@ local MAX_ID = VavaInventory.MAX_ID
 
 -- accessoire sans décalage ni rotation
 local ZERO = { 0.0, 0.0, 0.0 }
-local VECTOR = { type = 'array', min = 3, max = 3, items = { type = 'number', min = -360, max = 360 } }
 
 local hands = {}
 VavaInventory.hands = hands
 
---- Schéma du champ public (validé par le core à chaque écriture) ; nil quand les mains sont vides.
+--- Schéma du champ (validé par le core à chaque écriture) ; nil quand les mains sont vides. Les valeurs écrites en base
+--- avant 1.7.0 portaient aussi le placement : seul `id` en est relu au chargement.
 hands.SCHEMA = {
     type = 'table', optional = true,
     fields = {
         id = { type = 'integer', min = 1, max = MAX_ID },
         item = { type = 'string', min = 1, max = 64 },
-        model = { type = 'string', min = 1, max = 64 },
-        bone = { type = 'integer', min = 0, max = 65535 },
-        offset = VECTOR,
-        rotation = VECTOR,
     },
 }
 
@@ -56,47 +55,94 @@ local bySource = {}
 local byContainer = {}
 ---@type table<string, table>  objet tenable → accessoire déclaré { model, bone, offset, rotation } (liste publiée)
 local declared = {}
+-- vrai tant qu'une publication de la liste attend la fin du tick
+local declaredDirty = false
+-- copie de la dernière liste publiée dans GlobalState
+local published = {}
 
 local function characters()
     return VavaInventory.core.characters
 end
 
 --- Accessoire d'une déclaration `held`, valeurs par défaut comprises : modèle, os, décalage, rotation.
----@param held table
+---@param declaration table
 ---@return table
-local function propOf(held)
-    return { model = held.model, bone = held.bone or cfg.defaultBone, offset = held.offset or ZERO, rotation = held.rotation or ZERO }
+local function propOf(declaration)
+    return { model = declaration.model, bone = declaration.bone or cfg.defaultBone, offset = declaration.offset or ZERO,
+        rotation = declaration.rotation or ZERO }
 end
 
---- Valeur publiée pour une pile tenue : ce que chaque client a besoin de savoir pour montrer l'accessoire.
+--- Valeur publiée pour une pile tenue : { id, item }. Le placement se lit dans la liste des objets tenables.
 ---@param instance vAvA.ItemInstance
----@param def vAvA.ItemDefinition
 ---@return table
-local function describe(instance, def)
-    local value = propOf(def.held)
-    value.id, value.item = instance.id, instance.item
-    return value
+local function describe(instance)
+    return held.value(instance.id, instance.item)
+end
+
+--- Écrit la main : champ du personnage (le joueur, la base) puis statebag de son ped (les joueurs qui le voient).
+---@param src integer
+---@param characterId integer
+---@param value table|nil
+---@return boolean ok
+---@return string|nil err
+local function publish(src, characterId, value)
+    local ok, err = characters().set(characterId, HANDS_FIELD, value)
+    if not ok then return false, err end
+    pedState.set(src, value)
+    return true
 end
 
 --- Déclare le champ de personnage. Appelé pendant le setup du module.
 ---@return boolean ok
 ---@return string|nil err
 function hands.define()
-    return characters().defineField(HANDS_FIELD, { schema = hands.SCHEMA, visibility = 'public' })
+    return characters().defineField(HANDS_FIELD, { schema = hands.SCHEMA, visibility = 'owner' })
 end
 
---- Objet ajouté (définition) ou retiré (nil) du registre : la liste n'est republiée que pour un objet tenable, ou
---- qui l'était.
+--- Liste publiée en dernier (copie : `declared` continue de changer après la publication).
+---@param list table
+---@return table
+local function copyOf(list)
+    local copy = {}
+    for key, prop in pairs(list) do copy[key] = prop end
+    return copy
+end
+
+local function publishDeclared()
+    declaredDirty = false
+    -- retirée puis redéclarée à l'identique dans le même tick : rien ne repart
+    if held.sameList(declared, published) then return end
+    published = copyOf(declared)
+    GlobalState[HELD_MODELS] = declared
+end
+
+--- Objet ajouté (définition) ou retiré (nil) du registre : la liste n'est republiée que pour un objet tenable dont le
+--- placement change (nouveau, modifié, ou qui ne l'est plus), et une seule fois pour toutes les déclarations d'un même
+--- tick (un module qui déclare vingt objets tenables au démarrage : une écriture, non vingt ; un module qui les
+--- redéclare à l'identique : aucune).
 ---@param key string
 ---@param def table|nil
 local function track(key, def)
     local prop = type(def) == 'table' and type(def.held) == 'table' and propOf(def.held) or nil
-    if prop == nil and declared[key] == nil then return end
+    if held.samePlacement(prop, declared[key]) then return end
     declared[key] = prop
-    GlobalState[HELD_MODELS] = declared
+    if declaredDirty then return end
+    declaredDirty = true
+    SetTimeout(0, publishDeclared)
 end
 
---- Publie les objets tenables déjà déclarés et suit le registre. Appelé pendant le setup du module, après items.define.
+--- Jusqu'en 1.6.x, la main était un champ public, écrit dans le statebag du joueur (répliqué à tous). Après une mise à
+--- jour sans redémarrage du serveur, cette ancienne valeur y resterait : elle est effacée une fois, là où elle existe.
+local function clearLegacy()
+    for _, id in ipairs(GetPlayers()) do
+        local src = tonumber(id)
+        local state = src and Player(src).state
+        if state and state[HANDS_FIELD] ~= nil then state:set(HANDS_FIELD, nil, true) end
+    end
+end
+
+--- Publie les objets tenables déjà déclarés et suit le registre. Appelé pendant le setup du module, après items.define
+--- et hands.define.
 ---@return boolean ok
 ---@return string|nil err
 function hands.start()
@@ -105,8 +151,13 @@ function hands.start()
     for key, def in pairs(core.registry.all(REGISTRY) or {}) do
         if type(def) == 'table' and type(def.held) == 'table' then declared[key] = propOf(def.held) end
     end
+    declaredDirty, published = false, copyOf(declared)
     GlobalState[HELD_MODELS] = declared
-    local id, err = core.hooks.after('core:registry:added', function(payload)
+    local ok, err = pedState.start()
+    if not ok then return false, err end
+    clearLegacy()
+    local id
+    id, err = core.hooks.after('core:registry:added', function(payload)
         if payload.registry == REGISTRY then track(payload.key, core.registry.get(REGISTRY, payload.key)) end
     end)
     if not id then return false, err end
@@ -118,10 +169,11 @@ function hands.start()
 end
 
 --- Personnage arrivé : relit sa main. La pile doit encore être dans la besace et son objet se tenir en main (la
---- définition a pu changer, l'objet a pu être retiré hors ligne), sinon la main est vidée. Le champ suit toujours la
---- définition courante (modèle, os). Exception (1.6.3) : une pile gardée à part faute de définition (module qui ne
---- l'a pas encore redéclarée après un redémarrage de l'inventaire) existe toujours ; la main l'attend, champ inchangé
---- (aucun client n'en montre l'accessoire tant que l'objet n'est pas déclaré tenable), et la reprend à son retour.
+--- définition a pu changer, l'objet a pu être retiré hors ligne), sinon la main est vidée. Le champ est réécrit au
+--- format courant ({ id, item }) et la main publiée sur le ped du joueur. Exception (1.6.3) : une pile gardée à part
+--- faute de définition (module qui ne l'a pas encore redéclarée après un redémarrage de l'inventaire) existe
+--- toujours ; la main l'attend, champ inchangé, rien de publié sur le ped (aucun client ne pourrait en montrer
+--- l'accessoire tant que l'objet n'est pas déclaré tenable), et la reprend à son retour.
 ---@param src integer
 ---@param characterId integer
 ---@param container vAvA.Container
@@ -135,14 +187,17 @@ function hands.bind(src, characterId, container)
     local def = instance and items.get(instance.item)
     if def and def.held then
         state.instanceId = instance.id
-        characters().set(characterId, HANDS_FIELD, describe(instance, def))
+        publish(src, characterId, describe(instance))
         return
     end
     local aside = storedId and not instance and containers.aside(container, storedId)
     if aside and not items.get(aside.item) then
         state.awaitedId = aside.id
-    elseif stored ~= nil then
-        characters().set(characterId, HANDS_FIELD, nil)
+        -- un ped qui porterait encore une main d'avant (module redémarré) est vidé
+        pedState.set(src, nil)
+    else
+        if stored ~= nil then characters().set(characterId, HANDS_FIELD, nil) end
+        pedState.set(src, nil)
     end
 end
 
@@ -165,15 +220,19 @@ function hands.restore(container)
     end
     local def = items.get(instance.item)
     -- hands.set efface l'attente une fois le champ écrit
-    hands.set(src, def and def.held and instance or nil, def)
+    hands.set(src, def and def.held and instance or nil)
 end
 
+--- Personnage déchargé (retour à la sélection, départ) : sa main n'est plus montrée sur le ped du joueur. Le champ
+--- garde sa valeur en base, relue au prochain chargement.
 ---@param src integer
 function hands.unbind(src)
     local state = bySource[src]
     if not state then return end
     bySource[src] = nil
     if byContainer[state.containerId] == src then byContainer[state.containerId] = nil end
+    pedState.set(src, nil)
+    pedState.forget(src)
 end
 
 --- Identifiant de la pile tenue, ou 0.
@@ -198,13 +257,12 @@ end
 --- operations.lua, qui a validé la demande.
 ---@param src integer
 ---@param instance vAvA.ItemInstance|nil
----@param def vAvA.ItemDefinition|nil
 ---@return boolean ok
 ---@return string|nil code
-function hands.set(src, instance, def)
+function hands.set(src, instance)
     local state = bySource[src]
     if not state then return false, 'no_character' end
-    local ok, err = characters().set(state.characterId, HANDS_FIELD, instance and describe(instance, def) or nil)
+    local ok, err = publish(src, state.characterId, instance and describe(instance) or nil)
     if not ok then return false, err end
     state.instanceId = instance and instance.id or 0
     -- une main écrite n'attend plus rien

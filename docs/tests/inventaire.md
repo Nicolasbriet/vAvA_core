@@ -1,6 +1,6 @@
 # Inventaire — procédure de test en jeu
 
-Procédure pour vérifier en jeu `vava_inventory` 1.6.3 : besace, grille, poids, piles, ceinture, objets utilisés, sacs
+Procédure pour vérifier en jeu `vava_inventory` 1.7.0 : besace, grille, poids, piles, ceinture, objets utilisés, sacs
 au sol, conteneur ancré (grenier), catalogue de développement, et ce qui se joue à deux. Comptez une heure et demie
 seul, une demi-heure de plus à deux ; les tests à deux joueurs sont marqués **(2 joueurs)**. L'emplacement **Mains**
 et l'affichage des métadonnées (palier, provenance, signature, solidité) sont déjà dans [metiers.md](metiers.md),
@@ -9,7 +9,7 @@ section 1.1 : ne pas les refaire ici. Préparation commune, consoles, resmon et 
 
 ## 0. Préparation
 
-1. **Démarrage** : la console du serveur affiche `module 'vava_inventory' v1.6.4 prêt`, précédé de l'avertissement
+1. **Démarrage** : la console du serveur affiche `module 'vava_inventory' v1.7.0 prêt`, précédé de l'avertissement
    `catalogue de développement activé (/catalogue) : …` (attendu sur ce dépôt).
 2. **Les deux joueurs** : A, vous, Souverain ; B, le second, sans droit. Seul A agit depuis le Registre (`F10`).
 3. **Objets** : tout se prend au catalogue (`/catalogue`, double-clic), section par section. Ce qu'on dépose dans le
@@ -24,6 +24,27 @@ section 1.1 : ne pas les refaire ici. Préparation commune, consoles, resmon et 
    toucher `character` (taille et poids de la besace) : ils sont réécrits en base à chaque besace chargée.
 6. **Base** : le numéro de votre besace sert au § 16 :
    `SELECT id FROM vava_inventory_containers WHERE kind = 'character' AND owner_id = '<n° du personnage>'`.
+7. **Ressource jetable pour 11b-8 et 11b-9** (jamais versionnée, jamais en production) : un dossier `t045_inhand`
+   dans `resources/`, qui imite un client modifié réécrivant le statebag de son propre ped :
+   ```lua
+   -- fxmanifest.lua
+   fx_version 'cerulean'
+   game 'gta5'
+   lua54 'yes'
+   client_script 'client.lua'
+
+   -- client.lua : /t045 <objet> écrit une fausse main ; /t045 vide la vide ; /t045rafale <objet> l'écrit 30 fois
+   local function forge(item)
+       local state = Entity(PlayerPedId()).state
+       if item == 'vide' then return state:set('vava_inventory:inHand', nil, true) end
+       state:set('vava_inventory:inHand', { id = 999999, item = item }, true)
+   end
+   RegisterCommand('t045', function(_, args) forge(args[1] or 'hache_fer') print('main réécrite') end, false)
+   RegisterCommand('t045rafale', function(_, args)
+       CreateThread(function() for _ = 1, 30 do forge(args[1] or 'hache_fer') Wait(10) end print('rafale finie') end)
+   end, false)
+   ```
+   `ensure t045_inhand` (console du serveur) avant 11b-8, `stop t045_inhand` puis suppression du dossier après 11b-9.
 
 ## 1. Ouvrir et fermer la besace
 
@@ -178,6 +199,28 @@ en arrière que son propre geste ; ce que l'autre vient de prendre ou de poser r
 envoyé pendant l'attente. Après chaque refus, le perdant ferme et rouvre : l'affichage ne doit pas changer. Un objet
 affiché à tort ou manquant jusqu'à la réouverture est un écart : le noter avec le numéro du test.
 
+## 11b. L'objet en main vu des autres (1.7.0)
+
+Depuis 1.7.0, ce que tient un joueur est écrit par le serveur sur le statebag de **son ped** (`vava_inventory:inHand`,
+`{ id, item }`) : seuls les joueurs qui ont ce ped à portée le reçoivent, et ils le reçoivent quand le ped apparaît
+chez eux. A agit depuis le Registre (`F10`) ; « loin » veut dire à plus de 500 m (Registre → Déplacer vers un lieu, ou
+Rejoindre le repère posé à l'autre bout de la carte), hors de vue l'un de l'autre. Pour 8 et 9 : ressource jetable du
+§ 0.7 démarrée.
+
+| # | Faire | Attendu |
+|---|---|---|
+| 1 | **(2 joueurs)** A et B face à face, mains vides. A prend la hache en main, puis la pioche, puis repose. | Chez B, la hache apparaît dans la main de A en une seconde au plus, puis la pioche à sa place, puis plus rien. Aucune ligne `main réécrite` dans la console du serveur. |
+| 2 | **(2 joueurs)** A part loin. Là-bas, A prend la hache en main. Puis Registre → Joueurs → B → Rejoindre. | Dès que A apparaît près de B, B voit la hache dans sa main (une seconde au plus après l'apparition du personnage). C'est le défaut corrigé par T-045 : avant 1.7.0, la hache restait invisible tant que A ne changeait pas d'objet. |
+| 3 | **(2 joueurs)** A loin, hache en main ; A repose la hache et prend la pioche, toujours loin. Puis A : Registre → Joueurs → B → Amener. | B arrive près de A et voit la **pioche** dans sa main, jamais la hache. |
+| 4 | **(2 joueurs)** A loin, mains vides, puis revient près de B (Rejoindre). | Rien dans la main de A chez B. Puis A prend la hache près de B : elle apparaît. |
+| 5 | **(2 joueurs)** B loin pendant que A, près du grenier, prend la hache. Console : `restart vava_inventory`. Dès `module 'vava_inventory' v1.7.0 prêt`, B rejoint A. | Chez A, la hache revient dans sa main après le redémarrage (14-2) ; B, arrivé, la voit aussi. |
+| 6 | **(2 joueurs)** Réapparition : A, hache en main, face à B. A : `/perso quitter`, puis « Jouer » le même personnage. | Pendant la sélection, B ne voit plus rien dans la main de A (personnage déchargé : main vidée sur le ped). Après l'apparition, la hache revient dans la main de A chez B en une seconde au plus, et chez A lui-même. |
+| 7 | **(2 joueurs)** Changement de modèle : A a deux personnages de sexes différents (l'un tient la hache, l'autre la pioche). Face à B, A passe de l'un à l'autre (`/perso quitter`, « Jouer »). | Chez B, le nouveau personnage de A apparaît avec **son** outil (la pioche), jamais l'outil de l'autre, en une seconde au plus après l'apparition : le serveur repère le nouveau ped par un contrôle d'une seconde (`hands.pedCheckMs`), et la boucle de B tourne aussi à la seconde, d'où un outil qui peut manquer environ une seconde (jusqu'à deux au pire), sans être un écart. Puis retour au premier : la hache. À terre puis soigné (Registre → A → Soigner), l'outil reste en main. |
+| 8 | **(2 joueurs)** Client qui écrit une fausse valeur : A et B face à face, mains vides. A tape `/t045 hache_fer`. | Chez B, la hache apparaît au plus un quart de seconde dans la main de A puis disparaît ; elle n'y revient pas. Console du serveur : `[vAvA][WARN][vava_inventory] joueur <A> : main réécrite par son client sur l'entité réseau <n>, valeur du serveur remise`. La besace de A (`I`) : main toujours vide. Si la hache **reste** chez B : le serveur ne voit pas la réécriture du statebag d'un ped (à noter tel quel, § 17). |
+| 9 | **(2 joueurs)** A prend vraiment la hache, puis `/t045 pioche_fer`, puis `/t045 vide`, puis `/t045rafale pioche_fer`. Ensuite `/t045 prop_bomb` (objet non déclaré tenable). | Chaque fois, B revoit la **hache** dans la main de A après un quart de seconde au plus ; pendant la rafale, au plus un clignotement, et une seule ligne en console par 10 s ; dès la quatrième remise d'affilée, une ligne `main remise 3 fois de suite sans nouvelle publication`, puis des remises un peu plus tardives (une seconde au plus, `hands.guardMaxDelayMs`), jamais abandonnées : une fausse main n'est jamais visible plus d'une seconde environ. `prop_bomb` : rien ne s'affiche jamais chez B (objet absent de la liste des objets tenables), et la hache revient. |
+| 10 | Resmon chez B (`resmon 1`) pendant 1 et 2. | `vava_inventory` : 0,01 ms au plus, la boucle d'une seconde ne tourne que tant qu'un ped à portée porte quelque chose ; 0,00 ms quand A est loin. |
+| 11 | **(2 joueurs)** A, besace ouverte, double-clique la hache pour la prendre et la reposer aussi vite que possible (dix fois). | Les quatre premiers gestes passent, puis environ deux par seconde (`rateLimits.hold`) ; un geste refusé revient en arrière dans l'interface, avec « Doucement… ». Console du serveur : `limite dépassée sur vava_inventory:hold`. Chez B, la main de A suit sans clignoter plus de deux fois par seconde et finit dans l'état que montre la besace de A. |
+
 ## 12. Tentatives de triche
 
 | # | Faire | Attendu |
@@ -205,12 +248,12 @@ affiché à tort ou manquant jusqu'à la réouverture est un écart : le noter a
 
 | # | Faire | Attendu |
 |---|---|---|
-| 1 | Besace ouverte, hache en main, carotte sur la ceinture, un sac posé à côté, catalogue ouvert ; B au grenier. Console : `restart vava_inventory`. | Les interfaces d'inventaire disparaissent chez A et B, la main est rendue au jeu (à confirmer) ; l'accessoire en main disparaît ; le sac disparaît avec son contenu (voulu : les sacs ne sont pas conservés). Console : `registre 'vava_inventory:items' supprimé avec son propriétaire 'vava_inventory' : n entrée(s) d'autres modules perdue(s)`, `module 'vava_inventory' arrêté : vava_crafting, vava_farming, vava_gathering, vava_skills en dépend(ent)…`, puis `module 'vava_inventory' v1.6.4 prêt` et l'avertissement du catalogue. `vava_skills`, `vava_gathering`, `vava_crafting`, `vava_farming` tournent toujours (à confirmer : FXServer peut arrêter ce qui déclare `dependency 'vava_inventory'` ; sinon `ensure`). `n objet(s) d'inventaire non écrits à l'arrêt` signale une écriture perdue : à noter. |
+| 1 | Besace ouverte, hache en main, carotte sur la ceinture, un sac posé à côté, catalogue ouvert ; B au grenier. Console : `restart vava_inventory`. | Les interfaces d'inventaire disparaissent chez A et B, la main est rendue au jeu (à confirmer) ; l'accessoire en main disparaît ; le sac disparaît avec son contenu (voulu : les sacs ne sont pas conservés). Console : `registre 'vava_inventory:items' supprimé avec son propriétaire 'vava_inventory' : n entrée(s) d'autres modules perdue(s)`, `module 'vava_inventory' arrêté : vava_crafting, vava_farming, vava_gathering, vava_skills en dépend(ent)…`, puis `module 'vava_inventory' v1.7.0 prêt` et l'avertissement du catalogue. `vava_skills`, `vava_gathering`, `vava_crafting`, `vava_farming` tournent toujours (à confirmer : FXServer peut arrêter ce qui déclare `dependency 'vava_inventory'` ; sinon `ensure`). `n objet(s) d'inventaire non écrits à l'arrêt` signale une écriture perdue : à noter. |
 | 2 | `I`. | La besace avec tout son contenu, chaque pile à sa place d'avant le redémarrage, la ceinture garnie ; la hache toujours en main (emplacement Mains), son accessoire de nouveau visible chez A et chez B. Console : pendant le démarrage, `conteneur #n : objet #m (…) sans place ou sans définition, conservé à part` pour chaque pile d'un objet des métiers ou de la magie (leurs besaces sont rechargées avant que ces modules redéclarent leurs objets), puis, dès leur redéclaration, `conteneur #n : k pile(s) de '…' replacée(s)` pour chaque objet. Une ligne `… toujours sans place` ou une pile manquante est un écart à noter. |
 | 3 | Fermer, attendre 3 s ; en base, `SELECT id, item, x, y, rotated, quantity FROM vava_inventory_items WHERE container_id = <n° de la besace>` (relevé aussi avant le 1). Puis se reconnecter. | Mêmes lignes qu'avant le redémarrage (une pile replacée ailleurs que sa place d'origine a ses nouvelles `x`, `y`) ; l'écran correspond. Après reconnexion, tout est au même endroit, hache en main. |
 | 4 | `/catalogue` ; B : `E` au grenier. | Le catalogue fonctionne ; le grenier se rouvre avec son contenu, relu en base. |
 | 5 | `restart vava_inventory` avec tous les joueurs à la sélection de personnage, puis choisir son personnage. | Besace complète : elle se charge à la sélection, quand les objets sont déjà déclarés. |
-| 6 | **(2 joueurs)** A et B en jeu, chacun avec des objets des métiers (bûches à palier, charbon, hache en main pour A, pioche sur la ceinture de B) ; relever leurs besaces en base (3). Console : `restart vava_inventory` ; dès `module 'vava_inventory' v1.6.4 prêt`, A et B ouvrent leur besace (`I`). | Chez chacun, tout revient sans reconnexion, en un seul exemplaire ; aucun objet perdu ni recouvert (deux piles jamais sur les mêmes cases) ; la hache en main de A, la pioche sur la ceinture de B. En base : mêmes piles qu'avant, aux mêmes quantités. |
+| 6 | **(2 joueurs)** A et B en jeu, chacun avec des objets des métiers (bûches à palier, charbon, hache en main pour A, pioche sur la ceinture de B) ; relever leurs besaces en base (3). Console : `restart vava_inventory` ; dès `module 'vava_inventory' v1.7.0 prêt`, A et B ouvrent leur besace (`I`). | Chez chacun, tout revient sans reconnexion, en un seul exemplaire ; aucun objet perdu ni recouvert (deux piles jamais sur les mêmes cases) ; la hache en main de A, la pioche sur la ceinture de B. En base : mêmes piles qu'avant, aux mêmes quantités. |
 | 7 | Une miche et une bande de lin (`vava_example_items`) dans la besace ; `restart vava_inventory` ; `I`. | Elles sont à leur place sans reconnexion : le module d'exemple redéclare ses objets dès que l'inventaire est prêt (1.1.1), comme les modules du royaume ; console : `conteneur #n : k pile(s) de 'pain' replacée(s)`. |
 
 ## 15. Resmon
@@ -225,7 +268,8 @@ Ressource `vava_inventory`, console du client (`resmon 1`).
 | Un joueur proche tient un objet en main. | 0,01 ms au plus : une boucle d'une seconde, active seulement tant que quelqu'un tient quelque chose. |
 
 Cibles : 0,02 ms au repos, 0,15 ms en action. Côté serveur, aucune boucle permanente : l'écriture groupée passe
-toutes les 3 s, le contrôle d'éloignement des conteneurs ancrés toutes les 2 s, seulement tant qu'un est ouvert.
+toutes les 3 s, le contrôle d'éloignement des conteneurs ancrés toutes les 2 s, seulement tant qu'un est ouvert, et le
+contrôle du ped des porteurs (1.7.0) chaque seconde, seulement tant que quelqu'un tient quelque chose.
 
 ## 16. Ce qu'il faut regarder dans la base
 
@@ -244,7 +288,8 @@ toutes les 3 s, le contrôle d'éloignement des conteneurs ancrés toutes les 2 
   absorbée effacée ; division → nouvelle ligne ; dernière unité mangée → effacée. Les changements de page du
   catalogue n'écrivent rien.
 - `vava_characters.data` (JSON) : `vava_inventory:hotbar` (cinq `id` de piles, 0 pour vide) et `vava_inventory:hands`
-  (pile en main), écrits par le core au départ du personnage et toutes les 5 min.
+  (pile en main : `{ id, item }` depuis 1.7.0 ; une valeur plus ancienne porte aussi le placement, réécrite au format
+  court au chargement), écrits par le core au départ du personnage et toutes les 5 min.
 - `vava_farming_granary_log` : dépôts et retraits du grenier, regroupés par minute, écrits toutes les 10 s par
   `vava_farming`.
 - `vava_admin_logs` : `action = 'Catalogue de développement'`, détails joueur, catégorie, page, à chaque `/catalogue`
@@ -259,6 +304,11 @@ toutes les 3 s, le contrôle d'éloignement des conteneurs ancrés toutes les 2 
 - Que l'inventaire ouvert empêche de marcher, et que le curseur est rendu quand le module redémarre interface ouverte.
 - La hauteur du sac sur une pente ou un escalier (`drop.groundOffset = 0.98` sous le centre du ped) : il peut flotter
   ou s'enfoncer.
+- Ce qui, pour l'objet en main (1.7.0), dépend de OneSync et ne se voit qu'en jeu (11b) : que le statebag du ped soit
+  envoyé à un joueur au moment où le ped apparaît chez lui (2, 3), y compris s'il arrive avant le ped (attente de 10 s
+  au plus, `hands.awaitPedMs`) ; qu'un nouveau ped (réapparition, changement de modèle) soit vu par `GetPlayerPed` côté
+  serveur en une seconde (6, 7) ; que le serveur voie les écritures du client sur le statebag de son ped (8, 9). Le
+  reste (valeur courte, garde, comparaison, délais) est vérifié hors jeu (`tests/spec/inventory_held_spec.lua`).
 - La réception de l'identifiant d'un sac (state bag de l'entité) par un joueur qui arrive après la pose ou revient de
   loin : il doit pouvoir l'ouvrir avec `I`.
 - Ce que fait FXServer des ressources qui déclarent `dependency 'vava_inventory'` quand on le redémarre (14-1).
