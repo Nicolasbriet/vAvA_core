@@ -5,3 +5,7 @@
 @import url("http://exemple.invalid/f.css"); /* -- attendu: BLOQUANT */
 .d { background: var(--ui-grain, none); } /* -- attendu: rien */
 .e { background: url("nui://vava_ui/web/img/grain.webp"); } /* -- attendu: rien */
+.f { background: url(//exemple.invalid/z.png); } /* -- attendu: BLOQUANT */
+.g { background: url( "//exemple.invalid/z.png"); } /* -- attendu: BLOQUANT */
+@font-face { font-family: "X"; src: url('//exemple.invalid/x.woff2'); } /* -- attendu: BLOQUANT */
+.h { background: url("../img/cell.svg"); } /* -- attendu: rien */

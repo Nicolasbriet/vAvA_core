@@ -1,3 +1,5 @@
 # chemin<TAB>extrait exact de la ligne<TAB>raison — exceptions de l'essai du script d'audit (--essai), jamais lues en mode normal
 tests/audit/boucle_tous.lua	TriggerClientEvent('t:excuse', src)	cas d'essai : une exception inscrite couvre la ligne
 modules/vava_exempte/web/	[fichier]	cas d'essai : un chemin qui finit par / couvre les fichiers de ce dossier
+tests/audit/interface.js		cas d'essai : extrait vide, exception refusée (elle couvrirait tout le fichier)  -- attendu: BLOQUANT
+modules/vava_exempte_mal/web/	devmock	cas d'essai : dossier dont l'extrait n'est pas [fichier], exception refusée  -- attendu: BLOQUANT

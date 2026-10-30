@@ -21,3 +21,18 @@ modules/vava_ui/web/img/grain.webp  -- attendu: rien
 modules/vava_ui/web/img/frame.svg  -- attendu: rien
 modules/vava_exempte/web/fonts/cinzel.woff2  -- attendu: rien
 modules/vava_exempte/web/js/devmock.js  -- attendu: rien
+# relecture : seul modules/<module>/web/dev/ est exclu (pas un web/dev/ plus profond) ; vava_ui n'est exempté que des
+# copies, pas des données simulées
+modules/vava_essai/web/sous/web/dev/devmock.js  -- attendu: BLOQUANT
+modules/vava_ui/web/js/devmock.js  -- attendu: BLOQUANT
+modules/vava_ui/web/dev/devmock.js  -- attendu: rien
+# relecture : autres formats de police, partout sous web/ ; noms communs seulement sous web/fonts/ et web/img/
+modules/vava_essai/web/fonts/cinzel.woff  -- attendu: BLOQUANT
+modules/vava_essai/web/fonts/cinzel.ttf  -- attendu: BLOQUANT
+modules/vava_essai/web/fonts/cinzel.otf  -- attendu: BLOQUANT
+modules/vava_essai/web/items/police.ttf  -- attendu: BLOQUANT
+modules/vava_essai/web/img/textures/grain.webp  -- attendu: BLOQUANT
+modules/vava_essai/web/items/paper.svg  -- attendu: rien
+modules/vava_essai/web/icons/frame.svg  -- attendu: rien
+# relecture : exception de dossier dont l'extrait n'est pas [fichier] (refusée dans exceptions.txt) : rien n'est couvert
+modules/vava_exempte_mal/web/js/devmock.js  -- attendu: BLOQUANT
