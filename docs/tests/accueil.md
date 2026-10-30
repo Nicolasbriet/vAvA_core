@@ -1,6 +1,6 @@
 # Accueil des nouveaux venus — procédure de test en jeu
 
-Procédure pour vérifier en jeu l'arrivée d'un nouveau personnage (`vava_arrival` 1.0.0) et l'ouverture du Codex à un
+Procédure pour vérifier en jeu l'arrivée d'un nouveau personnage (`vava_arrival` 1.1.0) et l'ouverture du Codex à un
 chapitre (`vava_codex` 1.4.0). Comptez une heure ; les tests à deux joueurs sont marqués **(2 joueurs)**. Chaque test
 dit quoi faire et ce qui doit se passer ; si ce n'est pas le cas, notez l'étape, ce que vous avez vu, et la ligne de
 console correspondante.
@@ -10,7 +10,8 @@ console correspondante.
 1. **Ordre de démarrage** (`server.cfg`, ou la Chancellerie qui le fait seule), après `oxmysql` : `vAvA_core`,
    `vava_ui`, `vava_chat`, `vava_world`, `vava_time`, `vava_appearance`, `vava_characters_ui`, `vava_hud`,
    `vava_inventory`, `vava_needs`, `vava_health`, `vava_admin`, `vava_voice`, `vava_cameras`, `vava_magic`,
-   `vava_skills`, `vava_gathering`, `vava_crafting`, `vava_farming`, `vava_codex`, `vava_arrival`, `vava_chancellerie`.
+   `vava_skills`, `vava_gathering`, `vava_crafting`, `vava_farming`, `vava_provisions`, `vava_codex`, `vava_arrival`,
+   `vava_chancellerie`.
 2. **Rôles** : A est Sénéchal (console : `vava_conseil <compte de A> senechal`) ; B n'a aucun rang.
 3. **Outils de développement** (`/respawn`, `/perso`) : `set vava_env dev` au `server.cfg` du serveur de test, et
    `vava_dev_characters` démarré ; réservés au Souverain ou à l'ACE `vava.dev` (B : `add_ace identifier.license:<licence>
@@ -25,7 +26,7 @@ console correspondante.
 
 | # | Faire | Attendu |
 |---|---|---|
-| 1 | Démarrer le serveur. | Console : migration `0001_arrival.sql` appliquée, `module 'vava_arrival' v1.0.0 prêt`, `module 'vava_codex' v1.4.0 prêt`. Aucun avertissement. |
+| 1 | Démarrer le serveur. | Console : migration `0001_arrival.sql` appliquée, `module 'vava_arrival' v1.1.0 prêt`, `module 'vava_provisions' v1.0.0 prêt`, `module 'vava_codex' v1.4.0 prêt`. Aucun avertissement. |
 | 2 | B crée un personnage et le joue. | Apparition au point d'arrivée (`spawn.defaultPoint`). Environ 4 s après la fin du fondu : notification d'accueil, puis celle de la besace ; le Codex s'ouvre (au chapitre Inventaire avec le réglage d'essai, à son index sinon), clavier et souris pris ; `Échap` le ferme. Besace (`I`) : 2 Miche de pain, 2 Outre d'eau. |
 | 3 | B ferme le Codex, puis `/respawn` (ou se fait mettre à terre et rend l'âme). | Aucune notification, aucun objet de plus. |
 | 4 | B se déconnecte et revient sur le même personnage. | Apparition à sa dernière position ; ni accueil ni objet. |
@@ -60,6 +61,16 @@ console correspondante.
 | 18 | Console du serveur : `accueil etat <n° de B>`, puis `accueil redoter <n° de B>`. | La ligne d'état s'écrit dans la console ; la dotation part, `vava_arrival_log` : `admin_regive` avec `actor_account_id` vide. |
 | 19 | B en jeu : `restart vava_arrival`. | Aucun accueil, aucun objet ; `/accueil etat <B>` fonctionne aussitôt après `prêt`. |
 | 20 | Remettre `codex.chapter = 'premiers_pas'`, `restart vava_arrival`, créer un personnage. | Le Codex s'ouvre à son index (le chapitre n'existe pas avant T-023), sans erreur en F8. |
+
+## 4 bis. L'eau de la dotation (`vava_provisions`, T-130)
+
+L'Outre d'eau de la dotation est déclarée par `vava_provisions` (et non plus par `vava_arrival`). Procédure complète
+de l'eau : [eau.md](eau.md).
+
+| # | Faire | Attendu |
+|---|---|---|
+| 21 | B (nouveau personnage, dotation reçue), soif sous 95 (`/besoins 100 50`), boit une de ses deux Outres d'eau. | Geste de boire, soif remontée ; **une Outre vide** apparaît dans la besace (une fois sur dix : l'avis « Usée, l'outre se fend… » et rien). La fiche de l'Outre d'eau montre « Soif +40 » et l'image de l'outre. |
+| 22 | Console : `stop vava_provisions` ; C crée un personnage. Puis `ensure vava_provisions`. | Accueil de C sans la ligne de la besace ; console : objet `eau` inconnu, dotation reportée. Au retour du module, en quelques secondes : 2 pains et 2 outres dans la besace de C, **sans** nouvel accueil ; `/accueil etat <C>` : « donnée ». |
 
 ## 5. Ce qui reste à confirmer (README de `vava_arrival`)
 
