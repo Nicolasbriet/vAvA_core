@@ -2,7 +2,7 @@
 # scripts/verifier.sh — contrôle avant chaque commit d'agent et en CI.
 #   1. lint (luacheck) : fichiers Lua modifiés depuis BASE, ou tout le dépôt avec --tout
 #   2. tests unitaires (busted)
-#   3. audit réseau et sécurité statique (scripts/audit-reseau.sh)
+#   3. audit réseau et sécurité statique (scripts/audit-reseau.sh), puis son essai sur les cas de tests/audit/
 # Code de sortie 0 seulement si tout passe.
 set -uo pipefail
 cd "$(dirname "$0")/.."
@@ -52,6 +52,10 @@ fi
 titre "Audit réseau et sécurité"
 # shellcheck disable=SC2086
 ./scripts/audit-reseau.sh $fichiers_tous || echec=1
+
+titre "Essai du script d'audit"
+# les contrôles de l'audit lancés sur les cas écrits de tests/audit/ : chacun doit dire ce que la ligne attend
+./scripts/audit-reseau.sh --essai || echec=1
 
 echo
 if [[ $echec -eq 0 ]]; then echo "VÉRIFICATION : OK"; else echo "VÉRIFICATION : ÉCHEC"; fi
