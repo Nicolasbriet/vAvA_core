@@ -510,7 +510,10 @@ versé à T-014 ; les autres points déjà couverts sont précisés dans T-012 �
 ## Phase 2 — Arrivée
 
 ### T-020 — Écran de chargement `vava_loading`
-- Agents : vava-architecte → vava-dev-nui · Dépend de : T-012 · Statut : à faire
+- Agents : vava-architecte → vava-dev-lua + vava-dev-nui (cette tâche autorise à toucher le core, `vava_characters_ui`, `chancellerie/`, `scripts/verifier.sh` et `scripts/audit-exceptions.txt`, dans les limites de la spec) · Dépend de : T-012 · Statut : en cours
+- Spec : `docs/plan/specs/T-020.md` (treize décisions retenues telles que proposées, sur délégation du porteur du projet,
+  le 30 octobre 2026 : core 0.13.0 qui laisse l'écran à `vava_loading` avec un filet de 30 s, hook
+  `vava_characters_ui:shown`, polices embarquées, aucune musique livrée, ouverture à chaque connexion).
 - Ressource dédiée : `loadscreen` + `loadscreen_manual_shutdown 'yes'`, fermée par le client quand la sélection de
   personnage est prête (coordination avec `vava_characters_ui`). Progression réelle (messages `loadProgress`),
   extraits du lore en rotation, conseils, nom du serveur ; musique facultative coupable, désactivée par défaut.
@@ -537,7 +540,7 @@ versé à T-014 ; les autres points déjà couverts sont précisés dans T-012 �
 - 20 à 30 extraits courts du lore, 15 conseils de jeu, textes d'accueil.
 
 ### T-022 — Arrivée d'un nouveau personnage
-- Agents : vava-architecte → vava-dev-lua · Dépend de : — · Statut : à faire
+- Agents : vava-architecte → vava-dev-lua · Dépend de : — · Statut : en cours (spec)
 - Point d'arrivée en config (PLACEHOLDER), dotation de départ minimale en config (besace, vêtements simples, pain,
   eau), message d'accueil, ouverture du Codex au chapitre « Premiers pas » à la première connexion. Rien de plus :
   le reste s'obtient auprès des autres joueurs.
@@ -553,7 +556,7 @@ Référence : `docs/plan/ATELIER.md` et les maquettes `docs/maquettes/`. Les éc
 maquettes.
 
 ### T-100 — Ressource `vava_atelier` : cadre, accueil, droits
-- Agents : vava-architecte → vava-dev-lua + vava-dev-nui · Dépend de : T-012 · Statut : à faire
+- Agents : vava-architecte → vava-dev-lua + vava-dev-nui · Dépend de : T-012 · Statut : en cours (spec)
 - Interface NUI unique (accueil selon la maquette `Main` : familles, recherche, brouillons, journal), ouverture par
   touche et commande déclarées au registre `core:commands`, registre `vava_atelier:editors`, droits par éditeur via
   `vava_admin`, journal du Conseil. Formulaire générique piloté par schéma (widgets `slider`, `segmented`, `select`,
