@@ -3,7 +3,8 @@ local helper = require('tests.helper')
 -- Points d'eau partagés par les abonnements de zone du core (modules/vava_provisions/shared/pointzone.lua, T-130).
 -- Valeurs documentées : README du module (« Réseau ») et docs/plan/specs/T-130.md § 5.4 :
 --   une zone du core par point, rayon 2 m, marge = portée des props (80 m) + 20 m = 100 m ;
---   état { def = { kind, label, x, y, z, heading, model } }, sans réserve ;
+--   état { def = { kind, label, x, y, z, heading?, model? } }, sans réserve ; `model` seulement s'il diffère de celui
+--   de la sorte, `heading` seulement s'il n'est pas nul (le client reprend sa config) ;
 --   le client ignore ce qui est mal formé (jamais d'erreur) et ne connaît que les points des zones qu'il suit.
 
 describe('vava_provisions pointzone', function()
@@ -39,12 +40,23 @@ describe('vava_provisions pointzone', function()
             assert.same({ x = -250.0, y = -960.0, radius = 2.0, margin = 100.0 }, area)
         end)
 
-        it('dessin : sorte, nom, lieu, cap, modèle résolu, rien d\'autre (ni réserve)', function()
-            local drawing = pointzone.drawing(validated(1))
-            assert.same({ kind = 'fontaine', label = 'Fontaine du bourg', x = -250.0, y = -960.0, z = 31.2, heading = 0.0,
-                model = 'prop_barrel_01a' }, drawing)
+        it('dessin : sorte, nom, lieu ; ni réserve, ni modèle de la sorte, ni cap nul', function()
+            local drawing = pointzone.drawing(validated(1), cfg.kinds)
+            assert.same({ kind = 'fontaine', label = 'Fontaine du bourg', x = -250.0, y = -960.0, z = 31.2 }, drawing)
             assert.is_nil(drawing.reserve)
             assert.is_nil(drawing.id)
+        end)
+
+        it('dessin : modèle propre (ou aucun prop) et cap non nul envoyés', function()
+            local _, point = rules.validatePoint({ id = 'p', kind = 'puits', label = 'P', x = 1, y = 2, z = 3, heading = 90,
+                model = 'prop_well_01' }, cfg.kinds)
+            assert.same({ kind = 'puits', label = 'P', x = 1.0, y = 2.0, z = 3.0, heading = 90.0, model = 'prop_well_01' },
+                pointzone.drawing(point, cfg.kinds))
+            point.model = ''
+            assert.equal('', pointzone.drawing(point, cfg.kinds).model)
+            -- sans les sortes : un modèle non vide part toujours
+            point.model = 'prop_barrel_01a'
+            assert.equal('prop_barrel_01a', pointzone.drawing(point).model)
         end)
     end)
 
@@ -52,13 +64,16 @@ describe('vava_provisions pointzone', function()
         it('relit le dessin publié : le même point', function()
             for index, def in ipairs(cfg.points) do
                 local point = validated(index)
-                local read = pointzone.readDrawing(def.id, pointzone.drawing(point))
+                local read = pointzone.readDrawing(def.id, pointzone.drawing(point, cfg.kinds), cfg.kinds)
                 assert.same(point, read, def.id)
+                -- point sans prop malgré le modèle de sa sorte, cap non nul : relu tel quel
+                point.model, point.heading = '', 45.0
+                assert.same(point, pointzone.readDrawing(def.id, pointzone.drawing(point, cfg.kinds), cfg.kinds), def.id)
             end
         end)
 
         it('ignore un dessin mal formé, sans erreur', function()
-            local good = pointzone.drawing(validated(2))
+            local good = pointzone.drawing(validated(2), cfg.kinds)
             local function with(key, value)
                 local raw = {}
                 for k, v in pairs(good) do raw[k] = v end
@@ -77,21 +92,24 @@ describe('vava_provisions pointzone', function()
             assert.is_nil(pointzone.readDrawing('puits_lavoir', 'def'))
             assert.is_not_nil(pointzone.readDrawing('puits_lavoir', with('model', '')))
             assert.equal('', pointzone.readDrawing('puits_lavoir', with('model', nil)).model)
+            assert.equal('prop_barrel_01a', pointzone.readDrawing('puits_lavoir', with('model', nil), cfg.kinds).model)
+            assert.equal('', pointzone.readDrawing('puits_lavoir', with('kind', 'citerne'), cfg.kinds).model)
             assert.equal(0.0, pointzone.readDrawing('puits_lavoir', with('heading', nil)).heading)
         end)
 
         it('carnet : entrée, changement, sortie, taille et liste triée', function()
-            local book = pointzone.book()
-            local puits = { def = pointzone.drawing(validated(2)) }
-            local fontaine = { def = pointzone.drawing(validated(1)) }
+            local book = pointzone.book(cfg.kinds)
+            local puits = { def = pointzone.drawing(validated(2), cfg.kinds) }
+            local fontaine = { def = pointzone.drawing(validated(1), cfg.kinds) }
             assert.is_true(book:enter('puits_lavoir', puits))
             assert.is_false(book:enter('puits_lavoir', puits))   -- état renvoyé entier, identique
             assert.is_true(book:enter('fontaine_bourg', fontaine))
             assert.equal(2, book:size())
             assert.same({ 'fontaine_bourg', 'puits_lavoir' }, { book:list()[1].id, book:list()[2].id })
+            assert.equal('prop_barrel_01a', book:point('fontaine_bourg').model)
 
             -- changement du dessin (Atelier, plus tard)
-            local moved = pointzone.drawing(validated(2))
+            local moved = pointzone.drawing(validated(2), cfg.kinds)
             moved.x = moved.x + 5
             assert.is_true(book:change('puits_lavoir', { def = moved }, {}))
             assert.equal(moved.x, book:point('puits_lavoir').x)

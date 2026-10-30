@@ -100,6 +100,10 @@ VavaProvisions.config = {
         permission = 'metiers',     -- droit vava_admin (Sénéchal et au-dessus, comme /agriculture)
         ace = 'metiers.admin',      -- repli ACE sans vava_admin
         cooldownMs = 1000,          -- entre deux /eau d'un même membre (console exceptée)
+        -- /eau points : lignes regroupées en messages de `replyBytes` octets au plus (sous les 500 signes d'un message
+        -- de vava_chat) ; au-delà de `listMax` points, « … et N autres points d'eau. »
+        replyBytes = 480,
+        listMax = 60,
     },
 
     rateLimits = {
@@ -137,6 +141,7 @@ VavaProvisions.config = {
             range = 'La réserve de %s va de 0 à %d.',
             noReserve = '%s est sans fond : rien à régler.',
             wait = 'Patientez un instant.',
+            more = '… et %d autres points d\'eau.',
         },
         journal = {
             reserve = 'Réserve d\'eau fixée',     -- journal du Registre

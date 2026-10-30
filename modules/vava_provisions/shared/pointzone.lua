@@ -56,29 +56,46 @@ function pointzone.area(point, radius, margin)
     return { x = point.x, y = point.y, radius = radius, margin = margin }
 end
 
+---@param kinds table|nil
+---@param kindId string
+---@return string
+local function kindModel(kinds, kindId)
+    local kind = type(kinds) == 'table' and kinds[kindId] or nil
+    local model = type(kind) == 'table' and kind.model or nil
+    return type(model) == 'string' and model or ''
+end
+
 --- Ce que les clients proches reçoivent pour dessiner un point (point validé par rules.validatePoint, modèle résolu).
+--- Allégé : `model` seulement s'il diffère de celui de la sorte (le client le reprend de sa config), `heading`
+--- seulement s'il n'est pas nul.
 ---@param point { kind: string, label: string, x: number, y: number, z: number, heading: number, model: string }
----@return { kind: string, label: string, x: number, y: number, z: number, heading: number, model: string }
-function pointzone.drawing(point)
+---@param kinds table|nil  sortes de la config
+---@return { kind: string, label: string, x: number, y: number, z: number, heading: number|nil, model: string|nil }
+function pointzone.drawing(point, kinds)
+    local model = point.model or ''
+    local heading = point.heading or 0.0
     return {
-        kind = point.kind, label = point.label, x = point.x, y = point.y, z = point.z, heading = point.heading or 0.0,
-        model = point.model or '',
+        kind = point.kind, label = point.label, x = point.x, y = point.y, z = point.z,
+        heading = heading ~= 0 and heading or nil,
+        model = model ~= kindModel(kinds, point.kind) and model or nil,
     }
 end
 
 -- Client -------------------------------------------------------------------------------------------------------------
 
---- Point lu dans l'état d'une zone, ou nil si la valeur est mal formée.
+--- Point lu dans l'état d'une zone, ou nil si la valeur est mal formée. Sans `model` : celui de la sorte (config du
+--- client ; sorte inconnue : aucun prop) ; sans `heading` : 0.
 ---@param id any   identifiant local de la zone (= identifiant du point)
 ---@param raw any  valeur de `def`
+---@param kinds table|nil  sortes de la config
 ---@return { id: string, kind: string, label: string, x: number, y: number, z: number, heading: number, model: string }|nil
-function pointzone.readDrawing(id, raw)
+function pointzone.readDrawing(id, raw, kinds)
     if not identifier(id) or type(raw) ~= 'table' then return nil end
     if not identifier(raw.kind) or not text(raw.label, LABEL_MAX) then return nil end
     if not finite(raw.x) or not finite(raw.y) or not finite(raw.z) then return nil end
     if raw.heading ~= nil and not finite(raw.heading) then return nil end
     local model = raw.model
-    if model == nil then model = '' end
+    if model == nil then model = kindModel(kinds, raw.kind) end
     if type(model) ~= 'string' or #model > MODEL_MAX or not find(model, MODEL_PATTERN) then return nil end
     return {
         id = id, kind = raw.kind, label = raw.label, x = raw.x, y = raw.y, z = raw.z, heading = raw.heading or 0.0,
@@ -99,13 +116,15 @@ pointzone.sameDrawing = sameDrawing
 ---@field points table<string, table>   identifiant → point dessiné
 ---@field ordered table[]|nil           points triés par identifiant (refaits après un changement)
 ---@field count integer
+---@field kinds table|nil               sortes de la config (modèle d'un point qui n'en publie pas)
 local Book = {}
 Book.__index = Book
 
 --- Carnet des points connus du client : seulement ceux des zones qu'il suit.
+---@param kinds table|nil  sortes de la config
 ---@return vAvA.WaterPointBook
-function pointzone.book()
-    return setmetatable({ points = {}, ordered = nil, count = 0 }, Book)
+function pointzone.book(kinds)
+    return setmetatable({ points = {}, ordered = nil, count = 0, kinds = kinds }, Book)
 end
 
 --- Oublie un point.
@@ -137,7 +156,7 @@ end
 ---@param state any
 ---@return boolean changed  un point est apparu, a bougé (lieu, nom, sorte, modèle) ou a disparu
 function Book:enter(id, state)
-    local drawing = type(state) == 'table' and pointzone.readDrawing(id, state[pointzone.DEF]) or nil
+    local drawing = type(state) == 'table' and pointzone.readDrawing(id, state[pointzone.DEF], self.kinds) or nil
     if not drawing then return self:leave(id) end
     return self:place(id, drawing)
 end
@@ -156,7 +175,7 @@ function Book:change(id, set, removed)
         end
     end
     if type(set) == 'table' and set[pointzone.DEF] ~= nil then
-        local drawing = pointzone.readDrawing(id, set[pointzone.DEF])
+        local drawing = pointzone.readDrawing(id, set[pointzone.DEF], self.kinds)
         if not drawing then return self:leave(id) end
         return self:place(id, drawing)
     end

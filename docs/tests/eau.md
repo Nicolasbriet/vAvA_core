@@ -43,8 +43,8 @@ ligne de console correspondante. Un test se cite « eau 11 ».
 
 | # | Faire | Attendu |
 |---|---|---|
-| 10 | A : `/eau points`. | Une ligne par point dans le chat de A seul : « Puits du lavoir (puits_lavoir, puits) : 40 / 40 puisages. », « Fontaine du bourg (fontaine_bourg, fontaine) : sans fond. ». |
-| 11 | A : `/eau reserve puits_lavoir 2` ; B au Puits du lavoir avec 5 Outres vides, soif 99 : `E`, puis `E`. | Chat de A : « Réserve de Puits du lavoir : 2 / 40. » ; Registre (`F10`) → Journal : « Réserve d'eau fixée ». B : 2 remplies, puis « Le seau racle le fond : le puits doit se remplir (environ 1 min). » |
+| 10 | A : `/eau points`. | Un seul message (les lignes regroupées) dans le chat de A seul, une ligne par point : « Puits du lavoir (puits_lavoir, puits) : 40 / 40 puisages. », « Fontaine du bourg (fontaine_bourg, fontaine) : sans fond. ». Registre : rien (lecture seule). |
+| 11 | A : `/eau reserve puits_lavoir 2` ; B au Puits du lavoir avec 5 Outres vides, soif 99 : `E`, puis `E`. | Chat de A : « Réserve de Puits du lavoir : 2 / 40. » ; Registre (`F10`) → Journal : « Réserve d'eau fixée » (point, réserve 2, ancienne 40). B : 2 remplies, puis « Le seau racle le fond : le puits doit se remplir (environ 1 min). » |
 | 12 | B (même puits à sec, 3 Outres vides) : `/besoins 100 50`, `E`. | « Trop peu d'eau pour remplir une outre, mais assez pour boire quelques gorgées. » ; soif vers 70. |
 | 13 | Attendre 1 min, `E` (soif 99). | Une outre remplie. |
 | 14 | **(2 joueurs)** A : `/eau reserve puits_lavoir 1` ; A et B au puits, chacun une Outre vide, soif 99 ; appuyer sur `E` au même moment. | Un seul « Vous remplissez une outre. » ; l'autre : « Le seau racle le fond… ». |
@@ -54,7 +54,8 @@ ligne de console correspondante. Un test se cite « eau 11 ».
 
 | # | Faire | Attendu |
 |---|---|---|
-| 16 | B charge sa besace près de 25 kg avec 5 Outres vides : `E`. | « Votre besace serait trop lourde. » ; les outres restent vides ; `/eau points` : réserve inchangée. |
+| 16 | B charge sa besace près de 25 kg avec 5 Outres vides, soif 99 : `E`. | « Votre besace serait trop lourde. » ; les outres restent vides ; `/eau points` : réserve inchangée. |
+| 16 bis | Même besace, `/besoins 100 50` : `E` au même puits. | « Votre besace serait trop lourde. Vous buvez quelques gorgées d'eau fraîche. » ; geste de boire, soif vers 70 ; outres toujours vides ; réserve inchangée. |
 | 17 | B, besace pleine sauf la place de ses Outres d'eau (pile de 2), boit une Outre d'eau. | « Votre besace est pleine : l'outre vide est perdue. » ; soif remontée. |
 | 18 | `tearChance = 1` dans la config, `restart vava_provisions` ; B boit une Outre d'eau. Remettre `0.1`. | « La couture cède : l'outre se fend… » ; aucune Outre vide. |
 | 19 | B, 1 Cuir tanné (`/objet cuir 1`) à la Tannerie du bourg : recette « Outre ». | 2 Outres vides (palier noté) ; XP de Tannerie. |

@@ -63,7 +63,17 @@ Le serveur choisit (`rules.decide`), dans cet ordre :
 5. sinon → « Il vous faut une outre vide pour emporter de l'eau. ».
 
 Avant d'agir, le hook `vava_provisions:drawing` (annulable) laisse un autre module refuser (source empoisonnée, puits
-gardé, confrérie) : sa raison est montrée au joueur, coupée à 200 octets.
+gardé, confrérie) : sa raison est montrée au joueur, coupée à 200 octets. Après lui, le serveur relit le personnage et
+la distance (le hook a pu céder la main). Si le remplissage est refusé par la besace (pleine, trop lourde) et que le
+joueur a soif là où l'on peut boire, il boit sur place (« Votre besace est pleine. Vous buvez quelques gorgées… ») ;
+les puisages réservés sont rendus et le délai de 3 s est posé.
+
+### Où poser les points d'eau
+
+La fontaine est sans fond : c'est voulu, mais elle ne doit pas rendre le reste inutile. Placer les **fontaines au cœur
+du bourg** (là où l'on se croise), et les **puits et sources dans les hameaux, aux champs, près des mines et des
+chantiers**, loin d'une fontaine : là-bas, l'eau se compte et se tarit, et **porter l'eau devient un service** qu'on rend
+ou qu'on troque.
 
 ### Recettes qui consomment de l'eau
 
@@ -87,7 +97,7 @@ Aucune table SQL, aucune migration, aucun champ de personnage.
 
 | Quoi | Cible | Taille | Fréquence |
 |---|---|---|---|
-| état de la zone d'un point (`def` : sorte, nom, lieu, cap, modèle), envoyé par le core | les seuls joueurs à moins de 102 m du point (rayon 2 + marge 100, au sol), décidés par le serveur sur la position qu'il lit | ~160 o par point | une fois à l'arrivée ; de nouveau seulement si la définition change (Atelier, plus tard) |
+| état de la zone d'un point (`def` : sorte, nom, lieu ; cap s'il n'est pas nul, modèle s'il diffère de celui de la sorte, que le client lit dans sa config), envoyé par le core | les seuls joueurs à moins de 102 m du point (rayon 2 + marge 100, au sol), décidés par le serveur sur la position qu'il lit | ~160 o par point | une fois à l'arrivée ; de nouveau seulement si la définition change (Atelier, plus tard) |
 | RPC `vava_provisions:draw` (identifiant du point, 32 octets, motif ancré) | — | ~45 o montants, ~40 o de réponse | à chaque appui, 3 d'avance puis 1 par 2 s |
 | `vava_provisions:notice` (`torn` ou `lost`) | le **seul** joueur qui vient de boire une outre d'eau fendue ou sans place | ~35 o | une fois sur dix environ par outre bue |
 | `vava_provisions:notify` (texte) | le **seul** membre du Conseil qui a tapé `/eau`, sans `vava_chat` | 50 à 120 o par ligne | à la demande |
@@ -107,7 +117,8 @@ thread par geste accepté (`Wait` de la durée du geste, jamais `Wait(0)`).
 Le RPC `vava_provisions:draw` revérifie, dans l'ordre : personnage actif ; une demande à la fois par joueur (`busy`,
 rendu même en erreur) ; délai de 3 s ; à terre (`vava_health`) ; point connu ; **distance réelle** du ped (3,5 m, 3D) ;
 outres vides **réellement possédées** (compte de l'inventaire) ; soif lue côté serveur ; réserve ; choix de l'action ;
-hook annulable. Remplir : les puisages sont **réservés avant** l'échange (rien ne cède la main entre la lecture et la
+hook annulable, puis personnage et distance relus. Les payloads des hooks sont reconstruits par le serveur à chaque
+appel (un abonné de `drawing` ne change rien à `drawn`). Remplir : les puisages sont **réservés avant** l'échange (rien ne cède la main entre la lecture et la
 réservation), l'échange est **tout ou rien**, et la réserve est rendue s'il échoue — deux joueurs sur la dernière
 unité : un seul est servi. L'outre rendue ne l'est que si l'inventaire dit `consumed` (une unité réellement retirée),
 dans un thread, pour le même personnage. Limite connue de OneSync : la position du ped est déclarée par son client ;
@@ -116,9 +127,11 @@ le gain d'un tricheur serait de l'eau, sans valeur marchande.
 ## Conseil (droit `metiers`)
 
 `/eau points` : chaque point, son identifiant, sa sorte et sa réserve (« 12 / 40 puisages » ou « sans fond »), dans le
-chat du seul membre (lecture seule). `/eau reserve <point> <nombre>` : fixe ce qu'on peut encore puiser à un puits ou
-une source (0 à sa capacité ; refusé pour une fontaine sans fond) ; inscrit au journal du Registre (« Réserve d'eau
-fixée », point et réserve). Console du serveur : `eau points`, `eau reserve …`. Sans droit : rien, aucune réponse.
+chat du seul membre (lecture seule) ; les lignes sont regroupées en messages de 480 octets au plus (`admin.replyBytes`,
+sous les 500 signes de `vava_chat`), 60 points au plus (`admin.listMax`), puis « … et N autres points d'eau. ».
+`/eau reserve <point> <nombre>` : fixe ce qu'on peut encore puiser à un puits ou une source (0 à sa capacité ; refusé
+pour une fontaine sans fond) ; inscrit au journal du Registre (« Réserve d'eau fixée », point, ancienne et nouvelle
+réserve). Console du serveur : `eau points`, `eau reserve …`. Sans droit : rien, aucune réponse.
 Les deux actions sont au Codex (chapitre « Vivres »), la liste des points par l'export `codexList('points')`.
 
 ## API
@@ -147,7 +160,8 @@ rendues à sa déclaration : rien n'est perdu.
 **Assets à brancher** (`config.lua`, `-- PLACEHOLDER`) : modèles des sortes (`kinds.*.model` : puits, fontaine, rocher
 de source), coordonnées des points (`points`), gestes (`anims`). Un point posé sur un décor de la carte prend
 `model = ''` (aucun prop). Ne jamais poser un point à moins de 5 m d'une autre cible de la touche `E` (puits de
-`vava_farming`, stations, nœuds de récolte) : deux invites sur la même touche.
+`vava_farming`, stations, nœuds de récolte) : deux invites sur la même touche. Placement : voir « Où poser les points
+d'eau » (fontaines au cœur du bourg, puits et sources dans les hameaux).
 
 ## Tests
 

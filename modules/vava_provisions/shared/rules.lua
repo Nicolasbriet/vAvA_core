@@ -385,6 +385,31 @@ function rules.describePoint(point, reserve, messages)
     return format(messages.line, point.label, point.id, point.kind, stock)
 end
 
+--- Regroupe des lignes en messages d'au plus `maxBytes` octets (lignes séparées par un retour à la ligne, une ligne
+--- trop longue coupée sans briser un caractère) ; au-delà de `maxLines` lignes, les suivantes sont remplacées par
+--- `more` (format, %d : nombre de lignes tues), en fin du dernier message.
+---@param lines string[]
+---@param maxBytes integer
+---@param maxLines integer
+---@param more string
+---@return string[]
+function rules.packLines(lines, maxBytes, maxLines, more)
+    local kept = {}
+    for i = 1, min(#lines, maxLines) do kept[#kept + 1] = rules.cutText(lines[i], maxBytes) or '' end
+    if #lines > maxLines then kept[#kept + 1] = rules.cutText(format(more, #lines - maxLines), maxBytes) or '' end
+    local messages, current = {}, nil
+    for _, line in ipairs(kept) do
+        if current and #current + 1 + #line <= maxBytes then
+            current = current .. '\n' .. line
+        else
+            if current then messages[#messages + 1] = current end
+            current = line
+        end
+    end
+    if current then messages[#messages + 1] = current end
+    return messages
+end
+
 -- Textes au joueur ------------------------------------------------------------------------------------------------
 
 --- Minutes d'attente annoncées (arrondies au-dessus, au moins 1).
@@ -407,6 +432,9 @@ function rules.successText(result, messages)
         return format(messages.filledMany, count)
     end
     if result.action == ACTIONS.DRINK then
+        -- remplissage refusé par la besace : on a bu sur place à la place ; les deux textes, l'un après l'autre
+        local key = (result.blocked == 'no_space' or result.blocked == 'too_heavy') and REFUSAL_KEYS[result.blocked] or nil
+        if key then return messages[key] .. ' ' .. messages.drank end
         return result.dry == true and messages.drankDry or messages.drank
     end
     return nil

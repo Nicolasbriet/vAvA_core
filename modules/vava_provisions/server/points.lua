@@ -75,7 +75,7 @@ function points.put(def)
     if not ok then return false, point, field end
     local previous = byId[point.id]
     if not previous and #ordered >= cfg.maxPoints then return false, 'too_many' end
-    local state = { [DEF] = pointzone.drawing(point) }
+    local state = { [DEF] = pointzone.drawing(point, cfg.kinds) }
     local zoneOk, zoneErr
     if previous then
         zoneOk, zoneErr = bridge.Zones.move(point.id, areaOf(point))

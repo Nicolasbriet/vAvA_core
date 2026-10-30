@@ -37,7 +37,7 @@ describe('vava_provisions server', function()
     local cfg, points, draw, containers, items, admin, EVENTS, HOOKS
     local logs, active, positions, downed, counts, thirsts, thirstAdds
     local exchanges, exchangeAnswers, exchangeDuring, adds, addAnswers
-    local zoneCalls, zoneAnswers, sent, befores, beforeAnswer, afters
+    local zoneCalls, zoneAnswers, sent, befores, beforeAnswer, beforeDuring, afters
     local allowed, adminLogs, chats, itemsKnown, itemsAdded, recipeAnswers
     local now, timer, roll, deferred, queue
     local realRandom = math.random
@@ -54,7 +54,7 @@ describe('vava_provisions server', function()
         logs, active, positions, downed = nil, { [SOURCE] = CHARACTER, [OTHER] = CHARACTER2 }, {}, {}
         counts, thirsts, thirstAdds = { [SOURCE] = {}, [OTHER] = {} }, { [SOURCE] = 50, [OTHER] = 50 }, {}
         exchanges, exchangeAnswers, exchangeDuring, adds, addAnswers = {}, {}, nil, {}, {}
-        zoneCalls, zoneAnswers, sent, befores, beforeAnswer, afters = {}, {}, {}, {}, nil, {}
+        zoneCalls, zoneAnswers, sent, befores, beforeAnswer, beforeDuring, afters = {}, {}, {}, {}, nil, nil, {}
         allowed, adminLogs, chats, itemsKnown, itemsAdded, recipeAnswers = { [8] = true }, {}, {}, {}, {}, {}
         now, timer, roll, deferred, queue = NOW, TIMER, 0.5, false, {}
         _G.CreateThread = function(fn)
@@ -137,6 +137,8 @@ describe('vava_provisions server', function()
                 return true
             end,
             RunBefore = function(name, payload)
+                -- un abonné qui cède la main (déplacement, changement de personnage) ou modifie le payload
+                if beforeDuring then beforeDuring(payload) end
                 befores[#befores + 1] = { name = name, payload = copy(payload) }
                 if beforeAnswer then return table.unpack(beforeAnswer) end
                 return true
@@ -264,6 +266,7 @@ describe('vava_provisions server', function()
         it('rend la réserve si l\'échange échoue, sans délai', function()
             at(SOURCE, 'puits_lavoir')
             counts[SOURCE].outre = 2
+            thirsts[SOURCE] = 99  -- pas soif : aucune gorgée de repli
             exchangeAnswers = { { false, 'no_space' } }
             assert.same({ false, 'no_space' }, { draw.handle(SOURCE, 'puits_lavoir') })
             assert.equal(40, reserveOf('puits_lavoir'))
@@ -275,6 +278,62 @@ describe('vava_provisions server', function()
             assert.equal(40, reserveOf('puits_lavoir'))
             -- aucun délai posé : le geste suivant passe tout de suite
             assert.same({ true, { action = 'fill', count = 2 } }, { draw.handle(SOURCE, 'puits_lavoir') })
+            assert.equal(0, #thirstAdds)
+        end)
+
+        it('besace pleine ou trop lourde et soif : on boit sur place, réserve rendue, délai posé', function()
+            at(SOURCE, 'puits_lavoir')
+            counts[SOURCE].outre = 2
+            exchangeAnswers = { { false, 'no_space' } }
+            assert.same({ true, { action = 'drink', dry = false, blocked = 'no_space' } }, { draw.handle(SOURCE, 'puits_lavoir') })
+            assert.same({ { source = SOURCE, amount = 20 } }, thirstAdds)
+            assert.equal(40, reserveOf('puits_lavoir'))
+            -- deux hooks drawing (remplir, puis boire), un seul drawn (boire)
+            assert.same({ 'fill', 'drink' }, { befores[1].payload.action, befores[2].payload.action })
+            assert.equal(1, #afters)
+            assert.same({ source = SOURCE, characterId = CHARACTER, point = 'puits_lavoir', kind = 'puits', action = 'drink', count = 0, reserve = 40 },
+                afters[1].payload)
+            assert.same({ false, 'wait' }, { draw.handle(SOURCE, 'puits_lavoir') })
+
+            timer = timer + cfg.cooldownMs
+            exchangeAnswers = { { false, 'too_heavy' } }
+            assert.same({ true, { action = 'drink', dry = false, blocked = 'too_heavy' } }, { draw.handle(SOURCE, 'puits_lavoir') })
+            assert.equal(2, #thirstAdds)
+
+            -- un hook qui refuse de laisser boire : le refus de la besace
+            timer = timer + cfg.cooldownMs
+            exchangeAnswers = { { false, 'no_space' } }
+            local calls = 0
+            beforeDuring = function()
+                calls = calls + 1
+                if calls == 2 then beforeAnswer = { false, 'non' } end
+            end
+            assert.same({ false, 'no_space' }, { draw.handle(SOURCE, 'puits_lavoir') })
+            assert.equal(2, #thirstAdds)
+        end)
+
+        it('relit personnage et distance après le hook drawing (qui a pu céder la main)', function()
+            at(SOURCE, 'puits_lavoir')
+            counts[SOURCE].outre = 2
+            beforeDuring = function() at(SOURCE, 'puits_lavoir', 10) end
+            assert.same({ false, 'too_far' }, { draw.handle(SOURCE, 'puits_lavoir') })
+            at(SOURCE, 'puits_lavoir')
+            beforeDuring = function() active[SOURCE] = 999 end
+            assert.same({ false, 'unavailable' }, { draw.handle(SOURCE, 'puits_lavoir') })
+            assert.equal(0, #exchanges)
+            assert.equal(0, #thirstAdds)
+            assert.equal(0, #afters)
+            assert.equal(40, reserveOf('puits_lavoir'))
+        end)
+
+        it('reconstruit le payload du hook drawn : un abonné de drawing qui le modifie n\'y change rien', function()
+            at(SOURCE, 'puits_lavoir')
+            counts[SOURCE].outre = 2
+            beforeDuring = function(payload) payload.count, payload.point, payload.reserve, payload.source = 99, 'autre', 0, 1 end
+            assert.is_true(draw.handle(SOURCE, 'puits_lavoir'))
+            assert.same({ source = SOURCE, characterId = CHARACTER, point = 'puits_lavoir', kind = 'puits', action = 'fill', count = 2, reserve = 38 },
+                afters[1].payload)
+            assert.same({ { item = 'outre', quantity = 2 } }, exchanges[1].removals)
         end)
 
         it('deux joueurs sur la dernière unité : un seul remplissage, l\'autre à sec', function()
@@ -529,9 +588,9 @@ describe('vava_provisions server', function()
         it('points : une ligne par point, dans la console', function()
             admin.command(0, { 'points' })
             assert.same({
-                { source = 0, text = 'Fontaine du bourg (fontaine_bourg, fontaine) : sans fond.' },
-                { source = 0, text = 'Puits du lavoir (puits_lavoir, puits) : 40 / 40 puisages.' },
-                { source = 0, text = 'Source de la Rivière Claire (source_claire, source) : 15 / 15 puisages.' },
+                { source = 0, text = 'Fontaine du bourg (fontaine_bourg, fontaine) : sans fond.\n'
+                    .. 'Puits du lavoir (puits_lavoir, puits) : 40 / 40 puisages.\n'
+                    .. 'Source de la Rivière Claire (source_claire, source) : 15 / 15 puisages.' },
             }, chats)
             assert.equal(0, #adminLogs)
         end)
@@ -539,7 +598,7 @@ describe('vava_provisions server', function()
         it('reserve : fixée, au journal du Registre, réponse au seul membre', function()
             admin.command(MEMBER, { 'reserve', 'puits_lavoir', '2' })
             assert.equal(2, reserveOf('puits_lavoir'))
-            assert.same({ { source = MEMBER, label = 'Réserve d\'eau fixée', details = { point = 'puits_lavoir', reserve = 2 } } }, adminLogs)
+            assert.same({ { source = MEMBER, label = 'Réserve d\'eau fixée', details = { point = 'puits_lavoir', reserve = 2, before = 40 } } }, adminLogs)
             assert.same({ { source = MEMBER, text = 'Réserve de Puits du lavoir : 2 / 40.' } }, chats)
         end)
 
@@ -558,6 +617,21 @@ describe('vava_provisions server', function()
             assert.equal(40, reserveOf('puits_lavoir'))
         end)
 
+        it('points : regroupées en messages de 480 octets au plus, 60 points au plus puis « … et N autres »', function()
+            for i = 1, 67 do
+                assert.is_true(points.put({ id = 'puits_' .. i, kind = 'puits', label = 'Puits numéro ' .. i, x = i * 10.0, y = 0.0, z = 0.0 }))
+            end
+            admin.command(0, { 'points' })
+            assert.is_true(#chats > 1)
+            local lines = 0
+            for _, chat in ipairs(chats) do
+                assert.is_true(#chat.text <= 480, #chat.text .. ' octets')
+                for _ in chat.text:gmatch('[^\n]+') do lines = lines + 1 end
+            end
+            assert.equal(61, lines)
+            assert.matches('… et 10 autres points d\'eau%.$', chats[#chats].text)
+        end)
+
         it('délai entre deux commandes d\'un même membre (console exceptée)', function()
             admin.command(MEMBER, { 'points' })
             timer = timer + 500
@@ -569,7 +643,7 @@ describe('vava_provisions server', function()
             assert.equal(1, #adminLogs)
             admin.command(0, { 'points' })
             admin.command(0, { 'points' })
-            assert.equal(3 + 1 + 1 + 3 + 3, #chats)
+            assert.equal(1 + 1 + 1 + 1 + 1, #chats)
         end)
     end)
 end)

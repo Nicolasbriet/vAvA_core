@@ -5,13 +5,15 @@
            erreur), délai entre deux actions, à terre (vava_health), point connu, distance réelle lue par le serveur
            (distance d'usage + tolérance, 3D), outres vides réellement possédées, soif (vava_needs, si la sorte permet
            de boire), réserve, choix de l'action (rules.decide), hook `vava_provisions:drawing` annulable, puis :
-           remplir (puisages RÉSERVÉS avant l'échange atomique de l'inventaire, rendus s'il échoue) ou boire quelques
-           gorgées (vava_needs). Le client ne dit ni ce qu'il veut faire, ni ce qu'il porte, ni sa soif.
+           personnage et distance relus (le hook a pu céder la main), remplir (puisages RÉSERVÉS avant l'échange
+           atomique de l'inventaire, rendus s'il échoue ; besace pleine ou trop lourde : le joueur qui a soif boit sur
+           place) ou boire quelques gorgées (vava_needs). Payloads des hooks reconstruits à chaque fois. Le client ne
+           dit ni ce qu'il veut faire, ni ce qu'il porte, ni sa soif.
     Dépendances : shared/constants.lua, config.lua, shared/rules.lua, server/core.lua, bridge/server.lua,
                   server/points.lua
 ]]
 
-local tostring, pcall = tostring, pcall
+local type, tostring, pcall = type, tostring, pcall
 local pack, unpack = table.pack, table.unpack
 local sqrt = math.sqrt
 
@@ -57,6 +59,58 @@ local function refused(reason)
     return false, 'refused', text
 end
 
+--- Payload d'un hook, construit par le serveur à chaque fois (jamais la table passée à un autre hook, qu'un abonné
+--- aurait pu modifier).
+---@param source integer
+---@param characterId integer
+---@param point table
+---@param action string
+---@param count integer
+---@param reserve integer|nil  après le geste (sortes à réserve seulement)
+---@return table
+local function payloadOf(source, characterId, point, action, count, reserve)
+    return {
+        source = source, characterId = characterId, point = point.id, kind = point.kind, action = action, count = count,
+        reserve = reserve,
+    }
+end
+
+--- Après un hook (qui a pu céder la main) : même personnage, toujours à portée. Rend nil, ou le code du refus.
+---@param source integer
+---@param characterId integer
+---@param point table
+---@return string|nil code
+local function recheck(source, characterId, point)
+    if bridge.ActiveCharacterId(source) ~= characterId then return 'unavailable' end
+    if not near(source, point) then return 'too_far' end
+    return nil
+end
+
+--- Quelques gorgées au point d'eau (la réserve n'est pas touchée), délai posé, hook `drawn`.
+---@return boolean ok
+local function sip(source, characterId, point, kind)
+    if not bridge.AddThirst(source, drink.thirst) then return false end
+    nextAt[source] = bridge.Timer() + cfg.cooldownMs
+    local reserve = nil
+    if kind.reserve.capacity > 0 then reserve = rules.available(points.level(point, bridge.Now())) end
+    bridge.RunAfter(HOOKS.DRAWN, payloadOf(source, characterId, point, ACTIONS.DRINK, 0, reserve))
+    return true
+end
+
+--- Remplissage refusé par la besace (pleine, trop lourde) : le joueur qui a soif boit sur place plutôt que de repartir
+--- sans rien, si la sorte le permet et qu'un hook `drawing` l'accepte. Sinon, le code de l'inventaire.
+---@return boolean ok
+---@return any resultOrCode
+local function sipInstead(source, characterId, point, kind, blocked)
+    if not kind.drink then return false, blocked end
+    local thirst = bridge.Thirst(source)
+    if type(thirst) ~= 'number' or thirst >= drink.fullAt then return false, blocked end
+    local allowed = bridge.RunBefore(HOOKS.DRAWING, payloadOf(source, characterId, point, ACTIONS.DRINK, 0))
+    if not allowed or recheck(source, characterId, point) then return false, blocked end
+    if not sip(source, characterId, point, kind) then return false, blocked end
+    return true, { action = ACTIONS.DRINK, dry = false, blocked = blocked }
+end
+
 ---@param source integer
 ---@param characterId integer
 ---@param pointId string
@@ -85,17 +139,15 @@ local function process(source, characterId, pointId)
         return false, code
     end
 
-    local payload = {
-        source = source, characterId = characterId, point = point.id, kind = point.kind, action = decision.action,
-        count = decision.count or 0,
-    }
-    local allowed, reason = bridge.RunBefore(HOOKS.DRAWING, payload)
+    local allowed, reason = bridge.RunBefore(HOOKS.DRAWING, payloadOf(source, characterId, point, decision.action, decision.count or 0))
     if not allowed then return refused(reason) end
-    local hasReserve = kind.reserve.capacity > 0
+    -- un hook a pu céder la main : personnage et distance relus (rien n'est encore réservé)
+    local moved = recheck(source, characterId, point)
+    if moved then return false, moved end
 
     if decision.action == ACTIONS.FILL then
-        -- un hook a pu céder la main : niveau relu, puisages réservés AVANT l'échange (rien ne cède la main entre
-        -- les deux) ; deux joueurs sur la dernière unité : le premier réserve, le second lit 0
+        -- niveau relu, puisages réservés AVANT l'échange (rien ne cède la main entre les deux) ; deux joueurs sur la
+        -- dernière unité : le premier réserve, le second lit 0
         now = bridge.Now()
         level = points.level(point, now)
         local count = decision.count
@@ -106,20 +158,17 @@ local function process(source, characterId, pointId)
         local ok, exchangeCode = bridge.Exchange(source, { { item = fill.from, quantity = count } }, { { item = fill.to, quantity = count } })
         if not ok then
             points.giveBack(point, count)
-            return false, INVENTORY_CODES[exchangeCode] and exchangeCode or 'unavailable'
+            if INVENTORY_CODES[exchangeCode] then return sipInstead(source, characterId, point, kind, exchangeCode) end
+            return false, 'unavailable'
         end
         nextAt[source] = bridge.Timer() + cfg.cooldownMs
-        payload.count = count
-        if hasReserve then payload.reserve = rules.available(level - count) end
-        bridge.RunAfter(HOOKS.DRAWN, payload)
+        local reserve = nil
+        if kind.reserve.capacity > 0 then reserve = rules.available(level - count) end
+        bridge.RunAfter(HOOKS.DRAWN, payloadOf(source, characterId, point, ACTIONS.FILL, count, reserve))
         return true, { action = ACTIONS.FILL, count = count }
     end
 
-    -- quelques gorgées : la réserve n'est pas touchée
-    if not bridge.AddThirst(source, drink.thirst) then return false, 'unavailable' end
-    nextAt[source] = bridge.Timer() + cfg.cooldownMs
-    if hasReserve then payload.reserve = rules.available(points.level(point, bridge.Now())) end
-    bridge.RunAfter(HOOKS.DRAWN, payload)
+    if not sip(source, characterId, point, kind) then return false, 'unavailable' end
     return true, { action = ACTIONS.DRINK, dry = decision.dry == true }
 end
 

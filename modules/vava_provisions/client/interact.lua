@@ -9,7 +9,7 @@
 ]]
 
 local type, tostring, pcall = type, tostring, pcall
-local CreateThread, Wait, GetGameTimer = CreateThread, Wait, GetGameTimer
+local CreateThread, Wait, GetGameTimer, AddEventHandler = CreateThread, Wait, GetGameTimer, AddEventHandler
 local PlayerPedId, GetResourceState = PlayerPedId, GetResourceState
 local TaskStartScenarioInPlace, TaskPlayAnim, ClearPedTasks = TaskStartScenarioInPlace, TaskPlayAnim, ClearPedTasks
 local RequestAnimDict, HasAnimDictLoaded, RemoveAnimDict = RequestAnimDict, HasAnimDictLoaded, RemoveAnimDict
@@ -146,5 +146,12 @@ end
 function interact.reset()
     nui.hidePrompt()
 end
+
+-- arrêt du module pendant un geste : le ped ne reste pas figé dans le scénario ou l'animation
+AddEventHandler('onResourceStop', function(resource)
+    if resource ~= VavaProvisions.resource or not acting then return end
+    acting = false
+    ClearPedTasks(PlayerPedId())
+end)
 
 points.onNearest(interact.refreshPrompt)

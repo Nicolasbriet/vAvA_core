@@ -308,6 +308,10 @@ describe('vava_provisions rules', function()
             assert.equal('Vous remplissez 5 outres.', rules.successText({ action = 'fill', count = 5 }, messages))
             assert.equal(messages.drank, rules.successText({ action = 'drink', dry = false }, messages))
             assert.equal(messages.drankDry, rules.successText({ action = 'drink', dry = true }, messages))
+            assert.equal(messages.noSpace .. ' ' .. messages.drank, rules.successText({ action = 'drink', dry = false, blocked = 'no_space' }, messages))
+            assert.equal(messages.tooHeavy .. ' ' .. messages.drank, rules.successText({ action = 'drink', dry = false, blocked = 'too_heavy' }, messages))
+            assert.equal(messages.drank, rules.successText({ action = 'drink', dry = false, blocked = 'autre' }, messages))
+            assert.is_true(#rules.successText({ action = 'drink', blocked = 'too_heavy' }, messages) <= VavaProvisions.MAX_NOTIFICATION)
             assert.is_nil(rules.successText({ action = 'autre' }, messages))
             assert.is_nil(rules.successText(nil, messages))
         end)
@@ -342,6 +346,25 @@ describe('vava_provisions rules', function()
             assert.is_nil(rules.noticeText('autre', messages))
             assert.equal('Puiser ou boire', rules.promptVerb(cfg.kinds.puits, messages.prompt))
             assert.equal('Puiser', rules.promptVerb({ drink = false }, messages.prompt))
+        end)
+
+        it('regroupe les lignes en messages bornés, puis « … et N autres »', function()
+            assert.same({ 'a\nb', 'cc' }, rules.packLines({ 'a', 'b', 'cc' }, 3, 10, '%d de plus'))
+            assert.same({ 'a\nb', '1 de plus' }, rules.packLines({ 'a', 'b', 'c' }, 9, 2, '%d de plus'))
+            assert.same({}, rules.packLines({}, 480, 60, '%d'))
+            -- une ligne trop longue est coupée sans briser un caractère
+            local packed = rules.packLines({ string.rep('é', 10) }, 5, 10, '%d')
+            assert.same({ 'éé' }, packed)
+            local lines = {}
+            for i = 1, 100 do lines[i] = string.rep('x', 50) .. i end
+            packed = rules.packLines(lines, 480, 60, messages.admin.more)
+            local count = 0
+            for _, text in ipairs(packed) do
+                assert.is_true(#text <= 480)
+                for _ in text:gmatch('[^\n]+') do count = count + 1 end
+            end
+            assert.equal(61, count)
+            assert.equal('… et 40 autres points d\'eau.', packed[#packed]:match('[^\n]+$'))
         end)
 
         it('ligne de /eau points', function()

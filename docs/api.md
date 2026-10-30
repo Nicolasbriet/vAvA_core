@@ -1940,7 +1940,8 @@ SQL. Détail et réglages : `modules/vava_provisions/README.md`.
   2 outres) ajoutée aux registres `vava_crafting:recipes` et `vava_skills:recipes` si la station `tannerie` est
   déclarée, à l'annonce de `vava_crafting` ou de `vava_skills` au besoin.
 - **Points d'eau** : une zone du core par point (identifiant local = identifiant du point, cercle de 2 m, marge 100 m),
-  état `{ def = { kind, label, x, y, z, heading, model } }` (~160 o, une fois à l'arrivée) ; **la réserve n'est jamais
+  état `{ def = { kind, label, x, y, z, heading?, model? } }` (~130 o, une fois à l'arrivée ; `heading` absent s'il
+  vaut 0, `model` absent s'il est celui de la sorte, que le client lit dans sa config) ; **la réserve n'est jamais
   publiée**. Réserve en mémoire par point des sortes qui en ont une (puits 40, + 1 par minute ; source 15, + 1 toutes
   les 3 min ; fontaine sans fond), pleine à chaque démarrage. `rules.validatePoint` est le seul juge d'un point ;
   `points.put` et `points.drop` sont prêts pour l'éditeur de l'Atelier.
@@ -1950,12 +1951,13 @@ SQL. Détail et réglages : `modules/vava_provisions/README.md`.
 
 | RPC | `args` | `rateLimit` | Réponse |
 |---|---|---|---|
-| `vava_provisions:draw` | `{ { type = 'string', min = 1, max = 32, pattern = '^[a-z0-9_]+$' } }` (identifiant du point) | `{ capacity = 3, refillPerSecond = 0.5 }` | `true, { action = 'fill', count }` ; `true, { action = 'drink', dry }` ; `false, code` (`no_character`, `downed`, `unknown_point`, `too_far`, `wait`, `busy`, `not_thirsty`, `no_container`, `no_space`, `too_heavy`, `unavailable`) ; `false, 'dry', secondes` ; `false, 'refused', raison` (texte d'un hook, 200 octets au plus) |
+| `vava_provisions:draw` | `{ { type = 'string', min = 1, max = 32, pattern = '^[a-z0-9_]+$' } }` (identifiant du point) | `{ capacity = 3, refillPerSecond = 0.5 }` | `true, { action = 'fill', count }` ; `true, { action = 'drink', dry, blocked? }` (`blocked` : `no_space` ou `too_heavy`, remplissage refusé par la besace, le joueur assoiffé a bu sur place) ; `false, code` (`no_character`, `downed`, `unknown_point`, `too_far`, `wait`, `busy`, `not_thirsty`, `no_container`, `no_space`, `too_heavy`, `unavailable`) ; `false, 'dry', secondes` ; `false, 'refused', raison` (texte d'un hook, 200 octets au plus) |
 
 Le client ne dit ni ce qu'il veut faire, ni ce qu'il porte, ni sa soif : le serveur revérifie personnage, une demande à
 la fois, délai (3 s), à terre, point connu, distance réelle du ped (3,5 m, 3D), outres vides possédées, soif, réserve,
-puis choisit : remplir (au plus 5 outres, puisages réservés **avant** l'échange tout ou rien, rendus s'il échoue) ou
-boire (soif + 20, refusé dès 95).
+puis choisit ; après le hook `drawing`, personnage et distance sont relus. Remplir : au plus 5 outres, puisages
+réservés **avant** l'échange tout ou rien, rendus s'il échoue (besace pleine ou trop lourde et soif : gorgées sur place).
+Boire : soif + 20, refusé dès 95.
 
 | Évènement serveur → client | Valeurs | Cible |
 |---|---|---|
@@ -1974,8 +1976,9 @@ drink, count }`, `count` 0 pour boire ; la raison d'un refus est montrée au jou
 le même payload, plus `reserve`, entier après le geste, absent pour une sorte sans fond). Aucun export client.
 
 **Conseil** : `/eau points | reserve <point> <nombre>` (droit `metiers`, repli ACE `metiers.admin`, console permise,
-1 s entre deux commandes d'un membre ; chapitre « Vivres » du Codex). `reserve` va au journal du Registre (« Réserve
-d'eau fixée »). Touche `E` près d'un point d'eau (« Puiser ou boire »). Rendu hors jeu de l'invite :
+1 s entre deux commandes d'un membre ; chapitre « Vivres » du Codex). `points` : lignes regroupées en messages de
+480 octets au plus, 60 points au plus. `reserve` va au journal du Registre (« Réserve d'eau fixée », point, réserve et
+ancienne réserve `before`). Touche `E` près d'un point d'eau (« Puiser ou boire »). Rendu hors jeu de l'invite :
 `web/index.html?label=Puits%20du%20lavoir&verb=Puiser&key=E`.
 
 ### `vava_codex`

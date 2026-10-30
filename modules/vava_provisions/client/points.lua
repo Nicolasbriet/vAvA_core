@@ -34,7 +34,7 @@ local points = {}
 VavaProvisions.points = points
 
 -- points connus : ceux des zones suivies (le serveur décide lesquels, d'après la position du joueur)
-local book = pointzone.book()
+local book = pointzone.book(cfg.kinds)
 -- points groupés par case de grille, refaits au passage qui suit un changement
 local groups, regroup = {}, false
 -- props affichés : id du point → { entity, model }

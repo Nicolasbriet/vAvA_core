@@ -1,7 +1,8 @@
 --[[
     vava_provisions/server/admin.lua
     Rôle : commande du Conseil `/eau` (droit `metiers` de vava_admin, repli ACE ; console permise) : état des points
-           d'eau et de leurs réserves (lecture seule), réserve d'un puits ou d'une source fixée (journal du Registre).
+           d'eau et de leurs réserves (lecture seule, lignes regroupées en messages courts), réserve d'un puits ou d'une
+           source fixée (journal du Registre, ancienne et nouvelle réserve).
            Sans droit : rien, aucune réponse. Délai entre deux commandes d'un même membre (console exceptée). La
            réponse va au seul membre qui a tapé la commande (ou à la console).
     Dépendances : shared/constants.lua, config.lua, shared/rules.lua, server/core.lua, bridge/server.lua,
@@ -27,12 +28,17 @@ VavaProvisions.admin = admin
 -- membre du Conseil → horloge de sa dernière commande (GetGameTimer)
 local lastUse = {}
 
---- /eau points : une ligne par point, dans l'ordre de la config.
+--- /eau points : une ligne par point, dans l'ordre de la config, regroupées en messages de `replyBytes` octets au plus
+--- (`listMax` points au plus, puis « … et N autres »).
 ---@param source integer
 local function list(source)
     local now = bridge.Now()
+    local lines = {}
     for _, point in ipairs(points.list()) do
-        bridge.Chat(source, rules.describePoint(point, points.reserve(point, now), messages))
+        lines[#lines + 1] = rules.describePoint(point, points.reserve(point, now), messages)
+    end
+    for _, text in ipairs(rules.packLines(lines, settings.replyBytes, settings.listMax, messages.more)) do
+        bridge.Chat(source, text)
     end
 end
 
@@ -46,8 +52,10 @@ local function setReserve(source, id, amount)
     local capacity = cfg.kinds[point.kind].reserve.capacity
     if capacity == 0 then return bridge.Chat(source, format(messages.noReserve, point.label)) end
     if amount < 0 or amount > capacity then return bridge.Chat(source, format(messages.range, point.label, capacity)) end
-    points.setReserve(point, amount, bridge.Now())
-    bridge.AdminLog(source, labels.reserve, { point = point.id, reserve = amount })
+    local now = bridge.Now()
+    local previous = points.reserve(point, now).level
+    points.setReserve(point, amount, now)
+    bridge.AdminLog(source, labels.reserve, { point = point.id, reserve = amount, before = previous })
     bridge.Chat(source, format(messages.set, point.label, amount, capacity))
 end
 
