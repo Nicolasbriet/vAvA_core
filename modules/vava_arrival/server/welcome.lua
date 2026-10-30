@@ -3,7 +3,8 @@
     Rôle : l'arrivée à chaque apparition d'un personnage suivi : dotation puis accueil, dans un thread (une seule
            arrivée à la fois par personnage : `busy` pris sans céder la main) ; envoi de l'accueil au SEUL joueur
            concerné (au plus `welcome.maxSends` fois sans accusé, une fois par session), hook vava_arrival:arrived au
-           premier envoi ; dotations reprises au retour de l'inventaire (sans second accueil) ; accusé de lecture
+           premier envoi ; dotations reprises au retour de l'inventaire ou d'un module qui déclare des objets de la
+           dotation (`kit.providers`), sans second accueil ; accusé de lecture
            (RPC) ; accueil rejoué par le Conseil.
     Dépendances : shared/constants.lua, config.lua, shared/rules.lua, server/core.lua, bridge/server.lua,
                   server/store.lua, server/kit.lua
@@ -87,6 +88,17 @@ function welcome.onInventoryReady()
     for _, entry in ipairs(store.list()) do
         if entry.kit == KIT.DUE and entry.spawned and not entry.busy then welcome.start(entry, false) end
     end
+end
+
+--- Annonce `core:module:ready` d'un module qui déclare des objets de la dotation (`kit.providers`, l'eau :
+--- vava_provisions) : mêmes reprises qu'au retour de l'inventaire, sans redéclarer ni renvoyer l'accueil. Tout autre
+--- module : rien.
+---@param name any
+---@return boolean resumed
+function welcome.onProviderReady(name)
+    if not rules.isProvider(name, cfg.kit.providers) then return false end
+    welcome.onInventoryReady()
+    return true
 end
 
 --- RPC vava_arrival:welcomed : l'accueil envoyé pendant cette session a été montré. Un client qui accuse sans avoir

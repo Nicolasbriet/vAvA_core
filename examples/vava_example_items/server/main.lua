@@ -1,6 +1,7 @@
 --[[
     vava_example_items/server/main.lua
-    Rôle : déclaration des objets d'exemple dans le registre de l'inventaire. La nourriture et les boissons ne
+    Rôle : déclaration des sept objets d'exemple dans le registre de l'inventaire (l'Outre d'eau vient de
+           vava_provisions depuis 1.3.0). La nourriture et les boissons ne
            déclarent que leurs effets (`effects`) : l'inventaire consomme une unité et vava_needs les applique, sans
            une ligne de code ici. Un objet à usage particulier fournirait `onUse` (voir docs/api.md).
            Les objets sont redéclarés à chaque annonce `core:module:ready` de l'inventaire (1.1.1) : après un
@@ -51,11 +52,7 @@ local ITEMS = {
         width = 1, height = 1, weight = 150, stack = 20, category = 'nourriture', image = image('pomme'),
         effects = { hunger = 12, thirst = 4 },
     },
-    eau = {
-        label = 'Outre d\'eau', description = 'De l\'eau fraîche tirée du puits.',
-        width = 1, height = 2, weight = 700, stack = 5, category = 'boisson', image = image('eau'),
-        effects = { thirst = 40 },
-    },
+    -- l'eau est un objet du royaume : vava_provisions (T-130) ; déclarée ici, elle garderait sa forme d'exemple
     biere = {
         label = 'Chope de bière', description = 'Brassée à l\'auberge, mousse épaisse.',
         width = 1, height = 1, weight = 600, stack = 5, category = 'boisson', image = image('biere'),

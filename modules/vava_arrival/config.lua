@@ -1,7 +1,7 @@
 --[[
     vava_arrival/config.lua
-    Rôle : tout ce qui est réglable de l'arrivée d'un nouveau personnage : dotation de départ et sa limite par compte,
-           objets déclarés à l'inventaire s'ils manquent, attente de l'accueil côté client, chapitre du Codex, commande
+    Rôle : tout ce qui est réglable de l'arrivée d'un nouveau personnage : dotation de départ, sa limite par compte et
+           les modules qui en déclarent des objets, objets déclarés à l'inventaire s'ils manquent, attente de l'accueil côté client, chapitre du Codex, commande
            du Conseil, débit de l'accusé, rétention du journal, textes. Lue par le client et le serveur.
     Le point d'arrivée n'est PAS ici : c'est `spawn.defaultPoint` de config/server.lua (core), où le core fait déjà
     apparaître tout personnage sans position enregistrée, donc tout nouveau personnage (une seule source).
@@ -25,15 +25,19 @@ VavaArrival.config = {
         -- Au plus `max` dotations par compte sur `days` jours glissants (réservées, données ou incertaines, personnages
         -- supprimés compris) ; au-delà, l'accueil a lieu sans dotation. `max = 0` : aucune limite.
         perAccount = { max = 3, days = 30 },
+        -- Modules qui déclarent des objets de la dotation (l'eau : vava_provisions). À leur annonce `core:module:ready`,
+        -- les dotations dues des personnages apparus sont reprises, comme au retour de l'inventaire, sans second
+        -- accueil : l'ordre de démarrage ne fait perdre aucune dotation. Liste pure de noms de ressources (8 au plus,
+        -- 64 octets chacun).
+        providers = { 'vava_provisions' },
     },
 
     -- Objets déclarés à l'inventaire par ce module S'ILS NE LE SONT PAS DÉJÀ (le premier déclaré l'emporte). Image :
-    -- nui://vava_arrival/web/items/<nom>.svg, ajoutée à la déclaration. Mêmes définitions que vava_example_items.
+    -- nui://vava_arrival/web/items/<nom>.svg, ajoutée à la déclaration. Même définition que vava_example_items.
+    -- `eau` n'est plus ici : déclarée par vava_provisions (T-130), propriétaire de l'eau et des outres.
     items = {
         pain = { label = 'Miche de pain', description = 'Croûte épaisse, mie serrée.', width = 2, height = 1,
             weight = 400, stack = 10, category = 'nourriture', effects = { hunger = 35 } },
-        eau = { label = 'Outre d\'eau', description = 'De l\'eau fraîche tirée du puits.', width = 1, height = 2,
-            weight = 700, stack = 5, category = 'boisson', effects = { thirst = 40 } },
     },
 
     welcome = {
