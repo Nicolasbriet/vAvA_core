@@ -222,6 +222,55 @@ Corrections issues de l'audit T-010 (30 octobre 2026), à prendre avant le reste
 - Critères : tests des règles pures (chance de pêche, ordre de la récolte) ; procédures `docs/tests/metiers.md` et
   `besoins.md` complétées ; versions montées.
 
+Corrections issues de l'audit réseau T-011 (30 octobre 2026). Son seul BLOQUANT (zones de voix envoyées à tous) est
+versé à T-014 ; les autres points déjà couverts sont précisés dans T-012 à T-019.
+
+### T-045 — Inventaire : objet en main vu des seuls joueurs proches, et dès leur arrivée
+- Agent : vava-dev-lua (vava-architecte pour le choix du support) · Dépend de : — · Statut : à faire
+- **IMPORTANT** (`docs/audits/reseau-vava_inventory.md`) : `client/hands.lua:129-139` efface la valeur d'un porteur hors
+  de la zone de culling (`wanted[serverId] = nil`, `:137`) et rien ne la relit quand il arrive, ni au démarrage
+  (`:189-195` ne parcourt que les joueurs à portée) : l'outil d'un joueur venu de loin reste invisible tant qu'il ne
+  change pas d'objet. Garder les valeurs des joueurs hors de portée (effacées seulement à `nil` ou au départ) et les
+  attacher quand le ped apparaît.
+- **IMPORTANT** : `server/hands.lua:75-79`, `:85`, le champ public part chez **tous** les joueurs (environ 110 o par
+  objet pris) avec un placement que chaque client connaît déjà par `GlobalState[HELD_MODELS]`. Ne publier que
+  `{ id, item }` (environ 30 o) ; **décision** de l'architecte : state bag du ped (répliqué aux seuls joueurs proches et
+  relu à l'apparition du ped, réécrit par le serveur à chaque apparition) ou champ public du joueur réduit. Au passage
+  (MINEUR) : regrouper par tick les écritures de `GlobalState[HELD_MODELS]` (`:92-97`).
+- Critères : test de la règle pure (accessoire reconnu depuis `{ id, item }`) ; procédure `docs/tests/inventaire.md`
+  complétée (un joueur prend un outil à plus de 500 m puis rejoint l'autre, qui le voit) ; README et `docs/api.md` à
+  jour ; version montée.
+
+### T-046 — Codex : contenu versionné, gardé par la page entre deux ouvertures
+- Agents : vava-dev-lua + vava-dev-nui · Dépend de : — · Statut : à faire
+- **IMPORTANT** (`docs/audits/reseau-vava_codex.md`) : `server/main.lua:26-35`, appelé par `client/main.lua:82-97`,
+  renvoie tout le contenu visible (estimé 10 à 30 Ko, évènement fiable) à **chaque** appui sur F1, alors qu'il ne change
+  qu'au démarrage ou à l'arrêt d'un module et au changement de rang. Numéro de version du catalogue (hooks
+  `core:registry:added`/`removed` sur `core:commands`) et empreinte des droits du joueur ; `open` reçoit la version
+  connue et ne renvoie que les préférences si rien n'a changé ; la page garde le contenu. Envoi latent au-delà du
+  seuil de T-013 quand elle sera faite. Au passage (MINEUR) : préférences en `private` (`server/prefs.lua:50`, aucun
+  lecteur côté client).
+- Critères : test de la version et de l'empreinte ; une seconde ouverture sans changement envoie moins de 2 Ko ; le
+  contenu suit un redémarrage de module et un rang donné ; procédure `docs/tests/codex.md` complétée ; version montée.
+
+### T-047 — Caméras : budget du débit montant d'un joueur filmé
+- Agent : vava-dev-lua (+ vava-dev-nui pour la répartition dans la page) · Dépend de : T-026 · Statut : à faire
+- **IMPORTANT** (`docs/audits/reseau-vava_cameras.md`) : `config.lua:17-21`, `:28-29`, un encodeur et un débit par
+  spectateur, jusqu'à 6 : jusqu'à 7,2 Mbit/s pris sur la connexion montante d'un joueur filmé (le jeu et la voix
+  passent par la même). Budget total par joueur filmé en config (**décision** : 1 500 kbit/s proposés), une seule vue
+  pleine à la fois, refus `budget` (message en français) au-delà, côté serveur (`server/sessions.lua`).
+- Critères : test de la règle de répartition ; procédure `docs/tests/registre.md` complétée avec la mesure des images
+  par seconde et du ping du joueur filmé par 1, 3 et 6 membres ; README à jour ; version montée.
+
+### T-048 — Magie : registre des murmures envoyé par pages
+- Agents : vava-dev-lua + vava-dev-nui · Dépend de : — · Statut : à faire
+- **IMPORTANT** (`docs/audits/reseau-vava_magic.md`) : `server/registers.lua:154-167` envoie jusqu'à 200 pages (300
+  signes et un correspondant de 160 chacune : jusqu'à 100 Ko) en un seul évènement fiable, à chaque ouverture du
+  registre. N'envoyer que les 20 pages les plus récentes et le nombre total ; les plus anciennes par un RPC borné
+  (curseur sur l'identifiant de page, limite de débit) quand la page les demande.
+- Critères : un registre plein s'ouvre avec moins de 12 Ko envoyés ; procédure `docs/tests/magie.md` complétée ;
+  README de `vava_magic` à jour ; version montée.
+
 ### T-010 — Audit sécurité de tout le dépôt
 - Agent : vava-securite · Dépend de : — · Statut : à tester en jeu
 - Un rapport par module dans `docs/audits/securite-<module>.md` (le core compris). Chaque BLOQUANT ou IMPORTANT
@@ -233,15 +282,27 @@ Corrections issues de l'audit T-010 (30 octobre 2026), à prendre avant le reste
   versés à T-110. Rien à jouer : « à tester en jeu » vaut ici « à relire par le porteur du projet ».
 
 ### T-011 — Audit réseau et performance de tout le dépôt
-- Agent : vava-reseau-perf · Dépend de : — · Statut : à faire
+- Agent : vava-reseau-perf · Dépend de : — · Statut : à tester en jeu
 - Un rapport par module dans `docs/audits/reseau-<module>.md` : chaque évènement serveur→client (cible, taille,
   fréquence), chaque écriture de GlobalState et de state bag, chaque boucle client et sa fréquence, poids des
   fichiers web. Partir de l'état des lieux de `SECURITE_RESEAU.md`. Mêmes règles pour les tâches de correction.
+- Fait le 30 octobre 2026 : 20 rapports dans `docs/audits/` (`reseau-vAvA_core.md`, 18 modules, `reseau-examples.md`),
+  compte rendu `docs/plan/rapports/T-011.md` (envois par module, copies des fichiers web chiffrées pour T-012, boucles
+  permanentes, mesures pour T-019). Résultat : 1 BLOQUANT (zones de voix envoyées à tous, versé à T-014), 14 IMPORTANT,
+  23 MINEUR laissés aux rapports ; corrections ouvertes en tête de phase (T-045 à T-048) et lignes ajoutées à T-012 à
+  T-019. Rien à jouer : « à tester en jeu » vaut ici « à relire par le porteur du projet ».
 
 ### T-012 — Ressource web commune `vava_ui`
 - Agents : vava-architecte → vava-dev-nui · Dépend de : — · Statut : à faire
 - Polices, textures (grain, papier, cadres, séparateurs) et icônes communes dans une ressource unique, référencées
   par `nui://vava_ui/…` ; retirer les copies des autres modules. Démarre juste après `vAvA_core`.
+- Chiffres de T-011 (`docs/plan/rapports/T-011.md` § Fichiers web communs) : 4 003 861 o de `web/` livrés aux
+  joueurs, dont 2 823 748 o (70,5 %) sont 7 fichiers copiés 73 fois (EB Garamond droit et italique, Cinzel, Cinzel
+  Decorative 400 et 700, `grain.png`, `paper.png`) ; environ 1,42 Mo attendus après (− 64 %). Au passage : retirer
+  les fichiers livrés jamais chargés (`vava_cameras/web/img/paper.png`, `cinzel_decorative_400.woff2` de
+  `vava_cameras` et `vava_voice`), sortir les 14 `web/js/devmock.js` (88 565 o) des `files` livrés et de
+  `index.html` en jeu, et passer `grain.png` et `paper.png` en WebP. `chancellerie/web/` garde ses copies (servi par
+  Node, jamais téléchargé par les joueurs).
 - Critères : aucune police ni texture commune dupliquée ; poids total des dossiers `web/` mesuré avant/après dans le
   rapport ; toutes les interfaces s'affichent (devmock).
 
@@ -251,6 +312,14 @@ Corrections issues de l'audit T-010 (30 octobre 2026), à prendre avant le reste
   par ressource et par évènement le nombre d'envois et une estimation de taille ; commande du Conseil
   `/vava_reseau` (top des évènements de la dernière minute) et affichage dans la Chancellerie si simple.
 - Critères : tests unitaires de l'agrégation ; documenté dans `docs/api.md`.
+- **IMPORTANT** de T-011 (`docs/audits/reseau-vAvA_core.md`) : `server/core/rpc.lua:97-102`, `:301` et
+  `server/players/sync.lua:30`, `:64` envoient tout en évènement fiable, sans mesurer la taille (réponse d'ouverture du
+  Codex estimée 10 à 30 Ko, registre des murmures jusqu'à 100 Ko). `core.net` estime la taille sérialisée de chaque
+  envoi et de chaque réponse RPC ; au-delà d'un seuil en config (ex. 8 Ko), envoi par `TriggerLatentClientEvent` à
+  débit borné, accepté par `client/core/rpc.lua`.
+- **IMPORTANT** de T-011 : `scripts/audit-reseau.sh:47-48` ne voit que le littéral `-1`. Signaler aussi une cible qui
+  est une constante valant `-1` (`vava_voice/server/zones.lua:23,73`) et les boucles sur tous les joueurs qui envoient
+  (`vava_chat/server/api.lua:71`), avec un cas de test ; exceptions à faire relire au porteur du projet (voir T-014).
 
 ### T-014 — Abonnements de zone dans le core
 - Agents : vava-architecte → vava-dev-lua · Dépend de : T-013 · Statut : à faire
@@ -260,26 +329,53 @@ Corrections issues de l'audit T-010 (30 octobre 2026), à prendre avant le reste
 - Y reprendre les zones de voix (`vava_voice/server/zones.lua`) : chaque création, modification ou suppression part
   aujourd'hui à tous les joueurs (`EVERYONE`, seul envoi à tous du module, documenté comme voulu : rare et petit) ;
   avec les abonnements, n'envoyer qu'aux joueurs à portée de la zone (rapport T-008).
+- **BLOQUANT** de T-011 (`docs/audits/reseau-vava_voice.md`) : `vava_voice/server/zones.lua:73,75` envoie à
+  `EVERYONE` (constante `-1`, `:23`), environ 110 o par édition, et échappe à `audit-reseau.sh`. Seul BLOQUANT de
+  l'audit réseau : en attendant cette tâche, le porteur du projet décide d'inscrire l'exception dans
+  `scripts/audit-exceptions.txt` (nécessaire dès que T-013 renforce le garde-fou).
 
 ### T-015 — Récolte : GlobalState → abonnements de zone
 - Agent : vava-dev-lua · Dépend de : T-014 · Statut : à faire
 - `vava_gathering` (zones et nœuds) n'écrit plus dans GlobalState. Même comportement en jeu.
+- T-011 (`docs/audits/reseau-vava_gathering.md`) : une récolte coûte deux écritures (zone `server/zones.lua:123-129`,
+  nœud `server/nodes.lua:75-79`), environ 140 o chez chaque joueur connecté (64 joueurs, 15 récoltants : environ
+  27 Ko/s sortants pour rien). Retirer `vitality` de ce qui est publié (`zones.lua:124`) : le client ne lit que `band`
+  et `scarred` (`client/props.lua:76-79`), et la vitalité entière fait partir une écriture à presque chaque récolte et
+  à chaque point regagné (passage de 10 s) ; publier zone et nœuds aux seuls abonnés de la zone.
 
 ### T-016 — Agriculture : GlobalState → abonnements de zone
 - Agent : vava-dev-lua · Dépend de : T-014 · Statut : à faire
+- T-011 (`docs/audits/reseau-vava_farming.md`) : `server/slots.lua:140-155` republie la **parcelle entière** (470 o pour
+  les 12 emplacements du champ communal) à tous les joueurs dès qu'un seul emplacement change de culture, de stade ou
+  d'état. Envoyer aux abonnés de la parcelle la seule différence `{ parcelle, n°, crop, stage, state }` (environ 40 o)
+  et l'état complet seulement à l'abonnement.
 
 ### T-017 — Artisanat : GlobalState → abonnements de zone
 - Agent : vava-dev-lua · Dépend de : T-014 · Statut : à faire
+- T-011 (`docs/audits/reseau-vava_crafting.md`) : `server/stations.lua:75-82` publie `{ fuel, busy }` à tous, deux fois
+  par création au moins (occupée, libre) et à chaque unité de combustible ; `:85-87` réécrit la liste complète des
+  stations (110 o par station) à chaque station ajoutée par un module. Envoyer l'état aux abonnés de la zone de la
+  station ; la liste des stations devient la définition de zone (plus de clé globale).
 
 ### T-018 — Revue des boucles client
 - Agent : vava-dev-lua (avec vava-reseau-perf) · Dépend de : T-011 · Statut : à faire
 - Chacun des 13 fichiers avec `Wait(0)` : la boucle ne tourne que pendant un état actif, sinon intervalle adaptatif.
   Même revue pour toutes les boucles signalées par T-011.
+- T-011 (`docs/plan/rapports/T-011.md` § Boucles client permanentes) : les 14 `Wait(0)` sont tous liés à un état qui
+  se termine, rien à retirer. **IMPORTANT** : les trois boucles de props tournent à 1 000 ms fixes où que soit le
+  joueur et mesurent chaque cible de la config (`vava_gathering/client/props.lua:157-174`,
+  `vava_farming/client/props.lua:175-215`, `vava_crafting/client/props.lua:153-170`) ; l'Atelier en multipliera les
+  cibles. Mesurer d'abord la distance aux zones (ou parcelles), ne parcourir que les cibles d'une zone à portée,
+  allonger l'intervalle à 2-3 s quand rien n'est à moins de `streaming.radius`. Regroupements à décider selon le
+  resmon (MINEUR des rapports) : trois boucles de `vava_voice/client/main.lua:119-146`, visibilité du chat en double
+  avec le HUD, recherche permanente de `vava_magic/client/ambient.lua:423-440`.
 
 ### T-019 — PORTE : mesure après optimisation — **HUMAIN**
 - Dépend de : T-010 à T-018 et leurs corrections · Statut : à faire
 - Refaire les mesures de T-009 (resmon, poids, `/vava_reseau` à 2 joueurs éloignés puis proches). Comparer aux
   objectifs de `SECURITE_RESEAU.md`.
+- Mesures détaillées, cibles et scénarios (dont la mémoire des 14 pages NUI et le joueur filmé par les caméras) :
+  `docs/plan/rapports/T-011.md` § Mesures à reprendre à la porte T-019.
 
 ## Phase 2 — Arrivée
 
