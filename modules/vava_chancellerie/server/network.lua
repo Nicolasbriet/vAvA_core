@@ -26,7 +26,8 @@ local messages = VavaBridge.config.messages
 local ADMIN = VavaBridge.ADMIN
 local LIMIT = math.min(50, math.max(1, cfg.lines))
 
--- Compte du panneau (nom) → { readAt, pageAt?, player?, playerAt? } : dernière lecture et lignes inscrites au journal.
+-- Compte du panneau (nom) → { readAt, pageAt?, player?, playerAccount?, playerAt? } : dernière lecture et lignes
+-- inscrites au journal.
 -- Une entrée par compte qui a lu la page : bornée par le nombre de comptes du panneau.
 ---@type table<string, table>
 local accounts = {}
@@ -117,16 +118,25 @@ requests.netStats = function(actor, args)
     local listing = query.scope == 'players' or nil
     local read, stats, code = pcall(net.stats,
         { limit = LIMIT, resource = query.resource, target = query.target, players = listing })
-    -- liste des joueurs refusée : core antérieur à 0.12.0
-    if read and not stats and listing and code == 'invalid_options' then return failure('net_unavailable') end
+    -- liste des joueurs refusée (core antérieur à 0.12.0, ou runtime sans GetPlayers)
+    if read and not stats and listing and (code == 'invalid_options' or code == 'unsupported') then
+        return failure('net_unavailable')
+    end
     if not read or type(stats) ~= 'table' then return failure(read and code or 'net_unavailable') end
+    -- core 0.10 ou 0.11 : le détail d'un joueur n'y existe que pour un joueur suivi (watched rendu) ; ses chiffres
+    -- seraient faux ici
+    if query.target and stats.watched ~= nil then return failure('net_unavailable') end
 
+    local details = query.target and playerDetails(query.target) or nil
+    query.account = details and details.compte
     local page, player = rules.netJournal(state, query, now, cfg.logEveryMs, cfg.openLogMinMs)
     if page and journal(actor, messages.logNet, query.resource and { ressource = query.resource } or {}) then
         state.pageAt = now
     end
-    if player and journal(actor, messages.logNetPlayer, playerDetails(query.target)) then
-        state.player, state.playerAt = query.target, now
+    if player then
+        -- le détail d'un joueur n'est jamais rendu sans trace au journal
+        if not journal(actor, messages.logNetPlayer, details) then return failure('journal_unavailable') end
+        state.player, state.playerAccount, state.playerAt = query.target, query.account, now
     end
 
     local total = type(stats.total) == 'table' and stats.total or {}

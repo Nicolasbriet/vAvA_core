@@ -223,6 +223,18 @@ describe('vava_chancellerie règles du pont', function()
             assert.is_true(select(2, rules.netJournal(state, query('player', 4, false), 2000 + EVERY, EVERY, OPEN)))
         end)
 
+        it('inscrit le même numéro passé à un autre compte de jeu', function()
+            local state = { pageAt = 2000, player = 4, playerAccount = 41, playerAt = 2000 }
+            local same = query('player', 4, false)
+            same.account = 41
+            assert.is_false(select(2, rules.netJournal(state, same, 3000, EVERY, OPEN)))
+            local other = query('player', 4, false)
+            other.account = 77
+            assert.is_true(select(2, rules.netJournal(state, other, 3000, EVERY, OPEN)))
+            -- compte devenu inconnu (joueur parti, numéro redonné en connexion) : inscrit aussi
+            assert.is_true(select(2, rules.netJournal(state, query('player', 4, false), 3000, EVERY, OPEN)))
+        end)
+
         it('ne compte aucun joueur pour l\'ensemble ou un module', function()
             local state = { pageAt = 1000, player = 4, playerAt = 1000 }
             assert.is_false(select(2, rules.netJournal(state, query('all', '', true), 2000, EVERY, OPEN)))
@@ -261,7 +273,7 @@ describe('vava_chancellerie règles du pont', function()
                 { source = 3, name = 'Aldric Morn', messages = 4, bytes = 900.0, latent = 1, extra = 'x' },
                 { source = 7 },
                 { source = 0, messages = 1 }, { source = 65536 }, { source = 2.5 }, { source = '4' }, 'x',
-                { source = 9.0, name = string.rep('a', 65), messages = -1, bytes = 0 / 0, latent = math.huge },
+                { source = 9.0, name = string.rep('a', rules.NET_NAME_MAX + 1), messages = -1, bytes = 0 / 0, latent = math.huge },
                 { source = 5, name = '' },
             })
             assert.same({
@@ -289,7 +301,13 @@ describe('vava_chancellerie règles du pont', function()
         it('netName garde un nom court, rien d’autre', function()
             assert.equal('Ysolde Var', rules.netName('Ysolde Var'))
             assert.is_nil(rules.netName(''))
-            assert.is_nil(rules.netName(string.rep('é', 33)))
+            -- nom permis par le core, très accentué : 24 + 24 caractères de 2 octets et une espace (97 octets), gardé
+            local accented = string.rep('é', 24) .. ' ' .. string.rep('É', 24)
+            assert.equal(97, #accented)
+            assert.equal(accented, rules.netName(accented))
+            assert.equal(193, rules.NET_NAME_MAX)
+            assert.equal(string.rep('a', 193), rules.netName(string.rep('a', 193)))
+            assert.is_nil(rules.netName(string.rep('a', 194)))
             assert.is_nil(rules.netName(12))
             assert.is_nil(rules.netName(nil))
         end)

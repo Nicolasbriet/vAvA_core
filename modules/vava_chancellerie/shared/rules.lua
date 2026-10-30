@@ -88,11 +88,12 @@ function rules.netQuery(scope, value, opening)
 end
 
 --- Quelles lignes inscrire au journal du Registre pour cette lecture ? `state` : ce qui a déjà été inscrit pour ce
---- compte du panneau ({ pageAt?, player?, playerAt? }, heures des lignes acceptées par le Registre).
+--- compte du panneau ({ pageAt?, player?, playerAccount?, playerAt? }, heures des lignes acceptées par le Registre).
 --- Page : à son ouverture, à la première lecture connue du pont (page ouverte avant son redémarrage, ou client qui ne dit
 --- pas l'ouverture), puis au plus tard toutes les `everyMs` ; jamais à chaque relecture. L'ouverture est dite par le
 --- client : elle n'est prise qu'une fois par `openMinMs` (une page qui la répéterait n'inonde pas le journal).
---- Joueur : chaque fois qu'un autre joueur est lu, et au plus tard toutes les `everyMs` pour le même.
+--- Joueur : chaque fois qu'un autre joueur est lu (autre numéro, ou même numéro passé à un autre compte de jeu :
+--- `query.account`, compte de la cible s'il est connu), et au plus tard toutes les `everyMs` pour le même.
 ---@param state table
 ---@param query table  rendu par rules.netQuery
 ---@param now integer
@@ -104,13 +105,17 @@ function rules.netJournal(state, query, now, everyMs, openMinMs)
     local since = state.pageAt and now - state.pageAt
     local page = since == nil or since >= everyMs or (query.opening and since >= openMinMs)
     local player = query.scope == 'player'
-        and (state.player ~= query.target or state.playerAt == nil or now - state.playerAt >= everyMs)
+        and (state.player ~= query.target or state.playerAccount ~= query.account or state.playerAt == nil
+            or now - state.playerAt >= everyMs)
     return page == true, player == true
 end
 
--- Liste des joueurs de la page Réseau : 128 au plus (comme core.net.stats), nom de personnage de 64 octets au plus.
+-- Liste des joueurs de la page Réseau : 128 au plus (comme core.net.stats), nom de personnage borné comme ceux du core.
 local NET_PLAYERS_MAX = 128
-local NET_NAME_MAX = 64
+-- prénom et nom de 24 caractères au plus chacun (config.server.characters.name), 4 octets au plus par caractère, une
+-- espace entre les deux
+local NET_NAME_MAX = 2 * 24 * 4 + 1
+rules.NET_NAME_MAX = NET_NAME_MAX
 rules.NET_PLAYERS_MAX = NET_PLAYERS_MAX
 
 ---@param value any

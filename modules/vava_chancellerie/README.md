@@ -70,18 +70,21 @@ complet : `README.md` à la racine du dépôt).
   lit `core.net.stats` (core ≥ 0.12.0) — ce que montre `/vava_reseau` en jeu : mesure, envois, volume, latents,
   évènements les plus lourds et leur plus gros message — et ne rend que ces champs, en liste pure. Le core suit chaque
   joueur connecté d'office (0.12.0) : `players` rend la liste des joueurs connectés, du plus chargé au moins chargé
-  (`rules.netPlayers` : 128 au plus, numéro, nom du personnage de 64 octets au plus, envois, volume, latents, et le
-  nombre de joueurs connectés) ; `player` rend le détail par évènement du joueur et le nom de son personnage (absent
-  sans personnage), sans condition. Un core antérieur à 0.12.0 refuse la liste : `net_unavailable`. Arguments bornés
+  (`rules.netPlayers` : 128 au plus, numéro, nom du personnage de 193 octets au plus — la borne des noms du core —,
+  envois, volume, latents, et le nombre de joueurs connectés ; seul le total du royaume l'accompagne) ; `player` rend
+  le détail par évènement du joueur et le nom de son personnage (absent sans personnage), sans condition. Un core
+  antérieur à 0.12.0 (liste refusée, ou `watched` rendu avec le détail d'un joueur) ou un runtime sans `GetPlayers` :
+  `net_unavailable`. Arguments bornés
   (`rules.netQuery` : 48 signes au motif des ressources, joueur de 1 à 65 535), lectures d'un même compte espacées de
   `net.minIntervalMs` (vérifié avant le droit : `rate_limited`), droit `net.permission` (tools) vérifié auprès du
   Registre (`webCan`), joueur absent : `unknown_player`. Rien ne change côté jeu. Journal du Registre (`webLog`,
   `rules.netJournal`) : « Compteur réseau consulté » à l'ouverture de la page (dite par la page, prise au plus une fois
   par `net.openLogMinMs` et par compte ; et à la première lecture d'un compte que le pont ne connaît pas), « Réseau
   d'un joueur consulté » (`joueur` = numéro de connexion, réattribué après un départ, et `compte` = compte de jeu lu par
-  `core.players.get`, sans personnage chargé) à chaque autre joueur dont le détail est lu, puis au plus tard toutes les
-  `net.logEveryMs` ; lire la liste des joueurs n'inscrit rien ; jamais à chaque relecture. Une ligne ne compte que si
-  le Registre l'a acceptée.
+  `core.players.get`, sans personnage chargé) à chaque autre joueur dont le détail est lu (autre numéro, ou même numéro
+  passé à un autre compte de jeu), puis au plus tard toutes les `net.logEveryMs` ; lire la liste des joueurs n'inscrit
+  rien ; jamais à chaque relecture. Une ligne ne compte que si le Registre l'a acceptée ; le détail d'un joueur n'est
+  jamais rendu sans elle (`journal_unavailable`).
 - **Caméras** : ouvertes auprès de vava_cameras une fois le droit `watch` accordé — la vue en grand par la demande
   « écran du joueur » du Registre (cible vérifiée, au journal) — une fois le droit lu et la caméra jugée accordable par
   vava_cameras (`webCheck`, 1.5.1) : une vue refusée faute de débit chez le joueur filmé (`budget`), que la

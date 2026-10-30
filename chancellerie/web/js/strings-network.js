@@ -11,6 +11,7 @@ STRINGS.nav.network = 'Réseau';
 Object.assign(STRINGS.errors, {
   net_unavailable: 'Le compteur réseau demande vAvA_core 0.12.0 ou plus récent sur le serveur de jeu.',
   unknown_player: 'Aucun joueur de ce numéro en jeu.',
+  journal_unavailable: 'Le journal du Conseil n\'a pas pu inscrire cette consultation : le détail du joueur n\'est pas montré. Réessayez dans un instant.',
 });
 
 STRINGS.network = {

@@ -41,9 +41,10 @@ VavaBridge.config = {
     -- sa propre ligne « Cases du mur regardées ».
     cameras = { permission = 'watch', fullRequest = 'watchScreen', tileLogMs = 2 * 60 * 60 * 1000 },
 
-    -- Page Réseau (compteur des envois du core, core.net.stats, core ≥ 0.10.0 ; lecture seule) : droit du Registre,
+    -- Page Réseau (compteur des envois du core, core.net.stats, core ≥ 0.12.0 ; lecture seule) : droit du Registre,
     -- celui de /vava_reseau ; évènements rendus au plus (1 à 50) ; délai entre deux lectures d'un même compte du panneau
-    -- (ms, la page relit au plus toutes les 5 s) ; ligne au journal à l'ouverture de la page, à chaque autre joueur lu,
+    -- (ms, la page relit au plus toutes les 5 s) ; ligne au journal à l'ouverture de la page, à chaque autre joueur lu
+    -- (autre numéro ou autre compte de jeu ; sans ligne acceptée par le Registre, le détail est refusé),
     -- puis au plus tard toutes les logEveryMs (30 min) pendant une lecture continue, jamais à chaque relecture ;
     -- l'ouverture, dite par la page, n'est prise qu'une fois par openLogMinMs (1 min) pour un même compte.
     net = {

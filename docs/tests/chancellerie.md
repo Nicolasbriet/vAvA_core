@@ -76,10 +76,13 @@ bannière de la Chancellerie dit `v1.8.0` ; la console du serveur `module 'vava_
 | 13 | **Page ouverte, serveur de jeu arrêté** : relecture « toutes les 5 s », outils de développement (`F12`) → Réseau ouverts, arrêter le serveur de jeu depuis la Chancellerie ; laisser une minute. Recommencer avec `stop vava_chancellerie` (pont absent) au lieu de l'arrêt du serveur. | Serveur arrêté : **une** requête `/api/game/request` (« Le serveur de jeu est arrêté. »), puis la relecture s'arrête (« relecture automatique arrêtée », « à la demande ») ; plus aucune requête jusqu'à « Relire » ou un rythme choisi. Pont absent : une demande toutes les 5 s **au plus**, jamais plus (le message reste affiché) ; jamais « Trop de tentatives » sur les autres pages ouvertes. |
 | 14 | Relecture « toutes les 5 s », double-cliquer vite sur « Relire ». | Une seule requête : « Relire » est grisé pendant la lecture. |
 | 15 | Facultatif : relecture « toutes les 15 s », ne plus toucher à la page pendant 15 min (onglet visible). | Après 15 min : « relecture arrêtée après 15 min sans action », « à la demande » ; plus aucune requête. Choisir un rythme la relance. |
-| 16 | Facultatif : un `vAvA_core` antérieur à 0.12.0. | « Les joueurs » : « Le compteur réseau demande vAvA_core 0.12.0 ou plus récent sur le serveur de jeu. » ; aucune erreur dans la console. |
+| 16 | Facultatif : un `vAvA_core` antérieur à 0.12.0. | « Les joueurs » et « Un joueur » : « Le compteur réseau demande vAvA_core 0.12.0 ou plus récent sur le serveur de jeu. » (jamais un détail faux) ; aucune erreur dans la console. |
 | 17 | `<B>` et `<C>` en jeu, `<B>` très actif (besace, Codex), `<C>` immobile ; un troisième client en sélection de personnage. Choisir « Les joueurs ». | « 3 joueurs connectés. » et une ligne par joueur : N°, Personnage (« sans personnage » pour celui en sélection), Envois, Volume, Latents, `<B>` en tête (le plus chargé). Pas de champ de saisie. Journal du Conseil : **aucune** ligne nouvelle pour la liste (ni à la relecture). |
 | 18 | Cliquer sur la ligne de `<C>`. | Le tampon « Un joueur » se choisit, le champ montre son numéro, son détail s'affiche ; journal : « Réseau d'un joueur consulté », joueur = `<C>`, compte = son compte de jeu. Revenir à « Les joueurs » : aucune nouvelle ligne. |
 | 19 | `<C>` se déconnecte ; « Relire » sur « Les joueurs ». | `<C>` n'est plus dans la liste. S'il revient avec un autre numéro, son volume repart de zéro. |
+| 20 | Un joueur `<D>` se connecte et reçoit le numéro qu'avait `<C>` (fréquent sur un petit serveur) ; ouvrir le détail de ce numéro. | Une **nouvelle** ligne « Réseau d'un joueur consulté » avec le compte de jeu de `<D>`, même si le numéro de `<C>` avait été lu dans la demi-heure. |
+| 21 | Page Console : `stop vava_admin` ; ouvrir le détail d'un autre joueur. Puis `start vava_admin`. | Refus « Ce compte n'a pas ce droit. » (le Registre ne répond plus) ; jamais un détail affiché sans ligne au journal. Si le Registre accepte le droit mais refuse la ligne : « Le journal du Conseil n'a pas pu inscrire cette consultation… ». |
+| 22 | Personnage au nom très accentué (24 lettres accentuées de prénom et de nom), connecté. « Les joueurs ». | Son nom s'affiche en entier, jamais « sans personnage ». |
 
 ## 4. Ce que je ne peux pas avoir vérifié hors jeu
 
@@ -108,11 +111,12 @@ Restent à voir avec un vrai FXServer :
   cours 5 s au plus par requête) : 2-2 doit appliquer le rang du premier coup.
 
 Page Réseau (section 3), vérifiée hors jeu : le vrai `server/network.lua` du pont sous Lua 5.4 avec un faux Registre et
-un faux `core.net` (54 contrôles : arguments refusés, délai avant le droit, Gardien refusé sans rien lire ni inscrire,
+un faux `core.net` (59 contrôles : détail refusé sans ligne au journal, même numéro passé à un autre compte inscrit, core
+ancien refusé ; arguments refusés, délai avant le droit, Gardien refusé sans rien lire ni inscrire,
 une ligne à l'ouverture, aucune à la relecture, ouverture répétée prise une fois par minute, une ligne par autre joueur
 avec son compte de jeu, échéance de 30 min, ligne refusée réessayée, nom du personnage rendu sans condition de suivi,
 liste des joueurs copiée bornée à 128 et jamais inscrite, core sans liste, liste copiée pure, core sans `core.net`) ; la
-vraie page sous jsdom (106 contrôles : liste des joueurs, « sans personnage », clic vers le détail, liste plafonnée ou
+vraie page sous jsdom (108 contrôles : journal indisponible ; liste des joueurs, « sans personnage », clic vers le détail, liste plafonnée ou
 vide ; ouverture marquée une seule fois,
 relecture à 15 s puis 5 s, pause onglet caché, ligne cliquée, numéros refusés sans requête, réponse dépassée ignorée,
 droit retiré, aucun texte injecté en HTML ; et, après la relecture réseau, jamais moins de 5 s entre deux demandes
