@@ -208,7 +208,9 @@
         : 'suite terminée');
     }
     if (showFps && stats) {
-      parts.push((stats.fps ? stats.fps.toFixed(1) + ' im/s' : 'peint une fois') + ' · effets ' + stats.level);
+      parts.push((stats.fps
+        ? 'braises ' + stats.fps.toFixed(1) + ' im/s, paysage ' + (stats.worldFps ? stats.worldFps.toFixed(1) + ' im/s' : 'caché')
+        : 'peint une fois') + ' · effets ' + stats.level);
     }
     if (stats) parts.push('feu ' + (stats.stage + 1) + ' · ' + stats.pct + ' %');
     statusEl.textContent = parts.join(' · ');

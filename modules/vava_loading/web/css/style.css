@@ -9,7 +9,8 @@
  *        dans fonts/ (non livrées). Runes du sceau : police système Segoe UI Historic (décision 11).
  * Jetons repris par valeur de vava_ui (README), sans le préfixe --ui- réservé à vava_ui.
  * Performance : animations CSS sur transform et opacity seulement (composées) ; niveau d'effets dans
- *        .scene[data-level] (basse : ni grain ni reflet du titre).
+ *        .scene[data-level] (basse : anneaux, halo et flammes immobiles, sauf la flamme du feu en cours) ; grain et
+ *        reflet du titre coupés par les classes no-grain et no-shine (drapeaux grain et shine du niveau, js/config.js).
  */
 
 @font-face {
@@ -90,7 +91,7 @@ p, h1, blockquote { margin: 0; }
   opacity: 0.16; mix-blend-mode: overlay;
   background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='220' height='220'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 .5  0 0 0 0 .42  0 0 0 0 .32  0 0 0 .9 0'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>");
 }
-.scene[data-level="basse"]::after { display: none; }
+.scene.no-grain::after { display: none; }
 .vignette { position: absolute; inset: 0; pointer-events: none; z-index: 1;
   background: radial-gradient(120% 95% at 50% 40%, transparent 50%, rgba(7, 5, 4, 0.9) 100%); }
 
@@ -160,13 +161,13 @@ button:focus-visible { outline: 1px solid var(--brass-bright); outline-offset: 2
   25%  { opacity: 1; filter: drop-shadow(0 0 28px rgba(255, 179, 92, 0.95)) brightness(2.2); }
   100% { opacity: 1; transform: none; filter: drop-shadow(0 0 18px rgba(208, 138, 60, 0.35)) brightness(1); }
 }
-/* reflet qui passe sur le métal du titre (retiré en basse) */
+/* reflet qui passe sur le métal du titre (retiré par .no-shine) */
 .title .shine { position: absolute; inset: 0; pointer-events: none; color: transparent;
   background: linear-gradient(105deg, transparent 40%, rgba(255, 245, 220, 0.75) 50%, transparent 60%);
   background-size: 250% 100%; background-position: 150% 0;
   -webkit-background-clip: text; background-clip: text; }
 .revealed .title .shine { animation: sweep 7s ease-in-out 1.5s infinite; }
-.scene[data-level="basse"] .title .shine { display: none; animation: none; }
+.scene.no-shine .title .shine { display: none; animation: none; }
 @keyframes sweep { 0% { background-position: 150% 0; } 35%, 100% { background-position: -60% 0; } }
 
 .spark-line { position: relative; width: min(560px, 70vw); height: 2px; margin: 14px 0 12px; }
@@ -201,7 +202,8 @@ kbd { font-family: var(--font-body); font-weight: 600; font-size: 0.9em; color: 
 .path { position: relative; height: 34px; }
 .path .track { position: absolute; left: 0; right: 0; top: 22px; height: 1px;
   background: linear-gradient(90deg, transparent, var(--rule) 4%, var(--rule) 96%, transparent); }
-.path .fill { position: absolute; left: 0; top: 21px; height: 3px; width: 0; transition: width 0.5s var(--ease);
+.path .fill { position: absolute; left: 0; top: 21px; height: 3px; width: 100%; transform: scaleX(0); transform-origin: 0 50%;
+  transition: transform 0.5s var(--ease); will-change: transform;
   background: linear-gradient(90deg, rgba(208, 138, 60, 0), var(--ember) 30%, var(--brass-bright)); box-shadow: 0 0 14px rgba(255, 179, 92, 0.55); }
 .beacon { position: absolute; top: 0; width: 22px; height: 34px; margin-left: -11px; }
 .beacon .bowl { position: absolute; left: 3px; right: 3px; bottom: 6px; height: 6px; border: 1px solid var(--brass); border-top: none;
@@ -216,6 +218,9 @@ kbd { font-family: var(--font-body); font-weight: 600; font-size: 0.9em; color: 
 /* feu en cours : flamme rapide, seul signe de vie quand aucun message n'arrive (aucune progression inventée) */
 .beacon.current .flame { animation-duration: 0.45s; }
 @keyframes flicker { 0% { transform: scale(1, 1) skewX(0deg); } 50% { transform: scale(0.92, 1.08) skewX(-3deg); } 100% { transform: scale(1.04, 0.95) skewX(3deg); } }
+/* basse : plus rien ne bouge en continu, sauf la flamme du feu en cours (signe de vie) */
+.scene[data-level="basse"] .ring, .scene[data-level="basse"] .sigil-halo { animation: none; will-change: auto; }
+.scene[data-level="basse"] .beacon.lit:not(.current) .flame { animation: none; }
 .detail { display: flex; justify-content: space-between; gap: 16px; flex-wrap: wrap; font-size: 0.85rem; color: var(--text-faint);
   font-variant-numeric: tabular-nums; }
 

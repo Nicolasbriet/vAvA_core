@@ -51,10 +51,17 @@
 
   function effects() { return cfg.effects.levels[level]; }
 
+  /** Niveau posé sur la scène : data-level, et classes no-grain, no-shine d'après les drapeaux du niveau. */
+  function showLevel() {
+    sceneEl.setAttribute('data-level', level);
+    sceneEl.classList.toggle('no-grain', !effects().grain);
+    sceneEl.classList.toggle('no-shine', !effects().shine);
+  }
+
   function setLevel(name) {
     if (name === level) return;
     level = name;
-    sceneEl.setAttribute('data-level', level);
+    showLevel();
     painter.setLevel(level);
   }
 
@@ -66,7 +73,7 @@
       if (meter.level !== level) setLevel(meter.level);
     },
   });
-  sceneEl.setAttribute('data-level', level);
+  showLevel();
 
   /** Gerbe d'étincelles au centre d'un élément (coordonnées de la scène). */
   function burstAt(el, n, power, dy) {
@@ -146,7 +153,7 @@
     var k = state.stage, pct = state.pct, stage = S.stages[k] || { text: '', detail: '' };
     if (shown.fill !== pct) {
       shown.fill = pct;
-      $('fill').style.width = pct + '%';
+      $('fill').style.transform = 'scaleX(' + pct / 100 + ')'; // composé, sans relayout
       pathEl.setAttribute('aria-valuenow', String(pct));
     }
     put('pct', text.format(S.percent, { pct: pct }));
@@ -262,6 +269,7 @@
     if (phase !== 'opening') return;
     phase = 'revealed';
     clearList(openingTimers);
+    painter.showWorld(); // paysage peint avant que le rideau commence à se lever
     sceneEl.classList.add('drawn', 'revealed');
     measureFrom = performance.now() + cfg.effects.measureDelayMs;
     lightBeacons(state.stage, true); // feux atteints pendant l'ouverture : allumés un à un
@@ -400,12 +408,15 @@
   VavaLoading.app = {
     receive: receive,
     skip: skip,
-    stats: function () { return { fps: painter.fps(), level: level, stage: state.stage, pct: state.pct, phase: phase }; },
+    stats: function () {
+      return { fps: painter.fps(), worldFps: painter.worldFps(), level: level, stage: state.stage, pct: state.pct, phase: phase };
+    },
     /** Rejoue l'ouverture seule (la progression est gardée). */
     replayOpening: function () {
       if (phase !== 'opening' && phase !== 'revealed') return;
       clearList(openingTimers);
       phase = 'opening'; measureFrom = Infinity;
+      painter.hideWorld();
       sceneEl.classList.remove('revealed', 'drawn', 'quick');
       letters.forEach(function (l) { l.classList.remove('lit', 'now'); });
       beacons.forEach(function (b) { b.classList.remove('lit', 'current'); });

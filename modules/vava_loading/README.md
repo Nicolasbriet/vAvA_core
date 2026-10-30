@@ -7,7 +7,7 @@ attend » se dissout sur le Registre des âmes, **sans écran noir**.
 
 Ressource **cliente uniquement** : aucun RPC, aucun évènement réseau, aucun state bag, aucune donnée en base. Tout ce
 que l'écran montre est dans ses fichiers ou vient du jeu local. Le seul coût réseau est le téléchargement de ses
-fichiers (≈ 216 Ko, une fois par version, mis en cache par FiveM).
+fichiers (≈ 234 Ko avec le client Lua, une fois par version, mis en cache par FiveM).
 
 ## Installation et ordre de démarrage
 
@@ -79,8 +79,10 @@ partagée, celle de l'éclair, est envoyée par le Lua avec le message de passag
 | Seuils des six feux (%) : position sur le chemin et plancher de l'étape ; recalibrés après le premier test en jeu | `[0, 12, 38, 72, 88, 97]` | `stages` |
 | Ouverture à chaque connexion, passable d'un clic | oui ; filet 300 ms, 1re lettre 1 100 ms, puis 190 ms par lettre, rideau 300 ms après | `opening.*` |
 | Changement d'extrait, de conseil | 9 s, 6,5 s (fondu 900 ms) | `rotation.*` |
-| Niveau d'effets | `auto` (`haute`, `moyenne`, `basse`) | `effects.level` |
-| Cadence des canvas au plus ; dégradation sous `minFps` sur `badWindows` fenêtres de `windowMs` | 30 i/s ; 20 i/s, 2 × 2 s | `effects.*` |
+| Niveau d'effets (`auto` : `basse` si le joueur demande moins d'animations, `moyenne` jusqu'à 4 cœurs, sinon `haute`) | `auto` (`haute`, `moyenne`, `basse`) | `effects.level` |
+| Cadence au plus des braises et étincelles, du paysage (jamais au-dessus des braises ; pas repeint sous le rideau de l'ouverture) | 30 i/s, 15 i/s | `effects.fpsMax`, `effects.worldFpsMax` |
+| Dégradation sous `minFps` sur `badWindows` fenêtres de `windowMs` | 20 i/s, 2 × 2 s | `effects.*` |
+| Par niveau : étoiles, braises, brumes, étincelles, parallaxe, caméra, étoile filante, grain (`no-grain`), reflet du titre (`no-shine`) ; en `basse`, seule la flamme du feu en cours bouge encore | voir le fichier | `effects.levels.*` |
 | Musique (aucune piste en 1.0.0 : bouton caché) | `''` | `music.file` |
 | Journal de calibrage à l'écran (**`false` avant fusion**, le test unitaire le vérifie) | `false` | `debug.journal` |
 
@@ -95,14 +97,19 @@ s'écrit `[[F1]]` (3 au plus par conseil, 12 octets au plus).
 
 Toute retouche d'un fichier livré le fait retélécharger à chaque joueur : retouches rares et groupées.
 
+**Seuils des feux (`stages`)** : les calibrer avec le journal (`debug.journal`) **sur le serveur de test seulement**,
+puis publier les seuils recalibrés **dans le même envoi que les textes de T-021** (`strings.js`). Chaque retouche de la
+page fait retélécharger toute la ressource (≈ 234 Ko) à chaque joueur : une seule publication pour les deux.
+
 ## Poids (livré aux joueurs)
 
 | Partie | Mesuré (1.0.0) | Plafond |
 |---|---|---|
-| `web/index.html`, `web/css/style.css`, `web/js/*.js` (7 fichiers) | ≈ 83 Ko | |
+| `web/index.html`, `web/css/style.css`, `web/js/*.js` (7 fichiers) | ≈ 90 Ko | |
 | `web/fonts/*.woff2` : Cinzel, EB Garamond droit et italique (copies identiques de `vava_ui`), Cinzel Decorative 900 | ≈ 134 Ko | |
-| **Total livré sans musique** | **≈ 216 Ko** | **300 Ko** (700 Ko avec une piste) — test unitaire |
-| Dossier entier (README, licences, `web/dev/`, Lua) | ≈ 270 Ko (visé) | **1,5 Mo** — `scripts/audit-reseau.sh`, BLOQUANT |
+| **Total de la page sans musique** | **≈ 222 Ko** | **300 Ko** (700 Ko avec une piste) — test unitaire |
+| Avec le manifeste et le client Lua (téléchargé par chaque joueur) | ≈ 234 Ko | |
+| Dossier entier (README, licences, `web/dev/`, Lua) | ≈ 291 Ko | **1,5 Mo** — `scripts/audit-reseau.sh`, BLOQUANT |
 
 Aucune image, aucune vidéo, aucune ressource externe : le paysage est peint par le code, le grain est un petit SVG en
 `data:`. Les licences (`web/fonts/OFL_*.txt`) et `web/dev/` restent dans le dépôt sans être livrés. Une mise à jour des
@@ -141,8 +148,9 @@ modules/vava_loading/web/dev/essais.js` (lancé aussi par `scripts/verifier.sh` 
 Procédure complète : `docs/tests/chargement.md`. Par ordre d'importance :
 
 1. **Aucun noir au passage** (3-2) : l'éclair se dissout sur la sélection déjà en place.
-2. **Messages réellement reçus et seuils recalibrés** (1-4) : journal de calibrage, puis `stages` réglé et le journal
-   remis à `false`.
+2. **Messages réellement reçus et seuils recalibrés** (1-4) : journal de calibrage sur le serveur de test seulement,
+   puis `stages` réglé, le journal remis à `false`, et les seuils publiés avec les textes de T-021 (un seul
+   retéléchargement).
 3. **Transparence de la page à la dissolution** (3-2) : sinon la fermeture coupe au sommet de l'éclair (repli voulu,
    jamais par le noir).
 4. **Runes du sceau lisibles** (2-3) : pas de carrés vides (police système `Segoe UI Historic`).

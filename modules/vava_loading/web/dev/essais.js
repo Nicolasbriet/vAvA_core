@@ -1,6 +1,6 @@
 /*
  * vava_loading/web/dev/essais.js
- * Rôle : essais des fonctions pures de la page (js/progress.js, js/quality.js, js/text.js) et forme de js/config.js et
+ * Rôle : essais des fonctions pures de la page (js/progress.js, js/quality.js : niveaux et cadences, js/text.js) et forme de js/config.js et
  *        js/strings.js. Sans dépendance : `node modules/vava_loading/web/dev/essais.js` (code de sortie 1 au moindre
  *        échec), ou web/dev/essais.html ouvert dans un navigateur. Jamais livré.
  * Dépendances : js/config.js, js/strings.js, js/text.js, js/progress.js, js/quality.js
@@ -172,7 +172,10 @@
     eq(quality.initial({ level: 'auto', reducedMotion: true, cores: 16 }), 'basse', 'moins d\'animations');
     eq(quality.initial({ level: 'auto', cores: 2 }), 'moyenne', '2 cœurs');
     eq(quality.initial({ level: 'auto', cores: 1 }), 'moyenne', '1 cœur');
+    eq(quality.initial({ level: 'auto', cores: 4 }), 'moyenne', '4 cœurs');
+    eq(quality.initial({ level: 'auto', cores: 5 }), 'haute', '5 cœurs');
     eq(quality.initial({ level: 'auto', cores: 8 }), 'haute', '8 cœurs');
+    eq(quality.initial({ level: 'auto', cores: 0 }), 'haute', '0 cœur : inconnu');
     eq(quality.initial({ level: 'auto' }), 'haute', 'cœurs inconnus');
     eq(quality.initial({ level: 'ultra', cores: 8 }), 'haute', 'réglage inconnu : auto');
   });
@@ -196,6 +199,59 @@
     for (var i = 0; i < 20; i++) { t += 1500; m = quality.step(m, t, OPTS); }
     eq(m.level, 'haute');
     eq(m.frames, 0);
+  });
+  // Boucle de scene.js rejouée sur des horodatages d'images : braises si due, paysage si worldDue (sur une image des
+  // braises seulement). Rend le nombre d'images de chacun et le plus grand écart entre deux images du paysage.
+  function cadence(periodMs, seconds, jitterMs, fxFps, worldFps) {
+    var rnd = seeded(11), t = 1000, end = 1000 + seconds * 1000, last = 0, lastWorld = 0, fx = 0, world = 0, gap = 0;
+    while (t < end) {
+      t += periodMs + (jitterMs ? (rnd() - 0.5) * 2 * jitterMs : 0);
+      if (!quality.due(last, t, fxFps)) continue;
+      last = t; fx++;
+      if (quality.worldDue(lastWorld, t, worldFps, fxFps)) {
+        if (lastWorld) gap = Math.max(gap, t - lastWorld);
+        lastWorld = t; world++;
+      }
+    }
+    return { fx: fx / seconds, world: world / seconds, gap: gap };
+  }
+  function near(actual, expected, tolerance, what) {
+    check(Math.abs(actual - expected) <= tolerance, what + ' : attendu ' + expected + ' ± ' + tolerance + ', obtenu ' + actual.toFixed(2));
+  }
+  test('due : première image toujours, puis selon le plafond (30 par défaut), marge 1 ms ou donnée', function () {
+    eq(quality.due(0, 5, 30), true, 'aucune image avant');
+    eq(quality.due(1000, 1032.4, 30), true, '32,4 ms à 30 i/s');
+    eq(quality.due(1000, 1016.7, 30), false, '16,7 ms à 30 i/s');
+    eq(quality.due(1000, 1032.4, 0), true, 'plafond nul : 30');
+    eq(quality.due(1000, 1032.4, NaN), true, 'plafond invalide : 30');
+    eq(quality.due(1000, 1060, 15), false, '60 ms à 15 i/s');
+    eq(quality.due(1000, 1060, 15, 8), true, '60 ms à 15 i/s, marge 8 ms');
+  });
+  test('cadence à 60 Hz : braises à 30 i/s, paysage à 15 i/s', function () {
+    var r = cadence(1000 / 60, 20, 0, 30, 15);
+    near(r.fx, 30, 0.2, 'braises');
+    near(r.world, 15, 0.2, 'paysage');
+    check(r.gap < 70, 'écart du paysage ' + r.gap.toFixed(1) + ' ms');
+  });
+  test('cadence à 60 Hz, horloge qui vacille de 2 ms : paysage sur une image des braises sur deux, jamais moins', function () {
+    var r = cadence(1000 / 60, 20, 2, 30, 15);
+    check(r.fx <= 30, 'braises ' + r.fx);
+    near(r.world, r.fx / 2, 0.1, 'paysage');
+    check(r.gap < 110, 'écart du paysage ' + r.gap.toFixed(1) + ' ms');
+  });
+  test('cadence à 144 Hz : 30 et 15 i/s au plus', function () {
+    var r = cadence(1000 / 144, 20, 0, 30, 15);
+    check(r.fx <= 30 && r.fx >= 27, 'braises ' + r.fx);
+    check(r.world <= 15 && r.world >= 13.5, 'paysage ' + r.world);
+  });
+  test('cadence : page lente (braises à 20 i/s) → paysage à 10 i/s, jamais à chaque image', function () {
+    var r = cadence(50, 20, 0, 30, 15);
+    near(r.fx, 20, 0.5, 'braises');
+    near(r.world, 10, 0.5, 'paysage');
+  });
+  test('cadence : paysage jamais au-dessus des braises ; réglage absent → celui des braises', function () {
+    near(cadence(1000 / 60, 10, 0, 30, 60).world, 30, 1, 'paysage à 60 demandé');
+    near(cadence(1000 / 60, 10, 0, 30, undefined).world, 30, 1, 'worldFpsMax absent');
   });
   test('basse est terminal', function () {
     var m = quality.meter('basse');
@@ -273,8 +329,19 @@
   });
   test('config : journal coupé, niveaux complets', function () {
     eq(cfg.debug.journal, false);
-    ['haute', 'moyenne', 'basse'].forEach(function (l) { check(cfg.effects.levels[l], l); });
+    ['haute', 'moyenne', 'basse'].forEach(function (l) {
+      var lv = cfg.effects.levels[l];
+      check(lv, l);
+      ['parallax', 'camera', 'comet', 'grain', 'shine'].forEach(function (k) { eq(typeof lv[k], 'boolean', l + '.' + k); });
+      check(Number.isInteger(lv.fogs) && lv.fogs >= 0, l + '.fogs');
+    });
     eq(cfg.effects.levels.basse.embers, 0);
+    eq(cfg.effects.levels.basse.grain, false, 'basse : sans grain');
+    eq(cfg.effects.levels.basse.shine, false, 'basse : sans reflet');
+  });
+  test('config : paysage plafonné sous les braises', function () {
+    check(cfg.effects.fpsMax > 0 && cfg.effects.fpsMax <= 30, 'fpsMax');
+    check(cfg.effects.worldFpsMax > 0 && cfg.effects.worldFpsMax <= cfg.effects.fpsMax, 'worldFpsMax');
   });
   test('strings : 6 étapes, 6 à 40 extraits, 6 à 20 conseils, 240 octets au plus, aucun chevron', function () {
     eq(S.stages.length, 6);

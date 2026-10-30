@@ -34,18 +34,21 @@
 
     effects: {
       level: 'auto',        // 'auto', 'haute', 'moyenne' ou 'basse' (auto : choix au démarrage, puis dégradation)
-      fpsMax: 30,           // images par seconde au plus pour les canvas
+      fpsMax: 30,           // images par seconde au plus : braises et étincelles (#fx)
+      worldFpsMax: 15,      // images par seconde au plus : paysage (#world, presque immobile ; jamais plus que fpsMax)
       minFps: 20,           // en dessous, sur badWindows fenêtres de windowMs de suite : un niveau de moins
       windowMs: 2000,
       badWindows: 2,
       measureDelayMs: 1000, // mesure commencée après la levée du rideau (l'ouverture fausserait tout)
       maxPixelRatio: 1,     // résolution des canvas (le paysage est flou par nature : 1 suffit)
+      // grain : voile de grain sur la scène ; shine : reflet qui passe sur le titre (classes no-grain, no-shine)
       levels: {
-        haute: { stars: 250, embers: 60, fogs: 7, letterSparks: 26, beaconSparks: 30, finalSparks: 40,
+        haute: { stars: 250, embers: 60, fogs: 6, letterSparks: 26, beaconSparks: 30, finalSparks: 40,
           parallax: true, camera: true, comet: true, grain: true, shine: true },
         moyenne: { stars: 150, embers: 25, fogs: 3, letterSparks: 12, beaconSparks: 15, finalSparks: 20,
           parallax: true, camera: true, comet: false, grain: true, shine: true },
-        // paysage peint une fois (et à chaque redimensionnement), plus aucune image animée par le script
+        // paysage peint une fois (et à chaque redimensionnement), plus aucune image animée par le script ; en CSS,
+        // seule la flamme du feu en cours bouge encore
         basse: { stars: 150, embers: 0, fogs: 3, letterSparks: 0, beaconSparks: 0, finalSparks: 0,
           parallax: false, camera: false, comet: false, grain: false, shine: false },
       },

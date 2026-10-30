@@ -809,7 +809,7 @@ aucun state bag, aucun hook émis, aucun export**. Contrat (règles complètes :
 - **Fichiers de la page** : textes dans `web/js/strings.js` (seul fichier touché par T-021), rythmes, seuils des feux,
   effets, musique et journal dans `web/js/config.js` ; jamais d'image ni de ressource externe ; polices embarquées
   (exception d'audit `modules/vava_loading/web/fonts/`).
-- **Poids** : ≈ 216 Ko livrés (1.0.0), plafond 300 Ko (700 Ko avec une musique, test unitaire) ; dossier entier ≤ 1,5 Mo
+- **Poids** : ≈ 222 Ko livrés (1.0.0), plafond 300 Ko (700 Ko avec une musique, test unitaire) ; dossier entier ≤ 1,5 Mo
   (`scripts/audit-reseau.sh`).
 
 ### `vava_appearance`

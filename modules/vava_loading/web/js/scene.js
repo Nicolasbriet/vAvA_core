@@ -3,11 +3,13 @@
  * Rôle : le paysage de nuit peint par le code (dessin et couleurs de la maquette docs/maquettes/Chargement.html) : quatre
  *        plans de crêtes et de forêts, château aux fenêtres qui vacillent, étoiles, lune, étoile filante, brume ; sur un
  *        second canvas, les braises qui montent et les gerbes d'étincelles. Le ciel est le dégradé CSS du fond de .scene.
- * Coût (spec T-020 § 8.3) : 30 images/s au plus (une image sautée si la précédente a moins de 33 ms) ; canvas à 1 pixel
- *        par point ; lune et halo, brume et lueurs peints une fois en petits sprites posés par drawImage ; étoiles en 8
- *        paliers d'éclat ; calques des crêtes rognés à leur hauteur utile ; niveau `basse` : paysage peint une fois (et
- *        à chaque redimensionnement), calques libérés, plus aucune image animée.
- * Dépendances : js/config.js (réglages passés à create)
+ * Coût (spec T-020 § 8.3) : braises et étincelles à 30 images/s au plus (effects.fpsMax), paysage à 15 (worldFpsMax :
+ *        presque rien n'y bouge) ; paysage pas repeint tant que le rideau de l'ouverture le cache (showWorld le peint à
+ *        l'instant où il se lève) ; canvas à 1 pixel par point ; lune et halo, brume et lueurs peints une fois en petits
+ *        sprites posés par drawImage ; étoiles en 8 paliers d'éclat ; calques des crêtes rognés à leur hauteur utile ;
+ *        niveau `basse` : paysage peint une fois (et à chaque redimensionnement), calques libérés, plus aucune image
+ *        animée.
+ * Dépendances : js/config.js (réglages passés à create), js/quality.js (cadences : due, worldDue)
  */
 (function (root) {
   'use strict';
@@ -18,6 +20,10 @@
   var STAR_BUCKETS = 8;
   var MAX_SPARKS = 600;
   var COMET_PER_SECOND = 0.15; // chance qu'une étoile filante parte, par seconde (≈ une toutes les 7 s)
+  var STEP_MS = 1000 / 60;     // pas de la maquette, pensée à 60 images/s
+  var FX_MAX_GAP_MS = 100;     // au-delà (page figée par le chargement), les braises ne sautent pas plus loin
+  var WORLD_MAX_GAP_MS = 200;  // de même pour le paysage
+  var due = VavaLoading.quality.due, worldDue = VavaLoading.quality.worldDue;
 
   function rand(a, b) { return a + Math.random() * (b - a); }
 
@@ -78,8 +84,9 @@
     var layers = [], windows = [], buckets = [], fogs = [], embers = [], sparks = [], comet = null;
     var moon = null, fogSprite = null, emberSprite = null, sparkSprite = null;
     var mouse = { x: 0, y: 0, tx: 0, ty: 0 };
-    var t0 = performance.now(), last = 0, raf = 0, running = false, painted = false;
-    var meter = { start: 0, frames: 0, fps: 0 };
+    var t0 = performance.now(), last = 0, lastWorld = 0, raf = 0, running = false, painted = false;
+    var worldOn = false; // rideau levé : avant, seules les braises et étincelles sont dessinées
+    var meter = { start: 0, frames: 0, worldFrames: 0, fps: 0, worldFps: 0 };
     var resizeTimer = 0;
 
     // ------------------------------------------------------------------ calques peints une fois
@@ -250,7 +257,8 @@
         }
       }
 
-      // plans, du plus lointain au plus proche, brume entre eux
+      // plans, du plus lointain au plus proche ; brume j entre le plan j % gaps et le suivant (toutes dessinées)
+      var gaps = layers.length - 1;
       for (var l = 0; l < layers.length; l++) {
         var L = layers[l];
         var ox = -(L.w - W) / 2 - mouse.x * 30 * L.depth - sway * L.depth;
@@ -258,7 +266,7 @@
         ctx.drawImage(L.canvas, ox, oy + L.y0, L.w, L.h);
         if (l === 1) drawWindows(ctx, t, ox, oy);
         if (l < layers.length - 1) {
-          for (var j = l; j < fogs.length; j += layers.length) {
+          for (var j = l; j < fogs.length; j += gaps) {
             var fg = fogs[j];
             fg.x += fg.v * f;
             if (fg.x - fg.r > W) fg.x = -fg.r;
@@ -320,36 +328,51 @@
       ctx.globalCompositeOperation = 'source-over';
     }
 
+    /** Une image du paysage, au pas du temps écoulé depuis la précédente (0 pour la première : rien ne saute). */
+    function paintWorld(now) {
+      var f = lastWorld ? Math.min(now - lastWorld, WORLD_MAX_GAP_MS) / STEP_MS : 0;
+      lastWorld = now;
+      drawWorld((now - t0) / 1000, f);
+      meter.worldFrames++;
+    }
+
     function frame(now) {
       raf = 0;
       if (!running) return;
       raf = requestAnimationFrame(frame);
-      var gap = 1000 / (effects.fpsMax || 30) - 1;
-      if (last && now - last < gap) return; // 30 images/s au plus
-      var dt = last ? Math.min(now - last, 100) : 1000 / 60;
+      if (!due(last, now, effects.fpsMax)) return; // braises : 30 images/s au plus
+      var dt = last ? Math.min(now - last, FX_MAX_GAP_MS) : STEP_MS;
       last = now;
-      var f = dt / (1000 / 60); // pas de la maquette, pensée à 60 images/s
-      drawWorld((now - t0) / 1000, f);
-      drawFx(f);
-      if (now - meter.start >= 1000) { meter.fps = meter.frames * 1000 / (now - meter.start); meter.start = now; meter.frames = 0; }
+      if (worldOn && worldDue(lastWorld, now, effects.worldFpsMax, effects.fpsMax)) paintWorld(now); // 15 images/s au plus
+      drawFx(dt / STEP_MS);
+      if (now - meter.start >= 1000) {
+        var span = now - meter.start;
+        meter.fps = meter.frames * 1000 / span; meter.worldFps = meter.worldFrames * 1000 / span;
+        meter.start = now; meter.frames = 0; meter.worldFrames = 0;
+      }
       meter.frames++;
       if (opts.onDraw) opts.onDraw(now);
     }
 
-    /** Niveau basse : une seule image du paysage, calques libérés, braises effacées. */
+    /**
+     * Niveau basse : une seule image du paysage, calques libérés, braises effacées. Rideau encore baissé : braises
+     * effacées seulement, calques gardés ; showWorld peindra le paysage.
+     */
     function paintStatic(freezeAt) {
       sparks = []; embers = []; comet = null;
       if (freezeAt === undefined) mouse.x = mouse.y = 0;
-      drawWorld(freezeAt || 0, 0, freezeAt !== undefined);
       fctx.setTransform(1, 0, 0, 1, 0, 0); fctx.clearRect(0, 0, fx.width, fx.height);
       fx.width = 1; fx.height = 1; // mémoire rendue
+      meter.fps = 0; meter.worldFps = 0;
+      if (!worldOn) { painted = false; return; }
+      drawWorld(freezeAt || 0, 0, freezeAt !== undefined);
       layers = []; painted = true;
-      meter.fps = 0;
     }
 
     function startLoop() {
       if (running) return;
-      running = true; last = 0; meter.start = performance.now(); meter.frames = 0;
+      running = true; last = 0; lastWorld = 0;
+      meter.start = performance.now(); meter.frames = 0; meter.worldFrames = 0;
       raf = requestAnimationFrame(frame);
     }
 
@@ -364,18 +387,33 @@
       resizeTimer = setTimeout(function () {
         build();
         if (level === 'basse') paintStatic();
+        else if (running && worldOn) paintWorld(performance.now()); // pas d'image vide jusqu'à la suivante
       }, 200);
     }
 
     var api = {
-      /** Construit les calques et démarre (ou peint une fois en basse). */
+      /**
+       * Construit les calques et démarre, rideau baissé : seules les braises et étincelles sont dessinées jusqu'à
+       * showWorld (en basse : rien du tout).
+       */
       start: function () {
         window.removeEventListener('resize', onResize);
         window.addEventListener('resize', onResize);
         t0 = performance.now();
+        worldOn = false; painted = false;
         build();
-        if (level === 'basse') paintStatic(); else { painted = false; startLoop(); }
+        if (level === 'basse') paintStatic(); else startLoop();
       },
+      /** Rideau levé : le paysage est peint aussitôt (aucune image vide sous le rideau qui s'efface), puis à sa cadence. */
+      showWorld: function () {
+        if (worldOn) return;
+        worldOn = true;
+        if (level === 'basse') {
+          if (!painted) { if (!layers.length) build(); paintStatic(); }
+        } else if (running) paintWorld(performance.now());
+      },
+      /** Rideau rebaissé (ouverture rejouée hors jeu) : le paysage n'est plus repeint, la dernière image reste. */
+      hideWorld: function () { worldOn = false; },
       /** Arrête l'animation (éclair terminé) ; le dernier dessin reste. */
       stop: function () {
         stopLoop();
@@ -408,8 +446,10 @@
       },
       /** Position de la souris, de -0.5 à 0.5 sur chaque axe (parallaxe). */
       pointer: function (nx, ny) { mouse.tx = nx; mouse.ty = ny; },
-      /** Cadence mesurée (images dessinées par seconde ; 0 en basse). */
+      /** Cadence mesurée des braises (images par seconde ; 0 en basse). */
       fps: function () { return running ? meter.fps : 0; },
+      /** Cadence mesurée du paysage (0 en basse ou rideau baissé). */
+      worldFps: function () { return running && worldOn ? meter.worldFps : 0; },
       level: function () { return level; },
       painted: function () { return painted; },
     };
