@@ -8,7 +8,7 @@ régularité de l'arrosage et de la terre ; les graines récupérées gardent ce
 conteneur de l'inventaire ancré à son lieu, dont chaque dépôt et retrait est journalé. Le serveur décide de tout et
 demande l'XP à `vava_skills`.
 
-Ordre de démarrage : après `vAvA_core` (≥ 0.6.0), `vava_ui` (≥ 1.0.0, polices, grain, papier et coins des
+Ordre de démarrage : après `vAvA_core` (≥ 0.11.0 : abonnements de zone, 1.7.0), `vava_ui` (≥ 1.0.0, polices, grain, papier et coins des
 interfaces ; à ne jamais arrêter sur un serveur ouvert), `vava_inventory` (≥ 1.4.0), `vava_skills` (≥ 1.0.0),
 `vava_gathering` (≥ 1.0.0 : faucille) et `vava_crafting` (≥ 1.1.0 : composteur). Facultatifs : `vava_hud`,
 `vava_admin` (droit `metiers`), `vava_chat`, `vava_health` (aucun geste à terre), `vava_time` (saisons : vitesse de
@@ -38,6 +38,7 @@ les polices).
 | Composteur | type de station + recette (3 déchets → 1 compost, Agriculture) ajoutés à `vava_crafting`, station placée par `addStation` | `composter` |
 | Cultures de départ | blé 90 min, carotte 30, chou 45, lin 60 (durées d'essai) | `crops` |
 | Props | créés par le client à 80 m ; une parcelle et son grenier forment un groupe, les puits sont groupés par case de 200 m : seules les cibles d'un groupe à portée sont mesurées ; relues toutes les secondes près d'un groupe, toutes les 2,5 s quand aucune cible n'est à moins de 140 m (80 m + 60 m de marge d'approche) (1.5.2) | `streaming` |
+| Parcelles connues d'un joueur (1.7.0) | celles dont il est à moins de leur rayon (emplacements et grenier) + 100 m (80 m de portée des props + 20 m de battement : un cavalier au galop entre deux passages du core), décidées par le serveur sur sa position ; oubliées 25 m plus loin (props retirés). À l'arrivée, la parcelle entière (définition, emplacements) ; ensuite, seuls les emplacements qui changent de culture, de stade ou d'état, aux seuls joueurs proches, regroupés par parcelle (une nuit de gel : un envoi par parcelle touchée). Puits : config, connus de tous | `streaming.radius`, `streaming.subscribeSlack` |
 | Journal | plantations, récoltes Excellent+, arrachages, couvertures, plantes prises par le gel (une ligne par nuit, par parcelle), Conseil ; grenier (une ligne par minute, personnage, objet et sens) ; 90 jours | `logTier`, `logRetentionDays`, `persistence.granaryLogMax` |
 
 ### Parcelles et emplacements
@@ -47,11 +48,34 @@ client et serveur), propriétaire nul (communale) ou `{ kind = 'character', id }
 déclare son genre par `registerAccess`), grenier facultatif. Chaque emplacement garde : culture, palier de la graine,
 date de semis, croissance effective, humidité, fertilité, sécheresse (depuis quand, heures cumulées), arrosages,
 flétri, mort, couvert contre le gel, famille précédente, date du dernier calcul. **Aucune boucle de croissance** : tout est recalculé quand
-on touche l'emplacement ; la boucle lente de 10 s republie seulement les stades qui ont changé (state bag
-`vava_farming:parcel:<id>` : culture, stade, état de chaque emplacement), pour que les plantes poussent sous les yeux.
+on touche l'emplacement ; la boucle lente de 10 s republie seulement les emplacements dont le stade ou l'état a changé,
+pour que les plantes poussent sous les yeux.
 Les modèles de `stages` se partagent la croissance à parts égales, sauf le dernier, réservé à la plante mûre : il
 n'apparaît qu'à 100 %, quand « mûr » s'affiche et que la récolte est possible (1.2.3). Les heures de sécheresse d'une
 plante s'arrêtent à sa mort.
+
+### Ce que reçoivent les joueurs (1.7.0, T-016)
+
+Chaque parcelle est une **zone du core** (`core.zones`, `server/zones.lua`, règles pures dans
+`shared/parcelzone.lua`) : centre de la parcelle, rayon qui couvre ses emplacements et son grenier, marge de 100 m.
+Le serveur décide seul qui la reçoit, sur la position qu'il lit une fois par seconde ; le client ne demande rien.
+- **À l'arrivée** : l'état entier, une fois (`def` : nom, centre, cap, grille, grenier et son modèle ; `s<n°>` :
+  culture, stade, état de chaque emplacement ; environ 600 o pour le champ communal).
+- **Ensuite** : seuls les emplacements qui changent de culture, de stade ou d'état (environ 40 o chacun), aux seuls
+  joueurs proches. Les changements d'une parcelle faits dans le même tour partent ensemble : une nuit de gel, un passage
+  de la croissance ou `/agriculture arroser` font un envoi par parcelle touchée. Avant la 1.7.0, la parcelle entière
+  (470 o pour le champ communal) partait à tous les joueurs connectés à chaque changement, par un state bag global ;
+  l'ancienne clé `vava_farming:parcel:<id>` est effacée au démarrage si elle traîne encore, et plus rien n'est écrit dans
+  `GlobalState`.
+- **En s'éloignant** (25 m au-delà) : la parcelle est oubliée, ses props retirés. Retour à la sélection,
+  déchargement : de même.
+- **Parcelle créée, déplacée ou changée en jeu** (Atelier, T-103) : `zones.share(parcelle, valeurs)` la déclare, ou la
+  déplace et remplace son état ; `zones.drop(id)` la retire. Les joueurs proches la reçoivent (ou l'oublient) sans
+  reconnexion, les autres en arrivant.
+- **Rien de secret** dans cet état (un client modifié peut mentir sur sa position et le recevoir de loin) : ni
+  propriétaire, ni humidité, ni fertilité, ni qualité à venir, ni contenu du grenier ; le menu d'un emplacement les
+  demande au serveur (`vava_farming:open`), qui revérifie la distance, comme au début et à la fin de chaque geste, au
+  puits et au grenier.
 
 ### Grenier commun
 
@@ -92,7 +116,7 @@ withdraw, source, characterId, item, quantity }`). Détail : `docs/api.md`.
 
 1. **Semis** : graines de blé (deux paliers) → l'emplacement libre du champ communal propose Planter, le palier se
    choisit ; la graine du palier choisi est consommée ; XP d'Agriculture.
-2. **Pousse** : la plante avance de stade sans qu'on y touche (state bag relu toutes les 10 s), le modèle mûr
+2. **Pousse** : la plante avance de stade sans qu'on y touche (stades relus toutes les 10 s), le modèle mûr
    n'apparaissant qu'à 100 % ; `/agriculture pousser champ_communal 1` mûrit d'un coup, terre arrosée (la plante
    ne reflétrit pas dans la foulée).
 3. **Arrosage** : seau en main vide → « remplissez-le » ; au puits, `E` remplit (5 charges) ; arroser remet l'humidité
@@ -125,3 +149,16 @@ withdraw, source, characterId, item, quantity }`). Détail : `docs/api.md`.
     `docs/tests/metiers.md` (agriculture, tests 14 à 17).
 14. **Props à distance** (1.5.2) : plantes, puits et grenier apparaissent à 80 m et disparaissent au-delà, comme avant ;
     `resmon` loin de tout puis au champ : `vava_farming` plus bas loin de tout. Détail : `docs/tests/metiers.md` § 6.
+15. **Parcelles reçues par les seuls joueurs proches** (1.7.0, à deux) : un joueur au champ, l'autre à plus de 500 m ;
+    semer, arroser, récolter → `/vava_reseau joueur <n°>` du joueur loin : aucun envoi de `vava_farming` ; celui du
+    champ : `vAvA:zone:diff` d'environ 40 o par geste visible. Le joueur loin revient : les plantes sont là, au bon
+    stade, dès 80 m. Détail et mesure `profiler record` : `docs/tests/metiers.md` § 5.2.
+
+## À vérifier en jeu (1.7.0)
+
+- Les plantes apparaissent à 80 m comme avant, à pied comme au galop, et à l'arrivée par téléportation (au plus une
+  seconde de plus : le passage du core).
+- Après `restart vava_farming` près du champ : les plantes reviennent une seule fois, au bon stade.
+- Une nuit de gel près du champ : les plantes mortes changent de prop ensemble ; `/vava_reseau` : un seul
+  `vAvA:zone:diff` par parcelle touchée.
+- `profiler record` : coût du passage des zones du core avec les parcelles (attendu négligeable : deux zones).

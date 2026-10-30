@@ -9,7 +9,7 @@
 ]]
 
 VavaFarming.config = {
-    coreVersion = '0.6.0',
+    coreVersion = '0.11.0',  -- abonnements de zone (core.zones) : chaque parcelle est une zone du core
     dependencies = { vava_inventory = '1.4.0', vava_skills = '1.0.0', vava_gathering = '1.0.0', vava_crafting = '1.1.0' },
 
     -- Croissance : la plante pousse tant que l'humidité dépasse le seuil ; sèche, elle marque une pause, flétrit après
@@ -95,7 +95,12 @@ VavaFarming.config = {
     -- mesurées. Un passage toutes les `pollMs` près d'un groupe, toutes les `idlePollMs` quand aucune cible ne peut être
     -- à moins de `radius` + `idleMargin` (la marge couvre le chemin d'un cavalier rapide pendant `idlePollMs`, pour que
     -- les props apparaissent comme avant).
-    streaming = { radius = 80.0, pollMs = 1000, idlePollMs = 2500, idleMargin = 60.0, groupCell = 200.0, modelTimeoutMs = 5000 },
+    -- Une parcelle (emplacements, état des plantes, grenier) n'est connue que des joueurs à moins de son rayon +
+    -- `radius` + `subscribeSlack` mètres (abonnements de zone du core, positions lues par le serveur une fois par
+    -- seconde) : le battement couvre le chemin d'un cavalier au galop entre deux passages, pour que la parcelle soit
+    -- connue avant que ses props doivent apparaître. Le joueur l'oublie 25 m plus loin (`zones.exitMargin` du core).
+    streaming = { radius = 80.0, pollMs = 1000, idlePollMs = 2500, idleMargin = 60.0, groupCell = 200.0, modelTimeoutMs = 5000,
+        subscribeSlack = 20.0 },
     -- écriture groupée ; journal du grenier en attente (lignes par minute) borné à granaryLogMax : plein, il s'écrit
     -- aussitôt, et ce qui ne tient plus pendant une panne de la base est perdu (signalé)
     persistence = { flushMs = 10000, granaryLogMax = 2000 },

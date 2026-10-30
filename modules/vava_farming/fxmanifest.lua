@@ -8,10 +8,10 @@
            la récolte (graine, compétence, régularité d'arrosage, fertilité) en palier,
            graines récupérées, seau rempli aux puits, grenier commun (conteneur de l'inventaire, ancré, dépôts et
            retraits journalés), composteur ajouté à l'artisanat, commandes du Conseil. Le serveur décide de tout et
-           demande l'XP à vava_skills ; le client crée les props des plantes selon leur stade, montre l'invite et le menu,
-           joue les gestes.
-    Dépendances : vAvA_core ≥ 0.6.0, vava_ui ≥ 1.0.0 (polices, grain, papier et coins de la page, par
-                  nui://vava_ui/…), vava_inventory ≥ 1.4.0, vava_skills ≥ 1.0.0, vava_gathering ≥ 1.0.0 (faucille),
+           demande l'XP à vava_skills ; chaque parcelle est une zone du core, connue des seuls joueurs proches ; le client
+           crée les props des plantes selon leur stade, montre l'invite et le menu, joue les gestes.
+    Dépendances : vAvA_core ≥ 0.11.0 (abonnements de zone), vava_ui ≥ 1.0.0 (polices, grain, papier et coins de la
+                  page, par nui://vava_ui/…), vava_inventory ≥ 1.4.0, vava_skills ≥ 1.0.0, vava_gathering ≥ 1.0.0 (faucille),
                   vava_crafting ≥ 1.1.0 (composteur) ; facultatifs : vava_hud, vava_admin (droit metiers), vava_chat,
                   vava_health (aucun geste à terre), vava_time (saisons, nuits de gel)
 ]]
@@ -23,7 +23,7 @@ use_experimental_fxv2_oal 'yes'
 
 name 'vava_farming'
 description 'Agriculture vAvA : parcelles, croissance par dates, humidité et fertilité, qualité, grenier commun'
-version '1.6.0'
+version '1.7.0'
 
 dependency 'vAvA_core'
 dependency 'vava_ui'
@@ -51,6 +51,7 @@ shared_scripts {
     'shared/constants.lua',
     'config.lua',
     'shared/geometry.lua',
+    'shared/parcelzone.lua',
     'shared/proximity.lua',
     'shared/growth.lua',
 }
@@ -60,6 +61,7 @@ server_scripts {
     'bridge/server.lua',
     'server/journal.lua',
     'server/catalog.lua',
+    'server/zones.lua',
     'server/slots.lua',
     'server/frost.lua',
     'server/granary.lua',
