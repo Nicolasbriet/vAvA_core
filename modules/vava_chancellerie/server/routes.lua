@@ -7,7 +7,7 @@
            grand par la demande « écran du joueur » du Registre (cible vérifiée, au journal), les cases d'un mur sur
            le seul droit, l'ouverture du mur étant inscrite au journal ; une case demandée par un compte qui n'a pas
            ouvert de mur depuis `cameras.tileLogMs` inscrit sa propre ligne. D'autres fichiers du pont ajoutent leurs
-           demandes à `routes.requests` (ciel et heure : server/time.lua).
+           demandes à `routes.requests` (ciel et heure : server/time.lua ; compteur réseau : server/network.lua).
     Dépendances : shared/constants.lua, config.lua, server/core.lua
 ]]
 
@@ -25,7 +25,8 @@ local QUALITIES = { tile = true, full = true }
 local routes = {}
 VavaBridge.routes = routes
 
--- Demandes du panneau tenues par d'autres fichiers du pont (ciel et heure : server/time.lua), comme les zones de voix :
+-- Demandes du panneau tenues par d'autres fichiers du pont (ciel et heure : server/time.lua ; compteur réseau :
+-- server/network.lua), comme les zones de voix :
 -- nom → fun(actor, args): table. Le pont y vérifie lui-même le droit auprès du Registre.
 ---@type table<string, fun(actor: table, args: table): table>
 routes.requests = {}

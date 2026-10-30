@@ -3,8 +3,8 @@
 Le pont entre la Chancellerie (panneau web, programme Node.js à part : `chancellerie/`, guide dans
 `docs/chancellerie.md`) et le serveur de jeu. Il reçoit les demandes du panneau et les fait exécuter, au nom du compte
 du panneau, par le Registre du Conseil (`vava_admin`), les zones de voix (`vava_voice`), le ciel et l'heure
-(`vava_time`) et les caméras (`vava_cameras`) ; il prévient la Chancellerie en direct (signalements, arrivées et
-départs, caméras, rangs changés) ; il relie un compte du panneau à son joueur et tient la liste blanche Discord à la
+(`vava_time`) et les caméras (`vava_cameras`), et lit le compteur réseau du core (page Réseau, lecture seule) ; il
+prévient la Chancellerie en direct (signalements, arrivées et départs, caméras, rangs changés) ; il relie un compte du panneau à son joueur et tient la liste blanche Discord à la
 connexion. Serveur seulement : rien n'est envoyé aux joueurs, sauf le résultat de leur liaison (affiché par vava_admin).
 
 Ordre de démarrage : en dernier, après `vava_admin`, `vava_voice`, `vava_cameras`, `vava_time` et `vava_codex` (ordre
@@ -34,6 +34,7 @@ complet : `README.md` à la racine du dépôt).
 | `vava_voice` ≥ 1.1.0 | zones de voix lues, modifiées et supprimées depuis le web | page Zones de voix vide |
 | `vava_cameras` ≥ 1.3.0 | écran des joueurs depuis le web (`webCheck` depuis 1.5.1) | pas de caméras depuis le web |
 | `vava_time` ≥ 1.0.0 | ciel et heure du royaume lus et réglés depuis le web (1.4.0) | page Ciel et heure : « ne sont pas lancés » |
+| `vAvA_core` ≥ 0.10.0 | compteur réseau (`core.net.stats`) lu par la page Réseau (1.6.0) | page Réseau : « demande vAvA_core 0.10.0 » |
 
 ## Règles (config.lua)
 
@@ -46,9 +47,10 @@ complet : `README.md` à la racine du dépôt).
 | Évènements vers la Chancellerie | `/api/bridge/event` ; perdus si elle est fermée, signalés une fois par minute au plus | `eventPath`, `pushWarnEveryMs` |
 | Corps de requête | 64 Ko au plus | `bodyMax` |
 | Caméras | droit `watch` pour regarder ; la vue en grand passe par la demande `watchScreen` du Registre ; une case sans mur ouvert depuis 2 h est inscrite au journal | `cameras` |
+| Page Réseau | droit `tools` (celui de `/vava_reseau`) ; 20 évènements au plus ; deux lectures d'un même compte du panneau espacées de 500 ms ; une ligne au journal à l'ouverture de la page (une fois par minute au plus et par compte), à chaque autre joueur lu, puis au plus tard toutes les 30 min | `net` |
 | Liaison d'un compte | commande `chancellerie <code>`, 5 essais par minute, messages au joueur | `link` |
 | Liste blanche Discord | réponse attendue 8 s à la connexion d'un joueur ; messages quand elle ne répond pas, ou quand la clé n'est pas encore arrivée | `whitelist` |
-| Journal du Registre | « Zone de voix modifiée », « Zone de voix supprimée », « Mur des caméras ouvert », « Cases du mur regardées » | `messages` |
+| Journal du Registre | « Zone de voix modifiée », « Zone de voix supprimée », « Mur des caméras ouvert », « Cases du mur regardées », « Compteur réseau consulté », « Réseau d'un joueur consulté » | `messages` |
 
 ## Ce que fait le pont
 
@@ -63,6 +65,19 @@ complet : `README.md` à la racine du dépôt).
   `tools`) transmises à vava_time (`webState`, `webClock`, `webWeather`), qui revalide chaque valeur ; droit vérifié
   auprès du Registre (`webCan`), décision inscrite à son journal (`webLog`) si elle change quelque chose. Un fichier du
   pont ajoute ses demandes à `routes.requests`.
+- **Compteur réseau** (1.6.0, `server/network.lua`) : demande `netStats` (portée `all`, `resource` + nom de ressource
+  ou `player` + numéro, ouverture de la page), en **lecture seule** : le pont lit `core.net.stats` (core ≥ 0.10.0) —
+  ce que montre `/vava_reseau` en jeu : mesure, envois, volume, latents, évènements les plus lourds et leur plus gros
+  message — et ne rend que ces champs, en liste pure. Arguments bornés (`rules.netQuery` : 48 signes au motif des
+  ressources, joueur de 1 à 65 535), lectures d'un même compte espacées de `net.minIntervalMs` (vérifié avant le droit :
+  `rate_limited`), droit `net.permission` (tools) vérifié auprès du Registre (`webCan`), joueur absent :
+  `unknown_player`. Le pont ne lance ni n'arrête aucun suivi : le détail d'un joueur, évènement par évènement,
+  n'existe que s'il est suivi par `/vava_reseau joueur` en jeu, et son personnage n'est nommé que dans ce cas. Journal
+  du Registre (`webLog`, `rules.netJournal`) : « Compteur réseau consulté » à l'ouverture de la page (dite par la page,
+  prise au plus une fois par `net.openLogMinMs` et par compte ; et à la première lecture d'un compte que le pont ne
+  connaît pas), « Réseau d'un joueur consulté » (`joueur` = numéro de connexion, réattribué après un départ, et
+  `compte` = compte de jeu lu par `core.players.get`, sans personnage chargé) à chaque autre joueur lu, puis au plus tard toutes les `net.logEveryMs` ; jamais à chaque relecture. Une ligne ne compte que si le Registre
+  l'a acceptée.
 - **Caméras** : ouvertes auprès de vava_cameras une fois le droit `watch` accordé — la vue en grand par la demande
   « écran du joueur » du Registre (cible vérifiée, au journal) — une fois le droit lu et la caméra jugée accordable par
   vava_cameras (`webCheck`, 1.5.1) : une vue refusée faute de débit chez le joueur filmé (`budget`), que la
@@ -129,11 +144,13 @@ complet : `README.md` à la racine du dépôt).
 ```
 vava_chancellerie/
 ├── fxmanifest.lua · config.lua
-├── shared/   constants.lua (modules reliés, hooks, protocole de la clé) · rules.lua (forme de la clé, rangs permis :
-│             logique pure, tests/spec/chancellerie_rules_spec.lua, chargée côté serveur seulement)
+├── shared/   constants.lua (modules reliés, hooks, protocole de la clé) · rules.lua (forme de la clé, rangs permis,
+│             demande et journal du compteur réseau : logique pure, tests/spec/chancellerie_rules_spec.lua, chargée côté
+│             serveur seulement)
 ├── server/   core · auth (machine locale, clé demandée à la console) · push (évènements vers la Chancellerie)
 │             links (comptes vus reliés en jeu) · link (liaison d'un compte) · whitelist (liste blanche)
-│             routes (demandes du panneau) · time (ciel et heure) · http (écoute) · commands · main
+│             routes (demandes du panneau) · time (ciel et heure) · network (compteur réseau, lecture seule)
+│             http (écoute) · commands · main
 └── sql/      0001_chancellerie.sql (vava_chancellerie_links)
 ```
 
@@ -156,3 +173,5 @@ Avec la Chancellerie lancée (elle démarre FXServer) et un compte du panneau qu
 8. Ciel et heure : régler l'heure et imposer un ciel depuis la page Ciel et heure ; les joueurs le voient, le Journal
    du Conseil l'inscrit (voir `docs/tests/temps.md`, section 6).
 9. Clé du pont et rangs des comptes reliés (1.5.0) : procédure complète dans `docs/tests/chancellerie.md`.
+10. Page Réseau (1.6.0) : mêmes chiffres que `/vava_reseau`, journal à l'ouverture et à chaque joueur lu, refus d'un
+    Gardien : `docs/tests/chancellerie.md`, section 3.

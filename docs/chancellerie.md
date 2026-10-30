@@ -365,6 +365,23 @@ Pour les comptes qui ont un rang du Conseil, quand le serveur de jeu tourne avec
   le débit commun des décisions (6 coup sur coup, puis une toutes les deux secondes, jeu et web confondus :
   `rate_limited` au-delà), le Registre inscrit la décision à son journal si elle change quelque chose. Page relue après
   chaque décision et au changement de ciel prévu.
+- **Réseau** (Chancellerie 1.7.0, pont 1.6.0, `vAvA_core` 0.10.0 ou plus récent ; droit `tools` du Registre, Sénéchal et
+  au-dessus, comme `/vava_reseau`) : en **lecture seule**, ce que `/vava_reseau` montre en jeu — ce que le serveur de
+  jeu a envoyé aux joueurs pendant la dernière minute, compté par le core : mesure (exacte ou estimée), envois, volume,
+  envois en latent, plus gros message, et les 20 évènements les plus lourds (module, évènement, envois, volume, plus
+  gros message, latents). Trois portées : **tout le royaume** (un clic sur une ligne ne garde que ce module), **un
+  module** (nom de la ressource), **un joueur** (son numéro : ses totaux ; le détail évènement par évènement et le nom
+  de son personnage seulement s'il est suivi en jeu par `/vava_reseau joueur <n°>`, que la page ne lance jamais). Relue
+  par « Relire », ou toutes les 5, 15 (par défaut) ou 30 s, seulement quand l'onglet est visible (« relecture en
+  pause » sinon) ; le rythme court depuis la dernière demande, réussie ou non, une seule demande à la fois (« Relire »
+  grisé pendant une lecture). La relecture automatique s'arrête d'elle-même (« relecture automatique arrêtée », reprise
+  à la main) quand le serveur de jeu est arrêté, le compteur absent, le joueur parti ou le droit retiré, et après
+  15 min sans action sur la page. Demande `netStats` de `POST /api/game/request` (`[portée, valeur, ouverture]`) ; le
+  pont vérifie les arguments et le droit auprès du Registre, espace les lectures d'un même compte (500 ms) et inscrit au
+  journal du Conseil « Compteur réseau consulté » à l'ouverture de la page (une fois par minute au plus par compte) et
+  « Réseau d'un joueur consulté » (numéro de connexion et compte de jeu) à chaque autre joueur lu — puis au plus tard
+  toutes les 30 min d'une lecture continue —, jamais à chaque relecture. Non
+  comptés : GlobalState, state bags et envois directs des modules (rappelé en pied de page).
 - Restent en jeu : vol libre, invisibilité, invulnérabilité, repère, rejoindre et amener à soi (ils supposent un
   personnage dans le monde).
 - Chaque action passe par le Registre du Conseil, qui vérifie le droit du rang, la cible et son rang, et l'inscrit au
@@ -494,7 +511,7 @@ Toutes les réponses sont `{ ok, error?, … }`. Les `POST` demandent `x-chancel
 | `GET /api/journal` | connecté | 50 dernières inscriptions |
 | `GET /api/accounts` · `POST /api/accounts/create` · `update` · `password` · `delete` | compte maître | comptes du panneau |
 | `POST /api/account/password` | connecté | `{ current, password }` son propre mot de passe |
-| `POST /api/game/request` | rang du Conseil | `{ name, args }` demande au Registre (liste fermée) → `{ result }` |
+| `POST /api/game/request` | rang du Conseil | `{ name, args }` demande au Registre (liste fermée) → `{ result }` ; `netStats` (1.7.0, droit `tools` vérifié par le pont) : `[portée, valeur, ouverture]` (portée `all` et valeur `''`, `resource` et un nom, `player` et un numéro) → `{ scope, mode, windowMs, total, largest, events, watched?, name? }` |
 | `GET /api/game/ranks` | connecté | rangs du Conseil (`live` : lus à l'instant) |
 | `POST /api/game/cameras/wall` · `players` | rang du Conseil | joueurs du mur `{ source, label, active }` ; `wall` inscrit l'ouverture au journal |
 | `POST /api/game/camera/start` · `answer` · `stop` | rang du Conseil | `{ target, quality = tile\|full }` → `{ session, label, iceServers }` ; 17 caméras par onglet au plus (un mur 4 × 4 et une vue en grand) ; une case (`tile`) d'un compte qui n'a ouvert aucun mur depuis 2 h est inscrite au journal par le pont (« Cases du mur regardées », pont 1.4.1) |
