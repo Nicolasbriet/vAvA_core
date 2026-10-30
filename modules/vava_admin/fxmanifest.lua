@@ -3,8 +3,9 @@
     Rôle : administration du royaume : Conseil (rangs et droits), panneau « Registre du Conseil » (joueurs,
            signalements, sanctions, journal, outils, annonces), bans à la connexion, journal des actions, commandes de
            la console, API pour les autres modules et le futur panneau web.
-    Dépendances : vAvA_core ≥ 0.5.0 ; facultatives : vava_health, vava_needs, vava_inventory (actions sur les
-                  joueurs), vava_hud (notifications)
+    Dépendances : vAvA_core ≥ 0.5.0 ; vava_ui ≥ 1.0.0 (polices, grain, papier et coins du Registre, par
+                  nui://vava_ui/…) ; facultatives : vava_health, vava_needs, vava_inventory (actions sur les joueurs),
+                  vava_hud (notifications)
 ]]
 
 fx_version 'cerulean'
@@ -14,20 +15,20 @@ use_experimental_fxv2_oal 'yes'
 
 name 'vava_admin'
 description 'Administration vAvA (Registre du Conseil)'
-version '1.7.1'
+version '1.8.0'
 
 dependency 'vAvA_core'
+dependency 'vava_ui'
 
 vava_migration 'sql/0001_admin.sql'
 
 ui_page 'web/index.html'
 
+-- polices, grain, papier et coins : vava_ui ; les données simulées hors jeu (dossier dev/) ne sont jamais livrées
 files {
     'web/index.html',
     'web/css/*.css',
     'web/js/*.js',
-    'web/img/*',
-    'web/fonts/*.woff2',
 }
 
 shared_scripts {

@@ -20,6 +20,7 @@ local PAGES = {
     { module = 'vava_time', sheet = 'style.css' },
     { module = 'vava_voice', sheet = 'style.css' },
     { module = 'vava_cameras', sheet = 'wall.css' },
+    { module = 'vava_admin', sheet = 'style.css' },
 }
 
 local COMMON = {

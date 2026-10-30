@@ -1,9 +1,11 @@
 'use strict';
 /*
- * web/js/devmock.js
+ * web/dev/devmock.js
  * Rôle : registre simulé quand la page est ouverte dans un navigateur (hors FiveM), pour travailler le rendu sans
  *        lancer le jeu. Inactif en jeu. Paramètres d'URL : ?tab=players|reports|bans|logs|staff|tools|announce,
  *        &dialog=ban, &proclaim=1, &watch=1, &rank=gardien (Registre d'un Gardien).
+ *        Jamais livré (absent des `files`), jamais chargé en jeu : la ligne hors jeu de index.html ne l'insère
+ *        que hors FiveM.
  */
 
 const DevMock = (() => {
