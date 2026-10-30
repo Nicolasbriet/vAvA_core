@@ -2,7 +2,7 @@
 
 Procédure pour vérifier en jeu l'arrivée d'un joueur et la vie de ses personnages : compte, création, apparence,
 sélection, suppression, reconnexion, position, sauvegarde et temps de jeu. Modules : `vAvA_core` 0.8.0,
-`vava_appearance` 1.0.1, `vava_characters_ui` 1.0.1, et l'outil de développement `vava_dev_characters` 1.2.0. Comptez
+`vava_appearance` 1.0.1, `vava_characters_ui` 1.0.1, et l'outil de développement `vava_dev_characters` 1.3.0. Comptez
 une heure et demie seul, une demi-heure de plus pour les tests marqués **(2 joueurs)**. Un test se cite
 « personnage 4-2 ».
 
@@ -12,8 +12,10 @@ une heure et demie seul, une demi-heure de plus pour les tests marqués **(2 jou
    Registre du Conseil (`F10`) → Joueurs sert ici à lire le numéro de compte, le temps de jeu et la position d'un
    joueur.
 2. **Outil de développement** : `vava_dev_characters` (catégorie `[vava-dev]` de la Chancellerie, ou
-   `ensure vava_dev_characters` dans la console du serveur). Il n'a aucun contrôle d'administration : jamais en
-   production. Il apporte `/perso liste | creer <prénom> <nom> <h|f> | choisir <id> | quitter | supprimer <id>` et
+   `ensure vava_dev_characters` dans la console du serveur). Jamais en production : il exige `set vava_env dev` au
+   `server.cfg` (sinon rien n'est offert) et n'obéit qu'au Souverain (droit `staff`) ou à l'ACE `vava.dev`, voir
+   [developpement.md](developpement.md) ; pour B, hors du Conseil (`/perso quitter` au § 6) :
+   `add_ace identifier.license:<licence de B> vava.dev allow` en console. Il apporte `/perso liste | creer <prénom> <nom> <h|f> | choisir <id> | quitter | supprimer <id>` et
    `/respawn`. `/perso quitter` est le seul moyen de revenir à la sélection sans se reconnecter : le jeu de production
    n'a pas de commande pour cela. Les réponses s'affichent dans le chat et dans `F8`
    (`[vAvA][INFO][vava_dev_characters] …`). Sur l'écran de sélection le chat est fermé : tapez la commande dans

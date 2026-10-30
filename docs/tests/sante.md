@@ -9,8 +9,9 @@ besoins, l'inventaire, la voix et la magie. Comptez 1 h 15, dont 30 min à deux 
 
 1. **Préparation commune** : [LISEZMOI.md](LISEZMOI.md) (ordre de démarrage, compte du Conseil, catalogue, consoles,
    resmon, remontée des écarts).
-2. **Outils de test** : `vava_dev_characters` et `vava_example_items`, comme en [besoins 0.2](besoins.md). Commandes
-   utilisées ici, ouvertes aux deux joueurs : `/vie` (« vie 60 % » ou « à terre »), `/vie <pourcentage>`, `/aterre`,
+2. **Outils de test** : `vava_dev_characters` et `vava_example_items`, comme en [besoins 0.2](besoins.md) (mode
+   développement exigé). Commandes utilisées ici par les deux joueurs : B, hors du Conseil, a besoin de l'ACE
+   (`add_ace identifier.license:<licence de B> vava.dev allow` en console). `/vie` (« vie 60 % » ou « à terre »), `/vie <pourcentage>`, `/aterre`,
    `/besoins [faim] [soif]`, `/perso quitter`. Après `/vie <n>`, relire par `/vie` : la réponse de la commande qui
    fixe peut donner l'ancienne valeur.
 3. **Objets** (`/catalogue` ou `/objet`) : `bandage` ×6 (Bande de lin, +20 % de vie), `potion_de_soin` ×2 (+20 %),

@@ -2,8 +2,8 @@
     vava_dev_characters/client/main.lua
     Rôle : commandes de test : /perso liste | creer <prénom> <nom> <h|f> | choisir <id> | quitter | supprimer <id>,
            /respawn, /objet <nom> [quantité], /besoins [faim] [soif], /vie [pourcentage] et /aterre. Chaque commande
-           n'est qu'une intention :
-           le serveur valide et décide.
+           n'est qu'une intention : le serveur valide et décide. /perso appelle les RPC du core : il demande d'abord
+           l'accès au serveur (vava_dev_characters:access, refusé sans mode développement ni droit).
     Dépendances : vAvA_core (API v1), config.lua
 ]]
 
@@ -21,6 +21,7 @@ local tointeger = math.tointeger
 local format = string.format
 local CreateThread, TriggerEvent = CreateThread, TriggerEvent
 
+local RPC_ACCESS = RESOURCE .. ':access'
 local RPC_RESPAWN = RESOURCE .. ':respawn'
 local RPC_GIVE = RESOURCE .. ':give'
 local RPC_NEEDS = RESOURCE .. ':needs'
@@ -40,11 +41,11 @@ end
 ---@return boolean success
 local function report(action, ok, success, result)
     if not ok then
-        notify('%s : appel impossible (%s)', action, tostring(success))
+        notify('%s : appel impossible (%s)', action, cfg.refusals[success] or tostring(success))
         return false
     end
     if not success then
-        notify('%s : refusé (%s)', action, tostring(result))
+        notify('%s : refusé (%s)', action, cfg.refusals[result] or tostring(result))
         return false
     end
     return true
@@ -108,7 +109,11 @@ RegisterCommand(cfg.command, function(_, args)
         notify(USAGE)
         return
     end
-    CreateThread(function() handler(args) end)
+    CreateThread(function()
+        -- les RPC de /perso sont ceux du core : l'accès aux outils est demandé au serveur d'abord
+        local ok, success, code = core.rpc.call(RPC_ACCESS)
+        if report(cfg.command, ok, success, code) then handler(args) end
+    end)
 end, false)
 
 -- /objet <nom> [quantité] : objet donné au personnage actif (test de l'inventaire)

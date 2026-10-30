@@ -2,6 +2,7 @@
     vava_example_items/fxmanifest.lua
     Rôle : objets d'exemple pour l'inventaire (nourriture, boissons, épée, bourse, corde) avec leurs icônes.
            Montre comment un module déclare des objets, sert leurs images et leur donne des effets.
+           Jamais sur un serveur ouvert au public : sans `set vava_env dev`, aucun objet n'est déclaré (voir README.md).
     Dépendances : vAvA_core, vava_inventory
 ]]
 
@@ -10,8 +11,8 @@ game 'gta5'
 lua54 'yes'
 
 name 'vava_example_items'
-description 'Objets d\'exemple vAvA'
-version '1.1.1'
+description 'Objets d\'exemple vAvA (mode développement seulement)'
+version '1.2.0'
 
 dependencies {
     'vAvA_core',

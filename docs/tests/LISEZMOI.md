@@ -18,6 +18,7 @@ main. Chaque procédure dit quoi faire et ce qui doit se passer ; les tests à d
 | [codex.md](codex.md) | Toutes les commandes et touches | `vava_codex` |
 | [metiers.md](metiers.md) | Compétences, récolte, artisanat, agriculture | `vava_skills`, `vava_gathering`, `vava_crafting`, `vava_farming` |
 | [magie.md](magie.md) | Les onze sorts, états, zones, combinaisons | `vava_magic` |
+| [developpement.md](developpement.md) | Outils de développement : rien sans `vava_env`, réservés et journalisés avec | `vava_dev_characters`, `vava_example`, `vava_example_items`, `vava_anim_test` |
 
 Ordre conseillé : personnage, inventaire, besoins, santé, chat, voix, registre, Codex, métiers, magie. Chaque
 procédure s'appuie sur ce que les précédentes ont validé.
@@ -38,7 +39,11 @@ procédure s'appuie sur ce que les précédentes ont validé.
    (`F10`) → Joueurs → vous → Donner.
 5. **Deux joueurs** : deux clients FiveM sur deux machines, chacun avec son compte. Le second n'a pas besoin d'être
    du Conseil, sauf mention contraire.
-6. **Consoles** : celle du serveur, et celle du client (`F8`). Les lignes qui commencent par le nom du module
+6. **Outils de développement** (`/objet`, `/vie`, `/aterre`, `/besoins`, `/perso`, `/respawn`, objets d'exemple) :
+   seulement avec `set vava_env dev` au `server.cfg` du serveur de test, et réservés au Souverain ou à l'ACE
+   `vava.dev` (second joueur : `add_ace identifier.license:<licence> vava.dev allow` en console). Sans la convar, ils
+   n'offrent rien : voir [developpement.md](developpement.md) et le README racine.
+7. **Consoles** : celle du serveur, et celle du client (`F8`). Les lignes qui commencent par le nom du module
    (`[vava_inventory]`…) sont les plus parlantes.
 
 ## Mesurer le resmon

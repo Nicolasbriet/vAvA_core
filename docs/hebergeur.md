@@ -139,6 +139,18 @@ plantage. txAdmin ne démarre pas (FXServer est lancé avec `+exec server.cfg`) 
 - Comptes protégés par mot de passe (scrypt), limites de tentatives, journal des actions. Le `server.cfg` (clé de
   licence, mot de passe de la base) n'est jamais affiché dans le navigateur.
 
+## Ressources de développement : jamais sur le serveur public
+
+Les mises à jour posent dans `resources/[vava-dev]/` quatre outils de développement (`vava_dev_characters`,
+`vava_example`, `vava_example_items`, `vava_anim_test`) sans jamais les démarrer. Sur un serveur ouvert aux joueurs :
+
+- aucune ligne `ensure` ne les nomme dans le `server.cfg` (ni `ensure [vava-dev]`) ;
+- aucune ligne `set vava_env dev` (ni `setr`, ni `sets`) : sans elle, ces outils refusent de démarrer et n'offrent
+  rien, même lancés par erreur (console : « mode développement absent ») ;
+- aucune ligne `add_ace … vava.dev allow`.
+
+Ces trois lignes ne servent qu'au serveur de test du client ; elles ne sont jamais à écrire de votre côté.
+
 ## Vérifications après installation
 
 - [ ] `journalctl -u vava-chancellerie` (ou la console du panel) affiche la bannière « La Chancellerie » et un code
@@ -148,6 +160,8 @@ plantage. txAdmin ne démarre pas (FXServer est lancé avec `+exec server.cfg`) 
 - [ ] `systemctl stop vava-chancellerie` (ou `quit` dans le panel) : la console montre « Arrêt demandé », puis
       « FXServer est arrêté », en moins de 30 s.
 - [ ] La page Performances montre processeur, mémoire et réseau ; la page Sauvegardes trouve `mysqldump`.
+- [ ] Serveur public : `grep -nE 'vava_env|vava\.dev|vava-dev|vava_dev_characters|vava_example|vava_anim_test' server.cfg`
+      ne trouve rien ; page Ressources : aucune ressource de `[vava-dev]` lancée.
 
 ## Revenir à txAdmin
 
