@@ -616,20 +616,25 @@ function zones.start()
     SetTimeout(passMs, pass)
 end
 
---- Lecture pour /vava_reseau zones.
----@return table  { zones, owners = { { owner, count } } triés, subscriptions, lastPassMs, maxPassMs, passMs }
+--- Lecture pour /vava_reseau zones. Durées lues par os.clock : par pas d'une milliseconde sous Windows (la moyenne de
+--- la minute reste juste), temps processeur du serveur entier sous Linux (un majorant).
+---@return table  { zones, owners = { { owner, count } } triés, subscriptions, lastPassMs, meanPassMs, maxPassMs, passMs }
 function zones.stats()
     local owners = {}
     for owner, entry in pairs(byOwner) do owners[#owners + 1] = { owner = owner, count = entry.count } end
     sort(owners, function(a, b) return a.count > b.count or (a.count == b.count and a.owner < b.owner) end)
-    local longest = nil
+    local longest, total, passes = nil, 0, 0
     for i = 1, durationSlots do
         local ms = durations[i]
-        if ms and (not longest or ms > longest) then longest = ms end
+        if ms then
+            if not longest or ms > longest then longest = ms end
+            total, passes = total + ms, passes + 1
+        end
     end
     return {
         zones = zoneCount, owners = owners, subscriptions = subscriptionCount,
-        lastPassMs = lastDuration, maxPassMs = longest, passMs = passMs,
+        lastPassMs = lastDuration, meanPassMs = passes > 0 and total / passes or nil, maxPassMs = longest,
+        passMs = passMs,
     }
 end
 

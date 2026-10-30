@@ -19,7 +19,7 @@ describe('vAvA.netcommand : zones', function()
                 { owner = 'vava_voice', count = 200 }, { owner = 'vava_gathering', count = 4 },
                 { owner = 'vava_farming', count = 3 },
             },
-            subscriptions = 37, lastPassMs = 0.0812, maxPassMs = 0.1249, passMs = 1000,
+            subscriptions = 37, lastPassMs = 0.0812, meanPassMs = 0.0915, maxPassMs = 0.1249, passMs = 1000,
         }
         realPrint = _G.print
         _G.print = function(line) printed[#printed + 1] = tostring(line) end
@@ -77,16 +77,16 @@ describe('vAvA.netcommand : zones', function()
     it('zones : une ligne, durées à la virgule française, modules dans l’ordre rendu par le service', function()
         assert.same({
             'Zones : 207 (vava_voice 200, vava_gathering 4, vava_farming 3) ; 37 abonnements ; '
-                .. 'dernier passage 0,08 ms, au plus 0,12 ms sur la minute.',
+                .. 'passage : dernier 0,08 ms, moyen 0,09 ms, au plus 0,12 ms sur la minute.',
         }, run(1, 'zones'))
         assert.equal(1, lines[1].target)
         assert.same({}, journal)
     end)
 
     it('aucun passage encore mesuré ; aucune zone déclarée', function()
-        stats.lastPassMs, stats.maxPassMs = nil, nil
+        stats.lastPassMs, stats.meanPassMs, stats.maxPassMs = nil, nil, nil
         local texts = run(1, 'zones')
-        assert.truthy(texts[1]:find('dernier passage – ms, au plus – ms', 1, true))
+        assert.truthy(texts[1]:find('dernier – ms, moyen – ms, au plus – ms', 1, true))
         stats.zones, stats.owners, stats.subscriptions = 0, {}, 0
         assert.same({ 'Aucune zone déclarée.' }, run(1, 'zones'))
     end)

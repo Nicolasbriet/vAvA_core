@@ -160,7 +160,7 @@ vAvA.config.server = {
                 unknownPlayer = 'Aucun joueur n° %s en jeu.',
                 usage = 'usage : /vava_reseau | joueur <n°> | ressource <nom> | zones [n°]',
                 -- abonnements de zone (0.11.0) : durées à deux décimales, virgule française
-                zones = 'Zones : %d (%s) ; %d abonnements ; dernier passage %s ms, au plus %s ms sur la minute.',
+                zones = 'Zones : %d (%s) ; %d abonnements ; passage : dernier %s ms, moyen %s ms, au plus %s ms sur la minute.',
                 zonesNone = 'Aucune zone déclarée.',
                 zonesPlayer = 'Joueur %d : %d zone(s) suivie(s)%s',
                 zonesNoPass = '–',  -- aucun passage encore mesuré

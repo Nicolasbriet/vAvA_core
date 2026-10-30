@@ -171,7 +171,7 @@ local function zonesOverview(src)
         parts[i] = entry.owner .. ' ' .. entry.count
     end
     say(src, format(texts.zones, stats.zones, concat(parts, ', '), stats.subscriptions, formatMs(stats.lastPassMs),
-        formatMs(stats.maxPassMs)))
+        formatMs(stats.meanPassMs), formatMs(stats.maxPassMs)))
 end
 
 --- Zones suivies par un joueur (inscrit au journal du Registre : cela dit à peu près où il se trouve).
