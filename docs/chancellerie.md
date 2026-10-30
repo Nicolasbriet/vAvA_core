@@ -255,7 +255,9 @@ Le compte maître l'applique (« Mettre à jour »), ou la laisse s'appliquer au
      côté (`config.lua.nouveau`) pour que vous repreniez ses nouveautés ;
    - un autre fichier modifié des deux côtés prend la nouvelle version, la vôtre est gardée à côté (`.local`) ;
    - un nouveau module est posé dans `[vava]`, à activer dans la page Ressources. Le chat `vava_chat` remplace la
-     ressource `chat` de FiveM : activer `vava_chat` et couper `chat` au même endroit ;
+     ressource `chat` de FiveM : activer `vava_chat` et couper `chat` au même endroit. `vava_ui` (polices et textures
+     communes des interfaces, 1.6.2) démarre de lui-même avec les modules qui en dépendent ; l'activer le place juste
+     après `vAvA_core` ;
    - les exemples et outils de développement du dépôt (`examples/`) sont posés dans `[vava-dev]`, jamais lancés
      d'office : à activer seulement sur un serveur de test (ils n'ont aucun contrôle d'administration).
 7. Relance du serveur, puis **contrôle** : en marche, sans arrêt imprévu, et toutes les ressources qui tournaient avant

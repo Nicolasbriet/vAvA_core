@@ -20,14 +20,15 @@ main. Chaque procédure dit quoi faire et ce qui doit se passer ; les tests à d
 | [magie.md](magie.md) | Les onze sorts, états, zones, combinaisons | `vava_magic` |
 | [temps.md](temps.md) | Heure du royaume, saisons de quatorze jours, ciel, nuits de gel, Conseil en jeu et depuis la Chancellerie, effets sur les métiers | `vava_time`, `vava_farming`, `vava_gathering`, `vava_chancellerie` |
 | [chancellerie.md](chancellerie.md) | Clé du pont hors de la ligne de commande, rangs des seuls comptes vus reliés en jeu | Chancellerie, `vava_chancellerie` |
+| [interfaces.md](interfaces.md) | Polices, textures et ornements communs servis par `vava_ui` (pilote : le HUD), rendu des interfaces, CORS, WebP | `vava_ui`, `vava_hud`, puis toutes les interfaces |
 | [developpement.md](developpement.md) | Outils de développement : rien sans `vava_env`, réservés et journalisés avec | `vava_dev_characters`, `vava_example`, `vava_example_items`, `vava_anim_test` |
 
-Ordre conseillé : personnage, inventaire, besoins, santé, chat, voix, registre, Codex, métiers, temps, magie. Chaque
-procédure s'appuie sur ce que les précédentes ont validé.
+Ordre conseillé : interfaces (§ 0, pilote du HUD), personnage, inventaire, besoins, santé, chat, voix, registre, Codex,
+métiers, temps, magie. Chaque procédure s'appuie sur ce que les précédentes ont validé.
 
 ## Préparation commune
 
-1. **Ordre de démarrage** (`server.cfg`, ou la Chancellerie qui le fait seule), après `oxmysql` : `vAvA_core`,
+1. **Ordre de démarrage** (`server.cfg`, ou la Chancellerie qui le fait seule), après `oxmysql` : `vAvA_core`, `vava_ui`,
    `vava_chat`, `vava_world`, `vava_time`, `vava_appearance`, `vava_characters_ui`, `vava_hud`, `vava_inventory`, `vava_needs`,
    `vava_health`, `vava_admin`, `vava_voice`, `vava_cameras`, `vava_magic`, `vava_skills`, `vava_gathering`,
    `vava_crafting`, `vava_farming`, `vava_codex`, `vava_chancellerie`.

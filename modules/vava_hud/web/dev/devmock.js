@@ -1,8 +1,9 @@
 'use strict';
 /*
- * web/js/devmock.js
+ * web/dev/devmock.js
  * Rôle : jauges, notifications et progression simulées quand la page est ouverte dans un navigateur (hors FiveM), pour
- *        travailler le rendu sans lancer le jeu. Inactif en jeu. Paramètres d'URL : ?values=0.8,0.62,0.08,0.5 (santé,
+ *        travailler le rendu sans lancer le jeu. Jamais livré (absent des `files`), jamais chargé en jeu : la ligne
+ *        hors jeu de index.html ne l'insère que hors FiveM. Paramètres d'URL : ?values=0.8,0.62,0.08,0.5 (santé,
  *        faim, soif, voix), ?talking=1 (lueur du médaillon de la voix), ?progress=1 (barre de progression de 8 s menée
  *        à son terme) ou ?progress=cancel (interrompue à 60 %).
  */

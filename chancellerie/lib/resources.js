@@ -11,13 +11,15 @@ const path = require('path');
 
 const MANIFESTS = ['fxmanifest.lua', '__resource.lua'];
 const MAX_DEPTH = 4;
-// ordre de démarrage attendu par vAvA ; une ressource inconnue garde la place choisie, après celles-ci
-const KNOWN_ORDER = ['chat', 'sessionmanager', 'hardcap', 'oxmysql', 'vAvA_core', 'vava_chat', 'vava_world', 'vava_time', 'vava_appearance',
-  'vava_characters_ui', 'vava_hud', 'vava_inventory', 'vava_needs', 'vava_health', 'vava_admin', 'vava_voice', 'vava_cameras', 'vava_magic',
-  'vava_skills', 'vava_gathering', 'vava_crafting', 'vava_farming', 'vava_codex', 'vava_chancellerie'];
+// ordre de démarrage attendu par vAvA ; une ressource inconnue garde la place choisie, après celles-ci. vava_ui (polices
+// et textures communes des pages) juste après le core, avant la première ressource à page.
+const KNOWN_ORDER = ['chat', 'sessionmanager', 'hardcap', 'oxmysql', 'vAvA_core', 'vava_ui', 'vava_chat', 'vava_world', 'vava_time',
+  'vava_appearance', 'vava_characters_ui', 'vava_hud', 'vava_inventory', 'vava_needs', 'vava_health', 'vava_admin', 'vava_voice',
+  'vava_cameras', 'vava_magic', 'vava_skills', 'vava_gathering', 'vava_crafting', 'vava_farming', 'vava_codex', 'vava_chancellerie'];
 const CORE_DESCRIPTIONS = {
   vAvA_core: 'Le cœur du serveur (obligatoire)',
   oxmysql: 'Accès à la base de données (obligatoire)',
+  vava_ui: 'Polices, textures et ornements communs des interfaces (aucun script)',
   vava_chat: 'Chat du royaume : hors-RP, /me, /do, messages privés, Conseil (remplace « chat »)',
   vava_appearance: 'Apparence des personnages',
   vava_characters_ui: 'Écran de sélection et de création',
