@@ -246,7 +246,7 @@ versé à T-014 ; les autres points déjà couverts sont précisés dans T-012 �
   jour ; version montée.
 
 ### T-046 — Codex : contenu versionné, gardé par la page entre deux ouvertures
-- Agents : vava-dev-lua + vava-dev-nui · Dépend de : — · Statut : en cours
+- Agents : vava-dev-lua + vava-dev-nui · Dépend de : — · Statut : à tester en jeu
 - **IMPORTANT** (`docs/audits/reseau-vava_codex.md`) : `server/main.lua:26-35`, appelé par `client/main.lua:82-97`,
   renvoie tout le contenu visible (estimé 10 à 30 Ko, évènement fiable) à **chaque** appui sur F1, alors qu'il ne change
   qu'au démarrage ou à l'arrêt d'un module et au changement de rang. Numéro de version du catalogue (hooks
