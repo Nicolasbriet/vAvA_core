@@ -66,14 +66,18 @@ Le serveur décide seul qui la reçoit, sur la position qu'il lit une fois par s
   de la croissance ou `/agriculture arroser` font un envoi par parcelle touchée. Avant la 1.7.0, la parcelle entière
   (470 o pour le champ communal) partait à tous les joueurs connectés à chaque changement, par un state bag global ;
   l'ancienne clé `vava_farming:parcel:<id>` est effacée au démarrage si elle traîne encore, et plus rien n'est écrit dans
-  `GlobalState`.
+  `GlobalState`. Seules les parcelles encore dans la config sont effacées ainsi : après une mise à jour depuis une
+  version antérieure à 1.7.0 qui retire des parcelles, **redémarrer le serveur**, pas seulement la ressource.
 - **En s'éloignant** (25 m au-delà) : la parcelle est oubliée, ses props retirés. Retour à la sélection,
   déchargement : de même.
 - **Parcelle créée, déplacée ou changée en jeu** (Atelier, T-103) : `zones.share(parcelle, valeurs)` la déclare, ou la
   déplace et remplace son état ; `zones.drop(id)` la retire. Les joueurs proches la reçoivent (ou l'oublient) sans
-  reconnexion, les autres en arrivant.
-- **Rien de secret** dans cet état (un client modifié peut mentir sur sa position et le recevoir de loin) : ni
-  propriétaire, ni humidité, ni fertilité, ni qualité à venir, ni contenu du grenier ; le menu d'un emplacement les
+  reconnexion, les autres en arrivant. **Pas encore branché** : aucune commande ne crée, ne déplace ni ne supprime de
+  parcelle aujourd'hui ; T-103 appellera `zones.share` à la création et au déplacement, `zones.drop` à la suppression.
+- **Arrivée** : une parcelle reçue (ou changée, ou quittée) fait aussitôt un passage du client, sans attendre sa boucle
+  lente ; la marge de 20 m ne couvre donc que l'attente du passage du core (1 s : 15 m au galop).
+- **Rien de secret** dans cet état (un client modifié peut mentir sur sa position et le recevoir de loin) : le nom de
+  la parcelle et de son grenier y est (public, comme leur lieu), mais ni propriétaire, ni humidité, ni fertilité, ni qualité à venir, ni contenu du grenier ; le menu d'un emplacement les
   demande au serveur (`vava_farming:open`), qui revérifie la distance, comme au début et à la fin de chaque geste, au
   puits et au grenier.
 
@@ -156,8 +160,8 @@ withdraw, source, characterId, item, quantity }`). Détail : `docs/api.md`.
 
 ## À vérifier en jeu (1.7.0)
 
-- Les plantes apparaissent à 80 m comme avant, à pied comme au galop, et à l'arrivée par téléportation (au plus une
-  seconde de plus : le passage du core).
+- Les plantes apparaissent à 80 m comme avant, à pied comme au galop (jamais à 45-50 m : une parcelle reçue fait
+  aussitôt un passage du client), et à l'arrivée par téléportation (au plus une seconde de plus : le passage du core).
 - Après `restart vava_farming` près du champ : les plantes reviennent une seule fois, au bon stade.
 - Une nuit de gel près du champ : les plantes mortes changent de prop ensemble ; `/vava_reseau` : un seul
   `vAvA:zone:diff` par parcelle touchée.

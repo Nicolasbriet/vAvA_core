@@ -98,7 +98,10 @@ VavaFarming.config = {
     -- Une parcelle (emplacements, état des plantes, grenier) n'est connue que des joueurs à moins de son rayon +
     -- `radius` + `subscribeSlack` mètres (abonnements de zone du core, positions lues par le serveur une fois par
     -- seconde) : le battement couvre le chemin d'un cavalier au galop entre deux passages, pour que la parcelle soit
-    -- connue avant que ses props doivent apparaître. Le joueur l'oublie 25 m plus loin (`zones.exitMargin` du core).
+    -- connue avant que ses props doivent apparaître (une parcelle reçue fait aussitôt un passage du client : seule
+    -- l'attente du core compte). Il doit valoir au moins vitesse maximale × `zones.passMs` du core + 5 m (20 m :
+    -- cavalier au galop, ~15 m/s, avec passMs = 1000 ; 35 m avec passMs = 2000 ou pour une monture plus rapide). Le
+    -- joueur l'oublie 25 m plus loin (`zones.exitMargin` du core).
     streaming = { radius = 80.0, pollMs = 1000, idlePollMs = 2500, idleMargin = 60.0, groupCell = 200.0, modelTimeoutMs = 5000,
         subscribeSlack = 20.0 },
     -- écriture groupée ; journal du grenier en attente (lignes par minute) borné à granaryLogMax : plein, il s'écrit
@@ -157,7 +160,9 @@ VavaFarming.config = {
     },
 
     -- Parcelles : grille d'emplacements (lignes × colonnes, espacement en m) centrée et orientée ; `owner` nul =
-    -- communale ; `granary` : grenier commun (conteneur conservé) et son lieu. EXEMPLES.
+    -- communale ; `granary` : grenier commun (conteneur conservé) et son lieu. EXEMPLES. Le nom (`label`) d'une
+    -- parcelle et celui de son grenier sont publics : envoyés à tout joueur proche avec sa définition (jamais le
+    -- propriétaire ni le contenu du grenier).
     parcels = {
         { id = 'champ_communal', label = 'Champ communal', x = -230.0, y = -890.0, z = 31.2, heading = 0.0, rows = 3, cols = 4, spacing = 1.6,
             granary = { x = -222.0, y = -885.0, z = 31.2, label = 'Grenier commun', width = 10, height = 8, maxWeight = 200000, prop = 'prop_crate_11e' } },

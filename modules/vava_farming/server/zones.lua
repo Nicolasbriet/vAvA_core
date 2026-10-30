@@ -4,8 +4,10 @@
            proches (rayon de la parcelle + portée des props + battement, positions lues par le serveur), qui reçoivent
            son état entier en arrivant (définition et emplacements) puis les seuls emplacements changés. Les
            changements d'une parcelle faits dans un même passage (croissance, gel, Conseil) partent en un seul envoi.
-           Une parcelle créée ou changée en jeu se partage de nouveau (déclarée, déplacée, état remplacé) et arrive chez
-           les joueurs proches sans reconnexion. L'état d'une zone est public : il ne dit que ce qu'un passant voit
+           `share` sait déclarer une parcelle, ou la déplacer et remplacer son état, et `drop` la retirer : une
+           parcelle créée, changée ou supprimée en jeu arrivera ainsi chez les joueurs proches sans reconnexion. Le
+           branchement reste à faire avec l'Atelier (T-103) : aujourd'hui `share` ne sert qu'au démarrage et `drop`
+           n'est appelé nulle part. L'état d'une zone est public : il ne dit que ce qu'un passant voit
            (culture, stade, état) ; chaque geste revérifie la distance côté serveur sans se fier à l'abonnement.
     Dépendances : shared/constants.lua, config.lua, shared/parcelzone.lua, server/core.lua
 ]]
@@ -105,7 +107,8 @@ function zones.publish(parcel, values)
     return true
 end
 
---- Retire la zone d'une parcelle supprimée : ses abonnés l'oublient (props retirés).
+--- Retire la zone d'une parcelle supprimée : ses abonnés l'oublient (props retirés). À appeler par la suppression
+--- d'une parcelle quand l'Atelier saura la faire (T-103) ; pas encore appelé.
 ---@param parcelId string
 ---@return boolean ok
 function zones.drop(parcelId)
@@ -120,7 +123,8 @@ function zones.drop(parcelId)
 end
 
 --- Efface l'ancien state bag global de chaque parcelle s'il traîne encore (serveur non redémarré depuis la 1.6.0) :
---- un seul envoi par clé présente, puis plus jamais rien dans GlobalState. Appelé pendant le setup.
+--- un seul envoi par clé présente, puis plus jamais rien dans GlobalState. Appelé pendant le setup. Seules les
+--- parcelles encore dans la config sont vues : la clé d'une parcelle retirée part au redémarrage du serveur (README).
 ---@param parcels vAvA.ParcelDefinition[]
 function zones.clearLegacy(parcels)
     for _, parcel in ipairs(parcels) do

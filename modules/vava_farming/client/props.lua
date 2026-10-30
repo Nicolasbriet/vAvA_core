@@ -8,7 +8,8 @@
            cible la plus proche à distance d'interaction (emplacement, puits ou grenier). Une seule boucle lente,
            active seulement quand un personnage est en jeu : elle mesure d'abord les groupes (une parcelle avec son
            grenier, les puits par case de streaming.groupCell), ne parcourt que les cibles d'un groupe à portée, passe
-           toutes les streaming.pollMs près d'un groupe et toutes les streaming.idlePollMs loin de tous ; elle s'arrête
+           toutes les streaming.pollMs près d'un groupe et toutes les streaming.idlePollMs loin de tous ; une parcelle
+           reçue, changée ou quittée fait aussitôt un passage (props et invite à jour sans attendre) ; elle s'arrête
            d'elle-même à la sélection et au déchargement, et retire alors tous les props.
     Dépendances : shared/constants.lua, config.lua, shared/geometry.lua, shared/parcelzone.lua, shared/proximity.lua,
                   client/core.lua (core.zones, vAvA_core 0.11.0)
@@ -193,37 +194,44 @@ local function nearestOf(target, far)
     return { kind = 'well', well = target.well, distance = far }
 end
 
---- Boucle lente justifiée, seulement quand un personnage est en jeu : une distance par groupe (parcelle et grenier,
---- puits d'une case), puis une par cible des seuls groupes à portée ; un groupe qui sort de portée retire ses props
---- une fois. Intervalle : streaming.pollMs près d'un groupe, streaming.idlePollMs quand aucune cible ne peut être à
---- moins de radius + idleMargin.
+--- Un passage : une distance par groupe (parcelle et grenier, puits d'une case), puis une par cible des seuls groupes
+--- à portée ; un groupe qui sort de portée retire ses props une fois. Ne cède jamais la main. Rend l'intervalle du
+--- prochain passage : streaming.pollMs près d'un groupe, streaming.idlePollMs quand aucune cible ne peut être à moins
+--- de radius + idleMargin.
+---@return integer
+local function step()
+    local coords = GetEntityCoords(PlayerPedId())
+    local px, py, pz = coords.x, coords.y, coords.z
+    local best, bestTarget, bestDistance = nil, nil, cfg.interact.distance
+    local closest = huge
+    for _, group in ipairs(groups) do
+        local reachable, gap = proximity.reachable(group, px, py, pz, REACH)
+        if gap < closest then closest = gap end
+        if reachable then
+            group.active = true
+            for _, target in ipairs(group.targets) do
+                local far = geometry.distance(px, py, pz, target.x, target.y, target.z)
+                local model = target.model
+                if target.kind == 'slot' then model = modelFor(props.slot(target.parcel, target.index)) end
+                reconcile(target.key, model, far, target.x, target.y, target.z, target.heading)
+                if far <= bestDistance then bestTarget, bestDistance = target, far end
+            end
+        elseif group.active then
+            group.active = false
+            for _, target in ipairs(group.targets) do remove(target.key) end
+        end
+    end
+    if bestTarget then best = nearestOf(bestTarget, bestDistance) end
+    nearest = best
+    if onNearest then onNearest(best) end
+    return proximity.interval(closest, streaming.radius, streaming.idleMargin, streaming.pollMs, streaming.idlePollMs)
+end
+
+--- Boucle lente justifiée, seulement quand un personnage est en jeu (voir step). Une parcelle reçue, changée ou
+--- quittée fait aussitôt un passage hors de la boucle (onZone) : ses props n'attendent pas la fin d'un intervalle lent.
 local function loop()
     while playing do
-        local coords = GetEntityCoords(PlayerPedId())
-        local px, py, pz = coords.x, coords.y, coords.z
-        local best, bestTarget, bestDistance = nil, nil, cfg.interact.distance
-        local closest = huge
-        for _, group in ipairs(groups) do
-            local reachable, gap = proximity.reachable(group, px, py, pz, REACH)
-            if gap < closest then closest = gap end
-            if reachable then
-                group.active = true
-                for _, target in ipairs(group.targets) do
-                    local far = geometry.distance(px, py, pz, target.x, target.y, target.z)
-                    local model = target.model
-                    if target.kind == 'slot' then model = modelFor(props.slot(target.parcel, target.index)) end
-                    reconcile(target.key, model, far, target.x, target.y, target.z, target.heading)
-                    if far <= bestDistance then bestTarget, bestDistance = target, far end
-                end
-            elseif group.active then
-                group.active = false
-                for _, target in ipairs(group.targets) do remove(target.key) end
-            end
-        end
-        if bestTarget then best = nearestOf(bestTarget, bestDistance) end
-        nearest = best
-        if onNearest then onNearest(best) end
-        Wait(proximity.interval(closest, streaming.radius, streaming.idleMargin, streaming.pollMs, streaming.idlePollMs))
+        Wait(step())
     end
     for key in pairs(shown) do remove(key) end
     nearest = nil
@@ -296,12 +304,6 @@ local function removeGroup(group)
     for _, target in ipairs(group.targets) do remove(target.key) end
 end
 
---- L'invite montre la culture et son état, le nom de la parcelle ou du grenier : elle suit ce qui est reçu.
----@param id string
-local function refreshNearest(id)
-    if onNearest and nearest and nearest.parcel == id then onNearest(nearest) end
-end
-
 --- Place (ou replace) une parcelle reçue : ses props sont refaits si sa définition a changé (déplacée, agrandie…).
 ---@param id string
 ---@param def table
@@ -339,8 +341,16 @@ local function forget(id)
     end
 end
 
+--- Passage immédiat après une notification : props et invite (culture, état, nom de la parcelle ou du grenier) suivent
+--- aussitôt ce qui est reçu. Une parcelle arrive dans la marge d'abonnement (`subscribeSlack`) : sans ce passage, ses
+--- props attendraient jusqu'à `idlePollMs` et un cavalier au galop les verrait apparaître trop près.
+local function refresh()
+    if playing then step() end
+end
+
 --- Une parcelle arrive (état entier), change (emplacements, définition) ou part : nom local = id de la parcelle ; état
---- `def` et `s<n°>` (shared/parcelzone.lua). Une définition illisible fait oublier la parcelle.
+--- `def` et `s<n°>` (shared/parcelzone.lua). Une définition illisible fait oublier la parcelle. Chaque notification
+--- fait aussitôt un passage.
 ---@param kind string  'enter' | 'change' | 'leave'
 ---@param id string
 ---@param a table|nil  état (enter) ou valeurs changées (change)
@@ -349,6 +359,7 @@ local function onZone(kind, id, a, b)
     if type(id) ~= 'string' then return end
     if kind == 'leave' then
         forget(id)
+        refresh()
         return
     end
     if type(a) ~= 'table' then return end
@@ -357,6 +368,7 @@ local function onZone(kind, id, a, b)
         if not def then
             core.log.warn("parcelle '%s' : définition reçue illisible, ignorée", id)
             forget(id)
+            refresh()
             return
         end
         place(id, def)
@@ -368,6 +380,7 @@ local function onZone(kind, id, a, b)
             if not def then
                 core.log.warn("parcelle '%s' : définition reçue illisible, ignorée", id)
                 forget(id)
+                refresh()
                 return
             end
             place(id, def)
@@ -388,7 +401,7 @@ local function onZone(kind, id, a, b)
     else
         return
     end
-    refreshNearest(id)
+    refresh()
 end
 
 --- Suit les parcelles proches (abonnements de zone du core) et la vie du personnage. Appelé par client/main.lua.
