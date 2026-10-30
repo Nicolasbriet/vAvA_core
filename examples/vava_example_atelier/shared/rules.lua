@@ -39,6 +39,19 @@ fold('ùúûüÙÚÛÜ', 'u')
 fold('ýÿÝŸ', 'y')
 fold('œŒ', 'oe')
 fold('æÆ', 'ae')
+fold('ß', 'ss')
+fold('’', '\'')
+-- Paires de casse du latin étendu (U+0100 à U+017F) : chaque majuscule ramenée à sa minuscule (« Ł » → « ł »,
+-- « Š » → « š »), sans retirer l'accent.
+local function casePairs(first, last)
+    for code = first, last, 2 do FOLD[utf8char(code)] = utf8char(code + 1) end
+end
+casePairs(0x100, 0x12E)   -- Ā à Į
+casePairs(0x132, 0x136)   -- Ĳ, Ĵ, Ķ
+casePairs(0x139, 0x147)   -- Ĺ à Ň
+casePairs(0x14A, 0x176)   -- Ŋ à Ŷ
+casePairs(0x179, 0x17D)   -- Ź, Ż, Ž
+FOLD['İ'] = 'i'
 
 -- Casse et blancs ASCII écrits octet par octet : `string.lower` et `%s` suivent la locale du système (sous Windows,
 -- le premier octet de « Ł » passerait pour une majuscule, l'octet 0xA0 de « Š » pour une espace : la clé ne serait

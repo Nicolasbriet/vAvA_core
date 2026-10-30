@@ -166,6 +166,7 @@ Actif sur ce dépôt par choix (`config.catalog.enabled = true`), réservé au d
 | 1 | `/catalogue`. | À côté de la besace, « Catalogue (développement) » 16 × 10, une pile pleine de chaque objet, par catégorie puis nom, poids sans plafond. Bandeau : onglets « Tout » et une par catégorie avec leur compte, « Rechercher… », « n objets », « ‹ 1 / p › ». Message « Catalogue : n objet(s), page 1/p. », suivi de « Suite : /catalogue 2. » s'il y a plusieurs pages, et de « Catégories : … ». Journal du Registre : « Catalogue de développement ». |
 | 2 | Onglet « Outil » ; flèches de page. | Page 1 de la catégorie ; flèches grisées aux bornes. |
 | 3 | Rechercher `chene`, puis `zzz`. | « Bûche de chêne » (accents et casse ignorés, nom technique compris) ; puis grille vide, « Aucun objet ne répond à cette recherche. », « 0 objet ». |
+| 3b | (`vava_inventory` 1.8.1, T-133, serveur sous Windows de préférence) Rechercher `CHÊNE`, puis `Chêne`, puis `chêne`. | Chaque fois « Bûche de chêne » (avant 1.8.1, sous Windows, la casse baissée avant le repli des accents pouvait faire manquer « Ê » ou « É »). |
 | 4 | `Échap` dans le champ, puis `Échap`. | Le premier quitte le champ, le second ferme l'inventaire. |
 | 5 | Double-clic (ou clic droit → « Prendre ») sur la lavande. | Une pile pleine (40) dans la besace ; la même revient aussitôt au catalogue. |
 | 6 | `Maj`-glisser une pile du catalogue vers la besace. | La moitié dans la besace ; la pile du catalogue est regarnie. |

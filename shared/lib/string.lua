@@ -4,15 +4,31 @@
     Dépendances : shared/init.lua, config/shared.lua
 ]]
 
-local type, tostring = type, tostring
-local byte, sub, find, gsub, match = string.byte, string.sub, string.find, string.gsub, string.match
+local ipairs, type, tostring = ipairs, type, tostring
+local byte, char, sub, find, gsub, match = string.byte, string.char, string.sub, string.find, string.gsub, string.match
 local utf8len, utf8codes = utf8.len, utf8.codes
 
--- Ensembles ASCII écrits octet par octet : les classes %s et %c de Lua suivent la locale du système (sous Windows,
--- %s prend aussi l'octet 0xA0 de « à », %c les octets 0x81, 0x8D, 0x8F, 0x90, 0x9D, 0xAD de « Á », « Í », « í »…).
+-- Ensembles écrits octet par octet : les classes %s et %c de Lua (et string.lower) suivent la locale du système (sous
+-- Windows, %s prend aussi l'octet 0xA0 de « à », %c les octets 0x81, 0x8D, 0x8F, 0x90, 0x9D, 0xAD de « Á », « Í »,
+-- « í »… et laisse passer les contrôles C1 écrits en UTF-8).
 local BLANKS = '[\t-\r ]'   -- tabulation, saut de ligne, tabulation verticale, saut de page, retour chariot, espace
-local CONTROLS = '[\0-\31\127]'
 local TRIM_PATTERN = '^' .. BLANKS .. '*(.-)' .. BLANKS .. '*$'
+local COLOR_CODES = '%^+[0-9]'
+-- Caractères qui feraient mentir une console ou un affichage (même liste que vava_atelier, shared/text.lua) :
+-- contrôles ASCII, contrôles C1 en UTF-8 (U+0080 à U+009F : CSI, OSC, DCS… qu'un terminal interpréterait), espace sans
+-- largeur et marques de sens (U+200B à U+200F), séparateurs de ligne et de paragraphe et sens d'écriture (U+2028 à
+-- U+202E), isolats de sens (U+2066 à U+2069), marque arabe (U+061C), marque d'ordre des octets (U+FEFF).
+local CONTROL_SEQUENCES = {
+    '[\0-\31\127]',
+    '\xC2[\x80-\x9F]',
+    '\xE2\x80[\x8B-\x8F\xA8-\xAE]',
+    '\xE2\x81[\xA6-\xA9]',
+    '\xD8\x9C',
+    '\xEF\xBB\xBF',
+}
+local ASCII_UPPER = '[A-Z]'
+local ASCII_LOWER = {}
+for code = 65, 90 do ASCII_LOWER[char(code)] = char(code + 32) end
 
 local identifiers = vAvA.config.shared.identifiers
 local IDENTIFIER_PATTERN = identifiers.pattern
@@ -49,9 +65,27 @@ function str.trim(value)
     return match(value, TRIM_PATTERN)
 end
 
+--- Minuscules ASCII seulement (A à Z) : les caractères UTF-8 restent entiers, quelle que soit la locale.
+---@param value string
+---@return string
+function str.asciiLower(value)
+    return (gsub(value, ASCII_UPPER, ASCII_LOWER))
+end
+
+--- Vrai si le texte contient un caractère de contrôle (ASCII, C1 en UTF-8), un caractère invisible ou une marque de
+--- sens d'écriture (liste en tête du fichier, la même que vava_atelier).
+---@param value string
+---@return boolean
+function str.hasControl(value)
+    for _, pattern in ipairs(CONTROL_SEQUENCES) do
+        if find(value, pattern) then return true end
+    end
+    return false
+end
+
 --- Rend une valeur non fiable affichable sans risque dans la console :
---- codes couleur FiveM (^0-^9) retirés, caractères de contrôle ASCII (0x00 à 0x1F, 0x7F) remplacés par une espace,
---- longueur bornée.
+--- codes couleur FiveM (^0-^9) retirés, caractères de contrôle (ASCII, C1), invisibles et marques de sens d'écriture
+--- (voir hasControl) remplacés par une espace, longueur bornée.
 ---@param value any
 ---@param maxLength integer
 ---@return string
@@ -61,8 +95,10 @@ function str.sanitize(value, maxLength)
         text = sub(text, 1, maxLength) .. '…'
     end
     -- « ^^11 » : retirer « ^1 » laisserait « ^1 » ; la suite entière de ^ part avec le chiffre
-    text = gsub(text, '%^+%d', '')
-    text = gsub(text, CONTROLS, ' ')
+    text = gsub(text, COLOR_CODES, '')
+    for _, pattern in ipairs(CONTROL_SEQUENCES) do
+        text = gsub(text, pattern, ' ')
+    end
     return text
 end
 

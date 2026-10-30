@@ -3,13 +3,19 @@ local helper = require('tests.helper')
 -- Textes de l'Atelier (T-100) : UTF-8, longueur en caractères, jeux de caractères, recherche sans accents ni casse,
 -- coupe sans briser un caractère, nombres et durées à la française.
 describe('vava_atelier text', function()
-    local text
+    local text, previousLocale
 
     before_each(function()
+        -- T-133 : sous une locale Windows à octet unique si le système en a une (voir plus bas)
+        previousLocale = helper.legacyLocale()
         helper.reset()
         VavaAtelier = nil
         helper.loadAll({ 'modules/vava_atelier/shared/constants.lua', 'modules/vava_atelier/shared/text.lua' })
         text = VavaAtelier.text
+    end)
+
+    after_each(function()
+        helper.restoreLocale(previousLocale)
     end)
 
     it('refuse un UTF-8 invalide et ce qui n\'est pas une chaîne', function()
@@ -102,7 +108,8 @@ describe('vava_atelier text', function()
 
     -- T-133 : `%s` et `string.lower` suivent la locale du système ; sous Windows (cp1252), l'octet 0xA0 de « à » ou
     -- de « Š » passait pour un blanc et le premier octet d'un caractère accentué pour une majuscule (0xC5 → 0xE5).
-    -- Ces essais échouent avec l'ancien code sous une telle locale ; sous la locale « C », ils fixent la règle.
+    -- Ils tournent sous une telle locale si le système en a une (before_each) et échouent alors avec l'ancien code ;
+    -- sinon, ils fixent la règle.
     local function latinCodes()
         local codes = {}
         for code = 0xA0, 0x17F do codes[#codes + 1] = code end

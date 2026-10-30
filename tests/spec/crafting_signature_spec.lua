@@ -3,14 +3,16 @@ local helper = require('tests.helper')
 -- Baptême d'un chef-d'œuvre (modules/vava_crafting/server/signature.lua, signature.name) : le nom est rogné de ses
 -- blancs ASCII de bord puis vérifié caractère par caractère (lettres et séparateurs de config.masterpiece).
 -- T-133 : `%s` suit la locale du système ; sous Windows (cp1252), l'octet 0xA0 du « à » final passait pour un blanc,
--- le nom devenait de l'UTF-8 coupé et était refusé. Ces essais échouent avec l'ancien code sous une telle locale ; sous
--- la locale « C », ils fixent la règle.
+-- le nom devenait de l'UTF-8 coupé et était refusé. Ces essais tournent sous une telle locale si le système en a une
+-- (helper.legacyLocale) et échouent alors avec l'ancien code ; sinon, ils fixent la règle.
 describe('vava_crafting signature : baptême', function()
-    local signature, cfg, patched
+    local signature, cfg, patched, previousLocale
 
     local SRC, INSTANCE, CHARACTER = 7, 41, 12
 
     before_each(function()
+        -- sous une locale Windows à octet unique si le système en a une (helper.legacyLocale)
+        previousLocale = helper.legacyLocale()
         helper.reset()
         VavaCrafting = nil
         helper.loadAll({ 'modules/vava_crafting/shared/constants.lua', 'modules/vava_crafting/config.lua' })
@@ -33,6 +35,7 @@ describe('vava_crafting signature : baptême', function()
 
     after_each(function()
         VavaCrafting = nil
+        helper.restoreLocale(previousLocale)
     end)
 
     --- Baptise le chef-d'œuvre en attente : ok, code d'erreur, nom gardé.

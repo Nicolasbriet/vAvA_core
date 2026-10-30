@@ -3,9 +3,11 @@ local helper = require('tests.helper')
 -- Exemple de l'Atelier (T-100, examples/vava_example_atelier) : garde du mode développement, règles propres au module
 -- (nom unique, lanterne, runes), encadré « Pour comparer ».
 describe('vava_example_atelier', function()
-    local guard, rules, cfg
+    local guard, rules, cfg, previousLocale
 
     before_each(function()
+        -- T-133 : sous une locale Windows à octet unique si le système en a une
+        previousLocale = helper.legacyLocale()
         helper.reset()
         VavaExampleAtelier = nil
         helper.loadAll({
@@ -18,6 +20,7 @@ describe('vava_example_atelier', function()
 
     after_each(function()
         VavaExampleAtelier = nil
+        helper.restoreLocale(previousLocale)
     end)
 
     describe('garde', function()
@@ -71,7 +74,7 @@ describe('vava_example_atelier', function()
 
         -- T-133 : `%s` et `string.lower` suivent la locale du système ; sous Windows (cp1252), l'octet 0xA0 de « Š »
         -- passait pour un blanc et le premier octet d'un caractère accentué pour une majuscule. Échoue avec l'ancien
-        -- code sous une telle locale ; sous la locale « C », fixe la règle.
+        -- code sous une telle locale (helper.legacyLocale) ; sinon, fixe la règle.
         it('clé du nom : chaque caractère de U+00A0 à U+017F et U+2010 reste de l\'UTF-8 entier', function()
             local codes = {}
             for code = 0xA0, 0x17F do codes[#codes + 1] = code end
@@ -80,10 +83,26 @@ describe('vava_example_atelier', function()
                 local key = rules.key(' Panneau ' .. utf8.char(code) .. ' ')
                 assert.is_not_nil(utf8.len(key), string.format('U+%04X', code))
             end
-            for _, c in ipairs({ 'Š', 'Ł', 'Ġ', 'ı', '§', '\u{2010}' }) do
-                assert.equal('panneau ' .. c, rules.key('\tPANNEAU ' .. c .. ' \r\n'), c)
+            -- majuscule du latin étendu ramenée à sa minuscule, accent gardé ; le reste tel quel
+            for _, pair in ipairs({ { 'Š', 'š' }, { 'Ł', 'ł' }, { 'Ġ', 'ġ' }, { 'ı', 'ı' }, { '§', '§' },
+                { '\u{2010}', '\u{2010}' } }) do
+                assert.equal('panneau ' .. pair[2], rules.key('\tPANNEAU ' .. pair[1] .. ' \r\n'), pair[1])
             end
             assert.equal('chateau', rules.key(' \tChâteau\v\f'))
+        end)
+
+        it('clé du nom : apostrophe typographique et casse du latin étendu repliées', function()
+            assert.equal(rules.key("L'Ancre"), rules.key('L’ANCRE'))
+            assert.equal(rules.key('štěpán łódź'), rules.key('ŠTĚPÁN ŁÓDŹ'))
+            assert.equal(rules.key('weiss'), rules.key('Weiß'))
+            assert.equal(rules.key('istanbul'), rules.key('İstanbul'))
+            -- chaque majuscule de U+0100 à U+017F qui a sa minuscule juste après se replie sur elle
+            for _, range in ipairs({ { 0x100, 0x12E }, { 0x132, 0x136 }, { 0x139, 0x147 }, { 0x14A, 0x176 },
+                { 0x179, 0x17D } }) do
+                for code = range[1], range[2], 2 do
+                    assert.equal(utf8.char(code + 1), rules.key(utf8.char(code)), string.format('U+%04X', code))
+                end
+            end
         end)
 
         it('nom unique : l\'entrée elle-même est exclue', function()
