@@ -15,7 +15,9 @@ complet : `README.md` à la racine du dépôt).
 1. Placer le dossier dans `resources/[vava]/vava_chancellerie` (avec la Chancellerie : il est installé avec vAvA).
 2. `ensure vava_chancellerie` en dernier. Aucun réglage à poser à la main ; la table `vava_chancellerie_links` se crée
    seule (migration `sql/0001_chancellerie.sql`, 1.5.0). La Chancellerie pose son adresse sur la ligne de commande de
-   FXServer (`+set vava_chancellerie_url`, pas un secret) ; la **clé du pont**, tirée à chaque lancement, n'y passe
+   FXServer (`+set vava_chancellerie_url`, pas un secret), que le pont lit **une seule fois, au setup**, et seulement
+   de la forme `http://127.0.0.1:<port>` (sinon : « adresse de la Chancellerie refusée », pont fermé) ; changer la
+   convar ensuite ne déplace ni la clé ni les évènements. La **clé du pont**, tirée à chaque lancement, n'y passe
    plus (1.5.0) : le pont la demande dans la console et la Chancellerie la lui donne par l'entrée de FXServer (voir
    « Sécurité »). Il faut la Chancellerie 1.6.0 ou plus récente : une plus ancienne passe encore la clé en `+set
    vava_chancellerie_token`, que le pont ignore (console : « clé du pont passée sur la ligne de commande … : ignorée »),
@@ -39,13 +41,13 @@ complet : `README.md` à la racine du dépôt).
 | --- | --- | --- |
 | Réglage posé au lancement | `vava_chancellerie_url` (adresse de la Chancellerie ; présent : serveur lancé par elle) ; `vava_chancellerie_token`, ancienne clé, ignorée et signalée | `convars` |
 | Clé minimale | 32 signes hexadécimaux (128 au plus) ; hors de ces bornes, refusée | `tokenMin`, `key.max` |
-| Demande de la clé | « en attente de la clé de la Chancellerie (vava_chancellerie:cle?) » dans la console, toutes les 5 s pendant 2 min au plus ; une clé arrivée plus tard ouvre encore le pont | `key` |
-| Comptes vus reliés | une liaison en cours est attendue 10 s au plus avant de refuser un rang | `links.waitMs` |
+| Demande de la clé | ligne « en attente de la clé de la Chancellerie (vava_chancellerie:cle?) » dans la console (texte fixé par le protocole, `VavaBridge.KEY_ASK_LINE`), toutes les 5 s pendant 2 min au plus ; une clé arrivée plus tard ouvre encore le pont | `key` |
+| Comptes vus reliés | les liaisons en cours sont attendues 5 s au plus par requête, toutes confondues, avant de refuser un rang (sous les 8 s après lesquelles la Chancellerie abandonne sa demande) | `links.waitMs` |
 | Évènements vers la Chancellerie | `/api/bridge/event` ; perdus si elle est fermée, signalés une fois par minute au plus | `eventPath`, `pushWarnEveryMs` |
 | Corps de requête | 64 Ko au plus | `bodyMax` |
 | Caméras | droit `watch` pour regarder ; la vue en grand passe par la demande `watchScreen` du Registre | `cameras` |
 | Liaison d'un compte | commande `chancellerie <code>`, 5 essais par minute, messages au joueur | `link` |
-| Liste blanche Discord | réponse attendue 8 s à la connexion d'un joueur ; messages quand elle ne répond pas | `whitelist` |
+| Liste blanche Discord | réponse attendue 8 s à la connexion d'un joueur ; messages quand elle ne répond pas, ou quand la clé n'est pas encore arrivée | `whitelist` |
 | Journal du Registre | « Zone de voix modifiée », « Zone de voix supprimée », « Mur des caméras ouvert » | `messages` |
 
 ## Ce que fait le pont
@@ -76,8 +78,9 @@ complet : `README.md` à la racine du dépôt).
   Chancellerie fait entrer le compte de jeu dans `vava_chancellerie_links` (1.5.0).
 - **Rangs des comptes reliés** (`/staff/sync`) : appliqués par le Registre (`webSyncStaff`), mais un rang n'est **donné**
   qu'à un compte de `vava_chancellerie_links` (refus `not_linked_in_game`, une ligne dans la console) ; le retirer
-  reste toujours permis. Le panneau applique le rang pendant qu'il répond à la liaison : la liaison en cours pour ce
-  compte est attendue (`links.waitMs`).
+  reste toujours permis ; un retrait marqué `unlinked` (déliaison, compte du panneau supprimé) fait aussi oublier le
+  compte. Le panneau applique le rang pendant qu'il répond à la liaison : les liaisons en cours sont attendues, sous une
+  seule échéance par requête (`links.waitMs`, un seul minuteur).
 - **Liste blanche Discord** : à la connexion d'un joueur (hook `core:player:connecting`, avant toute création de
   données), le pont demande à la Chancellerie s'il peut entrer et lui montre sa réponse. Sans réponse en 8 s : refusé si
   la liste blanche était active à la dernière réponse, accepté sinon.
@@ -88,15 +91,27 @@ complet : `README.md` à la racine du dépôt).
   n'est jamais écrite dans le `server.cfg` et la Chancellerie la masque dans la console.
 - **La clé ne passe pas sur la ligne de commande** (1.5.0) : celle d'un processus se lit sans droit particulier sur la
   machine (`ps`, `/proc/<pid>/cmdline`, Gestionnaire des tâches). Au setup, le pont déclare la commande
-  `vava_chancellerie_cle` (console seulement : lancée par un joueur, elle est ignorée), puis écrit
-  `vava_chancellerie:cle?` dans la console ; la Chancellerie, qui lit cette console, répond sur l'entrée de FXServer
-  par `vava_chancellerie_cle <clé>`. Ni convar (qu'une autre ressource lirait par `GetConvar`) ni fichier : la clé ne
-  vit qu'en mémoire, la première reçue est gardée (une autre est refusée et signalée), et aucun message ne l'affiche.
-  `restart vava_chancellerie` : le pont la redemande et la Chancellerie la redonne.
+  `vava_chancellerie_cle` (console seulement : lancée par un joueur, elle est ignorée), puis écrit la ligne
+  `[script:vava_chancellerie] en attente de la clé de la Chancellerie (vava_chancellerie:cle?)` dans la console ; la
+  Chancellerie, qui lit cette console et ne reconnaît que cette ligne exacte, répond sur l'entrée de FXServer par
+  `vava_chancellerie_cle <clé>`, une fois par démarrage du pont (plus de réponse après l'évènement `ready` vérifié,
+  jusqu'au prochain lancement ou `restart vava_chancellerie`, qu'elle repère à « Started resource vava_chancellerie »).
+  Ni convar (qu'une autre ressource lirait par `GetConvar`) ni fichier : la clé ne vit qu'en mémoire, la première reçue
+  est gardée (une autre est refusée : ligne `une autre clé du pont a été refusée : la première reçue est gardée`), et
+  aucun message ne l'affiche.
+- **Ce mécanisme ne protège pas d'une ressource serveur hostile.** Une ressource qui lance `vava_chancellerie_cle` avant
+  la Chancellerie garde le pont ; la Chancellerie le **repère et alerte** (console, journal, bandeau dans les pages
+  ouvertes) : sa clé refusée par le pont, un évènement du pont arrivé avec une autre clé, ou aucun `ready` vérifié
+  15 s après sa réponse. Une ressource serveur a de toute façon tous les pouvoirs sur le serveur (console, base) : ne
+  lancer que des ressources de confiance.
 - **Défense en profondeur** : qui volerait la clé pourrait parler au pont au nom de n'importe quel rang (le panneau en est
-  la source), mais ne pourrait pas nommer Souverain un compte de son choix par `/staff/sync` : seuls les comptes que le
-  pont a vus reliés en jeu reçoivent un rang (un code juste tapé par le joueur et confirmé par la Chancellerie en
-  réponse au pont lui-même ; la clé n'y suffit pas).
+  la source), mais ne pourrait pas nommer Souverain un compte qui n'a jamais été relié en jeu, par `/staff/sync` :
+  seuls les comptes que le pont a vus reliés en jeu reçoivent un rang (un code juste tapé par le joueur et confirmé par
+  la Chancellerie en réponse au pont lui-même ; la clé n'y suffit pas). « Délier » dans le panneau fait oublier le
+  compte (ligne supprimée de `vava_chancellerie_links`).
+- **Liste blanche** : sur un serveur lancé par la Chancellerie, tant que la clé n'est pas arrivée, toute connexion est
+  refusée (« Le registre des portes s'ouvre : réessayez dans un instant. ») plutôt qu'acceptée faute de réponse. Si la
+  clé n'arrive jamais (Chancellerie trop ancienne), plus personne n'entre : mettre la Chancellerie à jour.
 - Le pont ne décide de rien : chaque demande est revérifiée par le module qui l'exécute (droit du rang, cible, schéma),
   et journalisée par le Registre. Les exports réservés au pont (`vava_admin:web*`, `vava_voice:webUpdateZone`,
   `webDeleteZone`, `vava_cameras:web*`, `vava_time:web*`) refusent toute autre ressource appelante.

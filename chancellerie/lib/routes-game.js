@@ -104,7 +104,9 @@ function register(route, { ok, fail, endpoint, server, discord }) {
     } else if (event.type === 'camera') {
       camera.incoming(event);
     } else if (event.type === 'ready') {
-      // serveur de jeu démarré : les rangs des comptes reliés s'y appliquent ; le pont apprend si la liste blanche joue
+      // serveur de jeu démarré : les rangs des comptes reliés s'y appliquent ; le pont apprend si la liste blanche joue.
+      // Évènement vérifié (clé) : le pont a bien notre clé, sa marque n'est plus écoutée jusqu'à son redémarrage
+      bridge.confirmed();
       links.syncAll();
       return ok({ whitelist: discord.whitelistActive() });
     } else if (event.type === 'whitelist') {

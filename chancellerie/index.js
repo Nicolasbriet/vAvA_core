@@ -157,6 +157,12 @@ async function main() {
     if (answer) server.write(answer);
   });
   server.on('exit', () => bridge.reset());
+  // le pont n'a pas pris la clé de la Chancellerie : console, journal et navigateurs ouverts
+  bridge.alerts.on('alert', ({ kind, text }) => {
+    server.system(`Alerte : ${text}`);
+    journal.record(journal.SYSTEM, 'bridge_alert', { sorte: kind, motif: text });
+    events.broadcast('alert', { text });
+  });
   events.attach(server);
   if (await server.cleanupOrphan()) say(`${colors.dim}  Un FXServer resté ouvert après un arrêt brutal a été arrêté.${colors.reset}`);
 

@@ -148,6 +148,7 @@ const STRINGS = (() => {
     scheduled_update: 'Mise à jour au redémarrage planifié',
     account_linked: 'Compte relié à son joueur', account_unlinked: 'Compte délié de son joueur',
     rank_synced: 'Rang appliqué en jeu', rank_sync_failed: 'Rang non appliqué en jeu',
+    bridge_alert: 'Alerte : clé du pont non prise',
     discord_linked: 'Compte Discord relié', discord_unlinked: 'Compte Discord délié', discord_settings: 'Réglages du bot Discord',
     discord_error: 'Erreur du bot Discord', discord_joined: 'Bot Discord arrivé sur le serveur',
   };

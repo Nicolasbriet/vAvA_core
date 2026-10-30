@@ -95,9 +95,12 @@ module.exports = {
     if (account && account.link) apply([memberOf(account)], actor);
   },
 
-  /** Révoque en jeu le rang d'un joueur délié (ou dont le compte du panneau est supprimé). */
+  /**
+   * Révoque en jeu le rang d'un joueur délié (ou dont le compte du panneau est supprimé) ; `unlinked` : le pont oublie
+   * aussi ce joueur, qui devra être relié de nouveau en jeu pour recevoir un rang.
+   */
   revoke(link, name, actor) {
-    if (link) apply([{ accountId: link.accountId, rank: '', label: name }], actor);
+    if (link) apply([{ accountId: link.accountId, rank: '', label: name, unlinked: true }], actor);
   },
 
   /** Serveur de jeu démarré : tous les rangs des comptes reliés. */

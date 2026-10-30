@@ -8,24 +8,26 @@ VavaBridge.config = {
     coreVersion = '0.5.0',
 
     -- Réglage posé par la Chancellerie au lancement de FXServer (+set sur la ligne de commande, jamais dans le
-    -- server.cfg) : son adresse, pour la prévenir ; présent, il dit aussi que le serveur a été lancé par elle.
+    -- server.cfg) : son adresse, pour la prévenir ; présente, elle dit aussi que le serveur a été lancé par elle. Lue
+    -- une seule fois, au setup, et seulement de la forme http://127.0.0.1:<port> (sinon refusée : pont fermé).
     -- `legacyToken` : ancienne façon de passer la clé (Chancellerie d'avant 1.6.0), ignorée et signalée.
     convars = { url = 'vava_chancellerie_url', legacyToken = 'vava_chancellerie_token' },
     -- longueur minimale de la clé : plus courte, elle est refusée et le pont reste fermé
     tokenMin = 32,
     -- Clé du pont, tirée à chaque lancement : jamais sur la ligne de commande (lisible par tout utilisateur de la
-    -- machine) ni dans une convar (lisible par toute ressource). Le pont la demande dans la console (`ask`, %s = la
-    -- marque que la Chancellerie guette) toutes les `askEveryMs`, pendant `waitMs` au plus ; elle arrive par la console
-    -- du serveur et ne vit qu'en mémoire. `max` : longueur au plus (la Chancellerie en envoie 64 signes).
+    -- machine) ni dans une convar (lisible par toute ressource). Le pont la demande dans la console (ligne
+    -- VavaBridge.KEY_ASK_LINE, fixée par le protocole) toutes les `askEveryMs`, pendant `waitMs` au plus ; elle arrive
+    -- par la console du serveur et ne vit qu'en mémoire. `max` : longueur au plus (la Chancellerie en envoie 64 signes).
     key = {
-        ask = 'en attente de la clé de la Chancellerie (%s)',
         askEveryMs = 5000,
         waitMs = 120000,
         max = 128,
     },
     -- Comptes de jeu vus reliés en jeu : seuls ceux-là reçoivent un rang du panneau. Une liaison en cours (réponse de
-    -- la Chancellerie pas encore arrivée) est attendue au plus ce délai (ms) avant de trancher.
-    links = { waitMs = 10000 },
+    -- la Chancellerie pas encore arrivée) est attendue au plus ce délai (ms) par requête /staff/sync, toutes liaisons
+    -- confondues. Doit rester sous le délai d'une demande de la Chancellerie au pont (TIMEOUT_MS = 8000 dans
+    -- chancellerie/lib/bridge.js) : au-delà, elle a déjà abandonné la requête.
+    links = { waitMs = 5000 },
     -- adresse de la Chancellerie qui reçoit les évènements
     eventPath = '/api/bridge/event',
     -- corps de requête accepté (octets)
@@ -60,6 +62,8 @@ VavaBridge.config = {
     whitelist = {
         timeoutMs = 8000,
         messages = {
+            -- serveur lancé par la Chancellerie dont la clé n'est pas encore arrivée : la liste ne peut pas être lue
+            opening = 'Le registre des portes s\'ouvre : réessayez dans un instant.',
             unreachable = 'La liste blanche ne peut pas être vérifiée pour l\'instant : réessayez dans une minute.',
             refused = 'Ce serveur est réservé aux membres de son Discord.',
         },

@@ -1,12 +1,12 @@
 --[[
     vava_chancellerie/shared/rules.lua
     Rôle : règles pures du pont, testées hors jeu (tests/spec/chancellerie_rules_spec.lua) : forme de la clé reçue de
-           la Chancellerie, rangs du Conseil qu'elle peut appliquer à un compte de jeu.
+           la Chancellerie et de son adresse, rangs du Conseil qu'elle peut appliquer à un compte de jeu, déliaison.
            Chargé côté serveur seulement (le pont n'a pas de partie client).
     Dépendances : shared/constants.lua
 ]]
 
-local type, find = type, string.find
+local type, find, tonumber = type, string.find, tonumber
 
 local rules = {}
 VavaBridge.rules = rules
@@ -30,4 +30,23 @@ end
 function rules.canSync(rankName, known)
     if rankName == '' or known == true then return true end
     return false, 'not_linked_in_game'
+end
+
+--- Ce retrait vient-il d'une déliaison (le compte du panneau n'est plus relié à ce joueur) ? Le pont oublie alors le
+--- compte de jeu : il devra être relié de nouveau en jeu pour recevoir un rang.
+---@param rankName any
+---@param unlinked any
+---@return boolean
+function rules.forgetsLink(rankName, unlinked)
+    return rankName == '' and unlinked == true
+end
+
+--- Adresse de la Chancellerie acceptable ? Seulement la machine elle-même : http://127.0.0.1:<port>, port 1 à 65535.
+---@param value any
+---@return boolean
+function rules.validPanelUrl(value)
+    if type(value) ~= 'string' then return false end
+    local port = value:match('^http://127%.0%.0%.1:(%d%d?%d?%d?%d?)$')
+    port = port and tonumber(port)
+    return port ~= nil and port >= 1 and port <= 65535
 end

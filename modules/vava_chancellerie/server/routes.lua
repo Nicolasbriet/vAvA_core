@@ -105,10 +105,12 @@ end)
 
 -- Comptes reliés ------------------------------------------------------------------------------------------------------
 
--- Rangs des comptes de jeu reliés à un compte du panneau : { members = { { accountId, rank ('' : aucun), label } } }.
+-- Rangs des comptes de jeu reliés à un compte du panneau :
+-- { members = { { accountId, rank ('' : aucun), label, unlinked? (retrait d'une déliaison) } } }.
 -- Le panneau est la source : chaque rang est appliqué tel quel par le Registre, et inscrit à son journal s'il change.
 -- Défense en profondeur : un rang n'est donné qu'à un compte que le pont a lui-même vu relié en jeu (server/links.lua) ;
--- qui détiendrait la clé ne peut pas nommer Souverain un compte de son choix. Retirer un rang reste toujours permis.
+-- qui détiendrait la clé ne peut pas nommer Souverain un compte de son choix. Retirer un rang reste toujours permis ;
+-- une déliaison fait oublier le compte. Une seule échéance d'attente des liaisons en cours pour toute la requête.
 local SYNC_MAX = 100
 local rules, links = VavaBridge.rules, VavaBridge.links
 
@@ -116,13 +118,14 @@ define('POST', '/staff/sync', function(body)
     local members = type(body.members) == 'table' and body.members or {}
     if #members > SYNC_MAX then return failure('invalid_args') end
     local results = {}
+    local deadline = links.deadline()
     for i = 1, #members do
         local member = members[i]
         if type(member) ~= 'table' then
             results[i] = { ok = false, error = 'invalid_args' }
         else
             local accountId = tointeger(member.accountId)
-            local allowed, refusal = rules.canSync(member.rank, links.known(accountId))
+            local allowed, refusal = rules.canSync(member.rank, member.rank ~= '' and links.known(accountId, deadline))
             if not allowed then
                 VavaBridge.log.warn('rang refusé au compte n° %s : jamais relié en jeu par un code de la Chancellerie',
                     tostring(accountId))
@@ -130,6 +133,7 @@ define('POST', '/staff/sync', function(body)
             else
                 local called, ok, changed = call(ADMIN, 'webSyncStaff', member.accountId, member.rank, member.label)
                 if not called then return failure('admin_unavailable') end
+                if accountId and rules.forgetsLink(member.rank, member.unlinked) then links.forget(accountId) end
                 results[i] = { ok = ok == true, changed = ok and changed or nil, error = not ok and tostring(changed) or nil }
             end
         end

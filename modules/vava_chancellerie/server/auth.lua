@@ -6,7 +6,10 @@
            machine) ni par une convar (lisible par toute ressource) : le pont la demande dans la console du serveur, que
            la Chancellerie lit, et elle la lui donne par l'entrée de FXServer avec une commande que seule la console
            peut lancer ; la clé ne vit qu'en mémoire, la première reçue est gardée. Sans Chancellerie (aucune adresse
-           posée au lancement), le pont ne demande rien et reste fermé.
+           posée au lancement, ou une adresse hors de la machine), le pont ne demande rien et reste fermé ; l'adresse
+           est figée au setup. Limite : une ressource serveur hostile qui lance la commande avant la Chancellerie
+           garderait le pont ; la Chancellerie le voit (KEY_CONFLICT_LINE, ou pas d'évènement `ready` vérifié) et
+           alerte, mais rien ici ne protège d'une ressource serveur, qui a déjà tous les pouvoirs sur le serveur.
     Dépendances : config.lua, shared/rules.lua
 ]]
 
@@ -26,6 +29,8 @@ VavaBridge.auth = auth
 local key = nil
 ---@type function|nil  à appeler dès que la clé arrive (pont prêt : la Chancellerie est prévenue)
 local onKey = nil
+---@type string|nil  adresse de la Chancellerie, figée au setup
+local panelUrl = nil
 
 ---@return string
 function auth.token()
@@ -37,10 +42,29 @@ function auth.enabled()
     return key ~= nil
 end
 
+--- Lit l'adresse de la Chancellerie, une seule fois (au setup) : une ressource qui changerait la convar ensuite ne
+--- recevrait ni la clé ni les évènements. Seulement la machine elle-même (shared/rules.lua).
+---@return string|nil url
+---@return string|nil err  invalid_url : convar posée mais refusée
+function auth.capture()
+    local url = GetConvar(cfg.convars.url, '')
+    panelUrl = nil
+    if url == '' then return nil end
+    if not rules.validPanelUrl(url) then return nil, 'invalid_url' end
+    panelUrl = url
+    return url
+end
+
+--- Adresse de la Chancellerie figée au setup, ou nil.
+---@return string|nil
+function auth.panelUrl()
+    return panelUrl
+end
+
 --- Serveur lancé par la Chancellerie ? Elle pose son adresse sur la ligne de commande ; la clé arrive ensuite.
 ---@return boolean
 function auth.expected()
-    return GetConvar(cfg.convars.url, '') ~= ''
+    return panelUrl ~= nil
 end
 
 --- Adresse sans son port : « 127.0.0.1:51234 » → « 127.0.0.1 », « [::1]:51234 » → « ::1 ».
@@ -117,7 +141,8 @@ function auth.listen()
         if ok then
             VavaBridge.log.info('clé de la Chancellerie reçue : pont ouvert')
         elseif code == 'conflict' then
-            VavaBridge.log.warn('une autre clé du pont a été refusée : la première reçue est gardée')
+            -- ligne du protocole, lue par la Chancellerie : elle en fait une alerte (sa clé n'a pas été prise)
+            print(VavaBridge.KEY_CONFLICT_LINE)
         elseif code == 'invalid' or code == 'not_expected' then
             VavaBridge.log.warn('clé du pont refusée (%s)', code)
         end
@@ -140,7 +165,7 @@ function auth.await(callback)
             VavaBridge.log.warn('la Chancellerie n\'a pas donné la clé du pont : pont fermé (est-elle à jour ?)')
             return
         end
-        print(cfg.key.ask:format(VavaBridge.KEY_ASK))
+        print(VavaBridge.KEY_ASK_LINE)
         SetTimeout(cfg.key.askEveryMs, ask)
     end
     ask()

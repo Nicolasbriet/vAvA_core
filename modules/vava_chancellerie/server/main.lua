@@ -42,7 +42,12 @@ local function setup()
     if not declared then return false, 'commandes : ' .. tostring(declareErr) end
     local loaded, loadErr = VavaBridge.links.load()
     if not loaded then return false, 'comptes reliés : ' .. tostring(loadErr) end
-    -- la commande qui reçoit la clé existe avant que le pont ne la demande
+    -- adresse de la Chancellerie figée maintenant ; la commande qui reçoit la clé existe avant que le pont ne la demande
+    local _, urlErr = auth.capture()
+    if urlErr then
+        core.log.warn('adresse de la Chancellerie refusée (%s : http://127.0.0.1:<port> seulement) : pont fermé',
+            cfg.convars.url)
+    end
     auth.listen()
     http.start()
     for _, def in ipairs({

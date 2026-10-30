@@ -31,13 +31,13 @@ const API = (() => {
 
   /**
    * Ouvre le flux d'évènements ; `handlers` : { state, history, line, report, players, camera, metrics, backup, job,
-   * update, error }.
+   * update, linked, alert, error }.
    * Le navigateur se reconnecte seul après une coupure.
    */
   function connect(handlers) {
     disconnect();
     source = new EventSource('/api/events');
-    for (const name of ['state', 'history', 'line', 'report', 'players', 'camera', 'metrics', 'backup', 'job', 'update', 'linked']) {
+    for (const name of ['state', 'history', 'line', 'report', 'players', 'camera', 'metrics', 'backup', 'job', 'update', 'linked', 'alert']) {
       source.addEventListener(name, (event) => {
         let data;
         try {
