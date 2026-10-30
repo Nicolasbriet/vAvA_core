@@ -10,7 +10,7 @@
            seulement à un compte vu relié en jeu ; liste blanche Discord à la connexion des joueurs.
            Serveur seulement : le seul message aux joueurs est le résultat de leur liaison (affiché par vava_admin).
     Dépendances : vAvA_core ≥ 0.5.0, vava_admin ≥ 1.3.0 ; facultatives : vava_voice ≥ 1.1.0 (zones de voix),
-                  vava_cameras ≥ 1.0.0 (écran des joueurs), vava_time ≥ 1.0.0 (ciel et heure)
+                  vava_cameras ≥ 1.3.0 (écran des joueurs), vava_time ≥ 1.0.0 (ciel et heure)
 ]]
 
 fx_version 'cerulean'
@@ -20,7 +20,7 @@ use_experimental_fxv2_oal 'yes'
 
 name 'vava_chancellerie'
 description 'Pont de la Chancellerie (panneau web) vAvA'
-version '1.5.0'
+version '1.5.1'
 
 dependencies { 'vAvA_core', 'vava_admin' }
 

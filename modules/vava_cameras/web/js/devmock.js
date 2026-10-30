@@ -4,7 +4,8 @@
  * Rôle : jeu et serveur simulés quand la page est ouverte dans un navigateur (hors FiveM), pour travailler le rendu
  *        sans lancer le jeu. Chaque caméra demandée est une vraie connexion WebRTC locale, filmant une scène dessinée
  *        (le mur est éprouvé de bout en bout). Inactif en jeu. Paramètres d'URL : ?players=N (joueurs simulés,
- *        11 par défaut), &layout=1..4, &focus=<numéro>, &closed=1 (mur fermé).
+ *        11 par défaut), &layout=1..4, &focus=<numéro>, &closed=1 (mur fermé), &budget=<numéro> (vue en grand de
+ *        ce joueur refusée : déjà regardé en grand ailleurs).
  */
 
 const DevMock = (() => {
@@ -79,6 +80,8 @@ const DevMock = (() => {
       const player = players.find((p) => p.source === target);
       if (!player) return { ok: false, error: 'not_found' };
       if (!player.active) return { ok: false, error: 'not_playing' };
+      // &budget=<numéro> : ce joueur est déjà regardé en grand par un autre membre
+      if (quality === 'full' && Number(params.get('budget')) === target) return { ok: false, error: 'budget' };
       serial += 1;
       const session = serial.toString(16).padStart(24, '0');
       setTimeout(() => film(session, target), 80);

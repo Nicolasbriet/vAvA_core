@@ -31,7 +31,14 @@ describe('vava_cameras sessions', function()
         _G.TriggerClientEvent = function(name, target, payload)
             events[#events + 1] = { name = name, target = target, payload = payload }
         end
-        helper.loadAll({ 'modules/vava_cameras/shared/constants.lua', 'modules/vava_cameras/config.lua' })
+        -- offre relayée au membre en envoi latent (T-047)
+        _G.TriggerLatentClientEvent = function(name, target, bps, payload)
+            events[#events + 1] = { name = name, target = target, payload = payload, bps = bps }
+        end
+        helper.loadAll({
+            'modules/vava_cameras/shared/constants.lua', 'modules/vava_cameras/config.lua',
+            'modules/vava_cameras/shared/budget.lua',
+        })
         VavaCameras.players = { active = function(target) return active[target] == true end }
         VavaCameras.core = { hooks = { runAfter = function(_, payload) webEvents[#webEvents + 1] = payload end } }
         helper.load('modules/vava_cameras/server/sessions.lua')
@@ -39,7 +46,7 @@ describe('vava_cameras sessions', function()
     end)
 
     after_each(function()
-        _G.TriggerClientEvent, _G.VavaCameras = nil, nil
+        _G.TriggerClientEvent, _G.TriggerLatentClientEvent, _G.VavaCameras = nil, nil, nil
     end)
 
     describe('offre du joueur filmé', function()
@@ -54,6 +61,7 @@ describe('vava_cameras sessions', function()
             local offers = sent(VavaCameras.EVENTS.OFFER)
             assert.equal(1, #offers)
             assert.equal(1, offers[1].target)
+            assert.equal(VavaCameras.config.limits.offerBytesPerSecond, offers[1].bps)
         end)
 
         it('refuse l\'offre d\'un autre que le joueur filmé, sans consommer celle du vrai', function()
@@ -73,8 +81,10 @@ describe('vava_cameras sessions', function()
         end)
 
         it('compte les offres par caméra : une nouvelle caméra a droit à la sienne', function()
+            -- une vue en grand et une case : deux vues en grand d'un même joueur sont refusées (budget, T-047)
+            sessions.openWall(1)
             local _, first = sessions.start(GAME, 5, 'full')
-            local _, second = sessions.start(GAME, 5, 'full')
+            local _, second = sessions.start(GAME, 5, 'tile')
             assert.is_true(sessions.offer(5, first, 'a'))
             assert.is_true(sessions.offer(5, second, 'b'))
         end)
@@ -153,7 +163,7 @@ describe('vava_cameras sessions', function()
 end)
 
 describe('vava_chancellerie routes des caméras', function()
-    local routes, calls, now, rights, started, logRefused
+    local routes, calls, now, rights, started, logRefused, checkRefusal
 
     local ALICE = { label = 'alice', rank = 'gardien' }
     local BRUNO = { label = 'bruno', rank = 'gardien' }
@@ -172,7 +182,7 @@ describe('vava_chancellerie routes des caméras', function()
 
     before_each(function()
         helper.reset()
-        calls, now, rights, started, logRefused = {}, 1000, { alice = true, bruno = true }, true, false
+        calls, now, rights, started, logRefused, checkRefusal = {}, 1000, { alice = true, bruno = true }, true, false, nil
         _G.GetGameTimer = function() return now end
         helper.loadAll({ 'modules/vava_chancellerie/shared/constants.lua', 'modules/vava_chancellerie/config.lua' })
         VavaBridge.call = function(resource, fn, ...)
@@ -184,6 +194,7 @@ describe('vava_chancellerie routes des caméras', function()
                 return true, true, { session = 'abc', label = 'B', iceServers = {} }
             end
             if fn == 'webLog' and logRefused then return true, false, 'invalid_args' end
+            if fn == 'webCheck' and checkRefusal then return true, false, checkRefusal end
             return true, true
         end
         helper.load('modules/vava_chancellerie/server/routes.lua')
@@ -257,7 +268,26 @@ describe('vava_chancellerie routes des caméras', function()
     it('laisse la vue en grand au Registre (demande watchScreen, déjà au journal)', function()
         assert.is_true(post('/camera/start', { actor = ALICE, target = 7, quality = 'full' }).ok)
         assert.equal(0, #logs())
-        assert.equal('webRequest', calls[1].fn)
+        local order = {}
+        for _, c in ipairs(calls) do order[#order + 1] = c.fn end
+        -- droit lu, caméra jugée accordable (T-047), puis demande au Registre, qui l'inscrit, et ouverture
+        assert.same({ 'webCan', 'webCheck', 'webRequest', 'webStart' }, order)
+    end)
+
+    it('ne fait rien inscrire pour une vue en grand refusée faute de débit (retentée toutes les 10 s)', function()
+        checkRefusal = 'budget'
+        for _ = 1, 3 do
+            assert.equal('budget', post('/camera/start', { actor = ALICE, target = 7, quality = 'full' }).error)
+        end
+        for _, c in ipairs(calls) do
+            assert.is_true(c.fn == 'webCan' or c.fn == 'webCheck', c.fn)
+        end
+    end)
+
+    it('ne dit rien de la caméra à un compte sans le droit', function()
+        rights.alice, checkRefusal = false, 'budget'
+        assert.equal('forbidden', post('/camera/start', { actor = ALICE, target = 7, quality = 'full' }).error)
+        for _, c in ipairs(calls) do assert.equal('webCan', c.fn) end
     end)
 
     it('garde le libellé du journal dans les bornes du Registre', function()

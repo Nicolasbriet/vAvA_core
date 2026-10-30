@@ -191,7 +191,13 @@ define('POST', '/camera/start', function(body)
     local target, quality = tointeger(body.target), body.quality
     if not target or not QUALITIES[quality] then return failure('invalid_args') end
     if quality == 'full' then
-        -- vue en grand : droit, joueur en jeu et journal par le Registre
+        -- vue en grand : droit (sans rien dire de plus à qui ne l'a pas), puis caméra accordable — une vue refusée
+        -- (budget du joueur filmé, retentée par la Chancellerie toutes les 10 s) ne laisse pas de ligne au journal —,
+        -- enfin droit, joueur en jeu et journal par le Registre
+        if not can(body.actor, CAMERAS_CFG.permission) then return failure('forbidden') end
+        local checked, admitted, code = call(CAMERAS, 'webCheck', target, quality)
+        if not checked then return failure('cameras_unavailable') end
+        if not admitted then return failure(code) end
         local called, ok, result = call(ADMIN, 'webRequest', body.actor, CAMERAS_CFG.fullRequest, { target })
         if not called then return failure('admin_unavailable') end
         if not ok then return failure(result) end

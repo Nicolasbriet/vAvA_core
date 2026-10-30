@@ -5,8 +5,9 @@
  *        interfaces : ni Windows, ni Discord, ni les pages du jeu) est reliée à une texture WebGL par la séquence
  *        propre à FiveM (celle de screenshot-basic) et dessinée dans un canevas hors de l'écran. Une seule capture,
  *        partagée par tous ceux qui regardent : chacun a sa connexion WebRTC, avec sa qualité (réduite pour une case
- *        de mur, pleine pour une vue en grand). L'offre part une fois les candidats réseau réunis (une seule
- *        négociation). Personne ne regarde : plus rien ne tourne, ni dessin ni capture.
+ *        de mur, pleine pour une vue en grand) et sa part du débit montant, donnée par le serveur et revue par lui à
+ *        chaque arrivée ou départ. L'offre part une fois les candidats réseau réunis (une seule négociation).
+ *        Personne ne regarde : plus rien ne tourne, ni dessin ni capture.
  */
 
 const Capture = (() => {
@@ -127,14 +128,36 @@ const Capture = (() => {
     if (tell) Bridge.post('capture:failed', { session: id, reason });
   }
 
-  /** Qualité du spectateur : taille réduite, cadence et débit bornés (la caméra ne prend pas la connexion du joueur). */
-  async function limit(sender, quality) {
-    const parameters = sender.getParameters();
+  /**
+   * Qualité du spectateur : taille réduite, cadence et débit bornés. Le débit est la part que le serveur lui donne
+   * dans le budget montant du joueur (revue à chaque arrivée ou départ d'un spectateur) : la caméra ne prend pas la
+   * connexion du joueur. Appliqué par `setParameters`, sans renégociation (une seule offre par caméra).
+   */
+  async function limit(session) {
+    const parameters = session.sender.getParameters();
     const base = (parameters.encodings && parameters.encodings[0]) || {};
     parameters.encodings = [{
-      ...base, scaleResolutionDownBy: quality.scale, maxFramerate: quality.fps, maxBitrate: quality.bitrateKbps * 1000,
+      ...base, scaleResolutionDownBy: session.quality.scale, maxFramerate: session.quality.fps, maxBitrate: session.kbps * 1000,
     }];
-    await sender.setParameters(parameters).catch(() => {});
+    await session.sender.setParameters(parameters).catch(() => {});
+  }
+
+  /** Applique la part actuelle, l'une après l'autre (deux `setParameters` mêlés seraient refusés). */
+  function apply(session) {
+    if (!session.ready) return session.chain;
+    session.chain = session.chain.then(() => limit(session)).catch(() => {});
+    return session.chain;
+  }
+
+  /** Parts revues par le serveur : seules changent celles des caméras de ce joueur qui sont encore ouvertes. */
+  function rates({ rates: list }) {
+    if (!Array.isArray(list)) return;
+    for (const { session: id, kbps } of list) {
+      const session = sessions.get(id);
+      if (!session || !Number.isInteger(kbps) || kbps < 1) continue;
+      session.kbps = kbps;
+      apply(session);
+    }
   }
 
   async function start({ session: id, iceServers, capture, quality }) {
@@ -146,15 +169,18 @@ const Capture = (() => {
     try {
       ensureStream(capture);
       const peer = new RTCPeerConnection({ iceServers: (iceServers || []).map((url) => ({ urls: url })) });
-      sessions.set(id, { peer });
-      const sender = peer.addTrack(track, stream);
+      // ready : description locale posée, le débit peut s'appliquer (une part arrivée avant attend ce moment)
+      const session = { peer, sender: null, quality, kbps: quality.bitrateKbps, ready: false, chain: Promise.resolve() };
+      sessions.set(id, session);
+      session.sender = peer.addTrack(track, stream);
       peer.addEventListener('connectionstatechange', () => {
         if (peer.connectionState === 'failed') end(id, 'connection_failed', true);
         else if (peer.connectionState === 'closed') end(id, 'closed', true);
       });
       const offer = await peer.createOffer();
       await peer.setLocalDescription(offer);
-      await limit(sender, quality);
+      session.ready = true;
+      await apply(session);
       await gathered(peer);
       if (!sessions.has(id)) return;
       Bridge.post('capture:offer', { session: id, sdp: peer.localDescription.sdp });
@@ -174,7 +200,7 @@ const Capture = (() => {
     }
   }
 
-  Bridge.on('capture:', { start, answer, stop: ({ session: id }) => end(id, 'closed', false) });
+  Bridge.on('capture:', { start, answer, rates, stop: ({ session: id }) => end(id, 'closed', false) });
 
   return { count: () => sessions.size };
 })();

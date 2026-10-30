@@ -28,10 +28,11 @@ Ordre de démarrage : après `vava_admin` et `vava_voice`, avant `vava_magic` et
 | --- | --- | --- |
 | Droit de regarder | `watch` : tout le Conseil, sur tout le monde, membres de tout rang compris | `permission` |
 | Capture (une par joueur filmé, partagée) | 960 × 540, 20 images/s | `capture` |
-| Case d'un mur | 480 × 270, 10 images/s, 250 kb/s | `qualities.tile` |
-| Vue en grand | 960 × 540, 20 images/s, 1,2 Mb/s | `qualities.full` |
+| Case d'un mur | 480 × 270, 10 images/s ; 250 kbit/s au plus, 120 au moins | `qualities.tile` |
+| Vue en grand | 960 × 540, 20 images/s ; 1 200 kbit/s au plus, 600 au moins | `qualities.full` |
+| Débit montant d'un joueur filmé (1.3.0) | 1 500 kbit/s pour tous ses spectateurs ensemble (jeu et web) ; une seule vue en grand à la fois ; au-delà, refus `budget` (voir « Débit montant du joueur filmé ») | `budget` |
 | Adresse STUN | `stun:stun.l.google.com:19302` | `iceServers` |
-| Limites | 6 spectateurs par joueur filmé, 96 caméras en tout, 2 h au plus ; sans réponse du spectateur en 30 s, la caméra s'éteint ; négociation de 20 000 octets au plus | `limits` |
+| Limites | 6 spectateurs par joueur filmé, 96 caméras en tout, 2 h au plus ; sans réponse du spectateur en 30 s, la caméra s'éteint ; négociation de 20 000 octets au plus ; offre relayée au membre en jeu en envoi latent, à 32 000 octets par seconde (1.3.0) | `limits` |
 | Mur | `/cameras` ; grilles 1 × 1 à 4 × 4 (3 × 3 par défaut) ; joueurs relus toutes les 5 s ; cases ouvertes à 150 ms d'écart (réellement depuis 1.2.0 : avant, toutes partaient d'un coup) ; mur valable 2 h, puis à rouvrir | `wall` |
 | Débits | capture du joueur filmé 8 puis 2/s ; ouverture du mur 4 puis 1 toutes les 2 s ; caméras demandées 40 puis 8/s ; réponses et fermetures 40 puis 8/s ; liste des joueurs 4 puis 1/s | `rateLimits` |
 | Pont du web | seule ressource admise à ouvrir une caméra en son nom : `vava_chancellerie` | `web.bridge` |
@@ -47,7 +48,9 @@ Registre du Conseil (`F10`) → Outils → « Mur des caméras », ou `/cameras`
   limite de messages du core). Liste des joueurs relue toutes les 5 s, mur ouvert seulement ; caméra perdue retentée
   après 10 s.
 - Un clic ouvre un écran en grand : flèches pour le joueur précédent ou suivant, `Échap` pour revenir au mur, puis pour
-  le fermer. En grand, seule la vue en grand garde sa caméra.
+  le fermer. En grand, seule la vue en grand garde sa caméra. Un joueur déjà regardé en grand par un autre membre (en
+  jeu ou depuis la Chancellerie) affiche « Débit du joueur déjà pris, nouvel essai bientôt » : la vue est retentée
+  (10 à 15 s après, au rythme de la relecture des joueurs) et s'ouvre une fois que l'autre membre a quitté la sienne.
 - Fermer le mur, revenir à la sélection ou partir éteint toutes ses caméras ; la ressource arrêtée mur ouvert rend le
   clavier et la souris au jeu.
 
@@ -59,8 +62,47 @@ joueur) ouvre la vue en grand : voir `docs/chancellerie.md`.
 - L'image va **directement** du jeu du joueur filmé au spectateur (jeu d'un membre ou navigateur) ; le serveur ne relaie
   que la négociation : une offre et une réponse de quelques Ko par caméra, au seul joueur concerné.
 - Une seule capture par joueur filmé, partagée par tous ceux qui le regardent ; chacun a sa connexion et sa qualité. La
-  connexion montante du joueur filmé porte le débit de chaque spectateur ; WebRTC le baisse de lui-même si elle sature.
+  connexion montante du joueur filmé porte le débit de chaque spectateur, borné ensemble par le budget (voir plus bas) ;
+  WebRTC le baisse encore de lui-même si elle sature.
+- L'offre (jusqu'à 20 000 octets) part au membre en jeu en envoi latent, à 32 000 octets par seconde : un mur 4 × 4 en
+  reçoit seize sans occuper la voie fiable de son jeu. La réponse du membre (quelques Ko) reste un envoi simple.
 - Personne ne regarde : ni dessin ni capture chez le joueur.
+
+## Débit montant du joueur filmé
+
+Avant 1.3.0, chaque spectateur avait son propre débit : 6 spectateurs en vue en grand prenaient jusqu'à 7,2 Mbit/s sur
+la connexion montante d'un joueur qui n'a rien demandé, celle qui porte aussi son jeu et sa voix. Désormais :
+
+- **Budget** : 1 500 kbit/s pour tous ses spectateurs ensemble (`budget.uplinkKbps`), en jeu comme depuis la
+  Chancellerie. C'est le débit visé par les encodeurs : sur le fil, compter environ 1,6 Mbit/s (en-têtes RTP, SRTP,
+  UDP et IP : 6 à 10 %, retransmissions, images clés, sondes de débit au démarrage). Régler `uplinkKbps` à 1 400 tient
+  1,5 Mbit/s sur le fil.
+- **Admission** (serveur, `server/sessions.lua`, après la limite de 6 spectateurs) : une seule vue en grand à la fois
+  (`budget.perQuality.full`), et la somme des planchers (`minKbps`) de tous les spectateurs sous le budget. Sinon :
+  refus `budget`, sans rien demander au joueur filmé. Avec les valeurs par défaut, seule la seconde vue en grand est
+  refusée (6 spectateurs dont une vue en grand : 1 200 kbit/s de planchers). Le mur ne met pas ce refus parmi les fins
+  définitives : la caméra est retentée comme une caméra perdue, le débit se libérant quand un spectateur s'en va.
+  Une case refusée faute de mur ouvert (`wall_closed`) l'est avant toute limite et ne compte dans aucun budget.
+- **Répartition** (règle pure, `shared/budget.lua`) : chacun reçoit son plancher ; le reste va d'abord à la vue en grand
+  jusqu'à son plafond, puis aux cases, à parts égales jusqu'au leur. Deux spectateurs de même qualité ont toujours le
+  même débit.
+- **Application** : la part d'une caméra nouvelle part avec l'ordre de capture ; les parts des autres caméras qui
+  changent (arrivée ou départ d'un spectateur) partent au seul joueur filmé (`vava_cameras:rates`), avant l'ordre de
+  la caméra nouvelle quand elles baissent. Sa page les applique à chaque encodeur par `setParameters`, sans nouvelle
+  offre (une seule offre par caméra).
+
+| Spectateurs du joueur filmé | Vue en grand | Chaque case | Total |
+| --- | --- | --- | --- |
+| 1 vue en grand | 1 200 | — | 1 200 |
+| 1 à 6 cases | — | 250 | 250 à 1 500 |
+| 1 vue en grand + 1 case | 1 200 | 250 | 1 450 |
+| 1 vue en grand + 2 cases | 1 200 | 150 | 1 500 |
+| 1 vue en grand + 3 cases | 1 140 | 120 | 1 500 |
+| 1 vue en grand + 4 cases | 1 020 | 120 | 1 500 |
+| 1 vue en grand + 5 cases | 900 | 120 | 1 500 |
+
+(kbit/s visés par les encodeurs, sans les en-têtes ni les retransmissions ; `tests/spec/cameras_budget_spec.lua`
+vérifie ce tableau.)
 
 ## Sécurité
 
@@ -86,8 +128,8 @@ joueur) ouvre la vue en grand : voir `docs/chancellerie.md`.
 
 ## Pour les autres modules
 
-Exports serveur `count()` (caméras ouvertes) et, réservés au pont de la Chancellerie, `webPlayers`, `webStart`,
-`webAnswer`, `webStop` ; hook `vava_cameras:web` (offre et fin des caméras regardées depuis le web). Détail :
+Exports serveur `count()` (caméras ouvertes) et, réservés au pont de la Chancellerie, `webPlayers`, `webCheck`
+(caméra accordable, sans rien ouvrir : 1.3.0), `webStart`, `webAnswer`, `webStop` ; hook `vava_cameras:web` (offre et fin des caméras regardées depuis le web). Détail :
 `docs/api.md`, section `vava_cameras`.
 
 ## Arborescence
@@ -95,14 +137,15 @@ Exports serveur `count()` (caméras ouvertes) et, réservés au pont de la Chanc
 ```
 vava_cameras/
 ├── fxmanifest.lua · config.lua
-├── shared/   constants.lua (protocole)
+├── shared/   constants.lua (protocole) · budget.lua (débit montant, chargé par le serveur seul)
 ├── server/   core · links (Conseil) · players (joueurs regardables) · sessions (caméras) · api · commands · main
 ├── client/   core · nui · capture (joueur filmé) · wall (mur du membre) · main
 └── web/      index.html · css/wall.css · js/ (strings, bridge, capture, viewer, wall, devmock)
 ```
 
-Pour travailler le rendu du mur sans le jeu : `web/index.html?players=11&layout=3` (ou `&focus=<numéro>`) dans un
-navigateur ; chaque case est une vraie connexion WebRTC locale filmant une scène dessinée.
+Pour travailler le rendu du mur sans le jeu : `web/index.html?players=11&layout=3` (ou `&focus=<numéro>`, et
+`&budget=<numéro>` pour voir la vue en grand de ce joueur refusée) dans un navigateur ; chaque case est une vraie
+connexion WebRTC locale filmant une scène dessinée.
 
 ## À vérifier en jeu
 
@@ -119,3 +162,6 @@ Il n'y a pas encore de procédure propre aux caméras : les tests du Registre le
 5. Depuis la Chancellerie : page Caméras, puis « Regarder l'écran » sur la fiche de B.
 6. Resmon de B pendant qu'on le regarde (capture active), puis au repos une fois le mur fermé.
 7. Offre unique et case sans mur (1.2.0) : `docs/tests/registre.md`, § 10, tests 9 à 12.
+8. Débit montant du joueur filmé (1.3.0) : `docs/tests/registre.md`, § 10, tests 15 à 20 (images par seconde et ping
+   du joueur filmé par 1, 3 et 6 membres, netteté de la vue en grand avec 5 cases, vue en grand unique, refus `budget`
+   depuis la Chancellerie, taille réelle d'une offre).
