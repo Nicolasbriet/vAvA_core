@@ -1,22 +1,23 @@
 --[[
     vava_gathering/client/props.lua
-    Rôle : les nœuds de récolte dans le monde, vus du joueur : état des zones et des nœuds lu dans les state bags
-           globaux (bande de vitalité, cicatrice, charges), props LOCAUX (jamais réseau) créés pour les nœuds à portée
-           et remplacés par leur modèle « épuisé » quand la zone l'est, nœud le plus proche à distance d'interaction.
-           Une seule boucle lente, active seulement quand un personnage est en jeu : elle mesure d'abord les zones
-           (centre et étendue de leurs nœuds), ne parcourt que les nœuds d'une zone à portée, passe toutes les
-           streaming.pollMs près d'une zone et toutes les streaming.idlePollMs loin de toutes ; elle s'arrête d'elle-même
-           à la sélection et au déchargement, et retire alors tous les props.
-    Dépendances : shared/constants.lua, config.lua, shared/geometry.lua, shared/proximity.lua, client/core.lua
+    Rôle : les nœuds de récolte dans le monde, vus du joueur : état des zones et des nœuds (bande de vitalité,
+           cicatrice, charges) reçu des seules zones proches, par les abonnements de zone du core (core.zones.watch,
+           1.6.0) ; props LOCAUX (jamais réseau) créés pour les nœuds à portée et remplacés par leur modèle « épuisé »
+           quand la zone l'est, nœud le plus proche à distance d'interaction.
+           Une seule boucle lente, active seulement quand un personnage est en jeu : elle ne mesure que les zones
+           suivies (centre et étendue de leurs nœuds), ne parcourt que les nœuds d'une zone à portée, passe toutes les
+           streaming.pollMs près d'une zone et toutes les streaming.idlePollMs loin de toutes ; une zone reçue, changée
+           ou quittée fait aussitôt un passage (props et invite à jour sans attendre) ; elle s'arrête d'elle-même à la
+           sélection et au déchargement, et retire alors tous les props.
+    Dépendances : shared/constants.lua, config.lua, shared/geometry.lua, shared/proximity.lua, shared/zonestate.lua,
+                  client/core.lua (core.zones, vAvA_core 0.11.0)
 ]]
 
-local type, pairs, ipairs, huge, max = type, pairs, ipairs, math.huge, math.max
-local sub = string.sub
+local type, pairs, ipairs, huge, max, tostring = type, pairs, ipairs, math.huge, math.max, tostring
 local CreateThread, Wait, GetGameTimer, AddEventHandler = CreateThread, Wait, GetGameTimer, AddEventHandler
 local PlayerPedId, GetEntityCoords, DoesEntityExist, DeleteObject = PlayerPedId, GetEntityCoords, DoesEntityExist, DeleteObject
 local RequestModel, HasModelLoaded, IsModelValid, SetModelAsNoLongerNeeded, GetHashKey = RequestModel, HasModelLoaded, IsModelValid, SetModelAsNoLongerNeeded, GetHashKey
 local CreateObjectNoOffset, SetEntityHeading, FreezeEntityPosition, PlaceObjectOnGroundProperly = CreateObjectNoOffset, SetEntityHeading, FreezeEntityPosition, PlaceObjectOnGroundProperly
-local AddStateBagChangeHandler = AddStateBagChangeHandler
 
 local core = VavaGathering.core
 if not core then return end
@@ -25,7 +26,7 @@ local cfg = VavaGathering.config
 local streaming = cfg.streaming
 local geometry = VavaGathering.geometry
 local proximity = VavaGathering.proximity
-local STATE_ZONE, STATE_NODE = VavaGathering.STATE_ZONE, VavaGathering.STATE_NODE
+local zonestate = VavaGathering.zonestate
 local BANDS = VavaGathering.BANDS
 local RESOURCE = VavaGathering.resource
 local LOAD_POLL_MS = 50
@@ -44,8 +45,9 @@ for _, group in ipairs(groups) do group.active = true end
 -- un nœud est mesuré si sa zone peut en avoir un à portée des props ou de l'invite
 local REACH = max(streaming.radius, cfg.interact.distance)
 
--- état connu du serveur : zone → { band, scarred, vitality } ; nœud → charges
-local zoneStates, nodeCharges = {}, {}
+-- zones suivies, reçues du serveur : id de zone → { zone = { band, scarred } | nil, charges = { [nœud] = charges } }
+---@type table<string, vAvA.GatheringZoneRecord>
+local followed = {}
 -- props affichés : id de nœud → { entity, model, loading }
 local shown = {}
 local running, playing = false, false
@@ -53,7 +55,7 @@ local nearestId, nearestDistance = nil, nil
 ---@type fun(nodeId: string|nil)|nil
 local onNearest = nil
 
-local DEFAULT_ZONE = { band = BANDS.NORMAL, scarred = false, vitality = 100 }
+local DEFAULT_ZONE = { band = BANDS.NORMAL, scarred = false }
 
 ---@param id string
 ---@return table|nil
@@ -73,11 +75,12 @@ function props.resource(node)
     return cfg.resources[node.resource]
 end
 
---- État d'une zone (normal tant que le serveur n'a rien publié).
+--- État d'une zone (pleine, sans cicatrice, tant que le serveur ne l'a pas envoyée).
 ---@param zoneId string
----@return { band: string, scarred: boolean, vitality: integer }
+---@return { band: string, scarred: boolean }
 function props.zoneState(zoneId)
-    return zoneStates[zoneId] or DEFAULT_ZONE
+    local record = followed[zoneId]
+    return record and record.zone or DEFAULT_ZONE
 end
 
 ---@param zoneId string
@@ -87,11 +90,12 @@ function props.isDepleted(zoneId)
     return state.band == BANDS.DEPLETED or state.scarred == true
 end
 
---- Charges d'un nœud (celles de la config tant que le serveur n'a rien publié).
+--- Charges d'un nœud (celles de la config tant que le serveur ne les a pas envoyées).
 ---@param node table
 ---@return integer
 function props.charges(node)
-    local charges = nodeCharges[node.id]
+    local record = followed[node.zone]
+    local charges = record and record.charges[node.id]
     if type(charges) == 'number' then return charges end
     return node.charges
 end
@@ -162,16 +166,25 @@ local function reconcile(node, distance)
     spawn(node, model)
 end
 
---- Boucle lente justifiée, seulement quand un personnage est en jeu : une distance par zone, puis une par nœud des
---- seules zones à portée ; une zone qui sort de portée retire ses props une fois. Intervalle : streaming.pollMs près
---- d'une zone, streaming.idlePollMs quand aucun nœud ne peut être à moins de radius + idleMargin.
-local function loop()
-    while playing do
-        local coords = GetEntityCoords(PlayerPedId())
-        local px, py, pz = coords.x, coords.y, coords.z
-        local bestId, bestDistance = nil, cfg.interact.distance
-        local closest = huge
-        for _, group in ipairs(groups) do
+--- Retire une fois les props d'un groupe sorti de portée (ou dont la zone n'est plus suivie).
+---@param group table
+local function deactivate(group)
+    group.active = false
+    for _, node in ipairs(group.targets) do remove(node.id) end
+end
+
+--- Un passage : une distance par zone suivie, puis une par nœud des seules zones à portée ; une zone qui sort de
+--- portée ou n'est plus suivie retire ses props une fois. Ne cède jamais la main. Rend l'intervalle du prochain
+--- passage : streaming.pollMs près d'une zone, streaming.idlePollMs quand aucun nœud ne peut être à moins de radius +
+--- idleMargin (aucune zone suivie : idlePollMs, et la prochaine zone reçue fait aussitôt un passage).
+---@return integer
+local function step()
+    local coords = GetEntityCoords(PlayerPedId())
+    local px, py, pz = coords.x, coords.y, coords.z
+    local bestId, bestDistance = nil, cfg.interact.distance
+    local closest = huge
+    for _, group in ipairs(groups) do
+        if followed[group.key] then
             local reachable, gap = proximity.reachable(group, px, py, pz, REACH)
             if gap < closest then closest = gap end
             if reachable then
@@ -182,13 +195,21 @@ local function loop()
                     if distance <= bestDistance then bestId, bestDistance = node.id, distance end
                 end
             elseif group.active then
-                group.active = false
-                for _, node in ipairs(group.targets) do remove(node.id) end
+                deactivate(group)
             end
+        elseif group.active then
+            deactivate(group)
         end
-        nearestId, nearestDistance = bestId, bestDistance
-        if onNearest then onNearest(bestId) end
-        Wait(proximity.interval(closest, streaming.radius, streaming.idleMargin, streaming.pollMs, streaming.idlePollMs))
+    end
+    nearestId, nearestDistance = bestId, bestDistance
+    if onNearest then onNearest(bestId) end
+    return proximity.interval(closest, streaming.radius, streaming.idleMargin, streaming.pollMs, streaming.idlePollMs)
+end
+
+--- Boucle lente justifiée, seulement quand un personnage est en jeu (voir step).
+local function loop()
+    while playing do
+        Wait(step())
     end
     for id in pairs(shown) do remove(id) end
     nearestId, nearestDistance = nil, nil
@@ -219,29 +240,37 @@ function props.onNearest(fn)
     onNearest = fn
 end
 
----@param key string
----@param value any
-local function applyState(key, value)
-    if sub(key, 1, #STATE_ZONE) == STATE_ZONE then
-        local zoneId = sub(key, #STATE_ZONE + 1)
-        if type(value) == 'table' then
-            zoneStates[zoneId] = { band = value.band or BANDS.NORMAL, scarred = value.scarred == true, vitality = value.vitality or 100 }
-        else
-            zoneStates[zoneId] = nil
-        end
-    elseif sub(key, 1, #STATE_NODE) == STATE_NODE then
-        local nodeId = sub(key, #STATE_NODE + 1)
-        nodeCharges[nodeId] = type(value) == 'number' and value or nil
+--- Zones de récolte proches, envoyées par le core aux seuls joueurs à portée (nom local = id de la zone ; état
+--- `zone` → { band, scarred }, `n:<nœud>` → charges) : entrée (état entier, ou de nouveau entier après un trou),
+--- changement (clés changées, clés retirées), sortie (valeurs par défaut). Le monde suit aussitôt.
+---@param kind string  'enter' | 'change' | 'leave'
+---@param id any
+---@param data any   état (enter) ou clés changées (change)
+---@param removed any clés retirées (change)
+local function onZone(kind, id, data, removed)
+    if type(id) ~= 'string' then return end
+    if kind == 'enter' then
+        followed[id] = zonestate.decode(data)
+    elseif kind == 'change' then
+        local record = followed[id]
+        if not record then return end
+        zonestate.patch(record, data, removed)
+    elseif kind == 'leave' then
+        followed[id] = nil
+    else
+        return
     end
+    if playing then step() end
 end
 
---- Suit les state bags globaux et reprend l'état déjà publié. Appelé par client/main.lua.
+--- Suit les zones de récolte proches (abonnements de zone du core) et la vie du personnage. Appelé par client/main.lua.
 function props.start()
-    AddStateBagChangeHandler(nil, 'global', function(_, key, value)
-        if type(key) == 'string' then applyState(key, value) end
-    end)
-    for _, zone in ipairs(cfg.zones) do applyState(STATE_ZONE .. zone.id, GlobalState[STATE_ZONE .. zone.id]) end
-    for _, node in ipairs(cfg.nodes) do applyState(STATE_NODE .. node.id, GlobalState[STATE_NODE .. node.id]) end
+    if core.zones then
+        local watched, watchErr = core.zones.watch(onZone)
+        if not watched then core.log.error('zones de récolte non suivies : %s', tostring(watchErr)) end
+    else
+        core.log.error('zones de récolte indisponibles : vAvA_core 0.11.0 au moins est requis')
+    end
 
     core.hooks.after('core:character:spawning', function() props.setPlaying(true) end)
     core.hooks.after('core:character:selection', function() props.setPlaying(false) end)

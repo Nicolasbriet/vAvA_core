@@ -3,7 +3,7 @@
     Rôle : SEUL point de contact, côté serveur, entre la récolte et le core / les autres modules : personnage et compte,
            position lue côté serveur, santé (à terre), inventaire (objet en main, place, ajout, usure par métadonnées,
            déclaration des objets), compétences (XP, niveau), droits et journal du Conseil, notifications, chat, saison
-           du royaume (vava_time, facultatif), base de données.
+           du royaume (vava_time, facultatif), zones du core (abonnements de zone, 1.6.0), base de données.
            Chaque appel à une autre ressource est isolé : un module absent ou en erreur ne retire que la fonction
            concernée.
     Dépendances : shared/constants.lua, config.lua, server/core.lua
@@ -270,6 +270,33 @@ function Bridge.SeasonFactor(kind, skill)
     local bySeason = byKind and byKind[season]
     return VavaGathering.season.factor(bySeason and bySeason[skill])
 end
+
+-- Zones du core (abonnements de zone, vAvA_core ≥ 0.11.0) ------------------------------------------------------------
+
+--- Fonction de `core.zones`, isolée : rend ses valeurs, ou `false, code` si elle manque ou lève une erreur.
+---@param fn string
+---@return boolean|nil ok
+---@return any code
+local function zoneCall(fn, ...)
+    local zones = core.zones
+    local target = type(zones) == 'table' and zones[fn] or nil
+    if not target then return false, 'unsupported' end
+    local results = pack(pcall(target, ...))
+    if not results[1] then
+        VavaGathering.log.warn('core.zones.%s en erreur : %s', fn, tostring(results[2]))
+        return false, 'error'
+    end
+    return unpack(results, 2, results.n)
+end
+
+--- Déclare une zone du module : `true, numéro` ou `false, code`.
+function Bridge.ZoneDefine(id, area, state) return zoneCall('define', id, area, state) end
+--- Déplace une zone (lieu, rayon, marge) : `true` ou `false, code`.
+function Bridge.ZoneMove(id, area) return zoneCall('move', id, area) end
+--- Change des clés de l'état d'une zone (envoyées aux seuls abonnés, regroupées par tour) : `true` ou `false, code`.
+function Bridge.ZoneSet(id, changes) return zoneCall('set', id, changes) end
+--- Remplace tout l'état d'une zone : `true` ou `false, code`.
+function Bridge.ZoneReplace(id, state) return zoneCall('replace', id, state) end
 
 -- Base de données -------------------------------------------------------------------------------------------------
 

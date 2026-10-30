@@ -3,20 +3,21 @@
     Rôle : charges des nœuds, tenues par le serveur : recalculées à la demande depuis `updatedAt` (une charge rendue
            toutes les `regenMs`, plus ou moins vite selon la saison de vava_time, le reste du délai conservé et recalé
            quand la saison change), prises par
-           une récolte avant toute attente et rendues si elle n'aboutit pas, publiées aux clients par un state bag
-           global (entier), écrit au seul changement.
+           une récolte avant toute attente et rendues si elle n'aboutit pas, publiées aux seuls joueurs qui suivent la
+           zone du nœud (clé `n:<nœud>` de la zone du core, server/share.lua), au seul changement.
            Écriture groupée sans perte : un changement pendant l'écriture reste à écrire.
-    Dépendances : shared/constants.lua, config.lua, server/core.lua, bridge/server.lua, server/catalog.lua
+    Dépendances : shared/constants.lua, config.lua, shared/zonestate.lua, server/core.lua, bridge/server.lua,
+                  server/catalog.lua, server/share.lua
 ]]
 
 local pairs, ipairs = pairs, ipairs
 local min, max, floor = math.min, math.max, math.floor
 local time = os.time
-local GlobalState = GlobalState
 
 local bridge = VavaGathering.bridge
 local catalog = VavaGathering.catalog
-local STATE_NODE = VavaGathering.STATE_NODE
+local share = VavaGathering.share
+local nodeKey = VavaGathering.zonestate.nodeKey
 
 local SELECT_SQL = 'SELECT `node`, `charges`, `updated_at` FROM `vava_gathering_nodes`'
 local UPSERT_SQL = 'INSERT INTO `vava_gathering_nodes` (`node`, `zone`, `charges`, `updated_at`) VALUES (?, ?, ?, ?) '
@@ -99,12 +100,21 @@ function nodes.refresh(def, state, now)
     state.updatedAt = state.charges >= def.charges and now or (state.updatedAt + floor(gained * period / factor))
 end
 
+--- Publie les charges aux joueurs qui suivent la zone du nœud, si elles ont changé.
 ---@param def vAvA.NodeDefinition
 ---@param state vAvA.NodeState
 function nodes.publish(def, state)
     if state.published == state.charges then return end
     state.published = state.charges
-    GlobalState[STATE_NODE .. def.id] = state.charges
+    share.set(def.zone.id, nodeKey(def.id), state.charges)
+end
+
+--- Dernières charges publiées d'un nœud, pour déclarer sa zone entière au core.
+---@param id string
+---@return integer|nil
+function nodes.published(id)
+    local state = states[id]
+    return state and state.published or nil
 end
 
 --- Charges disponibles (état relu).

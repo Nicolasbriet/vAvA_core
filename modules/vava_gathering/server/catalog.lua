@@ -15,6 +15,7 @@ local bridge = VavaGathering.bridge
 local cfg = VavaGathering.config
 local REGISTRY = VavaGathering.REGISTRY_TOOLS
 local ID_PATTERN = VavaGathering.ID_PATTERN
+local MAX_ZONE_ID, MAX_NODE_ID = VavaGathering.MAX_ZONE_ID, VavaGathering.MAX_NODE_ID
 
 local TOOL_SCHEMA = {
     type = 'table',
@@ -112,7 +113,9 @@ local function index()
         }
     end
     for i, zone in ipairs(cfg.zones) do
-        if type(zone.id) ~= 'string' or not zone.id:find(ID_PATTERN) then return false, format('zone #%d : identifiant invalide', i) end
+        if type(zone.id) ~= 'string' or not zone.id:find(ID_PATTERN) or #zone.id > MAX_ZONE_ID then
+            return false, format('zone #%d : identifiant invalide (%d octets au plus)', i, MAX_ZONE_ID)
+        end
         if zonesById[zone.id] then return false, format("zone '%s' en double", zone.id) end
         local def = {
             id = zone.id, label = zone.label or zone.id, kind = zone.kind or 'foret', x = zone.x, y = zone.y, z = zone.z,
@@ -123,7 +126,9 @@ local function index()
         nodesByZone[zone.id] = {}
     end
     for i, node in ipairs(cfg.nodes) do
-        if type(node.id) ~= 'string' or not node.id:find(ID_PATTERN) then return false, format('nœud #%d : identifiant invalide', i) end
+        if type(node.id) ~= 'string' or not node.id:find(ID_PATTERN) or #node.id > MAX_NODE_ID then
+            return false, format('nœud #%d : identifiant invalide (%d octets au plus)', i, MAX_NODE_ID)
+        end
         if nodesById[node.id] then return false, format("nœud '%s' en double", node.id) end
         local zone = zonesById[node.zone]
         if not zone then return false, format("nœud '%s' : zone '%s' inconnue", node.id, tostring(node.zone)) end
