@@ -34,7 +34,7 @@ complet : `README.md` à la racine du dépôt).
 | `vava_voice` ≥ 1.1.0 | zones de voix lues, modifiées et supprimées depuis le web | page Zones de voix vide |
 | `vava_cameras` ≥ 1.3.0 | écran des joueurs depuis le web (`webCheck` depuis 1.5.1) | pas de caméras depuis le web |
 | `vava_time` ≥ 1.0.0 | ciel et heure du royaume lus et réglés depuis le web (1.4.0) | page Ciel et heure : « ne sont pas lancés » |
-| `vAvA_core` ≥ 0.10.0 | compteur réseau (`core.net.stats`) lu par la page Réseau (1.6.0) | page Réseau : « demande vAvA_core 0.10.0 » |
+| `vAvA_core` ≥ 0.12.0 | compteur réseau (`core.net.stats`, joueurs suivis d'office) lu par la page Réseau (1.6.0, liste des joueurs 1.7.0) | page Réseau : « demande vAvA_core 0.12.0 » |
 
 ## Règles (config.lua)
 
@@ -65,19 +65,23 @@ complet : `README.md` à la racine du dépôt).
   `tools`) transmises à vava_time (`webState`, `webClock`, `webWeather`), qui revalide chaque valeur ; droit vérifié
   auprès du Registre (`webCan`), décision inscrite à son journal (`webLog`) si elle change quelque chose. Un fichier du
   pont ajoute ses demandes à `routes.requests`.
-- **Compteur réseau** (1.6.0, `server/network.lua`) : demande `netStats` (portée `all`, `resource` + nom de ressource
-  ou `player` + numéro, ouverture de la page), en **lecture seule** : le pont lit `core.net.stats` (core ≥ 0.10.0) —
-  ce que montre `/vava_reseau` en jeu : mesure, envois, volume, latents, évènements les plus lourds et leur plus gros
-  message — et ne rend que ces champs, en liste pure. Arguments bornés (`rules.netQuery` : 48 signes au motif des
-  ressources, joueur de 1 à 65 535), lectures d'un même compte espacées de `net.minIntervalMs` (vérifié avant le droit :
-  `rate_limited`), droit `net.permission` (tools) vérifié auprès du Registre (`webCan`), joueur absent :
-  `unknown_player`. Le pont ne lance ni n'arrête aucun suivi : le détail d'un joueur, évènement par évènement,
-  n'existe que s'il est suivi par `/vava_reseau joueur` en jeu, et son personnage n'est nommé que dans ce cas. Journal
-  du Registre (`webLog`, `rules.netJournal`) : « Compteur réseau consulté » à l'ouverture de la page (dite par la page,
-  prise au plus une fois par `net.openLogMinMs` et par compte ; et à la première lecture d'un compte que le pont ne
-  connaît pas), « Réseau d'un joueur consulté » (`joueur` = numéro de connexion, réattribué après un départ, et
-  `compte` = compte de jeu lu par `core.players.get`, sans personnage chargé) à chaque autre joueur lu, puis au plus tard toutes les `net.logEveryMs` ; jamais à chaque relecture. Une ligne ne compte que si le Registre
-  l'a acceptée.
+- **Compteur réseau** (1.6.0, liste des joueurs 1.7.0, `server/network.lua`) : demande `netStats` (portée `all`,
+  `players`, `resource` + nom de ressource ou `player` + numéro, ouverture de la page), en **lecture seule** : le pont
+  lit `core.net.stats` (core ≥ 0.12.0) — ce que montre `/vava_reseau` en jeu : mesure, envois, volume, latents,
+  évènements les plus lourds et leur plus gros message — et ne rend que ces champs, en liste pure. Le core suit chaque
+  joueur connecté d'office (0.12.0) : `players` rend la liste des joueurs connectés, du plus chargé au moins chargé
+  (`rules.netPlayers` : 128 au plus, numéro, nom du personnage de 64 octets au plus, envois, volume, latents, et le
+  nombre de joueurs connectés) ; `player` rend le détail par évènement du joueur et le nom de son personnage (absent
+  sans personnage), sans condition. Un core antérieur à 0.12.0 refuse la liste : `net_unavailable`. Arguments bornés
+  (`rules.netQuery` : 48 signes au motif des ressources, joueur de 1 à 65 535), lectures d'un même compte espacées de
+  `net.minIntervalMs` (vérifié avant le droit : `rate_limited`), droit `net.permission` (tools) vérifié auprès du
+  Registre (`webCan`), joueur absent : `unknown_player`. Rien ne change côté jeu. Journal du Registre (`webLog`,
+  `rules.netJournal`) : « Compteur réseau consulté » à l'ouverture de la page (dite par la page, prise au plus une fois
+  par `net.openLogMinMs` et par compte ; et à la première lecture d'un compte que le pont ne connaît pas), « Réseau
+  d'un joueur consulté » (`joueur` = numéro de connexion, réattribué après un départ, et `compte` = compte de jeu lu par
+  `core.players.get`, sans personnage chargé) à chaque autre joueur dont le détail est lu, puis au plus tard toutes les
+  `net.logEveryMs` ; lire la liste des joueurs n'inscrit rien ; jamais à chaque relecture. Une ligne ne compte que si
+  le Registre l'a acceptée.
 - **Caméras** : ouvertes auprès de vava_cameras une fois le droit `watch` accordé — la vue en grand par la demande
   « écran du joueur » du Registre (cible vérifiée, au journal) — une fois le droit lu et la caméra jugée accordable par
   vava_cameras (`webCheck`, 1.5.1) : une vue refusée faute de débit chez le joueur filmé (`budget`), que la
@@ -173,5 +177,6 @@ Avec la Chancellerie lancée (elle démarre FXServer) et un compte du panneau qu
 8. Ciel et heure : régler l'heure et imposer un ciel depuis la page Ciel et heure ; les joueurs le voient, le Journal
    du Conseil l'inscrit (voir `docs/tests/temps.md`, section 6).
 9. Clé du pont et rangs des comptes reliés (1.5.0) : procédure complète dans `docs/tests/chancellerie.md`.
-10. Page Réseau (1.6.0) : mêmes chiffres que `/vava_reseau`, journal à l'ouverture et à chaque joueur lu, refus d'un
+10. Page Réseau (1.6.0, liste des joueurs 1.7.0) : mêmes chiffres que `/vava_reseau`, liste des joueurs connectés avec
+    leur personnage, journal à l'ouverture et à chaque détail de joueur lu (pas pour la liste), refus d'un
     Gardien : `docs/tests/chancellerie.md`, section 3.
