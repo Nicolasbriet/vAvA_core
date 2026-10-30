@@ -68,6 +68,62 @@ describe('vava_atelier rights', function()
         assert.same({}, rights.visible(editors, {}))
     end)
 
+    describe('réglages de la config (refus de démarrer)', function()
+        local function config(over)
+            local cfg = {
+                families = { { id = 'monde', floor = 'metiers' }, { id = 'arts', floor = 'staff' } },
+                rights = { allowed = { 'metiers', 'staff' }, open = 'metiers', overrides = {} },
+            }
+            if over then over(cfg) end
+            return cfg
+        end
+
+        local function refused(cfg, start)
+            local ok, err = rights.checkSettings(cfg)
+            assert.is_false(ok)
+            assert.is_string(err)
+            assert.equal(start, err:sub(1, #start), err)
+        end
+
+        it('accepte la config livrée et une surcharge permise', function()
+            assert.same({ true }, { rights.checkSettings(VavaAtelier.config) })
+            assert.same({ true }, { rights.checkSettings(config(function(c)
+                c.rights.overrides['vava_magic:sorts'] = 'metiers'
+            end)) })
+            assert.same({ true }, { rights.checkSettings(config(function(c) c.rights.overrides = nil end)) })
+        end)
+
+        it('refuse un plancher de famille hors des droits permis', function()
+            refused(config(function(c) c.families[2].floor = 'souverain' end),
+                "families['arts'].floor = 'souverain' : pas un droit permis (metiers, staff)")
+            refused(config(function(c) c.families[1].floor = nil end), "families['monde'].floor = 'nil'")
+        end)
+
+        it('refuse une surcharge hors des droits permis', function()
+            refused(config(function(c) c.rights.overrides['vava_magic:sorts'] = 'view' end),
+                "rights.overrides['vava_magic:sorts'] = 'view' : pas un droit permis")
+            refused(config(function(c) c.rights.overrides = 'staff' end), 'rights.overrides : table attendue')
+        end)
+
+        it('refuse un droit d\'ouvrir hors des droits permis', function()
+            refused(config(function(c) c.rights.open = 'tools' end), "rights.open = 'tools' : pas un droit permis")
+            refused(config(function(c) c.rights.open = nil end), "rights.open = 'nil'")
+        end)
+
+        it('refuse une liste de droits permis vide ou fausse', function()
+            refused(config(function(c) c.rights.allowed = {} end), 'rights.allowed : liste de droits attendue')
+            refused(config(function(c) c.rights.allowed = { 'metiers', 3 } end), 'rights.allowed[2] : nom de droit')
+            refused({}, 'rights.allowed')
+        end)
+    end)
+
+    it('tous les droits permis détenus : aucun filtre de droit', function()
+        assert.is_true(rights.coversAll(settings.allowed, { 'metiers', 'staff' }))
+        assert.is_true(rights.coversAll(settings.allowed, { 'staff', 'metiers' }))
+        assert.is_false(rights.coversAll(settings.allowed, { 'metiers' }))
+        assert.is_false(rights.coversAll(settings.allowed, {}))
+    end)
+
     it('rang d\'un droit', function()
         assert.equal(1, rights.rank(settings.allowed, 'metiers'))
         assert.equal(2, rights.rank(settings.allowed, 'staff'))

@@ -56,18 +56,24 @@ function text.trim(value)
     return (gsub(gsub(value, '^%s+', ''), '%s+$', ''))
 end
 
---- Vrai si le texte contient un caractère de contrôle (ASCII, C1) ou un caractère de sens d'écriture (U+202A à
---- U+202E, U+2066 à U+2069), qui ferait mentir l'affichage. `allowNewline` : le retour à la ligne est permis.
+--- Vrai si le texte contient un caractère de contrôle (ASCII, C1), un caractère invisible ou de sens d'écriture qui
+--- ferait mentir l'affichage : espace sans largeur et marques de sens (U+200B à U+200F), séparateurs de ligne et de
+--- paragraphe (U+2028, U+2029), sens d'écriture (U+202A à U+202E, U+2066 à U+2069), marque arabe (U+061C), marque
+--- d'ordre des octets (U+FEFF). `allowNewline` : le retour à la ligne est permis.
 ---@param value string
 ---@param allowNewline? boolean
 ---@return boolean
 function text.hasControl(value, allowNewline)
     local probe = value
     if allowNewline then probe = gsub(value, '\n', '') end
-    return find(probe, '%c') ~= nil
+    -- contrôles ASCII écrits octet par octet : `%c` dépend de la locale du système (sous Windows, il prend aussi des
+    -- octets de suite UTF-8 comme 0x8F ou 0xAD, et refuserait « Ï » ou « í »)
+    return find(probe, '[\0-\31\127]') ~= nil
         or find(probe, '\xC2[\x80-\x9F]') ~= nil
-        or find(probe, '\xE2\x80[\xAA-\xAE]') ~= nil
+        or find(probe, '\xE2\x80[\x8B-\x8F\xA8-\xAE]') ~= nil
         or find(probe, '\xE2\x81[\xA6-\xA9]') ~= nil
+        or find(probe, '\xD8\x9C', 1, true) ~= nil
+        or find(probe, '\xEF\xBB\xBF', 1, true) ~= nil
 end
 
 --- Un point de code permis dans un nom : lettre (accents latins compris), chiffre, espace, apostrophe, trait d'union,
@@ -100,7 +106,8 @@ function text.isId(value)
     return find(value, '^[a-z0-9_]+$') ~= nil
 end
 
---- Jeu de caractères `free` : tout caractère imprimable sauf « < » et « > » (les contrôles sont vus à part).
+--- Jeu de caractères `free` : tout caractère imprimable sauf « < » et « > » (contrôles et invisibles : vus avant, par
+--- `hasControl`).
 ---@param value string
 ---@return boolean
 function text.isFree(value)

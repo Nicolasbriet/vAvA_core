@@ -2,15 +2,17 @@
     vava_atelier/server/journal.lua
     Rôle : journal du Conseil (table vava_atelier_journal, sql/0001_journal.sql). Écriture d'une ligne contrôlée
            (atelier et type déclarés, action connue, textes bornés, droit effectif de l'atelier ou console), sans
-           faire attendre l'appelant ; débit borné par ressource appelante ; recopie au journal du Registre ; hook
-           vava_atelier:journal. Lecture paginée par curseur, filtrée par les droits détenus (colonne `required_right`
-           écrite au moment du changement) et, au besoin, par atelier ; purge au démarrage.
-    Dépendances : shared/constants.lua, config.lua, shared/text.lua, shared/journaltext.lua, bridge/server.lua,
-                  server/core.lua, server/editors.lua
+           faire attendre l'appelant ; débit borné par ressource appelante ; recopie au journal du Registre et hook
+           vava_atelier:journal une fois la ligne écrite. Lecture paginée par curseur, filtrée par les droits détenus
+           (colonne `required_right` écrite au moment du changement ; aucun filtre pour qui les détient tous) et, au
+           besoin, par atelier ; purge au démarrage.
+    Dépendances : shared/constants.lua, config.lua, shared/text.lua, shared/journaltext.lua, shared/rights.lua,
+                  bridge/server.lua, server/core.lua, server/editors.lua
 ]]
 
 local type, ipairs, tostring, tonumber = type, ipairs, tostring, tonumber
 local find, rep = string.find, string.rep
+local concat = table.concat
 local mathType, min = math.type, math.min
 local CreateThread, GetGameTimer = CreateThread, GetGameTimer
 local time = os.time
@@ -22,7 +24,7 @@ local cfg = VavaAtelier.config
 local texts = cfg.texts
 local Bridge = VavaAtelier.bridge
 local editors = VavaAtelier.editors
-local text, jt = VavaAtelier.text, VavaAtelier.journaltext
+local text, jt, rights = VavaAtelier.text, VavaAtelier.journaltext, VavaAtelier.rights
 local OUT = VavaAtelier.OUT
 local HOOK_JOURNAL = VavaAtelier.HOOKS.JOURNAL
 local CONSOLE = 0
@@ -38,7 +40,9 @@ local INSERT_SQL = 'INSERT INTO `vava_atelier_journal` (`editor`, `kind`, `def_i
     .. "VALUES (?, ?, NULLIF(?, ''), ?, ?, NULLIF(?, ''), NULLIF(?, 0), ?, NULLIF(?, 0), ?)"
 local PURGE_SQL = 'DELETE FROM `vava_atelier_journal` WHERE `created_at` < DATE_SUB(NOW(), INTERVAL ? DAY)'
 local SELECT_HEAD = 'SELECT `id`, `editor`, `kind`, `def_id`, `action`, `title`, `summary`, `version`, `actor_label`, '
-    .. 'UNIX_TIMESTAMP(`created_at`) AS `at` FROM `vava_atelier_journal` WHERE `required_right` IN ('
+    .. 'UNIX_TIMESTAMP(`created_at`) AS `at` FROM `vava_atelier_journal`'
+-- colonne `version` : INT UNSIGNED
+local MAX_VERSION = 4294967295
 
 local journal = {}
 VavaAtelier.journal = journal
@@ -48,8 +52,9 @@ local flood = {}
 -- requêtes de lecture, construites une fois par forme : nombre de droits, curseur, atelier
 local selects = {}
 
---- Requête de lecture : autant de `?` que de droits détenus (jamais une valeur dans le texte), curseur et atelier
---- facultatifs, `LIMIT ?`.
+--- Requête de lecture : autant de `?` que de droits à filtrer (jamais une valeur dans le texte ; 0 : tous les droits
+--- permis sont détenus, aucun filtre, lecture à rebours sur la clé primaire), curseur et atelier facultatifs,
+--- `LIMIT ?`.
 ---@param rights integer
 ---@param cursor boolean
 ---@param editor boolean
@@ -58,8 +63,11 @@ local function selectSql(rights, cursor, editor)
     local key = rights .. (cursor and 'c' or '') .. (editor and 'e' or '')
     local sql = selects[key]
     if not sql then
-        sql = SELECT_HEAD .. rep('?', rights, ', ') .. ')'
-            .. (cursor and ' AND `id` < ?' or '') .. (editor and ' AND `editor` = ?' or '')
+        local where = {}
+        if rights > 0 then where[#where + 1] = '`required_right` IN (' .. rep('?', rights, ', ') .. ')' end
+        if cursor then where[#where + 1] = '`id` < ?' end
+        if editor then where[#where + 1] = '`editor` = ?' end
+        sql = SELECT_HEAD .. (#where > 0 and ' WHERE ' .. concat(where, ' AND ') or '')
             .. ' ORDER BY `id` DESC LIMIT ?'
         selects[key] = sql
     end
@@ -128,7 +136,8 @@ function journal.write(source, entry, owner)
         or not find(entry.id, VavaAtelier.ENTRY_PATTERN)) then
         return false, 'invalid_args'
     end
-    if entry.version ~= nil and (mathType(entry.version) ~= 'integer' or entry.version < 1) then
+    if entry.version ~= nil and (mathType(entry.version) ~= 'integer' or entry.version < 1
+        or entry.version > MAX_VERSION) then
         return false, 'invalid_args'
     end
 
@@ -145,6 +154,13 @@ function journal.write(source, entry, owner)
         editor = editor.id, kind = entry.kind, defId = entry.id, action = entry.action, title = entry.title,
         summary = summary, version = entry.version, right = editor.right, accountId = accountId, actor = actor,
     }
+    -- recopie au Registre préparée ici (libellé de l'atelier lu au moment de l'appel), envoyée après l'écriture
+    local mirror = nil
+    if source ~= CONSOLE and cfg.journal.mirror then
+        mirror = { atelier = editor.label, objet = row.title }
+        if row.version then mirror.version = row.version end
+        if row.summary then mirror.resume = text.truncate(row.summary, MIRROR_VALUE) end
+    end
     CreateThread(function()
         -- aucune valeur nil dans la liste (elle traverse un export) : '' et 0 deviennent NULL par NULLIF
         local id, err = core.db.insert(INSERT_SQL, {
@@ -155,22 +171,19 @@ function journal.write(source, entry, owner)
             VavaAtelier.log.error('journal non écrit (%s, %s) : %s', row.editor, row.action, tostring(err))
             return
         end
+        -- le Registre ne garde que ce qui est réellement écrit ici
+        if mirror then Bridge.MirrorLog(source, texts.mirror[row.action], mirror) end
         core.hooks.runAfter(HOOK_JOURNAL, {
             id = id, editor = row.editor, kind = row.kind, defId = row.defId, action = row.action, title = row.title,
             summary = row.summary, version = row.version, actor = { accountId = row.accountId, label = row.actor },
         })
     end)
-    if source ~= CONSOLE and cfg.journal.mirror then
-        local details = { atelier = editor.label, objet = row.title }
-        if row.version then details.version = row.version end
-        if row.summary then details.resume = text.truncate(row.summary, MIRROR_VALUE) end
-        Bridge.MirrorLog(source, texts.mirror[row.action], details)
-    end
     return true
 end
 
 --- Lignes du journal lisibles avec ces droits, des plus récentes aux plus anciennes : au plus `limit`, avant la ligne
---- `before` (0 : les plus récentes), d'un seul atelier si `editorId` n'est pas vide.
+--- `before` (0 : les plus récentes), d'un seul atelier si `editorId` n'est pas vide (les lignes n'ont alors pas de
+--- champ `editor` : la page le tient de son filtre). Qui détient tous les droits permis lit sans filtre de droit.
 ---@param held string[]  droits détenus (au moins un)
 ---@param before integer
 ---@param editorId string
@@ -180,12 +193,15 @@ end
 function journal.read(held, before, editorId, limit)
     if #held == 0 then return { lines = {}, more = false, next = 0 } end
     local params = {}
-    for i, right in ipairs(held) do params[i] = right end
+    if not rights.coversAll(cfg.rights.allowed, held) then
+        for i, right in ipairs(held) do params[i] = right end
+    end
+    local filteredRights = #params
     local cursor, filtered = before > 0, editorId ~= ''
     if cursor then params[#params + 1] = before end
     if filtered then params[#params + 1] = editorId end
     params[#params + 1] = limit + 1
-    local rows, err = core.db.query(selectSql(#held, cursor, filtered), params)
+    local rows, err = core.db.query(selectSql(filteredRights, cursor, filtered), params)
     if type(rows) ~= 'table' then
         VavaAtelier.log.error('journal illisible : %s', tostring(err))
         return nil, 'db_error'
@@ -196,7 +212,7 @@ function journal.read(held, before, editorId, limit)
         row.at = tonumber(row.at) or now
         local editor = editors.get(row.editor)
         local kind = editor and editors.kind(editor, row.kind)
-        lines[i] = jt.line(row, texts.verbs, kind and kind.def, now)
+        lines[i] = jt.line(row, texts.verbs, kind and kind.def, now, nil, filtered)
     end
     return { lines = lines, more = #rows > limit, next = #lines > 0 and lines[#lines].id or 0 }
 end

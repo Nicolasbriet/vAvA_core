@@ -71,6 +71,8 @@ VavaAtelier.config = {
         cacheMs = 5000,          -- durée de vie d'un `index` ou d'une source lus chez un module
         slowCallbackMs = 50,     -- fonction d'un éditeur signalée en console au-delà
         refusalLogMs = 60000,    -- une ligne de refus (droit) en console au plus par joueur et par intervalle
+        descriptorBytes = 32768, -- descripteur d'un atelier (codage canonique) : au-delà, atelier refusé au chargement
+        busyMs = 10000,          -- verrou d'une lecture tenu au-delà (appel resté en suspens) : repris, ligne en console
     },
 
     journal = {
@@ -100,13 +102,14 @@ VavaAtelier.config = {
         checkOk = 'Tout est en ordre.',
         check = 'Vérifier',
         stateLive = 'En vigueur',
-        stateNew = 'Nouveau, rien n\'est enregistré',
-        upcoming = 'Bientôt',
+        stateNew = 'Rien d\'enregistré',
         searchWorkshop = 'Atelier',
         modeLine = 'Mode édition : visible par vous seul',      -- bandeau du volet (message `mode`)
+        -- description de /atelier dans le Codex (registre core:commands)
+        codex = 'Créer et régler le royaume en jeu, sans redémarrer : zones, stations, parcelles… selon votre rang.',
         console = 'Console',
         revoked = 'Votre place au Conseil a changé : l\'Atelier se ferme.',
-        editorGone = 'Cet atelier vient d\'être retiré (module arrêté).',
+        editorGone = 'Cet atelier vient d\'être retiré : réessayez plus tard.',
         -- refus d'un RPC (codes du § 6.2 de la spec), montrés hors de l'interface quand elle ne peut pas s'ouvrir
         refused = {
             not_ready = 'Le Registre du Conseil s\'éveille : réessayez dans un instant.',
@@ -128,21 +131,21 @@ VavaAtelier.config = {
             required = 'À remplir.',
             range = 'Entre %s et %s.',
             step = 'Par pas de %s.',
-            integer = 'Un nombre entier.',
+            integer = 'Un nombre entier est attendu.',
             number = 'Un nombre est attendu.',
-            choice = 'Choix inconnu.',
+            choice = 'Ce choix n\'est pas proposé.',
             length = 'Entre %d et %d caractères.',
             lines = '%d lignes au plus.',
             spaces = 'Jamais deux espaces de suite.',
-            control = 'Caractère invisible ou de contrôle non permis.',
+            control = 'Un caractère invisible s\'est glissé : retirez-le.',
             charset = {
                 name = 'Lettres, chiffres, espaces, apostrophes, traits d\'union, virgules et points seulement.',
-                id = 'Minuscules sans accent, chiffres et « _ » seulement.',
+                id = 'Minuscules sans accent, chiffres et traits bas (_) seulement.',
                 free = 'Les signes « < » et « > » ne sont pas permis.',
             },
             item = 'Cet objet n\'existe pas dans le royaume.',
             itemCategory = 'Cet objet n\'est pas de la sorte demandée.',
-            itemUnavailable = 'La besace du royaume est indisponible : objet impossible à vérifier.',
+            itemUnavailable = 'La liste des objets du royaume ne répond pas : impossible de vérifier cet objet.',
             model = 'Ce modèle n\'est pas proposé.',
             type = 'Valeur d\'une autre nature que celle attendue.',
         },
@@ -150,13 +153,13 @@ VavaAtelier.config = {
         verbs = {
             created = 'A créé', saved = 'A enregistré le brouillon de', trial = 'A mis à l\'essai',
             published = 'A publié', archived = 'A archivé', restored = 'A restauré', removed = 'A retiré',
-            imported = 'A réimporté', placed = 'A placé', moved = 'A déplacé', note = 'A annoté',
+            imported = 'A rétabli l\'original de', placed = 'A placé', moved = 'A déplacé', note = 'A annoté',
         },
         -- libellés de la recopie au journal du Registre (32 caractères au plus, bornes de vava_admin)
         mirror = {
             created = 'Atelier : créé', saved = 'Atelier : brouillon', trial = 'Atelier : mis à l\'essai',
             published = 'Atelier : publié', archived = 'Atelier : archivé', restored = 'Atelier : restauré',
-            removed = 'Atelier : retiré', imported = 'Atelier : réimporté', placed = 'Atelier : placé',
+            removed = 'Atelier : retiré', imported = 'Atelier : original rétabli', placed = 'Atelier : placé',
             moved = 'Atelier : déplacé', note = 'Atelier : annoté',
         },
     },

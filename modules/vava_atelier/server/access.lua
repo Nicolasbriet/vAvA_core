@@ -4,7 +4,8 @@
            son compte ; chaque RPC revérifie, dans l'ordre : personnage chargé, Registre du Conseil prêt, droit
            d'ouvrir l'Atelier (relu auprès de vava_admin, jamais gardé), session de ce compte, atelier déclaré, droit
            effectif de l'atelier (relu), type et champ déclarés. Une seule lecture ou vérification de module à la fois
-           par joueur (`busy`). Un refus pour droit écrit une ligne en console, une fois par intervalle et par joueur.
+           par joueur (`busy`, repris au-delà de `limits.busyMs`). Un refus pour droit écrit une ligne en console, une
+           fois par intervalle et par joueur.
     Dépendances : shared/constants.lua, config.lua, bridge/server.lua, server/core.lua, server/editors.lua
 ]]
 
@@ -27,7 +28,8 @@ VavaAtelier.access = access
 ---@class vAvA.AtelierSession
 ---@field accountId integer
 ---@field editor string|nil   atelier ouvert (descripteur demandé en dernier)
----@field busy boolean
+---@field busy table|false     jeton de l'appel qui tient le verrou, false s'il est libre
+---@field busySince integer    instant (GetGameTimer) où le verrou a été pris
 
 ---@type table<integer, vAvA.AtelierSession>
 local sessions = {}
@@ -77,7 +79,7 @@ function access.open(source, rpc)
     local session = sessions[source]
     if not session or session.accountId ~= ctx.accountId then
         if session then access.close(source) end
-        session = { accountId = ctx.accountId, busy = false }
+        session = { accountId = ctx.accountId, busy = false, busySince = 0 }
         sessions[source] = session
         core.hooks.runAfter(HOOK_SESSION, { source = source, accountId = ctx.accountId, open = true })
     end
@@ -119,16 +121,25 @@ function access.check(source, rpc, options)
 end
 
 --- Lance `fn(ctx, …)` sous le verrou du joueur : une seule lecture ou vérification de module à la fois (`busy`). Le
---- verrou est rendu même si `fn` lève une erreur (renvoyée ensuite comme erreur serveur).
+--- verrou est rendu même si `fn` lève une erreur (renvoyée ensuite comme erreur serveur). Un verrou tenu au-delà de
+--- `limits.busyMs` (appel resté en suspens : base ou module qui ne répond plus) est repris, avec une ligne en console ;
+--- l'appel ancien, s'il finit un jour, ne rend pas le verrou du nouveau.
 ---@param ctx vAvA.AtelierContext
 ---@param fn fun(ctx: vAvA.AtelierContext, ...): any
 ---@return any
 function access.locked(ctx, fn, ...)
     local session = ctx.session
-    if session.busy then return false, 'busy' end
-    session.busy = true
+    local now = GetGameTimer()
+    if session.busy then
+        local held = now - session.busySince
+        if held < cfg.limits.busyMs then return false, 'busy' end
+        VavaAtelier.log.warn('joueur %d : verrou de lecture tenu depuis %d ms (au-delà de %d ms), repris', ctx.source,
+            held, cfg.limits.busyMs)
+    end
+    local token = {}
+    session.busy, session.busySince = token, now
     local results = pack(xpcall(fn, traceback, ctx, ...))
-    session.busy = false
+    if session.busy == token then session.busy = false end
     if not results[1] then error(results[2], 0) end
     return unpack(results, 2, results.n)
 end

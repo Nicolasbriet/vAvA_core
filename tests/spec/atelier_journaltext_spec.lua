@@ -96,5 +96,23 @@ describe('vava_atelier journaltext', function()
         local line = jt.line(row, verbs, nil, NOW, fixedDate)
         assert.equal('A annoté', line.lead)
         assert.is_nil(line.summary)
+        assert.equal('vava_example_atelier:panneaux', line.editor)
+    end)
+
+    it('ne répète pas l\'atelier sur une page filtrée sur lui', function()
+        local row = { id = 7, editor = 'vava_example_atelier:panneaux', kind = 'panneau', action = 'published',
+            title = 'Panneau de la place', actor_label = 'Console', at = NOW - 2 * HOUR }
+        assert.same({
+            id = 7, lead = 'A publié le panneau', title = 'Panneau de la place', actor = 'Console', when = 'il y a 2 h',
+        }, jt.line(row, verbs, { article = 'le', noun = 'panneau' }, NOW, fixedDate, true))
+        assert.equal('vava_example_atelier:panneaux',
+            jt.line(row, verbs, { article = 'le', noun = 'panneau' }, NOW, fixedDate, false).editor)
+    end)
+
+    it('rétablir l\'original : verbe et libellé du Registre', function()
+        assert.equal('A rétabli l\'original de la zone', jt.lead(verbs.imported, 'la', 'zone'))
+        assert.equal('A rétabli l\'original du panneau', jt.lead(verbs.imported, 'le', 'panneau'))
+        assert.equal('A rétabli l\'original de l\'enclume', jt.lead(verbs.imported, 'l\'', 'enclume'))
+        assert.equal('Atelier : original rétabli', VavaAtelier.config.texts.mirror.imported)
     end)
 end)

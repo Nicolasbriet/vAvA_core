@@ -51,7 +51,8 @@ VavaAtelier.ENTRY_PATTERN = '^[%w_%-]+$'       -- identifiant d'une entrée d'un
 VavaAtelier.MAX_ENTRY = 48
 VavaAtelier.VERSION_PATTERN = '^%x*$'          -- empreinte (shared/fingerprint.lua) ; '' : rien de gardé
 VavaAtelier.VERSION_LENGTH = 16
-VavaAtelier.QUERY_PATTERN = '^[^%c<>]*$'       -- filtre, recherche
+-- filtre, recherche : contrôles ASCII écrits octet par octet (`%c` dépend de la locale et refuserait « Ï » ou « í »)
+VavaAtelier.QUERY_PATTERN = '^[^\0-\31\127<>]*$'
 VavaAtelier.MAX_QUERY = 48
 VavaAtelier.OPTION_PATTERN = '^[%w_%-]+$'      -- valeur d'un choix (segmented, select, model)
 VavaAtelier.MAX_OPTION = 32

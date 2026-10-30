@@ -1,8 +1,7 @@
 'use strict';
 /*
  * vava_atelier/web/js/strings.js
- * Rôle : tous les textes de l'interface de l'Atelier (français, ton du royaume). Les textes venus du jeu (libellés des
- *        ateliers, des champs, aide, erreurs des modules, journal) ne sont pas ici : ils arrivent du serveur.
+ * Rôle : tous les textes de l'interface (les libellés, aides et erreurs des modules arrivent du serveur).
  * Dépendances : aucune.
  */
 
@@ -12,7 +11,7 @@ const STRINGS = Object.freeze({
   close: 'Fermer l\'Atelier',
   back: 'Retour à l\'Atelier',
   backList: 'Retour à la liste',
-  rank: (rank) => `Vous siégez au Conseil : ${rank}.`,
+  rank: (rank) => `Vous siégez au Conseil en qualité de ${rank}.`,
   upcoming: 'Bientôt',
 
   search: {
@@ -34,7 +33,7 @@ const STRINGS = Object.freeze({
     none: 'Rien n\'a encore été changé.',
     allEditors: 'Tous les ateliers',
     filter: 'Atelier',
-    older: 'Plus anciens',
+    older: 'Lignes plus anciennes',
     summary: (text) => ` — ${text}`,
     who: (actor, when) => `${actor}, ${when}`,
   },
@@ -43,7 +42,7 @@ const STRINGS = Object.freeze({
     filter: (plural) => `Filtrer les ${plural}…`,
     filterLabel: 'Filtrer la liste',
     count: (n, noun, plural) => `${n} ${n > 1 ? plural : noun}`,
-    // « Créer un panneau », « Créer une zone » : le genre se lit dans `newLabel` (Nouveau, Nouvel, Nouvelle)
+    // le genre se lit dans `newLabel` (Nouveau, Nouvel, Nouvelle)
     create: (noun, newLabel) => `Créer ${/^nouvelle\b/i.test(newLabel || '') ? 'une' : 'un'} ${noun}`,
     open: 'Ouvrir',
     empty: 'Rien ici pour l\'instant.',
@@ -51,25 +50,25 @@ const STRINGS = Object.freeze({
     previous: 'Page précédente',
     next: 'Page suivante',
     page: (page, pages) => `Page ${page} sur ${pages}`,
-    tabs: 'Types de l\'atelier',
+    tabs: 'Genres de fiches',
   },
 
   entry: {
     stateLive: 'En vigueur',
-    stateNew: 'Nouveau, rien n\'est enregistré',
+    stateNew: 'Rien d\'enregistré',
     check: 'Vérifier',
     checking: 'Vérification…',
     checkHint: 'Vérifier contrôle les réglages sans rien changer au royaume.',
     checkOk: 'Tout est en ordre.',
-    note: 'Le serveur revoit chaque réglage, pas seulement l\'interface. Rien n\'est changé au royaume tant que rien n\'est publié.',
-    warning: 'Valeur reprise par défaut.',
+    note: 'Chaque réglage est revu par le serveur, pas seulement à l\'affichage. Vos changements ne touchent pas le royaume tant qu\'ils ne sont pas publiés.',
+    warning: 'Valeur de départ remise : l\'ancienne manquait ou n\'est plus permise.',
     loading: 'Un instant…',
     steps: 'Étapes',
   },
 
   confirmLeave: {
     title: 'Quitter cette fiche ?',
-    text: 'Les changements non vérifiés seront perdus.',
+    text: 'Rien n\'est encore enregistré : vos changements seront perdus.',
     cancel: 'Rester',
     ok: 'Quitter',
   },
@@ -80,16 +79,16 @@ const STRINGS = Object.freeze({
     required: 'À remplir.',
     range: (min, max) => `Entre ${min} et ${max}.`,
     step: (step) => `Par pas de ${step}.`,
-    choice: 'Choix inconnu.',
+    choice: 'Ce choix n\'est pas proposé.',
     length: (min, max) => `Entre ${min} et ${max} caractères.`,
     lines: (max) => `${max} lignes au plus.`,
     charset: {
       name: 'Lettres, chiffres, espaces, apostrophes, traits d\'union, virgules et points seulement.',
-      id: 'Minuscules sans accent, chiffres et « _ » seulement.',
+      id: 'Minuscules sans accent, chiffres et traits bas (_) seulement.',
       free: 'Les signes « < » et « > » ne sont pas permis.',
     },
     item: 'Cet objet n\'existe pas dans le royaume.',
-    itemUnavailable: 'La besace du royaume est indisponible : objet impossible à vérifier.',
+    itemUnavailable: 'La liste des objets du royaume ne répond pas : impossible de vérifier cet objet.',
     model: 'Ce modèle n\'est pas proposé.',
     counter: (n, max) => `${n} / ${max}`,
     choose: 'Choisir…',
@@ -111,38 +110,35 @@ const STRINGS = Object.freeze({
     provisional: 'provisoire',
   },
 
-  // durées lues (« 10 minutes », « 1 h 30 min », « 7 jours »)
   duration: {
     long: { j: ['jour', 'jours'], h: ['heure', 'heures'], min: ['minute', 'minutes'], s: ['seconde', 'secondes'] },
     short: { j: 'j', h: 'h', min: 'min', s: 's' },
   },
 
-  // codes de refus du serveur et du transport (§ 6.2)
   errors: {
     not_ready: 'Le Registre du Conseil s\'éveille : réessayez dans un instant.',
-    no_character: 'Aucun personnage chargé.',
+    no_character: 'Choisissez d\'abord un personnage.',
     not_allowed: 'L\'Atelier est réservé au Conseil.',
     not_open: 'L\'Atelier s\'est refermé : rouvrez-le.',
     unknown_editor: 'Cet atelier n\'existe plus.',
-    unknown_kind: 'Ce type n\'existe plus dans l\'atelier.',
+    unknown_kind: 'Ce genre de fiche n\'existe plus dans cet atelier.',
     unknown_entry: 'Cette fiche n\'existe plus.',
     unknown_field: 'Ce réglage n\'existe plus.',
     busy: 'Un instant : une demande est déjà en cours.',
     editor_error: 'Cet atelier ne répond pas : prévenez un développeur.',
-    db_error: 'Le journal est indisponible pour l\'instant.',
-    rate_limited: 'Patience : trop de demandes à la fois. Réessayez dans un instant.',
+    db_error: 'Le journal ne répond pas pour le moment.',
+    rate_limited: 'Doucement : patientez un instant.',
     timeout: 'Le serveur ne répond pas.',
     invalid_args: 'Demande refusée.',
-    invalid_response: 'Réponse incomprise.',
+    invalid_response: 'Réponse du serveur illisible : rouvrez l\'Atelier.',
     stale: 'L\'Atelier s\'est désaccordé du serveur : rouvrez-le.',
-    client_error: 'Erreur de l\'interface.',
+    client_error: 'Cette page a trébuché : rouvrez l\'Atelier.',
     default: 'Action impossible.',
   },
   revoked: 'Votre place au Conseil a changé : l\'Atelier se ferme.',
-  editorGone: 'Cet atelier vient d\'être retiré (module arrêté).',
+  editorGone: 'Cet atelier vient d\'être retiré : réessayez plus tard.',
 });
 
-/** Message lisible pour un code de refus (jamais le code brut). */
 function errorText(code) {
   return STRINGS.errors[code] || STRINGS.errors.default;
 }

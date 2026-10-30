@@ -256,7 +256,7 @@ function fv.toData(form, packet)
 end
 
 --- `data` du module → paquet de l'interface. Une valeur absente ou refusée d'un champ (hors bornes, choix disparu…)
---- est remplacée par le défaut du champ et signalée dans `warnings` (« Valeur reprise par défaut ») ; un champ
+--- est remplacée par le défaut du champ et signalée dans `warnings` (« Valeur de départ remise : l'ancienne manquait ou n'est plus permise ») ; un champ
 --- facultatif absent vaut '' sans avertissement. Les cartes vides sont omises.
 ---@param form table
 ---@param data any

@@ -14,7 +14,7 @@
  *          ?screen=entry&errors=1       la même avec trois erreurs de champ et une erreur générale
  *          ?screen=entry&layout=side    fiche « volet » (affiche) avec bandeau
  *          ?screen=keys                 volet, bandeau et barre des touches de la maquette Recolte (aperçu de T-102)
- *          ?screen=journal              journal entier, filtre, « Plus anciens »
+ *          ?screen=journal              journal entier, filtre, « Lignes plus anciennes »
  *          ?screen=confirm              boîte de confirmation
  *          ?screen=picker               liste cherchable d'un champ « objet » ouverte (en plus du § 9.5)
  *        Essais des fonctions pures : node modules/vava_atelier/web/dev/essais.js
@@ -32,18 +32,18 @@ const DevMock = (() => {
   // Accueil ----------------------------------------------------------------------------------------------------------
   const families = [{ id: 'monde', label: 'Le monde' }, { id: 'societe', label: 'La société' }, { id: 'arts', label: 'Les arts' }];
   const cards = [
-    { editor: 'vava_gathering:zones', family: 'monde', label: 'Récolte', description: 'Forêts, mines, prairies et coins de pêche, arbres et filons un par un.', icon: 'recolte', tag: '4 zones', upcoming: false },
+    { editor: 'vava_gathering:zones', family: 'monde', label: 'Récolte', description: 'Forêts, mines, prairies et coins de pêche, arbres et filons un par un.', icon: 'recolte', upcoming: false },
     { editor: 'vava_farming:parcelles', family: 'monde', label: 'Agriculture', description: 'Parcelles communales ou privées, puits, greniers et composteurs.', icon: 'agriculture', upcoming: false },
     { editor: 'vava_crafting:stations', family: 'monde', label: 'Artisanat', description: 'Forges, établis, métiers à tisser : où ils sont, ce qu\'on peut y faire.', icon: 'artisanat', upcoming: false },
-    { editor: 'vava_doors:portes', family: 'monde', label: 'Portes et clés', description: 'Viser une porte, la déclarer, la verrouiller, créer ses clés.', icon: 'porte', tag: 'Bientôt', upcoming: true },
-    { editor: 'vava_example_atelier:panneaux', family: 'monde', label: 'Panneaux du bourg (exemple)', description: 'Exemple de développement : tous les réglages qu\'un atelier peut montrer.', icon: 'parchemin', tag: '3 panneaux', upcoming: false },
+    { editor: 'vava_doors:portes', family: 'monde', label: 'Portes et clés', description: 'Viser une porte, la déclarer, la verrouiller, créer ses clés.', icon: 'porte', upcoming: true },
+    { editor: 'vava_example_atelier:panneaux', family: 'monde', label: 'Panneaux du bourg (exemple)', description: 'Exemple de développement : tous les réglages qu\'un atelier peut montrer.', icon: 'parchemin', upcoming: false },
     { editor: 'vava_guilds:confreries', family: 'societe', label: 'Confréries', description: 'La Garde, les Guérisseurs, les guildes : grades, droits, coffres, lieux.', icon: 'confrerie', upcoming: false },
-    { editor: 'vava_housing:logis', family: 'societe', label: 'Logis', description: 'Maisons et chambres attribuées par le Conseil, coffres privés.', icon: 'logis', tag: 'Bientôt', upcoming: true },
-    { editor: 'vava_example_atelier:proclamations', family: 'societe', label: 'Proclamations (exemple)', description: 'Exemple de développement : un atelier réservé au Souverain.', icon: 'parchemin', tag: '1 proclamation', upcoming: false },
+    { editor: 'vava_housing:logis', family: 'societe', label: 'Logis', description: 'Maisons et chambres attribuées par le Conseil, coffres privés.', icon: 'logis', upcoming: true },
+    { editor: 'vava_example_atelier:proclamations', family: 'societe', label: 'Proclamations (exemple)', description: 'Exemple de développement : un atelier réservé au Souverain.', icon: 'parchemin', upcoming: false },
     { editor: 'vava_emotes:gestes', family: 'arts', label: 'Gestes', description: 'Animations et accessoires pour les émotes et les métiers.', icon: 'geste', upcoming: false },
     { editor: 'vava_combat:techniques', family: 'arts', label: 'Techniques de combat', description: 'Coups, parades, esquives : animation, timing et zone touchée.', icon: 'combat', upcoming: false },
     { editor: 'vava_magic:effets', family: 'arts', label: 'Effets', description: 'Particules, lumières et sons réutilisables partout.', icon: 'effet', upcoming: false },
-    { editor: 'vava_magic:sorts', family: 'arts', label: 'Sorts', description: 'Assembler un sort : type, valeurs, geste et effets.', icon: 'sort', tag: '1 en essai', tone: 'trial', upcoming: false },
+    { editor: 'vava_magic:sorts', family: 'arts', label: 'Sorts', description: 'Assembler un sort : type, valeurs, geste et effets.', icon: 'sort', upcoming: false },
   ];
   const visibleCards = () => cards.filter((c) => !senechal || c.family === 'monde');
   const drafts = [
@@ -79,11 +79,11 @@ const DevMock = (() => {
       { id: 'matiere', widget: 'segmented', label: 'Matière', help: 'Change l\'allure du panneau, pas ce qu\'il dit.', group: 'allure', options: [{ value: 'bois', label: 'Bois' }, { value: 'pierre', label: 'Pierre' }, { value: 'parchemin', label: 'Parchemin cloué' }], default: 'bois' },
       { id: 'quartier', widget: 'select', label: 'Quartier', help: 'Le quartier où le panneau se dresse.', group: 'allure', source: 'quartiers', default: 'marche' },
       { id: 'taille', widget: 'slider', label: 'Hauteur', help: 'Plus haut, il se voit de plus loin.', group: 'allure', min: 0.5, max: 3, step: 0.1, decimals: 1, unit: 'm', default: 1.5, width: 'half' },
-      { id: 'portee', widget: 'slider', label: 'Distance de lecture', help: 'De combien de pas on peut le lire.', group: 'allure', min: 1, max: 10, step: 1, integer: true, unit: 'm', default: 3, width: 'half' },
+      { id: 'portee', widget: 'slider', label: 'Distance de lecture', help: 'La distance d\'où l\'on peut encore le lire.', group: 'allure', min: 1, max: 10, step: 1, integer: true, unit: 'm', default: 3, width: 'half' },
       { id: 'modele', widget: 'model', label: 'Apparence', help: 'Le modèle utilisé en jeu.', group: 'allure', choices: [{ value: 'prop_sign_road_01a', label: 'Panneau de bois', provisional: true }, { value: 'prop_sign_road_03a', label: 'Pancarte de pierre', provisional: true }], default: 'prop_sign_road_01a' },
       { id: 'eclaire', widget: 'toggle', label: 'Éclairé la nuit', help: 'Une lanterne à son pied, allumée au crépuscule.', group: 'reglages', default: false },
       { id: 'duree', widget: 'duration', label: 'Reste affiché', help: 'Passé ce délai, le panneau est retiré.', group: 'reglages', min: 3600, max: 2592000, units: ['h', 'j'], default: 604800 },
-      { id: 'offrande', widget: 'item', label: 'Objet au pied du panneau', help: 'Un objet laissé là, que l\'on peut emporter.', group: 'reglages', optional: true, default: '' },
+      { id: 'offrande', widget: 'item', label: 'Objet au pied du panneau', help: 'Un objet posé là pour le décor : nul ne peut l\'emporter.', group: 'reglages', optional: true, default: '' },
     ],
   };
   const descriptors = {
@@ -171,6 +171,20 @@ const DevMock = (() => {
     'Filet de pêche', 'Pioche', 'Hache', 'Faucille', 'Seau', 'Cruche d\'eau', 'Vin de pays', 'Bière d\'orge']
     .map((label) => ({ value: fold(label).replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, ''), label, image: `nui://vava_inventory/web/items/${fold(label).replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, '')}.webp` }));
 
+  const optionsOf = (fieldId) => (fieldId === 'quartier' ? districts : (fieldId === 'offrande' ? items : []));
+
+  /** `labels` de read : { [champ] = { label, image?, provisional? } } pour chaque champ à liste distante dont la valeur est connue. */
+  function labelsOf(kind, values) {
+    const labels = {};
+    for (const field of kind ? kind.form.fields : []) {
+      const value = (values.s || {})[field.id];
+      if (!value || !(field.widget === 'item' || field.source)) continue;
+      const found = optionsOf(field.id).find((o) => o.value === value);
+      if (found) labels[field.id] = { label: found.label, image: found.image };
+    }
+    return labels;
+  }
+
   // Règles de l'exemple (comme shared/rules.lua de vava_example_atelier) --------------------------------------------
   function validatePanel(id, data) {
     const errors = [];
@@ -192,6 +206,19 @@ const DevMock = (() => {
     return true;
   }
 
+  // Étiquettes des cartes : hors du contenu gardé, recalculées à chaque réponse d'accueil (comme le serveur)
+  function tagsOf() {
+    const count = (key, noun, plural) => { const n = (entries[key] || []).length; return { text: `${n} ${n > 1 ? plural : noun}`, tone: 'count' }; };
+    const tags = {
+      'vava_gathering:zones': count('vava_gathering:zones|zone', 'zone', 'zones'),
+      'vava_example_atelier:panneaux': count('vava_example_atelier:panneaux|panneau', 'panneau', 'panneaux'),
+      'vava_example_atelier:proclamations': count('vava_example_atelier:proclamations|proclamation', 'proclamation', 'proclamations'),
+      'vava_magic:sorts': { text: '1 en essai', tone: 'trial' },
+    };
+    for (const editor of Object.keys(tags)) if (!visibleCards().some((c) => c.editor === editor)) delete tags[editor];
+    return tags;
+  }
+
   const sentDescriptors = new Set();
   let homeSent = false;
   const ok = (data) => ({ ok: true, data });
@@ -203,6 +230,7 @@ const DevMock = (() => {
     return {
       version: 'accueil-1',
       content: withContent ? { families: clone(families), cards: clone(visibleCards()), footnote: 'Chaque atelier n\'apparaît qu\'aux rangs qui y ont droit. Un Sénéchal ne voit que le monde ; un Souverain voit tout.' } : undefined,
+      tags: tagsOf(),
       drafts: empty ? [] : clone(drafts),
       journal: empty ? [] : clone(journal.filter((l) => !senechal || visibleCards().some((c) => c.editor === l.editor)).slice(0, 5)),
       rank: senechal ? 'Sénéchal' : 'Souveraine',
@@ -235,7 +263,8 @@ const DevMock = (() => {
       case 'read': {
         const entry = (entries[`${data.editor}|${data.kind}`] || []).find((e) => e.id === data.id);
         if (!entry) return fail('unknown_entry');
-        const answer = { id: entry.id, title: entry.title, values: clone(entry.values), warnings: entry.warnings, state: { label: 'En vigueur', tone: 'live' }, footer: [{ id: 'check', label: 'Vérifier', primary: true }] };
+        const kind = (descriptorFor(data.editor) || { kinds: [] }).kinds.find((k) => k.id === data.kind);
+        const answer = { id: entry.id, title: entry.title, values: clone(entry.values), labels: labelsOf(kind, entry.values), warnings: entry.warnings, state: { label: 'En vigueur', tone: 'live' }, footer: [{ id: 'check', label: 'Vérifier', primary: true }] };
         if (data.editor === 'vava_example_atelier:panneaux' && data.kind === 'panneau') {
           answer.compare = data.id === 'porte_nord' ? { title: 'Pour comparer : Panneau de la place', text: '1,5 m, lisible à 3 m, 7 jours' } : { title: 'Pour comparer : Pancarte de la porte nord', text: '2,2 m, lisible à 5 m, 30 jours' };
         }
@@ -257,9 +286,7 @@ const DevMock = (() => {
         return ok(errors.length > 0 ? { valid: false, errors } : { valid: true });
       }
       case 'options': {
-        let list = [];
-        if (data.field === 'quartier') list = districts;
-        else if (data.field === 'offrande') list = items;
+        const list = optionsOf(data.field);
         const q = fold(data.query);
         const found = list.filter((i) => !q || fold(i.label).includes(q) || i.value === data.query);
         const page = data.page || 1;
@@ -284,7 +311,9 @@ const DevMock = (() => {
         const lines = journal.filter((l) => (!data.editor || l.editor === data.editor) && (!data.before || l.id < data.before)
           && (!senechal || visibleCards().some((c) => c.editor === l.editor)));
         const page = lines.slice(0, 25);
-        return ok({ lines: clone(page), more: lines.length > 25, next: page.length > 0 ? page[page.length - 1].id : 0 });
+        const sent = clone(page);
+        if (data.editor) for (const line of sent) delete line.editor;
+        return ok({ lines: sent, more: lines.length > 25, next: page.length > 0 ? page[page.length - 1].id : 0 });
       }
       default: return fail('invalid_args');
     }

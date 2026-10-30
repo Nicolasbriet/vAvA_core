@@ -1,9 +1,7 @@
 'use strict';
 /*
  * vava_atelier/web/js/components.js
- * Rôle : pièces communes : fabrique d'éléments (texte TOUJOURS posé par textContent, jamais par innerHTML), icônes SVG
- *        en ligne (tracés de la maquette Main, aucun fichier image), étiquettes, ligne de journal, liste déroulante
- *        cherchable (Picker), boîte de confirmation, message bref, bandeau du volet et barre des touches (pour T-102).
+ * Rôle : pièces communes (texte TOUJOURS par textContent, jamais innerHTML) : éléments, icônes, Picker, Confirm, Toast…
  * Dépendances : strings.js, format.js
  */
 
@@ -11,7 +9,6 @@ const UI = (() => {
   const SVG_NS = 'http://www.w3.org/2000/svg';
   const byId = (id) => document.getElementById(id);
 
-  /** Élément HTML : `text` par textContent, `on…` écouteur, `data` dataset, `value`/`checked` propriétés. */
   function h(tag, props, ...children) {
     const el = document.createElement(tag);
     for (const [key, value] of Object.entries(props || {})) {
@@ -35,7 +32,7 @@ const UI = (() => {
     return el;
   }
 
-  // Tracés des maquettes (24 × 24, traits) : une chaîne = un chemin, [cx, cy, r] = un cercle.
+  // 24 × 24 : une chaîne = un chemin, [cx, cy, r] = un cercle
   const ICONS = {
     recolte: ['M12 3c-3 0-5 2.5-5 5 0 1 .3 2 .8 2.7C6.6 11.5 6 12.7 6 14c0 2.5 2.7 4 6 4s6-1.5 6-4c0-1.3-.6-2.5-1.8-3.3.5-.7.8-1.7.8-2.7 0-2.5-2-5-5-5z', 'M12 18v3'],
     agriculture: ['M12 21V8', 'M12 12c-2-.5-3.5-2-4-4 2 .3 3.5 1.5 4 4zM12 12c2-.5 3.5-2 4-4-2 .3-3.5 1.5-4 4zM12 16c-2-.5-3.5-2-4-4 2 .3 3.5 1.5 4 4zM12 16c2-.5 3.5-2 4-4-2 .3-3.5 1.5-4 4zM12 8c-1-1-1-3 0-5 1 2 1 4 0 5z'],
@@ -55,7 +52,6 @@ const UI = (() => {
     check: ['M5 12.5l4.5 4.5L19 7.5'],
   };
 
-  /** Icône décorative (cachée aux lecteurs d'écran) ; une icône inconnue devient le parchemin. */
   function icon(name, size = 22, stroke = 1.6) {
     const node = (tag, attrs) => {
       const el = document.createElementNS(SVG_NS, tag);
@@ -72,10 +68,9 @@ const UI = (() => {
 
   const round = (name, label, onclick) => h('button', { type: 'button', class: 'round', 'aria-label': label, title: label, onclick }, icon(name, 16, 2));
 
-  /** Étiquette : count et live (vert), upcoming et new (sable), trial (bleu), draft (ocre). */
   const tag = (text, tone = 'count') => h('span', { class: `tag tag-${tone}`, text });
 
-  /** Image d'objet : seulement un chemin nui:// (registre des objets), sinon rien. */
+  /** Image d'objet : seulement un chemin nui://, sinon rien. */
   function image(src) {
     if (typeof src !== 'string' || !/^nui:\/\/[\w.-]+\/[\w./-]+$/.test(src)) return null;
     const img = h('img', { class: 'thumb', src, alt: '', draggable: 'false' });
@@ -83,7 +78,6 @@ const UI = (() => {
     return img;
   }
 
-  /** « A publié la station **Forge du bourg** — résumé », puis « acteur, quand » (et l'atelier dans le journal entier). */
   function journalLine(line, editorLabel) {
     const str = Format.str, summary = str(line.summary);
     return h('div', { class: 'jr' },
@@ -105,7 +99,6 @@ const UI = (() => {
     };
   })();
 
-  // Boîte de confirmation (cuir et parchemin) : Confirm.ask({ title, text, cancel, ok }) → Promise<booléen>
   const Confirm = (() => {
     let resolver = null, lastFocus = null;
     function settle(value) {
@@ -130,8 +123,7 @@ const UI = (() => {
     return { ask, isOpen: () => resolver !== null, cancel: () => settle(false) };
   })();
 
-  // Liste déroulante cherchable, sous (ou sur) son bouton.
-  // Picker.open(bouton, { search, remote, current, none, load(texte, page) → Promise<{ items, more, error? }>, onPick(entrée) })
+  // Picker.open(bouton, { search, remote, current, none, load(texte, page) → Promise<{ items, more, error? }>, onPick })
   const Picker = (() => {
     let state = null, timer = 0;
     const options = () => (state ? Array.from(state.list.querySelectorAll('.picker-option')) : []);
@@ -221,7 +213,6 @@ const UI = (() => {
       if (refocus && document.contains(anchor)) anchor.focus();
     }
 
-    // un clic ailleurs ou un changement de taille la ferment ; un défilement de la fiche la replace sous son bouton
     const outside = (event) => { if (state && !byId('picker').contains(event.target) && !state.anchor.contains(event.target)) close(false); };
     document.addEventListener('mousedown', outside);
     document.addEventListener('scroll', (event) => { if (state && !byId('picker').contains(event.target)) place(byId('picker'), state.anchor); }, true);
@@ -229,7 +220,6 @@ const UI = (() => {
     return { open, close, isOpen: () => state !== null };
   })();
 
-  // Bandeau du volet (en haut à gauche) et barre des touches (en bas), prêts pour T-102
   const Banner = {
     show(title, line, back) {
       byId('banner').replaceChildren(round('back', STRINGS.back, back),

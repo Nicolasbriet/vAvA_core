@@ -43,6 +43,35 @@ describe('vava_atelier text', function()
         assert.is_true(text.hasControl('ligne\r\nsuivante', true))
     end)
 
+    it('repère les caractères invisibles : sans largeur, marques de sens, séparateurs, BOM', function()
+        for _, code in ipairs({ 0x200B, 0x200C, 0x200D, 0x200E, 0x200F, 0x2028, 0x2029, 0xFEFF, 0x061C }) do
+            local probe = 'Pan' .. utf8.char(code) .. 'neau'
+            assert.is_true(text.hasControl(probe), string.format('U+%04X', code))
+            assert.is_true(text.hasControl(probe, true), string.format('U+%04X (retours permis)', code))
+        end
+        -- leurs voisins imprimables restent permis : espace ultrafine (U+200A), tiret (U+2010), apostrophe (U+2019),
+        -- points de suspension (U+2026), point de coupure (U+2027), espace fine insécable (U+202F), ponctuation arabe
+        -- (U+061B, U+061F), ligature arabe (U+FEFC), é
+        for _, code in ipairs({ 0x200A, 0x2010, 0x2019, 0x2026, 0x2027, 0x202F, 0x061B, 0x061F, 0xFEFC, 0x00E9 }) do
+            assert.is_false(text.hasControl('Pan' .. utf8.char(code) .. 'neau'), string.format('U+%04X', code))
+        end
+    end)
+
+    it('ne dépend pas de la locale : aucune lettre latine accentuée n\'est prise pour un contrôle', function()
+        -- chaque caractère de U+00A0 à U+017F (lettres accentuées, œ, ligatures) : octets de suite 0x80 à 0xBF
+        for code = 0xA0, 0x17F do
+            assert.is_false(text.hasControl('a' .. utf8.char(code) .. 'b'), string.format('U+%04X', code))
+        end
+        assert.is_false(text.hasControl('Ïle d\'Ídrë, Ðan et Ýves'))
+        -- même règle pour le motif du filtre et de la recherche (schéma des RPC)
+        local QUERY = VavaAtelier.QUERY_PATTERN
+        assert.truthy(('Ïle d\'Ídrë'):find(QUERY))
+        assert.truthy((''):find(QUERY))
+        for _, bad in ipairs({ 'a\tb', 'a\0b', 'a\x7Fb', '<b>', 'a>b', 'ligne\n' }) do
+            assert.is_nil(bad:find(QUERY), bad)
+        end
+    end)
+
     it('jeu de caractères name : lettres accentuées, chiffres, espace et ponctuation légère', function()
         for _, good in ipairs({ 'Forêt de Brume', 'L\'Ancre-Rouge', 'Œuvre, 2e partie.', 'Château d’Ys', 'Noël' }) do
             assert.is_true(text.isName(good), good)

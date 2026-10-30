@@ -2,7 +2,8 @@
 
 Ressource de **développement** (T-100) : la preuve qu'un module déclare ses ateliers **sans une ligne d'interface**.
 Serveur seulement : ni client, ni page. **Jamais sur un serveur ouvert au public** : sans `set vava_env dev`, le module
-refuse de démarrer (« mode développement absent ») et ne déclare rien.
+refuse de démarrer (« mode développement absent ») et ne déclare rien ; la garde est relue à chaque
+redéclaration (hook `vava_atelier:editorsReady`) et à chaque commande.
 
 ## Ce qu'elle déclare
 

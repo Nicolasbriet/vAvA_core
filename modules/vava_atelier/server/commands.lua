@@ -20,9 +20,7 @@ local function entries()
     return {
         [cfg.command] = {
             kind = 'command', scope = 'admin', permission = cfg.rights.open, key = cfg.keys.open, ui = true,
-            label = cfg.labels.open,
-            description = 'Créer et régler le royaume en jeu, sans redémarrer : zones, stations, parcelles… '
-                .. 'selon votre rang.',
+            label = cfg.labels.open, description = cfg.texts.codex,
         },
     }
 end

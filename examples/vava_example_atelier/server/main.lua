@@ -8,7 +8,8 @@
            Données en mémoire, tirées de la config ; rien n'est écrit en base. Fonctions lues par l'Atelier : index,
            read, validate, options, compare. Commande /atelier_exemple journal <panneaux|proclamations> <texte> : une
            ligne `note` au journal du Conseil par l'export `journal` (droit effectif de l'atelier, revérifié par
-           l'Atelier). Garde : sans `set vava_env dev`, le setup refuse (aucun éditeur, aucune commande).
+           l'Atelier). Garde : sans `set vava_env dev`, le setup refuse (aucun éditeur, aucune commande) ; relue
+           à chaque redéclaration et à chaque commande.
     Dépendances : vAvA_core ≥ 0.11.0 (API v1), config.lua, shared/guard.lua, shared/rules.lua, shared/forms.lua ;
                   vava_atelier (registre et export journal ; redéclaration au hook vava_atelier:editorsReady)
 ]]
@@ -116,7 +117,7 @@ local EDITORS = {
         label = 'Panneaux du bourg (exemple)',
         description = 'Exemple de développement : tous les réglages qu\'un atelier peut montrer.',
         texts = { trial = 'Voir le panneau', publish = 'Dresser le panneau',
-            publishHint = 'Dresser le panneau le rend lisible aux passants (après T-101).' },
+            publishHint = 'Dresser le panneau le rend lisible aux passants.' },
         kinds = {
             { id = 'panneau', noun = 'panneau', nounPlural = 'panneaux', article = 'le', newLabel = 'Nouveau panneau',
                 layout = 'page', steps = { 'Le panneau', 'Son allure', 'Dresser' }, form = forms.panneau },
@@ -140,6 +141,11 @@ local EDITORS = {
 
 --- Déclare les deux éditeurs si le registre de l'Atelier existe (au setup, et à chaque démarrage de l'Atelier).
 local function declare()
+    -- mode développement relu à chaque appel : `set vava_env prod` puis `restart vava_atelier` ne redéclare rien
+    if not guard.isDevMode(GetConvar(guard.CONVAR, guard.FALLBACK)) then
+        log.warn('mode développement absent : ateliers d\'exemple non déclarés')
+        return
+    end
     if not core.registry.exists(REGISTRY) then return end
     for key, def in pairs(EDITORS) do
         if not core.registry.has(REGISTRY, key) then

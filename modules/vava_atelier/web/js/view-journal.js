@@ -1,9 +1,7 @@
 'use strict';
 /*
  * vava_atelier/web/js/view-journal.js
- * Rôle : journal entier (lignes .jr de la maquette Main, dans le cadre) : retour, titre « Journal du Conseil », filtre
- *        par atelier (« Tous les ateliers » et les ateliers visibles du membre), lignes par 25, « Plus anciens »
- *        (curseur `next` rendu par le serveur).
+ * Rôle : journal entier : filtre par atelier, lignes par 25, curseur `next`.
  * Dépendances : strings.js, format.js, components.js
  */
 
@@ -11,10 +9,6 @@ const JournalView = (() => {
   const { h, icon, round, journalLine, Picker } = UI;
   const str = Format.str;
 
-  /**
-   * @param model   { editors: [{ editor, label }], filter }
-   * @param actions { back, filter(editorId), older() }
-   */
   function render(model, actions) {
     const labels = new Map(model.editors.map((e) => [e.editor, e.label]));
     const items = [{ value: '', label: STRINGS.journal.allEditors }].concat(model.editors.map((e) => ({ value: e.editor, label: e.label })));
@@ -45,10 +39,10 @@ const JournalView = (() => {
 
     return {
       el,
-      /** Ajoute une page de lignes (reset : remplace). */
       add(data, reset) {
         const list = Format.list(data.lines).filter((l) => l && typeof l === 'object');
         if (reset) lines.replaceChildren();
+        // filtrée, la ligne n'a pas d'`editor` : c'est celui du filtre
         for (const line of list) lines.append(journalLine(line, model.filter ? '' : labels.get(str(line.editor)) || ''));
         if (lines.childElementCount === 0) lines.append(h('p', { class: 'hp empty', text: STRINGS.journal.none }));
         older.hidden = data.more !== true;

@@ -3,8 +3,9 @@
     Rôle : registre vava_atelier:editors. Définition (validateur : shared/formschema.lua), contrôle du propriétaire
            (un module ne déclare que sous son nom : une clé dont le préfixe n'est pas la ressource qui l'a ajoutée est
            retirée aussitôt), cache des éditeurs tenu par les hooks du registre (droit effectif, types et champs
-           indexés, fonctions du module, descripteur pour l'interface et son empreinte), cartes de l'accueil dans
-           l'ordre (cartes « Bientôt » de la config, puis les autres par `order`).
+           indexés, fonctions du module, descripteur pour l'interface et son empreinte ; un descripteur plus lourd
+           que `limits.descriptorBytes` est refusé et retiré), cartes de l'accueil dans l'ordre (cartes « Bientôt »
+           de la config, puis les autres par `order`).
     Dépendances : shared/constants.lua, config.lua, shared/formvalues.lua, shared/formschema.lua, shared/rights.lua,
                   shared/fingerprint.lua, server/core.lua
 ]]
@@ -125,9 +126,17 @@ local function load(id, owner)
         kinds[kind.id] = { def = kind, fields = fields, rank = i }
     end
     local descriptor = describe(id, data)
-    local version, err = VavaAtelier.fingerprint(descriptor)
+    local version, size = VavaAtelier.fingerprintSized(descriptor)
     if not version then
-        VavaAtelier.log.error("éditeur '%s' : empreinte impossible (%s)", id, tostring(err))
+        VavaAtelier.log.error("éditeur '%s' : empreinte impossible (%s), atelier refusé", id, tostring(size))
+        return false
+    end
+    -- plafond global : chaque borne de la déclaration est tenue, mais leur produit (8 types × 40 champs × aides de
+    -- 140 octets…) dépasserait ce qu'un membre doit recevoir à l'ouverture d'un atelier
+    if size > cfg.limits.descriptorBytes then
+        VavaAtelier.log.error("éditeur '%s' : descripteur de %d octets, au-delà de %d (limits.descriptorBytes), "
+            .. 'atelier refusé : alléger les formulaires ou les répartir sur deux ateliers', id, size,
+            cfg.limits.descriptorBytes)
         return false
     end
     loaded[id] = {
@@ -151,6 +160,9 @@ function editors.added(key, owner)
     end
     if load(key, owner) then
         VavaAtelier.log.info("atelier '%s' déclaré par %s (droit %s)", key, owner, loaded[key].right)
+    else
+        -- refusé (empreinte impossible, descripteur trop lourd) : retiré du registre, sa place est libérée
+        core.registry.remove(REGISTRY, key)
     end
 end
 

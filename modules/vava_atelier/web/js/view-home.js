@@ -1,11 +1,7 @@
 'use strict';
 /*
  * vava_atelier/web/js/view-home.js
- * Rôle : accueil (maquette Main) : en-tête (titre, phrase, recherche, bouton rond de fermeture), une section par
- *        famille (seulement celles qui ont une carte), cartes en grille de 2 (icône ronde, nom en Cinzel, étiquette,
- *        description ; « Bientôt » non cliquable), volet droit « Vos brouillons », « Journal du Conseil », « Tout le
- *        journal », note du bas. Recherche : dès 2 lettres, cartes filtrées sur place (sans réseau), puis, après 400 ms
- *        sans frappe, « Dans les ateliers » (RPC search) ; Entrée ouvre le premier résultat.
+ * Rôle : accueil (maquette Main) ; recherche dès 2 lettres : cartes filtrées sur place, puis RPC search après 400 ms.
  * Dépendances : strings.js, format.js, components.js
  */
 
@@ -13,17 +9,15 @@ const HomeView = (() => {
   const { h, icon, round, tag, journalLine } = UI;
   const str = Format.str;
   const SEARCH_DELAY = 400;
-  const TONES = new Set(['count', 'upcoming', 'trial', 'draft']);
 
-  function card(entry, actions) {
+  function card(entry, tags, actions) {
     const upcoming = entry.upcoming === true;
-    const tagText = upcoming ? STRINGS.upcoming : str(entry.tag);
-    const tone = upcoming ? 'upcoming' : (TONES.has(entry.tone) ? entry.tone : 'count');
+    const label = Format.cardTag(entry, tags);
     return h('button', { type: 'button', class: `ent${upcoming ? ' soon' : ''}`, disabled: upcoming, data: { editor: str(entry.editor) },
       onclick: upcoming ? null : () => actions.openEditor(entry.editor) },
       h('span', { class: 'ico' }, icon(entry.icon)),
       h('span', { class: 'ent-text' },
-        h('span', { class: 'ent-top' }, h('span', { class: 'nm', text: str(entry.label) }), tagText ? tag(tagText, tone) : null),
+        h('span', { class: 'ent-top' }, h('span', { class: 'nm', text: str(entry.label) }), label ? tag(label.text, label.tone) : null),
         h('span', { class: 'ds', text: str(entry.description) })));
   }
 
@@ -35,10 +29,6 @@ const HomeView = (() => {
       label ? tag(label, status === 'trial' ? 'trial' : 'draft') : null);
   }
 
-  /**
-   * @param model   { content: { families, cards, footnote }, drafts, journal, rank }
-   * @param actions { openEditor, openEntry, openHit, openJournal, close, search(text) → Promise }
-   */
   function render(model, actions) {
     const content = model.content || {};
     const cards = Format.list(content.cards).filter((c) => c && typeof c.editor === 'string');
@@ -48,7 +38,7 @@ const HomeView = (() => {
       if (members.length === 0) continue;
       sections.push(h('section', { class: 'family', data: { family: str(family.id) } },
         h('h2', { class: 'grp', text: str(family.label) }),
-        h('div', { class: 'cards' }, members.map((c) => card(c, actions)))));
+        h('div', { class: 'cards' }, members.map((c) => card(c, model.tags, actions)))));
     }
     const noCard = h('p', { class: 'hp empty', text: STRINGS.search.noCard, hidden: true });
     const hits = h('section', { class: 'hits', hidden: true });
@@ -77,7 +67,7 @@ const HomeView = (() => {
         round('close', STRINGS.close, () => actions.close())),
       h('div', { class: 'home-body' }, h('main', { class: 'home-main' }, sections, noCard, hits), aside));
 
-    // Recherche -----------------------------------------------------------------------------------------------------
+    // Recherche
     let timer = 0, seq = 0, results = [], pending = null;
 
     function filterCards(text) {
@@ -143,7 +133,6 @@ const HomeView = (() => {
     return {
       el,
       focus: () => input.focus(),
-      /** Échap : vide la recherche si elle a du texte ; vrai si elle a servi. */
       clearSearch() {
         if (input.value === '') return false;
         input.value = '';

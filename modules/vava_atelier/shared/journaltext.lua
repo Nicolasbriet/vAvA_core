@@ -69,14 +69,16 @@ end
 ---@field actor_label string
 ---@field at number  secondes (UNIX_TIMESTAMP)
 
---- Ligne du journal pour l'interface : { id, lead, title, summary?, actor, when, editor }.
+--- Ligne du journal pour l'interface : { id, lead, title, summary?, actor, when, editor? }. `sameEditor` : la page a
+--- demandé un seul atelier, qu'elle connaît déjà (filtre) : `editor` n'est pas répété sur chaque ligne.
 ---@param row vAvA.AtelierJournalRow
 ---@param verbs table<string, string>
 ---@param kind? { article: string, noun: string }  type de l'éditeur s'il est encore déclaré
 ---@param now number
 ---@param dateOf? fun(fmt: string, at: number): string
+---@param sameEditor? boolean
 ---@return table
-function jt.line(row, verbs, kind, now, dateOf)
+function jt.line(row, verbs, kind, now, dateOf, sameEditor)
     return {
         id = row.id,
         lead = jt.lead(verbs[row.action] or verbs.note, kind and kind.article, kind and kind.noun),
@@ -84,6 +86,6 @@ function jt.line(row, verbs, kind, now, dateOf)
         summary = jt.summary(row.summary),
         actor = row.actor_label,
         when = jt.age(now, row.at or now, dateOf),
-        editor = row.editor,
+        editor = not sameEditor and row.editor or nil,
     }
 end

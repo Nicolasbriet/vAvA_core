@@ -1,11 +1,7 @@
 'use strict';
 /*
  * vava_atelier/web/js/app.js
- * Rôle : assemblage de la page : messages du Lua (open, close, notify, editorGone, mode, keys), écrans enchaînés sans
- *        recharger (accueil, liste, fiche « page » ou « volet », journal), accueil et descripteurs gardés tant que leur
- *        empreinte tient (secours `stale`), Échap en haut de la pile (boîte, liste ouverte, retour, puis fermeture),
- *        touche de fermeture, confirmation avant de quitter une fiche modifiée. Rien n'est décidé ici : le serveur dit
- *        qui voit quoi et ce qui est valide.
+ * Rôle : assemblage de la page : messages du Lua, écrans, contenus gardés par empreinte, Échap, confirmation de sortie.
  * Dépendances : strings.js, bridge.js, format.js, components.js, widgets.js, form.js, view-*.js
  */
 
@@ -14,17 +10,16 @@
   const { str, list } = Format;
   const $ = (id) => document.getElementById(id);
   const app = $('app'), veil = $('veil'), frame = $('frame'), sheet = $('sheet'), sideBox = $('side'), sideSheet = $('side-sheet');
-  const MAX_RESOLVE = 6;   // libellés de valeurs (objet, liste d'un module) relus à l'ouverture d'une fiche, au plus
 
   const state = {
     closeKey: 'F9',
-    home: { version: '', content: null, drafts: [], journal: [], rank: '' },
-    descriptors: new Map(),   // atelier → { version, descriptor }
-    labels: new Map(),        // valeur d'un champ à liste distante → { label, image?, provisional? }
+    home: { version: '', content: null, tags: {}, drafts: [], journal: [], rank: '' },
+    descriptors: new Map(),
+    labels: new Map(),
     screen: null, view: null, editor: '', descriptor: null, kind: null, entry: null,
     list: { query: '', page: 1, seq: 0 },
     journal: { filter: '', next: 0, seq: 0 },
-    banner: undefined,        // bandeau imposé par `mode` (undefined : celui par défaut ; null : caché)
+    banner: undefined,   // undefined : par défaut ; null : caché
     keys: [],
   };
 
@@ -60,7 +55,6 @@
     Keys.hide();
   }
 
-  /** Demande refusée : message ; un atelier qui n'existe plus est oublié et l'on revient à l'accueil. */
   function refused(code, editor) {
     Toast.show(errorText(code), 'error');
     if (code === 'unknown_editor' && editor) {
@@ -69,19 +63,19 @@
     }
   }
 
-  // Accueil ----------------------------------------------------------------------------------------------------------
+  // Accueil
 
-  /** Range une réponse d'accueil ; vrai si la page a le contenu de la version annoncée. */
   function absorbHome(data) {
     const version = str(data.version);
     if (data.content && typeof data.content === 'object') Object.assign(state.home, { content: data.content, version });
+    state.home.tags = data.tags && typeof data.tags === 'object' && !Array.isArray(data.tags) ? data.tags : {};
     state.home.drafts = list(data.drafts);
     state.home.journal = list(data.journal);
     if (typeof data.rank === 'string') state.home.rank = data.rank;
     return state.home.content !== null && state.home.version === version;
   }
 
-  /** Secours : la page n'a pas le contenu annoncé ; le Lua oublie ses versions et tout est redemandé. */
+  /** Secours : le Lua oublie ses versions et tout est redemandé. */
   async function resyncHome() {
     Bridge.post('stale');
     const result = await Bridge.post('home', { version: '' });
@@ -95,7 +89,6 @@
     view.focus();
   }
 
-  /** Retour à l'accueil ; `refresh` relit brouillons et journal (le contenu gardé reste si son empreinte tient). */
   async function goHome(refresh) {
     if (refresh) {
       const result = await Bridge.post('home', { version: state.home.version });
@@ -113,7 +106,7 @@
     search: (text) => Bridge.post('search', { text }),
   };
 
-  // Ateliers ---------------------------------------------------------------------------------------------------------
+  // Ateliers
 
   function takeDescriptor(editor, data) {
     if (data.descriptor && typeof data.descriptor === 'object') state.descriptors.set(editor, { version: str(data.version), descriptor: data.descriptor });
@@ -121,7 +114,6 @@
     return cached && cached.version === str(data.version) ? cached.descriptor : null;
   }
 
-  /** Descripteur d'un atelier, gardé par la page tant que son empreinte tient ; { descriptor } ou { error }. */
   async function descriptorOf(editor) {
     for (let attempt = 0; attempt < 2; attempt += 1) {
       if (attempt > 0) Bridge.post('stale');
@@ -134,7 +126,6 @@
     return { error: 'invalid_response' };
   }
 
-  /** Rend courant un atelier et l'un de ses types (le premier par défaut) ; faux, avec un message, si impossible. */
   async function useEditor(editor, kindId) {
     if (!str(editor)) return false;
     let descriptor = state.editor === editor ? state.descriptor : null;
@@ -155,7 +146,7 @@
     if (await useEditor(editor, kindId)) showList();
   }
 
-  // Liste ------------------------------------------------------------------------------------------------------------
+  // Liste
 
   function showList() {
     const view = ListView.render({ descriptor: state.descriptor, kind: state.kind, query: state.list.query }, {
@@ -180,13 +171,11 @@
     if (result.error === 'unknown_editor') refused(result.error, editor);
   }
 
-  // Fiche ------------------------------------------------------------------------------------------------------------
+  // Fiche
 
   const labelKey = (field, value) => (field.widget === 'item' ? `item|${value}` : `${state.editor}|${state.kind.id}|${field.id}|${value}`);
-  const remoteField = (field) => field.widget === 'item' || (str(field.source) !== '' && !(field.widget === 'model' && list(field.choices).length > 0));
   const cleanItem = (item) => ({ value: item.value, label: str(item.label), image: str(item.image), provisional: item.provisional === true });
 
-  /** Valeurs proposées pour un champ (RPC options) ; chaque libellé reçu est gardé pour l'affichage. */
   async function lookup(field, query, page) {
     const result = await Bridge.post('options', { editor: state.editor, kind: state.kind.id, field: field.id, query: Format.query(query), page: page || 1 });
     if (!result.ok) return { error: result.error };
@@ -195,7 +184,6 @@
     return { items, more: result.data.more === true };
   }
 
-  /** Valeurs reçues { n, s, b } → table plate. */
   function flatten(values) {
     const out = {};
     for (const map of ['n', 's', 'b']) {
@@ -219,8 +207,8 @@
       footer = list(data.footer);
       title = str(data.title) || id;
       tag = data.state && str(data.state.label) ? { label: data.state.label, tone: str(data.state.tone) || 'live' } : { label: STRINGS.entry.stateLive, tone: 'live' };
+      for (const known of Format.fieldLabels((kind.form || {}).fields, values, data.labels)) state.labels.set(labelKey(known.field, known.value), known.item);
     }
-    const resolves = [];
     const entry = { editor, kind, id: id || '', checking: false };
     entry.form = Form.build(kind, values, {
       warnings: new Set(warnings),
@@ -232,7 +220,6 @@
       lookup,
       known: (field, value) => state.labels.get(labelKey(field, value)) || null,
       remember: (field, item) => state.labels.set(labelKey(field, item.value), cleanItem(item)),
-      resolve: (field, value, show) => { if (value && remoteField(field) && !state.labels.has(labelKey(field, value))) resolves.push({ field, value, show }); },
     });
     const layout = kind.layout === 'side' ? 'side' : 'page';
     entry.view = EntryView.render({ descriptor: state.descriptor, kind, layout, title, state: tag, form: entry.form, compare, footer }, { back, check });
@@ -240,15 +227,9 @@
     state.entry = entry;
     mount('entry', entry.view, layout);
     entry.form.focusFirst();
-    // libellés des valeurs tirées d'une liste (« Le marché », « Pain ») : une demande par valeur inconnue, à la suite
-    for (const pending of resolves.slice(0, MAX_RESOLVE)) {
-      const found = await lookup(pending.field, pending.value, 1);
-      if (state.entry !== entry) return;
-      if (!found.error && state.labels.has(labelKey(pending.field, pending.value))) pending.show();
-    }
   }
 
-  /** Vrai si l'on peut quitter la fiche : rien de changé depuis la lecture ou la dernière vérification, ou « Quitter ». */
+  /** Vrai si l'on peut quitter : rien de changé depuis l'ouverture (vérifiée ou non), ou « Quitter ». */
   async function leaveEntry() {
     if (!state.entry || state.entry.form.snapshot() === state.entry.snapshot) return true;
     return Confirm.ask(STRINGS.confirmLeave);
@@ -271,14 +252,13 @@
       entry.form.clear();
       entry.view.flashOk();
       if (result.data.compare) entry.view.setCompare(result.data.compare);
-      entry.snapshot = JSON.stringify(values);
     } else {
       entry.form.showErrors(result.data.errors);
       entry.form.focusFirstError();
     }
   }
 
-  // Journal ----------------------------------------------------------------------------------------------------------
+  // Journal
 
   function openJournal(filter) {
     Object.assign(state, { editor: '', descriptor: null, kind: null });
@@ -301,7 +281,7 @@
     view.add(result.data, reset);
   }
 
-  // Navigation et fermeture ------------------------------------------------------------------------------------------
+  // Navigation et fermeture
 
   async function back() {
     if (state.screen === 'entry') {
@@ -316,7 +296,6 @@
     Bridge.post('close');
   }
 
-  /** Touche de fermeture (`closeKey`, F9 par défaut) ; une lettre ne compte pas pendant la frappe. */
   function isCloseKey(event) {
     const key = str(state.closeKey).toLowerCase();
     if (!key || event.key.toLowerCase() !== key) return false;
@@ -335,7 +314,7 @@
     if (Picker.isOpen()) Picker.close(true); else back();
   });
 
-  // Messages du Lua --------------------------------------------------------------------------------------------------
+  // Messages du Lua
 
   async function onOpen(payload) {
     if (str(payload.closeKey)) state.closeKey = payload.closeKey;

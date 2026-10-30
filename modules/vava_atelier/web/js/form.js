@@ -1,12 +1,8 @@
 'use strict';
 /*
  * vava_atelier/web/js/form.js
- * Rôle : fiche générique pilotée par le schéma d'un type (§ 5.3) : champs sans groupe en tête, puis groupes dans
- *        l'ordre déclaré (replié : <details>, comme « Réglages de la zone » de Recolte), deux champs `half` consécutifs
- *        sur une ligne, phrase d'aide toujours visible sous chaque réglage, « Valeur reprise par défaut », erreurs sous
- *        le champ ou en tête de fiche, paquet de valeurs { n, s, b } (§ 6.1). Contrôles de confort seulement (champ
- *        requis, longueur, jeu de caractères, bornes d'une durée) : le serveur et le module restent seuls juges.
- *        Form.build(type, valeurs, env) ; env : { warnings: Set, changed(champ), lookup, known, remember, resolve }.
+ * Rôle : fiche pilotée par le schéma d'un type (§ 5.3), paquet { n, s, b } ; contrôles de confort seulement.
+ *        Form.build(type, valeurs, env) ; env : { warnings, changed, lookup, known, remember }.
  * Dépendances : strings.js, format.js, components.js, widgets.js
  */
 
@@ -17,7 +13,6 @@ const Form = (() => {
   const CONTROL = /[\u0000-\u0008\u000b-\u001f\u007f]/;
   const MAX_LINES = 8;
 
-  /** Contrôle de confort d'un champ ; '' si rien à redire. */
   function localError(field, value) {
     const optional = field.optional === true;
     switch (field.widget) {
@@ -57,7 +52,7 @@ const Form = (() => {
       const value = Object.prototype.hasOwnProperty.call(values, field.id) ? values[field.id] : Widgets.defaultOf(field);
       const widget = Widgets.create(field, value, {
         changed: () => { setError(field.id, ''); env.changed(field.id); },
-        lookup: env.lookup, known: env.known, remember: env.remember, resolve: env.resolve,
+        lookup: env.lookup, known: env.known, remember: env.remember,
       });
       UI.append(node, [widget.nodes, h('p', { class: 'hp', text: Format.str(field.help) }), widget.after,
         env.warnings.has(field.id) ? h('p', { class: 'warn', text: STRINGS.entry.warning }) : null, err]);
@@ -65,7 +60,6 @@ const Form = (() => {
       return node;
     }
 
-    /** Champs d'une suite ; deux `half` consécutifs partagent une ligne. */
     function rows(list) {
       const out = [];
       for (let i = 0; i < list.length; i += 1) {
@@ -89,7 +83,6 @@ const Form = (() => {
         h('div', { class: 'fgroup-body' }, rows(members))));
     }
 
-    /** Erreur sous un champ (une seconde erreur du même champ s'ajoute à la première) ; '' l'efface. */
     function setError(id, text, add) {
       const entry = entries.get(id);
       const full = add && entry.err.textContent ? `${entry.err.textContent} ${text}` : text;
@@ -107,7 +100,6 @@ const Form = (() => {
       alerts.hidden = true;
     }
 
-    /** Paquet { n, s, b } du RPC check ; les cartes vides sont omises. */
     function packet() {
       const out = { n: {}, s: {}, b: {} };
       for (const [id, entry] of entries) {
@@ -118,7 +110,6 @@ const Form = (() => {
       return out;
     }
 
-    /** Contrôle de confort de toute la fiche ; vrai si rien à redire. */
     function validate() {
       clear();
       let ok = true;
@@ -129,7 +120,6 @@ const Form = (() => {
       return ok;
     }
 
-    /** Erreurs rendues par le serveur, { field?, text } ; sans champ connu, elles vont en tête de fiche. */
     function showErrors(errors) {
       clear();
       for (const error of Format.list(errors)) {
@@ -140,7 +130,6 @@ const Form = (() => {
       alerts.hidden = alerts.childElementCount === 0;
     }
 
-    /** Focus sur le premier champ en erreur, sinon sur les erreurs générales. */
     function focusFirstError() {
       const entry = Array.from(entries.values()).find((e) => !e.err.hidden);
       (entry ? entry.node : alerts).scrollIntoView({ block: 'nearest' });

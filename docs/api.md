@@ -2024,23 +2024,43 @@ réponse d'une autre forme ou un module arrêté donnent `editor_error`. Les lis
 (`monde` : `metiers` ; `societe`, `arts` : `staff`). Ouvrir l'Atelier demande `metiers`. Tout est relu auprès de
 `vava_admin` à chaque appel.
 
-RPC (schémas stricts et bornés, débits dans `config.rateLimits`) : `home(version)` → `{ version, content?, drafts,
-journal, rank }` (ouvre la session ; contenu renvoyé seulement s'il a changé, empreinte comme le Codex),
-`editor(atelier, version)` → `{ version, descriptor? }`, `list(atelier, type, page, filtre)`, `read(atelier, type, id)` →
-`{ id, title, values = { n?, s?, b? }, warnings?, compare?, state, footer }`, `check(atelier, type, id | '', values)` →
-`{ valid, errors? | compare? }`, `options(atelier, type, champ, filtre, page)`, `search(texte)`, `journal(curseur,
-atelier | '')`, `close()`. Refus : `not_ready`, `no_character`, `not_allowed`, `not_open`, `unknown_editor`,
-`unknown_kind`, `unknown_entry`, `unknown_field`, `busy`, `editor_error`, `db_error`. Évènements (`core.net`, jamais à
-tous) : `vava_atelier:revoked` au seul membre qui perd le droit d'ouvrir l'Atelier, `vava_atelier:editorGone`
-(identifiant) aux seuls membres dont la session est sur l'atelier retiré.
+**Plafond d'un descripteur** : la déclaration (sans ses fonctions ni son droit, défauts ajoutés) pèse au plus
+`limits.descriptorBytes` (32 768 octets de codage canonique, celui de l'empreinte) ; au-delà, l'atelier est refusé au
+chargement et retiré du registre, avec une ligne en console. Un plancher de famille, une surcharge ou `rights.open` hors
+de `rights.allowed` : l'Atelier refuse de démarrer.
+
+RPC (schémas stricts et bornés, débits dans `config.rateLimits`) : `home(version)` → `{ version, content?, tags,
+drafts, journal, rank }` (ouvre la session), `editor(atelier, version)` → `{ version, descriptor? }`, `list(atelier,
+type, page, filtre)`, `read(atelier, type, id)` → `{ id, title, values = { n?, s?, b? }, labels, warnings?, compare?,
+state, footer }`, `check(atelier, type, id | '', values)` → `{ valid, errors? | compare? }`, `options(atelier, type,
+champ, filtre, page)`, `search(texte)`, `journal(curseur, atelier | '')` → `{ lines, more, next }`, `close()`. Refus :
+`not_ready`, `no_character`, `not_allowed`, `not_open`, `unknown_editor`, `unknown_kind`, `unknown_entry`,
+`unknown_field`, `busy`, `editor_error`, `db_error`. Évènements (`core.net`, jamais à tous) : `vava_atelier:revoked` au
+seul membre qui perd le droit d'ouvrir l'Atelier, `vava_atelier:editorGone` (identifiant) aux seuls membres dont la
+session est sur l'atelier retiré.
+
+Trois formes de réponse évitent d'envoyer deux fois la même chose :
+
+- `home` : `content = { families, cards, footnote }` (carte `{ editor, family, label, description, icon, upcoming }`)
+  ne porte que la partie stable et ne part que si son empreinte diffère de `version` (comme le Codex) ; les étiquettes
+  des cartes partent **à chaque fois**, à part : `tags = { [atelier] = { text, tone? } }` (« 2 panneaux » ; `tone`
+  absent vaut `count`, sinon `trial`, `draft`… ; ateliers visibles seulement, aucun pour une carte « Bientôt » ni pour
+  un atelier qui ne répond pas).
+- `read` : `labels = { [champ] = { label, image?, provisional? } }` nomme la valeur courante de chaque champ à liste
+  distante (`select` ou `model` à `source`, `item`), tirée de la source gardée 5 s et des objets du royaume ; une
+  valeur vide, inconnue ou dont la liste ne répond pas n'en a pas. La page n'appelle pas `options` pour ouvrir une
+  fiche.
+- `journal` : ligne `{ id, lead, title, summary?, actor, when, editor? }` ; `editor` est omis quand la demande est
+  filtrée sur un atelier.
 
 **Journal** (table `vava_atelier_journal`, 365 jours, recopié au journal du Registre) : actions `created`, `saved`,
-`trial`, `published`, `archived`, `restored`, `removed`, `imported`, `placed`, `moved`, `note`. Chaque ligne garde le
-droit effectif de l'atelier au moment de l'écriture : un membre ne lit que les lignes des droits qu'il détient.
+`trial`, `published`, `archived`, `restored`, `removed`, `imported` (original rétabli), `placed`, `moved`, `note`.
+Chaque ligne garde le droit effectif de l'atelier au moment de l'écriture : un membre ne lit que les lignes des droits
+qu'il détient. La recopie au Registre et le hook `vava_atelier:journal` partent une fois la ligne écrite.
 
 | Export | Retour |
 |---|---|
-| serveur `journal(source, { editor, kind, id?, action, title, summary?, version? })` | `true` ou `false, code` (`invalid_args`, `unknown_editor`, `not_owner`, `not_allowed`, `flood`) — atelier de la ressource appelante seulement ; `source` : membre qui a le droit effectif de l'atelier, ou `0` (console, sans recopie) ; `title` 1 à 64 octets, `summary` 160, `version` entier ≥ 1 ; 60 lignes par 10 s et par ressource ; l'écriture en base ne fait pas attendre (numéro de la ligne dans le hook) |
+| serveur `journal(source, { editor, kind, id?, action, title, summary?, version? })` | `true` (ligne acceptée, écrite ensuite ; sans numéro) ou `false, code` (`invalid_args`, `unknown_editor`, `not_owner`, `not_allowed`, `flood`) — atelier de la ressource appelante seulement ; `source` : membre qui a le droit effectif de l'atelier, ou `0` (console, sans recopie) ; `title` 1 à 64 octets, `summary` 160, `version` entier de 1 à 4 294 967 295 ; 60 lignes par 10 s et par ressource ; l'écriture en base ne fait pas attendre (numéro de la ligne dans le hook) |
 | serveur `can(source, atelier)` | booléen : atelier déclaré et droit effectif détenu (pour les RPC propres d'un module) |
 | serveur `isOpen(source)` | booléen : session ouverte |
 | client `isOpen()` | booléen |

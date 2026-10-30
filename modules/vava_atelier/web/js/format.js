@@ -1,10 +1,7 @@
 'use strict';
 /*
  * vava_atelier/web/js/format.js
- * Rôle : fonctions pures d'affichage et de mise en forme : nombres à la française (virgule décimale), valeurs d'un
- *        curseur (« 24 m », « × 1,0 », « 70° »), durées (« 10 minutes », « 1 h 30 min », « 7 jours »), listes reçues
- *        du Lua (une liste vide arrive en objet), textes repliés pour la recherche, textes bornés en octets UTF-8 pour
- *        les schémas du serveur. Rien n'y touche au DOM.
+ * Rôle : fonctions pures (aucun DOM) : nombres et durées à la française, listes du Lua, textes, étiquettes, libellés.
  * Dépendances : strings.js
  */
 
@@ -19,13 +16,10 @@ const Format = (() => {
 
   const str = (value) => (typeof value === 'string' ? value : '');
 
-  /** Texte replié pour la recherche : sans accents ni majuscules. */
   const fold = (text) => String(text || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
 
-  /** Longueur en caractères (« é » = 1), comme le serveur la compte. */
   const chars = (text) => Array.from(String(text || '')).length;
 
-  /** Coupe un texte à `max` octets UTF-8 sans couper un caractère (bornes `max` des schémas du serveur). */
   function clip(text, max) {
     let out = String(text || '');
     if (encoder.encode(out).length <= max) return out;
@@ -34,23 +28,19 @@ const Format = (() => {
     return parts.join('');
   }
 
-  /** Texte de recherche permis par le serveur (`^[^%c<>]*$`, 48 octets). */
   const query = (text) => clip(String(text || '').replace(/[\u0000-\u001f\u007f<>]/g, '').trim(), 48);
 
-  /** Décimales d'un pas (0,1 → 1 ; 0,25 → 2). */
   function stepDecimals(step) {
     const text = String(step);
     const dot = text.indexOf('.');
     return dot === -1 ? 0 : Math.min(3, text.length - dot - 1);
   }
 
-  /** Nombre à la française : virgule décimale, espace fine des milliers. */
   function number(value, decimals = 0) {
     if (!Number.isFinite(value)) return '—';
     return new Intl.NumberFormat('fr-FR', { minimumFractionDigits: decimals, maximumFractionDigits: decimals }).format(value);
   }
 
-  /** Valeur ramenée sur un pas d'un curseur, dans ses bornes. */
   function snap(field, value) {
     const min = Number(field.min), max = Number(field.max), step = Number(field.step) > 0 ? Number(field.step) : 1;
     let v = Number(value);
@@ -62,7 +52,6 @@ const Format = (() => {
     return Math.min(max, Math.max(min, v));
   }
 
-  /** « 24 m », « 0,6 s », « × 1,0 », « 70° », « 50 % ». */
   function measure(field, value) {
     const decimals = Number.isInteger(field.decimals) ? field.decimals : stepDecimals(field.step);
     const prefix = str(field.prefix) ? `${field.prefix}${NBSP}` : '';
@@ -71,7 +60,6 @@ const Format = (() => {
     return `${prefix}${number(value, decimals)}${suffix}`;
   }
 
-  /** Durée lue : un seul ordre de grandeur en toutes lettres, sinon abrégée (« 1 h 30 min »). */
   function duration(seconds) {
     let rest = Math.max(0, Math.round(Number(seconds) || 0));
     const parts = [];
@@ -89,7 +77,6 @@ const Format = (() => {
     return parts.map(([unit, amount]) => `${number(amount)}${NBSP}${STRINGS.duration.short[unit]}`).join(' ');
   }
 
-  /** Unité de départ d'un champ de durée : la plus grande permise qui tombe juste, sinon la plus petite permise. */
   function durationUnit(units, seconds) {
     const allowed = UNIT_ORDER.filter((unit) => units.includes(unit));
     if (allowed.length === 0) return 's';
@@ -99,12 +86,32 @@ const Format = (() => {
     return allowed[allowed.length - 1];
   }
 
-  /** Nombre tapé à la française (« 1,5 ») ; NaN si ce n'en est pas un. */
   function parseAmount(text) {
     const clean = String(text || '').trim().replace(/\s/g, '').replace(',', '.');
     if (!/^\d+(\.\d+)?$/.test(clean)) return NaN;
     return Number(clean);
   }
 
-  return { UNIT_SECONDS, UNIT_ORDER, list, str, fold, chars, clip, query, stepDecimals, number, snap, measure, duration, durationUnit, parseAmount };
+  const own = (map, key) => Boolean(map) && typeof map === 'object' && !Array.isArray(map) && Object.prototype.hasOwnProperty.call(map, key);
+  const TONES = new Set(['count', 'upcoming', 'trial', 'draft']);
+
+  function cardTag(card, tags) {
+    if (card.upcoming === true) return { text: STRINGS.upcoming, tone: 'upcoming' };
+    const got = own(tags, card.editor) ? tags[card.editor] : null;
+    const text = got && typeof got === 'object' ? str(got.text) : '';
+    return text ? { text, tone: TONES.has(got.tone) ? got.tone : 'count' } : null;
+  }
+
+  function fieldLabels(fields, values, labels) {
+    const out = [];
+    for (const field of list(fields)) {
+      const got = field && own(labels, field.id) ? labels[field.id] : null;
+      const value = got ? values[field.id] : '';
+      if (typeof value !== 'string' || value === '' || typeof got !== 'object' || !str(got.label)) continue;
+      out.push({ field, value, item: { value, label: got.label, image: str(got.image), provisional: got.provisional === true } });
+    }
+    return out;
+  }
+
+  return { UNIT_SECONDS, UNIT_ORDER, list, str, fold, chars, clip, query, stepDecimals, number, snap, measure, duration, durationUnit, parseAmount, cardTag, fieldLabels };
 })();

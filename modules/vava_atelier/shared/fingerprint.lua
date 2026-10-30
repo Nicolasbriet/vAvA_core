@@ -4,7 +4,8 @@
            FNV-1a 64 bits sur un codage canonique (clés triées, types distingués, longueurs écrites), qui ne dépend que
            de ce que la valeur contient. Copie de vava_codex/shared/fingerprint.lua (même algorithme, mêmes vecteurs de
            test : tests/spec/atelier_fingerprint_spec.lua), dans l'espace VavaAtelier ; une version commune dans le
-           core serait une tâche à part.
+           core serait une tâche à part. En plus : `fingerprintSized` rend aussi la taille du codage (plafond d'un
+           descripteur, server/editors.lua).
     Dépendances : shared/constants.lua
 ]]
 
@@ -141,8 +142,21 @@ end
 ---@return string|nil fingerprint
 ---@return string|nil err
 function VavaAtelier.fingerprint(value)
+    local version, err = VavaAtelier.fingerprintSized(value)
+    if not version then return nil, err end
+    return version
+end
+
+--- Empreinte et taille en octets du codage canonique (proche de ce que la valeur pèse sur le réseau : chaque chaîne
+--- y figure entière, avec sa longueur), en un seul codage. Ajout propre à l'Atelier (plafond d'un descripteur) ;
+--- l'empreinte reste celle du Codex.
+---@param value any
+---@return string|nil fingerprint
+---@return integer|string size  octets du codage, ou la raison du refus
+function VavaAtelier.fingerprintSized(value)
     local out = {}
     local n, err = encode(value, out, 0, 1, {})
     if not n then return nil, err end
-    return format('%016x', fnv1a(concat(out, '', 1, n)))
+    local canonical = concat(out, '', 1, n)
+    return format('%016x', fnv1a(canonical)), #canonical
 end

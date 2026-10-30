@@ -1,11 +1,7 @@
 'use strict';
 /*
  * vava_atelier/web/js/bridge.js
- * Rôle : SEUL pont vers le Lua (client/nui.lua) : retours de la page (fetch NUI) et messages entrants. Les demandes qui
- *        lisent un module (liste, fiche, vérification, valeurs, recherche, journal) partent une à une : le serveur
- *        n'en traite qu'une à la fois par joueur (`busy`). Hors jeu, les appels vont aux données simulées
- *        (web/dev/devmock.js, jamais livré).
- * Réponse toujours de la forme { ok, error?, data? } (§ 9.3 de la spec T-100).
+ * Rôle : SEUL pont vers le Lua (client/nui.lua) ; lectures une à une (`busy` du serveur). Hors jeu : dev/devmock.js.
  * Dépendances : aucune (DevMock hors jeu seulement).
  */
 
@@ -34,7 +30,6 @@ const Bridge = (() => {
     return { ok: true, data: result.data && typeof result.data === 'object' ? result.data : {} };
   }
 
-  /** Retour vers le jeu. */
   function post(name, data = {}) {
     if (DIRECT.has(name)) return send(name, data).then(normalize);
     const run = queue.then(() => send(name, data)).then(normalize, () => ({ ok: false, error: 'client_error' }));
@@ -42,7 +37,6 @@ const Bridge = (() => {
     return run;
   }
 
-  /** Messages du Lua : { action, payload } (une charge posée à plat est acceptée aussi). */
   function onMessage(handler) {
     window.addEventListener('message', (event) => {
       const message = event.data;

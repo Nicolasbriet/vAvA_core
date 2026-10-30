@@ -2,7 +2,8 @@
     vava_atelier/server/entries.lua
     Rôle : ce qui est en vigueur chez les modules, lu pour l'interface. Liste d'un type (fonction `index` du module,
            nettoyée, triée, gardée `limits.cacheMs`), filtre et pages ; fiche (`read` du module → paquet de valeurs,
-           valeurs reprises par défaut signalées, encadré « Pour comparer ») ; valeurs proposées d'un champ (source du
+           libellés des valeurs choisies dans une liste distante, valeurs reprises par défaut signalées, encadré
+           « Pour comparer ») ; valeurs proposées d'un champ (source du
            module gardée `limits.cacheMs`, ou objets du royaume) ; recherche dans les ateliers visibles. Points
            d'extension `index`, `read`, `state`, `footer` (T-101 les remplace : la base fera foi).
     Dépendances : shared/constants.lua, config.lua, shared/text.lua, shared/formvalues.lua, bridge/server.lua,
@@ -55,7 +56,7 @@ function providers.read(editor, kindId, id)
     return Bridge.CallEditor(editor.id, 'read', editor.fns.read, kindId, id)
 end
 
---- Étiquette d'état d'une fiche : « En vigueur » (lue chez le module) ou « Nouveau, rien n'est enregistré ».
+--- Étiquette d'état d'une fiche : « En vigueur » (lue chez le module) ou « Rien d'enregistré ».
 ---@param _ vAvA.AtelierEditor
 ---@param _kind string
 ---@param id string  '' : entrée nouvelle
@@ -177,7 +178,41 @@ function entries.compare(editor, kindId, data)
     return { title = text.truncate(raw.title, OUT.compareTitle), text = text.truncate(body, OUT.compareText) }
 end
 
---- Fiche en vigueur : { id, title, values, warnings?, compare?, state, footer }.
+--- Longueur d'une valeur de la source d'un champ : 64 pour un modèle, 32 pour un choix.
+---@param field table
+---@return integer
+local function sourceMax(field)
+    return field.widget == 'model' and MAX_MODEL or MAX_OPTION
+end
+
+--- Libellés des valeurs courantes des champs à liste distante (select ou model à source, objet), tirés de la source
+--- gardée et des objets du royaume : { [champ] = { label, image?, provisional? } }. Une valeur vide, absente de sa
+--- liste, ou dont la liste ne répond pas n'a pas de libellé (la page montre alors la valeur brute).
+---@param editor vAvA.AtelierEditor
+---@param form table
+---@param strings table<string, string>|nil  carte `s` du paquet de la fiche
+---@return table<string, table>
+local function labelsOf(editor, form, strings)
+    local labels = {}
+    if not strings then return labels end
+    for _, field in ipairs(form.fields) do
+        local value, known = strings[field.id], nil
+        if type(value) == 'string' and value ~= '' then
+            if field.widget == 'item' then
+                known = Bridge.Item(value)
+            elseif field.source and (field.widget == 'select' or field.widget == 'model') then
+                local _, byValue = entries.source(editor, field.source, sourceMax(field))
+                known = byValue and byValue[value]
+            end
+        end
+        if known then
+            labels[field.id] = { label = known.label, image = known.image, provisional = known.provisional }
+        end
+    end
+    return labels
+end
+
+--- Fiche en vigueur : { id, title, values, labels, warnings?, compare?, state, footer }.
 ---@param ctx vAvA.AtelierContext
 ---@param id string
 ---@return boolean ok
@@ -199,6 +234,8 @@ function entries.read(ctx, id)
     local values, warnings = fv.toPacket(kind.def.form, data)
     return true, {
         id = id, title = entry.title, values = values,
+        -- la page n'appelle plus `options` à l'ouverture d'une fiche pour nommer les valeurs choisies
+        labels = labelsOf(editor, kind.def.form, values.s),
         warnings = #warnings > 0 and warnings or nil,
         compare = entries.compare(editor, kindId, data),
         state = providers.state(editor, kindId, id),
@@ -209,11 +246,12 @@ end
 -- Valeurs proposées -------------------------------------------------------------------------------------------------
 
 --- Liste d'une source de module (gardée `limits.cacheMs`), nettoyée au motif du widget : { { value, label,
---- provisional?, search } }, ou nil si le module ne répond pas.
+--- provisional?, search } } et la même indexée par valeur, ou nil si le module ne répond pas.
 ---@param editor vAvA.AtelierEditor
 ---@param source string
 ---@param maxValue integer  longueur d'une valeur (32 pour select, 64 pour model)
----@return table[]|nil
+---@return table[]|nil list
+---@return table<string, table>|nil byValue
 function entries.source(editor, source, maxValue)
     local now = GetGameTimer()
     local byEditor = sourceCache[editor.id]
@@ -223,28 +261,32 @@ function entries.source(editor, source, maxValue)
     end
     local key = source .. '#' .. maxValue
     local cached = byEditor[key]
-    if cached and now - cached.at < limits.cacheMs then return cached.list end
+    if cached and now - cached.at < limits.cacheMs then return cached.list, cached.byValue end
     local called, raw = Bridge.CallEditor(editor.id, 'options', editor.fns.options, source)
     if not called then return nil end
     if type(raw) ~= 'table' then
         VavaAtelier.log.error('%s.options(%s) : liste attendue, reçu %s', editor.id, source, type(raw))
         return nil
     end
-    local list, seen = {}, {}
+    local list, byValue = {}, {}
     for _, item in ipairs(raw) do
         if type(item) == 'table' and type(item.value) == 'string' and #item.value <= maxValue
-            and find(item.value, OPTION_PATTERN) and not seen[item.value] then
+            and find(item.value, OPTION_PATTERN) and not byValue[item.value] then
             local label = item.value
-            if type(item.label) == 'string' and item.label ~= '' and text.isUtf8(item.label) then label = item.label end
+            if type(item.label) == 'string' and item.label ~= '' and text.isUtf8(item.label)
+                and not text.hasControl(item.label) then
+                label = item.label
+            end
             label = text.truncate(label, OUT.optionLabel)
-            seen[item.value] = true
-            list[#list + 1] = { value = item.value, label = label, provisional = item.provisional == true or nil,
+            local option = { value = item.value, label = label, provisional = item.provisional == true or nil,
                 search = text.normalize(label .. ' ' .. item.value) }
+            list[#list + 1] = option
+            byValue[item.value] = option
             if #list >= limits.optionsMax then break end
         end
     end
-    byEditor[key] = { at = now, list = list }
-    return list
+    byEditor[key] = { at = now, list = list, byValue = byValue }
+    return list, byValue
 end
 
 --- Une valeur appartient-elle à la source d'un champ ? nil si le module ne répond pas.
@@ -253,12 +295,9 @@ end
 ---@param value string
 ---@return boolean|nil
 function entries.inSource(editor, field, value)
-    local list = entries.source(editor, field.source, field.widget == 'model' and MAX_MODEL or MAX_OPTION)
+    local list, byValue = entries.source(editor, field.source, sourceMax(field))
     if not list then return nil end
-    for _, item in ipairs(list) do
-        if item.value == value then return true end
-    end
-    return false
+    return byValue[value] ~= nil
 end
 
 --- Valeurs proposées d'un champ (select ou model à source, objet) : { items = { { value, label, image?,
@@ -277,7 +316,7 @@ function entries.options(ctx, fieldId, query, page)
         list = Bridge.Items()
         if not list then return true, { items = {}, more = false } end
     elseif (field.widget == 'select' or field.widget == 'model') and field.source then
-        list = entries.source(ctx.editor, field.source, field.widget == 'model' and MAX_MODEL or MAX_OPTION)
+        list = entries.source(ctx.editor, field.source, sourceMax(field))
         if not list then return false, 'editor_error' end
     else
         return false, 'unknown_field'

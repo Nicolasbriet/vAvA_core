@@ -1,11 +1,7 @@
 'use strict';
 /*
  * vava_atelier/web/js/view-entry.js
- * Rôle : fiche d'une entrée en deux mises en page. « page » : cadre centré (maquette Confrerie), champs à gauche,
- *        « Pour comparer » et une note à droite. « side » : volet droit de 448 px, jeu visible (maquettes Recolte,
- *        Sort, Combat). En-tête : titre (valeur du champ titre, ou `newLabel`), étiquette d'état, étapes numérotées si
- *        déclarées. Pied : « Vérifier » et sa phrase, emplacement des boutons de T-101, bandeau vert « Tout est en
- *        ordre. » pendant 3 s.
+ * Rôle : fiche d'une entrée, en « page » (cadre centré) ou en « volet » (448 px) ; « Vérifier », emplacement de T-101.
  * Dépendances : strings.js, format.js, components.js
  */
 
@@ -35,17 +31,13 @@ const EntryView = (() => {
     return { box, set };
   }
 
-  /**
-   * @param model   { descriptor, kind, layout, title, state: { label, tone }, form, compare, footer: [{ id, label, primary }] }
-   * @param actions { back, check }
-   */
   function render(model, actions) {
     const { descriptor, kind, form } = model;
     const side = model.layout === 'side';
     const title = h('h1', { text: model.title });
     const compare = compareBox(model.compare);
     const ok = h('p', { class: 'okbar', role: 'status', hidden: true }, icon('check', 16, 2.2), h('span', { text: STRINGS.entry.checkOk }));
-    // pied rendu par le serveur ; T-100 n'y connaît que « Vérifier » (les boutons de T-101 prendront l'emplacement `slot`)
+    // T-100 ne connaît que « Vérifier » ; les boutons de T-101 iront dans `slot`
     const declared = Format.list(model.footer).find((b) => b && b.id === 'check') || {};
     const checkLabel = str(declared.label) || STRINGS.entry.check;
     const checkButton = h('button', { type: 'button', class: `btn check${declared.primary === false ? '' : ' primary'}`, text: checkLabel, onclick: () => actions.check() });

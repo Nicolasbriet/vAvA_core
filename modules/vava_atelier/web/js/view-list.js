@@ -1,9 +1,7 @@
 'use strict';
 /*
  * vava_atelier/web/js/view-list.js
- * Rôle : liste d'un atelier (cadre et onglets de la maquette Confrerie, lignes .row de Recolte) : flèche « Retour à
- *        l'Atelier », icône, nom, description ; un onglet par type s'il y en a plusieurs ; filtre (RPC list, 300 ms
- *        après la frappe) ; lignes (titre, indice, « Ouvrir ») ; « Créer un panneau » si le type le permet ; pages de 50.
+ * Rôle : liste d'un atelier : onglets par genre, filtre (300 ms), lignes, création, pages de 50.
  * Dépendances : strings.js, format.js, components.js
  */
 
@@ -12,13 +10,8 @@ const ListView = (() => {
   const str = Format.str;
   const FILTER_DELAY = 300;
 
-  /** Nom du type mis en capitale (« Panneaux ») pour un onglet. */
   const capital = (text) => (text ? text.charAt(0).toUpperCase() + text.slice(1) : '');
 
-  /**
-   * @param model   { descriptor, kind, query }
-   * @param actions { back, selectKind(id), filter(text), page(n), openEntry(id), create() }
-   */
   function render(model, actions) {
     const descriptor = model.descriptor;
     const kinds = Format.list(descriptor.kinds);

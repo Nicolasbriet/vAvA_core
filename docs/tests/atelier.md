@@ -52,10 +52,10 @@ du resmon et remontée des écarts : [LISEZMOI.md](LISEZMOI.md).
 | 1 | A : carte « Panneaux du bourg (exemple) ». | Liste en cadre centré : onglets « Panneaux » et « Affiches » ; « Panneau de la place », « Pancarte de la porte nord » ; « Créer un panneau ». |
 | 2 | Taper `porte` dans le filtre. | Une seule ligne. |
 | 3 | Ouvrir « Panneau de la place ». | Fiche en cadre centré, étiquette « En vigueur » ; groupes « Ce qui est écrit », « Son allure », « Réglages » (replié) ; chaque réglage a sa phrase d'aide ; Hauteur « 1,5 m », Distance de lecture « 3 m » côte à côte ; Reste affiché « 7 jours » ; Apparence avec « Modèle provisoire : il sera remplacé automatiquement… » ; encadré « Pour comparer : Pancarte de la porte nord » (« 2,2 m, lisible à 5 m, 30 jours »). |
-| 4 | Ouvrir la liste « Quartier ». | Les quatre quartiers (liste rendue par le module). |
-| 5 | « Objet au pied du panneau » : chercher `pain`. | L'objet « Miche de pain » avec son image ; le choisir. |
+| 4 | Ouvrir la liste « Quartier ». | Les quatre quartiers (liste rendue par le module). Revenir à la liste, rouvrir la fiche : le quartier choisi s'affiche aussitôt par son nom, sans attendre ; `/vava_reseau joueur <A>` : aucun `rpc vava_atelier:options` à l'ouverture de la fiche (seulement quand on ouvre la liste). |
+| 5 | « Objet au pied du panneau » : chercher `pain`. | Aide du champ : « Un objet posé là pour le décor : nul ne peut l'emporter. » ; l'objet « Miche de pain » avec son image ; le choisir. |
 | 6 | Onglet « Affiches » → « Foire d'automne ». | Fiche en volet à droite, jeu visible derrière ; bandeau en haut à gauche « Panneaux du bourg (exemple) », « Mode édition : visible par vous seul » ; pas de barre des touches. |
-| 7 | Modifier un champ, puis la flèche de retour. | « Quitter cette fiche ? Les changements non vérifiés seront perdus. » ; « Rester » garde la fiche, « Quitter » revient à la liste. |
+| 7 | Modifier un champ, puis la flèche de retour. | « Quitter cette fiche ? Rien n'est encore enregistré : vos changements seront perdus. » ; « Rester » garde la fiche, « Quitter » revient à la liste. |
 
 ## 4. Vérifier
 
@@ -67,9 +67,10 @@ du resmon et remontée des écarts : [LISEZMOI.md](LISEZMOI.md).
 | 4 | Nom remis ; Éclairé coché, Reste affiché 2 heures. | « Un panneau éclairé reste au moins un jour : la lanterne doit valoir la peine. » |
 | 5 | Langue « Runes », texte de 150 caractères. | « Les runes se gravent lentement : 120 caractères au plus. » |
 | 6 | Nom « <b>Essai</b> ». | « Lettres, chiffres, espaces, apostrophes, traits d'union, virgules et points seulement. » ; le texte ne s'affiche jamais en gras nulle part. |
-| 7 | « Créer un panneau ». | Fiche « Nouveau panneau », valeurs par défaut, étiquette « Nouveau, rien n'est enregistré » ; « Vérifier » avec un nom libre : « Tout est en ordre. » ; la liste n'a pas changé (rien n'est enregistré avant T-101). |
+| 7 | « Créer un panneau ». | Fiche « Nouveau panneau », valeurs par défaut, étiquette « Rien d'enregistré » ; « Vérifier » avec un nom libre : « Tout est en ordre. » ; la liste n'a pas changé (rien n'est enregistré avant T-101). |
 | 8 | Cliquer « Vérifier » dix fois très vite. | Quelques réponses puis un message de patience ; aucune erreur en console du serveur hormis la limite de débit. |
 | 9 | `nui_devtools` (comme 2-3), A : `fetch('https://vava_atelier/check', { method: 'POST', body: JSON.stringify({ editor: 'vava_example_atelier:panneaux', kind: 'panneau', id: '', values: { s: { intrus: 'x' } } }) }).then(r => r.json()).then(console.log)`. | `{ ok: false, error: 'unknown_field' }`. Puis avec `values: { n: { taille: 99 } }` : réponse `valid: false` avec « Entre 0,5 m et 3,0 m. » pour `taille`. |
+| 10 | Nom du panneau : y coller un espace sans largeur (U+200B, copié depuis une table de caractères) entre deux lettres, puis « Vérifier ». | « Un caractère invisible s'est glissé : retirez-le. » sous le nom ; même chose avec une marque de sens (U+200F) ou un séparateur de ligne (U+2028). Les lettres « Ï », « í », « Ý » passent (« Tout est en ordre. »). |
 
 ## 5. Recherche
 
@@ -83,11 +84,11 @@ du resmon et remontée des écarts : [LISEZMOI.md](LISEZMOI.md).
 
 | # | Faire | Attendu |
 |---|---|---|
-| 1 | A : `/atelier_exemple journal panneaux Lettres repeintes`. | Chat : « ligne écrite au journal : « Panneau de la place » ». À la réouverture : « A annoté le panneau **Panneau de la place** — Lettres repeintes », « Souverain <nom de A>, à l'instant ». Le Registre (`F10` → Journal) a la ligne « Atelier : annoté » (atelier, objet, resume). |
+| 1 | A : `/atelier_exemple journal panneaux Lettres repeintes`. | Chat : « ligne écrite au journal : « Panneau de la place » ». À la réouverture : « A annoté le panneau **Panneau de la place** — Lettres repeintes », « Souverain <nom de A>, à l'instant ». Le Registre (`F10` → Journal) a la ligne « Atelier : annoté » (atelier, objet, resume), recopiée une fois la ligne de l'Atelier écrite en base. |
 | 2 | `/atelier_exemple journal proclamations Sceau changé`. | Ligne de l'atelier Proclamations (« A annoté la proclamation… ») ; voir § 2-5. |
 | 3 | B (Sénéchal) : `/atelier_exemple journal proclamations essai`. | « refusé : cet atelier ne vous est pas ouvert. » ; aucune ligne. |
 | 4 | Console du serveur : `atelier_exemple journal panneaux Depuis la console`. | La console répond « ligne écrite… » ; la ligne a pour auteur « Console » ; aucune recopie au journal du Registre. |
-| 5 | Écrire 30 lignes (commande répétée), puis « Tout le journal ». | 25 lignes, puis « Plus anciens » donne la suite ; filtre « Panneaux du bourg (exemple) » ne garde que les siennes. |
+| 5 | Écrire 30 lignes (commande répétée), puis « Tout le journal ». | 25 lignes, puis « Plus anciens » donne la suite ; filtre « Panneaux du bourg (exemple) » ne garde que les siennes, toujours présentées comme lignes de cet atelier (le serveur ne répète plus l'atelier sur chaque ligne d'une page filtrée). |
 | 6 | Redémarrer le serveur. | Les lignes sont toujours là ; console : `journal : aucune ligne de plus de 365 jours`. |
 | 7 | En base : `UPDATE vava_atelier_journal SET created_at = NOW() - INTERVAL 400 DAY ORDER BY id LIMIT 1;` puis `restart vava_atelier`. | Console : `journal : 1 ligne(s) de plus de 365 jours retirée(s)`. |
 
@@ -95,11 +96,13 @@ du resmon et remontée des écarts : [LISEZMOI.md](LISEZMOI.md).
 
 | # | Faire | Attendu |
 |---|---|---|
-| 1 | Fiche d'un panneau ouverte ; console : `restart vava_example_atelier`. | « Cet atelier vient d'être retiré (module arrêté). », retour à l'accueil ; la carte revient à la réouverture (module redéclaré). |
+| 1 | Fiche d'un panneau ouverte ; console : `restart vava_example_atelier`. | « Cet atelier vient d'être retiré : réessayez plus tard. », retour à l'accueil ; la carte revient à la réouverture (module redéclaré). |
 | 2 | Atelier ouvert ; `restart vava_atelier`. | La page disparaît, souris et clavier rendus au jeu ; `vava_example_atelier` reste démarré ; après redémarrage, `F9` rouvre l'accueil avec les deux ateliers d'exemple (redéclarés au hook `vava_atelier:editorsReady`). |
 | 3 | `stop vava_admin` ; `F9`. | « Le Registre du Conseil s'éveille : réessayez dans un instant. » ; `vava_atelier` reste démarré. `ensure vava_admin` : l'Atelier s'ouvre de nouveau. |
 | 4 | Sans `set vava_env dev` : démarrer le serveur. | `vava_example_atelier` refuse de démarrer (« mode développement absent ») ; l'Atelier n'a que des cartes « Bientôt ». |
-| 5 | `stop vava_inventory` ; fiche d'un panneau avec un objet choisi : « Vérifier ». | « La besace du royaume est indisponible : objet impossible à vérifier. » ; `ensure vava_inventory`, puis de nouveau « Tout est en ordre. ». |
+| 5 | `stop vava_inventory` ; fiche d'un panneau avec un objet choisi : « Vérifier ». | « La liste des objets du royaume ne répond pas : impossible de vérifier cet objet. » ; `ensure vava_inventory`, puis de nouveau « Tout est en ordre. ». |
+| 6 | Serveur arrêté ; dans `modules/vava_atelier/config.lua`, `rights.overrides = { ['vava_magic:sorts'] = 'souverain' }` ; démarrer. | `vava_atelier` refuse de démarrer : « config.lua, droits : rights.overrides['vava_magic:sorts'] = 'souverain' : pas un droit permis (metiers, staff) ». Même refus pour un `floor` de famille ou `rights.open` hors de `metiers`, `staff`. Remettre `overrides = {}`. |
+| 7 | Serveur arrêté ; `limits.descriptorBytes = 2000` ; démarrer. | Console : `éditeur 'vava_example_atelier:panneaux' : descripteur de 4… octets, au-delà de 2000 (limits.descriptorBytes), atelier refusé…` ; la carte « Panneaux du bourg (exemple) » n'est pas sur l'accueil ; les Proclamations (≈ 1 Ko) y sont. Remettre `32768`. |
 
 ## 8. Réseau et resmon — **(2 joueurs)** pour 1
 
@@ -108,6 +111,7 @@ du resmon et remontée des écarts : [LISEZMOI.md](LISEZMOI.md).
 | 1 | A ouvre et parcourt l'Atelier ; C joue à côté ; `/vava_reseau joueur <C>`. | C n'a rien reçu de `vava_atelier`. |
 | 2 | `/vava_reseau joueur <A>` après une première ouverture, puis une seconde. | `rpc vava_atelier:home` ≈ 3 à 4 Ko la première fois, ≈ 1 Ko la seconde (console en debug : « contenu gardé par la page ») ; `rpc vava_atelier:editor` ≈ 60 o à la seconde ouverture du même atelier. |
 | 3 | `resmon 1` : au repos, puis Atelier ouvert. | `vava_atelier` à 0,00 ms au repos, ≤ 0,05 ms ouvert. |
+| 4 | Seconde ouverture de l'accueil (console en debug : « contenu gardé par la page »). | Les étiquettes « 2 panneaux » et « 1 proclamation » sont affichées : elles partent à chaque ouverture, à part du contenu gardé. |
 
 ## 9. Fin du test
 

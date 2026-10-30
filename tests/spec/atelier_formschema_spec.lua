@@ -60,6 +60,7 @@ describe('vava_atelier formschema', function()
             'modules/vava_atelier/shared/text.lua',
             'modules/vava_atelier/shared/formvalues.lua',
             'modules/vava_atelier/shared/formschema.lua',
+            'modules/vava_atelier/shared/fingerprint.lua',
             'examples/vava_example_atelier/config.lua',
             'examples/vava_example_atelier/shared/forms.lua',
         })
@@ -327,6 +328,55 @@ describe('vava_atelier formschema', function()
             local ok, err = check('éditeur')
             assert.is_false(ok)
             assert.is_string(err)
+        end)
+    end)
+
+    -- Plafond global d'un descripteur (server/editors.lua : taille du codage canonique ≤ limits.descriptorBytes).
+    describe('plafond du descripteur', function()
+        --- Descripteur comme le fait l'Atelier : la déclaration sans ses fonctions ni son droit.
+        local function descriptorSize(id, def)
+            local descriptor = { id = id, hasCompare = def.compare ~= nil }
+            for key, value in pairs(def) do
+                if type(value) ~= 'function' and key ~= 'right' then descriptor[key] = copy(value) end
+            end
+            local version, size = VavaAtelier.fingerprintSized(descriptor)
+            assert.is_string(version)
+            return size
+        end
+
+        it('rend la taille du codage canonique avec l\'empreinte', function()
+            -- « s5:Codex » et « T2{i1;s1:ai2;s1:b} »
+            assert.same({ '37e0166994ef71cc', 8 }, { VavaAtelier.fingerprintSized('Codex') })
+            assert.same({ '3ec51810f8a1ab41', 18 }, { VavaAtelier.fingerprintSized({ 'a', 'b' }) })
+            assert.equal('37e0166994ef71cc', VavaAtelier.fingerprint('Codex'))
+            assert.equal(1, select('#', VavaAtelier.fingerprint('Codex')))
+            assert.same({ nil, 'unsupported' }, { VavaAtelier.fingerprintSized(noop) })
+        end)
+
+        it('l\'exemple des panneaux tient très en dessous du plafond', function()
+            local def = editor(forms.panneau)
+            def.kinds[2] = { id = 'affiche', noun = 'affiche', nounPlural = 'affiches', article = 'l\'',
+                newLabel = 'Nouvelle affiche', layout = 'side', parent = 'panneau', placement = 'point', form = forms.affiche }
+            local size = descriptorSize('vava_example_atelier:panneaux', def)
+            assert.is_true(size < VavaAtelier.config.limits.descriptorBytes / 4, tostring(size))
+        end)
+
+        it('un éditeur accepté borne par borne peut dépasser le plafond : il sera refusé au chargement', function()
+            local help = string.rep('Une aide. ', 14)            -- 140 octets
+            local def = editor()
+            for k = 1, VavaAtelier.LIMITS.kinds do
+                local form = { titleField = 'f1', fields = {} }
+                for i = 1, VavaAtelier.LIMITS.fields do
+                    local text = i <= 20
+                    form.fields[i] = { id = 'f' .. i, widget = text and 'text' or 'slider', charset = text and 'name' or nil,
+                        max = text and 40 or 10, min = not text and 0 or nil, step = not text and 1 or nil,
+                        label = string.rep('L', 40), help = help }
+                end
+                def.kinds[k] = { id = 'type' .. k, noun = 'type', nounPlural = 'types', article = 'le',
+                    newLabel = 'Nouveau type', layout = 'page', form = form }
+            end
+            assert.same({ true }, { check(def) })
+            assert.is_true(descriptorSize('vava_example_atelier:lourd', def) > VavaAtelier.config.limits.descriptorBytes)
         end)
     end)
 end)

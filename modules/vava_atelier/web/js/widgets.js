@@ -1,11 +1,8 @@
 'use strict';
 /*
  * vava_atelier/web/js/widgets.js
- * Rôle : les huit widgets du formulaire générique (§ 5.3 de la spec T-100) : slider, segmented, select, toggle, text,
- *        duration, item, model. Chacun pose son libellé (Cinzel, .lb) et sa commande, et rend sa valeur ; aide, erreurs
- *        et avertissement sont posés par form.js. Contrôles de confort seulement : le serveur refait tout.
- *        Widgets.create(champ, valeur, ctx) → { nodes, after?, get(), focus(), control } ; ctx : { changed(),
- *        lookup(champ, texte, page) → Promise, known(champ, valeur), remember(champ, entrée), resolve(champ, valeur, show) }.
+ * Rôle : les huit widgets du formulaire (§ 5.3). create(champ, valeur, ctx) → { nodes, after?, get, focus, control } ;
+ *        ctx : { changed, lookup, known, remember }.
  * Dépendances : strings.js, format.js, components.js
  */
 
@@ -15,11 +12,9 @@ const Widgets = (() => {
   let uid = 0;
   const nextId = () => `fld-${++uid}`;
 
-  /** Rangée du haut : libellé (lié au champ `id`, sinon simple titre `lid`), valeur ou compteur à droite. */
   const head = (field, id, right, lid) => h('div', { class: 'fh' },
     id ? h('label', { class: 'lb', for: id, text: str(field.label) }) : h('span', { class: 'lb', id: lid, text: str(field.label) }), right || null);
 
-  /** Boutons radio jointifs (choix d'un segmented, unités d'une durée), flèches du clavier comprises. */
   function radios(box, options, current, onSet) {
     const buttons = options.map((o) => h('button', { type: 'button', role: 'radio', class: 'opt', text: o.label, 'aria-label': o.aria || null, data: { value: o.value },
       onclick: () => { set(o.value); onSet(o.value); } }));
@@ -47,7 +42,6 @@ const Widgets = (() => {
     return () => (buttons.find((b) => b.tabIndex === 0) || box).focus();
   }
 
-  // slider : valeur lue à droite (« 24 m », « × 1,0 »), curseur pleine largeur, flèches d'un pas (natives)
   function slider(field, value, ctx) {
     const id = nextId();
     const out = h('span', { class: 'v' });
@@ -59,7 +53,6 @@ const Widgets = (() => {
     return { nodes: [h('div', { class: 'sl' }, head(field, id, out), input)], get, focus: () => input.focus(), control: input };
   }
 
-  // segmented : barre jointive jusqu'à 4 choix, grille de 4 colonnes de 5 à 8
   function segmented(field, value, ctx) {
     const lid = `${nextId()}-l`;
     const options = Format.list(field.options).filter((o) => o && typeof o.value === 'string').map((o) => ({ value: o.value, label: str(o.label) || o.value }));
@@ -69,7 +62,6 @@ const Widgets = (() => {
     return { nodes: [head(field, null, null, lid), box], get: () => current, focus, control: box };
   }
 
-  // select, item, model : bouton champ qui ouvre une liste (statique, ou RPC options par pages de 30)
   function choice(field, value, ctx) {
     const id = nextId(), lid = `${id}-l`;
     const item = field.widget === 'item', model = field.widget === 'model';
@@ -110,12 +102,10 @@ const Widgets = (() => {
     });
     if (typed) typed.addEventListener('input', () => { current = typed.value.trim(); provisional(); ctx.changed(); });
     show();
-    if (remote) ctx.resolve(field, current, show);
     return { nodes: [head(field, null, null, lid), free ? h('div', { class: 'free' }, typed, button) : button], after: note ? [note] : null,
       get: () => current, focus: () => (typed || button).focus(), control: typed || button };
   }
 
-  // toggle : libellé à gauche, case de 22 px à droite (.sw de Combat)
   function toggle(field, value, ctx) {
     const id = nextId();
     const input = h('input', { type: 'checkbox', id, checked: value === true });
@@ -123,7 +113,6 @@ const Widgets = (() => {
     return { nodes: [h('label', { class: 'sw', for: id }, h('span', { class: 'lb', text: str(field.label) }), input)], get: () => input.checked, focus: () => input.focus(), control: input };
   }
 
-  // text : champ crème de 40 px ou zone de 4 lignes, compteur « 12 / 40 »
   function text(field, value, ctx) {
     const id = nextId();
     const max = Number(field.max) || 80;
@@ -137,7 +126,6 @@ const Widgets = (() => {
     return { nodes: [head(field, id, counter), input], get: () => input.value, focus: () => input.focus(), control: input };
   }
 
-  // duration : nombre + unité choisie parmi `units`, lue en clair à droite (« 7 jours ») ; valeur en secondes
   function duration(field, value, ctx) {
     const id = nextId();
     const units = Format.UNIT_ORDER.filter((u) => Format.list(field.units).includes(u)).reverse();
@@ -166,7 +154,6 @@ const Widgets = (() => {
 
   const create = (field, value, ctx) => (FACTORIES[field.widget] ? FACTORIES[field.widget](field, value, ctx) : null);
 
-  /** Valeur d'une entrée nouvelle (défauts déclarés, comme `defaults` du serveur). */
   function defaultOf(field) {
     const d = field.default;
     const first = (list) => (Format.list(list)[0] || {}).value || '';

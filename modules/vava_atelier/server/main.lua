@@ -4,8 +4,9 @@
            commence par les contrôles de server/access.lua) : accueil, descripteur d'un atelier, liste, fiche,
            « Vérifier », valeurs proposées, recherche, journal, fermeture. Hooks écoutés : registres (éditeurs : cache,
            propriétaire, `editorGone` ; objets du royaume), déchargement et départ (session retirée), actions du
-           Registre (`revoked` à qui perd le droit d'ouvrir l'Atelier). En fin de setup : journal purgé, hook
-           vava_atelier:editorsReady (les modules redéclarent leurs éditeurs).
+           Registre (`revoked` à qui perd le droit d'ouvrir l'Atelier). Le setup refuse une config de droits fausse
+           (shared/rights.lua › checkSettings) ; en fin de setup : journal purgé, hook vava_atelier:editorsReady (les
+           modules redéclarent leurs éditeurs).
     Dépendances : tous les fichiers server/ du module, bridge/server.lua
 ]]
 
@@ -188,6 +189,9 @@ local HOOKED = {
 }
 
 local function setup()
+    -- un plancher, une surcharge ou le droit d'ouvrir hors des droits permis ouvrirait ou fermerait un atelier à tort
+    local valid, invalid = rights.checkSettings(cfg)
+    if not valid then return false, 'config.lua, droits : ' .. tostring(invalid) end
     for _, hook in ipairs(HOOKED) do
         local id, err = core.hooks.after(hook[1], hook[2])
         if not id then return false, hook[1] .. ' : ' .. tostring(err) end
