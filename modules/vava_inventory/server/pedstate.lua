@@ -15,9 +15,9 @@
     Dépendances : shared/constants.lua, shared/held.lua, config.lua, server/core.lua
 ]]
 
-local type, pairs, next, tostring = type, pairs, next, tostring
+local type, pairs, ipairs, next, tostring, tonumber = type, pairs, ipairs, next, tostring, tonumber
 local CreateThread, Wait, SetTimeout, GetGameTimer = CreateThread, Wait, SetTimeout, GetGameTimer
-local GetPlayerPed, DoesEntityExist, DoesPlayerExist, Entity = GetPlayerPed, DoesEntityExist, DoesPlayerExist, Entity
+local GetPlayers, GetPlayerPed, DoesEntityExist, DoesPlayerExist, Entity = GetPlayers, GetPlayerPed, DoesEntityExist, DoesPlayerExist, Entity
 local NetworkGetNetworkIdFromEntity, NetworkGetEntityFromNetworkId, NetworkGetEntityOwner =
     NetworkGetNetworkIdFromEntity, NetworkGetEntityFromNetworkId, NetworkGetEntityOwner
 
@@ -166,6 +166,8 @@ local function correct(netId)
     local entity = NetworkGetEntityFromNetworkId(netId)
     if not entity or entity == NO_ENTITY or not DoesEntityExist(entity) then return end
     local value, entry = expected(netId)
+    -- numéro réseau redonné à une autre entité que le ped où la main a été écrite : rien n'y est attendu
+    if entry and entity ~= entry.ped then value, entry = nil, nil end
     local state = Entity(entity).state
     if held.same(state[HELD_STATE], value) then return end
     -- compté AVANT l'écriture : si elle revient différente, la remise suivante est déjà espacée
@@ -194,7 +196,18 @@ local function onChange(bagName, _, value)
     SetTimeout(held.guardDelay(streak, cfg), function() correct(netId) end)
 end
 
---- Branche la garde. Appelé pendant le setup du module.
+--- Vide la main du ped de chaque joueur connecté, là où il en porte une (rien n'est envoyé sinon).
+local function clearAllPeds()
+    for _, id in ipairs(GetPlayers()) do
+        local src = tonumber(id)
+        local ped = src and GetPlayerPed(src) or NO_ENTITY
+        if ped ~= NO_ENTITY and DoesEntityExist(ped) then write(ped, nil) end
+    end
+end
+
+--- Branche la garde, puis vide les peds : une main laissée par une instance précédente du module (arrêtée, ou d'une
+--- version antérieure) ne doit rien montrer tant que les besaces n'ont pas été relues (characters.adoptActive la
+--- republie pour chaque personnage en jeu). Appelé pendant le setup du module, avant l'adoption des personnages.
 ---@return boolean ok
 ---@return string|nil err
 function pedState.start()
@@ -202,5 +215,12 @@ function pedState.start()
     if type(native) ~= 'function' then return false, 'AddStateBagChangeHandler indisponible' end
     -- filtré sur la clé : ni les autres statebags d'entités, ni GlobalState n'atteignent ce gestionnaire
     native(HELD_STATE, nil, onChange)
+    clearAllPeds()
     return true
+end
+
+--- Arrêt du module : plus rien n'est publié ni gardé, et aucun ped ne garde une main que plus personne ne tient.
+function pedState.stop()
+    clearAllPeds()
+    bySource, byNet, scheduled, warnedAt = {}, {}, {}, {}
 end

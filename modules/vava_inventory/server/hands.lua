@@ -57,6 +57,8 @@ local byContainer = {}
 local declared = {}
 -- vrai tant qu'une publication de la liste attend la fin du tick
 local declaredDirty = false
+-- copie de la dernière liste publiée dans GlobalState
+local published = {}
 
 local function characters()
     return VavaInventory.core.characters
@@ -97,19 +99,32 @@ function hands.define()
     return characters().defineField(HANDS_FIELD, { schema = hands.SCHEMA, visibility = 'owner' })
 end
 
+--- Liste publiée en dernier (copie : `declared` continue de changer après la publication).
+---@param list table
+---@return table
+local function copyOf(list)
+    local copy = {}
+    for key, prop in pairs(list) do copy[key] = prop end
+    return copy
+end
+
 local function publishDeclared()
     declaredDirty = false
+    -- retirée puis redéclarée à l'identique dans le même tick : rien ne repart
+    if held.sameList(declared, published) then return end
+    published = copyOf(declared)
     GlobalState[HELD_MODELS] = declared
 end
 
---- Objet ajouté (définition) ou retiré (nil) du registre : la liste n'est republiée que pour un objet tenable, ou
---- qui l'était, et une seule fois pour toutes les déclarations d'un même tick (un module qui déclare vingt objets
---- tenables au démarrage : une écriture, non vingt).
+--- Objet ajouté (définition) ou retiré (nil) du registre : la liste n'est republiée que pour un objet tenable dont le
+--- placement change (nouveau, modifié, ou qui ne l'est plus), et une seule fois pour toutes les déclarations d'un même
+--- tick (un module qui déclare vingt objets tenables au démarrage : une écriture, non vingt ; un module qui les
+--- redéclare à l'identique : aucune).
 ---@param key string
 ---@param def table|nil
 local function track(key, def)
     local prop = type(def) == 'table' and type(def.held) == 'table' and propOf(def.held) or nil
-    if prop == nil and declared[key] == nil then return end
+    if held.samePlacement(prop, declared[key]) then return end
     declared[key] = prop
     if declaredDirty then return end
     declaredDirty = true
@@ -136,7 +151,7 @@ function hands.start()
     for key, def in pairs(core.registry.all(REGISTRY) or {}) do
         if type(def) == 'table' and type(def.held) == 'table' then declared[key] = propOf(def.held) end
     end
-    declaredDirty = false
+    declaredDirty, published = false, copyOf(declared)
     GlobalState[HELD_MODELS] = declared
     local ok, err = pedState.start()
     if not ok then return false, err end

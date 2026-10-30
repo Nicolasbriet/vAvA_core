@@ -49,10 +49,12 @@ VavaInventory.config = {
         pedCheckMs = 1000,         -- serveur : cadence du contrôle du ped des porteurs (réapparition, changement de
                                    -- modèle), active seulement tant que quelqu'un tient quelque chose
         -- serveur : garde du statebag du ped (une main réécrite par le client du porteur est remise) ; délai de la
-        -- remise, puis remises espacées (doublées jusqu'au plafond) au-delà de guardMaxCorrections sans publication
+        -- remise, puis remises espacées (doublées jusqu'au plafond) au-delà de guardMaxCorrections sans publication.
+        -- La comparaison { id, item } est exacte (aucune boucle légitime à amortir) : le plafond reste court, une
+        -- fausse main n'est jamais visible plus d'une seconde environ
         guardDelayMs = 250,
         guardMaxCorrections = 3,
-        guardMaxDelayMs = 10000,
+        guardMaxDelayMs = 1000,
         guardWarnMs = 10000,       -- serveur : une ligne en console au plus par joueur et par intervalle
     },
     -- écriture groupée du journal des modifications ; aussi l'écart minimal entre deux écritures déclenchées par les
@@ -84,5 +86,8 @@ VavaInventory.config = {
         open = { capacity = 4, refillPerSecond = 1 },
         action = { capacity = 20, refillPerSecond = 10 },  -- déplacer, diviser, fusionner, jeter, raccourcis
         use = { capacity = 4, refillPerSecond = 1 },
+        -- prendre en main ou reposer depuis l'interface (1.7.0) : chaque geste réécrit le statebag du ped, envoyé aux
+        -- joueurs proches ; la ceinture passe par `use`
+        hold = { capacity = 4, refillPerSecond = 2 },
     },
 }

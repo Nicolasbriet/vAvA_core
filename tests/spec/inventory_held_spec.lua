@@ -98,11 +98,31 @@ describe('vava_inventory objet en main', function()
             assert.is_nil(held.netIdOf(12))
         end)
 
-        it('espace les remises au-delà du plafond, jusqu\'au délai maximal', function()
+        it('compare deux placements déclarés et deux listes d\'objets tenables', function()
+            local hache = DECLARED.hache_fer
+            local copy = { model = 'prop_tool_fireaxe', bone = 57005, offset = { 0.1, 0.02, 0.0 }, rotation = { 0.0, 0.0, 0.0 } }
+            assert.is_true(held.samePlacement(hache, copy))
+            assert.is_true(held.samePlacement(nil, nil))
+            assert.is_false(held.samePlacement(hache, nil))
+            assert.is_false(held.samePlacement(nil, hache))
+            for field, other in pairs({ model = 'prop_tool_pickaxe', bone = 18905, offset = { 0.1, 0.0, 0.0 },
+                rotation = { 0.0, 90.0, 0.0 } }) do
+                local changed = { model = copy.model, bone = copy.bone, offset = copy.offset, rotation = copy.rotation }
+                changed[field] = other
+                assert.is_false(held.samePlacement(hache, changed), field)
+            end
+            assert.is_true(held.sameList({ hache_fer = hache }, { hache_fer = copy }))
+            assert.is_true(held.sameList({}, {}))
+            assert.is_false(held.sameList({ hache_fer = hache }, {}))
+            assert.is_false(held.sameList({}, { hache_fer = hache }))
+            assert.is_false(held.sameList({ hache_fer = hache }, { pioche_fer = copy }))
+        end)
+
+        it('espace les remises au-delà du plafond, jusqu\'à 1 s au plus (fausse main jamais visible plus longtemps)', function()
             local delays = {}
             for streak = 0, 10 do delays[#delays + 1] = held.guardDelay(streak, cfg) end
-            assert.same({ 250, 250, 250, 500, 1000, 2000, 4000, 8000, 10000, 10000, 10000 }, delays)
-            assert.equal(10000, held.guardDelay(1000, cfg))
+            assert.same({ 250, 250, 250, 500, 1000, 1000, 1000, 1000, 1000, 1000, 1000 }, delays)
+            assert.equal(1000, held.guardDelay(1000, cfg))
         end)
     end)
 
@@ -163,7 +183,7 @@ describe('vava_inventory objet en main', function()
 
         local HACHE = { id = 42, item = 'hache_fer' }
         local STUBBED = { 'Entity', 'GetPlayerPed', 'DoesEntityExist', 'DoesPlayerExist', 'NetworkGetNetworkIdFromEntity',
-            'NetworkGetEntityFromNetworkId', 'NetworkGetEntityOwner', 'AddStateBagChangeHandler' }
+            'NetworkGetEntityFromNetworkId', 'NetworkGetEntityOwner', 'AddStateBagChangeHandler', 'GetPlayers' }
 
         after_each(function()
             for _, name in ipairs(STUBBED) do _G[name] = nil end
@@ -184,6 +204,12 @@ describe('vava_inventory objet en main', function()
                 return 0
             end
             _G.NetworkGetEntityOwner = function(h) return entities[h] and entities[h].owner or -1 end
+            _G.GetPlayers = function()
+                local list = {}
+                for src in pairs(players) do list[#list + 1] = tostring(src) end
+                table.sort(list)
+                return list
+            end
             clock = 0
             _G.GetGameTimer = function() return clock end
             _G.CreateThread = function(fn) threads[#threads + 1] = coroutine.create(fn) end
@@ -305,6 +331,35 @@ describe('vava_inventory objet en main', function()
             assert.equal(2, #sets)
         end)
 
+        it('ne remet pas la main sur une autre entité qui a repris le numéro réseau du ped', function()
+            newEntity(100, 7, 1)
+            peds[1] = 100
+            pedState.set(1, HACHE)
+            -- le ped disparaît, une autre entité prend son numéro réseau avant le contrôle suivant
+            entities[100] = nil
+            local other = newEntity(200, 7, 2)
+            clientWrite(other, { id = 5, item = 'pioche_fer' })
+            fireTimers()
+            assert.is_nil(bagValue(other))
+            assert.matches('effacée', warnings[1])
+        end)
+
+        it('vide au démarrage la main laissée sur le ped de chaque joueur, et à l\'arrêt', function()
+            local first = newEntity(100, 7, 1)
+            local second = newEntity(101, 8, 2)
+            peds[1], peds[2] = 100, 101
+            first.values[VavaInventory.HELD_STATE] = HACHE
+            assert.is_true(pedState.start())
+            assert.is_nil(bagValue(first))
+            assert.is_nil(bagValue(second))
+            assert.equal(1, #sets)   -- seul le ped qui portait quelque chose est écrit
+            pedState.set(2, HACHE)
+            pedState.stop()
+            assert.is_nil(bagValue(second))
+            tick()
+            assert.equal(0, #threads)   -- plus rien n'est suivi : la boucle s'arrête
+        end)
+
         it('la boucle s\'arrête quand plus personne ne tient rien, et oublie un joueur parti', function()
             newEntity(100, 7, 1)
             peds[1] = 100
@@ -407,7 +462,7 @@ describe('vava_inventory objet en main', function()
                 fireTimers()
                 assert.same(HACHE, bagValue(ped))
             end
-            assert.same({ 250, 250, 250, 500, 1000, 2000 }, delays)
+            assert.same({ 250, 250, 250, 500, 1000, 1000 }, delays)
             -- une ligne par remise jusqu'au plafond (limitées par joueur), puis une seule ligne « de suite »
             local streakLines = 0
             for _, line in ipairs(warnings) do
@@ -433,6 +488,94 @@ describe('vava_inventory objet en main', function()
             clientWrite(ped, { id = 1, item = 'pioche_fer' })
             fireTimers()
             assert.equal(2, #warnings)
+        end)
+    end)
+
+    describe('liste des objets tenables (server/hands.lua)', function()
+        local hands, registry, hookFns, writes
+
+        local function def(model, offset)
+            return { label = model, held = { model = model, offset = offset or { 0.1, 0.0, 0.0 } } }
+        end
+
+        local function flush()
+            local timers = helper.timers
+            helper.timers = {}
+            for _, timer in ipairs(timers) do timer.fn() end
+        end
+
+        local function declare(key, definition)
+            registry[key] = definition
+            hookFns['core:registry:added']({ registry = VavaInventory.REGISTRY, key = key })
+        end
+
+        local function withdraw(key)
+            registry[key] = nil
+            hookFns['core:registry:removed']({ registry = VavaInventory.REGISTRY, key = key })
+        end
+
+        before_each(function()
+            loadShared()
+            registry, hookFns, writes = { hache_fer = def('prop_tool_fireaxe') }, {}, {}
+            _G.GlobalState = setmetatable({}, { __newindex = function(_, key, value)
+                local copy = {}
+                for k, v in pairs(value) do copy[k] = v end
+                writes[#writes + 1] = { key = key, value = copy }
+            end })
+            VavaInventory.items, VavaInventory.containers = {}, {}
+            VavaInventory.pedState = { start = function() return true end, set = function() end }
+            VavaInventory.core = {
+                registry = {
+                    all = function() return registry end,
+                    get = function(_, key) return registry[key] end,
+                },
+                hooks = { after = function(name, fn) hookFns[name] = fn return 1 end },
+                characters = {},
+            }
+            _G.GetPlayers = function() return {} end
+            helper.load('modules/vava_inventory/server/hands.lua')
+            hands = VavaInventory.hands
+            assert.is_true(hands.start())
+            assert.equal(1, #writes)
+            writes = {}
+        end)
+
+        after_each(function()
+            _G.GlobalState, _G.GetPlayers, VavaInventory = nil, nil, nil
+        end)
+
+        it('publie une seule fois les objets tenables déclarés dans un même tick', function()
+            declare('pioche_fer', def('prop_tool_pickaxe'))
+            declare('marteau', def('prop_tool_hammer'))
+            declare('carotte', { label = 'Carotte' })   -- ne se tient pas : rien à publier
+            assert.equal(0, #writes)
+            assert.equal(1, #helper.timers)   -- une seule publication programmée pour le tick
+            flush()
+            assert.equal(1, #writes)
+            assert.equal(VavaInventory.HELD_MODELS, writes[1].key)
+            assert.is_not_nil(writes[1].value.pioche_fer)
+            assert.is_not_nil(writes[1].value.marteau)
+            assert.is_nil(writes[1].value.carotte)
+        end)
+
+        it('ne republie rien pour un objet redéclaré à l\'identique, ni retiré puis rendu dans le même tick', function()
+            declare('hache_fer', def('prop_tool_fireaxe'))
+            assert.equal(0, #helper.timers)
+            withdraw('hache_fer')
+            declare('hache_fer', def('prop_tool_fireaxe'))
+            flush()
+            assert.equal(0, #writes)
+        end)
+
+        it('republie un placement changé, ou un objet qui ne se tient plus', function()
+            declare('hache_fer', def('prop_tool_fireaxe', { 0.2, 0.0, 0.0 }))
+            flush()
+            assert.equal(1, #writes)
+            assert.same({ 0.2, 0.0, 0.0 }, writes[1].value.hache_fer.offset)
+            withdraw('hache_fer')
+            flush()
+            assert.equal(2, #writes)
+            assert.is_nil(writes[2].value.hache_fer)
         end)
     end)
 end)

@@ -8,7 +8,7 @@
     Dépendances : shared/constants.lua
 ]]
 
-local type, next, tonumber = type, next, tonumber
+local type, next, pairs, tonumber = type, next, pairs, tonumber
 local min, mathType, tointeger = math.min, math.type, math.tointeger
 local match = string.match
 
@@ -84,6 +84,39 @@ function held.prop(value, declared)
         return nil
     end
     return { id = tointeger(value.id), model = decl.model, bone = decl.bone, offset = decl.offset, rotation = decl.rotation }
+end
+
+---@param a any
+---@param b any
+---@return boolean
+local function sameVector(a, b)
+    if type(a) ~= 'table' or type(b) ~= 'table' then return false end
+    return a[1] == b[1] and a[2] == b[2] and a[3] == b[3]
+end
+
+--- Vrai si deux accessoires déclarés ont le même placement (modèle, os, décalage, rotation), à l'identique : ils viennent
+--- tous deux des déclarations des modules, jamais du réseau.
+---@param a table|nil  { model, bone, offset, rotation }
+---@param b table|nil
+---@return boolean
+function held.samePlacement(a, b)
+    if a == nil or b == nil then return a == nil and b == nil end
+    return type(a) == 'table' and type(b) == 'table' and a.model == b.model and a.bone == b.bone
+        and sameVector(a.offset, b.offset) and sameVector(a.rotation, b.rotation)
+end
+
+--- Vrai si deux listes d'objets tenables (objet → accessoire) sont les mêmes : mêmes objets, mêmes placements.
+---@param a table
+---@param b table
+---@return boolean
+function held.sameList(a, b)
+    for key, prop in pairs(a) do
+        if not held.samePlacement(prop, b[key]) then return false end
+    end
+    for key in pairs(b) do
+        if a[key] == nil then return false end
+    end
+    return true
 end
 
 --- Numéro réseau d'une entité d'après le nom de son statebag (`entity:<n>`), ou nil pour tout autre statebag.

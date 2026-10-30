@@ -42,7 +42,9 @@ VavaInventory.hands = hands
 ---@class vAvA.HeldWanted
 ---@field value table     valeur reçue { id, item }
 ---@field since integer   instant de réception (attente bornée du ped)
----@field seen boolean    son ped a existé ici depuis la réception
+---@field ped? integer    handle de l'entité vue ici sous ce numéro réseau depuis la réception (nil : pas encore vue)
+---@field prop? table     accessoire à montrer (held.prop), calculé à la réception et quand la liste change ; nil : rien
+---@field key? string     identité de cet accessoire (keyOf)
 
 ---@type table<integer, vAvA.HeldWanted>  numéro réseau du ped → main reçue ; une entrée tant qu'elle est suivie
 local wanted = {}
@@ -59,6 +61,13 @@ local function keyOf(prop)
     return concat({ prop.id, prop.model, prop.bone, o[1], o[2], o[3], r[1], r[2], r[3] }, '|')
 end
 
+--- Accessoire d'une main reçue, d'après la liste courante des objets tenables.
+---@param want vAvA.HeldWanted
+local function resolve(want)
+    want.prop = held.prop(want.value, declared)
+    want.key = want.prop and keyOf(want.prop) or nil
+end
+
 ---@param netId integer
 local function remove(netId)
     local entry = shown[netId]
@@ -67,18 +76,19 @@ local function remove(netId)
     if entry.entity and DoesEntityExist(entry.entity) then DeleteObject(entry.entity) end
 end
 
---- Ped de joueur qui porte ce numéro réseau ici, ou 0 et la raison : ABSENT (aucune entité ici : pas encore créée,
---- hors de portée, supprimée), NOT_PED (une main écrite ailleurs que sur un ped n'est jamais montrée), NOT_PLAYER
---- (ped tout juste créé et pas encore lié à son joueur, ou ped d'un PNJ : rien de montré tant que c'est le cas).
+--- Entité qui porte ce numéro réseau ici (0 si aucune), et ce qui empêche d'y montrer la main : ABSENT (aucune entité
+--- ici : pas encore créée, hors de portée, supprimée), NOT_PED (une main écrite ailleurs que sur un ped n'est jamais
+--- montrée), NOT_PLAYER (ped tout juste créé et pas encore lié à son joueur, ou ped d'un PNJ : rien de montré tant que
+--- c'est le cas), nil : ped de joueur.
 ---@param netId integer
----@return integer ped
+---@return integer entity
 ---@return integer|nil reason
 local function pedOf(netId)
     if not NetworkDoesEntityExistWithNetworkId(netId) then return 0, ABSENT end
     local entity = NetworkGetEntityFromNetworkId(netId)
     if not entity or entity == 0 or not DoesEntityExist(entity) then return 0, ABSENT end
-    if not IsEntityAPed(entity) then return 0, NOT_PED end
-    if not IsPedAPlayer(entity) then return 0, NOT_PLAYER end
+    if not IsEntityAPed(entity) then return entity, NOT_PED end
+    if not IsPedAPlayer(entity) then return entity, NOT_PLAYER end
     return entity, nil
 end
 
@@ -86,8 +96,9 @@ end
 ---@param netId integer
 ---@param ped integer
 ---@param prop table  accessoire (voir held.prop)
-local function attach(netId, ped, prop)
-    local entry = { entity = nil, key = keyOf(prop), loading = true }
+---@param key string  identité de cet accessoire (keyOf)
+local function attach(netId, ped, prop, key)
+    local entry = { entity = nil, key = key, loading = true }
     shown[netId] = entry
     CreateThread(function()
         local model = GetHashKey(prop.model)
@@ -132,36 +143,34 @@ local function reconcile(netId)
     if reason == ABSENT then
         remove(netId)
         -- ped parti (hors de portée, remplacé) : son statebag reviendra avec lui ; ped jamais venu : attente bornée
-        if want.seen or GetGameTimer() - want.since > cfg.awaitPedMs then wanted[netId] = nil end
+        if want.ped or GetGameTimer() - want.since > cfg.awaitPedMs then wanted[netId] = nil end
         return
     end
-    if reason == NOT_PED then
+    -- une main écrite ailleurs que sur un ped n'est jamais montrée ; une autre entité sous ce numéro réseau que celle
+    -- vue d'abord (numéro redonné) n'a pas cette main : oubliée, son propre statebag arrivera s'il en a un
+    if reason == NOT_PED or (want.ped and want.ped ~= ped) then
         remove(netId)
         wanted[netId] = nil
         return
     end
-    want.seen = true
-    if reason == NOT_PLAYER then
-        remove(netId)
-        return
-    end
-    -- objet qui n'est pas (ou plus) déclaré tenable : rien d'affiché, relu si la liste change
-    local prop = held.prop(want.value, declared)
-    if not prop then
+    want.ped = ped
+    -- ped pas encore lié à son joueur, ou objet qui n'est pas (ou plus) déclaré tenable : rien d'affiché, relu au tour
+    -- suivant ou quand la liste change
+    local prop, key = want.prop, want.key
+    if reason == NOT_PLAYER or not prop then
         remove(netId)
         return
     end
     local entry = shown[netId]
     if entry then
         if entry.loading then return end
-        local key = keyOf(prop)
         -- toujours là et toujours accroché à ce ped : rien à faire
         if entry.key == key and entry.entity and DoesEntityExist(entry.entity) and IsEntityAttachedToEntity(entry.entity, ped) then return end
         -- modèle inconnu : on n'insiste pas tant que la valeur est la même
         if entry.key == key and not entry.entity then return end
         remove(netId)
     end
-    attach(netId, ped, prop)
+    attach(netId, ped, prop, key)
 end
 
 --- Boucle lente justifiée : une poignée de natives par main suivie, toutes les pollMs ; s'arrête d'elle-même quand
@@ -174,11 +183,14 @@ local function loop()
     running = false
 end
 
+--- Main reçue pour un ped (nil : mains vides). L'accessoire est calculé ici une fois, non à chaque tour de boucle.
 ---@param netId integer
 ---@param value any
 local function setWanted(netId, value)
     if type(value) == 'table' then
-        wanted[netId] = { value = value, since = GetGameTimer(), seen = false }
+        local want = { value = value, since = GetGameTimer() }
+        resolve(want)
+        wanted[netId] = want
     else
         wanted[netId] = nil
     end
@@ -189,11 +201,15 @@ local function setWanted(netId, value)
     end
 end
 
---- Nouvelle liste des objets tenables : chaque accessoire est revérifié (déclaration retirée, ou arrivée après la main).
+--- Nouvelle liste des objets tenables : chaque accessoire est recalculé puis revérifié (déclaration retirée, ou
+--- arrivée après la main).
 ---@param list any
 local function setDeclared(list)
     declared = type(list) == 'table' and list or {}
-    for netId in pairs(wanted) do reconcile(netId) end
+    for netId, want in pairs(wanted) do
+        resolve(want)
+        reconcile(netId)
+    end
 end
 
 --- Suit les statebags des peds et reprend ce que tiennent les joueurs déjà à portée. Appelé par client/main.lua.

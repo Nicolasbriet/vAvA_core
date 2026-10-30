@@ -571,19 +571,23 @@ quitte la besace (jetée, déposée, consommée, retirée par un module). Ce que
   (le client le lit par `core.characters.current().fields['vava_inventory:hands']`) ; il était `public` jusqu'en 1.6.x
   et portait aussi le placement ;
 - le serveur l'écrit sur le **statebag du ped** du porteur, `Entity(ped).state['vava_inventory:inHand']`
-  (`{ id, item }`, environ 25 o), que OneSync ne réplique qu'aux joueurs qui ont ce ped à portée et qu'il renvoie à
-  chacun quand le ped apparaît chez lui (arrivée de loin) ; un nouveau ped (réapparition, changement de modèle) est
-  repéré en une seconde au plus et la main y est réécrite. Chaque client en fait un accessoire local (aucune entité
-  réseau), sur un ped de joueur seulement ;
+  (`{ id, item }`, environ 25 o), que OneSync ne réplique qu'aux joueurs qui ont ce ped dans leur zone de pertinence
+  (environ 424 m) et qu'il renvoie à chacun quand le ped apparaît chez lui (arrivée de loin) ; un nouveau ped
+  (réapparition, changement de modèle) est repéré en une seconde au plus et la main y est réécrite. Les peds de tous
+  les joueurs sont vidés au démarrage du module (avant la relecture des besaces) et à son arrêt. Chaque client en fait un
+  accessoire local (aucune entité réseau), sur un ped de joueur seulement ;
 - le placement n'est jamais publié avec la main : chaque client le lit dans la déclaration `held` de l'objet, publiée
   par le serveur dans `GlobalState['vava_inventory:heldModels']` (`{ [objet] = { model, bone, offset, rotation } }`,
-  valeurs par défaut comprises, une écriture par tick au plus ; clé interne, que les modules n'écrivent pas) ; un objet
-  qui n'y figure pas n'est pas montré ;
+  valeurs par défaut comprises, une écriture par tick au plus et aucune quand rien ne change, objet redéclaré à
+  l'identique compris ; clé interne, que les modules n'écrivent pas) ; un objet qui n'y figure pas n'est pas montré ;
 - le ped étant possédé par son client, celui-ci peut réécrire ce statebag : le serveur retient la valeur qu'il a écrite
   sur chaque ped et remet la sienne (`hands.guardDelayMs`, 250 ms, une remise pour toutes les réécritures du délai ;
-  remises espacées jusqu'à 10 s après 3 sans nouvelle publication), et efface une main écrite sur toute autre entité ;
-  ligne en console limitée à une par joueur et par 10 s. Comme pour un champ public, un client ne décide jamais rien
-  d'après ce statebag : il ne fait que montrer un objet.
+  après 3 remises sans nouvelle publication, délai doublé jusqu'à `hands.guardMaxDelayMs`, 1 s) : une fausse main
+  reste visible **au plus une seconde environ** ; une main écrite sur toute autre entité (ou sur une entité qui a repris
+  le numéro réseau d'un ped) est effacée ; ligne en console limitée à une par joueur et par 10 s. Comme pour un champ
+  public, un client ne décide jamais rien d'après ce statebag : il ne fait que montrer un objet ;
+- le RPC `vava_inventory:hold` (prendre ou reposer depuis l'interface) a sa propre limite (`rateLimits.hold` : 4 d'avance,
+  puis 2 par seconde), chaque geste réécrivant le statebag du ped ; la ceinture passe par la limite `use`.
 
 **Affichage des métadonnées** (depuis 1.4.0) : la fiche et la case d'un objet montrent les métadonnées du **contrat
 standard** — `tier` (badge et liseré de la teinte du palier ; libellés `strings.js` → `metadata.tiers`), `quality`

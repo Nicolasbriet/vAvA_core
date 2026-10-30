@@ -37,7 +37,8 @@ local limits = cfg.rateLimits
 
 local RPCS = {
     { RPC.OPEN, { CONTAINER }, limits.open, operations.open },
-    { RPC.HOLD, { SLOT_CONTENT }, limits.action, function(src, id)
+    -- limite propre (1.7.0) : chaque prise ou dépôt réécrit le statebag du ped, envoyé aux joueurs proches
+    { RPC.HOLD, { SLOT_CONTENT }, limits.hold, function(src, id)
         local ok, code = operations.hold(src, id)
         return ok, code
     end },
@@ -108,6 +109,8 @@ AddEventHandler('onResourceStop', function(resource)
     if resource ~= VavaInventory.resource then return end
     -- les sacs sont des entités du monde : ils ne doivent pas survivre au module
     drops.clear()
+    -- aucun ped ne garde une main que plus personne ne publie ni ne garde
+    VavaInventory.pedState.stop()
     -- dernière écriture, sans en attendre la fin ; refusée pendant une écriture en cours (ou par un core qui tient déjà
     -- le module pour arrêté) : ce qui reste est signalé
     local pending = persistence.flushOnStop()
