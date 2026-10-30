@@ -2,7 +2,8 @@ local helper = require('tests.helper')
 
 -- RPC du core (server/core/rpc.lua), au regard de la section « core.rpc » de docs/api.md : enregistrement, chaîne de
 -- contrôle d'une requête (RPC connu, limite, schéma, handler isolé), réponses au seul appelant, entiers arrivés en
--- flottant convertis à tout niveau (0.8.1), appels serveur → client.
+-- flottant convertis à tout niveau (0.8.1), appels serveur → client (returns obligatoire, 0.9.0), réponse retenue
+-- quand le joueur est parti pendant le handler (0.9.0).
 -- Les net events sont capturés par une doublure de RegisterNetEvent ; `source` est posé avant chaque requête.
 describe('vAvA.rpc', function()
     local rpc, EVENTS, now, netHandlers, sent, realPrint
@@ -223,6 +224,33 @@ describe('vAvA.rpc', function()
             assert.is_true(lastReply().args[2])
         end)
 
+        it('ne répond pas si le joueur est parti pendant un handler lent, même si son numéro est redonné (0.9.0)', function()
+            -- le handler « attend la base » : le joueur part, un nouveau venu reçoit le même numéro et fait un appel
+            -- portant le même petit identifiant ; la réponse du premier ne doit jamais lui parvenir
+            assert.is_true(register('vava_test:quick', {}, function() return true, 'pour le nouveau' end))
+            assert.is_true(register('vava_test:slow', {}, function(src)
+                rpc.purgePlayer(src)
+                request(src, 5, 'vava_test:quick', {})
+                return true, 'liste du premier joueur'
+            end))
+            request(1, 5, 'vava_test:slow', {})
+            local replies = {}
+            for i = 1, #sent do
+                if sent[i].event == EVENTS.RPC_RESPONSE then replies[#replies + 1] = sent[i] end
+            end
+            assert.equal(1, #replies)
+            assert.same({ true, 'pour le nouveau' }, replies[1].args[4])
+        end)
+
+        it('ne répond pas non plus server_error à un joueur parti pendant le handler', function()
+            assert.is_true(register('vava_test:slow', {}, function(src)
+                rpc.purgePlayer(src)
+                error('base injoignable')
+            end))
+            request(1, 6, 'vava_test:slow', {})
+            assert.is_nil(lastReply())
+        end)
+
         it('ignore un déclenchement local (sans source réseau)', function()
             local calls = 0
             assert.is_true(register('vava_test:ping', {}, function() calls = calls + 1 end))
@@ -313,6 +341,60 @@ describe('vAvA.rpc', function()
             local ok2, value = rpc.callClient('vava_test', { returns = { { type = 'integer' } } }, 2, 'vava_test:show')
             assert.is_true(ok2)
             assert.equal(1, value)
+        end)
+
+        -- 0.9.0 : returns obligatoire, comme args pour un RPC (audit T-010)
+        it('refuse des options sans returns, avant tout envoi', function()
+            local ok, code = rpc.callClient('vava_test', {}, 2, 'vava_test:show')
+            assert.is_false(ok)
+            assert.equal('invalid_options', code)
+            ok, code = rpc.callClient('vava_test', { timeout = 1000 }, 2, 'vava_test:show')
+            assert.equal('invalid_options', code)
+            ok, code = rpc.callClient('vava_test', { returns = 'integer' }, 2, 'vava_test:show')
+            assert.equal('invalid_options', code)
+            ok, code = rpc.callClient('vava_test', { returns = { type = 'integer' } }, 2, 'vava_test:show')
+            assert.equal('invalid_options', code)
+            local many = {}
+            for i = 1, vAvA.config.server.rpc.maxReturns + 1 do many[i] = { type = 'integer' } end
+            ok, code = rpc.callClient('vava_test', { returns = many }, 2, 'vava_test:show')
+            assert.equal('invalid_options', code)
+            assert.equal(0, #sent)
+        end)
+
+        it('returns = {} : accepte un simple acquittement, refuse toute valeur renvoyée', function()
+            local answer = {}
+            onClientRequest = function(src, id)
+                _G.source = src
+                netHandlers[EVENTS.CLIENT_RESPONSE](id, true, #answer, answer)
+            end
+            local ok, extra = rpc.callClient('vava_test', { returns = {} }, 2, 'vava_test:show')
+            assert.is_true(ok)
+            assert.is_nil(extra)
+            answer = { { libre = string.rep('x', 100) } }
+            local code
+            ok, code = rpc.callClient('vava_test', { returns = {} }, 2, 'vava_test:show')
+            assert.is_false(ok)
+            assert.equal('invalid_response', code)
+        end)
+
+        it('sans options (callClient court), aucune valeur n’est acceptée du client', function()
+            local count, values = 0, {}
+            onClientRequest = function(src, id)
+                _G.source = src
+                netHandlers[EVENTS.CLIENT_RESPONSE](id, true, count, values)
+            end
+            local ok = rpc.callClient('vava_test', nil, 2, 'vava_test:show', 'ordre')
+            assert.is_true(ok)
+            -- une valeur, même nil, est refusée : le module n'a rien décrit
+            count, values = 1, { 'forgée' }
+            local code
+            ok, code = rpc.callClient('vava_test', nil, 2, 'vava_test:show')
+            assert.is_false(ok)
+            assert.equal('invalid_response', code)
+            count, values = 1, {}
+            ok, code = rpc.callClient('vava_test', nil, 2, 'vava_test:show')
+            assert.is_false(ok)
+            assert.equal('invalid_response', code)
         end)
     end)
 end)

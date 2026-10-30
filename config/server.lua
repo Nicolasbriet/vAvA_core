@@ -83,6 +83,19 @@ vAvA.config.server = {
         saveIntervalMs = 300000,   -- sauvegarde groupée des personnages modifiés
     },
 
+    -- Champs publics (statebag du joueur, répliqué) : un client peut réécrire le sien aux yeux des autres ; le serveur
+    -- garde la valeur qu'il a publiée et la remet.
+    sync = {
+        publicGuardDelayMs = 250,  -- délai avant de remettre la valeur du serveur : les réécritures d'un même joueur
+                                   -- pendant ce délai ne coûtent qu'une correction (au plus 4 par seconde et par joueur)
+        publicCompareDepth = 16,   -- tables imbriquées comparées au plus sur cette profondeur (au-delà : différentes) ;
+                                   -- un champ public au schéma plus profond est refusé à sa déclaration
+        publicFloatTolerance = 1e-6,  -- écart relatif admis entre deux nombres non entiers (aller-retour réseau)
+        publicMaxCorrections = 3,     -- remises d'un champ depuis sa dernière publication avant de les espacer
+        publicGuardMaxDelayMs = 10000,  -- espacement maximal (doublé à chaque remise au-delà du plafond) : une valeur
+                                        -- qui ne reviendrait jamais égale coûte au plus une écriture par 10 s
+    },
+
     spawn = {
         models = { m = 'mp_m_freemode_01', f = 'mp_f_freemode_01' },  -- en attendant un module d'apparence
         defaultPoint = { x = -269.4, y = -955.3, z = 31.2, heading = 205.8 },  -- premier spawn d'un personnage

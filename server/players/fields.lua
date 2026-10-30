@@ -3,14 +3,27 @@
     Rôle : registre des champs de personnage déclarés par les modules (schéma, valeur par défaut, visibilité),
            lecture et écriture validées des valeurs. Les valeurs vivent dans character.data (colonne JSON).
     Visibilité : private (serveur seul, défaut) · owner (envoyé au seul joueur concerné) · public (statebag répliqué).
-    Dépendances : shared/lib/string.lua, shared/lib/schema.lua
+    Un champ public est compilé comme une entrée réseau (ni any, ni function, ni table non stricte, chaînes et listes
+    bornées) et ne dépasse pas la profondeur que compare la garde de sync.lua : sa valeur revient du statebag
+    comparable à celle publiée.
+    Dépendances : shared/lib/string.lua, shared/lib/schema.lua, config/server.lua
 ]]
 
-local type, tostring, pairs = type, tostring, pairs
+local type, tostring, pairs, pcall = type, tostring, pairs, pcall
 local format = string.format
 
 local str = vAvA.lib.string
 local schema = vAvA.lib.schema
+local schemaCfg = vAvA.config.server.schema
+local syncCfg = vAvA.config.server.sync
+
+-- options de compilation d'un champ public : celles des entrées réseau (server/core/rpc.lua)
+local PUBLIC_SCHEMA = {
+    net = true,
+    maxStringLength = schemaCfg.maxStringLength,
+    maxArrayLength = schemaCfg.maxArrayLength,
+    maxMapEntries = schemaCfg.maxMapEntries,
+}
 
 local VISIBILITIES = { private = true, owner = true, public = true }
 
@@ -28,6 +41,28 @@ vAvA.fields = fields
 
 ---@type table<string, vAvA.FieldDefinition>
 local definitions = {}
+-- appelé à chaque déclaration d'un champ public (garde du statebag, server/players/sync.lua)
+local publicListener
+
+--- Niveaux de tables imbriquées qu'une valeur conforme au schéma compilé peut avoir (0 : valeur simple).
+---@param node table  schéma compilé (sans cycle : refusé à la compilation)
+---@return integer
+local function tableDepth(node)
+    local kind = node.type
+    if kind == 'table' then
+        local deepest = 0
+        for _, field in pairs(node.fields) do
+            local depth = tableDepth(field)
+            if depth > deepest then deepest = depth end
+        end
+        return deepest + 1
+    elseif kind == 'array' then
+        return tableDepth(node.items) + 1
+    elseif kind == 'map' then
+        return tableDepth(node.value) + 1
+    end
+    return 0
+end
 
 ---@class vAvA.FieldOptions
 ---@field schema vAvA.SchemaDefinition
@@ -50,17 +85,27 @@ function fields.define(owner, name, options)
     if type(options) ~= 'table' then
         return false, 'options requises : { schema = { ... } }'
     end
-    local compiled, err = schema.compile(options.schema)
-    if not compiled then return false, err end
     local visibility = options.visibility or 'private'
     if not VISIBILITIES[visibility] then
         return false, format("visibilité invalide '%s' (private, owner ou public)", tostring(visibility))
+    end
+    local public = visibility == 'public'
+    local compiled, err = schema.compile(options.schema, public and PUBLIC_SCHEMA or nil)
+    if not compiled then return false, err end
+    if public then
+        local depth = tableDepth(compiled)
+        if depth > syncCfg.publicCompareDepth then
+            return false, format('champ public : %d niveaux de tables imbriquées, maximum %d', depth,
+                syncCfg.publicCompareDepth)
+        end
     end
     if options.default ~= nil then
         local valid, defaultErr = schema.validate(compiled, options.default)
         if not valid then return false, 'valeur par défaut invalide : ' .. defaultErr end
     end
     definitions[name] = { owner = owner, name = name, schema = compiled, default = options.default, visibility = visibility }
+    -- isolé : une déclaration acceptée ne lève jamais d'erreur
+    if public and publicListener then pcall(publicListener, name) end
     return true
 end
 
@@ -122,6 +167,20 @@ function fields.forEachPublic(fn)
     for name, def in pairs(definitions) do
         if def.visibility == 'public' then fn(name, def) end
     end
+end
+
+--- Vrai si le champ est déclaré public (répliqué par statebag).
+---@param name any
+---@return boolean
+function fields.isPublic(name)
+    local def = definitions[name]
+    return def ~= nil and def.visibility == 'public'
+end
+
+--- Fonction appelée avec le nom de chaque champ public déclaré à partir de maintenant (une seule à la fois).
+---@param fn fun(name: string)|nil
+function fields.setPublicListener(fn)
+    publicListener = fn
 end
 
 --- Retire les définitions d'un propriétaire arrêté. Les valeurs restent dans data et sont toujours sauvegardées :

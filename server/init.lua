@@ -78,13 +78,15 @@ AddEventHandler('playerDropped', function(reason)
     if not src then return end
     rpc.purgePlayer(src)
     ratelimit.purgePlayer(src)
+    -- avant le déchargement : plus rien n'est envoyé à ce numéro, qui peut être redonné pendant la sauvegarde
+    sync.purgePlayer(src)
     -- déchargement et sauvegarde du personnage (peut attendre la base), puis libération de la session
     accounts.handleDropped(src, tostring(reason))
-    sync.purgePlayer(src)
 end)
 
 AddEventHandler('onResourceStop', function(resource)
     if resource == vAvA.resourceName then
+        sync.stop()
         -- FiveM n'attend pas les écritures lancées à l'arrêt : on prévient plutôt que de promettre une sauvegarde
         local unsaved = persistence.pendingCount()
         if unsaved > 0 then
@@ -106,6 +108,7 @@ if not configOk then
     failBoot(configErr)
 else
     rpc.start()
+    sync.start()
     CreateThread(function()
         local ok, crash = xpcall(boot, traceback)
         if not ok then failBoot('erreur interne : ' .. tostring(crash)) end

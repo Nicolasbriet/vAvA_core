@@ -1,7 +1,7 @@
 # Connexion et personnage — procédure de test en jeu
 
 Procédure pour vérifier en jeu l'arrivée d'un joueur et la vie de ses personnages : compte, création, apparence,
-sélection, suppression, reconnexion, position, sauvegarde et temps de jeu. Modules : `vAvA_core` 0.8.0,
+sélection, suppression, reconnexion, position, sauvegarde et temps de jeu. Modules : `vAvA_core` 0.9.0,
 `vava_appearance` 1.0.1, `vava_characters_ui` 1.0.1, et l'outil de développement `vava_dev_characters` 1.3.0. Comptez
 une heure et demie seul, une demi-heure de plus pour les tests marqués **(2 joueurs)**. Un test se cite
 « personnage 4-2 ».
@@ -35,6 +35,30 @@ une heure et demie seul, une demi-heure de plus pour les tests marqués **(2 jou
    - `vava_appearance/config.lua` : `createRateLimit = { capacity = 10, refillPerSecond = 1 }` (défaut
      `{ capacity = 2, refillPerSecond = 0.05 }`) si vous enchaînez les créations ; à remettre avant la section 8.
      `restart vava_appearance`, puis `ensure vava_characters_ui` (voir 9-4).
+6. **Ressource jetable pour 8-11 à 8-14** (jamais versionnée, jamais en production) : un dossier `t027_statebag`
+   dans `resources/`, qui imite un client modifié réécrivant son propre statebag :
+   ```lua
+   -- fxmanifest.lua
+   fx_version 'cerulean'
+   game 'gta5'
+   lua54 'yes'
+   client_script 'client.lua'
+
+   -- client.lua : /t027 <objet> réécrit la main ; /t027 vide la vide ; /t027rafale <objet> réécrit 30 fois
+   local function forge(item)
+       if item == 'vide' then return LocalPlayer.state:set('vava_inventory:hands', nil, true) end
+       local decl = (GlobalState['vava_inventory:heldModels'] or {})[item]
+       if not decl then return print('objet sans « held » : ' .. tostring(item)) end
+       LocalPlayer.state:set('vava_inventory:hands', { id = 999999, item = item, model = decl.model,
+           bone = decl.bone, offset = decl.offset, rotation = decl.rotation }, true)
+   end
+   RegisterCommand('t027', function(_, args) forge(args[1] or 'hache_fer') print('main réécrite') end, false)
+   RegisterCommand('t027rafale', function(_, args)
+       CreateThread(function() for _ = 1, 30 do forge(args[1] or 'hache_fer') Wait(10) end print('rafale finie') end)
+   end, false)
+   ```
+   `ensure t027_statebag` chez tout le monde (console du serveur), `stop t027_statebag` puis suppression du dossier
+   après la section 8.
 
 ## 1. Première connexion et compte
 
@@ -145,6 +169,12 @@ Les commandes `perso` se tapent dans `F8` sur la sélection, ou dans le chat en 
 | 8 | `perso supprimer <id>` trois fois en rafale sur ses propres personnages. | Deux supprimés ; le troisième : `suppression : appel impossible (rate_limited)` (2, puis 1 toutes les 20 s). |
 | 9 | À terre (`/aterre`) : `/perso quitter` puis rejouer le personnage ; puis à terre, se déconnecter et revenir. | Toujours à terre au retour, le temps déjà passé à terre conservé : changer de personnage ou partir ne relève pas (détails : procédure santé). |
 | 10 | Joueur sans droit ACE : `/vava_saveall` dans le chat. | Aucune sauvegarde lancée : la commande est restreinte (`RegisterCommand(…, true)`, portée console au registre des commandes) ; aucune ligne `vava_saveall :` dans la console du serveur. |
+| 10b | **(2 joueurs)** Témoin, **sans** `/t027` (core 0.9.0) : A prend vraiment en main la hache, puis la pioche (décalages non entiers, `0.1`, `0.02`), et reste immobile 30 s chaque fois face à B. | Aucune ligne `[sync]` dans la console du serveur pendant ces 30 s ; chez B, l'objet reste stable dans la main de A, sans clignoter. C'est ce qui montre qu'une publication normale du serveur ne déclenche ni remise ni avertissement (valeur relue égale à l'arrondi près). Une ligne `[sync]` ici est un défaut à remonter, avec sa ligne complète. |
+| 11 | **(2 joueurs)** Champ public réécrit par son client (core 0.9.0, § 0.6). A et B face à face, mains vides. A tape `/t027 hache_fer`. | Chez B, la hache apparaît au plus un quart de seconde dans la main de A puis disparaît (`sync.publicGuardDelayMs` = 250) ; elle n'y revient pas. Console du serveur : `[vAvA][WARN][sync] joueur <A> : champ(s) public(s) réécrit(s) par son client, valeur du serveur remise (vava_inventory:hands)`. Rien ne change dans la besace de A (`I`) : la main y est toujours vide. Si la hache **reste** chez B : le serveur ne voit pas la réécriture (voir § 12), à noter tel quel. |
+| 12 | **(2 joueurs)** A prend vraiment la hache en main (besace → Mains), puis `/t027 pioche_fer` (ou un autre objet à « held » du catalogue), puis `/t027 vide`. | Chaque fois, B revoit la **hache** dans la main de A après un quart de seconde au plus. Une seule ligne `[sync]` par 10 s (les suivantes comptées `[n message(s) similaire(s) ignoré(s)]`). |
+| 13 | **(2 joueurs)** A tape `/t027rafale hache_fer` (30 réécritures en 0,3 s environ), mains vides. | Chez B, la hache clignote au plus pendant la rafale puis disparaît ; console : au plus une remise par quart de seconde (pas trente lignes, pas de ralentissement du serveur). Resmon de `vAvA_core` côté serveur (`resmon 1` dans la console, si disponible) : pic bref, retour au repos. Chez B, `netgraph 1` dans `F8` : relever le débit pendant la rafale et 10 s après ; attendu de l'ordre de 800 o/s par joueur témoin pendant la rafale, puis retour au niveau d'avant (noter les chiffres tels quels). Si A enchaîne les rafales sans rien prendre en main, dès la quatrième remise : une ligne `remis 3 fois de suite sans nouvelle publication`, puis des remises de plus en plus tardives (jusqu'à 10 s), jamais abandonnées. |
+| 14 | Sans second joueur : A tape `/t027 hache_fer` sur l'écran de sélection (`F8`, `t027 hache_fer`), avant de choisir un personnage. | Même ligne `[sync]` dans la console : un champ public est remis vide tant qu'aucun personnage n'est chargé. Puis « Jouer » : la main est celle du personnage (vide ou son objet), jamais la hache forgée. |
+| 15 | Si `vava_example` est démarré : console du serveur `example_ping <n° de A>`. | `[vAvA][INFO][vava_example] joueur N : GetGameTimer client = … ms (déclaré par le client)` : un appel serveur → client avec `returns` fonctionne toujours (0.9.0 exige `returns`). |
 
 ## 9. Redémarrage des modules en cours de partie
 
@@ -202,6 +232,14 @@ SELECT JSON_EXTRACT(data, '$."vava_appearance:data".hair') FROM vava_characters 
   lui-même focus, caméra scriptée et ped local (9-2, 9-3, 9-3b), à voir en jeu.
 - La lisibilité du ped au moment du départ (5-3), le délai de FXServer avant de constater le départ d'un client tué
   (7-3), l'ouverture de `F8` par-dessus l'écran de sélection (§ 0.2).
+- Garde des champs publics (core 0.9.0, 8-11 à 8-14), écrite d'après le comportement connu de FiveM sans l'avoir vu :
+  qu'un client puisse réécrire son propre statebag de joueur avec réplication, et que la réécriture déclenche le
+  gestionnaire `AddStateBagChangeHandler` du **serveur** (s'il ne le fait pas, la garde ne sert à rien mais ne gêne
+  pas : la hache reste en 8-11) ; que ce gestionnaire soit appelé avant que la nouvelle valeur soit appliquée (d'où la
+  remise différée) ; que les noms de statebag de joueur soient `player:<numéro>`. L'argument « répliqué » du
+  gestionnaire n'est pas utilisé : la garde compare la valeur à celle publiée, quelle que soit son origine.
+- Réponse d'un RPC à un joueur parti pendant un handler lent : couverte par un test unitaire seulement
+  (`tests/spec/core_rpc_spec.lua`), la fenêtre étant trop courte pour se provoquer à la main.
 
 ## 13. Remonter un problème
 

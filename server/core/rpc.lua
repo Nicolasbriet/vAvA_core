@@ -40,6 +40,9 @@ local NET_SCHEMA = {
     maxMapEntries = schemaCfg.maxMapEntries,
 }
 
+-- Retours d'un appel sans options (callClient) : aucune valeur acceptée, le client ne fait qu'acquitter.
+local NO_RETURNS = assert(schema.compileList({}, NET_SCHEMA, 'returns'))
+
 local rpc = {}
 vAvA.rpc = rpc
 
@@ -142,8 +145,11 @@ local function handleRequest(src, id, name, count, args)
 
     state.inFlight = state.inFlight + 1
     local ok, resultCount, results = capture(xpcall(entry.handler, traceback, src, unpack(args, 1, count)))
-    -- le joueur a pu se déconnecter pendant que le handler attendait (DB…) : son état a alors été purgé
-    if playerStates[src] == state then
+    -- le joueur a pu se déconnecter pendant que le handler attendait (DB…) : son état a alors été purgé, et son
+    -- numéro a pu être redonné à un nouveau venu dont les appels comptent eux aussi à partir de 1. La réponse
+    -- n'appartient qu'au joueur qui a fait la demande : elle ne part que si son état est toujours le même.
+    local current = playerStates[src] == state
+    if current then
         state.inFlight = state.inFlight - 1
     end
 
@@ -153,10 +159,10 @@ local function handleRequest(src, id, name, count, args)
             log.error("handler RPC '%s' (ressource %s) en erreur%s : %s",
                 name, entry.owner, logger.suppressedNote(suppressed), tostring(results[1]))
         end
-        reply(src, id, false, 'server_error')
+        if current then reply(src, id, false, 'server_error') end
         return
     end
-    reply(src, id, true, resultCount, results)
+    if current then reply(src, id, true, resultCount, results) end
 end
 
 ---@param src integer
@@ -185,16 +191,15 @@ local function handleClientResponse(src, id, ok, count, results)
         outgoing:settle(id, false, 'invalid_response')
         return
     end
+    -- toujours un schéma : celui de l'appelant, ou aucune valeur (callClient sans options)
     local returns = entry.meta.returns
-    if returns then
-        local valid, err = schema.validateList(returns, results, count)
-        if not valid then
-            warnPlayer(src, 'réponse RPC invalide', str.sanitize(err, cfg.logNameMaxLength))
-            outgoing:settle(id, false, 'invalid_response')
-            return
-        end
-        schema.normalizeList(returns, results, count)
+    local valid, err = schema.validateList(returns, results, count)
+    if not valid then
+        warnPlayer(src, 'réponse RPC invalide', str.sanitize(err, cfg.logNameMaxLength))
+        outgoing:settle(id, false, 'invalid_response')
+        return
     end
+    schema.normalizeList(returns, results, count)
     outgoing:settle(id, true, unpack(results, 1, count))
 end
 
@@ -254,11 +259,13 @@ function rpc.unregister(owner, name)
 end
 
 ---@class vAvA.ClientCallOptions
----@field timeout? integer                   ms, borné par la config
----@field returns? vAvA.SchemaDefinition[]   schéma des valeurs attendues (fortement recommandé)
+---@field timeout? integer                  ms, borné par la config
+---@field returns vAvA.SchemaDefinition[]   obligatoire : schéma de chaque valeur attendue, dans l'ordre ({} si aucune)
 
 --- Appelle un handler enregistré sur un client et attend sa réponse. Bloque le thread courant.
---- Ce que renvoie le client est une déclaration non fiable : à valider (returns) et à ne jamais croire aveuglément.
+--- Ce que renvoie le client est une déclaration non fiable : toujours validée par un schéma, jamais crue aveuglément.
+--- Sans options (callClient), aucune valeur n'est attendue : une réponse qui en porte est refusée (invalid_response).
+--- Avec options (callClientWith), returns est obligatoire, comme args pour un RPC ; {} : aucune valeur attendue.
 ---@param owner string
 ---@param options vAvA.ClientCallOptions|nil
 ---@param target integer
@@ -273,7 +280,7 @@ function rpc.callClient(owner, options, target, name, ...)
         return false, 'invalid_name'
     end
 
-    local timeout, returns = cfg.defaultTimeoutMs, nil
+    local timeout, returns = cfg.defaultTimeoutMs, NO_RETURNS
     if options ~= nil then
         if type(options) ~= 'table' then return false, 'invalid_options' end
         if options.timeout ~= nil then
@@ -283,13 +290,21 @@ function rpc.callClient(owner, options, target, name, ...)
             end
             timeout = options.timeout
         end
-        if options.returns ~= nil then
-            local err
-            returns, err = schema.compileList(options.returns, NET_SCHEMA, 'returns')
-            if not returns then
-                log.error('[%s] callClient %s : %s', owner, name, err)
-                return false, 'invalid_options'
-            end
+        -- comme args pour un RPC : aucune valeur non décrite ne remonte d'un client
+        if options.returns == nil then
+            log.error('[%s] callClient %s : returns requis ({} si aucune valeur attendue)', owner, name)
+            return false, 'invalid_options'
+        end
+        local err
+        returns, err = schema.compileList(options.returns, NET_SCHEMA, 'returns')
+        if not returns then
+            log.error('[%s] callClient %s : %s', owner, name, err)
+            return false, 'invalid_options'
+        end
+        -- au-delà, aucune réponse ne pourrait passer (count borné par maxReturns) : erreur du module, dite tout de suite
+        if #returns > cfg.maxReturns then
+            log.error('[%s] callClient %s : %d valeurs déclarées, maximum %d', owner, name, #returns, cfg.maxReturns)
+            return false, 'invalid_options'
         end
     end
 

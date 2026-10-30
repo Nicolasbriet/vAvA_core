@@ -181,7 +181,7 @@ Corrections issues de l'audit T-010 (30 octobre 2026), à prendre avant le reste
 - Critères : procédure `docs/tests/registre.md` complétée ; versions montées.
 
 ### T-027 — Core : `returns` obligatoire dans callClient, champs publics du state bag
-- Agent : vava-dev-lua (cette tâche autorise à toucher le core) · Dépend de : — · Statut : à faire
+- Agent : vava-dev-lua (cette tâche autorise à toucher le core) · Dépend de : — · Statut : à tester en jeu
 - **IMPORTANT** (`securite-vAvA_core.md`) : `server/core/rpc.lua:188-198`, `returns` est facultatif dans `callClient` :
   sans schéma, jusqu'à 16 valeurs de forme quelconque remontent au module ; exiger `returns` comme `args` (`{}` admis),
   ou répondre `invalid_response` quand il manque et que `count > 0`. `server/players/sync.lua:204,216` : un champ
@@ -192,6 +192,10 @@ Corrections issues de l'audit T-010 (30 octobre 2026), à prendre avant le reste
   après un handler lent (`rpc.lua:146`).
 - Critères : tests dans `tests/spec/core_rpc_spec.lua` (`returns` manquant refusé) ; `docs/api.md` à jour ; version du
   core montée.
+- Fait (core **0.9.0**, rapport `docs/plan/rapports/T-027.md`) : `returns` obligatoire dans `callClientWith`, `callClient`
+  sans options n'accepte aucune valeur ; réponse RPC retenue si le joueur est parti pendant le handler ; champs publics
+  gardés (valeur serveur remise) et plus rien envoyé pour un personnage qui n'est plus celui du joueur. Procédure :
+  personnage 8-11 à 8-15.
 
 ### T-028 — Artisanat : signature et durabilité protégées par le hook des métadonnées
 - Agent : vava-dev-lua · Dépend de : — · Statut : à tester en jeu
