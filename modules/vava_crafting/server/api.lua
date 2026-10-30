@@ -32,12 +32,17 @@ exports('getStations', function()
 end)
 
 --- Place une station depuis un autre module (son type déjà déclaré au registre `vava_crafting:stations`) ; les joueurs
---- proches la reçoivent par sa zone du core, au passage suivant (1 s), sans reconnexion. Depuis 1.1.0.
+--- proches la reçoivent par sa zone du core, au passage suivant (1 s), sans reconnexion. Depuis 1.1.0. Zone refusée
+--- par le core : la station n'est pas placée (`zones_full` : trop de zones ; `zone_refused` : autre refus).
 exports('addStation', function(spec)
     if not VavaCrafting.ready then return false, 'not_ready' end
     local def, err = catalog.addStation(spec)
     if not def then return false, err end
-    stations.adopt(def)
+    local shared, code = stations.adopt(def)
+    if not shared then
+        catalog.removeStation(def.id)
+        return false, code == 'full' and 'zones_full' or 'zone_refused'
+    end
     VavaCrafting.core.hooks.runAfter('vava_crafting:stationAdded', { station = def.id, type = def.type.id, module = GetInvokingResource() })
     return true
 end)

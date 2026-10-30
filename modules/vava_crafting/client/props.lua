@@ -7,8 +7,9 @@
            lente, active seulement quand un personnage est en jeu ET qu'une station est connue (aucune boucle loin de
            toute station) : elle mesure d'abord les groupes de stations (par case de streaming.groupCell), ne parcourt
            que les stations d'un groupe à portée, passe toutes les streaming.pollMs près d'un groupe et toutes les
-           streaming.idlePollMs loin de tous ; elle s'arrête d'elle-même à la sélection, au déchargement et quand la
-           dernière station connue est oubliée, et retire alors tous les props.
+           streaming.idlePollMs loin de tous ; une station reçue, déplacée ou oubliée fait aussitôt un passage ; elle
+           s'arrête d'elle-même à la sélection, au déchargement et quand la dernière station connue est oubliée, et
+           retire alors tous les props. Le menu ouvert sur une station oubliée se ferme (props.onForget).
     Dépendances : shared/constants.lua, config.lua, shared/proximity.lua, shared/stationzone.lua, client/core.lua
                   (core.zones : vAvA_core 0.11.0)
 ]]
@@ -48,6 +49,8 @@ local nearestId, nearestDistance = nil, nil
 local onNearest = nil
 ---@type fun(stationId: string, status: { fuel: number, busy: boolean })|nil
 local onStatus = nil
+---@type fun(stationId: string)|nil
+local onForget = nil
 
 ---@param station table
 ---@return string
@@ -154,35 +157,43 @@ local function rebuildGroups()
     for _, group in ipairs(groups) do group.active = true end
 end
 
---- Boucle lente justifiée, seulement quand un personnage est en jeu et qu'une station est connue : une distance par
---- groupe de stations, puis une par station des seuls groupes à portée ; un groupe qui sort de portée retire ses props
---- une fois. Intervalle : streaming.pollMs près d'un groupe, streaming.idlePollMs quand aucune station ne peut être à
---- moins de radius + idleMargin.
+--- Un passage : une distance par groupe de stations, puis une par station des seuls groupes à portée ; un groupe qui
+--- sort de portée retire ses props une fois. Ne cède jamais la main. Rend l'intervalle du prochain passage :
+--- streaming.pollMs près d'un groupe, streaming.idlePollMs quand aucune station ne peut être à moins de radius +
+--- idleMargin.
+---@return integer
+local function step()
+    if regroup then rebuildGroups() end
+    local coords = GetEntityCoords(PlayerPedId())
+    local px, py, pz = coords.x, coords.y, coords.z
+    local bestId, bestDistance = nil, cfg.interact.distance
+    local closest = huge
+    for _, group in ipairs(groups) do
+        local reachable, gap = proximity.reachable(group, px, py, pz, REACH)
+        if gap < closest then closest = gap end
+        if reachable then
+            group.active = true
+            for _, station in ipairs(group.targets) do
+                local far = distance(px, py, pz, station.x, station.y, station.z)
+                reconcile(station, far)
+                if far <= bestDistance then bestId, bestDistance = station.id, far end
+            end
+        elseif group.active then
+            group.active = false
+            for _, station in ipairs(group.targets) do remove(station.id) end
+        end
+    end
+    nearestId, nearestDistance = bestId, bestDistance
+    if onNearest then onNearest(bestId) end
+    return proximity.interval(closest, streaming.radius, streaming.idleMargin, streaming.pollMs, streaming.idlePollMs)
+end
+
+--- Boucle lente justifiée, seulement quand un personnage est en jeu et qu'une station est connue (voir step). Une
+--- station reçue, déplacée ou oubliée fait aussitôt un passage hors de la boucle (onZone) : son prop n'attend pas la
+--- fin d'un intervalle lent quand la boucle tourne déjà pour une autre station.
 local function loop()
     while playing and book:size() > 0 do
-        if regroup then rebuildGroups() end
-        local coords = GetEntityCoords(PlayerPedId())
-        local px, py, pz = coords.x, coords.y, coords.z
-        local bestId, bestDistance = nil, cfg.interact.distance
-        local closest = huge
-        for _, group in ipairs(groups) do
-            local reachable, gap = proximity.reachable(group, px, py, pz, REACH)
-            if gap < closest then closest = gap end
-            if reachable then
-                group.active = true
-                for _, station in ipairs(group.targets) do
-                    local far = distance(px, py, pz, station.x, station.y, station.z)
-                    reconcile(station, far)
-                    if far <= bestDistance then bestId, bestDistance = station.id, far end
-                end
-            elseif group.active then
-                group.active = false
-                for _, station in ipairs(group.targets) do remove(station.id) end
-            end
-        end
-        nearestId, nearestDistance = bestId, bestDistance
-        if onNearest then onNearest(bestId) end
-        Wait(proximity.interval(closest, streaming.radius, streaming.idleMargin, streaming.pollMs, streaming.idlePollMs))
+        Wait(step())
     end
     for id in pairs(shown) do remove(id) end
     nearestId, nearestDistance = nil, nil
@@ -224,6 +235,12 @@ function props.onStatus(fn)
     onStatus = fn
 end
 
+--- Appelé quand une station est oubliée (le joueur s'en éloigne, elle est retirée) : le menu ouvert sur elle se ferme.
+---@param fn fun(stationId: string)
+function props.onForget(fn)
+    onForget = fn
+end
+
 --- Zones des stations, envoyées par le core (nom local = identifiant de la station, état { def, s }) : le carnet suit,
 --- le prop d'une station qui a bougé ou disparu est retiré (la boucle le recrée à portée), l'invite et le menu ouvert
 --- suivent l'état.
@@ -245,10 +262,15 @@ local function onZone(kind, id, a, b)
     if placed then
         remove(id)
         regroup = true
-        if id == nearestId and not book:station(id) then
-            nearestId, nearestDistance = nil, nil
-            if onNearest then onNearest(nil) end
+        if not book:station(id) then
+            if id == nearestId then
+                nearestId, nearestDistance = nil, nil
+                if onNearest then onNearest(nil) end
+            end
+            if onForget then onForget(id) end
         end
+        -- passage immédiat si la boucle tourne déjà (une autre station est connue), sinon elle démarre
+        if running and playing then step() end
         wake()
     end
     if statusChanged then

@@ -87,9 +87,11 @@ local function setup()
     if not guardId then return false, 'garde des métadonnées : ' .. tostring(guardErr) end
 
     CreateThread(function()
-        -- boucle lente justifiée : au plus une transaction toutes les flushMs, rien si rien n'a changé
+        -- boucle lente justifiée : au plus une transaction toutes les flushMs, rien si rien n'a changé ; stations
+        -- refusées par le core redéclarées (une fois par minute au plus) et états non envoyés repris
         while true do
             Wait(cfg.persistence.flushMs)
+            stations.retry()
             flush()
         end
     end)

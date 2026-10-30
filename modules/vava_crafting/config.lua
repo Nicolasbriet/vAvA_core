@@ -82,7 +82,9 @@ VavaCrafting.config = {
     -- Chaque station est une zone du core de `zoneRadius` mètres : un joueur la reçoit (dessin, combustible, occupation)
     -- à `radius` + `subscribeSlack` mètres de son bord, ses changements tant qu'il ne s'en éloigne pas de plus de 25 m
     -- au-delà (réglage du core), et ne connaît aucune autre station. `subscribeSlack` couvre le chemin d'un cavalier au
-    -- galop (~15 m/s) entre deux passages du core (1 s) : la station est connue avant d'arriver à portée des props. La
+    -- galop (~15 m/s) entre deux passages du core (1 s) : la station est connue avant d'arriver à portée des props (une
+    -- station reçue fait aussitôt un passage du client : seule l'attente du core compte). Il doit valoir au moins
+    -- vitesse maximale × `zones.passMs` du core + 5 m (35 m avec passMs = 2000 ou pour une monture plus rapide). La
     -- boucle des props ne tourne que si une station est connue.
     streaming = {
         radius = 80.0, pollMs = 1000, idlePollMs = 2500, idleMargin = 60.0, groupCell = 200.0, modelTimeoutMs = 5000,

@@ -42,7 +42,8 @@ end
 -- Serveur ------------------------------------------------------------------------------------------------------------
 
 --- Lieu de la zone du core d'une station : cercle au sol de `radius` mètres autour d'elle, connu des joueurs à
---- `margin` mètres de son bord.
+--- `margin` mètres de son bord. Pas de `bucket` : la zone vaut pour toutes les instances ; le jour où une station sera
+--- propre à une instance (logement, T-1xx), passer son routing bucket ici.
 ---@param station { x: number, y: number, z: number }
 ---@param radius number
 ---@param margin number

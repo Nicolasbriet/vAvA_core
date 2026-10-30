@@ -344,3 +344,7 @@ props.onNearest(interact.refreshPrompt)
 props.onStatus(function(stationId, status)
     interact.onStation({ id = stationId, fuel = status.fuel, busy = status.busy })
 end)
+-- station oubliée (le joueur s'en est éloigné, elle a été retirée) : son menu ne reste pas ouvert, figé
+props.onForget(function(stationId)
+    if menuStation == stationId then interact.closeMenu() end
+end)

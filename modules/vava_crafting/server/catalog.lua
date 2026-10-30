@@ -10,7 +10,7 @@
 
 local type, pairs, ipairs, tostring = type, pairs, ipairs, tostring
 local format = string.format
-local sort = table.sort
+local sort, remove = table.sort, table.remove
 
 local core = VavaCrafting.core
 local bridge = VavaCrafting.bridge
@@ -298,6 +298,16 @@ function catalog.addStation(spec)
     stationsById[spec.id] = def
     stationsOrdered[#stationsOrdered + 1] = def
     return def
+end
+
+--- Retire une station placée par `addStation` dont la zone a été refusée par le core (aucun joueur ne la verrait).
+---@param id string
+function catalog.removeStation(id)
+    if not stationsById[id] then return end
+    stationsById[id] = nil
+    for i = #stationsOrdered, 1, -1 do
+        if stationsOrdered[i].id == id then remove(stationsOrdered, i) end
+    end
 end
 
 ---@param id any

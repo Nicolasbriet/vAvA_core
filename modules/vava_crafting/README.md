@@ -59,11 +59,20 @@ zone de vAvA_core 0.11.0) nommée par son identifiant : cercle de 2 m autour d'e
   1,3 Ko pour les 7 stations livrées (une fois), puis 34 o par changement.
 - **Plus de GlobalState** : ni l'état `{ fuel, busy }` publié à tous, ni la liste des stations réécrite à chaque
   station ajoutée. Au démarrage, les anciennes clés `vava_crafting:station:<id>` et `vava_crafting:stations` sont
-  effacées une fois si elles existent encore (serveur pas redémarré depuis 1.4.0).
+  effacées une fois si elles existent encore (serveur pas redémarré depuis 1.4.0). Seules les stations encore connues
+  sont vues : après une mise à jour depuis 1.4.0 qui retire des stations de la config, **redémarrer le serveur**, pas
+  seulement la ressource.
 - **Station ajoutée, déplacée ou renommée en jeu** (module, Atelier, Conseil) : arrive chez les joueurs proches au
-  passage suivant (1 s au plus), sans reconnexion ; les autres la reçoivent en arrivant. Une station que le core refuse
-  (plus de place, lieu hors bornes) est écrite en console et retentée à son changement suivant.
-- **Menu ouvert** : il suit le combustible et l'occupation reçus par la zone (plus d'évènement `vava_crafting:station`).
+  passage suivant (1 s au plus), sans reconnexion ; les autres la reçoivent en arrivant. Une station de la config que
+  le core refuse (plus de place, lieu hors bornes) est écrite en console et retentée par la boucle d'écriture une fois
+  par minute au plus ; un état qui n'a pas pu partir est renvoyé au passage suivant de cette boucle (10 s). Une station
+  placée par `addStation` que le core refuse n'est pas placée : `false, 'zones_full'` (trop de zones) ou
+  `'zone_refused'`. Le déplacement, le renommage et le retrait en jeu (Atelier, Conseil) restent à brancher (T-101,
+  T-102) : `stations.share` sait déplacer une station, le retrait demandera un `RemoveZone` au bridge.
+- **Arrivée** : une station reçue, déplacée ou oubliée fait aussitôt un passage du client, même quand la boucle tourne
+  déjà pour une autre station : son prop n'attend pas un intervalle lent (2,5 s).
+- **Menu ouvert** : il suit le combustible et l'occupation reçus par la zone (plus d'évènement `vava_crafting:station`),
+  et se ferme si la station est oubliée (joueur éloigné de plus de 125 m, station retirée).
 - **Public** : l'état d'une zone est lu par quiconque s'approche (sous OneSync, la position est déclarée par le client) ;
   il ne contient rien de secret. Chaque action (menu, pièce, fin du geste, combustible, réparation) revérifie côté
   serveur, au moment de l'action, la distance réelle, l'accès et l'occupation, sans se fier à l'abonnement.
@@ -181,7 +190,7 @@ Hook écouté : `vava_inventory:metadata` (before, garde de la signature, voir p
 ## À vérifier en jeu (1.5.0)
 
 - Cavalier au galop qui arrive au bourg : les props apparaissent à 80 m comme avant (zone reçue à 100 m, passage du
-  core d'une seconde).
+  core d'une seconde), y compris pour la deuxième station d'un trajet (boucle déjà lancée par la première).
 - Aucun « instantané redemandé » en `F8` pendant un usage normal (état d'une station puis différences dans l'ordre).
 - Coût du passage du core avec les stations (`profiler record`, `docs/tests/metiers.md` 4.1-16).
 - Serveur gardé en marche pendant la mise à jour depuis 1.4.0 (`restart vava_crafting`) : les anciennes clés
