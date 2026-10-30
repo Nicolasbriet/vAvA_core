@@ -1,8 +1,10 @@
 'use strict';
 /*
- * web/js/devmock.js
+ * web/dev/devmock.js
  * Rôle : aperçu de l'éditeur dans un navigateur, sans le jeu : fond de scène, zones d'exemple, réponses simulées.
  *        Inactif en jeu. Paramètre d'URL : ?zone=<numéro> ouvre directement la zone.
+ *        Jamais livré (absent des `files`), jamais chargé en jeu : la ligne hors jeu de index.html ne l'insère
+ *        que hors FiveM.
  */
 
 const DevMock = (() => {

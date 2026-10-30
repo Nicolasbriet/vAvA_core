@@ -18,6 +18,7 @@ local PAGES = {
     { module = 'vava_crafting', sheet = 'style.css' },
     { module = 'vava_farming', sheet = 'style.css' },
     { module = 'vava_time', sheet = 'style.css' },
+    { module = 'vava_voice', sheet = 'style.css' },
 }
 
 local COMMON = {

@@ -4,7 +4,8 @@
            (Chuchoter, Parler, Crier, Déclamer) changées d'une touche, médaillon dans le HUD, cercle au sol au
            changement de portée, silence hors du jeu (sélection du personnage), portée réduite à terre, zones où la
            voix porte plus ou moins loin, créées en jeu par le Conseil.
-    Dépendances : vAvA_core ≥ 0.5.0 ; facultatives : vava_hud ≥ 1.2.0 (médaillon), vava_health (portée à terre),
+    Dépendances : vAvA_core ≥ 0.5.0 ; vava_ui ≥ 1.0.0 (polices, grain, papier et coins de l'éditeur, par
+                  nui://vava_ui/…) ; facultatives : vava_hud ≥ 1.2.0 (médaillon), vava_health (portée à terre),
                   vava_admin ≥ 1.1.0 (droits et outil « Zones de voix » du Registre, journal)
 ]]
 
@@ -15,20 +16,20 @@ use_experimental_fxv2_oal 'yes'
 
 name 'vava_voice'
 description 'Chat vocal de proximité vAvA'
-version '1.2.2'
+version '1.3.0'
 
 dependency 'vAvA_core'
+dependency 'vava_ui'
 
 vava_migration 'sql/0001_voice_zones.sql'
 
 ui_page 'web/index.html'
 
+-- polices, grain, papier et coins : vava_ui ; les données simulées hors jeu (dossier dev/) ne sont jamais livrées
 files {
     'web/index.html',
     'web/css/*.css',
     'web/js/*.js',
-    'web/img/*',
-    'web/fonts/*.woff2',
     'web/icons/*.svg',
 }
 
