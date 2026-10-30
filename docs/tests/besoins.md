@@ -10,9 +10,12 @@ test se cite « besoins 3-4 ».
 
 1. **Préparation commune** : [LISEZMOI.md](LISEZMOI.md) (ordre de démarrage, compte du Conseil, catalogue, consoles,
    resmon, remontée des écarts).
-2. **Outils de test** (serveur de test seulement : aucun contrôle d'administration, tout joueur peut s'en servir) :
-   activer `vava_example_items` et `vava_dev_characters`, rangés dans `[vava-dev]` (page Ressources de la
-   Chancellerie, ou `ensure vava_example_items` puis `ensure vava_dev_characters` dans la console du serveur).
+2. **Outils de test** (serveur de test seulement) : activer `vava_example_items` et `vava_dev_characters`, rangés dans
+   `[vava-dev]` (page Ressources de la Chancellerie, ou `ensure vava_example_items` puis `ensure vava_dev_characters`
+   dans la console du serveur). Ils exigent `set vava_env dev` au `server.cfg` (sinon : « mode développement absent »
+   en console, et rien n'est offert) et sont réservés au Souverain (droit `staff`) ou à l'ACE `vava.dev` : voir
+   [developpement.md](developpement.md) § 0. Un second joueur qui s'en sert : `add_ace identifier.license:<licence>
+   vava.dev allow` en console.
    Commandes utilisées ici : `/besoins` (affiche « faim 100.0 · soif 100.0 » dans le chat), `/besoins <faim> <soif>`
    (fixe, de 0 à 100), `/vie [pourcentage]`, `/aterre`, `/objet <nom> [quantité]`, `/perso quitter`. Sans
    `vava_example_items`, aucun objet ne désaltère : dans les modules, seuls `ragout_de_lievre` (+40), `chou` (+15) et

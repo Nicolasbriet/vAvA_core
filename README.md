@@ -34,3 +34,35 @@ Voir [docs/chancellerie.md](docs/chancellerie.md).
 `vava_skills`, `vava_gathering`, `vava_crafting`, `vava_farming`, `vava_codex`, `vava_chancellerie`.
 
 Le `server.cfg` contient la clé de licence et le mot de passe de la base : il ne doit jamais être publié.
+
+## Serveur de test et serveur ouvert au public
+
+Le dossier `examples/` contient quatre ressources de **développement**. **Ne jamais les `ensure` sur un serveur ouvert
+au public** (la Chancellerie les pose dans `[vava-dev]` sans jamais les lancer d'office) :
+
+| Ressource | Ce qu'elle offrirait |
+| --- | --- |
+| `vava_dev_characters` | `/objet` (n'importe quel objet), `/vie`, `/aterre`, `/besoins`, `/respawn`, `/perso` |
+| `vava_example` | `/note` (lignes écrites en base), `example_ping` |
+| `vava_example_items` | huit objets de démonstration, dont une Bande de lin qui soigne |
+| `vava_anim_test` | `/anim`, `/epee`, `/animstop`, `/animprop`, et un `.ycd` téléchargé par chaque joueur |
+
+Elles sont en plus **inoffensives par construction** : chacune refuse de démarrer tant que la convar serveur
+`vava_env` ne vaut pas exactement `dev` (console : « mode développement absent »). Sans cette ligne, elles ne
+proposent rien à personne ; avec, leurs commandes sont réservées au droit `staff` du Registre (Souverain) ou à l'ACE
+`vava.dev`, et les dons, soins et téléportations sont inscrits au journal du Registre.
+
+**Sur le serveur de test**, pour retrouver les commandes de développement, ajouter au `server.cfg` (page
+**server.cfg** de la Chancellerie, ou à la main), au-dessus des lignes `ensure`, puis redémarrer le serveur :
+
+```cfg
+set vava_env dev
+# facultatif : un testeur qui n'est pas Souverain (licence lue dans la Chancellerie, fiche du joueur)
+add_ace identifier.license:<licence> vava.dev allow
+```
+
+Sans redémarrer le serveur : `set vava_env dev` dans sa console (page Console de la Chancellerie), puis `restart` de
+chaque ressource de `[vava-dev]` démarrée (la convar est lue au démarrage du module ; posée ainsi, elle est perdue au
+prochain redémarrage du serveur). À l'inverse, `set vava_env prod` ferme aussitôt les commandes (relue à chaque
+appel) ; seuls les objets de `vava_example_items` restent déclarés jusqu'à son redémarrage. **Sur le serveur public, cette ligne ne doit jamais exister.** Détails :
+`examples/*/README.md` ; contrôles : [docs/tests/developpement.md](docs/tests/developpement.md).

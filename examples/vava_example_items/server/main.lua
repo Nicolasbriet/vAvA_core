@@ -5,6 +5,9 @@
            une ligne de code ici. Un objet à usage particulier fournirait `onUse` (voir docs/api.md).
            Les objets sont redéclarés à chaque annonce `core:module:ready` de l'inventaire (1.1.1) : après un
            `restart vava_inventory`, les piles gardées à part reviennent sans redémarrer ce module.
+           Garde (1.2.0) : sans `set vava_env dev`, `setup` refuse et aucun objet n'est déclaré (ni au catalogue, ni
+           à l'usage) ; les piles déjà dans une besace ou un grenier sont gardées à part par l'inventaire, jamais
+           effacées, et reviennent quand le module tourne de nouveau en mode développement.
     Dépendances : vAvA_core (API v1), vava_inventory ≥ 1.1.0 ; vava_needs pour que manger et boire aient un effet
 ]]
 
@@ -16,7 +19,12 @@ if not core then
     return
 end
 
+local GetConvar = GetConvar
+
 local INVENTORY = 'vava_inventory'
+-- mode développement : même convar et même valeur que les autres ressources d'examples/ (shared/guard.lua)
+local DEV_CONVAR, DEV_VALUE, DEV_FALLBACK = 'vava_env', 'dev', 'prod'
+local DEV_REFUSAL = 'mode développement absent (convar vava_env ≠ dev) : aucun objet déclaré'
 local ITEMS_REGISTRY = 'vava_inventory:items'
 local IMAGE_ROOT = ('nui://%s/web/items/'):format(RESOURCE)
 
@@ -84,6 +92,8 @@ local registered, registerErr = core.modules.register({
     coreVersion = '0.3.0',
     dependencies = { vava_inventory = '1.1.0' },
     setup = function()
+        -- objets de démonstration (une Bande de lin soigne) : rien n'est offert hors du mode développement
+        if GetConvar(DEV_CONVAR, DEV_FALLBACK) ~= DEV_VALUE then return false, DEV_REFUSAL end
         local ok, err = declare()
         if not ok then return false, err end
         -- inventaire redémarré : ses registres ont disparu avec lui, les objets sont redéclarés dès qu'il est prêt

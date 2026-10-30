@@ -9,11 +9,13 @@
       /animprop [modèle] [os] [x y z] [rx ry rz]          accroche un accessoire à la main pour juger la pose ;
       /animprop                                           le retire ;
       /animflags                                          rappelle les drapeaux utiles.
+    Chaque commande demande d'abord l'accès au serveur (vava_anim_test:access : mode développement et droit du
+    Conseil ou ACE), réponse positive gardée `accessCacheMs` ; sans vAvA_core, aucune commande n'est enregistrée.
     Un .ycd posé dans stream/ se joue sous le nom de son fichier. Retours dans le chat (chat:addMessage) et la console F8.
-    Dépendances : config.lua
+    Dépendances : vAvA_core (API v1), config.lua
 ]]
 
-local tonumber, ipairs = tonumber, ipairs
+local tonumber, tostring, ipairs, pcall = tonumber, tostring, ipairs, pcall
 local tointeger = math.tointeger
 local format, concat = string.format, table.concat
 local CreateThread, Wait, RegisterCommand, TriggerEvent, AddEventHandler = CreateThread, Wait, RegisterCommand, TriggerEvent, AddEventHandler
@@ -27,16 +29,50 @@ local RESOURCE = GetCurrentResourceName()
 local cfg = VavaAnimTest.config
 local C = cfg.commands
 local USAGE = format('/%s <dictionnaire> [clip] [drapeau] [durée ms] — /%s pour rejouer la dernière', C.play, C.play)
+local RPC_ACCESS = RESOURCE .. ':access'
+
+local called, core = pcall(function() return exports.vAvA_core:getApi(1) end)
+if not called or not core then
+    print(('^3[%s] vAvA_core absent : outil inactif^7'):format(RESOURCE))
+    return
+end
 
 -- dernière animation jouée et accessoire accroché
 local last = nil
 local prop = nil
+-- accès accordé par le serveur jusqu'à cette heure (GetGameTimer)
+local grantedUntil = 0
 
 ---@param message string
 local function say(message, ...)
     local text = format(message, ...)
     print(('[%s] %s'):format(RESOURCE, text))
     TriggerEvent('chat:addMessage', { args = { cfg.chatAuthor, text } })
+end
+
+--- Le serveur décide : mode développement et droit. Réponse positive gardée `accessCacheMs`. Bloque le thread courant.
+---@return boolean
+local function granted()
+    if GetGameTimer() < grantedUntil then return true end
+    local ok, success, code = core.rpc.call(RPC_ACCESS)
+    if ok and success then
+        grantedUntil = GetGameTimer() + cfg.accessCacheMs
+        return true
+    end
+    local reason = ok and code or success
+    say('%s', cfg.refusals[reason] or ('accès impossible (' .. tostring(reason) .. ').'))
+    return false
+end
+
+--- Enregistre une commande qui ne s'exécute qu'avec l'accès du serveur, dans son propre thread.
+---@param name string
+---@param handler fun(args: string[])
+local function command(name, handler)
+    RegisterCommand(name, function(_, args)
+        CreateThread(function()
+            if granted() then handler(args) end
+        end)
+    end, false)
 end
 
 --- Charge un dictionnaire d'animations. Bloque le thread courant jusqu'au chargement ou au délai.
@@ -115,83 +151,82 @@ local function playFrom(dict, clip, flag, duration)
     play(dict, found[1], flag, duration)
 end
 
-RegisterCommand(C.play, function(_, args)
+command(C.play, function(args)
     local dict = args[1]
-    CreateThread(function()
-        if not dict then
-            if last then
-                if loadDict(last.dict) then play(last.dict, last.clip, last.flag, last.duration) end
-            else
-                say(USAGE)
-            end
-            return
+    if not dict then
+        if last then
+            if loadDict(last.dict) then play(last.dict, last.clip, last.flag, last.duration) end
+        else
+            say(USAGE)
         end
-        playFrom(dict, args[2], tointeger(tonumber(args[3] or '')) or cfg.defaultFlag, tointeger(tonumber(args[4] or '')) or -1)
-    end)
-end, false)
+        return
+    end
+    playFrom(dict, args[2], tointeger(tonumber(args[3] or '')) or cfg.defaultFlag, tointeger(tonumber(args[4] or '')) or -1)
+end)
 
 -- raccourcis : une commande par animation à tester, rien à taper
 for _, shortcut in ipairs(cfg.shortcuts) do
-    RegisterCommand(shortcut.command, function()
-        CreateThread(function() playFrom(shortcut.dict, shortcut.clip, shortcut.flag or cfg.defaultFlag, shortcut.duration or -1) end)
-    end, false)
+    command(shortcut.command, function()
+        playFrom(shortcut.dict, shortcut.clip, shortcut.flag or cfg.defaultFlag, shortcut.duration or -1)
+    end)
 end
 
-RegisterCommand(C.stop, function()
+command(C.stop, function()
     ClearPedTasks(PlayerPedId())
     say('animation arrêtée.')
-end, false)
+end)
 
 local function removeProp()
     if prop and DoesEntityExist(prop) then DeleteObject(prop) end
     prop = nil
 end
 
-RegisterCommand(C.prop, function(_, args)
-    CreateThread(function()
-        removeProp()
-        if not args[1] and not last then
-            say('accessoire retiré. /%s <modèle> [os] [x y z] [rx ry rz] pour en accrocher un (défaut : %s).', C.prop, cfg.prop.defaultModel)
+command(C.prop, function(args)
+    removeProp()
+    if not args[1] and not last then
+        say('accessoire retiré. /%s <modèle> [os] [x y z] [rx ry rz] pour en accrocher un (défaut : %s).', C.prop, cfg.prop.defaultModel)
+        return
+    end
+    if not args[1] then
+        say('accessoire retiré.')
+        return
+    end
+    local model = args[1]
+    local hash = GetHashKey(model)
+    if not IsModelInCdimage(hash) then
+        say('modèle « %s » inconnu du jeu.', model)
+        return
+    end
+    RequestModel(hash)
+    local deadline = GetGameTimer() + cfg.loadTimeoutMs
+    while not HasModelLoaded(hash) do
+        if GetGameTimer() > deadline then
+            say('modèle « %s » : chargement trop long.', model)
             return
         end
-        if not args[1] then
-            say('accessoire retiré.')
-            return
-        end
-        local model = args[1]
-        local hash = GetHashKey(model)
-        if not IsModelInCdimage(hash) then
-            say('modèle « %s » inconnu du jeu.', model)
-            return
-        end
-        RequestModel(hash)
-        local deadline = GetGameTimer() + cfg.loadTimeoutMs
-        while not HasModelLoaded(hash) do
-            if GetGameTimer() > deadline then
-                say('modèle « %s » : chargement trop long.', model)
-                return
-            end
-            Wait(10)
-        end
-        local ped = PlayerPedId()
-        local bone = tointeger(tonumber(args[2] or '')) or cfg.prop.bone
-        local o, r = cfg.prop.offset, cfg.prop.rotation
-        local x, y, z = tonumber(args[3]) or o[1], tonumber(args[4]) or o[2], tonumber(args[5]) or o[3]
-        local rx, ry, rz = tonumber(args[6]) or r[1], tonumber(args[7]) or r[2], tonumber(args[8]) or r[3]
-        local at = GetEntityCoords(ped)
-        prop = CreateObject(hash, at.x, at.y, at.z, false, false, false)
-        AttachEntityToEntity(prop, ped, GetPedBoneIndex(ped, bone), x + 0.0, y + 0.0, z + 0.0, rx + 0.0, ry + 0.0, rz + 0.0, true, true, false, true, 1, true)
-        SetModelAsNoLongerNeeded(hash)
-        say('%s accroché à l\'os %d, décalage %.2f %.2f %.2f, rotation %.0f %.0f %.0f.', model, bone, x, y, z, rx, ry, rz)
-    end)
-end, false)
+        Wait(10)
+    end
+    local ped = PlayerPedId()
+    local bone = tointeger(tonumber(args[2] or '')) or cfg.prop.bone
+    local o, r = cfg.prop.offset, cfg.prop.rotation
+    local x, y, z = tonumber(args[3]) or o[1], tonumber(args[4]) or o[2], tonumber(args[5]) or o[3]
+    local rx, ry, rz = tonumber(args[6]) or r[1], tonumber(args[7]) or r[2], tonumber(args[8]) or r[3]
+    local at = GetEntityCoords(ped)
+    prop = CreateObject(hash, at.x, at.y, at.z, false, false, false)
+    AttachEntityToEntity(prop, ped, GetPedBoneIndex(ped, bone), x + 0.0, y + 0.0, z + 0.0, rx + 0.0, ry + 0.0, rz + 0.0, true, true, false, true, 1, true)
+    SetModelAsNoLongerNeeded(hash)
+    say('%s accroché à l\'os %d, décalage %.2f %.2f %.2f, rotation %.0f %.0f %.0f.', model, bone, x, y, z, rx, ry, rz)
+end)
 
-RegisterCommand(C.flags, function()
+command(C.flags, function()
     for _, entry in ipairs(cfg.flags) do say('%d : %s', entry[1], entry[2]) end
-end, false)
+end)
 
+-- À l'arrêt : l'accessoire est retiré ; l'animation n'est coupée que si c'est celle de l'outil (jamais une mise à
+-- terre ou le geste d'un autre module).
 AddEventHandler('onResourceStop', function(resource)
     if resource ~= RESOURCE then return end
     removeProp()
-    ClearPedTasks(PlayerPedId())
+    local ped = PlayerPedId()
+    if last and IsEntityPlayingAnim(ped, last.dict, last.clip, 3) then ClearPedTasks(ped) end
 end)

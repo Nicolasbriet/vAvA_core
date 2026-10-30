@@ -1,12 +1,23 @@
 --[[
     vava_anim_test/config.lua
-    Rôle : configuration de l'outil de test des animations : commandes, délais, drapeaux, noms de clips essayés,
-           accessoire par défaut.
+    Rôle : configuration de l'outil de test des animations : accès, commandes, délais, drapeaux, noms de clips
+           essayés, accessoire par défaut.
     Dépendances : aucune
 ]]
 
 VavaAnimTest = {
     config = {
+        -- Qui peut s'en servir : droit vava_admin `permission`, ou ACE `ace` ; le serveur répond à chaque demande
+        -- d'accès du client, gardée `accessCacheMs` (un droit retiré vaut au plus tard à l'expiration). Le module ne
+        -- démarre qu'en mode développement (`set vava_env dev`) : sinon aucune commande ne répond.
+        access = { permission = 'staff', ace = 'vava.dev' },
+        accessRateLimit = { capacity = 5, refillPerSecond = 0.5 },
+        accessCacheMs = 60000,
+        refusals = {
+            not_allowed = 'outil réservé au Conseil (droit staff) ou à l\'ACE vava.dev.',
+            unknown_rpc = 'outil inactif sur ce serveur (mode développement absent).',
+        },
+
         commands = { play = 'anim', stop = 'animstop', prop = 'animprop', flags = 'animflags' },
         -- Raccourcis : une commande par animation à tester, sans rien à taper (/epee). `clip` nil : sondage des noms
         -- courants. Chaque raccourci est déclaré au Codex avec son libellé.
