@@ -32,7 +32,8 @@ contenu et de son empreinte, mesuré hors jeu), borné par `rateLimits.open`.
 
 ## Prérequis
 
-`vAvA_core` ≥ 0.7.0. Facultatifs : `vava_admin` (rangs et droits du Conseil ; sans lui, ACE `vava_codex.staff` et les
+`vAvA_core` ≥ 0.7.0 et `vava_ui` ≥ 1.0.0 (polices, grain et ornements du livre, par `nui://vava_ui/…` ; déclaré en
+dépendance, à ne jamais arrêter sur un serveur ouvert). Facultatifs : `vava_admin` (rangs et droits du Conseil ; sans lui, ACE `vava_codex.staff` et les
 ACE déclarés avec les commandes), `vava_hud` (notifications), `vava_chat` (dernières pages des commandes tapées).
 
 ## Fichiers
@@ -48,7 +49,7 @@ ACE déclarés avec les commandes), `vava_hud` (notifications), `vava_chat` (der
 | `server/main.lua` | déclaration du module, RPC |
 | `client/keys.lua` | touche réellement liée par le joueur (lue dans le jeu) |
 | `client/main.lua` | ouverture, relais des gestes, lancement par `ExecuteCommand`, export `noteCommand` |
-| `web/` | le livre : `index.html` s'ouvre dans un navigateur (`?staff=0` : vue d'un simple joueur) |
+| `web/` | le livre : `index.html` s'ouvre dans un navigateur depuis le dépôt (`?staff=0` : vue d'un simple joueur ; option `--allow-file-access-from-files` pour les polices), avec les données simulées de `web/dev/devmock.js` (jamais livré) |
 
 ## Tests en jeu
 

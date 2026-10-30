@@ -3,13 +3,10 @@
  * Rôle : thème du Codex : livre ouvert sur fond de cuir surpiqué à coins de laiton, deux pages de parchemin grainé
  *        séparées par une reliure, onglets de registre colorés par chapitre sur la tranche, rubans de signet pendus
  *        au plat, recherche creusée, formulaires (listes déroulantes, pastilles, curseurs), Cinzel pour les titres et
- *        EB Garamond pour le texte (embarquées, OFL). Textures en images fixes, aucun flou ni filtre, transitions sur
- *        opacity et transform seulement.
+ *        EB Garamond pour le texte. Polices, textures et ornements : vava_ui (licence OFL des polices dans
+ *        modules/vava_ui/web/fonts/) ; sans vava_ui, polices de repli, sans grain, coins ni filets, toujours lisible.
+ *        Textures en images fixes, aucun flou ni filtre, transitions sur opacity et transform seulement.
  */
-
-@font-face { font-family: "Cinzel"; src: url("../fonts/cinzel.woff2") format("woff2"); font-weight: 400 700; font-style: normal; font-display: swap; }
-@font-face { font-family: "EB Garamond"; src: url("../fonts/eb_garamond.woff2") format("woff2"); font-weight: 400 700; font-style: normal; font-display: swap; }
-@font-face { font-family: "EB Garamond"; src: url("../fonts/eb_garamond_italic.woff2") format("woff2"); font-weight: 400 700; font-style: italic; font-display: swap; }
 
 :root {
   --edge: #070504;
@@ -26,7 +23,7 @@
   --font-display: "Cinzel", "Palatino Linotype", Georgia, serif;
   --font-body: "EB Garamond", "Palatino Linotype", Georgia, serif;
   --ease: cubic-bezier(0.2, 0.7, 0.2, 1);
-  --grain: url("../img/grain.png");
+  --grain: var(--ui-grain, none);
   --leather: var(--grain), radial-gradient(ellipse 120% 80% at 50% 0%, rgba(132, 92, 56, 0.2), transparent 65%), linear-gradient(180deg, #221a13, #16100c);
   /* pages : parchemin clair et uni (le grain du cuir y serait un craquelé), encre brune bien contrastée */
   --page: #e9ddc3;
@@ -91,7 +88,7 @@ button { color: inherit; font: inherit; }
 }
 .app:not([hidden]) .book { animation: rise 240ms var(--ease) both; }
 .book::after { content: ""; position: absolute; inset: 6px; border: 1px dashed rgba(var(--brass-rgb), 0.17); border-radius: 4px; pointer-events: none; }
-.book::before { content: ""; position: absolute; inset: -3px; border: var(--corner) solid transparent; border-image: url("../img/frame.svg") 18 / var(--corner); pointer-events: none; z-index: 2; }
+.book::before { content: ""; position: absolute; inset: -3px; border: var(--corner) solid transparent; border-image: var(--ui-frame, none) 18 / var(--corner); pointer-events: none; z-index: 2; }
 
 .page {
   position: relative;
@@ -129,7 +126,7 @@ button { color: inherit; font: inherit; }
   font-weight: 700;
   letter-spacing: 0.22em;
   text-transform: uppercase;
-  background: url("../img/divider.svg") left bottom / 100% 9px no-repeat;
+  background: var(--ui-divider, none) left bottom / 100% 9px no-repeat;
 }
 .tabs { display: flex; gap: 0.35rem; }
 .tab {
@@ -323,8 +320,8 @@ kbd, .badge-key, .row-keycap {
 .detail::-webkit-scrollbar-thumb { border-radius: 3px; background: rgba(70, 48, 24, 0.35); }
 .detail-empty { margin: 3rem 1rem; color: var(--ink-faint); font-size: 1.1rem; font-style: italic; text-align: center; line-height: 1.4; }
 
-.detail-head { position: relative; margin-bottom: 0.9rem; padding-bottom: 0.7rem; background: url("../img/divider.svg") left bottom / 100% 9px no-repeat; }
-.detail-head::after { content: ""; position: absolute; bottom: 0; left: 50%; width: 9px; height: 9px; background: url("../img/diamond.svg") center / contain no-repeat; transform: translateX(-50%); }
+.detail-head { position: relative; margin-bottom: 0.9rem; padding-bottom: 0.7rem; background: var(--ui-divider, none) left bottom / 100% 9px no-repeat; }
+.detail-head::after { content: ""; position: absolute; bottom: 0; left: 50%; width: 9px; height: 9px; background: var(--ui-diamond, none) center / contain no-repeat; transform: translateX(-50%); }
 .detail-chapter { margin: 0 0 0.2rem; color: var(--ink-faint); font-family: var(--font-display); font-size: 0.72rem; font-weight: 600; letter-spacing: 0.16em; text-transform: uppercase; }
 .detail-title { margin: 0; color: var(--ink); font-family: var(--font-display); font-size: 1.25rem; font-weight: 700; letter-spacing: 0.04em; line-height: 1.25; }
 .detail-text { margin: 0 0 0.7rem; color: var(--ink); font-size: 1.02rem; line-height: 1.4; }

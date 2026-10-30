@@ -11,6 +11,7 @@ local PAGES = {
     { module = 'vava_health', sheet = 'style.css' },
     { module = 'vava_characters_ui', sheet = 'style.css' },
     { module = 'vava_inventory', sheet = 'style.css' },
+    { module = 'vava_codex', sheet = 'style.css' },
 }
 
 local COMMON = {
