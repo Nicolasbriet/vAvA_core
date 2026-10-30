@@ -62,13 +62,16 @@ end
 --- facteur `regen` de la compétence) accélère ou ralentit la repousse ; à 0, rien ne repousse et le temps ne s'accumule
 --- pas (pas de charges rendues d'un coup à la saison suivante). Quand le facteur change entre deux passages, l'avance
 --- prise sur la prochaine charge (jusqu'au passage précédent) est gardée et recomptée au nouveau rythme ; tant que le
---- facteur vaut 0, elle est gardée à part. Le nœud recalé est à écrire.
+--- facteur vaut 0, elle est gardée à part. Le nœud recalé est à écrire. Saison en attente (vava_time démarre) : rien ne
+--- change, `updatedAt` compris.
 ---@param def vAvA.NodeDefinition
 ---@param state vAvA.NodeState
 ---@param now? integer
 function nodes.refresh(def, state, now)
     now = now or time()
     local factor = bridge.SeasonFactor('regen', def.resource.skill)
+    -- vava_time démarre, saison pas encore connue : rien ne bouge (le temps compté plus tard le sera à la bonne saison)
+    if factor == false then return end
     local previous, at = state.factor, state.refreshedAt
     state.factor, state.refreshedAt = factor, now
     if state.charges >= def.charges then

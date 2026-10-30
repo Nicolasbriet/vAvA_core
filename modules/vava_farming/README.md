@@ -19,7 +19,7 @@ et `vava_time:frost`).
 | Règle | Défaut | Clé |
 |---|---|---|
 | Croissance | pousse si humidité > 20 ; à sec : pause, flétrie après 6 h, morte après 18 h ; arroser une flétrie la fait repartir | `growth` |
-| Saisons (`vava_time`, facultatif) | pousse × 1,25 au printemps, × 1 l'été, × 0,75 l'automne, × 0,25 l'hiver ; la terre sèche × 1 au printemps, × 1,5 l'été (arroser plus souvent), × 0,75 l'automne, × 0,25 l'hiver : l'hiver, une culture met quatre fois plus longtemps, mais un arrosage tient quatre fois plus. Une valeur invalide compte pour 1. Sans `vava_time` : aucun effet | `seasons` |
+| Saisons (`vava_time`, facultatif) | pousse × 1,25 au printemps, × 1 l'été, × 0,75 l'automne, × 0,25 l'hiver ; la terre sèche × 1 au printemps, × 1,5 l'été (arroser plus souvent), × 0,75 l'automne, × 0,25 l'hiver : l'hiver, une culture met quatre fois plus longtemps, mais un arrosage tient quatre fois plus. Une valeur invalide ou infinie compte pour 1, au-delà de 10 pour 10. Sans `vava_time` : aucun effet ; pendant son démarrage (saison pas encore connue), rien ne pousse ni ne sèche, le temps est compté ensuite à la bonne saison ; à chaque changement de saison, les emplacements plantés sont réécrits (1.4.1) | `seasons` |
 | Gel (`vava_time`, facultatif ; à confirmer) | certaines nuits d'hiver gèlent (probabilité dans `vava_time`). Au soir (17 h du royaume), avertissement au propriétaire en jeu d'une parcelle privée où une plante est exposée et aux joueurs à moins de 60 m d'une parcelle commune exposée, à personne d'autre ; à la tombée de la nuit (21 h), toute plante vivante ni couverte ni résistante au froid meurt (état « morte » : seul Arracher reste) et les mêmes sont prévenus. Résiste au froid : le chou. **Couvrir** (geste de 3 s) consomme un objet de la liste (le compost, tant que la paille n'existe pas) et protège la plante jusqu'à sa récolte ou son arrachage | `frost`, `crops[].frostHardy`, `actions.cover` |
 | Fertilité | 80 au départ ; − coût de la culture par récolte ; même famille − 10, famille différente + 10 ; compost + 25 ; jachère + 10 par jour vide | `fertility`, `crops[].fertilityCost`, `crops[].family` |
 | Qualité | graine × 0,35 + compétence × 0,35 + régularité × 0,15 + fertilité × 0,15 ± 5 → paliers 20 / 40 / 60 / 85 ; provenance = nom de la parcelle | `quality` |
@@ -30,7 +30,7 @@ et `vava_time:frost`).
 | Déchets | une plante flétrie ou morte arrachée rend 1 à 2 déchets végétaux | `compost.waste` |
 | Composteur | type de station + recette (3 déchets → 1 compost, Agriculture) ajoutés à `vava_crafting`, station placée par `addStation` | `composter` |
 | Cultures de départ | blé 90 min, carotte 30, chou 45, lin 60 (durées d'essai) | `crops` |
-| Journal | plantations, récoltes Excellent+, arrachages, couvertures, plantes prises par le gel (par parcelle), Conseil ; grenier (une ligne par minute, personnage, objet et sens) ; 90 jours | `logTier`, `logRetentionDays`, `persistence.granaryLogMax` |
+| Journal | plantations, récoltes Excellent+, arrachages, couvertures, plantes prises par le gel (une ligne par nuit, par parcelle), Conseil ; grenier (une ligne par minute, personnage, objet et sens) ; 90 jours | `logTier`, `logRetentionDays`, `persistence.granaryLogMax` |
 
 ### Parcelles et emplacements
 

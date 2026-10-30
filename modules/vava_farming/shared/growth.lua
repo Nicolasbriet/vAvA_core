@@ -9,8 +9,8 @@
     Dépendances : shared/constants.lua, config.lua
 ]]
 
-local floor, min, max = math.floor, math.min, math.max
-local ipairs = ipairs
+local floor, min, max, huge = math.floor, math.min, math.max, math.huge
+local ipairs, type = ipairs, type
 
 local cfg = VavaFarming.config
 local g = cfg.growth
@@ -37,15 +37,30 @@ VavaFarming.growth = growth
 ---@field covered boolean       couvert contre le gel jusqu'à la récolte
 ---@field updatedAt integer
 
+-- facteur de saison le plus fort accepté (même règle que vava_gathering/shared/season.lua)
+growth.MAX_SEASON_FACTOR = 10
+
+--- Facteur de saison lu dans la config : un nombre fini, ramené dans [0, MAX_SEASON_FACTOR] ; tout le reste (absent,
+--- texte, NaN, infini, négatif) compte pour 1, sans effet.
+---@param value any
+---@return number
+function growth.seasonFactor(value)
+    if type(value) ~= 'number' or value ~= value or value < 0 or value == huge then return 1 end
+    if value > growth.MAX_SEASON_FACTOR then return growth.MAX_SEASON_FACTOR end
+    return value
+end
+
 --- Applique le temps écoulé depuis `updatedAt` à l'emplacement (modifié en place). `season` (vava_time, facultatif) :
 --- `growth` multiplie la vitesse de pousse, `drying` celle à laquelle la terre sèche ; sans saison, rien ne change.
 --- Avec une saison, la croissance garde ses fractions de seconde (une pousse lente appliquée toutes les 10 s ne perd
---- rien à l'arrondi) ; elle est écrite entière en base.
+--- rien à l'arrondi) ; elle est écrite entière en base. `season == false` : saison en attente (vava_time démarre) —
+--- rien n'avance, `updatedAt` compris ; le temps sera compté plus tard, à la bonne saison.
 ---@param slot vAvA.SlotState
 ---@param crop table|nil  définition de la culture plantée
 ---@param now integer
----@param season? { growth: number|nil, drying: number|nil }
+---@param season? { growth: number|nil, drying: number|nil }|false
 function growth.advance(slot, crop, now, season)
+    if season == false then return end
     local elapsed = now - slot.updatedAt
     if elapsed <= 0 then return end
     if not slot.crop or not crop then

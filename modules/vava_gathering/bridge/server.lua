@@ -227,30 +227,48 @@ local TIME = 'vava_time'
 -- la saison change au plus une fois par jour : relue toutes les 5 s au plus (les nœuds sont relus toutes les 10 s)
 local SEASON_CACHE_MS = 5000
 local seasonId, seasonReadAt = nil, nil
+-- états du module vava_time pendant lesquels il démarre (état relu en base) : la saison viendra
+local TIME_STARTING = { declared = true, waiting = true, migrating = true, starting = true }
 
---- Saison du royaume, ou nil (vava_time absent, arrêté ou pas encore prêt).
----@return string|nil
+--- Vrai si vava_time est en train de démarrer : sa saison n'est pas encore connue mais le sera.
+---@return boolean
+local function timeStarting()
+    local record = core.modules.get(TIME)
+    return record ~= nil and TIME_STARTING[record.state] == true
+end
+
+--- Saison du royaume. nil : vava_time absent, arrêté ou en échec (aucun effet). false : vava_time démarre et ne connaît
+--- pas encore la saison — rien ne doit repousser d'ici là (sinon tout le temps écoulé compterait sans saison) ; cet
+--- état n'est jamais gardé en cache.
+---@return string|false|nil
 function Bridge.Season()
     local now = GetGameTimer()
     if seasonReadAt and now - seasonReadAt < SEASON_CACHE_MS then return seasonId end
     local called, season = call(TIME, 'getSeason')
-    seasonId = called and type(season) == 'string' and season or nil
-    seasonReadAt = now
-    return seasonId
+    if called and type(season) == 'string' then
+        seasonId, seasonReadAt = season, now
+        return season
+    end
+    if called and season == nil and timeStarting() then
+        seasonId, seasonReadAt = nil, nil
+        return false
+    end
+    seasonId, seasonReadAt = nil, now
+    return nil
 end
 
 --- Facteur de la saison pour une compétence (config.seasons) : `kind` = regen (repousse des charges) ou yield (unités
---- récoltées). 1 sans vava_time, sans saison ou sans réglage ; jamais négatif.
+--- récoltées). 1 sans vava_time, sans saison ou sans réglage ; contrôlé par shared/season.lua (fini, dans [0, 10]).
+--- false : saison en attente (vava_time démarre), voir Bridge.Season.
 ---@param kind 'regen'|'yield'
 ---@param skill string
----@return number
+---@return number|false
 function Bridge.SeasonFactor(kind, skill)
     local season = Bridge.Season()
+    if season == false then return false end
     local byKind = season and cfg.seasons and cfg.seasons[kind]
     local bySeason = byKind and byKind[season]
-    local factor = bySeason and bySeason[skill]
-    if type(factor) ~= 'number' or factor ~= factor or factor < 0 then return 1 end
-    return factor
+    return VavaGathering.season.factor(bySeason and bySeason[skill])
 end
 
 -- Base de données -------------------------------------------------------------------------------------------------

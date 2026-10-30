@@ -158,14 +158,25 @@ function slots.publish(parcel)
     GlobalState[STATE_PARCEL .. parcel.id] = { slots = payload }
 end
 
+-- effets de saison appliqués au passage précédent (UNKNOWN : aucun passage encore, ou saison en attente)
+local UNKNOWN = {}
+local appliedSeason = UNKNOWN
+
 --- Relit et republie toutes les parcelles (passage de la boucle lente) : les plantes poussent sans qu'on y touche.
+--- Saison en attente (vava_time démarre) : rien n'avance. Quand les effets de saison changent, chaque emplacement planté
+--- est marqué à écrire : sa date de calcul en base suit, et un redémarrage ne recompte pas d'un bloc, au rythme de la
+--- nouvelle saison, tout le temps passé depuis son dernier geste.
 function slots.tick()
     local now = time()
     local season = bridge.SeasonEffects()
+    if season == false then return end
+    local changed = appliedSeason ~= UNKNOWN and appliedSeason ~= season
+    appliedSeason = season
     for _, parcel in ipairs(catalog.parcels()) do
         for index = 1, parcel.count do
             local slot = states[parcel.id][index]
             growth.advance(slot, slot.crop and catalog.crop(slot.crop) or nil, now, season)
+            if changed and slot.crop then slot.dirty = true end
         end
         slots.publish(parcel)
     end

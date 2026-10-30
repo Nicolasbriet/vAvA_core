@@ -223,3 +223,88 @@ describe('vava_farming hiver', function()
         assert.equal(hiver.growth, hiver.drying)
     end)
 end)
+
+-- Saison en attente (vava_time démarre et relit son état) : rien ne doit avancer, sinon tout le temps écoulé depuis la
+-- dernière écriture compterait sans saison (× 4 en hiver).
+describe('saison en attente pendant le démarrage de vava_time', function()
+    after_each(function()
+        GlobalState = nil
+    end)
+
+    it('n\'avance ni la pousse, ni l\'humidité, ni la date de calcul d\'une culture', function()
+        helper.reset()
+        VavaFarming = nil
+        helper.loadAll({
+            'modules/vava_farming/shared/constants.lua',
+            'modules/vava_farming/config.lua',
+            'modules/vava_farming/shared/growth.lua',
+        })
+        local growth = VavaFarming.growth
+        local crop = { id = 'essai', growMinutes = 60, waterPerHour = 10, stages = { 'a', 'b' } }
+        local slot = {
+            crop = 'essai', seedTier = 1, plantedAt = 0, growth = 120, moisture = 60, fertility = 80, drySince = nil,
+            dryHours = 0, waterings = 0, wilted = false, dead = false, updatedAt = 100,
+        }
+        growth.advance(slot, crop, 100 + 86400, false)
+        assert.same({ 120, 60, 100 }, { slot.growth, slot.moisture, slot.updatedAt })
+        -- puis la saison arrive : le temps est compté à son rythme, depuis la dernière date de calcul
+        growth.advance(slot, crop, 100 + 600, { growth = 0.25, drying = 0.25 })
+        assert.near(120 + 150, slot.growth, 1e-6)
+    end)
+
+    it('ne rend aucune charge à un nœud et ne déplace pas sa date', function()
+        helper.reset()
+        VavaGathering = nil
+        GlobalState = {}
+        local factor = false
+        helper.loadAll({ 'modules/vava_gathering/shared/constants.lua', 'modules/vava_gathering/config.lua' })
+        VavaGathering.bridge = { SeasonFactor = function() return factor end }
+        VavaGathering.catalog = {}
+        helper.loadAll({ 'modules/vava_gathering/server/nodes.lua' })
+        local nodes = VavaGathering.nodes
+        local def = { id = 'essai', charges = 4, regenMs = 600000, resource = { skill = 'herboristerie' } }
+        local state = { charges = 0, updatedAt = 1000, dirty = false }
+        nodes.refresh(def, state, 1000 + 86400)
+        assert.same({ 0, 1000, false }, { state.charges, state.updatedAt, state.dirty })
+        assert.is_nil(state.factor)
+        factor = 0.25                                     -- hiver connu : 2400 s pour une charge
+        nodes.refresh(def, state, 1000 + 2399)
+        assert.equal(0, state.charges)
+        nodes.refresh(def, state, 1000 + 2400)
+        assert.equal(1, state.charges)
+    end)
+end)
+
+-- Facteurs de saison lus dans la config : même règle dans l'agriculture et la récolte.
+describe('facteurs de saison contrôlés', function()
+    local function check(factor)
+        assert.equal(1, factor(nil))
+        assert.equal(1, factor('vite'))
+        assert.equal(1, factor(0 / 0))
+        assert.equal(1, factor(math.huge))
+        assert.equal(1, factor(-math.huge))
+        assert.equal(1, factor(-0.5))
+        assert.equal(0, factor(0))
+        assert.equal(0.25, factor(0.25))
+        assert.equal(10, factor(10))
+        assert.equal(10, factor(1e6))
+    end
+
+    it('borne les facteurs de l\'agriculture à [0, 10] et refuse l\'infini', function()
+        helper.reset()
+        VavaFarming = nil
+        helper.loadAll({
+            'modules/vava_farming/shared/constants.lua',
+            'modules/vava_farming/config.lua',
+            'modules/vava_farming/shared/growth.lua',
+        })
+        check(VavaFarming.growth.seasonFactor)
+    end)
+
+    it('borne les facteurs de la récolte de la même façon', function()
+        helper.reset()
+        VavaGathering = nil
+        helper.loadAll({ 'modules/vava_gathering/shared/constants.lua', 'modules/vava_gathering/shared/season.lua' })
+        check(VavaGathering.season.factor)
+    end)
+end)
