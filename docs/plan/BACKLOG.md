@@ -437,7 +437,7 @@ versé à T-014 ; les autres points déjà couverts sont précisés dans T-012 �
   `docs/plan/rapports/T-011.md` § Mesures à reprendre à la porte T-019.
 
 ### T-049 — Chancellerie : page « Réseau »
-- Agents : vava-architecte → vava-dev-lua + vava-dev-nui · Dépend de : T-013 · Statut : à faire
+- Agents : vava-architecte → vava-dev-lua + vava-dev-nui · Dépend de : T-013 · Statut : à tester en jeu
 - Décision du porteur du projet (30 octobre 2026, spec T-013, décision 6) : ce que montre `/vava_reseau` aussi dans la
   Chancellerie. Le pont `vava_chancellerie` lit `core.net.stats` (vue d'ensemble, une ressource, un joueur) par une
   route en lecture seule, réservée au droit `tools` vérifié par `webCan` ; une page JS dans `chancellerie/` (sans
