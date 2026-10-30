@@ -211,6 +211,27 @@ arracher une plante flétrie ou morte (1 à 2), ou le catalogue de développemen
 | 17 | **Automne** : `calendar.cycle.first = 'automne'`, `restart vava_time` ; couvrir une plante de blé. | « Couvrir » est proposé et réussit (on se prépare à l'hiver) ; aucune nuit ne gèle en automne. |
 | 18 | Hiver : lancer Couvrir, et pendant la barre de 3 s, `restart vava_time` avec `first = 'printemps'` (ou attendre la bascule d'une saison courte). | Si la saison a tourné avant la fin du geste : « Aucun gel à craindre en cette saison. », rien consommé, plante non couverte. |
 
+### 5.2 Parcelles reçues par les seuls joueurs proches (`vava_farming` 1.7.0, core 0.11.0, T-016)
+
+Chaque parcelle est une zone du core : un joueur la reçoit entière en arrivant à moins de son rayon + 100 m (champ
+communal : 9,4 + 100 m de son centre, (−230, −890) ; jardin privé : 1,8 + 100 m de (−240, −905)), puis seuls les
+emplacements qui changent ; il l'oublie à 25 m de plus. Rien ne doit changer à l'écran. Deux joueurs : **A** au champ
+communal, **B** à plus de 500 m de tous les lieux du § 0.6. Lecture du réseau : `/vava_reseau joueur <n°>` (droit
+`tools`), lignes de `vava_farming` (`vAvA:zone:state`, `vAvA:zone:diff`) ; `/vava_reseau zones <n°>` : zones suivies.
+
+| # | Faire | Attendu |
+|---|---|---|
+| 1 | A et B en jeu ; `/vava_reseau zones <A>` puis `/vava_reseau zones <B>`. | A suit `vava_farming:champ_communal` et `vava_farming:jardin_prive` ; B ne suit aucune zone de `vava_farming`. `/vava_reseau zones` : deux zones pour `vava_farming`. |
+| 2 | A plante du blé, l'arrose, puis `/vava_reseau joueur <A>` et `/vava_reseau joueur <B>`. | A : un `vAvA:zone:diff` de `vava_farming` d'environ 40 à 60 o par changement visible (semis, puis changement de stade), en plus de `vava_farming:slot` (menu ouvert) ; l'arrosage seul n'envoie rien aux autres (ni culture, ni stade, ni état ne changent). B : **aucune** ligne `vava_farming`. Avant la 1.7.0, B recevait 470 o de state bag à chaque changement. |
+| 3 | B vient au champ à pied, puis repart à plus de 200 m et revient au galop. | Les plantes de A apparaissent vers 80 m, au bon stade, comme avant ; `/vava_reseau joueur <B>` : un `vAvA:zone:state` de `vava_farming` d'environ 600 o par parcelle à chaque arrivée, rien entre-temps loin du champ. |
+| 4 | B se fait déplacer (Registre → Déplacer) de loin au milieu du champ. | Les plantes apparaissent au plus une seconde après l'arrivée (passage du core) ; l'invite `E` est disponible dès qu'elles sont là. |
+| 5 | A et B au champ ; `/agriculture arroser champ_communal`, puis `/agriculture pousser champ_communal 1`. | Arroser seul : aucune différence si aucune plante n'était flétrie (rien de visible ne change ; une plante flétrie qui repart, elle, part en différence) ; pousser : le blé de l'emplacement 1 passe au modèle mûr chez A et B dans la seconde, un `vAvA:zone:diff` chacun. |
+| 6 | Nuit de gel (§ 5.1, tests 6 et 7) avec 4 plantes nues au champ et 2 au jardin, A et B au champ. | À 21 h, les 6 plantes passent au modèle mort ensemble ; chez A et B, `/vava_reseau joueur` : **un** `vAvA:zone:diff` pour le champ et **un** pour le jardin (pas un par plante). |
+| 7 | B au champ ; `restart vava_farming`. | Les props disparaissent puis reviennent une seule fois, au bon stade, dans la seconde qui suit le démarrage ; console : aucune erreur `parcelle '…'`. |
+| 8 | B au champ ; retour à la sélection du personnage, puis reprendre le personnage. | À la sélection, plus aucun prop ; en jeu, les plantes reviennent au bon stade. |
+| 9 | Client modifié ou téléportation : un joueur reçoit l'état d'une parcelle et tente `E` sur un emplacement à plus de 3,5 m (si possible : appeler `vava_farming:begin` sans s'approcher). | Refus `too_far` : l'état reçu ne donne aucun droit ; chaque geste revérifie la distance côté serveur. |
+| 10 | Console du serveur, 32 joueurs ou plus si possible, dont certains en mouvement autour du champ : `profiler record 300`, puis `profiler view`. | Chercher `vAvA_core` (fonctions `runPass` / `pass` de `zones.lua`) et `vava_farming` (`publish`, `tick`) : le passage des zones ne doit pas bouger avec les deux parcelles (hors jeu : 0,03 ms à 64 joueurs immobiles, 0,2 ms en mouvement sur des zones éparses) ; la boucle de 10 s de l'agriculture ne compare plus que des signatures d'emplacements. Noter les valeurs avec le nombre de joueurs et de zones. |
+
 ## 6. Props à distance et resmon (récolte 1.4.1, artisanat 1.3.2, agriculture 1.5.2)
 
 Depuis T-018, chacun des trois modules regroupe ses cibles (nœuds par zone, stations par case de 200 m, parcelle avec
@@ -248,8 +269,9 @@ tout », s'en éloigner d'au moins 500 m (Registre → Déplacer, ou repère sur
   config : un modèle inconnu est signalé dans la console du client (`modèle inconnu 'x'`) et il n'y a simplement pas de
   prop ; une animation inconnue laisse le personnage immobile.
 - L'attache des accessoires en main (os 57005, décalages par modèle) : à régler objet par objet dans `held`.
-- La réception des state bags globaux à la connexion (zones, nœuds, stations, parcelles) : si les props ne
-  s'affichent pas au premier passage, c'est ce point.
+- La réception des state bags globaux à la connexion (zones, nœuds, stations) : si les props ne s'affichent pas au
+  premier passage, c'est ce point. Les parcelles (agriculture 1.7.0) arrivent par les abonnements de zone du core
+  (§ 5.2).
 
 ## 9. Comment me remonter un problème
 
