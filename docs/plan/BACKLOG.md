@@ -540,7 +540,9 @@ versé à T-014 ; les autres points déjà couverts sont précisés dans T-012 �
 - 20 à 30 extraits courts du lore, 15 conseils de jeu, textes d'accueil.
 
 ### T-022 — Arrivée d'un nouveau personnage
-- Agents : vava-architecte → vava-dev-lua · Dépend de : — · Statut : en cours (spec)
+- Agents : vava-architecte → vava-dev-lua (cette tâche autorise à toucher `config/server.lua` pour un commentaire, `vava_codex`, `chancellerie/lib/resources.js`, `.luacheckrc`, dans les limites de la spec) · Dépend de : — · Statut : en cours
+- Spec : `docs/plan/specs/T-022.md` (nouveau module `vava_arrival` ; décisions 1 à 9 retenues telles que proposées sur
+  délégation du porteur du projet le 30 octobre 2026, la 10 laissée en piste, core gardé en 0.12.0).
 - Point d'arrivée en config (PLACEHOLDER), dotation de départ minimale en config (besace, vêtements simples, pain,
   eau), message d'accueil, ouverture du Codex au chapitre « Premiers pas » à la première connexion. Rien de plus :
   le reste s'obtient auprès des autres joueurs.
@@ -556,7 +558,10 @@ Référence : `docs/plan/ATELIER.md` et les maquettes `docs/maquettes/`. Les éc
 maquettes.
 
 ### T-100 — Ressource `vava_atelier` : cadre, accueil, droits
-- Agents : vava-architecte → vava-dev-lua + vava-dev-nui · Dépend de : T-012 · Statut : en cours (spec)
+- Agents : vava-architecte → vava-dev-lua + vava-dev-nui · Dépend de : T-012 · Statut : en cours
+- Spec : `docs/plan/specs/T-100.md` (onze décisions retenues sur délégation du porteur du projet le 30 octobre 2026 :
+  `F9` et `/atelier`, planchers `metiers` pour le monde et `staff` pour la société et les arts, `vava_admin`
+  obligatoire, journal propre gardé 365 jours, rien d'enregistré avant T-101 ; bouton du Registre reporté).
 - Interface NUI unique (accueil selon la maquette `Main` : familles, recherche, brouillons, journal), ouverture par
   touche et commande déclarées au registre `core:commands`, registre `vava_atelier:editors`, droits par éditeur via
   `vava_admin`, journal du Conseil. Formulaire générique piloté par schéma (widgets `slider`, `segmented`, `select`,
