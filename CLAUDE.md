@@ -121,6 +121,9 @@ Choix tranchés par le porteur du projet : un agent ne les signale pas comme des
   compétence ; les fondateurs sont réservés à `staff` (Souverain) et à la console.
 - **Règles des métiers** (palier choisi par ingrédient, mentorat, pénurie, récolte communale dans la besace…) :
   décrites dans les README de `vava_skills`, `vava_gathering`, `vava_crafting` et `vava_farming`.
+- **Compteur réseau** (`core.net`) : **tous les joueurs connectés sont suivis d'office**, évènement par évènement
+  (les plus lourds de chacun, mémoire bornée), sans `/vava_reseau joueur` préalable ; la page Réseau de la
+  Chancellerie les liste avec le nom de leur personnage. Consulter le détail d'un joueur reste inscrit au journal.
 - **Commits** : un commit par chantier, au format du dépôt, jamais un commit fourre-tout.
 
 ## Façon de travailler
