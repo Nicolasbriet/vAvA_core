@@ -194,7 +194,7 @@ Corrections issues de l'audit T-010 (30 octobre 2026), à prendre avant le reste
   core montée.
 
 ### T-028 — Artisanat : signature et durabilité protégées par le hook des métadonnées
-- Agent : vava-dev-lua · Dépend de : — · Statut : à faire
+- Agent : vava-dev-lua · Dépend de : — · Statut : à tester en jeu
 - **IMPORTANT** (`securite-vava_crafting.md`) : aucun abonné au hook `vava_inventory:metadata` ne protège `crafter_id`,
   `crafter_name`, `crafted_at`, `mark`, `quality`, `tier` et `max_durability` (`server/signature.lua:138-147`) : tout
   module à venir qui appellera `setMetadata` ou `patchMetadata` avec des clés venues de son client réécrirait le

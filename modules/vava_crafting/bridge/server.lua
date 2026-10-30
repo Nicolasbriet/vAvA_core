@@ -3,9 +3,9 @@
     Rôle : SEUL point de contact, côté serveur, entre l'artisanat et le core / les autres modules : personnage et
            compte, position lue côté serveur, joueurs à portée (leçons), santé (à terre), inventaire (objet en main,
            piles et leurs métadonnées, comptage par palier, échange atomique, écriture partielle des métadonnées,
-           déclaration des objets), compétences (XP, niveau, rang, recette connue, leçon, registre des recettes),
-           libellés des compétences, poinçon (champ de personnage), droits et journal du Conseil, notifications, chat,
-           base.
+           garde de la signature au hook des métadonnées, déclaration des objets), compétences (XP, niveau, rang,
+           recette connue, leçon, registre des recettes), libellés des compétences, poinçon (champ de personnage),
+           droits et journal du Conseil, notifications, chat, base.
            Chaque appel à une autre ressource est isolé.
     Dépendances : shared/constants.lua, config.lua, server/core.lua
 ]]
@@ -25,6 +25,7 @@ local MARK_FIELD = VavaCrafting.MARK_FIELD
 local CONSOLE = 0
 local INVENTORY, SKILLS, ADMIN, CHAT, HEALTH = 'vava_inventory', 'vava_skills', 'vava_admin', 'vava_chat', 'vava_health'
 local ITEMS_REGISTRY = 'vava_inventory:items'
+local METADATA_HOOK = 'vava_inventory:metadata'
 local SKILLS_REGISTRY = 'vava_skills:skills'
 local SKILL_RECIPES_REGISTRY = 'vava_skills:recipes'
 
@@ -172,11 +173,32 @@ function Bridge.Remove(source, item, quantity, metadata)
     return ok == true, code
 end
 
---- Écrit ou remplace des clés de métadonnées, en retire d'autres.
+-- Écritures de métadonnées de l'artisanat en cours (compteur : une écriture dont un hook d'un autre module céderait
+-- la main ne doit pas faire tomber le drapeau d'une autre). Levé autour du seul appel à l'inventaire, protégé par pcall :
+-- il retombe toujours.
+local ownWrites = 0
+
+--- Écrit ou remplace des clés de métadonnées, en retire d'autres. Seule écriture de métadonnées du module : la garde
+--- (`Bridge.GuardMetadata`) la reconnaît comme interne.
 ---@return boolean ok
 function Bridge.PatchMetadata(source, instanceId, patch, removed)
+    ownWrites = ownWrites + 1
     local called, ok = call(INVENTORY, 'patchMetadata', source, instanceId, patch, removed)
+    ownWrites = ownWrites - 1
     return called and ok == true
+end
+
+--- Abonne `check(payload, interne)` au hook `before` de `vava_inventory:metadata`. Une écriture est interne quand
+--- l'inventaire l'attribue à cette ressource (`owner`, lu par lui avec `GetInvokingResource`) **et** qu'elle part de
+--- `Bridge.PatchMetadata` : ni un autre module, ni un autre chemin du module ne passe pour l'artisanat.
+---@param check fun(payload: table, internal: boolean): boolean|nil, string|nil
+---@return integer|nil id
+---@return string|nil err
+function Bridge.GuardMetadata(check)
+    return core.hooks.before(METADATA_HOOK, function(payload)
+        local internal = type(payload) == 'table' and payload.owner == VavaCrafting.resource and ownWrites > 0
+        return check(payload, internal)
+    end)
 end
 
 ---@param name string

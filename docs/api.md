@@ -1211,7 +1211,7 @@ nommé par zone et le cercle de son rayon, posés par le client depuis la config
 
 ### `vava_crafting`
 
-L'artisanat (1.2.3) : **stations** (forge, établi, métier à tisser, alambic, tannerie, fourneau, table d'arcanes)
+L'artisanat (1.3.0) : **stations** (forge, établi, métier à tisser, alambic, tannerie, fourneau, table d'arcanes)
 publiques ou privées, avec leur qualité et parfois leur combustible (forge : charbon ; fourneau : bois ; réserve
 alimentée par les joueurs), une pièce à la fois ; **recettes** à ingrédients par **palier choisi** (consommés par pile,
 les plus anciennes d'abord, échange atomique), outil requis en main, durée, XP par `vava_skills` ; **qualité** =
@@ -1247,6 +1247,19 @@ state bag global `vava_crafting:station:<id>` → `{ fuel, busy }`.
 **Hooks** : `vava_crafting:crafting` (`before`, annulable : `{ source, characterId, station, recipe, item }`),
 `crafted` (`after` : `+ quantity, quality, tier, signed, instanceId`), `repaired` (`after` : `{ source, characterId,
 station, recipe, item, instanceId, maxDurability }`).
+
+**Signature protégée** (depuis 1.3.0) : abonné `before` à `vava_inventory:metadata`, l'artisanat refuse l'écriture
+d'un autre module (`setMetadata`, `patchMetadata`) qui changerait, poserait ou retirerait `crafter_id`,
+`crafter_name`, `crafted_at`, `mark` ou `quality` sur n'importe quel objet (`false, 'signature_locked'`) ; sur un objet
+signé (`crafter_id` présent), qui changerait `tier` ou poserait, changerait ou retirerait `name` (le baptême seul
+nomme une pièce) (`signature_locked`), ferait monter, retirerait ou remplacerait par autre chose qu'un nombre
+`max_durability` ou `durability`, ou retirerait `broken` (`false, 'durability_locked'`). Une solidité qui baisse
+(usure, dommage) ou qui naît sur un objet qui n'en avait pas, `history`, `lines` et toute autre clé restent libres ; un
+objet ordinaire n'est touché que s'il recevait une de ces cinq clés (signature contrefaite). Un `setMetadata` sur un objet signé doit donc reporter
+ces clés telles quelles. Sont seules admises les écritures que l'inventaire attribue à `vava_crafting` (`owner`) et qui
+partent de son bridge (réparation, baptême). Chaque refus est journalisé (`vava_crafting_log`, nature
+`signature_locked` ou `durability_locked`). La garde tombe avec le module ; un objet **créé** déjà signé (`add`,
+`exchange`) n'est pas de son ressort.
 
 **Commande** `/artisanat stations | station <id> | carburant <id> <n>` (droit `metiers`). Touche `E` près d'une
 station. Rendu hors jeu : `web/index.html?view=menu` (ou `menu&tab=reparation`, `menu&tab=poincon`, `name`).

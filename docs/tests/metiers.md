@@ -132,6 +132,24 @@ la fin, sang à l'interruption. Hors jeu : `modules/vava_hud/web/index.html?prog
 | 11 | Station avec `owner = { kind = 'character', id = <autre> }` dans la config. | « ne vous appartient pas ». |
 | 12 | `/artisanat station forge_bourg`, `/artisanat carburant forge_bourg 20`. | État et recettes dans le chat ; combustible fixé. |
 | 13 | Près du fourneau : `/aterre`, puis `E` ; relevé, lancer une pièce et `/aterre` pendant la barre. | À terre : ni invite ni menu, `E` ne fait que rendre l'âme. Tombé pendant la pièce : rien de consommé, station libérée (« Vous êtes à terre. » à la fin de la barre, ou geste interrompu si le corps a glissé) ; un autre joueur peut s'en servir aussitôt. |
+| 14 | Signature protégée (1.3.0) : poser la ressource jetable `test_signature` décrite sous ce tableau, `ensure test_signature`. Hache **signée** en main (test 6) ; en console : `testsig <votre id> crafter_name Truand`, puis `testsig <id> quality 100`, `testsig <id> tier 5`, `testsig <id> mark X`, `testsig <id> name Truand`. | Chaque fois `false signature_locked` en console, avec un `WARN` de `vava_crafting` (« écriture de 'test_signature' refusée … clé '…' protégée ») ; fiche de la hache inchangée (créateur, qualité, palier, poinçon, pas de nom). |
+| 15 | Même hache : `testsig <id> max_durability 500`, puis `testsig <id> durability 1`, puis `testsig <id> durability 100`. | `false durability_locked` ; puis `true`, la fiche montre 1 / 100 ; puis `false durability_locked` (pas de réparation hors station). Réparer à la forge (test 9) : 95 / 95 comme d'habitude. |
+| 16 | Hache **du catalogue** (non signée) en main : `testsig <id> durability 50`, puis `testsig <id> crafter_name Truand`. | `true` (objet ordinaire, la garde ne s'en mêle pas) ; puis `false signature_locked` (pas de signature contrefaite). |
+| 17 | Avec la hache signée : couper du bois (récolte), puis baptiser un chef-d'œuvre (test 8) ; `SELECT kind, details FROM vava_crafting_log WHERE kind IN ('signature_locked','durability_locked')`. | La solidité baisse à chaque coupe, la hache se brise à 0 ; le baptême passe. En base : une ligne par refus des tests 14 à 16 (module `test_signature`, clé, objet). Supprimer ensuite la ressource jetable. |
+
+Ressource jetable des tests 14 à 17 (`resources/test_signature/`, à **ne pas** committer ni garder) : `fxmanifest.lua`
+avec `fx_version 'cerulean'`, `game 'gta5'`, `lua54 'yes'`, `server_script 'server.lua'`, et ce `server.lua` :
+
+```lua
+-- console seulement : testsig <id du joueur> <clé> <valeur> — écrit une clé sur l'objet tenu en main
+RegisterCommand('testsig', function(src, args)
+    if src ~= 0 then return end
+    local target, key, value = tonumber(args[1]), args[2], tonumber(args[3]) or args[3]
+    local held = target and exports.vava_inventory:held(target)
+    if not held or not key then return print('testsig : joueur, clé ou objet en main manquant') end
+    print('testsig', exports.vava_inventory:patchMetadata(target, held.id, { [key] = value }))
+end, true)
+```
 
 ## 5. Agriculture — `vava_farming`
 
