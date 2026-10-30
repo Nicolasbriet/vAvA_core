@@ -2,7 +2,8 @@
 # scripts/verifier.sh — contrôle avant chaque commit d'agent et en CI.
 #   1. lint (luacheck) : fichiers Lua modifiés depuis BASE, ou tout le dépôt avec --tout
 #   2. tests unitaires (busted)
-#   3. audit réseau et sécurité statique (scripts/audit-reseau.sh), puis son essai sur les cas de tests/audit/
+#   3. essais des fonctions pures des pages (node, s'il est présent ; sinon un message, sans échec)
+#   4. audit réseau et sécurité statique (scripts/audit-reseau.sh), puis son essai sur les cas de tests/audit/
 # Code de sortie 0 seulement si tout passe.
 set -uo pipefail
 cd "$(dirname "$0")/.."
@@ -47,6 +48,18 @@ elif [[ "$BUSTED" == *.bat ]]; then
     "$BUSTED" -o utfTerminal || echec=1
 else
     busted --lua=lua5.4 -o utfTerminal || echec=1
+fi
+
+titre "Essais de pages"
+# fonctions pures d'une page (sans dépendance), lancées par node ; node manquant : rien n'échoue, on le dit
+ESSAIS_PAGES=(modules/vava_loading/web/dev/essais.js)
+if ! command -v node >/dev/null; then
+    echo "node absent : essais de pages non lancés (${ESSAIS_PAGES[*]})"
+else
+    for essai in "${ESSAIS_PAGES[@]}"; do
+        if [[ -f "$essai" ]]; then node "$essai" || echec=1
+        else echo "$essai introuvable"; echec=1; fi
+    done
 fi
 
 titre "Audit réseau et sécurité"
