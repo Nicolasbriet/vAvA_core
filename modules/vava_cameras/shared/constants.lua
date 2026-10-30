@@ -11,7 +11,8 @@ VavaCameras.EVENTS = {
     START = 'vava_cameras:start',     -- au joueur filmé : { session, quality = { … }, iceServers }
     ANSWER = 'vava_cameras:answer',   -- au joueur filmé : { session, sdp } réponse de celui qui regarde
     STOP = 'vava_cameras:stop',       -- au joueur filmé : { session }
-    OFFER = 'vava_cameras:offer',     -- au membre qui regarde en jeu : { session, sdp }
+    RATES = 'vava_cameras:rates',     -- au joueur filmé : { rates = { { session, kbps }, … } } parts du débit changées
+    OFFER = 'vava_cameras:offer',     -- au membre qui regarde en jeu (envoi latent) : { session, sdp }
     ENDED = 'vava_cameras:ended',     -- au membre qui regarde en jeu : { session, reason }
 }
 

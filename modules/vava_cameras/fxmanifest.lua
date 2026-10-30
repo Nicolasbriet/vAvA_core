@@ -3,8 +3,9 @@
     Rôle : caméras sur l'écran des joueurs, pour le Conseil. Le jeu du joueur filme l'image du jeu seule (ni Windows,
            ni Discord, ni les interfaces) et l'envoie en WebRTC direct à chaque membre qui le regarde : en jeu (mur des
            caméras, ouvert depuis le Registre ou par commande) ou depuis la Chancellerie (par son pont). Une seule
-           capture par joueur, réduite pour les cases d'un mur, pleine pour une vue en grand. Le serveur ne relaie
-           que la négociation ; il décide qui regarde qui, et l'inscrit au journal du Conseil.
+           capture par joueur, réduite pour les cases d'un mur, pleine pour une vue en grand (une seule à la fois) ;
+           débit montant total du joueur filmé borné et réparti entre ses spectateurs. Le serveur ne relaie que la
+           négociation ; il décide qui regarde qui, et l'inscrit au journal du Conseil.
     Dépendances : vAvA_core ≥ 0.5.0 ; facultatives : vava_admin ≥ 1.2.0 (droit « watch », journal, outil du
                   Registre), vava_chancellerie (caméras depuis le web)
 ]]
@@ -16,7 +17,7 @@ use_experimental_fxv2_oal 'yes'
 
 name 'vava_cameras'
 description 'Caméras sur l\'écran des joueurs (Conseil) vAvA'
-version '1.2.0'
+version '1.3.0'
 
 dependency 'vAvA_core'
 
@@ -36,6 +37,7 @@ shared_scripts {
 }
 
 server_scripts {
+    'shared/budget.lua',
     'server/core.lua',
     'server/links.lua',
     'server/players.lua',

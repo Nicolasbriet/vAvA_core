@@ -23,7 +23,8 @@ const Wall = (() => {
   const focusNumber = focusBox.querySelector('.plate-number');
   const RETRY_MS = 10000;
   const EARLY_OFFER_MS = 15000;
-  // fins sans nouvel essai : le résultat ne changerait pas
+  // fins sans nouvel essai : le résultat ne changerait pas (`budget` n'en est pas : le débit du joueur se libère
+  // quand un autre spectateur s'en va, la caméra est retentée comme une autre)
   const FINAL = new Set(['unsupported', 'forbidden', 'self', 'wall_closed']);
   const WAITING = new Set(['queued', 'opening', 'waiting', 'connecting']);
 

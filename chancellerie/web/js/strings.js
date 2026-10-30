@@ -74,6 +74,7 @@ const STRINGS = (() => {
     label_too_long: 'Ce nom est trop long.',
     too_many_cameras: 'Trop de caméras ouvertes.',
     too_many_viewers: 'Six membres du Conseil regardent déjà ce joueur.',
+    budget: 'Le débit de ce joueur est déjà pris (une seule vue en grand à la fois, et un plafond pour toutes ses caméras) : réessayez dans un instant.',
     not_playing: 'Ce joueur est en sélection de personnage.',
     cameras_unavailable: 'Les caméras (vava_cameras) ne sont pas lancées sur le serveur de jeu.',
     unknown_session: 'Cette caméra est déjà éteinte.',
@@ -575,6 +576,7 @@ const STRINGS = (() => {
       privacy: 'Les joueurs ne sont pas prévenus : l\'ouverture du mur et chaque vue en grand sont inscrites au journal du Conseil.',
       status: {
         not_playing: 'En sélection de personnage', too_many_viewers: 'Déjà regardé par six membres', too_many_cameras: 'Trop de caméras ouvertes',
+        budget: 'Débit du joueur déjà pris, nouvel essai bientôt',
         forbidden: 'Droit refusé', dropped: 'Joueur parti', left_game: 'Plus en jeu', connection_failed: 'Connexion perdue',
         no_answer: 'Pas de réponse du joueur', capture_failed: 'Capture impossible', unsupported: 'Jeu du joueur incompatible',
         expired: 'Caméra expirée', closed: 'Caméra fermée', stopped: 'Caméra fermée', server_stopped: 'Serveur de jeu arrêté',

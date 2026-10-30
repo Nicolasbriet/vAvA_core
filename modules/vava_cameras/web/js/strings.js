@@ -24,6 +24,7 @@ const STRINGS = {
     not_playing: 'En sélection de personnage',
     too_many_viewers: 'Déjà regardé par six membres',
     too_many_cameras: 'Trop de caméras ouvertes',
+    budget: 'Débit du joueur déjà pris, nouvel essai bientôt',
     forbidden: 'Droit refusé',
     wall_closed: 'Mur à rouvrir',
     self: 'Votre propre écran',
