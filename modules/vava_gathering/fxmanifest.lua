@@ -18,7 +18,7 @@ use_experimental_fxv2_oal 'yes'
 
 name 'vava_gathering'
 description 'Récolte vAvA : zones à vitalité sur la carte, nœuds, outils en main, qualité, pêche, pistes de gibier'
-version '1.4.0'
+version '1.4.1'
 
 dependency 'vAvA_core'
 dependency 'vava_inventory'
@@ -42,6 +42,7 @@ shared_scripts {
     'shared/constants.lua',
     'config.lua',
     'shared/geometry.lua',
+    'shared/proximity.lua',
     'shared/season.lua',
     'shared/catch.lua',
 }

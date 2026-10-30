@@ -416,7 +416,8 @@ au point de l'effet). Aucun fichier n'est fourni.
 | Rempart | 2 à 6 objets réseau figés (synchronisés par OneSync), 8 déplacements à la montée et à la descente |
 
 Serveur : aucune boucle permanente (mana calculée à la demande ; écritures groupées toutes les 10 à 15 s). Client : une
-recherche des effets proches toutes les 250 ms ; le dessin par image ne tourne que si une lumière, un texte, un
+recherche des effets proches toutes les 250 ms, seulement tant qu'un state bag de magie est suivi ou qu'un effet reste
+à défaire (rien chez un joueur sans magie autour, 2.7.1) ; le dessin par image ne tourne que si une lumière, un texte, un
 projectile, une zone qui dessine (flammes, reflet, présage) est à portée, pendant l'incantation d'un sort qui permet de
 marcher, roue ouverte, ou en mode magie éveillé (qui coupe l'attaque de GTA à chaque image ; il s'endort après 20 s
 sans action). La brume ne relit la position du joueur que toutes les 200 ms, tant qu'elle est proche. Plafonds de
@@ -588,4 +589,5 @@ Deux joueurs (A et B) suffisent ; un troisième aide pour le cercle et la zone d
 - [ ] Arrêt de la ressource en pleine action (`restart vava_magic`) : plus aucune particule, lumière, voile ni pierre ne reste ; les joueurs gelés sont libres ; à son retour, les fiches sont intactes.
 
 **Performance**
+- [ ] Recherche endormie (2.7.1) : un joueur sans aucune magie autour n'a aucun thread de recherche ; dès qu'un mage proche incante, allume une Lueur ou subit un état, les effets apparaissent comme avant (dans le quart de seconde), et disparaissent quand tout cesse. Détail : `docs/tests/magie.md` § 15.
 - [ ] `resmon` : `vava_magic` à ~0,00 ms au repos, quelques centièmes pendant une incantation ou une lumière proche ; une brume, une vapeur ou un sol mouillé proches restent à quelques centièmes.

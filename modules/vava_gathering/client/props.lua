@@ -3,12 +3,14 @@
     Rôle : les nœuds de récolte dans le monde, vus du joueur : état des zones et des nœuds lu dans les state bags
            globaux (bande de vitalité, cicatrice, charges), props LOCAUX (jamais réseau) créés pour les nœuds à portée
            et remplacés par leur modèle « épuisé » quand la zone l'est, nœud le plus proche à distance d'interaction.
-           Une seule boucle lente (streaming.pollMs), active seulement quand un personnage est en jeu : elle s'arrête
-           d'elle-même à la sélection et au déchargement, et retire alors tous les props.
-    Dépendances : shared/constants.lua, config.lua, shared/geometry.lua, client/core.lua
+           Une seule boucle lente, active seulement quand un personnage est en jeu : elle mesure d'abord les zones
+           (centre et étendue de leurs nœuds), ne parcourt que les nœuds d'une zone à portée, passe toutes les
+           streaming.pollMs près d'une zone et toutes les streaming.idlePollMs loin de toutes ; elle s'arrête d'elle-même
+           à la sélection et au déchargement, et retire alors tous les props.
+    Dépendances : shared/constants.lua, config.lua, shared/geometry.lua, shared/proximity.lua, client/core.lua
 ]]
 
-local type, pairs, ipairs = type, pairs, ipairs
+local type, pairs, ipairs, huge, max = type, pairs, ipairs, math.huge, math.max
 local sub = string.sub
 local CreateThread, Wait, GetGameTimer, AddEventHandler = CreateThread, Wait, GetGameTimer, AddEventHandler
 local PlayerPedId, GetEntityCoords, DoesEntityExist, DeleteObject = PlayerPedId, GetEntityCoords, DoesEntityExist, DeleteObject
@@ -22,6 +24,7 @@ if not core then return end
 local cfg = VavaGathering.config
 local streaming = cfg.streaming
 local geometry = VavaGathering.geometry
+local proximity = VavaGathering.proximity
 local STATE_ZONE, STATE_NODE = VavaGathering.STATE_ZONE, VavaGathering.STATE_NODE
 local BANDS = VavaGathering.BANDS
 local RESOURCE = VavaGathering.resource
@@ -34,6 +37,12 @@ VavaGathering.props = props
 local zonesById, nodesById = {}, {}
 for _, zone in ipairs(cfg.zones) do zonesById[zone.id] = zone end
 for _, node in ipairs(cfg.nodes) do nodesById[node.id] = node end
+-- nœuds regroupés par zone (la config ne change pas en jeu) ; un groupe naît « actif » pour que le premier passage
+-- retire ce qui serait hors de portée
+local groups = proximity.group(cfg.nodes, function(node) return node.zone or ('node:' .. node.id) end)
+for _, group in ipairs(groups) do group.active = true end
+-- un nœud est mesuré si sa zone peut en avoir un à portée des props ou de l'invite
+local REACH = max(streaming.radius, cfg.interact.distance)
 
 -- état connu du serveur : zone → { band, scarred, vitality } ; nœud → charges
 local zoneStates, nodeCharges = {}, {}
@@ -153,19 +162,33 @@ local function reconcile(node, distance)
     spawn(node, model)
 end
 
---- Boucle lente justifiée : une distance par nœud toutes les pollMs, seulement quand un personnage est en jeu.
+--- Boucle lente justifiée, seulement quand un personnage est en jeu : une distance par zone, puis une par nœud des
+--- seules zones à portée ; une zone qui sort de portée retire ses props une fois. Intervalle : streaming.pollMs près
+--- d'une zone, streaming.idlePollMs quand aucun nœud ne peut être à moins de radius + idleMargin.
 local function loop()
     while playing do
         local coords = GetEntityCoords(PlayerPedId())
+        local px, py, pz = coords.x, coords.y, coords.z
         local bestId, bestDistance = nil, cfg.interact.distance
-        for _, node in ipairs(cfg.nodes) do
-            local distance = geometry.distance(coords.x, coords.y, coords.z, node.x, node.y, node.z)
-            reconcile(node, distance)
-            if distance <= bestDistance then bestId, bestDistance = node.id, distance end
+        local closest = huge
+        for _, group in ipairs(groups) do
+            local reachable, gap = proximity.reachable(group, px, py, pz, REACH)
+            if gap < closest then closest = gap end
+            if reachable then
+                group.active = true
+                for _, node in ipairs(group.targets) do
+                    local distance = geometry.distance(px, py, pz, node.x, node.y, node.z)
+                    reconcile(node, distance)
+                    if distance <= bestDistance then bestId, bestDistance = node.id, distance end
+                end
+            elseif group.active then
+                group.active = false
+                for _, node in ipairs(group.targets) do remove(node.id) end
+            end
         end
         nearestId, nearestDistance = bestId, bestDistance
         if onNearest then onNearest(bestId) end
-        Wait(streaming.pollMs)
+        Wait(proximity.interval(closest, streaming.radius, streaming.idleMargin, streaming.pollMs, streaming.idlePollMs))
     end
     for id in pairs(shown) do remove(id) end
     nearestId, nearestDistance = nil, nil

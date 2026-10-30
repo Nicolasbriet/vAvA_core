@@ -211,7 +211,28 @@ arracher une plante flétrie ou morte (1 à 2), ou le catalogue de développemen
 | 17 | **Automne** : `calendar.cycle.first = 'automne'`, `restart vava_time` ; couvrir une plante de blé. | « Couvrir » est proposé et réussit (on se prépare à l'hiver) ; aucune nuit ne gèle en automne. |
 | 18 | Hiver : lancer Couvrir, et pendant la barre de 3 s, `restart vava_time` avec `first = 'printemps'` (ou attendre la bascule d'une saison courte). | Si la saison a tourné avant la fin du geste : « Aucun gel à craindre en cette saison. », rien consommé, plante non couverte. |
 
-## 6. Ce qu'il faut regarder dans la base
+## 6. Props à distance et resmon (récolte 1.4.1, artisanat 1.3.2, agriculture 1.5.2)
+
+Depuis T-018, chacun des trois modules regroupe ses cibles (nœuds par zone, stations par case de 200 m, parcelle avec
+son grenier, puits par case de 200 m), ne mesure que celles d'un groupe à portée, et ne repasse que toutes les 2,5 s
+quand rien ne peut être à moins de 140 m (80 m de portée + 60 m de marge d'approche) ; toutes les secondes sinon.
+Rien ne doit changer à l'écran. Tous les lieux d'exemple sont à moins de 200 m du point d'apparition : pour « loin de
+tout », s'en éloigner d'au moins 500 m (Registre → Déplacer, ou repère sur la carte). Mesure : console du client
+(`F8`) → `resmon 1`, lignes `vava_gathering`, `vava_crafting`, `vava_farming`.
+
+| # | Faire | Attendu |
+|---|---|---|
+| 1 | Personnage debout, rien d'ouvert, à plus de 500 m de tous les lieux du § 0.6 ; regarder le resmon 30 s. | Les trois lignes à ~0,00 ms (≤ 0,02 ms) : un seul passage toutes les 2,5 s, qui ne mesure que les groupes. |
+| 2 | Revenir à pied, puis au galop, vers la Forêt de Brume. | Les arbres apparaissent vers 80 m, comme avant : jamais « sous le nez » ni avec retard visible. |
+| 3 | Rester debout au milieu de la Forêt de Brume, puis devant les stations du bourg, puis au champ communal, 30 s chaque fois. | Resmon de la ressource concernée ≤ 0,02 ms ; invite qui apparaît en moins d'une seconde près d'un arbre, d'une station, d'un emplacement, du puits, du grenier. |
+| 4 | Longer les stations du bourg de (−255, −945) à (−292, −915), puis s'en éloigner à plus de 80 m. | Chaque station a son prop, un seul ; tous disparaissent au-delà de 80 m. |
+| 5 | Au champ communal : plantes à différents stades, puits, grenier ; s'éloigner à plus de 80 m puis revenir. | Les plantes, le puits et le grenier disparaissent au-delà de 80 m et reviennent au retour, au bon stade ; une plante qui change de stade pendant qu'on est là change de prop dans la seconde. |
+| 6 | `/recolte vitalite foret_brume 20` en étant dans la forêt, puis `100`. | Souches puis arbres, comme avant (dans la seconde). |
+| 7 | Depuis un lieu à plus de 500 m, se faire déplacer (Registre → Déplacer) au milieu de la Forêt de Brume. | Les arbres apparaissent au plus 2,5 s après l'arrivée (seul écart connu : avant, 1 s au plus). |
+| 8 | `restart vava_farming` (le composteur est une station ajoutée par l'agriculture) près du champ. | Le composteur réapparaît ; les autres stations ne clignotent pas. |
+| 9 | Retour à la sélection du personnage, puis `restart vava_gathering`, `restart vava_crafting`, `restart vava_farming` en étant près de leurs lieux. | Aucun prop ne reste au sol à la sélection ; après chaque redémarrage, les props reviennent une seule fois. |
+
+## 7. Ce qu'il faut regarder dans la base
 
 - `vava_characters.play_seconds` monte ; `vava_skills_skills`, `vava_skills_mentorships`, `vava_skills_recipes`,
   `vava_skills_lessons`, `vava_skills_log` ; `vava_gathering_zones` (vitalité, `scarred_until`), `vava_gathering_nodes`,
@@ -219,7 +240,7 @@ arracher une plante flétrie ou morte (1 à 2), ou le catalogue de développemen
   baptêmes, leçons) ; `vava_farming_slots`, `vava_farming_granaries`, `vava_farming_granary_log`, `vava_farming_log`.
 - Les écritures sont groupées (10 s) : attendre un instant, ou arrêter proprement (`vava_saveall` puis `quit`).
 
-## 7. Ce que je ne peux pas avoir vérifié hors jeu
+## 8. Ce que je ne peux pas avoir vérifié hors jeu
 
 - Le rendu des interfaces dans CEF (polices `nui://`, cadres `border-image`, glyphes des poinçons) : chaque
   `web/index.html` s'ouvre aussi dans un navigateur pour comparer.
@@ -230,7 +251,7 @@ arracher une plante flétrie ou morte (1 à 2), ou le catalogue de développemen
 - La réception des state bags globaux à la connexion (zones, nœuds, stations, parcelles) : si les props ne
   s'affichent pas au premier passage, c'est ce point.
 
-## 8. Comment me remonter un problème
+## 9. Comment me remonter un problème
 
 Pour chaque anomalie : le numéro du test (ex. « 3.2-7 »), ce qui s'est passé, la ou les lignes de la console
 serveur ou client (F8) au même moment, et si possible l'état en base. Les lignes qui commencent par le nom du module

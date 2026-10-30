@@ -99,8 +99,11 @@ VavaGathering.config = {
         },
     },
 
-    -- Client : props des nœuds créés à portée, remplacés par le modèle « épuisé » quand la zone l'est.
-    streaming = { radius = 80.0, pollMs = 1000, modelTimeoutMs = 5000 },
+    -- Client : props des nœuds créés à portée (`radius`, mètres), remplacés par le modèle « épuisé » quand la zone l'est.
+    -- Les nœuds sont regroupés par zone : seuls ceux d'une zone à portée sont mesurés. Un passage toutes les `pollMs`
+    -- près d'une zone, toutes les `idlePollMs` quand aucun nœud ne peut être à moins de `radius` + `idleMargin` (la
+    -- marge couvre le chemin d'un cavalier rapide pendant `idlePollMs`, pour que les props apparaissent comme avant).
+    streaming = { radius = 80.0, pollMs = 1000, idlePollMs = 2500, idleMargin = 60.0, modelTimeoutMs = 5000 },
 
     -- Carte : un blip par zone (icône `sprite` et couleur `colour` du jeu selon le genre, liste sur docs.fivem.net →
     -- Blips), nommé comme elle, à courte portée (petite carte à l'approche, toujours sur la grande), et le cercle

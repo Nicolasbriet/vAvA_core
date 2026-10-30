@@ -523,7 +523,8 @@ simplement rien. Le réglage à corriger est entre parenthèses.
 ## 15. Resmon
 
 Console du client (`F8`) → `resmon 1`, ligne `vava_magic`. Cibles : 0,02 ms au plus au repos, 0,15 ms au plus en
-action. Au repos, le module ne fait qu'une recherche toutes les 250 ms ; les boucles par image ne tournent que mode
+action. Au repos, le module ne fait qu'une recherche toutes les 250 ms, et seulement tant qu'un state bag de magie
+est suivi ou qu'un effet reste à défaire (2.7.1 : sans aucune magie autour, elle dort) ; les boucles par image ne tournent que mode
 magie éveillé, en visant, cible verrouillée, pendant un vol, une incantation de projectile, sous un état qui touche
 le personnage, ou près d'une lumière, d'une zone qui dessine ou d'une trace.
 
@@ -536,6 +537,7 @@ le personnage, ou près d'une lumière, d'une zone qui dessine ou d'une trace.
 | 5 | **(2 joueurs)** Combat d'une minute à moins de 30 m : boules de feu, traits, un mur, une brume, une secousse, un rempart, une Lueur allumée. Noter la moyenne et la pointe, chez A et chez B. | ≤ 0,15 ms chez chacun, pointe comprise. C'est la mesure la plus importante du module. |
 | 6 | **(3 joueurs)** C regarde ce combat à 100 m, puis à 200 m. | ≤ 0,15 ms à 100 m (effets simplifiés) ; à 200 m, comme au repos. |
 | 7 | Une minute après la fin du combat (zones éteintes, traces effacées). | Retour à ≤ 0,02 ms. |
+| 8 | **(2 joueurs, 2.7.1)** B seul, loin de toute magie : ~0,00 ms. A arrive à 10 m et incante une boule de feu, puis allume une Lueur, puis B se fait geler par A (`/magie` du Conseil ou le sort). Enfin A éteint tout et s'éloigne à plus de 200 m. | Chez B, chaque effet apparaît comme avant (dans le quart de seconde) : texte et runes au-dessus de A, particules des mains, lumière, givre sur B ; tout disparaît quand cela cesse, aucune particule ne reste ; quelques secondes après le départ de A, retour à ~0,00 ms. |
 
 ## 16. Ce qu'il faut regarder dans la base
 

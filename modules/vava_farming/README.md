@@ -32,6 +32,7 @@ et `vava_time:frost`).
 | Ordre de la récolte (1.5.1) | la plante est prise (récolte) ou arrachée **avant** que quoi que ce soit n'entre dans la besace : de deux cultivateurs qui finissent le même geste sur la même plante, un seul est servi, l'autre lit « Ce geste n'est plus en cours. » ; une récolte refusée par la besace pleine rend la plante (mûre, couverte si elle l'était et si la couverture est payée, fertilité intacte), sauf si quelqu'un a semé entre-temps (journalisé en console) ; ce qu'un autre a fait sur l'emplacement vide pendant l'attente est gardé (compost : la fertilité rendue en tient compte) et un gel tombé entre-temps frappe la plante rendue ; rien n'a bougé : aucune écriture en base pour rien, et la parcelle est republiée aussitôt | — |
 | Composteur | type de station + recette (3 déchets → 1 compost, Agriculture) ajoutés à `vava_crafting`, station placée par `addStation` | `composter` |
 | Cultures de départ | blé 90 min, carotte 30, chou 45, lin 60 (durées d'essai) | `crops` |
+| Props | créés par le client à 80 m ; une parcelle et son grenier forment un groupe, les puits sont groupés par case de 200 m : seules les cibles d'un groupe à portée sont mesurées ; relues toutes les secondes près d'un groupe, toutes les 2,5 s quand aucune cible n'est à moins de 140 m (80 m + 60 m de marge d'approche) (1.5.2) | `streaming` |
 | Journal | plantations, récoltes Excellent+, arrachages, couvertures, plantes prises par le gel (une ligne par nuit, par parcelle), Conseil ; grenier (une ligne par minute, personnage, objet et sens) ; 90 jours | `logTier`, `logRetentionDays`, `persistence.granaryLogMax` |
 
 ### Parcelles et emplacements
@@ -117,3 +118,5 @@ withdraw, source, characterId, item, quantity }`). Détail : `docs/api.md`.
 13. **Ordre de la récolte** (1.5.1, à deux) : deux cultivateurs qui récoltent ou arrachent la même plante → un seul est
     servi ; besace pleine à la fin d'une récolte → la plante reste, mûre et couverte si elle l'était. Détail :
     `docs/tests/metiers.md` (agriculture, tests 14 à 17).
+14. **Props à distance** (1.5.2) : plantes, puits et grenier apparaissent à 80 m et disparaissent au-delà, comme avant ;
+    `resmon` loin de tout puis au champ : `vava_farming` plus bas loin de tout. Détail : `docs/tests/metiers.md` § 6.

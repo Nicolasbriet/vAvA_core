@@ -18,7 +18,7 @@ use_experimental_fxv2_oal 'yes'
 
 name 'vava_crafting'
 description 'Artisanat vAvA : stations, recettes, qualité, objets signés, réparation, leçons'
-version '1.3.1'
+version '1.3.2'
 
 dependency 'vAvA_core'
 dependency 'vava_inventory'
@@ -43,6 +43,7 @@ shared_scripts {
     'shared/constants.lua',
     'config.lua',
     'shared/quality.lua',
+    'shared/proximity.lua',
 }
 
 server_scripts {

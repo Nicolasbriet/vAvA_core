@@ -11,7 +11,9 @@
       - états élémentaires d'un joueur : flammes (brûlure), gouttes (mouillé), givre (gelé), poussière (chancelant),
         avec la lueur des flammes ; seulement la brûlure de loin, rien au-delà de la distance des effets.
     Les state bags sont suivis par gestionnaires de changement ; une recherche toutes les 250 ms retient ce qui est à
-    portée, et le dessin par image ne tourne que s'il y a quelque chose à dessiner. Lumières et particules passent
+    portée, et le dessin par image ne tourne que s'il y a quelque chose à dessiner. La recherche elle-même ne tourne
+    que tant qu'un state bag est suivi ou qu'un effet reste à défaire : réveillée par la première valeur reçue, elle
+    s'endort quand il n'y a plus rien (aucun thread chez un joueur sans magie autour). Lumières et particules passent
     par les plafonds de client/fx.lua. Un client peut écrire les state bags de ses propres entités : une lumière n'est
     retenue que si chacun de ses champs est un nombre dans les bornes de la config.
     Dépendances : shared/, config.lua, client/state.lua, client/fx.lua
@@ -79,6 +81,10 @@ local FAR_MARKED = { burn = true }
 local hands = {}
 ---@type table<integer, boolean>  orbes ancrés déjà cachés
 local hidden = {}
+-- recherche en cours (elle ne tourne que s'il y a quelque chose à suivre ou à défaire)
+local scanning = false
+---@type fun()  lance la recherche si elle dort (défini plus bas, après scan)
+local wake
 
 -- texture des runes, chargée depuis le fichier de la ressource
 local runesReady
@@ -100,12 +106,19 @@ end
 ---@param ms integer
 function ambient.setFragments(caster, words, ms)
     fragments[caster] = { words = words, untilMs = GetGameTimer() + ms }
+    wake()
 end
 
--- suivi des state bags (aucun appel périodique : FiveM prévient à chaque changement)
+-- suivi des state bags (aucun appel périodique : FiveM prévient à chaque changement) ; une valeur reçue réveille la
+-- recherche
 for key, list in pairs(tracked) do
     AddStateBagChangeHandler(key, nil, function(bagName, _, value)
-        if value == nil then list[bagName] = nil else list[bagName] = { value = value, since = GetGameTimer() } end
+        if value == nil then
+            list[bagName] = nil
+        else
+            list[bagName] = { value = value, since = GetGameTimer() }
+            wake()
+        end
     end)
 end
 
@@ -420,24 +433,42 @@ local function draw()
     end
 end
 
-CreateThread(function()
-    while true do
-        Wait(amb.scanMs)
-        local any = scan()
-        if any and not drawing then
-            drawing = true
-            CreateThread(function()
-                -- boucle par image justifiée : seulement tant qu'un effet de magie est à portée
-                while drawing do
-                    draw()
-                    Wait(0)
-                end
-            end)
-        elseif not any then
-            drawing = false
-        end
+--- Plus rien à suivre ni à défaire : aucun state bag suivi, aucune particule posée, aucun orbe caché, aucun fragment,
+--- rien à dessiner. Un passage de scan() ne ferait alors rien.
+---@return boolean
+local function idle()
+    if drawing then return false end
+    for _, list in pairs(tracked) do
+        if next(list) then return false end
     end
-end)
+    return next(marks) == nil and next(hands) == nil and next(hidden) == nil and next(fragments) == nil
+end
+
+--- Recherche toutes les `scanMs`, seulement tant qu'il y a quelque chose à suivre ou à défaire : chez un joueur sans
+--- aucun effet de magie autour, aucun thread ne tourne. Réveillée par un state bag suivi ou des fragments reçus.
+wake = function()
+    if scanning then return end
+    scanning = true
+    CreateThread(function()
+        repeat
+            Wait(amb.scanMs)
+            local any = scan()
+            if any and not drawing then
+                drawing = true
+                CreateThread(function()
+                    -- boucle par image justifiée : seulement tant qu'un effet de magie est à portée
+                    while drawing do
+                        draw()
+                        Wait(0)
+                    end
+                end)
+            elseif not any then
+                drawing = false
+            end
+        until idle()
+        scanning = false
+    end)
+end
 
 --- Arrêt du module : flammes éteintes.
 function ambient.stop()

@@ -3,14 +3,16 @@
     Rôle : les stations d'artisanat dans le monde, vues du joueur : liste des stations publiée par le serveur (config
            et stations ajoutées par d'autres modules, la config ne servant qu'avant la première publication), état
            publié par le serveur (combustible, occupée) lu dans les state bags globaux, props LOCAUX (jamais réseau)
-           créés pour les stations à portée, station la plus proche à distance d'interaction. Une seule boucle lente
-           (streaming.pollMs), active seulement quand un personnage est en jeu : elle s'arrête d'elle-même à la sélection
+           créés pour les stations à portée, station la plus proche à distance d'interaction. Une seule boucle lente,
+           active seulement quand un personnage est en jeu : elle mesure d'abord les groupes de stations (par case de
+           streaming.groupCell), ne parcourt que les stations d'un groupe à portée, passe toutes les streaming.pollMs
+           près d'un groupe et toutes les streaming.idlePollMs loin de tous ; elle s'arrête d'elle-même à la sélection
            et au déchargement, et retire alors tous les props.
-    Dépendances : shared/constants.lua, config.lua, client/core.lua
+    Dépendances : shared/constants.lua, config.lua, shared/proximity.lua, client/core.lua
 ]]
 
 local type, pairs, ipairs = type, pairs, ipairs
-local sub, sqrt = string.sub, math.sqrt
+local sub, sqrt, max, huge = string.sub, math.sqrt, math.max, math.huge
 local CreateThread, Wait, GetGameTimer, AddEventHandler = CreateThread, Wait, GetGameTimer, AddEventHandler
 local PlayerPedId, GetEntityCoords, DoesEntityExist, DeleteObject = PlayerPedId, GetEntityCoords, DoesEntityExist, DeleteObject
 local RequestModel, HasModelLoaded, IsModelValid, SetModelAsNoLongerNeeded, GetHashKey = RequestModel, HasModelLoaded, IsModelValid, SetModelAsNoLongerNeeded, GetHashKey
@@ -22,6 +24,7 @@ if not core then return end
 
 local cfg = VavaCrafting.config
 local streaming = cfg.streaming
+local proximity = VavaCrafting.proximity
 local STATE_STATION, STATE_STATIONS = VavaCrafting.STATE_STATION, VavaCrafting.STATE_STATIONS
 local RESOURCE = VavaCrafting.resource
 local LOAD_POLL_MS = 50
@@ -31,8 +34,18 @@ VavaCrafting.props = props
 
 -- stations connues : la config d'abord, puis la liste publiée par le serveur (qui comprend celles des autres modules)
 local known, stationsById = {}, {}
+-- stations groupées par case de grille, refaites à chaque liste adoptée
+local groups = {}
 -- props affichés : id de station → { entity, model, loading }
 local shown = {}
+-- une station est mesurée si son groupe peut en avoir une à portée des props ou de l'invite
+local REACH = max(streaming.radius, cfg.interact.distance)
+
+---@param station table
+---@return string
+local function cellOf(station)
+    return proximity.cell(station.x, station.y, streaming.groupCell)
+end
 
 ---@param list table
 local function adoptList(list)
@@ -43,6 +56,9 @@ local function adoptList(list)
             stationsById[station.id] = station
         end
     end
+    -- un groupe naît « actif » pour que le premier passage retire ce qui serait hors de portée
+    groups = proximity.group(known, cellOf)
+    for _, group in ipairs(groups) do group.active = true end
     -- une station disparue n'a plus de prop
     for id in pairs(shown) do
         if not stationsById[id] then props.remove(id) end
@@ -149,19 +165,34 @@ local function reconcile(station, far)
     if model then spawn(station, model) end
 end
 
---- Boucle lente justifiée : une distance par station toutes les pollMs, seulement quand un personnage est en jeu.
+--- Boucle lente justifiée, seulement quand un personnage est en jeu : une distance par groupe de stations, puis une
+--- par station des seuls groupes à portée ; un groupe qui sort de portée retire ses props une fois. Intervalle :
+--- streaming.pollMs près d'un groupe, streaming.idlePollMs quand aucune station ne peut être à moins de
+--- radius + idleMargin.
 local function loop()
     while playing do
         local coords = GetEntityCoords(PlayerPedId())
+        local px, py, pz = coords.x, coords.y, coords.z
         local bestId, bestDistance = nil, cfg.interact.distance
-        for _, station in ipairs(known) do
-            local far = distance(coords.x, coords.y, coords.z, station.x, station.y, station.z)
-            reconcile(station, far)
-            if far <= bestDistance then bestId, bestDistance = station.id, far end
+        local closest = huge
+        for _, group in ipairs(groups) do
+            local reachable, gap = proximity.reachable(group, px, py, pz, REACH)
+            if gap < closest then closest = gap end
+            if reachable then
+                group.active = true
+                for _, station in ipairs(group.targets) do
+                    local far = distance(px, py, pz, station.x, station.y, station.z)
+                    reconcile(station, far)
+                    if far <= bestDistance then bestId, bestDistance = station.id, far end
+                end
+            elseif group.active then
+                group.active = false
+                for _, station in ipairs(group.targets) do remove(station.id) end
+            end
         end
         nearestId, nearestDistance = bestId, bestDistance
         if onNearest then onNearest(bestId) end
-        Wait(streaming.pollMs)
+        Wait(proximity.interval(closest, streaming.radius, streaming.idleMargin, streaming.pollMs, streaming.idlePollMs))
     end
     for id in pairs(shown) do remove(id) end
     nearestId, nearestDistance = nil, nil

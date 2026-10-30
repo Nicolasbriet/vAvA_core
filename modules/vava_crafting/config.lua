@@ -75,7 +75,11 @@ VavaCrafting.config = {
 
     lessons = { radius = 10.0 },    -- une recette transmise réalisée devant un élève à cette distance lui vaut une leçon
 
-    streaming = { radius = 80.0, pollMs = 1000, modelTimeoutMs = 5000 },
+    -- Client : props des stations créés à portée (`radius`, mètres). Les stations sont groupées par case de `groupCell`
+    -- mètres : seules celles d'une case à portée sont mesurées. Un passage toutes les `pollMs` près d'une case, toutes
+    -- les `idlePollMs` quand aucune station ne peut être à moins de `radius` + `idleMargin` (la marge couvre le chemin
+    -- d'un cavalier rapide pendant `idlePollMs`, pour que les props apparaissent comme avant).
+    streaming = { radius = 80.0, pollMs = 1000, idlePollMs = 2500, idleMargin = 60.0, groupCell = 200.0, modelTimeoutMs = 5000 },
     persistence = { flushMs = 10000 },
     logRetentionDays = 180,
     -- journal : pièces de ce palier et au-dessus (Excellent+)
