@@ -334,7 +334,7 @@ versé à T-014 ; les autres points déjà couverts sont précisés dans T-012 �
   rapport ; toutes les interfaces s'affichent (devmock).
 
 ### T-013 — Compteur réseau `core.net`
-- Agents : vava-architecte → vava-dev-lua · Dépend de : — · Statut : à faire
+- Agents : vava-architecte → vava-dev-lua · Dépend de : — · Statut : en cours
 - API du core pour envoyer à un joueur ou à une liste (`core.net.send`, `sendNear(coords, rayon, …)`) qui compte
   par ressource et par évènement le nombre d'envois et une estimation de taille ; commande du Conseil
   `/vava_reseau` (top des évènements de la dernière minute) et affichage dans la Chancellerie si simple.
