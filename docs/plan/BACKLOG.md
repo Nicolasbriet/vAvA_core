@@ -209,12 +209,12 @@ Corrections issues de l'audit T-010 (30 octobre 2026), à prendre avant le reste
 - Critères : test de la règle pure (clés protégées) ; README et `docs/api.md` à jour ; version montée.
 
 ### T-029 — Le serveur décide : pêche, récolte communale, faim et soif
-- Agent : vava-dev-lua · Dépend de : — · Statut : à faire
+- Agent : vava-dev-lua · Dépend de : — · Statut : en cours
 - **IMPORTANT** (`securite-vava_gathering.md`) : la réussite de la barre de tension est calculée par la page
   (`web/js/view-tension.js:81`) et transmise par le client (`client/fishing.lua:50`, `server/fishing.lua:50`) : un
   client modifié prend un poisson à chaque touche. Faire tirer la réussite par le serveur (chance selon le niveau de
-  Pêche et la bande, comme `quality.failed`), la barre ne pouvant que faire rater. **Décision** inverse possible :
-  inscrire l'exception dans « Décisions déjà prises » de CLAUDE.md.
+  Pêche et la bande, comme `quality.failed`), la barre ne pouvant que faire rater. Décision prise le 30 octobre
+  2026 : le serveur tire la réussite.
 - **IMPORTANT** (`securite-vava_farming.md`) : `server/actions.lua:405-424` (et arrachage `:443-445`) ajoute le produit
   avant de vider l'emplacement ; un hook `before` de `vava_inventory:add` qui céderait la main laisserait deux joueurs
   récolter la même plante. Appliquer `slots.harvest` ou `slots.clear` avant l'ajout et restaurer l'emplacement si la
