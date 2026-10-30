@@ -23,7 +23,7 @@ l'export `getSeason`).
 | Durée du geste | base de la ressource × (1 − niveau × 0,004) ÷ puissance de l'outil, 1,2 s au moins | `duration` |
 | Qualité | score = niveau × 0,5 + outil × 0,3 + vitalité × 0,2 + bonus de l'outil ± 8 → paliers à 20, 40, 60, 85 ; provenance écrite | `quality` |
 | Pêche | touche entre 4 et 14 s ; barre de tension 6 s, zone à tenir 35–65 % qui dérive, 60 % du temps dans la zone | `fishing` |
-| Prise (tirée par le serveur, ligne tenue) | le poisson se décroche : 25 % au niveau 0 de Pêche, 2 % au niveau 100, linéaire entre les deux (13,5 % au niveau 50) ; + 5 points en eaux fatiguées, + 10 en eaux épuisées ; parts invalides comptées pour 0, chance ramenée dans [0, 1] (1.4.0) | `fishing.catch` |
+| Prise (tirée par le serveur, ligne tenue) | le poisson se décroche : 25 % au niveau 0 de Pêche, 2 % au niveau 100, linéaire entre les deux (13,5 % au niveau 50), quel que soit l'état de l'eau (décision du 30 octobre 2026 : supplément de la bande `catch.bands` à 0, gardé dans la config pour pouvoir le remettre ; l'eau fatiguée ou épuisée ne joue que par l'échec de la bande, 25 % / 50 %, avec son message d'eau) ; parts invalides comptées pour 0, chance ramenée dans [0, 1] (1.4.0) | `fishing.catch` |
 | Props | créés par le client à 80 m, relus toutes les secondes | `streaming` |
 | Zones d'eau | genres de zone dont les textes parlent de l'eau et non de la terre (échec de la bande, épuisement, invite) : `eau` | `waterKinds` |
 | Carte | un blip nommé par zone (icône et couleur selon le genre, courte portée) et le cercle de son rayon ; « Marquer » dans le panneau pose le repère de la carte | `map` |
@@ -70,7 +70,7 @@ outils de base avec leur accessoire en main), images dans `web/items`.
 Canne en main, `E` lance la ligne ; le serveur tire le moment de la touche et prévient le pêcheur ; la barre de tension
 s'affiche : tenir la touche fait monter l'aiguille, la relâcher la fait descendre, la zone à tenir dérive ; au bout du
 temps, le client dit s'il a tenu. Ce qu'il dit ne peut que **faire rater** (1.4.0) : ligne relâchée, la prise
-s'échappe ; ligne tenue, le **serveur tire la prise** selon le niveau de Pêche (lu au lancer) et la bande de la zone
+s'échappe ; ligne tenue, le **serveur tire la prise** selon le seul niveau de Pêche (lu au lancer ; l'état de l'eau n'y entre pas)
 (`fishing.catch`, règle pure `shared/catch.lua`) : un débutant perd encore une prise sur quatre, un maître presque
 jamais (« Au dernier moment, le poisson se décroche. »). Puis l'échec de la bande s'applique comme à
 toute récolte. Touche, durée, distance, charge, vitalité, rendement et XP sont au serveur. Une prise échappée ou

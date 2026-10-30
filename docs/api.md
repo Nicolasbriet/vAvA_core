@@ -1304,8 +1304,9 @@ facultatifs : `vava_hud`, `vava_admin` (droit `metiers`), `vava_chat`, `vava_hea
 - **Serveur maître** : distance lue côté serveur au début et à la fin, durée revérifiée, jeton par geste, cooldown,
   une récolte à la fois. Pêche (1.4.0, décision du 30 octobre 2026 : le serveur tire la réussite) : le booléen « a
   tenu la tension » de `vava_gathering:reel` ne peut que faire rater (`false` : code `escaped`) ; à `true`, le serveur
-  tire la prise d'après le niveau de Pêche et la bande de la zone (`fishing.catch`, règle pure `shared/catch.lua` :
-  25 % de poissons décrochés au niveau 0, 2 % au niveau 100, + 5 / + 10 points en eaux fatiguées / épuisées ; code
+  tire la prise d'après le seul niveau de Pêche (`fishing.catch`, règle pure `shared/catch.lua` :
+  25 % de poissons décrochés au niveau 0, 2 % au niveau 100 ; supplément de bande `catch.bands` à 0 depuis la
+  décision du 30 octobre 2026 ; code
   `escaped`, rien de consommé), puis l'échec de la bande comme pour toute récolte (zones de `waterKinds` : textes de
   l'eau pour l'échec, l'épuisement et l'invite). À terre (`vava_health:isDowned`,
   lu par le bridge), ni début ni fin (code `downed`) ; côté client, ni invite ni demande.

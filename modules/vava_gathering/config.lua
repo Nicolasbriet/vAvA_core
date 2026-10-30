@@ -87,13 +87,15 @@ VavaGathering.config = {
         reelGraceMs = 4000,         -- retard toléré (au-delà : la prise s'est échappée)
         -- Prise tirée par le serveur quand la ligne a tenu : chance que le poisson se décroche, de `novice` au niveau 0
         -- de Pêche à `master` au niveau `masterLevel` (linéaire entre les deux), plus le supplément de la bande de la
-        -- zone (eaux fatiguées : poisson méfiant). Parts de 0 à 1. L'échec de la bande (`bands.effects.failure`)
-        -- s'applique ensuite, comme à toute récolte.
+        -- zone (`bands`). Parts de 0 à 1. L'échec de la bande (`bands.effects.failure`) s'applique ensuite, comme à
+        -- toute récolte. Décision du 30 octobre 2026 (une seule cause par message) : supplément à 0 partout, le
+        -- décrochage ne dépend que du niveau ; l'état de l'eau ne joue que par l'échec de la bande. Réglage gardé pour
+        -- pouvoir le remettre (essai d'avant : reduced = 0.05, depleted = 0.10).
         catch = {
             novice = 0.25,
             master = 0.02,
             masterLevel = 100,
-            bands = { normal = 0.0, reduced = 0.05, depleted = 0.10 },
+            bands = { normal = 0.0, reduced = 0.0, depleted = 0.0 },
         },
     },
 

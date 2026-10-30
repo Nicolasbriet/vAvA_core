@@ -4,7 +4,8 @@ local helper = require('tests.helper')
 -- barre de tension ne peut que faire rater ; ligne tenue, le serveur tire la prise. Valeurs documentées : README du
 -- module, tableau « Règles », ligne « Prise » :
 --   poisson décroché : 25 % au niveau 0 de Pêche, 2 % au niveau 100, linéaire entre les deux (13,5 % au niveau 50) ;
---   + 5 points en eaux fatiguées, + 10 en eaux épuisées ; parts invalides comptées pour 0, chance dans [0, 1].
+--   supplément de la bande réglable (`bands`), à 0 partout par décision du 30 octobre 2026 (le décrochage ne dépend
+--   que du niveau ; l'état de l'eau joue par l'échec de la bande) ; parts invalides comptées pour 0, chance dans [0, 1].
 
 describe('vava_gathering catch', function()
     local catch, rules
@@ -29,7 +30,7 @@ describe('vava_gathering catch', function()
             assert.equal(0.25, rules.novice)
             assert.equal(0.02, rules.master)
             assert.equal(100, rules.masterLevel)
-            assert.same({ normal = 0.0, reduced = 0.05, depleted = 0.10 }, rules.bands)
+            assert.same({ normal = 0.0, reduced = 0.0, depleted = 0.0 }, rules.bands)
         end)
 
         it('couvre chaque bande de vitalité du module', function()
@@ -56,11 +57,22 @@ describe('vava_gathering catch', function()
             end
         end)
 
-        it('ajoute le supplément de la bande : + 5 points fatiguée, + 10 épuisée', function()
-            near(0.30, catch.escapeChance(0, 'reduced', rules))
-            near(0.35, catch.escapeChance(0, 'depleted', rules))
-            near(0.07, catch.escapeChance(100, 'reduced', rules))
-            near(0.12, catch.escapeChance(100, 'depleted', rules))
+        it('ne dépend que du niveau avec la config livrée : même chance dans toutes les bandes', function()
+            for _, level in ipairs({ 0, 20, 50, 100 }) do
+                local expected = catch.escapeChance(level, 'normal', rules)
+                near(expected, catch.escapeChance(level, 'reduced', rules))
+                near(expected, catch.escapeChance(level, 'depleted', rules))
+            end
+            near(0.25, catch.escapeChance(0, 'depleted', rules))
+            near(0.02, catch.escapeChance(100, 'depleted', rules))
+        end)
+
+        it('ajoute le supplément d’une bande s’il est remis dans la config (+ 5 points fatiguée, + 10 épuisée)', function()
+            local tried = { novice = 0.25, master = 0.02, masterLevel = 100, bands = { normal = 0.0, reduced = 0.05, depleted = 0.10 } }
+            near(0.30, catch.escapeChance(0, 'reduced', tried))
+            near(0.35, catch.escapeChance(0, 'depleted', tried))
+            near(0.07, catch.escapeChance(100, 'reduced', tried))
+            near(0.12, catch.escapeChance(100, 'depleted', tried))
         end)
 
         it('ne compte aucun supplément pour une bande inconnue ou absente', function()
