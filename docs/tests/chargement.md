@@ -27,7 +27,7 @@ test, ce que vous avez vu, et la ligne de console correspondante.
 |---|---|---|
 | 1 | Vider le cache de FiveM, se connecter. | Dès la fin de la carte de connexion : noir, puis le filet d'étincelle, les lettres d'« Eldoria » qui s'embrasent une à une avec des étincelles, le rideau qui se lève sur le paysage (≈ 3 s). Aucune page blanche, aucun texte de secours (polices justes : titre en capitales décoratives très grasses, texte en EB Garamond). |
 | 2 | Se reconnecter et cliquer « Passer l'ouverture » (ou n'importe où) pendant l'ouverture. | Le paysage et les textes apparaissent aussitôt. `Espace` ou `Entrée` font de même si le clavier parvient à la page (à noter). |
-| 3 | Regarder la progression jusqu'au bout. | Les six feux s'allument dans l'ordre, chacun avec une gerbe ; le pourcentage ne recule jamais ; « n / N fichiers » pendant « Les artisans dressent les échoppes » si le jeu l'envoie. |
+| 3 | Regarder la progression jusqu'au bout. | Les six feux s'allument dans l'ordre, chacun avec une gerbe ; le pourcentage ne recule jamais ; « n / N fichiers » pendant « Les artisans ouvrent leurs ateliers » si le jeu l'envoie. |
 | 4 | Lire le journal à l'écran (`debug.journal`), le photographier. | Liste des messages et de leur instant. Noter au rapport l'instant du premier message de chaque étape et la durée totale ; recalculer `stages` (`web/js/config.js`) pour que chaque étape occupe une part proportionnelle à sa durée moyenne (sur 3 connexions), puis remettre le journal à `false`. |
 | 5 | Pendant le chargement : extraits et conseils. | Un extrait toutes les 9 s à gauche, un conseil toutes les 6,5 s à droite, touches dans un cartouche ; jamais deux fois le même de suite. |
 
@@ -46,7 +46,7 @@ test, ce que vous avez vu, et la ligne de console correspondante.
 
 | # | Faire | Attendu |
 |---|---|---|
-| 1 | Laisser finir le chargement. | 6e feu : « Le Conseil prépare votre arrivée » ; puis 100 %, gerbes sur les six feux, l'éclair doré « Le Conseil vous attend ». |
+| 1 | Laisser finir le chargement. | 6e feu : « Le bourg prépare votre arrivée » ; puis 100 %, gerbes sur les six feux, l'éclair doré « Le royaume vous attend ». |
 | 2 | Regarder la fin de l'éclair (filmer si possible, image par image). | La page se dissout sur la sélection (Registre des âmes, caméra en place). **Aucune image noire** entre l'éclair et la sélection. Si la page coupe net au lieu de se dissoudre : noter (repli voulu), toujours sans noir. |
 | 3 | Aussitôt la sélection visible, cliquer « Jouer ». | La souris répond tout de suite ; plus de curseur de l'écran de chargement. |
 | 4 | Retour à la sélection en jeu (`/perso quitter`, outil de développement). | Comportement d'avant : écran noir puis sélection ; aucun écran de chargement, aucune erreur en `F8`. |

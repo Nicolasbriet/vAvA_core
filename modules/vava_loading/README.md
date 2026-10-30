@@ -32,9 +32,13 @@ loading ──(core:character:selection)──▶ waiting ──(vava_characters
 | Moment | Ce que fait `client/main.lua` | Ce que voit le joueur |
 |---|---|---|
 | le script client démarre | message `vava_loading:resources` | 4e feu au moins |
-| le core met le joueur en attente (session ouverte) | message `vava_loading:waiting` ; filet de `selectionFallbackMs` | 6e feu, « Le Conseil prépare votre arrivée » |
+| le core met le joueur en attente (session ouverte) | message `vava_loading:waiting` ; filet de `selectionFallbackMs` | 6e feu, « Le bourg prépare votre arrivée » |
 | la sélection est affichée (hook, ou export lu au démarrage) | message `vava_loading:handoff { ms = handoffMs }` | 100 %, éclair, puis la page se dissout sur la sélection |
 | `handoffMs` plus tard | `ShutdownLoadingScreenNui()` | la sélection, souris active |
+
+Seul le client Lua de `vava_loading` envoie ces trois messages. La page ne sait pas qui les envoie
+(`SendLoadingScreenMessage` est ouvert à toute ressource cliente du serveur) : une autre ressource qui enverrait
+`vava_loading:handoff` ferait jouer l'éclair trop tôt, sur ce seul client. Aucune ressource ne doit le faire.
 
 Le core (`spawn.loadingScreen` de `config/shared.lua`, 0.13.0) ne ferme plus l'écran à la première mise en attente quand
 `vava_loading` tourne : il fait son fondu au noir **sous** l'écran de chargement. Quatre chemins de fermeture, l'écran

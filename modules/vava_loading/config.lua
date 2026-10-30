@@ -19,7 +19,7 @@ VavaLoading.config = {
         isShownExport = 'isShown',
     },
 
-    -- Durée de l'éclair « Le Conseil vous attend » et du fondu de la page (ms, bornée de 300 à 5000), envoyée à la
+    -- Durée de l'éclair « Le royaume vous attend » et du fondu de la page (ms, bornée de 300 à 5000), envoyée à la
     -- page avec le message de passage ; l'écran de chargement est fermé à la fin.
     handoffMs = 1800,
 

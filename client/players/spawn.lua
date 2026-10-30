@@ -10,7 +10,7 @@
 ]]
 
 local type, tostring = type, tostring
-local HUGE = math.huge
+local HUGE, min = math.huge, math.min
 local CreateThread, Wait, GetGameTimer, RegisterNetEvent = CreateThread, Wait, GetGameTimer, RegisterNetEvent
 local SetTimeout, GetResourceState = SetTimeout, GetResourceState
 local PlayerId, PlayerPedId, NetworkIsPlayerActive = PlayerId, PlayerPedId, NetworkIsPlayerActive
@@ -92,16 +92,19 @@ end
 
 --- Écran de chargement (NUI) à la mise en attente. La première fois, si la ressource de spawn.loadingScreen tourne,
 --- elle le ferme elle-même quand la sélection est affichée (le fondu au noir se fait sous l'écran : aucun noir vu) ;
---- le core le ferme au plus tard maxHoldMs plus tard (sans effet s'il est déjà fermé). Sinon, fermé aussitôt.
+--- le core le ferme au plus tard maxHoldMs plus tard (sans effet s'il est déjà fermé), MAX_HOLD_MS au plus quelle que
+--- soit la config : une valeur démesurée ne supprime pas le filet. Sinon, fermé aussitôt.
+local MAX_HOLD_MS = 120000
 local function releaseLoadingScreen()
     local first = not loadingScreenReleased
     loadingScreenReleased = true
     local screen = cfg.loadingScreen
     local resource, maxHoldMs = screen and screen.resource, screen and screen.maxHoldMs
-    if first and type(resource) == 'string' and resource ~= '' and type(maxHoldMs) == 'number' and maxHoldMs > 0 then
+    if first and type(resource) == 'string' and resource ~= '' and type(maxHoldMs) == 'number' and maxHoldMs > 0
+        and maxHoldMs == maxHoldMs then
         local state = GetResourceState(resource)
         if state == 'started' or state == 'starting' then
-            SetTimeout(maxHoldMs, function() ShutdownLoadingScreenNui() end)
+            SetTimeout(min(maxHoldMs, MAX_HOLD_MS), function() ShutdownLoadingScreenNui() end)
             return
         end
     end

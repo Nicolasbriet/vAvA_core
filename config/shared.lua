@@ -66,7 +66,8 @@ vAvA.config.shared = {
         sessionPollMs = 250,         -- attente de la session réseau au démarrage du client
         -- Écran de chargement (0.13.0) : si cette ressource tourne à la première mise en attente, elle ferme elle-même
         -- l'écran quand la sélection est affichée (passage sans écran noir) ; '' : le core le ferme à la mise en
-        -- attente (comportement de 0.12.0). Filet : le core le ferme au plus tard maxHoldMs (ms) après.
+        -- attente (comportement de 0.12.0). Filet : le core le ferme au plus tard maxHoldMs (ms) après, borné à
+        -- 120000 par le core (une valeur plus grande ou infinie ne supprime pas le filet).
         loadingScreen = { resource = 'vava_loading', maxHoldMs = 30000 },
     },
 }

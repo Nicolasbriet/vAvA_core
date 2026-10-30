@@ -1,4 +1,7 @@
 # chemin<TAB>extrait exact de la ligne<TAB>raison (relu par un humain avant ajout)
 modules/vava_admin/server/requests.lua	TriggerClientEvent(EVENTS.ANNOUNCE, -1,	annonce du Conseil destinée à tout le royaume, rare et limitée par droit
 modules/vava_chat/server/logs.lua	INSERT .. concat(values, ', ')	insertion groupée : values ne contient que des groupes de « ? », les valeurs passent par params
-modules/vava_loading/web/fonts/	[fichier]	écran de chargement : affiché avant le téléchargement des autres ressources, il ne peut pas lire nui://vava_ui (décision 2 de T-012)
+modules/vava_loading/web/fonts/cinzel.woff2	[fichier]	écran de chargement : affiché avant le téléchargement des autres ressources, il ne peut pas lire nui://vava_ui (décision 2 de T-012)
+modules/vava_loading/web/fonts/eb_garamond.woff2	[fichier]	écran de chargement : affiché avant le téléchargement des autres ressources, il ne peut pas lire nui://vava_ui (décision 2 de T-012)
+modules/vava_loading/web/fonts/eb_garamond_italic.woff2	[fichier]	écran de chargement : affiché avant le téléchargement des autres ressources, il ne peut pas lire nui://vava_ui (décision 2 de T-012)
+modules/vava_loading/web/fonts/cinzel_decorative_900.woff2	[fichier]	écran de chargement : Cinzel Decorative 900, absente de vava_ui (décision 3 de T-020)
