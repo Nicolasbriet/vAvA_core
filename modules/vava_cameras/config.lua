@@ -26,6 +26,8 @@ VavaCameras.config = {
     -- revue à chaque arrivée ou départ d'un spectateur. Un spectateur de plus qui ne tient pas (deuxième vue en grand,
     -- ou planchers au-delà du total) est refusé : « budget ». Avec les valeurs ci-dessous et 6 spectateurs au plus,
     -- seul le second regard en grand est refusé ; le total, lui, ne dépasse jamais 1 500 kbit/s (au lieu de 7 200).
+    -- C'est le débit visé par les encodeurs : sur le fil, compter environ 1,6 Mbit/s (en-têtes RTP, SRTP, UDP et IP :
+    -- 6 à 10 %, retransmissions, images clés, sondes de débit au démarrage) ; 1 400 ici tient 1,5 Mbit/s sur le fil.
     budget = {
         uplinkKbps = 1500,
         perQuality = { full = 1 },   -- une seule vue en grand à la fois par joueur filmé

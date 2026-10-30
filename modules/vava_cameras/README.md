@@ -74,7 +74,9 @@ Avant 1.3.0, chaque spectateur avait son propre débit : 6 spectateurs en vue en
 la connexion montante d'un joueur qui n'a rien demandé, celle qui porte aussi son jeu et sa voix. Désormais :
 
 - **Budget** : 1 500 kbit/s pour tous ses spectateurs ensemble (`budget.uplinkKbps`), en jeu comme depuis la
-  Chancellerie.
+  Chancellerie. C'est le débit visé par les encodeurs : sur le fil, compter environ 1,6 Mbit/s (en-têtes RTP, SRTP,
+  UDP et IP : 6 à 10 %, retransmissions, images clés, sondes de débit au démarrage). Régler `uplinkKbps` à 1 400 tient
+  1,5 Mbit/s sur le fil.
 - **Admission** (serveur, `server/sessions.lua`, après la limite de 6 spectateurs) : une seule vue en grand à la fois
   (`budget.perQuality.full`), et la somme des planchers (`minKbps`) de tous les spectateurs sous le budget. Sinon :
   refus `budget`, sans rien demander au joueur filmé. Avec les valeurs par défaut, seule la seconde vue en grand est
@@ -99,7 +101,8 @@ la connexion montante d'un joueur qui n'a rien demandé, celle qui porte aussi s
 | 1 vue en grand + 4 cases | 1 020 | 120 | 1 500 |
 | 1 vue en grand + 5 cases | 900 | 120 | 1 500 |
 
-(kbit/s ; `tests/spec/cameras_budget_spec.lua` vérifie ce tableau.)
+(kbit/s visés par les encodeurs, sans les en-têtes ni les retransmissions ; `tests/spec/cameras_budget_spec.lua`
+vérifie ce tableau.)
 
 ## Sécurité
 
@@ -159,5 +162,6 @@ Il n'y a pas encore de procédure propre aux caméras : les tests du Registre le
 5. Depuis la Chancellerie : page Caméras, puis « Regarder l'écran » sur la fiche de B.
 6. Resmon de B pendant qu'on le regarde (capture active), puis au repos une fois le mur fermé.
 7. Offre unique et case sans mur (1.2.0) : `docs/tests/registre.md`, § 10, tests 9 à 12.
-8. Débit montant du joueur filmé (1.3.0) : `docs/tests/registre.md`, § 10, tests 15 à 19 (images par seconde et ping
-   du joueur filmé par 1, 3 et 6 membres, vue en grand unique, refus `budget` depuis la Chancellerie).
+8. Débit montant du joueur filmé (1.3.0) : `docs/tests/registre.md`, § 10, tests 15 à 20 (images par seconde et ping
+   du joueur filmé par 1, 3 et 6 membres, netteté de la vue en grand avec 5 cases, vue en grand unique, refus `budget`
+   depuis la Chancellerie, taille réelle d'une offre).

@@ -191,21 +191,24 @@ Sénéchal et au-dessus (droit `tools`).
 | 13 | **Depuis la Chancellerie** (compte du panneau Gardien, au moins deux joueurs en jeu) : page Caméras en 1 × 1 ; puis, page toujours ouverte, console : `restart vava_chancellerie` ; dans la page, passer à la page suivante du mur, puis en 2 × 2. | À l'ouverture de la page : « Mur des caméras ouvert » au nom de « Chancellerie : <compte> », pas de « Cases du mur regardées ». Après le redémarrage, le pont ne sait plus qu'un mur est ouvert : à la première case ouverte ensuite, une ligne « Cases du mur regardées » (« numero : <n° du joueur> »), une seule pour toutes les cases suivantes. Recharger la page : seulement « Mur des caméras ouvert ». (Caméras déjà ouvertes avant le redémarrage : gardées ou éteintes, à noter ; ce test ne dépend pas de leur sort.) |
 | 14 | **Mur trop ancien** : `wall.maxOpenMs = 60000` dans `modules/vava_cameras/config.lua`, `restart vava_cameras`. A ouvre le mur, attend plus d'une minute, puis change de page. | Les cases de la nouvelle page disent « Mur à rouvrir » ; fermer et rouvrir le mur : nouvelle ligne au Journal, les cases reviennent. Remettre `2 * 60 * 60 * 1000`. |
 
-**Débit montant du joueur filmé** (`vava_cameras` 1.3.0, tests 15 à 19). Il faut **B** filmé et plusieurs membres qui le
+**Débit montant du joueur filmé** (`vava_cameras` 1.3.0, tests 15 à 20). Il faut **B** filmé et plusieurs membres qui le
 regardent : A en jeu, et des onglets de la page Caméras de la Chancellerie (chaque onglet ouvert compte pour un
 spectateur ; un compte du panneau Gardien suffit). Chez B : `F8` → `cl_drawfps 1` (images par seconde) et
 `netgraph 1` (ping) ; dans Windows, Gestionnaire des tâches → Performances → la carte réseau : « Envoi » (tout ce que
 B envoie, image comprise). Dans un onglet de la Chancellerie, `edge://webrtc-internals` (ou `chrome://…`) montre le
 débit reçu de chaque caméra. Noter chaque mesure dans le compte rendu ; si possible, faire 15 à 17 une fois sur
-`vava_cameras` 1.2.0 (avant T-047) pour comparer.
+`vava_cameras` 1.2.0 (avant T-047) pour comparer. Les débits de la config (1 200, 1 500 kbit/s) sont ceux que visent
+les encodeurs : « Envoi » compte en plus les en-têtes et les retransmissions (6 à 10 % environ, davantage au démarrage
+d'une caméra), d'où les marges ci-dessous.
 
 | # | Faire | Attendu |
 |---|---|---|
 | 15 | **Référence** : personne ne regarde B ; B court en ville 30 s. | Noter images/s, ping, « Envoi » de B : c'est la référence (le jeu et la voix seuls). |
-| 16 | **1 membre** : A ouvre B en grand, B court 30 s. | Image nette et fluide chez A. « Envoi » de B : référence + 1,2 Mbit/s au plus. Images/s et ping de B notés, proches de la référence. |
-| 17 | **3 membres** : A garde B en grand ; deux onglets de la Chancellerie, mur en 1 × 1 sur B (case). | « Envoi » de B : référence + 1,5 Mbit/s au plus (1 200 pour la vue en grand, 150 par case). `webrtc-internals` d'un onglet : environ 150 kbit/s. Images/s et ping de B notés. |
-| 18 | **6 membres** : A garde B en grand ; cinq onglets en case sur B. Puis fermer trois onglets. | « Envoi » de B : jamais plus de référence + 1,5 Mbit/s ; la vue en grand de A reste à 20 images/s, un peu moins nette (900 kbit/s), les cases à 120 kbit/s. Images/s et ping de B notés (à comparer avec 7,2 Mbit/s avant T-047). Trois onglets fermés : dans les secondes qui suivent, la vue de A redevient aussi nette qu'au test 16, sans coupure ni nouvelle connexion (aucune ligne au Journal, aucune image noire). |
+| 16 | **1 membre** : A ouvre B en grand, B court 30 s. | Image nette et fluide chez A. « Envoi » de B : référence + 1,3 Mbit/s environ au plus (1,2 visés par l'encodeur). Images/s et ping de B notés, proches de la référence. |
+| 17 | **3 membres** : A garde B en grand ; deux onglets de la Chancellerie, mur en 1 × 1 sur B (case). | « Envoi » de B : référence + 1,6 Mbit/s environ au plus (1 500 visés : 1 200 pour la vue en grand, 150 par case). `webrtc-internals` d'un onglet : environ 150 kbit/s. Images/s et ping de B notés. |
+| 18 | **6 membres** : A garde B en grand ; cinq onglets en case sur B. Puis fermer trois onglets. | « Envoi » de B : jamais plus de référence + 1,6 Mbit/s environ (1 500 visés) ; la vue en grand de A reste à 20 images/s, un peu moins nette (900 kbit/s), les cases à 120 kbit/s. **Netteté de la vue en grand** avec ces cinq cases ouvertes : B qui court en ville reste lisible (noms, panneaux proches) ; noter si l'image bave ou se brouille en mouvement (900 kbit/s est le plus bas qu'elle reçoive). Images/s et ping de B notés (à comparer avec 7,2 Mbit/s avant T-047). Trois onglets fermés : dans les secondes qui suivent, la vue de A redevient aussi nette qu'au test 16, sans coupure ni nouvelle connexion (aucune ligne au Journal, aucune image noire). |
 | 19 | **Une seule vue en grand** : A garde B en grand. Un onglet de la Chancellerie : fiche de B → « Regarder l'écran » ; un second membre en jeu C (ou A depuis un second client) : `/cameras`, clic sur B. Puis A revient à son mur (`Échap`). | Chancellerie : « Le débit de ce joueur est déjà pris (une seule vue en grand à la fois, et un plafond pour toutes ses caméras) : réessayez dans un instant. » ; mur de C : « Débit du joueur déjà pris, nouvel essai bientôt ». Aucune ligne « Écran regardé » au Journal pour ces vues refusées, même après plusieurs essais. A revenu au mur : la vue de C (ou de l'onglet) s'ouvre d'elle-même dans les 15 s, avec sa ligne « Écran regardé ». |
+| 20 | **Taille réelle d'une offre** (une fois) : pour l'essai, ajouter au début de `sessions.offer` (`modules/vava_cameras/server/sessions.lua`) la ligne `print(('[vava_cameras] offre : %d octets'):format(#sdp))`, puis `restart vava_cameras` ; A ouvre le mur en 4 × 4 avec B dedans, puis B en grand. Retirer la ligne ensuite. | Une ligne par caméra dans la console du serveur : noter la plus grande taille. Au-delà de 10 Ko, passer `limits.offerBytesPerSecond` à 64 000 (une offre de 20 Ko arrive alors en 0,3 s) et le noter dans le compte rendu ; en dessous, garder 32 000. Toutes les cases s'ouvrent comme au test 9. |
 
 ## 11. Proclamation, journal, Conseil
 
@@ -309,7 +312,7 @@ débit reçu de chaque caméra. Noter chaque mesure dans le compte rendu ; si po
   du serveur et du pont ; un client qui renverrait l'offre en boucle ne se teste qu'avec un client modifié. L'arrêt
   des demandes au premier « Mur à rouvrir » et l'écart de 150 ms entre les cases ont été vérifiés sous jsdom (vrai
   `wall.js`), pas dans le CEF du jeu.
-- Le débit montant du joueur filmé (10-15 à 10-19) : `tests/spec/cameras_budget_spec.lua` vérifie la règle (tableau du
+- Le débit montant du joueur filmé (10-15 à 10-20) : `tests/spec/cameras_budget_spec.lua` vérifie la règle (tableau du
   README, jamais plus que le budget, une seule vue en grand), le refus `budget` et son ordre, les parts annoncées au
   seul joueur filmé, et `cameras_wall_spec.lua` le pont qui n'inscrit rien pour une vue refusée ; l'application des parts par `setParameters`
   (une à la fois, la dernière gagne, part arrivée avant la description locale) a été vérifiée sur le vrai

@@ -283,7 +283,7 @@ versé à T-014 ; les autres points déjà couverts sont précisés dans T-012 �
   `setParameters` chez le seul joueur filmé (`vava_cameras:rates`, sans nouvelle offre) ; offre relayée au membre en
   envoi latent ; vue en grand refusée jamais inscrite au journal depuis le web (`webCheck`). Compte rendu
   `docs/plan/rapports/T-047.md` (décisions à confirmer : budget, planchers, refus plutôt que vue réduite, envoi
-  latent) ; procédure `docs/tests/registre.md` 10-15 à 10-19.
+  latent) ; procédure `docs/tests/registre.md` 10-15 à 10-20.
 
 ### T-048 — Magie : registre des murmures envoyé par pages
 - Agents : vava-dev-lua + vava-dev-nui · Dépend de : — · Statut : à tester en jeu
