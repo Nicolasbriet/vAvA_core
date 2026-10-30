@@ -24,7 +24,7 @@ const Wall = (() => {
   const RETRY_MS = 10000;
   const EARLY_OFFER_MS = 15000;
   // fins sans nouvel essai : le résultat ne changerait pas
-  const FINAL = new Set(['unsupported', 'forbidden', 'self']);
+  const FINAL = new Set(['unsupported', 'forbidden', 'self', 'wall_closed']);
   const WAITING = new Set(['queued', 'opening', 'waiting', 'connecting']);
 
   let open = false;
@@ -45,6 +45,8 @@ const Wall = (() => {
   const tiles = new Map();
   let queue = [];
   let queueTimer = null;
+  // le serveur a fermé ce mur (droit retiré puis rendu, mur trop ancien) : plus aucune case demandée avant réouverture
+  let closedByServer = false;
 
   // Texte et cadre ---------------------------------------------------------------------------------------------
 
@@ -244,6 +246,7 @@ const Wall = (() => {
     }
     if (!response.ok) {
       fail(cam, response.error, false);
+      if (response.error === 'wall_closed') shutByServer();
       return;
     }
     cam.session = response.result.session;
@@ -269,14 +272,37 @@ const Wall = (() => {
     }
   }
 
+  /**
+   * Premier refus `wall_closed` : la file est vidée et chaque case en attente affiche « Mur à rouvrir », au lieu
+   * d'envoyer jusqu'à seize demandes vouées au même refus. Les caméras déjà ouvertes restent jusqu'à leur fin.
+   */
+  function shutByServer() {
+    closedByServer = true;
+    clearTimeout(queueTimer);
+    queueTimer = null;
+    const waiting = queue;
+    queue = [];
+    for (const cam of waiting) {
+      if (cams.get(cam.source) === cam && cam.state === 'queued') fail(cam, 'wall_closed', false);
+    }
+    paint();
+  }
+
   function want(source, quality) {
     const existing = cams.get(source);
     if (existing && existing.quality === quality && (existing.state !== 'ended' || Date.now() < existing.retryAt)) return;
     if (existing) drop(existing, true);
     const cam = { source, quality, state: 'queued', session: null, peer: null, code: null, retryAt: 0 };
     cams.set(source, cam);
+    // mur fermé par le serveur : la case le dit sans rien demander (la vue en grand n'en dépend pas)
+    if (closedByServer && quality === 'tile') {
+      fail(cam, 'wall_closed', false);
+      return;
+    }
     queue.push(cam);
-    if (!queueTimer) pump();
+    // départ au tour suivant : toutes les cases voulues sont en file avant la première demande, qui seule part tout
+    // de suite ; les suivantes attendent staggerMs chacune (et un refus wall_closed vide la file à temps)
+    if (!queueTimer) queueTimer = setTimeout(pump, 0);
   }
 
   /** Caméras alignées sur ce qui est affiché : la page (cases) ou le joueur en grand. */
@@ -367,6 +393,7 @@ const Wall = (() => {
     open(payload) {
       if (open) return;
       open = true;
+      closedByServer = false;
       players = Array.isArray(payload.players) ? payload.players : [];
       layouts = Array.isArray(payload.layouts) && payload.layouts.length ? payload.layouts : layouts;
       layout = layouts.includes(payload.defaultLayout) ? payload.defaultLayout : layouts[layouts.length - 1];

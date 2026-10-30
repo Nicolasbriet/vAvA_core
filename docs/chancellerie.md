@@ -470,7 +470,7 @@ Toutes les réponses sont `{ ok, error?, … }`. Les `POST` demandent `x-chancel
 | `POST /api/game/request` | rang du Conseil | `{ name, args }` demande au Registre (liste fermée) → `{ result }` |
 | `GET /api/game/ranks` | connecté | rangs du Conseil (`live` : lus à l'instant) |
 | `POST /api/game/cameras/wall` · `players` | rang du Conseil | joueurs du mur `{ source, label, active }` ; `wall` inscrit l'ouverture au journal |
-| `POST /api/game/camera/start` · `answer` · `stop` | rang du Conseil | `{ target, quality = tile\|full }` → `{ session, label, iceServers }` ; 17 caméras par onglet au plus (un mur 4 × 4 et une vue en grand) |
+| `POST /api/game/camera/start` · `answer` · `stop` | rang du Conseil | `{ target, quality = tile\|full }` → `{ session, label, iceServers }` ; 17 caméras par onglet au plus (un mur 4 × 4 et une vue en grand) ; une case (`tile`) d'un compte qui n'a ouvert aucun mur depuis 2 h est inscrite au journal par le pont (« Cases du mur regardées », pont 1.4.1) |
 | `POST /api/bridge/event` | pont (machine et clé) | évènements du serveur de jeu |
 | `GET /api/metrics?range=hour\|day` | connecté | relevés (`samples`, `stepMs`), cœurs, dernier relevé ; flux : `metrics` à chaque relevé |
 | `GET /api/resources` | connecté | ressources (`started`, `autostart`, version, auteur…), `live` |

@@ -32,7 +32,7 @@ Ordre de démarrage : après `vava_admin` et `vava_voice`, avant `vava_magic` et
 | Vue en grand | 960 × 540, 20 images/s, 1,2 Mb/s | `qualities.full` |
 | Adresse STUN | `stun:stun.l.google.com:19302` | `iceServers` |
 | Limites | 6 spectateurs par joueur filmé, 96 caméras en tout, 2 h au plus ; sans réponse du spectateur en 30 s, la caméra s'éteint ; négociation de 20 000 octets au plus | `limits` |
-| Mur | `/cameras` ; grilles 1 × 1 à 4 × 4 (3 × 3 par défaut) ; joueurs relus toutes les 5 s ; cases ouvertes à 150 ms d'écart | `wall` |
+| Mur | `/cameras` ; grilles 1 × 1 à 4 × 4 (3 × 3 par défaut) ; joueurs relus toutes les 5 s ; cases ouvertes à 150 ms d'écart (réellement depuis 1.2.0 : avant, toutes partaient d'un coup) ; mur valable 2 h, puis à rouvrir | `wall` |
 | Débits | capture du joueur filmé 8 puis 2/s ; ouverture du mur 4 puis 1 toutes les 2 s ; caméras demandées 40 puis 8/s ; réponses et fermetures 40 puis 8/s ; liste des joueurs 4 puis 1/s | `rateLimits` |
 | Pont du web | seule ressource admise à ouvrir une caméra en son nom : `vava_chancellerie` | `web.bridge` |
 | Journal du Conseil | « Mur des caméras ouvert », « Écran regardé » | `messages` |
@@ -65,14 +65,22 @@ joueur) ouvre la vue en grand : voir `docs/chancellerie.md`.
 ## Sécurité
 
 - Chaque demande du membre est un RPC du core à schéma strict et à débit limité ; le droit `watch` est revérifié à
-  chaque caméra. Seul le joueur filmé envoie l'offre de sa caméra ; seul son spectateur y répond (une fois) ou la ferme.
-  Identifiants de caméra tirés au hasard (24 chiffres hexadécimaux).
+  chaque caméra. Seul le joueur filmé envoie l'offre de sa caméra, une seule fois (une seconde offre est refusée,
+  `already_offered`, et rien n'est relayé : une renégociation passe par une nouvelle caméra) ; seul son spectateur y
+  répond (une fois) ou la ferme. Identifiants de caméra tirés au hasard (24 chiffres hexadécimaux).
+- **Pas de case sans mur ouvert** : le serveur tient pour chaque membre en jeu un état « mur ouvert », posé à
+  l'ouverture du mur (inscrite au journal), levé quand il le ferme, revient à la sélection, part ou perd le droit de
+  regarder ; il ne vaut que 2 h (`wall.maxOpenMs`), après quoi il faut rouvrir le mur (nouvelle ligne au journal).
+  Sans lui, une case est refusée (`wall_closed`) ; au premier refus, le mur cesse de demander des cases et chacune
+  affiche « Mur à rouvrir », sans nouvel essai, jusqu'à sa réouverture : nul ne regarde en cases sans une ligne « Mur
+  des caméras ouvert » de moins de 2 h. La vue en grand n'en dépend pas : chacune est inscrite.
+  Depuis le web, le pont inscrit la première case d'un compte qui n'a pas ouvert de mur (voir le README du pont).
 - Une caméra s'éteint quand le joueur filmé quitte le jeu (sélection, départ), quand son spectateur ferme le mur,
   revient à la sélection, part, ou perd le droit de regarder (rang donné ou retiré, relu au hook `vava_admin:action` ;
   son mur affiche « Droit refusé »). Depuis le web, le pont fait revérifier par la Chancellerie le rang de chaque compte
   qui regarde.
-- Journal du Conseil : l'ouverture du mur et chaque vue en grand (les cases d'un mur sont couvertes par l'ouverture).
-  Le joueur n'est pas prévenu.
+- Journal du Conseil : l'ouverture du mur et chaque vue en grand (les cases d'un mur sont couvertes par l'ouverture,
+  exigée par le serveur). Le joueur n'est pas prévenu.
 - Le WebRTC direct révèle l'adresse IP du joueur filmé au spectateur, et inversement ; derrière certains pare-feux, la
   connexion directe échoue (aucun relais TURN). Avec le DLSS activé, l'image peut inclure les interfaces du jeu.
 
@@ -110,3 +118,4 @@ Il n'y a pas encore de procédure propre aux caméras : les tests du Registre le
 4. `restart vava_cameras` mur ouvert : le mur disparaît, la souris revient au jeu.
 5. Depuis la Chancellerie : page Caméras, puis « Regarder l'écran » sur la fiche de B.
 6. Resmon de B pendant qu'on le regarde (capture active), puis au repos une fois le mur fermé.
+7. Offre unique et case sans mur (1.2.0) : `docs/tests/registre.md`, § 10, tests 9 à 12.

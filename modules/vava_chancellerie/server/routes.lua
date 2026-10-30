@@ -5,13 +5,14 @@
            supprimées auprès de vava_voice, après vérification du droit auprès du Registre, qui les inscrit à son
            journal ; les caméras sont ouvertes auprès de vava_cameras une fois le droit de regarder accordé : la vue en
            grand par la demande « écran du joueur » du Registre (cible vérifiée, au journal), les cases d'un mur sur
-           le seul droit, l'ouverture du mur étant inscrite au journal. D'autres fichiers du pont ajoutent leurs
+           le seul droit, l'ouverture du mur étant inscrite au journal ; une case demandée par un compte qui n'a pas
+           ouvert de mur depuis `cameras.tileLogMs` inscrit sa propre ligne. D'autres fichiers du pont ajoutent leurs
            demandes à `routes.requests` (ciel et heure : server/time.lua).
     Dépendances : shared/constants.lua, config.lua, server/core.lua
 ]]
 
 local type, tostring, tointeger = type, tostring, math.tointeger
-local GetResourceMetadata = GetResourceMetadata
+local GetResourceMetadata, GetGameTimer = GetResourceMetadata, GetGameTimer
 
 local call = VavaBridge.call
 local messages = VavaBridge.config.messages
@@ -124,12 +125,43 @@ end)
 
 -- Caméras -----------------------------------------------------------------------------------------------------------
 
+-- Dernière ligne du journal qui couvre les cases d'un mur, par compte du panneau (nom) : posée à l'ouverture du mur.
+-- Le pont ne sait pas quand un mur du navigateur se ferme (onglet fermé, Chancellerie ou pont redémarrés) : plutôt
+-- que de refuser une case, il l'inscrit au journal quand le compte n'a ouvert aucun mur depuis `tileLogMs`. Une entrée
+-- par compte du panneau qui a regardé : bornée par le nombre de comptes.
+---@type table<string, integer>
+local tilesLoggedAt = {}
+
+---@param actor any
+---@return string|nil
+local function actorName(actor)
+    return type(actor) == 'table' and type(actor.label) == 'string' and actor.label or nil
+end
+
+--- Case d'un mur ouverte : une ligne au journal si aucune ne la couvre (ni ouverture du mur, ni case récente).
+---@param actor table
+---@param target integer
+local function recordTile(actor, target)
+    local name = actorName(actor)
+    if not name then return end
+    local now, last = GetGameTimer(), tilesLoggedAt[name]
+    if last and now - last < CAMERAS_CFG.tileLogMs then return end
+    -- l'horloge ne repart que sur une ligne acceptée par le Registre : sinon la case suivante réessaie
+    local called, ok = call(ADMIN, 'webLog', actor, messages.logTiles, { numero = target })
+    if called and ok == true then tilesLoggedAt[name] = now end
+end
+
 --- Joueurs regardables ; `logged` : ouverture du mur, inscrite au journal.
 local function wallPlayers(actor, logged)
     if not can(actor, CAMERAS_CFG.permission) then return failure('forbidden') end
     local called, players = call(CAMERAS, 'webPlayers')
     if not called then return failure('cameras_unavailable') end
-    if logged then call(ADMIN, 'webLog', actor, messages.logWall, {}) end
+    if logged then
+        local logCalled, written = call(ADMIN, 'webLog', actor, messages.logWall, {})
+        local name = actorName(actor)
+        -- l'ouverture ne couvre les cases que si sa ligne a été acceptée par le Registre
+        if name and logCalled and written == true then tilesLoggedAt[name] = GetGameTimer() end
+    end
     return { ok = true, players = players }
 end
 
@@ -150,6 +182,7 @@ define('POST', '/camera/start', function(body)
     local called, ok, result = call(CAMERAS, 'webStart', target, quality)
     if not called then return failure('cameras_unavailable') end
     if not ok then return failure(result) end
+    if quality == 'tile' then recordTile(body.actor, target) end
     return { ok = true, session = result.session, label = result.label, iceServers = result.iceServers }
 end)
 

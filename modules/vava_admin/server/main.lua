@@ -59,6 +59,8 @@ local function setup()
         end
     end)
     VavaAdmin.ready = true
+    -- joueurs déjà en jeu (module ou core redémarré) : bans relus, sans retarder la fin du démarrage
+    CreateThread(bans.sweep)
     return true
 end
 

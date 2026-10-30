@@ -2,7 +2,8 @@
     vava_cameras/server/main.lua
     Rôle : déclaration du module auprès du core : intentions des clients en RPC à schéma strict et à débit limité
            (joueur filmé : offre, abandon ; membre du Conseil en jeu : mur, joueurs, caméra, réponse, fermeture), droit
-           revérifié à chaque demande du membre et quand son rang change, journal (ouverture du mur, vue en grand),
+           revérifié à chaque demande du membre et quand son rang change, journal (ouverture du mur, vue en grand ;
+           pas de case de mur sans mur ouvert),
            caméras éteintes quand le joueur filmé ou son spectateur quitte le jeu, ou que le spectateur perd le droit.
     Dépendances : tous les fichiers server/ du module
 ]]
@@ -58,7 +59,9 @@ local function watchable(src)
     return out
 end
 
+--- Ouverture du mur : inscrite au journal, elle seule ouvre droit aux cases (levée par leave, départ, droit retiré).
 local function wall(src)
+    sessions.openWall(src)
     links.record(src, messages.logWall, {})
     return true, {
         players = watchable(src), layouts = cfg.wall.layouts, defaultLayout = cfg.wall.defaultLayout,
@@ -71,7 +74,7 @@ local function watch(src, target, quality)
     local ok, result = sessions.start({ kind = 'game', source = src }, target, quality)
     if not ok then return false, result end
     local label = players.label(target)
-    -- journal : la vue en grand seulement (les cases d'un mur sont couvertes par l'ouverture du mur)
+    -- journal : la vue en grand seulement (une case n'est accordée que mur ouvert, et l'ouverture du mur y est)
     if quality == 'full' then links.record(src, messages.logWatch, { joueur = label, numero = target }) end
     return true, { session = result, label = label }
 end

@@ -158,7 +158,7 @@ core.hooks.runAfter('vava_inventory:move', payload)
 
 | Nom | Payload | Effet d'un refus `false, raison` |
 |---|---|---|
-| `core:player:connecting` | `{ source, license, name, accountId? }` | connexion refusée ; `raison` est affichée au joueur (ban, whitelist, file). `accountId` : compte déjà connu de cette license (absent à la première venue, aucun compte n'étant créé avant l'accord des hooks) |
+| `core:player:connecting` | `{ source, license, name, accountId? }` | connexion refusée ; `raison` est affichée au joueur (ban, whitelist, file). `accountId` : compte déjà connu de cette license (absent à la première venue, aucun compte n'étant créé avant l'accord des hooks). Depuis 0.9.1, un `accountId` absent veut toujours dire « première venue » : si la base ne répond pas à la recherche du compte, la connexion est refusée (`players.messages.unavailable`) avant les hooks |
 | `core:character:creating` | `{ source, accountId, firstName, lastName, sex }` | création refusée ; `raison` renvoyée au client |
 | `core:character:deleting` | `{ source, accountId, characterId }` | suppression refusée ; `raison` renvoyée au client |
 
@@ -170,6 +170,18 @@ limite. Une connexion acceptée puis abandonnée pendant le chargement (FiveM fe
 ne connaît plus son identifiant temporaire (0.7.3) : relevé toutes les `players.connectCheckMs` (5 s), license libérée
 après deux relevés manquants, au plus tard après `players.connectTimeoutMs` (120 s). Un joueur qui charge
 normalement n'est jamais concerné.
+
+**Porte gardée** (0.9.1) : un module qui vérifie chaque arrivant par un hook (les bans de `vava_admin`) se déclare
+dans `players.connectionGuards` (`{ 'vava_admin' }` par défaut). Tant que son module n'est pas `ready` — démarrage,
+redémarrage, échec du `setup`, ou ressource arrêtée (`stopped`, `uninitialized`) —, ses hooks n'existent pas : la
+connexion est refusée avec `players.messages.guardNotReady` (« Le royaume s'éveille : réessayez dans un instant. ») et
+une ligne d'erreur à la console, vérifiée avant les hooks puis de nouveau après (garde arrêté pendant la chaîne). Pour
+une ressource arrêtée, la console ajoute « ensure <ressource>, ou retirez-le de players.connectionGuards si le serveur
+n'a pas de Registre » : un `restart vAvA_core` arrête `vava_admin` (qui en dépend) sans le relancer, et la porte reste
+fermée jusqu'à `ensure vava_admin`. Seule une ressource absente du serveur (`missing`) n'est pas attendue : la
+connexion passe, avec un avertissement à la console à chaque fois (ce que le garde vérifie ne l'est pas). Une entrée de
+la liste qui n'est pas un nom de ressource est ignorée et signalée à la console. Un garde arrêté ou en échec garde donc
+la porte fermée jusqu'à ce qu'il soit relancé, réparé ou retiré de la liste.
 
 ### `core.players`
 
@@ -835,7 +847,32 @@ voulu (l'écran des joueurs non plus, voir plus bas).
   identifiants d'un joueur (license, discord, steam…, jamais l'adresse IP) ne partent qu'à la Chancellerie, qui les
   affiche : la fiche du Registre en jeu ne les reçoit pas (1.7.0).
 - Bans par compte, vérifiés au hook `core:player:connecting` : un banni voit le motif, la fin et le numéro du ban.
-  Aucun compte n'est créé pour une connexion refusée.
+  Aucun compte n'est créé pour une connexion refusée. Second contrôle au hook `core:player:joined` (compte alors
+  toujours connu, hors du fil du core) : un compte banni pendant son chargement est expulsé avec le même texte et le
+  journal l'inscrit (« Banni écarté par le Registre », au nom de la Console, `moment : à son arrivée`) (1.7.1). Au
+  démarrage du module (redémarrage du Registre ou du core), chaque joueur déjà en jeu est relu de la même façon
+  (`moment : au démarrage du Registre`) ; un joueur que le core n'a pas encore repris est relu au tour suivant
+  (`banRecheck.sweepAttempts` tours, `sweepRetryMs` d'écart).
+- **Registre absent** (1.7.1, avec le core 0.9.1) : `vava_admin` est un garde de connexion du core
+  (`players.connectionGuards`, voir « Porte gardée ») : en démarrage, en redémarrage, en échec ou arrêté (`stop
+  vava_admin`, ou `restart vAvA_core`, qui l'arrête sans le relancer), la porte est fermée (« Le royaume s'éveille :
+  réessayez dans un instant. ») jusqu'à `ensure vava_admin` ; la relecture de son démarrage passe alors sur les joueurs
+  déjà en jeu. Le module échoue au démarrage si la table des bans est illisible (lecture d'essai). Seul un serveur où la
+  ressource n'existe pas laisse entrer sans vérification de ban (signalé à la console à chaque connexion) : un serveur
+  sans Registre retire `vava_admin` de `players.connectionGuards`, et **renommer la ressource oblige à mettre cette
+  liste à jour** (sinon l'ancien nom est absent et la porte s'ouvre sans bans).
+- **Base en panne** (1.7.1, avec le core 0.9.1) : un compte n'entre jamais sans qu'une lecture de ses bans ait réussi.
+  Si la base ne répond pas pendant la recherche du compte, le core refuse la connexion (« Le serveur est momentanément
+  indisponible, réessayez dans un instant. ») ; si elle ne répond pas pendant la lecture des bans à la connexion, le
+  joueur est refusé avec « Le registre des bans ne peut être consulté pour l'instant : réessayez dans une minute. »
+  (`messages.banCheckUnavailable`), et la console l'écrit. À l'arrivée en jeu ou à la relecture du démarrage, une
+  lecture en échec est refaite après `banRecheck.retryMs` (5 s) ; si elle échoue encore, `banRecheck.onError` décide :
+  `keep` (défaut, décision du 30 octobre 2026 : le joueur reste en jeu, la console écrit « compte n° N … : bans
+  illisibles, joueur gardé (cause) » ; à l'arrivée, la lecture de la connexion avait réussi, et un hoquet de base au
+  démarrage du Registre n'expulse pas tout le serveur) ou `kick` (expulsé avec le même message). Personne n'est refusé
+  tant que la base répond. Une première venue (aucun compte encore) n'a rien à vérifier ; une base injoignable bloque de
+  toute façon la création du compte. Pendant une panne de la base, plus personne ne se connecte : c'était déjà vrai
+  (le compte et les personnages se lisent en base), le message dit maintenant pourquoi.
 - Déplacer et immobiliser passent par les natives serveur (OneSync). L'état « immobilisé » vit en mémoire : à l'arrêt
   (ou au redémarrage) du module, chaque joueur immobilisé est libéré et prévenu, jamais laissé figé sans Registre pour
   le libérer (1.7.0). Le vol libre est la seule boucle par image du module, active seulement pendant son usage ;
@@ -1094,10 +1131,17 @@ regarde en jeu), `vava_chancellerie` ≥ 1.1.0 (caméras depuis le web). Qualit�
   demande à la Chancellerie de revérifier chaque compte qui regarde, avec son rang actuel : sans le droit (ou compte
   supprimé), ses caméras s'éteignent (« Droit refusé » dans le navigateur, capture arrêtée en jeu). Un rang changé
   dans le panneau (compte relié ou non) fait la même revérification.
-- **Journal** du Conseil : l'ouverture du mur et chaque vue en grand (les cases d'un mur sont couvertes par
-  l'ouverture). Le joueur n'est pas prévenu : à mentionner dans le règlement du serveur.
+- **Journal** du Conseil : l'ouverture du mur et chaque vue en grand. Les cases d'un mur sont couvertes par
+  l'ouverture, que le serveur exige (1.2.0) : il tient pour chaque membre en jeu un état « mur ouvert », posé par
+  `vava_cameras:wall` et levé par `vava_cameras:leave`, le retour à la sélection, le départ ou le droit retiré, caduc
+  après `wall.maxOpenMs` (2 h : il faut rouvrir le mur, nouvelle ligne au journal) ; sans lui,
+  `vava_cameras:watch(joueur, 'tile')` répond `wall_closed`. Au premier refus, le mur cesse de demander des cases et
+  chacune affiche « Mur à rouvrir », sans nouvel essai, jusqu'à sa réouverture.
+  Depuis le web, voir `vava_chancellerie` (case sans mur inscrite au journal). Le joueur n'est pas prévenu : à
+  mentionner dans le règlement du serveur.
 - **Sécurité** : chaque demande du membre est une RPC à schéma strict et à débit limité, droit revérifié à chaque
-  caméra ; seul le joueur filmé envoie l'offre de sa caméra, seul son spectateur y répond (une fois) ou la ferme.
+  caméra ; seul le joueur filmé envoie l'offre de sa caméra, **une seule fois** (`already_offered` ensuite, 1.2.0 : une
+  renégociation passe par une nouvelle caméra), seul son spectateur y répond (une fois) ou la ferme.
   Identifiants de caméra tirés au hasard (24 chiffres hexadécimaux). Le WebRTC direct révèle l'adresse IP du joueur
   filmé au spectateur (et inversement) ; derrière certains pare-feux, la connexion directe échoue (aucun relais TURN).
   Avec le DLSS activé, l'image peut inclure les interfaces du jeu.
@@ -1590,8 +1634,12 @@ vava_cameras 1.0.0 pour l'écran des joueurs, vava_time 1.0.0 pour le ciel et l'
   `time_unavailable` si vava_time n'est pas lancé. Un fichier du pont ajoute ses demandes à `routes.requests`.
 - **Caméras** (1.1.0) : ouvertes auprès de vava_cameras une fois le droit `watch` accordé — la vue en grand par la
   demande « écran du joueur » du Registre (`watchScreen` : cible vérifiée, inscrite au journal), les cases d'un mur sur
-  le seul droit, l'ouverture du mur étant inscrite au journal (« Mur des caméras ouvert »). Routes : `/cameras/wall`,
-  `/cameras/players`, `/camera/start` (`{ actor, target, quality }`), `/camera/answer`, `/camera/stop`.
+  le seul droit, l'ouverture du mur étant inscrite au journal (« Mur des caméras ouvert »). Depuis 1.4.1, une case
+  demandée par un compte qui n'a ouvert aucun mur depuis `cameras.tileLogMs` (2 h) inscrit sa propre ligne (« Cases du
+  mur regardées », numéro du joueur) : aucune case n'échappe au journal, sans refuser le navigateur (le pont ne sait pas
+  quand un mur du web se ferme). Une ligne (ouverture ou case) ne compte que si le Registre l'a acceptée (`webLog`
+  appelé et réussi) : sinon, la case suivante réessaie. Routes : `/cameras/wall`, `/cameras/players`, `/camera/start`
+  (`{ actor, target, quality }`), `/camera/answer`, `/camera/stop`.
 - **Évènements** vers la Chancellerie (requête HTTP locale, avec la clé) : signalements, arrivées et départs des joueurs,
   offre et fin des caméras du web (hook `vava_cameras:web`), arrêt du module des caméras (`{ type = 'camera', reset }`),
   rang du Conseil donné ou retiré (`{ type = 'camera', recheck }`, 1.3.1 : la Chancellerie revérifie le droit de chaque
