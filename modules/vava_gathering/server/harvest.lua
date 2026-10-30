@@ -226,7 +226,7 @@ function harvest.succeed(session)
     -- l'outil s'use même quand la terre se refuse
     if held then wear(session, held) end
     if failed then
-        bridge.Notify(src, messages.failed, 'warning')
+        bridge.Notify(src, zones.isWater(zone) and messages.failedWater or messages.failed, 'warning')
         return false, 'failed'
     end
 

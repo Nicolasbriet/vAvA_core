@@ -25,6 +25,7 @@ l'export `getSeason`).
 | Pêche | touche entre 4 et 14 s ; barre de tension 6 s, zone à tenir 35–65 % qui dérive, 60 % du temps dans la zone | `fishing` |
 | Prise (tirée par le serveur, ligne tenue) | le poisson se décroche : 25 % au niveau 0 de Pêche, 2 % au niveau 100, linéaire entre les deux (13,5 % au niveau 50) ; + 5 points en eaux fatiguées, + 10 en eaux épuisées ; parts invalides comptées pour 0, chance ramenée dans [0, 1] (1.4.0) | `fishing.catch` |
 | Props | créés par le client à 80 m, relus toutes les secondes | `streaming` |
+| Zones d'eau | genres de zone dont les textes parlent de l'eau et non de la terre (échec de la bande, épuisement, invite) : `eau` | `waterKinds` |
 | Carte | un blip nommé par zone (icône et couleur selon le genre, courte portée) et le cercle de son rayon ; « Marquer » dans le panneau pose le repère de la carte | `map` |
 | Solidité d'un outil sans histoire | 100 au premier usage | `toolDefaults` |
 
@@ -71,7 +72,7 @@ s'affiche : tenir la touche fait monter l'aiguille, la relâcher la fait descend
 temps, le client dit s'il a tenu. Ce qu'il dit ne peut que **faire rater** (1.4.0) : ligne relâchée, la prise
 s'échappe ; ligne tenue, le **serveur tire la prise** selon le niveau de Pêche (lu au lancer) et la bande de la zone
 (`fishing.catch`, règle pure `shared/catch.lua`) : un débutant perd encore une prise sur quatre, un maître presque
-jamais (« La ligne a tenu, mais le poisson se décroche au dernier moment. »). Puis l'échec de la bande s'applique comme à
+jamais (« Au dernier moment, le poisson se décroche. »). Puis l'échec de la bande s'applique comme à
 toute récolte. Touche, durée, distance, charge, vitalité, rendement et XP sont au serveur. Une prise échappée ou
 décrochée ne consomme rien (ni charge, ni vitalité, ni usure, ni XP). Décision du porteur du projet (30 octobre 2026) :
 le serveur tire la réussite.
@@ -108,8 +109,10 @@ resource, item }`), `harvested` (after : `+ quantity, tier, band, extra? `), `zo
 7. **Pistes** : couteau en main sur une piste de lièvre → viande, parfois une peau.
 8. **Pêche** : canne en main au bord de la Rivière Claire : ligne lancée, touche, barre de tension tenue → truite le
    plus souvent ; relâchée → « La prise s'est échappée », aucune charge consommée. Ligne tenue au niveau 0 : environ
-   une prise sur quatre se décroche (« La ligne a tenu, mais le poisson se décroche au dernier moment. »), sans charge
-   ni usure ; Pêche portée à 100 (`/metiers niveau <joueur> peche 100`) : presque jamais. Détail : `docs/tests/metiers.md`.
+   une prise sur quatre se décroche (« Au dernier moment, le poisson se décroche. »), sans charge
+   ni usure ; Pêche portée à 100 (`/metiers niveau <joueur> peche 100`) : presque jamais. En eaux fatiguées ou
+   épuisées, les textes parlent de l'eau (« Ces eaux sont fatiguées : le poisson vous échappe. », « … l'eau a besoin de
+   repos. », invite « Ces eaux sont épuisées : la pêche sera maigre. »). Détail : `docs/tests/metiers.md`.
 9. **Panneau** : touche `O` → zones, vitalité, bandes, cicatrices, distances ; « Marquer » pose le repère de la carte
    sur la zone et ferme le panneau (l'itinéraire part aussitôt).
 10. **Carte** : en jeu, un blip nommé par zone et le cercle de son rayon sur la grande carte (icônes : gibier, foreuse,

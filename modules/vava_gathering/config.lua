@@ -117,6 +117,10 @@ VavaGathering.config = {
         default = { sprite = 1, colour = 0 },           -- genre sans icône : point blanc
     },
 
+    -- Genres de zone d'eau (`zones[].kind`) : leurs textes parlent de l'eau, non de la terre (échec de la bande,
+    -- épuisement, invite).
+    waterKinds = { eau = true },
+
     persistence = { flushMs = 10000 },  -- écriture groupée des zones et nœuds modifiés
     logRetentionDays = 90,
 
@@ -234,12 +238,14 @@ VavaGathering.config = {
         harvested = '%s : %d × %s (%s).',                     -- ressource, quantité, objet, palier
         harvestedExtra = 'Et aussi : %s.',
         failed = 'La récolte échoue : la terre est fatiguée ici.',
+        failedWater = 'Ces eaux sont fatiguées : le poisson vous échappe.',     -- zone d'eau (`waterKinds`)
         escaped = 'La prise s\'est échappée.',
-        slipped = 'La ligne a tenu, mais le poisson se décroche au dernier moment.',
+        slipped = 'Au dernier moment, le poisson se décroche.',
         noTool = 'Il vous faut %s en main.',                  -- genre d'outil (libellé)
         brokenTool = 'Votre outil est brisé.',
         noCharges = 'Il n\'y a plus rien à prendre ici pour le moment.',
         depleted = '%s est épuisée : la terre a besoin de repos.',
+        depletedWater = '%s est épuisée : l\'eau a besoin de repos.',          -- zone d'eau (`waterKinds`)
         scarred = '%s porte une cicatrice : elle mettra longtemps à se remettre.',
         toolWorn = 'Votre %s s\'use (%d).',
         toolBroken = 'Votre %s se brise !',

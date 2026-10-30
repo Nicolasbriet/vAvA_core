@@ -19,7 +19,7 @@ const PromptView = (() => {
     castHint: cast.querySelector('.cast-hint'),
   };
 
-  /** Invite pour un nœud : { key, anim, label, charges, exhausted, zoneDepleted, toolKind, toolOk }. */
+  /** Invite pour un nœud : { key, anim, label, charges, exhausted, zoneDepleted, water, toolKind, toolOk }. */
   function show(payload) {
     const P = STRINGS.prompt;
     refs.key.textContent = payload.key || 'E';
@@ -29,7 +29,7 @@ const PromptView = (() => {
     let help = '';
     if (payload.exhausted) help = P.exhausted;
     else if (payload.toolKind && payload.toolOk === false) help = P.needTool(P.toolKinds[payload.toolKind] || P.toolDefault);
-    else if (payload.zoneDepleted) help = P.zoneDepleted;
+    else if (payload.zoneDepleted) help = payload.water ? P.zoneDepletedWater : P.zoneDepleted;
     refs.help.textContent = help;
     refs.help.hidden = help === '';
     prompt.classList.toggle('is-blocked', Boolean(payload.exhausted) || (Boolean(payload.toolKind) && payload.toolOk === false));
