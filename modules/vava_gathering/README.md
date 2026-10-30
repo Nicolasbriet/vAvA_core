@@ -24,7 +24,7 @@ l'export `getSeason`).
 | Qualité | score = niveau × 0,5 + outil × 0,3 + vitalité × 0,2 + bonus de l'outil ± 8 → paliers à 20, 40, 60, 85 ; provenance écrite | `quality` |
 | Pêche | touche entre 4 et 14 s ; barre de tension 6 s, zone à tenir 35–65 % qui dérive, 60 % du temps dans la zone | `fishing` |
 | Prise (tirée par le serveur, ligne tenue) | le poisson se décroche : 25 % au niveau 0 de Pêche, 2 % au niveau 100, linéaire entre les deux (13,5 % au niveau 50), quel que soit l'état de l'eau (décision du 30 octobre 2026 : supplément de la bande `catch.bands` à 0, gardé dans la config pour pouvoir le remettre ; l'eau fatiguée ou épuisée ne joue que par l'échec de la bande, 25 % / 50 %, avec son message d'eau) ; parts invalides comptées pour 0, chance ramenée dans [0, 1] (1.4.0) | `fishing.catch` |
-| Props | créés par le client à 80 m, relus toutes les secondes | `streaming` |
+| Props | créés par le client à 80 m ; nœuds regroupés par zone, seuls ceux d'une zone à portée sont mesurés ; relus toutes les secondes près d'une zone, toutes les 2,5 s quand aucun nœud n'est à moins de 140 m (80 m + 60 m de marge d'approche) (1.4.1) | `streaming` |
 | Zones d'eau | genres de zone dont les textes parlent de l'eau et non de la terre (échec de la bande, épuisement, invite) : `eau` | `waterKinds` |
 | Carte | un blip nommé par zone (icône et couleur selon le genre, courte portée) et le cercle de son rayon ; « Marquer » dans le panneau pose le repère de la carte | `map` |
 | Solidité d'un outil sans histoire | 100 au premier usage | `toolDefaults` |
@@ -124,3 +124,6 @@ resource, item }`), `harvested` (after : `+ quantity, tier, band, extra? `), `zo
     sert qu'à rendre l'âme. Tombé pendant le geste : rien n'est pris, aucune charge consommée (« Vous êtes à terre. »).
 13. **Saisons** (`vava_time`) : voir `docs/tests/temps.md` (section des métiers) — en hiver, la sauge vidée revient
     quatre fois moins vite et la récolte d'herbes est divisée par deux ; `stop vava_time` → plus aucun effet.
+14. **Props à distance** (1.4.1) : venir de loin à cheval vers la Forêt de Brume → les arbres apparaissent à 80 m comme
+    avant ; s'éloigner → ils disparaissent ; `resmon` loin de toute zone puis dans une zone : `vava_gathering` plus bas
+    loin de tout. Détail : `docs/tests/metiers.md` § 6.
