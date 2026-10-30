@@ -4,8 +4,9 @@
            emplacement d'après le temps écoulé (humidité qui baisse, croissance tant que la terre est humide, pause,
            flétrissement puis mort quand elle est sèche, jachère qui rend de la fertilité ; saison de vava_time qui
            accélère ou ralentit la pousse et le dessèchement), stade et état, régularité d'arrosage, qualité d'une
-           récolte ; gel d'une nuit d'hiver (plante qu'il tue, saison où l'on couvre, objet qui couvre). Aucun état :
-           les fonctions reçoivent et rendent des tables.
+           récolte ; gel d'une nuit d'hiver (plante qu'il tue, saison où l'on couvre, objet qui couvre) ; emplacement
+           vidé par une récolte ou un arrachage, copié avant et rendu si la besace refuse. Aucun état : les fonctions
+           reçoivent et rendent des tables.
     Dépendances : shared/constants.lua, config.lua
 ]]
 
@@ -232,4 +233,60 @@ function growth.fertilityAfterHarvest(fertility, crop, lastFamily)
         end
     end
     return min(100, max(0, value))
+end
+
+-- Récolte et arrachage ------------------------------------------------------------------------------------------------
+-- La plante est prise AVANT que la besace ne reçoive le produit (l'ajout peut céder la main) : un second cultivateur
+-- trouve l'emplacement libre. Si la besace refuse, la plante est rendue telle quelle, à moins qu'on n'ait semé entre-temps.
+
+-- champs d'un emplacement gardés en base : ce que `snapshot` copie et ce que `giveBack` restitue
+local SLOT_FIELDS = {
+    'crop', 'seedTier', 'plantedAt', 'growth', 'moisture', 'fertility', 'drySince', 'dryHours', 'waterings', 'wilted',
+    'dead', 'covered', 'lastFamily', 'updatedAt',
+}
+
+--- Emplacement libre : ni plante, ni humidité, ni sécheresse, ni couverture.
+---@param slot vAvA.SlotState
+---@param now integer
+local function empty(slot, now)
+    slot.crop, slot.seedTier, slot.plantedAt, slot.growth = nil, 1, 0, 0
+    slot.moisture, slot.drySince, slot.dryHours, slot.waterings = 0, nil, 0, 0
+    slot.wilted, slot.dead, slot.covered, slot.updatedAt = false, false, false, now
+end
+
+--- Récolte (modifié en place) : l'emplacement redevient libre, la fertilité paie, la famille est retenue pour la
+--- rotation ; une couverture contre le gel part avec la plante.
+---@param slot vAvA.SlotState
+---@param crop table
+---@param now integer
+function growth.harvest(slot, crop, now)
+    slot.fertility = growth.fertilityAfterHarvest(slot.fertility, crop, slot.lastFamily)
+    slot.lastFamily = crop.family
+    empty(slot, now)
+end
+
+--- Arrachage (modifié en place) : l'emplacement redevient libre sans rien payer ni retenir.
+---@param slot vAvA.SlotState
+---@param now integer
+function growth.clear(slot, now)
+    empty(slot, now)
+end
+
+--- Copie des champs gardés d'un emplacement, prise juste avant de le vider.
+---@param slot vAvA.SlotState
+---@return table
+function growth.snapshot(slot)
+    local copy = {}
+    for _, field in ipairs(SLOT_FIELDS) do copy[field] = slot[field] end
+    return copy
+end
+
+--- Rend à un emplacement vidé ce qu'il portait (copie de `snapshot`), si personne n'y a semé entre-temps.
+---@param slot vAvA.SlotState
+---@param snapshot table|nil
+---@return boolean  vrai si la plante est rendue
+function growth.giveBack(slot, snapshot)
+    if type(snapshot) ~= 'table' or slot.crop ~= nil then return false end
+    for _, field in ipairs(SLOT_FIELDS) do slot[field] = snapshot[field] end
+    return true
 end

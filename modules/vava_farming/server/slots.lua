@@ -212,25 +212,33 @@ function slots.fertilize(slot)
     slot.dirty = true
 end
 
---- Récolte : l'emplacement redevient libre, la fertilité paie, la famille est retenue pour la rotation.
+--- Récolte : l'emplacement redevient libre, la fertilité paie, la famille est retenue pour la rotation, la couverture
+--- part avec la plante (shared/growth.lua).
 ---@param slot table
 ---@param crop table
 ---@param now integer
 function slots.harvest(slot, crop, now)
-    slot.fertility = growth.fertilityAfterHarvest(slot.fertility, crop, slot.lastFamily)
-    slot.lastFamily = crop.family
-    slot.crop, slot.seedTier, slot.plantedAt, slot.growth = nil, 1, 0, 0
-    slot.moisture, slot.drySince, slot.dryHours, slot.waterings = 0, nil, 0, 0
-    slot.wilted, slot.dead, slot.covered, slot.updatedAt, slot.dirty = false, false, false, now, true
+    growth.harvest(slot, crop, now)
+    slot.dirty = true
 end
 
 --- Arrachage : l'emplacement redevient libre sans rien payer ni retenir.
 ---@param slot table
 ---@param now integer
 function slots.clear(slot, now)
-    slot.crop, slot.seedTier, slot.plantedAt, slot.growth = nil, 1, 0, 0
-    slot.moisture, slot.drySince, slot.dryHours, slot.waterings = 0, nil, 0, 0
-    slot.wilted, slot.dead, slot.covered, slot.updatedAt, slot.dirty = false, false, false, now, true
+    growth.clear(slot, now)
+    slot.dirty = true
+end
+
+--- La besace a refusé ce que la plante donnait : elle est rendue telle qu'avant (copie de growth.snapshot), si personne
+--- n'a semé entre-temps.
+---@param slot table
+---@param snapshot table
+---@return boolean  vrai si la plante est rendue
+function slots.giveBack(slot, snapshot)
+    if not growth.giveBack(slot, snapshot) then return false end
+    slot.dirty = true
+    return true
 end
 
 -- Gel (vava_time) -------------------------------------------------------------------------------------------------------
