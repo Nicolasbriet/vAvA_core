@@ -1,14 +1,14 @@
 --[[
     server/core/netcommand.lua
     Rôle : commande du Conseil `/vava_reseau` (droit `tools` de vava_admin, repli ACE) : envois de la dernière minute,
-           les plus lourds, ceux d'une ressource, ou ce que reçoit un joueur (suivi évènement par évènement, inscrit au
-           journal du Registre), zones déclarées et abonnements, ou zones suivies par un joueur (inscrit au journal) ;
+           les plus lourds, ceux d'une ressource, ou ce que reçoit un joueur (évènement par évènement, tout de suite :
+           chaque joueur connecté est suivi d'office depuis 0.12.0 ; consultation inscrite au journal du Registre), zones déclarées et abonnements, ou zones suivies par un joueur (inscrit au journal) ;
            sortie dans le chat du seul membre, ou dans la console. Commande console `vava_reseau_essai` : mesure en
            jeu le débit réel du latent, l'ordre d'arrivée et l'envoi de proximité. Aucun RPC : rien n'entre par le
            réseau.
     Dépendances : shared/init.lua, config/server.lua, shared/lib/string.lua, shared/core/logger.lua,
                   server/core/netstats.lua, server/core/net.lua, server/core/zones.lua, server/core/commands.lua ;
-                  vAvA.characters lu à l'appel. Seule ressource extérieure lue : vava_admin (droit, journal), chaque
+                  vAvA.characters et vAvA.accounts lus à l'appel. Seule ressource extérieure lue : vava_admin (droit, journal), chaque
                   appel isolé par pcall.
 ]]
 
@@ -40,7 +40,7 @@ local NUMBER_PATTERN = '^%d+$'
 local NUMBER_MAX_DIGITS = 6
 -- noms de zones affichés pour un joueur, au plus
 local ZONE_NAMES_MAX = 20
-local JOURNAL_WATCH = 'Réseau d\'un joueur suivi'
+local JOURNAL_PLAYER = 'Réseau d\'un joueur consulté'
 local JOURNAL_ZONES = 'Zones d\'un joueur consultées'
 -- charge de l'essai : n Ko en tout pour le message (en-tête et nom de l'évènement compris)
 local PROBE_OVERHEAD = 64
@@ -126,29 +126,25 @@ end
 local function journal(src, target, label)
     local admin = commandCfg.adminResource
     if src ~= CONSOLE and GetResourceState(admin) == 'started' then
-        local called, ok = pcall(function() return exports[admin]:log(src, label, { joueur = target }) end)
+        -- numéro de connexion (réattribué après un départ) et compte de jeu, connu dès la connexion
+        local accounts = vAvA.accounts
+        local session = accounts and accounts.get(target)
+        local details = { joueur = target, compte = session and session.accountId or nil }
+        local called, ok = pcall(function() return exports[admin]:log(src, label, details) end)
         if called and ok == true then return end
     end
     log.info('%s : joueur %d (par %d)', label, target, src)
 end
 
+--- Ce que reçoit un joueur : tout de suite, chaque joueur connecté étant suivi d'office (0.12.0).
 ---@param src integer
 ---@param target integer
 local function playerView(src, target)
     local stats = net.stats({ limit = LINES, target = target })
     if not stats then return end
-    journal(src, target, JOURNAL_WATCH)
+    journal(src, target, JOURNAL_PLAYER)
     say(src, format(texts.player, target, playerLabel(target), stats.total.messages, formatBytes(stats.total.bytes)))
-    if stats.watched then
-        if #stats.events == 0 then say(src, texts.empty) else sayEvents(src, stats.events) end
-    else
-        local started = net.watch(target)
-        if started then
-            say(src, format(texts.watchStarted, cfg.counter.watchMs // 60000))
-        else
-            say(src, format(texts.watchFull, cfg.counter.maxWatched))
-        end
-    end
+    if #stats.events == 0 then say(src, texts.empty) else sayEvents(src, stats.events) end
     say(src, texts.footer)
 end
 

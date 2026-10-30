@@ -153,3 +153,80 @@ describe('vAvA.netcommand : zones', function()
             args = { { name = 'joueur', type = 'player', optional = true } } }, action)
     end)
 end)
+
+-- Action « joueur » depuis 0.12.0 : chaque joueur connecté est suivi d'office, la commande répond tout de suite avec
+-- le détail par évènement ; la consultation reste inscrite au journal du Registre (numéro et compte de jeu).
+describe('vAvA.netcommand : joueur', function()
+    local commands, lines, journal, now, realPrint
+
+    before_each(function()
+        helper.reset()
+        commands, lines, journal = {}, {}, {}
+        now = 0
+        realPrint = _G.print
+        _G.print = function() end
+        _G.GetGameTimer = function() return now end
+        _G.DoesPlayerExist = function(src) return src == 1 or src == 2 end
+        _G.RegisterCommand = function(name, handler) commands[name] = handler end
+        _G.GetResourceState = function() return 'started' end
+        _G.IsPlayerAceAllowed = function() return false end
+        _G.TriggerClientEvent = function(event, target, payload)
+            if event == 'chat:addMessage' then lines[#lines + 1] = { target = target, text = payload.args[2] } end
+        end
+        _G.exports = {
+            vava_admin = {
+                can = function(_, src) return src == 1 end,
+                log = function(_, src, label, data)
+                    journal[#journal + 1] = { src = src, label = label, data = data }
+                    return true
+                end,
+            },
+        }
+        helper.loadAll({
+            'shared/init.lua',
+            'config/shared.lua',
+            'shared/lib/string.lua',
+            'shared/core/logger.lua',
+            'config/server.lua',
+            'server/core/netsize.lua',
+            'server/core/netstats.lua',
+            'server/core/net.lua',
+        })
+        vAvA.zones = { stats = function() return {} end, ofPlayer = function() return {} end }
+        vAvA.commands = { declare = function() return true end }
+        vAvA.characters = {
+            describeActive = function(src)
+                return src == 2 and { firstName = 'Aldric', lastName = 'Morn' } or nil
+            end,
+        }
+        vAvA.accounts = { get = function(src) return src == 2 and { source = 2, accountId = 41 } or nil end }
+        helper.load('server/core/netcommand.lua')
+        vAvA.netcommand.start()
+    end)
+
+    after_each(function()
+        _G.print = realPrint
+        _G.exports = nil
+    end)
+
+    it('répond tout de suite avec le détail, sans suivi à lancer, et inscrit la consultation', function()
+        vAvA.net.send('vava_test', nil, 2, 'vava_test:e', 'bonjour')
+        now = now + 2000
+        commands.vava_reseau(1, { 'joueur', '2' })
+        local texts = {}
+        for i, line in ipairs(lines) do texts[i] = line.text end
+        assert.truthy(texts[1]:find('Joueur 2 (Aldric Morn) : 1 envois', 1, true))
+        assert.truthy(texts[2]:find('vava_test · vava_test:e : 1 envois', 1, true))
+        assert.equal(vAvA.config.server.net.command.messages.footer, texts[3])
+        assert.equal(3, #texts)
+        for _, text in ipairs(texts) do assert.is_nil(text:find('relancez', 1, true)) end
+        assert.same({ { src = 1, label = 'Réseau d\'un joueur consulté', data = { joueur = 2, compte = 41 } } }, journal)
+    end)
+
+    it('aucun envoi vers ce joueur : la ligne « aucun envoi », toujours au journal', function()
+        now = now + 2000
+        commands.vava_reseau(1, { 'joueur', '1' })
+        assert.equal(vAvA.config.server.net.command.messages.empty, lines[2].text)
+        assert.same({ joueur = 1 }, journal[1].data)
+    end)
+end)

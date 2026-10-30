@@ -131,9 +131,13 @@ vAvA.config.server = {
             bucketMs = 5000,        -- largeur d'une case de la fenêtre glissante
             buckets = 12,           -- cases : fenêtre d'une minute (55 à 60 s)
             maxKeys = 512,          -- couples (ressource, évènement) suivis ; au-delà, cumul sous (*, <autres>)
-            maxWatched = 4,         -- joueurs suivis évènement par évènement en même temps
-            maxWatchedKeys = 64,    -- évènements distincts par joueur suivi ; au-delà, <autres>
-            watchMs = 300000,       -- durée d'un suivi (5 min)
+            -- Chaque joueur connecté est suivi d'office, évènement par évènement (0.12.0) : ses playerKeys évènements les
+            -- plus lourds sur la minute, le reste cumulé sous <autres>. Un évènement suivi coûte un anneau de 1,1 Ko
+            -- (12 cases), réservé dès son premier envoi. Mesuré hors jeu, pire cas (128 joueurs, chacun au moins
+            -- playerKeys + 1 évènements différents dans la minute) : 12 → 2,1 Mo ; 16 → 2,6 Mo ; 8 → 1,5 Mo. 12 tient
+            -- le budget d'environ 2 Mo et couvre les évènements d'un joueur ordinaire (réponses des RPC de ses modules,
+            -- champs, zones) ; les plus petits rejoignent <autres>.
+            playerKeys = 12,
             sweepMs = 60000,        -- ménage des clés sans envoi depuis une fenêtre
         },
         command = {
@@ -155,8 +159,6 @@ vAvA.config.server = {
                 empty = 'Aucun envoi compté dans la dernière minute.',
                 player = 'Joueur %d (%s) : %d envois, %s dans la dernière minute.',
                 noCharacter = 'sans personnage',
-                watchStarted = 'Détail par évènement suivi pendant %d min : relancez la commande dans une minute.',
-                watchFull = 'Déjà %d joueurs suivis : détail indisponible pour celui-ci.',
                 unknownPlayer = 'Aucun joueur n° %s en jeu.',
                 usage = 'usage : /vava_reseau | joueur <n°> | ressource <nom> | zones [n°]',
                 -- abonnements de zone (0.11.0) : durées à deux décimales, virgule française

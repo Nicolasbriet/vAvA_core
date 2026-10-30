@@ -1,11 +1,12 @@
 local helper = require('tests.helper')
 
 -- Compteur des envois serveur → client (server/core/netstats.lua, core 0.10.0) : fenêtre glissante d'une minute en
--- 12 cases de 5 s, temps passé en argument ; mémoire bornée (clés, joueurs suivis, clés par joueur suivi).
+-- 12 cases de 5 s, temps passé en argument ; mémoire bornée (clés ; évènements détaillés par joueur, tous suivis
+-- d'office depuis 0.12.0, les plus lourds gardés, le reste sous <autres>).
 describe('vAvA.netstats', function()
     local netstats, counter
 
-    local CFG = { bucketMs = 5000, buckets = 12, maxKeys = 4, maxWatched = 2, maxWatchedKeys = 2, watchMs = 300000 }
+    local CFG = { bucketMs = 5000, buckets = 12, maxKeys = 4, playerKeys = 2 }
 
     before_each(function()
         helper.reset()
@@ -109,51 +110,111 @@ describe('vAvA.netstats', function()
     end)
 
     describe('joueurs', function()
-        it('tient les totaux par joueur ; le détail seulement pour un joueur suivi', function()
+        it('tient pour chaque joueur, sans suivi à lancer, son total et son détail par évènement', function()
             counter:record(0, 'vava_a', 'vava_a:x', 10, false, { 1, 2 })
-            local result = read(0, { target = 1 })
-            assert.same({ messages = 1, bytes = 10, latent = 0 }, result.total)
-            assert.is_false(result.watched)
-            assert.same({}, result.events)
-            assert.same({ true, 'started' }, { counter:watch(0, 1) })
-            assert.same({ true, 'already' }, { counter:watch(0, 1) })
             counter:record(1000, 'vava_a', 'vava_a:y', 30, true, 1)
-            result = read(1000, { target = 1 })
-            assert.is_true(result.watched)
+            local result = read(1000, { target = 1 })
             assert.same({ messages = 2, bytes = 40, latent = 1 }, result.total)
-            assert.equal(1, #result.events)   -- seul ce qui est arrivé depuis le début du suivi
-            assert.equal('vava_a:y', result.events[1].label)
+            assert.is_nil(result.watched)
+            assert.equal(2, #result.events)
+            assert.same({ resource = 'vava_a', label = 'vava_a:y', messages = 1, bytes = 30, latent = 1, largest = 30 },
+                result.events[1])
+            assert.equal('vava_a:x', result.events[2].label)
+            -- seulement ce que ce joueur a reçu
+            result = read(1000, { target = 2 })
+            assert.equal(1, #result.events)
+            assert.equal('vava_a:x', result.events[1].label)
             assert.same({ messages = 0, bytes = 0, latent = 0 }, read(1000, { target = 9 }).total)
+            assert.same({}, read(1000, { target = 9 }).events)
         end)
 
-        it('refuse un suivi au-delà de maxWatched ; un suivi expire après watchMs', function()
-            assert.is_true(counter:watch(0, 1))
-            assert.is_true(counter:watch(0, 2))
-            assert.same({ false, 'full' }, { counter:watch(0, 3) })
-            assert.is_false(counter:isWatched(300000, 1))
-            assert.same({ true, 'started' }, { counter:watch(300000, 3) })
-        end)
-
-        it('au-delà de maxWatchedKeys, les évènements du joueur suivi partent dans <autres>', function()
-            counter:watch(0, 1)
+        it('filtre le détail d’un joueur par ressource et le limite', function()
             counter:record(0, 'vava_a', 'vava_a:x', 10, false, 1)
-            counter:record(0, 'vava_a', 'vava_a:y', 10, false, 1)
+            counter:record(0, 'vava_b', 'vava_b:x', 50, false, 1)
+            local result = read(0, { target = 1, resource = 'vava_a' })
+            assert.equal(1, #result.events)
+            assert.equal('vava_a:x', result.events[1].label)
+            assert.equal(1, #read(0, { target = 1, limit = 1 }).events)
+            assert.equal('vava_b:x', read(0, { target = 1, limit = 1 }).events[1].label)
+        end)
+
+        it('au-delà de playerKeys, un petit évènement nouveau part dans <autres> du joueur', function()
+            counter:record(0, 'vava_a', 'vava_a:x', 100, false, 1)
+            counter:record(0, 'vava_a', 'vava_a:y', 100, false, 1)
             counter:record(0, 'vava_b', 'vava_b:z', 10, false, 1)
             local events = read(0, { target = 1 }).events
             assert.equal(3, #events)
-            assert.is_not_nil(find(events, netstats.OTHER_RESOURCE, netstats.OTHER_LABEL))
+            assert.equal(10, find(events, netstats.OTHER_RESOURCE, netstats.OTHER_LABEL).bytes)
+            assert.is_nil(find(events, 'vava_b', 'vava_b:z'))
+            assert.equal(2, counter.players[1].keyCount)
+            -- un autre joueur a ses propres places
+            counter:record(0, 'vava_b', 'vava_b:z', 10, false, 2)
+            assert.is_not_nil(find(read(0, { target = 2 }).events, 'vava_b', 'vava_b:z'))
         end)
 
-        it('forget efface les totaux et le suivi d’un joueur', function()
-            counter:watch(0, 1)
-            counter:record(0, 'vava_a', 'vava_a:x', 10, false, 1)
+        it('un message plus lourd que tout l’évènement le plus léger du joueur prend sa place ; le plus léger rejoint <autres>',
+            function()
+                counter:record(0, 'vava_a', 'vava_a:lourd', 500, false, 1)
+                counter:record(0, 'vava_a', 'vava_a:leger', 20, false, 1)
+                counter:record(5000, 'vava_a', 'vava_a:leger', 20, false, 1)  -- 40 o en deux cases
+                counter:record(6000, 'vava_c', 'vava_c:gros', 41, true, 1)
+                local events = read(6000, { target = 1 }).events
+                assert.equal(3, #events)
+                assert.same({ resource = 'vava_c', label = 'vava_c:gros', messages = 1, bytes = 41, latent = 1, largest = 41 },
+                    find(events, 'vava_c', 'vava_c:gros'))
+                assert.is_nil(find(events, 'vava_a', 'vava_a:leger'))
+                -- rien n'est perdu : ses deux cases sont dans <autres>, total du joueur inchangé
+                local other = find(events, netstats.OTHER_RESOURCE, netstats.OTHER_LABEL)
+                assert.same({ messages = 2, bytes = 40, latent = 0, largest = 20 },
+                    { messages = other.messages, bytes = other.bytes, latent = other.latent, largest = other.largest })
+                assert.same({ messages = 4, bytes = 581, latent = 1 }, read(6000, { target = 1 }).total)
+                assert.equal(2, counter.players[1].keyCount)
+                -- un message égal à ce qu'a envoyé le plus léger ne le chasse pas
+                counter:record(6000, 'vava_d', 'vava_d:pareil', 41, false, 1)
+                assert.is_nil(find(read(6000, { target = 1 }).events, 'vava_d', 'vava_d:pareil'))
+            end)
+
+        it('l’évincé ne garde dans <autres> que ses cases encore dans la fenêtre', function()
+            counter:record(55000, 'vava_a', 'vava_a:lourd', 500, false, 1)  -- encore dans la fenêtre à 60 000
+            counter:record(0, 'vava_a', 'vava_a:vieux', 30, false, 1)       -- case 0, sortie à 60 000
+            counter:record(55000, 'vava_a', 'vava_a:vieux', 5, false, 1)    -- case 11
+            counter:record(60000, 'vava_b', 'vava_b:neuf', 6, false, 1)     -- 6 > 5 : chasse vava_a:vieux
+            local events = read(60000, { target = 1 }).events
+            assert.is_not_nil(find(events, 'vava_b', 'vava_b:neuf'))
+            local other = find(events, netstats.OTHER_RESOURCE, netstats.OTHER_LABEL)
+            assert.equal(1, other.messages)
+            assert.equal(5, other.bytes)
+        end)
+
+        it('forget efface tout d’un joueur', function()
+            counter:record(0, 'vava_a', 'vava_a:x', 10, false, { 1, 2 })
             counter:forget(1)
+            assert.is_nil(counter.players[1])
             local result = read(0, { target = 1 })
             assert.equal(0, result.total.messages)
-            assert.is_false(result.watched)
-            -- la place du suivi est rendue
-            assert.is_true(counter:watch(0, 2))
-            assert.is_true(counter:watch(0, 3))
+            assert.same({}, result.events)
+            assert.equal(1, read(0, { target = 2 }).total.messages)
+            -- le compteur général garde l'envoi
+            assert.equal(2, read(0).total.messages)
+        end)
+
+        it('liste les joueurs donnés, du plus chargé au moins chargé, ceux sans envoi compris, bornée', function()
+            counter:record(0, 'vava_a', 'vava_a:x', 10, false, { 1, 2, 3 })
+            counter:record(0, 'vava_a', 'vava_a:y', 100, true, 2)
+            counter:record(0, 'vava_a', 'vava_a:z', 10, false, 3)
+            local list = counter:listPlayers(0, { 1, 2, 3, 4 }, 10)
+            assert.same({
+                { source = 2, messages = 2, bytes = 110, latent = 1 },
+                { source = 3, messages = 2, bytes = 20, latent = 0 },
+                { source = 1, messages = 1, bytes = 10, latent = 0 },
+                { source = 4, messages = 0, bytes = 0, latent = 0 },
+            }, list)
+            assert.equal(2, #counter:listPlayers(0, { 1, 2, 3, 4 }, 2))
+            assert.equal(2, counter:listPlayers(0, { 1, 2, 3, 4 }, 2)[1].source)
+            -- à égalité : le plus petit numéro d'abord ; hors fenêtre : zéro
+            assert.same({ 1, 2 }, { counter:listPlayers(60000, { 2, 1 }, 10)[1].source,
+                counter:listPlayers(60000, { 2, 1 }, 10)[2].source })
+            assert.same({}, counter:listPlayers(0, {}, 10))
         end)
     end)
 

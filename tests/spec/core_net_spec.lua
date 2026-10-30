@@ -453,20 +453,58 @@ describe('vAvA.net', function()
             assert.equal(1, net.stats({ target = 2 }).total.messages)
         end)
 
-        it('suit un joueur évènement par évènement', function()
-            assert.same({ true, 'started' }, { net.watch(2) })
+        it('détaille chaque joueur évènement par évènement, sans suivi à lancer (0.12.0), avec son personnage', function()
+            assert.is_nil(net.watch)
+            vAvA.characters.describeActive = function(src)
+                return src == 2 and { firstName = 'Aldric', lastName = 'Morn' } or nil
+            end
             net.send(OWNER, nil, 2, 'vava_test:e', 1)
             local stats = net.stats({ target = 2 })
-            assert.is_true(stats.watched)
+            assert.is_nil(stats.watched)
             assert.equal('vava_test:e', stats.events[1].label)
+            assert.equal('Aldric Morn', stats.name)
+            assert.is_nil(net.stats({ target = 3 }).name)
+        end)
+
+        it('liste les joueurs connectés, les plus chargés d’abord, avec leur personnage', function()
+            _G.GetPlayers = function() return { '1', '2', '3' } end
+            vAvA.characters.describeActive = function(src)
+                return src == 3 and { firstName = 'Ysolde', lastName = 'Var' } or nil
+            end
+            net.send(OWNER, nil, { 1, 3 }, 'vava_test:e', 'bonjour')
+            net.send(OWNER, nil, 3, 'vava_test:f', 'encore')
+            local stats = net.stats({ players = true })
+            assert.equal(3, stats.playerCount)
+            assert.equal(3, #stats.players)
+            assert.equal(3, stats.players[1].source)
+            assert.equal('Ysolde Var', stats.players[1].name)
+            assert.equal(2, stats.players[1].messages)
+            assert.equal(1, stats.players[2].source)
+            assert.is_nil(stats.players[2].name)
+            assert.same({ source = 2, messages = 0, bytes = 0, latent = 0 }, stats.players[3])
+            assert.is_nil(net.stats().players)
+            _G.GetPlayers = nil
+            assert.same({}, net.stats({ players = true }).players)
+        end)
+
+        it('plafonne la liste des joueurs à 128', function()
+            local list = {}
+            for i = 1, 200 do list[i] = tostring(i) end
+            _G.GetPlayers = function() return list end
+            local stats = net.stats({ players = true })
+            assert.equal(200, stats.playerCount)
+            assert.equal(128, #stats.players)
+            _G.GetPlayers = nil
         end)
 
         it('refuse des options de lecture inconnues ou hors bornes', function()
             for _, options in ipairs({ 'x', { foo = 1 }, { limit = 0 }, { limit = 51 }, { limit = 1.5 },
-                { resource = 'a b' }, { resource = string.rep('a', 49) }, { target = 0 } }) do
+                { resource = 'a b' }, { resource = string.rep('a', 49) }, { target = 0 }, { players = 1 },
+                { players = true, target = 1 }, { players = true, resource = 'vava_test' } }) do
                 assert.same({ nil, 'invalid_options' }, { net.stats(options) })
             end
             assert.is_table(net.stats({ limit = 50, resource = 'vava_test', target = 1 }))
+            assert.is_table(net.stats({ limit = 50, players = false, target = 1 }))
         end)
     end)
 

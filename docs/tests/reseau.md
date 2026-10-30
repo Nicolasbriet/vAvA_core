@@ -36,12 +36,17 @@ de console correspondante (serveur, ou `F8` du joueur).
 
 ## 3. Ce que reçoit un joueur (2 joueurs)
 
+Depuis le core 0.12.0, chaque joueur connecté est suivi d'office, évènement par évènement (ses 12 évènements les plus
+lourds de la minute, le reste sous `* · <autres>`) : plus de suivi à lancer, plus de limite de 4 joueurs.
+
 | # | Faire | Attendu |
 |---|---|---|
-| 1 | A (Sénéchal) tape `/vava_reseau joueur <n° de B>`. | « Joueur <n°> (Prénom Nom) : … envois, … dans la dernière minute. », puis « Détail par évènement suivi pendant 5 min : relancez la commande dans une minute. », puis le pied. Registre du Conseil (`F10`) → Journal : « Réseau d'un joueur suivi », joueur = n° de B. |
-| 2 | B joue une minute (ouvre la besace, le Codex, marche). A relance `/vava_reseau joueur <n° de B>`. | Les évènements reçus par B depuis le début du suivi, les plus lourds d'abord : seulement les siens (aucun envoi fait à A). |
-| 3 | Un même membre suit cinq joueurs différents l'un après l'autre (ou quatre membres en suivent un chacun, puis un cinquième). | Le cinquième : « Déjà 4 joueurs suivis : détail indisponible pour celui-ci. » ; ses totaux s'affichent quand même. Cinq minutes après, un suivi se libère. |
-| 4 | B se déconnecte, A tape `/vava_reseau joueur <n° de B>`. | « Aucun joueur n° … en jeu. » ; aucune erreur dans la console. |
+| 1 | B joue une minute (ouvre la besace, le Codex, marche). A (Sénéchal) tape `/vava_reseau joueur <n° de B>`. | **Tout de suite** : « Joueur <n°> (Prénom Nom) : … envois, … dans la dernière minute. », puis les évènements reçus par B, les plus lourds d'abord (seulement les siens : aucun envoi fait à A), puis le pied. Jamais « relancez la commande dans une minute ». Registre du Conseil (`F10`) → Journal : « Réseau d'un joueur consulté », joueur = n° de B, compte = son numéro de compte de jeu. |
+| 2 | B vient de se connecter, encore en sélection de personnage. A tape `/vava_reseau joueur <n° de B>`. | « Joueur <n°> (sans personnage) : … », et les envois de la sélection (réponses `rpc` des personnages) ; ligne au journal. |
+| 3 | A tape `/vava_reseau joueur` pour cinq joueurs différents l'un après l'autre (un toutes les 2 s). | Chacun répond tout de suite avec son détail ; une ligne au journal par consultation. |
+| 4 | B se déconnecte, A tape `/vava_reseau joueur <n° de B>`. | « Aucun joueur n° … en jeu. » ; aucune erreur dans la console. Si un autre joueur reprend ce numéro, son détail repart de zéro (rien de B). |
+| 5 | B ouvre beaucoup d'interfaces différentes en une minute (besace, Codex, métiers, Registre…), puis A tape `/vava_reseau joueur <n° de B>`. | Au plus 12 évènements nommés, plus une ligne `* · <autres>` qui cumule les plus petits ; le total de l'en-tête est celui de tous les envois à B. |
+| 6 | `resmon` du serveur (ou `profiler record` de la console) avec plusieurs joueurs actifs, avant et après la mise à jour. | Pas de hausse visible de `vAvA_core` : mesuré hors jeu, environ 0,25 µs de plus par joueur servi à chaque envoi. |
 
 ## 4. Essai du réseau (console du serveur)
 
