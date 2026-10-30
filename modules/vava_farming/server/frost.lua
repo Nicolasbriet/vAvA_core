@@ -89,11 +89,13 @@ end
 local function strike()
     local struck = slots.frost()
     if #struck == 0 then return end
-    local total = 0
+    -- une seule ligne de journal pour la nuit : plantes perdues par parcelle
+    local total, byParcel = 0, {}
     for _, entry in ipairs(struck) do
         total = total + entry.count
-        journal.write('frost', { parcel = entry.parcel.id, details = { plants = entry.count } })
+        byParcel[entry.parcel.id] = entry.count
     end
+    journal.write('frost', { details = { parcelles = byParcel, plantes = total } })
     VavaFarming.log.info('le gel a pris %d plante(s) sur %d parcelle(s)', total, #struck)
     for _, target in ipairs(recipients(struck)) do
         bridge.Notify(target.source, format(messages.frostStruck, target.count, concat(target.labels, messages.parcelSeparator)), 'danger')

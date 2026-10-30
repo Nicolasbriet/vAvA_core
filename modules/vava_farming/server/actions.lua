@@ -345,7 +345,7 @@ function actions.begin(src, parcelId, index, action, cropId, tier)
             return false, 'covered'
         end
         if planted.frostHardy then
-            bridge.Notify(src, format(messages.frostHardy, planted.label), 'info')
+            bridge.Notify(src, messages.frostHardy, 'info')
             return false, 'frost_hardy'
         end
         if not growth.coverOption(frost.covers(), function(item) return bridge.Count(src, item) end) then
@@ -365,7 +365,7 @@ function actions.begin(src, parcelId, index, action, cropId, tier)
     lastToken = (lastToken % MAX_TOKEN) + 1
     local session = {
         token = lastToken, source = src, characterId = characterId, parcel = parcel, index = index, action = action,
-        crop = crop, tier = chosenTier, heldId = heldId, startedAt = GetGameTimer(), durationMs = durationMs,
+        crop = crop, tier = chosenTier, heldId = heldId, plantedAt = slot.plantedAt, startedAt = GetGameTimer(), durationMs = durationMs,
     }
     sessions[src] = session
     SetTimeout(interact.expireMs, function()
@@ -485,14 +485,34 @@ function actions.finish(src, token)
         bridge.Notify(src, waste > 0 and format(messages.clearedWaste, waste) or messages.cleared, 'info')
         return true, { action = action, slot = settle(src, parcel, index), item = waste > 0 and cfg.compost.waste.item or nil, quantity = waste > 0 and waste or nil }
     elseif action == ACTIONS.COVER then
-        -- l'état a pu changer pendant le geste (gel tombé, autre joueur, arrachage puis autre semis)
-        if not planted or planted.id ~= session.crop.id or slot.dead or slot.covered or planted.frostHardy then return false, 'not_found' end
         local cover = growth.coverOption(frost.covers(), function(item) return bridge.Count(src, item) end)
-        if not cover or not bridge.Exchange(src, { { item = cover.item, quantity = cover.quantity } }, {}) then
+        if not cover then
             bridge.Notify(src, format(messages.noCover, frost.coverLabels()), 'warning')
             return false, 'missing_items'
         end
+        -- l'état a pu changer pendant le geste (gel tombé, autre joueur, arrachage puis nouveau semis, même de la même
+        -- culture : la date de semis gardée en session le dit) ; vérification et couverture sans céder la main
+        local plantedAt = slot.plantedAt
+        if not planted or planted.id ~= session.crop.id or plantedAt ~= session.plantedAt or slot.dead or slot.covered
+            or planted.frostHardy then
+            return false, 'not_found'
+        end
+        -- couverte AVANT l'échange (qui peut céder la main) : un second cultivateur voit la plante couverte et ne paie
+        -- pas pour elle ; l'échange refusé retire la couverture
         slots.cover(slot)
+        if not bridge.Exchange(src, { { item = cover.item, quantity = cover.quantity } }, {}) then
+            if slot.plantedAt == plantedAt and slot.crop == planted.id then slot.covered = false end
+            bridge.Notify(src, format(messages.noCover, frost.coverLabels()), 'warning')
+            return false, 'missing_items'
+        end
+        if slot.plantedAt ~= plantedAt or slot.crop ~= planted.id then
+            -- la plante a été récoltée ou arrachée pendant l'échange : l'objet est rendu
+            if not bridge.Add(src, cover.item, cover.quantity) then
+                VavaFarming.log.warn('couverture de %s n° %d : %d × %s non rendu(s) au personnage %d (besace pleine ?)',
+                    parcel.id, index, cover.quantity, cover.item, session.characterId)
+            end
+            return false, 'not_found'
+        end
         slots.writeNow(parcel, index)
         journal.write('covered', { parcel = parcel.id, slot = index, characterId = session.characterId, item = cover.item, details = { crop = planted.id, quantity = cover.quantity } })
         bridge.Notify(src, messages.covered, 'info')

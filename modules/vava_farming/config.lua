@@ -192,11 +192,11 @@ VavaFarming.config = {
         noAccess = 'Cette parcelle ne vous appartient pas.',
         noSpace = 'Vous ne pouvez rien porter de plus.',
         granaryOpened = 'Grenier commun ouvert.',
-        -- gel (vava_time) : couvrir une plante, avertissement du soir, plantes perdues ; %s : culture, objets qui
+        -- gel (vava_time) : couvrir une plante, avertissement du soir, plantes perdues ; %s : objets qui
         -- couvrent (joints par `coverOr`), parcelle(s) (jointes par `parcelSeparator`)
         covered = 'Plante couverte : elle passera les nuits de gel.',
         alreadyCovered = 'Cette plante est déjà couverte.',
-        frostHardy = '%s ne craint pas le gel.',
+        frostHardy = 'Cette culture ne craint pas le gel : inutile de la couvrir.',
         noCover = 'Il vous faut de quoi couvrir la plante (%s).',
         coverOr = ' ou ',
         parcelSeparator = ', ',
