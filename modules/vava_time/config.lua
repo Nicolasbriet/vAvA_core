@@ -104,7 +104,9 @@ VavaTime.config = {
     -- premier passage de la boucle). Au soir (`warnHour`, heure du royaume), les modules sont prévenus (hook
     -- vava_time:frostWarning : l'agriculture avertit les cultivateurs concernés) ; à la tombée de la nuit (`hour`), le gel
     -- frappe (hook vava_time:frost : l'agriculture perd les cultures ni couvertes ni résistantes). Une heure déjà passée
-    -- au démarrage du module ne déclenche rien.
+    -- au démarrage du module ne déclenche rien. Du tirage jusqu'au gel, la nuit est annoncée à tous par le monde : une
+    -- ligne de /date (`messages.frostTonight`) et la fiche des plantes de l'agriculture.
+    -- Réglages décidés par le porteur du projet (30 octobre 2026) : hiver seulement, 0,4, soir à 17 h, gel à 21 h.
     frost = { seasons = { hiver = 0.4 }, warnHour = 17, hour = 21 },
 
     -- Conseil : droit vava_admin de l'outil, de /ciel et des décisions prises depuis la Chancellerie (la lecture y
@@ -154,6 +156,8 @@ VavaTime.config = {
         date = 'Il est %s, le %s. C\'est %s : %s.',
         hour = '%d h %02d',
         frozen = 'Les astres restent immobiles dans le ciel.',
+        -- /date, les jours où une nuit de gel est annoncée (du tirage, au premier passage du jour, jusqu'au gel)
+        frostTonight = 'La nuit sera froide.',
         notReady = 'Le ciel du royaume n\'est pas encore connu : réessayez dans un instant.',
         -- au changement de saison, chez chaque joueur en jeu (lu sur l'état partagé, aucun envoi de plus)
         seasonStart = {

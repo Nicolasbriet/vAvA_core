@@ -4,7 +4,9 @@
  * Rôle : données simulées quand la page est ouverte dans un navigateur (hors FiveM), pour travailler le rendu sans
  *        lancer le jeu. Inactif en jeu. Paramètres d'URL : ?view=prompt (invites qui se succèdent), ?view=menu&state=…
  *        (empty, growing, ripe, wilted, dead : menu d'emplacement dans cet état ; wilted : culture qui ne craint pas le
- *        gel), &covered=1 (plante couverte contre le gel).
+ *        gel), &covered=1 (plante couverte contre le gel), &frost=1 (nuit de gel annoncée), &season=ete (printemps ou
+ *        été : « Couvrir » n'est pas proposé), &besace=compost (pas assez de déchets végétaux : compost en secours) ou
+ *        &besace=vide (rien pour couvrir).
  */
 
 const DevMock = (() => {
@@ -20,10 +22,25 @@ const DevMock = (() => {
     dead: { index: 9, crop: 'lin', cropLabel: 'Lin', state: 'dead', stage: 2, stages: 3, progress: 0.6, moisture: 0, fertility: 55, waterings: 1, dryHours: 20.1, plantedAt: now - 90000 },
   };
 
-  function menuFor(state, covered) {
+  // besace simulée : objets qui couvrent, dans l'ordre de config.frost.cover
+  const besaces = {
+    dechets: { dechets_vegetaux: 5, compost: 2 },
+    compost: { dechets_vegetaux: 1, compost: 2 },
+    vide: { dechets_vegetaux: 1, compost: 0 },
+  };
+  const coverRules = [
+    { item: 'dechets_vegetaux', label: 'Déchets végétaux', quantity: 2 },
+    { item: 'compost', label: 'Compost', quantity: 1 },
+  ];
+
+  function menuFor(state, covered, options = {}) {
     const slot = { ...(slots[state] || slots.growing), covered };
     const planted = Boolean(slot.crop);
-    const canCover = planted && slot.state !== 'dead' && !slot.covered && !slot.frostHardy;
+    const season = options.season !== 'printemps' && options.season !== 'ete';
+    const besace = besaces[options.besace] || besaces.dechets;
+    const coverOptions = season ? coverRules.map((rule) => ({ ...rule, count: besace[rule.item] || 0 })) : [];
+    const use = coverOptions.find((option) => option.count >= option.quantity) || null;
+    const canCover = season && use !== null && planted && slot.state !== 'dead' && !slot.covered && !slot.frostHardy;
     return {
       parcel: { id: 'champ_communal', label: 'Champ communal', communal: true },
       slot,
@@ -33,11 +50,12 @@ const DevMock = (() => {
         { crop: 'lin', label: 'Lin', item: 'graine_lin', available: [] },
       ],
       bucket: { held: true, charges: 3 },
-      compost: 2,
-      cover: { options: [{ item: 'compost', label: 'Compost', quantity: 1, count: 2 }], use: 'compost' },
+      compost: besace.compost,
+      cover: { season, options: coverOptions, use: use ? use.item : null },
+      frost: { tonight: planted && options.frost === true },
       sickle: false,
-      actions: { plant: !planted, water: planted && slot.state !== 'dead', fertilize: true, harvest: slot.state === 'ripe', clear: planted, cover: canCover },
-      rules: { moistureThreshold: 20, tierLabels: ['Grossier', 'Commun', 'Soigné', 'Excellent', 'Chef-d\'œuvre'] },
+      actions: { plant: !planted, water: planted && slot.state !== 'dead', fertilize: besace.compost > 0, harvest: slot.state === 'ripe', clear: planted, cover: canCover },
+      rules: { moistureThreshold: 20, tierLabels: ['Grossier', 'Commun', 'Soigné', 'Excellent', 'Chef-d\'œuvre'], frostTonight: 'gel annoncé cette nuit' },
       now,
       key: 'E',
     };
@@ -45,6 +63,7 @@ const DevMock = (() => {
 
   let current = 'growing';
   let covered = false;
+  let mockOptions = {};
 
   async function handle(name, data) {
     await new Promise((resolve) => setTimeout(resolve, 60));
@@ -60,7 +79,7 @@ const DevMock = (() => {
       }, 900);
       return { ok: true };
     }
-    if (name === 'refresh') return { ok: true, menu: menuFor(current, covered) };
+    if (name === 'refresh') return { ok: true, menu: menuFor(current, covered, mockOptions) };
     if (name === 'close') {
       post('menuClose', {});
       return { ok: true };
@@ -82,7 +101,8 @@ const DevMock = (() => {
       } else {
         current = params.get('state') || 'growing';
         covered = params.get('covered') === '1';
-        post('menu', menuFor(current, covered));
+        mockOptions = { frost: params.get('frost') === '1', season: params.get('season') || 'hiver', besace: params.get('besace') || 'dechets' };
+        post('menu', menuFor(current, covered, mockOptions));
       }
     });
   }

@@ -1,7 +1,7 @@
 # Ciel et heure du royaume — procédure de test en jeu
 
-Procédure pour vérifier en jeu `vava_time` 1.1.0 (heure de Paris, saisons de quatorze jours, ciel, nuits de gel,
-décisions du Conseil), ses effets sur `vava_farming` 1.4.1 et `vava_gathering` 1.3.2, et la page Ciel et heure de la
+Procédure pour vérifier en jeu `vava_time` 1.2.0 (heure de Paris, saisons de quatorze jours, ciel, nuits de gel et
+leur annonce, décisions du Conseil), ses effets sur `vava_farming` 1.5.0 et `vava_gathering` 1.3.2, et la page Ciel et heure de la
 Chancellerie 1.5.1 (pont `vava_chancellerie` 1.4.0). Comptez deux heures ; les tests à deux joueurs sont marqués
 **(2 joueurs)**. Chaque test dit quoi faire et ce qui doit se passer ; si ce n'est pas le cas, notez le test
 (« temps 3-4 »), ce que vous avez vu, et les lignes des consoles serveur et client.
@@ -10,7 +10,7 @@ Chancellerie 1.5.1 (pont `vava_chancellerie` 1.4.0). Comptez deux heures ; les t
 
 1. **Ordre de démarrage** (`server.cfg`, ou la Chancellerie qui le fait seule) : `vava_time` juste après `vava_world`,
    avant `vava_appearance` (voir `docs/tests/LISEZMOI.md`).
-2. **Démarrage** : la console affiche `module 'vava_time' v1.1.0 prêt` ; la migration `0001_time` passe seule (table
+2. **Démarrage** : la console affiche `module 'vava_time' v1.2.0 prêt` ; la migration `0001_time` passe seule (table
    `vava_time_state`), et `vava_farming` passe sa migration `0003_slot_cover` (colonne `covered`). Aucun avertissement
    attendu.
 3. **Comptes** : vous en Sénéchal ou Souverain (droit `tools`) ; un second compte en Gardien pour les refus
@@ -115,6 +115,10 @@ Avec les saisons rapides (§ 0) pour passer d'une saison à l'autre, ou en atten
 | 4 | Vider un nœud de sauge en automne, attendre la moitié de son délai, laisser passer l'hiver (saisons rapides). | La charge suivante arrive comme si l'avance prise en automne avait été gardée et recomptée au rythme de l'hiver : ni rendue d'un coup, ni perdue. |
 | 5 | À l'automne, une piste de lièvre. | Charges qui reviennent plus vite, un peu plus de viande. |
 | 6 | Nuits de gel en hiver : `docs/tests/metiers.md`, § 5.1 (Couvrir et gel). | Avertissement au soir aux seuls cultivateurs concernés, plantes ni couvertes ni résistantes perdues à 21 h. |
+| 6b | Nuit de gel à coup sûr (§ 0), en hiver avant 17 h : `/date`. | La réponse se termine par « La nuit sera froide. » (avant « Les astres restent immobiles dans le ciel. » si l'heure est figée). |
+| 6c | **(2 joueurs)** Même nuit : `/ciel heure 18 00` (l'avertissement de 17 h part) ; B se connecte **ensuite**, tape `/date`, puis ouvre une plante de blé nue au champ. | B n'a pas reçu l'avertissement, mais `/date` dit « La nuit sera froide. » et la fiche de la plante « gel annoncé cette nuit » : l'annonce est lue sur la date du royaume déjà partagée (F8 : aucun évènement de plus). |
+| 6d | Même nuit, `/ciel heure 21 01` (le gel tombe), puis `/date`. | Plus de « La nuit sera froide. » ; la fiche d'une plante ne parle plus du gel. |
+| 6e | Hiver avec `frost.seasons = { hiver = 0 }` (aucune nuit ne gèle), `restart vava_time`, `/date` ; puis au printemps. | Jamais « La nuit sera froide. ». |
 | 7 | `stop vava_time`, puis récolter et cultiver. | Tout revient aux valeurs sans saison ; aucun gel ; aucune erreur dans la console. |
 
 ## 8. Redémarrages et arrêt
@@ -126,6 +130,7 @@ Avec les saisons rapides (§ 0) pour passer d'une saison à l'autre, ou en atten
 | 3 | Réglages rapides, ciel non figé : noter « prochain changement » ; `restart vava_time`. | Le ciel et sa fin prévue sont repris tels quels, y compris quand le même ciel vient d'être prolongé (la fin prolongée est écrite en base). |
 | 3b | En hiver (saisons rapides), une carotte et un nœud de sauge vidé : noter leur avancement (`/agriculture parcelle <id>`, invite du nœud), `restart vava_time`, attendre une minute, relever de nouveau ; puis redémarrer tout le serveur (dans la même saison) et relever. | L'avancement suit le rythme de l'hiver : rien ne bondit pendant que `vava_time` relit son état, ni après le redémarrage du serveur (pas de pousse ni de repousse quatre fois plus rapide d'un coup). |
 | 4 | En hiver, nuit de gel, après 21 h : `restart vava_time`. | Le gel ne retombe pas une seconde fois ; avant 17 h, le soir et le gel se jouent normalement. |
+| 4b | En hiver, `frost.seasons = { hiver = 1 }`, entre 17 h et 21 h : `restart vava_time`, puis `/date`. | La nuit est tirée de nouveau : l'avertissement de 17 h ne se rejoue pas, mais `/date` dit aussitôt « La nuit sera froide. » et le gel tombe à 21 h. |
 | 5 | `stop vava_time`. | Chez chaque joueur, l'horloge rend la main au jeu (elle file à nouveau à la vitesse de GTA) et le ciel aussi ; plus de traces dans la neige ; aucune erreur. |
 | 6 | `start vava_time`. | Heure et ciel du royaume reviennent dans les secondes qui suivent, sans reconnexion. |
 | 7 | `restart vava_admin` pendant que l'outil est fermé, puis `F10` → Outils. | Le bouton « Ciel et heure » est de nouveau là. |

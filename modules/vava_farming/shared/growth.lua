@@ -4,8 +4,8 @@
            emplacement d'après le temps écoulé (humidité qui baisse, croissance tant que la terre est humide, pause,
            flétrissement puis mort quand elle est sèche, jachère qui rend de la fertilité ; saison de vava_time qui
            accélère ou ralentit la pousse et le dessèchement), stade et état, régularité d'arrosage, qualité d'une
-           récolte ; gel d'une nuit d'hiver (plante qu'il tue, objet qui couvre). Aucun état : les fonctions reçoivent
-           et rendent des tables.
+           récolte ; gel d'une nuit d'hiver (plante qu'il tue, saison où l'on couvre, objet qui couvre). Aucun état :
+           les fonctions reçoivent et rendent des tables.
     Dépendances : shared/constants.lua, config.lua
 ]]
 
@@ -113,8 +113,22 @@ function growth.frostKills(slot, crop)
     return slot.crop ~= nil and crop ~= nil and not slot.dead and slot.covered ~= true and crop.frostHardy ~= true
 end
 
+--- Peut-on couvrir une plante en cette saison ? Oui seulement dans une saison de `allowed` (config.frost.coverSeasons :
+--- l'automne pour se préparer, l'hiver). Saison inconnue (vava_time absent : aucun gel) ou en attente (false) : non.
+---@param season string|false|nil
+---@param allowed string[]
+---@return boolean
+function growth.coverSeason(season, allowed)
+    if type(season) ~= 'string' or type(allowed) ~= 'table' then return false end
+    for _, id in ipairs(allowed) do
+        if id == season then return true end
+    end
+    return false
+end
+
 --- Objet qui couvrira une plante : la première entrée de `options` (`{ item, quantity }`, ordre de config.frost.cover)
---- que le cultivateur a en quantité suffisante, ou nil.
+--- que le cultivateur a en quantité suffisante, ou nil. La config met les déchets végétaux en premier (un paillis, deux
+--- par plante) et le compost en secours.
 ---@param options { item: string, quantity: integer }[]
 ---@param countOf fun(item: string): integer  nombre de cet objet dans la besace
 ---@return { item: string, quantity: integer }|nil

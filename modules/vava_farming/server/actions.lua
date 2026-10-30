@@ -4,8 +4,9 @@
            emplacement à portée, accès, geste possible dans l'état présent, graines au palier choisi, seau en main avec
            des charges, compost, plante mûre, place ; hook annulable ; jeton, durée) ; fin du geste (durée revérifiée,
            distance — trop loin, le geste est abandonné —, puis application : semis, arrosage, compost, récolte avec
-           qualité, provenance, graines récupérées et XP, arrachage avec déchets, couverture contre le gel (un objet de
-           config.frost.cover consommé, revérifié à la fin) ; l'emplacement d'un geste qui donne ou consomme des objets
+           qualité, provenance, graines récupérées et XP, arrachage avec déchets, couverture contre le gel (en automne
+           et en hiver seulement, config.frost.coverSeasons ; un objet de config.frost.cover consommé, déchets
+           végétaux d'abord, compost en secours ; saison et objet revérifiés à la fin) ; l'emplacement d'un geste qui donne ou consomme des objets
            est écrit aussitôt) ; remplissage du seau au puits. Une seule action à la fois par joueur ; aucune à terre
            (vava_health) : ni menu, ni début, ni fin, ni puits.
     Dépendances : shared/, config.lua, server/core.lua, bridge/server.lua, server/journal.lua, server/catalog.lua,
@@ -182,10 +183,14 @@ function actions.menu(src, parcelId, index)
         if counts[item] == nil then counts[item] = bridge.Count(src, item) end
         return counts[item]
     end
-    local coverWith = growth.coverOption(frost.covers(), countOf)
+    -- hors des saisons où l'on couvre, le geste n'est pas proposé (et rien n'est compté pour lui)
+    local coverSeason = frost.coverSeason()
+    local coverWith = coverSeason and growth.coverOption(frost.covers(), countOf) or nil
     local coverOptions = {}
-    for i, option in ipairs(frost.covers()) do
-        coverOptions[i] = { item = option.item, label = catalog.itemLabel(option.item), quantity = option.quantity, count = countOf(option.item) }
+    if coverSeason then
+        for i, option in ipairs(frost.covers()) do
+            coverOptions[i] = { item = option.item, label = catalog.itemLabel(option.item), quantity = option.quantity, count = countOf(option.item) }
+        end
     end
     return true, {
         parcel = { id = parcel.id, label = parcel.label, communal = parcel.owner == nil },
@@ -193,7 +198,9 @@ function actions.menu(src, parcelId, index)
         seeds = seeds,
         bucket = { held = bucket ~= nil, charges = charges },
         compost = compost,
-        cover = { options = coverOptions, use = coverWith and coverWith.item or nil },
+        cover = { season = coverSeason, options = coverOptions, use = coverWith and coverWith.item or nil },
+        -- nuit de gel annoncée par vava_time (tirée, pas encore tombée) : mentionnée sur la fiche de la plante
+        frost = { tonight = crop ~= nil and bridge.FrostTonight() },
         sickle = hasSickle(src),
         actions = {
             plant = crop == nil and #seeds > 0,
@@ -201,9 +208,9 @@ function actions.menu(src, parcelId, index)
             fertilize = compost > 0,
             harvest = state == STATES.RIPE,
             clear = crop ~= nil,
-            cover = crop ~= nil and state ~= STATES.DEAD and not slot.covered and not crop.frostHardy and coverWith ~= nil,
+            cover = coverSeason and crop ~= nil and state ~= STATES.DEAD and not slot.covered and not crop.frostHardy and coverWith ~= nil,
         },
-        rules = { moistureThreshold = cfg.growth.moistureThreshold, tierLabels = cfg.quality.tierLabels },
+        rules = { moistureThreshold = cfg.growth.moistureThreshold, tierLabels = cfg.quality.tierLabels, frostTonight = messages.frostTonight },
         now = time(),
     }
 end
@@ -332,6 +339,10 @@ function actions.begin(src, parcelId, index, action, cropId, tier)
         end
         crop = planted
     elseif action == ACTIONS.COVER then
+        if not frost.coverSeason() then
+            bridge.Notify(src, messages.offSeason, 'info')
+            return false, 'off_season'
+        end
         if not planted then
             bridge.Notify(src, messages.empty, 'info')
             return false, 'empty'
@@ -485,6 +496,11 @@ function actions.finish(src, token)
         bridge.Notify(src, waste > 0 and format(messages.clearedWaste, waste) or messages.cleared, 'info')
         return true, { action = action, slot = settle(src, parcel, index), item = waste > 0 and cfg.compost.waste.item or nil, quantity = waste > 0 and waste or nil }
     elseif action == ACTIONS.COVER then
+        -- la saison a pu tourner pendant le geste
+        if not frost.coverSeason() then
+            bridge.Notify(src, messages.offSeason, 'info')
+            return false, 'off_season'
+        end
         local cover = growth.coverOption(frost.covers(), function(item) return bridge.Count(src, item) end)
         if not cover then
             bridge.Notify(src, format(messages.noCover, frost.coverLabels()), 'warning')

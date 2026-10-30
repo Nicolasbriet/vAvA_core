@@ -36,6 +36,8 @@ const STRINGS = Object.freeze({
       planted: (text) => `semé ${text}`,
       covered: 'couverte contre le gel',
       frostHardy: 'ne craint pas le gel',
+      // repli : le texte vient de la config du serveur (messages.frostTonight, envoyé dans rules.frostTonight)
+      frostTonight: 'gel annoncé cette nuit',
     },
     since: (seconds) => {
       if (seconds < 60) return 'à l\'instant';
@@ -75,6 +77,7 @@ const STRINGS = Object.freeze({
         covered: 'Déjà couverte.',
         frostHardy: 'Cette culture ne craint pas le gel.',
         noCover: (labels) => `Il vous faut de quoi la couvrir (${labels}).`,
+        coverItem: (quantity, label) => `${quantity} × ${label}`,
         coverOr: ' ou ',
         refused: 'Impossible pour le moment.',
       },
@@ -105,6 +108,7 @@ const STRINGS = Object.freeze({
     covered: 'Cette plante est déjà couverte.',
     frost_hardy: 'Cette culture ne craint pas le gel.',
     no_cover: 'Il vous faut de quoi couvrir la plante.',
+    off_season: 'Aucun gel à craindre en cette saison.',
     full: 'Le seau est déjà plein.',
     busy: 'Un geste est déjà en cours.',
     downed: 'Vous êtes à terre.',

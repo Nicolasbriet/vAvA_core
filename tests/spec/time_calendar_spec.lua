@@ -256,6 +256,25 @@ describe('vava_time calendrier', function()
                 .. cfg.messages.frozen, text)
         end)
 
+        it('annonce une nuit de gel les jours où le serveur l\'a tirée, avant une heure figée', function()
+            local date = { season = 'hiver', day = 4, year = 1, frost = true }
+            local text = calendar.describe(18 * HOUR, false, date, 'il neige')
+            assert.equal('Il est 18 h 00, le 4e jour de la saison des frimas (hiver), an 1 du royaume. C\'est le soir : il neige. '
+                .. 'La nuit sera froide.', text)
+            assert.equal('La nuit sera froide.', cfg.messages.frostTonight)
+            local frozen = calendar.describe(18 * HOUR, true, date, 'il neige')
+            assert.equal(text .. ' ' .. cfg.messages.frozen, frozen)
+        end)
+
+        it('ne dit rien du gel sans nuit de gel annoncée', function()
+            for _, flag in ipairs({ false, 'oui', 1 }) do
+                local text = calendar.describe(18 * HOUR, false, { season = 'hiver', day = 4, year = 1, frost = flag }, 'il neige')
+                assert.is_nil(text:find(cfg.messages.frostTonight, 1, true))
+            end
+            local text = calendar.describe(18 * HOUR, false, { season = 'hiver', day = 4, year = 1 }, 'il neige')
+            assert.is_nil(text:find(cfg.messages.frostTonight, 1, true))
+        end)
+
         it('donne la date seule pour les interfaces', function()
             assert.equal('38e jour de la saison des brumes (automne), an 1 du royaume', calendar.dateText({ season = 'automne', day = 38, year = 1 }))
             assert.equal('an 3 du royaume', calendar.yearText(3))

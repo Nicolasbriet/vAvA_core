@@ -1006,10 +1006,12 @@ commandes) ; facultatifs : `vava_admin` (droit `tools`, outil du Registre, journ
 - **Ciel** : cours pondéré par saison (successeurs plausibles, durées de 25 à 50 min, transition de 90 s) ; aucune neige
   hors de l'hiver ; « neige au sol » jamais tirée. Le Conseil impose un ciel (transition de 20 s ; il tient le temps d'un
   ciel puis reprend son cours, même hors saison), le fige, ou le rend à son cours.
-- **Nuits de gel** (1.1.0, décision à confirmer) : l'hiver, chaque nuit gèle avec la probabilité de `frost.seasons`
-  (0,4), tirée une fois par jour. Au soir (`frost.warnHour`, 17 h du royaume) le hook `vava_time:frostWarning`, à la
-  tombée de la nuit (`frost.hour`, 21 h) le hook `vava_time:frost` ; rien n'est envoyé aux joueurs par `vava_time`
-  (l'agriculture prévient elle-même ses cultivateurs). Ce qui est déjà passé au démarrage du module ne se rejoue pas.
+- **Nuits de gel** (1.1.0 ; réglages décidés le 30 octobre 2026) : l'hiver, chaque nuit gèle avec la probabilité de
+  `frost.seasons` (0,4), tirée une fois par jour. Au soir (`frost.warnHour`, 17 h du royaume) le hook
+  `vava_time:frostWarning`, à la tombée de la nuit (`frost.hour`, 21 h) le hook `vava_time:frost` ; aucun évènement
+  envoyé aux joueurs par `vava_time` (l'agriculture prévient elle-même ses cultivateurs). Ce qui est déjà passé au
+  démarrage du module ne se rejoue pas. **Annonce** (1.2.0) : du tirage jusqu'au gel, `vava_time:calendar` porte
+  `frost = true` ; `/date` ajoute alors `messages.frostTonight` (« La nuit sera froide. »).
 - **Conseil** : outil « Ciel et heure » (registre `vava_admin:tools`, clé `vava_time:ciel`, droit `tools`) et `/ciel`
   (sous-commandes nommées dans `commands.actions` : `heure`, `decaler`, `figer`, `reprendre`, `reelle`, `imposer`,
   `garder`, `rendre`). Chaque décision est revérifiée, soumise au **débit commun** (`council.rate` : 6 coup sur coup,
@@ -1022,7 +1024,7 @@ commandes) ; facultatifs : `vava_admin` (droit `tools`, outil du Registre, journ
 |---|---|---|
 | `vava_time:clock` | `{ shift, frozen }` — décalage (s) sur l'heure de Paris ; seconde du jour figée, ou `false` | démarrage, décision sur l'heure |
 | `vava_time:weather` | `{ id, from, at, fade, forced, frozen }` — ciel visé, ciel d'avant, début de la transition (secondes UTC du serveur), durée (s), imposé, figé | démarrage, chaque ciel (25 à 50 min), décision |
-| `vava_time:calendar` | `{ season, day, year }` | démarrage, changement de jour |
+| `vava_time:calendar` | `{ season, day, year, frost? }` — `frost = true` (1.2.0) quand une nuit de gel est annoncée (tirée, pas encore tombée), absent sinon | démarrage, changement de jour (une écriture avec la nuit tirée au même passage), gel tombé (nuits de gel seulement) |
 
 **RPC** : `vava_time:sync` (`{}` → secondes UTC du serveur ; à l'arrivée puis toutes les 30 min ; 6, 0,1/s),
 `vava_time:open` (`{}` → vue de l'outil ; droit `tools` ; 5, 1/s), `vava_time:clock` (`action` ∈ `set`, `shift`,
@@ -1420,16 +1422,21 @@ absent, arrêté ou en échec : aucun effet, croissance identique à la 1.2.2. *
 calcul) : le temps est compté ensuite, à la bonne saison. Quand les effets de saison changent, chaque emplacement planté
 est marqué à écrire, pour qu'un redémarrage ne recompte pas d'un bloc tout le temps passé depuis son dernier geste.
 
-**Gel** (1.4.0, décision à confirmer) : branchée par le bridge sur les hooks `vava_time:frostWarning` et
+**Gel** (1.4.0 ; règles décidées le 30 octobre 2026, 1.5.0) : branchée par le bridge sur les hooks `vava_time:frostWarning` et
 `vava_time:frost`, l'agriculture avertit au soir d'une nuit de gel les seuls cultivateurs concernés (propriétaire en jeu
 d'une parcelle privée où une plante est exposée, joueurs à `frost.warnRadius` m d'une parcelle commune exposée,
 positions lues côté serveur) puis, quand le gel tombe, fait mourir toute plante vivante ni couverte ni d'une culture
 `frostHardy` (état « morte » existant), journalise (une ligne `frost` par nuit : plantes perdues par parcelle, 1.4.1)
 et prévient les mêmes. Geste **Couvrir**
-(action `cover` de `vava_farming:begin`, codes `covered`, `frost_hardy`, `no_cover`) : plante vivante, non couverte,
-d'une culture qui craint le froid ; consomme le premier objet de `frost.cover` que le cultivateur possède en quantité
-(revérifié et retiré par `exchange` à la fin du geste) ; l'emplacement reste couvert jusqu'à la récolte ou
-l'arrachage (colonne `covered`, migration 0003, écrite aussitôt ; journal `covered`). Sans `vava_time`, rien ne gèle.
+(action `cover` de `vava_farming:begin`, codes `off_season` (1.5.0), `covered`, `frost_hardy`, `no_cover`) : en
+saison de `frost.coverSeasons` seulement (automne et hiver ; saison revérifiée au début et à la fin du geste ; sans
+`vava_time`, jamais), plante vivante, non couverte, d'une culture qui craint le froid ; consomme le premier objet de
+`frost.cover` que le cultivateur possède en quantité — 2 déchets végétaux, sinon 1 compost (1.5.0) — (revérifié et
+retiré par `exchange` à la fin du geste) ; l'emplacement reste couvert jusqu'à la récolte ou l'arrachage (colonne
+`covered`, migration 0003, écrite aussitôt ; journal `covered`). Sans `vava_time`, rien ne gèle. Réponse du menu d'un
+emplacement (RPC `vava_farming:open`) : `cover = { season, options, use }` (`season` faux : « Couvrir » n'est pas
+proposé, `options` vide) et `frost = { tonight }` (1.5.0 : nuit de gel annoncée par `getFrost` de `vava_time`, lue pour
+un emplacement planté), `rules.frostTonight` (texte de la fiche, `messages.frostTonight`).
 
 **Registre** `vava_farming:crops` (`{ label, family, seed, product, growMinutes, waterPerHour, fertilityCost, yield,
 xp, difficulty, stages, wilted, dead, frostHardy? }` ; `stages` : modèles par stade, le dernier réservé à la plante
@@ -1452,7 +1459,7 @@ withdraw, source, characterId, item, quantity }`).
 **Commande** `/agriculture parcelles | parcelle <id> | fertilite <id> <n> <0-100> | pousser <id> <n> | arroser <id>`
 (droit `metiers`). Touche `E` près d'un emplacement, d'un puits ou d'un grenier. Rendu hors jeu :
 `web/index.html?view=menu&state=growing` (ou `empty`, `ripe`, `wilted`, `dead`, `view=prompt` ; `&covered=1` : plante
-couverte).
+couverte ; `&frost=1` : gel annoncé ; `&season=ete` : « Couvrir » non proposé ; `&besace=compost` ou `vide`).
 
 ### `vava_codex`
 

@@ -2,7 +2,7 @@
     vava_time/fxmanifest.lua
     Rôle : le temps du royaume, le même pour tous les joueurs : heure de Paris (heure d'été comprise) au rythme réel,
            saisons de quatorze jours (ou vrai calendrier), ciel pondéré par saison avec transitions douces, aucune neige
-           hors de l'hiver, nuits de gel en hiver. Le Conseil décale ou fige l'heure et impose ou fige un ciel, depuis
+           hors de l'hiver, nuits de gel en hiver (annoncées dès leur tirage : une ligne de /date). Le Conseil décale ou fige l'heure et impose ou fige un ciel, depuis
            l'outil « Ciel et heure » du Registre, /ciel ou la Chancellerie, avec un débit commun ; état gardé en base.
            Les saisons et le gel sont lus par l'agriculture et la récolte (export, hooks). Le serveur décide de tout et
            publie trois petites valeurs par GlobalState ; le client fait avancer l'horloge du jeu seul et suit les
@@ -18,7 +18,7 @@ use_experimental_fxv2_oal 'yes'
 
 name 'vava_time'
 description 'Temps du royaume vAvA : heure de Paris, saisons, météo, ciel et heure du Conseil'
-version '1.1.0'
+version '1.2.0'
 
 dependency 'vAvA_core'
 

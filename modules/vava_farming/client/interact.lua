@@ -159,6 +159,7 @@ end
 local SERVER_NOTIFIED = {
     occupied = true, empty = true, no_seed = true, no_bucket = true, bucket_empty = true, no_compost = true,
     not_ripe = true, dead = true, no_space = true, no_access = true, covered = true, frost_hardy = true, no_cover = true,
+    off_season = true,
 }
 
 --- Refus ou erreur de transport : code traduit et affiché par l'interface (textes dans web/js/strings.js).

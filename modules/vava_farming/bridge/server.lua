@@ -364,6 +364,14 @@ function Bridge.SeasonEffects()
     return effects
 end
 
+--- Une nuit de gel est-elle annoncée (tirée par vava_time et pas encore tombée) ? Lu à l'ouverture du menu d'un
+--- emplacement (débit borné par son RPC) ; vava_time absent, arrêté ou en démarrage : non.
+---@return boolean
+function Bridge.FrostTonight()
+    local called, night = call(TIME, 'getFrost')
+    return called and type(night) == 'table' and night.tonight == true and night.struck ~= true
+end
+
 local FROST_WARNING_HOOK, FROST_HOOK = 'vava_time:frostWarning', 'vava_time:frost'
 
 --- Branche l'agriculture sur les nuits de gel de vava_time (hooks after ; sans vava_time, ils ne sont jamais émis).

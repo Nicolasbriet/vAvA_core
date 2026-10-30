@@ -27,17 +27,22 @@ VavaFarming.config = {
         hiver = { growth = 0.25, drying = 0.25 },
     },
 
-    -- Gel (vava_time, facultatif ; décision à confirmer par le porteur du projet). L'hiver, certaines nuits gèlent (la
-    -- probabilité est réglée dans vava_time). Au soir d'une nuit de gel, les cultivateurs concernés sont avertis : le
-    -- propriétaire en jeu d'une parcelle privée, les joueurs à moins de `warnRadius` mètres d'une parcelle commune (rien
-    -- n'est envoyé aux autres) ; à la tombée de la nuit, toute plante vivante ni couverte ni d'une culture `frostHardy`
-    -- meurt. Couvrir un emplacement (geste « Couvrir ») consomme UN des objets de `cover` (le premier que le cultivateur
-    -- a en quantité suffisante) et protège la plante jusqu'à sa récolte ou son arrachage. Aucun objet « paille »
-    -- n'existe encore dans le royaume : le compost en tient lieu (à remplacer ou compléter ici le jour où elle existe).
+    -- Gel (vava_time, facultatif ; règles décidées par le porteur du projet le 30 octobre 2026). L'hiver, certaines
+    -- nuits gèlent (la probabilité est réglée dans vava_time). Dès que la nuit est tirée, le monde l'annonce : une ligne
+    -- de /date (vava_time) et `messages.frostTonight` sur la fiche des plantes. Au soir d'une nuit de gel, les
+    -- cultivateurs concernés sont avertis : le propriétaire en jeu d'une parcelle privée, les joueurs à moins de
+    -- `warnRadius` mètres d'une parcelle commune (rien n'est envoyé aux autres) ; à la tombée de la nuit, toute plante
+    -- vivante ni couverte ni d'une culture `frostHardy` meurt (le chou seul y résiste).
+    -- Couvrir un emplacement (geste « Couvrir ») consomme UN des objets de `cover`, le premier dans l'ordre de la liste
+    -- que le cultivateur a en quantité suffisante, et protège la plante jusqu'à sa récolte ou son arrachage : d'abord un
+    -- paillis de déchets végétaux (deux par plante), le compost (un) en secours. On ne couvre qu'en `coverSeasons`
+    -- (l'automne pour se préparer, l'hiver) : hors de ces saisons, ou sans vava_time, aucun gel n'est à craindre.
     frost = {
         cover = {
+            { item = 'dechets_vegetaux', quantity = 2 },
             { item = 'compost', quantity = 1 },
         },
+        coverSeasons = { 'automne', 'hiver' },
         warnRadius = 60.0,
     },
 
@@ -192,15 +197,19 @@ VavaFarming.config = {
         noAccess = 'Cette parcelle ne vous appartient pas.',
         noSpace = 'Vous ne pouvez rien porter de plus.',
         granaryOpened = 'Grenier commun ouvert.',
-        -- gel (vava_time) : couvrir une plante, avertissement du soir, plantes perdues ; %s : objets qui
-        -- couvrent (joints par `coverOr`), parcelle(s) (jointes par `parcelSeparator`)
+        -- gel (vava_time) : couvrir une plante, gel annoncé sur la fiche, avertissement du soir, plantes perdues ;
+        -- %s : objets qui couvrent (chacun écrit par `coverItem`, joints par `coverOr`), parcelle(s) (jointes par
+        -- `parcelSeparator`)
         covered = 'Plante couverte : elle passera les nuits de gel.',
         alreadyCovered = 'Cette plante est déjà couverte.',
         frostHardy = 'Cette culture ne craint pas le gel : inutile de la couvrir.',
+        offSeason = 'Aucun gel à craindre en cette saison.',
         noCover = 'Il vous faut de quoi couvrir la plante (%s).',
+        coverItem = '%d × %s',
         coverOr = ' ou ',
+        frostTonight = 'gel annoncé cette nuit',
         parcelSeparator = ', ',
         frostWarning = 'Le froid mordra cette nuit (%s) : couvrez les cultures fragiles ou elles gèleront.',
-        frostStruck = 'Le gel a pris %d plante(s) cette nuit : %s.',
+        frostStruck = 'Le gel a pris %d plante(s) cette nuit (%s).',
     },
 }

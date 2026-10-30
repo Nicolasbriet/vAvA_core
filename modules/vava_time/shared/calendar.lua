@@ -156,6 +156,7 @@ end
 ---@field season string
 ---@field day integer  jour de la saison (1 = premier)
 ---@field year integer an du royaume (1 au moins)
+---@field frost boolean|nil  publié seulement : une nuit de gel est annoncée (du tirage jusqu'au gel)
 
 --- Saison, jour de la saison et an du royaume d'une date de Paris, au vrai calendrier.
 ---@param y integer
@@ -262,10 +263,11 @@ function calendar.seasonLength(cal)
     return nil
 end
 
---- Texte de /date : heure, jour, saison, an, moment du jour et ciel ; une phrase de plus si l'heure est figée.
+--- Texte de /date : heure, jour, saison, an, moment du jour et ciel ; une phrase de plus les jours où une nuit de gel
+--- est annoncée (`date.frost`, publié par le serveur), une autre si l'heure est figée.
 ---@param seconds number seconde du jour du royaume
 ---@param frozen boolean
----@param date vAvA.TimeDate
+---@param date vAvA.TimeDate  { season, day, year, frost? }
 ---@param phrase string ce que fait le ciel (« il pleut »)
 ---@param cal? table config.calendar
 ---@param messages? table config.messages
@@ -276,6 +278,7 @@ function calendar.describe(seconds, frozen, date, phrase, cal, messages)
     local hour, minute = calendar.hms(seconds)
     local text = messages.date:format(messages.hour:format(hour, minute), calendar.dateText(date, cal, messages),
         calendar.moment(hour, cal.moments), phrase)
+    if date.frost == true and messages.frostTonight then text = text .. ' ' .. messages.frostTonight end
     if frozen then text = text .. ' ' .. messages.frozen end
     return text
 end
