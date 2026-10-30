@@ -330,7 +330,7 @@ versé à T-014 ; les autres points déjà couverts sont précisés dans T-012 �
   `vava_ui`, SVG actif, adresse externe cherchée hors des seuls espaces de noms, cas d'essai), puis les 14 autres
   bascules (`vava_health` 1.2.0 … `vava_magic` 2.8.0), `tests/spec/ui_shared_spec.lua` sur les 15 pages ; poids livré
   4 104 918 o → 1 167 151 o (dépôt LF, − 71,6 %) ; `docs/tests/interfaces.md` § 1 à 6, rapport
-  `docs/plan/rapports/T-012.md` § Bascule des 14 modules. Relectures sécurité et réseau de la suite : à faire.
+  `docs/plan/rapports/T-012.md` § Bascule des 14 modules. Relu sécurité et réseau (OK, mineurs d'outillage appliqués).
 - Polices, textures (grain, papier, cadres, séparateurs) et icônes communes dans une ressource unique, référencées
   par `nui://vava_ui/…` ; retirer les copies des autres modules. Démarre juste après `vAvA_core`.
 - Chiffres de T-011 (`docs/plan/rapports/T-011.md` § Fichiers web communs) : 4 003 861 o de `web/` livrés aux
