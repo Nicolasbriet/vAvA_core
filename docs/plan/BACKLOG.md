@@ -482,7 +482,10 @@ versé à T-014 ; les autres points déjà couverts sont précisés dans T-012 �
   `docs/tests/magie.md` § 15-8.
 
 ### T-019 — PORTE : mesure après optimisation — **HUMAIN**
-- Dépend de : T-010 à T-018 et leurs corrections · Statut : à faire
+- Dépend de : T-010 à T-018 et leurs corrections · Statut : validée
+- Validée le 30 octobre 2026 par le porteur du projet : les phases 2 et 3 sont ouvertes. Relevé transmis : resmon
+  client au repos, 0,05 ms au total, chaque ressource à 0,00 ms (cible ≤ 0,02 ms). Rester attentif, aux premières
+  sessions à plusieurs, aux points « à tester en jeu » de T-012 à T-018 (fusionnées sans test en jeu).
 - Refaire les mesures de T-009 (resmon, poids, `/vava_reseau` à 2 joueurs éloignés puis proches). Comparer aux
   objectifs de `SECURITE_RESEAU.md`.
 - Mesures détaillées, cibles et scénarios (dont la mémoire des 14 pages NUI et le joueur filmé par les caméras) :
