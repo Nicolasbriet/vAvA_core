@@ -1,6 +1,6 @@
 # Magie d'Eldoria — procédure de test en jeu
 
-Procédure pour vérifier en jeu `vava_magic` 2.6.2 : fiche et commandes du Conseil, roue et mode magie, incantation,
+Procédure pour vérifier en jeu `vava_magic` 2.7.0 : fiche et commandes du Conseil, roue et mode magie, incantation,
 mana, verrouillage, les onze sorts, états élémentaires, zones au sol, combinaisons, effets et sons, triche,
 déconnexions, redémarrage et resmon. Le module n'a encore jamais été joué : chaque écart compte, même petit. Comptez
 trois heures seul et une heure et demie à plusieurs ; les tests à deux sont marqués **(2 joueurs)**, ceux qui
@@ -15,7 +15,7 @@ Aucun sort ne s'apprend en jeu : seul le Conseil en donne (`/magie`) ; le grimoi
 
 1. **Commune** : ordre de démarrage, compte du Conseil, objets, consoles, mesure du resmon et remontée des problèmes :
    voir [LISEZMOI.md](LISEZMOI.md).
-2. **Démarrage** : la console du serveur affiche `module 'vava_magic' v2.6.2 prêt`. La migration `sql/0001_magic.sql`
+2. **Démarrage** : la console du serveur affiche `module 'vava_magic' v2.7.0 prêt`. La migration `sql/0001_magic.sql`
    crée `vava_magic_sigils`, `vava_magic_registers`, `vava_magic_register_pages` et `vava_magic_damage_log`. Une ligne
    `… non déclaré(e) : …` (un sort refusé au chargement) ou `sort en erreur` est à me remonter telle quelle.
 3. **Rôles** : A, membre du Conseil (droit `tools` : Sénéchal ou Souverain) ; B, second joueur sans droits ; C,
@@ -377,6 +377,31 @@ Recharge : 4 s à tous les niveaux.
 | 12 | `/sigil renommer 1 Aldric` ; `/sigil oublier 1`. | « Sigil renommé : « Aldric ». » ; « Vous oubliez le sigil « Aldric ». » |
 | 13 | **(2 joueurs)** `/sigil brouiller`, confirmer ; B murmure à A par l'ancien sigil ; second brouillage. | Fenêtre « Brouiller votre sigil » (coût : 60 de mana) → « Votre sigil se brouille : l'ancien n'existe plus. » ; B : « Le lien reste silencieux. … » ; « Le sort n'est pas encore prêt (n s). » (6 h). |
 | 14 | **(2 joueurs)** Avec un registre sur soi, envoyer et recevoir ; l'utiliser. | Pages « À … » et « De … », datées (« Le 29 octobre, à 14h05 »), compteur « n / 200 pages » ; sans registre, rien n'est consigné. « Arracher la page » : « Vous arrachez la page. » Donner le registre à B : B lit les mêmes pages. Un registre neuf : « Ce registre est vierge. » |
+| 15 | **Registre long** : `/magie donner <B> registre` ; dans la base, `SELECT MAX(id) FROM vava_magic_registers` donne son numéro `<R>` ; y verser 199 pages (requête sous ce tableau), puis `restart vava_magic` (le nombre de pages est gardé en mémoire par le serveur). | 199 lignes pour `<R>` dans `vava_magic_register_pages`. |
+| 16 | B utilise ce registre. | Ouverture immédiate, sans à-coup. 20 pages à gauche, de « De Essai 199 » (en tête, la plus récente) à « À Essai 180 » ; compteur « 199 / 200 pages » ; au bas de la liste, « tourner les pages plus anciennes » (bas-de-casse, gras). |
+| 17 | B choisit une page, puis clique « tourner les pages plus anciennes » ; recommencer, en descendant chaque fois au bas de la liste, jusqu'à ce que le bouton disparaisse. | Le temps de la réponse, le bouton dit « Les pages tournent… » et ne répond plus ; puis 20 pages s'ajoutent au bas, la liste ne saute pas et la page choisie reste affichée à droite. Les essais se suivent sans trou ni doublon jusqu'à « Essai 1 » ; 10 lots en tout ; plus de bouton à la fin ; le compteur reste « 199 / 200 pages ». |
+| 18 | Arracher une page du troisième lot (« Essai 150 », par exemple). | « Vous arrachez la page. », compteur « 198 / 200 pages », la page voisine s'affiche ; aucune autre page ne bouge. Rouvrir, tourner jusqu'au troisième lot : « Essai 150 » n'y est plus, rien d'autre ne manque. |
+| 19 | Refermer, rouvrir. | Retour au premier lot (20 pages et le bouton) : les lots déjà lus ne sont pas gardés d'une ouverture à l'autre. |
+| 20 | **(2 joueurs) Droit revérifié** : B ouvre le registre (bouton visible) et le garde ouvert ; A : Registre du Conseil → Joueurs → B → Fouiller, et prend le registre dans la besace de B ; B clique « tourner les pages plus anciennes ». | B : « Vous n'avez pas ce registre sur vous. » ; aucune page ne s'ajoute, le bouton revient (un nouveau clic donne le même refus). Rendre le registre à B (A le repose dans sa besace) : le clic suivant ajoute bien le lot. |
+| 21 | Marteler « tourner les pages plus anciennes » (un clic dès que le bouton revient), sur un registre rouvert. | Pas plus de 5 lots d'affilée, puis environ un par seconde : au-delà, « Doucement : laissez la magie respirer. » et le bouton revient. Aucune page en double. |
+| 22 | Murmurer à B (qui porte ce registre de 198 pages) deux fois, puis une troisième. | Deux pages s'ajoutent (« De … » en tête à la réouverture, compteur « 200 / 200 pages ») ; la troisième : « Votre registre est plein : ce murmure n'y est pas consigné. » |
+
+Pages d'essai (ligne 15), `<R>` remplacé par le numéro du registre ; « Essai 1 » est la plus ancienne, « Essai 199 » la
+plus récente, une sur deux envoyée :
+
+```sql
+INSERT INTO vava_magic_register_pages (register_id, written_at, direction, contact, body)
+SELECT <R>, UNIX_TIMESTAMP() - (200 - k) * 600, 1 + k % 2, CONCAT('Essai ', k),
+       CONCAT('Murmure d''essai n° ', k, ' : ', REPEAT('le vent porte ces mots ', 10))
+FROM (SELECT u.d + 10 * t.d + 100 * h.d AS k
+      FROM (SELECT 0 d UNION ALL SELECT 1 UNION ALL SELECT 2 UNION ALL SELECT 3 UNION ALL SELECT 4
+            UNION ALL SELECT 5 UNION ALL SELECT 6 UNION ALL SELECT 7 UNION ALL SELECT 8 UNION ALL SELECT 9) u,
+           (SELECT 0 d UNION ALL SELECT 1 UNION ALL SELECT 2 UNION ALL SELECT 3 UNION ALL SELECT 4
+            UNION ALL SELECT 5 UNION ALL SELECT 6 UNION ALL SELECT 7 UNION ALL SELECT 8 UNION ALL SELECT 9) t,
+           (SELECT 0 d UNION ALL SELECT 1) h) n
+WHERE k BETWEEN 1 AND 199
+ORDER BY k;
+```
 
 ## 9. États élémentaires et immunité
 
@@ -489,7 +514,7 @@ simplement rien. Le réglage à corriger est entre parenthèses.
 | 3 | **(2 joueurs)** B se déconnecte en Brûlure ; recommencer dans une boue. | Plus de ligne `brulure` au journal pour B ; rien ne reste à son retour. |
 | 4 | **(2 joueurs)** A dresse un mur long (réglage), un Rempart N5, un orbe ancré, allume une Lueur, puis se déconnecte (`F8` → `quit`). | Le mur brûle jusqu'à sa fin et blesse encore B (journal au nom du personnage de A) ; le rempart tombe à son heure (16 s) ; l'orbe et la Lueur disparaissent aussitôt. |
 | 5 | **(2 joueurs)** A se déconnecte pendant qu'une offre de sigil attend la réponse de B. | La fenêtre de B se ferme. |
-| 6 | **(2 joueurs)** `restart vava_magic` (tapé d'avance dans la console du serveur) avec : un mur long actif, B dans une brume (voile), un rempart debout, B gelé (réglage), un présage de Secousse en cours, un orbe ancré, A en pleine incantation. | Tout disparaît sur-le-champ chez tous : flammes, lumières, brume et voile, filtre flou, pierres, orbe ; B est libre (libéré par le serveur à l'arrêt) ; l'incantation de A s'éteint sans rien consommer ; le présage ne frappe pas. Au retour, `module 'vava_magic' v2.6.2 prêt` ; `/magie fiche` : fiches intactes (sorts, XP, sigils, sort prêt) ; mana pleine ; recharges effacées ; aucune pierre ni zone ne reparaît. |
+| 6 | **(2 joueurs)** `restart vava_magic` (tapé d'avance dans la console du serveur) avec : un mur long actif, B dans une brume (voile), un rempart debout, B gelé (réglage), un présage de Secousse en cours, un orbe ancré, A en pleine incantation. | Tout disparaît sur-le-champ chez tous : flammes, lumières, brume et voile, filtre flou, pierres, orbe ; B est libre (libéré par le serveur à l'arrêt) ; l'incantation de A s'éteint sans rien consommer ; le présage ne frappe pas. Au retour, `module 'vava_magic' v2.7.0 prêt` ; `/magie fiche` : fiches intactes (sorts, XP, sigils, sort prêt) ; mana pleine ; recharges effacées ; aucune pierre ni zone ne reparaît. |
 | 6 bis | **(2 joueurs)** Réglage `combos.gel.result.durationMs = 30000` : A immobilise B depuis le Registre, puis le gèle ; pendant le gel, `restart vava_magic` ; au retour, B essaie de marcher ; enfin A « Libérer ». | B perd l'icône et le givre, mais reste figé au redémarrage et après (retenu par le Conseil) ; étiquette « Immobilisé » toujours au Registre ; « Libérer » le délivre. Même essai avec B gelé sans le Registre : libre dès l'arrêt du module (14-6). |
 | 7 | Même redémarrage juste après quelques coups ; puis réglage `combat.log = { flushMs = 600000, batch = 500, retentionDays = 30 }` (rien n'est écrit avant 500 lignes ou 10 min), une soixantaine de coups (Murs de flammes sur B, brûlures), compter les lignes de B, `restart vava_magic`, recompter. | Tous les dégâts sont au journal (`vava_magic_damage_log`), au-delà de 50 lignes : à l'arrêt, tout ce qui attend part en une seule requête. Aucune ligne `journal des dégâts non écrit` dans la console. Remettre le réglage. |
 | 8 | `restart vava_inventory`, puis utiliser le grimoire et le registre. | Les deux objets fonctionnent encore (redéclarés au retour de l'inventaire). |
@@ -537,5 +562,8 @@ le personnage, ou près d'une lumière, d'une zone qui dessine ou d'une trace.
 - Les touches : `MOUSE_BUTTON` et `MOUSE_WHEEL` dans les raccourcis de FiveM, et le nom qu'en donne GTA au grimoire.
 - La réplication des state bags (incantation, états, lumières) aux joueurs proches, et les sons Web Audio dans CEF.
 - L'ordre des messages quand une blessure et un contrôle dur brisent la même incantation (9-8).
+- Le poids réel d'un lot du registre (8.2-16 à 8.2-21) : estimé hors jeu à 7,5 Ko au plus (6,5 Ko pour les pages
+  d'essai, environ 3 Ko pour 20 murmures de 100 signes), contre 100 Ko et plus pour un registre plein envoyé d'un bloc
+  avant 2.7.0 ; à mesurer quand le compteur réseau du core (T-013) existera.
 
 Pour remonter un écart : voir [LISEZMOI.md](LISEZMOI.md) (citer « magie 5.2-4 »).

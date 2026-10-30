@@ -968,6 +968,25 @@ button { color: inherit; font: inherit; }
 .pair-icon:last-child { right: 0; bottom: 0; }
 .entry-seal.is-combo { font-size: 0.95rem; }
 .entry-note { margin: 0.5rem 0.6rem 0; color: var(--ink-muted); font-size: 0.88rem; font-style: italic; }
+/* registre : lot suivant, au bas de la liste (commande : bas-de-casse, EB Garamond gras) */
+.more-button {
+  display: block;
+  width: 100%;
+  margin-top: 0.7rem;
+  padding: 0.5rem 0.6rem;
+  border: 0;
+  border-top: 1px solid rgba(70, 48, 24, 0.3);
+  background: transparent;
+  color: var(--ink);
+  font-family: var(--font-body);
+  font-size: 1rem;
+  font-weight: 700;
+  text-align: center;
+  cursor: pointer;
+  transition: background-color 120ms;
+}
+.more-button:hover { background: rgba(var(--ink-rgb), 0.05); }
+.more-button:disabled { color: var(--ink-muted); font-style: italic; cursor: default; background: transparent; }
 .controls-line { margin: 0.8rem 0 0; color: var(--ink-muted); font-size: 0.92rem; font-style: italic; }
 .summary { margin: 0 0 1rem; color: var(--ink-muted); font-style: italic; }
 .xp { display: flex; align-items: center; gap: 0.9rem; margin: 0.4rem 0 0.6rem; }

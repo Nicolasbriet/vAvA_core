@@ -1027,7 +1027,16 @@ VavaMagic.config = {
     },
 
     -- Registre des murmures (objet) : l'historique suit l'objet ; il est en base sous le numéro du registre.
-    registers = { maxPages = 200, contactMax = 160 },
+    -- Il s'envoie par lots, les pages les plus récentes d'abord : à l'ouverture le premier lot, puis un lot de plus
+    -- chaque fois que le lecteur feuillette vers les plus anciennes (le serveur revérifie qu'il porte le registre).
+    registers = {
+        maxPages = 200,
+        contactMax = 160,
+        pageSize = 20,     -- pages par lot (au plus)
+        -- poids d'un lot (octets, estimé : correspondant + texte + 52 par page) ; un lot s'arrête avant de le
+        -- dépasser (au moins une page) : sous 8 Ko, un lot part toujours d'un seul message fiable
+        pageBytes = 7500,
+    },
 
     -- Objets déclarés dans vava_inventory.
     items = {
@@ -1110,6 +1119,7 @@ VavaMagic.config = {
         light = { capacity = 6, refillPerSecond = 1 },
         impact = { capacity = 8, refillPerSecond = 3 },
         register = { capacity = 6, refillPerSecond = 1 },
+        registerPages = { capacity = 5, refillPerSecond = 1 },
     },
 
     -- Textes vus par les joueurs (français, univers médiéval).
@@ -1327,6 +1337,7 @@ VavaMagic.config = {
                 title = 'Registre des murmures', empty = 'Ce registre est vierge.', sent = 'À %s', received = 'De %s',
                 unknown = 'D\'une présence inconnue',
                 tear = 'Arracher la page', count = '%d / %d pages', close = 'Fermer',
+                more = 'tourner les pages plus anciennes', loading = 'Les pages tournent…',
                 months = { 'janvier', 'février', 'mars', 'avril', 'mai', 'juin', 'juillet', 'août', 'septembre', 'octobre', 'novembre', 'décembre' },
                 date = 'Le %d %s, à %dh%s',
             },

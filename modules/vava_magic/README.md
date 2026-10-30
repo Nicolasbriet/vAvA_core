@@ -9,8 +9,9 @@ ardente**), d'eau (**Trait de glace**, **Vague**, **Brume**) et de terre (**Proj
 **Lueur** et **Murmure**, grimoire et registre des murmures (objets), commandes du Conseil. Le serveur décide de tout ;
 le client affiche et demande.
 
-Version 2.6.3 : les cinq étapes de la refonte (noyau, roue et contrôles ; états, zones et feu ; eau et terre ;
-combinaisons ; finitions : traces au sol, sons par fichier ou natifs, documentation et tests), puis leurs correctifs.
+Version 2.7.0 : les cinq étapes de la refonte (noyau, roue et contrôles ; états, zones et feu ; eau et terre ;
+combinaisons ; finitions : traces au sol, sons par fichier ou natifs, documentation et tests), puis leurs correctifs ;
+le registre des murmures s'envoie par lots (2.7.0).
 Rien n'a encore été joué en vrai : voir « À vérifier en jeu », « Tests à faire en jeu » et la procédure complète
 `docs/tests/magie.md`.
 
@@ -48,7 +49,7 @@ Rien n'a encore été joué en vrai : voir « À vérifier en jeu », « Tests �
 ```
 vava_magic/
   fxmanifest.lua · config.lua · README.md
-  shared/   constants.lua · text.lua (UTF-8) · progression.lua · geometry.lua
+  shared/   constants.lua · text.lua (UTF-8) · progression.lua · geometry.lua · pages.lua (lots du registre)
   bridge/   server.lua · client.lua                 ← seul contact avec le core et les autres modules
   server/   core · world · sheets · mana · spells · progression · combat · states (états) · obstacles (remparts…)
             zones (au sol) · grounds (sol mouillé) · combos (combinaisons) · projectiles (noyau commun) · registers
@@ -135,6 +136,23 @@ Commandes de secours (chat) :
 | `/sigils` · `/sigil offrir` · `renommer <n°> <nom>` · `oublier <n°>` · `brouiller` | gérer ses sigils |
 
 Le registre s'ouvre en l'utilisant dans l'inventaire.
+
+### Registre des murmures
+
+Un objet de l'inventaire : il ne porte que son numéro, l'historique est en base sous ce numéro et suit l'objet (volé ou
+donné, il part avec ses pages). Avec un registre sur soi, chaque murmure envoyé (« À … ») ou reçu (« De … ») y est
+consigné, jusqu'à 200 pages ; plein, plus rien n'y est écrit et le joueur est prévenu.
+
+- **Ouvrir** (l'utiliser) : seules les pages les plus récentes arrivent, au plus 20 et au plus 7 500 octets estimés
+  (`registers.pageSize`, `registers.pageBytes`), avec le nombre total de pages. Une seule page plus lourde que le lot
+  part quand même seule : le lecteur avance toujours.
+- **Feuilleter** : « tourner les pages plus anciennes », au bas de la liste, demande le lot suivant (RPC
+  `vava_magic:registerPages`, curseur : la plus ancienne page reçue ; 5 demandes d'affilée, puis une par seconde). Le
+  serveur revérifie **à chaque lot** que le joueur porte ce registre dans sa besace, comme pour arracher une page ;
+  donné ou lâché entre-temps : « Vous n'avez pas ce registre sur vous. », rien n'est lu en base.
+- Les lots reçus restent dans la page tant que le registre est ouvert (une page arrachée ne décale rien) ; refermé, il
+  repart du premier lot. Une page consignée pendant la lecture n'apparaît qu'à la réouverture.
+- **Arracher une page** : celui qui porte le registre ; la page disparaît de la base.
 
 ### Verrouiller une cible (sorts d'attaque)
 
@@ -289,7 +307,7 @@ plus la place. »… `texts.chat.adminErrors`) ; le code brut ne va qu'à la con
 | `spells.rempart` | portée, longueur, épaisseur, hauteur, blocs par segment, segments (2 au niveau 5) et angle du chevron, durée, modèle de pierre, enfoncement, montée par paliers, plafond du royaume, marges autour des joueurs et véhicules |
 | `combos` | combinaisons : déclencheur (`trigger` : spell ou element, on = zone ou target, zone ou state, projectile), résultat (`result` : remove, zone, state, consume, damageShare, noBurn, carry), textes du grimoire, mot bref, effet et son, nuée de la vapeur, rendu de la boue |
 | `combat` | dégâts entre joueurs, points de vie d'un personnage (100), zones protégées (`{ label, x, y, radius }`), journal (lots, rétention : `log.retentionDays`, 30 jours), réaction de la victime par élément (feu, eau, glace, terre), durée du recul |
-| `sigils` · `registers` · `items` | sigils (dont le délai après un refus, `refusedMs` : 60 s), registre (200 pages), objets |
+| `sigils` · `registers` · `items` | sigils (dont le délai après un refus, `refusedMs` : 60 s), registre (200 pages, lots de 20 pages et de 7 500 octets au plus), objets |
 | `ambient` | effets vus des autres (15 m, fragments à 3 m, runes, textes) |
 | `admin` · `keys` · `commands` · `rateLimits` | droits, touches et boutons, commandes, limites de débit |
 | `texts` | **tous** les textes vus par les joueurs (refus, messages, chat, journal, interface) |
@@ -389,6 +407,7 @@ au point de l'effet). Aucun fichier n'est fourni.
 | Nova | ~80 o aux joueurs à moins de 120 m ; recul et réaction à la seule victime |
 | Incantation | 2 RPC, plus un state bag du ped (~80 o) reçu des joueurs proches |
 | Murmure | < 1 Ko par destinataire ; fragments aux seuls joueurs à moins de 3 m |
+| Registre des murmures | au seul lecteur : à l'ouverture, un lot de 7,5 Ko au plus (3 Ko pour 20 murmures de 100 signes ; un registre plein envoyait jusqu'à 100 Ko d'un bloc avant 2.7.0) ; puis un lot par demande, au même plafond |
 | Lueur | ~100 o à l'allumage et à l'extinction ; un objet réseau par orbe ancré |
 | Projectiles | ~150 o de lancer aux joueurs proches (150 m), un impact, les dégâts |
 | Vague · Secousse · Rempart | ~100 à 250 o d'effet instantané aux joueurs à moins de 120 m ; recul, réaction et états à la seule victime |
@@ -491,6 +510,7 @@ Deux joueurs (A et B) suffisent ; un troisième aide pour le cercle et la zone d
 **Registre**
 - [ ] Avec un registre sur soi, envoyer et recevoir : pages datées « À … » / « De … » ; sans registre : rien n'est consigné.
 - [ ] Arracher une page. Donner le registre à B : B lit l'historique (il suit l'objet). Un registre neuf est vierge.
+- [ ] Registre de plus de 20 pages : 20 pages à l'ouverture, « tourner les pages plus anciennes » ajoute les suivantes sans doublon ni trou, jusqu'à la première ; registre donné pendant la lecture : le lot suivant est refusé.
 
 **Boule de feu**
 - [ ] A vise B (à 10 m) et clique : jet vers le réticule, projectile et lumière vus de tous, impact en flammes, B blessé (vava_health), A gagne son XP et le bonus au toucher. Pas d'explosion GTA.

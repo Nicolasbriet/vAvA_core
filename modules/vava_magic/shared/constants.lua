@@ -24,7 +24,7 @@ VavaMagic.EVENTS = {
     TARGETED = 'vava_magic:targeted',       -- () à la seule cible verrouillée d'un sort d'attaque : un frisson
     DAMAGE = 'vava_magic:damage',           -- (part de vie) sans vava_health : la victime applique la blessure
     GRIMOIRE = 'vava_magic:openGrimoire',   -- grimoire utilisé
-    REGISTER = 'vava_magic:openRegister',   -- { id, pages, count, max } registre utilisé
+    REGISTER = 'vava_magic:openRegister',   -- { id, pages, more, count, max } registre utilisé : premier lot de pages
     CHAT = 'vava_magic:chat',               -- lignes de réponse d'une commande
     ADMIN = 'vava_magic:admin',             -- le joueur peut se servir des commandes du Conseil (suggestions)
     COOLDOWNS = 'vava_magic:cooldowns',     -- () recharges effacées par le Conseil
@@ -55,6 +55,7 @@ VavaMagic.RPC = {
     LIGHT_COLOR = 'vava_magic:lightColor',
     PROJECTILE_IMPACT = 'vava_magic:projectileImpact', -- (lancer, cible, x, y, z) impact vu par le client du lanceur
     REGISTER_TEAR = 'vava_magic:registerTear',
+    REGISTER_PAGES = 'vava_magic:registerPages', -- (registre, avant la page n°) lot plus ancien → { pages, more }
 }
 VavaMagic.BEGIN_PREFIX = 'vava_magic:begin:'
 VavaMagic.FINISH_PREFIX = 'vava_magic:finish:'
