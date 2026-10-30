@@ -41,6 +41,12 @@ VavaBridge.config = {
     -- sa propre ligne « Cases du mur regardées ».
     cameras = { permission = 'watch', fullRequest = 'watchScreen', tileLogMs = 2 * 60 * 60 * 1000 },
 
+    -- Page Réseau (compteur des envois du core, core.net.stats, core ≥ 0.10.0 ; lecture seule) : droit du Registre,
+    -- celui de /vava_reseau ; évènements rendus au plus (1 à 50) ; délai entre deux lectures d'un même compte du panneau
+    -- (ms, la page relit au plus toutes les 5 s) ; ligne au journal à l'ouverture de la page, à chaque autre joueur lu,
+    -- puis au plus tard toutes les logEveryMs (30 min) pendant une lecture continue, jamais à chaque relecture.
+    net = { permission = 'tools', lines = 20, minIntervalMs = 500, logEveryMs = 30 * 60 * 1000 },
+
     -- Liaison d'un compte du panneau à son joueur : commande à taper en jeu avec le code affiché par le panneau,
     -- essais permis par minute, messages au joueur (clés = codes d'erreur renvoyés par la Chancellerie).
     link = {
@@ -77,5 +83,7 @@ VavaBridge.config = {
         logZoneDelete = 'Zone de voix supprimée',
         logWall = 'Mur des caméras ouvert',
         logTiles = 'Cases du mur regardées',
+        logNet = 'Compteur réseau consulté',
+        logNetPlayer = 'Réseau d\'un joueur consulté',
     },
 }

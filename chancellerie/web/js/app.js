@@ -5,7 +5,7 @@
  *        serveur, compte) et ses pages, en trois groupes : le serveur (tableau de bord, performances, console,
  *        ressources, server.cfg, planification, sauvegardes, configuration), le
  *        royaume pour les comptes qui ont un rang du Conseil (joueurs, signalements, sanctions, journal, Conseil,
- *        proclamation, zones de voix, ciel et heure, caméras), la Chancellerie (comptes). Tient l'état du serveur et la
+ *        proclamation, zones de voix, ciel et heure, caméras, réseau), la Chancellerie (comptes). Tient l'état du serveur et la
  *        console reçus en direct, et les distribue à la page affichée avec les relevés des performances et l'avancée
  *        des sauvegardes.
  *        Adresse de la page dans le fragment (#joueurs).
@@ -37,6 +37,7 @@ const App = (() => {
     { id: 'zones-de-voix', group: 'realm', label: N.zones, realm: 'view', view: ZonesView },
     { id: 'ciel-et-heure', group: 'realm', label: N.time, realm: 'view', view: TimeView },
     { id: 'cameras', group: 'realm', label: N.cameras, realm: 'watch', view: CamerasView },
+    { id: 'reseau', group: 'realm', label: N.network, realm: 'tools', view: NetworkView },
     { id: 'comptes', group: 'chancellery', label: N.accounts, view: AccountsView },
     { id: 'mises-a-jour', group: 'chancellery', label: N.updates, view: UpdatesView },
     { id: 'discord', group: 'chancellery', label: N.discord, master: true, view: DiscordView },
