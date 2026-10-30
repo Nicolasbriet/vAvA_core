@@ -50,6 +50,10 @@
 [data-chapter="vava_chancellerie"] { --chapter-rgb: 222, 186, 96; }
 [data-chapter="vava_codex"] { --chapter-rgb: 220, 192, 138; }
 [data-chapter="vAvA_core"] { --chapter-rgb: 128, 116, 100; }
+/* chapitres de lecture (1.5.0) : laiton clair, vert des champs, bleu de la magie */
+[data-chapter="premiers_pas"] { --chapter-rgb: 220, 192, 138; }
+[data-chapter="metiers"] { --chapter-rgb: 142, 170, 118; }
+[data-chapter="royaume"] { --chapter-rgb: 126, 164, 196; }
 
 * { box-sizing: border-box; }
 html { font-size: clamp(12px, 0.5vw + 6px, 18px); }
@@ -444,6 +448,87 @@ kbd, .badge-key, .row-keycap {
 .detail-keycap { display: grid; place-items: center; margin: 1rem 0 1.2rem; }
 .keycap-big { min-width: 4.5rem; padding: 0 1.2rem; font-size: 1.6rem; line-height: 3.4rem; border-radius: 6px; box-shadow: 0 0 0 1px #5a4424, inset 0 2px 0 rgba(255, 250, 235, 0.8), 0 4px 0 #5a4424, 0 8px 12px rgba(0, 0, 0, 0.35); }
 .detail-facts { margin-bottom: 0.8rem; }
+
+/* Onglet Lecture (1.5.0) : sommaire et page lue -------------------------------------------------------------
+   Interface claire : parchemin uni, aucun grain ; encre, encre atténuée, filets ; Cinzel pour les seuls titres. */
+
+.row-title { min-width: 0; color: var(--ink); font-family: var(--font-body); font-size: 1.05rem; font-weight: 700; line-height: 1.25; }
+.row-page .row-line { align-items: baseline; }
+.row-page .badge { align-self: center; flex: none; }
+
+.reader { padding-bottom: 0.4rem; }
+.reader-h {
+  margin: 1.1rem 0 0.5rem;
+  padding-bottom: 0.25rem;
+  border-bottom: 1px solid var(--rule);
+  color: var(--ink);
+  font-family: var(--font-display);
+  font-size: 0.8rem;
+  font-weight: 700;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+}
+.reader-h:first-child { margin-top: 0.2rem; }
+.reader-p { margin: 0 0 0.7rem; color: var(--ink); font-size: 1.02rem; line-height: 1.45; }
+.reader-note { margin: 0 0 0.8rem; padding: 0.45rem 0.75rem; border-left: 2px solid var(--brass); background: rgba(var(--brass-rgb), 0.12); color: var(--ink-muted); font-size: 0.96rem; font-style: italic; line-height: 1.4; }
+.reader-note em { font-style: normal; }
+.reader-list { margin: 0 0 0.8rem; padding-left: 1.5rem; color: var(--ink); font-size: 1.02rem; line-height: 1.45; }
+.reader-item + .reader-item { margin-top: 0.25rem; }
+ol.reader-list { list-style: decimal; }
+ol.reader-list > .reader-item::marker { color: var(--ink-muted); font-weight: 700; }
+ul.reader-list { list-style: none; }
+ul.reader-list > .reader-item { position: relative; }
+ul.reader-list > .reader-item::before { content: "❧"; position: absolute; left: -1.2rem; color: var(--brass); }
+
+/* cabochon dans le texte : même touche que l'onglet des touches, à la hauteur de la ligne */
+.reader-kbd { min-width: 1.5rem; margin: 0 0.12rem; padding: 0 0.4rem; font-size: 0.82rem; line-height: 1.3rem; vertical-align: 0.06em; }
+.reader-kbd.is-missing { color: var(--ink-faint); cursor: help; }
+
+/* liens : commandes en bas-de-casse et en gras, pages dans le corps du texte ; souligné pointillé laiton */
+.reader-cmd, .reader-link {
+  display: inline;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--ink);
+  font-family: var(--font-body);
+  font-size: inherit;
+  line-height: inherit;
+  text-align: inherit;
+  text-decoration: underline dotted var(--brass);
+  text-decoration-thickness: 1px;
+  text-underline-offset: 0.2em;
+  cursor: pointer;
+  transition: color 120ms;
+}
+.reader-cmd { font-weight: 700; }
+.reader-link { font-style: inherit; }
+.reader-cmd:hover, .reader-link:hover { color: #6a4e22; text-decoration-color: #6a4e22; }
+.reader-cmd.is-plain { text-decoration: none; cursor: default; }
+
+/* la page qui tarde : le message n'apparaît qu'après un instant (une page gardée ou rapide ne le montre pas) */
+@keyframes reader-wait { from { opacity: 0; } }
+.reader-loading { animation: reader-wait 180ms 160ms both; }
+
+/* pied de la page de droite : page précédente et suivante */
+.settings.is-reader { display: flex; justify-content: space-between; gap: 1rem; }
+.settings.is-reader:empty { display: none; }
+.reader-nav, .reader-nav-gap { display: flex; flex-direction: column; min-width: 0; max-width: 48%; }
+.reader-nav {
+  gap: 0.05rem;
+  padding: 0.25rem 0.55rem;
+  border: 0;
+  border-radius: 3px;
+  background: transparent;
+  text-align: left;
+  cursor: pointer;
+  transition: background-color 100ms;
+}
+.reader-nav-next { align-items: flex-end; text-align: right; }
+.reader-nav:hover { background: rgba(60, 40, 18, 0.08); }
+.reader-nav-label { color: var(--ink); font-size: 0.98rem; font-weight: 700; }
+.reader-nav-title { max-width: 100%; color: var(--ink-faint); font-size: 0.86rem; font-style: italic; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 
 /* Réglages, en pied de la page de droite ---------------------------------------------------------------- */
 

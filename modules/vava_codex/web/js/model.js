@@ -5,7 +5,9 @@
  *        commandes non décrites, préférences (signets, dernières pages, réglage), onglet, chapitre, recherche,
  *        ligne choisie. Le filtrage se fait ici, sans le serveur : la liste est déjà réduite à ce que le joueur
  *        peut voir. Le contenu et les préférences sont gardés d'une ouverture à l'autre : le serveur ne les renvoie
- *        que s'ils ont changé.
+ *        que s'ils ont changé. Onglet Lecture (1.5.0) : index des pages (dans le contenu), chapitre de lecture, page
+ *        choisie, pages gardées par empreinte (le texte d'une page ne vient qu'à la demande, voir app.js).
+ * Dépendances : strings.js (STRINGS, fold), reader.js (CodexReader)
  */
 
 const Model = (() => {
@@ -15,7 +17,18 @@ const Model = (() => {
     prefs: { favorites: [], recent: [], keepOpen: true }, closeKey: 'F1',
     recentMax: 12,   // dernières pages gardées : `recent.max` de la config, reçu à l'ouverture
     tab: 'commands', chapter: '', query: '', selected: null, rows: [],
+    // Lecture (1.5.0) : null tant que le serveur n'envoie pas d'index (pages de lecture fermées : pas d'onglet)
+    reading: null, pageById: new Map(),
+    readingChapter: '',   // chapitre de lecture choisi sur la tranche ('' : tout)
+    page: null,           // page choisie (identifiant)
+    pageCache: new Map(), // id → { hash, body } : pages reçues, gardées tant que leur empreinte ne change pas
+    pageBody: null,       // page affichée : { id, hash, body }
+    pageStatus: 'idle',   // idle | loading | error
   };
+
+  const PAGE_ROW = '#page:';   // reader.js est chargé après ce fichier : rien de lui n'est lu avant l'ouverture
+  /** Identifiant de la ligne d'une page : « # » n'appartient à aucun identifiant de page ni de commande. */
+  const pageRowId = (id) => PAGE_ROW + id;
 
   /** msgpack transmet une liste vide comme un objet vide : toujours une vraie liste. */
   const list = (value) => (Array.isArray(value) ? value : Object.values(value || {}));
@@ -35,6 +48,9 @@ const Model = (() => {
     state.undeclared = list(content.undeclared);
     state.staff = content.staff === true;
     state.version = typeof version === 'string' ? version : null;
+    state.reading = CodexReader.normalizeIndex(content.reading);
+    state.pageById = new Map(state.reading ? state.reading.pages.map((page) => [page.id, page]) : []);
+    CodexReader.prune(state.pageCache, state.pageById);
   }
 
   /** Message d'ouverture : `content` et `prefs` ne viennent que s'ils ont changé (sinon la page garde les siens) ;
@@ -49,6 +65,17 @@ const Model = (() => {
     if (payload.closeKey) state.closeKey = payload.closeKey;
     if (Number.isInteger(payload.recentMax) && payload.recentMax > 0) state.recentMax = payload.recentMax;
     if (state.chapter && !state.chapters.some((chapter) => chapter.id === state.chapter)) state.chapter = '';
+    const reading = state.reading;
+    if (state.readingChapter && !(reading && reading.chapters.some((chapter) => chapter.id === state.readingChapter))) state.readingChapter = '';
+    if (state.page && !state.pageById.has(state.page)) {
+      state.page = null;
+      state.pageBody = null;
+      state.pageStatus = 'idle';
+    }
+    if (!reading && state.tab === 'reading') {
+      state.tab = 'commands';
+      state.selected = null;
+    }
     rebuild();
   }
 
@@ -94,9 +121,30 @@ const Model = (() => {
     return fold(parts.filter(Boolean).join(' ')).includes(needle);
   }
 
-  /** Lignes affichables : touches pour l'onglet Touches, commandes sinon ; chapitre et recherche appliqués. */
+  /** Lignes de l'onglet Lecture : une par page, filtrées par chapitre de lecture et par la recherche (titre, résumé,
+   *  nom du chapitre). */
+  function readingRows(needle) {
+    const reading = state.reading;
+    if (!reading) return [];
+    const labels = new Map(reading.chapters.map((chapter) => [chapter.id, chapter.label]));
+    const rows = [];
+    for (const page of reading.pages) {
+      if (state.readingChapter && page.chapter !== state.readingChapter) continue;
+      if (needle && !fold(`${page.title} ${page.summary} ${labels.get(page.chapter) || ''}`).includes(needle)) continue;
+      rows.push({ id: pageRowId(page.id), page });
+    }
+    return rows;
+  }
+
+  /** Lignes affichables : pages pour l'onglet Lecture, touches pour l'onglet Touches, commandes sinon ; chapitre et
+   *  recherche appliqués. */
   function rebuild() {
     const needle = fold(state.query.trim());
+    if (state.tab === 'reading') {
+      state.rows = readingRows(needle);
+      if (state.selected && !state.rows.some((row) => row.id === state.selected)) state.selected = null;
+      return state.rows;
+    }
     const keysTab = state.tab === 'keys';
     const rows = [];
     for (const entry of state.entries) {
@@ -134,6 +182,14 @@ const Model = (() => {
       out.push({ id: 'results', label: STRINGS.sections.results, rows });
       return out;
     }
+    if (state.tab === 'reading') {
+      // une section par chapitre de lecture, dans l'ordre de l'index
+      for (const chapter of state.reading ? state.reading.chapters : []) {
+        const chapterRows = rows.filter((row) => row.page.chapter === chapter.id);
+        if (chapterRows.length > 0) out.push({ id: chapter.id, label: chapter.label, rows: chapterRows, reading: true });
+      }
+      return out;
+    }
     if (state.tab === 'commands' && !state.chapter) {
       const favorites = state.prefs.favorites.flatMap((name) => rows.filter((row) => row.entry.name === name));
       if (favorites.length > 0) out.push({ id: 'favorites', label: STRINGS.sections.favorites, rows: favorites });
@@ -155,15 +211,27 @@ const Model = (() => {
 
   function setTab(tab) {
     if (state.tab === tab) return;
+    if (tab === 'reading' && !state.reading) return;
     state.tab = tab;
-    state.selected = null;
+    state.selected = tab === 'reading' && state.page ? pageRowId(state.page) : null;
     rebuild();
   }
 
+  /** Chapitre de la tranche : chapitre de lecture dans l'onglet Lecture, module sinon. */
   function setChapter(chapter) {
-    state.chapter = chapter;
+    if (state.tab === 'reading') state.readingChapter = chapter;
+    else state.chapter = chapter;
     rebuild();
   }
+
+  /** Page choisie (onglet Lecture) : sa ligne est sélectionnée si elle est visible. */
+  function choosePage(id) {
+    state.page = id;
+    state.selected = pageRowId(id);
+  }
+
+  /** Page de lecture d'une ligne, ou null. */
+  const pageOfRow = (id) => (typeof id === 'string' && id.startsWith(PAGE_ROW) ? state.pageById.get(id.slice(PAGE_ROW.length)) || null : null);
 
   function setQuery(query) {
     state.query = query;
@@ -181,5 +249,8 @@ const Model = (() => {
     return sections().flatMap((section) => section.rows).filter((row) => !seen.has(row.id) && seen.add(row.id));
   }
 
-  return { state, list, load, rebuild, sections, syntax, row, rowId, isFavorite, setTab, setChapter, setQuery, select, visibleOrder, normalizePrefs };
+  return {
+    state, list, load, rebuild, sections, syntax, row, rowId, pageRowId, pageOfRow, isFavorite, setTab, setChapter, setQuery, select, choosePage,
+    visibleOrder, normalizePrefs,
+  };
 })();
