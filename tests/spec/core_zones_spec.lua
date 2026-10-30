@@ -693,6 +693,148 @@ describe('vAvA.zones', function()
         end)
     end)
 
+    -- relecture réseau de T-014
+    describe('coût du passage', function()
+        local candidatesCalls, sorts
+
+        --- Recharge le service avec une grille espionnée et un tri compté.
+        local function reloadSpied()
+            candidatesCalls, sorts = 0, 0
+            local realSort, realNew = table.sort, vAvA.zonegrid.new
+            table.sort = function(...)
+                sorts = sorts + 1
+                return realSort(...)
+            end
+            vAvA.zonegrid.new = function(size)
+                local grid = realNew(size)
+                local candidates = grid.candidates
+                grid.candidates = function(self, x, y)
+                    candidatesCalls = candidatesCalls + 1
+                    return candidates(self, x, y)
+                end
+                return grid
+            end
+            helper.load('server/core/zones.lua')
+            table.sort, vAvA.zonegrid.new = realSort, realNew
+            zones = vAvA.zones
+            zones.start()
+        end
+
+        it('au plafond de zones suivies : rien n’est construit ni trié, alerte une fois par minute', function()
+            reloadSpied()
+            cfg.maxSubscriptionsPerPlayer = 10
+            for i = 1, 50 do zones.define(OWNER, 'z' .. i, { x = i * 1.0, y = 0.0, radius = 100 }) end
+            place(1, 0, 0)
+            runPass()
+            -- les 10 plus proches, choisies sans tri complet
+            local names = zones.ofPlayer(1)
+            local expected = {}
+            for i = 1, 10 do expected[i] = OWNER .. ':z' .. i end
+            table.sort(expected)
+            assert.same(expected, names)
+            local before = sorts
+            for step = 1, 5 do
+                go(1, step * 2.0, 0)   -- bouge : calcul complet à chaque passage
+                runPass()
+            end
+            assert.equal(before, sorts)
+            local warnings = 0
+            for _, line in ipairs(printed) do
+                if line:find('les plus lointaines attendent', 1, true) then warnings = warnings + 1 end
+            end
+            assert.equal(1, warnings)
+        end)
+
+        it('sélection partielle : les plus proches, quel que soit l’ordre des candidates', function()
+            cfg.maxSubscriptionsPerPlayer = 7
+            local distances = { 40, 3, 77, 12, 5, 90, 1, 66, 25, 8, 50, 2, 31, 99, 14 }
+            for i, d in ipairs(distances) do zones.define(OWNER, 'z' .. i, { x = d * 1.0, y = 0.0, radius = 100 }) end
+            place(1, 0, 0)
+            runPass()
+            local got = {}
+            for _, name in ipairs(zones.ofPlayer(1)) do got[#got + 1] = distances[tonumber(name:match('z(%d+)$'))] end
+            table.sort(got)
+            assert.same({ 1, 2, 3, 5, 8, 12, 14 }, got)
+        end)
+
+        it('joueur immobile : pas recalculé ; recalculé au-delà de 1 m, à un changement d’instance ou de zones', function()
+            reloadSpied()
+            zones.define(OWNER, 'place', AREA)
+            place(1, 0, 0)
+            runPass()
+            assert.equal(1, candidatesCalls)
+            runPass()
+            go(1, 0.6, 0)
+            runPass()
+            assert.equal(1, candidatesCalls)
+            go(1, 0.6, 0.9)   -- 1,08 m du dernier calcul
+            runPass()
+            assert.equal(2, candidatesCalls)
+            runPass()
+            assert.equal(2, candidatesCalls)
+            buckets[1] = 4
+            runPass()
+            assert.equal(3, candidatesCalls)
+            buckets[1] = 0
+            runPass()
+            assert.equal(4, candidatesCalls)
+            -- une zone déclarée à côté d'un joueur immobile lui arrive au passage suivant
+            sent = {}
+            zones.define(OWNER, 'voisine', AREA)
+            runPass()
+            assert.equal(5, candidatesCalls)
+            assert.equal(1, #of(STATE, 1))
+            -- zone déplacée ou retirée : recalcul (sortie)
+            zones.move(OWNER, 'voisine', { x = 3000.0, y = 0.0, radius = 10 })
+            sent = {}
+            runPass()
+            assert.same({ LEAVE }, events(1))
+        end)
+
+        it('joueur immobile : ses instantanés en attente partent quand même', function()
+            for i = 1, 5 do
+                zones.define(OWNER, 'z' .. i, { x = i * 10.0, y = 0.0, radius = 100 }, bigState(10))
+            end
+            place(1, 0, 0)
+            runPass()
+            assert.equal(3, #of(STATE, 1))
+            sent = {}
+            runPass()
+            assert.equal(2, #of(STATE, 1))
+        end)
+
+        it('refreshPlayer relit la position (cache de 50 ms oublié) et recalcule', function()
+            zones.define(OWNER, 'ici', AREA)
+            zones.define(OWNER, 'labas', { x = 5000.0, y = 0.0, radius = 50 })
+            place(1, 0, 0)
+            runPass()
+            sent = {}
+            go(1, 5000, 0)          -- même instant : la position gardée serait l'ancienne
+            zones.refreshPlayer(1)
+            assert.same({ LEAVE, STATE }, events(1))
+        end)
+    end)
+
+    -- relecture sécurité de T-014 (M-1)
+    it('purgeOwner d’une ressource encore démarrée (setup en échec) : sorties envoyées, une par joueur', function()
+        _G.GetResourceState = function(resource) return resource == OWNER and 'started' or 'stopped' end
+        local _, a = zones.define(OWNER, 'a', AREA)
+        local _, b = zones.define(OWNER, 'b', AREA)
+        zones.define(OTHER, 'c', AREA)
+        place(1, 0, 0)
+        place(2, 0, 0)
+        runPass()
+        sent = {}
+        zones.purgeOwner(OWNER)
+        assert.same({ LEAVE, LEAVE }, events())
+        assert.same({ a, b }, of(LEAVE, 1)[1].args[1])
+        assert.same({ a, b }, of(LEAVE, 2)[1].args[1])
+        sent = {}
+        zones.purgeOwner(OTHER)
+        assert.same({}, events())
+        _G.GetResourceState = nil
+    end)
+
     describe('compteur et cibles', function()
         it('état et différence comptés sous la ressource de la zone, sorties sous vAvA_core ; jamais -1', function()
             local targets = {}

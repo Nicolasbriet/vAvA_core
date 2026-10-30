@@ -4,7 +4,7 @@ local helper = require('tests.helper')
 -- instantané redemandé (préavis dépassé, trou, échec de transport), nettoyage. Évènements, minuteries, RPC et threads en
 -- doublures ; hooks réels.
 describe('vAvA.zones (client)', function()
-    local zones, hooks, EVENTS, cfg, netHandlers, calls, answers, waits, printed, realPrint
+    local zones, hooks, EVENTS, cfg, netHandlers, calls, answers, waits, printed, realPrint, invoker, clock
 
     local OWNER, OTHER = 'vava_test', 'vava_autre'
 
@@ -13,9 +13,12 @@ describe('vAvA.zones (client)', function()
         netHandlers, calls, answers, waits, printed = {}, {}, {}, {}, {}
         realPrint = _G.print
         _G.print = function(line) printed[#printed + 1] = tostring(line) end
-        _G.GetGameTimer = function() return 0 end
+        clock = 0
+        _G.GetGameTimer = function() return clock end
         _G.RegisterNetEvent = function(name, fn) netHandlers[name] = fn end
         _G.Wait = function(ms) waits[#waits + 1] = ms end
+        invoker = nil
+        _G.GetInvokingResource = function() return invoker end
         helper.loadAll({
             'shared/init.lua',
             'config/shared.lua',
@@ -275,5 +278,100 @@ describe('vAvA.zones (client)', function()
         netHandlers[EVENTS.ZONE_PENDING](9, 1, 0)
         zones.purgeOwner('personne')
         fire()
+    end)
+
+    -- relecture réseau de T-014 (IMPORTANT 2) : une sortie fiable peut doubler un instantané latent annoncé
+    describe('instantané fantôme', function()
+        it('sortie pendant l’attente d’un instantané annoncé : l’instantané arrivé après est ignoré', function()
+            local handler, received = recorder()
+            zones.watch(OWNER, handler)
+            netHandlers[EVENTS.ZONE_PENDING](5, 3, 2000)
+            netHandlers[EVENTS.ZONE_LEAVE]({ 5 })
+            state(5, OWNER .. ':place', 3, { a = 3 })
+            state(5, OWNER .. ':place', 2, { a = 2 })
+            assert.same({}, zones.list(OWNER))
+            assert.same({}, received)
+            fire()
+            assert.same({}, calls)
+            -- un instantané plus récent (nouvelle entrée) est accepté, et la marque oubliée
+            state(5, OWNER .. ':place', 4, { a = 4 })
+            assert.same({ 'place' }, zones.list(OWNER))
+            assert.same({ { 'enter', 'place', { a = 4 } } }, received)
+        end)
+
+        it('nouvelle entrée annoncée à la même révision : accepté (même contenu)', function()
+            netHandlers[EVENTS.ZONE_PENDING](5, 3, 2000)
+            netHandlers[EVENTS.ZONE_LEAVE]({ 5 })
+            netHandlers[EVENTS.ZONE_PENDING](5, 3, 2000)
+            state(5, OWNER .. ':place', 3, { a = 3 })
+            assert.same({ 'place' }, zones.list(OWNER))
+        end)
+
+        it('nouvelle entrée annoncée plus récente : l’ancien instantané est ignoré, le nouveau accepté', function()
+            netHandlers[EVENTS.ZONE_PENDING](5, 3, 2000)
+            netHandlers[EVENTS.ZONE_LEAVE]({ 5 })
+            netHandlers[EVENTS.ZONE_PENDING](5, 6, 2000)
+            state(5, OWNER .. ':place', 3, { a = 3 })
+            assert.same({}, zones.list(OWNER))
+            state(5, OWNER .. ':place', 6, { a = 6 })
+            assert.same({ 'place' }, zones.list(OWNER))
+            assert.same({ a = 6 }, (zones.get(OWNER, 'place')))
+        end)
+
+        it('sortie d’une zone déjà reçue : aucune marque, une nouvelle entrée de même révision passe', function()
+            netHandlers[EVENTS.ZONE_PENDING](5, 3, 2000)
+            state(5, OWNER .. ':place', 3, { a = 3 })
+            netHandlers[EVENTS.ZONE_LEAVE]({ 5 })
+            state(5, OWNER .. ':place', 3, { a = 3 })
+            assert.same({ 'place' }, zones.list(OWNER))
+        end)
+
+        it('marque oubliée après staleSnapshotMs', function()
+            netHandlers[EVENTS.ZONE_PENDING](5, 3, 2000)
+            netHandlers[EVENTS.ZONE_LEAVE]({ 5 })
+            clock = cfg.staleSnapshotMs + 1
+            state(5, OWNER .. ':place', 3, { a = 3 })
+            assert.same({ 'place' }, zones.list(OWNER))
+        end)
+
+        -- relecture sécurité de T-014 (M-4) : instantané de l'ancien personnage arrivé après le chargement du suivant
+        it('instantané annoncé avant un déchargement, arrivé après le chargement suivant : ignoré', function()
+            netHandlers[EVENTS.ZONE_PENDING](5, 2, 5000)
+            hooks.runAfter('core:character:unloaded', { id = 1 })
+            hooks.runAfter('core:character:loaded', { id = 2 })
+            state(5, OWNER .. ':place', 2, { a = 2 })
+            assert.same({}, zones.list(OWNER))
+            -- les zones du nouveau personnage arrivent normalement
+            state(6, OWNER .. ':autre', 1, {})
+            assert.same({ 'autre' }, zones.list(OWNER))
+        end)
+    end)
+
+    -- relecture sécurité de T-014 (M-3) : seul le serveur envoie ces évènements
+    it('évènements déclenchés localement par une autre ressource : ignorés', function()
+        invoker = 'vava_triche'
+        state(1, OWNER .. ':place', 1, {})
+        netHandlers[EVENTS.ZONE_PENDING](2, 1, 10)
+        assert.same({}, zones.list(OWNER))
+        invoker = nil
+        state(1, OWNER .. ':place', 1, {})
+        invoker = 'vava_triche'
+        netHandlers[EVENTS.ZONE_LEAVE]({ 1 })
+        diff(1, 2, { a = 1 })
+        assert.same({ 'place' }, zones.list(OWNER))
+        assert.same({}, (zones.get(OWNER, 'place')))
+        -- le core lui-même (essai du réseau, outils) reste accepté
+        invoker = 'vAvA_core'
+        netHandlers[EVENTS.ZONE_LEAVE]({ 1 })
+        assert.same({}, zones.list(OWNER))
+    end)
+
+    it('tampon de 64 différences en attendant un instantané', function()
+        assert.equal(64, cfg.maxBuffered)
+        netHandlers[EVENTS.ZONE_PENDING](1, 1, 5000)
+        for revision = 2, 65 do diff(1, revision, { n = revision }) end
+        state(1, OWNER .. ':place', 1, {})
+        assert.same({ n = 65 }, (zones.get(OWNER, 'place')))
+        assert.same({}, calls)
     end)
 end)

@@ -4,7 +4,8 @@
            le core (paires clé → valeur, révision). À chaque passage (zones.passMs), le serveur lit une fois la position
            de chaque personnage présent, cherche dans la grille les zones proches, abonne les joueurs qui entrent dans le
            cercle d'intérêt (instantané, une seule sérialisation pour tous les entrants d'une zone) et désabonne ceux qui
-           en sortent au-delà de la marge de sortie. Les changements d'un tour partent regroupés en une différence, en
+           en sortent au-delà de la marge de sortie ; un joueur immobile (moins de stillDistance, même instance, zones
+           inchangées) n'est pas recalculé. Les changements d'un tour partent regroupés en une différence, en
            fiable, aux seuls abonnés à jour. Le client ne demande jamais d'entrer dans une zone : son seul RPC redemande
            l'instantané d'une zone qu'il suit déjà (core:zones:resync).
     Envois : tous par core.net (comptés, jamais -1) : état, préavis et différences sous la ressource de la zone, sorties
@@ -83,6 +84,14 @@ local durations, durationIndex, lastDuration = {}, 0, nil
 local durationSlots = 60
 local started = false
 local passLogState = {}
+-- version de la disposition des zones : + 1 à chaque zone déclarée, déplacée ou retirée
+local layoutVersion = 0
+-- joueur → dernier calcul complet { x, y, bucket, spawned, version } : un joueur qui n'a pas bougé de plus de
+-- stillDistance, même instance, sans zone déclarée, déplacée ou retirée depuis, n'est pas recalculé
+local anchors = {}
+local STILL2 = cfg.stillDistance * cfg.stillDistance
+-- zones candidates d'un joueur pendant un calcul (tableaux réutilisés : aucune table créée par candidat)
+local candZones, candDist = {}, {}
 
 ---@param value any
 ---@return boolean
@@ -125,6 +134,7 @@ local function place(zone, area)
     local exit = reach + cfg.exitMargin
     zone.enter2, zone.exit2 = reach * reach, exit * exit
     grid:insert(zone.handle, area.x, area.y, reach)
+    layoutVersion = layoutVersion + 1
 end
 
 ---@param owner string
@@ -262,6 +272,7 @@ local function forget(zone)
     entry.count = entry.count - 1
     if entry.count == 0 then byOwner[zone.owner] = nil end
     zoneCount = zoneCount - 1
+    layoutVersion = layoutVersion + 1
 end
 
 -- Passage ---------------------------------------------------------------------------------------------------------
@@ -295,15 +306,46 @@ local function byDistance(a, b)
     return a[2] < b[2] or (a[2] == b[2] and a[1].handle < b[1].handle)
 end
 
---- Sorties, entrées et instantanés retenus d'un personnage présent.
----@param character vAvA.Character
-local function visit(character)
-    if not vAvA.sync.isCurrent(character) then return end
-    local src = character.source
-    local position = net.positionOf(src)
-    if not position then return end
-    local px, py = position.x, position.y
-    local bucket = GetPlayerRoutingBucket(src)
+---@param i integer
+---@param j integer
+local function swapCandidates(i, j)
+    candZones[i], candZones[j] = candZones[j], candZones[i]
+    candDist[i], candDist[j] = candDist[j], candDist[i]
+end
+
+--- Sélection partielle (sans tri) : les k candidates les plus proches dans les cases 1..k des tableaux de travail.
+---@param n integer  candidates
+---@param k integer  places (1 ≤ k < n)
+local function selectNearest(n, k)
+    local lo, hi = 1, n
+    while lo < hi do
+        local pivot = candDist[(lo + hi) // 2]
+        local i, j = lo, hi
+        while i <= j do
+            while candDist[i] < pivot do i = i + 1 end
+            while candDist[j] > pivot do j = j - 1 end
+            if i <= j then
+                swapCandidates(i, j)
+                i, j = i + 1, j - 1
+            end
+        end
+        if k <= j then
+            hi = j
+        elseif k >= i then
+            lo = i
+        else
+            return
+        end
+    end
+end
+
+--- Sorties et entrées d'un joueur (calcul complet).
+---@param src integer
+---@param px number
+---@param py number
+---@param bucket integer
+---@param spawned boolean
+local function recompute(src, px, py, bucket, spawned)
     local entry = players[src]
     -- sorties
     local leaving = nil
@@ -323,37 +365,45 @@ local function visit(character)
         sort(leaving)
         net.dispatch(CORE_RESOURCE, EVENTS.ZONE_LEAVE, src, net.NEVER, EVENTS.ZONE_LEAVE, leaving)
     end
-    -- entrées : seulement un personnage apparu
-    if character.spawned then
-        local entering = nil
-        local followed = entry and entry.zones
-        for handle in pairs(grid:candidates(px, py)) do
-            if not (followed and followed[handle]) then
-                local zone = byHandle[handle]
-                if zone.bucket == nil or zone.bucket == bucket then
-                    local dx, dy = px - zone.x, py - zone.y
-                    local distance2 = dx * dx + dy * dy
-                    if distance2 <= zone.enter2 then
-                        entering = entering or {}
-                        entering[#entering + 1] = { zone, distance2 }
+    -- entrées : seulement un personnage apparu ; au plafond de zones suivies, rien n'est construit ni trié
+    if not spawned then return end
+    local followed = entry and entry.zones
+    local room = cfg.maxSubscriptionsPerPlayer - (entry and entry.count or 0)
+    local count, full = 0, false
+    for handle in pairs(grid:candidates(px, py)) do
+        if not (followed and followed[handle]) then
+            local zone = byHandle[handle]
+            if zone.bucket == nil or zone.bucket == bucket then
+                local dx, dy = px - zone.x, py - zone.y
+                local distance2 = dx * dx + dy * dy
+                if distance2 <= zone.enter2 then
+                    if room <= 0 then
+                        full = true
+                        break
                     end
+                    count = count + 1
+                    candZones[count], candDist[count] = zone, distance2
                 end
             end
-        end
-        if entering then
-            sort(entering, byDistance)
-            local room = cfg.maxSubscriptionsPerPlayer - (entry and entry.count or 0)
-            for i = 1, #entering do
-                if i > room then
-                    warnFull(src, GetGameTimer())
-                    break
-                end
-                setStatus(entering[i][1], src, PENDING)
-            end
-            entry = players[src]
         end
     end
-    -- instantanés en attente : les plus proches d'abord, dans le budget du passage (le premier toujours)
+    if count > room then
+        selectNearest(count, room)
+        full = true
+    end
+    if full then warnFull(src, GetGameTimer()) end
+    for i = 1, count do
+        if i <= room then setStatus(candZones[i], src, PENDING) end
+        candZones[i], candDist[i] = nil, nil
+    end
+end
+
+--- Instantanés en attente d'un joueur : les plus proches d'abord, dans le budget du passage (le premier toujours).
+---@param src integer
+---@param px number
+---@param py number
+local function retainPending(src, px, py)
+    local entry = players[src]
     if entry and entry.pending > 0 then
         local waiting = {}
         for handle in pairs(entry.zones) do
@@ -373,6 +423,35 @@ local function visit(character)
             retain(zone, src)
         end
     end
+end
+
+--- Un personnage présent : sorties et entrées s'il a bougé (ou si les zones ont changé), puis ses instantanés en
+--- attente. Un joueur immobile ne coûte qu'une lecture de position et d'instance.
+---@param character vAvA.Character
+local function visit(character)
+    if not vAvA.sync.isCurrent(character) then return end
+    local src = character.source
+    local position = net.positionOf(src)
+    if not position then return end
+    local px, py = position.x, position.y
+    local bucket = GetPlayerRoutingBucket(src)
+    local spawned = character.spawned == true
+    local anchor = anchors[src]
+    local still = anchor ~= nil and anchor.version == layoutVersion and anchor.bucket == bucket
+        and anchor.spawned == spawned
+    if still then
+        local dx, dy = px - anchor.x, py - anchor.y
+        still = dx * dx + dy * dy < STILL2
+    end
+    if not still then
+        recompute(src, px, py, bucket, spawned)
+        if not anchor then
+            anchor = {}
+            anchors[src] = anchor
+        end
+        anchor.x, anchor.y, anchor.bucket, anchor.spawned, anchor.version = px, py, bucket, spawned, layoutVersion
+    end
+    retainPending(src, px, py)
 end
 
 --- Envoie les instantanés retenus pendant le passage : une préparation par zone.
@@ -541,6 +620,9 @@ function zones.refreshPlayer(src)
         if character.source == src then found = character end
     end)
     if not found then return end
+    -- position relue et calcul complet : le joueur vient d'apparaître ailleurs
+    net.forgetPosition(src)
+    anchors[src] = nil
     local ok, err = xpcall(function()
         flushAll()
         visit(found)
@@ -562,16 +644,40 @@ function zones.purgePlayer(src)
     end
     players[src] = nil
     warnedAt[src] = nil
+    anchors[src] = nil
 end
 
---- Oublie les zones d'un module arrêté, sans rien envoyer (le client oublie de lui-même les zones du module).
+--- Oublie les zones d'un module arrêté ou en échec. Ressource arrêtée : rien n'est envoyé (le client oublie de lui-même
+--- les zones d'une ressource arrêtée). Ressource encore démarrée (setup en échec) : ses abonnés reçoivent la sortie,
+--- un seul message par joueur.
 ---@param owner string
 function zones.purgeOwner(owner)
     local entry = byOwner[owner]
     if not entry then return end
     local list = {}
     for _, zone in pairs(entry.zones) do list[#list + 1] = zone end
-    for i = 1, #list do forget(list[i]) end
+    sort(list, function(a, b) return a.handle < b.handle end)
+    local running = type(GetResourceState) == 'function' and GetResourceState(owner) == 'started'
+    local leaving = running and {} or nil
+    for i = 1, #list do
+        local zone = list[i]
+        if leaving then
+            for src in pairs(zone.subs) do
+                local handles = leaving[src]
+                if not handles then
+                    handles = {}
+                    leaving[src] = handles
+                end
+                handles[#handles + 1] = zone.handle
+            end
+        end
+        forget(zone)
+    end
+    if leaving then
+        for src, handles in pairs(leaving) do
+            net.dispatch(CORE_RESOURCE, EVENTS.ZONE_LEAVE, src, net.NEVER, EVENTS.ZONE_LEAVE, handles)
+        end
+    end
 end
 
 --- Redemande d'instantané d'un joueur : zone déjà suivie seulement.

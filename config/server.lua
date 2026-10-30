@@ -176,9 +176,16 @@ vAvA.config.server = {
     -- Abonnements de zone (core.zones, 0.11.0) : un module déclare des zones et tient leur état dans le core ; le serveur
     -- abonne les joueurs proches (positions lues par lui) et n'envoie l'état et ses différences qu'à eux.
     zones = {
-        passMs = 1000,             -- intervalle entre deux passages (entrées et sorties de zone). Réglable : 2000 reste
-                                   -- sûr avec la marge par défaut de 50 m (un cavalier au galop, ~15 m/s, parcourt
-                                   -- 30 m entre deux passages) ; au-delà, la zone peut arriver après le joueur
+        passMs = 1000,             -- intervalle entre deux passages (entrées et sorties de zone). Recommandé : garder
+                                   -- 1000. Coût mesuré hors jeu (Lua seul, 2 048 zones, rapport T-014) par passage :
+                                   -- joueurs immobiles 0,03 ms à 64 joueurs, 0,07 ms à 128 (non recalculés) ; en
+                                   -- mouvement, zones éparses 0,23 / 0,46 ms, ville (1,5 × 1,5 km, rayons 2-30 m)
+                                   -- 1,7 / 3,3 ms, ville très dense 6,4 / 13,9 ms ; plus quatre natives par joueur.
+                                   -- 2000 divise ce coût par deux et reste sûr avec la marge par défaut de 50 m (un
+                                   -- cavalier au galop, ~15 m/s, parcourt 30 m entre deux passages) ; au-delà, la zone
+                                   -- peut arriver après le joueur
+        stillDistance = 1.0,       -- m : un joueur qui a bougé de moins depuis son dernier calcul (même instance, aucune
+                                   -- zone déclarée, déplacée ou retirée entre-temps) n'est pas recalculé
         cellSize = 256.0,          -- côté d'une case de la grille (m)
         coordLimit = 50000.0,      -- |x| et |y| d'un centre au plus (la carte tient dans ±10 000)
         maxRadius = 500.0,         -- rayon d'une zone au plus (m, > 0)

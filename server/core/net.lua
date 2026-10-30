@@ -345,7 +345,8 @@ local function totalInFlight(now)
 end
 
 --- Réserve la place d'un envoi latent vers un joueur ; false si le volume en route vers lui, ou vers tous les joueurs
---- (`total`, calculé une fois par envoi), dépasserait sa borne.
+--- (`total`, calculé une fois par envoi), dépasserait sa borne. Le premier envoi latent vers un joueur qui n'a rien en
+--- route passe toujours le plafond global : un joueur n'est jamais privé de tout gros envoi par les autres.
 ---@param target integer
 ---@param bytes integer
 ---@param now integer
@@ -356,7 +357,7 @@ local function reserve(target, bytes, now, total)
     local drain = drainAt[target] or 0
     local inFlight = drain > now and (drain - now) * RATE / 1000 or 0
     if inFlight + bytes > cfg.latent.maxInFlightBytes then return false, 'player' end
-    if total + bytes > MAX_TOTAL_IN_FLIGHT then return false, 'global' end
+    if inFlight > 0 and total + bytes > MAX_TOTAL_IN_FLIGHT then return false, 'global' end
     drain = (drain > now and drain or now) + bytes * 1000 / RATE
     drainAt[target] = drain
     return ceil(drain - now)
@@ -699,7 +700,13 @@ function net.wouldSaturate(target, bytes)
     local drain = drainAt[target] or 0
     local inFlight = drain > now and (drain - now) * RATE / 1000 or 0
     if inFlight + bytes > cfg.latent.maxInFlightBytes then return true end
-    return totalInFlight(now) + bytes > MAX_TOTAL_IN_FLIGHT
+    return inFlight > 0 and totalInFlight(now) + bytes > MAX_TOTAL_IN_FLIGHT
+end
+
+--- Oublie la position gardée d'un joueur : la prochaine lecture interroge son ped (apparition, téléportation).
+---@param src integer
+function net.forgetPosition(src)
+    positionCache[src] = nil
 end
 
 ---@class vAvA.NetStatsOptions

@@ -5,6 +5,8 @@
            révision ou si un instantané annoncé n'arrive pas ; le module propriétaire de chaque zone est prévenu par le
            gestionnaire qu'il a donné à core.zones.watch (enter, change, leave). Tout est oublié au déchargement et à la
            sélection du personnage ; les zones d'une ressource arrêtée sont oubliées sans notification.
+           Instantané fantôme : un instantané latent annoncé, doublé par la sortie de sa zone (fiable) ou par un
+           déchargement, est marqué ; s'il arrive ensuite, il est ignoré (sauf nouveau préavis de la même révision).
            Aucune boucle : quatre gestionnaires d'évènement, une minuterie par instantané attendu, un thread par demande
            d'instantané en cours (au plus une par zone).
     Dépendances : shared/init.lua, config/shared.lua, shared/lib/schema.lua, shared/lib/zonereplica.lua,
@@ -12,10 +14,11 @@
 ]]
 
 local type, pairs, pcall, tostring, rawlen = type, pairs, pcall, tostring, rawlen
-local mathType, min = math.type, math.min
+local mathType, min, max = math.type, math.min, math.max
 local sort = table.sort
 local match = string.match
 local RegisterNetEvent, SetTimeout, CreateThread, Wait = RegisterNetEvent, SetTimeout, CreateThread, Wait
+local GetGameTimer, GetInvokingResource = GetGameTimer, GetInvokingResource
 
 local EVENTS = vAvA.EVENTS
 local MAX_HANDLE = vAvA.RPC_MAX_ID
@@ -45,9 +48,14 @@ vAvA.zones = zones
 ---@field notified boolean     le module a reçu enter
 ---@field generation integer   minuteries plus anciennes sans effet
 ---@field resyncing boolean
+---@field announced integer|nil  plus haute révision annoncée par un préavis (instantané latent en route)
 
 ---@type table<integer, vAvA.ZoneEntry>
 local entries = {}
+-- numéro → { revision, at } : instantané latent annoncé puis doublé par une sortie ou un déchargement ; un instantané de
+-- cette révision ou plus ancien, arrivé ensuite, est ignoré (oublié au premier plus récent, ou après staleSnapshotMs)
+local ghosts = {}
+local RESOURCE = vAvA.resourceName
 -- ressource → gestionnaire donné à watch
 local handlers = {}
 -- ressource → état de limitation de ses erreurs en console
@@ -123,7 +131,48 @@ local function drop(handle, silent)
     if not entry then return end
     entries[handle] = nil
     entry.generation = entry.generation + 1
+    -- instantané latent annoncé et pas encore arrivé : s'il arrive après la sortie, il ne doit rien recréer
+    local announced = entry.announced
+    if announced and (entry.replica.revision == nil or announced > entry.replica.revision) then
+        local ghost = ghosts[handle]
+        ghosts[handle] = { revision = ghost and max(ghost.revision, announced) or announced, at = GetGameTimer() }
+    end
     if entry.notified and not silent then notify(entry, 'leave') end
+end
+
+--- Oublie les marques d'instantanés fantômes trop anciennes (aucun latent n'est en route si longtemps).
+local function sweepGhosts()
+    local now = GetGameTimer()
+    for handle, ghost in pairs(ghosts) do
+        if now - ghost.at > cfg.staleSnapshotMs then ghosts[handle] = nil end
+    end
+end
+
+--- Vrai si cet instantané est un fantôme : annoncé avant une sortie (ou un déchargement), arrivé après, et sans
+--- nouveau préavis de la même révision depuis.
+---@param handle integer
+---@param revision integer
+---@return boolean
+local function isGhost(handle, revision)
+    local ghost = ghosts[handle]
+    if not ghost then return false end
+    if GetGameTimer() - ghost.at > cfg.staleSnapshotMs or revision > ghost.revision then
+        ghosts[handle] = nil
+        return false
+    end
+    local entry = entries[handle]
+    if entry and entry.announced == revision then
+        ghosts[handle] = nil
+        return false
+    end
+    return true
+end
+
+--- Évènements des zones : seulement ceux du serveur (un déclenchement local par une autre ressource est ignoré).
+---@return boolean
+local function fromServer()
+    local invoker = GetInvokingResource()
+    return invoker == nil or invoker == RESOURCE
 end
 
 local requestResync
@@ -174,9 +223,10 @@ end
 ---@param revision any
 ---@param state any
 local function onState(handle, name, revision, state)
-    if not accepting or not validHandle(handle) or not validRevision(revision) or type(state) ~= 'table' then return end
+    if not accepting or not fromServer() then return end
+    if not validHandle(handle) or not validRevision(revision) or type(state) ~= 'table' then return end
     local owner, id = splitName(name)
-    if not owner then return end
+    if not owner or isGhost(handle, revision) then return end
     local entry = entryOf(handle)
     if entry.name and entry.name ~= name then return end
     entry.name, entry.owner, entry.id = name, owner, id
@@ -193,9 +243,10 @@ end
 ---@param revision any
 ---@param delayMs any
 local function onPending(handle, revision, delayMs)
-    if not accepting or not validHandle(handle) or not validRevision(revision) then return end
+    if not accepting or not fromServer() or not validHandle(handle) or not validRevision(revision) then return end
     if mathType(delayMs) ~= 'integer' or delayMs < 0 then return end
     local entry = entryOf(handle)
+    entry.announced = max(entry.announced or 0, revision)
     if entry.replica:notice(revision) == 'awaiting' then
         awaitSnapshot(entry, min(delayMs + cfg.awaitMarginMs, cfg.maxAwaitMs))
     end
@@ -206,7 +257,7 @@ end
 ---@param set any
 ---@param removed any
 local function onDiff(handle, revision, set, removed)
-    if not accepting or not validHandle(handle) or not validRevision(revision) then return end
+    if not accepting or not fromServer() or not validHandle(handle) or not validRevision(revision) then return end
     if set ~= nil and type(set) ~= 'table' then return end
     if removed ~= nil and not zonereplica.isKeyList(removed) then return end
     local entry = entryOf(handle)
@@ -221,18 +272,21 @@ end
 
 ---@param handles any
 local function onLeave(handles)
-    if type(handles) ~= 'table' then return end
+    if not fromServer() or type(handles) ~= 'table' then return end
     local length = rawlen(handles)
     if length > MAX_HANDLES then return end
+    sweepGhosts()
     for i = 1, length do
         local handle = handles[i]
         if validHandle(handle) then drop(handle) end
     end
 end
 
---- Toutes les zones oubliées (déchargement, sélection) ; chaque module est prévenu pour les siennes.
+--- Toutes les zones oubliées (déchargement, sélection) ; chaque module est prévenu pour les siennes. Les instantanés
+--- latents annoncés et pas encore arrivés restent marqués : arrivés après le chargement suivant, ils sont ignorés.
 local function clearAll()
     accepting = false
+    sweepGhosts()
     local list = {}
     for handle in pairs(entries) do list[#list + 1] = handle end
     sort(list)

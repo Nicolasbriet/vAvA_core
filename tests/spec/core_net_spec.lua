@@ -257,33 +257,44 @@ describe('vAvA.net', function()
             assert.same({ 2 }, skipped)
         end)
 
-        it('plafond global : 16 envois de 256 Ko passent, le 17e est refusé (4 Mo en route), accepté 4 s plus tard', function()
+        it('plafond global : 4 Mo en route, un second envoi vers un joueur qui attend déjà est refusé, accepté 4 s plus tard', function()
             for src = 1, 20 do existing[src] = true end
             assert.equal(4194304, vAvA.config.server.net.latent.maxTotalInFlightBytes)
             for src = 1, 16 do
                 assert.is_true(net.send(OWNER, nil, src, EVENT, whole))
             end
             printed = {}
-            assert.is_true(net.wouldSaturate(17, 262144))
-            assert.same({ false, 'saturated' }, { net.send(OWNER, nil, 17, EVENT, whole) })
+            -- le joueur 1 a 256 Ko en route (son plafond de 512 Ko le permettrait) : refusé par le plafond global
+            assert.is_true(net.wouldSaturate(1, 262144))
+            assert.same({ false, 'saturated' }, { net.send(OWNER, nil, 1, EVENT, whole) })
             assert.is_true(printedMatching('plafond global du latent atteint'))
             assert.is_true(printedMatching('4194304 octets en route'))
             -- un petit message fiable passe toujours
-            assert.is_true(net.send(OWNER, nil, 17, EVENT, 'petit'))
+            assert.is_true(net.send(OWNER, nil, 1, EVENT, 'petit'))
             now = 4000
-            assert.is_false(net.wouldSaturate(17, 262144))
-            assert.is_true(net.send(OWNER, nil, 17, EVENT, whole))
+            assert.is_false(net.wouldSaturate(1, 262144))
+            assert.is_true(net.send(OWNER, nil, 1, EVENT, whole))
         end)
 
-        it('plafond global dans une liste : les cibles au-delà sont sautées et rendues', function()
+        -- relecture de T-014 (sécurité M-2) : un joueur n'est jamais privé de tout gros envoi par les autres
+        it('plafond global atteint : le premier envoi latent vers un joueur qui n’a rien en route passe toujours', function()
             for src = 1, 20 do existing[src] = true end
-            for src = 1, 15 do net.send(OWNER, nil, src, EVENT, whole) end
-            local list = { 16, 17, 18 }
+            for src = 1, 16 do net.send(OWNER, nil, src, EVENT, whole) end
+            assert.is_false(net.wouldSaturate(17, 262144))
+            assert.is_true(net.send(OWNER, nil, 17, EVENT, whole))
+            -- le second, lui, attend
+            assert.same({ false, 'saturated' }, { net.send(OWNER, nil, 17, EVENT, whole) })
+        end)
+
+        it('plafond global dans une liste : les cibles qui attendent déjà sont sautées et rendues', function()
+            for src = 1, 20 do existing[src] = true end
+            for src = 1, 16 do net.send(OWNER, nil, src, EVENT, whole) end
+            local list = { 1, 17, 2, 18 }
             local ok, count, _, _, skipped = net.send(OWNER, nil, list, EVENT, whole)
-            assert.same({ true, 1 }, { ok, count })
-            assert.same({ 17, 18 }, skipped)
+            assert.same({ true, 2 }, { ok, count })
+            assert.same({ 1, 2 }, skipped)
             -- la liste du module n'est pas touchée
-            assert.same({ 16, 17, 18 }, list)
+            assert.same({ 1, 17, 2, 18 }, list)
         end)
 
         it('deliverList : rend des listes neuves de servis et de sautés, sans toucher la liste donnée', function()
