@@ -5,6 +5,9 @@
            les zones proches sont dessinées en cylindres transparents (teinte selon l'effet) et l'aperçu suit les
            réglages en direct : la boucle par image ne vit que le temps de l'édition, chez le seul membre du Conseil.
            Un enregistrement à la fois (pas de double envoi) ; focus rendu si la ressource s'arrête éditeur ouvert.
+           Liste propre à l'éditeur (1.3.0) : toutes les zones, reçues du serveur à l'ouverture (au seul membre qui
+           l'ouvre), puis tenues à jour par ses propres actions et par les zones proches changées par un autre membre
+           (abonnements de zone) ; une zone lointaine changée par un autre l'est à la réouverture.
     Dépendances : shared/constants.lua, config.lua, client/core.lua, client/nui.lua, client/zones.lua
 ]]
 
@@ -30,6 +33,20 @@ local canTeleport = false
 -- aperçu : zone en cours de création (id nil) ou de modification, avec les réglages de l'interface
 ---@type table|nil
 local preview = nil
+-- zones connues de l'éditeur (numéro → zone vérifiée) : liste du serveur à l'ouverture, puis changements
+---@type table<integer, table>
+local known = {}
+
+--- Remplace la liste de l'éditeur par celle du serveur.
+---@param raw any
+local function adopt(raw)
+    known = {}
+    if type(raw) ~= 'table' then return end
+    for _, entry in pairs(raw) do
+        local zone = zones.valid(entry)
+        if zone then known[zone.id] = zone end
+    end
+end
 
 ---@return boolean
 function editor.isOpen()
@@ -54,7 +71,7 @@ end
 local function listed()
     local origin = here()
     local out = {}
-    for _, zone in pairs(zones.all()) do
+    for _, zone in pairs(known) do
         local dx, dy, dz = zone.x - origin.x, zone.y - origin.y, zone.z - origin.z
         out[#out + 1] = {
             id = zone.id, label = zone.label, radius = zone.radius, height = zone.height, multiplier = zone.multiplier,
@@ -79,7 +96,7 @@ local function drawLoop()
     while open do
         local origin = here()
         local editing = preview and preview.id
-        for _, zone in pairs(zones.all()) do
+        for _, zone in pairs(known) do
             local dx, dy = zone.x - origin.x, zone.y - origin.y
             if zone.id ~= editing and dx * dx + dy * dy <= DRAW_SQUARED then draw(zone, cfg.alpha) end
         end
@@ -136,7 +153,7 @@ function editor.open()
     local ok, success, data = core.rpc.call(RPC.EDITOR)
     opening = false
     if not ok or not success or type(data) ~= 'table' then return end
-    zones.replace(data.zones)
+    adopt(data.zones)
     canTeleport = data.canTeleport == true
     open = true
     preview = nil
@@ -155,6 +172,43 @@ end
 --- Les zones ont changé (décision du Conseil) : liste de l'interface à jour.
 function editor.refresh()
     if open then nui.send('zones', { zones = listed() }) end
+end
+
+--- Zone proche reçue ou changée (abonnements de zone) : la liste de l'éditeur suit, même pour un changement fait par
+--- un autre membre. S'éloigner d'une zone ne la retire pas de la liste.
+---@param kind string  'enter' | 'change' | 'leave'
+---@param raw any      la zone (enter, change)
+function editor.track(kind, raw)
+    if kind ~= 'enter' and kind ~= 'change' then return end
+    local zone = zones.valid(raw)
+    if not zone then return end
+    known[zone.id] = zone
+    editor.refresh()
+end
+
+--- Liste redemandée au serveur (une zone a disparu entre-temps : supprimée par un autre membre).
+local function refetch()
+    local ok, success, data = core.rpc.call(RPC.EDITOR)
+    if not open or not ok or not success or type(data) ~= 'table' then return end
+    adopt(data.zones)
+    editor.refresh()
+end
+
+--- Après une réponse du serveur : liste de l'éditeur à jour (zone scellée ou supprimée), ou redemandée.
+---@param result table  réponse pour l'interface
+---@param removedId integer|nil  zone supprimée
+local function follow(result, removedId)
+    if result.ok then
+        if removedId then
+            known[removedId] = nil
+        else
+            local zone = zones.valid(result.result)
+            if zone then known[zone.id] = zone end
+        end
+        editor.refresh()
+    elseif result.error == 'unknown_zone' then
+        CreateThread(refetch)
+    end
 end
 
 -- Interface -------------------------------------------------------------------------------------------------------
@@ -178,7 +232,7 @@ end)
 --- Modifier une zone : son aperçu remplace son dessin.
 nui.on('edit', function(data)
     local id = tointeger(data.id)
-    local zone = open and id and zones.all()[id]
+    local zone = open and id and known[id]
     if not zone then return { ok = false, error = 'unknown_zone' } end
     preview = { id = id, x = zone.x, y = zone.y, z = zone.z, radius = zone.radius, height = zone.height, multiplier = zone.multiplier, origin = zone }
     return { ok = true }
@@ -223,6 +277,7 @@ nui.on('save', function(data)
     saving = false
     if not called then error(result, 0) end
     if result.ok then preview = nil end
+    follow(result, nil)
     return result
 end)
 
@@ -231,6 +286,7 @@ nui.on('delete', function(data)
     if not open or not id then return { ok = false, error = 'unknown_zone' } end
     local result = answer(core.rpc.call(RPC.DELETE, id))
     if result.ok then preview = nil end
+    follow(result, id)
     return result
 end)
 
@@ -239,6 +295,7 @@ nui.on('reach', function(data)
     if not open or not id then return { ok = false, error = 'unknown_zone' } end
     if not canTeleport then return { ok = false, error = 'forbidden' } end
     local result = answer(core.rpc.call(RPC.REACH, id))
+    if not result.ok then follow(result, nil) end
     if result.ok then
         -- distances à jour une fois arrivé
         CreateThread(function()

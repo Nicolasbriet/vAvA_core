@@ -24,7 +24,7 @@ casque : **A**, membre du Conseil, et **B**, simple joueur. Un test se cite « v
    comportement voulu.
 3. **Chaque joueur** : chat vocal activé dans les réglages du jeu (Paramètres > Chat vocal), micro choisi, casque (sans
    casque, la voix de l'un repart dans le micro de l'autre). On parle en maintenant `N` (touche de GTA par défaut).
-4. **Démarrage** : la console du serveur affiche `module 'vava_voice' v1.2.1 prêt` ; la table `vava_voice_zones` est
+4. **Démarrage** : la console du serveur affiche `module 'vava_voice' v1.3.0 prêt` ; la table `vava_voice_zones` est
    créée au premier démarrage (migration `sql/0001_voice_zones.sql`). En jeu, médaillon « Voix » dans le HUD.
 5. **Joueurs** : A Souverain (`vava_conseil <compte de A> souverain` : droits `tools` et `teleport`), B sans rang.
 6. **Touche de portée** : `W` sur un clavier AZERTY (FiveM la nomme `Z`, d'après sa place sur un clavier QWERTY) ;
@@ -106,7 +106,7 @@ Tribune vaut ×2, rayon 3 m, hauteur 6 m (après 3-10) ; A se tient en son centr
 |---|---|---|
 | 1 | B (sans rang) : `/zonesvoix`. | Rien ne s'ouvre, aucun message. |
 | 2 | Console : `vava_conseil <compte de B> gardien` ; B ouvre le Registre (`F10`), puis tape `/zonesvoix`. | Aucun outil « Zones de voix » (le Gardien n'a pas le droit `tools`) ; la commande n'ouvre rien. |
-| 3 | Console : `vava_conseil <compte de B> souverain` ; B ouvre l'éditeur sur la liste ; A crée une zone. | La liste de B se met à jour d'elle-même ; la zone paraît aussi dans le monde chez B. |
+| 3 | Console : `vava_conseil <compte de B> souverain` ; B ouvre l'éditeur sur la liste ; A crée une zone. | Si B est à moins de 50 m de la nouvelle zone (rayon 10 m + 40 m), sa liste se met à jour d'elle-même et la zone paraît aussi dans le monde chez lui ; plus loin, il la voit à la réouverture de son éditeur (1.3.0 : une zone n'est envoyée qu'aux joueurs proches). |
 | 4 | B ouvre une zone en modification ; A la supprime ; B clique « Sceller ». | « Cette zone n'existe plus. » |
 | 5 | B garde l'éditeur ouvert ; console : `vava_conseil <compte de B> aucun` ; B clique « Sceller » sur une zone, puis ferme et tape `/zonesvoix`. | Le panneau resté ouvert ne se ferme pas de lui-même, mais « Sceller » répond « Votre rang ne le permet pas. » ; ensuite, l'éditeur ne s'ouvre plus. |
 
@@ -118,7 +118,7 @@ Tribune vaut ×2, rayon 3 m, hauteur 6 m (après 3-10) ; A se tient en son centr
 | 2 | A, à terre : `W` plusieurs fois. | Alterne Chuchoter (cercle de 1,5 m) et Parler (5 m), jamais au-delà. |
 | 3 | B relève A (`G` à moins de 2 m, 8 s). | A retrouve Crier (médaillon aux trois quarts), sans cercle ; B l'entend de nouveau à 10 m. |
 | 4 | A de nouveau à terre choisit Chuchoter, puis rend l'âme (maintenir `E` 3 s, permis après `downed.giveUpAfterMs`). | Au lieu de soins, A retrouve Crier : le choix fait à terre est oublié. |
-| 5 | A, à terre : console `restart vava_voice`. | Après le redémarrage, toujours limité à Parler (`W` : jamais au-delà) : le serveur relit l'état de santé, et le client, en redemandant la liste des zones à son redémarrage, reçoit de nouveau la limite du moment. |
+| 5 | A, à terre : console `restart vava_voice`. | Après le redémarrage, toujours limité à Parler (`W` : jamais au-delà) : le serveur relit l'état de santé, et le client, qui redemande la limite de portée à son redémarrage, la reçoit de nouveau. |
 | 6 | A, à terre, quitte le jeu et revient. | Toujours limité à Parler si vava_health le remet à terre à son retour (voir [sante.md](sante.md)). |
 
 ## 7. Tentatives de triche
@@ -134,7 +134,7 @@ Tribune vaut ×2, rayon 3 m, hauteur 6 m (après 3-10) ; A se tient en son centr
 
 | # | Faire | Attendu |
 |---|---|---|
-| 1 | A et B se parlent, A dans Tribune (×2) ; console du serveur : `restart vava_voice`. | Voix coupée un instant puis revenue sans reconnexion ; console `module 'vava_voice' v1.2.1 prêt` ; médaillon revenu à la même portée ; dans Tribune, `W` quatre fois : le cercle montre toujours l'effet (le client redemande la liste des zones à son redémarrage, et réessaie toutes les 2 s, cinq fois au plus, si le serveur n'est pas encore prêt). |
+| 1 | A et B se parlent, A dans Tribune (×2) ; console du serveur : `restart vava_voice`. | Voix coupée un instant puis revenue sans reconnexion ; console `module 'vava_voice' v1.3.0 prêt` ; médaillon revenu à la même portée ; dans Tribune, `W` quatre fois : le cercle montre toujours l'effet (les zones reviennent d'elles-mêmes par les abonnements de zone du core dans les 2 s ; le client redemande la limite de portée à son redémarrage, et réessaie toutes les 2 s, cinq fois au plus, si le serveur n'est pas encore prêt). |
 | 2 | Éditeur ouvert : `restart vava_voice`. | Le panneau disparaît, la souris et le clavier reviennent au jeu (le module rend le focus à son arrêt). |
 | 3 | A et B tous deux sur l'écran de sélection (se reconnecter) ; console du serveur : `restart vava_voice` ; ils parlent avant, pendant et après le redémarrage. | Ni l'un ni l'autre n'entend rien à aucun moment : à son arrêt, le module ne rend pas le micro des joueurs hors du jeu ; une fois prêt, il les tient toujours coupés. À l'apparition, la voix revient. |
 | 4 | Redémarrer tout le serveur. | Les zones sont toujours là : liste de l'éditeur, cylindres, effet en jeu. |

@@ -5,7 +5,7 @@
     Hors log, modules et version, chaque fonction exige que le module soit actif (pendant setup ou prêt) :
     un module refusé ou non déclaré ne peut rien enregistrer.
     Dépendances : shared/core/api.lua, server/core/database.lua, server/core/net.lua, server/core/rpc.lua,
-                  server/core/registry.lua, server/core/modules.lua
+                  server/core/zones.lua, server/core/registry.lua, server/core/modules.lua
 ]]
 
 local format = string.format
@@ -15,6 +15,7 @@ local modules = vAvA.modules
 local registry = vAvA.registry
 local net = vAvA.net
 local rpc = vAvA.rpc
+local zones = vAvA.zones
 local database = vAvA.database
 
 api.define(1, function(owner)
@@ -60,7 +61,8 @@ api.define(1, function(owner)
             callClientWith = guard(function(options, target, name, ...) return rpc.callClient(owner, options, target, name, ...) end),
         },
 
-        -- envois serveur → client mesurés et comptés (0.10.0) : jamais -1, évènement préfixé par la ressource
+        -- envois serveur → client mesurés et comptés (0.10.0) : jamais -1, évènement préfixé par la ressource ; une
+        -- liste ou un rayon rendent en 5e valeur les joueurs sautés (0.11.0)
         net = {
             send = guard(function(target, event, ...) return net.send(owner, nil, target, event, ...) end),
             sendWith = guard(function(options, target, event, ...)
@@ -72,8 +74,27 @@ api.define(1, function(owner)
             sendNearWith = guard(function(options, coords, radius, event, ...)
                 return net.sendNear(owner, options, coords, radius, event, ...)
             end),
+            -- charge sérialisée par le module (msgpack.pack_args) : une seule chaîne traverse l'export (0.11.0)
+            sendPacked = guard(function(options, target, event, payload)
+                return net.sendPacked(owner, options, target, event, payload)
+            end),
+            sendNearPacked = guard(function(options, coords, radius, event, payload)
+                return net.sendNearPacked(owner, options, coords, radius, event, payload)
+            end),
             playersNear = guard(function(coords, radius, options) return net.playersNear(coords, radius, options) end),
             stats = guard(function(options) return net.stats(options) end),
+        },
+
+        -- abonnements de zone (0.11.0) : zones du module seulement (identifiant local → <ressource>:<id>)
+        zones = {
+            define = guard(function(id, area, state) return zones.define(owner, id, area, state) end),
+            move = guard(function(id, area) return zones.move(owner, id, area) end),
+            set = guard(function(id, changes, removed) return zones.set(owner, id, changes, removed) end),
+            replace = guard(function(id, state) return zones.replace(owner, id, state) end),
+            remove = guard(function(id) return zones.remove(owner, id) end),
+            subscribers = guard(function(id) return zones.subscribers(owner, id) end),
+            info = guard(function(id) return zones.info(owner, id) end),
+            list = guard(function() return zones.list(owner) end),
         },
 
         db = {

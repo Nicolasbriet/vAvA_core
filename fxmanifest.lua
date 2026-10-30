@@ -12,7 +12,7 @@ use_experimental_fxv2_oal 'yes'
 
 name 'vAvA_core'
 description 'Core RP médiéval vAvA - fondations, joueurs et personnages'
-version '0.10.0'
+version '0.11.0'
 
 dependency 'oxmysql'
 
@@ -30,6 +30,7 @@ shared_scripts {
     'shared/lib/semver.lua',
     'shared/lib/schema.lua',
     'shared/lib/pending.lua',
+    'shared/lib/zonereplica.lua',
     'shared/core/logger.lua',
     'shared/core/hooks.lua',
     'shared/core/api.lua',
@@ -45,6 +46,9 @@ server_scripts {
     'server/core/netstats.lua',
     'server/core/net.lua',
     'server/core/rpc.lua',
+    'server/core/zonegrid.lua',
+    'server/core/zonestate.lua',
+    'server/core/zones.lua',
     'server/core/registry.lua',
     'server/core/commands.lua',
     'server/core/netcommand.lua',
@@ -65,6 +69,7 @@ server_scripts {
 client_scripts {
     'client/core/rpc.lua',
     'client/core/net.lua',
+    'client/core/zones.lua',
     'client/core/api.lua',
     'client/players/session.lua',
     'client/players/spawn.lua',

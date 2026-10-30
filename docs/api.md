@@ -403,6 +403,8 @@ permis dans un module, mais il n'est pas compté.
 | `sendWith({ latent? }, target, event, ...)` | idem |
 | `sendNear(coords, radius, event, ...)` | idem |
 | `sendNearWith({ latent?, from?, exclude?, bucket? }, coords, radius, event, ...)` | idem |
+| `sendPacked(options, target, event, payload)` | idem (0.11.0) — `payload` : chaîne produite par `msgpack.pack_args(...)` dans le module |
+| `sendNearPacked(options, coords, radius, event, payload)` | idem (0.11.0) |
 | `playersNear(coords, radius, { from?, exclude?, bucket? }?)` | liste de numéros de joueurs (copie), ou `nil, code` |
 | `stats({ limit?, resource?, target? }?)` | `{ mode, windowMs, total, events }`, ou `nil, code` |
 
@@ -428,12 +430,17 @@ local ok, count = core.net.sendNearWith({ from = source }, coords, 30.0, 'vava_c
   message. Dès qu'un module a des instances (intérieurs, cachots, essais), il fournit `from` (l'auteur de l'action)
   ou `bucket` à chaque envoi de proximité.
 - **Proches** : personnages chargés **et apparus**, ped existant, distance 3D ≤ rayon (0 < rayon ≤ 1 000 m, sinon
-  `invalid_radius`), positions lues par le serveur (gardées le temps d'une même milliseconde) ; `coords` : `vector3` ou
-  `{ x, y, z }` finis (`invalid_coords`). Personne à portée : `true, 0, 0, false`, rien n'est sérialisé.
+  `invalid_radius`), positions lues par le serveur (gardées 50 ms, `net.near.positionCacheMs`, 0.11.0 : un passage
+  des zones et les envois qui le suivent ne relisent rien) ; `coords` : `vector3` ou `{ x, y, z }` finis
+  (`invalid_coords`). Personne à portée : `true, 0, 0, false`, rien n'est sérialisé.
 - **Retour** : `envoyés` = joueurs servis, `octets` = taille d'**un** message (charge msgpack + nom de l'évènement),
-  `latent` = booléen.
-- **Latent** : 64 Ko/s par envoi (`net.latent.bytesPerSecond`) ; au plus 512 Ko en route vers un même joueur : au-delà,
-  `saturated` pour une cible seule ; dans une liste, la cible saturée est sautée et les autres reçoivent.
+  `latent` = booléen ; pour une liste ou un rayon (0.11.0), 5e valeur : la **liste des joueurs sautés** (latent refusé),
+  `nil` s'il n'y en a aucun — à renvoyer plus tard, ou à oublier si l'envoi n'a de sens que maintenant.
+- **Latent** : 64 Ko/s par envoi (`net.latent.bytesPerSecond`) ; au plus 512 Ko en route vers un même joueur et 4 Mo
+  tous joueurs confondus (`net.latent.maxTotalInFlightBytes`, 0.11.0 : catalogues de l'Atelier) : au-delà, `saturated`
+  pour une cible seule (console : « plus de … octets déjà en route », ou « plafond global du latent atteint ») ; dans une
+  liste, la cible saturée est sautée (5e valeur) et les autres reçoivent. Le premier envoi latent vers un joueur qui
+  n'a rien en route passe toujours le plafond global (personne n'est privé de tout gros envoi par les autres).
 - **Ordre** : deux messages fiables vers un même joueur arrivent dans l'ordre d'envoi ; un message latent peut être
   **dépassé** par tout message envoyé après lui, et l'ordre entre deux latents n'est pas garanti. Un module dont l'état
   suit un envoi (instantané puis différences) choisit `latent = 'never'`, ou numérote ses révisions.
@@ -441,8 +448,27 @@ local ok, count = core.net.sendNearWith({ from = source }, coords, 30.0, 'vava_c
   toutes les cibles : console `[net] mesure exacte`), sinon estimée sans sérialiser (`[net] estimation`) ;
   `net.mode = 'estimate'` dans `config/server.lua` force l'estimation. Un module paie en plus la copie de ses arguments
   à la traversée de l'export (§ Copies) : deux sérialisations pour un joueur, deux au lieu de N pour N joueurs proches.
-- Un module qui s'en sert déclare `coreVersion = '0.10.0'`, ou teste `core.net` dans son `bridge/server.lua` et garde
-  `TriggerClientEvent` en repli.
+- **`sendPacked` / `sendNearPacked`** (0.11.0) : le module sérialise lui-même (`msgpack.pack_args(...)`) ; une seule
+  chaîne traverse l'export (copie d'un bloc d'octets, sans parcours) et le core l'envoie telle quelle, après les mêmes
+  contrôles que `send` / `sendNear` (cible, préfixe, options, rayon, plafonds, compteur). Chaîne vide ou autre chose :
+  `invalid_args` ; message (chaîne + nom) au-delà de 256 Ko : `too_large`. En estimation (fonctions du runtime
+  absentes, ou repli après une erreur) : `false, 'unsupported'`, rien n'est envoyé — le module renvoie alors par
+  `send`. Un envoi interne en échec ne peut pas être rejoué (le core n'a pas les valeurs) : erreur en console, cible
+  sautée (`unsupported` pour une cible seule).
+
+```lua
+-- dans le bridge d'un module (forme recommandée)
+local function sendTo(target, event, ...)
+    if type(msgpack) == 'table' and type(msgpack.pack_args) == 'function' then
+        local ok, code = core.net.sendPacked(nil, target, event, msgpack.pack_args(...))
+        if ok or code ~= 'unsupported' then return ok, code end
+    end
+    return core.net.send(target, event, ...)
+end
+```
+
+- Un module qui s'en sert déclare `coreVersion = '0.10.0'` (`0.11.0` pour `sendPacked` et la 5e valeur), ou teste
+  `core.net` dans son `bridge/server.lua` et garde `TriggerClientEvent` en repli.
 
 `stats` lit le compteur de la dernière minute (12 cases de 5 s ; mémoire bornée : 512 couples ressource, évènement,
 au-delà cumulés sous `*`, `<autres>`). `limit` : 1 à 50 (défaut 10) ; `resource` : seulement cette ressource ;
@@ -471,12 +497,94 @@ déconnecté avec `players.messages.sendFailed` plutôt que laissé sur un écra
 **Commandes** (registre `core:commands`, chapitre Core) :
 - `/vava_reseau` (Conseil, droit `tools` de `vava_admin`, repli ACE `vava.reseau`, 2 s entre deux) : en-tête, les 10
   plus gros envois de la minute, pied ; `joueur <n°>` : totaux du joueur, puis suivi évènement par évènement pendant
-  5 min (4 joueurs suivis au plus ; inscrit au journal du Registre) ; `ressource <nom>` : les envois d'un module.
-  Sortie dans le chat du seul membre, ou dans la console.
+  5 min (4 joueurs suivis au plus ; inscrit au journal du Registre) ; `ressource <nom>` : les envois d'un module ;
+  `zones` (0.11.0) : zones déclarées par module, abonnements, durée du passage (dernier, moyen et plus long de la
+  minute) ; `zones <n°>` : zones suivies par un joueur (20 noms au plus ; inscrit au journal du Registre, « Zones d'un
+  joueur consultées »). Sortie dans le chat du seul membre, ou dans la console.
 - `vava_reseau_essai <n° du joueur> <Ko 1-256> [rayon]` (console du serveur seulement) : un message fiable, un message
   latent de la taille voulue, un message fiable (au joueur, ou aux joueurs à portée de lui si un rayon est donné) ; la
   console F8 du joueur écrit le débit réel du latent et l'ordre d'arrivée, celle d'un joueur proche « message de
   proximité reçu ».
+
+### `core.zones` (core 0.11.0)
+
+Abonnements de zone : un module déclare des **zones** (cercle au sol, marge) et tient leur **état** dans le core (paires
+clé → valeur). Le serveur décide seul qui les reçoit : à chaque passage (`zones.passMs`, 1 s), il lit une fois la
+position de chaque personnage apparu, cherche dans une grille (cases de 256 m) les zones proches, envoie l'état aux
+joueurs qui entrent dans le **cercle d'intérêt** (rayon + marge) et l'oublie pour ceux qui en sortent au-delà de
+rayon + marge + 25 m (pas d'aller-retour en bordure). Ensuite, seuls les changements partent, regroupés par tour, aux
+seuls abonnés. Le client ne demande jamais d'entrer dans une zone. Fait pour ce qui est **local et partagé** : charges
+des filons, cultures d'une parcelle, forge occupée, zone de voix. Ce qui est privé part par `core.net.send` au seul
+intéressé ; ce qui est commun à tous et rare (heure, saison) reste en GlobalState.
+
+| Fonction (serveur) | Retour |
+|---|---|
+| `define(id, area, state?)` | `true, numéro` ou `false, code` |
+| `move(id, area)` | `true` ou `false, code` — lieu changé ; état et abonnés gardés, réévalués au passage suivant |
+| `set(id, changes, removed?)` | `true` ou `false, code` — `changes` : clé → nouvelle valeur ; `removed` : liste de clés retirées ; part aux abonnés en fin de tour, regroupé avec les autres changements de la zone du même tour |
+| `replace(id, state)` | `true` ou `false, code` — tout l'état remplacé, envoyé entier aux abonnés (rechargement, publication de l'Atelier) |
+| `remove(id)` | `true` ou `false, code` — les abonnés reçoivent la sortie |
+| `subscribers(id)` | liste triée des joueurs abonnés, ou `nil, code` — pour viser un son, un effet, un message de lieu |
+| `info(id)` | `{ handle, revision, subscribers, keys, bytes }` ou `nil, code` |
+| `list()` | identifiants locaux des zones du module, triés |
+
+```lua
+-- une zone de récolte (forme que prendra T-015)
+core.zones.define('foret_brume', { x = -320.0, y = -880.0, radius = 140.0, margin = 100.0 },
+    { zone = { band = 'normal', scarred = false }, ['n:chene_1'] = 3 })
+-- une récolte : un seul envoi aux abonnés, en fin de tour, pour les deux clés
+core.zones.set('foret_brume', { ['n:chene_1'] = 2 })
+core.zones.set('foret_brume', { zone = { band = 'reduced', scarred = false } })
+```
+
+- **Zones du module seulement** : `id` local (identifiant de 48 octets au plus, motif `^[%w_%-%.:]+$`, sinon
+  `invalid_id`) devient `<ressource>:<id>` ; déjà pris : `exists` ; inconnu : `unknown_zone`. Deux modules peuvent
+  avoir le même `id`. Le numéro rendu par `define` n'est jamais redonné pendant la vie du core.
+- **`area`** : table à clés connues `x`, `y`, `z`, `radius`, `margin`, `bucket`, nombres finis ; `|x|, |y| ≤ 50 000` ;
+  `0 < radius ≤ 500` ; `0 ≤ margin ≤ 500` (défaut 50 : la zone arrive avant le joueur) ; `bucket` entier ≥ 0 (seuls
+  les joueurs de ce routing bucket ; absent : **tous**) ; `z` accepté et ignoré : distance **au sol** (mines, étages,
+  collines restent dans la zone ; une autre forme donne son cercle englobant). Sinon `invalid_area`.
+- **État** : table à clés chaînes (motif ci-dessus, 48 octets ; jamais de clé entière : `invalid_key`) → valeurs
+  sérialisables (`invalid_value` : fonction, cycle, profondeur au-delà de 32), 4 Ko au plus chacune (`too_large`) ;
+  au plus 64 clés changées ou retirées par appel et 256 clés dans l'état (`too_many_keys`) ; 32 Ko par état
+  (`too_large`) ; 8 Mo pour tous les états, 2 048 zones dont 1 024 par module (`full`). **Tout ou rien** : un seul
+  élément refusé, rien n'est appliqué. Une même clé changée et retirée dans le même appel : `invalid_key`.
+- Une valeur **scalaire** égale à l'actuelle ne part pas ; une **table** part toujours (comparer soi-même si besoin).
+  Une clé changée puis retirée dans le même tour ne part que retirée, et l'inverse.
+- **Révisions** : chaque envoi porte la révision de la zone (1 à la déclaration, + 1 par différence ou remplacement) ;
+  le client applique la révision attendue, ignore les anciennes et redemande l'état entier en cas de trou (RPC du core
+  `core:zones:resync`, limité). Aucune révision passée n'est gardée.
+- **Envois** (tous par `core.net`, comptés, jamais à tous) : l'état entier (`vAvA:zone:state`, une seule sérialisation
+  pour tous les entrants d'un passage ; latent au-delà de 8 Ko, annoncé par un préavis `vAvA:zone:pending`) et les
+  différences (`vAvA:zone:diff`, **toujours fiables**) sont comptés sous la ressource de la zone ; les sorties
+  (`vAvA:zone:leave`) sous `vAvA_core`. Une différence regroupée de plus de 8 Ko part comme un état entier. Un joueur
+  dont l'état entier n'a pas pu partir (latent saturé) ne reçoit aucune différence et l'aura au passage suivant.
+- **Arrivée dans un lieu chargé** : au plus 32 Ko d'états entiers par joueur et par passage, les zones les plus
+  proches d'abord (une zone plus grosse part seule) ; au plus 256 zones suivies par joueur (les plus lointaines
+  attendent, alerte en console une fois par minute).
+- **Qui est abonné** : personnage chargé, toujours celui de son joueur, **apparu** (un personnage renvoyé à une
+  apparition garde ses abonnements, seules les nouvelles entrées attendent) ; ped existant ; position lue par le
+  serveur. Retour à la sélection, déchargement, départ : tout est oublié sans envoi (le client vide ses zones). Arrêt du
+  module : ses zones sont oubliées, sans envoi (le client oublie celles de la ressource arrêtée) ; module en échec dont
+  la ressource tourne encore : ses abonnés reçoivent la sortie. Un joueur qui n'a pas bougé de plus de 1 m
+  (`zones.stillDistance`), dans la même instance, sans zone déclarée, déplacée ou retirée depuis, n'est pas recalculé.
+- **L'état d'une zone est public** pour quiconque peut s'y rendre. Sous OneSync, la position du ped que lit le serveur
+  est **déclarée par son client** : un client modifié peut se dire n'importe où et recevoir l'état de n'importe quelle
+  zone. L'abonnement n'est donc **ni un droit ni une preuve de présence** : n'y mettre rien de secret (récompense
+  cachée, qualité d'une récolte à venir, contenu d'un grenier), et revérifier à chaque action, côté serveur et au
+  moment de l'action, la distance réelle et le reste (possession, droit, délai) sans se fier à l'abonnement ; un module
+  qui en a besoin ajoute un contrôle de vitesse plausible.
+- **Atelier** (T-101, T-102) : une définition publiée → `define`, `move`, `replace` ou `set` ; une définition **en
+  essai** n'entre pas dans l'état de la zone (sinon tous les abonnés la verraient) : elle part par `core.net.send` à
+  son seul auteur.
+- **Réglages** (`config/server.lua` → `zones`) : tous modifiables. `passMs` (1 000 ms) : à 2 000 ms le coût est divisé
+  par deux et la marge par défaut de 50 m reste sûre (un cavalier au galop, environ 15 m/s, parcourt 30 m entre deux
+  passages) ; au-delà, une zone peut arriver après le joueur. **Recommandé : garder 1 s.** Coût mesuré hors jeu par
+  passage (Lua seul, 2 048 zones, 64 / 128 joueurs) : joueurs immobiles 0,03 / 0,07 ms ; en mouvement, zones éparses
+  0,23 / 0,46 ms, ville (1,5 × 1,5 km, rayons 2 à 30 m) 1,7 / 3,3 ms, ville très dense 6,4 / 13,9 ms ; plus quatre
+  natives par joueur ; passage qui suit le redémarrage d'un module (tout le monde y rentre) : 8 à 38 ms, une fois. En
+  jeu : `profiler record` de la console du serveur (`/vava_reseau zones` donne un ordre de grandeur).
+- Un module qui s'en sert déclare `coreVersion = '0.11.0'`.
 
 ### `core.db`
 
@@ -540,6 +648,40 @@ Le client n'est jamais une source de vérité : un RPC exprime une intention que
 
 Une grosse réponse (au-delà de 8 Ko, 0.10.0) arrive en latent, annoncée par un préavis qui repousse le délai
 d'attente de l'appel (temps de transfert + 3 s, 30 s de plus au plus) : `rpc.call` n'a rien à faire de plus.
+
+### `core.zones` (client, core 0.11.0)
+
+Les zones que le serveur a choisi d'envoyer à ce joueur (§ `core.zones` serveur). Le core tient une réplique de chacune
+(révisions, état entier redemandé s'il manque une révision ou si un état annoncé n'arrive pas) et prévient le module
+propriétaire. Un module ne voit que **ses** zones.
+
+| Fonction | Retour |
+|---|---|
+| `watch(handler)` | `true` ou `false, err` — un gestionnaire par ressource (un second appel remplace le premier) |
+| `get(id)` | état de la zone (copie) et sa révision, ou `nil` si elle n'est pas suivie et à jour — chaque appel copie tout l'état à la traversée de l'export : jamais dans une boucle, garder sa propre copie tenue par `watch` |
+| `list()` | identifiants locaux des zones du module suivies et à jour, triés |
+
+```lua
+core.zones.watch(function(kind, id, a, b)
+    if kind == 'enter' then         -- a : état entier (zone suivie, ou de nouveau entière après un trou)
+    elseif kind == 'change' then    -- a : clés changées (table, vide au besoin), b : clés retirées (liste)
+    elseif kind == 'leave' then     -- éloigné, zone retirée, déchargement ou sélection
+    end
+end)
+```
+
+- `enter` peut revenir pour une zone déjà suivie (état renvoyé entier) : le traiter comme un remplacement.
+- Un module qui appelle `watch` (démarrage, redémarrage) reçoit au tour suivant un `enter` pour chacune de ses zones
+  déjà à jour. Un gestionnaire en erreur est isolé (console, une fois par intervalle).
+- Aucune boucle : quatre gestionnaires d'évènement, une minuterie par état attendu, un thread par demande d'état en
+  cours (essais à 5 s, puis doublés jusqu'à 60 s ; `config/shared.lua` → `zones`). Ligne `debug` en `F8` :
+  « instantané redemandé : <nom> (…) ».
+- Le core ignore : les évènements de zone déclenchés localement par une autre ressource ; un état entier latent annoncé
+  puis doublé par une sortie de la zone ou par un déchargement (arrivé ensuite, il ne recrée rien, 60 s au plus) ; tout
+  ce qui arrive entre un déchargement et le chargement suivant. Jusqu'à 64 changements sont gardés par zone en
+  attendant un état entier.
+- Un module ne nomme jamais les évènements `vAvA:zone:*` (l'audit le refuse dans `modules/`) : il passe par
+  `core.zones`.
 
 ### `core.characters` (client)
 
@@ -1097,7 +1239,8 @@ Pour travailler le rendu sans le jeu : `web/index.html?tab=players` (ou `reports
 ### `vava_voice`
 
 Chat vocal de proximité, sur la voix intégrée à FiveM (Mumble de FXServer, son 3D du jeu) : aucune autre ressource.
-Portées, touche, zones, textes : `config.lua`. Demande le core 0.5.0 ; facultatifs : `vava_hud` ≥ 1.2.0 (médaillon),
+Portées, touche, zones, textes : `config.lua`. Demande le core 0.11.0 (abonnements de zone, 1.3.0) ; facultatifs :
+`vava_hud` ≥ 1.2.0 (médaillon),
 `vava_health` (portée à terre), `vava_admin` ≥ 1.1.0 (zones de voix).
 
 À poser dans le `server.cfg` (son 3D du jeu, voix envoyée aux seuls joueurs à portée), par `setr` (un `set` n'est pas
@@ -1134,10 +1277,15 @@ setr voice_useSendingRangeOnly true
   200 au plus). Module arrêté éditeur ouvert : clavier et souris rendus au jeu.
 - **Fonctionnement** : chaque joueur en jeu écoute son propre salon (`1000 + numéro de joueur`) ; sa parole part vers
   les salons des seuls joueurs à portée, recalculés toutes les 250 ms (Mumble n'est sollicité que si la liste change).
-  La liste des zones est demandée par le client (RPC `vava_voice:zones`) à l'apparition et au redémarrage du module,
-  avec quelques essais si le serveur n'est pas prêt ; le serveur renvoie au passage la limite de portée du moment
-  (évènement `vava_voice:limit`, au seul demandeur, s'il est en jeu). Aucune boucle par image, sauf pendant le cercle
-  au sol et l'éditeur ouvert.
+  Chaque zone de voix est une zone du core (`core.zones`, 1.3.0 : nom local `z<numéro>`, état `{ zone = { id, label,
+  x, y, z, radius, height, multiplier } }`, marge `zones.subscribeMargin` = 40 m) : elle n'est envoyée qu'aux joueurs à
+  moins de rayon + 40 m d'elle, et chaque changement à eux seuls (plus d'envoi à tous : l'évènement
+  `vava_voice:zone` n'existe plus). L'éditeur reçoit la liste complète à son ouverture (au seul membre qui l'ouvre),
+  puis suit les zones proches changées par un autre membre ; une zone lointaine changée par un autre l'est à la
+  réouverture. Le client redemande la limite de portée (RPC `vava_voice:zones`, qui ne renvoie plus que `true`) à
+  l'apparition et au redémarrage du module, avec quelques essais si le serveur n'est pas prêt ; elle revient par
+  `vava_voice:limit`, au seul demandeur, s'il est en jeu. Aucune boucle par image, sauf pendant le cercle au sol et
+  l'éditeur ouvert.
 - **Limite** : la portée est réglée par le client, comme toute voix FiveM ; un client modifié pourrait l'agrandir.
   FXServer n'a pas non plus de contrôle d'accès aux salons Mumble : un client modifié peut rejoindre le salon d'un
   autre joueur (et entendre ce qui se dit près de lui) ou viser tous les salons (parler à tout le serveur), hors de

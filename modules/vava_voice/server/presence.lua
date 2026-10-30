@@ -4,7 +4,7 @@
            côté client) tant que le personnage n'est pas apparu : sélection, chargement, retour à la sélection.
            Limites de portée par raison (à terre, décision d'un module) : la plus basse s'applique et part au seul
            joueur concerné ; son client la respecte (la portée est réglée côté client, comme toute voix FiveM). Le
-           client qui redémarre la redemande (avec la liste des zones) : celle du démarrage a pu lui échapper.
+           client la redemande à l'apparition et au redémarrage du module : celle du démarrage a pu lui échapper.
     Dépendances : shared/constants.lua, config.lua, server/core.lua
 ]]
 

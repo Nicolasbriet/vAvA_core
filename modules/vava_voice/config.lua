@@ -6,7 +6,7 @@
 ]]
 
 VavaVoice.config = {
-    coreVersion = '0.5.0',
+    coreVersion = '0.11.0',  -- abonnements de zone (core.zones)
 
     -- Portées, de la plus basse à la plus haute (mètres). La touche passe à la suivante, puis revient à la première.
     ranges = {
@@ -40,7 +40,7 @@ VavaVoice.config = {
         channelBase = 1000,      -- salon d'un joueur en jeu : base + son numéro de joueur
         idleChannel = 0,         -- salon racine : hors du jeu (sélection), personne ne parle à personne
         rangeKvp = 'range',      -- portée choisie, gardée sur la machine du joueur
-        -- liste des zones demandée à l'apparition et au redémarrage du module : essais si le serveur n'est pas prêt
+        -- limite de portée redemandée à l'apparition et au redémarrage du module : essais si le serveur n'est pas prêt
         syncTries = 5,
         syncRetryMs = 2000,
     },
@@ -70,6 +70,8 @@ VavaVoice.config = {
         multipliers = { 0.5, 0.75, 1.0, 1.5, 2.0, 3.0 },
         defaultMultiplier = 2.0,
         baseOffset = 1.0,                -- la zone commence à cette hauteur sous le centre
+        subscribeMargin = 40.0,          -- mètres au-delà du bord : la zone est connue du joueur avant qu'il y entre
+                                         -- (envoyée par le core aux seuls joueurs à rayon + marge)
         drawDistance = 150.0,            -- zones dessinées dans l'éditeur jusqu'à cette distance
         marker = 1,                      -- cylindre
         colors = {
@@ -91,7 +93,7 @@ VavaVoice.config = {
     web = { bridge = 'vava_chancellerie' },
 
     rateLimits = {
-        zones = { capacity = 3, refillPerSecond = 0.2 },  -- liste des zones (à l'apparition)
+        zones = { capacity = 3, refillPerSecond = 0.2 },  -- limite de portée renvoyée (apparition, redémarrage)
         editor = { capacity = 5, refillPerSecond = 1 },   -- ouverture de l'éditeur
         edit = { capacity = 10, refillPerSecond = 1 },    -- création, modification, suppression, déplacement
     },

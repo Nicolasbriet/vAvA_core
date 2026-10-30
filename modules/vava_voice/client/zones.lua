@@ -1,8 +1,9 @@
 --[[
     vava_voice/client/zones.lua
-    Rôle : zones de voix connues du client (reçues à l'apparition, puis à chaque changement décidé par le Conseil) et
-           zone où se trouve un point : la plus petite qui le contient l'emporte (la plus précise). Cylindre : rayon
-           à l'horizontale, de baseOffset sous le centre jusqu'à height au-dessus.
+    Rôle : zones de voix suivies par le client (les seules proches : envoyées par les abonnements de zone du core, à
+           l'approche, puis à chaque changement décidé par le Conseil, et retirées quand on s'éloigne) et zone où se
+           trouve un point : la plus petite qui le contient l'emporte (la plus précise). Cylindre : rayon à
+           l'horizontale, de baseOffset sous le centre jusqu'à height au-dessus.
     Dépendances : config.lua
 ]]
 
@@ -18,10 +19,10 @@ local list = {}
 
 local FIELDS = { 'x', 'y', 'z', 'radius', 'height', 'multiplier' }
 
---- Zone reçue du serveur, vérifiée avant d'être gardée.
+--- Zone reçue du serveur, vérifiée avant d'être gardée (copie).
 ---@param raw any
 ---@return table|nil
-local function valid(raw)
+function zones.valid(raw)
     if type(raw) ~= 'table' or mathType(raw.id) ~= 'integer' or type(raw.label) ~= 'string' then return nil end
     for _, field in ipairs(FIELDS) do
         if type(raw[field]) ~= 'number' then return nil end
@@ -33,22 +34,16 @@ local function valid(raw)
 end
 
 ---@param raw any
+---@return table|nil zone  la zone gardée (copie vérifiée), nil si refusée
 function zones.set(raw)
-    local zone = valid(raw)
+    local zone = zones.valid(raw)
     if zone then list[zone.id] = zone end
+    return zone
 end
 
 ---@param id any
 function zones.remove(id)
     if mathType(id) == 'integer' then list[id] = nil end
-end
-
---- Remplace toutes les zones (liste reçue à l'apparition).
----@param raw any
-function zones.replace(raw)
-    list = {}
-    if type(raw) ~= 'table' then return end
-    for _, entry in pairs(raw) do zones.set(entry) end
 end
 
 ---@return table<integer, table>

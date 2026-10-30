@@ -1,0 +1,130 @@
+local helper = require('tests.helper')
+
+-- Réplique d'une zone côté client (shared/lib/zonereplica.lua, core 0.11.0, T-014) : règles de révision du tableau
+-- de la spec T-014 § 8.2.
+describe('vAvA.lib.zonereplica', function()
+    local zonereplica
+
+    before_each(function()
+        helper.reset()
+        helper.load('shared/init.lua')
+        helper.load('shared/lib/zonereplica.lua')
+        zonereplica = vAvA.lib.zonereplica
+    end)
+
+    local function ready(revision, state)
+        local replica = zonereplica.new(32)
+        assert.equal('ready', replica:snapshot(revision, state or { a = 0 }))
+        return replica
+    end
+
+    it('instantané : état remplacé, révision prise, prête', function()
+        local replica = zonereplica.new(32)
+        assert.is_false(replica:isReady())
+        assert.equal('ready', replica:snapshot(5, { a = 1 }))
+        assert.equal(5, replica.revision)
+        assert.same({ a = 1 }, replica.state)
+        assert.is_true(replica:isReady())
+    end)
+
+    it('instantané 5, différences 6 et 7 → 7 ; différence 6 deux fois → la seconde ignorée', function()
+        local replica = ready(5)
+        assert.equal('applied', replica:diff(6, { a = 6 }))
+        assert.equal('ignored', replica:diff(6, { a = 66 }))
+        assert.equal('applied', replica:diff(7, { b = 7 }, { 'a' }))
+        assert.equal(7, replica.revision)
+        assert.same({ b = 7 }, replica.state)
+        assert.equal('ignored', replica:diff(3, { a = 3 }))
+    end)
+
+    it('différence avec un trou : gardée, instantané redemandé', function()
+        local replica = ready(5)
+        assert.equal('resync', replica:diff(7, { a = 7 }))
+        assert.is_true(replica.awaiting)
+        assert.equal(5, replica.revision)
+        -- pendant l'attente, les suivantes sont gardées
+        assert.equal('buffered', replica:diff(8, { a = 8 }))
+        assert.equal('ignored', replica:diff(5, { a = 5 }))
+    end)
+
+    it('différences 6 et 7 reçues avant l’instantané 5 (latent dépassé) : gardées, puis appliquées', function()
+        local replica = zonereplica.new(32)
+        assert.equal('awaiting', replica:notice(5))
+        assert.equal('buffered', replica:diff(6, { a = 6 }))
+        assert.equal('buffered', replica:diff(7, { b = 7 }))
+        assert.equal('ready', replica:snapshot(5, { a = 5 }))
+        assert.equal(7, replica.revision)
+        assert.same({ a = 6, b = 7 }, replica.state)
+        assert.equal(0, replica.buffered)
+        assert.is_false(replica.awaiting)
+    end)
+
+    it('instantané 5 avec 7 gardée sans 6 : resync ; puis instantané 6 → 7 appliquée', function()
+        local replica = zonereplica.new(32)
+        replica:notice(5)
+        replica:diff(7, { b = 7 })
+        assert.equal('resync', replica:snapshot(5, { a = 5 }))
+        assert.equal(5, replica.revision)
+        assert.is_true(replica.awaiting)
+        assert.equal('ready', replica:snapshot(6, { a = 6 }))
+        assert.equal(7, replica.revision)
+        assert.same({ a = 6, b = 7 }, replica.state)
+    end)
+
+    it('différences gardées anciennes jetées par l’instantané', function()
+        local replica = zonereplica.new(32)
+        replica:notice(5)
+        replica:diff(3, { x = 3 })
+        replica:diff(6, { a = 6 })
+        assert.equal('ready', replica:snapshot(5, { a = 5 }))
+        assert.same({ a = 6 }, replica.state)
+        assert.equal(0, replica.buffered)
+    end)
+
+    it('33 différences pendant l’attente : débordement, l’instantané rend resync', function()
+        local replica = zonereplica.new(32)
+        replica:notice(1)
+        for revision = 2, 34 do
+            assert.equal('buffered', replica:diff(revision, { n = revision }))
+        end
+        assert.is_true(replica.overflow)
+        assert.equal(32, replica.buffered)
+        assert.equal('resync', replica:snapshot(1, {}))
+        assert.is_false(replica.overflow)
+        assert.is_true(replica.awaiting)
+        -- les 32 gardées se sont appliquées ; la 34e manque
+        assert.equal(33, replica.revision)
+        -- l'instantané redemandé arrive à jour
+        assert.equal('ready', replica:snapshot(34, { n = 34 }))
+    end)
+
+    it('instantané 4 après l’instantané 5 : ignoré ; préavis 3 quand la révision est 5 : rien', function()
+        local replica = ready(5, { a = 5 })
+        assert.equal('ignored', replica:snapshot(4, { a = 4 }))
+        assert.same({ a = 5 }, replica.state)
+        assert.equal('ignored', replica:notice(3))
+        assert.equal('ignored', replica:notice(5))
+        assert.is_false(replica.awaiting)
+        assert.equal('awaiting', replica:notice(6))
+        assert.is_true(replica.awaiting)
+        -- même révision redemandée (resync) : acceptée
+        assert.equal('ready', replica:snapshot(6, { a = 6 }))
+    end)
+
+    it('différence sans aucune base connue : gardée, instantané redemandé', function()
+        local replica = zonereplica.new(32)
+        assert.equal('resync', replica:diff(3, { a = 3 }))
+        assert.is_true(replica.awaiting)
+        assert.equal('ready', replica:snapshot(2, {}))
+        assert.same({ a = 3 }, replica.state)
+    end)
+
+    it('isKeyList : liste pure de chaînes', function()
+        assert.is_true(zonereplica.isKeyList({}))
+        assert.is_true(zonereplica.isKeyList({ 'a', 'b' }))
+        assert.is_false(zonereplica.isKeyList({ 'a', 2 }))
+        assert.is_false(zonereplica.isKeyList({ a = 'b' }))
+        assert.is_false(zonereplica.isKeyList('a'))
+        assert.is_false(zonereplica.isKeyList({ [1] = 'a', [3] = 'c' }))
+    end)
+end)

@@ -201,6 +201,15 @@ if [[ ${#srv[@]} -gt 0 ]]; then
     noter BLOQUANT "évènement réseau serveur hors core.rpc.register" "$res"
 fi
 
+# --- Abonnements de zone (T-014) : les évènements vAvA:zone:* sont envoyés et écoutés par le seul core. Un module qui
+# les nomme (envoi, écoute, déclenchement local) contourne core.zones : interdit dans modules/ (et dans les cas d'essai).
+zone_lua=(); for f in "${lua[@]}"; do [[ $ESSAI -eq 1 || "$f" == modules/* ]] && zone_lua+=("$f"); done
+if [[ ${#zone_lua[@]} -gt 0 ]]; then
+    res=$(grep -HnE 'vAvA:zone:' "${zone_lua[@]}" 2>/dev/null | filtrer || true)
+    noter BLOQUANT "évènement des abonnements de zone (vAvA:zone:*) nommé par un module : passer par core.zones" "$res"
+fi
+# --- fin du bloc T-014
+
 signal AVERTISSEMENT 'GlobalState\[[^]]+\][[:space:]]*=' "écriture GlobalState (envoyée à TOUS les joueurs : petite, rare, utile à tous ?)"
 signal AVERTISSEMENT 'Wait\(0\)' "Wait(0) : uniquement pendant un état actif temporaire"
 signal AVERTISSEMENT 'GetGamePool' "GetGamePool : à éviter dans une boucle"

@@ -19,6 +19,7 @@ local ratelimit = vAvA.ratelimit
 local net = vAvA.net
 local netcommand = vAvA.netcommand
 local rpc = vAvA.rpc
+local zones = vAvA.zones
 local registry = vAvA.registry
 local modules = vAvA.modules
 local api = vAvA.api
@@ -44,6 +45,8 @@ local function purgeOwner(owner)
     registry.purgeOwner(owner)
     fields.purgeOwner(owner)
     net.purgeOwner(owner)
+    -- zones du module oubliées sans envoi : le client oublie de lui-même celles d'une ressource arrêtée
+    zones.purgeOwner(owner)
 end
 
 ---@param reason string
@@ -69,6 +72,7 @@ local function boot()
     persistence.start(characters.forEachActive)
     positions.start(characters.forEachActive)
     netcommand.start()
+    zones.start()
 end
 
 modules.setPurgeHandler(purgeOwner)
@@ -84,6 +88,8 @@ AddEventHandler('playerDropped', function(reason)
     ratelimit.purgePlayer(src)
     -- avant le déchargement : plus rien n'est envoyé à ce numéro, qui peut être redonné pendant la sauvegarde
     sync.purgePlayer(src)
+    -- abonnements de zone oubliés sans envoi (son numéro peut être redonné : aucun abonnement hérité)
+    zones.purgePlayer(src)
     -- volume latent en route, compteur et suivi du joueur, délai de sa commande : son numéro peut être redonné
     net.purgePlayer(src)
     netcommand.purgePlayer(src)
@@ -109,6 +115,9 @@ end)
 local configOk, configErr = rpc.init()
 if configOk then
     configOk, configErr = characters.registerRpc()
+end
+if configOk then
+    configOk, configErr = zones.registerRpc()
 end
 if not configOk then
     -- configuration invalide : aucun net event n'est ouvert, aucun joueur n'est accepté

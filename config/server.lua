@@ -119,9 +119,13 @@ vAvA.config.server = {
             bytesPerSecond = 65536,    -- débit de chaque envoi latent (64 Ko/s, environ 0,5 Mbit/s)
             maxInFlightBytes = 524288, -- 512 Ko : volume latent encore en route vers un même joueur au-delà duquel un
                                        -- nouvel envoi latent vers lui est refusé (saturated)
+            maxTotalInFlightBytes = 4194304,  -- 4 Mo : volume latent en route tous joueurs confondus au-delà duquel un
+                                              -- nouvel envoi latent est refusé (saturated) ; catalogues de l'Atelier
         },
         near = {
-            maxRadius = 1000.0,  -- mètres : rayon maximal de sendNear et playersNear
+            maxRadius = 1000.0,     -- mètres : rayon maximal de sendNear et playersNear
+            positionCacheMs = 50,   -- position d'un ped gardée ce temps : un passage des zones et les sendNear qui le
+                                    -- suivent ne relisent rien (50 ms à 10 m/s : 0,5 m d'écart au plus)
         },
         counter = {
             bucketMs = 5000,        -- largeur d'une case de la fenêtre glissante
@@ -154,7 +158,12 @@ vAvA.config.server = {
                 watchStarted = 'Détail par évènement suivi pendant %d min : relancez la commande dans une minute.',
                 watchFull = 'Déjà %d joueurs suivis : détail indisponible pour celui-ci.',
                 unknownPlayer = 'Aucun joueur n° %s en jeu.',
-                usage = 'usage : /vava_reseau | joueur <n°> | ressource <nom>',
+                usage = 'usage : /vava_reseau | joueur <n°> | ressource <nom> | zones [n°]',
+                -- abonnements de zone (0.11.0) : durées à deux décimales, virgule française
+                zones = 'Zones : %d (%s) ; %d abonnements ; passage : dernier %s ms, moyen %s ms, au plus %s ms sur la minute.',
+                zonesNone = 'Aucune zone déclarée.',
+                zonesPlayer = 'Joueur %d : %d zone(s) suivie(s)%s',
+                zonesNoPass = '–',  -- aucun passage encore mesuré
                 footer = 'Non comptés : GlobalState, state bags et envois directs des modules.',
                 probeUsage = 'usage : vava_reseau_essai <n° du joueur> <Ko 1-256> [rayon]',
                 probeSent = 'essai envoyé au joueur %d : %d Ko en latent, %d joueur(s) à %g m',
@@ -162,6 +171,40 @@ vAvA.config.server = {
                 probeRefused = 'essai refusé : %s',
             },
         },
+    },
+
+    -- Abonnements de zone (core.zones, 0.11.0) : un module déclare des zones et tient leur état dans le core ; le serveur
+    -- abonne les joueurs proches (positions lues par lui) et n'envoie l'état et ses différences qu'à eux.
+    zones = {
+        passMs = 1000,             -- intervalle entre deux passages (entrées et sorties de zone). Recommandé : garder
+                                   -- 1000. Coût mesuré hors jeu (Lua seul, 2 048 zones, rapport T-014) par passage :
+                                   -- joueurs immobiles 0,03 ms à 64 joueurs, 0,07 ms à 128 (non recalculés) ; en
+                                   -- mouvement, zones éparses 0,23 / 0,46 ms, ville (1,5 × 1,5 km, rayons 2-30 m)
+                                   -- 1,7 / 3,3 ms, ville très dense 6,4 / 13,9 ms ; plus quatre natives par joueur.
+                                   -- 2000 divise ce coût par deux et reste sûr avec la marge par défaut de 50 m (un
+                                   -- cavalier au galop, ~15 m/s, parcourt 30 m entre deux passages) ; au-delà, la zone
+                                   -- peut arriver après le joueur
+        stillDistance = 1.0,       -- m : un joueur qui a bougé de moins depuis son dernier calcul (même instance, aucune
+                                   -- zone déclarée, déplacée ou retirée entre-temps) n'est pas recalculé
+        cellSize = 256.0,          -- côté d'une case de la grille (m)
+        coordLimit = 50000.0,      -- |x| et |y| d'un centre au plus (la carte tient dans ±10 000)
+        maxRadius = 500.0,         -- rayon d'une zone au plus (m, > 0)
+        defaultMargin = 50.0,      -- marge par défaut au-delà du bord : la zone est reçue avant d'y entrer
+        maxMargin = 500.0,         -- marge au plus (≥ 0)
+        exitMargin = 25.0,         -- désabonné seulement au-delà de rayon + marge + exitMargin (pas d'aller-retour)
+        maxZones = 2048,           -- zones déclarées en tout
+        maxZonesPerOwner = 1024,   -- zones d'un même module
+        maxKeys = 256,             -- clés dans l'état d'une zone
+        keyMaxLength = 48,         -- octets d'une clé (et d'un identifiant de zone)
+        maxChanges = 64,           -- clés changées ou retirées par appel
+        maxValueBytes = 4096,      -- taille estimée d'une valeur
+        maxStateBytes = 32768,     -- taille estimée de l'état d'une zone (clés + valeurs)
+        maxTotalStateBytes = 8388608,  -- 8 Mo : somme des états de toutes les zones
+        maxDiffBytes = 8192,       -- différence regroupée d'un tour au-delà de laquelle l'instantané part à sa place
+        maxSubscriptionsPerPlayer = 256,  -- zones suivies par un joueur ; au-delà, les plus lointaines attendent
+        snapshotBudgetBytes = 32768,      -- instantanés envoyés à un même joueur dans un passage (taille estimée) ; le
+                                          -- reste au passage suivant, les plus proches d'abord
+        rateLimit = { capacity = 4, refillPerSecond = 0.5 },  -- RPC core:zones:resync, par joueur
     },
 
     spawn = {

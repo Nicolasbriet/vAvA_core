@@ -2,16 +2,17 @@
     vava_voice/client/main.lua
     Rôle : assemblage côté client :
       - en jeu (apparition du personnage, ou module redémarré en cours de partie) : salon vocal rejoint, portée
-        appliquée, médaillon, zones demandées au serveur (avec quelques essais, la limite de portée revient au
-        passage) ; hors du jeu (sélection) : plus de voix ni de médaillon, éditeur fermé ;
+        appliquée, médaillon, limite de portée redemandée au serveur (avec quelques essais) ; hors du jeu
+        (sélection) : plus de voix ni de médaillon, éditeur fermé ;
       - touche de portée (réglable), commande de l'éditeur, outil du Registre ;
       - à intervalle : joueurs à portée, lueur du médaillon quand le joueur parle, zone de voix où il se trouve ;
-      - ordres du serveur : limite de portée, zones changées ;
+      - ordres du serveur : limite de portée ; zones de voix proches reçues, changées et quittées par les
+        abonnements de zone du core (core.zones.watch, 1.3.0) ;
       - arrêt de la ressource éditeur ouvert : clavier et souris rendus au jeu.
     Dépendances : shared/, config.lua, tous les fichiers client/ du module
 ]]
 
-local type, mathType = type, math.type
+local type, mathType, tonumber, tostring = type, math.type, tonumber, tostring
 local CreateThread, Wait = CreateThread, Wait
 local RegisterCommand, RegisterKeyMapping, RegisterNetEvent, AddEventHandler =
     RegisterCommand, RegisterKeyMapping, RegisterNetEvent, AddEventHandler
@@ -28,25 +29,21 @@ local hud, mumble, zones, range, editor = VavaVoice.hud, VavaVoice.mumble, VavaV
 
 local playing = false
 local talking = false
--- numéro de la demande des zones : une demande plus ancienne s'arrête d'elle-même
+-- numéro de la demande de la limite : une demande plus ancienne s'arrête d'elle-même
 local fetching = 0
 
---- Liste des zones, demandée au serveur à chaque apparition et au redémarrage du module ; le serveur renvoie au passage
---- la limite de portée du moment. Nouvel essai si le module du serveur n'est pas encore prêt (RPC inconnu, délai).
+--- Limite de portée du moment, redemandée au serveur à chaque apparition et au redémarrage du module (elle revient par
+--- son évènement). Nouvel essai si le module du serveur n'est pas encore prêt (RPC inconnu, délai).
 ---@param run integer
-local function fetchZones(run)
+local function syncLimit(run)
     for _ = 1, cfg.client.syncTries do
         if run ~= fetching or not playing then return end
-        local ok, success, list = core.rpc.call(RPC.ZONES)
+        local ok, success = core.rpc.call(RPC.ZONES)
         if run ~= fetching or not playing then return end
-        if ok and success then
-            zones.replace(list)
-            editor.refresh()
-            return
-        end
+        if ok and success then return end
         Wait(cfg.client.syncRetryMs)
     end
-    VavaVoice.log.warn('zones de voix non reçues : elles seront redemandées à la prochaine apparition')
+    VavaVoice.log.warn('limite de portée non reçue : elle sera redemandée à la prochaine apparition')
 end
 
 local function start()
@@ -56,7 +53,23 @@ local function start()
     range.apply(false)
     fetching = fetching + 1
     local run = fetching
-    CreateThread(function() fetchZones(run) end)
+    CreateThread(function() syncLimit(run) end)
+end
+
+--- Zones de voix proches, envoyées par le core (nom local « z<numéro> », état { zone = … }) : la zone où se tient le
+--- joueur en dépend ; l'éditeur suit les changements faits par un autre membre du Conseil.
+---@param kind string  'enter' | 'change' | 'leave'
+---@param id string
+---@param data table|nil  état (enter) ou valeurs changées (change)
+local function onZone(kind, id, data)
+    if kind == 'leave' then
+        zones.remove(tonumber(type(id) == 'string' and id:sub(2) or nil))
+        return
+    end
+    local raw = type(data) == 'table' and data.zone or nil
+    if raw == nil then return end
+    zones.set(raw)
+    editor.track(kind, raw)
 end
 
 local function stop()
@@ -81,16 +94,13 @@ RegisterNetEvent(EVENTS.LIMIT, function(value)
     if mathType(value) == 'integer' then range.setCap(value) end
 end)
 
-RegisterNetEvent(EVENTS.ZONE, function(action, payload)
-    if action == 'set' then
-        zones.set(payload)
-    elseif action == 'remove' then
-        zones.remove(payload)
-    else
-        return
-    end
-    editor.refresh()
-end)
+-- zones de voix proches (abonnements de zone du core, vAvA_core 0.11.0)
+if core.zones then
+    local watched, watchErr = core.zones.watch(onZone)
+    if not watched then VavaVoice.log.error('zones de voix non suivies : %s', tostring(watchErr)) end
+else
+    VavaVoice.log.error('zones de voix indisponibles : vAvA_core 0.11.0 au moins est requis')
+end
 
 RegisterCommand(cfg.command, function()
     if playing and not editor.isOpen() then range.cycle() end

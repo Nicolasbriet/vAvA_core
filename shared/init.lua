@@ -45,6 +45,16 @@ vAvA.EVENTS = {
     CHARACTER_FIELDS = 'vAvA:character:fields',      -- lot de champs modifiés (regroupés par tick)
     CHARACTER_UNLOADED = 'vAvA:character:unloaded',
     SPAWN = 'vAvA:character:spawn',                  -- ordre d'apparition (position décidée par le serveur)
+    -- Abonnements de zone (0.11.0) : seulement aux joueurs abonnés, décidés par le serveur (positions lues par lui).
+    ZONE_STATE = 'vAvA:zone:state',      -- instantané (n°, nom, révision, état) : entrée, resync, remplacement
+    ZONE_PENDING = 'vAvA:zone:pending',  -- préavis d'un instantané latent (n°, révision, délai)
+    ZONE_DIFF = 'vAvA:zone:diff',        -- différence (n°, révision, valeurs, clés retirées), toujours fiable
+    ZONE_LEAVE = 'vAvA:zone:leave',      -- sorties (liste de n°) : éloigné, zone retirée
+}
+
+-- RPC des abonnements de zone : redemander l'instantané d'une zone déjà suivie (jamais d'abonnement demandé).
+vAvA.ZONE_RPC = {
+    RESYNC = 'core:zones:resync',
 }
 
 -- RPC des personnages exposés par le core : intentions du joueur, validées et décidées par le serveur.

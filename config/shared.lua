@@ -45,6 +45,18 @@ vAvA.config.shared = {
         probeTimeoutMs = 60000,
     },
 
+    -- Abonnements de zone, côté client (0.11.0) : les zones suivies sont décidées par le serveur ; le client garde une
+    -- réplique de chacune et redemande l'instantané s'il manque une révision.
+    zones = {
+        maxBuffered = 64,          -- différences gardées par zone en attendant un instantané (latent derrière une file)
+        awaitMarginMs = 3000,      -- marge ajoutée au délai annoncé d'un instantané latent avant de le redemander
+        maxAwaitMs = 30000,        -- attente maximale d'un instantané annoncé
+        resyncRetryMs = 5000,      -- premier délai avant de réessayer une demande d'instantané en échec (doublé)
+        resyncMaxRetryMs = 60000,  -- délai maximal entre deux essais
+        staleSnapshotMs = 60000,   -- instantané latent doublé par une sortie (ou un déchargement) : ignoré s'il arrive
+                                   -- dans ce délai (aucun latent n'est en route plus longtemps)
+    },
+
     -- Exécution des ordres d'apparition côté client (la position est toujours décidée par le serveur).
     spawn = {
         fadeMs = 500,

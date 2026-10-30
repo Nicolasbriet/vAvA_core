@@ -4,9 +4,9 @@
            (Chuchoter, Parler, Crier, Déclamer) changées d'une touche, médaillon dans le HUD, cercle au sol au
            changement de portée, silence hors du jeu (sélection du personnage), portée réduite à terre, zones où la
            voix porte plus ou moins loin, créées en jeu par le Conseil.
-    Dépendances : vAvA_core ≥ 0.5.0 ; vava_ui ≥ 1.0.0 (polices, grain, papier et coins de l'éditeur, par
-                  nui://vava_ui/…) ; facultatives : vava_hud ≥ 1.2.0 (médaillon), vava_health (portée à terre),
-                  vava_admin ≥ 1.1.0 (droits et outil « Zones de voix » du Registre, journal)
+    Dépendances : vAvA_core ≥ 0.11.0 (abonnements de zone) ; vava_ui ≥ 1.0.0 (polices, grain, papier et coins de
+                  l'éditeur, par nui://vava_ui/…) ; facultatives : vava_hud ≥ 1.2.0 (médaillon), vava_health (portée
+                  à terre), vava_admin ≥ 1.1.0 (droits et outil « Zones de voix » du Registre, journal)
 ]]
 
 fx_version 'cerulean'
