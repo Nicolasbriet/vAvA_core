@@ -30,6 +30,28 @@ ouverture. Le champ `vava_codex:prefs` est lu du seul serveur (`private`) : il n
 commande lancée. Coût serveur d'une ouverture : environ 1 ms pour un joueur, 2 ms pour un Souverain (calcul du
 contenu et de son empreinte, mesuré hors jeu), borné par `rateLimits.open`.
 
+## Ouvrir le livre à un chapitre (1.4.0)
+
+Export client `openAt(chapitre)` : ouvre le Codex par le même chemin que `F1` (RPC `vava_codex:open`, empreintes,
+préférences), puis la page ouvre le chapitre demandé dans l'onglet des commandes (recherche vidée). Rend `true`
+(ouverture lancée) ou `false, code` :
+
+| Code | Cas |
+| --- | --- |
+| `invalid_chapter` | pas une chaîne, vide, plus de 64 octets, ou hors du motif des identifiants du core (`^[%w_%-%.:]+$`) |
+| `no_character` | aucun personnage chargé |
+| `busy` | livre déjà ouvert, menu pause, ou une autre interface a le focus (`IsNuiFocused()`) |
+
+Le chapitre part dans le message `open` de la page (`focus`, absent pour `F1` et `/codex`) ; rien d'autre ne change
+sur le réseau. Un chapitre inconnu laisse le livre à son index, sans message. Aujourd'hui l'identifiant d'un chapitre
+est le nom du module qui déclare ses commandes : `openAt('vava_inventory')` ouvre le chapitre Inventaire.
+
+**Contrat pour T-023** (chapitre « Premiers pas ») : `vava_arrival` ouvre le Codex à son `codex.chapter`
+(`premiers_pas`) à la première venue d'un personnage. T-023 crée un chapitre d'identifiant `premiers_pas` dans
+`Model.state.chapters` ; s'il range ses pages de lecture ailleurs (onglet propre), il étend la seule fonction
+`applyFocus` de `web/js/app.js` pour y trouver `premiers_pas`. L'export `openAt` et le champ `focus` du message `open`
+ne changent pas.
+
 ## Prérequis
 
 `vAvA_core` ≥ 0.7.0 et `vava_ui` ≥ 1.0.0 (polices, grain et ornements du livre, par `nui://vava_ui/…` ; déclaré en
@@ -48,8 +70,8 @@ ACE déclarés avec les commandes), `vava_hud` (notifications), `vava_chat` (der
 | `server/prefs.lua` | champ de personnage : signets, dernières pages, réglage |
 | `server/main.lua` | déclaration du module, RPC |
 | `client/keys.lua` | touche réellement liée par le joueur (lue dans le jeu) |
-| `client/main.lua` | ouverture, relais des gestes, lancement par `ExecuteCommand`, export `noteCommand` |
-| `web/` | le livre : `index.html` s'ouvre dans un navigateur depuis le dépôt (`?staff=0` : vue d'un simple joueur ; option `--allow-file-access-from-files` pour les polices), avec les données simulées de `web/dev/devmock.js` (jamais livré) |
+| `client/main.lua` | ouverture, relais des gestes, lancement par `ExecuteCommand`, exports `noteCommand` et `openAt` |
+| `web/` | le livre : `index.html` s'ouvre dans un navigateur depuis le dépôt (`?staff=0` : vue d'un simple joueur ; `?focus=<chapitre>` : ouverture par `openAt`, par exemple `?focus=vava_gathering` ; option `--allow-file-access-from-files` pour les polices), avec les données simulées de `web/dev/devmock.js` (jamais livré) |
 
 ## Tests en jeu
 
@@ -84,3 +106,7 @@ ACE déclarés avec les commandes), `vava_hud` (notifications), `vava_chat` (der
 12. Ouvrir, fermer, rouvrir sans rien changer : le livre est le même (signets, dernières pages, touches) et le serveur
     ne renvoie que deux versions (compteur réseau ou `netgraph`). Donner un rang (`vava_conseil <compte> senechal`), ou
     `restart` d'un module qui déclare des commandes : à l'ouverture suivante, le contenu change aussitôt.
+13. `openAt` (1.4.0) : avec `vava_arrival`, `codex.chapter = 'vava_inventory'` et un nouveau personnage, le livre
+    s'ouvre seul au chapitre Inventaire, clavier et souris pris, `Échap` le ferme. Avec un chapitre inconnu
+    (`premiers_pas` avant T-023) : le livre s'ouvre à son index, sans erreur en F8. `F1` ensuite : le livre s'ouvre
+    là où il a été laissé, comme d'habitude (aucun chapitre imposé). Détail : `docs/tests/accueil.md`.

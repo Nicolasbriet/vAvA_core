@@ -2,11 +2,14 @@
 /*
  * web/js/app.js
  * Rôle : assemblage : messages du jeu, recherche, onglets et chapitres, sélection (souris et clavier), signets,
- *        lancement d'une ligne composée, réglage « rester ouvert », fermeture.
+ *        lancement d'une ligne composée, réglage « rester ouvert », fermeture, chapitre demandé à l'ouverture
+ *        (export openAt du client, 1.4.0).
  */
 
 (() => {
   const app = document.getElementById('app');
+  // Chapitre demandé à l'ouverture (export openAt, 1.4.0), appliqué une fois un contenu chargé, puis oublié.
+  let pendingFocus = null;
 
   function selectRow(id, focusForm) {
     Model.select(id);
@@ -60,6 +63,7 @@
   }
 
   function close() {
+    pendingFocus = null;
     app.hidden = true;
     Bridge.post('close');
   }
@@ -182,6 +186,20 @@
     }
   });
 
+  /** Ouvre le chapitre demandé s'il existe (onglet des commandes, recherche vidée) ; un chapitre inconnu laisse le
+   *  livre à son index, sans message. Les pages de lecture (T-023) qui vivraient ailleurs que dans les chapitres
+   *  étendent cette seule fonction. */
+  function applyFocus() {
+    const id = pendingFocus;
+    pendingFocus = null;
+    if (!id || !Model.state.chapters.some((chapter) => chapter.id === id)) return;
+    Model.setTab('commands');
+    Model.setQuery('');
+    refs.search.value = '';
+    Model.setChapter(id);
+    View.render();
+  }
+
   /** La page n'a pas le contenu de la version annoncée (cas de secours, jamais attendu). Sans aucun contenu, elle
    *  le redemande aussitôt (second appel au serveur, compté par le débit de l'ouverture) ; avec un contenu plus ancien,
    *  elle le montre et fait seulement oublier les versions au client : la prochaine ouverture renverra tout, sans
@@ -189,28 +207,34 @@
   async function resync() {
     if (Model.state.version !== null) {
       Bridge.post('stale');
+      applyFocus();
       return;
     }
     const result = await Bridge.post('refresh');
     if (!result.ok || !result.payload) {
+      pendingFocus = null;
       View.toast(errorMessage(result.error), 'danger');
       return;
     }
     Model.load(result.payload);
     View.render();
+    applyFocus();
   }
 
   Bridge.onMessage((action, payload) => {
     if (action === 'open') {
+      pendingFocus = typeof payload.focus === 'string' && payload.focus ? payload.focus : null;
       Forms.clearCache();
       Model.load(payload);
       View.render();
       app.hidden = false;
       View.focusSearch(true);
       if (Model.state.version !== payload.version) resync();
+      else applyFocus();
     } else if (action === 'notify') {
       View.toast(payload.message, payload.kind);
     } else if (action === 'close') {
+      pendingFocus = null;
       app.hidden = true;
     }
   });

@@ -42,7 +42,7 @@ end
 
 local ITEMS = {
     pain = {
-        label = 'Miche de pain', description = 'Encore tiède, sortie du four du village.',
+        label = 'Miche de pain', description = 'Croûte épaisse, mie serrée.',
         width = 2, height = 1, weight = 400, stack = 10, category = 'nourriture', image = image('pain'),
         effects = { hunger = 35 },
     },

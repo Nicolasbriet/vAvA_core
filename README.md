@@ -8,7 +8,7 @@ Aucun framework tiers (ni ESX, ni QBCore, ni Qbox, ni ox_core).
 | Dossier | Rôle |
 | --- | --- |
 | racine (`fxmanifest.lua`, `server/`, `client/`, `shared/`, `config/`) | La ressource `vAvA_core` : logger, base de données, migrations, RPC, limites de débit, hooks, registres, modules, joueurs et personnages |
-| `modules/` | Les modules du royaume : polices, textures et ornements communs des interfaces (`vava_ui`), écran de chargement (`vava_loading`), chat, apparence, sélection et création de personnage, HUD, inventaire, faim et soif, santé, Registre du Conseil, chat vocal, monde sans PNJ, ciel et heure (heure de Paris, saisons, météo), caméras, magie, compétences (fondation des métiers), récolte, artisanat, agriculture, Codex (toutes les commandes et touches), pont de la Chancellerie |
+| `modules/` | Les modules du royaume : polices, textures et ornements communs des interfaces (`vava_ui`), écran de chargement (`vava_loading`), chat, apparence, sélection et création de personnage, HUD, inventaire, faim et soif, santé, Registre du Conseil, chat vocal, monde sans PNJ, ciel et heure (heure de Paris, saisons, météo), caméras, magie, compétences (fondation des métiers), récolte, artisanat, agriculture, Codex (toutes les commandes et touches), arrivée des nouveaux personnages (dotation de départ, accueil), pont de la Chancellerie |
 | `examples/` | Modules d'exemple et outils de développement |
 | `chancellerie/` | La Chancellerie, panneau web autonome (Node.js, sans dépendance) qui configure, lance et surveille FXServer |
 | `docs/` | [API des modules](docs/api.md) et [guide de la Chancellerie](docs/chancellerie.md) |
@@ -31,7 +31,7 @@ Voir [docs/chancellerie.md](docs/chancellerie.md).
 À la main : placer `vAvA_core` et chaque module dans `resources/`, puis les démarrer dans cet ordre, après
 `oxmysql` : `vAvA_core`, `vava_ui`, `vava_loading`, `vava_chat` (à la place de `chat`), `vava_world`, `vava_time`, `vava_appearance`, `vava_characters_ui`,
 `vava_hud`, `vava_inventory`, `vava_needs`, `vava_health`, `vava_admin`, `vava_voice`, `vava_cameras`, `vava_magic`,
-`vava_skills`, `vava_gathering`, `vava_crafting`, `vava_farming`, `vava_codex`, `vava_chancellerie`.
+`vava_skills`, `vava_gathering`, `vava_crafting`, `vava_farming`, `vava_codex`, `vava_arrival`, `vava_chancellerie`.
 
 `vava_ui` n'a aucun script : il sert aux interfaces leurs polices, textures et ornements communs. Les ressources à
 page qui l'ont adopté le déclarent en dépendance : ne jamais l'arrêter ni le relancer sur un serveur ouvert (voir

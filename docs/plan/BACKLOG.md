@@ -546,7 +546,12 @@ versé à T-014 ; les autres points déjà couverts sont précisés dans T-012 �
 - 20 à 30 extraits courts du lore, 15 conseils de jeu, textes d'accueil.
 
 ### T-022 — Arrivée d'un nouveau personnage
-- Agents : vava-architecte → vava-dev-lua (cette tâche autorise à toucher `config/server.lua` pour un commentaire, `vava_codex`, `chancellerie/lib/resources.js`, `.luacheckrc`, dans les limites de la spec) · Dépend de : — · Statut : en cours
+- Agents : vava-architecte → vava-dev-lua (cette tâche autorise à toucher `config/server.lua` pour un commentaire, `vava_codex`, `chancellerie/lib/resources.js`, `.luacheckrc`, dans les limites de la spec) · Dépend de : — · Statut : à tester en jeu (relu sécurité, réseau et lore, suites appliquées ; fusionnée sans test en jeu, à la demande du porteur du projet)
+- Fait le 30 octobre 2026 : `vava_arrival` 1.0.0, `vava_codex` 1.4.0, Chancellerie 1.8.2 (ordre de démarrage). Rapport
+  `docs/plan/rapports/T-022.md`. **À tester en jeu** : `docs/tests/accueil.md`, en priorité accueil et Codex qui prend
+  le clavier (2), notifications lisibles par-dessus le Codex, aucune seconde dotation (3, 4, 8), `nil` reçus en `NULL`
+  par oxmysql (9, 18), limite du compte, `redoter`, `rejouer`, remise « incertaine » (10, 12, 13, 15), anciens
+  personnages à `play_seconds = 0`.
 - Spec : `docs/plan/specs/T-022.md` (nouveau module `vava_arrival` ; décisions 1 à 9 retenues telles que proposées sur
   délégation du porteur du projet le 30 octobre 2026, la 10 laissée en piste, core gardé en 0.12.0).
 - Point d'arrivée en config (PLACEHOLDER), dotation de départ minimale en config (besace, vêtements simples, pain,
@@ -557,6 +562,14 @@ versé à T-014 ; les autres points déjà couverts sont précisés dans T-012 �
 - Agents : vava-dev-lua + vava-gardien-lore · Dépend de : T-022 · Statut : à faire
 - Pages de lecture dans le Codex (pas seulement les commandes) : vivre à Eldoria, troquer, apprendre un métier,
   la magie, le Conseil.
+
+### T-130 — Eau potable
+- Agents : vava-architecte → vava-dev-lua · Dépend de : T-022 · Statut : à faire
+- Relecture lore de T-022 : aucun module livré ne produit de boisson ; une fois bues les deux outres de la dotation
+  (`vava_arrival`), aucun joueur ne peut en désaltérer un autre, et l'objet `eau` n'appartient qu'à `vava_arrival` et à
+  l'exemple de développement. Donner à l'eau une source commune dans l'esprit du royaume : remplir une outre au puits
+  (les puits de `vava_farming` remplissent déjà le seau), boire à une fontaine, ou une recette d'artisanat ; un module
+  propriétaire de l'objet `eau` (et, à terme, du `pain`). Rien qui rende un joueur autosuffisant.
 
 ## Phase 3 — L'Atelier : socle et créateurs du monde
 
@@ -707,6 +720,13 @@ seulement l'éditeur (phase 6).
 - Agents : vava-architecte → vava-dev-lua · Dépend de : — · Statut : à faire
 - On ne connaît pas le nom des inconnus : description courte affichée à la place, « se présenter » révèle son nom à
   un joueur proche (mémorisé par personnage). Utilisé par le chat de proximité et l'affichage au-dessus des têtes.
+
+### T-131 — L'arrivée d'un voyageur vue des joueurs proches
+- Agents : vava-architecte → vava-dev-lua · Dépend de : T-022 · Statut : à faire
+- Relecture lore de T-022 (décision 10, laissée en piste) : l'accueil reste un message système, rien ne crée encore de
+  rencontre. Prévenir discrètement les joueurs proches du point d'arrivée qu'un voyageur arrive (`core.net.sendNear`,
+  ~30 m, une ligne), ou donner au Conseil la liste des nouveaux venus du jour ; branché sur le hook
+  `vava_arrival:arrived`, sans toucher à `vava_arrival`. Aucun envoi à tous.
 
 ### T-039 — PORTE : soirée RP de test — **HUMAIN**
 - Dépend de : phase 5 · Statut : à faire
