@@ -13,7 +13,7 @@ ignore = {
 -- Globales qu'une ressource a le droit de créer : sa table de module, et rien d'autre.
 globals = {
     'vAvA',
-    'VavaAdmin', 'VavaAppearance', 'VavaCameras', 'VavaChancellerie', 'VavaCharactersUi', 'VavaChat',
+    'VavaAdmin', 'VavaAppearance', 'VavaArrival', 'VavaCameras', 'VavaChancellerie', 'VavaCharactersUi', 'VavaChat',
     'VavaCodex', 'VavaCrafting', 'VavaFarming', 'VavaGathering', 'VavaHealth', 'VavaHud', 'VavaInventory',
     'VavaMagic', 'VavaNeeds', 'VavaSkills', 'VavaTime', 'VavaVoice', 'VavaWorld',
     'VavaBridge', 'VavaExample', 'VavaAnimTest', 'VavaDevCharacters',

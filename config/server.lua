@@ -212,7 +212,7 @@ vAvA.config.server = {
 
     spawn = {
         models = { m = 'mp_m_freemode_01', f = 'mp_f_freemode_01' },  -- en attendant un module d'apparence
-        defaultPoint = { x = -269.4, y = -955.3, z = 31.2, heading = 205.8 },  -- premier spawn d'un personnage
+        defaultPoint = { x = -269.4, y = -955.3, z = 31.2, heading = 205.8 },  -- PLACEHOLDER : point d'arrivée des nouveaux personnages (T-022)
     },
 
     rateLimit = {
