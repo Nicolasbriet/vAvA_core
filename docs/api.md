@@ -346,8 +346,9 @@ end)
 - Depuis 0.10.0, réponses et appels serveur → client passent par `core.net` : mesurés, comptés sous la ressource du
   RPC (`rpc <nom>`, `callClient <nom>` ; un RPC inconnu sous `vAvA_core`, `rpc <inconnu>`, jamais sous le nom reçu),
   bornés à `net.maxBytes` (256 Ko). Une réponse de plus de `net.latent.threshold` (8 Ko) part **en latent**
-  (64 Ko/s), précédée d'un préavis fiable `vAvA:rpc:latent` (id, octets, débit) : le client repousse l'attente de
-  l'appel du temps de transfert plus `rpc.latentMarginMs` (3 s), au plus `rpc.maxLatentExtendMs` (30 s), et rien ne
+  (64 Ko/s), précédée d'un préavis fiable `vAvA:rpc:latent` (id, octets, débit, délai) : le client repousse l'attente
+  de l'appel du délai jusqu'à l'arrivée de la réponse (latents déjà en route vers lui compris, au moins le transfert
+  de la réponse seule) plus `rpc.latentMarginMs` (3 s), au plus `rpc.maxLatentExtendMs` (30 s), et rien ne
   change pour le module client (`rpc.call` rend les mêmes valeurs). `latent = 'never'` garde la réponse fiable quelle
   que soit sa taille : pour un état que des différences suivront aussitôt (voir l'ordre, § `core.net`). Toute autre
   valeur fait échouer `register`. Un `callClient` dont les arguments dépassent le seuil part aussi en latent, et
@@ -401,13 +402,13 @@ permis dans un module, mais il n'est pas compté.
 | `send(target, event, ...)` | `true, envoyés, octets, latent` ou `false, code` |
 | `sendWith({ latent? }, target, event, ...)` | idem |
 | `sendNear(coords, radius, event, ...)` | idem |
-| `sendNearWith({ latent?, exclude?, bucket? }, coords, radius, event, ...)` | idem |
-| `playersNear(coords, radius, { exclude?, bucket? }?)` | liste de numéros de joueurs (copie), ou `nil, code` |
+| `sendNearWith({ latent?, from?, exclude?, bucket? }, coords, radius, event, ...)` | idem |
+| `playersNear(coords, radius, { from?, exclude?, bucket? }?)` | liste de numéros de joueurs (copie), ou `nil, code` |
 | `stats({ limit?, resource?, target? }?)` | `{ mode, windowMs, total, events }`, ou `nil, code` |
 
 ```lua
--- un bruit de forge entendu à 30 m, sauf par le forgeron
-local ok, count = core.net.sendNearWith({ exclude = source }, coords, 30.0, 'vava_crafting:sound', 'marteau')
+-- un bruit de forge entendu à 30 m, sauf par le forgeron, et seulement dans son instance
+local ok, count = core.net.sendNearWith({ from = source }, coords, 30.0, 'vava_crafting:sound', 'marteau')
 ```
 
 - **Cible** : un numéro de joueur (entier > 0 qui existe), ou une **liste pure** d'entiers > 0 (1 à 256) ; dans une
@@ -420,9 +421,14 @@ local ok, count = core.net.sendNearWith({ exclude = source }, coords, 30.0, 'vav
   32), 256 Ko au plus par message (`too_large`, rien n'est envoyé, erreur en console).
 - **Options** (table à clés connues, sinon `invalid_options`) : `latent` = `'auto'` (défaut : latent strictement
   au-delà de 8 Ko) | `'never'` (toujours fiable) | `'always'` ; pour `sendNear*` et `playersNear` : `exclude`
-  (numéro de joueur à sauter) et `bucket` (entier ≥ 0 : seulement ce routing bucket ; défaut : tous).
+  (numéro de joueur à sauter), `bucket` (entier ≥ 0 : seulement ce routing bucket ; défaut : **tous**) et `from`
+  (joueur d'origine, qui existe : sauté, et seul son routing bucket compte ; `exclude` ou `bucket` donnés
+  l'emportent).
+- **Instances** : sans `bucket` ni `from`, un joueur d'une autre instance (routing bucket) au même endroit reçoit le
+  message. Dès qu'un module a des instances (intérieurs, cachots, essais), il fournit `from` (l'auteur de l'action)
+  ou `bucket` à chaque envoi de proximité.
 - **Proches** : personnages chargés **et apparus**, ped existant, distance 3D ≤ rayon (0 < rayon ≤ 1 000 m, sinon
-  `invalid_radius`), positions lues par le serveur (au plus une fois par tour) ; `coords` : `vector3` ou
+  `invalid_radius`), positions lues par le serveur (gardées le temps d'une même milliseconde) ; `coords` : `vector3` ou
   `{ x, y, z }` finis (`invalid_coords`). Personne à portée : `true, 0, 0, false`, rien n'est sérialisé.
 - **Retour** : `envoyés` = joueurs servis, `octets` = taille d'**un** message (charge msgpack + nom de l'évènement),
   `latent` = booléen.
@@ -457,7 +463,10 @@ joueur`, sinon une liste vide).
 Ce que le core envoie lui-même par `core.net` : réponses RPC et préavis, demandes de `callClient`, personnage chargé,
 champs, déchargement et ordre d'apparition (**toujours fiables** : l'ordre chargement → champs → apparition compte ;
 au-delà de 8 Ko, alerte en console une fois par minute et par évènement), sortie de `/vava_reseau`. Non comptés :
-GlobalState, state bags, envois directs des modules.
+GlobalState, state bags, envois directs des modules. Si le personnage chargé ou l'ordre d'apparition ne peut pas
+partir (trop gros, valeur non sérialisable), la console écrit le compte, le personnage et la cause, et le joueur est
+déconnecté avec `players.messages.sendFailed` plutôt que laissé sur un écran noir ; `characters.spawn` rend alors
+`false, code`.
 
 **Commandes** (registre `core:commands`, chapitre Core) :
 - `/vava_reseau` (Conseil, droit `tools` de `vava_admin`, repli ACE `vava.reseau`, 2 s entre deux) : en-tête, les 10

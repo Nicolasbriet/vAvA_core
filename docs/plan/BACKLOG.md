@@ -367,6 +367,18 @@ versé à T-014 ; les autres points déjà couverts sont précisés dans T-012 �
   `EVERYONE` (constante `-1`, `:23`), environ 110 o par édition, et échappe à `audit-reseau.sh`. Seul BLOQUANT de
   l'audit réseau : en attendant cette tâche, le porteur du projet décide d'inscrire l'exception dans
   `scripts/audit-exceptions.txt` (nécessaire dès que T-013 renforce le garde-fou).
+- Exception inscrite par T-013 (deux lignes de `scripts/audit-exceptions.txt`, extraits complets) : à retirer ici.
+- **IMPORTANT** de la relecture réseau de T-013 (`docs/plan/rapports/T-013.md` § Pour T-014) : un module qui passe par
+  `core.net` sérialise deux fois (copie de ses arguments à la traversée de l'export `server/core/api.lua`, puis la
+  mesure). Petite bibliothèque chargée par le module (`@vAvA_core/shared/…`) qui mesure et envoie sur place, et ne
+  remonte au core qu'un enregistrement de quelques octets (ressource, évènement, octets, cibles, latent) pour le
+  compteur. À faire avant que `publish` et la bascule des modules ne la multiplient.
+- **IMPORTANT** de la relecture réseau de T-013 : un envoi à une liste ne dit pas quelles cibles ont été sautées (latent
+  saturé, `server/core/net.lua` `deliverTo`). Pour les abonnés d'une zone : rendre la liste des sautés, ou règle « le
+  client attend la révision + 1, sinon il redemande un instantané ».
+- Relecture réseau de T-013, à reprendre ici : positions des joueurs gardées une fois par tour du serveur (aujourd'hui
+  le temps d'une même milliseconde) ou grille, pour les portées calculées souvent ; plafond global du volume latent
+  (pas seulement par joueur) pour la distribution des catalogues de l'Atelier.
 
 ### T-015 — Récolte : GlobalState → abonnements de zone
 - Agent : vava-dev-lua · Dépend de : T-014 · Statut : à faire

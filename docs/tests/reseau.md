@@ -55,6 +55,7 @@ de console correspondante (serveur, ou `F8` du joueur).
 | 6 | **(2 joueurs)** B se déconnecte pendant `vava_reseau_essai <B> 256`. | Aucune erreur dans la console du serveur. |
 | 7 | Console : `vava_reseau_essai`, `vava_reseau_essai <B> 0`, `vava_reseau_essai <B> 300`, `vava_reseau_essai <B> 10 2000`, `vava_reseau_essai 999 10`. | « usage : vava_reseau_essai <n° du joueur> <Ko 1-256> [rayon] » pour les quatre premiers ; « essai refusé : invalid_target » pour le dernier. |
 | 8 | Un joueur tape `/vava_reseau_essai <son n°> 10` dans le chat. | Rien (commande de console). |
+| 9 | Console : `vava_reseau_essai <B> 256` (4 s de latent en route vers B), et **aussitôt** B ouvre le Codex (`F1`) après un redémarrage de `vava_codex` (contenu complet, plus de 8 Ko). | Le Codex s'ouvre quand l'essai est passé, sans « délai dépassé » : le préavis de la réponse compte les 4 s déjà en route. |
 
 ## 5. Chat sans envoi à tous
 
