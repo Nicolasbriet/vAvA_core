@@ -21,6 +21,7 @@ local PAGES = {
     { module = 'vava_voice', sheet = 'style.css' },
     { module = 'vava_cameras', sheet = 'wall.css' },
     { module = 'vava_admin', sheet = 'style.css' },
+    { module = 'vava_magic', sheet = 'style.css' },
 }
 
 local COMMON = {

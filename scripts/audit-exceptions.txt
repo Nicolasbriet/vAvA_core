@@ -4,6 +4,3 @@ modules/vava_chat/server/logs.lua	INSERT .. concat(values, ', ')	insertion group
 # Provisoire jusqu'à T-014 (abonnements de zone), décision du porteur du projet du 30 octobre 2026 (T-013) : à retirer avec elle.
 modules/vava_voice/server/zones.lua	TriggerClientEvent(EVENTS.ZONE, EVERYONE, action, copy(zone))	zones de voix : envoi à tous provisoire, rare (édition du Conseil, ~110 o), retiré par T-014
 modules/vava_voice/server/zones.lua	TriggerClientEvent(EVENTS.ZONE, EVERYONE, action, id)	zones de voix (suppression) : envoi à tous provisoire, rare, retiré par T-014
-# Provisoire pendant la bascule des pages sur vava_ui (T-012) : copies communes et devmock.js encore livrés par les
-# pages pas encore basculées. Une ligne retirée à chaque bascule ; aucune ne reste à la fin de T-012.
-modules/vava_magic/web/	[fichier]	T-012 : page pas encore basculée sur vava_ui (provisoire, retiré à sa bascule)

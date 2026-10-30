@@ -38,6 +38,7 @@ Rien n'a encore été joué en vrai : voir « À vérifier en jeu », « Tests �
 | Dépendance | Rôle | Sans elle |
 | --- | --- | --- |
 | `vAvA_core` ≥ 0.5.0 | personnages, RPC, hooks, base, journal | obligatoire |
+| `vava_ui` ≥ 1.0.0 | polices (Cinzel Decorative comprise), grain, papier et coins de la page (`nui://vava_ui/…`) | obligatoire (dépendance déclarée : démarrée d'office, à ne jamais arrêter sur un serveur ouvert) |
 | `vava_inventory` ≥ 1.3.0 | grimoire et registre (objets, métadonnées) | pas d'objets ; `/grimoire` reste |
 | `vava_hud` | notifications | notifications de GTA (la barre de mana est celle du module) |
 | `vava_health` | blessures, état « à terre » (aucun sort ne touche un joueur à terre) | la victime applique la blessure elle-même |
@@ -62,8 +63,10 @@ vava_magic/
             projectiles (vol et rendu communs) · combos (mot bref, effets, vapeur, boue) · sigils · grimoire
             register · main
             spells/… (mêmes noms que côté serveur)
-  web/      index.html · css/ · js/ (dont wheel, hud, conditions, sound) · fonts/ (OFL) · sounds/ (.ogg facultatifs)
-            img/ (runes, textures, spells/, elements/, states/) · items/ (grimoire, registre)
+  web/      index.html · css/ · js/ (dont wheel, hud, conditions, sound) · sounds/ (.ogg facultatifs)
+            img/ (runes, écriture, spells/, elements/, states/) · items/ (grimoire, registre)
+            dev/devmock.js (aperçu hors jeu, jamais livré : web/index.html?view=… depuis le dépôt)
+            polices, grain, papier et coins : vava_ui
   sql/      0001_magic.sql
 ```
 
