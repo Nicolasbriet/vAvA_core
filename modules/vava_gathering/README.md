@@ -6,10 +6,14 @@ ternes) et rapporte peu ; poussée à zéro, elle garde une **cicatrice**. Les o
 la qualité de ce qu'on ramasse dépend de la compétence, de l'outil et de la santé de la terre, et chaque pile porte son
 palier et sa provenance. Le serveur décide de tout et demande l'XP à `vava_skills`.
 
-Ordre de démarrage : après `vAvA_core` (≥ 0.6.0), `vava_inventory` (≥ 1.4.0) et `vava_skills` (≥ 1.0.0).
+Ordre de démarrage : après `vAvA_core` (≥ 0.6.0), `vava_ui` (≥ 1.0.0, polices, grain, papier et coins des
+interfaces ; à ne jamais arrêter sur un serveur ouvert), `vava_inventory` (≥ 1.4.0) et `vava_skills` (≥ 1.0.0).
 Facultatifs : `vava_hud` (barre de progression, notifications), `vava_admin` (droit `metiers`), `vava_chat`,
 `vava_health` (aucune récolte à terre), `vava_time` (saisons : repousse des nœuds et quantité récoltée, lues par
 l'export `getSeason`).
+
+Rendu hors jeu : `web/index.html?view=prompt` (ou `tension`, `zones`) dans un navigateur, depuis le dépôt (option
+`--allow-file-access-from-files` pour les polices), avec les données simulées de `web/dev/devmock.js` (jamais livré).
 
 ## Règles (config.lua)
 

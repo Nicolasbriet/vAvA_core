@@ -6,7 +6,8 @@
            de tension, réaction de la terre, commandes du Conseil. Le serveur décide de tout (distance, outil,
            cooldown, durée, rendement, charges, vitalité, prise d'un poisson quand la ligne a tenu) et appelle vava_skills pour l'XP ; le client crée les props à
            portée, pose les blips des zones sur la carte, montre l'invite, joue le geste et la barre de tension.
-    Dépendances : vAvA_core ≥ 0.6.0, vava_inventory ≥ 1.4.0 (objets, mains, métadonnées), vava_skills ≥ 1.0.0 (XP) ;
+    Dépendances : vAvA_core ≥ 0.6.0, vava_ui ≥ 1.0.0 (polices, grain, papier et coins de la page, par
+                  nui://vava_ui/…), vava_inventory ≥ 1.4.0 (objets, mains, métadonnées), vava_skills ≥ 1.0.0 (XP) ;
                   facultatifs : vava_hud (barre de progression, notifications), vava_admin (droit metiers), vava_chat,
                   vava_health (aucune récolte à terre), vava_time (saisons : repousse des nœuds, quantité récoltée)
 ]]
@@ -18,9 +19,10 @@ use_experimental_fxv2_oal 'yes'
 
 name 'vava_gathering'
 description 'Récolte vAvA : zones à vitalité sur la carte, nœuds, outils en main, qualité, pêche, pistes de gibier'
-version '1.4.1'
+version '1.5.0'
 
 dependency 'vAvA_core'
+dependency 'vava_ui'
 dependency 'vava_inventory'
 dependency 'vava_skills'
 
@@ -28,13 +30,12 @@ vava_migration 'sql/0001_gathering.sql'
 
 ui_page 'web/index.html'
 
+-- polices, grain, papier et coins : vava_ui ; les données simulées hors jeu (dossier dev/) ne sont jamais livrées
 files {
     'web/index.html',
     'web/css/*.css',
     'web/js/*.js',
-    'web/img/*',
     'web/items/*.svg',
-    'web/fonts/*.woff2',
 }
 
 -- Ordre explicite : chaque fichier ne dépend que de ceux listés avant lui.
