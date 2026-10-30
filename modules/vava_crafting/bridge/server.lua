@@ -5,9 +5,9 @@
            piles et leurs métadonnées, comptage par palier, échange atomique, écriture partielle des métadonnées,
            garde de la signature au hook des métadonnées, déclaration des objets), compétences (XP, niveau, rang,
            recette connue, leçon, registre des recettes), libellés des compétences, poinçon (champ de personnage),
-           droits et journal du Conseil, notifications, chat, base.
+           droits et journal du Conseil, notifications, chat, zones du core des stations (abonnements de zone), base.
            Chaque appel à une autre ressource est isolé.
-    Dépendances : shared/constants.lua, config.lua, server/core.lua
+    Dépendances : shared/constants.lua, config.lua, server/core.lua (core.zones : vAvA_core 0.11.0)
 ]]
 
 local type, pairs, ipairs, pcall, tostring, tonumber = type, pairs, ipairs, pcall, tostring, tonumber
@@ -348,6 +348,39 @@ function Bridge.Chat(source, text)
     end
     local called = call(CHAT, 'addMessage', source, { text = text })
     if not called then Bridge.Notify(source, text) end
+end
+
+-- Abonnements de zone (vAvA_core 0.11.0) --------------------------------------------------------------------------
+-- Une zone du core par station : le core l'envoie aux seuls joueurs proches (positions lues par le serveur) et ne
+-- leur envoie ensuite que ses changements. Son état est public : rien de secret dedans. Les sons, effets ou messages
+-- liés à une station viseront `core.zones.subscribers(id)` ou `core.net.sendNear`, jamais tous les joueurs.
+
+---@param id string
+---@param area table
+---@param state table
+---@return boolean ok
+---@return integer|string handleOrErr
+function Bridge.DefineZone(id, area, state)
+    if not core.zones then return false, 'zones_unavailable' end
+    return core.zones.define(id, area, state)
+end
+
+---@param id string
+---@param area table
+---@return boolean ok
+---@return string|nil err
+function Bridge.MoveZone(id, area)
+    if not core.zones then return false, 'zones_unavailable' end
+    return core.zones.move(id, area)
+end
+
+---@param id string
+---@param changes table
+---@return boolean ok
+---@return string|nil err
+function Bridge.SetZone(id, changes)
+    if not core.zones then return false, 'zones_unavailable' end
+    return core.zones.set(id, changes)
 end
 
 -- Base de données -------------------------------------------------------------------------------------------------

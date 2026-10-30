@@ -443,7 +443,7 @@ versé à T-014 ; les autres points déjà couverts sont précisés dans T-012 �
   128 m à juger).
 
 ### T-017 — Artisanat : GlobalState → abonnements de zone
-- Agent : vava-dev-lua · Dépend de : T-014 · Statut : à faire
+- Agent : vava-dev-lua · Dépend de : T-014 · Statut : à tester en jeu (relu sécurité et réseau, suites appliquées ; fusionnée sans test en jeu, à la demande du porteur du projet)
 - T-011 (`docs/audits/reseau-vava_crafting.md`) : `server/stations.lua:75-82` publie `{ fuel, busy }` à tous, deux fois
   par création au moins (occupée, libre) et à chaque unité de combustible ; `:85-87` réécrit la liste complète des
   stations (110 o par station) à chaque station ajoutée par un module. Envoyer l'état aux abonnés de la zone de la
@@ -453,6 +453,14 @@ versé à T-014 ; les autres points déjà couverts sont précisés dans T-012 �
 - Relectures de T-014 : l'état d'une zone est **public** (position déclarée par le client sous OneSync) : rien de
   secret dedans, chaque action revérifie la distance côté serveur ; coût à mesurer par `profiler record` (cases de
   128 m à juger).
+- Fait le 30 octobre 2026 : `vava_crafting` 1.5.0 — une zone du core par station (2 m, marge 100 m), état `def` + `s`
+  aux seuls joueurs proches en différences (~34 o), plus aucune clé GlobalState, évènement `vava_crafting:station`
+  retiré, boucle des props seulement si une station est connue. Relu sécurité et réseau ; suites : `addStation`
+  refuse une station dont le core refuse la zone (`zones_full`), nouvel essai d'une déclaration refusée une fois par
+  minute, état non envoyé repris, passage immédiat du client pour chaque station reçue, menu fermé sur une station
+  oubliée. Compte rendu `docs/plan/rapports/T-017.md`. **À tester en jeu** : `docs/tests/metiers.md` § 4.1 (19 étapes :
+  joueur loin sans rien reçu, stations à 80 m au galop y compris la deuxième d'un trajet, menu qui suit le combustible
+  et se ferme quand on s'éloigne, composteur ajouté par l'agriculture, `zones_full`, `resmon`, `profiler record`).
 
 ### T-018 — Revue des boucles client
 - Agent : vava-dev-lua (avec vava-reseau-perf) · Dépend de : T-011 · Statut : à tester en jeu

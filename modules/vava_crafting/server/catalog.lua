@@ -5,18 +5,21 @@
            recette est aussi déclarée à `vava_skills:recipes`), stations placées, outils d'artisan, objets déclarés à
            l'inventaire (rappelé quand l'inventaire redémarre). Vérifie la cohérence au démarrage : une erreur de
            donnée refuse le module.
-    Dépendances : shared/constants.lua, config.lua, server/core.lua, bridge/server.lua
+    Dépendances : shared/constants.lua, config.lua, shared/stationzone.lua (bornes), server/core.lua, bridge/server.lua
 ]]
 
 local type, pairs, ipairs, tostring = type, pairs, ipairs, tostring
 local format = string.format
-local sort = table.sort
+local sort, remove = table.sort, table.remove
 
 local core = VavaCrafting.core
 local bridge = VavaCrafting.bridge
 local cfg = VavaCrafting.config
 local REGISTRY = VavaCrafting.REGISTRY
 local ID_PATTERN = VavaCrafting.ID_PATTERN
+local STATION_ID_MAX = VavaCrafting.STATION_ID_MAX
+-- nom et modèle d'une station placée par un module : bornes de ce que lit le client
+local LABEL_MAX, PROP_MAX = VavaCrafting.stationzone.LABEL_MAX, VavaCrafting.stationzone.PROP_MAX
 local MAX_TIER = VavaCrafting.MAX_TIER
 
 local STATION_SCHEMA = {
@@ -101,6 +104,20 @@ VavaCrafting.catalog = catalog
 ---@field ingredients { item: string, quantity: integer, minTier: integer }[]
 ---@field output { item: string, quantity: integer }
 
+--- Identifiant de station : motif du module, au plus STATION_ID_MAX octets (borne du schéma des RPC, et nom de sa zone
+--- du core).
+---@param id any
+---@return boolean
+local function validId(id)
+    return type(id) == 'string' and #id <= STATION_ID_MAX and id:find(ID_PATTERN) ~= nil
+end
+
+---@param value any
+---@return boolean
+local function finite(value)
+    return type(value) == 'number' and value == value and value ~= math.huge and value ~= -math.huge
+end
+
 local stationsById, stationsOrdered = {}, {}
 -- caches reconstruits après un changement de registre
 local typesById, recipesById, recipesByStation = nil, nil, nil
@@ -176,7 +193,10 @@ end
 ---@return string|nil err
 local function indexStations()
     for index, station in ipairs(cfg.stations) do
-        if type(station.id) ~= 'string' or not station.id:find(ID_PATTERN) then return false, format('station #%d : identifiant invalide', index) end
+        if not validId(station.id) then return false, format('station #%d : identifiant invalide', index) end
+        if not finite(station.x) or not finite(station.y) or not finite(station.z) then
+            return false, format("station '%s' : position x, y, z attendue", station.id)
+        end
         if stationsById[station.id] then return false, format("station '%s' en double", station.id) end
         local kind = catalog.stationType(station.type)
         if not kind then return false, format("station '%s' : type '%s' inconnu", station.id, tostring(station.type)) end
@@ -196,16 +216,6 @@ local function indexStations()
         stationsOrdered[#stationsOrdered + 1] = def
     end
     return true
-end
-
---- Stations telles que les clients les dessinent : { id, type, label, x, y, z, heading, prop }.
----@return table[]
-function catalog.stationList()
-    local list = {}
-    for i, def in ipairs(stationsOrdered) do
-        list[i] = { id = def.id, type = def.type.id, label = def.label, x = def.x, y = def.y, z = def.z, heading = def.heading or 0.0, prop = def.prop or def.type.prop }
-    end
-    return list
 end
 
 --- Définit les registres, y verse la config, déclare objets et recettes, indexe les stations. Appelé pendant le
@@ -262,16 +272,19 @@ function catalog.define()
     return true
 end
 
---- Place une station depuis un autre module (type déjà déclaré au registre). Depuis 1.1.0.
----@param spec table  { id, type, label?, x, y, z, quality?, owner? }
+--- Place une station depuis un autre module (type déjà déclaré au registre). Depuis 1.1.0 ; depuis 1.5.0, identifiant
+--- de 32 octets au plus, position finie, nom et modèle bornés (ce que les clients proches reçoivent pour la dessiner).
+---@param spec table  { id, type, label?, x, y, z, heading?, quality?, owner?, prop? }
 ---@return vAvA.StationDefinition|nil
 ---@return string|nil err
 function catalog.addStation(spec)
-    if type(spec) ~= 'table' or type(spec.id) ~= 'string' or not spec.id:find(ID_PATTERN) then return nil, 'invalid_id' end
+    if type(spec) ~= 'table' or not validId(spec.id) then return nil, 'invalid_id' end
     if stationsById[spec.id] then return nil, 'duplicate' end
     local kind = catalog.stationType(spec.type)
     if not kind then return nil, 'unknown_station_type' end
-    if type(spec.x) ~= 'number' or type(spec.y) ~= 'number' or type(spec.z) ~= 'number' then return nil, 'invalid_position' end
+    if not finite(spec.x) or not finite(spec.y) or not finite(spec.z) then return nil, 'invalid_position' end
+    if spec.label ~= nil and (type(spec.label) ~= 'string' or #spec.label < 1 or #spec.label > LABEL_MAX) then return nil, 'invalid_label' end
+    if spec.prop ~= nil and (type(spec.prop) ~= 'string' or #spec.prop < 1 or #spec.prop > PROP_MAX) then return nil, 'invalid_prop' end
     local owner = nil
     if type(spec.owner) == 'table' then
         if type(spec.owner.kind) ~= 'string' or math.tointeger(spec.owner.id) == nil then return nil, 'invalid_owner' end
@@ -279,12 +292,22 @@ function catalog.addStation(spec)
     end
     local def = {
         id = spec.id, type = kind, label = spec.label or kind.label, x = spec.x, y = spec.y, z = spec.z,
-        heading = type(spec.heading) == 'number' and spec.heading or 0.0,
-        quality = math.tointeger(spec.quality) or 50, owner = owner, prop = type(spec.prop) == 'string' and spec.prop or nil,
+        heading = finite(spec.heading) and spec.heading or 0.0,
+        quality = math.tointeger(spec.quality) or 50, owner = owner, prop = spec.prop,
     }
     stationsById[spec.id] = def
     stationsOrdered[#stationsOrdered + 1] = def
     return def
+end
+
+--- Retire une station placée par `addStation` dont la zone a été refusée par le core (aucun joueur ne la verrait).
+---@param id string
+function catalog.removeStation(id)
+    if not stationsById[id] then return end
+    stationsById[id] = nil
+    for i = #stationsOrdered, 1, -1 do
+        if stationsOrdered[i].id == id then remove(stationsOrdered, i) end
+    end
 end
 
 ---@param id any

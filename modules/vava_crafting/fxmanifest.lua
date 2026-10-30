@@ -5,8 +5,9 @@
            choisi, qualité d'une pièce (matériaux, niveau, station, aléa, plafonnée par le niveau), objets signés
            (qualité, solidité, créateur figé, poinçon, baptême d'un chef-d'œuvre, histoire), réparation qui marque
            l'objet, leçons données en réalisant une recette transmise devant un élève, commandes du Conseil. Le serveur
-           décide de tout ; le client crée les props des stations, montre l'invite et le menu, joue le geste.
-    Dépendances : vAvA_core ≥ 0.6.0, vava_ui ≥ 1.0.0 (polices, grain, papier et coins de la page, par
+           décide de tout ; le client crée les props des stations, montre l'invite et le menu, joue le geste. Chaque
+           station est une zone du core : seuls les joueurs proches la connaissent et reçoivent ses changements.
+    Dépendances : vAvA_core ≥ 0.11.0 (abonnements de zone), vava_ui ≥ 1.0.0 (polices, grain, papier et coins de la page, par
                   nui://vava_ui/…), vava_inventory ≥ 1.4.0 (échange atomique, mains, métadonnées), vava_skills ≥ 1.0.0
                   (recettes, XP, leçons), vava_gathering ≥ 1.0.0 (matières et outils de base) ; facultatifs : vava_hud,
                   vava_admin (droit metiers), vava_chat, vava_health (aucun artisanat à terre)
@@ -19,7 +20,7 @@ use_experimental_fxv2_oal 'yes'
 
 name 'vava_crafting'
 description 'Artisanat vAvA : stations, recettes, qualité, objets signés, réparation, leçons'
-version '1.4.0'
+version '1.5.0'
 
 dependency 'vAvA_core'
 dependency 'vava_ui'
@@ -45,6 +46,7 @@ shared_scripts {
     'config.lua',
     'shared/quality.lua',
     'shared/proximity.lua',
+    'shared/stationzone.lua',
 }
 
 server_scripts {

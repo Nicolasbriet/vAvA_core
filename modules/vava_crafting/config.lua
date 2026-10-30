@@ -10,7 +10,7 @@
 ]]
 
 VavaCrafting.config = {
-    coreVersion = '0.6.0',
+    coreVersion = '0.11.0',  -- abonnements de zone (core.zones)
     dependencies = { vava_inventory = '1.4.0', vava_skills = '1.0.0', vava_gathering = '1.0.0' },
 
     -- Paliers de qualité (bornes basses des paliers 2 à 5), libellés, et qualité équivalente d'un palier de matière.
@@ -79,7 +79,17 @@ VavaCrafting.config = {
     -- mètres : seules celles d'une case à portée sont mesurées. Un passage toutes les `pollMs` près d'une case, toutes
     -- les `idlePollMs` quand aucune station ne peut être à moins de `radius` + `idleMargin` (la marge couvre le chemin
     -- d'un cavalier rapide pendant `idlePollMs`, pour que les props apparaissent comme avant).
-    streaming = { radius = 80.0, pollMs = 1000, idlePollMs = 2500, idleMargin = 60.0, groupCell = 200.0, modelTimeoutMs = 5000 },
+    -- Chaque station est une zone du core de `zoneRadius` mètres : un joueur la reçoit (dessin, combustible, occupation)
+    -- à `radius` + `subscribeSlack` mètres de son bord, ses changements tant qu'il ne s'en éloigne pas de plus de 25 m
+    -- au-delà (réglage du core), et ne connaît aucune autre station. `subscribeSlack` couvre le chemin d'un cavalier au
+    -- galop (~15 m/s) entre deux passages du core (1 s) : la station est connue avant d'arriver à portée des props (une
+    -- station reçue fait aussitôt un passage du client : seule l'attente du core compte). Il doit valoir au moins
+    -- vitesse maximale × `zones.passMs` du core + 5 m (35 m avec passMs = 2000 ou pour une monture plus rapide). La
+    -- boucle des props ne tourne que si une station est connue.
+    streaming = {
+        radius = 80.0, pollMs = 1000, idlePollMs = 2500, idleMargin = 60.0, groupCell = 200.0, modelTimeoutMs = 5000,
+        zoneRadius = 2.0, subscribeSlack = 20.0,
+    },
     persistence = { flushMs = 10000 },
     logRetentionDays = 180,
     -- journal : pièces de ce palier et au-dessus (Excellent+)
