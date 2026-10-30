@@ -69,6 +69,7 @@ server_scripts {
 client_scripts {
     'client/core/rpc.lua',
     'client/core/net.lua',
+    'client/core/zones.lua',
     'client/core/api.lua',
     'client/players/session.lua',
     'client/players/spawn.lua',

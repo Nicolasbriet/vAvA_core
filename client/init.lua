@@ -16,6 +16,7 @@ local api = vAvA.api
 local session = vAvA.session
 local spawn = vAvA.spawn
 local netprobe = vAvA.netprobe
+local zones = vAvA.zones
 local log = logger.create('core')
 
 local clientLevel = vAvA.config.shared.log.clientLevel
@@ -25,6 +26,7 @@ end
 
 rpc.start()
 netprobe.start()
+zones.start()
 session.start()
 spawn.start()
 api.register()
@@ -33,5 +35,7 @@ AddEventHandler('onResourceStop', function(resource)
     if resource == vAvA.resourceName then return end
     hooks.purgeOwner(resource)
     rpc.purgeOwner(resource)
+    -- zones du module oubliées sans notification (le serveur oublie aussi les siennes)
+    zones.purgeOwner(resource)
     api.forget(resource)
 end)
