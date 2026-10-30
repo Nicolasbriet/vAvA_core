@@ -13,7 +13,7 @@
 local pairs, ipairs, pcall, tostring, tonumber = pairs, ipairs, pcall, tostring, tonumber
 local tointeger, max, min = math.tointeger, math.max, math.min
 local sort, concat = table.sort, table.concat
-local format, lower = string.format, string.lower
+local char, format = string.char, string.format
 local RegisterCommand, GetResourceState, IsPlayerAceAllowed = RegisterCommand, GetResourceState, IsPlayerAceAllowed
 local TriggerClientEvent = TriggerClientEvent
 
@@ -41,6 +41,8 @@ local FOLD = {
     ['ù'] = 'u', ['û'] = 'u', ['ü'] = 'u', ['ú'] = 'u', ['Ù'] = 'u', ['Û'] = 'u', ['Ü'] = 'u',
     ['ç'] = 'c', ['Ç'] = 'c', ['ñ'] = 'n', ['Ñ'] = 'n', ['œ'] = 'oe', ['Œ'] = 'oe', ['æ'] = 'ae', ['Æ'] = 'ae',
 }
+local ASCII_LOWER = {}
+for code = 65, 90 do ASCII_LOWER[char(code)] = char(code + 32) end
 
 local catalog = {}
 VavaInventory.catalog = catalog
@@ -55,9 +57,11 @@ local oversized = {}
 ---@param text string
 ---@return string
 local function fold(text)
-    local folded = lower(text):gsub('\xC3[\x80-\xBF]', FOLD)
+    -- accents d'abord, puis casse ASCII seulement : string.lower suit la locale du système (sous Windows, 0xC3 → 0xE3
+    -- avant le repli, qui ne reconnaissait plus aucun accent)
+    local folded = text:gsub('\xC3[\x80-\xBF]', FOLD)
     folded = folded:gsub('\xC5[\x92\x93]', FOLD)
-    return folded
+    return (folded:gsub('[A-Z]', ASCII_LOWER))
 end
 
 --- Objets du registre, par catégorie puis libellé, éventuellement d'une seule catégorie et répondant à une

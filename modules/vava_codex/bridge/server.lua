@@ -15,6 +15,10 @@ local GetResourceState, TriggerClientEvent, IsPlayerAceAllowed = GetResourceStat
 local GetPlayers, GetRegisteredCommands = GetPlayers, GetRegisteredCommands
 local GetPlayerPed, GetEntityCoords, GetPlayerRoutingBucket = GetPlayerPed, GetEntityCoords, GetPlayerRoutingBucket
 
+-- blancs ASCII de fin, écrits octet par octet : `%s` dépend de la locale du système et couperait le « à » final d'un
+-- nom (octet 0xA0)
+local TRAILING = '[\t-\r ]+$'
+
 local core = VavaCodex.core
 if not core then return end
 
@@ -70,7 +74,7 @@ local function activePlayers(keep)
     for _, id in ipairs(GetPlayers()) do
         local src = tonumber(id)
         local character = src and (not keep or keep(src)) and Bridge.GetCharacter(src)
-        if character then list[#list + 1] = { source = src, name = (character.firstName .. ' ' .. (character.lastName or '')):gsub('%s+$', '') } end
+        if character then list[#list + 1] = { source = src, name = (character.firstName .. ' ' .. (character.lastName or '')):gsub(TRAILING, '') } end
     end
     table.sort(list, function(a, b) return a.name < b.name end)
     return list

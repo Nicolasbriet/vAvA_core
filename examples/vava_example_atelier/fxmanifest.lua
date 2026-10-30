@@ -15,7 +15,7 @@ lua54 'yes'
 
 name 'vava_example_atelier'
 description "Exemple de l'Atelier vAvA (mode développement seulement)"
-version '1.0.0'
+version '1.0.1'
 
 dependency 'vAvA_core'
 
