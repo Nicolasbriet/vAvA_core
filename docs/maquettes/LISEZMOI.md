@@ -13,6 +13,7 @@ chargées depuis Google Fonts pour l'aperçu seulement : jamais de ressource ext
 | `Combat.html` | Éditeur d'une technique de combat, frise des phases | T-121 |
 | `Sort.html` | Sort offensif, menu « Ajouter un effet » ouvert | T-122, T-123 |
 | `Protection.html` | Sort de protection, règle de cumul | T-123 |
+| `Chargement.html` | Écran de chargement (hors Atelier) : ouverture, paysage peint par le code, feux de veille des étapes. Le panneau « Prototype » n'existe pas en jeu | T-020 |
 
 Les valeurs affichées pour la Boule de feu (8 dégâts, 20 m, 0,45 s, 4 s) viennent de la config réelle de
 `vava_magic`.

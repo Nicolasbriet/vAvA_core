@@ -1,0 +1,683 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Écran de chargement d'Eldoria</title>
+</head>
+<body>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600&family=Cinzel+Decorative:wght@400;700;900&family=EB+Garamond:ital,wght@0,400;0,600;1,400&display=swap">
+<style>
+/* Prototype de T-020 (vava_loading), version 2.
+   Mise en page : un paysage de nuit peint en direct (montagnes, château, lune, brume) sous une caméra lente ; le titre
+   s'embrase au centre devant un sceau de runes ; l'extrait du lore à gauche, le conseil à droite, et au pied six feux
+   de veille qui s'allument avec les étapes du chargement. Tout est dessiné par le code : aucune image à télécharger.
+   Jetons repris de vava_ui (fond de cuir sombre) : un seul thème, sombre, voulu. */
+:root {
+  color-scheme: dark;
+  --edge: #070504;
+  --night: #0c0a10;
+  --leather: #1d150f;
+  --brass: #b39463;
+  --brass-bright: #dcc08a;
+  --gold-hi: #f7e7bd;
+  --ember: #d08a3c;
+  --fire: #ffb35c;
+  --text: #ece1c8;
+  --text-muted: #a69881;
+  --text-faint: #786c5c;
+  --rule: rgba(179, 148, 99, 0.28);
+  --font-display: "Cinzel", "Palatino Linotype", Georgia, serif;
+  --font-deco: "Cinzel Decorative", "Cinzel", Georgia, serif;
+  --font-body: "EB Garamond", "Palatino Linotype", Georgia, serif;
+  --ease: cubic-bezier(0.2, 0.7, 0.2, 1);
+}
+
+html, body { height: 100%; }
+body { background: var(--edge); color: var(--text); font-family: var(--font-body); font-size: 18px; overflow: hidden; }
+
+.scene { position: relative; height: 100%; min-height: 560px; overflow: hidden; background: var(--night); cursor: default; }
+#world, #fx { position: absolute; inset: 0; width: 100%; height: 100%; display: block; }
+#fx { pointer-events: none; z-index: 2; }
+.scene::after {
+  content: ""; position: absolute; inset: 0; pointer-events: none; z-index: 3;
+  opacity: 0.16; mix-blend-mode: overlay;
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='220' height='220'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='.9' numOctaves='2' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 .5  0 0 0 0 .42  0 0 0 0 .32  0 0 0 .9 0'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>");
+}
+.vignette { position: absolute; inset: 0; pointer-events: none; z-index: 1;
+  background: radial-gradient(120% 95% at 50% 40%, transparent 50%, rgba(7, 5, 4, 0.9) 100%); }
+
+.ui {
+  position: relative; z-index: 4; height: 100%;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  grid-template-rows: auto 1fr auto auto;
+  column-gap: clamp(24px, 6vw, 96px);
+  padding-block: clamp(18px, 3.5vh, 40px);
+  padding-left: max(clamp(20px, 5vw, 80px), env(safe-area-inset-left, 0px));
+  padding-right: max(clamp(20px, 5vw, 80px), env(safe-area-inset-right, 0px));
+}
+.late { opacity: 0; transform: translateY(10px); transition: opacity 1.4s var(--ease), transform 1.4s var(--ease); }
+.revealed .late { opacity: 1; transform: none; }
+
+.top { grid-column: 1 / -1; display: flex; align-items: center; justify-content: space-between; gap: 16px;
+  font-family: var(--font-display); font-size: 0.72rem; letter-spacing: 0.24em; text-transform: uppercase; color: var(--text-faint); }
+.top .realm { display: flex; align-items: center; gap: 10px; }
+.music { font: 600 0.95rem var(--font-body); letter-spacing: 0; text-transform: none; color: var(--text-muted);
+  background: rgba(7, 5, 4, 0.5); border: 1px solid var(--rule); border-radius: 2px; padding: 6px 12px; cursor: pointer;
+  display: inline-flex; align-items: center; gap: 8px; }
+.music:hover { color: var(--text); border-color: var(--brass); }
+.music svg { width: 14px; height: 14px; }
+button:focus-visible { outline: 1px solid var(--brass-bright); outline-offset: 2px; }
+
+/* ---------- titre ---------- */
+.crest { grid-column: 1 / -1; grid-row: 2; position: relative; display: grid; place-items: center; align-content: center; min-width: 0; }
+.sigil { position: absolute; width: min(64vh, 82vw); aspect-ratio: 1; max-width: 100%; opacity: 0; transition: opacity 2.4s var(--ease); pointer-events: none; }
+.revealed .sigil { opacity: 1; }
+.sigil .ring-a { transform-origin: 50% 50%; animation: turn 120s linear infinite; }
+.sigil .ring-b { transform-origin: 50% 50%; animation: turn 80s linear infinite reverse; }
+.sigil .pulse { animation: breathe 6s ease-in-out infinite; }
+@keyframes turn { to { transform: rotate(360deg); } }
+@keyframes breathe { 0%, 100% { opacity: 0.35; } 50% { opacity: 0.8; } }
+
+.eyebrow { position: relative; font-family: var(--font-display); font-size: 0.8rem; letter-spacing: 0.42em; text-transform: uppercase;
+  color: var(--brass); margin: 0 0 6px; }
+.title {
+  position: relative; margin: 0; line-height: 0.95; white-space: nowrap;
+  font-family: var(--font-deco); font-weight: 900; font-size: clamp(3rem, 11vw, 9.5rem); letter-spacing: 0.04em;
+}
+.title .l {
+  display: inline-block;
+  color: transparent;
+  background: linear-gradient(180deg, var(--gold-hi) 0%, var(--brass-bright) 38%, #8d6b3b 52%, #e4c991 64%, #b39463 100%);
+  -webkit-background-clip: text; background-clip: text;
+  filter: drop-shadow(0 0 0 rgba(255, 179, 92, 0));
+  opacity: 0; transform: translateY(18px) scale(1.25);
+}
+.title .l.lit { animation: ignite 1.6s var(--ease) forwards; }
+@keyframes ignite {
+  0%   { opacity: 0; transform: translateY(18px) scale(1.3); filter: drop-shadow(0 0 0 rgba(255,179,92,0)) brightness(3); }
+  25%  { opacity: 1; filter: drop-shadow(0 0 28px rgba(255,179,92,0.95)) brightness(2.2); }
+  100% { opacity: 1; transform: none; filter: drop-shadow(0 0 18px rgba(208,138,60,0.35)) brightness(1); }
+}
+/* reflet qui passe sur le métal du titre */
+.title .shine { position: absolute; inset: 0; pointer-events: none; color: transparent;
+  background: linear-gradient(105deg, transparent 40%, rgba(255, 245, 220, 0.75) 50%, transparent 60%);
+  background-size: 250% 100%; background-position: 150% 0;
+  -webkit-background-clip: text; background-clip: text; }
+.revealed .title .shine { animation: sweep 7s ease-in-out 1.5s infinite; }
+@keyframes sweep { 0% { background-position: 150% 0; } 35%, 100% { background-position: -60% 0; } }
+
+.spark-line { position: relative; width: min(560px, 70vw); height: 2px; margin: 14px 0 12px; }
+.spark-line::before { content: ""; position: absolute; left: 50%; top: 0; height: 1px; width: 0; transform: translateX(-50%);
+  background: linear-gradient(90deg, transparent, var(--brass-bright), transparent); transition: width 1.3s var(--ease); }
+.drawn .spark-line::before { width: 100%; }
+.motto { position: relative; margin: 0; font-style: italic; font-size: clamp(1.15rem, 2vw, 1.6rem); color: var(--text-muted); }
+
+/* ---------- extraits et conseils ---------- */
+.lore, .tipbox { grid-row: 3; align-self: end; min-width: 0; padding-bottom: clamp(14px, 3vh, 28px); }
+.lore { grid-column: 1; max-width: 30rem; }
+.tipbox { grid-column: 2; justify-self: end; max-width: 24rem; text-align: right; }
+.label { display: flex; align-items: center; gap: 12px; font-family: var(--font-display); font-size: 0.68rem; letter-spacing: 0.26em;
+  text-transform: uppercase; color: var(--text-faint); margin: 0 0 10px; }
+.lore .label::after { content: ""; flex: 1; height: 1px; background: linear-gradient(90deg, var(--rule), transparent); }
+.tipbox .label { justify-content: flex-end; }
+.tipbox .label::before { content: ""; flex: 1; height: 1px; background: linear-gradient(270deg, var(--rule), transparent); }
+blockquote { margin: 0; font-size: clamp(1.1rem, 1.6vw, 1.32rem); line-height: 1.5; color: var(--text); min-height: 4.5em;
+  text-shadow: 0 1px 12px rgba(7, 5, 4, 0.9); transition: opacity 0.9s var(--ease), transform 0.9s var(--ease); }
+.tip { margin: 0; color: var(--text-muted); font-size: 1rem; line-height: 1.5; min-height: 3em; text-shadow: 0 1px 10px rgba(7, 5, 4, 0.9);
+  transition: opacity 0.9s var(--ease); }
+.out { opacity: 0 !important; transform: translateY(6px); }
+kbd { font-family: var(--font-body); font-weight: 600; font-size: 0.9em; color: var(--text); border: 1px solid var(--brass);
+  border-bottom-width: 2px; border-radius: 3px; padding: 0 6px; background: rgba(7, 5, 4, 0.6); }
+
+/* ---------- feux de veille ---------- */
+.progress { grid-column: 1 / -1; grid-row: 4; display: grid; gap: 10px; }
+.line { display: flex; align-items: baseline; justify-content: space-between; gap: 16px; }
+.stage { margin: 0; font-size: 1.15rem; font-style: italic; color: var(--text); min-width: 0; text-shadow: 0 1px 10px rgba(7,5,4,.9); }
+.pct { flex: none; font-family: var(--font-display); font-size: 0.95rem; letter-spacing: 0.08em; color: var(--brass-bright); font-variant-numeric: tabular-nums; }
+.path { position: relative; height: 34px; }
+.path .track { position: absolute; left: 0; right: 0; top: 22px; height: 1px; background: linear-gradient(90deg, transparent, var(--rule) 4%, var(--rule) 96%, transparent); }
+.path .fill { position: absolute; left: 0; top: 21px; height: 3px; width: 0; transition: width 0.5s var(--ease);
+  background: linear-gradient(90deg, rgba(208,138,60,0), var(--ember) 30%, var(--brass-bright)); box-shadow: 0 0 14px rgba(255,179,92,0.55); }
+.beacon { position: absolute; top: 0; width: 22px; height: 34px; margin-left: -11px; }
+.beacon .bowl { position: absolute; left: 3px; right: 3px; bottom: 6px; height: 6px; border: 1px solid var(--brass); border-top: none;
+  border-radius: 0 0 8px 8px; background: #1a130d; }
+.beacon .flame { position: absolute; left: 50%; bottom: 11px; width: 12px; height: 18px; margin-left: -6px; border-radius: 50% 50% 45% 45% / 65% 65% 35% 35%;
+  background: radial-gradient(circle at 50% 75%, #fff4d6 0%, var(--fire) 35%, var(--ember) 65%, transparent 72%);
+  opacity: 0; transform: scaleY(0.2); transform-origin: 50% 100%; transition: opacity 0.4s, transform 0.6s var(--ease); filter: blur(0.3px); }
+.beacon.lit .flame { opacity: 1; transform: none; animation: flicker 0.9s ease-in-out infinite alternate; }
+.beacon.lit::after { content: ""; position: absolute; left: 50%; bottom: 8px; width: 60px; height: 60px; margin-left: -30px; border-radius: 50%;
+  background: radial-gradient(circle, rgba(255,179,92,0.35), transparent 65%); pointer-events: none; }
+.beacon.current .flame { animation-duration: 0.45s; }
+@keyframes flicker { 0% { transform: scale(1, 1) skewX(0deg); } 50% { transform: scale(0.92, 1.08) skewX(-3deg); } 100% { transform: scale(1.04, 0.95) skewX(3deg); } }
+.detail { display: flex; justify-content: space-between; gap: 16px; flex-wrap: wrap; font-size: 0.85rem; color: var(--text-faint); font-variant-numeric: tabular-nums; }
+
+/* ---------- ouverture et sortie ---------- */
+.curtain { position: absolute; inset: 0; z-index: 5; background: #000; pointer-events: none; transition: opacity 2.6s var(--ease); }
+.revealed .curtain { opacity: 0; }
+.skip { position: absolute; z-index: 6; left: 50%; bottom: calc(24px + env(safe-area-inset-bottom, 0px)); transform: translateX(-50%);
+  font: italic 0.95rem var(--font-body); color: var(--text-faint); background: none; border: none; cursor: pointer; transition: opacity 1s; }
+.revealed .skip { opacity: 0; pointer-events: none; }
+.handoff { position: absolute; inset: 0; z-index: 7; display: grid; place-items: center; text-align: center;
+  background: radial-gradient(circle at 50% 50%, rgba(255, 230, 180, 0.95), rgba(7, 5, 4, 0.98) 60%);
+  opacity: 0; pointer-events: none; transition: opacity 1.4s var(--ease);
+  padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); }
+.handoff.on { opacity: 1; pointer-events: auto; }
+.handoff p { margin: 0; font-family: var(--font-display); text-transform: uppercase; letter-spacing: 0.3em; font-size: 0.9rem; color: var(--edge); }
+.handoff p span { display: block; margin-top: 10px; font-family: var(--font-body); text-transform: none; letter-spacing: 0; font-style: italic; font-size: 1.05rem; }
+
+.proto { position: absolute; z-index: 6; right: max(16px, env(safe-area-inset-right, 0px)); top: calc(64px + env(safe-area-inset-top, 0px));
+  display: flex; gap: 8px; align-items: center; flex-wrap: wrap; justify-content: flex-end;
+  font-size: 0.8rem; color: var(--text-faint); background: rgba(7, 5, 4, 0.7); border: 1px dashed var(--rule); padding: 8px 10px; border-radius: 2px; }
+.proto strong { font-family: var(--font-display); letter-spacing: 0.18em; text-transform: uppercase; font-size: 0.65rem; color: var(--ember); font-weight: 600; }
+.proto button { font: 600 0.85rem var(--font-body); color: var(--text-muted); background: transparent; border: 1px solid var(--rule); border-radius: 2px; padding: 4px 9px; cursor: pointer; }
+.proto button:hover { color: var(--text); border-color: var(--brass); }
+.proto button[aria-pressed="true"] { color: var(--brass-bright); border-color: var(--brass); }
+
+@media (max-width: 760px) {
+  body { font-size: 16px; }
+  .ui { grid-template-columns: minmax(0, 1fr); grid-template-rows: auto 1fr auto auto auto; row-gap: 12px; }
+  .lore { grid-column: 1; grid-row: 3; padding-bottom: 0; }
+  .tipbox { grid-column: 1; grid-row: 4; justify-self: start; text-align: left; padding-bottom: 0; }
+  .tipbox .label { justify-content: flex-start; }
+  .tipbox .label::before { display: none; }
+  .tipbox .label::after { content: ""; flex: 1; height: 1px; background: linear-gradient(90deg, var(--rule), transparent); }
+  .progress { grid-row: 5; }
+  blockquote { min-height: 0; }
+  .top .realm span:last-child { display: none; }
+  .proto { top: auto; bottom: calc(150px + env(safe-area-inset-bottom, 0px)); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .sigil .ring-a, .sigil .ring-b, .sigil .pulse, .revealed .title .shine, .beacon.lit .flame { animation: none; }
+  .title .l { opacity: 1; transform: none; }
+}
+</style>
+
+<div class="scene" id="scene">
+  <canvas id="world" aria-hidden="true"></canvas>
+  <div class="vignette"></div>
+  <canvas id="fx" aria-hidden="true"></canvas>
+
+  <div class="ui">
+    <header class="top late">
+      <div class="realm">
+        <svg width="10" height="10" viewBox="0 0 10 10" aria-hidden="true"><path d="M5 .8 9.2 5 5 9.2.8 5Z" fill="#1a130d" stroke="#c9aa72" stroke-width=".9"/><path d="M5 3.2 6.8 5 5 6.8 3.2 5Z" fill="#c9aa72"/></svg>
+        <span>Royaume d'Eldoria</span>
+        <span>· Rôle médiéval fantastique</span>
+      </div>
+      <button class="music" id="music" type="button" aria-pressed="false">
+        <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M2 6h3l4-3v10l-4-3H2z" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linejoin="round"/><path id="musicWave" d="M11.5 5.5 14.5 10.5M14.5 5.5 11.5 10.5" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/></svg>
+        <span id="musicLabel">Musique coupée</span>
+      </button>
+    </header>
+
+    <section class="crest">
+      <svg class="sigil" viewBox="0 0 400 400" aria-hidden="true">
+        <defs>
+          <path id="runeCircle" d="M200,200 m-150,0 a150,150 0 1,1 300,0 a150,150 0 1,1 -300,0"/>
+          <radialGradient id="halo"><stop offset="0" stop-color="#ffb35c" stop-opacity=".22"/><stop offset=".6" stop-color="#d08a3c" stop-opacity=".06"/><stop offset="1" stop-color="#d08a3c" stop-opacity="0"/></radialGradient>
+        </defs>
+        <circle cx="200" cy="200" r="198" fill="url(#halo)" class="pulse"/>
+        <g class="ring-a" fill="none" stroke="#b39463" stroke-opacity=".55">
+          <circle cx="200" cy="200" r="182" stroke-width=".8"/>
+          <circle cx="200" cy="200" r="174" stroke-width=".4" stroke-dasharray="2 6"/>
+          <text font-family="Cinzel, serif" font-size="13" letter-spacing="6" fill="#dcc08a" fill-opacity=".55" stroke="none">
+            <textPath href="#runeCircle">ᚱᛟᛃᚨᚢᛗᛖ · ᛞ · ᛖᛚᛞᛟᚱᛁᚨ · ᛚᚨ · ᛟᚢ · ᚾᚨᛁᛋᛋᛖᚾᛏ · ᛚᛖᛋ · ᛚᛖᚷᛖᚾᛞᛖᛋ · ᚱᛟᛃᚨᚢᛗᛖ · ᛞ · ᛖᛚᛞᛟᚱᛁᚨ ·</textPath>
+          </text>
+        </g>
+        <g class="ring-b" fill="none" stroke="#b39463" stroke-opacity=".4">
+          <circle cx="200" cy="200" r="130" stroke-width=".6"/>
+          <polygon points="200,72 311,264 89,264" stroke-width=".6"/>
+          <polygon points="200,328 89,136 311,136" stroke-width=".6"/>
+          <circle cx="200" cy="200" r="96" stroke-width=".4" stroke-dasharray="1 4"/>
+        </g>
+      </svg>
+      <p class="eyebrow late">Bienvenue, voyageur</p>
+      <h1 class="title" id="title" aria-label="Eldoria"></h1>
+      <div class="spark-line"></div>
+      <p class="motto late">Là où naissent les légendes</p>
+    </section>
+
+    <aside class="lore late" aria-live="polite">
+      <p class="label">Ce que l'on dit au bourg</p>
+      <blockquote id="quote"></blockquote>
+    </aside>
+    <aside class="tipbox late">
+      <p class="label">Conseil du voyageur</p>
+      <p class="tip" id="tip"></p>
+    </aside>
+
+    <footer class="progress late">
+      <div class="line">
+        <p class="stage" id="stage">Le messager franchit les portes</p>
+        <span class="pct" id="pct">0 %</span>
+      </div>
+      <div class="path" id="path" role="progressbar" aria-label="Progression du chargement" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
+        <div class="track"></div>
+        <div class="fill" id="fill"></div>
+      </div>
+      <div class="detail"><span id="detail">Connexion au royaume</span><span id="step">Étape 1 sur 6</span></div>
+    </footer>
+  </div>
+
+  <div class="curtain"></div>
+  <button class="skip" id="skip" type="button">Passer l'ouverture</button>
+
+  <div class="proto late" aria-label="Commandes du prototype">
+    <strong>Prototype</strong>
+    <button type="button" id="replay">Rejouer l'ouverture</button>
+    <button type="button" id="speed" aria-pressed="false">Vitesse ×4</button>
+    <button type="button" id="hold" aria-pressed="false">Figer</button>
+  </div>
+
+  <div class="handoff" id="handoff"><p>Le Conseil vous attend<span>La sélection du personnage s'ouvre</span></p></div>
+</div>
+
+<script>
+(function () {
+  'use strict';
+
+  // Étapes réelles du chargement FiveM (loadProgress et appels d'initialisation), dites dans le ton du royaume.
+  // La dernière attend la sélection du personnage (loadscreen_manual_shutdown 'yes', fermé par le client).
+  var STAGES = [
+    { at: 0,  text: 'Le messager franchit les portes',     detail: 'Connexion au royaume',                     files: 0 },
+    { at: 12, text: 'On déroule les cartes du royaume',     detail: 'Chargement de la carte',                   files: 0 },
+    { at: 38, text: 'Les artisans dressent les échoppes',   detail: 'Données du monde',                         files: 380 },
+    { at: 72, text: 'Les veilleurs allument les lanternes', detail: 'Ressources du serveur',                    files: 0 },
+    { at: 88, text: 'Le registre s’ouvre à votre nom', detail: 'Ouverture de la session',                  files: 0 },
+    { at: 97, text: 'Le Conseil prépare votre arrivée',     detail: 'En attente de la sélection du personnage', files: 0 }
+  ];
+  // Textes provisoires : T-021 (gardien du lore) écrira les 20 à 30 extraits définitifs.
+  var QUOTES = [
+    '« À Eldoria, nul ne compte en pièces d’or : on donne ce qu’on a, on reçoit ce qu’il faut. »',
+    '« Chaque échange tisse un lien. Le forgeron se souvient de qui lui a porté le charbon. »',
+    '« Personne ne sait tout faire. C’est pour cela que l’on frappe aux portes. »',
+    '« La terre donne à qui la ménage. Une coupe trop avide laisse des cicatrices qui mettent des saisons à se refermer. »',
+    '« La magie se paie toujours. Les anciens disent qu’elle se souvient de ceux qui l’oublient. »',
+    '« Le savoir ne s’achète pas : il passe de la main du maître à celle de l’apprenti. »',
+    '« On vient à Eldoria pour recommencer. Personne ne vous demandera d’où vous venez. »',
+    '« Chaque objet porte une histoire : le poinçon de son artisan, les mains qui l’ont tenu. »'
+  ];
+  // Touches réelles des configs du dépôt (vava_codex, vava_inventory, vava_voice, vava_chat).
+  var TIPS = [
+    '<kbd>F1</kbd> ouvre le Codex : toutes les commandes et les touches du royaume.',
+    '<kbd>I</kbd> ouvre votre besace. Ce que vous tenez en main, les autres le voient.',
+    '<kbd>Z</kbd> change la portée de votre voix : chuchoter, parler, crier, déclamer.',
+    '<kbd>T</kbd> pour écrire à ceux qui vous entourent.',
+    'Un apprenti progresse plus vite auprès d’un maître. Cherchez qui sait.',
+    'Rien ne s’achète ici : proposez un service, un troc, un coup de main.'
+  ];
+
+  var $ = function (id) { return document.getElementById(id); };
+  var reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  var scene = $('scene');
+
+  // =====================================================================
+  // Paysage : couches peintes une fois (hors écran), puis posées à chaque image avec parallaxe et caméra lente.
+  // =====================================================================
+  var world = $('world'), wctx = world.getContext('2d');
+  var fx = $('fx'), fctx = fx.getContext('2d');
+  var W = 0, H = 0, DPR = 1;
+  var layers = [], stars = [], windows = [], fogs = [], embers = [], sparks = [], comet = null;
+  var mouse = { x: 0, y: 0, tx: 0, ty: 0 };
+  var t0 = performance.now();
+
+  function rand(a, b) { return a + Math.random() * (b - a); }
+  // bruit 1D lissé (somme de sinusoïdes à phases tirées) : des crêtes qui ne se répètent pas
+  function ridgeFn(seed, rough) {
+    var p = [], i;
+    for (i = 0; i < 6; i++) p.push({ f: (i + 1) * 0.0013 * (1 + seed * 0.13) * Math.pow(1.9, i), a: Math.pow(0.52, i), ph: rand(0, 6.28) });
+    return function (x) {
+      var v = 0;
+      for (var k = 0; k < p.length; k++) v += Math.sin(x * p[k].f + p[k].ph) * p[k].a * (k > 2 ? rough : 1);
+      return v;
+    };
+  }
+
+  function paintLayer(opt) {
+    // couche plus large que l'écran pour la parallaxe
+    var lw = Math.ceil(W * 1.16), lh = H;
+    var c = document.createElement('canvas');
+    c.width = Math.round(lw * DPR); c.height = Math.round(lh * DPR);
+    var g = c.getContext('2d'); g.scale(DPR, DPR);
+    var f = ridgeFn(opt.seed, opt.rough);
+    var top = [];
+    g.beginPath(); g.moveTo(0, lh);
+    for (var x = 0; x <= lw; x += 4) {
+      var y = H * opt.base - f(x) * H * opt.amp;
+      top.push(y);
+      g.lineTo(x, y);
+    }
+    g.lineTo(lw, lh); g.closePath();
+    var grad = g.createLinearGradient(0, H * (opt.base - opt.amp), 0, lh);
+    grad.addColorStop(0, opt.c1); grad.addColorStop(1, opt.c2);
+    g.fillStyle = grad; g.fill();
+    // lisière éclairée par la lune
+    if (opt.rim) {
+      g.strokeStyle = opt.rim; g.lineWidth = 1;
+      g.beginPath();
+      for (var i = 0; i < top.length; i++) { if (i === 0) g.moveTo(0, top[0]); else g.lineTo(i * 4, top[i]); }
+      g.stroke();
+    }
+    if (opt.trees) paintTrees(g, top, lw, opt);
+    if (opt.castle) paintCastle(g, top, lw, opt);
+    return { canvas: c, depth: opt.depth, w: lw, h: lh };
+  }
+
+  function paintTrees(g, top, lw, opt) {
+    g.fillStyle = opt.c1;
+    for (var x = 0; x < lw; x += rand(5, 11)) {
+      var y = top[Math.min(top.length - 1, Math.floor(x / 4))];
+      var h = rand(14, 34) * opt.trees;
+      g.beginPath(); g.moveTo(x - h * 0.22, y + 4); g.lineTo(x, y - h); g.lineTo(x + h * 0.22, y + 4); g.closePath(); g.fill();
+    }
+  }
+
+  function paintCastle(g, top, lw, opt) {
+    // château posé sur la crête, vers les deux tiers de l'écran
+    var cx = lw * 0.64, s = Math.min(W, H) / 900;
+    var gy = top[Math.floor(cx / 4)] + 6;
+    g.fillStyle = opt.c1;
+    var parts = [
+      // [x relatif, largeur, hauteur, toit]
+      [-150, 34, 120, 'cone'], [-110, 120, 70, 'crenel'], [-60, 46, 175, 'cone'], [-14, 90, 110, 'crenel'],
+      [20, 30, 230, 'spire'], [60, 70, 90, 'crenel'], [118, 40, 150, 'cone'], [150, 80, 60, 'crenel'], [215, 26, 95, 'cone']
+    ];
+    windows = [];
+    parts.forEach(function (p) {
+      var x = cx + p[0] * s, w = p[1] * s, h = p[2] * s, y = gy - h;
+      g.fillRect(x - w / 2, y, w, h + 10);
+      if (p[3] === 'cone' || p[3] === 'spire') {
+        var rh = (p[3] === 'spire' ? 1.6 : 0.9) * w;
+        g.beginPath(); g.moveTo(x - w / 2 - 3 * s, y); g.lineTo(x, y - rh); g.lineTo(x + w / 2 + 3 * s, y); g.closePath(); g.fill();
+        if (p[3] === 'spire') { g.fillRect(x - 0.6, y - rh - 14 * s, 1.2, 14 * s); g.fillRect(x, y - rh - 14 * s, 9 * s, 5 * s); }
+      } else {
+        for (var k = -w / 2; k < w / 2 - 4 * s; k += 9 * s) g.fillRect(x + k, y - 6 * s, 5 * s, 6 * s);
+      }
+      // fenêtres : gardées pour vaciller à chaque image
+      var rows = Math.max(1, Math.floor(h / (34 * s)));
+      for (var r = 0; r < rows; r++) {
+        if (Math.random() < 0.55) windows.push({ x: x + rand(-w / 3, w / 3), y: y + 18 * s + r * 30 * s, w: 3.2 * s + 1, h: 6 * s + 2, ph: rand(0, 6.28), sp: rand(1.5, 4), dim: Math.random() < 0.25 });
+      }
+    });
+  }
+
+  function build() {
+    DPR = Math.min(window.devicePixelRatio || 1, 2);
+    W = world.clientWidth; H = world.clientHeight;
+    [world, fx].forEach(function (c) { c.width = Math.round(W * DPR); c.height = Math.round(H * DPR); });
+    wctx.setTransform(DPR, 0, 0, DPR, 0, 0); fctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+    layers = [
+      paintLayer({ seed: 1, base: 0.60, amp: 0.13, rough: 0.6, c1: '#2a2230', c2: '#17131b', rim: 'rgba(220,192,138,0.22)', depth: 0.15 }),
+      paintLayer({ seed: 2, base: 0.70, amp: 0.10, rough: 0.8, c1: '#1c1720', c2: '#120e12', rim: 'rgba(220,192,138,0.12)', depth: 0.35, castle: true }),
+      paintLayer({ seed: 3, base: 0.80, amp: 0.07, rough: 1.0, c1: '#120e0e', c2: '#0b0808', depth: 0.6, trees: 0.8 }),
+      paintLayer({ seed: 4, base: 0.92, amp: 0.05, rough: 1.2, c1: '#070504', c2: '#050303', depth: 1.0, trees: 1.5 })
+    ];
+    stars = [];
+    var n = Math.round(W * H / 4200);
+    for (var i = 0; i < n; i++) stars.push({ x: Math.random(), y: Math.pow(Math.random(), 1.6) * 0.62, r: rand(0.3, 1.3), ph: rand(0, 6.28), sp: rand(0.6, 2.2) });
+    fogs = [];
+    for (var j = 0; j < 7; j++) fogs.push({ x: rand(0, W), y: H * rand(0.6, 0.9), r: rand(220, 420), v: rand(0.04, 0.16) * (Math.random() < 0.5 ? 1 : -1), a: rand(0.03, 0.07) });
+    embers = [];
+    var m = Math.round(Math.min(80, W * H / 16000));
+    for (var e = 0; e < m; e++) embers.push(newEmber(true));
+  }
+  function newEmber(anywhere) {
+    return { x: rand(0, W), y: anywhere ? rand(0, H) : H + 10, r: rand(0.6, 2), vy: rand(0.2, 0.6), sw: rand(0, 6.28), life: rand(0.4, 1) };
+  }
+
+  function drawWorld(now) {
+    var t = (now - t0) / 1000;
+    mouse.x += (mouse.tx - mouse.x) * 0.04; mouse.y += (mouse.ty - mouse.y) * 0.04;
+    // caméra : avance lente sur une minute, puis recommence en douceur
+    var push = 1.02 + 0.05 * (0.5 - 0.5 * Math.cos(Math.min(1, t / 60) * Math.PI));
+    var ctx = wctx;
+    ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+    // ciel
+    var sky = ctx.createLinearGradient(0, 0, 0, H);
+    sky.addColorStop(0, '#07070d'); sky.addColorStop(0.45, '#151020'); sky.addColorStop(0.72, '#3a2218'); sky.addColorStop(1, '#120c09');
+    ctx.fillStyle = sky; ctx.fillRect(0, 0, W, H);
+
+    ctx.save();
+    ctx.translate(W / 2, H * 0.62); ctx.scale(push, push); ctx.translate(-W / 2, -H * 0.62);
+    // étoiles
+    for (var i = 0; i < stars.length; i++) {
+      var s = stars[i];
+      var a = 0.35 + 0.65 * (0.5 + 0.5 * Math.sin(t * s.sp + s.ph));
+      ctx.fillStyle = 'rgba(240,228,205,' + (a * 0.8) + ')';
+      ctx.fillRect(s.x * W - mouse.x * 4, s.y * H - mouse.y * 3, s.r, s.r);
+    }
+    // lune et son halo
+    var mx = W * 0.74 - mouse.x * 8, my = H * 0.2 - mouse.y * 6, mr = Math.min(W, H) * 0.055;
+    var halo = ctx.createRadialGradient(mx, my, mr * 0.8, mx, my, mr * 7);
+    halo.addColorStop(0, 'rgba(247,231,189,0.28)'); halo.addColorStop(1, 'rgba(247,231,189,0)');
+    ctx.fillStyle = halo; ctx.beginPath(); ctx.arc(mx, my, mr * 7, 0, 6.283); ctx.fill();
+    var disc = ctx.createRadialGradient(mx - mr * 0.3, my - mr * 0.3, mr * 0.1, mx, my, mr);
+    disc.addColorStop(0, '#fff6dc'); disc.addColorStop(1, '#d9c393');
+    ctx.fillStyle = disc; ctx.beginPath(); ctx.arc(mx, my, mr, 0, 6.283); ctx.fill();
+    ctx.fillStyle = 'rgba(150,120,80,0.18)';
+    ctx.beginPath(); ctx.arc(mx + mr * 0.25, my - mr * 0.1, mr * 0.22, 0, 6.283); ctx.arc(mx - mr * 0.3, my + mr * 0.3, mr * 0.14, 0, 6.283); ctx.fill();
+    // étoile filante, de loin en loin
+    if (!comet && Math.random() < 0.0025) comet = { x: rand(W * 0.1, W * 0.6), y: rand(H * 0.05, H * 0.25), vx: rand(7, 11), vy: rand(2, 4), life: 1 };
+    if (comet) {
+      var cg = ctx.createLinearGradient(comet.x, comet.y, comet.x - comet.vx * 14, comet.y - comet.vy * 14);
+      cg.addColorStop(0, 'rgba(255,245,220,' + comet.life + ')'); cg.addColorStop(1, 'rgba(255,245,220,0)');
+      ctx.strokeStyle = cg; ctx.lineWidth = 1.4; ctx.beginPath(); ctx.moveTo(comet.x, comet.y); ctx.lineTo(comet.x - comet.vx * 14, comet.y - comet.vy * 14); ctx.stroke();
+      comet.x += comet.vx; comet.y += comet.vy; comet.life -= 0.02;
+      if (comet.life <= 0) comet = null;
+    }
+    // couches, de la plus lointaine à la plus proche, brume entre elles
+    for (var l = 0; l < layers.length; l++) {
+      var L = layers[l];
+      var ox = -(L.w - W) / 2 - mouse.x * 30 * L.depth - Math.sin(t * 0.03) * 10 * L.depth;
+      var oy = -mouse.y * 12 * L.depth;
+      ctx.drawImage(L.canvas, ox, oy, L.w, L.h);
+      if (l === 1) {
+        // fenêtres du château : la lumière des chandelles vacille
+        for (var k = 0; k < windows.length; k++) {
+          var wdw = windows[k];
+          var fl = 0.55 + 0.45 * Math.sin(t * wdw.sp + wdw.ph) * Math.sin(t * wdw.sp * 1.7);
+          var al = wdw.dim ? 0.25 : 0.7 + 0.3 * fl;
+          var wx = wdw.x + ox, wy = wdw.y + oy;
+          ctx.fillStyle = 'rgba(255,179,92,' + (al * 0.18) + ')';
+          ctx.fillRect(wx - 3, wy - 3, wdw.w + 6, wdw.h + 6);
+          ctx.fillStyle = 'rgba(255,200,120,' + al + ')';
+          ctx.fillRect(wx, wy, wdw.w, wdw.h);
+        }
+      }
+      if (l < layers.length - 1) {
+        for (var f = l; f < fogs.length; f += layers.length) {
+          var fg = fogs[f];
+          fg.x += fg.v; if (fg.x - fg.r > W) fg.x = -fg.r; if (fg.x + fg.r < 0) fg.x = W + fg.r;
+          var gr = ctx.createRadialGradient(fg.x + ox * 0.2, fg.y, 0, fg.x + ox * 0.2, fg.y, fg.r);
+          gr.addColorStop(0, 'rgba(190,175,160,' + fg.a + ')'); gr.addColorStop(1, 'rgba(190,175,160,0)');
+          ctx.fillStyle = gr; ctx.fillRect(fg.x - fg.r + ox * 0.2, fg.y - fg.r, fg.r * 2, fg.r * 2);
+        }
+      }
+    }
+    ctx.restore();
+  }
+
+  // braises et étincelles : couche du dessus, hors caméra
+  function burst(x, y, n, power) {
+    for (var i = 0; i < n; i++) {
+      var a = rand(0, 6.283), v = rand(0.5, 1) * power;
+      sparks.push({ x: x, y: y, vx: Math.cos(a) * v, vy: Math.sin(a) * v - power * 0.4, life: 1, r: rand(0.6, 2.2) });
+    }
+  }
+  function drawFx() {
+    var ctx = fctx;
+    ctx.clearRect(0, 0, W, H);
+    ctx.globalCompositeOperation = 'lighter';
+    for (var i = 0; i < embers.length; i++) {
+      var e = embers[i];
+      e.y -= e.vy; e.sw += 0.012;
+      if (e.y < -10) { embers[i] = newEmber(false); continue; }
+      var x = e.x + Math.sin(e.sw) * 16 - mouse.x * 40;
+      var fade = Math.max(0, Math.min(1, e.y / H)) * e.life;
+      ctx.fillStyle = 'rgba(208,138,60,' + (0.1 * fade) + ')'; ctx.beginPath(); ctx.arc(x, e.y, e.r * 4, 0, 6.283); ctx.fill();
+      ctx.fillStyle = 'rgba(255,190,110,' + (0.9 * fade) + ')'; ctx.beginPath(); ctx.arc(x, e.y, e.r, 0, 6.283); ctx.fill();
+    }
+    for (var j = sparks.length - 1; j >= 0; j--) {
+      var s = sparks[j];
+      s.x += s.vx; s.y += s.vy; s.vy += 0.05; s.vx *= 0.985; s.life -= 0.018;
+      if (s.life <= 0) { sparks.splice(j, 1); continue; }
+      ctx.fillStyle = 'rgba(255,200,120,' + s.life + ')'; ctx.beginPath(); ctx.arc(s.x, s.y, s.r, 0, 6.283); ctx.fill();
+      ctx.fillStyle = 'rgba(255,150,60,' + (s.life * 0.15) + ')'; ctx.beginPath(); ctx.arc(s.x, s.y, s.r * 5, 0, 6.283); ctx.fill();
+    }
+    ctx.globalCompositeOperation = 'source-over';
+  }
+
+  function frame(now) {
+    drawWorld(now);
+    drawFx();
+    if (!reduce) requestAnimationFrame(frame);
+  }
+
+  scene.addEventListener('pointermove', function (e) {
+    var r = scene.getBoundingClientRect();
+    mouse.tx = (e.clientX - r.left) / r.width - 0.5;
+    mouse.ty = (e.clientY - r.top) / r.height - 0.5;
+  });
+  window.addEventListener('resize', function () { build(); if (reduce) frame(performance.now()); });
+
+  // =====================================================================
+  // Ouverture : une étincelle trace le filet, les lettres s'embrasent, le rideau se lève sur le paysage.
+  // =====================================================================
+  var title = $('title');
+  var NAME = 'Eldoria';
+  title.innerHTML = '';
+  for (var c = 0; c < NAME.length; c++) {
+    var sp = document.createElement('span'); sp.className = 'l'; sp.textContent = NAME[c]; sp.setAttribute('aria-hidden', 'true');
+    title.appendChild(sp);
+  }
+  var shine = document.createElement('span'); shine.className = 'shine'; shine.textContent = NAME; shine.setAttribute('aria-hidden', 'true');
+  title.appendChild(shine);
+
+  var timers = [];
+  function later(fn, ms) { timers.push(setTimeout(fn, ms)); }
+  function opening(skip) {
+    timers.forEach(clearTimeout); timers = [];
+    var letters = title.querySelectorAll('.l');
+    scene.classList.remove('revealed', 'drawn');
+    letters.forEach(function (l) { l.classList.remove('lit'); });
+    if (skip || reduce) {
+      scene.classList.add('drawn', 'revealed');
+      letters.forEach(function (l) { l.classList.add('lit'); });
+      return;
+    }
+    later(function () { scene.classList.add('drawn'); }, 300);
+    letters.forEach(function (l, i) {
+      later(function () {
+        l.classList.add('lit');
+        var r = l.getBoundingClientRect(), sr = scene.getBoundingClientRect();
+        burst(r.left - sr.left + r.width / 2, r.top - sr.top + r.height * 0.55, 26, 3.2);
+      }, 1100 + i * 190);
+    });
+    later(function () { scene.classList.add('revealed'); }, 1100 + NAME.length * 190 + 300);
+  }
+  $('skip').addEventListener('click', function () { opening(true); });
+
+  // =====================================================================
+  // Extraits et conseils
+  // =====================================================================
+  var qi = Math.floor(Math.random() * QUOTES.length), ti = Math.floor(Math.random() * TIPS.length);
+  var quote = $('quote'), tip = $('tip');
+  quote.textContent = QUOTES[qi];
+  tip.innerHTML = TIPS[ti]; // textes du fichier seulement, jamais une donnée de joueur
+  function rotate(el, text, html) {
+    el.classList.add('out');
+    setTimeout(function () { if (html) el.innerHTML = text; else el.textContent = text; el.classList.remove('out'); }, reduce ? 0 : 900);
+  }
+  setInterval(function () { qi = (qi + 1) % QUOTES.length; rotate(quote, QUOTES[qi], false); }, 9000);
+  setInterval(function () { ti = (ti + 1) % TIPS.length; rotate(tip, TIPS[ti], true); }, 6500);
+
+  // =====================================================================
+  // Progression simulée (le vrai écran lit les messages loadProgress) et feux de veille
+  // =====================================================================
+  var path = $('path'), beacons = [];
+  STAGES.forEach(function (s, i) {
+    var b = document.createElement('div');
+    b.className = 'beacon';
+    b.style.left = (i === 0 ? 1.5 : s.at) + '%';
+    b.innerHTML = '<div class="flame"></div><div class="bowl"></div>';
+    path.appendChild(b); beacons.push(b);
+  });
+
+  var pct = 0, speed = 1, held = false, done = false, litUpTo = -1;
+  function stageOf(p) { var idx = 0; for (var i = 0; i < STAGES.length; i++) if (p >= STAGES[i].at) idx = i; return idx; }
+  function light(idx) {
+    for (var i = 0; i < beacons.length; i++) {
+      beacons[i].classList.toggle('lit', i <= idx);
+      beacons[i].classList.toggle('current', i === idx && !done);
+    }
+    if (idx > litUpTo) {
+      for (var j = litUpTo + 1; j <= idx; j++) {
+        var r = beacons[j].getBoundingClientRect(), sr = scene.getBoundingClientRect();
+        burst(r.left - sr.left + r.width / 2, r.top - sr.top + 12, 30, 2.6);
+      }
+      litUpTo = idx;
+    }
+  }
+  function render() {
+    var p = Math.min(100, pct), shown = Math.floor(p), idx = stageOf(p), s = STAGES[idx];
+    $('fill').style.width = p + '%';
+    $('pct').textContent = shown + ' %';
+    path.setAttribute('aria-valuenow', String(shown));
+    $('stage').textContent = s.text;
+    $('step').textContent = 'Étape ' + (idx + 1) + ' sur ' + STAGES.length;
+    if (s.files) {
+      var part = Math.max(0, Math.min(1, (p - s.at) / (STAGES[idx + 1].at - s.at)));
+      $('detail').textContent = s.detail + ' · ' + Math.round(part * s.files) + ' / ' + s.files + ' fichiers';
+    } else $('detail').textContent = s.detail;
+    if (scene.classList.contains('revealed')) light(idx);
+  }
+  function tick() {
+    if (!held && !done && scene.classList.contains('revealed')) {
+      var base = [0.9, 0.35, 0.28, 0.6, 0.8, 0.12][stageOf(pct)];
+      pct += base * (0.4 + Math.random()) * speed;
+      if (pct >= 100) { pct = 100; finish(); }
+      render();
+    }
+    setTimeout(tick, 120);
+  }
+  function finish() {
+    done = true; render();
+    beacons.forEach(function (b, i) {
+      setTimeout(function () { var r = b.getBoundingClientRect(), sr = scene.getBoundingClientRect(); burst(r.left - sr.left + 11, r.top - sr.top + 12, 40, 3.4); }, i * 90);
+    });
+    setTimeout(function () { $('handoff').classList.add('on'); }, 1400);
+  }
+  function restart() {
+    pct = 0; done = false; litUpTo = -1;
+    beacons.forEach(function (b) { b.classList.remove('lit', 'current'); });
+    $('handoff').classList.remove('on');
+    render();
+    opening(false);
+  }
+
+  $('replay').addEventListener('click', restart);
+  $('handoff').addEventListener('click', restart);
+  $('speed').addEventListener('click', function () { speed = speed === 1 ? 4 : 1; this.setAttribute('aria-pressed', String(speed === 4)); });
+  $('hold').addEventListener('click', function () { held = !held; this.setAttribute('aria-pressed', String(held)); this.textContent = held ? 'Reprendre' : 'Figer'; });
+  // musique : désactivée par défaut (backlog T-020), le joueur la choisit ; le prototype n'a pas de piste
+  $('music').addEventListener('click', function () {
+    var on = this.getAttribute('aria-pressed') !== 'true';
+    this.setAttribute('aria-pressed', String(on));
+    $('musicLabel').textContent = on ? 'Musique jouée (aucune piste ici)' : 'Musique coupée';
+    $('musicWave').setAttribute('d', on ? 'M11 6c1 .8 1 3.2 0 4M13 4.5c2 1.6 2 5.4 0 7' : 'M11.5 5.5 14.5 10.5M14.5 5.5 11.5 10.5');
+  });
+
+  build();
+  render();
+  requestAnimationFrame(frame);
+  // les polices doivent être là avant de mesurer les lettres pour les étincelles
+  (document.fonts && document.fonts.ready ? document.fonts.ready : Promise.resolve()).then(function () { opening(false); });
+  tick();
+})();
+</script>
+</body>
+</html>

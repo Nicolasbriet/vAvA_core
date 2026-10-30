@@ -493,6 +493,20 @@ versé à T-014 ; les autres points déjà couverts sont précisés dans T-012 �
   Identité visuelle des autres interfaces. Aucune ressource externe.
 - Critères : poids total ≤ 1,5 Mo (contrôlé par `scripts/audit-reseau.sh`) ; ouvrable hors jeu avec un devmock qui
   simule la progression ; aucun écran noir entre le chargement et la sélection.
+- **Maquette validée par le porteur du projet** (30 octobre 2026) : `docs/maquettes/Chargement.html`, la référence
+  visuelle à suivre. Ouverture d'environ 3 s, qu'on peut passer : une étincelle trace un filet, les lettres
+  d'« Eldoria » s'embrasent une à une avec des étincelles, puis le rideau se lève. Paysage de nuit peint par le code,
+  sans image : quatre plans de crêtes et de forêts, un château aux fenêtres qui vacillent, une lune, des étoiles, de la
+  brume, une étoile filante. Parallaxe à la souris et caméra lente. Titre en métal doré avec un reflet, devant un sceau
+  de runes qui tourne. Extraits du lore à gauche, conseils à droite. Six feux de veille, un par étape du chargement
+  (les six étapes de la maquette correspondent aux phases de `loadProgress`), puis un éclair qui passe à la sélection.
+  À l'adaptation :
+  - polices de `vava_ui` (la maquette les prend sur Google Fonts pour l'aperçu, et demande Cinzel Decorative en 900,
+    que `vava_ui` n'a pas : 700, ou ajouter le 900 à `vava_ui`) ;
+  - panneau « Prototype » retiré ;
+  - textes provisoires remplacés par ceux de T-021 ;
+  - coût de l'animation mesuré pendant un vrai chargement, avec des effets réductibles (braises, brume) si elle le
+    ralentit sur une petite machine.
 
 ### T-021 — Textes de l'écran de chargement et du premier pas
 - Agent : vava-gardien-lore · Dépend de : T-020 · Statut : à faire
