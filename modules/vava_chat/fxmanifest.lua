@@ -6,7 +6,8 @@
            Actions, Conseil et un par correspondant ; fenêtre déplaçable et agrandissable, gardée sur le PC du joueur ;
            journal de modération en base (/ooc, /mp, /staff, 7 jours). Le serveur choisit chaque destinataire :
            aucun message n'est envoyé à tout le serveur.
-    Dépendances : vAvA_core ≥ 0.5.0 ; facultative : vava_admin (canal du Conseil, rangs)
+    Dépendances : vAvA_core ≥ 0.5.0 ; vava_ui ≥ 1.0.0 (polices, grain, papier et coins de la page, par
+                  nui://vava_ui/…) ; facultative : vava_admin (canal du Conseil, rangs)
 ]]
 
 fx_version 'cerulean'
@@ -16,9 +17,10 @@ use_experimental_fxv2_oal 'yes'
 
 name 'vava_chat'
 description 'Chat vAvA : hors-RP, /me, /do, messages privés, Conseil, onglets'
-version '1.2.0'
+version '1.3.0'
 
 dependency 'vAvA_core'
+dependency 'vava_ui'
 -- remplace la ressource « chat » : une ressource qui en dépend démarre avec celle-ci
 provide 'chat'
 
@@ -26,12 +28,11 @@ vava_migration 'sql/0001_chat.sql'
 
 ui_page 'web/index.html'
 
+-- polices, grain, papier et coins : vava_ui ; les données simulées hors jeu (dossier dev/) ne sont jamais livrées
 files {
     'web/index.html',
     'web/css/*.css',
     'web/js/*.js',
-    'web/fonts/*.woff2',
-    'web/img/*',
 }
 
 -- Ordre explicite : chaque fichier ne dépend que de ceux listés avant lui.

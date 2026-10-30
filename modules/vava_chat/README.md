@@ -11,6 +11,7 @@ destinataire : aucun message ne part à tout le serveur.
 
    ```cfg
    ensure vAvA_core
+   ensure vava_ui
    ensure vava_chat
    ```
 
@@ -23,6 +24,7 @@ destinataire : aucun message ne part à tout le serveur.
 | Dépendance | Rôle | Sans elle |
 | --- | --- | --- |
 | `vAvA_core` ≥ 0.5.0 | personnages, RPC, hooks, base, journal | obligatoire |
+| `vava_ui` ≥ 1.0.0 | polices, grain, papier et coins de laiton de la page (`nui://vava_ui/…`) | obligatoire (dépendance déclarée : démarrée d'office, à ne jamais arrêter sur un serveur ouvert) |
 | `vava_admin` | membres du Conseil et leur rang (`/staff`, insigne) | permission ACE `vava_chat.staff`, sans rang |
 
 ## Ce que fait le joueur
@@ -138,12 +140,14 @@ vava_chat/
 │             logs (journal) · messages (envoi) · compat (commande inconnue, commandes) · api · main
 ├── client/   core · nui · layout (place) · suggestions · compat (évènements chat:*) · outbox (envoi, avis)
 │             commands · overhead (au-dessus de la tête) · input (touche, saisie) · visibility · main
-├── web/      index.html · css/style.css · js/ (lines, tabs, suggest, composer, layout, chat, app, devmock)
+├── web/      index.html · css/style.css · js/ (lines, tabs, suggest, composer, layout, chat, app)
+│             dev/devmock.js (hors jeu seulement, jamais livré)
 └── sql/      0001_chat.sql
 ```
 
 Pour travailler le rendu sans le jeu : `web/index.html?view=open` (ou `passive`, `actions`, `mp`, `gone`, `staff`,
-`suggest`, `all`) dans un navigateur.
+`suggest`, `all`) dans un navigateur, depuis le dépôt (option `--allow-file-access-from-files` pour les polices) : la
+ligne hors jeu de la page charge `modules/vava_ui/web/dev/horsjeu.js` puis `web/dev/devmock.js`.
 
 ## Tests à faire en jeu
 

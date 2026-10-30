@@ -1,9 +1,11 @@
 'use strict';
 /*
- * web/js/devmock.js
+ * web/dev/devmock.js
  * Rôle : aperçu de l'interface dans un navigateur, hors du jeu (sans effet en jeu) : web/index.html?view=<vue> avec
  *        passive (chat fermé), open (Général), actions, mp, gone (correspondant parti), staff, suggest, all.
  *        Les textes ci-dessous ne sont qu'une copie d'aperçu : en jeu, ils viennent de config.lua.
+ *        Jamais livré (absent des `files`), jamais chargé en jeu : la ligne hors jeu de index.html ne l'insère
+ *        que hors FiveM.
  */
 
 window.DevMock = (() => {

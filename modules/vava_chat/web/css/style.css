@@ -3,14 +3,11 @@
  * Rôle : chat du royaume, dans la direction artistique des autres interfaces (cuir, laiton, parchemin) : fermé, les
  *        derniers messages flottent sur de fins rubans sombres puis s'effacent ; ouvert, une fenêtre de cuir cerclée
  *        de laiton, onglets gravés, saisie sur une bande de parchemin, suggestions sur un feuillet.
- *        Polices embarquées (licence OFL) : Cinzel (libellés), EB Garamond (texte).
+ *        Cinzel (libellés), EB Garamond (texte). Polices, textures et ornements : vava_ui (licence OFL des polices
+ *        dans modules/vava_ui/web/fonts/) ; sans vava_ui, polices de repli, sans grain, papier ni coins, lisible.
  * Performance : textures en images fixes, aucun flou ni filtre CSS ; seules l'opacité et les transformations sont
  *        animées ; rien n'est dessiné en continu.
  */
-
-@font-face { font-family: "Cinzel"; src: url("../fonts/cinzel.woff2") format("woff2"); font-weight: 400 700; font-display: swap; }
-@font-face { font-family: "EB Garamond"; src: url("../fonts/eb_garamond.woff2") format("woff2"); font-weight: 400 700; font-style: normal; font-display: swap; }
-@font-face { font-family: "EB Garamond"; src: url("../fonts/eb_garamond_italic.woff2") format("woff2"); font-weight: 400 700; font-style: italic; font-display: swap; }
 
 :root {
   --edge: #070504;
@@ -34,10 +31,10 @@
   --font-display: "Cinzel", "Palatino Linotype", Georgia, serif;
   --font-body: "EB Garamond", "Palatino Linotype", Georgia, serif;
   --ease: cubic-bezier(0.2, 0.7, 0.2, 1);
-  --grain: url("../img/grain.png");
+  --grain: var(--ui-grain, none);
   --leather: var(--grain), radial-gradient(ellipse 120% 60% at 50% 0%, rgba(132, 92, 56, 0.22), transparent 65%), linear-gradient(180deg, rgba(36, 26, 18, 0.96), rgba(21, 16, 11, 0.96));
   --paper-surface:
-    url("../img/paper.png"),
+    var(--ui-paper, none),
     radial-gradient(ellipse 70% 55% at 30% 25%, rgba(255, 248, 228, 0.55), transparent 70%),
     radial-gradient(ellipse 110% 100% at 50% 50%, transparent 55%, rgba(120, 84, 40, 0.35) 100%),
     linear-gradient(180deg, var(--paper-light), var(--paper));
@@ -102,7 +99,7 @@ button { color: inherit; font: inherit; }
   position: absolute;
   inset: -3px;
   border: 1.1rem solid transparent;
-  border-image: url("../img/frame.svg") 18 / 1.1rem;
+  border-image: var(--ui-frame, none) 18 / 1.1rem;
   pointer-events: none;
 }
 .chat.is-open::after {
