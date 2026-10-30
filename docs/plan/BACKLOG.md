@@ -529,8 +529,8 @@ seulement l'éditeur (phase 6).
 - Avancée en phase 0 à la demande du porteur du projet ; contrôle par le Registre et la Chancellerie.
 - Relectures de la 1.0.0 corrigées et décisions du porteur du projet appliquées (saisons de quatorze jours, nuits de gel
   et geste « Couvrir » dans `vava_farming`, débit commun des décisions du Conseil) : `vava_time` 1.1.0, `vava_farming`
-  1.4.0, `vava_gathering` 1.3.1, Chancellerie 1.5.1 — voir la section « Relecture » du rapport ; détails du gel à
-  confirmer (objet qui couvre, probabilité, cultures résistantes).
+  1.4.1, `vava_gathering` 1.3.2, Chancellerie 1.5.1 — voir les sections « Relecture » et « Seconde relecture » du
+  rapport ; détails du gel à confirmer (objet qui couvre, probabilité, cultures résistantes).
 - Spec : `docs/plan/specs/T-050.md` · rapport : `docs/plan/rapports/T-050.md` · test en jeu : `docs/tests/temps.md`
   et `docs/tests/metiers.md` § 5.1.
 

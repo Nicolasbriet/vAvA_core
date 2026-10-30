@@ -72,8 +72,8 @@ cours », avec l'heure, le décalage, le ciel et s'il est figé. Depuis la Chanc
   prêt, quatre relances puis plus rien jusqu'à ce qu'il publie l'heure), `open`, `clock`, `weather` (Conseil). Aucun
   évènement serveur → client : le gel passe par des hooks serveur, l'agriculture prévient elle-même ses cultivateurs.
 - **Client** : aucune boucle par image. Le jeu fait avancer l'horloge seul ; recalage local toutes les 60 s (aucun
-  réseau) ; un thread attend la fin d'une transition pour poser le ciel. À l'arrêt de la ressource, l'heure et la
-  météo sont rendues au jeu.
+  réseau) ; un thread attend la fin d'une transition pour poser le ciel. À l'arrêt de la ressource, l'heure et le
+  ciel sont rendus au jeu.
 - Le serveur relit la date, la fin du ciel et la nuit de gel toutes les 15 s (calcul en mémoire).
 
 ## Pour les autres modules

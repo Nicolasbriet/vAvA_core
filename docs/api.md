@@ -1242,7 +1242,7 @@ fondateur ; `/metiers niveau <joueur> <compétence> <niveau>`, `/metiers recette
 
 ### `vava_gathering`
 
-La récolte (1.3.1) : zones à **vitalité** 0–100 (plein rendement au-dessus de 60, réduit entre 60 et 25 avec chance
+La récolte (1.3.2) : zones à **vitalité** 0–100 (plein rendement au-dessus de 60, réduit entre 60 et 25 avec chance
 d'échec, **épuisée** sous 25 avec props remplacés et rendement effondré, **cicatrice** à 0 : régénération × 0,2 pendant
 la durée de la zone), nœuds à charges (arbres, filons, buissons, bancs de poissons, pistes de gibier) qui se
 régénèrent par le temps (recalcul à la demande, aucune boucle), outils **en main** (`vava_inventory:held`) du genre
@@ -1266,7 +1266,9 @@ facultatifs : `vava_hud`, `vava_admin` (droit `metiers`), `vava_chat`, `vava_hea
   charges ; 0 : rien ne repousse et le temps ne s'accumule pas ; au changement de facteur, l'avance prise sur la
   prochaine charge est gardée et recomptée au nouveau rythme, nœud réécrit — 1.3.1) et `yield` (unités récoltées, au
   moins une). Par défaut : herbes lentes et maigres en hiver, gibier abondant à l'automne, poissons au printemps,
-  minage sans saison. `vava_time` absent : facteur 1.
+  minage sans saison. `vava_time` absent, arrêté ou en échec : facteur 1. Facteurs contrôlés par `shared/season.lua`
+  (fini, ramené dans [0, 10], sinon 1 ; 1.3.2). Saison en attente pendant le démarrage de `vava_time` (1.3.2) : facteur
+  `false`, jamais gardé en cache ; aucun nœud ne repousse ni ne déplace sa date, le rendement compte pour 1.
 
 **Registre** `vava_gathering:tools` (objet → `{ kind, power, yieldBonus?, qualityBonus?, wear? }`) : rempli par la
 config, ouvert aux autres modules (une hache d'artisan de phase 3 s'y déclare, ou hérite du genre de son objet).
@@ -1333,7 +1335,7 @@ station. Rendu hors jeu : `web/index.html?view=menu` (ou `menu&tab=reparation`, 
 
 ### `vava_farming`
 
-L'agriculture (1.4.0) : **parcelles** communales ou privées (`owner = { kind = 'character', id }`, autres genres par
+L'agriculture (1.4.1) : **parcelles** communales ou privées (`owner = { kind = 'character', id }`, autres genres par
 `registerAccess`) faites d'emplacements en grille ; **croissance par dates** (humidité qui baisse, pousse au-dessus
 d'un seuil, pause à sec, flétrie après 6 h, morte après 18 h ; aucune boucle, republication des stades toutes les
 10 s) ; **fertilité** (coût par récolte, rotation par famille, compost, jachère) ; **qualité** de la récolte (graine ×
@@ -1356,14 +1358,20 @@ station et recette ajoutés aux registres de `vava_crafting`, station placée pa
 **Saisons** (1.3.0) : la saison de `vava_time` (export `getSeason`, lu par le bridge, gardée 5 s) règle, par
 `config.seasons`, la vitesse de pousse (`growth` : printemps × 1,25, été × 1, automne × 0,75, hiver × 0,25) et celle à
 laquelle la terre sèche (`drying` : × 1 ; × 1,5 ; × 0,75 ; × 0,25 : l'hiver, un arrosage tient quatre fois plus). Une
-valeur absente, négative ou invalide compte pour 1 (1.4.0). La croissance garde ses fractions de seconde en mémoire et
-s'écrit entière en base. `vava_time` absent : aucun effet, croissance identique à la 1.2.2.
+valeur absente, négative, infinie ou invalide compte pour 1, et une valeur au-delà de 10 compte pour 10 (1.4.1, même
+règle que la récolte). La croissance garde ses fractions de seconde en mémoire et s'écrit entière en base. `vava_time`
+absent, arrêté ou en échec : aucun effet, croissance identique à la 1.2.2. **Saison en attente** (1.4.1) : tant que
+`vava_time` démarre (module déclaré, en attente, en migration ou en `setup`, `getSeason` encore `nil`), le bridge rend
+`false`, jamais gardé en cache, et rien n'avance (`growth.advance` ne touche ni la pousse, ni l'humidité, ni la date de
+calcul) : le temps est compté ensuite, à la bonne saison. Quand les effets de saison changent, chaque emplacement planté
+est marqué à écrire, pour qu'un redémarrage ne recompte pas d'un bloc tout le temps passé depuis son dernier geste.
 
 **Gel** (1.4.0, décision à confirmer) : branchée par le bridge sur les hooks `vava_time:frostWarning` et
 `vava_time:frost`, l'agriculture avertit au soir d'une nuit de gel les seuls cultivateurs concernés (propriétaire en jeu
 d'une parcelle privée où une plante est exposée, joueurs à `frost.warnRadius` m d'une parcelle commune exposée,
 positions lues côté serveur) puis, quand le gel tombe, fait mourir toute plante vivante ni couverte ni d'une culture
-`frostHardy` (état « morte » existant), journalise (`frost`, par parcelle) et prévient les mêmes. Geste **Couvrir**
+`frostHardy` (état « morte » existant), journalise (une ligne `frost` par nuit : plantes perdues par parcelle, 1.4.1)
+et prévient les mêmes. Geste **Couvrir**
 (action `cover` de `vava_farming:begin`, codes `covered`, `frost_hardy`, `no_cover`) : plante vivante, non couverte,
 d'une culture qui craint le froid ; consomme le premier objet de `frost.cover` que le cultivateur possède en quantité
 (revérifié et retiré par `exchange` à la fin du geste) ; l'emplacement reste couvert jusqu'à la récolte ou

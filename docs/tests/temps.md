@@ -1,7 +1,7 @@
 # Ciel et heure du royaume — procédure de test en jeu
 
 Procédure pour vérifier en jeu `vava_time` 1.1.0 (heure de Paris, saisons de quatorze jours, ciel, nuits de gel,
-décisions du Conseil), ses effets sur `vava_farming` 1.4.0 et `vava_gathering` 1.3.1, et la page Ciel et heure de la
+décisions du Conseil), ses effets sur `vava_farming` 1.4.1 et `vava_gathering` 1.3.2, et la page Ciel et heure de la
 Chancellerie 1.5.1 (pont `vava_chancellerie` 1.4.0). Comptez deux heures ; les tests à deux joueurs sont marqués
 **(2 joueurs)**. Chaque test dit quoi faire et ce qui doit se passer ; si ce n'est pas le cas, notez le test
 (« temps 3-4 »), ce que vous avez vu, et les lignes des consoles serveur et client.
@@ -124,6 +124,7 @@ Avec les saisons rapides (§ 0) pour passer d'une saison à l'autre, ou en atten
 | 1 | Figer l'heure à 05:00, imposer et figer « Brouillard » ; `restart vava_time`. | Après le redémarrage : 05:00 figée, brouillard, sans fondu ; l'outil se rouvre sur le même état. |
 | 2 | Même chose, puis redémarrer tout le serveur. | Même état retrouvé (table `vava_time_state`). |
 | 3 | Réglages rapides, ciel non figé : noter « prochain changement » ; `restart vava_time`. | Le ciel et sa fin prévue sont repris tels quels, y compris quand le même ciel vient d'être prolongé (la fin prolongée est écrite en base). |
+| 3b | En hiver (saisons rapides), une carotte et un nœud de sauge vidé : noter leur avancement (`/agriculture parcelle <id>`, invite du nœud), `restart vava_time`, attendre une minute, relever de nouveau ; puis redémarrer tout le serveur (dans la même saison) et relever. | L'avancement suit le rythme de l'hiver : rien ne bondit pendant que `vava_time` relit son état, ni après le redémarrage du serveur (pas de pousse ni de repousse quatre fois plus rapide d'un coup). |
 | 4 | En hiver, nuit de gel, après 21 h : `restart vava_time`. | Le gel ne retombe pas une seconde fois ; avant 17 h, le soir et le gel se jouent normalement. |
 | 5 | `stop vava_time`. | Chez chaque joueur, l'horloge rend la main au jeu (elle file à nouveau à la vitesse de GTA) et le ciel aussi ; plus de traces dans la neige ; aucune erreur. |
 | 6 | `start vava_time`. | Heure et ciel du royaume reviennent dans les secondes qui suivent, sans reconnexion. |
