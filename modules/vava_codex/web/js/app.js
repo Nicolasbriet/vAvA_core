@@ -3,23 +3,27 @@
  * web/js/app.js
  * Rôle : assemblage : messages du jeu, recherche, onglets et chapitres, sélection (souris et clavier), signets,
  *        lancement d'une ligne composée, réglage « rester ouvert », fermeture, chapitre demandé à l'ouverture
- *        (export openAt du client, 1.4.0). Onglet Lecture (1.5.0) : page choisie, texte demandé au jeu seulement
- *        s'il n'est pas gardé à la même empreinte, liens entre pages et vers les commandes, page précédente et
- *        suivante ; openAt résout une page, puis un chapitre de lecture, puis un module.
+ *        (export openAt, 1.4.0). Onglet Lecture (1.5.0) : texte d'une page demandé seulement s'il n'est pas gardé à
+ *        la même empreinte, liens, pages voisines ; openAt résout une page, un chapitre de lecture, puis un module.
  * Dépendances : strings.js, bridge.js, model.js, reader.js, forms.js, view.js
  */
 
 (() => {
   const app = document.getElementById('app');
-  // Chapitre demandé à l'ouverture (export openAt, 1.4.0), appliqué une fois un contenu chargé, puis oublié.
+  // chapitre ou page demandé à l'ouverture (openAt), appliqué une fois le contenu chargé, puis oublié
   let pendingFocus = null;
-  // jeton de la dernière demande de page : seule la dernière compte pour l'affichage
+  // jeton de la dernière page choisie : seule elle s'affiche
   let pageRequest = 0;
+  const loader = CodexReader.createLoader({
+    post: (id) => Bridge.post('page', { id }),
+    wait: (ms) => new Promise((resolve) => setTimeout(resolve, ms)),
+    wanted: (id) => !app.hidden && Model.state.tab === 'reading' && Model.state.page === id,
+  });
 
-  function selectRow(id, focusForm) {
+  function selectRow(id, focusForm, delayed) {
     const page = Model.pageOfRow(id);
     if (page) {
-      selectPage(page.id);
+      selectPage(page.id, delayed);
       return;
     }
     Model.select(id);
@@ -27,10 +31,8 @@
     if (focusForm && !View.focusFirstField()) View.focusSearch(false);
   }
 
-  /** Ouvre une page dans l'onglet Lecture : texte gardé à la même empreinte, sinon demandé au jeu (une demande à la
-   *  fois compte ; la réponse est gardée même si le joueur est passé à une autre page). La ligne de la page est rendue
-   *  visible : recherche vidée, puis chapitre de la page, si elle n'est pas dans le sommaire affiché. */
-  async function selectPage(id) {
+  /** Ouvre une page (ligne rendue visible) : texte gardé, sinon demandé ; `delayed` (↑ ↓, pages voisines) : différé. */
+  async function selectPage(id, delayed) {
     const state = Model.state;
     const page = state.pageById.get(id);
     if (!page) return;
@@ -58,26 +60,24 @@
     if (body) return;
 
     const token = ++pageRequest;
-    const result = await Bridge.post('page', { id });
-    const answer = result && result.ok && result.page && typeof result.page === 'object' ? result.page : null;
-    if (answer && answer.id === id && typeof answer.hash === 'string') {
-      const blocks = CodexReader.normalizeBody(answer.body);
-      CodexReader.store(state.pageCache, id, answer.hash, blocks);
-      if (token !== pageRequest || state.page !== id) return;
-      state.pageBody = { id, hash: answer.hash, body: blocks };
-      state.pageStatus = 'idle';
-      if (!app.hidden && state.tab === 'reading') View.renderDetail();
+    const result = await loader.load(id, delayed);
+    const current = token === pageRequest && state.page === id;
+    if (result && result.skipped) {
+      // plus voulue (autre page, livre fermé, autre onglet) : redemandée au retour par ensurePage
+      if (current) state.pageStatus = 'idle';
       return;
     }
-    if (token !== pageRequest || state.page !== id) return;
-    state.pageStatus = 'error';
+    const answer = CodexReader.readAnswer(result, id);
+    if (answer) CodexReader.store(state.pageCache, id, answer.hash, answer.body);
+    if (!current) return;
+    state.pageBody = answer ? { id, hash: answer.hash, body: answer.body } : null;
+    state.pageStatus = answer ? 'idle' : 'error';
     if (app.hidden) return;
     if (state.tab === 'reading') View.renderDetail();
-    View.toast(errorMessage(result && result.ok ? 'client_error' : result && result.error), 'danger');
+    if (!answer) View.toast(errorMessage(result && result.ok ? 'client_error' : result && result.error), 'danger');
   }
 
-  /** Onglet Lecture affiché : une page est choisie (la première du sommaire sinon) et son texte est là, ou demandé
-   *  s'il manque ou si son empreinte a changé depuis. Ne demande rien si le texte gardé est le bon. */
+  // onglet Lecture affiché : une page choisie (la première sinon), son texte là ou redemandé si son empreinte a changé
   function ensurePage() {
     const state = Model.state;
     if (state.tab !== 'reading' || state.pageStatus === 'loading') return;
@@ -91,8 +91,7 @@
     if (state.pageStatus === 'error' || !shown || shown.id !== page.id || shown.hash !== page.hash) selectPage(page.id);
   }
 
-  /** Lien vers une commande depuis une page : onglet Commandes, chapitre et recherche vidés, sa ligne choisie
-   *  (la sous-commande citée, sinon la première ligne de la commande). */
+  // lien vers une commande : onglet Commandes, filtres vidés, sa ligne choisie (sinon la première de la commande)
   function openCommand(name, action) {
     if (!Model.state.byName.has(name)) return;
     Model.setTab('commands');
@@ -161,7 +160,7 @@
     if (order.length === 0) return;
     const index = order.findIndex((row) => row.id === Model.state.selected);
     const next = index === -1 ? (delta > 0 ? 0 : order.length - 1) : Math.min(order.length - 1, Math.max(0, index + delta));
-    selectRow(order[next].id, false);
+    selectRow(order[next].id, false, true);
   }
 
   View.init(app);
@@ -170,7 +169,7 @@
   refs.search.addEventListener('input', () => {
     Model.setQuery(refs.search.value);
     View.renderIndex();
-    // onglet Lecture : la recherche filtre le sommaire, la page lue reste à l'écran (↑ ↓ ou un clic en changent)
+    // onglet Lecture : la recherche filtre le sommaire, la page lue reste à l'écran
     if (Model.state.tab === 'reading') return;
     // première ligne des résultats choisie d'office : Entrée la lance ou ouvre son formulaire
     const order = Model.visibleOrder();
@@ -205,7 +204,7 @@
     }
     const pageLink = event.target.closest('[data-page]');
     if (pageLink) {
-      selectPage(pageLink.dataset.page);
+      selectPage(pageLink.dataset.page, pageLink.classList.contains('reader-nav'));
       return;
     }
     const command = event.target.closest('[data-command]');
@@ -297,10 +296,7 @@
     }
   });
 
-  /** Ouvre ce que demande openAt, dans cet ordre : une page de lecture (onglet Lecture, tranche sur « Tout ») ; un
-   *  chapitre de lecture (sa première page, contrat de T-022 : openAt('premiers_pas')) ; un chapitre de commandes
-   *  (onglet des commandes, recherche vidée). Un identifiant inconnu laisse le livre à son index, sans message.
-   *  Rend vrai si quelque chose a été ouvert. */
+  /** openAt : page, chapitre de lecture (première page ; T-022), puis module ; vrai si quelque chose s'est ouvert. */
   function applyFocus() {
     const target = CodexReader.focusTarget(pendingFocus, Model.state.reading, Model.state.chapters);
     pendingFocus = null;
@@ -317,10 +313,7 @@
     return true;
   }
 
-  /** La page n'a pas le contenu de la version annoncée (cas de secours, jamais attendu). Sans aucun contenu, elle
-   *  le redemande aussitôt (second appel au serveur, compté par le débit de l'ouverture) ; avec un contenu plus ancien,
-   *  elle le montre et fait seulement oublier les versions au client : la prochaine ouverture renverra tout, sans
-   *  appel de plus. */
+  /** Secours : sans contenu, le redemande ; avec un contenu ancien, fait oublier les versions au client. */
   async function resync() {
     if (Model.state.version !== null) {
       Bridge.post('stale');

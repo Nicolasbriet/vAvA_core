@@ -183,7 +183,7 @@ const DevMock = (() => {
       const page = readingPages.find((candidate) => candidate.id === data.id && (mockStaff || !candidate.staff));
       if (!mockReading) return { ok: false, error: 'disabled' };
       if (!page || !bodies[page.id]) return { ok: false, error: 'unknown_page' };
-      return { ok: true, page: { id: page.id, chapter: page.chapter, title: page.title, hash: page.hash, body: JSON.parse(JSON.stringify(bodies[page.id])) } };
+      return { ok: true, page: { id: page.id, hash: page.hash, body: JSON.parse(JSON.stringify(bodies[page.id])) } };
     }
     if (name === 'refresh') return { ok: true, payload: snapshot(mockStaff) };
     return { ok: true };

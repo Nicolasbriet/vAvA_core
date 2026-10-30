@@ -1,7 +1,9 @@
 /*
  * vava_codex/web/dev/essais.js
  * Rôle : essais des fonctions pures de l'onglet Lecture (js/reader.js : index et blocs reçus, jetons, liens, cible
- *        d'un openAt, pages voisines, pages gardées par empreinte, rendu des blocs dans un faux document), de l'état
+ *        d'un openAt, pages voisines, pages gardées par empreinte, réponse `page`, demandes de page (une à la fois
+ *        par page, envoi différé, relance après rate_limited, minuteries simulées), rendu des blocs dans un faux
+ *        document), de l'état
  *        de lecture de js/model.js et des textes de js/strings.js. Sans dépendance :
  *        `node modules/vava_codex/web/dev/essais.js` (code de sortie 1 au moindre échec). Jamais livré.
  * Dépendances : js/strings.js, js/reader.js, js/model.js (chargés comme dans la page, scripts classiques)
@@ -29,10 +31,10 @@ function eq(actual, expected, what) {
   if (!same(actual, expected)) throw new Error(`${what || 'valeur'} : attendu ${JSON.stringify(expected)}, obtenu ${JSON.stringify(actual)}`);
 }
 function check(cond, what) { if (!cond) throw new Error(what); }
-function test(name, fn) {
-  try { fn(); passed += 1; console.log(`  ok    ${name}`); } catch (error) { failed += 1; console.log(`  ÉCHEC ${name} — ${error.message}`); }
-}
-const group = (name) => console.log(name);
+// essais en file, lancés un à un (certains attendent des promesses)
+const queue = [];
+const test = (name, fn) => queue.push({ name, fn });
+const group = (name) => queue.push({ group: name });
 
 // Index témoin, dans l'ordre du serveur (chapitres, puis pages par chapitre et rang)
 const rawIndex = {
@@ -212,6 +214,130 @@ test('prune : page disparue ou empreinte changée oubliée, les autres gardées'
   eq([...cache.keys()], ['bienvenue']);
 });
 
+group('readAnswer (réponse `page` : { id, hash, body })');
+test('réponse allégée acceptée sans chapitre ni titre ; blocs revalidés', () => {
+  eq(R.readAnswer({ ok: true, page: { id: 'troquer', hash: '0a1b2c3d4e5f6071', body: [['p', 'x', ['foo']], ['zz']] } }, 'troquer'),
+    { hash: '0a1b2c3d4e5f6071', body: [['p', 'x']] });
+});
+test('échec, autre page, empreinte invalide ou réponse informe → null', () => {
+  eq(R.readAnswer({ ok: false, error: 'unknown_page' }, 'troquer'), null);
+  eq(R.readAnswer({ ok: true, page: { id: 'bienvenue', hash: '0f', body: [] } }, 'troquer'), null);
+  eq(R.readAnswer({ ok: true, page: { id: 'troquer', hash: 'XYZ', body: [] } }, 'troquer'), null);
+  eq(R.readAnswer({ ok: true }, 'troquer'), null);
+  eq(R.readAnswer(undefined, 'troquer'), null);
+});
+
+group('createLoader (demandes de page)');
+const tick = () => new Promise((resolve) => setImmediate(resolve));
+// minuteries simulées : wait(ms) n'avance que par flush()
+function fakeClock() {
+  const timers = [];
+  return {
+    timers,
+    wait: (ms) => new Promise((resolve) => timers.push({ ms, resolve })),
+    async flush() { await tick(); while (timers.length) { timers.shift().resolve(); await tick(); } },
+  };
+}
+// rappel NUI simulé : réponses données dans l'ordre, ou en attente tant que release() n'est pas appelé
+function fakePost(answers) {
+  const calls = [];
+  let release = null;
+  const post = (id) => {
+    calls.push(id);
+    const answer = answers.length > 1 ? answers.shift() : answers[0];
+    if (answer === 'hold') return new Promise((resolve) => { release = resolve; });
+    return Promise.resolve(answer);
+  };
+  return { post, calls, release: (value) => release(value) };
+}
+const okPage = { ok: true, page: { id: 'a', hash: '0f', body: [] } };
+test('même page demandée deux fois pendant l\'envoi : un seul appel, même réponse', async () => {
+  const net = fakePost(['hold']);
+  const clock = fakeClock();
+  const loader = R.createLoader({ post: net.post, wait: clock.wait, wanted: () => true });
+  const first = loader.load('a');
+  const second = loader.load('a');
+  await tick();
+  eq(net.calls, ['a']);
+  eq(loader.pending(), 1);
+  net.release(okPage);
+  eq([await first, await second], [okPage, okPage]);
+  eq(loader.pending(), 0);
+  eq(net.calls.length, 1, 'appels');
+});
+test('envoi différé (↑ ↓, pages voisines) : 150 ms, puis rien si la page n\'est plus choisie', async () => {
+  const net = fakePost([okPage]);
+  const clock = fakeClock();
+  let chosen = 'a';
+  const loader = R.createLoader({ post: net.post, wait: clock.wait, wanted: (id) => id === chosen });
+  const passed = loader.load('a', true);
+  const skipped = loader.load('b', true);
+  await tick();
+  eq(net.calls, [], 'aucun appel avant le délai');
+  eq(clock.timers.map((t) => t.ms), [150, 150]);
+  await clock.flush();
+  eq(await passed, okPage);
+  eq(await skipped, { skipped: true });
+  eq(net.calls, ['a']);
+  chosen = 'z';
+  eq(await Promise.all([loader.load('a', true), clock.flush()]).then(([r]) => r), { skipped: true });
+  eq(net.calls, ['a']);
+});
+test('envoi différé d\'une page déjà en cours : pas d\'attente, même demande', async () => {
+  const net = fakePost(['hold']);
+  const clock = fakeClock();
+  const loader = R.createLoader({ post: net.post, wait: clock.wait, wanted: () => true });
+  const first = loader.load('a');
+  await tick();
+  const second = loader.load('a', true);
+  await tick();
+  eq(clock.timers.length, 0);
+  net.release(okPage);
+  eq(await second, await first);
+  eq(net.calls, ['a']);
+});
+test('rate_limited : une seule relance après 1 s si la page est toujours choisie', async () => {
+  const net = fakePost([{ ok: false, error: 'rate_limited' }, okPage]);
+  const clock = fakeClock();
+  const loader = R.createLoader({ post: net.post, wait: clock.wait, wanted: () => true });
+  const result = loader.load('a');
+  await tick();
+  eq(clock.timers.map((t) => t.ms), [1000]);
+  await clock.flush();
+  eq(await result, okPage);
+  eq(net.calls, ['a', 'a']);
+});
+test('rate_limited deux fois : la seconde réponse est rendue, aucune troisième demande', async () => {
+  const limited = { ok: false, error: 'rate_limited' };
+  const net = fakePost([limited]);
+  const clock = fakeClock();
+  const loader = R.createLoader({ post: net.post, wait: clock.wait, wanted: () => true });
+  const result = loader.load('a');
+  await clock.flush();
+  eq(await result, limited);
+  eq(net.calls, ['a', 'a']);
+});
+test('rate_limited puis page quittée : pas de relance', async () => {
+  const net = fakePost([{ ok: false, error: 'rate_limited' }, okPage]);
+  const clock = fakeClock();
+  let chosen = 'a';
+  const loader = R.createLoader({ post: net.post, wait: clock.wait, wanted: (id) => id === chosen });
+  const result = loader.load('a');
+  await tick();
+  chosen = 'b';
+  await clock.flush();
+  eq(await result, { skipped: true });
+  eq(net.calls, ['a']);
+});
+test('autre erreur (unknown_page) : rendue telle quelle, sans relance', async () => {
+  const net = fakePost([{ ok: false, error: 'unknown_page' }]);
+  const clock = fakeClock();
+  const loader = R.createLoader({ post: net.post, wait: clock.wait, wanted: () => true });
+  eq(await loader.load('a'), { ok: false, error: 'unknown_page' });
+  eq(clock.timers.length, 0);
+  eq(net.calls, ['a']);
+});
+
 group('renderBlocks (faux document : createElement, createTextNode, textContent)');
 function fakeDocument() {
   const created = [];
@@ -354,5 +480,21 @@ test('pageCount : « 0 page », « 1 page », « 12 pages »', () => {
   eq([0, 1, 12].map(STRINGS.search.pageCount), ['0 page', '1 page', '12 pages']);
 });
 
-console.log(`\n${passed} essais réussis, ${failed} échoué${failed > 1 ? 's' : ''}`);
-process.exit(failed > 0 ? 1 : 0);
+(async () => {
+  for (const item of queue) {
+    if (item.group) {
+      console.log(item.group);
+      continue;
+    }
+    try {
+      await item.fn();
+      passed += 1;
+      console.log(`  ok    ${item.name}`);
+    } catch (error) {
+      failed += 1;
+      console.log(`  ÉCHEC ${item.name} — ${error.message}`);
+    }
+  }
+  console.log(`\n${passed} essais réussis, ${failed} échoué${failed > 1 ? 's' : ''}`);
+  process.exit(failed > 0 ? 1 : 0);
+})();

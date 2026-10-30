@@ -82,8 +82,7 @@ const Forms = (() => {
     return dot < 0 ? 0 : text.length - dot - 1;
   }
 
-  /** Saisie ramenée à l'argument : bornée (min, max), arrondie au pas compté depuis min, puis à l'entier pour un
-   *  `integer` ; null si ce n'est pas un nombre. Une borne qui tombe hors du pas donne le dernier pas permis. */
+  /** Saisie bornée, arrondie au pas compté depuis min (puis à l'entier) ; null si ce n'est pas un nombre. */
   function normalizeNumber(raw, bounds) {
     const text = String(raw).trim().replace(',', '.');
     if (text === '') return null;
@@ -106,9 +105,7 @@ const Forms = (() => {
     return clamp(value);
   }
 
-  /** Nombre : curseur et champ, **sans valeur d'office** — obligatoire ou non, il n'est rempli que choisi par le
-   *  joueur (curseur déplacé ou valeur tapée) ; un 0 jamais touché ne part donc pas. La valeur lancée est celle de
-   *  `normalizeNumber` : bornée et arrondie selon l'argument. */
+  /** Nombre : curseur et champ sans valeur d'office (rempli seulement par le joueur) ; lancé via normalizeNumber. */
   function numberField(wrap, arg, onChange) {
     const bounds = numberBounds(arg);
     // le curseur a besoin de bornes : défauts si l'argument n'en déclare pas (la saisie, elle, ne suit que les siennes)
