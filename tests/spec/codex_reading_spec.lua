@@ -83,7 +83,8 @@ describe('vava_codex pages de lecture : serveur', function()
     end
 
     before_each(function()
-        staff, rights, started, characters = {}, {}, { vava_magic = true }, { [1] = true, [2] = true, [3] = true }
+        staff, rights, characters = {}, {}, { [1] = true, [2] = true, [3] = true }
+        started = { vava_magic = true, vava_admin = true }
         registry = {
             codex = { kind = 'command', key = 'F1' },
             date = { kind = 'command' },
@@ -190,8 +191,8 @@ describe('vava_codex pages de lecture : serveur', function()
         it('rend la page visible en blocs', function()
             local ok, page = reading.page(1, 'bienvenue')
             assert.is_true(ok)
-            assert.same({ id = 'bienvenue', chapter = 'premiers_pas', title = 'Vivre à Eldoria', hash = page.hash,
-                body = page.body }, page)
+            -- chapitre et titre sont dans l'index : la réponse ne porte que l'id, l'empreinte et les blocs
+            assert.same({ id = 'bienvenue', hash = page.hash, body = page.body }, page)
             assert.equal(reading.index(1, false).pages[1].hash, page.hash)
             assert.same({ 'p', 'Le Codex : ', { 'key', 'codex' }, '. La besace : ', { 'key', 'vava_inventory' }, '.' }, page.body[1])
             assert.same({ 'ul', { { 'cmd', 'date', '' } } }, page.body[2])
@@ -210,6 +211,17 @@ describe('vava_codex pages de lecture : serveur', function()
             assert.is_true((reading.page(1, 'conseil_sieger')))
             assert.same({ false, 'unknown_page' }, { reading.page(1, 'metiers_conseil') })
             rights[1] = { metiers = true }
+            assert.is_true((reading.page(1, 'metiers_conseil')))
+        end)
+
+        it('cache une page à droit quand vava_admin n\'est pas démarré, sans ouvrir le repli ACE', function()
+            staff[1], rights[1] = true, { metiers = true }
+            started.vava_admin = nil
+            assert.same({ 'bienvenue', 'magie', 'conseil_sieger' }, pageIds(reading.index(1, true)))
+            assert.same({ false, 'unknown_page' }, { reading.page(1, 'metiers_conseil') })
+            -- une page du Conseil sans droit reste ouverte au Conseil reconnu par l'ACE
+            assert.is_true((reading.page(1, 'conseil_sieger')))
+            started.vava_admin = true
             assert.is_true((reading.page(1, 'metiers_conseil')))
         end)
 

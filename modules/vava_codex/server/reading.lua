@@ -25,6 +25,7 @@ local REGISTRY = VavaCodex.REGISTRY
 local MESSAGES = cfg.messages.pages
 local CONSOLE = 0
 local UNKNOWN = 'unknown_page'
+local ADMIN = 'vava_admin'
 
 local reading = {}
 VavaCodex.reading = reading
@@ -71,26 +72,29 @@ function reading.load()
     log.info(MESSAGES.loaded, #book.pages, refusedPages)
 end
 
+--- Ressource démarrée ? `started` garde ce qui a déjà été lu pendant un même calcul (nil : rien n'est gardé).
+---@param resource string
+---@param started table<string, boolean>|nil
+---@return boolean
+local function isStarted(resource, started)
+    if started and started[resource] ~= nil then return started[resource] end
+    local up = bridge.Started(resource)
+    if started then started[resource] = up end
+    return up
+end
+
 --- Le joueur peut-il voir cette page maintenant ? Module requis démarré ; page du Conseil : membre (`staff`, calculé
---- ici s'il est nil) et, si la page porte un droit, ce droit (repli ACE de la config sans vava_admin).
+--- ici s'il est nil) et, si la page porte un droit, ce droit, lu dans vava_admin : sans vava_admin démarré, une page à
+--- droit est cachée (comme si elle demandait `requires = 'vava_admin'`), plutôt que d'ouvrir le repli ACE.
 ---@param page table
 ---@param src integer
 ---@param staff boolean|nil
 ---@param started table<string, boolean>|nil  ressources déjà vues pendant ce calcul
 ---@return boolean
 local function visibleTo(page, src, staff, started)
-    local requires = page.requires
-    if requires ~= '' then
-        local up
-        if started and started[requires] ~= nil then
-            up = started[requires]
-        else
-            up = bridge.Started(requires)
-            if started then started[requires] = up end
-        end
-        if not up then return false end
-    end
+    if page.requires ~= '' and not isStarted(page.requires, started) then return false end
     if page.audience == 'player' then return true end
+    if page.permission ~= '' and not isStarted(ADMIN, started) then return false end
     if staff == nil then staff = bridge.IsStaff(src) end
     if not staff then return false end
     return page.permission == '' or bridge.Can(src, page.permission, nil)
@@ -121,8 +125,8 @@ function reading.index(src, staff)
     return { chapters = chapters, pages = list }
 end
 
---- RPC `vava_codex:page` : texte d'une page en blocs, `{ id, chapter, title, hash, body }`. Droits relus à l'appel :
---- un rang retiré entre l'ouverture et la lecture ferme la page. Aucune écriture, aucun journal (lecture).
+--- RPC `vava_codex:page` : texte d'une page en blocs, `{ id, hash, body }` (chapitre et titre : dans l'index). Droits
+--- relus à l'appel : un rang retiré entre l'ouverture et la lecture ferme la page. Aucune écriture, aucun journal.
 ---@param src integer
 ---@param id string  identifiant validé par le schéma
 ---@return boolean ok

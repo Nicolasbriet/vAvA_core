@@ -377,6 +377,19 @@ describe('vava_codex pages de lecture : chapitres et pages', function()
             assert.equal(3, refused[2].line)
         end)
 
+        it('refuse un lien vers une page dont le droit diffère de celui de la page qui le porte', function()
+            local book, refused = build({
+                page({ id = 'a', audience = 'admin', body = 'Voir [[page:m]].' }),                          -- Conseil → droit
+                page({ id = 'b', audience = 'admin', permission = 'staff', body = 'Voir [[page:m]].' }),   -- autre droit
+                page({ id = 'c', audience = 'admin', permission = 'metiers', body = 'Voir [[page:m]], [[page:d]].' }),
+                page({ id = 'd', audience = 'admin', body = 'Voir [[page:e]].' }),                          -- Conseil → public
+                page({ id = 'e', body = 'Texte.' }),
+                page({ id = 'm', audience = 'admin', permission = 'metiers', body = 'Voir [[page:d]] et [[page:e]].' }),
+            })
+            assert.same({ 'c', 'd', 'e', 'm' }, ids(book.pages))
+            assert.same({ a = 'bad_link', b = 'bad_link' }, codes(refused))
+        end)
+
         it('fait refuser en chaîne une page qui mène à une page refusée', function()
             local book, refused = build({
                 page({ id = 'a', order = 1, body = 'Voir [[page:b]].' }),
@@ -401,7 +414,8 @@ describe('vava_codex pages de lecture : chapitres et pages', function()
             local first = book.pages[1]
             assert.equal(16, #first.hash)
             assert.equal(VavaCodex.fingerprint({ title = first.title, body = first.blocks }), first.hash)
-            assert.same({ id = 'xa', chapter = 'a', title = 'Essai', hash = first.hash, body = first.blocks }, first.response)
+            -- chapitre et titre sont dans l'index : la réponse ne porte que l'id, l'empreinte et les blocs
+            assert.same({ id = 'xa', hash = first.hash, body = first.blocks }, first.response)
             assert.equal(msgpackSize(first.response), first.wire)
             assert.equal(first, book.byId.xa)
             assert.is_nil(first.lines)

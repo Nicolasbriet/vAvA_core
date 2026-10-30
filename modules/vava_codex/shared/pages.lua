@@ -10,7 +10,8 @@
            (tests/spec/codex_pages_spec.lua). Servi au seul serveur.
            Toutes les classes de caractères sont des ensembles d'octets écrits à la main : aucune classe liée à la
            locale (%a, %c, %s, %w…), aucun changement de casse.
-    Dépendances : shared/constants.lua (READING, MAX_NAME, MAX_ACTION), shared/fingerprint.lua (empreinte des pages)
+    Dépendances : shared/constants.lua (READING : MAX_ID, ID_PATTERN ; MAX_NAME, MAX_ACTION), shared/fingerprint.lua
+                  (empreinte des pages)
 ]]
 
 local type, pairs, ipairs = type, pairs, ipairs
@@ -19,7 +20,34 @@ local find, sub, match, gsub, gmatch, byte = string.find, string.sub, string.mat
 local concat, sort = table.concat, table.sort
 local utf8len = utf8.len
 
+-- Bornes du format (serveur seul : le client n'en relit que MAX_ID et ID_PATTERN, gardés dans shared/constants.lua).
+-- Elles protègent le réseau et le rendu de la page, elles ne sont donc pas en config. Motifs écrits en ensembles
+-- ASCII explicites (aucune classe liée à la locale).
 local R = VavaCodex.READING
+R.MAX_BODY = 6000                         -- octets du corps source
+R.MAX_BLOCKS = 40                         -- blocs par page
+R.MAX_ITEMS = 12                          -- éléments par liste
+R.MAX_PARAGRAPH = 1200                    -- octets d'un paragraphe ou d'une note (source, jetons compris)
+R.MAX_ITEM = 400                          -- octets d'un élément de liste
+R.MAX_HEADING = 80                        -- octets d'un intertitre
+R.MAX_TOKENS = 40                         -- jetons par page (touches, commandes, liens, italiques)
+R.MAX_KBD = 16                            -- octets d'une touche écrite en toutes lettres ([[F1]])
+R.MAX_LINK_LABEL = 48                     -- octets du libellé d'un lien de page
+R.MAX_EM = 200                            -- octets d'un passage en italique
+R.MAX_WIRE = 7500                         -- poids msgpack estimé de la réponse `page`, hors enveloppe du core (sous le
+                                          -- seuil latent de 8 Ko, enveloppe comprise)
+R.MAX_PAGES = 40
+R.MAX_CHAPTERS = 8
+R.MAX_TITLE = 48
+R.MAX_SUMMARY = 120
+R.MAX_LABEL = 32                          -- nom d'un chapitre
+R.MAX_PERMISSION = 32                     -- droit vava_admin d'une page du Conseil
+R.MAX_REQUIRES = 64                       -- ressource dont dépend une page
+R.NAME_PATTERN = '^[A-Za-z0-9_%-%.]+$'    -- touche ou commande citée ([[touche:…]], [[commande:…]]), MAX_NAME octets
+R.ACTION_PATTERN = '^[A-Za-z0-9_%-]+$'    -- sous-commande citée, MAX_ACTION octets
+R.PERMISSION_PATTERN = '^[a-z_]+$'
+R.REQUIRES_PATTERN = '^[A-Za-z0-9_%-]+$'
+
 local MAX_NAME, MAX_ACTION = VavaCodex.MAX_NAME, VavaCodex.MAX_ACTION
 
 local pages = {}
@@ -443,12 +471,26 @@ local function linkLine(page, target)
     return 0
 end
 
+--- Tout lecteur de `page` peut-il lire `target` ? Cible publique : oui ; cible du Conseil : seulement depuis une page
+--- du Conseil, et, si la cible porte un droit, depuis une page qui porte le même (un lien ne mène jamais vers une page
+--- que son lecteur ne peut pas ouvrir).
+---@param page table
+---@param target table
+---@return boolean
+local function readableFrom(page, target)
+    if target.audience == 'player' then return true end
+    if page.audience ~= 'admin' then return false end
+    return target.permission == '' or target.permission == page.permission
+end
+
 --- Construit l'ensemble des pages depuis la graine `{ chapters = { … }, pages = { … } }`. Rend
 --- `{ chapters, pages, byId }` (chapitres et pages gardés, triés : chapitres par rang puis id, pages par chapitre, rang,
 --- id) et la liste des refus `{ { kind = 'chapter'|'page', id, code, line } }`. Une page refusée est écartée seule ;
---- un lien vers une page absente ou refusée, ou d'une page publique vers une page du Conseil, fait refuser la page qui
---- le porte, jusqu'à stabilité. Chaque page gardée porte `blocks`, `refs`, `hash` (empreinte du titre et des blocs),
---- `response` (`{ id, chapter, title, hash, body }`, la réponse du RPC) et `wire` (son poids estimé).
+--- un lien vers une page absente ou refusée, ou vers une page que les lecteurs de la page qui le porte ne peuvent pas
+--- tous lire (page du Conseil depuis une page publique, page à droit depuis une page sans ce droit), fait refuser la
+--- page qui le porte, jusqu'à stabilité. Chaque page gardée porte `blocks`, `refs`, `hash` (empreinte du titre et des
+--- blocs), `response` (`{ id, hash, body }`, la réponse du RPC : chapitre et titre sont dans l'index) et `wire` (son
+--- poids estimé, hors enveloppe du core).
 ---@param seed any
 ---@return { chapters: table[], pages: table[], byId: table<string, table> } book
 ---@return { kind: string, id: string, code: string, line: integer }[] refused
@@ -527,7 +569,8 @@ function pages.build(seed)
             refuse('page', page.id, 'too_many_pages')
         else
             page.hash = fingerprint and fingerprint({ title = page.title, body = page.blocks }) or ''
-            page.response = { id = page.id, chapter = page.chapter, title = page.title, hash = page.hash, body = page.blocks }
+            -- chapitre et titre sont déjà dans l'index : la réponse ne porte que le texte et son empreinte
+            page.response = { id = page.id, hash = page.hash, body = page.blocks }
             page.wire = wireSize(page.response)
             if page.wire > R.MAX_WIRE then
                 refuse('page', page.id, 'too_large')
@@ -546,7 +589,7 @@ function pages.build(seed)
             if alive[page.id] then
                 for _, target in ipairs(page.refs.pages) do
                     local other = alive[target]
-                    if not other or (page.audience == 'player' and other.audience == 'admin') then
+                    if not other or not readableFrom(page, other) then
                         alive[page.id] = nil
                         refuse('page', page.id, 'bad_link', linkLine(page, target))
                         changed = true

@@ -2002,16 +2002,17 @@ sa ligne et écartée seule. `config.reading.enabled = false` : ni onglet, ni in
   title, summary, audience, permission, requires, body }` : `id` au motif `^[a-z][a-z0-9_]*$`, 32 octets au plus, jamais
   `vava…`, unique parmi pages et chapitres ; `order` entier de 0 à 999 ; `title` 48 octets, `summary` 120, `label` 32,
   UTF-8, sans contrôle ni `<` `>` ; `audience` `'player'` (tous) ou `'admin'` (Conseil) ; `permission` `''` ou un droit
-  `vava_admin` (seulement avec `admin`) ; `requires` `''` ou une ressource : la page n'est montrée que si elle est
-  démarrée. 8 chapitres et 40 pages au plus ; un chapitre sans page visible n'apparaît pas.
+  `vava_admin` (seulement avec `admin` ; une page à droit est cachée tant que `vava_admin` n'est pas démarré, sans
+  repli ACE) ; `requires` `''` ou une ressource : la page n'est montrée que si elle est démarrée. 8 chapitres et 40 pages au plus ; un chapitre sans page visible n'apparaît pas.
 - **Corps** (texte balisé léger, 6 000 octets au plus) : paragraphes séparés par une ligne vide ; `## Intertitre` ;
   `- élément` et `1. élément` (suite d'un élément : deux espaces en tête de ligne ; 12 éléments au plus) ; `> note` ;
   jetons `[[F1]]` (touche écrite telle quelle, 16 octets), `[[touche:nom]]` (touche **liée par le joueur** à l'entrée
   `nom` du registre `core:commands`), `[[commande:nom]]` ou `[[commande:nom action]]` (lien vers la ligne de l'onglet
   Commandes), `[[page:id]]` ou `[[page:id|libellé]]`, `*italique*` ; 40 blocs, 40 jetons ; paragraphe ou note 1 200
   octets, élément 400, intertitre 80. Refusés : `<` partout, `>` ailleurs qu'en tête de ligne, octets de contrôle
-  (sauf le saut de ligne), UTF-8 invalide. Un lien vers une page absente, ou d'une page publique vers une page du
-  Conseil, fait refuser la page qui le porte. Codes d'erreur et leurs textes : `config.reading.errors`.
+  (sauf le saut de ligne), UTF-8 invalide. Un lien vers une page absente, ou vers une page que tous les lecteurs de
+  la page qui le porte ne peuvent pas lire (page du Conseil depuis une page publique, page à droit depuis une page qui
+  n'a pas ce droit), fait refuser la page qui le porte. Codes d'erreur et leurs textes : `config.reading.errors`.
 - **Blocs envoyés** (listes pures) : `{ 'h', texte }`, `{ 'p', segment… }`, `{ 'note', segment… }`, `{ 'ul', { segment… },
   … }`, `{ 'ol', … }` ; segment : chaîne, `{ 'kbd', touche }`, `{ 'key', nom }`, `{ 'cmd', nom, action|'' }`,
   `{ 'page', id, libellé|'' }`, `{ 'em', texte }`. La page les rend par éléments et `textContent`, jamais de HTML.
@@ -2019,8 +2020,11 @@ sa ligne et écartée seule. `config.reading.enabled = false` : ni onglet, ni in
   title, summary, hash, staff? } } }` (absent si les pages sont fermées), calculé avec les droits du moment (module
   requis démarré ; page du Conseil : membre, et le droit de la page s'il y en a un), dans l'empreinte du contenu : il ne
   repart que s'il change. `staff = true` seulement sur une page du Conseil. `hash` : empreinte du titre et des blocs.
+  Quand l'Atelier éditera les pages à chaud, l'index aura besoin de sa propre empreinte (aujourd'hui, une page
+  changée renverrait tout le contenu du Codex à la prochaine ouverture).
 - **Texte à la demande** : RPC `vava_codex:page(id)` (id au motif ci-dessus, `rateLimits.page` : 6 puis 1 par seconde) →
-  `{ id, chapter, title, hash, body }` (7,5 Ko au plus, sous le seuil latent) ; `no_character`, `disabled`, ou
+  `{ id, hash, body }` (chapitre et titre sont dans l'index ; 7 500 o au plus hors enveloppe du core, sous le seuil
+  latent) ; `no_character`, `disabled`, ou
   `unknown_page` pour une page absente, refusée au chargement, réservée ou dont le module est arrêté (un seul code :
   rien ne trahit une page réservée). Les droits sont relus à chaque appel. La page garde le texte par empreinte.
 - **Console** : `vava_codex_pages` (déclarée `scope = 'console'`) : une ligne par page (poids réseau, public), puis

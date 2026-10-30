@@ -1,7 +1,7 @@
 --[[
     vava_codex/shared/constants.lua
     Rôle : table du module (seule globale de la ressource) et constantes de protocole : registre lu, champ des
-           préférences, RPC, évènements, bornes ; bornes du format des pages de lecture (1.5.0, `READING`).
+           préférences, RPC, évènements, bornes ; identifiant d'une page de lecture (1.5.0, `READING`).
     Dépendances : aucune
 ]]
 
@@ -32,33 +32,11 @@ VavaCodex.RPC = {
     PAGE = 'vava_codex:page',                -- identifiant d'une page de lecture : son texte en blocs (1.5.0)
 }
 
--- Pages de lecture (1.5.0) : bornes du format (shared/pages.lua). Elles protègent le réseau et le rendu de la page,
--- elles ne sont donc pas en config. Motifs écrits en ensembles ASCII explicites (aucune classe liée à la locale).
+-- Pages de lecture (1.5.0) : seules les bornes que le client relit (identifiant d'une page demandée par la page) ;
+-- les autres bornes du format, réservées au serveur, sont en tête de shared/pages.lua (servi au seul serveur).
 VavaCodex.READING = {
     ID_PATTERN = '^[a-z][a-z0-9_]*$',        -- identifiant de page ou de chapitre (jamais « vava… »)
     MAX_ID = 32,
-    MAX_BODY = 6000,                         -- octets du corps source
-    MAX_BLOCKS = 40,                         -- blocs par page
-    MAX_ITEMS = 12,                          -- éléments par liste
-    MAX_PARAGRAPH = 1200,                    -- octets d'un paragraphe ou d'une note (source, jetons compris)
-    MAX_ITEM = 400,                          -- octets d'un élément de liste
-    MAX_HEADING = 80,                        -- octets d'un intertitre
-    MAX_TOKENS = 40,                         -- jetons par page (touches, commandes, liens, italiques)
-    MAX_KBD = 16,                            -- octets d'une touche écrite en toutes lettres ([[F1]])
-    MAX_LINK_LABEL = 48,                     -- octets du libellé d'un lien de page
-    MAX_EM = 200,                            -- octets d'un passage en italique
-    MAX_WIRE = 7500,                         -- poids msgpack estimé de la réponse `page` (sous le seuil latent de 8 Ko)
-    MAX_PAGES = 40,
-    MAX_CHAPTERS = 8,
-    MAX_TITLE = 48,
-    MAX_SUMMARY = 120,
-    MAX_LABEL = 32,                          -- nom d'un chapitre
-    MAX_PERMISSION = 32,                     -- droit vava_admin d'une page du Conseil
-    MAX_REQUIRES = 64,                       -- ressource dont dépend une page
-    NAME_PATTERN = '^[A-Za-z0-9_%-%.]+$',    -- touche ou commande citée ([[touche:…]], [[commande:…]]), MAX_NAME octets
-    ACTION_PATTERN = '^[A-Za-z0-9_%-]+$',    -- sous-commande citée, MAX_ACTION octets
-    PERMISSION_PATTERN = '^[a-z_]+$',
-    REQUIRES_PATTERN = '^[A-Za-z0-9_%-]+$',
 }
 
 -- Évènements serveur → client, toujours vers le seul joueur concerné.

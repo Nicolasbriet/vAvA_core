@@ -68,7 +68,8 @@ d'Eldoria ; les touches qu'elle cite sont celles que le joueur a réellement li�
 `metiers.lua`, `royaume.lua` : les pages), chargés comme `server_scripts` : jamais téléchargés par les clients, ni pris
 dans `config.lua` (partagé avec le client). Au démarrage, chaque page est analysée et validée (`shared/pages.lua`) ;
 une page fautive est écrite en console (`page « … » refusée : … (ligne N)`) et écartée seule, les autres restent. Un
-lien vers une page refusée fait refuser la page qui le porte.
+lien vers une page refusée, ou vers une page que tous les lecteurs de la page qui le porte ne peuvent pas lire (page
+du Conseil depuis une page publique, page à droit depuis une page sans ce droit), fait refuser la page qui le porte.
 
 **Format d'une page** (table plate) :
 
@@ -77,7 +78,7 @@ lien vers une page refusée fait refuser la page qui le porte.
 | `id` | minuscules, chiffres, `_`, commence par une lettre, 32 octets au plus, jamais `vava…` ; unique parmi pages et chapitres |
 | `chapter`, `order` | chapitre déclaré dans `chapters.lua` ; rang de 0 à 999 (tri, puis `id`) |
 | `title`, `summary` | 48 et 120 octets au plus, sans `<`, `>` ni caractère de contrôle ; le résumé s'affiche sous le titre et se cherche |
-| `audience`, `permission` | `'player'` (tous) ou `'admin'` (Conseil) ; droit `vava_admin` facultatif, seulement avec `'admin'` |
+| `audience`, `permission` | `'player'` (tous) ou `'admin'` (Conseil) ; droit `vava_admin` facultatif, seulement avec `'admin'` ; une page à droit est cachée tant que `vava_admin` n'est pas démarré (aucun repli ACE pour elle) |
 | `requires` | `''` ou un nom de ressource : la page n'apparaît que si elle est démarrée |
 | `body` | texte entre `[==[` et `]==]` (les `]]` des jetons n'y ferment rien), 6 000 octets au plus |
 
@@ -87,7 +88,9 @@ Le corps : paragraphes séparés par une ligne vide (les lignes d'un paragraphe 
 registre `core:commands`), `[[commande:me]]`, `[[commande:metiers voir]]` (lien vers la ligne de l'onglet Commandes),
 `[[page:troquer]]`, `[[page:troquer|le troc]]` ; `*italique*`. Interdits : `<`, `>` ailleurs qu'en tête de ligne, les
 caractères de contrôle (tabulation comprise). Bornes : 40 blocs, 12 éléments par liste, 40 jetons, 1 200 octets par
-paragraphe ou note, 400 par élément, 80 par intertitre ; la réponse envoyée pèse 7,5 Ko au plus.
+paragraphe ou note, 400 par élément, 80 par intertitre ; la réponse envoyée (`{ id, hash, body }`) pèse 7 500 o au
+plus, hors enveloppe du core. Ces bornes sont en tête de `shared/pages.lua` (servi au seul serveur) ; le client n'en
+relit que l'identifiant (`READING.MAX_ID`, `READING.ID_PATTERN` de `shared/constants.lua`).
 
 **Une règle change, la page se relit.** Chaque page dit le jeu tel qu'il est codé. Au-dessus de chaque page, un
 commentaire liste ses **sources** (modules et réglages) : quand l'une change, relire la page. Les nombres réglables en
@@ -102,6 +105,8 @@ change (page modifiée, module arrêté, rang changé). Le texte d'une page part
 (RPC `vava_codex:page`, au seul joueur, `rateLimits.page` : 6 d'affilée puis 1 par seconde), et la page le garde tant
 que son empreinte ne change pas : un joueur ne paie que ce qu'il lit. La première ouverture d'une session peut dépasser
 8 Ko et partir en latent (préavis du core, rien à faire). Aucun évènement, aucun GlobalState, aucun state bag.
+Quand l'Atelier éditera les pages à chaud (T-101 et suivantes), l'index devra avoir sa propre empreinte : aujourd'hui
+il est dans celle du contenu, et une page changée renverrait tout le contenu du Codex à chaque joueur.
 
 **Droits.** Index filtré à chaque ouverture ; le RPC revérifie à chaque appel (module requis démarré ; page du Conseil :
 membre, et son droit s'il y en a un) et répond `unknown_page` pour une page absente, refusée, réservée ou arrêtée :

@@ -85,7 +85,9 @@ local RPCS = {
     { RPC.FAVORITE, { NAME, BOOL }, limits.prefs, favorite },
     { RPC.RECENT, { NAME, ACTION }, limits.prefs, recent },
     { RPC.KEEP_OPEN, { BOOL }, limits.prefs, keepOpen },
-    -- latent laissé à 'auto' : une page pèse au plus READING.MAX_WIRE (7,5 Ko), sous le seuil de 8 Ko
+    -- latent laissé à 'auto' : une page pèse au plus READING.MAX_WIRE (7 500 o, shared/pages.lua), mesuré sur la seule
+    -- réponse `{ id, hash, body }`, hors enveloppe du core (`true`, identifiant de l'appel…) : près de 700 o restent
+    -- pour l'enveloppe sous le seuil latent de 8 Ko (8 192 o)
     { RPC.PAGE, { PAGE_ID }, limits.page, reading.page },
 }
 
