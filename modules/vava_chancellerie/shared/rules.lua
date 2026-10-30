@@ -7,6 +7,7 @@
 ]]
 
 local type, find, tonumber, tointeger = type, string.find, tonumber, math.tointeger
+local floor, huge = math.floor, math.huge
 
 local rules = {}
 VavaBridge.rules = rules
@@ -56,7 +57,8 @@ local NET_RESOURCE_MAX = 48
 local NET_RESOURCE_PATTERN = '^[%w_%-%.]+$'
 local NET_PLAYER_MAX = 65535
 
---- Lecture du compteur réseau demandée par le panneau : `scope` = 'all' (valeur absente ou vide), 'resource' (nom de
+--- Lecture du compteur réseau demandée par le panneau : `scope` = 'all' ou 'players' (liste des joueurs connectés)
+--- (valeur absente ou vide pour les deux), 'resource' (nom de
 --- ressource) ou 'player' (numéro de joueur, entier ou flottant entier venu du JSON) ; `opening` : ouverture de la page
 --- (booléen, ou absent). Renvoie { scope, resource?, target?, opening }, ou nil, 'invalid_args'.
 ---@param scope any
@@ -67,9 +69,9 @@ local NET_PLAYER_MAX = 65535
 function rules.netQuery(scope, value, opening)
     if opening ~= nil and type(opening) ~= 'boolean' then return nil, 'invalid_args' end
     opening = opening == true
-    if scope == 'all' then
+    if scope == 'all' or scope == 'players' then
         if value ~= nil and value ~= '' then return nil, 'invalid_args' end
-        return { scope = 'all', opening = opening }
+        return { scope = scope, opening = opening }
     end
     if scope == 'resource' then
         if type(value) ~= 'string' or #value > NET_RESOURCE_MAX or not find(value, NET_RESOURCE_PATTERN) then
@@ -86,11 +88,12 @@ function rules.netQuery(scope, value, opening)
 end
 
 --- Quelles lignes inscrire au journal du Registre pour cette lecture ? `state` : ce qui a déjà été inscrit pour ce
---- compte du panneau ({ pageAt?, player?, playerAt? }, heures des lignes acceptées par le Registre).
+--- compte du panneau ({ pageAt?, player?, playerAccount?, playerAt? }, heures des lignes acceptées par le Registre).
 --- Page : à son ouverture, à la première lecture connue du pont (page ouverte avant son redémarrage, ou client qui ne dit
 --- pas l'ouverture), puis au plus tard toutes les `everyMs` ; jamais à chaque relecture. L'ouverture est dite par le
 --- client : elle n'est prise qu'une fois par `openMinMs` (une page qui la répéterait n'inonde pas le journal).
---- Joueur : chaque fois qu'un autre joueur est lu, et au plus tard toutes les `everyMs` pour le même.
+--- Joueur : chaque fois qu'un autre joueur est lu (autre numéro, ou même numéro passé à un autre compte de jeu :
+--- `query.account`, compte de la cible s'il est connu), et au plus tard toutes les `everyMs` pour le même.
 ---@param state table
 ---@param query table  rendu par rules.netQuery
 ---@param now integer
@@ -102,6 +105,51 @@ function rules.netJournal(state, query, now, everyMs, openMinMs)
     local since = state.pageAt and now - state.pageAt
     local page = since == nil or since >= everyMs or (query.opening and since >= openMinMs)
     local player = query.scope == 'player'
-        and (state.player ~= query.target or state.playerAt == nil or now - state.playerAt >= everyMs)
+        and (state.player ~= query.target or state.playerAccount ~= query.account or state.playerAt == nil
+            or now - state.playerAt >= everyMs)
     return page == true, player == true
+end
+
+-- Liste des joueurs de la page Réseau : 128 au plus (comme core.net.stats), nom de personnage borné comme ceux du core.
+local NET_PLAYERS_MAX = 128
+-- prénom et nom de 24 caractères au plus chacun (config.server.characters.name), 4 octets au plus par caractère, une
+-- espace entre les deux
+local NET_NAME_MAX = 2 * 24 * 4 + 1
+rules.NET_NAME_MAX = NET_NAME_MAX
+rules.NET_PLAYERS_MAX = NET_PLAYERS_MAX
+
+---@param value any
+---@return integer
+local function netCount(value)
+    return type(value) == 'number' and value >= 0 and value < huge and floor(value) or 0
+end
+
+--- Copie bornée de la liste des joueurs rendue par le core (stats({ players = true })) : champs connus seulement,
+--- numéro de joueur valide, nom gardé s'il est une chaîne courte, ordre gardé, NET_PLAYERS_MAX au plus ; liste pure.
+---@param list any
+---@return table[]
+function rules.netPlayers(list)
+    local copy = {}
+    if type(list) ~= 'table' then return copy end
+    for i = 1, #list do
+        if #copy >= NET_PLAYERS_MAX then break end
+        local entry = list[i]
+        local source = type(entry) == 'table' and type(entry.source) == 'number' and tointeger(entry.source) or nil
+        if source and source >= 1 and source <= NET_PLAYER_MAX then
+            local name = entry.name
+            copy[#copy + 1] = {
+                source = source,
+                name = type(name) == 'string' and #name > 0 and #name <= NET_NAME_MAX and name or nil,
+                messages = netCount(entry.messages), bytes = netCount(entry.bytes), latent = netCount(entry.latent),
+            }
+        end
+    end
+    return copy
+end
+
+--- Nom de personnage rendu par le core pour un joueur, s'il est une chaîne courte ; sinon nil.
+---@param name any
+---@return string|nil
+function rules.netName(name)
+    return type(name) == 'string' and #name > 0 and #name <= NET_NAME_MAX and name or nil
 end

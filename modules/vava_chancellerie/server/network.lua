@@ -1,14 +1,16 @@
 --[[
     vava_chancellerie/server/network.lua
     Rôle : page Réseau de la Chancellerie, en lecture seule : le compteur des envois du core sur la dernière minute
-           (core.net.stats, core ≥ 0.10.0) — vue d'ensemble, un module, ou ce que reçoit un joueur —, ce que montre
+           (core.net.stats, core ≥ 0.12.0) — vue d'ensemble, un module, la liste des joueurs connectés (numéro, nom du
+           personnage, volume reçu ; 128 au plus, les plus chargés d'abord) ou ce que reçoit un joueur —, ce que montre
            `/vava_reseau` en jeu. Droit `net.permission` (tools) vérifié auprès du Registre (webCan), lectures d'un même
            compte du panneau espacées de `net.minIntervalMs`, consultation inscrite au journal du Registre (webLog) au
            nom de « Chancellerie : <compte> » : à l'ouverture de la page (dite par la page, prise au plus une fois par
            `net.openLogMinMs`), à chaque autre joueur lu (numéro et compte de jeu), et au plus tard toutes les
-           `net.logEveryMs` (shared/rules.lua, netJournal), jamais à chaque relecture. Ne lance ni n'arrête aucun
-           suivi : le détail d'un joueur évènement par évènement n'existe que s'il est suivi par `/vava_reseau joueur`
-           en jeu, et son personnage n'est nommé que dans ce cas.
+           `net.logEveryMs` (shared/rules.lua, netJournal), jamais à chaque relecture ; lire la liste des joueurs
+           n'inscrit rien de plus, seul le détail d'un joueur est inscrit. Chaque joueur connecté est suivi d'office par
+           le core (0.12.0) : son détail par évènement et le nom de son personnage sont toujours lisibles, sans suivi à
+           lancer ; rien ne change côté jeu.
     Dépendances : shared/constants.lua, shared/rules.lua, config.lua, server/core.lua, server/routes.lua
 ]]
 
@@ -24,7 +26,8 @@ local messages = VavaBridge.config.messages
 local ADMIN = VavaBridge.ADMIN
 local LIMIT = math.min(50, math.max(1, cfg.lines))
 
--- Compte du panneau (nom) → { readAt, pageAt?, player?, playerAt? } : dernière lecture et lignes inscrites au journal.
+-- Compte du panneau (nom) → { readAt, pageAt?, player?, playerAccount?, playerAt? } : dernière lecture et lignes
+-- inscrites au journal.
 -- Une entrée par compte qui a lu la page : bornée par le nombre de comptes du panneau.
 ---@type table<string, table>
 local accounts = {}
@@ -74,19 +77,6 @@ local function copyEvents(events)
     return list, largest
 end
 
---- Personnage d'un joueur suivi (prénom et nom), ou nil.
----@param target integer
----@return string|nil
-local function characterName(target)
-    local core = VavaBridge.core
-    local characters = core and core.characters
-    if not characters then return nil end
-    local called, character = pcall(characters.getActive, target)
-    if not called or type(character) ~= 'table' then return nil end
-    if type(character.firstName) ~= 'string' or type(character.lastName) ~= 'string' then return nil end
-    return character.firstName .. ' ' .. character.lastName
-end
-
 --- Ligne du journal pour un joueur lu : son numéro de connexion (réattribué après son départ) et, si le core le
 --- connaît, son compte de jeu (core.players.get, sans personnage chargé).
 ---@param target integer
@@ -103,7 +93,8 @@ local function playerDetails(target)
     return details
 end
 
--- args : { portée ('all' | 'resource' | 'player'), valeur ('' | nom de ressource | numéro de joueur), ouverture }
+-- args : { portée ('all' | 'players' | 'resource' | 'player'), valeur ('' | nom de ressource | numéro de joueur),
+-- ouverture }
 requests.netStats = function(actor, args)
     local name = actorName(actor)
     if not name then return failure('forbidden') end
@@ -124,15 +115,28 @@ requests.netStats = function(actor, args)
     local net = core and core.net
     if type(net) ~= 'table' or not net.stats then return failure('net_unavailable') end
     if query.target and not DoesPlayerExist(query.target) then return failure('unknown_player') end
-    local read, stats, code = pcall(net.stats, { limit = LIMIT, resource = query.resource, target = query.target })
+    local listing = query.scope == 'players' or nil
+    local read, stats, code = pcall(net.stats,
+        { limit = LIMIT, resource = query.resource, target = query.target, players = listing })
+    -- liste des joueurs refusée (core antérieur à 0.12.0, ou runtime sans GetPlayers)
+    if read and not stats and listing and (code == 'invalid_options' or code == 'unsupported') then
+        return failure('net_unavailable')
+    end
     if not read or type(stats) ~= 'table' then return failure(read and code or 'net_unavailable') end
+    -- core 0.10 ou 0.11 : le détail d'un joueur n'y existe que pour un joueur suivi (watched rendu) ; ses chiffres
+    -- seraient faux ici
+    if query.target and stats.watched ~= nil then return failure('net_unavailable') end
 
+    local details = query.target and playerDetails(query.target) or nil
+    query.account = details and details.compte
     local page, player = rules.netJournal(state, query, now, cfg.logEveryMs, cfg.openLogMinMs)
     if page and journal(actor, messages.logNet, query.resource and { ressource = query.resource } or {}) then
         state.pageAt = now
     end
-    if player and journal(actor, messages.logNetPlayer, playerDetails(query.target)) then
-        state.player, state.playerAt = query.target, now
+    if player then
+        -- le détail d'un joueur n'est jamais rendu sans trace au journal
+        if not journal(actor, messages.logNetPlayer, details) then return failure('journal_unavailable') end
+        state.player, state.playerAccount, state.playerAt = query.target, query.account, now
     end
 
     local total = type(stats.total) == 'table' and stats.total or {}
@@ -147,10 +151,11 @@ requests.netStats = function(actor, args)
         largest = largest,
         events = events,
     }
-    if query.target then
-        result.watched = stats.watched == true
-        -- nommé seulement s'il est suivi en jeu : la page ne dit rien de plus que /vava_reseau joueur
-        if result.watched then result.name = characterName(query.target) end
+    -- chaque joueur est suivi d'office (core 0.12.0) : son nom vient du core, sans condition de suivi
+    if query.target then result.name = rules.netName(stats.name) end
+    if listing then
+        result.players = rules.netPlayers(stats.players)
+        result.playerCount = count(stats.playerCount)
     end
     return { ok = true, result = result }
 end

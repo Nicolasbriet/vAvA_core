@@ -223,6 +223,18 @@ describe('vava_chancellerie règles du pont', function()
             assert.is_true(select(2, rules.netJournal(state, query('player', 4, false), 2000 + EVERY, EVERY, OPEN)))
         end)
 
+        it('inscrit le même numéro passé à un autre compte de jeu', function()
+            local state = { pageAt = 2000, player = 4, playerAccount = 41, playerAt = 2000 }
+            local same = query('player', 4, false)
+            same.account = 41
+            assert.is_false(select(2, rules.netJournal(state, same, 3000, EVERY, OPEN)))
+            local other = query('player', 4, false)
+            other.account = 77
+            assert.is_true(select(2, rules.netJournal(state, other, 3000, EVERY, OPEN)))
+            -- compte devenu inconnu (joueur parti, numéro redonné en connexion) : inscrit aussi
+            assert.is_true(select(2, rules.netJournal(state, query('player', 4, false), 3000, EVERY, OPEN)))
+        end)
+
         it('ne compte aucun joueur pour l\'ensemble ou un module', function()
             local state = { pageAt = 1000, player = 4, playerAt = 1000 }
             assert.is_false(select(2, rules.netJournal(state, query('all', '', true), 2000, EVERY, OPEN)))
@@ -238,6 +250,66 @@ describe('vava_chancellerie règles du pont', function()
             assert.is_true(cfg.net.minIntervalMs < 5000)
             assert.is_true(cfg.net.lines >= 1 and cfg.net.lines <= 50)
             assert.equal('tools', cfg.net.permission)
+        end)
+    end)
+
+    describe('liste des joueurs (page Réseau, pont 1.7.0)', function()
+        it('netQuery accepte la portée players, sans valeur', function()
+            assert.same({ scope = 'players', opening = false }, rules.netQuery('players', '', false))
+            assert.same({ scope = 'players', opening = true }, rules.netQuery('players', nil, true))
+            assert.is_nil(rules.netQuery('players', 3, false))
+            assert.is_nil(rules.netQuery('players', 'vava_codex', false))
+            assert.is_nil(rules.netQuery('PLAYERS', '', false))
+        end)
+
+        it('la liste n’inscrit rien au journal ; seule l’ouverture de la page compte', function()
+            local state = { pageAt = 1000 }
+            assert.same({ false, false }, { rules.netJournal(state, rules.netQuery('players', '', false), 2000, 1800000, 60000) })
+            assert.same({ true, false }, { rules.netJournal({}, rules.netQuery('players', '', true), 2000, 1800000, 60000) })
+        end)
+
+        it('netPlayers copie les champs connus, garde l’ordre, retire ce qui est mal formé', function()
+            local copy = rules.netPlayers({
+                { source = 3, name = 'Aldric Morn', messages = 4, bytes = 900.0, latent = 1, extra = 'x' },
+                { source = 7 },
+                { source = 0, messages = 1 }, { source = 65536 }, { source = 2.5 }, { source = '4' }, 'x',
+                { source = 9.0, name = string.rep('a', rules.NET_NAME_MAX + 1), messages = -1, bytes = 0 / 0, latent = math.huge },
+                { source = 5, name = '' },
+            })
+            assert.same({
+                { source = 3, name = 'Aldric Morn', messages = 4, bytes = 900, latent = 1 },
+                { source = 7, messages = 0, bytes = 0, latent = 0 },
+                { source = 9, messages = 0, bytes = 0, latent = 0 },
+                { source = 5, messages = 0, bytes = 0, latent = 0 },
+            }, copy)
+            assert.equal('integer', math.type(copy[3].source))
+            assert.equal('integer', math.type(copy[1].bytes))
+            assert.same({}, rules.netPlayers(nil))
+            assert.same({}, rules.netPlayers('x'))
+        end)
+
+        it('netPlayers plafonne à 128 joueurs', function()
+            local list = {}
+            for i = 1, 300 do list[i] = { source = i, bytes = 300 - i } end
+            local copy = rules.netPlayers(list)
+            assert.equal(128, #copy)
+            assert.equal(rules.NET_PLAYERS_MAX, #copy)
+            assert.equal(1, copy[1].source)
+            assert.equal(128, copy[128].source)
+        end)
+
+        it('netName garde un nom court, rien d’autre', function()
+            assert.equal('Ysolde Var', rules.netName('Ysolde Var'))
+            assert.is_nil(rules.netName(''))
+            -- nom permis par le core, très accentué : 24 + 24 caractères de 2 octets et une espace (97 octets), gardé
+            local accented = string.rep('é', 24) .. ' ' .. string.rep('É', 24)
+            assert.equal(97, #accented)
+            assert.equal(accented, rules.netName(accented))
+            assert.equal(193, rules.NET_NAME_MAX)
+            assert.equal(string.rep('a', 193), rules.netName(string.rep('a', 193)))
+            assert.is_nil(rules.netName(string.rep('a', 194)))
+            assert.is_nil(rules.netName(12))
+            assert.is_nil(rules.netName(nil))
         end)
     end)
 end)

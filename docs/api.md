@@ -406,7 +406,7 @@ permis dans un module, mais il n'est pas compté.
 | `sendPacked(options, target, event, payload)` | idem (0.11.0) — `payload` : chaîne produite par `msgpack.pack_args(...)` dans le module |
 | `sendNearPacked(options, coords, radius, event, payload)` | idem (0.11.0) |
 | `playersNear(coords, radius, { from?, exclude?, bucket? }?)` | liste de numéros de joueurs (copie), ou `nil, code` |
-| `stats({ limit?, resource?, target? }?)` | `{ mode, windowMs, total, events }`, ou `nil, code` |
+| `stats({ limit?, resource?, target?, players? }?)` | `{ mode, windowMs, total, events }` (+ `name` avec `target`, + `players`, `playerCount` avec `players`, 0.12.0), ou `nil, code` |
 
 ```lua
 -- un bruit de forge entendu à 30 m, sauf par le forgeron, et seulement dans son instance
@@ -471,9 +471,23 @@ end
   `core.net` dans son `bridge/server.lua` et garde `TriggerClientEvent` en repli.
 
 `stats` lit le compteur de la dernière minute (12 cases de 5 s ; mémoire bornée : 512 couples ressource, évènement,
-au-delà cumulés sous `*`, `<autres>`). `limit` : 1 à 50 (défaut 10) ; `resource` : seulement cette ressource ;
-`target` : ce que reçoit ce joueur (`total` du joueur, `watched`, et ses `events` s'il est suivi par `/vava_reseau
-joueur`, sinon une liste vide).
+au-delà cumulés sous `*`, `<autres>`). Depuis 0.12.0, **chaque joueur connecté est suivi d'office**, évènement par
+évènement, sur la même fenêtre : ses `net.counter.playerKeys` (6) évènements les plus lourds, le reste cumulé sous
+`*`, `<autres>` (un nouveau message plus gros que tout ce qu'a envoyé l'évènement le plus léger du joueur dans la minute
+prend sa place, sans allocation : l'anneau écarté est vidé et réutilisé) ; tout est oublié à la sortie du joueur (et
+de nouveau après son déchargement). Il n'y a plus de suivi à lancer (`watched` et le suivi de 5 min de 0.10.0
+disparaissent). Mémoire au pire, mesurée hors jeu : part des joueurs 1,16 Mo pour 128 joueurs (6 évènements chacun, plus
+`<autres>` et leur total) ; compteur général (512 couples pleins) 0,64 Mo ; en tout, au pire, 1,8 Mo.
+- `limit` : 1 à 50 (défaut 10) ; `resource` : seulement cette ressource ;
+- `target` : ce que reçoit ce joueur : `total` du joueur, ses `events` (filtrés par `resource` si elle est donnée) et
+  `name`, prénom et nom de son personnage (absent sans personnage chargé) ;
+- `players = true` (0.12.0, ni `resource` ni `target`) : `players`, les joueurs connectés du plus chargé au moins
+  chargé (128 au plus, ceux qui n'ont rien reçu compris) : `{ source, messages, bytes, latent, name? }`, et
+  `playerCount`, le nombre de joueurs connectés ; seul le `total` du royaume l'accompagne (`events` vide : rien n'est
+  construit ni trié). Runtime sans `GetPlayers` : `nil, 'unsupported'`.
+- **`target` et `players` sont réservés aux outils du Conseil** (ce que reçoit un joueur, le nom des personnages
+  connectés) : tout appelant qui les montre à une personne vérifie son droit et inscrit la consultation du détail d'un
+  joueur au journal du Registre (comme `/vava_reseau joueur` et la page Réseau de la Chancellerie).
 
 ```lua
 {
@@ -483,8 +497,17 @@ joueur`, sinon une liste vide).
     events = {                 -- triés par octets décroissants, puis messages, puis ressource et évènement
         { resource = 'vava_codex', label = 'rpc vava_codex:open', messages = 12, bytes = 245760, latent = 9, largest = 28672 },
     },
+    -- avec players = true
+    players = { { source = 3, name = 'Aldric Morn', messages = 140, bytes = 61440, latent = 1 } },
+    playerCount = 37,
 }
 ```
+
+Coût du suivi de tous les joueurs (0.12.0, mesuré hors jeu, `server/core/net.lua` réel, 128 joueurs) : environ
+0,3 µs de plus par cible servie (liste de 128 joueurs : 73 → 111 µs ; un joueur : 3,4 → 4,0 µs ; `sendNear` de 50 m
+sur une place de 120 m, 49 cibles : 58 → 76 µs ; en ville, `sendNear` de 30 m à 150 m : autour de 45 µs, la recherche
+des proches dominant). Un remplacement du plus léger coûte de 4 à 7 µs par cible (pire cas : un nouvel évènement plus
+lourd à chaque envoi), sans allocation.
 
 Ce que le core envoie lui-même par `core.net` : réponses RPC et préavis, demandes de `callClient`, personnage chargé,
 champs, déchargement et ordre d'apparition (**toujours fiables** : l'ordre chargement → champs → apparition compte ;
@@ -496,8 +519,9 @@ déconnecté avec `players.messages.sendFailed` plutôt que laissé sur un écra
 
 **Commandes** (registre `core:commands`, chapitre Core) :
 - `/vava_reseau` (Conseil, droit `tools` de `vava_admin`, repli ACE `vava.reseau`, 2 s entre deux) : en-tête, les 10
-  plus gros envois de la minute, pied ; `joueur <n°>` : totaux du joueur, puis suivi évènement par évènement pendant
-  5 min (4 joueurs suivis au plus ; inscrit au journal du Registre) ; `ressource <nom>` : les envois d'un module ;
+  plus gros envois de la minute, pied ; `joueur <n°>` : totaux du joueur et ses évènements les plus lourds, tout de
+  suite (0.12.0 : chaque joueur est suivi d'office ; inscrit au journal du Registre, « Réseau d'un joueur consulté »,
+  numéro et compte de jeu) ; `ressource <nom>` : les envois d'un module ;
   `zones` (0.11.0) : zones déclarées par module, abonnements, durée du passage (dernier, moyen et plus long de la
   minute) ; `zones <n°>` : zones suivies par un joueur (20 noms au plus ; inscrit au journal du Registre, « Zones d'un
   joueur consultées »). Sortie dans le chat du seul membre, ou dans la console.

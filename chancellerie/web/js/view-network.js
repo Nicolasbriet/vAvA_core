@@ -3,9 +3,10 @@
  * web/js/view-network.js
  * Rôle : la page Réseau, en lecture seule : ce que montre /vava_reseau en jeu. Le compteur des envois du core sur la
  *        dernière minute (mesure exacte ou estimée, envois, volume, latents, plus gros message, évènements les plus
- *        lourds), pour tout le royaume, un module, ou ce que reçoit un joueur (totaux ; le détail seulement s'il est
- *        suivi en jeu par /vava_reseau joueur, que la page ne lance jamais). Droit des outils du Registre, vérifié par le
- *        pont. Relue à la demande, ou à intervalle choisi (5 s au moins, compté depuis la dernière demande, réussie ou
+ *        lourds), pour tout le royaume, un module, la liste des joueurs connectés (numéro, personnage, volume reçu, les
+ *        plus chargés d'abord ; un clic ouvre le détail du joueur) ou ce que reçoit un joueur (son détail par évènement :
+ *        chaque joueur est suivi d'office par le core). Seul le détail d'un joueur s'inscrit au journal, pas la liste.
+ *        Droit des outils du Registre, vérifié par le pont. Relue à la demande, ou à intervalle choisi (5 s au moins, compté depuis la dernière demande, réussie ou
  *        non), seulement quand la page est visible, une demande à la fois ; la relecture automatique s'arrête sur un refus
  *        durable (droit, serveur arrêté, compteur absent, joueur parti) et après 15 min sans action sur la page. La
  *        première lecture dit au pont que la page s'ouvre (une ligne au journal du Conseil), les relectures non.
@@ -13,7 +14,7 @@
 
 const NetworkView = (() => {
   const T = STRINGS.network;
-  const SCOPES = ['all', 'resource', 'player'];
+  const SCOPES = ['all', 'players', 'resource', 'player'];
   // relectures permises : à la demande (0), ou toutes les 5, 15 ou 30 s ; jamais plus vite que AUTO_MIN_MS
   const AUTOS = [0, 5000, 15000, 30000];
   const AUTO_MIN_MS = 5000;
@@ -126,7 +127,7 @@ const NetworkView = (() => {
   function readValue() {
     const input = refs.input;
     input.classList.remove('is-invalid');
-    if (scope === 'all') return '';
+    if (scope === 'all' || scope === 'players') return '';
     const text = input.value.trim();
     if (scope === 'resource') {
       if (!RESOURCE_PATTERN.test(text)) {
@@ -215,11 +216,12 @@ const NetworkView = (() => {
     acted();
     scope = next;
     if (next === 'resource' && value !== undefined) resource = value;
+    if (next === 'player' && value !== undefined) player = value;
     for (const node of refs.scopes.children) node.classList.toggle('is-selected', node.dataset.scope === scope);
     const input = refs.input;
     input.classList.remove('is-invalid');
-    input.hidden = scope === 'all';
-    refs.read.hidden = scope === 'all';
+    input.hidden = scope === 'all' || scope === 'players';
+    refs.read.hidden = input.hidden;
     if (scope === 'resource') {
       input.inputMode = 'text';
       input.maxLength = 48;
@@ -234,7 +236,7 @@ const NetworkView = (() => {
       input.value = player ? String(player) : '';
     }
     // valeur déjà connue (ligne cliquée, page rouverte, portée reprise) : lue aussitôt ; sinon on attend la saisie
-    if (scope === 'all' || (scope === 'resource' && resource) || (scope === 'player' && player)) {
+    if (scope === 'all' || scope === 'players' || (scope === 'resource' && resource) || (scope === 'player' && player)) {
       load(true);
     } else {
       stop();
@@ -293,25 +295,57 @@ const NetworkView = (() => {
     return T.empty;
   }
 
+  /** Liste des joueurs connectés, les plus chargés d'abord ; un clic ouvre le détail (inscrit au journal). */
+  function playerRows(players) {
+    return players.map((entry) => {
+      const source = Number(entry.source);
+      const row = UI.el('tr', null, null, [
+        UI.el('td', 'cell-strong', String(source)),
+        UI.el('td', null, typeof entry.name === 'string' ? entry.name : T.noCharacter),
+        UI.el('td', 'cell-end', count(entry.messages)),
+        UI.el('td', 'cell-end', STRINGS.bytes(Number(entry.bytes) || 0)),
+        UI.el('td', 'cell-end', Number(entry.latent) > 0 ? count(entry.latent) : '—'),
+      ]);
+      if (Number.isInteger(source) && source >= 1 && source <= PLAYER_MAX) {
+        row.addEventListener('click', () => setScope('player', source));
+      }
+      return row;
+    });
+  }
+
+  function renderPlayers(view, body) {
+    const players = UI.list(view.players);
+    const connected = Number(view.playerCount) || 0;
+    body.push(UI.el('p', 'prose', connected > players.length ? T.playersSome(connected, players.length) : T.playersAll(connected)));
+    if (!players.length) {
+      body.push(UI.el('p', 'empty', T.noPlayers));
+      return;
+    }
+    body.push(UI.el('table', 'ledger is-clickable', null, [
+      UI.el('thead', null, null, [UI.el('tr', null, null, T.playerColumns.map((c, i) => UI.el('th', i >= 2 ? 'cell-end' : null, c)))]),
+      UI.el('tbody', null, null, playerRows(players)),
+    ]));
+    body.push(UI.el('p', 'hint', T.playerRowHelp));
+  }
+
   function render(view) {
     if (!view || typeof view !== 'object' || !view.total) return;
     const total = view.total;
     const events = UI.list(view.events);
     const isPlayer = view.scope === 'player';
-    const watched = isPlayer && view.watched === true;
+    const isList = view.scope === 'players';
     const facts = [
-      isPlayer ? fact(T.facts.player, T.playerText(view.target, watched && typeof view.name === 'string' ? view.name : ''), 'fact-text') : null,
-      isPlayer ? fact(T.facts.watched, watched ? T.watchedYes : T.watchedNo, 'fact-text') : null,
+      isPlayer ? fact(T.facts.player, T.playerText(view.target, typeof view.name === 'string' ? view.name : T.noCharacter), 'fact-text') : null,
       fact(T.facts.mode, T.modes[view.mode] || T.modes.estimate, 'fact-text'),
       fact(T.facts.messages, count(total.messages)),
       fact(T.facts.bytes, STRINGS.bytes(Number(total.bytes) || 0)),
       fact(T.facts.latent, count(total.latent)),
-      isPlayer && !watched ? null : fact(T.facts.largest, events.length ? STRINGS.bytes(Number(view.largest) || 0) : '—'),
+      isList ? null : fact(T.facts.largest, events.length ? STRINGS.bytes(Number(view.largest) || 0) : '—'),
     ].filter(Boolean);
     const body = [UI.el('dl', 'facts', null, facts)];
     if (view.mode !== 'exact') body.push(UI.el('p', 'hint', T.modeHelp));
-    if (isPlayer && !watched) {
-      body.push(UI.el('p', 'prose', T.notWatched(view.target)));
+    if (isList) {
+      renderPlayers(view, body);
     } else if (!events.length) {
       body.push(UI.el('p', 'empty', emptyText(view)));
     } else {

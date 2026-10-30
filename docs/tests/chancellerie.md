@@ -3,8 +3,8 @@
 Procédure pour vérifier en jeu la Chancellerie 1.6.0 et `vava_chancellerie` 1.5.0 : **la clé du pont ne passe plus sur
 la ligne de commande de FXServer** (elle est demandée par le pont dans la console et donnée par l'entrée de FXServer),
 et **un rang du Conseil n'est donné qu'à un joueur que le pont a vu relié en jeu**. Comptez une demi-heure ; la
-section 2 se joue avec un client FiveM. La section 3 vérifie la page **Réseau** (Chancellerie 1.7.0, pont 1.6.0 : le
-compteur de `/vava_reseau` en lecture seule), un quart d'heure de plus avec deux clients FiveM. Un test se cite
+section 2 se joue avec un client FiveM. La section 3 vérifie la page **Réseau** (Chancellerie 1.8.0, pont 1.7.0 : le
+compteur de `/vava_reseau` en lecture seule, liste des joueurs), un quart d'heure de plus avec trois clients FiveM. Un test se cite
 « chancellerie 1-3 ». Préparation commune, mesure du resmon et
 remontée des écarts : [LISEZMOI.md](LISEZMOI.md). Le reste du pont (actions du Conseil depuis le web, caméras, zones de
 voix, ciel et heure) : `modules/vava_chancellerie/README.md`, « À vérifier en jeu », et [registre.md](registre.md).
@@ -51,13 +51,13 @@ voix, ciel et heure) : `modules/vava_chancellerie/README.md`, « À vérifier en
 | 6 | Page Comptes : « Délier » le compte de 2-2. | Rang retiré en jeu (`F10` ne fait plus rien) : retirer reste toujours permis. La ligne de `vava_chancellerie_links` est supprimée ; console : `compte n° <N> délié de la Chancellerie`. |
 | 7 | Relier de nouveau le même compte (code, `F8`). | La ligne revient en base, le rang revient aussitôt. |
 
-## 3. Page Réseau (Chancellerie 1.7.0, pont 1.6.0)
+## 3. Page Réseau (Chancellerie 1.8.0, pont 1.7.0)
 
-Ce que montre `/vava_reseau` en jeu, lu depuis la Chancellerie, en lecture seule. Il faut `vAvA_core` 0.10.0 ou plus
-récent, un compte du panneau de rang **Sénéchal** (droit `tools`) et un autre de rang **Gardien** ; pour 3-5 à 3-7, un
-joueur en jeu (`<B>`, son numéro de connexion) et un membre du Conseil en jeu (`<A>`, Sénéchal). Procédure du compteur
-lui-même : [reseau.md](reseau.md). La bannière de la Chancellerie dit `v1.7.0` ; la console du serveur
-`module 'vava_chancellerie' v1.6.0 prêt`.
+Ce que montre `/vava_reseau` en jeu, lu depuis la Chancellerie, en lecture seule. Il faut `vAvA_core` 0.12.0 ou plus
+récent (chaque joueur connecté suivi d'office), un compte du panneau de rang **Sénéchal** (droit `tools`) et un autre de
+rang **Gardien** ; pour 3-7 à 3-9 et 3-17 à 3-19, des joueurs en jeu (`<B>`, son numéro de connexion, et un second
+`<C>`) et un membre du Conseil en jeu (`<A>`, Sénéchal). Procédure du compteur lui-même : [reseau.md](reseau.md). La
+bannière de la Chancellerie dit `v1.8.0` ; la console du serveur `module 'vava_chancellerie' v1.7.0 prêt`.
 
 | # | Faire | Attendu |
 |---|---|---|
@@ -67,8 +67,8 @@ lui-même : [reseau.md](reseau.md). La bannière de la Chancellerie dit `v1.7.0`
 | 4 | Laisser la page ouverte deux minutes (relecture « toutes les 15 s », choisie par défaut). Puis choisir « toutes les 5 s », attendre 30 s ; puis « à la demande ». | L'heure « lu à » avance toutes les 15 s, puis toutes les 5 s ; plus rien à la demande, sauf « Relire ». Journal du Conseil : toujours **une seule** ligne « Compteur réseau consulté » (les relectures ne s'inscrivent pas). Navigateur, outils de développement (`F12`) → Réseau : au plus une requête `/api/game/request` toutes les 5 s. |
 | 5 | Relecture « toutes les 5 s » ; passer à un autre onglet du navigateur une minute, puis revenir. | Pendant l'absence : « relecture en pause (page cachée) » à côté de l'heure, aucune requête (outils de développement). Au retour : une lecture aussitôt, puis toutes les 5 s. |
 | 6 | Cliquer sur une ligne du tableau (par ex. `vava_codex`). Puis choisir « Un module », taper `vava_inventory`, Entrée. Puis taper `a/b`, « Lire ». | Le tampon « Un module » se choisit, le champ montre `vava_codex`, seul ce module reste ; ensuite seuls les envois de `vava_inventory` (ou « Aucun envoi de « vava_inventory » compté pendant la dernière minute. ») ; `a/b` : champ souligné de rouge, aucune requête. La ligne « (autres) », si elle paraît, ne se clique pas. Aucune nouvelle ligne au journal. |
-| 7 | Choisir « Un joueur », taper le numéro de `<B>`, Entrée (`<B>` **non suivi**). | Faits : « Joueur n° <B> » (sans nom de personnage), « Détail : totaux seulement », Mesure, Envois, Volume, Latents (pas de « Plus gros message ») ; phrase « Ce joueur n'est pas suivi : … tape « /vava_reseau joueur <B> » en jeu … ». Journal du Conseil : « Réseau d'un joueur consulté », joueur = `<B>`, compte = son numéro de compte de jeu (page Joueurs → fiche). En jeu, chez `<A>` : rien ; `/vava_reseau joueur <B>` dit ensuite « Détail par évènement suivi pendant 5 min » (la page n'avait pas lancé de suivi). |
-| 8 | Après 3-7, attendre une minute pendant que `<B>` joue (besace, Codex), puis « Relire » sur la page. | « Joueur n° <B> · Prénom Nom », « Détail : évènement par évènement », et les évènements reçus par `<B>` seulement. Journal : pas de nouvelle ligne (même joueur). |
+| 7 | `<B>` joue une minute (besace, Codex). Choisir « Un joueur », taper le numéro de `<B>`, Entrée. Personne n'a tapé `/vava_reseau joueur` avant. | **Tout de suite** : « Joueur n° <B> · Prénom Nom », Mesure, Envois, Volume, Latents, Plus gros message, et les évènements reçus par `<B>` seulement (12 nommés au plus, puis « (autres) »). Aucune phrase sur un suivi à lancer. Journal du Conseil : « Réseau d'un joueur consulté », joueur = `<B>`, compte = son numéro de compte de jeu (page Joueurs → fiche). En jeu, rien ne change chez personne. |
+| 8 | « Relire » sur le détail de `<B>`. Puis `<B>` revient à la sélection de personnage ; « Relire ». | Mêmes évènements mis à jour ; journal : pas de nouvelle ligne (même joueur). En sélection : « n° <B> · sans personnage », ses envois toujours là. |
 | 9 | Taper un autre numéro de joueur en jeu, puis revenir à `<B>`. Puis taper `999` (personne). Puis `abc`, `0`, `70000`. | Une ligne « Réseau d'un joueur consulté » par changement de joueur. `999` : « Aucun joueur de ce numéro en jeu. », aucune ligne au journal. `abc`, `0`, `70000` : champ souligné, aucune requête. |
 | 10 | Quitter la page (Tableau), y revenir aussitôt, la quitter et y revenir encore. Attendre une minute, y revenir. | Une seule ligne « Compteur réseau consulté » pour les retours de la même minute (une ouverture au plus par minute et par compte), puis une nouvelle après la minute ; la portée choisie est reprise. Hors de la page, aucune requête `netStats`. |
 | 11 | Page ouverte, relecture « toutes les 5 s » : depuis un autre compte maître, retirer le rang Sénéchal du compte (page Comptes → Gardien). | À la lecture suivante : « Ce compte n'a pas ce droit. », « relecture automatique arrêtée » à côté de l'heure, la relecture passe « à la demande ». Après rechargement de l'onglet, « Réseau » est grisé. |
@@ -76,7 +76,13 @@ lui-même : [reseau.md](reseau.md). La bannière de la Chancellerie dit `v1.7.0`
 | 13 | **Page ouverte, serveur de jeu arrêté** : relecture « toutes les 5 s », outils de développement (`F12`) → Réseau ouverts, arrêter le serveur de jeu depuis la Chancellerie ; laisser une minute. Recommencer avec `stop vava_chancellerie` (pont absent) au lieu de l'arrêt du serveur. | Serveur arrêté : **une** requête `/api/game/request` (« Le serveur de jeu est arrêté. »), puis la relecture s'arrête (« relecture automatique arrêtée », « à la demande ») ; plus aucune requête jusqu'à « Relire » ou un rythme choisi. Pont absent : une demande toutes les 5 s **au plus**, jamais plus (le message reste affiché) ; jamais « Trop de tentatives » sur les autres pages ouvertes. |
 | 14 | Relecture « toutes les 5 s », double-cliquer vite sur « Relire ». | Une seule requête : « Relire » est grisé pendant la lecture. |
 | 15 | Facultatif : relecture « toutes les 15 s », ne plus toucher à la page pendant 15 min (onglet visible). | Après 15 min : « relecture arrêtée après 15 min sans action », « à la demande » ; plus aucune requête. Choisir un rythme la relance. |
-| 16 | Facultatif : un `vAvA_core` antérieur à 0.10.0. | « Le compteur réseau demande vAvA_core 0.10.0 ou plus récent sur le serveur de jeu. » ; aucune erreur dans la console. |
+| 16 | Facultatif : un `vAvA_core` antérieur à 0.12.0. | « Les joueurs » et « Un joueur » : « Le compteur réseau demande vAvA_core 0.12.0 ou plus récent sur le serveur de jeu. » (jamais un détail faux) ; aucune erreur dans la console. |
+| 17 | `<B>` et `<C>` en jeu, `<B>` très actif (besace, Codex), `<C>` immobile ; un troisième client en sélection de personnage. Choisir « Les joueurs ». | « 3 joueurs connectés. » et une ligne par joueur : N°, Personnage (« sans personnage » pour celui en sélection), Envois, Volume, Latents, `<B>` en tête (le plus chargé). Pas de champ de saisie. Journal du Conseil : **aucune** ligne nouvelle pour la liste (ni à la relecture). |
+| 18 | Cliquer sur la ligne de `<C>`. | Le tampon « Un joueur » se choisit, le champ montre son numéro, son détail s'affiche ; journal : « Réseau d'un joueur consulté », joueur = `<C>`, compte = son compte de jeu. Revenir à « Les joueurs » : aucune nouvelle ligne. |
+| 19 | `<C>` se déconnecte ; « Relire » sur « Les joueurs ». | `<C>` n'est plus dans la liste. S'il revient avec un autre numéro, son volume repart de zéro. |
+| 20 | Un joueur `<D>` se connecte et reçoit le numéro qu'avait `<C>` (fréquent sur un petit serveur) ; ouvrir le détail de ce numéro. | Une **nouvelle** ligne « Réseau d'un joueur consulté » avec le compte de jeu de `<D>`, même si le numéro de `<C>` avait été lu dans la demi-heure. |
+| 21 | Page Console : `stop vava_admin` ; ouvrir le détail d'un autre joueur. Puis `start vava_admin`. | Refus « Ce compte n'a pas ce droit. » (le Registre ne répond plus) ; jamais un détail affiché sans ligne au journal. Si le Registre accepte le droit mais refuse la ligne : « Le journal du Conseil n'a pas pu inscrire cette consultation… ». |
+| 22 | Personnage au nom très accentué (24 lettres accentuées de prénom et de nom), connecté. « Les joueurs ». | Son nom s'affiche en entier, jamais « sans personnage ». |
 
 ## 4. Ce que je ne peux pas avoir vérifié hors jeu
 
@@ -105,10 +111,13 @@ Restent à voir avec un vrai FXServer :
   cours 5 s au plus par requête) : 2-2 doit appliquer le rang du premier coup.
 
 Page Réseau (section 3), vérifiée hors jeu : le vrai `server/network.lua` du pont sous Lua 5.4 avec un faux Registre et
-un faux `core.net` (46 contrôles : arguments refusés, délai avant le droit, Gardien refusé sans rien lire ni inscrire,
+un faux `core.net` (59 contrôles : détail refusé sans ligne au journal, même numéro passé à un autre compte inscrit, core
+ancien refusé ; arguments refusés, délai avant le droit, Gardien refusé sans rien lire ni inscrire,
 une ligne à l'ouverture, aucune à la relecture, ouverture répétée prise une fois par minute, une ligne par autre joueur
-avec son compte de jeu, échéance de 30 min, ligne refusée réessayée, personnage nommé seulement s'il est suivi, liste
-copiée pure, core sans `core.net`) ; la vraie page sous jsdom (89 contrôles : ouverture marquée une seule fois,
+avec son compte de jeu, échéance de 30 min, ligne refusée réessayée, nom du personnage rendu sans condition de suivi,
+liste des joueurs copiée bornée à 128 et jamais inscrite, core sans liste, liste copiée pure, core sans `core.net`) ; la
+vraie page sous jsdom (108 contrôles : journal indisponible ; liste des joueurs, « sans personnage », clic vers le détail, liste plafonnée ou
+vide ; ouverture marquée une seule fois,
 relecture à 15 s puis 5 s, pause onglet caché, ligne cliquée, numéros refusés sans requête, réponse dépassée ignorée,
 droit retiré, aucun texte injecté en HTML ; et, après la relecture réseau, jamais moins de 5 s entre deux demandes
 quand chaque lecture échoue, page rouverte en erreur sans relecture immédiate, relecture arrêtée sur serveur arrêté,
@@ -117,7 +126,7 @@ clic sur « Relire », arrêt après 15 min sans action — 24 de ces contrôles
 Restent à voir en jeu :
 - qu'un numéro de joueur arrivé en JSON (`12`) est bien lu par le pont (entier ou flottant entier : les deux sont
   acceptés) et que `DoesPlayerExist` le reconnaît (3-7, 3-9) ;
-- qu'une liste vide (aucun envoi, joueur non suivi) arrive à la page sans erreur, qu'elle soit encodée `[]` ou `{}`
-  (3-6, 3-7) ;
+- qu'une liste vide (aucun envoi, aucun joueur) arrive à la page sans erreur, qu'elle soit encodée `[]` ou `{}`
+  (3-6, 3-7, 3-17) ;
 - l'arrêt de la relecture dans un onglet caché ou une fenêtre réduite selon le navigateur (3-5) ;
 - le coût d'une lecture côté serveur (profiler de FXServer, page à 5 s) : attendu bien sous 0,1 ms.

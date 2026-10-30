@@ -477,6 +477,11 @@ versé à T-014 ; les autres points déjà couverts sont précisés dans T-012 �
   (la page lit seulement ce qui est suivi) ; `core.net.stats` suffit, aucun changement du core.
 - Critères : route bornée et journalisée côté pont ; procédure `docs/tests/chancellerie.md` complétée ; versions du
   pont et de la Chancellerie montées ; `docs/chancellerie.md` à jour.
+- Complément décidé par le porteur du projet (CLAUDE.md, « Compteur réseau ») : tous les joueurs connectés suivis
+  d'office par `core.net` (core 0.12.0, mémoire bornée par joueur, plus de suivi de 5 min ni de limite de 4,
+  `/vava_reseau joueur` répond tout de suite) ; la page Réseau liste les joueurs avec le nom de leur personnage, un
+  clic ouvre le détail (seul inscrit au journal). Pont 1.7.0, Chancellerie 1.8.0. Fait : à tester en jeu
+  (`docs/tests/reseau.md` § 3, `docs/tests/chancellerie.md` § 3).
 
 ## Phase 2 — Arrivée
 

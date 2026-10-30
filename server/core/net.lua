@@ -14,7 +14,8 @@
                   (chargés plus tard), jamais au chargement.
 ]]
 
-local type, tostring, select, next, pairs, pcall, rawlen, rawget = type, tostring, select, next, pairs, pcall, rawlen, rawget
+local type, tostring, tonumber, select, next, pairs, pcall, rawlen, rawget =
+    type, tostring, tonumber, select, next, pairs, pcall, rawlen, rawget
 local mathType, huge, min, ceil, floor = math.type, math.huge, math.min, math.ceil, math.floor
 local pack, unpack, concat = table.pack, table.unpack, table.concat
 local format = string.format
@@ -37,6 +38,8 @@ local WINDOW_MS = cfg.counter.bucketMs * cfg.counter.buckets
 -- Préfixes que seul le core envoie : un module ne peut pas les prendre, même sous un nom de ressource qui y ressemble.
 local RESERVED_PREFIXES = { 'vAvA:', 'core:' }
 local STATS_LIMIT_MAX = 50
+-- joueurs rendus au plus par stats({ players = true }) (les plus chargés d'abord)
+local STATS_PLAYERS_MAX = 128
 local RESOURCE_PATTERN = '^[%w_%-%.]+$'
 local RESOURCE_MAX = 48
 
@@ -54,7 +57,7 @@ local LATENT_CHOICES = { auto = true, never = true, always = true }
 local SEND_KEYS = { latent = true }
 local NEAR_KEYS = { latent = true, exclude = true, bucket = true, from = true }
 local PLAYERS_KEYS = { exclude = true, bucket = true, from = true }
-local STATS_KEYS = { limit = true, resource = true, target = true }
+local STATS_KEYS = { limit = true, resource = true, target = true, players = true }
 
 -- 'exact' : msgpack.pack_args et les envois internes du runtime (une sérialisation par envoi, quel que soit le nombre
 -- de cibles) ; 'estimate' : netsize, puis TriggerClientEvent par cible. Choisi par start().
@@ -713,13 +716,39 @@ end
 ---@field limit? integer     1 à 50 (défaut : command.lines)
 ---@field resource? string   seulement cette ressource
 ---@field target? integer    ce que reçoit ce joueur
+---@field players? boolean   aussi la liste des joueurs connectés (ni resource ni target)
+
+--- Nom du personnage actif d'un joueur, ou nil (sans personnage).
+---@param src integer
+---@return string|nil
+local function characterName(src)
+    local characters = vAvA.characters
+    local info = characters and characters.describeActive and characters.describeActive(src)
+    if type(info) ~= 'table' or type(info.firstName) ~= 'string' or type(info.lastName) ~= 'string' then return nil end
+    return info.firstName .. ' ' .. info.lastName
+end
+
+--- Joueurs connectés (numéros entiers), lus au runtime à l'appel ; nil si le runtime n'offre pas GetPlayers.
+---@return integer[]|nil
+local function connectedPlayers()
+    local list = {}
+    local getPlayers = GetPlayers
+    if type(getPlayers) ~= 'function' then return nil end
+    local players = getPlayers()
+    if type(players) ~= 'table' then return nil end
+    for i = 1, #players do
+        local src = tonumber(players[i])
+        if src and src > 0 then list[#list + 1] = floor(src) end
+    end
+    return list
+end
 
 --- Lecture du compteur sur la dernière minute.
 ---@param options vAvA.NetStatsOptions|nil
----@return table|nil stats  { mode, windowMs, total, events } (+ watched avec target)
+---@return table|nil stats  { mode, windowMs, total, events } (+ players, playerCount avec players ; + name avec target)
 ---@return string|nil code
 function net.stats(options)
-    local limit, resource, target = min(cfg.command.lines, STATS_LIMIT_MAX), nil, nil
+    local limit, resource, target, players = min(cfg.command.lines, STATS_LIMIT_MAX), nil, nil, false
     if options ~= nil then
         if type(options) ~= 'table' then return nil, 'invalid_options' end
         for key in pairs(options) do
@@ -739,18 +768,28 @@ function net.stats(options)
             target = options.target
             if mathType(target) ~= 'integer' or target <= 0 then return nil, 'invalid_options' end
         end
+        if options.players ~= nil then
+            if type(options.players) ~= 'boolean' then return nil, 'invalid_options' end
+            players = options.players
+            if players and (resource or target) then return nil, 'invalid_options' end
+        end
     end
-    local result = counter:read(GetGameTimer(), { limit = limit, resource = resource, target = target })
+    local now = GetGameTimer()
+    if players then
+        -- liste des joueurs : seul le total du royaume l'accompagne (aucun évènement construit ni trié)
+        local sources = connectedPlayers()
+        if not sources then return nil, 'unsupported' end
+        local list = counter:listPlayers(now, sources, STATS_PLAYERS_MAX)
+        for i = 1, #list do list[i].name = characterName(list[i].source) end
+        return {
+            mode = mode, windowMs = WINDOW_MS, total = counter:total(now), events = {},
+            players = list, playerCount = #sources,
+        }
+    end
+    local result = counter:read(now, { limit = limit, resource = resource, target = target })
     result.mode = mode
+    if target then result.name = characterName(target) end
     return result
-end
-
---- Commence le suivi d'un joueur, évènement par évènement, pour counter.watchMs.
----@param src integer
----@return boolean ok
----@return string state  'started' | 'already' | 'full'
-function net.watch(src)
-    return counter:watch(GetGameTimer(), src)
 end
 
 ---@return 'exact'|'estimate'
@@ -758,11 +797,18 @@ function net.mode()
     return mode
 end
 
---- Oublie un joueur parti : volume latent en route, totaux et suivi (son numéro peut être redonné).
+--- Oublie un joueur parti : volume latent en route, totaux et détail (son numéro peut être redonné).
 ---@param src integer
 function net.purgePlayer(src)
     drainAt[src] = nil
     positionCache[src] = nil
+    counter:forget(src)
+end
+
+--- Oublie de nouveau le compteur d'un joueur parti, après son déchargement : ce qui lui a été envoyé pendant la
+--- sauvegarde (hooks de déchargement) avait recréé son entrée.
+---@param src integer
+function net.forgetCounter(src)
     counter:forget(src)
 end
 
