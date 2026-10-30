@@ -69,7 +69,7 @@ de l'eau : [eau.md](eau.md).
 
 | # | Faire | Attendu |
 |---|---|---|
-| 21 | B (nouveau personnage, dotation reçue), soif sous 95 (`/besoins 100 50`), boit une de ses deux Outres d'eau. | Geste de boire, soif remontée ; **une Outre vide** apparaît dans la besace (une fois sur dix : l'avis « Usée, l'outre se fend… » et rien). La fiche de l'Outre d'eau montre « Soif +40 » et l'image de l'outre. |
+| 21 | B (nouveau personnage, dotation reçue), soif sous 95 (`/besoins 100 50`), boit une de ses deux Outres d'eau. | Geste de boire, soif remontée ; **une Outre vide** apparaît dans la besace (une fois sur dix : l'avis « La couture cède : l'outre se fend… » et rien). La fiche de l'Outre d'eau montre « Soif +40 » et l'image de l'outre. |
 | 22 | Console : `stop vava_provisions` ; C crée un personnage. Puis `ensure vava_provisions`. | Accueil de C sans la ligne de la besace ; console : objet `eau` inconnu, dotation reportée. Au retour du module, en quelques secondes : 2 pains et 2 outres dans la besace de C, **sans** nouvel accueil ; `/accueil etat <C>` : « donnée ». |
 
 ## 5. Ce qui reste à confirmer (README de `vava_arrival`)

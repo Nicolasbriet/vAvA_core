@@ -25,8 +25,8 @@ ligne de console correspondante. Un test se cite « eau 11 ».
 | # | Faire | Attendu |
 |---|---|---|
 | 1 | Démarrer le serveur. | Console : `module 'vava_provisions' v1.0.0 prêt`, aucune ligne « recette de l'outre non déclarée », aucun avertissement d'objet ; `vava_arrival` v1.1.0 prêt. |
-| 2 | B crée un personnage. | Besace : 2 Outre d'eau, image de l'outre ; fiche « Soif +40 », description nouvelle (« … l'outre vide vous reste. »). |
-| 3 | B : `/besoins 100 50`, boit une Outre d'eau. | Geste de boire, soif vers 90 ; une **Outre vide** apparaît dans la besace (ou, une fois sur dix, l'avis « Usée, l'outre se fend… » et rien). |
+| 2 | B crée un personnage. | Besace : 2 Outre d'eau, image de l'outre ; fiche « Soif +40 », description nouvelle (« … l'outre vide vous reste, si la couture tient. »). |
+| 3 | B : `/besoins 100 50`, boit une Outre d'eau. | Geste de boire, soif vers 90 ; une **Outre vide** apparaît dans la besace (ou, une fois sur dix, l'avis « La couture cède : l'outre se fend… » et rien). |
 
 ## 2. Au point d'eau
 
@@ -35,7 +35,7 @@ ligne de console correspondante. Un test se cite « eau 11 ».
 | 4 | B marche vers la Fontaine du bourg depuis 200 m. | Le prop apparaît vers 80 m ; à 2 m : invite « [E] Puiser ou boire — Fontaine du bourg » ; elle disparaît en s'éloignant. |
 | 5 | B, une Outre vide : `E`. | Geste de puiser (~2,5 s) ; « Vous remplissez une outre. » ; besace : l'Outre vide est devenue une Outre d'eau. |
 | 6 | B, aucune Outre vide, `/besoins 100 50` : `E`. | Geste de boire ; « Vous buvez quelques gorgées d'eau fraîche. » ; soif vers 70. |
-| 7 | B : `/besoins 100 96`, aucune Outre vide : `E`. | « Vous n'avez pas soif. » ; rien ne change. |
+| 7 | B : `/besoins 100 96`, aucune Outre vide : `E`. | « Vous n'avez pas soif. Pour emporter de l'eau, il vous faut une outre vide. » ; rien ne change. |
 | 8 | B : `E` deux fois en moins de 3 s (soif 50). | La seconde : « Patientez un instant. » ; une seule gorgée comptée. |
 | 9 | B : `/objet outre 7` (deux piles), `E`, puis `E` après 3 s. | 5 remplies, puis 2. |
 
@@ -45,7 +45,7 @@ ligne de console correspondante. Un test se cite « eau 11 ».
 |---|---|---|
 | 10 | A : `/eau points`. | Une ligne par point dans le chat de A seul : « Puits du lavoir (puits_lavoir, puits) : 40 / 40 puisages. », « Fontaine du bourg (fontaine_bourg, fontaine) : sans fond. ». |
 | 11 | A : `/eau reserve puits_lavoir 2` ; B au Puits du lavoir avec 5 Outres vides, soif 99 : `E`, puis `E`. | Chat de A : « Réserve de Puits du lavoir : 2 / 40. » ; Registre (`F10`) → Journal : « Réserve d'eau fixée ». B : 2 remplies, puis « Le seau racle le fond : le puits doit se remplir (environ 1 min). » |
-| 12 | B (même puits à sec, 3 Outres vides) : `/besoins 100 50`, `E`. | « Trop peu d'eau pour remplir une outre ; vous y buvez quelques gorgées. » ; soif vers 70. |
+| 12 | B (même puits à sec, 3 Outres vides) : `/besoins 100 50`, `E`. | « Trop peu d'eau pour remplir une outre, mais assez pour boire quelques gorgées. » ; soif vers 70. |
 | 13 | Attendre 1 min, `E` (soif 99). | Une outre remplie. |
 | 14 | **(2 joueurs)** A : `/eau reserve puits_lavoir 1` ; A et B au puits, chacun une Outre vide, soif 99 ; appuyer sur `E` au même moment. | Un seul « Vous remplissez une outre. » ; l'autre : « Le seau racle le fond… ». |
 | 15 | **(2 joueurs)** B puise devant A. | A voit le geste de B ; ni notification ni objet chez A. |
@@ -55,8 +55,8 @@ ligne de console correspondante. Un test se cite « eau 11 ».
 | # | Faire | Attendu |
 |---|---|---|
 | 16 | B charge sa besace près de 25 kg avec 5 Outres vides : `E`. | « Votre besace serait trop lourde. » ; les outres restent vides ; `/eau points` : réserve inchangée. |
-| 17 | B, besace pleine sauf la place de ses Outres d'eau (pile de 2), boit une Outre d'eau. | « Votre besace est pleine : vous abandonnez l'outre vide. » ; soif remontée. |
-| 18 | `tearChance = 1` dans la config, `restart vava_provisions` ; B boit une Outre d'eau. Remettre `0.1`. | « Usée, l'outre se fend… » ; aucune Outre vide. |
+| 17 | B, besace pleine sauf la place de ses Outres d'eau (pile de 2), boit une Outre d'eau. | « Votre besace est pleine : l'outre vide est perdue. » ; soif remontée. |
+| 18 | `tearChance = 1` dans la config, `restart vava_provisions` ; B boit une Outre d'eau. Remettre `0.1`. | « La couture cède : l'outre se fend… » ; aucune Outre vide. |
 | 19 | B, 1 Cuir tanné (`/objet cuir 1`) à la Tannerie du bourg : recette « Outre ». | 2 Outres vides (palier noté) ; XP de Tannerie. |
 
 ## 5. À terre, Codex, réseau, coût

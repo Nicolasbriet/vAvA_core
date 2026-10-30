@@ -17,7 +17,7 @@ VavaProvisions.config = {
     -- console). Image : nui://vava_provisions/web/items/<nom>.svg, ajoutée à la déclaration. La définition de `eau` est
     -- celle de vava_arrival 1.0.0 (taille, pile, poids, soif) : les piles déjà en jeu se relisent telles quelles.
     items = {
-        eau = { label = 'Outre d\'eau', description = 'De l\'eau fraîche tirée du puits. Une fois bue, l\'outre vide vous reste.',
+        eau = { label = 'Outre d\'eau', description = 'De l\'eau fraîche et claire. Une fois bue, l\'outre vide vous reste, si la couture tient.',
             width = 1, height = 2, weight = 700, stack = 5, category = 'boisson', effects = { thirst = 40 } },
         outre = { label = 'Outre vide', description = 'Cuir cousu et poissé. Elle se remplit à un puits, une fontaine ou une source.',
             width = 1, height = 2, weight = 150, stack = 5, category = 'divers' },
@@ -112,16 +112,17 @@ VavaProvisions.config = {
         filledOne = 'Vous remplissez une outre.',
         filledMany = 'Vous remplissez %d outres.',
         drank = 'Vous buvez quelques gorgées d\'eau fraîche.',
-        drankDry = 'Trop peu d\'eau pour remplir une outre ; vous y buvez quelques gorgées.',
-        notThirsty = 'Vous n\'avez pas soif.',
+        drankDry = 'Trop peu d\'eau pour remplir une outre, mais assez pour boire quelques gorgées.',
+        -- rendu seulement sans outre vide en besace (rules.decide, ligne 4) : la seconde phrase guide le nouveau venu
+        notThirsty = 'Vous n\'avez pas soif. Pour emporter de l\'eau, il vous faut une outre vide.',
         noContainer = 'Il vous faut une outre vide pour emporter de l\'eau.',
         noSpace = 'Votre besace est pleine.',
         tooHeavy = 'Votre besace serait trop lourde.',
         wait = 'Patientez un instant.',
         tooFar = 'Approchez-vous davantage.',
         unavailable = 'Impossible pour l\'instant : réessayez dans un moment.',
-        torn = 'Usée, l\'outre se fend tandis que vous buvez : il en faudra une neuve, de la main d\'un tanneur.',
-        lost = 'Votre besace est pleine : vous abandonnez l\'outre vide.',
+        torn = 'La couture cède : l\'outre se fend entre vos mains. Il vous en faudra une neuve, de la main d\'un tanneur.',
+        lost = 'Votre besace est pleine : l\'outre vide est perdue.',
         prompt = {
             both = 'Puiser ou boire',   -- sorte où l'on peut boire
             fill = 'Puiser',            -- sorte où l'on ne boit pas

@@ -1,6 +1,6 @@
 # vava_provisions — les vivres du royaume
 
-L'eau d'Eldoria ne coûte rien, mais il faut aller la chercher, la porter et garder de quoi la contenir. Une **outre
+L'eau d'Eldoria est à tous, mais il faut aller la chercher, la porter et garder de quoi la contenir. Une **outre
 vide** se remplit à un **puits**, une **fontaine** ou une **source** ; on y boit aussi quelques gorgées quand on a soif.
 Boire une outre d'eau rend l'outre vide, qui finit par se fendre : une outre neuve se demande à un tanneur (un cuir
 donne deux outres). Un puits ou une source se vide quand on y puise trop, et se remplit avec le temps ; la fontaine du
@@ -58,7 +58,8 @@ Le serveur choisit (`rules.decide`), dans cet ordre :
 2. sinon, la sorte permet de boire, la soif est lue (`vava_needs`) et sous 95 → boire quelques gorgées (avec
    « Trop peu d'eau pour remplir une outre… » si l'on avait des outres vides) ;
 3. sinon, des outres vides → « à sec » et l'attente en minutes ;
-4. sinon, la soif est lue → « Vous n'avez pas soif. » ;
+4. sinon, la soif est lue → « Vous n'avez pas soif. Pour emporter de l'eau, il vous faut une outre vide. » (on
+   n'arrive ici que sans outre vide) ;
 5. sinon → « Il vous faut une outre vide pour emporter de l'eau. ».
 
 Avant d'agir, le hook `vava_provisions:drawing` (annulable) laisse un autre module refuser (source empoisonnée, puits

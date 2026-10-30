@@ -36,7 +36,8 @@ lui, celles du jeu), `vava_admin` (droit `give`, journal du Registre ; sans lui,
 Ce que la dotation **n'est pas** : ni vêtements (la tenue est celle choisie à la création, `vava_appearance`), ni
 besace en objet (la besace **est** l'inventaire du personnage), ni toit, ni outil. Deux pains et deux outres
 repoussent la faim d'environ 2 h 50 et la soif d'environ 2 h 25 chez un personnage qui part de 100 : la première soirée, pas la
-première semaine.
+première semaine. Depuis 1.1.0, chaque outre bue rend une Outre vide (`vava_provisions`), qui se remplit aux puits, aux
+fontaines et aux sources : l'eau elle-même n'est plus à chercher auprès des autres, le pain et les outres neuves si.
 
 ## L'arrivée, pas à pas
 

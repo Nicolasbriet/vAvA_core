@@ -105,7 +105,7 @@
       'Haches, pioches, faucilles et cannes se tiennent en main et s’usent. Un artisan, à sa station, sait les réparer.',
       '[[O]] montre les zones de récolte et leur état. Une terre épuisée rapporte peu : laissez-la souffler, allez plus loin.',
       'Les champs communaux sont à tous : on y sème, on y arrose, et l’on porte une part de la récolte au grenier.',
-      'Le pain et l’eau de votre arrivée tiennent une soirée. Pour la suite, trouvez qui cultive, pêche ou cuisine.',
+      'Le pain de votre arrivée tient une soirée : pour la suite, trouvez qui cultive, pêche ou cuisine. Vos outres vides se remplissent aux puits et aux fontaines.',
       '[[G]] près d’une personne à terre : vous l’aidez à se relever. Personne ne se relève seul.',
       '/date donne l’heure, la saison et le ciel. En hiver, une nuit peut geler les champs : couvrez-les à temps.',
       'Un objet dit d’où il vient : sa qualité, sa provenance, parfois le poinçon de son artisan. Demandez qui l’a fait.',

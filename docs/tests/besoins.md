@@ -81,7 +81,7 @@ comble est à 95 ou plus, ou pendant les 3 s du geste précédent.
 | 4 | `/besoins 95 50` puis la miche ; `/besoins 94 50` puis la miche. | À 95 : refusée (« Vous n'avez plus faim. »). À 94 : mangée, faim 100 (plafonnée), une miche de moins. |
 | 5 | `/besoins 50 50` ; clic droit sur la miche → Utiliser ; marcher pendant le geste. | Faim 85 aussitôt (l'anneau remonte), une miche de moins ; geste de manger pendant 3 s sans empêcher la marche. |
 | 6 | Dans les 3 s, double-clic sur une autre miche ; puis de nouveau après 3 s. | D'abord « Vous n'avez pas encore fini. », miche gardée ; ensuite mangée : faim 100, et non 120. |
-| 7 | Outre d'eau. | Geste de boire ; soif vers 90 (50 + 40, moins la baisse écoulée). Une **Outre vide** revient dans la besace (`vava_provisions`), ou, une fois sur dix, l'avis « Usée, l'outre se fend… » et rien. |
+| 7 | Outre d'eau. | Geste de boire ; soif vers 90 (50 + 40, moins la baisse écoulée). Une **Outre vide** revient dans la besace (`vava_provisions`), ou, une fois sur dix, l'avis « La couture cède : l'outre se fend… » et rien. |
 | 8 | `/besoins 100 60` ; pomme. | Acceptée (la soif en profite) : soif 64, faim 100 ; geste de manger (catégorie nourriture). |
 | 9 | Chope de bière. | Geste de boire ; soif vers 89 (64 + 25), faim reste 100 (plafond). |
 | 10 | `/besoins 40 100` ; ragoût de lièvre, puis une carotte (3 s plus tard). | Faim 80 puis 88 ; geste de manger. |
