@@ -2,6 +2,9 @@
     client/players/spawn.lua
     Rôle : exécution des ordres d'apparition reçus du serveur (modèle, position) puis confirmation, et mise en
            attente (écran noir, joueur figé) tant qu'aucun personnage n'est chargé. Remplace spawnmanager.
+    Écran de chargement (0.13.0) : à la première mise en attente, laissé à la ressource spawn.loadingScreen si elle
+    tourne (elle le ferme quand la sélection est affichée, sans écran noir), fermé par le core au plus tard après
+    maxHoldMs ; toujours fermé à l'apparition.
     Aucune boucle permanente : les seules attentes sont bornées et ne durent que le temps d'une apparition.
     Dépendances : shared/init.lua, config/shared.lua, shared/core/logger.lua, shared/core/hooks.lua, client/core/rpc.lua
 ]]
@@ -9,6 +12,7 @@
 local type, tostring = type, tostring
 local HUGE = math.huge
 local CreateThread, Wait, GetGameTimer, RegisterNetEvent = CreateThread, Wait, GetGameTimer, RegisterNetEvent
+local SetTimeout, GetResourceState = SetTimeout, GetResourceState
 local PlayerId, PlayerPedId, NetworkIsPlayerActive = PlayerId, PlayerPedId, NetworkIsPlayerActive
 local SetPlayerControl, SetEntityVisible, SetEntityCollision = SetPlayerControl, SetEntityVisible, SetEntityCollision
 local FreezeEntityPosition, SetPlayerInvincible = FreezeEntityPosition, SetPlayerInvincible
@@ -37,6 +41,8 @@ vAvA.spawn = spawn
 local token = 0
 -- vrai pendant l'attente de sélection (aucun personnage chargé, aucune apparition en cours)
 local holding = false
+-- vrai dès la première mise en attente : l'écran de chargement n'est laissé à sa ressource qu'à ce moment-là
+local loadingScreenReleased = false
 
 --- Vrai si le joueur attend de choisir un personnage (une interface démarrée en retard peut s'ouvrir).
 ---@return boolean
@@ -84,6 +90,24 @@ local function loadModel(model)
     return hash
 end
 
+--- Écran de chargement (NUI) à la mise en attente. La première fois, si la ressource de spawn.loadingScreen tourne,
+--- elle le ferme elle-même quand la sélection est affichée (le fondu au noir se fait sous l'écran : aucun noir vu) ;
+--- le core le ferme au plus tard maxHoldMs plus tard (sans effet s'il est déjà fermé). Sinon, fermé aussitôt.
+local function releaseLoadingScreen()
+    local first = not loadingScreenReleased
+    loadingScreenReleased = true
+    local screen = cfg.loadingScreen
+    local resource, maxHoldMs = screen and screen.resource, screen and screen.maxHoldMs
+    if first and type(resource) == 'string' and resource ~= '' and type(maxHoldMs) == 'number' and maxHoldMs > 0 then
+        local state = GetResourceState(resource)
+        if state == 'started' or state == 'starting' then
+            SetTimeout(maxHoldMs, function() ShutdownLoadingScreenNui() end)
+            return
+        end
+    end
+    ShutdownLoadingScreenNui()
+end
+
 --- Écran noir et joueur figé : état de l'écran de sélection (aucun personnage chargé).
 --- Le hook core:character:selection permet à une interface de prendre la main (caméra, écran de sélection).
 local function hold()
@@ -92,7 +116,7 @@ local function hold()
     DoScreenFadeOut(cfg.fadeMs)
     setFrozen(true, false)
     ShutdownLoadingScreen()
-    ShutdownLoadingScreenNui()
+    releaseLoadingScreen()
     hooks.runAfter(HOOK_SELECTION, {})
 end
 
@@ -140,6 +164,7 @@ local function perform(order)
 
     ShutdownLoadingScreen()
     ShutdownLoadingScreenNui()
+    loadingScreenReleased = true
     setFrozen(false, false)
     DoScreenFadeIn(cfg.fadeMs)
     rpc.emit(RPC_SPAWNED)
