@@ -2,22 +2,26 @@
     server/core/netcommand.lua
     Rôle : commande du Conseil `/vava_reseau` (droit `tools` de vava_admin, repli ACE) : envois de la dernière minute,
            les plus lourds, ceux d'une ressource, ou ce que reçoit un joueur (suivi évènement par évènement, inscrit au
-           journal du Registre) ; sortie dans le chat du seul membre, ou dans la console. Commande console
-           `vava_reseau_essai` : mesure en jeu le débit réel du latent, l'ordre d'arrivée et l'envoi de proximité.
-           Aucun RPC : rien n'entre par le réseau.
+           journal du Registre), zones déclarées et abonnements, ou zones suivies par un joueur (inscrit au journal) ;
+           sortie dans le chat du seul membre, ou dans la console. Commande console `vava_reseau_essai` : mesure en
+           jeu le débit réel du latent, l'ordre d'arrivée et l'envoi de proximité. Aucun RPC : rien n'entre par le
+           réseau.
     Dépendances : shared/init.lua, config/server.lua, shared/lib/string.lua, shared/core/logger.lua,
-                  server/core/netstats.lua, server/core/net.lua, server/core/commands.lua ; vAvA.characters lu à
-                  l'appel. Seule ressource extérieure lue : vava_admin (droit, journal), chaque appel isolé par pcall.
+                  server/core/netstats.lua, server/core/net.lua, server/core/zones.lua, server/core/commands.lua ;
+                  vAvA.characters lu à l'appel. Seule ressource extérieure lue : vava_admin (droit, journal), chaque
+                  appel isolé par pcall.
 ]]
 
 local tonumber, tostring, type, pcall, print = tonumber, tostring, type, pcall, print
 local tointeger, huge, max, min = math.tointeger, math.huge, math.max, math.min
-local format, rep, match = string.format, string.rep, string.match
+local format, rep, match, gsub = string.format, string.rep, string.match, string.gsub
+local concat = table.concat
 local RegisterCommand, GetResourceState, IsPlayerAceAllowed, DoesPlayerExist, GetGameTimer =
     RegisterCommand, GetResourceState, IsPlayerAceAllowed, DoesPlayerExist, GetGameTimer
 
 local EVENTS = vAvA.EVENTS
 local net = vAvA.net
+local zones = vAvA.zones
 local formatBytes = vAvA.netstats.formatBytes
 local logger = vAvA.logger
 local cfg = vAvA.config.server.net
@@ -34,6 +38,10 @@ local RESOURCE_MAX = 48
 local RESOURCE_PATTERN = '^[%w_%-%.]+$'
 local NUMBER_PATTERN = '^%d+$'
 local NUMBER_MAX_DIGITS = 6
+-- noms de zones affichés pour un joueur, au plus
+local ZONE_NAMES_MAX = 20
+local JOURNAL_WATCH = 'Réseau d\'un joueur suivi'
+local JOURNAL_ZONES = 'Zones d\'un joueur consultées'
 -- charge de l'essai : n Ko en tout pour le message (en-tête et nom de l'évènement compris)
 local PROBE_OVERHEAD = 64
 
@@ -111,16 +119,17 @@ local function playerLabel(target)
     return info.firstName .. ' ' .. info.lastName
 end
 
---- Suivi d'un joueur inscrit au journal du Registre (console : journal du serveur).
+--- Consultation d'un joueur inscrite au journal du Registre (console : journal du serveur).
 ---@param src integer
 ---@param target integer
-local function journal(src, target)
+---@param label string  libellé du journal
+local function journal(src, target, label)
     local admin = commandCfg.adminResource
     if src ~= CONSOLE and GetResourceState(admin) == 'started' then
-        local called, ok = pcall(function() return exports[admin]:log(src, 'Réseau d\'un joueur suivi', { joueur = target }) end)
+        local called, ok = pcall(function() return exports[admin]:log(src, label, { joueur = target }) end)
         if called and ok == true then return end
     end
-    log.info('réseau du joueur %d consulté (par %d)', target, src)
+    log.info('%s : joueur %d (par %d)', label, target, src)
 end
 
 ---@param src integer
@@ -128,7 +137,7 @@ end
 local function playerView(src, target)
     local stats = net.stats({ limit = LINES, target = target })
     if not stats then return end
-    journal(src, target)
+    journal(src, target, JOURNAL_WATCH)
     say(src, format(texts.player, target, playerLabel(target), stats.total.messages, formatBytes(stats.total.bytes)))
     if stats.watched then
         if #stats.events == 0 then say(src, texts.empty) else sayEvents(src, stats.events) end
@@ -141,6 +150,43 @@ local function playerView(src, target)
         end
     end
     say(src, texts.footer)
+end
+
+--- Durée en millisecondes à deux décimales, virgule française (« 0,08 ») ; aucun passage encore : texte dédié.
+---@param ms number|nil
+---@return string
+local function formatMs(ms)
+    if type(ms) ~= 'number' then return texts.zonesNoPass end
+    return (gsub(format('%.2f', ms), '%.', ','))
+end
+
+--- Zones déclarées, par module, abonnements et durée des passages.
+---@param src integer
+local function zonesOverview(src)
+    local stats = zones.stats()
+    if stats.zones == 0 then return say(src, texts.zonesNone) end
+    local parts = {}
+    for i = 1, #stats.owners do
+        local entry = stats.owners[i]
+        parts[i] = entry.owner .. ' ' .. entry.count
+    end
+    say(src, format(texts.zones, stats.zones, concat(parts, ', '), stats.subscriptions, formatMs(stats.lastPassMs),
+        formatMs(stats.maxPassMs)))
+end
+
+--- Zones suivies par un joueur (inscrit au journal du Registre : cela dit à peu près où il se trouve).
+---@param src integer
+---@param target integer
+local function zonesOfPlayer(src, target)
+    local names = zones.ofPlayer(target)
+    journal(src, target, JOURNAL_ZONES)
+    local suffix = ''
+    if #names > 0 then
+        local shown = {}
+        for i = 1, min(#names, ZONE_NAMES_MAX) do shown[i] = names[i] end
+        suffix = ' : ' .. concat(shown, ', ') .. (#names > ZONE_NAMES_MAX and '…' or '')
+    end
+    say(src, format(texts.zonesPlayer, target, #names, suffix))
 end
 
 ---@param source any
@@ -170,6 +216,13 @@ local function onCommand(source, args)
             return say(src, texts.usage)
         end
         return overview(src, resource)
+    end
+    if action == 'zones' then
+        if args[2] == nil then return zonesOverview(src) end
+        local target = readNumber(args[2])
+        if not target then return say(src, texts.usage) end
+        if target <= 0 or not DoesPlayerExist(target) then return say(src, format(texts.unknownPlayer, args[2])) end
+        return zonesOfPlayer(src, target)
     end
     say(src, texts.usage)
 end
@@ -242,6 +295,8 @@ function netcommand.start()
             { id = 'joueur', label = 'Ce que reçoit un joueur', args = { { name = 'joueur', type = 'player' } } },
             { id = 'ressource', label = 'Envois d\'un module',
                 args = { { name = 'ressource', type = 'text', hint = 'nom de la ressource' } } },
+            { id = 'zones', label = 'Zones et abonnements',
+                args = { { name = 'joueur', type = 'player', optional = true } } },
         },
     })
     if not ok then log.warn('%s non déclarée au registre des commandes : %s', commandCfg.name, tostring(err)) end

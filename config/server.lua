@@ -158,7 +158,12 @@ vAvA.config.server = {
                 watchStarted = 'Détail par évènement suivi pendant %d min : relancez la commande dans une minute.',
                 watchFull = 'Déjà %d joueurs suivis : détail indisponible pour celui-ci.',
                 unknownPlayer = 'Aucun joueur n° %s en jeu.',
-                usage = 'usage : /vava_reseau | joueur <n°> | ressource <nom>',
+                usage = 'usage : /vava_reseau | joueur <n°> | ressource <nom> | zones [n°]',
+                -- abonnements de zone (0.11.0) : durées à deux décimales, virgule française
+                zones = 'Zones : %d (%s) ; %d abonnements ; dernier passage %s ms, au plus %s ms sur la minute.',
+                zonesNone = 'Aucune zone déclarée.',
+                zonesPlayer = 'Joueur %d : %d zone(s) suivie(s)%s',
+                zonesNoPass = '–',  -- aucun passage encore mesuré
                 footer = 'Non comptés : GlobalState, state bags et envois directs des modules.',
                 probeUsage = 'usage : vava_reseau_essai <n° du joueur> <Ko 1-256> [rayon]',
                 probeSent = 'essai envoyé au joueur %d : %d Ko en latent, %d joueur(s) à %g m',
