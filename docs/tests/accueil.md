@@ -16,9 +16,9 @@ console correspondante.
    `vava_dev_characters` démarré ; réservés au Souverain ou à l'ACE `vava.dev` (B : `add_ace identifier.license:<licence>
    vava.dev allow` en console).
 4. **Consoles** : celle du serveur et celle du client (`F8`) ouvertes.
-5. **Chapitre d'essai** : pour voir le Codex s'ouvrir à un chapitre **avant T-023**, mettre provisoirement
+5. **Chapitre d'essai** : pour voir le Codex s'ouvrir à un chapitre de commandes, mettre provisoirement
    `codex.chapter = 'vava_inventory'` dans `modules/vava_arrival/config.lua`, puis `restart vava_arrival` (remis au
-   test 20).
+   test 20 ; depuis T-023, `premiers_pas` existe : le défaut ouvre l'onglet Lecture).
 6. **Base** : un client SQL ouvert sur la base du serveur, pour les tables `vava_arrival` et `vava_arrival_log`.
 
 ## 1. Arrivée d'un nouveau personnage
@@ -59,7 +59,7 @@ console correspondante.
 | 17 | `resmon` client de B au repos, puis pendant les 4 s d'attente de l'accueil. | `vava_arrival` à 0,00 ms au repos ; au plus 0,01 ms pendant l'attente. |
 | 18 | Console du serveur : `accueil etat <n° de B>`, puis `accueil redoter <n° de B>`. | La ligne d'état s'écrit dans la console ; la dotation part, `vava_arrival_log` : `admin_regive` avec `actor_account_id` vide. |
 | 19 | B en jeu : `restart vava_arrival`. | Aucun accueil, aucun objet ; `/accueil etat <B>` fonctionne aussitôt après `prêt`. |
-| 20 | Remettre `codex.chapter = 'premiers_pas'`, `restart vava_arrival`, créer un personnage. | Le Codex s'ouvre à son index (le chapitre n'existe pas avant T-023), sans erreur en F8. |
+| 20 | Remettre `codex.chapter = 'premiers_pas'`, `restart vava_arrival`, créer un personnage. | Le Codex s'ouvre sur l'onglet Lecture, chapitre « Premiers pas », page « Vivre à Eldoria » (`vava_codex` 1.5.0, T-023), sans erreur en F8. |
 
 ## 5. Ce qui reste à confirmer (README de `vava_arrival`)
 

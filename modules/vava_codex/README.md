@@ -2,7 +2,8 @@
 
 Toutes les commandes et toutes les touches du serveur dans un livre ouvert : classées par chapitre (un par module),
 cherchées, composées par un formulaire selon le type de chaque argument, lancées. Signets, dernières pages et réglage
-« rester ouvert » par personnage. Onglet des touches, avec la touche réellement liée par le joueur.
+« rester ouvert » par personnage. Onglet des touches, avec la touche réellement liée par le joueur. Onglet de lecture
+(1.5.0) : le chapitre « Premiers pas » et le guide des métiers, écrits côté serveur.
 
 Le Codex ne contient aucune commande : il lit le registre `core:commands` du core, que chaque module remplit depuis
 sa config (`server/commands.lua`, voir `docs/api.md` → « Registre des commandes »). Le serveur décide de ce que chaque
@@ -46,11 +47,76 @@ Le chapitre part dans le message `open` de la page (`focus`, absent pour `F1` et
 sur le réseau. Un chapitre inconnu laisse le livre à son index, sans message. Aujourd'hui l'identifiant d'un chapitre
 est le nom du module qui déclare ses commandes : `openAt('vava_inventory')` ouvre le chapitre Inventaire.
 
-**Contrat pour T-023** (chapitre « Premiers pas ») : `vava_arrival` ouvre le Codex à son `codex.chapter`
-(`premiers_pas`) à la première venue d'un personnage. T-023 crée un chapitre d'identifiant `premiers_pas` dans
-`Model.state.chapters` ; s'il range ses pages de lecture ailleurs (onglet propre), il étend la seule fonction
-`applyFocus` de `web/js/app.js` pour y trouver `premiers_pas`. L'export `openAt` et le champ `focus` du message `open`
-ne changent pas.
+Depuis 1.5.0, l'identifiant est résolu dans cet ordre : page de lecture (onglet Lecture, cette page), chapitre de
+lecture (onglet Lecture, première page du chapitre), chapitre de commandes. `vava_arrival` ouvre le Codex à son
+`codex.chapter` (`premiers_pas`) à la première venue d'un personnage : le livre s'ouvre sur Lecture, chapitre
+« Premiers pas », page « Vivre à Eldoria ». L'export `openAt` et le champ `focus` du message `open` n'ont pas changé.
+
+## Pages de lecture (1.5.0)
+
+Un onglet **Lecture**, premier des trois (`F1` ouvre toujours le livre sur Commandes, comme avant) : un vrai livre
+pour le nouveau venu, en trois chapitres et douze pages. Chaque page renvoie vers les autres pages et vers les gens
+d'Eldoria ; les touches qu'elle cite sont celles que le joueur a réellement liées.
+
+| Chapitre | Pages (identifiant, module requis) |
+| --- | --- |
+| Premiers pas (`premiers_pas`) | Vivre à Eldoria (`bienvenue`, aucun), Se parler (`se_parler`, `vava_chat`), Troquer et partager (`troquer`, `vava_inventory`), La faim et la soif (`faim_soif`, `vava_needs`), À terre et soins (`a_terre`, `vava_health`) |
+| Les métiers (`metiers`) | Apprendre un métier (`apprendre`, `vava_skills`), La récolte (`recolte`, `vava_gathering`), L'artisanat (`artisanat`, `vava_crafting`), L'agriculture (`agriculture`, `vava_farming`) |
+| Le royaume (`royaume`) | La magie (`magie`, `vava_magic`), Le Conseil (`conseil`, `vava_admin`), Siéger au Conseil (`conseil_sieger`, `vava_admin`, **réservée au Conseil**) |
+
+**Où vit le texte.** Dans `content/*.lua` (`chapters.lua` : la graine et les chapitres ; `premiers_pas.lua`,
+`metiers.lua`, `royaume.lua` : les pages), chargés comme `server_scripts` : jamais téléchargés par les clients, ni pris
+dans `config.lua` (partagé avec le client). Au démarrage, chaque page est analysée et validée (`shared/pages.lua`) ;
+une page fautive est écrite en console (`page « … » refusée : … (ligne N)`) et écartée seule, les autres restent. Un
+lien vers une page refusée fait refuser la page qui le porte.
+
+**Format d'une page** (table plate) :
+
+| Champ | Règle |
+| --- | --- |
+| `id` | minuscules, chiffres, `_`, commence par une lettre, 32 octets au plus, jamais `vava…` ; unique parmi pages et chapitres |
+| `chapter`, `order` | chapitre déclaré dans `chapters.lua` ; rang de 0 à 999 (tri, puis `id`) |
+| `title`, `summary` | 48 et 120 octets au plus, sans `<`, `>` ni caractère de contrôle ; le résumé s'affiche sous le titre et se cherche |
+| `audience`, `permission` | `'player'` (tous) ou `'admin'` (Conseil) ; droit `vava_admin` facultatif, seulement avec `'admin'` |
+| `requires` | `''` ou un nom de ressource : la page n'apparaît que si elle est démarrée |
+| `body` | texte entre `[==[` et `]==]` (les `]]` des jetons n'y ferment rien), 6 000 octets au plus |
+
+Le corps : paragraphes séparés par une ligne vide (les lignes d'un paragraphe se joignent) ; `## Intertitre` ;
+`- élément` et `1. élément` (deux espaces en tête de ligne continuent l'élément) ; `> note` (encadré) ; jetons
+`[[F1]]` (touche écrite telle quelle), `[[touche:vava_inventory]]` (touche liée par le joueur à cette entrée du
+registre `core:commands`), `[[commande:me]]`, `[[commande:metiers voir]]` (lien vers la ligne de l'onglet Commandes),
+`[[page:troquer]]`, `[[page:troquer|le troc]]` ; `*italique*`. Interdits : `<`, `>` ailleurs qu'en tête de ligne, les
+caractères de contrôle (tabulation comprise). Bornes : 40 blocs, 12 éléments par liste, 40 jetons, 1 200 octets par
+paragraphe ou note, 400 par élément, 80 par intertitre ; la réponse envoyée pèse 7,5 Ko au plus.
+
+**Une règle change, la page se relit.** Chaque page dit le jeu tel qu'il est codé. Au-dessus de chaque page, un
+commentaire liste ses **sources** (modules et réglages) : quand l'une change, relire la page. Les nombres réglables en
+config (durées, distances, quantités) ne sont jamais cités ; seuls les nombres fixés par le jeu le sont (niveaux 0 à
+100, paliers des rangs). Les touches et commandes sont citées par leur nom au registre : `tests/spec/codex_pages_spec.lua`
+échoue si l'une est renommée, et la commande de console `vava_codex_pages` liste celles qui manquent au registre du
+serveur en marche.
+
+**Réseau.** L'index des pages visibles (titre, résumé, empreinte : ~1,6 Ko pour un joueur avec la graine provisoire,
+2,3 Ko visés avec les textes définitifs) part avec le contenu du Codex, dans la même empreinte : il ne repart que s'il
+change (page modifiée, module arrêté, rang changé). Le texte d'une page part à la demande, quand le joueur l'ouvre
+(RPC `vava_codex:page`, au seul joueur, `rateLimits.page` : 6 d'affilée puis 1 par seconde), et la page le garde tant
+que son empreinte ne change pas : un joueur ne paie que ce qu'il lit. La première ouverture d'une session peut dépasser
+8 Ko et partir en latent (préavis du core, rien à faire). Aucun évènement, aucun GlobalState, aucun state bag.
+
+**Droits.** Index filtré à chaque ouverture ; le RPC revérifie à chaque appel (module requis démarré ; page du Conseil :
+membre, et son droit s'il y en a un) et répond `unknown_page` pour une page absente, refusée, réservée ou arrêtée :
+rien ne trahit l'existence d'une page réservée. `reading.enabled = false` ferme l'onglet et le RPC (`disabled`).
+
+| Réglage | Défaut | Rôle |
+| --- | --- | --- |
+| `reading.enabled` | `true` | onglet Lecture, index et RPC `page` |
+| `reading.errors` | textes français | texte de chaque code d'erreur du format (console ; l'Atelier plus tard) |
+| `rateLimits.page` | `{ capacity = 6, refillPerSecond = 1 }` | RPC `vava_codex:page`, par joueur |
+| `pagesCommand` | `vava_codex_pages` | commande de console : bilan des pages |
+| `messages.pages` | textes | lignes de la console (chargement, refus, bilan, introuvables) |
+
+Plus tard (T-101 et suivantes), l'Atelier éditera chapitres et pages : `content/*.lua` sera la graine importée, la
+validation et les codes d'erreur sont déjà ceux de `shared/pages.lua` et `reading.errors`.
 
 ## Prérequis
 
@@ -70,6 +136,9 @@ retoucher les conseils de `modules/vava_loading/web/js/strings.js` et `messages.
 | `server/catalog.lua` | entrées visibles d'un joueur, chapitres, non décrites, valeurs d'un argument |
 | `shared/prefs.lua` | logique pure : préférences ramenées aux maximums de la config (testée : `tests/spec/codex_prefs_spec.lua`) |
 | `shared/fingerprint.lua` | logique pure : empreinte d'une valeur (version du contenu et des préférences), réponse à l'ouverture (testée : `tests/spec/codex_fingerprint_spec.lua`) |
+| `shared/pages.lua` | logique pure : analyse d'un corps de page en blocs, validation des chapitres et des pages, construction (liens, tri, empreinte, poids), références citées (testée : `tests/spec/codex_pages_spec.lua`) |
+| `content/*.lua` | pages de lecture : graine et chapitres (`chapters.lua`), pages de chaque chapitre ; serveur seul |
+| `server/reading.lua` | chargement des pages, index visible d'un joueur, page demandée (droits revérifiés), commande `vava_codex_pages` (testé : `tests/spec/codex_reading_spec.lua`) |
 | `server/prefs.lua` | champ de personnage : signets, dernières pages, réglage |
 | `server/main.lua` | déclaration du module, RPC |
 | `client/keys.lua` | touche réellement liée par le joueur (lue dans le jeu) |
@@ -110,6 +179,23 @@ retoucher les conseils de `modules/vava_loading/web/js/strings.js` et `messages.
     ne renvoie que deux versions (compteur réseau ou `netgraph`). Donner un rang (`vava_conseil <compte> senechal`), ou
     `restart` d'un module qui déclare des commandes : à l'ouverture suivante, le contenu change aussitôt.
 13. `openAt` (1.4.0) : avec `vava_arrival`, `codex.chapter = 'vava_inventory'` et un nouveau personnage, le livre
-    s'ouvre seul au chapitre Inventaire, clavier et souris pris, `Échap` le ferme. Avec un chapitre inconnu
-    (`premiers_pas` avant T-023) : le livre s'ouvre à son index, sans erreur en F8. `F1` ensuite : le livre s'ouvre
-    là où il a été laissé, comme d'habitude (aucun chapitre imposé). Détail : `docs/tests/accueil.md`.
+    s'ouvre seul au chapitre Inventaire, clavier et souris pris, `Échap` le ferme. Avec un chapitre inconnu : le livre
+    s'ouvre à son index, sans erreur en F8. `F1` ensuite : le livre s'ouvre là où il a été laissé, comme d'habitude
+    (aucun chapitre imposé). Détail : `docs/tests/accueil.md`.
+14. Pages de lecture (1.5.0) : console `pages de lecture : 12 chargées, 0 refusées` ; onglet Lecture en trois chapitres
+    (onze pages en simple joueur, douze au Conseil avec le sceau sur « Siéger au Conseil ») ; liens, cabochons des
+    touches du joueur, commandes qui ouvrent leur ligne ; nouveau personnage : le livre s'ouvre sur « Vivre à
+    Eldoria ». Procédure complète : `docs/tests/codex.md` § 16.
+
+Hors jeu : `tests/spec/codex_prefs_spec.lua`, `codex_fingerprint_spec.lua`, `codex_pages_spec.lua` (format, bornes,
+graine du dépôt : aucune page refusée, touches et commandes citées connues, aucun mot moderne, poids réseau),
+`codex_reading_spec.lua` (chargement, index selon les droits, page demandée, console) ; essais de la page :
+`web/dev/essais.js` (node).
+
+## À vérifier en jeu
+
+- Lisibilité d'une page longue dans CEF (défilement de la page de droite, police, liens au survol).
+- Cabochon d'une touche de souris (`[[touche:vava_magic_viser]]`) : nom montré par `GetControlInstructionalButton`
+  (sinon `keyDisplay`).
+- Première ouverture d'un joueur en latent (≈ 10 Ko avec les textes définitifs) : aucune attente visible à l'arrivée
+  d'un nouveau venu.

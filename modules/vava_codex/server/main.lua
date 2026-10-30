@@ -2,7 +2,9 @@
     vava_codex/server/main.lua
     Rôle : déclaration du module auprès du core (champ des préférences, commande du Codex au registre) et RPC du
            client (schéma strict, débit limité) : ouverture (contenu et préférences renvoyés seulement s'ils ont changé
-           depuis la version que le client dit avoir), valeurs d'un argument, signets, dernières pages, réglage.
+           depuis la version que le client dit avoir ; l'index des pages de lecture y voyage, 1.5.0), valeurs d'un
+           argument, signets, dernières pages, réglage, texte d'une page de lecture (1.5.0) ; chargement des pages et
+           commande de console `vava_codex_pages`.
     Dépendances : tous les fichiers server/ du module, shared/fingerprint.lua, bridge/server.lua
 ]]
 
@@ -16,18 +18,22 @@ local catalog = VavaCodex.catalog
 local answerOpen = VavaCodex.answerOpen
 local prefs = VavaCodex.prefs
 local commands = VavaCodex.commands
+local reading = VavaCodex.reading
 local RPC = VavaCodex.RPC
+local READING = VavaCodex.READING
 
 local NAME = { type = 'string', min = 1, max = VavaCodex.MAX_NAME, pattern = VavaCodex.NAME_PATTERN }
 local ACTION = { type = 'string', min = 0, max = VavaCodex.MAX_ACTION }   -- '' : forme nue
 local INDEX = { type = 'integer', min = 1, max = VavaCodex.MAX_ARGS }
 local BOOL = { type = 'boolean' }
 local VERSION = { type = 'string', min = 0, max = VavaCodex.VERSION_LENGTH, pattern = VavaCodex.VERSION_PATTERN }   -- '' : rien
+local PAGE_ID = { type = 'string', min = 1, max = READING.MAX_ID, pattern = READING.ID_PATTERN }
 local limits = cfg.rateLimits
 
 --- Ouverture : tout ce que le joueur peut voir et ce qui reste à décrire (Conseil), recalculé ici avec ses droits du
 --- moment, et ses préférences. Chacun ne part que si son empreinte diffère de celle que le client a envoyée : une
 --- version inventée ou ancienne ne fait que renvoyer le contenu complet, jamais plus que ce que le joueur peut voir.
+--- L'index des pages de lecture visibles (`reading`, 1.5.0) fait partie du contenu : il entre dans son empreinte.
 ---@param src integer
 ---@param knownVersion string  empreinte du contenu gardé par la page ('' : aucun)
 ---@param knownPrefsVersion string  empreinte des préférences gardées ('' : aucune)
@@ -35,7 +41,10 @@ local function open(src, knownVersion, knownPrefsVersion)
     local current = prefs.get(src)
     if not current then return false, 'no_character' end
     local entries, chapters, staff = catalog.visible(src)
-    local content = { entries = entries, chapters = chapters, staff = staff, undeclared = staff and catalog.undeclared() or {} }
+    local content = {
+        entries = entries, chapters = chapters, staff = staff, undeclared = staff and catalog.undeclared() or {},
+        reading = reading.index(src, staff),
+    }
     local answer = answerOpen(content, current, knownVersion, knownPrefsVersion)
     -- trace de test en jeu (niveau debug du core) : ce qui part réellement à chaque ouverture ; valeurs passées en
     -- arguments, le texte n'est formaté que si le niveau debug est affiché
@@ -76,6 +85,8 @@ local RPCS = {
     { RPC.FAVORITE, { NAME, BOOL }, limits.prefs, favorite },
     { RPC.RECENT, { NAME, ACTION }, limits.prefs, recent },
     { RPC.KEEP_OPEN, { BOOL }, limits.prefs, keepOpen },
+    -- latent laissé à 'auto' : une page pèse au plus READING.MAX_WIRE (7,5 Ko), sous le seuil de 8 Ko
+    { RPC.PAGE, { PAGE_ID }, limits.page, reading.page },
 }
 
 local function setup()
@@ -83,10 +94,13 @@ local function setup()
     if not ok then return false, 'préférences : ' .. tostring(err) end
     ok, err = commands.declare()
     if not ok then return false, 'commandes : ' .. tostring(err) end
+    -- pages de lecture : une page fautive est écartée seule, une erreur imprévue n'empêche pas le Codex de démarrer
+    reading.load()
     for _, def in ipairs(RPCS) do
         ok, err = core.rpc.register(def[1], { args = def[2], rateLimit = def[3] }, def[4])
         if not ok then return false, def[1] .. ' : ' .. tostring(err) end
     end
+    reading.listen()
     return true
 end
 
