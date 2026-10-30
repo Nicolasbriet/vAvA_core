@@ -31,7 +31,9 @@ modules/vava_xxx/
   bridge/server.lua     SEUL point de contact avec le core et les autres modules, chaque appel isolé (pcall)
   server/*.lua          logique, un fichier par responsabilité ; server/main.lua déclare le module et ses RPC
   client/*.lua          affichage et demandes ; client/nui.lua seul à parler à l'interface
-  web/                  interface NUI (HTML/CSS/JS sans framework), devmock.js pour la tester hors jeu
+  web/                  interface NUI (HTML/CSS/JS sans framework) ; polices, textures et ornements communs pris
+                        dans `vava_ui` (`nui://vava_ui/…`, `dependency 'vava_ui'`), jamais recopiés ;
+                        web/dev/devmock.js pour la tester hors jeu, jamais livré (hors des `files`)
   sql/0001_xxx.sql      migrations, jamais modifiées une fois publiées (on ajoute 0002_…)
   README.md             règles (tableau config), installation, dépendances, « À vérifier en jeu »
 ```
