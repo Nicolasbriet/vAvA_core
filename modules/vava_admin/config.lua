@@ -40,6 +40,12 @@ VavaAdmin.config = {
     logRetentionDays = 90,
     pageSize = 50,
 
+    -- Bans relus en jeu (arrivée d'un joueur, démarrage du Registre) quand la base ne répond pas : seconde lecture
+    -- après retryMs ; si elle échoue encore, onError = 'kick' (expulsé, message banCheckUnavailable) ou 'keep'
+    -- (laissé en jeu, noté à la console : à l'arrivée, la lecture de la connexion avait réussi). Au démarrage, un
+    -- joueur que le core n'a pas encore repris est relu jusqu'à sweepAttempts fois, à sweepRetryMs d'écart.
+    banRecheck = { retryMs = 5000, onError = 'kick', sweepAttempts = 6, sweepRetryMs = 5000 },
+
     -- Signalements (/signaler) : un par joueur et par intervalle ; gardés en mémoire jusqu'à leur clôture.
     reportCommand = 'signaler',
     reportCooldownMs = 60000,
@@ -74,8 +80,11 @@ VavaAdmin.config = {
         bannedForever = 'Ban définitif.',
         -- base qui ne répond pas à la vérification des bans : connexion refusée (jamais accordée sans vérification)
         banCheckUnavailable = 'Le registre des bans ne peut être consulté pour l\'instant : réessayez dans une minute.',
-        -- journal (32 caractères au plus) : compte banni pendant son chargement, expulsé à son arrivée en jeu
-        logBanEnforced = 'Banni écarté à son arrivée',
+        -- journal (32 caractères au plus) : compte banni trouvé en jeu (banni pendant son chargement, ou pendant que
+        -- le Registre était absent), expulsé ; moment inscrit dans les détails
+        logBanEnforced = 'Banni écarté par le Registre',
+        whenJoined = 'à son arrivée',
+        whenSwept = 'au démarrage du Registre',
         warned = 'Avertissement du Conseil : %s',
         messageTitle = 'Message du Conseil',
         frozen = 'Le Conseil vous a immobilisé.',

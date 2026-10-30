@@ -6,6 +6,8 @@
     Une connexion acceptée puis abandonnée (FiveM fermé pendant le chargement) libère sa license dès que FXServer
     n'en connaît plus l'identifiant temporaire (relevé lent, actif seulement tant qu'une connexion est en cours).
     Seule la license est conservée (minimisation des données personnelles) : ni IP, ni autre identifiant, ni pseudo.
+    Porte gardée (0.9.1) : tant qu'un module « garde de connexion » (players.connectionGuards : les bans) est démarré
+    sans être prêt, ou en échec, les connexions sont refusées ; absent du serveur ou arrêté, il n'est pas attendu.
     Dépendances : config/server.lua, shared/core/logger.lua, shared/core/hooks.lua, server/core/database.lua,
                   server/core/modules.lua
 ]]
@@ -14,6 +16,7 @@ local tonumber, tostring, type, ipairs, pairs, next, xpcall = tonumber, tostring
 local traceback = debug.traceback
 local GetPlayerIdentifierByType, GetPlayers, DoesPlayerExist, DropPlayer = GetPlayerIdentifierByType, GetPlayers, DoesPlayerExist, DropPlayer
 local GetGameTimer, SetTimeout, Wait, AddEventHandler = GetGameTimer, SetTimeout, Wait, AddEventHandler
+local GetResourceState = GetResourceState
 
 local hooks = vAvA.hooks
 local database = vAvA.database
@@ -40,6 +43,44 @@ local HOOK_DROPPED = 'core:player:dropped'
 
 local accounts = {}
 vAvA.accounts = accounts
+
+-- États FXServer d'une ressource qui ne tourne pas du tout : son module n'est pas attendu à la porte.
+local NOT_RUNNING = { missing = true, uninitialized = true, stopped = true }
+
+--- Verdict de la porte pour un module garde de connexion (logique pure).
+---@param resourceState string|nil  GetResourceState de la ressource
+---@param moduleState string|nil    état du module au core (nil : pas encore déclaré)
+---@return 'open'|'absent'|'closed'
+function accounts.guardVerdict(resourceState, moduleState)
+    if NOT_RUNNING[resourceState] then return 'absent' end
+    if resourceState == 'started' and moduleState == 'ready' then return 'open' end
+    return 'closed'
+end
+local guardVerdict = accounts.guardVerdict
+
+--- Premier garde de connexion qui ferme la porte (démarré sans être prêt, ou en échec), ou nil. Un garde absent est
+--- signalé à la console (sauf `quiet`) : ce qu'il vérifie (les bans) ne l'est plus.
+---@param quiet? boolean
+---@return string|nil name
+---@return string|nil detail  états de la ressource et du module
+function accounts.closedGuard(quiet)
+    local guards = cfg.connectionGuards or {}
+    for i = 1, #guards do
+        local name = guards[i]
+        local resourceState = GetResourceState(name)
+        local info = modules.get(name)
+        local moduleState = info and info.state
+        local verdict = guardVerdict(resourceState, moduleState)
+        if verdict == 'closed' then
+            local detail = ('ressource %s, module %s'):format(tostring(resourceState), tostring(moduleState or 'non déclaré'))
+            return name, detail
+        elseif verdict == 'absent' and not quiet then
+            log.warn("connexion accordée sans le garde '%s' (ressource %s) : ce qu'il vérifie ne l'est pas",
+                name, tostring(resourceState))
+        end
+    end
+    return nil
+end
 
 ---@alias vAvA.SessionState 'connecting'|'joined'|'loading'|'active'|'unloading'
 
@@ -243,6 +284,15 @@ local function onConnecting(name, _, deferrals)
         end
     end
 
+    -- porte gardée : les bans (vava_admin) sont des hooks ; module démarré sans être prêt, ou en échec, ils
+    -- n'existeraient pas et la connexion passerait sans vérification
+    local guard, detail = accounts.closedGuard()
+    if guard then
+        log.error("connexion refusée : le garde de connexion '%s' n'est pas prêt (%s)", guard, detail)
+        deferrals.done(messages.guardNotReady)
+        return
+    end
+
     local license = tempSource and GetPlayerIdentifierByType(tempSource, IDENTIFIER_TYPE)
     if not license then
         deferrals.done(messages.noLicense)
@@ -278,6 +328,15 @@ local function onConnecting(name, _, deferrals)
     if not allowed then
         release(session)
         deferrals.done(refusalMessage(reason))
+        return
+    end
+    -- garde arrêté pendant les hooks (ses hooks retirés, chaîne passée sans lui) : même refus
+    guard, detail = accounts.closedGuard(true)
+    if guard then
+        release(session)
+        log.error("connexion refusée : le garde de connexion '%s' s'est arrêté pendant la vérification (%s)",
+            guard, detail)
+        deferrals.done(messages.guardNotReady)
         return
     end
 

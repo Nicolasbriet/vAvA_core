@@ -41,6 +41,10 @@ vAvA.config.server = {
         connectCheckMs = 5000,      -- vérification qu'une connexion acceptée existe encore côté FXServer (abandon :
                                     -- licence libérée après deux relevés manquants, sans attendre connectTimeoutMs)
         coreWaitTimeoutMs = 60000,  -- attente maximale du démarrage du core par une connexion (base injoignable…)
+        -- Gardes de connexion : modules qui vérifient chaque arrivant par un hook (bans). Tant que l'un d'eux est
+        -- démarré sans être prêt (démarrage, redémarrage) ou en échec, les connexions sont refusées (guardNotReady) ;
+        -- absent du serveur ou arrêté, il n'est pas attendu (signalé à la console à chaque connexion).
+        connectionGuards = { 'vava_admin' },
         -- Messages affichés au joueur pendant la connexion.
         messages = {
             checking = 'Vérification de votre compte…',
@@ -50,6 +54,7 @@ vAvA.config.server = {
             alreadyConnected = 'Ce compte est déjà connecté au serveur.',
             refused = 'Connexion refusée.',
             unavailable = 'Le serveur est momentanément indisponible, réessayez dans un instant.',
+            guardNotReady = 'Le royaume s\'éveille : réessayez dans un instant.',  -- un garde de connexion pas prêt
         },
     },
 
