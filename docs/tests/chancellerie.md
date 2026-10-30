@@ -29,12 +29,13 @@ voix, ciel et heure) : `modules/vava_chancellerie/README.md`, « À vérifier en
 | 3 | Page Console : chercher `vava_chancellerie_cle`. Puis dans `chancellerie/data/journal.log`. | Console : rien, ou seulement `vava_chancellerie_cle ••••` si FXServer réaffiche les commandes reçues (à noter : c'est l'un des points à vérifier en jeu). Journal : aucune ligne. |
 | 4 | Page Console, taper `vava_chancellerie_token` (FXServer affiche la valeur d'une convar quand on tape son nom). | Pas de valeur : la clé n'est plus une convar (« No such command » ou équivalent). |
 | 5 | Pages Joueurs, Conseil, Sanctions de la Chancellerie. | Elles se remplissent : le pont répond avec la clé. |
-| 6 | Page Console : `restart vava_chancellerie`. Attendre 5 s, rouvrir la page Joueurs. | La marque revient, suivie de `clé de la Chancellerie reçue : pont ouvert` ; la page Joueurs marche de nouveau. |
-| 7 | Page Console : `vava_chancellerie_cle 0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef`. | `une autre clé du pont a été refusée : la première reçue est gardée` ; la clé tapée n'apparaît dans aucun message du pont ; la page Joueurs marche toujours. |
+| 6 | Page Console : `restart vava_chancellerie`. Attendre 5 s, rouvrir la page Joueurs. | `Started resource vava_chancellerie`, puis la marque revient, suivie de `clé de la Chancellerie reçue : pont ouvert` ; la page Joueurs marche de nouveau ; aucune alerte. |
+| 7 | Page Console : `vava_chancellerie_cle 0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef`. | `une autre clé du pont a été refusée : la première reçue est gardée`, puis l'alerte de la Chancellerie : console « Alerte : Le pont a refusé la clé de la Chancellerie… », bandeau en bas des pages ouvertes, journal « Alerte : clé du pont non prise » (ici sans danger : c'est vous qui avez tapé la clé). La clé tapée n'apparaît dans aucun message du pont ; la page Joueurs marche toujours. |
 | 8 | Page Console : `vava_chancellerie_cle pasunecle`. | Rien de changé ; le pont reste ouvert avec sa clé. |
 | 9 | **En jeu**, joueur hors du Conseil : `F8` → `vava_chancellerie_cle 0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef`. | Rien ne se passe (commande réservée à la console ; au plus un refus d'accès de FiveM). Console du serveur : rien du pont. Le panneau marche toujours. |
 | 10 | Arrêter le serveur, puis le redémarrer depuis la Chancellerie. | Même déroulé qu'en 1-1 : une nouvelle clé est donnée (rien à faire à la main). |
 | 11 | Facultatif : lancer FXServer **sans** la Chancellerie (à la main, `+exec server.cfg`). | Console : `serveur lancé sans la Chancellerie : le pont reste fermé` ; aucune marque `vava_chancellerie:cle?`. Le jeu marche normalement. |
+| 12 | Liste blanche Discord active : se connecter dans les toutes premières secondes du démarrage (avant « clé de la Chancellerie reçue »). Facultatif, la fenêtre est courte. | Refusé avec « Le registre des portes s'ouvre : réessayez dans un instant. » ; accepté (ou refusé selon le rôle Discord) une fois la clé reçue. |
 
 ## 2. Rangs des comptes reliés
 
@@ -45,16 +46,18 @@ voix, ciel et heure) : `modules/vava_chancellerie/README.md`, « À vérifier en
 | 3 | Page Comptes : changer le rang de ce compte (Gardien → Sénéchal). | Appliqué en jeu sans reconnexion (`F10` : sceau « Sénéchal »). |
 | 4 | Redémarrer le serveur depuis la Chancellerie. | Plus de « Rang non appliqué » pour ce compte ; son rang est toujours là en jeu. |
 | 5 | Un autre joueur tape un code faux : `chancellerie 000000`. | « Code inconnu ou expiré… » ; aucune ligne ajoutée à `vava_chancellerie_links`. |
-| 6 | Page Comptes : « Délier » le compte de 2-2. | Rang retiré en jeu (`F10` ne fait plus rien) : retirer reste toujours permis. La ligne de `vava_chancellerie_links` reste (le joueur a bien été vu relié). |
-| 7 | Relier de nouveau le même compte (code, `F8`). | Le rang revient aussitôt. |
+| 6 | Page Comptes : « Délier » le compte de 2-2. | Rang retiré en jeu (`F10` ne fait plus rien) : retirer reste toujours permis. La ligne de `vava_chancellerie_links` est supprimée ; console : `compte n° <N> délié de la Chancellerie`. |
+| 7 | Relier de nouveau le même compte (code, `F8`). | La ligne revient en base, le rang revient aussitôt. |
 
 ## 3. Ce que je ne peux pas avoir vérifié hors jeu
 
-Vérifié hors jeu : le pont réel sous Lua 5.4 avec un faux core (57 contrôles : clé reçue de la console seulement, la
-première gardée, ancienne convar ignorée, marque répétée puis abandonnée après 2 minutes, clé tardive acceptée, rang
-refusé à un compte inconnu, liaison en cours attendue, retrait permis) ; la Chancellerie réelle avec un faux FXServer
+Vérifié hors jeu : le pont réel sous Lua 5.4 avec un faux core (76 contrôles : clé reçue de la console seulement, la
+première gardée, ancienne convar ignorée, adresse figée au setup et refusée hors de 127.0.0.1, marque répétée puis
+abandonnée après 2 minutes, clé tardive acceptée, liste blanche refusée avant la clé, rang refusé à un compte inconnu,
+liaisons en cours attendues sous une seule échéance, retrait permis, compte oublié à la déliaison) ; la Chancellerie réelle avec un faux FXServer
 (clé absente des arguments, donnée une fois par l'entrée, masquée dans la console même réaffichée, absente du journal,
-nouvelle clé à chaque lancement, refus lisible au journal) et ses suites existantes (liaisons, console, performances,
+nouvelle clé à chaque lancement, une seule réponse par démarrage du pont et de nouveau après son redémarrage, alertes
+sur clé refusée, clé étrangère et confirmation absente, compte oublié à la déliaison, refus lisible au journal) et ses suites existantes (liaisons, console, performances,
 server.cfg, sauvegardes).
 
 Restent à voir avec un vrai FXServer :
@@ -63,8 +66,11 @@ Restent à voir avec un vrai FXServer :
 - qu'il ne réaffiche pas la commande reçue (sinon elle est masquée, 1-3) et qu'aucun fichier de log de FXServer ne la
   garde (`con_logFile`, s'il est réglé) ;
 - que la ligne écrite par le pont (`print`) arrive sur la sortie standard que lit la Chancellerie, préfixée par
-  `[script:vava_chancell…]` (la Chancellerie cherche seulement `vava_chancellerie:cle?` dans la ligne) ;
+  `[script:vava_chancellerie]` (ou un nom abrégé, complété d'espaces : la Chancellerie accepte `[ script:vava_chan…]`,
+  puis le texte exact, accents compris : si FXServer les abîmait, la marque ne serait plus reconnue, 1-1) ;
+- que FXServer écrit bien `Started resource vava_chancellerie` (éventuellement précédé de `[ resources]`) à un
+  `restart` : sinon la Chancellerie ne redonne pas la clé et alerte (1-6) ;
 - qu'une commande déclarée réservée (`RegisterCommand(…, true)`) tapée par un joueur n'atteint pas le pont, ou l'atteint
   avec un numéro de joueur (refusée) : 1-9 ;
 - l'ordre réel entre la réponse de la Chancellerie à une liaison et sa demande de rang (le pont attend la liaison en
-  cours 10 s au plus) : 2-2 doit appliquer le rang du premier coup.
+  cours 5 s au plus par requête) : 2-2 doit appliquer le rang du premier coup.

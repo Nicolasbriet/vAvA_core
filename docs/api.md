@@ -1561,7 +1561,12 @@ vava_cameras 1.0.0 pour l'écran des joueurs, vava_time 1.0.0 pour le ciel et l'
   `vava_chancellerie_token` est ignorée et signalée.
 - **Rangs des comptes reliés** (`/staff/sync`, 1.5.0) : un rang n'est donné qu'à un compte de jeu que le pont a lui-même
   vu relié (code juste tapé en jeu, confirmé par la Chancellerie ; table `vava_chancellerie_links`) ; ailleurs,
-  `not_linked_in_game`. Retirer un rang reste toujours permis. Une liaison en cours est attendue 10 s au plus.
+  `not_linked_in_game`. Retirer un rang reste toujours permis ; un retrait marqué `unlinked: true` (déliaison) fait
+  oublier le compte. Les liaisons en cours sont attendues 5 s au plus par requête (une seule échéance).
+- **Adresse de la Chancellerie** (1.5.0) : lue une seule fois au `setup`, seulement `http://127.0.0.1:<port>`.
+  **Liste blanche** : tant que la clé n'est pas arrivée sur un serveur lancé par la Chancellerie, connexion refusée.
+  **Limite** : une ressource serveur qui donne sa clé avant la Chancellerie garde le pont ; la Chancellerie le repère
+  (ligne de refus de sa clé, évènement avec une autre clé, pas de `ready` vérifié) et alerte, sans plus.
 - **Demandes** : passées telles quelles au Registre (`webRequest`), qui vérifie tout et tient le journal ; zones de voix
   lues, modifiées et supprimées auprès de vava_voice, droit vérifié et journal tenu par le Registre.
 - **Ciel et heure** (1.4.0, `server/time.lua`) : demandes `time` (droit `view`), `timeClock` (`{ action, minutes }`) et
