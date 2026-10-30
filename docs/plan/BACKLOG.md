@@ -334,7 +334,7 @@ versé à T-014 ; les autres points déjà couverts sont précisés dans T-012 �
   rapport ; toutes les interfaces s'affichent (devmock).
 
 ### T-013 — Compteur réseau `core.net`
-- Agents : vava-architecte → vava-dev-lua · Dépend de : — · Statut : en cours
+- Agents : vava-architecte → vava-dev-lua · Dépend de : — · Statut : à tester en jeu
 - API du core pour envoyer à un joueur ou à une liste (`core.net.send`, `sendNear(coords, rayon, …)`) qui compte
   par ressource et par évènement le nombre d'envois et une estimation de taille ; commande du Conseil
   `/vava_reseau` (top des évènements de la dernière minute) et affichage dans la Chancellerie si simple.
@@ -347,6 +347,13 @@ versé à T-014 ; les autres points déjà couverts sont précisés dans T-012 �
 - **IMPORTANT** de T-011 : `scripts/audit-reseau.sh:47-48` ne voit que le littéral `-1`. Signaler aussi une cible qui
   est une constante valant `-1` (`vava_voice/server/zones.lua:23,73`) et les boucles sur tous les joueurs qui envoient
   (`vava_chat/server/api.lua:71`), avec un cas de test ; exceptions à faire relire au porteur du projet (voir T-014).
+- Fait le 30 octobre 2026 selon `docs/plan/specs/T-013.md` (décisions du porteur du même jour) : core 0.10.0 —
+  `core.net` (`send`, `sendWith`, `sendNear`, `sendNearWith`, `playersNear`, `stats`), jamais `-1`, latent au-delà de
+  8 Ko (64 Ko/s, 512 Ko en route par joueur, 256 Ko par message), réponses RPC et `callClient` par `core.net` avec
+  préavis, personnage et apparition toujours fiables, compteur d'une minute, `/vava_reseau` et `vava_reseau_essai` ;
+  `vava_chat` 1.2.0 (plus de `-1`) ; audit : constante `-1` et boucle sur tous les joueurs, mode `--essai` ; zones de
+  voix en exception provisoire (T-014). Compte rendu `docs/plan/rapports/T-013.md`, procédure `docs/tests/reseau.md`.
+  La page de la Chancellerie est ouverte à part (T-049).
 
 ### T-014 — Abonnements de zone dans le core
 - Agents : vava-architecte → vava-dev-lua · Dépend de : T-013 · Statut : à faire
@@ -409,6 +416,17 @@ versé à T-014 ; les autres points déjà couverts sont précisés dans T-012 �
   objectifs de `SECURITE_RESEAU.md`.
 - Mesures détaillées, cibles et scénarios (dont la mémoire des 14 pages NUI et le joueur filmé par les caméras) :
   `docs/plan/rapports/T-011.md` § Mesures à reprendre à la porte T-019.
+
+### T-049 — Chancellerie : page « Réseau »
+- Agents : vava-architecte → vava-dev-lua + vava-dev-nui · Dépend de : T-013 · Statut : à faire
+- Décision du porteur du projet (30 octobre 2026, spec T-013, décision 6) : ce que montre `/vava_reseau` aussi dans la
+  Chancellerie. Le pont `vava_chancellerie` lit `core.net.stats` (vue d'ensemble, une ressource, un joueur) par une
+  route en lecture seule, réservée au droit `tools` vérifié par `webCan` ; une page JS dans `chancellerie/` (sans
+  bibliothèque) affiche la dernière minute (évènements les plus lourds, latents, plus gros message) et se rafraîchit à
+  la demande ou à intervalle borné. Le suivi d'un joueur évènement par évènement reste lancé par `/vava_reseau joueur`
+  (la page lit seulement ce qui est suivi) ; `core.net.stats` suffit, aucun changement du core.
+- Critères : route bornée et journalisée côté pont ; procédure `docs/tests/chancellerie.md` complétée ; versions du
+  pont et de la Chancellerie montées ; `docs/chancellerie.md` à jour.
 
 ## Phase 2 — Arrivée
 

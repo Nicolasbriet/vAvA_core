@@ -20,9 +20,10 @@ main. Chaque procédure dit quoi faire et ce qui doit se passer ; les tests à d
 | [magie.md](magie.md) | Les onze sorts, états, zones, combinaisons | `vava_magic` |
 | [temps.md](temps.md) | Heure du royaume, saisons de quatorze jours, ciel, nuits de gel, Conseil en jeu et depuis la Chancellerie, effets sur les métiers | `vava_time`, `vava_farming`, `vava_gathering`, `vava_chancellerie` |
 | [chancellerie.md](chancellerie.md) | Clé du pont hors de la ligne de commande, rangs des seuls comptes vus reliés en jeu | Chancellerie, `vava_chancellerie` |
+| [reseau.md](reseau.md) | Compteur réseau du Conseil (`/vava_reseau`), gros envois en latent, essai du réseau depuis la console, plus d'envoi à tous par le chat | `vAvA_core`, `vava_chat` |
 | [developpement.md](developpement.md) | Outils de développement : rien sans `vava_env`, réservés et journalisés avec | `vava_dev_characters`, `vava_example`, `vava_example_items`, `vava_anim_test` |
 
-Ordre conseillé : personnage, inventaire, besoins, santé, chat, voix, registre, Codex, métiers, temps, magie. Chaque
+Ordre conseillé : personnage, inventaire, besoins, santé, chat, voix, registre, Codex, réseau, métiers, temps, magie. Chaque
 procédure s'appuie sur ce que les précédentes ont validé.
 
 ## Préparation commune

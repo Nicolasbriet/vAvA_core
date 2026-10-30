@@ -331,6 +331,7 @@ core.rpc.register('vava_shop:buy', {
         { type = 'integer', min = 1, max = 100 },
     },
     rateLimit = { capacity = 5, refillPerSecond = 1 },   -- optionnel
+    latent = 'auto',                                      -- optionnel (0.10.0) : 'auto' ou 'never'
 }, function(source, itemName, amount)
     return true, newBalance
 end)
@@ -342,6 +343,15 @@ end)
 - Le handler reçoit `source` puis les arguments validés. Ses valeurs de retour sont envoyées **au seul
   joueur appelant**, et seulement s'il est toujours là : un joueur parti pendant un handler lent (attente de la base)
   ne reçoit rien, pas plus que celui qui aurait repris son numéro entre-temps (0.9.0).
+- Depuis 0.10.0, réponses et appels serveur → client passent par `core.net` : mesurés, comptés sous la ressource du
+  RPC (`rpc <nom>`, `callClient <nom>` ; un RPC inconnu sous `vAvA_core`, `rpc <inconnu>`, jamais sous le nom reçu),
+  bornés à `net.maxBytes` (256 Ko). Une réponse de plus de `net.latent.threshold` (8 Ko) part **en latent**
+  (64 Ko/s), précédée d'un préavis fiable `vAvA:rpc:latent` (id, octets, débit) : le client repousse l'attente de
+  l'appel du temps de transfert plus `rpc.latentMarginMs` (3 s), au plus `rpc.maxLatentExtendMs` (30 s), et rien ne
+  change pour le module client (`rpc.call` rend les mêmes valeurs). `latent = 'never'` garde la réponse fiable quelle
+  que soit sa taille : pour un état que des différences suivront aussitôt (voir l'ordre, § `core.net`). Toute autre
+  valeur fait échouer `register`. Un `callClient` dont les arguments dépassent le seuil part aussi en latent, et
+  l'attente du serveur est allongée selon la même règle.
 
 | Fonction | Retour |
 |---|---|
@@ -371,11 +381,93 @@ jamais de source de vérité.
 | `unknown_rpc` | aucun RPC de ce nom |
 | `invalid_args` | arguments refusés par le schéma (détail dans la console serveur uniquement) |
 | `server_error` | le handler serveur a levé une erreur (détail dans la console serveur uniquement) |
-| `saturated` | trop d'appels en attente |
+| `saturated` | trop d'appels en attente ; ou (0.10.0) plus de 512 Ko d'envois latents déjà en route vers ce joueur : la réponse, ou la demande de `callClient`, n'est pas partie |
+| `too_large` | (0.10.0) réponse, ou arguments de `callClient`, au-delà de `net.maxBytes` (256 Ko) : rien n'est parti que ce code ; nom du RPC et taille dans la console serveur |
+| `unserializable` | (0.10.0, `callClient`) arguments impossibles à envoyer (fonction, cycle, profondeur au-delà de 32) ; une réponse de handler dans ce cas arrive au client en `server_error` |
 | `invalid_target` / `invalid_name` / `invalid_options` | appel mal formé (`invalid_options` : timeout hors bornes, `returns` absent, refusé ou de plus de `rpc.maxReturns` = 16 valeurs ; détail dans la console serveur) |
 | `dropped` | joueur déconnecté pendant l'attente |
 | `owner_stopped` | ressource appelante arrêtée pendant l'attente |
 | `client_error` / `invalid_response` | le client a échoué ou a renvoyé des valeurs refusées par `returns` (toute valeur pour `callClient`) |
+
+### `core.net` (core 0.10.0)
+
+Envois serveur → client **mesurés et comptés** : à un joueur, à une liste, ou aux joueurs proches d'un point calculés
+par le serveur. Jamais à tous (`-1`), jamais un évènement d'un autre module ou du core. Les gros messages partent en
+latent sans bloquer le reste ; le Conseil voit qui envoie quoi par `/vava_reseau`. `TriggerClientEvent` direct reste
+permis dans un module, mais il n'est pas compté.
+
+| Fonction | Retour |
+|---|---|
+| `send(target, event, ...)` | `true, envoyés, octets, latent` ou `false, code` |
+| `sendWith({ latent? }, target, event, ...)` | idem |
+| `sendNear(coords, radius, event, ...)` | idem |
+| `sendNearWith({ latent?, exclude?, bucket? }, coords, radius, event, ...)` | idem |
+| `playersNear(coords, radius, { exclude?, bucket? }?)` | liste de numéros de joueurs (copie), ou `nil, code` |
+| `stats({ limit?, resource?, target? }?)` | `{ mode, windowMs, total, events }`, ou `nil, code` |
+
+```lua
+-- un bruit de forge entendu à 30 m, sauf par le forgeron
+local ok, count = core.net.sendNearWith({ exclude = source }, coords, 30.0, 'vava_crafting:sound', 'marteau')
+```
+
+- **Cible** : un numéro de joueur (entier > 0 qui existe), ou une **liste pure** d'entiers > 0 (1 à 256) ; dans une
+  liste, les doublons sont retirés et un joueur parti entre-temps est sauté (non compté dans `envoyés`). `-1`, `0`, un
+  flottant, une chaîne, une liste vide, trop longue ou mixte : `invalid_target` (`-1` écrit aussi en console « envoi à
+  tous refusé »).
+- **Évènement** : identifiant (64 caractères) préfixé par `<ressource appelante>:`, jamais `vAvA:` ni `core:`, sinon
+  `invalid_event`. `chat:addMessage` reste un `TriggerClientEvent` direct (évènement de `vava_chat`).
+- **Valeurs** : au plus 16 (`invalid_args`), sérialisables (`unserializable` : fonction, cycle, profondeur au-delà de
+  32), 256 Ko au plus par message (`too_large`, rien n'est envoyé, erreur en console).
+- **Options** (table à clés connues, sinon `invalid_options`) : `latent` = `'auto'` (défaut : latent strictement
+  au-delà de 8 Ko) | `'never'` (toujours fiable) | `'always'` ; pour `sendNear*` et `playersNear` : `exclude`
+  (numéro de joueur à sauter) et `bucket` (entier ≥ 0 : seulement ce routing bucket ; défaut : tous).
+- **Proches** : personnages chargés **et apparus**, ped existant, distance 3D ≤ rayon (0 < rayon ≤ 1 000 m, sinon
+  `invalid_radius`), positions lues par le serveur (au plus une fois par tour) ; `coords` : `vector3` ou
+  `{ x, y, z }` finis (`invalid_coords`). Personne à portée : `true, 0, 0, false`, rien n'est sérialisé.
+- **Retour** : `envoyés` = joueurs servis, `octets` = taille d'**un** message (charge msgpack + nom de l'évènement),
+  `latent` = booléen.
+- **Latent** : 64 Ko/s par envoi (`net.latent.bytesPerSecond`) ; au plus 512 Ko en route vers un même joueur : au-delà,
+  `saturated` pour une cible seule ; dans une liste, la cible saturée est sautée et les autres reçoivent.
+- **Ordre** : deux messages fiables vers un même joueur arrivent dans l'ordre d'envoi ; un message latent peut être
+  **dépassé** par tout message envoyé après lui, et l'ordre entre deux latents n'est pas garanti. Un module dont l'état
+  suit un envoi (instantané puis différences) choisit `latent = 'never'`, ou numérote ses révisions.
+- **Mesure** : exacte quand le runtime offre `msgpack.pack_args` et les envois internes (une seule sérialisation pour
+  toutes les cibles : console `[net] mesure exacte`), sinon estimée sans sérialiser (`[net] estimation`) ;
+  `net.mode = 'estimate'` dans `config/server.lua` force l'estimation. Un module paie en plus la copie de ses arguments
+  à la traversée de l'export (§ Copies) : deux sérialisations pour un joueur, deux au lieu de N pour N joueurs proches.
+- Un module qui s'en sert déclare `coreVersion = '0.10.0'`, ou teste `core.net` dans son `bridge/server.lua` et garde
+  `TriggerClientEvent` en repli.
+
+`stats` lit le compteur de la dernière minute (12 cases de 5 s ; mémoire bornée : 512 couples ressource, évènement,
+au-delà cumulés sous `*`, `<autres>`). `limit` : 1 à 50 (défaut 10) ; `resource` : seulement cette ressource ;
+`target` : ce que reçoit ce joueur (`total` du joueur, `watched`, et ses `events` s'il est suivi par `/vava_reseau
+joueur`, sinon une liste vide).
+
+```lua
+{
+    mode = 'exact',            -- ou 'estimate'
+    windowMs = 60000,
+    total = { messages = 1234, bytes = 421888, latent = 3 },
+    events = {                 -- triés par octets décroissants, puis messages, puis ressource et évènement
+        { resource = 'vava_codex', label = 'rpc vava_codex:open', messages = 12, bytes = 245760, latent = 9, largest = 28672 },
+    },
+}
+```
+
+Ce que le core envoie lui-même par `core.net` : réponses RPC et préavis, demandes de `callClient`, personnage chargé,
+champs, déchargement et ordre d'apparition (**toujours fiables** : l'ordre chargement → champs → apparition compte ;
+au-delà de 8 Ko, alerte en console une fois par minute et par évènement), sortie de `/vava_reseau`. Non comptés :
+GlobalState, state bags, envois directs des modules.
+
+**Commandes** (registre `core:commands`, chapitre Core) :
+- `/vava_reseau` (Conseil, droit `tools` de `vava_admin`, repli ACE `vava.reseau`, 2 s entre deux) : en-tête, les 10
+  plus gros envois de la minute, pied ; `joueur <n°>` : totaux du joueur, puis suivi évènement par évènement pendant
+  5 min (4 joueurs suivis au plus ; inscrit au journal du Registre) ; `ressource <nom>` : les envois d'un module.
+  Sortie dans le chat du seul membre, ou dans la console.
+- `vava_reseau_essai <n° du joueur> <Ko 1-256> [rayon]` (console du serveur seulement) : un message fiable, un message
+  latent de la taille voulue, un message fiable (au joueur, ou aux joueurs à portée de lui si un rayon est donné) ; la
+  console F8 du joueur écrit le débit réel du latent et l'ordre d'arrivée, celle d'un joueur proche « message de
+  proximité reçu ».
 
 ### `core.db`
 
@@ -436,6 +528,9 @@ if not ok then --[[ success contient le code de transport ]] end
 ```
 
 Le client n'est jamais une source de vérité : un RPC exprime une intention que le serveur valide et décide.
+
+Une grosse réponse (au-delà de 8 Ko, 0.10.0) arrive en latent, annoncée par un préavis qui repousse le délai
+d'attente de l'appel (temps de transfert + 3 s, 30 s de plus au plus) : `rpc.call` n'a rien à faire de plus.
 
 ### `core.characters` (client)
 
@@ -1639,7 +1734,7 @@ tests en jeu : `modules/vava_chat/README.md`. Demande le core 0.5.0 ; facultatif
 
 | Export serveur | Retour |
 |---|---|
-| `addMessage(cible, message)` | `true` ou `false, code` — `cible` : joueur connecté, ou `-1` pour tous les joueurs en jeu ; `message` : texte, `{ author?, text, color? }` ou `{ args, color? }` |
+| `addMessage(cible, message)` | `true` ou `false, code` — `cible` : joueur connecté (`-1`, envoi à tous, refusé depuis 1.2.0 : `invalid_target`) ; `message` : texte, `{ author?, text, color? }` ou `{ args, color? }` |
 
 **Hooks** : `vava_chat:sending` (`before`, annulable : `{ source, characterId, kind, text, target? }` — sourdine,
 prison… ; la raison du refus est montrée au joueur), `vava_chat:sent` (`after` : `+ recipients`, nombre de joueurs
