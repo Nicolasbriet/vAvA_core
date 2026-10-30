@@ -69,7 +69,8 @@ VavaGathering.config = {
     },
 
     -- Pêche : la ligne est lancée (begin) ; le serveur tire le moment de la touche, prévient le client, qui tient la
-    -- tension dans la zone pendant `durationMs` ; `reel` dit si la tenue a réussi. Un raté n'use aucune charge.
+    -- tension dans la zone pendant `durationMs` ; `reel` dit si la tenue a réussi. La barre ne peut que faire rater :
+    -- ligne tenue, le serveur tire encore la prise (`catch`). Un raté n'use aucune charge.
     fishing = {
         biteMinMs = 4000,
         biteMaxMs = 14000,
@@ -84,6 +85,16 @@ VavaGathering.config = {
         },
         reelToleranceMs = 500,      -- avance tolérée sur la durée de la barre
         reelGraceMs = 4000,         -- retard toléré (au-delà : la prise s'est échappée)
+        -- Prise tirée par le serveur quand la ligne a tenu : chance que le poisson se décroche, de `novice` au niveau 0
+        -- de Pêche à `master` au niveau `masterLevel` (linéaire entre les deux), plus le supplément de la bande de la
+        -- zone (eaux fatiguées : poisson méfiant). Parts de 0 à 1. L'échec de la bande (`bands.effects.failure`)
+        -- s'applique ensuite, comme à toute récolte.
+        catch = {
+            novice = 0.25,
+            master = 0.02,
+            masterLevel = 100,
+            bands = { normal = 0.0, reduced = 0.05, depleted = 0.10 },
+        },
     },
 
     -- Client : props des nœuds créés à portée, remplacés par le modèle « épuisé » quand la zone l'est.
@@ -224,6 +235,7 @@ VavaGathering.config = {
         harvestedExtra = 'Et aussi : %s.',
         failed = 'La récolte échoue : la terre est fatiguée ici.',
         escaped = 'La prise s\'est échappée.',
+        slipped = 'La ligne a tenu, mais le poisson se décroche au dernier moment.',
         noTool = 'Il vous faut %s en main.',                  -- genre d'outil (libellé)
         brokenTool = 'Votre outil est brisé.',
         noCharges = 'Il n\'y a plus rien à prendre ici pour le moment.',

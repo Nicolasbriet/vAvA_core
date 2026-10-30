@@ -4,7 +4,7 @@
            nœuds à charges (arbres, filons, buissons, bancs de poissons, pistes de gibier), outils en main qui s'usent,
            qualité de la récolte (compétence, outil, vitalité) en palier et provenance sur les piles, pêche à la barre
            de tension, réaction de la terre, commandes du Conseil. Le serveur décide de tout (distance, outil,
-           cooldown, durée, rendement, charges, vitalité) et appelle vava_skills pour l'XP ; le client crée les props à
+           cooldown, durée, rendement, charges, vitalité, prise d'un poisson quand la ligne a tenu) et appelle vava_skills pour l'XP ; le client crée les props à
            portée, pose les blips des zones sur la carte, montre l'invite, joue le geste et la barre de tension.
     Dépendances : vAvA_core ≥ 0.6.0, vava_inventory ≥ 1.4.0 (objets, mains, métadonnées), vava_skills ≥ 1.0.0 (XP) ;
                   facultatifs : vava_hud (barre de progression, notifications), vava_admin (droit metiers), vava_chat,
@@ -18,7 +18,7 @@ use_experimental_fxv2_oal 'yes'
 
 name 'vava_gathering'
 description 'Récolte vAvA : zones à vitalité sur la carte, nœuds, outils en main, qualité, pêche, pistes de gibier'
-version '1.3.2'
+version '1.4.0'
 
 dependency 'vAvA_core'
 dependency 'vava_inventory'
@@ -43,6 +43,7 @@ shared_scripts {
     'config.lua',
     'shared/geometry.lua',
     'shared/season.lua',
+    'shared/catch.lua',
 }
 
 server_scripts {

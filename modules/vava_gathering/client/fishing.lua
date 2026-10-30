@@ -3,8 +3,9 @@
     Rôle : la pêche côté joueur, après la touche annoncée par le serveur : la barre de tension est jouée par
            l'interface (une aiguille montée en tenant la touche, une zone qui dérive) ; le client lui transmet
            l'appui et le relâchement de la touche d'interaction (commandes +/− du jeu : la touche reste celle que le
-           joueur a choisie) et, à la fin, déclare au serveur si la ligne a été tenue. Aucune boucle Lua : l'interface
-           anime la barre tant qu'elle est visible, le jeu envoie les appuis.
+           joueur a choisie) et, à la fin, déclare au serveur si la ligne a été tenue. Seul un raté est cru : ligne
+           tenue, le serveur tire encore la prise. Aucune boucle Lua : l'interface anime la barre tant qu'elle est
+           visible, le jeu envoie les appuis.
     Dépendances : shared/constants.lua, config.lua, client/core.lua, client/nui.lua, client/interact.lua
 ]]
 
@@ -41,7 +42,7 @@ function fishing.hold(held)
 end
 
 --- Fin de la barre (retour de l'interface) : part du temps tenue dans la zone → tenue réussie ou non, déclarée au
---- serveur qui décide de la prise.
+--- serveur, qui tire la prise (une ligne relâchée la fait toujours rater, une ligne tenue ne l'assure pas).
 ---@param data table  { token, ratio }
 function fishing.done(data)
     local token = tointeger(tonumber(data.token))
