@@ -5,7 +5,7 @@
     Hors log, modules et version, chaque fonction exige que le module soit actif (pendant setup ou prêt) :
     un module refusé ou non déclaré ne peut rien enregistrer.
     Dépendances : shared/core/api.lua, server/core/database.lua, server/core/net.lua, server/core/rpc.lua,
-                  server/core/registry.lua, server/core/modules.lua
+                  server/core/zones.lua, server/core/registry.lua, server/core/modules.lua
 ]]
 
 local format = string.format
@@ -15,6 +15,7 @@ local modules = vAvA.modules
 local registry = vAvA.registry
 local net = vAvA.net
 local rpc = vAvA.rpc
+local zones = vAvA.zones
 local database = vAvA.database
 
 api.define(1, function(owner)
@@ -82,6 +83,18 @@ api.define(1, function(owner)
             end),
             playersNear = guard(function(coords, radius, options) return net.playersNear(coords, radius, options) end),
             stats = guard(function(options) return net.stats(options) end),
+        },
+
+        -- abonnements de zone (0.11.0) : zones du module seulement (identifiant local → <ressource>:<id>)
+        zones = {
+            define = guard(function(id, area, state) return zones.define(owner, id, area, state) end),
+            move = guard(function(id, area) return zones.move(owner, id, area) end),
+            set = guard(function(id, changes, removed) return zones.set(owner, id, changes, removed) end),
+            replace = guard(function(id, state) return zones.replace(owner, id, state) end),
+            remove = guard(function(id) return zones.remove(owner, id) end),
+            subscribers = guard(function(id) return zones.subscribers(owner, id) end),
+            info = guard(function(id) return zones.info(owner, id) end),
+            list = guard(function() return zones.list(owner) end),
         },
 
         db = {

@@ -8,7 +8,8 @@
            Noms uniques (option) : le nom est réservé en mémoire pendant toute sa création (créations simultanées).
     Les intentions du client passent par les RPC core:characters:* ; le serveur valide et décide de tout.
     Dépendances : shared/init.lua, config/server.lua, shared/lib/string.lua, shared/core/logger.lua,
-                  shared/core/hooks.lua, server/core/database.lua, server/core/rpc.lua, server/players/*.lua
+                  shared/core/hooks.lua, server/core/database.lua, server/core/rpc.lua, server/core/zones.lua,
+                  server/players/*.lua
 ]]
 
 local type, tostring, tonumber, pairs, xpcall, pcall = type, tostring, tonumber, pairs, xpcall, pcall
@@ -31,6 +32,7 @@ local persistence = vAvA.persistence
 local playtime = vAvA.playtime
 local positions = vAvA.positions
 local spawn = vAvA.spawn
+local zones = vAvA.zones
 local cfg = vAvA.config.server.characters
 local nameCfg = cfg.name
 local log = vAvA.logger.create('characters')
@@ -378,6 +380,8 @@ local function unload(session, reason)
     activeById[character.id] = nil
     session.characterId = nil
     character.spawned = false
+    -- abonnements de zone oubliés sans envoi : le client vide ses zones au déchargement
+    zones.purgePlayer(session.source)
     sync.clearCharacter(character)
     session.state = 'joined'
     return true
@@ -578,6 +582,8 @@ function characters.registerRpc()
             character.spawned = true
             playtime.begin(character)
             hooks.runAfter(HOOK_SPAWNED, { source = src, accountId = character.accountId, characterId = character.id })
+            -- zones proches envoyées tout de suite, sans attendre le passage suivant
+            zones.refreshPlayer(src)
             return true
         end },
     }

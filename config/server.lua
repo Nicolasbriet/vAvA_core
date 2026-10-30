@@ -168,6 +168,33 @@ vAvA.config.server = {
         },
     },
 
+    -- Abonnements de zone (core.zones, 0.11.0) : un module déclare des zones et tient leur état dans le core ; le serveur
+    -- abonne les joueurs proches (positions lues par lui) et n'envoie l'état et ses différences qu'à eux.
+    zones = {
+        passMs = 1000,             -- intervalle entre deux passages (entrées et sorties de zone). Réglable : 2000 reste
+                                   -- sûr avec la marge par défaut de 50 m (un cavalier au galop, ~15 m/s, parcourt
+                                   -- 30 m entre deux passages) ; au-delà, la zone peut arriver après le joueur
+        cellSize = 256.0,          -- côté d'une case de la grille (m)
+        coordLimit = 50000.0,      -- |x| et |y| d'un centre au plus (la carte tient dans ±10 000)
+        maxRadius = 500.0,         -- rayon d'une zone au plus (m, > 0)
+        defaultMargin = 50.0,      -- marge par défaut au-delà du bord : la zone est reçue avant d'y entrer
+        maxMargin = 500.0,         -- marge au plus (≥ 0)
+        exitMargin = 25.0,         -- désabonné seulement au-delà de rayon + marge + exitMargin (pas d'aller-retour)
+        maxZones = 2048,           -- zones déclarées en tout
+        maxZonesPerOwner = 1024,   -- zones d'un même module
+        maxKeys = 256,             -- clés dans l'état d'une zone
+        keyMaxLength = 48,         -- octets d'une clé (et d'un identifiant de zone)
+        maxChanges = 64,           -- clés changées ou retirées par appel
+        maxValueBytes = 4096,      -- taille estimée d'une valeur
+        maxStateBytes = 32768,     -- taille estimée de l'état d'une zone (clés + valeurs)
+        maxTotalStateBytes = 8388608,  -- 8 Mo : somme des états de toutes les zones
+        maxDiffBytes = 8192,       -- différence regroupée d'un tour au-delà de laquelle l'instantané part à sa place
+        maxSubscriptionsPerPlayer = 256,  -- zones suivies par un joueur ; au-delà, les plus lointaines attendent
+        snapshotBudgetBytes = 32768,      -- instantanés envoyés à un même joueur dans un passage (taille estimée) ; le
+                                          -- reste au passage suivant, les plus proches d'abord
+        rateLimit = { capacity = 4, refillPerSecond = 0.5 },  -- RPC core:zones:resync, par joueur
+    },
+
     spawn = {
         models = { m = 'mp_m_freemode_01', f = 'mp_f_freemode_01' },  -- en attendant un module d'apparence
         defaultPoint = { x = -269.4, y = -955.3, z = 31.2, heading = 205.8 },  -- premier spawn d'un personnage

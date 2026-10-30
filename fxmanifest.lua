@@ -48,6 +48,7 @@ server_scripts {
     'server/core/rpc.lua',
     'server/core/zonegrid.lua',
     'server/core/zonestate.lua',
+    'server/core/zones.lua',
     'server/core/registry.lua',
     'server/core/commands.lua',
     'server/core/netcommand.lua',
