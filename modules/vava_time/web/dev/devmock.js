@@ -1,10 +1,12 @@
 'use strict';
 /*
- * web/js/devmock.js
+ * web/dev/devmock.js
  * Rôle : aperçu de l'outil dans un navigateur, sans le jeu : fond de ciel, état d'exemple, décisions simulées (même
  *        sens que le serveur : mettre l'heure, décaler, figer, reprendre, heure réelle ; imposer, figer, rendre le ciel).
  *        Inactif en jeu. Paramètres d'URL : ?frozen=1 (heure figée), ?forced=1 (ciel imposé et figé), ?struck=1 (gel tombé),
  *        ?refused=1 (chaque décision refusée).
+ *        Jamais livré (absent des `files`), jamais chargé en jeu : la ligne hors jeu de index.html ne l'insère
+ *        que hors FiveM.
  */
 
 const DevMock = (() => {
