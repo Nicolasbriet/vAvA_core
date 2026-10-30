@@ -22,10 +22,11 @@ main. Chaque procédure dit quoi faire et ce qui doit se passer ; les tests à d
 | [chancellerie.md](chancellerie.md) | Clé du pont hors de la ligne de commande, rangs des seuls comptes vus reliés en jeu | Chancellerie, `vava_chancellerie` |
 | [interfaces.md](interfaces.md) | Polices, textures et ornements communs servis par `vava_ui` (pilote : le HUD), rendu des interfaces, CORS, WebP | `vava_ui`, `vava_hud`, puis toutes les interfaces |
 | [reseau.md](reseau.md) | Compteur réseau du Conseil (`/vava_reseau`), gros envois en latent, essai du réseau depuis la console, plus d'envoi à tous par le chat | `vAvA_core`, `vava_chat` |
+| [zones.md](zones.md) | Abonnements de zone : zones envoyées aux seuls joueurs proches, `/vava_reseau zones`, zones de voix et leur éditeur, coût du passage | `vAvA_core`, `vava_voice` |
 | [developpement.md](developpement.md) | Outils de développement : rien sans `vava_env`, réservés et journalisés avec | `vava_dev_characters`, `vava_example`, `vava_example_items`, `vava_anim_test` |
 
 Ordre conseillé : interfaces (§ 0, pilote du HUD), personnage, inventaire, besoins, santé, chat, voix, registre, Codex,
-réseau, métiers, temps, magie. Chaque procédure s'appuie sur ce que les précédentes ont validé.
+réseau, zones, métiers, temps, magie. Chaque procédure s'appuie sur ce que les précédentes ont validé.
 
 ## Préparation commune
 

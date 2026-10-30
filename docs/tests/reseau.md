@@ -21,9 +21,9 @@ de console correspondante (serveur, ou `F8` du joueur).
 | 1 | `ensure vAvA_core` (ou démarrage du serveur). | Console du serveur : `[net] mesure exacte`. Si la ligne dit `[net] estimation (fonctions du runtime absentes : …)`, la noter **avec la liste** : la version de FXServer n'offre pas la sérialisation à part ; tout marche, mais les tailles sont estimées et chaque cible coûte une sérialisation. |
 | 2 | Gardien (sans `tools`) : `/vava_reseau`, puis `F1` (Codex), chapitre Core. | Rien ne se passe, aucun message ; le Codex ne propose pas « Compteur réseau ». |
 | 3 | Sénéchal : marcher une minute, puis `/vava_reseau`. Retaper aussitôt `/vava_reseau`. | Au plus 13 lignes « Réseau » dans le chat : « Dernière minute (mesure exacte) : … envois, …, dont … latents. », puis les plus gros envois (`vAvA_core · vAvA:character:fields`, réponses `rpc …` des modules) avec leur taille (« 1,8 Ko »), puis « Non comptés : GlobalState, state bags et envois directs des modules. ». La seconde commande, dans les 2 s : rien. |
-| 4 | Sénéchal : `F1` → chapitre Core → « Compteur réseau ». | Trois actions : « Les plus gros envois », « Ce que reçoit un joueur » (choix d'un joueur), « Envois d'un module » (nom de la ressource). Lancer la première donne la même sortie qu'en 1-3. |
+| 4 | Sénéchal : `F1` → chapitre Core → « Compteur réseau ». | Quatre actions : « Les plus gros envois », « Ce que reçoit un joueur » (choix d'un joueur), « Envois d'un module » (nom de la ressource), « Zones et abonnements » (joueur facultatif, core 0.11.0 : voir [zones.md](zones.md)). Lancer la première donne la même sortie qu'en 1-3. |
 | 5 | Console du serveur : `vava_reseau`, puis `vava_reseau ressource vAvA_core`. | Les mêmes lignes, préfixées « Réseau : », dans la console ; la seconde ne liste que `vAvA_core`. |
-| 6 | Sénéchal : `/vava_reseau quoi`, `/vava_reseau joueur abc`, `/vava_reseau ressource a/b`, `/vava_reseau joueur 999`. | « usage : /vava_reseau \| joueur <n°> \| ressource <nom> » trois fois (une commande toutes les 2 s), puis « Aucun joueur n° 999 en jeu. ». |
+| 6 | Sénéchal : `/vava_reseau quoi`, `/vava_reseau joueur abc`, `/vava_reseau ressource a/b`, `/vava_reseau joueur 999`. | « usage : /vava_reseau \| joueur <n°> \| ressource <nom> \| zones [n°] » trois fois (une commande toutes les 2 s), puis « Aucun joueur n° 999 en jeu. ». |
 
 ## 2. Gros envois en latent
 
@@ -68,7 +68,7 @@ de console correspondante (serveur, ou `F8` du joueur).
 
 | # | Faire | Attendu |
 |---|---|---|
-| 1 | `./scripts/audit-reseau.sh` puis `./scripts/audit-reseau.sh --essai` (ou `./scripts/verifier.sh`). | Aucun BLOQUANT hors exceptions inscrites (les zones de voix sont en exception provisoire jusqu'à T-014) ; « ESSAI : OK (17 cas) ». |
+| 1 | `./scripts/audit-reseau.sh` puis `./scripts/audit-reseau.sh --essai` (ou `./scripts/verifier.sh`). | Aucun BLOQUANT hors exceptions inscrites (plus aucune exception des zones de voix depuis T-014) ; « ESSAI : OK (17 cas) ». |
 
 ## Ce qui n'est pas compté
 

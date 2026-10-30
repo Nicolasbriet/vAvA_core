@@ -28,7 +28,7 @@ Ordre de démarrage : après `vava_admin`, avant `vava_cameras` (ordre complet :
 
 | Dépendance | Rôle | Sans elle |
 | --- | --- | --- |
-| `vAvA_core` ≥ 0.5.0 | personnages, RPC, hooks, base, registre des commandes | obligatoire |
+| `vAvA_core` ≥ 0.11.0 | personnages, RPC, hooks, base, registre des commandes, abonnements de zone (1.3.0) | obligatoire |
 | `vava_hud` ≥ 1.2.0 | médaillon « Voix » et sa lueur | pas de médaillon |
 | `vava_health` | portée réduite à terre | aucune limite à terre |
 | `vava_admin` ≥ 1.1.0 | droits des zones, outil « Zones de voix » du Registre, journal | personne ne crée de zone |
@@ -45,11 +45,12 @@ Ordre de démarrage : après `vava_admin`, avant `vava_cameras` (ordre complet :
 | Joueurs à portée | recalculés toutes les 250 ms, marge de 2 m (la voix ne se coupe pas à chaque pas en bordure) | `client.targetsPollMs`, `client.targetMargin` |
 | Médaillon | un quart par portée, lueur relue toutes les 150 ms | `hud`, `client.talkingPollMs` |
 | Zone où se tient le joueur | relue toutes les 500 ms | `client.zonesPollMs` |
-| Liste des zones | demandée à l'apparition et au redémarrage du module : 5 essais à 2 s d'écart si le serveur n'est pas prêt | `client.syncTries`, `client.syncRetryMs` |
+| Limite de portée | redemandée à l'apparition et au redémarrage du module : 5 essais à 2 s d'écart si le serveur n'est pas prêt | `client.syncTries`, `client.syncRetryMs` |
+| Zones connues d'un joueur | celles dont il est à moins de rayon + 40 m (envoyées par le core, 1.3.0) ; oubliées au-delà de 25 m de plus | `zones.subscribeMargin` (et `zones.exitMargin` du core) |
 | Cercle au sol | 1,5 s, s'efface sur les 0,6 dernières, couleur laiton | `ring` |
 | Zones de voix | 200 au plus ; nom de 40 signes ; rayon 2 à 60 m (10 par défaut), hauteur 2 à 30 m (6), par pas de 0,5 ; effet ×0,5, ×0,75, ×1, ×1,5, ×2 (défaut) ou ×3 | `zones` |
 | Droits | `tools` pour créer, régler, supprimer ; `teleport` pour « S'y rendre » | `zones.permission`, `zones.teleportPermission` |
-| Débits | liste des zones : 3 puis 1 toutes les 5 s ; éditeur : 5 puis 1 par seconde ; actions : 10 puis 1 par seconde | `rateLimits` |
+| Débits | limite de portée : 3 puis 1 toutes les 5 s ; éditeur : 5 puis 1 par seconde ; actions : 10 puis 1 par seconde | `rateLimits` |
 | Journal du Registre | « Zone de voix créée », « modifiée », « supprimée » | `messages` |
 
 ## Ce que vit le joueur
@@ -84,7 +85,11 @@ moins, beiges à ×1, dorés au-delà).
   `teleport`), **Supprimer** (deux clics).
 - **Sceller** (ou `Entrée`) : une seule demande à la fois ; rien n'est écrit avant.
 - Chaque action est revérifiée par le serveur (droit, bornes, centre lu par lui) et inscrite au journal du Registre.
-  Chaque changement part à tous les joueurs en jeu : petit, rare, et chacun en a besoin pour savoir où il se trouve.
+  Chaque zone n'est envoyée qu'aux joueurs à moins de rayon + 40 m d'elle (abonnements de zone du core, 1.3.0), et
+  chaque changement à eux seuls : plus rien ne part à tous.
+- La liste de l'éditeur (toutes les zones) part au seul membre qui l'ouvre ; elle suit ensuite ses propres actions et
+  les zones proches changées par un autre membre. Une zone lointaine changée par un autre l'est à la réouverture ; une
+  zone supprimée par un autre entre-temps répond « Cette zone n'existe plus. » et la liste est redemandée.
 
 Depuis la Chancellerie (pont `vava_chancellerie`) : modifier (nom, rayon, hauteur, effet, sans recentrage) et
 supprimer, au journal du Registre ; la création reste en jeu, car une zone se centre sur qui la crée.
@@ -117,7 +122,10 @@ exports.vava_voice:releaseRange(source, 'baillon')
   Mumble : un client modifié peut écouter le salon d'un autre joueur ou parler à tout le serveur. Aucune parade
   technique fiable : à traiter par le règlement et la modération.
 - La limite de portée (à terre, autres modules) part au seul joueur concerné, à chaque changement, et de nouveau quand
-  son client redemande la liste des zones.
+  son client la redemande (apparition, redémarrage du module).
+- Zones de voix : envoyées par le core aux seuls joueurs proches (positions lues par le serveur, jamais demandées par
+  le client), environ 150 o par zone à l'approche, environ 100 o par changement aux seuls joueurs qui la suivent ;
+  `/vava_reseau zones` montre qui suit quoi. Plus d'exception d'audit pour ce module.
 - Aucune boucle par image au repos (relevés toutes les 150, 250 et 500 ms) ; une boucle par image seulement pendant le
   cercle au sol (1,5 s) et l'éditeur ouvert, chez le seul membre du Conseil.
 - Arrêt du module : aucun micro n'est rendu. Un joueur en sélection reste muet pendant un `restart`. Après un `stop`
@@ -151,3 +159,5 @@ Procédure complète : `docs/tests/voix.md`. À regarder en premier :
 3. La portée à terre, et après un `restart` à terre (voix 6-1 à 6-5).
 4. L'éditeur : nom de 40 signes accentués, double `Entrée`, clavier rendu à l'arrêt (voix 3-6, 3-15, 8-2).
 5. Les zones après un `restart` (voix 8-1).
+6. 1.3.0 : zones reçues à l'approche seulement, changées sans reconnexion, oubliées en s'éloignant (zones 2-1 à 2-10) ;
+   éditeur qui suit les changements d'un autre membre (zones 4-1 à 4-3).

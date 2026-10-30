@@ -363,10 +363,13 @@ versé à T-014 ; les autres points déjà couverts sont précisés dans T-012 �
   La page de la Chancellerie est ouverte à part (T-049).
 
 ### T-014 — Abonnements de zone dans le core
-- Agents : vava-architecte → vava-dev-lua · Dépend de : T-013 · Statut : en cours
-- Service générique : un module déclare des zones (centre, rayon) ; le serveur tient la liste des joueurs abonnés
-  à chaque zone (entrée demandée par le client, sortie vérifiée côté serveur, nettoyage à la déconnexion) ;
-  `publish(zone, différence)` n'envoie qu'aux abonnés. Voir le modèle de `SECURITE_RESEAU.md`.
+- Agents : vava-architecte → vava-dev-lua · Dépend de : T-013 · Statut : à tester en jeu
+- Service générique : un module déclare des zones (centre, rayon, marge) et tient leur état dans le core ; le serveur
+  tient la liste des joueurs abonnés à chaque zone (entrée **décidée par le serveur** à chaque passage d'après les
+  positions qu'il lit, sortie avec une marge, nettoyage à la sélection et à la déconnexion) ; les changements ne partent
+  qu'aux abonnés. Voir le modèle de `SECURITE_RESEAU.md` (réécrit) et `docs/plan/specs/T-014.md`. Décision du porteur
+  du projet du 30 octobre 2026 : aucun RPC d'abonnement (le client ne demande jamais d'entrer dans une zone : il
+  devrait connaître toutes les zones) ; seul `core:zones:resync` redemande l'état d'une zone déjà suivie.
 - Y reprendre les zones de voix (`vava_voice/server/zones.lua`) : chaque création, modification ou suppression part
   aujourd'hui à tous les joueurs (`EVERYONE`, seul envoi à tous du module, documenté comme voulu : rare et petit) ;
   avec les abonnements, n'envoyer qu'aux joueurs à portée de la zone (rapport T-008).
@@ -386,6 +389,15 @@ versé à T-014 ; les autres points déjà couverts sont précisés dans T-012 �
 - Relecture réseau de T-013, à reprendre ici : positions des joueurs gardées une fois par tour du serveur (aujourd'hui
   le temps d'une même milliseconde) ou grille, pour les portées calculées souvent ; plafond global du volume latent
   (pas seulement par joueur) pour la distribution des catalogues de l'Atelier.
+- Fait le 30 octobre 2026 selon `docs/plan/specs/T-014.md` (huit décisions du porteur du même jour) : core 0.11.0 —
+  `core.zones` serveur (`define`, `move`, `set`, `replace`, `remove`, `subscribers`, `info`, `list`) et client
+  (`watch`, `get`, `list`), passage d'une seconde (grille de 256 m, cercle au sol, hystérésis de 25 m, instances),
+  état tenu par le core avec révisions, différences regroupées toujours fiables, état entier latent avec préavis,
+  `core:zones:resync` ; `core.net` : positions gardées 50 ms, plafond global de 4 Mo en route, joueurs sautés en
+  5e valeur, `sendPacked` / `sendNearPacked` (au lieu d'une bibliothèque par module) ; `/vava_reseau zones [n°]` (durée
+  du passage ; consultation d'un joueur au journal) ; `vava_voice` 1.3.0 (zones de voix aux seuls joueurs proches,
+  exceptions d'audit retirées). Coût mesuré hors jeu : 0,16 ms par passage à 64 joueurs, 0,3 ms à 128 (2 048 zones),
+  plus quatre natives par joueur. Compte rendu `docs/plan/rapports/T-014.md`, procédure `docs/tests/zones.md`.
 
 ### T-015 — Récolte : GlobalState → abonnements de zone
 - Agent : vava-dev-lua · Dépend de : T-014 · Statut : à faire
@@ -395,6 +407,8 @@ versé à T-014 ; les autres points déjà couverts sont précisés dans T-012 �
   27 Ko/s sortants pour rien). Retirer `vitality` de ce qui est publié (`zones.lua:124`) : le client ne lit que `band`
   et `scarred` (`client/props.lua:76-79`), et la vitalité entière fait partir une écriture à presque chaque récolte et
   à chaque point regagné (passage de 10 s) ; publier zone et nœuds aux seuls abonnés de la zone.
+- Voir spec T-014 § 13.2 (une zone du core par zone de récolte, état `zone` + `n:<nœud>`, `core.zones.watch` côté
+  client ; `coreVersion = '0.11.0'`).
 
 ### T-016 — Agriculture : GlobalState → abonnements de zone
 - Agent : vava-dev-lua · Dépend de : T-014 · Statut : à faire
@@ -402,6 +416,7 @@ versé à T-014 ; les autres points déjà couverts sont précisés dans T-012 �
   les 12 emplacements du champ communal) à tous les joueurs dès qu'un seul emplacement change de culture, de stade ou
   d'état. Envoyer aux abonnés de la parcelle la seule différence `{ parcelle, n°, crop, stage, state }` (environ 40 o)
   et l'état complet seulement à l'abonnement.
+- Voir spec T-014 § 13.3 (une zone du core par parcelle, état `s<n°>` par emplacement ; `coreVersion = '0.11.0'`).
 
 ### T-017 — Artisanat : GlobalState → abonnements de zone
 - Agent : vava-dev-lua · Dépend de : T-014 · Statut : à faire
@@ -409,6 +424,8 @@ versé à T-014 ; les autres points déjà couverts sont précisés dans T-012 �
   par création au moins (occupée, libre) et à chaque unité de combustible ; `:85-87` réécrit la liste complète des
   stations (110 o par station) à chaque station ajoutée par un module. Envoyer l'état aux abonnés de la zone de la
   station ; la liste des stations devient la définition de zone (plus de clé globale).
+- Voir spec T-014 § 13.4 (une zone du core par station, état `def` + `s` ; sons par `core.zones.subscribers` ou
+  `sendNear` ; `coreVersion = '0.11.0'`).
 
 ### T-018 — Revue des boucles client
 - Agent : vava-dev-lua (avec vava-reseau-perf) · Dépend de : T-011 · Statut : à tester en jeu

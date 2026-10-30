@@ -33,9 +33,18 @@ du Conseil par appel direct du RPC.
 2. **GlobalState.** Toute écriture est envoyée à **tous** les joueurs connectés. Acceptable : heure du royaume,
    saison, météo, quelques drapeaux. Non acceptable : l'état de chaque nœud de récolte, parcelle ou station quand il
    y en a des dizaines et qu'il change à chaque action.
-3. **Données de zone.** Modèle recommandé : le client entre dans le rayon d'une zone → il la demande (RPC limité) →
-   le serveur l'inscrit comme « abonné » à la zone et lui envoie l'état → ensuite il ne reçoit que les différences
-   tant qu'il est abonné → le serveur le désabonne quand il s'éloigne (vérifié côté serveur) ou se déconnecte.
+3. **Données de zone.** Modèle en place depuis le core 0.11.0 (`core.zones`, T-014, décision du porteur du projet du
+   30 octobre 2026) : **le serveur décide seul** qui suit une zone. À chaque passage (1 s, réglable), il lit la position
+   de chaque personnage apparu (une lecture par joueur, gardée 50 ms), cherche dans une grille les zones proches et
+   abonne ceux qui entrent dans le cercle d'intérêt (rayon + marge, distance au sol, instance de la zone) → il leur
+   envoie l'état entier et sa révision → ensuite seulement les différences, regroupées par tour, toujours fiables →
+   il les désabonne au-delà de rayon + marge + 25 m (hystérésis : pas d'aller-retour en bordure), à la sélection, au
+   déchargement ou au départ. **Aucun RPC d'abonnement** : un client ne demande jamais d'entrer dans une zone (il
+   devrait sinon connaître toutes les zones, un annuaire envoyé à tous) ; son seul RPC (`core:zones:resync`, limité)
+   redemande l'état d'une zone **qu'il suit déjà**, quand une révision manque (le client applique la révision
+   attendue + 1, ignore les anciennes, garde les plus récentes en attendant un état entier). L'état vit dans le core :
+   une seule sérialisation pour tous les entrants d'un passage, rien de gros ne traverse un export. Bornes : 32 Ko par
+   état, 8 Mo en tout, 2 048 zones, 256 zones suivies par joueur, 32 Ko d'états entiers par joueur et par passage.
 4. **Différences.** On envoie `{ id, champ = nouvelle valeur }`, pas l'objet complet.
 5. **Gros volumes** (catalogue, journal, liste de recettes) : envoyés une fois à la demande, mis en cache côté
    client avec une version, renvoyés seulement si la version change ; `TriggerLatentClientEvent` au-delà de
@@ -58,7 +67,8 @@ Points solides déjà en place :
 Points à traiter (tâches de la phase 1) :
 - **GlobalState pour des états locaux** : `vava_gathering` (zones et nœuds), `vava_farming` (parcelles),
   `vava_crafting` (stations). Chaque changement part chez tous les joueurs. Coût faible à 10 joueurs, à mesurer et à
-  passer au modèle « abonnement de zone » avant d'ouvrir.
+  passer au modèle « abonnement de zone » avant d'ouvrir (service en place depuis T-014 ; bascules : T-015, T-016,
+  T-017, plan dans `docs/plan/specs/T-014.md` § 13).
 - **13 fichiers clients contiennent `Wait(0)`** (`vava_magic` en majorité, `vava_voice`, `vava_chat/overhead`,
   `vava_admin/tools`, `client/players/spawn.lua`) : vérifier que chaque boucle ne tourne que pendant un état actif.
 - **Environ 3 Mo de fichiers web dupliqués** : 50 polices WOFF2 (1,8 Mo) et les textures `grain.png`/`paper.png`
