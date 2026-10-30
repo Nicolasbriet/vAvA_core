@@ -3,6 +3,8 @@
     Rôle : déclaration et cycle de vie des modules.
       declared → waiting (core prêt, dépendances prêtes et en bonne version) → migrating → starting (setup) → ready
       Un échec à n'importe quelle étape : failed, message explicite, purge de tout ce que le module a enregistré.
+      Ressource arrêtée : stopping pendant le tour courant (le module garde l'API pour ses dernières écritures, l'ordre
+      des gestionnaires onResourceStop entre le core et lui n'étant pas défini), retiré au tour suivant.
     Le nom d'un module est celui de sa ressource (imposé) : aucune ressource ne peut se faire passer pour une autre.
     Dépendances : shared/init.lua, config/server.lua, shared/lib/table.lua, shared/lib/semver.lua, shared/lib/schema.lua,
                   shared/core/logger.lua, shared/core/hooks.lua, server/core/migrations.lua
@@ -34,7 +36,7 @@ local RUNNING_STATES = { started = true, starting = true }
 local modules = {}
 vAvA.modules = modules
 
----@alias vAvA.ModuleState 'declared'|'waiting'|'migrating'|'starting'|'ready'|'failed'
+---@alias vAvA.ModuleState 'declared'|'waiting'|'migrating'|'starting'|'ready'|'failed'|'stopping'
 
 ---@class vAvA.ModuleRecord
 ---@field name string
@@ -112,10 +114,12 @@ local function dependsOn(from, target, visited)
     return false
 end
 
+--- Vrai tant que le démarrage de ce module a encore un sens : il est toujours le module déclaré sous son nom et sa
+--- ressource n'est pas arrêtée.
 ---@param record vAvA.ModuleRecord
 ---@return boolean
 local function isCurrent(record)
-    return records[record.name] == record
+    return records[record.name] == record and record.state ~= 'stopping'
 end
 
 ---@param record vAvA.ModuleRecord
@@ -149,6 +153,9 @@ local function checkDependency(record, depName, minVersion)
     if not dep or dep.state ~= 'ready' then
         if dep and dep.state == 'failed' then
             return false, format("dépendance '%s' en échec : %s", depName, tostring(dep.error))
+        end
+        if dep and dep.state == 'stopping' then
+            return false, format("dépendance '%s' arrêtée", depName)
         end
         local outcome = waitFor(depName, cfg.dependencyTimeoutMs)
         if not isCurrent(record) then return false, "module arrêté pendant l'attente" end
@@ -267,6 +274,11 @@ function modules.declare(owner, def)
         return false, format("nom de module réservé '%s'", owner)
     end
     local existing = records[owner]
+    if existing and existing.state == 'stopping' then
+        -- ressource redémarrée dans le tour même de son arrêt : le retrait n'attend pas le tour suivant
+        modules.finishStop(owner)
+        existing = nil
+    end
     if existing then
         return false, format("module '%s' déjà déclaré (état : %s)", owner, existing.state)
     end
@@ -283,12 +295,13 @@ function modules.declare(owner, def)
     return true
 end
 
---- Vrai si le module peut utiliser l'API (pendant setup et une fois prêt).
+--- Vrai si le module peut utiliser l'API : pendant setup, une fois prêt, et le tour de son arrêt (dernières
+--- écritures de son propre gestionnaire onResourceStop).
 ---@param name string
 ---@return boolean
 function modules.isActive(name)
     local record = records[name]
-    return record ~= nil and (record.state == 'starting' or record.state == 'ready')
+    return record ~= nil and (record.state == 'starting' or record.state == 'ready' or record.state == 'stopping')
 end
 
 ---@class vAvA.ModuleInfo
@@ -325,13 +338,25 @@ function modules.list()
     return result
 end
 
---- Arrêt d'une ressource : le module disparaît, ceux qui en dépendent sont signalés.
+--- Arrêt d'une ressource : le module passe en `stopping` et disparaît au tour suivant (voir finishStop). Ceux qui
+--- l'attendaient sont libérés tout de suite.
 ---@param name string
 function modules.handleStop(name)
     local record = records[name]
-    if not record then return end
-    records[name] = nil
+    if not record or record.state == 'stopping' then return end
+    record.state = 'stopping'
+    record.setup = nil
     settle(name, 'stopped')
+    SetTimeout(0, function() modules.finishStop(name) end)
+end
+
+--- Retrait effectif d'un module arrêté : le tour suivant son arrêt, ou aussitôt s'il se redéclare avant. Ceux qui en
+--- dépendent sont signalés.
+---@param name string
+function modules.finishStop(name)
+    local record = records[name]
+    if not record or record.state ~= 'stopping' then return end
+    records[name] = nil
 
     local dependents = {}
     for otherName, other in pairs(records) do

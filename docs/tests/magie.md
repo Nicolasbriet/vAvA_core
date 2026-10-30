@@ -107,6 +107,7 @@ Aucun sort ne s'apprend en jeu : seul le Conseil en donne (`/magie`) ; le grimoi
 | 18 | Boule de feu prête : `/lancer` sans viser ; `/lancer mur_de_flammes`. | La boule part droit devant le personnage ; « Visez le sol, à portée. » |
 | 19 | Paramètres → Raccourcis → FiveM : « Magie : roue des sorts (maintenir) » sur `G`. | Les sept actions « Magie : … » y figurent ; `G` ouvre et ferme la roue ; le grimoire affiche la nouvelle touche. Remettre Tab. |
 | 20 | Se déconnecter, revenir. | Le sort prêt est retrouvé (gardé dans la fiche) ; mode magie endormi jusqu'au premier clic droit. |
+| 21 | **(2 joueurs)** Trait de glace N5 prêt (40 m), B verrouillé à 35 m : `/lancer projectile_de_roche` (N1 : 18 m) ; puis B à 10 m, même commande ; enfin `/lancer vague`. | Le bloc part droit devant, sans « Votre cible vous échappe. » (la cible verrouillée hors de portée du sort nommé n'est pas transmise) ; à 10 m, le bloc vise B ; la Vague ne se verrouille pas : elle part devant soi. |
 
 ## 3. Incantation, mana, recharges, XP
 
@@ -220,8 +221,8 @@ Aucun sort ne s'apprend en jeu : seul le Conseil en donne (`/magie`) ; le grimoi
 | # | Faire | Attendu |
 |---|---|---|
 | 1 | **(2 joueurs)** N1 sur B à 10 m. | Éclat blanc rapide (petite sphère bleutée), traînée de vapeur, lueur bleue ; son de glace brisée ; B −5, icônes Ralenti (2 s) et Mouillé (8 s), gouttes sur B vues des proches, givre bref à l'écran ; B marche aux trois quarts de son allure. |
-| 2 | **(2 joueurs)** N4. | B à 55 % de son allure, mais il peut encore courir : la course n'est coupée qu'à partir d'une force de 50 % (N5). Le grimoire N4 dit « La cible ne peut plus courir » : écart à me remonter. |
-| 3 | **(2 joueurs)** N5. | B à 50 %, course impossible 4 s. |
+| 2 | **(2 joueurs)** N4. | B à 55 % de son allure, mais il peut encore courir : la course n'est coupée qu'à partir d'une force de 50 % (N5). Le grimoire N4 l'annonce ainsi (« perd près de la moitié de son allure »). |
+| 3 | **(2 joueurs)** N5. | B à 50 %, course impossible 4 s ; le grimoire N5 le dit (« ne peut plus courir »). |
 | 4 | **(3 joueurs)** A (N5) touche B, puis C (N1) le touche pendant ce Ralenti. | Le Ralenti de 50 % reste (jamais cumulé, le plus fort l'emporte). |
 | 5 | **(2 joueurs)** B en Brûlure (Boule de feu N4) ; A le touche. | A : « Éteint ! » ; la brûlure de B s'arrête. |
 
@@ -395,6 +396,7 @@ Ralenti (Trait, Boue) ; Chancelant (Secousse N1-N3, Roche N3+) ; Renversé (Vagu
 | 9 | **(2 joueurs)** A touche B d'un Trait de glace (Mouillé 8 s), puis lance une Secousse N1 sur lui (Chancelant 1,2 s), aussitôt un Projectile de roche N3, puis un second Trait de glace. | Seul le chancellement passe ; la roche fait ses −20 sans faire chanceler ; le second trait blesse, ralentit et mouille, sans geler (pas de « Gelé ! ») ; l'icône « Protégé » paraît à la fin du chancellement et dure 6 s ; après elle, un contrôle repasse. |
 | 10 | **(2 joueurs)** Pendant « Protégé » : Boule de feu N4, Trait de glace. | Brûlure, Ralenti et Mouillé s'appliquent (seuls les contrôles durs sont bloqués). |
 | 11 | **(2 joueurs)** A immobilise B depuis le Registre du Conseil, puis le gèle (Gel) ; B essaie de marcher pendant le gel et après sa fin ; à la fin, A libère B depuis le Registre. | Pendant le gel comme après (icône et givre partis), B reste figé sur place : ni ses touches de déplacement, ni la fin du gel ne le libèrent (le client ne fige ni ne libère plus rien ; le serveur ne libère pas un joueur retenu par le Conseil) ; étiquette « Immobilisé » toujours au Registre. « Libérer » le délivre. S'il bouge avant « Libérer », c'est à me remonter. |
+| 11 bis | **(2 joueurs)** B immobilisé puis gelé (`durationMs` du Gel monté à 15 s le temps du test) ; A « Libère » B depuis le Registre **pendant** le gel. | B reste figé jusqu'à la fin du gel (le serveur le refige dès que le Registre a relâché le ped), étiquette « Immobilisé » partie ; à la fin du gel, B est libre. S'il bouge dès « Libérer », c'est à me remonter. |
 | 12 | **(2 joueurs)** Sans le Registre : geler B (Gel) ; B essaie de marcher pendant le gel, puis après. | Figé pendant les 2,5 s (le serveur seul fige le personnage), libre dès la fin du gel. S'il marche pendant le gel, c'est à me remonter. |
 
 ## 10. Zones au sol et ce que voit un témoin

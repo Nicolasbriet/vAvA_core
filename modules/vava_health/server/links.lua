@@ -2,12 +2,14 @@
     vava_health/server/links.lua
     Rôle : liens avec les autres modules, tous par leurs hooks (aucun n'est requis) :
       - vava_inventory : à terre, aucun geste sur les objets (prise en main comprise) ; objets de soin
-        (`effects = { health = 20 }` : +20 % de la vie), refusés si le joueur n'est pas blessé ;
+        (`effects = { health = 20 }` : +20 % de la vie), refusés si le joueur n'est pas blessé ; à la chute,
+        l'inventaire ouvert (grenier, coffre, fouille, sac) se ferme (export `close`, inventaire 1.6.4, appel isolé) ;
       - vava_needs : pas de baisse de la faim et de la soif à terre.
     Dépendances : shared/constants.lua, config.lua, server/core.lua, server/life.lua
 ]]
 
-local type, pairs, ipairs = type, pairs, ipairs
+local type, pairs, ipairs, pcall, tostring = type, pairs, ipairs, pcall, tostring
+local GetResourceState = GetResourceState
 
 local life = VavaHealth.life
 local cfg = VavaHealth.config
@@ -15,6 +17,7 @@ local messages = cfg.messages
 local EFFECT = VavaHealth.EFFECT
 -- avant les autres abonnés : un joueur à terre est refusé d'emblée
 local GUARD_PRIORITY = 10
+local INVENTORY = 'vava_inventory'
 
 local links = {}
 VavaHealth.links = links
@@ -65,6 +68,25 @@ local function beforeDecay(payload)
     if entry and entry.downed then return false, 'downed' end
 end
 
+--- Appel isolé à un export de l'inventaire (facultatif). Renvoie vrai si l'appel a abouti, puis son résultat.
+---@return boolean called
+---@return any result
+local function inventory(fn, ...)
+    if GetResourceState(INVENTORY) ~= 'started' then return false end
+    local called, result = pcall(function(...) return exports[INVENTORY][fn](exports[INVENTORY], ...) end, ...)
+    if not called then
+        VavaHealth.log.warn('%s.%s en erreur : %s', INVENTORY, fn, tostring(result))
+        return false
+    end
+    return true, result
+end
+
+--- À la chute, l'inventaire ouvert se ferme (grenier, coffre, fouille, sac) : à terre, on ne consulte plus rien.
+---@param payload table  { source, … }
+local function afterDowned(payload)
+    inventory('close', payload.source)
+end
+
 --- Branche les hooks. Appelé pendant le setup du module.
 ---@return boolean ok
 ---@return string|nil err
@@ -79,6 +101,7 @@ function links.start()
         { 'before', VavaHealth.INVENTORY_USE, beforeUse },
         { 'after', VavaHealth.INVENTORY_USE, afterUse },
         { 'before', VavaHealth.NEEDS_DECAY, beforeDecay },
+        { 'after', VavaHealth.HOOKS.DOWNED, afterDowned },
     }) do
         local id, err = hooks[def[1]](def[2], def[3], def[4])
         if not id then return false, err end

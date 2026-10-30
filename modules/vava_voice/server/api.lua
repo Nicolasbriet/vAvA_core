@@ -80,7 +80,8 @@ local function isMultiplier(value)
 end
 
 --- Modifie une zone (nom, rayon, hauteur, effet) : true, zone, détails pour le journal | false, code. Le nom suit la
---- règle de l'éditeur en jeu (signes, shared/label.lua) : refusé par `invalid_label` ou `label_too_long`.
+--- règle de l'éditeur en jeu (signes, shared/label.lua) : refusé par `invalid_label` (vide), `label_unreadable` (signe
+--- de contrôle ou invisible, 1.2.2) ou `label_too_long`.
 exports('webUpdateZone', function(id, label, radius, height, multiplier)
     if not VavaVoice.ready then return false, 'not_ready' end
     if GetInvokingResource() ~= WEB.bridge then return false, 'forbidden' end

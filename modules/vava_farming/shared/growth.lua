@@ -71,8 +71,11 @@ function growth.advance(slot, crop, now, season)
     slot.moisture = max(0, slot.moisture - rate * elapsed)
     local dry = elapsed - wetTime
     if dry > 0 then
-        slot.dryHours = slot.dryHours + dry / 3600
         slot.drySince = slot.drySince or (now - floor(dry))
+        -- les heures sèches s'arrêtent à la mort : même compte calculé en une fois ou peu à peu
+        local deathAt = slot.drySince + g.dieAfterHours * 3600
+        local counted = min(now, deathAt) - (now - dry)
+        if counted > 0 then slot.dryHours = slot.dryHours + counted / 3600 end
         local drySeconds = now - slot.drySince
         if drySeconds >= g.dieAfterHours * 3600 then
             slot.dead = true
@@ -124,14 +127,17 @@ function growth.state(slot, crop)
     return STATES.GROWING
 end
 
---- Stade visuel (1 à #stages) d'après l'avancement.
+--- Stade visuel (1 à #stages) d'après l'avancement. Le dernier modèle est celui de la plante mûre : il n'apparaît
+--- qu'à maturité ; les précédents se partagent la croissance à parts égales.
 ---@param slot vAvA.SlotState
 ---@param crop table
 ---@return integer
 function growth.stage(slot, crop)
     local count = #crop.stages
     if count == 0 then return 0 end
-    return min(count, floor(growth.progress(slot, crop) * count) + 1)
+    local progress = growth.progress(slot, crop)
+    if count == 1 or progress >= 1 then return count end
+    return min(count - 1, floor(progress * (count - 1)) + 1)
 end
 
 --- Régularité d'arrosage (0–100) : heures de sécheresse rapportées à la durée de croissance.

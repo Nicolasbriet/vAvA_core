@@ -273,11 +273,13 @@ function slots.setFertility(slot, value)
     slot.dirty = true
 end
 
---- Mûrit (Conseil) : croissance portée au total.
+--- Mûrit (Conseil) : croissance portée au total, terre arrosée (une sécheresse laissée en place la ferait reflétrir
+--- ou mourir au calcul suivant).
 ---@param slot table
 ---@param crop table
 function slots.ripen(slot, crop)
-    slot.growth, slot.wilted, slot.dead, slot.dirty = crop.growMinutes * 60, false, false, true
+    slot.growth, slot.wilted, slot.dead = crop.growMinutes * 60, false, false
+    slot.moisture, slot.drySince, slot.dirty = 100, nil, true
 end
 
 -- Écriture --------------------------------------------------------------------------------------------------------------

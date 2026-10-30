@@ -9,7 +9,7 @@ ardente**), d'eau (**Trait de glace**, **Vague**, **Brume**) et de terre (**Proj
 **Lueur** et **Murmure**, grimoire et registre des murmures (objets), commandes du Conseil. Le serveur décide de tout ;
 le client affiche et demande.
 
-Version 2.6.2 : les cinq étapes de la refonte (noyau, roue et contrôles ; états, zones et feu ; eau et terre ;
+Version 2.6.3 : les cinq étapes de la refonte (noyau, roue et contrôles ; états, zones et feu ; eau et terre ;
 combinaisons ; finitions : traces au sol, sons par fichier ou natifs, documentation et tests), puis leurs correctifs.
 Rien n'a encore été joué en vrai : voir « À vérifier en jeu », « Tests à faire en jeu » et la procédure complète
 `docs/tests/magie.md`.
@@ -128,7 +128,7 @@ Commandes de secours (chat) :
 | Commande | Action |
 | --- | --- |
 | `/sort <nom>` · `/sort aucun` | préparer un sort sans la roue, ou ranger la magie (un non-mage : « La magie ne vous a jamais répondu. ») |
-| `/lancer [sort]` | lancer le sort prêt (ou celui nommé), sans visée ; mains vides, comme le mode magie (arme sortie : refusé) |
+| `/lancer [sort]` | lancer le sort prêt (ou celui nommé), sans visée ; mains vides, comme le mode magie (arme sortie : refusé). La cible verrouillée n'est transmise à un autre sort nommé que s'il la vise et l'atteint ; sinon il part droit devant (2.6.3) |
 | `/murmure` · `/murmure 1,3 <message>` | ouvrir le parchemin, ou envoyer directement |
 | `/lueur` · `ancrer` · `couleur <nom>` · `eteindre` · `dissiper` | Lueur : allumer, ancrer là où l'on regarde (niveau 4), couleur (niveau 5), éteindre, dissiper ses orbes |
 | `/grimoire` | ouvrir le grimoire (l'objet l'ouvre aussi) |
@@ -520,7 +520,7 @@ Deux joueurs (A et B) suffisent ; un troisième aide pour le cercle et la zone d
 
 **Trait de glace**
 - [ ] A vise B et lance : éclat blanc rapide, traînée de vapeur, lueur bleutée ; B blessé un peu, icônes Ralenti et Mouillé, il marche moins vite, givre bref à l'écran.
-- [ ] Niveau 4 : B court encore (Ralenti 45 %) ; verrouillé, le trait s'incurve un peu vers lui. Niveau 5 : B ne peut plus courir.
+- [ ] Niveau 4 : B court encore (Ralenti 45 %, ce que le grimoire annonce depuis 2.6.3) ; verrouillé, le trait s'incurve un peu vers lui. Niveau 5 : B ne peut plus courir.
 
 **Vague**
 - [ ] Clic droit : cône bleu au sol devant soi, qui suit le regard. Clic gauche : gerbes d'eau qui balaient le cône, son de vague ; B devant est repoussé et mouillé ; C derrière, rien.

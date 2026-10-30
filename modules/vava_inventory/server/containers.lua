@@ -283,6 +283,9 @@ end
 ---@return string|nil err
 function containers.load(id)
     if byId[id] then return byId[id] end
+    -- des écritures de ce conteneur attendent encore (déchargé à l'instant, ou base en panne) : elles partent d'abord,
+    -- pour relire un état à jour
+    if persistence.pendingFor(id) then persistence.flush() end
     local row, err = db().single(SELECT_SQL, { id })
     if err then return nil, err end
     if not row then return nil, 'not_found' end

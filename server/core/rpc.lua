@@ -13,7 +13,7 @@
 
 local type, tonumber, tostring, pairs, xpcall, select, getmetatable = type, tonumber, tostring, pairs, xpcall, select, getmetatable
 local traceback = debug.traceback
-local mathType, tointeger = math.type, math.tointeger
+local mathType = math.type
 local format = string.format
 local unpack = table.unpack
 local RegisterNetEvent, TriggerClientEvent, DoesPlayerExist = RegisterNetEvent, TriggerClientEvent, DoesPlayerExist
@@ -136,11 +136,9 @@ local function handleRequest(src, id, name, count, args)
         reply(src, id, false, 'invalid_args')
         return
     end
-    -- un entier peut arriver en flottant (JSON d'une interface NUI) : le handler reçoit un vrai entier
-    local schemas = entry.args
-    for i = 1, count do
-        if schemas[i].type == 'integer' and mathType(args[i]) == 'float' then args[i] = tointeger(args[i]) end
-    end
+    -- un entier peut arriver en flottant (JSON d'une interface NUI) : le handler reçoit un vrai entier, aussi dans
+    -- les champs de table, les listes et les maps
+    schema.normalizeList(entry.args, args, count)
 
     state.inFlight = state.inFlight + 1
     local ok, resultCount, results = capture(xpcall(entry.handler, traceback, src, unpack(args, 1, count)))
@@ -195,6 +193,7 @@ local function handleClientResponse(src, id, ok, count, results)
             outgoing:settle(id, false, 'invalid_response')
             return
         end
+        schema.normalizeList(returns, results, count)
     end
     outgoing:settle(id, true, unpack(results, 1, count))
 end

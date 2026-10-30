@@ -100,8 +100,8 @@ VavaFarming.config = {
     },
 
     -- Cultures : graine → produit ; durée (minutes), eau consommée par heure (points d'humidité), coût de fertilité par
-    -- récolte, famille (rotation), rendement, XP, difficulté, props par stade (du semis au mûr), prop flétri, prop mort ;
-    -- `frostHardy` : résiste aux nuits de gel (vava_time) sans être couverte.
+    -- récolte, famille (rotation), rendement, XP, difficulté, props par stade (du semis au mûr ; le dernier n'apparaît qu'à
+    -- maturité), prop flétri, prop mort ; `frostHardy` : résiste aux nuits de gel (vava_time) sans être couverte.
     crops = {
         ble = { label = 'Blé', family = 'cereale', seed = 'graine_ble', product = 'ble', growMinutes = 90, waterPerHour = 20, fertilityCost = 15,
             yield = { 3, 6 }, xp = 14, difficulty = 15,

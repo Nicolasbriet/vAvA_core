@@ -75,8 +75,10 @@ moins, beiges à ×1, dorés au-delà).
   ses hanches (la position du personnage) ; la zone descend aussi d'un mètre sous elles (`zones.baseOffset`), jusqu'au
   sol : une zone de 2 m au rez-de-chaussée ne déborde pas à l'étage.
 - **Nom** : 40 signes au plus — un « é » ou un emoji compte pour un, dans le champ comme sur le serveur ; les espaces
-  en trop sont retirés. Refusés : un nom fait d'espaces (insécables comprises), les caractères de contrôle et les
-  caractères invisibles qui tromperaient la lecture (largeur nulle, marques de sens d'écriture, BOM).
+  en trop sont retirés. Refusés : un nom fait d'espaces (insécables comprises) — « Donnez un nom au lieu. » —, et les
+  caractères de contrôle ou invisibles qui tromperaient la lecture (largeur nulle, marques de sens d'écriture, BOM) —
+  « Ce nom contient des signes illisibles. » (code `label_unreadable`, 1.2.2 ; la Chancellerie montre son message
+  générique tant que ses textes ne connaissent pas ce code).
 - **Réglages** : rayon, hauteur, effet ; l'aperçu suit en direct, avec les quatre portées avant et après l'effet.
 - **Modifier** une zone (la cliquer dans la liste), la **recentrer** là où l'on se tient, **S'y rendre** (droit
   `teleport`), **Supprimer** (deux clics).

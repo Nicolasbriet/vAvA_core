@@ -44,7 +44,7 @@ Utilisés par les arguments de RPC, les retours client et les entrées de regist
 
 | Champ | Types concernés | Effet |
 |---|---|---|
-| `type` | tous | `string`, `number`, `integer`, `boolean`, `table`, `array`, `map`, `function`, `any` ; `integer` n'accepte un flottant que s'il a un équivalent entier Lua (`3.0` oui, `1e300` non) |
+| `type` | tous | `string`, `number`, `integer`, `boolean`, `table`, `array`, `map`, `function`, `any` ; `integer` n'accepte un flottant que s'il a un équivalent entier Lua (`3.0` oui, `1e300` non), et un RPC le convertit en entier avant le handler, à tout niveau (argument, champ de table, élément de liste, valeur de map ; 0.8.1) |
 | `optional` | tous | `nil` accepté |
 | `min` / `max` | string (longueur en octets), number/integer (valeur), array/map (nombre d'éléments) | bornes incluses ; entières pour string, array et map ; jamais `NaN` |
 | `pattern` | string | motif Lua (ancrer avec `^` et `$`) |
@@ -54,6 +54,8 @@ Utilisés par les arguments de RPC, les retours client et les entrées de regist
 | `key` / `value` | map | schémas des clés (string ou integer) et des valeurs |
 
 `function` accepte une fonction locale ou venant d'une autre ressource (callbacks d'entrées de registre).
+Une définition qui se contient elle-même, directement ou non (`def.items = def`), est refusée à la compilation (0.8.1) ;
+une même table de définition reprise à plusieurs endroits distincts reste permise.
 
 Pour une **entrée réseau** : `any`, `function` et `strict = false` sont refusés, et les chaînes, listes et maps sans `max`
 reçoivent la borne de `config/server.lua` (`schema.*`). `NaN` et `±inf` sont toujours refusés.
@@ -92,6 +94,9 @@ declared → waiting → migrating → starting (setup) → ready
   `modules.dependencyTimeoutMs`). Échec immédiat si la ressource dépendante est absente ou arrêtée, si sa version
   est insuffisante, ou en cas de dépendance circulaire.
 - Déclarer aussi les dépendances dans le fxmanifest (`dependency 'vava_inventory'`) pour l'ordre de démarrage.
+- À l'arrêt de sa ressource, un module passe par `stopping` et ne disparaît qu'au **tour suivant** (0.8.1) : son propre
+  gestionnaire `onResourceStop` garde l'API (`core.db` pour un journal, par exemple), quel que soit l'ordre des
+  gestionnaires d'arrêt entre le core et lui. Une ressource redémarrée dans le même tour se redéclare sans attendre.
 - **Toute l'API (hors `log`, `modules` et `version`) est refusée tant que le module n'est pas en `starting` ou
   `ready`** : enregistrer hooks, registres et RPC dans `setup`.
 
@@ -559,6 +564,7 @@ Règles tenues par l'inventaire :
 | `createContainer({ kind, ownerType?, ownerId?, width, height, maxWeight?, label? })` | id d'un conteneur conservé (coffre…) |
 | `open(source, containerId, ancrage?)` | ouvre un conteneur au joueur ; **l'appelant a vérifié le droit d'accès**. `ancrage` `{ x, y, z, radius }` (1.4.0) : distance vérifiée côté serveur à l'ouverture (`too_far`) et à chaque opération, conteneur fermé chez le joueur qui s'éloigne (vérification toutes les `anchor.sweepMs`, seulement tant qu'un conteneur ancré est ouvert) ; `radius` ≤ `anchor.maxRadius` sinon `invalid_anchor`. **À donner pour tout conteneur qui a un lieu** (coffre, grenier, station) |
 | `containerOf(source)` | id du conteneur porté par le personnage actif d'un joueur (fouille, administration), ou `nil, code` ; ouvert chez un autre joueur, il s'y ferme quand son porteur quitte le jeu ou change de personnage |
+| `close(source, containerId?)` | `true` ou `false, code` (`not_open`, `invalid_target`) — ferme chez un joueur tout ce qu'il regarde, son interface comprise (`vava_health` l'appelle à la mise à terre) ou, avec `containerId`, ce seul conteneur (accès retiré à un grenier, un coffre) ; depuis 1.6.4 |
 | `held(source)` | pile tenue en main par le personnage actif (`{ id, item, x, y, rotated, quantity, metadata }`), ou `nil` ; depuis 1.4.0 |
 | `hold(source, idObjet)` | `true` ou `false, code` (`not_found`, `not_holdable`, refus d'un hook) — fait prendre en main une pile de la besace, ou reposer (`0`) : outil brisé, désarmement… ; depuis 1.4.0 |
 
@@ -587,6 +593,10 @@ montré au joueur, dans l'interface ou en notification s'il utilisait un raccour
   départ de son auteur. Au-delà, le jet qui poserait un nouveau sac est refusé (`too_many_drops`) ; remplir un sac
   existant reste possible.
 - Le client ne reçoit que les conteneurs qu'il a ouverts, puis leurs différences.
+- Déchargement d'un personnage (1.6.4) : ce qu'un module note sur sa besace, par son numéro de conteneur, pendant
+  l'écriture qui précède le déchargement (objet retiré…) part aussi avant que le conteneur quitte la mémoire ; et un
+  conteneur relu en base dont des écritures attendent encore les fait partir d'abord. Un retour du personnage dans
+  les 3 s ne fait donc jamais revenir un objet retiré.
 - Pile d'un objet sans définition au chargement d'un conteneur (module arrêté, ou pas encore redéclaré après un
   `restart vava_inventory`) : gardée à part, sa ligne en base intacte, puis replacée dès que l'objet est déclaré
   (1.6.3) : à sa place d'origine si elle est libre, sinon à la première place libre ; sans place, elle reste à part.
@@ -707,7 +717,8 @@ touches et messages : `config.lua`. Demande le core 0.4.0 (hook `core:character:
   serveur ordonne toujours au client de coucher son ped (vie GTA 0) : ce que GTA fait d'une vie posée exactement sur
   le seuil ne compte pas (règle pure : `shared/vitality.lua`). Le joueur reste au sol, l'écran « wasted » de GTA est
   remplacé par l'écran « Vous êtes à terre », qui montre la touche « rendre l'âme » choisie par le joueur. À terre :
-  aucun geste sur les objets (prendre en main compris ; un module peut encore faire reposer l'objet tenu), faim et
+  aucun geste sur les objets (prendre en main compris ; un module peut encore faire reposer l'objet tenu), l'inventaire
+  ouvert se ferme à la chute (grenier, coffre, fouille, sac ; export `close` de l'inventaire 1.6.4, 1.1.4), faim et
   soif figées, ni récolte, ni artisanat, ni agriculture (refusés par ces modules), aucun effet des sorts ; un ped resté
   au seuil ou au-dessus (client qui se relève seul) est remis à terre.
 - **Relever** (touche G par défaut) : le serveur choisit la personne à terre la plus proche (2 m, positions lues côté
@@ -906,7 +917,7 @@ setr voice_useSendingRangeOnly true
 | `limitRange(source, raison, maximum)` | `true` ou `false, code` — portée limitée au numéro `maximum` (1 = Chuchoter) pour cette raison (préfixée par la ressource appelante) ; la plus basse des limites s'applique |
 | `releaseRange(source, raison)` | `true` ou `false, code` |
 | `getZones()` | liste `{ id, label, x, y, z, radius, height, multiplier }` |
-| `webUpdateZone(id, nom, rayon, hauteur, effet)` | `true, zone, détails` ou `false, code` — pont de la Chancellerie seulement (1.1.0) ; sans recentrage ; nom refusé par `invalid_label` ou `label_too_long` (40 signes, 1.2.1) |
+| `webUpdateZone(id, nom, rayon, hauteur, effet)` | `true, zone, détails` ou `false, code` — pont de la Chancellerie seulement (1.1.0) ; sans recentrage ; nom refusé par `invalid_label` (vide), `label_unreadable` (signe de contrôle ou invisible, 1.2.2) ou `label_too_long` (40 signes, 1.2.1) |
 | `webDeleteZone(id)` | `true, nil, détails` ou `false, code` — pont de la Chancellerie seulement (1.1.0) |
 
 | Export client | Retour |
@@ -1333,7 +1344,8 @@ croissance garde ses fractions de seconde en mémoire et s'écrit entière en ba
 croissance identique à la 1.2.2.
 
 **Registre** `vava_farming:crops` (`{ label, family, seed, product, growMinutes, waterPerHour, fertilityCost, yield,
-xp, difficulty, stages, wilted, dead }`), rempli par la config, ouvert aux autres modules. State bag global
+xp, difficulty, stages, wilted, dead }` ; `stages` : modèles par stade, le dernier réservé à la plante mûre), rempli par la
+config, ouvert aux autres modules. State bag global
 `vava_farming:parcel:<id>` → `{ slots = { { crop, stage, state } } }`.
 
 | Export serveur | Retour |

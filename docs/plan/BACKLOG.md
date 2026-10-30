@@ -101,42 +101,136 @@ marqués « décision » attendent le porteur du projet : ne pas les coder sans 
 - `docs/api.md` : ordre de démarrage complet, refus des besoins « dès 95 », actions non protégées par le rang.
 
 ### T-009 — PORTE : première session de test complète — **HUMAIN**
-- Dépend de : T-001, T-004, T-005 à T-008 · Statut : à faire
+- Dépend de : T-001, T-004, T-005 à T-008 · Statut : validée
+- Validée le 29 octobre 2026 par le porteur du projet : la phase 1 est ouverte. Les procédures de `docs/tests/` restent
+  la référence pour chaque écart rencontré ensuite (tâche de correction en tête de la phase en cours), et les
+  mesures de resmon et de poids téléchargé se prennent à la porte T-019.
 - Dérouler toutes les procédures de `docs/tests/`, noter chaque écart en tâche de correction (phase 0), mesurer le
   resmon de chaque ressource au repos et en action, noter le poids téléchargé à la première connexion.
 
-### Points relevés pendant T-002 à T-008 — à planifier par le porteur du projet
+### Suites des points relevés pendant T-002 à T-008 — Statut : à tester en jeu
 
-Ce ne sont **pas** des tâches : aucun agent ne les prend tant que le porteur du projet ne les a pas placés dans une
-phase. Détail dans les rapports cités.
-- Sécurité, à vérifier en premier par T-010 : un module qui retire un objet d'une besace par son numéro de conteneur
-  pendant l'écriture qui suit un déchargement pourrait dupliquer l'objet si le personnage revient dans les 3 s
-  (`vava_inventory/server/characters.lua:80`, relecture de T-005).
-- Vie GTA tenue par le client : un client modifié qui ignore `vava_health:set` ignore les dégâts des sorts ; à régler
-  avec la chaîne de dégâts T-110 (rapport T-006).
-- Core : le journal des dégâts de la magie écrit à l'arrêt dépend de l'ordre d'arrêt entre le core et le module
-  (lignes perdues mais signalées) ; différer d'un tour le retrait du module dans le core (rapport T-006).
-- Core : `rpc.lua` ne convertit `3.0` en `3` que pour les arguments de premier niveau ; une définition de schéma
-  cyclique fait lever `compile` ; tests de `rpc.lua`, `ratelimit.lua`, `registry.lua`, `modules.lua` (rapport T-002).
-- Inventaire : un export pour fermer un conteneur chez un joueur (le grenier resté ouvert pendant une mise à terre
-  reste consultable, sans dépôt ni retrait possible) ; `examples/vava_example_items` ne redéclare pas ses objets
-  quand l'inventaire redémarre (rapports T-005 et T-006).
-- Magie : « Libérer » du Registre pendant un Gel libère le ped ; `/lancer <autre sort>` peut répondre « Votre cible
-  vous échappe. » si ce sort porte moins loin que le sort prêt ; **décision** : Trait de glace N4 annoncé « ne peut
-  plus courir » alors que sa force (0,45) reste sous le seuil (0,5) — monter la force ou corriger les textes.
-- Agriculture : `/agriculture pousser` laisse la sécheresse en place (la plante redevient flétrie ou morte) ; heures
-  sèches d'une plante morte affichées au-delà de sa mort ; **décision** : le modèle « mûr » s'affiche dès 2/3 de la
-  croissance (la moitié pour la carotte et le chou) alors que la récolte n'est possible qu'à 100 % (rapport T-003).
-- Voix : un nom refusé pour un caractère invisible répond « Donnez un nom au lieu. » ; chaque changement de zone
-  part à tous les joueurs (à revoir avec T-014) (rapport T-008).
+Points des rapports T-002 à T-008, traités le 29 octobre 2026 par le porteur du projet hors de la boucle des agents
+(un commit par module, tests unitaires verts, audit statique passé). À dérouler pendant T-009 :
+- **Inventaire 1.6.4** (sécurité, relecture de T-005) : ce qu'un module note sur une besace par son numéro de
+  conteneur pendant l'écriture qui précède le déchargement part aussi avant la sortie de mémoire, et un conteneur relu
+  en base dont des écritures attendent les fait partir d'abord (plus d'objet retiré qui revient si le personnage
+  reparaît dans les 3 s). Export `close(source, conteneur?)` (interface fermée, évènement `vava_inventory:dismiss`) ;
+  **santé 1.1.4** ferme l'inventaire ouvert à la mise à terre ; **vava_example_items 1.1.1** redéclare ses objets au
+  redémarrage de l'inventaire. Procédures : inventaire 14-7, métiers 5-13, santé 3-9.
+- **Core 0.8.1** : définition de schéma cyclique refusée à la compilation ; entiers arrivés en flottant convertis à
+  tout niveau (champs de table, listes, maps) dans les arguments et les retours client ; module retiré au **tour
+  suivant** son arrêt (état `stopping` : il garde `core.db` pour les dernières écritures de son `onResourceStop`, le
+  journal des dégâts de la magie n'est plus perdu). Tests de `rpc.lua`, `ratelimit.lua`, `registry.lua`,
+  `modules.lua` (72 tests).
+- **Magie 2.6.3** : « Libérer » du Registre pendant un Gel ne relâche plus le ped avant la fin du gel (le serveur le
+  refige sur l'action du Conseil) ; `/lancer <sort>` ne transmet la cible verrouillée que si le sort nommé la vise et
+  l'atteint, sinon il part droit devant ; **décision prise** : textes du Trait de glace corrigés (la course n'est
+  coupée qu'au N5 ; la force du N4 reste 0,45, la progression garde une marche entre N4 et N5). Procédure : magie 2-21,
+  6.1-2 et 3, 9-11 bis.
+- **Agriculture 1.2.3** : `/agriculture pousser` arrose la terre (la plante ne reflétrit plus dans la foulée) ; les
+  heures sèches s'arrêtent à la mort, calculées en une fois ou peu à peu ; **décision prise** : le dernier modèle de
+  `stages` est réservé à la plante mûre (100 %, quand la récolte est possible), les autres se partagent la croissance
+  à parts égales. Procédure : métiers 5-3 et 5-5.
+- **Voix 1.2.2** : un nom refusé pour un signe de contrôle ou invisible répond « Ce nom contient des signes
+  illisibles. » (code `label_unreadable` ; la Chancellerie montre son message générique tant que ses textes ne le
+  connaissent pas : à ajouter à `chancellerie/web/js/strings.js` lors d'une prochaine version du panneau).
+  Procédure : voix 3-18.
+
+Reportés dans leur tâche : la vie GTA tenue par le client → T-110 ; la diffusion des zones de voix à tous → T-014.
 
 ## Phase 1 — Sécurité, performance, réseau
 
+Corrections issues de l'audit T-010 (30 octobre 2026), à prendre avant le reste de la phase :
+
+### T-024 — Ressources d'exemple et de développement inoffensives en public
+- Agent : vava-dev-lua · Dépend de : — · Statut : à faire
+- **BLOQUANT** (`docs/audits/securite-examples.md`) : `vava_dev_characters` donne à tout joueur `/objet` (100 objets par
+  appel), `/vie`, `/aterre` et `/besoins` sans droit ni journal (`server/main.lua:29-74`), et la ressource est `ensure`
+  sur le serveur de test. Garde par le code : `setup` refusé si la convar `vava_env` ne vaut pas `dev` (console :
+  « mode développement absent »), chaque commande réservée au droit `staff` de vava_admin ou à l'ACE `vava.dev`, dons et
+  soins journalisés par `vava_admin:log`. Même garde pour `vava_example` (`/note` : plafond par personnage et purge, ou
+  retrait) et `vava_anim_test` (commandes hors du Codex des joueurs). README racine : liste des ressources à ne jamais
+  `ensure` sur un serveur ouvert ; contrôle ajouté à `docs/hebergeur.md`.
+- Critères : sans la convar, les quatre ressources démarrent sans rien offrir ; procédure `docs/tests/` complétée ;
+  versions montées.
+
+### T-025 — Chancellerie : clé du pont hors de la ligne de commande
+- Agent : vava-dev-lua (cette tâche autorise à toucher `chancellerie/`) · Dépend de : — · Statut : à faire
+- **IMPORTANT** (`securite-vava_chancellerie.md`) : la clé du pont est passée à FXServer par
+  `+set vava_chancellerie_token …` (`chancellerie/lib/bridge.js:30-34`, `lib/process.js:205`, lue par
+  `modules/vava_chancellerie/server/auth.lua:20-22`) : lisible par tout utilisateur de la machine (`ps`,
+  `/proc/<pid>/cmdline`, Gestionnaire des tâches), elle permet d'appeler `/request` avec un acteur de rang `souverain` et
+  `/staff/sync`. La transmettre par l'entrée standard de FXServer après le lancement (déjà masquée par `secrets()`) ou
+  par un fichier à droits restreints lu au démarrage puis effacé ; en défense en profondeur, réserver `/staff/sync` et
+  les actions de rang élevé à une liste de comptes connus du pont ou à un second secret.
+- Critères : la clé n'apparaît plus dans la ligne de commande ni dans les journaux ; tests de la Chancellerie (faux
+  FXServer) à jour ; `docs/chancellerie.md` et README du pont à jour ; versions montées.
+
+### T-026 — Registre et caméras : bannis en panne de base, offres en boucle, cases sans mur
+- Agent : vava-dev-lua (cette tâche autorise à toucher `server/players/accounts.lua`) · Dépend de : — · Statut : à faire
+- **IMPORTANT** (`securite-vava_admin.md`) : `server/bans.lua:27-33` laisse entrer quand `accountId` est nul ou quand
+  la requête de ban échoue (`server/players/accounts.lua:264-266` perd l'erreur) : refuser la connexion
+  (`messages.unavailable`) sur erreur, et second contrôle au hook `core:player:joined` qui expulse un compte banni.
+- **IMPORTANT** (`securite-vava_cameras.md`) : `server/sessions.lua:118-123`, le joueur filmé peut renvoyer `sendOffer`
+  en boucle (jusqu'à 20 Ko relayés par offre vers le spectateur ou la Chancellerie) : `camera.offered` posé à la
+  première offre, `already_offered` ensuite. `server/main.lua:69-77` : `watch(joueur, 'tile')` sans mur ouvert n'est
+  jamais journalisé : tenir côté serveur un état « mur ouvert » par spectateur (posé par `wall`, levé par `leave`,
+  `forget`, `revoke`) et refuser `tile` sans lui ; côté pont (`modules/vava_chancellerie/server/routes.lua:139-141`),
+  exiger `/cameras/wall` d'abord ou journaliser la première caméra d'un compte sans mur.
+- Critères : procédure `docs/tests/registre.md` complétée ; versions montées.
+
+### T-027 — Core : `returns` obligatoire dans callClient, champs publics du state bag
+- Agent : vava-dev-lua (cette tâche autorise à toucher le core) · Dépend de : — · Statut : à faire
+- **IMPORTANT** (`securite-vAvA_core.md`) : `server/core/rpc.lua:188-198`, `returns` est facultatif dans `callClient` :
+  sans schéma, jusqu'à 16 valeurs de forme quelconque remontent au module ; exiger `returns` comme `args` (`{}` admis),
+  ou répondre `invalid_response` quand il manque et que `count > 0`. `server/players/sync.lua:204,216` : un champ
+  `public` est publié dans le state bag du joueur, que son propre client peut réécrire aux yeux des autres clients :
+  écrire dans `docs/api.md` qu'une valeur lue sur un autre client n'est pas authentique et, si FiveM le permet
+  (`AddStateBagChangeHandler` côté serveur, origine du changement), remettre la valeur serveur quand un changement ne
+  vient pas de lui. Au passage, le MINEUR d'une ligne : réponse RPC livrée sans revérifier que le joueur est le même
+  après un handler lent (`rpc.lua:146`).
+- Critères : tests dans `tests/spec/core_rpc_spec.lua` (`returns` manquant refusé) ; `docs/api.md` à jour ; version du
+  core montée.
+
+### T-028 — Artisanat : signature et durabilité protégées par le hook des métadonnées
+- Agent : vava-dev-lua · Dépend de : — · Statut : à faire
+- **IMPORTANT** (`securite-vava_crafting.md`) : aucun abonné au hook `vava_inventory:metadata` ne protège `crafter_id`,
+  `crafter_name`, `crafted_at`, `mark`, `quality`, `tier` et `max_durability` (`server/signature.lua:138-147`) : tout
+  module à venir qui appellera `setMetadata` ou `patchMetadata` avec des clés venues de son client réécrirait le
+  créateur (baptême, `signature.lua:210`) ou la durabilité (`repair.lua:55-59,170-171`), alors que le README promet un
+  créateur figé. S'abonner en `before` dans `bridge/server.lua` et refuser tout `set` ou `patch` qui change ces clés
+  (ou augmente `max_durability`) quand l'écriture ne vient pas de `vava_crafting` (drapeau local autour de ses propres
+  appels, synchrones).
+- Critères : test de la règle pure (clés protégées) ; README et `docs/api.md` à jour ; version montée.
+
+### T-029 — Le serveur décide : pêche, récolte communale, faim et soif
+- Agent : vava-dev-lua · Dépend de : — · Statut : à faire
+- **IMPORTANT** (`securite-vava_gathering.md`) : la réussite de la barre de tension est calculée par la page
+  (`web/js/view-tension.js:81`) et transmise par le client (`client/fishing.lua:50`, `server/fishing.lua:50`) : un
+  client modifié prend un poisson à chaque touche. Faire tirer la réussite par le serveur (chance selon le niveau de
+  Pêche et la bande, comme `quality.failed`), la barre ne pouvant que faire rater. **Décision** inverse possible :
+  inscrire l'exception dans « Décisions déjà prises » de CLAUDE.md.
+- **IMPORTANT** (`securite-vava_farming.md`) : `server/actions.lua:405-424` (et arrachage `:443-445`) ajoute le produit
+  avant de vider l'emplacement ; un hook `before` de `vava_inventory:add` qui céderait la main laisserait deux joueurs
+  récolter la même plante. Appliquer `slots.harvest` ou `slots.clear` avant l'ajout et restaurer l'emplacement si la
+  besace refuse (comme `vava_gathering/server/harvest.lua:221-222`).
+- **IMPORTANT** (`securite-vava_needs.md`) : la perte de vie d'un besoin épuisé est appliquée par le client
+  (`server/decay.lua:131`, `client/effects.lua:106-112`) : quand `vava_health` tourne, l'appliquer côté serveur par
+  `exports.vava_health:damage`, l'évènement client restant le seul repli sans lui ; l'endurance reste un effet GTA
+  client.
+- Critères : tests des règles pures (chance de pêche, ordre de la récolte) ; procédures `docs/tests/metiers.md` et
+  `besoins.md` complétées ; versions montées.
+
 ### T-010 — Audit sécurité de tout le dépôt
-- Agent : vava-securite · Dépend de : — · Statut : à faire
+- Agent : vava-securite · Dépend de : — · Statut : à tester en jeu
 - Un rapport par module dans `docs/audits/securite-<module>.md` (le core compris). Chaque BLOQUANT ou IMPORTANT
   devient une tâche de correction en tête de phase 1. (Exception à la lecture seule : l'agent écrit ses rapports et
   ses tâches.)
+- Fait le 30 octobre 2026 : 20 rapports dans `docs/audits/` (le core, 18 modules, un pour les quatre ressources
+  d'exemple), compte rendu `docs/plan/rapports/T-010.md`. Résultat : 2 BLOQUANT (`vava_dev_characters`), 13 IMPORTANT,
+  98 MINEUR laissés aux rapports ; corrections ouvertes en tête de phase (T-024 à T-029) ; deux points de la santé
+  versés à T-110. Rien à jouer : « à tester en jeu » vaut ici « à relire par le porteur du projet ».
 
 ### T-011 — Audit réseau et performance de tout le dépôt
 - Agent : vava-reseau-perf · Dépend de : — · Statut : à faire
@@ -163,6 +257,9 @@ phase. Détail dans les rapports cités.
 - Service générique : un module déclare des zones (centre, rayon) ; le serveur tient la liste des joueurs abonnés
   à chaque zone (entrée demandée par le client, sortie vérifiée côté serveur, nettoyage à la déconnexion) ;
   `publish(zone, différence)` n'envoie qu'aux abonnés. Voir le modèle de `SECURITE_RESEAU.md`.
+- Y reprendre les zones de voix (`vava_voice/server/zones.lua`) : chaque création, modification ou suppression part
+  aujourd'hui à tous les joueurs (`EVERYONE`, seul envoi à tous du module, documenté comme voulu : rare et petit) ;
+  avec les abonnements, n'envoyer qu'aux joueurs à portée de la zone (rapport T-008).
 
 ### T-015 — Récolte : GlobalState → abonnements de zone
 - Agent : vava-dev-lua · Dépend de : T-014 · Statut : à faire
@@ -280,6 +377,15 @@ seulement l'éditeur (phase 6).
 - Agents : vava-architecte → vava-dev-lua · Dépend de : — · Statut : à faire
 - Export serveur `vava_health:hit(target, paquet)`, registre de modificateurs ordonnés, hooks `vava_health:hit` ;
   annulation des dégâts natifs de GTA entre joueurs.
+- La vie GTA appartient au client : `vava_health:set` (soin, blessure, dégâts des sorts appliqués par
+  `vava_health:damage`) est appliqué par le client, et un client modifié qui l'ignore ignore les dégâts des sorts (le
+  serveur ne relit la vie que pour mettre à terre). La chaîne doit tenir la vie côté serveur (ou la revérifier après
+  chaque coup) pour qu'aucun client ne puisse refuser un dégât (rapport T-006).
+- La porte `entry.spawned` de `vava_health` (`server/life.lua:239,213,302,341`) repose sur une déclaration du client
+  (RPC `core:characters:spawned`) : un client qui fait apparaître son ped sans la confirmer n'est jamais lu ni mis à
+  terre, `setHealth`/`heal`/`damage` lui répondent `not_spawned`. Ne pas conditionner la vie à cette déclaration
+  (joueur « apparu » dès que son ped existe après l'ordre d'apparition, avec le délai de grâce), ou faire confirmer
+  `spawned` par le core quand le ped existe (audit T-010, `securite-vava_health.md`).
 - Critères : tests unitaires de l'ordre des modificateurs ; aucun dégât entre joueurs possible hors de la chaîne.
 
 ### T-111 — Armes de corps à corps

@@ -139,9 +139,9 @@ la fin, sang à l'interruption. Hors jeu : `modules/vava_hud/web/index.html?prog
 |---|---|---|
 | 1 | Champ communal, près d'un emplacement libre, `E`. | Menu : « Emplacement libre », Planter actif si graines, autres gestes grisés avec la raison. |
 | 2 | Planter du blé (choisir le palier si plusieurs). | Geste, semis, prop de semis, graine du palier consommée, XP d'Agriculture (petite). |
-| 3 | Attendre (ou `/agriculture pousser champ_communal 1`). | Le prop change de stade sans rien toucher ; « mûr » dans l'invite. |
+| 3 | Attendre (ou `/agriculture pousser champ_communal 1`). | Le prop change de stade sans rien toucher ; le dernier modèle n'apparaît qu'à 100 %, en même temps que « mûr » dans l'invite (blé : semis, pousse jusqu'à 50 %, plant jusqu'à 100 %, puis mûr). `pousser` arrose aussi la terre : une plante sèche ainsi mûrie ne reflétrit pas dans la foulée. |
 | 4 | Seau en main vide → Arroser. | « remplissez-le à un puits ». Au puits, `E` → 5 charges ; Arroser → humidité 100, charge − 1. |
-| 5 | Laisser une plante sans eau (réglages du § 0.7). | Flétrie (prop), arroser la fait repartir ; plus longtemps → morte : seul Arracher reste, qui rend des déchets végétaux. |
+| 5 | Laisser une plante sans eau (réglages du § 0.7). | Flétrie (prop), arroser la fait repartir ; plus longtemps → morte : seul Arracher reste, qui rend des déchets végétaux ; ses heures sèches (menu) ne montent plus après la mort. |
 | 6 | Récolter à la main, puis une autre à la faucille. | Plus rapide à la faucille ; produit au palier avec « Champ communal » ; parfois des graines du même palier ; fertilité en baisse ; replanter la même famille coûte 10 de plus, une autre rend 10. |
 | 7 | 3 déchets au composteur du champ (station de l'artisanat), puis Fertiliser. | Compost produit ; fertilité + 25. |
 | 8 | `E` près du grenier. | L'inventaire s'ouvre sur « Grenier commun » ; déposer, s'éloigner de 4 m → il se ferme ; `vava_farming_granary_log` : dépôt / retrait. |
@@ -149,7 +149,7 @@ la fin, sang à l'interruption. Hors jeu : `modules/vava_hud/web/index.html?prog
 | 10 | `/agriculture parcelle champ_communal`, `/agriculture arroser champ_communal`. | État des emplacements ; tout arrosé. |
 | 11 | `restart vava_farming`. | Emplacements retrouvés, croissance rattrapée d'après les dates. |
 | 12 | Près d'un emplacement, puis d'un puits, puis du grenier : `/aterre`, puis `E` ; relevé, lancer un semis et `/aterre` pendant la barre. | À terre : ni invite, ni menu, ni seau rempli, ni grenier ouvert ; `E` ne fait que rendre l'âme. Tombé pendant le semis : graine gardée, emplacement inchangé (« Vous êtes à terre. » à la fin de la barre, ou geste interrompu si le corps a glissé). |
-| 13 | Grenier ouvert (`E`), un objet en main de souris : se faire mettre à terre (`/aterre`), puis tenter un dépôt, un retrait, une division, un jet au sol. | Le grenier reste affiché (l'inventaire n'offre aucun moyen de le fermer pour un module), en consultation seulement : chaque geste est refusé, « Vous êtes à terre. » ; rien ne bouge, aucune ligne dans `vava_farming_granary_log`. Relevé, les gestes reprennent ; s'éloigner de plus de 4 m le ferme comme d'habitude. |
+| 13 | Grenier ouvert (`E`), un objet en main de souris : se faire mettre à terre (`/aterre`). Relevé, `E` au grenier, puis `/aterre` de nouveau pendant un glisser vers le grenier. | À la chute, l'inventaire se ferme aussitôt, grenier et besace (export `close` de l'inventaire, appelé par `vava_health`) ; rien n'est déplacé, aucune ligne dans `vava_farming_granary_log`. Relevé, `E` rouvre le grenier et les gestes reprennent ; le second `/aterre` le referme de même ; s'éloigner de plus de 4 m le ferme comme d'habitude. |
 
 ## 6. Ce qu'il faut regarder dans la base
 

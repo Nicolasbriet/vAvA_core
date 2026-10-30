@@ -171,6 +171,20 @@ describe('vava_farming growth', function()
             assert.equal(once.growth, hourly.growth)
         end)
 
+        it('arrête de compter les heures sèches à la mort, calculé en une fois ou heure par heure', function()
+            local crop = longCrop()
+            local once, hourly = slotOf('essai', 60), slotOf('essai', 60)   -- sèches dès 2 h, mortes à 20 h
+            growth.advance(once, crop, 25 * HOUR)
+            for hour = 1, 25 do growth.advance(hourly, crop, hour * HOUR) end
+            assert.is_true(once.dead)
+            assert.is_true(hourly.dead)
+            assert.is_near(18, once.dryHours, 1e-9)
+            assert.is_near(once.dryHours, hourly.dryHours, 1e-9)
+            -- morte, elle ne compte plus rien
+            growth.advance(once, crop, 40 * HOUR)
+            assert.is_near(18, once.dryHours, 1e-9)
+        end)
+
         it('une plante flétrie ne pousse plus', function()
             local crop = longCrop()
             local slot = slotOf('essai', 60)
@@ -264,20 +278,34 @@ describe('vava_farming growth', function()
             assert.equal(1, growth.progress(slot, { growMinutes = 0, stages = {} }))
         end)
 
-        it('donne un stade de 1 à #stages selon l’avancement : le premier au semis, le dernier à maturité', function()
-            local crop = cfg.crops.ble               -- trois stades
+        it('donne un stade de 1 à #stages : le premier au semis, le dernier réservé à la plante mûre', function()
+            local crop = cfg.crops.ble               -- trois stades : semis, pousse, mûr
             local slot = slotOf('ble', 60)
             slot.growth = 0
             assert.equal(1, growth.stage(slot, crop))
+            slot.growth = 44 * 60
+            assert.equal(1, growth.stage(slot, crop))
             slot.growth = 45 * 60
             assert.equal(2, growth.stage(slot, crop))
+            slot.growth = 89 * 60
+            assert.equal(2, growth.stage(slot, crop))   -- le dernier modèle attend la maturité
             slot.growth = 90 * 60
             assert.equal(3, growth.stage(slot, crop))
-            local carrot = cfg.crops.carotte         -- deux stades
+            local carrot = cfg.crops.carotte         -- deux stades : semis, puis mûr
             slot.growth = 0
+            assert.equal(1, growth.stage(slot, carrot))
+            slot.growth = 29 * 60
             assert.equal(1, growth.stage(slot, carrot))
             slot.growth = 30 * 60
             assert.equal(2, growth.stage(slot, carrot))
+        end)
+
+        it('affiche toujours l’unique modèle d’une culture à un seul stade', function()
+            local slot = slotOf('essai', 60)
+            local crop = { growMinutes = 10, stages = { 'seul' } }
+            assert.equal(1, growth.stage(slot, crop))
+            slot.growth = 10 * 60
+            assert.equal(1, growth.stage(slot, crop))
         end)
 
         it('ne fait jamais reculer le stade quand la plante pousse', function()

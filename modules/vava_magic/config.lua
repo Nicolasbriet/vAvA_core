@@ -376,14 +376,14 @@ VavaMagic.config = {
                 {
                     castMs = 220, cooldownMs = 2200, speed = 40.0, range = 36.0, damage = 10, size = 1.0,
                     slow = { strength = 0.45, durationMs = 3500 }, wetMs = 12000, homing = 20,
-                    description = 'La cible ne peut plus courir, trois secondes et demie ; le trait s\'incurve un peu vers la cible verrouillée.',
-                    unlock = 'Votre trait empêche de courir et s\'incurve vers la cible verrouillée.',
+                    description = 'La cible perd près de la moitié de son allure, trois secondes et demie ; le trait s\'incurve un peu vers la cible verrouillée.',
+                    unlock = 'Votre trait ralentit presque de moitié et s\'incurve vers la cible verrouillée.',
                 },
                 {
                     castMs = 200, cooldownMs = 2000, speed = 45.0, range = 40.0, damage = 12, size = 1.15,
                     slow = { strength = 0.5, durationMs = 4000 }, wetMs = 14000, homing = 40,
-                    description = 'Un dard de givre à quarante mètres, qui transit sa cible quatre secondes et la suit de près.',
-                    unlock = 'Votre trait de glace atteint sa pleine morsure.',
+                    description = 'Un dard de givre à quarante mètres : la cible ne peut plus courir, quatre secondes, et le trait la suit de près.',
+                    unlock = 'Votre trait de glace atteint sa pleine morsure : la cible ne peut plus courir.',
                 },
             },
             projectile = { model = 'prop_golf_ball', visible = false, radius = 0.2, marker = { r = 200, g = 236, b = 255, alpha = 220, size = 0.16 } },

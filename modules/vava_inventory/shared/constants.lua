@@ -32,6 +32,7 @@ VavaInventory.EVENTS = {
     SNAPSHOT = 'vava_inventory:snapshot',   -- ouverture : conteneurs visibles, définitions, raccourcis
     DELTA = 'vava_inventory:delta',         -- différences d'un conteneur ouvert
     CLOSED = 'vava_inventory:closed',       -- un conteneur ouvert n'est plus accessible (sac vidé, expiré)
+    DISMISS = 'vava_inventory:dismiss',     -- l'interface se ferme sur ordre du serveur (export close : mise à terre…)
     NOTIFY = 'vava_inventory:notify',       -- message au joueur (utilisation d'un objet…)
 }
 

@@ -3,6 +3,8 @@
     Rôle : déclaration des objets d'exemple dans le registre de l'inventaire. La nourriture et les boissons ne
            déclarent que leurs effets (`effects`) : l'inventaire consomme une unité et vava_needs les applique, sans
            une ligne de code ici. Un objet à usage particulier fournirait `onUse` (voir docs/api.md).
+           Les objets sont redéclarés à chaque annonce `core:module:ready` de l'inventaire (1.1.1) : après un
+           `restart vava_inventory`, les piles gardées à part reviennent sans redémarrer ce module.
     Dépendances : vAvA_core (API v1), vava_inventory ≥ 1.1.0 ; vava_needs pour que manger et boire aient un effet
 ]]
 
@@ -14,6 +16,7 @@ if not core then
     return
 end
 
+local INVENTORY = 'vava_inventory'
 local ITEMS_REGISTRY = 'vava_inventory:items'
 local IMAGE_ROOT = ('nui://%s/web/items/'):format(RESOURCE)
 
@@ -63,15 +66,34 @@ local ITEMS = {
     },
 }
 
+--- Déclare les objets qui ne le sont pas encore (le registre renaît vide quand l'inventaire redémarre).
+---@return boolean ok
+---@return string|nil err
+local function declare()
+    for name, definition in pairs(ITEMS) do
+        if not core.registry.has(ITEMS_REGISTRY, name) then
+            local ok, err = core.registry.add(ITEMS_REGISTRY, name, definition)
+            if not ok then return false, err end
+        end
+    end
+    return true
+end
+
 local registered, registerErr = core.modules.register({
     version = GetResourceMetadata(RESOURCE, 'version', 0),
     coreVersion = '0.3.0',
     dependencies = { vava_inventory = '1.1.0' },
     setup = function()
-        for name, definition in pairs(ITEMS) do
-            local ok, err = core.registry.add(ITEMS_REGISTRY, name, definition)
-            if not ok then return false, err end
-        end
+        local ok, err = declare()
+        if not ok then return false, err end
+        -- inventaire redémarré : ses registres ont disparu avec lui, les objets sont redéclarés dès qu'il est prêt
+        local id
+        id, err = core.hooks.after('core:module:ready', function(payload)
+            if payload.name ~= INVENTORY then return end
+            local redeclared, declareErr = declare()
+            if not redeclared then core.log.warn('objets non redéclarés : %s', tostring(declareErr)) end
+        end)
+        if not id then return false, err end
         return true
     end,
 })

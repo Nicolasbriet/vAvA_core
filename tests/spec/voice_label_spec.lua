@@ -32,7 +32,7 @@ describe('vava_voice nom de zone', function()
         assert.equal(4, #emoji)
         assert.equal(string.rep(emoji, 40), label.clean(string.rep(emoji, 40)))
         local _, code = label.clean(string.rep('a', 161))
-        assert.equal('invalid_label', code)
+        assert.equal('label_too_long', code)
     end)
 
     it('retire les espaces superflus, compte après nettoyage', function()
@@ -40,14 +40,22 @@ describe('vava_voice nom de zone', function()
         assert.equal(string.rep('a', 40), label.clean('   ' .. string.rep('a', 40) .. '   '))
     end)
 
-    it('refuse un nom vide, illisible ou porteur de caractères de contrôle', function()
-        for _, value in ipairs({ '', '    ', 'Tri\tbune', 'Tri\nbune', 'Tri\0bune', 'Tri\127bune', '\xff\xfe', 12 }) do
+    it('refuse un nom vide ou illisible (invalid_label)', function()
+        for _, value in ipairs({ '', '    ', '\xff\xfe', 12 }) do
             local refused, code = label.clean(value)
             assert.is_nil(refused)
             assert.equal('invalid_label', code)
         end
         local _, code = label.clean(nil)
         assert.equal('invalid_label', code)
+    end)
+
+    it('refuse un caractère de contrôle avec son propre code (label_unreadable)', function()
+        for _, value in ipairs({ 'Tri\tbune', 'Tri\nbune', 'Tri\0bune', 'Tri\127bune' }) do
+            local refused, code = label.clean(value)
+            assert.is_nil(refused)
+            assert.equal('label_unreadable', code)
+        end
     end)
 
     it('refuse les contrôles C1 et les caractères invisibles qui trompent la lecture', function()
@@ -63,7 +71,7 @@ describe('vava_voice nom de zone', function()
         for _, sign in ipairs(invisibles) do
             local refused, code = label.clean('Tri' .. sign .. 'bune')
             assert.is_nil(refused, ('U+%04X accepté'):format(utf8.codepoint(sign)))
-            assert.equal('invalid_label', code)
+            assert.equal('label_unreadable', code)
         end
         -- voisins permis : tiret insécable, espace fine, guillemets
         assert.equal('Tour\u{2011}Nord', label.clean('Tour\u{2011}Nord'))
