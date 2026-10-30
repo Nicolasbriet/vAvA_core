@@ -7,7 +7,7 @@ local helper = require('tests.helper')
 --   - hook before `core:player:connecting` : banni refusé avec le motif, bans illisibles refusés avec un message
 --     clair ;
 --   - hook after `core:player:joined` et relecture des joueurs déjà en jeu au démarrage (`bans.sweep`) : banni
---     expulsé (au journal) ; base muette : seconde lecture, puis `banRecheck.onError` (kick ou keep) ; rien pour un
+--     expulsé (au journal) ; base muette : seconde lecture, puis `banRecheck.onError` (keep par défaut, ou kick) ; rien pour un
 --     joueur parti ou un numéro repris ; un joueur pas encore repris par le core est relu au tour suivant.
 
 describe('vava_admin bans', function()
@@ -175,24 +175,42 @@ describe('vava_admin bans', function()
             assert.same({ { src = '3', reason = bans.message(BAN) } }, dropped)
         end)
 
-        it('expulse avec un message clair (onError = kick) quand les deux lectures échouent, sans journal', function()
+        it('garde le joueur par défaut (onError = keep, décision du 30/10) quand les deux lectures échouent', function()
+            assert.equal('keep', VavaAdmin.config.banRecheck.onError)
             playersBySource[3] = { source = 3, accountId = 7 }
             store.err = 'base injoignable'
             joined(3, 7)
             assert.equal(2, store.calls)
+            assert.same({}, dropped)
+            assert.same({}, recorded)
+            assert.equal(1, #errors)
+            assert.truthy(errors[1][1]:find('bans illisibles, joueur gardé', 1, true))
+            assert.equal(7, errors[1][2])
+            assert.equal(messages.whenJoined, errors[1][3])
+            assert.equal('base injoignable', errors[1][4])
+        end)
+
+        it('expulse avec un message clair quand onError = kick, sans journal', function()
+            VavaAdmin.config.banRecheck.onError = 'kick'
+            playersBySource[3] = { source = 3, accountId = 7 }
+            store.err = 'base injoignable'
+            joined(3, 7)
             assert.same({ { src = '3', reason = messages.banCheckUnavailable } }, dropped)
             assert.same({}, recorded)
             assert.equal(1, #errors)
         end)
 
-        it('laisse le joueur en jeu et l\'écrit à la console quand onError = keep', function()
-            VavaAdmin.config.banRecheck.onError = 'keep'
-            playersBySource[3] = { source = 3, accountId = 7 }
-            store.err = 'base injoignable'
-            joined(3, 7)
-            assert.same({}, dropped)
-            assert.equal(1, #errors)
-        end)
+        it('garde aussi les joueurs relus au démarrage du Registre quand la base ne répond pas (pas d\'expulsion en masse)',
+            function()
+                connected = { 3, 4 }
+                playersBySource[3] = { source = 3, accountId = 7 }
+                playersBySource[4] = { source = 4, accountId = 8 }
+                store.err = 'base injoignable'
+                bans.sweep()
+                assert.same({}, dropped)
+                assert.equal(2, #errors)
+                assert.equal(messages.whenSwept, errors[1][3])
+            end)
 
         it('ne fait rien pour un joueur parti ou un numéro repris par un autre compte', function()
             store.ban = BAN

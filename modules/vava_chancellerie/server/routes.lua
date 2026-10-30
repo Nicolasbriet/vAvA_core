@@ -146,7 +146,7 @@ local function recordTile(actor, target)
     if not name then return end
     local now, last = GetGameTimer(), tilesLoggedAt[name]
     if last and now - last < CAMERAS_CFG.tileLogMs then return end
-    -- l'horloge ne repart que sur une ligne réellement écrite : sinon la case suivante réessaie
+    -- l'horloge ne repart que sur une ligne acceptée par le Registre : sinon la case suivante réessaie
     local called, ok = call(ADMIN, 'webLog', actor, messages.logTiles, { numero = target })
     if called and ok == true then tilesLoggedAt[name] = now end
 end
@@ -159,7 +159,7 @@ local function wallPlayers(actor, logged)
     if logged then
         local logCalled, written = call(ADMIN, 'webLog', actor, messages.logWall, {})
         local name = actorName(actor)
-        -- l'ouverture ne couvre les cases que si sa ligne est réellement au journal
+        -- l'ouverture ne couvre les cases que si sa ligne a été acceptée par le Registre
         if name and logCalled and written == true then tilesLoggedAt[name] = GetGameTimer() end
     end
     return { ok = true, players = players }

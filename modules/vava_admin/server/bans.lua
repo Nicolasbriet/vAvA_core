@@ -72,8 +72,8 @@ local function stillThere(src, accountId)
 end
 
 --- Relit les bans d'un joueur en jeu et l'expulse s'il est banni. Base muette : seconde lecture après
---- `banRecheck.retryMs`, puis `banRecheck.onError` (kick : expulsé ; keep : laissé, noté à la console). Bloque le
---- thread courant.
+--- `banRecheck.retryMs`, puis `banRecheck.onError` (keep, défaut : gardé, noté à la console ; kick : expulsé). Bloque
+--- le thread courant.
 ---@param src integer
 ---@param accountId integer
 ---@param when string  moment, pour la console (« à son arrivée », « au démarrage du Registre »)
@@ -88,14 +88,13 @@ function bans.verify(src, accountId, when)
     if verdict == 'allow' or not stillThere(src, accountId) then return end
     if verdict == 'unavailable' then
         -- console seulement : le journal du Conseil est dans la même base, qui ne répond pas
-        if recheckCfg.onError == 'keep' then
-            VavaAdmin.log.error('compte n° %d laissé en jeu %s sans relecture de ses bans (%s)',
-                accountId, when, tostring(err))
+        if recheckCfg.onError == 'kick' then
+            VavaAdmin.log.error('compte n° %d expulsé %s : bans illisibles (%s)', accountId, when, tostring(err))
+            DropPlayer(tostring(src), messages.banCheckUnavailable)
             return
         end
-        VavaAdmin.log.error('compte n° %d expulsé %s : vérification de ban impossible (%s)',
-            accountId, when, tostring(err))
-        DropPlayer(tostring(src), messages.banCheckUnavailable)
+        -- keep (défaut, décision du 30 octobre 2026) : la lecture de la connexion avait réussi ; on garde le joueur
+        VavaAdmin.log.error('compte n° %d %s : bans illisibles, joueur gardé (%s)', accountId, when, tostring(err))
         return
     end
     VavaAdmin.log.warn('compte n° %d banni (ban n° %d) expulsé %s', accountId, ban.id, when)
