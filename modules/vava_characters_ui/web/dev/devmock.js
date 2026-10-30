@@ -1,9 +1,11 @@
 'use strict';
 /*
- * web/js/devmock.js
+ * web/dev/devmock.js
  * Rôle : données simulées quand la page est ouverte dans un navigateur (hors FiveM), pour travailler le rendu
  *        sans lancer le jeu. Inactif en jeu : aucun appel n'y est routé.
  *        Paramètres d'URL : ?screen=creator&tab=hair&sex=f
+ *        Jamais livré (absent des `files`), jamais chargé en jeu : la ligne hors jeu de index.html ne l'insère
+ *        que hors FiveM.
  */
 
 const DevMock = (() => {
