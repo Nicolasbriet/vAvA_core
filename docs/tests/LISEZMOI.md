@@ -13,6 +13,7 @@ main. Chaque procédure dit quoi faire et ce qui doit se passer ; les tests à d
 | [inventaire.md](inventaire.md) | Besace, ceinture, mains, sol, conteneurs, à deux | `vava_inventory` |
 | [besoins.md](besoins.md) | Faim, soif | `vava_needs` |
 | [sante.md](sante.md) | Blessure, mise à terre, aide, réveil | `vava_health` |
+| [combat.md](combat.md) | Chaîne de dégâts commune : coups, modificateurs (esquive, bouclier, résistance), coups natifs entre joueurs annulés, client qui ment, journal des coups | `vava_health`, `vava_example_combat`, `vava_needs` |
 | [chat.md](chat.md) | Chat de proximité, commandes, suggestions | `vava_chat` |
 | [voix.md](voix.md) | Chat vocal, portée, zones de voix | `vava_voice` |
 | [registre.md](registre.md) | Registre du Conseil : droits, joueurs, signalements, bans | `vava_admin` |
@@ -26,9 +27,9 @@ main. Chaque procédure dit quoi faire et ce qui doit se passer ; les tests à d
 | [interfaces.md](interfaces.md) | Polices, textures et ornements communs servis par `vava_ui` : § 0 pilote du HUD, puis § 1 à 6 les quinze interfaces, rendu, CORS, WebP | `vava_ui`, `vava_hud`, puis toutes les interfaces |
 | [reseau.md](reseau.md) | Compteur réseau du Conseil (`/vava_reseau`), gros envois en latent, essai du réseau depuis la console, plus d'envoi à tous par le chat | `vAvA_core`, `vava_chat` |
 | [zones.md](zones.md) | Abonnements de zone : zones envoyées aux seuls joueurs proches, `/vava_reseau zones`, zones de voix et leur éditeur, coût du passage | `vAvA_core`, `vava_voice` |
-| [developpement.md](developpement.md) | Outils de développement : rien sans `vava_env`, réservés et journalisés avec | `vava_dev_characters`, `vava_example`, `vava_example_items`, `vava_anim_test` |
+| [developpement.md](developpement.md) | Outils de développement : rien sans `vava_env`, réservés et journalisés avec | `vava_dev_characters`, `vava_example`, `vava_example_items`, `vava_anim_test`, `vava_example_atelier`, `vava_example_combat` |
 
-Ordre conseillé : interfaces (§ 0, pilote du HUD, puis § 1 à 6), chargement, personnage, inventaire, besoins, santé, chat, voix,
+Ordre conseillé : interfaces (§ 0, pilote du HUD, puis § 1 à 6), chargement, personnage, inventaire, besoins, santé, combat, chat, voix,
 registre, Codex, accueil, Atelier, réseau, zones, métiers, temps, magie. Chaque procédure s'appuie sur ce que les précédentes ont validé.
 
 ## Préparation commune

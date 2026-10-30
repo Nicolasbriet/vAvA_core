@@ -22,34 +22,45 @@ config → défense et endurance → test à plusieurs et réglages → éditeur
 
 ## 1. La chaîne de dégâts commune (T-110)
 
-**Tous** les dégâts du jeu passent par une seule fonction serveur, dans `vava_health` (qui possède la vie) :
+**Tous** les dégâts du jeu passent par une seule fonction serveur, dans `vava_health` (qui possède la vie, tenue par le
+serveur) :
 
 ```lua
 exports.vava_health:hit(target, {
-    amount = 12,              -- points avant modificateurs
-    kind = 'tranchant',       -- tranchant | contondant | perçant | feu | eau | terre | pur
+    amount = 12,              -- points avant modificateurs (100 = une vie pleine)
+    kind = 'tranchant',       -- tranchant | contondant | percant | feu | eau | terre | lumiere | esprit | pur |
+                              --   privation | monde (identifiants ASCII : « percant » sans cédille)
     source = attackerSrc,     -- joueur à l'origine, ou nil
-    origin = 'vava_combat',   -- module à l'origine
     technique = 'taille_descendante',
     tags = { melee = true },  -- pour les conditions (« frappé au corps à corps »)
 })
--- → { applied = 9, blocked = 3, absorbed = 0, downed = false } ou nil, err
+-- → { id, amount = 9, applied = 9, blocked = 3, absorbed = 0, resisted = 0, added = 0, downed = false, health = … }
+--   ou nil, err
 ```
 
-Ordre fixe, chaque étape est un **modificateur** enregistré par un module (registre
-`vava_health:modifiers`, priorité numérique) :
+Le module à l'origine n'est pas dans le paquet : `vava_health` pose lui-même `origin` (la ressource qui appelle
+l'export), pour qu'aucun module ne signe au nom d'un autre. Paquet complet, codes et contrat des modificateurs :
+`docs/api.md`, § `vava_health` ; spécification : `docs/plan/specs/T-110.md`.
 
-1. annulation (cible à terre, immunité, zone sûre) ;
-2. esquive en cours (fenêtre d'invulnérabilité) ;
-3. parade réussie (dégâts annulés, l'attaquant chancelle) ;
-4. blocage (réduction selon bouclier ou arme, coût d'endurance pour le défenseur) ;
-5. boucliers magiques (absorption, `vava_magic`) ;
-6. résistances (élément, armure de `vava_equipment` plus tard) ;
+Ordre fixe, chaque étape est remplie par des **modificateurs** enregistrés par les modules (registre
+`vava_health:modifiers`, une étape fixe et une priorité de 0 à 99 dans l'étape ; au plus un modificateur par étape et
+par module) :
+
+1. annulation (`annulation` : immunité, zone sûre ; la cible déjà à terre est écartée avant la chaîne) ;
+2. esquive en cours (`esquive` : fenêtre d'invulnérabilité) ;
+3. parade réussie (`parade` : dégâts annulés, l'attaquant chancelle) ;
+4. blocage (`blocage` : réduction selon bouclier ou arme, coût d'endurance pour le défenseur) ;
+5. boucliers magiques (`bouclier` : absorption, `vava_magic`) ;
+6. résistances (`resistance` : élément, armure de `vava_equipment` plus tard ; faiblesse possible) ;
 7. application à la vie, hooks `vava_health:hit` (after) pour les effets « quand le porteur est touché ».
 
+Un modificateur **rend un résultat** (`cancel`, `blocked`, `absorbed`, `resisted`, `added`) borné par la chaîne ; il
+ne modifie rien lui-même. Un hook `vava_health:hit` `before` permet de refuser un coup (trêve, prison).
+
 La magie est migrée sur cette chaîne (T-116) : un bouclier de l'Égide de givre protège alors aussi d'un coup
-d'épée. Les dégâts natifs de GTA entre joueurs sont annulés côté serveur (évènement de dégâts d'arme du moteur),
-pour qu'aucun coup ne passe hors de la chaîne.
+d'épée. Les dégâts natifs de GTA entre joueurs sont annulés côté serveur (évènement de dégâts d'arme du moteur, plus
+explosions, feux et projectiles lancés par un joueur), pour qu'aucun coup ne passe hors de la chaîne ; chute, noyade
+et feu du décor restent natifs, lus par le serveur et passés au hook `after` comme pertes du « monde ».
 
 ## 2. Armes (T-111)
 
