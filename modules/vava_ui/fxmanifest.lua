@@ -13,7 +13,7 @@ name 'vava_ui'
 description 'Polices, textures et ornements communs des interfaces vAvA'
 version '1.0.0'
 
--- servis aux pages des autres ressources par nui://vava_ui/web/… ; web/dev/ n'est jamais livré
+-- servis aux pages des autres ressources par nui://vava_ui/web/… ; outils hors jeu (dossier dev/) jamais livrés
 files {
     'web/css/vava_ui.css',
     'web/fonts/*.woff2',
