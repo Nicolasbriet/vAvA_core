@@ -60,7 +60,8 @@ api.define(1, function(owner)
             callClientWith = guard(function(options, target, name, ...) return rpc.callClient(owner, options, target, name, ...) end),
         },
 
-        -- envois serveur → client mesurés et comptés (0.10.0) : jamais -1, évènement préfixé par la ressource
+        -- envois serveur → client mesurés et comptés (0.10.0) : jamais -1, évènement préfixé par la ressource ; une
+        -- liste ou un rayon rendent en 5e valeur les joueurs sautés (0.11.0)
         net = {
             send = guard(function(target, event, ...) return net.send(owner, nil, target, event, ...) end),
             sendWith = guard(function(options, target, event, ...)
@@ -71,6 +72,13 @@ api.define(1, function(owner)
             end),
             sendNearWith = guard(function(options, coords, radius, event, ...)
                 return net.sendNear(owner, options, coords, radius, event, ...)
+            end),
+            -- charge sérialisée par le module (msgpack.pack_args) : une seule chaîne traverse l'export (0.11.0)
+            sendPacked = guard(function(options, target, event, payload)
+                return net.sendPacked(owner, options, target, event, payload)
+            end),
+            sendNearPacked = guard(function(options, coords, radius, event, payload)
+                return net.sendNearPacked(owner, options, coords, radius, event, payload)
             end),
             playersNear = guard(function(coords, radius, options) return net.playersNear(coords, radius, options) end),
             stats = guard(function(options) return net.stats(options) end),

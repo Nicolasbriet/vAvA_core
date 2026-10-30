@@ -234,6 +234,77 @@ describe('vAvA.net', function()
             assert.equal(4000, delays[3][3])
         end)
 
+        it('liste : la 5e valeur donne les joueurs sautés, nil s’il n’y en a aucun', function()
+            local ok, count, _, _, skipped = net.send(OWNER, nil, { 1, 2 }, EVENT, 'petit')
+            assert.same({ true, 2 }, { ok, count })
+            assert.is_nil(skipped)
+            net.send(OWNER, nil, 1, EVENT, whole)
+            net.send(OWNER, nil, 1, EVENT, whole)
+            ok, count, _, _, skipped = net.send(OWNER, nil, { 2, 1, 3 }, EVENT, whole)
+            assert.same({ true, 2 }, { ok, count })
+            assert.same({ 1 }, skipped)
+            -- un seul joueur : pas de liste, saturated
+            assert.same({ false, 'saturated' }, { net.send(OWNER, nil, 1, EVENT, whole) })
+        end)
+
+        it('rayon : la 5e valeur donne les joueurs sautés', function()
+            place(1, 1, 0, 0)
+            place(2, 2, 0, 0)
+            net.send(OWNER, nil, 2, EVENT, whole)
+            net.send(OWNER, nil, 2, EVENT, whole)
+            local ok, count, _, latent, skipped = net.sendNear(OWNER, nil, { x = 0, y = 0, z = 0 }, 10.0, EVENT, whole)
+            assert.same({ true, 1, true }, { ok, count, latent })
+            assert.same({ 2 }, skipped)
+        end)
+
+        it('plafond global : 16 envois de 256 Ko passent, le 17e est refusé (4 Mo en route), accepté 4 s plus tard', function()
+            for src = 1, 20 do existing[src] = true end
+            assert.equal(4194304, vAvA.config.server.net.latent.maxTotalInFlightBytes)
+            for src = 1, 16 do
+                assert.is_true(net.send(OWNER, nil, src, EVENT, whole))
+            end
+            printed = {}
+            assert.is_true(net.wouldSaturate(17, 262144))
+            assert.same({ false, 'saturated' }, { net.send(OWNER, nil, 17, EVENT, whole) })
+            assert.is_true(printedMatching('plafond global du latent atteint'))
+            assert.is_true(printedMatching('4194304 octets en route'))
+            -- un petit message fiable passe toujours
+            assert.is_true(net.send(OWNER, nil, 17, EVENT, 'petit'))
+            now = 4000
+            assert.is_false(net.wouldSaturate(17, 262144))
+            assert.is_true(net.send(OWNER, nil, 17, EVENT, whole))
+        end)
+
+        it('plafond global dans une liste : les cibles au-delà sont sautées et rendues', function()
+            for src = 1, 20 do existing[src] = true end
+            for src = 1, 15 do net.send(OWNER, nil, src, EVENT, whole) end
+            local list = { 16, 17, 18 }
+            local ok, count, _, _, skipped = net.send(OWNER, nil, list, EVENT, whole)
+            assert.same({ true, 1 }, { ok, count })
+            assert.same({ 17, 18 }, skipped)
+            -- la liste du module n'est pas touchée
+            assert.same({ 16, 17, 18 }, list)
+        end)
+
+        it('deliverList : rend des listes neuves de servis et de sautés, sans toucher la liste donnée', function()
+            net.send(OWNER, nil, 2, EVENT, whole)
+            net.send(OWNER, nil, 2, EVENT, whole)
+            local packet = net.prepare(OWNER, EVENT, EVENT, whole)
+            local list = { 1, 2, 3, 9 }
+            local notices = {}
+            local ok, served, skipped, bytes, latent = net.deliverList(OWNER, EVENT, list, nil, packet,
+                function(target) notices[#notices + 1] = target end)
+            assert.is_true(ok)
+            assert.same({ 1, 3 }, served)
+            assert.same({ 2 }, skipped)
+            assert.equal(packet.bytes, bytes)
+            assert.is_true(latent)
+            assert.same({ 1, 3 }, notices)
+            assert.same({ 1, 2, 3, 9 }, list)
+            ok, served, skipped, bytes, latent = net.deliverList(OWNER, EVENT, { 9 }, nil, packet)
+            assert.same({ true, {}, {}, 0, false }, { ok, served, skipped, bytes, latent })
+        end)
+
         it('purgePlayer oublie le volume en route et les totaux du joueur', function()
             net.send(OWNER, nil, 1, EVENT, whole)
             net.send(OWNER, nil, 1, EVENT, whole)
@@ -315,7 +386,8 @@ describe('vAvA.net', function()
             assert.same({ false, 'invalid_options' }, { net.send(OWNER, { from = 1 }, 2, 'vava_test:e') })
         end)
 
-        it('lit chaque position au plus une fois par tour du serveur', function()
+        -- 0.11.0 (T-014) : positions gardées near.positionCacheMs (50 ms) au lieu d'une milliseconde
+        it('lit chaque position au plus une fois pendant 50 ms', function()
             local reads = 0
             _G.GetEntityCoords = function(ped)
                 reads = reads + 1
@@ -323,14 +395,38 @@ describe('vAvA.net', function()
             end
             helper.load('server/core/net.lua')
             net = vAvA.net
+            assert.equal(50, vAvA.config.server.net.near.positionCacheMs)
             place(1, 1, 0, 0)
             place(2, 2, 0, 0)
             net.playersNear(CENTER, 10.0)
             net.playersNear(CENTER, 10.0)
             assert.equal(2, reads)
-            now = 1
+            now = 49
+            net.playersNear(CENTER, 10.0)
+            assert.is_table(net.positionOf(1))
+            assert.equal(2, reads)
+            now = 50
             net.playersNear(CENTER, 10.0)
             assert.equal(4, reads)
+        end)
+
+        it('positionOf : une lecture à 0 et 49 ms, deux à 50 ms ; sans ped : nil', function()
+            local reads = 0
+            _G.GetEntityCoords = function(ped)
+                reads = reads + 1
+                return positions[ped]
+            end
+            helper.load('server/core/net.lua')
+            net = vAvA.net
+            place(1, 1, 2, 3)
+            assert.same({ x = 1, y = 2, z = 3 }, net.positionOf(1))
+            now = 49
+            net.positionOf(1)
+            assert.equal(1, reads)
+            now = 50
+            net.positionOf(1)
+            assert.equal(2, reads)
+            assert.is_nil(net.positionOf(5))
         end)
     end)
 
@@ -430,6 +526,81 @@ describe('vAvA.net', function()
             assert.equal(0, #sent)
         end)
 
+        describe('sendPacked et sendNearPacked (0.11.0)', function()
+            it('envoie la chaîne telle quelle, sans appeler pack_args', function()
+                local payload = '\147\1\2\3'
+                local ok, count, bytes, latent = net.sendPacked(OWNER, nil, { 1, 2 }, 'vava_test:e', payload)
+                assert.same({ true, 2, #payload + #'vava_test:e', false }, { ok, count, bytes, latent })
+                assert.equal(0, packCalls)
+                assert.equal(2, #internalSent)
+                assert.equal(payload, internalSent[1].payload)
+                assert.equal(#payload, internalSent[1].length)
+                assert.equal('2', internalSent[2].target)
+                assert.equal(2, net.stats({ resource = OWNER }).total.messages)
+            end)
+
+            it('latent au-delà du seuil, par l’envoi latent interne', function()
+                local _, _, _, latent = net.sendPacked(OWNER, nil, 1, 'vava_test:e', string.rep('x', 9000))
+                assert.is_true(latent)
+                assert.is_true(internalSent[1].latent)
+            end)
+
+            it('refuse une chaîne vide ou autre chose, trop grande, une autre ressource, -1, des options inconnues', function()
+                -- en premier : les erreurs en console sont limitées à une par intervalle et par ressource
+                assert.same({ false, 'invalid_target' }, { net.sendPacked(OWNER, nil, -1, 'vava_test:e', 'x') })
+                assert.is_true(printedMatching('envoi à tous refusé'))
+                assert.same({ false, 'invalid_args' }, { net.sendPacked(OWNER, nil, 1, 'vava_test:e', '') })
+                assert.same({ false, 'invalid_args' }, { net.sendPacked(OWNER, nil, 1, 'vava_test:e', { 1 }) })
+                assert.same({ false, 'invalid_args' }, { net.sendPacked(OWNER, nil, 1, 'vava_test:e', nil) })
+                local max = vAvA.config.server.net.maxBytes
+                assert.same({ false, 'too_large' },
+                    { net.sendPacked(OWNER, nil, 1, 'vava_test:e', string.rep('x', max - #'vava_test:e' + 1)) })
+                assert.is_true(net.sendPacked(OWNER, nil, 1, 'vava_test:e', string.rep('x', max - #'vava_test:e')))
+                assert.same({ false, 'invalid_event' }, { net.sendPacked(OWNER, nil, 1, 'autre:e', 'x') })
+                assert.same({ false, 'invalid_event' }, { net.sendPacked(OWNER, nil, 1, 'vAvA:zone:state', 'x') })
+                assert.same({ false, 'invalid_target' }, { net.sendPacked(OWNER, nil, { 1, -1 }, 'vava_test:e', 'x') })
+                assert.same({ false, 'invalid_options' }, { net.sendPacked(OWNER, { from = 1 }, 1, 'vava_test:e', 'x') })
+                assert.equal(1, #internalSent)
+            end)
+
+            it('sendNearPacked : joueurs proches, personne à portée → true, 0, 0, false', function()
+                place(1, 1, 0, 0)
+                place(2, 50, 0, 0)
+                local ok, count = net.sendNearPacked(OWNER, nil, { x = 0, y = 0, z = 0 }, 10.0, 'vava_test:e', 'abc')
+                assert.same({ true, 1 }, { ok, count })
+                assert.equal('1', internalSent[1].target)
+                assert.same({ true, 0, 0, false },
+                    { net.sendNearPacked(OWNER, nil, { x = 900, y = 0, z = 0 }, 10.0, 'vava_test:e', 'abc') })
+                assert.same({ false, 'invalid_radius' },
+                    { net.sendNearPacked(OWNER, nil, { x = 0, y = 0, z = 0 }, 0, 'vava_test:e', 'abc') })
+                assert.same({ false, 'invalid_coords' }, { net.sendNearPacked(OWNER, nil, 'ici', 5.0, 'vava_test:e', 'abc') })
+                assert.equal(0, packCalls)
+            end)
+
+            it('envoi interne en échec : la cible n’est pas servie (rien à rejouer), sautée dans une liste', function()
+                _G.TriggerClientEventInternal = function() error('cible refusée') end
+                helper.load('server/core/net.lua')
+                net = vAvA.net
+                net.start()
+                assert.same({ false, 'unsupported' }, { net.sendPacked(OWNER, nil, 1, 'vava_test:e', 'abc') })
+                assert.equal(0, #sent)
+                assert.is_true(printedMatching('impossible à envoyer'))
+                -- désormais en estimation : unsupported avant tout envoi, le module renvoie par send
+                assert.same({ false, 'unsupported' }, { net.sendPacked(OWNER, nil, { 1, 2 }, 'vava_test:e', 'abc') })
+                assert.is_true(net.send(OWNER, nil, 1, 'vava_test:e', 'abc'))
+            end)
+
+            it('liste dont la première cible fait échouer l’envoi interne : toutes sautées', function()
+                _G.TriggerClientEventInternal = function() error('cible refusée') end
+                helper.load('server/core/net.lua')
+                net = vAvA.net
+                net.start()
+                local ok, count, _, _, skipped = net.sendPacked(OWNER, nil, { 1, 2 }, 'vava_test:e', 'abc')
+                assert.same({ true, 0 }, { ok, count })
+                assert.same({ 1, 2 }, skipped)
+            end)
+        end)
+
         it('latent : par l’envoi latent interne, au débit configuré', function()
             local _, _, _, latent = net.send(OWNER, { latent = 'always' }, 1, 'vava_test:e', 1)
             assert.is_true(latent)
@@ -476,5 +647,14 @@ describe('vAvA.net', function()
         net.start()
         assert.equal('estimate', net.mode())
         assert.is_true(printedMatching('msgpack.pack_args'))
+    end)
+
+    it('sendPacked en estimation : unsupported, rien n’est envoyé', function()
+        net.start()
+        assert.same({ false, 'unsupported' }, { net.sendPacked(OWNER, nil, 1, 'vava_test:e', 'abc') })
+        place(1, 1, 0, 0)
+        assert.same({ false, 'unsupported' },
+            { net.sendNearPacked(OWNER, nil, { x = 0, y = 0, z = 0 }, 10.0, 'vava_test:e', 'abc') })
+        assert.equal(0, #sent)
     end)
 end)

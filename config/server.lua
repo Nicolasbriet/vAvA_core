@@ -119,9 +119,13 @@ vAvA.config.server = {
             bytesPerSecond = 65536,    -- débit de chaque envoi latent (64 Ko/s, environ 0,5 Mbit/s)
             maxInFlightBytes = 524288, -- 512 Ko : volume latent encore en route vers un même joueur au-delà duquel un
                                        -- nouvel envoi latent vers lui est refusé (saturated)
+            maxTotalInFlightBytes = 4194304,  -- 4 Mo : volume latent en route tous joueurs confondus au-delà duquel un
+                                              -- nouvel envoi latent est refusé (saturated) ; catalogues de l'Atelier
         },
         near = {
-            maxRadius = 1000.0,  -- mètres : rayon maximal de sendNear et playersNear
+            maxRadius = 1000.0,     -- mètres : rayon maximal de sendNear et playersNear
+            positionCacheMs = 50,   -- position d'un ped gardée ce temps : un passage des zones et les sendNear qui le
+                                    -- suivent ne relisent rien (50 ms à 10 m/s : 0,5 m d'écart au plus)
         },
         counter = {
             bucketMs = 5000,        -- largeur d'une case de la fenêtre glissante

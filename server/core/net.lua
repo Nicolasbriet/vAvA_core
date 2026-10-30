@@ -3,8 +3,10 @@
     Rôle : tous les envois serveur → client du core et ceux des modules qui passent par core.net. Pour chaque envoi :
            cible validée (jamais -1, jamais 0 : un joueur, une liste, ou les joueurs proches calculés ici), taille
            mesurée (exacte : la seule sérialisation, celle qui part ; sinon estimée par netsize), envoi fiable, ou
-           latent à débit borné au-delà du seuil, volume latent en vol borné par joueur, compteur par ressource et
-           par évènement (netstats). Aucune fonction ne lève d'erreur : true, envoyés, octets, latent | false, code.
+           latent à débit borné au-delà du seuil, volume latent en vol borné par joueur et en tout (0.11.0), compteur
+           par ressource et par évènement (netstats). Aucune fonction ne lève d'erreur : true, envoyés, octets, latent
+           (+ joueurs sautés pour une liste ou un rayon) | false, code. Un module peut aussi envoyer une charge déjà
+           sérialisée chez lui (sendPacked) : une seule chaîne traverse l'export, le core l'envoie telle quelle.
     Ordre : deux messages fiables vers un même joueur arrivent dans l'ordre d'envoi ; un latent peut être dépassé par
            tout message envoyé après lui. Ce qui doit garder l'ordre (personnage, apparition) part en 'never'.
     Dépendances : shared/init.lua, config/server.lua, shared/lib/string.lua, shared/core/logger.lua,
@@ -13,7 +15,7 @@
 ]]
 
 local type, tostring, select, next, pairs, pcall, rawlen, rawget = type, tostring, select, next, pairs, pcall, rawlen, rawget
-local mathType, huge, min, ceil = math.type, math.huge, math.min, math.ceil
+local mathType, huge, min, ceil, floor = math.type, math.huge, math.min, math.ceil, math.floor
 local pack, unpack, concat = table.pack, table.unpack, table.concat
 local format = string.format
 local TriggerClientEvent, TriggerLatentClientEvent = TriggerClientEvent, TriggerLatentClientEvent
@@ -30,6 +32,7 @@ local log = logger.create('net')
 
 local RATE = cfg.latent.bytesPerSecond
 local THRESHOLD = cfg.latent.threshold
+local MAX_TOTAL_IN_FLIGHT = cfg.latent.maxTotalInFlightBytes
 local WINDOW_MS = cfg.counter.bucketMs * cfg.counter.buckets
 -- Préfixes que seul le core envoie : un module ne peut pas les prendre, même sous un nom de ressource qui y ressemble.
 local RESERVED_PREFIXES = { 'vAvA:', 'core:' }
@@ -65,8 +68,10 @@ local drainAt = {}
 local logStates = {}
 -- évènement → dernière alerte « gros envoi fiable »
 local largeWarnAt = {}
--- positions des peds lues pendant ce tour du serveur (vidées quand GetGameTimer change)
+-- positions des peds lues récemment (vidées near.positionCacheMs après le premier remplissage) : un passage des zones
+-- et les sendNear qui le suivent ne relisent rien
 local positionCache, positionTime = {}, nil
+local POSITION_CACHE_MS = cfg.near.positionCacheMs
 
 ---@param value any
 ---@return boolean
@@ -182,13 +187,14 @@ local function validRadius(radius)
     return finite(radius) and radius > 0 and radius <= cfg.near.maxRadius
 end
 
---- Position du ped d'un joueur, lue côté serveur (false : pas de ped). Gardée tant que GetGameTimer ne change pas,
---- c'est-à-dire pendant la même milliseconde : les recherches d'une même rafale en profitent, pas deux tours du serveur.
+--- Position du ped d'un joueur, lue côté serveur (false : pas de ped). Gardée near.positionCacheMs (50 ms : 0,5 m
+--- d'écart au plus à 10 m/s) après le premier remplissage du cache : un passage des zones lit chaque joueur une fois,
+--- et les envois de proximité qui le suivent en profitent.
 ---@param src integer
 ---@return vector3|table|false
 local function pedPosition(src)
     local now = GetGameTimer()
-    if now ~= positionTime then
+    if positionTime == nil or now - positionTime >= POSITION_CACHE_MS or now < positionTime then
         positionTime = now
         for key in pairs(positionCache) do positionCache[key] = nil end
     end
@@ -295,9 +301,12 @@ local function fallBack(err)
     log.error('[net] envoi interne du runtime en échec (%s) : estimation à partir de maintenant', tostring(err))
 end
 
+--- Envoie un paquet à une cible. false : charge déjà sérialisée par un module (sendPacked) dont l'envoi interne a
+--- échoué : sans ses valeurs, elle ne peut pas être rejouée (la cible est comptée comme sautée).
 ---@param packet vAvA.NetPacket
 ---@param target integer
 ---@param latent boolean
+---@return boolean sent
 local function sendOne(packet, target, latent)
     local payload = packet.payload
     if payload and mode == 'exact' then
@@ -307,29 +316,65 @@ local function sendOne(packet, target, latent)
         else
             ok, err = pcall(sendInternal, packet.event, tostring(target), payload, #payload)
         end
-        if ok then return end
+        if ok then return true end
         fallBack(err)
     end
     local args = packet.args
+    if not args then
+        log.error('%s : charge déjà sérialisée impossible à envoyer au joueur %d (mesure exacte indisponible)',
+            packet.event, target)
+        return false
+    end
     if latent then
         TriggerLatentClientEvent(packet.event, target, RATE, unpack(args, 1, args.n))
     else
         TriggerClientEvent(packet.event, target, unpack(args, 1, args.n))
     end
+    return true
 end
 
---- Réserve la place d'un envoi latent vers un joueur ; false si le volume en route dépasserait la borne.
+--- Volume latent encore en route vers tous les joueurs (estimé au débit configuré).
+---@param now integer
+---@return number
+local function totalInFlight(now)
+    local total = 0
+    for _, drain in pairs(drainAt) do
+        if drain > now then total = total + (drain - now) * RATE / 1000 end
+    end
+    return total
+end
+
+--- Réserve la place d'un envoi latent vers un joueur ; false si le volume en route vers lui, ou vers tous les joueurs
+--- (`total`, calculé une fois par envoi), dépasserait sa borne.
 ---@param target integer
 ---@param bytes integer
 ---@param now integer
+---@param total number  volume en route, tous joueurs confondus
 ---@return integer|false delayMs  délai au bout duquel ce message sera arrivé, latents déjà en route compris
-local function reserve(target, bytes, now)
+---@return string|nil why         'player' | 'global'
+local function reserve(target, bytes, now, total)
     local drain = drainAt[target] or 0
     local inFlight = drain > now and (drain - now) * RATE / 1000 or 0
-    if inFlight + bytes > cfg.latent.maxInFlightBytes then return false end
+    if inFlight + bytes > cfg.latent.maxInFlightBytes then return false, 'player' end
+    if total + bytes > MAX_TOTAL_IN_FLIGHT then return false, 'global' end
     drain = (drain > now and drain or now) + bytes * 1000 / RATE
     drainAt[target] = drain
     return ceil(drain - now)
+end
+
+---@param owner string
+---@param label string
+---@param target integer
+---@param why string
+---@param total number
+local function refuseLatent(owner, label, target, why, total)
+    if why == 'global' then
+        ownerError(owner, '%s : envoi latent refusé vers le joueur %d : plafond global du latent atteint (%d octets en route)',
+            label, target, floor(total))
+    else
+        ownerError(owner, '%s : envoi latent refusé vers le joueur %d (plus de %d octets déjà en route)',
+            label, target, cfg.latent.maxInFlightBytes)
+    end
 end
 
 ---@param options table
@@ -366,40 +411,54 @@ end
 ---@return integer|string sent
 ---@return integer|nil bytes
 ---@return boolean|nil latent
+---@return integer[]|nil skipped  liste : joueurs sautés (latent refusé, charge impossible à envoyer), nil si aucun
 local function deliverTo(owner, label, targets, count, options, packet, notice)
     local bytes = packet.bytes
     local latent = wantsLatent(options, bytes)
     local now = GetGameTimer()
     if not latent and options.warnLarge and bytes > THRESHOLD then warnLarge(label, bytes, now) end
+    -- volume latent en route, tous joueurs confondus : calculé une fois par envoi, augmenté de chaque cible acceptée
+    local total = latent and totalInFlight(now) or 0
     if type(targets) == 'number' then
-        local delay = latent and reserve(targets, bytes, now)
-        if latent and not delay then
-            ownerError(owner, '%s : envoi latent refusé vers le joueur %d (plus de %d octets déjà en route)',
-                label, targets, cfg.latent.maxInFlightBytes)
-            return false, 'saturated'
+        if latent then
+            local delay, why = reserve(targets, bytes, now, total)
+            if not delay then
+                refuseLatent(owner, label, targets, why, total)
+                return false, 'saturated'
+            end
+            if notice then notice(targets, packet, delay) end
         end
-        if latent and notice then notice(targets, packet, delay) end
-        sendOne(packet, targets, latent)
+        if not sendOne(packet, targets, latent) then return false, 'unsupported' end
         counter:record(now, owner, label, bytes, latent, targets)
         return true, 1, bytes, latent
     end
     -- liste : propre au core (copie de resolveTargets ou de collectNear), compactée sur place aux cibles servies
-    local sent = 0
+    local sent, skipped = 0, nil
     for i = 1, count do
         local target = targets[i]
-        local delay = latent and reserve(target, bytes, now)
-        if latent and not delay then
-            ownerError(owner, '%s : envoi latent refusé vers le joueur %d (plus de %d octets déjà en route)',
-                label, target, cfg.latent.maxInFlightBytes)
-        else
-            if latent and notice then notice(target, packet, delay) end
-            sendOne(packet, target, latent)
+        local served = true
+        if latent then
+            local delay, why = reserve(target, bytes, now, total)
+            if delay then
+                total = total + bytes
+                if notice then notice(target, packet, delay) end
+            else
+                refuseLatent(owner, label, target, why, total)
+                served = false
+            end
+        end
+        if served then served = sendOne(packet, target, latent) end
+        if served then
             sent = sent + 1
             targets[sent] = target
+        else
+            skipped = skipped or {}
+            skipped[#skipped + 1] = target
         end
     end
+    for i = sent + 1, count do targets[i] = nil end
     counter:record(now, owner, label, bytes, latent, targets, sent)
-    return true, sent, bytes, latent
+    return true, sent, bytes, latent, skipped
 end
 
 --- Envoi d'un paquet déjà mesuré (réponses RPC : préavis avant l'envoi latent).
@@ -413,6 +472,7 @@ end
 ---@return integer|string sent
 ---@return integer|nil bytes
 ---@return boolean|nil latent
+---@return integer[]|nil skipped  liste ou rayon : joueurs sautés, nil si aucun
 function net.deliver(owner, label, target, options, packet, notice)
     local targets, count, everyone = resolveTargets(target)
     if not targets then
@@ -421,6 +481,33 @@ function net.deliver(owner, label, target, options, packet, notice)
     end
     if count == 0 then return true, 0, 0, false end
     return deliverTo(owner, label, targets, count, options or net.AUTO, packet, notice)
+end
+
+--- Envoi d'un paquet déjà mesuré à une liste tenue par le core (abonnés d'une zone) : la liste donnée n'est pas
+--- modifiée ; un joueur parti entre-temps est oublié (ni servi ni sauté).
+---@param owner string
+---@param label string
+---@param list integer[]
+---@param options table|nil
+---@param packet vAvA.NetPacket
+---@param notice? vAvA.NetNotice
+---@return boolean ok
+---@return integer[] served   nouvelle liste : joueurs servis
+---@return integer[] skipped  nouvelle liste : joueurs sautés (latent refusé, charge impossible à envoyer)
+---@return integer bytes
+---@return boolean latent
+function net.deliverList(owner, label, list, options, packet, notice)
+    local targets, count = {}, 0
+    for i = 1, #list do
+        local src = list[i]
+        if mathType(src) == 'integer' and src > 0 and DoesPlayerExist(src) then
+            count = count + 1
+            targets[count] = src
+        end
+    end
+    if count == 0 then return true, targets, {}, 0, false end
+    local _, _, bytes, latent, skipped = deliverTo(owner, label, targets, count, options or net.AUTO, packet, notice)
+    return true, targets, skipped or {}, bytes, latent
 end
 
 --- Cœur de tous les envois du core : sans contrôle de préfixe, mêmes contrôles de cible, de taille et de débit.
@@ -433,6 +520,7 @@ end
 ---@return integer|string sent  joueurs servis, ou code d'erreur
 ---@return integer|nil bytes    taille d'un message
 ---@return boolean|nil latent
+---@return integer[]|nil skipped  liste : joueurs sautés (latent refusé), nil si aucun
 function net.dispatch(owner, label, target, options, event, ...)
     local targets, count, everyone = resolveTargets(target)
     if not targets then
@@ -457,6 +545,7 @@ end
 ---@return integer|string sent
 ---@return integer|nil bytes
 ---@return boolean|nil latent
+---@return integer[]|nil skipped  joueurs sautés (latent refusé), nil si aucun
 function net.dispatchNear(owner, label, options, coords, radius, event, ...)
     options = options or net.AUTO
     local x, y, z = readCoords(coords)
@@ -480,6 +569,7 @@ end
 ---@return integer|string sent
 ---@return integer|nil bytes
 ---@return boolean|nil latent
+---@return integer[]|nil skipped  liste : joueurs sautés (latent refusé), nil si aucun
 function net.send(owner, options, target, event, ...)
     local checked = checkOptions(options, SEND_KEYS)
     if not checked then return false, 'invalid_options' end
@@ -497,11 +587,84 @@ end
 ---@return integer|string sent
 ---@return integer|nil bytes
 ---@return boolean|nil latent
+---@return integer[]|nil skipped  joueurs sautés (latent refusé), nil si aucun
 function net.sendNear(owner, options, coords, radius, event, ...)
     local checked = checkOptions(options, NEAR_KEYS)
     if not checked then return false, 'invalid_options' end
     if not validEvent(owner, event) then return false, 'invalid_event' end
     return net.dispatchNear(owner, event, checked, coords, radius, event, ...)
+end
+
+--- Charge déjà sérialisée par un module (msgpack.pack_args) : non vide, message de maxBytes au plus.
+---@param owner string
+---@param event string
+---@param payload any
+---@return vAvA.NetPacket|nil packet  sans valeurs : impossible à rejouer par TriggerClientEvent
+---@return string|nil code
+local function packedPacket(owner, event, payload)
+    if type(payload) ~= 'string' or #payload == 0 then return nil, 'invalid_args' end
+    local bytes = #payload + #event
+    if bytes > cfg.maxBytes then
+        ownerError(owner, '%s : message de %d octets refusé (maximum %d)', event, bytes, cfg.maxBytes)
+        return nil, 'too_large'
+    end
+    return { event = event, bytes = bytes, payload = payload }
+end
+
+--- Surface des modules : charge sérialisée par le module lui-même (une chaîne traverse l'export, sans parcours),
+--- envoyée telle quelle à un joueur ou à une liste. Mêmes contrôles que send ; en estimation : 'unsupported', rien
+--- n'est envoyé (le module renvoie alors par send).
+---@param owner string
+---@param options any
+---@param target any
+---@param event any
+---@param payload any  chaîne produite par msgpack.pack_args(...)
+---@return boolean ok
+---@return integer|string sent
+---@return integer|nil bytes
+---@return boolean|nil latent
+---@return integer[]|nil skipped
+function net.sendPacked(owner, options, target, event, payload)
+    local checked = checkOptions(options, SEND_KEYS)
+    if not checked then return false, 'invalid_options' end
+    if not validEvent(owner, event) then return false, 'invalid_event' end
+    local packet, code = packedPacket(owner, event, payload)
+    if not packet then return false, code end
+    local targets, count, everyone = resolveTargets(target)
+    if not targets then
+        if everyone then refuseEveryone(owner, event) end
+        return false, count
+    end
+    if mode ~= 'exact' then return false, 'unsupported' end
+    if count == 0 then return true, 0, 0, false end
+    return deliverTo(owner, event, targets, count, checked, packet)
+end
+
+--- Surface des modules : charge sérialisée par le module, envoyée aux joueurs proches d'un point (règles de sendNear).
+---@param owner string
+---@param options any
+---@param coords any
+---@param radius any
+---@param event any
+---@param payload any
+---@return boolean ok
+---@return integer|string sent
+---@return integer|nil bytes
+---@return boolean|nil latent
+---@return integer[]|nil skipped
+function net.sendNearPacked(owner, options, coords, radius, event, payload)
+    local checked = checkOptions(options, NEAR_KEYS)
+    if not checked then return false, 'invalid_options' end
+    if not validEvent(owner, event) then return false, 'invalid_event' end
+    local packet, code = packedPacket(owner, event, payload)
+    if not packet then return false, code end
+    local x, y, z = readCoords(coords)
+    if not x then return false, 'invalid_coords' end
+    if not validRadius(radius) then return false, 'invalid_radius' end
+    if mode ~= 'exact' then return false, 'unsupported' end
+    local list, count = collectNear(x, y, z, radius, checked)
+    if count == 0 then return true, 0, 0, false end
+    return deliverTo(owner, event, list, count, checked, packet)
 end
 
 --- Joueurs proches d'un point (même règle que sendNear), dans une nouvelle liste.
@@ -526,7 +689,8 @@ function net.positionOf(src)
     return pedPosition(src) or nil
 end
 
---- Vrai si un envoi latent de `bytes` octets vers ce joueur serait refusé (saturated), sans rien réserver.
+--- Vrai si un envoi latent de `bytes` octets vers ce joueur serait refusé (saturated : plafond du joueur ou plafond
+--- global), sans rien réserver.
 ---@param target integer
 ---@param bytes integer
 ---@return boolean
@@ -534,7 +698,8 @@ function net.wouldSaturate(target, bytes)
     local now = GetGameTimer()
     local drain = drainAt[target] or 0
     local inFlight = drain > now and (drain - now) * RATE / 1000 or 0
-    return inFlight + bytes > cfg.latent.maxInFlightBytes
+    if inFlight + bytes > cfg.latent.maxInFlightBytes then return true end
+    return totalInFlight(now) + bytes > MAX_TOTAL_IN_FLIGHT
 end
 
 ---@class vAvA.NetStatsOptions
