@@ -16,7 +16,7 @@ globals = {
     'VavaAdmin', 'VavaAppearance', 'VavaArrival', 'VavaCameras', 'VavaChancellerie', 'VavaCharactersUi', 'VavaChat',
     'VavaCodex', 'VavaCrafting', 'VavaFarming', 'VavaGathering', 'VavaHealth', 'VavaHud', 'VavaInventory',
     'VavaLoading', 'VavaMagic', 'VavaNeeds', 'VavaSkills', 'VavaTime', 'VavaVoice', 'VavaWorld', 'VavaAtelier',
-    'VavaBridge', 'VavaExample', 'VavaAnimTest', 'VavaDevCharacters', 'VavaExampleAtelier',
+    'VavaBridge', 'VavaExample', 'VavaAnimTest', 'VavaDevCharacters', 'VavaExampleAtelier', 'VavaExampleCombat',
     'exports',
 }
 exclude_files = { 'chancellerie/**', '**/web/**', 'tests/**', '.outils/**', '.claude/**' }
