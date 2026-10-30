@@ -1306,7 +1306,8 @@ facultatifs : `vava_hud`, `vava_admin` (droit `metiers`), `vava_chat`, `vava_hea
   tenu la tension » de `vava_gathering:reel` ne peut que faire rater (`false` : code `escaped`) ; à `true`, le serveur
   tire la prise d'après le niveau de Pêche et la bande de la zone (`fishing.catch`, règle pure `shared/catch.lua` :
   25 % de poissons décrochés au niveau 0, 2 % au niveau 100, + 5 / + 10 points en eaux fatiguées / épuisées ; code
-  `escaped`, rien de consommé), puis l'échec de la bande comme pour toute récolte. À terre (`vava_health:isDowned`,
+  `escaped`, rien de consommé), puis l'échec de la bande comme pour toute récolte (zones de `waterKinds` : textes de
+  l'eau pour l'échec, l'épuisement et l'invite). À terre (`vava_health:isDowned`,
   lu par le bridge), ni début ni fin (code `downed`) ; côté client, ni invite ni demande.
 - **Saisons** (1.3.0) : la saison de `vava_time` (export `getSeason`, lu par le bridge, gardée 5 s) donne deux facteurs
   par compétence de la ressource, réglés dans `config.seasons` : `regen` (vitesse à laquelle les nœuds rendent leurs
@@ -1410,7 +1411,8 @@ ou à terre, le geste est abandonné ; à terre, `vava_health:isDowned` lu par l
 ni grenier, code `downed` ; un emplacement qui vient de donner ou de consommer des objets — semis, récolte, compost,
 couverture, arrachage — est écrit aussitôt, le reste par lots ; récolte et arrachage vident l'emplacement avant tout
 ajout à la besace, qui peut céder la main : de deux cultivateurs sur la même plante, un seul est servi ; une récolte
-refusée par la besace rend la plante telle quelle, couverture comprise, sauf semis fait entre-temps — 1.5.1) ; **grenier
+refusée par la besace rend la plante (couverture payée comprise), sauf semis fait entre-temps, sans effacer un compost
+posé entre-temps, et un gel tombé pendant l'attente la frappe ; parcelle republiée aussitôt — 1.5.1) ; **grenier
 commun** (conteneur `vava_inventory` conservé, ouvert ancré à qui a accès à la parcelle — communale : tous ; privée :
 son propriétaire ou le genre branché par `registerAccess` —, dépôts et retraits journalés par minute : une ligne par
 minute, grenier, personnage, objet et sens, quantités additionnées, attente bornée par `persistence.granaryLogMax` ;
