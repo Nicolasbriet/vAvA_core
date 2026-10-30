@@ -1,68 +1,61 @@
 --[[
     vava_farming/client/props.lua
-    Rôle : les parcelles, puits et greniers dans le monde, vus du joueur : état des emplacements publié par le serveur
-           (culture, stade, état) lu dans les state bags globaux, props LOCAUX (jamais réseau) créés pour les plantes,
-           puits et greniers à portée — une plante change de prop avec son stade ou son état, un emplacement vide n'en a
-           pas —, cible la plus proche à distance d'interaction (emplacement, puits ou grenier). Une seule boucle lente,
+    Rôle : les parcelles, puits et greniers dans le monde, vus du joueur : parcelles proches reçues par les abonnements
+           de zone du core (core.zones.watch, 1.7.0 : définition et état des emplacements — culture, stade, état — à
+           l'arrivée, puis les seuls emplacements changés ; oubliées en s'éloignant ; une parcelle créée ou déplacée en
+           jeu arrive de même), puits de la config ; props LOCAUX (jamais réseau) créés pour les plantes, puits et
+           greniers à portée — une plante change de prop avec son stade ou son état, un emplacement vide n'en a pas —,
+           cible la plus proche à distance d'interaction (emplacement, puits ou grenier). Une seule boucle lente,
            active seulement quand un personnage est en jeu : elle mesure d'abord les groupes (une parcelle avec son
            grenier, les puits par case de streaming.groupCell), ne parcourt que les cibles d'un groupe à portée, passe
-           toutes les streaming.pollMs près d'un groupe et toutes les streaming.idlePollMs loin de tous ; elle s'arrête
+           toutes les streaming.pollMs près d'un groupe et toutes les streaming.idlePollMs loin de tous ; une parcelle
+           reçue, changée ou quittée fait aussitôt un passage (props et invite à jour sans attendre) ; elle s'arrête
            d'elle-même à la sélection et au déchargement, et retire alors tous les props.
-    Dépendances : shared/constants.lua, config.lua, shared/geometry.lua, shared/proximity.lua, client/core.lua
+    Dépendances : shared/constants.lua, config.lua, shared/geometry.lua, shared/parcelzone.lua, shared/proximity.lua,
+                  client/core.lua (core.zones, vAvA_core 0.11.0)
 ]]
 
-local type, pairs, ipairs, tonumber = type, pairs, ipairs, tonumber
-local sub, floor, max, huge = string.sub, math.floor, math.max, math.huge
+local type, pairs, ipairs, tostring = type, pairs, ipairs, tostring
+local max, huge = math.max, math.huge
 local CreateThread, Wait, GetGameTimer, AddEventHandler = CreateThread, Wait, GetGameTimer, AddEventHandler
 local PlayerPedId, GetEntityCoords, DoesEntityExist, DeleteObject = PlayerPedId, GetEntityCoords, DoesEntityExist, DeleteObject
 local RequestModel, HasModelLoaded, IsModelValid, SetModelAsNoLongerNeeded, GetHashKey = RequestModel, HasModelLoaded, IsModelValid, SetModelAsNoLongerNeeded, GetHashKey
 local CreateObjectNoOffset, SetEntityHeading, FreezeEntityPosition, PlaceObjectOnGroundProperly = CreateObjectNoOffset, SetEntityHeading, FreezeEntityPosition, PlaceObjectOnGroundProperly
-local AddStateBagChangeHandler = AddStateBagChangeHandler
 
 local core = VavaFarming.core
 if not core then return end
 
 local cfg = VavaFarming.config
 local geometry = VavaFarming.geometry
+local parcelzone = VavaFarming.parcelzone
 local proximity = VavaFarming.proximity
 local streaming = cfg.streaming
-local STATE_PARCEL = VavaFarming.STATE_PARCEL
 local STATES = VavaFarming.STATES
 local RESOURCE = VavaFarming.resource
+local DEF = parcelzone.DEF
 local LOAD_POLL_MS = 50
 
 local props = {}
 VavaFarming.props = props
 
--- index de la config
-local parcelsById, wellsById = {}, {}
-for _, parcel in ipairs(cfg.parcels) do parcelsById[parcel.id] = parcel end
+-- puits : fixes (config), groupés par case de grille, cibles calculées une fois (clé du prop, position, cap, modèle)
+local wellsById = {}
 for _, well in ipairs(cfg.wells) do wellsById[well.id] = well end
--- cibles calculées une fois (la config ne change pas en jeu) : clé du prop, position, cap ; `model` fixe pour un puits
--- ou un grenier, lu dans l'état publié pour un emplacement. Une parcelle et son grenier forment un groupe, les puits
--- sont groupés par case de grille.
-local targets = {}
-for _, parcel in ipairs(cfg.parcels) do
-    local group = 'parcel:' .. parcel.id
-    for index = 1, geometry.slotCount(parcel) do
-        local x, y, z = geometry.slotPosition(parcel, index)
-        targets[#targets + 1] = { kind = 'slot', key = 'slot:' .. parcel.id .. ':' .. index, group = group,
-            parcel = parcel.id, index = index, x = x, y = y, z = z, heading = parcel.heading }
-    end
-    local g = parcel.granary
-    if g then
-        targets[#targets + 1] = { kind = 'granary', key = 'granary:' .. parcel.id, group = group, parcel = parcel.id,
-            model = g.prop, x = g.x, y = g.y, z = g.z, heading = g.heading or parcel.heading }
-    end
-end
+local wellTargets = {}
 for _, well in ipairs(cfg.wells) do
-    targets[#targets + 1] = { kind = 'well', key = 'well:' .. well.id, well = well.id, model = well.prop,
+    wellTargets[#wellTargets + 1] = { kind = 'well', key = 'well:' .. well.id, well = well.id, model = well.prop,
         x = well.x, y = well.y, z = well.z, heading = well.heading,
         group = 'wells:' .. proximity.cell(well.x, well.y, streaming.groupCell) }
 end
 -- un groupe naît « actif » pour que le premier passage retire ce qui serait hors de portée
-local groups = proximity.group(targets, function(target) return target.group end)
-for _, group in ipairs(groups) do group.active = true end
+local wellGroups = proximity.group(wellTargets, function(target) return target.group end)
+for _, group in ipairs(wellGroups) do group.active = true end
+
+-- parcelles proches, reçues du serveur : id → { def (parcelzone.readDefinition), signature, group } ; une parcelle et
+-- son grenier forment un groupe, cibles calculées à l'arrivée de la parcelle (ou quand sa définition change)
+local parcels = {}
+-- groupes mesurés par la boucle : puits, puis parcelles connues (refait quand une parcelle arrive, change ou part)
+local groups = wellGroups
 -- une cible est mesurée si son groupe peut en avoir une à portée des props ou de l'invite
 local REACH = max(streaming.radius, cfg.interact.distance)
 
@@ -83,10 +76,12 @@ local onNearest = nil
 
 local EMPTY_SLOT = { crop = nil, stage = 0, state = nil }
 
+--- Définition d'une parcelle proche (label, centre, grille, grenier), ou nil si le joueur n'en est pas assez près.
 ---@param id string
 ---@return table|nil
 function props.parcel(id)
-    return parcelsById[id]
+    local entry = parcels[id]
+    return entry and entry.def or nil
 end
 
 ---@param id string
@@ -199,37 +194,44 @@ local function nearestOf(target, far)
     return { kind = 'well', well = target.well, distance = far }
 end
 
---- Boucle lente justifiée, seulement quand un personnage est en jeu : une distance par groupe (parcelle et grenier,
---- puits d'une case), puis une par cible des seuls groupes à portée ; un groupe qui sort de portée retire ses props
---- une fois. Intervalle : streaming.pollMs près d'un groupe, streaming.idlePollMs quand aucune cible ne peut être à
---- moins de radius + idleMargin.
+--- Un passage : une distance par groupe (parcelle et grenier, puits d'une case), puis une par cible des seuls groupes
+--- à portée ; un groupe qui sort de portée retire ses props une fois. Ne cède jamais la main. Rend l'intervalle du
+--- prochain passage : streaming.pollMs près d'un groupe, streaming.idlePollMs quand aucune cible ne peut être à moins
+--- de radius + idleMargin.
+---@return integer
+local function step()
+    local coords = GetEntityCoords(PlayerPedId())
+    local px, py, pz = coords.x, coords.y, coords.z
+    local best, bestTarget, bestDistance = nil, nil, cfg.interact.distance
+    local closest = huge
+    for _, group in ipairs(groups) do
+        local reachable, gap = proximity.reachable(group, px, py, pz, REACH)
+        if gap < closest then closest = gap end
+        if reachable then
+            group.active = true
+            for _, target in ipairs(group.targets) do
+                local far = geometry.distance(px, py, pz, target.x, target.y, target.z)
+                local model = target.model
+                if target.kind == 'slot' then model = modelFor(props.slot(target.parcel, target.index)) end
+                reconcile(target.key, model, far, target.x, target.y, target.z, target.heading)
+                if far <= bestDistance then bestTarget, bestDistance = target, far end
+            end
+        elseif group.active then
+            group.active = false
+            for _, target in ipairs(group.targets) do remove(target.key) end
+        end
+    end
+    if bestTarget then best = nearestOf(bestTarget, bestDistance) end
+    nearest = best
+    if onNearest then onNearest(best) end
+    return proximity.interval(closest, streaming.radius, streaming.idleMargin, streaming.pollMs, streaming.idlePollMs)
+end
+
+--- Boucle lente justifiée, seulement quand un personnage est en jeu (voir step). Une parcelle reçue, changée ou
+--- quittée fait aussitôt un passage hors de la boucle (onZone) : ses props n'attendent pas la fin d'un intervalle lent.
 local function loop()
     while playing do
-        local coords = GetEntityCoords(PlayerPedId())
-        local px, py, pz = coords.x, coords.y, coords.z
-        local best, bestTarget, bestDistance = nil, nil, cfg.interact.distance
-        local closest = huge
-        for _, group in ipairs(groups) do
-            local reachable, gap = proximity.reachable(group, px, py, pz, REACH)
-            if gap < closest then closest = gap end
-            if reachable then
-                group.active = true
-                for _, target in ipairs(group.targets) do
-                    local far = geometry.distance(px, py, pz, target.x, target.y, target.z)
-                    local model = target.model
-                    if target.kind == 'slot' then model = modelFor(props.slot(target.parcel, target.index)) end
-                    reconcile(target.key, model, far, target.x, target.y, target.z, target.heading)
-                    if far <= bestDistance then bestTarget, bestDistance = target, far end
-                end
-            elseif group.active then
-                group.active = false
-                for _, target in ipairs(group.targets) do remove(target.key) end
-            end
-        end
-        if bestTarget then best = nearestOf(bestTarget, bestDistance) end
-        nearest = best
-        if onNearest then onNearest(best) end
-        Wait(proximity.interval(closest, streaming.radius, streaming.idleMargin, streaming.pollMs, streaming.idlePollMs))
+        Wait(step())
     end
     for key in pairs(shown) do remove(key) end
     nearest = nil
@@ -259,36 +261,157 @@ function props.onNearest(fn)
     onNearest = fn
 end
 
----@param key string
----@param value any
-local function applyState(key, value)
-    if sub(key, 1, #STATE_PARCEL) ~= STATE_PARCEL then return end
-    local parcelId = sub(key, #STATE_PARCEL + 1)
-    if not parcelsById[parcelId] then return end
-    if type(value) == 'table' and type(value.slots) == 'table' then
-        local slots = {}
-        for index, slot in pairs(value.slots) do
-            local i = tonumber(index)
-            if i and type(slot) == 'table' then
-                local crop = type(slot.crop) == 'string' and slot.crop ~= '' and slot.crop or nil
-                local state = type(slot.state) == 'string' and slot.state ~= '' and slot.state or nil
-                slots[floor(i)] = { crop = crop, stage = type(slot.stage) == 'number' and floor(slot.stage) or 0, state = crop and state or nil }
-            end
-        end
-        states[parcelId] = slots
-    else
-        states[parcelId] = nil
+-- Parcelles proches (abonnements de zone du core) ----------------------------------------------------------------------
+
+--- Groupes mesurés par la boucle : puits, puis parcelles connues. Refait seulement quand une parcelle arrive, change de
+--- définition ou part (la boucle ne cède jamais la main au milieu d'un parcours : elle lit toujours une liste entière).
+local function rebuildGroups()
+    local list = {}
+    for _, group in ipairs(wellGroups) do list[#list + 1] = group end
+    for _, entry in pairs(parcels) do
+        if entry.group then list[#list + 1] = entry.group end
     end
-    -- l'invite montre la culture et son état : elle suit l'état publié
-    if onNearest and nearest and nearest.kind == 'slot' and nearest.parcel == parcelId then onNearest(nearest) end
+    groups = list
 end
 
---- Suit les state bags globaux et reprend l'état déjà publié. Appelé par client/main.lua.
+--- Groupe d'une parcelle : ses emplacements et son grenier (clé du prop, position, cap ; `model` fixe pour le grenier,
+--- lu dans l'état reçu pour un emplacement).
+---@param id string
+---@param def table
+---@return table|nil
+local function parcelGroup(id, def)
+    local key = 'parcel:' .. id
+    local targets = {}
+    for index = 1, geometry.slotCount(def) do
+        local x, y, z = geometry.slotPosition(def, index)
+        targets[#targets + 1] = { kind = 'slot', key = 'slot:' .. id .. ':' .. index, group = key,
+            parcel = id, index = index, x = x, y = y, z = z, heading = def.heading }
+    end
+    local g = def.granary
+    if g then
+        targets[#targets + 1] = { kind = 'granary', key = 'granary:' .. id, group = key, parcel = id,
+            model = g.prop, x = g.x, y = g.y, z = g.z, heading = g.heading }
+    end
+    local group = proximity.group(targets, function(target) return target.group end)[1]
+    -- né « actif » : le premier passage retire ce qui serait hors de portée
+    if group then group.active = true end
+    return group
+end
+
+---@param group table|nil
+local function removeGroup(group)
+    if not group then return end
+    for _, target in ipairs(group.targets) do remove(target.key) end
+end
+
+--- Place (ou replace) une parcelle reçue : ses props sont refaits si sa définition a changé (déplacée, agrandie…).
+---@param id string
+---@param def table
+local function place(id, def)
+    local signature = parcelzone.definitionKey(def)
+    local entry = parcels[id]
+    if entry and entry.signature == signature then
+        entry.def = def
+        return
+    end
+    if entry then removeGroup(entry.group) end
+    parcels[id] = { def = def, signature = signature, group = parcelGroup(id, def) }
+    local list = states[id]
+    if list then
+        local count = geometry.slotCount(def)
+        for index in pairs(list) do
+            if index > count then list[index] = nil end
+        end
+    end
+    rebuildGroups()
+end
+
+--- Oublie une parcelle (éloigné, retirée, déchargement) : ses props partent, son état aussi.
+---@param id string
+local function forget(id)
+    local entry = parcels[id]
+    states[id] = nil
+    if not entry then return end
+    removeGroup(entry.group)
+    parcels[id] = nil
+    rebuildGroups()
+    if nearest and nearest.parcel == id then
+        nearest = nil
+        if onNearest then onNearest(nil) end
+    end
+end
+
+--- Passage immédiat après une notification : props et invite (culture, état, nom de la parcelle ou du grenier) suivent
+--- aussitôt ce qui est reçu. Une parcelle arrive dans la marge d'abonnement (`subscribeSlack`) : sans ce passage, ses
+--- props attendraient jusqu'à `idlePollMs` et un cavalier au galop les verrait apparaître trop près.
+local function refresh()
+    if playing then step() end
+end
+
+--- Une parcelle arrive (état entier), change (emplacements, définition) ou part : nom local = id de la parcelle ; état
+--- `def` et `s<n°>` (shared/parcelzone.lua). Une définition illisible fait oublier la parcelle. Chaque notification
+--- fait aussitôt un passage.
+---@param kind string  'enter' | 'change' | 'leave'
+---@param id string
+---@param a table|nil  état (enter) ou valeurs changées (change)
+---@param b table|nil  clés retirées (change)
+local function onZone(kind, id, a, b)
+    if type(id) ~= 'string' then return end
+    if kind == 'leave' then
+        forget(id)
+        refresh()
+        return
+    end
+    if type(a) ~= 'table' then return end
+    if kind == 'enter' then
+        local def = parcelzone.readDefinition(a[DEF])
+        if not def then
+            core.log.warn("parcelle '%s' : définition reçue illisible, ignorée", id)
+            forget(id)
+            refresh()
+            return
+        end
+        place(id, def)
+        states[id] = parcelzone.readSlots(a, geometry.slotCount(def))
+    elseif kind == 'change' then
+        if not parcels[id] then return end
+        if a[DEF] ~= nil then
+            local def = parcelzone.readDefinition(a[DEF])
+            if not def then
+                core.log.warn("parcelle '%s' : définition reçue illisible, ignorée", id)
+                forget(id)
+                refresh()
+                return
+            end
+            place(id, def)
+        end
+        local count = geometry.slotCount(parcels[id].def)
+        local list = states[id] or {}
+        states[id] = list
+        for key, raw in pairs(a) do
+            local index = parcelzone.slotIndex(key)
+            if index and index <= count then list[index] = parcelzone.readSlot(raw) end
+        end
+        if type(b) == 'table' then
+            for _, key in ipairs(b) do
+                local index = parcelzone.slotIndex(key)
+                if index then list[index] = nil end
+            end
+        end
+    else
+        return
+    end
+    refresh()
+end
+
+--- Suit les parcelles proches (abonnements de zone du core) et la vie du personnage. Appelé par client/main.lua.
 function props.start()
-    AddStateBagChangeHandler(nil, 'global', function(_, key, value)
-        if type(key) == 'string' then applyState(key, value) end
-    end)
-    for _, parcel in ipairs(cfg.parcels) do applyState(STATE_PARCEL .. parcel.id, GlobalState[STATE_PARCEL .. parcel.id]) end
+    if core.zones then
+        local watched, watchErr = core.zones.watch(onZone)
+        if not watched then core.log.error('parcelles non suivies : %s', tostring(watchErr)) end
+    else
+        core.log.error('parcelles indisponibles : vAvA_core 0.11.0 au moins est requis')
+    end
 
     core.hooks.after('core:character:spawning', function() props.setPlaying(true) end)
     core.hooks.after('core:character:selection', function() props.setPlaying(false) end)

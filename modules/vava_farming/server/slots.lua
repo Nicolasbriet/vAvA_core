@@ -1,25 +1,26 @@
 --[[
     vava_farming/server/slots.lua
     Rôle : état des emplacements, tenu par le serveur : chargé au démarrage, avancé à la demande par les règles pures de
-           shared/growth.lua (aucune boucle de croissance), publié aux clients par un state bag par parcelle (culture,
-           stade, état de chaque emplacement) écrit au seul changement et relu toutes les 10 s pour que les plantes
-           poussent sous les yeux, écrit par lots — et aussitôt, emplacement par emplacement, après un geste qui donne
-           ou consomme des objets. Accès aux parcelles privées par genre de propriétaire (personnage ; d'autres se
-           branchent par registerAccess). Couverture contre le gel ; plantes exposées et plantes perdues quand le gel
-           d'une nuit d'hiver tombe (vava_time).
-    Dépendances : shared/, config.lua, server/core.lua, bridge/server.lua, server/catalog.lua
+           shared/growth.lua (aucune boucle de croissance), publié aux seuls joueurs proches par la zone du core de sa
+           parcelle (culture, stade, état de chaque emplacement ; server/zones.lua) — seuls les emplacements changés
+           partent, relus toutes les 10 s pour que les plantes poussent sous les yeux —, écrit par lots — et aussitôt,
+           emplacement par emplacement, après un geste qui donne ou consomme des objets. Accès aux parcelles privées
+           par genre de propriétaire (personnage ; d'autres se branchent par registerAccess). Couverture contre le
+           gel ; plantes exposées et plantes perdues quand le gel d'une nuit d'hiver tombe (vava_time).
+    Dépendances : shared/, config.lua, server/core.lua, bridge/server.lua, server/catalog.lua, server/zones.lua
 ]]
 
 local pairs, ipairs, tostring = pairs, ipairs, tostring
 local floor, min, max = math.floor, math.min, math.max
 local time = os.time
-local GlobalState, CreateThread = GlobalState, CreateThread
+local CreateThread = CreateThread
 
 local bridge = VavaFarming.bridge
 local catalog = VavaFarming.catalog
 local growth = VavaFarming.growth
+local parcelzone = VavaFarming.parcelzone
+local zones = VavaFarming.zones
 local cfg = VavaFarming.config
-local STATE_PARCEL = VavaFarming.STATE_PARCEL
 
 local SELECT_SQL = 'SELECT `parcel`, `slot`, `crop`, `seed_tier`, `planted_at`, `growth`, `moisture`, `fertility`, `dry_since`, `dry_hours`, `waterings`, `wilted`, `dead`, `covered`, `last_family`, `updated_at` FROM `vava_farming_slots`'
 local UPSERT_SQL = 'INSERT INTO `vava_farming_slots` (`parcel`, `slot`, `crop`, `seed_tier`, `planted_at`, `growth`, `moisture`, `fertility`, `dry_since`, `dry_hours`, `waterings`, `wilted`, `dead`, `covered`, `last_family`, `updated_at`) '
@@ -38,8 +39,6 @@ local states = {}
 local WRITING = 'writing'
 -- `waterings` est un SMALLINT UNSIGNED : une plante mûre arrosée sans fin ne doit pas faire échouer toute l'écriture
 local MAX_WATERINGS = 65535
--- parcelle → dernière publication (clé de comparaison)
-local published = {}
 local accessors = {
     character = function(ownerId, characterId) return ownerId == characterId end,
 }
@@ -139,23 +138,31 @@ function slots.view(parcel, index)
     }
 end
 
---- Publie la parcelle si un stade ou un état a changé.
+--- Ce que voit un passant de chaque emplacement (culture, stade, état), tel que calculé à leur dernier passage.
 ---@param parcel vAvA.ParcelDefinition
-function slots.publish(parcel)
-    local list = states[parcel.id]
-    local payload, key = {}, {}
+---@return { crop: string, stage: integer, state: string }[]
+local function publicOf(parcel)
+    local list, values = states[parcel.id], {}
     for index = 1, parcel.count do
         local slot = list[index]
         local crop = slot.crop and catalog.crop(slot.crop) or nil
-        local stage = crop and growth.stage(slot, crop) or 0
-        local state = crop and growth.state(slot, crop) or ''
-        payload[index] = { crop = slot.crop or '', stage = stage, state = state }
-        key[index] = (slot.crop or '') .. stage .. state
+        values[index] = parcelzone.slotValue(slot.crop, crop and growth.stage(slot, crop) or 0,
+            crop and growth.state(slot, crop) or nil)
     end
-    local signature = table.concat(key, '|')
-    if published[parcel.id] == signature then return end
-    published[parcel.id] = signature
-    GlobalState[STATE_PARCEL .. parcel.id] = { slots = payload }
+    return values
+end
+
+--- Envoie aux joueurs proches de la parcelle les seuls emplacements dont la culture, le stade ou l'état a changé (rien
+--- si aucun) ; tous les changements de la parcelle faits dans le même passage partent ensemble.
+---@param parcel vAvA.ParcelDefinition
+function slots.publish(parcel)
+    zones.publish(parcel, publicOf(parcel))
+end
+
+--- Partage chaque parcelle entière avec les joueurs proches (zone du core déclarée, ou état remplacé). Appelé pendant
+--- le setup, après slots.load(), avant tout calcul de croissance (saison peut-être encore en attente).
+function slots.shareAll()
+    for _, parcel in ipairs(catalog.parcels()) do zones.share(parcel, publicOf(parcel)) end
 end
 
 -- effets de saison appliqués au passage précédent (UNKNOWN : aucun passage encore, ou saison en attente)

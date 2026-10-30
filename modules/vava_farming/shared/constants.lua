@@ -1,7 +1,7 @@
 --[[
     vava_farming/shared/constants.lua
     Rôle : table du module (seule globale de la ressource) et constantes de protocole : registre des cultures, RPC,
-           évènements ciblés, state bag des parcelles, états d'un emplacement, bornes.
+           évènements ciblés, zone du core d'une parcelle (et ancien state bag, effacé), états d'un emplacement, bornes.
     Dépendances : aucune
 ]]
 
@@ -11,8 +11,15 @@ VavaFarming = {}
 -- rempli par la config, extensible par d'autres modules.
 VavaFarming.REGISTRY_CROPS = 'vava_farming:crops'
 
--- State bag global d'une parcelle : + id → { slots = { [index] = { crop, stage, state } } }
-VavaFarming.STATE_PARCEL = 'vava_farming:parcel:'
+-- Ancien state bag global d'une parcelle (jusqu'à la 1.6.0) : + id. Plus jamais écrit, seulement effacé au démarrage
+-- s'il traîne encore (serveur non redémarré depuis l'ancienne version) : chaque parcelle est une zone du core.
+VavaFarming.LEGACY_STATE_PARCEL = 'vava_farming:parcel:'
+
+-- Zone du core d'une parcelle (core.zones, vAvA_core 0.11.0) : identifiant local = id de la parcelle ; état
+-- `def` (définition, shared/parcelzone.lua) et `s<n°>` → { crop, stage, state } (chaînes vides : emplacement libre).
+-- Clés changées au plus par appel de core.zones.set (limite du core, `zones.maxChanges`) ; rayon minimal d'une zone.
+VavaFarming.ZONE_MAX_CHANGES = 64
+VavaFarming.ZONE_MIN_RADIUS = 1.0
 
 -- États d'un emplacement planté.
 VavaFarming.STATES = { GROWING = 'growing', RIPE = 'ripe', WILTED = 'wilted', DEAD = 'dead' }

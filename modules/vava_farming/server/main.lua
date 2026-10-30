@@ -1,7 +1,7 @@
 --[[
     vava_farming/server/main.lua
     Rôle : déclaration du module auprès du core : catalogue (registre des cultures, objets, composteur), journal, état
-           des emplacements, greniers, nuits de gel (vava_time), intentions du client (RPC à schéma strict et débit limité), joueurs partis,
+           des emplacements et zones du core des parcelles (ancien state bag effacé), greniers, nuits de gel (vava_time), intentions du client (RPC à schéma strict et débit limité), joueurs partis,
            boucle lente d'écriture (emplacements, journal du grenier ; aussi à l'arrêt) et de republication (les plantes
            poussent), commande du Conseil.
     Dépendances : tous les fichiers server/ du module
@@ -17,6 +17,7 @@ local bridge = VavaFarming.bridge
 local journal = VavaFarming.journal
 local catalog = VavaFarming.catalog
 local slots = VavaFarming.slots
+local zones = VavaFarming.zones
 local granary = VavaFarming.granary
 local frost = VavaFarming.frost
 local actions = VavaFarming.actions
@@ -60,6 +61,10 @@ local function setup()
     journal.purge()
     ok, err = slots.load()
     if not ok then return false, 'emplacements : ' .. tostring(err) end
+    -- chaque parcelle devient une zone du core : seuls les joueurs proches la reçoivent (plus rien dans GlobalState)
+    if not core.zones then return false, 'abonnements de zone absents (vAvA_core 0.11.0 au moins)' end
+    zones.clearLegacy(catalog.parcels())
+    slots.shareAll()
     ok, err = granary.start()
     if not ok then return false, 'greniers : ' .. tostring(err) end
     ok, err = frost.start()

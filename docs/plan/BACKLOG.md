@@ -425,7 +425,14 @@ versé à T-014 ; les autres points déjà couverts sont précisés dans T-012 �
   128 m à juger).
 
 ### T-016 — Agriculture : GlobalState → abonnements de zone
-- Agent : vava-dev-lua · Dépend de : T-014 · Statut : à faire
+- Agent : vava-dev-lua · Dépend de : T-014 · Statut : à tester en jeu (relu sécurité et réseau, suites appliquées ; fusionnée sans test en jeu, à la demande du porteur du projet)
+- Rapport : `docs/plan/rapports/T-016.md` (`vava_farming` 1.7.0) ; procédure : `docs/tests/metiers.md` § 5.2.
+- Fait le 30 octobre 2026 : une zone du core par parcelle (définition et emplacements à l'arrivée, puis les seuls
+  emplacements changés, ~40 o, aux seuls joueurs proches, un envoi par parcelle pour le gel et la croissance). Suite de
+  la relecture réseau (IMPORTANT) : une parcelle reçue fait aussitôt un passage du client, sans quoi un cavalier au
+  galop voyait les plantes apparaître vers 45-50 m. `zones.share` et `zones.drop` restent à brancher à l'Atelier
+  (T-103). **À tester en jeu** : § 5.2 (joueur loin sans rien reçu, plantes à 80 m à pied, au galop et par
+  téléportation, un envoi par parcelle la nuit de gel, redémarrage du module, refus `too_far`, `profiler record`).
 - T-011 (`docs/audits/reseau-vava_farming.md`) : `server/slots.lua:140-155` republie la **parcelle entière** (470 o pour
   les 12 emplacements du champ communal) à tous les joueurs dès qu'un seul emplacement change de culture, de stade ou
   d'état. Envoyer aux abonnés de la parcelle la seule différence `{ parcelle, n°, crop, stage, state }` (environ 40 o)

@@ -1793,7 +1793,7 @@ station. Rendu hors jeu : `web/index.html?view=menu` (ou `menu&tab=reparation`, 
 
 ### `vava_farming`
 
-L'agriculture (1.5.1) : **parcelles** communales ou privées (`owner = { kind = 'character', id }`, autres genres par
+L'agriculture (1.7.0) : **parcelles** communales ou privées (`owner = { kind = 'character', id }`, autres genres par
 `registerAccess`) faites d'emplacements en grille ; **croissance par dates** (humidité qui baisse, pousse au-dessus
 d'un seuil, pause à sec, flétrie après 6 h, morte après 18 h ; aucune boucle, republication des stades toutes les
 10 s) ; **fertilité** (coût par récolte, rotation par famille, compost, jachère) ; **qualité** de la récolte (graine ×
@@ -1812,7 +1812,7 @@ minute, grenier, personnage, objet et sens, quantités additionnées, attente bo
 migration 0002 : colonne `minute` et clé unique, les lignes d'avant restent une par geste ; hook `granary` toujours
 par geste) ; **composteur** (type de
 station et recette ajoutés aux registres de `vava_crafting`, station placée par `addStation`). Détail, config et tests :
-`modules/vava_farming/README.md`. Demande le core 0.6.0, `vava_inventory` 1.4.0, `vava_skills` 1.0.0, `vava_gathering`
+`modules/vava_farming/README.md`. Demande le core 0.11.0 (abonnements de zone, 1.7.0), `vava_inventory` 1.4.0, `vava_skills` 1.0.0, `vava_gathering`
 1.0.0, `vava_crafting` 1.1.0 ; facultatifs : `vava_hud`, `vava_admin` (droit `metiers`), `vava_chat`, `vava_health`
 (à terre), `vava_time` (saisons, nuits de gel).
 
@@ -1845,8 +1845,20 @@ un emplacement planté), `rules.frostTonight` (texte de la fiche, `messages.fros
 
 **Registre** `vava_farming:crops` (`{ label, family, seed, product, growMinutes, waterPerHour, fertilityCost, yield,
 xp, difficulty, stages, wilted, dead, frostHardy? }` ; `stages` : modèles par stade, le dernier réservé à la plante
-mûre ; `frostHardy` : résiste au gel, 1.4.0), rempli par la config, ouvert aux autres modules. State bag global
-`vava_farming:parcel:<id>` → `{ slots = { { crop, stage, state } } }`.
+mûre ; `frostHardy` : résiste au gel, 1.4.0), rempli par la config, ouvert aux autres modules.
+
+**Parcelles vues des joueurs** (1.7.0, T-016) : chaque parcelle est une zone du core (`core.zones`, identifiant local
+= id de la parcelle ; centre de la parcelle, rayon qui couvre ses emplacements et son grenier, marge
+`streaming.radius` + `streaming.subscribeSlack` = 100 m). État : `def` → `{ label, x, y, z, heading, rows, cols,
+spacing, granary? = { label, x, y, z, heading, prop } }` (ce qu'il faut pour placer les props, ni propriétaire ni
+contenu du grenier) et `s<n°>` → `{ crop, stage, state }` (chaînes vides : emplacement libre). Un joueur qui arrive
+reçoit l'état entier (environ 600 o pour le champ communal) ; ensuite, seuls les emplacements dont la culture, le stade
+ou l'état change partent aux abonnés (environ 40 o par emplacement), regroupés par parcelle et par tour (une nuit de gel
+ou un passage de croissance : un envoi par parcelle touchée). Plus de state bag global : l'ancien
+`vava_farming:parcel:<id>` est effacé au démarrage s'il traîne encore. Une parcelle créée, déplacée ou changée en jeu
+(Atelier, T-103) passe par `server/zones.lua` (`share` : déclarée, ou déplacée et état remplacé ; `drop` : retirée) et
+arrive chez les joueurs proches sans reconnexion. Comme toute zone, l'état est public : chaque geste (menu, début et fin
+de geste, puits, grenier) revérifie la distance côté serveur.
 
 | Export serveur | Retour |
 |---|---|

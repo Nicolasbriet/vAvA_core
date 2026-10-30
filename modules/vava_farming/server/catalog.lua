@@ -52,7 +52,7 @@ VavaFarming.catalog = catalog
 ---@field spacing number
 ---@field count integer
 ---@field owner { kind: string, id: integer }|nil
----@field granary { x: number, y: number, z: number, label: string, width: integer, height: integer, maxWeight: integer, prop: string }|nil
+---@field granary { x: number, y: number, z: number, heading: number|nil, label: string, width: integer, height: integer, maxWeight: integer, prop: string }|nil
 ---@field positions { x: number, y: number, z: number }[]
 
 local parcelsById, parcelsOrdered = {}, {}
@@ -103,8 +103,8 @@ local function indexParcels()
         if type(parcel.granary) == 'table' then
             local g = parcel.granary
             def.granary = {
-                x = g.x, y = g.y, z = g.z, label = g.label or 'Grenier commun', width = g.width or 10, height = g.height or 8,
-                maxWeight = g.maxWeight or 0, prop = g.prop,
+                x = g.x, y = g.y, z = g.z, heading = g.heading, label = g.label or 'Grenier commun', width = g.width or 10,
+                height = g.height or 8, maxWeight = g.maxWeight or 0, prop = g.prop,
             }
         end
         parcelsById[parcel.id] = def
