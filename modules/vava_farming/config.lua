@@ -210,6 +210,6 @@ VavaFarming.config = {
         frostTonight = 'gel annoncé cette nuit',
         parcelSeparator = ', ',
         frostWarning = 'Le froid mordra cette nuit (%s) : couvrez les cultures fragiles ou elles gèleront.',
-        frostStruck = 'Le gel a pris %d plante(s) cette nuit : %s.',
+        frostStruck = 'Le gel a pris %d plante(s) cette nuit (%s).',
     },
 }
