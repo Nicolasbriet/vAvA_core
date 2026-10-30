@@ -2,6 +2,8 @@
     vava_characters_ui/client/main.lua
     Rôle : cycle de vie de l'écran de personnages et traitement des retours de l'interface.
       fermé → sélection (hook core:character:selection) ⇄ création → fermé (hook core:character:loaded)
+    Écran affiché (scène, caméra, liste, page, fondu d'entrée lancé) : hook client vava_characters_ui:shown et export
+    isShown() (1.2.0), lus par l'écran de chargement pour passer à la sélection sans écran noir.
     Le serveur reste maître : liste, création, sélection et suppression sont des intentions validées par le core ;
     les règles de nom viennent de lui (avec la liste). À l'arrêt de la ressource, tout ce qu'elle a posé est retiré.
     Dépendances : config.lua, client/core.lua, client/camera.lua, client/preview.lua, client/nui.lua
@@ -21,10 +23,13 @@ local nui, camera, preview, appearance = ui.nui, ui.camera, ui.preview, ui.appea
 
 local CLEAR_ALL_PEDS = 1
 local RESOURCE = GetCurrentResourceName()
+local HOOK_SHOWN = RESOURCE .. ':shown'
 
 ---@alias UiState 'closed'|'selection'|'creator'
 ---@type UiState
 local state = 'closed'
+-- vrai quand l'écran a fini de s'ouvrir (fin du fil de open()) et jusqu'à sa fermeture
+local shown = false
 
 ---@param value any
 ---@return boolean
@@ -71,12 +76,17 @@ local function open()
         nui.send('open', listCharacters())
         nui.setFocus(true)
         DoScreenFadeIn(cfg.fadeMs)
+        -- refermé pendant l'ouverture (personnage chargé entre-temps) : rien à annoncer
+        if state == 'closed' then return end
+        shown = true
+        core.hooks.runAfter(HOOK_SHOWN, {})
     end)
 end
 
 local function close()
     if state == 'closed' then return end
     state = 'closed'
+    shown = false
     nui.send('close')
     nui.setFocus(false)
     preview.destroy()
@@ -209,12 +219,16 @@ end)
 core.hooks.after('core:character:selection', open)
 core.hooks.after('core:character:loaded', close)
 
+--- Vrai si l'écran de sélection a fini de s'ouvrir et n'est pas refermé (lu par vava_loading à son démarrage).
+exports('isShown', function() return shown end)
+
 -- Arrêt de la ressource écran ouvert : rien ne doit lui survivre (ped d'aperçu, caméra scriptée, mise au point de la
 -- carte, radar caché, souris et clavier pris). L'écran redevient noir, comme l'attente de sélection du core : un
 -- redémarrage rouvre la sélection (plus bas), un arrêt laisse le joueur dans l'attente.
 AddEventHandler('onClientResourceStop', function(resource)
     if resource ~= RESOURCE or state == 'closed' then return end
     state = 'closed'
+    shown = false
     nui.setFocus(false)
     preview.destroy()
     camera.close()
