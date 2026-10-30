@@ -5,7 +5,8 @@
            un formulaire selon le type de chaque argument (joueur, compétence, zone, nombre…) et lancées ; signets,
            dernières pages et réglage « rester ouvert » par personnage ; onglet des touches. Touche F1 (réglable) et
            /codex. Le serveur décide de ce que chacun voit ; les commandes gardent leurs propres contrôles. Le contenu
-           est gardé par la page et ne repart que s'il a changé (empreinte calculée par le serveur).
+           est gardé par la page et ne repart que s'il a changé (empreinte calculée par le serveur). Export client
+           `openAt(chapitre)` : le livre s'ouvre à un chapitre (accueil des nouveaux venus, 1.4.0).
     Dépendances : vAvA_core ≥ 0.7.0 (registre des commandes) ; facultatifs : vava_admin (rangs et droits du
                   Conseil), vava_hud (notifications), vava_chat (dernières pages des commandes tapées) ; vava_ui ≥ 1.0.0
                   (polices, grain et ornements de la page, par nui://vava_ui/…)
@@ -18,7 +19,7 @@ use_experimental_fxv2_oal 'yes'
 
 name 'vava_codex'
 description 'Codex vAvA : toutes les commandes et touches du serveur, classées, cherchées, composées et lancées'
-version '1.3.0'
+version '1.4.0'
 
 dependency 'vAvA_core'
 dependency 'vava_ui'

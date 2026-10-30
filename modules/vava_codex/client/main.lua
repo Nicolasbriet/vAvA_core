@@ -5,7 +5,8 @@
            la page garde et ne renvoie que ce qui a changé (touches du joueur résolues ici à chaque fois) ; gestes
            de l'interface relayés au serveur (RPC à schéma strict), lancement d'une commande composée par
            ExecuteCommand (une commande du serveur y arrive comme si elle était tapée), export `noteCommand` pour que
-           le chat inscrive aux dernières pages ce que le joueur tape lui-même. Souris et clavier rendus au jeu si la
+           le chat inscrive aux dernières pages ce que le joueur tape lui-même, export `openAt` pour ouvrir le livre à
+           un chapitre (1.4.0, accueil des nouveaux venus). Souris et clavier rendus au jeu si la
            ressource s'arrête livre ouvert.
     Dépendances : shared/constants.lua, config.lua, client/core.lua, client/nui.lua, client/keys.lua
 ]]
@@ -120,8 +121,10 @@ local function absorb(answer)
 end
 
 --- Ouvre le Codex : le serveur reçoit les versions que la page garde et ne renvoie que ce qui a changé, puis le livre
---- s'affiche. Rien n'est ouvert si la réponse manque.
-local function openCodex()
+--- s'affiche. Rien n'est ouvert si la réponse manque. `focus` (1.4.0) : chapitre à ouvrir (export openAt), transmis à
+--- la page ; nil pour F1 et /codex.
+---@param focus? string
+local function openCodex(focus)
     if open or not core.characters.current() or IsPauseMenuActive() then return end
     CreateThread(function()
         local ok, success, answer = core.rpc.call(RPC.OPEN, known.version, known.prefsVersion)
@@ -138,6 +141,7 @@ local function openCodex()
             feed(cfg.messages.unavailable, 'warning')
             return
         end
+        message.focus = focus
         open = true
         nui.send('open', message)
         nui.setFocus(true)
@@ -145,7 +149,7 @@ local function openCodex()
 end
 
 local function toggle()
-    if open then close() else openCodex() end
+    if open then close() else openCodex(nil) end
 end
 
 --- Relaie un geste de l'interface au serveur ; `shape(réponse, …valeurs)` range les valeurs renvoyées dans la
@@ -248,6 +252,23 @@ AddEventHandler('onClientResourceStop', function(resource)
     if resource ~= RESOURCE or not open then return end
     open = false
     nui.setFocus(false)
+end)
+
+--- Ouvre le Codex à un chapitre (1.4.0 ; vava_arrival à la première venue) : même chemin que F1 (RPC vava_codex:open,
+--- empreintes, préférences), puis la page choisit le chapitre s'il existe (sinon le livre reste à son index).
+--- `true` : ouverture lancée ; `false, code` : invalid_chapter (pas un identifiant de 64 octets au plus),
+--- no_character, busy (livre déjà ouvert, menu pause, ou une autre interface a le focus).
+---@param chapter string
+---@return boolean ok
+---@return string|nil code
+exports('openAt', function(chapter)
+    if type(chapter) ~= 'string' or #chapter == 0 or #chapter > VavaCodex.MAX_NAME or not match(chapter, VavaCodex.NAME_PATTERN) then
+        return false, 'invalid_chapter'
+    end
+    if not core.characters.current() then return false, 'no_character' end
+    if open or IsPauseMenuActive() or IsNuiFocused() then return false, 'busy' end
+    openCodex(chapter)
+    return true
 end)
 
 --- Une commande tapée ailleurs (chat) : inscrite aux dernières pages. `line` sans son « / » ; le serveur ignore ce
