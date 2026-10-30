@@ -144,7 +144,7 @@ Reportés dans leur tâche : la vie GTA tenue par le client → T-110 ; la diffu
 Corrections issues de l'audit T-010 (30 octobre 2026), à prendre avant le reste de la phase :
 
 ### T-024 — Ressources d'exemple et de développement inoffensives en public
-- Agent : vava-dev-lua · Dépend de : — · Statut : à faire
+- Agent : vava-dev-lua · Dépend de : — · Statut : à tester en jeu
 - **BLOQUANT** (`docs/audits/securite-examples.md`) : `vava_dev_characters` donne à tout joueur `/objet` (100 objets par
   appel), `/vie`, `/aterre` et `/besoins` sans droit ni journal (`server/main.lua:29-74`), et la ressource est `ensure`
   sur le serveur de test. Garde par le code : `setup` refusé si la convar `vava_env` ne vaut pas `dev` (console :
