@@ -25,6 +25,7 @@ const STRINGS = {
     too_many_viewers: 'Déjà regardé par six membres',
     too_many_cameras: 'Trop de caméras ouvertes',
     forbidden: 'Droit refusé',
+    wall_closed: 'Mur à rouvrir',
     self: 'Votre propre écran',
     dropped: 'Joueur parti',
     left_game: 'Plus en jeu',

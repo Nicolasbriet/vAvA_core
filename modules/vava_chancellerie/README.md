@@ -35,10 +35,10 @@ complet : `README.md` à la racine du dépôt).
 | Clé minimale | 32 signes ; plus courte, le pont reste fermé | `tokenMin` |
 | Évènements vers la Chancellerie | `/api/bridge/event` ; perdus si elle est fermée, signalés une fois par minute au plus | `eventPath`, `pushWarnEveryMs` |
 | Corps de requête | 64 Ko au plus | `bodyMax` |
-| Caméras | droit `watch` pour regarder ; la vue en grand passe par la demande `watchScreen` du Registre | `cameras` |
+| Caméras | droit `watch` pour regarder ; la vue en grand passe par la demande `watchScreen` du Registre ; une case sans mur ouvert depuis 2 h est inscrite au journal | `cameras` |
 | Liaison d'un compte | commande `chancellerie <code>`, 5 essais par minute, messages au joueur | `link` |
 | Liste blanche Discord | réponse attendue 8 s à la connexion d'un joueur ; messages quand elle ne répond pas | `whitelist` |
-| Journal du Registre | « Zone de voix modifiée », « Zone de voix supprimée », « Mur des caméras ouvert » | `messages` |
+| Journal du Registre | « Zone de voix modifiée », « Zone de voix supprimée », « Mur des caméras ouvert », « Cases du mur regardées » | `messages` |
 
 ## Ce que fait le pont
 
@@ -55,8 +55,11 @@ complet : `README.md` à la racine du dépôt).
   pont ajoute ses demandes à `routes.requests`.
 - **Caméras** : ouvertes auprès de vava_cameras une fois le droit `watch` accordé — la vue en grand par la demande
   « écran du joueur » du Registre (cible vérifiée, au journal), les cases d'un mur sur le seul droit, l'ouverture du mur
-  étant inscrite au journal. Routes `/cameras/wall`, `/cameras/players`, `/camera/start`, `/camera/answer`,
-  `/camera/stop`.
+  étant inscrite au journal. Le pont ne sait pas quand un mur du navigateur se ferme (onglet fermé, redémarrage) : au
+  lieu de refuser une case, il inscrit au journal (« Cases du mur regardées », numéro du joueur) la première case d'un
+  compte qui n'a ouvert aucun mur depuis `cameras.tileLogMs` (2 h, durée maximale d'une caméra), puis au plus une ligne
+  toutes les 2 h (1.4.1). Aucune case n'est donc regardée sans trace au journal. Routes `/cameras/wall`,
+  `/cameras/players`, `/camera/start`, `/camera/answer`, `/camera/stop`.
 - **Évènements vers la Chancellerie** (requête HTTP locale, avec la clé, sans attendre de réponse) : signalements,
   arrivées et départs des joueurs, offre et fin des caméras du web, arrêt du module des caméras, rang du Conseil donné
   ou retiré (la Chancellerie revérifie alors le droit de chaque compte qui regarde), pont prêt (elle applique alors les
@@ -100,7 +103,8 @@ Avec la Chancellerie lancée (elle démarre FXServer) et un compte du panneau qu
 3. Zones de voix : modifier un nom (40 signes accentués acceptés), supprimer ; l'éditeur en jeu suit (voir
    `docs/tests/voix.md`, section 5).
 4. Caméras : page Caméras (mur), puis « Regarder l'écran » ; révoquer le rang du compte pendant qu'il regarde : ses
-   caméras s'éteignent (« Droit refusé »).
+   caméras s'éteignent (« Droit refusé »). Case demandée sans ouvrir le mur : une ligne « Cases du mur regardées »
+   (`docs/tests/registre.md`, § 10, test 13).
 5. Liaison : page Comptes → « Relier un joueur », puis `chancellerie <code>` en jeu ; le rang s'applique en jeu ;
    un code faux répond « Code inconnu ou expiré ».
 6. Liste blanche (si elle est réglée) : un joueur sans le rôle Discord est refusé avec le message de la Chancellerie.

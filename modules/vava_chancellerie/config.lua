@@ -20,8 +20,10 @@ VavaBridge.config = {
     pushWarnEveryMs = 60000,
 
     -- Caméras (vava_cameras) : droit du Registre pour regarder ; la vue en grand passe par la demande « écran du
-    -- joueur » du Registre (cible vérifiée, inscrite au journal), les cases d'un mur par l'ouverture du mur.
-    cameras = { permission = 'watch', fullRequest = 'watchScreen' },
+    -- joueur » du Registre (cible vérifiée, inscrite au journal), les cases d'un mur par l'ouverture du mur ; une case
+    -- demandée par un compte qui n'a ouvert aucun mur depuis tileLogMs (2 h, la durée maximale d'une caméra) inscrit
+    -- sa propre ligne « Cases du mur regardées ».
+    cameras = { permission = 'watch', fullRequest = 'watchScreen', tileLogMs = 2 * 60 * 60 * 1000 },
 
     -- Liaison d'un compte du panneau à son joueur : commande à taper en jeu avec le code affiché par le panneau,
     -- essais permis par minute, messages au joueur (clés = codes d'erreur renvoyés par la Chancellerie).
@@ -56,5 +58,6 @@ VavaBridge.config = {
         logZoneUpdate = 'Zone de voix modifiée',
         logZoneDelete = 'Zone de voix supprimée',
         logWall = 'Mur des caméras ouvert',
+        logTiles = 'Cases du mur regardées',
     },
 }
