@@ -1,7 +1,7 @@
 --[[
     vava_farming/server/main.lua
     Rôle : déclaration du module auprès du core : catalogue (registre des cultures, objets, composteur), journal, état
-           des emplacements, greniers, intentions du client (RPC à schéma strict et débit limité), joueurs partis,
+           des emplacements, greniers, nuits de gel (vava_time), intentions du client (RPC à schéma strict et débit limité), joueurs partis,
            boucle lente d'écriture (emplacements, journal du grenier ; aussi à l'arrêt) et de republication (les plantes
            poussent), commande du Conseil.
     Dépendances : tous les fichiers server/ du module
@@ -18,6 +18,7 @@ local journal = VavaFarming.journal
 local catalog = VavaFarming.catalog
 local slots = VavaFarming.slots
 local granary = VavaFarming.granary
+local frost = VavaFarming.frost
 local actions = VavaFarming.actions
 local admin = VavaFarming.admin
 local cfg = VavaFarming.config
@@ -61,6 +62,8 @@ local function setup()
     if not ok then return false, 'emplacements : ' .. tostring(err) end
     ok, err = granary.start()
     if not ok then return false, 'greniers : ' .. tostring(err) end
+    ok, err = frost.start()
+    if not ok then return false, 'gel : ' .. tostring(err) end
     slots.tick()
 
     for _, def in ipairs({

@@ -2,8 +2,8 @@
     vava_gathering/bridge/server.lua
     Rôle : SEUL point de contact, côté serveur, entre la récolte et le core / les autres modules : personnage et compte,
            position lue côté serveur, santé (à terre), inventaire (objet en main, place, ajout, usure par métadonnées,
-           déclaration des objets), compétences (XP, niveau), droits et journal du Conseil, notifications, chat, base de
-           données.
+           déclaration des objets), compétences (XP, niveau), droits et journal du Conseil, notifications, chat, saison
+           du royaume (vava_time, facultatif), base de données.
            Chaque appel à une autre ressource est isolé : un module absent ou en erreur ne retire que la fonction
            concernée.
     Dépendances : shared/constants.lua, config.lua, server/core.lua
@@ -14,6 +14,7 @@ local mathType = math.type
 local pack, unpack, concat = table.pack, table.unpack, table.concat
 local GetResourceState, TriggerClientEvent, IsPlayerAceAllowed = GetResourceState, TriggerClientEvent, IsPlayerAceAllowed
 local GetPlayerPed, DoesEntityExist, GetEntityCoords = GetPlayerPed, DoesEntityExist, GetEntityCoords
+local GetGameTimer = GetGameTimer
 
 local core = VavaGathering.core
 if not core then return end
@@ -218,6 +219,56 @@ function Bridge.Chat(source, text)
     end
     local called = call(CHAT, 'addMessage', source, { text = text })
     if not called then Bridge.Notify(source, text) end
+end
+
+-- Saisons (vava_time, facultatif) ---------------------------------------------------------------------------------
+
+local TIME = 'vava_time'
+-- la saison change au plus une fois par jour : relue toutes les 5 s au plus (les nœuds sont relus toutes les 10 s)
+local SEASON_CACHE_MS = 5000
+local seasonId, seasonReadAt = nil, nil
+-- états du module vava_time pendant lesquels il démarre (état relu en base) : la saison viendra
+local TIME_STARTING = { declared = true, waiting = true, migrating = true, starting = true }
+
+--- Vrai si vava_time est en train de démarrer : sa saison n'est pas encore connue mais le sera.
+---@return boolean
+local function timeStarting()
+    local record = core.modules.get(TIME)
+    return record ~= nil and TIME_STARTING[record.state] == true
+end
+
+--- Saison du royaume. nil : vava_time absent, arrêté ou en échec (aucun effet). false : vava_time démarre et ne connaît
+--- pas encore la saison — rien ne doit repousser d'ici là (sinon tout le temps écoulé compterait sans saison) ; cet
+--- état n'est jamais gardé en cache.
+---@return string|false|nil
+function Bridge.Season()
+    local now = GetGameTimer()
+    if seasonReadAt and now - seasonReadAt < SEASON_CACHE_MS then return seasonId end
+    local called, season = call(TIME, 'getSeason')
+    if called and type(season) == 'string' then
+        seasonId, seasonReadAt = season, now
+        return season
+    end
+    if called and season == nil and timeStarting() then
+        seasonId, seasonReadAt = nil, nil
+        return false
+    end
+    seasonId, seasonReadAt = nil, now
+    return nil
+end
+
+--- Facteur de la saison pour une compétence (config.seasons) : `kind` = regen (repousse des charges) ou yield (unités
+--- récoltées). 1 sans vava_time, sans saison ou sans réglage ; contrôlé par shared/season.lua (fini, dans [0, 10]).
+--- false : saison en attente (vava_time démarre), voir Bridge.Season.
+---@param kind 'regen'|'yield'
+---@param skill string
+---@return number|false
+function Bridge.SeasonFactor(kind, skill)
+    local season = Bridge.Season()
+    if season == false then return false end
+    local byKind = season and cfg.seasons and cfg.seasons[kind]
+    local bySeason = byKind and byKind[season]
+    return VavaGathering.season.factor(bySeason and bySeason[skill])
 end
 
 -- Base de données -------------------------------------------------------------------------------------------------

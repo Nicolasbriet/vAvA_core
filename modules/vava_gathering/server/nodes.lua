@@ -1,14 +1,16 @@
 --[[
     vava_gathering/server/nodes.lua
     Rôle : charges des nœuds, tenues par le serveur : recalculées à la demande depuis `updatedAt` (une charge rendue
-           toutes les `regenMs`, le reste du délai conservé), prises par une récolte avant toute attente et rendues si
-           elle n'aboutit pas, publiées aux clients par un state bag global (entier), écrit au seul changement.
+           toutes les `regenMs`, plus ou moins vite selon la saison de vava_time, le reste du délai conservé et recalé
+           quand la saison change), prises par
+           une récolte avant toute attente et rendues si elle n'aboutit pas, publiées aux clients par un state bag
+           global (entier), écrit au seul changement.
            Écriture groupée sans perte : un changement pendant l'écriture reste à écrire.
     Dépendances : shared/constants.lua, config.lua, server/core.lua, bridge/server.lua, server/catalog.lua
 ]]
 
 local pairs, ipairs = pairs, ipairs
-local min, max = math.min, math.max
+local min, max, floor = math.min, math.max, math.floor
 local time = os.time
 local GlobalState = GlobalState
 
@@ -27,6 +29,9 @@ VavaGathering.nodes = nodes
 ---@field charges integer
 ---@field updatedAt integer   début du délai de la prochaine charge (plein : maintenant)
 ---@field published integer|nil
+---@field factor number|nil       facteur de saison appliqué au dernier passage
+---@field refreshedAt integer|nil dernier passage
+---@field held number|nil         secondes de repousse acquises, gardées tant que le facteur vaut 0
 ---@field dirty boolean|'writing'  true : à écrire ; WRITING : écriture en cours (un changement pendant l'attente → true)
 
 ---@type table<string, vAvA.NodeState>
@@ -53,21 +58,45 @@ function nodes.load()
     return true
 end
 
---- Applique le temps écoulé : charges rendues, reste du délai conservé. Pur calcul en mémoire.
+--- Applique le temps écoulé : charges rendues, reste du délai conservé. Pur calcul en mémoire. La saison (vava_time,
+--- facteur `regen` de la compétence) accélère ou ralentit la repousse ; à 0, rien ne repousse et le temps ne s'accumule
+--- pas (pas de charges rendues d'un coup à la saison suivante). Quand le facteur change entre deux passages, l'avance
+--- prise sur la prochaine charge (jusqu'au passage précédent) est gardée et recomptée au nouveau rythme ; tant que le
+--- facteur vaut 0, elle est gardée à part. Le nœud recalé est à écrire. Saison en attente (vava_time démarre) : rien ne
+--- change, `updatedAt` compris.
 ---@param def vAvA.NodeDefinition
 ---@param state vAvA.NodeState
 ---@param now? integer
 function nodes.refresh(def, state, now)
     now = now or time()
+    local factor = bridge.SeasonFactor('regen', def.resource.skill)
+    -- vava_time démarre, saison pas encore connue : rien ne bouge (le temps compté plus tard le sera à la bonne saison)
+    if factor == false then return end
+    local previous, at = state.factor, state.refreshedAt
+    state.factor, state.refreshedAt = factor, now
     if state.charges >= def.charges then
+        state.updatedAt, state.held = now, nil
+        return
+    end
+    if previous ~= nil and previous ~= factor and at then
+        -- secondes de repousse acquises au rythme d'avant, jusqu'au passage précédent
+        local progress = state.held or max(0, at - state.updatedAt) * previous
+        if factor > 0 then
+            state.updatedAt, state.held = at - floor(progress / factor), nil
+        else
+            state.held = progress
+        end
+        state.dirty = true
+    end
+    if factor <= 0 then
         state.updatedAt = now
         return
     end
     local period = max(1, def.regenMs // 1000)
-    local gained = (now - state.updatedAt) // period
+    local gained = floor((now - state.updatedAt) * factor / period)
     if gained <= 0 then return end
     state.charges = min(def.charges, state.charges + gained)
-    state.updatedAt = state.charges >= def.charges and now or (state.updatedAt + gained * period)
+    state.updatedAt = state.charges >= def.charges and now or (state.updatedAt + floor(gained * period / factor))
 end
 
 ---@param def vAvA.NodeDefinition

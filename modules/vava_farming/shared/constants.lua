@@ -18,8 +18,8 @@ VavaFarming.STATE_PARCEL = 'vava_farming:parcel:'
 VavaFarming.STATES = { GROWING = 'growing', RIPE = 'ripe', WILTED = 'wilted', DEAD = 'dead' }
 
 -- Gestes sur un emplacement (durée et animation dans config.actions).
-VavaFarming.ACTIONS = { PLANT = 'plant', WATER = 'water', FERTILIZE = 'fertilize', HARVEST = 'harvest', CLEAR = 'clear' }
-VavaFarming.ACTION_LIST = { 'plant', 'water', 'fertilize', 'harvest', 'clear' }
+VavaFarming.ACTIONS = { PLANT = 'plant', WATER = 'water', FERTILIZE = 'fertilize', HARVEST = 'harvest', CLEAR = 'clear', COVER = 'cover' }
+VavaFarming.ACTION_LIST = { 'plant', 'water', 'fertilize', 'harvest', 'clear', 'cover' }
 
 -- Bornes de validation (protocole).
 VavaFarming.ID_PATTERN = '^[%l%d_]+$'

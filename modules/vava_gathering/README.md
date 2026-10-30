@@ -8,7 +8,8 @@ palier et sa provenance. Le serveur décide de tout et demande l'XP à `vava_ski
 
 Ordre de démarrage : après `vAvA_core` (≥ 0.6.0), `vava_inventory` (≥ 1.4.0) et `vava_skills` (≥ 1.0.0).
 Facultatifs : `vava_hud` (barre de progression, notifications), `vava_admin` (droit `metiers`), `vava_chat`,
-`vava_health` (aucune récolte à terre).
+`vava_health` (aucune récolte à terre), `vava_time` (saisons : repousse des nœuds et quantité récoltée, lues par
+l'export `getSeason`).
 
 ## Règles (config.lua)
 
@@ -17,6 +18,7 @@ Facultatifs : `vava_hud` (barre de progression, notifications), `vava_admin` (dr
 | Bandes de vitalité | > 60 plein ; 60–25 réduit (rendement × 0,6, palier − 1, 25 % d'échec) ; < 25 épuisée (× 0,2, − 2, 50 %) | `bands` |
 | Cicatrice | à 0 ; régénération × 0,2 pendant `scarHours` de la zone | `scar`, `zones[].scarHours` |
 | Réaction de la terre | 3 cicatrices en 7 jours → hook `vava_gathering:earthReaction` | `earthReaction` |
+| Saisons (`vava_time`, facultatif) | facteurs par saison et par compétence de la ressource. Repousse des charges : printemps herbes, gibier et poissons × 1,25 ; automne herbes × 0,75, gibier × 1,25 ; hiver herbes × 0,25, poissons et gibier × 0,5, bois × 0,75 (0 : rien ne repousse, sans rien accumuler). Au changement de saison, l'avance prise sur la prochaine charge est gardée et recomptée au nouveau rythme (1.3.1). Facteurs bornés à [0, 10] (invalide ou infini : 1) ; pendant le démarrage de `vava_time` (saison pas encore connue), aucun nœud ne repousse (1.3.2). Unités récoltées : automne gibier × 1,25, hiver herbes × 0,5 (au moins une). Minage : aucune saison. Sans `vava_time` : aucun effet | `seasons.regen`, `seasons.yield` |
 | Interaction | 2,5 m (+ 1,5 m de tolérance serveur), 1,5 s entre deux récoltes, geste oublié après 30 s | `interact` |
 | Durée du geste | base de la ressource × (1 − niveau × 0,004) ÷ puissance de l'outil, 1,2 s au moins | `duration` |
 | Qualité | score = niveau × 0,5 + outil × 0,3 + vitalité × 0,2 + bonus de l'outil ± 8 → paliers à 20, 40, 60, 85 ; provenance écrite | `quality` |
@@ -109,3 +111,5 @@ resource, item }`), `harvested` (after : `+ quantity, tier, band, extra? `), `zo
     blips retirés puis reposés.
 12. **À terre** (`vava_health`) : près d'un chêne, hache en main, se faire mettre à terre → l'invite disparaît ; `E` ne
     sert qu'à rendre l'âme. Tombé pendant le geste : rien n'est pris, aucune charge consommée (« Vous êtes à terre. »).
+13. **Saisons** (`vava_time`) : voir `docs/tests/temps.md` (section des métiers) — en hiver, la sauge vidée revient
+    quatre fois moins vite et la récolte d'herbes est divisée par deux ; `stop vava_time` → plus aucun effet.

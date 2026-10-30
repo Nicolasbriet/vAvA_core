@@ -16,6 +16,31 @@ VavaFarming.config = {
     -- wiltAfterHours de sécheresse continue, meurt après dieAfterHours. Arroser une plante flétrie la fait repartir.
     growth = { moistureThreshold = 20, wiltAfterHours = 6, dieAfterHours = 18 },
 
+    -- Saisons du royaume (vava_time, facultatif : sans lui, aucun effet). `growth` multiplie la vitesse de pousse,
+    -- `drying` celle à laquelle la terre sèche (1 : sans effet ; 0 : arrêt ; une valeur invalide compte pour 1).
+    -- L'hiver, une culture met quatre fois plus longtemps, mais un arrosage tient quatre fois plus ; l'été assoiffe :
+    -- il faut arroser plus souvent. Une saison absente de la liste est sans effet.
+    seasons = {
+        printemps = { growth = 1.25, drying = 1.0 },
+        ete = { growth = 1.0, drying = 1.5 },
+        automne = { growth = 0.75, drying = 0.75 },
+        hiver = { growth = 0.25, drying = 0.25 },
+    },
+
+    -- Gel (vava_time, facultatif ; décision à confirmer par le porteur du projet). L'hiver, certaines nuits gèlent (la
+    -- probabilité est réglée dans vava_time). Au soir d'une nuit de gel, les cultivateurs concernés sont avertis : le
+    -- propriétaire en jeu d'une parcelle privée, les joueurs à moins de `warnRadius` mètres d'une parcelle commune (rien
+    -- n'est envoyé aux autres) ; à la tombée de la nuit, toute plante vivante ni couverte ni d'une culture `frostHardy`
+    -- meurt. Couvrir un emplacement (geste « Couvrir ») consomme UN des objets de `cover` (le premier que le cultivateur
+    -- a en quantité suffisante) et protège la plante jusqu'à sa récolte ou son arrachage. Aucun objet « paille »
+    -- n'existe encore dans le royaume : le compost en tient lieu (à remplacer ou compléter ici le jour où elle existe).
+    frost = {
+        cover = {
+            { item = 'compost', quantity = 1 },
+        },
+        warnRadius = 60.0,
+    },
+
     -- Fertilité (0–100 par emplacement) : rendue par la jachère (par jour vide), le compost, la rotation (famille
     -- différente de la culture précédente) ; pénalité quand on replante la même famille.
     fertility = { fallowPerDay = 10, compostBonus = 25, rotationBonus = 10, sameFamilyPenalty = 10, initial = 80 },
@@ -42,6 +67,7 @@ VavaFarming.config = {
         fertilize = { durationMs = 2500, anim = 'plant' },
         harvest = { durationMs = 4500, anim = 'harvest', sickleFactor = 0.6 },
         clear = { durationMs = 3000, anim = 'plant' },
+        cover = { durationMs = 3000, anim = 'plant' },
     },
 
     -- Seau : objet tenu en main, charges en métadonnée `water`, rempli aux puits.
@@ -81,7 +107,8 @@ VavaFarming.config = {
     },
 
     -- Cultures : graine → produit ; durée (minutes), eau consommée par heure (points d'humidité), coût de fertilité par
-    -- récolte, famille (rotation), rendement, XP, difficulté, props par stade (du semis au mûr ; le dernier n'apparaît qu'à maturité), prop flétri, prop mort.
+    -- récolte, famille (rotation), rendement, XP, difficulté, props par stade (du semis au mûr ; le dernier n'apparaît qu'à
+    -- maturité), prop flétri, prop mort ; `frostHardy` : résiste aux nuits de gel (vava_time) sans être couverte.
     crops = {
         ble = { label = 'Blé', family = 'cereale', seed = 'graine_ble', product = 'ble', growMinutes = 90, waterPerHour = 20, fertilityCost = 15,
             yield = { 3, 6 }, xp = 14, difficulty = 15,
@@ -91,7 +118,8 @@ VavaFarming.config = {
             stages = { 'prop_plant_01b', 'prop_veg_crop_04_leaf' }, wilted = 'prop_veg_crop_02', dead = 'prop_veg_crop_02' },
         chou = { label = 'Chou', family = 'feuille', seed = 'graine_chou', product = 'chou', growMinutes = 45, waterPerHour = 30, fertilityCost = 12,
             yield = { 1, 3 }, xp = 10, difficulty = 10,
-            stages = { 'prop_plant_01b', 'prop_veg_crop_03_cab' }, wilted = 'prop_veg_crop_02', dead = 'prop_veg_crop_02' },
+            stages = { 'prop_plant_01b', 'prop_veg_crop_03_cab' }, wilted = 'prop_veg_crop_02', dead = 'prop_veg_crop_02',
+            frostHardy = true },
         lin = { label = 'Lin', family = 'fibre', seed = 'graine_lin', product = 'lin', growMinutes = 60, waterPerHour = 15, fertilityCost = 20,
             yield = { 2, 4 }, xp = 12, difficulty = 20,
             stages = { 'prop_plant_01b', 'prop_veg_crop_05', 'prop_veg_crop_tr_02' }, wilted = 'prop_veg_crop_02', dead = 'prop_veg_crop_02' },
@@ -164,5 +192,15 @@ VavaFarming.config = {
         noAccess = 'Cette parcelle ne vous appartient pas.',
         noSpace = 'Vous ne pouvez rien porter de plus.',
         granaryOpened = 'Grenier commun ouvert.',
+        -- gel (vava_time) : couvrir une plante, avertissement du soir, plantes perdues ; %s : objets qui
+        -- couvrent (joints par `coverOr`), parcelle(s) (jointes par `parcelSeparator`)
+        covered = 'Plante couverte : elle passera les nuits de gel.',
+        alreadyCovered = 'Cette plante est déjà couverte.',
+        frostHardy = 'Cette culture ne craint pas le gel : inutile de la couvrir.',
+        noCover = 'Il vous faut de quoi couvrir la plante (%s).',
+        coverOr = ' ou ',
+        parcelSeparator = ', ',
+        frostWarning = 'Le froid mordra cette nuit (%s) : couvrez les cultures fragiles ou elles gèleront.',
+        frostStruck = 'Le gel a pris %d plante(s) cette nuit : %s.',
     },
 }

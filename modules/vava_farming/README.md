@@ -10,23 +10,27 @@ demande l'XP à `vava_skills`.
 
 Ordre de démarrage : après `vAvA_core` (≥ 0.6.0), `vava_inventory` (≥ 1.4.0), `vava_skills` (≥ 1.0.0),
 `vava_gathering` (≥ 1.0.0 : faucille) et `vava_crafting` (≥ 1.1.0 : composteur). Facultatifs : `vava_hud`,
-`vava_admin` (droit `metiers`), `vava_chat`, `vava_health` (aucun geste à terre).
+`vava_admin` (droit `metiers`), `vava_chat`, `vava_health` (aucun geste à terre), `vava_time` (saisons : vitesse de
+pousse et de dessèchement, lues par l'export `getSeason` ; nuits de gel, reçues par ses hooks `vava_time:frostWarning`
+et `vava_time:frost`).
 
 ## Règles (config.lua)
 
 | Règle | Défaut | Clé |
 |---|---|---|
 | Croissance | pousse si humidité > 20 ; à sec : pause, flétrie après 6 h, morte après 18 h ; arroser une flétrie la fait repartir | `growth` |
+| Saisons (`vava_time`, facultatif) | pousse × 1,25 au printemps, × 1 l'été, × 0,75 l'automne, × 0,25 l'hiver ; la terre sèche × 1 au printemps, × 1,5 l'été (arroser plus souvent), × 0,75 l'automne, × 0,25 l'hiver : l'hiver, une culture met quatre fois plus longtemps, mais un arrosage tient quatre fois plus. Une valeur invalide ou infinie compte pour 1, au-delà de 10 pour 10. Sans `vava_time` : aucun effet ; pendant son démarrage (saison pas encore connue), rien ne pousse ni ne sèche, le temps est compté ensuite à la bonne saison ; à chaque changement de saison, les emplacements plantés sont réécrits (1.4.1) | `seasons` |
+| Gel (`vava_time`, facultatif ; à confirmer) | certaines nuits d'hiver gèlent (probabilité dans `vava_time`). Au soir (17 h du royaume), avertissement au propriétaire en jeu d'une parcelle privée où une plante est exposée et aux joueurs à moins de 60 m d'une parcelle commune exposée, à personne d'autre ; à la tombée de la nuit (21 h), toute plante vivante ni couverte ni résistante au froid meurt (état « morte » : seul Arracher reste) et les mêmes sont prévenus. Résiste au froid : le chou. **Couvrir** (geste de 3 s) consomme un objet de la liste (le compost, tant que la paille n'existe pas) et protège la plante jusqu'à sa récolte ou son arrachage | `frost`, `crops[].frostHardy`, `actions.cover` |
 | Fertilité | 80 au départ ; − coût de la culture par récolte ; même famille − 10, famille différente + 10 ; compost + 25 ; jachère + 10 par jour vide | `fertility`, `crops[].fertilityCost`, `crops[].family` |
 | Qualité | graine × 0,35 + compétence × 0,35 + régularité × 0,15 + fertilité × 0,15 ± 5 → paliers 20 / 40 / 60 / 85 ; provenance = nom de la parcelle | `quality` |
 | Régularité | 100 − 100 × heures de sécheresse ÷ durée de croissance | — |
 | Graines | chance 30 % + 0,5 %/niveau (≤ 90 %), 1 à 2 graines au palier de la récolte | `seeds` |
-| Gestes | semer 3 s, arroser 2,5 s, fertiliser 2,5 s, récolter 4,5 s (× 0,6 avec une faucille en main), arracher 3 s ; XP du semis = 25 % de celle de la culture ; finir trop loin abandonne le geste (rien n'est consommé) | `actions`, `quality.plantXpShare` |
+| Gestes | semer 3 s, arroser 2,5 s, fertiliser 2,5 s, récolter 4,5 s (× 0,6 avec une faucille en main), couvrir 3 s, arracher 3 s ; XP du semis = 25 % de celle de la culture ; finir trop loin abandonne le geste (rien n'est consommé) | `actions`, `quality.plantXpShare` |
 | Seau | 5 charges, rempli aux puits ; tenu en main | `bucket`, `wells` |
 | Déchets | une plante flétrie ou morte arrachée rend 1 à 2 déchets végétaux | `compost.waste` |
 | Composteur | type de station + recette (3 déchets → 1 compost, Agriculture) ajoutés à `vava_crafting`, station placée par `addStation` | `composter` |
 | Cultures de départ | blé 90 min, carotte 30, chou 45, lin 60 (durées d'essai) | `crops` |
-| Journal | plantations, récoltes Excellent+, arrachages, Conseil ; grenier (une ligne par minute, personnage, objet et sens) ; 90 jours | `logTier`, `logRetentionDays`, `persistence.granaryLogMax` |
+| Journal | plantations, récoltes Excellent+, arrachages, couvertures, plantes prises par le gel (une ligne par nuit, par parcelle), Conseil ; grenier (une ligne par minute, personnage, objet et sens) ; 90 jours | `logTier`, `logRetentionDays`, `persistence.granaryLogMax` |
 
 ### Parcelles et emplacements
 
@@ -34,7 +38,7 @@ Une parcelle : centre, cap, lignes × colonnes, espacement (positions par `geome
 client et serveur), propriétaire nul (communale) ou `{ kind = 'character', id }` (privée ; un futur module de foyer
 déclare son genre par `registerAccess`), grenier facultatif. Chaque emplacement garde : culture, palier de la graine,
 date de semis, croissance effective, humidité, fertilité, sécheresse (depuis quand, heures cumulées), arrosages,
-flétri, mort, famille précédente, date du dernier calcul. **Aucune boucle de croissance** : tout est recalculé quand
+flétri, mort, couvert contre le gel, famille précédente, date du dernier calcul. **Aucune boucle de croissance** : tout est recalculé quand
 on touche l'emplacement ; la boucle lente de 10 s republie seulement les stades qui ont changé (state bag
 `vava_farming:parcel:<id>` : culture, stade, état de chaque emplacement), pour que les plantes poussent sous les yeux.
 Les modèles de `stages` se partagent la croissance à parts égales, sauf le dernier, réservé à la plante mûre : il
@@ -55,11 +59,12 @@ l'écriture groupée et à l'arrêt ; une même minute écrite en plusieurs fois
 avant la migration 0002 (une par geste, `minute` nul) restent telles quelles. La récolte d'une parcelle communale va
 dans la besace du récolteur, qui la dépose au grenier.
 
-## Base de données (sql/0001_farming.sql, 0002_granary_log_minute.sql)
+## Base de données (sql/0001_farming.sql, 0002_granary_log_minute.sql, 0003_slot_cover.sql)
 
-`vava_farming_slots`, `vava_farming_granaries`, `vava_farming_granary_log` (colonne `minute` et clé unique minute,
-grenier, personnage, objet, sens depuis 0002), `vava_farming_log`. Écriture groupée toutes les 10 s et à l'arrêt ; un
-emplacement qui vient de donner ou de consommer des objets (semis, récolte, compost, arrachage) est écrit **aussitôt**,
+`vava_farming_slots` (colonne `covered` depuis 0003), `vava_farming_granaries`, `vava_farming_granary_log` (colonne
+`minute` et clé unique minute, grenier, personnage, objet, sens depuis 0002), `vava_farming_log`. Écriture groupée
+toutes les 10 s et à l'arrêt (les plantes prises par le gel partent avec elle) ; un emplacement qui vient de donner ou
+de consommer des objets (semis, récolte, compost, couverture, arrachage) est écrit **aussitôt**,
 pour qu'un crash ne le rende pas tel qu'avant (récolte rejouée), une seule écriture à la fois par emplacement.
 
 ## API
@@ -99,3 +104,9 @@ withdraw, source, characterId, item, quantity }`). Détail : `docs/api.md`.
 10. **À terre** (`vava_health`) : près d'un emplacement, d'un puits ou d'un grenier, se faire mettre à terre →
     l'invite disparaît, `E` ne sert qu'à rendre l'âme. Tombé pendant un geste : rien n'est appliqué (« Vous êtes à
     terre. »).
+11. **Saisons** (`vava_time`) : voir `docs/tests/temps.md` (section des métiers) — en hiver, une culture met quatre fois
+    plus longtemps et un arrosage tient quatre fois plus ; l'été, la terre sèche une fois et demie plus vite ;
+    `stop vava_time` → plus aucun effet.
+12. **Couvrir et gel** (`vava_time`) : voir `docs/tests/metiers.md` (agriculture, gel) — Couvrir consomme un compost et
+    marque la plante « couverte contre le gel » ; refusé à terre, trop loin, sans compost, sur un chou ou sur une plante
+    déjà couverte ; une nuit de gel avertit au soir les seuls cultivateurs concernés et tue à 21 h les plantes exposées.

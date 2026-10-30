@@ -54,7 +54,7 @@ const App = (() => {
     } else if (action === 'clear') {
       if (payload.item && Number(payload.quantity) > 0) toast(R.clearWaste(Number(payload.quantity), payload.label || payload.item), 'info');
       else toast(R.clear, 'info');
-    }
+    } else if (action === 'cover') toast(R.cover, 'info');
     if (payload.slot) MenuView.updateSlot(payload.slot);
   }
 

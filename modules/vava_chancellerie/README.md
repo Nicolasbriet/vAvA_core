@@ -2,13 +2,13 @@
 
 Le pont entre la Chancellerie (panneau web, programme Node.js à part : `chancellerie/`, guide dans
 `docs/chancellerie.md`) et le serveur de jeu. Il reçoit les demandes du panneau et les fait exécuter, au nom du compte
-du panneau, par le Registre du Conseil (`vava_admin`), les zones de voix (`vava_voice`) et les caméras
-(`vava_cameras`) ; il prévient la Chancellerie en direct (signalements, arrivées et départs, caméras, rangs changés) ;
-il relie un compte du panneau à son joueur et tient la liste blanche Discord à la connexion. Serveur seulement : rien
-n'est envoyé aux joueurs, sauf le résultat de leur liaison (affiché par vava_admin).
+du panneau, par le Registre du Conseil (`vava_admin`), les zones de voix (`vava_voice`), le ciel et l'heure
+(`vava_time`) et les caméras (`vava_cameras`) ; il prévient la Chancellerie en direct (signalements, arrivées et
+départs, caméras, rangs changés) ; il relie un compte du panneau à son joueur et tient la liste blanche Discord à la
+connexion. Serveur seulement : rien n'est envoyé aux joueurs, sauf le résultat de leur liaison (affiché par vava_admin).
 
-Ordre de démarrage : en dernier, après `vava_admin`, `vava_voice`, `vava_cameras` et `vava_codex` (ordre complet :
-`README.md` à la racine du dépôt).
+Ordre de démarrage : en dernier, après `vava_admin`, `vava_voice`, `vava_cameras`, `vava_time` et `vava_codex` (ordre
+complet : `README.md` à la racine du dépôt).
 
 ## Installation
 
@@ -25,6 +25,7 @@ Ordre de démarrage : en dernier, après `vava_admin`, `vava_voice`, `vava_camer
 | `vava_admin` ≥ 1.3.0 | demandes du Conseil, droits des rangs, journal, rangs des comptes reliés | obligatoire |
 | `vava_voice` ≥ 1.1.0 | zones de voix lues, modifiées et supprimées depuis le web | page Zones de voix vide |
 | `vava_cameras` ≥ 1.0.0 | écran des joueurs depuis le web | pas de caméras depuis le web |
+| `vava_time` ≥ 1.0.0 | ciel et heure du royaume lus et réglés depuis le web (1.4.0) | page Ciel et heure : « ne sont pas lancés » |
 
 ## Règles (config.lua)
 
@@ -48,6 +49,10 @@ Ordre de démarrage : en dernier, après `vava_admin`, `vava_voice`, `vava_camer
   la cible et son rang, et inscrit l'action à son journal au nom de « Chancellerie : <compte> ».
 - **Zones de voix** : lues (droit `view`), modifiées et supprimées (droit `tools`) auprès de vava_voice ; droit vérifié
   et journal tenu par le Registre. Le nom suit la règle de l'éditeur en jeu (40 signes).
+- **Ciel et heure** (1.4.0, `server/time.lua`) : demandes `time` (droit `view`), `timeClock` et `timeWeather` (droit
+  `tools`) transmises à vava_time (`webState`, `webClock`, `webWeather`), qui revalide chaque valeur ; droit vérifié
+  auprès du Registre (`webCan`), décision inscrite à son journal (`webLog`) si elle change quelque chose. Un fichier du
+  pont ajoute ses demandes à `routes.requests`.
 - **Caméras** : ouvertes auprès de vava_cameras une fois le droit `watch` accordé — la vue en grand par la demande
   « écran du joueur » du Registre (cible vérifiée, au journal), les cases d'un mur sur le seul droit, l'ouverture du mur
   étant inscrite au journal. Routes `/cameras/wall`, `/cameras/players`, `/camera/start`, `/camera/answer`,
@@ -70,7 +75,7 @@ Ordre de démarrage : en dernier, après `vava_admin`, `vava_voice`, `vava_camer
   n'est jamais écrite dans le `server.cfg` et la Chancellerie la masque dans la console.
 - Le pont ne décide de rien : chaque demande est revérifiée par le module qui l'exécute (droit du rang, cible, schéma),
   et journalisée par le Registre. Les exports réservés au pont (`vava_admin:web*`, `vava_voice:webUpdateZone`,
-  `webDeleteZone`, `vava_cameras:web*`) refusent toute autre ressource appelante.
+  `webDeleteZone`, `vava_cameras:web*`, `vava_time:web*`) refusent toute autre ressource appelante.
 - Liaison : 5 essais par minute et par joueur ; un code vaut 5 minutes, une fois ; après 5 codes faux, la license
   attend (règles tenues par la Chancellerie).
 
@@ -81,7 +86,8 @@ vava_chancellerie/
 ├── fxmanifest.lua · config.lua
 ├── shared/   constants.lua (modules reliés, hooks)
 └── server/   core · auth (machine locale, clé) · push (évènements vers la Chancellerie) · link (liaison d'un compte)
-              whitelist (liste blanche) · routes (demandes du panneau) · http (écoute) · commands · main
+              whitelist (liste blanche) · routes (demandes du panneau) · time (ciel et heure) · http (écoute)
+              commands · main
 ```
 
 ## À vérifier en jeu
@@ -99,3 +105,5 @@ Avec la Chancellerie lancée (elle démarre FXServer) et un compte du panneau qu
    un code faux répond « Code inconnu ou expiré ».
 6. Liste blanche (si elle est réglée) : un joueur sans le rôle Discord est refusé avec le message de la Chancellerie.
 7. FXServer lancé sans la Chancellerie : le pont reste fermé (console), le jeu marche normalement.
+8. Ciel et heure : régler l'heure et imposer un ciel depuis la page Ciel et heure ; les joueurs le voient, le Journal
+   du Conseil l'inscrit (voir `docs/tests/temps.md`, section 6).

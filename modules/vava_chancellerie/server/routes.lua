@@ -5,7 +5,8 @@
            supprimées auprès de vava_voice, après vérification du droit auprès du Registre, qui les inscrit à son
            journal ; les caméras sont ouvertes auprès de vava_cameras une fois le droit de regarder accordé : la vue en
            grand par la demande « écran du joueur » du Registre (cible vérifiée, au journal), les cases d'un mur sur
-           le seul droit, l'ouverture du mur étant inscrite au journal.
+           le seul droit, l'ouverture du mur étant inscrite au journal. D'autres fichiers du pont ajoutent leurs
+           demandes à `routes.requests` (ciel et heure : server/time.lua).
     Dépendances : shared/constants.lua, config.lua, server/core.lua
 ]]
 
@@ -22,6 +23,11 @@ local QUALITIES = { tile = true, full = true }
 
 local routes = {}
 VavaBridge.routes = routes
+
+-- Demandes du panneau tenues par d'autres fichiers du pont (ciel et heure : server/time.lua), comme les zones de voix :
+-- nom → fun(actor, args): table. Le pont y vérifie lui-même le droit auprès du Registre.
+---@type table<string, fun(actor: table, args: table): table>
+routes.requests = {}
 
 ---@type table<string, fun(body: table): table>
 local list = {}
@@ -89,7 +95,7 @@ end)
 
 define('POST', '/request', function(body)
     local name, args = body.name, type(body.args) == 'table' and body.args or {}
-    local zone = type(name) == 'string' and ZONE_REQUESTS[name]
+    local zone = type(name) == 'string' and (ZONE_REQUESTS[name] or routes.requests[name])
     if zone then return zone(body.actor, args) end
     local called, ok, result = call(ADMIN, 'webRequest', body.actor, name, args)
     if not called then return failure('admin_unavailable') end

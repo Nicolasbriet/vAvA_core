@@ -170,6 +170,28 @@ end, true)
 | 12 | Près d'un emplacement, puis d'un puits, puis du grenier : `/aterre`, puis `E` ; relevé, lancer un semis et `/aterre` pendant la barre. | À terre : ni invite, ni menu, ni seau rempli, ni grenier ouvert ; `E` ne fait que rendre l'âme. Tombé pendant le semis : graine gardée, emplacement inchangé (« Vous êtes à terre. » à la fin de la barre, ou geste interrompu si le corps a glissé). |
 | 13 | Grenier ouvert (`E`), un objet en main de souris : se faire mettre à terre (`/aterre`). Relevé, `E` au grenier, puis `/aterre` de nouveau pendant un glisser vers le grenier. | À la chute, l'inventaire se ferme aussitôt, grenier et besace (export `close` de l'inventaire, appelé par `vava_health`) ; rien n'est déplacé, aucune ligne dans `vava_farming_granary_log`. Relevé, `E` rouvre le grenier et les gestes reprennent ; le second `/aterre` le referme de même ; s'éloigner de plus de 4 m le ferme comme d'habitude. |
 
+### 5.1 Couvrir et gel (`vava_farming` 1.4.1, `vava_time`)
+
+Préparer une nuit de gel sans attendre l'hiver : dans `modules/vava_time/config.lua`, `calendar.cycle.first = 'hiver'`
+et `frost.seasons = { hiver = 1 }` (toutes les nuits gèlent), puis `restart vava_time` à une heure du royaume avant
+17 h (sinon le soir est déjà passé ce jour-là et rien ne se joue). Remettre les valeurs ensuite.
+
+| # | Faire | Attendu |
+|---|---|---|
+| 1 | Planter du blé au champ communal, avoir 2 composts ; `E` sur la plante. | Geste « Couvrir » actif : « avec 1 × Compost (2 dans la besace) ». |
+| 2 | Couvrir. | Geste de 3 s ; un compost consommé ; la fiche de l'emplacement porte « couverte contre le gel » ; Couvrir grisé (« Déjà couverte. ») ; `vava_farming_log` : `covered`. |
+| 3 | Sans compost, `E` sur une autre plante de blé. | Couvrir grisé : « Il vous faut de quoi la couvrir (Compost). ». |
+| 4 | Planter un chou, `E`. | La fiche porte « ne craint pas le gel » ; Couvrir grisé. |
+| 5 | Lancer Couvrir et `/aterre` pendant la barre ; puis lancer Couvrir et s'éloigner de plus de 4 m avant la fin. | Rien n'est consommé ni couvert (« Vous êtes à terre. » / geste abandonné). |
+| 6 | Laisser trois plantes : blé couvert, blé nu, chou. Rester près du champ (moins de 60 m) ; un second joueur loin du champ ; `/ciel heure 16 59`. | À 17 h du royaume : vous seul lisez « Le froid mordra cette nuit (Champ communal) : couvrez les cultures fragiles ou elles gèleront. » ; le second joueur ne reçoit rien. |
+| 7 | `/ciel heure 20 59`. | À 21 h : « Le gel a pris 1 plante(s) cette nuit : Champ communal. » ; le blé nu est mort (prop de plante morte, seul Arracher reste) ; le blé couvert et le chou vivent ; `vava_farming_log` : une seule ligne `frost` pour la nuit (`parcelles = { champ_communal = 1 }`, `plantes = 1`) ; console : « le gel a pris 1 plante(s)… ». |
+| 8 | Jardin privé (propriétaire n° 1) : une plante nue ; le propriétaire en jeu loin du jardin ; refaire 6 et 7 le lendemain (ou `restart vava_time` avant 17 h). | Le propriétaire est averti et prévenu où qu'il soit ; un joueur près du jardin qui n'en est pas le propriétaire ne reçoit rien. |
+| 9 | Récolter le blé couvert, replanter au même endroit. | La nouvelle plante n'est plus couverte. |
+| 10 | `restart vava_farming` après 7. | Plantes mortes et couverture retrouvées ; le gel ne retombe pas une seconde fois la même nuit. |
+| 11 | **(2 joueurs)** Les deux lancent Couvrir sur la même plante de blé, chacun avec un compost. | Un seul compost est consommé, chez celui qui finit le premier ; l'autre lit « Ce geste n'est plus en cours. » et garde son compost. |
+| 12 | **(2 joueurs)** A lance Couvrir ; pendant la barre, B arrache la plante et ressème du blé au même endroit. | La couverture de A échoue, son compost est gardé ; la nouvelle plante n'est pas couverte. |
+| 13 | `stop vava_time`, une plante nue ; attendre 21 h (heure réelle de Paris). | Aucun avertissement ni gel : sans `vava_time`, les plantes ne gèlent jamais. |
+
 ## 6. Ce qu'il faut regarder dans la base
 
 - `vava_characters.play_seconds` monte ; `vava_skills_skills`, `vava_skills_mentorships`, `vava_skills_recipes`,

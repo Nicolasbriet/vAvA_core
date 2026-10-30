@@ -21,7 +21,7 @@ const events = require('./events');
 const WEB_REQUESTS = new Set([
   'session', 'players', 'player', 'reports', 'reportClaim', 'reportClose', 'bans', 'unban', 'logs', 'staff', 'staffSet',
   'announce', 'sendBack', 'moveToPlayer', 'moveToCoords', 'freeze', 'heal', 'feed', 'message', 'warn', 'kick', 'ban',
-  'inventoryView', 'give', 'zones', 'zoneUpdate', 'zoneDelete',
+  'inventoryView', 'give', 'zones', 'zoneUpdate', 'zoneDelete', 'time', 'timeClock', 'timeWeather',
 ]);
 const ARGS_MAX = 8;
 const PLAYER_MAX = 65535;

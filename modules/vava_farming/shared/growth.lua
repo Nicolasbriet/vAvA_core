@@ -2,13 +2,15 @@
     vava_farming/shared/growth.lua
     Rôle : règles pures de la croissance, partagées par le client (affichage) et le serveur (décision) : avancée d'un
            emplacement d'après le temps écoulé (humidité qui baisse, croissance tant que la terre est humide, pause,
-           flétrissement puis mort quand elle est sèche, jachère qui rend de la fertilité), stade et état, régularité
-           d'arrosage, qualité d'une récolte. Aucun état : les fonctions reçoivent et rendent des tables.
+           flétrissement puis mort quand elle est sèche, jachère qui rend de la fertilité ; saison de vava_time qui
+           accélère ou ralentit la pousse et le dessèchement), stade et état, régularité d'arrosage, qualité d'une
+           récolte ; gel d'une nuit d'hiver (plante qu'il tue, objet qui couvre). Aucun état : les fonctions reçoivent
+           et rendent des tables.
     Dépendances : shared/constants.lua, config.lua
 ]]
 
-local floor, min, max = math.floor, math.min, math.max
-local ipairs = ipairs
+local floor, min, max, huge = math.floor, math.min, math.max, math.huge
+local ipairs, type = ipairs, type
 
 local cfg = VavaFarming.config
 local g = cfg.growth
@@ -32,13 +34,33 @@ VavaFarming.growth = growth
 ---@field wilted boolean
 ---@field dead boolean
 ---@field lastFamily string|nil
+---@field covered boolean       couvert contre le gel jusqu'à la récolte
 ---@field updatedAt integer
 
---- Applique le temps écoulé depuis `updatedAt` à l'emplacement (modifié en place).
+-- facteur de saison le plus fort accepté (même règle que vava_gathering/shared/season.lua)
+growth.MAX_SEASON_FACTOR = 10
+
+--- Facteur de saison lu dans la config : un nombre fini, ramené dans [0, MAX_SEASON_FACTOR] ; tout le reste (absent,
+--- texte, NaN, infini, négatif) compte pour 1, sans effet.
+---@param value any
+---@return number
+function growth.seasonFactor(value)
+    if type(value) ~= 'number' or value ~= value or value < 0 or value == huge then return 1 end
+    if value > growth.MAX_SEASON_FACTOR then return growth.MAX_SEASON_FACTOR end
+    return value
+end
+
+--- Applique le temps écoulé depuis `updatedAt` à l'emplacement (modifié en place). `season` (vava_time, facultatif) :
+--- `growth` multiplie la vitesse de pousse, `drying` celle à laquelle la terre sèche ; sans saison, rien ne change.
+--- Avec une saison, la croissance garde ses fractions de seconde (une pousse lente appliquée toutes les 10 s ne perd
+--- rien à l'arrondi) ; elle est écrite entière en base. `season == false` : saison en attente (vava_time démarre) —
+--- rien n'avance, `updatedAt` compris ; le temps sera compté plus tard, à la bonne saison.
 ---@param slot vAvA.SlotState
 ---@param crop table|nil  définition de la culture plantée
 ---@param now integer
-function growth.advance(slot, crop, now)
+---@param season? { growth: number|nil, drying: number|nil }|false
+function growth.advance(slot, crop, now, season)
+    if season == false then return end
     local elapsed = now - slot.updatedAt
     if elapsed <= 0 then return end
     if not slot.crop or not crop then
@@ -51,11 +73,16 @@ function growth.advance(slot, crop, now)
         slot.updatedAt = now
         return
     end
-    local rate = crop.waterPerHour / 3600
-    local wetTime = slot.moisture > g.moistureThreshold and (slot.moisture - g.moistureThreshold) / rate or 0
+    local speed = season and season.growth or 1
+    local rate = crop.waterPerHour / 3600 * (season and season.drying or 1)
+    local wetTime = 0
+    if slot.moisture > g.moistureThreshold then
+        -- une terre qui ne sèche pas (saison à 0) reste humide tout le temps écoulé
+        wetTime = rate > 0 and (slot.moisture - g.moistureThreshold) / rate or elapsed
+    end
     local grown = min(elapsed, wetTime)
-    if not slot.wilted and grown > 0 then
-        slot.growth = min(crop.growMinutes * 60, slot.growth + floor(grown))
+    if not slot.wilted and grown > 0 and speed > 0 then
+        slot.growth = min(crop.growMinutes * 60, slot.growth + (season and grown * speed or floor(grown)))
     end
     slot.moisture = max(0, slot.moisture - rate * elapsed)
     local dry = elapsed - wetTime
@@ -75,6 +102,27 @@ function growth.advance(slot, crop, now)
         slot.drySince = nil
     end
     slot.updatedAt = now
+end
+
+--- Le gel d'une nuit d'hiver (vava_time) tue-t-il la plante de cet emplacement ? Oui si elle est plantée et vivante,
+--- sans couverture, et d'une culture qui ne résiste pas au froid (`frostHardy`).
+---@param slot vAvA.SlotState
+---@param crop table|nil  définition de la culture plantée
+---@return boolean
+function growth.frostKills(slot, crop)
+    return slot.crop ~= nil and crop ~= nil and not slot.dead and slot.covered ~= true and crop.frostHardy ~= true
+end
+
+--- Objet qui couvrira une plante : la première entrée de `options` (`{ item, quantity }`, ordre de config.frost.cover)
+--- que le cultivateur a en quantité suffisante, ou nil.
+---@param options { item: string, quantity: integer }[]
+---@param countOf fun(item: string): integer  nombre de cet objet dans la besace
+---@return { item: string, quantity: integer }|nil
+function growth.coverOption(options, countOf)
+    for _, option in ipairs(options) do
+        if countOf(option.item) >= option.quantity then return option end
+    end
+    return nil
 end
 
 --- Arrosage : humidité pleine, une plante flétrie reprend.

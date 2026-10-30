@@ -466,10 +466,10 @@ chaque caractère pris dans `letters` ou dans `separators`) sans en garder de co
 Ressources séparées, dans `modules/` : à copier (ou lier) dans le dossier `resources` du serveur, dans cet ordre (le
 même que `README.md` à la racine, et celui qu'écrit la Chancellerie) :
 `ensure oxmysql`, `ensure vAvA_core`, `ensure vava_chat` (à la place de `ensure chat`), `ensure vava_world`,
-`ensure vava_appearance`, `ensure vava_characters_ui`, `ensure vava_hud`, `ensure vava_inventory`, `ensure vava_needs`,
-`ensure vava_health`, `ensure vava_admin`, `ensure vava_voice`, `ensure vava_cameras`, `ensure vava_magic`,
-`ensure vava_skills`, `ensure vava_gathering`, `ensure vava_crafting`, `ensure vava_farming`, `ensure vava_codex`,
-`ensure vava_chancellerie`, puis les modules qui déclarent des objets.
+`ensure vava_time`, `ensure vava_appearance`, `ensure vava_characters_ui`, `ensure vava_hud`, `ensure vava_inventory`,
+`ensure vava_needs`, `ensure vava_health`, `ensure vava_admin`, `ensure vava_voice`, `ensure vava_cameras`,
+`ensure vava_magic`, `ensure vava_skills`, `ensure vava_gathering`, `ensure vava_crafting`, `ensure vava_farming`,
+`ensure vava_codex`, `ensure vava_chancellerie`, puis les modules qui déclarent des objets.
 
 ### `vava_appearance`
 
@@ -986,6 +986,80 @@ aussi, retirer la scène de `config.audio.scenes`. Réglages : `config.lua`.
 
 Le gibier d'une future chasse sera créé par son module : la population du jeu n'en fournit plus.
 
+### `vava_time`
+
+L'heure, les saisons et le ciel du royaume (1.1.0), les mêmes pour tous les joueurs. Demande le core 0.7.0 (registre des
+commandes) ; facultatifs : `vava_admin` (droit `tools`, outil du Registre, journal ; sans lui, personne ne règle rien),
+`vava_hud` (notifications), `vava_chancellerie` ≥ 1.4.0 (page Ciel et heure). Ordre de démarrage : juste après
+`vava_world`. Détail, config et tests : `modules/vava_time/README.md` et `docs/tests/temps.md`.
+
+- **Heure** : celle de Paris (heure d'été du dernier dimanche de mars au dernier dimanche d'octobre, à 01:00 UTC),
+  calculée depuis l'heure UTC du serveur, au rythme réel (une minute du jeu = une minute). Le Conseil la décale (± 12 h),
+  la met à une heure voulue, la fige, la laisse reprendre (depuis l'heure figée) ou rend l'heure réelle.
+- **Calendrier** (1.1.0) : par défaut, cycle de 14 jours réels par saison (`calendar.cycle`), ancré à minuit (Paris) du
+  26 octobre 2026, printemps de l'an 1 ; l'an change à chaque nouveau printemps (une année du royaume : huit semaines).
+  Au choix, vrai calendrier (`calendar.mode = 'real'` : printemps 20 mars, été 21 juin, automne 22 septembre, hiver
+  21 décembre, heure de Paris). La date et la saison suivent l'heure réelle, pas le décalage du Conseil. L'ère et le
+  format de date ne sont écrits qu'une fois, dans la config (`messages.year` : « an %d du royaume », `messages.dateText`).
+  `/date` la donne en mots du jeu ; chaque début de saison est annoncé chez chaque joueur en jeu, lu sur
+  `vava_time:calendar` (aucun envoi de plus).
+- **Ciel** : cours pondéré par saison (successeurs plausibles, durées de 25 à 50 min, transition de 90 s) ; aucune neige
+  hors de l'hiver ; « neige au sol » jamais tirée. Le Conseil impose un ciel (transition de 20 s ; il tient le temps d'un
+  ciel puis reprend son cours, même hors saison), le fige, ou le rend à son cours.
+- **Nuits de gel** (1.1.0, décision à confirmer) : l'hiver, chaque nuit gèle avec la probabilité de `frost.seasons`
+  (0,4), tirée une fois par jour. Au soir (`frost.warnHour`, 17 h du royaume) le hook `vava_time:frostWarning`, à la
+  tombée de la nuit (`frost.hour`, 21 h) le hook `vava_time:frost` ; rien n'est envoyé aux joueurs par `vava_time`
+  (l'agriculture prévient elle-même ses cultivateurs). Ce qui est déjà passé au démarrage du module ne se rejoue pas.
+- **Conseil** : outil « Ciel et heure » (registre `vava_admin:tools`, clé `vava_time:ciel`, droit `tools`) et `/ciel`
+  (sous-commandes nommées dans `commands.actions` : `heure`, `decaler`, `figer`, `reprendre`, `reelle`, `imposer`,
+  `garder`, `rendre`). Chaque décision est revérifiée, soumise au **débit commun** (`council.rate` : 6 coup sur coup,
+  puis une toutes les deux secondes, jeu et Chancellerie confondus, code `rate_limited`), publiée, écrite en base
+  (`vava_time_state`) et inscrite au journal du Registre si elle change quelque chose.
+
+**GlobalState** (petit, rare, utile à tous ; retiré à l'arrêt du module) :
+
+| Clé | Valeur | Écrite |
+|---|---|---|
+| `vava_time:clock` | `{ shift, frozen }` — décalage (s) sur l'heure de Paris ; seconde du jour figée, ou `false` | démarrage, décision sur l'heure |
+| `vava_time:weather` | `{ id, from, at, fade, forced, frozen }` — ciel visé, ciel d'avant, début de la transition (secondes UTC du serveur), durée (s), imposé, figé | démarrage, chaque ciel (25 à 50 min), décision |
+| `vava_time:calendar` | `{ season, day, year }` | démarrage, changement de jour |
+
+**RPC** : `vava_time:sync` (`{}` → secondes UTC du serveur ; à l'arrivée puis toutes les 30 min ; 6, 0,1/s),
+`vava_time:open` (`{}` → vue de l'outil ; droit `tools` ; 5, 1/s), `vava_time:clock` (`action` ∈ `set`, `shift`,
+`freeze`, `resume`, `real` ; `value` entier −1440…1440 : minute du jour pour `set`, minutes à ajouter pour `shift`
+(± 720, jamais 0), sinon 0 ; 6, 0,5/s), `vava_time:weather` (`action` ∈ `impose`, `freeze`, `release` ; ciel de la
+config, pour `impose` ; `hold` booléen ; 6, 0,5/s). Codes : `forbidden`, `invalid_value`, `unknown_weather`,
+`not_ready`, `rate_limited` (débit commun des décisions). Si le module serveur n'est pas prêt, le client relance `sync`
+quatre fois (après 2, 5, 10 et 30 s) puis attend que `vava_time:clock` soit publié pour redemander.
+
+| Export serveur | Retour |
+|---|---|
+| `getSeason()` | `printemps`, `ete`, `automne`, `hiver`, ou `nil` avant le démarrage — lu par `vava_farming` et `vava_gathering` |
+| `getCalendar()` | `{ season, label, name, day, year, yearText, text, length }` — `yearText` et `text` écrits par la config ; `length` : jours d'une saison en mode cycle (1.1.0) |
+| `getClock()` | `{ hour, minute, seconds, frozen, shift }` |
+| `getFrost()` | `{ tonight, warned, struck, warnHour, hour }` — la nuit du jour (1.1.0) |
+| `getWeather()` | `{ id, label, forced, frozen }` |
+| `webState()` | `true, vue` ou `false, code` — pont de la Chancellerie seulement |
+| `webClock(action, minutes)` · `webWeather(action, ciel?, figer?)` | `true, vue, libellé du journal (nil : rien n'a changé), détails` ou `false, code` — pont seulement, mêmes règles que les RPC (droit vérifié par le pont auprès du Registre) |
+
+La vue : `{ clock = { seconds, real, shift, frozen }, calendar = { season, label, name, day, year, yearText, text,
+length }, frost = { tonight, warned, struck, warnHour, hour }, weather = { id, label, from, fromLabel, fading, forced,
+frozen, endsIn, inSeason }, weathers = { { id, label, inSeason } }, limits }`.
+
+| Export client | Retour |
+|---|---|
+| `getClock()` | `{ hour, minute, frozen }`, ou `nil` avant la première réponse du serveur |
+| `getSeason()` · `getWeather()` | identifiant, ou `nil` |
+
+**Hooks** (serveur, `after`) : `vava_time:seasonChanged` (`{ season, previous, day, year }`), `vava_time:dayChanged`
+(`{ season, day, year }`), `vava_time:weatherChanged` (`{ weather, previous, forced, frozen, by }`),
+`vava_time:clockChanged` (`{ shift, frozen, by }`) ; `by` : `cycle`, `council` ou `web` ; `vava_time:frostWarning` (au
+soir d'une nuit de gel) et `vava_time:frost` (le gel tombe) : `{ season, day, year, warnHour, hour }` (1.1.0).
+
+Un module lit la saison par son `bridge/server.lua` (appel isolé, saison gardée quelques secondes), s'abonne aux hooks
+du gel s'il en a l'usage, et garde ses réglages par saison dans sa propre config : `vava_time` absent ou arrêté = aucun
+effet. Rendu hors jeu de l'outil : `web/index.html` (`?frozen=1`, `?forced=1`, `?struck=1`, `?refused=1`).
+
 ### `vava_cameras`
 
 L'écran des joueurs, pour le Conseil : tout membre (droit `watch` de vava_admin, sans règle de rang) regarde tout le
@@ -1205,7 +1279,7 @@ fondateur ; `/metiers niveau <joueur> <compétence> <niveau>`, `/metiers recette
 
 ### `vava_gathering`
 
-La récolte (1.2.4) : zones à **vitalité** 0–100 (plein rendement au-dessus de 60, réduit entre 60 et 25 avec chance
+La récolte (1.3.2) : zones à **vitalité** 0–100 (plein rendement au-dessus de 60, réduit entre 60 et 25 avec chance
 d'échec, **épuisée** sous 25 avec props remplacés et rendement effondré, **cicatrice** à 0 : régénération × 0,2 pendant
 la durée de la zone), nœuds à charges (arbres, filons, buissons, bancs de poissons, pistes de gibier) qui se
 régénèrent par le temps (recalcul à la demande, aucune boucle), outils **en main** (`vava_inventory:held`) du genre
@@ -1213,7 +1287,7 @@ requis, non brisés, usés par `patchMetadata` (brisés à 0), qualité de la r�
 palier 1–5 et provenance sur la pile (`{ tier, origin }`), pêche à la barre de tension, réaction de la terre aux
 épuisements répétés, commandes du Conseil. L'XP passe par `vava_skills:addXp`. Tout le détail, la config et les tests en
 jeu : `modules/vava_gathering/README.md`. Demande le core 0.6.0, `vava_inventory` 1.4.0 et `vava_skills` 1.0.0 ;
-facultatifs : `vava_hud`, `vava_admin` (droit `metiers`), `vava_chat`, `vava_health` (à terre).
+facultatifs : `vava_hud`, `vava_admin` (droit `metiers`), `vava_chat`, `vava_health` (à terre), `vava_time` (saisons).
 
 - **Données** en `config.lua` : zones (centre, rayon, coût, régénération, cicatrice), nœuds (position, ressource, charges,
   délai, props normal et épuisé — tous les nœuds ont un prop créé par le client), ressources (objet, compétence, outil,
@@ -1224,6 +1298,14 @@ facultatifs : `vava_hud`, `vava_admin` (droit `metiers`), `vava_chat`, `vava_hea
 - **Serveur maître** : distance lue côté serveur au début et à la fin, durée revérifiée, jeton par geste, cooldown,
   une récolte à la fois ; pour la pêche, seul « a tenu la tension » est déclaratif. À terre (`vava_health:isDowned`,
   lu par le bridge), ni début ni fin (code `downed`) ; côté client, ni invite ni demande.
+- **Saisons** (1.3.0) : la saison de `vava_time` (export `getSeason`, lu par le bridge, gardée 5 s) donne deux facteurs
+  par compétence de la ressource, réglés dans `config.seasons` : `regen` (vitesse à laquelle les nœuds rendent leurs
+  charges ; 0 : rien ne repousse et le temps ne s'accumule pas ; au changement de facteur, l'avance prise sur la
+  prochaine charge est gardée et recomptée au nouveau rythme, nœud réécrit — 1.3.1) et `yield` (unités récoltées, au
+  moins une). Par défaut : herbes lentes et maigres en hiver, gibier abondant à l'automne, poissons au printemps,
+  minage sans saison. `vava_time` absent, arrêté ou en échec : facteur 1. Facteurs contrôlés par `shared/season.lua`
+  (fini, ramené dans [0, 10], sinon 1 ; 1.3.2). Saison en attente pendant le démarrage de `vava_time` (1.3.2) : facteur
+  `false`, jamais gardé en cache ; aucun nœud ne repousse ni ne déplace sa date, le rendement compte pour 1.
 
 **Registre** `vava_gathering:tools` (objet → `{ kind, power, yieldBonus?, qualityBonus?, wear? }`) : rempli par la
 config, ouvert aux autres modules (une hache d'artisan de phase 3 s'y déclare, ou hérite du genre de son objet).
@@ -1307,16 +1389,16 @@ station. Rendu hors jeu : `web/index.html?view=menu` (ou `menu&tab=reparation`, 
 
 ### `vava_farming`
 
-L'agriculture (1.2.2) : **parcelles** communales ou privées (`owner = { kind = 'character', id }`, autres genres par
+L'agriculture (1.4.1) : **parcelles** communales ou privées (`owner = { kind = 'character', id }`, autres genres par
 `registerAccess`) faites d'emplacements en grille ; **croissance par dates** (humidité qui baisse, pousse au-dessus
 d'un seuil, pause à sec, flétrie après 6 h, morte après 18 h ; aucune boucle, republication des stades toutes les
 10 s) ; **fertilité** (coût par récolte, rotation par famille, compost, jachère) ; **qualité** de la récolte (graine ×
 0,35 + compétence × 0,35 + régularité d'arrosage × 0,15 + fertilité × 0,15 ± 5) en palier avec provenance, graines
 récupérées au même palier ; gestes semer / arroser (seau en main rempli aux puits) / fertiliser / récolter (faucille :
-plus vite) / arracher (déchets), tous validés et appliqués par le serveur après un geste chronométré (fini trop loin
+plus vite) / couvrir (contre le gel, 1.4.0) / arracher (déchets), tous validés et appliqués par le serveur après un geste chronométré (fini trop loin
 ou à terre, le geste est abandonné ; à terre, `vava_health:isDowned` lu par le bridge : ni menu, ni geste, ni puits,
 ni grenier, code `downed` ; un emplacement qui vient de donner ou de consommer des objets — semis, récolte, compost,
-arrachage — est écrit aussitôt, le reste par lots) ; **grenier
+couverture, arrachage — est écrit aussitôt, le reste par lots) ; **grenier
 commun** (conteneur `vava_inventory` conservé, ouvert ancré à qui a accès à la parcelle — communale : tous ; privée :
 son propriétaire ou le genre branché par `registerAccess` —, dépôts et retraits journalés par minute : une ligne par
 minute, grenier, personnage, objet et sens, quantités additionnées, attente bornée par `persistence.granaryLogMax` ;
@@ -1325,17 +1407,39 @@ par geste) ; **composteur** (type de
 station et recette ajoutés aux registres de `vava_crafting`, station placée par `addStation`). Détail, config et tests :
 `modules/vava_farming/README.md`. Demande le core 0.6.0, `vava_inventory` 1.4.0, `vava_skills` 1.0.0, `vava_gathering`
 1.0.0, `vava_crafting` 1.1.0 ; facultatifs : `vava_hud`, `vava_admin` (droit `metiers`), `vava_chat`, `vava_health`
-(à terre).
+(à terre), `vava_time` (saisons, nuits de gel).
+
+**Saisons** (1.3.0) : la saison de `vava_time` (export `getSeason`, lu par le bridge, gardée 5 s) règle, par
+`config.seasons`, la vitesse de pousse (`growth` : printemps × 1,25, été × 1, automne × 0,75, hiver × 0,25) et celle à
+laquelle la terre sèche (`drying` : × 1 ; × 1,5 ; × 0,75 ; × 0,25 : l'hiver, un arrosage tient quatre fois plus). Une
+valeur absente, négative, infinie ou invalide compte pour 1, et une valeur au-delà de 10 compte pour 10 (1.4.1, même
+règle que la récolte). La croissance garde ses fractions de seconde en mémoire et s'écrit entière en base. `vava_time`
+absent, arrêté ou en échec : aucun effet, croissance identique à la 1.2.2. **Saison en attente** (1.4.1) : tant que
+`vava_time` démarre (module déclaré, en attente, en migration ou en `setup`, `getSeason` encore `nil`), le bridge rend
+`false`, jamais gardé en cache, et rien n'avance (`growth.advance` ne touche ni la pousse, ni l'humidité, ni la date de
+calcul) : le temps est compté ensuite, à la bonne saison. Quand les effets de saison changent, chaque emplacement planté
+est marqué à écrire, pour qu'un redémarrage ne recompte pas d'un bloc tout le temps passé depuis son dernier geste.
+
+**Gel** (1.4.0, décision à confirmer) : branchée par le bridge sur les hooks `vava_time:frostWarning` et
+`vava_time:frost`, l'agriculture avertit au soir d'une nuit de gel les seuls cultivateurs concernés (propriétaire en jeu
+d'une parcelle privée où une plante est exposée, joueurs à `frost.warnRadius` m d'une parcelle commune exposée,
+positions lues côté serveur) puis, quand le gel tombe, fait mourir toute plante vivante ni couverte ni d'une culture
+`frostHardy` (état « morte » existant), journalise (une ligne `frost` par nuit : plantes perdues par parcelle, 1.4.1)
+et prévient les mêmes. Geste **Couvrir**
+(action `cover` de `vava_farming:begin`, codes `covered`, `frost_hardy`, `no_cover`) : plante vivante, non couverte,
+d'une culture qui craint le froid ; consomme le premier objet de `frost.cover` que le cultivateur possède en quantité
+(revérifié et retiré par `exchange` à la fin du geste) ; l'emplacement reste couvert jusqu'à la récolte ou
+l'arrachage (colonne `covered`, migration 0003, écrite aussitôt ; journal `covered`). Sans `vava_time`, rien ne gèle.
 
 **Registre** `vava_farming:crops` (`{ label, family, seed, product, growMinutes, waterPerHour, fertilityCost, yield,
-xp, difficulty, stages, wilted, dead }` ; `stages` : modèles par stade, le dernier réservé à la plante mûre), rempli par la
-config, ouvert aux autres modules. State bag global
+xp, difficulty, stages, wilted, dead, frostHardy? }` ; `stages` : modèles par stade, le dernier réservé à la plante
+mûre ; `frostHardy` : résiste au gel, 1.4.0), rempli par la config, ouvert aux autres modules. State bag global
 `vava_farming:parcel:<id>` → `{ slots = { { crop, stage, state } } }`.
 
 | Export serveur | Retour |
 |---|---|
 | `getParcel(id)` · `getParcels()` | `{ id, label, x, y, z, count, communal, owner?, granary?, slots = { vue… } }` |
-| `getSlot(parcelle, n)` | `{ parcel, index, crop, cropLabel, state, stage, stages, progress, moisture, fertility, waterings, dryHours, plantedAt }` |
+| `getSlot(parcelle, n)` | `{ parcel, index, crop, cropLabel, state, stage, stages, progress, moisture, fertility, waterings, dryHours, plantedAt, covered, frostHardy }` |
 | `getCrop(id)` | définition ou `nil` |
 | `granaryOf(parcelle)` | id du conteneur du grenier, ou `nil` |
 | `registerAccess(kind, fn)` | genre de propriétaire de parcelle : `fn(ownerId, characterId)` → booléen |
@@ -1347,7 +1451,8 @@ withdraw, source, characterId, item, quantity }`).
 
 **Commande** `/agriculture parcelles | parcelle <id> | fertilite <id> <n> <0-100> | pousser <id> <n> | arroser <id>`
 (droit `metiers`). Touche `E` près d'un emplacement, d'un puits ou d'un grenier. Rendu hors jeu :
-`web/index.html?view=menu&state=growing` (ou `empty`, `ripe`, `wilted`, `dead`, `view=prompt`).
+`web/index.html?view=menu&state=growing` (ou `empty`, `ripe`, `wilted`, `dead`, `view=prompt` ; `&covered=1` : plante
+couverte).
 
 ### `vava_codex`
 
@@ -1437,7 +1542,7 @@ qui l'ont reçu : auteur compris, sauf pour un `/mp`, qui vaut 1).
 
 Le pont entre la Chancellerie (panneau web, programme à part : voir `docs/chancellerie.md`) et le serveur de jeu.
 Serveur seulement (rien n'est envoyé aux joueurs). Demande vava_admin 1.2.0 ; vava_voice 1.1.0 pour les zones de voix,
-vava_cameras 1.0.0 pour l'écran des joueurs.
+vava_cameras 1.0.0 pour l'écran des joueurs, vava_time 1.0.0 pour le ciel et l'heure (1.4.0).
 
 - **Entrée** : l'adresse HTTP du serveur de jeu (`http://127.0.0.1:<port>/vava_chancellerie/…`). N'accepte que les
   requêtes venues de la machine elle-même, portant la clé tirée par la Chancellerie à chaque lancement de FXServer et
@@ -1445,6 +1550,10 @@ vava_cameras 1.0.0 pour l'écran des joueurs.
   (serveur lancé sans la Chancellerie), le pont reste fermé.
 - **Demandes** : passées telles quelles au Registre (`webRequest`), qui vérifie tout et tient le journal ; zones de voix
   lues, modifiées et supprimées auprès de vava_voice, droit vérifié et journal tenu par le Registre.
+- **Ciel et heure** (1.4.0, `server/time.lua`) : demandes `time` (droit `view`), `timeClock` (`{ action, minutes }`) et
+  `timeWeather` (`{ action, ciel?, figer? }`, droit `tools`), transmises à `webState`, `webClock` et `webWeather` de
+  vava_time ; droit vérifié par `webCan`, décision inscrite par `webLog` si elle change quelque chose. Code
+  `time_unavailable` si vava_time n'est pas lancé. Un fichier du pont ajoute ses demandes à `routes.requests`.
 - **Caméras** (1.1.0) : ouvertes auprès de vava_cameras une fois le droit `watch` accordé — la vue en grand par la
   demande « écran du joueur » du Registre (`watchScreen` : cible vérifiée, inscrite au journal), les cases d'un mur sur
   le seul droit, l'ouverture du mur étant inscrite au journal (« Mur des caméras ouvert »). Routes : `/cameras/wall`,

@@ -333,7 +333,7 @@ historique). Il faut `vava_chancellerie` 1.2.0 pour la liste blanche.
 ## Le royaume depuis le web
 
 Pour les comptes qui ont un rang du Conseil, quand le serveur de jeu tourne avec la ressource `vava_chancellerie`
-(`ensure vava_chancellerie` après `vava_admin`, `vava_voice` et `vava_cameras`) :
+(`ensure vava_chancellerie` après `vava_admin`, `vava_voice`, `vava_cameras` et `vava_time`) :
 
 - **Joueurs** : liste en direct (numéro de connexion, nom FiveM, personnage, rang, temps de jeu du personnage, latence,
   compte du panneau relié), fiche (vie, faim, soif, temps de jeu — compté par le serveur de jeu entre l'apparition et
@@ -348,6 +348,15 @@ Pour les comptes qui ont un rang du Conseil, quand le serveur de jeu tourne avec
 - **Signalements** (en direct), **Sanctions** (bans, levée), **Journal du Conseil**, **Conseil** (nommer, changer de
   rang, révoquer), **Proclamation**, **Zones de voix** (modifier, supprimer ; la création reste en jeu, car une zone se
   centre sur la personne qui la crée), **Caméras** (le mur de l'écran des joueurs connectés).
+- **Ciel et heure** (module `vava_time`, 1.5.0 ; textes et nuit de gel 1.5.1) : heure du royaume qui avance dans la
+  page, heure de Paris, décalage, jour, saison, an (écrit par `vava_time`), durée d'une saison, nuit de gel annoncée ou
+  tombée, ciel courant (imposé, figé, hors saison) et prochain changement. Lecture au droit `view` ; avec le droit
+  `tools` : mettre l'heure, décaler d'une heure, figer, laisser le temps reprendre, rendre l'heure réelle, imposer un
+  ciel (et le figer), figer le ciel, le rendre à son cours. Demandes `time`, `timeClock` et `timeWeather` de
+  `POST /api/game/request` ; le pont vérifie le droit auprès du Registre, `vava_time` revalide les valeurs et applique
+  le débit commun des décisions (6 coup sur coup, puis une toutes les deux secondes, jeu et web confondus :
+  `rate_limited` au-delà), le Registre inscrit la décision à son journal si elle change quelque chose. Page relue après
+  chaque décision et au changement de ciel prévu.
 - Restent en jeu : vol libre, invisibilité, invulnérabilité, repère, rejoindre et amener à soi (ils supposent un
   personnage dans le monde).
 - Chaque action passe par le Registre du Conseil, qui vérifie le droit du rang, la cible et son rang, et l'inscrit au

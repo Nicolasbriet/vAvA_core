@@ -4,7 +4,8 @@
            compte, position lue côté serveur, santé (à terre), inventaire (objet en main, piles, comptage, échange
            atomique, ajout, retrait, métadonnées, conteneurs conservés et leur ouverture ancrée, déclaration des
            objets), compétences (XP, niveau), artisanat (type de station, recette et station du composteur), droits
-           et journal du Conseil, notifications, chat, base. Chaque appel à une autre ressource est isolé.
+           et journal du Conseil, joueurs en jeu et leur position, notifications, chat, saison et nuits de gel du
+           royaume (vava_time, facultatif), base. Chaque appel à une autre ressource est isolé.
     Dépendances : shared/constants.lua, config.lua, server/core.lua
 ]]
 
@@ -13,6 +14,8 @@ local mathType = math.type
 local pack, unpack, concat = table.pack, table.unpack, table.concat
 local GetResourceState, TriggerClientEvent, IsPlayerAceAllowed = GetResourceState, TriggerClientEvent, IsPlayerAceAllowed
 local GetPlayerPed, DoesEntityExist, GetEntityCoords = GetPlayerPed, DoesEntityExist, GetEntityCoords
+local GetGameTimer, GetPlayers = GetGameTimer, GetPlayers
+local ipairs = ipairs
 
 local core = VavaFarming.core
 if not core then return end
@@ -83,6 +86,22 @@ function Bridge.Position(source)
     if ped == 0 or not DoesEntityExist(ped) then return nil end
     local coords = GetEntityCoords(ped)
     return coords.x, coords.y, coords.z
+end
+
+--- Joueurs avec un personnage en jeu : { source, characterId, x?, y?, z? } (position lue côté serveur, absente si le
+--- ped n'existe pas encore).
+---@return { source: integer, characterId: integer, x: number|nil, y: number|nil, z: number|nil }[]
+function Bridge.ActivePlayers()
+    local list = {}
+    for _, id in ipairs(GetPlayers()) do
+        local source = tonumber(id)
+        local characterId = source and Bridge.GetCharacterId(source)
+        if characterId then
+            local x, y, z = Bridge.Position(source)
+            list[#list + 1] = { source = source, characterId = characterId, x = x, y = y, z = z }
+        end
+    end
+    return list
 end
 
 -- Santé -----------------------------------------------------------------------------------------------------------
@@ -282,6 +301,83 @@ function Bridge.Chat(source, text)
     end
     local called = call(CHAT, 'addMessage', source, { text = text })
     if not called then Bridge.Notify(source, text) end
+end
+
+-- Saisons (vava_time, facultatif) ---------------------------------------------------------------------------------
+
+local TIME = 'vava_time'
+-- la saison change au plus une fois par jour : relue toutes les 5 s au plus (la boucle des parcelles passe toutes les 10 s)
+local SEASON_CACHE_MS = 5000
+local seasonId, seasonReadAt = nil, nil
+-- états du module vava_time pendant lesquels il démarre (état relu en base) : la saison viendra
+local TIME_STARTING = { declared = true, waiting = true, migrating = true, starting = true }
+
+--- Vrai si vava_time est en train de démarrer : sa saison n'est pas encore connue mais le sera.
+---@return boolean
+local function timeStarting()
+    local record = core.modules.get(TIME)
+    return record ~= nil and TIME_STARTING[record.state] == true
+end
+
+--- Saison du royaume. nil : vava_time absent, arrêté ou en échec (aucun effet). false : vava_time démarre et ne connaît
+--- pas encore la saison — rien ne doit pousser ni sécher d'ici là (sinon tout le temps écoulé compterait sans saison) ;
+--- cet état n'est jamais gardé en cache.
+---@return string|false|nil
+function Bridge.Season()
+    local now = GetGameTimer()
+    if seasonReadAt and now - seasonReadAt < SEASON_CACHE_MS then return seasonId end
+    local called, season = call(TIME, 'getSeason')
+    if called and type(season) == 'string' then
+        seasonId, seasonReadAt = season, now
+        return season
+    end
+    if called and season == nil and timeStarting() then
+        seasonId, seasonReadAt = nil, nil
+        return false
+    end
+    seasonId, seasonReadAt = nil, now
+    return nil
+end
+
+-- effets contrôlés de chaque saison, calculés une fois (la config ne change pas en cours de route) ; NONE : saison
+-- sans réglage
+local NONE = {}
+local seasonEffects = {}
+
+--- Effets de la saison sur les cultures, `{ growth, drying }` de config.seasons contrôlés par growth.seasonFactor (une
+--- valeur absente ou invalide compte pour 1, bornée à 10). nil : aucun effet (vava_time absent, saison sans réglage).
+--- false : saison en attente (vava_time démarre), rien ne doit avancer (voir growth.advance). Une même saison rend
+--- toujours la même table : l'appelant voit un changement de saison à un changement de table.
+---@return { growth: number, drying: number }|false|nil
+function Bridge.SeasonEffects()
+    local season = Bridge.Season()
+    if season == false then return false end
+    if not season then return nil end
+    local effects = seasonEffects[season]
+    if effects == nil then
+        local raw = cfg.seasons and cfg.seasons[season]
+        local factor = VavaFarming.growth.seasonFactor
+        effects = type(raw) == 'table' and { growth = factor(raw.growth), drying = factor(raw.drying) } or NONE
+        seasonEffects[season] = effects
+    end
+    if effects == NONE then return nil end
+    return effects
+end
+
+local FROST_WARNING_HOOK, FROST_HOOK = 'vava_time:frostWarning', 'vava_time:frost'
+
+--- Branche l'agriculture sur les nuits de gel de vava_time (hooks after ; sans vava_time, ils ne sont jamais émis).
+--- Appelé pendant le setup.
+---@param onWarning fun(payload: table)  au soir d'une nuit de gel
+---@param onFrost fun(payload: table)    quand le gel tombe
+---@return boolean ok
+---@return string|nil err
+function Bridge.OnFrost(onWarning, onFrost)
+    local id, err = core.hooks.after(FROST_WARNING_HOOK, onWarning)
+    if not id then return false, err end
+    id, err = core.hooks.after(FROST_HOOK, onFrost)
+    if not id then return false, err end
+    return true
 end
 
 -- Base de données -------------------------------------------------------------------------------------------------

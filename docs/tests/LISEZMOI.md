@@ -18,15 +18,16 @@ main. Chaque procédure dit quoi faire et ce qui doit se passer ; les tests à d
 | [codex.md](codex.md) | Toutes les commandes et touches | `vava_codex` |
 | [metiers.md](metiers.md) | Compétences, récolte, artisanat, agriculture | `vava_skills`, `vava_gathering`, `vava_crafting`, `vava_farming` |
 | [magie.md](magie.md) | Les onze sorts, états, zones, combinaisons | `vava_magic` |
+| [temps.md](temps.md) | Heure du royaume, saisons de quatorze jours, ciel, nuits de gel, Conseil en jeu et depuis la Chancellerie, effets sur les métiers | `vava_time`, `vava_farming`, `vava_gathering`, `vava_chancellerie` |
 | [developpement.md](developpement.md) | Outils de développement : rien sans `vava_env`, réservés et journalisés avec | `vava_dev_characters`, `vava_example`, `vava_example_items`, `vava_anim_test` |
 
-Ordre conseillé : personnage, inventaire, besoins, santé, chat, voix, registre, Codex, métiers, magie. Chaque
+Ordre conseillé : personnage, inventaire, besoins, santé, chat, voix, registre, Codex, métiers, temps, magie. Chaque
 procédure s'appuie sur ce que les précédentes ont validé.
 
 ## Préparation commune
 
 1. **Ordre de démarrage** (`server.cfg`, ou la Chancellerie qui le fait seule), après `oxmysql` : `vAvA_core`,
-   `vava_chat`, `vava_world`, `vava_appearance`, `vava_characters_ui`, `vava_hud`, `vava_inventory`, `vava_needs`,
+   `vava_chat`, `vava_world`, `vava_time`, `vava_appearance`, `vava_characters_ui`, `vava_hud`, `vava_inventory`, `vava_needs`,
    `vava_health`, `vava_admin`, `vava_voice`, `vava_cameras`, `vava_magic`, `vava_skills`, `vava_gathering`,
    `vava_crafting`, `vava_farming`, `vava_codex`, `vava_chancellerie`.
 2. **Démarrage** : dans la console du serveur, chaque module affiche `module 'xxx' vY prêt` ; les migrations partent

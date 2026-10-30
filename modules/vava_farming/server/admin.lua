@@ -50,8 +50,9 @@ local function command(source, args)
             describe(source, parcel)
             for index = 1, parcel.count do
                 local view = slots.view(parcel, index)
-                bridge.Chat(source, format('  %d : %s%s, humidité %d %%, fertilité %d %%', index, view.cropLabel or 'libre',
-                    view.state and (' (' .. view.state .. ', ' .. floor(view.progress * 100 + 0.5) .. ' %)') or '', view.moisture, view.fertility))
+                bridge.Chat(source, format('  %d : %s%s, humidité %d %%, fertilité %d %%%s', index, view.cropLabel or 'libre',
+                    view.state and (' (' .. view.state .. ', ' .. floor(view.progress * 100 + 0.5) .. ' %)') or '', view.moisture, view.fertility,
+                    view.covered and ', couverte' or (view.frostHardy and ', résiste au gel' or '')))
             end
         elseif action == 'fertilite' then
             local parcel = catalog.parcel(args[2])
