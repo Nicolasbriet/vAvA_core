@@ -72,7 +72,7 @@ repris : utiliser l'export ci-dessous ou les hooks.
 
 | Export serveur | Retour |
 | --- | --- |
-| `addMessage(cible, message)` | `true`, ou `false, code` — `cible` : numéro d'un joueur connecté, ou `-1` pour tous les joueurs **en jeu** (pas ceux en connexion ou en sélection). `message` : texte, `{ author?, text, color? = { r, g, b } }` ou `{ args, color? }` |
+| `addMessage(cible, message)` | `true`, ou `false, code` — `cible` : numéro d'un joueur connecté ; `-1` (envoi à tous) est refusé depuis 1.2.0 (`invalid_target`) : l'annonce à tout le royaume est celle du Registre du Conseil. `message` : texte, `{ author?, text, color? = { r, g, b } }` ou `{ args, color? }` |
 
 | Hook | Phase | Payload |
 | --- | --- | --- |
