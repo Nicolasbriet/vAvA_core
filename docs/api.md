@@ -1227,7 +1227,7 @@ fondateur ; `/metiers niveau <joueur> <compétence> <niveau>`, `/metiers recette
 
 ### `vava_gathering`
 
-La récolte (1.3.0) : zones à **vitalité** 0–100 (plein rendement au-dessus de 60, réduit entre 60 et 25 avec chance
+La récolte (1.3.1) : zones à **vitalité** 0–100 (plein rendement au-dessus de 60, réduit entre 60 et 25 avec chance
 d'échec, **épuisée** sous 25 avec props remplacés et rendement effondré, **cicatrice** à 0 : régénération × 0,2 pendant
 la durée de la zone), nœuds à charges (arbres, filons, buissons, bancs de poissons, pistes de gibier) qui se
 régénèrent par le temps (recalcul à la demande, aucune boucle), outils **en main** (`vava_inventory:held`) du genre
@@ -1248,9 +1248,10 @@ facultatifs : `vava_hud`, `vava_admin` (droit `metiers`), `vava_chat`, `vava_hea
   lu par le bridge), ni début ni fin (code `downed`) ; côté client, ni invite ni demande.
 - **Saisons** (1.3.0) : la saison de `vava_time` (export `getSeason`, lu par le bridge, gardée 5 s) donne deux facteurs
   par compétence de la ressource, réglés dans `config.seasons` : `regen` (vitesse à laquelle les nœuds rendent leurs
-  charges ; 0 : rien ne repousse et le temps ne s'accumule pas) et `yield` (unités récoltées, au moins une). Par défaut :
-  herbes lentes et maigres en hiver, gibier abondant à l'automne, poissons au printemps, minage sans saison.
-  `vava_time` absent : facteur 1.
+  charges ; 0 : rien ne repousse et le temps ne s'accumule pas ; au changement de facteur, l'avance prise sur la
+  prochaine charge est gardée et recomptée au nouveau rythme, nœud réécrit — 1.3.1) et `yield` (unités récoltées, au
+  moins une). Par défaut : herbes lentes et maigres en hiver, gibier abondant à l'automne, poissons au printemps,
+  minage sans saison. `vava_time` absent : facteur 1.
 
 **Registre** `vava_gathering:tools` (objet → `{ kind, power, yieldBonus?, qualityBonus?, wear? }`) : rempli par la
 config, ouvert aux autres modules (une hache d'artisan de phase 3 s'y déclare, ou hérite du genre de son objet).

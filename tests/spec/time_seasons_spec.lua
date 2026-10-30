@@ -147,3 +147,79 @@ describe('vava_gathering repousse et rendement selon la saison', function()
         assert.is_true(seasons.regen.hiver.herboristerie < 1)
     end)
 end)
+
+-- Changement de saison pendant la repousse d'un nœud (vava_gathering/server/nodes.lua) : l'avance prise sur la prochaine
+-- charge est gardée, recomptée au nouveau rythme.
+describe('vava_gathering repousse au changement de saison', function()
+    local nodes, factor
+
+    before_each(function()
+        helper.reset()
+        VavaGathering = nil
+        GlobalState = {}
+        factor = 1
+        helper.loadAll({ 'modules/vava_gathering/shared/constants.lua', 'modules/vava_gathering/config.lua' })
+        VavaGathering.bridge = { SeasonFactor = function() return factor end }
+        VavaGathering.catalog = {}
+        helper.loadAll({ 'modules/vava_gathering/server/nodes.lua' })
+        nodes = VavaGathering.nodes
+    end)
+
+    after_each(function()
+        GlobalState = nil
+    end)
+
+    -- une charge toutes les 10 min au rythme normal
+    local DEF = { id = 'essai', charges = 4, regenMs = 600000, resource = { skill = 'herboristerie' } }
+
+    it('recale le délai quand le facteur change, sans rien perdre ni rien donner', function()
+        local state = { charges = 0, updatedAt = 1000, dirty = false }
+        nodes.refresh(DEF, state, 1300)                 -- la moitié du délai au rythme normal
+        assert.equal(0, state.charges)
+        factor = 0.5                                    -- l'hiver : les 300 s qui restent en prennent 600
+        nodes.refresh(DEF, state, 1310)
+        assert.equal(0, state.charges)
+        assert.is_true(state.dirty)
+        nodes.refresh(DEF, state, 1899)
+        assert.equal(0, state.charges)
+        nodes.refresh(DEF, state, 1900)
+        assert.equal(1, state.charges)
+    end)
+
+    it('garde l\'avance tant que rien ne repousse, puis repart d\'où il en était', function()
+        local state = { charges = 0, updatedAt = 1000 }
+        nodes.refresh(DEF, state, 1300)                 -- 300 s de repousse acquises
+        factor = 0
+        nodes.refresh(DEF, state, 1310)
+        nodes.refresh(DEF, state, 1310 + 86400)         -- un jour sans repousse : rien ne s'accumule
+        assert.equal(0, state.charges)
+        factor = 1
+        nodes.refresh(DEF, state, 1320 + 86400)
+        assert.equal(0, state.charges)
+        nodes.refresh(DEF, state, 1310 + 86400 + 299)
+        assert.equal(0, state.charges)
+        nodes.refresh(DEF, state, 1310 + 86400 + 300)   -- les 300 s qui manquaient
+        assert.equal(1, state.charges)
+    end)
+
+    it('ne recale rien sans changement de facteur', function()
+        factor = 0.25
+        local state = { charges = 0, updatedAt = 1000, dirty = false }
+        nodes.refresh(DEF, state, 1500)
+        nodes.refresh(DEF, state, 2000)
+        assert.is_false(state.dirty)
+        nodes.refresh(DEF, state, 1000 + 2400)
+        assert.equal(1, state.charges)
+    end)
+end)
+
+describe('vava_farming hiver', function()
+    it('fait tenir un arrosage aussi longtemps que la pousse est lente', function()
+        helper.reset()
+        VavaFarming = nil
+        helper.loadAll({ 'modules/vava_farming/shared/constants.lua', 'modules/vava_farming/config.lua' })
+        local hiver = VavaFarming.config.seasons.hiver
+        assert.equal(0.25, hiver.growth)
+        assert.equal(hiver.growth, hiver.drying)
+    end)
+end)
