@@ -28,7 +28,7 @@ Ordre de démarrage : après `vAvA_core` (≥ 0.6.0), `vava_inventory` (≥ 1.4.
 | Leçons | élèves à 10 m qui ont le niveau, recette `transmission` | `lessons` |
 | Combustible | forge : charbon ; fourneau : bois de pin ; 1 par pièce, réserve 20 | `stationTypes[].fuel` |
 | Journal | pièces Excellent+ (palier ≥ 4), réparations, baptêmes, leçons, Conseil, écritures refusées par la garde ; 180 jours | `logTier`, `logRetentionDays` |
-| Signature protégée | créateur, date, poinçon et qualité figés sur tout objet ; sur un objet signé, palier et nom figés, solidité qui ne remonte pas hors d'une réparation (voir plus bas) | `server/guard.lua` |
+| Signature protégée | créateur, date, poinçon et qualité figés sur tout objet ; sur un objet signé, palier et nom figés, solidité qui ne remonte pas hors d'une réparation (voir plus bas) ; refus journalisés une fois par minute et par objet, module et clé | `guard` (`windowMs`, `maxTracked`, `bornDurability`) |
 
 ### Stations
 
@@ -78,15 +78,19 @@ station.
 | Objet | Refusé (code) | Admis |
 |---|---|---|
 | Tout objet | changer, poser ou retirer `crafter_id`, `crafter_name`, `crafted_at`, `mark`, `quality` (`signature_locked`) | tout le reste |
-| Objet signé (`crafter_id` présent) | changer ou retirer `tier`, poser, changer ou retirer `name` (`signature_locked`) ; faire monter, retirer, ou remplacer par autre chose qu'un nombre `max_durability` ou `durability`, retirer `broken` d'un objet brisé (`durability_locked`) | solidité qui baisse (usure de la récolte, dommage), solidité donnée à un objet qui n'en avait pas, `broken` posé, `history`, `lines`, toute autre clé |
+| Objet signé (`crafter_id` présent) | changer ou retirer `tier`, poser, changer ou retirer `name` (`signature_locked`) ; faire monter, retirer, ou remplacer par autre chose qu'un nombre `max_durability` ou `durability`, retirer `broken` d'un objet brisé, donner à un objet qui n'en avait pas une solidité négative, non numérique, au-dessus du plafond, ou une courante au-dessus de sa maximale (`durability_locked`) | solidité qui baisse (usure de la récolte, dommage), solidité donnée à un objet qui n'en avait pas jusqu'au plafond (`guard.bornDurability`, 100, ou la solidité de sa recette si elle est plus haute), `broken` posé, `history`, `lines`, toute autre clé |
 | Objet ordinaire (sans `crafter_id`) | — | tout le reste, palier d'une matière et solidité d'un outil compris |
 
 - Les écritures de l'artisanat lui-même (réparation, baptême) passent : l'inventaire les attribue à `vava_crafting`
   (`owner`, lu par `GetInvokingResource`) **et** elles partent de `Bridge.PatchMetadata`, qui lève un compteur autour
   de son seul appel à l'inventaire. La création d'une pièce passe par l'échange atomique (hook `add`), pas par ce hook.
 - Un `setMetadata` d'un autre module sur un objet signé doit donc reporter ces clés telles quelles.
-- Un refus est inscrit au journal (`signature_locked` ou `durability_locked` : module, clé, objet, créateur) et
-  signalé en console ; le module appelant reçoit `false, code`.
+- Le module appelant reçoit toujours `false, code`. Un refus est inscrit au journal (`signature_locked` ou
+  `durability_locked` : module, clé, objet, créateur) et signalé en console **une fois par fenêtre** pour un même
+  module, un même objet et une même clé (`guard.windowMs`, 60 s) ; les suivants sont comptés et annoncés avec le
+  prochain refus signalé (« [n refus semblable(s) tu(s)] », `untold` au journal). Au plus `guard.maxTracked` (500)
+  refus distincts suivis à la fois : au-delà, un refus nouveau est seulement compté jusqu'à la purge suivante (une
+  fois par fenêtre). Un module qui insiste ne remplit donc ni le journal ni la console (depuis 1.3.1).
 - La garde ne vaut que pendant que `vava_crafting` tourne (ses hooks tombent à son arrêt). Elle ne couvre pas un objet
   **créé** déjà signé par un autre module (`add`, `exchange`), qui passe par d'autres hooks.
 

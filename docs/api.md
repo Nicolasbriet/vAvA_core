@@ -1211,7 +1211,7 @@ nommé par zone et le cercle de son rayon, posés par le client depuis la config
 
 ### `vava_crafting`
 
-L'artisanat (1.3.0) : **stations** (forge, établi, métier à tisser, alambic, tannerie, fourneau, table d'arcanes)
+L'artisanat (1.3.1) : **stations** (forge, établi, métier à tisser, alambic, tannerie, fourneau, table d'arcanes)
 publiques ou privées, avec leur qualité et parfois leur combustible (forge : charbon ; fourneau : bois ; réserve
 alimentée par les joueurs), une pièce à la fois ; **recettes** à ingrédients par **palier choisi** (consommés par pile,
 les plus anciennes d'abord, échange atomique), outil requis en main, durée, XP par `vava_skills` ; **qualité** =
@@ -1253,13 +1253,17 @@ d'un autre module (`setMetadata`, `patchMetadata`) qui changerait, poserait ou r
 `crafter_name`, `crafted_at`, `mark` ou `quality` sur n'importe quel objet (`false, 'signature_locked'`) ; sur un objet
 signé (`crafter_id` présent), qui changerait `tier` ou poserait, changerait ou retirerait `name` (le baptême seul
 nomme une pièce) (`signature_locked`), ferait monter, retirerait ou remplacerait par autre chose qu'un nombre
-`max_durability` ou `durability`, ou retirerait `broken` (`false, 'durability_locked'`). Une solidité qui baisse
-(usure, dommage) ou qui naît sur un objet qui n'en avait pas, `history`, `lines` et toute autre clé restent libres ; un
-objet ordinaire n'est touché que s'il recevait une de ces cinq clés (signature contrefaite). Un `setMetadata` sur un objet signé doit donc reporter
-ces clés telles quelles. Sont seules admises les écritures que l'inventaire attribue à `vava_crafting` (`owner`) et qui
-partent de son bridge (réparation, baptême). Chaque refus est journalisé (`vava_crafting_log`, nature
-`signature_locked` ou `durability_locked`). La garde tombe avec le module ; un objet **créé** déjà signé (`add`,
-`exchange`) n'est pas de son ressort.
+`max_durability` ou `durability`, retirerait `broken`, ou donnerait à un objet signé qui n'en avait pas une solidité
+négative, non numérique, au-dessus du plafond (`config.guard.bornDurability`, 100, ou la solidité de sa recette si
+elle est plus haute) ou une courante au-dessus de sa maximale (`false, 'durability_locked'`). Une solidité qui baisse
+(usure, dommage) ou qui naît dans ces bornes, `history`, `lines` et toute autre clé restent libres ; un objet ordinaire
+n'est touché que s'il recevait une de ces cinq clés (signature contrefaite). Un `setMetadata` sur un objet signé doit
+donc reporter ces clés telles quelles. Sont seules admises les écritures que l'inventaire attribue à `vava_crafting`
+(`owner`) et qui partent de son bridge (réparation, baptême). Un refus est toujours rendu au module ; il est journalisé
+(`vava_crafting_log`, nature `signature_locked` ou `durability_locked`) et signalé en console une fois par fenêtre de
+60 s pour un même module, objet et clé (`config.guard.windowMs`, au plus `maxTracked` = 500 refus suivis ; les refus
+tus sont comptés et annoncés avec le suivant, depuis 1.3.1). La garde tombe avec le module ; un objet **créé** déjà
+signé (`add`, `exchange`) n'est pas de son ressort.
 
 **Commande** `/artisanat stations | station <id> | carburant <id> <n>` (droit `metiers`). Touche `E` près d'une
 station. Rendu hors jeu : `web/index.html?view=menu` (ou `menu&tab=reparation`, `menu&tab=poincon`, `name`).

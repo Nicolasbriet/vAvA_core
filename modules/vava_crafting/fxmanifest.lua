@@ -18,7 +18,7 @@ use_experimental_fxv2_oal 'yes'
 
 name 'vava_crafting'
 description 'Artisanat vAvA : stations, recettes, qualité, objets signés, réparation, leçons'
-version '1.3.0'
+version '1.3.1'
 
 dependency 'vAvA_core'
 dependency 'vava_inventory'

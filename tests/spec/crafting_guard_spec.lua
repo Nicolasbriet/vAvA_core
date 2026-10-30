@@ -14,6 +14,7 @@ describe('vava_crafting guard', function()
         helper.reset()
         helper.loadAll({
             'modules/vava_crafting/shared/constants.lua',
+            'modules/vava_crafting/config.lua',
             'modules/vava_crafting/server/guard.lua',
         })
         guard = VavaCrafting.guard
@@ -36,8 +37,8 @@ describe('vava_crafting guard', function()
         return copy
     end
 
-    local function refused(before, after, reason, key)
-        local ok, gotReason, gotKey = guard.decide(before, after, false)
+    local function refused(before, after, reason, key, ceiling)
+        local ok, gotReason, gotKey = guard.decide(before, after, false, ceiling)
         assert.is_false(ok)
         assert.equal(reason, gotReason)
         assert.equal(key, gotKey)
@@ -128,9 +129,44 @@ describe('vava_crafting guard', function()
             assert.is_true(guard.decide(before, with(before, { durability = 0, max_durability = 100, broken = true }), false))
         end)
 
-        it('admet la solidité donnée à un objet signé qui n’en avait pas (outil sans solidité connue)', function()
+        it('admet la solidité donnée à un objet signé qui n’en avait pas, jusqu’au plafond (usure de la récolte)', function()
             local before = with(signed(), nil, { 'durability', 'max_durability' })
-            assert.is_true(guard.decide(before, with(before, { durability = 98, max_durability = 100 }), false))
+            -- harvest.lua : maximale = toolDefaults.durability (100), courante = maximale − usure
+            assert.is_true(guard.decide(before, with(before, { durability = 98, max_durability = 100 }), false, 100))
+            assert.is_true(guard.decide(before, with(before, { durability = 0, max_durability = 100, broken = true }), false, 100))
+            assert.is_true(guard.decide(before, with(before, { durability = 150 }), false, 150))
+            assert.is_true(guard.decide(before, with(before, { history = {} }), false, 100))
+        end)
+
+        it('refuse une solidité qui naît au-delà du plafond, négative ou non numérique', function()
+            local before = with(signed(), nil, { 'durability', 'max_durability' })
+            refused(before, with(before, { max_durability = 1e9, durability = 1e9 }), 'durability_locked', 'max_durability', 100)
+            refused(before, with(before, { max_durability = 101 }), 'durability_locked', 'max_durability', 100)
+            refused(before, with(before, { durability = 101 }), 'durability_locked', 'durability', 100)
+            refused(before, with(before, { max_durability = -1 }), 'durability_locked', 'max_durability', 100)
+            refused(before, with(before, { max_durability = '50' }), 'durability_locked', 'max_durability', 100)
+        end)
+
+        it('refuse une solidité courante qui naît au-dessus de la maximale de l’objet', function()
+            local before = with(signed(), nil, { 'durability' })
+            assert.is_true(guard.decide(before, with(before, { durability = 97 }), false, 150))
+            refused(before, with(before, { durability = 120 }), 'durability_locked', 'durability', 150)
+            local bare = with(signed(), nil, { 'durability', 'max_durability' })
+            refused(bare, with(bare, { durability = 90, max_durability = 80 }), 'durability_locked', 'durability', 100)
+        end)
+
+        it('refuse toute solidité qui naît quand aucun plafond n’est connu', function()
+            local before = with(signed(), nil, { 'durability', 'max_durability' })
+            refused(before, with(before, { max_durability = 1 }), 'durability_locked', 'max_durability')
+            refused(before, with(before, { durability = 1 }), 'durability_locked', 'durability')
+        end)
+
+        it('plafond : solidité de la recette si elle dépasse celle de la récolte', function()
+            assert.equal(100, guard.bornCeiling(80, 100))
+            assert.equal(150, guard.bornCeiling(150, 100))
+            assert.equal(100, guard.bornCeiling(nil, 100))
+            assert.equal(0, guard.bornCeiling(nil, nil))
+            assert.equal(100, VavaCrafting.config.guard.bornDurability)
         end)
 
         it('refuse de retirer `broken` d’un objet brisé', function()
@@ -201,6 +237,7 @@ describe('vava_crafting guard', function()
             logged, written = {}, {}
             VavaCrafting.log = { warn = function(...) logged[#logged + 1] = { ... } end }
             VavaCrafting.journal = { write = function(kind, entry) written[#written + 1] = { kind = kind, entry = entry } end }
+            VavaCrafting.catalog = { recipeFor = function() return nil end }
         end)
 
         local function payload(before, after, owner)
@@ -235,7 +272,7 @@ describe('vava_crafting guard', function()
             assert.is_false(ok)
             assert.is_nil(written[1].entry.quality)
             assert.is_nil(written[1].entry.characterId)
-            assert.is_false((guard.onMetadata(payload({ quality = 2.5, crafter_id = 1 << 40 }, {}, 'x'), false)))
+            assert.is_false((guard.onMetadata(payload({ quality = 2.5, crafter_id = 1 << 40 }, {}, 'y'), false)))
             assert.is_nil(written[2].entry.quality)
             assert.is_nil(written[2].entry.characterId)
         end)
@@ -243,6 +280,96 @@ describe('vava_crafting guard', function()
         it('ignore un payload qui n’est pas une table', function()
             assert.is_nil(guard.onMetadata(nil, false))
             assert.is_nil(guard.onMetadata('x', false))
+        end)
+
+        it('ne journalise et ne signale qu’une fois le même refus dans la fenêtre, mais refuse toujours', function()
+            local before = signed()
+            local forged = payload(before, with(before, { crafter_name = 'X' }), 'vava_graveur')
+            for _ = 1, 50 do
+                local ok, reason = guard.onMetadata(forged, false)
+                assert.is_false(ok)
+                assert.equal('signature_locked', reason)
+            end
+            assert.equal(1, #written)
+            assert.equal(1, #logged)
+            -- autre clé, autre objet, autre module : refus distincts, journalisés chacun une fois
+            guard.onMetadata(payload(before, with(before, { mark = '✶' }), 'vava_graveur'), false)
+            local other = payload(before, with(before, { crafter_name = 'X' }), 'vava_graveur')
+            other.instanceId = 902
+            guard.onMetadata(other, false)
+            guard.onMetadata(payload(before, with(before, { crafter_name = 'X' }), 'vava_autre'), false)
+            assert.equal(4, #written)
+        end)
+
+        it('borne la solidité qui naît par la recette de l’objet ou par la récolte (catalogue)', function()
+            local asked
+            VavaCrafting.catalog = { recipeFor = function(item) asked = item return { durability = 80 } end }
+            local before = with(signed(), nil, { 'durability', 'max_durability' })
+            -- usure de la récolte : maximale 100 (toolDefaults), au-dessus des 80 de la recette
+            assert.is_nil(guard.onMetadata(payload(before, with(before, { durability = 98, max_durability = 100 }), 'vava_gathering'), false))
+            assert.equal('hache_fer', asked)
+            local ok, reason = guard.onMetadata(payload(before, with(before, { durability = 1e9, max_durability = 1e9 }), 'vava_x'), false)
+            assert.is_false(ok)
+            assert.equal('durability_locked', reason)
+            assert.equal('max_durability', written[1].entry.details.key)
+            VavaCrafting.catalog = { recipeFor = function() return { durability = 300 } end }
+            assert.is_nil(guard.onMetadata(payload(before, with(before, { max_durability = 300 }), 'vava_x'), false))
+            VavaCrafting.catalog = { recipeFor = function() return nil end }
+            assert.is_false((guard.onMetadata(payload(before, with(before, { max_durability = 101 }), 'vava_x'), false)))
+        end)
+
+        it('ne consulte pas le catalogue quand la solidité est déjà connue', function()
+            VavaCrafting.catalog = { recipeFor = function() error('catalogue consulté') end }
+            local before = signed()
+            assert.is_nil(guard.onMetadata(payload(before, with(before, { durability = 10 }), 'vava_gathering'), false))
+        end)
+    end)
+
+    describe('limite du journal des refus', function()
+        local WINDOW, MAX = 60000, 3
+
+        it('signale le premier refus, tait les suivants pendant la fenêtre, puis les annonce', function()
+            local state = guard.newRecords()
+            assert.same({ true, 0 }, { guard.shouldRecord(state, 'a', 1000, WINDOW, MAX) })
+            assert.same({ false, 0 }, { guard.shouldRecord(state, 'a', 2000, WINDOW, MAX) })
+            assert.same({ false, 0 }, { guard.shouldRecord(state, 'a', 60999, WINDOW, MAX) })
+            assert.same({ true, 2 }, { guard.shouldRecord(state, 'a', 61000, WINDOW, MAX) })
+            assert.same({ false, 0 }, { guard.shouldRecord(state, 'a', 61001, WINDOW, MAX) })
+        end)
+
+        it('suit chaque refus à part', function()
+            local state = guard.newRecords()
+            assert.is_true((guard.shouldRecord(state, 'a', 0, WINDOW, MAX)))
+            assert.is_true((guard.shouldRecord(state, 'b', 0, WINDOW, MAX)))
+            assert.is_false((guard.shouldRecord(state, 'a', 10, WINDOW, MAX)))
+        end)
+
+        it('au-delà du nombre suivi, tait les refus nouveaux puis reprend après la purge', function()
+            local state = guard.newRecords()
+            for _, id in ipairs({ 'a', 'b', 'c' }) do assert.is_true((guard.shouldRecord(state, id, 0, WINDOW, MAX))) end
+            assert.same({ false, 0 }, { guard.shouldRecord(state, 'd', 10, WINDOW, MAX) })
+            assert.same({ false, 0 }, { guard.shouldRecord(state, 'e', 20, WINDOW, MAX) })
+            assert.equal(3, state.count)
+            -- fenêtre passée : les trois expirés sont purgés, la place revient, les deux refus tus sont annoncés
+            assert.same({ true, 2 }, { guard.shouldRecord(state, 'd', WINDOW + 30, WINDOW, MAX) })
+            assert.equal(1, state.count)
+            assert.is_nil(state.entries.a)
+        end)
+
+        it('purge au plus une fois par fenêtre et garde les entrées encore valides', function()
+            local state = guard.newRecords()
+            guard.shouldRecord(state, 'a', 0, WINDOW, MAX)
+            guard.shouldRecord(state, 'b', 30000, WINDOW, MAX)
+            guard.shouldRecord(state, 'c', WINDOW, WINDOW, MAX)   -- purge : a expiré, b encore valide
+            assert.is_nil(state.entries.a)
+            assert.is_not_nil(state.entries.b)
+            assert.equal(2, state.count)
+            assert.equal(2 * WINDOW, state.purgeAt)
+        end)
+
+        it('règles par défaut : fenêtre de 60 s, 500 refus suivis', function()
+            assert.equal(60000, VavaCrafting.config.guard.windowMs)
+            assert.equal(500, VavaCrafting.config.guard.maxTracked)
         end)
     end)
 end)

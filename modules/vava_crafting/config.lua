@@ -44,6 +44,19 @@ VavaCrafting.config = {
     -- Journal d'un objet : création + les 5 dernières entrées.
     history = { max = 6 },
 
+    -- Garde de la signature (hook des métadonnées, server/guard.lua).
+    guard = {
+        -- un même refus (même module, même objet, même clé) n'est journalisé et signalé en console qu'une fois par
+        -- fenêtre ; les suivants sont comptés et annoncés avec le prochain refus signalé
+        windowMs = 60000,
+        -- refus distincts suivis à la fois ; au-delà, un refus nouveau n'est ni journalisé ni signalé (seulement
+        -- compté) jusqu'à la purge suivante (une fois par fenêtre)
+        maxTracked = 500,
+        -- plus haute solidité qu'un autre module peut donner à un objet signé qui n'en a pas : celle que pose l'usure
+        -- de la récolte (vava_gathering, toolDefaults.durability), ou la solidité de sa recette si elle est plus haute
+        bornDurability = 100,
+    },
+
     -- Réparation : part des ingrédients de la recette (arrondie au-dessus), solidité rendue mais maximale réduite,
     -- niveau requis = part du niveau de la recette, XP = part de l'XP de la recette, durée du geste.
     repair = { ingredientShare = 0.25, maxDurabilityLoss = 5, minLevelShare = 0.5, xpShare = 0.25, durationMs = 4000 },
