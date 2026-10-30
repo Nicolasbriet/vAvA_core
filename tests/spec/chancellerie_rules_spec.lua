@@ -184,39 +184,49 @@ describe('vava_chancellerie règles du pont', function()
     end)
 
     describe('netJournal', function()
-        local EVERY = 1800000
+        local EVERY, OPEN = 1800000, 60000
 
         local function query(scope, value, opening)
             return rules.netQuery(scope, value, opening)
         end
 
         it('inscrit l\'ouverture de la page, et la première lecture connue du pont même sans ouverture', function()
-            assert.same({ true, false }, { rules.netJournal({}, query('all', '', true), 1000, EVERY) })
-            assert.same({ true, false }, { rules.netJournal({}, query('all', '', false), 1000, EVERY) })
-            assert.same({ true, false }, { rules.netJournal({ pageAt = 900 }, query('all', '', true), 1000, EVERY) })
+            assert.same({ true, false }, { rules.netJournal({}, query('all', '', true), 1000, EVERY, OPEN) })
+            assert.same({ true, false }, { rules.netJournal({}, query('all', '', false), 1000, EVERY, OPEN) })
+            assert.same({ true, false }, { rules.netJournal({ pageAt = 900 }, query('all', '', true), 900 + OPEN, EVERY, OPEN) })
+        end)
+
+        it('ne prend l\'ouverture dite par la page qu\'une fois par minute pour un même compte', function()
+            local state = { pageAt = 1000 }
+            assert.same({ false, false }, { rules.netJournal(state, query('all', '', true), 1001, EVERY, OPEN) })
+            assert.same({ false, false }, { rules.netJournal(state, query('all', '', true), 1000 + OPEN - 1, EVERY, OPEN) })
+            assert.same({ true, false }, { rules.netJournal(state, query('all', '', true), 1000 + OPEN, EVERY, OPEN) })
+            -- une ouverture répétée n'empêche pas la ligne d'un autre joueur
+            assert.same({ false, true }, { rules.netJournal(state, query('player', 3, true), 1001, EVERY, OPEN) })
+            assert.is_true(cfg.net.openLogMinMs >= 60000 and cfg.net.openLogMinMs < cfg.net.logEveryMs)
         end)
 
         it('n\'inscrit pas une relecture, d\'un module ou de l\'ensemble, avant l\'échéance', function()
             local state = { pageAt = 1000 }
-            assert.same({ false, false }, { rules.netJournal(state, query('all', '', false), 1000 + EVERY - 1, EVERY) })
+            assert.same({ false, false }, { rules.netJournal(state, query('all', '', false), 1000 + EVERY - 1, EVERY, OPEN) })
             assert.same({ false, false },
-                { rules.netJournal(state, query('resource', 'vava_codex', false), 5000, EVERY) })
-            assert.same({ true, false }, { rules.netJournal(state, query('all', '', false), 1000 + EVERY, EVERY) })
+                { rules.netJournal(state, query('resource', 'vava_codex', false), 5000, EVERY, OPEN) })
+            assert.same({ true, false }, { rules.netJournal(state, query('all', '', false), 1000 + EVERY, EVERY, OPEN) })
         end)
 
         it('inscrit chaque autre joueur lu, et le même au plus une fois par échéance', function()
             local state = { pageAt = 2000 }
-            assert.same({ false, true }, { rules.netJournal(state, query('player', 4, false), 2000, EVERY) })
+            assert.same({ false, true }, { rules.netJournal(state, query('player', 4, false), 2000, EVERY, OPEN) })
             state.player, state.playerAt = 4, 2000
-            assert.same({ false, false }, { rules.netJournal(state, query('player', 4, false), 2000 + EVERY - 1, EVERY) })
-            assert.same({ false, true }, { rules.netJournal(state, query('player', 5, false), 3000, EVERY) })
-            assert.is_true(select(2, rules.netJournal(state, query('player', 4, false), 2000 + EVERY, EVERY)))
+            assert.same({ false, false }, { rules.netJournal(state, query('player', 4, false), 2000 + EVERY - 1, EVERY, OPEN) })
+            assert.same({ false, true }, { rules.netJournal(state, query('player', 5, false), 3000, EVERY, OPEN) })
+            assert.is_true(select(2, rules.netJournal(state, query('player', 4, false), 2000 + EVERY, EVERY, OPEN)))
         end)
 
         it('ne compte aucun joueur pour l\'ensemble ou un module', function()
             local state = { pageAt = 1000, player = 4, playerAt = 1000 }
-            assert.is_false(select(2, rules.netJournal(state, query('all', '', true), 2000, EVERY)))
-            assert.is_false(select(2, rules.netJournal(state, query('resource', 'vAvA_core', true), 2000, EVERY)))
+            assert.is_false(select(2, rules.netJournal(state, query('all', '', true), 2000, EVERY, OPEN)))
+            assert.is_false(select(2, rules.netJournal(state, query('resource', 'vAvA_core', true), 2000, EVERY, OPEN)))
         end)
 
         it('les deux lignes du journal tiennent dans les 32 octets du Registre', function()

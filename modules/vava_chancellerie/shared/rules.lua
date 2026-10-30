@@ -88,16 +88,19 @@ end
 --- Quelles lignes inscrire au journal du Registre pour cette lecture ? `state` : ce qui a déjà été inscrit pour ce
 --- compte du panneau ({ pageAt?, player?, playerAt? }, heures des lignes acceptées par le Registre).
 --- Page : à son ouverture, à la première lecture connue du pont (page ouverte avant son redémarrage, ou client qui ne dit
---- pas l'ouverture), puis au plus tard toutes les `everyMs` ; jamais à chaque relecture.
+--- pas l'ouverture), puis au plus tard toutes les `everyMs` ; jamais à chaque relecture. L'ouverture est dite par le
+--- client : elle n'est prise qu'une fois par `openMinMs` (une page qui la répéterait n'inonde pas le journal).
 --- Joueur : chaque fois qu'un autre joueur est lu, et au plus tard toutes les `everyMs` pour le même.
 ---@param state table
 ---@param query table  rendu par rules.netQuery
 ---@param now integer
 ---@param everyMs integer
+---@param openMinMs integer
 ---@return boolean page
 ---@return boolean player
-function rules.netJournal(state, query, now, everyMs)
-    local page = query.opening or state.pageAt == nil or now - state.pageAt >= everyMs
+function rules.netJournal(state, query, now, everyMs, openMinMs)
+    local since = state.pageAt and now - state.pageAt
+    local page = since == nil or since >= everyMs or (query.opening and since >= openMinMs)
     local player = query.scope == 'player'
         and (state.player ~= query.target or state.playerAt == nil or now - state.playerAt >= everyMs)
     return page == true, player == true

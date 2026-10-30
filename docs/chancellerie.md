@@ -373,10 +373,14 @@ Pour les comptes qui ont un rang du Conseil, quand le serveur de jeu tourne avec
   module** (nom de la ressource), **un joueur** (son numéro : ses totaux ; le détail évènement par évènement et le nom
   de son personnage seulement s'il est suivi en jeu par `/vava_reseau joueur <n°>`, que la page ne lance jamais). Relue
   par « Relire », ou toutes les 5, 15 (par défaut) ou 30 s, seulement quand l'onglet est visible (« relecture en
-  pause » sinon). Demande `netStats` de `POST /api/game/request` (`[portée, valeur, ouverture]`) ; le pont vérifie les
-  arguments et le droit auprès du Registre, espace les lectures d'un même compte (500 ms) et inscrit au journal du
-  Conseil « Compteur réseau consulté » à l'ouverture de la page et « Réseau d'un joueur consulté » (numéro) à chaque
-  autre joueur lu — puis au plus tard toutes les 30 min d'une lecture continue —, jamais à chaque relecture. Non
+  pause » sinon) ; le rythme court depuis la dernière demande, réussie ou non, une seule demande à la fois (« Relire »
+  grisé pendant une lecture). La relecture automatique s'arrête d'elle-même (« relecture automatique arrêtée », reprise
+  à la main) quand le serveur de jeu est arrêté, le compteur absent, le joueur parti ou le droit retiré, et après
+  15 min sans action sur la page. Demande `netStats` de `POST /api/game/request` (`[portée, valeur, ouverture]`) ; le
+  pont vérifie les arguments et le droit auprès du Registre, espace les lectures d'un même compte (500 ms) et inscrit au
+  journal du Conseil « Compteur réseau consulté » à l'ouverture de la page (une fois par minute au plus par compte) et
+  « Réseau d'un joueur consulté » (numéro de connexion et compte de jeu) à chaque autre joueur lu — puis au plus tard
+  toutes les 30 min d'une lecture continue —, jamais à chaque relecture. Non
   comptés : GlobalState, state bags et envois directs des modules (rappelé en pied de page).
 - Restent en jeu : vol libre, invisibilité, invulnérabilité, repère, rejoindre et amener à soi (ils supposent un
   personnage dans le monde).

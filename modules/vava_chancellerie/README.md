@@ -47,7 +47,7 @@ complet : `README.md` à la racine du dépôt).
 | Évènements vers la Chancellerie | `/api/bridge/event` ; perdus si elle est fermée, signalés une fois par minute au plus | `eventPath`, `pushWarnEveryMs` |
 | Corps de requête | 64 Ko au plus | `bodyMax` |
 | Caméras | droit `watch` pour regarder ; la vue en grand passe par la demande `watchScreen` du Registre ; une case sans mur ouvert depuis 2 h est inscrite au journal | `cameras` |
-| Page Réseau | droit `tools` (celui de `/vava_reseau`) ; 20 évènements au plus ; deux lectures d'un même compte du panneau espacées de 500 ms ; une ligne au journal à l'ouverture de la page, à chaque autre joueur lu, puis au plus tard toutes les 30 min | `net` |
+| Page Réseau | droit `tools` (celui de `/vava_reseau`) ; 20 évènements au plus ; deux lectures d'un même compte du panneau espacées de 500 ms ; une ligne au journal à l'ouverture de la page (une fois par minute au plus et par compte), à chaque autre joueur lu, puis au plus tard toutes les 30 min | `net` |
 | Liaison d'un compte | commande `chancellerie <code>`, 5 essais par minute, messages au joueur | `link` |
 | Liste blanche Discord | réponse attendue 8 s à la connexion d'un joueur ; messages quand elle ne répond pas, ou quand la clé n'est pas encore arrivée | `whitelist` |
 | Journal du Registre | « Zone de voix modifiée », « Zone de voix supprimée », « Mur des caméras ouvert », « Cases du mur regardées », « Compteur réseau consulté », « Réseau d'un joueur consulté » | `messages` |
@@ -73,9 +73,10 @@ complet : `README.md` à la racine du dépôt).
   `rate_limited`), droit `net.permission` (tools) vérifié auprès du Registre (`webCan`), joueur absent :
   `unknown_player`. Le pont ne lance ni n'arrête aucun suivi : le détail d'un joueur, évènement par évènement,
   n'existe que s'il est suivi par `/vava_reseau joueur` en jeu, et son personnage n'est nommé que dans ce cas. Journal
-  du Registre (`webLog`, `rules.netJournal`) : « Compteur réseau consulté » à l'ouverture de la page (et à la première
-  lecture d'un compte que le pont ne connaît pas), « Réseau d'un joueur consulté » (numéro) à chaque autre joueur lu,
-  puis au plus tard toutes les `net.logEveryMs` ; jamais à chaque relecture. Une ligne ne compte que si le Registre
+  du Registre (`webLog`, `rules.netJournal`) : « Compteur réseau consulté » à l'ouverture de la page (dite par la page,
+  prise au plus une fois par `net.openLogMinMs` et par compte ; et à la première lecture d'un compte que le pont ne
+  connaît pas), « Réseau d'un joueur consulté » (`joueur` = numéro de connexion, réattribué après un départ, et
+  `compte` = compte de jeu lu par `core.players.get`, sans personnage chargé) à chaque autre joueur lu, puis au plus tard toutes les `net.logEveryMs` ; jamais à chaque relecture. Une ligne ne compte que si le Registre
   l'a acceptée.
 - **Caméras** : ouvertes auprès de vava_cameras une fois le droit `watch` accordé — la vue en grand par la demande
   « écran du joueur » du Registre (cible vérifiée, au journal) — une fois le droit lu et la caméra jugée accordable par

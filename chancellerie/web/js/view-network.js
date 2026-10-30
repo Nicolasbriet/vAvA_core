@@ -5,7 +5,9 @@
  *        dernière minute (mesure exacte ou estimée, envois, volume, latents, plus gros message, évènements les plus
  *        lourds), pour tout le royaume, un module, ou ce que reçoit un joueur (totaux ; le détail seulement s'il est
  *        suivi en jeu par /vava_reseau joueur, que la page ne lance jamais). Droit des outils du Registre, vérifié par le
- *        pont. Relue à la demande, ou à intervalle choisi (5 s au moins), seulement quand la page est visible ; la
+ *        pont. Relue à la demande, ou à intervalle choisi (5 s au moins, compté depuis la dernière demande, réussie ou
+ *        non), seulement quand la page est visible, une demande à la fois ; la relecture automatique s'arrête sur un refus
+ *        durable (droit, serveur arrêté, compteur absent, joueur parti) et après 15 min sans action sur la page. La
  *        première lecture dit au pont que la page s'ouvre (une ligne au journal du Conseil), les relectures non.
  */
 
@@ -16,6 +18,17 @@ const NetworkView = (() => {
   const AUTOS = [0, 5000, 15000, 30000];
   const AUTO_MIN_MS = 5000;
   const AUTO_DEFAULT = 15000;
+  // quoi qu'il arrive, jamais deux demandes automatiques à moins de GAP_MIN_MS l'une de l'autre
+  const GAP_MIN_MS = 1000;
+  // délai refusé par le pont (deux lectures trop proches) : un seul nouvel essai avancé (porté à GAP_MIN_MS)
+  const RETRY_MS = 600;
+  // relecture automatique repassée « à la demande » après ce temps sans action sur la page
+  const IDLE_MS = 15 * 60 * 1000;
+  // refus qui ne passeront pas tout seuls : la relecture automatique s'arrête, la reprise est manuelle
+  const STOPPING = new Set([
+    'forbidden', 'net_unavailable', 'server_stopped', 'unknown_player', 'invalid_args', 'unknown_request', 'no_rank',
+    'invalid_actor',
+  ]);
   const RESOURCE_PATTERN = /^[A-Za-z0-9_.-]{1,48}$/;
   const PLAYER_MAX = 65535;
   const OTHER_RESOURCE = '*';
@@ -28,7 +41,16 @@ const NetworkView = (() => {
   let player = null;
   let auto = AUTO_DEFAULT;
   let timer = null;
+  // dernière lecture réussie (affichage « lu à ») ; dernière demande partie, réussie ou non (rythme des relectures)
   let readAt = 0;
+  let attemptAt = 0;
+  // dernière action de la personne sur la page (portée, saisie, relecture, rythme)
+  let actionAt = 0;
+  // demande en route (les relectures attendent sa réponse) ; nouvel essai après un délai refusé déjà fait
+  let inFlight = false;
+  let retried = false;
+  // relecture automatique arrêtée par la page : pourquoi (affiché à côté de l'heure), ou ''
+  let autoNote = '';
   // la prochaine lecture est celle de l'ouverture de la page (inscrite au journal par le pont)
   let opening = true;
   // numéro de la dernière lecture demandée : une réponse plus ancienne (portée changée entre-temps) est ignorée
@@ -48,12 +70,40 @@ const NetworkView = (() => {
     timer = null;
   }
 
-  /** Prochaine relecture : seulement en relecture automatique, page affichée et visible. */
-  function schedule() {
+  function setBusy(busy) {
+    inFlight = busy;
+    if (refs.reload) refs.reload.disabled = busy;
+    if (refs.read) refs.read.disabled = busy;
+  }
+
+  /** Rythme choisi, sans rien relancer (tampons à jour). */
+  function markAuto(next) {
+    auto = AUTOS.includes(next) ? next : 0;
+    if (!refs.autos) return;
+    for (const node of refs.autos.children) node.classList.toggle('is-selected', Number(node.dataset.auto) === auto);
+  }
+
+  /** Arrêt de la relecture automatique par la page (refus durable, inactivité) : affiché, reprise manuelle. */
+  function halt(note) {
+    markAuto(0);
+    autoNote = note;
     stop();
-    if (!sheet || !auto || !visible()) return;
-    const delay = Math.max(0, Math.max(AUTO_MIN_MS, auto) - (Date.now() - readAt));
-    timer = setTimeout(() => load(), delay);
+  }
+
+  /**
+   * Prochaine relecture : seulement en relecture automatique, page affichée et visible, aucune demande en route.
+   * Le délai court depuis la dernière demande partie (réussie ou non) : un refus immédiat ne fait jamais boucler.
+   */
+  function schedule(delayMs) {
+    stop();
+    if (!sheet || !auto || !visible() || inFlight) return;
+    if (Date.now() - actionAt >= IDLE_MS) {
+      halt(T.idleStopped);
+      renderAside();
+      return;
+    }
+    const due = delayMs !== undefined ? delayMs : Math.max(AUTO_MIN_MS, auto) - (Date.now() - attemptAt);
+    timer = setTimeout(() => load(false), Math.max(GAP_MIN_MS, due));
   }
 
   function onVisibility() {
@@ -67,7 +117,8 @@ const NetworkView = (() => {
     if (!refs.aside) return;
     const parts = [];
     if (readAt) parts.push(T.readAt(STRINGS.clock(readAt)));
-    if (auto && !visible()) parts.push(T.paused);
+    if (autoNote) parts.push(autoNote);
+    else if (auto && !visible()) parts.push(T.paused);
     refs.aside.textContent = parts.join(' · ');
   }
 
@@ -92,37 +143,76 @@ const NetworkView = (() => {
     return target;
   }
 
-  async function load() {
-    if (!sheet) return;
+  /** Action de la personne : l'inactivité repart de zéro. */
+  function acted() {
+    actionAt = Date.now();
+  }
+
+  /**
+   * Une lecture. `byUser` : demandée par une action (portée, ligne, Lire, Relire), qui passe même si une relecture est
+   * en route (la réponse dépassée est ignorée) ; une relecture automatique, elle, attend toujours la réponse en route.
+   */
+  async function load(byUser) {
+    if (!sheet || (!byUser && inFlight)) return;
     stop();
     const value = scope === 'resource' ? resource : (scope === 'player' ? player : '');
     const ticket = ++sequence;
-    const first = opening;
-    const result = await GAME.call('netStats', scope, value, first);
+    attemptAt = Date.now();
+    setBusy(true);
+    const result = await GAME.call('netStats', scope, value, opening);
     if (!sheet || ticket !== sequence) return;
+    setBusy(false);
     if (result.ok) {
       opening = false;
+      retried = false;
       readAt = Date.now();
       render(result.result);
-    } else {
-      // l'ouverture refusée (serveur arrêté, droit…) sera redite à la lecture suivante
-      refs.body.replaceChildren(UI.el('p', 'empty', STRINGS.error(result.error)));
-      if (result.error === 'forbidden') setAuto(0);
+      renderAside();
+      schedule();
+      return;
     }
+    // l'ouverture refusée (serveur arrêté, droit…) sera redite à la lecture suivante
+    if (result.error === 'rate_limited') {
+      // deux lectures trop proches pour le pont : l'affichage reste ; en relecture automatique, un seul nouvel essai
+      // un peu plus tôt (jamais sous GAP_MIN_MS), puis le rythme normal ; à la demande, la personne relit elle-même
+      UI.slip(STRINGS.error(result.error));
+      const again = !retried;
+      retried = true;
+      schedule(again ? RETRY_MS : undefined);
+      renderAside();
+      return;
+    }
+    retried = false;
+    const lines = [UI.el('p', 'empty', STRINGS.error(result.error))];
+    if (STOPPING.has(result.error) && auto) {
+      halt(T.autoStopped);
+      lines.push(UI.el('p', 'hint', T.autoStoppedHelp));
+    }
+    refs.body.replaceChildren(...lines);
     renderAside();
     schedule();
   }
 
   /** Lire ce que montre la barre (bouton Lire, Entrée). */
   function readBar() {
+    if (inFlight) return;
     const value = readValue();
     if (value === undefined) return;
     if (scope === 'resource') resource = value;
     if (scope === 'player') player = value;
-    load();
+    acted();
+    load(true);
+  }
+
+  /** Relire : ignoré pendant une lecture en route (le bouton est grisé). */
+  function reload() {
+    if (inFlight) return;
+    acted();
+    load(true);
   }
 
   function setScope(next, value) {
+    acted();
     scope = next;
     if (next === 'resource' && value !== undefined) resource = value;
     for (const node of refs.scopes.children) node.classList.toggle('is-selected', node.dataset.scope === scope);
@@ -145,19 +235,22 @@ const NetworkView = (() => {
     }
     // valeur déjà connue (ligne cliquée, page rouverte, portée reprise) : lue aussitôt ; sinon on attend la saisie
     if (scope === 'all' || (scope === 'resource' && resource) || (scope === 'player' && player)) {
-      load();
+      load(true);
     } else {
       stop();
-      // une lecture encore en vol pour l'ancienne portée ne s'affichera pas
+      // une lecture encore en route pour l'ancienne portée ne s'affichera pas
       sequence += 1;
+      setBusy(false);
       refs.body.replaceChildren();
       input.focus();
     }
   }
 
+  /** Rythme choisi par la personne : la relecture reprend, la note d'arrêt s'efface. */
   function setAuto(next) {
-    auto = AUTOS.includes(next) ? next : 0;
-    for (const node of refs.autos.children) node.classList.toggle('is-selected', Number(node.dataset.auto) === auto);
+    acted();
+    markAuto(next);
+    autoNote = '';
     renderAside();
     schedule();
   }
@@ -244,6 +337,7 @@ const NetworkView = (() => {
       body: UI.el('div'),
       input,
       read: UI.button(T.read, readBar),
+      reload: UI.button(T.reload, reload, 'plain'),
       scopes: stampBar(SCOPES.map((id) => [id, T.scopes[id]]), scope, 'scope', (id) => setScope(id)),
       autos: stampBar(AUTOS.map((ms) => [ms, T.autos[ms]]), auto, 'auto', setAuto),
     };
@@ -255,7 +349,7 @@ const NetworkView = (() => {
       UI.el('div', 'perf-bar', null, [refs.scopes, input, refs.read]),
       refs.body,
       UI.el('div', 'perf-bar', null, [
-        UI.button(T.reload, () => load(), 'plain'), UI.el('span', 'spacer'), UI.el('span', 'field-label', T.autoLabel), refs.autos,
+        refs.reload, UI.el('span', 'spacer'), UI.el('span', 'field-label', T.autoLabel), refs.autos,
       ]),
     );
     input.hidden = true;
@@ -268,6 +362,10 @@ const NetworkView = (() => {
       const shown = ++showing;
       opening = true;
       readAt = 0;
+      attemptAt = 0;
+      retried = false;
+      autoNote = '';
+      inFlight = false;
       sheet.replaceChildren(UI.heading(T.title), UI.el('p', 'empty', '…'));
       const ready = await GAME.ensure();
       if (!sheet || shown !== showing) return;
@@ -283,6 +381,7 @@ const NetworkView = (() => {
       sheet = null;
       sequence += 1;
       showing += 1;
+      inFlight = false;
       stop();
       document.removeEventListener('visibilitychange', onVisibility);
       refs = {};

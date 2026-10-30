@@ -4,15 +4,16 @@
            (core.net.stats, core ≥ 0.10.0) — vue d'ensemble, un module, ou ce que reçoit un joueur —, ce que montre
            `/vava_reseau` en jeu. Droit `net.permission` (tools) vérifié auprès du Registre (webCan), lectures d'un même
            compte du panneau espacées de `net.minIntervalMs`, consultation inscrite au journal du Registre (webLog) au
-           nom de « Chancellerie : <compte> » : à l'ouverture de la page, à chaque autre joueur lu, et au plus tard toutes
-           les `net.logEveryMs` (shared/rules.lua, netJournal), jamais à chaque relecture. Ne lance ni n'arrête aucun
+           nom de « Chancellerie : <compte> » : à l'ouverture de la page (dite par la page, prise au plus une fois par
+           `net.openLogMinMs`), à chaque autre joueur lu (numéro et compte de jeu), et au plus tard toutes les
+           `net.logEveryMs` (shared/rules.lua, netJournal), jamais à chaque relecture. Ne lance ni n'arrête aucun
            suivi : le détail d'un joueur évènement par évènement n'existe que s'il est suivi par `/vava_reseau joueur`
            en jeu, et son personnage n'est nommé que dans ce cas.
     Dépendances : shared/constants.lua, shared/rules.lua, config.lua, server/core.lua, server/routes.lua
 ]]
 
 local type, tostring, tonumber, pcall = type, tostring, tonumber, pcall
-local max = math.max
+local max, mathType = math.max, math.type
 local GetGameTimer, DoesPlayerExist = GetGameTimer, DoesPlayerExist
 
 local call = VavaBridge.call
@@ -86,6 +87,22 @@ local function characterName(target)
     return character.firstName .. ' ' .. character.lastName
 end
 
+--- Ligne du journal pour un joueur lu : son numéro de connexion (réattribué après son départ) et, si le core le
+--- connaît, son compte de jeu (core.players.get, sans personnage chargé).
+---@param target integer
+---@return table
+local function playerDetails(target)
+    local details = { joueur = target }
+    local core = VavaBridge.core
+    local players = core and core.players
+    if not players then return details end
+    local called, session = pcall(players.get, target)
+    if called and type(session) == 'table' and mathType(session.accountId) == 'integer' then
+        details.compte = session.accountId
+    end
+    return details
+end
+
 -- args : { portée ('all' | 'resource' | 'player'), valeur ('' | nom de ressource | numéro de joueur), ouverture }
 requests.netStats = function(actor, args)
     local name = actorName(actor)
@@ -110,11 +127,11 @@ requests.netStats = function(actor, args)
     local read, stats, code = pcall(net.stats, { limit = LIMIT, resource = query.resource, target = query.target })
     if not read or type(stats) ~= 'table' then return failure(read and code or 'net_unavailable') end
 
-    local page, player = rules.netJournal(state, query, now, cfg.logEveryMs)
+    local page, player = rules.netJournal(state, query, now, cfg.logEveryMs, cfg.openLogMinMs)
     if page and journal(actor, messages.logNet, query.resource and { ressource = query.resource } or {}) then
         state.pageAt = now
     end
-    if player and journal(actor, messages.logNetPlayer, { joueur = query.target }) then
+    if player and journal(actor, messages.logNetPlayer, playerDetails(query.target)) then
         state.player, state.playerAt = query.target, now
     end
 

@@ -28,6 +28,9 @@ STRINGS.network = {
   autos: { 0: 'à la demande', 5000: 'toutes les 5 s', 15000: 'toutes les 15 s', 30000: 'toutes les 30 s' },
   readAt: (clock) => `lu à ${clock}`,
   paused: 'relecture en pause (page cachée)',
+  autoStopped: 'relecture automatique arrêtée',
+  autoStoppedHelp: 'La relecture automatique s\'est arrêtée : relisez à la main, ou choisissez de nouveau un rythme, une fois la cause levée.',
+  idleStopped: 'relecture arrêtée après 15 min sans action',
   facts: {
     mode: 'Mesure',
     messages: 'Envois',
