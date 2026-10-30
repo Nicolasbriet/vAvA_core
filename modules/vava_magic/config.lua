@@ -1034,7 +1034,7 @@ VavaMagic.config = {
         contactMax = 160,
         pageSize = 20,     -- pages par lot (au plus)
         -- poids d'un lot (octets, estimé : correspondant + texte + 52 par page) ; un lot s'arrête avant de le
-        -- dépasser (au moins une page) : sous 8 Ko, un lot part toujours d'un seul message fiable
+        -- dépasser (au moins une page) : reste sous 8 Ko (seuil de T-013, taille réelle à mesurer en jeu)
         pageBytes = 7500,
     },
 
