@@ -5,8 +5,9 @@
            que la limite est dépassée.
     Règles (msgpack) : nil et booléens 1 ; entiers 1, 2, 3, 5 ou 9 selon leur grandeur ; flottants 9 (majorant :
            float64) ; chaînes 1, 2, 3 ou 5 + longueur ; tables : en-tête 1 (jusqu'à 15 éléments), 3 (65 535), 5 au-delà,
-           puis chaque élément (liste) ou chaque clé et valeur (table à clés) ; une table qui a une partie liste compte
-           comme sa liste (ses clés nommées sont perdues à la traversée, docs/api.md) ; vecteurs 3 + 4 par composante.
+           puis chaque élément (liste pure) ou chaque clé et valeur (table à clés) ; une table mixte ou à trous compte
+           comme une table à clés, index compris (majorant : selon le sérialiseur, elle part en liste ou en table à
+           clés) ; vecteurs 3 + 4 par composante.
            Refus : cycle, profondeur au-delà de 32, fonction ou autre type.
     Dépendances : shared/init.lua
 ]]
@@ -70,6 +71,16 @@ local function measureTable(state, value, depth)
     if visiting[value] then return false, 'cycle' end
     visiting[value] = true
     local length = rawlen(value)
+    if length > 0 then
+        -- liste pure : exactement `length` paires ; sinon (clés nommées, trous) comptée comme une table à clés, la plus
+        -- grosse des deux formes possibles (par prudence : l'estimation reste un majorant)
+        local pairsCount = 0
+        for _ in next, value do
+            pairsCount = pairsCount + 1
+            if pairsCount > length then break end
+        end
+        if pairsCount ~= length then length = 0 end
+    end
     local ok, err
     if length > 0 then
         state.total = state.total + headerSize(length)

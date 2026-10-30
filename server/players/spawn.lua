@@ -3,7 +3,8 @@
     Rôle : ordres d'apparition. Le serveur décide de la position et du modèle ; l'ordre est envoyé au seul
            joueur concerné (core.net, toujours fiable : il suit le chargement du personnage), qui l'exécute puis
            confirme (core:characters:spawned).
-    Dépendances : shared/init.lua, config/server.lua, server/core/net.lua, server/players/playtime.lua
+    Dépendances : shared/init.lua, config/server.lua, server/core/net.lua, server/players/sync.lua,
+                  server/players/playtime.lua
 ]]
 
 local type = type
@@ -11,6 +12,7 @@ local HUGE = math.huge
 
 local EVENTS = vAvA.EVENTS
 local net = vAvA.net
+local sync = vAvA.sync
 local playtime = vAvA.playtime
 local cfg = vAvA.config.server.spawn
 
@@ -41,14 +43,19 @@ end
 ---@param character vAvA.Character
 ---@param point vAvA.SpawnPoint
 ---@param withModel boolean
+---@return boolean ok
+---@return string|nil err  envoi impossible : le joueur est déconnecté avec un message clair (sync.abandon)
 local function send(character, point, withModel)
     -- position non échantillonnée et temps de jeu suspendu tant que le client n'a pas confirmé
     playtime.pause(character)
     character.spawned = false
-    net.dispatch(vAvA.resourceName, EVENTS.SPAWN, character.source, net.RELIABLE, EVENTS.SPAWN, {
+    local sent, code = net.dispatch(vAvA.resourceName, EVENTS.SPAWN, character.source, net.RELIABLE, EVENTS.SPAWN, {
         model = withModel and cfg.models[character.sex] or nil,
         x = point.x, y = point.y, z = point.z, heading = point.heading,
     })
+    if sent then return true end
+    sync.abandon(character, EVENTS.SPAWN, code)
+    return false, code
 end
 
 --- Première apparition après sélection : dernière position connue, sinon point par défaut.
@@ -71,6 +78,5 @@ function spawn.at(character, coords)
         point = normalize(coords)
         if not point then return false, 'invalid_coords' end
     end
-    send(character, point, false)
-    return true
+    return send(character, point, false)
 end

@@ -2,4 +2,5 @@
 modules/vava_admin/server/requests.lua	TriggerClientEvent(EVENTS.ANNOUNCE, -1,	annonce du Conseil destinée à tout le royaume, rare et limitée par droit
 modules/vava_chat/server/logs.lua	INSERT .. concat(values, ', ')	insertion groupée : values ne contient que des groupes de « ? », les valeurs passent par params
 # Provisoire jusqu'à T-014 (abonnements de zone), décision du porteur du projet du 30 octobre 2026 (T-013) : à retirer avec elle.
-modules/vava_voice/server/zones.lua	TriggerClientEvent(EVENTS.ZONE, EVERYONE,	zones de voix : envoi à tous provisoire, rare (édition du Conseil, ~110 o), retiré par T-014
+modules/vava_voice/server/zones.lua	TriggerClientEvent(EVENTS.ZONE, EVERYONE, action, copy(zone))	zones de voix : envoi à tous provisoire, rare (édition du Conseil, ~110 o), retiré par T-014
+modules/vava_voice/server/zones.lua	TriggerClientEvent(EVENTS.ZONE, EVERYONE, action, id)	zones de voix (suppression) : envoi à tous provisoire, rare, retiré par T-014

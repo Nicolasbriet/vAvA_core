@@ -129,14 +129,17 @@ function rpc.start()
         end
     end)
 
-    -- préavis d'une réponse latente (id, octets, débit) : elle arrive par RPC_RESPONSE, plus lentement ; l'attente de
-    -- l'appel est repoussée du temps de transfert plus une marge, bornée. Id inconnu (déjà résolu) : ignoré.
-    RegisterNetEvent(EVENTS.RPC_LATENT, function(id, bytes, rate)
+    -- préavis d'une réponse latente (id, octets, débit, délai) : elle arrive par RPC_RESPONSE, plus lentement ; l'attente
+    -- de l'appel est repoussée du délai annoncé par le serveur (latents déjà en route compris), au moins du temps de
+    -- transfert du message seul, plus une marge, bornée. Id inconnu (déjà résolu) : ignoré.
+    RegisterNetEvent(EVENTS.RPC_LATENT, function(id, bytes, rate, delay)
         if mathType(id) ~= 'integer' or mathType(bytes) ~= 'integer' or mathType(rate) ~= 'integer'
             or id <= 0 or bytes <= 0 or rate <= 0 then
             return
         end
-        outgoing:extend(id, min(ceil(bytes * 1000 / rate) + cfg.latentMarginMs, cfg.maxLatentExtendMs))
+        local transfer = ceil(bytes * 1000 / rate)
+        if mathType(delay) == 'integer' and delay > transfer then transfer = delay end
+        outgoing:extend(id, min(transfer + cfg.latentMarginMs, cfg.maxLatentExtendMs))
     end)
 
     RegisterNetEvent(EVENTS.CLIENT_REQUEST, function(id, name, count, args)

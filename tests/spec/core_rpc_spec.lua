@@ -436,6 +436,50 @@ describe('vAvA.rpc', function()
             assert.is_true(sent[2].latent)
             assert.equal(netCfg.latent.bytesPerSecond, sent[2].rate)
             assert.same({ 4, true, 2 }, { sent[2].args[1], sent[2].args[2], sent[2].args[3] })
+            -- délai jusqu'à l'arrivée : le transfert de ce seul message (environ 20 Ko à 64 Ko/s)
+            assert.equal(math.ceil(sent[1].args[2] * 1000 / netCfg.latent.bytesPerSecond), sent[1].args[4])
+        end)
+
+        -- relecture réseau de T-013 : un second latent attend le premier, le préavis le dit
+        it('préavis : le délai annoncé compte les latents déjà en route vers le joueur', function()
+            assert.is_true(register('vava_test:gros', {}, function() return true, string.rep('x', 100000) end))
+            request(1, 1, 'vava_test:gros', {})
+            request(1, 2, 'vava_test:gros', {})
+            local notices = events(EVENTS.RPC_LATENT)
+            assert.equal(2, #notices)
+            local first, second = notices[1].args[4], notices[2].args[4]
+            assert.is_true(first > 1500 and first < 1600, 'premier : ' .. first)
+            assert.is_true(second >= 2 * first - 1 and second <= 2 * first, 'second : ' .. second)
+        end)
+
+        it('callClient derrière un latent en route : attente du serveur allongée des deux transferts', function()
+            assert.is_true(register('vava_test:gros', {}, function() return true, string.rep('x', 100000) end))
+            request(2, 1, 'vava_test:gros', {})   -- environ 1,5 s de latent vers le joueur 2
+            local timeout = vAvA.config.server.rpc.defaultTimeoutMs
+            local shared = vAvA.config.shared.rpc
+            local extended
+            onClientRequest = function(src, id)
+                extended = helper.timers[#helper.timers].ms
+                _G.source = src
+                netHandlers[EVENTS.CLIENT_RESPONSE](id, true, 0, {})
+            end
+            assert.is_true(rpc.callClient('vava_test', nil, 2, 'vava_test:show', string.rep('x', 20000)))
+            local waited = extended - timeout - shared.latentMarginMs
+            -- 100 Ko puis 20 Ko à 64 Ko/s : environ 1 527 + 306 ms
+            assert.is_true(waited > 1800 and waited < 1900, 'attente : ' .. waited)
+        end)
+
+        it('le préavis reste borné à rpc.maxLatentExtendMs', function()
+            local shared = vAvA.config.shared.rpc
+            shared.maxLatentExtendMs = 1000
+            local extended
+            onClientRequest = function(src, id)
+                extended = helper.timers[#helper.timers].ms
+                _G.source = src
+                netHandlers[EVENTS.CLIENT_RESPONSE](id, true, 0, {})
+            end
+            assert.is_true(rpc.callClient('vava_test', nil, 2, 'vava_test:show', string.rep('x', 100000)))
+            assert.equal(vAvA.config.server.rpc.defaultTimeoutMs + 1000, extended)
         end)
 
         it('latent = never : la même réponse part en fiable, sans préavis', function()

@@ -94,8 +94,15 @@ describe('vAvA.netsize', function()
         assert.equal(3 + 16 * (3 + 1), one(sixteen))
     end)
 
-    it('table mixte : comptée comme sa liste (les clés nommées sont perdues à la traversée)', function()
-        assert.equal(one({ 'a', 'b' }), one({ 'a', 'b', label = 'perdue' }))
+    -- relecture sécurité de T-013 : par prudence, la plus grosse des deux formes (liste ou table à clés)
+    it('table mixte ou à trous : comptée comme une table à clés, index et clés nommées compris', function()
+        -- en-tête 1 ; index 1 et 2 (1 octet) avec 'a', 'b' (2 octets) ; 'label' (6) = 'perdue' (7)
+        assert.equal(1 + 2 * (1 + 2) + (6 + 7), one({ 'a', 'b', label = 'perdue' }))
+        assert.is_true(one({ 'a', 'b', label = 'perdue' }) > one({ 'a', 'b' }))
+        local holes = { 'a', 'b', 'c' }
+        holes[5] = 'e'
+        assert.equal(1 + 4 * (1 + 2), one(holes))
+        assert.equal(1 + 3 * 2, one({ 'a', 'b', 'c' }))
     end)
 
     it('vecteur3 : 15 octets', function()

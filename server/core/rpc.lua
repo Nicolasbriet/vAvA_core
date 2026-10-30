@@ -105,19 +105,25 @@ local function capture(ok, ...)
     return ok, select('#', ...), { ... }
 end
 
---- Allongement d'une attente pour un message latent de `bytes` octets : temps de transfert au débit configuré, plus la
---- marge, au plus maxLatentExtendMs (même règle côté client).
+--- Allongement d'une attente pour un message latent : délai jusqu'à son arrivée (latents déjà en route vers le joueur
+--- compris, au moins le transfert du message seul au débit configuré), plus la marge, au plus maxLatentExtendMs (même
+--- règle côté client).
 ---@param bytes integer
+---@param delayMs integer  délai rendu par core.net à la réservation
 ---@return integer ms
-local function latentExtension(bytes)
-    return min(ceil(bytes * 1000 / latentRate) + sharedCfg.latentMarginMs, sharedCfg.maxLatentExtendMs)
+local function latentExtension(bytes, delayMs)
+    local transfer = ceil(bytes * 1000 / latentRate)
+    if delayMs > transfer then transfer = delayMs end
+    return min(transfer + sharedCfg.latentMarginMs, sharedCfg.maxLatentExtendMs)
 end
 
---- Préavis d'une réponse latente, envoyé juste avant elle (fiable) : (id, octets, débit).
+--- Préavis d'une réponse latente, envoyé juste avant elle (fiable) : (id, octets, débit, délai jusqu'à l'arrivée).
 ---@param target integer
 ---@param packet vAvA.NetPacket  args[1] : identifiant de la requête
-local function noticeLatentReply(target, packet)
-    net.dispatch(vAvA.resourceName, NOTICE_LABEL, target, net.NEVER, EVENTS.RPC_LATENT, packet.args[1], packet.bytes, latentRate)
+---@param delayMs integer
+local function noticeLatentReply(target, packet, delayMs)
+    net.dispatch(vAvA.resourceName, NOTICE_LABEL, target, net.NEVER, EVENTS.RPC_LATENT,
+        packet.args[1], packet.bytes, latentRate, delayMs)
 end
 
 --- Réponse à un appel client. Succès : (id, true, count, values) · échec : (id, false, code).
@@ -304,14 +310,15 @@ function rpc.unregister(owner, name)
     return true
 end
 
---- Demande serveur → client partie en latent : l'attente du serveur est allongée du temps de transfert (même règle que
---- le client pour une réponse latente).
+--- Demande serveur → client partie en latent : l'attente du serveur est allongée du délai jusqu'à son arrivée,
+--- latents déjà en route compris (même règle que le client pour une réponse latente).
 ---@param _ integer  joueur visé
 ---@param packet vAvA.NetPacket  args[1] : identifiant de l'appel
-local function extendLatentRequest(_, packet)
+---@param delayMs integer
+local function extendLatentRequest(_, packet, delayMs)
     local id = packet.args[1]
     local entry = outgoing:get(id)
-    if entry then outgoing:extend(id, entry.meta.timeout + latentExtension(packet.bytes)) end
+    if entry then outgoing:extend(id, entry.meta.timeout + latentExtension(packet.bytes, delayMs)) end
 end
 
 ---@class vAvA.ClientCallOptions

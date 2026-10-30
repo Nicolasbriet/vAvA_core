@@ -57,6 +57,8 @@ vAvA.config.server = {
             refused = 'Connexion refusée.',
             unavailable = 'Le serveur est momentanément indisponible, réessayez dans un instant.',
             guardNotReady = 'Le royaume s\'éveille : réessayez dans un instant.',  -- un garde de connexion pas prêt
+            -- personnage ou ordre d'apparition impossible à envoyer (trop gros…) : déconnexion plutôt qu'un joueur bloqué
+            sendFailed = 'Votre personnage n\'a pas pu vous être envoyé : reconnectez-vous ; si cela se répète, prévenez le Conseil.',
         },
     },
 
@@ -163,7 +165,7 @@ vAvA.config.server = {
     },
 
     spawn = {
-        models ={ m = 'mp_m_freemode_01', f = 'mp_f_freemode_01' },  -- en attendant un module d'apparence
+        models = { m = 'mp_m_freemode_01', f = 'mp_f_freemode_01' },  -- en attendant un module d'apparence
         defaultPoint = { x = -269.4, y = -955.3, z = 31.2, heading = 205.8 },  -- premier spawn d'un personnage
     },
 

@@ -40,7 +40,7 @@ local PROBE_OVERHEAD = 64
 local netcommand = {}
 vAvA.netcommand = netcommand
 
--- membre → heure de sa dernière commande (oublié à son départ)
+-- joueur → heure de sa dernière commande, membre ou non (oublié à son départ)
 local lastUse = {}
 
 ---@param src integer
@@ -147,13 +147,14 @@ end
 ---@param args string[]
 local function onCommand(source, args)
     local src = tonumber(source) or CONSOLE
-    if not allowed(src) then return end
+    -- délai avant le droit : une commande tapée en boucle ne coûte pas un appel à vava_admin par frappe
     if src ~= CONSOLE then
         local now = GetGameTimer()
         local last = lastUse[src]
         if last and now - last < commandCfg.cooldownMs then return end
         lastUse[src] = now
     end
+    if not allowed(src) then return end
     args = type(args) == 'table' and args or {}
     local action = args[1]
     if action == nil then return overview(src, nil) end

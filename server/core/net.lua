@@ -13,7 +13,7 @@
 ]]
 
 local type, tostring, select, next, pairs, pcall, rawlen, rawget = type, tostring, select, next, pairs, pcall, rawlen, rawget
-local mathType, huge, min = math.type, math.huge, math.min
+local mathType, huge, min, ceil = math.type, math.huge, math.min, math.ceil
 local pack, unpack, concat = table.pack, table.unpack, table.concat
 local format = string.format
 local TriggerClientEvent, TriggerLatentClientEvent = TriggerClientEvent, TriggerLatentClientEvent
@@ -49,8 +49,8 @@ net.RELIABLE = { latent = 'never', warnLarge = true }
 
 local LATENT_CHOICES = { auto = true, never = true, always = true }
 local SEND_KEYS = { latent = true }
-local NEAR_KEYS = { latent = true, exclude = true, bucket = true }
-local PLAYERS_KEYS = { exclude = true, bucket = true }
+local NEAR_KEYS = { latent = true, exclude = true, bucket = true, from = true }
+local PLAYERS_KEYS = { exclude = true, bucket = true, from = true }
 local STATS_KEYS = { limit = true, resource = true, target = true }
 
 -- 'exact' : msgpack.pack_args et les envois internes du runtime (une sérialisation par envoi, quel que soit le nombre
@@ -159,6 +159,8 @@ local function checkOptions(options, allowed)
     local exclude, bucket = options.exclude, options.bucket
     if exclude ~= nil and (mathType(exclude) ~= 'integer' or exclude <= 0) then return nil end
     if bucket ~= nil and (mathType(bucket) ~= 'integer' or bucket < 0) then return nil end
+    local from = options.from
+    if from ~= nil and (mathType(from) ~= 'integer' or from <= 0 or not DoesPlayerExist(from)) then return nil end
     return options
 end
 
@@ -180,7 +182,8 @@ local function validRadius(radius)
     return finite(radius) and radius > 0 and radius <= cfg.near.maxRadius
 end
 
---- Position du ped d'un joueur, lue côté serveur au plus une fois par tour (false : pas de ped).
+--- Position du ped d'un joueur, lue côté serveur (false : pas de ped). Gardée tant que GetGameTimer ne change pas,
+--- c'est-à-dire pendant la même milliseconde : les recherches d'une même rafale en profitent, pas deux tours du serveur.
 ---@param src integer
 ---@return vector3|table|false
 local function pedPosition(src)
@@ -224,12 +227,15 @@ local function visitNear(character)
 end
 
 --- Joueurs dont le personnage est apparu, à moins de `radius` (3D) du point, positions lues côté serveur.
+--- `from` (joueur d'origine) : sauté, et seul son routing bucket compte, sauf `exclude` ou `bucket` donnés.
 ---@return integer[] list
 ---@return integer count
 local function collectNear(x, y, z, radius, options)
     local list = {}
+    local from, bucket = options.from, options.bucket
+    if bucket == nil and from then bucket = GetPlayerRoutingBucket(from) end
     near.x, near.y, near.z, near.r2 = x, y, z, radius * radius
-    near.exclude, near.bucket, near.list, near.count = options.exclude, options.bucket, list, 0
+    near.exclude, near.bucket, near.list, near.count = options.exclude or from, bucket, list, 0
     near.sync = vAvA.sync
     vAvA.characters.forEachActive(visitNear)
     local count = near.count
@@ -316,13 +322,14 @@ end
 ---@param target integer
 ---@param bytes integer
 ---@param now integer
----@return boolean
+---@return integer|false delayMs  délai au bout duquel ce message sera arrivé, latents déjà en route compris
 local function reserve(target, bytes, now)
     local drain = drainAt[target] or 0
     local inFlight = drain > now and (drain - now) * RATE / 1000 or 0
     if inFlight + bytes > cfg.latent.maxInFlightBytes then return false end
-    drainAt[target] = (drain > now and drain or now) + bytes * 1000 / RATE
-    return true
+    drain = (drain > now and drain or now) + bytes * 1000 / RATE
+    drainAt[target] = drain
+    return ceil(drain - now)
 end
 
 ---@param options table
@@ -345,7 +352,7 @@ local function warnLarge(label, bytes, now)
     log.warn('%s : %d octets envoyés en fiable (seuil du latent : %d) ; l\'ordre passe avant', label, bytes, THRESHOLD)
 end
 
----@alias vAvA.NetNotice fun(target: integer, packet: vAvA.NetPacket)
+---@alias vAvA.NetNotice fun(target: integer, packet: vAvA.NetPacket, delayMs: integer)  délai jusqu'à l'arrivée
 
 --- Envoi d'un paquet mesuré à des cibles déjà validées.
 ---@param owner string
@@ -365,12 +372,13 @@ local function deliverTo(owner, label, targets, count, options, packet, notice)
     local now = GetGameTimer()
     if not latent and options.warnLarge and bytes > THRESHOLD then warnLarge(label, bytes, now) end
     if type(targets) == 'number' then
-        if latent and not reserve(targets, bytes, now) then
+        local delay = latent and reserve(targets, bytes, now)
+        if latent and not delay then
             ownerError(owner, '%s : envoi latent refusé vers le joueur %d (plus de %d octets déjà en route)',
                 label, targets, cfg.latent.maxInFlightBytes)
             return false, 'saturated'
         end
-        if latent and notice then notice(targets, packet) end
+        if latent and notice then notice(targets, packet, delay) end
         sendOne(packet, targets, latent)
         counter:record(now, owner, label, bytes, latent, targets)
         return true, 1, bytes, latent
@@ -379,11 +387,12 @@ local function deliverTo(owner, label, targets, count, options, packet, notice)
     local sent = 0
     for i = 1, count do
         local target = targets[i]
-        if latent and not reserve(target, bytes, now) then
+        local delay = latent and reserve(target, bytes, now)
+        if latent and not delay then
             ownerError(owner, '%s : envoi latent refusé vers le joueur %d (plus de %d octets déjà en route)',
                 label, target, cfg.latent.maxInFlightBytes)
         else
-            if latent and notice then notice(target, packet) end
+            if latent and notice then notice(target, packet, delay) end
             sendOne(packet, target, latent)
             sent = sent + 1
             targets[sent] = target

@@ -218,6 +218,22 @@ describe('vAvA.net', function()
             assert.equal(3, sent[2].target)
         end)
 
+        -- relecture de T-013 : le préavis doit compter ce qui est déjà en route vers le joueur
+        it('le préavis reçoit le délai jusqu’à l’arrivée, latents déjà en route compris', function()
+            local delays = {}
+            local function notice(target, packet, delay) delays[#delays + 1] = { target, packet.bytes, delay } end
+            local packet = net.prepare(OWNER, EVENT, EVENT, whole)
+            assert.is_true(net.deliver(OWNER, EVENT, 1, nil, packet, notice))
+            now = 1000
+            assert.is_true(net.deliver(OWNER, EVENT, 1, nil, packet, notice))
+            -- 262 144 octets à 64 Ko/s : 4 000 ms ; le second attend le premier (3 000 ms restants)
+            assert.same({ 1, 262144, 4000 }, delays[1])
+            assert.same({ 1, 262144, 7000 }, delays[2])
+            assert.equal('integer', math.type(delays[2][3]))
+            assert.is_true(net.deliver(OWNER, EVENT, 2, nil, packet, notice))
+            assert.equal(4000, delays[3][3])
+        end)
+
         it('purgePlayer oublie le volume en route et les totaux du joueur', function()
             net.send(OWNER, nil, 1, EVENT, whole)
             net.send(OWNER, nil, 1, EVENT, whole)
@@ -276,6 +292,27 @@ describe('vAvA.net', function()
             for _, coords in ipairs({ { x = 0 / 0, y = 0, z = 0 }, { 0, 0, 0 }, 'ici', { x = 1, y = 2 } }) do
                 assert.same({ false, 'invalid_coords' }, { net.sendNear(OWNER, nil, coords, 5.0, 'vava_test:e') })
             end
+        end)
+
+        -- relecture de T-013 : le joueur d'origine donne l'exclu et l'instance
+        it('from : saute le joueur d’origine et ne garde que son routing bucket', function()
+            place(1, 1, 0, 0)
+            place(2, 2, 0, 0)
+            place(3, 3, 0, 0)
+            buckets[1], buckets[2], buckets[3] = 7, 7, 0
+            assert.same({ 2 }, net.playersNear(CENTER, 50.0, { from = 1 }))
+            local ok, count = net.sendNear(OWNER, { from = 1 }, CENTER, 50.0, 'vava_test:e', 'son')
+            assert.same({ true, 1 }, { ok, count })
+            assert.equal(2, sent[1].target)
+            -- exclude ou bucket donnés l'emportent
+            local list = net.playersNear(CENTER, 50.0, { from = 1, bucket = 0 })
+            assert.same({ 3 }, list)
+            list = net.playersNear(CENTER, 50.0, { from = 1, exclude = 2 })
+            assert.same({ 1 }, list)
+            for _, from in ipairs({ 0, -1, 1.5, '1', 9 }) do
+                assert.same({ nil, 'invalid_options' }, { net.playersNear(CENTER, 50.0, { from = from }) })
+            end
+            assert.same({ false, 'invalid_options' }, { net.send(OWNER, { from = 1 }, 2, 'vava_test:e') })
         end)
 
         it('lit chaque position au plus une fois par tour du serveur', function()

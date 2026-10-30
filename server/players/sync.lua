@@ -14,10 +14,10 @@
                   server/core/net.lua, server/players/fields.lua
 ]]
 
-local pairs, tonumber, type, pcall = pairs, tonumber, type, pcall
+local pairs, tonumber, tostring, type, pcall = pairs, tonumber, tostring, type, pcall
 local min = math.min
 local match = string.match
-local SetTimeout, DoesPlayerExist, Player = SetTimeout, DoesPlayerExist, Player
+local SetTimeout, DoesPlayerExist, Player, DropPlayer = SetTimeout, DoesPlayerExist, Player, DropPlayer
 
 local EVENTS = vAvA.EVENTS
 local CORE = vAvA.resourceName
@@ -27,6 +27,7 @@ local fields = vAvA.fields
 local tbl = vAvA.lib.table
 local logger = vAvA.logger
 local cfg = vAvA.config.server.sync
+local messages = vAvA.config.server.players.messages
 local log = logger.create('sync')
 
 local sync = {}
@@ -224,6 +225,20 @@ local function publish(state, src, name, value)
     state:set(name, value, true)
 end
 
+--- Envoi indispensable au joueur (personnage, ordre d'apparition) impossible (trop gros, valeur non sérialisable…) :
+--- erreur explicite en console, puis déconnexion avec un message clair, plutôt qu'un joueur bloqué sur un écran noir.
+--- Joueur déjà parti (invalid_target) : rien à faire.
+---@param character vAvA.Character
+---@param event string
+---@param code string
+function sync.abandon(character, event, code)
+    if code == 'invalid_target' then return end
+    local src = character.source
+    log.error('compte #%s, personnage #%s : %s impossible à envoyer (%s) ; joueur %d déconnecté',
+        tostring(character.accountId), tostring(character.id), event, tostring(code), src)
+    DropPlayer(tostring(src), messages.sendFailed)
+end
+
 --- Envoie au joueur son personnage (identité + champs visibles) et publie les champs publics.
 ---@param character vAvA.Character
 function sync.sendCharacter(character)
@@ -235,10 +250,14 @@ function sync.sendCharacter(character)
         local value = fields.get(character, name)
         if value ~= nil then visible[name] = value end
     end)
-    net.dispatch(CORE, EVENTS.CHARACTER_LOADED, src, RELIABLE, EVENTS.CHARACTER_LOADED, {
+    local sent, code = net.dispatch(CORE, EVENTS.CHARACTER_LOADED, src, RELIABLE, EVENTS.CHARACTER_LOADED, {
         id = character.id, firstName = character.firstName, lastName = character.lastName,
         sex = character.sex, fields = visible,
     })
+    if not sent then
+        sync.abandon(character, EVENTS.CHARACTER_LOADED, code)
+        return
+    end
     local state = Player(src).state
     fields.forEachPublic(function(name)
         publish(state, src, name, fields.get(character, name))
