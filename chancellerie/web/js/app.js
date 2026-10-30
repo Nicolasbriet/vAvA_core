@@ -220,6 +220,10 @@ const App = (() => {
       linked: (data) => {
         if (currentView && currentView.linked) currentView.linked(data);
       },
+      // le pont n'a pas pris la clé de la Chancellerie (aussi dans la console et au journal)
+      alert: (data) => {
+        if (data && typeof data.text === 'string') UI.slip(data.text);
+      },
     });
     clearInterval(tick);
     tick = setInterval(() => { refs.stateDetail.textContent = STRINGS.describe(status, setupDone); }, STATE_TICK_MS);

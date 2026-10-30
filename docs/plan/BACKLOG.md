@@ -156,7 +156,7 @@ Corrections issues de l'audit T-010 (30 octobre 2026), à prendre avant le reste
   versions montées.
 
 ### T-025 — Chancellerie : clé du pont hors de la ligne de commande
-- Agent : vava-dev-lua (cette tâche autorise à toucher `chancellerie/`) · Dépend de : — · Statut : à faire
+- Agent : vava-dev-lua (cette tâche autorise à toucher `chancellerie/`) · Dépend de : — · Statut : à tester en jeu
 - **IMPORTANT** (`securite-vava_chancellerie.md`) : la clé du pont est passée à FXServer par
   `+set vava_chancellerie_token …` (`chancellerie/lib/bridge.js:30-34`, `lib/process.js:205`, lue par
   `modules/vava_chancellerie/server/auth.lua:20-22`) : lisible par tout utilisateur de la machine (`ps`,
@@ -166,6 +166,9 @@ Corrections issues de l'audit T-010 (30 octobre 2026), à prendre avant le reste
   les actions de rang élevé à une liste de comptes connus du pont ou à un second secret.
 - Critères : la clé n'apparaît plus dans la ligne de commande ni dans les journaux ; tests de la Chancellerie (faux
   FXServer) à jour ; `docs/chancellerie.md` et README du pont à jour ; versions montées.
+- Fait (`vava_chancellerie` **1.5.0**, Chancellerie **1.6.0**, rapport `docs/plan/rapports/T-025.md`, test en jeu
+  `docs/tests/chancellerie.md`) : clé demandée par le pont dans la console et donnée par l'entrée de FXServer, en
+  mémoire seule ; rang donné aux seuls comptes vus reliés en jeu (comptes reliés avant : à relier une fois de plus).
 
 ### T-026 — Registre et caméras : bannis en panne de base, offres en boucle, cases sans mur
 - Agent : vava-dev-lua (cette tâche autorise à toucher `server/players/accounts.lua`) · Dépend de : — · Statut : à tester en jeu

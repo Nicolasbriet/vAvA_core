@@ -3,12 +3,13 @@
     Rôle : déclaration du module auprès du core : écoute HTTP du pont, évènements relayés à la Chancellerie
            (signalements, arrivées et départs des joueurs, offres et fins des caméras regardées depuis le web, arrêt du
            module des caméras, rang du Conseil changé : elle revérifie le droit de chaque compte qui regarde, pont
-           prêt : elle applique alors les rangs des comptes reliés) ; commande de liaison d'un compte du panneau.
+           prêt : elle applique alors les rangs des comptes reliés) ; commande de liaison d'un compte du panneau ;
+           clé du pont demandée à la Chancellerie par la console (server/auth.lua).
     Dépendances : tous les fichiers server/ du module
 ]]
 
 local ipairs, tostring, type = ipairs, tostring, type
-local AddEventHandler = AddEventHandler
+local AddEventHandler, GetConvar, GetResourceMetadata = AddEventHandler, GetConvar, GetResourceMetadata
 
 local core = VavaBridge.core
 if not core then return end
@@ -39,6 +40,15 @@ end
 local function setup()
     local declared, declareErr = VavaBridge.commands.declare()
     if not declared then return false, 'commandes : ' .. tostring(declareErr) end
+    local loaded, loadErr = VavaBridge.links.load()
+    if not loaded then return false, 'comptes reliés : ' .. tostring(loadErr) end
+    -- adresse de la Chancellerie figée maintenant ; la commande qui reçoit la clé existe avant que le pont ne la demande
+    local _, urlErr = auth.capture()
+    if urlErr then
+        core.log.warn('adresse de la Chancellerie refusée (%s : http://127.0.0.1:<port> seulement) : pont fermé',
+            cfg.convars.url)
+    end
+    auth.listen()
     http.start()
     for _, def in ipairs({
         { VavaBridge.ADMIN_REPORT, function(payload) push.send({ type = 'report', action = payload.action, id = payload.id, author = payload.author }) end },
@@ -54,13 +64,19 @@ local function setup()
     local whitelistOk, whitelistErr = VavaBridge.whitelist.start()
     if not whitelistOk then return false, whitelistErr end
     VavaBridge.ready = true
-    if not auth.enabled() then
+    if GetConvar(cfg.convars.legacyToken, '') ~= '' then
+        core.log.warn('clé du pont passée sur la ligne de commande (%s) : ignorée ; mettez la Chancellerie à jour (1.6.0)',
+            cfg.convars.legacyToken)
+    end
+    if not auth.expected() then
         core.log.info('serveur lancé sans la Chancellerie : le pont reste fermé')
     else
-        -- la Chancellerie applique alors les rangs des comptes reliés (changés pendant que le serveur était arrêté) et
-        -- dit si sa liste blanche est active
-        push.request({ type = 'ready' }, function(answer)
-            VavaBridge.whitelist.setEnabled(answer and answer.whitelist)
+        -- dès que la clé arrive, la Chancellerie est prévenue : elle applique alors les rangs des comptes reliés
+        -- (changés pendant que le serveur était arrêté) et dit si sa liste blanche est active
+        auth.await(function()
+            push.request({ type = 'ready' }, function(answer)
+                VavaBridge.whitelist.setEnabled(answer and answer.whitelist)
+            end)
         end)
     end
     return true

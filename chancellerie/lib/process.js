@@ -78,8 +78,10 @@ function imageName(pid) {
 class ServerProcess extends EventEmitter {
   /**
    * @param {{ launchArgs?: () => string[], secrets?: () => string[], prepare?: () => string[] }} [options]  arguments
-   *        ajoutés au lancement (clé du pont), secrets à masquer dans la console, préparatifs juste avant chaque
-   *        lancement (server.cfg complété) qui renvoient leurs messages pour la console
+   *        ajoutés au lancement (adresse de la Chancellerie, jamais un secret qu'un autre utilisateur de la machine
+   *        lirait sur la ligne de commande : la clé du pont passe par l'entrée, voir write), secrets à masquer dans la
+   *        console, préparatifs juste avant chaque lancement (server.cfg complété) qui renvoient leurs messages pour
+   *        la console
    */
   constructor(options = {}) {
     super();
@@ -309,7 +311,7 @@ class ServerProcess extends EventEmitter {
     });
   }
 
-  /** Écrit une ligne sur l'entrée de FXServer ; faux si elle n'a pas pu partir. */
+  /** Écrit une ligne sur l'entrée de FXServer, sans la recopier dans la console ; faux si elle n'a pas pu partir. */
   write(text) {
     if (!this.child || !this.child.stdin.writable) return false;
     this.child.stdin.write(`${text}\n`);

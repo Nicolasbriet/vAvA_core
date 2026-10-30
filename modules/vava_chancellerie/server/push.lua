@@ -8,7 +8,7 @@
 ]]
 
 local tostring, type, pcall = tostring, type, pcall
-local GetConvar, PerformHttpRequest, GetGameTimer = GetConvar, PerformHttpRequest, GetGameTimer
+local PerformHttpRequest, GetGameTimer = PerformHttpRequest, GetGameTimer
 local encode, decode = json.encode, json.decode
 
 local auth = VavaBridge.auth
@@ -24,8 +24,8 @@ local warnedAt = nil
 ---@param event table  { type, … }
 ---@param callback fun(answer: table|nil)
 function push.request(event, callback)
-    local base = GetConvar(cfg.convars.url, '')
-    if base == '' or not auth.enabled() then
+    local base = auth.panelUrl()
+    if not base or not auth.enabled() then
         callback(nil)
         return
     end
@@ -41,8 +41,8 @@ end
 
 ---@param event table  { type, … }
 function push.send(event)
-    local base = GetConvar(cfg.convars.url, '')
-    if base == '' or not auth.enabled() then return end
+    local base = auth.panelUrl()
+    if not base or not auth.enabled() then return end
     PerformHttpRequest(base .. cfg.eventPath, function(status)
         if status >= OK_MIN and status <= OK_MAX then return end
         local now = GetGameTimer()

@@ -1623,9 +1623,21 @@ Serveur seulement (rien n'est envoyé aux joueurs). Demande vava_admin 1.2.0 ; v
 vava_cameras 1.0.0 pour l'écran des joueurs, vava_time 1.0.0 pour le ciel et l'heure (1.4.0).
 
 - **Entrée** : l'adresse HTTP du serveur de jeu (`http://127.0.0.1:<port>/vava_chancellerie/…`). N'accepte que les
-  requêtes venues de la machine elle-même, portant la clé tirée par la Chancellerie à chaque lancement de FXServer et
-  passée en `+set vava_chancellerie_token` (jamais dans le `server.cfg`, masquée dans la console). Sans cette clé
-  (serveur lancé sans la Chancellerie), le pont reste fermé.
+  requêtes venues de la machine elle-même, portant la clé tirée par la Chancellerie à chaque lancement de FXServer.
+  Depuis 1.5.0, la clé ne passe plus sur la ligne de commande (lisible par tout utilisateur de la machine) ni dans une
+  convar : seule l'adresse de la Chancellerie y est posée (`+set vava_chancellerie_url`) ; le pont demande la clé en
+  écrivant `vava_chancellerie:cle?` dans la console, la Chancellerie la lui donne par l'entrée de FXServer
+  (`vava_chancellerie_cle <clé>`, commande de la seule console, la première clé reçue gardée en mémoire). Sans
+  Chancellerie (aucune adresse posée), le pont ne demande rien et reste fermé ; une ancienne
+  `vava_chancellerie_token` est ignorée et signalée.
+- **Rangs des comptes reliés** (`/staff/sync`, 1.5.0) : un rang n'est donné qu'à un compte de jeu que le pont a lui-même
+  vu relié (code juste tapé en jeu, confirmé par la Chancellerie ; table `vava_chancellerie_links`) ; ailleurs,
+  `not_linked_in_game`. Retirer un rang reste toujours permis ; un retrait marqué `unlinked: true` (déliaison) fait
+  oublier le compte. Les liaisons en cours sont attendues 5 s au plus par requête (une seule échéance).
+- **Adresse de la Chancellerie** (1.5.0) : lue une seule fois au `setup`, seulement `http://127.0.0.1:<port>`.
+  **Liste blanche** : tant que la clé n'est pas arrivée sur un serveur lancé par la Chancellerie, connexion refusée.
+  **Limite** : une ressource serveur qui donne sa clé avant la Chancellerie garde le pont ; la Chancellerie le repère
+  (ligne de refus de sa clé, évènement avec une autre clé, pas de `ready` vérifié) et alerte, sans plus.
 - **Demandes** : passées telles quelles au Registre (`webRequest`), qui vérifie tout et tient le journal ; zones de voix
   lues, modifiées et supprimées auprès de vava_voice, droit vérifié et journal tenu par le Registre.
 - **Ciel et heure** (1.4.0, `server/time.lua`) : demandes `time` (droit `view`), `timeClock` (`{ action, minutes }`) et

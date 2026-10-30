@@ -3,8 +3,9 @@
     Rôle : liste blanche Discord de la Chancellerie. À la connexion d'un joueur (hook core:player:connecting, avant
            toute création de données), le pont demande à la Chancellerie s'il peut entrer (rôle sur le serveur Discord,
            ou compte du panneau relié à ce joueur) ; elle répond avec le message à lui montrer. Sans réponse à temps :
-           refusé si la liste blanche était active à la dernière réponse, accepté sinon. Serveur lancé sans la
-           Chancellerie : rien n'est vérifié.
+           refusé si la liste blanche était active à la dernière réponse, accepté sinon. Serveur lancé par la
+           Chancellerie dont la clé n'est pas encore arrivée : refusé (« le registre des portes s'ouvre »), jamais
+           accepté faute de réponse. Serveur lancé sans la Chancellerie : rien n'est vérifié.
     Dépendances : config.lua, server/core.lua, server/auth.lua, server/push.lua
 ]]
 
@@ -30,6 +31,8 @@ end
 ---@return boolean|nil allowed
 ---@return string|nil reason
 local function check(payload)
+    -- lancé par la Chancellerie mais clé pas encore là : la liste ne peut pas être lue, personne n'entre à l'aveugle
+    if not auth.enabled() then return false, cfg.messages.opening end
     local src = payload.source
     local p = promise.new()
     local settled = false
@@ -58,7 +61,9 @@ end
 ---@return boolean ok
 ---@return string|nil err
 function whitelist.start()
-    if not auth.enabled() then return true end
+    -- lancé par la Chancellerie (adresse figée par auth.capture, appelé avant) : branchée même si la clé n'est pas
+    -- encore arrivée ; d'ici là, la connexion est refusée
+    if not auth.expected() then return true end
     local id, err = core.hooks.before('core:player:connecting', check)
     if not id then return false, err end
     return true

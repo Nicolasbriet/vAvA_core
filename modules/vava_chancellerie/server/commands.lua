@@ -1,7 +1,7 @@
 --[[
     vava_chancellerie/server/commands.lua
     Rôle : déclaration de la commande de liaison d'un compte à la Chancellerie au registre `core:commands` du core
-           (Codex, suggestions du chat).
+           (Codex, suggestions du chat), et de la commande console qui reçoit la clé du pont (cachée).
     Dépendances : config.lua, server/core.lua
 ]]
 
@@ -20,6 +20,9 @@ local function entries()
         [cfg.link.command] = { kind = 'command', scope = 'player', label = 'Lier son compte à la Chancellerie',
             description = 'Relie votre compte du jeu à votre compte du panneau web, avec le code que celui-ci affiche.',
             args = { { name = 'code', type = 'text', hint = 'code à 6 chiffres affiché par la Chancellerie' } } },
+        -- tapée par la Chancellerie elle-même dans la console du serveur, à la demande du pont : cachée du Codex
+        [VavaBridge.KEY_COMMAND] = { kind = 'command', scope = 'console', hidden = true, label = 'Clé du pont',
+            description = 'Donnée par la Chancellerie au lancement du serveur ; jamais à taper à la main.' },
     }
 end
 

@@ -298,6 +298,12 @@ démarrage du serveur de jeu ; délier ou supprimer le compte retire le rang en 
 Chancellerie et à celui du Conseil (« Chancellerie : <compte> »). Il faut `vava_admin` 1.3.0 et `vava_chancellerie`
 1.2.0.
 
+Depuis `vava_chancellerie` 1.5.0, le serveur de jeu ne donne un rang qu'à un joueur qu'il a **vu relié en jeu** (étape 2
+ci-dessus, faite avec cette version ou une plus récente). Un compte relié avant cette mise à jour garde sa liaison dans
+le panneau, mais son rang n'est plus appliqué : le journal de la Chancellerie l'indique (« Rang non appliqué en jeu ·
+joueur jamais relié en jeu par un code : à relier de nouveau »). Il suffit de le relier une fois de plus (étapes 1 et
+2). Retirer un rang (délier, supprimer, rang « aucun ») marche toujours.
+
 ## Bot Discord
 
 Page **Discord** (compte maître). Le bot se connecte lui-même à Discord (Gateway, sans droit privilégié) : rien à
@@ -394,8 +400,27 @@ Pour les comptes qui ont un rang du Conseil, quand le serveur de jeu tourne avec
 - Les options avancées du `server.cfg` sont visibles par les comptes qui ont le droit « configuration » : n'y laissez
   pas d'autre secret que ceux que vous leur confiez.
 - Le pont du serveur de jeu n'accepte que les requêtes de la machine portant la clé tirée à chaque lancement de
-  FXServer (passée en `+set`, jamais écrite dans le `server.cfg`, masquée dans la console) ; les évènements qu'il envoie
-  à la Chancellerie sont vérifiés de la même façon.
+  FXServer ; les évènements qu'il envoie à la Chancellerie sont vérifiés de la même façon. Depuis la 1.6.0 (pont 1.5.0),
+  cette clé ne passe **ni sur la ligne de commande** de FXServer (que tout utilisateur de la machine peut lire) **ni
+  dans le `server.cfg`** : au démarrage, le pont la demande en écrivant `vava_chancellerie:cle?` dans la console ; la
+  Chancellerie, qui lit cette console, la lui donne par l'entrée de FXServer (`vava_chancellerie_cle <clé>`, commande
+  que seule la console peut lancer). Elle ne vit qu'en mémoire, des deux côtés ; elle n'est ni recopiée dans la console
+  du panneau (masquée si FXServer la réaffichait) ni écrite au journal. Seule l'adresse de la Chancellerie reste sur la
+  ligne de commande (`+set vava_chancellerie_url`, pas un secret), lue une seule fois par le pont, à son démarrage, et
+  seulement de la forme `http://127.0.0.1:<port>`. La Chancellerie ne reconnaît que la ligne exacte du pont et ne
+  répond qu'une fois par démarrage du pont (plus rien après sa confirmation, jusqu'au prochain lancement ou
+  `restart vava_chancellerie`).
+- **Alerte « clé du pont non prise »** (console, journal, bandeau dans les pages ouvertes) : le pont a refusé la clé de
+  la Chancellerie (une autre lui avait été donnée avant), un évènement du pont est arrivé avec une autre clé, ou le pont
+  n'a rien confirmé 15 s après avoir reçu la clé. Une ressource du serveur peut alors l'avoir devancée : vérifiez les
+  ressources lancées et redémarrez le serveur. Ce mécanisme signale, il ne protège pas d'une ressource serveur hostile
+  (qui a de toute façon tous les pouvoirs sur le serveur).
+- Défense en profondeur : le pont ne donne un rang du Conseil qu'à un joueur qu'il a lui-même vu relié en jeu (code juste
+  tapé avec `chancellerie <code>` et confirmé par la Chancellerie) ; qui volerait la clé ne pourrait pas nommer
+  Souverain un compte qui n'a jamais été relié en jeu. Retirer un rang reste toujours permis ; délier un compte le fait
+  oublier du pont.
+- Liste blanche : tant que le pont n'a pas reçu sa clé, les joueurs qui se connectent sont refusés (« Le registre des
+  portes s'ouvre : réessayez dans un instant. »), jamais acceptés faute de réponse.
 
 ## Fichiers
 
