@@ -9,8 +9,9 @@
     Rôle : le livre des compétences : un livre de cuir à pages de parchemin, quatre onglets (Compétences, Mentorat,
            Savoirs, Pénurie). Tous les textes viennent de js/strings.js ; toutes les données du serveur (message « open »).
            Dans un navigateur, web/index.html?tab=mentorat (ou competences, savoirs, penurie) montre chaque onglet avec
-           des données d'exemple (js/devmock.js).
+           des données d'exemple (dev/devmock.js).
   -->
+  <link rel="stylesheet" href="nui://vava_ui/web/css/vava_ui.css">
   <link rel="stylesheet" href="css/style.css">
 </head>
 <body>
@@ -28,7 +29,8 @@
   </div>
 
   <script src="js/strings.js"></script>
-  <script src="js/devmock.js"></script>
+  <!-- hors jeu seulement : vava_ui pris dans le dépôt, puis les données simulées (jamais livrées) -->
+  <script>typeof GetParentResourceName === 'function' || document.write('<script src="../../vava_ui/web/dev/horsjeu.js"><\/script><script src="dev/devmock.js"><\/script>');</script>
   <script src="js/bridge.js"></script>
   <script src="js/ui.js"></script>
   <script src="js/model.js"></script>

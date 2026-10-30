@@ -6,7 +6,6 @@ modules/vava_voice/server/zones.lua	TriggerClientEvent(EVENTS.ZONE, EVERYONE, ac
 modules/vava_voice/server/zones.lua	TriggerClientEvent(EVENTS.ZONE, EVERYONE, action, id)	zones de voix (suppression) : envoi à tous provisoire, rare, retiré par T-014
 # Provisoire pendant la bascule des pages sur vava_ui (T-012) : copies communes et devmock.js encore livrés par les
 # pages pas encore basculées. Une ligne retirée à chaque bascule ; aucune ne reste à la fin de T-012.
-modules/vava_skills/web/	[fichier]	T-012 : page pas encore basculée sur vava_ui (provisoire, retiré à sa bascule)
 modules/vava_gathering/web/	[fichier]	T-012 : page pas encore basculée sur vava_ui (provisoire, retiré à sa bascule)
 modules/vava_crafting/web/	[fichier]	T-012 : page pas encore basculée sur vava_ui (provisoire, retiré à sa bascule)
 modules/vava_farming/web/	[fichier]	T-012 : page pas encore basculée sur vava_ui (provisoire, retiré à sa bascule)

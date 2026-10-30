@@ -1,10 +1,12 @@
 'use strict';
 /*
- * web/js/devmock.js
+ * web/dev/devmock.js
  * Rôle : fiche simulée quand la page est ouverte dans un navigateur (hors FiveM), pour travailler le rendu sans
  *        lancer le jeu. Inactif en jeu. Paramètre d'URL : ?tab=mentorat (ou competences, savoirs, penurie). Treize
  *        compétences, un maître, deux apprentis, une proposition, trois savoirs dont une lignée à trois maillons, un
  *        apprentissage 2/3, deux métiers en pénurie. Les retours de l'interface reçoivent des réponses plausibles.
+ *        Jamais livré (absent des `files`), jamais chargé en jeu : la ligne hors jeu de index.html ne l'insère
+ *        que hors FiveM.
  */
 
 const DevMock = (() => {

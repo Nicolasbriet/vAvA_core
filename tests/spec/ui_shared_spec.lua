@@ -13,6 +13,7 @@ local PAGES = {
     { module = 'vava_inventory', sheet = 'style.css' },
     { module = 'vava_codex', sheet = 'style.css' },
     { module = 'vava_chat', sheet = 'style.css' },
+    { module = 'vava_skills', sheet = 'style.css' },
 }
 
 local COMMON = {
