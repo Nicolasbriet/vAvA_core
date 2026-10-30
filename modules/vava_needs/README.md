@@ -19,7 +19,7 @@ tomber au lieu de s'arrêter au plancher ; la perte de vie est alors appliquée 
 | Baisse | un passage du serveur par minute pour tous les personnages en jeu ; rien hors connexion ni pendant la sélection | `tickMs` |
 | Activité | vitesse horizontale lue côté serveur toutes les 15 s ; à partir de 4 m/s à pied, la baisse va jusqu'à × 1,5 ; un véhicule ne compte pas | `activity` |
 | Endurance | maximale à 35 % tant qu'un besoin est critique | `criticalStamina` |
-| Vie | avec `vava_health`, perte appliquée par le serveur (export `damage`), plancher levé ; sans lui, appliquée par le client, jamais sous 10 % de la vie au-dessus du seuil de mise à terre (100) | `health` |
+| Vie | avec `vava_health`, perte appliquée par le serveur (chaîne de dégâts `hit`, type `privation` ; export `damage` avec un `vava_health` antérieur à 1.3.0), plancher levé ; sans lui, appliquée par le client, jamais sous 10 % de la vie au-dessus du seuil de mise à terre (100) | `health` |
 | Manger, boire | geste de 3 s ; refusé si chacun des besoins comblés est à 95 ou plus, ou pendant le geste | `consumption` |
 | Gestes | manger (`mp_player_inteat@burger`), boire (`mp_player_intdrink`), haut du corps : on peut marcher | `gestures`, `animation` |
 | Médaillons | Faim puis Soif, après Santé | `hud` |
@@ -41,9 +41,10 @@ pures dans `shared/starvation.lua`, testées dans `tests/spec/needs_starvation_s
   `damage` de `vava_health` (par `bridge/server.lua`), qui tient la vie et la mise à terre et prévient lui-même le
   client : un client modifié ne peut plus l'ignorer. La perte qui atteint le seuil met la vie à 0 : le ped tombe
   franchement, le joueur est mis à terre, puis peut être relevé, et ses besoins restent figés tant qu'il est à terre.
-  À terre, pas encore apparu ou pendant le démarrage de `vava_health` : rien n'est retiré. Ce n'est ni un coup ni un
-  sort : elle passe par `damage` tant que la chaîne de dégâts `vava_health:hit` (`docs/plan/COMBAT_V1.md`, T-110)
-  n'existe pas ; y entrer ou non (boucliers, résistances) sera à trancher avec elle ;
+  À terre ou pendant le démarrage de `vava_health` : rien n'est retiré. Depuis 1.2.1 (avec `vava_health` 1.3.0),
+  la perte passe par la chaîne de dégâts (`exports.vava_health:hit`, type `privation`, sans source) : elle est
+  nommée dans le hook `vava_health:hit` et, quand elle met à terre, dans le journal des coups ; un modificateur peut
+  la filtrer par son type (aucun ne le fait). Avec un `vava_health` plus ancien, repli sur `damage` ;
 - sans `vava_health`, seul repli : le serveur envoie la perte au seul joueur, dont le client l'applique sans jamais
   descendre sous le plancher : personne ne reste mort sans recours.
 

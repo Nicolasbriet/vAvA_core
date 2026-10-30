@@ -3,10 +3,16 @@
 La vie des personnages, gardée d'une session à l'autre, et la **mise à terre** à la place de la mort de GTA : un
 personnage gravement blessé tombe et reste au sol ; un autre joueur peut le **relever**, sinon il **rend l'âme** et se
 réveille au lieu de soins. Personne ne se relève seul : on a besoin des autres. La récupération automatique de GTA est
-coupée ; on se soigne par objets (bandes, potions) ou en se faisant relever. Le serveur décide de tout : il lit lui-même
-la vie de chaque joueur, met à terre, relève et porte au lieu de soins ; le client applique et affiche.
+coupée ; on se soigne par objets (bandes, potions) ou en se faisant relever. Le serveur décide de tout : **il tient la
+vie de chaque joueur** (le client l'applique, rien de ce qu'il garde à l'écran ne compte), met à terre, relève et porte
+au lieu de soins ; le client applique et affiche.
 
-Ordre de démarrage : après `vAvA_core` (≥ 0.4.0) et `vava_ui` (≥ 1.0.0, polices, grain et ornements de l'écran à
+Depuis 1.3.0, `vava_health` porte aussi la **chaîne de dégâts commune** (`docs/plan/COMBAT_V1.md` § 1) : un coup
+d'épée, une boule de feu, la faim passent tous par l'export `hit`, ses modificateurs (esquive, parade, blocage,
+boucliers, résistances déclarés par les autres modules) et son journal ; les coups natifs de GTA entre joueurs sont
+annulés par le serveur.
+
+Ordre de démarrage : après `vAvA_core` (≥ 0.10.0) et `vava_ui` (≥ 1.0.0, polices, grain et ornements de l'écran à
 terre ; déclaré en dépendance, à ne jamais arrêter sur un serveur ouvert), avant les modules qui lisent l'état « à
 terre ». Facultatifs :
 `vava_inventory` (objets de soin, gestes bloqués à terre), `vava_needs` (faim et soif figées à terre), `vava_hud`
@@ -20,7 +26,13 @@ magie, voix, Registre) appellent l'export `isDowned` : la règle n'est écrite q
 | Vie | de 0 à 1 : part de la vie GTA au-dessus du seuil de mise à terre ; 1 pour un nouveau personnage | `initial` |
 | Seuil de mise à terre | vie GTA 100 (seuil « blessé mortellement » du jeu) | `downThreshold` |
 | Récupération de GTA | coupée | `naturalRegen` |
-| Lecture serveur | vie de chaque joueur apparu toutes les 500 ms ; enregistrée dans le personnage toutes les 10 s si elle a bougé d'au moins 1 % ; 3 s de grâce après une apparition ou une relève | `pollMs`, `sampleMs`, `sampleEpsilon`, `graceMs` |
+| Vie du serveur | valeur de référence ; coups, soins et `setHealth` la changent, le client l'applique ; écrite dans le personnage à chaque transition et à chaque soin, au plus toutes les 10 s après des coups (si elle a bougé d'au moins 1 %), au départ et à l'arrêt du module | `sampleMs`, `sampleEpsilon` |
+| Lecture du ped | ped de chaque joueur lu toutes les 500 ms ; 3 s de grâce après une apparition ou une relève ; ignoré 1,5 s + 2 × ping (1 s au plus) après chaque ordre de vie ; plus bas que le serveur de plus de 2 % : perte native acceptée ; au seuil : mise à terre ; plus haut : vie du serveur renvoyée au plus toutes les 2 s (console à la 1re puis toutes les 10) | `pollMs`, `graceMs`, `sync` |
+| Apparition non confirmée | ped lu d'office 20 s après l'ordre d'apparition, s'il existe | `spawn.confirmTimeoutMs` |
+| Chaîne de dégâts | 100 points pour une vie pleine ; un coup de 200 au plus ; onze types, quatre parties du corps, onze étiquettes (listes fermées) ; 20 coups par seconde et par cible ; un renvoi permis, pas un renvoi de renvoi ; 32 modificateurs ; combats entre joueurs permis (`pvp`) | `chain` |
+| Dégâts natifs | coups d'arme ou de poing d'un joueur sur un autre (ou sur une victime introuvable), explosions, feux et projectiles lancés par un joueur : annulés par le serveur ; une ligne de console par joueur et par minute | `natives` |
+| Journal des coups | écrit par lots de 50 toutes les 10 s, 2 000 lignes en attente au plus, purgé après 30 jours | `journal` |
+| Tir ami | coupé côté client à chaque apparition (confort) | `client.protect` |
 | À terre | rendre l'âme possible après 3 min ; porté d'office au lieu de soins après 10 min ; un ped resté debout est recouché toutes les 5 s | `downed` |
 | Relever | personne à terre la plus proche à 2 m (positions serveur), geste de 8 s, distance revérifiée à la fin (+ 1 m), 25 % de vie ; objet requis et consommé facultatif | `assist` |
 | Rendre l'âme | touche maintenue 3 s ; lieu de soins le plus proche, 50 % de vie | `respawn` |
@@ -42,7 +54,48 @@ jamais (`shared/vitality.lua`, testé dans `tests/spec/health_vitality_spec.lua`
 - à terre, un ped lu au seuil ou au-dessus n'a pas été couché (ordre perdu, client modifié) : il est recouché toutes
   les 5 s, et la console du serveur le note une fois par mise à terre.
 
-La dernière perte de faim ou de soif suit la même règle chez `vava_needs`.
+La dernière perte de faim ou de soif suit la même règle : elle passe par la chaîne (`privation`) et met à terre dès
+que la vie du serveur atteint 0.
+
+### La chaîne de dégâts
+
+Tout ce qui blesse un joueur passe par `exports.vava_health:hit(cible, paquet)`, côté serveur, après les vérifications
+du module qui frappe (portée, arme, technique, sort). Dans l'ordre, sans céder la main entre la lecture de la vie et
+son écriture :
+
+1. paquet fermé et borné (`shared/packet.lua`) ; le serveur y ajoute la ressource appelante (`origin`, jamais fournie
+   par l'appelant), un numéro de coup et le personnage de la source ;
+2. garde-fous : 20 coups par seconde et par cible (`too_many_hits`), un coup lancé pendant un autre (renvoi) permis
+   une fois (`too_deep` au-delà) ;
+3. cible à terre : coup annulé (`downed`), sans hook ni journal ; `chain.pvp = false` : tout coup venu d'un autre
+   joueur annulé (`pvp_off`) ;
+4. hook `vava_health:hit` `before` : un module peut refuser (trêve, prison, évènement du Conseil) ;
+5. modificateurs du registre `vava_health:modifiers`, dans l'ordre fixe des étapes **annulation → esquive → parade →
+   blocage → bouclier → résistance**, puis la priorité (0 à 99) et la clé ; arrêt à la première annulation ;
+6. application : vie du serveur baissée, ordre de vie envoyé à la seule cible en fin de tour (plusieurs coups d'un même
+   tour : un seul message), mise à terre **aussitôt** si elle atteint 0 ;
+7. hook `after` (tout coup qui a atteint l'étape 4, annulé compris) et journal.
+
+Un modificateur **rend un résultat**, il ne modifie rien : `{ cancel = 'raison' }`, `{ blocked = n }`,
+`{ absorbed = n }`, `{ resisted = n }` (retirés, au plus le montant courant) ou `{ added = n }` (faiblesse, au plus le
+montant de départ, total au plus 200). Un rendu invalide (négatif, non fini, autre type) est ignoré ; un modificateur
+en erreur est **ignoré pour ce coup** (une panne de bouclier ne rend personne invulnérable), une ligne d'erreur par
+minute ; un modificateur lent (plus de 5 ms) est signalé, jamais coupé. Règles pures testées :
+`tests/spec/health_chain_spec.lua`, `health_packet_spec.lua`, `health_sync_spec.lua` ; harnais serveur :
+`health_hit_spec.lua`.
+
+Les pertes que GTA applique lui-même (chute, noyade, feu du décor, animal) sont lues sur le ped et acceptées telles
+quelles, **sans modificateurs** (un bouclier arrête les coups et les sorts, pas une chute) ; elles passent par le hook
+`after` (`origin = 'vava_health'`, `kind = 'monde'`, `tags.native`). Les coups natifs entre joueurs (poings, armes,
+explosions, feux, projectiles lancés par un joueur) sont **annulés par le serveur** avant d'atteindre la victime.
+
+### Un client qui ment
+
+La vie du serveur fait foi pour tout (`hit`, `isDowned`, `get`, soins, mise à terre). Un client qui ignore l'ordre de
+vie ou se remet à plein est corrigé toutes les 2 s (console à la 1re correction, puis toutes les 10) et ne gagne rien ;
+celui qui ne confirme pas son apparition est lu d'office après 20 s. **Limite connue** : un client modifié peut garder
+son ped debout à l'écran alors qu'il est à terre pour le serveur ; rien ne lui est permis (`isDowned` partout), il est
+recouché toutes les 5 s ; aucun serveur FiveM ne peut imposer la vie d'un ped joueur.
 
 ### À terre
 
@@ -64,30 +117,57 @@ départ.
 
 ## Base de données
 
-Aucune table propre : l'état vit dans le champ de personnage `vava_health:state` (`{ health, downed, downedFor }`,
-visible du seul joueur), sauvegardé avec le personnage. Les soins du Conseil sont au journal de `vava_admin`.
+L'état vit dans le champ de personnage `vava_health:state` (`{ health, downed, downedFor }`, visible du seul joueur),
+sauvegardé avec le personnage. Les soins du Conseil sont au journal de `vava_admin`.
+
+Journal des coups `vava_health_hits` (`sql/0001_hits.sql`) : tout coup **venu d'un autre joueur** qui a atteint la
+chaîne (annulé compris) et **toute mise à terre** par la chaîne ou par une perte native, avec le personnage touché et
+celui à l'origine, la ressource appelante, le type, la technique ou le sort, l'arme, les points avant et après
+modificateurs (bloqués, absorbés, résistés), la raison d'une annulation et la position lue par le serveur. Ne sont
+pas inscrits : la faim, la chute et les autres coups sans source qui ne mettent pas à terre, les coups refusés, les
+coups sur une cible déjà à terre. Écrit par lots (une requête paramétrée), tout ce qui attend part à l'arrêt du
+module ; lignes de plus de 30 jours retirées au démarrage puis chaque jour.
 
 ## Pour les autres modules
 
 ```lua
 local health = exports.vava_health
 if health:isDowned(source) then return false, 'downed' end   -- refuser une action à terre
-health:damage(source, 0.2)                                   -- −20 % de la vie actuelle (0 fait tomber)
+local result, code = health:hit(target, {                     -- un coup (points sur 100), après vos vérifications
+    amount = 12, kind = 'tranchant', source = source, technique = 'taille_descendante',
+    tags = { melee = true, parryable = true },
+})
+if result and result.applied > 0 then --[[ réaction, XP, usure ]] end
 health:revive(source, 0.5)                                   -- relever sur place
 ```
 
-Exports complets (`get`, `isDowned`, `setHealth`, `heal`, `damage`, `down`, `revive`), codes et hooks
-(`vava_health:downed`, `reviving` annulable, `revived`, `respawned`) : `docs/api.md`, section `vava_health`. Export
-client `get()` : `{ health, downed }` du joueur local. Appeler `isDowned` par son bridge, isolé (`pcall`), module absent
-= pas à terre.
+`hit` rend `{ id, amount, applied, blocked, absorbed, resisted, added, cancelled?, stage?, downed, health }` ou
+`nil, code`. Un modificateur se déclare au registre `vava_health:modifiers` (clé `<ressource>:<nom>`, au plus un par
+étape et par module, qui lit ses propres données), dans le `setup` si le registre existe et de nouveau sur
+`core:module:ready` quand `name == 'vava_health'` : exemple complet dans `examples/vava_example_combat`. Contrat : un
+modificateur ne cède jamais la main (ni `Wait`, ni base, ni `callClient`) et ne lance pas `hit` lui-même (un renvoi se
+fait depuis le hook `after`, avec `tags.reflected`).
+
+`damage(source, part)` reste, **déprécié** pour les coups et les sorts : il passe par la chaîne (`kind = 'pur'`,
+`tags.legacy`, sans source) jusqu'à ce que la magie y entre (T-116).
+
+Exports complets (`hit`, `vocabulary`, `modifiers`, `get`, `isDowned`, `setHealth`, `heal`, `damage`, `down`,
+`revive`), codes et hooks (`vava_health:hit`, `downed`, `reviving` annulable, `revived`, `respawned`) : `docs/api.md`,
+section `vava_health`. Export client `get()` : `{ health, downed }` du joueur local. Appeler `isDowned` par son bridge,
+isolé (`pcall`), module absent = pas à terre.
 
 ## Réseau
 
-Le serveur lit la vie lui-même (une native par joueur et par demi-seconde) : le client n'envoie rien. Vers le seul
-joueur concerné : son champ (à chaque transition, et toutes les 10 s si la vie bouge ou à terre), l'ordre de le
-coucher, de le relever ou de le porter au lieu de soins, le geste de la relève. Deux RPC sans argument, à débit limité
-(relever, rendre l'âme). Client : une lecture de la vie toutes les 500 ms pour le médaillon (envoyé à `vava_hud`
-seulement s'il change), aucune boucle par image.
+Le serveur lit le ped lui-même (une native par joueur et par demi-seconde) : le client n'envoie rien. Tous les envois
+passent par `core.net.send` (comptés dans `/vava_reseau`), vers le **seul** joueur concerné : la vie fixée par le
+serveur (`vava_health:set`, ≈ 26 o, une fois par tour au plus, quel que soit le nombre de coups ; une correction au
+plus toutes les 2 s, seulement à un client en retard ou modifié), son champ (à chaque transition, aux soins, au plus
+toutes les 10 s après des coups, et toutes les 10 s à terre), l'ordre de le coucher, de le relever ou de le porter au
+lieu de soins, le geste de la relève. **Rien à l'attaquant ni aux proches** : le résultat d'un coup revient au module
+qui l'a lancé. Aucun envoi à tous, aucun GlobalState, aucun state bag. Coût d'un combat à six (un coup reçu par
+seconde chacun) : ≈ 160 o/s pour tout le serveur. Deux RPC sans argument, à débit limité (relever, rendre l'âme) ;
+aucun RPC ne peut demander un dégât (`hit` est un export serveur). Client : une lecture de la vie toutes les 500 ms
+pour le médaillon (envoyé à `vava_hud` seulement s'il change), aucune boucle par image.
 
 ## Conseil
 
@@ -96,7 +176,19 @@ terre ou rend toute sa vie à un joueur debout (exports `isDowned`, `revive`, `s
 
 ## À vérifier en jeu
 
-La procédure complète est `docs/tests/sante.md`. En priorité :
+La procédure complète est `docs/tests/sante.md`, et `docs/tests/combat.md` § 1 pour la chaîne de dégâts. En priorité :
+
+- **Chaîne** (`combat` 1-2 à 1-14, avec `vava_example_combat`) : coups appliqués aussitôt, mise à terre sans attendre la
+  lecture du ped, modificateurs dans l'ordre, un modificateur en erreur ignoré.
+- **`weaponDamageEvent` annulé** (`combat` 1-15, 1-16) : B ne voit ni perte ni réaction de coup ; A peut voir du sang ou
+  un tressaillement local (prédiction de son client) : à noter, sans conséquence. Champs `hitGlobalId` /
+  `hitGlobalIds` selon la version de FXServer (les deux sont lus).
+- **Tir ami coupé** (`NetworkSetFriendlyFireOption(false)`, `SetCanAttackFriendly`) : A ne parvient plus à viser B pour
+  un coup de poing (confort ; sans eux, l'annulation serveur suffit).
+- **Fenêtre d'application** (1,5 s + 2 × ping) : un soin n'est jamais pris pour une perte, même à 150 ms de ping
+  (`combat` 1-7).
+- **Client qui ment** : `/tricher` → vie remise en 2 à 3 s, une ligne de console (`combat` 1-21).
+- `vava_needs` 1.2.1 avec un `vava_health` plus ancien : repli sur `damage` (facultatif).
 
 1. **Seuil** : `/vie 0` (outil `vava_dev_characters`), la dernière perte de faim ou de soif, un sort qui vide la vie →
    le personnage s'effondre aussitôt et reste au sol sous l'écran à terre (`sante` 2-1, 12).

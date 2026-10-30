@@ -2,8 +2,9 @@
     vava_health/client/body.lua
     Rôle : le ped du joueur local : vie fixée (0 à 1), mise à terre (vie GTA à 0, jamais arrêtée sur le seuil), relève
            sur place, réglages de mort de GTA (pas de fondu ni de retour automatique à l'hôpital, pas de récupération
-           automatique de la vie) et geste pour relever quelqu'un. Les réglages sont des bascules (aucune boucle) ; le
-           changement de modèle en remet certains à zéro : ils sont réappliqués à chaque apparition.
+           automatique de la vie), tir ami coupé (confort : la garantie est l'annulation des coups natifs par le
+           serveur) et geste pour relever quelqu'un. Les réglages sont des bascules (aucune boucle) ; le changement de
+           modèle en remet certains à zéro : ils sont réappliqués à chaque apparition.
     Dépendances : shared/constants.lua, config.lua, shared/vitality.lua, client/core.lua
 ]]
 
@@ -17,6 +18,7 @@ local SetFadeOutAfterDeath, SetFadeInAfterDeathArrest = SetFadeOutAfterDeath, Se
 local PauseDeathArrestRestart, IgnoreNextRestart, AnimpostfxStopAll = PauseDeathArrestRestart, IgnoreNextRestart, AnimpostfxStopAll
 local RequestAnimDict, HasAnimDictLoaded, RemoveAnimDict = RequestAnimDict, HasAnimDictLoaded, RemoveAnimDict
 local TaskPlayAnim, StopAnimTask = TaskPlayAnim, StopAnimTask
+local NetworkSetFriendlyFireOption, SetCanAttackFriendly = NetworkSetFriendlyFireOption, SetCanAttackFriendly
 
 local cfg = VavaHealth.config
 local vitality = VavaHealth.vitality
@@ -79,6 +81,13 @@ function body.resurrect(ratio)
     IgnoreNextRestart(true)
 end
 
+--- Tir ami coupé : un client honnête ne tente même pas un coup natif sur un autre joueur (le serveur l'annulerait).
+function body.protect()
+    if not cfg.client.protect then return end
+    NetworkSetFriendlyFireOption(false)
+    SetCanAttackFriendly(PlayerPedId(), false, false)
+end
+
 --- Réglages de mort et de récupération (à chaque apparition : le changement de modèle en remet à zéro).
 function body.configure()
     if not cfg.naturalRegen then SetPlayerHealthRechargeMultiplier(PlayerId(), 0.0) end
@@ -86,6 +95,7 @@ function body.configure()
     SetFadeInAfterDeathArrest(false)
     PauseDeathArrestRestart(true)
     IgnoreNextRestart(true)
+    body.protect()
 end
 
 --- Geste de celui qui relève, pour la durée donnée (chargement de l'animation borné dans le temps).
