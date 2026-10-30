@@ -588,9 +588,15 @@ versé à T-014 ; les autres points déjà couverts sont précisés dans T-012 �
   le reste s'obtient auprès des autres joueurs.
 
 ### T-023 — Codex : chapitre « Premiers pas » et guide des métiers
-- Agents : vava-dev-lua + vava-gardien-lore · Dépend de : T-022 · Statut : à faire
+- Agents : vava-architecte → vava-dev-lua + vava-dev-nui + vava-gardien-lore · Dépend de : T-022 · Statut : à tester en jeu (relu sécurité, réseau et lore, suites appliquées)
 - Pages de lecture dans le Codex (pas seulement les commandes) : vivre à Eldoria, troquer, apprendre un métier,
   la magie, le Conseil.
+- Fait le 31 octobre 2026 : `vava_codex` 1.5.0, onglet « Lecture » en tête du livre, trois chapitres et douze pages
+  (une réservée au Conseil) dans `content/*.lua` servis au seul serveur, texte balisé léger analysé au démarrage,
+  index sous l'empreinte du contenu, page envoyée à la demande (RPC `vava_codex:page`) et gardée par la page ;
+  `openAt('premiers_pas')` ouvre « Vivre à Eldoria » à la première venue ; commande console `vava_codex_pages`.
+  Page du livre 95,5 Ko (+26 Ko). Spec `docs/plan/specs/T-023.md`, rapport `docs/plan/rapports/T-023.md`. **À tester
+  en jeu** : `docs/tests/codex.md` § 16 (16-1, 16-2, 16-3, 16-8 à 16-13, 16-15, 16-16), `docs/tests/accueil.md` 20.
 
 ### T-130 — Eau potable
 - Agents : vava-architecte → vava-dev-lua · Dépend de : T-022 · Statut : à faire
