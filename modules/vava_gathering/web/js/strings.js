@@ -13,6 +13,7 @@ const STRINGS = Object.freeze({
     charges: (n) => (n > 1 ? `${n} charges` : n === 1 ? '1 charge' : 'épuisé'),
     exhausted: 'Rien à prendre ici pour le moment : la ressource se refait.',
     zoneDepleted: 'La terre est épuisée ici : la récolte sera maigre.',
+    zoneDepletedWater: 'Ces eaux sont épuisées : la pêche sera maigre.',
     needTool: (tool) => `Il vous faut ${tool} en main.`,
     toolKinds: { hache: 'une hache', pioche: 'une pioche', faucille: 'une faucille', couteau: 'un couteau', canne: 'une canne à pêche' },
     toolDefault: 'l\'outil qui convient',
@@ -60,8 +61,8 @@ const STRINGS = Object.freeze({
     rate_limited: 'Doucement…',
     timeout: 'Le serveur ne répond pas.',
     refused: 'Action refusée.',
-    client_error: 'Erreur de l\'interface.',
-    server_error: 'Le serveur a rencontré une erreur.',
+    client_error: 'Quelque chose s\'est grippé.',
+    server_error: 'Le royaume ne répond pas, réessayez.',
   },
 });
 

@@ -1,8 +1,10 @@
 --[[
     vava_needs/fxmanifest.lua
     Rôle : besoins des personnages (faim, soif) : baisse avec le temps décidée par le serveur, paliers d'effets,
-           consommation des objets à effets de l'inventaire, API pour les autres modules.
-    Dépendances : vAvA_core ≥ 0.3.0 ; facultatives : vava_inventory ≥ 1.1.0 (manger, boire), vava_hud (jauges)
+           consommation des objets à effets de l'inventaire, perte de vie d'un besoin épuisé (décidée par le serveur
+           avec vava_health), API pour les autres modules.
+    Dépendances : vAvA_core ≥ 0.3.0 ; facultatives : vava_inventory ≥ 1.1.0 (manger, boire), vava_hud (jauges),
+                  vava_health (perte de vie appliquée par le serveur, mise à terre)
 ]]
 
 fx_version 'cerulean'
@@ -12,7 +14,7 @@ use_experimental_fxv2_oal 'yes'
 
 name 'vava_needs'
 description 'Faim et soif vAvA'
-version '1.1.2'
+version '1.2.0'
 
 dependency 'vAvA_core'
 
@@ -29,6 +31,7 @@ shared_scripts {
 
 server_scripts {
     'server/core.lua',
+    'bridge/server.lua',
     'server/state.lua',
     'server/decay.lua',
     'server/consume.lua',

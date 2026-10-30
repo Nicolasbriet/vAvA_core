@@ -9,7 +9,7 @@
                   client/props.lua
 ]]
 
-local type, tostring, pcall = type, tostring, pcall
+local type, tostring, pcall, ipairs = type, tostring, pcall, ipairs
 local CreateThread, Wait, SetTimeout, GetGameTimer = CreateThread, Wait, SetTimeout, GetGameTimer
 local PlayerPedId, GetEntityCoords, GetResourceState = PlayerPedId, GetEntityCoords, GetResourceState
 local TaskStartScenarioInPlace, TaskPlayAnim, ClearPedTasks = TaskStartScenarioInPlace, TaskPlayAnim, ClearPedTasks
@@ -32,6 +32,12 @@ local HANDS_STATE = 'vava_inventory:hands'
 local MOVE_POLL_MS = 250
 local ANIM_LOAD_MS = 5000
 local ANIM_BLEND = 8.0
+
+-- zones d'eau (config.waterKinds) : l'invite parle de l'eau, non de la terre
+local WATER_ZONES = {}
+for _, zone in ipairs(cfg.zones) do
+    if type(cfg.waterKinds) == 'table' and cfg.waterKinds[zone.kind] == true then WATER_ZONES[zone.id] = true end
+end
 
 local interact = {}
 VavaGathering.interact = interact
@@ -139,7 +145,7 @@ function interact.refreshPrompt(nodeId)
     local charges = props.charges(node)
     local payload = {
         key = cfg.keys.interact, anim = resource.anim, label = resource.label, charges = charges,
-        exhausted = charges <= 0, zoneDepleted = props.isDepleted(node.zone),
+        exhausted = charges <= 0, zoneDepleted = props.isDepleted(node.zone), water = WATER_ZONES[node.zone] == true,
         toolKind = resource.tool, toolOk = toolOk(resource),
     }
     local signature = table.concat({ node.id, charges, tostring(payload.zoneDepleted), tostring(payload.toolOk) }, '|')
@@ -157,7 +163,8 @@ end
 
 --- Codes que le serveur a déjà commentés au joueur (notification) : l'interface ne les répète pas.
 local SERVER_NOTIFIED = {
-    no_tool = true, wrong_tool = true, broken_tool = true, no_charges = true, no_space = true, failed = true, escaped = true,
+    no_tool = true, wrong_tool = true, broken_tool = true, no_charges = true, no_space = true, failed = true,
+    escaped = true, expired = true,
 }
 
 --- Refus ou erreur de transport : code traduit et affiché par l'interface (textes dans web/js/strings.js).

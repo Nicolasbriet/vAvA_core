@@ -7,7 +7,7 @@ lui-même l'activité, applique les effets des objets ; le client affiche et jou
 
 Ordre de démarrage : après `vAvA_core` (≥ 0.3.0). Facultatifs : `vava_inventory` ≥ 1.1.0 (manger et boire),
 `vava_hud` (médaillons Faim et Soif, notifications), `vava_health` (à terre : besoins figés, et un besoin épuisé fait
-tomber au lieu de s'arrêter au plancher).
+tomber au lieu de s'arrêter au plancher ; la perte de vie est alors appliquée par le serveur).
 
 ## Règles (config.lua)
 
@@ -19,7 +19,7 @@ tomber au lieu de s'arrêter au plancher).
 | Baisse | un passage du serveur par minute pour tous les personnages en jeu ; rien hors connexion ni pendant la sélection | `tickMs` |
 | Activité | vitesse horizontale lue côté serveur toutes les 15 s ; à partir de 4 m/s à pied, la baisse va jusqu'à × 1,5 ; un véhicule ne compte pas | `activity` |
 | Endurance | maximale à 35 % tant qu'un besoin est critique | `criticalStamina` |
-| Vie | sans `vava_health`, jamais sous 10 % de la vie au-dessus du seuil de mise à terre ; avec lui, plancher levé | `health` |
+| Vie | avec `vava_health`, perte appliquée par le serveur (export `damage`), plancher levé ; sans lui, appliquée par le client, jamais sous 10 % de la vie au-dessus du seuil de mise à terre (100) | `health` |
 | Manger, boire | geste de 3 s ; refusé si chacun des besoins comblés est à 95 ou plus, ou pendant le geste | `consumption` |
 | Gestes | manger (`mp_player_inteat@burger`), boire (`mp_player_intdrink`), haut du corps : on peut marcher | `gestures`, `animation` |
 | Médaillons | Faim puis Soif, après Santé | `hud` |
@@ -33,14 +33,21 @@ Les valeurs sont bornées à 0–100, arrondies à deux décimales, et ne sont �
 
 ### À zéro
 
-Un besoin épuisé retire des points de vie GTA à chaque passage (2 pour la faim, 4 pour la soif, 6 les deux). La vie
-d'un joueur appartient à son client dans GTA : le serveur lui envoie la perte, il l'applique (`shared/starvation.lua`,
-testé dans `tests/spec/needs_starvation_spec.lua`) :
+Un besoin épuisé retire des points de vie GTA à chaque passage (2 pour la faim, 4 pour la soif, 6 les deux). Règles
+pures dans `shared/starvation.lua`, testées dans `tests/spec/needs_starvation_spec.lua` :
 
-- sans `vava_health`, jamais sous le plancher : personne ne reste mort sans recours ;
-- avec `vava_health`, la perte qui atteint le seuil de mise à terre couche le ped franchement (vie GTA 0, jamais
-  exactement 100, où GTA peut laisser un ped debout) ; le joueur est mis à terre, puis peut être relevé, et ses besoins
-  restent figés tant qu'il est à terre.
+- avec `vava_health` (1.2.0) : **le serveur décide et applique** la perte. Il la rapporte à la vie au-dessus du seuil
+  de mise à terre, d'après la vie maximale du ped lue côté serveur (2 points sur 200 → 2 %), et la passe à l'export
+  `damage` de `vava_health` (par `bridge/server.lua`), qui tient la vie et la mise à terre et prévient lui-même le
+  client : un client modifié ne peut plus l'ignorer. La perte qui atteint le seuil met la vie à 0 : le ped tombe
+  franchement, le joueur est mis à terre, puis peut être relevé, et ses besoins restent figés tant qu'il est à terre.
+  À terre, pas encore apparu ou pendant le démarrage de `vava_health` : rien n'est retiré. Ce n'est ni un coup ni un
+  sort : elle passe par `damage` tant que la chaîne de dégâts `vava_health:hit` (`docs/plan/COMBAT_V1.md`, T-110)
+  n'existe pas ; y entrer ou non (boucliers, résistances) sera à trancher avec elle ;
+- sans `vava_health`, seul repli : le serveur envoie la perte au seul joueur, dont le client l'applique sans jamais
+  descendre sous le plancher : personne ne reste mort sans recours.
+
+L'endurance réduite d'un besoin critique reste un effet appliqué par le client (native GTA).
 
 ### Manger et boire
 
@@ -71,7 +78,8 @@ Un modificateur ne vit que le temps du personnage chargé et disparaît à l'arr
 
 Aucun RPC : le joueur n'exprime rien de plus que l'utilisation d'un objet, déjà validée par l'inventaire. Vers le seul
 joueur concerné : son champ (au passage de la minute s'il a changé, et à chaque repas ou appel d'un module), la perte
-de vie à 0, le geste de consommation. Client : aucune boucle (les valeurs arrivent par le champ, l'endurance est une
+de vie à 0 (seulement sans `vava_health` ; avec lui, c'est `vava_health` qui envoie la vie fixée par le serveur), le
+geste de consommation. Client : aucune boucle (les valeurs arrivent par le champ, l'endurance est une
 native persistante).
 
 ## Conseil
@@ -91,3 +99,6 @@ La procédure complète est `docs/tests/besoins.md`. En priorité :
 5. **Redémarrages** : `restart vava_needs` et `restart vava_hud` → médaillons de retour avec leurs valeurs ; messages
    des paliers atteints annoncés de nouveau.
 6. **Rendu des médaillons** : `modules/vava_hud/web/index.html?values=0.8,0.62,0.08` dans un navigateur.
+7. **Perte décidée par le serveur** (1.2.0) : avec `vava_health`, médaillon et fiche du Registre d'accord à chaque
+   passage (−2, −4, −6 %), aucun avertissement en console ; sans lui (`stop vava_health`), repli client au plancher
+   (`besoins` 4-7 à 4-9).

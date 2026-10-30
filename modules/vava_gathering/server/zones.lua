@@ -11,7 +11,7 @@
                   server/catalog.lua
 ]]
 
-local pairs, ipairs = pairs, ipairs
+local type, pairs, ipairs = type, pairs, ipairs
 local floor, min, max = math.floor, math.min, math.max
 local format = string.format
 local time = os.time
@@ -110,6 +110,13 @@ function zones.band(state)
     return BANDS.NORMAL
 end
 
+--- Zone d'eau (genre listé dans config.waterKinds) : ses textes parlent de l'eau, non de la terre.
+---@param def vAvA.ZoneDefinition
+---@return boolean
+function zones.isWater(def)
+    return type(cfg.waterKinds) == 'table' and cfg.waterKinds[def.kind] == true
+end
+
 --- Effets de la bande d'une zone : { yield, tierMalus, failure }.
 ---@param state vAvA.ZoneState
 ---@return table
@@ -168,7 +175,9 @@ function zones.consume(def, cost, src)
     if after == BANDS.DEPLETED and before ~= BANDS.DEPLETED then
         journal.write('depleted', { zone = def.id, characterId = src and bridge.GetCharacterId(src) or nil, details = { vitality = state.vitality } })
         core.hooks.runAfter(HOOK_DEPLETED, { zone = def.id, vitality = state.vitality })
-        if src and state.scarredUntil == nil then bridge.Notify(src, format(messages.depleted, def.label), 'warning') end
+        if src and state.scarredUntil == nil then
+            bridge.Notify(src, format(zones.isWater(def) and messages.depletedWater or messages.depleted, def.label), 'warning')
+        end
     end
     zones.publish(def, state)
 end

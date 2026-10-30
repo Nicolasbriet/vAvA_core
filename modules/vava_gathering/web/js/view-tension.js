@@ -3,7 +3,8 @@
  * web/js/view-tension.js
  * Rôle : la barre de tension de la pêche. Une aiguille (0 à 1) monte quand la touche est tenue (`pull`/s) et descend
  *        relâchée (`gravity`/s) ; une zone [zoneMin, zoneMax] dérive au hasard (±`drift`/s, bornée) ; pendant
- *        `durationMs`, la part du temps passée dans la zone est mesurée, puis déclarée au jeu (tensionDone). Seule
+ *        `durationMs`, la part du temps passée dans la zone est mesurée, puis déclarée au jeu (tensionDone) : elle
+ *        ne peut que faire rater la prise, que le serveur tire quand la ligne a tenu. Seule
  *        animation par image du module, et seulement tant que la barre est visible. Les appuis viennent du jeu
  *        (messages tensionHold) : la touche reste celle que le joueur a choisie.
  */

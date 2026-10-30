@@ -4,17 +4,23 @@
            par les hooks de chargement et de déchargement) :
       - entre deux passages, l'activité est échantillonnée côté serveur (course à pied ; un véhicule ne compte pas) ;
       - à chaque passage : hook annulable vava_needs:decay, baisse proportionnelle au temps écoulé, à l'activité et
-        aux modificateurs posés par d'autres modules, puis perte de vie si un besoin est épuisé.
-    Dépendances : shared/constants.lua, config.lua, server/core.lua, server/state.lua
+        aux modificateurs posés par d'autres modules, puis perte de vie si un besoin est épuisé : décidée et appliquée
+        par le serveur quand vava_health tourne (export damage) ; sans lui, seul repli, envoyée au seul joueur, dont
+        le client l'applique avec son plancher.
+    Dépendances : shared/constants.lua, config.lua, shared/starvation.lua, server/core.lua, bridge/server.lua,
+                  server/state.lua
 ]]
 
 local pairs, ipairs, tonumber, tostring = pairs, ipairs, tonumber, tostring
 local sqrt, max = math.sqrt, math.max
 local GetGameTimer, GetPlayerPed, GetVehiclePedIsIn, GetEntityVelocity, GetPlayers =
     GetGameTimer, GetPlayerPed, GetVehiclePedIsIn, GetEntityVelocity, GetPlayers
+local GetEntityMaxHealth = GetEntityMaxHealth
 local TriggerClientEvent, CreateThread, Wait = TriggerClientEvent, CreateThread, Wait
 
 local state = VavaNeeds.state
+local bridge = VavaNeeds.bridge
+local starvation = VavaNeeds.starvation
 local cfg = VavaNeeds.config
 local activity = cfg.activity
 local MAX = VavaNeeds.MAX
@@ -98,6 +104,30 @@ local function modifierFor(entry, name)
     return factor
 end
 
+-- codes de vava_health qui disent seulement qu'il n'y a rien à retirer maintenant (à terre, pas encore apparu,
+-- personnage pas encore suivi, module en démarrage)
+local QUIET_HEALTH_CODES = { downed = true, not_spawned = true, no_character = true, not_ready = true }
+
+--- Perte de vie d'un besoin épuisé (points de vie GTA). Avec vava_health, le serveur la décide et l'applique (part de
+--- la vie au-dessus du seuil, d'après la vie maximale lue sur le ped serveur) : vava_health tient la vie, la mise à
+--- terre, et prévient lui-même le client. Sans lui, seul repli : le client l'applique avec son plancher.
+---@param src integer
+---@param damage number
+local function starve(src, damage)
+    if not bridge.HealthRunning() then
+        TriggerClientEvent(STARVE, src, damage)
+        return
+    end
+    local ped = GetPlayerPed(src)
+    if ped == 0 then return end
+    local amount = starvation.share(damage, GetEntityMaxHealth(ped), cfg.health.downThreshold)
+    if not amount then return end
+    local ok, code = bridge.Damage(src, amount)
+    if not ok and not QUIET_HEALTH_CODES[code] then
+        VavaNeeds.log.warn('perte de vie (faim, soif) du joueur %d non appliquée : %s', src, tostring(code))
+    end
+end
+
 ---@param src integer
 ---@param entry vAvA.NeedsEntry
 ---@param now integer
@@ -127,8 +157,7 @@ local function decayOne(src, entry, now)
     for _, need in ipairs(cfg.needs) do
         if written[need.name] <= 0 then damage = damage + need.damage end
     end
-    -- la vie d'un joueur appartient à son client : il applique la perte en respectant le plancher configuré
-    if damage > 0 then TriggerClientEvent(STARVE, src, damage) end
+    if damage > 0 then starve(src, damage) end
 end
 
 --- Un passage sur tous les personnages actifs.

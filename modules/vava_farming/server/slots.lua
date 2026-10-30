@@ -212,25 +212,72 @@ function slots.fertilize(slot)
     slot.dirty = true
 end
 
---- Récolte : l'emplacement redevient libre, la fertilité paie, la famille est retenue pour la rotation.
+--- Récolte : l'emplacement redevient libre, la fertilité paie, la famille est retenue pour la rotation, la couverture
+--- part avec la plante (shared/growth.lua).
 ---@param slot table
 ---@param crop table
 ---@param now integer
 function slots.harvest(slot, crop, now)
-    slot.fertility = growth.fertilityAfterHarvest(slot.fertility, crop, slot.lastFamily)
-    slot.lastFamily = crop.family
-    slot.crop, slot.seedTier, slot.plantedAt, slot.growth = nil, 1, 0, 0
-    slot.moisture, slot.drySince, slot.dryHours, slot.waterings = 0, nil, 0, 0
-    slot.wilted, slot.dead, slot.covered, slot.updatedAt, slot.dirty = false, false, false, now, true
+    growth.harvest(slot, crop, now)
+    slot.dirty = true
 end
 
 --- Arrachage : l'emplacement redevient libre sans rien payer ni retenir.
 ---@param slot table
 ---@param now integer
 function slots.clear(slot, now)
-    slot.crop, slot.seedTier, slot.plantedAt, slot.growth = nil, 1, 0, 0
-    slot.moisture, slot.drySince, slot.dryHours, slot.waterings = 0, nil, 0, 0
-    slot.wilted, slot.dead, slot.covered, slot.updatedAt, slot.dirty = false, false, false, now, true
+    growth.clear(slot, now)
+    slot.dirty = true
+end
+
+-- nuits de gel tombées depuis le démarrage : une plante rendue après une récolte refusée subit un gel tombé pendant
+-- l'attente, comme les autres
+local frostNights = 0
+
+---@class vAvA.FarmClaim
+---@field taken table        copie de l'emplacement avant la récolte
+---@field emptied table      copie juste après l'avoir vidé
+---@field dirty any          marque d'écriture d'avant (false, true ou WRITING)
+---@field inflight boolean   une écriture était en route
+---@field frosts integer     nuits de gel tombées au moment de la prise
+
+--- Prend la plante d'une récolte, sans céder la main : copies avant et après, marque d'écriture et nuits de gel
+--- retenues pour `giveBack`. Une couverture en train d'être payée (échange de « Couvrir » en cours) n'est pas comptée
+--- dans la copie : le cultivateur qui couvre la repose s'il a payé et que la plante est revenue.
+---@param slot table
+---@param crop table
+---@param now integer
+---@return vAvA.FarmClaim
+function slots.take(slot, crop, now)
+    local taken = growth.snapshot(slot)
+    if slot.covering then taken.covered = false end
+    local claim = { taken = taken, dirty = slot.dirty, inflight = slot.inflight == true, frosts = frostNights }
+    slots.harvest(slot, crop, now)
+    claim.emptied = growth.snapshot(slot)
+    return claim
+end
+
+--- La besace a refusé ce que la plante donnait : elle est rendue (shared/growth.lua, giveBack), si personne n'a semé
+--- entre-temps ; un gel tombé pendant l'attente la frappe comme les autres. Si rien n'a bougé et qu'aucune écriture
+--- n'est partie entre-temps, la marque d'écriture d'avant revient (pas d'écriture pour rien) ; la parcelle est
+--- republiée (sans effet si rien de visible n'a changé).
+---@param parcel vAvA.ParcelDefinition
+---@param slot table
+---@param claim vAvA.FarmClaim
+---@param crop table
+---@return boolean  vrai si la plante est rendue
+function slots.giveBack(parcel, slot, claim, crop)
+    local given, whole = growth.giveBack(slot, claim.taken, claim.emptied)
+    if not given then return false end
+    local struck = frostNights ~= claim.frosts and growth.frostKills(slot, crop)
+    if struck then slot.dead = true end
+    if whole and not struck and claim.dirty ~= WRITING and not claim.inflight and slot.dirty == true and not slot.inflight then
+        slot.dirty = claim.dirty
+    else
+        slot.dirty = true
+    end
+    slots.publish(parcel)
+    return true
 end
 
 -- Gel (vava_time) -------------------------------------------------------------------------------------------------------
@@ -259,6 +306,7 @@ end
 --- parcelles republiées. Rend { parcel, count } des parcelles touchées.
 ---@return { parcel: vAvA.ParcelDefinition, count: integer }[]
 function slots.frost()
+    frostNights = frostNights + 1
     local now = time()
     local season = bridge.SeasonEffects()
     local out = {}

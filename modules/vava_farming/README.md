@@ -28,7 +28,8 @@ et `vava_time:frost`).
 | Graines | chance 30 % + 0,5 %/niveau (≤ 90 %), 1 à 2 graines au palier de la récolte | `seeds` |
 | Gestes | semer 3 s, arroser 2,5 s, fertiliser 2,5 s, récolter 4,5 s (× 0,6 avec une faucille en main), couvrir 3 s, arracher 3 s ; XP du semis = 25 % de celle de la culture ; finir trop loin abandonne le geste (rien n'est consommé) | `actions`, `quality.plantXpShare` |
 | Seau | 5 charges, rempli aux puits ; tenu en main | `bucket`, `wells` |
-| Déchets | une plante flétrie ou morte arrachée rend 1 à 2 déchets végétaux | `compost.waste` |
+| Déchets | une plante flétrie ou morte arrachée rend 1 à 2 déchets végétaux (perdus si la besace est pleine : l'arrachage se fait quand même, et le cultivateur en est prévenu) | `compost.waste` |
+| Ordre de la récolte (1.5.1) | la plante est prise (récolte) ou arrachée **avant** que quoi que ce soit n'entre dans la besace : de deux cultivateurs qui finissent le même geste sur la même plante, un seul est servi, l'autre lit « Ce geste n'est plus en cours. » ; une récolte refusée par la besace pleine rend la plante (mûre, couverte si elle l'était et si la couverture est payée, fertilité intacte), sauf si quelqu'un a semé entre-temps (journalisé en console) ; ce qu'un autre a fait sur l'emplacement vide pendant l'attente est gardé (compost : la fertilité rendue en tient compte) et un gel tombé entre-temps frappe la plante rendue ; rien n'a bougé : aucune écriture en base pour rien, et la parcelle est republiée aussitôt | — |
 | Composteur | type de station + recette (3 déchets → 1 compost, Agriculture) ajoutés à `vava_crafting`, station placée par `addStation` | `composter` |
 | Cultures de départ | blé 90 min, carotte 30, chou 45, lin 60 (durées d'essai) | `crops` |
 | Journal | plantations, récoltes Excellent+, arrachages, couvertures, plantes prises par le gel (une ligne par nuit, par parcelle), Conseil ; grenier (une ligne par minute, personnage, objet et sens) ; 90 jours | `logTier`, `logRetentionDays`, `persistence.granaryLogMax` |
@@ -113,3 +114,6 @@ withdraw, source, characterId, item, quantity }`). Détail : `docs/api.md`.
     printemps et en été ; refusé à terre, trop loin, sans rien pour couvrir, sur un chou ou sur une plante déjà
     couverte ; « gel annoncé cette nuit » sur la fiche dès que la nuit est tirée ; une nuit de gel avertit au soir les
     seuls cultivateurs concernés et tue à 21 h les plantes exposées.
+13. **Ordre de la récolte** (1.5.1, à deux) : deux cultivateurs qui récoltent ou arrachent la même plante → un seul est
+    servi ; besace pleine à la fin d'une récolte → la plante reste, mûre et couverte si elle l'était. Détail :
+    `docs/tests/metiers.md` (agriculture, tests 14 à 17).

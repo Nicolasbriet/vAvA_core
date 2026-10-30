@@ -185,6 +185,7 @@ VavaFarming.config = {
         seedsBack = 'Et %d graine(s) récupérée(s).',
         cleared = 'Emplacement dégagé.',
         clearedWaste = 'Emplacement dégagé : %d déchets végétaux.',
+        clearedLost = 'Emplacement dégagé. Besace pleine : les déchets végétaux sont perdus.',
         filled = 'Seau rempli (%d charges).',
         bucketEmpty = 'Votre seau est vide : remplissez-le à un puits.',
         noBucket = 'Il vous faut un seau en main.',

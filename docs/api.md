@@ -674,17 +674,21 @@ avec le personnage. Les besoins, durées, paliers, messages et gestes sont dans 
   en 4 h de jeu, soif en 3 h ; × 1,5 pour la part du temps passée à courir (vitesse lue côté serveur ; un véhicule
   ne compte pas). Aucune baisse hors connexion ni pendant la sélection.
 - **Paliers** : sous 30, un message ; sous 10, un message et l'endurance maximale réduite ; à 0, perte de vie à chaque
-  passage (2 points pour la faim, 4 pour la soif). Avec `vava_health`, le joueur finit à terre (la perte qui atteint
-  le seuil couche le ped, vie GTA 0 : `shared/starvation.lua`), puis peut être relevé, et la baisse s'arrête tant
-  qu'il y est ; sans lui, la vie ne descend jamais sous `health.floor` (10 % de la vie au-dessus du seuil de mise à
-  terre), pour que personne ne reste mort sans recours. Détail et tests en jeu : `modules/vava_needs/README.md`.
+  passage (2 points pour la faim, 4 pour la soif). Avec `vava_health` (1.2.0), **le serveur décide et applique** la
+  perte : rapportée à la vie au-dessus du seuil d'après la vie maximale du ped lue côté serveur
+  (`starvation.share` de `shared/starvation.lua`), passée à `exports.vava_health:damage` par `bridge/server.lua` ;
+  `vava_health` tient la vie et prévient le client ; à 0 le joueur est mis à terre, puis peut être relevé, et la
+  baisse s'arrête tant qu'il y est (à terre, pas encore apparu ou `vava_health` en démarrage : rien n'est retiré).
+  Sans lui, seul repli : l'évènement `vava_needs:starve` part vers le seul joueur, dont le client l'applique sans
+  descendre sous `health.floor` (10 % de la vie au-dessus du seuil de mise à terre), pour que personne ne reste mort
+  sans recours. L'endurance réduite reste un effet du client. Détail et tests en jeu : `modules/vava_needs/README.md`.
 - **Manger, boire** : objets de l'inventaire déclarant `effects = { hunger = …, thirst = … }`. Refusés dès 95 (à 95 et
   au-dessus pour chaque besoin que l'objet remplit : « Vous n'avez plus faim. ») et pendant le geste en cours (3 s).
   Geste selon la catégorie (`nourriture` : manger,
   `boisson` : boire), sans accessoire en main. Un objet portant aussi l'effet d'un autre module n'est jamais refusé
   pour cause de satiété.
 - **Réseau** : un envoi par joueur et par minute (son champ), à lui seul ; aucun RPC (l'utilisation d'un objet passe
-  par l'inventaire). La perte de vie est appliquée par le client (la vie d'un joueur lui appartient dans GTA).
+  par l'inventaire). La perte de vie n'est envoyée au client que sans `vava_health` (repli).
 
 **Exports serveur** (cible : un joueur, son personnage actif) :
 
@@ -1285,7 +1289,7 @@ fondateur ; `/metiers niveau <joueur> <compétence> <niveau>`, `/metiers recette
 
 ### `vava_gathering`
 
-La récolte (1.3.2) : zones à **vitalité** 0–100 (plein rendement au-dessus de 60, réduit entre 60 et 25 avec chance
+La récolte (1.4.0) : zones à **vitalité** 0–100 (plein rendement au-dessus de 60, réduit entre 60 et 25 avec chance
 d'échec, **épuisée** sous 25 avec props remplacés et rendement effondré, **cicatrice** à 0 : régénération × 0,2 pendant
 la durée de la zone), nœuds à charges (arbres, filons, buissons, bancs de poissons, pistes de gibier) qui se
 régénèrent par le temps (recalcul à la demande, aucune boucle), outils **en main** (`vava_inventory:held`) du genre
@@ -1302,7 +1306,13 @@ facultatifs : `vava_hud`, `vava_admin` (droit `metiers`), `vava_chat`, `vava_hea
 - **État** publié par state bags globaux : `vava_gathering:zone:<id>` → `{ band, scarred, vitality }`,
   `vava_gathering:node:<id>` → charges ; écrits au seul changement, relus toutes les 10 s.
 - **Serveur maître** : distance lue côté serveur au début et à la fin, durée revérifiée, jeton par geste, cooldown,
-  une récolte à la fois ; pour la pêche, seul « a tenu la tension » est déclaratif. À terre (`vava_health:isDowned`,
+  une récolte à la fois. Pêche (1.4.0, décision du 30 octobre 2026 : le serveur tire la réussite) : le booléen « a
+  tenu la tension » de `vava_gathering:reel` ne peut que faire rater (`false` : code `escaped`) ; à `true`, le serveur
+  tire la prise d'après le seul niveau de Pêche (`fishing.catch`, règle pure `shared/catch.lua` :
+  25 % de poissons décrochés au niveau 0, 2 % au niveau 100 ; supplément de bande `catch.bands` à 0 depuis la
+  décision du 30 octobre 2026 ; code
+  `escaped`, rien de consommé), puis l'échec de la bande comme pour toute récolte (zones de `waterKinds` : textes de
+  l'eau pour l'échec, l'épuisement et l'invite). À terre (`vava_health:isDowned`,
   lu par le bridge), ni début ni fin (code `downed`) ; côté client, ni invite ni demande.
 - **Saisons** (1.3.0) : la saison de `vava_time` (export `getSeason`, lu par le bridge, gardée 5 s) donne deux facteurs
   par compétence de la ressource, réglés dans `config.seasons` : `regen` (vitesse à laquelle les nœuds rendent leurs
@@ -1395,7 +1405,7 @@ station. Rendu hors jeu : `web/index.html?view=menu` (ou `menu&tab=reparation`, 
 
 ### `vava_farming`
 
-L'agriculture (1.4.1) : **parcelles** communales ou privées (`owner = { kind = 'character', id }`, autres genres par
+L'agriculture (1.5.1) : **parcelles** communales ou privées (`owner = { kind = 'character', id }`, autres genres par
 `registerAccess`) faites d'emplacements en grille ; **croissance par dates** (humidité qui baisse, pousse au-dessus
 d'un seuil, pause à sec, flétrie après 6 h, morte après 18 h ; aucune boucle, republication des stades toutes les
 10 s) ; **fertilité** (coût par récolte, rotation par famille, compost, jachère) ; **qualité** de la récolte (graine ×
@@ -1404,7 +1414,10 @@ récupérées au même palier ; gestes semer / arroser (seau en main rempli aux 
 plus vite) / couvrir (contre le gel, 1.4.0) / arracher (déchets), tous validés et appliqués par le serveur après un geste chronométré (fini trop loin
 ou à terre, le geste est abandonné ; à terre, `vava_health:isDowned` lu par le bridge : ni menu, ni geste, ni puits,
 ni grenier, code `downed` ; un emplacement qui vient de donner ou de consommer des objets — semis, récolte, compost,
-couverture, arrachage — est écrit aussitôt, le reste par lots) ; **grenier
+couverture, arrachage — est écrit aussitôt, le reste par lots ; récolte et arrachage vident l'emplacement avant tout
+ajout à la besace, qui peut céder la main : de deux cultivateurs sur la même plante, un seul est servi ; une récolte
+refusée par la besace rend la plante (couverture payée comprise), sauf semis fait entre-temps, sans effacer un compost
+posé entre-temps, et un gel tombé pendant l'attente la frappe ; parcelle republiée aussitôt — 1.5.1) ; **grenier
 commun** (conteneur `vava_inventory` conservé, ouvert ancré à qui a accès à la parcelle — communale : tous ; privée :
 son propriétaire ou le genre branché par `registerAccess` —, dépôts et retraits journalés par minute : une ligne par
 minute, grenier, personnage, objet et sens, quantités additionnées, attente bornée par `persistence.granaryLogMax` ;

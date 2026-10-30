@@ -69,7 +69,8 @@ VavaGathering.config = {
     },
 
     -- Pêche : la ligne est lancée (begin) ; le serveur tire le moment de la touche, prévient le client, qui tient la
-    -- tension dans la zone pendant `durationMs` ; `reel` dit si la tenue a réussi. Un raté n'use aucune charge.
+    -- tension dans la zone pendant `durationMs` ; `reel` dit si la tenue a réussi. La barre ne peut que faire rater :
+    -- ligne tenue, le serveur tire encore la prise (`catch`). Un raté n'use aucune charge.
     fishing = {
         biteMinMs = 4000,
         biteMaxMs = 14000,
@@ -84,6 +85,18 @@ VavaGathering.config = {
         },
         reelToleranceMs = 500,      -- avance tolérée sur la durée de la barre
         reelGraceMs = 4000,         -- retard toléré (au-delà : la prise s'est échappée)
+        -- Prise tirée par le serveur quand la ligne a tenu : chance que le poisson se décroche, de `novice` au niveau 0
+        -- de Pêche à `master` au niveau `masterLevel` (linéaire entre les deux), plus le supplément de la bande de la
+        -- zone (`bands`). Parts de 0 à 1. L'échec de la bande (`bands.effects.failure`) s'applique ensuite, comme à
+        -- toute récolte. Décision du 30 octobre 2026 (une seule cause par message) : supplément à 0 partout, le
+        -- décrochage ne dépend que du niveau ; l'état de l'eau ne joue que par l'échec de la bande. Réglage gardé pour
+        -- pouvoir le remettre (essai d'avant : reduced = 0.05, depleted = 0.10).
+        catch = {
+            novice = 0.25,
+            master = 0.02,
+            masterLevel = 100,
+            bands = { normal = 0.0, reduced = 0.0, depleted = 0.0 },
+        },
     },
 
     -- Client : props des nœuds créés à portée, remplacés par le modèle « épuisé » quand la zone l'est.
@@ -105,6 +118,10 @@ VavaGathering.config = {
         },
         default = { sprite = 1, colour = 0 },           -- genre sans icône : point blanc
     },
+
+    -- Genres de zone d'eau (`zones[].kind`) : leurs textes parlent de l'eau, non de la terre (échec de la bande,
+    -- épuisement, invite).
+    waterKinds = { eau = true },
 
     persistence = { flushMs = 10000 },  -- écriture groupée des zones et nœuds modifiés
     logRetentionDays = 90,
@@ -223,11 +240,14 @@ VavaGathering.config = {
         harvested = '%s : %d × %s (%s).',                     -- ressource, quantité, objet, palier
         harvestedExtra = 'Et aussi : %s.',
         failed = 'La récolte échoue : la terre est fatiguée ici.',
+        failedWater = 'Ces eaux sont fatiguées : le poisson vous échappe.',     -- zone d'eau (`waterKinds`)
         escaped = 'La prise s\'est échappée.',
+        slipped = 'Au dernier moment, le poisson se décroche.',
         noTool = 'Il vous faut %s en main.',                  -- genre d'outil (libellé)
         brokenTool = 'Votre outil est brisé.',
         noCharges = 'Il n\'y a plus rien à prendre ici pour le moment.',
         depleted = '%s est épuisée : la terre a besoin de repos.',
+        depletedWater = '%s est épuisée : l\'eau a besoin de repos.',          -- zone d'eau (`waterKinds`)
         scarred = '%s porte une cicatrice : elle mettra longtemps à se remettre.',
         toolWorn = 'Votre %s s\'use (%d).',
         toolBroken = 'Votre %s se brise !',
