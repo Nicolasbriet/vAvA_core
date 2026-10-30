@@ -25,6 +25,12 @@ local INVENTORY = 'vava_inventory'
 -- mode développement : même convar et même valeur que les autres ressources d'examples/ (shared/guard.lua)
 local DEV_CONVAR, DEV_VALUE, DEV_FALLBACK = 'vava_env', 'dev', 'prod'
 local DEV_REFUSAL = 'mode développement absent (convar vava_env ≠ dev) : aucun objet déclaré'
+
+--- Mode développement, relu à chaque déclaration (démarrage et redémarrage de l'inventaire).
+---@return boolean
+local function devMode()
+    return GetConvar(DEV_CONVAR, DEV_FALLBACK) == DEV_VALUE
+end
 local ITEMS_REGISTRY = 'vava_inventory:items'
 local IMAGE_ROOT = ('nui://%s/web/items/'):format(RESOURCE)
 
@@ -93,13 +99,18 @@ local registered, registerErr = core.modules.register({
     dependencies = { vava_inventory = '1.1.0' },
     setup = function()
         -- objets de démonstration (une Bande de lin soigne) : rien n'est offert hors du mode développement
-        if GetConvar(DEV_CONVAR, DEV_FALLBACK) ~= DEV_VALUE then return false, DEV_REFUSAL end
+        if not devMode() then return false, DEV_REFUSAL end
         local ok, err = declare()
         if not ok then return false, err end
         -- inventaire redémarré : ses registres ont disparu avec lui, les objets sont redéclarés dès qu'il est prêt
         local id
         id, err = core.hooks.after('core:module:ready', function(payload)
             if payload.name ~= INVENTORY then return end
+            -- set vava_env prod depuis le démarrage : l'inventaire redémarré ne retrouve pas les objets d'exemple
+            if not devMode() then
+                core.log.warn('objets non redéclarés : %s', DEV_REFUSAL)
+                return
+            end
             local redeclared, declareErr = declare()
             if not redeclared then core.log.warn('objets non redéclarés : %s', tostring(declareErr)) end
         end)

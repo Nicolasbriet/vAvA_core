@@ -44,7 +44,7 @@ au public** (la Chancellerie les pose dans `[vava-dev]` sans jamais les lancer d
 | --- | --- |
 | `vava_dev_characters` | `/objet` (n'importe quel objet), `/vie`, `/aterre`, `/besoins`, `/respawn`, `/perso` |
 | `vava_example` | `/note` (lignes écrites en base), `example_ping` |
-| `vava_example_items` | huit objets de démonstration, dont une Bande de lin qui soigne |
+| `vava_example_items` | huit objets de démonstration, dont une Bande de lin qui soigne, et leurs images (~51 Ko) téléchargées par chaque joueur |
 | `vava_anim_test` | `/anim`, `/epee`, `/animstop`, `/animprop`, et un `.ycd` téléchargé par chaque joueur |
 
 Elles sont en plus **inoffensives par construction** : chacune refuse de démarrer tant que la convar serveur

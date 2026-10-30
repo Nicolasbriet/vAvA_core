@@ -27,6 +27,8 @@ end
 local pcall, pairs, ipairs, tostring = pcall, pairs, ipairs, tostring
 local concat, sort = table.concat, table.sort
 local GetConvar, GetResourceState, IsPlayerAceAllowed = GetConvar, GetResourceState, IsPlayerAceAllowed
+local GetPlayerPed, GetEntityCoords, DoesEntityExist = GetPlayerPed, GetEntityCoords, DoesEntityExist
+local format = string.format
 
 local ADMIN = 'vava_admin'
 local RPC_ACCESS = RESOURCE .. ':access'
@@ -127,9 +129,20 @@ local function give(source, item, quantity)
     return ok, result
 end
 
+--- Position du ped au moment de l'appel, lue par le serveur (OneSync), pour le journal.
+---@param source integer
+---@return string
+local function whereIs(source)
+    local ped = GetPlayerPed(source)
+    if not ped or ped == 0 or not DoesEntityExist(ped) then return 'inconnue' end
+    local at = GetEntityCoords(ped)
+    return format('%.1f, %.1f, %.1f', at.x, at.y, at.z)
+end
+
 local function respawn(source)
+    local from = whereIs(source)
     local ok, code = core.characters.spawn(source)
-    if ok then journal(source, cfg.journal.respawn, { lieu = 'dernière position connue' }) end
+    if ok then journal(source, cfg.journal.respawn, { depuis = from, vers = 'dernière position connue' }) end
     return ok, code
 end
 

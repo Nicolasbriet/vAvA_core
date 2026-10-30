@@ -46,7 +46,7 @@ Poser la convar sans redémarrer le serveur : console `set vava_env dev`, puis `
 | 6 | A : `/vie 40`, puis `/vie`. | Vie à 40 % ; Journal : « Outil de test : vie fixée · vie : 40 ». La lecture seule (`/vie`) n'ajoute **aucune** ligne. |
 | 7 | A : `/besoins 50`, puis `/besoins`. | Faim 50, soif inchangée ; Journal : « Outil de test : besoins fixés · faim : 50 ; soif : - ». La lecture n'ajoute rien. |
 | 8 | A : `/aterre`, puis se relever (`/vie 100` ou aide de B). | À terre ; Journal : « Outil de test : mise à terre · cause : test ». |
-| 9 | A : `/respawn`. | Réapparition à la dernière position connue ; Journal : « Outil de test : réapparition ». |
+| 9 | A : `/respawn`. | Réapparition à la dernière position connue ; Journal : « Outil de test : réapparition · depuis : <x, y, z où se tenait A> ; vers : dernière position connue ». |
 | 10 | A : `/perso liste`. | La liste des personnages de A, comme avant ; rien au Journal (actions du core). |
 | 11 | A : `F1`, chapitre « Tests ». | `anim`, `animstop`, `animprop`, `animflags`, `epee`, lançables. |
 
@@ -70,6 +70,7 @@ Poser la convar sans redémarrer le serveur : console `set vava_env dev`, puis `
 | 2 | La miche gardée à part au § 1-7 (s'il y en avait une). | De retour à sa place dans la besace, sans reconnexion. |
 | 3 | A, une miche en besace, se déconnecte. Console : `set vava_env prod`, `restart vava_example_items`. A se reconnecte, `I`. | Console : `module 'vava_example_items' … refusé : … mode développement absent`, puis au chargement de A `conteneur #n : objet #m (pain) sans place ou sans définition, conservé à part`. La miche n'est pas dans la besace ; sa ligne est toujours en base. |
 | 4 | Console : `set vava_env dev`, `restart vava_example_items`. A : `I`. | La miche est revenue à sa place, sans reconnexion (`… pile(s) de 'pain' replacée(s)`). |
+| 5 | Console : `set vava_env prod` (sans redémarrer `vava_example_items`), puis `restart vava_inventory`. | Console : `[vava_example_items] objets non redéclarés : mode développement absent …` ; les objets d'exemple ne reviennent pas au catalogue. Remettre `set vava_env dev`, `restart vava_example_items`. |
 
 ## 5. Arrêt de l'outil d'animation
 

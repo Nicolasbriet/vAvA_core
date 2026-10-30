@@ -30,7 +30,7 @@ add_ace identifier.license:0123456789abcdef vava.dev allow
 | Commande | Effet | Journal |
 | --- | --- | --- |
 | `/perso liste \| creer <prénom> <nom> <h\|f> \| choisir <id> \| quitter \| supprimer <id>` | personnages du compte, par les RPC du core (le client demande d'abord l'accès au serveur) | — (actions du core) |
-| `/respawn` | réapparition à la dernière position connue | « Outil de test : réapparition » |
+| `/respawn` | réapparition à la dernière position connue | « Outil de test : réapparition » (position de départ, lue par le serveur) |
 | `/objet <nom> [quantité]` | objet du registre donné au personnage actif (100 au plus) | « Outil de test : objet donné » (objet, quantité) |
 | `/besoins [faim] [soif]` | lit, ou fixe, la faim et la soif | « Outil de test : besoins fixés » (lecture non inscrite) |
 | `/vie [pourcentage]` | lit, ou fixe, la vie | « Outil de test : vie fixée » (lecture non inscrite) |

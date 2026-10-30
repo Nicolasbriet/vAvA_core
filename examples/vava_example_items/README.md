@@ -21,6 +21,12 @@ Piles déjà en jeu quand le module ne déclare plus ses objets : l'inventaire l
 utilisables, jamais effacées) ; elles reviennent à leur place dès que le module tourne de nouveau en mode développement.
 Aucun module du royaume ne dépend de ces objets.
 
+La convar est relue quand l'inventaire redémarre : après `set vava_env prod`, un `restart vava_inventory` ne
+redéclare pas les objets (avertissement en console).
+
+Les images de `web/items/` (huit SVG, ~51 Ko) sont téléchargées par chaque joueur tant que la ressource tourne, garde
+ou non : seul le déploiement l'empêche (ne jamais la démarrer sur un serveur ouvert).
+
 ## Dépendances
 
 `vAvA_core` ≥ 0.3.0, `vava_inventory` ≥ 1.1.0 ; `vava_needs` et `vava_health` pour les effets.

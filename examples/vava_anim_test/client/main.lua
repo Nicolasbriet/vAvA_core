@@ -21,6 +21,7 @@ local format, concat = string.format, table.concat
 local CreateThread, Wait, RegisterCommand, TriggerEvent, AddEventHandler = CreateThread, Wait, RegisterCommand, TriggerEvent, AddEventHandler
 local PlayerPedId, GetEntityCoords, GetGameTimer = PlayerPedId, GetEntityCoords, GetGameTimer
 local DoesAnimDictExist, RequestAnimDict, HasAnimDictLoaded, GetAnimDuration = DoesAnimDictExist, RequestAnimDict, HasAnimDictLoaded, GetAnimDuration
+local RemoveAnimDict = RemoveAnimDict
 local TaskPlayAnim, IsEntityPlayingAnim, ClearPedTasks = TaskPlayAnim, IsEntityPlayingAnim, ClearPedTasks
 local GetHashKey, IsModelInCdimage, RequestModel, HasModelLoaded, SetModelAsNoLongerNeeded = GetHashKey, IsModelInCdimage, RequestModel, HasModelLoaded, SetModelAsNoLongerNeeded
 local CreateObject, AttachEntityToEntity, GetPedBoneIndex, DoesEntityExist, DeleteObject = CreateObject, AttachEntityToEntity, GetPedBoneIndex, DoesEntityExist, DeleteObject
@@ -40,6 +41,8 @@ end
 -- dernière animation jouée et accessoire accroché
 local last = nil
 local prop = nil
+-- dictionnaire chargé à la demande de l'outil (jamais un dictionnaire déjà chargé par un autre module)
+local requested = nil
 -- accès accordé par le serveur jusqu'à cette heure (GetGameTimer)
 local grantedUntil = 0
 
@@ -75,16 +78,25 @@ local function command(name, handler)
     end, false)
 end
 
---- Charge un dictionnaire d'animations. Bloque le thread courant jusqu'au chargement ou au délai.
+--- Rend au jeu le dictionnaire que l'outil a demandé.
+local function releaseDict()
+    if requested then RemoveAnimDict(requested) end
+    requested = nil
+end
+
+--- Charge un dictionnaire d'animations (et rend le précédent demandé par l'outil). Bloque le thread courant jusqu'au
+--- chargement ou au délai.
 ---@param dict string
 ---@return boolean
 local function loadDict(dict)
+    if requested and requested ~= dict then releaseDict() end
     if not DoesAnimDictExist(dict) then
         say('dictionnaire « %s » inconnu du jeu : le fichier %s.ycd est-il dans stream/ de cette ressource, et la ressource a-t-elle été (re)démarrée ?', dict, dict)
         return false
     end
     if HasAnimDictLoaded(dict) then return true end
     RequestAnimDict(dict)
+    requested = dict
     local deadline = GetGameTimer() + cfg.loadTimeoutMs
     while not HasAnimDictLoaded(dict) do
         if GetGameTimer() > deadline then
@@ -229,4 +241,5 @@ AddEventHandler('onResourceStop', function(resource)
     removeProp()
     local ped = PlayerPedId()
     if last and IsEntityPlayingAnim(ped, last.dict, last.clip, 3) then ClearPedTasks(ped) end
+    releaseDict()
 end)
