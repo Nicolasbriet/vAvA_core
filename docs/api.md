@@ -267,7 +267,11 @@ Persistance et positions :
 - FiveM n'attend pas les écritures à l'arrêt du serveur : **lancer `vava_saveall` avant `quit`**.
 
 Apparition : le core remplace `spawnmanager`. Ne pas démarrer `spawnmanager`, `basic-gamemode` ni de carte
-`mapmanager` avec vAvA_core.
+`mapmanager` avec vAvA_core. Un personnage sans position enregistrée (donc tout nouveau personnage) apparaît à
+`spawn.defaultPoint` de `config/server.lua` : c'est le **point d'arrivée** des nouveaux venus (`vava_arrival`, T-022),
+marqué `-- PLACEHOLDER` jusqu'à la carte du royaume. Aucune API ne permet à un module de choisir ce point (le
+personnage est encore en chargement pendant `core:character:loaded`) : un point d'arrivée géré par l'Atelier demandera
+une petite API du core.
 
 ### `core.registry`
 
@@ -753,7 +757,8 @@ même que `README.md` à la racine, et celui qu'écrit la Chancellerie) :
 `ensure vava_world`, `ensure vava_time`, `ensure vava_appearance`, `ensure vava_characters_ui`, `ensure vava_hud`,
 `ensure vava_inventory`, `ensure vava_needs`, `ensure vava_health`, `ensure vava_admin`, `ensure vava_voice`,
 `ensure vava_cameras`, `ensure vava_magic`, `ensure vava_skills`, `ensure vava_gathering`, `ensure vava_crafting`,
-`ensure vava_farming`, `ensure vava_codex`, `ensure vava_chancellerie`, puis les modules qui déclarent des objets.
+`ensure vava_farming`, `ensure vava_codex`, `ensure vava_arrival`, `ensure vava_chancellerie`, puis les modules qui
+déclarent des objets.
 
 ### `vava_ui`
 
@@ -1944,9 +1949,60 @@ un numéro à la main reste possible.
 |---|---|
 | serveur `suggestions(source)` | `{ { name, help, params = { { name, help } } } }` : les suggestions du chat pour ce joueur (ses commandes, une par sous-commande en deux mots, sans les touches ni la console) ; `vava_chat` l'appelle avec le profil |
 | client `noteCommand(ligne)` | — : une commande tapée ailleurs (chat) est inscrite aux dernières pages ; le serveur ignore ce que le joueur ne peut pas lancer |
+| client `openAt(chapitre)` | `true` (ouverture lancée, même chemin que `F1`) ou `false, code` : `invalid_chapter` (pas un identifiant du core de 64 octets au plus), `no_character`, `busy` (livre ouvert, menu pause, autre interface au focus) — 1.4.0 ; la page ouvre ce chapitre (onglet des commandes) s'il existe, sinon reste à l'index |
+
+**Ouvrir à un chapitre** (1.4.0) : le chapitre part dans le message `open` de la page (`focus`, 64 octets au plus,
+absent pour `F1` et `/codex`) ; rien de plus sur le réseau. L'identifiant d'un chapitre est aujourd'hui le nom du
+module qui déclare ses commandes (`openAt('vava_inventory')`). Le chapitre « Premiers pas » (`premiers_pas`, T-023)
+est celui qu'ouvre `vava_arrival` à la première venue : T-023 le crée dans les chapitres de la page, ou étend la seule
+fonction `applyFocus` de `web/js/app.js` s'il range ses pages ailleurs. Hors jeu : `?focus=<chapitre>`.
 
 Hors jeu : `web/index.html` dans un navigateur (`?staff=0` pour la vue d'un simple joueur) ; les listes des
 formulaires y sont simulées.
+
+### `vava_arrival`
+
+L'arrivée d'un nouveau personnage (1.0.0, T-022). Ordre de démarrage : après `vava_codex`, avant `vava_chancellerie`.
+Demande le core 0.10.0 (`core.net`, `playSeconds` du hook `loaded`, registre `core:commands`) et `vava_inventory`
+1.4.0 (`exchange`, registre des objets) ; facultatifs : `vava_codex` 1.4.0 (`openAt`), `vava_hud` (notifications),
+`vava_admin` (droit `give`, journal du Registre), `vava_chat` (réponses de `/accueil`). Détail et réglages :
+`modules/vava_arrival/README.md`.
+
+- **Point d'arrivée** : `spawn.defaultPoint` du core (voir « Apparition », § `core.characters`) ; le module ne recopie
+  aucune coordonnée.
+- **Première venue** reconnue par le serveur seul, au hook `core:character:loaded` : aucune ligne dans `vava_arrival`
+  **et** temps de jeu mesuré par le core nul → ligne « à donner ». Un personnage ancien (temps de jeu non nul) n'est
+  jamais suivi. Aucune entrée réseau ne la demande : le client ne se déclare jamais nouveau.
+- **Dotation** (`config.kit.items`, défaut 2 `pain` et 2 `eau`, objets déclarés par le module s'ils manquent), donnée à
+  l'apparition par **un** `exchange(source, {}, objets)` : objets connus vérifiés, limite par compte (3 dotations sur
+  30 jours glissants, personnages supprimés compris : au-delà, accueil sans dotation), **réservation conditionnelle en
+  base** (`UPDATE … WHERE kit = 'due'`, une ligne touchée), personnage actif relu juste avant l'échange sans céder la
+  main, état écrit ; échec (besace pleine, inventaire absent, personnage changé) → de nouveau « à donner », nouvel essai
+  à l'apparition suivante ou au retour de l'inventaire. Une ligne relue « réservée » (serveur tombé pendant la remise)
+  passe « incertaine » et n'est **jamais** redonnée d'office (console, journal ; le Conseil vérifie et redote).
+- **Accueil** : évènement `vava_arrival:welcome` (`kitGiven`, ~25 o) au **seul** nouveau venu par `core.net.send`, au
+  plus 3 fois sans accusé (une fois par session) ; le client attend un écran calme (4 s, puis essais d'une seconde,
+  30 s au plus), montre deux notifications du HUD, ouvre le Codex au chapitre `codex.chapter` (`premiers_pas`) par
+  `openAt`, puis accuse lecture. Rien n'est envoyé aux autres joueurs, rien aux personnages anciens ; aucun
+  GlobalState, aucun state bag, aucune boucle client au repos.
+
+| RPC | `args` | `rateLimit` | Réponse |
+|---|---|---|---|
+| `vava_arrival:welcomed` | `{}` | `{ capacity = 2, refillPerSecond = 0.05 }` | `true` ; `false, 'no_character'` ; `false, 'not_expected'` (aucun accueil envoyé à ce personnage pendant cette session, ou déjà accusé) ; `false, 'db_error'` |
+
+| Évènement serveur → client | Valeurs | Cible |
+|---|---|---|
+| `vava_arrival:welcome` | `kitGiven` (booléen) | le seul joueur dont le personnage nouveau vient d'apparaître, ou celui visé par `/accueil rejouer` |
+| `vava_arrival:notify` | texte | le seul membre du Conseil qui a tapé `/accueil`, quand `vava_chat` manque (sinon son chat) |
+
+**Hook émis** `vava_arrival:arrived` (`after`) : `{ source, characterId, accountId, kit }` au **premier** accueil envoyé
+à un nouveau personnage (`kit` : état après la dotation — `given`, `withheld`, `due` si elle a échoué, `uncertain`) ;
+point d'appui des modules à venir (annonce aux proches, confrérie d'accueil). Aucun export.
+
+**Conseil** : `/accueil etat | redoter | rejouer <n° de joueur>` (droit `give`, repli ACE `vava_arrival.admin`, console
+permise, 2 s entre deux commandes d'un membre ; chapitre « Accueil » du Codex). `redoter` ignore l'état et la limite du
+compte ; `rejouer` renvoie l'accueil (sans la ligne de la dotation). Chaque action va au journal du module
+(`vava_arrival_log`, 90 jours) et au Registre du Conseil.
 
 ### `vava_chat`
 
