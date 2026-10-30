@@ -50,8 +50,13 @@ la zone. Un joueur loin de toute zone ne reçoit rien. La **vitalité n'est jama
 que voit le joueur ; le panneau `O` la demande au serveur) : seule une bande ou une cicatrice qui change fait partir la
 clé `zone`, à la récolte ou au passage de la boucle lente (10 s) quand la zone se remet. Plus aucune écriture dans
 GlobalState : les anciennes clés `vava_gathering:zone:<id>` et `vava_gathering:node:<id>` sont effacées une fois au
-démarrage si un serveur resté allumé les garde encore. Une zone refusée par le core (rayon de plus de 500 m, plus de
-255 nœuds…) est écrite en console une fois et retentée toutes les 10 s ; ses nœuds n'apparaissent pas chez les joueurs.
+démarrage si un serveur resté allumé les garde encore (seulement pour les zones et nœuds encore dans la config : après
+une mise à jour depuis une version antérieure à 1.6.0 qui retire des zones ou des nœuds, **redémarrer le serveur**, pas
+seulement la ressource). Une zone hors des bornes d'une zone du core (nœuds à plus de 500 m de son centre, plus de 255
+nœuds, `streaming.radius` + `streaming.subscribeSlack` au-delà de 500 m) refuse le module au démarrage, avec la zone
+en cause dans la console. Une zone refusée en cours de route par le core (`full` : trop de zones, état total trop
+gros) est écrite en console une fois, rappelée toutes les 10 min avec le nombre de refus, et retentée toutes les 10 s ;
+ses nœuds n'apparaissent pas chez les joueurs.
 Identifiants : 48 octets au plus pour une zone, 46 pour un nœud (clé `n:<nœud>`), sinon le module refuse de démarrer.
 
 **L'état d'une zone est public** : sous OneSync, la position que lit le serveur est déclarée par le client, un client
@@ -174,3 +179,7 @@ resource, item }`), `harvested` (after : `+ quantity, tier, band, extra? `), `zo
 - Téléportation au milieu d'une zone : props au plus une seconde environ après l'arrivée (avant : jusqu'à 2,5 s).
 - Coût du passage des zones avec les zones de récolte (`profiler record`, `docs/tests/metiers.md` § 3.4).
 - `restart vava_gathering` en étant dans une zone : props retrouvés dans les deux secondes, sans reconnexion.
+- Une récolte qui change la bande d'une zone : une seule `vAvA:zone:diff` chez le joueur proche (charges et bande
+  ensemble) ; besace pleine : aucune.
+- Loin de toute zone de récolte : `vava_gathering` à 0,00 ms dans `resmon` (boucle des props arrêtée) ; elle repart à
+  l'approche d'une zone, props à 80 m comme avant.

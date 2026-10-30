@@ -124,6 +124,25 @@ describe('vava_gathering share', function()
         assert.is_true(share.isDeclared('foret_brume'))
     end)
 
+    it('rappelle un refus durable au plus toutes les 10 min, avec le nombre de refus', function()
+        local now = 1000
+        _G.GetGameTimer = function() return now end
+        helper.load('modules/vava_gathering/server/share.lua')
+        share = VavaGathering.share
+        answers.define = {}
+        for _ = 1, 4 do answers.define[#answers.define + 1] = { false, 'full' } end
+        assert.is_false(share.declare(FORET, {}))
+        now = now + 60000
+        assert.is_false(share.declare(FORET, {}))
+        assert.is_false(share.declare(FORET, {}))
+        assert.equal(1, #errors)
+        now = now + 600000
+        assert.is_false(share.declare(FORET, {}))
+        assert.equal(2, #errors)
+        assert.truthy(errors[2]:find('toujours refusée', 1, true))
+        assert.truthy(errors[2]:find('3 refus', 1, true))
+    end)
+
     it('oublie une zone dont un changement est refusé : elle sera redéclarée entière', function()
         share.declare(FORET, {})
         answers.set = { { false, 'unknown_zone' } }

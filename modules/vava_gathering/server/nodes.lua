@@ -128,10 +128,12 @@ function nodes.charges(def)
     return state.charges
 end
 
---- Consomme une charge ; faux s'il n'en reste aucune.
+--- Consomme une charge ; faux s'il n'en reste aucune. `deferred` : rien n'est publié, l'appelant le fera avec
+--- `nodes.flush` (une récolte publie nœud et zone ensemble, en une différence, une fois finie).
 ---@param def vAvA.NodeDefinition
+---@param deferred? boolean
 ---@return boolean
-function nodes.consume(def)
+function nodes.consume(def, deferred)
     local state = states[def.id]
     if not state then return false end
     local now = time()
@@ -141,13 +143,15 @@ function nodes.consume(def)
     if state.charges >= def.charges then state.updatedAt = now end
     state.charges = state.charges - 1
     state.dirty = true
-    nodes.publish(def, state)
+    if not deferred then nodes.publish(def, state) end
     return true
 end
 
---- Rend une charge prise par une récolte qui n'a pas abouti (besace pleine), sans dépasser le maximum.
+--- Rend une charge prise par une récolte qui n'a pas abouti (besace pleine), sans dépasser le maximum. `deferred` :
+--- comme pour `nodes.consume`.
 ---@param def vAvA.NodeDefinition
-function nodes.restore(def)
+---@param deferred? boolean
+function nodes.restore(def, deferred)
     local state = states[def.id]
     if not state then return end
     local now = time()
@@ -157,7 +161,15 @@ function nodes.restore(def)
     -- de nouveau plein : le délai de la prochaine charge partira de la prochaine consommation
     if state.charges >= def.charges then state.updatedAt = now end
     state.dirty = true
-    nodes.publish(def, state)
+    if not deferred then nodes.publish(def, state) end
+end
+
+--- Publie les charges d'un nœud si elles ont changé depuis la dernière publication (fin d'une récolte : une charge
+--- prise puis rendue ne fait rien partir).
+---@param def vAvA.NodeDefinition
+function nodes.flush(def)
+    local state = states[def.id]
+    if state then nodes.publish(def, state) end
 end
 
 --- Remet un nœud à plein (Conseil).

@@ -142,6 +142,10 @@ Pour « loin de tout », à plus de 500 m de tous les lieux du § 0.6.
 | 11 | B retourne à la sélection du personnage, puis rejoue dans la forêt. | À la sélection : aucun prop ; `/vava_reseau zones <B>` : 0 zone. Une seconde après l'apparition : la zone revient, les arbres aussi. |
 | 12 | **Mesure** : le plus de joueurs possible, dont une partie qui récolte et une partie qui se déplace entre les zones. Console du serveur : `profiler record 300`, puis `profiler view` ; chercher `vAvA_core` (fonctions `runPass` / `pass` de `zones.lua`, `flushZone`) et `vava_gathering` (`flush`, `share.set`). Noter aussi `/vava_reseau zones`. | `vava_gathering` n'apparaît qu'au passage de sa boucle lente (10 s) et à chaque récolte (quelques microsecondes) ; le passage des zones du core reste de l'ordre de ce que dit `docs/tests/zones.md` § 5-2 (4 zones de récolte en plus : rien de visible). Noter les valeurs avec le nombre de joueurs et de zones. |
 | 13 | `./scripts/audit-reseau.sh`. | Plus aucun avertissement « écriture GlobalState » dans `modules/vava_gathering`. |
+| 14 | B récolte jusqu'à faire changer la bande de la Forêt de Brume (`/recolte vitalite foret_brume 61`, puis une récolte : la vitalité passe à 59, sous le seuil `bands.normal` de 60). A : `/vava_reseau joueur <B>`. | Une seule `vAvA:zone:diff` sous `vava_gathering` pour cette récolte (charges et bande ensemble), pas deux. |
+| 15 | B, besace pleine, récolte un chêne. | « Vous ne pouvez rien porter de plus. » ; charge inchangée dans l'invite ; aucune `vAvA:zone:diff` pour cette récolte. |
+| 16 | B loin de toute zone de récolte : `resmon`. Puis B s'approche de la Forêt de Brume. | Loin : `vava_gathering` à 0,00 ms (boucle des props arrêtée). À l'approche : arbres à 80 m comme avant. |
+| 17 | Serveur arrêté : dans `config.lua`, déplacer un nœud de la Forêt de Brume à plus de 500 m du centre de la zone (par exemple `x = 300.0`), démarrer. Remettre la valeur ensuite. | Le module refuse de démarrer, console : « zone 'foret_brume' : rayon de … m (nœuds compris), 500 m au plus ». |
 
 ## 4. Artisanat — `vava_crafting`
 

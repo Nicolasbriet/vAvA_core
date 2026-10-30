@@ -4,16 +4,17 @@
            cicatrice, charges) reçu des seules zones proches, par les abonnements de zone du core (core.zones.watch,
            1.6.0) ; props LOCAUX (jamais réseau) créés pour les nœuds à portée et remplacés par leur modèle « épuisé »
            quand la zone l'est, nœud le plus proche à distance d'interaction.
-           Une seule boucle lente, active seulement quand un personnage est en jeu : elle ne mesure que les zones
-           suivies (centre et étendue de leurs nœuds), ne parcourt que les nœuds d'une zone à portée, passe toutes les
-           streaming.pollMs près d'une zone et toutes les streaming.idlePollMs loin de toutes ; une zone reçue, changée
-           ou quittée fait aussitôt un passage (props et invite à jour sans attendre) ; elle s'arrête d'elle-même à la
+           Une seule boucle lente, active seulement quand un personnage est en jeu et suit au moins une zone : elle ne
+           mesure que les zones suivies (centre et étendue de leurs nœuds), ne parcourt que les nœuds d'une zone à
+           portée, passe toutes les streaming.pollMs près d'une zone et toutes les streaming.idlePollMs loin de
+           toutes ; une zone reçue, changée ou quittée fait aussitôt un passage (props et invite à jour sans attendre),
+           la première reçue relance la boucle ; elle s'arrête d'elle-même quand plus aucune zone n'est suivie, à la
            sélection et au déchargement, et retire alors tous les props.
     Dépendances : shared/constants.lua, config.lua, shared/geometry.lua, shared/proximity.lua, shared/zonestate.lua,
                   client/core.lua (core.zones, vAvA_core 0.11.0)
 ]]
 
-local type, pairs, ipairs, huge, max, tostring = type, pairs, ipairs, math.huge, math.max, tostring
+local type, pairs, ipairs, next, huge, max, tostring = type, pairs, ipairs, next, math.huge, math.max, tostring
 local CreateThread, Wait, GetGameTimer, AddEventHandler = CreateThread, Wait, GetGameTimer, AddEventHandler
 local PlayerPedId, GetEntityCoords, DoesEntityExist, DeleteObject = PlayerPedId, GetEntityCoords, DoesEntityExist, DeleteObject
 local RequestModel, HasModelLoaded, IsModelValid, SetModelAsNoLongerNeeded, GetHashKey = RequestModel, HasModelLoaded, IsModelValid, SetModelAsNoLongerNeeded, GetHashKey
@@ -176,7 +177,7 @@ end
 --- Un passage : une distance par zone suivie, puis une par nœud des seules zones à portée ; une zone qui sort de
 --- portée ou n'est plus suivie retire ses props une fois. Ne cède jamais la main. Rend l'intervalle du prochain
 --- passage : streaming.pollMs près d'une zone, streaming.idlePollMs quand aucun nœud ne peut être à moins de radius +
---- idleMargin (aucune zone suivie : idlePollMs, et la prochaine zone reçue fait aussitôt un passage).
+--- idleMargin (aucune zone suivie : la boucle s'arrête, et la prochaine zone reçue fait aussitôt un passage).
 ---@return integer
 local function step()
     local coords = GetEntityCoords(PlayerPedId())
@@ -206,9 +207,10 @@ local function step()
     return proximity.interval(closest, streaming.radius, streaming.idleMargin, streaming.pollMs, streaming.idlePollMs)
 end
 
---- Boucle lente justifiée, seulement quand un personnage est en jeu (voir step).
+--- Boucle lente justifiée, seulement quand un personnage est en jeu et suit au moins une zone (voir step) : loin de
+--- toute zone de récolte, elle ne tourne pas ; la première zone reçue la relance.
 local function loop()
-    while playing do
+    while playing and next(followed) ~= nil do
         Wait(step())
     end
     for id in pairs(shown) do remove(id) end
@@ -217,14 +219,19 @@ local function loop()
     running = false
 end
 
---- Personnage en jeu ou non : la boucle démarre ou s'éteint.
----@param flag boolean
-function props.setPlaying(flag)
-    playing = flag
-    if flag and not running then
+--- Lance la boucle si elle doit tourner et ne tourne pas.
+local function wake()
+    if playing and not running and next(followed) ~= nil then
         running = true
         CreateThread(loop)
     end
+end
+
+--- Personnage en jeu ou non : la boucle démarre (s'il suit une zone) ou s'éteint.
+---@param flag boolean
+function props.setPlaying(flag)
+    playing = flag
+    wake()
 end
 
 --- Nœud le plus proche à distance d'interaction (et sa distance), ou nil.
@@ -260,7 +267,10 @@ local function onZone(kind, id, data, removed)
     else
         return
     end
-    if playing then step() end
+    if playing then
+        step()
+        wake()
+    end
 end
 
 --- Suit les zones de récolte proches (abonnements de zone du core) et la vie du personnage. Appelé par client/main.lua.

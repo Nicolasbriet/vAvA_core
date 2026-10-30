@@ -27,6 +27,12 @@ VavaGathering.ID_PATTERN = '^[%l%d_]+$'
 VavaGathering.MAX_ZONE_ID = 48
 VavaGathering.MAX_NODE_ID = 46
 VavaGathering.MAX_TOKEN = 0x7FFFFFFF
+-- limites d'une zone du core (config/server.lua, zones : maxRadius, maxMargin, maxKeys), vérifiées à l'indexation pour
+-- qu'une zone hors bornes refuse le module avec un message clair au lieu d'être refusée en silence par le core. Avec
+-- 255 nœuds au plus (la clé `zone` en plus) et des clés de 48 octets, l'état reste loin des 32 Ko du core.
+VavaGathering.ZONE_MAX_RADIUS = 500.0
+VavaGathering.ZONE_MAX_MARGIN = 500.0
+VavaGathering.ZONE_MAX_NODES = 255
 
 -- Intentions du client (RPC à schéma strict, débit limité).
 VavaGathering.RPC = {

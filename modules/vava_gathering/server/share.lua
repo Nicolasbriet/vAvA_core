@@ -6,8 +6,10 @@
            avant les props). État : `zone` → { band, scarred }, `n:<nœud>` → charges (shared/zonestate.lua). Chaque
            changement part aux seuls joueurs qui suivent la zone, regroupé par le core avec les autres changements du
            même tour (une récolte : zone et nœud en une différence). Une déclaration refusée est écrite en console
-           (une fois par raison) et retentée par la boucle lente ; une zone déjà déclarée est déplacée et son état
-           remplacé (redéclaration, Atelier). Anciennes clés GlobalState d'avant 1.6.0 effacées une fois.
+           (une fois par raison, puis rappelée toutes les 10 min avec le nombre de refus tant qu'elle dure) et
+           retentée par la boucle lente ; une zone déjà déclarée est déplacée et son état remplacé (redéclaration,
+           Atelier). Anciennes clés GlobalState d'avant 1.6.0 effacées une fois, pour les seules zones et nœuds encore
+           dans la config (celles d'une zone ou d'un nœud retiré partent au redémarrage du serveur).
            L'état d'une zone est public (positions déclarées par les clients sous OneSync) : rien de secret dedans, et
            chaque action revérifie la distance côté serveur sans se fier à l'abonnement (server/harvest.lua).
     Dépendances : shared/constants.lua, config.lua, shared/zonestate.lua, server/core.lua, bridge/server.lua,
@@ -15,7 +17,7 @@
 ]]
 
 local pairs, ipairs, tostring = pairs, ipairs, tostring
-local GlobalState = GlobalState
+local GlobalState, GetGameTimer = GlobalState, GetGameTimer
 
 local bridge = VavaGathering.bridge
 local catalog = VavaGathering.catalog
@@ -29,9 +31,11 @@ VavaGathering.share = share
 -- zones déclarées au core (zone → true) ; une zone absente n'envoie rien : elle partira entière à sa déclaration
 ---@type table<string, true>
 local declared = {}
--- dernier refus écrit en console par zone (le même refus n'est pas répété à chaque passage)
----@type table<string, string>
+-- dernier refus écrit en console par zone : un nouveau refus est écrit aussitôt ; le même refus est compté et rappelé
+-- au plus une fois toutes les REMIND_MS avec son nombre (un refus durable, `full`, ne remplit pas la console)
+---@type table<string, { code: string, count: integer, at: integer }>
 local failures = {}
+local REMIND_MS = 600000
 -- module à l'arrêt : le core oublie ses zones de lui-même, plus rien n'est déclaré ni envoyé
 local stopped = false
 
@@ -40,8 +44,16 @@ local stopped = false
 ---@param code any
 local function failed(zoneId, action, code)
     code = tostring(code)
-    if failures[zoneId] == code then return end
-    failures[zoneId] = code
+    local now, last = GetGameTimer(), failures[zoneId]
+    if last and last.code == code then
+        last.count = last.count + 1
+        if now - last.at < REMIND_MS then return end
+        VavaGathering.log.error("zone '%s' toujours refusée par le core (%s : %s, %d refus depuis le dernier message) ; nouvel essai au prochain passage",
+            zoneId, action, code, last.count)
+        last.count, last.at = 0, now
+        return
+    end
+    failures[zoneId] = { code = code, count = 0, at = now }
     VavaGathering.log.error("zone '%s' non partagée avec les joueurs proches (%s : %s) ; nouvel essai au prochain passage", zoneId, action, code)
 end
 

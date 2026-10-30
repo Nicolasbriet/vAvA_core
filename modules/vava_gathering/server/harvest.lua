@@ -217,9 +217,10 @@ function harvest.succeed(session)
     -- cooldown posé avant l'usure (le hook des métadonnées peut céder la main)
     lastFinish[src] = GetGameTimer()
     -- la charge est prise avant le premier appel qui peut céder la main (usure, ajout, XP) : de deux joueurs qui
-    -- finissent le même dernier coup, un seul est servi ; une terre qui se refuse n'en prend aucune
+    -- finissent le même dernier coup, un seul est servi ; une terre qui se refuse n'en prend aucune. Les charges ne
+    -- sont publiées qu'à la fin, avec la zone : une récolte fait une seule différence (et une charge rendue, aucune)
     local failed = quality.failed(effects)
-    if not failed and not nodes.consume(node) then
+    if not failed and not nodes.consume(node, true) then
         bridge.Notify(src, messages.noCharges, 'info')
         return false, 'no_charges'
     end
@@ -238,11 +239,14 @@ function harvest.succeed(session)
     local ok = bridge.Add(src, resource.item, amount, metadata)
     if not ok then
         -- besace pleine : la charge prise est rendue
-        nodes.restore(node)
+        nodes.restore(node, true)
+        nodes.flush(node)
         bridge.Notify(src, messages.noSpace, 'warning')
         return false, 'no_space'
     end
+    -- zone puis nœud, sans céder la main entre les deux : le core les envoie dans la même différence
     zones.consume(zone, zone.cost, src)
+    nodes.flush(node)
     local extra
     if resource.extra and random() < resource.extra.chance then
         if bridge.Add(src, resource.extra.item, 1, metadata) then
