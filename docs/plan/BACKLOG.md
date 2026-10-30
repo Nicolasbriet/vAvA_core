@@ -521,12 +521,29 @@ versé à T-014 ; les autres points déjà couverts sont précisés dans T-012 �
   question de poids.
 
 ### T-133 — `%c` dépend de la locale : contrôles de texte justes partout
-- Agent : vava-dev-lua · Dépend de : — · Statut : à faire
+- Agent : vava-dev-lua · Dépend de : — · Statut : à tester en jeu (relu sécurité, suites appliquées)
+- Fait le 31 octobre 2026 : core 0.13.1 (`str.sanitize` : contrôles ASCII, C1 en UTF-8, invisibles et marques de sens
+  d'écriture remplacés, liste commune `str.hasControl` ; `str.trim` et `str.asciiLower` sans classe de la locale),
+  `vava_atelier` 1.0.1, `vava_crafting` 1.5.1, `vava_codex` 1.4.1, `vava_inventory` 1.8.1, `vava_example_atelier`
+  1.0.1 ; essais lancés sous une locale Windows (`helper.legacyLocale`) ; `audit-reseau.sh` refuse un `%c` dans une
+  chaîne du code Lua. Rapport `docs/plan/rapports/T-133.md`. **À tester en jeu** (serveur Windows) : personnage 2-14
+  (« Ída Morvà »), chat 6-12, métiers 4-8b, atelier 5-4, inventaire 10-3b.
 - Trouvé pendant T-100 : la classe Lua `%c` suit la locale du système ; sous Windows, elle prend aussi les octets 0x81,
   0x8D, 0x8F, 0x90, 0x9D, 0xAD et fait refuser « Á », « Í », « Ï », « Ð », « Ý », « í » ou le tiret U+2010 dans un
   texte UTF-8. `vava_atelier` utilise désormais `[\0-\31\127]`. Même motif à corriger, avec un test sur U+00A0 à
   U+017F : `shared/lib/string.lua` (core), `vava_chat/shared/text.lua`, `vava_magic/shared/text.lua`,
   `vava_voice/shared/label.lua` (et tout autre `%c` du dépôt).
+
+### T-134 — Motifs d'identifiants et casse sans classes de la locale
+- Agent : vava-dev-lua · Dépend de : T-133 · Statut : à faire
+- Relecture sécurité de T-133 (défense en profondeur, aucun risque trouvé aujourd'hui) : sous une locale Windows,
+  `%w`, `%a`, `%l`, `%d` acceptent des octets ≥ 0x80 (y compris de l'UTF-8 invalide) dans les motifs d'identifiants
+  (`config/shared.lua:18`, zones, net, schémas RPC de l'admin, inventory, magic, atelier, crafting, farming, gathering,
+  skills, time). Les remplacer par des ensembles explicites (`[A-Za-z0-9_]`, `[a-z0-9_]`), comme `text.isId` de
+  l'Atelier, et faire refuser ces classes dans un motif par `audit-reseau.sh`. Même tâche : `text.normalize` de
+  l'Atelier ne replie pas la casse du latin étendu (« Ł » et « ł » diffèrent), alors que la clé de nom de l'exemple le
+  fait ; `vava_magic/client/controls.lua` (`lower` sur un mot de sort), `vava_codex/client/main.lua` (`%S`, `%s*`),
+  `vava_chancellerie/server/link.lua` (`%s` sur un code).
 
 ## Phase 2 — Arrivée
 
