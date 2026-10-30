@@ -177,8 +177,11 @@ Du travail des autres. Le cultivateur tire des légumes de ses champs ; le cuisi
 du chasseur et les herbes de l’herboriste. Qui ne sait rien de tout cela demande, troque ou rend service : voir
 [[page:troquer]].
 
-L’eau se partage comme le reste : une outre offerte au bon moment ne s’oublie pas. Et un repas pris ensemble est
-la meilleure façon d’apprendre qui, dans le royaume, sait faire quoi.
+## D’où vient l’eau
+Une outre vide se remplit aux puits, aux fontaines et aux sources ; on y boit aussi quand on a soif. Les outres se
+font chez le tanneur, et leur couture finit parfois par céder : une outre offerte au bon moment ne s’oublie pas.
+
+Un repas pris ensemble est la meilleure façon d’apprendre qui, dans le royaume, sait faire quoi.
 ]==],
 }
 

@@ -17,7 +17,7 @@ use_experimental_fxv2_oal 'yes'
 
 name 'vava_arrival'
 description 'Arrivée vAvA : première venue, dotation de départ unique, accueil et Codex, /accueil du Conseil'
-version '1.0.0'
+version '1.1.0'
 
 dependency 'vAvA_core'
 dependency 'vava_inventory'

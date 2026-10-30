@@ -21,7 +21,7 @@ use_experimental_fxv2_oal 'yes'
 
 name 'vava_codex'
 description 'Codex vAvA : toutes les commandes et touches du serveur, classées, cherchées, composées et lancées'
-version '1.5.0'
+version '1.5.1'
 
 dependency 'vAvA_core'
 dependency 'vava_ui'

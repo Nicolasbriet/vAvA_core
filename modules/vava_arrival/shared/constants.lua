@@ -36,7 +36,8 @@ VavaArrival.KIT = {
 -- Bornes de validation.
 VavaArrival.MAX_KIT_ENTRIES = 8                 -- objets différents dans la dotation
 VavaArrival.MAX_QUANTITY = 100                  -- quantité d'un objet de la dotation
-VavaArrival.ID_PATTERN = '^[%w_%-%.:]+$'        -- objet, chapitre du Codex : même motif que les identifiants du core
+VavaArrival.ID_PATTERN = '^[A-Za-z0-9_%-%.:]+$'  -- objet, chapitre du Codex : motif des identifiants du core, en ASCII
+                                                -- explicite (%w dépend de la locale du système, T-133)
 VavaArrival.MAX_ID = 64                         -- longueur d'un identifiant (octets)
 VavaArrival.MAX_PLAYER = 65535                  -- numéro de joueur accepté par /accueil
 VavaArrival.MAX_NOTIFICATION = 200              -- octets d'une notification du HUD (au-delà, elle est coupée)
