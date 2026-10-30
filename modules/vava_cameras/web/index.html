@@ -3,6 +3,7 @@
 <head>
   <meta charset="utf-8">
   <title>vAvA · Mur des caméras</title>
+  <link rel="stylesheet" href="nui://vava_ui/web/css/vava_ui.css">
   <link rel="stylesheet" href="css/wall.css">
 </head>
 <body>
@@ -41,7 +42,8 @@
   </div>
 
   <script src="js/strings.js"></script>
-  <script src="js/devmock.js"></script>
+  <!-- hors jeu seulement : vava_ui pris dans le dépôt, puis les données simulées (jamais livrées) -->
+  <script>typeof GetParentResourceName === 'function' || document.write('<script src="../../vava_ui/web/dev/horsjeu.js"><\/script><script src="dev/devmock.js"><\/script>');</script>
   <script src="js/bridge.js"></script>
   <script src="js/capture.js"></script>
   <script src="js/viewer.js"></script>

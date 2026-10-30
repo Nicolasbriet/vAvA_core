@@ -6,7 +6,8 @@
            capture par joueur, réduite pour les cases d'un mur, pleine pour une vue en grand (une seule à la fois) ;
            débit montant total du joueur filmé borné et réparti entre ses spectateurs. Le serveur ne relaie que la
            négociation ; il décide qui regarde qui, et l'inscrit au journal du Conseil.
-    Dépendances : vAvA_core ≥ 0.5.0 ; facultatives : vava_admin ≥ 1.2.0 (droit « watch », journal, outil du
+    Dépendances : vAvA_core ≥ 0.5.0 ; vava_ui ≥ 1.0.0 (polices, grain, coins et filet du mur, par nui://vava_ui/…) ;
+                  facultatives : vava_admin ≥ 1.2.0 (droit « watch », journal, outil du
                   Registre), vava_chancellerie (caméras depuis le web)
 ]]
 
@@ -17,18 +18,18 @@ use_experimental_fxv2_oal 'yes'
 
 name 'vava_cameras'
 description 'Caméras sur l\'écran des joueurs (Conseil) vAvA'
-version '1.3.0'
+version '1.4.0'
 
 dependency 'vAvA_core'
+dependency 'vava_ui'
 
 ui_page 'web/index.html'
 
+-- polices, grain, coins et filet : vava_ui ; les données simulées hors jeu (dossier dev/) ne sont jamais livrées
 files {
     'web/index.html',
     'web/css/*.css',
     'web/js/*.js',
-    'web/img/*',
-    'web/fonts/*.woff2',
 }
 
 shared_scripts {

@@ -1,11 +1,13 @@
 'use strict';
 /*
- * web/js/devmock.js
+ * web/dev/devmock.js
  * Rôle : jeu et serveur simulés quand la page est ouverte dans un navigateur (hors FiveM), pour travailler le rendu
  *        sans lancer le jeu. Chaque caméra demandée est une vraie connexion WebRTC locale, filmant une scène dessinée
  *        (le mur est éprouvé de bout en bout). Inactif en jeu. Paramètres d'URL : ?players=N (joueurs simulés,
  *        11 par défaut), &layout=1..4, &focus=<numéro>, &closed=1 (mur fermé), &budget=<numéro> (vue en grand de
  *        ce joueur refusée : déjà regardé en grand ailleurs).
+ *        Jamais livré (absent des `files`), jamais chargé en jeu : la ligne hors jeu de index.html ne l'insère
+ *        que hors FiveM.
  */
 
 const DevMock = (() => {

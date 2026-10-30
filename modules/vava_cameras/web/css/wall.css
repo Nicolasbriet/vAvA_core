@@ -2,16 +2,12 @@
  * web/css/wall.css
  * Rôle : le mur des caméras, dans la langue du Registre du Conseil : cadre de cuir surpiqué à coins de laiton,
  *        panneau de velours sombre où chaque écran est un portrait sous filet doré avec sa plaque gravée (nom et
- *        numéro du joueur). Polices embarquées (licence OFL) : Cinzel Decorative (titre), Cinzel (libellés),
- *        EB Garamond (texte).
+ *        numéro du joueur). Cinzel Decorative (titre, toujours en 700), Cinzel (libellés), EB Garamond (texte).
+ *        Polices, textures et ornements : vava_ui (licence OFL des polices dans modules/vava_ui/web/fonts/) ; sans
+ *        vava_ui, polices de repli, sans grain, coins ni filet, toujours lisible.
  * Performance : textures en images fixes, aucun flou ni filtre CSS ; seules l'opacité et les transformations sont
  *        animées ; la capture (canevas) reste hors de l'écran.
  */
-
-@font-face { font-family: "Cinzel Decorative"; src: url("../fonts/cinzel_decorative_700.woff2") format("woff2"); font-weight: 700; font-display: swap; }
-@font-face { font-family: "Cinzel"; src: url("../fonts/cinzel.woff2") format("woff2"); font-weight: 400 700; font-display: swap; }
-@font-face { font-family: "EB Garamond"; src: url("../fonts/eb_garamond.woff2") format("woff2"); font-weight: 400 700; font-style: normal; font-display: swap; }
-@font-face { font-family: "EB Garamond"; src: url("../fonts/eb_garamond_italic.woff2") format("woff2"); font-weight: 400 700; font-style: italic; font-display: swap; }
 
 :root {
   --edge: #070504;
@@ -28,7 +24,7 @@
   --font-display: "Cinzel", "Palatino Linotype", Georgia, serif;
   --font-body: "EB Garamond", "Palatino Linotype", Georgia, serif;
   --ease: cubic-bezier(0.2, 0.7, 0.2, 1);
-  --grain: url("../img/grain.png");
+  --grain: var(--ui-grain, none);
   --leather: var(--grain), radial-gradient(ellipse 120% 60% at 50% 0%, rgba(132, 92, 56, 0.22), transparent 65%), linear-gradient(180deg, #241a12, #15100b);
   --velvet: var(--grain), radial-gradient(ellipse 90% 80% at 50% 45%, #1d1410, #0d0907 75%);
   --gilt: linear-gradient(135deg, #e9d3a2, #b8975f 45%, #9a7a48 46%, #4e3b21);
@@ -105,7 +101,7 @@ button { color: inherit; font: inherit; }
   position: absolute;
   inset: -3px;
   border: 1.3rem solid transparent;
-  border-image: url("../img/frame.svg") 18 / 1.3rem;
+  border-image: var(--ui-frame, none) 18 / 1.3rem;
   pointer-events: none;
 }
 
@@ -116,7 +112,7 @@ button { color: inherit; font: inherit; }
   align-items: center;
   gap: 1.4rem;
   padding: 0.2rem 0.4rem 0.8rem;
-  background: url("../img/divider.svg") bottom / 100% 10px no-repeat;
+  background: var(--ui-divider, none) bottom / 100% 10px no-repeat;
 }
 .frame-title {
   margin: 0;
