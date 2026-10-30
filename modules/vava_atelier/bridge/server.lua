@@ -13,6 +13,10 @@ local pack, unpack, sort = table.pack, table.unpack, table.sort
 local find, match, sub = string.find, string.match, string.sub
 local GetResourceState, GetGameTimer = GetResourceState, GetGameTimer
 
+-- blancs ASCII de fin, écrits octet par octet : `%s` dépend de la locale du système et couperait le « à » final d'un
+-- nom (octet 0xA0)
+local TRAILING = '[\t-\r ]+$'
+
 local core = VavaAtelier.core
 if not core then return end
 
@@ -125,7 +129,7 @@ function Bridge.ActorLabel(source)
     local rank = Bridge.RankLabel(source)
     local character = core.characters.getActive(source)
     if not rank or not character then return nil end
-    local name = (tostring(character.firstName or '') .. ' ' .. tostring(character.lastName or '')):gsub('%s+$', '')
+    local name = (tostring(character.firstName or '') .. ' ' .. tostring(character.lastName or '')):gsub(TRAILING, '')
     return text.truncate(rank .. ' ' .. name, OUT.actor)
 end
 

@@ -29,6 +29,9 @@ for _, glyph in ipairs(markCfg.glyphs) do glyphs[glyph] = true end
 local letters, separators = {}, {}
 for _, code in utf8codes(nameCfg.nameLetters) do letters[code] = true end
 for _, code in utf8codes(nameCfg.nameSeparators) do separators[code] = true end
+-- blancs de bord d'un nom, ASCII écrits octet par octet : `%s` dépend de la locale du système (sous Windows, il prend
+-- aussi l'octet 0xA0 du « à » final, et le nom serait refusé)
+local LEADING_BLANKS, TRAILING_BLANKS = '^[\t-\r ]+', '[\t-\r ]+$'
 
 ---@class vAvA.PendingName
 ---@field instanceId integer
@@ -168,7 +171,7 @@ end
 ---@return string|nil
 local function validName(value)
     if type(value) ~= 'string' then return nil end
-    value = value:gsub('^%s+', ''):gsub('%s+$', '')
+    value = value:gsub(LEADING_BLANKS, ''):gsub(TRAILING_BLANKS, '')
     local length = utf8len(value)
     if not length or length < nameCfg.nameMin or length > nameCfg.nameMax then return nil end
     local afterSeparator = true

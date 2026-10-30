@@ -100,6 +100,48 @@ describe('vava_atelier text', function()
         assert.equal("l'ancre", text.normalize('L’Ancre'))
     end)
 
+    -- T-133 : `%s` et `string.lower` suivent la locale du système ; sous Windows (cp1252), l'octet 0xA0 de « à » ou
+    -- de « Š » passait pour un blanc et le premier octet d'un caractère accentué pour une majuscule (0xC5 → 0xE5).
+    -- Ces essais échouent avec l'ancien code sous une telle locale ; sous la locale « C », ils fixent la règle.
+    local function latinCodes()
+        local codes = {}
+        for code = 0xA0, 0x17F do codes[#codes + 1] = code end
+        codes[#codes + 1] = 0x2010
+        return codes
+    end
+
+    it('trim garde entier chaque caractère de U+00A0 à U+017F et U+2010', function()
+        for _, code in ipairs(latinCodes()) do
+            local c, label = utf8.char(code), string.format('U+%04X', code)
+            assert.equal(c, text.trim(c), label)
+            assert.equal('a ' .. c, text.trim(' \ta ' .. c .. ' \r\n'), label)
+            assert.equal(c .. ' a', text.trim(c .. ' a'), label)
+        end
+    end)
+
+    it('trim ne retire que les blancs ASCII : tabulation à retour chariot, espace', function()
+        for b = 0, 127 do
+            local c = string.char(b)
+            local blank = b == 32 or (b >= 9 and b <= 13)
+            assert.equal(blank and '' or c, text.trim(c), string.format('0x%02X', b))
+            assert.equal(blank and 'x' or 'x' .. c, text.trim('x' .. c), string.format('0x%02X', b))
+        end
+    end)
+
+    it('normalise sans briser un caractère de U+00A0 à U+017F ni U+2010', function()
+        for _, code in ipairs(latinCodes()) do
+            local normalized = text.normalize('A ' .. utf8.char(code) .. ' ')
+            assert.is_not_nil(utf8.len(normalized), string.format('U+%04X', code))
+        end
+        -- caractères sans repli : gardés tels quels, majuscules non ASCII comprises
+        for _, c in ipairs({ 'Š', 'š', 'Ł', 'Ġ', 'ı', 'Ŧ', '¡', '§', '\u{00A0}', '\u{2010}' }) do
+            assert.equal('a ' .. c, text.normalize('A  ' .. c .. ' '), c)
+        end
+        -- casse : seules les 26 majuscules ASCII sont baissées ; blancs ASCII réduits à une espace
+        assert.equal('abcxyz', text.normalize('ABCxyz'))
+        assert.equal('a b', text.normalize('A\t\n\v\f\rB'))
+    end)
+
     it('cherche par sous-chaîne normalisée', function()
         local hay = text.normalize('Panneau de la place')
         assert.is_true(text.contains(hay, text.normalize('PLACE')))

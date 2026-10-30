@@ -8,6 +8,12 @@ local type, tostring = type, tostring
 local byte, sub, find, gsub, match = string.byte, string.sub, string.find, string.gsub, string.match
 local utf8len, utf8codes = utf8.len, utf8.codes
 
+-- Ensembles ASCII écrits octet par octet : les classes %s et %c de Lua suivent la locale du système (sous Windows,
+-- %s prend aussi l'octet 0xA0 de « à », %c les octets 0x81, 0x8D, 0x8F, 0x90, 0x9D, 0xAD de « Á », « Í », « í »…).
+local BLANKS = '[\t-\r ]'   -- tabulation, saut de ligne, tabulation verticale, saut de page, retour chariot, espace
+local CONTROLS = '[\0-\31\127]'
+local TRIM_PATTERN = '^' .. BLANKS .. '*(.-)' .. BLANKS .. '*$'
+
 local identifiers = vAvA.config.shared.identifiers
 local IDENTIFIER_PATTERN = identifiers.pattern
 local IDENTIFIER_MAX_LENGTH = identifiers.maxLength
@@ -36,14 +42,16 @@ function str.hasPrefix(value, prefix)
     return sub(value, 1, #prefix) == prefix
 end
 
+--- Chaîne sans ses blancs ASCII de bord (espace, tabulation, sauts de ligne) ; les caractères UTF-8 restent entiers.
 ---@param value string
 ---@return string
 function str.trim(value)
-    return match(value, '^%s*(.-)%s*$')
+    return match(value, TRIM_PATTERN)
 end
 
 --- Rend une valeur non fiable affichable sans risque dans la console :
---- codes couleur FiveM (^0-^9) et caractères de contrôle retirés, longueur bornée.
+--- codes couleur FiveM (^0-^9) retirés, caractères de contrôle ASCII (0x00 à 0x1F, 0x7F) remplacés par une espace,
+--- longueur bornée.
 ---@param value any
 ---@param maxLength integer
 ---@return string
@@ -54,7 +62,7 @@ function str.sanitize(value, maxLength)
     end
     -- « ^^11 » : retirer « ^1 » laisserait « ^1 » ; la suite entière de ^ part avec le chiffre
     text = gsub(text, '%^+%d', '')
-    text = gsub(text, '%c', ' ')
+    text = gsub(text, CONTROLS, ' ')
     return text
 end
 

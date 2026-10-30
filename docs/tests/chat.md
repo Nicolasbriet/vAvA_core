@@ -122,6 +122,7 @@ testée dans [registre.md](registre.md).
 | 9 | `/me ~r~rouge~s~ ~h~gras`. | Au-dessus de la tête : « * rouge gras * », sans couleur ni gras. Dans le chat, les `~r~` restent visibles (texte brut). |
 | 10 | `/me <C>serré</C> <font color='#ff0000'>rouge</font>`. | Au-dessus de la tête, le texte tel quel (à confirmer : GTA interprète peut-être `<C>` ou `<font>`, que le module ne retire pas). |
 | 11 | `/ooc` suivi d'espaces seulement. | « — Usage : /ooc <message> ». |
+| 12 | (core 0.13.1, T-133) `/ooc Ída Ýr – í ‐ Áine, Ðan, Ïle, voilà`, puis le même texte en `/me` et en `/mp` à B. | Chez A et B, le texte arrive tel quel, chaque lettre entière : ni « � », ni espace à la place de « Á », « Í », « í », « Ý », « Ð », « Ï » ou du trait d'union U+2010 (`‐`), « voilà » garde son « à » final. Au-dessus de la tête (`/me`), même texte. En base (§ 9), la ligne `ooc` garde le texte entier. |
 
 ## 7. Départ et déconnexion **(2 joueurs)**
 

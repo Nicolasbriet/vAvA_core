@@ -94,6 +94,7 @@ une heure et demie seul, une demi-heure de plus pour les tests marqués **(2 jou
 | 11 | Deux personnages du même nom (même compte, ou deux comptes). | Accepté : `characters.uniqueNames` vaut `false`. |
 | 12 | Avec `uniqueNames = true` (§ 0.5) : recréer `Aldric Morvan`, puis `aldric morvan`, puis `Áldric Morvan`. | « Ce nom est déjà porté par un autre personnage. », retour sur Identité : casse et accents ne comptent pas. Une fois Aldric Morvan supprimé (4-4), le nom est de nouveau libre. |
 | 13 | **(2 joueurs)** Avec `uniqueNames = true`, A et B saisissent le même nom libre et cliquent « Créer » ensemble. | Un seul est créé ; l'autre lit « Ce nom est déjà porté par un autre personnage. ». Jamais deux. |
+| 14 | (core 0.13.1, T-133, serveur sous Windows de préférence) Prénom `Ída`, Nom `Morvà` (« à » final), avec un espace de plus en fin de nom ; créer. Puis un second personnage `Ýves` `Dulà`. | Acceptés et créés (avant 0.13.1, sous Windows, le « à » final pouvait être coupé et le nom refusé par le serveur). Sur la carte de sélection, dans `F10` → Joueurs, dans les joueurs que propose le Codex (`F1`, commande qui demande un joueur) et, pour un membre du Conseil, l'auteur d'une ligne du journal de l'Atelier (atelier 6-1) : « Ída Morvà », lettres entières, sans « � ». En base : `first_name` = `Ída`, `last_name` = `Morvà`, sans espace final. |
 
 ## 3. Apparence — `vava_appearance`
 

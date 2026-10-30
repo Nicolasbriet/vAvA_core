@@ -20,7 +20,7 @@ use_experimental_fxv2_oal 'yes'
 
 name 'vava_atelier'
 description 'Atelier du Conseil vAvA : créer et régler le royaume en jeu (socle : accueil, droits, formulaire, journal)'
-version '1.0.0'
+version '1.0.1'
 
 dependency 'vAvA_core'
 dependency 'vava_ui'

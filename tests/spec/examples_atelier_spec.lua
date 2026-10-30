@@ -69,6 +69,23 @@ describe('vava_example_atelier', function()
             assert.equal(rules.key('Château'), rules.key('chateau'))
         end)
 
+        -- T-133 : `%s` et `string.lower` suivent la locale du système ; sous Windows (cp1252), l'octet 0xA0 de « Š »
+        -- passait pour un blanc et le premier octet d'un caractère accentué pour une majuscule. Échoue avec l'ancien
+        -- code sous une telle locale ; sous la locale « C », fixe la règle.
+        it('clé du nom : chaque caractère de U+00A0 à U+017F et U+2010 reste de l\'UTF-8 entier', function()
+            local codes = {}
+            for code = 0xA0, 0x17F do codes[#codes + 1] = code end
+            codes[#codes + 1] = 0x2010
+            for _, code in ipairs(codes) do
+                local key = rules.key(' Panneau ' .. utf8.char(code) .. ' ')
+                assert.is_not_nil(utf8.len(key), string.format('U+%04X', code))
+            end
+            for _, c in ipairs({ 'Š', 'Ł', 'Ġ', 'ı', '§', '\u{2010}' }) do
+                assert.equal('panneau ' .. c, rules.key('\tPANNEAU ' .. c .. ' \r\n'), c)
+            end
+            assert.equal('chateau', rules.key(' \tChâteau\v\f'))
+        end)
+
         it('nom unique : l\'entrée elle-même est exclue', function()
             assert.same({}, rules.board(board({ titre = 'Pancarte de la porte nord' }), others, 'porte_nord'))
             assert.equal(1, #rules.board(board({ titre = 'Pancarte de la porte nord' }), others, 'place_du_marche'))

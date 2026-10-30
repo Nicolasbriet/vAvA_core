@@ -1,5 +1,16 @@
 local helper = require('tests.helper')
 
+-- T-133 : `%s` et `%c` suivent la locale du système ; sous Windows (cp1252), `%c` prenait les octets 0x81, 0x8D,
+-- 0x8F, 0x90, 0x9D, 0xAD (« Á », « Í », « Ï », « Ð », « Ý », « í », U+2010) et `%s` l'octet 0xA0 (« à », « Š »). Les
+-- essais sur U+00A0 à U+017F échouent avec l'ancien code sous une telle locale ; sous la locale « C », ils fixent la
+-- règle.
+local function latinCodes()
+    local codes = {}
+    for code = 0xA0, 0x17F do codes[#codes + 1] = code end
+    codes[#codes + 1] = 0x2010
+    return codes
+end
+
 describe('vAvA.lib.string', function()
     local str
 
@@ -65,6 +76,25 @@ describe('vAvA.lib.string', function()
             assert.equal('', str.trim('   \t\r\n'))
             assert.equal('', str.trim(''))
         end)
+
+        it('garde entier chaque caractère de U+00A0 à U+017F et U+2010 (« à » final d’un nom)', function()
+            for _, code in ipairs(latinCodes()) do
+                local c, label = utf8.char(code), string.format('U+%04X', code)
+                assert.equal(c, str.trim(c), label)
+                assert.equal('Il' .. c, str.trim(' \tIl' .. c .. ' \r\n'), label)
+                assert.equal(c .. ' a', str.trim(c .. ' a'), label)
+            end
+            assert.equal('Ída Ýr – í', str.trim('  Ída Ýr – í '))
+        end)
+
+        it('ne retire que les blancs ASCII : tabulation à retour chariot, espace', function()
+            for b = 0, 127 do
+                local c = string.char(b)
+                local blank = b == 32 or (b >= 9 and b <= 13)
+                assert.equal(blank and '' or c, str.trim(c), string.format('0x%02X', b))
+                assert.equal(blank and 'x' or 'x' .. c, str.trim('x' .. c), string.format('0x%02X', b))
+            end
+        end)
     end)
 
     describe('sanitize', function()
@@ -82,6 +112,26 @@ describe('vAvA.lib.string', function()
         it('remplace les caractères de contrôle par une espace', function()
             assert.equal('a b c d e', str.sanitize('a\nb\rc\td\0e', 100))
             assert.equal('ligne  forgée', str.sanitize('ligne\r\nforgée', 100))
+        end)
+
+        it('garde entier chaque caractère de U+00A0 à U+017F et U+2010 (« Á », « Í », « í »…)', function()
+            local all = {}
+            for _, code in ipairs(latinCodes()) do
+                local c = utf8.char(code)
+                all[#all + 1] = c
+                assert.equal('a' .. c .. 'b', str.sanitize('a' .. c .. 'b', 100), string.format('U+%04X', code))
+            end
+            local joined = table.concat(all)
+            assert.equal(joined, str.sanitize(joined, #joined))
+            assert.equal('Ída Ýr – í', str.sanitize('Ída Ýr – í', 100))
+        end)
+
+        it('remplace chaque contrôle ASCII (0x00 à 0x1F, 0x7F) et lui seul', function()
+            for b = 0, 127 do
+                local c = string.char(b)
+                local expected = (b <= 31 or b == 127) and 'a b' or 'a' .. c .. 'b'
+                assert.equal(expected, str.sanitize('a' .. c .. 'b', 100), string.format('0x%02X', b))
+            end
         end)
 
         it('tronque au-delà de maxLength octets et le signale par « … »', function()
