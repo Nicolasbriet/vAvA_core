@@ -6,7 +6,8 @@
            de l'interface relayés au serveur (RPC à schéma strict), lancement d'une commande composée par
            ExecuteCommand (une commande du serveur y arrive comme si elle était tapée), export `noteCommand` pour que
            le chat inscrive aux dernières pages ce que le joueur tape lui-même, export `openAt` pour ouvrir le livre à
-           un chapitre (1.4.0, accueil des nouveaux venus). Souris et clavier rendus au jeu si la
+           un chapitre (1.4.0, accueil des nouveaux venus ; 1.5.0 : aussi une page ou un chapitre de lecture, résolus
+           par la page), texte d'une page de lecture relayé à la demande (1.5.0). Souris et clavier rendus au jeu si la
            ressource s'arrête livre ouvert.
     Dépendances : shared/constants.lua, config.lua, client/core.lua, client/nui.lua, client/keys.lua
 ]]
@@ -25,6 +26,7 @@ if not core then return end
 
 local cfg = VavaCodex.config
 local RPC = VavaCodex.RPC
+local READING = VavaCodex.READING
 local EVENTS = VavaCodex.EVENTS
 local MAX_LINE = VavaCodex.MAX_LINE
 local nui, keys = VavaCodex.nui, VavaCodex.keys
@@ -219,6 +221,15 @@ nui.on('keepOpen', function(d)
     end, d.value == true)
 end)
 nui.on('run', run)
+-- Texte d'une page de lecture (1.5.0), demandé quand le joueur ouvre une page que la page ne garde pas encore. Le
+-- serveur revérifie que le joueur peut la voir ; l'identifiant est vérifié ici pour ne rien relayer d'informe.
+nui.on('page', function(d)
+    local id = d.id
+    if type(id) ~= 'string' or #id == 0 or #id > READING.MAX_ID or not match(id, READING.ID_PATTERN) then
+        return { ok = false, error = 'invalid_request' }
+    end
+    return forward(RPC.PAGE, function(r, page) r.page = page end, id)
+end)
 -- La page n'a pas le contenu que les versions annoncent (secours). Sans aucun contenu : tout est redemandé, et rangé
 -- comme à l'ouverture. Avec un contenu plus ancien : versions oubliées, sans appel au serveur ; la prochaine ouverture
 -- renverra tout.
@@ -255,7 +266,9 @@ AddEventHandler('onClientResourceStop', function(resource)
 end)
 
 --- Ouvre le Codex à un chapitre (1.4.0 ; vava_arrival à la première venue) : même chemin que F1 (RPC vava_codex:open,
---- empreintes, préférences), puis la page choisit le chapitre s'il existe (sinon le livre reste à son index).
+--- empreintes, préférences), puis la page choisit le chapitre s'il existe (sinon le livre reste à son index). Depuis
+--- 1.5.0, la page résout d'abord une page de lecture, puis un chapitre de lecture (`premiers_pas` : onglet Lecture,
+--- première page du chapitre), puis un chapitre de commandes ; le motif accepte déjà ces identifiants.
 --- `true` : ouverture lancée ; `false, code` : invalid_chapter (pas un identifiant de 64 octets au plus),
 --- no_character, busy (livre déjà ouvert, menu pause, ou une autre interface a le focus).
 ---@param chapter string

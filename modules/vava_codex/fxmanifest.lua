@@ -6,7 +6,9 @@
            dernières pages et réglage « rester ouvert » par personnage ; onglet des touches. Touche F1 (réglable) et
            /codex. Le serveur décide de ce que chacun voit ; les commandes gardent leurs propres contrôles. Le contenu
            est gardé par la page et ne repart que s'il a changé (empreinte calculée par le serveur). Export client
-           `openAt(chapitre)` : le livre s'ouvre à un chapitre (accueil des nouveaux venus, 1.4.0).
+           `openAt(chapitre)` : le livre s'ouvre à un chapitre (accueil des nouveaux venus, 1.4.0). Onglet « Lecture »
+           (1.5.0) : chapitres et pages de lecture écrits dans content/*.lua (servis au seul serveur, jamais téléchargés
+           par les clients), analysés au démarrage ; l'index part avec le contenu, le texte d'une page à la demande.
     Dépendances : vAvA_core ≥ 0.7.0 (registre des commandes) ; facultatifs : vava_admin (rangs et droits du
                   Conseil), vava_hud (notifications), vava_chat (dernières pages des commandes tapées) ; vava_ui ≥ 1.0.0
                   (polices, grain et ornements de la page, par nui://vava_ui/…)
@@ -19,14 +21,15 @@ use_experimental_fxv2_oal 'yes'
 
 name 'vava_codex'
 description 'Codex vAvA : toutes les commandes et touches du serveur, classées, cherchées, composées et lancées'
-version '1.4.1'
+version '1.5.0'
 
 dependency 'vAvA_core'
 dependency 'vava_ui'
 
 ui_page 'web/index.html'
 
--- polices, grain et ornements : vava_ui ; les données simulées hors jeu (dossier dev/) ne sont jamais livrées
+-- polices, grain et ornements : vava_ui ; les données simulées et les essais hors jeu (dossier dev/) ne sont jamais
+-- livrés ; web/js/*.js couvre reader.js (1.5.0)
 files {
     'web/index.html',
     'web/css/*.css',
@@ -45,6 +48,12 @@ server_scripts {
     'server/catalog.lua',
     'shared/prefs.lua',          -- logique pure, servie au seul serveur (testée hors jeu : tests/spec)
     'shared/fingerprint.lua',    -- idem : version du contenu (empreinte) et réponse à l'ouverture
+    'shared/pages.lua',          -- idem : format des pages de lecture (analyse, validation, construction)
+    'content/chapters.lua',      -- pages de lecture : graine (VavaCodex.seed) et chapitres ; jamais envoyées aux clients
+    'content/premiers_pas.lua',
+    'content/metiers.lua',
+    'content/royaume.lua',
+    'server/reading.lua',
     'server/prefs.lua',
     'server/suggestions.lua',
     'server/commands.lua',

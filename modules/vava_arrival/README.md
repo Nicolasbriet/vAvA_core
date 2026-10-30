@@ -24,7 +24,7 @@ lui, celles du jeu), `vava_admin` (droit `give`, journal du Registre ; sans lui,
 | Objets déclarés s'ils manquent | `pain` (faim + 35), `eau` (soif + 40), dessins `web/items/*.svg` | `items` |
 | Attente de l'accueil | 4 s après la réception, puis un essai par seconde, 30 s au plus | `welcome.delayMs`, `retryMs`, `maxWaitMs` |
 | Envois de l'accueil sans accusé | 3 au plus, un par session | `welcome.maxSends` |
-| Chapitre du Codex | `premiers_pas` (créé par T-023 ; d'ici là le Codex s'ouvre à son index) | `codex.chapter` |
+| Chapitre du Codex | `premiers_pas` : le Codex (1.5.0, T-023) s'ouvre sur l'onglet Lecture, chapitre « Premiers pas », page « Vivre à Eldoria » ; un chapitre de commandes (`vava_inventory`) ou une page de lecture sont aussi acceptés | `codex.chapter` |
 | Commande du Conseil | `/accueil`, droit `give` (Sénéchal et au-dessus), ACE `vava_arrival.admin`, 2 s entre deux | `admin` |
 | Accusé de lecture | 2 d'avance, puis 1 par 20 s | `rateLimits.welcomed` |
 | Journal | 90 jours | `logRetentionDays` |
@@ -97,8 +97,9 @@ rejoué »). Console du serveur : `accueil etat <n°>`. Sans droit : rien, aucun
 ## Installation
 
 `ensure vava_arrival` après `ensure vava_codex` (la Chancellerie le place seule). La migration crée les deux tables au
-premier démarrage. Pour voir le Codex s'ouvrir à un chapitre avant T-023 : `codex.chapter = 'vava_inventory'`, puis
-`restart vava_arrival` (à remettre ensuite).
+premier démarrage. Le chapitre « Premiers pas » existe depuis `vava_codex` 1.5.0 (T-023) ; avec un Codex plus
+ancien, le livre s'ouvre à son index, sans erreur. Pour essayer un chapitre de commandes : `codex.chapter =
+'vava_inventory'`, puis `restart vava_arrival` (à remettre ensuite).
 
 **Personnages anciens jamais joués.** La première venue se lit sur le temps de jeu mesuré par le core : un personnage
 créé avant la migration `0003_play_seconds.sql` du core (0.6.0) et jamais joué depuis est resté à `play_seconds = 0`

@@ -3,8 +3,13 @@
  * web/dev/devmock.js
  * Rôle : Codex simulé quand la page est ouverte dans un navigateur (hors FiveM), pour travailler le rendu sans lancer
  *        le jeu. Inactif en jeu. Paramètres d'URL : ?staff=0 pour voir le Codex d'un simple joueur ; ?focus=<chapitre>
- *        simule l'ouverture par l'export openAt (ex. ?focus=vava_gathering : chapitre Récolte). Les listes des
- *        formulaires (joueurs, compétences, zones) sont simulées ; « Lancer » affiche la ligne.
+ *        simule l'ouverture par l'export openAt (ex. ?focus=vava_gathering : chapitre Récolte ; ?focus=premiers_pas :
+ *        Lecture, première page du chapitre, contrat de T-022 ; ?focus=troquer : une page) ; ?lecture=0 : pages de
+ *        lecture fermées (aucun index, pas d'onglet). Les listes des formulaires (joueurs, compétences, zones) sont
+ *        simulées ; « Lancer » affiche la ligne. Lecture (1.5.0) : index de quatre pages, dont « Siéger au Conseil »
+ *        réservée (absente avec ?staff=0) ; trois textes simulés couvrant tous les blocs et jetons (touche liée,
+ *        touche absente « ? », commande visible ou non, lien présent ou cible absente, italique), rendus après
+ *        40 ms ; « Apprendre un métier » n'a pas de texte : sa demande rend unknown_page (état d'échec).
  *        Jamais livré (absent des `files`), jamais chargé en jeu : la ligne hors jeu de index.html ne l'insère
  *        que hors FiveM.
  */
@@ -61,6 +66,66 @@ const DevMock = (() => {
     players: [{ value: '1', label: 'Aldric Ferrand (n° 1)' }, { value: '3', label: 'Bertrand Vauclair (n° 3)' }, { value: '7', label: 'Nicolas (n° 7)' }],
   };
 
+  // Lecture : index tel que le serveur l'envoie (content.reading), puis les blocs déjà analysés de trois pages
+  const readingChapters = [{ id: 'premiers_pas', label: 'Premiers pas' }, { id: 'metiers', label: 'Les métiers' }, { id: 'royaume', label: 'Le royaume' }];
+  const readingPages = [
+    { id: 'bienvenue', chapter: 'premiers_pas', title: 'Vivre à Eldoria', summary: 'Une cité sans pièce, où chacun a besoin des autres.', hash: '9f1c2a7b3d4e5f60' },
+    { id: 'troquer', chapter: 'premiers_pas', title: 'Troquer et partager', summary: 'Ici rien ne s’achète : on donne, on rend service, on partage.', hash: '0a1b2c3d4e5f6071' },
+    { id: 'apprendre', chapter: 'metiers', title: 'Apprendre un métier', summary: 'Compétences, rangs, maîtres et apprentis.', hash: '1b2c3d4e5f607182' },
+    { id: 'conseil_sieger', chapter: 'royaume', title: 'Siéger au Conseil', summary: 'Rangs, droits et outils, et l’esprit dans lequel on s’en sert.', hash: '2c3d4e5f60718293', staff: true },
+  ];
+  const bodies = {
+    bienvenue: [
+      ['p', 'Ici, nul ne compte en pièces. On troque, on rend service, on partage les réserves communes. Personne ne sait tout faire : chacun apprend des autres, et c’est ce qui fait vivre la cité.'],
+      ['note', 'Vous arrivez avec un peu de pain et d’eau, de quoi tenir un soir. La suite se trouve auprès des gens d’Eldoria.'],
+      ['h', 'Ce livre'],
+      ['p', 'Le Codex s’ouvre avec ', ['key', 'codex'], '. Trois onglets : ', ['em', 'Lecture'], ', que vous lisez, ', ['em', 'Commandes'], ', où chaque commande se compose et se lance, et ', ['em', 'Touches'], ', qui montre les vôtres.', ['foo', 'segment inconnu, retiré']],
+      ['h', 'Vos premiers gestes'],
+      ['ul',
+        ['Ouvrir sa besace : ', ['key', 'vava_inventory'], '.'],
+        ['Le livre des compétences : ', ['key', 'vava_skills'], '.'],
+        ['L’heure, la saison et le ciel : ', ['cmd', 'date', ''], '.'],
+        ['Fermer une fenêtre : ', ['kbd', 'Échap'], ' ; viser : ', ['key', 'vava_magic_viser'], '.']],
+      ['p', 'Ce qui s’écrit dans le chat sans commande est dit hors du rôle, et entendu des seuls joueurs proches. Pour faire agir votre personnage, écrivez ', ['cmd', 'me', ''], ' ; pour décrire la scène, ', ['cmd', 'do', ''], '.'],
+      ['h', 'Pour aller plus loin'],
+      ['ul',
+        [['page', 'se_parler', '']],
+        [['page', 'troquer', '']],
+        [['page', 'apprendre', 'Apprendre un métier auprès d’un maître']],
+        [['page', 'conseil', 'Joindre le Conseil']]],
+    ],
+    troquer: [
+      ['p', 'Ici, rien ne s’achète. La valeur d’un objet tient à sa qualité, à sa provenance et à la main qui l’a façonné : sa fiche montre son palier, d’où il vient, son artisan et son poinçon.'],
+      ['h', 'Donner un objet'],
+      ['ol',
+        ['Ouvrez votre besace (', ['key', 'vava_inventory'], ').'],
+        ['Faites glisser l’objet hors de la fenêtre : un sac se pose à vos pieds, visible des proches.'],
+        ['L’autre ouvre sa besace près du sac et ramasse d’un double-clic.']],
+      ['note', 'Un sac ne reste pas indéfiniment et ne survit pas au redémarrage du royaume : ne posez que devant celui qui prend.'],
+      ['p', 'Annoncez-le d’un ', ['cmd', 'me', ''], ', et restez jusqu’à ce que l’autre ait pris.'],
+      ['h', 'Rendre service'],
+      ['ul',
+        ['Réparer un outil (', ['page', 'artisanat', 'l’artisanat'], ').'],
+        ['Relever un blessé : ', ['key', 'vava_health_assist'], ', un geste de quelques secondes.'],
+        ['Enseigner (', ['page', 'apprendre', ''], ').'],
+        ['Porter une part de récolte au grenier commun, où chaque dépôt et chaque retrait est ', ['em', 'inscrit'], '.']],
+      ['p', 'Un souci hors du rôle ? ', ['cmd', 'signaler', ''], ' prévient le Conseil.'],
+    ],
+    conseil_sieger: [
+      ['p', 'Le Conseil veille sur le royaume hors du rôle. Il répare et arbitre ; il n’enrichit personne.'],
+      ['h', 'Les outils'],
+      ['ul',
+        ['Le Registre : ', ['key', 'conseil'], '.'],
+        ['État des zones de récolte : ', ['cmd', 'recolte', 'zones'], '.'],
+        ['Fiche d’un joueur : ', ['cmd', 'metiers', 'voir'], '.'],
+        ['Fiche de magie : ', ['cmd', 'magie', 'fiche'], '.']],
+      ['note', 'Toute action est inscrite au journal et au registre du Conseil.'],
+      ['p', 'Retour au début : ', ['page', 'bienvenue', ''], '.'],
+    ],
+  };
+  let mockStaff = true;
+  let mockReading = true;
+
   function argOf(name, action, index) {
     const entry = entries.find((candidate) => candidate.name === name);
     if (!entry) return null;
@@ -70,15 +135,21 @@ const DevMock = (() => {
 
   /** Message d'ouverture complet, de la forme envoyée par client/main.lua : contenu, préférences, touches du joueur. */
   function snapshot(staff) {
+    mockStaff = staff;
     const visible = entries.filter((entry) => staff || entry.scope === 'player');
     const keys = {};
     for (const entry of visible) if (entry.keyLabel) keys[entry.name] = entry.keyLabel;
+    const pages = readingPages.filter((page) => staff || !page.staff);
     return {
       version: staff ? 'dev0000000000001' : 'dev0000000000000',
       content: {
         entries: JSON.parse(JSON.stringify(visible)), chapters: chapters.filter((chapter) => visible.some((entry) => entry.module === chapter.id)),
         undeclared: staff ? [{ name: 'vava_admin_noclip', module: 'vava_admin' }, { name: 'zonesvoix', module: 'vava_voice' }] : [],
         staff,
+        reading: mockReading ? {
+          chapters: readingChapters.filter((chapter) => pages.some((page) => page.chapter === chapter.id)),
+          pages: JSON.parse(JSON.stringify(pages)),
+        } : undefined,
       },
       prefs: JSON.parse(JSON.stringify(prefs)), keys, closeKey: 'F1', recentMax: 12,
     };
@@ -107,7 +178,14 @@ const DevMock = (() => {
       prefs.recent = [{ name: data.name, action: data.action || undefined, at: Math.floor(Date.now() / 1000) }].concat(prefs.recent.filter((entry) => entry.name !== data.name || (entry.action || '') !== (data.action || ''))).slice(0, 12);
       return { ok: true, closed: data.ui === true || !prefs.keepOpen };
     }
-    if (name === 'refresh') return { ok: true, payload: snapshot(true) };
+    if (name === 'page') {
+      // mêmes règles que le serveur : page de l'index visible pour ce joueur, sinon unknown_page (un seul code)
+      const page = readingPages.find((candidate) => candidate.id === data.id && (mockStaff || !candidate.staff));
+      if (!mockReading) return { ok: false, error: 'disabled' };
+      if (!page || !bodies[page.id]) return { ok: false, error: 'unknown_page' };
+      return { ok: true, page: { id: page.id, hash: page.hash, body: JSON.parse(JSON.stringify(bodies[page.id])) } };
+    }
+    if (name === 'refresh') return { ok: true, payload: snapshot(mockStaff) };
     return { ok: true };
   }
 
@@ -115,6 +193,7 @@ const DevMock = (() => {
     window.addEventListener('DOMContentLoaded', () => {
       document.body.classList.add('dev');
       const params = new URLSearchParams(window.location.search);
+      mockReading = params.get('lecture') !== '0';
       const payload = snapshot(params.get('staff') !== '0');
       if (params.get('focus')) payload.focus = params.get('focus');
       window.postMessage({ action: 'open', payload }, '*');

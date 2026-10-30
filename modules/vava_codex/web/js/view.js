@@ -1,14 +1,17 @@
 'use strict';
 /*
  * web/js/view.js
- * Rôle : rendu du livre : rubans de signet, onglets Commandes / Touches, recherche, index par sections (page de
- *        gauche), onglets de chapitre sur la tranche, détail et formulaire (page de droite), réglages, légende.
+ * Rôle : rendu du livre : rubans de signet, onglets Lecture / Commandes / Touches, recherche, index par sections (page
+ *        de gauche), onglets de chapitre sur la tranche, détail et formulaire (page de droite), réglages, légende.
+ *        Lecture (1.5.0) : sommaire, page lue (CodexReader.renderBlocks, sans HTML), pages voisines en pied de page.
+ * Dépendances : strings.js, model.js, reader.js, forms.js
  */
 
 const View = (() => {
   let refs = null;
   let fields = [];
   let currentRow = null;
+  let shownPage = null;   // page à l'écran : le défilement revient en haut quand elle change
 
   const el = (tag, className, text) => {
     const node = document.createElement(tag);
@@ -34,10 +37,10 @@ const View = (() => {
       detail: root.querySelector('.detail'),
       settings: root.querySelector('.settings'),
       toast: root.querySelector('.toast'),
+      hints: root.querySelector('.hints'),
     };
     root.querySelector('.title').textContent = STRINGS.title;
-    root.querySelector('.hints').replaceChildren(...STRINGS.hints.map(hint));
-    for (const tab of ['commands', 'keys']) {
+    for (const tab of ['reading', 'commands', 'keys']) {
       const button = el('button', 'tab', STRINGS.tabs[tab]);
       button.type = 'button';
       button.dataset.tab = tab;
@@ -48,9 +51,35 @@ const View = (() => {
 
   // Page de gauche ---------------------------------------------------------------------------------------------
 
+  const reading = () => Model.state.tab === 'reading';
+
   function renderTabs() {
-    for (const button of refs.tabs.children) button.classList.toggle('is-active', button.dataset.tab === Model.state.tab);
-    refs.search.placeholder = Model.state.tab === 'keys' ? STRINGS.search.keysPlaceholder : STRINGS.search.placeholder;
+    for (const button of refs.tabs.children) {
+      button.classList.toggle('is-active', button.dataset.tab === Model.state.tab);
+      if (button.dataset.tab === 'reading') button.hidden = Model.state.reading === null;
+    }
+    const tab = Model.state.tab;
+    refs.search.placeholder = tab === 'keys' ? STRINGS.search.keysPlaceholder : tab === 'reading' ? STRINGS.search.readingPlaceholder : STRINGS.search.placeholder;
+  }
+
+  function renderHints() {
+    refs.hints.replaceChildren(...(reading() ? STRINGS.readingHints : STRINGS.hints).map(hint));
+  }
+
+  // ligne du sommaire : titre, sceau « Conseil » si réservée, résumé
+  function pageRowNode(row) {
+    const page = row.page;
+    const node = el('div', 'row row-page');
+    node.dataset.row = row.id;
+    node.dataset.chapter = page.chapter;
+    node.setAttribute('role', 'option');
+    if (row.id === Model.state.selected) node.classList.add('is-selected');
+    const line = el('div', 'row-line');
+    line.append(el('span', 'row-title', page.title));
+    if (page.staff) line.append(el('span', 'badge badge-admin', STRINGS.scopes.admin));
+    node.append(line);
+    if (page.summary) node.append(el('span', 'row-label', page.summary));
+    return node;
   }
 
   function badges(row) {
@@ -58,12 +87,13 @@ const View = (() => {
     const entry = row.entry;
     if (entry.scope === 'admin') list.append(el('span', 'badge badge-admin', STRINGS.scopes.admin));
     if (entry.scope === 'console') list.append(el('span', 'badge badge-console', STRINGS.scopes.console));
-    if (entry.kind === 'command' && entry.key) list.append(el('kbd', 'badge-key', entry.keyLabel || entry.keyDisplay || entry.key));
+    if (entry.kind === 'command' && entry.key) list.append(el('kbd', 'badge-key', Model.keyText(entry)));
     if (entry.ui) list.append(el('span', 'badge badge-ui', STRINGS.badges.ui));
     return list;
   }
 
   function rowNode(row) {
+    if (row.page) return pageRowNode(row);
     const node = el('div', 'row');
     node.dataset.row = row.id;
     node.setAttribute('role', 'option');
@@ -71,7 +101,7 @@ const View = (() => {
     if (row.id === Model.state.selected) node.classList.add('is-selected');
     if (row.key || row.entry.kind === 'key') {
       node.classList.add('row-key');
-      node.append(el('kbd', 'row-keycap', row.entry.keyLabel || row.entry.keyDisplay || row.entry.key), el('span', 'row-label', row.entry.label));
+      node.append(el('kbd', 'row-keycap', Model.keyText(row.entry)), el('span', 'row-label', row.entry.label));
       if (row.entry.hold) node.append(el('span', 'badge badge-hold', STRINGS.badges.hold));
       return node;
     }
@@ -100,18 +130,20 @@ const View = (() => {
       nodes.push(block);
     }
     refs.index.replaceChildren(...nodes);
-    refs.count.textContent = STRINGS.search.count(Model.state.rows.length);
+    refs.count.textContent = (reading() ? STRINGS.search.pageCount : STRINGS.search.count)(Model.state.rows.length);
     const selected = refs.index.querySelector('.row.is-selected');
     if (selected) selected.scrollIntoView({ block: 'nearest' });
   }
 
   function renderChapters() {
-    const all = el('button', `chapter${Model.state.chapter === '' ? ' is-active' : ''}`, STRINGS.sections.allChapters);
+    const current = reading() ? Model.state.readingChapter : Model.state.chapter;
+    const chapters = reading() ? Model.state.reading.chapters : Model.state.chapters;
+    const all = el('button', `chapter${current === '' ? ' is-active' : ''}`, STRINGS.sections.allChapters);
     all.type = 'button';
     all.dataset.chapter = '';
     const nodes = [all];
-    for (const chapter of Model.state.chapters) {
-      const button = el('button', `chapter${Model.state.chapter === chapter.id ? ' is-active' : ''}`, chapter.label);
+    for (const chapter of chapters) {
+      const button = el('button', `chapter${current === chapter.id ? ' is-active' : ''}`, chapter.label);
       button.type = 'button';
       button.dataset.chapter = chapter.id;
       nodes.push(button);
@@ -148,7 +180,7 @@ const View = (() => {
     const head = el('header', 'detail-head');
     head.append(el('p', 'detail-chapter', entry.chapter), el('h2', 'detail-title', entry.label));
     const cap = el('div', 'detail-keycap');
-    cap.append(el('kbd', 'keycap-big', entry.keyLabel || entry.keyDisplay || entry.key));
+    cap.append(el('kbd', 'keycap-big', Model.keyText(entry)));
     const facts = el('div', 'detail-facts');
     facts.append(el('p', 'detail-text', STRINGS.detail.keyDefault(entry.keyDisplay || entry.key)));
     if (entry.hold) facts.append(el('p', 'detail-text', STRINGS.detail.keyHold));
@@ -217,7 +249,50 @@ const View = (() => {
     return { line, missing };
   }
 
+  // ce que le texte d'une page lit du Codex : touches du joueur, commandes qu'il voit, pages de l'index
+  const readerContext = {
+    strings: STRINGS.reader,
+    get pagesById() { return Model.state.pageById; },
+    keyLabel(name) {
+      const entry = Model.state.byName.get(name);
+      return (entry && Model.keyText(entry)) || null;
+    },
+    commandVisible(name, action) {
+      const entry = Model.state.byName.get(name);
+      if (!entry || entry.kind === 'key') return false;
+      return !action || (Array.isArray(entry.actions) && entry.actions.some((candidate) => (candidate.id || '') === action));
+    },
+  };
+
+  // page de droite de l'onglet Lecture : chapitre, titre, puis le texte ou l'état de la demande
+  function readerDetail() {
+    fields = [];
+    currentRow = null;
+    const state = Model.state;
+    const page = state.page ? state.pageById.get(state.page) : null;
+    if (!page) {
+      shownPage = null;
+      refs.detail.replaceChildren(el('p', 'detail-empty', STRINGS.reader.empty));
+      return;
+    }
+    const chapter = state.reading.chapters.find((candidate) => candidate.id === page.chapter);
+    const head = el('header', 'detail-head');
+    head.append(el('p', 'detail-chapter', chapter ? chapter.label : ''), el('h2', 'detail-title', page.title));
+    const text = el('article', 'reader');
+    const body = state.pageBody && state.pageBody.id === page.id ? state.pageBody.body : null;
+    if (body && state.pageStatus !== 'error') text.append(...CodexReader.renderBlocks(body, readerContext, document));
+    else if (state.pageStatus === 'error') text.append(el('p', 'detail-empty reader-failed', STRINGS.reader.failed));
+    else text.append(el('p', 'detail-empty reader-loading', STRINGS.reader.loading));
+    refs.detail.replaceChildren(head, text);
+    if (shownPage !== page.id) {
+      shownPage = page.id;
+      refs.detail.scrollTop = 0;
+    }
+  }
+
   function renderDetail() {
+    if (reading()) return readerDetail();
+    shownPage = null;
     const row = Model.state.selected ? Model.row(Model.state.selected) : null;
     if (!row) return emptyDetail();
     currentRow = row;
@@ -229,7 +304,31 @@ const View = (() => {
     }
   }
 
+  // pied de page de l'onglet Lecture : pages précédente et suivante (absentes en bout de livre)
+  function renderReaderNav() {
+    const state = Model.state;
+    const nodes = [];
+    if (state.page && state.pageById.has(state.page)) {
+      const { previous, next } = CodexReader.neighbours(state.reading.pages, state.page);
+      for (const [id, label, side] of [[previous, STRINGS.reader.previous, 'previous'], [next, STRINGS.reader.next, 'next']]) {
+        if (!id) {
+          nodes.push(el('span', `reader-nav-gap reader-nav-${side}`));
+          continue;
+        }
+        const button = el('button', `reader-nav reader-nav-${side}`);
+        button.type = 'button';
+        button.dataset.page = id;
+        button.append(el('span', 'reader-nav-label', label), el('span', 'reader-nav-title', state.pageById.get(id).title));
+        nodes.push(button);
+      }
+    }
+    refs.settings.classList.add('is-reader');
+    refs.settings.replaceChildren(...nodes);
+  }
+
   function renderSettings() {
+    if (reading()) return renderReaderNav();
+    refs.settings.classList.remove('is-reader');
     const label = el('label', 'setting');
     const box = el('input', 'setting-box');
     box.type = 'checkbox';
@@ -244,6 +343,7 @@ const View = (() => {
 
   function render() {
     renderTabs();
+    renderHints();
     renderRibbons();
     renderChapters();
     renderIndex();
@@ -251,12 +351,13 @@ const View = (() => {
     renderSettings();
   }
 
-  /** Après un changement de sélection : index et détail seulement. */
+  /** Après un changement de sélection : index, détail (et pages voisines dans l'onglet Lecture). */
   function renderSelection() {
     for (const node of refs.index.querySelectorAll('.row')) node.classList.toggle('is-selected', node.dataset.row === Model.state.selected);
     const selected = refs.index.querySelector('.row.is-selected');
     if (selected) selected.scrollIntoView({ block: 'nearest' });
     renderDetail();
+    if (reading()) renderReaderNav();
   }
 
   function focusSearch(selectAll) {

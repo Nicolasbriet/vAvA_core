@@ -2,10 +2,10 @@
 /*
  * web/js/model.js
  * Rôle : état du Codex côté interface : entrées visibles (une ligne par commande ou sous-commande), chapitres,
- *        commandes non décrites, préférences (signets, dernières pages, réglage), onglet, chapitre, recherche,
- *        ligne choisie. Le filtrage se fait ici, sans le serveur : la liste est déjà réduite à ce que le joueur
- *        peut voir. Le contenu et les préférences sont gardés d'une ouverture à l'autre : le serveur ne les renvoie
- *        que s'ils ont changé.
+ *        non décrites, préférences, onglet, chapitre, recherche, ligne choisie ; filtrage local (la liste est déjà
+ *        réduite par le serveur). Contenu et préférences gardés d'une ouverture à l'autre. Lecture (1.5.0) : index,
+ *        chapitre de lecture, page choisie, pages gardées par empreinte.
+ * Dépendances : strings.js (STRINGS, fold), reader.js (CodexReader)
  */
 
 const Model = (() => {
@@ -15,10 +15,16 @@ const Model = (() => {
     prefs: { favorites: [], recent: [], keepOpen: true }, closeKey: 'F1',
     recentMax: 12,   // dernières pages gardées : `recent.max` de la config, reçu à l'ouverture
     tab: 'commands', chapter: '', query: '', selected: null, rows: [],
+    // Lecture : reading null = pages fermées (pas d'onglet) ; pageCache id → { hash, body } ; pageBody : page affichée
+    reading: null, pageById: new Map(), readingChapter: '', page: null, pageCache: new Map(), pageBody: null,
+    pageStatus: 'idle',   // idle | loading | error
   };
 
-  /** msgpack transmet une liste vide comme un objet vide : toujours une vraie liste. */
-  const list = (value) => (Array.isArray(value) ? value : Object.values(value || {}));
+  // ligne d'une page ; « # » n'appartient à aucun identifiant (reader.js est chargé après ce fichier)
+  const PAGE_ROW = '#page:';
+  const pageRowId = (id) => PAGE_ROW + id;
+  const list = (value) => CodexReader.list(value);
+  const keyText = (entry) => entry.keyLabel || entry.keyDisplay || entry.key;
 
   /** Identifiant d'une ligne : commande + sous-commande ; « | » n'appartient pas aux identifiants du core. */
   const rowId = (name, action) => `${name}|${action || ''}`;
@@ -35,10 +41,12 @@ const Model = (() => {
     state.undeclared = list(content.undeclared);
     state.staff = content.staff === true;
     state.version = typeof version === 'string' ? version : null;
+    state.reading = CodexReader.normalizeIndex(content.reading);
+    state.pageById = new Map(state.reading ? state.reading.pages.map((page) => [page.id, page]) : []);
+    CodexReader.prune(state.pageCache, state.pageById);
   }
 
-  /** Message d'ouverture : `content` et `prefs` ne viennent que s'ils ont changé (sinon la page garde les siens) ;
-   *  `keys` (touches du joueur, relues par le jeu à chaque ouverture), `closeKey` et `recentMax` viennent toujours. */
+  /** Ouverture : `content` et `prefs` seulement s'ils ont changé ; `keys`, `closeKey`, `recentMax` toujours. */
   function load(payload) {
     if (payload.content && typeof payload.content === 'object') setContent(payload.content, payload.version);
     if (payload.prefs && typeof payload.prefs === 'object') state.prefs = normalizePrefs(payload.prefs);
@@ -49,6 +57,17 @@ const Model = (() => {
     if (payload.closeKey) state.closeKey = payload.closeKey;
     if (Number.isInteger(payload.recentMax) && payload.recentMax > 0) state.recentMax = payload.recentMax;
     if (state.chapter && !state.chapters.some((chapter) => chapter.id === state.chapter)) state.chapter = '';
+    const reading = state.reading;
+    if (state.readingChapter && !(reading && reading.chapters.some((chapter) => chapter.id === state.readingChapter))) state.readingChapter = '';
+    if (state.page && !state.pageById.has(state.page)) {
+      state.page = null;
+      state.pageBody = null;
+      state.pageStatus = 'idle';
+    }
+    if (!reading && state.tab === 'reading') {
+      state.tab = 'commands';
+      state.selected = null;
+    }
     rebuild();
   }
 
@@ -84,8 +103,7 @@ const Model = (() => {
     return parts.join(' ');
   }
 
-  /** Une ligne répond à la recherche par son nom, son libellé, son chapitre et, pour une sous-commande, son propre
-   *  libellé et sa description ; la description générale de la commande ne vaut que pour sa forme nue. */
+  /** Recherche : nom, libellé, chapitre, sous-commande ; la description générale ne vaut que pour la forme nue. */
   function matches(row, needle) {
     const action = row.action;
     const parts = [row.entry.name, row.entry.label, row.entry.chapter];
@@ -94,9 +112,28 @@ const Model = (() => {
     return fold(parts.filter(Boolean).join(' ')).includes(needle);
   }
 
-  /** Lignes affichables : touches pour l'onglet Touches, commandes sinon ; chapitre et recherche appliqués. */
+  /** Onglet Lecture : une ligne par page, filtrée par chapitre et recherche (titre, résumé, chapitre). */
+  function readingRows(needle) {
+    const reading = state.reading;
+    if (!reading) return [];
+    const labels = new Map(reading.chapters.map((chapter) => [chapter.id, chapter.label]));
+    const rows = [];
+    for (const page of reading.pages) {
+      if (state.readingChapter && page.chapter !== state.readingChapter) continue;
+      if (needle && !fold(`${page.title} ${page.summary} ${labels.get(page.chapter) || ''}`).includes(needle)) continue;
+      rows.push({ id: pageRowId(page.id), page });
+    }
+    return rows;
+  }
+
+  /** Lignes affichables de l'onglet (pages, touches ou commandes), chapitre et recherche appliqués. */
   function rebuild() {
     const needle = fold(state.query.trim());
+    if (state.tab === 'reading') {
+      state.rows = readingRows(needle);
+      if (state.selected && !state.rows.some((row) => row.id === state.selected)) state.selected = null;
+      return state.rows;
+    }
     const keysTab = state.tab === 'keys';
     const rows = [];
     for (const entry of state.entries) {
@@ -106,7 +143,7 @@ const Model = (() => {
       if (keysTab) {
         // une commande liée à une touche compte pour une seule touche, quelles que soient ses sous-commandes
         const row = { id: rowId(entry.name, '#touche'), entry, action: null, args: [], key: true };
-        if (!needle || fold(`${entry.name} ${entry.label} ${entry.chapter} ${entry.keyLabel || entry.keyDisplay || entry.key}`).includes(needle)) rows.push(row);
+        if (!needle || fold(`${entry.name} ${entry.label} ${entry.chapter} ${keyText(entry)}`).includes(needle)) rows.push(row);
         continue;
       }
       for (const row of rowsOf(entry)) {
@@ -134,6 +171,13 @@ const Model = (() => {
       out.push({ id: 'results', label: STRINGS.sections.results, rows });
       return out;
     }
+    if (state.tab === 'reading') {
+      for (const chapter of state.reading ? state.reading.chapters : []) {
+        const chapterRows = rows.filter((row) => row.page.chapter === chapter.id);
+        if (chapterRows.length > 0) out.push({ id: chapter.id, label: chapter.label, rows: chapterRows });
+      }
+      return out;
+    }
     if (state.tab === 'commands' && !state.chapter) {
       const favorites = state.prefs.favorites.flatMap((name) => rows.filter((row) => row.entry.name === name));
       if (favorites.length > 0) out.push({ id: 'favorites', label: STRINGS.sections.favorites, rows: favorites });
@@ -155,15 +199,25 @@ const Model = (() => {
 
   function setTab(tab) {
     if (state.tab === tab) return;
+    if (tab === 'reading' && !state.reading) return;
     state.tab = tab;
-    state.selected = null;
+    state.selected = tab === 'reading' && state.page ? pageRowId(state.page) : null;
     rebuild();
   }
 
+  // tranche : chapitre de lecture dans l'onglet Lecture, module sinon
   function setChapter(chapter) {
-    state.chapter = chapter;
+    if (state.tab === 'reading') state.readingChapter = chapter;
+    else state.chapter = chapter;
     rebuild();
   }
+
+  function choosePage(id) {
+    state.page = id;
+    state.selected = pageRowId(id);
+  }
+
+  const pageOfRow = (id) => (typeof id === 'string' && id.startsWith(PAGE_ROW) ? state.pageById.get(id.slice(PAGE_ROW.length)) || null : null);
 
   function setQuery(query) {
     state.query = query;
@@ -174,12 +228,14 @@ const Model = (() => {
     state.selected = id;
   }
 
-  /** Ordre visuel des lignes (sections) pour la navigation au clavier ; une ligne présente dans plusieurs
-   *  sections (signet et chapitre) n'est parcourue qu'une fois. */
+  /** Ordre visuel des lignes pour ↑ ↓ ; une ligne en signet et dans son chapitre n'est parcourue qu'une fois. */
   function visibleOrder() {
     const seen = new Set();
     return sections().flatMap((section) => section.rows).filter((row) => !seen.has(row.id) && seen.add(row.id));
   }
 
-  return { state, list, load, rebuild, sections, syntax, row, rowId, isFavorite, setTab, setChapter, setQuery, select, visibleOrder, normalizePrefs };
+  return {
+    state, list, keyText, load, rebuild, sections, syntax, row, rowId, pageRowId, pageOfRow, isFavorite, setTab, setChapter, setQuery, select,
+    choosePage, visibleOrder, normalizePrefs,
+  };
 })();

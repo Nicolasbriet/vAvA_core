@@ -1969,7 +1969,8 @@ aucune autre interface ne l'a pris.
 RPC : `vava_codex:open(version, versionPréférences)` (empreintes gardées, 16 chiffres hexadécimaux au plus, `''` :
 aucune ; rend `{ version, prefsVersion, content?, prefs? }`), `options(nom, sous-commande, rang)` (valeurs d'un argument dynamique : joueurs en jeu avec
 leur nom, clés d'un registre par `labelField`, export `codexList` du module déclarant), `favorite(nom, posé)`,
-`recent(nom, sous-commande)`, `keepOpen(bool)` — schémas stricts, débits dans `config.rateLimits`. Une sous-commande
+`recent(nom, sous-commande)`, `keepOpen(bool)`, `page(id)` (1.5.0, texte d'une page de lecture, voir plus bas) —
+schémas stricts, débits dans `config.rateLimits`. Une sous-commande
 à droit propre est refusée (`refused`) à qui n'a pas ce droit, pour ses valeurs (`options`) comme pour les dernières
 pages ; `recent` ne retient que le nom et une sous-commande déclarée, jamais le reste de la ligne tapée.
 
@@ -1982,13 +1983,52 @@ un numéro à la main reste possible.
 |---|---|
 | serveur `suggestions(source)` | `{ { name, help, params = { { name, help } } } }` : les suggestions du chat pour ce joueur (ses commandes, une par sous-commande en deux mots, sans les touches ni la console) ; `vava_chat` l'appelle avec le profil |
 | client `noteCommand(ligne)` | — : une commande tapée ailleurs (chat) est inscrite aux dernières pages ; le serveur ignore ce que le joueur ne peut pas lancer |
-| client `openAt(chapitre)` | `true` (ouverture lancée, même chemin que `F1`) ou `false, code` : `invalid_chapter` (pas un identifiant du core de 64 octets au plus), `no_character`, `busy` (livre ouvert, menu pause, autre interface au focus) — 1.4.0 ; la page ouvre ce chapitre (onglet des commandes) s'il existe, sinon reste à l'index |
+| client `openAt(chapitre)` | `true` (ouverture lancée, même chemin que `F1`) ou `false, code` : `invalid_chapter` (pas un identifiant du core de 64 octets au plus), `no_character`, `busy` (livre ouvert, menu pause, autre interface au focus) — 1.4.0 ; la page résout l'identifiant dans cet ordre (1.5.0) : page de lecture (onglet Lecture, cette page), chapitre de lecture (onglet Lecture, première page du chapitre), chapitre de commandes (onglet Commandes) ; inconnu : le livre reste à son index, sans message |
 
 **Ouvrir à un chapitre** (1.4.0) : le chapitre part dans le message `open` de la page (`focus`, 64 octets au plus,
-absent pour `F1` et `/codex`) ; rien de plus sur le réseau. L'identifiant d'un chapitre est aujourd'hui le nom du
-module qui déclare ses commandes (`openAt('vava_inventory')`). Le chapitre « Premiers pas » (`premiers_pas`, T-023)
-est celui qu'ouvre `vava_arrival` à la première venue : T-023 le crée dans les chapitres de la page, ou étend la seule
-fonction `applyFocus` de `web/js/app.js` s'il range ses pages ailleurs. Hors jeu : `?focus=<chapitre>`.
+absent pour `F1` et `/codex`) ; rien de plus sur le réseau. Un chapitre de commandes porte le nom du module qui les
+déclare (`openAt('vava_inventory')`) ; depuis 1.5.0, un identifiant de page ou de chapitre de lecture est résolu
+d'abord (les ids de lecture ne commencent jamais par `vava`, aucune collision). `openAt('premiers_pas')`, appelé par
+`vava_arrival` à la première venue, ouvre l'onglet Lecture au chapitre « Premiers pas », page « Vivre à Eldoria »
+(`bienvenue`). Hors jeu : `?focus=<identifiant>`.
+
+**Pages de lecture** (1.5.0, T-023) : un onglet « Lecture » (premier des trois onglets ; `F1` ouvre toujours le livre
+sur Commandes) porte des chapitres et des pages écrits dans `content/*.lua` du module, chargés comme
+`server_scripts` : jamais téléchargés par les clients (une page du Conseil ne part qu'aux membres). Au setup, chaque
+page est analysée et validée (`shared/pages.lua`, pur, testé) ; une page fautive est écrite en console avec son code et
+sa ligne et écartée seule. `config.reading.enabled = false` : ni onglet, ni index, RPC `page` refusé (`disabled`).
+
+- **Chapitre** `{ id, label, order }` ; **page** (table plate, le `data` de l'Atelier demain) `{ id, chapter, order,
+  title, summary, audience, permission, requires, body }` : `id` au motif `^[a-z][a-z0-9_]*$`, 32 octets au plus, jamais
+  `vava…`, unique parmi pages et chapitres ; `order` entier de 0 à 999 ; `title` 48 octets, `summary` 120, `label` 32,
+  UTF-8, sans contrôle ni `<` `>` ; `audience` `'player'` (tous) ou `'admin'` (Conseil) ; `permission` `''` ou un droit
+  `vava_admin` (seulement avec `admin` ; une page à droit est cachée tant que `vava_admin` n'est pas démarré, sans
+  repli ACE) ; `requires` `''` ou une ressource : la page n'est montrée que si elle est démarrée. 8 chapitres et 40 pages au plus ; un chapitre sans page visible n'apparaît pas.
+- **Corps** (texte balisé léger, 6 000 octets au plus) : paragraphes séparés par une ligne vide ; `## Intertitre` ;
+  `- élément` et `1. élément` (suite d'un élément : deux espaces en tête de ligne ; 12 éléments au plus) ; `> note` ;
+  jetons `[[F1]]` (touche écrite telle quelle, 16 octets), `[[touche:nom]]` (touche **liée par le joueur** à l'entrée
+  `nom` du registre `core:commands`), `[[commande:nom]]` ou `[[commande:nom action]]` (lien vers la ligne de l'onglet
+  Commandes), `[[page:id]]` ou `[[page:id|libellé]]`, `*italique*` ; 40 blocs, 40 jetons ; paragraphe ou note 1 200
+  octets, élément 400, intertitre 80. Refusés : `<` partout, `>` ailleurs qu'en tête de ligne, octets de contrôle
+  (sauf le saut de ligne), UTF-8 invalide. Un lien vers une page absente, ou vers une page que tous les lecteurs de
+  la page qui le porte ne peuvent pas lire (page du Conseil depuis une page publique, page à droit depuis une page qui
+  n'a pas ce droit), fait refuser la page qui le porte. Codes d'erreur et leurs textes : `config.reading.errors`.
+- **Blocs envoyés** (listes pures) : `{ 'h', texte }`, `{ 'p', segment… }`, `{ 'note', segment… }`, `{ 'ul', { segment… },
+  … }`, `{ 'ol', … }` ; segment : chaîne, `{ 'kbd', touche }`, `{ 'key', nom }`, `{ 'cmd', nom, action|'' }`,
+  `{ 'page', id, libellé|'' }`, `{ 'em', texte }`. La page les rend par éléments et `textContent`, jamais de HTML.
+- **Index** dans le contenu de l'ouverture : `content.reading = { chapters = { { id, label } }, pages = { { id, chapter,
+  title, summary, hash, staff? } } }` (absent si les pages sont fermées), calculé avec les droits du moment (module
+  requis démarré ; page du Conseil : membre, et le droit de la page s'il y en a un), dans l'empreinte du contenu : il ne
+  repart que s'il change. `staff = true` seulement sur une page du Conseil. `hash` : empreinte du titre et des blocs.
+  Quand l'Atelier éditera les pages à chaud, l'index aura besoin de sa propre empreinte (aujourd'hui, une page
+  changée renverrait tout le contenu du Codex à la prochaine ouverture).
+- **Texte à la demande** : RPC `vava_codex:page(id)` (id au motif ci-dessus, `rateLimits.page` : 6 puis 1 par seconde) →
+  `{ id, hash, body }` (chapitre et titre sont dans l'index ; 7 500 o au plus hors enveloppe du core, sous le seuil
+  latent) ; `no_character`, `disabled`, ou
+  `unknown_page` pour une page absente, refusée au chargement, réservée ou dont le module est arrêté (un seul code :
+  rien ne trahit une page réservée). Les droits sont relus à chaque appel. La page garde le texte par empreinte.
+- **Console** : `vava_codex_pages` (déclarée `scope = 'console'`) : une ligne par page (poids réseau, public), puis
+  chaque touche ou commande citée absente du registre à cet instant.
 
 Hors jeu : `web/index.html` dans un navigateur (`?staff=0` pour la vue d'un simple joueur) ; les listes des
 formulaires y sont simulées.

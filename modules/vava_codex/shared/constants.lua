@@ -1,7 +1,7 @@
 --[[
     vava_codex/shared/constants.lua
     Rôle : table du module (seule globale de la ressource) et constantes de protocole : registre lu, champ des
-           préférences, RPC, évènements, bornes.
+           préférences, RPC, évènements, bornes ; identifiant d'une page de lecture (1.5.0, `READING`).
     Dépendances : aucune
 ]]
 
@@ -29,6 +29,14 @@ VavaCodex.RPC = {
     FAVORITE = 'vava_codex:favorite',        -- nom, posé ? : signet
     RECENT = 'vava_codex:recent',            -- nom, sous-commande : une commande vient d'être lancée
     KEEP_OPEN = 'vava_codex:keepOpen',       -- rester ouvert après « Lancer » ?
+    PAGE = 'vava_codex:page',                -- identifiant d'une page de lecture : son texte en blocs (1.5.0)
+}
+
+-- Pages de lecture (1.5.0) : seules les bornes que le client relit (identifiant d'une page demandée par la page) ;
+-- les autres bornes du format, réservées au serveur, sont en tête de shared/pages.lua (servi au seul serveur).
+VavaCodex.READING = {
+    ID_PATTERN = '^[a-z][a-z0-9_]*$',        -- identifiant de page ou de chapitre (jamais « vava… »)
+    MAX_ID = 32,
 }
 
 -- Évènements serveur → client, toujours vers le seul joueur concerné.

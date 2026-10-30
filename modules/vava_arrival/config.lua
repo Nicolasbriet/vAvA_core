@@ -44,8 +44,9 @@ VavaArrival.config = {
     },
 
     codex = {
-        -- chapitre où le Codex s'ouvre à la première venue (identifiant, 64 octets au plus) ; tant que T-023 ne l'a pas
-        -- créé, le Codex s'ouvre à son index. Pour l'essayer avant T-023 : 'vava_inventory' (chapitre Inventaire).
+        -- chapitre ou page où le Codex s'ouvre à la première venue (identifiant, 64 octets au plus) : le chapitre de
+        -- lecture « Premiers pas » (vava_codex 1.5.0, T-023), ouvert à sa première page, « Vivre à Eldoria ». Un
+        -- identifiant que le Codex ne connaît pas (Codex antérieur à 1.5.0) le laisse s'ouvrir à son index.
         chapter = 'premiers_pas',
     },
 

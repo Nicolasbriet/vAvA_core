@@ -3,7 +3,8 @@
     Rôle : SEUL point de contact, côté serveur, entre le Codex et le core / les autres modules : personnage et
            joueurs en jeu (tous, ou les seuls proches d'un joueur, positions lues par le serveur), rangs et droits du
            Conseil (vava_admin, sinon ACE), listes de valeurs des modules
-           (export codexList), commandes enregistrées auprès du jeu, notifications. Chaque appel à une autre
+           (export codexList), ressources démarrées (pages de lecture liées à un module), commandes enregistrées
+           auprès du jeu, notifications. Chaque appel à une autre
            ressource est isolé : un module absent ou en erreur ne retire que la fonction concernée.
     Dépendances : shared/constants.lua, config.lua, server/core.lua
 ]]
@@ -137,6 +138,13 @@ function Bridge.Can(source, permission, ace)
 end
 
 -- Modules ---------------------------------------------------------------------------------------------------------
+
+--- Ressource démarrée ? (pages de lecture liées à un module : cachées s'il est arrêté, 1.5.0)
+---@param resource string
+---@return boolean
+function Bridge.Started(resource)
+    return type(resource) == 'string' and GetResourceState(resource) == 'started'
+end
 
 --- Valeurs proposées par un module pour un argument de type `list` : son export `codexList(name)`, nettoyé.
 ---@param module string
