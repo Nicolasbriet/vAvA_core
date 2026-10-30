@@ -8,11 +8,16 @@ régularité de l'arrosage et de la terre ; les graines récupérées gardent ce
 conteneur de l'inventaire ancré à son lieu, dont chaque dépôt et retrait est journalé. Le serveur décide de tout et
 demande l'XP à `vava_skills`.
 
-Ordre de démarrage : après `vAvA_core` (≥ 0.6.0), `vava_inventory` (≥ 1.4.0), `vava_skills` (≥ 1.0.0),
+Ordre de démarrage : après `vAvA_core` (≥ 0.6.0), `vava_ui` (≥ 1.0.0, polices, grain, papier et coins des
+interfaces ; à ne jamais arrêter sur un serveur ouvert), `vava_inventory` (≥ 1.4.0), `vava_skills` (≥ 1.0.0),
 `vava_gathering` (≥ 1.0.0 : faucille) et `vava_crafting` (≥ 1.1.0 : composteur). Facultatifs : `vava_hud`,
 `vava_admin` (droit `metiers`), `vava_chat`, `vava_health` (aucun geste à terre), `vava_time` (saisons : vitesse de
 pousse et de dessèchement, lues par l'export `getSeason` ; nuits de gel, reçues par ses hooks `vava_time:frostWarning`
 et `vava_time:frost`).
+
+Rendu hors jeu : `web/index.html?view=prompt` ou `?view=menu&state=growing` (paramètres en tête de
+`web/dev/devmock.js`, jamais livré) dans un navigateur, depuis le dépôt (option `--allow-file-access-from-files` pour
+les polices).
 
 ## Règles (config.lua)
 

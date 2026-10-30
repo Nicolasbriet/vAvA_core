@@ -29,6 +29,7 @@ Ordre de démarrage : après `vava_admin`, avant `vava_cameras` (ordre complet :
 | Dépendance | Rôle | Sans elle |
 | --- | --- | --- |
 | `vAvA_core` ≥ 0.5.0 | personnages, RPC, hooks, base, registre des commandes | obligatoire |
+| `vava_ui` ≥ 1.0.0 | polices, grain, papier et coins de l'éditeur (`nui://vava_ui/…`) | obligatoire (dépendance déclarée : démarrée d'office, à ne jamais arrêter sur un serveur ouvert) |
 | `vava_hud` ≥ 1.2.0 | médaillon « Voix » et sa lueur | pas de médaillon |
 | `vava_health` | portée réduite à terre | aucune limite à terre |
 | `vava_admin` ≥ 1.1.0 | droits des zones, outil « Zones de voix » du Registre, journal | personne ne crée de zone |
@@ -135,12 +136,12 @@ vava_voice/
 │             main
 ├── client/   core · nui · hud (médaillon) · mumble (salons, cibles) · ring (cercle) · zones · range (portée)
 │             editor · main
-├── web/      index.html · css/style.css · js/ (strings, bridge, editor, devmock)
+├── web/      index.html · css/style.css · js/ (strings, bridge, editor) · dev/devmock.js (hors jeu, jamais livré)
 └── sql/      0001_voice_zones.sql
 ```
 
 Pour travailler le rendu de l'éditeur sans le jeu : `web/index.html` (ou `?zone=1` pour le formulaire) dans un
-navigateur ; le médaillon : `vava_hud/web/index.html?values=0.8,0.6,0.3,0.75&talking=1`.
+navigateur, depuis le dépôt (option `--allow-file-access-from-files` pour les polices) ; le médaillon : `vava_hud/web/index.html?values=0.8,0.6,0.3,0.75&talking=1`.
 
 ## À vérifier en jeu
 

@@ -11,6 +11,7 @@
            grimoire et registre (livres). Tous les textes viennent de la config du module (message « init »). Dans un
            navigateur, web/index.html?view=… montre chaque vue avec des données d'exemple.
   -->
+  <link rel="stylesheet" href="nui://vava_ui/web/css/vava_ui.css">
   <link rel="stylesheet" href="css/style.css">
 </head>
 <body>
@@ -77,7 +78,8 @@
   <script src="js/prompts.js"></script>
   <script src="js/grimoire.js"></script>
   <script src="js/register.js"></script>
-  <script src="js/devmock.js"></script>
+  <!-- hors jeu seulement : vava_ui pris dans le dépôt, puis les données simulées (jamais livrées) -->
+  <script>typeof GetParentResourceName === 'function' || document.write('<script src="../../vava_ui/web/dev/horsjeu.js"><\/script><script src="dev/devmock.js"><\/script>');</script>
   <script src="js/app.js"></script>
 </body>
 </html>

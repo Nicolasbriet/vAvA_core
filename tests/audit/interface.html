@@ -1,0 +1,8 @@
+<!doctype html>
+<!-- tests/audit/interface.html : cas écrits pour le script d'audit en mode essai (page d'une interface) -->
+<link rel="stylesheet" href="nui://vava_ui/web/css/vava_ui.css"> <!-- attendu: rien -->
+<link rel="stylesheet" href="//exemple.invalid/f.css"> <!-- attendu: BLOQUANT -->
+<script src='//exemple.invalid/a.js'></script> <!-- attendu: BLOQUANT -->
+<img src=//exemple.invalid/b.png> <!-- attendu: BLOQUANT -->
+<script src="js/bridge.js"></script> <!-- attendu: rien -->
+<a href="https://cfx-nui-vava_ui/web/x.html">lien</a> <!-- attendu: rien -->

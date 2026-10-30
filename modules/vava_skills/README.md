@@ -5,7 +5,8 @@ on ne sait pas tout faire (budget de points et rouille), la connaissance se tran
 Arcanes de maître à apprenti), et le royaume a besoin de tous les métiers (pénurie). Les modules métiers — récolte,
 artisanat, agriculture — **ne calculent jamais l'XP** : ils appellent ce module avec un contexte, et le serveur décide.
 
-Ordre de démarrage : après `vAvA_core` (≥ 0.6.0) et `vava_inventory` (≥ 1.4.0), avant les modules métiers.
+Ordre de démarrage : après `vAvA_core` (≥ 0.6.0), `vava_ui` (≥ 1.0.0, polices et textures du livre ; à ne jamais
+arrêter sur un serveur ouvert) et `vava_inventory` (≥ 1.4.0), avant les modules métiers.
 Facultatifs : `vava_hud` (notifications), `vava_admin` (droits `metiers` et `staff`, journal du Conseil), `vava_chat`
 (réponses des commandes dans le chat).
 
@@ -106,8 +107,10 @@ Toute action est inscrite au journal du module et, avec vava_admin, au Registre 
 Touche `K` (réglable dans Paramètres > Raccourcis > FiveM). Quatre onglets : Compétences (budget, modes ↑ = ↓, barres
 d'XP, pénurie, mentor et apprentis), Mentorat (propositions reçues, maîtres, apprentis, proposer à un joueur proche),
 Savoirs (recettes connues et lignées, apprentissages en cours), Pénurie. Le client n'a aucune donnée propre : la fiche
-est demandée au serveur à chaque ouverture, les évènements ciblés la tiennent à jour. Rendu hors jeu :
-`web/index.html?tab=competences` (ou `mentorat`, `savoirs`, `penurie`).
+est demandée au serveur à chaque ouverture, les évènements ciblés la tiennent à jour. Polices, grain, papier et coins de
+laiton viennent de `vava_ui` (`nui://vava_ui/…`). Rendu hors jeu : `web/index.html?tab=competences` (ou `mentorat`,
+`savoirs`, `penurie`) dans un navigateur, depuis le dépôt (option `--allow-file-access-from-files` pour les polices),
+avec les données simulées de `web/dev/devmock.js` (jamais livré).
 
 ## Tests en jeu
 

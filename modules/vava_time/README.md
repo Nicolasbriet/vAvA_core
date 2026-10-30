@@ -8,7 +8,9 @@ saison, avec des transitions douces et sans neige hors de l'hiver, et certaines 
 Registre (`F10`), la commande `/ciel` ou la Chancellerie. Les saisons et le gel pèsent sur l'agriculture
 (`vava_farming`) et la récolte (`vava_gathering`), qui les lisent par l'export `getSeason` et les hooks du gel.
 
-Ordre de démarrage : après `vAvA_core` (≥ 0.7.0 : registre des commandes), de préférence juste après `vava_world`.
+Ordre de démarrage : après `vAvA_core` (≥ 0.7.0 : registre des commandes) et `vava_ui` (≥ 1.0.0, polices, grain et
+coins de l'outil ; déclaré en dépendance, à ne jamais arrêter sur un serveur ouvert), de préférence juste après
+`vava_world`.
 Facultatifs : `vava_admin` (droits, outil du Registre, journal ; sans lui, personne ne règle le ciel et l'heure),
 `vava_hud` (notifications), `vava_chancellerie` ≥ 1.4.0 (page Ciel et heure du panneau web).
 
@@ -112,8 +114,9 @@ démarrage, sans rejouer ce qui est déjà passé dans la journée.
 
 ## Hors jeu
 
-`web/index.html` dans un navigateur montre l'outil (`?frozen=1` heure figée, `?forced=1` ciel imposé et figé,
-`?struck=1` gel tombé, `?refused=1` décisions refusées). La logique pure (heure de Paris, saisons, tirage du ciel, nuits
+`web/index.html` dans un navigateur, depuis le dépôt (option `--allow-file-access-from-files` pour les polices), montre
+l'outil avec les données simulées de `web/dev/devmock.js`, jamais livré (`?frozen=1` heure figée, `?forced=1` ciel
+imposé et figé, `?struck=1` gel tombé, `?refused=1` décisions refusées). La logique pure (heure de Paris, saisons, tirage du ciel, nuits
 de gel) est testée dans `tests/spec/time_*_spec.lua`.
 
 ## À vérifier en jeu

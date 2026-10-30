@@ -4,10 +4,24 @@
 
 local ROOT = (os.getenv('VAVA_ROOT') or '.') .. '/'
 
--- Pages basculées sur vava_ui, avec le nom de leur feuille. Une page s'ajoute ici le jour de sa bascule (T-012,
--- étapes 4 à 17) ; à la fin de T-012, les 15 interfaces y sont.
+-- Pages basculées sur vava_ui, avec le nom de leur feuille : les 15 interfaces depuis la fin de T-012. Toute nouvelle
+-- ressource à page (écran de l'Atelier…) s'ajoute ici ; seule l'exception de vava_loading (T-020) reste à part.
 local PAGES = {
     { module = 'vava_hud', sheet = 'style.css' },
+    { module = 'vava_health', sheet = 'style.css' },
+    { module = 'vava_characters_ui', sheet = 'style.css' },
+    { module = 'vava_inventory', sheet = 'style.css' },
+    { module = 'vava_codex', sheet = 'style.css' },
+    { module = 'vava_chat', sheet = 'style.css' },
+    { module = 'vava_skills', sheet = 'style.css' },
+    { module = 'vava_gathering', sheet = 'style.css' },
+    { module = 'vava_crafting', sheet = 'style.css' },
+    { module = 'vava_farming', sheet = 'style.css' },
+    { module = 'vava_time', sheet = 'style.css' },
+    { module = 'vava_voice', sheet = 'style.css' },
+    { module = 'vava_cameras', sheet = 'wall.css' },
+    { module = 'vava_admin', sheet = 'style.css' },
+    { module = 'vava_magic', sheet = 'style.css' },
 }
 
 local COMMON = {
@@ -37,6 +51,20 @@ end
 local function find(text, needle)
     return text:find(needle, 1, true)
 end
+
+--- Nombre d'occurrences littérales de `needle` dans `text`.
+local function count(text, needle)
+    local n, from = 0, 1
+    while true do
+        local start, stop = text:find(needle, from, true)
+        if not start then return n end
+        n, from = n + 1, stop + 1
+    end
+end
+
+-- Lien de la feuille commune et ligne hors jeu, à l'identique dans chaque page (gabarit du pilote vava_hud).
+local COMMON_LINK = '<link rel="stylesheet" href="nui://vava_ui/web/css/vava_ui.css">'
+local OFFLINE_LINE = [[<script>typeof GetParentResourceName === 'function' || document.write('<script src="../../vava_ui/web/dev/horsjeu.js"><\/script><script src="dev/devmock.js"><\/script>');</script>]]
 
 --- Vrai si le manifeste déclare `name` en dépendance (`dependency 'x'` ou dans `dependencies { … }`).
 local function declaresDependency(manifest, name)
@@ -163,15 +191,15 @@ for _, page in ipairs(PAGES) do
         end)
 
         it('lie la feuille commune avant la sienne, et ne charge les données simulées que hors jeu', function()
-            local common = find(html, 'href="nui://vava_ui/web/css/vava_ui.css"')
+            local common = find(html, COMMON_LINK)
             local own = find(html, 'href="css/')
             assert.is_not_nil(common)
             assert.is_not_nil(own)
             assert.is_true(common < own)
-            local line = html:match('<script>(typeof GetParentResourceName === \'function\' ||[^\n]*)</script>')
-            assert.is_not_nil(line)
-            assert.truthy(find(line, '../../vava_ui/web/dev/horsjeu.js'))
-            assert.truthy(find(line, 'dev/devmock.js'))
+            assert.equal(1, count(html, 'vava_ui.css'))
+            -- la ligne hors jeu, à l'identique de celle du pilote (une correction d'adresse touchera les 15 pages pareil)
+            assert.equal(1, count(html, OFFLINE_LINE))
+            assert.equal(1, count(html, 'GetParentResourceName'))
             assert.is_nil(find(html, 'src="js/devmock.js"'))
         end)
 

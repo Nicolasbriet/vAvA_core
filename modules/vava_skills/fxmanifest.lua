@@ -6,7 +6,8 @@
            savoirs perdus reconstitués par fragments, fondateurs, journal. Les modules métiers (récolte, artisanat,
            agriculture) ne calculent jamais l'XP : ils l'appellent avec un contexte. Le serveur décide de tout ; le
            client affiche le livre des compétences (touche K) et demande.
-    Dépendances : vAvA_core ≥ 0.6.0 (temps de jeu), vava_inventory ≥ 1.4.0 (fragments) ; facultatifs : vava_hud
+    Dépendances : vAvA_core ≥ 0.6.0 (temps de jeu), vava_ui ≥ 1.0.0 (polices, grain, papier et coins de la page, par
+                  nui://vava_ui/…), vava_inventory ≥ 1.4.0 (fragments) ; facultatifs : vava_hud
                   (notifications), vava_admin (droits `metiers` et `staff`, journal du Conseil)
 ]]
 
@@ -17,21 +18,21 @@ use_experimental_fxv2_oal 'yes'
 
 name 'vava_skills'
 description 'Compétences vAvA : niveaux, rangs, rouille, pénurie, mentorat, Renommée, recettes transmises, lignées'
-version '1.1.3'
+version '1.2.0'
 
 dependency 'vAvA_core'
+dependency 'vava_ui'
 dependency 'vava_inventory'
 
 vava_migration 'sql/0001_skills.sql'
 
 ui_page 'web/index.html'
 
+-- polices, grain, papier et coins : vava_ui ; les données simulées hors jeu (dossier dev/) ne sont jamais livrées
 files {
     'web/index.html',
     'web/css/*.css',
     'web/js/*.js',
-    'web/img/*',
-    'web/fonts/*.woff2',
 }
 
 -- Ordre explicite : chaque fichier ne dépend que de ceux listés avant lui.

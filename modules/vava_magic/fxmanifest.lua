@@ -9,7 +9,8 @@
            (messages), grimoire (avec ses combinaisons découvertes) et registre des murmures (objets),
            commandes du Conseil. Le serveur décide de tout ; les effets visibles passent par des state bags posés par le
            serveur et des évènements ciblés, reçus des seuls joueurs proches.
-    Dépendances : vAvA_core ≥ 0.5.0 ; facultatives : vava_inventory ≥ 1.3.0 (grimoire et registre), vava_hud
+    Dépendances : vAvA_core ≥ 0.5.0 ; vava_ui ≥ 1.0.0 (polices, grain, papier et coins de la page, par
+                  nui://vava_ui/…) ; facultatives : vava_inventory ≥ 1.3.0 (grimoire et registre), vava_hud
                   (notifications), vava_health (dégâts, à terre), vava_admin (droits et journal du Conseil), vava_chat
 ]]
 
@@ -20,21 +21,24 @@ use_experimental_fxv2_oal 'yes'
 
 name 'vava_magic'
 description 'Magie vAvA : mana, progression, roue des sorts, états, sorts de feu, eau et terre, Murmure, Lueur, grimoire et registre'
-version '2.7.1'
+version '2.8.0'
 
 dependency 'vAvA_core'
+dependency 'vava_ui'
 
 vava_migration 'sql/0001_magic.sql'
 
 ui_page 'web/index.html'
 
+-- polices, grain, papier et coins : vava_ui (runes, écriture, sorts, éléments et états restent ici) ; les données
+-- simulées hors jeu (dossier dev/) ne sont jamais livrées
 files {
     'web/index.html',
     'web/css/*.css',
     'web/js/*.js',
-    'web/fonts/*.woff2',
     'web/sounds/*.ogg',
-    'web/img/*',
+    'web/img/*.svg',
+    'web/img/runes.png',
     'web/img/spells/*.svg',
     'web/img/elements/*.svg',
     'web/img/states/*.svg',

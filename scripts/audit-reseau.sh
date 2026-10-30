@@ -1,47 +1,82 @@
 #!/usr/bin/env bash
 # scripts/audit-reseau.sh — garde-fous statiques (motifs interdits). Ne remplace pas la relecture des agents.
 # Usage : audit-reseau.sh [fichiers…]  (sans argument : tout le dépôt)
-#         audit-reseau.sh --essai      contrôles Lua lancés sur les cas écrits de tests/audit/*.lua (avec
+#         audit-reseau.sh --essai      contrôles lancés sur les cas écrits de tests/audit/ (avec
 #                                      tests/audit/exceptions.txt), comparés à ce que chaque ligne attend en fin de
-#                                      ligne (« -- attendu: BLOQUANT | AVERTISSEMENT | rien ») ; code 1 au moindre écart
+#                                      ligne (« -- attendu: BLOQUANT | AVERTISSEMENT | rien ») ; code 1 au moindre écart.
+#                                      Cas : *.lua (code Lua), fxmanifest.lua (motifs livrés), *.css, *.svg, *.html,
+#                                      *.js (interfaces), chemins.txt (chemins fictifs de fichiers livrés, un par ligne),
+#                                      exceptions.txt (une exception refusée est signalée sur sa ligne)
 set -uo pipefail
 cd "$(dirname "$0")/.."
 
 ESSAI=0
 if [[ "${1:-}" == "--essai" ]]; then ESSAI=1; shift; fi
 
-# Exceptions justifiées : une par ligne « chemin<TAB>extrait exact de la ligne<TAB>raison »
+# Exceptions justifiées : une par ligne « chemin<TAB>extrait exact du contenu de la ligne<TAB>raison » ; un chemin qui
+# finit par « / » couvre les constats de fichier (« [fichier] ») de tout le dossier, et rien d'autre.
 EXCEPTIONS="scripts/audit-exceptions.txt"
-lua=(); web=()
+lua=(); web=(); chemins=(); manifestes=()
+declare -A lieu_chemin=()   # essai : chemin fictif → « tests/audit/chemins.txt:ligne »
 if [[ $ESSAI -eq 1 ]]; then
     EXCEPTIONS="tests/audit/exceptions.txt"
     for f in tests/audit/*.lua; do [[ -f "$f" ]] && lua+=("$f"); done
+    for f in tests/audit/*.css tests/audit/*.svg tests/audit/*.html tests/audit/*.js; do [[ -f "$f" ]] && web+=("$f"); done
+    [[ -f tests/audit/fxmanifest.lua ]] && manifestes+=(tests/audit/fxmanifest.lua)
+    if [[ -f tests/audit/chemins.txt ]]; then
+        n=0
+        while IFS= read -r ligne || [[ -n "$ligne" ]]; do
+            n=$((n + 1)); ligne="${ligne%$'\r'}"
+            [[ -z "$ligne" || "$ligne" == \#* ]] && continue
+            c="${ligne%%[[:space:]]*}"; chemins+=("$c"); lieu_chemin["$c"]="tests/audit/chemins.txt:$n"
+        done < tests/audit/chemins.txt
+    fi
 else
     if [[ $# -gt 0 ]]; then fichiers=("$@"); else mapfile -t fichiers < <(git ls-files); fi
     for f in "${fichiers[@]}"; do
         [[ -f "$f" ]] || continue
+        case "$f" in modules/*/web/*) chemins+=("$f") ;; esac
+        case "$f" in modules/*/fxmanifest.lua) manifestes+=("$f") ;; esac
         case "$f" in
             chancellerie/*|tests/*|examples/*) ;;
             *.lua) lua+=("$f") ;;
-            */web/*.js|*/web/*.html) web+=("$f") ;;
+            */web/*.js|*/web/*.html|*/web/*.css|*/web/*.svg) web+=("$f") ;;
         esac
     done
 fi
 
-filtrer() { # retire les commentaires Lua et les lignes couvertes par une exception ou marquées « audit: ok »
-    local ligne contenu chemin extrait garde
+# Exceptions lues une fois. Refusées (signalées BLOQUANT, sans effet) : extrait vide (il couvrirait toute ligne du
+# fichier) ; exception de dossier dont l'extrait n'est pas « [fichier] » (elle couvrirait le code de tout le dossier).
+exc_chemin=(); exc_extrait=(); exc_invalides=""
+if [[ -f "$EXCEPTIONS" ]]; then
+    n=0
+    while IFS= read -r ligne || [[ -n "$ligne" ]]; do
+        n=$((n + 1)); ligne="${ligne%$'\r'}"   # fichier d'exceptions extrait en CRLF sous Windows
+        [[ -z "$ligne" || "$ligne" == \#* ]] && continue
+        chemin="${ligne%%$'\t'*}"; extrait=""
+        if [[ "$ligne" == *$'\t'* ]]; then extrait="${ligne#*$'\t'}"; extrait="${extrait%%$'\t'*}"; fi
+        if [[ -z "$chemin" || -z "$extrait" ]] || [[ "$chemin" == */ && "$extrait" != "[fichier]" ]]; then
+            exc_invalides+="$EXCEPTIONS:$n:$ligne"$'\n'; continue
+        fi
+        exc_chemin+=("$chemin"); exc_extrait+=("$extrait")
+    done < "$EXCEPTIONS"
+fi
+
+filtrer() { # retire les commentaires Lua (sauf « filtrer code » : déjà retirés par l'appelant) et les lignes couvertes par
+            # une exception ou marquées « audit: ok »
+    local deja="${1:-}"
+    local ligne contenu chemin extrait garde i
     while IFS= read -r ligne; do
         [[ -z "$ligne" || "$ligne" == *"audit: ok"* ]] && continue
         contenu="${ligne#*:}"; contenu="${contenu#*:}"   # « chemin:ligne:contenu » (grep -H)
-        [[ "$contenu" =~ ^[[:space:]]*-- ]] && continue
+        [[ -z "$deja" && "$contenu" =~ ^[[:space:]]*-- ]] && continue
         garde=1
-        if [[ -f "$EXCEPTIONS" ]]; then
-            while IFS=$'\t' read -r chemin extrait _; do
-                extrait="${extrait%$'\r'}"   # fichier d'exceptions extrait en CRLF sous Windows
-                [[ -z "$chemin" || "$chemin" == \#* ]] && continue
-                if [[ "$ligne" == "$chemin:"* && "$ligne" == *"$extrait"* ]]; then garde=0; break; fi
-            done < "$EXCEPTIONS"
-        fi
+        for i in "${!exc_chemin[@]}"; do
+            chemin="${exc_chemin[$i]}"; extrait="${exc_extrait[$i]}"
+            if [[ "$chemin" == */ ]]; then
+                if [[ "$ligne" == "$chemin"* && "$contenu" == "$extrait "* ]]; then garde=0; break; fi
+            elif [[ "$ligne" == "$chemin:"* && "$contenu" == *"$extrait"* ]]; then garde=0; break; fi
+        done
         [[ $garde -eq 1 ]] && printf '%s\n' "$ligne"
     done
 }
@@ -60,6 +95,9 @@ noter() { # niveau message résultat (lignes « chemin:ligne:contenu », déjà 
     if [[ $ESSAI -eq 0 ]]; then echo "[$niveau] $message"; echo "$res" | sed 's/^/    /'; fi
     if [[ "$niveau" == BLOQUANT ]]; then bloquant=1; else avert=1; fi
 }
+
+noter BLOQUANT "exception refusée (extrait vide, ou dossier dont l'extrait n'est pas [fichier]) : elle ne couvre rien" \
+    "${exc_invalides%$'\n'}"
 
 signal() { # niveau motif message
     local niveau="$1" motif="$2" message="$3" res
@@ -167,11 +205,157 @@ signal AVERTISSEMENT 'GlobalState\[[^]]+\][[:space:]]*=' "écriture GlobalState 
 signal AVERTISSEMENT 'Wait\(0\)' "Wait(0) : uniquement pendant un état actif temporaire"
 signal AVERTISSEMENT 'GetGamePool' "GetGamePool : à éviter dans une boucle"
 
+# Adresse externe dans une interface : cherchée après avoir retiré les seules sous-chaînes permises — espaces de noms
+# (`xmlns="http://www.w3.org/…"`, guillemets simples ou doubles ; la chaîne exacte 'http://www.w3.org/2000/svg' et
+# ses sœurs xlink et xhtml), rappels NUI exacts (`https://cfx-nui-<ressource>/`, `https://${resource}/`,
+# `https://${GetParentResourceName()}/`). Le reste de la ligne compte toujours. Cherchés : `http(s)://`, `ws(s)://`,
+# et les adresses sans protocole (`src=//…`, `href=//…`, `url(//…)`).
+EXTERNE_AWK='
+{
+    l = $0; sub(/\r$/, "", l); c = l
+    gsub("xmlns(:[A-Za-z]+)?=[\"" Q "]http://www[.]w3[.]org/[^\"" Q "]*[\"" Q "]", "", c)
+    gsub("[\"" Q "]http://www[.]w3[.]org/(2000/svg|1999/xlink|1999/xhtml)[\"" Q "]", "", c)
+    gsub(/https:\/\/cfx-nui-[A-Za-z0-9_-]+\//, "", c)
+    gsub(/https:\/\/[$][{]resource[}]\//, "", c)
+    gsub(/https:\/\/[$][{]GetParentResourceName[(][)][}]\//, "", c)
+    if (c ~ /(https?|wss?):\/\// || c ~ ("(src|href)[ \t]*=[ \t]*[\"" Q "]?//") || c ~ ("url[(][ \t]*[\"" Q "]?//"))
+        print FILENAME ":" FNR ":" l
+}
+'
 if [[ ${#web[@]} -gt 0 ]]; then
-    res=$(grep -HnE 'https?://' "${web[@]}" 2>/dev/null | grep -vE 'xmlns|w3\.org|nui://|https://cfx-nui-|https://\$\{' | filtrer || true)
+    res=$(awk -v Q="'" "$EXTERNE_AWK" "${web[@]}" 2>/dev/null | filtrer || true)
     noter BLOQUANT "ressource externe dans une interface" "$res"
     res=$(grep -HnE '\.innerHTML[[:space:]]*\+?=' "${web[@]}" 2>/dev/null | filtrer || true)
     noter AVERTISSEMENT "innerHTML : jamais avec une donnée venant d'un joueur (marquer '// audit: ok' si sûr)" "$res"
+    svgs=(); for f in "${web[@]}"; do [[ "$f" == *.svg ]] && svgs+=("$f"); done
+    if [[ ${#svgs[@]} -gt 0 ]]; then
+        res=$(grep -HniE '<script|foreignObject|(^|[[:space:]])on[a-z]+[[:space:]]*=|javascript:' "${svgs[@]}" 2>/dev/null | filtrer || true)
+        noter BLOQUANT "SVG actif dans une interface (script, foreignObject, attribut on…= ou javascript:)" "$res"
+    fi
+fi
+
+# Fichiers communs des interfaces (T-012) : polices, textures et ornements communs vivent dans vava_ui seul ; les
+# données simulées d'une page (devmock.js) restent dans web/dev/, qu'aucun motif `files` ne livre. Un constat de
+# fichier s'écrit « chemin:1:[fichier] chemin » (une exception de dossier : « modules/x/web/<TAB>[fichier]<TAB>… »).
+relocaliser() { # essai : ramène un chemin fictif à sa ligne de tests/audit/chemins.txt
+    local l c
+    while IFS= read -r l; do
+        [[ -z "$l" ]] && continue
+        if [[ $ESSAI -eq 1 ]]; then c="${l%%:1:\[fichier\] *}"; printf '%s:%s\n' "${lieu_chemin[$c]:-$c:1}" "${l#*:1:}"
+        else printf '%s\n' "$l"; fi
+    done
+}
+if [[ ${#chemins[@]} -gt 0 ]]; then
+    devmocks=""; copies=""
+    # données simulées : partout sauf directement sous modules/<module>/web/dev/ (vava_ui compris) ; polices : partout
+    # sous web/ hors de vava_ui ; textures et ornements communs : sous web/fonts/ et web/img/ hors de vava_ui (un
+    # web/items/paper.svg propre à un module reste permis)
+    for c in "${chemins[@]}"; do
+        nom="${c##*/}"
+        if [[ "$nom" == *devmock*.js && ! "$c" =~ ^modules/[^/]+/web/dev/ ]]; then devmocks+="$c:1:[fichier] $c"$'\n'; fi
+        [[ "$c" =~ ^modules/vava_ui/ ]] && continue
+        case "$nom" in
+            *.woff2|*.woff|*.ttf|*.otf) copies+="$c:1:[fichier] $c"$'\n' ;;
+            grain.*|paper.*|frame.svg|divider.svg|diamond.svg)
+                [[ "$c" =~ ^modules/[^/]+/web/(fonts|img)/ ]] && copies+="$c:1:[fichier] $c"$'\n' ;;
+        esac
+    done
+    noter BLOQUANT "données simulées livrées aux joueurs (les mettre dans web/dev/, hors des files) (T-012)" \
+        "$(printf '%s' "$devmocks" | filtrer | relocaliser || true)"
+    noter BLOQUANT "police ou texture commune hors de vava_ui (la prendre par nui://vava_ui/…, T-012)" \
+        "$(printf '%s' "$copies" | filtrer | relocaliser || true)"
+fi
+
+# Motifs livrés d'un manifeste qui couvriraient web/dev/. Seules comptent les chaînes de `files { … }`, `file`,
+# `ui_page` et `loadscreen` (pas celles des scripts). Lecture du Lua : commentaires de fin de ligne et blocs
+# (`--[[ ]]`, `--[==[ ]==]`) ignorés, chaînes courtes et longues (`[[…]]`, `[==[…]==]`, sur plusieurs lignes) lues.
+# Chaque chaîne est normalisée (`\` → `/`, `./` et `/./` retirés, `//` réduit), puis refusée si elle contient `**`, ou si
+# sa première partie peut valoir `web` et que sa deuxième peut valoir `dev` (`web/dev…`, `web/de?`, `web/dev*`,
+# `web/*`, `*/dev/x.js`) ou qu'une partie de dossier porte un joker (`web/*/x.js`).
+MANIFESTE_AWK='
+function norm(m) {
+    gsub(/\\/, "/", m)
+    gsub(/\/\/+/, "/", m)
+    while (gsub(/\/\.\//, "/", m)) {}
+    while (sub(/^\.\//, "", m)) {}
+    sub(/^\/+/, "", m)
+    return m
+}
+function glob2re(g,    i, ch, r) {
+    r = ""
+    for (i = 1; i <= length(g); i++) {
+        ch = substr(g, i, 1)
+        if (ch == "*") r = r ".*"
+        else if (ch == "?") r = r "."
+        else if (ch == "[" && index(substr(g, i + 1), "]")) {
+            r = r "["; i++
+            if (substr(g, i, 1) == "!") { r = r "^"; i++ }
+            while (substr(g, i, 1) != "]") { r = r substr(g, i, 1); i++ }
+            r = r "]"
+        }
+        else if (ch ~ /[].[+^$(){}|]/) r = r "\\" ch
+        else r = r ch
+    }
+    return "^" r "$"
+}
+function couvre(g, mot) { return mot ~ glob2re(g) }
+function dangereux(m,    n, p, i) {
+    m = norm(m)
+    if (index(m, "**")) return 1
+    n = split(m, p, "/")
+    if (n < 2 || !couvre(p[1], "web")) return 0
+    if (couvre(p[2], "dev")) return 1
+    for (i = 1; i < n; i++) if (p[i] ~ /[*?[]/) return 1
+    return 0
+}
+function valeur(s) {
+    if (prof > 0 || attente == "files" || attente == "file" || attente == "ui_page" || attente == "loadscreen")
+        if (dangereux(s) && cle != FILENAME ":" debut) { cle = FILENAME ":" debut; print cle ":" ldebut }
+    if (prof == 0) attente = ""
+}
+FNR == 1 { mode = ""; ferme = ""; attente = ""; prof = 0; chaine = "" }
+{
+    l = $0; sub(/\r$/, "", l); n = length(l); i = 1
+    while (i <= n) {
+        if (mode != "") {   # dans un bloc de commentaire (C) ou une chaîne longue (L)
+            k = index(substr(l, i), ferme)
+            if (!k) { if (mode == "L") chaine = chaine substr(l, i) "\n"; break }
+            if (mode == "L") valeur(chaine substr(l, i, k - 1))
+            i += k - 1 + length(ferme); mode = ""; continue
+        }
+        ch = substr(l, i, 1)
+        if (ch == "-" && substr(l, i + 1, 1) == "-") {
+            if (match(substr(l, i + 2), /^\[=*\[/)) {
+                ferme = "]" substr(l, i + 3, RLENGTH - 2) "]"; mode = "C"; i += 2 + RLENGTH; continue
+            }
+            break
+        }
+        if (ch == "[" && match(substr(l, i), /^\[=*\[/)) {
+            ferme = "]" substr(l, i + 1, RLENGTH - 2) "]"; mode = "L"; chaine = ""; debut = FNR; ldebut = l
+            i += RLENGTH; continue
+        }
+        if (ch == "\"" || ch == Q) {
+            j = i + 1; s = ""
+            while (j <= n && substr(l, j, 1) != ch) {
+                if (substr(l, j, 1) == "\\") { s = s substr(l, j, 2); j += 2 } else { s = s substr(l, j, 1); j++ }
+            }
+            debut = FNR; ldebut = l; valeur(s); i = j + 1; continue
+        }
+        if (ch ~ /[A-Za-z_]/) {
+            match(substr(l, i), /^[A-Za-z_][A-Za-z0-9_]*/); mot = substr(l, i, RLENGTH); i += RLENGTH
+            if (prof == 0) attente = (mot == "files" || mot == "file" || mot == "ui_page" || mot == "loadscreen") ? mot : ""
+            continue
+        }
+        if (ch == "{") { if (prof > 0) prof++; else if (attente == "files") { prof = 1; attente = "" } else attente = "" }
+        else if (ch == "}") { if (prof > 0) prof-- }
+        else if (ch !~ /[ \t(),;]/ && prof == 0) attente = ""
+        i++
+    }
+}
+'
+if [[ ${#manifestes[@]} -gt 0 ]]; then
+    res=$(awk -v Q="'" "$MANIFESTE_AWK" "${manifestes[@]}" 2>/dev/null | filtrer code || true)
+    noter BLOQUANT "motif livré qui couvrirait web/dev/ (données simulées) : ni web/dev, ni **, ni joker dans un dossier sous web/ (T-012)" "$res"
 fi
 
 if [[ $ESSAI -eq 1 ]]; then
@@ -182,7 +366,8 @@ if [[ $ESSAI -eq 1 ]]; then
         [[ -z "$ligne" ]] && continue
         position="${ligne%%:-- attendu:*}"; niveau="${ligne##*-- attendu: }"; niveau="${niveau%%[[:space:]]*}"
         attendu["$position"]="$niveau"; cas=$((cas + 1))
-    done < <(grep -HnoE -- '-- attendu: (BLOQUANT|AVERTISSEMENT|rien)' "${lua[@]}" 2>/dev/null || true)
+    done < <(grep -HnoE -- '-- attendu: (BLOQUANT|AVERTISSEMENT|rien)' "${lua[@]}" "${web[@]}" \
+        "${manifestes[@]}" tests/audit/chemins.txt "$EXCEPTIONS" 2>/dev/null | sort -u || true)
     for c in "${constats[@]}"; do
         niveau="${c%%$'\t'*}"; position="${c#*$'\t'}"
         trouve["$position"]="${trouve[$position]:+${trouve[$position]} }$niveau"

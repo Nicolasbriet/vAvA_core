@@ -6,7 +6,9 @@ réveille au lieu de soins. Personne ne se relève seul : on a besoin des autres
 coupée ; on se soigne par objets (bandes, potions) ou en se faisant relever. Le serveur décide de tout : il lit lui-même
 la vie de chaque joueur, met à terre, relève et porte au lieu de soins ; le client applique et affiche.
 
-Ordre de démarrage : après `vAvA_core` (≥ 0.4.0), avant les modules qui lisent l'état « à terre ». Facultatifs :
+Ordre de démarrage : après `vAvA_core` (≥ 0.4.0) et `vava_ui` (≥ 1.0.0, polices, grain et ornements de l'écran à
+terre ; déclaré en dépendance, à ne jamais arrêter sur un serveur ouvert), avant les modules qui lisent l'état « à
+terre ». Facultatifs :
 `vava_inventory` (objets de soin, gestes bloqués à terre), `vava_needs` (faim et soif figées à terre), `vava_hud`
 (médaillon Santé, notifications). Les modules qui tiennent compte de l'état à terre (récolte, artisanat, agriculture,
 magie, voix, Registre) appellent l'export `isDowned` : la règle n'est écrite qu'ici.
@@ -107,4 +109,6 @@ La procédure complète est `docs/tests/sante.md`. En priorité :
 6. **Métiers** : à terre près d'un arbre, d'une station ou d'une parcelle → aucune invite ; `E` ne fait que rendre
    l'âme. Grenier ouvert à la chute → l'inventaire se ferme aussitôt, rien n'est déplacé (`metiers` 5-13).
 7. **Rendu de l'écran** : `web/index.html?state=downed` (ou `ready`, `patient`, `holding`, `assist`) dans un
-   navigateur.
+   navigateur, depuis le dépôt (option `--allow-file-access-from-files` pour les polices) : la ligne hors jeu de la
+   page charge `modules/vava_ui/web/dev/horsjeu.js` et les données simulées de `web/dev/devmock.js` (jamais livrés).
+   En jeu, polices, grain, filet et losange arrivent de `vava_ui` (`docs/tests/interfaces.md`).

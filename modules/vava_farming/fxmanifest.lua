@@ -10,7 +10,8 @@
            retraits journalés), composteur ajouté à l'artisanat, commandes du Conseil. Le serveur décide de tout et
            demande l'XP à vava_skills ; le client crée les props des plantes selon leur stade, montre l'invite et le menu,
            joue les gestes.
-    Dépendances : vAvA_core ≥ 0.6.0, vava_inventory ≥ 1.4.0, vava_skills ≥ 1.0.0, vava_gathering ≥ 1.0.0 (faucille),
+    Dépendances : vAvA_core ≥ 0.6.0, vava_ui ≥ 1.0.0 (polices, grain, papier et coins de la page, par
+                  nui://vava_ui/…), vava_inventory ≥ 1.4.0, vava_skills ≥ 1.0.0, vava_gathering ≥ 1.0.0 (faucille),
                   vava_crafting ≥ 1.1.0 (composteur) ; facultatifs : vava_hud, vava_admin (droit metiers), vava_chat,
                   vava_health (aucun geste à terre), vava_time (saisons, nuits de gel)
 ]]
@@ -22,9 +23,10 @@ use_experimental_fxv2_oal 'yes'
 
 name 'vava_farming'
 description 'Agriculture vAvA : parcelles, croissance par dates, humidité et fertilité, qualité, grenier commun'
-version '1.5.2'
+version '1.6.0'
 
 dependency 'vAvA_core'
+dependency 'vava_ui'
 dependency 'vava_inventory'
 dependency 'vava_skills'
 dependency 'vava_gathering'
@@ -36,13 +38,12 @@ vava_migration 'sql/0003_slot_cover.sql'
 
 ui_page 'web/index.html'
 
+-- polices, grain, papier et coins : vava_ui ; les données simulées hors jeu (dossier dev/) ne sont jamais livrées
 files {
     'web/index.html',
     'web/css/*.css',
     'web/js/*.js',
-    'web/img/*',
     'web/items/*.svg',
-    'web/fonts/*.woff2',
 }
 
 -- Ordre explicite : chaque fichier ne dépend que de ceux listés avant lui.

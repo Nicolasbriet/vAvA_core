@@ -19,6 +19,7 @@ Ordre de démarrage : après `vava_admin` et `vava_voice`, avant `vava_magic` et
 | Dépendance | Rôle | Sans elle |
 | --- | --- | --- |
 | `vAvA_core` ≥ 0.5.0 | personnages, RPC, hooks, registre des commandes | obligatoire |
+| `vava_ui` ≥ 1.0.0 | polices, grain, coins et filet du mur (`nui://vava_ui/…`) | obligatoire (dépendance déclarée : démarrée d'office, à ne jamais arrêter sur un serveur ouvert) |
 | `vava_admin` ≥ 1.2.0 | droit `watch`, journal du Conseil, outil « Mur des caméras » du Registre | personne ne regarde en jeu |
 | `vava_chancellerie` ≥ 1.1.0 | caméras regardées depuis le web | mur en jeu seulement |
 
@@ -140,11 +141,13 @@ vava_cameras/
 ├── shared/   constants.lua (protocole) · budget.lua (débit montant, chargé par le serveur seul)
 ├── server/   core · links (Conseil) · players (joueurs regardables) · sessions (caméras) · api · commands · main
 ├── client/   core · nui · capture (joueur filmé) · wall (mur du membre) · main
-└── web/      index.html · css/wall.css · js/ (strings, bridge, capture, viewer, wall, devmock)
+└── web/      index.html · css/wall.css · js/ (strings, bridge, capture, viewer, wall)
+              dev/devmock.js (hors jeu seulement, jamais livré)
 ```
 
 Pour travailler le rendu du mur sans le jeu : `web/index.html?players=11&layout=3` (ou `&focus=<numéro>`, et
-`&budget=<numéro>` pour voir la vue en grand de ce joueur refusée) dans un navigateur ; chaque case est une vraie
+`&budget=<numéro>` pour voir la vue en grand de ce joueur refusée) dans un navigateur, depuis le dépôt (option
+`--allow-file-access-from-files` pour les polices) ; chaque case est une vraie
 connexion WebRTC locale filmant une scène dessinée.
 
 ## À vérifier en jeu

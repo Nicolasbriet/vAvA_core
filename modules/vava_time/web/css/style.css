@@ -4,13 +4,10 @@
  *        visible), reliure de cuir sombre à coins de laiton (le grain reste sur le cuir), feuillet de parchemin uni et
  *        clair à l'encre brune bien contrastée, champs crème à filet de laiton, tampons pour les ciels, sceau de cire
  *        pour l'action lourde. Cinzel pour les titres seulement ; texte et boutons en EB Garamond.
- *        Polices embarquées (licence OFL) : Cinzel, EB Garamond.
+ *        Polices, grain et coins : vava_ui (licence OFL des polices dans modules/vava_ui/web/fonts/) ; sans vava_ui,
+ *        polices de repli, cuir sans grain ni coins, toujours lisible.
  * Performance : textures en images fixes, aucun flou ni filtre ; seules l'opacité et les transformations sont animées.
  */
-
-@font-face { font-family: "Cinzel"; src: url("../fonts/cinzel.woff2") format("woff2"); font-weight: 400 700; font-display: swap; }
-@font-face { font-family: "EB Garamond"; src: url("../fonts/eb_garamond.woff2") format("woff2"); font-weight: 400 700; font-style: normal; font-display: swap; }
-@font-face { font-family: "EB Garamond"; src: url("../fonts/eb_garamond_italic.woff2") format("woff2"); font-weight: 400 700; font-style: italic; font-display: swap; }
 
 :root {
   --edge: #070504;
@@ -31,7 +28,7 @@
   --font-display: "Cinzel", "Palatino Linotype", Georgia, serif;
   --font-body: "EB Garamond", "Palatino Linotype", Georgia, serif;
   --ease: cubic-bezier(0.2, 0.7, 0.2, 1);
-  --leather: url("../img/grain.png"), radial-gradient(ellipse 140% 60% at 50% 0%, rgba(132, 92, 56, 0.22), transparent 65%), linear-gradient(180deg, #241a12, #15100b);
+  --leather: var(--ui-grain, none), radial-gradient(ellipse 140% 60% at 50% 0%, rgba(132, 92, 56, 0.22), transparent 65%), linear-gradient(180deg, #241a12, #15100b);
   --paper-surface: linear-gradient(180deg, #f3ead6 0%, var(--page) 22%, var(--page-deep) 100%);
 }
 
@@ -85,7 +82,7 @@ input { color: inherit; font: inherit; }
   position: absolute;
   inset: -3px;
   border: 1.1rem solid transparent;
-  border-image: url("../img/frame.svg") 18 / 1.1rem;
+  border-image: var(--ui-frame, none) 18 / 1.1rem;
   pointer-events: none;
 }
 

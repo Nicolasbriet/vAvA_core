@@ -2,33 +2,13 @@
  * web/css/style.css
  * Rôle : thème de l'inventaire : cuir grainé surpiqué (besace, ceinture, mains), toile (sac au sol), cases creusées,
  *        coins de laiton, teinte par catégorie d'objet et par palier, marques des métadonnées (palier, solidité,
- *        brisé, en main), Cinzel pour les titres et EB Garamond pour le texte (embarquées, OFL).
+ *        brisé, en main), Cinzel pour les titres et EB Garamond pour le texte. Polices, textures et ornements :
+ *        vava_ui (licence OFL des polices dans modules/vava_ui/web/fonts/) ; cases et balance restent ici ; sans
+ *        vava_ui, polices de repli, cuir sans grain ni coins de laiton, toujours lisible.
  * Performance : textures en images fixes répétées (peintes une fois), aucun flou d'arrière-plan ni filtre CSS, grille
  *        dessinée en fond (aucun élément par case), transitions sur opacity et transform seulement, copie glissée
  *        déplacée par transform.
  */
-
-@font-face {
-  font-family: "Cinzel";
-  src: url("../fonts/cinzel.woff2") format("woff2");
-  font-weight: 400 700;
-  font-style: normal;
-  font-display: swap;
-}
-@font-face {
-  font-family: "EB Garamond";
-  src: url("../fonts/eb_garamond.woff2") format("woff2");
-  font-weight: 400 700;
-  font-style: normal;
-  font-display: swap;
-}
-@font-face {
-  font-family: "EB Garamond";
-  src: url("../fonts/eb_garamond_italic.woff2") format("woff2");
-  font-weight: 400 700;
-  font-style: italic;
-  font-display: swap;
-}
 
 :root {
   --edge: #070504;
@@ -47,7 +27,7 @@
   --font-display: "Cinzel", "Palatino Linotype", Georgia, serif;
   --font-body: "EB Garamond", "Palatino Linotype", Georgia, serif;
   --ease: cubic-bezier(0.2, 0.7, 0.2, 1);
-  --grain: url("../img/grain.png");
+  --grain: var(--ui-grain, none);
   --leather: var(--grain), radial-gradient(ellipse 120% 80% at 50% 0%, rgba(132, 92, 56, 0.2), transparent 65%), linear-gradient(180deg, #221a13, #16100c);
   --card: var(--grain), linear-gradient(180deg, #2a2017, #1a130e);
   --card-shadow: 0 0 0 1px var(--edge), 0 0 0 2px rgba(var(--brass-rgb), 0.2), inset 0 1px 0 var(--highlight), 0 1.2rem 2.4rem rgba(0, 0, 0, 0.6);
@@ -149,7 +129,7 @@ button { color: inherit; font: inherit; }
   position: absolute;
   inset: -3px;
   border: var(--corner) solid transparent;
-  border-image: url("../img/frame.svg") 18 / var(--corner);
+  border-image: var(--ui-frame, none) 18 / var(--corner);
   pointer-events: none;
 }
 
@@ -754,7 +734,7 @@ kbd {
   position: relative;
   margin-bottom: 0.6rem;
   padding-bottom: 0.75rem;
-  background: url("../img/divider.svg") left bottom / 100% 9px no-repeat;
+  background: var(--ui-divider, none) left bottom / 100% 9px no-repeat;
 }
 .tooltip-header::after {
   content: "";
@@ -763,7 +743,7 @@ kbd {
   left: 50%;
   width: 9px;
   height: 9px;
-  background: url("../img/diamond.svg") center / contain no-repeat;
+  background: var(--ui-diamond, none) center / contain no-repeat;
   transform: translateX(-50%);
 }
 .tooltip-title {

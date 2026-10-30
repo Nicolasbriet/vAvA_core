@@ -1,32 +1,12 @@
 /*
  * web/css/style.css
  * Rôle : thème de l'écran de personnages, commun avec l'inventaire : cuir grainé surpiqué, coins et boutons de
- *        laiton, champs gravés, Cinzel pour les titres et EB Garamond pour le texte (embarquées, licence OFL).
+ *        laiton, champs gravés, Cinzel pour les titres et EB Garamond pour le texte.
+ *        Polices, textures et ornements : vava_ui (licence OFL des polices dans modules/vava_ui/web/fonts/) ; le blason
+ *        reste ici ; sans vava_ui, polices de repli, cuir sans grain ni coins de laiton, toujours lisible.
  * Performance : textures en images fixes (peintes une fois), aucun flou d'arrière-plan ni filtre CSS, transitions
  *        limitées à l'opacité et aux transformations, écrans masqués retirés du rendu (display: none).
  */
-
-@font-face {
-  font-family: "Cinzel";
-  src: url("../fonts/cinzel.woff2") format("woff2");
-  font-weight: 400 700;
-  font-style: normal;
-  font-display: swap;
-}
-@font-face {
-  font-family: "EB Garamond";
-  src: url("../fonts/eb_garamond.woff2") format("woff2");
-  font-weight: 400 700;
-  font-style: normal;
-  font-display: swap;
-}
-@font-face {
-  font-family: "EB Garamond";
-  src: url("../fonts/eb_garamond_italic.woff2") format("woff2");
-  font-weight: 400 700;
-  font-style: italic;
-  font-display: swap;
-}
 
 :root {
   --edge: #070504;
@@ -48,7 +28,7 @@
   --font-display: "Cinzel", "Palatino Linotype", Georgia, serif;
   --font-body: "EB Garamond", "Palatino Linotype", Georgia, serif;
   --ease: cubic-bezier(0.2, 0.7, 0.2, 1);
-  --grain: url("../img/grain.png");
+  --grain: var(--ui-grain, none);
   --leather: var(--grain), radial-gradient(ellipse 120% 60% at 50% 0%, rgba(132, 92, 56, 0.2), transparent 65%), linear-gradient(180deg, #221a13, #16100c);
   --raised-shadow: 0 0 0 1px var(--edge), inset 0 1px 0 var(--highlight), inset 0 0 2.5rem rgba(0, 0, 0, 0.45), 0 1.8rem 3.5rem rgba(0, 0, 0, 0.55), 0 0.4rem 1rem rgba(0, 0, 0, 0.4);
   --card-shadow: 0 0 0 1px var(--edge), 0 0 0 2px rgba(var(--brass-rgb), 0.2), inset 0 1px 0 var(--highlight), 0 1.2rem 2.4rem rgba(0, 0, 0, 0.6);
@@ -116,7 +96,7 @@ button { font: inherit; color: inherit; }
   position: absolute;
   inset: -3px;
   border: var(--corner) solid transparent;
-  border-image: url("../img/frame.svg") 18 / var(--corner);
+  border-image: var(--ui-frame, none) 18 / var(--corner);
   pointer-events: none;
 }
 
@@ -215,7 +195,7 @@ kbd {
   width: 11px;
   height: 11px;
   margin: 0 0 0.9rem;
-  background: url("../img/diamond.svg") center / contain no-repeat;
+  background: var(--ui-diamond, none) center / contain no-repeat;
 }
 .brand-title {
   margin: 0;
@@ -241,7 +221,7 @@ kbd {
   left: -1px;
   width: 10px;
   height: 10px;
-  background: url("../img/diamond.svg") center / contain no-repeat;
+  background: var(--ui-diamond, none) center / contain no-repeat;
 }
 
 .slots { display: flex; flex-direction: column; gap: 0.8rem; }

@@ -7,7 +7,8 @@
            Les saisons et le gel sont lus par l'agriculture et la récolte (export, hooks). Le serveur décide de tout et
            publie trois petites valeurs par GlobalState ; le client fait avancer l'horloge du jeu seul et suit les
            transitions du ciel.
-    Dépendances : vAvA_core ≥ 0.7.0 ; facultatives : vava_admin (droits, outil du Registre, journal), vava_hud
+    Dépendances : vAvA_core ≥ 0.7.0 ; vava_ui ≥ 1.0.0 (polices, grain et coins de la page, par nui://vava_ui/…) ;
+                  facultatives : vava_admin (droits, outil du Registre, journal), vava_hud
                   (notifications), vava_chancellerie (actions depuis le web)
 ]]
 
@@ -18,20 +19,20 @@ use_experimental_fxv2_oal 'yes'
 
 name 'vava_time'
 description 'Temps du royaume vAvA : heure de Paris, saisons, météo, ciel et heure du Conseil'
-version '1.2.0'
+version '1.3.0'
 
 dependency 'vAvA_core'
+dependency 'vava_ui'
 
 vava_migration 'sql/0001_time.sql'
 
 ui_page 'web/index.html'
 
+-- polices, grain et coins : vava_ui ; les données simulées hors jeu (dossier dev/) ne sont jamais livrées
 files {
     'web/index.html',
     'web/css/*.css',
     'web/js/*.js',
-    'web/img/*',
-    'web/fonts/*.woff2',
 }
 
 -- Ordre explicite : chaque fichier ne dépend que de ceux listés avant lui.

@@ -5,7 +5,9 @@ supprimer, et l'éditeur de création en sept étapes (identité, héritage, vis
 avec un aperçu en direct. Ressource **cliente uniquement** : la liste, la création, la sélection et la suppression sont
 des intentions envoyées au serveur, qui décide de tout ; l'apparence passe par `vava_appearance`.
 
-Ordre de démarrage : après `vAvA_core` et `vava_appearance` (dépendance déclarée : l'arrêter arrête aussi cet écran).
+Ordre de démarrage : après `vAvA_core`, `vava_ui` (≥ 1.0.0 : polices, grain et ornements de la page) et
+`vava_appearance` (dépendances déclarées : arrêter l'une d'elles arrête aussi cet écran ; ne jamais arrêter `vava_ui`
+sur un serveur ouvert).
 Core ≥ 0.3.0 ; ≥ 0.8.0 pour vérifier les noms à la saisie avec les règles du serveur (sans elles, seul le serveur juge
 et un nom refusé l'est à la création).
 
@@ -76,8 +78,10 @@ scène (faire pivoter le ped ne les déplace pas).
 
 ## Hors jeu
 
-`web/index.html` s'ouvre dans un navigateur avec des données simulées (`web/js/devmock.js`), règles de nom comprises :
-`?screen=creator&tab=hair&sex=f` ouvre directement l'éditeur sur un onglet.
+`web/index.html` s'ouvre dans un navigateur depuis le dépôt (option `--allow-file-access-from-files` pour les polices)
+avec des données simulées (`web/dev/devmock.js`, jamais livré), règles de nom comprises : la ligne hors jeu de la page
+charge `modules/vava_ui/web/dev/horsjeu.js` puis le devmock. `?screen=creator&tab=hair&sex=f` ouvre directement
+l'éditeur sur un onglet. En jeu, polices, grain, cadre et losanges arrivent de `vava_ui` (`nui://vava_ui/…`).
 
 ## Fichiers
 
@@ -88,7 +92,7 @@ scène (faire pivoter le ped ne les déplace pas).
 | `client/camera.lua` | caméras de la scène et transitions |
 | `client/preview.lua` | ped d'aperçu local (créé, pivoté, retiré) |
 | `client/nui.lua` | pont avec la page (messages, retours isolés) |
-| `web/` | la page : sélection, éditeur, contrôles, textes (`strings.js`), données simulées |
+| `web/` | la page : sélection, éditeur, contrôles, textes (`strings.js`), blason ; données simulées dans `web/dev/` (jamais livrées) |
 
 ## À vérifier en jeu
 
