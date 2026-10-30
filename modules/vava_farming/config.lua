@@ -90,7 +90,12 @@ VavaFarming.config = {
         moveCancel = 1.5,
     },
 
-    streaming = { radius = 80.0, pollMs = 1000, modelTimeoutMs = 5000 },
+    -- Client : props des plantes, puits et greniers créés à portée (`radius`, mètres). Une parcelle et son grenier forment
+    -- un groupe, les puits sont groupés par case de `groupCell` mètres : seules les cibles d'un groupe à portée sont
+    -- mesurées. Un passage toutes les `pollMs` près d'un groupe, toutes les `idlePollMs` quand aucune cible ne peut être
+    -- à moins de `radius` + `idleMargin` (la marge couvre le chemin d'un cavalier rapide pendant `idlePollMs`, pour que
+    -- les props apparaissent comme avant).
+    streaming = { radius = 80.0, pollMs = 1000, idlePollMs = 2500, idleMargin = 60.0, groupCell = 200.0, modelTimeoutMs = 5000 },
     -- écriture groupée ; journal du grenier en attente (lignes par minute) borné à granaryLogMax : plein, il s'écrit
     -- aussitôt, et ce qui ne tient plus pendant une panne de la base est perdu (signalé)
     persistence = { flushMs = 10000, granaryLogMax = 2000 },

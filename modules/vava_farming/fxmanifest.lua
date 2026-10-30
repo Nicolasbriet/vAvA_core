@@ -22,7 +22,7 @@ use_experimental_fxv2_oal 'yes'
 
 name 'vava_farming'
 description 'Agriculture vAvA : parcelles, croissance par dates, humidité et fertilité, qualité, grenier commun'
-version '1.5.1'
+version '1.5.2'
 
 dependency 'vAvA_core'
 dependency 'vava_inventory'
@@ -50,6 +50,7 @@ shared_scripts {
     'shared/constants.lua',
     'config.lua',
     'shared/geometry.lua',
+    'shared/proximity.lua',
     'shared/growth.lua',
 }
 

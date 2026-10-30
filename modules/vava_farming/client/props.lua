@@ -3,14 +3,16 @@
     Rôle : les parcelles, puits et greniers dans le monde, vus du joueur : état des emplacements publié par le serveur
            (culture, stade, état) lu dans les state bags globaux, props LOCAUX (jamais réseau) créés pour les plantes,
            puits et greniers à portée — une plante change de prop avec son stade ou son état, un emplacement vide n'en a
-           pas —, cible la plus proche à distance d'interaction (emplacement, puits ou grenier). Une seule boucle lente
-           (streaming.pollMs), active seulement quand un personnage est en jeu : elle s'arrête d'elle-même à la sélection
-           et au déchargement, et retire alors tous les props.
-    Dépendances : shared/constants.lua, config.lua, shared/geometry.lua, client/core.lua
+           pas —, cible la plus proche à distance d'interaction (emplacement, puits ou grenier). Une seule boucle lente,
+           active seulement quand un personnage est en jeu : elle mesure d'abord les groupes (une parcelle avec son
+           grenier, les puits par case de streaming.groupCell), ne parcourt que les cibles d'un groupe à portée, passe
+           toutes les streaming.pollMs près d'un groupe et toutes les streaming.idlePollMs loin de tous ; elle s'arrête
+           d'elle-même à la sélection et au déchargement, et retire alors tous les props.
+    Dépendances : shared/constants.lua, config.lua, shared/geometry.lua, shared/proximity.lua, client/core.lua
 ]]
 
 local type, pairs, ipairs, tonumber = type, pairs, ipairs, tonumber
-local sub, floor, max = string.sub, math.floor, math.max
+local sub, floor, max, huge = string.sub, math.floor, math.max, math.huge
 local CreateThread, Wait, GetGameTimer, AddEventHandler = CreateThread, Wait, GetGameTimer, AddEventHandler
 local PlayerPedId, GetEntityCoords, DoesEntityExist, DeleteObject = PlayerPedId, GetEntityCoords, DoesEntityExist, DeleteObject
 local RequestModel, HasModelLoaded, IsModelValid, SetModelAsNoLongerNeeded, GetHashKey = RequestModel, HasModelLoaded, IsModelValid, SetModelAsNoLongerNeeded, GetHashKey
@@ -22,6 +24,7 @@ if not core then return end
 
 local cfg = VavaFarming.config
 local geometry = VavaFarming.geometry
+local proximity = VavaFarming.proximity
 local streaming = cfg.streaming
 local STATE_PARCEL = VavaFarming.STATE_PARCEL
 local STATES = VavaFarming.STATES
@@ -35,16 +38,33 @@ VavaFarming.props = props
 local parcelsById, wellsById = {}, {}
 for _, parcel in ipairs(cfg.parcels) do parcelsById[parcel.id] = parcel end
 for _, well in ipairs(cfg.wells) do wellsById[well.id] = well end
--- emplacements de chaque parcelle (clé du prop, position), calculés une fois : la config ne change pas en jeu
-local spotsOf = {}
+-- cibles calculées une fois (la config ne change pas en jeu) : clé du prop, position, cap ; `model` fixe pour un puits
+-- ou un grenier, lu dans l'état publié pour un emplacement. Une parcelle et son grenier forment un groupe, les puits
+-- sont groupés par case de grille.
+local targets = {}
 for _, parcel in ipairs(cfg.parcels) do
-    local spots = {}
+    local group = 'parcel:' .. parcel.id
     for index = 1, geometry.slotCount(parcel) do
         local x, y, z = geometry.slotPosition(parcel, index)
-        spots[index] = { key = 'slot:' .. parcel.id .. ':' .. index, x = x, y = y, z = z }
+        targets[#targets + 1] = { kind = 'slot', key = 'slot:' .. parcel.id .. ':' .. index, group = group,
+            parcel = parcel.id, index = index, x = x, y = y, z = z, heading = parcel.heading }
     end
-    spotsOf[parcel.id] = spots
+    local g = parcel.granary
+    if g then
+        targets[#targets + 1] = { kind = 'granary', key = 'granary:' .. parcel.id, group = group, parcel = parcel.id,
+            model = g.prop, x = g.x, y = g.y, z = g.z, heading = g.heading or parcel.heading }
+    end
 end
+for _, well in ipairs(cfg.wells) do
+    targets[#targets + 1] = { kind = 'well', key = 'well:' .. well.id, well = well.id, model = well.prop,
+        x = well.x, y = well.y, z = well.z, heading = well.heading,
+        group = 'wells:' .. proximity.cell(well.x, well.y, streaming.groupCell) }
+end
+-- un groupe naît « actif » pour que le premier passage retire ce qui serait hors de portée
+local groups = proximity.group(targets, function(target) return target.group end)
+for _, group in ipairs(groups) do group.active = true end
+-- une cible est mesurée si son groupe peut en avoir une à portée des props ou de l'invite
+local REACH = max(streaming.radius, cfg.interact.distance)
 
 ---@class vAvA.SlotView
 ---@field crop string|nil
@@ -169,44 +189,47 @@ local function reconcile(key, model, far, x, y, z, heading)
     spawn(key, model, x, y, z, heading)
 end
 
---- Boucle lente justifiée : une distance par cible toutes les pollMs, seulement quand un personnage est en jeu. Les
---- emplacements d'une parcelle ne sont mesurés que si la parcelle elle-même est à portée ; sinon, seuls ses props
---- encore affichés sont retirés.
+--- Cible la plus proche, au format de props.nearest().
+---@param target table
+---@param far number
+---@return table
+local function nearestOf(target, far)
+    if target.kind == 'slot' then return { kind = 'slot', parcel = target.parcel, index = target.index, distance = far } end
+    if target.kind == 'granary' then return { kind = 'granary', parcel = target.parcel, distance = far } end
+    return { kind = 'well', well = target.well, distance = far }
+end
+
+--- Boucle lente justifiée, seulement quand un personnage est en jeu : une distance par groupe (parcelle et grenier,
+--- puits d'une case), puis une par cible des seuls groupes à portée ; un groupe qui sort de portée retire ses props
+--- une fois. Intervalle : streaming.pollMs près d'un groupe, streaming.idlePollMs quand aucune cible ne peut être à
+--- moins de radius + idleMargin.
 local function loop()
     while playing do
         local coords = GetEntityCoords(PlayerPedId())
         local px, py, pz = coords.x, coords.y, coords.z
-        local best, bestDistance = nil, cfg.interact.distance
-        for _, parcel in ipairs(cfg.parcels) do
-            local extent = max(parcel.rows, parcel.cols) * parcel.spacing
-            local center = geometry.distance(px, py, pz, parcel.x, parcel.y, parcel.z)
-            local inRange = center <= streaming.radius + extent
-            for index, spot in ipairs(spotsOf[parcel.id]) do
-                if inRange then
-                    local far = geometry.distance(px, py, pz, spot.x, spot.y, spot.z)
-                    reconcile(spot.key, modelFor(props.slot(parcel.id, index)), far, spot.x, spot.y, spot.z, parcel.heading)
-                    if far <= bestDistance then
-                        best, bestDistance = { kind = 'slot', parcel = parcel.id, index = index, distance = far }, far
-                    end
-                elseif shown[spot.key] then
-                    remove(spot.key)
+        local best, bestTarget, bestDistance = nil, nil, cfg.interact.distance
+        local closest = huge
+        for _, group in ipairs(groups) do
+            local reachable, gap = proximity.reachable(group, px, py, pz, REACH)
+            if gap < closest then closest = gap end
+            if reachable then
+                group.active = true
+                for _, target in ipairs(group.targets) do
+                    local far = geometry.distance(px, py, pz, target.x, target.y, target.z)
+                    local model = target.model
+                    if target.kind == 'slot' then model = modelFor(props.slot(target.parcel, target.index)) end
+                    reconcile(target.key, model, far, target.x, target.y, target.z, target.heading)
+                    if far <= bestDistance then bestTarget, bestDistance = target, far end
                 end
-            end
-            if parcel.granary then
-                local g = parcel.granary
-                local far = geometry.distance(px, py, pz, g.x, g.y, g.z)
-                reconcile('granary:' .. parcel.id, g.prop, far, g.x, g.y, g.z, g.heading or parcel.heading)
-                if far <= bestDistance then best, bestDistance = { kind = 'granary', parcel = parcel.id, distance = far }, far end
+            elseif group.active then
+                group.active = false
+                for _, target in ipairs(group.targets) do remove(target.key) end
             end
         end
-        for _, well in ipairs(cfg.wells) do
-            local far = geometry.distance(px, py, pz, well.x, well.y, well.z)
-            reconcile('well:' .. well.id, well.prop, far, well.x, well.y, well.z, well.heading)
-            if far <= bestDistance then best, bestDistance = { kind = 'well', well = well.id, distance = far }, far end
-        end
+        if bestTarget then best = nearestOf(bestTarget, bestDistance) end
         nearest = best
         if onNearest then onNearest(best) end
-        Wait(streaming.pollMs)
+        Wait(proximity.interval(closest, streaming.radius, streaming.idleMargin, streaming.pollMs, streaming.idlePollMs))
     end
     for key in pairs(shown) do remove(key) end
     nearest = nil
