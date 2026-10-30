@@ -593,12 +593,33 @@ versé à T-014 ; les autres points déjà couverts sont précisés dans T-012 �
   la magie, le Conseil.
 
 ### T-130 — Eau potable
-- Agents : vava-architecte → vava-dev-lua · Dépend de : T-022 · Statut : à faire
+- Agents : vava-architecte → vava-dev-lua + vava-dev-nui (cette tâche autorise à toucher `vava_arrival`, `examples/vava_example_items`, `vava_loading` (un conseil), `chancellerie/lib/resources.js` et `config.js`, `.luacheckrc`, dans les limites de la spec) · Dépend de : T-022 · Statut : à tester en jeu (relu sécurité, réseau et lore, suites appliquées)
+- Fait le 31 octobre 2026 : nouveau module `vava_provisions` 1.0.0, propriétaire de `eau` et `outre` ; puits, fontaines
+  et sources (réserve en mémoire, recalculée à la lecture, jamais envoyée ; fontaine sans fond), transmis aux seuls
+  proches par `core.zones` ; `E` remplit les outres vides ou fait boire, l'outre bue revient vide et se fend une fois sur
+  dix ; outres faites à la tannerie (1 cuir → 2) ; `/eau` pour le Conseil (`metiers`). `vava_arrival` 1.1.0 et
+  `vava_example_items` 1.3.0 ne déclarent plus `eau` (dotations dues reprises quand `vava_provisions` arrive),
+  `vava_loading` 1.1.1 (conseil du pain et de l'eau), Chancellerie 1.8.4. Spec `docs/plan/specs/T-130.md`, rapport
+  `docs/plan/rapports/T-130.md`. **À tester en jeu** : `docs/tests/eau.md` (27 tests, en priorité gestes, `z` des points
+  au sol, aucune autre invite `E` à moins de 2 m, deux joueurs sur la dernière unité, recette de la tannerie, dotation
+  reprise après `stop` puis `ensure vava_provisions`), accueil 21-22, besoins 3-7, développement 4-1.
 - Relecture lore de T-022 : aucun module livré ne produit de boisson ; une fois bues les deux outres de la dotation
   (`vava_arrival`), aucun joueur ne peut en désaltérer un autre, et l'objet `eau` n'appartient qu'à `vava_arrival` et à
   l'exemple de développement. Donner à l'eau une source commune dans l'esprit du royaume : remplir une outre au puits
   (les puits de `vava_farming` remplissent déjà le seau), boire à une fontaine, ou une recette d'artisanat ; un module
   propriétaire de l'objet `eau` (et, à terme, du `pain`). Rien qui rende un joueur autosuffisant.
+
+### T-135 — Usure de l'outre selon la qualité du tanneur
+- Agent : vava-dev-lua · Dépend de : T-130 · Statut : à faire
+- Relecture lore de T-130 : une outre se fend une fois sur dix quel que soit son palier, alors qu'une outre « Soignée »
+  s'affiche à part. Lier `tearChance` au palier (moins pour une outre Soignée ou Excellente) en gardant le palier sur
+  l'outre rendue vide, sans casser l'empilement : le savoir du tanneur doit compter.
+
+### T-136 — Recettes de `vava_farming` déclarées aux compétences
+- Agent : vava-dev-lua · Dépend de : — · Statut : à faire
+- Trouvé pendant T-130 : `vava_farming` déclare sa recette `compost` à l'artisanat mais pas à `vava_skills:recipes` ;
+  le composteur devrait la refuser comme « recette inconnue » (à vérifier en jeu d'abord). Déclarer la recette et la
+  redéclarer au retour de `vava_skills`, comme `vava_provisions` le fait pour l'outre.
 
 ## Phase 3 — L'Atelier : socle et créateurs du monde
 
@@ -763,6 +784,14 @@ seulement l'éditeur (phase 6).
   rencontre. Prévenir discrètement les joueurs proches du point d'arrivée qu'un voyageur arrive (`core.net.sendNear`,
   ~30 m, une ligne), ou donner au Conseil la liste des nouveaux venus du jour ; branché sur le hook
   `vava_arrival:arrived`, sans toucher à `vava_arrival`. Aucun envoi à tous.
+
+### T-137 — Props sans clignotement et points hors des instances
+- Agent : vava-dev-lua · Dépend de : — · Statut : à faire
+- Relectures de T-130 : un joueur qui reste à la limite de portée voit un prop créé puis supprimé à chaque passage
+  (`vava_provisions/client/points.lua`, `vava_crafting/client/props.lua:143`, `vava_gathering/client/props.lua:158`,
+  `vava_farming`) : créer à `radius`, retirer à `radius + 10` m. Et aucun point de récolte, station ou point d'eau ne
+  vérifie l'instance (routing bucket) du joueur : un joueur dans une instance, aux coordonnées d'un puits, peut puiser.
+  Ajouter `bucket` aux zones concernées et le contrôle dans `near`.
 
 ### T-039 — PORTE : soirée RP de test — **HUMAIN**
 - Dépend de : phase 5 · Statut : à faire
