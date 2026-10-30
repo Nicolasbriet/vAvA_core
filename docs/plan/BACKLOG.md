@@ -242,7 +242,7 @@ Corrections issues de l'audit réseau T-011 (30 octobre 2026). Son seul BLOQUANT
 versé à T-014 ; les autres points déjà couverts sont précisés dans T-012 à T-019.
 
 ### T-045 — Inventaire : objet en main vu des seuls joueurs proches, et dès leur arrivée
-- Agent : vava-dev-lua (vava-architecte pour le choix du support) · Dépend de : — · Statut : à faire
+- Agent : vava-dev-lua (vava-architecte pour le choix du support) · Dépend de : — · Statut : à tester en jeu
 - **IMPORTANT** (`docs/audits/reseau-vava_inventory.md`) : `client/hands.lua:129-139` efface la valeur d'un porteur hors
   de la zone de culling (`wanted[serverId] = nil`, `:137`) et rien ne la relit quand il arrive, ni au démarrage
   (`:189-195` ne parcourt que les joueurs à portée) : l'outil d'un joueur venu de loin reste invisible tant qu'il ne
