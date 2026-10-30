@@ -32,15 +32,17 @@ describe('vava_farming harvest order', function()
         }, crop
     end
 
-    --- Ce que fait server/actions.lua à la fin d'une récolte : contrôle et prise sans céder la main, puis ajout (qui peut
-    --- céder la main : `add` est appelé à ce moment), plante rendue si la besace refuse.
+    --- Ce que fait server/actions.lua (par slots.take et slots.giveBack) à la fin d'une récolte : contrôle et prise sans
+    --- céder la main (copies avant et après), puis ajout (qui peut céder la main : `add` est appelé à ce moment), plante
+    --- rendue si la besace refuse.
     local function finishHarvest(slot, crops, now, add)
         local crop = slot.crop and crops[slot.crop] or nil
         if not crop or growth.state(slot, crop) ~= STATES.RIPE then return false, 'not_found' end
         local taken = growth.snapshot(slot)
         growth.harvest(slot, crop, now)
+        local emptied = growth.snapshot(slot)
         if not add() then
-            growth.giveBack(slot, taken)
+            growth.giveBack(slot, taken, emptied)
             return false, 'no_space'
         end
         return true
@@ -142,6 +144,64 @@ describe('vava_farming harvest order', function()
             slot.fertility, slot.covered = 10, false
             assert.equal(80, taken.fertility)
             assert.is_true(taken.covered)
+        end)
+
+        it('rend tout tel quel quand l’emplacement vidé n’a pas bougé (second retour : vrai)', function()
+            local slot = ripeWheat()
+            local taken = growth.snapshot(slot)
+            growth.harvest(slot, cfg.crops.ble, 10000)
+            local emptied = growth.snapshot(slot)
+            local given, whole = growth.giveBack(slot, taken, emptied)
+            assert.is_true(given)
+            assert.is_true(whole)
+            assert.same(taken, growth.snapshot(slot))
+        end)
+
+        it('n’efface pas un compost posé sur l’emplacement vide : plante rendue, fertilité d’avant + l’écart (50 → 75)', function()
+            local slot = ripeWheat()
+            slot.fertility = 50
+            local taken = growth.snapshot(slot)
+            growth.harvest(slot, cfg.crops.ble, 10000)          -- 50 − 15 + 10 = 45
+            local emptied = growth.snapshot(slot)
+            assert.equal(45, slot.fertility)
+            slot.fertility, slot.updatedAt = slot.fertility + cfg.fertility.compostBonus, 10050   -- compost d'un tiers : 70
+            local given, whole = growth.giveBack(slot, taken, emptied)
+            assert.is_true(given)
+            assert.is_false(whole)
+            assert.equal(75, slot.fertility)
+            assert.equal('ble', slot.crop)
+            assert.equal(STATES.RIPE, growth.state(slot, cfg.crops.ble))
+            assert.is_true(slot.covered)
+            assert.equal('racine', slot.lastFamily)
+            assert.equal(4, slot.seedTier)
+            assert.equal(10050, slot.updatedAt)                -- date de calcul du moment, pas celle d'avant
+        end)
+
+        it('borne la fertilité rendue à 0–100', function()
+            local slot = ripeWheat()                           -- fertilité 80
+            local taken = growth.snapshot(slot)
+            growth.harvest(slot, cfg.crops.ble, 10000)          -- 75
+            local emptied = growth.snapshot(slot)
+            slot.fertility = 100                               -- + 25
+            growth.giveBack(slot, taken, emptied)
+            assert.equal(100, slot.fertility)
+            slot = ripeWheat()
+            taken = growth.snapshot(slot)
+            growth.harvest(slot, cfg.crops.ble, 10000)
+            emptied = growth.snapshot(slot)
+            slot.fertility = -200                              -- écart absurde
+            growth.giveBack(slot, taken, emptied)
+            assert.equal(0, slot.fertility)
+        end)
+
+        it('compare deux copies champ par champ', function()
+            local slot = ripeWheat()
+            local a = growth.snapshot(slot)
+            assert.is_true(growth.sameSlot(slot, a))
+            slot.fertility = 81
+            assert.is_false(growth.sameSlot(slot, a))
+            slot.fertility, slot.dirty = 80, true              -- marque d'écriture : hors des champs gardés
+            assert.is_true(growth.sameSlot(slot, a))
         end)
     end)
 

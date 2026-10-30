@@ -454,6 +454,7 @@ function actions.finish(src, token)
         local level = bridge.GetLevel(src, 'agriculture')
         -- relue après le niveau (un export peut céder la main) : du contrôle à la prise de la plante, rien ne cède la main
         slot = slots.get(parcel, index)
+        if not slot then return false, 'not_found' end
         planted = slot.crop and catalog.crop(slot.crop) or nil
         if not planted or growth.state(slot, planted) ~= STATES.RIPE then return false, 'not_found' end
         local regularity = growth.regularity(slot, planted)
@@ -463,13 +464,13 @@ function actions.finish(src, token)
         local metadata = { tier = tier }
         if cfg.quality.origin then metadata.origin = parcel.label end
         -- la plante est prise AVANT l'ajout à la besace (ses hooks peuvent céder la main) : un second cultivateur qui
-        -- finit le même geste trouve l'emplacement libre ; si la besace refuse, la plante est rendue telle quelle
-        -- (couverture comprise), à moins qu'on n'ait semé entre-temps
-        local taken = growth.snapshot(slot)
-        slots.harvest(slot, planted, now)
+        -- finit le même geste trouve l'emplacement libre ; si la besace refuse, la plante est rendue (couverture payée
+        -- comprise, gel tombé pendant l'attente compris), sans effacer ce qu'un autre a fait sur l'emplacement vide, à
+        -- moins qu'on n'y ait semé entre-temps
+        local claim = slots.take(slot, planted, now)
         local ok = bridge.Add(src, planted.product, quantity, metadata)
         if not ok then
-            if not slots.giveBack(slot, taken) then
+            if not slots.giveBack(parcel, slot, claim, planted) then
                 VavaFarming.log.warn('récolte de %s n° %d refusée par la besace du personnage %d : emplacement semé '
                     .. 'entre-temps, plante perdue', parcel.id, index, session.characterId)
             end
@@ -503,9 +504,12 @@ function actions.finish(src, token)
         -- trouve l'emplacement libre ; l'arrachage ne dépend pas des déchets, perdus si la besace est pleine
         slots.clear(slot, now)
         slots.writeNow(parcel, index)
-        if waste > 0 and not bridge.Add(src, cfg.compost.waste.item, waste) then waste = 0 end
+        local lost = false
+        if waste > 0 and not bridge.Add(src, cfg.compost.waste.item, waste) then waste, lost = 0, true end
         journal.write('cleared', { parcel = parcel.id, slot = index, characterId = session.characterId, item = planted.id, details = { waste = waste } })
-        bridge.Notify(src, waste > 0 and format(messages.clearedWaste, waste) or messages.cleared, 'info')
+        local text = messages.cleared
+        if waste > 0 then text = format(messages.clearedWaste, waste) elseif lost then text = messages.clearedLost end
+        bridge.Notify(src, text, lost and 'warning' or 'info')
         return true, { action = action, slot = settle(src, parcel, index), item = waste > 0 and cfg.compost.waste.item or nil, quantity = waste > 0 and waste or nil }
     elseif action == ACTIONS.COVER then
         -- la saison a pu tourner pendant le geste
@@ -526,9 +530,14 @@ function actions.finish(src, token)
             return false, 'not_found'
         end
         -- couverte AVANT l'échange (qui peut céder la main) : un second cultivateur voit la plante couverte et ne paie
-        -- pas pour elle ; l'échange refusé retire la couverture
+        -- pas pour elle ; l'échange refusé retire la couverture. Pendant l'échange, la marque « couverture en cours »
+        -- (hors des champs gardés) dit à une récolte qui prendrait la plante de ne pas compter cette couverture pas
+        -- encore payée : rendue après un refus de la besace, la plante ne reste couverte que si l'échange a réussi
         slots.cover(slot)
-        if not bridge.Exchange(src, { { item = cover.item, quantity = cover.quantity } }, {}) then
+        slot.covering = true
+        local paid = bridge.Exchange(src, { { item = cover.item, quantity = cover.quantity } }, {})
+        slot.covering = nil
+        if not paid then
             if slot.plantedAt == plantedAt and slot.crop == planted.id then slot.covered = false end
             bridge.Notify(src, format(messages.noCover, frost.coverLabels()), 'warning')
             return false, 'missing_items'
@@ -541,6 +550,8 @@ function actions.finish(src, token)
             end
             return false, 'not_found'
         end
+        -- payée : couverte (de nouveau, si une récolte refusée a rendu la plante pendant l'échange)
+        slots.cover(slot)
         slots.writeNow(parcel, index)
         journal.write('covered', { parcel = parcel.id, slot = index, characterId = session.characterId, item = cover.item, details = { crop = planted.id, quantity = cover.quantity } })
         bridge.Notify(src, messages.covered, 'info')

@@ -237,7 +237,8 @@ end
 
 -- Récolte et arrachage ------------------------------------------------------------------------------------------------
 -- La plante est prise AVANT que la besace ne reçoive le produit (l'ajout peut céder la main) : un second cultivateur
--- trouve l'emplacement libre. Si la besace refuse, la plante est rendue telle quelle, à moins qu'on n'ait semé entre-temps.
+-- trouve l'emplacement libre. Si la besace refuse, la plante est rendue, à moins qu'on n'ait semé entre-temps, sans
+-- effacer ce qui a été fait sur l'emplacement vide pendant l'attente.
 
 -- champs d'un emplacement gardés en base : ce que `snapshot` copie et ce que `giveBack` restitue
 local SLOT_FIELDS = {
@@ -281,12 +282,41 @@ function growth.snapshot(slot)
     return copy
 end
 
---- Rend à un emplacement vidé ce qu'il portait (copie de `snapshot`), si personne n'y a semé entre-temps.
----@param slot vAvA.SlotState
----@param snapshot table|nil
----@return boolean  vrai si la plante est rendue
-function growth.giveBack(slot, snapshot)
-    if type(snapshot) ~= 'table' or slot.crop ~= nil then return false end
-    for _, field in ipairs(SLOT_FIELDS) do slot[field] = snapshot[field] end
+-- champs de la plante (et de la famille qu'une récolte retient) : ce qui est rendu quand l'emplacement vidé a changé
+-- entre-temps ; la fertilité suit alors l'écart survenu, la date de calcul reste celle du moment
+local PLANT_FIELDS = {
+    'crop', 'seedTier', 'plantedAt', 'growth', 'moisture', 'drySince', 'dryHours', 'waterings', 'wilted', 'dead',
+    'covered', 'lastFamily',
+}
+
+--- Vrai si deux copies (ou un emplacement et une copie) ont les mêmes champs gardés.
+---@param a table
+---@param b table
+---@return boolean
+function growth.sameSlot(a, b)
+    for _, field in ipairs(SLOT_FIELDS) do
+        if a[field] ~= b[field] then return false end
+    end
     return true
+end
+
+--- Rend à un emplacement vidé ce qu'il portait (`taken`, copie prise avant de le vider), si personne n'y a semé
+--- entre-temps. `emptied` est la copie prise juste après l'avoir vidé : si l'emplacement n'a pas bougé depuis, tout est
+--- rendu tel quel ; sinon (compost d'un tiers, jachère comptée, Conseil), seule la plante revient, et la fertilité
+--- d'avant reçoit l'écart survenu depuis (bornée à 0–100), sans effacer ce qu'un autre a fait.
+---@param slot vAvA.SlotState
+---@param taken table|nil
+---@param emptied table|nil
+---@return boolean given   vrai si la plante est rendue
+---@return boolean whole   vrai si l'emplacement est rendu tel qu'avant (rien n'avait changé)
+function growth.giveBack(slot, taken, emptied)
+    if type(taken) ~= 'table' or slot.crop ~= nil then return false, false end
+    if type(emptied) ~= 'table' or growth.sameSlot(slot, emptied) then
+        for _, field in ipairs(SLOT_FIELDS) do slot[field] = taken[field] end
+        return true, true
+    end
+    local fertility = taken.fertility + (slot.fertility - emptied.fertility)
+    for _, field in ipairs(PLANT_FIELDS) do slot[field] = taken[field] end
+    slot.fertility = min(100, max(0, fertility))
+    return true, false
 end
