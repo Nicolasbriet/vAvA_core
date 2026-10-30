@@ -171,6 +171,15 @@ ne connaît plus son identifiant temporaire (0.7.3) : relevé toutes les `player
 après deux relevés manquants, au plus tard après `players.connectTimeoutMs` (120 s). Un joueur qui charge
 normalement n'est jamais concerné.
 
+**Porte gardée** (0.9.1) : un module qui vérifie chaque arrivant par un hook (les bans de `vava_admin`) se déclare
+dans `players.connectionGuards` (`{ 'vava_admin' }` par défaut). Tant que sa ressource est démarrée (ou en démarrage,
+en arrêt) sans que son module soit `ready` — démarrage, redémarrage, échec du `setup` —, ses hooks n'existent pas : la
+connexion est refusée avec `players.messages.guardNotReady` (« Le royaume s'éveille : réessayez dans un instant. ») et
+une ligne d'erreur à la console, vérifiée avant les hooks puis de nouveau après (garde arrêté pendant la chaîne). Une
+ressource absente du serveur ou arrêtée (`missing`, `uninitialized`, `stopped`) n'est pas attendue : la connexion passe,
+avec un avertissement à la console à chaque fois (ce que le garde vérifie ne l'est pas). Un module en échec garde donc
+la porte fermée jusqu'à ce qu'il soit réparé ou retiré de la liste.
+
 ### `core.players`
 
 | Fonction | Retour |
@@ -833,16 +842,26 @@ voulu (l'écran des joueurs non plus, voir plus bas).
 - Bans par compte, vérifiés au hook `core:player:connecting` : un banni voit le motif, la fin et le numéro du ban.
   Aucun compte n'est créé pour une connexion refusée. Second contrôle au hook `core:player:joined` (compte alors
   toujours connu, hors du fil du core) : un compte banni pendant son chargement est expulsé avec le même texte et le
-  journal l'inscrit (« Banni écarté à son arrivée », au nom de la Console) (1.7.1).
-- **Base en panne** (1.7.1, avec le core 0.9.1) : un compte n'entre jamais sans que ses bans aient été lus. Si la base
-  ne répond pas pendant la recherche du compte, le core refuse la connexion (« Le serveur est momentanément
-  indisponible, réessayez dans un instant. ») ; si elle ne répond pas pendant la lecture des bans (connexion ou arrivée
-  en jeu), le joueur est refusé, ou expulsé s'il venait d'arriver, avec « Le registre des bans ne peut être consulté
-  pour l'instant : réessayez dans une minute. » (`messages.banCheckUnavailable`), et la console l'écrit. Personne
-  n'est refusé tant que la base répond. Une première
-  venue (aucun compte encore) n'a rien à vérifier ; une base injoignable bloque de toute façon la création du compte.
-  Pendant une panne de la base, plus personne ne se connecte : c'était déjà vrai (le compte et les personnages se
-  lisent en base), le message dit maintenant pourquoi.
+  journal l'inscrit (« Banni écarté par le Registre », au nom de la Console, `moment : à son arrivée`) (1.7.1). Au
+  démarrage du module (redémarrage du Registre ou du core), chaque joueur déjà en jeu est relu de la même façon
+  (`moment : au démarrage du Registre`) ; un joueur que le core n'a pas encore repris est relu au tour suivant
+  (`banRecheck.sweepAttempts` tours, `sweepRetryMs` d'écart).
+- **Registre absent** (1.7.1, avec le core 0.9.1) : `vava_admin` est un garde de connexion du core
+  (`players.connectionGuards`, voir « Porte gardée ») : en démarrage, en redémarrage ou en échec, la porte est fermée
+  (« Le royaume s'éveille : réessayez dans un instant. »). Le module échoue au démarrage si la table des bans est
+  illisible (lecture d'essai). Arrêté volontairement (`stop vava_admin`) ou absent, il n'est pas attendu : les
+  connexions passent sans vérification de ban, la console le signale à chacune, et la relecture du démarrage suivant
+  expulse ceux qui sont entrés bannis.
+- **Base en panne** (1.7.1, avec le core 0.9.1) : un compte n'entre jamais sans qu'une lecture de ses bans ait réussi.
+  Si la base ne répond pas pendant la recherche du compte, le core refuse la connexion (« Le serveur est momentanément
+  indisponible, réessayez dans un instant. ») ; si elle ne répond pas pendant la lecture des bans à la connexion, le
+  joueur est refusé avec « Le registre des bans ne peut être consulté pour l'instant : réessayez dans une minute. »
+  (`messages.banCheckUnavailable`), et la console l'écrit. À l'arrivée en jeu ou à la relecture du démarrage, une
+  lecture en échec est refaite après `banRecheck.retryMs` (5 s) ; si elle échoue encore, `banRecheck.onError` décide :
+  `kick` (défaut : expulsé avec le même message) ou `keep` (laissé en jeu, noté à la console). Personne n'est refusé
+  tant que la base répond. Une première venue (aucun compte encore) n'a rien à vérifier ; une base injoignable bloque de
+  toute façon la création du compte. Pendant une panne de la base, plus personne ne se connecte : c'était déjà vrai
+  (le compte et les personnages se lisent en base), le message dit maintenant pourquoi.
 - Déplacer et immobiliser passent par les natives serveur (OneSync). L'état « immobilisé » vit en mémoire : à l'arrêt
   (ou au redémarrage) du module, chaque joueur immobilisé est libéré et prévenu, jamais laissé figé sans Registre pour
   le libérer (1.7.0). Le vol libre est la seule boucle par image du module, active seulement pendant son usage ;
@@ -1103,8 +1122,10 @@ regarde en jeu), `vava_chancellerie` ≥ 1.1.0 (caméras depuis le web). Qualit�
   dans le panneau (compte relié ou non) fait la même revérification.
 - **Journal** du Conseil : l'ouverture du mur et chaque vue en grand. Les cases d'un mur sont couvertes par
   l'ouverture, que le serveur exige (1.2.0) : il tient pour chaque membre en jeu un état « mur ouvert », posé par
-  `vava_cameras:wall` et levé par `vava_cameras:leave`, le retour à la sélection, le départ ou le droit retiré ; sans
-  lui, `vava_cameras:watch(joueur, 'tile')` répond `wall_closed` (« Mur à rouvrir » dans le mur, sans nouvel essai).
+  `vava_cameras:wall` et levé par `vava_cameras:leave`, le retour à la sélection, le départ ou le droit retiré, caduc
+  après `wall.maxOpenMs` (2 h : il faut rouvrir le mur, nouvelle ligne au journal) ; sans lui,
+  `vava_cameras:watch(joueur, 'tile')` répond `wall_closed`. Au premier refus, le mur cesse de demander des cases et
+  chacune affiche « Mur à rouvrir », sans nouvel essai, jusqu'à sa réouverture.
   Depuis le web, voir `vava_chancellerie` (case sans mur inscrite au journal). Le joueur n'est pas prévenu : à
   mentionner dans le règlement du serveur.
 - **Sécurité** : chaque demande du membre est une RPC à schéma strict et à débit limité, droit revérifié à chaque
@@ -1582,7 +1603,8 @@ vava_cameras 1.0.0 pour l'écran des joueurs, vava_time 1.0.0 pour le ciel et l'
   le seul droit, l'ouverture du mur étant inscrite au journal (« Mur des caméras ouvert »). Depuis 1.4.1, une case
   demandée par un compte qui n'a ouvert aucun mur depuis `cameras.tileLogMs` (2 h) inscrit sa propre ligne (« Cases du
   mur regardées », numéro du joueur) : aucune case n'échappe au journal, sans refuser le navigateur (le pont ne sait pas
-  quand un mur du web se ferme). Routes : `/cameras/wall`, `/cameras/players`, `/camera/start`
+  quand un mur du web se ferme). Une ligne (ouverture ou case) ne compte que si le Registre l'a acceptée (`webLog`
+  appelé et réussi) : sinon, la case suivante réessaie. Routes : `/cameras/wall`, `/cameras/players`, `/camera/start`
   (`{ actor, target, quality }`), `/camera/answer`, `/camera/stop`.
 - **Évènements** vers la Chancellerie (requête HTTP locale, avec la clé) : signalements, arrivées et départs des joueurs,
   offre et fin des caméras du web (hook `vava_cameras:web`), arrêt du module des caméras (`{ type = 'camera', reset }`),
