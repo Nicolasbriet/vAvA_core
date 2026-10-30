@@ -1,9 +1,9 @@
 # Registre du Conseil — procédure de test en jeu
 
-Procédure pour vérifier en jeu `vava_admin` 1.7.0 : le Conseil et ses trois rangs, le Registre du Conseil (`F10` ou
-`/conseil`), les signalements, les bans et le journal. Le point capital est la section 3 : **un droit refusé l'est par
-le serveur**, pas seulement par l'interface. Comptez une heure et demie ; presque tout se joue à deux, marqué
-**(2 joueurs)**. Un test se cite « registre 3-4 ». Préparation commune, mesure du resmon et remontée des écarts :
+Procédure pour vérifier en jeu `vava_admin` 1.7.1 (avec le core 0.9.1, `vava_cameras` 1.2.0 et le pont
+`vava_chancellerie` 1.4.1) : le Conseil et ses trois rangs, le Registre du Conseil (`F10` ou `/conseil`), les
+signalements, les bans et le journal. Le point capital est la section 3 : **un droit refusé l'est par le serveur**, pas
+seulement par l'interface. Comptez une heure et demie ; presque tout se joue à deux, marqué **(2 joueurs)**. Un test se cite « registre 3-4 ». Préparation commune, mesure du resmon et remontée des écarts :
 [LISEZMOI.md](LISEZMOI.md).
 
 ## 0. Préparation
@@ -128,6 +128,10 @@ pas le Registre entre le changement de rang et le clic.
 | 10 | Console : `vava_ban <B> -1 essai`, `vava_ban <B> 1.5 essai`, `vava_ban <B> 2` (sans motif). | Chaque fois `usage : vava_ban <compte> <heures\|0> <motif>`, rien en base. |
 | 11 | Console : `vava_kick <idB> essai`, puis `vava_kick 999 essai`. | B expulsé sur « Expulsé par le Conseil. / Motif : essai » et `joueur <idB> expulsé` ; puis `joueur 999 introuvable`. |
 | 12 | `vava_conseil <A> senechal`, A rouvre le Registre → Sanctions. Remettre `souverain`. | La liste s'affiche, sans bouton « Lever » (droit `unban` du Souverain). |
+| 13 | **Ban pendant le chargement** (1.7.1) : B quitte, puis se reconnecte ; dès l'écran de chargement du jeu (après « Vérification de votre compte… »), console : `vava_ban <B> 1 essai`. | Console : `ban n° <n> prononcé contre le compte n° <B>` ; B termine son chargement, puis est expulsé dès son arrivée (avant de choisir un personnage) sur « Vous êtes banni de ce royaume. / Motif : essai / … / Ban n° <n> ». Console : `compte n° <B> banni (ban n° <n>) expulsé à son arrivée`. Journal : « Banni écarté à son arrivée », Auteur « Console », Cible « compte n° <B> », « ban : <n> ». Puis `vava_unban <B>`. |
+| 14 | **Bans illisibles à la connexion** (1.7.1) : B quitte. En base : `RENAME TABLE vava_admin_bans TO vava_admin_bans_essai;`. B se reconnecte. | Refusé avant la sélection de personnage sur « Le registre des bans ne peut être consulté pour l'instant : réessayez dans une minute. » ; console : `connexion du compte n° <B> refusée : vérification de ban impossible (…)`. Aucun personnage chargé. A (déjà en jeu) n'est pas touché. |
+| 15 | **Bans illisibles à l'arrivée** : table toujours renommée, B quitte. En base `RENAME TABLE vava_admin_bans_essai TO vava_admin_bans;`, B se reconnecte et, pendant l'écran de chargement du jeu, `RENAME TABLE vava_admin_bans TO vava_admin_bans_essai;`. | B entre (vérification à la connexion réussie), puis est expulsé dès son arrivée avec le même message qu'en 14 ; console : `compte n° <B> expulsé à son arrivée : vérification de ban impossible (…)`. Rien au Journal (même base). **Remettre** `RENAME TABLE vava_admin_bans_essai TO vava_admin_bans;` ; B se reconnecte normalement. |
+| 16 | **Base arrêtée** (core 0.9.1) : arrêter le service MariaDB (ou MySQL) ; B se connecte. Relancer le service ; B se reconnecte. | Refusé sur « Le serveur est momentanément indisponible, réessayez dans un instant. » ; console : `connexion refusée : compte de la license introuvable, base indisponible (…)`. Aucun compte créé. Base relancée : B entre normalement (à confirmer : délai de la réponse d'oxmysql quand la base est arrêtée). |
 
 ## 8. Signalements (2 joueurs)
 
@@ -175,6 +179,11 @@ Sénéchal et au-dessus (droit `tools`).
 | 6 | Écran des joueurs (droit `watch`, tout le Conseil, sans règle de rang) : `vava_conseil <B> gardien` ; B : `/cameras`. | Le mur s'ouvre (joueurs connectés, B exclu, disposition 3 × 3 par défaut) ; B peut regarder l'écran de A bien que A soit Souverain. Journal « Mur des caméras ouvert ». |
 | 7 | B Gardien : `F10` → Outils → « Mur des caméras » → « Ouvrir ». | L'onglet Outils ne montre que cet outil (pas de titre « Outils des modules », aucun levier) ; le Registre se ferme et le mur s'ouvre, comme par `/cameras`. |
 | 8 | `vava_conseil <B> aucun` ; B : `/cameras`. | Rien. |
+| 9 | **Une offre par caméra** (`vava_cameras` 1.2.0) : A ouvre le mur en 4 × 4 avec B dedans, puis ouvre B en grand, revient au mur, change de page et revient. | Chaque case et la vue en grand montrent l'image de B comme avant : une seule offre suffit à chaque caméra. Console du serveur : aucune erreur `already_offered`. (Un client qui renverrait l'offre en boucle est couvert par les tests unitaires, `tests/spec/cameras_wall_spec.lua`.) |
+| 10 | **Mur fermé puis rouvert** : A ferme le mur (`Échap`), le rouvre (`/cameras`). | Deux lignes « Mur des caméras ouvert » au Journal ; les cases reviennent à la réouverture. |
+| 11 | **Droit retiré puis rendu, mur ouvert** : B Gardien, mur ouvert sur A. Console : `vava_conseil <B> aucun`, puis `vava_conseil <B> gardien` sans que B ferme son mur ; un troisième joueur (ou A revenu de la sélection) apparaît dans le mur de B. | Au retrait, « Droit refusé » sur chaque case. Rang rendu, mur toujours affiché : une case nouvelle affiche « Mur à rouvrir » (le serveur a levé le mur au retrait) et n'est pas retentée toutes les 10 s. B ferme et rouvre le mur : nouvelle ligne « Mur des caméras ouvert », les cases reviennent. |
+| 12 | **Retour à la sélection** : B, mur ouvert, revient à la sélection de personnage, rejoue, puis `/cameras`. | Le mur se ferme à la sélection ; à la réouverture, une ligne « Mur des caméras ouvert » et les cases fonctionnent. Aucune case n'est jamais vue sans une ligne d'ouverture au Journal juste avant. |
+| 13 | **Depuis la Chancellerie** (compte du panneau Gardien, au moins deux joueurs en jeu) : page Caméras en 1 × 1 ; puis, page toujours ouverte, console : `restart vava_chancellerie` ; dans la page, passer à la page suivante du mur, puis en 2 × 2. | À l'ouverture de la page : « Mur des caméras ouvert » au nom de « Chancellerie : <compte> », pas de « Cases du mur regardées ». Après le redémarrage, le pont ne sait plus qu'un mur est ouvert : à la première case ouverte ensuite, une ligne « Cases du mur regardées » (« numero : <n° du joueur> »), une seule pour toutes les cases suivantes. Recharger la page : seulement « Mur des caméras ouvert ». (Caméras déjà ouvertes avant le redémarrage : gardées ou éteintes, à noter ; ce test ne dépend pas de leur sort.) |
 
 ## 11. Proclamation, journal, Conseil
 
@@ -205,7 +214,7 @@ Sénéchal et au-dessus (droit `tools`).
 
 | # | Faire | Attendu |
 |---|---|---|
-| 1 | A en vol libre avec le Registre ouvert, B immobilisé, un signalement ouvert. Console : `restart vava_admin`. | Console : `arrêt : 1 joueur(s) immobilisé(s) libéré(s)` puis `module 'vava_admin' v1.7.0 prêt`. Chez A : Registre fermé, souris rendue au jeu, vol libre coupé (A visible, retombe). Chez B : il peut de nouveau bouger, avec « Vous pouvez de nouveau bouger. » (à confirmer : le message part pendant l'arrêt du module chez B ; s'il manque, seul le mouvement compte). |
+| 1 | A en vol libre avec le Registre ouvert, B immobilisé, un signalement ouvert. Console : `restart vava_admin`. | Console : `arrêt : 1 joueur(s) immobilisé(s) libéré(s)` puis `module 'vava_admin' v1.7.1 prêt`. Chez A : Registre fermé, souris rendue au jeu, vol libre coupé (A visible, retombe). Chez B : il peut de nouveau bouger, avec « Vous pouvez de nouveau bouger. » (à confirmer : le message part pendant l'arrêt du module chez B ; s'il manque, seul le mouvement compte). |
 | 2 | A : `F10`, `F2` sans se reconnecter. | Tous deux fonctionnent. Rangs, bans, avertissements et journal intacts (base). |
 | 3 | Signalements. | Vide : les signalements vivent en mémoire ; le suivant repart au n° 1 et le délai d'une minute de B est remis à zéro. |
 | 4 | Fiche de B (immobilisé avant le redémarrage). | B est libre et la fiche le dit : pas d'étiquette « Immobilisé », bouton « Immobiliser ». État cohérent ; à immobiliser de nouveau si besoin. |
@@ -266,3 +275,8 @@ Sénéchal et au-dessus (droit `tools`).
   spectateur (`NetworkSetInSpectatorMode`, attente de 3 s que le joueur observé soit transmis).
 - La recherche du sol au repère (`GetGroundZFor_3dCoord` à onze hauteurs) et la copie dans le presse-papiers depuis CEF.
 - La mise en page du texte de refus sur l'écran de connexion de FiveM (retours à la ligne du message de ban).
+- Le second contrôle des bans à l'arrivée (7-13, 7-15) et la base arrêtée (7-16) : couverts hors jeu par
+  `tests/spec/admin_bans_spec.lua` (verdict, connexion, arrivée, joueur parti ou numéro repris), pas sur un vrai
+  FXServer ; le délai d'oxmysql quand MariaDB est arrêtée n'est pas connu.
+- L'offre unique et le mur exigé pour une case (10-9 à 10-13) : `tests/spec/cameras_wall_spec.lua` vérifie les règles
+  du serveur et du pont ; un client qui renverrait l'offre en boucle ne se teste qu'avec un client modifié.

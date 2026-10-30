@@ -168,7 +168,7 @@ Corrections issues de l'audit T-010 (30 octobre 2026), à prendre avant le reste
   FXServer) à jour ; `docs/chancellerie.md` et README du pont à jour ; versions montées.
 
 ### T-026 — Registre et caméras : bannis en panne de base, offres en boucle, cases sans mur
-- Agent : vava-dev-lua (cette tâche autorise à toucher `server/players/accounts.lua`) · Dépend de : — · Statut : à faire
+- Agent : vava-dev-lua (cette tâche autorise à toucher `server/players/accounts.lua`) · Dépend de : — · Statut : à tester en jeu
 - **IMPORTANT** (`securite-vava_admin.md`) : `server/bans.lua:27-33` laisse entrer quand `accountId` est nul ou quand
   la requête de ban échoue (`server/players/accounts.lua:264-266` perd l'erreur) : refuser la connexion
   (`messages.unavailable`) sur erreur, et second contrôle au hook `core:player:joined` qui expulse un compte banni.
@@ -179,6 +179,11 @@ Corrections issues de l'audit T-010 (30 octobre 2026), à prendre avant le reste
   `forget`, `revoke`) et refuser `tile` sans lui ; côté pont (`modules/vava_chancellerie/server/routes.lua:139-141`),
   exiger `/cameras/wall` d'abord ou journaliser la première caméra d'un compte sans mur.
 - Critères : procédure `docs/tests/registre.md` complétée ; versions montées.
+- Fait (core **0.9.1**, vava_admin **1.7.1**, vava_cameras **1.2.0**, pont **1.4.1**, rapport
+  `docs/plan/rapports/T-026.md`) : base muette à la recherche du compte ou des bans → connexion refusée avec un message
+  clair, second contrôle à l'arrivée en jeu (banni expulsé et inscrit au journal) ; une offre par caméra ; case refusée
+  sans mur ouvert (`wall_closed`) ; depuis le web, case sans mur inscrite au journal (choix motivé dans le rapport).
+  Procédure : registre 7-13 à 7-16, 10-9 à 10-13.
 
 ### T-027 — Core : `returns` obligatoire dans callClient, champs publics du state bag
 - Agent : vava-dev-lua (cette tâche autorise à toucher le core) · Dépend de : — · Statut : à tester en jeu

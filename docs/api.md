@@ -158,7 +158,7 @@ core.hooks.runAfter('vava_inventory:move', payload)
 
 | Nom | Payload | Effet d'un refus `false, raison` |
 |---|---|---|
-| `core:player:connecting` | `{ source, license, name, accountId? }` | connexion refusée ; `raison` est affichée au joueur (ban, whitelist, file). `accountId` : compte déjà connu de cette license (absent à la première venue, aucun compte n'étant créé avant l'accord des hooks) |
+| `core:player:connecting` | `{ source, license, name, accountId? }` | connexion refusée ; `raison` est affichée au joueur (ban, whitelist, file). `accountId` : compte déjà connu de cette license (absent à la première venue, aucun compte n'étant créé avant l'accord des hooks). Depuis 0.9.1, un `accountId` absent veut toujours dire « première venue » : si la base ne répond pas à la recherche du compte, la connexion est refusée (`players.messages.unavailable`) avant les hooks |
 | `core:character:creating` | `{ source, accountId, firstName, lastName, sex }` | création refusée ; `raison` renvoyée au client |
 | `core:character:deleting` | `{ source, accountId, characterId }` | suppression refusée ; `raison` renvoyée au client |
 
@@ -831,7 +831,18 @@ voulu (l'écran des joueurs non plus, voir plus bas).
   identifiants d'un joueur (license, discord, steam…, jamais l'adresse IP) ne partent qu'à la Chancellerie, qui les
   affiche : la fiche du Registre en jeu ne les reçoit pas (1.7.0).
 - Bans par compte, vérifiés au hook `core:player:connecting` : un banni voit le motif, la fin et le numéro du ban.
-  Aucun compte n'est créé pour une connexion refusée.
+  Aucun compte n'est créé pour une connexion refusée. Second contrôle au hook `core:player:joined` (compte alors
+  toujours connu, hors du fil du core) : un compte banni pendant son chargement est expulsé avec le même texte et le
+  journal l'inscrit (« Banni écarté à son arrivée », au nom de la Console) (1.7.1).
+- **Base en panne** (1.7.1, avec le core 0.9.1) : un compte n'entre jamais sans que ses bans aient été lus. Si la base
+  ne répond pas pendant la recherche du compte, le core refuse la connexion (« Le serveur est momentanément
+  indisponible, réessayez dans un instant. ») ; si elle ne répond pas pendant la lecture des bans (connexion ou arrivée
+  en jeu), le joueur est refusé, ou expulsé s'il venait d'arriver, avec « Le registre des bans ne peut être consulté
+  pour l'instant : réessayez dans une minute. » (`messages.banCheckUnavailable`), et la console l'écrit. Personne
+  n'est refusé tant que la base répond. Une première
+  venue (aucun compte encore) n'a rien à vérifier ; une base injoignable bloque de toute façon la création du compte.
+  Pendant une panne de la base, plus personne ne se connecte : c'était déjà vrai (le compte et les personnages se
+  lisent en base), le message dit maintenant pourquoi.
 - Déplacer et immobiliser passent par les natives serveur (OneSync). L'état « immobilisé » vit en mémoire : à l'arrêt
   (ou au redémarrage) du module, chaque joueur immobilisé est libéré et prévenu, jamais laissé figé sans Registre pour
   le libérer (1.7.0). Le vol libre est la seule boucle par image du module, active seulement pendant son usage ;
@@ -1090,10 +1101,15 @@ regarde en jeu), `vava_chancellerie` ≥ 1.1.0 (caméras depuis le web). Qualit�
   demande à la Chancellerie de revérifier chaque compte qui regarde, avec son rang actuel : sans le droit (ou compte
   supprimé), ses caméras s'éteignent (« Droit refusé » dans le navigateur, capture arrêtée en jeu). Un rang changé
   dans le panneau (compte relié ou non) fait la même revérification.
-- **Journal** du Conseil : l'ouverture du mur et chaque vue en grand (les cases d'un mur sont couvertes par
-  l'ouverture). Le joueur n'est pas prévenu : à mentionner dans le règlement du serveur.
+- **Journal** du Conseil : l'ouverture du mur et chaque vue en grand. Les cases d'un mur sont couvertes par
+  l'ouverture, que le serveur exige (1.2.0) : il tient pour chaque membre en jeu un état « mur ouvert », posé par
+  `vava_cameras:wall` et levé par `vava_cameras:leave`, le retour à la sélection, le départ ou le droit retiré ; sans
+  lui, `vava_cameras:watch(joueur, 'tile')` répond `wall_closed` (« Mur à rouvrir » dans le mur, sans nouvel essai).
+  Depuis le web, voir `vava_chancellerie` (case sans mur inscrite au journal). Le joueur n'est pas prévenu : à
+  mentionner dans le règlement du serveur.
 - **Sécurité** : chaque demande du membre est une RPC à schéma strict et à débit limité, droit revérifié à chaque
-  caméra ; seul le joueur filmé envoie l'offre de sa caméra, seul son spectateur y répond (une fois) ou la ferme.
+  caméra ; seul le joueur filmé envoie l'offre de sa caméra, **une seule fois** (`already_offered` ensuite, 1.2.0 : une
+  renégociation passe par une nouvelle caméra), seul son spectateur y répond (une fois) ou la ferme.
   Identifiants de caméra tirés au hasard (24 chiffres hexadécimaux). Le WebRTC direct révèle l'adresse IP du joueur
   filmé au spectateur (et inversement) ; derrière certains pare-feux, la connexion directe échoue (aucun relais TURN).
   Avec le DLSS activé, l'image peut inclure les interfaces du jeu.
@@ -1563,8 +1579,11 @@ vava_cameras 1.0.0 pour l'écran des joueurs, vava_time 1.0.0 pour le ciel et l'
   `time_unavailable` si vava_time n'est pas lancé. Un fichier du pont ajoute ses demandes à `routes.requests`.
 - **Caméras** (1.1.0) : ouvertes auprès de vava_cameras une fois le droit `watch` accordé — la vue en grand par la
   demande « écran du joueur » du Registre (`watchScreen` : cible vérifiée, inscrite au journal), les cases d'un mur sur
-  le seul droit, l'ouverture du mur étant inscrite au journal (« Mur des caméras ouvert »). Routes : `/cameras/wall`,
-  `/cameras/players`, `/camera/start` (`{ actor, target, quality }`), `/camera/answer`, `/camera/stop`.
+  le seul droit, l'ouverture du mur étant inscrite au journal (« Mur des caméras ouvert »). Depuis 1.4.1, une case
+  demandée par un compte qui n'a ouvert aucun mur depuis `cameras.tileLogMs` (2 h) inscrit sa propre ligne (« Cases du
+  mur regardées », numéro du joueur) : aucune case n'échappe au journal, sans refuser le navigateur (le pont ne sait pas
+  quand un mur du web se ferme). Routes : `/cameras/wall`, `/cameras/players`, `/camera/start`
+  (`{ actor, target, quality }`), `/camera/answer`, `/camera/stop`.
 - **Évènements** vers la Chancellerie (requête HTTP locale, avec la clé) : signalements, arrivées et départs des joueurs,
   offre et fin des caméras du web (hook `vava_cameras:web`), arrêt du module des caméras (`{ type = 'camera', reset }`),
   rang du Conseil donné ou retiré (`{ type = 'camera', recheck }`, 1.3.1 : la Chancellerie revérifie le droit de chaque
