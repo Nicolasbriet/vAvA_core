@@ -1,12 +1,14 @@
 'use strict';
 /*
- * web/js/devmock.js
+ * web/dev/devmock.js
  * Rôle : inventaire simulé quand la page est ouverte dans un navigateur (hors FiveM), pour travailler le rendu sans
  *        lancer le jeu. Inactif en jeu. Paramètres d'URL : ?drop=1 pour afficher aussi un sac au sol, ?catalog=1 le
  *        catalogue de développement. Les images
  *        viennent du module d'exemple voisin (examples/vava_example_items) quand le dépôt est complet. Les objets
  *        portent des métadonnées du contrat standard (palier, qualité, solidité, signature, histoire, brisé) et une
  *        hache est tenue en main.
+ *        Jamais livré (absent des `files`), jamais chargé en jeu : la ligne hors jeu de index.html ne l'insère
+ *        que hors FiveM.
  */
 
 const DevMock = (() => {
