@@ -2,12 +2,13 @@
     vava_arrival/server/store.lua
     Rôle : table vava_arrival et sa mémoire : une entrée par personnage CHARGÉ qui a une ligne (bornée par le nombre de
            joueurs). Reconnaissance d'une première venue au chargement (temps de jeu mesuré par le core et ligne en
-           base), reprise d'une ligne, dotation réservée relue « incertaine » ; transitions CONDITIONNELLES de l'état
+           base), reprise d'une ligne, dotation réservée relue « incertaine » (sauf remise en cours dans ce serveur :
+           personnage rechargé pendant qu'elle se fait) ; transitions CONDITIONNELLES de l'état
            de la dotation (la base arbitre : une ligne touchée ou rien) ; envois comptés, accusé de lecture ; écritures
            du Conseil (redoter, rejouer). Toutes les requêtes sont paramétrées ; les états sont des littéraux du SQL ou
            des paramètres, jamais concaténés.
     Dépendances : shared/constants.lua, config.lua, shared/rules.lua, server/core.lua, bridge/server.lua,
-                  server/journal.lua
+                  server/journal.lua ; server/kit.lua lu à l'appel (remise en cours, chargé après ce fichier)
 ]]
 
 local pairs, tonumber, tostring = pairs, tonumber, tostring
@@ -50,6 +51,14 @@ store.SQL = SQL
 local entries = {}
 ---@type table<integer, integer>
 local bySource = {}
+
+--- Vrai si une remise de la dotation de ce personnage est en cours dans ce serveur (server/kit.lua).
+---@param characterId integer
+---@return boolean
+local function claimInProgress(characterId)
+    local kit = VavaArrival.kit
+    return kit ~= nil and kit.isClaiming(characterId) == true
+end
 
 ---@param value any
 ---@return integer|nil
@@ -221,6 +230,11 @@ function store.load(source, accountId, characterId, playSeconds, spawned)
             return nil
         end
         decision = rules.onLoad(row, playSeconds)
+    end
+    -- réservée par une remise en cours dans ce serveur (personnage déchargé puis rechargé pendant ses attentes de la
+    -- base) : reprise « réservée », la remise écrit son issue et la pose aussi sur cette entrée (kit.lua)
+    if decision.uncertain and row.kit == KIT.CLAIMED and claimInProgress(characterId) then
+        decision.uncertain = false
     end
     if decision.uncertain then
         local ok, transitionErr = store.transition(characterId, KIT.UNCERTAIN, row.kitAt, row.kit)

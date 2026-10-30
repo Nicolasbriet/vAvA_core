@@ -42,13 +42,17 @@ première semaine.
 1. **Chargement** (hook `core:character:loaded`, avant l'apparition) : une lecture par clé primaire. Aucune ligne et
    temps de jeu nul → ligne « à donner » (`INSERT IGNORE`) ; aucune ligne et temps de jeu non nul → personnage ancien,
    rien (jamais suivi) ; ligne → reprise ; ligne « réservée » → « incertaine » (serveur tombé pendant une remise :
-   console, journal, jamais redonnée d'office). Lecture ou écriture en échec : rien cette session.
+   console, journal, jamais redonnée d'office), sauf si une remise de ce personnage est en cours dans ce serveur
+   (personnage déchargé puis rechargé pendant qu'elle se fait : reprise « réservée », la remise écrit son issue).
+   Lecture ou écriture en échec : rien cette session.
 2. **Apparition** (hook `core:character:spawned`, chaque apparition) : dans un thread, une seule arrivée à la fois par
    personnage :
    - dotation « à donner » : objets connus de l'inventaire (sinon rien n'est réservé, une ligne de console par objet et
-     par 10 min) ; limite du compte (« retenue ») ; **réservation** `WHERE kit = 'due'` (la base arbitre) ; personnage
-     actif relu juste avant l'échange, sans céder la main ; **un** `exchange` tout ou rien ; « donnée », ou retour à
-     « à donner » (besace pleine, inventaire absent, personnage changé) pour un nouvel essai à l'apparition suivante ;
+     par 10 min) ; limite du compte (« retenue ») ; **réservation** `WHERE kit = 'due'` (la base arbitre) ; limite
+     **recomptée** aussitôt après (atteinte : « retenue », rien donné) ; entrée de cette arrivée (personnage ni
+     déchargé ni rechargé entre-temps) et personnage actif relus juste avant l'échange, sans céder la main ; **un**
+     `exchange` tout ou rien ; « donnée », ou retour à « à donner » (besace pleine, inventaire absent, personnage
+     changé ou rechargé) pour un nouvel essai à l'apparition suivante ;
    - accueil jamais vu, envoyé moins de 3 fois et pas encore pendant cette session : `vava_arrival:welcome` au seul
      joueur ; au premier envoi, hook `vava_arrival:arrived`.
 3. **Retour de l'inventaire** (`core:module:ready`) : objets redéclarés, dotations dues reprises pour les personnages
@@ -85,7 +89,8 @@ thread borné par accueil reçu.
 
 `/accueil etat <n°>` : état de la dotation et de l'accueil du personnage en jeu (lecture seule). `/accueil redoter <n°>` :
 redonne la dotation par un échange atomique, quels que soient l'état et la limite du compte (journal du module et du
-Registre, « Dotation redonnée ») ; un personnage d'avant l'accueil redoté n'aura pas d'accueil ensuite.
+Registre, « Dotation redonnée ») ; refusée pendant une remise en cours (« en cours ») ; un personnage d'avant
+l'accueil redoté n'aura pas d'accueil ensuite.
 `/accueil rejouer <n°>` : renvoie l'accueil (sans la ligne de la dotation) et le compte comme un envoi (« Accueil
 rejoué »). Console du serveur : `accueil etat <n°>`. Sans droit : rien, aucune réponse.
 
@@ -94,6 +99,13 @@ rejoué »). Console du serveur : `accueil etat <n°>`. Sans droit : rien, aucun
 `ensure vava_arrival` après `ensure vava_codex` (la Chancellerie le place seule). La migration crée les deux tables au
 premier démarrage. Pour voir le Codex s'ouvrir à un chapitre avant T-023 : `codex.chapter = 'vava_inventory'`, puis
 `restart vava_arrival` (à remettre ensuite).
+
+**Personnages anciens jamais joués.** La première venue se lit sur le temps de jeu mesuré par le core : un personnage
+créé avant la migration `0003_play_seconds.sql` du core (0.6.0) et jamais joué depuis est resté à `play_seconds = 0`
+et, s'il n'a pas de ligne dans `vava_arrival`, sera accueilli et doté comme un nouveau venu à sa prochaine venue (une
+fois, dans la limite du compte). Les repérer avant d'installer le module : ``SELECT `id` FROM `vava_characters` WHERE
+`play_seconds` = 0``. Quand l'un d'eux revient, `/accueil etat <n° du joueur>` dit ce qu'il a reçu (« donnée le … ») ;
+la règle ne change pas, le Conseil juge au cas par cas (rien à reprendre : deux pains et deux outres).
 
 Assets à brancher : aucun dans le module. Le point d'arrivée définitif se règle dans `config/server.lua`
 (`spawn.defaultPoint`) ; les dessins `web/items/pain.svg` et `eau.svg` sont ceux de `vava_example_items`.
@@ -112,5 +124,7 @@ dotation, accueil, accusé, `/accueil` avec des doublures de la base et de l'inv
 - `IsScreenFadedIn()` est vrai assez tôt après l'apparition (sinon l'accueil attendrait 30 s : accueil 2).
 - Le Codex ouvert par `openAt` reçoit bien clavier et souris, et `Échap` le ferme (accueil 2).
 - `IsNuiFocused()` voit le Codex et l'inventaire ouverts (accueil 6 et 7).
+- Un personnage d'avant la mesure du temps de jeu du core resté à `play_seconds = 0` est pris pour un nouveau venu
+  (voir « Installation ») : le vérifier avec `/accueil etat` sur la base de test.
 - Les paramètres `nil` des requêtes (`kit_at` remis à vide, compte de la console au journal) arrivent en `NULL` (accueil
   9 et 18).

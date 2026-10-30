@@ -10,7 +10,7 @@
 ]]
 
 local type, pcall, tostring = type, pcall, tostring
-local CreateThread, Wait, RegisterNetEvent, GetInvokingResource = CreateThread, Wait, RegisterNetEvent, GetInvokingResource
+local CreateThread, Wait, RegisterNetEvent = CreateThread, Wait, RegisterNetEvent
 local GetGameTimer, GetResourceState = GetGameTimer, GetResourceState
 local IsPauseMenuActive, IsNuiFocused, IsScreenFadedIn = IsPauseMenuActive, IsNuiFocused, IsScreenFadedIn
 local BeginTextCommandThefeedPost, AddTextComponentSubstringPlayerName, EndTextCommandThefeedPostTicker =
@@ -104,9 +104,10 @@ local function show(mine, characterId, kitGiven)
     core.rpc.call(RPC.WELCOMED)
 end
 
+-- envoyé par le serveur au seul nouveau venu ; un déclenchement local par une autre ressource n'agirait que sur ce
+-- client (le serveur reste juge de l'accusé), d'où les seuls contrôles de type
 RegisterNetEvent(EVENTS.WELCOME, function(kitGiven)
-    -- déclenché localement par une ressource : ignoré (seul le serveur l'envoie)
-    if GetInvokingResource() ~= nil or type(kitGiven) ~= 'boolean' then return end
+    if type(kitGiven) ~= 'boolean' then return end
     local character = core.characters.current()
     if not character then return end
     token = token + 1
@@ -116,7 +117,7 @@ end)
 
 -- réponse de /accueil quand vava_chat manque (envoyée au seul membre du Conseil qui l'a tapée)
 RegisterNetEvent(EVENTS.NOTIFY, function(message)
-    if GetInvokingResource() ~= nil or type(message) ~= 'string' or #message == 0 or #message > MAX_REPLY then return end
+    if type(message) ~= 'string' or #message == 0 or #message > MAX_REPLY then return end
     feed(message)
 end)
 

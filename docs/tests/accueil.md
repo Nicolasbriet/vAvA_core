@@ -66,5 +66,8 @@ console correspondante.
 - `IsScreenFadedIn()` est vrai assez tôt après l'apparition (sinon l'accueil attendrait 30 s : test 2).
 - Le Codex ouvert par `openAt` reçoit bien clavier et souris et `Échap` le ferme (test 2).
 - `IsNuiFocused()` voit le Codex et l'inventaire ouverts (tests 6 et 7).
+- Un personnage créé avant la mesure du temps de jeu du core et jamais joué depuis (`play_seconds = 0` dans
+  `vava_characters`) est accueilli et doté comme un nouveau venu (README, « Installation ») : avant le test 5, vérifier
+  que le personnage choisi a bien un temps de jeu non nul ; `/accueil etat` dit ce qu'un tel personnage a reçu.
 - Les valeurs vides des requêtes (`kit_at` effacé au retour « à donner », compte de la console au journal) arrivent en
   `NULL` (tests 9 et 18).

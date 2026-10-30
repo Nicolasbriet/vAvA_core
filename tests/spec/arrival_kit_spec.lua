@@ -196,7 +196,8 @@ describe('vava_arrival server', function()
 
             queries = {}
             welcome.onSpawned(SPAWN)
-            assert.same({ 'COUNT_KITS', 'TRANSITION', 'TRANSITION', 'COUNT_SEND' }, queries)
+            -- limite comptée, réservation, limite recomptée, échange, dotation écrite, envoi compté
+            assert.same({ 'COUNT_KITS', 'TRANSITION', 'COUNT_KITS', 'TRANSITION', 'COUNT_SEND' }, queries)
             assert.equal(1, #exchanges)
             assert.same({ source = SOURCE, removals = {}, additions = cfg.kit.items }, exchanges[1])
             assert.equal('given', rows[CHARACTER].kit)
@@ -212,6 +213,7 @@ describe('vava_arrival server', function()
             assert.equal(HOOKS.ARRIVED, emitted[1].name)
             assert.same({ source = SOURCE, characterId = CHARACTER, accountId = ACCOUNT, kit = 'given' }, emitted[1].payload)
             assert.is_false(entry.busy)
+            assert.is_false(VavaArrival.kit.isClaiming(CHARACTER))
         end)
 
         it('ne fait rien à une seconde apparition (réanimation), accusée ou non', function()
@@ -347,6 +349,131 @@ describe('vava_arrival server', function()
         end)
     end)
 
+    describe('personnage rechargé pendant la remise', function()
+        it('ne lit pas « incertaine » une dotation dont la remise est en cours, et pose son issue sur la nouvelle entrée', function()
+            local entry = arrive(0)
+            local reloaded
+            -- rechargé pendant l'écriture de la dotation donnée (après l'échange)
+            after.TRANSITION = function()
+                before.TRANSITION = function()
+                    store.forget(SOURCE)
+                    reloaded = arrive(30)
+                end
+            end
+            welcome.onSpawned(SPAWN)
+            assert.is_table(reloaded)
+            assert.are_not.equal(entry, reloaded)
+            assert.equal(1, #exchanges)
+            assert.equal('given', rows[CHARACTER].kit)
+            assert.equal('given', reloaded.kit)
+            assert.equal(now, reloaded.kitAt)
+            assert.same({ 'kit_given' }, kinds())
+            assert.same({}, logs.error)
+            assert.is_false(VavaArrival.kit.isClaiming(CHARACTER))
+            -- la nouvelle entrée ne redonne rien
+            welcome.onSpawned(SPAWN)
+            assert.equal(1, #exchanges)
+        end)
+
+        it('refuse de redoter pendant une remise en cours d\'une entrée remplacée', function()
+            arrive(0)
+            after.TRANSITION = function()
+                before.TRANSITION = function()
+                    store.forget(SOURCE)
+                    arrive(30)
+                    admin.command(8, { 'redoter', tostring(SOURCE) })
+                end
+            end
+            welcome.onSpawned(SPAWN)
+            assert.equal(1, #exchanges)
+            assert.equal(cfg.messages.admin.busy, chats[1].text)
+            assert.same({}, adminLogs)
+        end)
+
+        it('abandonne la remise d\'une entrée remplacée pendant les attentes de la base, sans rien donner', function()
+            local entry = arrive(0)
+            local reloaded
+            -- rechargé juste après la réservation, avant l'échange
+            after.TRANSITION = function()
+                store.forget(SOURCE)
+                reloaded = arrive(30)
+            end
+            welcome.onSpawned(SPAWN)
+            assert.is_table(reloaded)
+            assert.are_not.equal(entry, reloaded)
+            assert.equal(0, #exchanges)
+            assert.equal('due', rows[CHARACTER].kit)
+            assert.is_nil(rows[CHARACTER].kit_at)
+            assert.equal('due', reloaded.kit)
+            assert.same({}, kinds())
+            assert.same({}, logs.error)
+            assert.is_false(VavaArrival.kit.isClaiming(CHARACTER))
+            -- la nouvelle entrée donne la dotation, une fois
+            welcome.onSpawned(SPAWN)
+            assert.equal(1, #exchanges)
+            assert.equal('given', rows[CHARACTER].kit)
+            assert.equal('given', reloaded.kit)
+        end)
+
+        it('abandonne la remise d\'un personnage déchargé pendant les attentes de la base', function()
+            arrive(0)
+            after.TRANSITION = function() store.forget(SOURCE) end
+            welcome.onSpawned(SPAWN)
+            assert.equal(0, #exchanges)
+            assert.equal('due', rows[CHARACTER].kit)
+            assert.is_false(VavaArrival.kit.isClaiming(CHARACTER))
+        end)
+
+        it('nettoie la remise en cours sur une erreur : la ligne restée réservée est relue « incertaine »', function()
+            arrive(0)
+            VavaArrival.bridge.Exchange = function() error('inventaire en panne') end
+            welcome.onSpawned(SPAWN)
+            assert.is_false(VavaArrival.kit.isClaiming(CHARACTER))
+            assert.equal('claimed', rows[CHARACTER].kit)
+            assert.equal(1, #logs.error)
+            assert.matches('inventaire en panne', logs.error[1])
+            store.forget(SOURCE)
+            local entry = arrive(30)
+            assert.equal('uncertain', entry.kit)
+            assert.equal('uncertain', rows[CHARACTER].kit)
+            assert.same({ 'kit_uncertain' }, kinds())
+        end)
+    end)
+
+    describe('limite recomptée après la réservation', function()
+        it('retient la dotation si le compte a atteint sa limite pendant les attentes de la base', function()
+            rows[1] = { account_id = ACCOUNT, kit = 'given', kit_at = now - 86400, welcome_sends = 1 }
+            rows[2] = { account_id = ACCOUNT, kit = 'given', kit_at = now - 2 * 86400, welcome_sends = 1 }
+            local entry = arrive(0)
+            -- une troisième dotation du compte écrite entre le premier compte et la réservation
+            after.COUNT_KITS = function()
+                rows[3] = { account_id = ACCOUNT, kit = 'claimed', kit_at = now, welcome_sends = 0 }
+            end
+            welcome.onSpawned(SPAWN)
+            assert.equal(2, count(queries, 'COUNT_KITS'))
+            assert.equal(0, #exchanges)
+            assert.equal('withheld', rows[CHARACTER].kit)
+            assert.equal(now, rows[CHARACTER].kit_at)
+            assert.equal('withheld', entry.kit)
+            assert.same({ 'kit_withheld' }, kinds())
+            assert.same({ count = 3, max = 3, days = 30 }, journal[1].entry.details)
+            assert.equal(1, #sent)
+            assert.same({ n = 1, false }, sent[1].args)
+            assert.is_false(VavaArrival.kit.isClaiming(CHARACTER))
+        end)
+
+        it('rend la réservation si le recomptage échoue', function()
+            local entry = arrive(0)
+            after.COUNT_KITS = function() failures.COUNT_KITS = 'boom' end
+            welcome.onSpawned(SPAWN)
+            assert.equal(0, #exchanges)
+            assert.equal('due', rows[CHARACTER].kit)
+            assert.equal('due', entry.kit)
+            assert.same({}, kinds())
+            assert.is_false(VavaArrival.kit.isClaiming(CHARACTER))
+        end)
+    end)
+
     it('ne donne rien si la réservation ne touche aucune ligne, et relit l\'entrée', function()
         local entry = arrive(0)
         before.TRANSITION = function() rows[CHARACTER].kit, rows[CHARACTER].kit_at = 'given', now - 5 end
@@ -374,7 +501,8 @@ describe('vava_arrival server', function()
         welcome.onSpawned(SPAWN)
         assert.equal(1, #exchanges)
         assert.equal(1, #sent)
-        assert.equal(1, count(queries, 'COUNT_KITS'))
+        -- une arrivée : le compte avant la réservation et le recomptage après
+        assert.equal(2, count(queries, 'COUNT_KITS'))
     end)
 
     it('ne réserve rien si un objet de la dotation est inconnu, et ne le répète qu\'une fois par 10 min', function()
