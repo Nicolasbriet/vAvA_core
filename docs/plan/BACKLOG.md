@@ -378,7 +378,7 @@ versé à T-014 ; les autres points déjà couverts sont précisés dans T-012 �
   station ; la liste des stations devient la définition de zone (plus de clé globale).
 
 ### T-018 — Revue des boucles client
-- Agent : vava-dev-lua (avec vava-reseau-perf) · Dépend de : T-011 · Statut : à faire
+- Agent : vava-dev-lua (avec vava-reseau-perf) · Dépend de : T-011 · Statut : à tester en jeu
 - Chacun des 13 fichiers avec `Wait(0)` : la boucle ne tourne que pendant un état actif, sinon intervalle adaptatif.
   Même revue pour toutes les boucles signalées par T-011.
 - T-011 (`docs/plan/rapports/T-011.md` § Boucles client permanentes) : les 14 `Wait(0)` sont tous liés à un état qui
@@ -389,6 +389,12 @@ versé à T-014 ; les autres points déjà couverts sont précisés dans T-012 �
   allonger l'intervalle à 2-3 s quand rien n'est à moins de `streaming.radius`. Regroupements à décider selon le
   resmon (MINEUR des rapports) : trois boucles de `vava_voice/client/main.lua:119-146`, visibilité du chat en double
   avec le HUD, recherche permanente de `vava_magic/client/ambient.lua:423-440`.
+- Fait le 30 octobre 2026 : récolte 1.4.1, agriculture 1.5.2, artisanat 1.3.2 (cibles groupées par zone, parcelle ou
+  case de 200 m, seules celles d'un groupe à portée mesurées, 2,5 s au repos au-delà de 80 + 60 m ; règles pures
+  `shared/proximity.lua` testées dans `tests/spec/props_proximity_spec.lua`) ; magie 2.7.1 (recherche des effets
+  endormie sans magie autour). Les 14 `Wait(0)` relus, tous conformes. Voix et visibilité chat/HUD : propositions pour
+  la mesure de T-019. Compte rendu `docs/plan/rapports/T-018.md`, procédure `docs/tests/metiers.md` § 6 et
+  `docs/tests/magie.md` § 15-8.
 
 ### T-019 — PORTE : mesure après optimisation — **HUMAIN**
 - Dépend de : T-010 à T-018 et leurs corrections · Statut : à faire
