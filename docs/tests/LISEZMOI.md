@@ -19,6 +19,7 @@ main. Chaque procédure dit quoi faire et ce qui doit se passer ; les tests à d
 | [metiers.md](metiers.md) | Compétences, récolte, artisanat, agriculture | `vava_skills`, `vava_gathering`, `vava_crafting`, `vava_farming` |
 | [magie.md](magie.md) | Les onze sorts, états, zones, combinaisons | `vava_magic` |
 | [temps.md](temps.md) | Heure du royaume, saisons de quatorze jours, ciel, nuits de gel, Conseil en jeu et depuis la Chancellerie, effets sur les métiers | `vava_time`, `vava_farming`, `vava_gathering`, `vava_chancellerie` |
+| [chancellerie.md](chancellerie.md) | Clé du pont hors de la ligne de commande, rangs des seuls comptes vus reliés en jeu | Chancellerie, `vava_chancellerie` |
 | [developpement.md](developpement.md) | Outils de développement : rien sans `vava_env`, réservés et journalisés avec | `vava_dev_characters`, `vava_example`, `vava_example_items`, `vava_anim_test` |
 
 Ordre conseillé : personnage, inventaire, besoins, santé, chat, voix, registre, Codex, métiers, temps, magie. Chaque

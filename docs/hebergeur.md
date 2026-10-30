@@ -138,6 +138,9 @@ plantage. txAdmin ne démarre pas (FXServer est lancé avec `+exec server.cfg`) 
   `http.secureCookies` à `true` dans ce même fichier.
 - Comptes protégés par mot de passe (scrypt), limites de tentatives, journal des actions. Le `server.cfg` (clé de
   licence, mot de passe de la base) n'est jamais affiché dans le navigateur.
+- La clé qui relie la Chancellerie au serveur de jeu (Chancellerie 1.6.0) n'est ni sur la ligne de commande de FXServer
+  (`ps`, `/proc/<pid>/cmdline`) ni dans un fichier : elle passe par son entrée standard, que la Chancellerie garde
+  ouverte. Rien à régler ; ne pas relancer FXServer hors d'elle (le pont resterait fermé).
 
 ## Ressources de développement : jamais sur le serveur public
 
