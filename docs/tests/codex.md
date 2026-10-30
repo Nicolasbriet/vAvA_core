@@ -25,8 +25,8 @@ resmon et remontée des écarts : [LISEZMOI.md](LISEZMOI.md).
    0 que personne n'a choisi.
 5. **Ce qui part à chaque ouverture** (§ 12) : dans `config/server.lua` du core, `log.level = 'debug'` le temps du
    § 12 (redémarrage du serveur), à remettre à `'info'` après. La console écrit alors à chaque ouverture
-   `[vava_codex] ouverture (joueur N) : contenu envoyé (X entrées) | gardé par la page, préférences envoyées |
-   gardées`.
+   `[vava_codex] ouverture (joueur N, X entrées visibles) : contenu envoyé | gardé par la page, préférences
+   envoyées | gardées`.
 
 ## 1. Ouvrir et fermer (README 1)
 
@@ -161,7 +161,7 @@ au niveau `debug` (§ 0.5). Mesuré hors jeu avec les déclarations du dépôt :
 
 | # | Faire | Attendu |
 |---|---|---|
-| 1 | A, juste après l'arrivée en jeu : `F1`. | Console : `contenu envoyé (N entrées), préférences envoyées` (première ouverture). Le livre est complet. |
+| 1 | A, juste après l'arrivée en jeu : `F1`. | Console : `contenu envoyé, préférences envoyées` (première ouverture). Le livre est complet. |
 | 2 | `Échap`, `F1`, `Échap`, `F1` (en laissant deux secondes entre deux ouvertures : `rateLimits.open`). | Console, à chaque fois : `contenu gardé par la page, préférences gardées`. Le livre est identique : mêmes chapitres, signets, Dernières pages, réglage, touches. |
 | 3 | Poser un signet, fermer, rouvrir. | `contenu gardé par la page, préférences envoyées` ; le ruban est là. Rouvrir encore : `préférences gardées`. |
 | 4 | Lancer `/sigils` depuis le Codex, fermer, rouvrir ; puis taper `/me essai` dans le chat, rouvrir. | Les deux fois : `contenu gardé par la page, préférences envoyées` ; la ligne est en tête des Dernières pages. |
@@ -173,13 +173,18 @@ au niveau `debug` (§ 0.5). Mesuré hors jeu avec les déclarations du dépôt :
 | 10 | Revenir à la sélection de personnage, prendre un autre personnage du même compte, `F1`. | `contenu gardé par la page, préférences envoyées` : les signets et Dernières pages sont ceux du nouveau personnage (9-3). |
 | 11 | Livre ouvert, `restart vava_codex`, puis `F1`. | `contenu envoyé, préférences envoyées` : la page repart de rien. |
 
+Secours (jamais attendu, non provoquable en jeu) : si la page n'a pas la version que le client annonce, elle garde son
+contenu et fait oublier les versions au client, sans appel au serveur (la prochaine ouverture renvoie tout) ; si elle
+n'a encore aucun contenu, elle le redemande aussitôt, et cette ouverture compte alors pour deux dans
+`rateLimits.open`. Vérifié hors jeu sous jsdom.
+
 ## 13. Resmon
 
 | Situation | Attendu (`resmon 1`, ligne `vava_codex`) |
 |---|---|
 | Au repos, livre fermé | 0,02 ms au plus (aucune boucle : 0,00 attendu). |
 | Livre ouvert, recherche, formulaires | 0,02 ms au plus côté Lua : tout se fait dans la page ; 0,15 ms au plus au moment de « Lancer ». |
-| Serveur, à chaque ouverture (`resmon` côté serveur ou profiler) | Pointe brève : environ 1 ms pour un joueur, 2,5 ms pour un Souverain (contenu recalculé et son empreinte, mesurés hors jeu) ; rien entre deux ouvertures. |
+| Serveur, à chaque ouverture (`resmon` côté serveur ou profiler) | Pointe brève : environ 1 ms pour un joueur, 2 ms pour un Souverain (contenu recalculé et son empreinte, mesurés hors jeu) ; rien entre deux ouvertures. **Plus de 3 ms chez un Souverain** : à noter dans la remontée (suite prévue, voir le rapport T-046). |
 
 ## 14. Ce qu'il faut regarder dans la base
 

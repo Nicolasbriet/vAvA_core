@@ -37,9 +37,10 @@ local function open(src, knownVersion, knownPrefsVersion)
     local entries, chapters, staff = catalog.visible(src)
     local content = { entries = entries, chapters = chapters, staff = staff, undeclared = staff and catalog.undeclared() or {} }
     local answer = answerOpen(content, current, knownVersion, knownPrefsVersion)
-    -- trace de test en jeu (niveau debug du core) : ce qui part réellement à chaque ouverture
-    VavaCodex.log.debug('ouverture (joueur %d) : contenu %s, préférences %s', src,
-        answer.content and 'envoyé (' .. #entries .. ' entrées)' or 'gardé par la page', answer.prefs and 'envoyées' or 'gardées')
+    -- trace de test en jeu (niveau debug du core) : ce qui part réellement à chaque ouverture ; valeurs passées en
+    -- arguments, le texte n'est formaté que si le niveau debug est affiché
+    VavaCodex.log.debug('ouverture (joueur %d, %d entrées visibles) : contenu %s, préférences %s', src, #entries,
+        answer.content and 'envoyé' or 'gardé par la page', answer.prefs and 'envoyées' or 'gardées')
     return true, answer
 end
 

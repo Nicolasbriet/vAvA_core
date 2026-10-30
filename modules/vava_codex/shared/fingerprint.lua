@@ -17,7 +17,6 @@ local concat, sort = table.concat, table.sort
 -- FNV-1a 64 bits : base et multiplicateur publiés (les littéraux hexadécimaux trop grands bouclent en Lua 5.4).
 local FNV_OFFSET = 0xcbf29ce484222325
 local FNV_PRIME = 0x100000001b3
-local CHUNK = 64              -- octets lus d'un coup dans la chaîne codée
 local MAX_DEPTH = 16          -- tables imbriquées : 8 au plus dans le contenu (… › action › arguments › argument › choix)
 
 -- rang d'un type de clé dans l'ordre canonique : booléens, puis nombres, puis chaînes
@@ -113,15 +112,25 @@ end
 ---@param text string
 ---@return integer
 local function fnv1a(text)
-    local hash = FNV_OFFSET
+    local hash, prime = FNV_OFFSET, FNV_PRIME
     local length = #text
-    for first = 1, length, CHUNK do
-        local last = first + CHUNK - 1
-        if last > length then last = length end
-        local bytes = { byte(text, first, last) }
-        for i = 1, #bytes do
-            hash = (hash ~ bytes[i]) * FNV_PRIME
-        end
+    local i = 1
+    -- huit octets lus d'un coup dans des locales : aucune table créée pendant le calcul
+    while i + 7 <= length do
+        local b1, b2, b3, b4, b5, b6, b7, b8 = byte(text, i, i + 7)
+        hash = (hash ~ b1) * prime
+        hash = (hash ~ b2) * prime
+        hash = (hash ~ b3) * prime
+        hash = (hash ~ b4) * prime
+        hash = (hash ~ b5) * prime
+        hash = (hash ~ b6) * prime
+        hash = (hash ~ b7) * prime
+        hash = (hash ~ b8) * prime
+        i = i + 8
+    end
+    while i <= length do
+        hash = (hash ~ byte(text, i)) * prime
+        i = i + 1
     end
     return hash
 end
@@ -141,17 +150,20 @@ end
 
 --- Réponse à l'ouverture du Codex. `content` : ce que le joueur peut voir ({ entries, chapters, staff, undeclared }) ;
 --- `prefs` : ses préférences ; `knownVersion` et `knownPrefsVersion` : les empreintes que son client dit avoir ('' :
---- rien). Le contenu (ou les préférences) part si son empreinte diffère, ou s'il n'a pu en avoir aucune.
+--- rien). Le contenu (ou les préférences) part si son empreinte diffère, ou s'il n'a pu en avoir aucune. Chaque
+--- empreinte est calculée une seule fois, et seulement parce qu'elle accompagne la réponse : pour un client qui n'a
+--- rien (''), la valeur part sans comparaison, mais sa version doit partir avec elle.
 ---@param content table
 ---@param prefs table
 ---@param knownVersion string
 ---@param knownPrefsVersion string
 ---@return { version: string, prefsVersion: string, content?: table, prefs?: table }
 function VavaCodex.answerOpen(content, prefs, knownVersion, knownPrefsVersion)
-    local version = VavaCodex.fingerprint(content) or ''
-    local prefsVersion = VavaCodex.fingerprint(prefs) or ''
+    local fingerprint = VavaCodex.fingerprint
+    local version = fingerprint(content) or ''
+    local prefsVersion = fingerprint(prefs) or ''
     local answer = { version = version, prefsVersion = prefsVersion }
-    if version == '' or version ~= knownVersion then answer.content = content end
-    if prefsVersion == '' or prefsVersion ~= knownPrefsVersion then answer.prefs = prefs end
+    if knownVersion == '' or version == '' or version ~= knownVersion then answer.content = content end
+    if knownPrefsVersion == '' or prefsVersion == '' or prefsVersion ~= knownPrefsVersion then answer.prefs = prefs end
     return answer
 end

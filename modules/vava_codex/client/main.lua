@@ -215,7 +215,13 @@ nui.on('keepOpen', function(d)
     end, d.value == true)
 end)
 nui.on('run', run)
--- La page n'a pas le contenu que les versions annoncent : tout est redemandé, et rangé comme à l'ouverture.
+-- La page n'a pas le contenu que les versions annoncent (secours). Sans aucun contenu : tout est redemandé, et rangé
+-- comme à l'ouverture. Avec un contenu plus ancien : versions oubliées, sans appel au serveur ; la prochaine ouverture
+-- renverra tout.
+nui.on('stale', function()
+    known.version, known.prefsVersion = '', ''
+    return { ok = true }
+end)
 nui.on('refresh', function()
     local ok, success, answer = core.rpc.call(RPC.OPEN, '', '')
     if not ok then return { ok = false, error = tostring(success) } end

@@ -51,6 +51,12 @@ describe('vava_codex empreinte du contenu', function()
         assert.equal('3ec51810f8a1ab41', fingerprint({ 'a', 'b' })) -- « T2{i1;s1:ai2;s1:b} »
     end)
 
+    it('lit les longues chaînes par blocs sans changer le résultat (blocs de 8 octets, puis le reste)', function()
+        -- références calculées hors Lua (BigInt) : 1 006 octets codés (125 blocs + 6), puis 365 en UTF-8 (45 + 5)
+        assert.equal('46330131d62edf53', fingerprint(string.rep('abcdefghij', 100)))
+        assert.equal('b5225d328897b74d', fingerprint(string.rep('Récolte · nœud ', 20)))
+    end)
+
     it('ne dépend pas de l\'ordre dans lequel une table a été remplie', function()
         local first = { name = 'recolte', label = 'Récolte', scope = 'admin', runnable = true, args = { 'a', 'b' } }
         local second = {}
@@ -145,6 +151,18 @@ describe('vava_codex empreinte du contenu', function()
                 assert.equal(content, answer.content)
                 assert.is_nil(answer.prefs)
             end
+        end)
+
+        it('envoie tout, versions comprises, à un client qui n\'a que l\'une des deux', function()
+            local first = answerOpen(content, prefs, '', '')
+            local noContent = answerOpen(content, prefs, '', first.prefsVersion)
+            assert.equal(content, noContent.content)
+            assert.equal(first.version, noContent.version)
+            assert.is_nil(noContent.prefs)
+            local noPrefs = answerOpen(content, prefs, first.version, '')
+            assert.is_nil(noPrefs.content)
+            assert.equal(prefs, noPrefs.prefs)
+            assert.equal(first.prefsVersion, noPrefs.prefsVersion)
         end)
 
         it('envoie toujours un contenu dont l\'empreinte n\'a pu être calculée', function()

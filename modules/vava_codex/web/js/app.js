@@ -182,8 +182,15 @@
     }
   });
 
-  /** La page n'a pas le contenu de la version annoncée (cas de secours) : tout est redemandé au serveur. */
+  /** La page n'a pas le contenu de la version annoncée (cas de secours, jamais attendu). Sans aucun contenu, elle
+   *  le redemande aussitôt (second appel au serveur, compté par le débit de l'ouverture) ; avec un contenu plus ancien,
+   *  elle le montre et fait seulement oublier les versions au client : la prochaine ouverture renverra tout, sans
+   *  appel de plus. */
   async function resync() {
+    if (Model.state.version !== null) {
+      Bridge.post('stale');
+      return;
+    }
     const result = await Bridge.post('refresh');
     if (!result.ok || !result.payload) {
       View.toast(errorMessage(result.error), 'danger');

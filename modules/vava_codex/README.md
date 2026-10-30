@@ -27,7 +27,7 @@ Le contenu repart dès qu'il change, quelle qu'en soit la cause : module démarr
 d'un rang, ACE, commande non décrite apparue. Les préférences repartent après un signet, un réglage, une commande
 lancée (du Codex ou du chat) ou un changement de personnage. Les touches du joueur sont relues dans le jeu à chaque
 ouverture. Le champ `vava_codex:prefs` est lu du seul serveur (`private`) : il ne part plus vers le client à chaque
-commande lancée. Coût serveur d'une ouverture : environ 1 ms pour un joueur, 2,5 ms pour un Souverain (calcul du
+commande lancée. Coût serveur d'une ouverture : environ 1 ms pour un joueur, 2 ms pour un Souverain (calcul du
 contenu et de son empreinte, mesuré hors jeu), borné par `rateLimits.open`.
 
 ## Prérequis
