@@ -1,12 +1,14 @@
 'use strict';
 /*
  * vava_atelier/web/js/view-list.js
- * Rôle : liste d'un atelier : onglets par genre, filtre (300 ms), lignes, création, pages de 50.
+ * Rôle : liste d'un atelier : onglets par genre, filtre (300 ms), lignes et leur état, création, pages de 50 ;
+ *        même écran pour « Retirés du royaume » (`model.removed` : ni onglets, ni filtre, ni création).
  * Dépendances : strings.js, format.js, components.js
  */
 
 const ListView = (() => {
-  const { h, icon, round } = UI;
+  const { h, icon, round, tag } = UI;
+  const TONES = new Set(['new', 'draft', 'trial', 'live', 'archived', 'removal', 'refused']);
   const str = Format.str;
   const FILTER_DELAY = 300;
 
@@ -16,6 +18,7 @@ const ListView = (() => {
     const descriptor = model.descriptor;
     const kinds = Format.list(descriptor.kinds);
     const kind = model.kind;
+    const removed = model.removed === true;
 
     const filter = h('input', { type: 'search', class: 'inp filter', placeholder: STRINGS.list.filter(str(kind.nounPlural)), 'aria-label': STRINGS.list.filterLabel,
       autocomplete: 'off', spellcheck: 'false', maxlength: '48', value: model.query || '' });
@@ -35,34 +38,36 @@ const ListView = (() => {
     const rows = h('div', { class: 'rows', role: 'list' });
     const pager = h('div', { class: 'pager', hidden: true });
 
-    const tabs = kinds.length > 1 ? h('nav', { class: 'tabs', 'aria-label': STRINGS.list.tabs }, kinds.map((k) => h('button', {
+    const tabs = !removed && kinds.length > 1 ? h('nav', { class: 'tabs', 'aria-label': STRINGS.list.tabs }, kinds.map((k) => h('button', {
       type: 'button', class: `tab${k.id === kind.id ? ' on' : ''}`, 'aria-current': k.id === kind.id ? 'page' : null,
       text: capital(str(k.nounPlural)), onclick: () => { if (k.id !== kind.id) actions.selectKind(k.id); } }))) : null;
 
-    const create = kind.creatable !== false ? h('button', { type: 'button', class: 'btn dark', text: STRINGS.list.create(str(kind.noun), str(kind.newLabel)), onclick: () => actions.create() }) : null;
+    const create = !removed && kind.creatable !== false ? h('button', { type: 'button', class: 'btn dark', text: STRINGS.list.create(str(kind.noun), str(kind.newLabel)), onclick: () => actions.create() }) : null;
 
     const el = h('div', { class: 'list-screen' },
       h('header', { class: 'page-head' },
         round('back', STRINGS.back, () => actions.back()),
         h('span', { class: 'ico big' }, icon(descriptor.icon, 24)),
-        h('div', { class: 'page-titles' }, h('h1', { text: str(descriptor.label) }), h('p', { class: 'hp', text: str(descriptor.description) }))),
+        h('div', { class: 'page-titles' }, h('h1', { text: removed ? STRINGS.removed.link : str(descriptor.label) }),
+          h('p', { class: 'hp', text: removed ? `${str(descriptor.label)} › ${capital(str(kind.nounPlural))}` : str(descriptor.description) }))),
       tabs,
       h('div', { class: 'list-body' },
-        h('div', { class: 'toolbar' }, filter, count, create),
-        rows, pager));
+        h('div', { class: 'toolbar' }, removed ? null : filter, count, create),
+        rows, pager,
+        !removed && descriptor.stored === true ? h('div', { class: 'list-foot' }, h('button', { type: 'button', class: 'link', text: STRINGS.removed.link, onclick: () => actions.removed() })) : null));
 
     function setData(data) {
       const entries = Format.list(data.entries).filter((e) => e && typeof e.id === 'string');
       const total = Number.isInteger(data.total) ? data.total : entries.length;
       count.textContent = STRINGS.list.count(total, str(kind.noun), str(kind.nounPlural));
       if (entries.length === 0) {
-        rows.replaceChildren(h('p', { class: 'hp empty', text: model.query ? STRINGS.list.noMatch : STRINGS.list.empty }));
+        rows.replaceChildren(h('p', { class: 'hp empty', text: removed ? STRINGS.removed.empty : (model.query ? STRINGS.list.noMatch : STRINGS.list.empty) }));
       } else {
         rows.replaceChildren(...entries.map((entry) => h('div', { class: 'row', role: 'listitem' },
-          h('button', { type: 'button', class: 'row-main', onclick: () => actions.openEntry(entry.id) },
+          h('button', { type: 'button', class: 'row-main', onclick: () => actions.openEntry(entry.id, str(entry.title)) },
             h('span', { class: 'row-title', text: str(entry.title) || entry.id }),
-            str(entry.hint) ? h('span', { class: 'hp', text: entry.hint }) : null),
-          h('button', { type: 'button', class: 'btn small', text: STRINGS.list.open, onclick: () => actions.openEntry(entry.id) }))));
+            !str(entry.hint) ? null : (TONES.has(entry.tone) ? tag(entry.hint, entry.tone) : h('span', { class: 'hp', text: entry.hint }))),
+          h('button', { type: 'button', class: 'btn small', text: STRINGS.list.open, onclick: () => actions.openEntry(entry.id, str(entry.title)) }))));
       }
       const page = Number.isInteger(data.page) ? data.page : 1;
       const pages = Number.isInteger(data.pages) ? data.pages : 1;
@@ -77,7 +82,7 @@ const ListView = (() => {
       rows.replaceChildren(h('p', { class: 'hp empty err', text: errorText(code) }));
     }
 
-    return { el, setData, setError, focus: () => filter.focus() };
+    return { el, setData, setError, focus: () => (removed ? el.querySelector('.round') : filter).focus() };
   }
 
   return { render };
