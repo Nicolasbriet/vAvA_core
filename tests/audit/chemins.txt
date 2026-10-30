@@ -1,0 +1,23 @@
+# tests/audit/chemins.txt — cas écrits pour `./scripts/audit-reseau.sh --essai` : chemins fictifs de fichiers d'un
+# module (la règle ne lit que le chemin), chacun suivi de ce que l'audit doit en dire. Fichiers communs des
+# interfaces (T-012) : polices, textures et ornements dans vava_ui seul, données simulées dans web/dev/.
+modules/vava_essai/web/js/devmock.js  -- attendu: BLOQUANT
+modules/vava_essai/web/devmock.js  -- attendu: BLOQUANT
+modules/vava_essai/web/dev/devmock.js  -- attendu: rien
+modules/vava_essai/web/js/app.js  -- attendu: rien
+modules/vava_essai/web/fonts/cinzel.woff2  -- attendu: BLOQUANT
+modules/vava_essai/web/fonts/eb_garamond_sous_ensemble.woff2  -- attendu: BLOQUANT
+modules/vava_essai/web/img/grain.png  -- attendu: BLOQUANT
+modules/vava_essai/web/img/grain.webp  -- attendu: BLOQUANT
+modules/vava_essai/web/img/paper.png  -- attendu: BLOQUANT
+modules/vava_essai/web/img/paper.webp  -- attendu: BLOQUANT
+modules/vava_essai/web/img/frame.svg  -- attendu: BLOQUANT
+modules/vava_essai/web/img/divider.svg  -- attendu: BLOQUANT
+modules/vava_essai/web/img/diamond.svg  -- attendu: BLOQUANT
+modules/vava_essai/web/img/crest.svg  -- attendu: rien
+modules/vava_essai/web/items/pain.svg  -- attendu: rien
+modules/vava_ui/web/fonts/cinzel.woff2  -- attendu: rien
+modules/vava_ui/web/img/grain.webp  -- attendu: rien
+modules/vava_ui/web/img/frame.svg  -- attendu: rien
+modules/vava_exempte/web/fonts/cinzel.woff2  -- attendu: rien
+modules/vava_exempte/web/js/devmock.js  -- attendu: rien

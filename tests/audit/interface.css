@@ -1,0 +1,7 @@
+/* tests/audit/interface.css : cas écrits pour le script d'audit en mode essai (feuille d'une interface) */
+.a { background: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg'/>"); } /* -- attendu: rien */
+.b { background: url("https://exemple.invalid/x.png"); } /* -- attendu: BLOQUANT */
+.c { background: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg'><image href='http://exemple.invalid/y.png'/></svg>"); } /* -- attendu: BLOQUANT */
+@import url("http://exemple.invalid/f.css"); /* -- attendu: BLOQUANT */
+.d { background: var(--ui-grain, none); } /* -- attendu: rien */
+.e { background: url("nui://vava_ui/web/img/grain.webp"); } /* -- attendu: rien */
