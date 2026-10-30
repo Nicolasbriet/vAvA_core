@@ -104,7 +104,8 @@ Toute action est inscrite au journal du module et, avec vava_admin, au Registre 
 
 ## Livre des compétences (client)
 
-Touche `K` (réglable dans Paramètres > Raccourcis > FiveM). Quatre onglets : Compétences (budget, modes ↑ = ↓, barres
+Touche `K` (réglable dans Paramètres > Raccourcis > FiveM ; citée par l'écran de chargement : changer la touche par
+défaut, `keys.open`, oblige à retoucher le conseil de `modules/vava_loading/web/js/strings.js`). Quatre onglets : Compétences (budget, modes ↑ = ↓, barres
 d'XP, pénurie, mentor et apprentis), Mentorat (propositions reçues, maîtres, apprentis, proposer à un joueur proche),
 Savoirs (recettes connues et lignées, apprentissages en cours), Pénurie. Le client n'a aucune donnée propre : la fiche
 est demandée au serveur à chaque ouverture, les évènements ciblés la tiennent à jour. Polices, grain, papier et coins de

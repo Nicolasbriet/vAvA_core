@@ -14,7 +14,7 @@ use_experimental_fxv2_oal 'yes'
 
 name 'vava_loading'
 description "Écran de chargement d'Eldoria"
-version '1.0.0'
+version '1.1.0'
 
 dependency 'vAvA_core'
 

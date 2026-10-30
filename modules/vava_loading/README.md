@@ -2,7 +2,7 @@
 
 Dès qu'il se connecte, le voyageur voit Eldoria s'allumer : le nom du royaume s'embrase lettre à lettre, un paysage de
 nuit s'anime, des paroles du bourg et des conseils défilent, et **six feux de veille** s'allument au rythme **réel** du
-chargement. Quand le dernier feu brûle et que la sélection du personnage est prête, un éclair doré « Le Conseil vous
+chargement. Quand le dernier feu brûle et que la sélection du personnage est prête, un éclair doré « Le royaume vous
 attend » se dissout sur le Registre des âmes, **sans écran noir**.
 
 Ressource **cliente uniquement** : aucun RPC, aucun évènement réseau, aucun state bag, aucune donnée en base. Tout ce
@@ -86,14 +86,18 @@ partagée, celle de l'éclair, est envoyée par le Lua avec le message de passag
 | Musique (aucune piste en 1.0.0 : bouton caché) | `''` | `music.file` |
 | Journal de calibrage à l'écran (**`false` avant fusion**, le test unitaire le vérifie) | `false` | `debug.journal` |
 
-Les textes vus du joueur sont tous dans `web/js/strings.js` (provisoires : ceux de la maquette, remplacés par T-021 en
-ne touchant que ce fichier). Format fixé, vérifié par `tests/spec/loading_screen_spec.lua` : aucun `<`, 6 étapes,
-6 à 40 extraits et 6 à 20 conseils de 240 octets au plus, une chaîne entre apostrophes simples par ligne ; une touche
-s'écrit `[[F1]]` (3 au plus par conseil, 12 octets au plus).
+Les textes vus du joueur sont tous dans `web/js/strings.js` (définitifs depuis 1.1.0, T-021 : 28 extraits du lore,
+15 conseils). Format fixé, vérifié par `tests/spec/loading_screen_spec.lua` : aucun `<`, 6 étapes, 6 à 40 extraits et
+6 à 20 conseils de 240 octets au plus, une chaîne entre apostrophes simples par ligne ; une touche s'écrit `[[F1]]`
+(3 au plus par conseil, 12 octets au plus). Chaque conseil décrit le jeu tel qu'il est codé : une règle qui change
+dans un module (récolte, agriculture, santé, compétences…) fait relire le conseil qui en parle.
 
-**Touches citées** : celles **par défaut** de `vava_codex` (F1), `vava_inventory` (I), `vava_voice` (Z) et `vava_chat`
-(T) ; la page ne peut pas lire les réglages du joueur. Changer une de ces touches par défaut oblige à retoucher
-`strings.js` (décision 12).
+**Touches citées** : celles **par défaut** de `vava_codex` (F1), `vava_inventory` (I), `vava_chat` (T),
+`vava_skills` (K), `vava_health` (G, relever) et `vava_gathering` (O) ; la page ne peut pas lire les réglages du
+joueur. Changer une de ces touches par défaut oblige à retoucher `strings.js` (décision 12, rappel dans les README de
+ces modules). Seules sont citées des touches à la même place en QWERTY et en AZERTY (FiveM nomme les touches d'après
+le QWERTY) : la touche de la voix (`Z`, le W d'un clavier AZERTY) et les chiffres de la ceinture ne le sont pas, le
+conseil renvoie au Codex, qui montre la touche réellement liée.
 
 Toute retouche d'un fichier livré le fait retélécharger à chaque joueur : retouches rares et groupées.
 
@@ -110,6 +114,9 @@ page fait retélécharger toute la ressource (≈ 234 Ko) à chaque joueur : une
 | **Total de la page sans musique** | **≈ 222 Ko** | **300 Ko** (700 Ko avec une piste) — test unitaire |
 | Avec le manifeste et le client Lua (téléchargé par chaque joueur) | ≈ 234 Ko | |
 | Dossier entier (README, licences, `web/dev/`, Lua) | ≈ 291 Ko | **1,5 Mo** — `scripts/audit-reseau.sh`, BLOQUANT |
+
+En 1.1.0 (textes définitifs, T-021), `web/js/strings.js` passe de 4,7 à 8,6 Ko : environ 4 Ko de plus pour chaque
+joueur, une seule fois.
 
 Aucune image, aucune vidéo, aucune ressource externe : le paysage est peint par le code, le grain est un petit SVG en
 `data:`. Les licences (`web/fonts/OFL_*.txt`) et `web/dev/` restent dans le dépôt sans être livrés. Une mise à jour des

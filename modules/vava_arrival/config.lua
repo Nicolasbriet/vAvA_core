@@ -5,7 +5,8 @@
            du Conseil, débit de l'accusé, rétention du journal, textes. Lue par le client et le serveur.
     Le point d'arrivée n'est PAS ici : c'est `spawn.defaultPoint` de config/server.lua (core), où le core fait déjà
     apparaître tout personnage sans position enregistrée, donc tout nouveau personnage (une seule source).
-    Les textes sont provisoires : T-021 et le gardien du lore les réécriront.
+    Les textes ont été relus avec ceux de l'écran de chargement (T-021) : `messages.kit` suit `kit.items`,
+    `messages.codexHint` cite la touche par défaut de vava_codex (F1).
     Dépendances : shared/constants.lua
 ]]
 
