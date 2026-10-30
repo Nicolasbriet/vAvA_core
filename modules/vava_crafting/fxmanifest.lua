@@ -6,7 +6,8 @@
            (qualité, solidité, créateur figé, poinçon, baptême d'un chef-d'œuvre, histoire), réparation qui marque
            l'objet, leçons données en réalisant une recette transmise devant un élève, commandes du Conseil. Le serveur
            décide de tout ; le client crée les props des stations, montre l'invite et le menu, joue le geste.
-    Dépendances : vAvA_core ≥ 0.6.0, vava_inventory ≥ 1.4.0 (échange atomique, mains, métadonnées), vava_skills ≥ 1.0.0
+    Dépendances : vAvA_core ≥ 0.6.0, vava_ui ≥ 1.0.0 (polices, grain, papier et coins de la page, par
+                  nui://vava_ui/…), vava_inventory ≥ 1.4.0 (échange atomique, mains, métadonnées), vava_skills ≥ 1.0.0
                   (recettes, XP, leçons), vava_gathering ≥ 1.0.0 (matières et outils de base) ; facultatifs : vava_hud,
                   vava_admin (droit metiers), vava_chat, vava_health (aucun artisanat à terre)
 ]]
@@ -18,9 +19,10 @@ use_experimental_fxv2_oal 'yes'
 
 name 'vava_crafting'
 description 'Artisanat vAvA : stations, recettes, qualité, objets signés, réparation, leçons'
-version '1.3.2'
+version '1.4.0'
 
 dependency 'vAvA_core'
+dependency 'vava_ui'
 dependency 'vava_inventory'
 dependency 'vava_skills'
 dependency 'vava_gathering'
@@ -29,13 +31,12 @@ vava_migration 'sql/0001_crafting.sql'
 
 ui_page 'web/index.html'
 
+-- polices, grain, papier et coins : vava_ui ; les données simulées hors jeu (dossier dev/) ne sont jamais livrées
 files {
     'web/index.html',
     'web/css/*.css',
     'web/js/*.js',
-    'web/img/*',
     'web/items/*.svg',
-    'web/fonts/*.woff2',
 }
 
 -- Ordre explicite : chaque fichier ne dépend que de ceux listés avant lui.

@@ -1,9 +1,11 @@
 'use strict';
 /*
- * web/js/devmock.js
+ * web/dev/devmock.js
  * Rôle : données simulées quand la page est ouverte dans un navigateur (hors FiveM), pour travailler le rendu sans
  *        lancer le jeu. Inactif en jeu. Paramètres d'URL : ?view=prompt (invite), ?view=menu (menu de la forge ;
  *        &tab=reparation ou &tab=poincon ouvre l'onglet), ?view=name (boîte de baptême).
+ *        Jamais livré (absent des `files`), jamais chargé en jeu : la ligne hors jeu de index.html ne l'insère
+ *        que hors FiveM.
  */
 
 const DevMock = (() => {

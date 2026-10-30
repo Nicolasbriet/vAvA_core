@@ -7,9 +7,14 @@ Les outils, armes, armures, bijoux, objets magiques et grandes potions sont des 
 créateur figé, poinçon, baptême d'un chef-d'œuvre, histoire des réparations. Réaliser une recette transmise devant un
 élève lui vaut une leçon. Le serveur décide de tout et demande l'XP à `vava_skills`.
 
-Ordre de démarrage : après `vAvA_core` (≥ 0.6.0), `vava_inventory` (≥ 1.4.0), `vava_skills` (≥ 1.0.0) et
+Ordre de démarrage : après `vAvA_core` (≥ 0.6.0), `vava_ui` (≥ 1.0.0, polices, grain, papier et coins des
+interfaces ; à ne jamais arrêter sur un serveur ouvert), `vava_inventory` (≥ 1.4.0), `vava_skills` (≥ 1.0.0) et
 `vava_gathering` (≥ 1.0.0 : matières et outils de base). Facultatifs : `vava_hud`, `vava_admin` (droit `metiers`),
 `vava_chat`, `vava_health` (aucun artisanat à terre).
+
+Rendu hors jeu : `web/index.html?view=menu` (ou `menu&tab=reparation`, `menu&tab=poincon`, `prompt`, `name`) dans un
+navigateur, depuis le dépôt (option `--allow-file-access-from-files` pour les polices), avec les données simulées de
+`web/dev/devmock.js` (jamais livré).
 
 ## Règles (config.lua)
 
