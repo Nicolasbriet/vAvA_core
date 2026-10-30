@@ -13,11 +13,17 @@ complet : `README.md` à la racine du dépôt).
 ## Installation
 
 1. Placer le dossier dans `resources/[vava]/vava_chancellerie` (avec la Chancellerie : il est installé avec vAvA).
-2. `ensure vava_chancellerie` en dernier. Aucune table, aucun réglage à poser à la main : la Chancellerie passe la clé
-   du pont et sa propre adresse à FXServer sur la ligne de commande, à chaque lancement (`+set
-   vava_chancellerie_token`, `+set vava_chancellerie_url`), jamais dans le `server.cfg`.
+2. `ensure vava_chancellerie` en dernier. Aucun réglage à poser à la main ; la table `vava_chancellerie_links` se crée
+   seule (migration `sql/0001_chancellerie.sql`, 1.5.0). La Chancellerie pose son adresse sur la ligne de commande de
+   FXServer (`+set vava_chancellerie_url`, pas un secret) ; la **clé du pont**, tirée à chaque lancement, n'y passe
+   plus (1.5.0) : le pont la demande dans la console et la Chancellerie la lui donne par l'entrée de FXServer (voir
+   « Sécurité »). Il faut la Chancellerie 1.6.0 ou plus récente : une plus ancienne passe encore la clé en `+set
+   vava_chancellerie_token`, que le pont ignore (console : « clé du pont passée sur la ligne de commande … : ignorée »),
+   et le pont reste fermé.
 3. Serveur lancé sans la Chancellerie (txAdmin, à la main) : le pont reste fermé, la liste blanche n'est pas vérifiée ;
    la console le dit au démarrage (« serveur lancé sans la Chancellerie : le pont reste fermé »).
+4. Après la mise à jour en 1.5.0 : chaque compte du panneau déjà relié à un joueur est **à relier une fois de plus**
+   (page Comptes, puis `chancellerie <code>` en jeu) pour que son rang s'applique encore en jeu (voir « Sécurité »).
 
 | Dépendance | Rôle | Sans elle |
 | --- | --- | --- |
@@ -31,8 +37,10 @@ complet : `README.md` à la racine du dépôt).
 
 | Règle | Défaut | Clé |
 | --- | --- | --- |
-| Réglages posés au lancement | `vava_chancellerie_token` (clé), `vava_chancellerie_url` (adresse de la Chancellerie) | `convars` |
-| Clé minimale | 32 signes ; plus courte, le pont reste fermé | `tokenMin` |
+| Réglage posé au lancement | `vava_chancellerie_url` (adresse de la Chancellerie ; présent : serveur lancé par elle) ; `vava_chancellerie_token`, ancienne clé, ignorée et signalée | `convars` |
+| Clé minimale | 32 signes hexadécimaux (128 au plus) ; hors de ces bornes, refusée | `tokenMin`, `key.max` |
+| Demande de la clé | « en attente de la clé de la Chancellerie (vava_chancellerie:cle?) » dans la console, toutes les 5 s pendant 2 min au plus ; une clé arrivée plus tard ouvre encore le pont | `key` |
+| Comptes vus reliés | une liaison en cours est attendue 10 s au plus avant de refuser un rang | `links.waitMs` |
 | Évènements vers la Chancellerie | `/api/bridge/event` ; perdus si elle est fermée, signalés une fois par minute au plus | `eventPath`, `pushWarnEveryMs` |
 | Corps de requête | 64 Ko au plus | `bodyMax` |
 | Caméras | droit `watch` pour regarder ; la vue en grand passe par la demande `watchScreen` du Registre | `cameras` |
@@ -64,7 +72,12 @@ complet : `README.md` à la racine du dépôt).
 - **Liaison d'un compte du panneau** : le joueur tape en jeu (console `F8`) `chancellerie 482913`, avec le code affiché
   par la page Comptes ; le pont envoie à la Chancellerie le code, la license, les identifiants `fivem:` et `discord:`
   et le numéro de compte vAvA du joueur ; elle relie le compte et applique son rang du Conseil en jeu. Le joueur lit le
-  résultat (relié, code inconnu, trop d'essais, Chancellerie injoignable).
+  résultat (relié, code inconnu, trop d'essais, Chancellerie injoignable). Une liaison confirmée par la réponse de la
+  Chancellerie fait entrer le compte de jeu dans `vava_chancellerie_links` (1.5.0).
+- **Rangs des comptes reliés** (`/staff/sync`) : appliqués par le Registre (`webSyncStaff`), mais un rang n'est **donné**
+  qu'à un compte de `vava_chancellerie_links` (refus `not_linked_in_game`, une ligne dans la console) ; le retirer
+  reste toujours permis. Le panneau applique le rang pendant qu'il répond à la liaison : la liaison en cours pour ce
+  compte est attendue (`links.waitMs`).
 - **Liste blanche Discord** : à la connexion d'un joueur (hook `core:player:connecting`, avant toute création de
   données), le pont demande à la Chancellerie s'il peut entrer et lui montre sa réponse. Sans réponse en 8 s : refusé si
   la liste blanche était active à la dernière réponse, accepté sinon.
@@ -73,6 +86,17 @@ complet : `README.md` à la racine du dépôt).
 
 - Le port du jeu est public (et relayé par Cfx.re) : la machine locale **et** la clé du lancement sont exigées ; la clé
   n'est jamais écrite dans le `server.cfg` et la Chancellerie la masque dans la console.
+- **La clé ne passe pas sur la ligne de commande** (1.5.0) : celle d'un processus se lit sans droit particulier sur la
+  machine (`ps`, `/proc/<pid>/cmdline`, Gestionnaire des tâches). Au setup, le pont déclare la commande
+  `vava_chancellerie_cle` (console seulement : lancée par un joueur, elle est ignorée), puis écrit
+  `vava_chancellerie:cle?` dans la console ; la Chancellerie, qui lit cette console, répond sur l'entrée de FXServer
+  par `vava_chancellerie_cle <clé>`. Ni convar (qu'une autre ressource lirait par `GetConvar`) ni fichier : la clé ne
+  vit qu'en mémoire, la première reçue est gardée (une autre est refusée et signalée), et aucun message ne l'affiche.
+  `restart vava_chancellerie` : le pont la redemande et la Chancellerie la redonne.
+- **Défense en profondeur** : qui volerait la clé pourrait parler au pont au nom de n'importe quel rang (le panneau en est
+  la source), mais ne pourrait pas nommer Souverain un compte de son choix par `/staff/sync` : seuls les comptes que le
+  pont a vus reliés en jeu reçoivent un rang (un code juste tapé par le joueur et confirmé par la Chancellerie en
+  réponse au pont lui-même ; la clé n'y suffit pas).
 - Le pont ne décide de rien : chaque demande est revérifiée par le module qui l'exécute (droit du rang, cible, schéma),
   et journalisée par le Registre. Les exports réservés au pont (`vava_admin:web*`, `vava_voice:webUpdateZone`,
   `webDeleteZone`, `vava_cameras:web*`, `vava_time:web*`) refusent toute autre ressource appelante.
@@ -84,10 +108,12 @@ complet : `README.md` à la racine du dépôt).
 ```
 vava_chancellerie/
 ├── fxmanifest.lua · config.lua
-├── shared/   constants.lua (modules reliés, hooks)
-└── server/   core · auth (machine locale, clé) · push (évènements vers la Chancellerie) · link (liaison d'un compte)
-              whitelist (liste blanche) · routes (demandes du panneau) · time (ciel et heure) · http (écoute)
-              commands · main
+├── shared/   constants.lua (modules reliés, hooks, protocole de la clé) · rules.lua (forme de la clé, rangs permis :
+│             logique pure, tests/spec/chancellerie_rules_spec.lua, chargée côté serveur seulement)
+├── server/   core · auth (machine locale, clé demandée à la console) · push (évènements vers la Chancellerie)
+│             links (comptes vus reliés en jeu) · link (liaison d'un compte) · whitelist (liste blanche)
+│             routes (demandes du panneau) · time (ciel et heure) · http (écoute) · commands · main
+└── sql/      0001_chancellerie.sql (vava_chancellerie_links)
 ```
 
 ## À vérifier en jeu
@@ -107,3 +133,4 @@ Avec la Chancellerie lancée (elle démarre FXServer) et un compte du panneau qu
 7. FXServer lancé sans la Chancellerie : le pont reste fermé (console), le jeu marche normalement.
 8. Ciel et heure : régler l'heure et imposer un ciel depuis la page Ciel et heure ; les joueurs le voient, le Journal
    du Conseil l'inscrit (voir `docs/tests/temps.md`, section 6).
+9. Clé du pont et rangs des comptes reliés (1.5.0) : procédure complète dans `docs/tests/chancellerie.md`.

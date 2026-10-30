@@ -28,6 +28,8 @@ const FIVEM_PATTERN = /^fivem:\d{1,12}$/;
 const DISCORD_PATTERN = /^discord:(\d{17,20})$/;
 const PLAYER_MAX = 64;
 const ACCOUNT_ID_MAX = 0xffffffff;
+// refus du pont lisibles au journal (le pont ne donne un rang qu'à un joueur qu'il a vu relié en jeu par un code)
+const SYNC_ERRORS = { not_linked_in_game: 'joueur jamais relié en jeu par un code : à relier de nouveau' };
 
 /** @type {Map<string, { name: string, expiresAt: number }>} code → compte */
 const pending = new Map();
@@ -72,7 +74,7 @@ async function apply(members, actor) {
   }
   results.forEach((entry, index) => {
     const member = members[index];
-    if (!entry.ok) journal.record(actor || journal.SYSTEM, 'rank_sync_failed', { compte: member.label, erreur: String(entry.error) });
+    if (!entry.ok) journal.record(actor || journal.SYSTEM, 'rank_sync_failed', { compte: member.label, erreur: Object.hasOwn(SYNC_ERRORS, entry.error) ? SYNC_ERRORS[entry.error] : String(entry.error) });
     else if (entry.changed) journal.record(actor || journal.SYSTEM, 'rank_synced', { compte: member.label, jeu: `compte n° ${member.accountId}`, rang: member.rank || 'aucun' });
   });
 }

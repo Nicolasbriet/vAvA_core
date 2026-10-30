@@ -7,11 +7,25 @@
 VavaBridge.config = {
     coreVersion = '0.5.0',
 
-    -- Réglages posés par la Chancellerie au lancement de FXServer (+set sur la ligne de commande, jamais dans le
-    -- server.cfg) : clé partagée, tirée à chaque lancement, et adresse de la Chancellerie pour la prévenir.
-    convars = { token = 'vava_chancellerie_token', url = 'vava_chancellerie_url' },
-    -- longueur minimale de la clé : plus courte, le pont reste fermé
+    -- Réglage posé par la Chancellerie au lancement de FXServer (+set sur la ligne de commande, jamais dans le
+    -- server.cfg) : son adresse, pour la prévenir ; présent, il dit aussi que le serveur a été lancé par elle.
+    -- `legacyToken` : ancienne façon de passer la clé (Chancellerie d'avant 1.6.0), ignorée et signalée.
+    convars = { url = 'vava_chancellerie_url', legacyToken = 'vava_chancellerie_token' },
+    -- longueur minimale de la clé : plus courte, elle est refusée et le pont reste fermé
     tokenMin = 32,
+    -- Clé du pont, tirée à chaque lancement : jamais sur la ligne de commande (lisible par tout utilisateur de la
+    -- machine) ni dans une convar (lisible par toute ressource). Le pont la demande dans la console (`ask`, %s = la
+    -- marque que la Chancellerie guette) toutes les `askEveryMs`, pendant `waitMs` au plus ; elle arrive par la console
+    -- du serveur et ne vit qu'en mémoire. `max` : longueur au plus (la Chancellerie en envoie 64 signes).
+    key = {
+        ask = 'en attente de la clé de la Chancellerie (%s)',
+        askEveryMs = 5000,
+        waitMs = 120000,
+        max = 128,
+    },
+    -- Comptes de jeu vus reliés en jeu : seuls ceux-là reçoivent un rang du panneau. Une liaison en cours (réponse de
+    -- la Chancellerie pas encore arrivée) est attendue au plus ce délai (ms) avant de trancher.
+    links = { waitMs = 10000 },
     -- adresse de la Chancellerie qui reçoit les évènements
     eventPath = '/api/bridge/event',
     -- corps de requête accepté (octets)

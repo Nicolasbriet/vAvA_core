@@ -58,7 +58,9 @@ end
 ---@return boolean ok
 ---@return string|nil err
 function whitelist.start()
-    if not auth.enabled() then return true end
+    -- lancé par la Chancellerie : branchée même si la clé n'est pas encore arrivée (sans elle, la réponse manque et
+    -- la règle « sans réponse » s'applique)
+    if not auth.expected() then return true end
     local id, err = core.hooks.before('core:player:connecting', check)
     if not id then return false, err end
     return true

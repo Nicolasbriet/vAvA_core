@@ -1,29 +1,46 @@
 --[[
     vava_chancellerie/server/auth.lua
     Rôle : qui peut parler au pont. L'adresse HTTP du serveur de jeu est publique (port du jeu, relais de Cfx.re) :
-           seules les requêtes venues de la machine elle-même, portant la clé posée par la Chancellerie à ce lancement,
-           sont acceptées. Sans clé (serveur lancé sans la Chancellerie), le pont reste fermé.
-    Dépendances : config.lua
+           seules les requêtes venues de la machine elle-même, portant la clé de la Chancellerie pour ce lancement,
+           sont acceptées. La clé ne passe ni par la ligne de commande de FXServer (lisible par tout utilisateur de la
+           machine) ni par une convar (lisible par toute ressource) : le pont la demande dans la console du serveur, que
+           la Chancellerie lit, et elle la lui donne par l'entrée de FXServer avec une commande que seule la console
+           peut lancer ; la clé ne vit qu'en mémoire, la première reçue est gardée. Sans Chancellerie (aucune adresse
+           posée au lancement), le pont ne demande rien et reste fermé.
+    Dépendances : config.lua, shared/rules.lua
 ]]
 
-local type, select, byte, pairs, lower = type, select, string.byte, pairs, string.lower
-local GetConvar = GetConvar
+local type, select, byte, pairs, lower, tonumber, print = type, select, string.byte, pairs, string.lower, tonumber, print
+local GetConvar, GetGameTimer, SetTimeout, RegisterCommand = GetConvar, GetGameTimer, SetTimeout, RegisterCommand
 
 local cfg = VavaBridge.config
+local rules = VavaBridge.rules
 local HEADER = 'x-vava-token'
 local LOOPBACK = { ['127.0.0.1'] = true, ['::1'] = true, ['::ffff:127.0.0.1'] = true }
+local CONSOLE = 0
 
 local auth = {}
 VavaBridge.auth = auth
 
+---@type string|nil  clé de ce lancement : seulement en mémoire, jamais écrite ni affichée
+local key = nil
+---@type function|nil  à appeler dès que la clé arrive (pont prêt : la Chancellerie est prévenue)
+local onKey = nil
+
 ---@return string
 function auth.token()
-    return GetConvar(cfg.convars.token, '')
+    return key or ''
 end
 
 ---@return boolean
 function auth.enabled()
-    return #auth.token() >= cfg.tokenMin
+    return key ~= nil
+end
+
+--- Serveur lancé par la Chancellerie ? Elle pose son adresse sur la ligne de commande ; la clé arrive ensuite.
+---@return boolean
+function auth.expected()
+    return GetConvar(cfg.convars.url, '') ~= ''
 end
 
 --- Adresse sans son port : « 127.0.0.1:51234 » → « 127.0.0.1 », « [::1]:51234 » → « ::1 ».
@@ -60,8 +77,8 @@ end
 ---@return string|nil
 local function header(headers, name)
     if type(headers) ~= 'table' then return nil end
-    for key, value in pairs(headers) do
-        if type(key) == 'string' and lower(key) == name then return value end
+    for headerName, value in pairs(headers) do
+        if type(headerName) == 'string' and lower(headerName) == name then return value end
     end
     return nil
 end
@@ -70,8 +87,63 @@ end
 ---@param request table  requête de SetHttpHandler
 ---@return boolean
 function auth.check(request)
-    if not auth.enabled() or not auth.isLoopback(request.address) then return false end
-    return same(header(request.headers, HEADER), auth.token())
+    if not key or not auth.isLoopback(request.address) then return false end
+    return same(header(request.headers, HEADER), key)
+end
+
+--- Clé reçue par la commande de la console. Refus : `console_only` (lancée par un joueur), `not_expected` (serveur
+--- lancé sans la Chancellerie), `already` (la même, déjà reçue), `conflict` (une autre : la première est gardée),
+--- `invalid` (pas une clé). La clé n'apparaît dans aucun message.
+---@param src integer  0 : la console du serveur
+---@param value any
+---@return boolean ok
+---@return string|nil err
+function auth.receive(src, value)
+    if src ~= CONSOLE then return false, 'console_only' end
+    if not auth.expected() then return false, 'not_expected' end
+    if key then return false, same(value, key) and 'already' or 'conflict' end
+    if not rules.validKey(value, cfg.tokenMin, cfg.key.max) then return false, 'invalid' end
+    key = value
+    local callback = onKey
+    onKey = nil
+    if callback then callback() end
+    return true
+end
+
+--- Déclare la commande par laquelle la Chancellerie donne la clé. Appelé pendant le setup, avant toute demande.
+function auth.listen()
+    RegisterCommand(VavaBridge.KEY_COMMAND, function(source, args)
+        local ok, code = auth.receive(tonumber(source) or -1, type(args) == 'table' and args[1] or nil)
+        if ok then
+            VavaBridge.log.info('clé de la Chancellerie reçue : pont ouvert')
+        elseif code == 'conflict' then
+            VavaBridge.log.warn('une autre clé du pont a été refusée : la première reçue est gardée')
+        elseif code == 'invalid' or code == 'not_expected' then
+            VavaBridge.log.warn('clé du pont refusée (%s)', code)
+        end
+    end, true)
+end
+
+--- Demande la clé à la Chancellerie (marque écrite dans la console, répétée tant qu'elle n'arrive pas, pendant
+--- `key.waitMs` au plus), puis appelle `callback` dès qu'elle arrive, même après ce délai.
+---@param callback fun()
+function auth.await(callback)
+    if key then
+        callback()
+        return
+    end
+    onKey = callback
+    local started = GetGameTimer()
+    local function ask()
+        if key then return end
+        if GetGameTimer() - started >= cfg.key.waitMs then
+            VavaBridge.log.warn('la Chancellerie n\'a pas donné la clé du pont : pont fermé (est-elle à jour ?)')
+            return
+        end
+        print(cfg.key.ask:format(VavaBridge.KEY_ASK))
+        SetTimeout(cfg.key.askEveryMs, ask)
+    end
+    ask()
 end
 
 auth.HEADER = HEADER

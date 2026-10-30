@@ -156,7 +156,7 @@ Corrections issues de l'audit T-010 (30 octobre 2026), à prendre avant le reste
   versions montées.
 
 ### T-025 — Chancellerie : clé du pont hors de la ligne de commande
-- Agent : vava-dev-lua (cette tâche autorise à toucher `chancellerie/`) · Dépend de : — · Statut : à faire
+- Agent : vava-dev-lua (cette tâche autorise à toucher `chancellerie/`) · Dépend de : — · Statut : en cours
 - **IMPORTANT** (`securite-vava_chancellerie.md`) : la clé du pont est passée à FXServer par
   `+set vava_chancellerie_token …` (`chancellerie/lib/bridge.js:30-34`, `lib/process.js:205`, lue par
   `modules/vava_chancellerie/server/auth.lua:20-22`) : lisible par tout utilisateur de la machine (`ps`,

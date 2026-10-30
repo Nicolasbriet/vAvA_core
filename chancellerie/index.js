@@ -143,13 +143,20 @@ async function main() {
     return;
   }
   config.ensureData();
-  // la clé du pont et le jeton de players.json partent avec FXServer à chaque lancement, et restent masqués dans sa console ;
-  // le server.cfg est complété juste avant, s'il lui manque un réglage exigé
+  // l'adresse de la Chancellerie et le jeton de players.json partent avec FXServer à chaque lancement ; la clé du pont,
+  // tirée au même moment, lui est donnée par son entrée quand le pont la demande dans la console, jamais sur la ligne de
+  // commande ; clé et jeton restent masqués dans la console. Le server.cfg est complété juste avant, s'il lui manque un
+  // réglage exigé
   const server = new ServerProcess({
     launchArgs: () => [...bridge.launchArgs(), ...status.launchArgs()],
     secrets: () => [...bridge.secrets(), ...status.secrets()],
     prepare: completeCfg,
   });
+  server.on('line', (line) => {
+    const answer = bridge.keyAnswer(line);
+    if (answer) server.write(answer);
+  });
+  server.on('exit', () => bridge.reset());
   events.attach(server);
   if (await server.cleanupOrphan()) say(`${colors.dim}  Un FXServer resté ouvert après un arrêt brutal a été arrêté.${colors.reset}`);
 
