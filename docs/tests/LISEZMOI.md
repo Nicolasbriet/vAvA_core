@@ -18,7 +18,7 @@ main. Chaque procédure dit quoi faire et ce qui doit se passer ; les tests à d
 | [codex.md](codex.md) | Toutes les commandes et touches | `vava_codex` |
 | [metiers.md](metiers.md) | Compétences, récolte, artisanat, agriculture | `vava_skills`, `vava_gathering`, `vava_crafting`, `vava_farming` |
 | [magie.md](magie.md) | Les onze sorts, états, zones, combinaisons | `vava_magic` |
-| [temps.md](temps.md) | Heure du royaume, saisons, météo, Conseil en jeu et depuis la Chancellerie, effets sur les métiers | `vava_time`, `vava_farming`, `vava_gathering`, `vava_chancellerie` |
+| [temps.md](temps.md) | Heure du royaume, saisons de quatorze jours, ciel, nuits de gel, Conseil en jeu et depuis la Chancellerie, effets sur les métiers | `vava_time`, `vava_farming`, `vava_gathering`, `vava_chancellerie` |
 
 Ordre conseillé : personnage, inventaire, besoins, santé, chat, voix, registre, Codex, métiers, temps, magie. Chaque
 procédure s'appuie sur ce que les précédentes ont validé.

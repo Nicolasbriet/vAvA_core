@@ -18,7 +18,7 @@ use_experimental_fxv2_oal 'yes'
 
 name 'vava_time'
 description 'Temps du royaume vAvA : heure de Paris, saisons, météo, ciel et heure du Conseil'
-version '1.0.0'
+version '1.1.0'
 
 dependency 'vAvA_core'
 

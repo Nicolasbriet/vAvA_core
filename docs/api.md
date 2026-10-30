@@ -951,7 +951,7 @@ Le gibier d'une future chasse sera créé par son module : la population du jeu 
 
 ### `vava_time`
 
-L'heure, les saisons et le ciel du royaume (1.0.0), les mêmes pour tous les joueurs. Demande le core 0.7.0 (registre des
+L'heure, les saisons et le ciel du royaume (1.1.0), les mêmes pour tous les joueurs. Demande le core 0.7.0 (registre des
 commandes) ; facultatifs : `vava_admin` (droit `tools`, outil du Registre, journal ; sans lui, personne ne règle rien),
 `vava_hud` (notifications), `vava_chancellerie` ≥ 1.4.0 (page Ciel et heure). Ordre de démarrage : juste après
 `vava_world`. Détail, config et tests : `modules/vava_time/README.md` et `docs/tests/temps.md`.
@@ -959,15 +959,25 @@ commandes) ; facultatifs : `vava_admin` (droit `tools`, outil du Registre, journ
 - **Heure** : celle de Paris (heure d'été du dernier dimanche de mars au dernier dimanche d'octobre, à 01:00 UTC),
   calculée depuis l'heure UTC du serveur, au rythme réel (une minute du jeu = une minute). Le Conseil la décale (± 12 h),
   la met à une heure voulue, la fige, la laisse reprendre (depuis l'heure figée) ou rend l'heure réelle.
-- **Calendrier** : vrai calendrier (printemps 20 mars, été 21 juin, automne 22 septembre, hiver 21 décembre, heure de
-  Paris ; l'an 1 commence au printemps 2026) ou cycle de `calendar.cycle.seasonDays` jours réels par saison. La date et
-  la saison suivent l'heure réelle, pas le décalage du Conseil. `/date` la donne en mots du jeu.
-- **Ciel** : cycle pondéré par saison (successeurs plausibles, durées de 25 à 50 min, transition de 90 s) ; aucune neige
-  hors de l'hiver ; « neige au sol » jamais tirée par le cycle. Le Conseil impose un ciel (transition de 20 s ; il dure le
-  temps d'un ciel puis le cycle reprend, même hors saison), le fige, ou rend la main au cycle.
+- **Calendrier** (1.1.0) : par défaut, cycle de 14 jours réels par saison (`calendar.cycle`), ancré à minuit (Paris) du
+  26 octobre 2026, printemps de l'an 1 ; l'an change à chaque nouveau printemps (une année du royaume : huit semaines).
+  Au choix, vrai calendrier (`calendar.mode = 'real'` : printemps 20 mars, été 21 juin, automne 22 septembre, hiver
+  21 décembre, heure de Paris). La date et la saison suivent l'heure réelle, pas le décalage du Conseil. L'ère et le
+  format de date ne sont écrits qu'une fois, dans la config (`messages.year` : « an %d du royaume », `messages.dateText`).
+  `/date` la donne en mots du jeu ; chaque début de saison est annoncé chez chaque joueur en jeu, lu sur
+  `vava_time:calendar` (aucun envoi de plus).
+- **Ciel** : cours pondéré par saison (successeurs plausibles, durées de 25 à 50 min, transition de 90 s) ; aucune neige
+  hors de l'hiver ; « neige au sol » jamais tirée. Le Conseil impose un ciel (transition de 20 s ; il tient le temps d'un
+  ciel puis reprend son cours, même hors saison), le fige, ou le rend à son cours.
+- **Nuits de gel** (1.1.0, décision à confirmer) : l'hiver, chaque nuit gèle avec la probabilité de `frost.seasons`
+  (0,4), tirée une fois par jour. Au soir (`frost.warnHour`, 17 h du royaume) le hook `vava_time:frostWarning`, à la
+  tombée de la nuit (`frost.hour`, 21 h) le hook `vava_time:frost` ; rien n'est envoyé aux joueurs par `vava_time`
+  (l'agriculture prévient elle-même ses cultivateurs). Ce qui est déjà passé au démarrage du module ne se rejoue pas.
 - **Conseil** : outil « Ciel et heure » (registre `vava_admin:tools`, clé `vava_time:ciel`, droit `tools`) et `/ciel`
-  (`heure`, `decaler`, `figer`, `reprendre`, `reelle`, `meteo`, `garder`, `cycle`). Chaque décision est revérifiée,
-  publiée, écrite en base (`vava_time_state`) et inscrite au journal du Registre si elle change quelque chose.
+  (sous-commandes nommées dans `commands.actions` : `heure`, `decaler`, `figer`, `reprendre`, `reelle`, `imposer`,
+  `garder`, `rendre`). Chaque décision est revérifiée, soumise au **débit commun** (`council.rate` : 6 coup sur coup,
+  puis une toutes les deux secondes, jeu et Chancellerie confondus, code `rate_limited`), publiée, écrite en base
+  (`vava_time_state`) et inscrite au journal du Registre si elle change quelque chose.
 
 **GlobalState** (petit, rare, utile à tous ; retiré à l'arrêt du module) :
 
@@ -981,19 +991,23 @@ commandes) ; facultatifs : `vava_admin` (droit `tools`, outil du Registre, journ
 `vava_time:open` (`{}` → vue de l'outil ; droit `tools` ; 5, 1/s), `vava_time:clock` (`action` ∈ `set`, `shift`,
 `freeze`, `resume`, `real` ; `value` entier −1440…1440 : minute du jour pour `set`, minutes à ajouter pour `shift`
 (± 720, jamais 0), sinon 0 ; 6, 0,5/s), `vava_time:weather` (`action` ∈ `impose`, `freeze`, `release` ; ciel de la
-config, pour `impose` ; `hold` booléen ; 6, 0,5/s). Codes : `forbidden`, `invalid_value`, `unknown_weather`, `not_ready`.
+config, pour `impose` ; `hold` booléen ; 6, 0,5/s). Codes : `forbidden`, `invalid_value`, `unknown_weather`,
+`not_ready`, `rate_limited` (débit commun des décisions). Si le module serveur n'est pas prêt, le client relance `sync`
+quatre fois (après 2, 5, 10 et 30 s) puis attend que `vava_time:clock` soit publié pour redemander.
 
 | Export serveur | Retour |
 |---|---|
 | `getSeason()` | `printemps`, `ete`, `automne`, `hiver`, ou `nil` avant le démarrage — lu par `vava_farming` et `vava_gathering` |
-| `getCalendar()` | `{ season, label, name, day, year, text }` |
+| `getCalendar()` | `{ season, label, name, day, year, yearText, text, length }` — `yearText` et `text` écrits par la config ; `length` : jours d'une saison en mode cycle (1.1.0) |
 | `getClock()` | `{ hour, minute, seconds, frozen, shift }` |
+| `getFrost()` | `{ tonight, warned, struck, warnHour, hour }` — la nuit du jour (1.1.0) |
 | `getWeather()` | `{ id, label, forced, frozen }` |
 | `webState()` | `true, vue` ou `false, code` — pont de la Chancellerie seulement |
 | `webClock(action, minutes)` · `webWeather(action, ciel?, figer?)` | `true, vue, libellé du journal (nil : rien n'a changé), détails` ou `false, code` — pont seulement, mêmes règles que les RPC (droit vérifié par le pont auprès du Registre) |
 
-La vue : `{ clock = { seconds, real, shift, frozen }, calendar = { season, label, name, day, year, text }, weather = { id,
-label, from, fromLabel, fading, forced, frozen, endsIn, inSeason }, weathers = { { id, label, inSeason } }, limits }`.
+La vue : `{ clock = { seconds, real, shift, frozen }, calendar = { season, label, name, day, year, yearText, text,
+length }, frost = { tonight, warned, struck, warnHour, hour }, weather = { id, label, from, fromLabel, fading, forced,
+frozen, endsIn, inSeason }, weathers = { { id, label, inSeason } }, limits }`.
 
 | Export client | Retour |
 |---|---|
@@ -1002,11 +1016,12 @@ label, from, fromLabel, fading, forced, frozen, endsIn, inSeason }, weathers = {
 
 **Hooks** (serveur, `after`) : `vava_time:seasonChanged` (`{ season, previous, day, year }`), `vava_time:dayChanged`
 (`{ season, day, year }`), `vava_time:weatherChanged` (`{ weather, previous, forced, frozen, by }`),
-`vava_time:clockChanged` (`{ shift, frozen, by }`) ; `by` : `cycle`, `council` ou `web`.
+`vava_time:clockChanged` (`{ shift, frozen, by }`) ; `by` : `cycle`, `council` ou `web` ; `vava_time:frostWarning` (au
+soir d'une nuit de gel) et `vava_time:frost` (le gel tombe) : `{ season, day, year, warnHour, hour }` (1.1.0).
 
-Un module lit la saison par son `bridge/server.lua` (appel isolé, saison gardée quelques secondes) et garde ses réglages
-par saison dans sa propre config : `vava_time` absent ou arrêté = aucun effet. Rendu hors jeu de l'outil :
-`web/index.html` (`?frozen=1`, `?forced=1`, `?refused=1`).
+Un module lit la saison par son `bridge/server.lua` (appel isolé, saison gardée quelques secondes), s'abonne aux hooks
+du gel s'il en a l'usage, et garde ses réglages par saison dans sa propre config : `vava_time` absent ou arrêté = aucun
+effet. Rendu hors jeu de l'outil : `web/index.html` (`?frozen=1`, `?forced=1`, `?struck=1`, `?refused=1`).
 
 ### `vava_cameras`
 

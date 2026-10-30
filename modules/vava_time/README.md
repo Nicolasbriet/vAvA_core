@@ -81,7 +81,7 @@ cours », avec l'heure, le décalage, le ciel et s'il est figé. Depuis la Chanc
 | Export serveur | Retour |
 |---|---|
 | `getSeason()` | `printemps`, `ete`, `automne`, `hiver`, ou `nil` avant le démarrage |
-| `getCalendar()` | `{ season, label, name, day, year, text }` |
+| `getCalendar()` | `{ season, label, name, day, year, yearText, text, length }` (`yearText`, `text` : écrits par la config ; `length` : jours d'une saison) |
 | `getClock()` | `{ hour, minute, seconds, frozen, shift }` |
 | `getFrost()` | `{ tonight, warned, struck, warnHour, hour }` : la nuit du jour |
 | `getWeather()` | `{ id, label, forced, frozen }` |
@@ -101,8 +101,8 @@ du gel) : `vava_time` absent ou arrêté = aucun effet. Les réglages par saison
 
 `vava_time_state` : une ligne (`id` = 1) — décalage, seconde figée (−1 : l'heure court), ciel, fin prévue, imposé,
 figé, date d'écriture. Au démarrage, un ciel figé ou pas encore fini est repris sans transition ; un ciel inconnu de la
-config est remplacé par un ciel de la saison. La nuit de gel n'est pas gardée : retirée au démarrage, sans rejouer ce
-qui est déjà passé.
+config est remplacé par un ciel de la saison. La nuit de gel n'est pas gardée : elle est tirée de nouveau au
+démarrage, sans rejouer ce qui est déjà passé dans la journée.
 
 ## Hors jeu
 

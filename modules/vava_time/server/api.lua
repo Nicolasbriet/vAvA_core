@@ -25,12 +25,17 @@ exports('getSeason', function()
     return seasons.current().season
 end)
 
---- Date du royaume : { season, label, name, day, year, text }, ou nil.
+--- Date du royaume : { season, label, name, day, year, yearText, text, length }, ou nil. `yearText` (« an 1 du
+--- royaume ») et `text` sont écrits par la config (messages.year, messages.dateText) : l'ère n'est écrite qu'à un
+--- endroit ; `length` : jours d'une saison en mode cycle (nil au vrai calendrier).
 exports('getCalendar', function()
     if not VavaTime.ready then return nil end
     local date = seasons.current()
     local info = calendar.seasonInfo(date.season)
-    return { season = date.season, label = info.label, name = info.name, day = date.day, year = date.year, text = calendar.dateText(date) }
+    return {
+        season = date.season, label = info.label, name = info.name, day = date.day, year = date.year,
+        yearText = calendar.yearText(date.year), text = calendar.dateText(date), length = calendar.seasonLength(),
+    }
 end)
 
 --- Heure du royaume : { hour, minute, seconds, frozen, shift }, ou nil.
