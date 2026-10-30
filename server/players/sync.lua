@@ -8,16 +8,21 @@
       - private : jamais envoyé.
     Rien ne part pour un personnage qui n'est plus celui du joueur (déchargé, ou joueur parti dont le numéro a pu
     être redonné à un nouveau venu).
+    Envois par core.net, toujours fiables (l'ordre chargement → champs → apparition compte), mesurés et signalés en
+    console au-delà du seuil du latent.
     Dépendances : shared/init.lua, shared/lib/table.lua, shared/core/logger.lua, config/server.lua,
-                  server/players/fields.lua
+                  server/core/net.lua, server/players/fields.lua
 ]]
 
 local pairs, tonumber, type, pcall = pairs, tonumber, type, pcall
 local min = math.min
 local match = string.match
-local TriggerClientEvent, SetTimeout, DoesPlayerExist, Player = TriggerClientEvent, SetTimeout, DoesPlayerExist, Player
+local SetTimeout, DoesPlayerExist, Player = SetTimeout, DoesPlayerExist, Player
 
 local EVENTS = vAvA.EVENTS
+local CORE = vAvA.resourceName
+local net = vAvA.net
+local RELIABLE = net.RELIABLE
 local fields = vAvA.fields
 local tbl = vAvA.lib.table
 local logger = vAvA.logger
@@ -54,7 +59,7 @@ local function flush()
     for src, batch in pairs(batches) do
         local cleared = {}
         for name in pairs(batch.cleared) do cleared[#cleared + 1] = name end
-        TriggerClientEvent(EVENTS.CHARACTER_FIELDS, src, batch.values, cleared)
+        net.dispatch(CORE, EVENTS.CHARACTER_FIELDS, src, RELIABLE, EVENTS.CHARACTER_FIELDS, batch.values, cleared)
     end
 end
 
@@ -230,7 +235,7 @@ function sync.sendCharacter(character)
         local value = fields.get(character, name)
         if value ~= nil then visible[name] = value end
     end)
-    TriggerClientEvent(EVENTS.CHARACTER_LOADED, src, {
+    net.dispatch(CORE, EVENTS.CHARACTER_LOADED, src, RELIABLE, EVENTS.CHARACTER_LOADED, {
         id = character.id, firstName = character.firstName, lastName = character.lastName,
         sex = character.sex, fields = visible,
     })
@@ -272,7 +277,15 @@ function sync.clearCharacter(character)
     fields.forEachPublic(function(name)
         publish(state, src, name, nil)
     end)
-    TriggerClientEvent(EVENTS.CHARACTER_UNLOADED, src, character.id)
+    net.dispatch(CORE, EVENTS.CHARACTER_UNLOADED, src, RELIABLE, EVENTS.CHARACTER_UNLOADED, character.id)
+end
+
+--- Vrai si ce personnage est celui dont son joueur reçoit les données (chargé, ni déchargé ni joueur parti) : les
+--- envois de proximité (core.net) ne visent jamais un joueur parti dont le numéro a pu être redonné.
+---@param character vAvA.Character
+---@return boolean
+function sync.isCurrent(character)
+    return owners[character.source] == character
 end
 
 --- Oublie un joueur parti. À appeler dès son départ, avant le déchargement de son personnage : plus rien ne lui est

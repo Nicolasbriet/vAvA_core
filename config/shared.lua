@@ -32,6 +32,17 @@ vAvA.config.shared = {
         minTimeoutMs = 250,
         maxTimeoutMs = 60000,
         maxPending = 32,        -- appels simultanés en attente de réponse sur un client
+        -- Réponse trop grosse envoyée en latent (core.net) : le serveur prévient avant (octets, débit) et l'attente
+        -- de l'appel est repoussée du temps de transfert plus cette marge, au plus de maxLatentExtendMs. Le serveur
+        -- applique la même règle à ses appels serveur → client partis en latent.
+        latentMarginMs = 3000,
+        maxLatentExtendMs = 30000,
+    },
+
+    -- Essai du réseau lancé depuis la console du serveur (vava_reseau_essai) : au-delà, le client écrit en console F8
+    -- ce qui est arrivé.
+    net = {
+        probeTimeoutMs = 60000,
     },
 
     -- Exécution des ordres d'apparition côté client (la position est toujours décidée par le serveur).

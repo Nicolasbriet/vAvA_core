@@ -103,8 +103,67 @@ vAvA.config.server = {
                                         -- qui ne reviendrait jamais égale coûte au plus une écriture par 10 s
     },
 
+    -- Envois serveur → client (core.net) : mesure de taille, envoi latent des gros messages, compteur par ressource et
+    -- par évènement, commande du Conseil /vava_reseau.
+    net = {
+        mode = 'auto',          -- auto : mesure exacte (une seule sérialisation) si le runtime l'offre, sinon
+                                -- estimation ; estimate : forcer l'estimation (secours si la mesure exacte se conduit
+                                -- mal en jeu)
+        maxBytes = 262144,      -- 256 Ko : au-delà, envoi refusé (too_large) et erreur en console
+        maxArgs = 16,           -- valeurs par envoi
+        maxTargets = 256,       -- joueurs dans une liste de cibles
+        latent = {
+            threshold = 8192,          -- octets : strictement au-delà, envoi latent (option auto)
+            bytesPerSecond = 65536,    -- débit de chaque envoi latent (64 Ko/s, environ 0,5 Mbit/s)
+            maxInFlightBytes = 524288, -- 512 Ko : volume latent encore en route vers un même joueur au-delà duquel un
+                                       -- nouvel envoi latent vers lui est refusé (saturated)
+        },
+        near = {
+            maxRadius = 1000.0,  -- mètres : rayon maximal de sendNear et playersNear
+        },
+        counter = {
+            bucketMs = 5000,        -- largeur d'une case de la fenêtre glissante
+            buckets = 12,           -- cases : fenêtre d'une minute (55 à 60 s)
+            maxKeys = 512,          -- couples (ressource, évènement) suivis ; au-delà, cumul sous (*, <autres>)
+            maxWatched = 4,         -- joueurs suivis évènement par évènement en même temps
+            maxWatchedKeys = 64,    -- évènements distincts par joueur suivi ; au-delà, <autres>
+            watchMs = 300000,       -- durée d'un suivi (5 min)
+            sweepMs = 60000,        -- ménage des clés sans envoi depuis une fenêtre
+        },
+        command = {
+            name = 'vava_reseau',             -- commande du Conseil
+            probeName = 'vava_reseau_essai',  -- commande console d'essai (débit du latent, ordre, proximité)
+            permission = 'tools',             -- droit vava_admin (Sénéchal et au-dessus)
+            ace = 'vava.reseau',              -- repli sans vava_admin
+            adminResource = 'vava_admin',     -- ressource qui tient les droits et le journal
+            cooldownMs = 2000,                -- entre deux commandes d'un même membre
+            lines = 10,                       -- évènements affichés (1 à 20)
+            probeMaxKb = 256,                 -- taille maximale d'un essai
+            messages = {
+                author = 'Réseau',
+                header = 'Dernière minute (%s) : %d envois, %s, dont %d latents.',
+                modeExact = 'mesure exacte',
+                modeEstimate = 'estimation',
+                line = '%d. %s · %s : %d envois, %s, le plus gros %s%s',
+                lineLatent = ', %d latents',
+                empty = 'Aucun envoi compté dans la dernière minute.',
+                player = 'Joueur %d (%s) : %d envois, %s dans la dernière minute.',
+                noCharacter = 'sans personnage',
+                watchStarted = 'Détail par évènement suivi pendant %d min : relancez la commande dans une minute.',
+                watchFull = 'Déjà %d joueurs suivis : détail indisponible pour celui-ci.',
+                unknownPlayer = 'Aucun joueur n° %s en jeu.',
+                usage = 'usage : /vava_reseau | joueur <n°> | ressource <nom>',
+                footer = 'Non comptés : GlobalState, state bags et envois directs des modules.',
+                probeUsage = 'usage : vava_reseau_essai <n° du joueur> <Ko 1-256> [rayon]',
+                probeSent = 'essai envoyé au joueur %d : %d Ko en latent, %d joueur(s) à %g m',
+                probeSentAlone = 'essai envoyé au joueur %d : %d Ko en latent',
+                probeRefused = 'essai refusé : %s',
+            },
+        },
+    },
+
     spawn = {
-        models = { m = 'mp_m_freemode_01', f = 'mp_f_freemode_01' },  -- en attendant un module d'apparence
+        models ={ m = 'mp_m_freemode_01', f = 'mp_f_freemode_01' },  -- en attendant un module d'apparence
         defaultPoint = { x = -269.4, y = -955.3, z = 31.2, heading = 205.8 },  -- premier spawn d'un personnage
     },
 

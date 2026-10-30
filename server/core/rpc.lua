@@ -7,16 +7,19 @@
     Le client ne reçoit jamais de détail d'erreur interne : uniquement un code.
     Format réseau : toute liste de valeurs voyage en (nombre, liste). msgpack sérialise une table ayant une partie
     liste comme une liste pure (le champ n de table.pack est perdu) et une liste à trous n'a pas de longueur fiable.
-    Dépendances : shared/init.lua, config/server.lua, shared/lib/string.lua, shared/lib/schema.lua,
-                  shared/lib/pending.lua, shared/core/logger.lua, server/core/ratelimit.lua
+    Envois vers les clients par core.net (mesurés et comptés) : une réponse ou une demande au-delà du seuil part en
+    latent ; la réponse latente est annoncée au client (préavis : id, octets, débit) qui repousse son attente, et le
+    serveur repousse la sienne pour une demande latente.
+    Dépendances : shared/init.lua, config/shared.lua, config/server.lua, shared/lib/string.lua, shared/lib/schema.lua,
+                  shared/lib/pending.lua, shared/core/logger.lua, server/core/ratelimit.lua, server/core/net.lua
 ]]
 
 local type, tonumber, tostring, pairs, xpcall, select, getmetatable = type, tonumber, tostring, pairs, xpcall, select, getmetatable
 local traceback = debug.traceback
-local mathType = math.type
+local mathType, ceil, min = math.type, math.ceil, math.min
 local format = string.format
 local unpack = table.unpack
-local RegisterNetEvent, TriggerClientEvent, DoesPlayerExist = RegisterNetEvent, TriggerClientEvent, DoesPlayerExist
+local RegisterNetEvent, DoesPlayerExist = RegisterNetEvent, DoesPlayerExist
 
 local EVENTS = vAvA.EVENTS
 local MAX_ID = vAvA.RPC_MAX_ID
@@ -25,13 +28,21 @@ local schema = vAvA.lib.schema
 local pending = vAvA.lib.pending
 local logger = vAvA.logger
 local ratelimit = vAvA.ratelimit
+local net = vAvA.net
 local cfg = vAvA.config.server.rpc
+local sharedCfg = vAvA.config.shared.rpc
 local rateCfg = vAvA.config.server.rateLimit
 local schemaCfg = vAvA.config.server.schema
+local latentRate = vAvA.config.server.net.latent.bytesPerSecond
 local log = logger.create('rpc')
 
 -- Clé du bucket global : '<' et '>' sont hors du motif d'identifiant, aucune collision possible avec un RPC.
 local GLOBAL_KEY = '<global>'
+
+-- Réponses comptées sous le RPC enregistré (jamais sous un nom venu du client) : un RPC inconnu a sa clé fixe.
+local UNKNOWN_ENTRY = { owner = vAvA.resourceName, label = 'rpc <inconnu>', sendOptions = net.NEVER }
+local NOTICE_LABEL = 'rpc préavis'
+local SEND_OPTIONS = { auto = net.AUTO, never = net.NEVER }
 
 local NET_SCHEMA = {
     net = true,
@@ -94,14 +105,41 @@ local function capture(ok, ...)
     return ok, select('#', ...), { ... }
 end
 
+--- Allongement d'une attente pour un message latent de `bytes` octets : temps de transfert au débit configuré, plus la
+--- marge, au plus maxLatentExtendMs (même règle côté client).
+---@param bytes integer
+---@return integer ms
+local function latentExtension(bytes)
+    return min(ceil(bytes * 1000 / latentRate) + sharedCfg.latentMarginMs, sharedCfg.maxLatentExtendMs)
+end
+
+--- Préavis d'une réponse latente, envoyé juste avant elle (fiable) : (id, octets, débit).
+---@param target integer
+---@param packet vAvA.NetPacket  args[1] : identifiant de la requête
+local function noticeLatentReply(target, packet)
+    net.dispatch(vAvA.resourceName, NOTICE_LABEL, target, net.NEVER, EVENTS.RPC_LATENT, packet.args[1], packet.bytes, latentRate)
+end
+
 --- Réponse à un appel client. Succès : (id, true, count, values) · échec : (id, false, code).
+--- Une réponse impossible à envoyer (trop grosse, joueur saturé de latents, valeurs non sérialisables) part en échec
+--- court : (id, false, too_large | saturated | server_error).
 ---@param src integer
 ---@param id integer
-local function reply(src, id, ok, ...)
+---@param entry { owner: string, label: string, sendOptions: table }  RPC enregistré, ou UNKNOWN_ENTRY
+local function reply(src, id, entry, ok, ...)
     -- id 0 : emit, l'appelant n'attend aucune réponse
-    if id ~= 0 then
-        TriggerClientEvent(EVENTS.RPC_RESPONSE, src, id, ok, ...)
+    if id == 0 then return end
+    local owner, label = entry.owner, entry.label
+    local packet, code = net.prepare(owner, label, EVENTS.RPC_RESPONSE, id, ok, ...)
+    if packet then
+        local sent
+        sent, code = net.deliver(owner, label, src, entry.sendOptions, packet, noticeLatentReply)
+        if sent then return end
     end
+    -- joueur parti : personne à prévenir
+    if code == 'invalid_target' then return end
+    if code ~= 'too_large' and code ~= 'saturated' then code = 'server_error' end
+    net.dispatch(owner, label, src, net.NEVER, EVENTS.RPC_RESPONSE, id, false, code)
 end
 
 ---@param src integer
@@ -118,25 +156,25 @@ local function handleRequest(src, id, name, count, args)
     local entry = handlers[name]
     if not entry then
         warnPlayer(src, 'RPC inconnu', str.sanitize(name, cfg.logNameMaxLength))
-        reply(src, id, false, 'unknown_rpc')
+        reply(src, id, UNKNOWN_ENTRY, false, 'unknown_rpc')
         return
     end
 
     if not ratelimit.consume(src, name, entry.rule) then
-        reply(src, id, false, 'rate_limited')
+        reply(src, id, entry, false, 'rate_limited')
         return
     end
 
     local state = getPlayerState(src)
     if state.inFlight >= cfg.maxInFlightPerPlayer then
-        reply(src, id, false, 'busy')
+        reply(src, id, entry, false, 'busy')
         return
     end
 
     local valid, err = schema.validateList(entry.args, args, count)
     if not valid then
         warnPlayer(src, format("arguments refusés pour '%s'", name), str.sanitize(err, cfg.logNameMaxLength))
-        reply(src, id, false, 'invalid_args')
+        reply(src, id, entry, false, 'invalid_args')
         return
     end
     -- un entier peut arriver en flottant (JSON d'une interface NUI) : le handler reçoit un vrai entier, aussi dans
@@ -159,10 +197,10 @@ local function handleRequest(src, id, name, count, args)
             log.error("handler RPC '%s' (ressource %s) en erreur%s : %s",
                 name, entry.owner, logger.suppressedNote(suppressed), tostring(results[1]))
         end
-        if current then reply(src, id, false, 'server_error') end
+        if current then reply(src, id, entry, false, 'server_error') end
         return
     end
-    if current then reply(src, id, true, resultCount, results) end
+    if current then reply(src, id, entry, true, resultCount, results) end
 end
 
 ---@param src integer
@@ -206,6 +244,7 @@ end
 ---@class vAvA.RpcOptions
 ---@field args vAvA.SchemaDefinition[]  schéma de chaque argument, dans l'ordre ({} si aucun)
 ---@field rateLimit? vAvA.RateRule       défaut : config rateLimit.rpcDefault
+---@field latent? 'auto'|'never'         réponse latente au-delà du seuil (auto, défaut) ou toujours fiable
 
 --- Enregistre un RPC appelable par les clients. Le nom doit être préfixé par "<owner>:".
 ---@param owner string
@@ -241,7 +280,14 @@ function rpc.register(owner, name, options, handler)
         if not rule then return false, 'rateLimit : ' .. ruleErr end
     end
 
-    handlers[name] = { owner = owner, name = name, handler = handler, args = args, rule = rule }
+    -- réponse latente au-delà du seuil (auto), ou toujours fiable (never : un état que des différences suivront)
+    local sendOptions = SEND_OPTIONS[options.latent == nil and 'auto' or options.latent]
+    if not sendOptions then return false, "latent : 'auto' ou 'never'" end
+
+    handlers[name] = {
+        owner = owner, name = name, handler = handler, args = args, rule = rule,
+        label = 'rpc ' .. name, sendOptions = sendOptions,
+    }
     return true
 end
 
@@ -256,6 +302,16 @@ function rpc.unregister(owner, name)
     handlers[name] = nil
     ratelimit.purgeKey(name)
     return true
+end
+
+--- Demande serveur → client partie en latent : l'attente du serveur est allongée du temps de transfert (même règle que
+--- le client pour une réponse latente).
+---@param _ integer  joueur visé
+---@param packet vAvA.NetPacket  args[1] : identifiant de l'appel
+local function extendLatentRequest(_, packet)
+    local id = packet.args[1]
+    local entry = outgoing:get(id)
+    if entry then outgoing:extend(id, entry.meta.timeout + latentExtension(packet.bytes)) end
 end
 
 ---@class vAvA.ClientCallOptions
@@ -308,12 +364,20 @@ function rpc.callClient(owner, options, target, name, ...)
         end
     end
 
-    local id, entry = outgoing:add({ source = target, owner = owner, returns = returns }, timeout)
+    local id, entry = outgoing:add({ source = target, owner = owner, returns = returns, timeout = timeout }, timeout)
     if not id then
         log.warn('[%s] callClient %s refusé : %d appels serveur → client déjà en attente', owner, name, cfg.maxPending)
         return false, 'saturated'
     end
-    TriggerClientEvent(EVENTS.CLIENT_REQUEST, target, id, name, select('#', ...), { ... })
+    local label = 'callClient ' .. name
+    local packet, code = net.prepare(owner, label, EVENTS.CLIENT_REQUEST, id, name, select('#', ...), { ... })
+    if packet then
+        local sent
+        sent, code = net.deliver(owner, label, target, net.AUTO, packet, extendLatentRequest)
+        if sent then return pending.await(entry) end
+    end
+    -- trop gros, joueur saturé de latents, valeurs non sérialisables, joueur parti : rien n'est parti
+    outgoing:settle(id, false, code)
     return pending.await(entry)
 end
 
