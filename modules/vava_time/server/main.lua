@@ -81,13 +81,14 @@ local function setup()
     if not adminOk then return false, adminErr end
 
     VavaTime.ready = true
+    -- nuit de gel du jour tirée tout de suite (ce qui est déjà passé aujourd'hui ne se rejoue pas), avant la première
+    -- publication de la date qui dit si elle est annoncée
+    frost.tick(seasons.current(), clock.seconds(now))
     clock.publish()
     seasons.publish()
     sky.publish()
     -- état écrit tel que repris (premier démarrage : la ligne est créée)
     store.save()
-    -- nuit de gel du jour tirée tout de suite (ce qui est déjà passé aujourd'hui ne se rejoue pas)
-    frost.tick(seasons.current(), clock.seconds(now))
     CreateThread(function()
         while true do
             Wait(cfg.server.tickMs)
@@ -96,6 +97,8 @@ local function setup()
             local date = seasons.current()
             sky.tick(tick, date.season)
             frost.tick(date, clock.seconds(tick))
+            -- une seule écriture de la date pour le changement de jour et la nuit de gel du même passage
+            seasons.flush()
         end
     end)
     return true

@@ -27,7 +27,7 @@ Facultatifs : `vava_admin` (droits, outil du Registre, journal ; sans lui, perso
 | Cours du ciel | chaque ciel dure 25 à 50 min (orage, tempête : 10 à 20), puis un successeur plausible est tiré selon les poids de la saison (pas d'orage sous un ciel clair) ; transition de 90 s | `weather.next`, `weather.seasons`, `weather.durationMinutes`, `weather.durations`, `weather.fadeSeconds` |
 | Neige | en hiver seulement (neige légère, neige, tempête rare) ; « neige au sol » (traces de pas et de roues) jamais tirée, imposable par le Conseil ; `snow = false` : aucune neige tirée | `weather.snow`, `weather.seasons.hiver` |
 | Changement de saison | un ciel qui n'est plus de saison (neige au printemps) change dans les 15 s, sauf s'il est imposé ou figé | `server.tickMs` |
-| Nuits de gel | l'hiver, chaque nuit gèle avec 40 % de chances (tirées une fois par jour) ; avertissement à 17 h, gel à 21 h (heure du royaume) ; ce qui est déjà passé au démarrage du module ne se rejoue pas | `frost` |
+| Nuits de gel (décidé le 30 octobre 2026) | l'hiver seulement, chaque nuit gèle avec 40 % de chances (tirées une fois par jour, au premier passage de la boucle après minuit) ; annoncée par le monde dès son tirage et jusqu'au gel (« La nuit sera froide. » dans `/date`, mention sur la fiche des plantes de l'agriculture) ; avertissement aux cultivateurs concernés à 17 h, gel à 21 h (heure du royaume) ; ce qui est déjà passé au démarrage du module ne se rejoue pas | `frost`, `messages.frostTonight` |
 | Ciel imposé | transition de 20 s ; il tient le temps d'un ciel puis reprend son cours (même hors saison), sauf s'il est figé | `council.fadeSeconds` |
 | Débit du Conseil | 6 décisions coup sur coup, puis une toutes les deux secondes, en jeu et depuis la Chancellerie confondus (chaque décision part à tous les joueurs) | `council.rate` |
 | Droit du Conseil | `tools` (Sénéchal et au-dessus), comme les zones de voix ; Chancellerie : lecture au droit `view`, décisions au droit `tools` | `council.permission` |
@@ -35,8 +35,10 @@ Facultatifs : `vava_admin` (droits, outil du Registre, journal ; sans lui, perso
 ## Joueurs
 
 - **`/date`** : « Il est 15 h 20, le 4e jour de la saison des semailles (printemps), an 1 du royaume. C'est
-  l'après-midi : il pleut. » (plus « Les astres restent immobiles dans le ciel. » si l'heure est figée). Calculé chez le
-  joueur, sans réseau, et montré à lui seul.
+  l'après-midi : il pleut. » (plus « La nuit sera froide. » les jours où une nuit de gel est annoncée, et « Les astres
+  restent immobiles dans le ciel. » si l'heure est figée). Calculé chez le joueur, sans réseau, et montré à lui seul :
+  la nuit de gel annoncée est un champ de la date du royaume déjà partagée, connue de tout joueur en jeu, même arrivé
+  après l'avertissement de 17 h.
 - **Nouvelle saison** : « La saison des frimas commence : la terre dort, les herbes se font rares, les nuits gèlent. »
   (une phrase par saison), chez chaque joueur en jeu, lue sur l'état partagé : aucun envoi de plus.
 - L'heure et le ciel s'appliquent dès l'arrivée, sélection du personnage comprise. Un joueur qui arrive pendant une
@@ -66,7 +68,9 @@ cours », avec l'heure, le décalage, le ciel et s'il est figé. Depuis la Chanc
 
 - **GlobalState** (usage légitime : petit, rare, utile à tous) : `vava_time:clock` `{ shift, frozen }` (~35 o, à chaque
   décision sur l'heure), `vava_time:weather` `{ id, from, at, fade, forced, frozen }` (~70 o, à chaque ciel : toutes les
-  25 à 50 min), `vava_time:calendar` `{ season, day, year }` (~45 o, une fois par jour). Retirés à l'arrêt du module.
+  25 à 50 min), `vava_time:calendar` `{ season, day, year, frost? }` (~45 o, ~52 o avec `frost = true` ; une fois par
+  jour — le changement de jour et la nuit de gel tirée au même passage ne font qu'une écriture —, plus une écriture
+  quand le gel tombe, les nuits de gel seulement). Retirés à l'arrêt du module.
   Au pire, un Conseil qui clique sans arrêt (jeu et web confondus) : une écriture toutes les deux secondes.
 - **RPC** : `vava_time:sync` (heure UTC du serveur, à l'arrivée puis toutes les 30 min ; si le module serveur n'est pas
   prêt, quatre relances puis plus rien jusqu'à ce qu'il publie l'heure), `open`, `clock`, `weather` (Conseil). Aucun
@@ -83,7 +87,7 @@ cours », avec l'heure, le décalage, le ciel et s'il est figé. Depuis la Chanc
 | `getSeason()` | `printemps`, `ete`, `automne`, `hiver`, ou `nil` avant le démarrage |
 | `getCalendar()` | `{ season, label, name, day, year, yearText, text, length }` (`yearText`, `text` : écrits par la config ; `length` : jours d'une saison) |
 | `getClock()` | `{ hour, minute, seconds, frozen, shift }` |
-| `getFrost()` | `{ tonight, warned, struck, warnHour, hour }` : la nuit du jour |
+| `getFrost()` | `{ tonight, warned, struck, warnHour, hour }` : la nuit du jour (annoncée : `tonight` et pas `struck`) |
 | `getWeather()` | `{ id, label, forced, frozen }` |
 
 Exports client : `getClock()` (`{ hour, minute, frozen }`), `getSeason()`, `getWeather()` (identifiant).
@@ -95,7 +99,9 @@ d'une nuit de gel) et `vava_time:frost` (le gel tombe) `{ season, day, year, war
 
 Un module qui lit la saison passe par son `bridge/server.lua` (appel isolé, saison gardée 5 s ; abonnement aux hooks
 du gel) : `vava_time` absent ou arrêté = aucun effet. Les réglages par saison vivent dans la config du module lecteur
-(`vava_farming` : `seasons` et `frost` ; `vava_gathering` : `seasons.regen` et `seasons.yield`).
+(`vava_farming` : `seasons` et `frost`, dont les saisons où l'on couvre ; `vava_gathering` : `seasons.regen` et
+`seasons.yield`). L'agriculture lit `getFrost` à l'ouverture du menu d'un emplacement planté pour la mention « gel
+annoncé cette nuit ».
 
 ## Base de données (sql/0001_time.sql)
 

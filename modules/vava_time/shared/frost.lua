@@ -49,6 +49,14 @@ function rules.night(season, hour, late, rnd, fcfg)
     }
 end
 
+--- La nuit de gel est-elle annoncée ? Oui dès qu'elle est tirée (au premier passage du jour) et jusqu'à ce que le
+--- gel tombe (ou qu'il soit déjà passé au démarrage) : /date le dit, la fiche d'une plante aussi.
+---@param night vAvA.FrostNight|nil
+---@return boolean
+function rules.announced(night)
+    return night ~= nil and night.frosty == true and not night.struck
+end
+
 --- Moments dus à cette heure du royaume ; la nuit est marquée en conséquence. Une heure qui saute au-delà du gel
 --- (décalage du Conseil) rend les deux moments dus ensemble, l'avertissement d'abord.
 ---@param night vAvA.FrostNight

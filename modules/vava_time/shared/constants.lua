@@ -11,7 +11,7 @@ VavaTime = {}
 VavaTime.STATE = {
     CLOCK = 'vava_time:clock',          -- { shift, frozen } : décalage (s) et seconde du jour figée (false : l'heure court)
     WEATHER = 'vava_time:weather',      -- { id, from, at, fade, forced, frozen } : ciel, transition depuis `at` (UTC)
-    CALENDAR = 'vava_time:calendar',    -- { season, day, year }
+    CALENDAR = 'vava_time:calendar',    -- { season, day, year, frost? } : frost = true quand une nuit de gel est annoncée
 }
 
 -- Intentions du client (RPC à schéma strict, débit limité).

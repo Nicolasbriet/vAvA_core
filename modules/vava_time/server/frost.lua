@@ -3,9 +3,10 @@
     Rôle : les nuits de gel tenues par le serveur. Chaque jour du royaume, la nuit est tirée une fois (probabilité de la
            saison, config.frost) ; au soir, puis à la tombée de la nuit (heure du royaume, décalage et gel du Conseil
            compris), les autres modules sont prévenus par des hooks (l'agriculture avertit ses cultivateurs, puis perd
-           les cultures ni couvertes ni résistantes). Rien n'est envoyé aux joueurs d'ici. Au démarrage, ce qui est déjà
-           passé dans la journée ne se rejoue pas.
-    Dépendances : shared/, config.lua, server/core.lua
+           les cultures ni couvertes ni résistantes). Rien n'est envoyé aux joueurs d'ici : la nuit de gel annoncée (du
+           tirage au gel) est un champ de la date du royaume déjà publiée (server/seasons.lua). Au démarrage, ce qui
+           est déjà passé dans la journée ne se rejoue pas.
+    Dépendances : shared/, config.lua, server/core.lua, server/seasons.lua
 ]]
 
 local random = math.random
@@ -34,6 +35,8 @@ function frost.tick(date, seconds)
         if night.frosty then VavaTime.log.info('la nuit qui vient gèlera (%s)', key) end
     end
     local warn, strike = rules.due(night, hour)
+    -- gel annoncé, publié avec la date du royaume (seasons.flush, après le passage) : dès le tirage, jusqu'au gel
+    VavaTime.seasons.setFrost(rules.announced(night))
     local payload = { season = date.season, day = date.day, year = date.year, warnHour = cfg.warnHour, hour = cfg.hour }
     local hooks = VavaTime.core.hooks
     if warn then hooks.runAfter(HOOKS.FROST_WARNING, payload) end
