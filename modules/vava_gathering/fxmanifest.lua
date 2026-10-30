@@ -6,7 +6,9 @@
            de tension, réaction de la terre, commandes du Conseil. Le serveur décide de tout (distance, outil,
            cooldown, durée, rendement, charges, vitalité, prise d'un poisson quand la ligne a tenu) et appelle vava_skills pour l'XP ; le client crée les props à
            portée, pose les blips des zones sur la carte, montre l'invite, joue le geste et la barre de tension.
-    Dépendances : vAvA_core ≥ 0.6.0, vava_ui ≥ 1.0.0 (polices, grain, papier et coins de la page, par
+           État des zones et des nœuds (bande, cicatrice, charges) envoyé aux seuls joueurs proches, par les
+           abonnements de zone du core (1.6.0).
+    Dépendances : vAvA_core ≥ 0.11.0 (abonnements de zone), vava_ui ≥ 1.0.0 (polices, grain, papier et coins de la page, par
                   nui://vava_ui/…), vava_inventory ≥ 1.4.0 (objets, mains, métadonnées), vava_skills ≥ 1.0.0 (XP) ;
                   facultatifs : vava_hud (barre de progression, notifications), vava_admin (droit metiers), vava_chat,
                   vava_health (aucune récolte à terre), vava_time (saisons : repousse des nœuds, quantité récoltée)
@@ -19,7 +21,7 @@ use_experimental_fxv2_oal 'yes'
 
 name 'vava_gathering'
 description 'Récolte vAvA : zones à vitalité sur la carte, nœuds, outils en main, qualité, pêche, pistes de gibier'
-version '1.5.0'
+version '1.6.0'
 
 dependency 'vAvA_core'
 dependency 'vava_ui'
@@ -44,6 +46,7 @@ shared_scripts {
     'config.lua',
     'shared/geometry.lua',
     'shared/proximity.lua',
+    'shared/zonestate.lua',
     'shared/season.lua',
     'shared/catch.lua',
 }
@@ -53,6 +56,7 @@ server_scripts {
     'bridge/server.lua',
     'server/journal.lua',
     'server/catalog.lua',
+    'server/share.lua',
     'server/zones.lua',
     'server/nodes.lua',
     'server/quality.lua',

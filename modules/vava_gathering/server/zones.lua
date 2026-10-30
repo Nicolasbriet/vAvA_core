@@ -2,30 +2,31 @@
     vava_gathering/server/zones.lua
     Rôle : vitalité des zones, tenue par le serveur : recalculée à la demande depuis `updatedAt` (régénération par
            heure, ralentie pendant une cicatrice), consommée par chaque récolte réussie, bandes (plein, réduit, épuisée),
-           cicatrice à 0, épuisements répétés (réaction de la terre). État publié aux clients par un state bag global
-           (bande, cicatrice, vitalité entière), écrit au seul changement ; relu et republié au passage de la boucle
-           lente d'écriture pour que les props reviennent quand la zone se remet ; écriture groupée sans perte (un
-           changement pendant l'écriture reste à écrire). Hooks `vava_gathering:zoneDepleted`, `zoneScarred`,
-           `earthReaction` (after).
-    Dépendances : shared/constants.lua, config.lua, server/core.lua, bridge/server.lua, server/journal.lua,
-                  server/catalog.lua
+           cicatrice à 0, épuisements répétés (réaction de la terre). Bande et cicatrice (jamais la vitalité) publiées
+           aux seuls joueurs qui suivent la zone (clé `zone` de la zone du core, server/share.lua), au seul
+           changement ; relues et republiées au passage de la boucle lente d'écriture pour que les props reviennent
+           quand la zone se remet ; écriture groupée sans perte (un changement pendant l'écriture reste à écrire).
+           Hooks `vava_gathering:zoneDepleted`, `zoneScarred`, `earthReaction` (after).
+    Dépendances : shared/constants.lua, config.lua, shared/zonestate.lua, server/core.lua, bridge/server.lua,
+                  server/journal.lua, server/catalog.lua, server/share.lua
 ]]
 
 local type, pairs, ipairs = type, pairs, ipairs
 local floor, min, max = math.floor, math.min, math.max
 local format = string.format
 local time = os.time
-local GlobalState = GlobalState
 
 local core = VavaGathering.core
 local bridge = VavaGathering.bridge
 local journal = VavaGathering.journal
 local catalog = VavaGathering.catalog
+local share = VavaGathering.share
+local zonestate = VavaGathering.zonestate
 local cfg = VavaGathering.config
 local bands = cfg.bands
 local messages = cfg.messages
 local BANDS = VavaGathering.BANDS
-local STATE_ZONE = VavaGathering.STATE_ZONE
+local ZONE_KEY = zonestate.ZONE_KEY
 
 local HOOK_DEPLETED = 'vava_gathering:zoneDepleted'
 local HOOK_SCARRED = 'vava_gathering:zoneScarred'
@@ -45,7 +46,7 @@ VavaGathering.zones = zones
 ---@field scarredUntil integer|nil
 ---@field depletions integer
 ---@field lastDepletionAt integer|nil
----@field published { band: string, scarred: boolean, vitality: integer }|nil
+---@field published { band: string, scarred: boolean }|nil
 ---@field dirty boolean|'writing'  true : à écrire ; WRITING : écriture en cours (un changement pendant l'attente → true)
 
 ---@type table<string, vAvA.ZoneState>
@@ -124,15 +125,23 @@ function zones.effects(state)
     return bands.effects[zones.band(state)]
 end
 
---- Publie l'état aux clients si quelque chose de visible a changé.
+--- Publie la bande et la cicatrice aux joueurs qui suivent la zone, si l'une d'elles a changé (la vitalité seule ne
+--- change rien de ce que voit le joueur : elle n'est pas publiée).
 ---@param def vAvA.ZoneDefinition
 ---@param state vAvA.ZoneState
 function zones.publish(def, state)
-    local snapshot = { band = zones.band(state), scarred = state.scarredUntil ~= nil, vitality = floor(state.vitality + 0.5) }
-    local previous = state.published
-    if previous and previous.band == snapshot.band and previous.scarred == snapshot.scarred and previous.vitality == snapshot.vitality then return end
-    state.published = snapshot
-    GlobalState[STATE_ZONE .. def.id] = snapshot
+    local value = zonestate.zoneValue(zones.band(state), state.scarredUntil ~= nil)
+    if zonestate.sameZone(state.published, value) then return end
+    state.published = value
+    share.set(def.id, ZONE_KEY, value)
+end
+
+--- Dernière valeur publiée d'une zone ({ band, scarred }), pour la déclarer entière au core.
+---@param id string
+---@return { band: string, scarred: boolean }|nil
+function zones.published(id)
+    local state = states[id]
+    return state and state.published or nil
 end
 
 ---@param id string

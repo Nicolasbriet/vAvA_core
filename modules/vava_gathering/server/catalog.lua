@@ -3,8 +3,9 @@
     Rôle : la donnée de la récolte indexée depuis la config : zones, nœuds (par identifiant et par zone), ressources,
            outils (registre du core `vava_gathering:tools`, rempli par la config, extensible par d'autres modules,
            cache tenu à jour par les hooks du registre), objets déclarés à l'inventaire (rappelé quand l'inventaire
-           redémarre). Vérifie la cohérence de la config au démarrage : une erreur de donnée refuse le module.
-    Dépendances : shared/constants.lua, config.lua, server/core.lua, bridge/server.lua
+           redémarre). Vérifie la cohérence de la config au démarrage : une erreur de donnée refuse le module (zone qui
+           dépasserait les bornes d'une zone du core comprise : rayon, marge, nombre de nœuds).
+    Dépendances : shared/constants.lua, config.lua, shared/zonestate.lua, server/core.lua, bridge/server.lua
 ]]
 
 local type, pairs, ipairs, tostring = type, pairs, ipairs, tostring
@@ -15,6 +16,9 @@ local bridge = VavaGathering.bridge
 local cfg = VavaGathering.config
 local REGISTRY = VavaGathering.REGISTRY_TOOLS
 local ID_PATTERN = VavaGathering.ID_PATTERN
+local MAX_ZONE_ID, MAX_NODE_ID = VavaGathering.MAX_ZONE_ID, VavaGathering.MAX_NODE_ID
+local ZONE_MAX_RADIUS, ZONE_MAX_MARGIN, ZONE_MAX_NODES = VavaGathering.ZONE_MAX_RADIUS, VavaGathering.ZONE_MAX_MARGIN, VavaGathering.ZONE_MAX_NODES
+local zonestate = VavaGathering.zonestate
 
 local TOOL_SCHEMA = {
     type = 'table',
@@ -112,8 +116,13 @@ local function index()
         }
     end
     for i, zone in ipairs(cfg.zones) do
-        if type(zone.id) ~= 'string' or not zone.id:find(ID_PATTERN) then return false, format('zone #%d : identifiant invalide', i) end
+        if type(zone.id) ~= 'string' or not zone.id:find(ID_PATTERN) or #zone.id > MAX_ZONE_ID then
+            return false, format('zone #%d : identifiant invalide (%d octets au plus)', i, MAX_ZONE_ID)
+        end
         if zonesById[zone.id] then return false, format("zone '%s' en double", zone.id) end
+        if type(zone.x) ~= 'number' or type(zone.y) ~= 'number' or type(zone.z) ~= 'number' then
+            return false, format("zone '%s' : x, y, z requis", zone.id)
+        end
         local def = {
             id = zone.id, label = zone.label or zone.id, kind = zone.kind or 'foret', x = zone.x, y = zone.y, z = zone.z,
             radius = zone.radius or 50.0, cost = zone.cost or 1.0, regenPerHour = zone.regenPerHour or 1.0, scarHours = zone.scarHours or 24,
@@ -123,7 +132,9 @@ local function index()
         nodesByZone[zone.id] = {}
     end
     for i, node in ipairs(cfg.nodes) do
-        if type(node.id) ~= 'string' or not node.id:find(ID_PATTERN) then return false, format('nœud #%d : identifiant invalide', i) end
+        if type(node.id) ~= 'string' or not node.id:find(ID_PATTERN) or #node.id > MAX_NODE_ID then
+            return false, format('nœud #%d : identifiant invalide (%d octets au plus)', i, MAX_NODE_ID)
+        end
         if nodesById[node.id] then return false, format("nœud '%s' en double", node.id) end
         local zone = zonesById[node.zone]
         if not zone then return false, format("nœud '%s' : zone '%s' inconnue", node.id, tostring(node.zone)) end
@@ -138,6 +149,21 @@ local function index()
         nodesById[node.id] = def
         local list = nodesByZone[zone.id]
         list[#list + 1] = def
+    end
+    -- chaque zone de récolte devient une zone du core : ses bornes sont vérifiées ici, le core la refuserait sinon
+    local margin = cfg.streaming.radius + cfg.streaming.subscribeSlack
+    if margin > ZONE_MAX_MARGIN then
+        return false, format("streaming.radius + streaming.subscribeSlack : %.0f m, %.0f m au plus (marge d'une zone du core)", margin, ZONE_MAX_MARGIN)
+    end
+    for _, def in ipairs(zonesOrdered) do
+        local list = nodesByZone[def.id]
+        if #list > ZONE_MAX_NODES then
+            return false, format("zone '%s' : %d nœuds, %d au plus (clés de l'état d'une zone du core)", def.id, #list, ZONE_MAX_NODES)
+        end
+        local area = zonestate.area(def, list, margin)
+        if area.radius > ZONE_MAX_RADIUS then
+            return false, format("zone '%s' : rayon de %.0f m (nœuds compris), %.0f m au plus (rayon d'une zone du core)", def.id, area.radius, ZONE_MAX_RADIUS)
+        end
     end
     return true
 end

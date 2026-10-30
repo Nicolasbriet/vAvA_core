@@ -1,9 +1,10 @@
 --[[
     vava_gathering/server/main.lua
     Rôle : déclaration du module auprès du core : catalogue (registre des outils, objets), journal, état des zones et
-           des nœuds (chargé puis publié), intentions du client (RPC à schéma strict et débit limité : commencer,
-           interrompre, finir, ferrer, zones), joueurs partis, boucle lente d'écriture et de republication, commande du
-           Conseil.
+           des nœuds (chargé, puis déclaré entier aux abonnements de zone du core : une zone du core par zone de
+           récolte), intentions du client (RPC à schéma strict et débit limité : commencer, interrompre, finir, ferrer,
+           zones), joueurs partis, boucle lente d'écriture, de republication et de nouvel essai des zones refusées,
+           commande du Conseil.
     Dépendances : tous les fichiers server/ du module
 ]]
 
@@ -17,6 +18,8 @@ if not core then return end
 local bridge = VavaGathering.bridge
 local journal = VavaGathering.journal
 local catalog = VavaGathering.catalog
+local share = VavaGathering.share
+local zonestate = VavaGathering.zonestate
 local zones = VavaGathering.zones
 local nodes = VavaGathering.nodes
 local harvest = VavaGathering.harvest
@@ -47,10 +50,30 @@ local function zonesFor(src)
     return list
 end
 
+---@param node vAvA.NodeDefinition
+---@return integer|nil
+local function publishedCharges(node)
+    return nodes.published(node.id)
+end
+
+--- Déclare au core les zones de récolte (toutes, ou seulement celles qui ne le sont pas encore), avec leur état entier
+--- tel que publié en dernier : bande, cicatrice, charges de chaque nœud. Une zone refusée est écrite en console par
+--- share.lua et n'empêche pas les autres.
+---@param missingOnly boolean
+local function shareZones(missingOnly)
+    for _, def in ipairs(catalog.zones()) do
+        if not (missingOnly and share.isDeclared(def.id)) then
+            local value = zones.published(def.id)
+            if value then share.declare(def, zonestate.build(value, catalog.nodesOf(def.id), publishedCharges)) end
+        end
+    end
+end
+
 --- Écrit l'état modifié et republie ce qui a changé avec le temps. Bloque le thread courant.
 local function flush()
     zones.tick()
     nodes.tick()
+    shareZones(true)
     local queries = {}
     zones.collect(queries)
     nodes.collect(queries)
@@ -74,8 +97,11 @@ local function setup()
     if not ok then return false, 'zones : ' .. tostring(err) end
     ok, err = nodes.load()
     if not ok then return false, 'nœuds : ' .. tostring(err) end
+    -- état relu (valeurs publiées posées), puis chaque zone déclarée entière : les joueurs proches la reçoivent
     zones.tick()
     nodes.tick()
+    share.clearLegacy()
+    shareZones(false)
 
     for _, def in ipairs({
         { RPC.BEGIN, { NODE }, limits.begin, harvest.begin },
@@ -112,9 +138,10 @@ local function setup()
     return true
 end
 
--- arrêt du module : état écrit (une transaction)
+-- arrêt du module : état écrit (une transaction) ; plus rien n'est envoyé (le core oublie nos zones de lui-même)
 AddEventHandler('onResourceStop', function(resource)
     if resource ~= VavaGathering.resource or not VavaGathering.ready then return end
+    share.stop()
     flush()
 end)
 

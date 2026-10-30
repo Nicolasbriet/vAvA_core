@@ -3,20 +3,21 @@
     Rôle : charges des nœuds, tenues par le serveur : recalculées à la demande depuis `updatedAt` (une charge rendue
            toutes les `regenMs`, plus ou moins vite selon la saison de vava_time, le reste du délai conservé et recalé
            quand la saison change), prises par
-           une récolte avant toute attente et rendues si elle n'aboutit pas, publiées aux clients par un state bag
-           global (entier), écrit au seul changement.
+           une récolte avant toute attente et rendues si elle n'aboutit pas, publiées aux seuls joueurs qui suivent la
+           zone du nœud (clé `n:<nœud>` de la zone du core, server/share.lua), au seul changement.
            Écriture groupée sans perte : un changement pendant l'écriture reste à écrire.
-    Dépendances : shared/constants.lua, config.lua, server/core.lua, bridge/server.lua, server/catalog.lua
+    Dépendances : shared/constants.lua, config.lua, shared/zonestate.lua, server/core.lua, bridge/server.lua,
+                  server/catalog.lua, server/share.lua
 ]]
 
 local pairs, ipairs = pairs, ipairs
 local min, max, floor = math.min, math.max, math.floor
 local time = os.time
-local GlobalState = GlobalState
 
 local bridge = VavaGathering.bridge
 local catalog = VavaGathering.catalog
-local STATE_NODE = VavaGathering.STATE_NODE
+local share = VavaGathering.share
+local nodeKey = VavaGathering.zonestate.nodeKey
 
 local SELECT_SQL = 'SELECT `node`, `charges`, `updated_at` FROM `vava_gathering_nodes`'
 local UPSERT_SQL = 'INSERT INTO `vava_gathering_nodes` (`node`, `zone`, `charges`, `updated_at`) VALUES (?, ?, ?, ?) '
@@ -99,12 +100,21 @@ function nodes.refresh(def, state, now)
     state.updatedAt = state.charges >= def.charges and now or (state.updatedAt + floor(gained * period / factor))
 end
 
+--- Publie les charges aux joueurs qui suivent la zone du nœud, si elles ont changé.
 ---@param def vAvA.NodeDefinition
 ---@param state vAvA.NodeState
 function nodes.publish(def, state)
     if state.published == state.charges then return end
     state.published = state.charges
-    GlobalState[STATE_NODE .. def.id] = state.charges
+    share.set(def.zone.id, nodeKey(def.id), state.charges)
+end
+
+--- Dernières charges publiées d'un nœud, pour déclarer sa zone entière au core.
+---@param id string
+---@return integer|nil
+function nodes.published(id)
+    local state = states[id]
+    return state and state.published or nil
 end
 
 --- Charges disponibles (état relu).
@@ -118,10 +128,12 @@ function nodes.charges(def)
     return state.charges
 end
 
---- Consomme une charge ; faux s'il n'en reste aucune.
+--- Consomme une charge ; faux s'il n'en reste aucune. `deferred` : rien n'est publié, l'appelant le fera avec
+--- `nodes.flush` (une récolte publie nœud et zone ensemble, en une différence, une fois finie).
 ---@param def vAvA.NodeDefinition
+---@param deferred? boolean
 ---@return boolean
-function nodes.consume(def)
+function nodes.consume(def, deferred)
     local state = states[def.id]
     if not state then return false end
     local now = time()
@@ -131,13 +143,15 @@ function nodes.consume(def)
     if state.charges >= def.charges then state.updatedAt = now end
     state.charges = state.charges - 1
     state.dirty = true
-    nodes.publish(def, state)
+    if not deferred then nodes.publish(def, state) end
     return true
 end
 
---- Rend une charge prise par une récolte qui n'a pas abouti (besace pleine), sans dépasser le maximum.
+--- Rend une charge prise par une récolte qui n'a pas abouti (besace pleine), sans dépasser le maximum. `deferred` :
+--- comme pour `nodes.consume`.
 ---@param def vAvA.NodeDefinition
-function nodes.restore(def)
+---@param deferred? boolean
+function nodes.restore(def, deferred)
     local state = states[def.id]
     if not state then return end
     local now = time()
@@ -147,7 +161,15 @@ function nodes.restore(def)
     -- de nouveau plein : le délai de la prochaine charge partira de la prochaine consommation
     if state.charges >= def.charges then state.updatedAt = now end
     state.dirty = true
-    nodes.publish(def, state)
+    if not deferred then nodes.publish(def, state) end
+end
+
+--- Publie les charges d'un nœud si elles ont changé depuis la dernière publication (fin d'une récolte : une charge
+--- prise puis rendue ne fait rien partir).
+---@param def vAvA.NodeDefinition
+function nodes.flush(def)
+    local state = states[def.id]
+    if state then nodes.publish(def, state) end
 end
 
 --- Remet un nœud à plein (Conseil).

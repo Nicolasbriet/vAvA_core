@@ -10,7 +10,7 @@
 ]]
 
 VavaGathering.config = {
-    coreVersion = '0.6.0',
+    coreVersion = '0.11.0',  -- abonnements de zone (core.zones)
     dependencies = { vava_inventory = '1.4.0', vava_skills = '1.0.0' },
 
     -- Vitalité d'une zone (0 à 100). Au-dessus de `normal` : plein rendement ; entre `reduced` et `normal` : rendement
@@ -103,7 +103,13 @@ VavaGathering.config = {
     -- Les nœuds sont regroupés par zone : seuls ceux d'une zone à portée sont mesurés. Un passage toutes les `pollMs`
     -- près d'une zone, toutes les `idlePollMs` quand aucun nœud ne peut être à moins de `radius` + `idleMargin` (la
     -- marge couvre le chemin d'un cavalier rapide pendant `idlePollMs`, pour que les props apparaissent comme avant).
-    streaming = { radius = 80.0, pollMs = 1000, idlePollMs = 2500, idleMargin = 60.0, modelTimeoutMs = 5000 },
+    -- État des zones et des nœuds (bande, cicatrice, charges) : envoyé par le core aux seuls joueurs à moins de
+    -- `radius` + `subscribeSlack` mètres du cercle qui englobe les nœuds d'une zone (abonnements de zone) : il est là
+    -- avant que le premier prop puisse apparaître ; seuls les nœuds des zones reçues sont mesurés. Une zone reçue fait
+    -- aussitôt un passage : `subscribeSlack` ne couvre que l'attente du passage du core, il doit valoir au moins
+    -- vitesse maximale × `zones.passMs` du core + 5 m (20 m : cavalier au galop, ~15 m/s, avec passMs = 1000 ; à
+    -- passer à 35 m avec passMs = 2000 ou pour une monture plus rapide). `radius` + `subscribeSlack` : 500 m au plus.
+    streaming = { radius = 80.0, pollMs = 1000, idlePollMs = 2500, idleMargin = 60.0, modelTimeoutMs = 5000, subscribeSlack = 20.0 },
 
     -- Carte : un blip par zone (icône `sprite` et couleur `colour` du jeu selon le genre, liste sur docs.fivem.net →
     -- Blips), nommé comme elle, à courte portée (petite carte à l'approche, toujours sur la grande), et le cercle

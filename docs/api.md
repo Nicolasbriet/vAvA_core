@@ -553,7 +553,7 @@ intéressé ; ce qui est commun à tous et rare (heure, saison) reste en GlobalS
 | `list()` | identifiants locaux des zones du module, triés |
 
 ```lua
--- une zone de récolte (forme que prendra T-015)
+-- une zone de récolte (vava_gathering 1.6.0, T-015)
 core.zones.define('foret_brume', { x = -320.0, y = -880.0, radius = 140.0, margin = 100.0 },
     { zone = { band = 'normal', scarred = false }, ['n:chene_1'] = 3 })
 -- une récolte : un seul envoi aux abonnés, en fin de tour, pour les deux clés
@@ -1670,22 +1670,29 @@ fondateur ; `/metiers niveau <joueur> <compétence> <niveau>`, `/metiers recette
 
 ### `vava_gathering`
 
-La récolte (1.4.0) : zones à **vitalité** 0–100 (plein rendement au-dessus de 60, réduit entre 60 et 25 avec chance
+La récolte (1.6.0) : zones à **vitalité** 0–100 (plein rendement au-dessus de 60, réduit entre 60 et 25 avec chance
 d'échec, **épuisée** sous 25 avec props remplacés et rendement effondré, **cicatrice** à 0 : régénération × 0,2 pendant
 la durée de la zone), nœuds à charges (arbres, filons, buissons, bancs de poissons, pistes de gibier) qui se
 régénèrent par le temps (recalcul à la demande, aucune boucle), outils **en main** (`vava_inventory:held`) du genre
 requis, non brisés, usés par `patchMetadata` (brisés à 0), qualité de la récolte (niveau, outil, vitalité, aléa) en
 palier 1–5 et provenance sur la pile (`{ tier, origin }`), pêche à la barre de tension, réaction de la terre aux
 épuisements répétés, commandes du Conseil. L'XP passe par `vava_skills:addXp`. Tout le détail, la config et les tests en
-jeu : `modules/vava_gathering/README.md`. Demande le core 0.6.0, `vava_inventory` 1.4.0 et `vava_skills` 1.0.0 ;
-facultatifs : `vava_hud`, `vava_admin` (droit `metiers`), `vava_chat`, `vava_health` (à terre), `vava_time` (saisons).
+jeu : `modules/vava_gathering/README.md`. Demande le core 0.11.0 (abonnements de zone, 1.6.0), `vava_inventory` 1.4.0 et
+`vava_skills` 1.0.0 ; facultatifs : `vava_hud`, `vava_admin` (droit `metiers`), `vava_chat`, `vava_health` (à terre),
+`vava_time` (saisons).
 
 - **Données** en `config.lua` : zones (centre, rayon, coût, régénération, cicatrice), nœuds (position, ressource, charges,
   délai, props normal et épuisé — tous les nœuds ont un prop créé par le client), ressources (objet, compétence, outil,
   difficulté, XP, fourchette, durée, animation, pièce supplémentaire), outils, objets déclarés à l'inventaire. Les zones
   livrées sont des exemples.
-- **État** publié par state bags globaux : `vava_gathering:zone:<id>` → `{ band, scarred, vitality }`,
-  `vava_gathering:node:<id>` → charges ; écrits au seul changement, relus toutes les 10 s.
+- **État** (1.6.0) envoyé aux seuls joueurs proches par les abonnements de zone du core (§ `core.zones`) : une zone du
+  core par zone de récolte (nom local = identifiant de la zone ; centre de la zone, rayon qui englobe ses nœuds au sol,
+  marge `streaming.radius` + `streaming.subscribeSlack` = 100 m) ; état `zone` → `{ band, scarred }` et `n:<nœud>` →
+  charges, changé au seul changement (une récolte : une différence, relue toutes les 10 s pour une zone qui se remet).
+  La vitalité n'est jamais envoyée (export `getZone` et panneau `vava_gathering:zones` pour la lire). Plus aucune clé
+  GlobalState (les anciennes `vava_gathering:zone:<id>` et `vava_gathering:node:<id>` sont effacées une fois au
+  démarrage). État public (rien de secret) : chaque action revérifie la distance côté serveur. Identifiants : zone
+  48 octets au plus, nœud 46.
 - **Serveur maître** : distance lue côté serveur au début et à la fin, durée revérifiée, jeton par geste, cooldown,
   une récolte à la fois. Pêche (1.4.0, décision du 30 octobre 2026 : le serveur tire la réussite) : le booléen « a
   tenu la tension » de `vava_gathering:reel` ne peut que faire rater (`false` : code `escaped`) ; à `true`, le serveur

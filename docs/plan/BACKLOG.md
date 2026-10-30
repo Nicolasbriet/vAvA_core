@@ -405,8 +405,14 @@ versé à T-014 ; les autres points déjà couverts sont précisés dans T-012 �
   13,9 ms (très dense) ; garder 1 s. Compte rendu `docs/plan/rapports/T-014.md`, procédure `docs/tests/zones.md`.
 
 ### T-015 — Récolte : GlobalState → abonnements de zone
-- Agent : vava-dev-lua · Dépend de : T-014 · Statut : à faire
+- Agent : vava-dev-lua · Dépend de : T-014 · Statut : à tester en jeu (rapport docs/plan/rapports/T-015.md ; relu sécurité et réseau, suites appliquées ; fusionnée sans test en jeu, à la demande du porteur du projet)
 - `vava_gathering` (zones et nœuds) n'écrit plus dans GlobalState. Même comportement en jeu.
+- Fait le 30 octobre 2026 : `vava_gathering` 1.6.0, une zone du core par zone de récolte (état `zone` → bande et
+  cicatrice, `n:<nœud>` → charges ; vitalité plus publiée), aux seuls joueurs proches, en différences. Suites des
+  relectures : bornes d'une zone du core vérifiées au démarrage, une récolte = une seule différence, refus durable
+  rappelé toutes les 10 min, boucle des props arrêtée loin de toute zone. **À tester en jeu** : `docs/tests/metiers.md`
+  § 3.4 (17 étapes : joueur loin sans rien reçu, arrivée au galop et par téléportation, une différence par récolte,
+  besace pleine sans envoi, `resmon` loin de tout, zone hors bornes refusée, `profiler record`).
 - T-011 (`docs/audits/reseau-vava_gathering.md`) : une récolte coûte deux écritures (zone `server/zones.lua:123-129`,
   nœud `server/nodes.lua:75-79`), environ 140 o chez chaque joueur connecté (64 joueurs, 15 récoltants : environ
   27 Ko/s sortants pour rien). Retirer `vitality` de ce qui est publié (`zones.lua:124`) : le client ne lit que `band`

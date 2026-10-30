@@ -87,7 +87,8 @@ describe('vava_gathering repousse et rendement selon la saison', function()
         VavaGathering = nil
         GlobalState = {}
         factor = 1
-        helper.loadAll({ 'modules/vava_gathering/shared/constants.lua', 'modules/vava_gathering/config.lua' })
+        helper.loadAll({ 'modules/vava_gathering/shared/constants.lua', 'modules/vava_gathering/config.lua',
+            'modules/vava_gathering/shared/zonestate.lua' })
         VavaGathering.bridge = { SeasonFactor = function() return factor end }
         VavaGathering.catalog = {}
         helper.loadAll({ 'modules/vava_gathering/server/nodes.lua', 'modules/vava_gathering/server/quality.lua' })
@@ -158,7 +159,8 @@ describe('vava_gathering repousse au changement de saison', function()
         VavaGathering = nil
         GlobalState = {}
         factor = 1
-        helper.loadAll({ 'modules/vava_gathering/shared/constants.lua', 'modules/vava_gathering/config.lua' })
+        helper.loadAll({ 'modules/vava_gathering/shared/constants.lua', 'modules/vava_gathering/config.lua',
+            'modules/vava_gathering/shared/zonestate.lua' })
         VavaGathering.bridge = { SeasonFactor = function() return factor end }
         VavaGathering.catalog = {}
         helper.loadAll({ 'modules/vava_gathering/server/nodes.lua' })
@@ -257,7 +259,8 @@ describe('saison en attente pendant le démarrage de vava_time', function()
         VavaGathering = nil
         GlobalState = {}
         local factor = false
-        helper.loadAll({ 'modules/vava_gathering/shared/constants.lua', 'modules/vava_gathering/config.lua' })
+        helper.loadAll({ 'modules/vava_gathering/shared/constants.lua', 'modules/vava_gathering/config.lua',
+            'modules/vava_gathering/shared/zonestate.lua' })
         VavaGathering.bridge = { SeasonFactor = function() return factor end }
         VavaGathering.catalog = {}
         helper.loadAll({ 'modules/vava_gathering/server/nodes.lua' })
