@@ -1,23 +1,24 @@
 --[[
     vava_crafting/client/props.lua
-    Rôle : les stations d'artisanat dans le monde, vues du joueur : liste des stations publiée par le serveur (config
-           et stations ajoutées par d'autres modules, la config ne servant qu'avant la première publication), état
-           publié par le serveur (combustible, occupée) lu dans les state bags globaux, props LOCAUX (jamais réseau)
-           créés pour les stations à portée, station la plus proche à distance d'interaction. Une seule boucle lente,
-           active seulement quand un personnage est en jeu : elle mesure d'abord les groupes de stations (par case de
-           streaming.groupCell), ne parcourt que les stations d'un groupe à portée, passe toutes les streaming.pollMs
-           près d'un groupe et toutes les streaming.idlePollMs loin de tous ; elle s'arrête d'elle-même à la sélection
-           et au déchargement, et retire alors tous les props.
-    Dépendances : shared/constants.lua, config.lua, shared/proximity.lua, client/core.lua
+    Rôle : les stations d'artisanat dans le monde, vues du joueur : seulement celles que le serveur lui envoie, par les
+           abonnements de zone du core (une zone par station, vAvA_core 0.11.0) — dessin (type, nom, position, modèle)
+           et état (combustible, occupée) —, tenues dans un carnet (shared/stationzone.lua) ; props LOCAUX (jamais
+           réseau) créés pour les stations à portée, station la plus proche à distance d'interaction. Une seule boucle
+           lente, active seulement quand un personnage est en jeu ET qu'une station est connue (aucune boucle loin de
+           toute station) : elle mesure d'abord les groupes de stations (par case de streaming.groupCell), ne parcourt
+           que les stations d'un groupe à portée, passe toutes les streaming.pollMs près d'un groupe et toutes les
+           streaming.idlePollMs loin de tous ; elle s'arrête d'elle-même à la sélection, au déchargement et quand la
+           dernière station connue est oubliée, et retire alors tous les props.
+    Dépendances : shared/constants.lua, config.lua, shared/proximity.lua, shared/stationzone.lua, client/core.lua
+                  (core.zones : vAvA_core 0.11.0)
 ]]
 
-local type, pairs, ipairs = type, pairs, ipairs
-local sub, sqrt, max, huge = string.sub, math.sqrt, math.max, math.huge
+local pairs, ipairs, tostring = pairs, ipairs, tostring
+local sqrt, max, huge = math.sqrt, math.max, math.huge
 local CreateThread, Wait, GetGameTimer, AddEventHandler = CreateThread, Wait, GetGameTimer, AddEventHandler
 local PlayerPedId, GetEntityCoords, DoesEntityExist, DeleteObject = PlayerPedId, GetEntityCoords, DoesEntityExist, DeleteObject
 local RequestModel, HasModelLoaded, IsModelValid, SetModelAsNoLongerNeeded, GetHashKey = RequestModel, HasModelLoaded, IsModelValid, SetModelAsNoLongerNeeded, GetHashKey
 local CreateObjectNoOffset, SetEntityHeading, FreezeEntityPosition, PlaceObjectOnGroundProperly = CreateObjectNoOffset, SetEntityHeading, FreezeEntityPosition, PlaceObjectOnGroundProperly
-local AddStateBagChangeHandler = AddStateBagChangeHandler
 
 local core = VavaCrafting.core
 if not core then return end
@@ -25,54 +26,34 @@ if not core then return end
 local cfg = VavaCrafting.config
 local streaming = cfg.streaming
 local proximity = VavaCrafting.proximity
-local STATE_STATION, STATE_STATIONS = VavaCrafting.STATE_STATION, VavaCrafting.STATE_STATIONS
+local stationzone = VavaCrafting.stationzone
 local RESOURCE = VavaCrafting.resource
 local LOAD_POLL_MS = 50
 
 local props = {}
 VavaCrafting.props = props
 
--- stations connues : la config d'abord, puis la liste publiée par le serveur (qui comprend celles des autres modules)
-local known, stationsById = {}, {}
--- stations groupées par case de grille, refaites à chaque liste adoptée
-local groups = {}
+-- stations connues : celles des zones suivies (le serveur décide lesquelles, d'après la position du joueur)
+local book = stationzone.book()
+-- stations groupées par case de grille, refaites au passage qui suit un changement de lieu
+local groups, regroup = {}, false
 -- props affichés : id de station → { entity, model, loading }
 local shown = {}
 -- une station est mesurée si son groupe peut en avoir une à portée des props ou de l'invite
 local REACH = max(streaming.radius, cfg.interact.distance)
+
+local running, playing = false, false
+local nearestId, nearestDistance = nil, nil
+---@type fun(stationId: string|nil)|nil
+local onNearest = nil
+---@type fun(stationId: string, status: { fuel: number, busy: boolean })|nil
+local onStatus = nil
 
 ---@param station table
 ---@return string
 local function cellOf(station)
     return proximity.cell(station.x, station.y, streaming.groupCell)
 end
-
----@param list table
-local function adoptList(list)
-    known, stationsById = {}, {}
-    for _, station in ipairs(list) do
-        if type(station) == 'table' and type(station.id) == 'string' then
-            known[#known + 1] = station
-            stationsById[station.id] = station
-        end
-    end
-    -- un groupe naît « actif » pour que le premier passage retire ce qui serait hors de portée
-    groups = proximity.group(known, cellOf)
-    for _, group in ipairs(groups) do group.active = true end
-    -- une station disparue n'a plus de prop
-    for id in pairs(shown) do
-        if not stationsById[id] then props.remove(id) end
-    end
-end
-
--- état connu du serveur : station → { fuel, busy }
-local states = {}
-local running, playing = false, false
-local nearestId, nearestDistance = nil, nil
----@type fun(stationId: string|nil)|nil
-local onNearest = nil
-
-local DEFAULT_STATE = { fuel = 0, busy = false }
 
 ---@return number
 local function distance(x1, y1, z1, x2, y2, z2)
@@ -83,7 +64,7 @@ end
 ---@param id string
 ---@return table|nil
 function props.station(id)
-    return stationsById[id]
+    return book:station(id)
 end
 
 --- Type d'une station (compétences, combustible, animation, prop).
@@ -93,11 +74,11 @@ function props.type(station)
     return cfg.stationTypes[station.type]
 end
 
---- État d'une station (vide et libre tant que le serveur n'a rien publié).
+--- État d'une station (vide et libre tant que le serveur n'a rien envoyé).
 ---@param stationId string
----@return { fuel: integer, busy: boolean }
+---@return { fuel: number, busy: boolean }
 function props.state(stationId)
-    return states[stationId] or DEFAULT_STATE
+    return book:status(stationId)
 end
 
 ---@param station table
@@ -132,7 +113,7 @@ local function spawn(station, model)
         RequestModel(hash)
         local deadline = GetGameTimer() + streaming.modelTimeoutMs
         while not HasModelLoaded(hash) and GetGameTimer() < deadline do Wait(LOAD_POLL_MS) end
-        -- la station a pu sortir de portée pendant le chargement
+        -- la station a pu sortir de portée (ou bouger) pendant le chargement
         if shown[station.id] ~= entry or not HasModelLoaded(hash) then
             if shown[station.id] == entry then shown[station.id] = nil end
             SetModelAsNoLongerNeeded(hash)
@@ -165,12 +146,21 @@ local function reconcile(station, far)
     if model then spawn(station, model) end
 end
 
---- Boucle lente justifiée, seulement quand un personnage est en jeu : une distance par groupe de stations, puis une
---- par station des seuls groupes à portée ; un groupe qui sort de portée retire ses props une fois. Intervalle :
---- streaming.pollMs près d'un groupe, streaming.idlePollMs quand aucune station ne peut être à moins de
---- radius + idleMargin.
+--- Groupes refaits depuis le carnet ; un groupe naît « actif » pour que le premier passage retire ce qui serait hors
+--- de portée.
+local function rebuildGroups()
+    regroup = false
+    groups = proximity.group(book:list(), cellOf)
+    for _, group in ipairs(groups) do group.active = true end
+end
+
+--- Boucle lente justifiée, seulement quand un personnage est en jeu et qu'une station est connue : une distance par
+--- groupe de stations, puis une par station des seuls groupes à portée ; un groupe qui sort de portée retire ses props
+--- une fois. Intervalle : streaming.pollMs près d'un groupe, streaming.idlePollMs quand aucune station ne peut être à
+--- moins de radius + idleMargin.
 local function loop()
-    while playing do
+    while playing and book:size() > 0 do
+        if regroup then rebuildGroups() end
         local coords = GetEntityCoords(PlayerPedId())
         local px, py, pz = coords.x, coords.y, coords.z
         local bestId, bestDistance = nil, cfg.interact.distance
@@ -200,14 +190,19 @@ local function loop()
     running = false
 end
 
---- Personnage en jeu ou non : la boucle démarre ou s'éteint.
----@param flag boolean
-function props.setPlaying(flag)
-    playing = flag
-    if flag and not running then
+--- Démarre la boucle si un personnage est en jeu, qu'une station est connue et qu'elle ne tourne pas déjà.
+local function wake()
+    if playing and not running and book:size() > 0 then
         running = true
         CreateThread(loop)
     end
+end
+
+--- Personnage en jeu ou non : la boucle démarre (si une station est connue) ou s'éteint.
+---@param flag boolean
+function props.setPlaying(flag)
+    playing = flag
+    wake()
 end
 
 --- Station la plus proche à distance d'interaction (et sa distance), ou nil.
@@ -223,33 +218,54 @@ function props.onNearest(fn)
     onNearest = fn
 end
 
----@param key string
----@param value any
-local function applyState(key, value)
-    if key == STATE_STATIONS then
-        if type(value) == 'table' then adoptList(value) end
-        return
-    end
-    if sub(key, 1, #STATE_STATION) ~= STATE_STATION then return end
-    local stationId = sub(key, #STATE_STATION + 1)
-    if type(value) == 'table' then
-        states[stationId] = { fuel = type(value.fuel) == 'number' and value.fuel or 0, busy = value.busy == true }
-    else
-        states[stationId] = nil
-    end
-    -- l'invite montre le combustible et l'occupation : elle suit l'état
-    if onNearest and stationId == nearestId then onNearest(nearestId) end
+--- Appelé quand le combustible ou l'occupation d'une station connue change (menu ouvert sur elle).
+---@param fn fun(stationId: string, status: { fuel: number, busy: boolean })
+function props.onStatus(fn)
+    onStatus = fn
 end
 
---- Suit les state bags globaux et reprend l'état déjà publié. Appelé par client/main.lua.
+--- Zones des stations, envoyées par le core (nom local = identifiant de la station, état { def, s }) : le carnet suit,
+--- le prop d'une station qui a bougé ou disparu est retiré (la boucle le recrée à portée), l'invite et le menu ouvert
+--- suivent l'état.
+---@param kind string  'enter' | 'change' | 'leave'
+---@param id string
+---@param a any  état entier (enter) ou valeurs changées (change)
+---@param b any  clés retirées (change)
+local function onZone(kind, id, a, b)
+    local placed, statusChanged
+    if kind == 'enter' then
+        placed, statusChanged = book:enter(id, a)
+    elseif kind == 'change' then
+        placed, statusChanged = book:change(id, a, b)
+    elseif kind == 'leave' then
+        placed, statusChanged = book:leave(id)
+    else
+        return
+    end
+    if placed then
+        remove(id)
+        regroup = true
+        if id == nearestId and not book:station(id) then
+            nearestId, nearestDistance = nil, nil
+            if onNearest then onNearest(nil) end
+        end
+        wake()
+    end
+    if statusChanged then
+        -- l'invite montre le combustible et l'occupation : elle suit l'état
+        if onNearest and id == nearestId then onNearest(nearestId) end
+        if onStatus then onStatus(id, book:status(id)) end
+    end
+end
+
+--- Suit les zones des stations et le personnage. Appelé par client/main.lua.
 function props.start()
-    adoptList(cfg.stations)
-    AddStateBagChangeHandler(nil, 'global', function(_, key, value)
-        if type(key) == 'string' then applyState(key, value) end
-    end)
-    local published = GlobalState[STATE_STATIONS]
-    if type(published) == 'table' then adoptList(published) end
-    for _, station in ipairs(known) do applyState(STATE_STATION .. station.id, GlobalState[STATE_STATION .. station.id]) end
+    if core.zones then
+        local watched, watchErr = core.zones.watch(onZone)
+        if not watched then core.log.error('stations non suivies : %s', tostring(watchErr)) end
+    else
+        core.log.error('stations indisponibles : vAvA_core 0.11.0 au moins est requis')
+    end
 
     core.hooks.after('core:character:spawning', function() props.setPlaying(true) end)
     core.hooks.after('core:character:selection', function() props.setPlaying(false) end)

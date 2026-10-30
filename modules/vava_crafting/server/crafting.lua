@@ -519,7 +519,7 @@ function crafting.fuel(src, stationId, quantity)
     if not ok then return false, 'missing_items' end
     stations.addFuel(def, amount)
     bridge.Notify(src, format(messages.fueled, def.label, stations.fuel(def), fuel.capacity), 'info')
-    TriggerClientEvent(EVENTS.STATION, src, { id = def.id, fuel = stations.fuel(def), busy = stations.busyBy(def) ~= nil })
+    -- la réponse donne la réserve au menu ; les joueurs proches (l'artisan compris) la reçoivent par la zone de la station
     return true, { stock = stations.fuel(def), capacity = fuel.capacity }
 end
 

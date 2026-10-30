@@ -2,20 +2,26 @@
     vava_crafting/server/stations.lua
     Rôle : état des stations placées, tenu par le serveur : réserve de combustible (écrite par lots), occupation (un
            artisan à la fois, en mémoire), accès (publique, ou privée à son propriétaire ; d'autres genres de
-           propriétaires — foyer — se branchent par `registerAccess`), distance au joueur, publication aux clients par un
-           state bag global écrit au seul changement.
-    Dépendances : shared/constants.lua, config.lua, server/core.lua, bridge/server.lua, server/catalog.lua
+           propriétaires — foyer — se branchent par `registerAccess`), distance au joueur. Chaque station est une zone du
+           core (abonnements de zone, 1.5.0) : son dessin (`def`) et son état (`s` : combustible, occupation) ne partent
+           qu'aux joueurs proches (positions lues par le serveur), puis seulement ses changements, écrits au seul
+           changement. Aucune clé GlobalState (les anciennes sont effacées une fois au démarrage).
+    Dépendances : shared/constants.lua, config.lua, shared/stationzone.lua, server/core.lua, bridge/server.lua,
+                  server/catalog.lua
 ]]
 
-local pairs, ipairs = pairs, ipairs
+local pairs, ipairs, tostring = pairs, ipairs, tostring
 local min, max = math.min, math.max
 local time = os.time
 local GlobalState = GlobalState
 
 local bridge = VavaCrafting.bridge
 local catalog = VavaCrafting.catalog
+local stationzone = VavaCrafting.stationzone
 local cfg = VavaCrafting.config
-local STATE_STATION = VavaCrafting.STATE_STATION
+local streaming = cfg.streaming
+local LEGACY_STATE_STATION, LEGACY_STATE_STATIONS = VavaCrafting.LEGACY_STATE_STATION, VavaCrafting.LEGACY_STATE_STATIONS
+local DEF, STATUS = stationzone.DEF, stationzone.STATUS
 
 local SELECT_SQL = 'SELECT `station`, `fuel` FROM `vava_crafting_stations`'
 local UPSERT_SQL = 'INSERT INTO `vava_crafting_stations` (`station`, `fuel`, `updated_at`) VALUES (?, ?, ?) '
@@ -27,12 +33,15 @@ VavaCrafting.stations = stations
 ---@class vAvA.StationState
 ---@field fuel integer
 ---@field busyBy integer|nil     joueur qui travaille
----@field published { fuel: integer, busy: boolean }|nil
+---@field published { fuel: integer, busy: boolean }|nil   dernier état accepté par le core (nil : zone pas encore déclarée)
 ---@field dirty boolean|string   true : à écrire ; WRITING : écriture en cours (une modification pendant l'attente remet true)
 
 ---@type table<string, vAvA.StationState>
 local states = {}
 local WRITING = 'writing'
+-- stations dont la zone du core est déclarée (une déclaration refusée est retentée au changement suivant)
+---@type table<string, true>
+local declared = {}
 -- genre de propriétaire → fun(ownerId, characterId): boolean
 local accessors = {
     character = function(ownerId, characterId) return ownerId == characterId end,
@@ -60,35 +69,89 @@ local function stateOf(def)
     return states[def.id]
 end
 
---- Station ajoutée après le chargement (autre module) : état neuf, publié. Bloque le thread courant (lecture).
+--- Ancienne clé GlobalState (1.4.0 et avant) effacée si elle existe encore : une seule écriture, seulement quand le
+--- serveur n'a pas redémarré depuis l'ancienne version.
+---@param key string
+local function forgetLegacy(key)
+    if GlobalState[key] ~= nil then
+        GlobalState[key] = nil -- audit: ok (effacement unique d'une clé de l'ancienne version, plus jamais écrite)
+    end
+end
+
+--- Zone du core de la station : cercle au sol autour d'elle, connu à streaming.radius + subscribeSlack de son bord.
+---@param def vAvA.StationDefinition
+---@return table
+local function areaOf(def)
+    return stationzone.area(def, streaming.zoneRadius, streaming.radius + streaming.subscribeSlack)
+end
+
+--- Déclare la zone de la station au core, ou, déjà déclarée, la déplace et remplace son dessin et son état : les
+--- joueurs proches la reçoivent (ou la voient changer) sans reconnexion, eux seuls. Pour une station placée par un
+--- module, ou dont le lieu, le nom ou le modèle a changé (Atelier, Conseil).
+---@param def vAvA.StationDefinition
+---@return boolean ok
+function stations.share(def)
+    local state = stateOf(def)
+    local status = stationzone.status(state.fuel, state.busyBy ~= nil)
+    local ok, err
+    if declared[def.id] then
+        ok, err = bridge.MoveZone(def.id, areaOf(def))
+        if ok then ok, err = bridge.SetZone(def.id, { [DEF] = stationzone.drawing(def), [STATUS] = status }) end
+    else
+        ok, err = bridge.DefineZone(def.id, areaOf(def), { [DEF] = stationzone.drawing(def), [STATUS] = status })
+        if ok then declared[def.id] = true end
+    end
+    if not ok then
+        VavaCrafting.log.error("station '%s' non partagée avec les joueurs proches : %s", def.id, tostring(err))
+        return false
+    end
+    state.published = status
+    return true
+end
+
+--- Station ajoutée après le chargement (autre module) : état neuf, partagé avec les joueurs proches. Bloque le thread
+--- courant (lecture).
 ---@param def vAvA.StationDefinition
 function stations.adopt(def)
     if states[def.id] then return end
     local capacity = def.type.fuel and def.type.fuel.capacity or 0
     local row = bridge.db.single('SELECT `fuel` FROM `vava_crafting_stations` WHERE `station` = ?', { def.id })
     states[def.id] = { fuel = row and min(capacity, bridge.Integer(row.fuel, 0)) or 0, busyBy = nil, published = nil, dirty = row == nil }
-    stations.publish(def)
-    stations.publishList()
+    forgetLegacy(LEGACY_STATE_STATION .. def.id)
+    stations.share(def)
 end
 
+--- Combustible et occupation envoyés aux abonnés de la zone de la station, au seul changement (une différence
+--- d'environ 30 octets, regroupée par le core avec les autres changements du même tour).
 ---@param def vAvA.StationDefinition
 function stations.publish(def)
+    if not declared[def.id] then
+        stations.share(def)
+        return
+    end
     local state = stateOf(def)
-    local snapshot = { fuel = state.fuel, busy = state.busyBy ~= nil }
-    local previous = state.published
-    if previous and previous.fuel == snapshot.fuel and previous.busy == snapshot.busy then return end
-    state.published = snapshot
-    GlobalState[STATE_STATION .. def.id] = snapshot
+    local status = stationzone.status(state.fuel, state.busyBy ~= nil)
+    if stationzone.sameStatus(state.published, status) then return end
+    local ok, err = bridge.SetZone(def.id, { [STATUS] = status })
+    if not ok then
+        VavaCrafting.log.warn("station '%s' : état non envoyé aux joueurs proches : %s", def.id, tostring(err))
+        return
+    end
+    state.published = status
 end
 
---- Publie la liste des stations placées (config et modules) : les clients la dessinent.
-function stations.publishList()
-    GlobalState[VavaCrafting.STATE_STATIONS] = catalog.stationList()
-end
-
-function stations.publishAll()
-    for _, def in ipairs(catalog.stations()) do stations.publish(def) end
-    stations.publishList()
+--- Déclare au core la zone de chaque station placée (setup du module, après stations.load()) et efface les anciennes
+--- clés GlobalState. Une station refusée est écrite en console et n'empêche pas les autres.
+---@return integer shared  stations partagées
+function stations.declareAll()
+    declared = {}
+    forgetLegacy(LEGACY_STATE_STATIONS)
+    local shared = 0
+    for _, def in ipairs(catalog.stations()) do
+        forgetLegacy(LEGACY_STATE_STATION .. def.id)
+        if stations.share(def) then shared = shared + 1 end
+    end
+    return shared
 end
 
 --- Branche un genre de propriétaire (foyer, guilde…) : `fn(ownerId, characterId)` dit si le personnage a accès.

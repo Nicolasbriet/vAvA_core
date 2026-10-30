@@ -7,7 +7,7 @@ Les outils, armes, armures, bijoux, objets magiques et grandes potions sont des 
 créateur figé, poinçon, baptême d'un chef-d'œuvre, histoire des réparations. Réaliser une recette transmise devant un
 élève lui vaut une leçon. Le serveur décide de tout et demande l'XP à `vava_skills`.
 
-Ordre de démarrage : après `vAvA_core` (≥ 0.6.0), `vava_ui` (≥ 1.0.0, polices, grain, papier et coins des
+Ordre de démarrage : après `vAvA_core` (≥ 0.11.0 : abonnements de zone), `vava_ui` (≥ 1.0.0, polices, grain, papier et coins des
 interfaces ; à ne jamais arrêter sur un serveur ouvert), `vava_inventory` (≥ 1.4.0), `vava_skills` (≥ 1.0.0) et
 `vava_gathering` (≥ 1.0.0 : matières et outils de base). Facultatifs : `vava_hud`, `vava_admin` (droit `metiers`),
 `vava_chat`, `vava_health` (aucun artisanat à terre).
@@ -32,7 +32,8 @@ navigateur, depuis le dépôt (option `--allow-file-access-from-files` pour les 
 | Station tenue | une pièce jamais finie libère la station après 2 min, ou après sa durée + 30 s si c'est plus long | `interact.expireMs`, `interact.expireMarginMs` |
 | Leçons | élèves à 10 m qui ont le niveau, recette `transmission` | `lessons` |
 | Combustible | forge : charbon ; fourneau : bois de pin ; 1 par pièce, réserve 20 | `stationTypes[].fuel` |
-| Props | créés par le client à 80 m ; stations groupées par case de 200 m, seules celles d'une case à portée sont mesurées ; relues toutes les secondes près d'une case, toutes les 2,5 s quand aucune station n'est à moins de 140 m (80 m + 60 m de marge d'approche) (1.3.2) | `streaming` |
+| Props | créés par le client à 80 m ; stations groupées par case de 200 m, seules celles d'une case à portée sont mesurées ; relues toutes les secondes près d'une case, toutes les 2,5 s quand aucune station n'est à moins de 140 m (80 m + 60 m de marge d'approche) (1.3.2) ; aucune boucle tant qu'aucune station n'est connue (1.5.0) | `streaming` |
+| Stations connues du joueur | une zone du core par station, de 2 m ; reçue (dessin, combustible, occupation) à 100 m de son bord (80 m des props + 20 m : le chemin d'un cavalier au galop entre deux passages du core), oubliée au-delà de 125 m (marge de sortie du core) (1.5.0) | `streaming.zoneRadius`, `streaming.subscribeSlack` |
 | Journal | pièces Excellent+ (palier ≥ 4), réparations, baptêmes, leçons, Conseil, écritures refusées par la garde ; 180 jours | `logTier`, `logRetentionDays` |
 | Signature protégée | créateur, date, poinçon et qualité figés sur tout objet ; sur un objet signé, palier et nom figés, solidité qui ne remonte pas hors d'une réparation (voir plus bas) ; refus journalisés une fois par minute et par objet, module et clé | `guard` (`windowMs`, `maxTracked`, `bornDurability`) |
 
@@ -40,8 +41,34 @@ navigateur, depuis le dépôt (option `--allow-file-access-from-files` pour les 
 
 Un **type** (compétences servies, combustible, animation, prop) et des **instances** placées (position, nom, qualité
 0–100, propriétaire : nulle = publique, `{ kind = 'character', id }` = privée ; d'autres genres — foyer — se branchent
-par `registerAccess`). Une seule pièce à la fois par station ; état `{ fuel, busy }` publié par le state bag
-`vava_crafting:station:<id>`. Les stations livrées sont des **exemples** avec des props du jeu de base.
+par `registerAccess`). Une seule pièce à la fois par station. Les stations livrées sont des **exemples** avec des props
+du jeu de base.
+
+### Réseau : une zone du core par station (depuis 1.5.0)
+
+Chaque station placée (config, ou `addStation` d'un autre module) est une **zone du core** (`core.zones`, abonnements de
+zone de vAvA_core 0.11.0) nommée par son identifiant : cercle de 2 m autour d'elle, marge de 100 m. Son état :
+
+| Clé | Valeur | Quand elle part |
+|---|---|---|
+| `def` | `{ type, label, x, y, z, heading, prop }` : ce qu'il faut pour la dessiner (ni qualité ni propriétaire) | à l'entrée d'un joueur dans la zone (état entier), et si la station est déplacée ou renommée |
+| `s` | `{ fuel, busy }` | à l'entrée, puis à chaque changement, en différence (environ 34 o), aux seuls joueurs qui suivent la zone |
+
+- **Qui la reçoit** : le core décide seul, chaque seconde, d'après la position que lit le serveur ; personne ne la
+  demande. Un joueur loin de toute station ne reçoit rien et n'en connaît aucune ; au bourg, l'arrivée coûte environ
+  1,3 Ko pour les 7 stations livrées (une fois), puis 34 o par changement.
+- **Plus de GlobalState** : ni l'état `{ fuel, busy }` publié à tous, ni la liste des stations réécrite à chaque
+  station ajoutée. Au démarrage, les anciennes clés `vava_crafting:station:<id>` et `vava_crafting:stations` sont
+  effacées une fois si elles existent encore (serveur pas redémarré depuis 1.4.0).
+- **Station ajoutée, déplacée ou renommée en jeu** (module, Atelier, Conseil) : arrive chez les joueurs proches au
+  passage suivant (1 s au plus), sans reconnexion ; les autres la reçoivent en arrivant. Une station que le core refuse
+  (plus de place, lieu hors bornes) est écrite en console et retentée à son changement suivant.
+- **Menu ouvert** : il suit le combustible et l'occupation reçus par la zone (plus d'évènement `vava_crafting:station`).
+- **Public** : l'état d'une zone est lu par quiconque s'approche (sous OneSync, la position est déclarée par le client) ;
+  il ne contient rien de secret. Chaque action (menu, pièce, fin du geste, combustible, réparation) revérifie côté
+  serveur, au moment de l'action, la distance réelle, l'accès et l'occupation, sans se fier à l'abonnement.
+- **Sons, effets, messages d'une station** (à venir) : aux seuls abonnés de sa zone (`core.zones.subscribers(id)`) ou
+  aux joueurs à portée (`core.net.sendNear`), jamais à tous.
 
 ### Recettes
 
@@ -107,8 +134,11 @@ station.
 
 ## API
 
-Exports : `getStation(id)`, `getStations()`, `setFuel(id, n)`, `registerAccess(kind, fn(ownerId, characterId))`,
-`getRecipe(id)`, `recipesOf(type)`, `getSession(joueur)`, `getMark(personnage)`. Hooks : `vava_crafting:crafting`
+Exports : `getStation(id)`, `getStations()`, `addStation(spec)`, `setFuel(id, n)`, `registerAccess(kind, fn(ownerId,
+characterId))`, `getRecipe(id)`, `recipesOf(type)`, `getSession(joueur)`, `getMark(personnage)`. `addStation` refuse
+depuis 1.5.0 un identifiant de plus de 32 octets (`invalid_id`), une position non finie (`invalid_position`), un nom
+qui n'est pas une chaîne de 1 à 128 octets (`invalid_label`), un modèle qui n'est pas une chaîne de 1 à 64 octets
+(`invalid_prop`). Hooks : `vava_crafting:crafting`
 (before, annulable : `{ source, characterId, station, recipe, item }`), `crafted` (after : `+ quantity, quality, tier,
 signed, instanceId`), `repaired` (after : `{ source, characterId, station, recipe, item, instanceId, maxDurability }`).
 Hook écouté : `vava_inventory:metadata` (before, garde de la signature, voir plus haut). Détail : `docs/api.md`.
@@ -144,3 +174,15 @@ Hook écouté : `vava_inventory:metadata` (before, garde de la signature, voir p
 13. **Props à distance** (1.3.2) : les stations apparaissent à 80 m et disparaissent au-delà, comme avant ; le
     composteur ajouté par l'agriculture aussi ; `resmon` loin de tout puis au bourg : `vava_crafting` plus bas loin de
     tout. Détail : `docs/tests/metiers.md` § 6.
+14. **Stations par zone** (1.5.0, deux joueurs) : B loin du bourg ne reçoit rien quand A travaille à la forge
+    (`/vava_reseau joueur <B>`) ; B arrive : les stations apparaissent comme avant, `/vava_reseau zones <B>` les cite ;
+    A ajoute du charbon : l'invite de B (à la forge) et le menu ouvert suivent. Détail : `docs/tests/metiers.md` § 4.1.
+
+## À vérifier en jeu (1.5.0)
+
+- Cavalier au galop qui arrive au bourg : les props apparaissent à 80 m comme avant (zone reçue à 100 m, passage du
+  core d'une seconde).
+- Aucun « instantané redemandé » en `F8` pendant un usage normal (état d'une station puis différences dans l'ordre).
+- Coût du passage du core avec les stations (`profiler record`, `docs/tests/metiers.md` 4.1-16).
+- Serveur gardé en marche pendant la mise à jour depuis 1.4.0 (`restart vava_crafting`) : les anciennes clés
+  GlobalState disparaissent (un nouveau joueur ne les reçoit plus).

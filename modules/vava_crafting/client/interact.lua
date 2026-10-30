@@ -203,7 +203,7 @@ function interact.refreshMenu()
     return { ok = true, menu = menu }
 end
 
---- La station ouverte a changé (combustible, occupation) : l'interface la met à jour.
+--- La station ouverte a changé (combustible, occupation, reçus par sa zone) : l'interface la met à jour.
 ---@param payload table
 function interact.onStation(payload)
     if type(payload) == 'table' and menuStation and payload.id == menuStation then nui.send('station', payload) end
@@ -340,3 +340,7 @@ function interact.reset()
 end
 
 props.onNearest(interact.refreshPrompt)
+-- combustible et occupation reçus par la zone de la station : le menu ouvert sur elle suit
+props.onStatus(function(stationId, status)
+    interact.onStation({ id = stationId, fuel = status.fuel, busy = status.busy })
+end)

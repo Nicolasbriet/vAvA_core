@@ -1,8 +1,9 @@
 --[[
     vava_crafting/client/main.lua
     Rôle : assemblage côté joueur : touche d'interaction (réglable par le joueur, aucune boucle), évènements du serveur
-           (résultat d'une pièce, station mise à jour, notifications par vava_hud sinon celles du jeu), retours de
-           l'interface relayés au serveur (RPC à schéma strict), fermeture au déchargement du personnage.
+           (résultat d'une pièce, notifications par vava_hud sinon celles du jeu ; les stations arrivent par les zones
+           du core, client/props.lua), retours de l'interface relayés au serveur (RPC à schéma strict), fermeture au
+           déchargement du personnage.
     Dépendances : shared/constants.lua, config.lua, client/core.lua, client/nui.lua, client/props.lua,
                   client/interact.lua
 ]]
@@ -75,10 +76,6 @@ end)
 
 RegisterNetEvent(EVENTS.CRAFTED, function(payload)
     interact.onCrafted(payload)
-end)
-
-RegisterNetEvent(EVENTS.STATION, function(payload)
-    interact.onStation(payload)
 end)
 
 -- Retours de l'interface --------------------------------------------------------------------------------------------

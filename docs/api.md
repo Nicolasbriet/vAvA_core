@@ -1727,7 +1727,7 @@ nommé par zone et le cercle de son rayon, posés par le client depuis la config
 
 ### `vava_crafting`
 
-L'artisanat (1.3.1) : **stations** (forge, établi, métier à tisser, alambic, tannerie, fourneau, table d'arcanes)
+L'artisanat (1.5.0) : **stations** (forge, établi, métier à tisser, alambic, tannerie, fourneau, table d'arcanes)
 publiques ou privées, avec leur qualité et parfois leur combustible (forge : charbon ; fourneau : bois ; réserve
 alimentée par les joueurs), une pièce à la fois ; **recettes** à ingrédients par **palier choisi** (consommés par pile,
 les plus anciennes d'abord, échange atomique), outil requis en main, durée, XP par `vava_skills` ; **qualité** =
@@ -1741,20 +1741,27 @@ sa fin, son annulation, ou au plus 2 min (ou sa durée + 30 s si c'est plus long
 trop loin ou à terre, elle est abandonnée (rien n'est consommé) et la station libérée aussitôt. À terre
 (`vava_health:isDowned`, lu par le bridge) : ni menu, ni pièce, ni réparation, ni combustible (code `downed`). Détail,
 config et tests : `modules/vava_crafting/README.md`.
-Demande le core 0.6.0, `vava_inventory` 1.4.0, `vava_skills` 1.0.0, `vava_gathering` 1.0.0 ; facultatifs :
-`vava_hud`, `vava_admin` (droit `metiers`), `vava_chat`, `vava_health` (à terre).
+Demande le core 0.11.0 (abonnements de zone, depuis 1.5.0), `vava_inventory` 1.4.0, `vava_skills` 1.0.0,
+`vava_gathering` 1.0.0 ; facultatifs : `vava_hud`, `vava_admin` (droit `metiers`), `vava_chat`, `vava_health` (à terre).
 
 **Registres** : `vava_crafting:stations` (types : `{ label, skills, fuel?, anim, prop }`) et `vava_crafting:recipes`
 (`{ label, skill, level, station, tool?, durationMs, difficulty, xp, signed?, signedIfQuality?, durability?,
 transmission?, fragments?, ingredients = { { item, quantity, minTier? } }, output = { item, quantity } }`), remplis par
-la config, ouverts aux autres modules ; chaque recette est aussi déclarée à `vava_skills:recipes`. État d'une station :
-state bag global `vava_crafting:station:<id>` → `{ fuel, busy }`.
+la config, ouverts aux autres modules ; chaque recette est aussi déclarée à `vava_skills:recipes`.
+
+**Stations chez les joueurs** (depuis 1.5.0) : chaque station placée est une zone du core (`core.zones`, nom = son
+identifiant, cercle de 2 m, marge de 100 m : `streaming.zoneRadius`, `streaming.radius` + `streaming.subscribeSlack`) ;
+état `def` → `{ type, label, x, y, z, heading, prop }` (dessin, ni qualité ni propriétaire) et `s` → `{ fuel, busy }`,
+reçus des seuls joueurs proches, puis en différences. Plus aucune clé GlobalState (les anciennes
+`vava_crafting:station:<id>` et `vava_crafting:stations` sont effacées une fois au démarrage) ni d'évènement
+`vava_crafting:station` (le menu ouvert suit la zone). L'état est public : chaque action revérifie distance, accès et
+occupation côté serveur. Un son ou un effet de station vise `core.zones.subscribers(id)` ou `core.net.sendNear`.
 
 | Export serveur | Retour |
 |---|---|
 | `getStation(id)` · `getStations()` | `{ id, label, type, typeLabel, quality, busy, x, y, z, fuel?, owner? }` |
 | `setFuel(id, n)` | `true` ou `false, code` — journalisé au nom du module |
-| `addStation({ id, type, label?, x, y, z, heading?, quality?, owner?, prop? })` | `true` ou `false, code` — place une station d'un type déjà déclaré au registre (un module pose son composteur…) ; la liste des stations est publiée aux clients par le state bag `vava_crafting:stations` ; hook `vava_crafting:stationAdded` ; depuis 1.1.0 |
+| `addStation({ id, type, label?, x, y, z, heading?, quality?, owner?, prop? })` | `true` ou `false, code` — place une station d'un type déjà déclaré au registre (un module pose son composteur…) ; les joueurs proches la reçoivent par sa zone du core au passage suivant (1 s), sans reconnexion ; hook `vava_crafting:stationAdded` ; depuis 1.1.0. Depuis 1.5.0 : `invalid_id` au-delà de 32 octets, `invalid_position` (position non finie), `invalid_label` (nom qui n'est pas une chaîne de 1 à 128 octets), `invalid_prop` (modèle qui n'est pas une chaîne de 1 à 64 octets) |
 | `registerAccess(kind, fn)` | branche un genre de propriétaire de station : `fn(ownerId, characterId)` → booléen (foyer, guilde…) |
 | `getRecipe(id)` · `recipesOf(type)` | définitions |
 | `getSession(joueur)` | `{ token, kind = craft \| repair, station, recipe, startedAt, durationMs }` ou `nil` |

@@ -31,8 +31,8 @@ exports('getStations', function()
     return list
 end)
 
---- Place une station depuis un autre module (son type déjà déclaré au registre `vava_crafting:stations`) ; les clients
---- la voient par le state bag et la liste publiée (`getStations`). Depuis 1.1.0.
+--- Place une station depuis un autre module (son type déjà déclaré au registre `vava_crafting:stations`) ; les joueurs
+--- proches la reçoivent par sa zone du core, au passage suivant (1 s), sans reconnexion. Depuis 1.1.0.
 exports('addStation', function(spec)
     if not VavaCrafting.ready then return false, 'not_ready' end
     local def, err = catalog.addStation(spec)

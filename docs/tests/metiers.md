@@ -156,6 +156,35 @@ RegisterCommand('testsig', function(src, args)
 end, true)
 ```
 
+### 4.1 Stations par zone (`vava_crafting` 1.5.0, T-017)
+
+Chaque station est une zone du core (`core.zones`) : un joueur ne reçoit une station (dessin, combustible, occupation)
+qu'à moins de 100 m de son bord, puis ses seuls changements, et l'oublie au-delà de 125 m. Plus rien en GlobalState.
+À l'écran, rien ne doit changer, sauf le menu ouvert qui suit désormais aussi ce que font les autres (test 6).
+
+Préparation : A est Sénéchal ou Souverain (droit `tools` pour `/vava_reseau`, `metiers` pour `/artisanat`) ; B sans
+rang. Stations du bourg de (−255, −945) à (−292, −915) ; « loin » = à plus de 500 m du bourg (Registre → Déplacer).
+Console F8 ouverte chez B (`set vava_log_level debug` côté client pour voir un éventuel « instantané redemandé »).
+
+| # | Faire | Attendu |
+|---|---|---|
+| 1 | Démarrage du serveur (ou `ensure vava_crafting`) ; A : `/vava_reseau zones`. | Console : `module 'vava_crafting' v1.5.0 prêt`, aucune ligne « station … non partagée ». `/vava_reseau zones` cite `vava_crafting 8` (7 stations du bourg + le composteur de l'agriculture ; 7 sans `vava_farming`). |
+| 2 | **(2 joueurs)** B loin du bourg depuis au moins une minute ; A lance une pièce à la forge, l'interrompt, ajoute du charbon, puis `/vava_reseau joueur <B>`. | Aucune ligne `vava_crafting` dans le détail de B (ni `vAvA:zone:state` ni `vAvA:zone:diff`) ; `/vava_reseau zones <B>` : aucune zone `vava_crafting:…`. |
+| 3 | **(2 joueurs)** B marche vers la forge ; A : `/vava_reseau zones <B>` quand B est à environ 110 m de la forge, puis à environ 90 m. | À 110 m : pas de `vava_crafting:forge_bourg` ; à 90 m : citée (rayon 2 m + marge 100 m). Les props des stations apparaissent vers 80 m, comme avant ; l'invite revient en moins d'une seconde près de chaque station. |
+| 4 | **(2 joueurs)** B devant la forge ; A : `/vava_reseau joueur <B>`. | Sous `vava_crafting` : `vAvA:zone:state`, un envoi par station du bourg à l'arrivée (170 à 200 o chacun, environ 1,3 Ko en tout, tous fiables). |
+| 5 | **(2 joueurs)** B devant la forge, invite visible ; A ajoute du charbon par le menu de la forge. | L'invite de B montre la nouvelle réserve en une seconde au plus, sans rien faire ; `/vava_reseau joueur <B>` : `vAvA:zone:diff` sous `vava_crafting`, environ 34 o par changement. |
+| 6 | **(2 joueurs)** B a le menu de la forge ouvert ; A lance une pièce à la forge et la finit. | Le bandeau du menu de B passe à « Occupée » pendant la pièce, puis redevient libre avec une unité de combustible de moins (nouveau : avant, le menu ne suivait que ses propres ajouts). L'invite de B suit de même. |
+| 7 | A seul, menu de la forge ouvert : ajouter du charbon. | La réserve du menu se met à jour aussitôt, comme avant ; `/vava_reseau joueur <A>` ne cite plus d'évènement `vava_crafting:station`. |
+| 8 | **(2 joueurs)** B s'éloigne lentement de la forge jusqu'à 120 m, puis 135 m. | `/vava_reseau zones <B>` : la forge est toujours suivie à 120 m (sortie au-delà de 127 m du centre) ; plus à 135 m. Les props ont disparu dès 80 m, comme avant. |
+| 9 | **(2 joueurs)** B ouvre le menu de la forge (charbon dans la besace) ; A le déplace (Registre → Déplacer) à une vingtaine de mètres ; B, menu toujours ouvert, clique « Alimenter ». | « Trop loin. », rien n'est pris : le serveur revérifie la distance à chaque action, sans se fier à l'abonnement (B suit toujours la zone de la forge). |
+| 10 | `restart vava_farming` près du champ communal. | Le composteur réapparaît en 2 s au plus (station ajoutée par un module : zone déclarée, reçue au passage suivant, sans reconnexion) ; les stations du bourg ne clignotent pas. |
+| 11 | **(2 joueurs)** B devant la forge ; console : `restart vava_crafting`. | Après `module 'vava_crafting' v1.5.0 prêt`, les props reviennent chez B dans les 2 s, une seule fois, et l'invite marche. |
+| 12 | B retourne à la sélection du personnage devant la forge, puis rejoue. | Aucun prop ne reste au sol pendant la sélection ; à l'apparition, les stations proches reviennent dans la seconde qui suit. |
+| 13 | B se fait déplacer (Registre → Déplacer) de loin jusqu'au bourg. | Les props apparaissent au plus 1 à 2 s après l'arrivée. |
+| 14 | `resmon 1` chez B : loin de tout 30 s, puis devant les stations 30 s. | Loin : `vava_crafting` à 0,00 ms (aucune boucle tant qu'aucune station n'est connue) ; au bourg : ≤ 0,02 ms. |
+| 15 | Mise à jour depuis 1.4.0 **sans redémarrer le serveur** : `restart vava_crafting` en 1.5.0, puis un troisième joueur se connecte loin du bourg. | Aucune erreur ; le nouveau joueur ne voit aucune station tant qu'il est loin ; il les voit en arrivant au bourg (les anciennes clés GlobalState ont été effacées au démarrage). |
+| 16 | **Mesure** : le plus de joueurs possible, certains immobiles au bourg, d'autres qui le traversent ; console du serveur `profiler record 300`, puis `profiler view` ; chercher `vAvA_core`, fonctions `runPass` / `pass` de `zones.lua`. En parallèle, `/vava_reseau zones`. | Passage des zones bien sous 0,5 ms (hors jeu, Lua seul, 64 joueurs : 0,03 ms immobiles, 0,2 à 1,7 ms en mouvement selon la densité de zones) ; les 8 stations n'y pèsent presque rien. Noter les valeurs avec le nombre de joueurs et de zones (`/vava_reseau zones`). |
+
 ## 5. Agriculture — `vava_farming`
 
 | # | Faire | Attendu |

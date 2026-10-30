@@ -1,8 +1,9 @@
 --[[
     vava_crafting/server/main.lua
     Rôle : déclaration du module auprès du core : catalogue (registres, objets, recettes auprès des compétences),
-           journal, poinçon, état des stations, intentions du client (RPC à schéma strict et débit limité), joueurs
-           partis, garde de la signature (hook des métadonnées), boucle lente d'écriture, commande du Conseil.
+           journal, poinçon, état des stations (une zone du core par station), intentions du client (RPC à schéma
+           strict et débit limité), joueurs partis, garde de la signature (hook des métadonnées), boucle lente
+           d'écriture, commande du Conseil.
     Dépendances : tous les fichiers server/ du module
 ]]
 
@@ -25,7 +26,7 @@ local cfg = VavaCrafting.config
 local limits = cfg.rateLimits
 local RPC = VavaCrafting.RPC
 
-local STATION = { type = 'string', min = 1, max = 32, pattern = VavaCrafting.ID_PATTERN }
+local STATION = { type = 'string', min = 1, max = VavaCrafting.STATION_ID_MAX, pattern = VavaCrafting.ID_PATTERN }
 local RECIPE = { type = 'string', min = 1, max = 64, pattern = VavaCrafting.ID_PATTERN }
 local CHOICES = { type = 'map', max = 12, key = { type = 'string', min = 1, max = 64, pattern = '^[%w_]+$' }, value = { type = 'integer', min = 1, max = VavaCrafting.MAX_TIER }, optional = true }
 local TOKEN = { type = 'integer', min = 1, max = VavaCrafting.MAX_TOKEN }
@@ -57,7 +58,8 @@ local function setup()
     if not ok then return false, 'poinçon : ' .. tostring(err) end
     ok, err = stations.load()
     if not ok then return false, 'stations : ' .. tostring(err) end
-    stations.publishAll()
+    -- une zone du core par station : les joueurs proches la reçoivent, eux seuls (abonnements de zone)
+    stations.declareAll()
 
     for _, def in ipairs({
         { RPC.OPEN, { STATION }, limits.open, crafting.menu },
