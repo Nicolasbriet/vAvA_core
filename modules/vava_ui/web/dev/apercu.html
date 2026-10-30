@@ -1,0 +1,103 @@
+<!doctype html>
+<!--
+  vava_ui/web/dev/apercu.html
+  Rôle : planche de contrôle hors jeu (jamais livrée, absente des `files`) : les cinq polices, les textures, les
+         ornements et les jetons de vava_ui, et, pour juger le WebP, la même tuile en PNG (copies de la Chancellerie)
+         et en WebP côte à côte. Ouvrir dans un navigateur depuis le dépôt (Edge : --allow-file-access-from-files pour
+         les polices en file://).
+-->
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <title>vava_ui · planche</title>
+  <link rel="stylesheet" href="nui://vava_ui/web/css/vava_ui.css">
+  <style>
+    * { box-sizing: border-box; }
+    body { margin: 0; padding: 2rem; background: #2c3829; color: var(--ui-text); font-family: var(--ui-font-body); font-size: 18px; }
+    h1, h2 { font-family: var(--ui-font-display); font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; }
+    h1 { margin: 0 0 1rem; font-size: 1.6rem; }
+    h2 { margin: 2rem 0 0.75rem; font-size: 1.05rem; color: var(--ui-brass-bright); }
+    .grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(22rem, 1fr)); gap: 1.25rem; }
+    .leather {
+      padding: 1.25rem 1.5rem;
+      background: var(--ui-grain, none), radial-gradient(ellipse 120% 60% at 50% 0%, rgba(132, 92, 56, 0.22), transparent 65%), linear-gradient(180deg, #241a12, #15100b);
+      border: 1.3rem solid transparent;
+      border-image: var(--ui-frame, none) 18 / 1.3rem;
+      box-shadow: 0 0 0 1px var(--ui-edge);
+    }
+    .leather .muted { color: var(--ui-text-muted); }
+    .leather .faint { color: var(--ui-text-faint); }
+    .paper {
+      padding: 1.25rem 1.5rem;
+      color: var(--ui-ink);
+      background: var(--ui-paper, none), radial-gradient(ellipse 70% 55% at 30% 25%, rgba(255, 248, 228, 0.55), transparent 70%), linear-gradient(180deg, #f4e8cc, #e9d8b4);
+    }
+    .page { padding: 1.25rem 1.5rem; color: var(--ui-ink); background: var(--ui-page-surface); }
+    .page .muted, .paper .muted { color: var(--ui-ink-muted); }
+    .page .faint, .paper .faint { color: var(--ui-ink-faint); }
+    .page hr { border: 0; border-top: 1px solid var(--ui-rule); }
+    .field { display: block; width: 100%; padding: 0.4rem 0.6rem; font: inherit; color: var(--ui-ink); background: var(--ui-field); border: 1px solid var(--ui-field-rule); border-radius: 2px; }
+    .command { font-weight: 700; }
+    .divider { height: 9px; margin: 1rem 0; background: var(--ui-divider, none) left bottom / 100% 9px no-repeat; }
+    .diamond { display: inline-block; width: 14px; height: 14px; vertical-align: middle; background: var(--ui-diamond, none) center / contain no-repeat; }
+    .f-display { font-family: "Cinzel"; }
+    .f-deco { font-family: "Cinzel Decorative"; }
+    .f-body { font-family: "EB Garamond"; }
+    .sample p { margin: 0.2rem 0; font-size: 1.3rem; }
+    .tiles { display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; }
+    .tile { height: 600px; display: grid; place-items: end start; padding: 0.5rem; font-weight: 700; }
+    .tile.grain { background-color: #1d160f; }
+    .tile.paper-tile { background-color: #ecdcb8; color: var(--ui-ink); }
+  </style>
+</head>
+<body>
+  <h1>Planche de vava_ui</h1>
+
+  <h2>Polices</h2>
+  <div class="leather sample">
+    <p class="f-display" style="font-weight: 400">Cinzel 400 — Les saisons célébrées, les récoltes rassemblent</p>
+    <p class="f-display" style="font-weight: 700">Cinzel 700 — Les saisons célébrées, les récoltes rassemblent</p>
+    <p class="f-deco" style="font-weight: 400">Cinzel Decorative 400 — Les saisons célébrées</p>
+    <p class="f-deco" style="font-weight: 700">Cinzel Decorative 700 — Les saisons célébrées</p>
+    <p class="f-body" style="font-weight: 400">EB Garamond 400 — Les saisons célébrées, les récoltes rassemblent.</p>
+    <p class="f-body" style="font-weight: 700">EB Garamond 700 — Les saisons célébrées, les récoltes rassemblent.</p>
+    <p class="f-body" style="font-style: italic">EB Garamond italique — Les saisons célébrées, les récoltes rassemblent.</p>
+    <p class="f-body" style="font-style: italic; font-weight: 700">EB Garamond italique 700 — Les saisons célébrées, les récoltes rassemblent.</p>
+  </div>
+
+  <h2>Matières</h2>
+  <div class="grid">
+    <div class="leather">
+      <strong>Cuir grainé, cadre de laiton</strong>
+      <p>Texte sur cuir. <span class="muted">Atténué.</span> <span class="faint">Effacé.</span></p>
+      <div class="divider"></div>
+      <span class="diamond"></span> filet et losange
+    </div>
+    <div class="paper">
+      <strong>Parchemin à papier</strong>
+      <p>Encre. <span class="muted">Atténuée.</span> <span class="faint">Effacée.</span></p>
+    </div>
+    <div class="page">
+      <strong>Parchemin uni (sans grain)</strong>
+      <p>Encre. <span class="muted">Atténuée.</span> <span class="faint">Effacée.</span></p>
+      <hr>
+      <label>Champ crème <input class="field" value="/metiers niveau Aldric"></label>
+      <p class="command">/metiers niveau &lt;joueur&gt;</p>
+    </div>
+  </div>
+
+  <h2>Grain : PNG (Chancellerie) à gauche, WebP à droite</h2>
+  <div class="tiles">
+    <div class="tile grain" style="background-image: url('../../../../chancellerie/web/img/grain.png')">PNG</div>
+    <div class="tile grain" style="background-image: var(--ui-grain, none)">WebP</div>
+  </div>
+
+  <h2>Papier : PNG (Chancellerie) à gauche, WebP à droite</h2>
+  <div class="tiles">
+    <div class="tile paper-tile" style="background-image: url('../../../../chancellerie/web/img/paper.png')">PNG</div>
+    <div class="tile paper-tile" style="background-image: var(--ui-paper, none)">WebP</div>
+  </div>
+
+  <script src="horsjeu.js"></script>
+</body>
+</html>

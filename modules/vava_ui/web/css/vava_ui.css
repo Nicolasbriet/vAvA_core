@@ -1,0 +1,91 @@
+/*
+ * vava_ui/web/css/vava_ui.css
+ * Rôle : feuille commune des interfaces vAvA, chargée par chaque page AVANT sa propre feuille :
+ *        <link rel="stylesheet" href="nui://vava_ui/web/css/vava_ui.css">
+ *        Déclare les polices (Cinzel, EB Garamond droit et italique, Cinzel Decorative 400 et 700, licence OFL dans
+ *        ../fonts/) et des jetons --ui-* sur :root (textures, ornements, encres et matières des fonds clairs et sombres).
+ * Règles :
+ *  - aucune règle d'élément ni de classe : seulement @font-face et :root, pour que la feuille ne change rien d'elle-même
+ *    à une page (le module garde le dernier mot) ;
+ *  - adresses des polices relatives à cette feuille ; adresses des images ABSOLUES (nui://vava_ui/…), car une adresse
+ *    relative dans une propriété personnalisée peut être résolue par rapport à la feuille qui l'emploie ; hors jeu,
+ *    web/dev/horsjeu.js les remplace (même liste de jetons, vérifiée par tests/spec/ui_shared_spec.lua) ;
+ *  - un jeton d'image s'emploie toujours avec un repli : var(--ui-grain, none) (sans vava_ui, l'image disparaît, les
+ *    dégradés restent) ;
+ *  - semver : une version mineure ajoute (fichier, jeton) ; retirer ou renommer est une version majeure, faite dans le
+ *    même chantier que la mise à jour de toutes les pages qui l'emploient.
+ * Grain et gris pâles (--ui-text-*) : fonds de cuir sombre seulement. Fonds clairs : --ui-page-surface, encres --ui-ink*.
+ */
+
+@font-face {
+  font-family: "Cinzel";
+  src: url("../fonts/cinzel.woff2") format("woff2");
+  font-weight: 400 700;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "EB Garamond";
+  src: url("../fonts/eb_garamond.woff2") format("woff2");
+  font-weight: 400 700;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "EB Garamond";
+  src: url("../fonts/eb_garamond_italic.woff2") format("woff2");
+  font-weight: 400 700;
+  font-style: italic;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Cinzel Decorative";
+  src: url("../fonts/cinzel_decorative_400.woff2") format("woff2");
+  font-weight: 400;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "Cinzel Decorative";
+  src: url("../fonts/cinzel_decorative_700.woff2") format("woff2");
+  font-weight: 700;
+  font-style: normal;
+  font-display: swap;
+}
+
+:root {
+  /* textures et ornements */
+  --ui-grain: url("nui://vava_ui/web/img/grain.webp");
+  --ui-paper: url("nui://vava_ui/web/img/paper.webp");
+  --ui-frame: url("nui://vava_ui/web/img/frame.svg");
+  --ui-divider: url("nui://vava_ui/web/img/divider.svg");
+  --ui-diamond: url("nui://vava_ui/web/img/diamond.svg");
+
+  /* polices : Cinzel pour les titres seulement (capitales) ; texte et commandes en EB Garamond */
+  --ui-font-display: "Cinzel", "Palatino Linotype", Georgia, serif;
+  --ui-font-body: "EB Garamond", "Palatino Linotype", Georgia, serif;
+  --ui-font-decorative: "Cinzel Decorative", "Cinzel", Georgia, serif;
+
+  /* fonds clairs (parchemin, livre, fiche) : jamais de grain, dégradé éclairé en haut */
+  --ui-ink: #241b12;
+  --ui-ink-muted: #56442f;
+  --ui-ink-faint: #7a6750;
+  --ui-rule: rgba(70, 48, 24, 0.3);
+  --ui-page: #ece1c8;
+  --ui-page-deep: #dccdab;
+  --ui-page-surface: linear-gradient(180deg, #f3ead6 0%, var(--ui-page) 22%, var(--ui-page-deep) 100%);
+  --ui-field: #f6eedb;
+  --ui-field-rule: #b39463;
+
+  /* fonds de cuir sombre */
+  --ui-edge: #070504;
+  --ui-brass: #b39463;
+  --ui-brass-bright: #dcc08a;
+  --ui-text: #ece1c8;
+  --ui-text-muted: #a69881;
+  --ui-text-faint: #786c5c;
+}

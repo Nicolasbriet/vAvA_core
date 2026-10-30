@@ -479,11 +479,32 @@ chaque caractère pris dans `letters` ou dans `separators`) sans en garder de co
 
 Ressources séparées, dans `modules/` : à copier (ou lier) dans le dossier `resources` du serveur, dans cet ordre (le
 même que `README.md` à la racine, et celui qu'écrit la Chancellerie) :
-`ensure oxmysql`, `ensure vAvA_core`, `ensure vava_chat` (à la place de `ensure chat`), `ensure vava_world`,
-`ensure vava_time`, `ensure vava_appearance`, `ensure vava_characters_ui`, `ensure vava_hud`, `ensure vava_inventory`,
-`ensure vava_needs`, `ensure vava_health`, `ensure vava_admin`, `ensure vava_voice`, `ensure vava_cameras`,
-`ensure vava_magic`, `ensure vava_skills`, `ensure vava_gathering`, `ensure vava_crafting`, `ensure vava_farming`,
-`ensure vava_codex`, `ensure vava_chancellerie`, puis les modules qui déclarent des objets.
+`ensure oxmysql`, `ensure vAvA_core`, `ensure vava_ui`, `ensure vava_chat` (à la place de `ensure chat`),
+`ensure vava_world`, `ensure vava_time`, `ensure vava_appearance`, `ensure vava_characters_ui`, `ensure vava_hud`,
+`ensure vava_inventory`, `ensure vava_needs`, `ensure vava_health`, `ensure vava_admin`, `ensure vava_voice`,
+`ensure vava_cameras`, `ensure vava_magic`, `ensure vava_skills`, `ensure vava_gathering`, `ensure vava_crafting`,
+`ensure vava_farming`, `ensure vava_codex`, `ensure vava_chancellerie`, puis les modules qui déclarent des objets.
+
+### `vava_ui`
+
+Polices, textures et ornements communs des interfaces, servis par `nui://vava_ui/web/…` (aucun script, aucun export,
+aucun hook, rien à régler). Démarre juste après `vAvA_core`. Contrat public (règles complètes, poids et jetons :
+`modules/vava_ui/README.md`) :
+
+- feuille `nui://vava_ui/web/css/vava_ui.css`, liée par la page **avant** sa propre feuille ; ligne hors jeu à la place
+  de l'ancien `<script src="js/devmock.js">` (en jeu elle ne fait rien ; `web/dev/` n'est jamais dans `files`) :
+  `<script>typeof GetParentResourceName === 'function' || document.write('<script src="../../vava_ui/web/dev/horsjeu.js"><\/script><script src="dev/devmock.js"><\/script>');</script>` ;
+- familles `"Cinzel"`, `"EB Garamond"` (droit et italique, 400 à 700), `"Cinzel Decorative"` (400, 700) ;
+- jetons `--ui-*` sur `:root` : images `--ui-grain`, `--ui-paper`, `--ui-frame`, `--ui-divider`, `--ui-diamond`,
+  **toujours** employées avec un repli (`var(--ui-grain, none)`) ; polices `--ui-font-display`, `--ui-font-body`,
+  `--ui-font-decorative` ; couleurs des fonds clairs (`--ui-ink*`, `--ui-rule`, `--ui-page*`, `--ui-field*`) et du cuir
+  (`--ui-edge`, `--ui-brass*`, `--ui-text*`) ;
+- toute ressource dont la page l'emploie déclare `dependency 'vava_ui'` : FXServer démarre alors `vava_ui` d'office, et
+  arrêterait la ressource avec lui (**jamais** de `stop` ni de `restart vava_ui` sur un serveur ouvert) ;
+- évolution : version mineure = ajout d'un fichier ou d'un jeton ; majeure = retrait ou renommage, avec toutes les
+  pages qui l'emploient dans le même chantier. Un fichier y entre dès que deux ressources l'emploient.
+
+Les interfaces gardent leurs propres copies jusqu'à leur bascule (T-012).
 
 ### `vava_appearance`
 
