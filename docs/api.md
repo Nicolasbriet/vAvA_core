@@ -504,7 +504,8 @@ aucun hook, rien à régler). Démarre juste après `vAvA_core`. Contrat public 
 - évolution : version mineure = ajout d'un fichier ou d'un jeton ; majeure = retrait ou renommage, avec toutes les
   pages qui l'emploient dans le même chantier. Un fichier y entre dès que deux ressources l'emploient.
 
-Les interfaces gardent leurs propres copies jusqu'à leur bascule (T-012).
+Adopté par `vava_hud` (1.4.0, pilote) ; les autres interfaces gardent leurs propres copies jusqu'à leur bascule
+(T-012).
 
 ### `vava_appearance`
 
@@ -794,7 +795,8 @@ Jauges affichées quand un personnage est en jeu ; masquées pendant la sélecti
   (`{ id, reason }`) à l'interruption, `reason` = `module` (`cancelProgress`, ou arrêt de la ressource qui l'avait
   lancée) ou `hidden` (retour à la sélection, déchargement du personnage).
 - Pour travailler le rendu sans le jeu : `web/index.html?values=0.8,0.62,0.08` dans un navigateur ; `&progress=1`
-  (barre de 8 s menée à son terme) ou `&progress=cancel` (interrompue à 60 %).
+  (barre de 8 s menée à son terme) ou `&progress=cancel` (interrompue à 60 %). Depuis 1.4.0, polices et grain viennent
+  de `vava_ui` (dépendance déclarée) et les données simulées de `web/dev/devmock.js`, jamais livré.
 
 ### `vava_health`
 

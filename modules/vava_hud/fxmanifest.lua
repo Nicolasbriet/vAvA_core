@@ -3,7 +3,8 @@
     Rôle : affichage en jeu : retire l'interface native de GTA (minimap, HUD, notifications) et la remplace par des
            jauges (santé, faim, soif…), des notifications et une barre de progression des actions longues que les
            autres modules utilisent par exports. Ressource cliente uniquement.
-    Dépendances : vAvA_core ≥ 0.3.0 (hooks client du personnage)
+    Dépendances : vAvA_core ≥ 0.3.0 (hooks client du personnage) ; vava_ui ≥ 1.0.0 (polices et grain de la page, par
+                  nui://vava_ui/…)
 ]]
 
 fx_version 'cerulean'
@@ -13,18 +14,18 @@ use_experimental_fxv2_oal 'yes'
 
 name 'vava_hud'
 description 'Affichage en jeu vAvA (jauges, notifications, progression)'
-version '1.3.0'
+version '1.4.0'
 
 dependency 'vAvA_core'
+dependency 'vava_ui'
 
 ui_page 'web/index.html'
 
+-- polices et grain : vava_ui ; les données simulées hors jeu (dossier dev/) ne sont jamais livrées
 files {
     'web/index.html',
     'web/css/*.css',
     'web/js/*.js',
-    'web/img/*',
-    'web/fonts/*.woff2',
 }
 
 client_scripts {
