@@ -27,6 +27,7 @@ Ordre de démarrage : après `vAvA_core` (≥ 0.6.0), `vava_inventory` (≥ 1.4.
 | Station tenue | une pièce jamais finie libère la station après 2 min, ou après sa durée + 30 s si c'est plus long | `interact.expireMs`, `interact.expireMarginMs` |
 | Leçons | élèves à 10 m qui ont le niveau, recette `transmission` | `lessons` |
 | Combustible | forge : charbon ; fourneau : bois de pin ; 1 par pièce, réserve 20 | `stationTypes[].fuel` |
+| Props | créés par le client à 80 m ; stations groupées par case de 200 m, seules celles d'une case à portée sont mesurées ; relues toutes les secondes près d'une case, toutes les 2,5 s quand aucune station n'est à moins de 140 m (80 m + 60 m de marge d'approche) (1.3.2) | `streaming` |
 | Journal | pièces Excellent+ (palier ≥ 4), réparations, baptêmes, leçons, Conseil, écritures refusées par la garde ; 180 jours | `logTier`, `logRetentionDays` |
 | Signature protégée | créateur, date, poinçon et qualité figés sur tout objet ; sur un objet signé, palier et nom figés, solidité qui ne remonte pas hors d'une réparation (voir plus bas) ; refus journalisés une fois par minute et par objet, module et clé | `guard` (`windowMs`, `maxTracked`, `bornDurability`) |
 
@@ -135,3 +136,6 @@ Hook écouté : `vava_inventory:metadata` (before, garde de la signature, voir p
 12. **Signature protégée** : avec la ressource jetable de `docs/tests/metiers.md` § 4 (tests 14 à 17), réécrire le
     créateur ou faire monter la solidité d'une hache signée → refusé (`signature_locked`, `durability_locked`), fiche
     inchangée, ligne au journal ; l'usure de la récolte, la réparation et le baptême marchent toujours.
+13. **Props à distance** (1.3.2) : les stations apparaissent à 80 m et disparaissent au-delà, comme avant ; le
+    composteur ajouté par l'agriculture aussi ; `resmon` loin de tout puis au bourg : `vava_crafting` plus bas loin de
+    tout. Détail : `docs/tests/metiers.md` § 6.
