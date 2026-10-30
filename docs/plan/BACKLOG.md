@@ -510,7 +510,13 @@ versé à T-014 ; les autres points déjà couverts sont précisés dans T-012 �
 ## Phase 2 — Arrivée
 
 ### T-020 — Écran de chargement `vava_loading`
-- Agents : vava-architecte → vava-dev-lua + vava-dev-nui (cette tâche autorise à toucher le core, `vava_characters_ui`, `chancellerie/`, `scripts/verifier.sh` et `scripts/audit-exceptions.txt`, dans les limites de la spec) · Dépend de : T-012 · Statut : en cours
+- Agents : vava-architecte → vava-dev-lua + vava-dev-nui (cette tâche autorise à toucher le core, `vava_characters_ui`, `chancellerie/`, `scripts/verifier.sh` et `scripts/audit-exceptions.txt`, dans les limites de la spec) · Dépend de : T-012 · Statut : à tester en jeu (relu sécurité, réseau et lore, suites appliquées ; fusionnée sans test en jeu, à la demande du porteur du projet)
+- Fait le 30 octobre 2026 : `vava_loading` 1.0.0 (≈ 222 Ko livrés, aucun RPC ni évènement réseau), core 0.13.0,
+  `vava_characters_ui` 1.2.0, Chancellerie 1.8.1. Rapport `docs/plan/rapports/T-020.md`. **À tester en jeu** :
+  `docs/tests/chargement.md`, en priorité aucune image noire au passage à la sélection (3-2), messages réellement
+  reçus et seuils des feux recalibrés avec le journal sur le serveur de test (1-4, à publier avec T-021), runes
+  lisibles (2-3), coût sur une petite machine (5-1). Reste pour T-021 : rappel dans les README de `vava_codex`,
+  `vava_inventory`, `vava_voice`, `vava_chat` qu'un changement de touche par défaut retouche `strings.js` (décision 12).
 - Spec : `docs/plan/specs/T-020.md` (treize décisions retenues telles que proposées, sur délégation du porteur du projet,
   le 30 octobre 2026 : core 0.13.0 qui laisse l'écran à `vava_loading` avec un filet de 30 s, hook
   `vava_characters_ui:shown`, polices embarquées, aucune musique livrée, ouverture à chaque connexion).

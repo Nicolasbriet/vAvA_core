@@ -22,6 +22,17 @@ et un nom refusé l'est à la création).
   `vava_appearance:create`) et joué aussitôt.
 - L'écran se ferme au hook `core:character:loaded` : l'apparition qui suit est celle du core.
 
+## Hook et export (1.2.0)
+
+Pour l'écran de chargement (`vava_loading`), qui passe à la sélection sans écran noir quand elle est prête :
+
+| Nom | Genre | Quand, ce qu'il rend |
+|---|---|---|
+| `vava_characters_ui:shown` | hook client (after), payload `{}` | à la fin de l'ouverture : scène, caméra, liste des personnages, page et focus en place, fondu d'entrée lancé ; une fois par ouverture (connexion, retour à la sélection) |
+| `isShown()` | export client | `true` entre la fin de l'ouverture et la fermeture (personnage joué, arrêt de la ressource), sinon `false` ; lu par `vava_loading` à son démarrage s'il a manqué le hook |
+
+Rien d'autre ne change : l'écran ne sait rien du chargement, il annonce seulement qu'il est affiché.
+
 ## Règles (config.lua)
 
 | Règle | Défaut | Clé |
@@ -105,3 +116,5 @@ Procédure complète : `docs/tests/personnage.md` (sections 1 à 4 et 9). En pri
 3. **Arrêt** (9-2, 9-3) : `restart vava_characters_ui` dans l'éditeur ne laisse ni ped d'aperçu, ni caméra figée, ni
    souris prise ; la sélection revient avec sa liste.
 4. `F8` par-dessus l'écran de sélection (§ 0.2 de la procédure).
+5. **Passage depuis l'écran de chargement** (1.2.0, `docs/tests/chargement.md` § 3) : à la connexion, l'éclair de
+   `vava_loading` se dissout sur la sélection déjà en place, sans image noire ; la souris répond aussitôt.

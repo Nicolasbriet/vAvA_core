@@ -13,7 +13,7 @@ use_experimental_fxv2_oal 'yes'
 
 name 'vava_characters_ui'
 description 'Sélection et création de personnage vAvA'
-version '1.1.0'
+version '1.2.0'
 
 dependencies {
     'vAvA_core',

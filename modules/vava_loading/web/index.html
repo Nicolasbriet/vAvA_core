@@ -1,0 +1,105 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Eldoria</title>
+  <!--
+    vava_loading/web/index.html
+    Rôle : l'écran de chargement d'Eldoria (référence : docs/maquettes/Chargement.html). Paysage de nuit peint par le
+           code, titre qui s'embrase devant un sceau de runes, extraits du lore et conseils en rotation, six feux de
+           veille allumés par la progression réelle (messages du jeu et du client Lua de vava_loading), éclair final
+           vers la sélection du personnage. Tous les textes viennent de js/strings.js, les réglages de js/config.js.
+           Aucune image, aucune ressource externe : polices dans fonts/, le reste est dessiné.
+    Ouverte dans un navigateur depuis le dépôt, la page rejoue une progression simulée (ligne hors jeu ci-dessous).
+  -->
+  <link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+  <div class="scene" id="scene">
+    <canvas id="world" aria-hidden="true"></canvas>
+    <div class="vignette"></div>
+    <canvas id="fx" aria-hidden="true"></canvas>
+
+    <div class="ui">
+      <header class="top late">
+        <div class="realm">
+          <svg width="10" height="10" viewBox="0 0 10 10" aria-hidden="true"><path d="M5 .8 9.2 5 5 9.2.8 5Z" fill="#1a130d" stroke="#c9aa72" stroke-width=".9"/><path d="M5 3.2 6.8 5 5 6.8 3.2 5Z" fill="#c9aa72"/></svg>
+          <span data-text="realm"></span>
+          <span class="tagline" data-text="tagline"></span>
+        </div>
+        <button class="music" id="music" type="button" aria-pressed="false" hidden>
+          <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M2 6h3l4-3v10l-4-3H2z" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linejoin="round"/><path id="music-wave" d="M11.5 5.5 14.5 10.5M14.5 5.5 11.5 10.5" fill="none" stroke="currentColor" stroke-width="1.2" stroke-linecap="round"/></svg>
+          <span id="music-label" data-text="musicOff"></span>
+        </button>
+      </header>
+
+      <section class="crest">
+        <div class="sigil" aria-hidden="true">
+          <div class="sigil-halo"></div>
+          <div class="ring ring-a">
+            <svg viewBox="0 0 400 400">
+              <defs><path id="rune-circle" d="M200,200 m-150,0 a150,150 0 1,1 300,0 a150,150 0 1,1 -300,0"/></defs>
+              <g fill="none" stroke="#b39463" stroke-opacity=".55">
+                <circle cx="200" cy="200" r="182" stroke-width=".8"/>
+                <circle cx="200" cy="200" r="174" stroke-width=".4" stroke-dasharray="2 6"/>
+              </g>
+              <text class="runes"><textPath href="#rune-circle" id="runes"></textPath></text>
+            </svg>
+          </div>
+          <div class="ring ring-b">
+            <svg viewBox="0 0 400 400">
+              <g fill="none" stroke="#b39463" stroke-opacity=".4">
+                <circle cx="200" cy="200" r="130" stroke-width=".6"/>
+                <polygon points="200,72 311,264 89,264" stroke-width=".6"/>
+                <polygon points="200,328 89,136 311,136" stroke-width=".6"/>
+                <circle cx="200" cy="200" r="96" stroke-width=".4" stroke-dasharray="1 4"/>
+              </g>
+            </svg>
+          </div>
+        </div>
+        <p class="eyebrow late" data-text="eyebrow"></p>
+        <h1 class="title" id="title"></h1>
+        <div class="spark-line"></div>
+        <p class="motto late" data-text="motto"></p>
+      </section>
+
+      <aside class="lore late" aria-live="polite">
+        <p class="label" data-text="loreLabel"></p>
+        <blockquote id="quote"></blockquote>
+      </aside>
+      <aside class="tipbox late">
+        <p class="label" data-text="tipLabel"></p>
+        <p class="tip" id="tip"></p>
+      </aside>
+
+      <footer class="progress late">
+        <div class="line">
+          <p class="stage" id="stage"></p>
+          <span class="pct" id="pct"></span>
+        </div>
+        <div class="path" id="path" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0">
+          <div class="track"></div>
+          <div class="fill" id="fill"></div>
+        </div>
+        <div class="detail"><span id="detail"></span><span id="step"></span></div>
+      </footer>
+    </div>
+
+    <div class="curtain"></div>
+    <button class="skip" id="skip" type="button" data-text="skip"></button>
+
+    <div class="handoff" id="handoff"><p><span data-text="handoffTitle"></span><span class="handoff-text" data-text="handoffText"></span></p></div>
+  </div>
+
+  <script src="js/config.js"></script>
+  <script src="js/strings.js"></script>
+  <script src="js/text.js"></script>
+  <script src="js/progress.js"></script>
+  <script src="js/quality.js"></script>
+  <script src="js/scene.js"></script>
+  <!-- hors jeu seulement (page ouverte depuis le dépôt) : progression simulée, jamais livrée -->
+  <script>location.protocol === 'file:' && document.write('<script src="dev/devmock.js"><\/script>');</script>
+  <script src="js/app.js"></script>
+</body>
+</html>
