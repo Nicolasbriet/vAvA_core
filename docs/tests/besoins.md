@@ -1,6 +1,6 @@
 # Besoins — procédure de test en jeu
 
-Procédure pour vérifier en jeu `vava_needs` 1.1.2 (faim et soif) avec ses voisins : médaillons de `vava_hud` 1.3.0,
+Procédure pour vérifier en jeu `vava_needs` 1.2.0 (faim et soif) avec ses voisins : médaillons de `vava_hud` 1.3.0,
 objets de `vava_inventory` 1.6.1, mise à terre de `vava_health` 1.1.3, Registre du Conseil. Le module n'a ni
 commande ni RPC : la faim et la soif ne changent que par le temps, les objets, le Registre et l'API des autres modules.
 Comptez 45 minutes seul avec les outils de test (§ 0.2) ; les tests à deux joueurs sont marqués **(2 joueurs)**. Un
@@ -90,10 +90,13 @@ comble est à 95 ou plus, ou pendant les 3 s du geste précédent.
 ## 4. À zéro
 
 À 0, chaque passage du serveur (60 s) retire des points de vie GTA : 2 pour la faim, 4 pour la soif, 6 quand les deux
-sont épuisés ; aucun message à chaque perte. Avec `vava_health` (le cas du serveur), aucun plancher : le joueur finit
-à terre, et à terre la faim, la soif et les pertes s'arrêtent. Sans lui, la vie ne descend pas sous 10 % de la jauge
-(`health.floor`). Pour un ped de 200 points de vie (le cas habituel, à confirmer pour un modèle féminin), un point vaut
-1 % de la jauge Santé.
+sont épuisés ; aucun message à chaque perte. Avec `vava_health` (le cas du serveur), la perte est **décidée et
+appliquée par le serveur** (`vava_needs` 1.2.0 : export `damage` de `vava_health`, part de la vie au-dessus du seuil
+d'après la vie maximale lue côté serveur ; un client modifié ne peut plus l'ignorer), aucun plancher : le joueur finit
+à terre, et à terre la faim, la soif et les pertes s'arrêtent. Sans lui, seul repli, le serveur envoie la perte au
+joueur, dont le client l'applique sans descendre sous 10 % de la jauge (`health.floor`). Pour un ped de 200 points de
+vie (le cas habituel, à confirmer pour un modèle féminin), un point vaut 1 % de la jauge Santé. L'endurance réduite
+(§ 2) reste un effet du client.
 
 | # | Faire | Attendu |
 |---|---|---|
@@ -103,7 +106,9 @@ sont épuisés ; aucun message à chaque perte. Avec `vava_health` (le cas du se
 | 4 | À terre : `/besoins`, puis encore 3 min plus tard. | « faim 0.0 · soif 0.0 » les deux fois ; la Santé ne bouge plus. |
 | 5 | Registre → vous → Soigner. | Relevé sur place, Santé 100 % ; les pertes reprennent au passage suivant (−6 %). |
 | 6 | Registre → vous → Nourrir. | Faim et Soif à 100, anneaux pleins ; plus aucune perte. |
-| 7 | (Facultatif, sans `vava_health`) `/vie 20`, `/besoins 0 0`, console du serveur `stop vava_health` ; attendre 3 min ; `ensure vava_health` puis `ensure vava_dev_characters`. | Au retour du module, médaillon Santé à 10 % (plancher), personnage debout (à confirmer : GTA ne rend pas de vie pendant l'arrêt). Ensuite le plancher est levé : à terre au 2e passage. |
+| 7 | (Facultatif, sans `vava_health`) `/vie 20`, `/besoins 0 0`, console du serveur `stop vava_health` ; attendre 3 min ; `ensure vava_health` puis `ensure vava_dev_characters`. | Pendant l'arrêt, le client applique la perte (repli) : médaillon Santé à 10 % (plancher), personnage debout (à confirmer : GTA ne rend pas de vie pendant l'arrêt). Au retour du module, le serveur reprend la main et le plancher est levé : à terre au 2e passage. |
+| 8 | Serveur maître (`vava_needs` 1.2.0) : `/vie 50`, `/besoins 0 0`, attendre deux passages, puis Registre → vous (fiche Santé). | Médaillon et fiche du Registre d'accord à chaque passage (50, 44, 38 %) ; la perte est faite par `vava_health` (vie relue côté serveur), aucune ligne « perte de vie (faim, soif) du joueur n non appliquée » dans la console du serveur. |
+| 9 | Faim et soif à 0 : `/perso quitter`, reprendre le personnage et rester sur l'écran noir d'apparition jusqu'au passage suivant (réglage `tickMs = 15000` du § 0.5 conseillé). | Aucune perte avant l'apparition, aucune ligne d'avertissement en console ; les pertes reprennent une fois apparu (après le court délai de `vava_health`). |
 
 ## 5. Persistance et reconnexion
 
@@ -169,7 +174,10 @@ FROM vava_characters WHERE deleted_at IS NULL;
   la console du client.
 - L'effet réel de `SetPlayerMaxStamina` à 35 % sur la course (§ 2-3).
 - Le seuil de course (4 m/s horizontaux) : le trot par défaut compte-t-il ? Le § 1-4 le montrera.
-- La dernière perte de vie à 0 couche le ped à une vie GTA de 0 (avec `vava_health`), au lieu de le poser au seuil de
-  100 où GTA pourrait le laisser debout ; et `vava_health` recouche de toute façon un ped resté au seuil (§ 4-3).
+- La dernière perte de vie à 0 couche le ped à une vie GTA de 0 (avec `vava_health` : son export `damage` amène la
+  vie à 0 et son client couche le ped), au lieu de le poser au seuil de 100 où GTA pourrait le laisser debout ; et
+  `vava_health` recouche de toute façon un ped resté au seuil (§ 4-3).
+- La vie maximale lue côté serveur (`GetEntityMaxHealth` du ped, OneSync) vaut bien celle du client (200 pour le
+  modèle habituel) : sinon les pertes du § 4-8 ne tombent pas sur 2, 4, 6 %.
 - Le rendu des médaillons et des notifications : `modules/vava_hud/web/index.html?values=0.8,0.62,0.08` dans un
   navigateur.

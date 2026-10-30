@@ -111,9 +111,12 @@ la fin, sang à l'interruption. Hors jeu : `modules/vava_hud/web/index.html?prog
 |---|---|---|
 | 1 | Canne en main au bord de la Rivière Claire, `E`. | « Ligne lancée… », animation. |
 | 2 | Attendre la touche (4 à 14 s). | Barre de tension : tenir `E` fait monter l'aiguille, relâcher la fait descendre ; la zone dérive. |
-| 3 | Tenir l'aiguille dans la zone 60 % du temps. | Truite dans la besace (palier) ; charge du banc − 1. |
-| 4 | Ne pas tenir. | « La prise s'est échappée », aucune charge consommée. |
+| 3 | Tenir l'aiguille dans la zone 60 % du temps. | « La ligne a tenu ! » dans la barre, puis le plus souvent truite dans la besace (palier) et charge du banc − 1. |
+| 4 | Ne pas tenir. | « La ligne s'est relâchée… » puis « La prise s'est échappée », aucune charge consommée. |
 | 5 | Marcher pendant la barre. | Interruption. |
+| 6 | Prise tirée par le serveur (`vava_gathering` 1.4.0) : Pêche au niveau 0 (`/metiers niveau <vous> peche 0`), Rivière Claire à pleine vitalité (`/recolte vitalite riviere_claire 100`), réussir la barre une douzaine de fois (`/recolte recharger riviere_claire_truite_1` quand le banc est vide). | Environ une prise sur quatre (25 %) : « La ligne a tenu ! » puis « La ligne a tenu, mais le poisson se décroche au dernier moment. » ; ni charge, ni vitalité, ni solidité de la canne, ni XP pris. Les autres : truite comme au test 3. |
+| 7 | Même essai à Pêche 100 (`/metiers niveau <vous> peche 100`). | Presque jamais décroché (2 %). |
+| 8 | Eaux fatiguées : `/recolte vitalite riviere_claire 40`, Pêche 0, une douzaine de barres réussies. | Plus de pertes qu'au test 6 : 30 % de poissons décrochés, puis 25 % des restants « La récolte échoue : la terre est fatiguée ici. » (échec de la bande, canne usée). Remettre `/recolte vitalite riviere_claire 100`. |
 
 ## 4. Artisanat — `vava_crafting`
 
@@ -169,6 +172,10 @@ end, true)
 | 11 | `restart vava_farming`. | Emplacements retrouvés, croissance rattrapée d'après les dates. |
 | 12 | Près d'un emplacement, puis d'un puits, puis du grenier : `/aterre`, puis `E` ; relevé, lancer un semis et `/aterre` pendant la barre. | À terre : ni invite, ni menu, ni seau rempli, ni grenier ouvert ; `E` ne fait que rendre l'âme. Tombé pendant le semis : graine gardée, emplacement inchangé (« Vous êtes à terre. » à la fin de la barre, ou geste interrompu si le corps a glissé). |
 | 13 | Grenier ouvert (`E`), un objet en main de souris : se faire mettre à terre (`/aterre`). Relevé, `E` au grenier, puis `/aterre` de nouveau pendant un glisser vers le grenier. | À la chute, l'inventaire se ferme aussitôt, grenier et besace (export `close` de l'inventaire, appelé par `vava_health`) ; rien n'est déplacé, aucune ligne dans `vava_farming_granary_log`. Relevé, `E` rouvre le grenier et les gestes reprennent ; le second `/aterre` le referme de même ; s'éloigner de plus de 4 m le ferme comme d'habitude. |
+| 14 | **(2 joueurs)** Ordre de la récolte (`vava_farming` 1.5.1) : une plante de blé mûre au champ communal ; les deux lancent Récolter dessus et finissent le geste à quelques instants d'écart. | Un seul reçoit le blé (et peut-être des graines) ; l'autre lit « Ce geste n'est plus en cours. » et ne reçoit rien ; l'emplacement est libre ; une seule perte de fertilité ; `vava_farming_log` : au plus une ligne `harvested` (récolte Excellent ou mieux). |
+| 15 | Besace pleine à la fin d'une récolte : lancer Récolter sur un blé mûr **couvert** (§ 5.1), puis, pendant la barre, remplir la besace (catalogue de développement) jusqu'à ce que le blé n'y tienne plus. | « Vous ne pouvez rien porter de plus. » ; la plante est toujours là, mûre et **couverte** (fiche), fertilité inchangée ; vider la besace et récolter de nouveau réussit (la couverture part alors avec la plante). |
+| 16 | **(2 joueurs)** Une plante morte : les deux lancent Arracher dessus et finissent à quelques instants d'écart. | Un seul arrache et reçoit les déchets végétaux ; l'autre lit « Ce geste n'est plus en cours. » ; une seule ligne `cleared` au journal. |
+| 17 | Arracher une plante morte la besace pleine. | La plante est arrachée quand même (« Emplacement dégagé. », sans déchets) : les déchets sont perdus, l'emplacement est libre. Décision à confirmer (rapport T-029). |
 
 ### 5.1 Couvrir et gel (`vava_farming` 1.5.0, `vava_time` 1.2.0)
 

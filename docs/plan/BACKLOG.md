@@ -209,7 +209,7 @@ Corrections issues de l'audit T-010 (30 octobre 2026), à prendre avant le reste
 - Critères : test de la règle pure (clés protégées) ; README et `docs/api.md` à jour ; version montée.
 
 ### T-029 — Le serveur décide : pêche, récolte communale, faim et soif
-- Agent : vava-dev-lua · Dépend de : — · Statut : en cours
+- Agent : vava-dev-lua · Dépend de : — · Statut : à tester en jeu
 - **IMPORTANT** (`securite-vava_gathering.md`) : la réussite de la barre de tension est calculée par la page
   (`web/js/view-tension.js:81`) et transmise par le client (`client/fishing.lua:50`, `server/fishing.lua:50`) : un
   client modifié prend un poisson à chaque touche. Faire tirer la réussite par le serveur (chance selon le niveau de
@@ -225,6 +225,8 @@ Corrections issues de l'audit T-010 (30 octobre 2026), à prendre avant le reste
   client.
 - Critères : tests des règles pures (chance de pêche, ordre de la récolte) ; procédures `docs/tests/metiers.md` et
   `besoins.md` complétées ; versions montées.
+- Fait le 30 octobre 2026 : `vava_gathering` 1.4.0, `vava_farming` 1.5.1, `vava_needs` 1.2.0 ; compte rendu, réglages
+  de la pêche et décisions à confirmer dans `docs/plan/rapports/T-029.md`.
 
 Corrections issues de l'audit réseau T-011 (30 octobre 2026). Son seul BLOQUANT (zones de voix envoyées à tous) est
 versé à T-014 ; les autres points déjà couverts sont précisés dans T-012 à T-019.
