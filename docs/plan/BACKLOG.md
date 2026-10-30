@@ -405,7 +405,8 @@ versé à T-014 ; les autres points déjà couverts sont précisés dans T-012 �
   13,9 ms (très dense) ; garder 1 s. Compte rendu `docs/plan/rapports/T-014.md`, procédure `docs/tests/zones.md`.
 
 ### T-015 — Récolte : GlobalState → abonnements de zone
-- Agent : vava-dev-lua · Dépend de : T-014 · Statut : à tester en jeu (rapport docs/plan/rapports/T-015.md ; relu sécurité et réseau, suites appliquées ; fusionnée sans test en jeu, à la demande du porteur du projet)
+- Agent : vava-dev-lua · Dépend de : T-014 · Statut : validée
+- Validée le 30 octobre 2026 par le porteur du projet, après essai en jeu. Rapport `docs/plan/rapports/T-015.md`.
 - `vava_gathering` (zones et nœuds) n'écrit plus dans GlobalState. Même comportement en jeu.
 - Fait le 30 octobre 2026 : `vava_gathering` 1.6.0, une zone du core par zone de récolte (état `zone` → bande et
   cicatrice, `n:<nœud>` → charges ; vitalité plus publiée), aux seuls joueurs proches, en différences. Suites des
@@ -425,7 +426,8 @@ versé à T-014 ; les autres points déjà couverts sont précisés dans T-012 �
   128 m à juger).
 
 ### T-016 — Agriculture : GlobalState → abonnements de zone
-- Agent : vava-dev-lua · Dépend de : T-014 · Statut : à tester en jeu (relu sécurité et réseau, suites appliquées ; fusionnée sans test en jeu, à la demande du porteur du projet)
+- Agent : vava-dev-lua · Dépend de : T-014 · Statut : validée
+- Validée le 30 octobre 2026 par le porteur du projet, après essai en jeu.
 - Rapport : `docs/plan/rapports/T-016.md` (`vava_farming` 1.7.0) ; procédure : `docs/tests/metiers.md` § 5.2.
 - Fait le 30 octobre 2026 : une zone du core par parcelle (définition et emplacements à l'arrivée, puis les seuls
   emplacements changés, ~40 o, aux seuls joueurs proches, un envoi par parcelle pour le gel et la croissance). Suite de
@@ -443,7 +445,8 @@ versé à T-014 ; les autres points déjà couverts sont précisés dans T-012 �
   128 m à juger).
 
 ### T-017 — Artisanat : GlobalState → abonnements de zone
-- Agent : vava-dev-lua · Dépend de : T-014 · Statut : à tester en jeu (relu sécurité et réseau, suites appliquées ; fusionnée sans test en jeu, à la demande du porteur du projet)
+- Agent : vava-dev-lua · Dépend de : T-014 · Statut : validée
+- Validée le 30 octobre 2026 par le porteur du projet, après essai en jeu.
 - T-011 (`docs/audits/reseau-vava_crafting.md`) : `server/stations.lua:75-82` publie `{ fuel, busy }` à tous, deux fois
   par création au moins (occupée, libre) et à chaque unité de combustible ; `:85-87` réécrit la liste complète des
   stations (110 o par station) à chaque station ajoutée par un module. Envoyer l'état aux abonnés de la zone de la
@@ -528,7 +531,8 @@ versé à T-014 ; les autres points déjà couverts sont précisés dans T-012 �
 ## Phase 2 — Arrivée
 
 ### T-020 — Écran de chargement `vava_loading`
-- Agents : vava-architecte → vava-dev-lua + vava-dev-nui (cette tâche autorise à toucher le core, `vava_characters_ui`, `chancellerie/`, `scripts/verifier.sh` et `scripts/audit-exceptions.txt`, dans les limites de la spec) · Dépend de : T-012 · Statut : à tester en jeu (relu sécurité, réseau et lore, suites appliquées ; fusionnée sans test en jeu, à la demande du porteur du projet)
+- Agents : vava-architecte → vava-dev-lua + vava-dev-nui (cette tâche autorise à toucher le core, `vava_characters_ui`, `chancellerie/`, `scripts/verifier.sh` et `scripts/audit-exceptions.txt`, dans les limites de la spec) · Dépend de : T-012 · Statut : validée
+- Validée le 30 octobre 2026 par le porteur du projet, après essai en jeu (« tout fonctionne en jeu »).
 - Fait le 30 octobre 2026 : `vava_loading` 1.0.0 (≈ 222 Ko livrés, aucun RPC ni évènement réseau), core 0.13.0,
   `vava_characters_ui` 1.2.0, Chancellerie 1.8.1. Rapport `docs/plan/rapports/T-020.md`. **À tester en jeu** :
   `docs/tests/chargement.md`, en priorité aucune image noire au passage à la sélection (3-2), messages réellement
@@ -564,7 +568,8 @@ versé à T-014 ; les autres points déjà couverts sont précisés dans T-012 �
 - 20 à 30 extraits courts du lore, 15 conseils de jeu, textes d'accueil.
 
 ### T-022 — Arrivée d'un nouveau personnage
-- Agents : vava-architecte → vava-dev-lua (cette tâche autorise à toucher `config/server.lua` pour un commentaire, `vava_codex`, `chancellerie/lib/resources.js`, `.luacheckrc`, dans les limites de la spec) · Dépend de : — · Statut : à tester en jeu (relu sécurité, réseau et lore, suites appliquées ; fusionnée sans test en jeu, à la demande du porteur du projet)
+- Agents : vava-architecte → vava-dev-lua (cette tâche autorise à toucher `config/server.lua` pour un commentaire, `vava_codex`, `chancellerie/lib/resources.js`, `.luacheckrc`, dans les limites de la spec) · Dépend de : — · Statut : validée
+- Validée le 30 octobre 2026 par le porteur du projet, après essai en jeu (« tout fonctionne en jeu »).
 - Fait le 30 octobre 2026 : `vava_arrival` 1.0.0, `vava_codex` 1.4.0, Chancellerie 1.8.2 (ordre de démarrage). Rapport
   `docs/plan/rapports/T-022.md`. **À tester en jeu** : `docs/tests/accueil.md`, en priorité accueil et Codex qui prend
   le clavier (2), notifications lisibles par-dessus le Codex, aucune seconde dotation (3, 4, 8), `nil` reçus en `NULL`
@@ -595,7 +600,8 @@ Référence : `docs/plan/ATELIER.md` et les maquettes `docs/maquettes/`. Les éc
 maquettes.
 
 ### T-100 — Ressource `vava_atelier` : cadre, accueil, droits
-- Agents : vava-architecte → vava-dev-lua + vava-dev-nui · Dépend de : T-012 · Statut : à tester en jeu (relu sécurité, réseau et lore, suites appliquées ; fusionnée sans test en jeu, à la demande du porteur du projet)
+- Agents : vava-architecte → vava-dev-lua + vava-dev-nui · Dépend de : T-012 · Statut : validée
+- Validée le 30 octobre 2026 par le porteur du projet, après essai en jeu (« tout fonctionne en jeu »).
 - Fait le 30 octobre 2026 : `vava_atelier` 1.0.0 (page ≈ 99 Ko), `vava_example_atelier` 1.0.0, Chancellerie 1.8.3
   (ordre de démarrage). Rapport `docs/plan/rapports/T-100.md`. **À tester en jeu** : `docs/tests/atelier.md`, en
   priorité redémarrages (7-2, 7-3), appels directs refusés et révocation en direct (2-3, 2-4, 4-9), fiche et « Vérifier »
