@@ -29,7 +29,7 @@ files {
     'web/index.html',
     'web/css/*.css',
     'web/js/*.js',
-    'web/img/*',
+    'web/img/*.svg',
 }
 
 client_scripts {
