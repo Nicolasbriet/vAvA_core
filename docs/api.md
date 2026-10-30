@@ -172,13 +172,16 @@ après deux relevés manquants, au plus tard après `players.connectTimeoutMs` (
 normalement n'est jamais concerné.
 
 **Porte gardée** (0.9.1) : un module qui vérifie chaque arrivant par un hook (les bans de `vava_admin`) se déclare
-dans `players.connectionGuards` (`{ 'vava_admin' }` par défaut). Tant que sa ressource est démarrée (ou en démarrage,
-en arrêt) sans que son module soit `ready` — démarrage, redémarrage, échec du `setup` —, ses hooks n'existent pas : la
+dans `players.connectionGuards` (`{ 'vava_admin' }` par défaut). Tant que son module n'est pas `ready` — démarrage,
+redémarrage, échec du `setup`, ou ressource arrêtée (`stopped`, `uninitialized`) —, ses hooks n'existent pas : la
 connexion est refusée avec `players.messages.guardNotReady` (« Le royaume s'éveille : réessayez dans un instant. ») et
-une ligne d'erreur à la console, vérifiée avant les hooks puis de nouveau après (garde arrêté pendant la chaîne). Une
-ressource absente du serveur ou arrêtée (`missing`, `uninitialized`, `stopped`) n'est pas attendue : la connexion passe,
-avec un avertissement à la console à chaque fois (ce que le garde vérifie ne l'est pas). Un module en échec garde donc
-la porte fermée jusqu'à ce qu'il soit réparé ou retiré de la liste.
+une ligne d'erreur à la console, vérifiée avant les hooks puis de nouveau après (garde arrêté pendant la chaîne). Pour
+une ressource arrêtée, la console ajoute « ensure <ressource>, ou retirez-le de players.connectionGuards si le serveur
+n'a pas de Registre » : un `restart vAvA_core` arrête `vava_admin` (qui en dépend) sans le relancer, et la porte reste
+fermée jusqu'à `ensure vava_admin`. Seule une ressource absente du serveur (`missing`) n'est pas attendue : la
+connexion passe, avec un avertissement à la console à chaque fois (ce que le garde vérifie ne l'est pas). Une entrée de
+la liste qui n'est pas un nom de ressource est ignorée et signalée à la console. Un garde arrêté ou en échec garde donc
+la porte fermée jusqu'à ce qu'il soit relancé, réparé ou retiré de la liste.
 
 ### `core.players`
 
@@ -847,18 +850,22 @@ voulu (l'écran des joueurs non plus, voir plus bas).
   (`moment : au démarrage du Registre`) ; un joueur que le core n'a pas encore repris est relu au tour suivant
   (`banRecheck.sweepAttempts` tours, `sweepRetryMs` d'écart).
 - **Registre absent** (1.7.1, avec le core 0.9.1) : `vava_admin` est un garde de connexion du core
-  (`players.connectionGuards`, voir « Porte gardée ») : en démarrage, en redémarrage ou en échec, la porte est fermée
-  (« Le royaume s'éveille : réessayez dans un instant. »). Le module échoue au démarrage si la table des bans est
-  illisible (lecture d'essai). Arrêté volontairement (`stop vava_admin`) ou absent, il n'est pas attendu : les
-  connexions passent sans vérification de ban, la console le signale à chacune, et la relecture du démarrage suivant
-  expulse ceux qui sont entrés bannis.
+  (`players.connectionGuards`, voir « Porte gardée ») : en démarrage, en redémarrage, en échec ou arrêté (`stop
+  vava_admin`, ou `restart vAvA_core`, qui l'arrête sans le relancer), la porte est fermée (« Le royaume s'éveille :
+  réessayez dans un instant. ») jusqu'à `ensure vava_admin` ; la relecture de son démarrage passe alors sur les joueurs
+  déjà en jeu. Le module échoue au démarrage si la table des bans est illisible (lecture d'essai). Seul un serveur où la
+  ressource n'existe pas laisse entrer sans vérification de ban (signalé à la console à chaque connexion) : un serveur
+  sans Registre retire `vava_admin` de `players.connectionGuards`, et **renommer la ressource oblige à mettre cette
+  liste à jour** (sinon l'ancien nom est absent et la porte s'ouvre sans bans).
 - **Base en panne** (1.7.1, avec le core 0.9.1) : un compte n'entre jamais sans qu'une lecture de ses bans ait réussi.
   Si la base ne répond pas pendant la recherche du compte, le core refuse la connexion (« Le serveur est momentanément
   indisponible, réessayez dans un instant. ») ; si elle ne répond pas pendant la lecture des bans à la connexion, le
   joueur est refusé avec « Le registre des bans ne peut être consulté pour l'instant : réessayez dans une minute. »
   (`messages.banCheckUnavailable`), et la console l'écrit. À l'arrivée en jeu ou à la relecture du démarrage, une
   lecture en échec est refaite après `banRecheck.retryMs` (5 s) ; si elle échoue encore, `banRecheck.onError` décide :
-  `kick` (défaut : expulsé avec le même message) ou `keep` (laissé en jeu, noté à la console). Personne n'est refusé
+  `keep` (défaut, décision du 30 octobre 2026 : le joueur reste en jeu, la console écrit « compte n° N … : bans
+  illisibles, joueur gardé (cause) » ; à l'arrivée, la lecture de la connexion avait réussi, et un hoquet de base au
+  démarrage du Registre n'expulse pas tout le serveur) ou `kick` (expulsé avec le même message). Personne n'est refusé
   tant que la base répond. Une première venue (aucun compte encore) n'a rien à vérifier ; une base injoignable bloque de
   toute façon la création du compte. Pendant une panne de la base, plus personne ne se connecte : c'était déjà vrai
   (le compte et les personnages se lisent en base), le message dit maintenant pourquoi.
