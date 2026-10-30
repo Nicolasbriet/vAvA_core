@@ -6,6 +6,7 @@
 
 local move, sort, remove = table.move, table.sort, table.remove
 local pairs, tostring, type, next, rawget, rawequal = pairs, tostring, type, next, rawget, rawequal
+local abs, mathType = math.abs, math.type
 
 local tbl = {}
 vAvA.lib.table = tbl
@@ -32,25 +33,43 @@ function tbl.removeValue(list, value)
     return false
 end
 
---- Égalité de valeur : nombres, chaînes et booléens par ==, tables clé à clé, sans tenir compte des métatables.
---- Sert à comparer une valeur reçue du réseau (copie désérialisée) à celle que l'on a envoyée. Au-delà de maxDepth
---- niveaux de tables imbriquées, les valeurs sont jugées différentes : une donnée forgée trop profonde ne coûte
---- jamais une récursion sans fin.
+--- Vrai pour un nombre à partie décimale (NaN compris, jamais égal à rien).
+---@param n number
+---@return boolean
+local function isFractional(n)
+    return mathType(n) == 'float' and n ~= n // 1
+end
+
+--- Égalité de valeur : chaînes et booléens par ==, nombres par == (un entier égal à son flottant) ou, si tolerance est
+--- donnée et que les deux ont une partie décimale, à tolerance près en écart relatif ; tables clé à clé, sans tenir
+--- compte des métatables. Sert à comparer une valeur reçue du réseau (copie désérialisée, flottants éventuellement
+--- arrondis) à celle que l'on a envoyée. Pour des arbres de données, pas des graphes à références partagées : une
+--- même sous-table vue par deux chemins est comparée deux fois. Au-delà de maxDepth niveaux de tables imbriquées, les
+--- valeurs sont jugées différentes : une donnée forgée trop profonde ne coûte jamais une récursion sans fin.
 ---@param a any
 ---@param b any
 ---@param maxDepth? integer  défaut 16
+---@param tolerance? number  écart relatif admis entre deux nombres non entiers (défaut 0 : égalité stricte)
 ---@return boolean
-function tbl.deepEqual(a, b, maxDepth)
+function tbl.deepEqual(a, b, maxDepth, tolerance)
     if rawequal(a, b) then return true end
-    if type(a) ~= 'table' or type(b) ~= 'table' then
-        if type(a) == 'table' or type(b) == 'table' then return false end
-        return a == b
+    local typeA, typeB = type(a), type(b)
+    if typeA ~= 'table' or typeB ~= 'table' then
+        if typeA == 'table' or typeB == 'table' then return false end
+        if a == b then return true end
+        -- seulement entre deux nombres à partie décimale : un entier (ou un flottant entier) reste comparé à
+        -- l'identique, une valeur décalée d'une fraction de millionième ne l'est pas
+        if not tolerance or typeA ~= 'number' or typeB ~= 'number' or not isFractional(a) or not isFractional(b) then
+            return false
+        end
+        local scale = abs(a) > abs(b) and abs(a) or abs(b)
+        return abs(a - b) <= tolerance * scale
     end
     local depth = maxDepth or 16
     if depth <= 0 then return false end
     for key, value in next, a do
         local other = rawget(b, key)
-        if other == nil or not tbl.deepEqual(value, other, depth - 1) then return false end
+        if other == nil or not tbl.deepEqual(value, other, depth - 1, tolerance) then return false end
     end
     -- une clé de plus d'un côté : la première absente de l'autre suffit, sans compter toute la table
     for key in next, b do

@@ -232,6 +232,19 @@ lui ; il le recoupe avec une donnée publiée par le serveur ailleurs (comme `va
 `GlobalState['vava_inventory:heldModels']`). Les statebags qu'un module pose lui-même (entité, joueur) ne sont pas
 gardés par le core : même règle.
 
+Détails de la garde (0.9.0) :
+- La comparaison tolère l'arrondi du réseau sur les nombres non entiers (`sync.publicFloatTolerance`, écart relatif
+  de 1e-6) ; entiers, chaînes et booléens sont comparés à l'identique.
+- Après `sync.publicMaxCorrections` (3) remises d'un même champ sans nouvelle publication du serveur, les remises
+  s'espacent (délai doublé à chaque fois, jusqu'à `sync.publicGuardMaxDelayMs` = 10 s) et une ligne unique le dit en
+  console (`remis 3 fois de suite sans nouvelle publication`) : une valeur qui ne reviendrait jamais égale coûte au
+  plus une écriture par 10 s, un client qui insiste est toujours remis, de plus en plus tard. Toute publication remet
+  le compte à zéro.
+- Le schéma d'un champ `public` est compilé **comme une entrée réseau** (ni `any`, ni `function`, ni table
+  `strict = false` ; chaînes, listes et maps bornées par `schema.*` de la config du core) et ne peut pas avoir plus de
+  `sync.publicCompareDepth` (16) niveaux de tables imbriquées : `defineField` refuse sinon. Les champs `private` et
+  `owner` ne changent pas.
+
 Persistance et positions :
 
 - La position est lue **côté serveur** (OneSync obligatoire), seulement après confirmation de l'apparition.

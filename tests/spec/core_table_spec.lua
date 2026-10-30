@@ -100,6 +100,20 @@ describe('vAvA.lib.table', function()
             assert.is_true(tbl.deepEqual(nest(15), nest(15)))
         end)
 
+        it('avec une tolérance : deux nombres à partie décimale à l’écart relatif près, le reste à l’identique', function()
+            local f32 = 0.10000000149011612   -- 0.1 relu en float32
+            assert.is_false(tbl.deepEqual(0.1, f32))
+            assert.is_true(tbl.deepEqual(0.1, f32, nil, 1e-6))
+            assert.is_true(tbl.deepEqual({ o = { x = 0.1, y = -2.7 } }, { o = { x = f32, y = -2.7000001 } }, 4, 1e-6))
+            assert.is_false(tbl.deepEqual(0.1, 0.1001, nil, 1e-6))
+            -- entiers et flottants entiers : jamais tolérés
+            assert.is_false(tbl.deepEqual(16777216, 16777210.0, nil, 1e-6))
+            assert.is_false(tbl.deepEqual(16777216, 16777215.5, nil, 1e-6))
+            assert.is_false(tbl.deepEqual(1, 1.0000001, nil, 1e-6))
+            assert.is_false(tbl.deepEqual(0 / 0, 0 / 0, nil, 1e-6))
+            assert.is_false(tbl.deepEqual('0.1', 0.1, nil, 1e-6))
+        end)
+
         it('ignore les métatables (__eq, __index, __pairs)', function()
             local trap = { __eq = function() return true end, __index = function() return 1 end, __pairs = error }
             local a = setmetatable({ x = 1 }, trap)

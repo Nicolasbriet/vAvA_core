@@ -88,7 +88,12 @@ vAvA.config.server = {
     sync = {
         publicGuardDelayMs = 250,  -- délai avant de remettre la valeur du serveur : les réécritures d'un même joueur
                                    -- pendant ce délai ne coûtent qu'une correction (au plus 4 par seconde et par joueur)
-        publicCompareDepth = 16,   -- tables imbriquées comparées au plus sur cette profondeur (au-delà : différentes)
+        publicCompareDepth = 16,   -- tables imbriquées comparées au plus sur cette profondeur (au-delà : différentes) ;
+                                   -- un champ public au schéma plus profond est refusé à sa déclaration
+        publicFloatTolerance = 1e-6,  -- écart relatif admis entre deux nombres non entiers (aller-retour réseau)
+        publicMaxCorrections = 3,     -- remises d'un champ depuis sa dernière publication avant de les espacer
+        publicGuardMaxDelayMs = 10000,  -- espacement maximal (doublé à chaque remise au-delà du plafond) : une valeur
+                                        -- qui ne reviendrait jamais égale coûte au plus une écriture par 10 s
     },
 
     spawn = {

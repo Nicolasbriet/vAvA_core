@@ -86,6 +86,7 @@ end)
 
 AddEventHandler('onResourceStop', function(resource)
     if resource == vAvA.resourceName then
+        sync.stop()
         -- FiveM n'attend pas les écritures lancées à l'arrêt : on prévient plutôt que de promettre une sauvegarde
         local unsaved = persistence.pendingCount()
         if unsaved > 0 then
