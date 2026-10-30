@@ -2,12 +2,15 @@
     shared/lib/pending.lua
     Rôle : stockage des requêtes en attente de réponse (identifiant unique, timeout, résolution unique).
     Utilisé par le RPC client et serveur. Chaque entrée est retirée à sa résolution : aucune fuite possible.
-    Dépendances : shared/init.lua (SetTimeout, promise et Citizen.Await sont fournis par le runtime FiveM)
+    L'échéance d'une entrée peut être repoussée (extend) quand on sait que la réponse sera longue à arriver (envoi
+    latent) : chaque minuterie porte le numéro de génération de l'échéance qu'elle garde, une minuterie dépassée ne
+    résout rien.
+    Dépendances : shared/init.lua (SetTimeout, GetGameTimer, promise et Citizen.Await sont fournis par le runtime FiveM)
 ]]
 
 local setmetatable, pairs = setmetatable, pairs
 local pack, unpack = table.pack, table.unpack
-local SetTimeout = SetTimeout
+local SetTimeout, GetGameTimer = SetTimeout, GetGameTimer
 local newPromise = promise.new
 local await = Citizen.Await
 
@@ -15,8 +18,10 @@ local pending = {}
 vAvA.lib.pending = pending
 
 ---@class vAvA.PendingEntry
----@field meta any       données de l'appelant (source ciblée, propriétaire…)
----@field promise table  résolue avec table.pack(ok, ...)
+---@field meta any            données de l'appelant (source ciblée, propriétaire…)
+---@field promise table       résolue avec table.pack(ok, ...)
+---@field deadline integer    échéance courante (GetGameTimer, ms)
+---@field generation integer  numéro de l'échéance courante : seule la minuterie qui le porte peut résoudre
 
 ---@class vAvA.PendingStore
 ---@field entries table<integer, vAvA.PendingEntry>
@@ -47,6 +52,22 @@ local function nextId(self)
     return id
 end
 
+--- Minuterie d'une échéance : résout (false, 'timeout') si l'entrée est toujours là et que son échéance n'a pas été
+--- repoussée entre-temps.
+---@param self vAvA.PendingStore
+---@param id integer
+---@param entry vAvA.PendingEntry
+---@param ms integer
+local function arm(self, id, entry, ms)
+    local generation = entry.generation
+    SetTimeout(ms, function()
+        -- comparaison d'identité : un timer périmé ne résout jamais une requête qui a réutilisé le même id
+        if self.entries[id] == entry and entry.generation == generation then
+            self:settle(id, false, 'timeout')
+        end
+    end)
+end
+
 --- Enregistre une requête. Résolue automatiquement par (false, 'timeout') si personne ne répond à temps.
 ---@param meta any
 ---@param timeoutMs integer
@@ -55,15 +76,10 @@ end
 function Store:add(meta, timeoutMs)
     if self.size >= self.maxPending then return nil end
     local id = nextId(self)
-    local entry = { meta = meta, promise = newPromise() }
+    local entry = { meta = meta, promise = newPromise(), deadline = GetGameTimer() + timeoutMs, generation = 1 }
     self.entries[id] = entry
     self.size = self.size + 1
-    SetTimeout(timeoutMs, function()
-        -- comparaison d'identité : un timer périmé ne résout jamais une requête qui a réutilisé le même id
-        if self.entries[id] == entry then
-            self:settle(id, false, 'timeout')
-        end
-    end)
+    arm(self, id, entry, timeoutMs)
     return id, entry
 end
 
@@ -71,6 +87,22 @@ end
 ---@return vAvA.PendingEntry|nil
 function Store:get(id)
     return self.entries[id]
+end
+
+--- Repousse l'échéance d'une requête à maintenant + ms, si c'est plus tard que l'échéance actuelle (jamais plus tôt).
+---@param id integer
+---@param ms integer
+---@return boolean found  false : requête inconnue (déjà résolue, ou jamais posée)
+function Store:extend(id, ms)
+    local entry = self.entries[id]
+    if not entry then return false end
+    local deadline = GetGameTimer() + ms
+    if deadline > entry.deadline then
+        entry.deadline = deadline
+        entry.generation = entry.generation + 1
+        arm(self, id, entry, ms)
+    end
+    return true
 end
 
 --- Résout une requête une seule fois et la retire. Les valeurs sont rendues telles quelles à l'appelant.

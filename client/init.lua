@@ -15,6 +15,7 @@ local rpc = vAvA.rpc
 local api = vAvA.api
 local session = vAvA.session
 local spawn = vAvA.spawn
+local netprobe = vAvA.netprobe
 local log = logger.create('core')
 
 local clientLevel = vAvA.config.shared.log.clientLevel
@@ -23,6 +24,7 @@ if not logger.setLevel(clientLevel) then
 end
 
 rpc.start()
+netprobe.start()
 session.start()
 spawn.start()
 api.register()

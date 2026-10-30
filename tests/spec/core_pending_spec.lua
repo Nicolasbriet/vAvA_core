@@ -129,4 +129,61 @@ describe('vAvA.lib.pending', function()
         assert.equal(0, store:settleWhere(function() return false end, false, 'x'))
         assert.equal(1, store.size)
     end)
+
+    -- 0.10.0 : réponse annoncée en latent (préavis), demande serveur → client partie en latent
+    describe('extend', function()
+        local now
+
+        before_each(function()
+            now = 0
+            -- horloge réglée par le test : pending.lua la garde en local à son chargement
+            _G.GetGameTimer = function() return now end
+            helper.load('shared/lib/pending.lua')
+            pending = vAvA.lib.pending
+        end)
+
+        it('repousse l’échéance : la première minuterie ne résout plus rien, la seconde résout timeout', function()
+            local store = pending.create(8, 100)
+            local id, entry = store:add({}, 1000)
+            now = 500
+            assert.is_true(store:extend(id, 3000))
+            assert.equal(2, #helper.timers)
+            assert.equal(3000, helper.timers[2].ms)
+            helper.timers[1].fn()
+            assert.equal(entry, store:get(id))
+            helper.timers[2].fn()
+            assert.is_nil(store:get(id))
+            assert.same({ false, 'timeout' }, { pending.await(entry) })
+        end)
+
+        it('une échéance plus proche que l’actuelle ne raccourcit rien', function()
+            local store = pending.create(8, 100)
+            local id, entry = store:add({}, 5000)
+            now = 1000
+            assert.is_true(store:extend(id, 2000))   -- 3 000 < 5 000 : rien ne change
+            assert.equal(1, #helper.timers)
+            helper.timers[1].fn()
+            assert.same({ false, 'timeout' }, { pending.await(entry) })
+        end)
+
+        it('deux allongements : seule la dernière minuterie résout', function()
+            local store = pending.create(8, 100)
+            local id = store:add({}, 1000)
+            store:extend(id, 2000)
+            store:extend(id, 4000)
+            helper.timers[2].fn()
+            assert.is_not_nil(store:get(id))
+            helper.timers[3].fn()
+            assert.is_nil(store:get(id))
+        end)
+
+        it('un identifiant inconnu ou déjà résolu rend false', function()
+            local store = pending.create(8, 100)
+            assert.is_false(store:extend(42, 1000))
+            local id = store:add({}, 1000)
+            store:settle(id, true)
+            assert.is_false(store:extend(id, 1000))
+            assert.equal(1, #helper.timers)
+        end)
+    end)
 end)

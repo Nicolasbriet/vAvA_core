@@ -16,6 +16,8 @@ local hooks = vAvA.hooks
 local database = vAvA.database
 local migrations = vAvA.migrations
 local ratelimit = vAvA.ratelimit
+local net = vAvA.net
+local netcommand = vAvA.netcommand
 local rpc = vAvA.rpc
 local registry = vAvA.registry
 local modules = vAvA.modules
@@ -41,6 +43,7 @@ local function purgeOwner(owner)
     rpc.purgeOwner(owner)
     registry.purgeOwner(owner)
     fields.purgeOwner(owner)
+    net.purgeOwner(owner)
 end
 
 ---@param reason string
@@ -65,6 +68,7 @@ local function boot()
     accounts.adoptConnected()
     persistence.start(characters.forEachActive)
     positions.start(characters.forEachActive)
+    netcommand.start()
 end
 
 modules.setPurgeHandler(purgeOwner)
@@ -80,6 +84,9 @@ AddEventHandler('playerDropped', function(reason)
     ratelimit.purgePlayer(src)
     -- avant le déchargement : plus rien n'est envoyé à ce numéro, qui peut être redonné pendant la sauvegarde
     sync.purgePlayer(src)
+    -- volume latent en route, compteur et suivi du joueur, délai de sa commande : son numéro peut être redonné
+    net.purgePlayer(src)
+    netcommand.purgePlayer(src)
     -- déchargement et sauvegarde du personnage (peut attendre la base), puis libération de la session
     accounts.handleDropped(src, tostring(reason))
 end)
@@ -107,6 +114,8 @@ if not configOk then
     -- configuration invalide : aucun net event n'est ouvert, aucun joueur n'est accepté
     failBoot(configErr)
 else
+    -- mode de mesure choisi avant tout envoi (ligne [net] en console)
+    net.start()
     rpc.start()
     sync.start()
     CreateThread(function()

@@ -36,6 +36,10 @@ vAvA.EVENTS = {
     RPC_RESPONSE = 'vAvA:rpc:response',           -- serveur → client
     CLIENT_REQUEST = 'vAvA:rpc:clientRequest',    -- serveur → client
     CLIENT_RESPONSE = 'vAvA:rpc:clientResponse',  -- client → serveur
+    -- Préavis d'une réponse envoyée en latent (id, octets, débit) : le client repousse l'attente de l'appel.
+    RPC_LATENT = 'vAvA:rpc:latent',               -- serveur → client
+    -- Essai du réseau lancé depuis la console du serveur (n°, nature, charge) : écrit en console F8.
+    NET_PROBE = 'vAvA:net:probe',                 -- serveur → client
     -- Toujours envoyés au seul joueur concerné, jamais en broadcast.
     CHARACTER_LOADED = 'vAvA:character:loaded',      -- son personnage et ses champs visibles
     CHARACTER_FIELDS = 'vAvA:character:fields',      -- lot de champs modifiés (regroupés par tick)

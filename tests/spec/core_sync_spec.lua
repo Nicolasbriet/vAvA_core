@@ -65,6 +65,9 @@ describe('vAvA.sync', function()
             'shared/lib/schema.lua',
             'shared/core/logger.lua',
             'config/server.lua',
+            'server/core/netsize.lua',
+            'server/core/netstats.lua',
+            'server/core/net.lua',
             'server/players/fields.lua',
             'server/players/sync.lua',
         })
@@ -443,6 +446,90 @@ describe('vAvA.sync', function()
         -- plus aucun suivi : un champ déclaré ensuite n'est pas branché
         assert.is_true(fields.define('vava_test', 'vava_test:cape', { schema = { type = 'string', max = 8 }, visibility = 'public' }))
         assert.is_nil(registrations['vava_test:cape'])
+    end)
+
+    -- 0.10.0 : envois par core.net, toujours fiables (l'ordre chargement → champs → apparition compte)
+    describe('envois par core.net', function()
+        it('un chargement de 12 Ko part en fiable, jamais en latent ; alerte une fois par minute au plus', function()
+            _G.TriggerLatentClientEvent = function() error('jamais en latent') end
+            assert.is_true(fields.define('vava_test', 'vava_test:carnet', {
+                schema = { type = 'string', max = 20000 }, visibility = 'owner',
+            }))
+            local character = newCharacter(1, 10)
+            setField(character, 'vava_test:carnet', string.rep('x', 12288))
+            sync.sendCharacter(character)
+            sync.sendCharacter(character)
+            local loaded = eventsNamed(EVENTS.CHARACTER_LOADED)
+            assert.equal(2, #loaded)
+            assert.equal(12288, #loaded[1].args[1].fields['vava_test:carnet'])
+            assert.equal(1, linesMatching(EVENTS.CHARACTER_LOADED .. ' : %d+ octets envoyés en fiable'))
+            local stats = vAvA.net.stats({ resource = vAvA.resourceName })
+            assert.equal(EVENTS.CHARACTER_LOADED, stats.events[1].label)
+            assert.equal(2, stats.events[1].messages)
+            assert.equal(0, stats.total.latent)
+        end)
+
+        -- relecture sécurité de T-013 : un envoi indispensable impossible ne laisse pas le joueur bloqué
+        describe('envoi indispensable impossible', function()
+            local dropped
+
+            before_each(function()
+                dropped = {}
+                _G.DropPlayer = function(target, reason) dropped[#dropped + 1] = { target = target, reason = reason } end
+                -- sync.lua garde DropPlayer en local : rechargé avec la doublure
+                helper.load('server/players/sync.lua')
+                sync = vAvA.sync
+                assert.is_true(fields.define('vava_test', 'vava_test:carnet', {
+                    schema = { type = 'string', max = 300000 }, visibility = 'owner',
+                }))
+            end)
+
+            it('personnage trop gros : erreur en console (compte, cause) et déconnexion avec un message clair', function()
+                local character = newCharacter(1, 10)
+                character.accountId = 42
+                setField(character, 'vava_test:carnet', string.rep('x', vAvA.config.server.net.maxBytes))
+                sync.sendCharacter(character)
+                assert.equal(0, #eventsNamed(EVENTS.CHARACTER_LOADED))
+                assert.equal(1, #dropped)
+                assert.equal('1', dropped[1].target)
+                assert.equal(vAvA.config.server.players.messages.sendFailed, dropped[1].reason)
+                assert.equal(1, linesMatching('compte #42, personnage #10 : vAvA:character:loaded impossible à envoyer %(too_large%)'))
+                assert.is_nil(bagOf(1).values[HANDS])   -- rien n'est publié
+            end)
+
+            it('joueur déjà parti : ni erreur ni déconnexion', function()
+                existing[1] = nil
+                sync.sendCharacter(newCharacter(1, 10))
+                assert.equal(0, #dropped)
+            end)
+
+            it('ordre d’apparition impossible : même traitement, spawn.at rend false et le code', function()
+                vAvA.playtime = { pause = function() end }
+                helper.load('server/players/spawn.lua')
+                local character = newCharacter(2, 11)
+                character.accountId = 7
+                vAvA.config.server.spawn.models.f = string.rep('x', vAvA.config.server.net.maxBytes)
+                vAvA.spawn.forCharacter(character)
+                assert.equal(1, #dropped)
+                assert.equal('2', dropped[1].target)
+                assert.equal(1, linesMatching('compte #7, personnage #11 : vAvA:character:spawn impossible à envoyer'))
+                assert.same({ true }, { vAvA.spawn.at(character, { x = 1.0, y = 2.0, z = 3.0 }) })
+                assert.equal(1, #dropped)
+            end)
+        end)
+
+        it('isCurrent : vrai pour le personnage envoyé, faux après son déchargement ou le départ du joueur', function()
+            local character = newCharacter(1, 10)
+            assert.is_false(sync.isCurrent(character))
+            sync.sendCharacter(character)
+            assert.is_true(sync.isCurrent(character))
+            sync.clearCharacter(character)
+            assert.is_false(sync.isCurrent(character))
+            local other = newCharacter(2, 11)
+            sync.sendCharacter(other)
+            sync.purgePlayer(2)
+            assert.is_false(sync.isCurrent(other))
+        end)
     end)
 
     it('start renvoie false sans suivi des statebags côté serveur', function()

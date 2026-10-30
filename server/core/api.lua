@@ -4,8 +4,8 @@
     Accès : exports.vAvA_core:getApi(1). Documentation : docs/api.md.
     Hors log, modules et version, chaque fonction exige que le module soit actif (pendant setup ou prêt) :
     un module refusé ou non déclaré ne peut rien enregistrer.
-    Dépendances : shared/core/api.lua, server/core/database.lua, server/core/rpc.lua, server/core/registry.lua,
-                  server/core/modules.lua
+    Dépendances : shared/core/api.lua, server/core/database.lua, server/core/net.lua, server/core/rpc.lua,
+                  server/core/registry.lua, server/core/modules.lua
 ]]
 
 local format = string.format
@@ -13,6 +13,7 @@ local format = string.format
 local api = vAvA.api
 local modules = vAvA.modules
 local registry = vAvA.registry
+local net = vAvA.net
 local rpc = vAvA.rpc
 local database = vAvA.database
 
@@ -57,6 +58,22 @@ api.define(1, function(owner)
             unregister = guard(function(name) return rpc.unregister(owner, name) end),
             callClient = guard(function(target, name, ...) return rpc.callClient(owner, nil, target, name, ...) end),
             callClientWith = guard(function(options, target, name, ...) return rpc.callClient(owner, options, target, name, ...) end),
+        },
+
+        -- envois serveur → client mesurés et comptés (0.10.0) : jamais -1, évènement préfixé par la ressource
+        net = {
+            send = guard(function(target, event, ...) return net.send(owner, nil, target, event, ...) end),
+            sendWith = guard(function(options, target, event, ...)
+                return net.send(owner, options, target, event, ...)
+            end),
+            sendNear = guard(function(coords, radius, event, ...)
+                return net.sendNear(owner, nil, coords, radius, event, ...)
+            end),
+            sendNearWith = guard(function(options, coords, radius, event, ...)
+                return net.sendNear(owner, options, coords, radius, event, ...)
+            end),
+            playersNear = guard(function(coords, radius, options) return net.playersNear(coords, radius, options) end),
+            stats = guard(function(options) return net.stats(options) end),
         },
 
         db = {

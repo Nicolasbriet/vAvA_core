@@ -1,21 +1,19 @@
 --[[
     vava_chat/server/api.lua
-    Rôle : export serveur pour les autres modules : un message du royaume dans l'onglet Général d'un joueur, ou de
-           tous les joueurs en jeu (annonce : -1, comme la ressource « chat » de FiveM, mais jamais aux joueurs en
-           connexion ou en sélection). Forme du message : un texte, { author?, text, color? } ou celle de
+    Rôle : export serveur pour les autres modules : un message du royaume dans l'onglet Général d'un joueur. Jamais
+           à tous (1.2.0 : la cible -1 de l'ancienne ressource « chat » est refusée ; l'annonce à tout le royaume est
+           celle du Registre du Conseil). Forme du message : un texte, { author?, text, color? } ou celle de
            chat:addMessage ({ args, color? }). Les messages d'un joueur passent par le RPC et ses hooks.
            TriggerClientEvent('chat:addMessage', joueur, …) marche toujours.
-    Dépendances : shared/, config.lua, server/core.lua, server/sessions.lua
+    Dépendances : shared/, config.lua, server/core.lua
 ]]
 
-local type, tostring, pairs, mathType, concat = type, tostring, pairs, math.type, table.concat
+local type, tostring, mathType, concat = type, tostring, math.type, table.concat
 local TriggerClientEvent, GetPlayerName = TriggerClientEvent, GetPlayerName
 
 local text = VavaChat.text
-local sessions = VavaChat.sessions
 local cfg = VavaChat.config
 local ADD_MESSAGE = VavaChat.COMPAT.ADD_MESSAGE
-local EVERYONE = -1
 local AUTHOR_MAX = 32
 local ARGS_MAX = 8
 local COLOR_MAX = 255
@@ -49,12 +47,12 @@ local function read(message)
     return parts[1], concat(parts, ' ', 2)
 end
 
---- Message du royaume : `target` = numéro d'un joueur connecté, ou -1 pour tous les joueurs en jeu.
+--- Message du royaume : `target` = numéro d'un joueur connecté (-1, envoi à tous, refusé : invalid_target).
 ---@return boolean ok
 ---@return string|nil err
 exports('addMessage', function(target, message)
     if not VavaChat.ready then return false, 'not_ready' end
-    if mathType(target) ~= 'integer' or (target ~= EVERYONE and (target < 1 or not GetPlayerName(target))) then
+    if mathType(target) ~= 'integer' or target < 1 or not GetPlayerName(target) then
         return false, 'invalid_target'
     end
     local author, body = read(message)
@@ -64,10 +62,6 @@ exports('addMessage', function(target, message)
     local args = { text.truncate(body, cfg.systemMaxLength) }
     if author and author ~= '' then args = { text.truncate(author, AUTHOR_MAX), args[1] } end
     local payload = { args = args, color = cleanColor(type(message) == 'table' and message.color or nil) }
-    if target ~= EVERYONE then
-        TriggerClientEvent(ADD_MESSAGE, target, payload)
-        return true
-    end
-    for src in pairs(sessions.all()) do TriggerClientEvent(ADD_MESSAGE, src, payload) end
+    TriggerClientEvent(ADD_MESSAGE, target, payload)
     return true
 end)

@@ -2,13 +2,14 @@
     client/core/rpc.lua
     Rôle : côté client du RPC. Appels vers le serveur (call avec réponse, emit sans réponse) et exécution des
            handlers que le serveur appelle (callClient). Le client exprime des intentions, le serveur décide.
+           Une grosse réponse arrive en latent par le même évènement, précédée d'un préavis qui repousse l'attente.
     Dépendances : shared/init.lua, config/shared.lua, shared/lib/string.lua, shared/lib/schema.lua,
                   shared/lib/pending.lua, shared/core/logger.lua
 ]]
 
 local type, tostring, pairs, xpcall, select = type, tostring, pairs, xpcall, select
 local traceback = debug.traceback
-local mathType = math.type
+local mathType, ceil, min = math.type, math.ceil, math.min
 local format = string.format
 local unpack = table.unpack
 local RegisterNetEvent, TriggerServerEvent = RegisterNetEvent, TriggerServerEvent
@@ -126,6 +127,19 @@ function rpc.start()
         else
             outgoing:settle(id, false, type(countOrCode) == 'string' and countOrCode or 'server_error')
         end
+    end)
+
+    -- préavis d'une réponse latente (id, octets, débit, délai) : elle arrive par RPC_RESPONSE, plus lentement ; l'attente
+    -- de l'appel est repoussée du délai annoncé par le serveur (latents déjà en route compris), au moins du temps de
+    -- transfert du message seul, plus une marge, bornée. Id inconnu (déjà résolu) : ignoré.
+    RegisterNetEvent(EVENTS.RPC_LATENT, function(id, bytes, rate, delay)
+        if mathType(id) ~= 'integer' or mathType(bytes) ~= 'integer' or mathType(rate) ~= 'integer'
+            or id <= 0 or bytes <= 0 or rate <= 0 then
+            return
+        end
+        local transfer = ceil(bytes * 1000 / rate)
+        if mathType(delay) == 'integer' and delay > transfer then transfer = delay end
+        outgoing:extend(id, min(transfer + cfg.latentMarginMs, cfg.maxLatentExtendMs))
     end)
 
     RegisterNetEvent(EVENTS.CLIENT_REQUEST, function(id, name, count, args)

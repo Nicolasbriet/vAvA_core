@@ -1,0 +1,2 @@
+# chemin<TAB>extrait exact de la ligne<TAB>raison — exceptions de l'essai du script d'audit (--essai), jamais lues en mode normal
+tests/audit/boucle_tous.lua	TriggerClientEvent('t:excuse', src)	cas d'essai : une exception inscrite couvre la ligne

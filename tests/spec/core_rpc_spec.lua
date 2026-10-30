@@ -6,7 +6,7 @@ local helper = require('tests.helper')
 -- quand le joueur est parti pendant le handler (0.9.0).
 -- Les net events sont capturés par une doublure de RegisterNetEvent ; `source` est posé avant chaque requête.
 describe('vAvA.rpc', function()
-    local rpc, EVENTS, now, netHandlers, sent, realPrint
+    local rpc, EVENTS, now, netHandlers, sent, realPrint, printed
     -- réaction d'un faux client à une demande serveur → client (rpc.lua garde TriggerClientEvent en local : la
     -- doublure posée avant le chargement délègue ici)
     local onClientRequest
@@ -16,12 +16,18 @@ describe('vAvA.rpc', function()
         now = 0
         _G.GetGameTimer = function() return now end
         realPrint = _G.print
-        _G.print = function() end
+        printed = {}
+        _G.print = function(line) printed[#printed + 1] = tostring(line) end
         netHandlers, sent = {}, {}
         _G.RegisterNetEvent = function(name, fn) netHandlers[name] = fn end
         onClientRequest = nil
         _G.TriggerClientEvent = function(event, src, ...)
             sent[#sent + 1] = { event = event, src = src, n = select('#', ...), args = { ... } }
+            if event == EVENTS.CLIENT_REQUEST and onClientRequest then onClientRequest(src, ...) end
+        end
+        -- envoi latent (net.lua en estimation, faute de msgpack.pack_args hors jeu) : noté avec son débit
+        _G.TriggerLatentClientEvent = function(event, src, rate, ...)
+            sent[#sent + 1] = { event = event, src = src, rate = rate, latent = true, n = select('#', ...), args = { ... } }
             if event == EVENTS.CLIENT_REQUEST and onClientRequest then onClientRequest(src, ...) end
         end
         _G.DoesPlayerExist = function(src) return src == 1 or src == 2 end
@@ -36,6 +42,9 @@ describe('vAvA.rpc', function()
             'shared/core/hooks.lua',
             'config/server.lua',
             'server/core/ratelimit.lua',
+            'server/core/netsize.lua',
+            'server/core/netstats.lua',
+            'server/core/net.lua',
             'server/core/rpc.lua',
         })
         rpc, EVENTS = vAvA.rpc, vAvA.EVENTS
@@ -395,6 +404,174 @@ describe('vAvA.rpc', function()
             ok, code = rpc.callClient('vava_test', nil, 2, 'vava_test:show')
             assert.is_false(ok)
             assert.equal('invalid_response', code)
+        end)
+    end)
+
+    -- 0.10.0 : envois par core.net (mesurés, comptés, latents au-delà du seuil)
+    describe('réponses et appels par core.net', function()
+        local netCfg
+
+        before_each(function()
+            netCfg = vAvA.config.server.net
+        end)
+
+        local function events(name)
+            local found = {}
+            for i = 1, #sent do
+                if sent[i].event == name then found[#found + 1] = sent[i] end
+            end
+            return found
+        end
+
+        it('réponse de 20 Ko : préavis (id, octets, débit) puis réponse latente, dans cet ordre', function()
+            assert.is_true(register('vava_test:gros', {}, function() return true, string.rep('x', 20480) end))
+            request(1, 4, 'vava_test:gros', {})
+            assert.equal(2, #sent)
+            assert.equal(EVENTS.RPC_LATENT, sent[1].event)
+            assert.is_nil(sent[1].latent)
+            assert.equal(4, sent[1].args[1])
+            assert.is_true(sent[1].args[2] > 20480)
+            assert.equal(netCfg.latent.bytesPerSecond, sent[1].args[3])
+            assert.equal(EVENTS.RPC_RESPONSE, sent[2].event)
+            assert.is_true(sent[2].latent)
+            assert.equal(netCfg.latent.bytesPerSecond, sent[2].rate)
+            assert.same({ 4, true, 2 }, { sent[2].args[1], sent[2].args[2], sent[2].args[3] })
+            -- délai jusqu'à l'arrivée : le transfert de ce seul message (environ 20 Ko à 64 Ko/s)
+            assert.equal(math.ceil(sent[1].args[2] * 1000 / netCfg.latent.bytesPerSecond), sent[1].args[4])
+        end)
+
+        -- relecture réseau de T-013 : un second latent attend le premier, le préavis le dit
+        it('préavis : le délai annoncé compte les latents déjà en route vers le joueur', function()
+            assert.is_true(register('vava_test:gros', {}, function() return true, string.rep('x', 100000) end))
+            request(1, 1, 'vava_test:gros', {})
+            request(1, 2, 'vava_test:gros', {})
+            local notices = events(EVENTS.RPC_LATENT)
+            assert.equal(2, #notices)
+            local first, second = notices[1].args[4], notices[2].args[4]
+            assert.is_true(first > 1500 and first < 1600, 'premier : ' .. first)
+            assert.is_true(second >= 2 * first - 1 and second <= 2 * first, 'second : ' .. second)
+        end)
+
+        it('callClient derrière un latent en route : attente du serveur allongée des deux transferts', function()
+            assert.is_true(register('vava_test:gros', {}, function() return true, string.rep('x', 100000) end))
+            request(2, 1, 'vava_test:gros', {})   -- environ 1,5 s de latent vers le joueur 2
+            local timeout = vAvA.config.server.rpc.defaultTimeoutMs
+            local shared = vAvA.config.shared.rpc
+            local extended
+            onClientRequest = function(src, id)
+                extended = helper.timers[#helper.timers].ms
+                _G.source = src
+                netHandlers[EVENTS.CLIENT_RESPONSE](id, true, 0, {})
+            end
+            assert.is_true(rpc.callClient('vava_test', nil, 2, 'vava_test:show', string.rep('x', 20000)))
+            local waited = extended - timeout - shared.latentMarginMs
+            -- 100 Ko puis 20 Ko à 64 Ko/s : environ 1 527 + 306 ms
+            assert.is_true(waited > 1800 and waited < 1900, 'attente : ' .. waited)
+        end)
+
+        it('le préavis reste borné à rpc.maxLatentExtendMs', function()
+            local shared = vAvA.config.shared.rpc
+            shared.maxLatentExtendMs = 1000
+            local extended
+            onClientRequest = function(src, id)
+                extended = helper.timers[#helper.timers].ms
+                _G.source = src
+                netHandlers[EVENTS.CLIENT_RESPONSE](id, true, 0, {})
+            end
+            assert.is_true(rpc.callClient('vava_test', nil, 2, 'vava_test:show', string.rep('x', 100000)))
+            assert.equal(vAvA.config.server.rpc.defaultTimeoutMs + 1000, extended)
+        end)
+
+        it('latent = never : la même réponse part en fiable, sans préavis', function()
+            assert.is_true(rpc.register('vava_test', 'vava_test:etat', { args = {}, latent = 'never' }, function()
+                return true, string.rep('x', 20480)
+            end))
+            request(1, 4, 'vava_test:etat', {})
+            assert.equal(1, #sent)
+            assert.equal(EVENTS.RPC_RESPONSE, sent[1].event)
+            assert.is_nil(sent[1].latent)
+        end)
+
+        it('register refuse une autre valeur de latent', function()
+            for _, value in ipairs({ 'oui', 'always', true, 1 }) do
+                local ok, err = rpc.register('vava_test', 'vava_test:x', { args = {}, latent = value }, function() end)
+                assert.is_false(ok)
+                assert.matches('latent', err)
+            end
+            assert.is_true(rpc.register('vava_test', 'vava_test:x', { args = {}, latent = 'auto' }, function() end))
+        end)
+
+        it('réponse au-delà de maxBytes : (id, false, too_large), erreur en console avec le nom du RPC', function()
+            assert.is_true(register('vava_test:enorme', {}, function() return true, string.rep('x', netCfg.maxBytes) end))
+            request(1, 5, 'vava_test:enorme', {})
+            assert.equal(1, #sent)
+            assert.same({ 5, false, 'too_large' }, { sent[1].args[1], sent[1].args[2], sent[1].args[3] })
+            local named = false
+            for _, line in ipairs(printed) do
+                if line:find('rpc vava_test:enorme', 1, true) then named = true end
+            end
+            assert.is_true(named)
+        end)
+
+        it('joueur saturé de réponses latentes : (id, false, saturated)', function()
+            assert.is_true(register('vava_test:gros', {}, function() return true, string.rep('x', 200000) end))
+            request(1, 1, 'vava_test:gros', {})
+            request(1, 2, 'vava_test:gros', {})
+            request(1, 3, 'vava_test:gros', {})
+            local replies = events(EVENTS.RPC_RESPONSE)
+            assert.equal(3, #replies)
+            assert.is_true(replies[2].args[2])
+            assert.same({ 3, false, 'saturated' }, { replies[3].args[1], replies[3].args[2], replies[3].args[3] })
+            assert.is_nil(replies[3].latent)
+            assert.equal(2, #events(EVENTS.RPC_LATENT))
+        end)
+
+        it('compte un RPC inconnu sous « rpc <inconnu> », quel que soit le nom envoyé', function()
+            for i = 1, 100 do
+                now = i * 100   -- limite globale du joueur rechargée
+                request(1, i, 'vava_test:absent' .. i, {})
+            end
+            assert.equal(100, #events(EVENTS.RPC_RESPONSE))
+            local stats = vAvA.net.stats({ limit = 50 })
+            assert.equal(1, #stats.events)
+            assert.same({ vAvA.resourceName, 'rpc <inconnu>', 100 },
+                { stats.events[1].resource, stats.events[1].label, stats.events[1].messages })
+        end)
+
+        it('compte les réponses sous la ressource et le nom du RPC enregistré', function()
+            assert.is_true(register('vava_test:ping', {}))
+            request(1, 1, 'vava_test:ping', {})
+            local event = vAvA.net.stats().events[1]
+            assert.same({ 'vava_test', 'rpc vava_test:ping', 1 }, { event.resource, event.label, event.messages })
+        end)
+
+        it('callClient au-delà du seuil : demande latente, attente du serveur allongée du temps de transfert', function()
+            local timeout = vAvA.config.server.rpc.defaultTimeoutMs
+            local shared = vAvA.config.shared.rpc
+            local seen
+            onClientRequest = function(src, id)
+                seen = {}
+                for _, timer in ipairs(helper.timers) do seen[#seen + 1] = timer.ms end
+                -- l'échéance d'origine est dépassée : elle ne résout plus rien, la réponse du client passe encore
+                helper.timers[1].fn()
+                _G.source = src
+                netHandlers[EVENTS.CLIENT_RESPONSE](id, true, 0, {})
+            end
+            local ok = rpc.callClient('vava_test', nil, 2, 'vava_test:show', string.rep('x', 20000))
+            assert.is_true(ok)
+            assert.is_true(events(EVENTS.CLIENT_REQUEST)[1].latent)
+            assert.equal(2, #seen)
+            assert.equal(timeout, seen[1])
+            -- délai d'origine + transfert (environ 20 Ko à 64 Ko/s : 306 ms) + marge
+            local transfer = seen[2] - timeout - shared.latentMarginMs
+            assert.is_true(transfer >= 305 and transfer <= 310, 'transfert : ' .. transfer)
+        end)
+
+        it('callClient trop gros : too_large tout de suite, rien n’est envoyé', function()
+            local ok, code = rpc.callClient('vava_test', nil, 2, 'vava_test:show', string.rep('x', netCfg.maxBytes))
+            assert.is_false(ok)
+            assert.equal('too_large', code)
+            assert.equal(0, #sent)
         end)
     end)
 end)
