@@ -27,7 +27,8 @@ Ordre de démarrage : après `vAvA_core` (≥ 0.6.0), `vava_inventory` (≥ 1.4.
 | Station tenue | une pièce jamais finie libère la station après 2 min, ou après sa durée + 30 s si c'est plus long | `interact.expireMs`, `interact.expireMarginMs` |
 | Leçons | élèves à 10 m qui ont le niveau, recette `transmission` | `lessons` |
 | Combustible | forge : charbon ; fourneau : bois de pin ; 1 par pièce, réserve 20 | `stationTypes[].fuel` |
-| Journal | pièces Excellent+ (palier ≥ 4), réparations, baptêmes, leçons, Conseil ; 180 jours | `logTier`, `logRetentionDays` |
+| Journal | pièces Excellent+ (palier ≥ 4), réparations, baptêmes, leçons, Conseil, écritures refusées par la garde ; 180 jours | `logTier`, `logRetentionDays` |
+| Signature protégée | créateur, date, poinçon et qualité figés sur tout objet ; sur un objet signé, palier et nom figés, solidité qui ne remonte pas hors d'une réparation (voir plus bas) ; refus journalisés une fois par minute et par objet, module et clé | `guard` (`windowMs`, `maxTracked`, `bornDurability`) |
 
 ### Stations
 
@@ -68,6 +69,31 @@ Depuis le menu, sur un objet signé usé ou brisé dont la recette est servie pa
 la solidité revient à une maximale réduite de 5, l'histoire garde « réparation par … », `broken` disparaît ; le
 créateur n'est jamais touché. Finir trop loin abandonne la réparation (rien n'est consommé) et libère la station.
 
+### Signature protégée (depuis 1.3.0)
+
+L'artisanat s'abonne en `before` au hook `vava_inventory:metadata` : un autre module qui écrit des métadonnées
+(`setMetadata`, `patchMetadata`) ne peut ni contrefaire ni réécrire une signature, ni réparer un objet signé hors d'une
+station.
+
+| Objet | Refusé (code) | Admis |
+|---|---|---|
+| Tout objet | changer, poser ou retirer `crafter_id`, `crafter_name`, `crafted_at`, `mark`, `quality` (`signature_locked`) | tout le reste |
+| Objet signé (`crafter_id` présent) | changer ou retirer `tier`, poser, changer ou retirer `name` (`signature_locked`) ; faire monter, retirer, ou remplacer par autre chose qu'un nombre `max_durability` ou `durability`, retirer `broken` d'un objet brisé, donner à un objet qui n'en avait pas une solidité négative, non numérique, au-dessus du plafond, ou une courante au-dessus de sa maximale (`durability_locked`) | solidité qui baisse (usure de la récolte, dommage), solidité donnée à un objet qui n'en avait pas jusqu'au plafond (`guard.bornDurability`, 100, ou la solidité de sa recette si elle est plus haute), `broken` posé, `history`, `lines`, toute autre clé |
+| Objet ordinaire (sans `crafter_id`) | — | tout le reste, palier d'une matière et solidité d'un outil compris |
+
+- Les écritures de l'artisanat lui-même (réparation, baptême) passent : l'inventaire les attribue à `vava_crafting`
+  (`owner`, lu par `GetInvokingResource`) **et** elles partent de `Bridge.PatchMetadata`, qui lève un compteur autour
+  de son seul appel à l'inventaire. La création d'une pièce passe par l'échange atomique (hook `add`), pas par ce hook.
+- Un `setMetadata` d'un autre module sur un objet signé doit donc reporter ces clés telles quelles.
+- Le module appelant reçoit toujours `false, code`. Un refus est inscrit au journal (`signature_locked` ou
+  `durability_locked` : module, clé, objet, créateur) et signalé en console **une fois par fenêtre** pour un même
+  module, un même objet et une même clé (`guard.windowMs`, 60 s) ; les suivants sont comptés et annoncés avec le
+  prochain refus signalé (« [n refus semblable(s) tu(s)] », `untold` au journal). Au plus `guard.maxTracked` (500)
+  refus distincts suivis à la fois : au-delà, un refus nouveau est seulement compté jusqu'à la purge suivante (une
+  fois par fenêtre). Un module qui insiste ne remplit donc ni le journal ni la console (depuis 1.3.1).
+- La garde ne vaut que pendant que `vava_crafting` tourne (ses hooks tombent à son arrêt). Elle ne couvre pas un objet
+  **créé** déjà signé par un autre module (`add`, `exchange`), qui passe par d'autres hooks.
+
 ## Base de données (sql/0001_crafting.sql)
 
 `vava_crafting_stations` (combustible), `vava_crafting_log`. Le poinçon vit dans le champ de personnage
@@ -79,7 +105,7 @@ Exports : `getStation(id)`, `getStations()`, `setFuel(id, n)`, `registerAccess(k
 `getRecipe(id)`, `recipesOf(type)`, `getSession(joueur)`, `getMark(personnage)`. Hooks : `vava_crafting:crafting`
 (before, annulable : `{ source, characterId, station, recipe, item }`), `crafted` (after : `+ quantity, quality, tier,
 signed, instanceId`), `repaired` (after : `{ source, characterId, station, recipe, item, instanceId, maxDurability }`).
-Détail : `docs/api.md`.
+Hook écouté : `vava_inventory:metadata` (before, garde de la signature, voir plus haut). Détail : `docs/api.md`.
 
 ## Conseil (droit `metiers`)
 
@@ -106,3 +132,6 @@ Détail : `docs/api.md`.
 10. **Privée** : station avec `owner = { kind = 'character', id = n }` → les autres lisent « ne vous appartient pas ».
 11. **À terre** (`vava_health`) : près d'une station, se faire mettre à terre → l'invite disparaît, `E` ne sert qu'à
     rendre l'âme. Tombé pendant une pièce : rien n'est consommé, la station est libérée (« Vous êtes à terre. »).
+12. **Signature protégée** : avec la ressource jetable de `docs/tests/metiers.md` § 4 (tests 14 à 17), réécrire le
+    créateur ou faire monter la solidité d'une hache signée → refusé (`signature_locked`, `durability_locked`), fiche
+    inchangée, ligne au journal ; l'usure de la récolte, la réparation et le baptême marchent toujours.

@@ -2,7 +2,7 @@
     vava_crafting/server/main.lua
     Rôle : déclaration du module auprès du core : catalogue (registres, objets, recettes auprès des compétences),
            journal, poinçon, état des stations, intentions du client (RPC à schéma strict et débit limité), joueurs
-           partis, boucle lente d'écriture, commande du Conseil.
+           partis, garde de la signature (hook des métadonnées), boucle lente d'écriture, commande du Conseil.
     Dépendances : tous les fichiers server/ du module
 ]]
 
@@ -17,6 +17,7 @@ local journal = VavaCrafting.journal
 local catalog = VavaCrafting.catalog
 local stations = VavaCrafting.stations
 local signature = VavaCrafting.signature
+local guard = VavaCrafting.guard
 local crafting = VavaCrafting.crafting
 local repair = VavaCrafting.repair
 local admin = VavaCrafting.admin
@@ -79,6 +80,9 @@ local function setup()
         local id, hookErr = core.hooks.after(def[1], def[2])
         if not id then return false, hookErr end
     end
+    -- signature et solidité des objets d'artisan : aucun autre module ne les réécrit
+    local guardId, guardErr = bridge.GuardMetadata(guard.onMetadata)
+    if not guardId then return false, 'garde des métadonnées : ' .. tostring(guardErr) end
 
     CreateThread(function()
         -- boucle lente justifiée : au plus une transaction toutes les flushMs, rien si rien n'a changé
