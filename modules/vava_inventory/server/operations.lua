@@ -735,7 +735,7 @@ function operations.hold(src, instanceId, owner)
     local ok, code = guarded(HOOK.HOLD, payload, { container })
     -- troisième valeur : refus rédigé par un module (à terre…), notifié par la ceinture comme une utilisation
     if not ok then return false, code, isReadable(code) end
-    ok, code = hands.set(src, instance, def)
+    ok, code = hands.set(src, instance)
     if not ok then return false, code end
     hooks().runAfter(HOOK.HOLD, payload)
     return true

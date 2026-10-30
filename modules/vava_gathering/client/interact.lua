@@ -27,8 +27,8 @@ local RPC = VavaGathering.RPC
 local HUD = 'vava_hud'
 local HEALTH = 'vava_health'
 local PROGRESS_ID = 'vava_gathering:harvest'
--- champ public de l'inventaire : ce que le joueur tient (objet et modèle)
-local HANDS_STATE = 'vava_inventory:hands'
+-- champ de personnage de l'inventaire, reçu par le seul joueur : ce qu'il tient ({ id, item })
+local HANDS_FIELD = 'vava_inventory:hands'
 local MOVE_POLL_MS = 250
 local ANIM_LOAD_MS = 5000
 local ANIM_BLEND = 8.0
@@ -124,7 +124,8 @@ end
 ---@return boolean
 local function toolOk(resource)
     if not resource.tool then return true end
-    local held = LocalPlayer.state[HANDS_STATE]
+    local character = core.characters.current()
+    local held = character and type(character.fields) == 'table' and character.fields[HANDS_FIELD] or nil
     local item = type(held) == 'table' and held.item or nil
     local tool = item and cfg.tools[item]
     return tool ~= nil and tool.kind == resource.tool
