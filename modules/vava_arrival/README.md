@@ -34,7 +34,7 @@ lui, celles du jeu), `vava_admin` (droit `give`, journal du Registre ; sans lui,
 
 Ce que la dotation **n'est pas** : ni vêtements (la tenue est celle choisie à la création, `vava_appearance`), ni
 besace en objet (la besace **est** l'inventaire du personnage), ni toit, ni outil. Deux pains et deux outres
-rendent environ 2 h 50 de faim et 2 h 25 de soif à un personnage qui part de 100 : la première soirée, pas la
+repoussent la faim d'environ 2 h 50 et la soif d'environ 2 h 25 chez un personnage qui part de 100 : la première soirée, pas la
 première semaine.
 
 ## L'arrivée, pas à pas
@@ -106,6 +106,9 @@ dotation, accueil, accusé, `/accueil` avec des doublures de la base et de l'inv
 
 ## À vérifier en jeu
 
+- Les deux notifications (4,5 s chacune dans `vava_hud`) restent visibles et lisibles par-dessus le Codex qui s'ouvre
+  aussitôt après : c'est le seul message qui dit « allez vers les autres » (accueil 2). Sinon, prévoir une attente
+  réglable avant l'ouverture du Codex.
 - `IsScreenFadedIn()` est vrai assez tôt après l'apparition (sinon l'accueil attendrait 30 s : accueil 2).
 - Le Codex ouvert par `openAt` reçoit bien clavier et souris, et `Échap` le ferme (accueil 2).
 - `IsNuiFocused()` voit le Codex et l'inventaire ouverts (accueil 6 et 7).

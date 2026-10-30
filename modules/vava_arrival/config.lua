@@ -29,7 +29,7 @@ VavaArrival.config = {
     -- Objets déclarés à l'inventaire par ce module S'ILS NE LE SONT PAS DÉJÀ (le premier déclaré l'emporte). Image :
     -- nui://vava_arrival/web/items/<nom>.svg, ajoutée à la déclaration. Mêmes définitions que vava_example_items.
     items = {
-        pain = { label = 'Miche de pain', description = 'Encore tiède, sortie du four du village.', width = 2, height = 1,
+        pain = { label = 'Miche de pain', description = 'Croûte épaisse, mie serrée.', width = 2, height = 1,
             weight = 400, stack = 10, category = 'nourriture', effects = { hunger = 35 } },
         eau = { label = 'Outre d\'eau', description = 'De l\'eau fraîche tirée du puits.', width = 1, height = 2,
             weight = 700, stack = 5, category = 'boisson', effects = { thirst = 40 } },
@@ -63,9 +63,9 @@ VavaArrival.config = {
 
     -- Textes (notifications : 200 octets au plus, texte brut ; libellés du journal du Registre : 32 octets au plus).
     messages = {
-        welcome = 'Bienvenue à Eldoria. Ici, point de pièces : tout se troque, se prête ou se donne. Allez vers les gens du royaume, ils vous guideront.',
-        kit = 'Dans votre besace : deux miches de pain et deux outres d\'eau, de quoi tenir jusqu\'au soir.',
-        codexHint = 'Votre Codex (F1) garde la page de vos premiers pas : ouvrez-le quand vous le voudrez.',
+        welcome = 'Bienvenue à Eldoria. Nulle pièce ici : on troque, on rend service, on partage. Allez vers les autres, ils vous guideront.',
+        kit = 'Dans votre besace : deux miches de pain et deux outres d\'eau. Pour la suite, comptez sur les autres.',
+        codexHint = 'Votre Codex (F1) garde ce qu\'il faut savoir pour vos premiers pas : ouvrez-le quand vous le voudrez.',
         admin = {
             usage = 'usage : /%s etat <n°> | redoter <n°> | rejouer <n°>',
             noCharacter = 'Joueur %d : aucun personnage en jeu.',
