@@ -1,33 +1,12 @@
 /*
  * web/css/style.css
  * Rôle : écran à terre et bandeau du geste pour relever, dans la matière des autres interfaces : voile sombre qui
- *        rougit vers les bords, titre en Cinzel, filet orné, touche gravée, barres de laiton. Polices embarquées
- *        (licence OFL).
+ *        rougit vers les bords, titre en Cinzel, filet orné, touche gravée, barres de laiton. Polices, textures et
+ *        ornements : vava_ui (licence OFL des polices dans modules/vava_ui/web/fonts/) ; sans vava_ui, polices de
+ *        repli, sans grain ni filet orné, toujours lisible.
  * Performance : aucun filtre ni flou ; les barres se remplissent par une seule transition de transform ; le voile
  *        apparaît en fondu d'opacité.
  */
-
-@font-face {
-  font-family: "Cinzel";
-  src: url("../fonts/cinzel.woff2") format("woff2");
-  font-weight: 400 700;
-  font-style: normal;
-  font-display: swap;
-}
-@font-face {
-  font-family: "EB Garamond";
-  src: url("../fonts/eb_garamond.woff2") format("woff2");
-  font-weight: 400 700;
-  font-style: normal;
-  font-display: swap;
-}
-@font-face {
-  font-family: "EB Garamond";
-  src: url("../fonts/eb_garamond_italic.woff2") format("woff2");
-  font-weight: 400 700;
-  font-style: italic;
-  font-display: swap;
-}
 
 :root {
   --edge: #070504;
@@ -96,8 +75,8 @@ body.dev { background: radial-gradient(ellipse at 50% 60%, #6b6a58 0%, #3a3a2e 5
   height: 10px;
   margin-bottom: 0.4rem;
   background:
-    url("../img/diamond.svg") center / 10px 10px no-repeat,
-    url("../img/divider.svg") center / 100% 10px no-repeat;
+    var(--ui-diamond, none) center / 10px 10px no-repeat,
+    var(--ui-divider, none) center / 100% 10px no-repeat;
 }
 
 .downed-title {
@@ -173,7 +152,7 @@ kbd {
   padding: 0.75rem 1.4rem 0.95rem;
   border-radius: 4px;
   background:
-    url("../img/grain.png") 0 0 / 96px 96px,
+    var(--ui-grain, none) 0 0 / 96px 96px,
     linear-gradient(180deg, #2a2017, #1a130e);
   box-shadow: 0 0 0 1px var(--edge), 0 0 0 2px rgba(var(--brass-rgb), 0.2), inset 0 1px 0 rgba(255, 235, 200, 0.07), 0 1rem 2rem rgba(0, 0, 0, 0.55);
   transform: translateX(-50%);

@@ -8,6 +8,7 @@ local ROOT = (os.getenv('VAVA_ROOT') or '.') .. '/'
 -- étapes 4 à 17) ; à la fin de T-012, les 15 interfaces y sont.
 local PAGES = {
     { module = 'vava_hud', sheet = 'style.css' },
+    { module = 'vava_health', sheet = 'style.css' },
 }
 
 local COMMON = {
