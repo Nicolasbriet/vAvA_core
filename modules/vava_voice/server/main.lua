@@ -1,8 +1,9 @@
 --[[
     vava_voice/server/main.lua
-    Rôle : déclaration du module auprès du core : zones lues en base, micro ouvert à l'apparition du personnage et
-           coupé hors du jeu, liens avec la santé et le Conseil, intentions du client (liste des zones, éditeur du
-           Conseil) en RPC à schéma strict et à débit limité ; chaque action de l'éditeur revérifie le droit.
+    Rôle : déclaration du module auprès du core : zones lues en base et déclarées au core (envoyées aux seuls joueurs
+           proches), micro ouvert à l'apparition du personnage et coupé hors du jeu, liens avec la santé et le Conseil,
+           intentions du client (limite de portée redemandée, éditeur du Conseil) en RPC à schéma strict et à débit
+           limité ; chaque action de l'éditeur revérifie le droit.
            À l'arrêt, rien n'est rendu : un micro coupé (joueur hors du jeu) le reste pendant un `restart`.
     Dépendances : tous les fichiers server/ du module
 ]]
@@ -57,11 +58,12 @@ local function reach(src, id)
     return true
 end
 
---- Liste des zones, demandée par le client à l'apparition et au redémarrage du module. La limite de portée du moment
---- lui repart au passage par son évènement habituel : un client qui redémarre a pu manquer celle du démarrage.
+--- Demandé par le client à l'apparition et au redémarrage du module : la limite de portée du moment lui repart par son
+--- évènement habituel (un client qui redémarre a pu manquer celle du démarrage). Les zones, elles, arrivent d'elles-mêmes
+--- aux joueurs proches (abonnements de zone du core, 1.3.0).
 local function zoneList(src)
     presence.resend(src)
-    return true, zones.all()
+    return true
 end
 
 local function onSpawned(payload)
@@ -74,6 +76,8 @@ local function setup()
     if not declared then return false, 'commandes : ' .. tostring(declareErr) end
     local ok, err = zones.load()
     if not ok then return false, 'zones : ' .. tostring(err) end
+    -- chaque zone devient une zone du core : seuls les joueurs proches la reçoivent
+    zones.declareAll()
     ok, err = links.start()
     if not ok then return false, err end
     for _, def in ipairs({

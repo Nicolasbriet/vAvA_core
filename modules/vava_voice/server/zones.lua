@@ -4,23 +4,21 @@
            le Conseil : nom compté en signes (shared/label.lua), valeurs ramenées aux bornes et au pas de la
            configuration, centre lu côté serveur (position du membre du Conseil, jamais envoyée par son client),
            écriture en base avant toute diffusion, journal.
-           Chaque changement part à tous les joueurs : rare, petit, et chaque client en a besoin pour savoir où il se
-           trouve (seul envoi à tous du module).
-    Dépendances : shared/constants.lua, config.lua, shared/label.lua, server/core.lua, server/store.lua,
-                  server/links.lua
+           Chaque zone est une zone du core (abonnements de zone, 1.3.0) : envoyée aux seuls joueurs proches (rayon
+           + subscribeMargin, positions lues par le serveur), et chaque changement aux seuls joueurs qui la suivent.
+    Dépendances : shared/constants.lua, config.lua, shared/label.lua, server/core.lua (core.zones, vAvA_core 0.11.0),
+                  server/store.lua, server/links.lua
 ]]
 
 local pairs, ipairs, tostring, sort, floor = pairs, ipairs, tostring, table.sort, math.floor
-local GetPlayerPed, GetEntityCoords, TriggerClientEvent = GetPlayerPed, GetEntityCoords, TriggerClientEvent
+local GetPlayerPed, GetEntityCoords = GetPlayerPed, GetEntityCoords
 
 local store = VavaVoice.store
 local links = VavaVoice.links
 local names = VavaVoice.label
 local cfg = VavaVoice.config.zones
 local messages = VavaVoice.config.messages
-local EVENTS = VavaVoice.EVENTS
 local HOOK_CHANGED = VavaVoice.HOOKS.ZONES_CHANGED
-local EVERYONE = -1
 -- coordonnées gardées au centimètre
 local COORD_PRECISION = 100
 
@@ -30,6 +28,9 @@ VavaVoice.zones = zones
 ---@type table<integer, vAvA.VoiceZone>
 local list = {}
 local count = 0
+-- numéros des zones déclarées au core (une déclaration refusée est retentée au changement suivant)
+---@type table<integer, true>
+local declared = {}
 
 ---@param zone vAvA.VoiceZone
 ---@return vAvA.VoiceZone
@@ -64,15 +65,49 @@ local function positionOf(src)
     return { x = round(coords.x), y = round(coords.y), z = round(coords.z) }
 end
 
+--- Nom de la zone du core : « z<numéro> » (le core le préfixe par la ressource).
+---@param id integer
+---@return string
+local function coreId(id)
+    return 'z' .. id
+end
+
+--- Lieu de la zone du core : cercle au sol de la zone de voix, connu des joueurs à subscribeMargin de son bord.
+---@param zone vAvA.VoiceZone
+---@return table
+local function areaOf(zone)
+    return { x = zone.x, y = zone.y, z = zone.z, radius = zone.radius, margin = cfg.subscribeMargin }
+end
+
+--- Déclare (ou met à jour) la zone au core : les joueurs proches la reçoivent, eux seuls.
+---@param zone vAvA.VoiceZone
+---@return boolean ok
+local function share(zone)
+    local core = VavaVoice.core
+    local id, name = zone.id, coreId(zone.id)
+    local ok, err
+    if declared[id] then
+        ok, err = core.zones.move(name, areaOf(zone))
+        if ok then ok, err = core.zones.set(name, { zone = copy(zone) }) end
+    else
+        ok, err = core.zones.define(name, areaOf(zone), { zone = copy(zone) })
+        if ok then declared[id] = true end
+    end
+    if not ok then VavaVoice.log.error('zone #%d non partagée avec les joueurs proches : %s', id, tostring(err)) end
+    return ok == true
+end
+
 ---@param action string
 ---@param zone vAvA.VoiceZone|nil
 ---@param id integer
 ---@param src integer
 local function publish(action, zone, id, src)
     if zone then
-        TriggerClientEvent(EVENTS.ZONE, EVERYONE, action, copy(zone))
-    else
-        TriggerClientEvent(EVENTS.ZONE, EVERYONE, action, id)
+        share(zone)
+    elseif declared[id] then
+        local ok, err = VavaVoice.core.zones.remove(coreId(id))
+        if not ok then VavaVoice.log.error('zone #%d non retirée du core : %s', id, tostring(err)) end
+        declared[id] = nil
     end
     VavaVoice.core.hooks.runAfter(HOOK_CHANGED, { action = action, id = id, zone = zone and copy(zone) or nil, source = src })
 end
@@ -95,6 +130,21 @@ function zones.load()
         count = count + 1
     end
     return true
+end
+
+--- Déclare toutes les zones lues au core. Appelé pendant le setup, après zones.load() : une zone refusée est écrite en
+--- console et n'empêche pas les autres.
+---@return integer shared  zones déclarées
+function zones.declareAll()
+    declared = {}
+    local ids = {}
+    for id in pairs(list) do ids[#ids + 1] = id end
+    sort(ids)
+    local shared = 0
+    for _, id in ipairs(ids) do
+        if share(list[id]) then shared = shared + 1 end
+    end
+    return shared
 end
 
 --- Toutes les zones (copies), par numéro.

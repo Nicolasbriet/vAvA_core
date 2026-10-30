@@ -6,15 +6,15 @@
 
 VavaVoice = {}
 
--- Événements serveur → client.
+-- Événements serveur → client. Les zones de voix arrivent par les abonnements de zone du core (1.3.0) : aux seuls
+-- joueurs proches, nom local « z<numéro> », état { zone = { id, label, x, y, z, radius, height, multiplier } }.
 VavaVoice.EVENTS = {
     LIMIT = 'vava_voice:limit',     -- au seul joueur concerné : portée maximale (numéro), 0 = aucune limite
-    ZONE = 'vava_voice:zone',       -- à tous : ('set', zone) créée ou modifiée, ('remove', id) supprimée
 }
 
 -- Intentions du client (RPC du core).
 VavaVoice.RPC = {
-    ZONES = 'vava_voice:zones',         -- liste des zones (apparition, redémarrage) ; la limite repart par LIMIT
+    ZONES = 'vava_voice:zones',         -- limite de portée renvoyée (apparition, redémarrage)
     EDITOR = 'vava_voice:editor',       -- ouvrir l'éditeur (droit du Conseil)
     CREATE = 'vava_voice:zoneCreate',   -- nouvelle zone centrée sur le membre du Conseil
     UPDATE = 'vava_voice:zoneUpdate',
