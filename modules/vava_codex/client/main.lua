@@ -1,7 +1,8 @@
 --[[
     vava_codex/client/main.lua
     Rôle : le Codex côté joueur : ouverture par une touche (RegisterKeyMapping : réglable par le joueur, aucune
-           boucle) ou /codex, contenu demandé au serveur à chaque ouverture (touches du joueur résolues ici), gestes
+           boucle) ou /codex ; à chaque ouverture, le serveur reçoit les versions du contenu et des préférences que
+           la page garde et ne renvoie que ce qui a changé (touches du joueur résolues ici à chaque fois) ; gestes
            de l'interface relayés au serveur (RPC à schéma strict), lancement d'une commande composée par
            ExecuteCommand (une commande du serveur y arrive comme si elle était tapée), export `noteCommand` pour que
            le chat inscrive aux dernières pages ce que le joueur tape lui-même. Souris et clavier rendus au jeu si la
@@ -36,6 +37,10 @@ local REFOCUS_MS = 150
 local open = false
 local keepOpen = cfg.keepOpenDefault
 
+-- Ce que la page garde entre deux ouvertures : les empreintes données par le serveur avec le dernier contenu et les
+-- dernières préférences qu'elle a reçus ('' : rien, ou changé par la page depuis), et les touches à relire.
+local known = { version = '', prefsVersion = '', keyed = {} }
+
 local function hudNotify(message, kind)
     return exports[HUD]:notify(message, kind)
 end
@@ -61,38 +66,80 @@ local function close()
     nui.setFocus(false)
 end
 
---- Les touches du joueur, résolues ici : le serveur ne connaît que les défauts.
----@param entries table[]
-local function resolveKeys(entries)
+--- Entrées liées à une touche, gardées pour relire à chaque ouverture la touche du joueur (sans le contenu entier).
+---@param entries any
+---@return { name: string, key: string, hold?: boolean, keyDisplay?: string }[]
+local function keyedEntries(entries)
+    local out = {}
+    if type(entries) ~= 'table' then return out end
     for _, entry in ipairs(entries) do
-        if entry.kind == 'key' or entry.key then entry.keyLabel = keys.label(entry) end
+        if type(entry) == 'table' and type(entry.name) == 'string' and type(entry.key) == 'string' then
+            out[#out + 1] = { name = entry.name, key = entry.key, hold = entry.hold == true, keyDisplay = entry.keyDisplay }
+        end
     end
+    return out
 end
 
---- Complète le contenu reçu du serveur avant de l'envoyer à la page : touches du joueur, touche de fermeture, nombre
---- de dernières pages gardées (la page tient sa liste à jour entre deux ouvertures, à la même borne que le serveur).
----@param payload table
-local function decorate(payload)
-    resolveKeys(payload.entries or {})
-    payload.closeKey = cfg.keys.open
-    payload.recentMax = cfg.recent.max
+--- Les touches du joueur, résolues ici (le serveur ne connaît que les défauts) : { [nom] = touche affichée }.
+---@return table<string, string>
+local function keyLabels()
+    local labels = {}
+    for _, entry in ipairs(known.keyed) do labels[entry.name] = keys.label(entry) end
+    return labels
 end
 
---- Ouvre le Codex : le contenu est demandé au serveur, puis affiché. Rien n'est ouvert s'il manque.
+--- Range la réponse du serveur à l'ouverture et compose le message de la page : le contenu et les préférences
+--- seulement s'ils sont arrivés (la page garde les précédents), les touches du joueur relues à chaque fois (elles se
+--- changent dans les réglages du jeu, le serveur ne le sait pas), la touche de fermeture, le nombre de dernières
+--- pages gardées. À n'appeler que si le message part aussitôt vers la page : `known` dit ce qu'elle a.
+---@param answer table  { version, prefsVersion, content?, prefs? }
+---@return table|nil message  nil : réponse incohérente (rien de gardé ; la prochaine ouverture redemande tout)
+local function absorb(answer)
+    local content, current = answer.content, answer.prefs
+    if type(answer.version) ~= 'string' or type(answer.prefsVersion) ~= 'string'
+        or (type(content) ~= 'table' and answer.version ~= known.version)
+        or (type(current) ~= 'table' and answer.prefsVersion ~= known.prefsVersion) then
+        known.version, known.prefsVersion = '', ''
+        return nil
+    end
+    if type(content) == 'table' then
+        known.version, known.keyed = answer.version, keyedEntries(content.entries)
+    else
+        content = nil
+    end
+    if type(current) == 'table' then
+        known.prefsVersion = answer.prefsVersion
+        keepOpen = current.keepOpen ~= false
+    else
+        current = nil
+    end
+    return {
+        version = known.version, content = content, prefs = current, keys = keyLabels(),
+        closeKey = cfg.keys.open, recentMax = cfg.recent.max,
+    }
+end
+
+--- Ouvre le Codex : le serveur reçoit les versions que la page garde et ne renvoie que ce qui a changé, puis le livre
+--- s'affiche. Rien n'est ouvert si la réponse manque.
 local function openCodex()
     if open or not core.characters.current() or IsPauseMenuActive() then return end
     CreateThread(function()
-        local ok, success, payload = core.rpc.call(RPC.OPEN)
-        if not ok or not success or type(payload) ~= 'table' then
-            core.log.warn('Codex indisponible : %s', tostring(ok and payload or success))
+        local ok, success, answer = core.rpc.call(RPC.OPEN, known.version, known.prefsVersion)
+        if not ok or not success or type(answer) ~= 'table' then
+            core.log.warn('Codex indisponible : %s', tostring(ok and answer or success))
             feed(cfg.messages.unavailable, 'warning')
             return
         end
+        -- rien n'est gardé d'une réponse qui n'ira pas à la page
         if open or not core.characters.current() or IsPauseMenuActive() then return end
-        decorate(payload)
-        keepOpen = payload.prefs and payload.prefs.keepOpen ~= false
+        local message = absorb(answer)
+        if not message then
+            core.log.warn('Codex : réponse incomplète, tout sera redemandé')
+            feed(cfg.messages.unavailable, 'warning')
+            return
+        end
         open = true
-        nui.send('open', payload)
+        nui.send('open', message)
         nui.setFocus(true)
     end)
 end
@@ -128,6 +175,7 @@ local function run(d)
     if match(line, '^(%S+)') ~= name then return { ok = false, error = 'invalid_request' } end
     local noted = forward(RPC.RECENT, nil, name, type(d.action) == 'string' and d.action or '')
     if not noted.ok then return noted end
+    known.prefsVersion = ''   -- la page note la ligne elle-même : ses préférences ne sont plus celles de l'empreinte
     local closing = d.ui == true or not keepOpen
     if closing then close() end
     ExecuteCommand(line)
@@ -146,26 +194,35 @@ RegisterNetEvent(EVENTS.NOTIFY, function(message, kind)
 end)
 
 -- Gestes de l'interface ---------------------------------------------------------------------------------------------
+-- Un signet ou un réglage accepté change les préférences de la page : leur empreinte ne vaut plus, la prochaine
+-- ouverture les redemande (celles du serveur font foi).
 
 nui.on('options', function(d)
     return forward(RPC.OPTIONS, function(r, options) r.options = options end,
         tostring(d.name or ''), type(d.action) == 'string' and d.action or '', math.tointeger(tonumber(d.index or 0)) or 1)
 end)
 nui.on('favorite', function(d)
-    return forward(RPC.FAVORITE, function(r, favorites) r.favorites = favorites end, tostring(d.name or ''), d.on == true)
+    return forward(RPC.FAVORITE, function(r, favorites)
+        known.prefsVersion = ''
+        r.favorites = favorites
+    end, tostring(d.name or ''), d.on == true)
 end)
 nui.on('keepOpen', function(d)
     return forward(RPC.KEEP_OPEN, function(r, value)
+        known.prefsVersion = ''
         keepOpen = value ~= false
         r.keepOpen = keepOpen
     end, d.value == true)
 end)
 nui.on('run', run)
+-- La page n'a pas le contenu que les versions annoncent : tout est redemandé, et rangé comme à l'ouverture.
 nui.on('refresh', function()
-    return forward(RPC.OPEN, function(r, payload)
-        if type(payload) == 'table' then decorate(payload) end
-        r.payload = payload
-    end)
+    local ok, success, answer = core.rpc.call(RPC.OPEN, '', '')
+    if not ok then return { ok = false, error = tostring(success) } end
+    if not success then return { ok = false, error = tostring(answer) } end
+    local message = type(answer) == 'table' and absorb(answer) or nil
+    if not message then return { ok = false, error = 'invalid_response' } end
+    return { ok = true, payload = message }
 end)
 nui.on('close', function()
     close()
@@ -175,7 +232,10 @@ end)
 RegisterCommand(cfg.command, toggle, false)
 RegisterKeyMapping(cfg.command, cfg.labels.open, 'keyboard', cfg.keys.open)
 
-core.hooks.after('core:character:unloaded', close)
+core.hooks.after('core:character:unloaded', function()
+    close()
+    known.prefsVersion = ''   -- préférences propres au personnage : celles du suivant sont redemandées
+end)
 
 -- Arrêt de la ressource livre ouvert : la page disparaît avec elle, mais la souris et le clavier resteraient pris.
 AddEventHandler('onClientResourceStop', function(resource)

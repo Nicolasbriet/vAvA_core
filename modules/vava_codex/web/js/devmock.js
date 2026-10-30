@@ -65,12 +65,19 @@ const DevMock = (() => {
     return args ? args[index - 1] : null;
   }
 
+  /** Message d'ouverture complet, de la forme envoyée par client/main.lua : contenu, préférences, touches du joueur. */
   function snapshot(staff) {
     const visible = entries.filter((entry) => staff || entry.scope === 'player');
+    const keys = {};
+    for (const entry of visible) if (entry.keyLabel) keys[entry.name] = entry.keyLabel;
     return {
-      entries: JSON.parse(JSON.stringify(visible)), chapters: chapters.filter((chapter) => visible.some((entry) => entry.module === chapter.id)),
-      undeclared: staff ? [{ name: 'vava_admin_noclip', module: 'vava_admin' }, { name: 'zonesvoix', module: 'vava_voice' }] : [],
-      staff, prefs: JSON.parse(JSON.stringify(prefs)), closeKey: 'F1',
+      version: staff ? 'dev0000000000001' : 'dev0000000000000',
+      content: {
+        entries: JSON.parse(JSON.stringify(visible)), chapters: chapters.filter((chapter) => visible.some((entry) => entry.module === chapter.id)),
+        undeclared: staff ? [{ name: 'vava_admin_noclip', module: 'vava_admin' }, { name: 'zonesvoix', module: 'vava_voice' }] : [],
+        staff,
+      },
+      prefs: JSON.parse(JSON.stringify(prefs)), keys, closeKey: 'F1', recentMax: 12,
     };
   }
 

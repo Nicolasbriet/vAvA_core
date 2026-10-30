@@ -182,6 +182,17 @@
     }
   });
 
+  /** La page n'a pas le contenu de la version annoncée (cas de secours) : tout est redemandé au serveur. */
+  async function resync() {
+    const result = await Bridge.post('refresh');
+    if (!result.ok || !result.payload) {
+      View.toast(errorMessage(result.error), 'danger');
+      return;
+    }
+    Model.load(result.payload);
+    View.render();
+  }
+
   Bridge.onMessage((action, payload) => {
     if (action === 'open') {
       Forms.clearCache();
@@ -189,6 +200,7 @@
       View.render();
       app.hidden = false;
       View.focusSearch(true);
+      if (Model.state.version !== payload.version) resync();
     } else if (action === 'notify') {
       View.toast(payload.message, payload.kind);
     } else if (action === 'close') {

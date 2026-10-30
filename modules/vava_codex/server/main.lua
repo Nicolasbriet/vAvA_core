@@ -1,8 +1,9 @@
 --[[
     vava_codex/server/main.lua
     Rôle : déclaration du module auprès du core (champ des préférences, commande du Codex au registre) et RPC du
-           client (schéma strict, débit limité) : ouverture, valeurs d'un argument, signets, dernières pages, réglage.
-    Dépendances : tous les fichiers server/ du module, bridge/server.lua
+           client (schéma strict, débit limité) : ouverture (contenu et préférences renvoyés seulement s'ils ont changé
+           depuis la version que le client dit avoir), valeurs d'un argument, signets, dernières pages, réglage.
+    Dépendances : tous les fichiers server/ du module, shared/fingerprint.lua, bridge/server.lua
 ]]
 
 local ipairs, tostring = ipairs, tostring
@@ -12,6 +13,7 @@ if not core then return end
 
 local cfg = VavaCodex.config
 local catalog = VavaCodex.catalog
+local answerOpen = VavaCodex.answerOpen
 local prefs = VavaCodex.prefs
 local commands = VavaCodex.commands
 local RPC = VavaCodex.RPC
@@ -20,18 +22,25 @@ local NAME = { type = 'string', min = 1, max = VavaCodex.MAX_NAME, pattern = Vav
 local ACTION = { type = 'string', min = 0, max = VavaCodex.MAX_ACTION }   -- '' : forme nue
 local INDEX = { type = 'integer', min = 1, max = VavaCodex.MAX_ARGS }
 local BOOL = { type = 'boolean' }
+local VERSION = { type = 'string', min = 0, max = VavaCodex.VERSION_LENGTH, pattern = VavaCodex.VERSION_PATTERN }   -- '' : rien
 local limits = cfg.rateLimits
 
---- Ouverture : tout ce que le joueur peut voir, ce qui reste à décrire (Conseil), ses préférences.
-local function open(src)
+--- Ouverture : tout ce que le joueur peut voir et ce qui reste à décrire (Conseil), recalculé ici avec ses droits du
+--- moment, et ses préférences. Chacun ne part que si son empreinte diffère de celle que le client a envoyée : une
+--- version inventée ou ancienne ne fait que renvoyer le contenu complet, jamais plus que ce que le joueur peut voir.
+---@param src integer
+---@param knownVersion string  empreinte du contenu gardé par la page ('' : aucun)
+---@param knownPrefsVersion string  empreinte des préférences gardées ('' : aucune)
+local function open(src, knownVersion, knownPrefsVersion)
     local current = prefs.get(src)
     if not current then return false, 'no_character' end
     local entries, chapters, staff = catalog.visible(src)
-    return true, {
-        entries = entries, chapters = chapters, staff = staff,
-        undeclared = staff and catalog.undeclared() or {},
-        prefs = current,
-    }
+    local content = { entries = entries, chapters = chapters, staff = staff, undeclared = staff and catalog.undeclared() or {} }
+    local answer = answerOpen(content, current, knownVersion, knownPrefsVersion)
+    -- trace de test en jeu (niveau debug du core) : ce qui part réellement à chaque ouverture
+    VavaCodex.log.debug('ouverture (joueur %d) : contenu %s, préférences %s', src,
+        answer.content and 'envoyé (' .. #entries .. ' entrées)' or 'gardé par la page', answer.prefs and 'envoyées' or 'gardées')
+    return true, answer
 end
 
 local function favorite(src, name, on)
@@ -61,7 +70,7 @@ local function keepOpen(src, value)
 end
 
 local RPCS = {
-    { RPC.OPEN, {}, limits.open, open },
+    { RPC.OPEN, { VERSION, VERSION }, limits.open, open },
     { RPC.OPTIONS, { NAME, ACTION, INDEX }, limits.options, catalog.options },
     { RPC.FAVORITE, { NAME, BOOL }, limits.prefs, favorite },
     { RPC.RECENT, { NAME, ACTION }, limits.prefs, recent },

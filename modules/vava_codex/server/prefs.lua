@@ -1,7 +1,7 @@
 --[[
     vava_codex/server/prefs.lua
-    Rôle : préférences du Codex par personnage, dans un champ de personnage du core (écrit en base avec lui, visible
-           du seul joueur) : signets (favoris, bornés), dernières pages (commandes lancées, les plus récentes en tête,
+    Rôle : préférences du Codex par personnage, dans un champ de personnage du core (écrit en base avec lui, lu du
+           seul serveur) : signets (favoris, bornés), dernières pages (commandes lancées, les plus récentes en tête,
            sans doublon), réglage « rester ouvert après Lancer ». Un maximum abaissé dans la config tronque les
            listes (shared/prefs.lua) au lieu de bloquer les écritures.
     Dépendances : shared/constants.lua, config.lua, shared/prefs.lua, server/core.lua, bridge/server.lua
@@ -47,7 +47,7 @@ function prefs.define()
             },
         },
         default = default(),
-        visibility = 'owner',
+        visibility = 'private',   -- le client les reçoit à l'ouverture du Codex ; aucun envoi à chaque écriture
     })
 end
 
