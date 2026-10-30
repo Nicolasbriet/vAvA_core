@@ -13,8 +13,12 @@ local PAGES = {
 local COMMON = {
     'web/fonts/cinzel.woff2', 'web/fonts/eb_garamond.woff2', 'web/fonts/eb_garamond_italic.woff2',
     'web/fonts/cinzel_decorative_400.woff2', 'web/fonts/cinzel_decorative_700.woff2',
-    'web/img/grain.png', 'web/img/paper.png', 'web/img/frame.svg', 'web/img/divider.svg', 'web/img/diamond.svg',
+    'web/img/grain.png', 'web/img/paper.png', 'web/img/grain.webp', 'web/img/paper.webp',
+    'web/img/frame.svg', 'web/img/divider.svg', 'web/img/diamond.svg',
 }
+
+-- Seuls motifs livrés par vava_ui (liste exacte : un motif plus large pourrait livrer web/dev/).
+local UI_FILES = { 'web/css/vava_ui.css', 'web/fonts/*.woff2', 'web/img/*.webp', 'web/img/*.svg' }
 
 local function read(path)
     local file = io.open(ROOT .. path, 'rb')
@@ -49,17 +53,57 @@ local function withoutComments(css)
     return (css:gsub('/%*.-%*/', ''))
 end
 
+--- Manifeste sans ses commentaires Lua (blocs `--[[ … ]]`, puis lignes `-- …`).
+local function manifestCode(manifest)
+    return (manifest:gsub('%-%-%[(=*)%[.-%]%1%]', ''):gsub('%-%-[^\n]*', ''))
+end
+
+--- Motifs livrés par un manifeste : entrées des blocs `files { … }` et des lignes `file '…'`, dans l'ordre.
+local function deliveredPatterns(manifest)
+    local code, patterns = manifestCode(manifest), {}
+    for block in code:gmatch('%f[%w_]files%s*(%b{})') do
+        for pattern in block:gmatch('[\'"]([^\'"]+)[\'"]') do patterns[#patterns + 1] = pattern end
+    end
+    for pattern in code:gmatch('%f[%w_]file%s*%(?%s*[\'"]([^\'"]+)[\'"]') do patterns[#patterns + 1] = pattern end
+    return patterns
+end
+
+--- Nil si le motif ne peut rien livrer de web/dev/ ; sinon la raison. Refusés : `**`, un joker dans une partie de
+--- dossier (`web/*/x.js` livrerait web/dev/x.js), et tout motif sous web/dev/.
+local function unsafePattern(pattern)
+    if find(pattern, '**') then return '** : ' .. pattern end
+    local folders = pattern:match('^(.*)/[^/]*$') or ''
+    if folders:find('[%*%?%[]') then return 'joker dans un dossier : ' .. pattern end
+    if pattern == 'web/dev' or pattern:sub(1, 8) == 'web/dev/' then return 'web/dev/ livré : ' .. pattern end
+    return nil
+end
+
 describe('vava_ui', function()
     local manifest = assert(read('modules/vava_ui/fxmanifest.lua'))
     local sheet = withoutComments(assert(read('modules/vava_ui/web/css/vava_ui.css')))
     local offline = assert(read('modules/vava_ui/web/dev/horsjeu.js'))
 
-    it('ne livre ni ses outils hors jeu ni aucun script', function()
+    it('ne livre que ses quatre motifs, ni outils hors jeu, ni script, ni page', function()
         assert.is_nil(find(manifest, 'web/dev'))
-        assert.is_nil(manifest:find('_scripts?%s*[{(\'"]'))
-        for _, pattern in ipairs({ "'web/css/vava_ui.css'", "'web/fonts/*.woff2'", "'web/img/*.webp'", "'web/img/*.svg'" }) do
-            assert.truthy(find(manifest, pattern), pattern)
+        local code = manifestCode(manifest)
+        assert.is_nil(code:find('_scripts?%s*[{(\'"]'))
+        assert.is_nil(code:find('%f[%w_]ui_page%f[^%w_]'))
+        assert.is_nil(code:find('%f[%w_]loadscreen'))
+        assert.same(UI_FILES, deliveredPatterns(manifest))
+        for _, pattern in ipairs(deliveredPatterns(manifest)) do
+            assert.is_nil(unsafePattern(pattern))
         end
+    end)
+
+    it('repère les motifs qui livreraient web/dev/', function()
+        for _, pattern in ipairs({ 'web/**', 'web/**/*.js', 'web/*/devmock.js', 'web/*/*', 'web/dev/devmock.js',
+            'web/dev/*.js', 'web/d?v/*.js' }) do
+            assert.is_not_nil(unsafePattern(pattern), pattern)
+        end
+        for _, pattern in ipairs({ 'web/index.html', 'web/js/*.js', 'web/css/*.css', 'web/img/*', 'web/devices.js' }) do
+            assert.is_nil(unsafePattern(pattern), pattern)
+        end
+        assert.same({ 'a', 'b', 'c' }, deliveredPatterns("-- files { 'x' }\nfiles {\n    'a', -- 'y'\n    'b',\n}\nfile 'c'\n"))
     end)
 
     it('déclare cinq polices, chacune présente', function()
@@ -111,6 +155,11 @@ for _, page in ipairs(PAGES) do
             assert.is_true(declaresDependency(manifest, 'vava_ui'))
             assert.is_nil(find(manifest, 'web/fonts'))
             assert.is_nil(find(manifest, 'web/dev'))
+            local patterns = deliveredPatterns(manifest)
+            assert.is_true(#patterns > 0)
+            for _, pattern in ipairs(patterns) do
+                assert.is_nil(unsafePattern(pattern))
+            end
         end)
 
         it('lie la feuille commune avant la sienne, et ne charge les données simulées que hors jeu', function()

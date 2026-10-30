@@ -86,6 +86,11 @@ Atelier) et aux modules qu'on retouchera. Le préfixe `--ui-` est réservé à `
 - `vava_ui.css` ne contient que `@font-face` et `:root` ; les jetons d'image et la table de `web/dev/horsjeu.js` restent
   identiques.
 - Images en SVG ou WebP ; un WebP n'est retenu que s'il gagne plus de 20 % sur le PNG, sinon le PNG reste.
+- **Retouches rares et groupées** : toute modification d'un fichier livré fait retélécharger la ressource à tous les
+  joueurs à leur connexion suivante. On réunit les ajouts dans une même version plutôt que d'en publier une par
+  fichier ; jamais de retouche « pour voir ».
+- `files` : exactement `web/css/vava_ui.css`, `web/fonts/*.woff2`, `web/img/*.webp`, `web/img/*.svg` ; jamais de `**`
+  ni de joker dans un nom de dossier (un motif plus large livrerait `web/dev/`) ; ni `ui_page`, ni `loadscreen`, ni script. `tests/spec/ui_shared_spec.lua` le vérifie.
 
 ## Hors jeu
 

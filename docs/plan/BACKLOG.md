@@ -325,6 +325,9 @@ versé à T-014 ; les autres points déjà couverts sont précisés dans T-012 �
 - Pilote vava_hud fait, à tester en jeu avant la suite : `vava_ui` 1.0.0, Chancellerie 1.6.2 (ordre de démarrage),
   `vava_hud` 1.4.0 seul basculé ; `docs/tests/interfaces.md` § 0, rapport `docs/plan/rapports/T-012.md`. Les 14 autres
   bascules (étapes 4 à 19 de la spec) attendent que les polices soient vues servies par `nui://vava_ui/…` en jeu.
+  Relu sécurité et réseau (OK). Avant la deuxième bascule, **obligatoire** : règle de `scripts/audit-reseau.sh` (devmock
+  livré, `web/dev` ou `web/**` dans un manifeste, police ou texture commune hors de `vava_ui`) et ses mineurs, une fois
+  T-013 fusionnée (rapport T-012 § Relecture).
 - Polices, textures (grain, papier, cadres, séparateurs) et icônes communes dans une ressource unique, référencées
   par `nui://vava_ui/…` ; retirer les copies des autres modules. Démarre juste après `vAvA_core`.
 - Chiffres de T-011 (`docs/plan/rapports/T-011.md` § Fichiers web communs) : 4 003 861 o de `web/` livrés aux
