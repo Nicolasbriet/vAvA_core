@@ -32,7 +32,7 @@ complet : `README.md` à la racine du dépôt).
 | `vAvA_core` ≥ 0.5.0 | joueurs, hooks, registre des commandes | obligatoire |
 | `vava_admin` ≥ 1.3.0 | demandes du Conseil, droits des rangs, journal, rangs des comptes reliés | obligatoire |
 | `vava_voice` ≥ 1.1.0 | zones de voix lues, modifiées et supprimées depuis le web | page Zones de voix vide |
-| `vava_cameras` ≥ 1.0.0 | écran des joueurs depuis le web | pas de caméras depuis le web |
+| `vava_cameras` ≥ 1.3.0 | écran des joueurs depuis le web (`webCheck` depuis 1.5.1) | pas de caméras depuis le web |
 | `vava_time` ≥ 1.0.0 | ciel et heure du royaume lus et réglés depuis le web (1.4.0) | page Ciel et heure : « ne sont pas lancés » |
 
 ## Règles (config.lua)
@@ -64,7 +64,9 @@ complet : `README.md` à la racine du dépôt).
   auprès du Registre (`webCan`), décision inscrite à son journal (`webLog`) si elle change quelque chose. Un fichier du
   pont ajoute ses demandes à `routes.requests`.
 - **Caméras** : ouvertes auprès de vava_cameras une fois le droit `watch` accordé — la vue en grand par la demande
-  « écran du joueur » du Registre (cible vérifiée, au journal), les cases d'un mur sur le seul droit, l'ouverture du mur
+  « écran du joueur » du Registre (cible vérifiée, au journal) — une fois le droit lu et la caméra jugée accordable par
+  vava_cameras (`webCheck`, 1.5.1) : une vue refusée faute de débit chez le joueur filmé (`budget`), que la
+  Chancellerie retente toutes les 10 s, ne laisse pas de ligne au journal —, les cases d'un mur sur le seul droit, l'ouverture du mur
   étant inscrite au journal. Le pont ne sait pas quand un mur du navigateur se ferme (onglet fermé, redémarrage) : au
   lieu de refuser une case, il inscrit au journal (« Cases du mur regardées », numéro du joueur) la première case d'un
   compte qui n'a ouvert aucun mur depuis `cameras.tileLogMs` (2 h, durée maximale d'une caméra), puis au plus une ligne

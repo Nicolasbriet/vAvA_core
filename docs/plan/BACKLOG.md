@@ -270,13 +270,20 @@ versé à T-014 ; les autres points déjà couverts sont précisés dans T-012 �
   contenu suit un redémarrage de module et un rang donné ; procédure `docs/tests/codex.md` complétée ; version montée.
 
 ### T-047 — Caméras : budget du débit montant d'un joueur filmé
-- Agent : vava-dev-lua (+ vava-dev-nui pour la répartition dans la page) · Dépend de : T-026 · Statut : en cours
+- Agent : vava-dev-lua (+ vava-dev-nui pour la répartition dans la page) · Dépend de : T-026 · Statut : à tester en jeu
 - **IMPORTANT** (`docs/audits/reseau-vava_cameras.md`) : `config.lua:17-21`, `:28-29`, un encodeur et un débit par
   spectateur, jusqu'à 6 : jusqu'à 7,2 Mbit/s pris sur la connexion montante d'un joueur filmé (le jeu et la voix
   passent par la même). Budget total par joueur filmé en config (**décision** : 1 500 kbit/s proposés), une seule vue
   pleine à la fois, refus `budget` (message en français) au-delà, côté serveur (`server/sessions.lua`).
 - Critères : test de la règle de répartition ; procédure `docs/tests/registre.md` complétée avec la mesure des images
   par seconde et du ping du joueur filmé par 1, 3 et 6 membres ; README à jour ; version montée.
+- Fait le 30 octobre 2026 : `vava_cameras` 1.3.0, pont 1.5.1, Chancellerie 1.6.1 ; 1 500 kbit/s pour tous les
+  spectateurs d'un joueur filmé, une seule vue en grand, refus `budget` retenté par le mur et la Chancellerie ; parts
+  revues à chaque arrivée ou départ (`shared/budget.lua`, planchers puis vue en grand puis cases) et appliquées par
+  `setParameters` chez le seul joueur filmé (`vava_cameras:rates`, sans nouvelle offre) ; offre relayée au membre en
+  envoi latent ; vue en grand refusée jamais inscrite au journal depuis le web (`webCheck`). Compte rendu
+  `docs/plan/rapports/T-047.md` (décisions à confirmer : budget, planchers, refus plutôt que vue réduite, envoi
+  latent) ; procédure `docs/tests/registre.md` 10-15 à 10-19.
 
 ### T-048 — Magie : registre des murmures envoyé par pages
 - Agents : vava-dev-lua + vava-dev-nui · Dépend de : — · Statut : à tester en jeu

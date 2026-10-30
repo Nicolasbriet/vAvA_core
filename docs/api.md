@@ -1114,12 +1114,21 @@ regarde en jeu), `vava_chancellerie` ≥ 1.1.0 (caméras depuis le web). Qualit�
 - **Capture** : à l'ordre du serveur seulement, le jeu du joueur filmé relie une texture WebGL à l'image du jeu
   (séquence de screenshot-basic : ni Windows, ni Discord, ni les interfaces du jeu) et la dessine hors de l'écran,
   au rythme de la capture (960 × 540, 20 images/s). **Une seule capture**, partagée par tous ceux qui regardent ; chacun
-  a sa connexion WebRTC et sa qualité : `tile` (case d'un mur : 480 × 270, 10 images/s, 250 kb/s) ou `full` (vue en
-  grand : 960 × 540, 20 images/s, 1,2 Mb/s). Personne ne regarde : ni dessin ni capture.
+  a sa connexion WebRTC et sa qualité : `tile` (case d'un mur : 480 × 270, 10 images/s, 250 kbit/s au plus) ou `full` (vue en
+  grand : 960 × 540, 20 images/s, 1,2 Mbit/s au plus). Personne ne regarde : ni dessin ni capture.
 - **Réseau** : l'image va **directement** du jeu du joueur au spectateur (jeu d'un membre ou navigateur) ; le serveur
-  ne relaie que la négociation (une offre et une réponse de quelques Ko par caméra). La connexion montante du joueur
-  filmé porte le débit de chaque spectateur ; WebRTC le baisse de lui-même si elle sature. Adresse STUN publique de
-  Google par défaut (aucun coût pour le serveur ; elle voit passer l'adresse IP des joueurs à la connexion).
+  ne relaie que la négociation (une offre et une réponse de quelques Ko par caméra ; l'offre part au membre en jeu en
+  envoi latent, 32 000 octets par seconde, 1.3.0). Adresse STUN publique de Google par défaut (aucun coût pour le
+  serveur ; elle voit passer l'adresse IP des joueurs à la connexion).
+- **Débit montant du joueur filmé** (1.3.0) : borné pour tous ses spectateurs ensemble, jeu et web (`budget.uplinkKbps`,
+  1 500 kbit/s), avec **une seule vue en grand** à la fois. Admission par le serveur, après la limite de spectateurs :
+  une seconde vue en grand, ou des planchers (`qualities.*.minKbps` : case 120, vue en grand 600) dont la somme
+  dépasserait le budget → refus `budget` (`vava_cameras:watch` comme `webStart`). Répartition (règle pure
+  `shared/budget.lua`) : plancher pour chacun, puis le reste à la vue en grand jusqu'à son plafond (1 200), enfin aux
+  cases à parts égales jusqu'au leur (250). La part d'une caméra nouvelle part avec son ordre de capture ; les parts
+  changées des autres partent au seul joueur filmé (évènement `vava_cameras:rates`, `{ rates = { { session, kbps } } }`),
+  qui les applique par `setParameters`, sans nouvelle offre. Le mur et la Chancellerie retentent une caméra refusée
+  `budget` (« Débit du joueur déjà pris, nouvel essai bientôt »). Détail et tableau : README du module.
 - **Mur en jeu** : grille 1 × 1 à 4 × 4 (touches 1 à 4), pages (flèches), un clic ouvre en grand (flèches : joueur
   précédent ou suivant ; Échap : retour, puis fermeture). Seules les cases de la page affichée ont une caméra, ouvertes
   une à une (150 ms d'écart : un mur 4 × 4 reste sous la limite de messages du core) ; en grand, seule la vue en grand
@@ -1150,14 +1159,15 @@ regarde en jeu), `vava_chancellerie` ≥ 1.1.0 (caméras depuis le web). Qualit�
 |---|---|
 | `count()` | nombre de caméras ouvertes |
 | `webPlayers()` | liste `{ source, label, active }` — pont de la Chancellerie seulement |
-| `webStart(joueur, qualité)` | `true, { session, label, iceServers }` ou `false, code` — pont seulement (droit vérifié par le pont auprès du Registre) |
+| `webCheck(joueur, qualité)` | `true` ou `false, code` : la caméra serait-elle accordée maintenant (rien n'est ouvert) — pont seulement, avant de faire inscrire une vue en grand au journal (1.3.0) |
+| `webStart(joueur, qualité)` | `true, { session, label, iceServers }` ou `false, code` (dont `budget`, 1.3.0) — pont seulement (droit vérifié par le pont auprès du Registre) |
 | `webAnswer(session, sdp)` · `webStop(session)` | `true` ou `false, code` — pont seulement |
 
 Hook `vava_cameras:web` (serveur, `after` : `{ session, offer? , ended? }`) : offre et fin des caméras regardées
 depuis le web, relayées par le pont à la Chancellerie.
 
-Pour travailler le rendu du mur sans le jeu : `web/index.html?players=11&layout=3` (ou `&focus=<numéro>`) dans un
-navigateur ; chaque case est une vraie connexion WebRTC locale filmant une scène dessinée.
+Pour travailler le rendu du mur sans le jeu : `web/index.html?players=11&layout=3` (ou `&focus=<numéro>`,
+`&budget=<numéro>`) dans un navigateur ; chaque case est une vraie connexion WebRTC locale filmant une scène dessinée.
 
 ### `vava_magic`
 
@@ -1646,7 +1656,10 @@ vava_cameras 1.0.0 pour l'écran des joueurs, vava_time 1.0.0 pour le ciel et l'
   `time_unavailable` si vava_time n'est pas lancé. Un fichier du pont ajoute ses demandes à `routes.requests`.
 - **Caméras** (1.1.0) : ouvertes auprès de vava_cameras une fois le droit `watch` accordé — la vue en grand par la
   demande « écran du joueur » du Registre (`watchScreen` : cible vérifiée, inscrite au journal), les cases d'un mur sur
-  le seul droit, l'ouverture du mur étant inscrite au journal (« Mur des caméras ouvert »). Depuis 1.4.1, une case
+  le seul droit, l'ouverture du mur étant inscrite au journal (« Mur des caméras ouvert »). Depuis 1.5.1, la vue en
+  grand n'est demandée au Registre qu'après le droit lu (`webCan`) et la caméra jugée accordable (`webCheck` de
+  vava_cameras ≥ 1.3.0) : une vue refusée faute de débit chez le joueur filmé (`budget`), que la Chancellerie retente
+  toutes les 10 s, ne laisse pas de ligne au journal. Depuis 1.4.1, une case
   demandée par un compte qui n'a ouvert aucun mur depuis `cameras.tileLogMs` (2 h) inscrit sa propre ligne (« Cases du
   mur regardées », numéro du joueur) : aucune case n'échappe au journal, sans refuser le navigateur (le pont ne sait pas
   quand un mur du web se ferme). Une ligne (ouverture ou case) ne compte que si le Registre l'a acceptée (`webLog`
