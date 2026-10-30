@@ -119,6 +119,30 @@ la fin, sang à l'interruption. Hors jeu : `modules/vava_hud/web/index.html?prog
 | 8 | Eaux fatiguées : `/recolte vitalite riviere_claire 40`, Pêche 0, une douzaine de barres réussies. | Toujours environ 25 % de poissons décrochés (« Au dernier moment, le poisson se décroche. » : l'état de l'eau n'y joue pas, décision du 30 octobre 2026), puis 25 % des restants « Ces eaux sont fatiguées : le poisson vous échappe. » (échec de la bande, canne usée ; jamais le texte de la terre). Remettre `/recolte vitalite riviere_claire 100`. |
 | 9 | Eaux épuisées : `/recolte vitalite riviere_claire 26`, puis réussir une prise (coût de la zone : 2) ; s'approcher ensuite du banc ; enfin `/recolte vitalite foret_brume 20` et s'approcher d'un chêne. | Après la prise : « Rivière Claire est épuisée : l'eau a besoin de repos. » ; invite du banc : « Ces eaux sont épuisées : la pêche sera maigre. ». Près du chêne : « La terre est épuisée ici : la récolte sera maigre. » (textes de la terre inchangés hors de l'eau). Remettre les deux zones à 100. |
 
+### 3.4 Joueurs proches seulement (`vava_gathering` 1.6.0, abonnements de zone du core)
+
+Depuis T-015, l'état des zones de récolte (bande, cicatrice) et les charges des nœuds ne partent plus chez tout le monde
+par GlobalState : chaque zone est une zone du core, envoyée entière aux seuls joueurs à moins de 100 m (80 m de portée
+des props + 20 m) du cercle qui englobe ses nœuds, puis ses seuls changements. La vitalité n'est plus envoyée. Rien ne
+doit changer à l'écran. Préparation : A est Sénéchal ou Souverain (droit `tools` pour `/vava_reseau`) ; B sans rang.
+Pour « loin de tout », à plus de 500 m de tous les lieux du § 0.6.
+
+| # | Faire | Attendu |
+|---|---|---|
+| 1 | `restart vava_gathering` (ou démarrage du serveur). | Console : `module 'vava_gathering' v1.6.0 prêt`, aucune ligne « zone '…' non partagée avec les joueurs proches ». A : `/vava_reseau zones` → `vava_gathering 4` dans la liste des zones. |
+| 2 | A se tient au milieu de la Forêt de Brume ; `/vava_reseau zones <A>`. | `vava_gathering:foret_brume` dans la liste ; arbres et invite comme avant (§ 3.1). |
+| 3 | **(2 joueurs)** B loin de tout ; A récolte trois fois dans la Forêt de Brume, puis `/recolte vitalite foret_brume 20` et `100`. A : `/vava_reseau joueur <B>`. | Aucune ligne `vAvA:zone:*` sous `vava_gathering` chez B ; aucune clé `vava_gathering:*` reçue (plus de GlobalState). |
+| 4 | **(2 joueurs)** B s'approche à pied de la Forêt de Brume ; A : `/vava_reseau zones <B>` quand B est à environ 200 m du centre (−320, −880), puis à 230 m. | Suivie à 200 m (cercle d'intérêt de 220 m : rayon 120 m + 100 m) ; plus suivie au-delà de 245 m (25 m de jeu à la sortie). Les arbres n'apparaissent qu'à 80 m, comme avant. |
+| 5 | **(2 joueurs)** A et B près du même chêne ; A le récolte. | Chez B, l'invite passe de « 3 charges » à « 2 charges » dans la seconde ; `/vava_reseau joueur <B>` : `vAvA:zone:diff` sous `vava_gathering`, environ 50 o par récolte. |
+| 6 | **(2 joueurs)** B dans la forêt ; A (n'importe où) : `/recolte vitalite foret_brume 20`, puis `/recolte recharger foret_brume_chene_1`, puis `/recolte vitalite foret_brume 100`. | Chez B, sans reconnexion : souches dans la seconde, puis l'invite à pleines charges, puis les arbres. |
+| 7 | B récolte une dizaine de fois à pleine vitalité (la vitalité passe de 100 à 80, bande inchangée). `/vava_reseau joueur <B>`. | Une seule différence par récolte (les charges) ; aucune différence de la zone tant que la bande ne change pas (avant : une écriture GlobalState à presque chaque récolte, chez tous les joueurs). |
+| 8 | B arrive au galop vers la Forêt de Brume depuis 500 m. | Les arbres apparaissent à 80 m, jamais pleins puis en souches quand la zone est épuisée (essai à refaire après `/recolte vitalite foret_brume 20`). |
+| 9 | B, loin de tout, se fait déplacer (Registre → Déplacer) au milieu de la Prairie Haute. | Buissons et plantes en une à deux secondes après l'arrivée (avant : jusqu'à 2,5 s). |
+| 10 | B dans la forêt ; console : `restart vava_gathering`. | Après `module 'vava_gathering' v1.6.0 prêt`, les arbres reviennent chez B en deux secondes au plus, sans reconnexion ; aucun prop en double. |
+| 11 | B retourne à la sélection du personnage, puis rejoue dans la forêt. | À la sélection : aucun prop ; `/vava_reseau zones <B>` : 0 zone. Une seconde après l'apparition : la zone revient, les arbres aussi. |
+| 12 | **Mesure** : le plus de joueurs possible, dont une partie qui récolte et une partie qui se déplace entre les zones. Console du serveur : `profiler record 300`, puis `profiler view` ; chercher `vAvA_core` (fonctions `runPass` / `pass` de `zones.lua`, `flushZone`) et `vava_gathering` (`flush`, `share.set`). Noter aussi `/vava_reseau zones`. | `vava_gathering` n'apparaît qu'au passage de sa boucle lente (10 s) et à chaque récolte (quelques microsecondes) ; le passage des zones du core reste de l'ordre de ce que dit `docs/tests/zones.md` § 5-2 (4 zones de récolte en plus : rien de visible). Noter les valeurs avec le nombre de joueurs et de zones. |
+| 13 | `./scripts/audit-reseau.sh`. | Plus aucun avertissement « écriture GlobalState » dans `modules/vava_gathering`. |
+
 ## 4. Artisanat — `vava_crafting`
 
 | # | Faire | Attendu |
@@ -248,8 +272,8 @@ tout », s'en éloigner d'au moins 500 m (Registre → Déplacer, ou repère sur
   config : un modèle inconnu est signalé dans la console du client (`modèle inconnu 'x'`) et il n'y a simplement pas de
   prop ; une animation inconnue laisse le personnage immobile.
 - L'attache des accessoires en main (os 57005, décalages par modèle) : à régler objet par objet dans `held`.
-- La réception des state bags globaux à la connexion (zones, nœuds, stations, parcelles) : si les props ne
-  s'affichent pas au premier passage, c'est ce point.
+- La réception des state bags globaux à la connexion (stations, parcelles) : si les props ne s'affichent pas au premier
+  passage, c'est ce point. La récolte n'en utilise plus depuis 1.6.0 (§ 3.4 : abonnements de zone du core).
 
 ## 9. Comment me remonter un problème
 

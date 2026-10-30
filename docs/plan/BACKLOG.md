@@ -405,7 +405,7 @@ versé à T-014 ; les autres points déjà couverts sont précisés dans T-012 �
   13,9 ms (très dense) ; garder 1 s. Compte rendu `docs/plan/rapports/T-014.md`, procédure `docs/tests/zones.md`.
 
 ### T-015 — Récolte : GlobalState → abonnements de zone
-- Agent : vava-dev-lua · Dépend de : T-014 · Statut : à faire
+- Agent : vava-dev-lua · Dépend de : T-014 · Statut : à tester en jeu (rapport docs/plan/rapports/T-015.md ; relectures sécurité et réseau à faire)
 - `vava_gathering` (zones et nœuds) n'écrit plus dans GlobalState. Même comportement en jeu.
 - T-011 (`docs/audits/reseau-vava_gathering.md`) : une récolte coûte deux écritures (zone `server/zones.lua:123-129`,
   nœud `server/nodes.lua:75-79`), environ 140 o chez chaque joueur connecté (64 joueurs, 15 récoltants : environ

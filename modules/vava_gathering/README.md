@@ -6,7 +6,7 @@ ternes) et rapporte peu ; poussée à zéro, elle garde une **cicatrice**. Les o
 la qualité de ce qu'on ramasse dépend de la compétence, de l'outil et de la santé de la terre, et chaque pile porte son
 palier et sa provenance. Le serveur décide de tout et demande l'XP à `vava_skills`.
 
-Ordre de démarrage : après `vAvA_core` (≥ 0.6.0), `vava_ui` (≥ 1.0.0, polices, grain, papier et coins des
+Ordre de démarrage : après `vAvA_core` (≥ 0.11.0, abonnements de zone), `vava_ui` (≥ 1.0.0, polices, grain, papier et coins des
 interfaces ; à ne jamais arrêter sur un serveur ouvert), `vava_inventory` (≥ 1.4.0) et `vava_skills` (≥ 1.0.0).
 Facultatifs : `vava_hud` (barre de progression, notifications), `vava_admin` (droit `metiers`), `vava_chat`,
 `vava_health` (aucune récolte à terre), `vava_time` (saisons : repousse des nœuds et quantité récoltée, lues par
@@ -28,7 +28,8 @@ Rendu hors jeu : `web/index.html?view=prompt` (ou `tension`, `zones`) dans un na
 | Qualité | score = niveau × 0,5 + outil × 0,3 + vitalité × 0,2 + bonus de l'outil ± 8 → paliers à 20, 40, 60, 85 ; provenance écrite | `quality` |
 | Pêche | touche entre 4 et 14 s ; barre de tension 6 s, zone à tenir 35–65 % qui dérive, 60 % du temps dans la zone | `fishing` |
 | Prise (tirée par le serveur, ligne tenue) | le poisson se décroche : 25 % au niveau 0 de Pêche, 2 % au niveau 100, linéaire entre les deux (13,5 % au niveau 50), quel que soit l'état de l'eau (décision du 30 octobre 2026 : supplément de la bande `catch.bands` à 0, gardé dans la config pour pouvoir le remettre ; l'eau fatiguée ou épuisée ne joue que par l'échec de la bande, 25 % / 50 %, avec son message d'eau) ; parts invalides comptées pour 0, chance ramenée dans [0, 1] (1.4.0) | `fishing.catch` |
-| Props | créés par le client à 80 m ; nœuds regroupés par zone, seuls ceux d'une zone à portée sont mesurés ; relus toutes les secondes près d'une zone, toutes les 2,5 s quand aucun nœud n'est à moins de 140 m (80 m + 60 m de marge d'approche) (1.4.1) | `streaming` |
+| Props | créés par le client à 80 m ; nœuds regroupés par zone, seuls ceux d'une zone suivie (1.6.0) et à portée sont mesurés ; relus toutes les secondes près d'une zone, toutes les 2,5 s quand aucun nœud n'est à moins de 140 m (80 m + 60 m de marge d'approche) (1.4.1) ; une zone reçue, changée ou quittée fait aussitôt un passage (1.6.0) | `streaming` |
+| État envoyé aux joueurs proches (1.6.0) | bande, cicatrice et charges d'une zone envoyées par le core aux seuls joueurs à moins de 80 m + 20 m du cercle qui englobe ses nœuds (l'état est là avant que le premier prop puisse apparaître), puis ses seuls changements ; la vitalité n'est jamais envoyée | `streaming.radius`, `streaming.subscribeSlack` |
 | Zones d'eau | genres de zone dont les textes parlent de l'eau et non de la terre (échec de la bande, épuisement, invite) : `eau` | `waterKinds` |
 | Carte | un blip nommé par zone (icône et couleur selon le genre, courte portée) et le cercle de son rayon ; « Marquer » dans le panneau pose le repère de la carte | `map` |
 | Solidité d'un outil sans histoire | 100 au premier usage | `toolDefaults` |
@@ -37,10 +38,38 @@ Rendu hors jeu : `web/index.html?view=prompt` (ou `tension`, `zones`) dans un na
 
 Une **zone** (identifiant, nom, genre, centre, rayon, coût de vitalité par récolte, régénération par heure, durée de
 cicatrice) regroupe des **nœuds** (position, ressource, charges, délai par charge rendue, prop normal et prop épuisé).
-La vitalité et les charges sont recalculées à la demande depuis leur dernière date : aucune boucle de croissance. L'état
-est publié aux clients par deux state bags globaux (`vava_gathering:zone:<id>` : bande, cicatrice, vitalité entière ;
-`vava_gathering:node:<id>` : charges), écrits au seul changement et relus toutes les 10 s pour que les props reviennent
-quand une zone se remet.
+La vitalité et les charges sont recalculées à la demande depuis leur dernière date : aucune boucle de croissance.
+
+**Ce qui part chez les joueurs** (1.6.0, abonnements de zone du core, `vAvA_core` ≥ 0.11.0) : chaque zone de récolte
+est une zone du core (nom = identifiant de la zone ; centre de la zone ; rayon = la plus grande distance au sol entre ce
+centre et ses nœuds, au moins le rayon de la zone ; marge = `streaming.radius` + `streaming.subscribeSlack`, 100 m). Son
+état : `zone` → `{ band, scarred }` et `n:<nœud>` → charges. Le core l'envoie entier aux seuls joueurs qui entrent dans
+ce cercle (position lue par le serveur, une fois par seconde), puis ses seuls changements, regroupés par tour : une
+récolte qui fait changer la bande et les charges ne fait partir qu'une différence d'environ 50 o, aux seuls joueurs de
+la zone. Un joueur loin de toute zone ne reçoit rien. La **vitalité n'est jamais envoyée** (elle ne change rien à ce
+que voit le joueur ; le panneau `O` la demande au serveur) : seule une bande ou une cicatrice qui change fait partir la
+clé `zone`, à la récolte ou au passage de la boucle lente (10 s) quand la zone se remet. Plus aucune écriture dans
+GlobalState : les anciennes clés `vava_gathering:zone:<id>` et `vava_gathering:node:<id>` sont effacées une fois au
+démarrage si un serveur resté allumé les garde encore. Une zone refusée par le core (rayon de plus de 500 m, plus de
+255 nœuds…) est écrite en console une fois et retentée toutes les 10 s ; ses nœuds n'apparaissent pas chez les joueurs.
+Identifiants : 48 octets au plus pour une zone, 46 pour un nœud (clé `n:<nœud>`), sinon le module refuse de démarrer.
+
+**L'état d'une zone est public** : sous OneSync, la position que lit le serveur est déclarée par le client, un client
+modifié peut recevoir l'état de n'importe quelle zone. Il n'y a donc rien de secret dedans (bande, cicatrice, charges,
+tout ce qui se voit déjà sur place), et chaque action revérifie côté serveur, au moment de l'action, la distance réelle
+au nœud (au début et à la fin du geste), le personnage, l'outil, le délai et les charges, sans se fier à l'abonnement.
+
+Le client ne mesure que les nœuds des zones qu'il suit ; il crée leurs props, les remplace par le modèle épuisé et met à
+jour l'invite dès qu'une zone arrive, change ou part (sans attendre le passage suivant de sa boucle). Une zone quittée
+reprend ses valeurs par défaut (pleine, charges de la config) : elle n'a alors aucun prop à portée. Le Conseil
+(`/recolte vitalite`, `/recolte recharger`) et les autres modules (`setVitality`) changent l'état en jeu : les joueurs
+proches le voient aussitôt, sans reconnexion. Les zones et nœuds **créés** en jeu viendront avec l'Atelier (T-102) :
+`server/share.lua` sait déjà redéclarer une zone (déplacée, état remplacé) ; les positions et modèles des nœuds devront
+alors entrer dans l'état de la zone (aujourd'hui lus dans la config par le client).
+
+`cellSize` du core (cases de 256 m) est gardé : les zones de récolte sont grandes (zones d'exemple : rayon 60 à 120 m,
+cercle d'intérêt de 160 à 220 m) et peu nombreuses ; elles ajoutent une poignée de candidates par case, là où les cases de 128 m ne font
+gagner qu'en ville, sur des zones de quelques mètres (rapport T-015).
 
 Sur la **carte**, chaque zone a son blip (icône et couleur par genre dans `map.kinds`, nom de la zone, visible sur la
 petite carte à l'approche et toujours sur la grande) et le cercle translucide de son rayon. Le client les pose depuis
@@ -104,7 +133,8 @@ resource, item }`), `harvested` (after : `+ quantity, tier, band, extra? `), `zo
 1. **Invite et outil** : approcher un chêne sans rien en main → « Il vous faut une hache en main » ; prendre la hache
    (emplacement Mains) → « [E] Couper — Chêne · 3 charges ».
 2. **Récolte** : `E`, geste et barre ; bûches de chêne dans la besace avec palier et « Forêt de Brume » ; XP de
-   Bûcheronnage ; solidité de la hache − 2 ; charge − 1 (state bag) ; une seconde récolte dans la seconde → refusée.
+   Bûcheronnage ; solidité de la hache − 2 ; charge − 1 (différence de la zone) ; une seconde récolte dans la seconde
+   → refusée.
 3. **Interruption** : marcher pendant le geste → arrêt, rien n'est pris.
 4. **Épuisement** : `/recolte vitalite foret_brume 20` → props remplacés (souches), récolte à rendement effondré, échecs
    fréquents ; `/recolte vitalite foret_brume 0` → cicatrice, journal ; `/recolte vitalite foret_brume 100` → retour.
@@ -131,3 +161,16 @@ resource, item }`), `harvested` (after : `+ quantity, tier, band, extra? `), `zo
 14. **Props à distance** (1.4.1) : venir de loin à cheval vers la Forêt de Brume → les arbres apparaissent à 80 m comme
     avant ; s'éloigner → ils disparaissent ; `resmon` loin de toute zone puis dans une zone : `vava_gathering` plus bas
     loin de tout. Détail : `docs/tests/metiers.md` § 6.
+15. **Joueurs proches seulement** (1.6.0) **(2 joueurs)** : A récolte dans la Forêt de Brume, B à plus de 500 m ;
+    `/vava_reseau joueur <B>` : aucune ligne `vAvA:zone:*` de `vava_gathering` ; B s'approche : les arbres apparaissent
+    à 80 m, `/vava_reseau zones <B>` cite `vava_gathering:foret_brume` ; chaque récolte de A change la charge dans
+    l'invite de B (une `vAvA:zone:diff` d'environ 50 o). Détail et mesure `profiler record` : `docs/tests/metiers.md`
+    § 3.4.
+
+## À vérifier en jeu
+
+- Arrivée au galop dans une zone (marge de 100 m, passage du core d'une seconde) : l'état est là avant les props, les
+  arbres apparaissent toujours à 80 m (jamais d'abord pleins puis en souches).
+- Téléportation au milieu d'une zone : props au plus une seconde environ après l'arrivée (avant : jusqu'à 2,5 s).
+- Coût du passage des zones avec les zones de récolte (`profiler record`, `docs/tests/metiers.md` § 3.4).
+- `restart vava_gathering` en étant dans une zone : props retrouvés dans les deux secondes, sans reconnexion.
