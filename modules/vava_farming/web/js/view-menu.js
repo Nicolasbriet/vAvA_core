@@ -3,8 +3,8 @@
  * web/js/view-menu.js
  * Rôle : le menu d'un emplacement : bandeau (parcelle, numéro, communale ou privée), carte de l'emplacement (culture et
  *        état, croissance, humidité avec le seuil, fertilité, arrosages, sécheresse, date de semis, couverture contre le
- *        gel), gestes (semer avec choix de la graine et de son palier, arroser, fertiliser, récolter, couvrir, arracher)
- *        avec la raison d'un refus.
+ *        gel, nuit de gel annoncée), gestes (semer avec choix de la graine et de son palier, arroser, fertiliser,
+ *        récolter, couvrir — proposé en automne et en hiver seulement —, arracher) avec la raison d'un refus.
  *        Construit à chaque message du jeu ; rien n'est animé en continu.
  */
 
@@ -36,7 +36,8 @@ const MenuView = (() => {
     copy.bucket = data.bucket || { held: false, charges: 0 };
     copy.compost = Number(data.compost) || 0;
     const cover = data.cover || {};
-    copy.cover = { options: UI.list(cover.options), use: typeof cover.use === 'string' ? cover.use : null };
+    copy.cover = { season: cover.season === true, options: UI.list(cover.options), use: typeof cover.use === 'string' ? cover.use : null };
+    copy.frost = { tonight: Boolean(data.frost && data.frost.tonight === true) };
     copy.sickle = data.sickle === true;
     copy.actions = data.actions || {};
     copy.rules = data.rules || {};
@@ -54,6 +55,15 @@ const MenuView = (() => {
   }
 
   // Carte de l'emplacement ----------------------------------------------------------------------------------------------
+
+  /** Nuit de gel annoncée (serveur) sur une plante vivante ; marquée si la plante y est exposée. */
+  function frostFact() {
+    const slot = menu.slot;
+    if (!menu.frost.tonight || !slot.crop || slot.state === 'dead') return null;
+    const text = typeof menu.rules.frostTonight === 'string' && menu.rules.frostTonight !== '' ? menu.rules.frostTonight : M.facts.frostTonight;
+    const exposed = slot.covered !== true && slot.frostHardy !== true;
+    return UI.el('span', `fact${exposed ? ' is-bad' : ''}`, text);
+  }
 
   function slotCard() {
     const slot = menu.slot;
@@ -84,6 +94,7 @@ const MenuView = (() => {
         Number(slot.plantedAt) > 0 ? UI.el('span', 'fact', M.facts.planted(M.since(Math.max(0, menu.now - Number(slot.plantedAt))))) : null,
         slot.covered === true ? UI.el('span', 'fact', M.facts.covered) : null,
         slot.frostHardy === true ? UI.el('span', 'fact', M.facts.frostHardy) : null,
+        frostFact(),
       ];
       children.push(UI.el('div', 'detail-facts', null, facts));
     }
@@ -194,7 +205,7 @@ const MenuView = (() => {
       : slot.state === 'dead' ? A.reasons.dead
         : slot.covered === true ? A.reasons.covered
           : slot.frostHardy === true ? A.reasons.frostHardy
-            : coverWith === null ? A.reasons.noCover(cover.options.map((option) => option.label || option.item).join(A.reasons.coverOr))
+            : coverWith === null ? A.reasons.noCover(cover.options.map((option) => A.reasons.coverItem(Number(option.quantity) || 1, option.label || option.item)).join(A.reasons.coverOr))
               : A.reasons.refused;
     const coverDetail = coverEnabled ? A.coverWith(Number(coverWith.quantity) || 1, coverWith.label || coverWith.item, Number(coverWith.count) || 0) : null;
     const blocks = [
@@ -202,7 +213,8 @@ const MenuView = (() => {
       actionBlock('water', A.water, waterEnabled, waterReason, bucketText, (event) => begin('water', '', 0, event.currentTarget)),
       actionBlock('fertilize', A.fertilize, fertilizeEnabled, fertilizeReason, A.compost(menu.compost), (event) => begin('fertilize', '', 0, event.currentTarget)),
       actionBlock('harvest', A.harvest, harvestEnabled, harvestReason, menu.sickle ? A.sickle : A.noSickle, (event) => begin('harvest', '', 0, event.currentTarget)),
-      actionBlock('cover', A.cover, coverEnabled, coverReason, coverDetail, (event) => begin('cover', '', 0, event.currentTarget)),
+      // hors de l'automne et de l'hiver (saison décidée par le serveur), « Couvrir » n'est pas proposé
+      cover.season ? actionBlock('cover', A.cover, coverEnabled, coverReason, coverDetail, (event) => begin('cover', '', 0, event.currentTarget)) : null,
       actionBlock('clear', A.clear, clearEnabled, clearReason, slot.crop && (slot.state === 'wilted' || slot.state === 'dead') ? A.waste : null, (event) => begin('clear', '', 0, event.currentTarget)),
     ];
     return UI.el('section', 'actions', null, [UI.el('h4', 'section-title', A.title), ...blocks]);

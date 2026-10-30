@@ -170,27 +170,38 @@ end, true)
 | 12 | Près d'un emplacement, puis d'un puits, puis du grenier : `/aterre`, puis `E` ; relevé, lancer un semis et `/aterre` pendant la barre. | À terre : ni invite, ni menu, ni seau rempli, ni grenier ouvert ; `E` ne fait que rendre l'âme. Tombé pendant le semis : graine gardée, emplacement inchangé (« Vous êtes à terre. » à la fin de la barre, ou geste interrompu si le corps a glissé). |
 | 13 | Grenier ouvert (`E`), un objet en main de souris : se faire mettre à terre (`/aterre`). Relevé, `E` au grenier, puis `/aterre` de nouveau pendant un glisser vers le grenier. | À la chute, l'inventaire se ferme aussitôt, grenier et besace (export `close` de l'inventaire, appelé par `vava_health`) ; rien n'est déplacé, aucune ligne dans `vava_farming_granary_log`. Relevé, `E` rouvre le grenier et les gestes reprennent ; le second `/aterre` le referme de même ; s'éloigner de plus de 4 m le ferme comme d'habitude. |
 
-### 5.1 Couvrir et gel (`vava_farming` 1.4.1, `vava_time`)
+### 5.1 Couvrir et gel (`vava_farming` 1.5.0, `vava_time` 1.2.0)
+
+Règles décidées le 30 octobre 2026 : on couvre d'abord avec **2 déchets végétaux** (un paillis), sinon avec
+**1 compost** ; on ne couvre qu'en **automne** et en **hiver** ; la nuit de gel est annoncée par le monde dès qu'elle est
+tirée (`/date` et fiche de la plante) ; le chou seul résiste.
 
 Préparer une nuit de gel sans attendre l'hiver : dans `modules/vava_time/config.lua`, `calendar.cycle.first = 'hiver'`
 et `frost.seasons = { hiver = 1 }` (toutes les nuits gèlent), puis `restart vava_time` à une heure du royaume avant
-17 h (sinon le soir est déjà passé ce jour-là et rien ne se joue). Remettre les valeurs ensuite.
+17 h (sinon le soir est déjà passé ce jour-là et rien ne se joue). Remettre les valeurs ensuite. Déchets végétaux :
+arracher une plante flétrie ou morte (1 à 2), ou le catalogue de développement.
 
 | # | Faire | Attendu |
 |---|---|---|
-| 1 | Planter du blé au champ communal, avoir 2 composts ; `E` sur la plante. | Geste « Couvrir » actif : « avec 1 × Compost (2 dans la besace) ». |
-| 2 | Couvrir. | Geste de 3 s ; un compost consommé ; la fiche de l'emplacement porte « couverte contre le gel » ; Couvrir grisé (« Déjà couverte. ») ; `vava_farming_log` : `covered`. |
-| 3 | Sans compost, `E` sur une autre plante de blé. | Couvrir grisé : « Il vous faut de quoi la couvrir (Compost). ». |
-| 4 | Planter un chou, `E`. | La fiche porte « ne craint pas le gel » ; Couvrir grisé. |
+| 1 | Planter du blé au champ communal, avoir 5 déchets végétaux et 2 composts ; `E` sur la plante. | Geste « Couvrir » actif : « avec 2 × Déchets végétaux (5 dans la besace) ». La fiche porte « gel annoncé cette nuit » (marqué comme un danger : la plante est exposée). |
+| 2 | Couvrir. | Geste de 3 s ; deux déchets végétaux consommés, les composts gardés ; la fiche de l'emplacement porte « couverte contre le gel » et « gel annoncé cette nuit » (sans marque de danger) ; Couvrir grisé (« Déjà couverte. ») ; `vava_farming_log` : `covered`, `item = dechets_vegetaux`, `quantity = 2`. |
+| 3 | Garder un seul déchet végétal (jeter le reste), `E` sur une autre plante de blé, Couvrir. | Détail : « avec 1 × Compost (2 dans la besace) » ; un compost consommé, le déchet gardé ; journal `covered` avec `item = compost`. |
+| 3 bis | Un seul déchet végétal et aucun compost, `E` sur une troisième plante de blé. | Couvrir grisé : « Il vous faut de quoi la couvrir (2 × Déchets végétaux ou 1 × Compost). ». |
+| 4 | Planter un chou, `E`. | La fiche porte « ne craint pas le gel » et « gel annoncé cette nuit » (sans marque de danger) ; Couvrir grisé. |
 | 5 | Lancer Couvrir et `/aterre` pendant la barre ; puis lancer Couvrir et s'éloigner de plus de 4 m avant la fin. | Rien n'est consommé ni couvert (« Vous êtes à terre. » / geste abandonné). |
 | 6 | Laisser trois plantes : blé couvert, blé nu, chou. Rester près du champ (moins de 60 m) ; un second joueur loin du champ ; `/ciel heure 16 59`. | À 17 h du royaume : vous seul lisez « Le froid mordra cette nuit (Champ communal) : couvrez les cultures fragiles ou elles gèleront. » ; le second joueur ne reçoit rien. |
 | 7 | `/ciel heure 20 59`. | À 21 h : « Le gel a pris 1 plante(s) cette nuit : Champ communal. » ; le blé nu est mort (prop de plante morte, seul Arracher reste) ; le blé couvert et le chou vivent ; `vava_farming_log` : une seule ligne `frost` pour la nuit (`parcelles = { champ_communal = 1 }`, `plantes = 1`) ; console : « le gel a pris 1 plante(s)… ». |
 | 8 | Jardin privé (propriétaire n° 1) : une plante nue ; le propriétaire en jeu loin du jardin ; refaire 6 et 7 le lendemain (ou `restart vava_time` avant 17 h). | Le propriétaire est averti et prévenu où qu'il soit ; un joueur près du jardin qui n'en est pas le propriétaire ne reçoit rien. |
 | 9 | Récolter le blé couvert, replanter au même endroit. | La nouvelle plante n'est plus couverte. |
 | 10 | `restart vava_farming` après 7. | Plantes mortes et couverture retrouvées ; le gel ne retombe pas une seconde fois la même nuit. |
-| 11 | **(2 joueurs)** Les deux lancent Couvrir sur la même plante de blé, chacun avec un compost. | Un seul compost est consommé, chez celui qui finit le premier ; l'autre lit « Ce geste n'est plus en cours. » et garde son compost. |
-| 12 | **(2 joueurs)** A lance Couvrir ; pendant la barre, B arrache la plante et ressème du blé au même endroit. | La couverture de A échoue, son compost est gardé ; la nouvelle plante n'est pas couverte. |
-| 13 | `stop vava_time`, une plante nue ; attendre 21 h (heure réelle de Paris). | Aucun avertissement ni gel : sans `vava_time`, les plantes ne gèlent jamais. |
+| 11 | **(2 joueurs)** Les deux lancent Couvrir sur la même plante de blé, chacun avec 2 déchets végétaux. | Deux déchets seulement sont consommés, chez celui qui finit le premier ; l'autre lit « Ce geste n'est plus en cours. » et garde les siens. |
+| 12 | **(2 joueurs)** A lance Couvrir ; pendant la barre, B arrache la plante et ressème du blé au même endroit. | La couverture de A échoue, ses déchets sont gardés ; la nouvelle plante n'est pas couverte. |
+| 13 | `stop vava_time`, une plante nue ; attendre 21 h (heure réelle de Paris). | Aucun avertissement ni gel : sans `vava_time`, les plantes ne gèlent jamais. Le menu ne propose pas « Couvrir » (aucun gel à craindre) et la fiche ne parle pas de gel. |
+| 14 | **Arrivée après 17 h** : nuit de gel du § 0, `/ciel heure 18 00` (l'avertissement part) ; un second joueur se connecte **ensuite**, s'approche du champ et ouvre une plante de blé nue. | Le second joueur n'a pas reçu l'avertissement de 17 h, mais sa fiche porte « gel annoncé cette nuit » (et `/date`, « La nuit sera froide. ») ; il peut couvrir. |
+| 15 | **Été** : `calendar.cycle.first = 'ete'`, `restart vava_time` ; `E` sur une plante de blé avec des déchets et du compost. | Pas de geste « Couvrir » dans le menu (les autres gestes restent) ; aucune mention du gel sur la fiche. |
+| 16 | En été, lancer Couvrir quand même (menu ouvert avant le passage à l'été, ou client modifié). | Refus du serveur : « Aucun gel à craindre en cette saison. » ; rien consommé. Même refus au printemps (`first = 'printemps'`). |
+| 17 | **Automne** : `calendar.cycle.first = 'automne'`, `restart vava_time` ; couvrir une plante de blé. | « Couvrir » est proposé et réussit (on se prépare à l'hiver) ; aucune nuit ne gèle en automne. |
+| 18 | Hiver : lancer Couvrir, et pendant la barre de 3 s, `restart vava_time` avec `first = 'printemps'` (ou attendre la bascule d'une saison courte). | Si la saison a tourné avant la fin du geste : « Aucun gel à craindre en cette saison. », rien consommé, plante non couverte. |
 
 ## 6. Ce qu'il faut regarder dans la base
 

@@ -1,7 +1,7 @@
 --[[
     vava_farming/server/frost.lua
-    Rôle : le gel des nuits d'hiver (vava_time, facultatif). Objets qui couvrent une plante (config.frost.cover, contrôlés
-           au démarrage). Au soir d'une nuit de gel : avertissement aux seuls cultivateurs concernés — le propriétaire en
+    Rôle : le gel des nuits d'hiver (vava_time, facultatif). Objets qui couvrent une plante et saisons où l'on couvre
+           (config.frost.cover et coverSeasons, contrôlés au démarrage). Au soir d'une nuit de gel : avertissement aux seuls cultivateurs concernés — le propriétaire en
            jeu d'une parcelle privée où une plante est exposée, les joueurs à portée d'une parcelle commune exposée —,
            position lue côté serveur, rien envoyé aux autres. À la tombée de la nuit : plantes exposées perdues (ni
            couvertes ni d'une culture qui résiste au froid), parcelles republiées, journal, mêmes destinataires prévenus.
@@ -21,6 +21,7 @@ local journal = VavaFarming.journal
 local catalog = VavaFarming.catalog
 local slots = VavaFarming.slots
 local geometry = VavaFarming.geometry
+local growth = VavaFarming.growth
 local cfg = VavaFarming.config
 local messages = cfg.messages
 
@@ -29,6 +30,8 @@ VavaFarming.frost = frost
 
 ---@type { item: string, quantity: integer }[]
 local covers = {}
+---@type string[]
+local coverSeasons = {}
 
 --- Objets qui couvrent une plante, dans l'ordre de la config (contrôlés au démarrage).
 ---@return { item: string, quantity: integer }[]
@@ -36,11 +39,18 @@ function frost.covers()
     return covers
 end
 
---- Libellés des objets qui couvrent, joints (« Compost ou Paille »), pour les messages.
+--- Peut-on couvrir une plante maintenant ? Seulement dans une saison de config.frost.coverSeasons (saison de vava_time
+--- lue par le bridge, gardée 5 s ; vava_time absent ou en démarrage : non).
+---@return boolean
+function frost.coverSeason()
+    return growth.coverSeason(bridge.Season(), coverSeasons)
+end
+
+--- Objets qui couvrent, joints (« 2 × Déchets végétaux ou 1 × Compost »), pour les messages.
 ---@return string
 function frost.coverLabels()
     local labels = {}
-    for i, option in ipairs(covers) do labels[i] = catalog.itemLabel(option.item) end
+    for i, option in ipairs(covers) do labels[i] = format(messages.coverItem, option.quantity, catalog.itemLabel(option.item)) end
     return concat(labels, messages.coverOr)
 end
 
@@ -115,6 +125,15 @@ function frost.start()
             return false, format('frost.cover #%d : { item, quantity ≥ 1 } attendu', index)
         end
         covers[index] = { item = option.item, quantity = option.quantity }
+    end
+    coverSeasons = {}
+    local seasons = cfg.frost.coverSeasons
+    if type(seasons) ~= 'table' then return false, 'frost.coverSeasons : liste de saisons attendue' end
+    for index, season in ipairs(seasons) do
+        if type(season) ~= 'string' or season == '' then
+            return false, format('frost.coverSeasons #%d : identifiant de saison attendu', index)
+        end
+        coverSeasons[index] = season
     end
     if type(cfg.frost.warnRadius) ~= 'number' or cfg.frost.warnRadius < 0 then return false, 'frost.warnRadius : nombre attendu' end
     return bridge.OnFrost(function()

@@ -3,7 +3,8 @@
     Rôle : l'agriculture du royaume : parcelles communales ou privées à emplacements, croissance par stades calculée
            sur les dates (humidité qui baisse, pause à sec, flétrissement, mort ; saison de vava_time qui accélère ou
            ralentit la pousse et le dessèchement ; nuits de gel d'hiver qui tuent les plantes ni couvertes ni
-           résistantes), fertilité (coût par récolte, rotation, compost, jachère), qualité de
+           résistantes, annoncées sur la fiche des plantes ; couvrir en automne et en hiver, de déchets végétaux ou
+           de compost), fertilité (coût par récolte, rotation, compost, jachère), qualité de
            la récolte (graine, compétence, régularité d'arrosage, fertilité) en palier,
            graines récupérées, seau rempli aux puits, grenier commun (conteneur de l'inventaire, ancré, dépôts et
            retraits journalés), composteur ajouté à l'artisanat, commandes du Conseil. Le serveur décide de tout et
@@ -21,7 +22,7 @@ use_experimental_fxv2_oal 'yes'
 
 name 'vava_farming'
 description 'Agriculture vAvA : parcelles, croissance par dates, humidité et fertilité, qualité, grenier commun'
-version '1.4.1'
+version '1.5.0'
 
 dependency 'vAvA_core'
 dependency 'vava_inventory'
