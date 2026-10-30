@@ -1,12 +1,14 @@
 'use strict';
 /*
- * web/js/devmock.js
+ * web/dev/devmock.js
  * Rôle : données simulées quand la page est ouverte dans un navigateur (hors FiveM), pour travailler le rendu sans
  *        lancer le jeu. Inactif en jeu. Paramètres d'URL : ?view=prompt (invites qui se succèdent), ?view=menu&state=…
  *        (empty, growing, ripe, wilted, dead : menu d'emplacement dans cet état ; wilted : culture qui ne craint pas le
  *        gel), &covered=1 (plante couverte contre le gel), &frost=1 (nuit de gel annoncée), &season=ete (printemps ou
  *        été : « Couvrir » n'est pas proposé), &besace=compost (pas assez de déchets végétaux : compost en secours) ou
  *        &besace=vide (rien pour couvrir).
+ *        Jamais livré (absent des `files`), jamais chargé en jeu : la ligne hors jeu de index.html ne l'insère
+ *        que hors FiveM.
  */
 
 const DevMock = (() => {

@@ -16,6 +16,7 @@ local PAGES = {
     { module = 'vava_skills', sheet = 'style.css' },
     { module = 'vava_gathering', sheet = 'style.css' },
     { module = 'vava_crafting', sheet = 'style.css' },
+    { module = 'vava_farming', sheet = 'style.css' },
 }
 
 local COMMON = {
