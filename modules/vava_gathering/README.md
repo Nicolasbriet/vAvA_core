@@ -31,6 +31,7 @@ Rendu hors jeu : `web/index.html?view=prompt` (ou `tension`, `zones`) dans un na
 | Props | créés par le client à 80 m ; nœuds regroupés par zone, seuls ceux d'une zone suivie (1.6.0) et à portée sont mesurés ; relus toutes les secondes près d'une zone, toutes les 2,5 s quand aucun nœud n'est à moins de 140 m (80 m + 60 m de marge d'approche) (1.4.1) ; une zone reçue, changée ou quittée fait aussitôt un passage (1.6.0) | `streaming` |
 | État envoyé aux joueurs proches (1.6.0) | bande, cicatrice et charges d'une zone envoyées par le core aux seuls joueurs à moins de 80 m + 20 m du cercle qui englobe ses nœuds (l'état est là avant que le premier prop puisse apparaître), puis ses seuls changements ; la vitalité n'est jamais envoyée | `streaming.radius`, `streaming.subscribeSlack` |
 | Zones d'eau | genres de zone dont les textes parlent de l'eau et non de la terre (échec de la bande, épuisement, invite) : `eau` | `waterKinds` |
+| Touches | `E` récolter, `O` panneau des zones (réglables dans Paramètres > Raccourcis > FiveM) ; `O` est cité par l'écran de chargement : changer cette touche par défaut oblige à retoucher le conseil de `modules/vava_loading/web/js/strings.js` | `keys` |
 | Carte | un blip nommé par zone (icône et couleur selon le genre, courte portée) et le cercle de son rayon ; « Marquer » dans le panneau pose le repère de la carte | `map` |
 | Solidité d'un outil sans histoire | 100 au premier usage | `toolDefaults` |
 

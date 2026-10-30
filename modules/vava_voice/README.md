@@ -42,7 +42,7 @@ Ordre de démarrage : après `vava_admin`, avant `vava_cameras` (ordre complet :
 | Portées | Chuchoter 1,5 m, Parler 5 m, Crier 15 m, Déclamer 25 m | `ranges` |
 | Portée de départ | Parler | `defaultRange` |
 | À terre | Chuchoter et Parler seulement ; la portée d'avant revient à la réanimation | `downedMaxRange` |
-| Touche de portée | `Z` pour FiveM, soit la touche W d'un clavier AZERTY ; réglable par chaque joueur (Paramètres > Raccourcis > FiveM) ; changer la touche par défaut demande de renommer la commande | `key`, `command`, `keyLabel` |
+| Touche de portée | `Z` pour FiveM, soit la touche W d'un clavier AZERTY ; réglable par chaque joueur (Paramètres > Raccourcis > FiveM) ; changer la touche par défaut demande de renommer la commande, et de relire le conseil de la voix dans `modules/vava_loading/web/js/strings.js` (il ne cite pas la touche, mais les quatre portées) | `key`, `command`, `keyLabel` |
 | Joueurs à portée | recalculés toutes les 250 ms, marge de 2 m (la voix ne se coupe pas à chaque pas en bordure) | `client.targetsPollMs`, `client.targetMargin` |
 | Médaillon | un quart par portée, lueur relue toutes les 150 ms | `hud`, `client.talkingPollMs` |
 | Zone où se tient le joueur | relue toutes les 500 ms | `client.zonesPollMs` |

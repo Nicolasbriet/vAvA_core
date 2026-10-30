@@ -564,8 +564,14 @@ versé à T-014 ; les autres points déjà couverts sont précisés dans T-012 �
     ralentit sur une petite machine.
 
 ### T-021 — Textes de l'écran de chargement et du premier pas
-- Agent : vava-gardien-lore · Dépend de : T-020 · Statut : à faire
+- Agent : vava-gardien-lore · Dépend de : T-020 · Statut : à tester en jeu (textes seuls, poids mesuré ; relu par le gardien du lore)
 - 20 à 30 extraits courts du lore, 15 conseils de jeu, textes d'accueil.
+- Fait le 31 octobre 2026 : `vava_loading` 1.1.0, 28 extraits et 15 conseils dans `web/js/strings.js` (+ 4 Ko),
+  « Ressources du royaume » ; touches citées seulement si elles sont à la même place en QWERTY et en AZERTY (F1, I,
+  T, K, G, O ; la voix renvoie au Codex) ; rappel de la décision 12 dans les README de `vava_codex`, `vava_chat`,
+  `vava_voice`, `vava_skills`, `vava_health`, `vava_gathering` et la config de `vava_inventory` ; messages de
+  `vava_arrival` relus, inchangés. **À tester en jeu** : `docs/tests/chargement.md` 1-5 et 1-6 (plus long conseil en
+  1280 × 720, chaque touche citée). Reste à faire : calibrer les seuils des feux (1-4) et les publier avec ces textes.
 
 ### T-022 — Arrivée d'un nouveau personnage
 - Agents : vava-architecte → vava-dev-lua (cette tâche autorise à toucher `config/server.lua` pour un commentaire, `vava_codex`, `chancellerie/lib/resources.js`, `.luacheckrc`, dans les limites de la spec) · Dépend de : — · Statut : validée

@@ -58,6 +58,9 @@ ne changent pas.
 dépendance, à ne jamais arrêter sur un serveur ouvert). Facultatifs : `vava_admin` (rangs et droits du Conseil ; sans lui, ACE `vava_codex.staff` et les
 ACE déclarés avec les commandes), `vava_hud` (notifications), `vava_chat` (dernières pages des commandes tapées).
 
+Touche par défaut (`keys.open`, `F1`) : elle est citée par l'écran de chargement et par l'accueil. La changer oblige à
+retoucher les conseils de `modules/vava_loading/web/js/strings.js` et `messages.codexHint` de `vava_arrival`.
+
 ## Fichiers
 
 | Fichier | Rôle |

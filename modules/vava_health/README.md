@@ -25,7 +25,7 @@ magie, voix, Registre) appellent l'export `isDowned` : la règle n'est écrite q
 | Relever | personne à terre la plus proche à 2 m (positions serveur), geste de 8 s, distance revérifiée à la fin (+ 1 m), 25 % de vie ; objet requis et consommé facultatif | `assist` |
 | Rendre l'âme | touche maintenue 3 s ; lieu de soins le plus proche, 50 % de vie | `respawn` |
 | Soins par objet | `effects = { health = 20 }` : + 20 % ; refusé à 98 % et plus | `healing.fullAt` |
-| Touches | `G` relever, `E` rendre l'âme (réglables dans Paramètres > Raccourcis > FiveM) | `keys`, `labels` |
+| Touches | `G` relever, `E` rendre l'âme (réglables dans Paramètres > Raccourcis > FiveM) ; `G` est cité par l'écran de chargement : changer cette touche par défaut oblige à retoucher le conseil de `modules/vava_loading/web/js/strings.js` | `keys`, `labels` |
 | Débit | relever : 3 demandes, puis 1 toutes les 2 s ; rendre l'âme : 2, puis 1 toutes les 5 s | `rateLimits` |
 | Médaillon | « Santé », ambre à 30 %, rouge à 10 % | `hud` |
 | Messages | tous les textes vus par le joueur | `messages` |

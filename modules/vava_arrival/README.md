@@ -28,7 +28,7 @@ lui, celles du jeu), `vava_admin` (droit `give`, journal du Registre ; sans lui,
 | Commande du Conseil | `/accueil`, droit `give` (Sénéchal et au-dessus), ACE `vava_arrival.admin`, 2 s entre deux | `admin` |
 | Accusé de lecture | 2 d'avance, puis 1 par 20 s | `rateLimits.welcomed` |
 | Journal | 90 jours | `logRetentionDays` |
-| Textes | provisoires (T-021) ; notifications de 200 octets au plus, libellés du journal de 32 octets au plus | `messages` |
+| Textes | relus avec l'écran de chargement (T-021) ; notifications de 200 octets au plus, libellés du journal de 32 octets au plus ; `codexHint` cite la touche par défaut du Codex (F1) | `messages` |
 
 `startingItems` de `vava_inventory` reste vide : le remplir en même temps donnerait deux dotations.
 
