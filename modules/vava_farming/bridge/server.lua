@@ -4,8 +4,8 @@
            compte, position lue côté serveur, santé (à terre), inventaire (objet en main, piles, comptage, échange
            atomique, ajout, retrait, métadonnées, conteneurs conservés et leur ouverture ancrée, déclaration des
            objets), compétences (XP, niveau), artisanat (type de station, recette et station du composteur), droits
-           et journal du Conseil, notifications, chat, saison du royaume (vava_time, facultatif), base. Chaque appel à
-           une autre ressource est isolé.
+           et journal du Conseil, joueurs en jeu et leur position, notifications, chat, saison et nuits de gel du
+           royaume (vava_time, facultatif), base. Chaque appel à une autre ressource est isolé.
     Dépendances : shared/constants.lua, config.lua, server/core.lua
 ]]
 
@@ -14,7 +14,8 @@ local mathType = math.type
 local pack, unpack, concat = table.pack, table.unpack, table.concat
 local GetResourceState, TriggerClientEvent, IsPlayerAceAllowed = GetResourceState, TriggerClientEvent, IsPlayerAceAllowed
 local GetPlayerPed, DoesEntityExist, GetEntityCoords = GetPlayerPed, DoesEntityExist, GetEntityCoords
-local GetGameTimer = GetGameTimer
+local GetGameTimer, GetPlayers = GetGameTimer, GetPlayers
+local ipairs = ipairs
 
 local core = VavaFarming.core
 if not core then return end
@@ -85,6 +86,22 @@ function Bridge.Position(source)
     if ped == 0 or not DoesEntityExist(ped) then return nil end
     local coords = GetEntityCoords(ped)
     return coords.x, coords.y, coords.z
+end
+
+--- Joueurs avec un personnage en jeu : { source, characterId, x?, y?, z? } (position lue côté serveur, absente si le
+--- ped n'existe pas encore).
+---@return { source: integer, characterId: integer, x: number|nil, y: number|nil, z: number|nil }[]
+function Bridge.ActivePlayers()
+    local list = {}
+    for _, id in ipairs(GetPlayers()) do
+        local source = tonumber(id)
+        local characterId = source and Bridge.GetCharacterId(source)
+        if characterId then
+            local x, y, z = Bridge.Position(source)
+            list[#list + 1] = { source = source, characterId = characterId, x = x, y = y, z = z }
+        end
+    end
+    return list
 end
 
 -- Santé -----------------------------------------------------------------------------------------------------------
@@ -304,11 +321,46 @@ function Bridge.Season()
     return seasonId
 end
 
---- Effets de la saison sur les cultures, `{ growth, drying }` de config.seasons, ou nil (aucun effet).
----@return table|nil
+--- Facteur de saison lu dans la config : un nombre ni NaN ni négatif, sinon 1 (sans effet).
+---@param value any
+---@return number
+local function seasonFactor(value)
+    if type(value) ~= 'number' or value ~= value or value < 0 then return 1 end
+    return value
+end
+
+-- effets contrôlés de chaque saison, calculés une fois (la config ne change pas en cours de route) ; false : aucun
+local seasonEffects = {}
+
+--- Effets de la saison sur les cultures, `{ growth, drying }` de config.seasons contrôlés (une valeur absente ou
+--- invalide compte pour 1), ou nil (aucun effet : vava_time absent, saison sans réglage).
+---@return { growth: number, drying: number }|nil
 function Bridge.SeasonEffects()
     local season = Bridge.Season()
-    return season and cfg.seasons and cfg.seasons[season] or nil
+    if not season then return nil end
+    local effects = seasonEffects[season]
+    if effects == nil then
+        local raw = cfg.seasons and cfg.seasons[season]
+        effects = type(raw) == 'table' and { growth = seasonFactor(raw.growth), drying = seasonFactor(raw.drying) } or false
+        seasonEffects[season] = effects
+    end
+    return effects or nil
+end
+
+local FROST_WARNING_HOOK, FROST_HOOK = 'vava_time:frostWarning', 'vava_time:frost'
+
+--- Branche l'agriculture sur les nuits de gel de vava_time (hooks after ; sans vava_time, ils ne sont jamais émis).
+--- Appelé pendant le setup.
+---@param onWarning fun(payload: table)  au soir d'une nuit de gel
+---@param onFrost fun(payload: table)    quand le gel tombe
+---@return boolean ok
+---@return string|nil err
+function Bridge.OnFrost(onWarning, onFrost)
+    local id, err = core.hooks.after(FROST_WARNING_HOOK, onWarning)
+    if not id then return false, err end
+    id, err = core.hooks.after(FROST_HOOK, onFrost)
+    if not id then return false, err end
+    return true
 end
 
 -- Base de données -------------------------------------------------------------------------------------------------

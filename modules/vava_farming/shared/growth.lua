@@ -3,8 +3,9 @@
     Rôle : règles pures de la croissance, partagées par le client (affichage) et le serveur (décision) : avancée d'un
            emplacement d'après le temps écoulé (humidité qui baisse, croissance tant que la terre est humide, pause,
            flétrissement puis mort quand elle est sèche, jachère qui rend de la fertilité ; saison de vava_time qui
-           accélère ou ralentit la pousse et le dessèchement), stade et état, régularité
-           d'arrosage, qualité d'une récolte. Aucun état : les fonctions reçoivent et rendent des tables.
+           accélère ou ralentit la pousse et le dessèchement), stade et état, régularité d'arrosage, qualité d'une
+           récolte ; gel d'une nuit d'hiver (plante qu'il tue, objet qui couvre). Aucun état : les fonctions reçoivent
+           et rendent des tables.
     Dépendances : shared/constants.lua, config.lua
 ]]
 
@@ -95,6 +96,18 @@ end
 ---@return boolean
 function growth.frostKills(slot, crop)
     return slot.crop ~= nil and crop ~= nil and not slot.dead and slot.covered ~= true and crop.frostHardy ~= true
+end
+
+--- Objet qui couvrira une plante : la première entrée de `options` (`{ item, quantity }`, ordre de config.frost.cover)
+--- que le cultivateur a en quantité suffisante, ou nil.
+---@param options { item: string, quantity: integer }[]
+---@param countOf fun(item: string): integer  nombre de cet objet dans la besace
+---@return { item: string, quantity: integer }|nil
+function growth.coverOption(options, countOf)
+    for _, option in ipairs(options) do
+        if countOf(option.item) >= option.quantity then return option end
+    end
+    return nil
 end
 
 --- Arrosage : humidité pleine, une plante flétrie reprend.

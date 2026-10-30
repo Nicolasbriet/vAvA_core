@@ -27,12 +27,19 @@ VavaFarming.config = {
         hiver = { growth = 0.25, drying = 0.25 },
     },
 
-    -- Gel (vava_time, facultatif) : au soir d'une nuit de gel, les cultivateurs concernés sont avertis (propriétaire en
-    -- jeu d'une parcelle privée, joueurs à `warnRadius` mètres d'une parcelle) ; à la tombée de la nuit, toute plante ni
-    -- couverte ni d'une culture `frostHardy` meurt. Couvrir un emplacement (geste « Couvrir ») consomme `cover` et le
-    -- protège jusqu'à la récolte ou l'arrachage. Aucun objet « paille » n'existe encore dans le royaume : le compost en
-    -- tient lieu (à changer ici le jour où la paille existe).
-    frost = { cover = { item = 'compost', quantity = 1 }, warnRadius = 60.0 },
+    -- Gel (vava_time, facultatif ; décision à confirmer par le porteur du projet). L'hiver, certaines nuits gèlent (la
+    -- probabilité est réglée dans vava_time). Au soir d'une nuit de gel, les cultivateurs concernés sont avertis : le
+    -- propriétaire en jeu d'une parcelle privée, les joueurs à moins de `warnRadius` mètres d'une parcelle commune (rien
+    -- n'est envoyé aux autres) ; à la tombée de la nuit, toute plante vivante ni couverte ni d'une culture `frostHardy`
+    -- meurt. Couvrir un emplacement (geste « Couvrir ») consomme UN des objets de `cover` (le premier que le cultivateur
+    -- a en quantité suffisante) et protège la plante jusqu'à sa récolte ou son arrachage. Aucun objet « paille »
+    -- n'existe encore dans le royaume : le compost en tient lieu (à remplacer ou compléter ici le jour où elle existe).
+    frost = {
+        cover = {
+            { item = 'compost', quantity = 1 },
+        },
+        warnRadius = 60.0,
+    },
 
     -- Fertilité (0–100 par emplacement) : rendue par la jachère (par jour vide), le compost, la rotation (famille
     -- différente de la culture précédente) ; pénalité quand on replante la même famille.
@@ -185,12 +192,15 @@ VavaFarming.config = {
         noAccess = 'Cette parcelle ne vous appartient pas.',
         noSpace = 'Vous ne pouvez rien porter de plus.',
         granaryOpened = 'Grenier commun ouvert.',
-        -- gel (vava_time) : couvrir un emplacement, avertissement du soir, plantes perdues ; %s : culture ou parcelle(s)
-        covered = 'Emplacement couvert : la plante passera les nuits de gel.',
+        -- gel (vava_time) : couvrir une plante, avertissement du soir, plantes perdues ; %s : culture, objets qui
+        -- couvrent (joints par `coverOr`), parcelle(s) (jointes par `parcelSeparator`)
+        covered = 'Plante couverte : elle passera les nuits de gel.',
         alreadyCovered = 'Cette plante est déjà couverte.',
         frostHardy = '%s ne craint pas le gel.',
-        noCover = 'Il vous faut du compost pour couvrir la plante.',
+        noCover = 'Il vous faut de quoi couvrir la plante (%s).',
+        coverOr = ' ou ',
+        parcelSeparator = ', ',
         frostWarning = 'Le froid mordra cette nuit (%s) : couvrez les cultures fragiles ou elles gèleront.',
-        frostStruck = 'Le gel a pris %d plante(s) : %s.',
+        frostStruck = 'Le gel a pris %d plante(s) cette nuit : %s.',
     },
 }

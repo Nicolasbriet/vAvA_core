@@ -4,12 +4,12 @@
            emplacement à portée, accès, geste possible dans l'état présent, graines au palier choisi, seau en main avec
            des charges, compost, plante mûre, place ; hook annulable ; jeton, durée) ; fin du geste (durée revérifiée,
            distance — trop loin, le geste est abandonné —, puis application : semis, arrosage, compost, récolte avec
-           qualité, provenance, graines récupérées et XP, arrachage avec déchets, couverture contre le gel (objet de
-           config.frost.cover consommé) ; l'emplacement d'un geste qui donne ou consomme des objets est écrit aussitôt) ;
-           remplissage du seau au puits. Une seule action à la fois par
-           joueur ; aucune à terre (vava_health) : ni menu, ni début, ni fin, ni puits.
+           qualité, provenance, graines récupérées et XP, arrachage avec déchets, couverture contre le gel (un objet de
+           config.frost.cover consommé, revérifié à la fin) ; l'emplacement d'un geste qui donne ou consomme des objets
+           est écrit aussitôt) ; remplissage du seau au puits. Une seule action à la fois par joueur ; aucune à terre
+           (vava_health) : ni menu, ni début, ni fin, ni puits.
     Dépendances : shared/, config.lua, server/core.lua, bridge/server.lua, server/journal.lua, server/catalog.lua,
-                  server/slots.lua
+                  server/slots.lua, server/frost.lua
 ]]
 
 local type, pairs, ipairs = type, pairs, ipairs
@@ -24,6 +24,7 @@ local bridge = VavaFarming.bridge
 local journal = VavaFarming.journal
 local catalog = VavaFarming.catalog
 local slots = VavaFarming.slots
+local frost = VavaFarming.frost
 local growth = VavaFarming.growth
 local geometry = VavaFarming.geometry
 local cfg = VavaFarming.config
@@ -175,15 +176,24 @@ function actions.menu(src, parcelId, index)
     sort(seeds, function(a, b) return a.label < b.label end)
     local bucket, charges = bucketOf(src)
     local compost = bridge.Count(src, cfg.compost.item)
-    local coverSpec = cfg.frost.cover
-    local coverCount = coverSpec.item == cfg.compost.item and compost or bridge.Count(src, coverSpec.item)
+    -- objets qui couvrent : comptés une fois chacun (le compost l'est déjà)
+    local counts = { [cfg.compost.item] = compost }
+    local function countOf(item)
+        if counts[item] == nil then counts[item] = bridge.Count(src, item) end
+        return counts[item]
+    end
+    local coverWith = growth.coverOption(frost.covers(), countOf)
+    local coverOptions = {}
+    for i, option in ipairs(frost.covers()) do
+        coverOptions[i] = { item = option.item, label = catalog.itemLabel(option.item), quantity = option.quantity, count = countOf(option.item) }
+    end
     return true, {
         parcel = { id = parcel.id, label = parcel.label, communal = parcel.owner == nil },
         slot = slots.view(parcel, index),
         seeds = seeds,
         bucket = { held = bucket ~= nil, charges = charges },
         compost = compost,
-        cover = { item = coverSpec.item, label = catalog.itemLabel(coverSpec.item), quantity = coverSpec.quantity, count = coverCount },
+        cover = { options = coverOptions, use = coverWith and coverWith.item or nil },
         sickle = hasSickle(src),
         actions = {
             plant = crop == nil and #seeds > 0,
@@ -191,8 +201,7 @@ function actions.menu(src, parcelId, index)
             fertilize = compost > 0,
             harvest = state == STATES.RIPE,
             clear = crop ~= nil,
-            cover = crop ~= nil and state ~= STATES.DEAD and not slot.covered and not crop.frostHardy
-                and coverCount >= coverSpec.quantity,
+            cover = crop ~= nil and state ~= STATES.DEAD and not slot.covered and not crop.frostHardy and coverWith ~= nil,
         },
         rules = { moistureThreshold = cfg.growth.moistureThreshold, tierLabels = cfg.quality.tierLabels },
         now = time(),
@@ -339,8 +348,8 @@ function actions.begin(src, parcelId, index, action, cropId, tier)
             bridge.Notify(src, format(messages.frostHardy, planted.label), 'info')
             return false, 'frost_hardy'
         end
-        if bridge.Count(src, cfg.frost.cover.item) < cfg.frost.cover.quantity then
-            bridge.Notify(src, messages.noCover, 'warning')
+        if not growth.coverOption(frost.covers(), function(item) return bridge.Count(src, item) end) then
+            bridge.Notify(src, format(messages.noCover, frost.coverLabels()), 'warning')
             return false, 'no_cover'
         end
         crop = planted
@@ -476,16 +485,16 @@ function actions.finish(src, token)
         bridge.Notify(src, waste > 0 and format(messages.clearedWaste, waste) or messages.cleared, 'info')
         return true, { action = action, slot = settle(src, parcel, index), item = waste > 0 and cfg.compost.waste.item or nil, quantity = waste > 0 and waste or nil }
     elseif action == ACTIONS.COVER then
-        -- l'état a pu changer pendant le geste (gel tombé, autre joueur, arrachage)
-        if not planted or slot.dead or slot.covered or planted.frostHardy then return false, 'not_found' end
-        local cover = cfg.frost.cover
-        if not bridge.Exchange(src, { { item = cover.item, quantity = cover.quantity } }, {}) then
-            bridge.Notify(src, messages.noCover, 'warning')
+        -- l'état a pu changer pendant le geste (gel tombé, autre joueur, arrachage puis autre semis)
+        if not planted or planted.id ~= session.crop.id or slot.dead or slot.covered or planted.frostHardy then return false, 'not_found' end
+        local cover = growth.coverOption(frost.covers(), function(item) return bridge.Count(src, item) end)
+        if not cover or not bridge.Exchange(src, { { item = cover.item, quantity = cover.quantity } }, {}) then
+            bridge.Notify(src, format(messages.noCover, frost.coverLabels()), 'warning')
             return false, 'missing_items'
         end
         slots.cover(slot)
         slots.writeNow(parcel, index)
-        journal.write('covered', { parcel = parcel.id, slot = index, characterId = session.characterId, item = cover.item, details = { crop = planted.id } })
+        journal.write('covered', { parcel = parcel.id, slot = index, characterId = session.characterId, item = cover.item, details = { crop = planted.id, quantity = cover.quantity } })
         bridge.Notify(src, messages.covered, 'info')
         return true, { action = action, slot = settle(src, parcel, index) }
     end

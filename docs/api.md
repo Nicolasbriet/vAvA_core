@@ -1317,16 +1317,16 @@ station. Rendu hors jeu : `web/index.html?view=menu` (ou `menu&tab=reparation`, 
 
 ### `vava_farming`
 
-L'agriculture (1.3.0) : **parcelles** communales ou privées (`owner = { kind = 'character', id }`, autres genres par
+L'agriculture (1.4.0) : **parcelles** communales ou privées (`owner = { kind = 'character', id }`, autres genres par
 `registerAccess`) faites d'emplacements en grille ; **croissance par dates** (humidité qui baisse, pousse au-dessus
 d'un seuil, pause à sec, flétrie après 6 h, morte après 18 h ; aucune boucle, republication des stades toutes les
 10 s) ; **fertilité** (coût par récolte, rotation par famille, compost, jachère) ; **qualité** de la récolte (graine ×
 0,35 + compétence × 0,35 + régularité d'arrosage × 0,15 + fertilité × 0,15 ± 5) en palier avec provenance, graines
 récupérées au même palier ; gestes semer / arroser (seau en main rempli aux puits) / fertiliser / récolter (faucille :
-plus vite) / arracher (déchets), tous validés et appliqués par le serveur après un geste chronométré (fini trop loin
+plus vite) / couvrir (contre le gel, 1.4.0) / arracher (déchets), tous validés et appliqués par le serveur après un geste chronométré (fini trop loin
 ou à terre, le geste est abandonné ; à terre, `vava_health:isDowned` lu par le bridge : ni menu, ni geste, ni puits,
 ni grenier, code `downed` ; un emplacement qui vient de donner ou de consommer des objets — semis, récolte, compost,
-arrachage — est écrit aussitôt, le reste par lots) ; **grenier
+couverture, arrachage — est écrit aussitôt, le reste par lots) ; **grenier
 commun** (conteneur `vava_inventory` conservé, ouvert ancré à qui a accès à la parcelle — communale : tous ; privée :
 son propriétaire ou le genre branché par `registerAccess` —, dépôts et retraits journalés par minute : une ligne par
 minute, grenier, personnage, objet et sens, quantités additionnées, attente bornée par `persistence.granaryLogMax` ;
@@ -1335,23 +1335,33 @@ par geste) ; **composteur** (type de
 station et recette ajoutés aux registres de `vava_crafting`, station placée par `addStation`). Détail, config et tests :
 `modules/vava_farming/README.md`. Demande le core 0.6.0, `vava_inventory` 1.4.0, `vava_skills` 1.0.0, `vava_gathering`
 1.0.0, `vava_crafting` 1.1.0 ; facultatifs : `vava_hud`, `vava_admin` (droit `metiers`), `vava_chat`, `vava_health`
-(à terre), `vava_time` (saisons).
+(à terre), `vava_time` (saisons, nuits de gel).
 
 **Saisons** (1.3.0) : la saison de `vava_time` (export `getSeason`, lu par le bridge, gardée 5 s) règle, par
 `config.seasons`, la vitesse de pousse (`growth` : printemps × 1,25, été × 1, automne × 0,75, hiver × 0,25) et celle à
-laquelle la terre sèche (`drying` : × 1 ; × 1,5 ; × 0,75 ; × 0,5). L'hiver ralentit sans tuer (pas de gel). La
-croissance garde ses fractions de seconde en mémoire et s'écrit entière en base. `vava_time` absent : aucun effet,
-croissance identique à la 1.2.2.
+laquelle la terre sèche (`drying` : × 1 ; × 1,5 ; × 0,75 ; × 0,25 : l'hiver, un arrosage tient quatre fois plus). Une
+valeur absente, négative ou invalide compte pour 1 (1.4.0). La croissance garde ses fractions de seconde en mémoire et
+s'écrit entière en base. `vava_time` absent : aucun effet, croissance identique à la 1.2.2.
+
+**Gel** (1.4.0, décision à confirmer) : branchée par le bridge sur les hooks `vava_time:frostWarning` et
+`vava_time:frost`, l'agriculture avertit au soir d'une nuit de gel les seuls cultivateurs concernés (propriétaire en jeu
+d'une parcelle privée où une plante est exposée, joueurs à `frost.warnRadius` m d'une parcelle commune exposée,
+positions lues côté serveur) puis, quand le gel tombe, fait mourir toute plante vivante ni couverte ni d'une culture
+`frostHardy` (état « morte » existant), journalise (`frost`, par parcelle) et prévient les mêmes. Geste **Couvrir**
+(action `cover` de `vava_farming:begin`, codes `covered`, `frost_hardy`, `no_cover`) : plante vivante, non couverte,
+d'une culture qui craint le froid ; consomme le premier objet de `frost.cover` que le cultivateur possède en quantité
+(revérifié et retiré par `exchange` à la fin du geste) ; l'emplacement reste couvert jusqu'à la récolte ou
+l'arrachage (colonne `covered`, migration 0003, écrite aussitôt ; journal `covered`). Sans `vava_time`, rien ne gèle.
 
 **Registre** `vava_farming:crops` (`{ label, family, seed, product, growMinutes, waterPerHour, fertilityCost, yield,
-xp, difficulty, stages, wilted, dead }` ; `stages` : modèles par stade, le dernier réservé à la plante mûre), rempli par la
-config, ouvert aux autres modules. State bag global
+xp, difficulty, stages, wilted, dead, frostHardy? }` ; `stages` : modèles par stade, le dernier réservé à la plante
+mûre ; `frostHardy` : résiste au gel, 1.4.0), rempli par la config, ouvert aux autres modules. State bag global
 `vava_farming:parcel:<id>` → `{ slots = { { crop, stage, state } } }`.
 
 | Export serveur | Retour |
 |---|---|
 | `getParcel(id)` · `getParcels()` | `{ id, label, x, y, z, count, communal, owner?, granary?, slots = { vue… } }` |
-| `getSlot(parcelle, n)` | `{ parcel, index, crop, cropLabel, state, stage, stages, progress, moisture, fertility, waterings, dryHours, plantedAt }` |
+| `getSlot(parcelle, n)` | `{ parcel, index, crop, cropLabel, state, stage, stages, progress, moisture, fertility, waterings, dryHours, plantedAt, covered, frostHardy }` |
 | `getCrop(id)` | définition ou `nil` |
 | `granaryOf(parcelle)` | id du conteneur du grenier, ou `nil` |
 | `registerAccess(kind, fn)` | genre de propriétaire de parcelle : `fn(ownerId, characterId)` → booléen |
@@ -1363,7 +1373,8 @@ withdraw, source, characterId, item, quantity }`).
 
 **Commande** `/agriculture parcelles | parcelle <id> | fertilite <id> <n> <0-100> | pousser <id> <n> | arroser <id>`
 (droit `metiers`). Touche `E` près d'un emplacement, d'un puits ou d'un grenier. Rendu hors jeu :
-`web/index.html?view=menu&state=growing` (ou `empty`, `ripe`, `wilted`, `dead`, `view=prompt`).
+`web/index.html?view=menu&state=growing` (ou `empty`, `ripe`, `wilted`, `dead`, `view=prompt` ; `&covered=1` : plante
+couverte).
 
 ### `vava_codex`
 

@@ -224,15 +224,20 @@ end
 
 -- Gel (vava_time) -------------------------------------------------------------------------------------------------------
 
---- Plantes que le gel tuerait cette nuit, par parcelle : liste { parcel, count } (parcelles sans plante exposée omises).
+--- Plantes que le gel tuerait cette nuit (état avancé à maintenant), par parcelle : liste { parcel, count } (parcelles
+--- sans plante exposée omises).
 ---@return { parcel: vAvA.ParcelDefinition, count: integer }[]
 function slots.exposed()
+    local now = time()
+    local season = bridge.SeasonEffects()
     local out = {}
     for _, parcel in ipairs(catalog.parcels()) do
         local count = 0
         for index = 1, parcel.count do
             local slot = states[parcel.id][index]
-            if growth.frostKills(slot, slot.crop and catalog.crop(slot.crop) or nil) then count = count + 1 end
+            local crop = slot.crop and catalog.crop(slot.crop) or nil
+            growth.advance(slot, crop, now, season)
+            if growth.frostKills(slot, crop) then count = count + 1 end
         end
         if count > 0 then out[#out + 1] = { parcel = parcel, count = count } end
     end

@@ -63,3 +63,70 @@ describe('vava_time nuits de gel', function()
         assert.same({ false, false }, { rules.due(night, 23) })
     end)
 end)
+
+-- Le gel dans l'agriculture (modules/vava_farming/shared/growth.lua) : plante qu'il tue, objet qui couvre.
+describe('vava_farming gel des cultures', function()
+    local growth, cfg
+
+    before_each(function()
+        helper.reset()
+        VavaFarming = nil
+        helper.loadAll({
+            'modules/vava_farming/shared/constants.lua',
+            'modules/vava_farming/config.lua',
+            'modules/vava_farming/shared/growth.lua',
+        })
+        growth = VavaFarming.growth
+        cfg = VavaFarming.config
+    end)
+
+    local FRAGILE = { id = 'ble', frostHardy = false }
+    local HARDY = { id = 'chou', frostHardy = true }
+
+    local function slotOf(crop, fields)
+        local slot = { crop = crop and crop.id or nil, dead = false, covered = false }
+        for key, value in pairs(fields or {}) do slot[key] = value end
+        return slot
+    end
+
+    it('tue une plante vivante ni couverte ni résistante, flétrie ou mûre comprise', function()
+        assert.is_true(growth.frostKills(slotOf(FRAGILE), FRAGILE))
+        assert.is_true(growth.frostKills(slotOf(FRAGILE, { wilted = true }), FRAGILE))
+        assert.is_true(growth.frostKills(slotOf(FRAGILE, { growth = 5400 }), FRAGILE))
+    end)
+
+    it('épargne la plante couverte, la culture qui résiste au froid, la plante déjà morte et la terre vide', function()
+        assert.is_false(growth.frostKills(slotOf(FRAGILE, { covered = true }), FRAGILE))
+        assert.is_false(growth.frostKills(slotOf(HARDY), HARDY))
+        assert.is_false(growth.frostKills(slotOf(FRAGILE, { dead = true }), FRAGILE))
+        assert.is_false(growth.frostKills(slotOf(nil), nil))
+        -- culture retirée de la config : rien à tuer
+        assert.is_false(growth.frostKills(slotOf(FRAGILE), nil))
+    end)
+
+    it('fait du chou la seule culture qui résiste au froid dans la config', function()
+        assert.is_true(cfg.crops.chou.frostHardy)
+        for id, crop in pairs(cfg.crops) do
+            if id ~= 'chou' then assert.is_not_true(crop.frostHardy) end
+        end
+    end)
+
+    it('couvre avec le premier objet de la liste que le cultivateur a en quantité suffisante', function()
+        local options = { { item = 'paille', quantity = 2 }, { item = 'compost', quantity = 1 } }
+        local besace = { paille = 1, compost = 3 }
+        local function countOf(item) return besace[item] or 0 end
+        assert.equal('compost', growth.coverOption(options, countOf).item)
+        besace.paille = 2
+        assert.equal('paille', growth.coverOption(options, countOf).item)
+        besace.paille, besace.compost = 0, 0
+        assert.is_nil(growth.coverOption(options, countOf))
+        assert.is_nil(growth.coverOption({}, countOf))
+    end)
+
+    it('couvre avec un compost tant que la paille n\'existe pas', function()
+        local cover = cfg.frost.cover
+        assert.equal(1, #cover)
+        assert.equal(cfg.compost.item, cover[1].item)
+        assert.equal(1, cover[1].quantity)
+    end)
+end)

@@ -2,7 +2,8 @@
     vava_farming/fxmanifest.lua
     Rôle : l'agriculture du royaume : parcelles communales ou privées à emplacements, croissance par stades calculée
            sur les dates (humidité qui baisse, pause à sec, flétrissement, mort ; saison de vava_time qui accélère ou
-           ralentit la pousse et le dessèchement), fertilité (coût par récolte, rotation, compost, jachère), qualité de
+           ralentit la pousse et le dessèchement ; nuits de gel d'hiver qui tuent les plantes ni couvertes ni
+           résistantes), fertilité (coût par récolte, rotation, compost, jachère), qualité de
            la récolte (graine, compétence, régularité d'arrosage, fertilité) en palier,
            graines récupérées, seau rempli aux puits, grenier commun (conteneur de l'inventaire, ancré, dépôts et
            retraits journalés), composteur ajouté à l'artisanat, commandes du Conseil. Le serveur décide de tout et
@@ -10,7 +11,7 @@
            joue les gestes.
     Dépendances : vAvA_core ≥ 0.6.0, vava_inventory ≥ 1.4.0, vava_skills ≥ 1.0.0, vava_gathering ≥ 1.0.0 (faucille),
                   vava_crafting ≥ 1.1.0 (composteur) ; facultatifs : vava_hud, vava_admin (droit metiers), vava_chat,
-                  vava_health (aucun geste à terre), vava_time (saisons)
+                  vava_health (aucun geste à terre), vava_time (saisons, nuits de gel)
 ]]
 
 fx_version 'cerulean'
@@ -20,7 +21,7 @@ use_experimental_fxv2_oal 'yes'
 
 name 'vava_farming'
 description 'Agriculture vAvA : parcelles, croissance par dates, humidité et fertilité, qualité, grenier commun'
-version '1.3.0'
+version '1.4.0'
 
 dependency 'vAvA_core'
 dependency 'vava_inventory'
@@ -57,6 +58,7 @@ server_scripts {
     'server/journal.lua',
     'server/catalog.lua',
     'server/slots.lua',
+    'server/frost.lua',
     'server/granary.lua',
     'server/actions.lua',
     'server/admin.lua',
