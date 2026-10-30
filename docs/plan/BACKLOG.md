@@ -320,14 +320,17 @@ versé à T-014 ; les autres points déjà couverts sont précisés dans T-012 �
   T-019. Rien à jouer : « à tester en jeu » vaut ici « à relire par le porteur du projet ».
 
 ### T-012 — Ressource web commune `vava_ui`
-- Agents : vava-architecte → vava-dev-nui · Dépend de : — · Statut : en cours
+- Agents : vava-architecte → vava-dev-nui · Dépend de : — · Statut : à tester en jeu (**fusion de la suite après le
+  test du pilote en jeu**)
 - Spec : `docs/plan/specs/T-012.md` (décisions du porteur du projet du 30 octobre 2026 incluses).
-- Pilote vava_hud fait, à tester en jeu avant la suite : `vava_ui` 1.0.0, Chancellerie 1.6.2 (ordre de démarrage),
-  `vava_hud` 1.4.0 seul basculé ; `docs/tests/interfaces.md` § 0, rapport `docs/plan/rapports/T-012.md`. Les 14 autres
-  bascules (étapes 4 à 19 de la spec) attendent que les polices soient vues servies par `nui://vava_ui/…` en jeu.
-  Relu sécurité et réseau (OK). Avant la deuxième bascule, **obligatoire** : règle de `scripts/audit-reseau.sh` (devmock
-  livré, `web/dev` ou `web/**` dans un manifeste, police ou texture commune hors de `vava_ui`) et ses mineurs, une fois
-  T-013 fusionnée (rapport T-012 § Relecture).
+- Pilote vava_hud (sur `main`) : `vava_ui` 1.0.0, Chancellerie 1.6.2 (ordre de démarrage), `vava_hud` 1.4.0 ;
+  `docs/tests/interfaces.md` § 0. Relu sécurité et réseau (OK).
+- Suite (branche `agents/T-012-suite`, à ne fusionner qu'après un § 0 réussi en jeu) : règle de
+  `scripts/audit-reseau.sh` (devmock livré, motif `files` qui couvrirait `web/dev/`, police ou texture commune hors de
+  `vava_ui`, SVG actif, adresse externe cherchée hors des seuls espaces de noms, cas d'essai), puis les 14 autres
+  bascules (`vava_health` 1.2.0 … `vava_magic` 2.8.0), `tests/spec/ui_shared_spec.lua` sur les 15 pages ; poids livré
+  4 104 918 o → 1 167 151 o (dépôt LF, − 71,6 %) ; `docs/tests/interfaces.md` § 1 à 6, rapport
+  `docs/plan/rapports/T-012.md` § Bascule des 14 modules. Relectures sécurité et réseau de la suite : à faire.
 - Polices, textures (grain, papier, cadres, séparateurs) et icônes communes dans une ressource unique, référencées
   par `nui://vava_ui/…` ; retirer les copies des autres modules. Démarre juste après `vAvA_core`.
 - Chiffres de T-011 (`docs/plan/rapports/T-011.md` § Fichiers web communs) : 4 003 861 o de `web/` livrés aux

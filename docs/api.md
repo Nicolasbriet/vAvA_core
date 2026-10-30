@@ -608,8 +608,13 @@ aucun hook, rien à régler). Démarre juste après `vAvA_core`. Contrat public 
 - évolution : version mineure = ajout d'un fichier ou d'un jeton ; majeure = retrait ou renommage, avec toutes les
   pages qui l'emploient dans le même chantier. Un fichier y entre dès que deux ressources l'emploient.
 
-Adopté par `vava_hud` (1.4.0, pilote) ; les autres interfaces gardent leurs propres copies jusqu'à leur bascule
-(T-012).
+Adopté par les quinze interfaces (T-012) : `vava_hud` 1.4.0 (pilote), `vava_health` 1.2.0, `vava_characters_ui`
+1.1.0, `vava_inventory` 1.8.0, `vava_codex` 1.3.0, `vava_chat` 1.3.0, `vava_skills` 1.2.0, `vava_gathering` 1.5.0,
+`vava_crafting` 1.4.0, `vava_farming` 1.6.0, `vava_time` 1.3.0, `vava_voice` 1.3.0, `vava_cameras` 1.4.0,
+`vava_admin` 1.8.0, `vava_magic` 2.8.0. Aucune ne livre plus de copie commune ni ses données simulées : leur rendu hors
+jeu (`web/index.html?…` dans un navigateur, depuis le dépôt) passe par la ligne ci-dessus, qui charge
+`web/dev/devmock.js`. Garde-fous : `tests/spec/ui_shared_spec.lua` (chaque page) et `scripts/audit-reseau.sh`
+(BLOQUANT : police ou texture commune hors de `vava_ui`, `devmock.js` livré, motif `files` qui couvrirait `web/dev/`).
 
 ### `vava_appearance`
 
@@ -804,9 +809,11 @@ l'interface : glisser pour déplacer (sur la ceinture : raccourci ; sur les Main
 `Maj` pour diviser en deux, double-clic pour utiliser, prendre en main ou ramasser, clic droit pour les actions,
 relâcher hors de l'inventaire pour jeter au sol.
 
-Polices de l'interface : Cinzel et EB Garamond, embarquées dans `web/fonts` (licence SIL Open Font License, textes
-joints). Pour travailler le rendu sans le jeu, ouvrir `web/index.html` dans un navigateur (`?drop=1` ajoute un sac
-au sol, `?catalog=1` le catalogue de développement).
+Polices de l'interface : Cinzel et EB Garamond, prises dans `vava_ui` avec le grain, les coins, le filet et le losange
+(dépendance déclarée depuis 1.8.0 ; licence SIL Open Font License dans `modules/vava_ui/web/fonts/`) ; les cases et la
+balance restent dans le module. Pour travailler le rendu sans le jeu, ouvrir `web/index.html` dans un navigateur
+(`?drop=1` ajoute un sac au sol, `?catalog=1` le catalogue de développement) : données simulées de
+`web/dev/devmock.js`, jamais livré.
 
 **Catalogue de développement** (1.5.0, `config.catalog`, désactivé par défaut) : `enabled = true` ajoute la commande
 `/catalogue [catégorie] [page]` (droit vava_admin `staff` ; sans vava_admin, ACE `vava_inventory.catalogue` ; en
@@ -1083,7 +1090,9 @@ Hook `vava_admin:report` (serveur, `after` : `{ action = created|claimed|closed,
 web à jour.
 
 Pour travailler le rendu sans le jeu : `web/index.html?tab=players` (ou `reports`, `bans`, `logs`, `staff`, `tools`,
-`announce`), avec `&dialog=ban`, `&proclaim=1` ou `&watch=1`.
+`announce`), avec `&dialog=ban`, `&proclaim=1`, `&watch=1` ou `&rank=gardien` (données simulées de
+`web/dev/devmock.js`, jamais livré). Polices (Cinzel Decorative comprise), grain, papier et coins du Registre viennent de
+`vava_ui` (dépendance déclarée depuis 1.8.0 : `vava_ui` démarre avant `vava_admin`).
 
 ### `vava_voice`
 

@@ -5,8 +5,12 @@ Procédure pour vérifier que les interfaces prennent leurs polices, textures et
 téléchargement plus léger. Le point que le dépôt n'a jamais vu en jeu est le **chargement d'une police depuis une autre
 ressource** (`nui://vava_ui/…`, règle CORS du navigateur du jeu) : c'est le premier test.
 
-T-012 se fait en deux temps. **Maintenant : le pilote** (§ 0), seul `vava_hud` 1.4.0 a basculé ; les autres interfaces
-gardent leurs copies et ne doivent pas avoir bougé. **Ensuite** (§ 1 à 6), quand les quatorze autres auront basculé.
+T-012 se fait en deux temps. **D'abord le pilote** (§ 0, sur `main`) : seul `vava_hud` 1.4.0 a basculé ; les autres
+interfaces gardent leurs copies et ne doivent pas avoir bougé. **Ensuite** (§ 1 à 6) : les quatorze autres ont basculé
+sur la branche `agents/T-012-suite`, **fusionnée seulement après un § 0 réussi** — `vava_health` 1.2.0,
+`vava_characters_ui` 1.1.0, `vava_inventory` 1.8.0, `vava_codex` 1.3.0, `vava_chat` 1.3.0, `vava_skills` 1.2.0,
+`vava_gathering` 1.5.0, `vava_crafting` 1.4.0, `vava_farming` 1.6.0, `vava_time` 1.3.0, `vava_voice` 1.3.0,
+`vava_cameras` 1.4.0, `vava_admin` 1.8.0, `vava_magic` 2.8.0.
 Les tests à deux joueurs sont marqués **(2 joueurs)**. Pour chaque écart : le test (« interfaces 0-3 »), ce que vous
 avez vu, les lignes de la console du client (`F8`) et de l'onglet Console des outils de la page.
 
@@ -40,27 +44,36 @@ le dire : c'est le cas attendu d'un refus CORS.
 
 ## 1. Démarrage (après la bascule des 15 interfaces)
 
+Préparation : § 0 réussi, branche de la suite fusionnée, serveur de test à jour (versions ci-dessus). Gardez une capture
+d'écran de chaque interface prise **avant** la mise à jour (ou les captures « avant » du rapport) pour comparer.
+
 | # | Faire | Attendu |
 |---|---|---|
-| 1 | Démarrer le serveur (Chancellerie, `server.cfg` régénéré). | Console : `Started resource vava_ui` juste après `vAvA_core`, avant `vava_chat` ; chaque module affiche `module 'xxx' vY prêt` ; aucune ligne `Couldn't start resource` ni `dependency`. |
-| 2 | Serveur existant mis à jour, **sans** ligne `ensure vava_ui` : redémarrer. | `vava_ui` démarre quand même, avant `vava_chat` (dépendance) ; Chancellerie → Ressources : `vava_ui` listée avec sa description, placée après `vAvA_core` quand on la coche. |
-| 3 | `resmon 1` au repos. | `vava_ui` n'apparaît pas (ou 0,00 ms) : aucun script. |
+| 1 | Démarrer le serveur (Chancellerie, `server.cfg` régénéré). | Console : `Started resource vava_ui` juste après `vAvA_core`, avant `vava_chat` ; chaque module affiche `module 'xxx' vY prêt` avec les versions ci-dessus ; aucune ligne `Couldn't start resource` ni `dependency`. |
+| 2 | Serveur existant mis à jour, **sans** ligne `ensure vava_ui` : redémarrer. | `vava_ui` démarre quand même, avant `vava_chat` (dépendance de quinze ressources) ; Chancellerie → Ressources : `vava_ui` listée avec sa description, placée après `vAvA_core` quand on la coche. |
+| 3 | `resmon 1` au repos. | `vava_ui` n'apparaît pas (ou 0,00 ms) : aucun script. Les quinze modules à page comme avant. |
 
 ## 2. Rendu de chaque interface
 
 Pour chacune : titres en Cinzel (capitales à empattements fins, pas les capitales de Georgia), texte en EB Garamond
 (italique distinct du droit), grain sur le cuir, papier sur les parchemins qui en avaient, coins de laiton aux cadres ;
-allure identique aux captures « après » du rapport.
+allure identique à la capture d'avant la mise à jour (hors jeu, les 101 vues des pages ont été comparées pixel par
+pixel : aucune différence hormis les animations et les heures affichées, voir le rapport).
 
 | # | Faire | Attendu |
 |---|---|---|
-| 1 | Se connecter (écran de sélection et de création). | `vava_characters_ui` comme avant : losanges, blason, cadre. |
+| 1 | Se connecter : écran de sélection, puis « Créer » et parcourir les sept onglets de l'éditeur. | `vava_characters_ui` comme avant : cuir grainé, coins de laiton du cadre, losanges des cartes, blason, filets. |
 | 2 | En jeu : regarder le HUD ; lancer une action longue (récolte). | Médaillons au grain fin, barre de progression en Cinzel. |
-| 3 | Ouvrir l'inventaire, le Codex (`F1`), le chat (`T`). | Cuir grainé, cadres de laiton, filets et losanges (inventaire, Codex), papier du chat. |
-| 4 | Compétences, invite de récolte, menu d'une forge, menu d'un emplacement de champ. | Parchemins au papier, coins de laiton, rien de changé. |
-| 5 | `/aterre` (outil de développement) puis aide. | Écran de la santé : filet et losange, grain. |
-| 6 | Conseil : Registre (`F10`), outil « Ciel et heure », éditeur des zones de voix, mur des caméras. | Grands titres en Cinzel Decorative à la même graisse qu'avant (voix, caméras : pas plus fins). |
-| 7 | Magie : roue, grimoire, registre des murmures. | Cinzel Decorative 400 et 700, papier, runes, cadre. |
+| 3 | Inventaire (`I`), puis jeter un objet pour voir le sac au sol. | Cuir grainé, coins de laiton, filet et losange des titres ; cases et balance du module inchangées. |
+| 4 | Codex (`F1`) ; chat (`T`) avec quelques messages et une suggestion de commande. | Codex : livre, coins, deux filets, losange. Chat : fenêtre de cuir à coins de laiton, bande de parchemin **au papier** sous la saisie, suggestions. |
+| 5 | Compétences (`K`), les quatre onglets. | Livre de cuir grainé, pages au papier, coins de laiton. |
+| 6 | Récolte : invite près d'un arbre ; pêche jusqu'à la barre de tension ; panneau des zones. | Invite à plaque de laiton, barre de tension, panneau de parchemin au papier : rien de changé. |
+| 7 | Forge : invite, menu (Recettes, Réparation, Poinçon) ; façonner un chef-d'œuvre jusqu'à la boîte de baptême. Champ : invite et menu d'un emplacement. | Parchemins au papier, coins de laiton (deux cadres à la forge), rien de changé. |
+| 8 | `/aterre` (outil de développement `vava_dev_characters`), puis se faire relever par un autre joueur **(2 joueurs)**. | Écran à terre : filet et losange au-dessus du titre ; bandeau du relevage grainé. |
+| 9 | Conseil : Registre (`F10`), chaque signet, dialogue de bannissement, proclamation. | Couverture grainée, pages au papier, coins ; grands titres en **Cinzel Decorative** comme avant. |
+| 10 | Outil « Ciel et heure » (Registre → Outils, ou `/ciel`). | Reliure de cuir grainé, coins de laiton, feuillet clair. |
+| 11 | Éditeur des zones de voix (`/zonesvoix`), ouvrir une zone ; mur des caméras (`/cameras`). | Titres « Zones de voix » et « Mur des caméras » en Cinzel Decorative **grasse**, comme avant (pas plus fins) ; lettrines de la voix ; papier de l'éditeur ; filet sous le bandeau du mur. |
+| 12 | Magie : roue (`Tab`), barre d'incantation, grimoire, registre des murmures. | Cinzel Decorative 400 et 700, papier, runes, écriture, cadres de laiton. |
 
 ## 3. Outils de développement de la NUI
 
@@ -68,18 +81,20 @@ allure identique aux captures « après » du rapport.
 |---|---|---|
 | 1 | `F8` → `nui_devtools`, cadre de `vava_hud`, onglet Réseau, puis recharger la page (ou `restart vava_hud`). | `vava_ui.css`, `eb_garamond.woff2`, `cinzel.woff2`, `grain.webp` : tous servis (200) ; **aucune** erreur CORS ni requête en rouge ; aucune requête vers `devmock.js` ni `/dev/`. |
 | 2 | Même chose dans le cadre de `vava_crafting` (menu ouvert). | `paper.webp`, `frame.svg` servis ; Éléments → texte → « Rendered Fonts » : `EB Garamond`, pas `Georgia`. |
+| 3 | Cadre de `vava_voice` (éditeur ouvert) ou de `vava_cameras` (mur ouvert) : Éléments → titre → « Rendered Fonts ». | `Cinzel Decorative` (Bold), pas `Cinzel` ni `Georgia`. |
+| 4 | Dans trois ou quatre autres cadres (inventaire, chat, Registre, magie), onglet Réseau après avoir ouvert l'interface. | Aucune requête en rouge (404) : en particulier rien vers `web/fonts/`, `img/grain.png`, `img/paper.png`, `img/frame.svg` du module, ni vers `devmock.js` ou `/dev/`. |
 
 ## 4. Première connexion **(2 joueurs)**
 
 | # | Faire | Attendu |
 |---|---|---|
-| 1 | Second client : vider le cache de FiveM, se connecter pendant que le premier est en jeu. | Écran de sélection et toutes les interfaces justes dès la première connexion. Noter le volume téléchargé si le client l'affiche (repris à T-019). |
+| 1 | Second client : vider le cache de FiveM, se connecter pendant que le premier est en jeu. | Écran de sélection et toutes les interfaces justes dès la première connexion. Noter le volume téléchargé si le client l'affiche (attendu : environ 2,9 Mo de moins qu'avant T-012 ; repris à T-019). |
 
 ## 5. Arrêt de `vava_ui` (serveur de test seulement)
 
 | # | Faire | Attendu |
 |---|---|---|
-| 1 | `stop vava_ui` en console. | FXServer arrête aussi les modules qui en dépendent (console). Redémarrer le serveur pour revenir à l'état normal. Si les modules restent démarrés, noter ce qui s'affiche (attendu : polices de repli, dégradés sans grain ni coins, tout reste lisible). |
+| 1 | `stop vava_ui` en console. | FXServer arrête aussi les quinze modules qui en dépendent, et par ricochet ceux qui dépendent d'eux (console). Redémarrer le serveur pour revenir à l'état normal. Si des modules restent démarrés, noter ce qui s'affiche (attendu : polices de repli, dégradés sans grain ni coins, tout reste lisible). |
 
 ## 6. Textures WebP
 

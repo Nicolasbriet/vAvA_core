@@ -20,12 +20,13 @@ main. Chaque procédure dit quoi faire et ce qui doit se passer ; les tests à d
 | [magie.md](magie.md) | Les onze sorts, états, zones, combinaisons | `vava_magic` |
 | [temps.md](temps.md) | Heure du royaume, saisons de quatorze jours, ciel, nuits de gel, Conseil en jeu et depuis la Chancellerie, effets sur les métiers | `vava_time`, `vava_farming`, `vava_gathering`, `vava_chancellerie` |
 | [chancellerie.md](chancellerie.md) | Clé du pont hors de la ligne de commande, rangs des seuls comptes vus reliés en jeu | Chancellerie, `vava_chancellerie` |
-| [interfaces.md](interfaces.md) | Polices, textures et ornements communs servis par `vava_ui` (pilote : le HUD), rendu des interfaces, CORS, WebP | `vava_ui`, `vava_hud`, puis toutes les interfaces |
+| [interfaces.md](interfaces.md) | Polices, textures et ornements communs servis par `vava_ui` : § 0 pilote du HUD, puis § 1 à 6 les quinze interfaces (après la fusion de la suite), rendu, CORS, WebP | `vava_ui`, `vava_hud`, puis toutes les interfaces |
 | [reseau.md](reseau.md) | Compteur réseau du Conseil (`/vava_reseau`), gros envois en latent, essai du réseau depuis la console, plus d'envoi à tous par le chat | `vAvA_core`, `vava_chat` |
 | [developpement.md](developpement.md) | Outils de développement : rien sans `vava_env`, réservés et journalisés avec | `vava_dev_characters`, `vava_example`, `vava_example_items`, `vava_anim_test` |
 
-Ordre conseillé : interfaces (§ 0, pilote du HUD), personnage, inventaire, besoins, santé, chat, voix, registre, Codex,
-réseau, métiers, temps, magie. Chaque procédure s'appuie sur ce que les précédentes ont validé.
+Ordre conseillé : interfaces (§ 0, pilote du HUD ; § 1 à 6 une fois la suite de T-012 fusionnée), personnage,
+inventaire, besoins, santé, chat, voix, registre, Codex, réseau, métiers, temps, magie. Chaque procédure s'appuie sur
+ce que les précédentes ont validé.
 
 ## Préparation commune
 
