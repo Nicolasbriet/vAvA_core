@@ -507,6 +507,24 @@ versé à T-014 ; les autres points déjà couverts sont précisés dans T-012 �
   clic ouvre le détail (seul inscrit au journal). Pont 1.7.0, Chancellerie 1.8.0. Fait : à tester en jeu
   (`docs/tests/reseau.md` § 3, `docs/tests/chancellerie.md` § 3).
 
+### T-132 — Configs partagées : n'envoyer au client que ce qu'il lit
+- Agents : vava-architecte → vava-dev-lua · Dépend de : — · Statut : à faire
+- Relecture réseau de T-100 : chaque module déclare `config.lua` (et souvent `shared/constants.lua`) en
+  `shared_scripts` ; chaque joueur télécharge donc, à chaque version, des réglages que son client ne lit jamais (pour
+  `vava_atelier` seul : ~12,8 Ko bruts sur 16,5, ~4,5 Ko compressés ; `vava_arrival` : ~12 Ko). Mesurer module par
+  module ce qui part pour rien, puis proposer une règle commune qui garde « tout ce qui est réglable dans
+  `config.lua` » (par exemple une section `client` relue par un petit fichier client, ou un découpage serveur / client
+  du même fichier) et l'appliquer. Rien de secret n'est en jeu (README de `vava_atelier`, § Sécurité) : c'est une
+  question de poids.
+
+### T-133 — `%c` dépend de la locale : contrôles de texte justes partout
+- Agent : vava-dev-lua · Dépend de : — · Statut : à faire
+- Trouvé pendant T-100 : la classe Lua `%c` suit la locale du système ; sous Windows, elle prend aussi les octets 0x81,
+  0x8D, 0x8F, 0x90, 0x9D, 0xAD et fait refuser « Á », « Í », « Ï », « Ð », « Ý », « í » ou le tiret U+2010 dans un
+  texte UTF-8. `vava_atelier` utilise désormais `[\0-\31\127]`. Même motif à corriger, avec un test sur U+00A0 à
+  U+017F : `shared/lib/string.lua` (core), `vava_chat/shared/text.lua`, `vava_magic/shared/text.lua`,
+  `vava_voice/shared/label.lua` (et tout autre `%c` du dépôt).
+
 ## Phase 2 — Arrivée
 
 ### T-020 — Écran de chargement `vava_loading`
@@ -577,7 +595,13 @@ Référence : `docs/plan/ATELIER.md` et les maquettes `docs/maquettes/`. Les éc
 maquettes.
 
 ### T-100 — Ressource `vava_atelier` : cadre, accueil, droits
-- Agents : vava-architecte → vava-dev-lua + vava-dev-nui · Dépend de : T-012 · Statut : en cours
+- Agents : vava-architecte → vava-dev-lua + vava-dev-nui · Dépend de : T-012 · Statut : à tester en jeu (relu sécurité, réseau et lore, suites appliquées ; fusionnée sans test en jeu, à la demande du porteur du projet)
+- Fait le 30 octobre 2026 : `vava_atelier` 1.0.0 (page ≈ 99 Ko), `vava_example_atelier` 1.0.0, Chancellerie 1.8.3
+  (ordre de démarrage). Rapport `docs/plan/rapports/T-100.md`. **À tester en jeu** : `docs/tests/atelier.md`, en
+  priorité redémarrages (7-2, 7-3), appels directs refusés et révocation en direct (2-3, 2-4, 4-9), fiche et « Vérifier »
+  sur l'exemple (3-3, 3-4, 4-3), journal recopié au Registre et filtré (6-1, 6-5), caractères invisibles (4-10), config
+  de droits fausse et descripteur trop lourd (7-6, 7-7), tailles réseau (8-2, 8-4). Reportés : bouton du Registre
+  (tâche qui touchera `vava_admin`), configs partagées (T-132), `%c` ailleurs dans le dépôt (T-133).
 - Spec : `docs/plan/specs/T-100.md` (onze décisions retenues sur délégation du porteur du projet le 30 octobre 2026 :
   `F9` et `/atelier`, planchers `metiers` pour le monde et `staff` pour la société et les arts, `vava_admin`
   obligatoire, journal propre gardé 365 jours, rien d'enregistré avant T-101 ; bouton du Registre reporté).

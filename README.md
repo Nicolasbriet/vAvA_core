@@ -8,7 +8,7 @@ Aucun framework tiers (ni ESX, ni QBCore, ni Qbox, ni ox_core).
 | Dossier | Rôle |
 | --- | --- |
 | racine (`fxmanifest.lua`, `server/`, `client/`, `shared/`, `config/`) | La ressource `vAvA_core` : logger, base de données, migrations, RPC, limites de débit, hooks, registres, modules, joueurs et personnages |
-| `modules/` | Les modules du royaume : polices, textures et ornements communs des interfaces (`vava_ui`), écran de chargement (`vava_loading`), chat, apparence, sélection et création de personnage, HUD, inventaire, faim et soif, santé, Registre du Conseil, chat vocal, monde sans PNJ, ciel et heure (heure de Paris, saisons, météo), caméras, magie, compétences (fondation des métiers), récolte, artisanat, agriculture, Codex (toutes les commandes et touches), arrivée des nouveaux personnages (dotation de départ, accueil), pont de la Chancellerie |
+| `modules/` | Les modules du royaume : polices, textures et ornements communs des interfaces (`vava_ui`), écran de chargement (`vava_loading`), chat, apparence, sélection et création de personnage, HUD, inventaire, faim et soif, santé, Registre du Conseil, chat vocal, monde sans PNJ, ciel et heure (heure de Paris, saisons, météo), caméras, magie, compétences (fondation des métiers), récolte, artisanat, agriculture, Codex (toutes les commandes et touches), Atelier du Conseil (créer et régler le royaume en jeu), arrivée des nouveaux personnages (dotation de départ, accueil), pont de la Chancellerie |
 | `examples/` | Modules d'exemple et outils de développement |
 | `chancellerie/` | La Chancellerie, panneau web autonome (Node.js, sans dépendance) qui configure, lance et surveille FXServer |
 | `docs/` | [API des modules](docs/api.md) et [guide de la Chancellerie](docs/chancellerie.md) |
@@ -30,7 +30,7 @@ Voir [docs/chancellerie.md](docs/chancellerie.md).
 
 À la main : placer `vAvA_core` et chaque module dans `resources/`, puis les démarrer dans cet ordre, après
 `oxmysql` : `vAvA_core`, `vava_ui`, `vava_loading`, `vava_chat` (à la place de `chat`), `vava_world`, `vava_time`, `vava_appearance`, `vava_characters_ui`,
-`vava_hud`, `vava_inventory`, `vava_needs`, `vava_health`, `vava_admin`, `vava_voice`, `vava_cameras`, `vava_magic`,
+`vava_hud`, `vava_inventory`, `vava_needs`, `vava_health`, `vava_admin`, `vava_atelier`, `vava_voice`, `vava_cameras`, `vava_magic`,
 `vava_skills`, `vava_gathering`, `vava_crafting`, `vava_farming`, `vava_codex`, `vava_arrival`, `vava_chancellerie`.
 
 `vava_ui` n'a aucun script : il sert aux interfaces leurs polices, textures et ornements communs. Les ressources à
@@ -45,7 +45,7 @@ Le `server.cfg` contient la clé de licence et le mot de passe de la base : il n
 
 ## Serveur de test et serveur ouvert au public
 
-Le dossier `examples/` contient quatre ressources de **développement**. **Ne jamais les `ensure` sur un serveur ouvert
+Le dossier `examples/` contient cinq ressources de **développement**. **Ne jamais les `ensure` sur un serveur ouvert
 au public** (la Chancellerie les pose dans `[vava-dev]` sans jamais les lancer d'office) :
 
 | Ressource | Ce qu'elle offrirait |
@@ -54,6 +54,7 @@ au public** (la Chancellerie les pose dans `[vava-dev]` sans jamais les lancer d
 | `vava_example` | `/note` (lignes écrites en base), `example_ping` |
 | `vava_example_items` | huit objets de démonstration, dont une Bande de lin qui soigne, et leurs images (~51 Ko) téléchargées par chaque joueur |
 | `vava_anim_test` | `/anim`, `/epee`, `/animstop`, `/animprop`, et un `.ycd` téléchargé par chaque joueur |
+| `vava_example_atelier` | deux ateliers d'exemple dans l'Atelier du Conseil (données en mémoire) et `/atelier_exemple`, qui écrit au journal du Conseil |
 
 Elles sont en plus **inoffensives par construction** : chacune refuse de démarrer tant que la convar serveur
 `vava_env` ne vaut pas exactement `dev` (console : « mode développement absent »). Sans cette ligne, elles ne

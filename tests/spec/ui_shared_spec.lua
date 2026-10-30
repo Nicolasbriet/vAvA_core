@@ -4,8 +4,8 @@
 
 local ROOT = (os.getenv('VAVA_ROOT') or '.') .. '/'
 
--- Pages basculées sur vava_ui, avec le nom de leur feuille : les 15 interfaces depuis la fin de T-012. Toute nouvelle
--- ressource à page (écran de l'Atelier…) s'ajoute ici ; seule l'exception de vava_loading (T-020) reste à part.
+-- Pages basculées sur vava_ui, avec le nom de leur feuille : les 15 interfaces depuis la fin de T-012, puis l'Atelier
+-- (T-100). Toute nouvelle ressource à page s'ajoute ici ; seule l'exception de vava_loading (T-020) reste à part.
 local PAGES = {
     { module = 'vava_hud', sheet = 'style.css' },
     { module = 'vava_health', sheet = 'style.css' },
@@ -22,6 +22,7 @@ local PAGES = {
     { module = 'vava_cameras', sheet = 'wall.css' },
     { module = 'vava_admin', sheet = 'style.css' },
     { module = 'vava_magic', sheet = 'style.css' },
+    { module = 'vava_atelier', sheet = 'style.css' },
 }
 
 local COMMON = {

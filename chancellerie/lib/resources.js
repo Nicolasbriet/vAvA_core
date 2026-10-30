@@ -16,7 +16,7 @@ const MAX_DEPTH = 4;
 // chargement) juste après, pour que son script client tourne avant celui de vava_characters_ui.
 const KNOWN_ORDER = ['chat', 'sessionmanager', 'hardcap', 'oxmysql', 'vAvA_core', 'vava_ui', 'vava_loading', 'vava_chat', 'vava_world',
   'vava_time', 'vava_appearance', 'vava_characters_ui', 'vava_hud', 'vava_inventory', 'vava_needs', 'vava_health', 'vava_admin',
-  'vava_voice', 'vava_cameras', 'vava_magic', 'vava_skills', 'vava_gathering', 'vava_crafting', 'vava_farming', 'vava_codex',
+  'vava_atelier', 'vava_voice', 'vava_cameras', 'vava_magic', 'vava_skills', 'vava_gathering', 'vava_crafting', 'vava_farming', 'vava_codex',
   'vava_arrival', 'vava_chancellerie'];
 const CORE_DESCRIPTIONS = {
   vAvA_core: 'Le cœur du serveur (obligatoire)',
@@ -31,6 +31,7 @@ const CORE_DESCRIPTIONS = {
   vava_needs: 'Faim et soif',
   vava_health: 'Santé, mise à terre, réanimation',
   vava_admin: 'Registre du Conseil (administration en jeu)',
+  vava_atelier: 'Atelier du Conseil : créer et régler le royaume en jeu (F9, /atelier)',
   vava_world: 'Carte sans PNJ ni véhicules',
   vava_time: 'Ciel et heure du royaume : heure de Paris, saisons, ciel, nuits de gel, décisions du Conseil',
   vava_voice: 'Chat vocal de proximité',

@@ -762,10 +762,9 @@ même que `README.md` à la racine, et celui qu'écrit la Chancellerie) :
 `ensure oxmysql`, `ensure vAvA_core`, `ensure vava_ui`, `ensure vava_loading`, `ensure vava_chat` (à la place de
 `ensure chat`), `ensure vava_world`, `ensure vava_time`, `ensure vava_appearance`, `ensure vava_characters_ui`,
 `ensure vava_hud`, `ensure vava_inventory`, `ensure vava_needs`, `ensure vava_health`, `ensure vava_admin`,
-`ensure vava_voice`, `ensure vava_cameras`, `ensure vava_magic`, `ensure vava_skills`, `ensure vava_gathering`,
-`ensure vava_crafting`, `ensure vava_farming`, `ensure vava_codex`, `ensure vava_arrival`, `ensure vava_chancellerie`,
-puis les modules qui
-déclarent des objets.
+`ensure vava_atelier`, `ensure vava_voice`, `ensure vava_cameras`, `ensure vava_magic`, `ensure vava_skills`,
+`ensure vava_gathering`, `ensure vava_crafting`, `ensure vava_farming`, `ensure vava_codex`, `ensure vava_arrival`,
+`ensure vava_chancellerie`, puis les modules qui déclarent des objets.
 
 ### `vava_ui`
 
@@ -2037,6 +2036,133 @@ point d'appui des modules à venir (annonce aux proches, confrérie d'accueil). 
 permise, 2 s entre deux commandes d'un membre ; chapitre « Accueil » du Codex). `redoter` ignore l'état et la limite du
 compte ; `rejouer` renvoie l'accueil (sans la ligne de la dotation). Chaque action va au journal du module
 (`vava_arrival_log`, 90 jours) et au Registre du Conseil.
+
+### `vava_atelier`
+
+L'Atelier du Conseil (T-100, socle) : une interface unique où le Conseil crée et règle le royaume en jeu. Ordre de
+démarrage : juste après `vava_admin` (l'ordre n'est pas critique : les modules redéclarent leurs éditeurs au hook
+`vava_atelier:editorsReady`). Dépend du core ≥ 0.11.0 et de `vava_ui` ; `vava_admin` ≥ 1.8.0 est relu à chaque appel
+(sans lui, refus `not_ready`), volontairement pas en `dependency` du manifeste (FiveM arrêterait l'Atelier avec le
+Registre). Touche `F9` (réglable) et `/atelier`, déclarées au registre `core:commands` (droit `metiers`). En 1.0.0,
+l'Atelier **n'enregistre aucune définition** : il lit ce qui est en vigueur chez les modules et vérifie une fiche ;
+brouillons, essai, publication et versions viennent avec T-101, le placement en jeu avec T-102.
+
+**Déclarer un éditeur** (registre `vava_atelier:editors`, 32 entrées au plus ; clé `<ressource>:<nom>` au motif
+`^[%w_]+:[%w_]+$`, 64 octets ; une clé dont le préfixe n'est pas la ressource qui l'ajoute est retirée aussitôt). Un
+module l'ajoute dans son `setup` si `core.registry.exists('vava_atelier:editors')`, **et** au hook
+`vava_atelier:editorsReady`. Toutes les tables sont des listes pures ou des tables à clés nommées ; toute clé inconnue
+est refusée, avec son chemin (« kinds[1].form.fields[3].max : doit dépasser min »).
+
+```lua
+core.registry.add('vava_atelier:editors', 'vava_gathering:zones', {
+    family = 'monde',                -- monde | societe | arts (config.families)
+    label = 'Récolte',               -- 1 à 32 octets
+    description = 'Forêts, mines…',  -- 1 à 120
+    icon = 'recolte',                -- recolte, agriculture, artisanat, porte, confrerie, logis, geste, combat, effet,
+                                     -- sort, parchemin
+    order = 10,                      -- facultatif, 0 à 999 : rang dans la famille, après les cartes de la config
+    right = 'metiers',               -- metiers | staff ; le droit effectif peut être plus fort (plancher de la famille)
+    texts = { trial = 'Tester la récolte', publish = 'Publier la zone', publishHint = '…' },  -- 32, 32, 120 (facultatif)
+    kinds = {                        -- 1 à 8 types ; le premier est le principal (étiquette « 4 zones » de l'accueil)
+        { id = 'zone', noun = 'zone', nounPlural = 'zones', article = 'la',   -- article : le | la | l'
+          newLabel = 'Nouvelle zone', layout = 'side',                          -- page (cadre centré) | side (volet)
+          creatable = true, steps = { 'La zone', 'Les points', 'Publier' },     -- facultatifs (0 à 4 étapes de 24)
+          placement = 'circle', parent = nil,                                   -- T-102, acceptés et ignorés en T-100
+          form = ZONE_FORM },
+    },
+    index = function(kind) end,              -- → { { id, title, hint? } } : entrées en vigueur
+    read = function(kind, id) end,           -- → data (table plate) ou nil
+    validate = function(kind, data, ctx) end,-- → true | false, 'texte' | false, { { field, text } } ; ctx { source, accountId, id? }
+    options = function(source) end,          -- facultatif (obligatoire si un champ a une `source`) → { { value, label, provisional? } }
+    compare = function(kind, data) end,      -- facultatif → { title, text } (« Pour comparer : … »)
+    -- apply, remove, trial, endTrial, diff : acceptées, appelées à partir de T-101
+})
+```
+
+**Formulaire** : `{ titleField, groups?, fields }` — `titleField` : un champ `text` sur une ligne, non facultatif
+(nom de l'entrée) ; `groups` : 0 à 8 `{ id, label, help?, folded? }` ; `fields` : 1 à 40, dont 24 au plus en chaînes et
+24 au plus en booléens. Chaque champ : `id` (`^[%a][%w_]*$`, 32, unique, jamais `id`, `place`, `version`, `status`,
+`parent`), `widget`, `label` (1 à 40, **obligatoire**, mots du jeu), `help` (1 à 140, **obligatoire**), `group`, `width`
+(`full` | `half`), `optional` (text, select, item, model), `default`.
+
+| Widget | Clés et bornes | Valeur dans `data` |
+|---|---|---|
+| `slider` | `min` < `max` finis (\|v\| ≤ 1e9), `step` > 0, (max − min) / step entier et ≤ 2 000 ; `integer`, `unit` (8), `prefix` (4), `decimals` (0 à 3) | nombre sur un pas |
+| `segmented` | `options` : 2 à 8 `{ value, label }` (`value` `^[%w_%-]+$` 32, `label` 24) | une `value` |
+| `select` | soit `options` (1 à 64, `label` 40), soit `source` (liste rendue par `options(source)`) | une `value` |
+| `toggle` | `default` booléen **obligatoire** | booléen |
+| `text` | `charset` = `name` (lettres accentuées, chiffres, espace, `'`, `-`, `,`, `.`) \| `id` (`^[a-z0-9_]+$`) \| `free` (sans `<` ni `>`) ; `max` 1 à 80, ou 1 à 300 avec `multiline` (8 lignes) ; `min` | chaîne nettoyée (bords retirés) |
+| `duration` | `min` ≥ 1, `max` ≤ 31 536 000 (secondes) ; `units` parmi `s`, `min`, `h`, `j` | secondes entières |
+| `item` | `category` (filtre) | nom d'un objet de `vava_inventory:items`, ou `''` si facultatif |
+| `model` | soit `choices` (1 à 32 `{ value, label, provisional? }`, `value` 64), soit `source` ; `free` (nom tapé à la main) | nom de modèle |
+
+**Valeurs** : `data` est une table plate `{ [champ] = nombre | chaîne | booléen }`, exactement les champs du formulaire
+(un champ facultatif vide vaut `''`) : ce que `read` rend, ce que `validate` reçoit, ce que T-101 stockera. Un module qui
+garde ses données sous une autre forme (millisecondes, tables imbriquées) convertit lui-même dans `read` et `validate`.
+Une valeur rendue par `read` hors bornes est remplacée par le défaut du champ et signalée à la page.
+
+**« Vérifier »** (aucune écriture) : forme (clés, bornes, pas, choix, jeux de caractères, longueurs en caractères), puis
+monde (objet existant et de la sorte demandée, valeur rendue par la source), puis `validate` du module, **seul juge**.
+Toute fonction d'un module est appelée isolée (`pcall`) et chronométrée (alerte au-delà de 50 ms) : une erreur, une
+réponse d'une autre forme ou un module arrêté donnent `editor_error`. Les listes `index` et les sources sont gardées
+5 s.
+
+**Droits** : un droit `vava_admin` par atelier, `metiers` ou `staff` ; droit effectif = surcharge de
+`config.rights.overrides` si elle est permise, sinon le plus fort du droit déclaré et du plancher de la famille
+(`monde` : `metiers` ; `societe`, `arts` : `staff`). Ouvrir l'Atelier demande `metiers`. Tout est relu auprès de
+`vava_admin` à chaque appel.
+
+**Plafond d'un descripteur** : la déclaration (sans ses fonctions ni son droit, défauts ajoutés) pèse au plus
+`limits.descriptorBytes` (32 768 octets de codage canonique, celui de l'empreinte) ; au-delà, l'atelier est refusé au
+chargement et retiré du registre, avec une ligne en console. Un plancher de famille, une surcharge ou `rights.open` hors
+de `rights.allowed` : l'Atelier refuse de démarrer.
+
+RPC (schémas stricts et bornés, débits dans `config.rateLimits`) : `home(version)` → `{ version, content?, tags,
+drafts, journal, rank }` (ouvre la session), `editor(atelier, version)` → `{ version, descriptor? }`, `list(atelier,
+type, page, filtre)`, `read(atelier, type, id)` → `{ id, title, values = { n?, s?, b? }, labels, warnings?, compare?,
+state, footer }`, `check(atelier, type, id | '', values)` → `{ valid, errors? | compare? }`, `options(atelier, type,
+champ, filtre, page)`, `search(texte)`, `journal(curseur, atelier | '')` → `{ lines, more, next }`, `close()`. Refus :
+`not_ready`, `no_character`, `not_allowed`, `not_open`, `unknown_editor`, `unknown_kind`, `unknown_entry`,
+`unknown_field`, `busy`, `editor_error`, `db_error`. Évènements (`core.net`, jamais à tous) : `vava_atelier:revoked` au
+seul membre qui perd le droit d'ouvrir l'Atelier, `vava_atelier:editorGone` (identifiant) aux seuls membres dont la
+session est sur l'atelier retiré.
+
+Trois formes de réponse évitent d'envoyer deux fois la même chose :
+
+- `home` : `content = { families, cards, footnote }` (carte `{ editor, family, label, description, icon, upcoming }`)
+  ne porte que la partie stable et ne part que si son empreinte diffère de `version` (comme le Codex) ; les étiquettes
+  des cartes partent **à chaque fois**, à part : `tags = { [atelier] = { text, tone? } }` (« 2 panneaux » ; `tone`
+  absent vaut `count`, sinon `trial`, `draft`… ; ateliers visibles seulement, aucun pour une carte « Bientôt » ni pour
+  un atelier qui ne répond pas).
+- `read` : `labels = { [champ] = { label, image?, provisional? } }` nomme la valeur courante de chaque champ à liste
+  distante (`select` ou `model` à `source`, `item`), tirée de la source gardée 5 s et des objets du royaume ; une
+  valeur vide, inconnue ou dont la liste ne répond pas n'en a pas. La page n'appelle pas `options` pour ouvrir une
+  fiche.
+- `journal` : ligne `{ id, lead, title, summary?, actor, when, editor? }` ; `editor` est omis quand la demande est
+  filtrée sur un atelier.
+
+**Journal** (table `vava_atelier_journal`, 365 jours, recopié au journal du Registre) : actions `created`, `saved`,
+`trial`, `published`, `archived`, `restored`, `removed`, `imported` (original rétabli), `placed`, `moved`, `note`.
+Chaque ligne garde le droit effectif de l'atelier au moment de l'écriture : un membre ne lit que les lignes des droits
+qu'il détient. La recopie au Registre et le hook `vava_atelier:journal` partent une fois la ligne écrite.
+
+| Export | Retour |
+|---|---|
+| serveur `journal(source, { editor, kind, id?, action, title, summary?, version? })` | `true` (ligne acceptée, écrite ensuite ; sans numéro) ou `false, code` (`invalid_args`, `unknown_editor`, `not_owner`, `not_allowed`, `flood`) — atelier de la ressource appelante seulement ; `source` : membre qui a le droit effectif de l'atelier, ou `0` (console, sans recopie) ; `title` 1 à 64 octets, `summary` 160, `version` entier de 1 à 4 294 967 295 ; 60 lignes par 10 s et par ressource ; l'écriture en base ne fait pas attendre (numéro de la ligne dans le hook) |
+| serveur `can(source, atelier)` | booléen : atelier déclaré et droit effectif détenu (pour les RPC propres d'un module) |
+| serveur `isOpen(source)` | booléen : session ouverte |
+| client `isOpen()` | booléen |
+
+| Hook | Côté, phase | Payload |
+|---|---|---|
+| `vava_atelier:editorsReady` | serveur, after | `{}` — fin du démarrage : (re)déclarer ses éditeurs |
+| `vava_atelier:session` | serveur, after | `{ source, accountId, open }` |
+| `vava_atelier:journal` | serveur, after | `{ id, editor, kind, defId?, action, title, summary?, version?, actor = { accountId?, label } }` |
+| `vava_atelier:state` | client, local | `{ open }` |
+
+Exemple complet, sans une ligne d'interface : `examples/vava_example_atelier` (mode développement). Hors jeu :
+`web/index.html?screen=home` (puis `list`, `entry`, `entry&layout=side`, `journal`, `confirm`, `keys`…), données
+simulées de `web/dev/devmock.js`, jamais livré.
 
 ### `vava_chat`
 
