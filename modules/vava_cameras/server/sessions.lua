@@ -40,10 +40,18 @@ VavaCameras.sessions = sessions
 ---@type table<string, vAvA.Camera>
 local list = {}
 local count = 0
--- membres en jeu dont le mur est ouvert : posé par l'ouverture du mur (inscrite au journal), levé quand il le ferme,
--- quitte le jeu ou perd le droit de regarder. Sans lui, aucune case de mur.
----@type table<integer, true>
+-- membres en jeu dont le mur est ouvert → heure d'ouverture : posée par l'ouverture du mur (inscrite au journal),
+-- levée quand il le ferme, quitte le jeu ou perd le droit de regarder, et caduque après wall.maxOpenMs (une
+-- réouverture, donc une nouvelle ligne au journal, est alors demandée). Sans elle, aucune case de mur.
+---@type table<integer, integer>
 local walls = {}
+
+---@param src integer
+---@return boolean
+local function hasWall(src)
+    local openedAt = walls[src]
+    return openedAt ~= nil and GetGameTimer() - openedAt < cfg.wall.maxOpenMs
+end
 
 ---@return string
 local function newId()
@@ -97,7 +105,7 @@ end
 function sessions.start(viewer, target, quality)
     local settings = cfg.qualities[quality]
     if not settings then return false, 'invalid_quality' end
-    if quality == 'tile' and viewer.kind == 'game' and not walls[viewer.source] then return false, 'wall_closed' end
+    if quality == 'tile' and viewer.kind == 'game' and not hasWall(viewer.source) then return false, 'wall_closed' end
     if not players.active(target) then return false, 'not_playing' end
     if count >= limits.sessions then return false, 'too_many_cameras' end
     if watchersOf(target) >= limits.viewersPerPlayer then return false, 'too_many_viewers' end
@@ -174,14 +182,14 @@ end
 --- Un membre en jeu ouvre son mur (droit vérifié et ouverture inscrite au journal par l'appelant).
 ---@param src integer
 function sessions.openWall(src)
-    walls[src] = true
+    walls[src] = GetGameTimer()
 end
 
---- Le mur de ce membre est-il ouvert ?
+--- Le mur de ce membre est-il ouvert (et depuis moins de wall.maxOpenMs) ?
 ---@param src integer
 ---@return boolean
 function sessions.wallOpen(src)
-    return walls[src] == true
+    return hasWall(src)
 end
 
 --- Le joueur n'a plus d'image (départ, retour à la sélection) ou n'est plus là pour regarder : son mur se ferme.

@@ -32,7 +32,7 @@ Ordre de démarrage : après `vava_admin` et `vava_voice`, avant `vava_magic` et
 | Vue en grand | 960 × 540, 20 images/s, 1,2 Mb/s | `qualities.full` |
 | Adresse STUN | `stun:stun.l.google.com:19302` | `iceServers` |
 | Limites | 6 spectateurs par joueur filmé, 96 caméras en tout, 2 h au plus ; sans réponse du spectateur en 30 s, la caméra s'éteint ; négociation de 20 000 octets au plus | `limits` |
-| Mur | `/cameras` ; grilles 1 × 1 à 4 × 4 (3 × 3 par défaut) ; joueurs relus toutes les 5 s ; cases ouvertes à 150 ms d'écart | `wall` |
+| Mur | `/cameras` ; grilles 1 × 1 à 4 × 4 (3 × 3 par défaut) ; joueurs relus toutes les 5 s ; cases ouvertes à 150 ms d'écart (réellement depuis 1.2.0 : avant, toutes partaient d'un coup) ; mur valable 2 h, puis à rouvrir | `wall` |
 | Débits | capture du joueur filmé 8 puis 2/s ; ouverture du mur 4 puis 1 toutes les 2 s ; caméras demandées 40 puis 8/s ; réponses et fermetures 40 puis 8/s ; liste des joueurs 4 puis 1/s | `rateLimits` |
 | Pont du web | seule ressource admise à ouvrir une caméra en son nom : `vava_chancellerie` | `web.bridge` |
 | Journal du Conseil | « Mur des caméras ouvert », « Écran regardé » | `messages` |
@@ -70,8 +70,10 @@ joueur) ouvre la vue en grand : voir `docs/chancellerie.md`.
   répond (une fois) ou la ferme. Identifiants de caméra tirés au hasard (24 chiffres hexadécimaux).
 - **Pas de case sans mur ouvert** : le serveur tient pour chaque membre en jeu un état « mur ouvert », posé à
   l'ouverture du mur (inscrite au journal), levé quand il le ferme, revient à la sélection, part ou perd le droit de
-  regarder. Sans lui, une case est refusée (`wall_closed`, « Mur à rouvrir » dans la case, sans nouvel essai) : nul ne
-  regarde en cases sans une ligne « Mur des caméras ouvert ». La vue en grand n'en dépend pas : chacune est inscrite.
+  regarder ; il ne vaut que 2 h (`wall.maxOpenMs`), après quoi il faut rouvrir le mur (nouvelle ligne au journal).
+  Sans lui, une case est refusée (`wall_closed`) ; au premier refus, le mur cesse de demander des cases et chacune
+  affiche « Mur à rouvrir », sans nouvel essai, jusqu'à sa réouverture : nul ne regarde en cases sans une ligne « Mur
+  des caméras ouvert » de moins de 2 h. La vue en grand n'en dépend pas : chacune est inscrite.
   Depuis le web, le pont inscrit la première case d'un compte qui n'a pas ouvert de mur (voir le README du pont).
 - Une caméra s'éteint quand le joueur filmé quitte le jeu (sélection, départ), quand son spectateur ferme le mur,
   revient à la sélection, part, ou perd le droit de regarder (rang donné ou retiré, relu au hook `vava_admin:action` ;

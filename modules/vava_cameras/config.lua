@@ -40,6 +40,8 @@ VavaCameras.config = {
         refreshMs = 5000,
         -- cases ouvertes l'une après l'autre : un mur 4 × 4 reste sous la limite de messages du core (20 par seconde)
         staggerMs = 150,
+        -- un mur ouvert depuis plus longtemps n'ouvre plus de case : le rouvrir (nouvelle ligne au journal)
+        maxOpenMs = 2 * 60 * 60 * 1000,
         tool = { label = 'Mur des caméras', hint = 'L\'écran de tous les joueurs connectés, en grille ; un clic l\'ouvre en grand.' },
     },
 

@@ -22,9 +22,12 @@ describe('vava_cameras sessions', function()
         return out
     end
 
+    local clock
+
     before_each(function()
         helper.reset()
-        events, webEvents, active = {}, {}, { [5] = true, [6] = true }
+        events, webEvents, active, clock = {}, {}, { [5] = true, [6] = true }, 1000
+        _G.GetGameTimer = function() return clock end
         _G.TriggerClientEvent = function(name, target, payload)
             events[#events + 1] = { name = name, target = target, payload = payload }
         end
@@ -126,6 +129,19 @@ describe('vava_cameras sessions', function()
             end)
         end
 
+        it('demande de rouvrir un mur ouvert depuis wall.maxOpenMs (nouvelle ligne au journal)', function()
+            sessions.openWall(1)
+            clock = clock + VavaCameras.config.wall.maxOpenMs - 1
+            assert.is_true((sessions.start(GAME, 5, 'tile')))
+            clock = clock + 1
+            assert.is_false(sessions.wallOpen(1))
+            local ok, code = sessions.start(GAME, 6, 'tile')
+            assert.is_false(ok)
+            assert.equal('wall_closed', code)
+            sessions.openWall(1)
+            assert.is_true((sessions.start(GAME, 6, 'tile')))
+        end)
+
         it('garde le mur d\'un membre quand un autre part', function()
             sessions.openWall(1)
             sessions.forget(2, 'dropped')
@@ -137,7 +153,7 @@ describe('vava_cameras sessions', function()
 end)
 
 describe('vava_chancellerie routes des caméras', function()
-    local routes, calls, now, rights, started
+    local routes, calls, now, rights, started, logRefused
 
     local ALICE = { label = 'alice', rank = 'gardien' }
     local BRUNO = { label = 'bruno', rank = 'gardien' }
@@ -156,7 +172,7 @@ describe('vava_chancellerie routes des caméras', function()
 
     before_each(function()
         helper.reset()
-        calls, now, rights, started = {}, 1000, { alice = true, bruno = true }, true
+        calls, now, rights, started, logRefused = {}, 1000, { alice = true, bruno = true }, true, false
         _G.GetGameTimer = function() return now end
         helper.loadAll({ 'modules/vava_chancellerie/shared/constants.lua', 'modules/vava_chancellerie/config.lua' })
         VavaBridge.call = function(resource, fn, ...)
@@ -167,6 +183,7 @@ describe('vava_chancellerie routes des caméras', function()
                 if not started then return true, false, 'not_playing' end
                 return true, true, { session = 'abc', label = 'B', iceServers = {} }
             end
+            if fn == 'webLog' and logRefused then return true, false, 'invalid_args' end
             return true, true
         end
         helper.load('modules/vava_chancellerie/server/routes.lua')
@@ -223,6 +240,18 @@ describe('vava_chancellerie routes des caméras', function()
         rights.alice, started = true, false
         assert.equal('not_playing', post('/camera/start', { actor = ALICE, target = 7, quality = 'tile' }).error)
         assert.equal(0, #logs())
+    end)
+
+    it('ne tient pour écrite qu\'une ligne réellement acceptée par le Registre (ouverture comme case)', function()
+        logRefused = true
+        post('/cameras/wall', { actor = ALICE })
+        post('/camera/start', { actor = ALICE, target = 7, quality = 'tile' })
+        post('/camera/start', { actor = ALICE, target = 8, quality = 'tile' })
+        assert.equal(2, #logs(VavaBridge.config.messages.logTiles))
+        logRefused = false
+        post('/camera/start', { actor = ALICE, target = 9, quality = 'tile' })
+        post('/camera/start', { actor = ALICE, target = 10, quality = 'tile' })
+        assert.equal(3, #logs(VavaBridge.config.messages.logTiles))
     end)
 
     it('laisse la vue en grand au Registre (demande watchScreen, déjà au journal)', function()

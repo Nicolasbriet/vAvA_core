@@ -58,7 +58,8 @@ complet : `README.md` à la racine du dépôt).
   étant inscrite au journal. Le pont ne sait pas quand un mur du navigateur se ferme (onglet fermé, redémarrage) : au
   lieu de refuser une case, il inscrit au journal (« Cases du mur regardées », numéro du joueur) la première case d'un
   compte qui n'a ouvert aucun mur depuis `cameras.tileLogMs` (2 h, durée maximale d'une caméra), puis au plus une ligne
-  toutes les 2 h (1.4.1). Aucune case n'est donc regardée sans trace au journal. Routes `/cameras/wall`,
+  toutes les 2 h (1.4.1). Une ligne ne compte que si le Registre l'a acceptée : sinon la case suivante réessaie. Aucune
+  case n'est donc regardée sans trace au journal. Routes `/cameras/wall`,
   `/cameras/players`, `/camera/start`, `/camera/answer`, `/camera/stop`.
 - **Évènements vers la Chancellerie** (requête HTTP locale, avec la clé, sans attendre de réponse) : signalements,
   arrivées et départs des joueurs, offre et fin des caméras du web, arrêt du module des caméras, rang du Conseil donné

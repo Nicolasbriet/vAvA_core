@@ -146,8 +146,9 @@ local function recordTile(actor, target)
     if not name then return end
     local now, last = GetGameTimer(), tilesLoggedAt[name]
     if last and now - last < CAMERAS_CFG.tileLogMs then return end
-    tilesLoggedAt[name] = now
-    call(ADMIN, 'webLog', actor, messages.logTiles, { numero = target })
+    -- l'horloge ne repart que sur une ligne réellement écrite : sinon la case suivante réessaie
+    local called, ok = call(ADMIN, 'webLog', actor, messages.logTiles, { numero = target })
+    if called and ok == true then tilesLoggedAt[name] = now end
 end
 
 --- Joueurs regardables ; `logged` : ouverture du mur, inscrite au journal.
@@ -156,9 +157,10 @@ local function wallPlayers(actor, logged)
     local called, players = call(CAMERAS, 'webPlayers')
     if not called then return failure('cameras_unavailable') end
     if logged then
-        call(ADMIN, 'webLog', actor, messages.logWall, {})
+        local logCalled, written = call(ADMIN, 'webLog', actor, messages.logWall, {})
         local name = actorName(actor)
-        if name then tilesLoggedAt[name] = GetGameTimer() end
+        -- l'ouverture ne couvre les cases que si sa ligne est réellement au journal
+        if name and logCalled and written == true then tilesLoggedAt[name] = GetGameTimer() end
     end
     return { ok = true, players = players }
 end
