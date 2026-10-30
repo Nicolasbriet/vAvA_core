@@ -363,7 +363,7 @@ versé à T-014 ; les autres points déjà couverts sont précisés dans T-012 �
   La page de la Chancellerie est ouverte à part (T-049).
 
 ### T-014 — Abonnements de zone dans le core
-- Agents : vava-architecte → vava-dev-lua · Dépend de : T-013 · Statut : à faire
+- Agents : vava-architecte → vava-dev-lua · Dépend de : T-013 · Statut : en cours
 - Service générique : un module déclare des zones (centre, rayon) ; le serveur tient la liste des joueurs abonnés
   à chaque zone (entrée demandée par le client, sortie vérifiée côté serveur, nettoyage à la déconnexion) ;
   `publish(zone, différence)` n'envoie qu'aux abonnés. Voir le modèle de `SECURITE_RESEAU.md`.
