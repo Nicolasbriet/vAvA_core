@@ -95,6 +95,8 @@ AddEventHandler('playerDropped', function(reason)
     netcommand.purgePlayer(src)
     -- déchargement et sauvegarde du personnage (peut attendre la base), puis libération de la session
     accounts.handleDropped(src, tostring(reason))
+    -- un envoi pendant le déchargement a pu recréer son entrée au compteur ; sauf si le numéro est déjà redonné
+    if not accounts.get(src) then net.forgetCounter(src) end
 end)
 
 AddEventHandler('onResourceStop', function(resource)

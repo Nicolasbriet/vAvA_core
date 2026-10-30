@@ -36,7 +36,7 @@ de console correspondante (serveur, ou `F8` du joueur).
 
 ## 3. Ce que reçoit un joueur (2 joueurs)
 
-Depuis le core 0.12.0, chaque joueur connecté est suivi d'office, évènement par évènement (ses 12 évènements les plus
+Depuis le core 0.12.0, chaque joueur connecté est suivi d'office, évènement par évènement (ses 6 évènements les plus
 lourds de la minute, le reste sous `* · <autres>`) : plus de suivi à lancer, plus de limite de 4 joueurs.
 
 | # | Faire | Attendu |
@@ -45,8 +45,8 @@ lourds de la minute, le reste sous `* · <autres>`) : plus de suivi à lancer, p
 | 2 | B vient de se connecter, encore en sélection de personnage. A tape `/vava_reseau joueur <n° de B>`. | « Joueur <n°> (sans personnage) : … », et les envois de la sélection (réponses `rpc` des personnages) ; ligne au journal. |
 | 3 | A tape `/vava_reseau joueur` pour cinq joueurs différents l'un après l'autre (un toutes les 2 s). | Chacun répond tout de suite avec son détail ; une ligne au journal par consultation. |
 | 4 | B se déconnecte, A tape `/vava_reseau joueur <n° de B>`. | « Aucun joueur n° … en jeu. » ; aucune erreur dans la console. Si un autre joueur reprend ce numéro, son détail repart de zéro (rien de B). |
-| 5 | B ouvre beaucoup d'interfaces différentes en une minute (besace, Codex, métiers, Registre…), puis A tape `/vava_reseau joueur <n° de B>`. | Au plus 12 évènements nommés, plus une ligne `* · <autres>` qui cumule les plus petits ; le total de l'en-tête est celui de tous les envois à B. |
-| 6 | `resmon` du serveur (ou `profiler record` de la console) avec plusieurs joueurs actifs, avant et après la mise à jour. | Pas de hausse visible de `vAvA_core` : mesuré hors jeu, environ 0,25 µs de plus par joueur servi à chaque envoi. |
+| 5 | B ouvre beaucoup d'interfaces différentes en une minute (besace, Codex, métiers, Registre…), puis A tape `/vava_reseau joueur <n° de B>`. | Au plus 6 évènements nommés, plus une ligne `* · <autres>` qui cumule les plus petits ; le total de l'en-tête est celui de tous les envois à B. |
+| 6 | `resmon` du serveur (ou `profiler record` de la console) avec plusieurs joueurs actifs, avant et après la mise à jour. | Pas de hausse visible de `vAvA_core` : mesuré hors jeu, environ 0,3 µs de plus par joueur servi à chaque envoi. |
 
 ## 4. Essai du réseau (console du serveur)
 

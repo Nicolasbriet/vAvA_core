@@ -724,17 +724,18 @@ end
 local function characterName(src)
     local characters = vAvA.characters
     local info = characters and characters.describeActive and characters.describeActive(src)
-    if not info then return nil end
+    if type(info) ~= 'table' or type(info.firstName) ~= 'string' or type(info.lastName) ~= 'string' then return nil end
     return info.firstName .. ' ' .. info.lastName
 end
 
---- Joueurs connectés (numéros entiers), lus au runtime à l'appel.
----@return integer[]
+--- Joueurs connectés (numéros entiers), lus au runtime à l'appel ; nil si le runtime n'offre pas GetPlayers.
+---@return integer[]|nil
 local function connectedPlayers()
     local list = {}
     local getPlayers = GetPlayers
-    if type(getPlayers) ~= 'function' then return list end
+    if type(getPlayers) ~= 'function' then return nil end
     local players = getPlayers()
+    if type(players) ~= 'table' then return nil end
     for i = 1, #players do
         local src = tonumber(players[i])
         if src and src > 0 then list[#list + 1] = floor(src) end
@@ -774,15 +775,20 @@ function net.stats(options)
         end
     end
     local now = GetGameTimer()
+    if players then
+        -- liste des joueurs : seul le total du royaume l'accompagne (aucun évènement construit ni trié)
+        local sources = connectedPlayers()
+        if not sources then return nil, 'unsupported' end
+        local list = counter:listPlayers(now, sources, STATS_PLAYERS_MAX)
+        for i = 1, #list do list[i].name = characterName(list[i].source) end
+        return {
+            mode = mode, windowMs = WINDOW_MS, total = counter:total(now), events = {},
+            players = list, playerCount = #sources,
+        }
+    end
     local result = counter:read(now, { limit = limit, resource = resource, target = target })
     result.mode = mode
     if target then result.name = characterName(target) end
-    if players then
-        local sources = connectedPlayers()
-        local list = counter:listPlayers(now, sources, STATS_PLAYERS_MAX)
-        for i = 1, #list do list[i].name = characterName(list[i].source) end
-        result.players, result.playerCount = list, #sources
-    end
     return result
 end
 
@@ -796,6 +802,13 @@ end
 function net.purgePlayer(src)
     drainAt[src] = nil
     positionCache[src] = nil
+    counter:forget(src)
+end
+
+--- Oublie de nouveau le compteur d'un joueur parti, après son déchargement : ce qui lui a été envoyé pendant la
+--- sauvegarde (hooks de déchargement) avait recréé son entrée.
+---@param src integer
+function net.forgetCounter(src)
     counter:forget(src)
 end
 

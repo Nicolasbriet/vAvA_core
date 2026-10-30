@@ -174,6 +174,62 @@ describe('vAvA.netstats', function()
                 assert.is_nil(find(read(6000, { target = 1 }).events, 'vava_d', 'vava_d:pareil'))
             end)
 
+        it('le plus léger gardé en cache est relu avant d’écarter : un évènement devenu lourd n’est pas chassé', function()
+            local c = netstats.create({ bucketMs = 5000, buckets = 12, maxKeys = 512, playerKeys = 3 })
+            c:record(1000, 'r', 'r:A', 100, false, 7)
+            c:record(1000, 'r', 'r:B', 2000, false, 7)
+            c:record(1000, 'r', 'r:C', 2000, false, 7)
+            -- D, plus petit que tout : <autres> ; le plus léger (A, 100 o) est mis en cache pour la case
+            c:record(1100, 'r', 'r:D', 50, false, 7)
+            -- A devient de loin le plus lourd, dans la même case
+            for _ = 1, 20 do c:record(1200, 'r', 'r:A', 1000, false, 7) end
+            -- E (500 o) : plus gros que l'ancien poids de A, plus petit que tout ce qui est suivi → <autres>
+            c:record(1300, 'r', 'r:E', 500, false, 7)
+            local result = c:read(4999, { limit = 10, target = 7 })
+            assert.equal(20100, find(result.events, 'r', 'r:A').bytes)
+            assert.is_nil(find(result.events, 'r', 'r:E'))
+            assert.equal(550, find(result.events, netstats.OTHER_RESOURCE, netstats.OTHER_LABEL).bytes)
+            -- rien de perdu : la somme des évènements vaut le total du joueur
+            local sum = 0
+            for _, event in ipairs(result.events) do sum = sum + event.bytes end
+            assert.equal(result.total.bytes, sum)
+        end)
+
+        it('l’anneau écarté sert au nouvel évènement, vidé, même dans la ressource du plus léger', function()
+            counter:record(0, 'vava_a', 'vava_a:lourd', 500, false, 1)
+            counter:record(0, 'vava_b', 'vava_b:leger', 20, false, 1)
+            local reused = counter.players[1].keys.vava_b['vava_b:leger']
+            -- même ressource que le plus léger, dont c'était le seul évènement
+            counter:record(0, 'vava_b', 'vava_b:gros', 300, false, 1)
+            assert.equal(reused, counter.players[1].keys.vava_b['vava_b:gros'])
+            assert.is_nil(counter.players[1].keys.vava_b['vava_b:leger'])
+            assert.equal(2, counter.players[1].keyCount)
+            local event = find(read(0, { target = 1 }).events, 'vava_b', 'vava_b:gros')
+            assert.same({ messages = 1, bytes = 300, latent = 0, largest = 300 },
+                { messages = event.messages, bytes = event.bytes, latent = event.latent, largest = event.largest })
+            -- ressource nouvelle
+            counter:record(0, 'vava_c', 'vava_c:enorme', 900, false, 1)
+            assert.is_not_nil(counter.players[1].keys.vava_c['vava_c:enorme'])
+            assert.is_nil(counter.players[1].keys.vava_b)
+            assert.equal(500 + 20 + 300 + 900, read(0, { target = 1 }).total.bytes)
+        end)
+
+        it('un anneau neuf est vide et à sa taille', function()
+            counter:record(0, 'vava_a', 'vava_a:x', 10, false, 1)
+            local ring = counter.players[1].keys.vava_a['vava_a:x']
+            assert.equal(60, #ring)
+            assert.equal(0, ring[1])          -- case 0 remplie par cet envoi
+            assert.equal(-1, ring[6])         -- les autres vides
+            assert.equal(0, ring[60])
+        end)
+
+        it('total : tous les envois de la fenêtre, comme read', function()
+            counter:record(0, 'vava_a', 'vava_a:x', 10, false, { 1, 2 })
+            counter:record(1000, 'vava_b', 'vava_b:y', 30, true, 1)
+            assert.same(read(1000).total, counter:total(1000))
+            assert.same({ messages = 0, bytes = 0, latent = 0 }, counter:total(70000))
+        end)
+
         it('l’évincé ne garde dans <autres> que ses cases encore dans la fenêtre', function()
             counter:record(55000, 'vava_a', 'vava_a:lourd', 500, false, 1)  -- encore dans la fenêtre à 60 000
             counter:record(0, 'vava_a', 'vava_a:vieux', 30, false, 1)       -- case 0, sortie à 60 000

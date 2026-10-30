@@ -132,12 +132,13 @@ vAvA.config.server = {
             buckets = 12,           -- cases : fenêtre d'une minute (55 à 60 s)
             maxKeys = 512,          -- couples (ressource, évènement) suivis ; au-delà, cumul sous (*, <autres>)
             -- Chaque joueur connecté est suivi d'office, évènement par évènement (0.12.0) : ses playerKeys évènements les
-            -- plus lourds sur la minute, le reste cumulé sous <autres>. Un évènement suivi coûte un anneau de 1,1 Ko
-            -- (12 cases), réservé dès son premier envoi. Mesuré hors jeu, pire cas (128 joueurs, chacun au moins
-            -- playerKeys + 1 évènements différents dans la minute) : 12 → 2,1 Mo ; 16 → 2,6 Mo ; 8 → 1,5 Mo. 12 tient
-            -- le budget d'environ 2 Mo et couvre les évènements d'un joueur ordinaire (réponses des RPC de ses modules,
-            -- champs, zones) ; les plus petits rejoignent <autres>.
-            playerKeys = 12,
+            -- plus lourds sur la minute, le reste cumulé sous <autres>. Un évènement suivi coûte un anneau d'environ
+            -- 1 Ko (12 cases), réservé dès son premier envoi. Mesuré hors jeu, pire cas (128 joueurs, chacun au moins
+            -- playerKeys + 1 évènements différents dans la minute), part des joueurs : 6 → 1,16 Mo ; 12 → 1,95 Mo ;
+            -- s'y ajoute le compteur général (512 couples pleins) : 0,64 Mo. Décision du porteur du projet : 6 (au pire
+            -- 1,8 Mo en tout) ; les évènements les plus lourds de chacun suffisent à trouver ce qui pèse, les plus petits
+            -- rejoignent <autres>, et un évènement plus lourd prend la place du plus léger sans allocation.
+            playerKeys = 6,
             sweepMs = 60000,        -- ménage des clés sans envoi depuis une fenêtre
         },
         command = {

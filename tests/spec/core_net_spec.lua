@@ -482,9 +482,38 @@ describe('vAvA.net', function()
             assert.equal(1, stats.players[2].source)
             assert.is_nil(stats.players[2].name)
             assert.same({ source = 2, messages = 0, bytes = 0, latent = 0 }, stats.players[3])
+            -- avec la liste, seul le total du royaume : aucun évènement construit
+            assert.same(net.stats().total, stats.total)
+            assert.same({}, stats.events)
+            assert.equal(60000, stats.windowMs)
             assert.is_nil(net.stats().players)
+            -- runtime sans GetPlayers : refus, pas une liste vide trompeuse
             _G.GetPlayers = nil
-            assert.same({}, net.stats({ players = true }).players)
+            assert.same({ nil, 'unsupported' }, { net.stats({ players = true }) })
+        end)
+
+        it('nom du personnage seulement si prénom et nom sont des chaînes', function()
+            vAvA.characters.describeActive = function(src)
+                if src == 1 then return { firstName = 'Aldric', lastName = 7 } end
+                if src == 2 then return 'Aldric Morn' end
+                return { firstName = 'Ysolde', lastName = 'Var' }
+            end
+            assert.is_nil(net.stats({ target = 1 }).name)
+            assert.is_nil(net.stats({ target = 2 }).name)
+            assert.equal('Ysolde Var', net.stats({ target = 3 }).name)
+        end)
+
+        it('garde les net.counter.playerKeys (6) évènements les plus lourds d’un joueur, le reste sous <autres>', function()
+            local keys = vAvA.config.server.net.counter.playerKeys
+            assert.equal(6, keys)
+            for i = 1, keys + 3 do net.send(OWNER, nil, 4, 'vava_test:e' .. i, string.rep('x', 300)) end
+            local events = net.stats({ target = 4, limit = 50 }).events
+            assert.equal(keys + 1, #events)
+            local other = 0
+            for _, event in ipairs(events) do
+                if event.label == '<autres>' then other = event.messages end
+            end
+            assert.equal(3, other)
         end)
 
         it('plafonne la liste des joueurs à 128', function()

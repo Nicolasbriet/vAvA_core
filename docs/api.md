@@ -472,16 +472,22 @@ end
 
 `stats` lit le compteur de la dernière minute (12 cases de 5 s ; mémoire bornée : 512 couples ressource, évènement,
 au-delà cumulés sous `*`, `<autres>`). Depuis 0.12.0, **chaque joueur connecté est suivi d'office**, évènement par
-évènement, sur la même fenêtre : ses `net.counter.playerKeys` (12) évènements les plus lourds, le reste cumulé sous
+évènement, sur la même fenêtre : ses `net.counter.playerKeys` (6) évènements les plus lourds, le reste cumulé sous
 `*`, `<autres>` (un nouveau message plus gros que tout ce qu'a envoyé l'évènement le plus léger du joueur dans la minute
-prend sa place) ; environ 2 Mo au pire pour 128 joueurs ; tout est oublié à la sortie du joueur. Il n'y a plus de suivi
-à lancer (`watched` et le suivi de 5 min de 0.10.0 disparaissent).
+prend sa place, sans allocation : l'anneau écarté est vidé et réutilisé) ; tout est oublié à la sortie du joueur (et
+de nouveau après son déchargement). Il n'y a plus de suivi à lancer (`watched` et le suivi de 5 min de 0.10.0
+disparaissent). Mémoire au pire, mesurée hors jeu : part des joueurs 1,16 Mo pour 128 joueurs (6 évènements chacun, plus
+`<autres>` et leur total) ; compteur général (512 couples pleins) 0,64 Mo ; en tout, au pire, 1,8 Mo.
 - `limit` : 1 à 50 (défaut 10) ; `resource` : seulement cette ressource ;
 - `target` : ce que reçoit ce joueur : `total` du joueur, ses `events` (filtrés par `resource` si elle est donnée) et
   `name`, prénom et nom de son personnage (absent sans personnage chargé) ;
-- `players = true` (0.12.0, ni `resource` ni `target`) : en plus, `players`, les joueurs connectés du plus chargé au
-  moins chargé (128 au plus, ceux qui n'ont rien reçu compris) : `{ source, messages, bytes, latent, name? }`, et
-  `playerCount`, le nombre de joueurs connectés.
+- `players = true` (0.12.0, ni `resource` ni `target`) : `players`, les joueurs connectés du plus chargé au moins
+  chargé (128 au plus, ceux qui n'ont rien reçu compris) : `{ source, messages, bytes, latent, name? }`, et
+  `playerCount`, le nombre de joueurs connectés ; seul le `total` du royaume l'accompagne (`events` vide : rien n'est
+  construit ni trié). Runtime sans `GetPlayers` : `nil, 'unsupported'`.
+- **`target` et `players` sont réservés aux outils du Conseil** (ce que reçoit un joueur, le nom des personnages
+  connectés) : tout appelant qui les montre à une personne vérifie son droit et inscrit la consultation du détail d'un
+  joueur au journal du Registre (comme `/vava_reseau joueur` et la page Réseau de la Chancellerie).
 
 ```lua
 {
@@ -498,9 +504,10 @@ prend sa place) ; environ 2 Mo au pire pour 128 joueurs ; tout est oublié à la
 ```
 
 Coût du suivi de tous les joueurs (0.12.0, mesuré hors jeu, `server/core/net.lua` réel, 128 joueurs) : environ
-0,25 µs de plus par cible servie (liste de 128 joueurs : 75 → 110 µs ; un joueur : 3,5 → 4,1 µs ; `sendNear` de 50 m
-sur une place de 120 m, 49 cibles : 60 → 74 µs ; en ville, `sendNear` de 30 m à 150 m : inchangé, autour de 45 µs, la
-recherche des proches dominant).
+0,3 µs de plus par cible servie (liste de 128 joueurs : 73 → 111 µs ; un joueur : 3,4 → 4,0 µs ; `sendNear` de 50 m
+sur une place de 120 m, 49 cibles : 58 → 76 µs ; en ville, `sendNear` de 30 m à 150 m : autour de 45 µs, la recherche
+des proches dominant). Un remplacement du plus léger coûte de 4 à 7 µs par cible (pire cas : un nouvel évènement plus
+lourd à chaque envoi), sans allocation.
 
 Ce que le core envoie lui-même par `core.net` : réponses RPC et préavis, demandes de `callClient`, personnage chargé,
 champs, déchargement et ordre d'apparition (**toujours fiables** : l'ordre chargement → champs → apparition compte ;

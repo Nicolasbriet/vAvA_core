@@ -11,7 +11,7 @@
 local type, pairs, next, setmetatable = type, pairs, next, setmetatable
 local max, floor, huge = math.max, math.floor, math.huge
 local format, gsub = string.format, string.gsub
-local sort = table.sort
+local sort, unpack = table.sort, table.unpack
 
 local netstats = {}
 vAvA.netstats = netstats
@@ -51,15 +51,39 @@ function netstats.create(cfg)
     }, Counter)
 end
 
+-- Modèles d'anneau vide, un par nombre de cases, préparés une fois : un anneau neuf se construit en une seule
+-- allocation, à sa taille exacte (sans les agrandissements successifs d'une boucle).
+---@type table<integer, number[]>
+local templates = {}
+
+---@param buckets integer
+---@return number[]
+local function templateOf(buckets)
+    local template = templates[buckets]
+    if template then return template end
+    template = {}
+    for base = 0, (buckets - 1) * FIELDS, FIELDS do
+        template[base + STAMP], template[base + MESSAGES], template[base + BYTES], template[base + LATENT],
+            template[base + LARGEST] = EMPTY, 0, 0, 0, 0
+    end
+    templates[buckets] = template
+    return template
+end
+
 ---@param buckets integer
 ---@return table ring
 local function newRing(buckets)
-    local ring = { last = -huge }
+    local template = templateOf(buckets)
+    return { last = -huge, unpack(template, 1, #template) }
+end
+
+--- Remet un anneau à vide, sur place (anneau d'un évènement écarté, rattaché au nouvel évènement).
+local function clearRing(ring, buckets)
     for base = 0, (buckets - 1) * FIELDS, FIELDS do
         ring[base + STAMP], ring[base + MESSAGES], ring[base + BYTES], ring[base + LATENT], ring[base + LARGEST] =
             EMPTY, 0, 0, 0, 0
     end
-    return ring
+    ring.last = -huge
 end
 
 ---@param ring table
@@ -177,37 +201,59 @@ end
 
 --- Évènement le plus léger d'un joueur sur la fenêtre (gardé en cache le temps d'une case).
 local function findLightest(entry, index, buckets)
-    local lightBytes, lightResource, lightLabel = huge, nil, nil
+    local lightBytes, lightResource, lightLabel, lightRing = huge, nil, nil, nil
     for resource, byLabel in pairs(entry.keys) do
         if resource ~= OTHER_RESOURCE then
             for label, ring in pairs(byLabel) do
                 local bytes = bytesOf(ring, index, buckets)
-                if bytes < lightBytes then lightBytes, lightResource, lightLabel = bytes, resource, label end
+                if bytes < lightBytes then lightBytes, lightResource, lightLabel, lightRing = bytes, resource, label, ring end
+                if bytes == 0 then break end
             end
+            -- rien de plus léger qu'un évènement muet sur la fenêtre
+            if lightBytes == 0 then break end
         end
     end
-    entry.lightIndex, entry.lightBytes, entry.lightResource, entry.lightLabel = index, lightBytes, lightResource, lightLabel
+    entry.lightIndex, entry.lightBytes, entry.lightResource, entry.lightLabel, entry.lightRing =
+        index, lightBytes, lightResource, lightLabel, lightRing
 end
 
 --- Anneau d'un évènement dans le détail d'un joueur. Au-delà de playerKeys évènements, un nouveau message plus gros
 --- que tout ce qu'a envoyé l'évènement le plus léger du joueur sur la fenêtre prend sa place (le plus léger rejoint
 --- <autres>) ; sinon il part dans <autres>. Ainsi restent, à peu près, les évènements les plus lourds de chacun.
+--- Le plus léger est gardé en cache le temps d'une case. Dans une même case, les poids ne font que croître : un
+--- message qui ne dépasse pas le poids gardé part sans autre calcul dans <autres> ; s'il le dépasse, le poids du plus
+--- léger est relu avant d'écarter, et s'il a changé (il a reçu depuis), le plus léger est recherché de nouveau : un
+--- évènement devenu lourd n'est jamais écarté sur un poids périmé. L'anneau écarté, vidé sur place, sert au nouvel
+--- évènement : un remplacement n'alloue rien.
 local function playerRing(self, entry, resource, label, size, index)
     local byLabel = entry.keys[resource]
     local ring = byLabel and byLabel[label]
     if ring then return ring end
     local buckets = self.cfg.buckets
     if entry.keyCount < self.cfg.playerKeys then return addKey(entry, resource, label, buckets) end
-    if entry.lightIndex ~= index then findLightest(entry, index, buckets) end
+    if entry.lightIndex ~= index or not entry.lightRing then
+        findLightest(entry, index, buckets)
+    end
+    if not entry.lightResource or size <= entry.lightBytes then return otherOf(entry, buckets) end
+    if bytesOf(entry.lightRing, index, buckets) ~= entry.lightBytes then
+        findLightest(entry, index, buckets)
+        if not entry.lightResource or size <= entry.lightBytes then return otherOf(entry, buckets) end
+    end
     local lightResource = entry.lightResource
-    if not lightResource or size <= entry.lightBytes then return otherOf(entry, buckets) end
-    local lightKeys = entry.keys[lightResource]
-    merge(otherOf(entry, buckets), lightKeys[entry.lightLabel], index, buckets)
+    local lightKeys, light = entry.keys[lightResource], entry.lightRing
+    merge(otherOf(entry, buckets), light, index, buckets)
     lightKeys[entry.lightLabel] = nil
     if next(lightKeys) == nil then entry.keys[lightResource] = nil end
-    entry.keyCount = entry.keyCount - 1
-    entry.lightIndex = nil
-    return addKey(entry, resource, label, buckets)
+    entry.lightIndex, entry.lightRing = nil, nil
+    clearRing(light, buckets)
+    -- relu : la table de la ressource a pu être retirée avec le plus léger (même ressource, dernier évènement)
+    byLabel = entry.keys[resource]
+    if not byLabel then
+        byLabel = {}
+        entry.keys[resource] = byLabel
+    end
+    byLabel[label] = light
+    return light
 end
 
 ---@param self vAvA.NetCounter
@@ -323,6 +369,23 @@ end
 ---@field limit integer         évènements rendus au plus
 ---@field resource? string      seulement cette ressource
 ---@field target? integer       ce que reçoit ce joueur
+
+--- Total de tous les envois sur la fenêtre, sommé sans construire de liste ni trier (liste des joueurs : seul le
+--- total du royaume est rendu avec elle).
+---@param now integer
+---@return table  { messages, bytes, latent }
+function Counter:total(now)
+    local index = position(self, now)
+    local buckets = self.cfg.buckets
+    local messages, bytes, latent = 0, 0, 0
+    for _, byLabel in pairs(self.keys) do
+        for _, ring in pairs(byLabel) do
+            local m, b, l = sum(ring, index, buckets)
+            messages, bytes, latent = messages + m, bytes + b, latent + l
+        end
+    end
+    return { messages = messages, bytes = bytes, latent = latent }
+end
 
 --- Lecture de la fenêtre qui finit à `now`.
 --- Sans target : total des envois (de la ressource si elle est filtrée), évènements les plus lourds.
