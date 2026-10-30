@@ -261,8 +261,15 @@ local function onConnecting(name, _, deferrals)
     end
 
     local session = open(license)
-    -- compte déjà connu (nil pour une première venue) : un ban, une liste blanche s'y rattachent
-    local knownAccount = findAccount(license)
+    -- compte déjà connu (nil pour une première venue) : un ban, une liste blanche s'y rattachent. Base qui ne répond
+    -- pas : refus, sans quoi un compte existant passerait aux hooks pour une première venue (aucun ban vérifié)
+    local knownAccount, findErr = findAccount(license)
+    if findErr then
+        release(session)
+        log.error('connexion refusée : compte de la license introuvable, base indisponible (%s)', tostring(findErr))
+        deferrals.done(messages.unavailable)
+        return
+    end
     local allowed, reason = hooks.runBefore(HOOK_CONNECTING, { source = tempSource, license = license, name = name, accountId = knownAccount })
     if byLicense[license] ~= session then
         deferrals.done(messages.refused)

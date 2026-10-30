@@ -72,6 +72,10 @@ VavaAdmin.config = {
         banned = 'Vous êtes banni de ce royaume.\nMotif : %s\n%s\nBan n° %d',
         bannedUntil = 'Jusqu\'au %s.',
         bannedForever = 'Ban définitif.',
+        -- base qui ne répond pas à la vérification des bans : connexion refusée (jamais accordée sans vérification)
+        banCheckUnavailable = 'Le registre des bans ne peut être consulté pour l\'instant : réessayez dans une minute.',
+        -- journal (32 caractères au plus) : compte banni pendant son chargement, expulsé à son arrivée en jeu
+        logBanEnforced = 'Banni écarté à son arrivée',
         warned = 'Avertissement du Conseil : %s',
         messageTitle = 'Message du Conseil',
         frozen = 'Le Conseil vous a immobilisé.',
