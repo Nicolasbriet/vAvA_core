@@ -439,7 +439,8 @@ local ok, count = core.net.sendNearWith({ from = source }, coords, 30.0, 'vava_c
 - **Latent** : 64 Ko/s par envoi (`net.latent.bytesPerSecond`) ; au plus 512 Ko en route vers un même joueur et 4 Mo
   tous joueurs confondus (`net.latent.maxTotalInFlightBytes`, 0.11.0 : catalogues de l'Atelier) : au-delà, `saturated`
   pour une cible seule (console : « plus de … octets déjà en route », ou « plafond global du latent atteint ») ; dans une
-  liste, la cible saturée est sautée (5e valeur) et les autres reçoivent.
+  liste, la cible saturée est sautée (5e valeur) et les autres reçoivent. Le premier envoi latent vers un joueur qui
+  n'a rien en route passe toujours le plafond global (personne n'est privé de tout gros envoi par les autres).
 - **Ordre** : deux messages fiables vers un même joueur arrivent dans l'ordre d'envoi ; un message latent peut être
   **dépassé** par tout message envoyé après lui, et l'ordre entre deux latents n'est pas garanti. Un module dont l'état
   suit un envoi (instantané puis différences) choisit `latent = 'never'`, ou numérote ses révisions.
@@ -564,14 +565,25 @@ core.zones.set('foret_brume', { zone = { band = 'reduced', scarred = false } })
 - **Qui est abonné** : personnage chargé, toujours celui de son joueur, **apparu** (un personnage renvoyé à une
   apparition garde ses abonnements, seules les nouvelles entrées attendent) ; ped existant ; position lue par le
   serveur. Retour à la sélection, déchargement, départ : tout est oublié sans envoi (le client vide ses zones). Arrêt du
-  module : ses zones sont oubliées, sans envoi (le client oublie celles de la ressource arrêtée).
+  module : ses zones sont oubliées, sans envoi (le client oublie celles de la ressource arrêtée) ; module en échec dont
+  la ressource tourne encore : ses abonnés reçoivent la sortie. Un joueur qui n'a pas bougé de plus de 1 m
+  (`zones.stillDistance`), dans la même instance, sans zone déclarée, déplacée ou retirée depuis, n'est pas recalculé.
+- **L'état d'une zone est public** pour quiconque peut s'y rendre. Sous OneSync, la position du ped que lit le serveur
+  est **déclarée par son client** : un client modifié peut se dire n'importe où et recevoir l'état de n'importe quelle
+  zone. L'abonnement n'est donc **ni un droit ni une preuve de présence** : n'y mettre rien de secret (récompense
+  cachée, qualité d'une récolte à venir, contenu d'un grenier), et revérifier à chaque action, côté serveur et au
+  moment de l'action, la distance réelle et le reste (possession, droit, délai) sans se fier à l'abonnement ; un module
+  qui en a besoin ajoute un contrôle de vitesse plausible.
 - **Atelier** (T-101, T-102) : une définition publiée → `define`, `move`, `replace` ou `set` ; une définition **en
   essai** n'entre pas dans l'état de la zone (sinon tous les abonnés la verraient) : elle part par `core.net.send` à
   son seul auteur.
 - **Réglages** (`config/server.lua` → `zones`) : tous modifiables. `passMs` (1 000 ms) : à 2 000 ms le coût est divisé
   par deux et la marge par défaut de 50 m reste sûre (un cavalier au galop, environ 15 m/s, parcourt 30 m entre deux
-  passages) ; au-delà, une zone peut arriver après le joueur. Coût mesuré hors jeu : 0,16 ms par passage à 64 joueurs
-  et 2 048 zones (0,3 ms à 128), plus quatre natives par joueur ; `/vava_reseau zones` l'affiche en jeu.
+  passages) ; au-delà, une zone peut arriver après le joueur. **Recommandé : garder 1 s.** Coût mesuré hors jeu par
+  passage (Lua seul, 2 048 zones, 64 / 128 joueurs) : joueurs immobiles 0,03 / 0,07 ms ; en mouvement, zones éparses
+  0,23 / 0,46 ms, ville (1,5 × 1,5 km, rayons 2 à 30 m) 1,7 / 3,3 ms, ville très dense 6,4 / 13,9 ms ; plus quatre
+  natives par joueur ; passage qui suit le redémarrage d'un module (tout le monde y rentre) : 8 à 38 ms, une fois. En
+  jeu : `profiler record` de la console du serveur (`/vava_reseau zones` donne un ordre de grandeur).
 - Un module qui s'en sert déclare `coreVersion = '0.11.0'`.
 
 ### `core.db`
@@ -646,7 +658,7 @@ propriétaire. Un module ne voit que **ses** zones.
 | Fonction | Retour |
 |---|---|
 | `watch(handler)` | `true` ou `false, err` — un gestionnaire par ressource (un second appel remplace le premier) |
-| `get(id)` | état de la zone (copie) et sa révision, ou `nil` si elle n'est pas suivie et à jour |
+| `get(id)` | état de la zone (copie) et sa révision, ou `nil` si elle n'est pas suivie et à jour — chaque appel copie tout l'état à la traversée de l'export : jamais dans une boucle, garder sa propre copie tenue par `watch` |
 | `list()` | identifiants locaux des zones du module suivies et à jour, triés |
 
 ```lua
@@ -664,6 +676,12 @@ end)
 - Aucune boucle : quatre gestionnaires d'évènement, une minuterie par état attendu, un thread par demande d'état en
   cours (essais à 5 s, puis doublés jusqu'à 60 s ; `config/shared.lua` → `zones`). Ligne `debug` en `F8` :
   « instantané redemandé : <nom> (…) ».
+- Le core ignore : les évènements de zone déclenchés localement par une autre ressource ; un état entier latent annoncé
+  puis doublé par une sortie de la zone ou par un déchargement (arrivé ensuite, il ne recrée rien, 60 s au plus) ; tout
+  ce qui arrive entre un déchargement et le chargement suivant. Jusqu'à 64 changements sont gardés par zone en
+  attendant un état entier.
+- Un module ne nomme jamais les évènements `vAvA:zone:*` (l'audit le refuse dans `modules/`) : il passe par
+  `core.zones`.
 
 ### `core.characters` (client)
 

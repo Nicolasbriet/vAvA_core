@@ -48,6 +48,7 @@ vous avez vu, et la ligne de console correspondante (serveur, ou `F8` du joueur)
 |---|---|---|
 | 1 | A crée 30 zones de voix dans un rayon de 100 m, s'en éloigne à 1 km, puis y revient (téléportation). | À l'arrivée, `/vava_reseau joueur <A>` : `vAvA:zone:state` ≈ 30 envois de ~150 o, tous fiables ; aucune ligne « instantané redemandé » en `F8` (niveau debug, § 0-3). Supprimer ensuite ces zones. |
 | 2 | **(2 joueurs)** Console : `vava_reseau_essai <B> 256` deux fois de suite, puis aussitôt A crée une zone près de B. | Les deux essais partent (plafond par joueur : 512 Ko) ; la zone arrive chez B normalement (petit instantané fiable, jamais retenu par le latent en route). |
+| 3 | **(2 joueurs)** Console : `vava_reseau_essai <B> 256` deux fois ; A crée 30 zones de voix près de B ; aussitôt, B se téléporte loin (ou retourne à la sélection). | Aucune zone fantôme chez B : `/zonesvoix` fermé, `W` au milieu des anciennes zones (si B y revient plus de 75 m plus loin, plus tard) n'applique aucun effet qui ne devrait pas être là ; F8 en debug : aucune erreur. (Un instantané latent doublé par la sortie est ignoré à son arrivée.) |
 
 ## 4. Éditeur des zones de voix **(2 joueurs)**
 
@@ -62,7 +63,7 @@ vous avez vu, et la ligne de console correspondante (serveur, ou `F8` du joueur)
 | # | Faire | Attendu |
 |---|---|---|
 | 1 | `resmon` client au repos. | `vAvA_core` à 0,00 ms (aucune boucle ajoutée) ; `vava_voice` inchangé. |
-| 2 | Avec le plus de joueurs possible (32, 64…), `/vava_reseau zones` toutes les minutes pendant 5 min. | « moyen » bien sous 0,5 ms à 64 joueurs (estimation hors jeu : 0,15 à 0,2 ms de Lua, plus quatre natives par joueur et par passage). Noter les valeurs avec le nombre de joueurs et de zones. |
+| 2 | Avec le plus de joueurs possible (32, 64…), en partie immobiles, en partie en mouvement dans une ville : console du serveur `profiler record 300` (300 images), puis `profiler view` ; chercher `vAvA_core` et la durée des fonctions `runPass` / `pass` du fichier `zones.lua`. En parallèle, `/vava_reseau zones` pour l'ordre de grandeur. | Hors jeu (Lua seul, 2 048 zones, 64 joueurs) : 0,03 ms immobiles, 0,2 ms en mouvement sur des zones éparses, 1,7 ms en ville (1,5 × 1,5 km, rayons 2 à 30 m), 6,4 ms en ville très dense ; plus quatre natives par joueur. Noter les valeurs du profiler avec le nombre de joueurs, de zones et le lieu. `os.clock` (la ligne de `/vava_reseau zones`) ne suffit pas pour mesurer : pas d'une milliseconde sous Windows, temps de tout le processus sous Linux. |
 | 3 | `./scripts/audit-reseau.sh`. | Aucun BLOQUANT ; plus aucune exception des zones de voix dans `scripts/audit-exceptions.txt`. |
 
 ## Réglage du passage
@@ -70,7 +71,9 @@ vous avez vu, et la ligne de console correspondante (serveur, ou `F8` du joueur)
 `zones.passMs` (`config/server.lua` du core, 1 000 ms) se règle sans rien changer d'autre : 2 000 ms divise le coût par
 deux et reste sûr avec la marge par défaut de 50 m (un cavalier au galop, environ 15 m/s, parcourt 30 m entre deux
 passages) ; au-delà, une zone peut arriver après le joueur. Les zones de voix ont 40 m de marge : à 2 s, un galopant
-peut entrer dans la zone avant qu'elle n'arrive (l'effet s'applique alors une seconde plus tard).
+peut entrer dans la zone avant qu'elle n'arrive (l'effet s'applique alors une seconde plus tard). Recommandation :
+garder 1 s ; un joueur immobile ne coûte presque rien (il n'est pas recalculé), le coût vient des joueurs qui bougent
+dans un lieu chargé de zones.
 
 ## À vérifier en jeu (ce qui n'a pas pu l'être hors jeu)
 
@@ -80,6 +83,9 @@ peut entrer dans la zone avant qu'elle n'arrive (l'effet s'applique alors une se
   `RegisterNetEvent('vava_example:essai', function(...) print(json.encode({ ... })) end)` : la console `F8` doit écrire
   `["é",42,{"a":true}]`. Si `sendPacked` rend `false, 'unsupported'`, le serveur est en estimation (console
   `[net] estimation …`) : le module renvoie alors par `core.net.send` (repli prévu).
+- Les évènements de zone venus du serveur sont acceptés par le client : il ignore ceux déclenchés localement par une
+  autre ressource (`GetInvokingResource()` doit valoir `nil` pour un évènement du serveur). Si aucune zone n'arrive
+  jamais (test 2-2), c'est la première chose à regarder.
 - Position du ped côté serveur juste après l'apparition confirmée (`refreshPlayer`) : bonne, ou encore l'ancienne (les
   zones arrivent alors au passage suivant, 1 s plus tard) — test 2-8.
 - Durée réelle d'un passage à 32 et 64 joueurs (test 5-2) ; précision de `os.clock` sur le système du serveur (pas

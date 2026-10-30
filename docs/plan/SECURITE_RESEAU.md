@@ -45,6 +45,12 @@ du Conseil par appel direct du RPC.
    attendue + 1, ignore les anciennes, garde les plus récentes en attendant un état entier). L'état vit dans le core :
    une seule sérialisation pour tous les entrants d'un passage, rien de gros ne traverse un export. Bornes : 32 Ko par
    état, 8 Mo en tout, 2 048 zones, 256 zones suivies par joueur, 32 Ko d'états entiers par joueur et par passage.
+   **Limite à connaître** : sous OneSync, la position du ped que lit le serveur est **déclarée par son client**. Un
+   client modifié peut se dire n'importe où et recevoir l'état de n'importe quelle zone : l'abonnement économise la
+   bande passante, il ne protège rien. L'état d'une zone est donc **public pour quiconque peut s'y rendre** : on n'y
+   met rien de secret (récompense cachée, qualité d'une récolte à venir, contenu d'un grenier) ; chaque action d'un
+   module revérifie côté serveur, au moment de l'action, la distance réelle, la possession, le droit et le délai, sans
+   se fier à l'abonnement (contrôle de vitesse plausible si un module en a besoin).
 4. **Différences.** On envoie `{ id, champ = nouvelle valeur }`, pas l'objet complet.
 5. **Gros volumes** (catalogue, journal, liste de recettes) : envoyés une fois à la demande, mis en cache côté
    client avec une version, renvoyés seulement si la version change ; `TriggerLatentClientEvent` au-delà de

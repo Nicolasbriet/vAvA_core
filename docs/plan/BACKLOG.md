@@ -396,8 +396,10 @@ versé à T-014 ; les autres points déjà couverts sont précisés dans T-012 �
   `core:zones:resync` ; `core.net` : positions gardées 50 ms, plafond global de 4 Mo en route, joueurs sautés en
   5e valeur, `sendPacked` / `sendNearPacked` (au lieu d'une bibliothèque par module) ; `/vava_reseau zones [n°]` (durée
   du passage ; consultation d'un joueur au journal) ; `vava_voice` 1.3.0 (zones de voix aux seuls joueurs proches,
-  exceptions d'audit retirées). Coût mesuré hors jeu : 0,16 ms par passage à 64 joueurs, 0,3 ms à 128 (2 048 zones),
-  plus quatre natives par joueur. Compte rendu `docs/plan/rapports/T-014.md`, procédure `docs/tests/zones.md`.
+  exceptions d'audit retirées). Relu sécurité et réseau, corrigé (plafond de zones suivies sans tri, zone fantôme,
+  joueurs immobiles non recalculés, état des zones public sous OneSync). Coût hors jeu par passage, 2 048 zones, 64 /
+  128 joueurs : immobiles 0,03 / 0,07 ms ; en mouvement 0,23 / 0,46 ms (zones éparses), 1,7 / 3,3 ms (ville), 6,4 /
+  13,9 ms (très dense) ; garder 1 s. Compte rendu `docs/plan/rapports/T-014.md`, procédure `docs/tests/zones.md`.
 
 ### T-015 — Récolte : GlobalState → abonnements de zone
 - Agent : vava-dev-lua · Dépend de : T-014 · Statut : à faire
@@ -409,6 +411,9 @@ versé à T-014 ; les autres points déjà couverts sont précisés dans T-012 �
   à chaque point regagné (passage de 10 s) ; publier zone et nœuds aux seuls abonnés de la zone.
 - Voir spec T-014 § 13.2 (une zone du core par zone de récolte, état `zone` + `n:<nœud>`, `core.zones.watch` côté
   client ; `coreVersion = '0.11.0'`).
+- Relectures de T-014 : l'état d'une zone est **public** (position déclarée par le client sous OneSync) : rien de
+  secret dedans, chaque action revérifie la distance côté serveur ; coût à mesurer par `profiler record` (cases de
+  128 m à juger).
 
 ### T-016 — Agriculture : GlobalState → abonnements de zone
 - Agent : vava-dev-lua · Dépend de : T-014 · Statut : à faire
@@ -417,6 +422,9 @@ versé à T-014 ; les autres points déjà couverts sont précisés dans T-012 �
   d'état. Envoyer aux abonnés de la parcelle la seule différence `{ parcelle, n°, crop, stage, state }` (environ 40 o)
   et l'état complet seulement à l'abonnement.
 - Voir spec T-014 § 13.3 (une zone du core par parcelle, état `s<n°>` par emplacement ; `coreVersion = '0.11.0'`).
+- Relectures de T-014 : l'état d'une zone est **public** (position déclarée par le client sous OneSync) : rien de
+  secret dedans, chaque action revérifie la distance côté serveur ; coût à mesurer par `profiler record` (cases de
+  128 m à juger).
 
 ### T-017 — Artisanat : GlobalState → abonnements de zone
 - Agent : vava-dev-lua · Dépend de : T-014 · Statut : à faire
@@ -426,6 +434,9 @@ versé à T-014 ; les autres points déjà couverts sont précisés dans T-012 �
   station ; la liste des stations devient la définition de zone (plus de clé globale).
 - Voir spec T-014 § 13.4 (une zone du core par station, état `def` + `s` ; sons par `core.zones.subscribers` ou
   `sendNear` ; `coreVersion = '0.11.0'`).
+- Relectures de T-014 : l'état d'une zone est **public** (position déclarée par le client sous OneSync) : rien de
+  secret dedans, chaque action revérifie la distance côté serveur ; coût à mesurer par `profiler record` (cases de
+  128 m à juger).
 
 ### T-018 — Revue des boucles client
 - Agent : vava-dev-lua (avec vava-reseau-perf) · Dépend de : T-011 · Statut : à tester en jeu
