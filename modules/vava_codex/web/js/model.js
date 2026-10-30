@@ -4,12 +4,14 @@
  * Rôle : état du Codex côté interface : entrées visibles (une ligne par commande ou sous-commande), chapitres,
  *        commandes non décrites, préférences (signets, dernières pages, réglage), onglet, chapitre, recherche,
  *        ligne choisie. Le filtrage se fait ici, sans le serveur : la liste est déjà réduite à ce que le joueur
- *        peut voir.
+ *        peut voir. Le contenu et les préférences sont gardés d'une ouverture à l'autre : le serveur ne les renvoie
+ *        que s'ils ont changé.
  */
 
 const Model = (() => {
   const state = {
     entries: [], byName: new Map(), chapters: [], undeclared: [], staff: false,
+    version: null,   // empreinte du contenu gardé, donnée par le serveur (null : aucun contenu reçu)
     prefs: { favorites: [], recent: [], keepOpen: true }, closeKey: 'F1',
     recentMax: 12,   // dernières pages gardées : `recent.max` de la config, reçu à l'ouverture
     tab: 'commands', chapter: '', query: '', selected: null, rows: [],
@@ -21,17 +23,29 @@ const Model = (() => {
   /** Identifiant d'une ligne : commande + sous-commande ; « | » n'appartient pas aux identifiants du core. */
   const rowId = (name, action) => `${name}|${action || ''}`;
 
-  function load(payload) {
-    state.entries = list(payload.entries).map((entry) => ({
+  /** Contenu visible (entrées, chapitres, non décrites, Conseil ?), gardé jusqu'au prochain envoi du serveur. */
+  function setContent(content, version) {
+    state.entries = list(content.entries).map((entry) => ({
       ...entry,
       actions: entry.actions ? list(entry.actions).map((action) => ({ ...action, args: entry.actions && action.args ? list(action.args) : [] })) : null,
       args: entry.args ? list(entry.args) : [],
     }));
     state.byName = new Map(state.entries.map((entry) => [entry.name, entry]));
-    state.chapters = list(payload.chapters);
-    state.undeclared = list(payload.undeclared);
-    state.staff = payload.staff === true;
-    state.prefs = normalizePrefs(payload.prefs);
+    state.chapters = list(content.chapters);
+    state.undeclared = list(content.undeclared);
+    state.staff = content.staff === true;
+    state.version = typeof version === 'string' ? version : null;
+  }
+
+  /** Message d'ouverture : `content` et `prefs` ne viennent que s'ils ont changé (sinon la page garde les siens) ;
+   *  `keys` (touches du joueur, relues par le jeu à chaque ouverture), `closeKey` et `recentMax` viennent toujours. */
+  function load(payload) {
+    if (payload.content && typeof payload.content === 'object') setContent(payload.content, payload.version);
+    if (payload.prefs && typeof payload.prefs === 'object') state.prefs = normalizePrefs(payload.prefs);
+    const keys = payload.keys && typeof payload.keys === 'object' ? payload.keys : {};
+    for (const entry of state.entries) {
+      if (typeof keys[entry.name] === 'string') entry.keyLabel = keys[entry.name];
+    }
     if (payload.closeKey) state.closeKey = payload.closeKey;
     if (Number.isInteger(payload.recentMax) && payload.recentMax > 0) state.recentMax = payload.recentMax;
     if (state.chapter && !state.chapters.some((chapter) => chapter.id === state.chapter)) state.chapter = '';

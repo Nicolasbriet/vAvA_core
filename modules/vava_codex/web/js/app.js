@@ -182,6 +182,24 @@
     }
   });
 
+  /** La page n'a pas le contenu de la version annoncée (cas de secours, jamais attendu). Sans aucun contenu, elle
+   *  le redemande aussitôt (second appel au serveur, compté par le débit de l'ouverture) ; avec un contenu plus ancien,
+   *  elle le montre et fait seulement oublier les versions au client : la prochaine ouverture renverra tout, sans
+   *  appel de plus. */
+  async function resync() {
+    if (Model.state.version !== null) {
+      Bridge.post('stale');
+      return;
+    }
+    const result = await Bridge.post('refresh');
+    if (!result.ok || !result.payload) {
+      View.toast(errorMessage(result.error), 'danger');
+      return;
+    }
+    Model.load(result.payload);
+    View.render();
+  }
+
   Bridge.onMessage((action, payload) => {
     if (action === 'open') {
       Forms.clearCache();
@@ -189,6 +207,7 @@
       View.render();
       app.hidden = false;
       View.focusSearch(true);
+      if (Model.state.version !== payload.version) resync();
     } else if (action === 'notify') {
       View.toast(payload.message, payload.kind);
     } else if (action === 'close') {

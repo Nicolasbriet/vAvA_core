@@ -5,6 +5,7 @@
            chapitres, commandes des ressources vAvA enregistrées auprès du jeu mais non décrites (Conseil), et valeurs
            proposées pour un argument (joueurs en jeu : tous pour le Conseil, les seuls proches sinon ; clés d'un
            registre, liste d'un module). Tout est recalculé à la demande : le registre vit en mémoire dans le core.
+           L'ordre rendu est total (même contenu, même empreinte : shared/fingerprint.lua).
     Dépendances : shared/constants.lua, config.lua, server/core.lua, bridge/server.lua
 ]]
 
@@ -120,7 +121,11 @@ function catalog.visible(src)
         if a.label ~= b.label then return a.label < b.label end
         return a.name < b.name
     end)
-    sort(chapters, function(a, b) return a.label < b.label end)
+    -- ordre total (deux modules peuvent porter le même chapitre) : même contenu, même empreinte à chaque ouverture
+    sort(chapters, function(a, b)
+        if a.label ~= b.label then return a.label < b.label end
+        return a.id < b.id
+    end)
     return entries, chapters, staff
 end
 

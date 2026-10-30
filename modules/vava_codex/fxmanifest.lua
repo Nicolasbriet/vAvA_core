@@ -4,7 +4,8 @@
            chaque module remplit, filtrées selon les droits du joueur, classées par chapitre, cherchées, composées par
            un formulaire selon le type de chaque argument (joueur, compétence, zone, nombre…) et lancées ; signets,
            dernières pages et réglage « rester ouvert » par personnage ; onglet des touches. Touche F1 (réglable) et
-           /codex. Le serveur décide de ce que chacun voit ; les commandes gardent leurs propres contrôles.
+           /codex. Le serveur décide de ce que chacun voit ; les commandes gardent leurs propres contrôles. Le contenu
+           est gardé par la page et ne repart que s'il a changé (empreinte calculée par le serveur).
     Dépendances : vAvA_core ≥ 0.7.0 (registre des commandes) ; facultatifs : vava_admin (rangs et droits du
                   Conseil), vava_hud (notifications), vava_chat (dernières pages des commandes tapées)
 ]]
@@ -16,7 +17,7 @@ use_experimental_fxv2_oal 'yes'
 
 name 'vava_codex'
 description 'Codex vAvA : toutes les commandes et touches du serveur, classées, cherchées, composées et lancées'
-version '1.1.2'
+version '1.2.0'
 
 dependency 'vAvA_core'
 
@@ -41,6 +42,7 @@ server_scripts {
     'bridge/server.lua',
     'server/catalog.lua',
     'shared/prefs.lua',          -- logique pure, servie au seul serveur (testée hors jeu : tests/spec)
+    'shared/fingerprint.lua',    -- idem : version du contenu (empreinte) et réponse à l'ouverture
     'server/prefs.lua',
     'server/suggestions.lua',
     'server/commands.lua',

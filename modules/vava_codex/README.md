@@ -9,6 +9,27 @@ sa config (`server/commands.lua`, voir `docs/api.md` → « Registre des command
 joueur voit (public, droit du Conseil, console en lecture seule) ; la ligne est lancée chez le joueur comme s'il
 l'avait tapée, et chaque commande garde ses contrôles.
 
+## Ce qui passe sur le réseau (1.2.0)
+
+La page garde le contenu (entrées, chapitres, commandes non décrites) et les préférences d'une ouverture à l'autre. À
+chaque ouverture, le client envoie leurs deux versions ; le serveur recalcule ce que le joueur peut voir avec ses droits
+du moment, en prend l'empreinte (`shared/fingerprint.lua`) et ne renvoie que ce qui a changé. Mesuré hors jeu avec les
+déclarations de tous les modules du dépôt (taille msgpack estimée) :
+
+| Ouverture | Joueur (35 entrées) | Souverain (52 entrées) |
+| --- | --- | --- |
+| Avant 1.2.0, à chaque `F1` | 7,5 Ko | 16,9 Ko |
+| Première ouverture, ou contenu changé | 7,5 Ko | 17,0 Ko |
+| Ouverture suivante sans changement | 56 o | 56 o |
+| Préférences seules changées (24 signets, 12 pages au plus) | 1 Ko au plus | 1 Ko au plus |
+
+Le contenu repart dès qu'il change, quelle qu'en soit la cause : module démarré ou arrêté, rang donné ou retiré, droit
+d'un rang, ACE, commande non décrite apparue. Les préférences repartent après un signet, un réglage, une commande
+lancée (du Codex ou du chat) ou un changement de personnage. Les touches du joueur sont relues dans le jeu à chaque
+ouverture. Le champ `vava_codex:prefs` est lu du seul serveur (`private`) : il ne part plus vers le client à chaque
+commande lancée. Coût serveur d'une ouverture : environ 1 ms pour un joueur, 2 ms pour un Souverain (calcul du
+contenu et de son empreinte, mesuré hors jeu), borné par `rateLimits.open`.
+
 ## Prérequis
 
 `vAvA_core` ≥ 0.7.0. Facultatifs : `vava_admin` (rangs et droits du Conseil ; sans lui, ACE `vava_codex.staff` et les
@@ -22,6 +43,7 @@ ACE déclarés avec les commandes), `vava_hud` (notifications), `vava_chat` (der
 | `bridge/server.lua` | seul point de contact avec le core et les modules : joueurs (tous, ou les seuls proches), Conseil, exports `codexList`, commandes du jeu |
 | `server/catalog.lua` | entrées visibles d'un joueur, chapitres, non décrites, valeurs d'un argument |
 | `shared/prefs.lua` | logique pure : préférences ramenées aux maximums de la config (testée : `tests/spec/codex_prefs_spec.lua`) |
+| `shared/fingerprint.lua` | logique pure : empreinte d'une valeur (version du contenu et des préférences), réponse à l'ouverture (testée : `tests/spec/codex_fingerprint_spec.lua`) |
 | `server/prefs.lua` | champ de personnage : signets, dernières pages, réglage |
 | `server/main.lua` | déclaration du module, RPC |
 | `client/keys.lua` | touche réellement liée par le joueur (lue dans le jeu) |
@@ -58,3 +80,6 @@ ACE déclarés avec les commandes), `vava_hud` (notifications), `vava_chat` (der
    comme `/metiers niveau …`, est retenue ; rien du message n'est gardé).
 10. Se déconnecter puis revenir : signets, dernières pages et réglage retrouvés (champ de personnage).
 11. Livre ouvert : `restart vava_codex` : le livre disparaît, souris et clavier reviennent au jeu ; `F1` le rouvre.
+12. Ouvrir, fermer, rouvrir sans rien changer : le livre est le même (signets, dernières pages, touches) et le serveur
+    ne renvoie que deux versions (compteur réseau ou `netgraph`). Donner un rang (`vava_conseil <compte> senechal`), ou
+    `restart` d'un module qui déclare des commandes : à l'ouverture suivante, le contenu change aussitôt.

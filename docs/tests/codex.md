@@ -1,9 +1,10 @@
 # Le Codex — procédure de test en jeu
 
-Procédure pour vérifier en jeu `vava_codex` 1.1.2 : toutes les commandes et toutes les touches du serveur dans un
+Procédure pour vérifier en jeu `vava_codex` 1.2.0 : toutes les commandes et toutes les touches du serveur dans un
 livre (`F1` ou `/codex`), la recherche, les formulaires selon le type de chaque argument, « Lancer », ce que chacun
-voit selon ses droits, les signets, les dernières pages et la greffe du chat. Elle reprend les onze tests de la section
-« Tests en jeu » du README (repérés « README n ») et les complète d'après le code. Comptez trois quarts d'heure ; les
+voit selon ses droits, les signets, les dernières pages, la greffe du chat et le contenu gardé par la page entre deux
+ouvertures (§ 12, 1.2.0). Elle reprend les douze tests de la section « Tests en jeu » du README (repérés
+« README n ») et les complète d'après le code. Comptez trois quarts d'heure ; les
 tests à deux joueurs sont marqués **(2 joueurs)**. Un test se cite « codex 3-4 ». Préparation commune, mesure du
 resmon et remontée des écarts : [LISEZMOI.md](LISEZMOI.md).
 
@@ -22,6 +23,10 @@ resmon et remontée des écarts : [LISEZMOI.md](LISEZMOI.md).
 4. **Nombres** : un champ numérique n'a aucune valeur d'office (1.1.2). Obligatoire, il manque tant qu'il n'est pas
    choisi (curseur déplacé ou valeur tapée) : `/recolte vitalite <zone>` ou `/metiers niveau` ne partent jamais avec un
    0 que personne n'a choisi.
+5. **Ce qui part à chaque ouverture** (§ 12) : dans `config/server.lua` du core, `log.level = 'debug'` le temps du
+   § 12 (redémarrage du serveur), à remettre à `'info'` après. La console écrit alors à chaque ouverture
+   `[vava_codex] ouverture (joueur N, X entrées visibles) : contenu envoyé | gardé par la page, préférences
+   envoyées | gardées`.
 
 ## 1. Ouvrir et fermer (README 1)
 
@@ -132,7 +137,7 @@ Le serveur décide de ce que chacun voit, à chaque ouverture ; et il revérifie
 
 | # | Faire | Attendu |
 |---|---|---|
-| 1 | Livre ouvert : `restart vava_codex` (README 11). | Le livre disparaît ; console `module 'vava_codex' v1.1.2 prêt` ; souris et clavier reviennent au jeu aussitôt (le module rend la main à l'arrêt). `F1` rouvre ; signets, Dernières pages et réglage intacts. |
+| 1 | Livre ouvert : `restart vava_codex` (README 11). | Le livre disparaît ; console `module 'vava_codex' v1.2.0 prêt` ; souris et clavier reviennent au jeu aussitôt (le module rend la main à l'arrêt). `F1` rouvre ; signets, Dernières pages et réglage intacts. |
 | 2 | `stop vava_codex` ; `F1` ; `/me essai` dans le chat ; `start vava_codex` ; `F1`. | `F1` sans effet pendant l'arrêt ; `/me` ne figure pas aux Dernières pages. |
 | 3 | `stop vava_admin` ; A : `F1`. | Plus de chapitre « Conseil » (ses entrées partent avec le module, `/signaler` compris), plus aucune commande du Conseil ni de la console, sauf si A a l'ACE `vava_codex.staff` ou l'ACE propre à la commande (`metiers.admin`…). |
 | 4 | `start vava_admin` ; A : `F1`. | Tout revient sans redémarrer le Codex. |
@@ -148,24 +153,51 @@ Le serveur décide de ce que chacun voit, à chaque ouverture ; et il revérifie
 | 5 | Valeur hors bornes dans un formulaire | Voir 3-4 : la valeur part ramenée dans les bornes de l'argument ; tapée à la main dans le chat, la commande garde ses propres contrôles. |
 | 6 | À terre (`vava_health`) : `F1`. | Le Codex s'ouvre (à confirmer) ; chaque commande lancée garde ses propres refus. |
 
-## 12. Resmon
+## 12. Contenu gardé par la page (1.2.0, README 12)
+
+La page garde le contenu et les préférences ; à chaque ouverture, le serveur ne renvoie que ce qui a changé. Console
+au niveau `debug` (§ 0.5). Mesuré hors jeu avec les déclarations du dépôt : contenu complet 7,5 Ko (joueur) à 17 Ko
+(Souverain), ouverture sans changement 56 octets.
+
+| # | Faire | Attendu |
+|---|---|---|
+| 1 | A, juste après l'arrivée en jeu : `F1`. | Console : `contenu envoyé, préférences envoyées` (première ouverture). Le livre est complet. |
+| 2 | `Échap`, `F1`, `Échap`, `F1` (en laissant deux secondes entre deux ouvertures : `rateLimits.open`). | Console, à chaque fois : `contenu gardé par la page, préférences gardées`. Le livre est identique : mêmes chapitres, signets, Dernières pages, réglage, touches. |
+| 3 | Poser un signet, fermer, rouvrir. | `contenu gardé par la page, préférences envoyées` ; le ruban est là. Rouvrir encore : `préférences gardées`. |
+| 4 | Lancer `/sigils` depuis le Codex, fermer, rouvrir ; puis taper `/me essai` dans le chat, rouvrir. | Les deux fois : `contenu gardé par la page, préférences envoyées` ; la ligne est en tête des Dernières pages. |
+| 5 | Paramètres › Raccourcis › FiveM : « Ouvrir le Codex » sur `J` ; rouvrir par `J`, onglet Touches. | `contenu gardé par la page` ; « Ouvrir le Codex » porte `J` (les touches sont relues par le client à chaque ouverture). Remettre `F1`. |
+| 6 | **(2 joueurs)** B ouvre, ferme. Console : `vava_conseil <B> senechal`. B rouvre. | Chez B : `contenu envoyé` ; les commandes du Conseil et du droit `metiers` apparaissent aussitôt, sans reconnexion. Rouvrir : `contenu gardé par la page`. |
+| 7 | Console : `vava_conseil <B> aucun`. B rouvre. | `contenu envoyé` ; plus rien du Conseil (comme 4-8). |
+| 8 | A ouvre, ferme. `restart vava_gathering`. A rouvre. | `contenu envoyé` ; `/recolte` est là (le module l'a redéclaré). `stop vava_gathering`, A rouvre : `contenu envoyé`, plus de chapitre « Récolte » ; `start vava_gathering` : il revient. |
+| 9 | A ouvre, ferme ; B ouvre, ferme ; rien ne change ; chacun rouvre. | `gardé` pour l'un comme pour l'autre : chacun a sa propre version, calculée avec ses droits. |
+| 10 | Revenir à la sélection de personnage, prendre un autre personnage du même compte, `F1`. | `contenu gardé par la page, préférences envoyées` : les signets et Dernières pages sont ceux du nouveau personnage (9-3). |
+| 11 | Livre ouvert, `restart vava_codex`, puis `F1`. | `contenu envoyé, préférences envoyées` : la page repart de rien. |
+
+Secours (jamais attendu, non provoquable en jeu) : si la page n'a pas la version que le client annonce, elle garde son
+contenu et fait oublier les versions au client, sans appel au serveur (la prochaine ouverture renvoie tout) ; si elle
+n'a encore aucun contenu, elle le redemande aussitôt, et cette ouverture compte alors pour deux dans
+`rateLimits.open`. Vérifié hors jeu sous jsdom.
+
+## 13. Resmon
 
 | Situation | Attendu (`resmon 1`, ligne `vava_codex`) |
 |---|---|
 | Au repos, livre fermé | 0,02 ms au plus (aucune boucle : 0,00 attendu). |
 | Livre ouvert, recherche, formulaires | 0,02 ms au plus côté Lua : tout se fait dans la page ; 0,15 ms au plus au moment de « Lancer ». |
+| Serveur, à chaque ouverture (`resmon` côté serveur ou profiler) | Pointe brève : environ 1 ms pour un joueur, 2 ms pour un Souverain (contenu recalculé et son empreinte, mesurés hors jeu) ; rien entre deux ouvertures. **Plus de 3 ms chez un Souverain** : à noter dans la remontée (suite prévue, voir le rapport T-046). |
 
-## 13. Ce qu'il faut regarder dans la base
+## 14. Ce qu'il faut regarder dans la base
 
 - Les préférences vivent dans le personnage : `vava_characters.data`, clé `vava_codex:prefs` (`favorites`, `recent`
   avec `name`, `action`, `at`, et `keepOpen`). Exemple : `SELECT id, JSON_EXTRACT(data, '$."vava_codex:prefs"') FROM
   vava_characters WHERE id = <n>;`
 - Écrites avec le personnage : sauvegarde groupée toutes les 5 min (`saveIntervalMs` du core), au départ du joueur, ou
-  `vava_saveall` en console.
+  `vava_saveall` en console. Depuis 1.2.0, le champ est lu du seul serveur : il ne part plus vers le client à chaque
+  écriture (le client les reçoit à l'ouverture du Codex).
 - `vava_admin_logs` : les commandes lancées depuis le Codex y laissent la trace que laisse leur module (« Vitalité
   fixée »…) ; le Codex lui-même n'écrit rien.
 
-## 14. Ce que je ne peux pas avoir vérifié hors jeu
+## 15. Ce que je ne peux pas avoir vérifié hors jeu
 
 - Le rendu du livre dans CEF (polices, rubans, onglets de tranche) : `web/index.html` dans un navigateur, `?staff=0`
   pour la vue d'un simple joueur ; les listes y sont simulées.
@@ -174,3 +206,7 @@ Le serveur décide de ce que chacun voit, à chaque ouverture ; et il revérifie
 - Le retour du clavier au Codex 150 ms après « Lancer » (`IsNuiFocused`) quand une commande affiche quelque chose.
 - `ExecuteCommand` d'une commande du serveur depuis le client (elle doit arriver comme si elle était tapée).
 - Le focus après l'arrêt de la ressource livre ouvert (10-1).
+- La taille réelle des réponses `open` (estimée hors jeu en msgpack, sans l'enveloppe du core) : à lire au compteur
+  réseau quand T-013 existera.
+- La page qui garde son contenu entre deux ouvertures dans CEF (vérifié sous jsdom : contenu, signets et touches
+  gardés ; préférences seules remplacées ; version inconnue → tout redemandé).

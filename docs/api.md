@@ -1491,7 +1491,16 @@ commande (ou tout membre du Conseil si aucun), repli ACE sans vava_admin (`ace` 
 droit. Le Codex ne donne aucun pouvoir : la ligne est lancée par `ExecuteCommand` chez le joueur, comme si elle
 était tapée, et chaque commande garde ses propres contrôles.
 
-**Préférences par personnage** (champ `vava_codex:prefs`, visible du seul joueur) : signets (`favorites.max`),
+**Contenu gardé par la page** (1.2.0) : à chaque ouverture, le serveur recalcule ce que le joueur peut voir avec ses
+droits du moment, puis en prend l'**empreinte** (FNV-1a 64 bits d'un codage canonique, `shared/fingerprint.lua`) ;
+le client envoie les empreintes du contenu et des préférences que sa page garde, et le serveur ne renvoie que ce qui
+a changé. Une seconde ouverture sans changement coûte 56 octets au lieu de 7 à 17 Ko (mesurés avec les déclarations
+du dépôt, joueur et Souverain). Tout ce qui change le contenu change l'empreinte : module démarré ou arrêté, rang
+donné ou retiré, droit d'un rang, ACE, commande non décrite apparue. Les touches du joueur sont relues par le client à
+chaque ouverture, sans le serveur.
+
+**Préférences par personnage** (champ `vava_codex:prefs`, lu du seul serveur depuis 1.2.0 : le client les reçoit à
+l'ouverture, et seulement si elles ont changé) : signets (`favorites.max`),
 dernières pages (`recent.max`, sans doublon, les plus récentes en tête — depuis le Codex, et depuis le chat via
 l'export client `noteCommand(line)`), réglage « rester ouvert après Lancer » (`keepOpenDefault`). Un maximum abaissé
 dans la config tronque les listes déjà enregistrées (premiers signets, dernières pages les plus récentes) à la
@@ -1499,7 +1508,8 @@ lecture, et la prochaine écriture garde la version courte : rien n'est bloqué 
 déclarée `ui = true` (ouvre une interface) ferme toujours le Codex d'abord ; sinon le Codex reprend le focus si
 aucune autre interface ne l'a pris.
 
-RPC : `vava_codex:open`, `options(nom, sous-commande, rang)` (valeurs d'un argument dynamique : joueurs en jeu avec
+RPC : `vava_codex:open(version, versionPréférences)` (empreintes gardées, 16 chiffres hexadécimaux au plus, `''` :
+aucune ; rend `{ version, prefsVersion, content?, prefs? }`), `options(nom, sous-commande, rang)` (valeurs d'un argument dynamique : joueurs en jeu avec
 leur nom, clés d'un registre par `labelField`, export `codexList` du module déclarant), `favorite(nom, posé)`,
 `recent(nom, sous-commande)`, `keepOpen(bool)` — schémas stricts, débits dans `config.rateLimits`. Une sous-commande
 à droit propre est refusée (`refused`) à qui n'a pas ce droit, pour ses valeurs (`options`) comme pour les dernières
