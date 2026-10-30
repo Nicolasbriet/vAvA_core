@@ -27,7 +27,7 @@ const CORE_DESCRIPTIONS = {
   vava_health: 'Santé, mise à terre, réanimation',
   vava_admin: 'Registre du Conseil (administration en jeu)',
   vava_world: 'Carte sans PNJ ni véhicules',
-  vava_time: 'Ciel et heure du royaume : heure de Paris, saisons, météo, décisions du Conseil',
+  vava_time: 'Ciel et heure du royaume : heure de Paris, saisons, ciel, nuits de gel, décisions du Conseil',
   vava_voice: 'Chat vocal de proximité',
   vava_cameras: 'Écran des joueurs pour le Conseil (mur des caméras)',
   vava_magic: 'Magie : roue des sorts, mode magie, états, zones, sorts de feu, d\'eau et de terre, combinaisons, Lueur, Murmure, grimoire et registre',

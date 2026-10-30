@@ -2,9 +2,9 @@
 /*
  * web/js/view-time.js
  * Rôle : la page Ciel et heure (vava_time) : heure du royaume (qui avance dans la page), heure de Paris, décalage,
- *        date et saison, ciel courant et prochain changement. Avec le droit des outils du Registre : mettre l'heure,
- *        décaler d'une heure, figer, reprendre, rendre l'heure réelle ; imposer un ciel (et le figer), figer le ciel,
- *        le rendre au cycle. Chaque décision passe par le pont du serveur de jeu : le Registre vérifie le droit du rang
+ *        date et saison (an du royaume écrit par le serveur de jeu, durée d'une saison, nuit de gel), ciel courant et
+ *        prochain changement. Avec le droit des outils du Registre : mettre l'heure, décaler d'une heure, figer,
+ *        reprendre, rendre l'heure réelle ; imposer un ciel (et le figer), figer le ciel, le rendre à son cours. Chaque décision passe par le pont du serveur de jeu : le Registre vérifie le droit du rang
  *        et l'inscrit à son journal, vava_time revalide les valeurs. Relue après chaque décision et au prochain
  *        changement de ciel prévu ; aucune relecture en boucle.
  */
@@ -44,6 +44,13 @@ const TimeView = (() => {
     if (w.endsIn < 0) return T.never;
     const minutes = Math.floor(Math.max(0, w.endsIn - elapsed()) / 60);
     return minutes < 1 ? T.soon : T.inMinutes(minutes);
+  }
+
+  /** Nuit du jour : gel annoncé, tombé, ou rien. */
+  function frostText() {
+    const frost = view.frost || {};
+    if (!frost.tonight) return T.frostNone;
+    return frost.struck ? T.frostStruck : T.frostTonight(Number(frost.hour) || 0);
   }
 
   function update() {
@@ -138,8 +145,10 @@ const TimeView = (() => {
       UI.el('dl', 'facts', null, [
         fact(T.day, UI.el('dd', 'fact-text', T.dayText(cal.day))),
         fact(T.season, UI.el('dd', 'fact-text', `${cal.name} (${cal.label})`)),
-        fact(T.year, UI.el('dd', 'fact-text', T.yearText(cal.year))),
-      ]),
+        fact(T.year, UI.el('dd', 'fact-text', typeof cal.yearText === 'string' ? cal.yearText : String(cal.year))),
+        Number(cal.length) > 0 ? fact(T.length, UI.el('dd', 'fact-text', T.lengthText(Number(cal.length)))) : null,
+        fact(T.frostLabel, UI.el('dd', 'fact-text', frostText())),
+      ].filter(Boolean)),
       UI.el('h4', 'section-title', T.weatherTitle),
       UI.el('dl', 'facts', null, [
         fact(T.weatherNow, UI.el('dd', 'fact-text', w.label)),
