@@ -267,13 +267,17 @@ versé à T-014 ; les autres points déjà couverts sont précisés dans T-012 �
   par seconde et du ping du joueur filmé par 1, 3 et 6 membres ; README à jour ; version montée.
 
 ### T-048 — Magie : registre des murmures envoyé par pages
-- Agents : vava-dev-lua + vava-dev-nui · Dépend de : — · Statut : à faire
+- Agents : vava-dev-lua + vava-dev-nui · Dépend de : — · Statut : à tester en jeu
 - **IMPORTANT** (`docs/audits/reseau-vava_magic.md`) : `server/registers.lua:154-167` envoie jusqu'à 200 pages (300
   signes et un correspondant de 160 chacune : jusqu'à 100 Ko) en un seul évènement fiable, à chaque ouverture du
   registre. N'envoyer que les 20 pages les plus récentes et le nombre total ; les plus anciennes par un RPC borné
   (curseur sur l'identifiant de page, limite de débit) quand la page les demande.
 - Critères : un registre plein s'ouvre avec moins de 12 Ko envoyés ; procédure `docs/tests/magie.md` complétée ;
   README de `vava_magic` à jour ; version montée.
+- Fait le 30 octobre 2026 : `vava_magic` 2.7.0, lots de 20 pages et de 7,5 Ko au plus (ouverture d'un registre plein :
+  3,2 à 7,1 Ko au lieu de 32 à 193 Ko), RPC `vava_magic:registerPages` à curseur, droit revérifié à chaque lot ;
+  compte rendu `docs/plan/rapports/T-048.md` (décisions à confirmer : taille d'un lot, bouton, pas de mémoire entre
+  deux ouvertures, débit) ; procédure `docs/tests/magie.md` 8.2-15 à 8.2-22.
 
 ### T-010 — Audit sécurité de tout le dépôt
 - Agent : vava-securite · Dépend de : — · Statut : à tester en jeu

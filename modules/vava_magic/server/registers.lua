@@ -6,18 +6,22 @@
            première ouverture (ou au premier murmure consigné).
       - Consigner : si le joueur porte un registre, le dernier qu'il a ouvert (sinon le premier trouvé) ; plein, rien
         n'y est écrit et le joueur est prévenu.
-      - Ouvrir : en l'utilisant (pages les plus récentes d'abord).
+      - Ouvrir : en l'utilisant ; seul le premier lot part (les pages les plus récentes, `registers.pageSize` au plus,
+        sous `registers.pageBytes` octets), avec le nombre total de pages.
+      - Feuilleter : les lots plus anciens, demandés un par un (curseur : numéro de la plus ancienne page reçue), à
+        celui qui porte le registre, revérifié à chaque lot.
       - Arracher une page : celui qui porte le registre.
     Dépendances : shared/, config.lua, server/core.lua, bridge/server.lua, server/sheets.lua
 ]]
 
-local ipairs, tonumber, tostring, type = ipairs, tonumber, tostring, type
+local ipairs, tonumber, tostring = ipairs, tonumber, tostring
 local time = os.time
 local TriggerClientEvent = TriggerClientEvent
 
 local bridge = VavaMagic.bridge
 local sheets = VavaMagic.sheets
 local text = VavaMagic.text
+local pages = VavaMagic.pages
 local cfg = VavaMagic.config
 local limits = cfg.registers
 local notify = cfg.texts.notify
@@ -27,7 +31,8 @@ local ITEM = cfg.items.registre.name
 local META_KEY = 'registre'
 
 local INSERT_REGISTER = 'INSERT INTO `vava_magic_registers` (`created_at`) VALUES (?)'
-local SELECT_PAGES = 'SELECT `id`, `written_at`, `direction`, `contact`, `body` FROM `vava_magic_register_pages` WHERE `register_id` = ? ORDER BY `id` DESC LIMIT ?'
+local SELECT_LATEST = 'SELECT `id`, `written_at`, `direction`, `contact`, `body` FROM `vava_magic_register_pages` WHERE `register_id` = ? ORDER BY `id` DESC LIMIT ?'
+local SELECT_BEFORE = 'SELECT `id`, `written_at`, `direction`, `contact`, `body` FROM `vava_magic_register_pages` WHERE `register_id` = ? AND `id` < ? ORDER BY `id` DESC LIMIT ?'
 local COUNT_PAGES = 'SELECT COUNT(*) FROM `vava_magic_register_pages` WHERE `register_id` = ?'
 local INSERT_PAGE = 'INSERT INTO `vava_magic_register_pages` (`register_id`, `written_at`, `direction`, `contact`, `body`) VALUES (?, ?, ?, ?, ?)'
 local DELETE_PAGE = 'DELETE FROM `vava_magic_register_pages` WHERE `id` = ? AND `register_id` = ?'
@@ -137,7 +142,26 @@ function registers.archive(src, direction, contact, body)
     return true
 end
 
---- Ouvre un registre utilisé par le joueur : pages les plus récentes d'abord.
+--- Lot de pages d'un registre, les plus récentes d'abord : le premier, ou celui qui précède la page `before`. Bloque
+--- le thread.
+---@param id integer
+---@param before integer|nil  numéro de la plus ancienne page déjà reçue
+---@return table[]|nil list
+---@return boolean|string more  il reste des pages plus anciennes ; sinon le code d'erreur
+local function batch(id, before)
+    local fetch = limits.pageSize + 1
+    local rows, err
+    if before then
+        rows, err = bridge.db.query(SELECT_BEFORE, { id, before, fetch })
+    else
+        rows, err = bridge.db.query(SELECT_LATEST, { id, fetch })
+    end
+    if err then return nil, 'db_error' end
+    return pages.take(rows, limits.pageSize, limits.pageBytes)
+end
+
+--- Ouvre un registre utilisé par le joueur (l'inventaire n'utilise qu'un objet de sa propre besace) : premier lot et
+--- nombre total de pages.
 ---@param src integer
 ---@param instance { instanceId: integer, metadata: table }
 function registers.open(src, instance)
@@ -151,20 +175,30 @@ function registers.open(src, instance)
         sheet.register = id
         sheets.touch(src)
     end
-    local rows, err = bridge.db.query(SELECT_PAGES, { id, limits.maxPages })
-    if err then
+    local list, more = batch(id)
+    if not list then
         bridge.Notify(src, cfg.texts.errors.db_error, 'danger')
         return
     end
-    local pages = {}
-    for _, row in ipairs(type(rows) == 'table' and rows or {}) do
-        pages[#pages + 1] = {
-            id = sheets.integer(tonumber(row.id)), at = sheets.integer(tonumber(row.written_at)) or 0,
-            direction = sheets.integer(tonumber(row.direction)), contact = tostring(row.contact), text = tostring(row.body),
-        }
-    end
-    counts[id] = #pages < limits.maxPages and #pages or counts[id]
-    TriggerClientEvent(EVENTS.REGISTER, src, { id = id, pages = pages, count = countOf(id) or #pages, max = limits.maxPages })
+    -- registre lu en entier : son compte est exact
+    if not more then counts[id] = #list end
+    TriggerClientEvent(EVENTS.REGISTER, src, {
+        id = id, pages = list, more = more, count = countOf(id) or #list, max = limits.maxPages,
+    })
+end
+
+--- Lot plus ancien d'un registre que le joueur porte (mêmes contrôles qu'à l'ouverture : l'objet est dans sa besace).
+--- Bloque le thread.
+---@param src integer
+---@param id integer
+---@param before integer  numéro de la plus ancienne page déjà reçue
+---@return boolean ok
+---@return table|string result  { pages, more }, ou le code du refus
+function registers.pages(src, id, before)
+    if not holds(src, id) then return false, 'no_register' end
+    local list, more = batch(id, before)
+    if not list then return false, more end
+    return true, { pages = list, more = more }
 end
 
 --- Arrache une page d'un registre que le joueur porte. Bloque le thread.

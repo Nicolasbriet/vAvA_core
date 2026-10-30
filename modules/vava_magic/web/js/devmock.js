@@ -2,7 +2,7 @@
 /*
  * web/js/devmock.js
  * Rôle : aperçu de l'interface dans un navigateur, hors du jeu (sans effet en jeu) : web/index.html?view=<vue>
- *        avec composer, offer, naming, confirm, grimoire, lueur, sealed, register, cast, broken, murmur, unknown,
+ *        avec composer, offer, naming, confirm, grimoire, lueur, sealed, register, registerlong, cast, broken, murmur, unknown,
  *        threat, wheel, wheelfire, hud, aim, states, frost, messages, all.
  *        Les textes ci-dessous ne sont qu'une copie d'aperçu : en jeu, ils viennent de config.lua.
  */
@@ -52,6 +52,7 @@ window.DevMock = (() => {
       title: 'Registre des murmures', empty: 'Ce registre est vierge.', sent: 'À %s', received: 'De %s', unknown: 'D\'une présence inconnue',
       tear: 'Arracher la page',
       count: '%d / %d pages', close: 'Fermer',
+      more: 'tourner les pages plus anciennes', loading: 'Les pages tournent…',
       months: ['janvier', 'février', 'mars', 'avril', 'mai', 'juin', 'juillet', 'août', 'septembre', 'octobre', 'novembre', 'décembre'],
       date: 'Le %d %s, à %dh%s',
     },
@@ -151,6 +152,16 @@ window.DevMock = (() => {
     { id: 40, at: NOW - 7200, direction: 1, contact: 'Mage du moulin, Le souverain', text: 'Le conseil se tiendra demain à la troisième heure, dans la salle aux tapisseries.' },
     { id: 37, at: NOW - 90000, direction: 2, contact: '', text: 'On t\'observe depuis le pont.' },
   ];
+  // registre long (?view=registerlong) : 47 pages, envoyées par lots de 20 comme le fait le serveur
+  const LONG = Array.from({ length: 47 }, (_, i) => ({
+    id: 300 - i * 3, at: NOW - 3600 * (i + 1), direction: i % 3 === 0 ? 1 : 2, contact: i % 5 === 4 ? '' : CONTACTS[i % CONTACTS.length].name,
+    text: `Murmure n° ${47 - i} : quelques mots confiés au vent, pour feuilleter le registre.`,
+  }));
+  const LOT = 20;
+  function lotBefore(before) {
+    const older = LONG.filter((page) => page.id < before);
+    return { pages: older.slice(0, LOT), more: older.length > LOT };
+  }
 
   const SCENES = {
     composer: () => Bridge.emit('modal:composer', { contacts: CONTACTS, circle: 4, maxLength: 220, waypoint: true, cost: 8 }),
@@ -159,7 +170,8 @@ window.DevMock = (() => {
     confirm: () => Bridge.emit('modal:confirm', { kind: 'scramble', cost: 60 }),
     grimoire: () => Bridge.emit('modal:grimoire', { sealed: false, spells: SPELLS, groups: GROUPS, controls: CONTROLS, combos: COMBOS, hiddenCombos: 5 }),
     sealed: () => Bridge.emit('modal:grimoire', { sealed: true }),
-    register: () => Bridge.emit('modal:register', { id: 7, pages: PAGES, count: 3, max: 200 }),
+    register: () => Bridge.emit('modal:register', { id: 7, pages: PAGES, more: false, count: 3, max: 200 }),
+    registerlong: () => Bridge.emit('modal:register', { id: 8, ...lotBefore(Infinity), count: LONG.length, max: 200 }),
     cast: () => Bridge.emit('cast:start', { label: 'Murmure', ms: 6000 }),
     broken: () => { Bridge.emit('cast:start', { label: 'Boule de feu', ms: 4000 }); setTimeout(() => Bridge.emit('cast:interrupted'), 1500); },
     murmur: () => Bridge.emit('murmur:show', { from: 'Mage du moulin', text: 'Rendez-vous au moulin ce soir, … la lune sera haute.', waypoint: true, ms: 600000 }),
@@ -237,6 +249,7 @@ window.DevMock = (() => {
     texts: TEXTS,
     answer(name, body) {
       posted.push({ name, body });
+      if (name === 'register:more') return { ok: true, ...lotBefore(Number(body.before)) };
       return { ok: true };
     },
   };

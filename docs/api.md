@@ -1113,7 +1113,7 @@ navigateur ; chaque case est une vraie connexion WebRTC locale filmant une scèn
 
 ### `vava_magic`
 
-La magie (2.6.2) : fiche magie par personnage (champ privé `vava_magic:sheet` : mage ou non, sorts et leur XP, sort
+La magie (2.7.0) : fiche magie par personnage (champ privé `vava_magic:sheet` : mage ou non, sorts et leur XP, sort
 prêt dans les mains, combinaisons découvertes, sigils gardés, sigil unique dans tout le royaume), mana (100, +3 toutes
 les 5 s, jamais sauvegardée) et sa barre, 5 niveaux par sort, incantation commune avec délai global (1 s), roue des
 sorts (Tab) et mode magie à la souris (clic droit viser, clic gauche lancer, clic molette verrouiller), états
@@ -1138,7 +1138,11 @@ Mouillé, ni recul, ni Renversé, ni Ralenti), `vava_admin` (droit `tools` et jo
   évènements ciblés aux seuls joueurs proches (`vava_magic:projectile`, `projectileEnd`, `zone`, `zoneEnd`, `burst`) ;
   `vava_magic:combo` (nom) au seul lanceur d'une combinaison réussie.
 - **Murmure** : fragments envoyés aux seuls joueurs à moins de 3 m ; registre des murmures en base sous le numéro porté
-  par l'objet (métadonnée `registre`), l'historique suit l'objet. Sigils : après un refus, le donneur attend
+  par l'objet (métadonnée `registre`), l'historique suit l'objet. Il s'envoie par lots au seul lecteur (2.7.0) :
+  `vava_magic:openRegister` `{ id, pages, more, count, max }` à l'ouverture (pages les plus récentes, 20 et 7 500 octets
+  estimés au plus, `config.registers`), puis RPC `vava_magic:registerPages` `(registre, avant)` → `true, { pages, more }`
+  pour le lot qui précède la page `avant` (curseur : la plus ancienne reçue), refusé `no_register` si le joueur ne porte
+  plus ce registre (revérifié à chaque lot). Sigils : après un refus, le donneur attend
   `sigils.refusedMs` (60 s) avant de retendre son sigil au même joueur (`vava_magic:sigilOffer` répond alors
   `false, 'offer_refused', secondes`). Boue : Ralenti reposé au plus toutes les 2 s
   (`combos.boue.result.slow.refreshMs`), chaque pose couvrant l'intervalle ; 1 à 3 s encore à la sortie.
@@ -1193,7 +1197,7 @@ animation (`VavaMagic.casting.start` n'existe qu'à l'intérieur de vava_magic).
 
 Pour travailler le rendu sans le jeu : `web/index.html?view=grimoire` (ou `wheel`, `wheelfire`, `wheelwater`,
 `wheelearth`, `hud`, `aim`, `states`, `frost`, `mist`, `hits`, `combo`, `combos`, `composer`, `offer`, `naming`,
-`confirm`, `lueur`, `sealed`, `register`, `messages`, `broken`) dans un navigateur, servi en HTTP (les
+`confirm`, `lueur`, `sealed`, `register`, `registerlong`, `messages`, `broken`) dans un navigateur, servi en HTTP (les
 icônes sont des masques CSS, refusés depuis `file://`).
 
 ### `vava_skills`

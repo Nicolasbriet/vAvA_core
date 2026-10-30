@@ -99,6 +99,7 @@ local function setup()
         { RPC.SIGIL_FORGET, { INDEX }, limits.edit, sigils.forget },
         { RPC.SIGIL_SCRAMBLE, {}, limits.scramble, sigils.scramble },
         { RPC.REGISTER_TEAR, { ID, PAGE_ID }, limits.register, registers.tear },
+        { RPC.REGISTER_PAGES, { ID, PAGE_ID }, limits.registerPages, registers.pages },
     }) do
         ok, err = core.rpc.register(def[1], { args = def[2], rateLimit = def[3] }, def[4])
         if not ok then return false, err end
