@@ -1,8 +1,8 @@
 # Outils de développement — procédure de test en jeu
 
-Procédure pour vérifier en jeu la garde des quatre ressources de `examples/` (T-024) : `vava_dev_characters` 1.3.0,
-`vava_example` 1.2.0, `vava_example_items` 1.2.0, `vava_anim_test` 1.1.0. Le point capital est la section 1 : **sans
-la convar `vava_env`, rien n'est offert**, même ressources démarrées. Puis, en mode développement : réservé au droit
+Procédure pour vérifier en jeu la garde des ressources de `examples/` (T-024) : `vava_dev_characters` 1.3.0,
+`vava_example` 1.2.0, `vava_example_items` 1.2.0, `vava_anim_test` 1.1.0, et `vava_example_atelier` 1.0.0 (T-100,
+§ 6). Le point capital est la section 1 : **sans la convar `vava_env`, rien n'est offert**, même ressources démarrées. Puis, en mode développement : réservé au droit
 `staff` du Registre ou à l'ACE `vava.dev`, et journalisé. Comptez 45 minutes, dont la moitié à deux ; les tests à
 deux joueurs sont marqués **(2 joueurs)**. Un test se cite « developpement 2-3 ».
 
@@ -79,7 +79,18 @@ Poser la convar sans redémarrer le serveur : console `set vava_env dev`, puis `
 | 1 | A : `/epee`, puis console `stop vava_anim_test`. | L'animation s'arrête, l'accessoire éventuel (`/animprop`) disparaît. |
 | 2 | A : `/aterre` (outil de `vava_dev_characters`), puis console `ensure vava_anim_test` et `stop vava_anim_test`. | A reste couché : l'arrêt de l'outil ne coupe pas une animation qu'il n'a pas jouée. Se relever ensuite. |
 
-## 6. Fin du test
+## 6. Exemple de l'Atelier (`vava_example_atelier` 1.0.0, T-100)
+
+Procédure complète de l'Atelier : [atelier.md](atelier.md). Ici, la seule garde de l'exemple.
+
+| # | Faire | Attendu |
+|---|---|---|
+| 1 | Sans `vava_env` (§ 1) : `ensure vava_atelier`, `ensure vava_example_atelier`. | Console : `module 'vava_example_atelier' v1.0.0 refusé : … mode développement absent (convar vava_env ≠ dev) : aucun atelier d'exemple déclaré`. A : `F9` : aucune carte « Panneaux du bourg (exemple) » ni « Proclamations (exemple) ». `/atelier_exemple journal panneaux essai` : commande inconnue. |
+| 2 | `set vava_env dev`, `restart vava_example_atelier`. | Console : `atelier 'vava_example_atelier:panneaux' déclaré par vava_example_atelier (droit metiers)`, la même pour `proclamations` (droit `staff`), puis l'avertissement `mode développement : ateliers d'exemple déclarés et /atelier_exemple ouverte au Conseil — jamais sur un serveur ouvert au public`. |
+| 3 | **(2 joueurs)** B (hors du Conseil) : `/atelier_exemple journal panneaux essai`. | « refusé : cet atelier ne vous est pas ouvert. » ; aucune ligne au journal du Conseil. |
+| 4 | Console : `set vava_env prod` (sans redémarrer). A : `/atelier_exemple journal panneaux essai`. | « outil inactif sur ce serveur (mode développement absent). » : la convar est relue à chaque appel. Les ateliers d'exemple restent déclarés jusqu'au redémarrage de la ressource. Remettre `set vava_env dev`. |
+
+## 7. Fin du test
 
 Retirer `set vava_env dev` s'il a été posé pour l'occasion, `remove_ace` pour B s'il reste, et arrêter les ressources
 de `[vava-dev]` si le serveur doit servir à autre chose.
