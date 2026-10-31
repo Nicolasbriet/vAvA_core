@@ -1,9 +1,9 @@
 --[[
     vava_crafting/shared/quality.lua
-    Rôle : règles pures de la qualité d'une pièce, partagées par le client (aperçu dans le menu) et le serveur (décision,
-           qui ajoute l'aléa) : qualité moyenne des matériaux d'après les paliers choisis, score pondéré plafonné par le
-           niveau, palier d'une qualité. Aucun état.
-    Dépendances : shared/constants.lua, config.lua
+    Rôle : règles pures de la qualité d'une pièce : qualité moyenne des matériaux d'après les paliers choisis, score
+           pondéré plafonné par le niveau, palier d'une qualité. Aucun état. Servies au seul serveur (décision, qui
+           ajoute l'aléa ; le menu reçoit son aperçu du serveur, T-132).
+    Dépendances : shared/constants.lua, config_client.lua, config.lua
 ]]
 
 local ipairs = ipairs

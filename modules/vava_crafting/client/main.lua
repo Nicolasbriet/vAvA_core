@@ -4,7 +4,7 @@
            (résultat d'une pièce, notifications par vava_hud sinon celles du jeu ; les stations arrivent par les zones
            du core, client/props.lua), retours de l'interface relayés au serveur (RPC à schéma strict), fermeture au
            déchargement du personnage.
-    Dépendances : shared/constants.lua, config.lua, client/core.lua, client/nui.lua, client/props.lua,
+    Dépendances : shared/constants.lua, config_client.lua, client/core.lua, client/nui.lua, client/props.lua,
                   client/interact.lua
 ]]
 

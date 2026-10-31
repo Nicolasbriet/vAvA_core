@@ -149,10 +149,10 @@ describe('vava_crafting stations vues du client', function()
 
     before_each(function()
         helper.reset()
-        VavaCrafting = nil
+        -- la seule vue client (T-132) : constantes et config_client.lua, comme chez un joueur ; config.lua n'est pas lu
+        helper.loadClientView('modules/vava_crafting', 'VavaCrafting')
+        assert.is_nil(VavaCrafting.config.stations, 'vue client : config.lua ne doit pas être chargé')
         helper.loadAll({
-            'modules/vava_crafting/shared/constants.lua',
-            'modules/vava_crafting/config.lua',
             'modules/vava_crafting/shared/proximity.lua',
             'modules/vava_crafting/shared/stationzone.lua',
         })

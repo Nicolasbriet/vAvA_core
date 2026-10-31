@@ -5,7 +5,7 @@
            du HUD, fin au bout de la durée annoncée, interruption par déplacement ou nouvel appui), résultat et boîte de
            baptême d'un chef-d'œuvre, focus partagé entre le menu et la boîte. À terre (vava_health), ni invite ni
            demande. Le client ne décide de rien : il montre, joue et demande ; le serveur notifie les résultats.
-    Dépendances : shared/constants.lua, config.lua, client/core.lua, client/nui.lua, client/props.lua
+    Dépendances : shared/constants.lua, config_client.lua, client/core.lua, client/nui.lua, client/props.lua
 ]]
 
 local type, tostring, pcall = type, tostring, pcall

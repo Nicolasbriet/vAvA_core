@@ -16,7 +16,15 @@ Rendu hors jeu : `web/index.html?view=menu` (ou `menu&tab=reparation`, `menu&tab
 navigateur, depuis le dépôt (option `--allow-file-access-from-files` pour les polices), avec les données simulées de
 `web/dev/devmock.js` (jamais livré).
 
-## Règles (config.lua)
+## Règles (config.lua, config_client.lua)
+
+Depuis 1.6.0 (T-132), les réglages sont dans deux fichiers et chacun n'est écrit qu'une fois : `config_client.lua`
+porte ce que lit le client, et le serveur aussi : `masterpiece.nameMin` et `nameMax`, `repair.durationMs`,
+`interact.distance` et `interact.moveCancel`, `streaming` (sauf `zoneRadius` et `subscribeSlack`), `keys`, `labels`,
+`stationTypes` (entiers : le client les lit par type), `anims` ; `config.lua` porte tout le reste, lu par le seul
+serveur (dont le palier, la fenêtre et les lettres du baptême, les parts de la réparation, les tolérances des gestes,
+la zone des stations, ajoutés aux tables ouvertes par `config_client.lua`), et complète la table sans réécrire une clé
+de `config_client.lua`.
 
 | Règle | Défaut | Clé |
 |---|---|---|
@@ -135,6 +143,26 @@ station.
   fois par fenêtre). Un module qui insiste ne remplit donc ni le journal ni la console (depuis 1.3.1).
 - La garde ne vaut que pendant que `vava_crafting` tourne (ses hooks tombent à son arrêt). Elle ne couvre pas un objet
   **créé** déjà signé par un autre module (`add`, `exchange`), qui passe par d'autres hooks.
+
+## Fichiers
+
+| Fichier | Rôle |
+|---|---|
+| `config_client.lua` | réglages lus par le client (nom d'un chef-d'œuvre, geste de réparation, interaction, streaming, touche, types de stations, animations) : téléchargé par chaque joueur, ouvre `VavaCrafting.config` |
+| `config.lua` | tous les autres réglages, servi au seul serveur (en tête des `server_scripts`) : complète la table |
+| `shared/proximity.lua`, `shared/stationzone.lua` | purs, lus par le client et le serveur : groupes du streaming, carnet des stations reçues |
+| `shared/quality.lua` | pur, servi au seul serveur : qualité d'une pièce, paliers |
+
+Fichiers téléchargés par chaque joueur (1.6.0, T-132) : `shared/constants.lua`, `config_client.lua`, les deux
+`shared/*.lua` lus par le client, les cinq `client/*.lua`, la page et les dessins des objets ; `config.lua` et
+`shared/quality.lua` sont servis au seul serveur.
+
+**Mise à jour vers 1.6.0 (T-132)** : la longueur d'un nom de chef-d'œuvre, la durée de la réparation, la distance
+d'interaction, le streaming, la touche, les types de stations et les animations ont quitté `config.lua` pour
+`config_client.lua`. Un `config.lua` modifié et gardé par l'installeur de la Chancellerie (le nouveau posé en
+`config.lua.nouveau`) garde l'ancienne forme : le module démarre, mais la console le signale (« config.lua garde la
+forme d'avant 1.6.0 … ») et un réglage client changé dans ce fichier reste sans effet. Reportez vos réglages dans
+`config.lua` et `config_client.lua` d'après les nouveaux fichiers.
 
 ## Base de données (sql/0001_crafting.sql)
 
