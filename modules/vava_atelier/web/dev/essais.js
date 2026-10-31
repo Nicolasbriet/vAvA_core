@@ -19,7 +19,8 @@ load('strings.js', ['STRINGS', 'errorText']);
 load('format.js', ['Format']);
 load('lifecycle.js', ['Lifecycle']);
 load('form.js', ['Form']);
-const { Format: F, STRINGS: S, Form, Lifecycle: L } = ctx;
+load('placing.js', ['Placing']);
+const { Format: F, STRINGS: S, Form, Lifecycle: L, Placing: PL } = ctx;
 
 let passed = 0;
 const eq = (actual, expected, label) => { assert.deepStrictEqual(actual, expected, label); passed += 1; };
@@ -129,12 +130,75 @@ eq(js(got.map((g) => [g.field.id, g.value, g.item])), js([
 eq(F.fieldLabels(fields, { offrande: 'pain' }, []).length, 0);
 eq(F.fieldLabels(fields, { offrande: 'pain' }, undefined).length, 0);
 
+// Placement (T-102) : fonctions pures de placing.js, textes de la maquette Recolte
+const ZONE = { id: 'zone', noun: 'zone', nounPlural: 'zones', article: 'la', placement: 'circle', steps: ['La zone', 'Les points', 'Publier'], rules: { radius: { min: 10, max: 300, default: 60 } } };
+const NODE = { id: 'node', noun: 'point', nounPlural: 'points', article: 'le', parent: 'zone', placement: 'oriented', rules: { inside: { slack: 5 }, spacing: 2 },
+  template: ['ressource', 'charges', 'repousse'], autoTitle: 'ressource',
+  ghost: { field: 'ressource', models: { chene: { model: 'prop_tree_oak_01', label: 'chêne de GTA', provisional: true }, fer: { model: 'prop_rock_1_a', label: 'rocher' } } } };
+const BORNE = { id: 'borne', noun: 'borne', nounPlural: 'bornes', article: 'la', parent: 'enclos', placement: 'point' };
+eq(PL.placeable(ZONE), true);
+eq(PL.placeable({ placement: 'door' }), false, 'porte : T-106');
+eq(PL.placeable({}), false);
+eq(PL.childOf({ kinds: [ZONE, NODE] }, ZONE).id, 'node');
+eq(PL.childOf({ kinds: [ZONE, { id: 'affiche', parent: 'zone' }] }, ZONE), null, 'enfant sans lieu : pas de liste');
+eq(js(PL.cleanPlace('oriented', { x: 1, y: 2, z: 3, h: 90, r: 5, model: 'x' })), js({ x: 1, y: 2, z: 3, h: 90 }));
+eq(js(PL.cleanPlace('circle', { x: 1, y: 2, r: 60 })), js({ x: 1, y: 2, z: 0, r: 60 }));
+eq(PL.cleanPlace('circle', { x: NaN, y: 2 }), null);
+eq(PL.cleanPlace('point', 'x'), null);
+eq(PL.cleanPlace('polygon', { z: 1, points: [{ x: 0, y: 0 }, { x: 1, y: 0 }] }), null, 'deux sommets');
+eq(js(PL.center(PL.cleanPlace('polygon', { z: 1, points: [{ x: 0, y: 0 }, { x: 4, y: 0 }, { x: 4, y: 4 }, { x: 0, y: 4 }] }))), js({ x: 2, y: 2 }));
+eq(js(PL.center({ x: 5, y: 6, z: 1 })), js({ x: 5, y: 6 }));
+eq(PL.lieuLine(ZONE, null), 'Pas encore placée.');
+eq(PL.lieuLine(NODE, null), 'Pas encore placé.');
+eq(sp(PL.lieuLine(ZONE, { x: 0, y: 0, r: 120 }, 32.4)), 'Posée à 32 m de vous, rayon 120 m', 'maquette');
+eq(sp(PL.lieuLine(ZONE, { x: 0, y: 0, r: 81.5 }, 1500)), 'Posée à 1,5 km de vous, rayon 81,5 m');
+eq(PL.lieuLine(ZONE, { x: 0, y: 0, r: 120 }), 'Posée, rayon 120 m', 'distance inconnue');
+eq(sp(PL.lieuLine(NODE, { x: 0, y: 0, h: 0 }, 4)), 'Posé à 4 m de vous');
+eq(PL.lieuLine({ placement: 'polygon', article: 'l\'', feminine: false }, { z: 0, points: [{}, {}, {}, {}, {}, {}] }), 'Posé, 6 sommets');
+const nodes5 = ['live', 'live', 'live', 'live', 'new'].map((tone, i) => PL.cleanRow({ id: `n${i}`, title: `Chêne ${i + 1}`, tone, hint: '3 récoltes', place: { x: i, y: 0, z: 0, h: 0 } }, NODE));
+eq(PL.countLine(nodes5, NODE), '5 points, dont 1 nouveau', 'maquette');
+eq(PL.countLine(nodes5.map((r) => ({ ...r, tone: 'new' })), NODE), '5 points, dont 5 nouveaux');
+eq(PL.countLine(nodes5.slice(0, 1), NODE), '1 point');
+eq(PL.countLine(nodes5.slice(0, 2).map((r) => ({ ...r, tone: 'new' })), BORNE), '2 bornes, dont 2 nouvelles');
+eq(PL.countLine([{ tone: 'removal' }], NODE), 'Aucun point pour l\'instant.', 'retrait non compté');
+eq(PL.cleanRow({ id: 'x', tone: 'piege', title: 3 }, NODE).tone, 'live');
+eq(PL.cleanRow({ id: 'x', title: 3 }, NODE).title, 'x', 'titre non textuel : identifiant');
+eq(PL.cleanRow({ title: 'sans id' }, NODE), null);
+eq(js(PL.mark({ tone: 'new' }, NODE)), js({ text: 'nouveau', tone: 'new' }));
+eq(js(PL.mark({ tone: 'removal' }, BORNE)), js({ text: 'retirée', tone: 'removal' }));
+eq(PL.mark({ tone: 'other' }, NODE).text, 'brouillon d\'un autre membre');
+eq(PL.mark({ tone: 'live' }, NODE), null);
+eq(['new', 'live', 'draft', 'removal', 'other'].map((tone) => PL.removal({ tone })).join(), 'discard,retire,retire,,');
+eq(PL.stepStates(3, { placed: false, children: false }).join(), 'current,todo,todo');
+eq(PL.stepStates(3, { placed: true, children: false }).join(), 'done,current,todo');
+eq(PL.stepStates(3, { placed: true, children: true }).join(), 'done,done,current');
+eq(PL.stepStates(3, { placed: false, children: true }).join(), 'current,todo,todo', 'des points sans zone placée : étape 1');
+eq(js(PL.ghostOf(NODE, 'chene')), js({ model: 'prop_tree_oak_01', label: 'chêne de GTA', provisional: true }));
+eq(PL.ghostOf(NODE, 'inconnu'), null);
+eq(PL.ghostOf(NODE, 'toString'), null, 'clé héritée ignorée');
+eq(js(PL.ghostOf({ ghost: { field: 'modele' } }, 'prop_sign_road_01a', { label: 'Panneau de bois', provisional: true })), js({ model: 'prop_sign_road_01a', label: 'Panneau de bois', provisional: true }));
+eq(PL.lookLine(PL.ghostOf(NODE, 'chene')), 'Apparence : chêne de GTA, modèle provisoire. Il sera remplacé automatiquement quand le modèle médiéval sera ajouté.', 'maquette');
+eq(PL.lookLine(PL.ghostOf(NODE, 'fer')), 'Apparence : rocher.');
+eq(PL.lookLine(null), '');
+eq(js(PL.startPayload({ editor: 'g:z', kind: ZONE, child: NODE, id: 'foret_brume', rev: 3, mode: 'children', title: 'Forêt de Brume', template: { s: { ressource: 'chene' } }, label: 'Chêne', ghost: { model: 'm' } })),
+  js({ editor: 'g:z', kind: 'node', id: '', rev: 0, mode: 'children', shape: 'oriented', rules: NODE.rules, title: 'Forêt de Brume', parent: 'foret_brume', parentRev: 3, template: { s: { ressource: 'chene' } }, label: 'Chêne', ghost: { model: 'm' } }));
+eq(js(PL.startPayload({ editor: 'g:z', kind: ZONE, child: NODE, id: 'foret_brume', rev: 3, mode: 'self', title: 'Forêt de Brume' })),
+  js({ editor: 'g:z', kind: 'zone', id: 'foret_brume', rev: 3, mode: 'self', shape: 'circle', rules: ZONE.rules, title: 'Forêt de Brume' }));
+eq(PL.upsert(nodes5, { id: 'n1', title: 'Chêne 9' }).length, 5, 'ligne remplacée');
+eq(PL.upsert(nodes5, { id: 'n9' }).length, 6, 'ligne ajoutée');
+eq(S.place.next(false, 'point'), 'Prochain point à poser');
+eq(S.place.next(true, 'borne'), 'Prochaine borne à poser');
+eq(S.place.many('points'), 'Poser des points');
+eq(S.place.list('points', L.ofNoun(ZONE)), 'Points de la zone');
+eq(S.place.put(L.theNoun(ZONE)), 'Placer la zone');
+eq(S.place.move(L.theNoun(NODE)), 'Déplacer le point');
+
 // app.js chargé sur une page factice : libellés pris dans `read` sans RPC options, étiquettes renouvelées à chaque
 // accueil, confirmation de sortie dès qu'une valeur a changé depuis l'ouverture, même après « Vérifier »
 async function appEssais() {
   const posts = [], asked = [];
   let homeTags = { 'm:a': { text: '3 panneaux' } }, current = '', homeModel = null, env = null, onMessage = null;
-  const node = () => ({ hidden: false, replaceChildren() {} });
+  const node = () => ({ hidden: false, replaceChildren() {}, classList: { toggle() {}, remove() {} } });
   const nodes = {};
   const view = () => ({ el: {}, focus() {}, setData() {}, setError() {}, clearSearch: () => false, hideOk() {}, setBusy() {}, flashOk() {}, setCompare() {}, setTitle() {} });
   const kind = { id: 'panneau', layout: 'page', form: { fields: [{ id: 'offrande', widget: 'item' }, { id: 'quartier', widget: 'select', source: 'quartiers' }] } };
@@ -146,7 +210,7 @@ async function appEssais() {
     list: () => ({ entries: [] }),
   };
   const page = vm.createContext({
-    STRINGS: S, errorText: ctx.errorText, Format: F, Lifecycle: L, window: {},
+    STRINGS: S, errorText: ctx.errorText, Format: F, Lifecycle: L, Placing: PL, window: {},
     document: { getElementById: (id) => (nodes[id] = nodes[id] || node()), addEventListener() {} },
     Bridge: { inGame: false, onMessage: (handler) => { onMessage = handler; }, post: async (name, data) => { posts.push(name); return replies[name] ? { ok: true, data: replies[name](data) } : { ok: true, data: {} }; } },
     UI: { Toast: { show() {} }, Confirm: { ask: async (texts) => { asked.push(texts); return false; }, isOpen: () => false, cancel() {} },
@@ -297,8 +361,8 @@ async function cycleEssais() {
   const stub = () => ({ el: {}, focus() {}, setData() {}, setError() {}, hideOk() {}, setBusy() {}, flashOk() {}, setCompare() {}, setTitle() {}, setReadOnly() {},
     setState() {}, setFooter: (f) => footers.push(f), setNotice: (text) => notices.push(text) });
   const page = vm.createContext({
-    STRINGS: S, errorText: ctx.errorText, Format: F, Lifecycle: L, window: {},
-    document: { getElementById: () => ({ hidden: false, replaceChildren() {} }), addEventListener() {} },
+    STRINGS: S, errorText: ctx.errorText, Format: F, Lifecycle: L, Placing: PL, window: {},
+    document: { getElementById: () => ({ hidden: false, replaceChildren() {}, classList: { toggle() {}, remove() {} } }), addEventListener() {} },
     Bridge: { inGame: false, onMessage: (h) => { onMessage = h; }, post: async (name, data) => {
       posts.push([name, data]);
       if (name === 'trial' && data.rev !== 4) return { ok: false, error: 'stale', text: 'Texte du refus reçu du serveur.' };
@@ -379,4 +443,131 @@ async function cycleEssais() {
   eq([A.state.entry.rev, A.state.entry.holder], [6, null]);
 }
 
-appEssais().then(cycleEssais).then(() => console.log(`${passed} essais passés`), (error) => { console.error(error); process.exitCode = 1; });
+// placement (T-102) : liste des enfants lue à l'ouverture, visée demandée au jeu avec le modèle, poses et refus reçus,
+// bandeau et barre des touches de la visée, essai joué, arrêt de la visée en quittant la fiche, corbeille d'une ligne
+async function placementEssais() {
+  const posts = [], asked = [], banners = [], keysShown = [], steps = [], messages = [], built = [];
+  let onMessage = null, snap = 'a', rows = [];
+  const descriptor = { label: 'Récolte', stored: true, hasTrial: true, trialPlay: true, texts: { trialLine: 'Mode essai : vous seul voyez ces points' },
+    kinds: [{ ...ZONE, layout: 'side', form: { titleField: 'nom', fields: [{ id: 'nom', label: 'Nom' }] } }, { ...NODE, layout: 'side', form: { titleField: 'nom', fields: [] } }] };
+  const replies = {
+    editor: () => ({ version: 'e1', descriptor }),
+    read: (d) => ({ title: d.id === 'chene_5' ? 'Chêne 5' : 'Forêt de Brume', values: { s: { nom: 'Forêt de Brume' } }, rev: d.id === 'chene_5' ? 2 : 3, place: { x: 1, y: 2, z: 3, r: 120 }, distance: 32,
+      state: { label: 'Brouillon', tone: 'draft' }, footer: [B('save', 'Enregistrer le brouillon'), B('trial', 'Tester la récolte'), B('publish', 'Publier la zone', { primary: true })] }),
+    children: () => ({ self: { place: { x: 1, y: 2, z: 3, r: 120 } }, rows: [{ kind: 'node', id: 'chene_1', title: 'Chêne 1', tone: 'live', hint: '3 récoltes', place: { x: 1, y: 2, z: 3, h: 0 } }] }),
+    save: (d) => ({ done: true, id: d.id || 'bois_des_essais', rev: d.rev + 1, title: 'Bois des Essais', state: { label: 'Brouillon', tone: 'draft' }, footer: [] }),
+    trial: () => ({ done: true, rev: 3, state: { label: 'Essai, version 2', tone: 'trial' }, footer: [] }),
+    discard: () => ({ done: true, gone: true }),
+  };
+  const fakePlacer = (model, actions) => {
+    const p = { model, actions, place: model.place, rows: [], el: {},
+      setPlace(value, far) { p.place = value; p.far = far; }, setRows(got) { p.rows = got; rows = got; }, upsert(row) { p.rows = p.rows.concat([row]); }, drop(id) { p.rows = p.rows.filter((r) => r.id !== id); },
+      failed() {}, progress: () => ({ placed: Boolean(p.place), children: p.rows.length > 0 }), message: (mode, text) => messages.push([mode, text]),
+      template: () => ({ s: { ressource: 'chene' }, n: { charges: 3 } }), ghost: () => ({ model: 'prop_tree_oak_01' }), label: () => 'Chêne' };
+    built.push(p);
+    return p;
+  };
+  const stub = () => ({ el: {}, focus() {}, setData() {}, setError() {}, hideOk() {}, setBusy() {}, flashOk() {}, setCompare() {}, setTitle() {}, setReadOnly() {},
+    setState() {}, setFooter() {}, setNotice() {}, setSteps: (s) => steps.push(s.join()) });
+  const page = vm.createContext({
+    STRINGS: S, errorText: ctx.errorText, Format: F, Lifecycle: L, Placing: { ...PL, build: fakePlacer }, window: {}, setTimeout, clearTimeout,
+    document: { getElementById: () => ({ hidden: false, replaceChildren() {}, classList: { toggle() {}, remove() {} } }), addEventListener() {} },
+    Bridge: { inGame: false, onMessage: (h) => { onMessage = h; }, post: async (name, data) => { posts.push([name, data]); return { ok: true, data: replies[name] ? replies[name](data) : {} }; } },
+    UI: { Toast: { show() {} }, Confirm: { ask: async (box) => { asked.push(box); return true; }, isOpen: () => false, cancel() {} },
+      Picker: { close() {}, isOpen: () => false }, Banner: { show: (...a) => banners.push(a), hide() {} }, Keys: { show: (k) => keysShown.push(k), hide: () => keysShown.push(null) } },
+    Form: { build: (k, v, env) => ({ titleField: 'nom', between: env.between, snapshot: () => snap, packet: () => ({ s: { nom: snap } }), validate: () => true, clear() {}, focusFirst() {}, showErrors() {}, focusFirstError() {}, title: () => 'Forêt de Brume' }) },
+    HomeView: { render: stub }, ListView: { render: stub }, EntryView: { render: stub }, JournalView: { render: stub }, HistoryView: { render: stub },
+  });
+  vm.runInContext(fs.readFileSync(path.join(JS, 'app.js'), 'utf8'), page);
+  const A = page.window.Atelier;
+  const names = () => posts.map((x) => x[0]);
+  const tick = () => new Promise((resolve) => setImmediate(resolve));
+  onMessage('open', { version: 'h1', content: { families: [], cards: [] }, tags: {}, drafts: [], journal: [] });
+  await tick();
+
+  // ouverture : lieu de read, enfants demandés une fois, étapes cochées
+  posts.length = 0;
+  await A.openEntry('g:z', 'zone', 'foret_brume');
+  await tick();
+  eq(js(names()), js(['editor', 'read', 'children']));
+  eq(js(posts[2][1]), js({ editor: 'g:z', kind: 'zone', id: 'foret_brume' }));
+  const zone = built[built.length - 1];
+  eq([zone.model.child.id, zone.place.r, zone.model.distance, rows.length], ['node', 120, 32, 1]);
+  eq(steps[steps.length - 1], 'done,done,current');
+
+  // « Poser des points » : fiche intacte, rien d'enregistré ; visée demandée avec le modèle
+  posts.length = 0;
+  await zone.actions.start('children');
+  eq(js(posts), js([['placeStart', { editor: 'g:z', kind: 'node', id: '', rev: 0, mode: 'children', shape: 'oriented', rules: NODE.rules, title: 'Forêt de Brume',
+    parent: 'foret_brume', parentRev: 3, template: { s: { ressource: 'chene' }, n: { charges: 3 } }, label: 'Chêne', ghost: { model: 'prop_tree_oak_01' } }]]));
+
+  // visée : bandeau d'édition, barre du mode ; touches de la page ignorées
+  const keys = [{ keys: ['Clic'], label: 'Poser ici' }, { keys: ['Ctrl', 'Z'], label: 'Annuler' }];
+  onMessage('placing', { on: true, mode: 'children', shape: 'oriented', keys });
+  eq(js(banners[banners.length - 1].slice(0, 2)), js(['Récolte', S.place.editLine]));
+  eq(js(keysShown[keysShown.length - 1]), js(keys));
+
+  // pose reçue : ligne ajoutée, révision et pied de la fiche parent repris ; refus sous le bloc
+  onMessage('placed', { kind: 'node', id: 'chene_5', rev: 1, title: 'Chêne 5', row: { kind: 'node', id: 'chene_5', title: 'Chêne 5', tone: 'new' },
+    parent: { id: 'foret_brume', rev: 4, state: { label: 'Brouillon', tone: 'draft' }, footer: [] } });
+  eq([A.state.entry.rev, zone.rows.length], [4, 2]);
+  onMessage('placed', { kind: 'node', id: 'chene_6', rev: 1, row: { kind: 'node', id: 'chene_6', title: 'Chêne 6', tone: 'new' } });
+  eq([A.state.entry.rev, zone.rows.length], [4, 3], 'parent absent : ligne ajoutée pendant la visée des points');
+  onMessage('placeRefused', { text: 'Trop près de « Chêne 2 » (1,4 m).' });
+  eq(js(messages[messages.length - 1]), js(['children', 'Trop près de « Chêne 2 » (1,4 m).']));
+  onMessage('undone', { kind: 'node', id: 'chene_6', gone: true });
+  eq(zone.rows.length, 2, 'annulation : ligne retirée');
+  onMessage('placing', { on: false });
+  eq(keysShown[keysShown.length - 1], null, 'fin de visée : barre cachée');
+
+  // déplacer la zone : lieu repris de la pose, distance oubliée
+  posts.length = 0;
+  await zone.actions.start('self');
+  eq(js(posts[0][1]), js({ editor: 'g:z', kind: 'zone', id: 'foret_brume', rev: 4, mode: 'self', shape: 'circle', rules: ZONE.rules, title: 'Forêt de Brume' }));
+  onMessage('placing', { on: true, mode: 'self', shape: 'circle', keys });
+  onMessage('placed', { kind: 'zone', id: 'foret_brume', rev: 5, place: { x: 9, y: 9, z: 3, r: 140 }, state: { label: 'Brouillon', tone: 'draft' }, footer: [] });
+  eq([A.state.entry.rev, zone.place.r, zone.far], [5, 140, null]);
+
+  // quitter la fiche pendant la visée : visée arrêtée
+  posts.length = 0;
+  await A.back();
+  eq(names().includes('placeStop'), true);
+  eq(A.state.placing.on, false);
+
+  // corbeille d'un point jamais publié : boîte, révision relue, abandon, liste relue
+  await A.openEntry('g:z', 'zone', 'foret_brume');
+  await tick();
+  const again = built[built.length - 1];
+  posts.length = 0;
+  asked.length = 0;
+  await again.actions.remove({ kind: 'node', id: 'chene_5', title: 'Chêne 5', tone: 'new' }, 'discard');
+  eq(asked.length, 1);
+  eq(js(posts.slice(0, 3)), js([['read', { editor: 'g:z', kind: 'node', id: 'chene_5' }], ['discard', { editor: 'g:z', kind: 'node', id: 'chene_5', rev: 2 }], ['children', { editor: 'g:z', kind: 'zone', id: 'foret_brume' }]]));
+
+  // ouvrir un point depuis la liste, puis revenir : la fiche de la zone
+  await again.actions.open({ kind: 'node', id: 'chene_5' });
+  eq([A.state.entry.kind.id, A.state.entry.id], ['node', 'chene_5']);
+  await A.back();
+  await tick();
+  eq([A.state.entry.kind.id, A.state.entry.id], ['zone', 'foret_brume']);
+
+  // zone nouvelle : « Placer la zone » enregistre d'abord
+  await A.openEntry('g:z', 'zone', '');
+  posts.length = 0;
+  await built[built.length - 1].actions.start('self');
+  eq(js(names()), js(['save', 'placeStart']));
+  eq(posts[1][1].id, 'bois_des_essais');
+
+  // essai joué : la page demande à se mettre de côté ; bandeau seul, sans retour
+  posts.length = 0;
+  await A.run('trial');
+  eq(names().slice(-1)[0], 'suspend');
+  onMessage('suspended', { on: true });
+  const last = banners[banners.length - 1];
+  eq([last[1], last[2]], ['Mode essai : vous seul voyez ces points · F9 : revenir à l\'Atelier', null]);
+  eq(keysShown[keysShown.length - 1], null);
+  onMessage('suspended', { on: false });
+  eq(A.state.suspended, false);
+}
+
+appEssais().then(cycleEssais).then(placementEssais).then(() => console.log(`${passed} essais passés`), (error) => { console.error(error); process.exitCode = 1; });

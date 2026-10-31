@@ -6,7 +6,7 @@
 
 const Bridge = (() => {
   const resource = typeof GetParentResourceName === 'function' ? GetParentResourceName() : null;
-  const DIRECT = new Set(['close', 'stale']);   // jamais mis en file : ils ne lisent aucun module
+  const DIRECT = new Set(['close', 'stale', 'placeStop', 'templateChanged', 'goTo', 'suspend']);   // jamais mis en file : ils ne lisent aucun module
   let queue = Promise.resolve();
 
   async function send(name, data) {
