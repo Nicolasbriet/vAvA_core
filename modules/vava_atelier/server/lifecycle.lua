@@ -231,6 +231,59 @@ local function saveWarnings(editor, kind, data, ctx, id, entry)
     return out
 end
 
+--- Fiches d'un lot ({ { head, kind, entry, removal? } }) telles que le module les reçoit (shared/lifecycle.lua › lot).
+local function lotOf(items)
+    local list = {}
+    for i, item in ipairs(items) do
+        list[i] = { kind = item.head.kind, id = item.head.id, data = item.entry.data, parent = item.entry.parent,
+            place = item.entry.place, removal = item.removal == true }
+    end
+    return list
+end
+
+--- Erreurs d'une fiche d'un lot ajoutées à `errors` : telles quelles pour la fiche principale, précédées du nom de
+--- la fiche pour un enfant.
+local function pushErrors(errors, item, found)
+    for _, e in ipairs(found) do
+        if item.depth == 1 then
+            errors[#errors + 1] = e
+        else
+            errors[#errors + 1] = { text = text.truncate(format(texts.summaries.child,
+                changes.capital(item.kind.def.noun), item.head.title, e.text), OUT.errorText) }
+        end
+    end
+end
+
+--- Revue d'un lot par le module : `validate` de chaque fiche (forme et monde d'abord, sauf pour un retrait), avec
+--- `ctx.bundle` en références légères, puis, si rien n'est à redire, `validateLot` une seule fois sur le lot entier.
+--- Rend les erreurs (vide : valide), ou nil et un code.
+---@param ctx vAvA.AtelierContext
+---@param items table[]  { { head, kind, entry, removal?, depth } }, la fiche principale d'abord
+---@param action fun(item: table): string  action vue par le module pour une fiche
+---@param lotAction string  action vue par `validateLot`
+local function reviewLot(ctx, items, action, lotAction)
+    local editor = ctx.editor
+    local list = lotOf(items)
+    local bundle = lc.lot(list)
+    local errors = {}
+    for _, item in ipairs(items) do
+        local vctx = { source = ctx.source, accountId = ctx.accountId, id = item.head.id, action = action(item),
+            parent = item.entry.parent, place = item.entry.place, bundle = bundle }
+        local found, code
+        if item.removal then
+            found, code = check.module(editor, item.kind, item.entry.data, vctx)
+        else
+            found, code = check.stored(editor, item.kind, item.entry.data, vctx)
+        end
+        if not found then return nil, code end
+        pushErrors(errors, item, found)
+    end
+    if #errors > 0 then return errors end
+    local main = items[1]
+    return check.lot(editor, main.kind, lc.lot(list, true), { source = ctx.source, accountId = ctx.accountId,
+        kind = main.head.kind, id = main.head.id, action = lotAction })
+end
+
 --- Résumé court d'un brouillon (« 2 réglages changés ») vis-à-vis de la publiée.
 local function draftSummary(kind, before, after)
     local _, count = changes.fields(kind.def.form, before, after, texts.changes)
@@ -444,31 +497,14 @@ local function trialLot(ctx, head)
                 depth = ref.depth }
         end
     end
-    local bundle = {}
     for _, item in ipairs(items) do
         local row, entry = rowEntry(editor, item.kind, item.rowId)
         if not row then return nil, entry end
         item.entry = entry
-        bundle[#bundle + 1] = { kind = item.head.kind, id = item.head.id, data = entry.data, parent = entry.parent,
-            place = entry.place, removal = false }
     end
-    local errors = {}
-    for _, item in ipairs(items) do
-        local found, code = check.stored(editor, item.kind, item.entry.data, {
-            source = ctx.source, accountId = ctx.accountId, id = item.head.id, action = 'trial',
-            parent = item.entry.parent, place = item.entry.place, bundle = bundle,
-        })
-        if not found then return nil, code end
-        for _, e in ipairs(found) do
-            if item.depth == 1 then
-                errors[#errors + 1] = e
-            else
-                errors[#errors + 1] = { text = text.truncate(format(texts.summaries.child,
-                    changes.capital(item.kind.def.noun), item.head.title, e.text), OUT.errorText) }
-            end
-        end
-    end
-    if #errors > 0 then return nil, nil, errors end
+    local errors, code = reviewLot(ctx, items, function() return 'trial' end, 'trial')
+    if not errors then return nil, code end
+    if #errors > 0 then return nil, nil, check.bounded(errors) end
     return items
 end
 
@@ -686,35 +722,13 @@ local function publishPlan(ctx, head)
             if not ready then return nil, code end
         end
     end
-    -- validation complète : forme, monde, module (`publish`, ou `remove` pour un retrait)
-    local bundle = {}
-    for _, item in ipairs(items) do
-        bundle[#bundle + 1] = { kind = item.head.kind, id = item.head.id, data = item.entry.data,
-            parent = item.entry.parent, place = item.entry.place, removal = item.removal }
-    end
-    local errors = {}
-    for _, item in ipairs(items) do
-        local vctx = { source = ctx.source, accountId = ctx.accountId, id = item.head.id,
-            action = item.removal and 'remove' or 'publish', parent = item.entry.parent, place = item.entry.place,
-            bundle = bundle }
-        local found, code
-        if item.removal then
-            found, code = check.module(editor, item.kind, item.entry.data, vctx)
-        else
-            found, code = check.stored(editor, item.kind, item.entry.data, vctx)
-        end
-        if not found then return nil, code end
-        for _, e in ipairs(found) do
-            if item.depth == 1 then
-                errors[#errors + 1] = e
-            else
-                errors[#errors + 1] = { text = text.truncate(format(texts.summaries.child,
-                    changes.capital(item.kind.def.noun), item.head.title, e.text), OUT.errorText) }
-            end
-        end
-    end
+    -- validation complète : forme, monde, module (`publish`, ou `remove` pour un retrait), puis le lot entier
+    local errors, reviewCode = reviewLot(ctx, items, function(item) return item.removal and 'remove' or 'publish' end,
+        removal and 'remove' or 'publish')
+    if not errors then return nil, reviewCode end
     -- résumé
-    local lines, warnings, summary = {}, {}, ''
+    local lines, warnings = {}, {}
+    local summary
     local publishedVersion = head.published and head.published.version or nil
     if removal then
         local groups = childGroups(editor, items, true)
@@ -826,26 +840,8 @@ local function restorePlan(ctx, head, target)
     for kindId, count in pairs(reviving) do
         if index.liveCount(editor.id, kindId) + count > cfg.definitions.perKind then return nil, 'full' end
     end
-    local bundle = {}
-    for _, item in ipairs(items) do
-        bundle[#bundle + 1] = { kind = item.head.kind, id = item.head.id, data = item.entry.data,
-            parent = item.entry.parent, place = item.entry.place, removal = false }
-    end
-    local errors = {}
-    for _, item in ipairs(items) do
-        local found, foundCode = check.stored(editor, item.kind, item.entry.data, {
-            source = ctx.source, accountId = ctx.accountId, id = item.head.id, action = 'restore',
-            parent = item.entry.parent, place = item.entry.place, bundle = bundle,
-        })
-        if not found then return nil, foundCode end
-        for _, e in ipairs(found) do
-            if item.depth == 1 then errors[#errors + 1] = e
-            else
-                errors[#errors + 1] = { text = text.truncate(format(texts.summaries.child,
-                    changes.capital(item.kind.def.noun), item.head.title, e.text), OUT.errorText) }
-            end
-        end
-    end
+    local errors, reviewCode = reviewLot(ctx, items, function() return 'restore' end, 'restore')
+    if not errors then return nil, reviewCode end
     local lines, warnings = {}, {}
     if head.published then
         local pubRow, pubEntry = rowEntry(editor, mainKind, head.published.row)

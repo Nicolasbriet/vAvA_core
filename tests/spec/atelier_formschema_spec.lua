@@ -428,6 +428,14 @@ describe('vava_atelier formschema', function()
             refused(stored({ upgrade = 'monter' }), 'upgrade')
         end)
 
+        it('validateLot : fonction facultative d\'un atelier gardé seulement (R-1)', function()
+            assert.same({ true }, { check(stored({ validateLot = noop })) })
+            refused(stored({ validateLot = 'lot' }), 'validateLot')
+            local def = editor()
+            def.validateLot = noop
+            refused(def, 'validateLot')
+        end)
+
         it('texts.trialLine de 81 octets refusé, 80 accepté', function()
             local def = stored()
             def.texts.trialLine = string.rep('a', 81)

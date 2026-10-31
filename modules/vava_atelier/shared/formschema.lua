@@ -7,7 +7,8 @@
            registre (server/editors.lua) n'accepte que ce que ce fichier accepte.
            T-101 : `format` (1 à 65535), `upgrade`, `texts.trialLine` (80), `feminine` d'un type ; `apply` et `remove`
            ensemble (atelier gardé), `trial` et `endTrial` ensemble et seulement avec `apply` ; chaîne des `parent`
-           sans cycle, trois types au plus (fiche, enfant, petit-enfant).
+           sans cycle, trois types au plus (fiche, enfant, petit-enfant) ; `validateLot` (facultatif, seulement avec
+           `apply`) : le lot entier revu une fois.
            Testée : tests/spec/atelier_formschema_spec.lua.
     Dépendances : shared/constants.lua, shared/text.lua, shared/formvalues.lua
 ]]
@@ -40,10 +41,12 @@ end
 local EDITOR_KEYS = set({
     'family', 'label', 'description', 'icon', 'order', 'right', 'texts', 'kinds',
     'index', 'read', 'validate', 'options', 'compare', 'apply', 'remove', 'trial', 'endTrial', 'diff',
-    'format', 'upgrade',
+    'format', 'upgrade', 'validateLot',
 })
 local REQUIRED_FUNCTIONS = { 'index', 'read', 'validate' }
-local OPTIONAL_FUNCTIONS = { 'options', 'compare', 'apply', 'remove', 'trial', 'endTrial', 'diff', 'upgrade' }
+local OPTIONAL_FUNCTIONS = {
+    'options', 'compare', 'apply', 'remove', 'trial', 'endTrial', 'diff', 'upgrade', 'validateLot',
+}
 local TEXTS_KEYS = set({ 'trial', 'publish', 'publishHint', 'trialLine' })
 local KIND_KEYS = set({
     'id', 'noun', 'nounPlural', 'article', 'newLabel', 'layout', 'creatable', 'steps', 'placement', 'parent', 'form',
@@ -564,5 +567,8 @@ function fs.checkEditor(def, ctx)
         return fail(def.trial == nil and 'trial' or 'endTrial', 'trial et endTrial se déclarent ensemble')
     end
     if def.trial ~= nil and def.apply == nil then return fail('trial', 'un essai demande apply et remove') end
+    if def.validateLot ~= nil and def.apply == nil then
+        return fail('validateLot', 'un lot n\'existe que dans un atelier gardé (apply et remove)')
+    end
     return true
 end

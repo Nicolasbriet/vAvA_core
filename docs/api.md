@@ -2288,6 +2288,7 @@ core.registry.add('vava_atelier:editors', 'vava_gathering:zones', {
     endTrial = function(kind, id, ctx) end,
     diff = function(kind, before, after) end, -- facultatif → texte ≤ 160 ou nil
     upgrade = function(kind, data, from) end, -- facultatif → data au format en vigueur, ou nil, 'texte'
+    validateLot = function(lot, ctx) end,     -- facultatif, avec apply : le lot entier, une fois (comme validate)
 })
 ```
 
@@ -2377,6 +2378,7 @@ qu'il détient. La recopie au Registre et le hook `vava_atelier:journal` partent
 **Déclaration** (en plus de T-100, contrôlée par le validateur) : `format` (1 à 65535, défaut 1) ; `texts.trialLine`
 (0 à 80 octets, bandeau pendant l'essai) ; par type `feminine` (booléen ; défaut : vrai pour l'article `la`) ;
 `apply` et `remove` **ensemble** (atelier gardé), `trial` et `endTrial` ensemble et seulement avec `apply` ; `upgrade` ;
+`validateLot` (seulement avec `apply`) ;
 chaîne des `parent` sans cycle, trois types au plus. Le descripteur gagne `stored`, `hasTrial`, `format` et
 `feminine` sur chaque type.
 
@@ -2387,9 +2389,18 @@ chaîne des `parent` sans cycle, trois types au plus. Le descripteur gagne `stor
   T-101** : avec `ctx = { original = true }`, ils rendent l'**original de la config** (avant tout `apply`), pour
   `/atelier_archives original` ; un module qui l'ignore rend ce qui est en vigueur (rien ne paraît alors à rétablir).
 - `validate(kind, data, ctx)` : `ctx` gagne `action` (`check`, `save`, `trial`, `publish`, `remove`, `restore`,
-  `import`), `parent`, `place`, `bundle` (`{ { kind, id, data, parent, place, removal } }` des fiches publiées
-  ensemble). Sur `save`, un refus n'empêche pas d'enregistrer (avertissements) ; avec `remove`, `data` est la publiée
+  `import`), `parent`, `place`, `bundle` : **références légères** des fiches publiées ensemble, `{ { kind, id,
+  parent?, removal, place? } }` (≈ 100 octets par fiche, **sans data** : seule la fiche validée a la sienne, en
+  `data`). Sur `save`, un refus n'empêche pas d'enregistrer (avertissements) ; avec `remove`, `data` est la publiée
   et le module peut refuser un retrait qui détruirait des objets de joueurs.
+- `validateLot(lot, ctx)` (facultatif, atelier gardé seulement) : pour un module qui doit **croiser** les fiches d'un
+  lot (deux enfants d'un même parent, une somme…). Appelé **une fois par lot** de plus d'une fiche (essai, publication
+  groupée, retrait en cascade, retour en arrière en cascade, import), après les `validate` de chaque fiche et seulement
+  s'ils n'ont rien à redire ; `lot = { { kind, id, data, parent?, place?, removal } }` (la fiche principale d'abord),
+  `ctx = { source?, accountId?, kind, id, action }` (fiche principale ; `action` comme pour `validate`). Même retour
+  que `validate` ; un champ nommé dans une erreur est un champ de la fiche principale. Ne jamais faire passer un lot
+  entier par `ctx.bundle` : chaque appel à une fonction d'un module resérialise ses arguments (un lot de 200 fiches
+  à 2 Ko croisé par chaque `validate` ≈ 80 Mo).
 - `apply(kind, def, info)` : `def` = data normalisée + `id`, `version`, `parent?`, `place?` (jamais `status`) ;
   `info = { reason, last, previous? }`, `reason` ∈ `publish`, `restore`, `reimport`, `import`, `sync` ; `last` : dernier
   appel d'un lot. Crée ou remplace, idempotente, tout ou rien.

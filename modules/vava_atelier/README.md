@@ -31,7 +31,9 @@ Le module ajoute ses éditeurs dans son `setup` si `core.registry.exists('vava_a
 
 Pour être **gardé** (T-101), il déclare en plus `apply(kind, def, info)` et `remove(kind, id, info)` (rechargement à
 chaud, tout ou rien, idempotents), et s'il le veut `trial` / `endTrial` (montrer une fiche à son seul auteur), `diff`
-(résumé d'un changement), `format` et `upgrade` (montée d'une data d'un format plus ancien). `index` et `read` ne
+(résumé d'un changement), `format` et `upgrade` (montée d'une data d'un format plus ancien), `validateLot(lot, ctx)`
+(le lot entier d'une publication groupée, data comprises, **une fois** ; `validate` n'en reçoit que des références
+légères dans `ctx.bundle`, sans data). `index` et `read` ne
 servent plus qu'à la graine et à la synchronisation ; `read(kind, id, { original = true })` et
 `index(kind, { original = true })` rendent l'original de la config (retour à l'original). Contrat d'aller-retour :
 après `apply(kind, def)`, `read(kind, def.id)` rend la même data, le même `place`, le même `parent`.

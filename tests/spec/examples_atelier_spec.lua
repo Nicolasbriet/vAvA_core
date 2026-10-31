@@ -129,6 +129,27 @@ describe('vava_example_atelier', function()
                 langue = 'runes', texte = string.rep('x', 121) }), others, nil)
             assert.equal(3, #errors)
         end)
+
+        it('lot (validateLot) : deux affiches d\'un même panneau ne portent pas le même nom', function()
+            local function poster(id, titre, parent, removal)
+                return { kind = 'affiche', id = id, data = { titre = titre }, parent = parent, removal = removal }
+            end
+            local main = { kind = 'panneau', id = 'place', data = { titre = 'Panneau de la place' } }
+            local twice = rules.TEXTS.posterTwice:format('Foire')
+            -- dans le lot
+            assert.same({ { text = twice } },
+                rules.lot({ main, poster('a1', 'Foire', 'place'), poster('a2', 'Foire', 'place') }, {}))
+            -- contre une affiche en vigueur du même panneau, pas d'un autre
+            assert.same({ { text = twice } },
+                rules.lot({ main, poster('a2', 'Foire', 'place') }, { { id = 'a1', titre = 'Foire', parent = 'place' } }))
+            assert.same({}, rules.lot({ main, poster('a2', 'Foire', 'place') },
+                { { id = 'a1', titre = 'Foire', parent = 'porte' } }))
+            -- l'affiche du lot remplace sa version en vigueur ; une affiche retirée par le lot ne compte plus
+            assert.same({}, rules.lot({ main, poster('a1', 'Foire', 'place') },
+                { { id = 'a1', titre = 'Foire', parent = 'place' } }))
+            assert.same({}, rules.lot({ main, poster('a1', 'Foire', 'place', true), poster('a2', 'Foire', 'place') },
+                { { id = 'a1', titre = 'Foire', parent = 'place' } }))
+        end)
     end)
 
     describe('pour comparer', function()

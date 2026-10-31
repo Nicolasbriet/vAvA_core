@@ -159,6 +159,7 @@ Console).
 | 5 | Publier une fiche identique à la publiée (brouillon sans changement). | « Rien n'a changé depuis la version publiée. » |
 | 6 | Affiche enfant : la page de T-101 ne choisit pas de parent ; console de la page (`nui_devtools`) : `fetch('https://vava_atelier/save', { method: 'POST', body: JSON.stringify({ editor: 'vava_example_atelier:panneaux', kind: 'affiche', id: '', rev: 0, values: { s: { titre: "Marché de l'aube", couleur: 'vert', parent: 'place_du_marche' }, n: { duree: 3600 } } }) }).then(r => r.json()).then(console.log)`, puis publier le panneau (après un changement). | Résumé « 1 affiche ajoutée » ; une seule ligne de journal. |
 | 7 | Une affiche créée par la page (sans parent) : « Dresser le panneau » sur elle. | « Cette fiche dépend d'une autre qui n'est pas publiée… » |
+| 8 | Lot vu une fois (`validateLot`) : comme en 6, une affiche nommée « Foire d'automne » (le nom de l'affiche `foire` de la config, déjà collée sur ce panneau), puis « Dresser le panneau » (après un changement). | Boîte de publication refusée : « Deux affiches d'un même panneau portent le nom « Foire d'automne ». » ; rien n'est publié. Abandonner l'affiche : la publication repasse. |
 
 ## 13. Revenir en arrière, sans redémarrage (T-101) — **(2 joueurs)** pour 2 et 4
 

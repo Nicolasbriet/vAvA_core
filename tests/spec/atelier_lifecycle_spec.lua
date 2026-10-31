@@ -230,6 +230,27 @@ describe('vava_atelier lifecycle', function()
             assert.equal('b', removalOnly[1].id)
             assert.is_true(removalOnly[2].last)
         end)
+
+        it('lot vu par le module : références légères sans data pour validate, data pour validateLot (R-1)', function()
+            local place = { x = 1.0, y = 2.0, z = 3.0 }
+            local big = { texte = string.rep('a', 2000) }
+            local items = {
+                { kind = 'zone', id = 'foret', data = big, place = place },
+                { kind = 'node', id = 'n1', data = { taille = 2 }, parent = 'foret', removal = true, extra = 'jamais' },
+            }
+            local refs = lc.lot(items)
+            assert.same({
+                { kind = 'zone', id = 'foret', place = place, removal = false },
+                { kind = 'node', id = 'n1', parent = 'foret', removal = true },
+            }, refs)
+            for _, ref in ipairs(refs) do assert.is_nil(ref.data) end
+            local full = lc.lot(items, true)
+            assert.equal(big, full[1].data)
+            assert.same({ taille = 2 }, full[2].data)
+            assert.is_nil(full[2].extra)
+            assert.is_false(full[1].removal)
+            assert.same({}, lc.lot({}))
+        end)
     end)
 
     describe('purge', function()

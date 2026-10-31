@@ -114,14 +114,14 @@ local function stateLine(editor)
 end
 
 local function stateCommand(source, editorId)
-    local count = 0
+    local shown = 0
     for _, editor in ipairs(editors.list()) do
         if editor.stored and (editorId == nil or editor.id == editorId) and can(source, editor.right) then
             say(source, stateLine(editor))
-            count = count + 1
+            shown = shown + 1
         end
     end
-    if count == 0 then say(source, editorId and format(T.unknownEditor, editorId) or T.nothing) end
+    if shown == 0 then say(source, editorId and format(T.unknownEditor, editorId) or T.nothing) end
 end
 
 -- Plans (original, import) --------------------------------------------------------------------------------------
@@ -161,11 +161,6 @@ local function planFor(editor, source, items)
         local head = index.get(editor.id, kindId, id)
         return head ~= nil and head.published ~= nil
     end
-    local bundle = {}
-    for _, item in ipairs(items) do
-        bundle[#bundle + 1] = { kind = item.kind, id = item.id, data = item.entry.data, parent = item.entry.parent,
-            place = item.entry.place, removal = false }
-    end
     -- fiches qui reviennent ou arrivent : jamais plus de `definitions.perKind` fiches vivantes par type
     local arriving = {}
     for i, item in ipairs(items) do
@@ -178,10 +173,10 @@ local function planFor(editor, source, items)
     for kindId, n in pairs(arriving) do
         if index.liveCount(editor.id, kindId) + n > cfg.definitions.perKind then return nil, texts.refused.full end
     end
-    local todo = {}
-    local step = yielder()
+    -- fiches publiées ensemble : celles qui changent ; le module les reçoit en références légères (`ctx.bundle`), puis
+    -- entières une seule fois (`validateLot`)
+    local todo, lot = {}, {}
     for i, item in ipairs(items) do
-        step()
         local action = plan.items[i].action
         if action ~= 'unchanged' then
             local kind = editor.kinds[item.kind]
@@ -189,16 +184,33 @@ local function planFor(editor, source, items)
             if not ready then
                 return nil, format(T.entryPlan, kind.def.noun, item.id, texts.refused.parent_missing)
             end
-            local found, code = check.stored(editor, kind, item.entry.data, {
-                source = source ~= CONSOLE and source or nil, accountId = accountId, id = item.id, action = 'import',
-                parent = item.entry.parent, place = item.entry.place, bundle = bundle,
-            })
-            if not found then return nil, texts.refused[code] or tostring(code) end
-            if #found > 0 then
-                return nil, text.truncate(format(T.entryPlan, kind.def.noun, item.id, found[1].text), OUT.summary)
-            end
             todo[#todo + 1] = { kind = item.kind, id = item.id, entry = item.entry, action = action }
+            lot[#lot + 1] = { kind = item.kind, id = item.id, data = item.entry.data, parent = item.entry.parent,
+                place = item.entry.place, removal = false }
         end
+    end
+    local bundle = lc.lot(lot)
+    local who = source ~= CONSOLE and source or nil
+    local step = yielder()
+    for _, item in ipairs(todo) do
+        step()
+        local kind = editor.kinds[item.kind]
+        local found, code = check.stored(editor, kind, item.entry.data, {
+            source = who, accountId = accountId, id = item.id, action = 'import',
+            parent = item.entry.parent, place = item.entry.place, bundle = bundle,
+        })
+        if not found then return nil, texts.refused[code] or tostring(code) end
+        if #found > 0 then
+            return nil, text.truncate(format(T.entryPlan, kind.def.noun, item.id, found[1].text), OUT.summary)
+        end
+    end
+    if #todo > 0 then
+        local first = todo[1]
+        local found, code = check.lot(editor, editor.kinds[first.kind], lc.lot(lot, true), {
+            source = who, accountId = accountId, kind = first.kind, id = first.id, action = 'import',
+        })
+        if not found then return nil, texts.refused[code] or tostring(code) end
+        if #found > 0 then return nil, text.truncate(found[1].text, OUT.summary) end
     end
     plan.todo = todo
     return plan

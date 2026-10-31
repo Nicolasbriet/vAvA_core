@@ -7,7 +7,8 @@
              - numéros : une version prend son numéro à la publication (plus haute version figée + 1) ;
              - lot d'une publication : brouillons du même tenant dont le parent est la fiche (récursivement), borné ;
                parent publié ou dans le lot ; retrait et rétablissement en cascade ; ordre des appels au module
-               (retraits des enfants d'abord, puis applications des parents d'abord, `last` au dernier) ;
+               (retraits des enfants d'abord, puis applications des parents d'abord, `last` au dernier) ; lot passé
+               au module (références légères pour `validate`, data comprise pour l'unique `validateLot`) ;
              - purge de l'historique, réparation au démarrage, annulation d'un lot refusé par le module ;
              - pied de fiche (identifiants des boutons) selon la situation.
            Testée : tests/spec/atelier_lifecycle_spec.lua.
@@ -166,6 +167,32 @@ function lc.bundle(main, drafts, kinds, holder, maxChildren)
         frontier = nextFrontier
     end
     sort(out, byDepth)
+    return out
+end
+
+---@class vAvA.AtelierLotItem
+---@field kind string
+---@field id string
+---@field data? table
+---@field parent? string
+---@field place? table
+---@field removal? boolean
+
+--- Lot d'une écriture tel que le module le reçoit. Sans `withData` : références légères `{ kind, id, parent?,
+--- removal, place? }` (≈ 100 octets par fiche), le `ctx.bundle` de chaque `validate` (le lot n'est jamais resérialisé
+--- entier pour chaque fiche) ; avec : la même liste et la `data` de chaque fiche, pour l'unique appel à `validateLot`.
+--- Les tables du lieu et de la data ne sont pas copiées (lecture seule).
+---@param items vAvA.AtelierLotItem[]
+---@param withData? boolean
+---@return table[]
+function lc.lot(items, withData)
+    local out = {}
+    for i, item in ipairs(items) do
+        local ref = { kind = item.kind, id = item.id, parent = item.parent, place = item.place,
+            removal = item.removal == true }
+        if withData then ref.data = item.data end
+        out[i] = ref
+    end
     return out
 end
 

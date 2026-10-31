@@ -26,6 +26,7 @@ local fv, fs, rights = VavaAtelier.formvalues, VavaAtelier.formschema, VavaAteli
 -- fonctions qu'un éditeur peut déclarer (jamais copiées dans le descripteur)
 local FUNCTIONS = {
     'index', 'read', 'validate', 'options', 'compare', 'apply', 'remove', 'trial', 'endTrial', 'diff', 'upgrade',
+    'validateLot',
 }
 local IS_FUNCTION = {}
 for _, name in ipairs(FUNCTIONS) do IS_FUNCTION[name] = true end

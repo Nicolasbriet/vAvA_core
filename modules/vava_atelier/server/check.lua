@@ -6,7 +6,9 @@
            `validate` du module, seul juge des règles du jeu (§ 7.3 de la spec : vrai, erreur générale ou erreurs par
            champ ; toute autre forme est une erreur de l'éditeur). Erreurs mises en mots ici (textes de la config).
            T-101 : les mêmes contrôles servent à l'enregistrement (`values`), à l'essai et à la publication
-           (`stored` : data gardée revue par le formulaire en vigueur, le monde et le module, avec `ctx.action`).
+           (`stored` : data gardée revue par le formulaire en vigueur, le monde et le module, avec `ctx.action`) ;
+           un lot passe à `validate` en références légères (`ctx.bundle`, sans data) et, entier, une seule fois à
+           `validateLot` s'il est déclaré (`lot`).
            La mise en mots des valeurs (`show`) est dans shared/changes.lua.
     Dépendances : shared/constants.lua, config.lua, shared/text.lua, shared/formvalues.lua, shared/changes.lua,
                   bridge/server.lua, server/core.lua, server/entries.lua
@@ -118,7 +120,7 @@ end
 ---@param editor vAvA.AtelierEditor
 ---@param kind vAvA.AtelierKind
 ---@param data table
----@param vctx table  { source, accountId, id?, action?, parent?, place?, bundle? }
+---@param vctx table  { source, accountId, id?, action?, parent?, place?, bundle? } (bundle : références, sans data)
 ---@return table[]|nil
 ---@return string|nil
 function check.module(editor, kind, data, vctx)
@@ -129,6 +131,29 @@ function check.module(editor, kind, data, vctx)
     if not found then
         VavaAtelier.log.error('%s.validate(%s) : réponse d\'une forme inattendue (true, false + texte, false + liste)',
             editor.id, kindId)
+        return nil, 'editor_error'
+    end
+    return found
+end
+
+--- `validateLot` du module (facultatif), une fois par lot de plus d'une fiche, après les `validate` de chaque fiche :
+--- erreurs (vide : valide, ou pas de `validateLot`), ou nil, 'editor_error'. Une erreur rattachée à un champ l'est au
+--- type de la fiche principale (`kind`).
+---@param editor vAvA.AtelierEditor
+---@param kind vAvA.AtelierKind  type de la fiche principale du lot
+---@param lot table[]  { { kind, id, data, parent?, place?, removal } } (shared/lifecycle.lua › lot, avec data)
+---@param vctx table  { source?, accountId?, kind, id, action }
+---@return table[]|nil
+---@return string|nil
+function check.lot(editor, kind, lot, vctx)
+    local fn = editor.fns.validateLot
+    if not fn or #lot < 2 then return {} end
+    local called, ok, detail = Bridge.CallEditor(editor.id, 'validateLot', fn, lot, vctx)
+    if not called then return nil, 'editor_error' end
+    local found = moduleErrors(kind, ok, detail)
+    if not found then
+        VavaAtelier.log.error('%s.validateLot : réponse d\'une forme inattendue (true, false + texte, false + liste)',
+            editor.id)
         return nil, 'editor_error'
     end
     return found

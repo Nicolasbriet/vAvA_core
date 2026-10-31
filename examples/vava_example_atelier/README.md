@@ -14,7 +14,7 @@ seulement. **Jamais sur un serveur ouvert au public** : sans `set vava_env dev`,
 | `vava_example_atelier:proclamations` — « Proclamations (exemple) » | la société, `staff` (Souverain : sert au test des droits) | `proclamation` |
 
 **1.1.0 (T-101) : ateliers gardés.** Les deux ateliers déclarent `apply` et `remove` (les panneaux aussi `trial`,
-`endTrial`, `diff` et `format = 1` ; les proclamations n'ont pas d'essai). Les fiches vivent en mémoire
+`endTrial`, `diff`, `validateLot` et `format = 1` ; les proclamations n'ont pas d'essai). Les fiches vivent en mémoire
 (`shared/store.lua`) : la config au démarrage — c'est la **graine** que l'Atelier importe en version 1 au premier
 démarrage —, puis l'Atelier met le magasin à l'état de la base à chaque synchronisation (la base fait foi : un texte
 changé dans la config ne revient pas sans `/atelier_archives original_fiche`). L'original de la config reste lisible
@@ -37,6 +37,10 @@ Règles propres au module (`shared/rules.lua`, rendues par `validate`) :
 - panneau éclairé ⇒ affiché au moins un jour : « Un panneau éclairé reste au moins un jour : la lanterne doit valoir la
   peine. » ;
 - langue « Runes » ⇒ texte de 120 caractères au plus : « Les runes se gravent lentement : 120 caractères au plus. »
+
+Et, rendue par `validateLot` (le lot entier, une seule fois : `validate` n'en reçoit que les références) : deux
+affiches d'un même panneau ne portent pas le même nom (celles du lot et celles en vigueur) : « Deux affiches d'un même
+panneau portent le nom « … ». »
 
 Modèles du réglage « Apparence » et lieux des panneaux : provisoires (`-- PLACEHOLDER` dans `config.lua`).
 

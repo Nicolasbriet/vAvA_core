@@ -6,7 +6,7 @@
                règles propres (shared/rules.lua) ;
              - vava_example_atelier:proclamations (société, droit staff, sans essai) : sert au test des droits.
            T-101 : les deux ateliers sont gardés (`apply`, `remove`, et pour les panneaux `trial`, `endTrial`, `diff`,
-           `format = 1`). Les fiches vivent en mémoire (shared/store.lua) : la config au démarrage, puis l'Atelier les
+           `validateLot`, `format = 1`). Les fiches vivent en mémoire (shared/store.lua) : la config au démarrage, puis l'Atelier les
            synchronise sur la base (la base fait foi). Diffusion aux seuls joueurs concernés : chaque panneau qui a un
            lieu a sa zone du core (`panneau:<id>`, état public : titre, texte, langue) ; une publication l'annonce au
            chat de ses seuls abonnés ; un essai n'est montré qu'à son auteur. /atelier_exemple journal (Conseil) écrit
@@ -152,6 +152,18 @@ local function validateBoards(kind, data, ctx)
     return false, errors
 end
 
+--- `validateLot` : le lot entier (un panneau et ses affiches), une seule fois ; `validate` n'en reçoit que les
+--- références (`ctx.bundle`, sans data).
+local function validateBoardLot(lot)
+    local posted = {}
+    for i, entry in ipairs(boards:all('affiche')) do
+        posted[i] = { id = entry.id, titre = entry.data.titre, parent = entry.parent }
+    end
+    local errors = rules.lot(lot, posted)
+    if #errors == 0 then return true end
+    return false, errors
+end
+
 local function options(source)
     if source == 'quartiers' then return cfg.districts end
     return {}
@@ -253,8 +265,8 @@ local EDITORS = {
             { id = 'affiche', noun = 'affiche', nounPlural = 'affiches', article = 'l\'', newLabel = 'Nouvelle affiche',
                 layout = 'side', parent = 'panneau', feminine = true, form = forms.affiche },
         },
-        index = index, read = read, validate = validateBoards, options = options, compare = compare,
-        apply = apply, remove = remove, trial = trial, endTrial = endTrial, diff = diff,
+        index = index, read = read, validate = validateBoards, validateLot = validateBoardLot, options = options,
+        compare = compare, apply = apply, remove = remove, trial = trial, endTrial = endTrial, diff = diff,
     },
     [PROCLAMATIONS] = {
         family = 'societe', right = 'staff', icon = 'parchemin', order = 900,
