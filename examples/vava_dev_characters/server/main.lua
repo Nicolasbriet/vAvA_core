@@ -150,6 +150,12 @@ end
 
 local function setup()
     if not guard.isDevMode(GetConvar(guard.CONVAR, guard.FALLBACK)) then return false, guard.REFUSAL end
+    -- T-132 : un config.lua d'avant 1.4.0 (gardé par une mise à jour) remplace la table de config_client.lua
+    if cfg.clientFile ~= true then
+        core.log.warn('config.lua garde la forme d\'avant 1.4.0 (il remplace la table de config_client.lua) : les '
+            .. 'réglages lus par les joueurs sont dans config_client.lua ; reportez vos changements d\'après '
+            .. 'config.lua.nouveau')
+    end
     local ok, err = core.rpc.register(RPC_ACCESS, { args = {}, rateLimit = cfg.accessRateLimit }, guarded(function()
         return true
     end))

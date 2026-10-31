@@ -13,7 +13,7 @@ lua54 'yes'
 
 name 'vava_dev_characters'
 description 'Commandes de test des personnages vAvA (mode développement et Conseil seulement)'
-version '1.3.0'
+version '1.4.0'
 
 dependencies {
     'vAvA_core',
@@ -22,8 +22,10 @@ dependencies {
     'vava_health',
 }
 
-shared_script 'config.lua'
+-- config_client.lua : ce que lit le client ; config.lua, en tête des server_scripts, n'est jamais servi (T-132)
+shared_script 'config_client.lua'
 server_scripts {
+    'config.lua',
     'shared/guard.lua',
     'server/main.lua',
 }

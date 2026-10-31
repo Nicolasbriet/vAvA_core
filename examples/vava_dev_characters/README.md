@@ -39,7 +39,11 @@ add_ace identifier.license:0123456789abcdef vava.dev allow
 `/perso` passe par les RPC du core, que l'écran de sélection utilise aussi : la garde de cette ressource retire la
 commande, pas le pouvoir (le core reste seul juge : compte propriétaire, état de la session).
 
-## Réglages (`config.lua`)
+## Réglages (`config.lua`, `config_client.lua`)
+
+Depuis 1.4.0 (T-132), ce que lit le client (noms des commandes, `refusals`, `sexes`, `sexLabels`, `chatAuthor`) est
+dans `config_client.lua` ; le reste du tableau est dans `config.lua`, servi au seul serveur. Un `config.lua` d'avant,
+gardé par l'installeur de la Chancellerie, est signalé en console : reportez vos réglages dans les deux fichiers.
 
 | Clé | Défaut | Rôle |
 | --- | --- | --- |
@@ -49,7 +53,7 @@ commande, pas le pouvoir (le core reste seul juge : compte propriétaire, état 
 | `giveRateLimit`, `maxGiveQuantity` | 5, +1/s ; 100 | dons |
 | `needsRateLimit`, `healthRateLimit`, `respawnRateLimit` | 5, +1/s ; 5, +1/s ; 2, +0,1/s | autres commandes |
 | `journal` | libellés ci-dessus | libellés du journal du Registre (32 octets au plus) |
-| `refusals` | — | textes affichés pour `not_allowed` et `unknown_rpc` |
+| `refusals` (`config_client.lua`) | — | textes affichés pour `not_allowed` et `unknown_rpc` |
 
 ## RPC
 
