@@ -787,10 +787,20 @@ versé à T-014 ; les autres points déjà couverts sont précisés dans T-012 �
   propriétaire de l'objet `eau` (et, à terme, du `pain`). Rien qui rende un joueur autosuffisant.
 
 ### T-135 — Usure de l'outre selon la qualité du tanneur
-- Agent : vava-dev-lua · Dépend de : T-130 · Statut : à faire
+- Agent : vava-dev-lua · Dépend de : T-130 · Statut : à tester en jeu (relu sécurité, suites appliquées)
 - Relecture lore de T-130 : une outre se fend une fois sur dix quel que soit son palier, alors qu'une outre « Soignée »
   s'affiche à part. Lier `tearChance` au palier (moins pour une outre Soignée ou Excellente) en gardant le palier sur
   l'outre rendue vide, sans casser l'empilement : le savoir du tanneur doit compter.
+- Fait le 31 octobre 2026 (branche `agents/T-135`), sans RPC, évènement, state bag, boucle ni interface (relecture
+  réseau non requise) : `vava_provisions` 1.3.0 garde le palier `{ tier }` de `vava_crafting` de l'outre vide à l'Outre
+  d'eau (remplissage pile par pile, retraits par identifiant, eau regroupée par palier) et à l'outre rendue (palier
+  relevé par un abonné `before` de `vava_inventory:use`, priorité 1000, jamais de refus) ; risque de fente par palier
+  (`containers.eau.tearChanceByTier`) : Grossière 15 %, Commune 10 %, Soignée 5 %, Excellente 2,5 %, Chef-d'œuvre 1 %,
+  sans palier 10 % (valeurs retenues par le porteur du projet). Empilement par palier essayé sur l'inventaire réel
+  (`provisions_outre_tier_spec`). Relecture sécurité OK, trois mineurs appliqués (relevé effacé si l'inventaire ne
+  répond pas, condition « rien ne cède la main entre `before` et `after` » écrite, avertissement en console au plus
+  une fois par minute). Suite proposée : métadonnées dans le payload de `vava_inventory:use` (tâche à ouvrir). Rapport
+  `docs/plan/rapports/T-135.md` ; à tester en jeu : `docs/tests/eau.md` § 4 bis (tests 28 à 35).
 
 ### T-136 — Recettes de `vava_farming` déclarées aux compétences
 - Agent : vava-dev-lua · Dépend de : — · Statut : à tester en jeu
