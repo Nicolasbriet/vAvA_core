@@ -178,6 +178,49 @@ test('réglages : définitions relues, valeurs hors liste → défaut', () => {
   eq(M.settingValue(defs[1], { 'voice.circle': 'non' }), true);
   eq(M.settingValue(defs[1], null), true);
 });
+// « Chiffres des coups » (T-155) : la ligne de config_client.lua, telle que la page la reçoit dans `open`
+const numbersDef = { key: 'combat.numbers', tab: 'interface', kind: 'choice', default: 'tous', choices: ['tous', 'infliges', 'aucun'],
+  labels: ['Donnés et reçus', 'Donnés seulement', 'Aucun'], uses: ['vava_hud'], label: 'Chiffres des coups',
+  help: 'Ce que vos coups emportent, et ce que vous encaissez, au-dessus de la cible.' };
+test('chiffres des coups : réglage à choix de l\'onglet Interface, libellés entiers', () => {
+  const [def] = M.settingDefs([numbersDef]);
+  eq([def.key, def.tab, def.kind, def.default], ['combat.numbers', 'interface', 'choice', 'tous']);
+  eq(def.choices, ['tous', 'infliges', 'aucun']);
+  eq(def.labels, ['Donnés et reçus', 'Donnés seulement', 'Aucun']);
+  eq([def.label, def.help], [numbersDef.label, numbersDef.help]);
+  assert.ok(def.help.length <= 160, 'aide coupée');
+});
+test('chiffres des coups : valeur lue (gardée si permise, sinon Donnés et reçus)', () => {
+  const [def] = M.settingDefs([numbersDef]);
+  eq(M.settingValue(def, { 'combat.numbers': 'infliges' }), 'infliges');
+  eq(M.settingValue(def, { 'combat.numbers': 'aucun' }), 'aucun');
+  for (const bad of ['Aucun', 'tout', '', 1, true, null]) eq(M.settingValue(def, { 'combat.numbers': bad }), 'tous');
+  eq(M.settingValue(def, {}), 'tous');
+  eq(M.settingValue(def, null), 'tous');
+});
+test('chiffres des coups : un tampon choisi écrit la valeur de son rang (rappel `setting` au Lua, jamais au serveur)', () => {
+  // views.js pose data-index ; app.js changeSetting envoie { key, value: def.choices[index] } par Bridge.post('setting')
+  const [def] = M.settingDefs([numbersDef]);
+  eq(def.choices.map((value, index) => ({ key: def.key, value: def.choices[index] })),
+    [{ key: 'combat.numbers', value: 'tous' }, { key: 'combat.numbers', value: 'infliges' }, { key: 'combat.numbers', value: 'aucun' }]);
+  const app = fs.readFileSync(path.join(web, 'js', 'app.js'), 'utf8');
+  assert.ok(/Bridge\.post\('setting', \{ key, value \}\)/.test(app), 'rappel setting');
+  const bridge = fs.readFileSync(path.join(web, 'js', 'bridge.js'), 'utf8');
+  assert.ok(/fetch\(`https:\/\/\$\{resource\}\//.test(bridge), 'rappels NUI vers la ressource elle-même seulement');
+});
+test('chiffres des coups : la ligne de config_client.lua est celle de la page simulée', () => {
+  const lua = fs.readFileSync(path.join(web, '..', 'config_client.lua'), 'utf8');
+  const line = lua.match(/\{ key = 'combat\.numbers',[\s\S]*?help = '((?:[^'\\]|\\.)*)' \}/);
+  assert.ok(line, 'combat.numbers absent de settings.list');
+  const unquote = (s) => s.replace(/\\'/g, '\'');
+  assert.ok(/tab = 'interface', kind = 'choice', default = 'tous'/.test(line[0]), 'onglet, sorte, défaut');
+  assert.ok(/choices = \{ 'tous', 'infliges', 'aucun' \}/.test(line[0]), 'choix');
+  assert.ok(/labels = \{ 'Donnés et reçus', 'Donnés seulement', 'Aucun' \}/.test(line[0]), 'libellés');
+  assert.ok(/uses = \{ 'vava_hud' \}/.test(line[0]), 'uses');
+  eq(unquote(line[1]), numbersDef.help);
+  const mock = fs.readFileSync(path.join(__dirname, 'devmock.js'), 'utf8');
+  assert.ok(mock.includes(`key: 'combat.numbers'`) && mock.includes(`'Donnés et reçus', 'Donnés seulement', 'Aucun'`), 'devmock');
+});
 test('touches : groupées par chapitre, touche liée d\'abord, entrée malformée écartée', () => {
   const keys = [
     { name: 'codex', label: 'Ouvrir le Codex', chapter: 'Codex', module: 'vava_codex', key: 'F1' },

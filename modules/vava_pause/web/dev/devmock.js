@@ -19,6 +19,9 @@
  *          &council=0  &voice=0  &codex=0    Conseil, voix ou Codex absents
  *          &slow=1                           réponse du serveur 800 ms après le déroulé (message `data`)
  *          &motion=0                         sans animation (open.rollMs = 0)
+ *          &numbers=tous|infliges|aucun      « Chiffres des coups » (T-155) au départ ; sans ce paramètre, le choix fait
+ *                                            dans la page est gardé d'une ouverture à l'autre (stockage local du
+ *                                            navigateur, comme le KVP du jeu ; sans stockage, il est oublié)
  *        Touches de la manette simulées : 8 2 4 6 (pavé numérique) = croix, 5 = A, 0 = B, 7 / 9 = LB / RB.
  *        Échap ferme : la page se rouvre par un clic n'importe où.
  */
@@ -66,9 +69,31 @@ const DevMock = (() => {
   const defs = [
     { key: 'ui.scale', tab: 'interface', kind: 'choice', default: 100, choices: [90, 100, 115], labels: ['90 %', '100 %', '115 %'], label: 'Taille de l\'interface', help: 'Plus lisible de loin, sur un grand écran.' },
     { key: 'hud.notifyDuration', tab: 'interface', kind: 'choice', default: 'normale', choices: ['courte', 'normale', 'longue'], labels: ['Courte', 'Normale', 'Longue'], label: 'Durée des notifications', help: 'Le temps qu\'un message reste à l\'écran.' },
+    // T-155 : la ligne de config_client.lua (settings.list), servie à la page par le message `open`
+    { key: 'combat.numbers', tab: 'interface', kind: 'choice', default: 'tous', choices: ['tous', 'infliges', 'aucun'], labels: ['Donnés et reçus', 'Donnés seulement', 'Aucun'], label: 'Chiffres des coups', help: 'Ce que vos coups emportent, et ce que vous encaissez, au-dessus de la cible.' },
     ...(params.get('voice') === '0' ? [] : [{ key: 'voice.circle', tab: 'voix', kind: 'lever', default: true, label: 'Cercle de portée au sol', help: 'Montre jusqu\'où porte votre voix quand vous en changez.' }]),
   ];
-  const values = { 'ui.scale': Number(params.get('scale')) || 100, 'hud.notifyDuration': 'normale', 'voice.circle': true };
+  const DEFAULTS = { 'ui.scale': 100, 'hud.notifyDuration': 'normale', 'combat.numbers': 'tous', 'voice.circle': true };
+  // réglages gardés d'une ouverture à l'autre, comme le KVP du jeu (stockage du navigateur refusé : rien n'est gardé)
+  const STORE = 'vava_pause:devmock:reglages';
+  function stored() {
+    try {
+      const raw = JSON.parse(window.localStorage.getItem(STORE) || '{}');
+      return raw && typeof raw === 'object' && !Array.isArray(raw) ? raw : {};
+    } catch (error) {
+      return {};
+    }
+  }
+  function store() {
+    try {
+      window.localStorage.setItem(STORE, JSON.stringify(values));
+    } catch (error) {
+      // stockage refusé (fichier local, navigation privée) : le réglage vaut pour cette page seulement
+    }
+  }
+  const values = { ...DEFAULTS, ...stored() };
+  if (params.get('scale')) values['ui.scale'] = Number(params.get('scale')) || 100;
+  if (params.get('numbers')) values['combat.numbers'] = params.get('numbers');
 
   function snapshot() {
     if (flag('downed')) return { downed: true, people: 28 };
@@ -148,11 +173,17 @@ const DevMock = (() => {
       return { ok: true };
     }
     if (name === 'setting') {
+      // le jeu relit la valeur (shared/settings.lua) : hors de la liste du réglage, refusée
+      const def = defs.find((entry) => entry.key === data.key);
+      const allowed = def && (def.kind === 'lever' ? typeof data.value === 'boolean' : def.choices.includes(data.value));
+      if (!allowed) return { ok: false, error: 'invalid_value' };
       values[data.key] = data.value;
+      store();
       return { ok: true, value: data.value };
     }
     if (name === 'resetSettings') {
-      Object.assign(values, { 'ui.scale': 100, 'hud.notifyDuration': 'normale', 'voice.circle': true });
+      Object.assign(values, DEFAULTS);
+      store();
       return { ok: true, values: { ...values } };
     }
     if (name === 'council') {

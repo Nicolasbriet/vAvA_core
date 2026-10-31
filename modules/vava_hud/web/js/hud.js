@@ -7,6 +7,10 @@
  *        interruption annoncée par le jeu). Chaque jauge garde son élément ; une mise à jour ne touche que la jauge
  *        concernée. Réglages de la bannière (vava_pause, 1.6.0) : message `settings` { scale, durationMs } (aussi dans
  *        `init.settings`) : échelle du HUD par transform (--hud-scale), durée des notifications ; valeurs bornées ici.
+ *        Chiffres des coups (T-155) : `number`, `numbersMove`, `numbersClear`, rythme dans `init.numbers` ; montée
+ *        par animation CSS, suivi par transition de transform, retrait à la fin de l'animation ; rien ne tourne sans
+ *        chiffre à l'écran.
+ * Dépendances : js/numbers.js (HudNumbers), chargé avant
  */
 
 (() => {
@@ -21,6 +25,12 @@
   const barFill = bar.querySelector('.progress-fill');
   const barHint = bar.querySelector('.progress-hint');
   const entries = new Map();
+  const N = HudNumbers;
+  const layer = document.getElementById('numbers');
+  // chiffres à l'écran, du plus ancien au plus récent : id → { node, dx, dy, timer }
+  const alive = new Map();
+  let numberRules = N.rules(null);
+  let numberTimes = [];
   // réglages des notifications, reçus à l'initialisation
   let toastRules = { durationMs: 4500, maxVisible: 4 };
   let barTimer = null;
@@ -154,9 +164,73 @@
     if (finite(durationMs) && durationMs >= 500 && durationMs <= 60000) toastRules.durationMs = Math.round(durationMs);
   }
 
+  // Chiffres des coups --------------------------------------------------------------------------------------
+
+  function numberDrop(id) {
+    const entry = alive.get(id);
+    if (!entry) return;
+    clearTimeout(entry.timer);
+    entry.node.remove();
+    alive.delete(id);
+  }
+
+  function numbersClear() {
+    for (const entry of alive.values()) clearTimeout(entry.timer);
+    alive.clear();
+    numberTimes = [];
+    layer.replaceChildren();
+  }
+
+  function numberRhythm(raw) {
+    numberRules = N.rules(raw);
+    layer.style.setProperty('--number-ms', `${numberRules.durationMs}ms`);
+    layer.style.setProperty('--number-rise', `${numberRules.riseVh}vh`);
+    layer.style.setProperty('--number-follow', `${numberRules.followMs}ms`);
+  }
+
+  // ancre (suivie) > corps (monte, s'efface) > chiffre, mot
+  function number(raw) {
+    const n = N.read(raw);
+    if (!n) return;
+    numberDrop(n.id);
+    const gate = N.admit(numberTimes, performance.now(), numberRules.maxPerSecond);
+    numberTimes = gate.times;
+    if (!gate.ok) return;
+    for (const old of N.evict([...alive.keys()], numberRules.maxAlive)) numberDrop(old);
+    const node = document.createElement('div');
+    node.className = 'number';
+    node.style.transform = N.place(n.x, n.y, n.dx, n.dy);
+    const body = document.createElement('div');
+    body.className = `number-body ${n.cls.join(' ')}`;
+    for (const [cls, text] of [['number-text', n.text], ['number-sub', n.sub]]) {
+      if (!text) continue;
+      const span = document.createElement('span');
+      span.className = cls;
+      span.textContent = text;
+      body.append(span);
+    }
+    node.append(body);
+    body.addEventListener('animationend', () => numberDrop(n.id), { once: true });
+    // secours : animations coupées (mouvement réduit)
+    const timer = setTimeout(() => numberDrop(n.id), numberRules.durationMs + 250);
+    alive.set(n.id, { node, dx: n.dx, dy: n.dy, timer });
+    layer.append(node);
+  }
+
+  function numbersMove(raw) {
+    for (const move of N.moves(raw)) {
+      const entry = alive.get(move.id);
+      if (!entry) continue;
+      if (move.x !== null && move.y !== null) entry.node.style.transform = N.place(move.x, move.y, entry.dx, entry.dy);
+      entry.node.classList.toggle('is-hidden', move.hidden);
+    }
+  }
+
   const handlers = {
-    init({ position = {}, gauges = [], visible = false, notifications, progress = null, settings: tuned = null }) {
+    init({ position = {}, gauges = [], visible = false, notifications, progress = null, settings: tuned = null, numbers = null }) {
       if (notifications) toastRules = { durationMs: notifications.durationMs, maxVisible: notifications.maxVisible };
+      numberRhythm(numbers);
+      numbersClear();
       if (tuned && typeof tuned === 'object') settings(tuned);
       if (position.left) root.style.setProperty('--left', position.left);
       if (position.bottom) root.style.setProperty('--bottom', position.bottom);
@@ -187,6 +261,7 @@
     },
     visible({ visible }) {
       root.classList.toggle('is-visible', Boolean(visible));
+      if (!visible) numbersClear();
       // la progression continue derrière le menu pause ou un fondu : seule son opacité suit le HUD
       bar.classList.toggle('is-visible', Boolean(visible));
     },
@@ -194,6 +269,9 @@
     progress: progressStart,
     progressEnd,
     settings,
+    number,
+    numbersMove,
+    numbersClear,
   };
 
   window.addEventListener('message', (event) => {
