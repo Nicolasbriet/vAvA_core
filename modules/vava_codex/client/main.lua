@@ -8,15 +8,18 @@
            le chat inscrive aux dernières pages ce que le joueur tape lui-même, export `openAt` pour ouvrir le livre à
            un chapitre (1.4.0, accueil des nouveaux venus ; 1.5.0 : aussi une page ou un chapitre de lecture, résolus
            par la page), texte d'une page de lecture relayé à la demande (1.5.0). Souris et clavier rendus au jeu si la
-           ressource s'arrête livre ouvert.
-    Dépendances : shared/constants.lua, config.lua, client/core.lua, client/nui.lua, client/keys.lua
+           ressource s'arrête livre ouvert. Codex « en panneau » (1.6.0) : exports `openDocked(chapitre, rectangle)` et
+           `closeDocked()`, réservés à la ressource hôte (`config.docked.host`, la bannière de vava_pause) : le livre se
+           dessine dans le rectangle donné, sans voile, et le crochet client `vava_codex:closed` dit chaque fermeture
+           (échec de l'ouverture compris) pour que l'hôte reprenne la main.
+    Dépendances : shared/constants.lua, config.lua, shared/dock.lua, client/core.lua, client/nui.lua, client/keys.lua
 ]]
 
 local type, tostring, pcall, ipairs = type, tostring, pcall, ipairs
 local pack, unpack = table.pack, table.unpack
 local match, sub = string.match, string.sub
 local CreateThread, Wait, RegisterNetEvent, RegisterCommand, RegisterKeyMapping = CreateThread, Wait, RegisterNetEvent, RegisterCommand, RegisterKeyMapping
-local AddEventHandler, GetCurrentResourceName = AddEventHandler, GetCurrentResourceName
+local AddEventHandler, GetCurrentResourceName, GetInvokingResource = AddEventHandler, GetCurrentResourceName, GetInvokingResource
 local IsPauseMenuActive, GetResourceState, ExecuteCommand, IsNuiFocused = IsPauseMenuActive, GetResourceState, ExecuteCommand, IsNuiFocused
 local BeginTextCommandThefeedPost, AddTextComponentSubstringPlayerName, EndTextCommandThefeedPostTicker =
     BeginTextCommandThefeedPost, AddTextComponentSubstringPlayerName, EndTextCommandThefeedPostTicker
@@ -28,6 +31,8 @@ local cfg = VavaCodex.config
 local RPC = VavaCodex.RPC
 local READING = VavaCodex.READING
 local EVENTS = VavaCodex.EVENTS
+local HOOK_CLOSED = VavaCodex.HOOKS.CLOSED
+local dock = VavaCodex.dock
 local MAX_LINE = VavaCodex.MAX_LINE
 local nui, keys = VavaCodex.nui, VavaCodex.keys
 
@@ -39,6 +44,11 @@ local REFOCUS_MS = 150
 
 local open = false
 local keepOpen = cfg.keepOpenDefault
+-- 1.6.0 : rectangle du livre ouvert en panneau (nil : plein écran) ; ouverture en cours (réponse du serveur attendue)
+-- et, pour une ouverture en panneau, son annulation par l'hôte (closeDocked) avant la réponse
+local docked = nil
+local opening = false
+local dockCancelled = false
 
 -- Ce que la page garde entre deux ouvertures : les empreintes données par le serveur avec le dernier contenu et les
 -- dernières préférences qu'elle a reçus ('' : rien, ou changé par la page depuis), et les touches à relire.
@@ -62,11 +72,22 @@ local function feed(message, kind)
     EndTextCommandThefeedPostTicker(false, false)
 end
 
-local function close()
+--- Crochet client `vava_codex:closed` (1.6.0) : l'hôte d'un livre en panneau reprend la main.
+---@param wasDocked boolean
+---@param reason string  close | run | failed | unloaded | stopped
+local function closed(wasDocked, reason)
+    core.hooks.runAfter(HOOK_CLOSED, { docked = wasDocked, reason = reason })
+end
+
+---@param reason? string  défaut : close
+local function close(reason)
     if not open then return end
     open = false
+    local wasDocked = docked ~= nil
+    docked = nil
     nui.send('close')
     nui.setFocus(false)
+    closed(wasDocked, reason or 'close')
 end
 
 --- Entrées liées à une touche, gardées pour relire à chaque ouverture la touche du joueur (sans le contenu entier).
@@ -124,27 +145,44 @@ end
 
 --- Ouvre le Codex : le serveur reçoit les versions que la page garde et ne renvoie que ce qui a changé, puis le livre
 --- s'affiche. Rien n'est ouvert si la réponse manque. `focus` (1.4.0) : chapitre à ouvrir (export openAt), transmis à
---- la page ; nil pour F1 et /codex.
+--- la page ; nil pour F1 et /codex. `rect` (1.6.0) : rectangle du panneau (export openDocked, déjà validé), transmis
+--- à la page (`dock`) ; nil : plein écran. Un échec rend la main à l'hôte par le crochet (`failed`) ; un livre en
+--- panneau ne notifie rien, l'hôte dit lui-même que le Codex est fermé.
 ---@param focus? string
-local function openCodex(focus)
-    if open or not core.characters.current() or IsPauseMenuActive() then return end
+---@param rect? table
+local function openCodex(focus, rect)
+    if open or opening or not core.characters.current() or IsPauseMenuActive() then return end
+    opening, dockCancelled = true, false
+    local wantDock = rect ~= nil
     CreateThread(function()
         local ok, success, answer = core.rpc.call(RPC.OPEN, known.version, known.prefsVersion)
+        opening = false
         if not ok or not success or type(answer) ~= 'table' then
             core.log.warn('Codex indisponible : %s', tostring(ok and answer or success))
-            feed(cfg.messages.unavailable, 'warning')
+            if not wantDock then feed(cfg.messages.unavailable, 'warning') end
+            closed(wantDock, 'failed')
             return
         end
         -- rien n'est gardé d'une réponse qui n'ira pas à la page
-        if open or not core.characters.current() or IsPauseMenuActive() then return end
+        if wantDock and dockCancelled then
+            closed(true, 'close')
+            return
+        end
+        if open or not core.characters.current() or IsPauseMenuActive() then
+            closed(wantDock, 'failed')
+            return
+        end
         local message = absorb(answer)
         if not message then
             core.log.warn('Codex : réponse incomplète, tout sera redemandé')
-            feed(cfg.messages.unavailable, 'warning')
+            if not wantDock then feed(cfg.messages.unavailable, 'warning') end
+            closed(wantDock, 'failed')
             return
         end
         message.focus = focus
+        message.dock = rect
         open = true
+        docked = rect
         nui.send('open', message)
         nui.setFocus(true)
     end)
@@ -183,7 +221,7 @@ local function run(d)
     if not noted.ok then return noted end
     known.prefsVersion = ''   -- la page note la ligne elle-même : ses préférences ne sont plus celles de l'empreinte
     local closing = d.ui == true or not keepOpen
-    if closing then close() end
+    if closing then close('run') end
     ExecuteCommand(line)
     if not closing then
         CreateThread(function()
@@ -246,7 +284,7 @@ nui.on('refresh', function()
     return { ok = true, payload = message }
 end)
 nui.on('close', function()
-    close()
+    close('close')
     return { ok = true }
 end)
 
@@ -254,15 +292,22 @@ RegisterCommand(cfg.command, toggle, false)
 RegisterKeyMapping(cfg.command, cfg.labels.open, 'keyboard', cfg.keys.open)
 
 core.hooks.after('core:character:unloaded', function()
-    close()
+    close('unloaded')
     known.prefsVersion = ''   -- préférences propres au personnage : celles du suivant sont redemandées
 end)
 
 -- Arrêt de la ressource livre ouvert : la page disparaît avec elle, mais la souris et le clavier resteraient pris.
+-- Arrêt de l'hôte (1.6.0) livre en panneau ouvert : le livre se referme, la main revient au jeu.
 AddEventHandler('onClientResourceStop', function(resource)
-    if resource ~= RESOURCE or not open then return end
-    open = false
-    nui.setFocus(false)
+    if resource == RESOURCE then
+        if not open then return end
+        local wasDocked = docked ~= nil
+        open, docked = false, nil
+        nui.setFocus(false)
+        closed(wasDocked, 'stopped')
+    elseif docked and cfg.docked and resource == cfg.docked.host then
+        close('stopped')
+    end
 end)
 
 --- Ouvre le Codex à un chapitre (1.4.0 ; vava_arrival à la première venue) : même chemin que F1 (RPC vava_codex:open,
@@ -274,13 +319,55 @@ end)
 ---@param chapter string
 ---@return boolean ok
 ---@return string|nil code
+---@param chapter any
+---@return boolean
+local function isChapter(chapter)
+    return type(chapter) == 'string' and #chapter > 0 and #chapter <= VavaCodex.MAX_NAME
+        and match(chapter, VavaCodex.NAME_PATTERN) ~= nil
+end
+
 exports('openAt', function(chapter)
-    if type(chapter) ~= 'string' or #chapter == 0 or #chapter > VavaCodex.MAX_NAME or not match(chapter, VavaCodex.NAME_PATTERN) then
-        return false, 'invalid_chapter'
-    end
+    if not isChapter(chapter) then return false, 'invalid_chapter' end
     if not core.characters.current() then return false, 'no_character' end
-    if open or IsPauseMenuActive() or IsNuiFocused() then return false, 'busy' end
+    if open or opening or IsPauseMenuActive() or IsNuiFocused() then return false, 'busy' end
     openCodex(chapter)
+    return true
+end)
+
+--- Seule la ressource hôte (`config.docked.host`) ouvre ou ferme le livre en panneau.
+---@return boolean
+local function fromHost()
+    return type(cfg.docked) == 'table' and GetInvokingResource() == cfg.docked.host
+end
+
+--- Ouvre le Codex en panneau (1.6.0, bannière de vava_pause) : même chemin que F1 (RPC vava_codex:open, empreintes,
+--- préférences), le livre dessiné dans `rect` ({ left, top, width, height } en vw et vh, shared/dock.lua), sans voile.
+--- L'hôte rend le focus juste avant : l'ouverture ne se refuse pas parce qu'une interface a le focus. `chapter` : nil
+--- (index) ou comme openAt. `true` : ouverture lancée, sa fin dite par le crochet `vava_codex:closed` ; `false, code` :
+--- not_allowed (appelant autre que l'hôte), invalid_chapter, invalid_rect, no_character, busy (livre ouvert ou en
+--- cours d'ouverture, menu de GTA ouvert).
+---@param chapter string|nil
+---@param rect table
+---@return boolean ok
+---@return string|nil code
+exports('openDocked', function(chapter, rect)
+    if not fromHost() then return false, 'not_allowed' end
+    if chapter ~= nil and not isChapter(chapter) then return false, 'invalid_chapter' end
+    local clean, code = dock.rect(rect)
+    if not clean then return false, code end
+    if not core.characters.current() then return false, 'no_character' end
+    if open or opening or IsPauseMenuActive() then return false, 'busy' end
+    openCodex(chapter, clean)
+    return true
+end)
+
+--- Referme le livre s'il est en panneau, ou annule son ouverture en cours (1.6.0) ; le crochet le dit (`close`).
+---@return boolean ok
+---@return string|nil code  not_allowed
+exports('closeDocked', function()
+    if not fromHost() then return false, 'not_allowed' end
+    if opening then dockCancelled = true end
+    if open and docked then close('close') end
     return true
 end)
 

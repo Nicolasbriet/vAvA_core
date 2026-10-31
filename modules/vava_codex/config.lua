@@ -35,6 +35,10 @@ VavaCodex.config = {
     -- (`ui = true` dans sa déclaration) ferme toujours le Codex d'abord.
     keepOpenDefault = true,
 
+    -- Codex « en panneau » (1.6.0) : seule ressource qui peut ouvrir le livre dans un rectangle de son écran, sans voile
+    -- (exports client openDocked et closeDocked) ; la bannière du royaume (vava_pause) l'ouvre à droite de ses rubriques.
+    docked = { host = 'vava_pause' },
+
     -- Pages de lecture (1.5.0) : onglet « Lecture » du livre. Le texte vit dans content/*.lua, côté serveur seulement ;
     -- les bornes du format sont en tête de shared/pages.lua (serveur seul). `false` : ni onglet, ni index envoyé, et le RPC
     -- `page` répond `disabled` ; le reste du Codex est inchangé.

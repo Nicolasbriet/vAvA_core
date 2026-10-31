@@ -2269,6 +2269,23 @@ d'abord (les ids de lecture ne commencent jamais par `vava`, aucune collision). 
 `vava_arrival` à la première venue, ouvre l'onglet Lecture au chapitre « Premiers pas », page « Vivre à Eldoria »
 (`bienvenue`). Hors jeu : `?focus=<identifiant>`.
 
+**Codex en panneau** (1.6.0, T-145) : la bannière de `vava_pause` ouvre le livre dans son panneau, sans copie ni
+voile ; c'est la page du Codex qui le dessine dans un rectangle donné par l'hôte (`config.docked.host`, seul appelant
+admis).
+
+| Export client | Retour |
+|---|---|
+| `openDocked(chapitre\|nil, rect)` | `true` (ouverture lancée, même chemin que `F1`) ou `false, code` : `not_allowed` (`GetInvokingResource()` autre que `docked.host`), `invalid_chapter` (motif d'`openAt`), `invalid_rect`, `no_character`, `busy` (livre ouvert ou en cours d'ouverture, menu de GTA). Ne refuse pas pour `IsNuiFocused` : l'hôte rend le focus juste avant |
+| `closeDocked()` | `true` (même réserve d'appelant, sinon `false, 'not_allowed'`) : referme le livre en panneau, ou annule son ouverture en cours |
+
+- `rect` = `{ left, top, width, height }` en vw et vh (`shared/dock.lua`, pur, testé) : nombres finis, `left` et `top`
+  ≥ 0, `width` et `height` ≥ 10, `left + width` et `top + height` ≤ 100, aucun autre champ. Il part dans le message
+  `open` de la page (`dock`) ; rien de plus sur le réseau.
+- Crochet client **`vava_codex:closed`** (`after`, `{ docked, reason }`) à chaque fermeture, plein écran ou panneau,
+  échec de l'ouverture compris : `reason` ∈ `close`, `run` (une commande lancée a fermé le livre), `failed`,
+  `unloaded`, `stopped`. Un échec en panneau ne notifie rien au joueur : l'hôte le dit.
+- Arrêt de l'hôte (`onClientResourceStop`) livre en panneau ouvert : le livre se referme, souris et clavier rendus.
+
 **Pages de lecture** (1.5.0, T-023) : un onglet « Lecture » (premier des trois onglets ; `F1` ouvre toujours le livre
 sur Commandes) porte des chapitres et des pages écrits dans `content/*.lua` du module, chargés comme
 `server_scripts` : jamais téléchargés par les clients (une page du Conseil ne part qu'aux membres). Au setup, chaque
