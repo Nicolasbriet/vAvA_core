@@ -1834,7 +1834,8 @@ souris, dégainer et rengainer. Demande le core 0.10.0, `vava_inventory` 1.7.0 e
   qu'en soit la cause (chancellement, à terre, main changée, véhicule, bond), compte comme allé au bout : sa
   récupération et le compte d'enchaînement tiennent (s'annuler soi-même ne libère jamais plus tôt). Une demande admise
   **réserve** sa place avant le premier export ou crochet : deux demandes simultanées ne passent jamais toutes les deux,
-  un refus rend la place au coup d'avant. **Chancellement** (`staggers`, le Fendant) : la cible ne frappe plus 0,9 s,
+  un refus (ou une erreur) rend la place au premier coup d'avant qui n'a pas été refusé, jamais à un joueur oublié ni
+  par-dessus une autre réservation ; une réservation refusée n'est jamais rendue. **Chancellement** (`staggers`, le Fendant) : la cible ne frappe plus 0,9 s,
   son coup en cours est coupé, puis aucun autre chancellement avant 3 s.
 - **Dégainer et rengainer** (1.2.0, décision du porteur du projet) : arme prise en main (hook `vava_inventory:hold`), aucune
   technique avant **0,8 s** (`drawing`) ; arme rangée, `armed(src)` rend encore `{ …, sheathing = true, readyInMs }`
@@ -1855,7 +1856,12 @@ souris, dégainer et rengainer. Demande le core 0.10.0, `vava_inventory` 1.7.0 e
 `vava_combat:hit`, ou jamais), `false, code`, `false, code, attente` (ms : `busy`, `chain_limit`, `drawing`,
 `staggered`) ou `false, 'refused', raison` (texte d'un crochet, 120 octets, contrôles retirés). Codes : `not_ready`,
 `unknown_technique`, `not_attack`, `not_opener`, `busy`, `chain_limit`, `staggered`, `drawing`, `no_character`,
-`no_weapon`, `no_style`, `not_in_style`, `downed`, `vehicle`, `controlled`, `refused`.
+`no_weapon`, `no_style`, `not_in_style`, `downed`, `vehicle`, `controlled`, `refused`, `error` (erreur pendant la
+vérification : la place est rendue, une ligne de console par minute au plus).
+
+Interne (T-113, jamais exporté) : `VavaCombat.swings.of(src)` rend le dernier coup du joueur (`pending` : réservé,
+pas encore accepté ; `cancelled` : annulé) ; `swings.cancel(src, raison)` annule le coup en cours et, pendant une
+réservation, le coup d'avant qu'un refus rendrait : `cancelled` est toujours fiable.
 
 **Évènement** `vava_combat:hit(attaquant, cible, issue)` (serveur → clients proches, `core.net.sendNearWith` avec
 l'instance de l'attaquant, 30 m autour de la cible) : `issue` ∈ `hit`, `stagger`, `down`, `block`, `parry` (`dodge` et

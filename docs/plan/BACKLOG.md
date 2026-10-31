@@ -1107,7 +1107,8 @@ faire tout le système de combat ») : la porte T-119 reste à passer en jeu.
   ajoutées à `vava_crafting`.
 
 ### T-112 — Moteur de techniques `vava_combat`
-- Agents : vava-architecte → vava-dev-lua · Dépend de : T-111 · Statut : en cours
+- Agents : vava-architecte → vava-dev-lua · Dépend de : T-111 · Statut : à tester en jeu (relu sécurité, contre-relu,
+  relu réseau ; suites appliquées)
 - Spec : `docs/plan/specs/T-112.md`, avec les décisions du porteur du projet du 31 octobre 2026.
 - Techniques en données (format de `COMBAT_V1.md`), 4 techniques d'épée en config, RPC `vava_combat:use`, fenêtre
   de frappe tenue par le serveur, positions serveur et tolérances, enchaînement, réactions envoyées aux proches
@@ -1119,7 +1120,16 @@ faire tout le système de combat ») : la porte T-119 reste à passer en jeu.
   tout le personnage à chaque `armed()` ; **(lore)** prévoir une vraie durée pour dégainer et rengainer, ou un court
   délai avant d'incanter après avoir rangé une arme, sinon la règle « le mage a besoin d'un garde » ne tient pas
   (l'incantation est déjà brisée dès qu'une arme passe en main, `vava_inventory:hold`).
-- Suites des relectures sécurité et réseau appliquées, contre-relecture sécurité à faire.
+- Fait le 31 octobre 2026 (branche `agents/T-112`) : `vava_combat` 1.2.0 — techniques en données (Taille descendante,
+  Estoc rapide, Revers, Fendant ; style `epee_une_main`), RPC `vava_combat:use` (schéma borné, 4 d'avance puis 3 / s),
+  fenêtre de frappe tenue par deux minuteries du serveur, positions et cap lus par le serveur, tolérances décidées
+  (+ 0,25 m, + 10°, aucun contrôle des murs), un adversaire par coup, enchaînement (4 coups au plus), chancellement
+  (0,9 s, immunité 3 s), dégainer 0,8 s et rengainer 1,5 s tenus par le serveur, réactions aux seuls joueurs à 30 m
+  de la cible (rien pour une esquive ni un coup absorbé), mode combat éveillé et borné, verrou sans boucle propre,
+  cache client de la main (T-140 R-1). Suites des relectures : coup annulé qui garde son cycle, réservation avant
+  tout appel qui cède la main et restitution au premier coup d'avant non refusé (sous `pcall`), `mode.blocked` sans
+  Échap ni P ; géométrie et admission servies au seul serveur, en-têtes livrés allégés (106,6 → 85,7 Ko livrés).
+  Rapport `docs/plan/rapports/T-112.md` ; procédure `docs/tests/combat.md` § 3 (32 tests) et § 4.
 
 ### T-149 — La magie et le mode combat
 - Agent : vava-dev-lua (cette tâche autorise à toucher `vava_magic`) · Dépend de : T-112, T-138 · Statut : à faire
