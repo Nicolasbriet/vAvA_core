@@ -52,7 +52,7 @@ local WITHOUT_LUA = { ['modules/vava_ui'] = true }
 -- Modules pas encore basculés (lots 2 à 4 de T-132), sautés par T0 à T3 ; chaque lot retire les siens, avec leurs
 -- exceptions transitoires de scripts/audit-exceptions.txt.
 local PENDING = {
-    vava_farming = 'T-141', vava_crafting = 'T-141', vava_gathering = 'T-141',
+    vava_crafting = 'T-141', vava_gathering = 'T-141',
     vava_provisions = 'T-141',
     vava_inventory = 'T-142', vava_combat = 'T-142', vava_health = 'T-142', vava_time = 'T-142', vava_codex = 'T-142',
     vava_admin = 'T-142', vava_voice = 'T-142', vava_chat = 'T-142', vava_cameras = 'T-142',

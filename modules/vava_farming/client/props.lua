@@ -11,7 +11,7 @@
            toutes les streaming.pollMs près d'un groupe et toutes les streaming.idlePollMs loin de tous ; une parcelle
            reçue, changée ou quittée fait aussitôt un passage (props et invite à jour sans attendre) ; elle s'arrête
            d'elle-même à la sélection et au déchargement, et retire alors tous les props.
-    Dépendances : shared/constants.lua, config.lua, shared/geometry.lua, shared/parcelzone.lua, shared/proximity.lua,
+    Dépendances : shared/constants.lua, config_client.lua, shared/geometry.lua, shared/parcelzone.lua, shared/proximity.lua,
                   client/core.lua (core.zones, vAvA_core 0.11.0)
 ]]
 

@@ -19,7 +19,14 @@ Rendu hors jeu : `web/index.html?view=prompt` ou `?view=menu&state=growing` (par
 `web/dev/devmock.js`, jamais livré) dans un navigateur, depuis le dépôt (option `--allow-file-access-from-files` pour
 les polices).
 
-## Règles (config.lua)
+## Règles (config.lua, config_client.lua)
+
+Depuis 1.8.0 (T-132), les réglages sont dans deux fichiers et chacun n'est écrit qu'une fois : `config_client.lua`
+porte ce que lit le client, et le serveur aussi : `actions`, `interact.distance` et `interact.moveCancel`,
+`streaming` (sauf `subscribeSlack`), `keys`, `labels`, `crops` (entières : le client les lit par culture), `wells`,
+`anims` ; `config.lua` porte tout le reste, lu par le seul serveur (dont les tolérances `interact.serverTolerance`,
+`expireMs`, `finishToleranceMs` et le battement `streaming.subscribeSlack`, ajoutés aux tables ouvertes par
+`config_client.lua`), et complète la table sans réécrire une clé de `config_client.lua`.
 
 | Règle | Défaut | Clé |
 |---|---|---|
@@ -94,6 +101,25 @@ l'attente s'écrit aussitôt, et ce qui n'y tient plus pendant une panne de la b
 l'écriture groupée et à l'arrêt ; une même minute écrite en plusieurs fois reste une seule ligne. Les lignes écrites
 avant la migration 0002 (une par geste, `minute` nul) restent telles quelles. La récolte d'une parcelle communale va
 dans la besace du récolteur, qui la dépose au grenier.
+
+## Fichiers
+
+| Fichier | Rôle |
+|---|---|
+| `config_client.lua` | réglages lus par le client (gestes, distance d'interaction, streaming, touche, cultures, puits, animations) : téléchargé par chaque joueur, ouvre `VavaFarming.config` |
+| `config.lua` | tous les autres réglages, servi au seul serveur (en tête des `server_scripts`) : complète la table |
+| `shared/geometry.lua`, `shared/parcelzone.lua`, `shared/proximity.lua` | purs, lus par le client et le serveur : géométrie des emplacements, parcelle envoyée aux joueurs proches, groupes du streaming |
+| `shared/growth.lua` | pur, servi au seul serveur : croissance, humidité, fertilité, qualité, gel |
+
+Fichiers téléchargés par chaque joueur (1.8.0, T-132) : `shared/constants.lua`, `config_client.lua`, les trois
+`shared/*.lua` lus par le client, les cinq `client/*.lua`, la page et les dessins des objets ; `config.lua` et
+`shared/growth.lua` sont servis au seul serveur.
+
+**Mise à jour vers 1.8.0 (T-132)** : les gestes, la distance d'interaction, le streaming, la touche, les cultures, les
+puits et les animations ont quitté `config.lua` pour `config_client.lua`. Un `config.lua` modifié et gardé par
+l'installeur de la Chancellerie (le nouveau posé en `config.lua.nouveau`) garde l'ancienne forme : le module démarre,
+mais la console le signale (« config.lua garde la forme d'avant 1.8.0 … ») et un réglage client changé dans ce fichier
+reste sans effet. Reportez vos réglages dans `config.lua` et `config_client.lua` d'après les nouveaux fichiers.
 
 ## Base de données (sql/0001_farming.sql, 0002_granary_log_minute.sql, 0003_slot_cover.sql)
 
