@@ -1062,7 +1062,11 @@ faire tout le système de combat ») : la porte T-119 reste à passer en jeu.
   `annulation`, priorité 10, `kinds` de la chaîne sauf `monde`) déclaré au démarrage et redéclaré au retour de
   `vava_health` par un appel isolé ; il ne lit que la mémoire et ne protège plus un compte qui a perdu le droit. Aucun
   RPC, évènement ni boucle ajouté. Essais `admin_invulnerability_spec` (15). Rapport `docs/plan/rapports/T-138.md`.
-  Relectures sécurité et réseau à faire. **À tester en jeu** : `docs/tests/registre.md` § 9 bis.
+  Relecture sécurité faite (à corriger, aucun bloquant), suites appliquées : observation bornée (corps près de
+  l'ancrage, `spectateMaxMs`, au journal), raisons au droit perdu retirées au changement de rang et évènement
+  `vava_admin:toolsReset` au seul joueur, `tool(nom, false)` sans droit, export `isInvulnerable`, doc « tout coup et
+  tout sort qui blessent », faim et soif écrites comme décision ; 23 essais. Relecture réseau à faire (évènement
+  nouveau). **À tester en jeu** : `docs/tests/registre.md` § 9 bis.
 
 ### T-139 — Apparition confirmée par le core
 - Agent : vava-dev-lua (cette tâche autorise à toucher le core, `server/players/`) · Dépend de : — · Statut : à faire

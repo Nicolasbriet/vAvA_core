@@ -22,7 +22,8 @@ Comptez 1 h par section, presque tout à deux ; les tests à deux joueurs sont m
 4. **Consoles** : `F8` chez A et chez B, console du serveur ouverte ; une requête SQL sous la main
    (`SELECT * FROM vava_health_hits ORDER BY id DESC LIMIT 5`).
 5. **Invulnérabilité** du Registre éteinte chez les deux, vol libre et observation compris : depuis `vava_admin` 1.11.0
-   (T-138), elles annulent tout coup de la chaîne (`invulnerable`, `spectating` ; essai : [registre 9 bis](registre.md)).
+   (T-138), elles annulent tout coup et tout sort qui blessent (`invulnerable`, `spectating` ; essai :
+   [registre 9 bis](registre.md)) ; les effets sans dégâts (recul, mouillé, ralenti) ne sont pas couverts.
    `/chaine` montre alors aussi `vava_admin:invulnerabilite` en tête de liste, à l'étape annulation.
 6. **Armes** (section 2) : `ensure vava_combat` **après** `vava_health` et `vava_crafting`, et `vava_example_combat`
    1.1.0 (`/frapper_arme`). A est Souverain ; `/metiers niveau <A> forge 60` et `/metiers niveau <A> menuiserie 30` ;
