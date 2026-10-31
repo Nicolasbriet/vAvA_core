@@ -533,7 +533,7 @@ describe('vava_provisions rules', function()
 
         it('remplit des outres en eau et rend une outre vide qui se fend une fois sur dix sans palier, moins si elle est mieux faite', function()
             assert.same({ from = 'outre', to = 'eau', maxPerDraw = 5 }, cfg.fill)
-            -- valeurs provisoires de T-135 (Grossier, Commun, Soigné, Excellent, Chef-d'œuvre), à trancher
+            -- valeurs de T-135 retenues par le porteur du projet (Grossier, Commun, Soigné, Excellent, Chef-d'œuvre)
             assert.same({ empty = 'outre', tearChance = 0.1, tearChanceByTier = { 0.15, 0.1, 0.05, 0.025, 0.01 } }, cfg.containers.eau)
             -- une outre Soignée ou Excellente se fend moins qu'une outre sans palier ou Commune
             local eau = cfg.containers.eau

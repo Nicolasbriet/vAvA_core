@@ -2212,7 +2212,7 @@ SQL. Détail et réglages : `modules/vava_provisions/README.md`.
   `points.put` et `points.drop` sont prêts pour l'éditeur de l'Atelier.
 - **Outre rendue** : hook `vava_inventory:use` (after) ; seulement si `consumed`, pour un objet de `containers` ; dans
   un thread, pour le même personnage : `add(outre, 1, { tier }?)` au palier de l'Outre d'eau bue, sauf quand elle se
-  fend (`tearChanceByTier[palier]`, sinon `tearChance` : valeurs provisoires 15 %, 10 %, 5 %, 2,5 %, 1 % du palier 1
+  fend (`tearChanceByTier[palier]`, sinon `tearChance` : 15 %, 10 %, 5 %, 2,5 %, 1 % du palier 1
   au palier 5, 10 % sans palier) ; sans place, elle est abandonnée. Avis au seul buveur.
 - **Palier de l'outre** (1.3.0, T-135) : la métadonnée `tier` (1 à 5) posée par `vava_crafting` passe de l'outre vide à
   l'Outre d'eau (remplissage pile par pile : retraits par `instanceId`, ajouts `{ item = 'eau', quantity, metadata =

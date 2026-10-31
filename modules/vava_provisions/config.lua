@@ -34,8 +34,8 @@ config.fill = { from = 'outre', to = 'eau', maxPerDraw = 5 }
 -- dépend du savoir du tanneur, lu sur le palier de l'outre (`tier` posé par vava_crafting : 1 Grossier, 2 Commun,
 -- 3 Soigné, 4 Excellent, 5 Chef-d'œuvre) : `tearChanceByTier[palier]` (0 à 1, jamais plus haut qu'au palier d'avant ;
 -- facultatif) ; une outre sans palier (dotation, outres d'avant 1.3.0) ou d'un palier absent de la liste : `tearChance`.
--- VALEURS PROVISOIRES (T-135), à trancher par le porteur du projet : usages moyens avant la fente, environ 7, 10,
--- 20, 40 et 100 (10 sans palier). Une recette future qui consomme `eau` doit rendre `outre` dans sa sortie, sinon
+-- Valeurs retenues par le porteur du projet (T-135) : usages moyens avant la fente, environ 7, 10, 20, 40 et 100
+-- (10 sans palier). Une recette future qui consomme `eau` doit rendre `outre` dans sa sortie, sinon
 -- l'outre est perdue.
 config.containers = {
     eau = { empty = 'outre', tearChance = 0.1, tearChanceByTier = { 0.15, 0.1, 0.05, 0.025, 0.01 } },

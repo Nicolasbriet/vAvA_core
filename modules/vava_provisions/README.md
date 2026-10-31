@@ -36,7 +36,7 @@ lu par le seul serveur (dont `interact.serverTolerance`, `streaming.zoneRadius`,
 | Objets déclarés s'ils manquent | `eau` (Outre d'eau : 1 × 2, pile de 5, 700 g, soif + 40, `boisson` — définition de `vava_arrival` 1.0.0 gardée telle quelle) et `outre` (Outre vide : 1 × 2, pile de 5, 150 g, `divers`) ; image `nui://vava_provisions/web/items/<nom>.svg` ajoutée à la déclaration ; un objet déjà déclaré par une autre ressource n'est pas remplacé (avertissement en console) | `items` |
 | Remplir | un appui remplit au plus 5 outres vides : outres prises pile par pile (les plus anciennes d'abord, tous paliers confondus) et eau donnée **en un seul échange tout ou rien** ; chaque Outre d'eau garde le palier de son outre (`{ tier }`, seule métadonnée gardée), une outre sans palier donne une Outre d'eau sans palier (1.3.0, T-135) | `fill` |
 | Outre rendue | boire une Outre d'eau rend une Outre vide **du même palier**, sauf quand elle se fend (avis au buveur) ; sans place dans la besace, elle est abandonnée (avis) ; une outre au plus par unité réellement bue | `containers` |
-| Usure selon le palier | risque de fente à chaque Outre d'eau bue, selon le palier de l'outre (savoir du tanneur) : Grossière 15 %, Commune 10 %, Soignée 5 %, Excellente 2,5 %, Chef-d'œuvre 1 % ; sans palier (dotation, outres d'avant 1.3.0) 10 % — **valeurs provisoires** (T-135), à trancher ; liste de 1 à 5 risques de 0 à 1, jamais plus haut qu'au palier d'avant, un palier absent de la liste prend le risque sans palier (1.3.0) | `containers.eau.tearChanceByTier`, `containers.eau.tearChance` |
+| Usure selon le palier | risque de fente à chaque Outre d'eau bue, selon le palier de l'outre (savoir du tanneur) : Grossière 15 %, Commune 10 %, Soignée 5 %, Excellente 2,5 %, Chef-d'œuvre 1 % ; sans palier (dotation, outres d'avant 1.3.0) 10 % (valeurs retenues par le porteur du projet, T-135) ; liste de 1 à 5 risques de 0 à 1, jamais plus haut qu'au palier d'avant, un palier absent de la liste prend le risque sans palier (1.3.0) | `containers.eau.tearChanceByTier`, `containers.eau.tearChance` |
 | Outres neuves | recette « Outre » à la tannerie (`vava_crafting`, compétence Tannerie, niveau 0, 6 s, 1 cuir → 2 outres, 8 XP), ni signée ni transmise ; ajoutée aux registres de l'artisanat et des compétences dès qu'ils sont là | `recipe` |
 | Boire au point d'eau | soif + 20, refusé dès 95 (même seuil que `vava_needs`) ; la réserve n'est pas touchée | `drink` |
 | Délai | 3 s entre deux actions d'un même joueur (puiser ou boire), tenu par le serveur | `cooldownMs` |
@@ -57,7 +57,7 @@ fautif (« config : points[2].label : invalid_label »).
 Bilan d'une outre : la soif passe de 100 à 0 en 3 h (`vava_needs`), une Outre d'eau vaut 40, soit environ 0,8 outre
 par heure de jeu ; une outre sans palier fait en moyenne 10 usages, donc 12 h de jeu environ. Les deux outres de la
 dotation donnent environ 24 h de jeu avant de devoir passer chez un tanneur (en moyenne : le tirage est indépendant à
-chaque gorgée). Selon le palier (valeurs provisoires) : Grossière environ 7 usages (8 h), Commune 10 (12 h), Soignée 20
+chaque gorgée). Selon le palier : Grossière environ 7 usages (8 h), Commune 10 (12 h), Soignée 20
 (25 h), Excellente 40 (50 h), Chef-d'œuvre 100 (125 h). Une outre de débutant s'use plus vite que celle de la dotation ;
 celle d'un tanneur confirmé dure deux à quatre fois plus : on revient chez lui, et on s'adresse à lui plutôt qu'au
 premier venu.
@@ -75,7 +75,8 @@ pose sur l'outre neuve (`{ tier }`, produit simple). Le serveur le suit seul, d'
    jamais) relève le palier de la pile d'Outres d'eau visée, car la pile disparaît avec sa dernière unité ; en phase
    `after`, si l'unité a été bue, le risque de fente est celui de ce palier et l'Outre vide rendue porte `{ tier }`.
    Sans relevé (pile introuvable, inventaire muet, gorgée commencée avant un redémarrage du module), l'outre est
-   traitée sans palier. Au plus 8 relevés gardés par joueur (gorgées refusées par un autre abonné), oubliés quand il
+   traitée sans palier, le relevé ancien de la pile est effacé, et la console l'écrit (« palier de l'outre d'eau non
+   relevé … », au plus une fois par minute, le nombre des suivants tus en fin de ligne). Au plus 8 relevés gardés par joueur (gorgées refusées par un autre abonné), oubliés quand il
    part ou change de personnage.
 
 Empilement (règle de `vava_inventory` : métadonnées strictement identiques) : deux outres du même palier s'empilent, et
@@ -157,7 +158,13 @@ serveur dans la besace : le client ne dit rien du palier). Les payloads des hook
 appel (un abonné de `drawing` ne change rien à `drawn`). Remplir : les puisages sont **réservés avant** l'échange (rien ne cède la main entre la lecture et la
 réservation), l'échange est **tout ou rien**, et la réserve est rendue s'il échoue — deux joueurs sur la dernière
 unité : un seul est servi. L'outre rendue ne l'est que si l'inventaire dit `consumed` (une unité réellement retirée),
-dans un thread, pour le même personnage. Limite connue de OneSync : la position du ped est déclarée par son client ;
+dans un thread, pour le même personnage. Le palier de l'outre rendue est relevé en phase `before` de
+`vava_inventory:use` et repris en phase `after` : cela suppose que **rien ne cède la main entre les deux**. C'est vrai
+aujourd'hui (abonné `before` dernier de la chaîne, priorité 1000 ; Outre d'eau sans `onUse` ; l'inventaire retire
+l'unité puis lance la phase `after` d'un bloc), et cela cesserait de l'être avec un `onUse` de l'eau ou un abonné
+`before` qui céderait la main après celui-ci : il faudrait alors lire les métadonnées dans le payload de `use` (suite
+notée au rapport de T-135). Un relevé manqué ne donne jamais un meilleur palier : l'outre est traitée sans palier.
+Limite connue de OneSync : la position du ped est déclarée par son client ;
 le gain d'un tricheur serait de l'eau, sans valeur marchande.
 
 ## Conseil (droit `metiers`)

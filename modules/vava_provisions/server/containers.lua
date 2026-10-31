@@ -24,12 +24,22 @@ local EVENTS, NOTICES = VavaProvisions.EVENTS, VavaProvisions.NOTICES
 local MAX_PENDING = 8
 -- palier relevé « sans palier » (distinct de « rien relevé »)
 local NO_TIER = false
+-- relevé manqué (inventaire muet, pile introuvable, gorgée sans phase before) : un avertissement en console au plus
+-- par minute (relecture sécurité S-3 de T-135)
+local WARN_INTERVAL_MS = 60000
 
 local containers = {}
 VavaProvisions.containers = containers
 
--- joueur → { [identifiant de pile] = palier | NO_TIER }, relevé en phase before, repris en phase after
+-- joueur → { [identifiant de pile] = palier | NO_TIER }, relevé en phase before, repris en phase after.
+-- CONDITION (relecture sécurité S-2 de T-135) : rien ne cède la main entre ce relevé et la phase after. L'abonné before
+-- est le dernier de la chaîne (priorité 1000) ; l'Outre d'eau n'a pas d'`onUse` (effets seuls) et l'inventaire retire
+-- l'unité puis lance la phase after d'un bloc : la pile relevée est bien celle qui vient d'être bue, avec les
+-- métadonnées lues. Un futur `onUse` de l'eau, ou un abonné before qui céderait la main après celui-ci, romprait cette
+-- condition : il faudrait alors lire les métadonnées dans le payload de `vava_inventory:use` (suite notée au rapport).
 local pending = {}
+-- horloge (bridge.Timer) du dernier avertissement de relevé manqué, et relevés manqués tus depuis
+local warnedAt, silenced = nil, 0
 
 ---@param tbl table
 ---@return integer
@@ -39,22 +49,49 @@ local function size(tbl)
     return count
 end
 
+--- Relevé manqué : avertissement en console, au plus un par `WARN_INTERVAL_MS` (les suivants comptés et tus).
+---@param source integer
+---@param instanceId any
+local function warnUnread(source, instanceId)
+    local now = bridge.Timer()
+    if warnedAt and now - warnedAt < WARN_INTERVAL_MS then
+        silenced = silenced + 1
+        return
+    end
+    local note = silenced > 0 and (' (%d autres depuis le précédent avis)'):format(silenced) or ''
+    warnedAt, silenced = now, 0
+    VavaProvisions.log.warn("palier de l'outre d'eau non relevé (joueur %d, pile %s) : risque de fente et outre rendue "
+        .. 'sans palier%s', source, tostring(instanceId), note)
+end
+
+--- Oublie le relevé d'une pile (relecture sécurité S-1 de T-135 : un relevé ancien ne doit jamais servir).
+---@param source integer
+---@param instanceId integer
+local function dropTier(source, instanceId)
+    local known = pending[source]
+    if not known then return end
+    known[instanceId] = nil
+    if next(known) == nil then pending[source] = nil end
+end
+
 --- Avant l'utilisation d'un objet de la besace : relève le palier de l'outre d'eau visée. Ne refuse jamais (rien n'est
---- rendu) ; lecture seule de la besace, sans attente.
+--- rendu) ; lecture seule de la besace, sans attente. Inventaire muet ou pile introuvable : relevé de cette pile
+--- effacé (la phase after avertit et traite l'outre sans palier).
 ---@param payload { source: integer, instanceId: integer, item: string }
 function containers.beforeUse(payload)
     if type(payload) ~= 'table' or not cfg.containers[payload.item] then return end
     local source, instanceId = payload.source, payload.instanceId
     if mathType(source) ~= 'integer' or source <= 0 or mathType(instanceId) ~= 'integer' then return end
     local piles = bridge.Piles(source, payload.item)
-    if not piles then return end
-    local tier = NO_TIER
+    if not piles then return dropTier(source, instanceId) end
+    local tier = nil
     for _, pile in ipairs(piles) do
         if type(pile) == 'table' and pile.id == instanceId then
             tier = rules.tierOf(pile.metadata) or NO_TIER
             break
         end
     end
+    if tier == nil then return dropTier(source, instanceId) end
     local known = pending[source]
     if not known or size(known) >= MAX_PENDING then
         known = {}
@@ -63,17 +100,17 @@ function containers.beforeUse(payload)
     known[instanceId] = tier
 end
 
---- Palier relevé pour cette pile (et oublié), ou nil.
+--- Palier relevé pour cette pile (et oublié) : palier, NO_TIER (relevé, sans palier) ou nil (rien relevé).
 ---@param source integer
 ---@param instanceId any
----@return integer|nil
+---@return integer|false|nil
 local function takeTier(source, instanceId)
     local known = pending[source]
     if not known or instanceId == nil then return nil end
     local tier = known[instanceId]
     known[instanceId] = nil
     if next(known) == nil then pending[source] = nil end
-    return tier or nil
+    return tier
 end
 
 --- Après l'utilisation d'un objet de la besace.
@@ -85,6 +122,8 @@ function containers.onUse(payload)
     local source = payload.source
     if mathType(source) ~= 'integer' or source <= 0 then return end
     local tier = takeTier(source, payload.instanceId)
+    if tier == nil then warnUnread(source, payload.instanceId) end
+    tier = tier or nil   -- NO_TIER : sans palier
     local characterId = bridge.ActiveCharacterId(source)
     if not characterId then return end
     CreateThread(function()

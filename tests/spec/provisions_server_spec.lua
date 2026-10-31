@@ -655,6 +655,49 @@ describe('vava_provisions server', function()
                 assert.equal(3, #adds)
             end)
 
+            -- relecture sécurité S-1 de T-135
+            it('inventaire muet à la gorgée : le relevé ancien de la pile est effacé, jamais repris', function()
+                roll = 0.5
+                -- relevé d'une gorgée refusée par un autre abonné (jamais bue) : palier Soigné gardé pour la pile 43
+                containers.beforeUse({ source = SOURCE, instanceId = 43, item = 'eau' })
+                -- la pile a changé de palier entre-temps, puis l'inventaire ne répond plus au relevé suivant
+                piles[SOURCE].eau = false
+                assert.is_nil(containers.beforeUse({ source = SOURCE, instanceId = 43, item = 'eau' }))
+                drink({ instanceId = 43 })
+                assert.same({ { source = SOURCE, item = 'outre', quantity = 1 } }, adds)
+                -- de même pour une pile introuvable dans une besace qui répond
+                piles[SOURCE].eau = { { id = 44, item = 'eau', quantity = 1, metadata = { tier = 4 } } }
+                containers.beforeUse({ source = SOURCE, instanceId = 44, item = 'eau' })
+                piles[SOURCE].eau = {}
+                containers.beforeUse({ source = SOURCE, instanceId = 44, item = 'eau' })
+                drink({ instanceId = 44 })
+                assert.is_nil(adds[2].metadata)
+            end)
+
+            -- relecture sécurité S-3 de T-135
+            it('relevé manqué : un avertissement en console au plus par minute, les suivants comptés', function()
+                roll = 0.5
+                drink({ instanceId = 44 })               -- aucun relevé
+                assert.equal(1, #logs.warn)
+                assert.matches("palier de l'outre d'eau non relevé %(joueur 5, pile 44%)", logs.warn[1])
+                piles[SOURCE].eau = false
+                sip(43)                                  -- inventaire muet
+                timer = timer + 59999
+                drink({ instanceId = 40 })
+                assert.equal(1, #logs.warn)
+                timer = timer + 1
+                drink({ instanceId = 41 })
+                assert.equal(2, #logs.warn)
+                assert.matches('pile 41', logs.warn[2])
+                assert.matches('%(2 autres depuis le précédent avis%)', logs.warn[2])
+                -- relevé réussi, même sans palier : aucun avertissement
+                piles[SOURCE].eau = { { id = 40, item = 'eau', quantity = 1, metadata = {} } }
+                timer = timer + 60000
+                sip(40)
+                assert.equal(2, #logs.warn)
+                assert.equal(5, #adds)
+            end)
+
             it('un relevé ne sert qu\'une fois, et pas pour une autre pile', function()
                 roll = 0.5
                 containers.beforeUse({ source = SOURCE, instanceId = 43, item = 'eau' })
