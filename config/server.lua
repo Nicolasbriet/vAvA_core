@@ -213,6 +213,18 @@ vAvA.config.server = {
     spawn = {
         models = { m = 'mp_m_freemode_01', f = 'mp_f_freemode_01' },  -- en attendant un module d'apparence
         defaultPoint = { x = -269.4, y = -955.3, z = 31.2, heading = 205.8 },  -- PLACEHOLDER : point d'arrivée des nouveaux personnages (T-022)
+        -- Apparition confirmée par le serveur (0.14.0, T-139). Après chaque ordre d'apparition, le serveur lit le ped du
+        -- joueur (GetPlayerPed, GetEntityCoords) et ne tient l'apparition pour faite qu'après l'avoir vu au point
+        -- ordonné : aussitôt à la déclaration du client (fin du fondu), ou d'office graceMs après l'ordre s'il ne déclare
+        -- rien. Jamais vu au point : une ligne de console et le personnage reste non apparu (ni temps de jeu, ni
+        -- position relevée, ni envois de proximité, ni zones) jusqu'à ce qu'il y soit vu.
+        confirm = {
+            checkMs = 500,     -- intervalle des lectures, seulement pour les joueurs dont l'apparition attend
+            radius = 10.0,     -- écart horizontal maximal (m) entre le ped et le point ordonné (le ped peut tomber
+                               -- du point, et courir un instant entre la fin du fondu et la lecture du serveur)
+            graceMs = 20000,   -- confirmation d'office sans déclaration du client ; au-delà du plus long chargement
+                               -- normal du client (config/shared.lua : fondu × 4 + modèle + collisions = 17 s)
+        },
     },
 
     rateLimit = {

@@ -57,7 +57,6 @@ local HOOK_UNLOADING = 'core:character:unloading'
 local HOOK_DELETING = 'core:character:deleting'
 local HOOK_DELETED = 'core:character:deleted'
 local HOOK_FIELD_CHANGED = 'core:character:fieldChanged'
-local HOOK_SPAWNED = 'core:character:spawned'
 
 local NAME_LETTERS = str.codepointSet(nameCfg.letters)
 local NAME_SEPARATORS = str.codepointSet(nameCfg.separators)
@@ -99,7 +98,7 @@ vAvA.characters = characters
 ---@field data table<string, any>   valeurs des champs déclarés par les modules
 ---@field revision integer          incrémenté à chaque modification à sauvegarder
 ---@field savedRevision integer
----@field spawned boolean           apparition confirmée par le client
+---@field spawned boolean           apparition confirmée par le serveur (server/players/spawn.lua, 0.14.0)
 ---@field playSeconds integer       temps de jeu relevé (secondes entières), écrit en base
 ---@field playMarker integer|nil    GetGameTimer du dernier relevé ; nil quand le temps ne compte pas (non apparu)
 
@@ -380,6 +379,7 @@ local function unload(session, reason)
     activeById[character.id] = nil
     session.characterId = nil
     character.spawned = false
+    spawn.forget(character)
     -- abonnements de zone oubliés sans envoi : le client vide ses zones au déchargement
     zones.purgePlayer(session.source)
     sync.clearCharacter(character)
@@ -533,6 +533,18 @@ function characters.unload(src, reason)
     return withSession(src, 'active', unload, reason or 'server')
 end
 
+--- Vrai si l'apparition du personnage actif du joueur est confirmée par le serveur (0.14.0) : ped vu au point du
+--- dernier ordre d'apparition. Faux pendant une apparition ou une téléportation en cours.
+---@param src integer
+---@return boolean spawned
+---@return string|nil err  'no_character' : aucun personnage actif
+function characters.isSpawned(src)
+    local session = accounts.get(src)
+    local character = session and session.state == 'active' and activeById[session.characterId]
+    if not character then return false, 'no_character' end
+    return character.spawned == true
+end
+
 --- Réapparition ou téléportation décidée par le serveur.
 ---@param src integer
 ---@param coords? vAvA.SpawnPoint
@@ -549,6 +561,9 @@ end
 ---@return boolean ok
 ---@return string|nil err
 function characters.registerRpc()
+    -- réglages de la confirmation d'apparition (0.14.0) vérifiés avec ceux des RPC : invalides, le core ne démarre pas
+    local valid, configErr = spawn.validateConfig()
+    if not valid then return false, configErr end
     local nameArg = { type = 'string', min = 1, max = nameCfg.maxLength * UTF8_MAX_BYTES }
     local idArg = { type = 'integer', min = 1, max = MAX_CHARACTER_ID }
     local limits = cfg.rateLimits
@@ -577,14 +592,9 @@ function characters.registerRpc()
             local session = accounts.get(src)
             local character = session and session.state == 'active' and activeById[session.characterId]
             if not character then return false, 'no_character' end
-            -- une seule fois par apparition demandée par le serveur (spawn.send remet l'état à faux)
-            if character.spawned then return true end
-            character.spawned = true
-            playtime.begin(character)
-            hooks.runAfter(HOOK_SPAWNED, { source = src, accountId = character.accountId, characterId = character.id })
-            -- zones proches envoyées tout de suite, sans attendre le passage suivant
-            zones.refreshPlayer(src)
-            return true
+            -- simple déclaration : le serveur ne confirme l'apparition qu'après avoir vu le ped au point ordonné
+            -- (spawn.claim, une fois par ordre : spawn.send remet l'état à faux)
+            return spawn.claim(character)
         end },
     }
 

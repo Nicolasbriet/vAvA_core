@@ -1,9 +1,10 @@
 --[[
     server/players/playtime.lua
-    Rôle : temps de jeu des personnages, compté CÔTÉ SERVEUR entre l'apparition confirmée et le déchargement (la
-           sélection et le temps entre deux apparitions ne comptent pas). Un marqueur par personnage ; le total,
-           en secondes entières, est relevé dans la boucle des positions (aucune boucle propre), à chaque changement
-           d'apparition et au déchargement, puis écrit avec le personnage (colonne play_seconds).
+    Rôle : temps de jeu des personnages, compté CÔTÉ SERVEUR entre l'apparition confirmée par le serveur (0.14.0 : ped
+           vu au point ordonné, server/players/spawn.lua) et le déchargement (la sélection et le temps entre deux
+           apparitions ne comptent pas). Un marqueur par personnage ; le total, en secondes entières, est relevé dans
+           la boucle des positions (aucune boucle propre), à chaque changement d'apparition et au déchargement, puis
+           écrit avec le personnage (colonne play_seconds).
     Dépendances : shared/init.lua
 ]]
 
@@ -12,7 +13,7 @@ local GetGameTimer = GetGameTimer
 local playtime = {}
 vAvA.playtime = playtime
 
---- Reprend le compte : apparition confirmée par le client. Sans effet si le compte est déjà en cours.
+--- Reprend le compte : apparition confirmée par le serveur. Sans effet si le compte est déjà en cours.
 ---@param character vAvA.Character
 function playtime.begin(character)
     if not character.playMarker then character.playMarker = GetGameTimer() end
