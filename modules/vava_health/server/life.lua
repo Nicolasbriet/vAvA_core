@@ -7,8 +7,9 @@
       - Une boucle lit le ped de chaque joueur (une native par joueur, aucun message du client) après la fenêtre
         d'application d'un ordre : ped plus bas = perte native (chute, noyade, feu du décor…) acceptée telle quelle,
         sans modificateurs ; ped au seuil ou dessous = mise à terre native (cause et auteur lus côté serveur) ; ped
-        plus haut = client en retard ou modifié : la valeur du serveur est renvoyée au plus toutes les `sync.resendMs`,
-        avec une ligne de console à la 1re correction puis toutes les `sync.logEvery`.
+        plus haut = client en retard ou modifié : la valeur du serveur est renvoyée après `sync.resendMs`, puis après un
+        délai doublé à chaque correction sans effet (jusqu'à `sync.maxResendMs`, remis à zéro dès l'accord), avec une
+        ligne de console à la 1re correction puis toutes les `sync.logEvery`.
       - Porte d'apparition : rien dans l'écriture de la vie n'en dépend ; un client qui ne confirme pas son
         apparition voit son ped lu d'office `spawn.confirmTimeoutMs` après l'ordre.
       - Toute mise à terre ordonne au client de coucher son ped (vie GTA à 0). À terre : temps compté, retour
@@ -65,7 +66,8 @@ VavaHealth.life = life
 ---@field syncUntil integer     avant : lecture du ped ignorée (ordre de vie en cours d'application)
 ---@field pushPending boolean   un envoi de la vie est déjà prévu ce tour
 ---@field dirty boolean         vie à écrire dans le personnage
----@field correctedAt integer|nil
+---@field correctedAt integer|nil  dernière correction (nil : ped d'accord depuis)
+---@field correctionGap integer|nil délai avant la correction suivante
 ---@field corrections integer
 ---@field spawnOrderedAt integer|nil
 ---@field forcedSpawn boolean   apparition lue d'office (console une fois par chargement)
@@ -79,13 +81,14 @@ function life.entry(src)
     return entries[src]
 end
 
---- Vie actuelle d'un ped (0 à 1), lue côté serveur.
+--- Vie actuelle d'un ped (0 à 1), d'après sa vie GTA déjà lue côté serveur.
 ---@param ped integer
+---@param health integer  GetEntityHealth(ped)
 ---@return number
-local function ratioOf(ped)
+local function ratioOf(ped, health)
     local maxHealth = GetEntityMaxHealth(ped)
     if maxHealth <= DOWN then return 0 end
-    local value = (GetEntityHealth(ped) - DOWN) / (maxHealth - DOWN)
+    local value = (health - DOWN) / (maxHealth - DOWN)
     if value < 0 then return 0 end
     if value > 1 then return 1 end
     return value
@@ -216,7 +219,7 @@ end
 ---@param reason string
 ---@param cause? integer|string
 ---@param killer? integer
----@param extra? { origin: string|nil, hitId: integer|nil }
+---@param extra? { origin: string|nil, hitId: integer|nil, claimedKiller: integer|nil }
 ---@return boolean ok
 ---@return string|nil code
 function life.down(src, reason, cause, killer, extra)
@@ -224,6 +227,7 @@ function life.down(src, reason, cause, killer, extra)
     if not entry then return false, 'no_character' end
     if entry.downed then return false, 'already_downed' end
     local now = GetGameTimer()
+    local claimed = extra and extra.claimedKiller
     entry.downed, entry.downedFor, entry.health, entry.reported = true, 0, 0, false
     entry.sampledAt, entry.resentAt, entry.graceUntil = now, now, now + cfg.graceMs
     persist(entry)
@@ -232,6 +236,7 @@ function life.down(src, reason, cause, killer, extra)
     VavaHealth.core.hooks.runAfter(HOOKS.DOWNED, {
         source = src, characterId = entry.characterId, reason = reason, cause = cause, killer = killer,
         origin = extra and extra.origin, hitId = extra and extra.hitId,
+        claimedKiller = claimed, killerUnverified = claimed and true or nil,
     })
     return true
 end
@@ -354,28 +359,40 @@ local function nativeLoss(src, entry, part)
     reportNative(src, entry, VavaHealth.nextHitId(), points, false)
 end
 
---- Mise à terre native (ped lu au seuil ou dessous) : toute la vie restante perdue, mise à terre `death`.
+--- Mise à terre native (ped lu au seuil ou dessous) : toute la vie restante perdue, mise à terre `death`. L'auteur
+--- (GetPedSourceOfDeath) est déclaré par le client de la victime : jamais transmis comme `killer`, seulement comme
+--- `claimedKiller` avec `killerUnverified`.
 ---@param src integer
 ---@param entry vAvA.HealthEntry
 ---@param ped integer
 local function nativeFall(src, entry, ped)
     local points = entry.health * HEALTH_POINTS
     local id = VavaHealth.nextHitId()
-    local killer = killerOf(src, ped)
-    if killer then
-        VavaHealth.log.warn('joueur %d mis à terre par un coup natif du joueur %d (hors chaîne)', src, killer)
+    local claimed = killerOf(src, ped)
+    if claimed then
+        VavaHealth.log.warn('joueur %d mis à terre par un coup natif du joueur %d (hors chaîne, déclaré par le client '
+            .. 'de la victime, non vérifié)', src, claimed)
     end
     life.applyLoss(src, entry.health, false)
-    life.down(src, 'death', GetPedCauseOfDeath(ped), killer, { origin = VavaHealth.resource, hitId = id })
+    life.down(src, 'death', GetPedCauseOfDeath(ped), nil,
+        { origin = VavaHealth.resource, hitId = id, claimedKiller = claimed })
     reportNative(src, entry, id, points, true)
 end
 
---- Ped au-dessus de la valeur du serveur : la valeur est renvoyée (au plus toutes les `sync.resendMs`).
+--- Ped au-dessus de la valeur du serveur : la valeur est renvoyée, d'abord après `sync.resendMs`, puis après un délai
+--- doublé à chaque correction restée sans effet (jusqu'à `sync.maxResendMs`) ; l'accord du ped remet le délai à zéro.
 ---@param src integer
 ---@param entry vAvA.HealthEntry
 ---@param now integer
 local function correct(src, entry, now)
-    if entry.correctedAt and now - entry.correctedAt < syncCfg.resendMs then return end
+    local gap = entry.correctionGap or syncCfg.resendMs
+    if entry.correctedAt then
+        if now - entry.correctedAt < gap then return end
+        -- la précédente n'a rien changé : la suivante attendra deux fois plus
+        entry.correctionGap = min(gap * 2, syncCfg.maxResendMs)
+    else
+        entry.correctionGap = syncCfg.resendMs
+    end
     entry.correctedAt = now
     entry.corrections = entry.corrections + 1
     if entry.corrections == 1 or entry.corrections % syncCfg.logEvery == 0 then
@@ -448,15 +465,21 @@ local function check(src, entry, now, elapsed)
     end
 
     if now >= entry.graceUntil then
-        if vitality.fallen(GetEntityHealth(ped), DOWN) then
+        local health = GetEntityHealth(ped)
+        if vitality.fallen(health, DOWN) then
             nativeFall(src, entry, ped)
             return
         end
-        local verdict, gap = sync.judge(ratioOf(ped), entry.health, now, entry.syncUntil, syncCfg.tolerance)
-        if verdict == 'loss' then
-            nativeLoss(src, entry, gap)
-        elseif verdict == 'above' then
-            correct(src, entry, now)
+        -- pendant la fenêtre d'application, rien à juger : la vie maximale n'est pas lue
+        if now >= entry.syncUntil then
+            local verdict, gap = sync.judge(ratioOf(ped, health), entry.health, now, entry.syncUntil,
+                syncCfg.tolerance)
+            if verdict == 'loss' then
+                nativeLoss(src, entry, gap)
+            elseif verdict == 'above' then
+                correct(src, entry, now)
+            end
+            if verdict ~= 'above' then entry.correctedAt, entry.correctionGap = nil, nil end
         end
     end
     -- un hook a pu céder la main : l'entrée a pu partir
@@ -466,14 +489,18 @@ local function check(src, entry, now, elapsed)
     end
 end
 
+-- liste figée des joueurs d'un passage, gardée d'un passage à l'autre (aucune allocation à chaque tour)
+local sources = {}
+
 local function tick(elapsed)
     local now = GetGameTimer()
     -- liste figée : un handler de hook peut céder la main, et un personnage se charger entre-temps
-    local sources, count = {}, 0
+    local count = 0
     for src in pairs(entries) do
         count = count + 1
         sources[count] = src
     end
+    for i = count + 1, #sources do sources[i] = nil end
     for i = 1, count do
         local src = sources[i]
         local entry = entries[src]
@@ -527,10 +554,12 @@ local function onUnloading(src)
     local now = GetGameTimer()
     local ped = entry.spawned and not entry.downed and now >= entry.graceUntil and readablePed(src)
     if ped then
-        if vitality.fallen(GetEntityHealth(ped), DOWN) then
+        local health = GetEntityHealth(ped)
+        if vitality.fallen(health, DOWN) then
             nativeFall(src, entry, ped)
         else
-            local verdict, gap = sync.judge(ratioOf(ped), entry.health, now, entry.syncUntil, syncCfg.tolerance)
+            local verdict, gap = sync.judge(ratioOf(ped, health), entry.health, now, entry.syncUntil,
+                syncCfg.tolerance)
             if verdict == 'loss' then nativeLoss(src, entry, gap) end
         end
     end

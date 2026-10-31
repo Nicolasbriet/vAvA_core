@@ -5,9 +5,10 @@
              1. module prêt, cible (personnage suivi ; aucune condition d'apparition) ;
              2. paquet validé et copié (shared/packet.lua) ; `origin` (ressource appelante), numéro et personnage de la
                 source posés par le serveur ;
-             3. garde-fous : profondeur (renvois), débit par cible ;
-             4. préconditions : cible à terre, combats entre joueurs coupés (résultat annulé, sans hook ni journal) ;
-             5. hook vava_health:hit `before` (refus seul) ;
+             3. garde-fous : type `monde` réservé à ce module, profondeur (renvois), débit par paire (cible, source) ;
+             4. préconditions : cible à terre, combats entre joueurs coupés, source à terre hors `overTime` et
+                `reflected` (résultat annulé, sans hook ni journal) ;
+             5. hook vava_health:hit `before` (refus seul ; un abonné en erreur ne refuse pas : le coup passe) ;
              6. modificateurs du registre, dans l'ordre des étapes (shared/chain.lua), chacun isolé et chronométré ;
              7. application : cible relue, vie du serveur baissée, mise à terre aussitôt à 0 ;
              8. hook `after` (tout coup qui a atteint l'étape 5, annulé compris) et journal.
@@ -30,6 +31,7 @@ local modifiers = VavaHealth.modifiers
 local HOOK = VavaHealth.HOOKS.HIT
 local LIMITS = packet.compile(cfg)
 local HEALTH_POINTS = cfg.healthPoints
+local WORLD_KIND = 'monde'
 local WINDOW_MS = 1000
 local LOG_MS = 60000
 -- champs du paquet recopiés dans le contexte
@@ -40,8 +42,11 @@ VavaHealth.hits = hits
 
 -- profondeur courante (un renvoi lancé par un hook after est un coup dans un coup)
 local depth = 0
----@type table<integer, { count: integer, since: integer }>
+-- débit par paire (cible, source) : un joueur qui frappe une cible en rafale n'épuise pas le débit des autres ; les
+-- coups sans source (le monde, la faim, une enveloppe damage) partagent la clé 0
+---@type table<integer, table<integer, { count: integer, since: integer }>>
 local rates = {}
+local NO_SOURCE = 0
 ---@type table<string, integer>  clé de console → dernière ligne
 local logged = {}
 
@@ -57,15 +62,22 @@ local function due(key, intervalMs)
     return true
 end
 
---- Débit par cible sur une seconde : vrai si le coup est admis.
+--- Débit par paire (cible, source) sur une seconde : vrai si le coup est admis.
 ---@param target integer
+---@param source integer|nil
 ---@param now integer
 ---@return boolean
-local function admit(target, now)
-    local rate = rates[target]
+local function admit(target, source, now)
+    local bySource = rates[target]
+    if not bySource then
+        bySource = {}
+        rates[target] = bySource
+    end
+    local key = source or NO_SOURCE
+    local rate = bySource[key]
     if not rate or now - rate.since >= WINDOW_MS then
         rate = { count = 0, since = now }
-        rates[target] = rate
+        bySource[key] = rate
     end
     rate.count = rate.count + 1
     return rate.count <= cfg.maxHitsPerSecond
@@ -148,6 +160,14 @@ local function process(target, entry, p, origin)
         state.amount, state.cancelled = 0, 'pvp_off'
         return resultOf(id, state, 0, false, entry.health)
     end
+    -- un joueur à terre ne frappe plus (un effet qui dure et un renvoi ne sont pas des gestes : ils passent)
+    if p.source and p.source ~= target and not p.tags.overTime and not p.tags.reflected then
+        local attacker = life.entry(p.source)
+        if attacker and attacker.downed then
+            state.amount, state.cancelled = 0, 'source_downed'
+            return resultOf(id, state, 0, false, entry.health)
+        end
+    end
 
     local ctx = {
         id = id, target = target, targetCharacter = entry.characterId, origin = origin, kind = p.kind,
@@ -159,6 +179,14 @@ local function process(target, entry, p, origin)
     end
 
     local allowed, reason = core.hooks.runBefore(HOOK, ctx)
+    -- un abonné en erreur ne rend personne invulnérable : le coup passe (un refus volontaire reste un refus)
+    if not allowed and reason == 'hook_error' then
+        if due('before:error', LOG_MS) then
+            VavaHealth.log.error('hook vava_health:hit before en erreur : coup laissé passer (console du core pour '
+                .. 'l\'abonné en cause)')
+        end
+        allowed = true
+    end
     ctx.base = p.amount
     local applied, downed = 0, false
     if not allowed then
@@ -217,17 +245,20 @@ function hits.hit(target, raw, origin)
     if not entry then return nil, 'no_character' end
     local p, code = packet.normalize(raw, LIMITS)
     if not p then return nil, code end
+    origin = type(origin) == 'string' and origin or VavaHealth.resource
+    -- `monde` : réservé aux pertes natives lues par ce module
+    if p.kind == WORLD_KIND and origin ~= VavaHealth.resource then return nil, 'invalid_kind' end
     if depth >= cfg.maxDepth then return nil, 'too_deep' end
     local now = GetGameTimer()
-    if not admit(target, now) then
+    if not admit(target, p.source, now) then
         if due('rate:' .. target, LOG_MS) then
-            VavaHealth.log.warn('joueur %d : plus de %d coups en une seconde, coups refusés (too_many_hits)', target,
-                cfg.maxHitsPerSecond)
+            VavaHealth.log.warn('joueur %d : plus de %d coups en une seconde d\'une même source, coups refusés '
+                .. '(too_many_hits)', target, cfg.maxHitsPerSecond)
         end
         return nil, 'too_many_hits'
     end
     depth = depth + 1
-    local ok, result = pcall(process, target, entry, p, type(origin) == 'string' and origin or VavaHealth.resource)
+    local ok, result = pcall(process, target, entry, p, origin)
     depth = depth - 1
     if not ok then
         VavaHealth.log.error('coup sur le joueur %d en erreur : %s', target, tostring(result))
@@ -242,9 +273,10 @@ function hits.depth()
     return depth
 end
 
---- Oublie un joueur parti (débit).
+--- Oublie un joueur parti (débit, comme cible et comme source).
 ---@param src integer
 function hits.forget(src)
     rates[src] = nil
+    for _, bySource in pairs(rates) do bySource[src] = nil end
     logged['rate:' .. src] = nil
 end

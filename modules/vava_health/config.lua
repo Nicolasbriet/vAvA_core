@@ -46,7 +46,8 @@ VavaHealth.config = {
         tolerance = 0.02,       -- écart toléré entre le ped lu et la valeur du serveur (≈ 2 points GTA sur 100)
         applyMs = 1500,         -- après un envoi de vie, la lecture du ped est ignorée ce temps…
         maxPingMs = 1000,       -- … plus deux fois le ping du joueur, au plus cette valeur
-        resendMs = 2000,        -- ped au-dessus de la valeur du serveur : vie renvoyée au plus toutes les 2 s
+        resendMs = 2000,        -- ped au-dessus de la valeur du serveur : vie renvoyée au plus toutes les 2 s…
+        maxResendMs = 30000,    -- … délai doublé après chaque correction sans effet, jusqu'à 30 s (2 s dès l'accord)
         logEvery = 10,          -- console à la 1re correction d'un joueur, puis toutes les 10
     },
 

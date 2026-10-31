@@ -38,12 +38,13 @@ shared_scripts {
     'shared/constants.lua',
     'config.lua',
     'shared/vitality.lua',
+}
+
+-- logique pure servie au seul serveur (paquet, chaîne, lecture du ped) : le client n'en télécharge rien
+server_scripts {
     'shared/packet.lua',
     'shared/chain.lua',
     'shared/sync.lua',
-}
-
-server_scripts {
     'server/core.lua',
     'server/state.lua',
     'server/journal.lua',

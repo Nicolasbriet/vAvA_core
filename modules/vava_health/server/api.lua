@@ -14,6 +14,7 @@
 
 local type, ipairs = type, ipairs
 local mathType, huge = math.type, math.huge
+local find = string.find
 local GetInvokingResource = GetInvokingResource
 
 local life = VavaHealth.life
@@ -21,6 +22,9 @@ local hits = VavaHealth.hits
 local modifiers = VavaHealth.modifiers
 local cfg = VavaHealth.config
 local LEGACY_KIND = 'pur'
+-- cause d'une mise à terre décidée par un module (hooks, journaux)
+local CAUSE_PATTERN = '^[A-Za-z0-9_%-]+$'
+local CAUSE_MAX = 32
 
 ---@param src any
 ---@return vAvA.HealthEntry|nil
@@ -117,11 +121,13 @@ exports('damage', function(src, amount)
     return true
 end)
 
---- Met à terre (cause libre pour les hooks : 'execution', 'piege'…).
+--- Met à terre (cause pour les hooks : identifiant ASCII de 32 octets au plus, 'execution', 'piege'…).
 exports('down', function(src, cause)
     local entry, code = resolve(src)
     if not entry then return false, code end
-    if cause ~= nil and type(cause) ~= 'string' then return false, 'invalid_cause' end
+    if cause ~= nil and (type(cause) ~= 'string' or #cause > CAUSE_MAX or not find(cause, CAUSE_PATTERN)) then
+        return false, 'invalid_cause'
+    end
     return life.down(src, 'api', cause)
 end)
 

@@ -10,6 +10,7 @@ describe('vava_health chaîne de dégâts (serveur)', function()
     local now, peds, entityHealth, active, fields
     local sent, logs, queries, hookCalls, registered, handlers, cancelled, threads, entities
     local hooksBefore, hooksAfter, registries, propagateAfterErrors
+    local dbFails, deathSource
 
     local A, B, C = 1, 2, 3
     local CHAR = { [A] = 101, [B] = 102, [C] = 103 }
@@ -95,6 +96,7 @@ describe('vava_health chaîne de dégâts (serveur)', function()
         peds, entityHealth, active, fields = {}, {}, {}, {}
         sent, logs, queries, hookCalls, registered, handlers, cancelled, threads, entities = {}, {}, {}, {}, {}, {}, {}, {}, {}
         hooksBefore, hooksAfter, registries, propagateAfterErrors = {}, {}, {}, false
+        dbFails, deathSource = nil, 0
 
         local function log(level)
             return function(fmt, ...) logs[#logs + 1] = level .. ' ' .. string.format(fmt, ...) end
@@ -176,6 +178,7 @@ describe('vava_health chaîne de dégâts (serveur)', function()
             db = {
                 query = function(sql, params)
                     queries[#queries + 1] = { sql = sql, params = params }
+                    if dbFails and dbFails(sql, params) then return nil, 'refus de la base' end
                     return {}
                 end,
                 update = function(sql, params)
@@ -211,7 +214,7 @@ describe('vava_health chaîne de dégâts (serveur)', function()
         _G.GetEntityMaxHealth = function() return 200 end
         _G.GetEntityCoords = function(ped) return { x = ped + 0.5, y = 2.0, z = 3.0 } end
         _G.GetPedCauseOfDeath = function() return 0 end
-        _G.GetPedSourceOfDeath = function() return 0 end
+        _G.GetPedSourceOfDeath = function() return deathSource end
         _G.GetPlayerPing = function() return 40 end
         _G.TriggerClientEvent = function() error('TriggerClientEvent direct interdit (core.net présent)') end
         _G.AddEventHandler = function(name, fn) handlers[name] = fn end
@@ -405,6 +408,53 @@ describe('vava_health chaîne de dégâts (serveur)', function()
             assert.is_table(hit(B, { amount = 0.5, kind = 'feu' }))
         end)
 
+        it('compte le débit par paire (cible, source) : une rafale n\'épuise pas celui des autres', function()
+            load(A)
+            load(B)
+            load(C)
+            for i = 1, 20 do assert.is_table(hit(B, { amount = 0.5, kind = 'feu', source = A }), 'coup ' .. i) end
+            assert.equal('too_many_hits', select(2, hit(B, { amount = 0.5, kind = 'feu', source = A })))
+            assert.equal(0.5, hit(B, { amount = 0.5, kind = 'feu', source = C }).applied)
+            assert.equal(0.5, hit(B, { amount = 0.5, kind = 'feu' }).applied)
+            -- départ de la source : son compte disparaît
+            hits.forget(A)
+            assert.is_table(hit(B, { amount = 0.5, kind = 'feu', source = A }))
+        end)
+
+        it('laisse passer un coup dont un abonné before est en erreur (un refus reste un refus)', function()
+            load(B)
+            hooksBefore[HOOKS.HIT] = { { priority = 100, fn = function() error('abonné en panne') end } }
+            for _ = 1, 2 do
+                local result = hit(B, { amount = 10, kind = 'tranchant' })
+                assert.is_nil(result.cancelled)
+                assert.equal(10, result.applied)
+            end
+            assert.equal(1, logged('hook vava_health:hit before en erreur'))
+            hooksBefore[HOOKS.HIT] = { { priority = 100, fn = function() return false, 'treve' end } }
+            assert.equal('treve', hit(B, { amount = 10, kind = 'tranchant' }).cancelled)
+        end)
+
+        it('refuse le coup d\'une source à terre, sauf un effet qui dure ou un renvoi', function()
+            load(A)
+            load(B)
+            life.down(A, 'api')
+            hookCalls = {}
+            local result = hit(B, { amount = 10, kind = 'tranchant', source = A })
+            assert.equal('source_downed', result.cancelled)
+            assert.equal(0, result.applied)
+            assert.equal(0, #calls(HOOKS.HIT))
+            assert.equal(0, journal.pending())
+            assert.equal(10, hit(B, { amount = 10, kind = 'feu', source = A, tags = { overTime = true } }).applied)
+            assert.equal(10, hit(B, { amount = 10, kind = 'pur', source = A, tags = { reflected = true } }).applied)
+        end)
+
+        it('réserve le type monde aux pertes natives de vava_health', function()
+            load(B)
+            local refused, code = hit(B, { amount = 10, kind = 'monde' })
+            assert.is_nil(refused)
+            assert.equal('invalid_kind', code)
+        end)
+
         it('permet un renvoi, refuse le renvoi d\'un renvoi, et rend toujours la profondeur', function()
             load(A)
             load(B)
@@ -438,6 +488,18 @@ describe('vava_health chaîne de dégâts (serveur)', function()
             assert.is_nil(registries['vava_health:modifiers'].entries['autre:x'])
             assert.equal(0, #modifiers.list())
             assert.equal(1, logged("modificateur 'autre:x' ajouté par 'vava_test'"))
+        end)
+
+        it('n\'admet qu\'un modificateur par étape et par module', function()
+            addModifier('vava_test:a', { stage = 'bouclier', label = 'A', apply = function() end })
+            addModifier('vava_test:b', { stage = 'bouclier', label = 'B', apply = function() end })
+            addModifier('vava_test:c', { stage = 'resistance', label = 'C', apply = function() end })
+            addModifier('autre:b', { stage = 'bouclier', label = 'Autre', apply = function() end }, 'autre')
+            local keys = {}
+            for i, entry in ipairs(api.modifiers()) do keys[i] = entry.key end
+            assert.same({ 'autre:b', 'vava_test:a', 'vava_test:c' }, keys)
+            assert.is_nil(registries['vava_health:modifiers'].entries['vava_test:b'])
+            assert.equal(1, logged("modificateur 'vava_test:b' refusé"))
         end)
 
         it('suit les ajouts et les retraits, dans l\'ordre des étapes', function()
@@ -506,6 +568,16 @@ describe('vava_health chaîne de dégâts (serveur)', function()
             assert.equal(1, #sentTo(B, EVENTS.DOWN))
         end)
 
+        it('borne la cause d\'une mise à terre décidée par un module', function()
+            load(B)
+            for _, cause in ipairs({ string.rep('a', 33), 'piège', 'a b', 12, '' }) do
+                local ok, code = api.down(B, cause)
+                assert.is_false(ok, tostring(cause))
+                assert.equal('invalid_cause', code, tostring(cause))
+            end
+            assert.is_true(api.down(B, 'piege-a_loup'))
+        end)
+
         it('get rend la vie du serveur, vocabulary des copies', function()
             load(B, 0.4)
             entityHealth[peds[B]] = 200
@@ -547,6 +619,60 @@ describe('vava_health chaîne de dégâts (serveur)', function()
             assert.equal('vava_health', params[4])
             assert.equal('monde', params[5])
             assert.equal(1, params[14])
+        end)
+
+        it('ne transmet jamais comme vrai l\'auteur d\'une mise à terre native', function()
+            load(A)
+            load(B, 0.5)
+            deathSource = peds[A]
+            entityHealth[peds[B]] = 90
+            life.tick(500)
+            local downed = calls(HOOKS.DOWNED)[1].payload
+            assert.equal('death', downed.reason)
+            assert.is_nil(downed.killer)
+            assert.equal(A, downed.claimedKiller)
+            assert.is_true(downed.killerUnverified)
+            assert.equal(1, logged('non vérifié'))
+        end)
+
+        it('espace les corrections restées sans effet, et revient à 2 s dès l\'accord', function()
+            local entry = load(B, 0.5)
+            entityHealth[peds[B]] = 200
+            local function sets() return #sentTo(B, EVENTS.SET) end
+            life.tick(500)
+            assert.equal(1, sets())
+            now = now + 2000
+            life.tick(500)
+            assert.equal(2, sets())
+            now = now + 2000
+            life.tick(500)
+            assert.equal(2, sets())
+            now = now + 2000
+            life.tick(500)
+            assert.equal(3, sets())
+            -- 8 s ensuite, puis 16, plafond 30
+            now = now + 7999
+            life.tick(500)
+            assert.equal(3, sets())
+            now = now + 1
+            life.tick(500)
+            assert.equal(4, sets())
+            assert.equal(16000, entry.correctionGap)
+            for _ = 1, 3 do
+                now = now + 30000
+                life.tick(500)
+            end
+            assert.equal(30000, entry.correctionGap)
+            -- le client applique enfin : délai remis à zéro, une nouvelle dérive est corrigée aussitôt
+            entityHealth[peds[B]] = ratioToGame(0.5)
+            now = now + 3000
+            life.tick(500)
+            assert.is_nil(entry.correctedAt)
+            local before = sets()
+            entityHealth[peds[B]] = 200
+            now = now + 3000
+            life.tick(500)
+            assert.equal(before + 1, sets())
         end)
 
         it('corrige un client au-dessus de la valeur du serveur, au plus toutes les 2 s', function()
@@ -621,6 +747,42 @@ describe('vava_health chaîne de dégâts (serveur)', function()
             assert.equal(3, groups)
             assert.equal(3 * 17, #queries[1].params)
             assert.is_nil(queries[1].sql:find('vava_test', 1, true))
+        end)
+    end)
+
+    describe('journal refusé par la base', function()
+        it('réessaie ligne à ligne et abandonne la seule ligne refusée, sans boucle', function()
+            load(A)
+            load(B)
+            hit(B, { amount = 1, kind = 'tranchant', source = A, weapon = 'bonne' })
+            hit(B, { amount = 1, kind = 'tranchant', source = A, weapon = 'mauvaise' })
+            hit(B, { amount = 1, kind = 'tranchant', source = A, weapon = 'bonne' })
+            -- la base refuse tout lot qui contient la mauvaise ligne
+            dbFails = function(_, params)
+                for _, value in ipairs(params) do
+                    if value == 'mauvaise' then return true end
+                end
+                return false
+            end
+            journal.flush()
+            -- un lot, puis trois lignes seules
+            assert.equal(4, #queries)
+            assert.equal(0, journal.pending())
+            assert.equal(1, logged('1 ligne(s) refusée(s) par la base'))
+            journal.flush()
+            assert.equal(4, #queries)
+        end)
+
+        it('n\'attend la base qu\'une fois à l\'arrêt', function()
+            load(A)
+            load(B)
+            hit(B, { amount = 1, kind = 'tranchant', source = A })
+            hit(B, { amount = 1, kind = 'tranchant', source = A })
+            dbFails = function() return true end
+            journal.flushAll()
+            assert.equal(1, #queries)
+            assert.equal(0, journal.pending())
+            assert.equal(1, logged('2 ligne(s) refusée(s)'))
         end)
     end)
 

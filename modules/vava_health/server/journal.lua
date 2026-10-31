@@ -4,7 +4,8 @@
            la chaîne (annulés compris) et toutes les mises à terre par la chaîne ou par une perte native. Écrit en base
            par lots (patron de vava_magic/server/combat.lua) : un lot plein s'écrit dans son propre thread (un coup
            n'attend jamais la base), le reste toutes les `journal.flushMs` ; à l'arrêt du module, tout ce qui attend
-           part en une seule requête. File bornée : une base qui ne répond pas ne fait pas grossir la mémoire. Les
+           part en une seule requête. Un lot refusé est réessayé ligne à ligne, une ligne refusée est abandonnée
+           (comptée) : jamais de boucle sur une ligne que la base refuse. File bornée. Les
            lignes plus anciennes que `journal.retentionDays` sont retirées au démarrage puis une fois par jour, par
            lots bornés. Requêtes paramétrées seulement : le texte SQL n'est fait que de morceaux constants (groupes
            de `?`) ; une valeur absente devient NULL par NULLIF, jamais par un trou dans la liste des paramètres (elle
@@ -59,17 +60,13 @@ local queue = {}
 -- écriture d'un lot plein déjà demandée (un seul thread à la fois)
 local scheduled = false
 local dropped, droppedLoggedAt = 0, nil
+-- lignes refusées par la base (réessayées seules puis abandonnées), depuis la dernière ligne de console
+local rejected, rejectedLoggedAt = 0, nil
 
---- Écrit en base au plus `limit` lignes en attente, les plus anciennes, en une requête ; refusée, elles reviennent en
---- attente (dans la limite de la file).
----@param limit integer
-local function write(limit)
-    if #queue == 0 then return end
-    local count = min(#queue, limit)
-    local rows = move(queue, 1, count, 1, {})
-    local remaining = {}
-    move(queue, count + 1, #queue, 1, remaining)
-    queue = remaining
+--- Insère des lignes en une requête. Rend l'erreur de la base, ou nil.
+---@param rows table[]
+---@return any err
+local function insert(rows)
     local params, templates, n = {}, {}, 0
     for i, row in ipairs(rows) do
         templates[i] = row.template
@@ -81,24 +78,60 @@ local function write(limit)
     -- seuls des morceaux constants (groupes de `?`) sont assemblés ; les valeurs passent par params
     local sql = INSERT .. concat(templates, ', ')
     local _, err = VavaHealth.core.db.query(sql, params)
-    if err then
-        VavaHealth.log.warn('journal des coups non écrit (%d lignes) : %s', count, tostring(err))
-        if #queue + count <= cfg.queueMax then move(rows, 1, count, #queue + 1, queue) end
+    return err
+end
+
+--- Écrit en base au plus `limit` lignes en attente, les plus anciennes, en une requête. Lot refusé : avec `retry`,
+--- chaque ligne est réessayée seule une fois et une ligne refusée est abandonnée (comptée, console au plus une fois
+--- par minute) ; sans (arrêt du module), le lot est perdu et compté. Jamais remis en file : aucune boucle sans fin sur
+--- une ligne que la base refuse.
+---@param limit integer
+---@param retry boolean
+local function write(limit, retry)
+    if #queue == 0 then return end
+    local count = min(#queue, limit)
+    local rows = move(queue, 1, count, 1, {})
+    local remaining = {}
+    move(queue, count + 1, #queue, 1, remaining)
+    queue = remaining
+    local err = insert(rows)
+    if not err then return end
+    local lost = count
+    if retry then
+        lost = 0
+        for _, row in ipairs(rows) do
+            local rowErr = insert({ row })
+            if rowErr then
+                lost = lost + 1
+                err = rowErr
+            end
+        end
+    end
+    if lost == 0 then return end
+    rejected = rejected + lost
+    local now = GetGameTimer()
+    if not rejectedLoggedAt or now - rejectedLoggedAt >= FULL_LOG_MS then
+        rejectedLoggedAt = now
+        VavaHealth.log.warn('journal des coups : %d ligne(s) refusée(s) par la base, abandonnée(s) : %s', rejected,
+            tostring(err))
+        rejected = 0
     end
 end
 
---- Écrit un lot en attente (une requête, `journal.batch` lignes au plus).
+--- Écrit un lot en attente (une requête, `journal.batch` lignes au plus ; réessai ligne à ligne s'il est refusé).
 function journal.flush()
-    write(cfg.batch)
+    write(cfg.batch, true)
 end
 
---- Arrêt du module : tout le journal en attente part, en une seule requête.
+--- Arrêt du module : tout le journal en attente part, en une seule requête (aucun réessai : rien ne doit attendre la
+--- base deux fois pendant l'arrêt).
 function journal.flushAll()
     if #queue > STOP_ROWS then
         VavaHealth.log.warn('journal des coups : %d ligne(s) au-delà de %d non écrite(s) à l\'arrêt',
             #queue - STOP_ROWS, STOP_ROWS)
     end
-    write(STOP_ROWS)
+    rejectedLoggedAt = nil
+    write(STOP_ROWS, false)
 end
 
 --- Inscrit un coup. Ne cède jamais la main : un lot plein part dans son propre thread.

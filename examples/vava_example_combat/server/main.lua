@@ -15,7 +15,8 @@
       - /chaine     : modificateurs déclarés, dans l'ordre d'appel (export modifiers), et ses propres réserves ;
       - RPC vava_example_combat:access : accord demandé par le client avant /arme, /explosion, /tricher.
       Chaque coup et chaque protection posée est inscrit au journal du Registre (vava_admin:log), ou à la console du
-      serveur sans lui. Rien n'est écrit en base.
+      serveur sans lui. Rien n'est écrit en base. Mode développement relu faux pendant un coup : toutes les réserves
+      sont vidées. Réponses au seul joueur par core.net.send (vava_example_combat:message, comptées).
     Dépendances : vAvA_core (API v1, core ≥ 0.10.0), config.lua, shared/guard.lua ; vava_health ≥ 1.3.0 (export hit,
                   modifiers, registre) ; facultatif : vava_admin (droit et journal)
 ]]
@@ -30,19 +31,21 @@ if not core then
     return
 end
 
-local pcall, pairs, ipairs, tostring, tonumber, type, error = pcall, pairs, ipairs, tostring, tonumber, type, error
+local pcall, pairs, ipairs, next, tostring, tonumber, type, error = pcall, pairs, ipairs, next, tostring, tonumber,
+    type, error
 local min, floor, tointeger = math.min, math.floor, math.tointeger
 local concat, sort = table.concat, table.sort
 local format = string.format
 local GetConvar, GetResourceState, IsPlayerAceAllowed = GetConvar, GetResourceState, IsPlayerAceAllowed
-local GetGameTimer, RegisterCommand, TriggerClientEvent = GetGameTimer, RegisterCommand, TriggerClientEvent
+local GetGameTimer, RegisterCommand = GetGameTimer, RegisterCommand
 
 local ADMIN = 'vava_admin'
 local HEALTH = 'vava_health'
 local REGISTRY = 'vava_health:modifiers'
 local COMMANDS = 'core:commands'
 local RPC_ACCESS = RESOURCE .. ':access'
-local CHAT_EVENT = 'chat:addMessage'
+-- message au seul joueur, compté par core.net (le client l'affiche dans son chat)
+local MESSAGE_EVENT = RESOURCE .. ':message'
 local C = cfg.commands
 local PERCENT = 100
 
@@ -98,7 +101,7 @@ local function reply(source, message, ...)
     if source == 0 then
         print(('[%s] %s'):format(RESOURCE, text))
     else
-        TriggerClientEvent(CHAT_EVENT, source, { args = { cfg.chatAuthor, text } })
+        core.net.send(source, MESSAGE_EVENT, text)
     end
 end
 
@@ -149,7 +152,19 @@ end
 -- Modificateurs d'essai --------------------------------------------------------------------------------------------
 -- Appelés par vava_health pendant un coup : ils lisent leurs réserves, rendent un résultat, ne cèdent jamais la main.
 
+--- Mode développement relu : faux, toutes les réserves sont vidées (plus rien ne protège personne).
+---@return boolean
+local function stillDev()
+    if guard.isDevMode(GetConvar(guard.CONVAR, guard.FALLBACK)) then return true end
+    if next(dodges) or next(shields) or next(resistances) then
+        dodges, shields, resistances = {}, {}, {}
+        core.log.warn('mode développement absent : réserves d\'essai vidées')
+    end
+    return false
+end
+
 local function dodgeModifier(ctx)
+    if not stillDev() then return nil end
     local untilAt = dodges[ctx.target]
     if untilAt and GetGameTimer() < untilAt and ctx.tags.melee and not ctx.tags.undodgeable then
         return { cancel = 'esquive' }
@@ -158,6 +173,7 @@ local function dodgeModifier(ctx)
 end
 
 local function shieldModifier(ctx)
+    if not stillDev() then return nil end
     local shield = shields[ctx.target]
     if not shield then return nil end
     if shield.failing then error('bouclier d\'essai en panne (voulu : essai d\'isolement)') end
@@ -172,6 +188,7 @@ local function shieldModifier(ctx)
 end
 
 local function resistanceModifier(ctx)
+    if not stillDev() then return nil end
     local resistance = resistances[ctx.target]
     if not resistance or resistance.kind ~= ctx.kind then return nil end
     if resistance.percent >= 0 then return { resisted = ctx.amount * resistance.percent / PERCENT } end

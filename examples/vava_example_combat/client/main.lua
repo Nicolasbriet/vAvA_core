@@ -4,7 +4,8 @@
       - /arme pistolet | couteau | non : donne ou retire une arme vanilla (config `weapons`, provisoire) ;
       - /explosion : explosion vanilla à quelques mètres devant soi (config `explosion`, provisoire) ;
       - /tricher : vie GTA du ped local remise au maximum (simule un client qui refuse la vie du serveur ; seule
-        exception voulue à « le client ne touche pas à la vie »).
+        exception voulue à « le client ne touche pas à la vie ») ;
+      - réponses du serveur (vava_example_combat:message) affichées dans le chat.
       Chaque commande demande d'abord l'accord du serveur (RPC vava_example_combat:access : mode développement et
       droit, revérifiés à chaque appel). Aucune boucle, aucun envoi au serveur hors de cet accord.
     Dépendances : vAvA_core (API v1), config.lua
@@ -19,9 +20,10 @@ if not core then
     return
 end
 
-local tostring, pairs = tostring, pairs
+local tostring, pairs, type = tostring, pairs, type
 local format = string.format
-local CreateThread, TriggerEvent, RegisterCommand = CreateThread, TriggerEvent, RegisterCommand
+local CreateThread, TriggerEvent, RegisterCommand, RegisterNetEvent = CreateThread, TriggerEvent, RegisterCommand,
+    RegisterNetEvent
 local PlayerPedId, GetHashKey, GiveWeaponToPed, RemoveWeaponFromPed = PlayerPedId, GetHashKey, GiveWeaponToPed, RemoveWeaponFromPed
 local GetOffsetFromEntityInWorldCoords, AddExplosion = GetOffsetFromEntityInWorldCoords, AddExplosion
 local SetEntityHealth, GetEntityMaxHealth = SetEntityHealth, GetEntityMaxHealth
@@ -35,6 +37,11 @@ local function say(message, ...)
     core.log.info(text)
     TriggerEvent('chat:addMessage', { args = { cfg.chatAuthor, text } })
 end
+
+-- réponses du serveur (à ce seul joueur) : texte brut affiché dans le chat
+RegisterNetEvent(RESOURCE .. ':message', function(text)
+    if type(text) == 'string' then say('%s', text) end
+end)
 
 --- Le serveur décide : mode développement et droit. Bloque le thread courant.
 ---@return boolean

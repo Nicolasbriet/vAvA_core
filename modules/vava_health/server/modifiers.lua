@@ -1,9 +1,9 @@
 --[[
     vava_health/server/modifiers.lua
     Rôle : registre vava_health:modifiers (spec T-110 § 5.2). Défini au démarrage du module ; les autres modules y
-           déclarent leurs modificateurs (au plus un par étape et par module, chacun lit ses propres données). Contrôle
-           du propriétaire : une clé dont le préfixe n'est pas la ressource qui l'a ajoutée est retirée aussitôt (comme
-           vava_atelier:editors). Cache trié tenu par les hooks du registre : reconstruit (copie, jamais en place) à
+           déclarent leurs modificateurs (au plus un par étape et par module, chacun lit ses propres données : un
+           second à la même étape est retiré aussitôt). Contrôle du propriétaire : une clé dont le préfixe n'est pas la
+           ressource qui l'a ajoutée est retirée aussitôt (comme vava_atelier:editors). Cache trié tenu par les hooks du registre : reconstruit (copie, jamais en place) à
            chaque ajout ou retrait ; un coup en cours garde la liste qu'il a prise.
     Dépendances : shared/constants.lua, config.lua, shared/chain.lua, server/core.lua
 ]]
@@ -83,6 +83,15 @@ function modifiers.added(key, owner)
     end
     local data = core.registry.get(REGISTRY, key)
     if type(data) ~= 'table' then return end
+    -- un module, un modificateur par étape : il lit ses propres données, un second ne ferait que doubler l'effet
+    for otherKey, other in pairs(loaded) do
+        if other.owner == owner and other.stage == data.stage and otherKey ~= key then
+            VavaHealth.log.warn("modificateur '%s' refusé : %s déclare déjà '%s' à l'étape %s (un par étape et par "
+                .. 'module), entrée retirée', key, owner, otherKey, data.stage)
+            core.registry.remove(REGISTRY, key)
+            return
+        end
+    end
     local kindSet, kindList
     if type(data.kinds) == 'table' then
         kindSet, kindList = {}, {}
