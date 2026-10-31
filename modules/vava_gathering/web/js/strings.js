@@ -17,6 +17,7 @@ const STRINGS = Object.freeze({
     needTool: (tool) => `Il vous faut ${tool} en main.`,
     toolKinds: { hache: 'une hache', pioche: 'une pioche', faucille: 'une faucille', couteau: 'un couteau', canne: 'une canne à pêche' },
     toolDefault: 'l\'outil qui convient',
+    trial: 'Essai',   // point d'un essai de l'Atelier, vu et récolté (à blanc) par son seul auteur
   },
   cast: {
     text: (label) => `Ligne lancée — ${label}`,

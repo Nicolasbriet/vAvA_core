@@ -115,6 +115,7 @@ kbd {
 .prompt-verb { font-family: var(--font-display); font-size: 0.95rem; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase; color: var(--brass-bright); }
 .prompt-sep { margin: 0 0.3rem; color: var(--parchment-faint); }
 .prompt-label { font-size: 1.1rem; font-weight: 600; }
+.prompt-trial { margin-right: 0.45rem; padding: 0.05rem 0.45rem; border: 1px solid var(--brass-bright); border-radius: 3px; color: var(--brass-bright); font-size: 0.8rem; font-weight: 700; vertical-align: 0.1rem; }
 .prompt-charges { margin-left: 0.3rem; color: var(--parchment-muted); font-size: 0.95rem; font-style: italic; }
 .prompt-help { margin: 0; color: var(--parchment-muted); font-size: 0.92rem; font-style: italic; white-space: nowrap; }
 .prompt.is-blocked .prompt-verb { color: var(--parchment-faint); }
