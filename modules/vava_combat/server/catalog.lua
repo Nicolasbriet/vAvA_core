@@ -94,7 +94,7 @@ function catalog.view(item)
     return out
 end
 
---- Fiches ordonnées : catégorie (ordre de la config), puis libellé, puis nom.
+--- Fiches ordonnées : catégorie (ordre de la config), puis libellé (accents et casse ignorés), puis nom.
 ---@return vAvA.CombatWeapon[]
 function catalog.list()
     if not ordered then
@@ -103,7 +103,8 @@ function catalog.list()
         sort(ordered, function(a, b)
             local oa, ob = cfg.categories[a.category].order, cfg.categories[b.category].order
             if oa ~= ob then return oa < ob end
-            if a.label ~= b.label then return a.label < b.label end
+            local ka, kb = weapons.sortKey(a.label), weapons.sortKey(b.label)
+            if ka ~= kb then return ka < kb end
             return a.item < b.item
         end)
     end

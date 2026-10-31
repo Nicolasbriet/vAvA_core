@@ -415,6 +415,27 @@ function weapons.packet(item, def, amount, source, options)
     return packet
 end
 
+-- Tri des libellés ----------------------------------------------------------------------------------------------------
+
+-- lettres accentuées du français (UTF-8) ramenées à leur lettre de base, pour trier « Épée » avec les « e »
+local FOLD = {
+    ['à'] = 'a', ['â'] = 'a', ['ä'] = 'a', ['À'] = 'a', ['Â'] = 'a', ['Ä'] = 'a',
+    ['é'] = 'e', ['è'] = 'e', ['ê'] = 'e', ['ë'] = 'e', ['É'] = 'e', ['È'] = 'e', ['Ê'] = 'e', ['Ë'] = 'e',
+    ['î'] = 'i', ['ï'] = 'i', ['Î'] = 'i', ['Ï'] = 'i', ['ô'] = 'o', ['ö'] = 'o', ['Ô'] = 'o', ['Ö'] = 'o',
+    ['ù'] = 'u', ['û'] = 'u', ['ü'] = 'u', ['Ù'] = 'u', ['Û'] = 'u', ['Ü'] = 'u', ['ç'] = 'c', ['Ç'] = 'c',
+    ['œ'] = 'oe', ['Œ'] = 'oe', ['æ'] = 'ae', ['Æ'] = 'ae',
+}
+
+--- Clé de tri d'un libellé : lettres accentuées ramenées à leur base, casse ignorée (octets ASCII seulement baissés :
+--- string.lower suit la locale du système).
+---@param label any
+---@return string
+function weapons.sortKey(label)
+    if type(label) ~= 'string' then return '' end
+    local folded = label:gsub('[\xC3\xC5][\x80-\xBF]', FOLD)
+    return (folded:gsub('[A-Z]', function(c) return string.char(c:byte() + 32) end))
+end
+
 -- Versions ------------------------------------------------------------------------------------------------------------
 
 --- Vrai si `version` (semver « a.b.c ») est au moins `minimum`. Une version illisible n'est jamais suffisante.
