@@ -724,6 +724,46 @@ versé à T-014 ; les autres points déjà couverts sont précisés dans T-012 �
   le composteur devrait la refuser comme « recette inconnue » (à vérifier en jeu d'abord). Déclarer la recette et la
   redéclarer au retour de `vava_skills`, comme `vava_provisions` le fait pour l'outre.
 
+### T-145 — Menu pause `vava_pause` (la bannière)
+- Agents : vava-architecte → vava-dev-lua + vava-dev-nui · Dépend de : T-012 · Statut : à faire
+- Référence visuelle : canevas « Menu pause d'Eldoria », section « La bannière, version finale avec le thème du
+  serveur » (écrans Personnage, Réglages, Le Conseil, Quitter : `docs/maquettes/menu-pause/HD_*.dc.html`) ; écrans
+  B1 Codex, B2 Carte et B6 bannière de confrérie (`Codex.dc.html`, `Carte.dc.html`, `Confrerie.dc.html`) pour ce qui
+  n'est pas dans la version finale. L'interface réalisée doit leur ressembler.
+- Interception : le menu pause natif de GTA est remplacé par la bannière (touches Échap et P). Bloquer ces touches
+  impose une boucle par image permanente : c'est une **exception documentée** à la règle « pas de Wait(0) », limitée
+  à ce seul blocage (aucune autre logique dans cette boucle). Pas d'ouverture pendant un combat, à terre, ligoté ou
+  dans une autre interface ; fermeture par Échap et par « Reprendre ».
+- Bannière : tringle et pommeaux de laiton, tissu tissé, broderie, queue fourchue, blason, « Eldoria » en Cinzel
+  Decorative ; rubrique active en bande de parchemin qui pointe vers le panneau ; ouverture en déroulé de 250 ms
+  (opacité et transformation uniquement) ; navigation au clavier et à la manette.
+- Couleurs de confrérie : si le joueur appartient à une confrérie (`vava_guilds`, via le bridge, facultatif), la
+  bannière prend sa teinte et son blason ; sinon bannière royale.
+- Rubriques :
+  - Personnage : médaillon, nom, tampons de rang et de confrérie, fiche, jauges santé, faim, soif, registre des
+    savoir-faire (`vava_skills`), bouton vers la fiche complète.
+  - Codex : ouvre `vava_codex` dans le panneau (chapitres, recherche, lecture).
+  - Carte : bouton vers la carte de GTA en attendant la carte médiévale ; filtres par type de lieu prévus pour quand
+    les lieux viendront de l'Atelier.
+  - Réglages : signets Interface, Voix, Touches ; leviers et tampons ; préférences gardées **côté client** (stockage
+    local de FiveM), rien n'est envoyé au serveur ; touches lues depuis le registre `core:commands`.
+  - Le Conseil : type de demande (question, signaler un joueur, bug, autre), message sur papier ligné, position
+    jointe en option, suivi de la demande en cours ; passe par le système de requêtes de `vava_admin`. Le joueur
+    signalé ne voit jamais le nom de celui qui signale.
+  - Paramètres du jeu : ouvre les paramètres natifs de GTA.
+  - Quitter : confirmation (« enregistré là où il se trouve », « à terre au retour si vous l'êtes », « un échange en
+    cours sera annulé ») ; Rester (laiton), Se déconnecter (encre), Quitter le jeu (cire).
+- Plaque du royaume en bas à droite : heure, saison (quand `vava_time` existe), nombre d'habitants présents.
+- Réseau : **une seule** demande à l'ouverture (personnage, confrérie, royaume, état de la demande au Conseil), mise
+  en cache le temps de la pause ; rien n'est envoyé en continu ; la demande au Conseil est un RPC borné avec une
+  limite de débit stricte.
+- Thème : uniquement les ressources de `vava_ui` (polices, `grain.webp`, `paper.webp`, `frame.svg`, `divider.svg`,
+  `diamond.svg`) et les composants du Registre du Conseil ; aucun flou ni filtre CSS ; pas de `color-mix` ni de
+  fonction CSS récente non garantie dans le navigateur de FiveM.
+- Critères : resmon au repos ≤ 0,02 ms malgré la boucle de blocage ; ouverture en moins de 300 ms ; devmock qui
+  montre chaque rubrique hors jeu ; impossible d'ouvrir le menu en combat ou ligoté ; relectures sécurité, réseau et
+  lore OK.
+
 ## Phase 3 — L'Atelier : socle et créateurs du monde
 
 Référence : `docs/plan/ATELIER.md` et les maquettes `docs/maquettes/`. Les écrans réalisés doivent ressembler aux

@@ -1,0 +1,158 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<title>Menu pause, version finale : le Conseil</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<style>
+@font-face{font-family:"Cinzel Decorative";src:url("/_blob/38e12a6ae9f22fa7bf5636c0f610b323") format("woff2");font-weight:700}
+@font-face{font-family:"Cinzel";src:url("/_blob/78ef8a6bb952c31b255039b0dc78062e") format("woff2");font-weight:400 700}
+@font-face{font-family:"EB Garamond";src:url("/_blob/c700f552d85810d9a235992fb48fe720") format("woff2");font-weight:400 700;font-style:normal}
+@font-face{font-family:"EB Garamond";src:url("/_blob/e478f1e3f52dbc0920080864461a7e07") format("woff2");font-weight:400 700;font-style:italic}
+body{margin:0}
+a{color:#8e2c1d}a:hover{color:#5f1d13}
+button{font:inherit;color:inherit}
+.root{--edge:#070504;--brass:#b39463;--brass-bright:#dcc08a;--parchment-text:#ece1c8;--paper:#e9d8b4;--paper-light:#f4e8cc;--ink:#2b1d12;--ink-muted:#6b5640;--rubric:#8e2c1d;--gold:#a8823a;--forest:#3f5a33;--frost:#3c5a6e;
+ --font-decorative:"Cinzel Decorative","Cinzel",Georgia,serif;--font-display:"Cinzel","Palatino Linotype",Georgia,serif;--font-body:"EB Garamond","Palatino Linotype",Georgia,serif;
+ --leather:url("/_blob/d0bb526bea655e77ef5450ea198cfa5d"),radial-gradient(ellipse 120% 60% at 50% 0%,rgba(132,92,56,.22),transparent 65%),linear-gradient(180deg,#241a12,#15100b);
+ --paper-surface:url("/_blob/d95ecd2452e1c3b8496c0ca362a7f942"),radial-gradient(ellipse 70% 55% at 30% 25%,rgba(255,248,228,.55),transparent 70%),radial-gradient(ellipse 110% 100% at 50% 50%,transparent 55%,rgba(120,84,40,.35) 100%),linear-gradient(180deg,#f4e8cc,#e9d8b4);
+ position:relative;width:1440px;height:900px;overflow:hidden;background:#0b0805;color:var(--ink);font-family:var(--font-body);font-size:17px;font-variant-numeric:lining-nums;-webkit-font-smoothing:antialiased}
+.vignette{position:absolute;inset:0;background:radial-gradient(ellipse 80% 75% at 62% 48%,rgba(8,6,4,.25),rgba(8,6,4,.82))}
+/* bannière */
+.ban{position:absolute;left:84px;top:0;width:332px;height:820px}
+.ban-shadow{position:absolute;left:10px;top:18px;width:332px;height:808px;background:rgba(0,0,0,.55);clip-path:polygon(0 0,100% 0,100% 100%,50% 92.5%,0 100%)}
+.ban-cloth{position:absolute;left:0;top:14px;width:332px;height:800px;--dye:#6e2116;--dye-dark:#4a150d;background:url("/_blob/d0bb526bea655e77ef5450ea198cfa5d"),repeating-linear-gradient(90deg,rgba(255,255,255,.035) 0 1px,transparent 1px 3px),radial-gradient(ellipse 120% 50% at 50% 0%,rgba(255,210,170,.12),transparent 60%),linear-gradient(180deg,var(--dye),var(--dye-dark));clip-path:polygon(0 0,100% 0,100% 100%,50% 92.5%,0 100%)}
+.ban-rod{position:absolute;left:-26px;top:4px;width:384px;height:16px;border-radius:8px;background:linear-gradient(180deg,#e9d3a2,#b8975f 45%,#9a7a48 46%,#4e3b21);box-shadow:0 0 0 1px #1d140b,0 3px 6px rgba(0,0,0,.6)}
+.ban-knob{position:absolute;top:-3px;width:22px;height:22px;border-radius:50%;background:radial-gradient(circle at 35% 30%,#fbe8bb,#b48a4c 55%,#5c4220);box-shadow:0 0 0 1px #1d140b,0 2px 3px rgba(0,0,0,.6)}
+.ban-name{position:absolute;left:0;right:0;top:196px;text-align:center;color:var(--brass-bright);font-family:var(--font-decorative);font-weight:700;font-size:30px;letter-spacing:.08em;text-shadow:0 2px 0 rgba(0,0,0,.7),0 0 18px rgba(220,192,138,.15)}
+.ban-div{position:absolute;left:40px;right:40px;height:10px;background:url("/_blob/756ea07125baa1a408d0cc3b8f86b96f") center/100% 100% no-repeat}
+.ban-nav{position:absolute;left:0;top:262px;width:332px;display:flex;flex-direction:column;gap:2px}
+.bn{position:relative;display:flex;align-items:center;gap:14px;width:100%;height:50px;padding:0 30px;border:0;background:transparent;color:#f3e3c4;font-family:var(--font-display);font-size:15px;font-weight:700;letter-spacing:.16em;text-transform:uppercase;text-shadow:0 1px 0 rgba(0,0,0,.6);text-align:left;cursor:pointer}
+.bn:hover{background:rgba(220,192,138,.1)}
+.bn::before{content:"";width:11px;height:11px;flex:none;background:url("/_blob/2fb124a6faf2f1e104e0111385204d77") center/contain no-repeat;opacity:.85}
+.bn.is-active{width:calc(100% + 34px);color:var(--ink);text-shadow:none;background:var(--paper-surface);background-size:auto;clip-path:polygon(0 0,calc(100% - 18px) 0,100% 50%,calc(100% - 18px) 100%,0 100%);box-shadow:inset 0 -2px 0 rgba(110,74,34,.35)}
+.bn.is-active::before{filter:brightness(.4)}
+.bn.is-quit{color:#f0b9aa}
+.ban-foot{position:absolute;left:0;right:0;top:700px;text-align:center;color:var(--parchment-text);font-style:italic;font-size:15px;opacity:.85}
+/* tome (panneau) */
+.tome{position:absolute;padding:14px;border-radius:6px;background:var(--leather);box-shadow:0 0 0 1px var(--edge),inset 0 1px 0 rgba(255,235,200,.07),inset 0 0 48px rgba(0,0,0,.5),0 32px 64px rgba(0,0,0,.6)}
+.tome::before{content:"";position:absolute;inset:-3px;border:20px solid transparent;border-image:url("/_blob/ef2aad9b6c26fb119f990cb04844d445") 18 / 20px;pointer-events:none}
+.tome::after{content:"";position:absolute;inset:7px;border:1px dashed rgba(220,192,138,.18);border-radius:4px;pointer-events:none}
+.leaf{position:relative;height:100%;box-sizing:border-box;border-radius:3px;background:var(--paper-surface);box-shadow:0 0 0 1px rgba(0,0,0,.6),inset 0 0 40px rgba(110,74,34,.35),0 10px 20px rgba(0,0,0,.45);padding:26px 32px;display:flex;flex-direction:column;gap:18px}
+.ph{display:flex;align-items:baseline;justify-content:space-between;gap:16px;padding-bottom:8px;border-bottom:3px double rgba(142,44,29,.55)}
+.pt{margin:0;font-family:var(--font-display);font-size:25px;font-weight:600;letter-spacing:.04em}
+.lt{margin-right:.04em;color:var(--rubric);font-family:var(--font-decorative);font-size:1.6em;font-weight:700;line-height:.8;text-shadow:1px 1px 0 var(--gold),-1px 0 0 rgba(168,130,58,.6)}
+.cross{position:relative;width:34px;height:34px;border:0;background:transparent;cursor:pointer;opacity:.75}
+.cross::before,.cross::after{content:"";position:absolute;top:50%;left:18%;width:64%;height:2px;background:var(--ink);transform:rotate(45deg)}
+.cross::after{transform:rotate(-45deg)}
+.lbl{color:var(--ink-muted);font-family:var(--font-display);font-size:12px;font-weight:700;letter-spacing:.12em;text-transform:uppercase}
+.gt{margin:0 0 6px;color:var(--rubric);font-family:var(--font-display);font-size:13px;font-weight:700;letter-spacing:.16em;text-transform:uppercase}
+.tag{display:inline-block;padding:2px 8px;border:1px solid currentColor;border-radius:2px;font-family:var(--font-display);font-size:11px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;transform:rotate(-2deg)}
+.gauge{height:7px;overflow:hidden;border-radius:4px;background:rgba(43,29,18,.1);box-shadow:inset 0 0 0 1px rgba(43,29,18,.35)}
+.gauge span{display:block;height:100%;background:var(--rubric)}
+.ink{min-height:40px;padding:0 16px;border:1px solid rgba(43,29,18,.55);border-radius:2px;background:transparent;font-family:var(--font-display);font-size:13px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;cursor:pointer}
+.ink:hover{background:rgba(43,29,18,.08)}
+.seal-b{min-height:44px;padding:0 20px;border:0;border-radius:2px;background:radial-gradient(circle at 30% 25%,#c24b3b,#8e2c1d 60%,#5e1a10);box-shadow:inset 0 1px 0 rgba(255,220,200,.3),inset 0 0 0 1px rgba(0,0,0,.25),0 1px 2px rgba(0,0,0,.4);color:#f7e9d4;text-shadow:0 1px 0 rgba(0,0,0,.35);font-family:var(--font-display);font-size:13px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;cursor:pointer}
+.brass-b{min-height:48px;padding:0 22px;border:0;border-radius:3px;background:linear-gradient(180deg,#e9d3a2,#b8975f 48%,#9a7a48 52%,#6e5530);box-shadow:0 0 0 1px #1d140b,inset 0 1px 0 rgba(255,243,210,.6),0 2px 4px rgba(0,0,0,.45);color:#1d140b;font-family:var(--font-display);font-size:14px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;cursor:pointer}
+.plain{border:0;background:transparent;color:var(--ink-muted);font-style:italic;cursor:pointer;padding:0;font-size:16px}
+.plain:hover{color:var(--rubric)}
+.dotrow{border-bottom:1px dotted rgba(43,29,18,.3)}
+.seal{display:inline-block;width:40px;height:40px;flex:none;border-radius:46% 54% 50% 50%;background:radial-gradient(circle at 35% 30%,#c95443,#8e2c1d 55%,#571409);box-shadow:inset 0 0 0 4px rgba(0,0,0,.18),inset 0 0 0 5px rgba(255,200,180,.18),0 2px 4px rgba(0,0,0,.5)}
+.plate{position:absolute;display:flex;align-items:center;gap:18px;padding:12px 22px;border-radius:4px;background:var(--leather);box-shadow:0 0 0 1px var(--edge),inset 0 0 20px rgba(0,0,0,.5),0 10px 24px rgba(0,0,0,.55);color:var(--parchment-text);font-size:16px}
+.plate i{width:9px;height:9px;background:url("/_blob/2fb124a6faf2f1e104e0111385204d77") center/contain no-repeat}
+.ribbons{display:flex;gap:6px;margin:-26px 0 0;height:40px}
+.ribbon{--dye:#7a2418;min-width:120px;height:42px;padding:0 16px 9px;border:0;background:repeating-linear-gradient(90deg,rgba(255,255,255,.04) 0 1px,transparent 1px 3px),var(--dye);box-shadow:inset 0 -1px 0 rgba(0,0,0,.35);color:#f3e3c4;font-family:var(--font-display);font-size:12px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;text-shadow:0 1px 0 rgba(0,0,0,.5);cursor:pointer;clip-path:polygon(0 0,100% 0,100% 100%,50% 78%,0 100%);opacity:.82}
+.ribbon.on{opacity:1;height:52px}
+.lever{display:flex;align-items:center;gap:10px;padding:0;border:0;background:transparent;cursor:pointer}
+.lt-track{position:relative;width:48px;height:22px;border-radius:16px;background:rgba(43,29,18,.15);box-shadow:inset 0 1px 3px rgba(43,29,18,.5),inset 0 0 0 1px rgba(43,29,18,.4)}
+.lt-knob{position:absolute;top:3px;left:3px;width:16px;height:16px;border-radius:50%;background:radial-gradient(circle at 35% 30%,#fbe8bb,#b48a4c 55%,#5c4220);box-shadow:0 0 0 1px #1d140b,0 1px 2px rgba(0,0,0,.5)}
+.lever.on .lt-track{background:rgba(63,90,51,.55)}
+.lever.on .lt-knob{transform:translateX(26px)}
+.lt-state{min-width:70px;color:var(--ink-muted);font-family:var(--font-display);font-size:11px;font-weight:700;letter-spacing:.12em;text-transform:uppercase}
+.lever.on .lt-state{color:var(--forest)}
+.stamp{min-height:36px;padding:0 14px;border:1px solid rgba(43,29,18,.55);border-radius:2px;background:transparent;font-family:var(--font-display);font-size:12px;font-weight:700;letter-spacing:.1em;text-transform:uppercase;cursor:pointer}
+.stamp.on{border-color:var(--rubric);background:rgba(142,44,29,.1);color:var(--rubric);transform:rotate(-1.5deg)}
+.lines{width:100%;box-sizing:border-box;border:0;border-bottom:1px solid rgba(43,29,18,.4);background:repeating-linear-gradient(180deg,transparent 0 26px,rgba(43,29,18,.16) 26px 27px);font:inherit;font-size:18px;line-height:27px;color:var(--ink);resize:none;padding:0 2px}
+</style>
+</helmet>
+<div class="root">
+  <svg aria-hidden="true" width="1440" height="900" viewBox="0 0 1440 900" style="position:absolute;inset:0">
+    <defs>
+      <linearGradient id="ws" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#2d3a4f"></stop><stop offset=".55" stop-color="#a5745a"></stop><stop offset="1" stop-color="#d9a873"></stop></linearGradient>
+      <filter id="wb" x="-5%" y="-5%" width="110%" height="110%"><feGaussianBlur stdDeviation="5"></feGaussianBlur></filter>
+    </defs>
+    <g filter="url(#wb)">
+      <rect x="-40" y="-40" width="1520" height="980" fill="url(#ws)"></rect>
+      <path d="M-40 520 L200 430 L420 500 L700 410 L980 490 L1220 420 L1480 480 L1480 940 L-40 940Z" fill="#4a4a3a"></path>
+      <g fill="#2b2620">
+        <path d="M180 600 v-120 l70-60 70 60 v120z"></path><path d="M330 600 v-90 l55-45 55 45 v90z"></path>
+        <path d="M560 600 v-170 l40-80 40 80 v170z"></path><path d="M660 600 v-110 l80-70 80 70 v110z"></path>
+        <path d="M900 600 v-100 l60-50 60 50 v100z"></path><path d="M1060 600 v-140 l75-65 75 65 v140z"></path>
+      </g>
+      <g fill="#f2b660"><rect x="236" y="530" width="18" height="24"></rect><rect x="702" y="540" width="16" height="22"></rect><rect x="1120" y="520" width="18" height="24"></rect><rect x="370" y="550" width="14" height="18"></rect></g>
+      <rect x="-40" y="600" width="1520" height="340" fill="#3a3228"></rect>
+    </g>
+    <rect width="1440" height="900" fill="#0b0805" opacity="0.0"></rect>
+  </svg>
+  <div class="vignette" aria-hidden="true"></div>
+  <div class="ban">
+    <div class="ban-shadow" aria-hidden="true"></div>
+    <div class="ban-cloth" aria-hidden="true"></div>
+    <svg aria-hidden="true" width="332" height="820" viewBox="0 0 332 820" style="position:absolute;left:0;top:0">
+      <defs><linearGradient id="bz" x1="0" y1="0" x2="1" y2="1"><stop offset="0" stop-color="#e9d3a2"></stop><stop offset=".45" stop-color="#b8975f"></stop><stop offset=".46" stop-color="#9a7a48"></stop><stop offset="1" stop-color="#4e3b21"></stop></linearGradient></defs>
+      <path d="M12 26 V796 L166 744 L320 796 V26" fill="none" stroke="#dcc08a" stroke-opacity=".38" stroke-width="1.2" stroke-dasharray="5 4"></path>
+      <path d="M22 26 V780 L166 732 L310 780 V26" fill="none" stroke="#dcc08a" stroke-opacity=".16" stroke-width="1"></path>
+      <path d="M166 56 l50 18 v44 c0 34-22 52-50 62-28-10-50-28-50-62 v-44z" fill="url(#bz)" stroke="#1d140b" stroke-width="1.2"></path>
+      <path d="M166 66 l40 14 v37 c0 27-18 42-40 50-22-8-40-23-40-50 v-37z" fill="#273b56"></path>
+      <path d="M166 82 v68 M140 110 h52" stroke="#e9d3a2" stroke-width="6" stroke-linecap="round"></path>
+      <circle cx="166" cy="110" r="9" fill="#273b56" stroke="#e9d3a2" stroke-width="3"></circle>
+      <g fill="url(#bz)" stroke="#1d140b" stroke-width=".8"><path d="M4 800 h16 l-3 10 h-10z"></path><path d="M312 800 h16 l-3 10 h-10z"></path></g>
+      <g stroke="#b8975f" stroke-width="2"><path d="M8 810 v10 M12 810 v12 M16 810 v10 M20 810 v12"></path><path d="M316 810 v10 M320 810 v12 M324 810 v10 M328 810 v12"></path></g>
+    </svg>
+    <div class="ban-rod" aria-hidden="true"><span class="ban-knob" style="left:-8px"></span><span class="ban-knob" style="right:-8px"></span></div>
+    <div class="ban-name">Eldoria</div>
+    <div class="ban-div" style="top:244px" aria-hidden="true"></div>
+    <nav class="ban-nav" aria-label="Menu">
+      <button class="bn">Reprendre</button><button class="bn">Personnage</button><button class="bn">Codex</button><button class="bn">Carte</button><button class="bn">Réglages</button><button class="bn is-active" aria-current="true">Le Conseil</button>
+      <div class="ban-div" style="position:relative;left:auto;right:auto;margin:14px 40px;width:auto" aria-hidden="true"></div>
+      <button class="bn" style="font-size:13px;height:44px">Paramètres du jeu</button>
+      <button class="bn is-quit" style="font-size:13px;height:44px">Quitter Eldoria</button>
+    </nav>
+    <div class="ban-foot">Échap pour reprendre</div>
+  </div>
+  <section class="tome" aria-label="Contacter le Conseil" style="left:470px;top:86px;width:720px;height:690px;box-sizing:border-box">
+    <div class="leaf">
+      <div class="ph"><h1 class="pt"><span class="lt">L</span>e Conseil vous écoute</h1><button class="cross" aria-label="Fermer"></button></div>
+      <div style="display:flex;gap:14px;align-items:center;padding:12px 16px;border-left:3px solid var(--forest);background:rgba(63,90,51,.08)">
+        <span class="seal" style="width:30px;height:30px;background:radial-gradient(circle at 35% 30%,#7fa06c,#3f5a33 55%,#22341b)" aria-hidden="true"></span>
+        <span style="display:flex;flex-direction:column"><span style="font-weight:600">Votre demande précédente est prise en charge</span><span style="font-style:italic;color:var(--ink-muted);font-size:16px">Un membre du Conseil va vous rejoindre.</span></span>
+      </div>
+      <div style="display:flex;flex-direction:column;gap:8px">
+        <span class="lbl">De quoi s'agit-il ?</span>
+        <div style="display:flex;gap:6px"><button class="stamp on">Une question</button><button class="stamp">Signaler un joueur</button><button class="stamp">Un bug</button><button class="stamp">Autre</button></div>
+      </div>
+      <label style="display:flex;flex-direction:column;gap:8px;flex:1">
+        <span class="lbl">Votre message</span>
+        <textarea class="lines" placeholder="Décrivez la situation en quelques phrases…" style="flex:1;min-height:150px;font-style:italic"></textarea>
+      </label>
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:16px">
+        <button class="lever on" aria-pressed="true"><span class="lt-track"><span class="lt-knob"></span></span><span style="font-size:16px">Joindre ma position</span></button>
+        <button class="seal-b">Sceller et envoyer</button>
+      </div>
+      <p style="margin:0;font-style:italic;color:var(--ink-muted);font-size:15px">Un joueur signalé ne voit jamais votre nom.</p>
+    </div>
+  </section>
+  <div class="plate" style="right:40px;bottom:34px"><span>Soir, 19 h</span><i aria-hidden="true"></i><span>Automne</span><i aria-hidden="true"></i><span>28 habitants présents</span></div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":900}}'>
+class Component extends DCLogic {
+  renderVals() { return {}; }
+}
+</script>
+</body>
+</html>

@@ -1,0 +1,83 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<title>Bannière : aux couleurs de la confrérie</title>
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;600;700&amp;family=EB+Garamond:ital,wght@0,400;0,500;0,600;1,400&amp;display=swap" rel="stylesheet">
+<style>
+body{margin:0}
+a{color:#8e2c1d}a:hover{color:#5f1d13}
+button{font:inherit}
+.bi{display:flex;align-items:center;gap:14px;width:100%;height:52px;padding:0 26px;border:0;background:transparent;color:#f1e3c4;text-align:left;cursor:pointer;font-family:Cinzel,Georgia,serif;font-size:19px;letter-spacing:.03em}
+.bi:hover{background:rgba(220,192,138,.14)}
+.bi.on{background:#dcc08a;color:#2b1d12;font-weight:700}
+.fl{position:absolute;box-sizing:border-box;padding:8px;background:#241a12;border:1px solid #b39463;border-radius:10px;box-shadow:0 20px 50px rgba(0,0,0,.55)}
+.fi{height:100%;box-sizing:border-box;background:#ecdcb8;border-radius:6px;display:flex;flex-direction:column}
+.fh{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:20px 26px 14px;border-bottom:1px solid #c9ad80}
+.fh h1{margin:0;font-family:Cinzel,Georgia,serif;font-size:24px}
+.x{width:40px;height:40px;border-radius:50%;border:1px solid #b39463;background:#f4e8cc;display:flex;align-items:center;justify-content:center;cursor:pointer}
+.lb{font-family:Cinzel,Georgia,serif;font-size:13px;font-weight:600;letter-spacing:.04em;color:#4a3826}
+.hp{font-size:15px;color:#5a4633;line-height:1.4}
+.pb{height:46px;padding:0 20px;border:1px solid #2b1d12;border-radius:6px;background:#2b1d12;color:#f4e8cc;font-family:Cinzel,Georgia,serif;font-size:15px;font-weight:600;cursor:pointer}
+.sb{height:46px;padding:0 18px;border:1px solid #b39463;border-radius:6px;background:#f4e8cc;color:#2b1d12;font-size:16px;cursor:pointer}
+.seg{display:flex;border:1px solid #b39463;border-radius:6px;overflow:hidden}
+.seg button{flex:1;height:42px;border:0;border-right:1px solid #c9ad80;background:#f4e8cc;font-size:15px;color:#2b1d12;cursor:pointer}
+.seg button:last-child{border-right:0}
+.seg .on{background:#2b1d12;color:#f4e8cc;font-weight:600}
+</style>
+</helmet>
+<div style="width:1440px;height:900px;position:relative;overflow:hidden;font-family:'EB Garamond',Georgia,serif;color:#2b1d12;background:#15100b">
+  <svg aria-hidden="true" width="1440" height="900" viewBox="0 0 1440 900" style="position:absolute;inset:0">
+    <defs>
+      <linearGradient id="ws" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#2d3a4f"></stop><stop offset=".55" stop-color="#a5745a"></stop><stop offset="1" stop-color="#d9a873"></stop></linearGradient>
+      <filter id="wb" x="-5%" y="-5%" width="110%" height="110%"><feGaussianBlur stdDeviation="4"></feGaussianBlur></filter>
+    </defs>
+    <g filter="url(#wb)">
+      <rect x="-40" y="-40" width="1520" height="980" fill="url(#ws)"></rect>
+      <path d="M-40 520 L200 430 L420 500 L700 410 L980 490 L1220 420 L1480 480 L1480 940 L-40 940Z" fill="#4a4a3a"></path>
+      <g fill="#2b2620">
+        <path d="M180 600 v-120 l70-60 70 60 v120z"></path><path d="M330 600 v-90 l55-45 55 45 v90z"></path>
+        <path d="M560 600 v-170 l40-80 40 80 v170z"></path><path d="M660 600 v-110 l80-70 80 70 v110z"></path>
+        <path d="M900 600 v-100 l60-50 60 50 v100z"></path><path d="M1060 600 v-140 l75-65 75 65 v140z"></path>
+      </g>
+      <g fill="#f2b660"><rect x="236" y="530" width="18" height="24"></rect><rect x="702" y="540" width="16" height="22"></rect><rect x="1120" y="520" width="18" height="24"></rect><rect x="370" y="550" width="14" height="18"></rect></g>
+      <rect x="-40" y="600" width="1520" height="340" fill="#3a3228"></rect>
+    </g>
+    <rect width="1440" height="900" fill="#0b0805" opacity="0.2"></rect>
+  </svg>
+  <svg aria-hidden="true" width="1440" height="900" viewBox="0 0 1440 900" style="position:absolute;inset:0">
+    <rect x="70" y="0" width="360" height="14" fill="#7a5a32"></rect>
+    <path d="M90 14 H410 V760 L250 700 L90 760 Z" fill="#2c4527" stroke="#a8823a" stroke-width="3"></path>
+    <path d="M104 14 V742 L250 686 L396 742 V14" fill="none" stroke="#a8823a" stroke-width="1" opacity=".6"></path>
+    <path d="M250 60 l44 16 v40 c0 30-20 46-44 54-24-8-44-24-44-54 v-40z" fill="#5c1a12" stroke="#dcc08a" stroke-width="2"></path>
+    <path d="M250 82 v64 M226 108 h48" stroke="#f1e3c4" stroke-width="5"></path>
+  </svg>
+  <div style="position:absolute;left:90px;top:186px;width:320px;text-align:center;font-family:Cinzel,Georgia,serif;font-weight:700;font-size:22px;letter-spacing:.1em;color:#f1e3c4">GUÉRISSEURS</div>
+  <nav aria-label="Menu" style="position:absolute;left:90px;top:244px;width:320px;display:flex;flex-direction:column;gap:2px">
+    <button class="bi on" aria-current="true"><svg aria-hidden="true" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#2b1d12" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M7 5l12 7-12 7z"></path></svg>Reprendre</button><button class="bi"><svg aria-hidden="true" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#dcc08a" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="8" r="4"></circle><path d="M4 21c1.2-4.5 4.4-6.5 8-6.5s6.8 2 8 6.5"></path></svg>Personnage</button><button class="bi"><svg aria-hidden="true" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#dcc08a" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M4 5c3-1.5 6-1.5 8 0v15c-2-1.5-5-1.5-8 0z"></path><path d="M20 5c-3-1.5-6-1.5-8 0v15c2-1.5 5-1.5 8 0z"></path></svg>Codex</button><button class="bi"><svg aria-hidden="true" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#dcc08a" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6l6-2 6 2 6-2v14l-6 2-6-2-6 2z"></path><path d="M9 4v14M15 6v14"></path></svg>Carte</button><button class="bi"><svg aria-hidden="true" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#dcc08a" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"></circle><path d="M12 2v3M12 19v3M2 12h3M19 12h3M4.9 4.9l2.1 2.1M17 17l2.1 2.1M4.9 19.1L7 17M17 7l2.1-2.1"></path></svg>Réglages</button><button class="bi"><svg aria-hidden="true" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="#dcc08a" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="10" r="6"></circle><path d="M9 15l-2 6 5-2 5 2-2-6"></path></svg>Le Conseil</button>
+    <div style="height:1px;background:rgba(220,192,138,.4);margin:12px 26px"></div>
+    <button class="bi" style="font-size:16px;height:44px"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#dcc08a" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="12" rx="1.5"></rect><path d="M8 20h8M12 16v4"></path></svg>Paramètres du jeu</button>
+    <button class="bi" style="font-size:16px;height:44px;color:#f0b2a3"><svg aria-hidden="true" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#f0b2a3" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3H6v18h8"></path><path d="M10 12h11M18 9l3 3-3 3"></path></svg>Quitter Eldoria</button>
+  </nav>
+  <div style="position:absolute;left:90px;top:790px;width:320px;text-align:center;font-size:16px;color:#ece1c8">Bannière des Guérisseurs d'Eldoria</div>
+  <div style="position:absolute;right:40px;bottom:36px;display:flex;align-items:center;gap:24px;background:rgba(36,26,18,.9);border:1px solid #b39463;border-radius:8px;padding:12px 20px;color:#ece1c8;font-size:17px">
+    <span style="display:flex;align-items:center;gap:8px"><svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#dcc08a" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="4"></circle><path d="M12 2v2M12 20v2M2 12h2M20 12h2"></path></svg>Soir, 19 h</span>
+    <span style="display:flex;align-items:center;gap:8px"><svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#dcc08a" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M5 19C5 10 11 5 20 4c-1 9-6 15-15 15z"></path><path d="M5 19l7-7"></path></svg>Automne</span>
+    <span style="display:flex;align-items:center;gap:8px"><svg aria-hidden="true" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#dcc08a" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="3"></circle><path d="M3 20c.8-3.5 3.2-5 6-5s5.2 1.5 6 5"></path><circle cx="17" cy="9" r="2.5"></circle><path d="M16 14.5c2.5 0 4.3 1.5 5 4.5"></path></svg>28 présents</span>
+    <span style="color:#cbb994">Échap : reprendre</span>
+  </div>
+</div>
+</x-dc>
+<script type="text/x-dc" data-dc-script data-props='{"$preview":{"width":1440,"height":900}}'>
+class Component extends DCLogic {
+  renderVals() { return {}; }
+}
+</script>
+</body>
+</html>
