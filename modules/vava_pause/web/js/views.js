@@ -113,7 +113,7 @@ const PauseViews = (() => {
       const node = button('bn', null, 'entry', { id: entry.id });
       node.classList.toggle('is-small', Boolean(entry.small));
       node.classList.toggle('is-quit', entry.id === 'quitter');
-      const active = entry.id === state.rubric || (entry.id === 'quitter' && state.dialog);
+      const active = state.dialog ? entry.id === 'quitter' : entry.id === state.rubric;
       node.classList.toggle('is-active', active);
       if (active) node.setAttribute('aria-current', 'true');
       node.append(svg('0 0 10 10', 'bn-mark', [['M5 0 10 5 5 10 0 5z', 'currentColor']]), S.rubrics[entry.id]);
@@ -131,7 +131,7 @@ const PauseViews = (() => {
   function renderPanel(state) {
     const rubric = state.rubric;
     const codexHidden = rubric === 'codex' && state.codex === 'docked';
-    refs.tome.hidden = !rubric || codexHidden;
+    refs.tome.hidden = !rubric || codexHidden || state.dialog;
     root.classList.toggle('is-codex', codexHidden);
     if (refs.tome.hidden) {
       refs.leaf.replaceChildren();
