@@ -598,7 +598,7 @@ versé à T-014 ; les autres points déjà couverts sont précisés dans T-012 �
   `config.lua` modifié de `vava_hud`), 7-C-16 (`resource.rpf` avant et après).
 
 ### T-143 — Configs partagées, lot 4 : magie et vivres
-- Agent : vava-dev-lua · Dépend de : T-132 · Statut : à faire
+- Agent : vava-dev-lua · Dépend de : T-132 · Statut : en cours
 - Premier passage de `vava_magic` (spec T-132 § 3.3 : `spells` reste partagé jusqu'à T-123 ; `shared/text.lua` et
   `shared/pages.lua` au serveur si aucun fichier client ne s'en sert) ; `vava_provisions/shared/rules.lua` coupé en
   deux (`shared/texts.lua` partagé, `shared/rules.lua` au serveur). Retirer les dernières exceptions transitoires et
