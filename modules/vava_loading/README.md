@@ -1,13 +1,15 @@
 # vava_loading — l'écran de chargement d'Eldoria
 
-Dès qu'il se connecte, le voyageur voit Eldoria s'allumer : le nom du royaume s'embrase lettre à lettre, un paysage de
-nuit s'anime, des paroles du bourg et des conseils défilent, et **six feux de veille** s'allument au rythme **réel** du
+Dès qu'il se connecte, le voyageur voit Eldoria s'allumer : le nom du royaume s'embrase lettre à lettre, la cité
+passe d'une lumière à l'autre (aube, brume du matin, hiver, crépuscule, nuit étoilée, brume de nuit, orage), des
+paroles du bourg et des conseils défilent, et **six feux de veille** s'allument au rythme **réel** du
 chargement. Quand le dernier feu brûle et que la sélection du personnage est prête, un éclair doré « Le royaume vous
 attend » se dissout sur le Registre des âmes, **sans écran noir**.
 
 Ressource **cliente uniquement** : aucun RPC, aucun évènement réseau, aucun state bag, aucune donnée en base. Tout ce
 que l'écran montre est dans ses fichiers ou vient du jeu local. Le seul coût réseau est le téléchargement de ses
-fichiers (≈ 234 Ko avec le client Lua, une fois par version, mis en cache par FiveM).
+fichiers (≈ 1,38 Mo avec le client Lua, dont 1,15 Mo pour les sept ambiances, une fois par version, mis en cache par
+FiveM).
 
 ## Installation et ordre de démarrage
 
@@ -85,12 +87,21 @@ partagée, celle de l'éclair, est envoyée par le Lua avec le message de passag
 | Seuils des six feux (%) : position sur le chemin et plancher de l'étape ; recalibrés après le premier test en jeu | `[0, 12, 38, 72, 88, 97]` | `stages` |
 | Ouverture à chaque connexion, passable d'un clic | oui ; filet 300 ms, 1re lettre 1 100 ms, puis 190 ms par lettre, rideau 300 ms après | `opening.*` |
 | Changement d'extrait, de conseil | 9 s, 6,5 s (fondu 900 ms) | `rotation.*` |
+| Ambiances, dans leur ordre (noms des fichiers de `web/img/ambiances/`, sans `.webp` ; 12 au plus). La première est tirée au hasard, puis la suite de la liste, en boucle ; une image manquante ou illisible est sautée pour de bon ; aucune lisible : le dégradé de nuit reste | `aube`, `brume_matin`, `hiver`, `crepuscule`, `nuit_etoilee`, `brume_nuit`, `orage` | `ambiances.order` |
+| Durée d'une ambiance, du début de son fondu au début du suivant (la première est comptée depuis la levée du rideau) | 9 000 ms (3 000 à 60 000) | `ambiances.showMs` |
+| Fondu enchaîné (opacité seule) | 3 000 ms (300 à 6 000, jamais plus de la moitié de `showMs`) | `ambiances.fadeMs` |
+| Dérive lente de l'image (zoom et glissement, sens alterné) ; jamais en `basse` ni quand le joueur demande moins d'animations | 3 % (0 à 5 ; 0 : fondu seul) | `ambiances.driftPct` |
 | Niveau d'effets (`auto` : `basse` si le joueur demande moins d'animations, `moyenne` jusqu'à 4 cœurs, sinon `haute`) | `auto` (`haute`, `moyenne`, `basse`) | `effects.level` |
-| Cadence au plus des braises et étincelles, du paysage (jamais au-dessus des braises ; pas repeint sous le rideau de l'ouverture) | 30 i/s, 15 i/s | `effects.fpsMax`, `effects.worldFpsMax` |
+| Cadence au plus des braises et étincelles | 30 i/s | `effects.fpsMax` |
 | Dégradation sous `minFps` sur `badWindows` fenêtres de `windowMs` | 20 i/s, 2 × 2 s | `effects.*` |
-| Par niveau : étoiles, braises, brumes, étincelles, parallaxe, caméra, étoile filante, grain (`no-grain`), reflet du titre (`no-shine`) ; en `basse`, seule la flamme du feu en cours bouge encore | voir le fichier | `effects.levels.*` |
+| Par niveau : braises, étincelles, parallaxe de la souris (ambiances et braises), dérive des ambiances (`drift`), grain (`no-grain`), reflet du titre (`no-shine`) ; en `basse`, plus rien n'est animé par le script, la dérive en cours s'arrête sur place, les ambiances continuent en fondu seul, seule la flamme du feu en cours bouge encore | voir le fichier | `effects.levels.*` |
 | Musique (aucune piste en 1.0.0 : bouton caché) | `''` | `music.file` |
 | Journal de calibrage à l'écran (**`false` avant fusion**, le test unitaire le vérifie) | `false` | `debug.journal` |
+
+Les réglages `ambiances.*` sont bornés par `web/js/ambiances.js` (hors bornes : ramenés à la borne ; pas un nombre :
+le défaut ; ordre sans nom valable : les sept) ; aucune image n'est lue hors de `web/img/ambiances/`. Ajouter une
+ambiance : son WebP dans ce dossier (1600 × 900, qualité 50, 300 Ko au plus), son nom dans `ambiances.order`, et le
+poids total vérifié (plafond de 1,5 Mo ci-dessous).
 
 Les textes vus du joueur sont tous dans `web/js/strings.js` (définitifs depuis 1.1.0, T-021 : 28 extraits du lore,
 15 conseils). Format fixé, vérifié par `tests/spec/loading_screen_spec.lua` : aucun `<`, 6 étapes, 6 à 40 extraits et
@@ -109,30 +120,36 @@ Toute retouche d'un fichier livré le fait retélécharger à chaque joueur : re
 
 **Seuils des feux (`stages`)** : les calibrer avec le journal (`debug.journal`) **sur le serveur de test seulement**,
 puis publier les seuils recalibrés **dans le même envoi que les textes de T-021** (`strings.js`). Chaque retouche de la
-page fait retélécharger toute la ressource (≈ 234 Ko) à chaque joueur : une seule publication pour les deux.
+page fait retélécharger les fichiers retouchés à chaque joueur : une seule publication pour les deux.
 
 ## Poids (livré aux joueurs)
 
-| Partie | Mesuré (1.0.0) | Plafond |
-|---|---|---|
-| `web/index.html`, `web/css/style.css`, `web/js/*.js` (7 fichiers) | ≈ 90 Ko | |
-| `web/fonts/*.woff2` : Cinzel, EB Garamond droit et italique (copies identiques de `vava_ui`), Cinzel Decorative 900 | ≈ 134 Ko | |
-| **Total de la page sans musique** | **≈ 222 Ko** | **300 Ko** (700 Ko avec une piste) — test unitaire |
-| Avec le manifeste et le client Lua (téléchargé par chaque joueur) | ≈ 234 Ko | |
-| Dossier entier (README, licences, `web/dev/`, Lua) | ≈ 291 Ko | **1,5 Mo** — `scripts/audit-reseau.sh`, BLOQUANT |
+| Partie | 1.2.0 | Mesuré (1.3.0) | Plafond |
+|---|---|---|---|
+| `web/index.html`, `web/css/style.css`, `web/js/*.js` (8 fichiers en 1.3.0) | 93 518 o | 92 437 o | |
+| `web/fonts/*.woff2` : Cinzel, EB Garamond droit et italique (copies identiques de `vava_ui`), Cinzel Decorative 900 | 132 748 o | 132 748 o | |
+| **Code et polices** | **226 266 o** | **225 185 o** | **300 Ko** (700 Ko avec une piste) — test unitaire |
+| `web/img/ambiances/*.webp` : sept ambiances 1600 × 900, qualité 50 (de 104 à 257 Ko chacune) | — | 1 208 910 o | 300 Ko chacune — essais de la page |
+| **Page entière** | 226 266 o | **1 434 095 o (≈ 1,37 Mo)** | **1,5 Mo** — test unitaire |
+| Avec le manifeste et le client Lua (téléchargé par chaque joueur) | ≈ 234 Ko | ≈ 1,38 Mo | |
+| Dossier entier (README, licences, `web/dev/`, Lua) | | voir le rapport de T-152 | **1,5 Mo** — `scripts/audit-reseau.sh`, BLOQUANT |
 
-En 1.1.0 (textes définitifs, T-021), `web/js/strings.js` passe de 4,7 à 8,6 Ko : environ 4 Ko de plus pour chaque
-joueur, une seule fois.
+En 1.3.0 (T-152), le paysage peint par le code est retiré : le code livré baisse d'un peu plus d'1 Ko malgré la
+logique des ambiances ; les sept peintures (1,15 Mo) sont le seul ajout. Elles ne sont pas toutes chargées d'un coup :
+la page décode la suivante seulement après l'affichage de la courante (mais FiveM télécharge tout le dossier livré à
+la première connexion, puis le garde en cache).
 
-Aucune image, aucune vidéo, aucune ressource externe : le paysage est peint par le code, le grain est un petit SVG en
-`data:`. Les licences (`web/fonts/OFL_*.txt`) et `web/dev/` restent dans le dépôt sans être livrés. Une mise à jour des
-polices de `vava_ui` se reporte ici (le test compare les octets).
+Aucune vidéo, aucune ressource externe : les ambiances sont des WebP du dossier `web/img/ambiances/`, le grain est un
+petit SVG en `data:`. Les licences (`web/fonts/OFL_*.txt`) et `web/dev/` restent dans le dépôt sans être livrés. Une
+mise à jour des polices de `vava_ui` se reporte ici (le test compare les octets).
 
 ## Hors jeu
 
 `web/index.html` s'ouvre dans un navigateur depuis le dépôt : en `file:`, la page charge `web/dev/devmock.js` (jamais
 livré), qui rejoue des suites de messages et ajoute un panneau « Hors jeu ». Adresses : `?scenario=normal|rapide|lent|
-muet|sans-selection`, `?niveau=haute|moyenne|basse`, `?vitesse=4`, `?ouverture=0`, `?fps=1`, `?journal=1`. Les
+muet|sans-selection`, `?niveau=haute|moyenne|basse`, `?vitesse=4`, `?ouverture=0`, `?fps=1` (cadence, niveau et ambiance à l'écran), `?journal=1`,
+`?ambiances=hiver,absente,orage` (un nom sans fichier montre le saut d'une image manquante ; que des noms absents : le
+fond de repli), `?tenue=4000` (durée d'une ambiance) ; bouton « Ambiance suivante ». Les
 fonctions pures de la page s'essaient par `web/dev/essais.html` (navigateur) ou `node
 modules/vava_loading/web/dev/essais.js` (lancé aussi par `scripts/verifier.sh` quand `node` est présent).
 
@@ -154,7 +171,8 @@ modules/vava_loading/web/dev/essais.js` (lancé aussi par `scripts/verifier.sh` 
 | `shared/constants.lua` | `VavaLoading` (seule globale Lua), noms des messages et des hooks, bornes, fonctions pures |
 | `client/core.lua` | API client du core et export de la sélection, lus sous `pcall` |
 | `client/main.lua` | cycle chargement → attente → passage → fermé |
-| `web/` | la page (`index.html`, `css/`, `js/`, `fonts/`) ; `web/dev/` : données simulées et essais, jamais livrés |
+| `web/` | la page (`index.html`, `css/`, `js/`, `fonts/`, `img/ambiances/`) ; `web/dev/` : données simulées et essais, jamais livrés |
+| `web/js/ambiances.js` | logique pure des ambiances (réglages bornés, ordre, image sautée, dérive) ; `web/js/scene.js` : calques, fondu, braises |
 
 ## À vérifier en jeu
 
@@ -172,3 +190,5 @@ Procédure complète : `docs/tests/chargement.md`. Par ordre d'importance :
 6. **Souris et clavier** sur l'écran de chargement (1-2) : « Passer l'ouverture », clic n'importe où.
 7. `localStorage` gardé d'une connexion à l'autre (seulement si une musique est ajoutée).
 8. **Indicateur du jeu** par-dessus le pourcentage (2-5) : sinon régler `--foot-gap`.
+9. **Ambiances** (2-7 à 2-11) : ordre et rebouclage, fondu sans écran vide ni creux de lumière, image renommée sautée,
+   `basse` sans dérive, coût du fondu sur petite machine.
