@@ -1,11 +1,14 @@
 --[[
     vava_health/server/main.lua
-    Rôle : déclaration du module auprès du core : champ de personnage, suivi de la vie, liens avec l'inventaire et les
-           besoins, intentions du joueur (relever, rendre l'âme) en RPC sans argument et à débit limité.
+    Rôle : déclaration du module auprès du core : champ de personnage, registre des modificateurs de la chaîne de
+           dégâts, journal des coups, annulation des dégâts natifs, suivi de la vie, liens avec l'inventaire et les
+           besoins, intentions du joueur (relever, rendre l'âme) en RPC sans argument et à débit limité. À l'arrêt :
+           vie de chaque personnage et journal en attente écrits.
     Dépendances : tous les fichiers server/ du module
 ]]
 
 local tostring = tostring
+local AddEventHandler = AddEventHandler
 
 local core = VavaHealth.core
 if not core then return end
@@ -14,6 +17,10 @@ local state = VavaHealth.state
 local life = VavaHealth.life
 local assist = VavaHealth.assist
 local links = VavaHealth.links
+local modifiers = VavaHealth.modifiers
+local journal = VavaHealth.journal
+local natives = VavaHealth.natives
+local hits = VavaHealth.hits
 local cfg = VavaHealth.config
 local RPC = VavaHealth.RPC
 
@@ -27,11 +34,27 @@ local function giveUp(src)
     return life.respawn(src, 'choice')
 end
 
+---@param payload table  { source, … }
+local function onDropped(payload)
+    if not payload.source then return end
+    hits.forget(payload.source)
+    natives.forget(payload.source)
+end
+
 local function setup()
     local declared, declareErr = VavaHealth.commands.declare()
     if not declared then return false, 'commandes : ' .. tostring(declareErr) end
     local ok, err = state.define()
     if not ok then return false, err end
+    ok, err = modifiers.start()
+    if not ok then return false, 'registre des modificateurs : ' .. tostring(err) end
+    ok, err = modifiers.define()
+    if not ok then return false, 'registre des modificateurs : ' .. tostring(err) end
+    local id
+    id, err = core.hooks.after('core:player:dropped', onDropped)
+    if not id then return false, err end
+    journal.start()
+    natives.start()
     ok, err = life.start()
     if not ok then return false, err end
     ok, err = links.start()
@@ -44,6 +67,15 @@ local function setup()
     life.adoptActive()
     return true
 end
+
+-- arrêt du module : la vie de chaque personnage (écriture différée des coups) et le journal en attente sont écrits ;
+-- l'API du core reste servie pendant `stopping`
+AddEventHandler('onResourceStop', function(resource)
+    if resource ~= VavaHealth.resource or not VavaHealth.ready then return end
+    VavaHealth.ready = false
+    life.persistAll()
+    journal.flushAll()
+end)
 
 local registered, registerErr = core.modules.register({
     version = GetResourceMetadata(VavaHealth.resource, 'version', 0),

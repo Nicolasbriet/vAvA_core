@@ -1,8 +1,8 @@
 # Outils de développement — procédure de test en jeu
 
 Procédure pour vérifier en jeu la garde des ressources de `examples/` (T-024) : `vava_dev_characters` 1.3.0,
-`vava_example` 1.2.0, `vava_example_items` 1.2.0, `vava_anim_test` 1.1.0, et `vava_example_atelier` 1.0.0 (T-100,
-§ 6). Le point capital est la section 1 : **sans la convar `vava_env`, rien n'est offert**, même ressources démarrées. Puis, en mode développement : réservé au droit
+`vava_example` 1.2.0, `vava_example_items` 1.2.0, `vava_anim_test` 1.1.0, `vava_example_atelier` 1.0.0 (T-100,
+§ 6) et `vava_example_combat` 1.0.0 (T-110, § 6 bis). Le point capital est la section 1 : **sans la convar `vava_env`, rien n'est offert**, même ressources démarrées. Puis, en mode développement : réservé au droit
 `staff` du Registre ou à l'ACE `vava.dev`, et journalisé. Comptez 45 minutes, dont la moitié à deux ; les tests à
 deux joueurs sont marqués **(2 joueurs)**. Un test se cite « developpement 2-3 ».
 
@@ -91,6 +91,18 @@ Procédure complète de l'Atelier : [atelier.md](atelier.md). Ici, la seule gard
 | 4 | Console : `set vava_env prod` (sans redémarrer). A : `/atelier_exemple journal panneaux essai`. | « outil inactif sur ce serveur (mode développement absent). » : la convar est relue à chaque appel. Les ateliers d'exemple restent déclarés jusqu'au redémarrage de la ressource. Remettre `set vava_env dev`. |
 | 5 | B (hors du Conseil), près du « Panneau de la place » : `/atelier_exemple lire`, deux fois de suite. | Le titre et le texte du panneau ; la seconde fois : « Doucement : patientez un instant. ». Loin de tout panneau : « Aucun panneau à portée de lecture. » |
 | 6 | Console : `set vava_example_refuse 1` avec `vava_env prod`, puis publier un panneau (A, Atelier). | Le refus d'essai n'agit qu'en mode développement : la publication passe. Remettre `set vava_example_refuse 0` et `set vava_env dev`. |
+
+## 6 bis. Essai de la chaîne de dégâts (`vava_example_combat` 1.0.0, T-110)
+
+Procédure complète de la chaîne : [combat.md](combat.md) § 1. Ici, la seule garde de l'essai.
+
+| # | Faire | Attendu |
+|---|---|---|
+| 1 | Sans `vava_env` (§ 1) : `ensure vava_example_combat`. | Console : `module 'vava_example_combat' v1.0.0 refusé : … mode développement absent (convar vava_env ≠ dev) : rien n'est offert`. `/frapper`, `/chaine` : commandes inconnues ; aucun modificateur `vava_example_combat:…` déclaré. |
+| 2 | `set vava_env dev`, `restart vava_example_combat`. | Console : trois lignes « modificateur 'vava_example_combat:…' déclaré », puis l'avertissement `mode développement : /frapper, /esquive, /bouclier, /resistance, /chaine et les modificateurs d'essai ouverts au droit « staff » et à l'ACE « vava.dev » — à ne jamais laisser sur un serveur ouvert au public`. |
+| 3 | **(2 joueurs)** C, sans droit ni ACE : `/frapper <A> 10`, `/arme pistolet`, `/tricher`. | « refusé : outil d'essai réservé… » pour la première ; « refusé (not_allowed). » pour les deux autres ; rien ne change chez A ni chez C. |
+| 4 | A : `/frapper <B> 5` ; Registre → Journal. | Ligne « Essai de combat : coup porté » (cible, points, type, résultat). |
+| 5 | Console : `set vava_env prod` (sans redémarrer). A : `/frapper <B> 5`, `/arme couteau`. | Refusés : la convar est relue à chaque appel. Les modificateurs restent déclarés jusqu'au redémarrage de la ressource (et ne sont plus redéclarés au redémarrage de `vava_health`). Remettre `set vava_env dev`. |
 
 ## 7. Fin du test
 

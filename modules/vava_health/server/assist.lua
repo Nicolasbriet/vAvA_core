@@ -4,12 +4,12 @@
            plus proche (positions lues côté serveur : rien n'est diffusé pour la repérer), demande l'accord des
            modules (hook vava_health:reviving), puis revérifie tout à la fin du geste : distance, états, objet requis.
            Un geste en cours s'annule si l'un des deux tombe, se déconnecte ou part.
-    Dépendances : shared/constants.lua, config.lua, server/core.lua, server/life.lua
+    Dépendances : shared/constants.lua, config.lua, server/core.lua (VavaHealth.send), server/life.lua
 ]]
 
 local ipairs, pairs, tonumber, tostring, pcall, type = ipairs, pairs, tonumber, tostring, pcall, type
 local GetPlayers, GetPlayerPed, GetEntityCoords, GetResourceState = GetPlayers, GetPlayerPed, GetEntityCoords, GetResourceState
-local TriggerClientEvent, SetTimeout = TriggerClientEvent, SetTimeout
+local SetTimeout = SetTimeout
 
 local life = VavaHealth.life
 local cfg = VavaHealth.config.assist
@@ -70,8 +70,8 @@ end
 ---@param channel vAvA.AssistChannel
 ---@param state string
 local function tell(channel, state)
-    TriggerClientEvent(EVENTS.CHANNEL, channel.helper, { role = 'helper', state = state })
-    TriggerClientEvent(EVENTS.CHANNEL, channel.patient, { role = 'patient', state = state })
+    VavaHealth.send(channel.helper, EVENTS.CHANNEL, { role = 'helper', state = state })
+    VavaHealth.send(channel.patient, EVENTS.CHANNEL, { role = 'patient', state = state })
 end
 
 ---@param channel vAvA.AssistChannel
@@ -103,7 +103,7 @@ local function finish(channel)
         tell(channel, 'cancel')
         return
     end
-    TriggerClientEvent(EVENTS.CHANNEL, channel.helper, { role = 'helper', state = 'done' })
+    VavaHealth.send(channel.helper, EVENTS.CHANNEL, { role = 'helper', state = 'done' })
     life.revive(channel.patient, cfg.health, 'assist', channel.helper)
 end
 
@@ -129,8 +129,8 @@ function assist.start(helper)
 
     local channel = { helper = helper, patient = patient }
     byHelper[helper], byPatient[patient] = channel, channel
-    TriggerClientEvent(EVENTS.CHANNEL, helper, { role = 'helper', state = 'start', durationMs = cfg.durationMs })
-    TriggerClientEvent(EVENTS.CHANNEL, patient, { role = 'patient', state = 'start', durationMs = cfg.durationMs })
+    VavaHealth.send(helper, EVENTS.CHANNEL, { role = 'helper', state = 'start', durationMs = cfg.durationMs })
+    VavaHealth.send(patient, EVENTS.CHANNEL, { role = 'patient', state = 'start', durationMs = cfg.durationMs })
     SetTimeout(cfg.durationMs, function() finish(channel) end)
     return true
 end

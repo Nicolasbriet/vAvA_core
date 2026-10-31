@@ -6,17 +6,71 @@
 ]]
 
 VavaHealth.config = {
-    coreVersion = '0.4.0',
+    coreVersion = '0.10.0',     -- core.net.send : tous les envois du module sont comptés (/vava_reseau)
 
     downThreshold = 100,        -- vie GTA à laquelle un joueur est à terre (seuil « blessé mortellement » du jeu)
     initial = 1.0,              -- vie d'un nouveau personnage
     naturalRegen = false,       -- récupération automatique de GTA : coupée, on se soigne par objets ou réanimation
 
-    -- Serveur : lecture de la vie des joueurs en jeu (une native par joueur) ; le client n'a rien à déclarer.
+    -- Serveur : la vie de référence est celle du serveur ; le ped de chaque joueur est lu (une native par joueur) pour
+    -- les pertes natives (chute, noyade…) et pour corriger un client qui garde plus de vie qu'il n'en a.
     pollMs = 500,
-    sampleMs = 10000,           -- enregistrement de la vie dans le personnage
+    sampleMs = 10000,           -- écriture différée de la vie dans le personnage après des coups ou des pertes
     sampleEpsilon = 0.01,       -- écart minimal pour la réécrire
     graceMs = 3000,             -- après une apparition ou une réanimation, la vie lue côté serveur peut être en retard
+
+    -- Chaîne de dégâts (export hit) : tous les coups et les sorts passent par elle (docs/plan/COMBAT_V1.md § 1).
+    chain = {
+        healthPoints = 100,     -- points d'une vie pleine : échelle des paquets (amount = 25 : un quart de la vie)
+        maxAmount = 200,        -- plafond d'un coup, avant et après modificateurs (deux vies pleines)
+        -- types de dégâts admis (liste fermée, choix des éditeurs de l'Atelier) ; `pur` : ignoré par les résistances
+        -- par convention ; `monde` : réservé aux pertes natives lues par le serveur
+        kinds = { 'tranchant', 'contondant', 'percant', 'feu', 'eau', 'terre', 'lumiere', 'esprit', 'pur', 'privation',
+            'monde' },
+        parts = { 'tete', 'torse', 'bras', 'jambes' },  -- partie du corps touchée (facultative)
+        -- étiquettes admises dans `tags` (liste fermée : conditions de l'Atelier)
+        tags = { 'melee', 'ranged', 'spell', 'area', 'overTime', 'native', 'legacy', 'reflected', 'parryable',
+            'unblockable', 'undodgeable' },
+        maxTags = 8,
+        pvp = true,             -- false : tout coup venu d'un autre joueur est annulé (pvp_off)
+        maxHitsPerSecond = 20,  -- coups traités par cible et par seconde ; au-delà : too_many_hits
+        maxDepth = 2,           -- un coup lancé pendant un autre (renvoi) est permis une fois ; au-delà : too_deep
+        maxModifiers = 32,      -- entrées du registre vava_health:modifiers
+        slowModifierMs = 5,     -- modificateur plus lent : signalé (une ligne par minute et par modificateur)
+        slowHitMs = 15,         -- coup entier plus lent : signalé (une ligne par minute)
+        errorLogMs = 60000,     -- intervalle des lignes d'erreur d'un même modificateur
+    },
+
+    -- Lecture du ped après un ordre du serveur.
+    sync = {
+        tolerance = 0.02,       -- écart toléré entre le ped lu et la valeur du serveur (≈ 2 points GTA sur 100)
+        applyMs = 1500,         -- après un envoi de vie, la lecture du ped est ignorée ce temps…
+        maxPingMs = 1000,       -- … plus deux fois le ping du joueur, au plus cette valeur
+        resendMs = 2000,        -- ped au-dessus de la valeur du serveur : vie renvoyée au plus toutes les 2 s…
+        maxResendMs = 30000,    -- … délai doublé après chaque correction sans effet, jusqu'à 30 s (2 s dès l'accord)
+        logEvery = 10,          -- console à la 1re correction d'un joueur, puis toutes les 10
+    },
+
+    -- Apparition non confirmée par le client : ped lu d'office ce délai après l'ordre, s'il existe.
+    spawn = { confirmTimeoutMs = 20000 },
+
+    -- Dégâts natifs de GTA venus d'un joueur, annulés côté serveur (évènements du moteur OneSync).
+    natives = {
+        weaponDamage = true,    -- coup d'arme ou de poing d'un joueur sur un autre joueur
+        unresolved = true,      -- … ou sur une victime introuvable côté serveur
+        explosions = true,      -- toute explosion lancée par un joueur (aucun module n'en crée)
+        fires = true,           -- tout feu lancé par un joueur
+        projectiles = true,     -- tout projectile lancé par un joueur (à revoir avec les arcs, hors v1)
+        logMs = 60000,          -- au plus une ligne de console par joueur et par minute
+    },
+
+    -- Journal des coups (table vava_health_hits) : coups venus d'un autre joueur et mises à terre.
+    journal = {
+        flushMs = 10000,
+        batch = 50,             -- lignes par requête
+        queueMax = 2000,        -- lignes gardées si la base ne répond pas ; au-delà, abandonnées (console)
+        retentionDays = 30,     -- purge au démarrage puis chaque jour (0 : jamais)
+    },
 
     downed = {
         giveUpAfterMs = 180000, -- rendre l'âme possible après 3 minutes
@@ -49,6 +103,8 @@ VavaHealth.config = {
         gaugePollMs = 500,      -- lecture locale de la vie pour la jauge (aucun échange réseau)
         animation = { blendIn = 8.0, blendOut = -8.0, loadTimeoutMs = 1000, loadPollMs = 10 },
         postFxDelayMs = 1500,   -- effets de mort de GTA coupés après leur démarrage
+        -- à chaque apparition : tir ami coupé (confort ; la garantie est l'annulation des coups natifs par le serveur)
+        protect = true,
     },
 
     keys = { assist = 'G', giveUp = 'E' },

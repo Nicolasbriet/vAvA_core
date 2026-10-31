@@ -1,11 +1,12 @@
 local helper = require('tests.helper')
 
 -- Garde des ressources d'examples/ (T-024) : mode développement (`set vava_env dev`) et accès (droit vava_admin ou
--- ACE), même fichier dans trois ressources ; plafond des notes de vava_example ; libellés du journal.
+-- ACE), même fichier dans quatre ressources ; plafond des notes de vava_example ; libellés du journal.
 local COPIES = {
     { path = 'examples/vava_dev_characters/shared/guard.lua', global = 'VavaDevCharacters' },
     { path = 'examples/vava_example/shared/guard.lua', global = 'VavaExample' },
     { path = 'examples/vava_anim_test/shared/guard.lua', global = 'VavaAnimTest' },
+    { path = 'examples/vava_example_combat/shared/guard.lua', global = 'VavaExampleCombat' },
 }
 
 local function loadGuard(copy)
@@ -108,7 +109,7 @@ describe('garde des examples : copies identiques', function()
         return table.concat(lines, '\n')
     end
 
-    it('les trois copies ne diffèrent que par leur chemin et leur table', function()
+    it('les copies ne diffèrent que par leur chemin et leur table', function()
         local reference = body(COPIES[1].path)
         for i = 2, #COPIES do
             assert.equal(reference, body(COPIES[i].path), COPIES[i].path)

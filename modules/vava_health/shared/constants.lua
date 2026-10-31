@@ -28,10 +28,26 @@ VavaHealth.RPC = {
 
 -- Hooks déclenchés par le module.
 VavaHealth.HOOKS = {
-    DOWNED = 'vava_health:downed',      -- after : { source, characterId, reason, cause?, killer? }
+    DOWNED = 'vava_health:downed',      -- after : { source, characterId, reason, cause?, killer?, origin?, hitId? }
     REVIVING = 'vava_health:reviving',  -- before, annulable : { source, target } (métier exigé, objet…)
     REVIVED = 'vava_health:revived',    -- after : { source, characterId, reason, by? }
     RESPAWNED = 'vava_health:respawned',-- after : { source, characterId, reason, point } (pénalités à venir)
+    -- chaîne de dégâts : before (refus seul) puis after (tout coup qui a atteint la chaîne, et les pertes natives)
+    HIT = 'vava_health:hit',
+}
+
+-- Registre des modificateurs de la chaîne de dégâts (défini par ce module, rempli par les autres).
+VavaHealth.MODIFIERS = 'vava_health:modifiers'
+
+-- Étapes de la chaîne, dans l'ordre fixe de docs/plan/COMBAT_V1.md (une règle, pas un réglage) ; l'application à la
+-- vie vient après la dernière.
+VavaHealth.STAGES = { 'annulation', 'esquive', 'parade', 'blocage', 'bouclier', 'resistance' }
+
+-- Codes de refus de l'export hit (nil, code) : le coup n'a pas atteint la chaîne.
+VavaHealth.KNOWN_CODES = {
+    'not_ready', 'invalid_target', 'no_character', 'invalid_packet', 'invalid_amount', 'invalid_kind',
+    'invalid_source', 'invalid_part', 'invalid_ref', 'invalid_tags', 'unknown_field', 'too_many_hits', 'too_deep',
+    'hit_error',
 }
 
 -- Hooks d'autres modules écoutés (tous facultatifs).
