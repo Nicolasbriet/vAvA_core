@@ -7,6 +7,9 @@ du panneau, par le Registre du Conseil (`vava_admin`), les zones de voix (`vava_
 prévient la Chancellerie en direct (signalements, arrivées et départs, caméras, rangs changés) ; il relie un compte du panneau à son joueur et tient la liste blanche Discord à la
 connexion. Serveur seulement : rien n'est envoyé aux joueurs, sauf le résultat de leur liaison (affiché par vava_admin).
 
+Serveur seulement aussi pour les fichiers : rien n'est servi aux joueurs (1.7.1, T-132). Constantes, `config.lua` et
+logique pure sont en `server_scripts` ; un joueur ne télécharge ni ne démarre cette ressource.
+
 Ordre de démarrage : en dernier, après `vava_admin`, `vava_voice`, `vava_cameras`, `vava_time` et `vava_codex` (ordre
 complet : `README.md` à la racine du dépôt).
 
@@ -150,10 +153,10 @@ complet : `README.md` à la racine du dépôt).
 
 ```
 vava_chancellerie/
-├── fxmanifest.lua · config.lua
+├── fxmanifest.lua · config.lua (servi au seul serveur, comme tout le module)
 ├── shared/   constants.lua (modules reliés, hooks, protocole de la clé) · rules.lua (forme de la clé, rangs permis,
-│             demande et journal du compteur réseau : logique pure, tests/spec/chancellerie_rules_spec.lua, chargée côté
-│             serveur seulement)
+│             demande et journal du compteur réseau : logique pure, tests/spec/chancellerie_rules_spec.lua) : servis
+│             au seul serveur, comme config.lua (aucun fichier client, T-132)
 ├── server/   core · auth (machine locale, clé demandée à la console) · push (évènements vers la Chancellerie)
 │             links (comptes vus reliés en jeu) · link (liaison d'un compte) · whitelist (liste blanche)
 │             routes (demandes du panneau) · time (ciel et heure) · network (compteur réseau, lecture seule)
