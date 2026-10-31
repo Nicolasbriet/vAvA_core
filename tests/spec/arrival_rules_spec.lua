@@ -193,25 +193,63 @@ describe('vava_arrival rules', function()
     end)
 
     describe('config', function()
-        it('a une dotation valide dont chaque objet est déclaré par le module', function()
+        --- Objets déclarés par vava_provisions (l'eau, depuis T-130), lus dans sa config.
+        local function provisionsItems()
+            helper.loadAll({
+                'modules/vava_provisions/shared/constants.lua',
+                'modules/vava_provisions/config.lua',
+            })
+            local provided = VavaProvisions.config.items
+            VavaProvisions = nil
+            return provided
+        end
+
+        it('a une dotation valide dont chaque objet est déclaré par le module ou par vava_provisions', function()
+            local provided = provisionsItems()
             assert.is_true(rules.validateKit(cfg.kit.items))
             for _, entry in ipairs(cfg.kit.items) do
-                assert.is_table(cfg.items[entry.item], entry.item)
+                assert.is_table(cfg.items[entry.item] or provided[entry.item], entry.item)
             end
             assert.is_table(cfg.items.pain)
-            assert.is_table(cfg.items.eau)
+            assert.is_table(provided.eau)
+            -- un seul propriétaire de l'eau : vava_provisions
+            assert.is_nil(cfg.items.eau)
+            -- même forme qu'avant T-130 : les piles d'eau déjà en jeu se relisent telles quelles
+            local eau = provided.eau
+            assert.same({ 'Outre d\'eau', 1, 2, 700, 5, 'boisson' }, { eau.label, eau.width, eau.height, eau.weight, eau.stack, eau.category })
+            assert.same({ thirst = 40 }, eau.effects)
         end)
 
         it('déclare des objets à la forme attendue par l\'inventaire, sans image écrite en dur', function()
-            for name, def in pairs(cfg.items) do
-                assert.is_true(rules.isId(name), name)
-                assert.is_string(def.label, name)
-                assert.equal('integer', math.type(def.width), name)
-                assert.equal('integer', math.type(def.height), name)
-                assert.equal('integer', math.type(def.weight), name)
-                assert.equal('integer', math.type(def.stack), name)
-                assert.is_nil(def.image, name)
+            local provided = provisionsItems()
+            for _, list in ipairs({ cfg.items, { eau = provided.eau } }) do
+                for name, def in pairs(list) do
+                    assert.is_true(rules.isId(name), name)
+                    assert.is_string(def.label, name)
+                    assert.equal('integer', math.type(def.width), name)
+                    assert.equal('integer', math.type(def.height), name)
+                    assert.equal('integer', math.type(def.weight), name)
+                    assert.equal('integer', math.type(def.stack), name)
+                    assert.is_nil(def.image, name)
+                end
             end
+        end)
+
+        it('nomme les modules qui déclarent des objets de la dotation : liste pure de noms valides', function()
+            assert.same({ 'vava_provisions' }, cfg.kit.providers)
+            assert.is_true(rules.validateProviders(cfg.kit.providers))
+            assert.is_true(rules.validateProviders({}))
+            assert.same({ false, 'invalid_list' }, { rules.validateProviders({ 'vava_provisions', extra = 'x' }) })
+            assert.same({ false, 'invalid_list' }, { rules.validateProviders('vava_provisions') })
+            assert.same({ false, 'invalid_name' }, { rules.validateProviders({ 'a b' }) })
+            assert.same({ false, 'invalid_name' }, { rules.validateProviders({ string.rep('a', 65) }) })
+            assert.same({ false, 'duplicate' }, { rules.validateProviders({ 'vava_provisions', 'vava_provisions' }) })
+            local many = {}
+            for i = 1, 9 do many[i] = 'module_' .. i end
+            assert.same({ false, 'too_many' }, { rules.validateProviders(many) })
+            assert.is_true(rules.isProvider('vava_provisions', cfg.kit.providers))
+            assert.is_false(rules.isProvider('vava_codex', cfg.kit.providers))
+            assert.is_false(rules.isProvider(nil, cfg.kit.providers))
         end)
 
         it('vise un chapitre du Codex au bon motif', function()

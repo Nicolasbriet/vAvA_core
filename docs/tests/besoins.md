@@ -18,8 +18,9 @@ test se cite « besoins 3-4 ».
    vava.dev allow` en console.
    Commandes utilisées ici : `/besoins` (affiche « faim 100.0 · soif 100.0 » dans le chat), `/besoins <faim> <soif>`
    (fixe, de 0 à 100), `/vie [pourcentage]`, `/aterre`, `/objet <nom> [quantité]`, `/perso quitter`. Sans
-   `vava_example_items`, aucun objet ne désaltère : dans les modules, seuls `ragout_de_lievre` (+40), `chou` (+15) et
-   `carotte` (+8) nourrissent.
+   `vava_example_items`, l'eau vient de `vava_provisions` (Outre d'eau, soif +40, et les points d'eau : [eau.md](eau.md)) ;
+   la pomme et la bière manquent ; dans les modules, seuls `ragout_de_lievre` (+40), `chou` (+15) et `carotte` (+8)
+   nourrissent.
 3. **Objets** (`/catalogue` ou `/objet`) : `pain` ×8 (Miche de pain, faim +35), `pomme` ×3 (faim +12, soif +4),
    `eau` ×3 (Outre d'eau, soif +40), `biere` ×2 (Chope de bière, soif +25, faim +5), `ragout_de_lievre` ×1,
    `carotte` ×2. Glisser une miche sur le raccourci `1` de la ceinture.
@@ -80,7 +81,7 @@ comble est à 95 ou plus, ou pendant les 3 s du geste précédent.
 | 4 | `/besoins 95 50` puis la miche ; `/besoins 94 50` puis la miche. | À 95 : refusée (« Vous n'avez plus faim. »). À 94 : mangée, faim 100 (plafonnée), une miche de moins. |
 | 5 | `/besoins 50 50` ; clic droit sur la miche → Utiliser ; marcher pendant le geste. | Faim 85 aussitôt (l'anneau remonte), une miche de moins ; geste de manger pendant 3 s sans empêcher la marche. |
 | 6 | Dans les 3 s, double-clic sur une autre miche ; puis de nouveau après 3 s. | D'abord « Vous n'avez pas encore fini. », miche gardée ; ensuite mangée : faim 100, et non 120. |
-| 7 | Outre d'eau. | Geste de boire ; soif vers 90 (50 + 40, moins la baisse écoulée). |
+| 7 | Outre d'eau. | Geste de boire ; soif vers 90 (50 + 40, moins la baisse écoulée). Une **Outre vide** revient dans la besace (`vava_provisions`), ou, une fois sur dix, l'avis « La couture cède : l'outre se fend… » et rien. |
 | 8 | `/besoins 100 60` ; pomme. | Acceptée (la soif en profite) : soif 64, faim 100 ; geste de manger (catégorie nourriture). |
 | 9 | Chope de bière. | Geste de boire ; soif vers 89 (64 + 25), faim reste 100 (plafond). |
 | 10 | `/besoins 40 100` ; ragoût de lièvre, puis une carotte (3 s plus tard). | Faim 80 puis 88 ; geste de manger. |

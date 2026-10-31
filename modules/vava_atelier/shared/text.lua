@@ -10,7 +10,7 @@
 local type, ipairs, floor, tointeger = type, ipairs, math.floor, math.tointeger
 local utf8len, utf8codes, utf8char = utf8.len, utf8.codes, utf8.char
 local byte, find, format, gsub = string.byte, string.find, string.format, string.gsub
-local lower, sub = string.lower, string.sub
+local char, sub = string.char, string.sub
 local concat = table.concat
 
 local text = {}
@@ -35,6 +35,15 @@ fold('ß', 'ss')
 fold('’', '\'')
 
 local NBSP = '\u{00A0}'
+-- blancs ASCII écrits octet par octet : `%s` dépend de la locale du système (sous Windows, il prend aussi l'octet 0xA0
+-- de « à » ou de « Š », et couperait ces caractères en deux) ; de même, `string.lower` prendrait le premier octet d'un
+-- caractère accentué pour une majuscule (0xC3 → 0xE3) : seules les 26 majuscules ASCII sont baissées
+local LEADING_BLANKS = '^[\t-\r ]+'
+local TRAILING_BLANKS = '[\t-\r ]+$'
+local BLANK_RUNS = '[\t-\r ]+'
+local ASCII_UPPER = '[A-Z]'
+local ASCII_LOWER = {}
+for code = 65, 90 do ASCII_LOWER[char(code)] = char(code + 32) end
 
 ---@param value any
 ---@return boolean
@@ -53,7 +62,7 @@ end
 ---@param value string
 ---@return string
 function text.trim(value)
-    return (gsub(gsub(value, '^%s+', ''), '%s+$', ''))
+    return (gsub(gsub(value, LEADING_BLANKS, ''), TRAILING_BLANKS, ''))
 end
 
 --- Vrai si le texte contient un caractère de contrôle (ASCII, C1), un caractère invisible ou de sens d'écriture qui
@@ -119,7 +128,7 @@ end
 ---@return string
 function text.normalize(value)
     local folded = gsub(value, '[\xC2-\xF4][\x80-\xBF]*', FOLD)
-    return text.trim(gsub(lower(folded), '%s+', ' '))
+    return text.trim(gsub(gsub(folded, ASCII_UPPER, ASCII_LOWER), BLANK_RUNS, ' '))
 end
 
 --- Vrai si `needle` (déjà normalisé) se trouve dans `haystack` (déjà normalisé). Un filtre vide garde tout.

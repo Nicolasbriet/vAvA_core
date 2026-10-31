@@ -3,18 +3,104 @@
  * web/js/app.js
  * Rôle : assemblage : messages du jeu, recherche, onglets et chapitres, sélection (souris et clavier), signets,
  *        lancement d'une ligne composée, réglage « rester ouvert », fermeture, chapitre demandé à l'ouverture
- *        (export openAt du client, 1.4.0).
+ *        (export openAt, 1.4.0). Onglet Lecture (1.5.0) : texte d'une page demandé seulement s'il n'est pas gardé à
+ *        la même empreinte, liens, pages voisines ; openAt résout une page, un chapitre de lecture, puis un module.
+ * Dépendances : strings.js, bridge.js, model.js, reader.js, forms.js, view.js
  */
 
 (() => {
   const app = document.getElementById('app');
-  // Chapitre demandé à l'ouverture (export openAt, 1.4.0), appliqué une fois un contenu chargé, puis oublié.
+  // chapitre ou page demandé à l'ouverture (openAt), appliqué une fois le contenu chargé, puis oublié
   let pendingFocus = null;
+  // jeton de la dernière page choisie : seule elle s'affiche
+  let pageRequest = 0;
+  const loader = CodexReader.createLoader({
+    post: (id) => Bridge.post('page', { id }),
+    wait: (ms) => new Promise((resolve) => setTimeout(resolve, ms)),
+    wanted: (id) => !app.hidden && Model.state.tab === 'reading' && Model.state.page === id,
+  });
 
-  function selectRow(id, focusForm) {
+  function selectRow(id, focusForm, delayed) {
+    const page = Model.pageOfRow(id);
+    if (page) {
+      selectPage(page.id, delayed);
+      return;
+    }
     Model.select(id);
     View.renderSelection();
     if (focusForm && !View.focusFirstField()) View.focusSearch(false);
+  }
+
+  /** Ouvre une page (ligne rendue visible) : texte gardé, sinon demandé ; `delayed` (↑ ↓, pages voisines) : différé. */
+  async function selectPage(id, delayed) {
+    const state = Model.state;
+    const page = state.pageById.get(id);
+    if (!page) return;
+    let full = false;
+    if (state.tab !== 'reading') {
+      Model.setTab('reading');
+      full = true;
+    }
+    const rowId = Model.pageRowId(id);
+    if (!Model.row(rowId) && state.query) {
+      Model.setQuery('');
+      refs.search.value = '';
+      full = true;
+    }
+    if (!Model.row(rowId) && state.readingChapter) {
+      Model.setChapter(page.chapter);
+      full = true;
+    }
+    Model.choosePage(id);
+    const body = CodexReader.cached(state.pageCache, id, page.hash);
+    state.pageBody = body ? { id, hash: page.hash, body } : null;
+    state.pageStatus = body ? 'idle' : 'loading';
+    if (full) View.render();
+    else View.renderSelection();
+    if (body) return;
+
+    const token = ++pageRequest;
+    const result = await loader.load(id, delayed);
+    const current = token === pageRequest && state.page === id;
+    if (result && result.skipped) {
+      // plus voulue (autre page, livre fermé, autre onglet) : redemandée au retour par ensurePage
+      if (current) state.pageStatus = 'idle';
+      return;
+    }
+    const answer = CodexReader.readAnswer(result, id);
+    if (answer) CodexReader.store(state.pageCache, id, answer.hash, answer.body);
+    if (!current) return;
+    state.pageBody = answer ? { id, hash: answer.hash, body: answer.body } : null;
+    state.pageStatus = answer ? 'idle' : 'error';
+    if (app.hidden) return;
+    if (state.tab === 'reading') View.renderDetail();
+    if (!answer) View.toast(errorMessage(result && result.ok ? 'client_error' : result && result.error), 'danger');
+  }
+
+  // onglet Lecture affiché : une page choisie (la première sinon), son texte là ou redemandé si son empreinte a changé
+  function ensurePage() {
+    const state = Model.state;
+    if (state.tab !== 'reading' || state.pageStatus === 'loading') return;
+    if (!state.page || !state.pageById.has(state.page)) {
+      const first = Model.visibleOrder()[0] || (state.reading && state.reading.pages[0] ? { page: state.reading.pages[0] } : null);
+      if (first) selectPage(first.page.id);
+      return;
+    }
+    const page = state.pageById.get(state.page);
+    const shown = state.pageBody;
+    if (state.pageStatus === 'error' || !shown || shown.id !== page.id || shown.hash !== page.hash) selectPage(page.id);
+  }
+
+  // lien vers une commande : onglet Commandes, filtres vidés, sa ligne choisie (sinon la première de la commande)
+  function openCommand(name, action) {
+    if (!Model.state.byName.has(name)) return;
+    Model.setTab('commands');
+    Model.setChapter('');
+    Model.setQuery('');
+    refs.search.value = '';
+    const row = Model.row(Model.rowId(name, action)) || Model.visibleOrder().find((candidate) => candidate.entry.name === name);
+    View.render();
+    if (row) selectRow(row.id, true);
   }
 
   /** Lance la ligne composée de la ligne choisie, si elle est complète. */
@@ -74,7 +160,7 @@
     if (order.length === 0) return;
     const index = order.findIndex((row) => row.id === Model.state.selected);
     const next = index === -1 ? (delta > 0 ? 0 : order.length - 1) : Math.min(order.length - 1, Math.max(0, index + delta));
-    selectRow(order[next].id, false);
+    selectRow(order[next].id, false, true);
   }
 
   View.init(app);
@@ -83,6 +169,8 @@
   refs.search.addEventListener('input', () => {
     Model.setQuery(refs.search.value);
     View.renderIndex();
+    // onglet Lecture : la recherche filtre le sommaire, la page lue reste à l'écran
+    if (Model.state.tab === 'reading') return;
     // première ligne des résultats choisie d'office : Entrée la lance ou ouvre son formulaire
     const order = Model.visibleOrder();
     if (Model.state.query.trim() && order.length > 0 && !order.some((row) => row.id === Model.state.selected)) {
@@ -99,12 +187,29 @@
       Model.setTab(tab.dataset.tab);
       View.render();
       View.focusSearch(true);
+      ensurePage();
       return;
     }
     const chapter = event.target.closest('.chapter');
     if (chapter) {
       Model.setChapter(chapter.dataset.chapter);
       View.render();
+      // onglet Lecture : un chapitre de la tranche ouvre sa première page (« Tout » garde la page lue)
+      if (Model.state.tab === 'reading') {
+        const first = chapter.dataset.chapter ? Model.visibleOrder()[0] : null;
+        if (first) selectPage(first.page.id);
+        else ensurePage();
+      }
+      return;
+    }
+    const pageLink = event.target.closest('[data-page]');
+    if (pageLink) {
+      selectPage(pageLink.dataset.page, pageLink.classList.contains('reader-nav'));
+      return;
+    }
+    const command = event.target.closest('[data-command]');
+    if (command) {
+      openCommand(command.dataset.command, command.dataset.action || '');
       return;
     }
     const ribbon = event.target.closest('.ribbon');
@@ -136,7 +241,7 @@
 
   app.addEventListener('dblclick', (event) => {
     const rowNode = event.target.closest('.row');
-    if (rowNode) {
+    if (rowNode && !Model.pageOfRow(rowNode.dataset.row)) {
       selectRow(rowNode.dataset.row, false);
       run();
     }
@@ -171,6 +276,11 @@
     }
     if (event.key === 'Enter') {
       if (target.closest && target.closest('.picker-menu')) return;
+      if (Model.state.tab === 'reading') {
+        // rien à lancer dans l'onglet Lecture ; un lien ou un bouton de la page reste activable au clavier
+        if (!(target.tagName === 'BUTTON' && target.closest('.page-right'))) event.preventDefault();
+        return;
+      }
       event.preventDefault();
       if (inField) { run(); return; }
       const row = View.currentRow();
@@ -186,28 +296,28 @@
     }
   });
 
-  /** Ouvre le chapitre demandé s'il existe (onglet des commandes, recherche vidée) ; un chapitre inconnu laisse le
-   *  livre à son index, sans message. Les pages de lecture (T-023) qui vivraient ailleurs que dans les chapitres
-   *  étendent cette seule fonction. */
+  /** openAt : page, chapitre de lecture (première page ; T-022), puis module ; vrai si quelque chose s'est ouvert. */
   function applyFocus() {
-    const id = pendingFocus;
+    const target = CodexReader.focusTarget(pendingFocus, Model.state.reading, Model.state.chapters);
     pendingFocus = null;
-    if (!id || !Model.state.chapters.some((chapter) => chapter.id === id)) return;
-    Model.setTab('commands');
+    if (!target) return false;
+    Model.setTab(target.tab);
     Model.setQuery('');
     refs.search.value = '';
-    Model.setChapter(id);
+    Model.setChapter(target.chapter);
     View.render();
+    if (target.tab === 'reading') {
+      if (target.page) selectPage(target.page);
+      else ensurePage();
+    }
+    return true;
   }
 
-  /** La page n'a pas le contenu de la version annoncée (cas de secours, jamais attendu). Sans aucun contenu, elle
-   *  le redemande aussitôt (second appel au serveur, compté par le débit de l'ouverture) ; avec un contenu plus ancien,
-   *  elle le montre et fait seulement oublier les versions au client : la prochaine ouverture renverra tout, sans
-   *  appel de plus. */
+  /** Secours : sans contenu, le redemande ; avec un contenu ancien, fait oublier les versions au client. */
   async function resync() {
     if (Model.state.version !== null) {
       Bridge.post('stale');
-      applyFocus();
+      if (!applyFocus()) ensurePage();
       return;
     }
     const result = await Bridge.post('refresh');
@@ -218,7 +328,7 @@
     }
     Model.load(result.payload);
     View.render();
-    applyFocus();
+    if (!applyFocus()) ensurePage();
   }
 
   Bridge.onMessage((action, payload) => {
@@ -230,7 +340,7 @@
       app.hidden = false;
       View.focusSearch(true);
       if (Model.state.version !== payload.version) resync();
-      else applyFocus();
+      else if (!applyFocus()) ensurePage();
     } else if (action === 'notify') {
       View.toast(payload.message, payload.kind);
     } else if (action === 'close') {

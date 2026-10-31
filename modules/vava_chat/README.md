@@ -110,7 +110,7 @@ Une page de lecture dans la Chancellerie viendra dans un second temps.
 | `log` | genres gardés, durée, lots, purge |
 | `overhead` | texte au-dessus de la tête : durée, distance, lignes, police, couleurs |
 | `ui` | messages gardés par onglet, historique, effacement, place par défaut, taille minimale |
-| `key`, `commands` | touche d'ouverture, noms des commandes |
+| `key`, `commands` | touche d'ouverture, noms des commandes ; la touche par défaut (`T`) et `/me`, `/do` sont cités par l'écran de chargement : les changer oblige à retoucher le conseil de `modules/vava_loading/web/js/strings.js` |
 | `commandList` | commandes des autres ressources proposées en suggestion (motifs cachés : `vava_…`, touches `+`/`-`) |
 | `rateLimits` | 6 messages d'affilée puis 1 par seconde ; profil ; avis « commande inconnue » |
 | `texts` | **tous** les textes vus par les joueurs |

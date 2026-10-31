@@ -214,6 +214,49 @@ signal AVERTISSEMENT 'GlobalState\[[^]]+\][[:space:]]*=' "écriture GlobalState 
 signal AVERTISSEMENT 'Wait\(0\)' "Wait(0) : uniquement pendant un état actif temporaire"
 signal AVERTISSEMENT 'GetGamePool' "GetGamePool : à éviter dans une boucle"
 
+# --- Classe %c (T-133) : elle suit la locale du système (sous Windows, elle prend aussi les octets 0x81, 0x8D, 0x8F,
+# 0x90, 0x9D, 0xAD de « Á », « Í », « í »… et laisse passer les contrôles C1). Cherchée dans les seules chaînes du code
+# Lua (commentaires retirés, `--[[ … ]]` compris ; chaînes longues lues) : un nombre impair de % devant le c compte
+# (`%%c` est un « %c » littéral). Écrire les contrôles octet par octet : '[\0-\31\127]'.
+CLASSE_C_AWK='
+function chaine(s) { if (s ~ /(^|[^%])(%%)*%c/) { print FILENAME ":" FNR ":" ligne; vu = 1 } }
+FNR == 1 { mode = "" }
+{
+    l = $0; sub(/\r$/, "", l); ligne = l; n = length(l); i = 1; vu = 0
+    while (i <= n && !vu) {
+        if (mode == "C" || mode == "L") {
+            k = index(substr(l, i), ferme)
+            if (!k) { if (mode == "L") chaine(substr(l, i)); break }
+            if (mode == "L") chaine(substr(l, i, k - 1))
+            i += k - 1 + length(ferme); mode = ""; continue
+        }
+        ch = substr(l, i, 1)
+        if (ch == "-" && substr(l, i + 1, 1) == "-") {
+            if (match(substr(l, i + 2), /^\[=*\[/)) {
+                ferme = "]" substr(l, i + 3, RLENGTH - 2) "]"; mode = "C"; i += 2 + RLENGTH; continue
+            }
+            break
+        }
+        if (ch == "[" && match(substr(l, i), /^\[=*\[/)) {
+            ferme = "]" substr(l, i + 1, RLENGTH - 2) "]"; mode = "L"; i += RLENGTH; continue
+        }
+        if (ch == "\"" || ch == Q) {
+            j = i + 1; s = ""
+            while (j <= n && substr(l, j, 1) != ch) {
+                if (substr(l, j, 1) == "\\") { s = s substr(l, j, 2); j += 2 } else { s = s substr(l, j, 1); j++ }
+            }
+            chaine(s); i = j + 1; continue
+        }
+        i++
+    }
+}
+'
+if [[ ${#lua[@]} -gt 0 ]]; then
+    res=$(awk -v Q="'" "$CLASSE_C_AWK" "${lua[@]}" 2>/dev/null | filtrer code || true)
+    noter BLOQUANT "classe %c dans un motif : elle suit la locale (« Á », « í » coupés sous Windows) ; écrire '[\\0-\\31\\127]'" "$res"
+fi
+# --- fin du bloc T-133
+
 # Adresse externe dans une interface : cherchée après avoir retiré les seules sous-chaînes permises — espaces de noms
 # (`xmlns="http://www.w3.org/…"`, guillemets simples ou doubles ; la chaîne exacte 'http://www.w3.org/2000/svg' et
 # ses sœurs xlink et xhtml), rappels NUI exacts (`https://cfx-nui-<ressource>/`, `https://${resource}/`,

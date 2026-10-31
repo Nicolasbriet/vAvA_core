@@ -18,6 +18,10 @@ local GetResourceState, GetGameTimer = GetResourceState, GetGameTimer
 local SaveResourceFile, LoadResourceFile, TriggerClientEvent = SaveResourceFile, LoadResourceFile, TriggerClientEvent
 local jsonEncode, jsonDecode = json.encode, json.decode
 
+-- blancs ASCII de fin, écrits octet par octet : `%s` dépend de la locale du système et couperait le « à » final d'un
+-- nom (octet 0xA0)
+local TRAILING = '[\t-\r ]+$'
+
 local core = VavaAtelier.core
 if not core then return end
 
@@ -130,7 +134,7 @@ function Bridge.ActorLabel(source)
     local rank = Bridge.RankLabel(source)
     local character = core.characters.getActive(source)
     if not rank or not character then return nil end
-    local name = (tostring(character.firstName or '') .. ' ' .. tostring(character.lastName or '')):gsub('%s+$', '')
+    local name = (tostring(character.firstName or '') .. ' ' .. tostring(character.lastName or '')):gsub(TRAILING, '')
     return text.truncate(rank .. ' ' .. name, OUT.actor)
 end
 

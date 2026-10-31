@@ -75,7 +75,8 @@ VavaInventory.config = {
         permission = 'staff', ace = 'vava_inventory.catalogue',
     },
 
-    -- Touches par défaut, modifiables par chaque joueur (Paramètres > Raccourcis > FiveM).
+    -- Touches par défaut, modifiables par chaque joueur (Paramètres > Raccourcis > FiveM). `open` est citée par l'écran
+    -- de chargement : la changer oblige à retoucher le conseil de modules/vava_loading/web/js/strings.js.
     keys = { open = 'I', hotbar = { '1', '2', '3', '4', '5' } },
     labels = { open = 'Ouvrir l\'inventaire', slot = 'Raccourci d\'inventaire %d' },
 

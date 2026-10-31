@@ -763,8 +763,8 @@ même que `README.md` à la racine, et celui qu'écrit la Chancellerie) :
 `ensure chat`), `ensure vava_world`, `ensure vava_time`, `ensure vava_appearance`, `ensure vava_characters_ui`,
 `ensure vava_hud`, `ensure vava_inventory`, `ensure vava_needs`, `ensure vava_health`, `ensure vava_admin`,
 `ensure vava_atelier`, `ensure vava_voice`, `ensure vava_cameras`, `ensure vava_magic`, `ensure vava_skills`,
-`ensure vava_gathering`, `ensure vava_crafting`, `ensure vava_farming`, `ensure vava_codex`, `ensure vava_arrival`,
-`ensure vava_chancellerie`, puis les modules qui déclarent des objets.
+`ensure vava_gathering`, `ensure vava_crafting`, `ensure vava_farming`, `ensure vava_provisions`, `ensure vava_codex`,
+`ensure vava_arrival`, `ensure vava_chancellerie`, puis les modules qui déclarent des objets.
 
 ### `vava_ui`
 
@@ -1923,6 +1923,64 @@ withdraw, source, characterId, item, quantity }`).
 `web/index.html?view=menu&state=growing` (ou `empty`, `ripe`, `wilted`, `dead`, `view=prompt` ; `&covered=1` : plante
 couverte ; `&frost=1` : gel annoncé ; `&season=ete` : « Couvrir » non proposé ; `&besace=compost` ou `vide`).
 
+### `vava_provisions`
+
+Les vivres du royaume (1.0.0, T-130) : objets `eau` (Outre d'eau) et `outre` (Outre vide), points d'eau (puits,
+fontaines, sources) où l'on remplit ses outres et où l'on boit, outre rendue vide qui se fend parfois, outres faites à la
+tannerie. Ordre de démarrage : après `vava_farming`, avant `vava_codex` et `vava_arrival`. Demande le core 0.11.0
+(`core.zones`, `core.net`, registre `core:commands`), `vava_ui` et `vava_inventory` 1.8.0 ; facultatifs : `vava_needs`
+(boire au point d'eau), `vava_crafting` et `vava_skills` (recette de l'outre, avant ou après), `vava_health` (rien à
+terre), `vava_hud`, `vava_admin` (droit `metiers`, journal du Registre), `vava_chat` (réponses de `/eau`). Aucune table
+SQL. Détail et réglages : `modules/vava_provisions/README.md`.
+
+- **Objets** déclarés s'ils manquent (le premier déclaré l'emporte, avertissement en console) : `eau` garde la
+  définition de `vava_arrival` 1.0.0 (1 × 2, pile de 5, 700 g, soif + 40, `boisson`), seule l'image
+  (`nui://vava_provisions/web/items/eau.svg`) et la description changent ; `outre` (1 × 2, pile de 5, 150 g, `divers`).
+  Redéclarés à l'annonce de `vava_inventory` (les piles gardées à part reviennent). Recette `outre` (Tannerie, 1 cuir →
+  2 outres) ajoutée aux registres `vava_crafting:recipes` et `vava_skills:recipes` si la station `tannerie` est
+  déclarée, à l'annonce de `vava_crafting` ou de `vava_skills` au besoin.
+- **Points d'eau** : une zone du core par point (identifiant local = identifiant du point, cercle de 2 m, marge 100 m),
+  état `{ def = { kind, label, x, y, z, heading?, model? } }` (~130 o, une fois à l'arrivée ; `heading` absent s'il
+  vaut 0, `model` absent s'il est celui de la sorte, que le client lit dans sa config) ; **la réserve n'est jamais
+  publiée**. Réserve en mémoire par point des sortes qui en ont une (puits 40, + 1 par minute ; source 15, + 1 toutes
+  les 3 min ; fontaine sans fond), pleine à chaque démarrage. `rules.validatePoint` est le seul juge d'un point ;
+  `points.put` et `points.drop` sont prêts pour l'éditeur de l'Atelier.
+- **Outre rendue** : hook `vava_inventory:use` (after) ; seulement si `consumed`, pour un objet de `containers` ; dans
+  un thread, pour le même personnage : `add(outre, 1)`, sauf une fois sur dix (`tearChance`) où elle se fend ; sans
+  place, elle est abandonnée. Avis au seul buveur.
+
+| RPC | `args` | `rateLimit` | Réponse |
+|---|---|---|---|
+| `vava_provisions:draw` | `{ { type = 'string', min = 1, max = 32, pattern = '^[a-z0-9_]+$' } }` (identifiant du point) | `{ capacity = 3, refillPerSecond = 0.5 }` | `true, { action = 'fill', count }` ; `true, { action = 'drink', dry, blocked? }` (`blocked` : `no_space` ou `too_heavy`, remplissage refusé par la besace, le joueur assoiffé a bu sur place) ; `false, code` (`no_character`, `downed`, `unknown_point`, `too_far`, `wait`, `busy`, `not_thirsty`, `no_container`, `no_space`, `too_heavy`, `unavailable`) ; `false, 'dry', secondes` ; `false, 'refused', raison` (texte d'un hook, 200 octets au plus) |
+
+Le client ne dit ni ce qu'il veut faire, ni ce qu'il porte, ni sa soif : le serveur revérifie personnage, une demande à
+la fois, délai (3 s), à terre, point connu, distance réelle du ped (3,5 m, 3D), outres vides possédées, soif, réserve,
+puis choisit ; après le hook `drawing`, personnage et distance sont relus. Remplir : au plus 5 outres, puisages
+réservés **avant** l'échange tout ou rien, rendus s'il échoue (besace pleine ou trop lourde et soif : gorgées sur place).
+Boire : soif + 20, refusé dès 95.
+
+| Évènement serveur → client | Valeurs | Cible |
+|---|---|---|
+| `vava_provisions:notice` | `torn` ou `lost` | le seul joueur qui vient de boire une outre d'eau fendue ou sans place (`core.net.send`) |
+| `vava_provisions:notify` | texte | le seul membre du Conseil qui a tapé `/eau`, quand `vava_chat` manque (sinon son chat) |
+
+| Export serveur | Retour |
+|---|---|
+| `getPoints()` | liste `{ id, kind, label, x, y, z, reserve? = { level, capacity } }` dans l'ordre de la config ; `nil, 'not_ready'` |
+| `getPoint(id)` | une entrée de la même forme, ou `nil, 'unknown_point'` |
+| `pointNear(source, radius?)` | `id, distance` du point le plus proche à au plus `radius` (défaut 3,5 m, au plus 10) de la position du ped lue côté serveur, ou `nil` ; `nil, 'invalid_target'` hors joueur |
+| `codexList(name)` | `points` → `{ { value = id, label } }` triés par nom |
+
+**Hooks émis** : `vava_provisions:drawing` (`before`, annulable : `{ source, characterId, point, kind, action = fill |
+drink, count }`, `count` 0 pour boire ; la raison d'un refus est montrée au joueur) et `vava_provisions:drawn` (`after` :
+le même payload, plus `reserve`, entier après le geste, absent pour une sorte sans fond). Aucun export client.
+
+**Conseil** : `/eau points | reserve <point> <nombre>` (droit `metiers`, repli ACE `metiers.admin`, console permise,
+1 s entre deux commandes d'un membre ; chapitre « Vivres » du Codex). `points` : lignes regroupées en messages de
+480 octets au plus, 60 points au plus. `reserve` va au journal du Registre (« Réserve d'eau fixée », point, réserve et
+ancienne réserve `before`). Touche `E` près d'un point d'eau (« Puiser ou boire »). Rendu hors jeu de l'invite :
+`web/index.html?label=Puits%20du%20lavoir&verb=Puiser&key=E`.
+
 ### `vava_codex`
 
 Le Codex : toutes les commandes et toutes les touches du serveur, lues dans le registre `core:commands` (voir
@@ -1969,7 +2027,8 @@ aucune autre interface ne l'a pris.
 RPC : `vava_codex:open(version, versionPréférences)` (empreintes gardées, 16 chiffres hexadécimaux au plus, `''` :
 aucune ; rend `{ version, prefsVersion, content?, prefs? }`), `options(nom, sous-commande, rang)` (valeurs d'un argument dynamique : joueurs en jeu avec
 leur nom, clés d'un registre par `labelField`, export `codexList` du module déclarant), `favorite(nom, posé)`,
-`recent(nom, sous-commande)`, `keepOpen(bool)` — schémas stricts, débits dans `config.rateLimits`. Une sous-commande
+`recent(nom, sous-commande)`, `keepOpen(bool)`, `page(id)` (1.5.0, texte d'une page de lecture, voir plus bas) —
+schémas stricts, débits dans `config.rateLimits`. Une sous-commande
 à droit propre est refusée (`refused`) à qui n'a pas ce droit, pour ses valeurs (`options`) comme pour les dernières
 pages ; `recent` ne retient que le nom et une sous-commande déclarée, jamais le reste de la ligne tapée.
 
@@ -1982,20 +2041,60 @@ un numéro à la main reste possible.
 |---|---|
 | serveur `suggestions(source)` | `{ { name, help, params = { { name, help } } } }` : les suggestions du chat pour ce joueur (ses commandes, une par sous-commande en deux mots, sans les touches ni la console) ; `vava_chat` l'appelle avec le profil |
 | client `noteCommand(ligne)` | — : une commande tapée ailleurs (chat) est inscrite aux dernières pages ; le serveur ignore ce que le joueur ne peut pas lancer |
-| client `openAt(chapitre)` | `true` (ouverture lancée, même chemin que `F1`) ou `false, code` : `invalid_chapter` (pas un identifiant du core de 64 octets au plus), `no_character`, `busy` (livre ouvert, menu pause, autre interface au focus) — 1.4.0 ; la page ouvre ce chapitre (onglet des commandes) s'il existe, sinon reste à l'index |
+| client `openAt(chapitre)` | `true` (ouverture lancée, même chemin que `F1`) ou `false, code` : `invalid_chapter` (pas un identifiant du core de 64 octets au plus), `no_character`, `busy` (livre ouvert, menu pause, autre interface au focus) — 1.4.0 ; la page résout l'identifiant dans cet ordre (1.5.0) : page de lecture (onglet Lecture, cette page), chapitre de lecture (onglet Lecture, première page du chapitre), chapitre de commandes (onglet Commandes) ; inconnu : le livre reste à son index, sans message |
 
 **Ouvrir à un chapitre** (1.4.0) : le chapitre part dans le message `open` de la page (`focus`, 64 octets au plus,
-absent pour `F1` et `/codex`) ; rien de plus sur le réseau. L'identifiant d'un chapitre est aujourd'hui le nom du
-module qui déclare ses commandes (`openAt('vava_inventory')`). Le chapitre « Premiers pas » (`premiers_pas`, T-023)
-est celui qu'ouvre `vava_arrival` à la première venue : T-023 le crée dans les chapitres de la page, ou étend la seule
-fonction `applyFocus` de `web/js/app.js` s'il range ses pages ailleurs. Hors jeu : `?focus=<chapitre>`.
+absent pour `F1` et `/codex`) ; rien de plus sur le réseau. Un chapitre de commandes porte le nom du module qui les
+déclare (`openAt('vava_inventory')`) ; depuis 1.5.0, un identifiant de page ou de chapitre de lecture est résolu
+d'abord (les ids de lecture ne commencent jamais par `vava`, aucune collision). `openAt('premiers_pas')`, appelé par
+`vava_arrival` à la première venue, ouvre l'onglet Lecture au chapitre « Premiers pas », page « Vivre à Eldoria »
+(`bienvenue`). Hors jeu : `?focus=<identifiant>`.
+
+**Pages de lecture** (1.5.0, T-023) : un onglet « Lecture » (premier des trois onglets ; `F1` ouvre toujours le livre
+sur Commandes) porte des chapitres et des pages écrits dans `content/*.lua` du module, chargés comme
+`server_scripts` : jamais téléchargés par les clients (une page du Conseil ne part qu'aux membres). Au setup, chaque
+page est analysée et validée (`shared/pages.lua`, pur, testé) ; une page fautive est écrite en console avec son code et
+sa ligne et écartée seule. `config.reading.enabled = false` : ni onglet, ni index, RPC `page` refusé (`disabled`).
+
+- **Chapitre** `{ id, label, order }` ; **page** (table plate, le `data` de l'Atelier demain) `{ id, chapter, order,
+  title, summary, audience, permission, requires, body }` : `id` au motif `^[a-z][a-z0-9_]*$`, 32 octets au plus, jamais
+  `vava…`, unique parmi pages et chapitres ; `order` entier de 0 à 999 ; `title` 48 octets, `summary` 120, `label` 32,
+  UTF-8, sans contrôle ni `<` `>` ; `audience` `'player'` (tous) ou `'admin'` (Conseil) ; `permission` `''` ou un droit
+  `vava_admin` (seulement avec `admin` ; une page à droit est cachée tant que `vava_admin` n'est pas démarré, sans
+  repli ACE) ; `requires` `''` ou une ressource : la page n'est montrée que si elle est démarrée. 8 chapitres et 40 pages au plus ; un chapitre sans page visible n'apparaît pas.
+- **Corps** (texte balisé léger, 6 000 octets au plus) : paragraphes séparés par une ligne vide ; `## Intertitre` ;
+  `- élément` et `1. élément` (suite d'un élément : deux espaces en tête de ligne ; 12 éléments au plus) ; `> note` ;
+  jetons `[[F1]]` (touche écrite telle quelle, 16 octets), `[[touche:nom]]` (touche **liée par le joueur** à l'entrée
+  `nom` du registre `core:commands`), `[[commande:nom]]` ou `[[commande:nom action]]` (lien vers la ligne de l'onglet
+  Commandes), `[[page:id]]` ou `[[page:id|libellé]]`, `*italique*` ; 40 blocs, 40 jetons ; paragraphe ou note 1 200
+  octets, élément 400, intertitre 80. Refusés : `<` partout, `>` ailleurs qu'en tête de ligne, octets de contrôle
+  (sauf le saut de ligne), UTF-8 invalide. Un lien vers une page absente, ou vers une page que tous les lecteurs de
+  la page qui le porte ne peuvent pas lire (page du Conseil depuis une page publique, page à droit depuis une page qui
+  n'a pas ce droit), fait refuser la page qui le porte. Codes d'erreur et leurs textes : `config.reading.errors`.
+- **Blocs envoyés** (listes pures) : `{ 'h', texte }`, `{ 'p', segment… }`, `{ 'note', segment… }`, `{ 'ul', { segment… },
+  … }`, `{ 'ol', … }` ; segment : chaîne, `{ 'kbd', touche }`, `{ 'key', nom }`, `{ 'cmd', nom, action|'' }`,
+  `{ 'page', id, libellé|'' }`, `{ 'em', texte }`. La page les rend par éléments et `textContent`, jamais de HTML.
+- **Index** dans le contenu de l'ouverture : `content.reading = { chapters = { { id, label } }, pages = { { id, chapter,
+  title, summary, hash, staff? } } }` (absent si les pages sont fermées), calculé avec les droits du moment (module
+  requis démarré ; page du Conseil : membre, et le droit de la page s'il y en a un), dans l'empreinte du contenu : il ne
+  repart que s'il change. `staff = true` seulement sur une page du Conseil. `hash` : empreinte du titre et des blocs.
+  Quand l'Atelier éditera les pages à chaud, l'index aura besoin de sa propre empreinte (aujourd'hui, une page
+  changée renverrait tout le contenu du Codex à la prochaine ouverture).
+- **Texte à la demande** : RPC `vava_codex:page(id)` (id au motif ci-dessus, `rateLimits.page` : 6 puis 1 par seconde) →
+  `{ id, hash, body }` (chapitre et titre sont dans l'index ; 7 500 o au plus hors enveloppe du core, sous le seuil
+  latent) ; `no_character`, `disabled`, ou
+  `unknown_page` pour une page absente, refusée au chargement, réservée ou dont le module est arrêté (un seul code :
+  rien ne trahit une page réservée). Les droits sont relus à chaque appel. La page garde le texte par empreinte.
+- **Console** : `vava_codex_pages` (déclarée `scope = 'console'`) : une ligne par page (poids réseau, public), puis
+  chaque touche ou commande citée absente du registre à cet instant.
 
 Hors jeu : `web/index.html` dans un navigateur (`?staff=0` pour la vue d'un simple joueur) ; les listes des
 formulaires y sont simulées.
 
 ### `vava_arrival`
 
-L'arrivée d'un nouveau personnage (1.0.0, T-022). Ordre de démarrage : après `vava_codex`, avant `vava_chancellerie`.
+L'arrivée d'un nouveau personnage (1.0.0, T-022 ; 1.1.0, T-130). Ordre de démarrage : après `vava_provisions` et
+`vava_codex`, avant `vava_chancellerie`.
 Demande le core 0.10.0 (`core.net`, `playSeconds` du hook `loaded`, registre `core:commands`) et `vava_inventory`
 1.4.0 (`exchange`, registre des objets) ; facultatifs : `vava_codex` 1.4.0 (`openAt`), `vava_hud` (notifications),
 `vava_admin` (droit `give`, journal du Registre), `vava_chat` (réponses de `/accueil`). Détail et réglages :
@@ -2006,12 +2105,14 @@ Demande le core 0.10.0 (`core.net`, `playSeconds` du hook `loaded`, registre `co
 - **Première venue** reconnue par le serveur seul, au hook `core:character:loaded` : aucune ligne dans `vava_arrival`
   **et** temps de jeu mesuré par le core nul → ligne « à donner ». Un personnage ancien (temps de jeu non nul) n'est
   jamais suivi. Aucune entrée réseau ne la demande : le client ne se déclare jamais nouveau.
-- **Dotation** (`config.kit.items`, défaut 2 `pain` et 2 `eau`, objets déclarés par le module s'ils manquent), donnée à
+- **Dotation** (`config.kit.items`, défaut 2 `pain` et 2 `eau` ; `pain` déclaré par le module s'il manque, `eau` par
+  `vava_provisions` depuis 1.1.0), donnée à
   l'apparition par **un** `exchange(source, {}, objets)` : objets connus vérifiés, limite par compte (3 dotations sur
   30 jours glissants, personnages supprimés compris : au-delà, accueil sans dotation), **réservation conditionnelle en
   base** (`UPDATE … WHERE kit = 'due'`, une ligne touchée), personnage actif relu juste avant l'échange sans céder la
   main, état écrit ; échec (besace pleine, inventaire absent, personnage changé) → de nouveau « à donner », nouvel essai
-  à l'apparition suivante ou au retour de l'inventaire. Une ligne relue « réservée » (serveur tombé pendant la remise)
+  à l'apparition suivante, au retour de l'inventaire ou à l'annonce d'un module de `kit.providers` (`vava_provisions` :
+  objet de la dotation inconnu tant qu'il n'a pas démarré, dotation reportée puis reprise, sans second accueil). Une ligne relue « réservée » (serveur tombé pendant la remise)
   passe « incertaine » et n'est **jamais** redonnée d'office (console, journal ; le Conseil vérifie et redote).
 - **Accueil** : évènement `vava_arrival:welcome` (`kitGiven`, ~25 o) au **seul** nouveau venu par `core.net.send`, au
   plus 3 fois sans accusé (une fois par session) ; le client attend un écran calme (4 s, puis essais d'une seconde,

@@ -1,13 +1,17 @@
 'use strict';
 /*
  * web/js/strings.js
- * Rôle : tous les textes affichés par le Codex (français).
+ * Rôle : tous les textes affichés par le Codex (français), onglet Lecture compris (1.5.0).
  */
 
 const STRINGS = Object.freeze({
   title: 'Codex',
-  tabs: { commands: 'Commandes', keys: 'Touches' },
-  search: { placeholder: 'Rechercher une commande…', keysPlaceholder: 'Rechercher une touche…', count: (n) => (n > 1 ? `${n} entrées` : `${n} entrée`) },
+  tabs: { reading: 'Lecture', commands: 'Commandes', keys: 'Touches' },
+  search: {
+    placeholder: 'Rechercher une commande…', keysPlaceholder: 'Rechercher une touche…', readingPlaceholder: 'Rechercher une page…',
+    count: (n) => (n > 1 ? `${n} entrées` : `${n} entrée`),
+    pageCount: (n) => (n > 1 ? `${n} pages` : `${n} page`),
+  },
   sections: {
     favorites: 'Signets',
     recent: 'Dernières pages',
@@ -40,6 +44,16 @@ const STRINGS = Object.freeze({
     undeclaredNote: 'Commande non décrite : écrivez ses arguments tels que vous les taperiez.',
     placeholder: (name) => name,
   },
+  // onglet Lecture : page de droite, navigation en pied de page, touche citée que le joueur n'a pas
+  reader: {
+    empty: 'Choisissez une page à gauche.',
+    loading: 'Le Codex tourne la page…',
+    failed: 'Cette page n’a pu être lue. Réessayez dans un instant.',
+    previous: '‹ Page précédente',
+    next: 'Page suivante ›',
+    noKey: '?',
+    noKeyHint: 'Touche indisponible',
+  },
   settings: {
     keepOpen: 'Rester ouvert après « Lancer »',
     keepOpenHint: 'Une commande qui ouvre une interface ferme toujours le Codex d\'abord.',
@@ -51,9 +65,16 @@ const STRINGS = Object.freeze({
     ['Tab', 'champ suivant'],
     ['Échap', 'retour, fermer'],
   ],
+  // légende de l'onglet Lecture : Entrée n'y lance rien
+  readingHints: [
+    ['↑ ↓', 'changer de page'],
+    ['Échap', 'retour, fermer'],
+  ],
   errors: {
     default: 'Action impossible.',
     unknown: 'Cette commande n\'est pas dans le Codex.',
+    unknown_page: 'Cette page n’est plus dans le Codex.',
+    disabled: 'Les pages de lecture sont fermées pour le moment.',
     refused: 'Cette commande ne vous est pas ouverte.',
     console: 'Cette commande ne se lance que depuis la console du serveur.',
     favorites_full: 'Vous avez atteint le nombre de signets permis : retirez-en un.',

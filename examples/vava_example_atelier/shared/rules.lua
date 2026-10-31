@@ -11,7 +11,7 @@
 ]]
 
 local type, ipairs, floor = type, ipairs, math.floor
-local format, gsub, lower = string.format, string.gsub, string.lower
+local char, format, gsub = string.char, string.format, string.gsub
 local utf8len, utf8codes, utf8char = utf8.len, utf8.codes, utf8.char
 
 local rules = {}
@@ -39,6 +39,25 @@ fold('ùúûüÙÚÛÜ', 'u')
 fold('ýÿÝŸ', 'y')
 fold('œŒ', 'oe')
 fold('æÆ', 'ae')
+fold('ß', 'ss')
+fold('’', '\'')
+-- Paires de casse du latin étendu (U+0100 à U+017F) : chaque majuscule ramenée à sa minuscule (« Ł » → « ł »,
+-- « Š » → « š »), sans retirer l'accent.
+local function casePairs(first, last)
+    for code = first, last, 2 do FOLD[utf8char(code)] = utf8char(code + 1) end
+end
+casePairs(0x100, 0x12E)   -- Ā à Į
+casePairs(0x132, 0x136)   -- Ĳ, Ĵ, Ķ
+casePairs(0x139, 0x147)   -- Ĺ à Ň
+casePairs(0x14A, 0x176)   -- Ŋ à Ŷ
+casePairs(0x179, 0x17D)   -- Ź, Ż, Ž
+FOLD['İ'] = 'i'
+
+-- Casse et blancs ASCII écrits octet par octet : `string.lower` et `%s` suivent la locale du système (sous Windows,
+-- le premier octet de « Ł » passerait pour une majuscule, l'octet 0xA0 de « Š » pour une espace : la clé ne serait
+-- plus de l'UTF-8).
+local ASCII_LOWER = {}
+for code = 65, 90 do ASCII_LOWER[char(code)] = char(code + 32) end
 
 --- Nom ramené à une forme comparable : accents, casse et blancs de bord ignorés.
 ---@param name any
@@ -46,7 +65,7 @@ fold('æÆ', 'ae')
 function rules.key(name)
     if type(name) ~= 'string' then return '' end
     local folded = gsub(name, '[\xC2-\xF4][\x80-\xBF]*', FOLD)
-    return (gsub(gsub(lower(folded), '^%s+', ''), '%s+$', ''))
+    return (gsub(gsub(gsub(folded, '[A-Z]', ASCII_LOWER), '^[\t-\r ]+', ''), '[\t-\r ]+$', ''))
 end
 
 --- Erreurs d'un panneau : { { field, text } } (vide : rien à redire). `others` : les autres panneaux connus

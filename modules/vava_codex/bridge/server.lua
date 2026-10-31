@@ -3,7 +3,8 @@
     Rôle : SEUL point de contact, côté serveur, entre le Codex et le core / les autres modules : personnage et
            joueurs en jeu (tous, ou les seuls proches d'un joueur, positions lues par le serveur), rangs et droits du
            Conseil (vava_admin, sinon ACE), listes de valeurs des modules
-           (export codexList), commandes enregistrées auprès du jeu, notifications. Chaque appel à une autre
+           (export codexList), ressources démarrées (pages de lecture liées à un module), commandes enregistrées
+           auprès du jeu, notifications. Chaque appel à une autre
            ressource est isolé : un module absent ou en erreur ne retire que la fonction concernée.
     Dépendances : shared/constants.lua, config.lua, server/core.lua
 ]]
@@ -14,6 +15,10 @@ local pack, unpack = table.pack, table.unpack
 local GetResourceState, TriggerClientEvent, IsPlayerAceAllowed = GetResourceState, TriggerClientEvent, IsPlayerAceAllowed
 local GetPlayers, GetRegisteredCommands = GetPlayers, GetRegisteredCommands
 local GetPlayerPed, GetEntityCoords, GetPlayerRoutingBucket = GetPlayerPed, GetEntityCoords, GetPlayerRoutingBucket
+
+-- blancs ASCII de fin, écrits octet par octet : `%s` dépend de la locale du système et couperait le « à » final d'un
+-- nom (octet 0xA0)
+local TRAILING = '[\t-\r ]+$'
 
 local core = VavaCodex.core
 if not core then return end
@@ -70,7 +75,7 @@ local function activePlayers(keep)
     for _, id in ipairs(GetPlayers()) do
         local src = tonumber(id)
         local character = src and (not keep or keep(src)) and Bridge.GetCharacter(src)
-        if character then list[#list + 1] = { source = src, name = (character.firstName .. ' ' .. (character.lastName or '')):gsub('%s+$', '') } end
+        if character then list[#list + 1] = { source = src, name = (character.firstName .. ' ' .. (character.lastName or '')):gsub(TRAILING, '') } end
     end
     table.sort(list, function(a, b) return a.name < b.name end)
     return list
@@ -133,6 +138,13 @@ function Bridge.Can(source, permission, ace)
 end
 
 -- Modules ---------------------------------------------------------------------------------------------------------
+
+--- Ressource démarrée ? (pages de lecture liées à un module : cachées s'il est arrêté, 1.5.0)
+---@param resource string
+---@return boolean
+function Bridge.Started(resource)
+    return type(resource) == 'string' and GetResourceState(resource) == 'started'
+end
 
 --- Valeurs proposées par un module pour un argument de type `list` : son export `codexList(name)`, nettoyé.
 ---@param module string

@@ -1,9 +1,9 @@
 # Le Codex — procédure de test en jeu
 
-Procédure pour vérifier en jeu `vava_codex` 1.2.0 : toutes les commandes et toutes les touches du serveur dans un
+Procédure pour vérifier en jeu `vava_codex` 1.5.0 : toutes les commandes et toutes les touches du serveur dans un
 livre (`F1` ou `/codex`), la recherche, les formulaires selon le type de chaque argument, « Lancer », ce que chacun
 voit selon ses droits, les signets, les dernières pages, la greffe du chat et le contenu gardé par la page entre deux
-ouvertures (§ 12, 1.2.0). Elle reprend les douze tests de la section « Tests en jeu » du README (repérés
+ouvertures (§ 12, 1.2.0), les pages de lecture et l'onglet Lecture (§ 16, 1.5.0). Elle reprend les douze tests de la section « Tests en jeu » du README (repérés
 « README n ») et les complète d'après le code. Comptez trois quarts d'heure ; les
 tests à deux joueurs sont marqués **(2 joueurs)**. Un test se cite « codex 3-4 ». Préparation commune, mesure du
 resmon et remontée des écarts : [LISEZMOI.md](LISEZMOI.md).
@@ -32,7 +32,7 @@ resmon et remontée des écarts : [LISEZMOI.md](LISEZMOI.md).
 
 | # | Faire | Attendu |
 |---|---|---|
-| 1 | `F1`. | Le livre « Codex » s'ouvre : onglets Commandes et Touches ; curseur dans la recherche (« Rechercher une commande… ») ; « N entrées » ; l'index à gauche ; à droite « Choisissez une commande à gauche, ou tapez pour chercher. » ; sur la tranche « Tout » puis un onglet par chapitre ; en bas « Rester ouvert après « Lancer » », coché (`keepOpenDefault = true`) ; légende sous le livre : `↑ ↓` parcourir, `Entrée` choisir, lancer, `Tab` champ suivant, `Échap` retour, fermer. |
+| 1 | `F1`. | Le livre « Codex » s'ouvre sur l'onglet Commandes : onglets Lecture, Commandes et Touches (1.5.0) ; curseur dans la recherche (« Rechercher une commande… ») ; « N entrées » ; l'index à gauche ; à droite « Choisissez une commande à gauche, ou tapez pour chercher. » ; sur la tranche « Tout » puis un onglet par chapitre ; en bas « Rester ouvert après « Lancer » », coché (`keepOpenDefault = true`) ; légende sous le livre : `↑ ↓` parcourir, `Entrée` choisir, lancer, `Tab` champ suivant, `Échap` retour, fermer. |
 | 2 | `Échap`. | Le livre se ferme ; souris et clavier reviennent au jeu. |
 | 3 | `/codex` dans le chat. | Le livre s'ouvre. |
 | 4 | Livre ouvert : `F1`. | Rien : le livre a le clavier ; on le ferme par `Échap` (à confirmer). |
@@ -210,3 +210,36 @@ n'a encore aucun contenu, elle le redemande aussitôt, et cette ouverture compte
   réseau quand T-013 existera.
 - La page qui garde son contenu entre deux ouvertures dans CEF (vérifié sous jsdom : contenu, signets et touches
   gardés ; préférences seules remplacées ; version inconnue → tout redemandé).
+
+## 16. Pages de lecture (1.5.0)
+
+L'onglet Lecture : trois chapitres et douze pages écrits côté serveur (`modules/vava_codex/content/*.lua`), l'index
+dans le contenu du Codex (même empreinte), le texte d'une page demandé quand on l'ouvre (RPC `vava_codex:page`) et gardé
+par la page. Préparation : A Souverain, B hors du Conseil (§ 0) ; tous les modules du dépôt démarrés ;
+`log.level = 'debug'` pour lire « contenu envoyé | gardé » (§ 0.5).
+
+| # | Faire | Attendu |
+|---|---|---|
+| 1 | Démarrer le serveur. | Console : `pages de lecture : 12 chargées, 0 refusées`, puis `module 'vava_codex' v1.5.0 prêt`. |
+| 2 | Console : `vava_codex_pages`. | Une ligne par page (id, chapitre, poids entre 1 700 et 7 500 octets avec les textes définitifs, `public` ou `Conseil`, module requis) ; aucune ligne « introuvable au registre ». |
+| 3 | B : `F1`, onglet « Lecture ». | Trois onglets, Lecture en premier ; le livre s'est ouvert sur Commandes comme avant. Lecture : sommaire en trois chapitres, onze pages, aucun sceau « Conseil » ; tranche « Tout », « Premiers pas », « Les métiers », « Le royaume » ; la première page s'affiche. |
+| 4 | B : cliquer « Troquer et partager », puis un lien vers une autre page, puis « Page suivante › ». | Le texte s'affiche aussitôt (première lecture : « Le Codex tourne la page… » à peine visible) ; le lien ouvre la page citée ; la navigation suit l'ordre du sommaire. |
+| 5 | B : dans « Vivre à Eldoria », regarder le cabochon du Codex ; Paramètres › Raccourcis › FiveM : « Ouvrir le Codex » sur `J` ; rouvrir. | Le cabochon montre `F1`, puis `J` : la page cite la touche du joueur. Remettre `F1`. |
+| 6 | B : cliquer `/me` dans « Se parler ». | Onglet Commandes, la ligne « /me » choisie, son formulaire prêt. |
+| 7 | B : taper « grenier » dans la recherche de l'onglet Lecture. | Les pages dont le titre ou le résumé parle de grenier restent (ou aucune : « 0 page ») ; `Échap` vide la recherche. |
+| 8 | **(2 joueurs)** A : `F1`, Lecture. | Douze pages : « Siéger au Conseil » porte le sceau « Conseil ». Ses liens de commandes (`/recolte zones`…) ouvrent les lignes du Conseil. |
+| 9 | **(2 joueurs)** B lit les onze pages une fois ; A : `/vava_reseau joueur <B>`. | Chez B : `rpc vava_codex:page`, onze messages de 1 à 4 Ko chacun (un par page lue pour la première fois), et rien de plus ; le plus gros envoi de B reste `rpc vava_codex:open`. La page réservée ne peut pas être demandée par B (vérifié hors jeu : `codex_reading_spec.lua`, `unknown_page`). |
+| 10 | B : fermer, rouvrir le Codex, relire une page déjà lue. | Console : `contenu gardé par la page` ; aucune nouvelle ligne `rpc vava_codex:page` pour cette page. |
+| 11 | Console : `stop vava_magic` ; B rouvre. | `contenu envoyé` ; la page « La magie » a disparu du sommaire ; un lien qui y menait s'affiche en texte brut. `start vava_magic`, rouvrir : elle revient. |
+| 12 | **(2 joueurs)** Console : `vava_conseil <B> senechal` ; B rouvre ; puis `vava_conseil <B> aucun` pendant que B a « Siéger au Conseil » ouvert, et B clique « Page suivante › » puis revient. | Sénéchal : la page réservée apparaît. Révoqué : la page déjà affichée reste à l'écran jusqu'à la fermeture, mais une nouvelle demande est refusée (« Cette page n'est plus dans le Codex. ») ; à la réouverture, elle a disparu. |
+| 13 | Créer un nouveau personnage (accueil de `vava_arrival`). | Le Codex s'ouvre seul sur Lecture, chapitre « Premiers pas », page « Vivre à Eldoria » (`docs/tests/accueil.md` 20). |
+| 14 | `F1` ensuite. | Le livre s'ouvre là où il a été laissé (Lecture, même page), sans nouvel appel pour cette page. |
+| 15 | Cliquer très vite dix pages jamais lues. | Les six premières s'affichent, puis « Doucement… » ; une seconde plus tard, la suivante passe (`rateLimits.page`). |
+| 16 | Dans `content/premiers_pas.lua`, écrire `[[foo:bar]]` dans une page ; `restart vava_codex`. | Console : `page « … » refusée : jeton mal formé … (ligne N)` ; les pages qui la citent sont refusées aussi (`lien vers une page absente…`), les autres sont là ; le Codex démarre. Annuler la modification. |
+| 17 | Livre ouvert sur une page : `restart vava_codex`, puis `F1`. | Souris et clavier rendus ; `contenu envoyé` ; la page se relit (nouvel appel). |
+| 18 | `resmon 1`, livre fermé puis en lisant. | `vava_codex` 0,00 ms au repos, au plus 0,02 ms en lisant ; côté serveur, l'ouverture coûte comme avant (+0,1 ms au plus). |
+| 19 | Rendu hors jeu : `web/index.html?focus=premiers_pas`, puis `?staff=0&focus=troquer`. | Le livre s'ouvre sur la page voulue ; tous les blocs et jetons rendus (cabochons, liens, note, listes) ; pas de page réservée avec `staff=0`. |
+
+Ce qui ne se voit pas hors jeu : la lisibilité d'une page longue dans CEF (défilement, police, liens au survol) ; le
+cabochon d'une touche de souris (`[[touche:vava_magic_viser]]`, nom donné par `GetControlInstructionalButton`, sinon
+`keyDisplay`) ; la première ouverture d'un joueur partie en latent (aucune attente visible à l'arrivée).

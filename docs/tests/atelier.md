@@ -80,6 +80,7 @@ sont marqués **(2 joueurs)**. Un test se cite « atelier 3-4 ». Préparation c
 | 1 | Accueil : `pan`. | Les cartes se filtrent à chaque lettre ; « Dans les ateliers » liste les deux panneaux (« Panneaux du bourg (exemple) › panneau »). |
 | 2 | `PLACE`, puis `Entrée`. | Accents et casse ignorés ; la fiche « Panneau de la place » s'ouvre. |
 | 3 | B (Sénéchal) : `couronnement`. | Aucun résultat : la proclamation n'est pas dans ses ateliers. |
+| 4 | (`vava_atelier` 1.0.1, `vava_example_atelier` 1.0.1, T-133) Fiche « Panneau de la place » : nom ` Panneau de la place Š ` (espaces autour), « Vérifier » ; puis fiche « Pancarte de la porte nord » : nom ` PANNEAU DE LA PLACE ` ; puis, sur l'accueil, chercher `voilà`, `Ŧ` et `Š`. | Premier nom : « Tout est en ordre. » (le « Š » final n'est ni coupé ni pris pour un blanc). Second : « Un panneau porte déjà ce nom. ». Recherches : aucune erreur, aucun « � » dans les résultats ni en console du serveur. |
 
 ## 6. Journal
 

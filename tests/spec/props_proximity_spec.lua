@@ -1,14 +1,15 @@
 local helper = require('tests.helper')
 
--- Streaming des props par groupes (shared/proximity.lua, même fichier dans vava_gathering, vava_farming et
--- vava_crafting ; T-018). Ce qui compte : un groupe écarté ne cache jamais une cible à portée (sinon un prop
--- manquerait), l'intervalle ne s'allonge que loin de tout, et les valeurs de la config sont celles des README
--- (80 m, 1 s près d'un groupe, 2,5 s au-delà de 80 + 60 m).
+-- Streaming des props par groupes (shared/proximity.lua, même fichier dans vava_gathering, vava_farming,
+-- vava_crafting et vava_provisions ; T-018, T-130). Ce qui compte : un groupe écarté ne cache jamais une cible à
+-- portée (sinon un prop manquerait), l'intervalle ne s'allonge que loin de tout, et les valeurs de la config sont
+-- celles des README (80 m, 1 s près d'un groupe, 2,5 s au-delà de 80 + 60 m).
 
 local MODULES = {
     { name = 'vava_gathering', global = 'VavaGathering' },
     { name = 'vava_farming', global = 'VavaFarming' },
     { name = 'vava_crafting', global = 'VavaCrafting' },
+    { name = 'vava_provisions', global = 'VavaProvisions' },
 }
 
 --- Distance réelle, pour comparer à la borne du groupe.

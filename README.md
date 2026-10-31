@@ -31,7 +31,8 @@ Voir [docs/chancellerie.md](docs/chancellerie.md).
 À la main : placer `vAvA_core` et chaque module dans `resources/`, puis les démarrer dans cet ordre, après
 `oxmysql` : `vAvA_core`, `vava_ui`, `vava_loading`, `vava_chat` (à la place de `chat`), `vava_world`, `vava_time`, `vava_appearance`, `vava_characters_ui`,
 `vava_hud`, `vava_inventory`, `vava_needs`, `vava_health`, `vava_admin`, `vava_atelier`, `vava_voice`, `vava_cameras`, `vava_magic`,
-`vava_skills`, `vava_gathering`, `vava_crafting`, `vava_farming`, `vava_codex`, `vava_arrival`, `vava_chancellerie`.
+`vava_skills`, `vava_gathering`, `vava_crafting`, `vava_farming`, `vava_provisions`, `vava_codex`, `vava_arrival`,
+`vava_chancellerie`.
 
 `vava_ui` n'a aucun script : il sert aux interfaces leurs polices, textures et ornements communs. Les ressources à
 page qui l'ont adopté le déclarent en dépendance : ne jamais l'arrêter ni le relancer sur un serveur ouvert (voir
@@ -52,7 +53,7 @@ au public** (la Chancellerie les pose dans `[vava-dev]` sans jamais les lancer d
 | --- | --- |
 | `vava_dev_characters` | `/objet` (n'importe quel objet), `/vie`, `/aterre`, `/besoins`, `/respawn`, `/perso` |
 | `vava_example` | `/note` (lignes écrites en base), `example_ping` |
-| `vava_example_items` | huit objets de démonstration, dont une Bande de lin qui soigne, et leurs images (~51 Ko) téléchargées par chaque joueur |
+| `vava_example_items` | sept objets de démonstration, dont une Bande de lin qui soigne, et leurs images (~47 Ko) téléchargées par chaque joueur |
 | `vava_anim_test` | `/anim`, `/epee`, `/animstop`, `/animprop`, et un `.ycd` téléchargé par chaque joueur |
 | `vava_example_atelier` | deux ateliers d'exemple dans l'Atelier du Conseil (données en mémoire) et `/atelier_exemple`, qui écrit au journal du Conseil |
 

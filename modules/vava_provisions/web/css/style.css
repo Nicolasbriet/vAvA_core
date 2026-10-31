@@ -1,0 +1,71 @@
+/*
+ * web/css/style.css
+ * Rôle : l'invite d'un point d'eau : plaquette de cuir sombre (grain de vava_ui permis : fond sombre) à filet de
+ *        laiton, touche en laiton (Cinzel), verbe et nom du point en EB Garamond ; même place et même allure que
+ *        l'invite de vava_farming. Sans vava_ui : polices de repli, sans grain, toujours lisible.
+ * Performance : aucune image propre, aucun flou ni filtre ; seule une apparition courte (opacité, translation).
+ */
+
+:root {
+  --brass-rgb: 220, 192, 138;
+  --text: var(--ui-text, #ece1c8);
+  --text-faint: var(--ui-text-faint, #786c5c);
+  --brass-bright: var(--ui-brass-bright, #dcc08a);
+  --font-display: "Cinzel", "Palatino Linotype", Georgia, serif;
+  --font-body: "EB Garamond", "Palatino Linotype", Georgia, serif;
+}
+
+* { box-sizing: border-box; }
+html { font-size: clamp(12px, 0.5vw + 6px, 18px); }
+html,
+body { height: 100%; margin: 0; overflow: hidden; background: transparent; pointer-events: none; }
+body {
+  color: var(--text);
+  font-family: var(--font-body);
+  font-size: 1.05rem;
+  -webkit-font-smoothing: antialiased;
+  user-select: none;
+}
+body.dev { background: radial-gradient(ellipse at 50% 40%, #3f5363 0%, #1f2a31 50%, #0a0d10 100%); }
+[hidden] { display: none !important; }
+
+@keyframes rise {
+  from { opacity: 0; transform: translate(-50%, 10px); }
+}
+
+.prompt {
+  position: fixed;
+  bottom: 9.5rem;
+  left: 50%;
+  display: flex;
+  align-items: center;
+  gap: 0.85rem;
+  max-width: 36rem;
+  padding: 0.6rem 1.1rem 0.6rem 0.75rem;
+  border-radius: 4px;
+  background: var(--ui-grain, none), linear-gradient(180deg, #2a2017, #1a130e);
+  box-shadow: 0 0 0 1px var(--ui-edge, #070504), 0 0 0 2px rgba(var(--brass-rgb), 0.2), inset 0 1px 0 rgba(255, 235, 200, 0.07), 0 1.2rem 2.4rem rgba(0, 0, 0, 0.6);
+  transform: translateX(-50%);
+  animation: rise 180ms cubic-bezier(0.2, 0.7, 0.2, 1) both;
+}
+
+.prompt-key {
+  flex: none;
+  min-width: 1.7rem;
+  padding: 0 0.5rem;
+  border-radius: 3px;
+  background: linear-gradient(180deg, #e7cf9b, #b89359 55%, #8a6a3a);
+  box-shadow: 0 0 0 1px #2a1d0c, inset 0 1px 0 rgba(255, 250, 235, 0.55), 0 2px 0 #2a1d0c;
+  color: #1a120a;
+  font-family: var(--font-display);
+  font-size: 0.85rem;
+  font-weight: 700;
+  line-height: 1.6rem;
+  text-align: center;
+  text-shadow: 0 1px 0 rgba(255, 240, 210, 0.35);
+}
+
+.prompt-line { min-width: 0; margin: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.prompt-verb { color: var(--brass-bright); font-weight: 700; }
+.prompt-sep { margin: 0 0.4rem; color: var(--text-faint); }
+.prompt-label { font-size: 1.1rem; font-weight: 600; }

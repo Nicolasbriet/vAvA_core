@@ -16,7 +16,6 @@ local type, tostring, tonumber, pairs, xpcall, pcall = type, tostring, tonumber,
 local traceback = debug.traceback
 local tointeger = math.tointeger
 local sort, concat = table.sort, table.concat
-local lower = string.lower
 local utf8codes, utf8char = utf8.codes, utf8.char
 local decodeJson, encodeJson = json.decode, json.encode
 local newPromise, await = promise.new, Citizen.Await
@@ -135,7 +134,8 @@ end
 local function foldName(name)
     local parts = {}
     for _, code in utf8codes(name) do
-        parts[#parts + 1] = FOLDED[code] or lower(utf8char(code))
+        -- casse ASCII seulement : string.lower suit la locale et casserait une lettre ajoutée hors de FOLDED
+        parts[#parts + 1] = FOLDED[code] or str.asciiLower(utf8char(code))
     end
     return concat(parts)
 end

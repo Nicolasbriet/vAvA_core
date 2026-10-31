@@ -1,9 +1,10 @@
 --[[
     vava_arrival/server/main.lua
-    Rôle : déclaration du module auprès du core : commande au registre, config vérifiée (dotation, chapitre du Codex),
-           objets déclarés, journal purgé, accusé de lecture (RPC à schéma vide et débit limité), hooks du core
-           (chargement : première venue reconnue ; apparition : dotation et accueil ; déchargement et départ : entrée
-           oubliée ; retour de l'inventaire : objets redéclarés, dotations dues reprises), adoption des joueurs déjà
+    Rôle : déclaration du module auprès du core : commande au registre, config vérifiée (dotation, modules qui en
+           déclarent des objets, chapitre du Codex), objets déclarés, journal purgé, accusé de lecture (RPC à schéma
+           vide et débit limité), hooks du core (chargement : première venue reconnue ; apparition : dotation et
+           accueil ; déchargement et départ : entrée oubliée ; retour de l'inventaire : objets redéclarés, dotations
+           dues reprises ; annonce d'un module de `kit.providers` : dotations dues reprises), adoption des joueurs déjà
            en jeu (module redémarré), commande du Conseil. Aucune boucle.
     Dépendances : tous les fichiers server/ du module
 ]]
@@ -34,6 +35,8 @@ local function checkConfig()
     if mathType(cap.max) ~= 'integer' or cap.max < 0 or type(cap.days) ~= 'number' or cap.days <= 0 then
         return false, 'kit.perAccount : max entier ≥ 0 et days > 0 attendus'
     end
+    ok, code = rules.validateProviders(cfg.kit.providers)
+    if not ok then return false, 'kit.providers : ' .. tostring(code) end
     if not rules.isId(cfg.codex.chapter) then return false, 'codex.chapter : identifiant attendu (64 octets, ^[%w_%-%.:]+$)' end
     return true
 end
@@ -68,9 +71,13 @@ local function setup()
             store.forget(payload.source)
             admin.forget(payload.source)
         end },
-        -- l'inventaire redémarré a perdu nos objets : les redéclarer, puis reprendre les dotations dues
+        -- l'inventaire redémarré a perdu nos objets : les redéclarer, puis reprendre les dotations dues ; un module qui
+        -- déclare des objets de la dotation (kit.providers) devient prêt : reprendre les dotations dues
         { 'core:module:ready', function(payload)
-            if payload.name ~= bridge.INVENTORY then return end
+            if payload.name ~= bridge.INVENTORY then
+                welcome.onProviderReady(payload.name)
+                return
+            end
             kit.declareItems()
             welcome.onInventoryReady()
         end },

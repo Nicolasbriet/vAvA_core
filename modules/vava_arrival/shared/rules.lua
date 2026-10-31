@@ -1,7 +1,7 @@
 --[[
     vava_arrival/shared/rules.lua
     Rôle : logique PURE de l'arrivée (aucune native, testée hors jeu : tests/spec/arrival_rules_spec.lua) : validation
-           de la dotation, décision au chargement d'un personnage (première venue, ligne reprise, dotation
+           de la dotation et des modules qui en déclarent des objets, décision au chargement d'un personnage (première venue, ligne reprise, dotation
            incertaine), plan d'une apparition (dotation, accueil), limite du compte, écran prêt pour l'accueil,
            lecture de /accueil, textes d'état pour le Conseil.
     Dépendances : shared/constants.lua
@@ -63,6 +63,36 @@ function rules.validateKit(items)
         seen[entry.item] = true
     end
     return true
+end
+
+--- Valide les modules qui déclarent des objets de la dotation (`kit.providers`) : liste pure de noms de ressources,
+--- 8 au plus, chacun un identifiant de 64 octets au plus, une fois.
+---@param providers any
+---@return boolean ok
+---@return string|nil code  invalid_list | too_many | invalid_name | duplicate
+function rules.validateProviders(providers)
+    if not isList(providers) then return false, 'invalid_list' end
+    if #providers > MAX_KIT_ENTRIES then return false, 'too_many' end
+    local seen = {}
+    for i = 1, #providers do
+        local name = providers[i]
+        if not rules.isId(name) then return false, 'invalid_name' end
+        if seen[name] then return false, 'duplicate' end
+        seen[name] = true
+    end
+    return true
+end
+
+--- Vrai si `name` est l'un des modules qui déclarent des objets de la dotation.
+---@param name any
+---@param providers string[]
+---@return boolean
+function rules.isProvider(name, providers)
+    if type(name) ~= 'string' or type(providers) ~= 'table' then return false end
+    for i = 1, #providers do
+        if providers[i] == name then return true end
+    end
+    return false
 end
 
 ---@class vAvA.ArrivalLoad

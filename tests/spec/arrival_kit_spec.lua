@@ -527,6 +527,36 @@ describe('vava_arrival server', function()
         assert.equal(0, #exchanges)
     end)
 
+    it('reprend la dotation reportée quand vava_provisions devient prêt, sans second accueil', function()
+        -- vava_provisions pas encore démarré : l'eau est inconnue, la dotation est reportée
+        known.eau = false
+        arrive(0)
+        welcome.onSpawned(SPAWN)
+        assert.equal(0, #exchanges)
+        assert.equal('due', rows[CHARACTER].kit)
+        assert.equal(1, #sent)
+
+        -- annonce d'un module qui ne déclare rien de la dotation : rien
+        known.eau = nil
+        assert.is_false(welcome.onProviderReady('vava_codex'))
+        assert.is_false(welcome.onProviderReady(nil))
+        assert.equal(0, #exchanges)
+        assert.equal('due', rows[CHARACTER].kit)
+
+        -- vava_provisions prêt (l'eau est connue) : un échange, dotation donnée, aucun nouvel accueil
+        assert.is_true(welcome.onProviderReady('vava_provisions'))
+        assert.equal(1, #exchanges)
+        assert.same({ source = SOURCE, removals = {}, additions = cfg.kit.items }, exchanges[1])
+        assert.equal('given', rows[CHARACTER].kit)
+        assert.same({ 'kit_given' }, kinds())
+        assert.equal(1, #sent)
+        assert.equal(1, #emitted)
+
+        -- une seconde annonce ne redonne rien
+        assert.is_true(welcome.onProviderReady('vava_provisions'))
+        assert.equal(1, #exchanges)
+    end)
+
     it('passe une dotation vide à « donnée » sans échange', function()
         cfg.kit.items = {}
         arrive(0)

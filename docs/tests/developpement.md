@@ -66,7 +66,7 @@ Poser la convar sans redémarrer le serveur : console `set vava_env dev`, puis `
 
 | # | Faire | Attendu |
 |---|---|---|
-| 1 | Mode développement (§ 2). A : `/catalogue`. | Les huit objets d'exemple (Miche de pain, Pomme, Outre d'eau, Chope de bière, Bande de lin, Épée courte, Bourse de cuir, Rouleau de corde) avec leurs images. |
+| 1 | Mode développement (§ 2). A : `/catalogue`. | Les sept objets d'exemple (Miche de pain, Pomme, Chope de bière, Bande de lin, Épée courte, Bourse de cuir, Rouleau de corde) avec leurs images. L'Outre d'eau et l'Outre vide y sont aussi, mais elles viennent de `vava_provisions` (images de son dossier). |
 | 2 | La miche gardée à part au § 1-7 (s'il y en avait une). | De retour à sa place dans la besace, sans reconnexion. |
 | 3 | A, une miche en besace, se déconnecte. Console : `set vava_env prod`, `restart vava_example_items`. A se reconnecte, `I`. | Console : `module 'vava_example_items' … refusé : … mode développement absent`, puis au chargement de A `conteneur #n : objet #m (pain) sans place ou sans définition, conservé à part`. La miche n'est pas dans la besace ; sa ligne est toujours en base. |
 | 4 | Console : `set vava_env dev`, `restart vava_example_items`. A : `I`. | La miche est revenue à sa place, sans reconnexion (`… pile(s) de 'pain' replacée(s)`). |

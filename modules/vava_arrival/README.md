@@ -9,8 +9,8 @@ Le serveur décide de tout : la nouveauté est lue sur le temps de jeu **mesuré
 part **au plus une fois** (réservation conditionnelle en base, échange atomique de l'inventaire), et le client ne fait
 qu'afficher l'accueil puis accuser lecture. Aucun envoi aux autres joueurs, aucune boucle.
 
-Ordre de démarrage : après `vAvA_core` (≥ 0.10.0), `vava_inventory` (≥ 1.4.0) et `vava_codex`, avant
-`vava_chancellerie`. Facultatifs : `vava_codex` ≥ 1.4.0 (Codex ouvert au chapitre), `vava_hud` (notifications ; sans
+Ordre de démarrage : après `vAvA_core` (≥ 0.10.0), `vava_inventory` (≥ 1.4.0), `vava_provisions` (recommandé : il
+déclare l'eau de la dotation) et `vava_codex`, avant `vava_chancellerie`. Facultatifs : `vava_codex` ≥ 1.4.0 (Codex ouvert au chapitre), `vava_hud` (notifications ; sans
 lui, celles du jeu), `vava_admin` (droit `give`, journal du Registre ; sans lui, ACE `vava_arrival.admin`), `vava_chat`
 (réponses de `/accueil` ; sans lui, une notification au seul membre).
 
@@ -21,21 +21,23 @@ lui, celles du jeu), `vava_admin` (droit `give`, journal du Registre ; sans lui,
 | Point d'arrivée | `spawn.defaultPoint` de `config/server.lua` (core), `-- PLACEHOLDER` jusqu'à la carte du royaume (T-052) | aucune ici |
 | Dotation de départ | 2 `pain`, 2 `eau` ; liste pure, 8 entrées au plus, quantités 1 à 100, un objet une fois ; `{}` : aucune dotation | `kit.items` |
 | Limite par compte | 3 dotations sur 30 jours glissants (réservées, données ou incertaines, personnages supprimés compris) ; au-delà, accueil sans dotation ; `max = 0` : aucune limite | `kit.perAccount` |
-| Objets déclarés s'ils manquent | `pain` (faim + 35), `eau` (soif + 40), dessins `web/items/*.svg` | `items` |
+| Modules qui déclarent des objets de la dotation (1.1.0) | `vava_provisions` (l'eau) : à son annonce `core:module:ready`, les dotations dues des personnages apparus sont reprises, comme au retour de l'inventaire, sans second accueil ; liste pure de noms de ressources (8 au plus, 64 octets) | `kit.providers` |
+| Objets déclarés s'ils manquent | `pain` (faim + 35), dessin `web/items/pain.svg` ; `eau` (soif + 40) est déclarée par `vava_provisions` depuis 1.1.0 (un seul propriétaire, même définition) | `items` |
 | Attente de l'accueil | 4 s après la réception, puis un essai par seconde, 30 s au plus | `welcome.delayMs`, `retryMs`, `maxWaitMs` |
 | Envois de l'accueil sans accusé | 3 au plus, un par session | `welcome.maxSends` |
-| Chapitre du Codex | `premiers_pas` (créé par T-023 ; d'ici là le Codex s'ouvre à son index) | `codex.chapter` |
+| Chapitre du Codex | `premiers_pas` : le Codex (1.5.0, T-023) s'ouvre sur l'onglet Lecture, chapitre « Premiers pas », page « Vivre à Eldoria » ; un chapitre de commandes (`vava_inventory`) ou une page de lecture sont aussi acceptés | `codex.chapter` |
 | Commande du Conseil | `/accueil`, droit `give` (Sénéchal et au-dessus), ACE `vava_arrival.admin`, 2 s entre deux | `admin` |
 | Accusé de lecture | 2 d'avance, puis 1 par 20 s | `rateLimits.welcomed` |
 | Journal | 90 jours | `logRetentionDays` |
-| Textes | provisoires (T-021) ; notifications de 200 octets au plus, libellés du journal de 32 octets au plus | `messages` |
+| Textes | relus avec l'écran de chargement (T-021) ; notifications de 200 octets au plus, libellés du journal de 32 octets au plus ; `codexHint` cite la touche par défaut du Codex (F1) | `messages` |
 
 `startingItems` de `vava_inventory` reste vide : le remplir en même temps donnerait deux dotations.
 
 Ce que la dotation **n'est pas** : ni vêtements (la tenue est celle choisie à la création, `vava_appearance`), ni
 besace en objet (la besace **est** l'inventaire du personnage), ni toit, ni outil. Deux pains et deux outres
 repoussent la faim d'environ 2 h 50 et la soif d'environ 2 h 25 chez un personnage qui part de 100 : la première soirée, pas la
-première semaine.
+première semaine. Depuis 1.1.0, chaque outre bue rend une Outre vide (`vava_provisions`), qui se remplit aux puits, aux
+fontaines et aux sources : l'eau elle-même n'est plus à chercher auprès des autres, le pain et les outres neuves si.
 
 ## L'arrivée, pas à pas
 
@@ -56,7 +58,9 @@ première semaine.
    - accueil jamais vu, envoyé moins de 3 fois et pas encore pendant cette session : `vava_arrival:welcome` au seul
      joueur ; au premier envoi, hook `vava_arrival:arrived`.
 3. **Retour de l'inventaire** (`core:module:ready`) : objets redéclarés, dotations dues reprises pour les personnages
-   apparus, sans second accueil.
+   apparus, sans second accueil. **Annonce d'un module de `kit.providers`** (`vava_provisions`, 1.1.0) : mêmes
+   reprises, sans rien redéclarer. Ainsi, `vava_arrival` démarré avant `vava_provisions` ne perd rien : la dotation
+   d'un personnage qui apparaît entre-temps est reportée (objet `eau` inconnu, une ligne de console), puis donnée.
 4. **Client** : attente d'un écran calme (fondu fini, ni menu pause, ni interface au focus), mot d'accueil et ligne de
    la besace en notifications, Codex ouvert au chapitre (sinon rappel de sa touche), puis accusé
    `vava_arrival:welcomed`. Un nouvel accueil ou le retour à la sélection annule l'attente.
@@ -97,8 +101,9 @@ rejoué »). Console du serveur : `accueil etat <n°>`. Sans droit : rien, aucun
 ## Installation
 
 `ensure vava_arrival` après `ensure vava_codex` (la Chancellerie le place seule). La migration crée les deux tables au
-premier démarrage. Pour voir le Codex s'ouvrir à un chapitre avant T-023 : `codex.chapter = 'vava_inventory'`, puis
-`restart vava_arrival` (à remettre ensuite).
+premier démarrage. Le chapitre « Premiers pas » existe depuis `vava_codex` 1.5.0 (T-023) ; avec un Codex plus
+ancien, le livre s'ouvre à son index, sans erreur. Pour essayer un chapitre de commandes : `codex.chapter =
+'vava_inventory'`, puis `restart vava_arrival` (à remettre ensuite).
 
 **Personnages anciens jamais joués.** La première venue se lit sur le temps de jeu mesuré par le core : un personnage
 créé avant la migration `0003_play_seconds.sql` du core (0.6.0) et jamais joué depuis est resté à `play_seconds = 0`
@@ -108,13 +113,15 @@ fois, dans la limite du compte). Les repérer avant d'installer le module : ``SE
 la règle ne change pas, le Conseil juge au cas par cas (rien à reprendre : deux pains et deux outres).
 
 Assets à brancher : aucun dans le module. Le point d'arrivée définitif se règle dans `config/server.lua`
-(`spawn.defaultPoint`) ; les dessins `web/items/pain.svg` et `eau.svg` sont ceux de `vava_example_items`.
+(`spawn.defaultPoint`) ; le dessin `web/items/pain.svg` est celui de `vava_example_items` ; celui de l'eau est dans
+`vava_provisions`.
 
 ## Tests
 
-Hors jeu : `tests/spec/arrival_rules_spec.lua` (règles pures et config), `tests/spec/arrival_kit_spec.lua` (chargement,
-dotation, accueil, accusé, `/accueil` avec des doublures de la base et de l'inventaire). En jeu :
-`docs/tests/accueil.md`.
+Hors jeu : `tests/spec/arrival_rules_spec.lua` (règles pures et config, l'eau lue dans la config de
+`vava_provisions`), `tests/spec/arrival_kit_spec.lua` (chargement, dotation, reprise à l'annonce de `vava_provisions`,
+accueil, accusé, `/accueil` avec des doublures de la base et de l'inventaire). En jeu : `docs/tests/accueil.md` (§ 4 bis
+pour l'eau).
 
 ## À vérifier en jeu
 

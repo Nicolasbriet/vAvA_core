@@ -50,6 +50,29 @@ function helper.reset()
     for name, fn in pairs(stubs) do _G[name] = fn end
 end
 
+-- Locales Windows à octet unique, sous lesquelles %c, %s et string.lower prennent des octets de caractères UTF-8
+-- (« Á », « í », le 0xA0 de « à ») : les essais de texte s'y lancent quand le système en a une (T-133).
+local LEGACY_LOCALES = { '.1252', 'English_United States.1252', 'French_France.1252', 'fr_FR.ISO-8859-1' }
+
+--- Passe la classification des caractères (`ctype`) sous la première locale de LEGACY_LOCALES que le système accepte.
+--- Rend la locale d'avant (à redonner par helper.restoreLocale, dans un after_each) et celle obtenue (nil : aucune,
+--- l'essai tourne alors sous la locale courante et fixe seulement la règle).
+---@return string|nil previous
+---@return string|nil legacy
+function helper.legacyLocale()
+    local previous = os.setlocale(nil, 'ctype')
+    for _, name in ipairs(LEGACY_LOCALES) do
+        local legacy = os.setlocale(name, 'ctype')
+        if legacy then return previous, legacy end
+    end
+    return previous, nil
+end
+
+---@param previous string|nil  locale rendue par helper.legacyLocale ('C' si inconnue)
+function helper.restoreLocale(previous)
+    os.setlocale(previous or 'C', 'ctype')
+end
+
 --- Charge un fichier du dépôt (chemin relatif à la racine).
 ---@param path string
 function helper.load(path)

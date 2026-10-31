@@ -1,12 +1,40 @@
 local helper = require('tests.helper')
 
+-- T-133 : `%s`, `%c` et string.lower suivent la locale du système ; sous Windows (cp1252), `%c` prenait les octets
+-- 0x81, 0x8D, 0x8F, 0x90, 0x9D, 0xAD (« Á », « Í », « Ï », « Ð », « Ý », « í », U+2010) et `%s` l'octet 0xA0 (« à »,
+-- « Š »). Chaque essai tourne sous une telle locale si le système en a une (helper.legacyLocale) : ceux sur U+00A0 à
+-- U+017F échouent alors avec l'ancien code ; sinon, ils fixent la règle.
+local function latinCodes()
+    local codes = {}
+    for code = 0xA0, 0x17F do codes[#codes + 1] = code end
+    codes[#codes + 1] = 0x2010
+    return codes
+end
+
+-- contrôles C1 (U+0080 à U+009F), invisibles et marques de sens d'écriture : remplacés par sanitize
+local function hiddenCodes()
+    local codes = {}
+    for code = 0x80, 0x9F do codes[#codes + 1] = code end
+    for code = 0x200B, 0x200F do codes[#codes + 1] = code end
+    for code = 0x2028, 0x202E do codes[#codes + 1] = code end
+    for code = 0x2066, 0x2069 do codes[#codes + 1] = code end
+    codes[#codes + 1] = 0x061C
+    codes[#codes + 1] = 0xFEFF
+    return codes
+end
+
 describe('vAvA.lib.string', function()
-    local str
+    local str, previousLocale
 
     before_each(function()
+        previousLocale = helper.legacyLocale()
         helper.reset()
         helper.loadAll({ 'shared/init.lua', 'config/shared.lua', 'shared/lib/string.lua' })
         str = vAvA.lib.string
+    end)
+
+    after_each(function()
+        helper.restoreLocale(previousLocale)
     end)
 
     describe('isIdentifier', function()
@@ -65,6 +93,25 @@ describe('vAvA.lib.string', function()
             assert.equal('', str.trim('   \t\r\n'))
             assert.equal('', str.trim(''))
         end)
+
+        it('garde entier chaque caractère de U+00A0 à U+017F et U+2010 (« à » final d’un nom)', function()
+            for _, code in ipairs(latinCodes()) do
+                local c, label = utf8.char(code), string.format('U+%04X', code)
+                assert.equal(c, str.trim(c), label)
+                assert.equal('Il' .. c, str.trim(' \tIl' .. c .. ' \r\n'), label)
+                assert.equal(c .. ' a', str.trim(c .. ' a'), label)
+            end
+            assert.equal('Ída Ýr – í', str.trim('  Ída Ýr – í '))
+        end)
+
+        it('ne retire que les blancs ASCII : tabulation à retour chariot, espace', function()
+            for b = 0, 127 do
+                local c = string.char(b)
+                local blank = b == 32 or (b >= 9 and b <= 13)
+                assert.equal(blank and '' or c, str.trim(c), string.format('0x%02X', b))
+                assert.equal(blank and 'x' or 'x' .. c, str.trim('x' .. c), string.format('0x%02X', b))
+            end
+        end)
     end)
 
     describe('sanitize', function()
@@ -84,6 +131,36 @@ describe('vAvA.lib.string', function()
             assert.equal('ligne  forgée', str.sanitize('ligne\r\nforgée', 100))
         end)
 
+        it('garde entier chaque caractère de U+00A0 à U+017F et U+2010 (« Á », « Í », « í »…)', function()
+            local all = {}
+            for _, code in ipairs(latinCodes()) do
+                local c = utf8.char(code)
+                all[#all + 1] = c
+                assert.equal('a' .. c .. 'b', str.sanitize('a' .. c .. 'b', 100), string.format('U+%04X', code))
+            end
+            local joined = table.concat(all)
+            assert.equal(joined, str.sanitize(joined, #joined))
+            assert.equal('Ída Ýr – í', str.sanitize('Ída Ýr – í', 100))
+        end)
+
+        it('remplace chaque contrôle ASCII (0x00 à 0x1F, 0x7F) et lui seul', function()
+            for b = 0, 127 do
+                local c = string.char(b)
+                local expected = (b <= 31 or b == 127) and 'a b' or 'a' .. c .. 'b'
+                assert.equal(expected, str.sanitize('a' .. c .. 'b', 100), string.format('0x%02X', b))
+            end
+        end)
+
+        it('remplace les contrôles C1 en UTF-8, les invisibles et les marques de sens d’écriture', function()
+            for _, code in ipairs(hiddenCodes()) do
+                local label = string.format('U+%04X', code)
+                assert.equal('a b', str.sanitize('a' .. utf8.char(code) .. 'b', 100), label)
+            end
+            -- CSI (U+009B) d'une séquence de terminal : rien ne reste à interpréter
+            assert.equal(' 31m rouge', str.sanitize('\u{9B}31m rouge', 100))
+            assert.equal('RPC  inconnu', str.sanitize('RPC\u{202E}\u{2066}inconnu', 100))
+        end)
+
         it('tronque au-delà de maxLength octets et le signale par « … »', function()
             assert.equal('abc…', str.sanitize('abcdef', 3))
             assert.equal('abc', str.sanitize('abc', 3))
@@ -93,6 +170,43 @@ describe('vAvA.lib.string', function()
             assert.equal('nil', str.sanitize(nil, 10))
             assert.equal('42', str.sanitize(42, 10))
             assert.equal('false', str.sanitize(false, 10))
+        end)
+    end)
+
+    describe('hasControl', function()
+        it('repère les contrôles ASCII, C1, invisibles et marques de sens d’écriture', function()
+            for b = 0, 127 do
+                local expected = b <= 31 or b == 127
+                assert.equal(expected, str.hasControl('a' .. string.char(b) .. 'b'), string.format('0x%02X', b))
+            end
+            for _, code in ipairs(hiddenCodes()) do
+                assert.is_true(str.hasControl('a' .. utf8.char(code) .. 'b'), string.format('U+%04X', code))
+            end
+        end)
+
+        it('ne prend aucun caractère de U+00A0 à U+017F ni U+2010 pour un contrôle', function()
+            for _, code in ipairs(latinCodes()) do
+                assert.is_false(str.hasControl('a' .. utf8.char(code) .. 'b'), string.format('U+%04X', code))
+            end
+            assert.is_false(str.hasControl('Ída Ýr – í'))
+        end)
+    end)
+
+    describe('asciiLower', function()
+        it('baisse les 26 majuscules ASCII et rien d’autre', function()
+            assert.equal('aldric morvan 42_x', str.asciiLower('ALDRIC Morvan 42_X'))
+            for b = 0, 127 do
+                local c = string.char(b)
+                local expected = (b >= 65 and b <= 90) and string.char(b + 32) or c
+                assert.equal(expected, str.asciiLower(c), string.format('0x%02X', b))
+            end
+        end)
+
+        it('garde entier chaque caractère de U+00A0 à U+017F et U+2010', function()
+            for _, code in ipairs(latinCodes()) do
+                local c = utf8.char(code)
+                assert.equal(c, str.asciiLower(c), string.format('U+%04X', code))
+            end
         end)
     end)
 

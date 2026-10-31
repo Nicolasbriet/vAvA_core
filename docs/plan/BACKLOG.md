@@ -521,12 +521,29 @@ versé à T-014 ; les autres points déjà couverts sont précisés dans T-012 �
   question de poids.
 
 ### T-133 — `%c` dépend de la locale : contrôles de texte justes partout
-- Agent : vava-dev-lua · Dépend de : — · Statut : à faire
+- Agent : vava-dev-lua · Dépend de : — · Statut : à tester en jeu (relu sécurité, suites appliquées)
+- Fait le 31 octobre 2026 : core 0.13.1 (`str.sanitize` : contrôles ASCII, C1 en UTF-8, invisibles et marques de sens
+  d'écriture remplacés, liste commune `str.hasControl` ; `str.trim` et `str.asciiLower` sans classe de la locale),
+  `vava_atelier` 1.0.1, `vava_crafting` 1.5.1, `vava_codex` 1.4.1, `vava_inventory` 1.8.1, `vava_example_atelier`
+  1.0.1 ; essais lancés sous une locale Windows (`helper.legacyLocale`) ; `audit-reseau.sh` refuse un `%c` dans une
+  chaîne du code Lua. Rapport `docs/plan/rapports/T-133.md`. **À tester en jeu** (serveur Windows) : personnage 2-14
+  (« Ída Morvà »), chat 6-12, métiers 4-8b, atelier 5-4, inventaire 10-3b.
 - Trouvé pendant T-100 : la classe Lua `%c` suit la locale du système ; sous Windows, elle prend aussi les octets 0x81,
   0x8D, 0x8F, 0x90, 0x9D, 0xAD et fait refuser « Á », « Í », « Ï », « Ð », « Ý », « í » ou le tiret U+2010 dans un
   texte UTF-8. `vava_atelier` utilise désormais `[\0-\31\127]`. Même motif à corriger, avec un test sur U+00A0 à
   U+017F : `shared/lib/string.lua` (core), `vava_chat/shared/text.lua`, `vava_magic/shared/text.lua`,
   `vava_voice/shared/label.lua` (et tout autre `%c` du dépôt).
+
+### T-134 — Motifs d'identifiants et casse sans classes de la locale
+- Agent : vava-dev-lua · Dépend de : T-133 · Statut : à faire
+- Relecture sécurité de T-133 (défense en profondeur, aucun risque trouvé aujourd'hui) : sous une locale Windows,
+  `%w`, `%a`, `%l`, `%d` acceptent des octets ≥ 0x80 (y compris de l'UTF-8 invalide) dans les motifs d'identifiants
+  (`config/shared.lua:18`, zones, net, schémas RPC de l'admin, inventory, magic, atelier, crafting, farming, gathering,
+  skills, time). Les remplacer par des ensembles explicites (`[A-Za-z0-9_]`, `[a-z0-9_]`), comme `text.isId` de
+  l'Atelier, et faire refuser ces classes dans un motif par `audit-reseau.sh`. Même tâche : `text.normalize` de
+  l'Atelier ne replie pas la casse du latin étendu (« Ł » et « ł » diffèrent), alors que la clé de nom de l'exemple le
+  fait ; `vava_magic/client/controls.lua` (`lower` sur un mot de sort), `vava_codex/client/main.lua` (`%S`, `%s*`),
+  `vava_chancellerie/server/link.lua` (`%s` sur un code).
 
 ## Phase 2 — Arrivée
 
@@ -564,8 +581,14 @@ versé à T-014 ; les autres points déjà couverts sont précisés dans T-012 �
     ralentit sur une petite machine.
 
 ### T-021 — Textes de l'écran de chargement et du premier pas
-- Agent : vava-gardien-lore · Dépend de : T-020 · Statut : à faire
+- Agent : vava-gardien-lore · Dépend de : T-020 · Statut : à tester en jeu (textes seuls, poids mesuré ; relu par le gardien du lore)
 - 20 à 30 extraits courts du lore, 15 conseils de jeu, textes d'accueil.
+- Fait le 31 octobre 2026 : `vava_loading` 1.1.0, 28 extraits et 15 conseils dans `web/js/strings.js` (+ 4 Ko),
+  « Ressources du royaume » ; touches citées seulement si elles sont à la même place en QWERTY et en AZERTY (F1, I,
+  T, K, G, O ; la voix renvoie au Codex) ; rappel de la décision 12 dans les README de `vava_codex`, `vava_chat`,
+  `vava_voice`, `vava_skills`, `vava_health`, `vava_gathering` et la config de `vava_inventory` ; messages de
+  `vava_arrival` relus, inchangés. **À tester en jeu** : `docs/tests/chargement.md` 1-5 et 1-6 (plus long conseil en
+  1280 × 720, chaque touche citée). Reste à faire : calibrer les seuils des feux (1-4) et les publier avec ces textes.
 
 ### T-022 — Arrivée d'un nouveau personnage
 - Agents : vava-architecte → vava-dev-lua (cette tâche autorise à toucher `config/server.lua` pour un commentaire, `vava_codex`, `chancellerie/lib/resources.js`, `.luacheckrc`, dans les limites de la spec) · Dépend de : — · Statut : validée
@@ -582,17 +605,44 @@ versé à T-014 ; les autres points déjà couverts sont précisés dans T-012 �
   le reste s'obtient auprès des autres joueurs.
 
 ### T-023 — Codex : chapitre « Premiers pas » et guide des métiers
-- Agents : vava-dev-lua + vava-gardien-lore · Dépend de : T-022 · Statut : à faire
+- Agents : vava-architecte → vava-dev-lua + vava-dev-nui + vava-gardien-lore · Dépend de : T-022 · Statut : à tester en jeu (relu sécurité, réseau et lore, suites appliquées)
 - Pages de lecture dans le Codex (pas seulement les commandes) : vivre à Eldoria, troquer, apprendre un métier,
   la magie, le Conseil.
+- Fait le 31 octobre 2026 : `vava_codex` 1.5.0, onglet « Lecture » en tête du livre, trois chapitres et douze pages
+  (une réservée au Conseil) dans `content/*.lua` servis au seul serveur, texte balisé léger analysé au démarrage,
+  index sous l'empreinte du contenu, page envoyée à la demande (RPC `vava_codex:page`) et gardée par la page ;
+  `openAt('premiers_pas')` ouvre « Vivre à Eldoria » à la première venue ; commande console `vava_codex_pages`.
+  Page du livre 95,5 Ko (+26 Ko). Spec `docs/plan/specs/T-023.md`, rapport `docs/plan/rapports/T-023.md`. **À tester
+  en jeu** : `docs/tests/codex.md` § 16 (16-1, 16-2, 16-3, 16-8 à 16-13, 16-15, 16-16), `docs/tests/accueil.md` 20.
 
 ### T-130 — Eau potable
-- Agents : vava-architecte → vava-dev-lua · Dépend de : T-022 · Statut : à faire
+- Agents : vava-architecte → vava-dev-lua + vava-dev-nui (cette tâche autorise à toucher `vava_arrival`, `examples/vava_example_items`, `vava_loading` (un conseil), `chancellerie/lib/resources.js` et `config.js`, `.luacheckrc`, dans les limites de la spec) · Dépend de : T-022 · Statut : à tester en jeu (relu sécurité, réseau et lore, suites appliquées)
+- Fait le 31 octobre 2026 : nouveau module `vava_provisions` 1.0.0, propriétaire de `eau` et `outre` ; puits, fontaines
+  et sources (réserve en mémoire, recalculée à la lecture, jamais envoyée ; fontaine sans fond), transmis aux seuls
+  proches par `core.zones` ; `E` remplit les outres vides ou fait boire, l'outre bue revient vide et se fend une fois sur
+  dix ; outres faites à la tannerie (1 cuir → 2) ; `/eau` pour le Conseil (`metiers`). `vava_arrival` 1.1.0 et
+  `vava_example_items` 1.3.0 ne déclarent plus `eau` (dotations dues reprises quand `vava_provisions` arrive),
+  `vava_loading` 1.1.1 (conseil du pain et de l'eau), Chancellerie 1.8.4. Spec `docs/plan/specs/T-130.md`, rapport
+  `docs/plan/rapports/T-130.md`. **À tester en jeu** : `docs/tests/eau.md` (27 tests, en priorité gestes, `z` des points
+  au sol, aucune autre invite `E` à moins de 2 m, deux joueurs sur la dernière unité, recette de la tannerie, dotation
+  reprise après `stop` puis `ensure vava_provisions`), accueil 21-22, besoins 3-7, développement 4-1.
 - Relecture lore de T-022 : aucun module livré ne produit de boisson ; une fois bues les deux outres de la dotation
   (`vava_arrival`), aucun joueur ne peut en désaltérer un autre, et l'objet `eau` n'appartient qu'à `vava_arrival` et à
   l'exemple de développement. Donner à l'eau une source commune dans l'esprit du royaume : remplir une outre au puits
   (les puits de `vava_farming` remplissent déjà le seau), boire à une fontaine, ou une recette d'artisanat ; un module
   propriétaire de l'objet `eau` (et, à terme, du `pain`). Rien qui rende un joueur autosuffisant.
+
+### T-135 — Usure de l'outre selon la qualité du tanneur
+- Agent : vava-dev-lua · Dépend de : T-130 · Statut : à faire
+- Relecture lore de T-130 : une outre se fend une fois sur dix quel que soit son palier, alors qu'une outre « Soignée »
+  s'affiche à part. Lier `tearChance` au palier (moins pour une outre Soignée ou Excellente) en gardant le palier sur
+  l'outre rendue vide, sans casser l'empilement : le savoir du tanneur doit compter.
+
+### T-136 — Recettes de `vava_farming` déclarées aux compétences
+- Agent : vava-dev-lua · Dépend de : — · Statut : à faire
+- Trouvé pendant T-130 : `vava_farming` déclare sa recette `compost` à l'artisanat mais pas à `vava_skills:recipes` ;
+  le composteur devrait la refuser comme « recette inconnue » (à vérifier en jeu d'abord). Déclarer la recette et la
+  redéclarer au retour de `vava_skills`, comme `vava_provisions` le fait pour l'outre.
 
 ## Phase 3 — L'Atelier : socle et créateurs du monde
 
@@ -757,6 +807,14 @@ seulement l'éditeur (phase 6).
   rencontre. Prévenir discrètement les joueurs proches du point d'arrivée qu'un voyageur arrive (`core.net.sendNear`,
   ~30 m, une ligne), ou donner au Conseil la liste des nouveaux venus du jour ; branché sur le hook
   `vava_arrival:arrived`, sans toucher à `vava_arrival`. Aucun envoi à tous.
+
+### T-137 — Props sans clignotement et points hors des instances
+- Agent : vava-dev-lua · Dépend de : — · Statut : à faire
+- Relectures de T-130 : un joueur qui reste à la limite de portée voit un prop créé puis supprimé à chaque passage
+  (`vava_provisions/client/points.lua`, `vava_crafting/client/props.lua:143`, `vava_gathering/client/props.lua:158`,
+  `vava_farming`) : créer à `radius`, retirer à `radius + 10` m. Et aucun point de récolte, station ou point d'eau ne
+  vérifie l'instance (routing bucket) du joueur : un joueur dans une instance, aux coordonnées d'un puits, peut puiser.
+  Ajouter `bucket` aux zones concernées et le contrôle dans `near`.
 
 ### T-039 — PORTE : soirée RP de test — **HUMAIN**
 - Dépend de : phase 5 · Statut : à faire
