@@ -1114,7 +1114,9 @@ faire tout le système de combat ») : la porte T-119 reste à passer en jeu.
   « rangez votre arme » ni anneau de verrou ; texte propre pendant le rengainement ; export `hardControl(src)` (gelé,
   renversé, chancelant) lu par `vava_combat` pour refuser une frappe.
 - Relecture sécurité de T-138 (S-2) : `combat.affects` lit `vava_admin:isInvulnerable(src)` (appel isolé) pour que
-  les effets sans dégâts (recul, renversement, mouillé, ralenti) épargnent un membre invulnérable.
+  les effets sans dégâts (recul, renversement, mouillé, ralenti) épargnent un membre invulnérable. Consigne de la
+  relecture réseau de T-138 (R-3) : `isInvulnerable` une fois par effet appliqué, jamais en boucle (ni par image, ni
+  par cible dans un balayage répété).
 
 ### T-113 — Blocage, parade, esquive
 - Agent : vava-dev-lua · Dépend de : T-112 · Statut : à faire
