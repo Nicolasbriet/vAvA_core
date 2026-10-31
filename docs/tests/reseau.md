@@ -185,6 +185,25 @@ que chaque ressource sert.
 | 14 | Si possible : comme 7-A-14, avant (serveur sur `main`) et après, taille de `cache/files/<ressource>/resource.rpf`. | Ordre de grandeur cohérent avec la colonne `total` de `poids-client.sh` : `vava_magic` ≈ 458 Ko (≈ 477 avant), `vava_provisions` ≈ 63 Ko (≈ 81) ; noter au rapport. |
 | 15 | Serveur arrêté ; remplacer `modules/vava_provisions/config_client.lua` par celui de 1.1.0 (`git show 7a6d4b3:modules/vava_provisions/config_client.lua`) ; démarrer ; `/eau points`. | Console : « config_client.lua garde les textes du Conseil d'avant 1.2.0 … » ; le module démarre, `/eau` répond avec les textes de `config.lua`. Remettre le fichier de 1.2.0 : plus d'avertissement. |
 
+### 7-E — `vava_time` 1.5.0 (T-146) : cours des ciels au seul serveur
+
+Le cours des ciels (`weather.next`, `seasons`, `snow`, `durationMinutes`, `durations`, `fadeSeconds`) est passé de
+`config_client.lua` à `config.lua`, son tirage de `shared/weather.lua` (partagé) à `shared/cycle.lua` (au seul
+serveur) ; le client garde `weather.types` et la définition d'un ciel. Préparation : `docs/tests/temps.md` § 0, dont
+les « réglages pour aller vite » du ciel, désormais dans `config.lua`. Hors jeu, `./scripts/poids-client.sh vava_time`.
+
+| # | Faire | Attendu |
+|---|---|---|
+| 1 | Démarrer le serveur. | `module 'vava_time' v1.5.0 prêt` ; aucune ligne « config.lua garde la forme d'avant … », « config.lua d'avant 1.5.0 … » ni « config_client.lua garde le cours des ciels … ». |
+| 2 | **(2 joueurs)** A et B se connectent, cache FiveM vidé chez B ; `F8` de chacun pendant tout le tour ; `/date` (temps 1-1). | Aucune `SCRIPT ERROR` de `vava_time` ; date, moment et phrase du ciel comme avant ; l'heure et le ciel s'appliquent dès la sélection du personnage (temps 1-4). |
+| 3 | Réglages rapides du ciel dans `config.lua` (temps § 0) ; temps 2-1. | Le ciel change toutes les 1 à 2 min, en fondu sur 30 s, chez A comme chez B, avec des enchaînements plausibles : le serveur lit le cours dans `config.lua`. |
+| 4 | Temps 2-2, 2-3, 2-5 (hors de l'hiver, en hiver, passage au printemps pendant qu'il neige). | Comme avant : jamais de neige hors de l'hiver, neige en hiver sans « neige au sol » tirée seule, la neige quitte le ciel en fondu au printemps. |
+| 5 | Outil « Ciel et heure » et `/ciel` : temps 3-x sur le ciel (imposer `pluie`, figer, rendre à son cours). | Tampons des treize ciels et mention « hors saison » comme avant ; ciel imposé en 20 s chez A et B ; « Rendre à son cours » tire tout de suite un ciel de saison. |
+| 6 | Serveur arrêté ; remplacer `modules/vava_time/config.lua` par celui de 1.4.0 (`git show 9429695:modules/vava_time/config.lua`) ; démarrer. | Console : refus de démarrer « config.lua d'avant 1.5.0 : le cours des ciels y manque (weather.next, weather.seasons, weather.snow, weather.durationMinutes, weather.fadeSeconds) … » (`vava_time` n'est pas prêt). Remettre le fichier de 1.5.0 et redémarrer : prêt. |
+| 7 | Serveur arrêté ; remplacer `modules/vava_time/config_client.lua` par celui de 1.4.0 (`git show 9429695:modules/vava_time/config_client.lua`), y mettre `durationMinutes = { 1, 2 }` ; démarrer. | Console : « config_client.lua garde le cours des ciels d'avant 1.5.0 … » ; le module démarre ; le ciel dure 25 à 50 min (valeur de `config.lua`, qui fait foi), pas 1 à 2. Remettre le fichier de 1.5.0 : plus d'avertissement. |
+| 8 | Serveur arrêté ; remplacer `modules/vava_time/config.lua` par celui de 1.3.0 (`git show 3014bfc:modules/vava_time/config.lua`) ; démarrer ; `/date`. | Console : « config.lua garde la forme d'avant 1.4.0 … le cours des ciels (successeurs, poids, neige, durées, transition) est pris dans cet ancien config.lua … » ; le module démarre, `/date` et le ciel marchent. Remettre le fichier de 1.5.0. |
+| 9 | Si possible : comme 7-A-14, avant (serveur sur `main`) et après, taille de `cache/files/vava_time/resource.rpf`. | Ordre de grandeur cohérent avec la colonne `total` de `poids-client.sh` : ≈ 76 Ko (≈ 81 avant) ; noter au rapport. |
+
 ## Ce qui n'est pas compté
 
 GlobalState, state bags, et les envois que les modules font encore eux-mêmes par `TriggerClientEvent` (inventaire,

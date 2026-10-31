@@ -1,9 +1,10 @@
 --[[
     vava_crafting/client/props.lua
     Rôle : les stations d'artisanat dans le monde, vues du joueur : seulement celles que le serveur lui envoie, par les
-           abonnements de zone du core (une zone par station, vAvA_core 0.11.0) — dessin (type, nom, position, modèle)
-           et état (combustible, occupée) —, tenues dans un carnet (shared/stationzone.lua) ; props LOCAUX (jamais
-           réseau) créés pour les stations à portée, station la plus proche à distance d'interaction. Une seule boucle
+           abonnements de zone du core (une zone par station, vAvA_core 0.11.0) — dessin (type et son nom, réserve,
+           nom, position, modèle) et état (combustible, occupée) —, tenues dans un carnet (shared/stationzone.lua) ;
+           props LOCAUX (jamais réseau) créés pour les stations à portée, station la plus proche à distance
+           d'interaction. Une seule boucle
            lente, active seulement quand un personnage est en jeu ET qu'une station est connue (aucune boucle loin de
            toute station) : elle mesure d'abord les groupes de stations (par case de streaming.groupCell), ne parcourt
            que les stations d'un groupe à portée, passe toutes les streaming.pollMs près d'un groupe et toutes les
@@ -70,25 +71,11 @@ function props.station(id)
     return book:station(id)
 end
 
---- Type d'une station (compétences, combustible, animation, prop).
----@param station table
----@return table|nil
-function props.type(station)
-    return cfg.stationTypes[station.type]
-end
-
 --- État d'une station (vide et libre tant que le serveur n'a rien envoyé).
 ---@param stationId string
 ---@return { fuel: number, busy: boolean }
 function props.state(stationId)
     return book:status(stationId)
-end
-
----@param station table
----@return string|nil
-local function modelFor(station)
-    local kind = props.type(station)
-    return station.prop or (kind and kind.prop) or nil
 end
 
 ---@param id string
@@ -145,8 +132,8 @@ local function reconcile(station, far)
         return
     end
     if entry then return end
-    local model = modelFor(station)
-    if model then spawn(station, model) end
+    -- modèle de la station, sinon de son type : résolu par le serveur dans le dessin
+    if station.prop then spawn(station, station.prop) end
 end
 
 --- Groupes refaits depuis le carnet ; un groupe naît « actif » pour que le premier passage retire ce qui serait hors
@@ -242,20 +229,20 @@ function props.onForget(fn)
 end
 
 --- Zones des stations, envoyées par le core (nom local = identifiant de la station, état { def, s }) : le carnet suit,
---- le prop d'une station qui a bougé ou disparu est retiré (la boucle le recrée à portée), l'invite et le menu ouvert
---- suivent l'état.
+--- le prop d'une station qui a bougé ou disparu est retiré (la boucle le recrée à portée) ; un nom ou une réserve
+--- changés ne touchent que l'invite ; l'invite et le menu ouvert suivent l'état.
 ---@param kind string  'enter' | 'change' | 'leave'
 ---@param id string
 ---@param a any  état entier (enter) ou valeurs changées (change)
 ---@param b any  clés retirées (change)
 local function onZone(kind, id, a, b)
-    local placed, statusChanged
+    local placed, statusChanged, relabeled
     if kind == 'enter' then
-        placed, statusChanged = book:enter(id, a)
+        placed, statusChanged, relabeled = book:enter(id, a)
     elseif kind == 'change' then
-        placed, statusChanged = book:change(id, a, b)
+        placed, statusChanged, relabeled = book:change(id, a, b)
     elseif kind == 'leave' then
-        placed, statusChanged = book:leave(id)
+        placed, statusChanged, relabeled = book:leave(id)
     else
         return
     end
@@ -273,11 +260,9 @@ local function onZone(kind, id, a, b)
         if running and playing then step() end
         wake()
     end
-    if statusChanged then
-        -- l'invite montre le combustible et l'occupation : elle suit l'état
-        if onNearest and id == nearestId then onNearest(nearestId) end
-        if onStatus then onStatus(id, book:status(id)) end
-    end
+    -- l'invite montre les noms, la réserve, le combustible et l'occupation : elle les suit
+    if (statusChanged or relabeled) and onNearest and id == nearestId then onNearest(nearestId) end
+    if statusChanged and onStatus then onStatus(id, book:status(id)) end
 end
 
 --- Suit les zones des stations et le personnage. Appelé par client/main.lua.

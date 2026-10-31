@@ -29,6 +29,8 @@ VavaCrafting.STATION_ID_MAX = 32
 VavaCrafting.MAX_TOKEN = 0x7FFFFFFF
 VavaCrafting.MAX_INSTANCE = 9007199254740991
 VavaCrafting.MAX_TIER = 5
+-- réserve de combustible d'un type : bornée par le serveur (server/catalog.lua), relue par le client (stationzone)
+VavaCrafting.FUEL_CAPACITY_MAX = 10000
 
 -- Intentions du client (RPC à schéma strict, débit limité).
 VavaCrafting.RPC = {
