@@ -1,14 +1,15 @@
 # Écran de chargement — procédure de test en jeu
 
-Procédure pour vérifier en jeu l'écran de chargement d'Eldoria (`vava_loading` 1.0.0) et son passage à la sélection
-du personnage (`vAvA_core` 0.13.0, `vava_characters_ui` 1.2.0). Elle suit l'ordre d'une connexion : l'ouverture, la
+Procédure pour vérifier en jeu l'écran de chargement d'Eldoria (`vava_loading` 1.0.0, ambiances en fondu enchaîné
+depuis 1.3.0 : tests 2-1, 2-2 et 2-7 à 2-11, 5-5, 5-6) et son passage à la sélection du personnage (`vAvA_core`
+0.13.0, `vava_characters_ui` 1.2.0). Elle suit l'ordre d'une connexion : l'ouverture, la
 progression, le passage, puis les cas dégradés, le coût et le réseau. Comptez une heure seul ; les tests à deux joueurs
 sont marqués **(2 joueurs)**. Chaque test dit quoi faire et ce qui doit se passer ; si ce n'est pas le cas, notez le
 test, ce que vous avez vu, et la ligne de console correspondante.
 
 ## 0. Préparation
 
-1. **Serveur de test à jour** : `vAvA_core` 0.13.0, `vava_loading` 1.0.0, `vava_characters_ui` 1.2.0. **Ordre de
+1. **Serveur de test à jour** : `vAvA_core` 0.13.0, `vava_loading` 1.3.0, `vava_characters_ui` 1.2.0. **Ordre de
    démarrage** (`server.cfg`, ou la Chancellerie 1.8.1 qui le fait seule), après `oxmysql` : `vAvA_core`, `vava_ui`,
    `vava_loading`, `vava_chat`, `vava_world`, `vava_time`, `vava_appearance`, `vava_characters_ui`, puis les autres
    (voir [LISEZMOI.md](LISEZMOI.md)).
@@ -25,10 +26,10 @@ test, ce que vous avez vu, et la ligne de console correspondante.
 
 | # | Faire | Attendu |
 |---|---|---|
-| 1 | Vider le cache de FiveM, se connecter. | Dès la fin de la carte de connexion : noir, puis le filet d'étincelle, les lettres d'« Eldoria » qui s'embrasent une à une avec des étincelles, le rideau qui se lève sur le paysage (≈ 3 s). Aucune page blanche, aucun texte de secours (polices justes : titre en capitales décoratives très grasses, texte en EB Garamond). |
-| 2 | Se reconnecter et cliquer « Passer l'ouverture » (ou n'importe où) pendant l'ouverture. | Le paysage et les textes apparaissent aussitôt. `Espace` ou `Entrée` font de même si le clavier parvient à la page (à noter). |
+| 1 | Vider le cache de FiveM, se connecter. | Dès la fin de la carte de connexion : noir, puis le filet d'étincelle, les lettres d'« Eldoria » qui s'embrasent une à une avec des étincelles, le rideau qui se lève sur une ambiance d'Eldoria (≈ 3 s), déjà affichée dessous : jamais de fond vide à la levée. Aucune page blanche, aucun texte de secours (polices justes : titre en capitales décoratives très grasses, texte en EB Garamond). |
+| 2 | Se reconnecter et cliquer « Passer l'ouverture » (ou n'importe où) pendant l'ouverture. | L'ambiance et les textes apparaissent aussitôt. `Espace` ou `Entrée` font de même si le clavier parvient à la page (à noter). |
 | 3 | Regarder la progression jusqu'au bout. | Les six feux s'allument dans l'ordre, chacun avec une gerbe ; le pourcentage ne recule jamais ; « n / N fichiers » pendant « Les artisans ouvrent leurs ateliers » si le jeu l'envoie. |
-| 4 | **Sur le serveur de test seulement** : lire le journal à l'écran (`debug.journal`), le photographier. | Liste des messages et de leur instant. Noter au rapport l'instant du premier message de chaque étape et la durée totale ; recalculer `stages` (`web/js/config.js`) pour que chaque étape occupe une part proportionnelle à sa durée moyenne (sur 3 connexions), puis remettre le journal à `false`. Ne pas publier ces seuils seuls : ils partent **dans le même envoi que les textes de T-021** (textes fusionnés en 1.1.0 avant ce calibrage : publier 1.1.0 et les seuils ensemble sur le serveur public) (chaque retouche de la page fait retélécharger toute la ressource, ≈ 234 Ko, à chaque joueur). |
+| 4 | **Sur le serveur de test seulement** : lire le journal à l'écran (`debug.journal`), le photographier. | Liste des messages et de leur instant. Noter au rapport l'instant du premier message de chaque étape et la durée totale ; recalculer `stages` (`web/js/config.js`) pour que chaque étape occupe une part proportionnelle à sa durée moyenne (sur 3 connexions), puis remettre le journal à `false`. Ne pas publier ces seuils seuls : ils partent **dans le même envoi que les textes de T-021** (textes fusionnés en 1.1.0 avant ce calibrage : publier 1.1.0 et les seuils ensemble sur le serveur public) (chaque retouche de la page fait retélécharger les fichiers retouchés à chaque joueur). |
 | 5 | Pendant le chargement : extraits et conseils. | Un extrait toutes les 9 s à gauche, un conseil toutes les 6,5 s à droite, touches dans un cartouche ; jamais deux fois le même de suite. |
 | 6 | Textes définitifs (1.1.0, T-021) : attendre plusieurs conseils, en 1280 × 720 fenêtré. | 28 extraits et 15 conseils possibles ; le plus long conseil (« O montre les zones de récolte… », 3 lignes) tient dans son cadre sans toucher les feux. Chaque touche citée (F1, I, T, K, G, O) ouvre bien ce que le conseil annonce, au clavier AZERTY comme QWERTY. Aucune lettre accentuée ni apostrophe (’) remplacée par un carré. |
 
@@ -36,12 +37,17 @@ test, ce que vous avez vu, et la ligne de console correspondante.
 
 | # | Faire | Attendu |
 |---|---|---|
-| 1 | Bouger la souris. | Les plans du paysage glissent légèrement, les plus proches davantage ; la caméra avance lentement. |
-| 2 | Regarder le château et le ciel. | Fenêtres qui vacillent, étoiles qui scintillent, brume qui dérive, de temps en temps une étoile filante (niveau `haute`). |
+| 1 | Bouger la souris. | L'image glisse doucement à l'opposé de la souris (quelques pixels, sans à-coup) et les braises la suivent ; le bord de l'image n'apparaît jamais. |
+| 2 | Regarder l'image une dizaine de secondes. | Elle avance et glisse très lentement (dérive), sans saccade ; braises qui montent par-dessus. |
 | 3 | Regarder le sceau derrière le titre. | Deux anneaux qui tournent en sens contraires, runes **lisibles** (pas de carrés vides), halo qui respire. |
 | 4 | Jeu en 1280 × 720 fenêtré, puis 2560 × 1440 si possible. | Tout tient à l'écran ; titre, extraits, conseils et feux lisibles et sans chevauchement. |
 | 5 | Regarder le coin inférieur droit. | Aucun indicateur du jeu par-dessus le pourcentage ; sinon régler `--foot-gap` (`web/css/style.css`) et le noter. |
 | 6 | Écouter. | Silence (aucune musique livrée) ; pas de musique du jeu par-dessus. Bouton musique absent. |
+| 7 | Se connecter trois fois (cache gardé), noter la première ambiance de chacune. | La première change d'une connexion à l'autre (tirée au hasard). Ensuite, toujours dans l'ordre : aube → brume du matin → hiver → crépuscule → nuit étoilée → brume de nuit → orage → aube… (repartir de celle tirée). |
+| 8 | Chronométrer deux changements (chargement lent de préférence : cache vidé). | Une ambiance toutes les ≈ 9 s ; fondu enchaîné doux de ≈ 3 s. Pendant le fondu, aucune image noire, aucun creux de lumière, aucun saut de l'image qui part. |
+| 9 | Regarder les textes sur l'hiver et l'aube (les plus claires), en 1280 × 720 puis 2560 × 1440. | Titre, devise, extraits, conseils, libellés et pourcentage restent lisibles (voile sombre et ombre des textes). |
+| 10 | **Serveur de test** : renommer `web/img/ambiances/hiver.webp` en `hiver.bak`, redémarrer le serveur, vider le cache, se connecter. | Aucun écran vide ni erreur visible : l'hiver est sauté (brume du matin → crépuscule), le reste tourne. Puis renommer **les sept** : le dégradé de nuit reste seul, braises et feux fonctionnent, rien ne clignote. Remettre les noms. |
+| 11 | `effects.level = 'basse'` (`web/js/config.js`, serveur de test), se connecter ; puis Windows « Afficher les animations » coupé (moins d'animations) avec `'auto'`. | Les deux fois : les ambiances changent toujours en fondu, mais l'image ne bouge plus du tout (ni dérive ni parallaxe en `basse`). Remettre `'auto'`. |
 
 ## 3. Passage à la sélection
 
@@ -69,6 +75,8 @@ test, ce que vous avez vu, et la ligne de console correspondante.
 | 2 | Gestionnaire des tâches pendant le chargement (`haute`). | Processus du navigateur de FiveM sous ≈ 10 % d'un processeur ; noter la valeur. |
 | 3 | Journal ou `?fps=1` hors jeu sur la même machine. | Niveau atteint après dégradation noté au rapport. |
 | 4 | Une fois en jeu : `resmon 1` en `F8`. | `vava_loading` à 0,00 ms (aucune boucle). |
+| 5 | Gestionnaire des tâches pendant un fondu, sur la machine modeste (`haute`, puis `basse`). | Processeur du navigateur de FiveM pas plus haut pendant un fondu qu'entre deux (le fondu est composé par la carte graphique) ; aucun à-coup visible du chargement au changement d'ambiance. Noter les valeurs. |
+| 6 | Durée de chargement de 5-1 comparée à celle de 1.2.0 (si notée). | Écart ≤ 5 % ; sinon le noter : la première connexion télécharge ≈ 1,15 Mo d'images de plus (une fois, puis cache). |
 
 ## 6. Réseau **(2 joueurs)**
 
@@ -76,12 +84,15 @@ test, ce que vous avez vu, et la ligne de console correspondante.
 |---|---|---|
 | 1 | A en jeu suit son trafic (`/vava_reseau joueur <A>`, [reseau.md](reseau.md)) ; B se connecte. | A ne reçoit aucun évènement lié à l'arrivée de B ni à `vava_loading`. |
 | 2 | A et B se connectent en même temps. | Deux écrans de chargement indépendants, chacun passe à sa propre sélection. |
-| 3 | Chancellerie ou console du serveur : `./scripts/audit-reseau.sh`. | `vava_loading : … octets (≤ 1,5 Mo)`, aucune ligne BLOQUANT sur `web/fonts/`. |
+| 3 | Chancellerie ou console du serveur : `./scripts/audit-reseau.sh`. | `vava_loading : … octets (≤ 1,5 Mo)`, aucune ligne BLOQUANT sur `web/fonts/` ni `web/img/`. |
 
 ## 7. Ce que je ne peux pas avoir vérifié hors jeu
 
 Par ordre d'importance :
 
+- le fondu des ambiances dans le navigateur de FiveM (2-8) : sans creux de lumière ni saut, et sans coût visible
+  pendant le chargement (5-5) ; la dérive et la parallaxe (2-1, 2-2) ;
+- le joker `web/img/ambiances/*.webp` du manifeste réellement servi par FiveM (2-7 : une ambiance s'affiche) ;
 - l'absence d'image noire au passage (3-2), qui dépend de l'ordre réel des appels du core, de `vava_characters_ui` et
   de `vava_loading` dans le jeu ;
 - les messages que FiveM envoie vraiment à la page et leur ordre (1-4) : les seuils des feux sont provisoires ;
