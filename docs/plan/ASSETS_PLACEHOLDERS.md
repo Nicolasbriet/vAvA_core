@@ -14,7 +14,8 @@ reste à remplacer.
 | Props | Stations, nœuds de récolte, cultures | Props vanilla (déjà utilisés par les modules métiers) | Props médiévaux |
 
 Règles pour les agents :
-1. Toute table de correspondance a la forme `{ id_du_jeu = { model = '…', -- PLACEHOLDER … } }` dans `config.lua`.
+1. Toute table de correspondance a la forme `{ id_du_jeu = { model = '…', -- PLACEHOLDER … } }` dans `config.lua`
+   (dans `config_client.lua` si le client lit le modèle, ce qui est le cas des props et accessoires ; T-132).
 2. Le code ne teste jamais un nom de modèle : il lit la config.
 3. Un asset absent ne doit jamais faire planter un module : modèle introuvable → message de log, repli sur le
    remplaçant.

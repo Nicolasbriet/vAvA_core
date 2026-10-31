@@ -95,7 +95,7 @@ La fenêtre affiche :
        suit en direct ; ensuite l'assistant continue avec les dossiers posés.
      - **Serveur déjà en place** : le dossier du serveur (deviné s'il contient `resources/`) et le chemin de
        `FXServer.exe` ; la case « Installer ou compléter vAvA et oxmysql » pose ce qui manque et met à niveau ce qui est
-       là, sans toucher à vos `config.lua` modifiés (voir Mises à jour).
+       là, sans toucher à vos fichiers de config modifiés (`config.lua`, `config_client.lua` ; voir Mises à jour).
    - **Identité** : nom affiché, nom de projet, description, places, présence dans la liste publique.
    - **Licence** : clé `cfxk_…` (portal.cfx.re), adresse et port d'écoute, OneSync.
    - **Base** : hôte, port, utilisateur, mot de passe et nom de la base d'oxmysql. Le bouton « Tester l'adresse » vérifie
@@ -251,8 +251,11 @@ Le compte maître l'applique (« Mettre à jour »), ou la laisse s'appliquer au
 6. Écriture de la nouvelle version, qui garde ce que vous avez modifié :
    - un fichier que vous n'avez pas touché est remplacé ; un fichier supprimé en amont est retiré ;
    - un fichier que vous avez modifié et qui n'a pas changé en amont est gardé ;
-   - un **réglage** (`config.lua`, dossier `config/`) modifié des deux côtés est gardé, et la nouvelle version posée à
-     côté (`config.lua.nouveau`) pour que vous repreniez ses nouveautés ;
+   - un **réglage** (`config.lua`, `config_client.lua` depuis 1.8.5, dossier `config/`) modifié des deux côtés est
+     gardé, et la nouvelle version posée à côté (`config.lua.nouveau`) pour que vous repreniez ses nouveautés ; quand
+     un module partage ses réglages entre `config.lua` et `config_client.lua` (T-132), un ancien `config.lua` gardé
+     le fait signaler en console au démarrage (« config.lua garde la forme d'avant … ») : reportez vos réglages dans les
+     deux nouveaux fichiers ;
    - un autre fichier modifié des deux côtés prend la nouvelle version, la vôtre est gardée à côté (`.local`) ;
    - un nouveau module est posé dans `[vava]`, à activer dans la page Ressources. Le chat `vava_chat` remplace la
      ressource `chat` de FiveM : activer `vava_chat` et couper `chat` au même endroit. `vava_ui` (polices et textures

@@ -3,3 +3,4 @@ tests/audit/boucle_tous.lua	TriggerClientEvent('t:excuse', src)	cas d'essai : un
 modules/vava_exempte/web/	[fichier]	cas d'essai : un chemin qui finit par / couvre les fichiers de ce dossier
 tests/audit/interface.js		cas d'essai : extrait vide, exception refusée (elle couvrirait tout le fichier)  -- attendu: BLOQUANT
 modules/vava_exempte_mal/web/	devmock	cas d'essai : dossier dont l'extrait n'est pas [fichier], exception refusée  -- attendu: BLOQUANT
+tests/audit/fxmanifest.lua	{ 'config.lua' } -- exception transitoire	cas d'essai : une exception transitoire de T-132 couvre la ligne

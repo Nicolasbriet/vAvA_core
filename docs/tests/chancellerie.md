@@ -57,7 +57,8 @@ Ce que montre `/vava_reseau` en jeu, lu depuis la Chancellerie, en lecture seule
 récent (chaque joueur connecté suivi d'office), un compte du panneau de rang **Sénéchal** (droit `tools`) et un autre de
 rang **Gardien** ; pour 3-7 à 3-9 et 3-17 à 3-19, des joueurs en jeu (`<B>`, son numéro de connexion, et un second
 `<C>`) et un membre du Conseil en jeu (`<A>`, Sénéchal). Procédure du compteur lui-même : [reseau.md](reseau.md). La
-bannière de la Chancellerie dit `v1.8.0` ; la console du serveur `module 'vava_chancellerie' v1.7.0 prêt`.
+bannière de la Chancellerie dit `v1.8.0` ; la console du serveur `module 'vava_chancellerie' v1.7.0 prêt` (ou plus récent :
+Chancellerie 1.8.5 et pont 1.7.1 depuis T-132, qui ne changent rien à cette page).
 
 | # | Faire | Attendu |
 |---|---|---|

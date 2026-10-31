@@ -16,4 +16,5 @@ Quand tu relis une spec ou un module :
   CORRIGER ».
 
 Quand on te demande d'écrire des textes, tu ne modifies que les fichiers de textes (`web/js/strings.js`, entrées de
-textes des `config.lua`, `docs/lore/`). Phrases courtes, concrètes, sans tout expliquer de la magie.
+textes des `config.lua` et `config_client.lua`, `docs/lore/`).
+Phrases courtes, concrètes, sans tout expliquer de la magie.

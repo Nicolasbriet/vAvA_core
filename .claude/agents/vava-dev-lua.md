@@ -15,8 +15,10 @@ Règles de travail :
   possession, droit et délai côté serveur.
 - Aucun `TriggerClientEvent(…, -1, …)`, aucun `RegisterNetEvent` serveur hors core, aucun SQL concaténé, aucun
   `Wait(0)` hors état actif temporaire.
-- Tout modèle, coordonnée, arme, composant de vêtement vient de `config.lua` et porte `-- PLACEHOLDER` s'il est
-  provisoire.
+- Tout réglage va dans `config.lua` (lu par le seul serveur, jamais téléchargé) ou dans `config_client.lua` (ce que
+  le client lit), une valeur à un seul endroit ; voir CLAUDE.md et `docs/plan/specs/T-132.md`. Tout modèle,
+  coordonnée, arme, composant de vêtement y vient et porte `-- PLACEHOLDER` s'il est provisoire.
+- Un `shared/*.lua` n'est en `shared_scripts` que si un fichier client s'en sert ; sinon `server_scripts`.
 - Les fonctions pures (calculs, validations) vont dans `shared/` et reçoivent des tests dans `tests/spec/`
   (voir `tests/helper.lua`).
 - Lance `./scripts/verifier.sh` et corrige jusqu'à ce qu'il passe. N'affaiblis jamais un test.

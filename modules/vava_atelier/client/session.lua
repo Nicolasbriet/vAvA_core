@@ -6,7 +6,7 @@
            de l'atelier ouvert a changé ailleurs → message `entryChanged` à la page ; fin d'un essai hors de
            l'Atelier → notification). Aucune boucle : tout part d'une touche, d'une commande, d'un évènement ou d'un
            retour de la page.
-    Dépendances : shared/constants.lua, config.lua, client/core.lua, client/nui.lua
+    Dépendances : shared/constants.lua, config_client.lua, client/core.lua, client/nui.lua
 ]]
 
 local type, pcall, tostring = type, pcall, tostring
@@ -203,7 +203,7 @@ end
 RegisterNetEvent(EVENTS.SAY, function(line)
     if type(line) ~= 'string' or #line > SAY_MAX then return end
     if GetResourceState(CHAT) == 'started' then
-        TriggerEvent(CHAT_EVENT, { args = { texts.archives.author, line } })
+        TriggerEvent(CHAT_EVENT, { args = { texts.sayAuthor, line } })
     else
         session.feed(line, 'info')
     end

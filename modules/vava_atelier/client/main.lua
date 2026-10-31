@@ -3,7 +3,7 @@
     Rôle : l'Atelier côté joueur : touche (RegisterKeyMapping, réglable par le joueur, aucune boucle) et /atelier pour
            ouvrir ou fermer ; fermeture au déchargement du personnage ; souris et clavier rendus au jeu si la ressource
            s'arrête Atelier ouvert ; export `isOpen`. Le bouton de la page Outils du Registre est reporté.
-    Dépendances : shared/constants.lua, config.lua, client/core.lua, client/session.lua
+    Dépendances : shared/constants.lua, config_client.lua, client/core.lua, client/session.lua
 ]]
 
 local RegisterCommand, RegisterKeyMapping, AddEventHandler, GetCurrentResourceName =

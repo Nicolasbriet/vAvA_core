@@ -5,7 +5,8 @@
            vide et débit limité), hooks du core (chargement : première venue reconnue ; apparition : dotation et
            accueil ; déchargement et départ : entrée oubliée ; retour de l'inventaire : objets redéclarés, dotations
            dues reprises ; annonce d'un module de `kit.providers` : dotations dues reprises), adoption des joueurs déjà
-           en jeu (module redémarré), commande du Conseil. Aucune boucle.
+           en jeu (module redémarré), commande du Conseil. Aucune boucle. Avertit au démarrage si config.lua garde la
+           forme d'avant 1.2.0 (T-132).
     Dépendances : tous les fichiers server/ du module
 ]]
 
@@ -51,6 +52,13 @@ local function adoptActive()
 end
 
 local function setup()
+    -- T-132 : un config.lua d'avant 1.2.0 (gardé par une mise à jour) remplace la table de config_client.lua ; il
+    -- contient tout ce que lit le serveur, le module démarre, mais un réglage client qu'on y change reste sans effet
+    if cfg.clientFile ~= true then
+        core.log.warn('config.lua garde la forme d\'avant 1.2.0 (il remplace la table de config_client.lua) : les '
+            .. 'réglages lus par les joueurs sont dans config_client.lua ; reportez vos changements d\'après '
+            .. 'config.lua.nouveau')
+    end
     local declared, declareErr = VavaArrival.commands.declare()
     if not declared then return false, 'commandes : ' .. tostring(declareErr) end
     local ok, err = checkConfig()

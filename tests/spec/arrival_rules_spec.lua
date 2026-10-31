@@ -1,7 +1,8 @@
 local helper = require('tests.helper')
 
--- Règles pures de l'arrivée (modules/vava_arrival/shared/rules.lua, T-022) et config du module. Règles documentées :
--- README du module (« Règles ») et docs/plan/specs/T-022.md § 7 et § 11.
+-- Règles pures de l'arrivée (modules/vava_arrival/shared/rules.lua, T-022 ; shared/screen.lua, seule logique lue par le
+-- client depuis T-132) et config du module (config_client.lua puis config.lua, chargés par le helper). Règles
+-- documentées : README du module (« Règles ») et docs/plan/specs/T-022.md § 7 et § 11.
 
 describe('vava_arrival rules', function()
     local rules, cfg
@@ -13,6 +14,7 @@ describe('vava_arrival rules', function()
             'modules/vava_arrival/shared/constants.lua',
             'modules/vava_arrival/config.lua',
             'modules/vava_arrival/shared/rules.lua',
+            'modules/vava_arrival/shared/screen.lua',
         })
         rules, cfg = VavaArrival.rules, VavaArrival.config
     end)
@@ -119,11 +121,14 @@ describe('vava_arrival rules', function()
         assert.equal('integer', math.type(rules.capSince(1000000, 30)))
     end)
 
-    it('écran prêt seulement sans pause, sans focus d\'interface et fondu fini', function()
-        assert.is_true(rules.welcomeReady({ paused = false, nuiFocused = false, fadedIn = true }))
-        assert.is_false(rules.welcomeReady({ paused = true, nuiFocused = false, fadedIn = true }))
-        assert.is_false(rules.welcomeReady({ paused = false, nuiFocused = true, fadedIn = true }))
-        assert.is_false(rules.welcomeReady({ paused = false, nuiFocused = false, fadedIn = false }))
+    it('écran prêt seulement sans pause, sans focus d\'interface et fondu fini (shared/screen.lua)', function()
+        local screen = VavaArrival.screen
+        assert.is_true(screen.ready({ paused = false, nuiFocused = false, fadedIn = true }))
+        assert.is_false(screen.ready({ paused = true, nuiFocused = false, fadedIn = true }))
+        assert.is_false(screen.ready({ paused = false, nuiFocused = true, fadedIn = true }))
+        assert.is_false(screen.ready({ paused = false, nuiFocused = false, fadedIn = false }))
+        -- la fonction a quitté shared/rules.lua (servi au seul serveur) : une seule définition
+        assert.is_nil(rules.welcomeReady)
     end)
 
     describe('parseCommand', function()

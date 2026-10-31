@@ -699,7 +699,7 @@ const STRINGS = (() => {
       saveSettings: 'Sceller',
       settingsSaved: 'Suivi enregistré.',
       repo: (repo, branch) => `Dépôt : ${repo} (branche ${branch})`,
-      keptNote: 'Après une mise à jour : un réglage que vous aviez modifié est gardé, la nouvelle version est posée à côté (« config.lua.nouveau ») pour comparaison.',
+      keptNote: 'Après une mise à jour : un réglage que vous aviez modifié est gardé, la nouvelle version est posée à côté (« config.lua.nouveau », « config_client.lua.nouveau ») pour comparaison.',
     },
 
     performance: {
@@ -903,7 +903,7 @@ const STRINGS = (() => {
       installing: 'Installation en cours…',
       installFailed: 'L\'installation a échoué : corrigez puis relancez-la (ce qui est déjà en place est gardé).',
       installExisting: 'Installer ou compléter vAvA et oxmysql dans ce serveur',
-      installExistingHelp: 'Ressources posées dans resources/[vava] ; celles déjà là sont mises à niveau sans toucher à vos config.lua modifiés.',
+      installExistingHelp: 'Ressources posées dans resources/[vava] ; celles déjà là sont mises à niveau sans toucher à vos fichiers de config modifiés (config.lua, config_client.lua).',
       dbCreate: 'Créer la base',
       dbCreating: 'Création…',
       dbCreated: (name) => `La base « ${name} » est prête (créée si elle n'existait pas).`,
