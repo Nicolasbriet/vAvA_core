@@ -6,6 +6,13 @@ ternes) et rapporte peu ; poussée à zéro, elle garde une **cicatrice**. Les o
 la qualité de ce qu'on ramasse dépend de la compétence, de l'outil et de la santé de la terre, et chaque pile porte son
 palier et sa provenance. Le serveur décide de tout et demande l'XP à `vava_skills`.
 
+**Version 1.8.0 (T-102) : la récolte dans l'Atelier.** Le Conseil (droit `metiers`) trace une zone au sol, y pose ses
+arbres, filons et buissons un par un en visant là où ils doivent pousser, les essaie seul (à blanc), puis publie : les
+joueurs proches voient les points sortir de terre dans la seconde, sans redémarrage, et ceux qui sont loin ne reçoivent
+rien. La config n'est plus que la **graine** de l'atelier « Récolte » : au premier démarrage, chaque zone et chaque nœud
+y deviennent la version 1 ; ensuite **la base de l'Atelier fait foi**. Sans `vava_atelier`, la récolte tourne sur sa
+graine.
+
 Ordre de démarrage : après `vAvA_core` (≥ 0.11.0, abonnements de zone), `vava_ui` (≥ 1.0.0, polices, grain, papier et coins des
 interfaces ; à ne jamais arrêter sur un serveur ouvert), `vava_inventory` (≥ 1.4.0) et `vava_skills` (≥ 1.0.0).
 Facultatifs : `vava_hud` (barre de progression, notifications), `vava_admin` (droit `metiers`), `vava_chat`,
@@ -19,8 +26,14 @@ Rendu hors jeu : `web/index.html?view=prompt` (ou `tension`, `zones`) dans un na
 
 Depuis 1.7.0 (T-132), les réglages sont dans deux fichiers et chacun n'est écrit qu'une fois : `config_client.lua`
 porte ce que lit le client, et le serveur aussi : `interact.distance` et `interact.moveCancel`, `streaming` (sauf
-`subscribeSlack`), `map`, `waterKinds`, `keys`, `labels`, `tools`, `resources`, `zones`, `nodes` et `anims` (entiers :
-le client les lit par identifiant ou les parcourt) ; `config.lua` porte tout le reste, lu par le seul serveur, dont
+`subscribeSlack`), `map`, `waterKinds`, `keys`, `labels`, `tools` (le seul genre de chaque outil), `resources` (libellé,
+outil requis, geste, modèles `prop`) et `anims`. Depuis 1.8.0 (T-102, relecture T-141 S-3 et R-3), chaque entrée a une
+part client et une part serveur : `zones` et `nodes` (graine de l'Atelier), `resourceStats` (objet, compétence,
+difficulté, XP, rendement, durée, pêche, pièce en plus), `toolStats` (puissance, bonus, usure), `looks` et `editor` sont
+dans `config.lua` ; ce que le joueur doit voir d'une zone et de ses points (nom, type, lieu, ressource) lui arrive par
+l'état de la zone. `resources` et `resourceStats`, `tools` et `toolStats` portent les mêmes identifiants, sinon le
+module refuse de démarrer avec le nom en cause ; une ressource sans `prop.model` aussi. `config.lua` porte tout le
+reste, lu par le seul serveur, dont
 `fishing` entier (la barre de tension part avec la touche : le client n'en lit que `holdRatio`, borné de 0 à 1, sinon
 le repli `FISHING_HOLD_RATIO` de `shared/constants.lua`) et, ajoutés aux tables ouvertes par `config_client.lua`, les
 tolérances `interact.serverTolerance`, `cooldownMs`, `finishToleranceMs`, `expireMs` et `streaming.subscribeSlack` ;
@@ -43,6 +56,19 @@ il complète la table sans réécrire une clé de `config_client.lua`.
 | Touches | `E` récolter, `O` panneau des zones (réglables dans Paramètres > Raccourcis > FiveM) ; `O` est cité par l'écran de chargement : changer cette touche par défaut oblige à retoucher le conseil de `modules/vava_loading/web/js/strings.js` | `keys` |
 | Carte | un blip nommé par zone (icône et couleur selon le genre, courte portée) et le cercle de son rayon ; « Marquer » dans le panneau pose le repère de la carte | `map` |
 | Solidité d'un outil sans histoire | 100 au premier usage | `toolDefaults` |
+| Atelier : droit (1.8.0) | `metiers` (Sénéchal et au-dessus, décision déjà prise) | `editor.right` |
+| Atelier : rayon d'une zone | 10 à 300 m, 60 m au premier tracé | `editor.zoneRadius` |
+| Atelier : un point hors de sa zone | 5 m au plus (un tronc au bord) | `editor.nodeSlack` |
+| Atelier : écart entre deux points d'une zone | 2 m au moins, au sol | `editor.spacing` |
+| Atelier : chevauchement de deux zones | 10 m au plus (décision du 31 octobre 2026) | `editor.overlapTolerance` |
+| Atelier : plafonds | 256 zones ; 120 points par zone (deux clés d'état par point, 256 clés par zone du core) | `editor.maxZones`, `editor.maxNodesPerZone` |
+| Atelier : diffusion de garde | une zone notée depuis plus de 2 s sans fin de lot part au passage suivant de la boucle lente | `editor.flushGraceMs` |
+| Atelier : types de lieu | Forêt, Mine, Prairie, Eau (chaque valeur a son icône dans `map.kinds`) | `editor.zoneKinds` |
+| Atelier : valeurs de départ | fatigue 2 % par récolte, repos 4 % par heure, cicatrice 48 h, 3 récoltes, repousse 10 min | `editor.defaults` |
+| Atelier : bornes de l'abondance | repos de la terre 12 % par heure au plus, repousse d'une récolte 5 min au moins (relecture lore : « ressources exploitées avec mesure ») | `editor.restMax`, `editor.regrowMin` |
+| Apparence d'un point | celle de sa ressource (`resources[…].prop`), dite au Conseil (« chêne de GTA, modèle provisoire ») | `looks` |
+| Liste de la carte | redemandée une fois par séance, 2 demandes puis une toutes les 20 s | `rateLimits.map` |
+| Essai à blanc | « [Essai] Chêne : 3 × Bûche de chêne (commun). Rien n'est donné pendant un essai. » | `messages.trialHarvest`, `trialFailed` |
 
 ### Zones et nœuds
 
@@ -62,9 +88,9 @@ clé `zone`, à la récolte ou au passage de la boucle lente (10 s) quand la zon
 GlobalState : les anciennes clés `vava_gathering:zone:<id>` et `vava_gathering:node:<id>` sont effacées une fois au
 démarrage si un serveur resté allumé les garde encore (seulement pour les zones et nœuds encore dans la config : après
 une mise à jour depuis une version antérieure à 1.6.0 qui retire des zones ou des nœuds, **redémarrer le serveur**, pas
-seulement la ressource). Une zone hors des bornes d'une zone du core (nœuds à plus de 500 m de son centre, plus de 255
-nœuds, `streaming.radius` + `streaming.subscribeSlack` au-delà de 500 m) refuse le module au démarrage, avec la zone
-en cause dans la console. Une zone refusée en cours de route par le core (`full` : trop de zones, état total trop
+seulement la ressource). Une zone hors des bornes d'une zone du core (nœuds à plus de 500 m de son centre, plus de 120
+nœuds depuis 1.8.0 — 255 avant —, `streaming.radius` + `streaming.subscribeSlack` au-delà de 500 m) refuse le module au
+démarrage, avec la zone en cause dans la console. Une zone refusée en cours de route par le core (`full` : trop de zones, état total trop
 gros) est écrite en console une fois, rappelée toutes les 10 min avec le nombre de refus, et retentée toutes les 10 s ;
 ses nœuds n'apparaissent pas chez les joueurs.
 Identifiants : 48 octets au plus pour une zone, 46 pour un nœud (clé `n:<nœud>`), sinon le module refuse de démarrer.
@@ -76,19 +102,78 @@ au nœud (au début et à la fin du geste), le personnage, l'outil, le délai et
 
 Le client ne mesure que les nœuds des zones qu'il suit ; il crée leurs props, les remplace par le modèle épuisé et met à
 jour l'invite dès qu'une zone arrive, change ou part (sans attendre le passage suivant de sa boucle). Une zone quittée
-reprend ses valeurs par défaut (pleine, charges de la config) : elle n'a alors aucun prop à portée. Le Conseil
+reprend ses valeurs par défaut (pleine) et perd ses points : elle n'a alors aucun prop à portée. Le Conseil
 (`/recolte vitalite`, `/recolte recharger`) et les autres modules (`setVitality`) changent l'état en jeu : les joueurs
-proches le voient aussitôt, sans reconnexion. Les zones et nœuds **créés** en jeu viendront avec l'Atelier (T-102) :
-`server/share.lua` sait déjà redéclarer une zone (déplacée, état remplacé) ; les positions et modèles des nœuds devront
-alors entrer dans l'état de la zone (aujourd'hui lus dans la config par le client).
+proches le voient aussitôt, sans reconnexion.
+
+Depuis 1.8.0 (T-102), l'état porte aussi **`def`** → `{ nom, type, x, y, z, rayon }` et **`p:<nœud>`** →
+`{ ressource, x, y, z, cap }`, en listes au format compact (longueurs en centimètres entiers, cap en dixièmes de
+degré entiers ; le client divise) : le client ne lit plus aucune zone ni
+aucun nœud dans sa config, une zone ou un point publiés dans l'Atelier paraissent sans redémarrage. Le modèle d'un point
+est celui de sa ressource. Ni coût, ni repos, ni cicatrice réglée, ni charges maximales, ni repousse, ni nom d'un
+point n'y entrent (part serveur) : changer la fatigue d'une zone n'envoie **rien** aux joueurs. Taille : ≈ 0,3 Ko pour
+une zone de 5 points, ≈ 2 Ko pour 50, ≈ 4,9 Ko pour 120 points aux identifiants courts, sous le seuil du latent
+(≈ 15,9 Ko au pire, identifiants de 46 octets ; ≈ 9 et ≈ 19,5 Ko avant le format compact). Le client garde 120 points
+au plus par zone et ignore une valeur mal formée. Une récolte (charges, bande) ne fait qu'un passage de la boucle des
+props chez les abonnés : les points d'une zone ne sont regroupés de nouveau que si un lieu ou la `def` change (0,26 →
+0,002 ms par différence pour 120 points, mesure hors jeu).
 
 `cellSize` du core (cases de 256 m) est gardé : les zones de récolte sont grandes (zones d'exemple : rayon 60 à 120 m,
 cercle d'intérêt de 160 à 220 m) et peu nombreuses ; elles ajoutent une poignée de candidates par case, là où les cases de 128 m ne font
 gagner qu'en ville, sur des zones de quelques mètres (rapport T-015).
 
 Sur la **carte**, chaque zone a son blip (icône et couleur par genre dans `map.kinds`, nom de la zone, visible sur la
-petite carte à l'approche et toujours sur la grande) et le cercle translucide de son rayon. Le client les pose depuis
-la config à l'entrée en jeu et les retire à la sélection : rien ne circule. `map.blips = false` les coupe.
+petite carte à l'approche et toujours sur la grande) et le cercle translucide de son rayon. Depuis 1.8.0, la liste
+n'est **jamais poussée** : chaque client la garde en stockage local (KVP `vava_gathering:map`, avec sa version, 16 Ko
+et 256 zones au plus, contrôlée à la relecture et oubliée si elle est abîmée), pose ses blips à l'entrée en jeu, puis
+la redemande une fois par séance (RPC `vava_gathering:map`, ≈ 30 o si rien n'a changé, ≈ 60 o par zone sinon) ; une
+zone suivie qui porte sa `def` corrige son blip sans rien demander. Une zone nouvelle et lointaine paraît sur la carte à
+la prochaine connexion, ou en approchant (décision du 31 octobre 2026). Blips retirés à la sélection.
+`map.blips = false` les coupe.
+
+### Atelier de la récolte (1.8.0, T-102)
+
+Atelier gardé `vava_gathering:zones` (« Récolte », famille monde, droit `metiers`), maquette `docs/maquettes/Recolte.html` :
+
+- **Zone** (cercle) : nom (unique, sans accents ni casse), type de lieu, et repliés sous « Réglages de la zone » :
+  fatigue par récolte, repos de la terre, durée d'une cicatrice. Le rayon n'est pas un champ : il se règle à la molette
+  en plaçant la zone. Étapes « La zone · Les points · Publier ».
+- **Point** (orienté, enfant d'une zone) : nom (« Chêne 4 », donné tout seul à la pose), ressource, récoltes avant
+  repos, repousse d'une récolte. Un point naît d'un clic dans sa zone (« Poser des points », valeurs du bloc
+  « Prochain point à poser ») ; son apparence est celle de sa ressource.
+- **Règles** (le module seul en juge) : `validate` — nom unique, type connu, lieu exigé à l'essai et à la publication,
+  rayon de 10 à 300 m, chevauchement de 10 m au plus avec une autre zone publiée (hors celles retirées par le même lot) ;
+  point : ressource connue, un poisson dans l'eau et rien d'autre dans l'eau, dedans sa zone (+ 5 m) si la zone n'est
+  pas dans le lot. `validateLot` — la zone après le lot : 120 points au plus, chacun dans le cercle neuf, 2 m entre deux
+  points, cercle englobant de 500 m. `placeCheck` (au clic, avant d'écrire) — chevauchement, 256 zones, 120 points.
+- **Rechargement à chaud** : `apply` et `remove` changent le catalogue tout ou rien (un refus ne change rien) ; la
+  vitalité et les charges d'une zone ou d'un point qui revient sont reprises de la base (les lignes ne sont jamais
+  effacées : un retour en arrière retrouve la terre comme elle était) ; les charges sont ramenées au nouveau maximum ;
+  une récolte en cours sur un point changé ou retiré est oubliée (`unknown_node` à la fin). Aucun objet de joueur n'est
+  touché. Une zone posée n'est contrôlée que pour son rayon, un point que pour lui (nombre de points de sa zone,
+  distance à son centre de 500 m au plus) ; au dernier appel du lot, chaque zone touchée doit tenir dans les bornes
+  d'une zone du core (sinon le lot est annulé par l'Atelier). Une zone publiée déplacée sans ses points est jugée
+  avec eux dès `validate` (ils doivent rester dans le cercle neuf). Nom d'une zone : 80 octets au plus
+  (`editor.nameBytes`, lettres accentuées comprises) ; le client en accepte 160.
+- **Diffusion** (consignes R-12 de l'Atelier) : `apply` et `remove` ne font que **noter** la zone ; au dernier appel du
+  lot (`info.last`), chaque zone notée part une fois : déclarée entière si elle est nouvelle, déplacée si son cercle
+  d'intérêt change puis sa **différence** (clés changées et retirées, par paquets de 64 dans le même tour : une seule
+  différence par abonné), retirée du core si elle n'existe plus ; la liste de la carte prend une nouvelle version. Garde :
+  une zone notée depuis plus de `editor.flushGraceMs` part au passage suivant de la boucle lente (10 s).
+- **Essai à blanc** (« Tester la récolte », décision du 31 octobre 2026) : la zone essayée et ses points ne partent
+  qu'à leur auteur (`vava_gathering:trial`, entier puis en différences ; `vava_gathering:trialEnd` à la fin), jamais
+  dans l'état de la zone ; chez lui, ils remplacent l'affichage de la zone du même nom (les points dont le retrait est
+  préparé sont cachés) et l'invite porte « Essai ». Seul l'auteur peut récolter un point d'essai, avec tous les
+  contrôles d'une vraie récolte (personnage, pas à terre, distance au début et à la fin, outil en main du bon genre et
+  non brisé, durée, jeton, délai) ; à la fin, quantité et palier sont calculés et dits, **rien n'est donné** (ni objet,
+  ni XP, ni usure, ni vitalité, ni charge réelle, ni hook `harvesting` / `harvested`), une charge d'essai est prise.
+- **Consigne au Conseil** (relecture lore, risque R-2) : une zone publiée fait sortir ses arbres de terre dans la
+  seconde sous les yeux des joueurs proches ; publier hors de leur vue, ou l'annoncer en jeu (une coupe ordonnée, une
+  mine rouverte par le Conseil…).
+- **Arrêt de l'Atelier** : `stop` ou `restart vava_atelier` met fin à tous les essais en cours (leurs auteurs retrouvent
+  l'affichage publié).
+- **Graine** : sans l'Atelier (absent ou pas encore synchronisé), la récolte tourne sur `config.zones` et
+  `config.nodes`, avec un avertissement en console ; l'atelier se redéclare au hook `vava_atelier:editorsReady`.
 
 Les zones et nœuds livrés sont des **exemples** autour du point d'apparition par défaut, avec des modèles du jeu de base :
 à remplacer par les lieux et les props du royaume.
@@ -129,14 +214,27 @@ le serveur tire la réussite.
 
 | Fichier | Rôle |
 |---|---|
-| `config_client.lua` | réglages lus par le client (invite, streaming, carte, touches, outils, ressources, zones et nœuds, animations) : téléchargé par chaque joueur, ouvre `VavaGathering.config` |
-| `config.lua` | tous les autres réglages, servi au seul serveur (en tête des `server_scripts`) : complète la table |
-| `shared/geometry.lua`, `shared/proximity.lua`, `shared/zonestate.lua` | purs, lus par le client et le serveur : distances, groupes du streaming, état des zones reçu |
-| `shared/season.lua`, `shared/catch.lua` | purs, servis au seul serveur : facteurs de saison, prise d'un poisson |
+| `config_client.lua` | réglages lus par le client (invite, streaming, carte, touches, genre des outils, part client des ressources, animations) : téléchargé par chaque joueur, ouvre `VavaGathering.config` |
+| `config.lua` | tous les autres réglages, servi au seul serveur (en tête des `server_scripts`) : complète la table ; zones et nœuds (graine de l'Atelier), part serveur des ressources et des outils, apparences, atelier |
+| `shared/geometry.lua`, `shared/proximity.lua`, `shared/zonestate.lua` | purs, lus par le client et le serveur : distances, groupes du streaming, lecture de l'état des zones (`def`, `p:`, essai, liste de la carte) |
+| `shared/season.lua`, `shared/catch.lua`, `shared/editing.lua`, `shared/zonebuild.lua` | purs, servis au seul serveur : facteurs de saison, prise d'un poisson ; atelier « Récolte » (formulaires, conversions, règles, liste de la carte) ; construction de l'état des zones (format compact, cercle, différences, paquets) |
+| `client/props.lua`, `blips.lua`, `interact.lua`, `fishing.lua`, `main.lua` | points dans le monde (props locaux à portée, boucle lente arrêtée sans zone suivie, essai de l'Atelier chez son auteur) ; carte ; invite et geste ; barre de tension ; entrée du client |
+| `server/catalog.lua`, `zones.lua`, `nodes.lua`, `share.lua` | catalogue mutable ; vitalité et charges (lignes de la base gardées) ; zones du core et différences de l'Atelier |
+| `server/atelier.lua`, `trials.lua`, `map.lua` | déclaration de l'atelier et fonctions lues par l'Atelier ; essais à blanc par auteur ; liste de la carte (RPC `map`) |
 
 Fichiers téléchargés par chaque joueur (1.7.0, T-132) : `shared/constants.lua`, `config_client.lua`, les trois
 `shared/*.lua` lus par le client, les sept `client/*.lua`, la page et les dessins des objets ; `config.lua`,
-`shared/season.lua` et `shared/catch.lua` sont servis au seul serveur.
+`shared/season.lua`, `shared/catch.lua`, `shared/editing.lua` et `shared/zonebuild.lua` sont servis au seul serveur.
+Poids du Lua livré (1.8.0) : 71,0 Ko (23,9 Ko compressés), contre 65,5 Ko (22,7) en 1.7.0 : `config_client.lua` perd
+4,3 Ko (zones, nœuds, parts serveur), `client/props.lua` et `client/blips.lua` gagnent la lecture de `def` et `p:`,
+l'essai et la liste de la carte ; la construction de l'état est servie au seul serveur, et les en-têtes des fichiers
+livrés sont courts (relecture réseau R-1 : 82,9 → 71,0 Ko). Le détail des fichiers est dans ce README.
+
+**Mise à jour vers 1.8.0 (T-102)** : `zones` et `nodes` ont quitté `config_client.lua` pour `config.lua` ; la part
+serveur des ressources et des outils est passée dans `resourceStats` et `toolStats`. Un `config_client.lua` d'avant
+1.8.0 gardé par l'installeur porte encore des zones et des nœuds : ils sont ignorés et la console le dit
+(« config_client.lua d'avant 1.8.0 : ses zones et nœuds sont ignorés … »). La graine `prairie_haute` passe à un rayon de
+75 m (100 avant) pour respecter la règle de chevauchement de l'Atelier.
 
 **Mise à jour vers 1.7.0 (T-132)** : l'invite, le streaming, la carte, les genres d'eau, les
 touches, les outils, les ressources, les zones et nœuds et les animations ont quitté `config.lua` pour
@@ -153,8 +251,9 @@ forme d'avant 1.7.0 … ») et un réglage client changé dans ce fichier reste 
 
 ## API
 
-Exports : `getZone(id)`, `getZones()`, `setVitality(id, 0–100)`, `nodeState(id)`, `getResource(id)`, `getTool(objet)`,
-`getSession(joueur)`. Hooks : `vava_gathering:harvesting` (before, annulable : `{ source, characterId, node, zone,
+Exports : `getZone(id)`, `getZones()` (ordre de la graine, puis de création dans l'Atelier), `setVitality(id, 0–100)`,
+`nodeState(id)`, `getResource(id)`, `getTool(objet)`, `getSession(joueur)`. RPC `vava_gathering:map` (1.8.0) ;
+évènements `vava_gathering:trial` et `trialEnd` (au seul auteur d'un essai). Hooks : `vava_gathering:harvesting` (before, annulable : `{ source, characterId, node, zone,
 resource, item }`), `harvested` (after : `+ quantity, tier, band, extra? `), `zoneDepleted`, `zoneScarred`,
 `earthReaction` (after : `{ zone, … }`). Détail : `docs/api.md`.
 
@@ -201,6 +300,9 @@ resource, item }`), `harvested` (after : `+ quantity, tier, band, extra? `), `zo
     à 80 m, `/vava_reseau zones <B>` cite `vava_gathering:foret_brume` ; chaque récolte de A change la charge dans
     l'invite de B (une `vAvA:zone:diff` d'environ 50 o). Détail et mesure `profiler record` : `docs/tests/metiers.md`
     § 3.4.
+16. **Atelier** (1.8.0) **(3 joueurs)** : créer une zone et cinq points en jeu, les essayer à blanc, publier ; un joueur
+    proche les voit apparaître sans redémarrage, un joueur loin ne reçoit rien (`/vava_reseau`). Procédure :
+    `docs/tests/atelier.md` § 19 à 24, et `docs/tests/metiers.md` § 3.5 (récolte d'un point publié par l'Atelier).
 
 ## À vérifier en jeu
 
@@ -213,3 +315,8 @@ resource, item }`), `harvested` (after : `+ quantity, tier, band, extra? `), `zo
   ensemble) ; besace pleine : aucune.
 - Loin de toute zone de récolte : `vava_gathering` à 0,00 ms dans `resmon` (boucle des props arrêtée) ; elle repart à
   l'approche d'une zone, props à 80 m comme avant.
+- **1.8.0 (T-102)** : zone et points publiés vus d'un joueur proche en moins d'une seconde, sans redémarrage ; rien chez
+  un joueur loin (`/vava_reseau joueur <n°>`) ; changer seulement la fatigue d'une zone n'envoie rien ; essai à blanc vu
+  et récolté par son seul auteur (besace, XP et hache inchangées) ; liste de la carte gardée (≈ 30 o à la reconnexion
+  suivante) ; `restart vava_gathering` après des changements en jeu : zones et points de la base, pas de la graine ;
+  récolte d'un point publié par l'Atelier identique à celle d'un point de la graine (invite, durée, qualité, vitalité).

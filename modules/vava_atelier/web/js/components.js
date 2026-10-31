@@ -49,6 +49,8 @@ const UI = (() => {
     back: ['M15 5l-7 7 7 7'],
     chevron: ['M6 9l6 6 6-6'],
     check: ['M5 12.5l4.5 4.5L19 7.5'],
+    pin: ['M12 21s-7-6-7-11a7 7 0 0114 0c0 5-7 11-7 11z', [12, 10, 2.5]],
+    trash: ['M5 7h14M10 7V4h4v3M7 7l1 13h8l1-13'],
   };
 
   function icon(name, size = 22, stroke = 1.6) {
@@ -223,7 +225,7 @@ const UI = (() => {
 
   const Banner = {
     show(title, line, back) {
-      byId('banner').replaceChildren(round('back', STRINGS.back, back),
+      byId('banner').replaceChildren(back ? round('back', STRINGS.back, back) : '',
         h('span', { class: 'banner-text' }, h('span', { class: 'banner-title', text: title }), line ? h('span', { class: 'banner-line', text: line }) : null));
       byId('banner').hidden = false;
     },

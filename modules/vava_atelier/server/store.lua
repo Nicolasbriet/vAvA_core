@@ -98,6 +98,13 @@ local UNDO_INSERT_SQL = 'DELETE FROM ' .. T .. ' WHERE `editor` = ? AND `kind` =
     .. 'AND `batch` = ?'
 local BATCH_ROWS_SQL = 'SELECT `id`, `kind`, `def_id`, `version`, `status`, `rev` FROM ' .. T
     .. ' WHERE `editor` = ? AND `batch` = ?'
+-- T-102 : lieux des enfants d'une fiche (index `idx_atelier_def_parent`, sql/0003_parent_index.sql) ; brouillon d'une
+-- fiche relu après une transaction qui l'a créé (numéro de sa ligne)
+local CHILDREN_SQL = 'SELECT `id`, `kind`, `def_id`, `status`, `removal`, `title`, `parent`, `place`, `data`, '
+    .. "`author_account_id`, `rev` FROM " .. T .. " WHERE `editor` = ? AND `parent` = ? "
+    .. "AND `status` IN ('draft', 'trial', 'published') LIMIT ?"
+local DRAFT_ROW_SQL = 'SELECT `id`, `rev` FROM ' .. T
+    .. " WHERE `editor` = ? AND `kind` = ? AND `def_id` = ? AND `status` IN ('draft', 'trial') LIMIT 1"
 
 -- requêtes à liste `IN (?, …)`, construites une fois par forme et par longueur
 local inQueries = {}
@@ -225,6 +232,25 @@ function store.batchRemovals(editorId, batch)
     return rowsOr(core.db.query(BATCH_REMOVALS_SQL, { editorId, batch }), nil, 'lot ' .. tostring(batch))
 end
 
+--- Lignes vivantes (brouillons, essais, publiées) des enfants d'une fiche, `limit` au plus : { { id, kind, def_id,
+--- status, removal, title, parent, place, data, author_account_id, rev } }, ou nil, 'db_error' (T-102).
+---@param editorId string
+---@param parentId string
+---@param limit integer
+function store.children(editorId, parentId, limit)
+    return rowsOr(core.db.query(CHILDREN_SQL, { editorId, parentId, limit }), nil, 'enfants de ' .. tostring(parentId))
+end
+
+--- Brouillon (ou essai) d'une fiche : { id, rev }, ou nil ; nil, 'db_error' si la base ne répond pas (T-102).
+function store.draftRow(editorId, kindId, defId)
+    local row, err = core.db.single(DRAFT_ROW_SQL, { editorId, kindId, defId })
+    if err then
+        VavaAtelier.log.error('définitions : brouillon de %s illisible (%s)', tostring(defId), tostring(err))
+        return nil, 'db_error'
+    end
+    return row
+end
+
 -- Brouillons -------------------------------------------------------------------------------------------------------
 
 ---@class vAvA.AtelierDraftRow
@@ -257,6 +283,23 @@ function store.insertDraft(d)
         return nil, 'db_error'
     end
     return tonumber(id)
+end
+
+--- Morceau de transaction d'un nouveau brouillon (révision 1) : une pose qui crée aussi le brouillon du parent (T-102).
+---@param d vAvA.AtelierDraftRow
+---@return table
+function store.insertDraftStep(d)
+    return { query = INSERT_DRAFT_SQL, values = {
+        d.editor, d.kind, d.defId, d.removal and 1 or 0, d.format, d.title, d.parent or '', d.data, d.place or '',
+        d.fingerprint, d.base or 0, d.summary or '', d.accountId or 0, d.author,
+    } }
+end
+
+--- Morceau de transaction d'une sauvegarde de brouillon à sa révision (T-102 : pose dans un lot).
+function store.updateDraftStep(rowId, rev, d)
+    return { query = UPDATE_DRAFT_SQL, values = {
+        d.data, d.place or '', d.parent or '', d.title, d.fingerprint, d.format, d.summary or '', rowId, rev,
+    } }
 end
 
 --- Sauvegarde d'un brouillon à sa révision : lignes touchées (0 : révision dépassée), ou nil, 'db_error'.

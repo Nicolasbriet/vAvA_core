@@ -1,11 +1,38 @@
 local helper = require('tests.helper')
 
+-- Taille d'une valeur une fois sérialisée en msgpack (règle de tests/spec/codex_fingerprint_spec.lua, entiers au plus
+-- juste : 1, 2, 3, 5 ou 9 octets selon leur plage, comme le format compact de l'état les écrit).
+local function msgpackSize(value)
+    local kind = type(value)
+    if kind == 'nil' or kind == 'boolean' then return 1 end
+    if kind == 'number' then
+        if math.type(value) == 'float' then return 9 end
+        if value >= -32 and value <= 127 then return 1 end
+        if value >= -128 and value <= 255 then return 2 end
+        if value >= -32768 and value <= 65535 then return 3 end
+        if value >= -2147483648 and value <= 4294967295 then return 5 end
+        return 9
+    end
+    if kind == 'string' then
+        local n = #value
+        return n + (n < 32 and 1 or n < 256 and 2 or n < 65536 and 3 or 5)
+    end
+    local count = 0
+    for _ in pairs(value) do count = count + 1 end
+    local isList = count == #value
+    local size = count < 16 and 1 or 3
+    for key, item in pairs(value) do size = size + msgpackSize(item) + (isList and 0 or msgpackSize(key)) end
+    return size
+end
+
 -- Bornes d'une zone du core vérifiées à l'indexation (modules/vava_gathering/server/catalog.lua, T-015 reprise) et
 -- publication des charges d'une récolte avec sa zone (server/nodes.lua). Règles documentées : README du module (« Ce
 -- qui part chez les joueurs ») :
---   une zone dont les nœuds sont à plus de 500 m de son centre, qui a plus de 255 nœuds, ou une marge (portée des
---   props + jeu) de plus de 500 m refuse le module avec la zone en cause ; une charge prise par une récolte n'est
---   publiée qu'à sa fin (avec la zone), et une charge prise puis rendue ne fait rien partir.
+--   une zone dont les nœuds sont à plus de 500 m de son centre, qui a plus de 120 nœuds (1.8.0, T-102 : deux clés
+--   d'état par point, `p:` et `n:`, plus `zone` et `def`, 256 clés au plus par zone du core ; 255 avant 1.8.0, une
+--   clé par nœud), ou une marge (portée des props + jeu) de plus de 500 m refuse le module avec la zone en cause ; une
+--   charge prise par une récolte n'est publiée qu'à sa fin (avec la zone), et une charge prise puis rendue ne fait
+--   rien partir.
 
 describe('vava_gathering bornes des zones du core', function()
     local cfg
@@ -17,6 +44,7 @@ describe('vava_gathering bornes des zones du core', function()
             'modules/vava_gathering/shared/constants.lua',
             'modules/vava_gathering/config.lua',
             'modules/vava_gathering/shared/zonestate.lua',
+            'modules/vava_gathering/shared/zonebuild.lua',
         })
         VavaGathering.resource = 'vava_gathering'
         VavaGathering.log = { warn = function() end }
@@ -56,12 +84,13 @@ describe('vava_gathering bornes des zones du core', function()
         assert.truthy(err:find('500 m au plus', 1, true))
     end)
 
-    it('accepte 255 nœuds dans une zone et en refuse 256', function()
+    -- T-102 : la borne passe de 255 à 120 nœuds (deux clés d'état par point) ; l'essai garde la frontière exacte
+    it('accepte 120 nœuds dans une zone et en refuse 121', function()
         local own = 0
         for _, node in ipairs(cfg.nodes) do
             if node.zone == 'foret_brume' then own = own + 1 end
         end
-        addNodes('foret_brume', 255 - own)
+        addNodes('foret_brume', 120 - own)
         assert.is_true(define())
         cfg.nodes[#cfg.nodes + 1] = {
             id = 'foret_brume_essai_de_trop', zone = 'foret_brume', resource = 'chene', x = -320.0, y = -880.0, z = 31.0,
@@ -69,7 +98,53 @@ describe('vava_gathering bornes des zones du core', function()
         }
         local ok, err = define()
         assert.is_false(ok)
-        assert.truthy(err:find('256 nœuds, 255 au plus', 1, true))
+        assert.truthy(err:find('121 nœuds, 120 au plus', 1, true))
+    end)
+
+    it('tient les clés d’une zone de 120 points dans les 256 du core, réglage de l’atelier compris', function()
+        assert.equal(120, VavaGathering.ZONE_MAX_NODES)
+        assert.equal(VavaGathering.ZONE_MAX_NODES, cfg.editor.maxNodesPerZone)
+        -- `zone`, `def`, puis `p:` et `n:` par point
+        assert.is_true(2 + 2 * VavaGathering.ZONE_MAX_NODES <= 256)
+    end)
+
+    it('tient l’état d’une zone de 120 points aux identifiants les plus longs sous les 32 Ko du core', function()
+        local zonestate = VavaGathering.zonestate
+        local zone = { id = 'z', label = string.rep('é', 40), kind = 'prairie', x = -12345.678, y = 23456.789,
+            z = 123.456, radius = 300.0 }
+        local list = {}
+        for i = 1, VavaGathering.ZONE_MAX_NODES do
+            list[i] = { id = string.format('%s%03d', string.rep('n', VavaGathering.MAX_NODE_ID - 3), i),
+                resource = 'piste_lievre', x = -12345.678 + i, y = 23456.789 - i, z = 123.456, heading = 359.9 }
+        end
+        local state = zonestate.build({ band = 'reduced', scarred = true }, list, function() return 20 end, zone)
+        local keys = 0
+        for key in pairs(state) do
+            keys = keys + 1
+            assert.is_true(#key <= 48, key)
+        end
+        assert.equal(2 + 2 * VavaGathering.ZONE_MAX_NODES, keys)
+        -- pire des cas (identifiants de 46 octets ; format compact de la relecture réseau R-3 : centimètres et dixièmes
+        -- de degré entiers) : ≈ 15,9 Ko au lieu de ≈ 19,5 Ko, latent au-delà de 8 Ko
+        local size = msgpackSize(state)
+        assert.is_true(size < 16 * 1024, tostring(size))
+        -- cas courant de la spec (§ 5.4 : identifiants de 7 octets) : ≈ 4,9 Ko pour 120 points au lieu de ≈ 9 Ko, sous
+        -- le seuil du latent
+        local short = {}
+        for i = 1, VavaGathering.ZONE_MAX_NODES do
+            short[i] = { id = string.format('pt_%03d', i), resource = 'chene', x = -320.5 + i, y = -880.25 - i,
+                z = 31.0, heading = 90.0 }
+        end
+        local typical = msgpackSize(zonestate.build({ band = 'normal', scarred = false }, short, function() return 3 end,
+            { label = 'Forêt de Brume', kind = 'foret', x = -320.0, y = -880.0, z = 31.0, radius = 120.0 }))
+        assert.is_true(typical < 6 * 1024, tostring(typical))
+    end)
+
+    it('tient un identifiant de point de 46 octets dans les clés `p:` et `n:` de 48', function()
+        local zonestate = VavaGathering.zonestate
+        local id = string.rep('a', VavaGathering.MAX_NODE_ID)
+        assert.equal(48, #zonestate.placeKey(id))
+        assert.equal(48, #zonestate.nodeKey(id))
     end)
 
     it('refuse une marge de plus de 500 m', function()
@@ -77,6 +152,16 @@ describe('vava_gathering bornes des zones du core', function()
         local ok, err = define()
         assert.is_false(ok)
         assert.truthy(err:find('subscribeSlack', 1, true))
+    end)
+
+    -- seconde contre-relecture D-4 : le nom part dans l'état de zone et la carte
+    it('refuse au démarrage une zone de la graine au nom de plus de 80 octets, accepte 80', function()
+        cfg.zones[1].label = string.rep('é', 40)
+        assert.is_true(define())
+        cfg.zones[1].label = string.rep('é', 40) .. 'x'
+        local ok, err = define()
+        assert.is_false(ok)
+        assert.truthy(err:find('nom de 1 à 80 octets', 1, true))
     end)
 
     it('refuse une zone sans position', function()
@@ -97,6 +182,7 @@ describe('vava_gathering charges publiées à la fin d’une récolte', function
             'modules/vava_gathering/shared/constants.lua',
             'modules/vava_gathering/config.lua',
             'modules/vava_gathering/shared/zonestate.lua',
+            'modules/vava_gathering/shared/zonebuild.lua',
         })
         sets = {}
         DEF = { id = 'chene_1', zone = { id = 'foret_brume' }, charges = 3, regenMs = 600000, resource = { skill = 'bucheronnage' } }

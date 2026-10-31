@@ -22,7 +22,7 @@ VavaAtelier.QUERY_PATTERN = '^[^\0-\31\127<>]*$'
 VavaAtelier.MAX_QUERY = 48
 VavaAtelier.OPTION_PATTERN = '^[A-Za-z0-9_%-]+$'  -- valeur d'un choix (segmented, select, model)
 VavaAtelier.MAX_OPTION = 32
-VavaAtelier.MAX_MODEL = 64
+-- VavaAtelier.MAX_MODEL (64) : shared/constants.lua, lu aussi par le client (fantômes de l'outil de placement)
 VavaAtelier.ITEM_PATTERN = '^[A-Za-z0-9_%-%.:]+$' -- nom d'un objet du registre vava_inventory:items
 VavaAtelier.MAX_ITEM = 64
 VavaAtelier.MAX_VALUE_STRING = 1200            -- valeur texte reçue (300 caractères UTF-8 accentués)
@@ -73,6 +73,8 @@ VavaAtelier.REFUSALS = {
     'stale', 'draft_taken', 'draft_open', 'not_holder', 'no_draft', 'not_stored', 'too_large', 'full',
     'parent_missing', 'trial_busy', 'no_trial', 'syncing', 'unknown_version', 'not_archived', 'unchanged',
     'unreadable',
+    -- T-102 (outil de placement)
+    'not_placeable', 'instance', 'bad_request',
 }
 
 -- Bornes d'une fiche gardée.
@@ -100,6 +102,17 @@ VavaAtelier.PLACE = {
     minArea = 0.01,            -- aire d'un polygone, au moins (m²)
     modelMin = -2147483648,    -- empreinte d'un modèle (porte) : signée ou non
     modelMax = 4294967295,
+}
+
+-- Règles de placement d'un type (T-102, shared/formschema.lua) : bornes d'une déclaration `rules`, `template`,
+-- `hintFormat`, `ghost`. Les bornes d'un cercle et d'un tracé viennent de config.place.
+VavaAtelier.RULES = {
+    slackMax = 50,             -- rules.inside.slack (m)
+    spacingMax = 100,          -- rules.spacing (m)
+    template = { min = 1, max = 8 },
+    hintFormat = 24,           -- octets, un seul %s
+    ghostModels = 64,          -- entrées de ghost.models
+    ghostLabel = 40,           -- libellé d'un modèle (« chêne de GTA »)
 }
 
 -- Archives JSON (shared/exchange.lua) : nom d'un fichier (sans barre ni « .. »), version du format, profondeur.

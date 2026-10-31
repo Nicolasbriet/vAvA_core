@@ -4,6 +4,7 @@
            les suggestions du chat) : visibles du Conseil qui a le droit d'ouvrir l'Atelier. Le bouton de la page
            Outils du Registre est reporté à une tâche qui touchera vava_admin. T-101 : /atelier_archives (état,
            original, archives), une permission par action (le droit d'un atelier est revérifié à l'exécution).
+           T-102 : commande-touche de l'outil de placement (Ctrl+Z, touche Z réglable), sans interface.
     Dépendances : shared/constants.lua, config.lua, server/core.lua
 ]]
 
@@ -22,7 +23,13 @@ local function entries()
     local open = cfg.rights.open
     local L = cfg.texts.archives.labels
     local atelier = { name = 'atelier', type = 'list', list = 'ateliers' }
+    local undo = cfg.placement.undoKey
     return {
+        -- T-102 : Ctrl+Z de l'outil de placement (Z en commande-touche, avec Ctrl ; hors visée, rien)
+        [undo.command] = {
+            kind = 'key', scope = 'admin', permission = open, key = undo.key, keyDisplay = 'Ctrl ' .. undo.key,
+            hold = true, ui = false, label = undo.label,
+        },
         [cfg.command] = {
             kind = 'command', scope = 'admin', permission = cfg.rights.open, key = cfg.keys.open, ui = true,
             label = cfg.labels.open, description = cfg.texts.codex,
