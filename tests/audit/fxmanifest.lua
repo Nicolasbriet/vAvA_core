@@ -1,8 +1,9 @@
 --[[
     tests/audit/fxmanifest.lua
     Rôle : cas écrits pour `./scripts/audit-reseau.sh --essai` (jamais chargé, ni linté, ni audité en mode normal) :
-           motifs livrés d'un manifeste qui couvriraient web/dev/ (données simulées, T-012). Chaque ligne qui compte
-           finit par ce que l'audit doit en dire. Un bloc de commentaire ne compte pas : 'web/dev/devmock.js', 'web/**'
+           motifs livrés d'un manifeste qui couvriraient web/dev/ (données simulées, T-012) ; config.lua servi aux
+           joueurs, config_client.lua servi au seul serveur (T-132). Chaque ligne qui compte finit par ce que l'audit
+           doit en dire. Un bloc de commentaire ne compte pas : 'web/dev/devmock.js', 'web/**', 'config.lua'
 ]]
 
 ui_page 'web/index.html'  -- attendu: rien
@@ -55,3 +56,35 @@ file 'web/dev/horsjeu.js'  -- attendu: BLOQUANT
 ]==] file 'web/*/x.js'  -- attendu: BLOQUANT
 --[[ bloc fermé sur la même ligne ]] file 'web/**'  -- attendu: BLOQUANT
 --[[ 'web/**' ]] file 'web/index.html'  -- attendu: rien
+
+-- T-132 : config.lua jamais servi aux joueurs ; config_client.lua jamais au seul serveur
+shared_scripts {
+    'shared/constants.lua',  -- attendu: rien
+    'config_client.lua',  -- attendu: rien
+    'config.lua',  -- attendu: BLOQUANT
+    './config.lua',  -- attendu: BLOQUANT
+    '*.lua',  -- attendu: BLOQUANT
+    'config.*',  -- attendu: BLOQUANT
+    'conf?g.lua',  -- attendu: BLOQUANT
+    '**/*.lua',  -- attendu: BLOQUANT
+    '@vava_autre/config.lua',  -- attendu: BLOQUANT
+    'shared/config.lua',  -- attendu: rien
+    'config_client.lua.bak',  -- attendu: rien
+}
+client_script 'config.lua'  -- attendu: BLOQUANT
+client_scripts { 'config_client.lua', 'client/main.lua' }  -- attendu: rien
+files { 'config.lua' }  -- attendu: BLOQUANT
+server_scripts {
+    'config.lua',  -- attendu: rien
+    'config_client.lua',  -- attendu: BLOQUANT
+    'shared/rules.lua',  -- attendu: rien
+}
+server_script 'config_client.lua'  -- attendu: BLOQUANT
+server_scripts { '*.lua' }  -- attendu: BLOQUANT
+-- shared_script 'config.lua'  -- attendu: rien
+--[[ client_script 'config.lua' ]] client_script 'client/a.lua'  -- attendu: rien
+shared_scripts { 'config.lua' } -- exception transitoire  -- attendu: rien
+-- relecture : ui_page et loadscreen ne servent pas de script ; une table imbriquée garde sa directive
+ui_page 'config.lua'  -- attendu: rien
+client_scripts { { 'config.lua' } }  -- attendu: BLOQUANT
+server_scripts { 'config.lua' } shared_script 'config.lua'  -- attendu: BLOQUANT

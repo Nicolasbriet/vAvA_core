@@ -1,10 +1,11 @@
 #!/usr/bin/env bash
 # scripts/audit-reseau.sh — garde-fous statiques (motifs interdits). Ne remplace pas la relecture des agents.
 # Usage : audit-reseau.sh [fichiers…]  (sans argument : tout le dépôt)
+#         (manifestes lus : modules/*/fxmanifest.lua et examples/*/fxmanifest.lua, par scripts/lib/manifeste.awk)
 #         audit-reseau.sh --essai      contrôles lancés sur les cas écrits de tests/audit/ (avec
 #                                      tests/audit/exceptions.txt), comparés à ce que chaque ligne attend en fin de
 #                                      ligne (« -- attendu: BLOQUANT | AVERTISSEMENT | rien ») ; code 1 au moindre écart.
-#                                      Cas : *.lua (code Lua), fxmanifest.lua (motifs livrés), *.css, *.svg, *.html,
+#                                      Cas : *.lua (code Lua), fxmanifest.lua (motifs livrés, config), *.css, *.svg, *.html,
 #                                      *.js (interfaces), chemins.txt (chemins fictifs de fichiers livrés, un par ligne),
 #                                      exceptions.txt (une exception refusée est signalée sur sa ligne)
 set -uo pipefail
@@ -36,7 +37,7 @@ else
     for f in "${fichiers[@]}"; do
         [[ -f "$f" ]] || continue
         case "$f" in modules/*/web/*) chemins+=("$f") ;; esac
-        case "$f" in modules/*/fxmanifest.lua) manifestes+=("$f") ;; esac
+        case "$f" in modules/*/fxmanifest.lua|examples/*/fxmanifest.lua) manifestes+=("$f") ;; esac
         case "$f" in
             chancellerie/*|tests/*|examples/*) ;;
             *.lua) lua+=("$f") ;;
@@ -318,96 +319,24 @@ if [[ ${#chemins[@]} -gt 0 ]]; then
         "$(printf '%s' "$copies" | filtrer | relocaliser || true)"
 fi
 
-# Motifs livrés d'un manifeste qui couvriraient web/dev/. Seules comptent les chaînes de `files { … }`, `file`,
-# `ui_page` et `loadscreen` (pas celles des scripts). Lecture du Lua : commentaires de fin de ligne et blocs
-# (`--[[ ]]`, `--[==[ ]==]`) ignorés, chaînes courtes et longues (`[[…]]`, `[==[…]==]`, sur plusieurs lignes) lues.
-# Chaque chaîne est normalisée (`\` → `/`, `./` et `/./` retirés, `//` réduit), puis refusée si elle contient `**`, ou si
-# sa première partie peut valoir `web` et que sa deuxième peut valoir `dev` (`web/dev…`, `web/de?`, `web/dev*`,
-# `web/*`, `*/dev/x.js`) ou qu'une partie de dossier porte un joker (`web/*/x.js`).
-MANIFESTE_AWK='
-function norm(m) {
-    gsub(/\\/, "/", m)
-    gsub(/\/\/+/, "/", m)
-    while (gsub(/\/\.\//, "/", m)) {}
-    while (sub(/^\.\//, "", m)) {}
-    sub(/^\/+/, "", m)
-    return m
-}
-function glob2re(g,    i, ch, r) {
-    r = ""
-    for (i = 1; i <= length(g); i++) {
-        ch = substr(g, i, 1)
-        if (ch == "*") r = r ".*"
-        else if (ch == "?") r = r "."
-        else if (ch == "[" && index(substr(g, i + 1), "]")) {
-            r = r "["; i++
-            if (substr(g, i, 1) == "!") { r = r "^"; i++ }
-            while (substr(g, i, 1) != "]") { r = r substr(g, i, 1); i++ }
-            r = r "]"
-        }
-        else if (ch ~ /[].[+^$(){}|]/) r = r "\\" ch
-        else r = r ch
-    }
-    return "^" r "$"
-}
-function couvre(g, mot) { return mot ~ glob2re(g) }
-function dangereux(m,    n, p, i) {
-    m = norm(m)
-    if (index(m, "**")) return 1
-    n = split(m, p, "/")
-    if (n < 2 || !couvre(p[1], "web")) return 0
-    if (couvre(p[2], "dev")) return 1
-    for (i = 1; i < n; i++) if (p[i] ~ /[*?[]/) return 1
-    return 0
-}
-function valeur(s) {
-    if (prof > 0 || attente == "files" || attente == "file" || attente == "ui_page" || attente == "loadscreen")
-        if (dangereux(s) && cle != FILENAME ":" debut) { cle = FILENAME ":" debut; print cle ":" ldebut }
-    if (prof == 0) attente = ""
-}
-FNR == 1 { mode = ""; ferme = ""; attente = ""; prof = 0; chaine = "" }
-{
-    l = $0; sub(/\r$/, "", l); n = length(l); i = 1
-    while (i <= n) {
-        if (mode != "") {   # dans un bloc de commentaire (C) ou une chaîne longue (L)
-            k = index(substr(l, i), ferme)
-            if (!k) { if (mode == "L") chaine = chaine substr(l, i) "\n"; break }
-            if (mode == "L") valeur(chaine substr(l, i, k - 1))
-            i += k - 1 + length(ferme); mode = ""; continue
-        }
-        ch = substr(l, i, 1)
-        if (ch == "-" && substr(l, i + 1, 1) == "-") {
-            if (match(substr(l, i + 2), /^\[=*\[/)) {
-                ferme = "]" substr(l, i + 3, RLENGTH - 2) "]"; mode = "C"; i += 2 + RLENGTH; continue
-            }
-            break
-        }
-        if (ch == "[" && match(substr(l, i), /^\[=*\[/)) {
-            ferme = "]" substr(l, i + 1, RLENGTH - 2) "]"; mode = "L"; chaine = ""; debut = FNR; ldebut = l
-            i += RLENGTH; continue
-        }
-        if (ch == "\"" || ch == Q) {
-            j = i + 1; s = ""
-            while (j <= n && substr(l, j, 1) != ch) {
-                if (substr(l, j, 1) == "\\") { s = s substr(l, j, 2); j += 2 } else { s = s substr(l, j, 1); j++ }
-            }
-            debut = FNR; ldebut = l; valeur(s); i = j + 1; continue
-        }
-        if (ch ~ /[A-Za-z_]/) {
-            match(substr(l, i), /^[A-Za-z_][A-Za-z0-9_]*/); mot = substr(l, i, RLENGTH); i += RLENGTH
-            if (prof == 0) attente = (mot == "files" || mot == "file" || mot == "ui_page" || mot == "loadscreen") ? mot : ""
-            continue
-        }
-        if (ch == "{") { if (prof > 0) prof++; else if (attente == "files") { prof = 1; attente = "" } else attente = "" }
-        else if (ch == "}") { if (prof > 0) prof-- }
-        else if (ch !~ /[ \t(),;]/ && prof == 0) attente = ""
-        i++
-    }
-}
-'
+# Motifs des manifestes, lus par scripts/lib/manifeste.awk (partagé avec scripts/poids-client.sh ; règles détaillées
+# en tête du fichier). Lecture du Lua : commentaires ignorés, chaînes courtes et longues lues ; chaque chaîne est
+# normalisée (`\` → `/`, `./` et `/./` retirés, `//` réduit). Constats par étiquette :
+#  W — (T-012) chaîne de `files`, `file`, `ui_page` ou `loadscreen` qui couvrirait web/dev/ (`**`, `web/dev…`,
+#      `web/*`, `*/dev/x.js`, joker dans un dossier sous web/) ;
+#  C — (T-132) `config.lua` couvert par une chaîne de `shared_script(s)`, `client_script(s)`, `files` ou `file` ;
+#  S — (T-132) `config_client.lua` couvert par une chaîne de `server_script(s)`.
+# Les modules pas encore basculés (lots 2 à 4 de T-132) ont une exception transitoire par manifeste dans
+# scripts/audit-exceptions.txt : la liste des exceptions est la liste du travail restant.
 if [[ ${#manifestes[@]} -gt 0 ]]; then
-    res=$(awk -v Q="'" "$MANIFESTE_AWK" "${manifestes[@]}" 2>/dev/null | filtrer code || true)
-    noter BLOQUANT "motif livré qui couvrirait web/dev/ (données simulées) : ni web/dev, ni **, ni joker dans un dossier sous web/ (T-012)" "$res"
+    lus=$(awk -v Q="'" -f scripts/lib/manifeste.awk "${manifestes[@]}" 2>/dev/null || true)
+    etiquette() { printf '%s\n' "$lus" | sed -n "s/^$1"$'\t'"//p" | filtrer code || true; }
+    noter BLOQUANT "motif livré qui couvrirait web/dev/ (données simulées) : ni web/dev, ni **, ni joker dans un dossier sous web/ (T-012)" \
+        "$(etiquette W)"
+    noter BLOQUANT "config.lua servi aux joueurs : il est réservé au serveur ; ce que le client lit va dans config_client.lua (T-132)" \
+        "$(etiquette C)"
+    noter BLOQUANT "config_client.lua servi au seul serveur : les joueurs ne le recevraient pas (shared_scripts, ou client_scripts pour un module sans partie serveur) (T-132)" \
+        "$(etiquette S)"
 fi
 
 if [[ $ESSAI -eq 1 ]]; then
