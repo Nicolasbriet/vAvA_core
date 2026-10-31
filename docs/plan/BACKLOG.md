@@ -751,8 +751,10 @@ faire tout le système de combat ») : la porte T-119 reste à passer en jeu.
 
 ### T-111 — Armes de corps à corps
 - Agent : vava-dev-lua · Dépend de : T-110 · Statut : en cours
-- **En cours (31 octobre 2026, interrompu)** : branche `agents/T-111`. Spec `docs/plan/specs/T-111.md` commitée
-  (16 décisions retenues) ; cinq icônes d'armes faites, bouclier et tout le Lua restent à faire.
+- **En cours (31 octobre 2026, repris)** : branche `agents/T-111`. Spec `docs/plan/specs/T-111.md` (16 décisions
+  retenues) ; `vava_combat` 1.0.0 codé, testé hors jeu (`verifier.sh` OK avec `BASE=main`), documenté (README, api.md,
+  `docs/tests/combat.md` § 2, rapport `docs/plan/rapports/T-111.md`) ; `vava_example_combat` 1.1.0 (`/frapper_arme`,
+  spec § 13-2 : autorisation à confirmer). Restent les relectures sécurité, réseau et lore.
 - Objets armes (catégories, dégâts de base, qualité de forge, usure), correspondance vers modèles vanilla
   (PLACEHOLDER), bouclier accroché, contrôles natifs du corps à corps et armes à feu coupés. Recettes de forge
   ajoutées à `vava_crafting`.
