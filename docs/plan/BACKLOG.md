@@ -976,7 +976,8 @@ faire tout le système de combat ») : la porte T-119 reste à passer en jeu.
   ajoutées à `vava_crafting`.
 
 ### T-112 — Moteur de techniques `vava_combat`
-- Agents : vava-architecte → vava-dev-lua · Dépend de : T-111 · Statut : à faire
+- Agents : vava-architecte → vava-dev-lua · Dépend de : T-111 · Statut : en cours
+- Spec : `docs/plan/specs/T-112.md`, avec les décisions du porteur du projet du 31 octobre 2026.
 - Techniques en données (format de `COMBAT_V1.md`), 4 techniques d'épée en config, RPC `vava_combat:use`, fenêtre
   de frappe tenue par le serveur, positions serveur et tolérances, enchaînement, réactions envoyées aux proches
   seulement ; verrouillage de cible repris de `vava_magic`.
@@ -987,6 +988,14 @@ faire tout le système de combat ») : la porte T-119 reste à passer en jeu.
   tout le personnage à chaque `armed()` ; **(lore)** prévoir une vraie durée pour dégainer et rengainer, ou un court
   délai avant d'incanter après avoir rangé une arme, sinon la règle « le mage a besoin d'un garde » ne tient pas
   (l'incantation est déjà brisée dès qu'une arme passe en main, `vava_inventory:hold`).
+
+### T-149 — La magie et le mode combat
+- Agent : vava-dev-lua (cette tâche autorise à toucher `vava_magic`) · Dépend de : T-112, T-138 · Statut : à faire
+- Décision du porteur du projet (31/10, spec T-112) : en mode combat (arme en main), la magie ne montre ni rappel
+  « rangez votre arme » ni anneau de verrou ; texte propre pendant le rengainement ; export `hardControl(src)` (gelé,
+  renversé, chancelant) lu par `vava_combat` pour refuser une frappe.
+- Relecture sécurité de T-138 (S-2) : `combat.affects` lit `vava_admin:isInvulnerable(src)` (appel isolé) pour que
+  les effets sans dégâts (recul, renversement, mouillé, ralenti) épargnent un membre invulnérable.
 
 ### T-113 — Blocage, parade, esquive
 - Agent : vava-dev-lua · Dépend de : T-112 · Statut : à faire
