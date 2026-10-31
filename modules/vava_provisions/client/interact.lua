@@ -3,9 +3,9 @@
     Rôle : le point d'eau côté joueur. Invite pour le point le plus proche à portée d'usage (cachée à terre, pendant une
            demande ou un geste, sans personnage). Appui sur la touche : le point désigné est envoyé au serveur (RPC
            vava_provisions:draw), qui décide tout ; puis geste local (puiser ou boire, durée de la config, aucune boucle
-           par image) et notification du résultat, ou du refus, formée d'après la config (shared/rules.lua). Le client ne
+           par image) et notification du résultat, ou du refus, formée d'après la config (shared/texts.lua). Le client ne
            décide de rien.
-    Dépendances : shared/constants.lua, config_client.lua, shared/rules.lua, client/core.lua, client/nui.lua, client/points.lua
+    Dépendances : shared/constants.lua, config_client.lua, shared/texts.lua, client/core.lua, client/nui.lua, client/points.lua
 ]]
 
 local type, tostring, pcall = type, tostring, pcall
@@ -18,7 +18,7 @@ local core = VavaProvisions.core
 if not core then return end
 
 local cfg = VavaProvisions.config
-local rules = VavaProvisions.rules
+local texts = VavaProvisions.texts
 local nui = VavaProvisions.nui
 local points = VavaProvisions.points
 local RPC = VavaProvisions.RPC
@@ -59,7 +59,7 @@ function interact.refreshPrompt(pointId)
         nui.hidePrompt()
         return
     end
-    nui.showPrompt(cfg.keys.interact, rules.promptVerb(cfg.kinds[point.kind], messages.prompt), point.label)
+    nui.showPrompt(cfg.keys.interact, texts.promptVerb(cfg.kinds[point.kind]), point.label)
 end
 
 --- Joue le geste de l'action (scénario, ou animation du haut du corps) pendant sa durée, puis l'arrête. Bloque le
@@ -102,12 +102,12 @@ local function request(pointId)
         return
     end
     if not success then
-        local text = rules.refusalText(result, extra, kind, messages)
+        local text = texts.refusalText(result, extra, kind)
         if text and notify then notify(text, 'warning') end
         interact.refreshPrompt(points.nearest())
         return
     end
-    local text = rules.successText(result, messages)
+    local text = texts.successText(result)
     if type(result) == 'table' and (result.action == 'fill' or result.action == 'drink') and core.characters.current() then
         acting = true
         interact.refreshPrompt(nil)

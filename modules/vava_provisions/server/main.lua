@@ -51,6 +51,12 @@ local function setup()
             .. 'les réglages lus par les joueurs sont dans config_client.lua ; reportez vos changements d\'après '
             .. 'config.lua.nouveau')
     end
+    -- T-143 : les textes du Conseil ont quitté config_client.lua pour config.lua en 1.2.0 ; un config.lua de 1.1.0 gardé
+    -- par une mise à jour ne les a pas, et /eau les lit : le module ne démarre pas sans eux
+    if type(cfg.messages.admin) ~= 'table' or type(cfg.messages.journal) ~= 'table' then
+        return false, 'config.lua d\'avant 1.2.0 : messages.admin et messages.journal (textes du Conseil) y manquent ; '
+            .. 'reportez-les d\'après config.lua.nouveau'
+    end
     local declared, declareErr = VavaProvisions.commands.declare()
     if not declared then return false, 'commandes : ' .. tostring(declareErr) end
     local valid, code, path = rules.validateConfig(cfg)

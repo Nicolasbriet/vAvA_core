@@ -9,7 +9,7 @@
            atomique de l'inventaire, rendus s'il échoue ; besace pleine ou trop lourde : le joueur qui a soif boit sur
            place) ou boire quelques gorgées (vava_needs). Payloads des hooks reconstruits à chaque fois. Le client ne
            dit ni ce qu'il veut faire, ni ce qu'il porte, ni sa soif.
-    Dépendances : shared/constants.lua, config.lua, shared/rules.lua, server/core.lua, bridge/server.lua,
+    Dépendances : shared/constants.lua, config.lua, shared/texts.lua, shared/rules.lua, server/core.lua, bridge/server.lua,
                   server/points.lua
 ]]
 
@@ -19,6 +19,7 @@ local sqrt = math.sqrt
 
 local bridge = VavaProvisions.bridge
 local rules = VavaProvisions.rules
+local texts = VavaProvisions.texts
 local points = VavaProvisions.points
 local cfg = VavaProvisions.config
 local ACTIONS, HOOKS = VavaProvisions.ACTIONS, VavaProvisions.HOOKS
@@ -54,7 +55,7 @@ end
 ---@return string|nil reason
 local function refused(reason)
     if reason == 'hook_error' then return false, 'unavailable' end
-    local text = rules.cutText(reason, MAX_REASON)
+    local text = texts.cutText(reason, MAX_REASON)
     if not text then return false, 'unavailable' end
     return false, 'refused', text
 end

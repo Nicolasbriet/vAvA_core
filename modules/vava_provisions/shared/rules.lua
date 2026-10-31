@@ -1,16 +1,17 @@
 --[[
     vava_provisions/shared/rules.lua
-    Rôle : logique PURE des vivres (aucune native, testée hors jeu : tests/spec/provisions_rules_spec.lua) : validation
-           d'un point d'eau (seul juge, repris tel quel par le futur éditeur de l'Atelier) et de la config, réserve d'un
+    Rôle : logique PURE des vivres (aucune native, testée hors jeu : tests/spec/provisions_rules_spec.lua), servie au
+           seul serveur (T-143 : les textes montrés au joueur sont dans shared/texts.lua, partagé) : validation d'un
+           point d'eau (seul juge, repris tel quel par le futur éditeur de l'Atelier) et de la config, réserve d'un
            point (niveau, attente), choix de l'action au point d'eau, contenant gardé ou fendu, lecture de /eau, textes
-           montrés au joueur et au Conseil. Motifs écrits octet par octet (ni %c, ni %s, ni %w : ils dépendent de la
-           locale du système et prendraient des octets d'un caractère accentué).
-    Dépendances : shared/constants.lua
+           du Conseil. Motifs écrits octet par octet (ni %c, ni %s, ni %w : ils dépendent de la locale du système et
+           prendraient des octets d'un caractère accentué).
+    Dépendances : shared/constants.lua, shared/texts.lua
 ]]
 
 local type, pairs, ipairs, next, tostring, tonumber = type, pairs, ipairs, next, tostring, tonumber
 local mathType, tointeger, floor, ceil, min, max, huge = math.type, math.tointeger, math.floor, math.ceil, math.min, math.max, math.huge
-local find, format, gsub, sub, byte = string.find, string.format, string.gsub, string.sub, string.byte
+local find, format, gsub = string.find, string.format, string.gsub
 local utf8len = utf8.len
 
 local ACTIONS = VavaProvisions.ACTIONS
@@ -28,12 +29,7 @@ local ITEM_PATTERN = '^[a-z0-9_]+$'
 local EFFECT_PATTERN = '^[A-Za-z_][A-Za-z0-9_]*$'
 local ITEM_SIZE_MAX, ITEM_QUANTITY_MAX, EFFECT_ENTRIES_MAX, EFFECT_VALUE_MAX = 8, 1000000, 8, 1000
 
--- codes de refus du serveur → clé du texte dans `messages`
-local REFUSAL_KEYS = {
-    wait = 'wait', too_far = 'tooFar', not_thirsty = 'notThirsty', no_container = 'noContainer', no_space = 'noSpace',
-    too_heavy = 'tooHeavy', unavailable = 'unavailable',
-}
-local NOTICE_KEYS = { torn = 'torn', lost = 'lost' }
+local texts = VavaProvisions.texts
 
 local rules = {}
 VavaProvisions.rules = rules
@@ -82,26 +78,6 @@ function rules.cleanText(value, maxBytes)
     local trimmed = gsub(gsub(value, '^ +', ''), ' +$', '')
     if #trimmed < 1 or #trimmed > maxBytes then return nil end
     return trimmed
-end
-
---- Texte coupé à `maxBytes` octets sans briser un caractère UTF-8, contrôles remplacés par une espace ; nil si vide
---- ou si ce n'est pas un texte.
----@param value any
----@param maxBytes integer
----@return string|nil
-function rules.cutText(value, maxBytes)
-    if type(value) ~= 'string' then return nil end
-    local text = gsub(value, CONTROL_PATTERN, ' ')
-    if #text > maxBytes then
-        local cut = maxBytes
-        -- recule tant que l'octet suivant la coupe est un octet de suite (10xxxxxx) : le caractère entier part
-        while cut > 0 and (byte(text, cut + 1) or 0) >= 0x80 and (byte(text, cut + 1) or 0) < 0xC0 do cut = cut - 1 end
-        text = sub(text, 1, cut)
-    end
-    if utf8len(text) == nil then return nil end
-    text = gsub(gsub(text, '^ +', ''), ' +$', '')
-    if text == '' then return nil end
-    return text
 end
 
 --- Nom de modèle : absent (nil), '' (aucun prop) ou 1 à 64 octets `^[A-Za-z0-9_]+$`.
@@ -395,8 +371,8 @@ end
 ---@return string[]
 function rules.packLines(lines, maxBytes, maxLines, more)
     local kept = {}
-    for i = 1, min(#lines, maxLines) do kept[#kept + 1] = rules.cutText(lines[i], maxBytes) or '' end
-    if #lines > maxLines then kept[#kept + 1] = rules.cutText(format(more, #lines - maxLines), maxBytes) or '' end
+    for i = 1, min(#lines, maxLines) do kept[#kept + 1] = texts.cutText(lines[i], maxBytes) or '' end
+    if #lines > maxLines then kept[#kept + 1] = texts.cutText(format(more, #lines - maxLines), maxBytes) or '' end
     local messages, current = {}, nil
     for _, line in ipairs(kept) do
         if current and #current + 1 + #line <= maxBytes then
@@ -408,69 +384,4 @@ function rules.packLines(lines, maxBytes, maxLines, more)
     end
     if current then messages[#messages + 1] = current end
     return messages
-end
-
--- Textes au joueur ------------------------------------------------------------------------------------------------
-
---- Minutes d'attente annoncées (arrondies au-dessus, au moins 1).
----@param seconds any
----@return integer
-function rules.dryMinutes(seconds)
-    if not finite(seconds) or seconds <= 0 then return 1 end
-    return max(1, tointeger(ceil(seconds / 60)) or 1)
-end
-
---- Texte d'une action réussie (réponse du RPC), ou nil.
----@param result any  { action = 'fill', count } | { action = 'drink', dry }
----@param messages table
----@return string|nil
-function rules.successText(result, messages)
-    if type(result) ~= 'table' then return nil end
-    if result.action == ACTIONS.FILL then
-        local count = mathType(result.count) == 'integer' and result.count or 1
-        if count <= 1 then return messages.filledOne end
-        return format(messages.filledMany, count)
-    end
-    if result.action == ACTIONS.DRINK then
-        -- remplissage refusé par la besace : on a bu sur place à la place ; les deux textes, l'un après l'autre
-        local key = (result.blocked == 'no_space' or result.blocked == 'too_heavy') and REFUSAL_KEYS[result.blocked] or nil
-        if key then return messages[key] .. ' ' .. messages.drank end
-        return result.dry == true and messages.drankDry or messages.drank
-    end
-    return nil
-end
-
---- Texte d'un refus du serveur, ou nil quand il n'y a rien à dire (sans personnage, à terre, occupé, point inconnu).
---- `dry` : texte de la sorte avec les minutes d'attente ; `refused` : raison du hook, coupée à 200 octets.
----@param code any
----@param extra any       secondes (dry), raison (refused)
----@param kind table|nil  sorte du point (dry)
----@param messages table
----@return string|nil
-function rules.refusalText(code, extra, kind, messages)
-    if code == 'dry' then
-        if type(kind) ~= 'table' or type(kind.dry) ~= 'string' then return messages.unavailable end
-        return format(kind.dry, rules.dryMinutes(extra))
-    end
-    if code == 'refused' then return rules.cutText(extra, MAX_NOTIFICATION) end
-    local key = REFUSAL_KEYS[code]
-    return key and messages[key] or nil
-end
-
---- Texte d'un avis du serveur (outre fendue, perdue), ou nil pour toute autre valeur.
----@param code any
----@param messages table
----@return string|nil
-function rules.noticeText(code, messages)
-    local key = NOTICE_KEYS[code]
-    return key and messages[key] or nil
-end
-
---- Verbe de l'invite selon la sorte : on y boit (« Puiser ou boire »), ou on n'y fait que puiser.
----@param kind table|nil
----@param prompt { both: string, fill: string }
----@return string
-function rules.promptVerb(kind, prompt)
-    if type(kind) == 'table' and kind.drink == true then return prompt.both end
-    return prompt.fill
 end

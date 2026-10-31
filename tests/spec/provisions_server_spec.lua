@@ -29,6 +29,7 @@ end
 local BASE_FILES = {
     'modules/vava_provisions/shared/constants.lua',
     'modules/vava_provisions/config.lua',
+    'modules/vava_provisions/shared/texts.lua',
     'modules/vava_provisions/shared/rules.lua',
     'modules/vava_provisions/shared/pointzone.lua',
 }
