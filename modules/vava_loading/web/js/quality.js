@@ -3,8 +3,7 @@
  * Rôle : logique pure du niveau d'effets (spec T-020 § 8.3) : niveau de départ (réglage, moins d'animations demandé,
  *        nombre de cœurs) et dégradation en cours de route d'après l'intervalle entre les images déjà dessinées.
  *        Jamais de remontée : pas d'oscillation pendant les à-coups du chargement ; `basse` est terminal.
- *        Aucun minuteur : la page appelle step() à chaque image dessinée. Cadence des canvas (due) : paysage et braises
- *        n'ont pas le même plafond.
+ *        Aucun minuteur : la page appelle step() à chaque image dessinée. Cadence du canvas des braises (due).
  * Dépendances : aucune
  */
 (function (root) {
@@ -47,22 +46,6 @@
     return now - last >= 1000 / cap - margin;
   }
 
-  /**
-   * Image du paysage due à l'instant `now` ? Il n'est repeint que sur une image des braises : plafond `worldFps`, jamais
-   * au-dessus de `fxFps` ; marge d'un quart d'intervalle des braises (à 30 et 15 i/s : une image des braises sur deux,
-   * même si l'horloge des images vacille de quelques ms).
-   * @param {number} last  instant de la dernière image du paysage (0 : aucune)
-   * @param {number} now
-   * @param {number} worldFps
-   * @param {number} fxFps
-   * @return {boolean}
-   */
-  function worldDue(last, now, worldFps, fxFps) {
-    var fx = typeof fxFps === 'number' && isFinite(fxFps) && fxFps > 0 ? fxFps : 30;
-    var world = typeof worldFps === 'number' && isFinite(worldFps) && worldFps > 0 ? Math.min(worldFps, fx) : fx;
-    return due(last, now, world, 250 / fx);
-  }
-
   /** Niveau juste en dessous (basse reste basse). */
   function lower(level) {
     var i = LEVELS.indexOf(level);
@@ -99,7 +82,7 @@
     return next;
   }
 
-  VavaLoading.quality = { LEVELS: LEVELS, initial: initial, due: due, worldDue: worldDue, lower: lower, meter: meter, step: step };
+  VavaLoading.quality = { LEVELS: LEVELS, initial: initial, due: due, lower: lower, meter: meter, step: step };
 
   if (typeof module === 'object' && module.exports) module.exports = VavaLoading.quality;
 })(typeof window !== 'undefined' ? window : globalThis);

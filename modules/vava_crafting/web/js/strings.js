@@ -49,11 +49,13 @@ const STRINGS = Object.freeze({
       quantity: (n) => `× ${n}`,
       signed: 'Objet signé',
       transmission: 'Savoir transmis',
+      unregistered: 'Indisponible',
       preview: 'Qualité attendue',
       previewValue: (q, lo, hi) => `${q} · entre ${lo} et ${hi}`,
       previewSimple: 'Palier attendu',
       craft: 'Façonner',
       reasons: {
+        unregistered: 'Cette recette ne peut ni se façonner ni s\'apprendre : prévenez le Conseil.',
         level: 'Niveau insuffisant.',
         tool: 'Prenez l\'outil en main.',
         fuel: 'La station manque de combustible.',

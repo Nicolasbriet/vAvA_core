@@ -703,6 +703,16 @@ versé à T-014 ; les autres points déjà couverts sont précisés dans T-012 �
 - Critères : aucun `TriggerClientEvent` direct hors du repli et de l'annonce ; essai du repli ; `/vava_reseau` montre
   les envois du Registre.
 
+### T-153 — Audit : peser ce qui est livré, pas le dossier
+- Agent : vava-dev-lua · Dépend de : — · Statut : à faire
+- Trouvé pendant T-152 (relecture réseau R-5) : `scripts/audit-reseau.sh` (contrôle du poids de `vava_loading`) mesure
+  le dossier par `du -sb`, qui compte ≈ 70 Ko jamais livrés (README, `web/dev/`, licences des polices) ; il ne reste
+  que ≈ 56 Ko de marge, et une simple retouche du README ou des essais déclencherait un BLOQUANT sans un octet de plus
+  chez les joueurs. Mesurer les seuls fichiers du manifeste (`scripts/lib/manifeste.awk`, comme
+  `scripts/poids-client.sh`) et poser le plafond sur ce total.
+- Critères : plafond sur le total livré ; cas d'essai de l'audit (`tests/audit/`) pour un fichier non livré lourd
+  (sans effet) et un fichier livré qui dépasse (BLOQUANT) ; mesures avant et après dans le rapport.
+
 ### T-148 — Fichiers `shared/` absents du manifeste
 - Agent : vava-dev-lua · Dépend de : T-132 · Statut : à faire
 - Trouvé pendant T-146 : rien ne vérifie qu'un `shared/*.lua` présent dans un module est bien listé à son manifeste ;
@@ -831,13 +841,25 @@ versé à T-014 ; les autres points déjà couverts sont précisés dans T-012 �
   `docs/plan/rapports/T-136.md` ; à tester en jeu : `docs/tests/metiers.md` § 5.3.
 
 ### T-147 — Artisanat : recette libre inconnue des compétences signalée
-- Agent : vava-dev-lua · Dépend de : — · Statut : à faire
+- Agent : vava-dev-lua · Dépend de : — · Statut : à tester en jeu (relu lore, sécurité et réseau, suites appliquées)
 - Trouvé pendant T-136 : `vava_crafting` affiche au menu une recette déclarée à l'artisanat mais inconnue de
   `vava_skills:recipes`, puis la refuse au clic (`not_known`), sans rien en console. Un module qui oublie la
   déclaration aux compétences retombe dans ce piège sans signe : avertir au démarrage de `vava_crafting` (et au
   retour de `vava_skills`) pour chaque recette de l'artisanat absente des compétences, et la montrer verrouillée.
 - Critères : essai hors jeu d'une recette déclarée à l'artisanat seul (avertissement, recette verrouillée) ;
   métiers en jeu.
+- Fait le 31 octobre 2026 (branche `agents/T-147`), sans RPC, évènement, boucle ni envoi ajouté : `vava_crafting`
+  1.8.0, une ligne `WARN` par recette de `vava_crafting:recipes` absente de `vava_skills:recipes` (nom, module qui l'a
+  déclarée), une seule fois, `skillsCheck.delayMs` (5 s, borné de 1 s à 10 min, R-3) après le démarrage, l'ajout d'une
+  recette par un autre module, le retrait d'une recette des compétences ou le retour de `vava_skills`, 4 × le délai au
+  plus après la première demande (R-1) ; une recette signalée puis déclarée aux compétences relance le contrôle et une
+  ligne d'information le dit (S-1, R-2) ; lecture du registre en échec : une ligne, rien de signalé ni gardé en cache
+  (S-2) ; au menu, la recette libre est verrouillée (`unregistered`, « Indisponible », raison « Cette recette ne peut ni
+  se façonner ni s'apprendre : prévenez le Conseil. », relu lore) ; `known`, lu par personne, n'est plus envoyé (R-4) ;
+  le serveur reste juge (`not_known` au début). Essais hors jeu `crafting_skill_recipes_spec` (14). Rapport
+  `docs/plan/rapports/T-147.md`. **À tester en jeu** : `docs/tests/metiers.md` § 4.2 (ressource jetable
+  `test_recette` : une seule ligne au démarrage, recette « Indisponible » à l'établi, ligne d'information puis
+  déverrouillée une fois déclarée aux compétences, retour de `vava_skills`).
 
 ### T-145 — Menu pause `vava_pause` (la bannière)
 - Agents : vava-architecte → vava-dev-lua + vava-dev-nui (cette tâche autorise à toucher `vava_codex`, `vava_admin`,
@@ -895,6 +917,29 @@ versé à T-014 ; les autres points déjà couverts sont précisés dans T-012 �
 - Critères : resmon au repos ≤ 0,02 ms malgré la boucle de blocage ; ouverture en moins de 300 ms ; devmock qui
   montre chaque rubrique hors jeu ; impossible d'ouvrir le menu en combat ou ligoté ; relectures sécurité, réseau et
   lore OK.
+
+### T-152 — Écran de chargement : les ambiances d'Eldoria en fondu enchaîné
+- Agent : vava-dev-nui · Dépend de : T-020 · Statut : à tester en jeu (relu réseau, suites appliquées)
+- Fait le 31 octobre 2026 (branche `agents/T-152`) : `vava_loading` 1.3.0. Paysage peint retiré ; sept ambiances en
+  fondu enchaîné (première au hasard, puis l'ordre de `ambiances.order`, ≈ 9 s chacune, fondu de 3 s, dérive lente
+  coupée en `basse` et quand le joueur demande moins d'animations), un seul minuteur, image suivante décodée après
+  l'affichage de la courante, image manquante sautée, fond de repli si toutes manquent. Page livrée 1 434 095 o (code
+  92 437 o, en baisse de 1 081 o), dossier 1 516 438 o sous le plafond de l'audit. Essais de la page 52 (40 avant,
+  ceux du paysage remplacés) ; `tests/spec/loading_screen_spec.lua` complété (motif des images, `ambiances.js`, poids
+  avec images). Rapport `docs/plan/rapports/T-152.md`. **À tester en jeu** : `docs/tests/chargement.md` 2-7 à 2-11 en
+  priorité (ordre, fondu sans écran vide, image renommée sautée, `basse` sans dérive), puis 2-1, 2-2, 5-5, 5-6.
+  Relecture réseau et performance : OK ; suites R-2 (dossier des ambiances égal à `ambiances.order`), R-3 (dérive
+  mesurée seule, test 5-5) et R-4 (test 5-6 cache vidé) appliquées ; R-1 (poids des images, ≈ 40 % de plus au
+  premier téléchargement d'un nouveau joueur) : images gardées telles quelles, décision du porteur du projet
+  (31 octobre 2026) ; R-5 → T-153.
+- Demande du porteur du projet (31 octobre 2026) : sept peintures de la même vue d'Eldoria sous des ambiances
+  différentes (aube, brume du matin, hiver, crépuscule, nuit étoilée, brume de nuit, orage), fournies en PNG
+  1672 × 941, converties en WebP 1600 × 900 qualité 50 (1 181 Ko pour les sept) dans
+  `modules/vava_loading/web/img/ambiances/`, pour tenir sous le plafond de 1,5 Mo de l'écran. Elles remplacent le
+  paysage peint par le code et se succèdent par un fondu enchaîné doux (opacité et transformation seulement).
+- Critères : `vava_loading` sous 1,5 Mo (audit) ; aucune image chargée hors de `web/img/` ; ordre, durées et fondu en
+  config ; première image affichée sans écran vide ; repli propre si une image manque ; aucune boucle par image
+  au-delà de l'animation CSS ; essais de la page ; procédure `docs/tests/chargement.md` à jour.
 
 ## Phase 3 — L'Atelier : socle et créateurs du monde
 
