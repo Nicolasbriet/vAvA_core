@@ -24,7 +24,7 @@ describe('vava_combat server', function()
     local active, positions, downed, held, piles, itemsDown, containers, patches, patchAnswer
     local itemDefs, itemsAdded, recipes, recipesAdded, skillRecipes, versions
     local hits, hitAnswer, notifies, befores, beforeAnswer, afters, fields, fieldSets
-    local allowed, adminLogs, chats, logs, exported, invoking
+    local allowed, adminLogs, chats, chatLines, logs, exported, invoking, buckets
     local entities, peds, players, threads, sets, handler, clock, roll
     local realRandom = math.random
     local STUBBED = { 'Entity', 'GetPlayerPed', 'DoesEntityExist', 'DoesPlayerExist', 'NetworkGetNetworkIdFromEntity',
@@ -98,7 +98,8 @@ describe('vava_combat server', function()
         itemsAdded, recipes, recipesAdded, skillRecipes = {}, { epee_courte = { durability = 150 } }, {}, {}
         versions = { vava_crafting = '1.5.0', vava_skills = '1.1.3' }
         hits, hitAnswer, notifies, befores, beforeAnswer, afters, fields, fieldSets = {}, nil, {}, {}, nil, {}, {}, {}
-        allowed, adminLogs, chats, logs, exported, invoking = {}, {}, {}, { warn = {}, info = {} }, {}, 'vava_example_combat'
+        allowed, adminLogs, chats, chatLines, logs, exported, invoking = {}, {}, {}, {}, { warn = {}, info = {} }, {}, 'vava_example_combat'
+        buckets = {}
         entities, peds, players, threads, sets, handler, clock, roll = {}, {}, { [A] = true, [B] = true }, {}, {}, nil, 100000, 0.1
 
         _G.Entity = function(h) return { state = entities[h].state } end
@@ -158,6 +159,7 @@ describe('vava_combat server', function()
                 return p[1], p[2], p[3]
             end,
             IsDowned = function(src) return downed[src] == true end,
+            SameBucket = function(a, b) return (buckets[a] or 0) == (buckets[b] or 0) end,
             Held = function(src) return held[src] end,
             Items = function(src, item)
                 if itemsDown[src] then return nil end
@@ -229,6 +231,7 @@ describe('vava_combat server', function()
             IsAllowed = function(src) return src == 0 or allowed[src] == true end,
             AdminLog = function(src, label, details) adminLogs[#adminLogs + 1] = { source = src, label = label, details = copy(details) } end,
             Chat = function(src, text) chats[#chats + 1] = { source = src, text = text } end,
+            ChatLines = function(src, lines) chatLines[#chatLines + 1] = { source = src, lines = copy(lines) } end,
             Timer = function() return clock end,
         }
         helper.loadAll({
@@ -430,6 +433,45 @@ describe('vava_combat server', function()
             assert.same({ { source = A, id = 10, patch = { durability = 149, max_durability = 150 } } }, patches)
         end)
 
+        it('refuse une cible dans une autre instance (routing bucket), quelle que soit la distance', function()
+            give(A, pile(10, 'epee_courte'), true)
+            buckets[B] = 7
+            assert.same({ nil, 'too_far' }, { strike.run(A, B) })
+            assert.equal(0, #hits)
+            buckets[A] = 7
+            assert.is_table(strike.run(A, B))
+        end)
+
+        it('use la pile relue après le coup, pas celle lue avant (usée entre-temps par un autre coup)', function()
+            local sword = give(A, pile(10, 'epee_courte', { quality = 50, durability = 150, max_durability = 150 }), true)
+            hitAnswer = function(packet)
+                -- un abonné de la chaîne a cédé la main : un autre coup a porté la solidité à 100
+                sword.metadata.durability = 100
+                return { amount = packet.amount, applied = packet.amount, health = 0.5 }
+            end
+            local result = strike.run(A, B)
+            assert.same({ { source = A, id = 10, patch = { durability = 99 } } }, patches)
+            assert.equal(99, result.weapon.durability)
+        end)
+
+        it('pile partie de la besace pendant le coup, ou inventaire muet : aucune usure', function()
+            give(A, pile(10, 'epee_courte', { quality = 50 }), true)
+            hitAnswer = function(packet)
+                piles[A] = {}
+                return { amount = packet.amount, applied = packet.amount, health = 0.5 }
+            end
+            local result = strike.run(A, B)
+            assert.same({}, patches)
+            assert.is_false(result.weapon.worn)
+            give(A, pile(10, 'epee_courte', { quality = 50 }), true)
+            hitAnswer = function(packet)
+                itemsDown[A] = true
+                return { amount = packet.amount, applied = packet.amount, health = 0.5 }
+            end
+            strike.run(A, B)
+            assert.same({}, patches)
+        end)
+
         it('écriture refusée : console, rien de prévenu, solidité inchangée dans le résultat', function()
             give(A, pile(10, 'epee_courte', { durability = 1, max_durability = 150 }), true)
             patchAnswer = { false, 'durability_locked' }
@@ -573,6 +615,32 @@ describe('vava_combat server', function()
             assert.equal(20, fields[CHAR_A])
         end)
 
+        it('shield(src) : rien sans la pile ; pile partie de la besace : décroché aussitôt', function()
+            give(A, pile(20, 'bouclier_rond', { durability = 120, max_durability = 150 }))
+            use(20)
+            itemsDown[A] = true
+            assert.is_nil(exported.shield(A))
+            -- inventaire muet : rien n'est affirmé, mais rien n'est décroché non plus
+            assert.is_not_nil(bag(entities[101]))
+            itemsDown[A] = nil
+            piles[A] = {}
+            assert.is_nil(exported.shield(A))
+            assert.is_nil(bag(entities[101]))
+            assert.is_nil(fields[CHAR_A])
+            assert.equal('gone', hookAfters(HOOKS.SHIELD_HANG)[2].reason)
+        end)
+
+        it('une même pile accrochée par un autre porteur décroche le premier', function()
+            local buckler = give(A, pile(20, 'bouclier_rond'))
+            use(20)
+            piles[B][1] = buckler
+            shields.onUse(B, { id = 20, item = 'bouclier_rond' })
+            assert.is_nil(bag(entities[101]))
+            assert.same({ id = 20, item = 'bouclier_rond' }, bag(entities[102]))
+            assert.is_nil(shields.hungOf(A))
+            assert.is_nil(fields[CHAR_A])
+        end)
+
         it('shield(src) : solidité de la pile et position d\'après la main', function()
             give(A, pile(20, 'bouclier_rond', { durability = 120, max_durability = 150 }))
             use(20)
@@ -643,11 +711,24 @@ describe('vava_combat server', function()
             assert.matches('émoussée', notifies[#notifies].text)
         end)
 
+        it('écriture refusée : message à part, rien au journal', function()
+            allowed[A] = true
+            local sword = give(B, pile(40, 'epee_courte', { durability = 149, max_durability = 150 }), true)
+            patchAnswer = { false, 'durability_locked' }
+            commands.handle(A, { 'user', tostring(B), '20' })
+            assert.equal(149, sword.metadata.durability)
+            assert.equal(cfg.messages.adminFailed:format('Épée courte'), chats[#chats].text)
+            assert.same({}, adminLogs)
+        end)
+
         it('liste les armes et inspecte celle d\'un joueur (journal)', function()
             allowed[A] = true
             commands.handle(A, { 'liste' })
-            assert.equal(8, #chats)
-            assert.matches('modèle provisoire', chats[2].text)
+            -- en-tête et sept lignes, remis d'un bloc (regroupés en messages par le bridge)
+            assert.equal(0, #chats)
+            assert.equal(1, #chatLines)
+            assert.equal(8, #chatLines[1].lines)
+            assert.matches('modèle provisoire', chatLines[1].lines[2])
             give(B, pile(40, 'epee_courte', { quality = 64, tier = 3, durability = 149, max_durability = 150 }), true)
             commands.handle(A, { 'voir', tostring(B) })
             assert.matches('coup 12 → 12,5', chats[#chats].text)

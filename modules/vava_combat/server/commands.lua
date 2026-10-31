@@ -69,17 +69,18 @@ local function reply(source, text)
     bridge.Chat(source, text)
 end
 
---- /armes liste
+--- /armes liste : en-tête et une ligne par arme, regroupées en aussi peu de messages que possible (bridge.ChatLines).
 ---@param source integer
 local function list(source)
     local messages = cfg.messages
     local all = catalog.list()
-    reply(source, format(messages.listHeader, #all))
+    local lines = { format(messages.listHeader, #all) }
     for _, def in ipairs(all) do
-        reply(source, format(messages.list, def.label, cfg.categories[def.category].label,
+        lines[#lines + 1] = format(messages.list, def.label, cfg.categories[def.category].label,
             cfg.kindLabels[def.kind] or def.kind, number(def.damage), def.durability,
-            def.provisional and messages.provisional or ''))
+            def.provisional and messages.provisional or '')
     end
+    bridge.ChatLines(source, lines)
 end
 
 --- Joueur ciblé (en jeu, avec un personnage), ou nil.
@@ -147,7 +148,8 @@ local function lower(source, target, points)
     end
     step = wear.applyStep(target, held.id, held.item, step)
     if not step.worn then
-        reply(source, format(messages.adminNothing, def.label))
+        -- écriture refusée (pile partie entre-temps, garde de l'artisanat) : l'arme n'est pas émoussée pour autant
+        reply(source, format(messages.adminFailed, def.label))
         return
     end
     reply(source, format(messages.wornByCouncil, def.label, step.before, step.durability, target))

@@ -264,6 +264,16 @@ describe('vava_combat shared/weapons', function()
         end)
     end)
 
+    describe('groupLines', function()
+        it('regroupe des lignes en messages bornés, dans l\'ordre', function()
+            assert.same({ 'aa\nbb', 'cc' }, weapons.groupLines({ 'aa', 'bb', 'cc' }, 6, '\n'))
+            assert.same({ 'aa\nbb\ncc' }, weapons.groupLines({ 'aa', 'bb', 'cc' }, 8, '\n'))
+            -- une ligne trop longue part seule
+            assert.same({ 'a', 'bbbbbbbbbb', 'c' }, weapons.groupLines({ 'a', 'bbbbbbbbbb', 'c' }, 4, ' · '))
+            assert.same({}, weapons.groupLines({}, 10, '\n'))
+        end)
+    end)
+
     describe('versionAtLeast', function()
         it('compare des versions semver', function()
             assert.is_true(weapons.versionAtLeast('1.5.0', '1.5.0'))

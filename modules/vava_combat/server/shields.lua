@@ -39,6 +39,8 @@ VavaCombat.shields = shields
 local hung = {}
 -- numéro de pile → source du porteur
 local byInstance = {}
+-- besace (numéro de conteneur) → source du porteur : un retrait d'objet ne regarde que ce porteur
+local byContainer = {}
 -- source → instant du dernier geste d'accroche
 local lastToggle = {}
 local verifying = false
@@ -64,6 +66,26 @@ local function announce(src, entry, hang, reason)
     })
 end
 
+--- Retire un porteur des index (seulement ce qui pointe encore vers lui).
+---@param src integer
+---@param entry vAvA.HungShield
+local function unindex(src, entry)
+    if byInstance[entry.instanceId] == src then byInstance[entry.instanceId] = nil end
+    if entry.container and byContainer[entry.container] == src then byContainer[entry.container] = nil end
+end
+
+--- Besace du porteur, relue si elle manquait (inventaire muet à l'accroche), et indexée.
+---@param src integer
+---@param entry vAvA.HungShield
+---@return integer|nil
+local function containerOf(src, entry)
+    if not entry.container then
+        entry.container = bridge.ContainerOf(src)
+        if entry.container then byContainer[entry.container] = src end
+    end
+    return entry.container
+end
+
 --- Décroche le bouclier d'un joueur : statebag vidé, champ effacé (sauf `keepField`), hook `after`.
 ---@param src integer
 ---@param reason string  use | gone
@@ -72,7 +94,7 @@ local function unhang(src, reason, keepField)
     local entry = hung[src]
     if not entry then return end
     hung[src] = nil
-    if byInstance[entry.instanceId] == src then byInstance[entry.instanceId] = nil end
+    unindex(src, entry)
     pedState.set(src, nil)
     if not keepField then bridge.SetShieldField(entry.characterId, nil) end
     announce(src, entry, false, reason)
@@ -119,10 +141,14 @@ end
 ---@param item string
 ---@param reason string  use | restored
 local function hang(src, characterId, instanceId, item, reason)
+    -- une même pile ne s'accroche qu'à un porteur : un ancien porteur encore en mémoire (hook manqué) est décroché
+    local previous = byInstance[instanceId]
+    if previous and previous ~= src then unhang(previous, 'gone') end
     local entry = { instanceId = instanceId, item = item, characterId = characterId,
         container = bridge.ContainerOf(src), misses = 0 }
     hung[src] = entry
     byInstance[instanceId] = src
+    if entry.container then byContainer[entry.container] = src end
     pedState.set(src, shield.value(instanceId, item))
     bridge.SetShieldField(characterId, instanceId)
     announce(src, entry, true, reason)
@@ -170,9 +196,9 @@ function shields.onMove(payload)
     local src = byInstance[payload.instanceId]
     local entry = src and hung[src]
     if not entry then return end
-    entry.container = entry.container or bridge.ContainerOf(src)
+    local container = containerOf(src, entry)
     -- besace inconnue (inventaire muet) : le relevé lent tranchera
-    if entry.container and payload.to ~= entry.container then unhang(src, 'gone') end
+    if container and payload.to ~= container then unhang(src, 'gone') end
 end
 
 --- Pile jetée au sol : décrochée aussitôt.
@@ -184,19 +210,18 @@ function shields.onDrop(payload)
 end
 
 --- Retrait par un module (échange, recette, retrait) dans la besace d'un porteur, par numéro de pile ou par objet :
---- possession relue, décroché si la pile n'y est plus.
+--- possession relue, décroché si la pile n'y est plus. Seul le porteur de cette besace est regardé (index).
 ---@param payload { container: integer, removals: table[] }
 function shields.onRemove(payload)
     if type(payload) ~= 'table' or type(payload.removals) ~= 'table' then return end
-    for src, entry in pairs(hung) do
-        if entry.container ~= nil and entry.container == payload.container then
-            for _, removal in ipairs(payload.removals) do
-                if type(removal) == 'table' and (removal.instanceId == entry.instanceId or removal.item == entry.item) then
-                    local list = bridge.Items(src, entry.item)
-                    if list and not find(list, entry.instanceId) then unhang(src, 'gone') end
-                    break
-                end
-            end
+    local src = byContainer[payload.container]
+    local entry = src and hung[src]
+    if not entry then return end
+    for _, removal in ipairs(payload.removals) do
+        if type(removal) == 'table' and (removal.instanceId == entry.instanceId or removal.item == entry.item) then
+            local list = bridge.Items(src, entry.item)
+            if list and not find(list, entry.instanceId) then unhang(src, 'gone') end
+            return
         end
     end
 end
@@ -234,7 +259,7 @@ function shields.release(src)
     local entry = hung[src]
     if entry then
         hung[src] = nil
-        if byInstance[entry.instanceId] == src then byInstance[entry.instanceId] = nil end
+        unindex(src, entry)
         pedState.set(src, nil)
     end
     pedState.forget(src)
@@ -251,7 +276,8 @@ function shields.hungOf(src)
 end
 
 --- Vue du bouclier accroché pour l'export `shield(src)` : solidité lue sur la pile, position d'après la main tenue
---- (lue par le serveur), `ready` au bras. Nil si rien n'est accroché.
+--- (lue par le serveur), `ready` au bras. Nil si rien n'est accroché, si l'inventaire ne répond pas (rien n'est
+--- affirmé sans la pile), ou si la pile n'est plus dans la besace : elle est alors décrochée aussitôt.
 ---@param src integer
 ---@return table|nil
 function shields.view(src)
@@ -260,8 +286,13 @@ function shields.view(src)
     local def = catalog.weapon(entry.item)
     if not def then return nil end
     local list = bridge.Items(src, entry.item)
-    local pile = list and find(list, entry.instanceId)
-    local d = weapons.durabilityOf(pile and pile.metadata, def)
+    if not list then return nil end
+    local pile = find(list, entry.instanceId)
+    if not pile then
+        unhang(src, 'gone')
+        return nil
+    end
+    local d = weapons.durabilityOf(pile.metadata, def)
     local held = bridge.Held(src)
     local position = shield.position(held and held.item or nil, cfg.weapons, cfg.shield)
     return {
@@ -272,5 +303,5 @@ end
 
 --- Arrêt du module : tout est oublié (les statebags sont vidés par pedState.stop).
 function shields.stop()
-    hung, byInstance, lastToggle = {}, {}, {}
+    hung, byInstance, byContainer, lastToggle = {}, {}, {}, {}
 end

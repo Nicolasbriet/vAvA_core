@@ -8,7 +8,9 @@
            Placement (modèle, os, décalage, rotation) lu dans SA config, jamais dans la valeur ; rien n'est montré
            ailleurs que sur un ped de joueur. Quand la main change, l'accessoire est réattaché à l'autre os sans être
            recréé. Une boucle lente ne tourne que tant qu'un bouclier est suivi : elle attache ce qui attendait son ped
-           ou son modèle, rattache ce que le jeu a détaché, et oublie les peds disparus. Modèle invalide : une ligne de
+           ou son modèle, rattache ce que le jeu a détaché, oublie les peds disparus, et ne montre un bouclier qu'à
+           `shield.showRadius` (120 m) du joueur local : au-delà, l'accessoire est retiré et revient quand on
+           s'approche. Position et placement sont recalculés seulement quand la valeur ou la main change. Modèle invalide : une ligne de
            console, rien d'affiché, pas de nouvel essai tant que la valeur ne change pas.
     Dépendances : shared/constants.lua, config.lua, shared/shield.lua, client/core.lua, bridge/client.lua
 ]]
@@ -20,8 +22,8 @@ local AddStateBagChangeHandler, GetActivePlayers, GetPlayerPed, Entity =
 local NetworkDoesEntityExistWithNetworkId, NetworkGetEntityFromNetworkId, NetworkGetNetworkIdFromEntity,
     NetworkGetEntityIsNetworked = NetworkDoesEntityExistWithNetworkId, NetworkGetEntityFromNetworkId,
     NetworkGetNetworkIdFromEntity, NetworkGetEntityIsNetworked
-local DoesEntityExist, IsEntityAPed, IsPedAPlayer, GetEntityCoords, GetHashKey =
-    DoesEntityExist, IsEntityAPed, IsPedAPlayer, GetEntityCoords, GetHashKey
+local DoesEntityExist, IsEntityAPed, IsPedAPlayer, GetEntityCoords, GetHashKey, PlayerPedId =
+    DoesEntityExist, IsEntityAPed, IsPedAPlayer, GetEntityCoords, GetHashKey, PlayerPedId
 local RequestModel, HasModelLoaded, IsModelValid, SetModelAsNoLongerNeeded = RequestModel, HasModelLoaded, IsModelValid, SetModelAsNoLongerNeeded
 local CreateObject, DeleteObject, AttachEntityToEntity, IsEntityAttachedToEntity, GetPedBoneIndex, SetEntityCollision =
     CreateObject, DeleteObject, AttachEntityToEntity, IsEntityAttachedToEntity, GetPedBoneIndex, SetEntityCollision
@@ -34,6 +36,8 @@ local SHIELD_STATE = VavaCombat.SHIELD_STATE
 local HELD_STATE = bridge.HELD_STATE
 local RESOURCE = GetCurrentResourceName()
 local ABSENT, NOT_PED, NOT_PLAYER = 1, 2, 3
+-- carré du rayon d'affichage : au-delà, l'accessoire est retiré (la valeur reste suivie, il revient en s'approchant)
+local SHOW_RADIUS_SQ = cfg.shield.showRadius * cfg.shield.showRadius
 
 local shields = {}
 VavaCombat.shields = shields
@@ -44,6 +48,9 @@ VavaCombat.shields = shields
 ---@field ped? integer     entité vue sous ce numéro réseau depuis la réception
 ---@field handKnown boolean  main du porteur connue (statebag lu, ou reçue par son gestionnaire)
 ---@field handItem? string   objet tenu par le porteur (nil : mains vides)
+---@field position? string   bras ou dos, calculé quand la valeur ou la main change (resolve)
+---@field place? table       placement de la config pour cette position, ou nil (objet sans placement)
+---@field key? string        identité de l'accessoire (numéro de pile, objet, modèle)
 
 ---@type table<integer, vAvA.ShieldWanted>  numéro réseau du ped → bouclier reçu
 local wanted = {}
@@ -57,6 +64,30 @@ local running = false
 local function itemOf(value)
     if type(value) == 'table' and type(value.item) == 'string' then return value.item end
     return nil
+end
+
+--- Position, placement et identité de l'accessoire, recalculés seulement quand la valeur ou la main change (jamais à
+--- chaque tour de boucle). La main n'est lue sur le statebag que si son gestionnaire ne l'a pas encore donnée.
+---@param want vAvA.ShieldWanted
+---@param ped integer
+local function resolve(want, ped)
+    if not want.handKnown then
+        want.handItem, want.handKnown = itemOf(Entity(ped).state[HELD_STATE]), true
+    end
+    want.position = shield.position(want.handItem, cfg.weapons, cfg.shield)
+    want.place = shield.placement(want.value.item, want.position, cfg.shields)
+    want.key = want.place and (tostring(want.value.id) .. '|' .. want.value.item .. '|' .. want.place.model) or nil
+end
+
+--- Vrai si le ped est assez près du joueur local pour montrer son bouclier.
+---@param ped integer
+---@return boolean
+local function near(ped)
+    local me = PlayerPedId()
+    if ped == me then return true end
+    local a, b = GetEntityCoords(ped), GetEntityCoords(me)
+    local dx, dy, dz = a.x - b.x, a.y - b.y, a.z - b.z
+    return dx * dx + dy * dy + dz * dz <= SHOW_RADIUS_SQ
 end
 
 ---@param netId integer
@@ -149,16 +180,13 @@ local function reconcile(netId)
         remove(netId)
         return
     end
-    if not want.handKnown then
-        want.handItem, want.handKnown = itemOf(Entity(ped).state[HELD_STATE]), true
-    end
-    local position = shield.position(want.handItem, cfg.weapons, cfg.shield)
-    local place = shield.placement(want.value.item, position, cfg.shields)
-    if not place then
+    if not want.position then resolve(want, ped) end
+    local position, place, key = want.position, want.place, want.key
+    -- objet sans placement, ou porteur au-delà du rayon d'affichage : rien de montré, relu au tour suivant
+    if not place or not near(ped) then
         remove(netId)
         return
     end
-    local key = tostring(want.value.id) .. '|' .. want.value.item .. '|' .. place.model
     local entry = shown[netId]
     if entry then
         if entry.loading then return end
@@ -192,6 +220,7 @@ end
 local function setWanted(netId, value)
     if value ~= nil and shield.valid(value) then
         local previous = wanted[netId]
+        -- la main déjà connue est gardée ; position et placement seront recalculés (resolve)
         wanted[netId] = { value = value, since = GetGameTimer(), handKnown = previous ~= nil and previous.handKnown,
             handItem = previous and previous.handItem }
     else
@@ -215,7 +244,7 @@ function shields.start()
         local netId = shield.netIdOf(bagName)
         local want = netId and wanted[netId]
         if not want then return end
-        want.handItem, want.handKnown = itemOf(value), true
+        want.handItem, want.handKnown, want.position = itemOf(value), true, nil
         reconcile(netId)
     end)
     for _, player in pairs(GetActivePlayers()) do

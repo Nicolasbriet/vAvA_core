@@ -146,6 +146,7 @@ VavaCombat.config = {
         guardMaxDelayMs = 1000,
         guardWarnMs = 10000,
         pollMs = 1000,                      -- client : boucle lente, seulement tant qu'un bouclier est suivi
+        showRadius = 120.0,                 -- client : mètres au-delà desquels un bouclier suivi n'est pas montré
         awaitPedMs = 10000,                 -- client : attente bornée d'un ped annoncé par son statebag
         modelTimeoutMs = 5000,              -- client : attente maximale du chargement d'un modèle
     },
@@ -185,6 +186,7 @@ VavaCombat.config = {
         adminNoWeapon = 'Ce personnage ne tient aucune arme du royaume en main.',
         adminDenied = 'Ce registre est réservé au Conseil.',
         adminNothing = '%s : l\'arme est déjà émoussée, il n\'y a plus rien à user.',
+        adminFailed = '%s : la solidité n\'a pas pu être changée (l\'arme a quitté la besace, ou l\'artisanat refuse).',
         -- libellé, catégorie, type, dégâts, solidité, « modèle provisoire »
         list = '%s — %s, %s, coup %s, solidité %d%s',
         provisional = ', modèle provisoire',

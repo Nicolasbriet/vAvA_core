@@ -436,6 +436,28 @@ function weapons.sortKey(label)
     return (folded:gsub('[A-Z]', function(c) return string.char(c:byte() + 32) end))
 end
 
+-- Réponses regroupées -------------------------------------------------------------------------------------------------
+
+--- Regroupe des lignes en messages d'au plus `max` octets, joints par `sep`, dans l'ordre ; une ligne plus longue que
+--- `max` part seule (le destinataire la coupe).
+---@param lines string[]
+---@param max integer
+---@param sep string
+---@return string[]
+function weapons.groupLines(lines, max, sep)
+    local out, current = {}, nil
+    for _, line in ipairs(lines) do
+        if current and #current + #sep + #line <= max then
+            current = current .. sep .. line
+        else
+            if current then out[#out + 1] = current end
+            current = line
+        end
+    end
+    if current then out[#out + 1] = current end
+    return out
+end
+
 -- Versions ------------------------------------------------------------------------------------------------------------
 
 --- Vrai si `version` (semver « a.b.c ») est au moins `minimum`. Une version illisible n'est jamais suffisante.

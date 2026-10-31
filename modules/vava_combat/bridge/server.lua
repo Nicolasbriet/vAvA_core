@@ -15,6 +15,7 @@ local mathType = math.type
 local pack, unpack, concat, sort = table.pack, table.unpack, table.concat, table.sort
 local GetResourceState, IsPlayerAceAllowed, GetPlayers = GetResourceState, IsPlayerAceAllowed, GetPlayers
 local GetPlayerPed, DoesEntityExist, GetEntityCoords, GetGameTimer = GetPlayerPed, DoesEntityExist, GetEntityCoords, GetGameTimer
+local GetPlayerRoutingBucket = GetPlayerRoutingBucket
 
 local core = VavaCombat.core
 if not core then return end
@@ -29,6 +30,8 @@ local ITEMS_REGISTRY = 'vava_inventory:items'
 local RECIPES_REGISTRY = 'vava_crafting:recipes'
 local SKILL_RECIPES_REGISTRY = 'vava_skills:recipes'
 local READY = 'ready'
+-- octets d'un message de chat regroupé (vava_chat coupe au-delà de 500 signes)
+local CHAT_GROUP_MAX = 480
 
 local Bridge = {}
 VavaCombat.bridge = Bridge
@@ -84,6 +87,14 @@ function Bridge.Position(source)
     if not ped or ped == 0 or not DoesEntityExist(ped) then return nil end
     local coords = GetEntityCoords(ped)
     return coords.x, coords.y, coords.z
+end
+
+--- Vrai si deux joueurs sont dans la même instance (routing bucket lu par le serveur).
+---@param a integer
+---@param b integer
+---@return boolean
+function Bridge.SameBucket(a, b)
+    return GetPlayerRoutingBucket(a) == GetPlayerRoutingBucket(b)
 end
 
 --- Vrai si le joueur est à terre (règle de vava_health) ; module absent ou en erreur : pas à terre.
@@ -348,6 +359,25 @@ function Bridge.Chat(source, text)
     end
     local called = call(CHAT, 'addMessage', source, { text = text })
     if not called then Bridge.Notify(source, text, 'info') end
+end
+
+--- Plusieurs lignes au seul membre du Conseil, en aussi peu de messages que possible : chat (lignes gardées, 480 octets
+--- par message), sinon notifications (200 octets, lignes séparées par « · ») ; console : une ligne par print.
+---@param source integer
+---@param lines string[]
+function Bridge.ChatLines(source, lines)
+    if source == CONSOLE then
+        for _, line in ipairs(lines) do print(('[%s] %s'):format(VavaCombat.resource, line)) end
+        return
+    end
+    local weapons = VavaCombat.weapons
+    if GetResourceState(CHAT) == 'started' then
+        for _, text in ipairs(weapons.groupLines(lines, CHAT_GROUP_MAX, '\n')) do Bridge.Chat(source, text) end
+        return
+    end
+    for _, text in ipairs(weapons.groupLines(lines, VavaCombat.MAX_NOTIFICATION, ' · ')) do
+        Bridge.Notify(source, text, 'info')
+    end
 end
 
 -- Horloge -----------------------------------------------------------------------------------------------------------

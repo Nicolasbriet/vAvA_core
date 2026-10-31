@@ -2,9 +2,9 @@
     vava_combat/server/strike.lua
     Rôle : brique serveur d'un coup d'arme, que T-112 appellera après sa géométrie : `strike.run(src, cible, opts)`
            vérifie (module prêt, cibles, personnages, attaquant debout, options bornées, arme RÉELLEMENT tenue lue côté
-           serveur, distance lue côté serveur), construit le paquet fermé de vava_health depuis l'arme tenue (qualité,
-           usure, multiplicateur de la technique), appelle la chaîne de dégâts commune (`hit`), puis use l'arme si le
-           coup a touché. Aucun `Wait`, aucune base entre la lecture de l'arme et l'usure. Débit, cible à terre,
+           serveur, même instance et distance lue côté serveur), construit le paquet fermé de vava_health depuis l'arme
+           tenue (qualité, usure, multiplicateur de la technique), appelle la chaîne de dégâts commune (`hit`), puis use
+           l'arme si le coup a touché, sur la pile relue juste avant l'écriture (server/wear.lua). Débit, cible à terre,
            combats coupés, refus des hooks et modificateurs sont tenus par vava_health, pas recopiés ici. Aucun coup
            donné par un joueur dans T-111 : l'export `strike` (server/api.lua) est réservé à `strike.callers`.
     Dépendances : shared/constants.lua, config.lua, shared/weapons.lua, server/core.lua, bridge/server.lua,
@@ -58,7 +58,8 @@ function strike.run(src, target, opts)
 
     local ax, ay, az = bridge.Position(src)
     local tx, ty, tz = bridge.Position(target)
-    if not ax or not tx then return nil, 'too_far' end
+    -- une autre instance (routing bucket : intérieur, cachot, essai) est hors d'atteinte, quelle que soit la distance
+    if not ax or not tx or not bridge.SameBucket(src, target) then return nil, 'too_far' end
     local dx, dy, dz = ax - tx, ay - ty, az - tz
     if sqrt(dx * dx + dy * dy + dz * dz) > cfg.strike.maxDistance then return nil, 'too_far' end
 
@@ -68,7 +69,7 @@ function strike.run(src, target, opts)
     if not result then return nil, code end
 
     local step
-    if weapons.shouldWear(result, cfg) then step = wear.apply(src, held.id, item, def, meta, attacker) end
+    if weapons.shouldWear(result, cfg) then step = wear.apply(src, held.id, item, def, attacker) end
     if step then
         result.weapon = { item = item, durability = step.durability, maxDurability = step.maxDurability, worn = step.worn,
             dull = step.dull }

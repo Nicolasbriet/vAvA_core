@@ -10,7 +10,7 @@
                   server/catalog.lua
 ]]
 
-local tostring = tostring
+local tostring, ipairs = tostring, ipairs
 local random = math.random
 local format = string.format
 
@@ -72,16 +72,24 @@ function wear.applyStep(source, instanceId, item, step, characterId)
     return step
 end
 
---- Un coup qui use : tirage, puis écriture éventuelle (une au plus par coup).
+--- Un coup qui use : la pile est RELUE juste avant l'écriture (un abonné de la chaîne de dégâts a pu céder la main et
+--- un autre coup l'user entre-temps), le pas est calculé sur cette lecture, puis écrit (une écriture au plus par coup),
+--- sans céder la main entre la lecture et l'écriture. Inventaire muet, ou pile partie de la besace : aucune usure, nil.
 ---@param source integer
 ---@param instanceId integer
 ---@param item string
 ---@param def table   fiche de l'arme
----@param meta any    métadonnées de la pile (lues avant le coup, sans céder la main)
 ---@param characterId? integer
----@return table step
-function wear.apply(source, instanceId, item, def, meta, characterId)
-    local step = weapons.wearStep(meta, def, random(), cfg)
+---@return table|nil step
+function wear.apply(source, instanceId, item, def, characterId)
+    local list = bridge.Items(source, item)
+    if not list then return nil end
+    local pile
+    for _, entry in ipairs(list) do
+        if entry.id == instanceId then pile = entry end
+    end
+    if not pile then return nil end
+    local step = weapons.wearStep(pile.metadata, def, random(), cfg)
     return wear.applyStep(source, instanceId, item, step, characterId)
 end
 
