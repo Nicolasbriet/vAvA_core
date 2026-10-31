@@ -6,7 +6,7 @@
     isShown() (1.2.0), lus par l'écran de chargement pour passer à la sélection sans écran noir.
     Le serveur reste maître : liste, création, sélection et suppression sont des intentions validées par le core ;
     les règles de nom viennent de lui (avec la liste). À l'arrêt de la ressource, tout ce qu'elle a posé est retiré.
-    Dépendances : config.lua, client/core.lua, client/camera.lua, client/preview.lua, client/nui.lua
+    Dépendances : config_client.lua, client/core.lua, client/camera.lua, client/preview.lua, client/nui.lua
 ]]
 
 local type, tostring = type, tostring
@@ -18,7 +18,7 @@ local DisplayRadar, DoScreenFadeIn, DoScreenFadeOut = DisplayRadar, DoScreenFade
 local ui = VavaCharactersUi
 local core = ui.core
 if not core then return end
-local cfg = ui.config
+local cfg = VavaCharactersUi.config   -- nommée en entier : config_split_spec suit les lectures du client (T-132)
 local nui, camera, preview, appearance = ui.nui, ui.camera, ui.preview, ui.appearance
 
 local CLEAR_ALL_PEDS = 1

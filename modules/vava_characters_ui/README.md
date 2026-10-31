@@ -33,7 +33,13 @@ Pour l'écran de chargement (`vava_loading`), qui passe à la sélection sans é
 
 Rien d'autre ne change : l'écran ne sait rien du chargement, il annonce seulement qu'il est affiché.
 
-## Règles (config.lua)
+## Règles (config_client.lua)
+
+Ressource cliente uniquement : tous ses réglages sont lus par le client, dans `config_client.lua` (nommé `config.lua`
+avant 1.3.0, T-132 : `config.lua` est réservé aux réglages du seul serveur, jamais téléchargés). **Mise à jour vers
+1.3.0** : un `config.lua` modifié est gardé par l'installeur de la Chancellerie, qui le signale (« reportez vos
+réglages dans config_client.lua »), mais il n'est plus au manifeste et n'est plus lu : reportez vos réglages dans
+`config_client.lua`, puis supprimez l'ancien fichier.
 
 | Règle | Défaut | Clé |
 |---|---|---|
@@ -98,7 +104,7 @@ l'éditeur sur un onglet. En jeu, polices, grain, cadre et losanges arrivent de 
 
 | Fichier | Rôle |
 |---|---|
-| `config.lua` | scène, caméras, modèles, temporisations |
+| `config_client.lua` | scène, caméras, modèles, temporisations (`config.lua` avant 1.3.0) |
 | `client/main.lua` | cycle de vie de l'écran, retours de l'interface, nettoyage à l'arrêt |
 | `client/camera.lua` | caméras de la scène et transitions |
 | `client/preview.lua` | ped d'aperçu local (créé, pivoté, retiré) |

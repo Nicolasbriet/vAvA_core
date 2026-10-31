@@ -1,7 +1,8 @@
 --[[
     vava_characters_ui/fxmanifest.lua
     Rôle : écran de sélection et éditeur de création de personnage (NUI). Ressource cliente uniquement : chaque
-           action est une intention envoyée au serveur via l'API du core et de vava_appearance.
+           action est une intention envoyée au serveur via l'API du core et de vava_appearance. Réglages :
+           config_client.lua (nommé config.lua avant 1.3.0, T-132).
     Dépendances : vAvA_core ≥ 0.3.0 (règles de nom du serveur : ≥ 0.8.0), vava_appearance, vava_ui ≥ 1.0.0 (polices,
                   grain et ornements de la page, par nui://vava_ui/…)
 ]]
@@ -13,7 +14,7 @@ use_experimental_fxv2_oal 'yes'
 
 name 'vava_characters_ui'
 description 'Sélection et création de personnage vAvA'
-version '1.2.0'
+version '1.3.0'
 
 dependencies {
     'vAvA_core',
@@ -33,7 +34,7 @@ files {
 }
 
 client_scripts {
-    'config.lua',
+    'config_client.lua',
     'client/core.lua',
     'client/camera.lua',
     'client/preview.lua',
