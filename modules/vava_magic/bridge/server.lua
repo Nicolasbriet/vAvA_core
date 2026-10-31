@@ -3,7 +3,8 @@
     Rôle : SEUL point de contact, côté serveur, entre la magie et le core / les autres modules : personnage, droits du
            Conseil, notifications, objets de l'inventaire, sauvegarde de la fiche, base de données, santé (chaîne de
            dégâts de vava_health : coups des sorts, vie tenue par le serveur, hook des coups, modificateurs), mains vides
-           pour incanter (arme et bouclier au bras lus par vava_combat).
+           pour incanter (arme de GTA sur le ped, arme et bouclier au bras lus par vava_combat, prises en main suivies
+           par le hook vava_inventory:hold).
            Pour brancher la magie sur un autre core, réécrire les fonctions de ce fichier (et de bridge/client.lua) :
            le reste du module ne connaît qu'elles.
     Implémentation : vAvA_core (API documentée dans docs/api.md) et ses modules officiels. Chaque appel à une autre

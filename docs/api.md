@@ -1732,11 +1732,13 @@ incanter ; sans lui, aucune restriction).
 
 - **Bridge** : `bridge/server.lua` et `bridge/client.lua` sont les seuls fichiers qui appellent le core et les autres
   modules ; les réécrire suffit pour un autre core (avec un équivalent de `core.rpc`).
-- **Mains vides** (2.10.0, T-140) : le serveur refuse le début d'une incantation, et la brise à sa fin, quand
-  `exports.vava_combat:armed(source)` rend une arme (code `armed`) ou que `shield(source).ready` dit un bouclier au bras
-  (code `shielded`) ; un bouclier dans le dos ne gêne pas. vava_combat absent, pas prêt ou en erreur : aucune
-  restriction (une ligne de console par minute au plus). Le client lit `armed()` pour le montrer tôt (mode magie
-  endormi, roue, touches, incantation interrompue), sans en décider.
+- **Mains vides** (2.10.0, T-140) : le serveur refuse le début d'une incantation (après les recharges), la brise dès
+  qu'une arme ou un bouclier passe en main (hook `vava_inventory:hold` after) et la revérifie à sa fin, quand une arme
+  de GTA est sortie (`GetSelectedPedWeapon` sur le ped, OneSync), que `exports.vava_combat:armed(source)` rend une arme
+  (code `armed`) ou que `shield(source).ready` dit un bouclier au bras (code `shielded`) ; un bouclier dans le dos ne
+  gêne pas. Brisée : ni mana ni recharge. vava_combat absent, pas prêt ou en erreur : aucune restriction pour les armes
+  de l'inventaire (une ligne de console par minute au plus, aussi quand `not_ready` dure). Le client lit `armed()` pour
+  le montrer tôt (mode magie endormi, roue, touches, incantation interrompue), sans en décider.
 - **Incantation** : RPC `vava_magic:begin:<sort>` puis `vava_magic:finish:<sort>` (numéro d'incantation). Le serveur
   revérifie à la fin la durée, le déplacement (positions serveur) et la blessure (2.9.0 : un coup de la chaîne ou une
   perte native qui a retiré de la vie au lanceur, hook `vava_health:hit` after, ou sa vie de `vava_health:get` plus

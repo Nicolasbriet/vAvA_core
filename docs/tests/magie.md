@@ -645,10 +645,11 @@ LIMIT 5` après chaque coup.
 ## 19. Mains vides pour incanter (2.10.0, T-140)
 
 Décision du porteur du projet (31 octobre 2026) : on n'incante pas avec une arme ou un bouclier en main. Le serveur le
-vérifie par `vava_combat` (`armed`, puis `shield().ready`) au début de l'incantation et à sa fin ; le client ne fait que
-le montrer tôt. Préparation : [combat 0.6](combat.md) en plus de la section 0 ici (`ensure vava_combat` après
-`vava_health` et `vava_crafting`) ; A mage (`/magie tous`), Souverain ; une Épée courte, une Dague, un Bouclier rond et
-une Hache de bûcheron prises au catalogue (`/catalogue arme`, `/catalogue outil`). Entre deux tests : `/magie mana`,
+vérifie (arme de GTA sur le ped, puis `vava_combat` : `armed`, puis `shield().ready`) au début de l'incantation, dès
+qu'une arme passe en main pendant (hook `vava_inventory:hold`) et à sa fin ; le client ne fait que le montrer tôt.
+Préparation : [combat 0.6](combat.md) en plus de la section 0 ici (`ensure vava_combat` après `vava_health` et
+`vava_crafting`) ; A mage (`/magie tous`), Souverain ; une Épée courte, une Dague, un Bouclier rond et une Hache de
+bûcheron prises au catalogue (`/catalogue arme`, `/catalogue outil`). Entre deux tests : `/magie mana`,
 `/magie recharges`.
 
 | # | Faire | Attendu |
@@ -656,18 +657,21 @@ une Hache de bûcheron prises au catalogue (`/catalogue arme`, `/catalogue outil
 | 1 | Démarrer le serveur. | `module 'vava_magic' v2.10.0 prêt`, aucun avertissement nouveau. |
 | 2 | A, mains vides, Lueur prête : clic gauche. | La Lueur part comme avant. |
 | 3 | A prend l'Épée courte dans les Mains ; `Tab`, choisit la Boule de feu. | Aussitôt : « Il vous faut les mains libres pour incanter : rangez votre arme. » Le sceau de la Boule de feu est près de la barre de mana (le sort reste prêt). |
-| 4 | Épée en main : clic droit maintenu, puis trois clics gauches en 2 s ; attendre 6 s, un clic gauche. | Ni réticule, ni aperçu, ni incantation, ni mana dépensée. Le rappel paraît **une** fois pour toute la rafale, puis une fois au clic d'après 6 s (`controls.armedNoticeMs`, 5 s). |
+| 4 | Épée en main : clic droit maintenu, puis trois clics gauches en 2 s ; attendre 6 s, un clic gauche. Puis reposer l'épée, la reprendre, clic droit. | Ni réticule, ni aperçu, ni incantation, ni mana dépensée ; **aucun** nouveau rappel (déjà dit à la roue pour cette épée). Épée reprise : le clic droit donne **un** rappel, sans réticule. |
 | 5 | Épée en main : `/lancer`, deux fois. | Le rappel à chaque fois ; rien ne part. |
 | 6 | A repose l'épée (mains vides) ; clic droit bref, puis clic gauche. | La boule part (le mode redevient actif en 0,2 s au plus). |
-| 7 | A incante une Lueur (2,5 s) et, pendant l'incantation, prend la Dague dans les Mains (glisser depuis la besace). | L'incantation se brise dans le dixième de seconde : le rappel s'affiche, barre d'incantation interrompue, mana **inchangée**, aucun temps de recharge sur la Lueur (le grimoire ou la roue le montrent). |
+| 7 | A incante une Lueur (2,5 s) et, pendant l'incantation, prend la Dague dans les Mains (glisser depuis la besace). | L'incantation se brise dans le quart de seconde : le rappel s'affiche (une seule fois), barre d'incantation interrompue, mana **inchangée**, aucun temps de recharge sur la Lueur (le grimoire ou la roue le montrent). |
+| 7 bis | A incante une Lueur ; pendant l'incantation, prend la Dague et la repose aussitôt (moins d'une seconde). | Brisée quand même dès la prise (le serveur suit les mains) : rappel, mana inchangée ; la Lueur n'aboutit pas. |
 | 8 | A, Hache de bûcheron en main, lance une Lueur. | Elle part : un outil n'est pas une arme. |
 | 9 | **(2 joueurs)** A « utilise » le Bouclier rond, mains vides (il pend dans le dos, B le voit) ; lance une Lueur. | Elle part : un bouclier dans le dos ne gêne pas. |
 | 10 | **(2 joueurs)** A prend l'Épée courte (le bouclier passe au bras) ; `/lancer`. Puis repose l'épée. | Refusé (« rangez votre arme ») : l'épée suffit à refuser. Épée reposée : le bouclier repasse dans le dos et le sort part. |
 | 11 | Réglage `shield.armWithEmptyHand = true` dans `vava_combat/config.lua`, `restart vava_combat` ; A, mains vides, bouclier accroché (au bras), lance une Lueur ; puis « utilise » le bouclier (décroché) et relance. Remettre `false`. | Le client laisse partir la demande, le serveur la refuse : « Votre bouclier vous charge le bras : décrochez-le pour incanter. », aucune barre d'incantation ni mana dépensée. Décroché : la Lueur part. |
 | 12 | `stop vava_combat` ; A lance une Lueur, trois fois (`/magie recharges` entre deux). Puis `ensure vava_combat`, Épée courte en main, `/lancer`. | Arrêté : la Lueur part chaque fois (aucune restriction), **aucune** ligne de console de `vava_magic`. Au retour : refusé de nouveau. |
-| 13 | `resmon 1` chez A : mains vides en mode magie éveillé, puis Épée courte en main pendant 20 s (mode éveillé). | `vava_magic` inchangé par rapport à la section 15 (un appel d'export tous les 200 ms, seulement mode éveillé ; aucune boucle par image arme en main : le mode n'est pas actif). |
-| 14 | **(2 joueurs)** `/vava_reseau joueur <A>` après 3 à 12. | Aucun évènement nouveau : seulement les réponses des RPC `vava_magic:begin:…` refusées et les notifications habituelles. |
+| 13 | `resmon 1` chez A : mains vides en mode magie éveillé ; puis Épée courte en main, clic droit plusieurs fois pendant 20 s ; puis une Lueur de 2,5 s mains vides. | `vava_magic` inchangé par rapport à la section 15 : un export tous les 200 ms seulement mode éveillé ou pendant une incantation ; l'épée en main, le clic droit ne réveille pas le mode (aucun relevé, aucune boucle par image). |
+| 14 | **(2 joueurs)** `/vava_reseau joueur <A>` après 3 à 12. | Aucun évènement nouveau : seulement les réponses des RPC `vava_magic:begin:…` refusées, `vava_magic:castAbort` au seul A en 7 et 7 bis, et les notifications habituelles. |
 
 Ce qui n'est pas vérifiable en jeu sans client modifié : le refus par le serveur d'un client qui tairait son arme (le
-client refuse toujours en premier). Il est prouvé hors jeu (`tests/spec/magic_hands_spec.lua` : refus au début, arme
-prise pendant l'incantation, bouclier au bras ou dans le dos, sans vava_combat, vava_combat en erreur).
+client refuse toujours en premier), arme de GTA comprise (`vava_combat` la retire en moins d'une seconde). Il est prouvé
+hors jeu (`tests/spec/magic_hands_spec.lua` : refus au début et après les recharges, arme prise puis reposée pendant
+l'incantation, arme de GTA sur le ped, bouclier au bras ou dans le dos, sans vava_combat, vava_combat en erreur ou pas
+prêt).

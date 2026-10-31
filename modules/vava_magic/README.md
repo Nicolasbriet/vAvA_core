@@ -46,7 +46,7 @@ Rien n'a encore été joué en vrai : voir « À vérifier en jeu », « Tests �
 | `vava_inventory` ≥ 1.3.0 | grimoire et registre (objets, métadonnées) | pas d'objets ; `/grimoire` reste |
 | `vava_hud` | notifications | notifications de GTA (la barre de mana est celle du module) |
 | `vava_health` ≥ 1.3.0 (1.4.0 conseillé) | blessures par la chaîne de dégâts (`hit`), vie tenue par le serveur, état « à terre » (aucun sort ne touche un joueur à terre) ; 1.4.0 : un sort lancé debout porte encore si le lanceur tombe avant l'impact, et `chain.pvp = false` coupe aussi les effets sans dégâts | **aucun sort ne blesse personne** (le lanceur le lit, une fois par minute ; console) ; rien n'interrompt une incantation |
-| `vava_combat` ≥ 1.0.0 | mains vides pour incanter : `armed(source)` (arme tenue) et `shield(source).ready` (bouclier au bras) côté serveur, `armed()` côté client (affichage seulement) | **aucune restriction** : on incante l'arme à la main (seules les armes de GTA restent refusées par le client) |
+| `vava_combat` ≥ 1.0.0 | mains vides pour incanter : `armed(source)` (arme tenue) et `shield(source).ready` (bouclier au bras) côté serveur, `armed()` côté client (affichage seulement) | **aucune restriction** : on incante l'arme à la main (les armes de GTA restent refusées, par le serveur aussi) |
 | `vava_admin` | droits et journal du Conseil ; ≥ 1.6.0 : la fin d'un Gel ne libère pas un joueur immobilisé par le Registre | permission ACE `magie.admin`, journal en console |
 | `vava_chat` | réponses des commandes et suggestions (évènements `chat:*`, aussi ceux de la ressource « chat » de FiveM) | touches seulement |
 
@@ -100,7 +100,8 @@ Le noyau utilise en plus l'infrastructure du core (`core.rpc` à schéma strict 
 | `Hit(cible, paquet)` | `vava_health:hit` (chaîne de dégâts) ; sans lui : `nil, 'health_unavailable'`, aucun dégât |
 | `GetHealth(source)` · `IsDowned(source)` | `vava_health:get().health` (vie tenue par le serveur) · `isDowned` |
 | `OnHit(rappel)` | hook `vava_health:hit` (after) : une blessure du lanceur brise son incantation |
-| `HandsBusy(source)` | `vava_combat:armed(source)` (arme tenue) → `armed`, sinon `vava_combat:shield(source).ready` (bouclier au bras) → `shielded`, sinon nil ; vava_combat absent, pas prêt ou en erreur : nil, aucune restriction (une ligne de console par minute au plus) |
+| `HandsBusy(source)` | arme de GTA sur le ped (`GetSelectedPedWeapon`) ou `vava_combat:armed(source)` (arme tenue) → `armed`, sinon `vava_combat:shield(source).ready` (bouclier au bras) → `shielded`, sinon nil ; vava_combat absent, pas prêt ou en erreur : nil, aucune restriction (une ligne de console par minute au plus ; aussi quand `not_ready` dure plus d'une minute) |
+| `OnHold(rappel)` | hook `vava_inventory:hold` (after) : une arme ou un bouclier pris en main brise l'incantation en cours |
 | `SetModifiers(liste)` · `ChainHealthPoints()` | registre `vava_health:modifiers` (redéclarés à chaque démarrage de vava_health) · `vocabulary().healthPoints` |
 
 | Fonction client | Implémentation vAvA |
@@ -109,6 +110,7 @@ Le noyau utilise en plus l'infrastructure du core (`core.rpc` à schéma strict 
 | `IsDowned()` | `vava_health:get().downed` |
 | `CanUseMagic()` | ni mort, ni à terre, ni menotté (`IsPedCuffed`), ni assommé |
 | `IsArmed()` | `vava_combat:armed()` : arme de l'inventaire en main ; sans lui ou en erreur : non. Affichage seulement, le serveur décide |
+| `OnHandsChanged(rappel)` | hook local `core:character:fieldChanged` filtré sur `vava_inventory:hands` : un rappel « rangez votre arme » par arme sortie |
 | `GetLockedTarget()` | cible du verrouillage de ce module (clic molette), numéro serveur ou nil |
 | `ChatLines` · `ChatSuggestion` | `chat:addMessage` · `chat:addSuggestion` |
 
@@ -129,8 +131,9 @@ serveur et s'affiche près de la barre de mana.
 **Le mode magie** : un sort prêt, mains vides, à pied, debout. Le clic gauche lance alors le sort au lieu de frapper.
 Il s'endort après 20 s sans viser ni lancer (le clic gauche refrappe comme d'habitude) ; **le clic droit le réveille**.
 Sortir une arme ou monter en véhicule le coupe, sans perdre le sort prêt. Arme en main (celle de l'inventaire, avec
-vava_combat), viser ou lancer rappelle « Il vous faut les mains libres pour incanter : rangez votre arme. », au plus
-une fois toutes les 5 s (`controls.armedNoticeMs`) ; choisir un sort dans la roue l'arme à la main le dit aussitôt.
+vava_combat), viser ou lancer rappelle « Il vous faut les mains libres pour incanter : rangez votre arme. », une fois
+par arme sortie (jamais deux en 5 s, `controls.armedNoticeMs`), et viser ne réveille pas le mode ; choisir un sort
+dans la roue l'arme à la main le dit aussitôt.
 
 | Touche ou bouton | Action |
 | --- | --- |
@@ -351,20 +354,25 @@ Le mage a besoin d'un garde, le guerrier d'un mage. Un bâton de mage (focaliseu
 | Arme de l'inventaire en main (épée, hache d'armes, masse, dague, bâton ferré…) | **non** | `armed` : « Il vous faut les mains libres pour incanter : rangez votre arme. » |
 | Bouclier accroché **au bras** (`vava_combat:shield(source).ready`) | **non** | `shielded` : « Votre bouclier vous charge le bras : décrochez-le pour incanter. » |
 | Bouclier accroché **dans le dos** | oui : il ne gêne pas les mains | — |
-| Arme de GTA sortie | non (client, comme avant ; vava_combat la retire de toute façon) | `armed` |
+| Arme de GTA sortie | **non** (serveur : ped lu par OneSync, `GetSelectedPedWeapon` ; vava_combat la retire de toute façon) | `armed` |
 
-- **Serveur (fait foi)** : au début de l'incantation (après « à terre » et « en véhicule »), puis de nouveau à la fin :
-  une arme prise en main ou un bouclier passé au bras pendant l'incantation la brise, sans consommer de mana ni poser
-  de recharge. Lu par `bridge.HandsBusy` (`exports.vava_combat:armed(source)`, puis `shield(source)`).
+- **Serveur (fait foi)** : au début de l'incantation (après « à terre », « en véhicule », les empêchements, le délai
+  global et la recharge : une demande en recharge ne paie pas les exports), dès qu'une arme ou un bouclier passe en
+  main pendant l'incantation (hook `vava_inventory:hold` after : elle se brise aussitôt, même si l'arme est reposée
+  avant la fin), puis de nouveau à la fin. Une incantation brisée ne consomme ni mana ni recharge. Lu par
+  `bridge.HandsBusy` : arme de GTA sur le ped, puis `exports.vava_combat:armed(source)`, puis `shield(source)`.
 - Avec la config de vava_combat livrée (`shield.armWithEmptyHand = false`), le bouclier ne passe au bras qu'avec une
   arme à une main ou une dague en main : c'est l'arme qui refuse. `shielded` ne sert que si vava_combat met le bouclier
   au bras mains vides (`armWithEmptyHand = true`).
 - **Client (affichage seulement)** : `bridge.IsArmed()` (`exports.vava_combat:armed()`) endort le mode magie comme une
-  arme de GTA, refuse la pré-vérification (`armed`), interrompt une incantation quand une arme est prise en main, et le
-  dit à la roue et aux touches. Il ne sait pas où pend un bouclier (`shieldHung()` ne donne que l'objet) : le refus
-  `shielded` vient du serveur.
-- **Sans vava_combat** (absent, pas encore prêt, ou en erreur) : aucune restriction ; en erreur, une ligne de console par
-  minute au plus, jamais une par lancer.
+  arme de GTA, refuse la pré-vérification (`armed`), interrompt une incantation quand une arme est prise en main (relevé
+  toutes les 200 ms, `casting.armedCheckMs`), et le dit : aussitôt à la roue et à `/lancer` ; aux touches (viser,
+  lancer), **une fois par arme sortie** (remis à zéro quand le champ `vava_inventory:hands` change ou que les mains se
+  libèrent), jamais deux fois en moins de 5 s (`controls.armedNoticeMs`). Viser l'arme en main ne réveille pas le mode.
+  Il ne sait pas où pend un bouclier (`shieldHung()` ne donne que l'objet) : le refus `shielded` vient du serveur.
+- **Sans vava_combat** (absent, pas encore prêt, ou en erreur) : aucune restriction pour les armes de l'inventaire (les
+  armes de GTA restent refusées) ; en erreur, ou pas prêt depuis plus d'une minute, une ligne de console par minute au
+  plus, jamais une par lancer.
 
 ## Commandes du Conseil
 
@@ -396,11 +404,11 @@ plus la place. »… `texts.chat.adminErrors`) ; le code brut ne va qu'à la con
 | --- | --- |
 | `mana` | maximum (100), régénération (3 points / 5 s), temps d'affichage de la barre après un sort |
 | `progression` | seuils d'XP (0, 100, 300, 700, 1500), coût selon le niveau, part d'XP d'un échec, anti-farm (20 s) |
-| `casting` | délai global entre deux sorts (1 s), tolérances, barre d'incantation au-delà de 0,5 s |
+| `casting` | délai global entre deux sorts (1 s), tolérances, relevés du client (100 ms ; arme en main : 200 ms, `armedCheckMs`), barre d'incantation au-delà de 0,5 s |
 | `persistence` | écriture de la fiche dans le personnage (au plus toutes les 15 s, et au départ) |
 | `elements` | feu, eau, terre, lumière, esprit : nom, groupe de la roue, couleur, particules des mains pendant l'incantation |
 | `wheel` | groupes de l'anneau intérieur, dans l'ordre |
-| `controls` | mode magie : endormissement (20 s), allure en visant, molette, rappel « rangez votre arme » (au plus toutes les 5 s, `armedNoticeMs`), aperçu au sol |
+| `controls` | mode magie : endormissement (20 s), allure en visant, molette, rappel « rangez votre arme » (une fois par arme sortie, jamais deux en 5 s, `armedNoticeMs`), aperçu au sol |
 | `effects` | niveau de détail (complet en deçà de 30 m, rien au-delà de 150 m), plafonds de lumières et de particules, chargement et libération des ressources, traces au sol (`traces` : durée, couleur, taille) |
 | `sounds` | portée des sons (60 m), fichiers .ogg qui remplacent les sons fabriqués (`files`), sons natifs de GTA (`native`) |
 | `projectiles` | contrôles communs de l'impact (axe, marge sur la cible, portée, délai, joueurs qui voient le lancer, hauteur des mains et du torse) ; un sort peut en changer dans son `hit` |
@@ -704,7 +712,7 @@ Deux joueurs (A et B) suffisent ; un troisième aide pour le cercle et la zone d
 - [ ] Pendant un Chancelant ou un Gelé, B ne peut pas incanter ; son incantation en cours se brise.
 
 **Mains vides (2.10.0, avec vava_combat)**
-- [ ] Épée courte en main : la roue prévient, le clic gauche ne lance rien (rappel « rangez votre arme », pas plus d'une fois en 5 s), `/lancer` refusé ; la reposer : le sort part. Prendre l'épée pendant une incantation : elle se brise, mana intacte.
+- [ ] Épée courte en main : la roue prévient, le clic droit ne vise pas, le clic gauche ne lance rien (rappel « rangez votre arme », une fois pour cette épée sortie), `/lancer` refusé ; la reposer : le sort part. Prendre l'épée pendant une incantation, même pour la reposer aussitôt : elle se brise, mana intacte.
 - [ ] Bouclier accroché dans le dos, mains vides : le sort part ; au bras (épée en main) : refusé. `stop vava_combat` : plus aucune restriction. Détail : `docs/tests/magie.md` § 19.
 
 **Effets, traces, sons, niveau de détail**
