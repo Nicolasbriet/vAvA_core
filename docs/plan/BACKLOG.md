@@ -825,7 +825,7 @@ faire tout le système de combat ») : la porte T-119 reste à passer en jeu.
   d'apparition (délai de grâce), et expose l'état confirmé.
 
 ### T-140 — Mains vides pour incanter
-- Agent : vava-dev-lua (cette tâche autorise à toucher `vava_magic`) · Dépend de : T-111, T-116 · Statut : à faire
+- Agent : vava-dev-lua (cette tâche autorise à toucher `vava_magic`) · Dépend de : T-111, T-116 · Statut : en cours
 - Décision du porteur du projet (31/10, spec T-111 § 13-1) : impossible d'incanter avec une arme ou un bouclier en
   main. Le serveur refuse le lancer par `exports.vava_combat:armed(src)` (le texte `errors.armed` existe dans la config
   de la magie) ; le client le montre par `armed()` sans en décider. Sans `vava_combat`, aucune restriction. Un bâton de
