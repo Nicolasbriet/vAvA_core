@@ -248,6 +248,17 @@ describe('vava_gathering atelier côté serveur', function()
             assert.equal(0, flushes)
         end)
 
+        -- seconde contre-relecture D-2 : A rétrécit la zone pendant que B publie un point jugé sur l'ancien cercle
+        it('deux publications simultanées : le point resté hors du cercle neuf fait refuser la fin de son lot (D-2)', function()
+            assert.is_true(fn('apply')('zone', zoneDef({ id = 'foret_brume', nom = 'Forêt de Brume',
+                place = { x = -320.0, y = -880.0, z = 31.0, r = 45.0 } }), { reason = 'publish', last = true }))
+            local ok, err = fn('apply')('node', nodeDef('foret_brume_tard', -265.0, { parent = 'foret_brume',
+                place = { x = -265.0, y = -880.0, z = 31.0, h = 0.0 } }), { reason = 'publish', last = true })
+            assert.is_false(ok)
+            assert.equal('Ce point est hors de « Forêt de Brume ».', err)
+            assert.equal(1, flushes)
+        end)
+
         it('un point posé n’est contrôlé que pour lui : à plus de 500 m de sa zone ou 121e, refusé (C-1)', function()
             local ok, err = catalog.putNode({ id = 'foret_brume_loin', zone = 'foret_brume', resource = 'chene',
                 x = -320.0 + 501.0, y = -880.0, z = 31.0, charges = 1 })
@@ -674,5 +685,93 @@ describe('vava_gathering charges d’un point de l’Atelier', function()
             end
         end
         assert.is_true(found)
+    end)
+end)
+
+-- Seconde contre-relecture D-1 : un refus de fin de lot suit un catalogue déjà changé (réparé par le rapprochement de
+-- l'Atelier) ; d'ici là, la boucle lente ne doit jamais envoyer au core une zone hors de ses bornes.
+describe('vava_gathering zone hors bornes et boucle lente', function()
+    local catalog, share, atelier, calls, errors, now
+
+    before_each(function()
+        helper.reset()
+        VavaGathering = nil
+        helper.loadAll({
+            'modules/vava_gathering/shared/constants.lua',
+            'modules/vava_gathering/config.lua',
+            'modules/vava_gathering/shared/zonestate.lua',
+            'modules/vava_gathering/shared/zonebuild.lua',
+            'modules/vava_gathering/shared/editing.lua',
+        })
+        calls, errors, now = {}, {}, 1000
+        _G.GetGameTimer = function() return now end
+        local hooks = {}
+        VavaGathering.resource = 'vava_gathering'
+        VavaGathering.log = { warn = function() end, error = function(fmt, ...) errors[#errors + 1] = fmt:format(...) end }
+        VavaGathering.core = {
+            registry = { define = function() return true end, add = function() return true end, all = function() return {} end },
+            hooks = { after = function(name, fn) hooks[name] = fn return 1 end },
+        }
+        local function record(name)
+            return function(id) calls[#calls + 1] = { name, id } return true end
+        end
+        local declared = {}
+        VavaGathering.bridge = {
+            DeclareItem = function() end, ItemExists = function() return true end,
+            AtelierExists = function() return true end, AtelierHas = function() return false end,
+            AtelierDeclare = function(_, def) declared.def = def return true end,
+            ZoneDefine = record('define'), ZoneMove = record('move'), ZoneSet = record('set'),
+            ZoneReplace = record('replace'), ZoneRemove = record('remove'),
+        }
+        helper.load('modules/vava_gathering/server/catalog.lua')
+        catalog = VavaGathering.catalog
+        assert.is_true(catalog.define())
+        helper.load('modules/vava_gathering/server/share.lua')
+        share = VavaGathering.share
+        share.configure(function(id)
+            local def = catalog.zone(id)
+            if not def then return nil, nil end
+            return def, VavaGathering.zonestate.build({ band = 'normal', scarred = false }, catalog.nodesOf(id),
+                function() return 3 end, def)
+        end, nil)
+        VavaGathering.zones = { ensure = function() end, forget = function() end }
+        VavaGathering.nodes = { ensure = function() end, forget = function() end }
+        VavaGathering.trials = {}
+        VavaGathering.harvest = { forgetNode = function() end }
+        helper.load('modules/vava_gathering/server/atelier.lua')
+        atelier = VavaGathering.atelier
+        assert.is_true(atelier.start())
+        VavaGathering.atelierDef = declared.def
+    end)
+
+    local function sent(id)
+        for _, call in ipairs(calls) do
+            if call[2] == id then return true end
+        end
+        return false
+    end
+
+    it('lot refusé en fin (zone hors bornes) : la boucle lente ne l’envoie pas, puis l’envoie une fois réparée', function()
+        local def = VavaGathering.atelierDef
+        local ok = def.apply('zone', { id = 'foret_brume', version = 2, nom = 'Forêt de Brume', genre = 'foret',
+            fatigue = 2, repos = 4, cicatrice = 172800, place = { x = -320.0, y = 650.0, z = 31.0, r = 120.0 } },
+            { reason = 'publish', last = true })
+        assert.is_false(ok)
+        now = now + 5000
+        share.flush(2000)
+        assert.is_false(sent('foret_brume'))
+        assert.equal(1, #errors)
+        assert.truthy(errors[1]:find('out_of_bounds', 1, true))
+        -- passages suivants : toujours rien, la console n'est pas noyée
+        now = now + 10000
+        share.flush(2000)
+        assert.is_false(sent('foret_brume'))
+        assert.equal(1, #errors)
+        -- rapprochement : la zone revient à sa place publiée, elle part au passage suivant
+        assert.is_true(catalog.putZone({ id = 'foret_brume', label = 'Forêt de Brume', kind = 'foret', x = -320.0,
+            y = -880.0, z = 31.0, radius = 120.0 }))
+        now = now + 10000
+        share.flush(2000)
+        assert.is_true(sent('foret_brume'))
     end)
 end)

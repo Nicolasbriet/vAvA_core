@@ -159,6 +159,11 @@ local function checkZone(zone)
     if type(radius) ~= 'number' or radius ~= radius or radius <= 0 or radius > ZONE_MAX_RADIUS then
         return nil, format("zone '%s' : rayon de plus de 0 à %.0f m", zone.id, ZONE_MAX_RADIUS)
     end
+    -- le nom part dans l'état de zone et la liste de la carte : borné en octets (seconde contre-relecture D-4)
+    local nameBytes = cfg.editor and cfg.editor.nameBytes or 80
+    if zone.label ~= nil and (type(zone.label) ~= 'string' or #zone.label == 0 or #zone.label > nameBytes) then
+        return nil, format("zone '%s' : nom de 1 à %d octets attendu", zone.id, nameBytes)
+    end
     return {
         id = zone.id, label = zone.label or zone.id, kind = zone.kind or 'foret', x = zone.x, y = zone.y, z = zone.z,
         radius = radius, cost = zone.cost or 1.0, regenPerHour = zone.regenPerHour or 1.0, scarHours = zone.scarHours or 24,
@@ -425,6 +430,21 @@ function catalog.bounds(zoneId)
     local ok, err = checkBounds(def, nodesByZone[zoneId] or {})
     if ok then return true end
     return false, err, zonestate.area(def, nodesByZone[zoneId] or {}, margin()).radius
+end
+
+--- Points d'une zone hors de son cercle (rayon + `editor.nodeSlack`) : nil si tous sont dedans, sinon le premier
+--- (seconde contre-relecture D-2 : deux publications simultanées, l'une de la zone, l'autre d'un point).
+---@param zoneId string
+---@return vAvA.NodeDefinition|nil
+function catalog.outside(zoneId)
+    local def = zonesById[zoneId]
+    if not def then return nil end
+    local limit = def.radius + (cfg.editor and cfg.editor.nodeSlack or 0) + 1e-9
+    for _, node in ipairs(nodesByZone[zoneId] or {}) do
+        local dx, dy = node.x - def.x, node.y - def.y
+        if math.sqrt(dx * dx + dy * dy) > limit then return node end
+    end
+    return nil
 end
 
 --- La graine telle que la config la donne (retour à l'original de l'Atelier) : { zones, nodes } (tables de la config,

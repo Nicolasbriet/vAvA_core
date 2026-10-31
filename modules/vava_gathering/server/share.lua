@@ -221,9 +221,21 @@ function share.flush(graceMs)
     end
     table.sort(ids)
     for _, id in ipairs(ids) do
-        touched[id] = nil
-        flushOne(id)
-        any = true
+        -- boucle lente : une zone hors des bornes du core (lot refusé, rapprochement pas encore fait) reste notée et
+        -- n'est pas envoyée ; une ligne en console, rappelée au plus toutes les 10 min (seconde contre-relecture D-1)
+        local inBounds = true
+        if graceMs and catalog.bounds then
+            local ok = catalog.bounds(id)
+            if not ok then
+                inBounds = false
+                failed(id, 'flush', 'out_of_bounds')
+            end
+        end
+        if inBounds then
+            touched[id] = nil
+            flushOne(id)
+            any = true
+        end
     end
     if any and afterFlush then afterFlush() end
 end

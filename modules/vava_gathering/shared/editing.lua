@@ -294,7 +294,7 @@ function editing.validateZone(data, ctx, view)
     if not view.kinds[data.genre] then push(errors, { field = 'genre', text = T.kind }) end
     -- nom borné en octets (lettres accentuées comprises) : il part dans l'état de zone et la liste de la carte
     -- (contre-relecture C-5)
-    if type(data.nom) == 'string' and #data.nom > s.nameBytes then push(errors, { field = 'nom', text = T.nameLong }) end
+    if type(data.nom) == 'string' and #data.nom > (s.nameBytes or 80) then push(errors, { field = 'nom', text = T.nameLong }) end
     local place = ctx.place
     if type(place) ~= 'table' then
         if ctx.action == 'trial' or ctx.action == 'publish' then push(errors, { text = T.noPlaceZone }) end

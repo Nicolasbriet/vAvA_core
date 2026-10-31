@@ -154,6 +154,16 @@ describe('vava_gathering bornes des zones du core', function()
         assert.truthy(err:find('subscribeSlack', 1, true))
     end)
 
+    -- seconde contre-relecture D-4 : le nom part dans l'état de zone et la carte
+    it('refuse au démarrage une zone de la graine au nom de plus de 80 octets, accepte 80', function()
+        cfg.zones[1].label = string.rep('é', 40)
+        assert.is_true(define())
+        cfg.zones[1].label = string.rep('é', 40) .. 'x'
+        local ok, err = define()
+        assert.is_false(ok)
+        assert.truthy(err:find('nom de 1 à 80 octets', 1, true))
+    end)
+
     it('refuse une zone sans position', function()
         cfg.zones[2].y = nil
         local ok, err = define()
