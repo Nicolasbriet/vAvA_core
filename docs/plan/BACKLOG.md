@@ -831,7 +831,7 @@ versé à T-014 ; les autres points déjà couverts sont précisés dans T-012 �
   `docs/plan/rapports/T-136.md` ; à tester en jeu : `docs/tests/metiers.md` § 5.3.
 
 ### T-147 — Artisanat : recette libre inconnue des compétences signalée
-- Agent : vava-dev-lua · Dépend de : — · Statut : à faire
+- Agent : vava-dev-lua · Dépend de : — · Statut : en cours
 - Trouvé pendant T-136 : `vava_crafting` affiche au menu une recette déclarée à l'artisanat mais inconnue de
   `vava_skills:recipes`, puis la refuse au clic (`not_known`), sans rien en console. Un module qui oublie la
   déclaration aux compétences retombe dans ce piège sans signe : avertir au démarrage de `vava_crafting` (et au
