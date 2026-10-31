@@ -110,7 +110,10 @@ local function hintOf(kind, data)
     if type(value) ~= 'number' then return nil end
     local field = kind.fields[def.hintField]
     local written = field and field.widget == 'duration' and text.duration(value) or text.number(value)
-    return text.truncate(format(def.hintFormat or '%s', written), OUT.hint)
+    local pattern = def.hintFormat or '%s'
+    -- accordé : `one` pour 0 et 1, `many` au-delà (relecture lore L-1)
+    if type(pattern) == 'table' then pattern = value <= 1 and pattern.one or pattern.many end
+    return text.truncate(format(pattern, written), OUT.hint)
 end
 
 --- Lignes de CHILDREN_SQL regroupées par fiche (types voulus seulement) : clé 'type|id' → { kind, id, published?,

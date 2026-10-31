@@ -64,6 +64,12 @@ local template, templateGhost, templateLabel = {}, nil, nil
 -- fiche dont la réponse n'est plus gardée (retour d'un essai joué, autre fiche lue entre-temps) la redemande
 local kindsSeen, kindsCount = {}, 0
 local MAX_KINDS_SEEN = 256
+-- révision des lieux gardés et du modèle : titres, frères, lieu du parent et lignes ne sont recalculés que quand elle
+-- change, jamais à chaque image (relecture réseau R-5)
+local revision = 0
+local function bump()
+    revision = revision + 1
+end
 
 -- Valeurs reçues (page, serveur) ---------------------------------------------------------------------------------------
 
@@ -129,7 +135,7 @@ local function cleanRow(row)
     return {
         kind = row.kind, id = row.id, title = str(row.title, MAX_TITLE) or row.id, hint = str(row.hint, MAX_HINT),
         tone = row.tone, place = where, look = cleanLook(row.look), rev = tointeger(tonumber(row.rev)) or 0,
-        x = center.x, y = center.y, z = center.z,
+        x = center.x, y = center.y, z = center.z, key = row.kind .. '|' .. row.id,
     }
 end
 
@@ -161,7 +167,7 @@ local function ghostList(origin, skip)
     local list = {}
     local settings = placement.ghosts
     for i, row in ipairs(aim.nearest(candidates, origin.x, origin.y, origin.z, settings.max, settings.distance)) do
-        list[i] = { key = row.kind .. '|' .. row.id, model = row.look.model, x = row.place.x, y = row.place.y,
+        list[i] = { key = row.key, model = row.look.model, x = row.place.x, y = row.place.y,
             z = row.place.z, h = row.place.h or 0.0 }
     end
     return list
@@ -193,6 +199,7 @@ function placer.absorb(editorId, kindId, id, data)
     kindsSeen[seen] = kindId
     kept = { editor = editorId, kind = kindId, id = id, rows = rows, parent = parent,
         self = { place = type(data.self) == 'table' and cleanPlace(data.self.place) or nil } }
+    bump()
     -- distance du bloc « Lieu » (« Posée à 32 m de vous »), calculée ici : la page la lit dans `self.distance`
     if type(data.self) == 'table' then data.self.distance = placer.distance(kept.self.place) end
     if not state then ghosts.sync(ghostList(pedCoords(), nil)) end
@@ -202,6 +209,7 @@ end
 function placer.leave()
     if state then placer.stop() end
     kept = nil
+    bump()
     ghosts.clear()
 end
 
@@ -243,7 +251,7 @@ local function pauseBlock(on)
 end
 
 --- Lieu du parent dessiné et jugé (`inside`) : en mode « points », la fiche elle-même ; sinon le parent de la fiche.
-local function parentArea(current)
+local function computeArea(current)
     if not kept then return nil end
     local where, title
     if current.mode == 'children' then
@@ -256,7 +264,7 @@ local function parentArea(current)
 end
 
 --- Frères pour la règle d'écart : lignes du type posé (le serveur relit les siens).
-local function siblings(current)
+local function computeSiblings(current)
     local list = {}
     for _, row in ipairs(kept and kept.rows or {}) do
         if row.kind == current.kind then
@@ -267,7 +275,7 @@ local function siblings(current)
 end
 
 --- Titre du candidat (« Chêne 4 ») : titre donné tout seul d'un enfant nouveau, sinon celui de la fiche.
-local function candidateTitle(current)
+local function computeTitle(current)
     if current.mode == 'children' then
         if current.picked then return current.picked.title end
         if templateLabel then
@@ -280,6 +288,30 @@ local function candidateTitle(current)
         return templateGhost and templateGhost.label or current.title
     end
     return current.title
+end
+
+--- Lieu du parent, frères et titre du candidat, recalculés seulement quand les lieux, le modèle ou l'élément choisi
+--- changent.
+local function refreshCache(current)
+    if current.cacheRev == revision and current.cachePicked == (current.picked or false) then return end
+    current.cacheRev, current.cachePicked = revision, current.picked or false
+    current.area, current.siblingList, current.titleText = computeArea(current), computeSiblings(current),
+        computeTitle(current)
+end
+
+local function parentArea(current)
+    refreshCache(current)
+    return current.area
+end
+
+local function siblings(current)
+    refreshCache(current)
+    return current.siblingList
+end
+
+local function candidateTitle(current)
+    refreshCache(current)
+    return current.titleText
 end
 
 --- Règles réévaluées pour le candidat (les mêmes que le serveur ; le serveur décide).
@@ -332,8 +364,44 @@ local function sortNear(current)
     for _, row in ipairs(kept and kept.rows or {}) do
         if row.id ~= skip then list[#list + 1] = row end
     end
-    current.near = aim.nearest(list, origin.x, origin.y, origin.z, labels.max, labels.distance)
+    -- étiquettes et teintes faites ici, toutes les `sortMs`, pas à chaque image
+    local near = {}
+    for i, row in ipairs(aim.nearest(list, origin.x, origin.y, origin.z, labels.max, labels.distance)) do
+        local color, suffix = colors.child, nil
+        if row.tone == 'new' then color, suffix = colors.valid, placeTexts.new
+        elseif row.tone == 'removal' then color, suffix = colors.refused, placeTexts.removal end
+        local label = row.title
+        if row.hint then label = label .. ' · ' .. row.hint end
+        if suffix then label = label .. ' (' .. suffix .. ')' end
+        near[i] = { row = row, label = label, color = color,
+            chevron = (row.tone == 'new' or row.tone == 'draft') and not row.place.r and not row.place.points }
+    end
+    current.near = near
     ghosts.sync(ghostList(origin, skip))
+end
+
+-- texte constant de l'absence de visée
+local groundLine = nil
+
+--- Ligne du candidat, refaite seulement quand son titre, l'aperçu, le rayon ou le nombre de sommets changent.
+local function candidateLine(current)
+    local title, verdict, candidate = candidateTitle(current), current.verdict, current.candidate
+    local r = candidate and candidate.r or false
+    local n = #current.vertices
+    local line = current.line
+    if line and line.title == title and line.verdict == verdict and line.r == r and line.n == n then return line.text end
+    local text
+    if verdict then
+        text = format(placeTexts.refused, title, placerules.text(verdict, placeTexts))
+    elseif current.shape == 'circle' and r then
+        text = format(placeTexts.area, title, placerules.number(r))
+    elseif current.shape == 'polygon' then
+        text = format(placeTexts.trace, n)
+    else
+        text = format(placeTexts.valid, title)
+    end
+    current.line = { title = title, verdict = verdict, r = r, n = n, text = text }
+    return text
 end
 
 --- Dessin d'un lieu de zone (anneau, ou tracé fermé) dans une teinte.
@@ -356,14 +424,11 @@ local function draw(current, at)
     if area then drawArea(area.place, colors.area) end
     local candidate, verdict = current.candidate, current.verdict
     local color = verdict and colors.refused or colors.valid
-    local title = candidateTitle(current)
-    local line = verdict and format(placeTexts.refused, title, placerules.text(verdict, placeTexts))
-        or format(placeTexts.valid, title)
     if candidate then
+        local line = candidateLine(current)
         if current.shape == 'circle' then
             drawing.ring(candidate.x, candidate.y, candidate.z, candidate.r, color)
-            local areaLine = format(placeTexts.area, title, placerules.number(candidate.r))
-            drawing.label(candidate.x, candidate.y, candidate.z, verdict and line or areaLine, color)
+            drawing.label(candidate.x, candidate.y, candidate.z, line, color)
         elseif current.shape == 'polygon' then
             local points = candidate.points
             for i = 1, #points - 1 do
@@ -371,8 +436,7 @@ local function draw(current, at)
             end
             for _, point in ipairs(points) do drawing.post(point.x, point.y, candidate.z, color) end
             local last = points[#points]
-            local traceLine = format(placeTexts.trace, #current.vertices)
-            drawing.label(last.x, last.y, candidate.z, verdict and line or traceLine, color)
+            drawing.label(last.x, last.y, candidate.z, line, color)
         else
             local model = current.mode == 'children' and not current.picked and templateGhost and templateGhost.model
                 or (current.picked and current.picked.look and current.picked.look.model)
@@ -384,24 +448,20 @@ local function draw(current, at)
         end
     else
         ghosts.candidate(nil)
-        drawing.screen(placerules.text({ code = 'ground', args = {} }, placeTexts), colors.refused)
+        groundLine = groundLine or placerules.text({ code = 'ground', args = {} }, placeTexts)
+        drawing.screen(groundLine, colors.refused)
     end
-    for _, row in ipairs(current.near or {}) do
-        local rowColor, suffix = colors.child, nil
-        if row.tone == 'new' then rowColor, suffix = colors.valid, placeTexts.new
-        elseif row.tone == 'removal' then rowColor, suffix = colors.refused, placeTexts.removal end
-        local label = row.title
-        if row.hint then label = label .. ' · ' .. row.hint end
-        if suffix then label = label .. ' (' .. suffix .. ')' end
-        if (row.tone == 'new' or row.tone == 'draft') and not ghosts.has(row.kind .. '|' .. row.id) and not row.place.r
-            and not row.place.points then
-            drawing.chevron(row.x, row.y, row.z, row.place.h, rowColor)
+    for _, item in ipairs(current.near or {}) do
+        local row = item.row
+        if item.chevron and not ghosts.has(row.key) then drawing.chevron(row.x, row.y, row.z, row.place.h, item.color) end
+        drawing.label(row.x, row.y, row.z, item.label, item.color)
+    end
+    local picked = current.picked
+    if picked then
+        if current.pickedLine == nil or current.pickedFor ~= picked then
+            current.pickedFor, current.pickedLine = picked, format(placeTexts.picked, picked.title)
         end
-        drawing.label(row.x, row.y, row.z, label, rowColor)
-    end
-    if current.picked then
-        drawing.label(current.picked.x, current.picked.y, current.picked.z,
-            format(placeTexts.picked, current.picked.title), colors.picked)
+        drawing.label(picked.x, picked.y, picked.z, current.pickedLine, colors.picked)
     end
     local message = current.flash
     if message then
@@ -418,10 +478,12 @@ local function keepRow(raw)
     for i, known in ipairs(kept.rows) do
         if known.kind == row.kind and known.id == row.id then
             kept.rows[i] = row
+            bump()
             return row
         end
     end
     if #kept.rows < VavaAtelier.MAX_ROWS then kept.rows[#kept.rows + 1] = row end
+    bump()
     return row
 end
 
@@ -431,6 +493,7 @@ local function forgetRow(kindId, id)
         local row = kept.rows[i]
         if row.kind == kindId and row.id == id then table.remove(kept.rows, i) end
     end
+    bump()
 end
 
 local function rowOf(kindId, id)
@@ -781,6 +844,7 @@ function placer.start(d)
         if type(d.template) == 'table' then template = d.template end
         if d.ghost ~= nil then templateGhost = cleanLook(d.ghost) end
         if d.label ~= nil then templateLabel = str(d.label, MAX_LABEL) end
+        bump()
     end
     local selfPlace = mode == 'self' and kept and kept.self and kept.self.place or nil
     local current = {
@@ -825,6 +889,7 @@ function placer.templateChanged(d)
     if type(d.values) == 'table' then template = d.values end
     if d.ghost ~= nil then templateGhost = cleanLook(d.ghost) end
     if d.label ~= nil then templateLabel = str(d.label, MAX_LABEL) end
+    bump()
     if state then state.lastCandidate = nil end
 end
 

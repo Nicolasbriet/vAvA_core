@@ -56,8 +56,8 @@ VavaAtelier.config = {
             unreadable = 'Cette version ne peut plus être lue par cet atelier.',
             -- T-102 (outil de placement)
             not_placeable = 'Cette fiche ne se place pas en jeu.',
-            instance = 'Vous êtes dans une instance : revenez dans le royaume pour placer.',
-            bad_request = 'Demande mal formée.',
+            instance = 'Vous êtes hors du monde commun (intérieur, cachot…) : revenez-y pour placer.',
+            bad_request = 'Demande refusée : rouvrez la fiche.',
         },
         -- bandeau du volet pendant un essai, si l'éditeur n'a pas de texts.trialLine
         trialLineDefault = 'Mode essai : vous seul voyez ce changement en jeu',
@@ -131,9 +131,9 @@ VavaAtelier.config = {
         -- textes de l'aperçu et des refus (le serveur rend les mêmes)
         texts = {
             valid = '%s, emplacement valide',
-            refused = '%s : %s',
+            refused = '%s — %s',
             area = '%s, rayon %s m',
-            far = 'Trop loin de vous : approchez-vous (%d m).',
+            far = 'Trop loin de vous (%d m) : approchez-vous.',
             ground = 'Visez le sol.',
             inside = 'Hors de %s.',
             spacing = 'Trop près de « %s » (%s m).',
@@ -143,9 +143,9 @@ VavaAtelier.config = {
             busy = 'Un instant…',
             undoNone = 'Rien à annuler.',
             undoFailed = 'Impossible d\'annuler : la fiche a changé.',
-            picked = '%s : cliquez pour le déplacer',
-            trace = 'Tracé : %d sommets (Entrée pour fermer)',
-            quitTrace = 'Échap encore pour abandonner le tracé.',
+            picked = '%s : cliquez à sa nouvelle place',
+            trace = 'Sommets posés : %d (Entrée pour fermer le tracé)',
+            quitTrace = 'Appuyez encore sur Échap pour abandonner le tracé.',
             vehicle = 'Descendez de votre monture pour placer.',
             new = 'nouveau',
             removal = 'retiré',

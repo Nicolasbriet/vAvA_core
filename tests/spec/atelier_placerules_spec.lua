@@ -186,7 +186,7 @@ describe('vava_atelier placerules', function()
 
     describe('textes', function()
         it('formatés comme ceux du serveur', function()
-            assert.equal('Trop loin de vous : approchez-vous (72 m).', rules.text({ code = 'far', args = { 72 } }, texts))
+            assert.equal('Trop loin de vous (72 m) : approchez-vous.', rules.text({ code = 'far', args = { 72 } }, texts))
             assert.equal('Visez le sol.', rules.text({ code = 'ground', args = {} }, texts))
             assert.equal('1,4', rules.number(1.44))
             assert.equal('81,5', rules.number(81.5))

@@ -138,7 +138,9 @@ nui.on('editor', function(d)
     end
     if type(answer.descriptor) == 'table' then
         local descTexts = type(answer.descriptor.texts) == 'table' and answer.descriptor.texts or {}
-        editors[id] = { version = answer.version, label = str(answer.descriptor.label),
+        local bannerTitle = str(descTexts.banner)
+        editors[id] = { version = answer.version,
+            label = bannerTitle ~= '' and bannerTitle or str(answer.descriptor.label),
             trialLine = str(descTexts.trialLine) }
     end
     session.setEditor(id)
@@ -176,6 +178,7 @@ nui.on('search', function(d)
 end)
 
 nui.on('journal', function(d)
+    leaveEntry()
     return forward(RPC.JOURNAL, int(d.before, 0), str(d.editor))
 end)
 
@@ -215,14 +218,17 @@ nui.on('preview', function(d)
 end)
 
 nui.on('history', function(d)
+    leaveEntry()
     return forward(RPC.HISTORY, str(d.editor), str(d.kind), str(d.id), int(d.before, 0))
 end)
 
 nui.on('version', function(d)
+    leaveEntry()
     return forward(RPC.VERSION, str(d.editor), str(d.kind), str(d.id), int(d.version, 0))
 end)
 
 nui.on('removed', function(d)
+    leaveEntry()
     return forward(RPC.REMOVED, str(d.editor), str(d.kind), int(d.page, 1))
 end)
 

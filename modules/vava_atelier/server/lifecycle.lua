@@ -1445,7 +1445,7 @@ end
 ---@field parentHead vAvA.AtelierHead|nil  parent dont il faut peut-être le brouillon (enfant nouveau, mode « points »)
 
 --- Écriture d'une pose sous verrous, places de brouillon réservées (voir `cycle.place`).
-local function placeLocked(ctx, req, head, plan)
+local function placeLocked(ctx, req, head, plan, token, keys)
     local editor, kind = ctx.editor, req.kind
     local kindId = kind.def.id
     local where, author = req.where, actorOf(ctx)
@@ -1485,34 +1485,58 @@ local function placeLocked(ctx, req, head, plan)
         parentRow, err = parentCopyRow(ctx, parentHead)
         if not parentRow then return false, err end
     end
-    -- la base d'abord
+    -- la base d'abord, par la garde des écritures de T-101 (relecture sécurité S-3) : verrous encore à nous, atelier
+    -- inchangé, verrous épinglés jusqu'à la fin de l'écriture
     local rowId, parentRowId
     local entryId = head and head.id or req.id
     if parentRow then
         local steps = { store.insertDraftStep(parentRow),
             update and store.updateDraftStep(head.draft.row, req.rev, d) or store.insertDraftStep(d) }
-        local written, dbErr = store.transaction(steps)
+        local written, dbErr = transaction(ctx, token, steps)
         if not written then return false, dbErr end
         local readErr
         parentRowId, readErr = draftRowId(editor.id, parentHead.kind, parentHead.id)
-        if not parentRowId then return false, readErr end
+        if not parentRowId then
+            resync(ctx, keys)
+            return false, readErr
+        end
         if update then
+            -- un UPDATE … WHERE rev = ? d'une transaction ne dit pas s'il a touché la ligne : la révision est relue
+            local row, rowErr = store.draftRow(editor.id, kindId, entryId)
+            if rowErr or not row or index.toInt(row.rev) ~= req.rev + 1 then
+                resync(ctx, keys)
+                return false, rowErr or 'stale'
+            end
             rowId = head.draft.row
         else
             rowId, readErr = draftRowId(editor.id, kindId, entryId)
-            if not rowId then return false, readErr end
+            if not rowId then
+                resync(ctx, keys)
+                return false, readErr
+            end
         end
-    elseif update then
-        local affected, dbErr = store.updateDraft(head.draft.row, req.rev, d)
-        if not affected then return false, dbErr end
-        if affected == 0 then return false, 'stale' end
-        rowId = head.draft.row
     else
-        local dbErr
-        rowId, dbErr = store.insertDraft(d)
-        if not rowId then return false, dbErr end
+        if not index.owns(token) then return false, 'busy' end
+        if not stillCurrent(ctx) then return false, 'syncing' end
+        index.pin(token, true)
+        if update then
+            local affected, dbErr = store.updateDraft(head.draft.row, req.rev, d)
+            if not affected then return false, dbErr end
+            if affected == 0 then return false, 'stale' end
+            rowId = head.draft.row
+        else
+            local dbErr
+            rowId, dbErr = store.insertDraft(d)
+            if not rowId then return false, dbErr end
+        end
     end
     -- écrit en base : au journal même si l'atelier a changé entre-temps (§ 7.5 : un enfant posé n'a pas de ligne)
+    -- brouillon du parent copié de sa publiée : sa ligne `saved`, comme le premier brouillon de T-101 (relecture
+    -- sécurité S-2)
+    if parentRow then
+        record(ctx, { editor = editor.id, kind = parentHead.kind, id = parentHead.id, action = 'saved',
+            title = parentRow.title, version = parentHead.published.version })
+    end
     if plan.entry == 'insert' and not kind.def.parent then
         record(ctx, { editor = editor.id, kind = kindId, id = entryId, action = 'created', title = d.title })
     elseif plan.entry == 'copy' then
@@ -1569,7 +1593,7 @@ function cycle.place(ctx, req)
     local parentHead = req.parentHead
     local keys = { index.key(editor.id, kindId, req.id) }
     if parentHead then keys[#keys + 1] = index.key(editor.id, parentHead.kind, parentHead.id) end
-    return locked(keys, function()
+    return locked(keys, function(token)
         local head = req.head
         if head == nil and index.taken(editor.id, kindId, req.id) then return false, 'busy' end
         local situation = head and situationOf(head, ctx) or 'new'
@@ -1584,7 +1608,7 @@ function cycle.place(ctx, req)
                 return false, 'full'
             end
         end
-        local results = pack(xpcall(placeLocked, traceback, ctx, req, head, plan))
+        local results = pack(xpcall(placeLocked, traceback, ctx, req, head, plan, token, keys))
         for _ = 1, slots do index.releaseDraft(ctx.accountId) end
         if not results[1] then error(results[2], 0) end
         return unpack(results, 2, results.n)

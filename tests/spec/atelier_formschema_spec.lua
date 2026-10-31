@@ -531,6 +531,16 @@ describe('vava_atelier formschema : placement (T-102)', function()
         assert.same({ true }, { fs.checkEditor(zones(), ctx) })
     end)
 
+    it('texts.banner (titre du bandeau) : 1 à 32 octets', function()
+        local def = zones()
+        def.texts.banner = 'Atelier de la récolte'
+        assert.same({ true }, { fs.checkEditor(def, ctx) })
+        def.texts.banner = ''
+        refused(def, 'texts.banner')
+        def.texts.banner = string.rep('a', 33)
+        refused(def, 'texts.banner')
+    end)
+
     it('rules.radius sur un type non cercle refusé ; min > max refusé ; au-delà de config.place refusé', function()
         local def = zones()
         def.kinds[2].rules.radius = { min = 1, max = 5, default = 2 }
@@ -616,6 +626,15 @@ describe('vava_atelier formschema : placement (T-102)', function()
         refused(def, 'kinds[2].hintFormat')
         def.kinds[2].hintFormat = '%s récoltes (100 %%)'
         assert.same({ true }, { fs.checkEditor(def, ctx) })
+        -- accordé (relecture lore L-1) : { one, many }, chacun à un seul %s ; une forme manquante ou en trop refusée
+        def.kinds[2].hintFormat = { one = '%s récolte', many = '%s récoltes' }
+        assert.same({ true }, { fs.checkEditor(def, ctx) })
+        def.kinds[2].hintFormat = { one = '%s récolte' }
+        refused(def, 'kinds[2].hintFormat')
+        def.kinds[2].hintFormat = { one = '%s récolte', many = 'récoltes' }
+        refused(def, 'kinds[2].hintFormat')
+        def.kinds[2].hintFormat = { one = '%s récolte', many = '%s récoltes', few = '%s' }
+        refused(def, 'kinds[2].hintFormat.few')
         def = zones()
         def.kinds[2].hintField = nil
         refused(def, 'kinds[2].hintFormat')

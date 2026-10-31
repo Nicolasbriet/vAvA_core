@@ -77,7 +77,7 @@ const STRINGS = Object.freeze({
   // placement en jeu (T-102) : genre et nombre lus dans la déclaration du type (`article`, `feminine`, `noun…`)
   place: {
     editLine: 'Mode édition : les cercles et étiquettes ne sont visibles que par vous',
-    trialLine: 'Mode essai : vous seul voyez ces points',
+    trialLine: 'Mode essai : vous seul voyez ce changement en jeu',
     back: (key) => `${key} : revenir à l'Atelier`,
     lieu: 'Lieu',
     none: (f) => `Pas encore ${f ? 'placée' : 'placé'}.`,
@@ -100,7 +100,7 @@ const STRINGS = Object.freeze({
       draft: (f) => (f ? 'modifiée' : 'modifié'),
       other: 'brouillon d\'un autre membre',
     },
-    goTo: (title) => `Aller à ${title}`,
+    goTo: (title) => `Marquer ${title} sur la carte`,
     remove: (title) => `Retirer ${title}`,
     marked: (title) => `Repère posé sur ${title}.`,
     loading: 'Un instant…',

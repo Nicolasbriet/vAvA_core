@@ -53,7 +53,6 @@ shared_scripts {
     'shared/constants.lua',
     'config_client.lua',         -- ouvre VavaAtelier.config : ce que lit le client
     'shared/placerules.lua',     -- T-102 : règles de placement, les mêmes pour l'aperçu (client) et la décision (serveur)
-    'shared/aim.lua',            -- T-102 : visée de l'outil de placement (lue par le client)
 }
 
 server_scripts {
@@ -95,6 +94,7 @@ server_scripts {
 }
 
 client_scripts {
+    'shared/aim.lua',            -- logique pure de la visée, lue par le seul client (testée hors jeu)
     'client/core.lua',
     'client/nui.lua',
     'client/session.lua',

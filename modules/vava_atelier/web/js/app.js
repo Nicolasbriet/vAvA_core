@@ -328,7 +328,7 @@
 
   /** Lieux de la fiche, de son parent et de ses enfants (le jeu garde la réponse pour la visée). */
   async function loadChildren(entry, force) {
-    if (!entry.placer || !entry.id || !(force || entry.kind.parent || Placing.childOf(state.descriptor, entry.kind))) return;
+    if (!entry.placer || !entry.id || !(force || Placing.childOf(state.descriptor, entry.kind))) return;
     const result = await Bridge.post('children', { editor: entry.editor, kind: entry.kind.id, id: entry.id });
     if (state.entry !== entry) return;
     if (!result.ok) { entry.placer.failed(errorText(result.error, result.text)); return; }
@@ -640,10 +640,18 @@
     else reloadEntry(entry).then((done) => { if (done) Toast.show(STRINGS.changed.live); });
   }
 
+  const SAVED_GROUP_MS = 800;
+  let savedTimer = 0;
+
   function onChanged(payload) {
     const parked = state.history && state.history.parked;
     if (parked && Lifecycle.changed(parked, payload, false) !== 'none') parked.outdated = true;
-    if (state.screen === 'entry' && Lifecycle.changed(state.entry, payload, false) !== 'none') changedElsewhere(state.entry);
+    if (state.screen !== 'entry' || Lifecycle.changed(state.entry, payload, false) === 'none') return;
+    const entry = state.entry;
+    clearTimeout(savedTimer);
+    if (str(payload.what) !== 'saved') { changedElsewhere(entry); return; }
+    // un autre membre qui pose des points : une relecture après la dernière pose, pas une par pose
+    savedTimer = setTimeout(() => { if (state.entry === entry && state.screen === 'entry') changedElsewhere(entry); }, SAVED_GROUP_MS);
   }
 
   // Journal

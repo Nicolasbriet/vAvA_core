@@ -210,7 +210,7 @@ async function appEssais() {
     list: () => ({ entries: [] }),
   };
   const page = vm.createContext({
-    STRINGS: S, errorText: ctx.errorText, Format: F, Lifecycle: L, Placing: PL, window: {},
+    STRINGS: S, errorText: ctx.errorText, Format: F, Lifecycle: L, Placing: PL, window: {}, setTimeout, clearTimeout,
     document: { getElementById: (id) => (nodes[id] = nodes[id] || node()), addEventListener() {} },
     Bridge: { inGame: false, onMessage: (handler) => { onMessage = handler; }, post: async (name, data) => { posts.push(name); return replies[name] ? { ok: true, data: replies[name](data) } : { ok: true, data: {} }; } },
     UI: { Toast: { show() {} }, Confirm: { ask: async (texts) => { asked.push(texts); return false; }, isOpen: () => false, cancel() {} },
@@ -361,7 +361,7 @@ async function cycleEssais() {
   const stub = () => ({ el: {}, focus() {}, setData() {}, setError() {}, hideOk() {}, setBusy() {}, flashOk() {}, setCompare() {}, setTitle() {}, setReadOnly() {},
     setState() {}, setFooter: (f) => footers.push(f), setNotice: (text) => notices.push(text) });
   const page = vm.createContext({
-    STRINGS: S, errorText: ctx.errorText, Format: F, Lifecycle: L, Placing: PL, window: {},
+    STRINGS: S, errorText: ctx.errorText, Format: F, Lifecycle: L, Placing: PL, window: {}, setTimeout, clearTimeout,
     document: { getElementById: () => ({ hidden: false, replaceChildren() {}, classList: { toggle() {}, remove() {} } }), addEventListener() {} },
     Bridge: { inGame: false, onMessage: (h) => { onMessage = h; }, post: async (name, data) => {
       posts.push([name, data]);
@@ -545,11 +545,23 @@ async function placementEssais() {
   eq(js(posts.slice(0, 3)), js([['read', { editor: 'g:z', kind: 'node', id: 'chene_5' }], ['discard', { editor: 'g:z', kind: 'node', id: 'chene_5', rev: 2 }], ['children', { editor: 'g:z', kind: 'zone', id: 'foret_brume' }]]));
 
   // ouvrir un point depuis la liste, puis revenir : la fiche de la zone
+  posts.length = 0;
   await again.actions.open({ kind: 'node', id: 'chene_5' });
   eq([A.state.entry.kind.id, A.state.entry.id], ['node', 'chene_5']);
+  await tick();
+  eq(names().includes('children'), false, 'relecture réseau R-4 : un point ouvert ne charge pas les lieux de ses frères');
   await A.back();
   await tick();
   eq([A.state.entry.kind.id, A.state.entry.id], ['zone', 'foret_brume']);
+
+  // relecture réseau R-10 : trois poses d'un autre membre (avis `saved`) font une seule relecture, 800 ms après la dernière
+  posts.length = 0;
+  for (let i = 0; i < 3; i += 1) onMessage('entryChanged', { editor: 'g:z', kind: 'zone', id: 'foret_brume', what: 'saved' });
+  eq(posts.length, 0, 'aucune relecture tout de suite');
+  await new Promise((resolve) => setTimeout(resolve, 900));
+  await tick();
+  eq(names().filter((n) => n === 'read').length, 1, 'une seule relecture groupée');
+  await tick();
 
   // zone nouvelle : « Placer la zone » enregistre d'abord
   await A.openEntry('g:z', 'zone', '');

@@ -48,7 +48,7 @@ local REQUIRED_FUNCTIONS = { 'index', 'read', 'validate' }
 local OPTIONAL_FUNCTIONS = {
     'options', 'compare', 'apply', 'remove', 'trial', 'endTrial', 'diff', 'upgrade', 'validateLot', 'placeCheck',
 }
-local TEXTS_KEYS = set({ 'trial', 'publish', 'publishHint', 'trialLine' })
+local TEXTS_KEYS = set({ 'trial', 'publish', 'publishHint', 'trialLine', 'banner' })
 local KIND_KEYS = set({
     'id', 'noun', 'nounPlural', 'article', 'newLabel', 'layout', 'creatable', 'steps', 'placement', 'parent', 'form',
     'feminine',
@@ -443,6 +443,7 @@ end
 
 local RULES = VavaAtelier.RULES
 local RULES_KEYS = set({ 'inside', 'spacing', 'radius', 'vertices' })
+local HINT_FORMS = set({ 'one', 'many' })
 local INSIDE_KEYS = set({ 'slack' })
 local RADIUS_KEYS = set({ 'min', 'max', 'default' })
 local VERTICES_KEYS = set({ 'min', 'max' })
@@ -626,8 +627,17 @@ local function checkPlacement(kind, here, byId, limits)
     if kind.hintFormat ~= nil then
         local path = join(here, 'hintFormat')
         if kind.hintField == nil then return fail(path, 'demande hintField') end
-        if not isText(kind.hintFormat, 1, RULES.hintFormat) or not oneString(kind.hintFormat) then
-            return fail(path, format('texte de 1 à %d octets à un seul %%s attendu', RULES.hintFormat))
+        -- un texte, ou { one, many } accordé selon la valeur (« 1 récolte », « 3 récoltes »)
+        local forms = type(kind.hintFormat) == 'table' and kind.hintFormat or { one = kind.hintFormat }
+        local unknownForm = type(kind.hintFormat) == 'table' and unknownKey(kind.hintFormat, HINT_FORMS) or nil
+        if unknownForm then return fail(join(path, unknownForm), 'clé inconnue (one, many)') end
+        if type(kind.hintFormat) == 'table' and (forms.one == nil or forms.many == nil) then
+            return fail(path, 'one et many attendus')
+        end
+        for _, form in pairs(forms) do
+            if not isText(form, 1, RULES.hintFormat) or not oneString(form) then
+                return fail(path, format('texte de 1 à %d octets à un seul %%s attendu', RULES.hintFormat))
+            end
         end
     end
     if kind.ghost ~= nil then
@@ -679,6 +689,9 @@ function fs.checkEditor(def, ctx)
     end
     if texts.trialLine ~= nil and not isText(texts.trialLine, 0, DEF.trialLine) then
         return fail('texts.trialLine', format('texte de %d octets au plus', DEF.trialLine))
+    end
+    if texts.banner ~= nil and not isText(texts.banner, 1, LIMITS.textsLabel) then
+        return fail('texts.banner', format('texte de 1 à %d octets attendu', LIMITS.textsLabel))
     end
     if def.format ~= nil and (not isInteger(def.format) or def.format < 1 or def.format > DEF.formatMax) then
         return fail('format', format('entier de 1 à %d attendu', DEF.formatMax))
