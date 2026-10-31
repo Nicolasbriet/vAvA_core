@@ -484,6 +484,198 @@ describe('vava_combat techniques (serveur)', function()
         end)
     end)
 
+    -- Relecture sécurité S-1 : un coup annulé, quelle qu'en soit la cause, garde son cycle (récupération, compte
+    -- d'enchaînement) ; s'annuler soi-même ne libère jamais plus tôt.
+    describe('un coup annulé garde son cycle', function()
+        it('annulé pendant la préparation (véhicule au relevé 1) : la Taille suivante attend la fin du cycle', function()
+            use(A, 'taille_descendante', B)       -- frappe 320 à 480, fin 900
+            at(100)
+            vehicles[A] = true
+            at(330)
+            vehicles[A] = nil
+            assert.equal(0, #hits)
+            assert.equal('state', swings.of(A).cancelled)
+            -- comme si la Taille était allée au bout : hors chaîne, attendre 900 − 60
+            at(490)
+            assert.same({ false, 'busy', 350 }, use(A, 'taille_descendante', B))
+            at(839)
+            assert.same({ false, 'busy', 1 }, use(A, 'taille_descendante', B))
+            at(840)
+            assert.same({ true }, use(A, 'taille_descendante', B))
+        end)
+
+        it('annulé pendant la frappe (bond au relevé 2) : Fendant redemandé à la fin de la frappe + 10 → busy', function()
+            assert.same({ true }, use(A, 'fendant', B))   -- frappe 650 à 850, fin 1550
+            at(650)
+            assert.equal(1, #hits)                        -- touché au relevé 1
+            positions[A] = { 0, 10, 0 }                   -- 10 m en 850 ms : bond invraisemblable
+            at(850)
+            assert.equal('moved', swings.of(A).cancelled)
+            positions[A] = { 0, 0, 0 }
+            at(860)
+            assert.same({ false, 'busy', 630 }, use(A, 'fendant', B))
+            at(1490)
+            assert.same({ true }, use(A, 'fendant', B))
+            assert.equal(1, #hits)
+        end)
+
+        it('arme reposée puis reprise : le cycle du coup coupé compte encore après le dégainer', function()
+            assert.same({ true }, use(A, 'fendant', B))   -- fin 1550
+            at(100)
+            hands.onHold({ source = A, instanceId = 0, previous = 10 })
+            at(200)
+            hands.onHold({ source = A, instanceId = 10, item = 'epee_courte', previous = 0 })
+            at(1000)                                      -- dégainé (800 ms), cycle du Fendant pas fini
+            assert.same({ false, 'busy', 490 }, use(A, 'fendant', B))
+            at(1490)
+            assert.same({ true }, use(A, 'fendant', B))
+        end)
+
+        it('chancelé (ou mis à terre) : même règle, le coup coupé n\'est pas oublié', function()
+            assert.same({ true }, use(A, 'fendant', B))   -- fin 1550
+            at(100)
+            reactions.stagger(A, 900, clock)
+            at(1000)
+            assert.same({ false, 'busy', 490 }, use(A, 'fendant', B))
+            at(1490)
+            assert.same({ true }, use(A, 'fendant', B))   -- fin 3040
+            at(1500)
+            swings.onDowned(A)
+            at(1600)
+            assert.same({ false, 'busy', 1380 }, use(A, 'fendant', B))
+        end)
+
+        it('quatre coups enchaînés puis le quatrième annulé : le compte n\'est pas remis à zéro', function()
+            use(A, 'taille_descendante', B)                       -- 0 → fin 900
+            at(420)
+            assert.same({ true }, use(A, 'estoc_rapide', B))      -- 420 → frappe finie 760, fin 1140
+            at(700)
+            assert.same({ true }, use(A, 'revers', B))            -- 700 → frappe finie 1140, fin 1600
+            at(1080)
+            assert.same({ true }, use(A, 'taille_descendante', B)) -- 1080 → frappe 1400 à 1560, fin 1980 (chaîne 3)
+            at(1100)
+            vehicles[A] = true                                    -- annulé au relevé 1 (1400)
+            at(1500)
+            vehicles[A] = nil
+            assert.equal('state', swings.of(A).cancelled)
+            at(1560)
+            assert.same({ false, 'chain_limit', 360 }, use(A, 'estoc_rapide', B))
+            -- et pas de nouvelle série : la Taille qui ouvre attend aussi la fin de la récupération
+            assert.same({ false, 'busy', 360 }, use(A, 'taille_descendante', B))
+            at(1920)
+            assert.same({ true }, use(A, 'taille_descendante', B))
+            assert.equal(0, swings.of(A).chainCount)
+        end)
+    end)
+
+    -- Relecture sécurité S-2 : la réservation est posée avant tout appel qui peut céder la main (crochet, export).
+    describe('demandes simultanées, crochet using qui cède la main', function()
+        --- Le crochet `using` cède la main (comme un Wait) tant que `paused` est vrai, puis répond `beforeAnswer`.
+        local paused
+        before_each(function()
+            paused = true
+            VavaCombat.bridge.RunBefore = function(name, payload)
+                befores[#befores + 1] = { name = name, payload = copy(payload) }
+                if paused then coroutine.yield('paused') end
+                if beforeAnswer then return table.unpack(beforeAnswer) end
+                return true
+            end
+        end)
+
+        --- Lance une demande dans sa propre coroutine (comme un RPC du core) ; rend la coroutine et, si elle a fini,
+        --- ses résultats.
+        local function request(src, id, target)
+            local co = coroutine.create(function() return swings.use(src, id, target or 0) end)
+            local out = { coroutine.resume(co, src, id, target) }
+            assert.is_true(table.remove(out, 1), tostring(out[1]))
+            if coroutine.status(co) == 'dead' then return co, out end
+            return co, nil
+        end
+
+        local function finish(co)
+            local out = { coroutine.resume(co) }
+            assert.is_true(table.remove(out, 1), tostring(out[1]))
+            assert.equal('dead', coroutine.status(co))
+            return out
+        end
+
+        it('deux demandes : la seconde est refusée pendant que la première attend le crochet, une seule passe', function()
+            local first, done = request(A, 'taille_descendante', B)
+            assert.is_nil(done)
+            assert.is_true(swings.of(A).pending)
+            local _, second = request(A, 'taille_descendante', B)
+            assert.same({ false, 'busy', 840 }, second)
+            local _, third = request(A, 'fendant', B)      -- suite de la chaîne : attendre la fin de la frappe réservée
+            assert.same({ false, 'busy', 420 }, third)
+            assert.equal(1, #befores)                    -- la seconde n'atteint jamais le crochet
+            assert.same({ true }, finish(first))
+            assert.is_nil(swings.of(A).pending)
+            assert.equal(2, #timers)
+            at(2000)
+            assert.equal(1, #hits)
+        end)
+
+        it('le crochet refuse après avoir cédé la main : la place revient au coup d\'avant, tel quel', function()
+            paused = false
+            assert.same({ true }, use(A, 'taille_descendante', B))   -- frappe finie 480, fin 900
+            local taille = swings.of(A)
+            at(420)
+            paused, beforeAnswer = true, { false, 'Trêve.' }
+            local estoc = request(A, 'estoc_rapide', B)
+            assert.same({ false, 'refused', 'Trêve.' }, finish(estoc))
+            assert.equal(taille, swings.of(A))
+            -- la Taille est toujours là : la suite de sa chaîne passe, au compte 1
+            paused, beforeAnswer = false, nil
+            at(430)
+            assert.same({ true }, use(A, 'fendant', B))
+            assert.equal(1, swings.of(A).chainCount)
+        end)
+
+        it('refus sans coup d\'avant : plus rien de réservé, la demande suivante passe', function()
+            beforeAnswer = { false, 'Trêve.' }
+            local co = request(A, 'taille_descendante', B)
+            assert.same({ false, 'refused', 'Trêve.' }, finish(co))
+            assert.is_nil(swings.of(A))
+            paused, beforeAnswer = false, nil
+            assert.same({ true }, use(A, 'taille_descendante', B))
+        end)
+
+        it('chancelé pendant l\'attente : refus staggered, rien de programmé', function()
+            local co = request(A, 'fendant', B)
+            at(100)
+            reactions.stagger(A, 900, clock)
+            assert.same({ false, 'staggered', 900 }, finish(co))
+            assert.equal(0, #timers)
+            assert.is_nil(swings.of(A))
+        end)
+
+        it('parti pendant l\'attente : refus no_character, rien n\'est ressuscité', function()
+            local co = request(A, 'fendant', B)
+            swings.forget(A)
+            assert.same({ false, 'no_character' }, finish(co))
+            assert.is_nil(swings.of(A))
+            assert.equal(0, #timers)
+        end)
+
+        it('module arrêté pendant l\'attente : refus not_ready, rien de programmé', function()
+            local co = request(A, 'fendant', B)
+            swings.stop()
+            VavaCombat.ready = false
+            assert.same({ false, 'not_ready' }, finish(co))
+            assert.equal(0, #timers)
+        end)
+
+        it('repris tard : les relevés gardent l\'heure de la demande', function()
+            local co = request(A, 'taille_descendante', B)
+            clock = T0 + 100                             -- 100 ms en suspens
+            assert.same({ true }, finish(co))
+            at(319)
+            assert.equal(0, #hits)
+            at(320)
+            assert.equal(1, #hits)
+        end)
+    end)
+
     describe('enchaînement', function()
         it('Taille à 0, Estoc à 420 : relevés de la Taille à 320 et 480, de l\'Estoc à 640 et 760', function()
             local sampled = {}

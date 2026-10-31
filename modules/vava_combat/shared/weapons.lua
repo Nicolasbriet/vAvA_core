@@ -308,6 +308,10 @@ local ATTACKS = setOf(VavaCombat.ATTACK_TYPES)
 local LABEL_MAX, GESTURE_MAX, SKILL_MAX = 48, 64, 32
 local CHAIN_MAX = 4
 local PHASES_TOTAL_MAX = 3000
+-- contrôles de GTA coupés en mode combat (`mode.blocked`) : 32 au plus, numéros de 0 à 360 ; jamais ceux que lit
+-- vava_pause (199 : P et Start, 200 : Échap, 322 : Échap aussi)
+local BLOCKED_MAX, CONTROL_MAX = 32, 360
+local RESERVED_CONTROLS = { [199] = true, [200] = true, [322] = true }
 
 ---@param value any
 ---@param max integer
@@ -466,7 +470,8 @@ function weapons.checkTechniques(cfg)
     return true, warnings
 end
 
---- Contrôle des réglages du moteur (cycle, tolérances bornées, géométrie, bond, réactions, dégainer, chancellement).
+--- Contrôle des réglages du moteur (cycle, tolérances bornées, géométrie, bond, réactions, dégainer, chancellement,
+--- contrôles de GTA coupés en mode combat : jamais Échap ni P).
 --- Rend `true`, ou `false, raison` à la première erreur.
 ---@param cfg table
 ---@return boolean ok
@@ -516,6 +521,19 @@ function weapons.checkEngine(cfg)
     end
     err = gestureError(st.gesture)
     if err then return false, 'stagger : ' .. err end
+    local m = cfg.mode
+    if type(m) ~= 'table' or not pureList(m.blocked, BLOCKED_MAX) then
+        return false, format('mode.blocked : liste de %d contrôles au plus attendue', BLOCKED_MAX)
+    end
+    for _, control in ipairs(m.blocked) do
+        local int = integerIn(control, 0, CONTROL_MAX)
+        if int == nil then
+            return false, format('mode.blocked : numéros de contrôle entiers de 0 à %d attendus', CONTROL_MAX)
+        end
+        if RESERVED_CONTROLS[int] then
+            return false, format('mode.blocked : le contrôle %d (Échap ou P, lus par vava_pause) ne doit jamais être coupé', int)
+        end
+    end
     return true
 end
 

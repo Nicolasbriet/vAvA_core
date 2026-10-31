@@ -156,6 +156,31 @@ describe('vava_combat techniques', function()
             refusedEngine(function(c) c.debug.logSamples = 'oui' end, 'debug')
         end)
 
+        -- relecture sécurité S-5 : Échap et P (lus par vava_pause) ne sont jamais coupés par le mode combat
+        it('mode.blocked : jamais 199, 200 ni 322 ; entiers de 0 à 360 ; 32 au plus', function()
+            for _, control in ipairs({ 199, 200, 322, 199.0 }) do
+                refusedEngine(function(c) c.mode.blocked[#c.mode.blocked + 1] = control end, 'vava_pause')
+            end
+            refusedEngine(function(c) c.mode.blocked = { 24, 25.5 } end, 'entiers')
+            refusedEngine(function(c) c.mode.blocked = { -1 } end, 'entiers')
+            refusedEngine(function(c) c.mode.blocked = { 361 } end, 'entiers')
+            refusedEngine(function(c) c.mode.blocked = { '24' } end, 'entiers')
+            refusedEngine(function(c) c.mode.blocked = { 24, nil, 25 } end, 'mode.blocked')
+            refusedEngine(function(c) c.mode.blocked = { 24, pause = 200 } end, 'mode.blocked')
+            refusedEngine(function(c) c.mode.blocked = nil end, 'mode.blocked')
+            refusedEngine(function(c) c.mode = nil end, 'mode.blocked')
+            local many = {}
+            for i = 1, 33 do many[i] = i end
+            refusedEngine(function(c) c.mode.blocked = many end, '32')
+            many[33] = nil
+            assert.is_true(weapons.checkEngine(variant(function(c) c.mode.blocked = many end)))
+            assert.is_true(weapons.checkEngine(variant(function(c) c.mode.blocked = {} end)))
+            -- la liste livrée ne contient aucun des trois
+            for _, control in ipairs(cfg.mode.blocked) do
+                assert.is_false(control == 199 or control == 200 or control == 322)
+            end
+        end)
+
         it('les tolérances livrées sont celles décidées par le porteur du projet (+ 0,25 m, + 10°)', function()
             assert.equal(0.25, cfg.tolerance.range)
             assert.equal(10, cfg.tolerance.angle)

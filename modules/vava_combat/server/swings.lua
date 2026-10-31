@@ -2,23 +2,29 @@
     vava_combat/server/swings.lua
     Rôle : un coup de technique, décidé par le serveur (docs/plan/specs/T-112.md § 7.1, § 7.5). Handler du RPC
            `vava_combat:use(technique, cible)` : refus en mémoire d'abord (technique, type, chancellement, dégainer,
-           admission : délai et enchaînement), exports ensuite (personnage, arme RÉELLEMENT tenue, style de l'arme, à
-           terre, véhicule, contrôle de la magie, crochet `vava_combat:using`, position) ; puis la fenêtre de frappe
-           est programmée par le serveur (préparation, puis un ou deux relevés pendant la frappe). À chaque relevé :
+           admission : délai et enchaînement), puis le coup est RÉSERVÉ (il tient la place du coup en cours) avant
+           tout appel qui pourrait céder la main : exports (personnage, arme RÉELLEMENT tenue, style de l'arme, à
+           terre, véhicule, contrôle de la magie, crochet `vava_combat:using`, position) ; un refus rend la place au
+           coup d'avant, tel quel ; deux demandes simultanées ne passent donc jamais toutes les deux, même si un
+           crochet cède la main. Un coup annulé, quelle qu'en soit la cause (chancellement, à terre, main changée,
+           véhicule, bond, départ), garde son cycle : récupération et compte d'enchaînement comptent comme s'il était
+           allé au bout (s'annuler soi-même ne libère jamais plus tôt). Puis la fenêtre de frappe est programmée par
+           le serveur (préparation, puis un ou deux relevés pendant la frappe). À chaque relevé :
            attaquant toujours le même personnage, debout, à pied, pas chancelant, même pile en main, bond plausible
            depuis la demande ; candidats = joueurs proches de la même instance, jugés sur les positions et le cap LUS
            PAR LE SERVEUR (portée + bonus de l'arme + tolérance, demi-angle + tolérance, hauteur), triés (cible
            verrouillée d'abord, puis angle, distance, numéro), une cible touchée une fois par coup, `maxTargets` par
            coup ; chaque cible passe par strike.run (chaîne de dégâts, usure), puis server/reactions.lua. Rien n'est
-           rendu au client que l'acceptation ou le refus : aucun résultat. Ne cède jamais la main (aucune attente, aucune
-           base, aucun callClient).
+           rendu au client que l'acceptation ou le refus : aucun résultat. N'attend jamais lui-même (aucune attente,
+           aucune base, aucun callClient) ; s'il est repris après un crochet ou un export qui a cédé la main, il
+           revérifie que sa réservation tient toujours.
     Dépendances : shared/constants.lua, config_client.lua, config.lua, shared/weapons.lua, shared/geometry.lua,
                   shared/techniques.lua, server/core.lua, bridge/server.lua, server/catalog.lua, server/strike.lua,
                   server/hands.lua, server/reactions.lua
 ]]
 
 local type, pairs, ipairs, tostring = type, pairs, ipairs, tostring
-local tointeger, floor = math.tointeger, math.floor
+local tointeger, floor, max = math.tointeger, math.floor, math.max
 local SetTimeout = SetTimeout
 
 local bridge = VavaCombat.bridge
@@ -39,6 +45,9 @@ local MOVED_WARN_MS = 60000
 
 local ATTACKS = {}
 for _, kind in ipairs(VavaCombat.ATTACK_TYPES) do ATTACKS[kind] = true end
+
+-- réservation annulée pendant que la demande était en suspens → code du refus
+local CANCEL_CODES = { stagger = 'staggered', downed = 'downed', hands = 'no_weapon', left = 'no_character' }
 
 local swings = {}
 VavaCombat.swings = swings
@@ -62,23 +71,25 @@ VavaCombat.swings = swings
 ---@field arc table            arc de la technique avec l'arme tenue
 ---@field hits table<integer, true>
 ---@field hitCount integer
----@field cancelled string|nil
+---@field cancelled string|nil   annulé : ses relevés ne frappent plus, son cycle compte toujours
+---@field pending true|nil       réservé, pas encore accepté (demande en cours de vérification)
 
----@type table<integer, vAvA.Swing>  source → dernier coup
+---@type table<integer, vAvA.Swing>  source → dernier coup (annulé ou non : son cycle compte) ou coup réservé
 local current = {}
 local seq = 0
 -- source → instant du dernier avertissement « bond »
 local movedWarnAt = {}
 
---- Annule le coup en cours d'un joueur (ses relevés encore à venir ne frappent plus).
+--- Annule le coup en cours d'un joueur (ses relevés encore à venir ne frappent plus). Son cycle reste compté :
+--- l'admission suivante attend sa récupération comme s'il était allé au bout.
 ---@param src integer
----@param reason string  hands | stagger | downed | left | moved
+---@param reason string  hands | stagger | downed | left | moved | state
 function swings.cancel(src, reason)
     local swing = current[src]
     if swing and not swing.cancelled then swing.cancelled = reason end
 end
 
---- Coup en cours d'un joueur (lecture : T-113), ou nil.
+--- Coup en cours d'un joueur (lecture : T-113), ou nil. `pending` : réservé, pas encore accepté ; `cancelled` : annulé.
 ---@param src integer
 ---@return vAvA.Swing|nil
 function swings.of(src)
@@ -179,6 +190,52 @@ local function sample(swing, k)
     end
 end
 
+--- Vérifications qui appellent d'autres ressources (exports, crochet `vava_combat:using`), le coup déjà réservé : l'un
+--- de ces appels peut céder la main (un crochet qui attend, un export qui attend), d'où la réservation posée avant.
+--- Complète `swing` et rend `true`, ou `false, code[, détail]`.
+---@param src integer
+---@param swing vAvA.Swing  coup réservé (`pending`)
+---@param target any        cible annoncée par le client
+---@return boolean ok
+---@return string|nil code
+---@return integer|string|nil detail
+local function confirm(src, swing, target)
+    local id, def = swing.id, swing.def
+    local characterId = bridge.ActiveCharacterId(src)
+    if not characterId then return false, 'no_character' end
+    local held = bridge.Held(src)
+    local item = held and held.item
+    local weapon = catalog.weapon(item)
+    if not weapon or weapon.category == SHIELD or not catalog.holdable(item) then return false, 'no_weapon' end
+    local style = techniques.styleOf(cfg.weaponClasses[item])
+    if not style or type(cfg.styles[style]) ~= 'table' then return false, 'no_style' end
+    if def.style ~= style then return false, 'not_in_style' end
+    if bridge.IsDowned(src) then return false, 'downed' end
+    if bridge.InVehicle(src) then return false, 'vehicle' end
+    if bridge.MagicHardControl(src) then return false, 'controlled' end
+    target = lockedTarget(src, target)
+    local allowed, reason = bridge.RunBefore(HOOKS.USING, {
+        source = src, characterId = characterId, technique = id, item = item, target = target ~= 0 and target or nil,
+    })
+    if not allowed then return false, 'refused', weapons.reasonText(reason, MAX_REASON) end
+    local x, y, z = bridge.Position(src)
+    if not x then return false, 'no_character' end
+    -- peut-être repris après avoir cédé la main : la réservation doit tenir (module arrêté, joueur oublié, place prise,
+    -- coup annulé entre-temps : refus)
+    if not VavaCombat.ready then return false, 'not_ready' end
+    local holder = current[src]
+    if holder ~= swing then return false, holder and 'busy' or 'no_character' end
+    if swing.cancelled then
+        local code = CANCEL_CODES[swing.cancelled] or 'busy'
+        if code == 'staggered' then return false, code, reactions.staggeredLeft(src, bridge.Timer()) end
+        return false, code
+    end
+    swing.style, swing.item, swing.instanceId, swing.characterId = style, item, held.id, characterId
+    swing.target, swing.origin = target, { x = x, y = y, z = z }
+    swing.arc = geometry.arcOf(def, weapon, cfg)
+    return true
+end
+
 --- Handler du RPC `vava_combat:use` (arguments déjà validés par le schéma). Rend `true` (coup accepté, fenêtre
 --- programmée), `false, code`, `false, code, attente` (busy, chain_limit, drawing, staggered) ou
 --- `false, 'refused', raison`.
@@ -199,49 +256,40 @@ function swings.use(src, id, target)
     if stagger then return false, 'staggered', stagger end
     local drawing = hands.drawingLeft(src, now)
     if drawing then return false, 'drawing', drawing end
+    -- le dernier coup compte même annulé (quelle qu'en soit la cause) : récupération et enchaînement comme s'il était
+    -- allé au bout ; s'annuler soi-même (bond, véhicule, arme changée) ne libère jamais plus tôt
     local prev = current[src]
-    if prev and prev.cancelled then prev = nil end
     local admitted, chainCount, wait = techniques.admit(prev, def, id, now, {
         earlyMs = cfg.timing.earlyMs, chainMax = cfg.timing.chainMax, styles = cfg.styles,
     })
     if not admitted then return false, chainCount, wait end
 
-    -- exports ensuite
-    local characterId = bridge.ActiveCharacterId(src)
-    if not characterId then return false, 'no_character' end
-    local held = bridge.Held(src)
-    local item = held and held.item
-    local weapon = catalog.weapon(item)
-    if not weapon or weapon.category == SHIELD or not catalog.holdable(item) then return false, 'no_weapon' end
-    local style = techniques.styleOf(cfg.weaponClasses[item])
-    if not style or type(cfg.styles[style]) ~= 'table' then return false, 'no_style' end
-    if def.style ~= style then return false, 'not_in_style' end
-    if bridge.IsDowned(src) then return false, 'downed' end
-    if bridge.InVehicle(src) then return false, 'vehicle' end
-    if bridge.MagicHardControl(src) then return false, 'controlled' end
-    target = lockedTarget(src, target)
-    local allowed, reason = bridge.RunBefore(HOOKS.USING, {
-        source = src, characterId = characterId, technique = id, item = item, target = target ~= 0 and target or nil,
-    })
-    if not allowed then return false, 'refused', weapons.reasonText(reason, MAX_REASON) end
-    local x, y, z = bridge.Position(src)
-    if not x then return false, 'no_character' end
-
-    hands.noteHeld(src, item)
+    -- réservation : le coup tient la place AVANT tout appel qui peut céder la main ; une seconde demande arrivée
+    -- pendant ce temps est jugée contre lui (busy), jamais contre le coup d'avant
     seq = seq + 1
     local plan = techniques.plan(def, now)
     local swing = {
-        seq = seq, source = src, id = id, def = def, style = style, item = item, instanceId = held.id,
-        characterId = characterId, startedAt = plan.startedAt, openAt = plan.openAt, closeAt = plan.closeAt,
-        endAt = plan.endAt, chainCount = chainCount, target = target, origin = { x = x, y = y, z = z },
-        arc = geometry.arcOf(def, weapon, cfg), hits = {}, hitCount = 0, cancelled = nil,
+        seq = seq, source = src, id = id, def = def, startedAt = plan.startedAt, openAt = plan.openAt,
+        closeAt = plan.closeAt, endAt = plan.endAt, chainCount = chainCount, target = 0, hits = {}, hitCount = 0,
+        cancelled = nil, pending = true,
     }
     -- le coup précédent n'est pas annulé : ses relevés encore à venir se font (une frappe ouverte va à son terme)
     current[src] = swing
+    -- exports ensuite
+    local ok, code, detail = confirm(src, swing, target)
+    if not ok then
+        -- refus : la place revient au coup d'avant, tel quel (s'il n'a pas été oublié entre-temps)
+        if current[src] == swing then current[src] = prev end
+        return false, code, detail
+    end
+    swing.pending = nil
+    hands.noteHeld(src, swing.item)
+    -- le cycle part de l'arrivée de la demande : le temps passé en suspens (0 d'ordinaire) est déduit des minuteries
+    local late = bridge.Timer() - now
     local phases = def.phases
-    SetTimeout(phases.windup, function() sample(swing, 1) end)
+    SetTimeout(max(0, phases.windup - late), function() sample(swing, 1) end)
     if cfg.timing.samples == 2 then
-        SetTimeout(phases.windup + phases.active, function() sample(swing, 2) end)
+        SetTimeout(max(0, phases.windup + phases.active - late), function() sample(swing, 2) end)
     end
     return true
 end

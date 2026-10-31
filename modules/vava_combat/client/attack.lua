@@ -39,7 +39,8 @@ local TURN_EPSILON = 0.5
 local attack = {}
 VavaCombat.attack = attack
 
--- coup en cours : { id, def, startedAt, openAt, closeAt, endAt, chainCount }, ou nil
+-- coup en cours : { id, def, startedAt, openAt, closeAt, endAt, chainCount, cut? }, ou nil ; `cut` : geste coupé par un
+-- chancellement, cycle toujours compté (comme le serveur : un coup annulé ne libère pas plus tôt)
 local current = nil
 ---@type { slot: string, at: integer }|nil  touche gardée (une seule, la dernière)
 local buffered = nil
@@ -182,7 +183,7 @@ function attack.tick(now, ped)
         buffered = nil
         attack.press(slot)
     end
-    if not current or now >= current.closeAt then return end
+    if not current or current.cut or now >= current.closeAt then return end
     local targetPed = targeting.ped()
     if not targetPed or not DoesEntityExist(targetPed) then return end
     local want = geometry.headingTo(GetEntityCoords(ped), GetEntityCoords(targetPed))
@@ -200,10 +201,14 @@ function attack.busy(now)
     return current ~= nil and now < current.endAt
 end
 
---- Coupe le coup en cours (geste arrêté) et la touche gardée.
+--- Coupe le geste du coup en cours et la touche gardée. Le cycle du coup reste compté (récupération, enchaînement) :
+--- le serveur le garde aussi, la prédiction suivante attend donc comme lui.
 function attack.cancel()
-    if current then hands.stopGesture(current.def.gesture) end
-    current, buffered = nil, nil
+    if current and not current.cut then
+        hands.stopGesture(current.def.gesture)
+        current.cut = true
+    end
+    buffered = nil
 end
 
 --- Chancellement reçu du serveur : coup en cours coupé, aucune technique avant `untilMs`.

@@ -134,7 +134,7 @@ VavaCombat.config = {
         noticeMs = 3000,       -- un même refus n'est pas redit avant ce délai
         gestureTimeoutMs = 1000, -- attente maximale du chargement d'un dictionnaire d'animation
         -- contrôles de GTA coupés à chaque image en mode actif : attaque, visée, corps à corps, roue et changement
-        -- d'arme (jamais Échap ni P, lus par vava_pause)
+        -- d'arme (jamais Échap ni P, lus par vava_pause : 199, 200 et 322 refusés au démarrage ; 32 au plus)
         blocked = { 24, 25, 37, 140, 141, 142, 257, 263, 264, 14, 15, 16, 17 },
     },
 

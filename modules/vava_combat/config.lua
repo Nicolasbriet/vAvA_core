@@ -69,7 +69,8 @@ config.tolerance = { range = 0.25, angle = 10, height = 0.4 }
 config.geometry = { maxHeight = 1.6, closeRange = 0.6, maxTargets = 1, searchMargin = 1.0 }
 
 -- Bond plausible de l'attaquant entre sa demande et un relevé (positions déclarées par le client sous OneSync) :
--- mètres par seconde et marge.
+-- mètres par seconde et marge. Large pendant une longue préparation (8 × 0,65 + 0,5 = 5,7 m au Fendant) : à resserrer
+-- à la porte T-119 (≈ 4 à 5 m/s) sur les relevés en jeu (relecture sécurité S-3).
 config.lunge = { maxSpeed = 8.0, margin = 0.5 }
 
 -- Réactions : rayon des joueurs prévenus d'un coup qui porte (même instance que l'attaquant).

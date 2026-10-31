@@ -62,13 +62,13 @@ variable) : une technique n'a rien de secret. Les joueurs téléchargent les con
 | Styles (client) | style = `<famille>_<catégorie>` de l'arme tenue ; technique qui ouvre chaque touche (`legere`, `lourde`) | `styles` |
 | Dégainer, rengainer | aucune technique avant **0,8 s** après la prise en main ; une arme rangée laisse les mains prises **1,5 s** (`armed()` : pas de sort) ; gestes `-- PLACEHOLDER` (décision du porteur du projet) | `draw` |
 | Chancellement | 0,9 s sans frapper, coup en cours coupé ; aucun autre avant 3 s | `stagger`, `timing.staggerImmunityMs` |
-| Cycle d'un coup (serveur) | demande admise 60 ms avant d'être permise (gigue) ; 3 techniques enchaînées au plus après celle qui ouvre ; deux relevés pendant la frappe (ouverture, fin) | `timing` |
+| Cycle d'un coup (serveur) | demande admise 60 ms avant d'être permise (gigue) ; 3 techniques enchaînées au plus après celle qui ouvre ; deux relevés pendant la frappe (ouverture, fin) ; un coup **annulé** (quelle qu'en soit la cause) garde sa récupération et son compte d'enchaînement, comme s'il était allé au bout | `timing` |
 | Tolérances (serveur) | **+ 0,25 m** à la portée, **+ 10°** au demi-angle, + 0,4 m à la hauteur (resserrées : décision du porteur du projet ; bornées au démarrage à 1 m, 30°, 1 m) ; aucun contrôle des murs | `tolerance` |
 | Géométrie (serveur) | hauteur 1,6 m (+ tolérance), contact sous 0,6 m (l'angle ne compte plus), **un** adversaire par coup, marge de recherche des proches 1 m | `geometry` |
-| Bond de l'attaquant (serveur) | 8 m/s + 0,5 m entre la demande et un relevé, sinon coup annulé (console) | `lunge` |
+| Bond de l'attaquant (serveur) | 8 m/s + 0,5 m entre la demande et un relevé, sinon coup annulé (console) ; large pendant une longue préparation (5,7 m au Fendant) : à resserrer à la porte T-119 (≈ 4 à 5 m/s) | `lunge` |
 | Réactions (serveur) | joueurs prévenus à 30 m de la cible, dans l'instance de l'attaquant ; avis d'un coup retenu au seul attaquant, un par raison et par 10 s | `reactions`, `notices`, `messages.pvpOff`, `peace`, `held` |
 | Débit du RPC (serveur) | 4 d'avance, puis 3 par seconde | `rateLimits.use` |
-| Mode combat (client) | endormi après 10 s sans coup ni verrou ; conditions relevées à 200 ms ; touche gardée 250 ms ; virage de 90° au plus au départ du coup ; un même refus redit au plus toutes les 3 s ; contrôles de GTA coupés à chaque image en mode actif (jamais Échap ni P) | `mode` |
+| Mode combat (client) | endormi après 10 s sans coup ni verrou ; conditions relevées à 200 ms ; touche gardée 250 ms ; virage de 90° au plus au départ du coup ; un même refus redit au plus toutes les 3 s ; contrôles de GTA coupés à chaque image en mode actif (jamais Échap ni P : 199, 200, 322 refusés au démarrage ; 32 au plus) | `mode` |
 | Touches (client) | clic gauche (attaque légère), clic droit (attaque lourde), clic molette (verrouiller ; maintenu : relâcher) ; réglables dans Paramètres > Raccourcis > FiveM | `keys` |
 | Verrou (client) | 6 m, 30° autour du centre de l'écran, en vue ; maintenu 0,6 s : relâché ; perdu à 7 m ou hors de vue 4 relevés de suite ; virage de 540°/s vers la cible pendant la préparation et la frappe | `lock` |
 | Effets (client) | tressaillement, sang, étincelles (blocage, parade), secousse de caméra, son (aucun par défaut) ; 12 effets par seconde au plus | `effects` (-- PLACEHOLDER) |
@@ -142,7 +142,8 @@ T-114.
    (combats coupés, lieu de paix, crochet) : un avis à l'attaquant seul.
 
 **Enchaînement** : une technique de la chaîne part pendant la récupération de la précédente (qui est coupée) ; quatre
-coups de suite au plus, puis la récupération entière. **Chancellement** : un Fendant qui porte fait chanceler la cible
+coups de suite au plus, puis la récupération entière. Un coup annulé (chancellement, à terre, arme changée, véhicule,
+bond) compte comme allé au bout : on ne gagne rien à couper son propre coup. **Chancellement** : un Fendant qui porte fait chanceler la cible
 0,9 s (elle ne frappe plus, son coup en cours est coupé), puis aucun autre chancellement avant 3 s.
 
 ### Le mode combat
@@ -208,14 +209,23 @@ lecture du personnage) ; les dictionnaires des gestes du style de l'arme sont ch
 - **Délai** : aucun coup ne porte hors de la frappe (deux minuteries du serveur par coup, rien d'autre ne frappe) ; une
   demande pendant un coup est refusée sauf enchaînement admis après la frappe ; quatre coups enchaînés au plus ; une cible
   touchée une fois par coup ; débit du RPC 3 / s ; dégainer (0,8 s) et chancellement (0,9 s) tenus en mémoire du
-  serveur ; `vava_health` limite encore à 20 coups par seconde par paire.
+  serveur ; `vava_health` limite encore à 20 coups par seconde par paire. Un coup annulé, quelle qu'en soit la cause,
+  garde sa récupération et son compte d'enchaînement (relecture sécurité S-1) : se mettre soi-même en véhicule, faire
+  un bond ou changer d'arme ne libère jamais plus tôt. Une demande admise **réserve** sa place avant le premier export
+  ou crochet (S-2) : deux demandes simultanées ne passent jamais toutes les deux, même si un crochet `using` cède la
+  main ; un refus rend la place au coup d'avant, tel quel.
 - **Technique choisie** : contrôlée contre le style de l'arme **tenue** (lue par le serveur), technique qui ouvre
   obligatoire hors enchaînement, chaîne déclarée en données. Arme échangée ou rangée pendant le coup : hook `hold`, pile
   relue au relevé, puis par `strike`.
 - **Bond** : déplacement de l'attaquant borné entre la demande et chaque relevé (8 m/s + 0,5 m), console une fois par
   minute et par joueur. Non fermé : une position mensongère **avant** la demande (OneSync : position déclarée par le
   client, limite connue de `SECURITE_RESEAU.md` § 3 ; portée courte, journal `vava_health_hits` pour le Conseil) ; un coup
-  à travers une cloison mince (aucun contrôle des murs : décision du porteur du projet).
+  à travers une cloison mince (aucun contrôle des murs : décision du porteur du projet). Le bond permis grandit avec la
+  préparation (5,7 m pendant le Fendant) : `lunge.maxSpeed` à resserrer à la porte T-119 (S-3).
+- **Cap** : lu par le serveur sur le ped, mais c'est celui que le client déclare (OneSync) ; l'angle arrête les ratés
+  honnêtes, pas un client modifié qui se tourne au bon moment (comme les murs, S-4). Aucune borne de l'écart de cap
+  entre la demande et le relevé : le virage légitime vers la cible verrouillée (540°/s) la rendrait sans effet ; la
+  portée, elle, reste tenue.
 - Le serveur lit l'objet **tenu** (`vava_inventory:held`), jamais une donnée du client.
 - `strike` : même instance que la cible (`GetPlayerRoutingBucket`), positions lues par le serveur (6 m), options fermées
   et bornées (`weapons.options`, testé), paquet revalidé par `vava_health` ; export réservé à `strike.callers`
