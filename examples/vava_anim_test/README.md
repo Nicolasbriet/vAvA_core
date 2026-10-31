@@ -12,7 +12,7 @@ coupe n'importe quelle animation (une mise à terre comprise) : l'outil n'est do
 | --- | --- |
 | Convar `vava_env` absente ou différente de `dev` | `setup` refuse (« mode développement absent ») : ni accès, ni entrée au Codex ; chaque commande répond « outil inactif sur ce serveur ». |
 | `set vava_env dev` | Chaque commande demande l'accès au serveur (`vava_anim_test:access`) ; réponse positive gardée `accessCacheMs` (60 s). |
-| Joueur sans droit | « outil réservé au Conseil (droit staff) ou à l'ACE vava.dev. » ; rien n'est joué. |
+| Joueur sans droit | « outil réservé au Conseil. » ; rien n'est joué (le droit et l'ACE, `access`, sont réglés dans `config.lua`). |
 | Droit vava_admin `staff` ou ACE `vava.dev` | Commandes ouvertes ; elles paraissent au Codex du seul Conseil qui y a droit (`scope = 'admin'`), jamais des joueurs. |
 
 Le serveur relit la convar à chaque demande d'accès : après `set vava_env prod`, l'outil se ferme au plus tard à
@@ -22,12 +22,16 @@ l'animation coupée seulement si c'est celle que l'outil a jouée.
 Le `.ycd` de `stream/` est téléchargé par chaque joueur tant que la ressource tourne, garde ou non : c'est une raison
 de plus de ne jamais la démarrer sur un serveur ouvert.
 
-| Réglage (`config.lua`) | Défaut | Rôle |
+| Réglage | Défaut | Rôle |
 | --- | --- | --- |
-| `access` | `staff` / `vava.dev` | droit vava_admin ou ACE qui ouvre l'outil |
-| `accessRateLimit` | 5, +0,5/s | demandes d'accès au serveur |
-| `accessCacheMs` | 60000 | durée pendant laquelle un accès accordé est gardé par le client |
-| `refusals` | — | textes affichés pour `not_allowed` et `unknown_rpc` |
+| `access` (`config.lua`) | `staff` / `vava.dev` | droit vava_admin ou ACE qui ouvre l'outil |
+| `accessRateLimit` (`config.lua`) | 5, +0,5/s | demandes d'accès au serveur |
+| `accessCacheMs` (`config_client.lua`) | 60000 | durée pendant laquelle un accès accordé est gardé par le client |
+| `refusals` (`config_client.lua`) | — | textes affichés pour `not_allowed` et `unknown_rpc` |
+
+Depuis 1.2.0 (T-132), ce que lit le client (commandes, raccourcis, délais, drapeaux, clips, accessoire, refus) est dans
+`config_client.lua` ; `config.lua` (accès et débit) est servi au seul serveur. Un `config.lua` d'avant, gardé par
+l'installeur de la Chancellerie, est signalé en console : reportez vos réglages dans les deux fichiers.
 
 ## Mettre une animation
 
@@ -36,7 +40,7 @@ de plus de ne jamais la démarrer sur un serveur ouvert.
 2. `ensure vava_anim_test` (ou `restart` si elle tournait déjà : un fichier ajouté n'est diffusé qu'au redémarrage).
 3. En jeu : `/epee` (raccourci de la config pour `vava_sword_1h`, haut du corps en boucle), ou `/anim vava_sword_1h`.
 
-Un **raccourci** par animation à tester se déclare dans `config.lua` → `shortcuts` (`command`, `label`, `dict`,
+Un **raccourci** par animation à tester se déclare dans `config_client.lua` → `shortcuts` (`command`, `label`, `dict`,
 `clip` ou nil pour sonder, `flag`). Toutes ces commandes apparaissent dans le **Codex** du Conseil (chapitre
 « Tests ») et dans ses suggestions du chat, avec leurs arguments.
 

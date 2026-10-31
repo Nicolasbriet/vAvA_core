@@ -1,6 +1,6 @@
 --[[
     vava_admin/shared/requests.lua
-    Rôle : logique pure des demandes au Conseil (1.9.0, T-145) : état de la demande d'un compte (la plus récente
+    Rôle : logique pure des demandes au Conseil (1.10.0, T-145) : état de la demande d'un compte (la plus récente
            ouverte, sinon la dernière close depuis peu), demandes ouvertes d'un compte, position arrondie au mètre,
            témoins retenus. Servi au seul serveur (testé hors jeu : tests/spec/admin_requests_spec.lua).
     Dépendances : shared/constants.lua

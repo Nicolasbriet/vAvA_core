@@ -1,5 +1,5 @@
 --[[
-    vava_characters_ui/config.lua
+    vava_characters_ui/config_client.lua
     Rôle : configuration de l'écran de personnages (client) : scène, caméras, temporisations.
     Dépendances : aucune
 ]]

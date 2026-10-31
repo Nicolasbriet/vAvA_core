@@ -7,7 +7,7 @@
         l'applique lui-même) ; plancher configuré tant qu'aucun module ne gère la mise à terre ; si vava_health
         démarre entre l'envoi et l'arrivée, la dernière perte couche le ped ;
       - geste de consommation (animation du haut du corps, sans accessoire).
-    Dépendances : shared/constants.lua, config.lua, shared/starvation.lua, client/core.lua
+    Dépendances : shared/constants.lua, config_client.lua, shared/starvation.lua, client/core.lua
 ]]
 
 local ipairs = ipairs

@@ -3,7 +3,7 @@
     Rôle : exports serveur pour les autres modules (anti-triche, métiers, panneau web à venir) : savoir si un joueur
            siège au Conseil et avec quels droits, s'il est immobilisé par le Conseil, bannir ou expulser au nom d'un
            module (inscrit au journal), inscrire au journal une action faite par un membre dans un module ; depuis
-           1.9.0, créer une demande au Conseil au nom d'un joueur et lire l'état de la sienne (bannière de vava_pause,
+           1.10.0, créer une demande au Conseil au nom d'un joueur et lire l'état de la sienne (bannière de vava_pause,
            seules les ressources de `requests.callers`).
     Dépendances : config.lua, server/core.lua, server/ranks.lua, server/staff.lua, server/players.lua,
                   server/actions.lua, server/audit.lua, server/reports.lua
@@ -82,7 +82,7 @@ exports('log', function(src, label, details)
     return true
 end)
 
--- Demandes au Conseil (1.9.0, T-145) ---------------------------------------------------------------------------------
+-- Demandes au Conseil (1.10.0, T-145) ---------------------------------------------------------------------------------
 
 local lastRefusedAt = {}   -- ressource refusée → GetGameTimer() de sa dernière ligne de console
 

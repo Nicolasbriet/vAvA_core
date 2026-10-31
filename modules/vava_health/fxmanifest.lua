@@ -16,7 +16,7 @@ use_experimental_fxv2_oal 'yes'
 
 name 'vava_health'
 description 'Santé, mise à terre et réanimation vAvA'
-version '1.4.0'
+version '1.5.0'
 
 dependency 'vAvA_core'
 dependency 'vava_ui'
@@ -34,14 +34,17 @@ files {
     'web/icons/*.svg',
 }
 
+-- Les joueurs ne téléchargent que les shared_scripts et les client_scripts : config.lua, en tête des server_scripts,
+-- n'est jamais servi (T-132).
 shared_scripts {
     'shared/constants.lua',
-    'config.lua',
+    'config_client.lua',         -- ouvre VavaHealth.config : ce que lit le client
     'shared/vitality.lua',
 }
 
 -- logique pure servie au seul serveur (paquet, chaîne, lecture du ped) : le client n'en télécharge rien
 server_scripts {
+    'config.lua',                -- complète VavaHealth.config : ce que lit le seul serveur
     'shared/packet.lua',
     'shared/chain.lua',
     'shared/sync.lua',

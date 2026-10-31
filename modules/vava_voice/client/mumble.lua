@@ -5,7 +5,7 @@
            joueurs à portée, recalculée à intervalle régulier (et envoyée à Mumble seulement si elle change). La
            distance d'écoute du son 3D suit la portée. Hors du jeu, le joueur revient au salon racine sans cible :
            personne ne l'entend et il n'entend personne (le serveur coupe aussi son micro).
-    Dépendances : config.lua, client/core.lua
+    Dépendances : config_client.lua, client/core.lua
 ]]
 
 local pairs, ipairs, next = pairs, ipairs, next

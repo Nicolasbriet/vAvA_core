@@ -1,10 +1,10 @@
 --[[
     vava_hud/client/pause.lua
-    Rôle : lien avec la bannière du royaume (vava_pause, 1.5.0) : bannière déployée ou non (crochet vava_pause:state,
+    Rôle : lien avec la bannière du royaume (vava_pause, 1.6.0) : bannière déployée ou non (crochet vava_pause:state,
            remis à « repliée » à l'arrêt de sa ressource) ; réglages du joueur lus chez elle (export setting, isolé) et
            suivis (crochet vava_pause:settingChanged) : taille de l'interface et durée des notifications, envoyées à la
            page (message `settings`) seulement quand elles changent. Sans vava_pause : échelle 1, durée de base.
-    Dépendances : config.lua, client/core.lua, client/nui.lua
+    Dépendances : config_client.lua, client/core.lua, client/nui.lua
 ]]
 
 local type, pcall, tostring = type, pcall, tostring

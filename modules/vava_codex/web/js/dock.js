@@ -1,7 +1,7 @@
 'use strict';
 /*
  * web/js/dock.js
- * Rôle : mode « panneau » (1.6.0) : le livre s'ouvre dans un rectangle de l'écran (vw, vh) donné par la ressource hôte
+ * Rôle : mode « panneau » (1.7.0) : le livre s'ouvre dans un rectangle de l'écran (vw, vh) donné par la ressource hôte
  *        (la bannière de vava_pause), sans voile, la bannière restant visible à côté. Le rectangle est relu ici avec
  *        les mêmes règles que shared/dock.lua : quatre nombres finis, rien d'autre ; 0 ≤ left, top ; 10 ≤ width,
  *        height ; left + width ≤ 100 ; top + height ≤ 100. Invalide : le livre s'ouvre en plein écran comme avant.

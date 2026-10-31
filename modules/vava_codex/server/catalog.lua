@@ -6,7 +6,7 @@
            proposées pour un argument (joueurs en jeu : tous pour le Conseil, les seuls proches sinon ; clés d'un
            registre, liste d'un module). Tout est recalculé à la demande : le registre vit en mémoire dans le core.
            L'ordre rendu est total (même contenu, même empreinte : shared/fingerprint.lua).
-    Dépendances : shared/constants.lua, config.lua, server/core.lua, bridge/server.lua
+    Dépendances : shared/constants.lua, config_client.lua, config.lua, server/core.lua, bridge/server.lua
 ]]
 
 local pairs, ipairs, type, tostring = pairs, ipairs, type, tostring

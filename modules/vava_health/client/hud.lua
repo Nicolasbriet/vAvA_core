@@ -3,7 +3,7 @@
     Rôle : jauge « Santé » et notifications par vava_hud. Facultatif : sans vava_hud, pas de jauge et les messages
            passent par les notifications de GTA. Appels inter-ressources isolés ; jauge redéclarée si vava_hud
            (re)démarre.
-    Dépendances : config.lua, client/core.lua
+    Dépendances : config_client.lua, client/core.lua
 ]]
 
 local pcall, tostring = pcall, tostring

@@ -55,11 +55,6 @@ local WITHOUT_LUA = { ['modules/vava_ui'] = true }
 -- Modules pas encore basculés (lots 2 à 4 de T-132), sautés par T0 à T3 ; chaque lot retire les siens, avec leurs
 -- exceptions transitoires de scripts/audit-exceptions.txt.
 local PENDING = {
-    vava_inventory = 'T-142', vava_combat = 'T-142', vava_health = 'T-142', vava_time = 'T-142', vava_codex = 'T-142',
-    vava_admin = 'T-142', vava_voice = 'T-142', vava_chat = 'T-142', vava_cameras = 'T-142',
-    vava_appearance = 'T-142', vava_needs = 'T-142', vava_world = 'T-142', vava_hud = 'T-142', vava_loading = 'T-142',
-    vava_characters_ui = 'T-142', vava_anim_test = 'T-142', vava_dev_characters = 'T-142',
-    vava_example_combat = 'T-142',
     vava_magic = 'T-143',
 }
 
@@ -291,8 +286,13 @@ local function at(view, path)
     local value = view
     for key in path:gmatch('[^.]+') do
         if type(value) ~= 'table' then return nil end
-        local num = tonumber(key)
-        value = value[key] ~= nil and value[key] or (num and value[num])
+        -- une feuille `false` est une valeur (T-142 : `population.enabled = false` du monde), pas une absence
+        local found = value[key]
+        if found == nil then
+            local num = tonumber(key)
+            if num then found = value[num] end
+        end
+        value = found
     end
     return value
 end
@@ -702,6 +702,16 @@ describe('configs partagées : T2 sur des sources d\'essai', function()
             check('local t = VavaX.config.texts\nprint(t[key])'), 1, true)
         assert.matches('utilise la table config entière', check('cfg = VavaX.config'), 1, true)
         assert.matches('utilise la table config entière', check('local cfg\ncfg = VavaX.config'), 1, true)
+    end)
+end)
+
+-- T1 compare chaque feuille de la vue client à la vue complète : une feuille `false` y est une valeur (T-142).
+describe('configs partagées : chemins de T1', function()
+    it('une feuille false est trouvée, une absente rend nil, un indice numérique suit la liste', function()
+        local view = { population = { enabled = false, buckets = { 0 } } }
+        assert.is_false(at(view, 'population.enabled'))
+        assert.is_nil(at(view, 'population.cleanupOnStart'))
+        assert.equal(0, at(view, 'population.buckets.1'))
     end)
 end)
 

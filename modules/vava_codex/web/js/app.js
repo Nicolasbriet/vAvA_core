@@ -5,7 +5,7 @@
  *        lancement d'une ligne composée, réglage « rester ouvert », fermeture, chapitre demandé à l'ouverture
  *        (export openAt, 1.4.0). Onglet Lecture (1.5.0) : texte d'une page demandé seulement s'il n'est pas gardé à
  *        la même empreinte, liens, pages voisines ; openAt résout une page, un chapitre de lecture, puis un module.
- *        Mode panneau (1.6.0) : `dock` du message open, livre placé dans le rectangle de l'hôte (js/dock.js).
+ *        Mode panneau (1.7.0) : `dock` du message open, livre placé dans le rectangle de l'hôte (js/dock.js).
  * Dépendances : strings.js, bridge.js, model.js, reader.js, forms.js, view.js, dock.js
  */
 

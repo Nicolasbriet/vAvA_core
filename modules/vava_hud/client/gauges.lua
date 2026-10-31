@@ -3,7 +3,7 @@
     Rôle : jauges déclarées par les modules. Un module ne gère que les siennes (identifiant préfixé par son nom de
            ressource) ; elles disparaissent à son arrêt. Valeurs de 0 à 1, et un état « actif » (lueur de laiton :
            parole, effet en cours…) ; l'interface n'est prévenue que d'un changement réel.
-    Dépendances : config.lua, client/nui.lua
+    Dépendances : config_client.lua, client/nui.lua
 ]]
 
 local type, pairs, sort = type, pairs, table.sort

@@ -270,7 +270,7 @@ ul.reader-list > .reader-item::before { content: "❧"; position: absolute; left
 .toast { position: fixed; bottom: 4.4rem; left: 50%; z-index: 45; max-width: 90vw; padding: 0.7rem 1.35rem 0.7rem 1.2rem; border-radius: 3px; background: var(--grain), linear-gradient(180deg, #2a2017, #1a130e); box-shadow: inset 3px 0 0 var(--brass), 0 0 0 1px var(--edge), 0 0 0 2px rgba(var(--brass-rgb), 0.2), 0 1.2rem 2.4rem rgba(0, 0, 0, 0.6); color: var(--parchment); font-size: 1.02rem; transform: translateX(-50%); animation: toast-in 200ms var(--ease) both; }
 .toast[data-kind="danger"] { box-shadow: inset 3px 0 0 #d0705c, 0 0 0 1px var(--edge), 0 1.2rem 2.4rem rgba(0, 0, 0, 0.6); }
 
-/* Mode panneau (1.6.0) : le livre dans le rectangle de l'hôte (vw, vh), sans voile ; les onglets de la tranche restent
+/* Mode panneau (1.7.0) : le livre dans le rectangle de l'hôte (vw, vh), sans voile ; les onglets de la tranche restent
    dans le rectangle ; la légende se tait (l'hôte montre la sienne) ; l'avis se pose au pied du livre ----------------- */
 
 .app.is-docked { display: block; background: none; }

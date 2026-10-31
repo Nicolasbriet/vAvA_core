@@ -480,7 +480,7 @@ test('pageCount : « 0 page », « 1 page », « 12 pages »', () => {
   eq([0, 1, 12].map(STRINGS.search.pageCount), ['0 page', '1 page', '12 pages']);
 });
 
-// Mode panneau (1.6.0) : mêmes règles que shared/dock.lua
+// Mode panneau (1.7.0) : mêmes règles que shared/dock.lua
 const Dock = require('../js/dock.js');
 group('mode panneau (dock.js)');
 test('rectangle valide gardé tel quel (celui de vava_pause, bords exacts)', () => {

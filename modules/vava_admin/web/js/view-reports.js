@@ -11,7 +11,7 @@ const ReportsView = (() => {
   let selected = null;
   let ctx = null;
 
-  // nature d'une demande (1.9.0) : libellé connu seulement, sinon rien (jamais une valeur reçue telle quelle)
+  // nature d'une demande (1.10.0) : libellé connu seulement, sinon rien (jamais une valeur reçue telle quelle)
   const kindLabel = (report) => (Object.prototype.hasOwnProperty.call(R.kinds, report.kind) ? R.kinds[report.kind] : null);
   const isCoord = (v) => typeof v === 'number' && Number.isFinite(v);
 

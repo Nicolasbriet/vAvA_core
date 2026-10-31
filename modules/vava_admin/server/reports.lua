@@ -1,6 +1,6 @@
 --[[
     vava_admin/server/reports.lua
-    Rôle : signalements et demandes au Conseil (/signaler, et depuis 1.9.0 la bannière de vava_pause par l'export
+    Rôle : signalements et demandes au Conseil (/signaler, et depuis 1.10.0 la bannière de vava_pause par l'export
            submitRequest), gardés en mémoire jusqu'à leur clôture (leur suite est au journal). Chaque demande a une
            nature (question, signalement d'un joueur, bug, autre), éventuellement la position de son auteur lue par le
            serveur, et pour un signalement de joueur ses témoins (joueurs proches, même instance). Les membres du
@@ -35,7 +35,7 @@ VavaAdmin.reports = reports
 ---@field author string
 ---@field message string
 ---@field at integer
----@field kind string                                  1.9.0 : question | player | bug | other
+---@field kind string                                  1.10.0 : question | player | bug | other
 ---@field position { x: integer, y: integer, z: integer }|nil
 ---@field witnesses { accountId: integer, name: string }[]
 ---@field claimedBy string|nil
@@ -46,7 +46,7 @@ local count = 0
 local nextId = 0
 ---@type table<integer, integer>  compte → dernier signalement
 local lastByAccount = {}
----@type table<integer, { id: integer, kind: string, at: integer }>  compte → dernière demande close (1.9.0)
+---@type table<integer, { id: integer, kind: string, at: integer }>  compte → dernière demande close (1.10.0)
 local closedByAccount = {}
 
 --- Prévient les abonnés (panneau web) qu'un signalement est né, pris en charge ou clos.
@@ -58,7 +58,7 @@ local function tell(src, text, kind)
     if src then TriggerClientEvent(EVENTS.NOTIFY, src, { text = text, kind = kind }) end
 end
 
---- Réglages des demandes (1.9.0), ou nil si config.lua est d'avant 1.9.0 (gardé par une mise à jour).
+--- Réglages des demandes (1.10.0), ou nil si config.lua est d'avant 1.10.0 (gardé par une mise à jour).
 ---@return table|nil
 local function settings()
     local value = cfg.requests
@@ -106,10 +106,10 @@ local function witnessesOf(src, position, options)
 end
 
 --- Nouvelle demande d'un joueur : RPC /signaler (ouvert à tous, débit limité, nature `other`) ou export submitRequest
---- (bannière, 1.9.0). `options.kind` (défaut `other`), `options.position` (joindre la position lue par le serveur ;
+--- (bannière, 1.10.0). `options.kind` (défaut `other`), `options.position` (joindre la position lue par le serveur ;
 --- toujours jointe pour un signalement de joueur), `options.quiet` (aucune notification à l'auteur : la bannière
 --- affiche elle-même la réponse). Rend `true, n°` ou `false, code[, secondes restantes]` : no_session, too_soon,
---- too_many (demandes ouvertes du compte, 1.9.0), full.
+--- too_many (demandes ouvertes du compte, 1.10.0), full.
 ---@param src integer
 ---@param text string
 ---@param options? { kind?: string, position?: boolean, quiet?: boolean }
@@ -182,7 +182,7 @@ function reports.get(id)
     return open[id]
 end
 
---- État de la demande d'un compte pour la bannière (1.9.0) : { id, kind, state, age } ou nil.
+--- État de la demande d'un compte pour la bannière (1.10.0) : { id, kind, state, age } ou nil.
 ---@param accountId integer
 ---@return table|nil
 function reports.statusOf(accountId)

@@ -6,7 +6,7 @@
            (export codexList), ressources démarrées (pages de lecture liées à un module), commandes enregistrées
            auprès du jeu, notifications. Chaque appel à une autre
            ressource est isolé : un module absent ou en erreur ne retire que la fonction concernée.
-    Dépendances : shared/constants.lua, config.lua, server/core.lua
+    Dépendances : shared/constants.lua, config_client.lua, config.lua, server/core.lua
 ]]
 
 local type, ipairs, pcall, tostring = type, ipairs, pcall, tostring

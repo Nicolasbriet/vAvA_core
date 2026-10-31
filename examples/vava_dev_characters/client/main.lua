@@ -4,7 +4,7 @@
            /respawn, /objet <nom> [quantité], /besoins [faim] [soif], /vie [pourcentage] et /aterre. Chaque commande
            n'est qu'une intention : le serveur valide et décide. /perso appelle les RPC du core : il demande d'abord
            l'accès au serveur (vava_dev_characters:access, refusé sans mode développement ni droit).
-    Dépendances : vAvA_core (API v1), config.lua
+    Dépendances : vAvA_core (API v1), config_client.lua
 ]]
 
 local RESOURCE = GetCurrentResourceName()

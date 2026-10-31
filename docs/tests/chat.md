@@ -16,9 +16,10 @@ simple joueur. Un test se cite « chat 3-4 » (section 3, ligne 4).
 4. **Repères de distance** : le cercle au sol de la voix (touche `W` en AZERTY, voir [voix.md](voix.md)) a pour rayon
    5 m en Parler, 15 m en Crier (la portée de `/me` et `/do`), 25 m en Déclamer (au-delà des 20 m du hors-RP).
 5. **Réglages pour aller vite** (à remettre ensuite, puis `restart` du module) :
-   `vava_chat/config.lua` → `log.flushMs = 1000` (défaut `10000` : le journal s'écrit en une seconde),
-   `overhead.durationMs = 30000` (défaut `8000` : le temps de passer derrière un mur) ;
-   `vava_voice/config.lua` → `ring.durationMs = 10000` (défaut `1500` : le cercle reste le temps de se placer).
+   `vava_chat/config.lua` → `log.flushMs = 1000` (défaut `10000` : le journal s'écrit en une seconde) ;
+   `vava_chat/config_client.lua` → `overhead.durationMs = 30000` (défaut `8000` : le temps de passer derrière un mur) ;
+   `vava_voice/config_client.lua` → `ring.durationMs = 10000` (défaut `1500` : le cercle reste le temps de se placer).
+   Depuis T-142, un réglage lu par le client est dans `config_client.lua` ; seul le serveur lit `config.lua`.
 6. **Textes à coller** (`Ctrl+V`), préparés dans un bloc-notes : 26 fois `0123456789` (260 signes) ; 25 fois
    `éééééééééé` (250 signes) ; 60 fois `éééééééééé` (600 signes, soit 1 200 octets).
 

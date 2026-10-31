@@ -8,7 +8,7 @@
            Liste propre à l'éditeur (1.3.0) : toutes les zones, reçues du serveur à l'ouverture (au seul membre qui
            l'ouvre), puis tenues à jour par ses propres actions et par les zones proches changées par un autre membre
            (abonnements de zone) ; une zone lointaine changée par un autre l'est à la réouverture.
-    Dépendances : shared/constants.lua, config.lua, client/core.lua, client/nui.lua, client/zones.lua
+    Dépendances : shared/constants.lua, config_client.lua, client/core.lua, client/nui.lua, client/zones.lua
 ]]
 
 local type, pairs, sort, floor, tointeger, tostring = type, pairs, table.sort, math.floor, math.tointeger, tostring

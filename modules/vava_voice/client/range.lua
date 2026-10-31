@@ -4,8 +4,8 @@
            le serveur (à terre…) borne la portée : la touche ne fait alors tourner que les portées permises, sans
            oublier le choix d'avant, qui revient à la levée de la limite. L'effet de la zone de voix où se trouve le
            joueur multiplie la distance. Chaque changement règle Mumble et le médaillon ; le cercle au sol n'apparaît
-           qu'à l'appui sur la touche, et seulement si le joueur ne l'a pas retiré dans la bannière (1.4.0).
-    Dépendances : shared/constants.lua, config.lua, client/core.lua, client/hud.lua, client/mumble.lua,
+           qu'à l'appui sur la touche, et seulement si le joueur ne l'a pas retiré dans la bannière (1.5.0).
+    Dépendances : shared/constants.lua, config_client.lua, client/core.lua, client/hud.lua, client/mumble.lua,
                   client/ring.lua
 ]]
 
@@ -35,7 +35,7 @@ local preferred = isIndex(saved) and saved or cfg.defaultRange
 local temporary = nil
 local cap = NO_LIMIT
 local multiplier = 1.0
--- réglage du joueur dans la bannière du royaume (1.4.0) : cercle au sol au changement de portée
+-- réglage du joueur dans la bannière du royaume (1.5.0) : cercle au sol au changement de portée
 local ringEnabled = true
 
 --- Montre ou non le cercle au sol au changement de portée (réglage `voice.circle` de vava_pause).

@@ -2,10 +2,10 @@
     vava_hud/client/main.lua
     Rôle : exports (jauges, notifications, progression), retrait de l'interface native de GTA, et visibilité du HUD :
            affiché quand un personnage est en jeu, masqué pendant la sélection, le menu pause et les fondus au noir
-           (apparition, chargement) et, depuis 1.5.0, pendant la bannière du royaume (vava_pause). Une progression en
+           (apparition, chargement) et, depuis 1.6.0, pendant la bannière du royaume (vava_pause). Une progression en
            cours est interrompue au retour à la sélection.
-    Dépendances : config.lua, client/core.lua, client/nui.lua, client/gauges.lua, client/native.lua, client/notify.lua,
-                  client/progress.lua, client/pause.lua
+    Dépendances : config_client.lua, client/core.lua, client/nui.lua, client/gauges.lua, client/native.lua,
+                  client/notify.lua, client/progress.lua, client/pause.lua
 ]]
 
 local CreateThread, Wait, AddEventHandler = CreateThread, Wait, AddEventHandler
@@ -41,7 +41,7 @@ nui.onReady(function()
         progress = progress.snapshot(), settings = pause.settings(),
     }
 end)
--- bannière déployée ou repliée (1.5.0) : visibilité relue aussitôt, sans attendre le prochain relevé
+-- bannière déployée ou repliée (1.6.0) : visibilité relue aussitôt, sans attendre le prochain relevé
 pause.onChange(function() refresh() end)
 
 ---@return string

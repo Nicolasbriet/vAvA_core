@@ -3,7 +3,7 @@
     Rôle : sacs au sol connus du client. Le jeu ne transmet au client que les entités proches de lui ; leur statebag
            donne l'id du conteneur. Aucune boucle de proximité : le plus proche n'est cherché qu'à l'ouverture de
            l'inventaire (le serveur revérifie la distance).
-    Dépendances : shared/constants.lua, config.lua
+    Dépendances : shared/constants.lua, config_client.lua
 ]]
 
 local pairs = pairs

@@ -8,7 +8,7 @@
       - réponses du serveur (vava_example_combat:message) affichées dans le chat.
       Chaque commande demande d'abord l'accord du serveur (RPC vava_example_combat:access : mode développement et
       droit, revérifiés à chaque appel). Aucune boucle, aucun envoi au serveur hors de cet accord.
-    Dépendances : vAvA_core (API v1), config.lua
+    Dépendances : vAvA_core (API v1), config_client.lua
 ]]
 
 local RESOURCE = GetCurrentResourceName()

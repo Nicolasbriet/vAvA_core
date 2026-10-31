@@ -2,7 +2,7 @@
     vava_characters_ui/client/preview.lua
     Rôle : ped d'aperçu de l'éditeur. Créé en local (non réseau) : invisible pour les autres joueurs, aucun coût
            de synchronisation, aucune interférence entre joueurs qui créent au même endroit.
-    Dépendances : config.lua
+    Dépendances : config_client.lua
 ]]
 
 local GetGameTimer, Wait = GetGameTimer, Wait

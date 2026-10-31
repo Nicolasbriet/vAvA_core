@@ -170,7 +170,7 @@ describe('vava_pause : poids de la page', function()
             end
         end
         list:close()
-        if count == 0 then return pending('page de vava_pause absente (développement NUI en cours)') end
+        assert.is_true(count > 0, 'page de vava_pause introuvable (git ls-files modules/vava_pause/web)')
         assert.is_true(total <= LIMIT, ('page de vava_pause : %d octets (≤ %d)'):format(total, LIMIT))
     end)
 end)

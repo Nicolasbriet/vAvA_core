@@ -28,6 +28,19 @@ const servercfg = require('./servercfg');
 const status = require('./status');
 const { STATES } = require('./process');
 
+/**
+ * Réglages modifiés gardés mais absents de la nouvelle version (relecture réseau R-8 de T-132) : la ressource ne les
+ * lit plus ; une ligne par fichier, avec celui où reporter les réglages (`config_client.lua` d'un module dont
+ * `config.lua` a été renommé).
+ */
+function sayOrphans(job, report) {
+  for (const orphan of report.orphans || []) {
+    job.say(orphan.successor
+      ? `Réglages modifiés gardés, mais ${orphan.file} n'existe plus dans la nouvelle version et n'est plus lu : reportez vos réglages dans ${orphan.successor}, puis supprimez l'ancien fichier.`
+      : `Réglages modifiés gardés, mais ${orphan.file} n'existe plus dans la nouvelle version et n'est plus lu : reportez vos réglages là où le module les lit désormais (voir son README), puis supprimez l'ancien fichier.`);
+  }
+}
+
 const FIRST_CHECK_MS = 30000;
 const RUNNING_TIMEOUT_MS = 180000;
 const RESOURCES_TIMEOUT_MS = 90000;
@@ -307,6 +320,7 @@ class Updates extends EventEmitter {
     const report = installer.applyResources(plans, serverDataPath, head);
     if (report.sideNew.length) job.say(`Réglages modifiés gardés ; nouvelle version posée à côté (.nouveau) : ${report.sideNew.join(', ')}`);
     if (report.sideLocal.length) job.say(`Fichiers modifiés remplacés ; ancienne version gardée à côté (.local) : ${report.sideLocal.join(', ')}`);
+    sayOrphans(job, report);
     if (report.added.length) job.say(`Nouveaux modules : ${report.added.join(', ')} (à activer dans la page Ressources).`);
     const expected = this.expected(startedBefore);
     const summary = `${head.label} : ${[...report.changed, ...report.added, ...(panelChanges ? ['Chancellerie'] : [])].join(', ') || 'rien'}`;
@@ -393,6 +407,7 @@ class Updates extends EventEmitter {
       const report = installer.applyResources(plans, serverDataPath, head);
       installer.recordPanel(installer.layout(root).panel, head.ref);
       if (report.sideNew.length) job.say(`Réglages existants gardés ; nouvelle version posée à côté (.nouveau) : ${report.sideNew.join(', ')}`);
+      sayOrphans(job, report);
       config.update({ serverDataPath, fxserverPath });
       installer.cleanStaging();
       this.check();

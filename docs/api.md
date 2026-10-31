@@ -771,8 +771,13 @@ Réglages d'un module (T-132, aucune API du core) : chaque module lit sa config 
 (`shared_scripts`, téléchargé par chaque joueur) ouvre la table avec ce que lit le client et pose `clientFile = true` ;
 `config.lua` (en tête des `server_scripts`, jamais téléchargé) la complète avec ce que lit le seul serveur. Basculés :
 `vava_atelier` 1.2.0, `vava_arrival` 1.2.0 ; `vava_chancellerie` 1.7.1 ne sert plus rien aux joueurs ; métiers (T-141) :
-`vava_skills` 1.3.0, `vava_farming` 1.8.0, `vava_crafting` 1.6.0, `vava_gathering` 1.7.0, `vava_provisions` 1.1.0 ; les
-autres suivent (T-142, T-143). Règle complète : `docs/plan/specs/T-132.md` § 2.4.
+`vava_skills` 1.3.0, `vava_farming` 1.8.0, `vava_crafting` 1.6.0, `vava_gathering` 1.7.0, `vava_provisions` 1.1.0 ;
+socle (T-142) : `vava_inventory` 1.9.0, `vava_combat` 1.1.0, `vava_health` 1.5.0, `vava_time` 1.4.0, `vava_codex` 1.6.0,
+`vava_admin` 1.9.0, `vava_voice` 1.4.0, `vava_chat` 1.4.0, `vava_cameras` 1.5.0, `vava_appearance` 1.1.0,
+`vava_needs` 1.3.0, `vava_world` 1.2.0, exemples `vava_anim_test` 1.2.0, `vava_dev_characters` 1.4.0,
+`vava_example_combat` 1.2.0 ; les ressources sans partie serveur n'ont que `config_client.lua` (`client_scripts`) :
+`vava_hud` 1.5.0, `vava_loading` 1.2.0, `vava_characters_ui` 1.3.0. Reste `vava_magic` (T-143). Règle complète :
+`docs/plan/specs/T-132.md` § 2.4.
 
 ### `vava_ui`
 
@@ -812,8 +817,8 @@ aucun state bag, aucun hook émis, aucun export**. Contrat (règles complètes :
 - **Core** ≥ 0.13.0 : `spawn.loadingScreen` (§ `core.characters` client) ne ferme plus l'écran à la première mise en
   attente quand `vava_loading` est démarré ; filet du core à 30 s.
 - **Écoute** les hooks client `core:character:selection` (attente, filet de 20 s), `core:character:loaded` (fermeture
-  immédiate) et `vava_characters_ui:shown` (passage) ; nommés dans `config.lua` (`selection.*`) pour un autre écran de
-  sélection.
+  immédiate) et `vava_characters_ui:shown` (passage) ; nommés dans `config_client.lua` (`selection.*`) pour un autre
+  écran de sélection.
 - **Messages locaux** à la page (`SendLoadingScreenMessage`, aucun réseau, ≤ 80 octets) : `vava_loading:resources`
   (script client lancé), `vava_loading:waiting` (mise en attente), `vava_loading:handoff` `{ ms }` (sélection affichée :
   éclair de `ms` millisecondes, bornées de 300 à 5 000, puis `ShutdownLoadingScreenNui`). La page lit aussi les messages
@@ -850,7 +855,7 @@ Format (listes pures et tables nommées uniquement, pour une sérialisation sans
   `component`, `prop`), `limits(ped)`, `textureCount(ped, kind, id, drawable)`, `palettes()`.
 - Modifier l'apparence d'un personnage chargé : `core.characters.set(id, 'vava_appearance:data', appearance)`
   côté serveur ; le client concerné la réapplique.
-- Vêtements proposés et apparences de départ : `config.lua` (`components`, `props`, `defaults`). Les packs
+- Vêtements proposés et apparences de départ : `config_client.lua` (`components`, `props`, `defaults`). Les packs
   médiévaux ne demanderont que ces réglages. Règles, installation et vérifications en jeu :
   `modules/vava_appearance/README.md`.
 
@@ -858,9 +863,9 @@ Format (listes pures et tables nommées uniquement, pour une sérialisation sans
 
 Écran de sélection et éditeur de création (NUI, sans framework). S'ouvre sur `core:character:selection`, se ferme
 sur `core:character:loaded`. Aperçu sur un ped **local** (invisible des autres joueurs). Scène et caméras :
-`config.lua` ; la scène est distincte du point d'apparition du core (sinon les nouveaux arrivants entreraient dans la
-scène de ceux qui créent) et reste provisoire (`-- PLACEHOLDER`). Les noms sont vérifiés à la saisie avec les règles
-du serveur (`characters.name`, reçues avec la liste des personnages, core ≥ 0.8.0) ; le serveur revérifie à la
+`config_client.lua` ; la scène est distincte du point d'apparition du core (sinon les nouveaux arrivants entreraient
+dans la scène de ceux qui créent) et reste provisoire (`-- PLACEHOLDER`). Les noms sont vérifiés à la saisie avec les
+règles du serveur (`characters.name`, reçues avec la liste des personnages, core ≥ 0.8.0) ; le serveur revérifie à la
 création. À l'arrêt de la ressource écran ouvert, ped d'aperçu, caméra, mise au point de la carte, radar et focus sont
 rendus, et l'écran redevient noir comme l'attente de sélection. Détails : `modules/vava_characters_ui/README.md`. Pour
 travailler le rendu sans le jeu, ouvrir `web/index.html` dans un navigateur (`?screen=creator&tab=hair&sex=f`) : des
@@ -1043,7 +1048,7 @@ n'activer que sur un serveur de test : le module l'annonce par un avertissement 
 ### `vava_needs`
 
 Faim et soif, de 0 (épuisé) à 100. Champ `vava_needs:state` `{ hunger, thirst }` (visibilité `owner`), sauvegardé
-avec le personnage. Les besoins, durées, paliers, messages et gestes sont dans `config.lua` : ajouter un besoin
+avec le personnage. Les besoins, durées, paliers, messages et gestes sont dans `config_client.lua` : ajouter un besoin
 à `needs` suffit pour qu'il baisse, s'affiche et se mange.
 
 - **Baisse** : décidée par le serveur, une boucle pour tous les personnages actifs (`tickMs`, 60 s). Faim de 100 à 0
@@ -1092,8 +1097,9 @@ reason, resource? }`, `reason` = `decay`, `consume` ou `api`).
 
 Affichage en jeu (ressource cliente). **Retire l'interface native de GTA** : minimap (et ses barres de vie), HUD
 (argent, noms de rue et de véhicule, munitions, notifications…) ; réappliqué si le jeu la réaffiche ; le menu pause
-et le chat restent (`config.lua` → `native`). La remplace par des jauges et des notifications pour tous les modules.
-Jauges affichées quand un personnage est en jeu ; masquées pendant la sélection, le menu pause et les fondus au noir.
+et le chat restent (`config_client.lua` → `native`). La remplace par des jauges et des notifications pour tous les
+modules. Jauges affichées quand un personnage est en jeu ; masquées pendant la sélection, le menu pause et les fondus au
+noir.
 
 | Export client | Retour |
 |---|---|
@@ -1114,12 +1120,12 @@ Jauges affichées quand un personnage est en jeu ; masquées pendant la sélecti
 - La barre de progression est **purement visuelle** : le serveur reste maître du temps et revérifie la durée à la fin
   de l'action (comme l'incantation de `vava_magic`). Le HUD n'écoute aucune touche : interrompre (touche, déplacement,
   coup reçu) est l'affaire du module, qui appelle `cancelProgress` ; `cancelable` n'ajoute qu'un indice discret sous la
-  barre (`config.lua` → `progress.cancelHint`). Le menu pause et les fondus masquent la barre sans l'interrompre ; une
-  page d'interface rechargée en cours d'action reprend à la bonne avancée.
+  barre (`config_client.lua` → `progress.cancelHint`). Le menu pause et les fondus masquent la barre sans
+  l'interrompre ; une page d'interface rechargée en cours d'action reprend à la bonne avancée.
 - Hooks client (émis par le HUD) : `vava_hud:progressDone` (`{ id }`) à la fin ; `vava_hud:progressCancelled`
   (`{ id, reason }`) à l'interruption, `reason` = `module` (`cancelProgress`, ou arrêt de la ressource qui l'avait
   lancée) ou `hidden` (retour à la sélection, déchargement du personnage).
-- **Bannière du royaume** (1.5.0, T-145) : jauges et barre de progression masquées (jamais interrompues) pendant que
+- **Bannière du royaume** (1.6.0, T-145) : jauges et barre de progression masquées (jamais interrompues) pendant que
   la bannière de `vava_pause` est déployée (crochet client `vava_pause:state`, remis à « repliée » à l'arrêt de
   `vava_pause`) ; notifications visibles. Réglages du joueur lus chez elle (export client `setting`, isolé ; crochet
   `vava_pause:settingChanged`) : `ui.scale` → échelle de la page (`config.scales`), `hud.notifyDuration` → durée des
@@ -1135,7 +1141,8 @@ Jauges affichées quand un personnage est en jeu ; masquées pendant la sélecti
 Santé, mise à terre, réanimation, et **chaîne de dégâts commune** (1.3.0 ; coup déjà lancé et `vocabulary().pvp` :
 1.4.0 ; `docs/plan/COMBAT_V1.md` § 1). Champ
 `vava_health:state` `{ health, downed, downedFor }` (visibilité `owner`) : `health` de 0 à 1, part de la vie au-dessus
-du seuil où GTA met un joueur à terre. Lieux de soins, délais, distances, touches, chaîne et messages : `config.lua`.
+du seuil où GTA met un joueur à terre. Délais à terre, touches et messages : `config_client.lua` ; lieux de soins,
+distances, chaîne : `config.lua`.
 Demande le core 0.10.0 (`core.net.send` : tous les envois du module sont comptés dans `/vava_reseau`).
 
 - **Vie tenue par le serveur** (1.3.0) : la valeur du serveur fait foi pour tout (`hit`, `isDowned`, `get`, soins, mise
@@ -1298,7 +1305,8 @@ Détail et tests en jeu : `modules/vava_health/README.md`, `docs/tests/sante.md`
 
 Administration du royaume : le **Conseil** (rangs et droits), le panneau **Registre du Conseil** (F10 ou `/conseil`,
 réglable), les bans vérifiés à la connexion, le journal des actions, les signalements des joueurs (`/signaler`).
-Rangs, droits, durées, textes : `config.lua`. Demande le core 0.5.0 (compte connu transmis au hook de connexion).
+Rangs, droits, durées, textes du serveur : `config.lua` ; touches, outils et textes du client : `config_client.lua`.
+Demande le core 0.5.0 (compte connu transmis au hook de connexion).
 
 **Rangs** (cumulatifs). Les actions qui contraignent un joueur (amener à soi, renvoyer, déplacer, immobiliser,
 avertir, expulser, bannir, fouiller, observer) ne visent jamais un membre de rang égal ou supérieur. Rejoindre,
@@ -1380,10 +1388,10 @@ voulu (l'écran des joueurs non plus, voir plus bas).
 | `ban(compte, heures, motif)` | `true, n° du ban` ou `false, code` — au journal sous le nom du module appelant |
 | `kick(source, motif)` | `true` ou `false, code` |
 | `log(source, libellé, détails?)` | `true` ou `false, code` — inscrit au journal une action d'un membre du Conseil faite dans un module (libellé lu tel quel, 32 caractères ; détails `{ clé = texte ou nombre }`, 8 au plus) ; depuis 1.1.0 |
-| `submitRequest(source, nature, texte, position)` | `true, { id, kind, state = 'sent', age = 0 }` ou `false, code[, secondes]` — demande au Conseil au nom d'un joueur (1.9.0, bannière de `vava_pause`) ; réservé aux ressources de `requests.callers` (`not_allowed`, une ligne de console par minute et par ressource) ; `nature` dans `requests.kinds` (`invalid_kind`) ; texte de 1 à 500 octets, `position` booléen (`invalid_args`) ; `no_session`, `too_soon` (+ secondes restantes, `reportCooldownMs`), `too_many` (`requests.maxOpenPerAccount` demandes ouvertes du compte), `full` ; aucune notification au joueur |
-| `requestOf(source)` | `{ id, kind, state, age }` ou `nil` — demande du compte du joueur (1.9.0) : la plus récente ouverte (`sent`, ou `claimed` si un membre l'a prise), sinon la dernière close depuis moins de `requests.closedMemoryMs` (15 min, `closed`) ; `age` en secondes ; réservé aux ressources de `requests.callers` |
+| `submitRequest(source, nature, texte, position)` | `true, { id, kind, state = 'sent', age = 0 }` ou `false, code[, secondes]` — demande au Conseil au nom d'un joueur (1.10.0, bannière de `vava_pause`) ; réservé aux ressources de `requests.callers` (`not_allowed`, une ligne de console par minute et par ressource) ; `nature` dans `requests.kinds` (`invalid_kind`) ; texte de 1 à 500 octets, `position` booléen (`invalid_args`) ; `no_session`, `too_soon` (+ secondes restantes, `reportCooldownMs`), `too_many` (`requests.maxOpenPerAccount` demandes ouvertes du compte), `full` ; aucune notification au joueur |
+| `requestOf(source)` | `{ id, kind, state, age }` ou `nil` — demande du compte du joueur (1.10.0) : la plus récente ouverte (`sent`, ou `claimed` si un membre l'a prise), sinon la dernière close depuis moins de `requests.closedMemoryMs` (15 min, `closed`) ; `age` en secondes ; réservé aux ressources de `requests.callers` |
 
-**Demandes au Conseil** (1.9.0, T-145) : `/signaler` et la bannière passent par le même chemin. Chaque demande a une
+**Demandes au Conseil** (1.10.0, T-145) : `/signaler` et la bannière passent par le même chemin. Chaque demande a une
 nature (`question`, `player` — signalement d'un joueur —, `bug`, `other` ; `/signaler` crée une demande `other`), et le
 cas échéant la position de son auteur, **lue par le serveur** et arrondie au mètre (jamais une valeur du client ;
 toujours jointe pour `player`). Pour `player`, les témoins : joueurs à `requests.witnessRadius` (30 m) de l'auteur, même
@@ -1395,7 +1403,7 @@ jamais envoyé aux témoins ni à aucun joueur hors du Conseil, hormis l'auteur 
 membre). L'alerte part à tous les membres en ligne qui ont le droit `reports` (`messages.requestNew` : « Question n° 12
 de … »). Mémoire seulement, rien de plus en base ; la création est une ligne de console `info` (n°, nature, compte).
 Pure et testée : `shared/requests.lua` (servi au seul serveur ; `tests/spec/admin_requests_spec.lua`). Un `config.lua`
-d'avant 1.9.0 (sans `requests`) : `/signaler` marche comme avant, la bannière reçoit `not_allowed`, une ligne `warn` au
+d'avant 1.10.0 (sans `requests`) : `/signaler` marche comme avant, la bannière reçoit `not_allowed`, une ligne `warn` au
 démarrage.
 
 **Outils des modules** (depuis 1.1.0) : un module ajoute un bouton à la page Outils du Registre par le registre du core
@@ -1433,7 +1441,7 @@ rang (droit `watch`, tout le Conseil) : chacun le regarde chez tout le monde, me
 | `webLog({ label, rank }, libellé, détails?)` | `true` ou `false, code` — action d'un compte du panneau faite dans un autre module |
 
 Hook `vava_admin:report` (serveur, `after` : `{ action = created|claimed|closed, id, author, kind }` — `kind` depuis
-1.9.0) : tient le panneau web à jour.
+1.10.0) : tient le panneau web à jour.
 
 Pour travailler le rendu sans le jeu : `web/index.html?tab=players` (ou `reports`, `bans`, `logs`, `staff`, `tools`,
 `announce`), avec `&dialog=ban`, `&proclaim=1`, `&watch=1` ou `&rank=gardien` (données simulées de
@@ -1443,8 +1451,8 @@ Pour travailler le rendu sans le jeu : `web/index.html?tab=players` (ou `reports
 ### `vava_voice`
 
 Chat vocal de proximité, sur la voix intégrée à FiveM (Mumble de FXServer, son 3D du jeu) : aucune autre ressource.
-Portées, touche, zones, textes : `config.lua`. Demande le core 0.11.0 (abonnements de zone, 1.3.0) ; facultatifs :
-`vava_hud` ≥ 1.2.0 (médaillon),
+Portées, touche, zones : `config_client.lua` ; droits des zones, textes du journal : `config.lua`. Demande le core
+0.11.0 (abonnements de zone, 1.3.0) ; facultatifs : `vava_hud` ≥ 1.2.0 (médaillon),
 `vava_health` (portée à terre), `vava_admin` ≥ 1.1.0 (zones de voix).
 
 À poser dans le `server.cfg` (son 3D du jeu, voix envoyée aux seuls joueurs à portée), par `setr` (un `set` n'est pas
@@ -1513,7 +1521,7 @@ setr voice_useSendingRangeOnly true
 Hooks : `vava_voice:zonesChanged` (serveur, `after` : `{ action = set|remove, id, zone?, source }`),
 `vava_voice:rangeChanged` (client, `after` : `{ index, name, distance }`).
 
-Bannière du royaume (1.4.0, T-145) : le cercle au sol ne se montre que si le réglage `voice.circle` de `vava_pause`
+Bannière du royaume (1.5.0, T-145) : le cercle au sol ne se montre que si le réglage `voice.circle` de `vava_pause`
 n'est pas `false` (export client `setting`, isolé, relu quand `vava_pause` démarre, suivi par le crochet
 `vava_pause:settingChanged`) ; sans `vava_pause`, comme avant (`config.pauseResource`).
 
@@ -1530,7 +1538,7 @@ gardés). Chez chaque joueur, réglés une fois et à chaque apparition : budget
 recherche ; **sons de la ville coupés** (depuis 1.1.0) : ambiance de circulation et de foule (scène de mixage de GTA
 `FBI_HEIST_H5_MUTE_AMBIENCE_SCENE`), véhicules lointains, sirènes au loin, radio de police, musiques d'avion et d'avis de
 recherche, et les émetteurs fixes listés (`config.audio.staticEmitters`). Si la nature (oiseaux, vent) se taisait
-aussi, retirer la scène de `config.audio.scenes`. Réglages : `config.lua`.
+aussi, retirer la scène de `config.audio.scenes`. Réglages : `config_client.lua` (instances préparées : `config.lua`).
 
 | Export serveur | Retour |
 |---|---|
@@ -1620,7 +1628,8 @@ L'écran des joueurs, pour le Conseil : tout membre (droit `watch` de vava_admin
 monde, en jeu (**mur des caméras** : page Outils du Registre — Gardien compris depuis vava_admin 1.7.0, qui l'ouvre
 avec le seul droit `watch` — ou `/cameras`) ou depuis la Chancellerie (par son pont).
 Demande le core 0.5.0 ; facultatifs : `vava_admin` ≥ 1.2.0 (droit, journal, outil du Registre ; sans lui, personne ne
-regarde en jeu), `vava_chancellerie` ≥ 1.1.0 (caméras depuis le web). Qualités, limites, adresse STUN : `config.lua`.
+regarde en jeu), `vava_chancellerie` ≥ 1.1.0 (caméras depuis le web). Qualités : `config_client.lua` ; limites, adresse
+STUN : `config.lua`.
 
 - **Capture** : à l'ordre du serveur seulement, le jeu du joueur filmé relie une texture WebGL à l'image du jeu
   (séquence de screenshot-basic : ni Windows, ni Discord, ni les interfaces du jeu) et la dessine hors de l'écran,
@@ -2297,7 +2306,7 @@ d'abord (les ids de lecture ne commencent jamais par `vava`, aucune collision). 
 `vava_arrival` à la première venue, ouvre l'onglet Lecture au chapitre « Premiers pas », page « Vivre à Eldoria »
 (`bienvenue`). Hors jeu : `?focus=<identifiant>`.
 
-**Codex en panneau** (1.6.0, T-145) : la bannière de `vava_pause` ouvre le livre dans son panneau, sans copie ni
+**Codex en panneau** (1.7.0, T-145) : la bannière de `vava_pause` ouvre le livre dans son panneau, sans copie ni
 voile ; c'est la page du Codex qui le dessine dans un rectangle donné par l'hôte (`config.docked.host`, seul appelant
 admis).
 
@@ -2358,7 +2367,7 @@ formulaires y sont simulées.
 ### `vava_pause`
 
 La bannière du royaume (1.0.0, T-145), à la place du menu pause de GTA : Échap, P ou Start déploient une page à soi
-(`vava_pause/web`) : Personnage, Codex (en panneau, `vava_codex` 1.6.0), Carte (celle de GTA en attendant), Réglages,
+(`vava_pause/web`) : Personnage, Codex (en panneau, `vava_codex` 1.7.0), Carte (celle de GTA en attendant), Réglages,
 Le Conseil, Paramètres du jeu, Quitter Eldoria ; plaque du royaume (moment du jour, saison, habitants). Ordre de
 démarrage : après `vava_codex`, avant `vava_arrival`. Demande le core 0.10.0 et `vava_ui` ; tout le reste est
 facultatif. Aucune table en base. Détail et réglages : `modules/vava_pause/README.md` ; spec :

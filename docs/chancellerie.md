@@ -256,6 +256,11 @@ Le compte maître l'applique (« Mettre à jour »), ou la laisse s'appliquer au
      un module partage ses réglages entre `config.lua` et `config_client.lua` (T-132), un ancien `config.lua` gardé
      le fait signaler en console au démarrage (« config.lua garde la forme d'avant … ») : reportez vos réglages dans les
      deux nouveaux fichiers ;
+   - un **réglage** modifié que la nouvelle version n'a plus (depuis 1.8.6 : `config.lua` de `vava_hud`,
+     `vava_loading` et `vava_characters_ui`, renommé `config_client.lua` par T-142) est gardé tel quel, mais la
+     ressource ne le lit plus : le journal de la mise à jour le dit, une ligne par fichier (« … n'existe plus dans la
+     nouvelle version et n'est plus lu : reportez vos réglages dans …/config_client.lua, puis supprimez l'ancien
+     fichier »), une seule fois ; un tel fichier jamais touché est simplement retiré ;
    - un autre fichier modifié des deux côtés prend la nouvelle version, la vôtre est gardée à côté (`.local`) ;
    - un nouveau module est posé dans `[vava]`, à activer dans la page Ressources. Le chat `vava_chat` remplace la
      ressource `chat` de FiveM : activer `vava_chat` et couper `chat` au même endroit. `vava_ui` (polices et textures

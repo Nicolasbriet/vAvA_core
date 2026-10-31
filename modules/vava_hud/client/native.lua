@@ -3,7 +3,7 @@
     Rôle : retrait de l'interface native de GTA (minimap, HUD et ses notifications). Les natives utilisées sont des
            bascules qui gardent leur effet : aucun appel par image ; le jeu pouvant les réactiver (changement de
            ped, cinématique), elles sont revérifiées à chaque passage de la boucle de visibilité.
-    Dépendances : config.lua
+    Dépendances : config_client.lua
 ]]
 
 local IsRadarHidden, IsHudHidden, DisplayRadar, DisplayHud = IsRadarHidden, IsHudHidden, DisplayRadar, DisplayHud

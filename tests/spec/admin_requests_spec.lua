@@ -1,6 +1,6 @@
 local helper = require('tests.helper')
 
--- Demandes au Conseil (vava_admin 1.9.0, T-145 § 7.3) : logique pure de shared/requests.lua.
+-- Demandes au Conseil (vava_admin 1.10.0, T-145 § 7.3) : logique pure de shared/requests.lua.
 describe('vava_admin : demandes au Conseil', function()
     local rules
     local MEMORY = 900000

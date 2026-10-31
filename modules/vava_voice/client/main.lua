@@ -9,7 +9,7 @@
       - ordres du serveur : limite de portée ; zones de voix proches reçues, changées et quittées par les
         abonnements de zone du core (core.zones.watch, 1.3.0) ;
       - arrêt de la ressource éditeur ouvert : clavier et souris rendus au jeu.
-    Dépendances : shared/, config.lua, tous les fichiers client/ du module
+    Dépendances : shared/constants.lua, config_client.lua, tous les fichiers client/ du module
 ]]
 
 local type, mathType, tonumber, tostring, pcall = type, math.type, tonumber, tostring, pcall
@@ -111,7 +111,7 @@ RegisterCommand(cfg.zones.command, function()
     if playing then CreateThread(editor.open) end
 end, false)
 
--- Réglage « Cercle de portée au sol » de la bannière du royaume (1.4.0) : lu chez vava_pause (export isolé) au
+-- Réglage « Cercle de portée au sol » de la bannière du royaume (1.5.0) : lu chez vava_pause (export isolé) au
 -- démarrage et quand elle démarre, suivi par son crochet ; sans elle, le cercle se montre comme avant.
 local PAUSE = cfg.pauseResource
 local CIRCLE_KEY = 'voice.circle'

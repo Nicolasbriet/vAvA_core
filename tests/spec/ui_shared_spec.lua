@@ -5,7 +5,8 @@
 local ROOT = (os.getenv('VAVA_ROOT') or '.') .. '/'
 
 -- Pages basculées sur vava_ui, avec le nom de leur feuille : les 15 interfaces depuis la fin de T-012, puis l'Atelier
--- (T-100). Toute nouvelle ressource à page s'ajoute ici ; seule l'exception de vava_loading (T-020) reste à part.
+-- (T-100) et la bannière (T-145). Toute nouvelle ressource à page s'ajoute ici ; seule l'exception de vava_loading
+-- (T-020) reste à part.
 local PAGES = {
     { module = 'vava_hud', sheet = 'style.css' },
     { module = 'vava_health', sheet = 'style.css' },
@@ -23,6 +24,7 @@ local PAGES = {
     { module = 'vava_admin', sheet = 'style.css' },
     { module = 'vava_magic', sheet = 'style.css' },
     { module = 'vava_atelier', sheet = 'style.css' },
+    { module = 'vava_pause', sheet = 'pause.css' },
 }
 
 local COMMON = {
@@ -217,10 +219,19 @@ for _, page in ipairs(PAGES) do
             for _, name in ipairs({ 'grain.png', 'paper.png', 'frame.svg', 'divider.svg', 'diamond.svg' }) do
                 assert.is_nil(find(css, name), name)
             end
+            -- jetons d'image : repli `none` (README de vava_ui) ; autres jetons (encres, filets, polices, T-145) : un repli
+            -- écrit, jamais vide ; aucun jeton sans repli (boucle suivante)
+            local IMAGES = { ['--ui-grain'] = true, ['--ui-paper'] = true, ['--ui-frame'] = true, ['--ui-divider'] = true,
+                ['--ui-diamond'] = true }
             local uses = 0
             for token in css:gmatch('var%((%-%-ui%-[%w-]+)') do
                 uses = uses + 1
-                assert.truthy(css:find('var%(' .. token:gsub('%-', '%%-') .. ',%s*none%)'), token)
+                local escaped = token:gsub('%-', '%%-')
+                if IMAGES[token] then
+                    assert.truthy(css:find('var%(' .. escaped .. ',%s*none%)'), token)
+                else
+                    assert.truthy(css:find('var%(' .. escaped .. ',%s*[^%s)]'), token)
+                end
             end
             for _ in css:gmatch('var%(%-%-ui%-[%w-]+%)') do
                 error('jeton --ui- employé sans repli')

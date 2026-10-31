@@ -23,14 +23,21 @@ Registre ; sans lui, ACE `combat.admin`), `vava_chat` (réponses de `/armes` ; s
 « gardées à part » par l'inventaire, les recettes quittent les stations et les gestes natifs de GTA reviennent (sans
 dégâts entre joueurs : `vava_health` les annule).
 
-## Règles (config.lua)
+## Règles (config.lua, config_client.lua)
+
+Depuis 1.1.0 (T-132), les réglages sont dans deux fichiers et chacun n'est écrit qu'une fois : `config_client.lua`
+porte ce que lit le client (`weapons`, `shield`, `shields`, `natives`), et le serveur aussi ; `config.lua` porte tout
+le reste, lu par le seul serveur, et complète la table sans réécrire une clé de `config_client.lua`. `weapons` et
+`shield` y sont entiers (dégâts, solidité, part bloquée, garde du statebag compris) : le client les passe à
+`shared/shield.lua`. Les joueurs ne téléchargent que les constantes, `config_client.lua`, `shared/shield.lua` et les
+`client/*.lua` ; `config.lua` et `shared/weapons.lua` sont servis au seul serveur.
 
 | Règle | Défaut | Clé |
 |---|---|---|
 | Catégories (liste fermée de `COMBAT_V1.md`) | `une_main`, `deux_mains`, `dague`, `baton`, `bouclier` ; libellés et ordre en config, les clés sont fixes (le module refuse de démarrer sinon) | `categories` |
 | Familles | `epee`, `hache`, `masse`, `dague`, `baton`, `bouclier` (techniques de T-115 ; style = famille + catégorie) | `families` |
 | Types de dégâts d'une arme | `tranchant`, `contondant`, `percant` (recoupés au démarrage avec `vava_health:vocabulary()`) | `kinds`, `kindLabels` |
-| Fiche d'une arme | catégorie, famille, type, `damage` (points sur 100 d'un coup de multiplicateur 1,0, qualité 50, arme non émoussée ; 0 exclu à 100), `reachBonus` (mètres ajoutés à la portée d'une technique, −1 à 1,5, T-112), `durability` (solidité d'une pièce neuve, 1 à 10 000), `block` (part arrêtée en bloquant, 0 à 1, T-113), `provisional` (modèle provisoire) ; toute autre clé refuse le module | `weapons` |
+| Fiche d'une arme (client) | catégorie, famille, type, `damage` (points sur 100 d'un coup de multiplicateur 1,0, qualité 50, arme non émoussée ; 0 exclu à 100), `reachBonus` (mètres ajoutés à la portée d'une technique, −1 à 1,5, T-112), `durability` (solidité d'une pièce neuve, 1 à 10 000), `block` (part arrêtée en bloquant, 0 à 1, T-113), `provisional` (modèle provisoire) ; toute autre clé refuse le module | `weapons` |
 | Objets déclarés | six objets (ci-dessous), `stack = 1`, catégorie `arme`, image `nui://vava_combat/web/items/<nom>.svg` posée par le code ; un objet déjà déclaré par une autre ressource n'est pas remplacé (avertissement) | `items` |
 | Recettes | six recettes déclarées à `vava_crafting:recipes` (et à `vava_skills:recipes`), **signées**, solidité **tirée de la fiche** (ni `signed` ni `durability` en config : le module refuse sinon) ; une recette refusée est une ligne d'avertissement | `recipes` |
 | Qualité → dégâts | facteur linéaire de 0,85 (qualité 0) à 1,15 (qualité 100), 1,00 à 50 ; pile sans qualité : 50 | `quality` |
@@ -38,9 +45,9 @@ dégâts entre joueurs : `vava_health` les annule).
 | Seuils prévenus au seul porteur | quand la solidité passe sous le quart de la maximale (« l'arme s'émousse »), et à 0 (« l'arme est émoussée ») | `wear.warnRatio`, `messages.worn`, `messages.dull` |
 | Arme émoussée | solidité 0 (ou `broken` posé par un autre module) : coups × 0,5, toujours utilisable, jamais `broken` ; la réparation de `vava_crafting` la remet en état (maximale − 5) | `wear.dullFactor` |
 | Filet de `strike` | même instance (routing bucket) et positions **lues par le serveur** à 6 m au plus (la vraie portée est jugée par T-112) ; multiplicateur de la technique 0,1 à 3 ; plancher 0,5 point ; plafond 200 ; étiquettes admises `parryable`, `unblockable`, `undodgeable` (`melee` toujours posé) ; export réservé à `vava_example_combat` | `strike` |
-| Bouclier accroché | au **bras** avec une arme à une main ou une dague, dans le **dos** sinon (deux mains, bâton, outil, torche, mains vides) ; 1 s entre deux gestes ; relevé de possession toutes les 5 s, décroché après deux relevés manquants ; montré aux joueurs à 120 m au plus | `shield` |
-| Placement du bouclier | modèle et placements au bras (os 61163, avant-bras gauche) et au dos (os 24818, haut du dos) | `shields` (-- PLACEHOLDER) |
-| Combat natif coupé | drapeau 122 (corps à corps désactivé), changement d'arme bloqué, armes GTA retirées ; contrôle à 1 Hz ; rendu à GTA à l'arrêt | `natives` |
+| Bouclier accroché (client) | au **bras** avec une arme à une main ou une dague, dans le **dos** sinon (deux mains, bâton, outil, torche, mains vides) ; 1 s entre deux gestes ; relevé de possession toutes les 5 s, décroché après deux relevés manquants ; montré aux joueurs à 120 m au plus | `shield` |
+| Placement du bouclier (client) | modèle et placements au bras (os 61163, avant-bras gauche) et au dos (os 24818, haut du dos) | `shields` (-- PLACEHOLDER) |
+| Combat natif coupé (client) | drapeau 122 (corps à corps désactivé), changement d'arme bloqué, armes GTA retirées ; contrôle à 1 Hz ; rendu à GTA à l'arrêt | `natives` |
 | Conseil | `/armes`, droit `metiers` (sans `vava_admin` : ACE `combat.admin`), `user` jusqu'à 1 000 points | `admin`, `journal` |
 | Textes | notifications, réponses des commandes | `messages` |
 
@@ -166,8 +173,8 @@ Console admise (`armes …`). Déclarée au registre `core:commands` (chapitre �
 Tous les modèles sont des remplaçants vanilla (`-- PLACEHOLDER`, `docs/plan/ASSETS_PLACEHOLDERS.md`) : épée longue →
 machette, hache d'armes → hachette, masse → batte, dague → dague de GTA, bâton ferré → queue de billard ; l'Épée courte
 garde la machette de `vava_crafting`. **Le bouclier rond est le bouclier balistique de GTA, anachronique : à remplacer
-en priorité.** Le jour où un modèle arrive : changer `items[…].held.model` (ou `shields[…]`) et ses placements, puis
-`provisional = false`. Un modèle absent ne fait jamais planter : une ligne de console, rien d'affiché.
+en priorité.** Le jour où un modèle arrive : changer `items[…].held.model` de `config.lua` (ou `shields[…]` de
+`config_client.lua`) et ses placements, puis `provisional = false` (fiche de l'arme, `config_client.lua`). Un modèle absent ne fait jamais planter : une ligne de console, rien d'affiché.
 
 Icônes : `web/items/*.svg` (une par objet nouveau, au format de l'objet, fond transparent, ombre comprise).
 
@@ -176,10 +183,17 @@ Icônes : `web/items/*.svg` (une par objet nouveau, au format de l'objet, fond t
 `ensure vava_combat` après `vava_health` et `vava_crafting` (voir l'ordre du `README.md` à la racine). Pour essayer un
 coup en développement : `set vava_env dev` et `ensure vava_example_combat` (1.1.0), puis `/frapper_arme <n°>`.
 
+**Mise à jour vers 1.1.0 (T-132)** : les fiches des armes, le bouclier accroché, le placement des boucliers et les
+contrôles natifs ont quitté `config.lua` pour `config_client.lua`. Un `config.lua` modifié et gardé par l'installeur
+de la Chancellerie (le nouveau posé en `config.lua.nouveau`) garde l'ancienne forme : le module démarre, mais la
+console le signale (« config.lua garde la forme d'avant 1.1.0 … ») et un réglage client changé dans ce fichier reste
+sans effet. Reportez vos réglages dans `config.lua` et `config_client.lua` d'après les nouveaux fichiers.
+
 ## Tests
 
 - Hors jeu : `tests/spec/combat_weapons_spec.lua` (catalogue, qualité, solidité, montant, usure, options, paquet),
-  `combat_shield_spec.lua` (position, placement, valeur du statebag, garde), `combat_strike_spec.lua` (serveur avec
+  `combat_shield_spec.lua` (position, placement, valeur du statebag, garde ; position et placement aussi sur la seule
+  vue client, `config_client.lua` sans `config.lua`), `combat_strike_spec.lua` (serveur avec
   doublures : catalogue, strike, usure, bouclier, garde, `/armes`).
 - En jeu : [docs/tests/combat.md](../../docs/tests/combat.md) § 2.
 

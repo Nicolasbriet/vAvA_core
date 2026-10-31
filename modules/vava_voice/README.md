@@ -35,7 +35,20 @@ Ordre de démarrage : après `vava_admin`, avant `vava_cameras` (ordre complet :
 | `vava_admin` ≥ 1.1.0 | droits des zones, outil « Zones de voix » du Registre, journal | personne ne crée de zone |
 | `vava_chancellerie` | zones modifiées et supprimées depuis le web | zones gérées en jeu seulement |
 
-## Règles (config.lua)
+## Règles (config.lua, config_client.lua)
+
+Depuis 1.4.0 (T-132), les réglages sont dans deux fichiers et chacun n'est écrit qu'une fois : `config_client.lua`
+porte ce que lit le client (`ranges`, `defaultRange`, `key`, `command`, `keyLabel`, `client`, `ring`, `zones` hors des
+quatre clés du serveur, `hud`), et le serveur aussi ; `config.lua` porte ce que lit le seul serveur (`downedMaxRange`,
+`zones.permission`, `zones.teleportPermission`, `zones.subscribeMargin`, `zones.tool`, `web`, `rateLimits`,
+`messages`) et complète la table sans réécrire une clé de `config_client.lua`. Les joueurs ne téléchargent que les
+constantes, `config_client.lua`, les `client/*.lua`, l'éditeur et ses icônes ; `config.lua` et `shared/label.lua`
+sont servis au seul serveur.
+
+**Mise à jour vers 1.4.0 (T-132)** : un `config.lua` modifié et gardé par l'installeur de la Chancellerie (le nouveau
+posé en `config.lua.nouveau`) garde l'ancienne forme : le module démarre, mais la console le signale (« config.lua
+garde la forme d'avant 1.4.0 … ») et un réglage client changé dans ce fichier reste sans effet. Reportez vos réglages
+dans `config.lua` et `config_client.lua` d'après les nouveaux fichiers.
 
 | Règle | Défaut | Clé |
 | --- | --- | --- |
@@ -49,7 +62,7 @@ Ordre de démarrage : après `vava_admin`, avant `vava_cameras` (ordre complet :
 | Limite de portée | redemandée à l'apparition et au redémarrage du module : 5 essais à 2 s d'écart si le serveur n'est pas prêt | `client.syncTries`, `client.syncRetryMs` |
 | Zones connues d'un joueur | celles dont il est à moins de rayon + 40 m (envoyées par le core, 1.3.0) ; oubliées au-delà de 25 m de plus | `zones.subscribeMargin` (et `zones.exitMargin` du core) |
 | Cercle au sol | 1,5 s, s'efface sur les 0,6 dernières, couleur laiton | `ring` |
-| Cercle au sol, réglage du joueur (1.4.0) | « Cercle de portée au sol » de la bannière du royaume (`voice.circle`, gardé sur sa machine) : désactivé, la portée change sans cercle ; sans `vava_pause`, toujours montré | `pauseResource` |
+| Cercle au sol, réglage du joueur (1.5.0) | « Cercle de portée au sol » de la bannière du royaume (`voice.circle`, gardé sur sa machine) : désactivé, la portée change sans cercle ; sans `vava_pause`, toujours montré | `pauseResource` |
 | Zones de voix | 200 au plus ; nom de 40 signes ; rayon 2 à 60 m (10 par défaut), hauteur 2 à 30 m (6), par pas de 0,5 ; effet ×0,5, ×0,75, ×1, ×1,5, ×2 (défaut) ou ×3 | `zones` |
 | Droits | `tools` pour créer, régler, supprimer ; `teleport` pour « S'y rendre » | `zones.permission`, `zones.teleportPermission` |
 | Débits | limite de portée : 3 puis 1 toutes les 5 s ; éditeur : 5 puis 1 par seconde ; actions : 10 puis 1 par seconde | `rateLimits` |
@@ -59,7 +72,7 @@ Ordre de démarrage : après `vava_admin`, avant `vava_cameras` (ordre complet :
 
 - **Portée** : la touche passe à la suivante, puis revient à Chuchoter ; le choix est gardé sur sa machine. Le
   médaillon « Voix » se remplit d'un quart par portée et s'illumine quand il parle ; le cercle au sol montre la distance
-  pendant 1,5 s, au seul appui sur la touche, vu de lui seul ; il le retire dans la bannière (Réglages → Voix, 1.4.0).
+  pendant 1,5 s, au seul appui sur la touche, vu de lui seul ; il le retire dans la bannière (Réglages → Voix, 1.5.0).
 - **Hors du jeu** (connexion, sélection du personnage) : micro coupé par le serveur (`MumbleSetPlayerMuted`) et joueur
   au salon racine, sans personne à qui parler. Le micro s'ouvre à l'apparition confirmée du personnage.
 - **À terre** (`vava_health`) : Chuchoter et Parler seulement. Relu à chaque apparition (reconnecté à terre : toujours
@@ -139,8 +152,8 @@ exports.vava_voice:releaseRange(source, 'baillon')
 
 ```
 vava_voice/
-├── fxmanifest.lua · config.lua
-├── shared/   constants.lua (protocole) · label.lua (nom d'une zone, compté en signes)
+├── fxmanifest.lua · config_client.lua (lu par le client) · config.lua (servi au seul serveur)
+├── shared/   constants.lua (protocole) · label.lua (nom d'une zone, compté en signes ; servi au seul serveur)
 ├── server/   core · store (base) · presence (micros, limites) · links (santé, Conseil) · zones · api · commands
 │             main
 ├── client/   core · nui · hud (médaillon) · mumble (salons, cibles) · ring (cercle) · zones · range (portée)
@@ -163,5 +176,5 @@ Procédure complète : `docs/tests/voix.md`. À regarder en premier :
 5. Les zones après un `restart` (voix 8-1).
 6. 1.3.0 : zones reçues à l'approche seulement, changées sans reconnexion, oubliées en s'éloignant (zones 2-1 à 2-10) ;
    éditeur qui suit les changements d'un autre membre (zones 4-1 à 4-3).
-7. 1.4.0 : réglage « Cercle de portée au sol » désactivé dans la bannière → aucun cercle au changement de portée ; réactivé
+7. 1.5.0 : réglage « Cercle de portée au sol » désactivé dans la bannière → aucun cercle au changement de portée ; réactivé
    ou `vava_pause` arrêté → le cercle revient (pause 6-3).

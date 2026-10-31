@@ -245,8 +245,9 @@ Règles décidées le 30 octobre 2026 : on couvre d'abord avec **2 déchets vég
 **1 compost** ; on ne couvre qu'en **automne** et en **hiver** ; la nuit de gel est annoncée par le monde dès qu'elle est
 tirée (`/date` et fiche de la plante) ; le chou seul résiste.
 
-Préparer une nuit de gel sans attendre l'hiver : dans `modules/vava_time/config.lua`, `calendar.cycle.first = 'hiver'`
-et `frost.seasons = { hiver = 1 }` (toutes les nuits gèlent), puis `restart vava_time` à une heure du royaume avant
+Préparer une nuit de gel sans attendre l'hiver : `calendar.cycle.first = 'hiver'` dans
+`modules/vava_time/config_client.lua` et `frost.seasons = { hiver = 1 }` dans `modules/vava_time/config.lua` (toutes
+les nuits gèlent), puis `restart vava_time` à une heure du royaume avant
 17 h (sinon le soir est déjà passé ce jour-là et rien ne se joue). Remettre les valeurs ensuite. Déchets végétaux :
 arracher une plante flétrie ou morte (1 à 2), ou le catalogue de développement.
 

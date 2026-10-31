@@ -1,5 +1,5 @@
 --[[
-    vava_hud/config.lua
+    vava_hud/config_client.lua
     Rôle : table du module (seule globale de la ressource) et configuration de l'affichage.
     Dépendances : aucune
 ]]
@@ -22,7 +22,7 @@ VavaHud.config = {
     -- Purement visuelle : le serveur reste maître du temps.
     progress = { minDurationMs = 250, maxDurationMs = 120000, maxLabelLength = 60, cancelHint = 'Peut être interrompue' },
 
-    -- Bannière du royaume (vava_pause, 1.5.0) : HUD masqué pendant qu'elle est déployée (jauges et barre de
+    -- Bannière du royaume (vava_pause, 1.6.0) : HUD masqué pendant qu'elle est déployée (jauges et barre de
     -- progression masquées, jamais interrompues ; notifications visibles), et deux réglages du joueur lus chez elle :
     -- taille de l'interface (choix 90, 100 ou 115 → échelle de la page) et durée des notifications (multiplicateur de
     -- notifications.durationMs). Sans vava_pause : échelle 1, durée de base.

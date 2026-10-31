@@ -4,7 +4,8 @@
            fourni par l'appelant (tests déterministes), moments dus à une heure du royaume (avertissement du soir, gel
            de la nuit) sans rejouer ce qui est fait ni ce qui était déjà passé au démarrage. Aucun état : l'appelant
            garde celui de la nuit.
-    Dépendances : shared/constants.lua, config.lua
+           Servie au seul serveur (T-132) : aucun fichier client ne s'en sert.
+    Dépendances : shared/constants.lua, config.lua (frost)
 ]]
 
 local type = type

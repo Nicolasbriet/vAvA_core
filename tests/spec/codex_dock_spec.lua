@@ -1,6 +1,6 @@
 local helper = require('tests.helper')
 
--- Codex en panneau (vava_codex 1.6.0, T-145 § 9.3) : rectangle du livre donné par l'hôte, en vw et vh.
+-- Codex en panneau (vava_codex 1.7.0, T-145 § 9.3) : rectangle du livre donné par l'hôte, en vw et vh.
 describe('vava_codex : rectangle du panneau', function()
     local rect
 

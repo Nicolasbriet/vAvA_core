@@ -21,7 +21,7 @@ Spec : `docs/plan/specs/T-145.md` (avec les décisions du porteur du projet du 3
   la bannière (« Vous êtes pris à partie : la bannière se replie. »).
 - **Personnage** : nom, rang du métier principal, confrérie (ou « sujet du royaume »), santé, faim, soif, savoir-faire ;
   « ouvrir la fiche complète » ouvre le livre des compétences.
-- **Codex** : le livre de `vava_codex` s'ouvre à droite de la bannière (Codex en panneau, `vava_codex` ≥ 1.6.0).
+- **Codex** : le livre de `vava_codex` s'ouvre à droite de la bannière (Codex en panneau, `vava_codex` ≥ 1.7.0).
 - **Carte** : la carte de GTA en attendant la carte du royaume ; Échap la ferme et la bannière revient.
 - **Réglages** : taille de l'interface (bannière et HUD), durée des notifications, cercle de portée de la voix ; touches
   du joueur (celles qu'il a liées). Gardés **sur sa machine**, pour tous ses personnages ; rien ne part au serveur.
@@ -99,8 +99,8 @@ que bannière ouverte. Le reste : 100, 250 ou 500 ms. Cible : `resmon` ≤ 0,02 
 ## Installation
 
 `ensure vava_pause` juste après `ensure vava_codex`, avant `vava_arrival`. Demande `vAvA_core` ≥ 0.10.0 et `vava_ui`.
-Facultatifs : `vava_skills`, `vava_health`, `vava_needs`, `vava_time`, `vava_voice`, `vava_hud` ≥ 1.5.0 (HUD masqué,
-réglages), `vava_codex` ≥ 1.6.0 (panneau), `vava_admin` ≥ 1.9.0 (Conseil ; `vava_pause` dans `requests.callers`),
+Facultatifs : `vava_skills`, `vava_health`, `vava_needs`, `vava_time`, `vava_voice`, `vava_hud` ≥ 1.6.0 (HUD masqué,
+réglages), `vava_codex` ≥ 1.7.0 (panneau), `vava_admin` ≥ 1.10.0 (Conseil ; `vava_pause` dans `requests.callers`),
 `vava_guilds` (couleurs de confrérie, à venir). Aucune table en base.
 
 ## Fichiers

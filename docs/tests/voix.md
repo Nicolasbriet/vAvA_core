@@ -31,9 +31,10 @@ casque : **A**, membre du Conseil, et **B**, simple joueur. Un test se cite « v
    Paramètres > Raccourcis > FiveM : « Portée de la voix (Chuchoter, Parler, Crier, Déclamer) ».
 7. **Placer B** : A appuie sur `W` ; le cercle au sol a pour rayon la portée de A ; B se tient juste dedans ou juste
    dehors. Les distances des tableaux sont prises ainsi.
-8. **Réglages pour aller vite** (à remettre ensuite, puis `restart` du module) : `vava_voice/config.lua` →
+8. **Réglages pour aller vite** (à remettre ensuite, puis `restart` du module) : `vava_voice/config_client.lua` →
    `ring.durationMs = 10000` (défaut `1500` : le cercle reste le temps de placer B), `zones.max = 1` (défaut `200`,
-   pour le seul test 3-17) ; `vava_health/config.lua` → `downed.giveUpAfterMs = 10000` (défaut `180000`, pour 6-4).
+   pour le seul test 3-17) ; `vava_health/config_client.lua` → `downed.giveUpAfterMs = 10000` (défaut `180000`, pour
+   6-4). Depuis T-142, ces réglages lus par le client ne sont plus dans `config.lua`.
 
 ## 1. Portées, médaillon et cercle (seul)
 

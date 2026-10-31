@@ -8,11 +8,11 @@
            le chat inscrive aux dernières pages ce que le joueur tape lui-même, export `openAt` pour ouvrir le livre à
            un chapitre (1.4.0, accueil des nouveaux venus ; 1.5.0 : aussi une page ou un chapitre de lecture, résolus
            par la page), texte d'une page de lecture relayé à la demande (1.5.0). Souris et clavier rendus au jeu si la
-           ressource s'arrête livre ouvert. Codex « en panneau » (1.6.0) : exports `openDocked(chapitre, rectangle)` et
+           ressource s'arrête livre ouvert. Codex « en panneau » (1.7.0) : exports `openDocked(chapitre, rectangle)` et
            `closeDocked()`, réservés à la ressource hôte (`config.docked.host`, la bannière de vava_pause) : le livre se
            dessine dans le rectangle donné, sans voile, et le crochet client `vava_codex:closed` dit chaque fermeture
            (échec de l'ouverture compris) pour que l'hôte reprenne la main.
-    Dépendances : shared/constants.lua, config.lua, shared/dock.lua, client/core.lua, client/nui.lua, client/keys.lua
+    Dépendances : shared/constants.lua, config_client.lua, shared/dock.lua, client/core.lua, client/nui.lua, client/keys.lua
 ]]
 
 local type, tostring, pcall, ipairs = type, tostring, pcall, ipairs
@@ -44,7 +44,7 @@ local REFOCUS_MS = 150
 
 local open = false
 local keepOpen = cfg.keepOpenDefault
--- 1.6.0 : rectangle du livre ouvert en panneau (nil : plein écran) ; ouverture en cours (réponse du serveur attendue)
+-- 1.7.0 : rectangle du livre ouvert en panneau (nil : plein écran) ; ouverture en cours (réponse du serveur attendue)
 -- et, pour une ouverture en panneau, son annulation par l'hôte (closeDocked) avant la réponse
 local docked = nil
 local opening = false
@@ -72,7 +72,7 @@ local function feed(message, kind)
     EndTextCommandThefeedPostTicker(false, false)
 end
 
---- Crochet client `vava_codex:closed` (1.6.0) : l'hôte d'un livre en panneau reprend la main.
+--- Crochet client `vava_codex:closed` (1.7.0) : l'hôte d'un livre en panneau reprend la main.
 ---@param wasDocked boolean
 ---@param reason string  close | run | failed | unloaded | stopped
 local function closed(wasDocked, reason)
@@ -145,7 +145,7 @@ end
 
 --- Ouvre le Codex : le serveur reçoit les versions que la page garde et ne renvoie que ce qui a changé, puis le livre
 --- s'affiche. Rien n'est ouvert si la réponse manque. `focus` (1.4.0) : chapitre à ouvrir (export openAt), transmis à
---- la page ; nil pour F1 et /codex. `rect` (1.6.0) : rectangle du panneau (export openDocked, déjà validé), transmis
+--- la page ; nil pour F1 et /codex. `rect` (1.7.0) : rectangle du panneau (export openDocked, déjà validé), transmis
 --- à la page (`dock`) ; nil : plein écran. Un échec rend la main à l'hôte par le crochet (`failed`) ; un livre en
 --- panneau ne notifie rien, l'hôte dit lui-même que le Codex est fermé.
 ---@param focus? string
@@ -297,7 +297,7 @@ core.hooks.after('core:character:unloaded', function()
 end)
 
 -- Arrêt de la ressource livre ouvert : la page disparaît avec elle, mais la souris et le clavier resteraient pris.
--- Arrêt de l'hôte (1.6.0) livre en panneau ouvert : le livre se referme, la main revient au jeu.
+-- Arrêt de l'hôte (1.7.0) livre en panneau ouvert : le livre se referme, la main revient au jeu.
 AddEventHandler('onClientResourceStop', function(resource)
     if resource == RESOURCE then
         if not open then return end
@@ -340,7 +340,7 @@ local function fromHost()
     return type(cfg.docked) == 'table' and GetInvokingResource() == cfg.docked.host
 end
 
---- Ouvre le Codex en panneau (1.6.0, bannière de vava_pause) : même chemin que F1 (RPC vava_codex:open, empreintes,
+--- Ouvre le Codex en panneau (1.7.0, bannière de vava_pause) : même chemin que F1 (RPC vava_codex:open, empreintes,
 --- préférences), le livre dessiné dans `rect` ({ left, top, width, height } en vw et vh, shared/dock.lua), sans voile.
 --- L'hôte rend le focus juste avant : l'ouverture ne se refuse pas parce qu'une interface a le focus. `chapter` : nil
 --- (index) ou comme openAt. `true` : ouverture lancée, sa fin dite par le crochet `vava_codex:closed` ; `false, code` :
@@ -361,7 +361,7 @@ exports('openDocked', function(chapter, rect)
     return true
 end)
 
---- Referme le livre s'il est en panneau, ou annule son ouverture en cours (1.6.0) ; le crochet le dit (`close`).
+--- Referme le livre s'il est en panneau, ou annule son ouverture en cours (1.7.0) ; le crochet le dit (`close`).
 ---@return boolean ok
 ---@return string|nil code  not_allowed
 exports('closeDocked', function()

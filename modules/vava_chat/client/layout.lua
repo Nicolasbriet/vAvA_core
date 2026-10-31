@@ -3,7 +3,7 @@
     Rôle : place et taille du chat, choisies par le joueur (déplacé par son bandeau, agrandi par son coin) et gardées
            sur son PC (KVP de la ressource), en parts de l'écran pour suivre un changement de résolution.
            `/chat reinit` le remet à sa place par défaut.
-    Dépendances : config.lua, client/nui.lua
+    Dépendances : config_client.lua, client/nui.lua
 ]]
 
 local type, pcall = type, pcall

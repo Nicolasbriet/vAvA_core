@@ -39,8 +39,8 @@ Poser la convar sans redémarrer le serveur : console `set vava_env dev`, puis `
 | # | Faire | Attendu |
 |---|---|---|
 | 1 | Console du serveur. | Chaque module « prêt » ; pour `vava_dev_characters`, un avertissement `mode développement : /objet, /vie, … ouverts au droit « staff » et à l'ACE « vava.dev » — à ne jamais laisser sur un serveur ouvert au public`. |
-| 2 | **(2 joueurs)** B : `/objet pain 5`, `/vie 100`, `/aterre`, `/besoins 100 100`, `/respawn`, `/perso liste`. | Chaque fois : « refusé (réservé au Conseil (droit staff) ou à l'ACE vava.dev) ». Rien ne change chez B. |
-| 3 | **(2 joueurs)** B : `/anim vava_sword_1h`, `/animstop`, `/note annonce essai`. | « outil réservé au Conseil (droit staff) ou à l'ACE vava.dev. » ; rien n'est joué. `/note` : F8 `note refusée : not_allowed` ; requête du § 0.5 inchangée. |
+| 2 | **(2 joueurs)** B : `/objet pain 5`, `/vie 100`, `/aterre`, `/besoins 100 100`, `/respawn`, `/perso liste`. | Chaque fois : « refusé (réservé au Conseil) ». Rien ne change chez B. |
+| 3 | **(2 joueurs)** B : `/anim vava_sword_1h`, `/animstop`, `/note annonce essai`. | « outil réservé au Conseil. » ; rien n'est joué. `/note` : F8 `note refusée : not_allowed` ; requête du § 0.5 inchangée. |
 | 4 | **(2 joueurs)** B : `F1`, chercher « anim ». | Rien : les commandes de l'outil d'animation ne paraissent qu'au Codex du Conseil qui a le droit `staff`. |
 | 5 | A : `/objet pain 5`. | « pain × 5 ajouté » ; cinq miches dans la besace. Registre (`F10`) → Journal : ligne « Souverain <nom de A> · Outil de test : objet donné · objet : pain ; quantite : 5 ». |
 | 6 | A : `/vie 40`, puis `/vie`. | Vie à 40 % ; Journal : « Outil de test : vie fixée · vie : 40 ». La lecture seule (`/vie`) n'ajoute **aucune** ligne. |

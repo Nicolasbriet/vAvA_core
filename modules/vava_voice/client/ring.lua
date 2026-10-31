@@ -2,7 +2,7 @@
     vava_voice/client/ring.lua
     Rôle : cercle au sol, à la distance de la portée, montré au seul joueur quand il change de portée ; il le suit
            puis s'efface. Un marqueur se dessine à chaque image : la boucle par image ne vit que le temps du cercle.
-    Dépendances : config.lua
+    Dépendances : config_client.lua
 ]]
 
 local floor, min = math.floor, math.min

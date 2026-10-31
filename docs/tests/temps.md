@@ -19,11 +19,13 @@ Chancellerie 1.5.1 (pont `vava_chancellerie` 1.4.0). Comptez deux heures ; les t
    serveur peut être réglé sur n'importe quel fuseau : l'heure du royaume doit rester celle de Paris.
 5. **Calendrier par défaut** : chaque saison dure 14 jours réels à partir du lundi 26 octobre 2026 (printemps de l'an 1) ;
    le 30 octobre 2026, c'est donc le 5e jour de la saison des semailles, an 1 du royaume.
-6. **Réglages pour aller vite** (facultatif, `modules/vava_time/config.lua`, à remettre après, `restart vava_time`) :
-   - ciel qui change souvent : `weather.durationMinutes = { 1, 2 }`, `weather.durations = {}`, `weather.fadeSeconds = 30` ;
-   - saisons de quelques minutes : `calendar.cycle.seasonDays = 0.01` (≈ 14 min par saison), `calendar.cycle.origin` =
-     la date du jour, `calendar.cycle.first = 'automne'` (l'hiver arrive au bout d'un quart d'heure) ;
-   - nuit de gel à coup sûr : `frost.seasons = { hiver = 1 }`.
+6. **Réglages pour aller vite** (facultatif, à remettre après, `restart vava_time`) :
+   - ciel qui change souvent (`modules/vava_time/config_client.lua` depuis 1.4.0) : `weather.durationMinutes = { 1, 2 }`,
+     `weather.durations = {}`, `weather.fadeSeconds = 30` ;
+   - saisons de quelques minutes (`config_client.lua`) : `calendar.cycle.seasonDays = 0.01` (≈ 14 min par saison),
+     `calendar.cycle.origin` = la date du jour, `calendar.cycle.first = 'automne'` (l'hiver arrive au bout d'un quart
+     d'heure) ;
+   - nuit de gel à coup sûr (`modules/vava_time/config.lua`) : `frost.seasons = { hiver = 1 }`.
 
 ## 1. Heure du royaume
 

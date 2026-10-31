@@ -9,7 +9,7 @@
       Les commandes du chat marchent aussi depuis la console F8. Suggestions françaises de chaque commande (/staff
       pour le seul Conseil).
       Toute commande tapée est signalée au Codex (vava_codex, s'il est là) pour ses « dernières pages ».
-    Dépendances : shared/, config.lua, client/outbox.lua, client/suggestions.lua, client/layout.lua
+    Dépendances : shared/, config_client.lua, client/outbox.lua, client/suggestions.lua, client/layout.lua
 ]]
 
 local type, tonumber, pairs, pcall, tostring, match, sub, lower = type, tonumber, pairs, pcall, tostring, string.match, string.sub, string.lower

@@ -1,6 +1,6 @@
 --[[
     vava_codex/shared/dock.lua
-    Rôle : logique pure du Codex « en panneau » (1.6.0) : rectangle où la page dessine le livre, donné par la ressource
+    Rôle : logique pure du Codex « en panneau » (1.7.0) : rectangle où la page dessine le livre, donné par la ressource
            hôte (la bannière de vava_pause) en pourcentages de l'écran (vw, vh). Rend une copie à quatre champs, ou un
            refus : nombres finis, bord gauche et haut ≥ 0, largeur et hauteur ≥ 10, rien qui déborde de l'écran.
     Dépendances : shared/constants.lua

@@ -10,7 +10,7 @@
            Le statebag d'un ped peut avoir été écrit par le client qui le possède : seuls `id` et `item` y sont lus,
            l'accessoire (modèle, os, décalage, rotation) vient de la liste des objets tenables que le serveur publie
            dans GlobalState (que seul le serveur écrit), et rien n'est montré ailleurs que sur un ped de joueur.
-    Dépendances : shared/constants.lua, config.lua, shared/held.lua, client/core.lua
+    Dépendances : shared/constants.lua, config_client.lua, shared/held.lua, client/core.lua
 ]]
 
 local type, pairs, next = type, pairs, next

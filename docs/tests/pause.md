@@ -1,7 +1,7 @@
 # La bannière du royaume — procédure de test en jeu
 
 Procédure pour vérifier en jeu `vava_pause` 1.0.0 (menu pause d'Eldoria, T-145) et ce qu'il demande aux autres modules :
-`vava_codex` 1.6.0 (Codex en panneau), `vava_admin` 1.9.0 (demandes au Conseil), `vava_hud` 1.5.0 et `vava_voice` 1.4.0
+`vava_codex` 1.7.0 (Codex en panneau), `vava_admin` 1.10.0 (demandes au Conseil), `vava_hud` 1.6.0 et `vava_voice` 1.5.0
 (réglages). Elle suit la spec `docs/plan/specs/T-145.md` § 11.2, avec les décisions du porteur du projet du 31 octobre
 2026 (bannière réduite à terre ; auteur d'un signalement visible du Conseil ; combat 10 s). Comptez une heure ; les
 tests à plusieurs sont marqués **(2 joueurs)** ou **(3 joueurs)**. Un test se cite « pause 3-2 ». Préparation commune,
@@ -13,7 +13,7 @@ mesure du resmon et remontée des écarts : [LISEZMOI.md](LISEZMOI.md).
    (la Chancellerie l'écrit seule). Console : `module 'vava_pause' v1.0.0 prêt`.
 2. **Compte du Souverain** (`vava_conseil <compte> souverain`) ; un second joueur **B** pour les tests à deux, un
    troisième **C** pour 7-6.
-3. `vava_admin` 1.9.0 avec `requests.callers = { 'vava_pause' }` (défaut). Un `config.lua` d'avant (gardé par une
+3. `vava_admin` 1.10.0 avec `requests.callers = { 'vava_pause' }` (défaut). Un `config.lua` d'avant (gardé par une
    mise à jour) écrit au démarrage « config.lua sans « requests » » : la bannière ne peut alors pas écrire au Conseil.
 
 ## 1. Ouvrir et fermer

@@ -4,6 +4,9 @@
            par d'autres modules, ancrés à un lieu), opérations validées par le serveur, poids, métadonnées par pile
            (empilement par égalité, retraits ciblés, écriture partielle), raccourcis, interface glisser-déposer,
            catalogue de développement (désactivé par défaut).
+           T-132 : les joueurs ne téléchargent que les constantes, config_client.lua (distance et attente des sacs,
+           cadences de la main, raccourcis, touches) et shared/held.lua ; config.lua et shared/grid.lua sont servis au
+           seul serveur.
     Dépendances : vAvA_core ≥ 0.3.0, OneSync (sacs au sol en entités réseau, objet en main sur le statebag du ped,
                  distances lues côté serveur) ; vava_ui ≥ 1.0.0 (polices, grain et ornements de la page, par
                  nui://vava_ui/…)
@@ -16,7 +19,7 @@ use_experimental_fxv2_oal 'yes'
 
 name 'vava_inventory'
 description 'Inventaire en grille vAvA'
-version '1.8.1'
+version '1.9.0'
 
 dependency 'vAvA_core'
 dependency 'vava_ui'
@@ -35,14 +38,17 @@ files {
     'web/img/*.svg',
 }
 
+-- Les joueurs ne téléchargent que les shared_scripts et les client_scripts : config.lua, en tête des server_scripts,
+-- n'est jamais servi (T-132).
 shared_scripts {
     'shared/constants.lua',
-    'config.lua',
-    'shared/grid.lua',
+    'config_client.lua',         -- ouvre VavaInventory.config : ce que lit le client
     'shared/held.lua',
 }
 
 server_scripts {
+    'config.lua',                -- complète VavaInventory.config : ce que lit le seul serveur
+    'shared/grid.lua',           -- logique pure, servie au seul serveur (testée hors jeu : tests/spec)
     'server/core.lua',
     'server/positions.lua',
     'server/items.lua',

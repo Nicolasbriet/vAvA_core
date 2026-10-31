@@ -9,7 +9,8 @@
       - /date : l'heure, le jour, la saison et le ciel en mots du jeu (lus sans réseau) ; /ciel et l'outil du Registre ;
       - à l'arrêt : horloge et météo rendues au jeu, outil fermé ;
       - exports : heure, saison, ciel.
-    Dépendances : shared/, config.lua, tous les fichiers client/ du module
+    Dépendances : shared/constants.lua, config_client.lua, shared/calendar.lua, shared/weather.lua, tous les fichiers
+                  client/ du module
 ]]
 
 local type, tostring, pcall = type, tostring, pcall

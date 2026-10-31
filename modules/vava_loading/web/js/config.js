@@ -2,8 +2,8 @@
  * vava_loading/web/js/config.js
  * Rôle : réglages de la page de l'écran de chargement (rythmes de l'ouverture et des textes, seuils des six feux,
  *        effets, musique, journal de calibrage). La page s'affiche avant que le moindre script Lua tourne : elle ne
- *        peut pas lire config.lua (décision 5 de T-020). Seule durée partagée avec le Lua : celle de l'éclair, envoyée
- *        par le client avec le message de passage (la page n'en garde pas de copie).
+ *        peut pas lire config_client.lua (décision 5 de T-020). Seule durée partagée avec le Lua : celle de l'éclair,
+ *        envoyée par le client avec le message de passage (la page n'en garde pas de copie).
  *        Toute retouche de ce fichier le fait retélécharger par chaque joueur : retouches rares et groupées.
  * Dépendances : aucune (premier script de la page). Seule globale : window.VavaLoading.
  */

@@ -4,7 +4,7 @@
  * Rôle : Codex simulé quand la page est ouverte dans un navigateur (hors FiveM), pour travailler le rendu sans lancer
  *        le jeu. Inactif en jeu. Paramètres d'URL : ?staff=0 pour voir le Codex d'un simple joueur ; ?focus=<chapitre>
  *        simule l'ouverture par l'export openAt ; ?dock=1 : mode panneau (openDocked, appelé par
- *        vava_pause, 1.6.0), combinable avec ?focus=… ; (ex. ?focus=vava_gathering : chapitre Récolte ; ?focus=premiers_pas :
+ *        vava_pause, 1.7.0), combinable avec ?focus=… ; (ex. ?focus=vava_gathering : chapitre Récolte ; ?focus=premiers_pas :
  *        Lecture, première page du chapitre, contrat de T-022 ; ?focus=troquer : une page) ; ?lecture=0 : pages de
  *        lecture fermées (aucun index, pas d'onglet). Les listes des formulaires (joueurs, compétences, zones) sont
  *        simulées ; « Lancer » affiche la ligne. Lecture (1.5.0) : index de quatre pages, dont « Siéger au Conseil »
@@ -197,7 +197,7 @@ const DevMock = (() => {
       mockReading = params.get('lecture') !== '0';
       const payload = snapshot(params.get('staff') !== '0');
       if (params.get('focus')) payload.focus = params.get('focus');
-      // mode panneau (1.6.0) : rectangle de config_client.lua de vava_pause ; la bannière est esquissée à gauche
+      // mode panneau (1.7.0) : rectangle de config_client.lua de vava_pause ; la bannière est esquissée à gauche
       if (params.get('dock') === '1') {
         payload.dock = { left: 32.6, top: 10.7, width: 58.3, height: 71.1 };
         const banner = document.createElement('div');

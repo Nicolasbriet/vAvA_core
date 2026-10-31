@@ -14,16 +14,18 @@ use_experimental_fxv2_oal 'yes'
 
 name 'vava_world'
 description 'Monde vAvA (carte sans population)'
-version '1.1.0'
+version '1.2.0'
 
 dependency 'vAvA_core'
 
+-- config.lua n'est jamais servi aux joueurs (T-132)
 shared_scripts {
     'shared/constants.lua',
-    'config.lua',
+    'config_client.lua',
 }
 
 server_scripts {
+    'config.lua',
     'server/core.lua',
     'server/population.lua',
     'server/api.lua',

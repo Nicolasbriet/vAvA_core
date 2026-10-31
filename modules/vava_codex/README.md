@@ -66,7 +66,7 @@ d'Eldoria ; les touches qu'elle cite sont celles que le joueur a réellement li�
 
 **Où vit le texte.** Dans `content/*.lua` (`chapters.lua` : la graine et les chapitres ; `premiers_pas.lua`,
 `metiers.lua`, `royaume.lua` : les pages), chargés comme `server_scripts` : jamais téléchargés par les clients, ni pris
-dans `config.lua` (partagé avec le client). Au démarrage, chaque page est analysée et validée (`shared/pages.lua`) ;
+dans la config du module. Au démarrage, chaque page est analysée et validée (`shared/pages.lua`) ;
 une page fautive est écrite en console (`page « … » refusée : … (ligne N)`) et écartée seule, les autres restent. Un
 lien vers une page refusée, ou vers une page que tous les lecteurs de la page qui le porte ne peuvent pas lire (page
 du Conseil depuis une page publique, page à droit depuis une page sans ce droit), fait refuser la page qui le porte.
@@ -123,7 +123,7 @@ rien ne trahit l'existence d'une page réservée. `reading.enabled = false` ferm
 Plus tard (T-101 et suivantes), l'Atelier éditera chapitres et pages : `content/*.lua` sera la graine importée, la
 validation et les codes d'erreur sont déjà ceux de `shared/pages.lua` et `reading.errors`.
 
-## Le Codex en panneau (1.6.0)
+## Le Codex en panneau (1.7.0)
 
 La bannière du royaume (`vava_pause`, menu pause) ouvre le Codex **dans son panneau**, à droite de ses rubriques, sans
 copie du livre : c'est toujours la page de `vava_codex` qui le dessine, dans un rectangle donné par l'hôte, sans voile.
@@ -156,19 +156,27 @@ Rien ne change sur le réseau (le rectangle ne quitte pas le client). Page : cla
 dépendance, à ne jamais arrêter sur un serveur ouvert). Facultatifs : `vava_admin` (rangs et droits du Conseil ; sans lui, ACE `vava_codex.staff` et les
 ACE déclarés avec les commandes), `vava_hud` (notifications), `vava_chat` (dernières pages des commandes tapées).
 
-Touche par défaut (`keys.open`, `F1`) : elle est citée par l'écran de chargement et par l'accueil. La changer oblige à
-retoucher les conseils de `modules/vava_loading/web/js/strings.js` et `messages.codexHint` de `vava_arrival`.
+Touche par défaut (`keys.open` de `config_client.lua`, `F1`) : elle est citée par l'écran de chargement et par
+l'accueil. La changer oblige à retoucher les conseils de `modules/vava_loading/web/js/strings.js` et
+`messages.codexHint` de `vava_arrival`.
+
+**Mise à jour vers 1.6.0 (T-132)** : la touche, la commande, le nombre de dernières pages, « rester ouvert » et le
+texte du livre indisponible ont quitté `config.lua` pour `config_client.lua`. Un `config.lua` modifié et gardé par
+l'installeur de la Chancellerie (le nouveau posé en `config.lua.nouveau`) garde l'ancienne forme : le module démarre,
+mais la console le signale (« config.lua garde la forme d'avant 1.6.0 … ») et un réglage client changé dans ce
+fichier reste sans effet. Reportez vos réglages dans `config.lua` et `config_client.lua` d'après les nouveaux fichiers.
 
 ## Fichiers
 
 | Fichier | Rôle |
 | --- | --- |
-| `config.lua` | touche (`F1`) et commande (`/codex`), bornes des signets et dernières pages, commandes non décrites, ACE, rayon des joueurs proposés hors du Conseil (`players.nearbyRadius`), débits, textes |
+| `config_client.lua` | lu par le client (téléchargé par chaque joueur, ouvre `VavaCodex.config`) : touche (`F1`) et commande (`/codex`), dernières pages (`recent.max`), « rester ouvert » par défaut, texte du livre indisponible |
+| `config.lua` | servi au seul serveur (en tête des `server_scripts`), complète la table : signets (`favorites.max`), commandes non décrites, ACE, rayon des joueurs proposés hors du Conseil (`players.nearbyRadius`), pages de lecture, débits, textes du serveur |
 | `bridge/server.lua` | seul point de contact avec le core et les modules : joueurs (tous, ou les seuls proches), Conseil, exports `codexList`, commandes du jeu |
 | `server/catalog.lua` | entrées visibles d'un joueur, chapitres, non décrites, valeurs d'un argument |
 | `shared/prefs.lua` | logique pure : préférences ramenées aux maximums de la config (testée : `tests/spec/codex_prefs_spec.lua`) |
 | `shared/fingerprint.lua` | logique pure : empreinte d'une valeur (version du contenu et des préférences), réponse à l'ouverture (testée : `tests/spec/codex_fingerprint_spec.lua`) |
-| `shared/dock.lua` | logique pure, lue par le client : rectangle du livre en panneau (1.6.0 ; testée : `tests/spec/codex_dock_spec.lua`) |
+| `shared/dock.lua` | logique pure, lue par le client : rectangle du livre en panneau (1.7.0 ; testée : `tests/spec/codex_dock_spec.lua`) |
 | `shared/pages.lua` | logique pure : analyse d'un corps de page en blocs, validation des chapitres et des pages, construction (liens, tri, empreinte, poids), références citées (testée : `tests/spec/codex_pages_spec.lua`) |
 | `content/*.lua` | pages de lecture : graine et chapitres (`chapters.lua`), pages de chaque chapitre ; serveur seul |
 | `server/reading.lua` | chargement des pages, index visible d'un joueur, page demandée (droits revérifiés), commande `vava_codex_pages` (testé : `tests/spec/codex_reading_spec.lua`) |
@@ -219,7 +227,7 @@ retoucher les conseils de `modules/vava_loading/web/js/strings.js` et `messages.
     (onze pages en simple joueur, douze au Conseil avec le sceau sur « Siéger au Conseil ») ; liens, cabochons des
     touches du joueur, commandes qui ouvrent leur ligne ; nouveau personnage : le livre s'ouvre sur « Vivre à
     Eldoria ». Procédure complète : `docs/tests/codex.md` § 16.
-15. Codex en panneau (1.6.0) : bannière (`Échap`) → Codex : le livre s'ouvre à droite de la bannière, sans voile ;
+15. Codex en panneau (1.7.0) : bannière (`Échap`) → Codex : le livre s'ouvre à droite de la bannière, sans voile ;
     recherche, chapitres et lecture fonctionnent ; `Échap` jusqu'à fermer le livre rend la main à la bannière ; une
     commande qui ouvre une interface ferme livre et bannière. Procédure complète : `docs/tests/pause.md` § 4.
 
@@ -233,7 +241,7 @@ graine du dépôt : aucune page refusée, touches et commandes citées connues, 
 - Lisibilité d'une page longue dans CEF (défilement de la page de droite, police, liens au survol).
 - Cabochon d'une touche de souris (`[[touche:vava_magic_viser]]`) : nom montré par `GetControlInstructionalButton`
   (sinon `keyDisplay`).
-- Codex en panneau (1.6.0) : focus rendu par la bannière puis pris par le livre sans image où ni l'un ni l'autre n'a la
+- Codex en panneau (1.7.0) : focus rendu par la bannière puis pris par le livre sans image où ni l'un ni l'autre n'a la
   main ; ordre des deux pages à l'écran (le rectangle ne recouvre ni la bannière ni sa plaque).
 - Première ouverture d'un joueur en latent (≈ 10 Ko avec les textes définitifs) : aucune attente visible à l'arrivée
   d'un nouveau venu.

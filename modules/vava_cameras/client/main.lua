@@ -2,7 +2,7 @@
     vava_cameras/client/main.lua
     Rôle : assemblage côté client : commande et outil du Registre pour ouvrir le mur, mur fermé quand le personnage
            quitte le jeu ou que la ressource s'arrête (focus rendu).
-    Dépendances : shared/, config.lua, tous les fichiers client/ du module
+    Dépendances : shared/constants.lua, config_client.lua, tous les fichiers client/ du module
 ]]
 
 local type = type

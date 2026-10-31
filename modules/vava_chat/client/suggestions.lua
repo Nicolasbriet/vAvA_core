@@ -9,7 +9,7 @@
         l'emportent sur une déclaration du même nom, et peuvent nommer une sous-commande (« metiers niveau ») ; un
         nouveau profil (rang changé) les remplace : celles qui ne sont plus permises s'effacent ;
       - les commandes réservées au Conseil (/staff) : proposées à ses seuls membres.
-    Dépendances : shared/text.lua, config.lua, client/nui.lua
+    Dépendances : shared/text.lua, config_client.lua, client/nui.lua
 ]]
 
 local type, pairs, ipairs, match, sub = type, pairs, ipairs, string.match, string.sub

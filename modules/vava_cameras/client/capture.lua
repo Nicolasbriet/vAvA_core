@@ -5,7 +5,7 @@
            serveur vers l'interface (départ, réponse, fin, part du débit de chaque spectateur), offre et abandon de
            l'interface vers le serveur. Rien n'est filmé sans ordre du serveur, et tout s'arrête à son ordre ou à
            l'arrêt de la ressource.
-    Dépendances : shared/constants.lua, config.lua, client/core.lua, client/nui.lua
+    Dépendances : shared/constants.lua, config_client.lua, client/core.lua, client/nui.lua
 ]]
 
 local type, ipairs, pairs, tointeger, min = type, ipairs, pairs, math.tointeger, math.min

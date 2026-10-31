@@ -5,7 +5,7 @@
  *        (empilées, retirées après leur durée ou quand elles sont trop nombreuses) et barre de progression d'une action
  *        longue (une seule : avance par une transition CSS sur la durée restante, aucune boucle par image ; fin ou
  *        interruption annoncée par le jeu). Chaque jauge garde son élément ; une mise à jour ne touche que la jauge
- *        concernée. Réglages de la bannière (vava_pause, 1.5.0) : message `settings` { scale, durationMs } (aussi dans
+ *        concernée. Réglages de la bannière (vava_pause, 1.6.0) : message `settings` { scale, durationMs } (aussi dans
  *        `init.settings`) : échelle du HUD par transform (--hud-scale), durée des notifications ; valeurs bornées ici.
  */
 

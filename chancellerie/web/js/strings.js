@@ -699,7 +699,7 @@ const STRINGS = (() => {
       saveSettings: 'Sceller',
       settingsSaved: 'Suivi enregistré.',
       repo: (repo, branch) => `Dépôt : ${repo} (branche ${branch})`,
-      keptNote: 'Après une mise à jour : un réglage que vous aviez modifié est gardé, la nouvelle version est posée à côté (« config.lua.nouveau », « config_client.lua.nouveau ») pour comparaison.',
+      keptNote: 'Après une mise à jour : un réglage que vous aviez modifié est gardé, la nouvelle version est posée à côté (« config.lua.nouveau », « config_client.lua.nouveau ») pour comparaison. Un réglage modifié qui n\'existe plus dans la nouvelle version est gardé mais n\'est plus lu : le journal de la mise à jour dit où reporter vos réglages (par exemple dans config_client.lua).',
     },
 
     performance: {

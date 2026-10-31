@@ -5,7 +5,7 @@
            hors du jeu (sélection), chat fermé et caché, onglets privés et textes au-dessus des têtes oubliés ; messages
            du serveur vérifiés puis remis à la page (et au-dessus de la tête pour /me et /do) ; liste des commandes
            relue quand une ressource démarre ou s'arrête ; redémarrage du module lui-même.
-    Dépendances : shared/, config.lua, tous les fichiers client/ du module
+    Dépendances : shared/, config_client.lua, tous les fichiers client/ du module
 ]]
 
 local type, mathType = type, math.type

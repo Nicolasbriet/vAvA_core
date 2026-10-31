@@ -20,7 +20,20 @@ terre ». Facultatifs :
 (médaillon Santé, notifications). Les modules qui tiennent compte de l'état à terre (récolte, artisanat, agriculture,
 magie, voix, Registre) appellent l'export `isDowned` : la règle n'est écrite qu'ici.
 
-## Règles (config.lua)
+## Règles (config.lua, config_client.lua)
+
+Depuis 1.5.0 (T-132), les réglages sont dans deux fichiers et chacun n'est écrit qu'une fois : `config_client.lua`
+porte ce que lit le client (`initial`, `downThreshold`, `naturalRegen`, `downed`, le geste `assist.gesture`, la touche
+maintenue `respawn.holdMs`, `client`, `keys`, `labels`, `messages`, `hud`), et le serveur aussi ; `config.lua` porte ce
+que lit le seul serveur (relevés, `chain`, `sync`, `spawn`, `natives`, `journal`, le reste de `assist` et de `respawn`,
+`healing`, `rateLimits`) et complète la table sans réécrire une clé de `config_client.lua`. Les joueurs ne
+téléchargent que les constantes, `config_client.lua`, `shared/vitality.lua`, les `client/*.lua`, l'écran et ses
+icônes ; `config.lua` est servi au seul serveur.
+
+**Mise à jour vers 1.5.0 (T-132)** : un `config.lua` modifié et gardé par l'installeur de la Chancellerie (le nouveau
+posé en `config.lua.nouveau`) garde l'ancienne forme : le module démarre, mais la console le signale (« config.lua
+garde la forme d'avant 1.5.0 … ») et un réglage client changé dans ce fichier reste sans effet. Reportez vos réglages
+dans `config.lua` et `config_client.lua` d'après les nouveaux fichiers.
 
 | Règle | Défaut | Clé |
 |---|---|---|
@@ -35,8 +48,8 @@ magie, voix, Registre) appellent l'export `isDowned` : la règle n'est écrite q
 | Journal des coups | écrit par lots de 50 toutes les 10 s, 2 000 lignes en attente au plus, purgé après 30 jours | `journal` |
 | Tir ami | coupé côté client à chaque apparition (confort) | `client.protect` |
 | À terre | rendre l'âme possible après 3 min ; porté d'office au lieu de soins après 10 min ; un ped resté debout est recouché toutes les 5 s | `downed` |
-| Relever | personne à terre la plus proche à 2 m (positions serveur), geste de 8 s, distance revérifiée à la fin (+ 1 m), 25 % de vie ; objet requis et consommé facultatif | `assist` |
-| Rendre l'âme | touche maintenue 3 s ; lieu de soins le plus proche, 50 % de vie | `respawn` |
+| Relever | personne à terre la plus proche à 2 m (positions serveur), geste de 8 s, distance revérifiée à la fin (+ 1 m), 25 % de vie ; objet requis et consommé facultatif | `assist` (`assist.gesture` dans `config_client.lua`) |
+| Rendre l'âme | touche maintenue 3 s ; lieu de soins le plus proche, 50 % de vie | `respawn` (`respawn.holdMs` dans `config_client.lua`) |
 | Soins par objet | `effects = { health = 20 }` : + 20 % ; refusé à 98 % et plus | `healing.fullAt` |
 | Touches | `G` relever, `E` rendre l'âme (réglables dans Paramètres > Raccourcis > FiveM) ; `G` est cité par l'écran de chargement : changer cette touche par défaut oblige à retoucher le conseil de `modules/vava_loading/web/js/strings.js` | `keys`, `labels` |
 | Débit | relever : 3 demandes, puis 1 toutes les 2 s ; rendre l'âme : 2, puis 1 toutes les 5 s | `rateLimits` |

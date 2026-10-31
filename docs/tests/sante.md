@@ -21,12 +21,12 @@ dégâts (coups, modificateurs, coups natifs annulés, client qui ment) a sa pro
    la chute blesse ; de très haut, elle met à terre. Invulnérabilité (Registre → Outils) éteinte.
 5. **Lire la vie** : médaillon Santé (le premier en bas à gauche ; ambre à 30 % et moins, rouge pulsant à 10 % et
    moins), `/vie`, ou Registre (`F10`) → Joueurs → vous : Vie en pour cent, étiquette « À terre ».
-6. **Réglages pour aller vite** (facultatif, `vava_health/config.lua`, puis `restart vava_health` quand personne n'est
-   à terre, à remettre après) :
+6. **Réglages pour aller vite** (facultatif, `vava_health/config_client.lua` depuis 1.5.0, puis `restart vava_health`
+   quand personne n'est à terre, à remettre après) :
    - `downed.giveUpAfterMs = 20000` (défaut `180000`) : rendre l'âme possible après 20 s au lieu de 3 min ;
    - `downed.autoRespawnMs = 60000` (défaut `600000`) : porté au lieu de soins après 1 min au lieu de 10.
    Dérouler au moins une fois les tests 4-1 à 4-5 avec les valeurs par défaut (3:00 et 10:00).
-7. **Lieux de soins** (provisoires, dans la config) : (298.6, −584.5, 43.3) et (1839.0, 3672.9, 34.3) ; depuis le point
+7. **Lieux de soins** (provisoires, `respawn.points` de `vava_health/config.lua`) : (298.6, −584.5, 43.3) et (1839.0, 3672.9, 34.3) ; depuis le point
    d'apparition par défaut (−269, −955), le plus proche est le premier.
 
 ## 1. Vie et blessures

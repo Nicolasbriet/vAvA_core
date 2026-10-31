@@ -5,7 +5,7 @@
  *        travailler le rendu sans lancer le jeu. Jamais livré (absent des `files`), jamais chargé en jeu : la ligne
  *        hors jeu de index.html ne l'insère que hors FiveM. Paramètres d'URL : ?values=0.8,0.62,0.08,0.5 (santé,
  *        faim, soif, voix), ?talking=1 (lueur du médaillon de la voix), ?progress=1 (barre de progression de 8 s menée
- *        à son terme) ou ?progress=cancel (interrompue à 60 %). Réglages de la bannière (1.5.0) : ?scale=90|100|115
+ *        à son terme) ou ?progress=cancel (interrompue à 60 %). Réglages de la bannière (1.6.0) : ?scale=90|100|115
  *        (taille de l'interface), ?notify=courte|normale|longue (durée des notifications : 0,6, 1 ou 1,6 × 4,5 s ; sans
  *        ce paramètre, les notifications simulées restent à l'écran).
  */

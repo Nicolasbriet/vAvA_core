@@ -16,12 +16,14 @@ lua54 'yes'
 
 name 'vava_anim_test'
 description 'Test des animations personnalisées vAvA (.ycd dans stream/, mode développement et Conseil seulement)'
-version '1.1.0'
+version '1.2.0'
 
 dependency 'vAvA_core'
 
-shared_script 'config.lua'
+-- config.lua n'est jamais servi aux joueurs (T-132)
+shared_script 'config_client.lua'
 server_scripts {
+    'config.lua',
     'shared/guard.lua',
     'server/main.lua',
 }

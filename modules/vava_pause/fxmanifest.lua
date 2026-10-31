@@ -9,7 +9,7 @@
     Dépendances : vAvA_core ≥ 0.10.0 (core.net, registre core:commands) ; vava_ui ≥ 1.0.0 (polices, grain et
                   ornements de la page, par nui://vava_ui/…) ; facultatifs : vava_skills (savoir-faire, fiche),
                   vava_health (à terre, vie, fenêtre de combat), vava_needs, vava_time, vava_voice, vava_hud,
-                  vava_codex ≥ 1.6.0 (panneau), vava_admin ≥ 1.9.0 (demandes au Conseil), vava_guilds (couleurs)
+                  vava_codex ≥ 1.7.0 (panneau), vava_admin ≥ 1.10.0 (demandes au Conseil), vava_guilds (couleurs)
 ]]
 
 fx_version 'cerulean'

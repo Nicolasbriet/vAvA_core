@@ -3,7 +3,7 @@
     Rôle : application d'une apparence (complète ou par partie) à un ped, et lecture des limites réelles du modèle
            (nombre de coupes, de vêtements, de textures…) pour borner les interfaces.
     Appliquer une seule partie ne coûte que les natives de cette partie : c'est ce qui rend l'aperçu fluide.
-    Dépendances : shared/constants.lua, config.lua, shared/appearance.lua
+    Dépendances : shared/constants.lua, config_client.lua, shared/appearance.lua
 ]]
 
 local type, ipairs = type, ipairs

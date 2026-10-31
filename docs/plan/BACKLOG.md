@@ -566,7 +566,7 @@ versé à T-014 ; les autres points déjà couverts sont précisés dans T-012 �
   signalé), 7-B-14 (`resource.rpf` avant et après).
 
 ### T-142 — Configs partagées, lot 3 : le socle
-- Agent : vava-dev-lua · Dépend de : T-132 · Statut : à faire
+- Agent : vava-dev-lua · Dépend de : T-132 · Statut : à tester en jeu (relu sécurité et réseau, suites appliquées)
 - Même forme que T-141 pour `vava_inventory`, `vava_combat`, `vava_health`, `vava_time`, `vava_codex`, `vava_admin`,
   `vava_voice`, `vava_chat`, `vava_cameras`, `vava_appearance`, `vava_needs`, `vava_world` (spec T-132 § 3.3) ;
   `config.lua` renommé `config_client.lua` dans les trois modules sans partie serveur (`vava_hud`, `vava_loading`,
@@ -578,6 +578,24 @@ versé à T-014 ; les autres points déjà couverts sont précisés dans T-012 �
   config_client.lua »).
 - Critères : comme T-141 (essai sur la vue client, bornes de protection dans les constantes, rien du serveur servi) ;
   `docs/tests/reseau.md` § 7-C.
+- Fait le 31 octobre 2026 (branche `agents/T-142`) : `vava_inventory` 1.9.0, `vava_combat` 1.1.0,
+  `vava_health` 1.5.0, `vava_time` 1.4.0, `vava_codex` 1.6.0, `vava_admin` 1.9.0, `vava_voice` 1.4.0, `vava_chat` 1.4.0,
+  `vava_cameras` 1.5.0, `vava_appearance` 1.1.0, `vava_needs` 1.3.0, `vava_world` 1.2.0 (`config_client.lua` partagé,
+  `config.lua` et `shared/grid.lua`, `shared/frost.lua`, `shared/label.lua` au seul serveur, feuilles du seul serveur
+  ajoutées par `config.lua`, avertissement d'un `config.lua` d'avant) ; `vava_hud` 1.5.0, `vava_loading` 1.2.0,
+  `vava_characters_ui` 1.3.0 (`config.lua` renommé `config_client.lua`) ; exemples `vava_anim_test` 1.2.0,
+  `vava_dev_characters` 1.4.0, `vava_example_combat` 1.2.0 ; Chancellerie 1.8.6 (réglage modifié gardé mais absent de
+  la nouvelle version signalé au journal de la mise à jour, R-8) ; essais sur la vue client (apparence, temps,
+  bouclier) ; `config_split_spec` : une feuille `false` est une valeur pour T1. Dix-huit exceptions transitoires et
+  entrées `PENDING` retirées (reste `vava_magic`). Suites des relectures : exception de R6 écrite dans la spec T-132
+  (borne que le serveur applique lui-même à ce qu'il relaie, lue dans le même fichier partagé : rien ne bouge) ; refus
+  neutres des exemples ; avertissement d'ancienne forme précisé (`vava_time`, `vava_appearance`) ; paragraphe « T-132 »
+  retiré de six en-têtes de manifeste ; restes reportés à T-121 (combat), T-143 (alias, bornes de schéma) et T-146
+  (ciels du temps, ≈ 4,6 Ko). Lot 3 : 43 568 octets de moins par joueur, net du manifeste (15 889 compressés). Rapport
+  `docs/plan/rapports/T-142.md`. **À tester en jeu** : `docs/tests/reseau.md` § 7-C, en priorité 7-C-1 (aucune ligne
+  d'ancienne forme), 7-C-2 à 7-C-10 (`F8` sans `SCRIPT ERROR` au chargement, à la sélection et pendant les gestes),
+  7-C-11 (deux joueurs), 7-C-12 (ancien `config.lua` signalé), 7-C-15 (mise à jour par la Chancellerie d'un
+  `config.lua` modifié de `vava_hud`), 7-C-16 (`resource.rpf` avant et après).
 
 ### T-143 — Configs partagées, lot 4 : magie et vivres
 - Agent : vava-dev-lua · Dépend de : T-132 · Statut : à faire
@@ -589,6 +607,10 @@ versé à T-014 ; les autres points déjà couverts sont précisés dans T-012 �
   contrôle T4 vert) ; `messages.admin` et `messages.journal` de `vava_provisions` (textes du Conseil, ≈ 0,7 Ko,
   servis par T-141 parce que le client passe `messages` entier à `shared/rules.lua`) quittent `config_client.lua` avec
   la coupe de `rules.lua` (relectures de T-141 : sécurité S-1, réseau R-3) ; `docs/tests/reseau.md` § 7-D.
+  Relectures de T-142 : T2 échoue sur un alias de la table du module (`local <nom> = <Global>` suivi de `<nom>.config`),
+  que le lecteur ne suit pas aujourd'hui (réseau R-6) ; piste pour une borne de schéma du serveur prise dans
+  `config_client.lua` (copie gardée sans la clé : nombre non borné) : version dans `clientFile`, ou contrôle au `setup`
+  que ces bornes sont des nombres (sécurité, pour information).
 
 ### T-133 — `%c` dépend de la locale : contrôles de texte justes partout
 - Agent : vava-dev-lua · Dépend de : — · Statut : à tester en jeu (relu sécurité, suites appliquées)
@@ -624,6 +646,19 @@ versé à T-014 ; les autres points déjà couverts sont précisés dans T-012 �
   chercher dans la config du client.
 - Critères : au composteur du champ, l'invite « Composteur » et le menu apparaissent (métiers 5-7) ; essai hors jeu
   d'une station d'un type inconnu de la config du client ; `config_split_spec` vert.
+
+### T-146 — Ciel de `vava_time` : cycle au seul serveur
+- Agent : vava-dev-lua · Dépend de : T-142 · Statut : à faire
+- Relecture réseau R-1 de T-142 : le temps sert ≈ 4,6 Ko bruts pour le seul serveur, plus que le gain du module au lot
+  3 : le cycle des ciels de `config_client.lua` (`weather.next`, `seasons`, `snow`, `durationMinutes`, `durations`,
+  ≈ 1,9 Ko) et les fonctions de tirage de `shared/weather.lua` (`weight`, `allowed`, `candidates`, `pick`, `duration`,
+  ≈ 2,7 Ko) ; le client n'utilise que `rules.get` et `rules.progress`. Cause : `weather.lua` garde la table entière
+  (`local cfg = VavaTime.config.weather`, `(wcfg or cfg).types`). Découpe : `shared/weather.lua` réduit à `get`,
+  `ids`, `progress` (partagé) ; le reste dans un fichier en `server_scripts` ; feuilles du serveur de `weather`
+  ajoutées par `config.lua` (`config.weather.next = …`), `weather.types` et `fadeSeconds` restant côté client.
+- Critères : `config_split_spec` T0 à T4 verts ; essai du ciel sur la vue client (`time_client_view_spec`) et tirages
+  inchangés au serveur (`time_weather_spec`) ; comparaison clé par clé de la config ; gain mesuré par
+  `scripts/poids-client.sh` ; temps 2-x en jeu (`docs/tests/temps.md`).
 
 ## Phase 2 — Arrivée
 
@@ -1059,6 +1094,12 @@ faire tout le système de combat ») : la porte T-119 reste à passer en jeu.
 - Agents : vava-dev-lua + vava-dev-nui · Dépend de : T-120, T-119 · Statut : à faire
 - Maquette `Combat` : frise des phases réglable à la souris, aperçu au ralenti, zone touchée dessinée au sol,
   essai contre un mannequin ; les techniques de la config sont importées comme version 1.
+- Relectures de T-142 (réseau R-2 et R-3, sécurité S-2) : `weapons` de `vava_combat` reste entier dans
+  `config_client.lua` (≈ 1,9 Ko : `damage`, `durability`, `block`, `reachBonus`) alors que le client n'en lit que
+  `category` et `family`, et `shield` y sert les délais du serveur (`toggleMs`, `verifyMs`, `missesToDrop`,
+  `pedCheckMs`, `guard*`, ≈ 0,6 Ko), parce que le client passe ces tables à `shared/shield.lua` ; `shield.guardDelay`
+  (`shared/shield.lua:115-128`) n'est appelé que par le serveur. À donner une part client et une part serveur en
+  reprenant le module.
 
 ### T-122 — Atelier des effets
 - Agents : vava-architecte → vava-dev-lua + vava-dev-nui · Dépend de : T-101 · Statut : à faire

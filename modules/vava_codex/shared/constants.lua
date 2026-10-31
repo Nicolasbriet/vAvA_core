@@ -1,7 +1,7 @@
 --[[
     vava_codex/shared/constants.lua
     Rôle : table du module (seule globale de la ressource) et constantes de protocole : registre lu, champ des
-           préférences, RPC, évènements, bornes ; identifiant d'une page de lecture (1.5.0, `READING`) ; crochet de fermeture du livre (1.6.0,
+           préférences, RPC, évènements, bornes ; identifiant d'une page de lecture (1.5.0, `READING`) ; crochet de fermeture du livre (1.7.0,
            `HOOKS`).
     Dépendances : aucune
 ]]
@@ -42,7 +42,7 @@ VavaCodex.READING = {
 
 -- Crochets émis par le module (client, locaux au joueur).
 VavaCodex.HOOKS = {
-    -- after (1.6.0) : { docked, reason } à chaque fermeture du livre, échec de l'ouverture compris ; reason : close (le
+    -- after (1.7.0) : { docked, reason } à chaque fermeture du livre, échec de l'ouverture compris ; reason : close (le
     -- joueur ou l'hôte), run (une commande lancée l'a fermé), failed (ouverture impossible), unloaded, stopped
     CLOSED = 'vava_codex:closed',
 }

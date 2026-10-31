@@ -9,7 +9,7 @@
            `openAt(chapitre)` : le livre s'ouvre à un chapitre (accueil des nouveaux venus, 1.4.0). Onglet « Lecture »
            (1.5.0) : chapitres et pages de lecture écrits dans content/*.lua (servis au seul serveur, jamais téléchargés
            par les clients), analysés au démarrage ; l'index part avec le contenu, le texte d'une page à la demande.
-           Codex « en panneau » (1.6.0) : exports client `openDocked` et `closeDocked`, réservés à la bannière de
+           Codex « en panneau » (1.7.0) : exports client `openDocked` et `closeDocked`, réservés à la bannière de
            vava_pause, et crochet client `vava_codex:closed`.
     Dépendances : vAvA_core ≥ 0.7.0 (registre des commandes) ; facultatifs : vava_admin (rangs et droits du
                   Conseil), vava_hud (notifications), vava_chat (dernières pages des commandes tapées) ; vava_ui ≥ 1.0.0
@@ -23,7 +23,7 @@ use_experimental_fxv2_oal 'yes'
 
 name 'vava_codex'
 description 'Codex vAvA : toutes les commandes et touches du serveur, classées, cherchées, composées et lancées'
-version '1.6.0'
+version '1.7.0'
 
 dependency 'vAvA_core'
 dependency 'vava_ui'
@@ -39,13 +39,16 @@ files {
 }
 
 -- Ordre explicite : chaque fichier ne dépend que de ceux listés avant lui.
+-- Les joueurs ne téléchargent que les shared_scripts et les client_scripts : config.lua, en tête des server_scripts,
+-- n'est jamais servi (T-132).
 shared_scripts {
     'shared/constants.lua',
-    'config.lua',
-    'shared/dock.lua',           -- 1.6.0 : rectangle du livre en panneau (pur, lu par le client)
+    'config_client.lua',         -- ouvre VavaCodex.config : ce que lit le client
+    'shared/dock.lua',           -- 1.7.0 : rectangle du livre en panneau (pur, lu par le client)
 }
 
 server_scripts {
+    'config.lua',                -- complète VavaCodex.config : ce que lit le seul serveur
     'server/core.lua',
     'bridge/server.lua',
     'server/catalog.lua',
