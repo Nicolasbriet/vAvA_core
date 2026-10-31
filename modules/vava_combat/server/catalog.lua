@@ -1,8 +1,9 @@
 --[[
     vava_combat/server/catalog.lua
-    Rôle : le catalogue des armes, contrôlé au démarrage (shared/weapons.lua : la première erreur refuse le module) et
-           exposé au reste du module : fiche d'une arme (catalog.weapon), liste ordonnée, arme réellement tenable
-           (objet connu de l'inventaire avec un `held`). Déclare les objets à l'inventaire (ceux qu'il ne connaît pas
+    Rôle : le catalogue des armes et des techniques, contrôlé au démarrage (shared/weapons.lua : la première erreur
+           refuse le module) et exposé au reste du module : fiche d'une arme (classe et part du serveur fusionnées,
+           catalog.weapon), liste ordonnée, arme réellement tenable (objet connu de l'inventaire avec un `held`),
+           technique (catalog.technique) et leurs copies pour les exports. Déclare les objets à l'inventaire (ceux qu'il ne connaît pas
            encore, `onUse` posé sur chaque bouclier), les recettes à l'artisanat (signées, solidité tirée de la fiche)
            et aux compétences, et les redéclare au démarrage de vava_inventory, vava_crafting et vava_skills. Une
            recette refusée est une ligne d'avertissement, jamais un échec. L'Épée courte de vava_crafting est adoptée
@@ -38,6 +39,8 @@ VavaCombat.catalog = catalog
 local byItem = {}
 ---@type vAvA.CombatWeapon[]|nil  liste ordonnée, refaite quand un libellé change
 local ordered = nil
+---@type { id: string, def: table }[]  techniques ordonnées (style, libellé, identifiant)
+local techniqueList = {}
 -- arme → true si l'inventaire la connaît avec un `held` (bouclier : jamais)
 local holdable = {}
 -- objets, recettes de l'artisanat et des compétences que ce module a déclarés aux registres actuels
@@ -60,10 +63,12 @@ local function imageOf(name)
     return 'nui://' .. VavaCombat.resource .. '/web/items/' .. name .. '.svg'
 end
 
---- Fiches indexées depuis la config ; libellé de l'objet déclaré ici, sinon le nom (corrigé à la déclaration).
+--- Fiches indexées depuis la config (classe de config_client.lua et part du serveur de config.lua, fusionnées) ;
+--- libellé de l'objet déclaré ici, sinon le nom (corrigé à la déclaration). Techniques indexées, liste ordonnée.
 local function build()
     byItem, ordered = {}, nil
-    for name, def in pairs(cfg.weapons) do
+    for name, fiche in pairs(cfg.weapons) do
+        local def = weapons.merge(cfg.weaponClasses[name], fiche)
         local item = cfg.items[name]
         byItem[name] = {
             item = name, label = type(item) == 'table' and item.label or name, category = def.category,
@@ -71,9 +76,64 @@ local function build()
             durability = def.durability, block = def.block, provisional = def.provisional,
         }
     end
+    techniqueList = {}
+    for id, def in pairs(cfg.techniques) do techniqueList[#techniqueList + 1] = { id = id, def = def } end
+    sort(techniqueList, function(a, b)
+        if a.def.style ~= b.def.style then return a.def.style < b.def.style end
+        local ka, kb = weapons.sortKey(a.def.label), weapons.sortKey(b.def.label)
+        if ka ~= kb then return ka < kb end
+        return a.id < b.id
+    end)
+end
+
+---@param value any
+---@return any
+local function deepCopy(value)
+    if type(value) ~= 'table' then return value end
+    local out = {}
+    for key, item in pairs(value) do out[key] = deepCopy(item) end
+    return out
 end
 
 -- Lecture -------------------------------------------------------------------------------------------------------------
+
+--- Technique de la config (table du module : à ne pas modifier), ou nil. Contrôlée au démarrage.
+---@param id any
+---@return table|nil
+function catalog.technique(id)
+    if type(id) ~= 'string' then return nil end
+    local def = cfg.techniques[id]
+    return type(def) == 'table' and def or nil
+end
+
+--- Copie d'une technique pour un export : { id, label, style, type, gesture, phases, hit, damage, stamina, parryable,
+--- staggers, chain, learn? }, ou nil.
+---@param id any
+---@return table|nil
+function catalog.techniqueView(id)
+    local def = catalog.technique(id)
+    if not def then return nil end
+    local out = deepCopy(def)
+    out.id = id
+    return out
+end
+
+--- Copies des techniques, par style puis libellé (accents et casse ignorés), puis identifiant.
+---@return table[]
+function catalog.techniques()
+    local out = {}
+    for i, entry in ipairs(techniqueList) do out[i] = catalog.techniqueView(entry.id) end
+    return out
+end
+
+--- Nombre de techniques et de styles (console du démarrage).
+---@return integer techniques
+---@return integer styles
+function catalog.counts()
+    local styles = 0
+    for _ in pairs(cfg.styles) do styles = styles + 1 end
+    return #techniqueList, styles
+end
 
 --- Fiche d'une arme du catalogue (table du module : à ne pas modifier), ou nil.
 ---@param item any
@@ -156,7 +216,7 @@ function catalog.declareItems()
             local definition = {}
             for key, value in pairs(def) do definition[key] = value end
             definition.image = imageOf(name)
-            if cfg.weapons[name].category == SHIELD then
+            if cfg.weaponClasses[name].category == SHIELD then
                 -- l'inventaire a déjà vérifié la possession, la besace et la limite `use` ; jamais consommé
                 definition.onUse = function(source, instance) return VavaCombat.shields.onUse(source, instance) end
             end
@@ -267,12 +327,18 @@ function catalog.onSkillsReady()
     return catalog.declareSkillRecipes()
 end
 
---- Contrôle le catalogue puis déclare objets, recettes et champ. Appelé pendant le setup.
+--- Contrôle le catalogue, les techniques et les réglages du moteur, puis déclare objets, recettes et champ. Une
+--- technique que rien n'atteint est une ligne d'avertissement. Appelé pendant le setup.
 ---@return boolean ok
 ---@return string|integer err_or_items
 ---@return integer|nil recipes
 function catalog.setup()
     local ok, err = weapons.check(cfg, CATEGORIES)
+    if not ok then return false, 'config : ' .. tostring(err) end
+    local checked, warnings = weapons.checkTechniques(cfg)
+    if not checked then return false, 'config : ' .. tostring(warnings) end
+    for _, line in ipairs(warnings) do VavaCombat.log.warn('%s', line) end
+    ok, err = weapons.checkEngine(cfg)
     if not ok then return false, 'config : ' .. tostring(err) end
     build()
     local kinds = bridge.HealthKinds()

@@ -1,11 +1,11 @@
 local helper = require('tests.helper')
 
 -- Règles pures du bouclier accroché (modules/vava_combat/shared/shield.lua, T-111) avec la config livrée : position
--- (bras ou dos) selon l'objet en main, placement lu dans la config, valeur du statebag, numéro réseau d'un statebag,
--- délai de la garde. Règles documentées : README du module et docs/plan/specs/T-111.md § 5.3, § 7.5 et § 11.1.
+-- (bras ou dos) selon l'objet en main, placement lu dans la config, valeur du statebag, numéro réseau d'un statebag ;
+-- délai de la garde (shared/guard.lua, servi au seul serveur depuis 1.2.0, T-112). Règles documentées : README du module et docs/plan/specs/T-111.md § 5.3, § 7.5 et § 11.1.
 
 describe('vava_combat shared/shield', function()
-    local shield, cfg
+    local shield, guard, cfg
 
     before_each(function()
         helper.reset()
@@ -14,14 +14,18 @@ describe('vava_combat shared/shield', function()
             'modules/vava_combat/shared/constants.lua',
             'modules/vava_combat/config.lua',
             'modules/vava_combat/shared/shield.lua',
+            'modules/vava_combat/shared/guard.lua',
         })
-        shield, cfg = VavaCombat.shield, VavaCombat.config
+        shield, guard, cfg = VavaCombat.shield, VavaCombat.guard, VavaCombat.config
     end)
 
     after_each(function() VavaCombat = nil end)
 
     describe('position', function()
-        local function at(item, rules) return shield.position(item, cfg.weapons, rules or cfg.shield) end
+        local function at(item, rules)
+            rules = rules or cfg.shield
+            return shield.position(item, cfg.weaponClasses, rules.armWith, rules.armWithEmptyHand)
+        end
 
         it('mains vides : dans le dos, ou au bras avec armWithEmptyHand', function()
             assert.equal('back', at(nil))
@@ -93,20 +97,24 @@ describe('vava_combat shared/shield', function()
         end)
     end)
 
-    describe('guardDelay', function()
+    describe('guard.delay', function()
         -- même règle que vava_inventory/shared/held.lua : remises 0 à 2 → 250 ms ; la quatrième remise (3 déjà faites)
         -- → 500 ms ; puis 1 000 ms, plafond
         it('espace les remises après guardMaxCorrections, jusqu\'au plafond', function()
             local delays = {}
-            for streak = 0, 6 do delays[#delays + 1] = shield.guardDelay(streak, cfg.shield) end
+            for streak = 0, 6 do delays[#delays + 1] = guard.delay(streak, cfg.shield) end
             assert.same({ 250, 250, 250, 500, 1000, 1000, 1000 }, delays)
-            assert.equal(1000, shield.guardDelay(40, cfg.shield))
+            assert.equal(1000, guard.delay(40, cfg.shield))
+        end)
+
+        it('n\'est plus servie au client : shared/shield.lua n\'a plus guardDelay (relecture réseau R-3 de T-142)', function()
+            assert.is_nil(shield.guardDelay)
         end)
     end)
 end)
 
--- Vue client (T-142, lot 3 de T-132 ; relecture réseau R-2) : le client passe `weapons`, `shield` et `shields` de sa
--- config à shared/shield.lua (client/shields.lua) ; sur la SEULE vue client (constantes et config_client.lua, comme
+-- Vue client (T-142, lot 3 de T-132 ; relecture réseau R-2) : le client passe `weaponClasses`, `shield.armWith`,
+-- `shield.armWithEmptyHand` et `shields` de sa config à shared/shield.lua (client/shields.lua, 1.2.0) ; sur la SEULE vue client (constantes et config_client.lua, comme
 -- chez un joueur), position et placement sont ceux de la config complète du serveur, pour chaque objet.
 describe('vava_combat shared/shield vu du client (config_client.lua seul)', function()
     local DIR = 'modules/vava_combat'
@@ -136,16 +144,24 @@ describe('vava_combat shared/shield vu du client (config_client.lua seul)', func
         assert.is_nil(client.cfg.items)
         assert.is_nil(client.cfg.strike)
         assert.is_nil(client.cfg.messages)
+        -- 1.2.0 (T-112, relecture réseau R-2 de T-142) : fiches des armes et délais du serveur du bouclier sortis
+        assert.is_nil(client.cfg.weapons)
+        assert.is_nil(client.cfg.shield.toggleMs)
+        assert.is_nil(client.cfg.shield.guardDelayMs)
+        assert.is_nil(client.cfg.timing)
+        assert.is_nil(client.cfg.tolerance)
     end)
 
     it('même position pour chaque objet en main, mains vides comprises', function()
         local hands = { false }
         for item in pairs(full.cfg.weapons) do hands[#hands + 1] = item end
         for item in pairs(full.cfg.items) do hands[#hands + 1] = item end
+        local f, c = full.cfg, client.cfg
         for _, item in ipairs(hands) do
             local hand = item or nil
-            assert.equal(full.shield.position(hand, full.cfg.weapons, full.cfg.shield),
-                client.shield.position(hand, client.cfg.weapons, client.cfg.shield), tostring(item))
+            assert.equal(full.shield.position(hand, f.weaponClasses, f.shield.armWith, f.shield.armWithEmptyHand),
+                client.shield.position(hand, c.weaponClasses, c.shield.armWith, c.shield.armWithEmptyHand),
+                tostring(item))
         end
     end)
 

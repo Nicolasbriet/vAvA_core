@@ -294,7 +294,8 @@ function shields.view(src)
     end
     local d = weapons.durabilityOf(pile.metadata, def)
     local held = bridge.Held(src)
-    local position = shield.position(held and held.item or nil, cfg.weapons, cfg.shield)
+    local position = shield.position(held and held.item or nil, cfg.weaponClasses, cfg.shield.armWith,
+        cfg.shield.armWithEmptyHand)
     return {
         instanceId = entry.instanceId, item = entry.item, block = def.block, durability = d.current,
         maxDurability = d.max, dull = d.dull, position = position, ready = position == shield.ARM,

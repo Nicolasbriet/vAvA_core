@@ -136,6 +136,9 @@ describe('vava_combat server', function()
             'modules/vava_combat/config.lua',
             'modules/vava_combat/shared/shield.lua',
             'modules/vava_combat/shared/weapons.lua',
+            'modules/vava_combat/shared/guard.lua',
+            'modules/vava_combat/shared/geometry.lua',
+            'modules/vava_combat/shared/techniques.lua',
         })
         cfg, HOOKS, SHIELD_STATE = VavaCombat.config, VavaCombat.HOOKS, VavaCombat.SHIELD_STATE
         VavaCombat.resource = 'vava_combat'
@@ -240,6 +243,9 @@ describe('vava_combat server', function()
             'modules/vava_combat/server/wear.lua',
             'modules/vava_combat/server/shields.lua',
             'modules/vava_combat/server/strike.lua',
+            'modules/vava_combat/server/hands.lua',
+            'modules/vava_combat/server/reactions.lua',
+            'modules/vava_combat/server/swings.lua',
             'modules/vava_combat/server/api.lua',
             'modules/vava_combat/server/commands.lua',
         })
@@ -320,6 +326,42 @@ describe('vava_combat server', function()
             assert.same({ { source = A, id = 10, patch = { durability = 149 } } }, patches)
             assert.same({ item = 'epee_courte', durability = 149, maxDurability = 150, worn = true, dull = false }, result.weapon)
             assert.equal(12.5, result.applied)
+        end)
+
+        -- T-112 : le relevé d'une technique passe la pile et le personnage qu'il vient de lire ; le reste est revérifié
+        it('avec ctx (interne) : ni la main ni le personnage de l\'attaquant relus, tout le reste revérifié', function()
+            local entry = give(A, pile(10, 'epee_courte', { quality = 50 }), true)
+            local bridge = VavaCombat.bridge
+            local heldCalls, activeCalls = 0, {}
+            local realHeld, realActive = bridge.Held, bridge.ActiveCharacterId
+            bridge.Held = function(src) heldCalls = heldCalls + 1 return realHeld(src) end
+            bridge.ActiveCharacterId = function(src)
+                activeCalls[#activeCalls + 1] = src
+                return realActive(src)
+            end
+            local result = strike.run(A, B, { technique = 'taille_descendante' }, { held = entry, characterId = CHAR_A })
+            assert.equal(0, heldCalls)
+            assert.same({ B }, activeCalls)
+            assert.equal(12, result.applied)
+            assert.equal('taille_descendante', hits[1].packet.technique)
+            -- toujours revérifiés : distance et instance
+            positions[B] = { 7, 0, 0 }
+            assert.same({ nil, 'too_far' }, { strike.run(A, B, nil, { held = entry, characterId = CHAR_A }) })
+            -- un ctx mal formé est ignoré : tout est relu
+            positions[B] = { 2, 0, 0 }
+            strike.run(A, B, nil, { held = 'epee_courte', characterId = CHAR_A })
+            assert.equal(1, heldCalls)
+        end)
+
+        it('l\'export strike ne transmet jamais un 4e argument (ctx)', function()
+            give(A, pile(10, 'epee_courte'), true)
+            local bridge = VavaCombat.bridge
+            local heldCalls = 0
+            local realHeld = bridge.Held
+            bridge.Held = function(src) heldCalls = heldCalls + 1 return realHeld(src) end
+            exported.strike(A, B, nil, { held = pile(99, 'epee_longue'), characterId = CHAR_A })
+            assert.equal(1, heldCalls)
+            assert.equal('epee_courte', hits[1].packet.weapon)
         end)
 
         it('une pièce de qualité épargne parfois l\'usure', function()

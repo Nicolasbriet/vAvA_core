@@ -10,8 +10,8 @@
         est écrite et la réécrit sur le nouveau ; il ne tourne que tant qu'un bouclier est accroché.
       - Le ped d'un joueur est possédé par son client, qui peut écrire son statebag : le serveur retient la valeur qu'il
         a publiée sur chaque ped et remet la sienne après un délai de regroupement, de plus en plus espacé si elle ne
-        revient pas égale (shared/shield.lua). Une valeur écrite sur une entité non suivie est effacée.
-    Dépendances : shared/constants.lua, shared/shield.lua, config.lua, server/core.lua
+        revient pas égale (shared/guard.lua). Une valeur écrite sur une entité non suivie est effacée.
+    Dépendances : shared/constants.lua, shared/shield.lua, shared/guard.lua, config.lua, server/core.lua
 ]]
 
 local type, pairs, ipairs, next, tostring, tonumber = type, pairs, ipairs, next, tostring, tonumber
@@ -21,6 +21,7 @@ local NetworkGetNetworkIdFromEntity, NetworkGetEntityFromNetworkId, NetworkGetEn
     NetworkGetNetworkIdFromEntity, NetworkGetEntityFromNetworkId, NetworkGetEntityOwner
 
 local shield = VavaCombat.shield
+local guard = VavaCombat.guard
 local cfg = VavaCombat.config.shield
 local SHIELD_STATE = VavaCombat.SHIELD_STATE
 local NO_ENTITY = 0
@@ -181,7 +182,7 @@ local function onChange(bagName, _, value)
         VavaCombat.log.warn('entité réseau %d : bouclier remis %d fois de suite sans nouvelle publication, remises'
             .. ' espacées jusqu\'à %d ms', netId, streak, cfg.guardMaxDelayMs)
     end
-    SetTimeout(shield.guardDelay(streak, cfg), function() correct(netId) end)
+    SetTimeout(guard.delay(streak, cfg), function() correct(netId) end)
 end
 
 --- Vide le bouclier du ped de chaque joueur connecté, là où il en porte un.

@@ -4,20 +4,18 @@
            est réduite à { id, item } : le placement (modèle, os, décalage, rotation) se lit dans la config de chaque
            client, et la position (bras ou dos) se déduit de ce que le porteur tient en main. Ces règles disent où
            porter le bouclier, quel placement montrer, si une valeur est publiable et si deux valeurs sont la même
-           (garde du serveur), quel ped vise un statebag, et quand remettre une valeur réécrite par un client. Les
-           règles de valeur et de garde sont celles de vava_inventory/shared/held.lua, recopiées (une ressource n'en
-           charge pas une autre).
+           (garde du serveur), et quel ped vise un statebag. Les règles de valeur sont celles de
+           vava_inventory/shared/held.lua, recopiées (une ressource n'en charge pas une autre) ; le délai de la garde,
+           appliqué par le seul serveur, est dans shared/guard.lua (servi au seul serveur depuis 1.2.0).
     Dépendances : shared/constants.lua
 ]]
 
 local type, next, tonumber, ipairs = type, next, tonumber, ipairs
-local min, mathType, tointeger = math.min, math.type, math.tointeger
+local mathType, tointeger = math.type, math.tointeger
 local match = string.match
 
 local MAX_ID = VavaCombat.MAX_ID
 local ITEM_MAX = VavaCombat.ITEM_MAX
--- au-delà, le décalage du délai déborderait : le plafond est atteint bien avant
-local MAX_SHIFT = 20
 local ARM, BACK = 'arm', 'back'
 
 local shield = {}
@@ -38,18 +36,19 @@ local function validItem(item)
     return type(item) == 'string' and #item >= 1 and #item <= ITEM_MAX
 end
 
---- Position du bouclier : au bras si l'objet en main est une arme dont la catégorie est dans `rules.armWith`, ou si les
---- mains sont vides et `rules.armWithEmptyHand` ; dans le dos sinon (arme à deux mains, bâton, outil, objet inconnu).
+--- Position du bouclier : au bras si l'objet en main est une arme dont la catégorie est dans `armWith`, ou si les mains
+--- sont vides et `armWithEmptyHand` ; dans le dos sinon (arme à deux mains, bâton, outil, objet inconnu).
 ---@param handItem string|nil  objet tenu en main (nil : mains vides)
----@param weapons table        fiches des armes (config.weapons)
----@param rules { armWith: string[], armWithEmptyHand: boolean }  config.shield
+---@param classes table        classes des armes (config.weaponClasses : catégorie, famille)
+---@param armWith string[]     catégories qui font porter le bouclier au bras (config.shield.armWith)
+---@param armWithEmptyHand boolean  mains vides : au bras (config.shield.armWithEmptyHand)
 ---@return string 'arm' | 'back'
-function shield.position(handItem, weapons, rules)
-    if handItem == nil then return rules.armWithEmptyHand == true and ARM or BACK end
-    local def = type(handItem) == 'string' and type(weapons) == 'table' and weapons[handItem] or nil
-    if type(def) ~= 'table' then return BACK end
-    for _, category in ipairs(rules.armWith) do
-        if def.category == category then return ARM end
+function shield.position(handItem, classes, armWith, armWithEmptyHand)
+    if handItem == nil then return armWithEmptyHand == true and ARM or BACK end
+    local class = type(handItem) == 'string' and type(classes) == 'table' and classes[handItem] or nil
+    if type(class) ~= 'table' or type(armWith) ~= 'table' then return BACK end
+    for _, category in ipairs(armWith) do
+        if class.category == category then return ARM end
     end
     return BACK
 end
@@ -114,15 +113,3 @@ function shield.netIdOf(bagName)
     return netId
 end
 
---- Délai avant de remettre la valeur du serveur sur un ped dont le statebag a été réécrit : `guardDelayMs` tant que la
---- valeur n'a pas été remise `guardMaxCorrections` fois depuis la dernière publication, puis doublé à chaque remise
---- jusqu'à `guardMaxDelayMs`.
----@param streak integer  remises déjà faites depuis la dernière publication
----@param cfg { guardDelayMs: integer, guardMaxCorrections: integer, guardMaxDelayMs: integer }
----@return integer
-function shield.guardDelay(streak, cfg)
-    local over = streak - cfg.guardMaxCorrections
-    if over < 0 then return cfg.guardDelayMs end
-    if over >= MAX_SHIFT then return cfg.guardMaxDelayMs end
-    return min(cfg.guardDelayMs << (over + 1), cfg.guardMaxDelayMs)
-end

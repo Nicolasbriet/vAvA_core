@@ -74,7 +74,7 @@ local function resolve(want, ped)
     if not want.handKnown then
         want.handItem, want.handKnown = itemOf(Entity(ped).state[HELD_STATE]), true
     end
-    want.position = shield.position(want.handItem, cfg.weapons, cfg.shield)
+    want.position = shield.position(want.handItem, cfg.weaponClasses, cfg.shield.armWith, cfg.shield.armWithEmptyHand)
     want.place = shield.placement(want.value.item, want.position, cfg.shields)
     want.key = want.place and (tostring(want.value.id) .. '|' .. want.value.item .. '|' .. want.place.model) or nil
 end

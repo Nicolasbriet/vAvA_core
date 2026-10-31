@@ -1,15 +1,19 @@
 --[[
     vava_combat/shared/weapons.lua
     Rôle : règles pures des armes, servies au seul serveur (server_scripts) : contrôle du catalogue de la config au
-           démarrage, qualité lue et facteur de dégâts, solidité lue (émoussée ou non), montant d'un coup, chance et pas
-           d'usure, coup qui use (d'après le résultat de vava_health:hit), options d'un appel à `strike`, paquet `hit`,
-           comparaison de versions. Aucun état, aucune native, ne lève jamais d'erreur sur une donnée reçue.
+           démarrage (classes de config_client.lua et fiches de config.lua), contrôle des techniques et des styles
+           (format de COMBAT_V1.md § 3) et des réglages du moteur, qualité lue et facteur de dégâts, solidité lue
+           (émoussée ou non), montant d'un coup, chance et pas d'usure, coup qui use (d'après le résultat de
+           vava_health:hit), issue d'un coup montrée aux proches, options d'un appel à `strike`, paquet `hit`, raison
+           d'un refus montrée au joueur, comparaison de versions. Aucun état, aucune native, ne lève jamais d'erreur sur
+           une donnée reçue.
     Dépendances : shared/constants.lua
 ]]
 
 local type, pairs, ipairs, next, tostring, tonumber = type, pairs, ipairs, next, tostring, tonumber
 local floor, huge, mathType, tointeger = math.floor, math.huge, math.type, math.tointeger
 local find, format, gmatch = string.find, string.format, string.gmatch
+local sort = table.sort
 
 local ID_PATTERN = VavaCombat.ID_PATTERN
 local REF_PATTERN, REF_MAX = VavaCombat.REF_PATTERN, VavaCombat.REF_MAX
@@ -71,10 +75,12 @@ end
 
 -- Contrôle du catalogue ---------------------------------------------------------------------------------------------
 
+-- fiche fusionnée : classe (config_client.lua → weaponClasses) et part du serveur (config.lua → weapons)
 local WEAPON_KEYS = {
     category = true, family = true, kind = true, damage = true, reachBonus = true, durability = true, block = true,
     provisional = true,
 }
+local CLASS_KEYS = { category = true, family = true }
 
 ---@param value any
 ---@return boolean
@@ -150,6 +156,57 @@ local function checkWeapon(name, def, cfg, categories)
     return true
 end
 
+--- Fiche d'une arme : sa classe (catégorie, famille) et la part du serveur, en une table (copie). Une des deux absente :
+--- nil.
+---@param class any  config.weaponClasses[objet]
+---@param fiche any  config.weapons[objet]
+---@return table|nil
+function weapons.merge(class, fiche)
+    if type(class) ~= 'table' or type(fiche) ~= 'table' then return nil end
+    local out = {}
+    for key, value in pairs(fiche) do out[key] = value end
+    for key, value in pairs(class) do out[key] = value end
+    return out
+end
+
+--- Les deux parts de la config vont ensemble (1.2.0) : classes dans config_client.lua, fiches et délais du serveur du
+--- bouclier dans config.lua, mêmes objets des deux côtés.
+---@param cfg table
+---@return boolean ok
+---@return string|nil err
+local function checkParts(cfg)
+    if type(cfg.weaponClasses) ~= 'table' then
+        return false, "config_client.lua d'avant 1.2.0 : les fiches des armes y sont maintenant `weaponClasses` "
+            .. "(catégorie, famille) ; reportez vos changements d'après config_client.lua.nouveau"
+    end
+    if type(cfg.weapons) ~= 'table' or type(cfg.shield) ~= 'table' or cfg.shield.toggleMs == nil then
+        return false, "config.lua d'avant 1.2.0 : les fiches des armes (weapons) et les délais du serveur du bouclier "
+            .. "(shield.toggleMs…) y sont maintenant ; reportez vos changements d'après config.lua.nouveau"
+    end
+    for name, fiche in pairs(cfg.weapons) do
+        if type(fiche) == 'table' and (fiche.category ~= nil or fiche.family ~= nil) then
+            return false, format("config.lua d'avant 1.2.0 : arme '%s' : catégorie et famille sont dans "
+                .. 'config_client.lua (weaponClasses)', tostring(name))
+        end
+        if cfg.weaponClasses[name] == nil then
+            return false, format("arme '%s' : fiche sans classe dans weaponClasses (config_client.lua)", tostring(name))
+        end
+    end
+    for name, class in pairs(cfg.weaponClasses) do
+        if cfg.weapons[name] == nil then
+            return false, format("arme '%s' : classe sans fiche dans weapons (config.lua)", tostring(name))
+        end
+        if type(class) ~= 'table' then return false, format("arme '%s' : classe attendue (table)", tostring(name)) end
+        for key in pairs(class) do
+            if not CLASS_KEYS[key] then
+                return false, format("arme '%s' : clé '%s' hors de la classe (category, family)", tostring(name),
+                    tostring(key))
+            end
+        end
+    end
+    return true
+end
+
 --- Contrôle du catalogue de la config. Rend `true`, ou `false, raison` à la première erreur.
 ---@param cfg table         VavaCombat.config
 ---@param CATEGORIES string[]  liste fermée des catégories
@@ -157,6 +214,8 @@ end
 ---@return string|nil err
 function weapons.check(cfg, CATEGORIES)
     if type(cfg) ~= 'table' then return false, 'config absente' end
+    local partsOk, partsErr = checkParts(cfg)
+    if not partsOk then return false, partsErr end
     for _, key in ipairs({ 'kinds', 'categories', 'families', 'weapons', 'items', 'recipes', 'shields' }) do
         if type(cfg[key]) ~= 'table' then return false, format('%s : table attendue', key) end
     end
@@ -180,7 +239,9 @@ function weapons.check(cfg, CATEGORIES)
         if type(kind) ~= 'string' or not find(kind, ID_PATTERN) then return false, format("kinds : '%s' invalide", tostring(kind)) end
     end
     if next(cfg.weapons) == nil then return false, 'weapons : aucune arme' end
-    for name, def in pairs(cfg.weapons) do
+    for name, fiche in pairs(cfg.weapons) do
+        local def = weapons.merge(cfg.weaponClasses[name], fiche)
+        if not def then return false, format("arme '%s' : fiche attendue", tostring(name)) end
         local ok, err = checkWeapon(name, def, cfg, categories)
         if not ok then return false, err end
     end
@@ -188,8 +249,10 @@ function weapons.check(cfg, CATEGORIES)
         if not cfg.weapons[name] then return false, format("items : '%s' n'est pas une arme du catalogue", tostring(name)) end
     end
     for name in pairs(cfg.shields) do
-        local def = cfg.weapons[name]
-        if not def or def.category ~= SHIELD then return false, format("shields : '%s' n'est pas un bouclier du catalogue", tostring(name)) end
+        local class = cfg.weaponClasses[name]
+        if not class or class.category ~= SHIELD then
+            return false, format("shields : '%s' n'est pas un bouclier du catalogue", tostring(name))
+        end
     end
     for id, recipe in pairs(cfg.recipes) do
         if type(recipe) ~= 'table' then return false, format("recette '%s' : table attendue", tostring(id)) end
@@ -226,6 +289,284 @@ function weapons.check(cfg, CATEGORIES)
         if tag == 'melee' then return false, 'strike.tags : melee est toujours posé, jamais ajouté par un appelant' end
     end
     return true
+end
+
+-- Techniques et styles (docs/plan/COMBAT_V1.md § 3 ; bornes des curseurs de la maquette Combat) -------------------------
+
+local TECHNIQUE_KEYS = {
+    label = true, style = true, type = true, gesture = true, phases = true, hit = true, damage = true, stamina = true,
+    parryable = true, staggers = true, chain = true, learn = true,
+}
+local GESTURE_KEYS = { dict = true, clip = true, flag = true }
+local PHASE_KEYS = { windup = true, active = true, recovery = true }
+local HIT_KEYS = { range = true, angle = true }
+local LEARN_KEYS = { skill = true, level = true }
+local STYLE_KEYS = { label = true, keys = true }
+local TECHNIQUE_PATTERN, TECHNIQUE_MAX = VavaCombat.TECHNIQUE_PATTERN, VavaCombat.TECHNIQUE_MAX
+local TYPES = setOf(VavaCombat.TECHNIQUE_TYPES)
+local ATTACKS = setOf(VavaCombat.ATTACK_TYPES)
+local LABEL_MAX, GESTURE_MAX, SKILL_MAX = 48, 64, 32
+local CHAIN_MAX = 4
+local PHASES_TOTAL_MAX = 3000
+
+---@param value any
+---@param max integer
+---@return boolean
+local function text(value, max)
+    return type(value) == 'string' and #value >= 1 and #value <= max
+end
+
+--- Première clé de `map` hors de `allowed`, ou nil.
+---@param map table
+---@param allowed table<string, true>
+---@return any
+local function extraKey(map, allowed)
+    for key in pairs(map) do
+        if not allowed[key] then return key end
+    end
+    return nil
+end
+
+---@param value any
+---@param low number
+---@param high number
+---@return boolean
+local function between(value, low, high)
+    return finite(value) and value >= low and value <= high
+end
+
+--- Liste pure (indices 1 à n, aucune autre clé), de `max` éléments au plus.
+---@param list any
+---@param max integer
+---@return boolean
+local function pureList(list, max)
+    if type(list) ~= 'table' then return false end
+    local count = 0
+    for _ in pairs(list) do count = count + 1 end
+    return count == #list and count <= max
+end
+
+--- Geste : { dict, clip } chaînes de 1 à 64 octets, `flag` entier de 0 à 65535, aucune autre clé. Rend nil ou la raison.
+---@param gesture any
+---@return string|nil
+local function gestureError(gesture)
+    if type(gesture) ~= 'table' then return 'geste attendu ({ dict, clip, flag })' end
+    local extra = extraKey(gesture, GESTURE_KEYS)
+    if extra ~= nil then return format("geste : clé inconnue '%s'", tostring(extra)) end
+    if not text(gesture.dict, GESTURE_MAX) or not text(gesture.clip, GESTURE_MAX) then
+        return format('geste : dict et clip attendus (1 à %d octets)', GESTURE_MAX)
+    end
+    if integerIn(gesture.flag, 0, 65535) == nil then return 'geste : flag entier de 0 à 65535 attendu' end
+    return nil
+end
+weapons.gestureError = gestureError
+
+---@param id any
+---@param def any
+---@param styles table
+---@return string|nil err
+local function techniqueError(id, def, styles)
+    if type(id) ~= 'string' or #id > TECHNIQUE_MAX or not find(id, TECHNIQUE_PATTERN) then
+        return format("technique '%s' : identifiant invalide (^[a-z0-9_]+$, %d octets au plus)", tostring(id), TECHNIQUE_MAX)
+    end
+    local function fail(fmt, ...) return format("technique '%s' : " .. fmt, id, ...) end
+    if type(def) ~= 'table' then return fail('table attendue') end
+    local extra = extraKey(def, TECHNIQUE_KEYS)
+    if extra ~= nil then return fail("clé inconnue '%s'", tostring(extra)) end
+    if not text(def.label, LABEL_MAX) then return fail('label attendu (1 à %d octets)', LABEL_MAX) end
+    if type(def.style) ~= 'string' or type(styles[def.style]) ~= 'table' then
+        return fail("style inconnu '%s'", tostring(def.style))
+    end
+    if not TYPES[def.type] then return fail("type inconnu '%s'", tostring(def.type)) end
+    local gestureErr = gestureError(def.gesture)
+    if gestureErr then return fail('%s', gestureErr) end
+    local p = def.phases
+    if type(p) ~= 'table' or extraKey(p, PHASE_KEYS) ~= nil then
+        return fail('phases attendues ({ windup, active, recovery })')
+    end
+    local windup, active, recovery = integerIn(p.windup, 80, 1500), integerIn(p.active, 40, 500), integerIn(p.recovery, 0, 2000)
+    if not windup then return fail('phases.windup entier de 80 à 1 500 ms attendu') end
+    if not active then return fail('phases.active entier de 40 à 500 ms attendu') end
+    if not recovery then return fail('phases.recovery entier de 0 à 2 000 ms attendu') end
+    if windup + active + recovery > PHASES_TOTAL_MAX then return fail('phases : 3 000 ms au plus en tout') end
+    local hit = def.hit
+    if type(hit) ~= 'table' or extraKey(hit, HIT_KEYS) ~= nil then return fail('hit attendu ({ range, angle })') end
+    if not between(hit.range, 1.0, 4.0) then return fail('hit.range attendu de 1 à 4 m') end
+    if not between(hit.angle, 10, 180) then return fail('hit.angle attendu de 10 à 180 degrés') end
+    if not between(def.damage, 0.5, 2.0) then return fail('damage attendu de 0,5 à 2') end
+    if integerIn(def.stamina, 0, 40) == nil then return fail('stamina entier de 0 à 40 attendu') end
+    if type(def.parryable) ~= 'boolean' then return fail('parryable attendu (booléen)') end
+    if type(def.staggers) ~= 'boolean' then return fail('staggers attendu (booléen)') end
+    if not pureList(def.chain, CHAIN_MAX) then return fail('chain : liste de %d techniques au plus attendue', CHAIN_MAX) end
+    if def.learn ~= nil then
+        local learn = def.learn
+        if type(learn) ~= 'table' or extraKey(learn, LEARN_KEYS) ~= nil or not text(learn.skill, SKILL_MAX)
+            or not find(learn.skill, ID_PATTERN) or integerIn(learn.level, 0, 100) == nil then
+            return fail('learn : { skill (^[a-z0-9_]+$, %d octets), level entier de 0 à 100 } attendu', SKILL_MAX)
+        end
+    end
+    return nil
+end
+
+--- Contrôle des techniques et des styles de la config (format de COMBAT_V1.md § 3). Rend `true, avertissements`
+--- (technique que rien n'ouvre et qu'aucune chaîne n'atteint : une ligne chacune), ou `false, raison` à la première
+--- erreur.
+---@param cfg table
+---@return boolean ok
+---@return string|string[] err_or_warnings
+function weapons.checkTechniques(cfg)
+    if type(cfg) ~= 'table' or type(cfg.techniques) ~= 'table' or type(cfg.styles) ~= 'table' then
+        return false, 'techniques et styles : tables attendues'
+    end
+    local techniques, styles = cfg.techniques, cfg.styles
+    for id, def in pairs(techniques) do
+        local err = techniqueError(id, def, styles)
+        if err then return false, err end
+    end
+    local reached = {}
+    for id, def in pairs(techniques) do
+        local seen = {}
+        for _, chained in ipairs(def.chain) do
+            local other = techniques[chained]
+            if type(chained) ~= 'string' or type(other) ~= 'table' then
+                return false, format("technique '%s' : chain vers une technique inconnue '%s'", id, tostring(chained))
+            end
+            if chained == id then return false, format("technique '%s' : chain vers elle-même", id) end
+            if other.style ~= def.style then
+                return false, format("technique '%s' : chain vers '%s', d'un autre style", id, chained)
+            end
+            if seen[chained] then return false, format("technique '%s' : '%s' deux fois dans chain", id, chained) end
+            seen[chained], reached[chained] = true, true
+        end
+    end
+    for name, style in pairs(styles) do
+        if type(name) ~= 'string' or #name > TECHNIQUE_MAX or not find(name, ID_PATTERN) then
+            return false, format("style '%s' : identifiant invalide", tostring(name))
+        end
+        if type(style) ~= 'table' or extraKey(style, STYLE_KEYS) ~= nil or not text(style.label, LABEL_MAX)
+            or type(style.keys) ~= 'table' then
+            return false, format("style '%s' : { label (1 à %d octets), keys } attendu", name, LABEL_MAX)
+        end
+        for slot, id in pairs(style.keys) do
+            if not ATTACKS[slot] then return false, format("style '%s' : touche inconnue '%s'", name, tostring(slot)) end
+            local def = type(id) == 'string' and techniques[id] or nil
+            if type(def) ~= 'table' or def.style ~= name or def.type ~= slot then
+                return false, format("style '%s' : la touche %s doit ouvrir une technique %s de ce style", name, slot, slot)
+            end
+            reached[id] = true
+        end
+    end
+    local warnings = {}
+    for id in pairs(techniques) do
+        if not reached[id] then
+            warnings[#warnings + 1] = format("technique '%s' : aucune touche ne l'ouvre et aucune chaîne ne l'atteint", id)
+        end
+    end
+    sort(warnings)
+    return true, warnings
+end
+
+--- Contrôle des réglages du moteur (cycle, tolérances bornées, géométrie, bond, réactions, dégainer, chancellement).
+--- Rend `true`, ou `false, raison` à la première erreur.
+---@param cfg table
+---@return boolean ok
+---@return string|nil err
+function weapons.checkEngine(cfg)
+    local r = type(cfg.rateLimits) == 'table' and cfg.rateLimits.use
+    if type(r) ~= 'table' or integerIn(r.capacity, 1, 100) == nil or not between(r.refillPerSecond, 0.01, 100) then
+        return false, 'rateLimits.use : { capacity entier de 1 à 100, refillPerSecond > 0 } attendu'
+    end
+    local t = cfg.timing
+    if type(t) ~= 'table' or integerIn(t.earlyMs, 0, 500) == nil or integerIn(t.chainMax, 0, 10) == nil
+        or integerIn(t.samples, 1, 2) == nil or integerIn(t.staggerImmunityMs, 0, 60000) == nil then
+        return false, 'timing : earlyMs (0 à 500), chainMax (0 à 10), samples (1 ou 2), staggerImmunityMs entiers attendus'
+    end
+    local tol = cfg.tolerance
+    if type(tol) ~= 'table' or not between(tol.range, 0, 1.0) or not between(tol.angle, 0, 30)
+        or not between(tol.height, 0, 1.0) then
+        return false, 'tolerance : range de 0 à 1 m, angle de 0 à 30 degrés, height de 0 à 1 m attendus'
+    end
+    local g = cfg.geometry
+    if type(g) ~= 'table' or not between(g.maxHeight, 0.1, 5) or not between(g.closeRange, 0, 2)
+        or integerIn(g.maxTargets, 1, 8) == nil or not between(g.searchMargin, 0, 5) then
+        return false, 'geometry : maxHeight (0,1 à 5), closeRange (0 à 2), maxTargets (1 à 8), searchMargin (0 à 5) attendus'
+    end
+    local l = cfg.lunge
+    if type(l) ~= 'table' or not between(l.maxSpeed, 0.1, 30) or not between(l.margin, 0, 5) then
+        return false, 'lunge : maxSpeed (0,1 à 30 m/s) et margin (0 à 5 m) attendus'
+    end
+    if type(cfg.reactions) ~= 'table' or not between(cfg.reactions.radius, 1, 100) then
+        return false, 'reactions.radius attendu de 1 à 100 m'
+    end
+    if type(cfg.notices) ~= 'table' or integerIn(cfg.notices.intervalMs, 0, 3600000) == nil then
+        return false, 'notices.intervalMs entier attendu'
+    end
+    if type(cfg.debug) ~= 'table' or type(cfg.debug.logSamples) ~= 'boolean' then
+        return false, 'debug.logSamples attendu (booléen)'
+    end
+    local d = cfg.draw
+    if type(d) ~= 'table' or integerIn(d.drawMs, 0, 5000) == nil or integerIn(d.sheatheMs, 0, 10000) == nil then
+        return false, 'draw : drawMs (0 à 5 000) et sheatheMs (0 à 10 000) entiers attendus'
+    end
+    local err = gestureError(d.drawGesture) or gestureError(d.sheatheGesture)
+    if err then return false, 'draw : ' .. err end
+    local st = cfg.stagger
+    if type(st) ~= 'table' or integerIn(st.durationMs, 0, 5000) == nil then
+        return false, 'stagger.durationMs entier de 0 à 5 000 attendu'
+    end
+    err = gestureError(st.gesture)
+    if err then return false, 'stagger : ' .. err end
+    return true
+end
+
+-- Issue d'un coup -----------------------------------------------------------------------------------------------------
+
+-- étape d'annulation de la chaîne → issue montrée (l'arme a été arrêtée)
+local GUARDED = { esquive = 'dodge', parade = 'parry', blocage = 'block', bouclier = 'absorb' }
+
+--- Issue d'un coup qui a atteint la chaîne (résultat de vava_health:hit), montrée aux proches : `down`, `dodge`,
+--- `parry`, `block`, `absorb`, `hit` ; nil pour une autre annulation (cible à terre, combats coupés, attaquant à terre,
+--- crochet, lieu de paix) : rien n'est montré.
+---@param result any
+---@return string|nil
+function weapons.outcome(result)
+    if type(result) ~= 'table' then return nil end
+    if result.downed == true then return 'down' end
+    if result.cancelled ~= nil then return GUARDED[result.stage] end
+    local applied = finite(result.applied) and result.applied or 0
+    if applied == 0 and finite(result.blocked) and result.blocked > 0 then return 'block' end
+    if applied == 0 and finite(result.absorbed) and result.absorbed > 0 then return 'absorb' end
+    return 'hit'
+end
+
+--- Avis à l'attaquant d'un coup retenu (clé de config.messages), ou nil : combats coupés (`pvpOff`), lieu de paix
+--- (`peace`), refus d'un crochet `before` de la chaîne (`held`).
+---@param result any
+---@return string|nil
+function weapons.noticeOf(result)
+    if type(result) ~= 'table' or result.cancelled == nil then return nil end
+    if result.cancelled == 'pvp_off' then return 'pvpOff' end
+    if result.cancelled == 'zone_protegee' then return 'peace' end
+    if result.stage == 'before' then return 'held' end
+    return nil
+end
+
+--- Raison d'un refus d'un crochet, à montrer au joueur : chaîne sans caractère de contrôle, coupée à `max` octets sans
+--- couper un caractère UTF-8 ; vide ou autre chose : nil.
+---@param reason any
+---@param max integer
+---@return string|nil
+function weapons.reasonText(reason, max)
+    if type(reason) ~= 'string' then return nil end
+    local clean = reason:gsub('[\0-\31\127]', ' ')
+    if #clean > max then
+        local cut = max + 1
+        while cut > 1 and (clean:byte(cut) or 0) >= 0x80 and (clean:byte(cut) or 0) <= 0xBF do cut = cut - 1 end
+        clean = clean:sub(1, cut - 1)
+    end
+    clean = clean:match('^ *(.-) *$')
+    if clean == '' then return nil end
+    return clean
 end
 
 -- Qualité, solidité, montant ----------------------------------------------------------------------------------------

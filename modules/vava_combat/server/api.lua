@@ -1,10 +1,12 @@
 --[[
     vava_combat/server/api.lua
-    Rôle : exports serveur des armes : fiche d'une arme et catalogue ordonné (pour l'éditeur de techniques, T-121), arme
-           tenue par un joueur et son coup de base (T-112, T-116 : « mains vides »), bouclier accroché et prêt au bras
-           (T-113), brique `strike` réservée aux ressources de `strike.callers` (T-112 appelle la fonction interne).
-    Dépendances : shared/constants.lua, config.lua, shared/weapons.lua, server/core.lua, bridge/server.lua,
-                  server/catalog.lua, server/shields.lua, server/strike.lua
+    Rôle : exports serveur des armes : fiche d'une arme et catalogue ordonné (pour l'éditeur de techniques, T-121),
+           techniques (copies, T-115 et T-121), arme tenue par un joueur et son coup de base (« mains vides » de la
+           magie, T-140), mains encore prises pendant le rengainement (T-112), bouclier accroché et prêt au bras
+           (T-113), brique `strike` réservée aux ressources de `strike.callers` (les techniques appellent la fonction
+           interne).
+    Dépendances : shared/constants.lua, config_client.lua, config.lua, shared/weapons.lua, server/core.lua,
+                  bridge/server.lua, server/catalog.lua, server/shields.lua, server/strike.lua, server/hands.lua
 ]]
 
 local type, ipairs, pairs, tostring = type, ipairs, pairs, tostring
@@ -16,6 +18,7 @@ local weapons = VavaCombat.weapons
 local catalog = VavaCombat.catalog
 local shields = VavaCombat.shields
 local strike = VavaCombat.strike
+local hands = VavaCombat.hands
 local cfg = VavaCombat.config
 local SHIELD = VavaCombat.SHIELD_CATEGORY
 
@@ -30,7 +33,9 @@ for _, name in ipairs(cfg.strike.callers) do callers[name] = true end
 -- ressource refusée → instant du dernier avertissement
 local refusedAt = {}
 
---- Arme tenue par un joueur et son coup à × 1,0, ou `nil, code` (`not_ready`, `no_character`, `no_weapon`).
+--- Arme tenue par un joueur et son coup à × 1,0 ; pendant le rengainement (arme rangée depuis moins de
+--- `draw.sheatheMs`), `{ item, category, family, sheathing = true, readyInMs }` : les mains ne sont pas encore libres
+--- (la magie refuse d'incanter) ; sinon `nil, code` (`not_ready`, `no_character`, `no_weapon`).
 ---@param src any
 ---@return table|nil
 ---@return string|nil code
@@ -41,7 +46,15 @@ function api.armed(src)
     local held = bridge.Held(source)
     local item = held and held.item
     local def = catalog.weapon(item)
-    if not def or def.category == SHIELD or not catalog.holdable(item) then return nil, 'no_weapon' end
+    if not def or def.category == SHIELD or not catalog.holdable(item) then
+        local now = bridge.Timer()
+        local sheath = hands.sheathing(source, now)
+        local class = sheath and cfg.weaponClasses[sheath.item]
+        if not class then return nil, 'no_weapon' end
+        return { item = sheath.item, category = class.category, family = class.family, sheathing = true,
+            readyInMs = sheath.untilMs - now }
+    end
+    hands.noteHeld(source, item)
     local meta = held.metadata
     local d = weapons.durabilityOf(meta, def)
     local amount, factor = weapons.amount(def, meta, 1, cfg)
@@ -88,6 +101,16 @@ end)
 
 exports('armed', function(src)
     return api.armed(src)
+end)
+
+--- Techniques (copies), par style puis libellé — pour les compétences (T-115) et l'éditeur (T-121).
+exports('techniques', function()
+    return catalog.techniques()
+end)
+
+--- Copie d'une technique, ou nil.
+exports('technique', function(id)
+    return catalog.techniqueView(id)
 end)
 
 --- Bouclier accroché d'un joueur, ou nil.

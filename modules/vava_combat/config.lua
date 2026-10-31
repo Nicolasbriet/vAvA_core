@@ -1,23 +1,85 @@
 --[[
     vava_combat/config.lua
-    Rôle : réglages des armes de corps à corps que lit le seul serveur (servi au seul serveur, jamais téléchargé par
-           les joueurs) : catégories, familles et types de dégâts, objets déclarés à l'inventaire, recettes déclarées à
-           l'artisanat, qualité et usure, filet de la brique `strike`, commandes du Conseil, journal, textes. Complète
-           la table ouverte par config_client.lua (fiches des armes, bouclier accroché, placement des boucliers,
-           contrôles natifs) sans en réécrire une clé (T-132).
+    Rôle : réglages des armes que lit le seul serveur (servi au seul serveur, jamais téléchargé par les joueurs) :
+           fiches des armes (part du serveur), délais du serveur du bouclier, catégories, familles et types de dégâts,
+           objets déclarés à l'inventaire, recettes déclarées à l'artisanat, qualité et usure, filet de la brique
+           `strike`, débit du RPC des techniques, cycle d'un coup, tolérances, géométrie, réactions, commandes du
+           Conseil, journal, textes. Complète la table ouverte par config_client.lua (classes des armes, bouclier
+           accroché, placements, contrôles natifs, techniques, styles, mode combat, touches) sans en réécrire une clé
+           (T-132).
     Les modèles sont des remplaçants vanilla (-- PLACEHOLDER, docs/plan/ASSETS_PLACEHOLDERS.md) : le jour où les armes
-    médiévales arrivent, seuls `items[…].held.model` (ici), `shields[…]` et `provisional` (config_client.lua) changent.
-    Les chiffres (solidité, usure) sont des valeurs de départ, à régler à la porte T-119.
+    médiévales arrivent, seuls `items[…].held.model` et `weapons[…].provisional` (ici), et `shields[…]`
+    (config_client.lua) changent. Les chiffres (solidité, usure, tolérances) sont des valeurs de départ, à régler à la
+    porte T-119.
     Dépendances : shared/constants.lua, config_client.lua
 ]]
 
 local config = VavaCombat.config
 
-config.coreVersion = '0.10.0'  -- core.net.send (0.10.0), registre core:commands (0.7.0)
+config.coreVersion = '0.10.0'  -- core.net.send et sendNearWith (0.10.0), registre core:commands (0.7.0)
 -- statebag de la main de l'inventaire (1.7.0) ; chaîne de dégâts `hit` (1.3.0)
 config.dependencies = { vava_inventory = '1.7.0', vava_health = '1.3.0' }
 -- versions minimales pour déclarer les recettes ; plus anciennes ou absentes : armes sans recette (console)
 config.optional = { vava_crafting = '1.5.0', vava_skills = '1.0.0' }
+
+-- Fiches des armes, part du serveur (clé = objet ; mêmes objets que weaponClasses de config_client.lua, contrôlé au
+-- démarrage). `damage` : points de vie (sur 100) d'un coup de multiplicateur 1,0, qualité 50, arme non émoussée ;
+-- `reachBonus` : mètres ajoutés à la portée de la technique ; `durability` : solidité d'une pièce neuve (recette
+-- déclarée ici, pile sans métadonnées) ; `block` : part arrêtée en bloquant (lue par T-113) ; `provisional` : modèle
+-- provisoire, signalé par l'éditeur (T-121).
+config.weapons = {
+    -- adoptée : objet et recette de vava_crafting (forge 30, transmise, solidité 150)
+    epee_courte = { kind = 'tranchant', damage = 12, reachBonus = 0, durability = 150, block = 0.40, provisional = true },
+    epee_longue = { kind = 'tranchant', damage = 17, reachBonus = 0.4, durability = 160, block = 0.50, provisional = true },
+    hache_d_armes = { kind = 'tranchant', damage = 14, reachBonus = -0.1, durability = 140, block = 0.30, provisional = true },
+    masse_d_armes = { kind = 'contondant', damage = 13, reachBonus = -0.1, durability = 180, block = 0.30, provisional = true },
+    dague = { kind = 'percant', damage = 8, reachBonus = -0.5, durability = 100, block = 0.15, provisional = true },
+    baton_ferre = { kind = 'contondant', damage = 9, reachBonus = 0.6, durability = 120, block = 0.45, provisional = true },
+    bouclier_rond = { kind = 'contondant', damage = 5, reachBonus = -0.6, durability = 150, block = 0.70, provisional = true },
+}
+
+-- Bouclier accroché : délais du serveur (valeurs de 1.1.0), ajoutés à la part du client.
+config.shield.toggleMs = 1000            -- délai entre deux gestes d'accroche d'un même joueur
+config.shield.verifyMs = 5000            -- relevé de possession des boucliers accrochés (filet des hooks)
+config.shield.missesToDrop = 2           -- relevés manquants d'affilée avant de décrocher
+config.shield.pedCheckMs = 1000          -- nouveau ped d'un porteur → statebag réécrit
+config.shield.guardDelayMs = 250         -- garde du statebag (mêmes valeurs que vava_inventory.hands)
+config.shield.guardMaxCorrections = 3
+config.shield.guardMaxDelayMs = 1000
+config.shield.guardWarnMs = 10000
+
+-- Débit du RPC des techniques : 4 d'avance, puis 3 par seconde (une technique dure au moins 340 ms jusqu'à sa fin de
+-- frappe : 3 / s couvre un enchaînement rapide).
+config.rateLimits = { use = { capacity = 4, refillPerSecond = 3 } }
+
+-- Cycle d'un coup tenu par le serveur.
+config.timing = {
+    earlyMs = 60,              -- une demande arrivée au plus ce temps avant d'être permise est acceptée (gigue du réseau)
+    chainMax = 3,              -- techniques enchaînées de suite au plus après celle qui ouvre (4 coups), puis récupération
+    samples = 2,               -- relevés pendant la frappe : à l'ouverture, puis à la fin (1 ou 2)
+    staggerImmunityMs = 3000,  -- après un chancellement, aucun autre avant ce délai (pas d'enchaînement de contrôles)
+}
+
+-- Tolérances (latence) : ajoutées à la portée, au demi-angle et à la hauteur ; bornées au démarrage (≤ 1,0 m, ≤ 30°,
+-- ≤ 1,0 m). Resserrées (+ 0,25 m, + 10°) : décision du porteur du projet (31/10) ; aucun contrôle des murs.
+config.tolerance = { range = 0.25, angle = 10, height = 0.4 }
+
+-- Géométrie : écart de hauteur permis, distance sous laquelle l'angle ne compte plus (corps au contact), adversaires
+-- touchés par coup au plus, marge de la recherche des proches.
+config.geometry = { maxHeight = 1.6, closeRange = 0.6, maxTargets = 1, searchMargin = 1.0 }
+
+-- Bond plausible de l'attaquant entre sa demande et un relevé (positions déclarées par le client sous OneSync) :
+-- mètres par seconde et marge.
+config.lunge = { maxSpeed = 8.0, margin = 0.5 }
+
+-- Réactions : rayon des joueurs prévenus d'un coup qui porte (même instance que l'attaquant).
+config.reactions = { radius = 30.0 }
+
+-- Avis à l'attaquant d'un coup retenu (combats coupés, lieu de paix, refus d'un crochet) : un par raison et par délai.
+config.notices = { intervalMs = 10000 }
+
+-- Réglage en jeu (porte T-119) : une ligne de console par relevé (distance, angle, portée, issue). Faux en service.
+config.debug = { logSamples = false }
 
 -- Types de dégâts admis pour une arme (recoupés au démarrage avec vava_health:vocabulary().kinds).
 config.kinds = { 'tranchant', 'contondant', 'percant' }
@@ -124,6 +186,10 @@ config.messages = {
     shieldUnhung = '%s décroché.',
     shieldDowned = 'Vous ne pouvez pas faire cela à terre.',
     tooSoon = 'Un instant…',
+    -- coup retenu, au seul attaquant (un par raison et par notices.intervalMs)
+    pvpOff = 'Les combats entre habitants sont suspendus : votre lame s\'arrête.',
+    peace = 'Ce lieu est sous la paix du royaume : votre lame s\'arrête.',
+    held = 'Votre coup est retenu.',
     worn = '%s : solidité %d / %d, l\'arme s\'émousse.',
     dull = '%s : l\'arme est émoussée, ses coups ne portent plus qu\'à moitié. Un artisan peut la remettre en état.',
     adminUsage = 'Usage : /armes liste | voir <n° du joueur> | user <n° du joueur> <points 1 à %d>',
