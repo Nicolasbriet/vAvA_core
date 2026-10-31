@@ -5,7 +5,8 @@
            en points (`chain.healthPoints` pour une vie pleine). La vie est celle du serveur : aucune lecture du ped,
            aucune condition d'apparition.
              - hit(cible, paquet) : la chaîne de dégâts (server/chain.lua) ; `origin` = ressource appelante ;
-             - vocabulary() : listes fermées de la chaîne (types, parties, étiquettes, étapes) pour les éditeurs ;
+             - vocabulary() : listes fermées de la chaîne (types, parties, étiquettes, étapes) pour les éditeurs, et ses
+               réglages utiles aux modules (`pvp`, `launchedMaxMs`, 1.4.0) ;
              - modifiers() : modificateurs déclarés, dans l'ordre d'appel ;
              - damage(cible, part) : enveloppe de hit (`pur`, `tags.legacy`), dépréciée pour les coups et les sorts.
     Dépendances : shared/constants.lua, config.lua, server/core.lua, server/life.lua, server/modifiers.lua,
@@ -70,6 +71,9 @@ exports('vocabulary', function()
     return {
         healthPoints = chain.healthPoints, maxAmount = chain.maxAmount, kinds = copyList(chain.kinds),
         parts = copyList(chain.parts), tags = copyList(chain.tags), stages = copyList(VavaHealth.STAGES),
+        -- 1.4.0 : interrupteur des combats entre joueurs (les modules y règlent leurs effets sans dégâts) et délai
+        -- d'un coup déjà lancé
+        pvp = chain.pvp ~= false, launchedMaxMs = chain.launchedMaxMs,
     }
 end)
 

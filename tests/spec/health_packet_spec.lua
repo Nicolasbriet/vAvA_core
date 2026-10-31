@@ -119,6 +119,29 @@ describe('vava_health paquet de dégât', function()
         assert.same(eight, normalize(base({ tags = eight })).tags)
     end)
 
+    it('coup déjà lancé (1.4.0) : l\'étiquette launched et launchedAt vont ensemble, entier positif', function()
+        local copy, code = normalize(base({ tags = { launched = true, spell = true }, launchedAt = 120000 }))
+        assert.is_nil(code)
+        assert.equal(120000, copy.launchedAt)
+        assert.is_true(copy.tags.launched)
+        assert.equal(5, normalize(base({ tags = { launched = true }, launchedAt = 5.0 })).launchedAt)
+        assert.equal(0, normalize(base({ tags = { launched = true }, launchedAt = 0 })).launchedAt)
+        local refused = {
+            { tags = { launched = true } },
+            { launchedAt = 120000 },
+            { tags = { spell = true }, launchedAt = 120000 },
+            { tags = { launched = true }, launchedAt = -1 },
+            { tags = { launched = true }, launchedAt = 1.5 },
+            { tags = { launched = true }, launchedAt = '120000' },
+            { tags = { launched = true }, launchedAt = 0 / 0 },
+            { tags = { launched = true }, launchedAt = math.huge },
+        }
+        for i, extra in ipairs(refused) do
+            assert.equal('invalid_launch', select(2, normalize(base(extra))), 'cas ' .. i)
+        end
+        assert.is_nil(normalize(base()).launchedAt)
+    end)
+
     it('refuse toute clé hors du paquet, origin compris, et ce qui n\'est pas une table', function()
         assert.equal('unknown_field', select(2, normalize(base({ origin = 'vava_magic' }))))
         assert.equal('unknown_field', select(2, normalize(base({ foo = 1 }))))

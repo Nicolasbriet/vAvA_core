@@ -1117,7 +1117,8 @@ Jauges affichées quand un personnage est en jeu ; masquées pendant la sélecti
 
 ### `vava_health`
 
-Santé, mise à terre, réanimation, et **chaîne de dégâts commune** (1.3.0, `docs/plan/COMBAT_V1.md` § 1). Champ
+Santé, mise à terre, réanimation, et **chaîne de dégâts commune** (1.3.0 ; coup déjà lancé et `vocabulary().pvp` :
+1.4.0 ; `docs/plan/COMBAT_V1.md` § 1). Champ
 `vava_health:state` `{ health, downed, downedFor }` (visibilité `owner`) : `health` de 0 à 1, part de la vie au-dessus
 du seuil où GTA met un joueur à terre. Lieux de soins, délais, distances, touches, chaîne et messages : `config.lua`.
 Demande le core 0.10.0 (`core.net.send` : tous les envois du module sont comptés dans `/vava_reseau`).
@@ -1171,7 +1172,8 @@ local result, code = exports.vava_health:hit(target, {
     technique = 'taille_descendante', -- facultatif : technique (identifiant, `<éditeur>:<id>` accepté)
     spell = 'boule_de_feu',       -- facultatif : sort
     tags = { melee = true, parryable = true },  -- facultatif : melee, ranged, spell, area, overTime, native, legacy,
-                                  --   reflected, parryable, unblockable, undodgeable (8 au plus, valeur true)
+                                  --   reflected, parryable, unblockable, undodgeable, launched (8 au plus, valeur true)
+    launchedAt = 123456,          -- avec tags.launched seulement (1.4.0) : GetGameTimer() du serveur au lancement
 })
 -- → { id, amount (après modificateurs), applied, blocked, absorbed, resisted, added, cancelled?, stage?, downed,
 --     health (0 à 1 après le coup) } ou nil, code
@@ -1184,7 +1186,8 @@ local result, code = exports.vava_health:hit(target, {
   même source sur une même cible, les coups sans source partageant un compte : `too_many_hits` ; un coup lancé pendant
   un autre permis une fois : `too_deep` au-delà) ; préconditions, sans hook ni journal : cible à terre, annulé
   `downed` ; `chain.pvp = false` et source ≠ cible, annulé `pvp_off` ; source à terre (hors `tags.overTime` et
-  `tags.reflected`), annulé `source_downed` ; hook `before` (refus volontaire : `cancelled` = raison,
+  `tags.reflected`, et hors coup **déjà lancé** debout, 1.4.0 : `tags.launched` avec `launchedAt`, la source tombée
+  après le lancement, lancé depuis au plus `chain.launchedMaxMs` = 4 s), annulé `source_downed` ; hook `before` (refus volontaire : `cancelled` = raison,
   `stage = 'before'` ; un abonné **en erreur** ne refuse pas : le coup passe, une ligne de console par minute) ; modificateurs
   dans l'ordre fixe **annulation → esquive → parade → blocage → bouclier → resistance**, puis `priority`, puis clé ;
   application (cible relue, vie du serveur baissée, mise à terre aussitôt à 0, `reason = 'hit'`) ; hook `after` ;
@@ -1192,8 +1195,13 @@ local result, code = exports.vava_health:hit(target, {
 - `downed` du résultat : ce coup a mis la cible à terre. `stage` : étape de l'annulation (`before`, une étape,
   `application` si la cible est partie ou tombée entre-temps).
 - Codes (`nil, code`) : `not_ready`, `invalid_target`, `no_character`, `invalid_packet`, `invalid_amount`,
-  `invalid_kind`, `invalid_source`, `invalid_part`, `invalid_ref`, `invalid_tags`, `unknown_field`, `too_many_hits`,
+  `invalid_kind`, `invalid_source`, `invalid_part`, `invalid_ref`, `invalid_tags`, `invalid_launch` (1.4.0 :
+  `launchedAt` sans `tags.launched` ou l'inverse, ou pas un entier positif), `unknown_field`, `too_many_hits`,
   `too_deep`, `hit_error` (erreur interne, console).
+- **Coup déjà lancé** (1.4.0) : un projectile en vol, le présage d'un sort, une flèche… lancés par un joueur debout
+  portent encore s'il tombe à terre avant l'impact. Le module serveur qui frappe pose `tags.launched` et `launchedAt`
+  (son `GetGameTimer()` au lancement, jamais une valeur venue d'un client) ; `vava_health` compare à l'instant de la
+  mise à terre de la source, qu'il tient lui-même. Ce n'est pas `overTime` (réservé aux effets qui durent).
 
 **Registre `vava_health:modifiers`** (défini par `vava_health`, 32 entrées) : un module y déclare ses modificateurs,
 **au plus un par étape** (un second à la même étape est retiré aussitôt, console), sous son nom (`<ressource>:<nom>` ;
@@ -1231,7 +1239,7 @@ refusée est abandonnée et comptée en console), purgé après 30 jours.
 | Export | Retour |
 |---|---|
 | `hit(cible, paquet)` | résultat ou `nil, code` (ci-dessus) |
-| `vocabulary()` | copie `{ healthPoints, maxAmount, kinds, parts, tags, stages }` : listes pour les éditeurs de l'Atelier et les modules |
+| `vocabulary()` | copie `{ healthPoints, maxAmount, kinds, parts, tags, stages, pvp, launchedMaxMs }` : listes pour les éditeurs de l'Atelier et les modules ; `pvp` (1.4.0) : interrupteur `chain.pvp`, pour qu'un module coupe aussi ses effets sans dégâts (poussées, gel…) quand les combats entre joueurs sont coupés |
 | `modifiers()` | liste ordonnée `{ { key, stage, priority, label, kinds? } }` (sans les fonctions) |
 | `get(source)` | `{ health, downed, downedFor }` ou `nil, code` — `health` : vie du serveur (0 à terre) |
 | `isDowned(source)` | booléen — à appeler (isolé, `pcall`) par tout module qui refuse une action à terre, plutôt que de recopier la règle ; module absent : pas à terre |

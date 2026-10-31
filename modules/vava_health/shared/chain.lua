@@ -7,7 +7,8 @@
       - pas d'un résultat : ce que rend un modificateur (cancel, blocked, absorbed, resisted, added), borné ;
       - déroulé de la chaîne avec un invocateur, une horloge et des rapports injectés (le serveur y met pcall,
         GetGameTimer et la console) : un modificateur en erreur est ignoré pour ce coup, un lent est signalé, une
-        annulation arrête la chaîne.
+        annulation arrête la chaîne ;
+      - source à terre : passent un effet qui dure, un renvoi, et un coup lancé debout depuis peu (`launched`, 1.4.0).
       Les motifs n'emploient que des classes ASCII explicites (jamais %w, qui dépend de la locale). Aucun état.
     Dépendances : shared/constants.lua
 ]]
@@ -218,4 +219,21 @@ function chain.run(list, ctx, state, options)
         end
     end
     return state
+end
+
+--- Un coup venu d'une source à terre passe-t-il quand même ? Oui pour un effet qui dure (`overTime`), un renvoi
+--- (`reflected`), et un coup déjà lancé (`launched`) alors que la source était debout : lancé (`launchedAt`) avant sa
+--- mise à terre (`downedAt`, nil : inconnue, à terre depuis avant), et depuis au plus `maxMs` (projectile en vol,
+--- présage d'un sort). Un coup lancé à terre, ou trop vieux, ne passe pas.
+---@param tags table<string, true>
+---@param launchedAt integer|nil   instant du lancement (horloge du serveur, ms)
+---@param downedAt integer|nil     instant de la mise à terre de la source
+---@param now integer
+---@param maxMs integer
+---@return boolean
+function chain.passesDownedSource(tags, launchedAt, downedAt, now, maxMs)
+    if tags.overTime or tags.reflected then return true end
+    if not tags.launched or mathType(launchedAt) ~= 'integer' or mathType(downedAt) ~= 'integer' then return false end
+    local age = now - launchedAt
+    return age >= 0 and age <= maxMs and downedAt > launchedAt
 end

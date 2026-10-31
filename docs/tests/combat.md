@@ -1,7 +1,7 @@
 # Combat — procédure de test en jeu
 
 Procédure pour vérifier en jeu le combat de la phase 4 (`docs/plan/COMBAT_V1.md`). Section 1 : la **chaîne de dégâts
-commune** de `vava_health` 1.3.0 (T-110), éprouvée avec la ressource d'essai `vava_example_combat` 1.0.0 et
+commune** de `vava_health` 1.4.0 (T-110 ; coup déjà lancé et `vocabulary().pvp` : T-116), éprouvée avec la ressource d'essai `vava_example_combat` 1.0.0 et
 `vava_needs` 1.2.1. Les sections suivantes viendront avec les armes, les techniques et la défense (T-111 à T-116).
 Comptez 1 h, presque tout à deux ; les tests à deux joueurs sont marqués **(2 joueurs)**. Un test se cite
 « combat 1-8 ».
@@ -60,6 +60,8 @@ par le serveur ; la chute et la noyade restent, lues sur le ped.
 | 29 | Mesure : B change de modèle (créateur d'apparence, ou reprise de personnage) à 60 %. | Au plus **une** ligne « vie du client au-dessus de celle du serveur » ; vie de retour à 60 %. |
 | 30 | Mesure : personnage féminin (`mp_f_freemode_01`) ; F8 `GetEntityMaxHealth(PlayerPedId())` (ou noter le médaillon) et `/vie` après `/vie 50`. | La vie maximale lue par le serveur est la même que celle du client (200) : `/vie 50` → médaillon 50 %, aucune correction ni perte dans les 5 s. |
 | 31 | **(2 joueurs, facultatif)** Renversement : A en véhicule (ou plus tard en monture) roule sur B. | Noter ce qui se passe : perte de B lue comme perte native (`kind = monde` au hook, aucune ligne de journal sauf mise à terre) ou coup annulé (`weaponDamageEvent` compté chez A dans la console). À me remonter dans les deux cas. |
+| 32 | **(2 joueurs)** Coup déjà lancé (1.4.0, avec `vava_magic` 2.9.0, A mage) : B garde `/frapper <A> 100` tapé d'avance. A lance un Projectile de roche N1 sur B à 15 m (1,2 s de vol) ; B valide dès le lancer. Puis réglage `chain.launchedMaxMs = 500` (`restart vava_health`), recommencer ; remettre 4000. | 1er essai : A tombe pendant le vol, la roche blesse B quand même (−14, ligne `vava_health_hits` `ref = projectile_de_roche`). 2e essai : la roche arrive plus de 0,5 s après le lancement, B ne perd rien (`source_downed`, aucune ligne). Un sort ne peut pas être lancé à terre (« Vous êtes à terre. »). |
+| 33 | `chain.pvp = false` (`restart vava_health` : la magie relit le réglage à son retour) ; A (mage) lance une Vague et un Trait de glace sur B. | B n'est ni poussé, ni mouillé, ni ralenti, ne perd rien : la magie lit `pvp` dans `vocabulary()` et coupe aussi ses effets sans dégâts. Remettre `chain.pvp = true`. |
 
 ## 2. Ce que je ne peux pas avoir vérifié hors jeu
 

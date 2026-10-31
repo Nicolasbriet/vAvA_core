@@ -448,6 +448,35 @@ describe('vava_health chaîne de dégâts (serveur)', function()
             assert.equal(10, hit(B, { amount = 10, kind = 'pur', source = A, tags = { reflected = true } }).applied)
         end)
 
+        it('coup lancé debout (1.4.0) : porte si la source tombe après, pas lancé à terre ni trop vieux', function()
+            load(A)
+            load(B)
+            local launched = { spell = true, ranged = true, launched = true }
+            -- lancé à 100000, A tombe 300 ms plus tard, l'impact arrive 1 s après le lancement
+            local launchedAt = now
+            now = now + 300
+            life.down(A, 'api')
+            now = now + 700
+            local result = hit(B, { amount = 10, kind = 'feu', source = A, tags = launched, launchedAt = launchedAt })
+            assert.is_nil(result.cancelled)
+            assert.equal(10, result.applied)
+            -- lancé alors que A était déjà à terre
+            result = hit(B, { amount = 10, kind = 'feu', source = A, tags = launched, launchedAt = now - 100 })
+            assert.equal('source_downed', result.cancelled)
+            -- délai dépassé
+            now = launchedAt + cfg.chain.launchedMaxMs + 1
+            result = hit(B, { amount = 10, kind = 'feu', source = A, tags = launched, launchedAt = launchedAt })
+            assert.equal('source_downed', result.cancelled)
+            -- sans l'étiquette : refusé comme avant
+            now = launchedAt + 1000
+            assert.equal('source_downed', hit(B, { amount = 10, kind = 'feu', source = A,
+                tags = { spell = true, ranged = true } }).cancelled)
+            -- l'instant sans l'étiquette : paquet refusé
+            local refused, code = hit(B, { amount = 10, kind = 'feu', source = A, launchedAt = launchedAt })
+            assert.is_nil(refused)
+            assert.equal('invalid_launch', code)
+        end)
+
         it('réserve le type monde aux pertes natives de vava_health', function()
             load(B)
             local refused, code = hit(B, { amount = 10, kind = 'monde' })
@@ -585,6 +614,8 @@ describe('vava_health chaîne de dégâts (serveur)', function()
             local vocabulary = api.vocabulary()
             assert.equal(100, vocabulary.healthPoints)
             assert.equal(11, #vocabulary.kinds)
+            assert.is_true(vocabulary.pvp)
+            assert.equal(cfg.chain.launchedMaxMs, vocabulary.launchedMaxMs)
             assert.same(VavaHealth.STAGES, vocabulary.stages)
             vocabulary.kinds[1] = 'x'
             assert.equal('tranchant', cfg.chain.kinds[1])
