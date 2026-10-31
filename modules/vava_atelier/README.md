@@ -71,16 +71,18 @@ après `apply(kind, def)`, `read(kind, def.id)` rend la même data, le même `pl
 
 ## Commande `/atelier_archives`
 
-Conseil et console (auteur « Console »), 2 s entre deux commandes d'un membre, réponse dans son chat ou la console.
+Conseil et console (auteur « Console »), 2 s entre deux commandes d'un membre et une seule à la fois (console
+comprise), réponse dans son chat ou la console. Un membre doit avoir son personnage chargé et un nom au Registre :
+rien ne s'écrit sans son nom au journal (une ligne refusée par le journal est écrite en console).
 
 | Action | Droit | Effet |
 |---|---|---|
 | `etat [atelier]` | Conseil (ateliers visibles) | publiées, brouillons, essais, retirées, « à synchroniser », refusées en jeu |
 | `original <atelier>` | Souverain | résumé du retour à l'original de tout l'atelier (fiches changées, rétablies, nouvelles ; les fiches créées dans l'Atelier ne sont pas touchées), puis `confirmer` |
 | `original_fiche <atelier> <type> <fiche>` | droit de l'atelier | la même chose pour une fiche (« Identique à l'original : rien à faire ») |
-| `exporter <atelier\|tout>` | Souverain | écrit `echanges/atelier_<date>_<heure>.json` (versions publiées seulement) |
+| `exporter <atelier\|tout>` | Souverain | écrit `echanges/atelier_<date>_<heure>.json` (versions publiées seulement, lues par paquets de 100) ; un export par minute, tous membres confondus ; refusé au-delà de 4 Mo (l'import le refuserait : copier les ateliers un par un) |
 | `importer <fichier>` | Souverain | lit, contrôle, résume par atelier (tout ou rien par atelier), puis `confirmer` |
-| `confirmer` | celui de l'opération, relu | l'exécute si elle a moins de 60 s et que rien n'a changé depuis le résumé |
+| `confirmer` | celui de l'opération, relu | l'exécute si elle a moins de 60 s et que rien n'a changé depuis le résumé (revu pour chaque atelier juste avant de l'écrire) |
 
 Un retour à l'original ou un import publie de nouvelles versions (`origin` seed ou import), n'en retire jamais, garde
 les brouillons, puis le module les applique et l'atelier est resynchronisé.
@@ -115,8 +117,8 @@ les brouillons, puis le module les applique et l'atelier est resynchronisé.
 | `history.keep` / `pageLines` / `purgeOnStart` | 20 / 20 / `true` | versions figées gardées par fiche (jamais la publiée ni la dernière d'une fiche retirée) ; lignes d'une page ; purge au démarrage |
 | `trial.maxMinutes` / `perMember` | 30 / 1 | durée au plus d'un essai ; essais au plus par membre |
 | `bundle.maxChildren` | 200 | fiches enfants au plus dans une publication groupée |
-| `sync.yieldEvery` / `retryMs` / `retries` | 100 / 10 000 / 3 | pause du fil de synchronisation ; nouvel essai si la base est muette ; essais au plus |
-| `archives.command` / `folder` / `maxBytes` / `confirmMs` / `cooldownMs` | `atelier_archives` / `echanges` / 4 Mo / 60 000 / 2 000 | commande, dossier des archives (jamais servi aux joueurs), fichier lu au plus, délai de confirmation, délai entre deux commandes |
+| `sync.sliceMs` / `retryMs` / `retries` | 4 / 10 000 / 3 | travail au plus (ms) entre deux pauses d'un fil de synchronisation ou d'archives ; nouvel essai si la base est muette ; essais au plus |
+| `archives.command` / `folder` / `maxBytes` / `confirmMs` / `cooldownMs` / `exportCooldownMs` | `atelier_archives` / `echanges` / 4 Mo / 60 000 / 2 000 / 60 000 | commande, dossier des archives (jamais servi aux joueurs), fichier lu ou écrit au plus, délai de confirmation, délai entre deux commandes d'un membre, délai entre deux exports (tous membres confondus) |
 | `place.maxXY` / `maxZ` / `maxRadius` / `polygonPoints` | 50 000 / 5 000 / 500 / 3 à 32 | bornes d'un lieu (formes point, orienté, cercle, polygone, porte) |
 | `texts` | — | textes vus par les membres (refus, erreurs de champ, verbes du journal, libellés du Registre) ; l'interface a les siens (`web/js/strings.js`) |
 

@@ -16,7 +16,7 @@
                   server/index.lua, server/calls.lua
 ]]
 
-local pairs, ipairs, tostring, format = pairs, ipairs, tostring, string.format
+local pairs, ipairs, tostring = pairs, ipairs, tostring
 local sort = table.sort
 local CreateThread, Wait, GetGameTimer = CreateThread, Wait, GetGameTimer
 
@@ -45,14 +45,20 @@ local function current(editor, generation)
     return editors.get(editor.id) == editor and generations[editor.id] == generation
 end
 
---- Pause du fil toutes les `sync.yieldEvery` fiches (serveur : cède la main au reste du tour).
+--- Pause du fil au temps : `Wait(0)` dès que `sync.sliceMs` se sont écoulées depuis la dernière pause (une fiche de
+--- 16 Ko pèse bien plus qu'une de 1 Ko : compter les fiches laisserait des tranches de 30 à 100 ms). Serveur : cède la
+--- main au reste du tour. Aussi pour les commandes d'archives.
+---@return fun()
 local function yielder()
-    local count = 0
+    local since = GetGameTimer()
     return function()
-        count = count + 1
-        if count % cfg.sync.yieldEvery == 0 then Wait(0) end -- audit: ok (fil serveur, pas une boucle d'affichage)
+        if GetGameTimer() - since >= cfg.sync.sliceMs then
+            Wait(0) -- audit: ok (fil serveur, pas une boucle d'affichage)
+            since = GetGameTimer()
+        end
     end
 end
+sync.yielder = yielder
 
 --- Graine : identifiants du module jamais vus en base, importés en version 1 publiée. Rend le nombre importé, ou nil.
 ---@param editor vAvA.AtelierEditor

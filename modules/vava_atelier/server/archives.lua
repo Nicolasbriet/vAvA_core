@@ -1,15 +1,20 @@
 --[[
     vava_atelier/server/archives.lua
-    Rôle : commande /atelier_archives (§ 5.9, § 10.4 de la spec T-101), membres du Conseil et console, réponse dans le
-           chat du seul membre ou dans la console, 2 s entre deux commandes d'un membre :
+    Rôle : commande /atelier_archives (§ 5.9, § 10.4 de la spec T-101), membres du Conseil (personnage chargé, nom au
+           Registre) et console, réponse dans le chat du seul membre ou dans la console, 2 s entre deux commandes d'un
+           membre, une seule à la fois par membre (console comprise) :
              - etat [atelier]            par atelier visible : publiées, brouillons, essais, retirées, « à
                                          synchroniser », refusées en jeu ;
              - original <atelier>        (Souverain) résumé du retour à l'original de tout l'atelier, puis `confirmer` ;
              - original_fiche <atelier> <type> <fiche>   (droit de l'atelier) la même chose pour une fiche ;
-             - exporter <atelier|tout>   (Souverain) seules les versions publiées, écrites dans `archives.folder` ;
+             - exporter <atelier|tout>   (Souverain) seules les versions publiées, écrites dans `archives.folder`
+                                         (un export par `archives.exportCooldownMs`, tous membres confondus ; jamais
+                                         plus lourd que `archives.maxBytes`) ;
              - importer <fichier>        (Souverain) fichier lu, contrôlé, résumé par atelier, puis `confirmer` ;
              - confirmer                 exécute l'opération en attente (moins de `archives.confirmMs`, droit relu, et
-                                         rien n'a changé entre-temps : empreinte des têtes de l'atelier).
+                                         rien n'a changé entre-temps : empreinte des têtes de l'atelier, revue pour
+                                         chaque atelier juste avant de l'écrire).
+           Un plan ne relit que ses fiches (empreinte gardée dans la tête ; la publiée relue seulement si elle diffère).
            Aucun octet ne part vers les joueurs, aucun fichier hors du dossier des archives (nom contrôlé). Un retour
            à l'original ou un import publie de nouvelles versions (tout ou rien par atelier ; rien n'est jamais retiré,
            les brouillons sont gardés), puis le module les applique et l'atelier est resynchronisé.
@@ -19,10 +24,11 @@
                   server/sync.lua
 ]]
 
-local type, ipairs, pairs, tostring, select = type, ipairs, pairs, tostring, select
+local type, ipairs, pairs, tostring, select, xpcall = type, ipairs, pairs, tostring, select, xpcall
+local traceback = debug.traceback
 local format = string.format
 local sort = table.sort
-local CreateThread, GetGameTimer, RegisterCommand, Wait = CreateThread, GetGameTimer, RegisterCommand, Wait
+local CreateThread, GetGameTimer, RegisterCommand = CreateThread, GetGameTimer, RegisterCommand
 local date = os.date
 
 local core = VavaAtelier.core
@@ -47,8 +53,10 @@ local MAX_REFUSAL_LINES = 5
 local archives = {}
 VavaAtelier.archives = archives
 
--- opération résumée en attente, par joueur (0 : console) ; dernière commande d'un membre
-local pending, lastUse = {}, {}
+-- opération résumée en attente, par joueur (0 : console) ; dernière commande d'un membre ; commande en cours d'un
+-- membre ; dernier export (tous membres confondus)
+local pending, lastUse, inFlight = {}, {}, {}
+local lastExport = nil
 
 local function say(source, line, ...)
     if select('#', ...) > 0 then line = format(line, ...) end
@@ -60,13 +68,9 @@ local function count(n, key)
     return changes.count(n, texts.counts[key])
 end
 
---- Pause du fil toutes les `sync.yieldEvery` fiches (fichier lourd, atelier de 1 000 fiches).
+--- Pause du fil au temps (`sync.sliceMs`) : fichier lourd, atelier de 1 000 fiches.
 local function yielder()
-    local done = 0
-    return function()
-        done = done + 1
-        if done % cfg.sync.yieldEvery == 0 then Wait(0) end -- audit: ok (fil serveur d'une commande, pas d'affichage)
-    end
+    return sync.yielder()
 end
 
 --- Droit relu (la console a tous les droits).
@@ -74,10 +78,25 @@ local function can(source, right)
     return source == CONSOLE or Bridge.Can(source, right)
 end
 
---- Compte et nom d'un membre (journal) ; console : nil, « Console ».
+--- Compte et nom d'un membre (journal) ; console : nil, « Console ». Un joueur sans personnage chargé ou sans nom au
+--- Registre n'a pas d'auteur : nil, nil (la commande est refusée, rien ne s'écrit sans trace).
+---@return integer|nil accountId
+---@return string|nil label
 local function actorOf(source)
     if source == CONSOLE then return nil, texts.console end
-    return Bridge.AccountId(source), Bridge.ActorLabel(source) or texts.console
+    if not Bridge.Character(source) then return nil, nil end
+    local label = Bridge.ActorLabel(source)
+    if not label then return nil, nil end
+    return Bridge.AccountId(source), label
+end
+
+--- Ligne de journal d'une commande ; un refus est écrit en console (jamais perdu sans trace).
+local function record(source, entry)
+    local ok, code = journal.write(source, entry)
+    if not ok then
+        VavaAtelier.log.warn('/%s : ligne de journal refusée (%s, %s) : %s', cfg.archives.command, entry.editor,
+            entry.action, tostring(code))
+    end
 end
 
 --- Atelier gardé, ou nil (et la réponse est donnée).
@@ -126,20 +145,35 @@ end
 
 -- Plans (original, import) --------------------------------------------------------------------------------------
 
---- État en base des fiches d'un atelier pour un plan : 'type|id' → { fingerprint?, retired? }.
-local function currentOf(editor)
+--- État en base des seules fiches du plan : 'type|id' → { fingerprint?, retired? }. L'empreinte gardée dans la tête
+--- suffit quand elle est celle de la fiche reçue (même format) ; sinon la publiée est relue et revue par le formulaire
+--- en vigueur (une forme changée depuis l'écriture donne une autre empreinte pour la même data). Rend nil, code si la
+--- base ne répond pas.
+---@param editor vAvA.AtelierEditor
+---@param items { kind: string, id: string, entry: table }[]
+---@return table|nil
+---@return string|nil
+local function currentOf(editor, items)
     local current = {}
     local step = yielder()
-    for kindId, kind in pairs(index.kinds(editor.id)) do
-        for id, head in pairs(kind.byId) do
-            step()
-            local entry = nil
-            if head.published then
-                local row = store.row(head.published.row)
-                entry = row and calls.entryOf(editor, editor.kinds[kindId], row) or nil
+    for _, item in ipairs(items) do
+        local head = index.get(editor.id, item.kind, item.id)
+        if head then
+            local fingerprint = nil
+            local published = head.published
+            if published then
+                if published.format == editor.format and published.fingerprint == item.entry.fingerprint then
+                    fingerprint = published.fingerprint
+                else
+                    step()
+                    local row, err = store.row(published.row)
+                    if err then return nil, err end
+                    local entry = row and calls.entryOf(editor, editor.kinds[item.kind], row) or nil
+                    fingerprint = entry and entry.fingerprint or '?'
+                end
             end
-            current[kindId .. '|' .. id] = { fingerprint = entry and entry.fingerprint or (head.published and '?'),
-                retired = head.retired ~= nil and not head.published }
+            current[item.kind .. '|' .. item.id] = { fingerprint = fingerprint,
+                retired = head.retired ~= nil and not published }
         end
     end
     return current
@@ -149,7 +183,8 @@ end
 --- items : { { kind, id, entry } } avec `entry.fingerprint` ; rend le plan, ou nil et « fiche : raison ».
 local function planFor(editor, source, items)
     local accountId = source ~= CONSOLE and Bridge.AccountId(source) or nil
-    local current = currentOf(editor)
+    local current, currentErr = currentOf(editor, items)
+    if not current then return nil, texts.refused[currentErr] or tostring(currentErr) end
     local refs = {}
     for i, item in ipairs(items) do
         refs[i] = { kind = item.kind, id = item.id, fingerprint = item.entry.fingerprint }
@@ -278,12 +313,14 @@ end
 --- Publie les fiches d'un plan confirmé en nouvelles versions (`origin` seed ou import), applique au module, journal,
 --- hooks, puis resynchronise l'atelier. Rend le nombre publié, ou nil et un code.
 local function publishPlan(source, editor, todo, origin, reason)
+    -- jamais d'écriture sans auteur : un joueur sans personnage chargé ou sans nom au Registre est refusé
+    local accountId, author = actorOf(source)
+    if not author then return nil, 'no_character' end
     local keys = {}
     for i, item in ipairs(todo) do keys[i] = index.key(editor.id, item.kind, item.id) end
     local token, busy = index.lock(keys)
     if not token then return nil, busy end
     index.setState(editor.id, 'syncing')
-    local accountId, author = actorOf(source)
     local steps, items = {}, {}
     for _, item in ipairs(todo) do
         local head = index.get(editor.id, item.kind, item.id)
@@ -339,32 +376,54 @@ local function confirm(source)
     pending[source] = nil
     if not op then return say(source, T.noPending) end
     if GetGameTimer() - op.at > cfg.archives.confirmMs then return say(source, T.expired) end
-    for _, part in ipairs(op.parts) do
+    --- Partie encore publiable : atelier déclaré (le même), droit relu, atelier prêt, rien de changé depuis le résumé.
+    --- Rend l'atelier, ou nil et la réponse donnée. Aucune attente entre ce contrôle et la prise des verrous.
+    local function ready(part)
         local editor = editors.get(part.editor)
-        if not editor or not can(source, op.right or editor.right) then return say(source, T.deniedEditor) end
-        if index.state(editor.id) ~= 'ready' then return say(source, T.busy, editor.label) end
-        if index.digest(editor.id) ~= part.digest then return say(source, T.changed) end
+        if not editor or not editor.stored then
+            say(source, T.unknownEditor, tostring(part.editor))
+            return nil
+        end
+        if not can(source, op.right or editor.right) then
+            say(source, T.deniedEditor)
+            return nil
+        end
+        if index.state(editor.id) ~= 'ready' then
+            say(source, T.busy, editor.label)
+            return nil
+        end
+        if index.digest(editor.id) ~= part.digest then
+            say(source, T.changed)
+            return nil
+        end
+        return editor
     end
+    -- tout est revu d'abord (rien ne part si une partie a déjà changé), puis chaque partie juste avant d'être écrite
     for _, part in ipairs(op.parts) do
-        local editor = editors.get(part.editor)
-        local published, items = publishPlan(source, editor, part.todo, op.origin, op.reason)
-        if not published then
+        if not ready(part) then return end
+    end
+    -- (une partie refusée par `ready` l'est avec sa réponse ; les suivantes sont revues à leur tour)
+    for _, part in ipairs(op.parts) do
+        local editor = ready(part)
+        local published, items = nil, nil
+        if editor then published, items = publishPlan(source, editor, part.todo, op.origin, op.reason) end
+        if editor and not published then
             say(source, T.failed, editor.label, texts.refused[items] or tostring(items))
-        else
+        elseif editor then
             say(source, T.done, editor.label, count(published, 'fiches'))
             if op.kind == 'original_fiche' then
                 local item = items[1]
                 if item then
-                    journal.write(source, { editor = editor.id, kind = item.kind, id = item.id, action = 'imported',
+                    record(source, { editor = editor.id, kind = item.kind, id = item.id, action = 'imported',
                         title = item.title, version = item.version })
                 end
             elseif op.kind == 'original' then
-                journal.write(source, { editor = editor.id, kind = editor.firstKind, action = 'imported',
+                record(source, { editor = editor.id, kind = editor.firstKind, action = 'imported',
                     title = editor.label, summary = format(texts.summaries.reimported,
                         count(part.plan.changed, 'changed'), count(part.plan.revived, 'revived'),
                         count(part.plan.new, 'new')) })
             else
-                journal.write(source, { editor = editor.id, kind = editor.firstKind, action = 'received',
+                record(source, { editor = editor.id, kind = editor.firstKind, action = 'received',
                     title = editor.label, summary = text.truncate(format(texts.summaries.received,
                         count(published, 'taken'), count(part.plan.unchanged, 'unchanged')), OUT.summary) })
             end
@@ -428,18 +487,30 @@ local function exportCommand(source, target)
         if editor.stored and (target == 'tout' or editor.id == target) then chosen[#chosen + 1] = editor end
     end
     if #chosen == 0 then return say(source, T.unknownEditor, tostring(target)) end
+    -- un export à la fois et par minute, tous membres confondus : le dossier des archives ne se remplit pas
+    local now = GetGameTimer()
+    if lastExport and now - lastExport < cfg.archives.exportCooldownMs then
+        return say(source, T.exportCooldown, (cfg.archives.exportCooldownMs - (now - lastExport)) // 1000 + 1)
+    end
+    lastExport = now
     local perEditor = {}
+    local step = yielder()
     for _, editor in ipairs(chosen) do
         local kinds, n = {}, 0
         for _, kindId in ipairs(editor.kindOrder) do
-            local rows = {}
-            local heads = {}
+            local heads, ids = {}, {}
             for _, head in pairs((index.kinds(editor.id)[kindId] or { byId = {} }).byId) do
                 if head.published then heads[#heads + 1] = head end
             end
             sort(heads, function(a, b) return a.id < b.id end)
+            for i, head in ipairs(heads) do ids[i] = head.published.row end
+            -- les publiées d'un type lues en lot (paquets de 100), jamais une requête par fiche
+            local byRow, err = store.rows(ids)
+            if not byRow then return say(source, T.exportFailed, texts.refused[err] or tostring(err)) end
+            local rows = {}
             for _, head in ipairs(heads) do
-                local row = store.row(head.published.row)
+                step()
+                local row = byRow[head.published.row]
                 local entry = row and calls.entryOf(editor, editor.kinds[kindId], row)
                 if entry then
                     rows[#rows + 1] = { id = head.id, version = head.published.version, parent = entry.parent,
@@ -457,10 +528,14 @@ local function exportCommand(source, target)
     local name = exchange.exportName(target ~= 'tout' and target or nil, date('%Y%m%d_%H%M%S'))
     local content = Bridge.JsonEncode(doc)
     if not content then return say(source, T.exportFailed, T.unwritable) end
+    -- jamais un fichier que l'import refuserait (`archives.maxBytes`)
+    if #content > cfg.archives.maxBytes then
+        return say(source, T.exportFailed, format(T.exportTooLarge, cfg.archives.maxBytes // 1048576))
+    end
     local ok, err = Bridge.SaveArchive(name, content)
     if not ok then return say(source, T.exportFailed, tostring(err)) end
     for _, part in ipairs(perEditor) do
-        journal.write(source, { editor = part.editor.id, kind = part.editor.firstKind, action = 'exported',
+        record(source, { editor = part.editor.id, kind = part.editor.firstKind, action = 'exported',
             title = part.editor.label, summary = format(texts.summaries.exported, name, count(part.count, 'fiches')) })
     end
     say(source, T.exported, name, count(total, 'fiches'))
@@ -493,6 +568,9 @@ local function importCommand(source, name)
         local editor = result.id and editors.get(result.id) or nil
         if result.error then
             refuse(editor and editor.label or result.label, result.error)
+        elseif not editor or not editor.stored then
+            -- retiré du registre pendant la lecture du fichier (pauses du fil)
+            refuse(result.label or tostring(result.id), format(T.unknownEditor, tostring(result.id)))
         elseif index.state(editor.id) ~= 'ready' then
             say(source, T.busy, editor.label)
         else
@@ -519,7 +597,10 @@ end
 local function handler(source, args)
     if source ~= CONSOLE then
         if not Bridge.AdminReady() then return say(source, T.notReady) end
+        -- personnage chargé et nom au Registre : rien ne s'écrit au nom de « Console » ni sans ligne de journal
+        if not Bridge.Character(source) then return say(source, texts.refused.no_character) end
         if not Bridge.Can(source, cfg.rights.open) then return say(source, texts.refused.not_allowed) end
+        if not Bridge.ActorLabel(source) then return say(source, T.notReady) end
         local now = GetGameTimer()
         if lastUse[source] and now - lastUse[source] < cfg.archives.cooldownMs then return say(source, T.cooldown) end
         lastUse[source] = now
@@ -562,9 +643,14 @@ end
 function archives.register()
     RegisterCommand(cfg.archives.command, function(source, args)
         local clean = cleanArgs(args)
+        if not clean then return say(source, T.usage, cfg.archives.command) end
+        -- une commande à la fois par membre (console comprise) : la suivante attend la fin de la précédente
+        if inFlight[source] then return say(source, T.running) end
+        inFlight[source] = true
         CreateThread(function()
-            if not clean then return say(source, T.usage, cfg.archives.command) end
-            handler(source, clean)
+            local ok, err = xpcall(handler, traceback, source, clean)
+            inFlight[source] = nil
+            if not ok then VavaAtelier.log.error('/%s : %s', cfg.archives.command, tostring(err)) end
         end)
     end, false)
 end

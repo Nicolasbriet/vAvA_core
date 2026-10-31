@@ -2442,7 +2442,7 @@ refus jugé par le module `{ done = false, errors = { { field?, text } } }`, ref
 | `discard` | atelier, type, fiche, révision | `{ done, state, footer }` ou `{ done, gone = true }` |
 | `retire` | atelier, type, fiche | `{ done, rev, state, footer }` (brouillon jamais publié : `{ done, gone = true }`) |
 | `take` | atelier, type, fiche, révision vue | `{ done, rev, state, footer }` |
-| `history` | atelier, type, fiche, avant la version (0 : récentes) | `{ versions = { { version, status, removal, origin, restoredFrom?, summary?, author, when } }, more }` |
+| `history` | atelier, type, fiche, avant la version (0 : récentes) | `{ versions = { { version, status, removal, restoredFrom?, summary?, author, when } }, more }` (sans `origin` : la page ne s'en sert pas) |
 | `version` | atelier, type, fiche, version | `{ id, title, version, values, labels, warnings?, state, footer }` |
 | `removed` | atelier, type, page | `{ total, page, pages, entries = { { id, title, hint } } }` |
 
@@ -2472,8 +2472,11 @@ séance est sur cet atelier, sauf l'auteur du changement, et au tenant d'un essa
 Journal : actions ajoutées `discarded`, `taken`, `trial_ended`, `exported`, `received` ; une ligne sans fiche (`def_id`
 NULL) porte sur l'atelier entier (« A rétabli l'original de l'atelier Récolte »).
 
-**Archives** (`/atelier_archives`, Souverain ou console ; fichiers dans `vava_atelier/echanges/`, nom
-`^[A-Za-z0-9_-]+\.json$` de 64 octets au plus, 4 Mo au plus, jamais servis aux joueurs) :
+**Archives** (`/atelier_archives` ; `etat` : droit d'ouvrir l'Atelier (`metiers`), ateliers visibles seulement ;
+`original_fiche` : droit de l'atelier ; `original`, `exporter`, `importer` : Souverain ou console ; `confirmer` : le
+droit de l'opération, relu ; personnage chargé et nom au Registre exigés, une commande à la fois par membre ; fichiers
+dans `vava_atelier/echanges/`, nom `^[A-Za-z0-9_-]+\.json$` de 64 octets au plus, 4 Mo au plus à la lecture comme à
+l'écriture, un export par minute tous membres confondus, jamais servis aux joueurs) :
 
 ```json
 { "atelier": 1, "exported_at": "2026-10-30T14:05:00Z",

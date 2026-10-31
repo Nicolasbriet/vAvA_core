@@ -117,6 +117,9 @@ local SET_STATUS_HEAD = 'UPDATE ' .. T .. ' SET `status` = ? WHERE `status` = ? 
 local ARCHIVE_IDS_HEAD = 'UPDATE ' .. T .. " SET `status` = 'archived' WHERE `status` = 'published' AND `id`"
 local DELETE_DRAFTS_HEAD = 'DELETE FROM ' .. T .. " WHERE `status` IN ('draft', 'trial') AND `id`"
 local PURGE_HEAD = 'DELETE FROM ' .. T .. " WHERE `status` = 'archived' AND `id`"
+local ROWS_HEAD = 'SELECT ' .. ROW_COLUMNS .. ' FROM ' .. T .. ' WHERE `id`'
+-- identifiants au plus par requête `IN (…)` d'une lecture en lot
+local ROWS_CHUNK = 100
 
 ---@param rows any
 ---@param err any
@@ -163,6 +166,29 @@ function store.row(id)
         return nil, 'db_error'
     end
     return row
+end
+
+--- Lignes entières lues en lot (`WHERE id IN (…)`, paquets de `ROWS_CHUNK`) : table id → ligne (une ligne disparue
+--- est absente), ou nil, 'db_error'. Remplace une lecture par fiche (lots, rapprochement, export).
+---@param ids integer[]
+---@return table<integer, table>|nil
+---@return string|nil
+function store.rows(ids)
+    local out = {}
+    for first = 1, #ids, ROWS_CHUNK do
+        local params = {}
+        for i = first, math.min(#ids, first + ROWS_CHUNK - 1) do params[#params + 1] = ids[i] end
+        local rows, err = core.db.query(inSql('rows', ROWS_HEAD, #params), params)
+        if type(rows) ~= 'table' then
+            VavaAtelier.log.error('définitions : %d ligne(s) illisible(s) (%s)', #params, tostring(err))
+            return nil, 'db_error'
+        end
+        for _, row in ipairs(rows) do
+            local id = tonumber(row.id)
+            if id then out[math.tointeger(id) or id] = row end
+        end
+    end
+    return out
 end
 
 --- Une version figée d'une fiche, ou nil.

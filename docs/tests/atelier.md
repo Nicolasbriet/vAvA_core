@@ -201,6 +201,9 @@ Console).
 | 4 | `importer ../server.json`, `importer a.lua`. | « Nom de fichier refusé… ». |
 | 5 | B : `exporter tout`. | « Refusé : réservé au Souverain. » |
 | 6 | `/atelier_archives etat`. | Une ligne par atelier gardé : publiées, brouillons, essais, retirées. |
+| 7 | A : `exporter tout`, puis de nouveau moins d'une minute après (B Souverain aussi, s'il l'est). | Le second : « Une copie aux archives vient d'être faite : réessayez dans n s. » ; un seul fichier écrit. |
+| 8 | B (Sénéchal) revient au choix du personnage, puis tape dans la console F8 `atelier_archives etat` et `atelier_archives original_fiche vava_example_atelier:panneaux panneau porte_nord`. | « Choisissez d'abord un personnage. » les deux fois ; rien au journal, rien de publié. |
+| 9 | A : `original_fiche` sur une fiche changée (§ 15-3), puis, avant `confirmer`, B publie un changement de **la même** fiche ; A : `confirmer`. | « Les fiches ont changé depuis le résumé : relancez la commande. » ; la publication de B reste en vigueur. |
 
 ## 17. Redémarrages (T-101)
 

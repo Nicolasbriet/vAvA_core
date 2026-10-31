@@ -106,7 +106,7 @@ VavaAtelier.config = {
         maxChildren = 200,       -- fiches enfants au plus dans une publication groupée
     },
     sync = {
-        yieldEvery = 100,        -- fiches traitées entre deux pauses du fil de synchronisation (serveur)
+        sliceMs = 4,             -- travail au plus (ms) entre deux pauses d'un fil de synchronisation ou d'archives (serveur)
         retryMs = 10000,         -- nouvel essai d'une synchronisation en échec (registres muets)
         retries = 3,             -- essais au plus ; ensuite l'atelier reste « à synchroniser »
     },
@@ -116,6 +116,7 @@ VavaAtelier.config = {
         maxBytes = 4194304,      -- fichier lu au plus (4 Mo)
         confirmMs = 60000,       -- délai pour « confirmer » une opération résumée
         cooldownMs = 2000,       -- délai entre deux commandes d'un membre
+        exportCooldownMs = 60000, -- délai entre deux exports, tous membres confondus (fichiers sur le disque)
     },
     -- Lieux d'une fiche (formes du § 5.4 de la spec T-101), aux bornes de core.zones.
     place = {
@@ -358,6 +359,9 @@ VavaAtelier.config = {
             failed = '%s : rien n\'a changé (%s).',
             exported = 'Archives écrites : %s (%s).',
             exportFailed = 'Archives non écrites : %s.',
+            exportTooLarge = 'plus de %d Mo, que l\'import refuserait : copiez les ateliers un par un',
+            exportCooldown = 'Une copie aux archives vient d\'être faite : réessayez dans %d s.',
+            running = 'La commande précédente n\'est pas finie : patientez un instant.',
             unwritable = 'fichier illisible à l\'écriture',
             upgradeRefused = 'données d\'une forme plus ancienne que cet atelier ne sait plus lire',
             tooManyEditors = 'plus de %d ateliers dans le fichier',
