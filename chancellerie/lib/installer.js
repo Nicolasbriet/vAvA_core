@@ -10,7 +10,9 @@
  *          fichier modifié sur place et inchangé en amont est gardé ; modifié des deux côtés, un fichier de réglages
  *          (config.lua, config_client.lua, config/…) est gardé et la nouvelle version posée à côté (« .nouveau »),
  *          un autre fichier est remplacé et l'ancien gardé à côté (« .local »). Sans version installée connue (vAvA
- *          posé à la main), les fichiers de réglages qui diffèrent sont gardés, les autres remplacés.
+ *          posé à la main), les fichiers de réglages qui diffèrent sont gardés, les autres remplacés. Un fichier
+ *          retiré en amont est retiré s'il n'a pas été touché ; un fichier de réglages modifié et retiré en amont
+ *          (config.lua d'un module renommé config_client.lua, T-132) est gardé et signalé : la ressource ne le lit plus.
  *        - Sauvegarde des ressources touchées avant d'écrire, et restauration à l'identique (retour en arrière).
  *        - Première installation : FXServer (build recommandée par Cfx.re), oxmysql (dernière version).
  *        - La Chancellerie elle-même : nouvelle version vérifiée (elle doit se charger) avant de remplacer les
@@ -138,10 +140,12 @@ function inGitCheckout(dir) {
  * Ce qu'il faut faire pour amener `target` à la version de `source`, en gardant les modifications locales.
  * @param {Record<string, string>} incoming  empreintes de la nouvelle version
  * @param {Record<string, string>|null} baseline  empreintes de la version installée (null : inconnue)
- * @returns {{ copy: string[], keepLocal: string[], sideNew: string[], sideLocal: string[], remove: string[] }}
+ * `orphans` : fichiers de réglages modifiés sur place et absents de la nouvelle version, gardés sans être écrits (la
+ * ressource ne les lit plus : leurs réglages sont à reporter dans le fichier qui les remplace).
+ * @returns {{ copy: string[], keepLocal: string[], sideNew: string[], sideLocal: string[], remove: string[], orphans: string[] }}
  */
 function plan(target, incoming, baseline) {
-  const out = { copy: [], keepLocal: [], sideNew: [], sideLocal: [], remove: [] };
+  const out = { copy: [], keepLocal: [], sideNew: [], sideLocal: [], remove: [], orphans: [] };
   for (const [relative, fresh] of Object.entries(incoming)) {
     const file = path.join(target, relative);
     const local = fs.existsSync(file) ? dl.hashFile(file) : null;
@@ -156,9 +160,25 @@ function plan(target, incoming, baseline) {
   for (const [relative, base] of Object.entries(baseline || {})) {
     if (incoming[relative] !== undefined) continue;
     const file = path.join(target, relative);
-    if (fs.existsSync(file) && dl.hashFile(file) === base) out.remove.push(relative);
+    if (!fs.existsSync(file)) continue;
+    if (dl.hashFile(file) === base) out.remove.push(relative);
+    else if (userOwned(relative)) out.orphans.push(relative);
   }
   return out;
+}
+
+/**
+ * Fichier qui remplace un fichier de réglages retiré, dans la nouvelle version : `config_client.lua` du même dossier
+ * pour un `config.lua` (T-132), sinon null.
+ * @param {string} relative
+ * @param {Record<string, string>} incoming
+ * @returns {string|null}
+ */
+function successorOf(relative, incoming) {
+  if (path.posix.basename(relative) !== 'config.lua') return null;
+  const dir = path.posix.dirname(relative);
+  const next = dir === '.' ? 'config_client.lua' : `${dir}/config_client.lua`;
+  return incoming[next] !== undefined ? next : null;
 }
 
 const changes = (p) => p.copy.length + p.sideNew.length + p.sideLocal.length + p.remove.length;
@@ -227,11 +247,13 @@ function restoreResources(id) {
 
 /**
  * Applique les plans des ressources et retient la nouvelle version installée.
- * @returns {{ changed: string[], added: string[], kept: string[], sideNew: string[], sideLocal: string[] }}
+ * `orphans` : { file, successor } des réglages modifiés gardés mais absents de la nouvelle version (successor : le
+ * fichier où les reporter, ou null).
+ * @returns {{ changed: string[], added: string[], kept: string[], sideNew: string[], sideLocal: string[], orphans: { file: string, successor: string|null }[] }}
  */
 function applyResources(plans, serverDataPath, source) {
   const root = resourcesRoot(serverDataPath);
-  const report = { changed: [], added: [], kept: [], sideNew: [], sideLocal: [] };
+  const report = { changed: [], added: [], kept: [], sideNew: [], sideLocal: [], orphans: [] };
   const installed = state();
   for (const item of plans) {
     if (changes(item.plan)) {
@@ -241,6 +263,10 @@ function applyResources(plans, serverDataPath, source) {
     report.kept.push(...item.plan.keepLocal.map((f) => `${item.name}/${f}`));
     report.sideNew.push(...item.plan.sideNew.map((f) => `${item.name}/${f}`));
     report.sideLocal.push(...item.plan.sideLocal.map((f) => `${item.name}/${f}`));
+    report.orphans.push(...(item.plan.orphans || []).map((f) => {
+      const next = successorOf(f, item.incoming);
+      return { file: `${item.name}/${f}`, successor: next ? `${item.name}/${next}` : null };
+    }));
     installed.resources[item.name] = { folder: path.relative(root, item.target).split(path.sep).join('/'), files: item.incoming };
   }
   installed.source = source;
