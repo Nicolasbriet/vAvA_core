@@ -1107,6 +1107,7 @@ faire tout le système de combat ») : la porte T-119 reste à passer en jeu.
   tout le personnage à chaque `armed()` ; **(lore)** prévoir une vraie durée pour dégainer et rengainer, ou un court
   délai avant d'incanter après avoir rangé une arme, sinon la règle « le mage a besoin d'un garde » ne tient pas
   (l'incantation est déjà brisée dès qu'une arme passe en main, `vava_inventory:hold`).
+- Suites de la relecture sécurité appliquées ; relecture réseau en cours.
 
 ### T-149 — La magie et le mode combat
 - Agent : vava-dev-lua (cette tâche autorise à toucher `vava_magic`) · Dépend de : T-112, T-138 · Statut : à faire

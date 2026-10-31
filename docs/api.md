@@ -1817,7 +1817,8 @@ souris, dégainer et rengainer. Demande le core 0.10.0, `vava_inventory` 1.7.0 e
   reconnexion).
 - **Combat natif** : drapeau de ped 122 (corps à corps désactivé), `SetPedCanSwitchWeapon(false)`, armes GTA retirées,
   réappliqués à 1 Hz côté client ; rendus à GTA à l'arrêt du module. En mode combat actif, les touches d'attaque, de
-  visée, de corps à corps et de la roue des armes sont aussi coupées à chaque image (jamais Échap ni P). Le filet reste
+  visée, de corps à corps et de la roue des armes sont aussi coupées à chaque image (jamais Échap ni P : 199, 200 et
+  322 dans `mode.blocked` refusent le module au démarrage, 32 contrôles au plus). Le filet reste
   l'annulation serveur de `vava_health`.
 - **Une technique** (1.2.0) : le client joue le geste **aussitôt** et demande ; le serveur vérifie (en mémoire d'abord :
   technique connue, type d'attaque, chancellement, dégainer, délai et enchaînement ; puis personnage, arme **réellement
@@ -1829,8 +1830,12 @@ souris, dégainer et rengainer. Demande le core 0.10.0, `vava_inventory` 1.7.0 e
   d'abord, puis le plus en face, le plus proche), touché une fois ; bond de l'attaquant borné (8 m/s + 0,5 m depuis la
   demande, sinon coup annulé, console). Le coup passe par `strike` (chaîne de dégâts, usure). Aucun contrôle des murs
   (décision du porteur du projet). **Enchaînement** : une technique de `chain` part pendant la récupération (60 ms de
-  gigue admis), 3 enchaînées au plus après celle qui ouvre, puis la récupération entière. **Chancellement** (`staggers`,
-  le Fendant) : la cible ne frappe plus 0,9 s, son coup en cours est coupé, puis aucun autre chancellement avant 3 s.
+  gigue admis), 3 enchaînées au plus après celle qui ouvre, puis la récupération entière. Un coup **annulé**, quelle
+  qu'en soit la cause (chancellement, à terre, main changée, véhicule, bond), compte comme allé au bout : sa
+  récupération et le compte d'enchaînement tiennent (s'annuler soi-même ne libère jamais plus tôt). Une demande admise
+  **réserve** sa place avant le premier export ou crochet : deux demandes simultanées ne passent jamais toutes les deux,
+  un refus rend la place au coup d'avant. **Chancellement** (`staggers`, le Fendant) : la cible ne frappe plus 0,9 s,
+  son coup en cours est coupé, puis aucun autre chancellement avant 3 s.
 - **Dégainer et rengainer** (1.2.0, décision du porteur du projet) : arme prise en main (hook `vava_inventory:hold`), aucune
   technique avant **0,8 s** (`drawing`) ; arme rangée, `armed(src)` rend encore `{ …, sheathing = true, readyInMs }`
   pendant **1,5 s** : la magie refuse d'incanter (« rangez votre arme ») sans que `vava_magic` change. Dégainer ne
@@ -1886,8 +1891,9 @@ gratuitement) ; pile partie ou inventaire muet : aucune usure.
 | `inCombatMode()` | vrai si le mode combat est éveillé et actif (arme du royaume en main, éveillé par une touche du combat, endormi après 10 s sans coup) |
 | `shieldHung()` | objet du bouclier accroché sur son propre ped, ou `nil` |
 
-**Hooks** : `vava_combat:using` (`before`, annulable, ne doit jamais céder la main : `{ source, characterId, technique,
-item, target? }` — prison, ligotage, trêve du Conseil ; la raison, 120 octets, est montrée au joueur),
+**Hooks** : `vava_combat:using` (`before`, annulable, ne doit jamais céder la main ; s'il le fait, le coup reste
+réservé et revérifié à la reprise ; charge : `{ source, characterId, technique, item, target? }` — prison, ligotage, trêve du
+Conseil ; la raison, 120 octets, est montrée au joueur),
 `vava_combat:shieldHang` (`before`, annulable, accroche seule : `{ source, characterId, instanceId, item }` ; la raison du
 refus est montrée au joueur — prison, interdiction ; `after` : `+ hang, reason` = `use` | `gone` | `restored`),
 `vava_combat:dulled` (`after` : `{ source, characterId, instanceId, item }`, une arme vient d'atteindre 0). **Écoutés** :

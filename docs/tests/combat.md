@@ -139,7 +139,7 @@ avant). Préparation : 0.7.
 | 9 | **(2 joueurs)** B à 1,5 m sur le côté (90°), A ne se tourne pas (sans verrou, caméra ailleurs que vers B). | Aucun dégât ; avec le verrou (clic molette sur B) : A se tourne vers B, dégâts. |
 | 10 | **(2 joueurs)** A clic droit (Fendant, 0,65 s de préparation) ; B recule aussitôt de 2 m. | Le Fendant manque si B est sorti de portée avant la frappe. |
 | 11 | **(2 joueurs)** A Fendant sur B. | B chancelle (geste, secousse), ne peut pas frapper 0,9 s (« Vous chancelez. ») ; un second Fendant dans les 3 s suivantes : dégâts sans chancellement ; plus tard : chancelle de nouveau. |
-| 12 | **(2 joueurs)** B prépare un Fendant, A le touche d'un Fendant avant la frappe de B. | Le Fendant de B est coupé, aucun dégât chez A. |
+| 12 | **(2 joueurs)** B prépare un Fendant, A le touche d'un Fendant avant la frappe de B ; B reclique dès la fin du chancellement. | Le Fendant de B est coupé, aucun dégât chez A. B ne repart qu'à la fin du cycle de son Fendant coupé (≈ 1,5 s après son départ), sans geste refusé entre-temps : un coup coupé compte comme donné. |
 | 13 | **(3 joueurs)** A clic molette avec B et C en vue. | Anneau sous le plus proche du centre de l'écran ; second clic : l'autre ; maintenu : relâché ; B s'éloigne à 8 m : relâché. Rien chez B ni chez C. |
 | 14 | **(2 joueurs)** B `/esquive` puis A frappe. | Aucun dégât, aucun sang ; `/vava_reseau joueur <B>` : un `vava_combat:hit` (issue `dodge`). |
 | 15 | **(2 joueurs)** B `/bouclier 50` puis A frappe. | Dégâts absorbés (B ne perd rien), aucun sang. |
@@ -159,6 +159,7 @@ avant). Préparation : 0.7.
 | 29 | **(2 joueurs)** A se déconnecte pendant la préparation d'un Fendant. | Aucun coup chez B ; console sans erreur. |
 | 30 | `restart vava_combat` pendant une mêlée. | Coups en cours perdus sans erreur ; techniques de nouveau jouables au retour (arme à reprendre en main si l'inventaire l'a gardée à part). |
 | 31 | Console : `debug.logSamples = true` (config.lua), redémarrage, coups à portée limite. | Une ligne par relevé (`coup <n> <technique> relevé <k> : <joueur> d=… a=… portée … → issue`) : base des réglages de T-119. |
+| 32 | A clic droit (Fendant), range l'épée aussitôt, la reprend et clique de nouveau, plusieurs fois. | Aucun coup avant la fin du cycle du Fendant coupé (1,55 s après son départ) ni avant 0,8 s de dégainer : couper son propre coup ne fait pas frapper plus vite. |
 
 ## 4. Ce que je ne peux pas avoir vérifié hors jeu
 
