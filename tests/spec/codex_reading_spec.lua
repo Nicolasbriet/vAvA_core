@@ -55,7 +55,7 @@ describe('vava_codex pages de lecture : serveur', function()
         }
         VavaCodex.prefs = { get = function(src) return characters[src] and { favorites = {}, recent = {}, keepOpen = true } or nil end }
         commands = {}
-        RegisterCommand = function(name, handler, restricted) commands[name] = { handler = handler, restricted = restricted } end
+        _G.RegisterCommand = function(name, handler, restricted) commands[name] = { handler = handler, restricted = restricted } end
         VavaCodex.seed = value
         helper.load('modules/vava_codex/server/reading.lua')
         reading = VavaCodex.reading
