@@ -4,7 +4,9 @@ Procédure pour vérifier en jeu `vava_magic` 2.10.0 : fiche et commandes du Con
 mana, verrouillage, les onze sorts, états élémentaires, zones au sol, combinaisons, effets et sons, triche,
 déconnexions, redémarrage et resmon ; la section 18 éprouve les blessures portées par la chaîne de dégâts de
 `vava_health` 1.3.0 (T-116 : mêmes dégâts, boucliers et résistances, combats entre joueurs coupés, lanceur à terre,
-incantation brisée par un coup, `vava_health` arrêté) ; la section 19, les mains vides pour incanter (T-140). Le module n'a encore jamais été joué : chaque écart compte, même petit. Comptez
+incantation brisée par un coup, `vava_health` arrêté) ; la section 19, les mains vides pour incanter (T-140) ; la
+section 20, la magie et le mode combat (2.12.0, T-149 : silence arme du royaume en main, rengainement, contrôles durs
+qui empêchent de frapper, membre du Conseil invulnérable épargné des effets sans dégâts). Le module n'a encore jamais été joué : chaque écart compte, même petit. Comptez
 trois heures seul et une heure et demie à plusieurs ; les tests à deux sont marqués **(2 joueurs)**, ceux qui
 demandent un témoin ou un voisin **(3 joueurs)**.
 
@@ -658,7 +660,7 @@ bûcheron prises au catalogue (`/catalogue arme`, `/catalogue outil`). Entre deu
 | 1 | Démarrer le serveur. | `module 'vava_magic' v2.10.0 prêt`, aucun avertissement nouveau. |
 | 2 | A, mains vides, Lueur prête : clic gauche. | La Lueur part comme avant. |
 | 3 | A prend l'Épée courte dans les Mains ; `Tab`, choisit la Boule de feu. | Aussitôt : « Il vous faut les mains libres pour incanter : rangez votre arme. » Le sceau de la Boule de feu est près de la barre de mana (le sort reste prêt). |
-| 4 | Épée en main : clic droit maintenu, puis trois clics gauches en 2 s ; attendre 6 s, un clic gauche. Puis reposer l'épée, la reprendre, clic droit. | Ni réticule, ni aperçu, ni incantation, ni mana dépensée ; **aucun** nouveau rappel (déjà dit à la roue pour cette épée). Épée reprise : le clic droit donne **un** rappel, sans réticule. |
+| 4 | Épée en main : clic droit maintenu, puis trois clics gauches en 2 s ; attendre 6 s, un clic gauche. Puis reposer l'épée, la reprendre, clic droit. | Ni réticule, ni aperçu, ni incantation, ni mana dépensée ; **aucun** nouveau rappel (déjà dit à la roue pour cette épée). Épée reprise : depuis 2.12.0 (T-149), le clic droit ne dit **rien** du côté de la magie (arme du royaume en main : la souris est au mode combat), sans réticule ; en reposant l'épée, un clic dans les 1,5 s dit « Vous rengainez votre arme… » (voir 20). |
 | 5 | Épée en main : `/lancer`, deux fois. | Le rappel à chaque fois ; rien ne part. |
 | 6 | A repose l'épée (mains vides) ; clic droit bref, puis clic gauche. | La boule part (le mode redevient actif en 0,2 s au plus). |
 | 7 | A incante une Lueur (2,5 s) et, pendant l'incantation, prend la Dague dans les Mains (glisser depuis la besace). | L'incantation se brise dans le quart de seconde : le rappel s'affiche (une seule fois), barre d'incantation interrompue, mana **inchangée**, aucun temps de recharge sur la Lueur (le grimoire ou la roue le montrent). |
@@ -676,3 +678,37 @@ client refuse toujours en premier), arme de GTA comprise (`vava_combat` la retir
 hors jeu (`tests/spec/magic_hands_spec.lua` : refus au début et après les recharges, arme prise puis reposée pendant
 l'incantation, arme de GTA sur le ped, bouclier au bras ou dans le dos, sans vava_combat, vava_combat en erreur ou pas
 prêt).
+
+## 20. La magie et le mode combat (2.12.0, T-149)
+
+Décisions du porteur du projet (31 octobre 2026, spec T-112 § 13-1 à 13-3). Une arme du royaume en main, les boutons de
+la souris sont au mode combat de `vava_combat` : la magie se tait aux touches et ne verrouille personne ; pendant les
+1,5 s du rengainement, un mot propre ; un joueur gelé, renversé ou chancelant par un sort ne frappe pas ; un membre du
+Conseil invulnérable n'est ni poussé, ni renversé, ni mouillé, ni ralenti par un sort. Préparation : la section 19
+(`vava_combat` 1.2.0, A mage avec tous les sorts, Épée courte au catalogue), et B mage aussi (`/magie tous <B>`), une
+Épée courte pour B ; `vava_admin` 1.11.0 (Outils : levier « Invulnérabilité », vol libre `F2`). Entre deux tests :
+`/magie mana`, `/magie recharges`.
+
+| # | Faire | Attendu |
+|---|---|---|
+| 1 | Démarrer le serveur. | `module 'vava_magic' v2.12.0 prêt`, aucun avertissement nouveau ; `vava_combat` v1.2.0 inchangé. |
+| 2 | A, Boule de feu prête, prend l'Épée courte ; clic droit maintenu, clic gauche, clic molette, chacun trois fois. | **Aucun** mot de la magie (ni « rangez votre arme »), aucun réticule, aucun anneau de la magie ; seul le combat répond (coups, verrou du combat et son anneau). |
+| 3 | A, l'épée toujours en main : `Tab` et choisir la Boule de feu ; puis `/lancer`. | La roue et `/lancer` disent « Il vous faut les mains libres pour incanter : rangez votre arme. » (gestes de magie explicites) ; rien ne part. |
+| 4 | **(2 joueurs)** A, mains vides, verrouille B (clic molette, anneau de la magie sous B) ; puis prend l'épée. | L'anneau de la magie disparaît en un quart de seconde au plus ; un clic molette ne pose ensuite que le verrou du combat. |
+| 5 | A range l'épée et, dans la seconde, clic droit puis clic gauche. | Geste de rengainer ; **un** avis (pas un avertissement) « Vous rengainez votre arme : vos mains seront libres dans un instant. », jamais « rangez votre arme » ; après 1,5 s, clic droit : le mode magie s'éveille, le sort part. |
+| 6 | A range l'épée et tape aussitôt `/lancer`. | « Vous rengainez votre arme… » ; rien ne part, aucune mana dépensée ; 1,5 s plus tard, `/lancer` : le sort part. |
+| 7 | `stop vava_combat` (sinon le pistolet est retiré en moins d'une seconde) ; A sort un pistolet de GTA (`/arme pistolet` de `vava_example_combat`) ; clic droit deux fois. Puis `/arme non`, `ensure vava_combat`. | « rangez votre arme » une fois (comme avant 2.12.0) ; verrou de la magie toujours possible. |
+| 8 | **(2 joueurs)** B, l'Épée courte en main ; A gèle B (Trait de glace sur B mouillé, combinaison Gel) ; B clique (clic gauche, clic droit) pendant le gel. | « Vous ne pouvez pas frapper ainsi. » ; aucun coup. À la fin du gel, B frappe de nouveau. |
+| 9 | **(2 joueurs)** Même chose avec la Vague N4 (B renversé), puis la Secousse (B chancelant). | Pendant le Renversé et le Chancelant : « Vous ne pouvez pas frapper ainsi. » ; ensuite, les coups partent. |
+| 10 | **(2 joueurs)** A : Outils → « Invulnérabilité » ; B lance une Vague N4 sur A. | A n'est ni poussé, ni renversé, ni mouillé (aucune icône) ; aucun dégât (chaîne). B voit sa vague partir normalement. |
+| 11 | **(2 joueurs)** A toujours invulnérable ; B lance une Brume N3 sur A, puis une Vague (sol mouillé devant B, A dedans) et une Secousse sur ce sol (boue). A reste dedans 10 s. | A n'est jamais mouillé, ni ralenti, ni chancelant ; aucune ligne de console. |
+| 12 | **(2 joueurs)** A coupe « Invulnérabilité », reste dans la brume. | Mouillé dans les 4 s (pose suivante), pas avant. |
+| 13 | **(2 joueurs)** A en vol libre (`F2`) ; B lance une Vague N4 sur A. | Comme 10 (le vol libre protège aussi). |
+| 14 | **(2 joueurs)** `/vava_reseau joueur <A>` pendant 10 à 13. | Aucun évènement `vava_magic:push` ni `vava_magic:hit` vers A tant qu'il est protégé ; pas d'envoi nouveau. |
+| 15 | `resmon 1` chez A : l'épée en main, mode combat éveillé, 20 s de clics ; puis mains vides, verrou de la magie posé 20 s. | `vava_magic` comme en 19-13 (aucune boucle nouvelle) : l'épée en main, rien ne tourne côté magie ; verrou posé : un export toutes les 250 ms en plus, seulement tant qu'il est posé. |
+| 16 | `stop vava_combat` ; A, épée en main (gardée à part), clic droit ; `ensure vava_combat`. Puis `stop vava_admin`, B lance une Vague sur A ; `ensure vava_admin`. | Sans vava_combat : comme sans arme (la magie répond). Sans vava_admin : A est poussé et mouillé (personne n'est épargné), aucune ligne de console de `vava_magic`. |
+
+Ce qui est prouvé hors jeu (`tests/spec/magic_combat_mode_spec.lua`, `magic_chain_server_spec.lua`,
+`magic_hands_spec.lua`) : règles des mots et du verrou, refus `sheathing` du serveur, export `hardControl` (échéance
+comprise) lu par le bridge de `vava_combat`, une lecture de `isInvulnerable` par effet (Vague : une par cible ; sol
+mouillé, brume, boue : une par pose, jamais à chaque vérification), vava_admin absent ou en erreur.

@@ -1429,8 +1429,9 @@ voulu (l'écran des joueurs non plus, voir plus bas).
   `vava_health:modifiers` (étape `annulation`, priorité 10, déclaré avec `kinds` : tous les types de la chaîne sauf
   `monde`) annule alors **tout coup et tout sort qui blessent** (`cancelled = 'invulnerable'`, `'spectating'` pendant
   une observation ; inscrits au journal des coups de `vava_health` quand ils viennent d'un joueur). Les **effets sans
-  dégâts** (recul, renversement, mouillé, ralenti des sorts) ne passent pas par la chaîne et **ne sont pas couverts** :
-  un module qui veut les épargner lit l'export `isInvulnerable` (pas encore branché dans `vava_magic`). **Décision**
+  dégâts** (recul, renversement, mouillé, ralenti des sorts) ne passent pas par la chaîne, qui ne les couvre pas : un
+  module qui veut les épargner lit l'export `isInvulnerable` (branché dans `vava_magic` 2.12.0, T-149 : recul,
+  Renversé, Mouillé, Ralenti des sorts épargnés). **Décision**
   (relecture S-6) : la faim et la soif (`privation`) sont annulées aussi ; avant 1.11.0, elles traversaient
   l'invincibilité locale. Le modificateur ne lit que la mémoire du Registre et deux positions (natives) ; il ne cède
   jamais la main.
@@ -1798,7 +1799,8 @@ journal) ; **techniques** en données (format de `COMBAT_V1.md` § 3, contrôlé
 rapide, Revers, Fendant, style `epee_une_main`), coup jugé par le serveur, enchaînement, chancellement, mode combat à la
 souris, dégainer et rengainer. Demande le core 0.10.0, `vava_inventory` 1.7.0 et `vava_health` 1.3.0 ; facultatifs :
 `vava_crafting` ≥ 1.5.0 et `vava_skills` ≥ 1.0.0 (recettes), `vava_hud`, `vava_admin` (sans lui, ACE `combat.admin`),
-`vava_chat`, `vava_magic` (export `hardControl` s'il existe, T-149). Ordre de démarrage : après `vava_health` et
+`vava_chat`, `vava_magic` (export `hardControl`, `vava_magic` ≥ 2.12.0, T-149 : gelé, renversé ou chancelant par un
+sort → refus `controlled` ; plus ancien, arrêté ou en erreur : aucun refus de ce côté). Ordre de démarrage : après `vava_health` et
 `vava_crafting`. **Un RPC, aucune NUI, aucune table SQL.** Détail, valeurs et tests en jeu :
 `modules/vava_combat/README.md`, `docs/tests/combat.md` § 2 et § 3.
 
@@ -1913,7 +1915,7 @@ le mode magie dort arme en main, le mode combat ne s'éveille qu'arme en main.
 
 ### `vava_magic`
 
-La magie (2.11.0) : fiche magie par personnage (champ privé `vava_magic:sheet` : mage ou non, sorts et leur XP, sort
+La magie (2.12.0) : fiche magie par personnage (champ privé `vava_magic:sheet` : mage ou non, sorts et leur XP, sort
 prêt dans les mains, combinaisons découvertes, sigils gardés, sigil unique dans tout le royaume), mana (100, +3 toutes
 les 5 s, jamais sauvegardée) et sa barre, 5 niveaux par sort, incantation commune avec délai global (1 s), roue des
 sorts (Tab) et mode magie à la souris (clic droit viser, clic gauche lancer, clic molette verrouiller), états
@@ -1929,8 +1931,9 @@ détail, la config et la liste des tests en jeu : `modules/vava_magic/README.md`
 (notifications), `vava_health` ≥ 1.3.0, 1.4.0 conseillé (blessures par la chaîne de dégâts — sans lui, aucun sort ne blesse
 personne —, à terre : un joueur à terre ne subit plus aucun effet des sorts — ni Mouillé, ni recul, ni Renversé, ni
 Ralenti), `vava_admin` (droit `tools` et journal ; sans lui, ACE `magie.admin` ;
-≥ 1.6.0 : la fin d'un Gel ne libère pas un joueur immobilisé par le Registre), `vava_combat` ≥ 1.0.0 (mains vides pour
-incanter ; sans lui, aucune restriction).
+≥ 1.6.0 : la fin d'un Gel ne libère pas un joueur immobilisé par le Registre ; ≥ 1.11.0 : `isInvulnerable`, un membre
+protégé est épargné des effets sans dégâts), `vava_combat` ≥ 1.0.0 (mains vides pour incanter ; sans lui, aucune
+restriction ; 1.2.0 : rengainement et mode combat, T-149).
 
 - **Bridge** : `bridge/server.lua` et `bridge/client.lua` sont les seuls fichiers qui appellent le core et les autres
   modules ; les réécrire suffit pour un autre core (avec un équivalent de `core.rpc`).
@@ -1942,7 +1945,19 @@ incanter ; sans lui, aucune restriction).
   de l'inventaire (une ligne de console par minute au plus, aussi quand `not_ready` dure). Le client lit `armed()` pour
   le montrer tôt (mode magie endormi, roue, touches, incantation interrompue), sans en décider.
   **Rengainer** (`vava_combat` 1.2.0, T-112) : une arme rangée laisse `armed()` (serveur et client) dire « mains
-  prises » pendant 1,5 s (`sheathing = true`) : la magie refuse d'incanter pendant ce temps, sans changement ici.
+  prises » pendant 1,5 s (`sheathing = true`) : la magie refuse d'incanter pendant ce temps ; depuis 2.12.0 (T-149),
+  avec le code `sheathing` (« Vous rengainez votre arme : vos mains seront libres dans un instant. », simple avis).
+- **Mode combat** (2.12.0, T-149, décisions du porteur du projet) : arme du royaume en main (`armed()` côté client, un
+  appel isolé, aux relevés existants et aux touches, aucune boucle nouvelle), la magie ne dit rien aux touches de la
+  souris (le combat a les mêmes) et ne verrouille personne (un verrou posé tombe à la vérification suivante) ; pendant
+  le rengainement, le mot propre ; la roue et `/lancer` le disent toujours ; arme de GTA : « rangez votre arme » comme
+  avant. Règles pures : `shared/hands.lua`.
+- **Membre du Conseil invulnérable** (2.12.0, T-149 ; relectures S-2 et R-3 de T-138) : les effets sans dégâts (recul,
+  Renversé, Mouillé, Ralenti, états des combinaisons) épargnent un joueur que `exports.vava_admin:isInvulnerable` tient
+  pour invulnérable : lu par `combat.affects` en dernier (seulement pour qui serait touché), **une fois par effet** —
+  une fois par cible d'une Vague ; un sol mouillé, une brume, une boue notent ce refus comme une pose et ne le relisent
+  qu'à la pose suivante (4 s, 4 s, 2 s), jamais à chaque vérification de 500 ms. Sans `vava_admin` ≥ 1.11.0 : personne
+  n'est épargné (en erreur : une ligne de console par minute au plus).
 - **Incantation** : RPC `vava_magic:begin:<sort>` puis `vava_magic:finish:<sort>` (numéro d'incantation). Le serveur
   revérifie à la fin la durée, le déplacement (positions serveur) et la blessure (2.9.0 : un coup de la chaîne ou une
   perte native qui a retiré de la vie au lanceur, hook `vava_health:hit` after, ou sa vie de `vava_health:get` plus
@@ -2001,6 +2016,7 @@ incanter ; sans lui, aucune restriction).
 | `isMage(source)` | booléen — personnage en jeu |
 | `spellLevel(source, sort)` | niveau (1 à 5) d'un sort connu, ou `nil` |
 | `mana(source)` | mana actuelle, maximum (0 pour un non-mage) |
+| `hardControl(source)` | `'frozen'`, `'knockdown'` ou `'stagger'` — vrai, avec sa nature — tant qu'un Gelé, un Renversé ou un Chancelant d'un sort tient le joueur (le premier dans l'ordre de `states.order`), sinon `nil` (source non entière comprise) ; mémoire seule, sans attente ; lu par `vava_combat` à chaque frappe (refus `controlled`) ; depuis 2.12.0 (T-149) |
 
 **Hooks** : `vava_magic:castStarting` (`before`, annulable : `{ source, characterId, spell, level }` — prison, zone…),
 `vava_magic:castDone` (`after` : `+ success`), `vava_magic:levelUp` (`after` : `{ source, characterId, spell, level }`),

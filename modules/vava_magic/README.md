@@ -9,14 +9,17 @@ ardente**), d'eau (**Trait de glace**, **Vague**, **Brume**) et de terre (**Proj
 **Lueur** et **Murmure**, grimoire et registre des murmures (objets), commandes du Conseil. Le serveur décide de tout ;
 le client affiche et demande.
 
-Version 2.11.0 : les cinq étapes de la refonte (noyau, roue et contrôles ; états, zones et feu ; eau et terre ;
+Version 2.12.0 : les cinq étapes de la refonte (noyau, roue et contrôles ; états, zones et feu ; eau et terre ;
 combinaisons ; finitions : traces au sol, sons par fichier ou natifs, documentation et tests), puis leurs correctifs ;
 le registre des murmures s'envoie par lots (2.7.0) ; polices et papier de vava_ui (2.8.0) ; les blessures des sorts
 passent par la **chaîne de dégâts** de vava_health, boucliers, résistances et zones de paix en modificateurs, une
 blessure ne se lit plus sur le ped (2.9.0, T-116 : voir « Blessures et chaîne de dégâts ») ; **mains vides pour
 incanter** : ni arme tenue ni bouclier au bras, vérifié par le serveur avec vava_combat (2.10.0, T-140 : voir « Mains
 vides pour incanter »). Les réglages sont en deux fichiers depuis 2.11.0 (T-143, lot 4 de T-132) : voir
-« Configuration ».
+« Configuration ». **La magie et le mode combat** (2.12.0, T-149 : voir « La magie et le mode combat ») : arme du
+royaume en main, la magie se tait aux touches et ne verrouille personne, un mot propre pendant le rengainement ;
+l'export `hardControl` dit à vava_combat qu'un joueur gelé, renversé ou chancelant ne frappe pas ; les effets sans
+dégâts épargnent un membre du Conseil que vava_admin tient pour invulnérable.
 Rien n'a encore été joué en vrai : voir « À vérifier en jeu », « Tests à faire en jeu » et la procédure complète
 `docs/tests/magie.md`.
 
@@ -47,8 +50,8 @@ Rien n'a encore été joué en vrai : voir « À vérifier en jeu », « Tests �
 | `vava_inventory` ≥ 1.3.0 | grimoire et registre (objets, métadonnées) | pas d'objets ; `/grimoire` reste |
 | `vava_hud` | notifications | notifications de GTA (la barre de mana est celle du module) |
 | `vava_health` ≥ 1.3.0 (1.4.0 conseillé) | blessures par la chaîne de dégâts (`hit`), vie tenue par le serveur, état « à terre » (aucun sort ne touche un joueur à terre) ; 1.4.0 : un sort lancé debout porte encore si le lanceur tombe avant l'impact, et `chain.pvp = false` coupe aussi les effets sans dégâts | **aucun sort ne blesse personne** (le lanceur le lit, une fois par minute ; console) ; rien n'interrompt une incantation |
-| `vava_combat` ≥ 1.0.0 | mains vides pour incanter : `armed(source)` (arme tenue) et `shield(source).ready` (bouclier au bras) côté serveur, `armed()` côté client (affichage seulement) | **aucune restriction** : on incante l'arme à la main (les armes de GTA restent refusées, par le serveur aussi) |
-| `vava_admin` | droits et journal du Conseil ; ≥ 1.6.0 : la fin d'un Gel ne libère pas un joueur immobilisé par le Registre | permission ACE `magie.admin`, journal en console |
+| `vava_combat` ≥ 1.0.0 (1.2.0 conseillé) | mains vides pour incanter : `armed(source)` (arme tenue ; 1.2.0 : `sheathing = true` pendant le rengainement) et `shield(source).ready` (bouclier au bras) côté serveur, `armed()` côté client (affichage seulement : silence de la magie arme du royaume en main, mot du rengainement) ; il lit l'export `hardControl` de la magie | **aucune restriction** : on incante l'arme à la main (les armes de GTA restent refusées, par le serveur aussi) |
+| `vava_admin` | droits et journal du Conseil ; ≥ 1.6.0 : la fin d'un Gel ne libère pas un joueur immobilisé par le Registre ; ≥ 1.11.0 : `isInvulnerable`, un membre protégé est épargné des effets sans dégâts | permission ACE `magie.admin`, journal en console ; effets sans dégâts sur tout le monde |
 | `vava_chat` | réponses des commandes et suggestions (évènements `chat:*`, aussi ceux de la ressource « chat » de FiveM) | touches seulement |
 
 ## Arborescence
@@ -56,7 +59,8 @@ Rien n'a encore été joué en vrai : voir « À vérifier en jeu », « Tests �
 ```
 vava_magic/
   fxmanifest.lua · config_client.lua (lu par le client) · config.lua (servi au seul serveur) · README.md
-  shared/   constants.lua · progression.lua · geometry.lua (lus par le client et le serveur)
+  shared/   constants.lua · progression.lua · geometry.lua · hands.lua (lus par le client et le serveur ; hands.lua :
+            mains prises et mode combat, 2.12.0)
             text.lua (UTF-8) · pages.lua (lots du registre) · harm.lua (blessures sur la chaîne) : servis au seul serveur
   bridge/   server.lua · client.lua                 ← seul contact avec le core et les autres modules
   server/   core · world · sheets · mana · spells · progression · combat (coups par la chaîne) · protections
@@ -101,7 +105,8 @@ Le noyau utilise en plus l'infrastructure du core (`core.rpc` à schéma strict 
 | `Hit(cible, paquet)` | `vava_health:hit` (chaîne de dégâts) ; sans lui : `nil, 'health_unavailable'`, aucun dégât |
 | `GetHealth(source)` · `IsDowned(source)` | `vava_health:get().health` (vie tenue par le serveur) · `isDowned` |
 | `OnHit(rappel)` | hook `vava_health:hit` (after) : une blessure du lanceur brise son incantation |
-| `HandsBusy(source)` | arme de GTA sur le ped (`GetSelectedPedWeapon`) ou `vava_combat:armed(source)` (arme tenue) → `armed`, sinon `vava_combat:shield(source).ready` (bouclier au bras) → `shielded`, sinon nil ; vava_combat absent, pas prêt ou en erreur : nil, aucune restriction (une ligne de console par minute au plus ; aussi quand `not_ready` dure plus d'une minute) |
+| `IsInvulnerable(source)` | `vava_admin:isInvulnerable` (≥ 1.11.0) : un membre du Conseil protégé (outil, vol libre, observation) est épargné des effets sans dégâts ; lu une fois par effet, jamais en boucle ; absent, ancien ou en erreur : non (une ligne de console par minute au plus) |
+| `HandsBusy(source)` | arme de GTA sur le ped (`GetSelectedPedWeapon`) ou `vava_combat:armed(source)` (arme tenue) → `armed` (`sheathing` si l'arme est encore rengainée, `sheathing = true`), sinon `vava_combat:shield(source).ready` (bouclier au bras) → `shielded`, sinon nil ; vava_combat absent, pas prêt ou en erreur : nil, aucune restriction (une ligne de console par minute au plus ; aussi quand `not_ready` dure plus d'une minute) |
 | `OnHold(rappel)` | hook `vava_inventory:hold` (after) : une arme ou un bouclier pris en main brise l'incantation en cours |
 | `SetModifiers(liste)` · `ChainHealthPoints()` | registre `vava_health:modifiers` (redéclarés à chaque démarrage de vava_health) · `vocabulary().healthPoints` |
 
@@ -110,7 +115,8 @@ Le noyau utilise en plus l'infrastructure du core (`core.rpc` à schéma strict 
 | `Notify(message, nature)` | `vava_hud:notify`, sinon notification de GTA |
 | `IsDowned()` | `vava_health:get().downed` |
 | `CanUseMagic()` | ni mort, ni à terre, ni menotté (`IsPedCuffed`), ni assommé |
-| `IsArmed()` | `vava_combat:armed()` : arme de l'inventaire en main ; sans lui ou en erreur : non. Affichage seulement, le serveur décide |
+| `CombatHands()` | `vava_combat:armed()` (un appel isolé) : `weapon` (arme du royaume en main), `sheathing` (qu'on rengaine encore), nil ; sans lui ou en erreur : nil. Affichage seulement, le serveur décide |
+| `IsArmed()` | `CombatHands() ~= nil` |
 | `OnHandsChanged(rappel)` | hook local `core:character:fieldChanged` filtré sur `vava_inventory:hands` : un rappel « rangez votre arme » par arme sortie |
 | `GetLockedTarget()` | cible du verrouillage de ce module (clic molette), numéro serveur ou nil |
 | `ChatLines` · `ChatSuggestion` | `chat:addMessage` · `chat:addSuggestion` |
@@ -131,10 +137,12 @@ serveur et s'affiche près de la barre de mana.
 
 **Le mode magie** : un sort prêt, mains vides, à pied, debout. Le clic gauche lance alors le sort au lieu de frapper.
 Il s'endort après 20 s sans viser ni lancer (le clic gauche refrappe comme d'habitude) ; **le clic droit le réveille**.
-Sortir une arme ou monter en véhicule le coupe, sans perdre le sort prêt. Arme en main (celle de l'inventaire, avec
-vava_combat), viser ou lancer rappelle « Il vous faut les mains libres pour incanter : rangez votre arme. », une fois
-par arme sortie (jamais deux en 5 s, `controls.armedNoticeMs`), et viser ne réveille pas le mode ; choisir un sort
-dans la roue l'arme à la main le dit aussitôt.
+Sortir une arme ou monter en véhicule le coupe, sans perdre le sort prêt. Arme du royaume en main (celle de
+l'inventaire, avec vava_combat) : les boutons de la souris sont au **mode combat**, la magie se tait (2.12.0, T-149) ;
+pendant les 1,5 s du rengainement, viser ou lancer dit « Vous rengainez votre arme : vos mains seront libres dans un
+instant. ». Arme de GTA sortie : viser ou lancer rappelle « Il vous faut les mains libres pour incanter : rangez votre
+arme. ». Ces mots viennent une fois par arme sortie (jamais deux en 5 s, `controls.armedNoticeMs`), et viser ne
+réveille pas le mode ; choisir un sort dans la roue l'arme à la main, ou `/lancer`, le dit aussitôt.
 
 | Touche ou bouton | Action |
 | --- | --- |
@@ -194,6 +202,9 @@ Un sort d'attaque (`lockOn = true` dans sa config : les trois projectiles) peut 
   degrés par seconde, `levels[].homing`), le Trait de glace un peu (20 puis 40) ; le Projectile de roche, lent, jamais.
   Cible échappée pendant l'incantation : la visée reprend.
 - Les sorts lisent la cible par `Bridge.GetLockedTarget()` : un autre système de verrouillage se branche là.
+- Arme du royaume en main, ou qu'on rengaine (vava_combat, même clic molette) : la magie ne verrouille personne, et un
+  verrou posé tombe à la vérification suivante (250 ms) quand l'arme est prise : seul l'anneau du combat se voit
+  (2.12.0, T-149).
 
 ## États élémentaires
 
@@ -211,7 +222,8 @@ personnage) ; le joueur affecté voit leurs icônes et leurs secondes à droite 
 
 **Règle d'équité** : dès qu'un contrôle dur (Chancelant, Renversé, Gelé) touche, la cible est protégée des autres
 jusqu'à 6 s après sa fin (`states.hardImmunityMs`) : aucun enchaînement. Les dégâts s'appliquent toujours. Un contrôle
-dur brise l'incantation en cours. « Renversé » plutôt qu'« À terre » : ce mot désigne déjà, chez vava_health, un
+dur brise l'incantation en cours, et **empêche de frapper** tant qu'il dure : vava_combat lit l'export serveur
+`hardControl(source)` (2.12.0, T-149 ; refus `controlled`, « Vous ne pouvez pas frapper ainsi. »). « Renversé » plutôt qu'« À terre » : ce mot désigne déjà, chez vava_health, un
 personnage hors de combat. Un joueur **à terre** n'est la cible d'aucun sort : ni dégâts (refusés par vava_health),
 ni état, ni recul (Vague, sol mouillé, brume, boue l'ignorent). Le hook `vava_magic:stateApplying` permet à un autre
 module de refuser un état.
@@ -332,6 +344,15 @@ concentration »), sans rien consommer. Un coup tout absorbé par un bouclier ne
 `vocabulary()` à chaque démarrage de vava_health) : aucun dégât, et aucun effet sans dégâts non plus (poussée, gel,
 Ralenti, Mouillé : `combat.affects`).
 
+**Membre du Conseil invulnérable** (2.12.0, T-149 ; relecture S-2 de T-138) : la chaîne de dégâts annule déjà ses
+blessures ; ses effets sans dégâts (recul, Renversé, Mouillé, Ralenti, gel d'une combinaison) l'épargnent aussi :
+`combat.affects` lit `exports.vava_admin:isInvulnerable(cible)`, en dernier (seulement pour qui serait touché), et rend
+`nil, 'invulnerable'`. **Une lecture par effet, jamais en boucle** (relecture R-3 de T-138) : une Vague le lit une fois
+par cible (par `combos.hit`, que la Vague ne double plus d'un second `combat.affects`) ; un sol mouillé, une brume ou
+une boue, qui vérifient leurs occupants toutes les 500 ms, notent ce refus comme une pose et ne le relisent qu'à la
+pose suivante (4 s, 4 s, 2 s) ; les autres refus (à terre, zone de paix) restent relus à chaque vérification, comme
+avant. Sans vava_admin (ou plus ancien que 1.11.0) : personne n'est épargné.
+
 **Mêmes refus pour les effets sans dégâts** : `combat.affects(cible, lanceur, personnage)` refuse aussi un lanceur qui
 joue désormais un autre personnage, ou qui se tient dans une zone de paix (brume, sols mouillés, boue, vague,
 combinaisons). Le personnage du lanceur est retenu au lancement d'un projectile (impact, éclats, brûlure, bonus d'XP).
@@ -356,6 +377,7 @@ Le mage a besoin d'un garde, le guerrier d'un mage. Un bâton de mage (focaliseu
 | Bouclier accroché **au bras** (`vava_combat:shield(source).ready`) | **non** | `shielded` : « Votre bouclier vous charge le bras : décrochez-le pour incanter. » |
 | Bouclier accroché **dans le dos** | oui : il ne gêne pas les mains | — |
 | Arme de GTA sortie | **non** (serveur : ped lu par OneSync, `GetSelectedPedWeapon` ; vava_combat la retire de toute façon) | `armed` |
+| Arme du royaume qu'on vient de ranger (1,5 s de rengainement, vava_combat ≥ 1.2.0) | **non** | `sheathing` : « Vous rengainez votre arme : vos mains seront libres dans un instant. » (simple avis, pas un avertissement) |
 
 - **Serveur (fait foi)** : au début de l'incantation (après « à terre », « en véhicule », les empêchements, le délai
   global et la recharge : une demande en recharge ne paie pas les exports), dès qu'une arme ou un bouclier passe en
@@ -371,9 +393,38 @@ Le mage a besoin d'un garde, le guerrier d'un mage. Un bâton de mage (focaliseu
   lancer), **une fois par arme sortie** (remis à zéro quand le champ `vava_inventory:hands` change ou que les mains se
   libèrent), jamais deux fois en moins de 5 s (`controls.armedNoticeMs`). Viser l'arme en main ne réveille pas le mode.
   Il ne sait pas où pend un bouclier (`shieldHung()` ne donne que l'objet) : le refus `shielded` vient du serveur.
+  Depuis 2.12.0, voir « La magie et le mode combat » : arme du royaume en main, les touches ne disent plus rien.
 - **Sans vava_combat** (absent, pas encore prêt, ou en erreur) : aucune restriction pour les armes de l'inventaire (les
   armes de GTA restent refusées) ; en erreur, ou pas prêt depuis plus d'une minute, une ligne de console par minute au
   plus, jamais une par lancer.
+
+## La magie et le mode combat
+
+Décisions du porteur du projet (31 octobre 2026, spec T-112 § 13-1 à 13-3 ; T-149, 2.12.0). Le mode combat de
+vava_combat prend les **mêmes boutons** que la magie (clic gauche, clic droit, molette) quand une arme du royaume est en
+main.
+
+| Ce que tiennent les mains | Clic droit, clic gauche | Clic molette (verrou) | Roue, `/lancer` |
+| --- | --- | --- | --- |
+| Rien, outil, bouclier dans le dos | la magie (mode magie) | verrou de la magie (sort `lockOn`) | le sort part |
+| Arme du royaume en main (mode combat) | **rien** du côté de la magie : le combat frappe | **rien** : verrou et anneau du combat ; un verrou de la magie déjà posé tombe à la vérification suivante | « rangez votre arme » |
+| Arme qu'on rengaine (1,5 s) | « Vous rengainez votre arme… », simple avis, une fois (clic gauche compris, mode magie endormi) | rien | « Vous rengainez votre arme… » |
+| Arme de GTA sortie | « rangez votre arme », une fois (comme avant) | verrou de la magie | « rangez votre arme » |
+
+- Règles pures dans `shared/hands.lua` (`hands.notice`, `hands.canLock`, `hands.code`), testées hors jeu. Le client lit
+  `exports.vava_combat:armed()` par un appel isolé (`bridge.CombatHands`), aux relevés déjà existants (conditions du
+  mode magie, 200 ms ; vérification du verrou, 250 ms, seulement tant qu'un verrou de la magie existe) et à l'appui
+  d'une touche : **aucune boucle nouvelle**. Le client ne décide rien : le serveur refuse lui-même (`armed`,
+  `sheathing`, `shielded`).
+- **Serveur** : `bridge.HandsBusy` rend `sheathing` quand `vava_combat:armed(source)` porte `sheathing = true` (arme
+  rangée depuis moins de `draw.sheatheMs`), sinon `armed` comme avant ; une incantation demandée pendant le
+  rengainement est refusée avec le texte propre.
+- **Contrôles durs** : export serveur `hardControl(source)` → `'frozen'`, `'knockdown'` ou `'stagger'` (vrai, et sa
+  nature) tant qu'un Gelé, un Renversé ou un Chancelant de la magie tient le joueur (échéance comprise : un état échu
+  dont la minuterie n'est pas encore tombée ne compte plus), sinon `nil` ; source non entière : `nil`. Mémoire seule,
+  sans attente. vava_combat le lit à chaque frappe (`bridge.MagicHardControl`, isolé, magie facultative) et refuse
+  `controlled`. Le chancellement propre au combat (0,9 s) reste distinct (spec T-112 § 13-4).
+- **Membre invulnérable** : voir « Blessures et chaîne de dégâts ».
 
 ## Commandes du Conseil
 
@@ -417,7 +468,8 @@ la régénération de la mana, l'XP d'un échec et l'anti-farm, les délais et m
 textes que le serveur envoie (messages au joueur, réponses du Conseil, journal).
 
 Fichiers téléchargés par chaque joueur (2.11.0) : `shared/constants.lua`, `config_client.lua`,
-`shared/progression.lua`, `shared/geometry.lua`, les fichiers `client/`, la page, ses sons et ses images ;
+`shared/progression.lua`, `shared/geometry.lua`, `shared/hands.lua` (2.12.0), les fichiers `client/`, la page, ses sons
+et ses images ;
 `config.lua`, `shared/text.lua`, `shared/pages.lua` et `shared/harm.lua` sont servis au seul serveur.
 
 **Mise à jour vers 2.11.0** : les réglages lus par le client ont quitté `config.lua` pour `config_client.lua`. Un
@@ -436,7 +488,7 @@ sans effet.
 | `persistence` | écriture de la fiche dans le personnage (au plus toutes les 15 s, et au départ) |
 | `elements` | feu, eau, terre, lumière, esprit : nom, groupe de la roue, couleur, particules des mains pendant l'incantation |
 | `wheel` | groupes de l'anneau intérieur, dans l'ordre |
-| `controls` | mode magie : endormissement (20 s), allure en visant, molette, rappel « rangez votre arme » (une fois par arme sortie, jamais deux en 5 s, `armedNoticeMs`), aperçu au sol |
+| `controls` | mode magie : endormissement (20 s), allure en visant, molette, rappel « rangez votre arme » ou « vous rengainez » (une fois par arme sortie, jamais deux en 5 s, `armedNoticeMs` ; rien arme du royaume en main), aperçu au sol |
 | `effects` | niveau de détail (complet en deçà de 30 m, rien au-delà de 150 m), plafonds de lumières et de particules, chargement (particules et animations, `assetLoadMs`) et libération des ressources, traces au sol (`traces` : durée, couleur, taille) |
 | `sounds` | portée des sons (60 m), fichiers .ogg qui remplacent les sons fabriqués (`files`), sons natifs de GTA (`native`) |
 | `projectiles` | contrôles communs de l'impact (axe, marge sur la cible, portée, délai, joueurs qui voient le lancer, hauteur des mains et du torse) ; un sort peut en changer dans son `hit` |
@@ -534,9 +586,9 @@ au point de l'effet). Aucun fichier n'est fourni.
 
 - Le serveur vérifie à chaque incantation : mage, sort connu, niveau, recharge (tenue par personnage, la reconnexion ne
   l'efface pas), mana, une seule incantation, pas à terre ni en véhicule (la cible non plus : un joueur à terre ne
-  subit aucun sort), mains vides (ni arme ni bouclier au bras, lus par vava_combat), puis à la fin : durée écoulée,
-  déplacement (positions serveur), blessure (coups de la chaîne et vie tenue par vava_health, jamais celle du ped) et
-  mains vides. Interrompue : rien n'est consommé.
+  subit aucun sort), mains vides (ni arme ni bouclier au bras, ni arme qu'on rengaine, lus par vava_combat), puis à la
+  fin : durée écoulée, déplacement (positions serveur), blessure (coups de la chaîne et vie tenue par vava_health,
+  jamais celle du ped) et mains vides. Interrompue : rien n'est consommé.
 - Blessures : un seul chemin, `exports.vava_health:hit`, après les contrôles du sort ; aucun RPC ni évènement ne peut
   en demander une, aucun client n'en applique une.
 - Projectiles : un seul impact par lancer, point d'impact dans la portée et dans l'axe annoncé, délai cohérent avec la
@@ -742,6 +794,12 @@ Deux joueurs (A et B) suffisent ; un troisième aide pour le cercle et la zone d
 **Mains vides (2.10.0, avec vava_combat)**
 - [ ] Épée courte en main : la roue prévient, le clic droit ne vise pas, le clic gauche ne lance rien (rappel « rangez votre arme », une fois pour cette épée sortie), `/lancer` refusé ; la reposer : le sort part. Prendre l'épée pendant une incantation, même pour la reposer aussitôt : elle se brise, mana intacte.
 - [ ] Bouclier accroché dans le dos, mains vides : le sort part ; au bras (épée en main) : refusé. `stop vava_combat` : plus aucune restriction. Détail : `docs/tests/magie.md` § 19.
+
+**La magie et le mode combat (2.12.0, T-149)**
+- [ ] Épée courte en main, sort prêt : clic droit, clic gauche, clic molette ne disent rien du côté de la magie, aucun anneau de la magie ; seul le combat répond. La roue et `/lancer` disent encore « rangez votre arme ».
+- [ ] Ranger l'épée puis cliquer aussitôt : « Vous rengainez votre arme… » (une fois, simple avis) ; 1,5 s plus tard, le sort part.
+- [ ] Gelé ou renversé par un sort, l'épée en main : le clic gauche ne frappe pas (« Vous ne pouvez pas frapper ainsi. »).
+- [ ] Un membre du Conseil en vol libre ou `godmode` : la Vague ne le pousse ni ne le mouille, la brume et le sol mouillé ne le trempent pas, la boue ne le ralentit pas. Détail : `docs/tests/magie.md` § 20.
 
 **Effets, traces, sons, niveau de détail**
 - [ ] Mur de flammes éteint, Nova, Secousse : une trace sombre reste au sol et s'efface en vingt secondes.

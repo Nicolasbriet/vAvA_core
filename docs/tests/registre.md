@@ -176,8 +176,8 @@ Sénéchal et au-dessus (droit `tools`).
 
 L'outil « Invulnérabilité », le vol libre et l'observation protègent désormais de la **chaîne de dégâts** de
 `vava_health` : **tout coup et tout sort qui blessent**, et la faim et la soif (décision, relecture S-6) ; le serveur
-garde l'état et l'annule par le modificateur `vava_admin:invulnerabilite`. Les **effets sans dégâts** (recul,
-renversement, mouillé, ralenti) ne sont **pas couverts** (test 3 bis). Préparation : celle de [combat 0](combat.md)
+garde l'état et l'annule par le modificateur `vava_admin:invulnerabilite`. Les **effets sans dégâts** des sorts (recul,
+renversement, mouillé, ralenti) l'épargnent aussi depuis `vava_magic` 2.12.0 (T-149, test 3 bis). Préparation : celle de [combat 0](combat.md)
 (mode développement, `vava_example_combat` pour `/frapper` et `/chaine`, B avec l'ACE `vava.dev`) ; A Sénéchal ou
 plus ; la requête `SELECT id, target_id, origin, kind, applied, cancelled FROM vava_health_hits ORDER BY id DESC LIMIT 5`
 sous la main.
@@ -187,7 +187,7 @@ sous la main.
 | 1 | Démarrer le serveur (ou `restart vava_admin`) ; B `/chaine`. | Console : « modificateur 'vava_admin:invulnerabilite' (Invulnérabilité du Conseil, étape annulation) déclaré par vava_admin ». `/chaine` : `vava_admin:invulnerabilite` en tête (étape annulation, priorité 10), ses types sans `monde`. Aucun avertissement de `vava_admin`. |
 | 2 | A : Outils → levier « Invulnérabilité ». B : `/frapper <A> 40`, puis `/frapper <A> 40 feu`. | Chez B : « annulé : invulnerable » deux fois ; `/vie` de A inchangée. `vava_health_hits` : deux lignes `cancelled = invulnerable`, `applied = 0.0`. Journal du Registre : « a utilisé un outil », « actif : oui ; outil : godmode ». |
 | 3 | (si un des deux est mage) A toujours invulnérable ; B lance une Boule de feu sur A. | A ne perd rien ; ligne `origin = vava_magic`, `cancelled = invulnerable`. |
-| 3 bis | (si B est mage) A toujours invulnérable ; B lance une Vague sur A, puis un Trait de glace. | **Non couvert, attendu** : A est poussé ou renversé, mouillé, ralenti, mais ne perd aucune vie (dégâts annulés). L'export `isInvulnerable` existe pour une tâche qui branchera la magie. |
+| 3 bis | (si B est mage) A toujours invulnérable ; B lance une Vague sur A, puis un Trait de glace. | Depuis `vava_magic` 2.12.0 (T-149) : A n'est ni poussé, ni renversé, ni mouillé, ni ralenti, et ne perd aucune vie (dégâts annulés). Avant 2.12.0 : poussé, mouillé, ralenti (non couvert). Détail : [magie 20](magie.md). |
 | 4 | A toujours invulnérable : `/besoins 0 0`, attendre deux minutes ; puis `/besoins 100 100`. | A ne perd rien : la faim passe par la chaîne (`privation`), annulée aussi (décision). |
 | 5 | A : levier « Inactif » ; B : `/frapper <A> 10`. | Appliqué 10 ; Journal « actif : non ; outil : godmode ». |
 | 6 | A : `F2` (vol libre) ; B : `/frapper <A> 10` ; A : `F2` ; B de nouveau. | Pendant le vol : « annulé : invulnerable » ; après : appliqué 10. |
