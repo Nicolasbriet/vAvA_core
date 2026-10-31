@@ -2,7 +2,7 @@
     vava_cameras/server/links.lua
     Rôle : liens avec le Registre du Conseil (vava_admin), facultatif : droit de regarder (sans lui, personne ne
            regarde en jeu), journal, outil « Mur des caméras » ajouté au Registre (et rajouté s'il redémarre).
-    Dépendances : shared/constants.lua, config.lua, server/core.lua
+    Dépendances : shared/constants.lua, config_client.lua, config.lua, server/core.lua
 ]]
 
 local tostring = tostring

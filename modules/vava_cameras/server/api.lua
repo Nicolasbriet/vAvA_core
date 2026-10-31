@@ -4,7 +4,8 @@
            (le droit du compte et le journal sont vérifiés par le pont auprès du Registre) : joueurs regardables,
            caméra accordable, ouvrir, répondre, fermer une caméra. Offres et fins des caméras du web repartent par le hook
            vava_cameras:web, que le pont relaie à la Chancellerie.
-    Dépendances : shared/constants.lua, config.lua, server/core.lua, server/players.lua, server/sessions.lua
+    Dépendances : shared/constants.lua, config_client.lua, config.lua, server/core.lua, server/players.lua,
+                  server/sessions.lua
 ]]
 
 local mathType = math.type
