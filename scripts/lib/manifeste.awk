@@ -5,19 +5,22 @@
 # Lecture du Lua : commentaires de fin de ligne et blocs (`--[[ ]]`, `--[==[ ]==]`) ignorés, chaînes courtes et longues
 # (`[[…]]`, `[==[…]==]`, sur plusieurs lignes) lues. Directives suivies : `files`, `file`, `ui_page`, `loadscreen`,
 # `shared_script(s)`, `client_script(s)`, `server_script(s)`, en forme simple (`file 'x'`) ou en table (`{ … }`, tables
-# imbriquées comprises). Chaque chaîne est normalisée (`\` → `/`, `./` et `/./` retirés, `//` réduit).
+# imbriquées comprises). Chaque chaîne est normalisée (`\` → `/`, `./` et `/./` retirés, `//` réduit) ; pour les
+# règles, mise en minuscules (NTFS ne distingue pas la casse), préfixe `@<ressource>/` retiré, `x/../` réduit.
 #
 # MODE vide (audit) : une ligne par constat, « étiquette<TAB>chemin:ligne:contenu de la ligne où commence la chaîne »
 # (une seule fois par étiquette et par ligne) :
 #   W — (T-012) chaîne de `files`, `file`, `ui_page` ou `loadscreen` qui couvrirait web/dev/ : refusée si elle contient
 #       `**`, ou si sa première partie peut valoir `web` et que sa deuxième peut valoir `dev` (`web/dev…`, `web/de?`,
 #       `web/dev*`, `web/*`, `*/dev/x.js`) ou qu'une partie de dossier porte un joker (`web/*/x.js`) ;
-#   C — (T-132) chaîne de `shared_script(s)`, `client_script(s)`, `files` ou `file` dont le motif couvre `config.lua`
-#       (préfixe `@<ressource>/` retiré ; un motif `**/…` est aussi essayé sans ce préfixe) : config.lua servi aux
-#       joueurs ;
-#   S — (T-132) chaîne de `server_script(s)` qui couvre `config_client.lua` : il ne serait pas servi aux joueurs.
+#   C — (T-132) chaîne de `shared_script(s)`, `client_script(s)`, `files`, `file`, `ui_page` ou `loadscreen` dont le
+#       motif couvre `config.lua` (un motif `**/…` est aussi essayé sans ce préfixe) : config.lua servi aux joueurs ;
+#   S — (T-132) chaîne de `server_script(s)` qui couvre `config_client.lua` : il ne serait pas servi aux joueurs ;
+#   D — (T-132) chaîne d'une directive suivie qui sort de la ressource (un `..` de trop) ;
+#   X — (T-132) directive suivie d'autre chose qu'une chaîne ou une table de chaînes (nom, concaténation `..`, appel,
+#       index) : valeur illisible pour l'audit, donc refusée (l'écrire en toutes lettres).
 # MODE=liste : une ligne par chaîne, « chemin<TAB>client|serveur<TAB>directive<TAB>chaîne normalisée » (côté client :
-# tout sauf `server_script(s)`).
+# tout sauf `server_script(s)` ; casse gardée, pour lire le disque).
 
 function norm(m) {
     gsub(/\\/, "/", m)
@@ -60,6 +63,18 @@ function couvreRacine(m, nom) {
     if (substr(m, 1, 3) == "**/" && couvre(substr(m, 4), nom)) return 1
     return 0
 }
+# réduit `x/../` ; `sort` vaut 1 si un `..` remonte au-dessus de la racine de la ressource
+function reduire(m,    n, p, out, k, i, r) {
+    sort = 0; k = 0
+    n = split(m, p, "/")
+    for (i = 1; i <= n; i++) {
+        if (p[i] == "..") { if (k > 0) k--; else sort = 1 }
+        else if (p[i] != "." && p[i] != "") out[++k] = p[i]
+    }
+    r = ""
+    for (i = 1; i <= k; i++) r = r (i > 1 ? "/" : "") out[i]
+    return r
+}
 function suivie(mot) {
     return mot == "files" || mot == "file" || mot == "ui_page" || mot == "loadscreen" ||
         mot == "shared_script" || mot == "shared_scripts" || mot == "client_script" || mot == "client_scripts" ||
@@ -67,14 +82,17 @@ function suivie(mot) {
 }
 function livre(d) { return d == "files" || d == "file" || d == "ui_page" || d == "loadscreen" }
 function constat(etiquette) {
+    if (MODE == "liste") return
     if (!((etiquette, FILENAME ":" debut) in vu)) {
         vu[etiquette, FILENAME ":" debut] = 1
         print etiquette "\t" FILENAME ":" debut ":" ldebut
     }
 }
+# forme refusée : constat X sur la ligne courante
+function illisible() { debut = FNR; ldebut = l; constat("X") }
 function valeur(s,    d, m) {
     d = (prof > 0) ? dans : attente
-    if (prof == 0) attente = ""
+    if (prof == 0) { attente = ""; if (d != "") apres = 1 }
     if (d == "") return
     m = norm(s)
     if (MODE == "liste") {
@@ -82,13 +100,15 @@ function valeur(s,    d, m) {
         print FILENAME "\t" (d ~ /^server_script/ ? "serveur" : "client") "\t" d "\t" m
         return
     }
-    if (livre(d) && dangereux(s)) constat("W")
+    m = tolower(m)
     sub(/^@[^\/]*\//, "", m)
-    if ((d ~ /^(shared|client)_scripts?$/ || d == "files" || d == "file") && couvreRacine(m, "config.lua"))
-        constat("C")
+    m = reduire(m)
+    if (sort) constat("D")
+    if (livre(d) && dangereux(m)) constat("W")
+    if ((d ~ /^(shared|client)_scripts?$/ || livre(d)) && couvreRacine(m, "config.lua")) constat("C")
     if (d ~ /^server_scripts?$/ && couvreRacine(m, "config_client.lua")) constat("S")
 }
-FNR == 1 { mode = ""; ferme = ""; attente = ""; dans = ""; prof = 0; chaine = "" }
+FNR == 1 { mode = ""; ferme = ""; attente = ""; dans = ""; prof = 0; chaine = ""; apres = 0 }
 {
     l = $0; sub(/\r$/, "", l); n = length(l); i = 1
     while (i <= n) {
@@ -105,6 +125,9 @@ FNR == 1 { mode = ""; ferme = ""; attente = ""; dans = ""; prof = 0; chaine = ""
             }
             break
         }
+        if (ch == " " || ch == "\t") { i++; continue }
+        # concaténation après la chaîne d'une directive en forme simple : valeur calculée, illisible
+        if (apres) { apres = 0; if (ch == "." && substr(l, i + 1, 1) == ".") illisible() }
         if (ch == "[" && match(substr(l, i), /^\[=*\[/)) {
             ferme = "]" substr(l, i + 1, RLENGTH - 2) "]"; mode = "L"; chaine = ""; debut = FNR; ldebut = l
             i += RLENGTH; continue
@@ -118,7 +141,9 @@ FNR == 1 { mode = ""; ferme = ""; attente = ""; dans = ""; prof = 0; chaine = ""
         }
         if (ch ~ /[A-Za-z_]/) {
             match(substr(l, i), /^[A-Za-z_][A-Za-z0-9_]*/); mot = substr(l, i, RLENGTH); i += RLENGTH
-            if (prof == 0) attente = suivie(mot) ? mot : ""
+            if (prof > 0) { if (dans != "") illisible(); continue }   # nom dans une table de directive suivie
+            if (attente != "") illisible()                            # directive suivie d'un nom (variable, appel)
+            attente = suivie(mot) ? mot : ""
             continue
         }
         if (ch == "{") {
@@ -126,7 +151,9 @@ FNR == 1 { mode = ""; ferme = ""; attente = ""; dans = ""; prof = 0; chaine = ""
             else if (attente != "") { prof = 1; dans = attente; attente = "" }
         }
         else if (ch == "}") { if (prof > 0) { prof--; if (prof == 0) dans = "" } }
-        else if (ch !~ /[ \t(),;]/ && prof == 0) attente = ""
+        else if (prof > 0) { if (dans != "" && ch !~ /[,;]/) illisible() }   # table : chaînes, tables, virgules
+        else if (attente != "" && ch != "(") { illisible(); attente = "" }
+        else if (ch !~ /[(),;]/) attente = ""
         i++
     }
 }

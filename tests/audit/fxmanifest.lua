@@ -84,7 +84,29 @@ server_scripts { '*.lua' }  -- attendu: BLOQUANT
 -- shared_script 'config.lua'  -- attendu: rien
 --[[ client_script 'config.lua' ]] client_script 'client/a.lua'  -- attendu: rien
 shared_scripts { 'config.lua' } -- exception transitoire  -- attendu: rien
--- relecture : ui_page et loadscreen ne servent pas de script ; une table imbriquée garde sa directive
-ui_page 'config.lua'  -- attendu: rien
+-- relecture : une table imbriquée garde sa directive ; deux directives sur une ligne
 client_scripts { { 'config.lua' } }  -- attendu: BLOQUANT
 server_scripts { 'config.lua' } shared_script 'config.lua'  -- attendu: BLOQUANT
+-- relecture sécurité S-6 : ui_page et loadscreen servent aussi le fichier aux joueurs
+ui_page 'config.lua'  -- attendu: BLOQUANT
+loadscreen 'config.lua'  -- attendu: BLOQUANT
+-- relecture sécurité S-1 : casse (NTFS), `..`, valeur calculée
+shared_script 'Config.lua'  -- attendu: BLOQUANT
+client_script 'CONFIG.LUA'  -- attendu: BLOQUANT
+server_script 'Config_Client.lua'  -- attendu: BLOQUANT
+client_script 'shared/../config.lua'  -- attendu: BLOQUANT
+client_script 'client/x/../../config.lua'  -- attendu: BLOQUANT
+files { 'web/x/../dev/devmock.js' }  -- attendu: BLOQUANT
+server_script 'server/../server/main.lua'  -- attendu: rien
+shared_script '../config.lua'  -- attendu: BLOQUANT
+client_script '../vava_autre/client/a.lua'  -- attendu: BLOQUANT
+shared_script 'con' .. 'fig.lua'  -- attendu: BLOQUANT
+shared_scripts(liste)  -- attendu: BLOQUANT
+shared_scripts liste  -- attendu: BLOQUANT
+client_scripts { 'client/a.lua', autre }  -- attendu: BLOQUANT
+client_scripts { 'client/' .. 'a.lua' }  -- attendu: BLOQUANT
+client_scripts { 'client/a.lua'; 'client/b.lua' }  -- attendu: rien
+client_script('client/a.lua')  -- attendu: rien
+dependencies { 'vAvA_core', nom }  -- attendu: rien
+-- relecture sécurité S-2 : « audit: ok » ne fait pas taire les règles des manifestes
+shared_script 'config.lua' -- audit: ok  -- attendu: BLOQUANT

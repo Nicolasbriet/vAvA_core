@@ -64,11 +64,13 @@ if [[ -f "$EXCEPTIONS" ]]; then
 fi
 
 filtrer() { # retire les commentaires Lua (sauf « filtrer code » : déjà retirés par l'appelant) et les lignes couvertes par
-            # une exception ou marquées « audit: ok »
-    local deja="${1:-}"
+            # une exception ou marquées « audit: ok » (sauf « filtrer code strict » : seules les exceptions du fichier
+            # comptent, pour les règles des manifestes ; relecture sécurité S-2 de T-132)
+    local deja="${1:-}" strict="${2:-}"
     local ligne contenu chemin extrait garde i
     while IFS= read -r ligne; do
-        [[ -z "$ligne" || "$ligne" == *"audit: ok"* ]] && continue
+        [[ -z "$ligne" ]] && continue
+        [[ -z "$strict" && "$ligne" == *"audit: ok"* ]] && continue
         contenu="${ligne#*:}"; contenu="${contenu#*:}"   # « chemin:ligne:contenu » (grep -H)
         [[ -z "$deja" && "$contenu" =~ ^[[:space:]]*-- ]] && continue
         garde=1
@@ -324,19 +326,27 @@ fi
 # normalisée (`\` → `/`, `./` et `/./` retirés, `//` réduit). Constats par étiquette :
 #  W — (T-012) chaîne de `files`, `file`, `ui_page` ou `loadscreen` qui couvrirait web/dev/ (`**`, `web/dev…`,
 #      `web/*`, `*/dev/x.js`, joker dans un dossier sous web/) ;
-#  C — (T-132) `config.lua` couvert par une chaîne de `shared_script(s)`, `client_script(s)`, `files` ou `file` ;
-#  S — (T-132) `config_client.lua` couvert par une chaîne de `server_script(s)`.
+#  C — (T-132) `config.lua` couvert par une chaîne de `shared_script(s)`, `client_script(s)`, `files`, `file`,
+#      `ui_page` ou `loadscreen` (sans tenir compte de la casse) ;
+#  S — (T-132) `config_client.lua` couvert par une chaîne de `server_script(s)` ;
+#  D — (T-132) chemin qui sort de la ressource (`..` de trop) ;
+#  X — (T-132) directive suivie d'autre chose qu'une chaîne ou une table de chaînes (illisible, donc refusée).
+# Pour ces règles, « audit: ok » ne fait rien taire : seules les exceptions du fichier comptent.
 # Les modules pas encore basculés (lots 2 à 4 de T-132) ont une exception transitoire par manifeste dans
 # scripts/audit-exceptions.txt : la liste des exceptions est la liste du travail restant.
 if [[ ${#manifestes[@]} -gt 0 ]]; then
     lus=$(awk -v Q="'" -f scripts/lib/manifeste.awk "${manifestes[@]}" 2>/dev/null || true)
-    etiquette() { printf '%s\n' "$lus" | sed -n "s/^$1"$'\t'"//p" | filtrer code || true; }
+    # « audit: ok » ne fait rien taire ici : seules les exceptions de scripts/audit-exceptions.txt comptent (S-2)
+    etiquette() { printf '%s\n' "$lus" | sed -n "s/^$1"$'\t'"//p" | filtrer code strict || true; }
     noter BLOQUANT "motif livré qui couvrirait web/dev/ (données simulées) : ni web/dev, ni **, ni joker dans un dossier sous web/ (T-012)" \
         "$(etiquette W)"
     noter BLOQUANT "config.lua servi aux joueurs : il est réservé au serveur ; ce que le client lit va dans config_client.lua (T-132)" \
         "$(etiquette C)"
     noter BLOQUANT "config_client.lua servi au seul serveur : les joueurs ne le recevraient pas (shared_scripts, ou client_scripts pour un module sans partie serveur) (T-132)" \
         "$(etiquette S)"
+    noter BLOQUANT "motif qui sort de la ressource (.. de trop) (T-132)" "$(etiquette D)"
+    noter BLOQUANT "directive suivie d'autre chose qu'une chaîne ou une table de chaînes (nom, concaténation, appel) : écrire chaque chemin en toutes lettres (T-132)" \
+        "$(etiquette X)"
 fi
 
 if [[ $ESSAI -eq 1 ]]; then

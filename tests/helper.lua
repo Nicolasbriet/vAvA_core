@@ -96,6 +96,19 @@ function helper.load(path)
     return loadOne(path)
 end
 
+--- Vue client d'un module (T-132, relecture réseau R-2) : charge `shared/constants.lua` puis `config_client.lua` (s'ils
+--- existent), et rien d'autre, comme chez un joueur : `config.lua`, servi au seul serveur, n'est pas lu. À utiliser
+--- pour essayer un fichier client ou une fonction partagée sur ce que le client a vraiment ; rend la table du module.
+---@param dir string  dossier du module, par exemple 'modules/vava_atelier'
+---@param global string  table du module, par exemple 'VavaAtelier'
+---@return table|nil
+function helper.loadClientView(dir, global)
+    _G[global] = nil
+    if exists(dir .. '/shared/constants.lua') then loadOne(dir .. '/shared/constants.lua') end
+    if exists(dir .. '/config_client.lua') then loadOne(dir .. '/config_client.lua') end
+    return _G[global]
+end
+
 --- Charge plusieurs fichiers dans l'ordre, comme le ferait un fxmanifest.
 ---@param paths string[]
 function helper.loadAll(paths)

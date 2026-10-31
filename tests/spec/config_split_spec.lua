@@ -6,8 +6,10 @@ local helper = require('tests.helper')
 -- shared/ n'est partagée que si un fichier client s'en sert. Fichiers lus depuis VAVA_ROOT (ou le dossier courant).
 --
 -- T0 forme du manifeste · T1 aucune valeur écrite deux fois · T2 le client ne lit que sa part · T3 logique au bon
--- endroit. Limites de T2 (lecture statique) : un index dynamique (`cfg.x[k]`) arrête la chaîne, un alias passé en
--- paramètre ou posé sur plusieurs lignes n'est pas suivi ; une clé absente des deux vues (facultative) est ignorée.
+-- endroit. T2 (lecture statique) suit les alias `local a, b <const> = <Global>.config.x, cfg.y` (sur une ligne) et
+-- ferme par défaut : toute table de config utilisée autrement que par `.clé` — indexée par une variable, passée à une
+-- fonction, parcourue, rangée ailleurs, alias non suivi (`local c = cfg or {}`) — doit être ENTIÈRE dans la vue client
+-- (relecture réseau R-1 et R-2). Une clé absente des deux vues (facultative) est ignorée.
 
 local ROOT = (os.getenv('VAVA_ROOT') or '.') .. '/'
 
@@ -311,52 +313,95 @@ local function escape(text)
     return (text:gsub('[%^%$%(%)%%%.%[%]%*%+%-%?]', '%%%0'))
 end
 
---- Lectures de config d'un fichier client : liste de { line, chain = { 'texts', 'refused' } }.
+--- Coupe une liste d'expressions aux virgules de premier niveau (hors parenthèses, accolades, crochets).
+local function splitTop(text)
+    local parts, depth, start = {}, 0, 1
+    for i = 1, #text do
+        local c = text:sub(i, i)
+        if c == '(' or c == '{' or c == '[' then depth = depth + 1
+        elseif c == ')' or c == '}' or c == ']' then depth = depth - 1
+        elseif c == ',' and depth == 0 then
+            parts[#parts + 1] = text:sub(start, i - 1)
+            start = i + 1
+        end
+    end
+    parts[#parts + 1] = text:sub(start)
+    return parts
+end
+
+local function trim(text)
+    return (text:gsub('^%s+', ''):gsub('%s+$', ''))
+end
+
+--- Références à la config d'un fichier client (code sans commentaires ni contenu de chaînes) : liste de
+--- { line, chain = { 'texts', 'refused' }, pure } — `pure` : l'expression entière d'un alias suivi
+--- (`local texts = cfg.texts`), dont la table n'a pas à être entière côté client.
 local function configReads(code, global)
     local reads = {}
     local lines = {}
     for l in (code .. '\n'):gmatch('([^\n]*)\n') do lines[#lines + 1] = l end
-    -- alias : `local x = <global>.config[.a.b]` puis `local y = x.c` (expression qui finit la ligne), jusqu'au point fixe
-    local aliases = {}   -- nom → chemin de base (liste)
     local base = escape(global) .. '%.config'
+    -- alias : `local a, b <const> = <global>.config[.x], cfg.y[.z], cfg` (une ligne), jusqu'au point fixe
+    local aliases = {}   -- nom → chemin de base (liste)
+    local pure = {}      -- ligne → { [expression] = true }
+    local function aliasOf(expr)
+        local rest = expr:match('^' .. base .. '([A-Za-z0-9_.]*)$')
+        local from = {}
+        if not rest then
+            local head
+            head, rest = expr:match('^([A-Za-z_][A-Za-z0-9_]*)([A-Za-z0-9_.]*)$')
+            from = head and aliases[head]
+            if not from then return nil end
+        end
+        if rest ~= '' and not rest:match('^%.[A-Za-z_]') then return nil end
+        local chain = {}
+        for _, k in ipairs(from) do chain[#chain + 1] = k end
+        for k in rest:gmatch('[A-Za-z0-9_]+') do chain[#chain + 1] = k end
+        return chain
+    end
     local changed = true
     while changed do
         changed = false
-        for _, l in ipairs(lines) do
-            local name, rest = l:match('^%s*local%s+([A-Za-z_][A-Za-z0-9_]*)%s*=%s*' .. base .. '([A-Za-z0-9_.]*)%s*$')
-            local from
-            if not name then
-                local src
-                name, src, rest = l:match('^%s*local%s+([A-Za-z_][A-Za-z0-9_]*)%s*=%s*([A-Za-z_][A-Za-z0-9_]*)'
-                    .. '(%.[A-Za-z0-9_.]+)%s*$')
-                from = src and aliases[src]
-                if not from then name = nil end
-            else
-                from = {}
-            end
-            if name and not aliases[name] and (rest == '' or rest:match('^%.[A-Za-z_]')) then
-                local chain = {}
-                for _, k in ipairs(from) do chain[#chain + 1] = k end
-                for k in rest:gmatch('[A-Za-z0-9_]+') do chain[#chain + 1] = k end
-                aliases[name] = chain
-                changed = true
+        for lineNo, l in ipairs(lines) do
+            local names, exprs = l:match('^%s*local%s+([A-Za-z0-9_,%s<>]+)=%s*([^=].*)$')
+            if names and not names:match('^function') then
+                local nameList, exprList = {}, splitTop(exprs)
+                for n in names:gmatch('[^,]+') do
+                    nameList[#nameList + 1] = n:match('^%s*([A-Za-z_][A-Za-z0-9_]*)%s*<?%a*>?%s*$')
+                end
+                for i, name in ipairs(nameList) do
+                    local expr = exprList[i] and trim(exprList[i])
+                    local chain = expr and aliasOf(expr)
+                    if chain then
+                        pure[lineNo] = pure[lineNo] or {}
+                        pure[lineNo][expr] = true
+                        if name and not aliases[name] then
+                            aliases[name] = chain
+                            changed = true
+                        end
+                    end
+                end
             end
         end
     end
-    -- chaîne `<tête>.k1.k2…` : arrêt à `[`, `(`, `:` ou tout autre signe ; la tête n'est pas précédée d'un nom, d'un
-    -- point ou de deux-points (`self.cfg.x` n'est pas l'alias `cfg`)
+    -- référence `<tête>.k1.k2…` (tête : <global>.config ou un alias, pas précédée d'un nom, d'un point ni de deux-points ;
+    -- `self.cfg.x` n'est pas l'alias `cfg`) ; la chaîne s'arrête à `[`, `(`, `:` ou tout autre signe
     local function scan(lineNo, l, head, prefix)
-        local pos = 1
+        -- les noms déclarés (`local a, b = …`, avant le `=`) ne sont pas des lectures
+        local declared = l:match('^(%s*local%s+[A-Za-z0-9_,%s<>]+)=[^=]')
+        local pos = declared and #declared + 1 or 1
         while true do
             local s, e, tail = l:find(head .. '([A-Za-z0-9_.]*)', pos)
             if not s then break end
             pos = e + 1
             local before = s > 1 and l:sub(s - 1, s - 1) or ''
             if not before:match('[A-Za-z0-9_.:]') and (tail == '' or tail:sub(1, 1) == '.') then
+                tail = tail:gsub('%.$', '')
                 local chain = {}
                 for _, k in ipairs(prefix) do chain[#chain + 1] = k end
                 for k in tail:gmatch('[A-Za-z0-9_]+') do chain[#chain + 1] = k end
-                if #chain > 0 then reads[#reads + 1] = { line = lineNo, chain = chain } end
+                local text = trim(l:sub(s, e))
+                reads[#reads + 1] = { line = lineNo, chain = chain, pure = pure[lineNo] and pure[lineNo][text] or false }
             end
         end
     end
@@ -365,6 +410,37 @@ local function configReads(code, global)
         for name, chain in pairs(aliases) do scan(lineNo, l, '%f[A-Za-z0-9_]' .. escape(name), chain) end
     end
     return reads
+end
+
+local function deepEqual(a, b)
+    if type(a) ~= 'table' or type(b) ~= 'table' then return a == b end
+    for k, v in pairs(a) do if not deepEqual(v, b[k]) then return false end end
+    for k in pairs(b) do if a[k] == nil then return false end end
+    return true
+end
+
+--- T2 pour un fichier : nil, ou le premier manquement. `full` : vue complète ; `client` : vue client.
+local function checkReads(file, code, global, full, client)
+    for _, r in ipairs(configReads(code, global)) do
+        local f, c, path = full, client, 'config'
+        local broken = false
+        for _, key in ipairs(r.chain) do
+            if type(f) ~= 'table' then broken = true break end
+            f = f[key]
+            if type(c) == 'table' then c = c[key] else c = nil end
+            path = path .. '.' .. key
+            if f == nil then broken = true break end
+            if c == nil then
+                return ('%s:%d lit config.%s (%s), que seul config.lua définit'):format(file, r.line,
+                    table.concat(r.chain, '.'), path)
+            end
+        end
+        if not broken and type(f) == 'table' and not r.pure and not deepEqual(f, c) then
+            return ('%s:%d utilise la table %s entière (indexée par une variable, passée, parcourue ou alias non '
+                .. 'suivi) : elle doit être entière dans config_client.lua'):format(file, r.line, path)
+        end
+    end
+    return nil
 end
 
 --- Champs exportés par un fichier : `^Global.champ =` ou `^function Global.champ`.
@@ -384,6 +460,35 @@ local function cites(code, global, field)
 end
 
 describe('configs partagées (T-132)', function()
+    -- relectures S-3 et R-5 : les exceptions transitoires de l'audit et PENDING désignent les mêmes ressources, et une
+    -- exception qui ne couvre plus rien (manifeste déjà basculé) est signalée
+    it('exceptions « T-132 » de scripts/audit-exceptions.txt = PENDING, aucune morte', function()
+        local text = read('scripts/audit-exceptions.txt')
+        assert(text, 'scripts/audit-exceptions.txt introuvable')
+        local excepted = {}
+        for line in (text .. '\n'):gmatch('([^\n]*)\n') do
+            local path, extract, reason = line:match('^([^\t#][^\t]*)\t([^\t]*)\t(.*)$')
+            if path and reason:match('^T%-132') then
+                local name = path:match('^[a-z]+/([^/]+)/fxmanifest%.lua$')
+                assert(name, 'exception T-132 hors d\'un manifeste : ' .. path)
+                assert.is_nil(excepted[name], 'deux exceptions T-132 pour ' .. name)
+                excepted[name] = true
+                local manifest = read(path)
+                assert(manifest, 'exception T-132 morte : ' .. path .. ' introuvable')
+                assert(manifest:find(extract, 1, true), 'exception T-132 morte : extrait absent de ' .. path)
+                local lists = parseManifest(manifest)
+                assert(indexOf(lists.shared, 'config.lua') or indexOf(lists.client, 'config.lua'),
+                    'exception T-132 morte : ' .. path .. ' ne sert plus config.lua (retirer l\'exception et PENDING)')
+            end
+        end
+        for name in pairs(PENDING) do
+            assert(excepted[name], name .. ' est dans PENDING sans exception T-132 dans scripts/audit-exceptions.txt')
+        end
+        for name in pairs(excepted) do
+            assert(PENDING[name], name .. ' a une exception T-132 sans être dans PENDING')
+        end
+    end)
+
     it('la liste des ressources est complète (git ls-files)', function()
         local pipe = io.popen and io.popen('git -C "' .. ROOT .. '" ls-files -- "modules/*/fxmanifest.lua" '
             .. '"examples/*/fxmanifest.lua" 2>&1')
@@ -468,21 +573,8 @@ describe('configs partagées (T-132)', function()
                 for _, file in ipairs(clientFiles(lists)) do
                     local src = read(mod.dir .. '/' .. file)
                     assert(src, mod.dir .. '/' .. file .. ' introuvable')
-                    local code = strip(src, true)
-                    for _, r in ipairs(configReads(code, mod.global)) do
-                        local f, c, path = full, clientView, 'config'
-                        for _, key in ipairs(r.chain) do
-                            if type(f) ~= 'table' then break end
-                            f = f[key]
-                            if type(c) == 'table' then c = c[key] else c = nil end
-                            path = path .. '.' .. key
-                            if f == nil then break end
-                            if c == nil then
-                                error(('%s:%d lit config.%s (%s), que seul config.lua définit'):format(file, r.line,
-                                    table.concat(r.chain, '.'), path))
-                            end
-                        end
-                    end
+                    local failure = checkReads(file, strip(src, true), mod.global, full, clientView)
+                    if failure then error(failure) end
                 end
             end)
 
@@ -518,4 +610,51 @@ describe('configs partagées (T-132)', function()
             end)
         end) end
     end
+end)
+
+-- Lecture statique de T2 sur des sources écrites ici (relecture réseau R-1 et R-2) : chaque forme d'alias suivie, et
+-- toute autre façon de tenir une table de config fermée par défaut (essais de mutation gardés).
+describe('configs partagées : T2 sur des sources d\'essai', function()
+    local full = {
+        kit = { items = { 1 } },
+        texts = { title = 'T', refused = { busy = 'B' } },
+        welcome = { delayMs = 1 },
+    }
+    local client = { texts = { refused = { busy = 'B' } }, welcome = { delayMs = 1 } }
+    local function check(src) return checkReads('client/x.lua', strip(src, true), 'VavaX', full, client) end
+
+    it('lectures de la part client : rien à redire', function()
+        assert.is_nil(check('local cfg = VavaX.config\nlocal texts = cfg.texts\nprint(texts.refused[code], cfg.welcome.delayMs)'))
+        assert.is_nil(check('for k in pairs(VavaX.config.texts.refused) do end'))   -- refused entier côté client
+        assert.is_nil(check('show(VavaX.config.welcome)'))                           -- welcome entier côté client
+        assert.is_nil(check('local cfg = VavaX.config\nprint(self.cfg.kit, other.cfg.kit)'))
+        assert.is_nil(check('local cfg = VavaX.config\n-- cfg.kit.items\nprint(\'cfg.kit\')'))
+    end)
+
+    it('alias en affectation multiple suivi', function()
+        local failure = check('local cfg, screen = VavaX.config, VavaX.screen\nlocal n = #cfg.kit.items')
+        assert.matches('client/x.lua:2 lit config.kit.items', failure, 1, true)
+        -- l'alias lui-même lit config.kit, absent de la vue client
+        failure = check('local a, b = 1, VavaX.config.kit\nprint(b.items)')
+        assert.matches('client/x.lua:1 lit config.kit', failure, 1, true)
+    end)
+
+    it('alias <const> suivi', function()
+        assert.matches('client/x.lua:2 lit config.kit', check('local cfg <const> = VavaX.config\nreturn cfg.kit'), 1, true)
+    end)
+
+    it('alias d\'alias et copie d\'alias suivis', function()
+        local failure = check('local cfg = VavaX.config\nlocal c2 = cfg\nlocal t = c2.texts\nprint(t.title)')
+        assert.matches('client/x.lua:4 lit config.texts.title', failure, 1, true)
+    end)
+
+    it('fermé par défaut : alias non suivi, table passée, index dynamique, affectation', function()
+        assert.matches('utilise la table config entière', check('local cfg = VavaX.config or {}'), 1, true)
+        assert.matches('utilise la table config.texts entière', check('local t = VavaX.config.texts or {}'), 1, true)
+        assert.matches('utilise la table config.texts entière', check('show(VavaX.config.texts)'), 1, true)
+        assert.matches('utilise la table config.texts entière',
+            check('local t = VavaX.config.texts\nprint(t[key])'), 1, true)
+        assert.matches('utilise la table config entière', check('cfg = VavaX.config'), 1, true)
+        assert.matches('utilise la table config entière', check('local cfg\ncfg = VavaX.config'), 1, true)
+    end)
 end)

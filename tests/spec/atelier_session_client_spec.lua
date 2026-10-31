@@ -3,18 +3,17 @@ local helper = require('tests.helper')
 -- Réponse de l'accueil vue du client (modules/vava_atelier/client/session.lua › absorbHome, T-101, relecture réseau
 -- R-3) : les étiquettes des cartes (« 2 panneaux », « 1 en essai ») partent du serveur à chaque réponse, hors du
 -- contenu gardé ; le client les transmet à la page, jamais il ne les jette.
--- Vue du client (T-132) : seuls shared/constants.lua et config_client.lua sont chargés, comme chez un joueur
--- (config.lua est servi au seul serveur) : une clé lue par le client et restée dans config.lua y serait nil.
+-- Vue du client (T-132) : seuls shared/constants.lua et config_client.lua sont chargés (helper.loadClientView), comme
+-- chez un joueur (config.lua est servi au seul serveur) : une clé lue par le client et restée dans config.lua y serait
+-- nil.
 describe('vava_atelier accueil côté client', function()
     local session, handlers, triggered
 
     before_each(function()
         helper.reset()
-        VavaAtelier = nil
-        helper.loadAll({
-            'modules/vava_atelier/shared/constants.lua',
-            'modules/vava_atelier/config_client.lua',
-        })
+        local atelier = helper.loadClientView('modules/vava_atelier', 'VavaAtelier')
+        assert.is_true(atelier.config.clientFile)
+        assert.is_nil(atelier.config.rights, 'config.lua ne doit pas être chargé dans la vue client')
         -- doublures : core et page (rien n'est appelé au chargement), évènements du serveur gardés par nom
         VavaAtelier.core = { log = { warn = function() end } }
         VavaAtelier.nui = { send = function() end, setFocus = function() end }
