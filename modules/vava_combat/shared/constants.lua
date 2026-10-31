@@ -7,9 +7,10 @@
 
 VavaCombat = {}
 
--- RPC client → serveur (core.rpc : schéma borné, limite de débit) : le seul du module.
+-- RPC client → serveur (core.rpc : schéma borné, limite de débit).
 VavaCombat.RPC = {
-    USE = 'vava_combat:use',            -- (technique, cible verrouillée ou 0) : un coup, jugé par le serveur
+    USE = 'vava_combat:use',            -- (technique, cible verrouillée ou 0) : un geste, jugé par le serveur
+    LOWER = 'vava_combat:lower',        -- () : abaisser la garde
 }
 
 -- Évènements serveur → client, toujours ciblés (core.net, comptés) : jamais à tous.
@@ -28,6 +29,7 @@ VavaCombat.HOOKS = {
     SHIELD_HANG = 'vava_combat:shieldHang',  -- before (accroche seule, annulable) puis after (accroche et décrochage)
     DULLED = 'vava_combat:dulled',           -- after : une arme vient d'atteindre 0 de solidité
     USING = 'vava_combat:using',             -- before (annulable) : une technique va partir (prison, ligotage, trêve)
+    DEFENDED = 'vava_combat:defended',       -- after : un coup esquivé, paré, bloqué ou qui brise la garde
 }
 
 -- Catégories d'armes : liste fermée (docs/plan/COMBAT_V1.md § 2). Les clés de config.categories doivent être
@@ -35,15 +37,17 @@ VavaCombat.HOOKS = {
 VavaCombat.CATEGORIES = { 'une_main', 'deux_mains', 'dague', 'baton', 'bouclier' }
 VavaCombat.SHIELD_CATEGORY = 'bouclier'
 
--- Techniques (docs/plan/COMBAT_V1.md § 3) : types admis par le format, et ceux qui frappent (T-112). Les types de
--- défense (T-113) passent le contrôle et sont refusés à l'usage (not_attack).
+-- Techniques (docs/plan/COMBAT_V1.md § 3) : types admis par le format, ceux qui frappent, ceux qui défendent (T-113),
+-- ceux qu'on peut demander (pas `garde`, une posture : not_attack).
 VavaCombat.TECHNIQUE_TYPES = { 'legere', 'lourde', 'parade', 'blocage', 'esquive', 'garde' }
 VavaCombat.ATTACK_TYPES = { 'legere', 'lourde' }
+VavaCombat.DEFENSE_TYPES = { 'blocage', 'parade', 'esquive' }
+VavaCombat.USABLE_TYPES = { 'legere', 'lourde', 'blocage', 'parade', 'esquive' }
 -- identifiant de technique : inclus dans REF_PATTERN (paquet de vava_health), 32 octets au plus
 VavaCombat.TECHNIQUE_PATTERN = '^[a-z0-9_]+$'
 VavaCombat.TECHNIQUE_MAX = 32
--- Issue d'un coup qui porte, envoyée aux proches (vava_combat:hit).
-VavaCombat.OUTCOMES = { 'hit', 'stagger', 'down', 'block', 'parry', 'dodge', 'absorb' }
+-- Issue d'un coup qui porte, envoyée aux proches (vava_combat:hit) ; `break` : garde brisée.
+VavaCombat.OUTCOMES = { 'hit', 'stagger', 'down', 'block', 'parry', 'dodge', 'absorb', 'break' }
 
 -- Parties du corps admises dans un coup (liste de vava_health).
 VavaCombat.PARTS = { 'tete', 'torse', 'bras', 'jambes' }

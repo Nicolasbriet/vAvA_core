@@ -3,7 +3,7 @@
     Rôle : mode combat éveillé par une touche du combat, actif à pied et sans interface, endormi après `mode.idleMs` ;
            seule boucle par image du module, et seulement éveillée et active.
     Dépendances : shared/constants.lua, config_client.lua, client/core.lua, bridge/client.lua, client/hands.lua,
-                  client/keys.lua, client/targeting.lua, client/attack.lua
+                  client/keys.lua, client/targeting.lua, client/attack.lua, client/defense.lua
 ]]
 
 local ipairs = ipairs
@@ -22,6 +22,7 @@ local hands = VavaCombat.hands
 local keys = VavaCombat.keys
 local targeting = VavaCombat.targeting
 local attack = VavaCombat.attack
+local defense = VavaCombat.stance
 
 local mode = {}
 VavaCombat.mode = mode
@@ -55,7 +56,10 @@ end
 local function setActive(value)
     if active == value then return end
     active = value
-    if not value then attack.reset() end
+    if not value then
+        attack.reset()
+        defense.drop(true)
+    end
 end
 
 local function run()
@@ -84,6 +88,7 @@ local function run()
                 end
                 targeting.draw(now)
                 attack.tick(now, ped)
+                defense.tick(now)
                 Wait(0)
             else
                 Wait(modeCfg.conditionsMs)
@@ -123,6 +128,7 @@ function mode.sleep()
     awake = false
     targeting.release()
     attack.reset()
+    defense.drop(true)
 end
 
 --- Vrai si le mode combat est éveillé et actif (export client inCombatMode).
@@ -133,7 +139,7 @@ end
 
 ---@param slot string
 local function onAttack(slot)
-    if not mode.wake() or not active then return end
+    if not mode.wake() or not active or defense.guarding() then return end
     attack.press(slot)
 end
 
@@ -149,4 +155,13 @@ keys.bindHold('cible', function()
     if mode.wake() and active then targeting.pressed() end
 end, function()
     targeting.released()
+end)
+-- R éveille le mode et pare ; Espace n'agit qu'en mode actif (sinon le saut de GTA)
+keys.bindHold('garde', function()
+    if mode.wake() and active then defense.press() end
+end, function()
+    defense.release()
+end)
+keys.bind('esquive', function()
+    if awake and active and mode.wake() then defense.dodge() end
 end)

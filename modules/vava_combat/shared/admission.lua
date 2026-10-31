@@ -26,7 +26,8 @@ end
 --- = { earlyMs, chainMax, styles }. Libre (aucun coup, ou fin de récupération à `earlyMs` près) : seule la technique qui
 --- ouvre sa touche est admise (`not_opener`). Pendant la récupération (frappe finie, à `earlyMs` près), une technique de
 --- `prev.def.chain` est admise si elle ne dépasse pas `chainMax` coups enchaînés (`chain_limit`). Sinon `busy`. Rend
---- `true, chainCount` ou `false, code[, attente en ms]`.
+--- `true, chainCount` ou `false, code[, attente en ms]`. Garde ouverte (sans `endAt`) : `guarding`, sans attente (il faut
+--- l'abaisser).
 ---@param prev table|nil
 ---@param def table
 ---@param id string
@@ -37,6 +38,7 @@ end
 ---@return integer|nil wait
 function techniques.admit(prev, def, id, now, rules)
     local early = rules.earlyMs
+    if prev and not prev.endAt then return false, 'guarding' end
     if not prev or now >= prev.endAt - early then
         local style = rules.styles[def.style]
         local keys = type(style) == 'table' and style.keys

@@ -94,6 +94,7 @@ describe('vava_combat techniques (serveur)', function()
             'modules/vava_combat/shared/geometry.lua',
             'modules/vava_combat/shared/techniques.lua',
             'modules/vava_combat/shared/admission.lua',
+            'modules/vava_combat/shared/defense.lua',
             'modules/vava_combat/shared/weapons.lua',
             'modules/vava_combat/shared/guard.lua',
         })
@@ -166,6 +167,8 @@ describe('vava_combat techniques (serveur)', function()
             Recipe = function() return nil end,
             SkillRecipesReady = function() return false end,
             HealthKinds = function() return { 'tranchant', 'contondant', 'percant' } end,
+            HealthTags = function() return { 'melee', 'ranged', 'area', 'overTime', 'native', 'reflected', 'parryable',
+                'unblockable', 'undodgeable' } end,
             DefineShieldField = function() return true end,
             Hit = function(target, packet)
                 hits[#hits + 1] = { target = target, packet = copy(packet), at = clock - T0 }
@@ -199,6 +202,7 @@ describe('vava_combat techniques (serveur)', function()
             'modules/vava_combat/server/strike.lua',
             'modules/vava_combat/server/hands.lua',
             'modules/vava_combat/server/reactions.lua',
+            'modules/vava_combat/server/defense.lua',
             'modules/vava_combat/server/swings.lua',
             'modules/vava_combat/server/api.lua',
         })
@@ -434,7 +438,7 @@ describe('vava_combat techniques (serveur)', function()
             beforeAnswer = { false, 'Vous êtes au cachot.\n' }
             assert.same({ false, 'refused', 'Vous êtes au cachot.' }, use(A, 'taille_descendante', B))
             assert.same({ name = 'vava_combat:using', payload = { source = A, characterId = CHAR_A,
-                technique = 'taille_descendante', item = 'epee_courte', target = B } }, befores[1])
+                technique = 'taille_descendante', item = 'epee_courte', target = B, kind = 'legere' } }, befores[1])
             beforeAnswer = { false, { 'pas une chaîne' } }
             assert.same({ false, 'refused' }, use(A, 'taille_descendante'))
             assert.equal(0, #timers)
@@ -496,6 +500,18 @@ describe('vava_combat techniques (serveur)', function()
             positions[B] = { 0, 3, 0 }
             at(320)
             assert.equal(1, #hits)
+        end)
+
+        -- relecture sécurité S-1 de T-149 : un contrôle dur de la magie qui tombe pendant la préparation annule le coup
+        it('gelé par la magie pendant la préparation : coup annulé, ne touche pas ; le cycle compte', function()
+            use(A, 'taille_descendante', B)
+            at(100)
+            magic[A] = 'frozen'
+            at(1000)
+            assert.equal(0, #hits)
+            assert.equal('state', swings.of(A).cancelled)
+            magic[A] = nil
+            assert.same({ true }, use(A, 'taille_descendante', B))
         end)
 
         it('départ du joueur pendant la préparation : aucun hit, rien en attente ne frappe', function()
@@ -679,6 +695,15 @@ describe('vava_combat techniques (serveur)', function()
             at(100)
             reactions.stagger(A, 900, clock)
             assert.same({ false, 'staggered', 900 }, finish(co))
+            assert.equal(0, #timers)
+            assert.is_nil(swings.of(A))
+        end)
+
+        -- relecture sécurité S-1 de T-149 : le contrôle dur est relu après le crochet
+        it('contrôle dur posé pendant le crochet : refus controlled, rien de programmé', function()
+            local co = request(A, 'taille_descendante', B)
+            magic[A] = 'stagger'
+            assert.same({ false, 'controlled' }, finish(co))
             assert.equal(0, #timers)
             assert.is_nil(swings.of(A))
         end)
@@ -999,7 +1024,8 @@ describe('vava_combat techniques (serveur)', function()
             local list = exported.techniques()
             local ids = {}
             for i, entry in ipairs(list) do ids[i] = entry.id end
-            assert.same({ 'estoc_rapide', 'fendant', 'revers', 'taille_descendante' }, ids)
+            assert.same({ 'estoc_rapide', 'fendant', 'garde_epee', 'parade_epee', 'pas_de_cote', 'revers',
+                'taille_descendante' }, ids)
             local taille = exported.technique('taille_descendante')
             assert.equal('Taille descendante', taille.label)
             assert.same({ windup = 320, active = 160, recovery = 420 }, taille.phases)
@@ -1008,5 +1034,49 @@ describe('vava_combat techniques (serveur)', function()
             assert.is_nil(exported.technique('moulinet'))
             assert.is_nil(exported.technique(42))
         end)
+    end)
+end)
+
+-- Relecture sécurité S-4 de T-149 : après un « No such export » (vava_magic sans hardControl), l'export n'est plus
+-- cherché pendant une minute ; un (re)démarrage de vava_magic le fait relire aussitôt (bridge/server.lua réel).
+describe('vava_combat bridge : contrôle dur de la magie', function()
+    local handlers, clock, answer, invoked
+
+    before_each(function()
+        helper.reset()
+        VavaCombat = nil
+        handlers, clock, answer, invoked = {}, 1000, nil, 0
+        helper.loadAll({ 'modules/vava_combat/shared/constants.lua', 'modules/vava_combat/config.lua' })
+        local log = { warn = function() end, info = function() end }
+        VavaCombat.log, VavaCombat.resource, VavaCombat.core = log, 'vava_combat', { log = log }
+        _G.GetGameTimer = function() return clock end
+        _G.GetResourceState = function(name) return name == 'vava_magic' and 'started' or 'missing' end
+        _G.AddEventHandler = function(name, fn) handlers[name] = fn end
+        _G.exports = { vava_magic = { hardControl = function()
+            invoked = invoked + 1
+            if not answer then error('No such export hardControl in resource vava_magic') end
+            return answer
+        end } }
+        helper.load('modules/vava_combat/bridge/server.lua')
+    end)
+
+    after_each(function()
+        for _, name in ipairs({ 'GetGameTimer', 'GetResourceState', 'AddEventHandler', 'exports' }) do _G[name] = nil end
+        VavaCombat = nil
+    end)
+
+    it('export absent : plus cherché pendant 60 s ; vava_magic redémarré : relu aussitôt', function()
+        local bridge = VavaCombat.bridge
+        assert.is_nil(bridge.MagicHardControl(1))
+        assert.equal(1, invoked)
+        answer = 'frozen'
+        clock = 2000
+        assert.is_nil(bridge.MagicHardControl(1))
+        assert.equal(1, invoked)
+        handlers.onResourceStart('vava_inventory')
+        assert.is_nil(bridge.MagicHardControl(1))
+        handlers.onResourceStart('vava_magic')
+        assert.equal('frozen', bridge.MagicHardControl(1))
+        assert.equal(2, invoked)
     end)
 end)

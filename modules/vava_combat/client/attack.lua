@@ -1,12 +1,12 @@
 --[[
     vava_combat/client/attack.lua
-    Rôle : un coup côté client, prédiction sans décision : technique choisie, geste aussitôt, demande
-           `vava_combat:use`, refus et attente du serveur respectés, touche gardée, virage vers la cible.
+    Rôle : un geste côté client (coup ou défense), prédiction sans décision : technique choisie, geste aussitôt,
+           demande `vava_combat:use`, refus et attente du serveur respectés, touche gardée, virage vers la cible.
     Dépendances : shared/constants.lua, config_client.lua, shared/heading.lua, shared/techniques.lua, client/core.lua,
                   bridge/client.lua, client/hands.lua, client/targeting.lua
 ]]
 
-local type, sub = type, string.sub
+local type, ipairs, sub = type, ipairs, string.sub
 local mathType, max, min, abs = math.type, math.max, math.min, math.abs
 local CreateThread, GetGameTimer = CreateThread, GetGameTimer
 local PlayerPedId, DoesEntityExist, GetEntityCoords, GetEntityHeading, SetEntityHeading, GetGameplayCamRot =
@@ -28,12 +28,14 @@ local MAX_NOTIFICATION = VavaCombat.MAX_NOTIFICATION
 local ROTATION_ORDER = 2
 -- en deçà (degrés), le personnage n'est pas retourné
 local TURN_EPSILON = 0.5
+local ATTACKS = {}
+for _, kind in ipairs(VavaCombat.ATTACK_TYPES) do ATTACKS[kind] = true end
 
 local attack = {}
 VavaCombat.attack = attack
 
--- coup en cours : { id, def, startedAt, openAt, closeAt, endAt, chainCount, cut? }, ou nil ; `cut` : geste coupé par un
--- chancellement, cycle toujours compté (comme le serveur : un coup annulé ne libère pas plus tôt)
+-- geste en cours : { id, def, gesture, startedAt, openAt, closeAt, endAt, chainCount, cut?, onRefused? }, ou nil ; `cut` :
+-- coupé par un chancellement, cycle toujours compté (comme le serveur) ; garde ouverte : ni closeAt ni endAt
 local current = nil
 ---@type { slot: string, at: integer }|nil  touche gardée (une seule, la dernière)
 local buffered = nil
@@ -97,9 +99,10 @@ local function request(swing, locked)
         if not transport then code, detail = accepted, nil end
         if mathType(detail) == 'integer' and detail > 0 then waitUntil = max(waitUntil, GetGameTimer() + detail) end
         if current == swing then
-            hands.stopGesture(swing.def.gesture)
+            hands.stopGesture(swing.gesture)
             current = nil
         end
+        if swing.onRefused then swing.onRefused() end
         if code == 'refused' and type(detail) == 'string' and detail ~= '' then
             attack.notice(code, sub(detail, 1, MAX_NOTIFICATION))
         else
@@ -108,22 +111,26 @@ local function request(swing, locked)
     end)
 end
 
---- Lance une technique : orientation, geste aussitôt (dictionnaire déjà chargé ; sinon aucun geste, la demande part
---- quand même), cycle local, demande.
+--- Lance une technique : orientation, geste aussitôt (`gesture`, sinon celui de la technique ; dictionnaire déjà
+--- chargé, sinon aucun geste, la demande part quand même), cycle local, demande (cible verrouillée : attaques seules).
+--- Rend le geste local.
 ---@param id string
 ---@param now integer
-local function start(id, now)
+---@param gesture? table
+---@return table swing
+function attack.start(id, now, gesture)
     local def = cfg.techniques[id]
     local ped = PlayerPedId()
     faceAtStart(ped)
-    local p = def.phases
-    hands.playNow(def.gesture, p.windup + p.active + p.recovery)
-    local chainCount = (current and now < current.endAt) and current.chainCount + 1 or 0
+    gesture = gesture or def.gesture
     local plan = techniques.plan(def, now)
-    local swing = { id = id, def = def, startedAt = plan.startedAt, openAt = plan.openAt, closeAt = plan.closeAt,
-        endAt = plan.endAt, chainCount = chainCount }
+    hands.playNow(gesture, plan.endAt and plan.endAt - now or -1)
+    local chainCount = (current and current.endAt and now < current.endAt) and current.chainCount + 1 or 0
+    local swing = { id = id, def = def, gesture = gesture, startedAt = plan.startedAt, openAt = plan.openAt,
+        closeAt = plan.closeAt, endAt = plan.endAt, chainCount = chainCount }
     current = swing
-    request(swing, targeting.current() or 0)
+    request(swing, ATTACKS[def.type] and targeting.current() or 0)
+    return swing
 end
 
 --- Garde une touche pressée un peu tôt, si l'attente ne dépasse pas `mode.bufferMs`.
@@ -134,34 +141,41 @@ local function keep(slot, now, wait)
     if wait <= modeCfg.bufferMs then buffered = { slot = slot, at = now + wait } end
 end
 
+--- Technique d'une touche si elle peut partir à `now` (chancellement, dégainer, style, attente du serveur, cycle en
+--- cours) : son identifiant, ou `nil[, attente]` ; `quiet` : aucun texte.
+---@param slot string
+---@param now integer
+---@param quiet? boolean
+---@return string|nil id
+---@return integer|nil wait
+function attack.choose(slot, now, quiet)
+    local refusal = (now < staggeredUntil and 'staggered') or (not hands.ready(now) and 'drawing')
+        or (not cfg.styles[hands.style()] and 'no_style')
+    if refusal then
+        if not quiet then attack.notice(refusal) end
+        return nil
+    end
+    if now < waitUntil then return nil, waitUntil - now end
+    return techniques.pick(cfg.styles[hands.style()], slot, current, current and current.def, now, cfg.techniques)
+end
+
 --- Appui sur une touche d'attaque (`legere`, `lourde`), le mode combat éveillé et actif.
 ---@param slot string
 function attack.press(slot)
     local now = GetGameTimer()
-    if now < staggeredUntil then
-        attack.notice('staggered')
-        return
-    end
-    if not hands.ready(now) then
-        attack.notice('drawing')
-        return
-    end
-    local style = cfg.styles[hands.style()]
-    if not style then
-        attack.notice('no_style')
-        return
-    end
-    if now < waitUntil then
-        keep(slot, now, waitUntil - now)
-        return
-    end
-    local id, wait = techniques.pick(style, slot, current, current and current.def, now, cfg.techniques)
+    local id, wait = attack.choose(slot, now)
     if not id then
         if wait then keep(slot, now, wait) end
         return
     end
     buffered = nil
-    start(id, now)
+    attack.start(id, now)
+end
+
+--- Geste en cours (table du module : à ne pas modifier), ou nil.
+---@return table|nil
+function attack.current()
+    return current
 end
 
 --- Une image du mode combat actif : touche gardée jouée à son heure, virage vers la cible pendant la préparation et la
@@ -176,7 +190,10 @@ function attack.tick(now, ped)
         buffered = nil
         attack.press(slot)
     end
-    if not current or current.cut or now >= current.closeAt then return end
+    if not current or current.cut or not current.closeAt or now >= current.closeAt
+        or current.def.type == 'esquive' then
+        return
+    end
     local targetPed = targeting.ped()
     if not targetPed or not DoesEntityExist(targetPed) then return end
     local want = headingTo(GetEntityCoords(ped), GetEntityCoords(targetPed))
@@ -187,28 +204,31 @@ function attack.tick(now, ped)
     if abs(delta) > TURN_EPSILON then SetEntityHeading(ped, (heading + delta) % 360) end
 end
 
---- Vrai pendant un coup (de la demande à la fin de la récupération).
+--- Vrai pendant un geste (de la demande à la fin de la récupération ; garde ouverte comprise).
 ---@param now integer
 ---@return boolean
 function attack.busy(now)
-    return current ~= nil and now < current.endAt
+    return current ~= nil and (current.endAt == nil or now < current.endAt)
 end
 
 --- Coupe le geste du coup en cours et la touche gardée. Le cycle du coup reste compté (récupération, enchaînement) :
 --- le serveur le garde aussi, la prédiction suivante attend donc comme lui.
 function attack.cancel()
     if current and not current.cut then
-        hands.stopGesture(current.def.gesture)
+        hands.stopGesture(current.gesture)
         current.cut = true
     end
     buffered = nil
 end
 
---- Chancellement reçu du serveur : coup en cours coupé, aucune technique avant `untilMs`.
+--- Chancellement reçu du serveur : coup en cours coupé, garde tombée (le serveur l'a fermée), aucune technique avant
+--- `untilMs`.
 ---@param untilMs integer
 function attack.stagger(untilMs)
     staggeredUntil = untilMs
     attack.cancel()
+    local defense = VavaCombat.stance
+    if defense then defense.drop(false) end
 end
 
 --- Mode endormi ou inactif : touche gardée oubliée, horloge du virage remise à zéro.

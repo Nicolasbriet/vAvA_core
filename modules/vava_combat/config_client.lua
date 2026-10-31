@@ -84,11 +84,50 @@ VavaCombat.config = {
             parryable = false, staggers = true, chain = {},
             learn = { skill = 'armes_une_main', level = 15 },
         },
+        -- défense (T-113) : blocage = garde tenue (active : tenue minimale), parade (active : fenêtre), esquive
+        -- (active : invulnérable) ; hit.angle = arc protégé ; stamina = coût d'un coup bloqué, d'une parade, d'un pas
+        garde_epee = {
+            label = 'Garde', style = 'epee_une_main', type = 'blocage',
+            gesture = { dict = 'anim@melee@machete@streamed_core@', clip = 'plyr_block_idle', flag = 49 }, -- PLACEHOLDER
+            phases = { windup = 100, active = 200, recovery = 250 },
+            hit = { angle = 120 }, stamina = 8, chain = {},
+            learn = { skill = 'armes_une_main', level = 0 },
+        },
+        parade_epee = {
+            label = 'Parade', style = 'epee_une_main', type = 'parade',
+            gesture = { dict = 'anim@melee@machete@streamed_core@', clip = 'plyr_block_react', flag = 48 }, -- PLACEHOLDER
+            phases = { windup = 0, active = 200, recovery = 250 },
+            hit = { angle = 120 }, stamina = 6, chain = { 'garde_epee' },
+            learn = { skill = 'armes_une_main', level = 10 },
+        },
+        pas_de_cote = {
+            label = 'Pas de côté', style = 'epee_une_main', type = 'esquive',
+            gesture = { dict = 'move_strafe@roll', clip = 'combatroll_bwd_p1_180', flag = 0 }, -- PLACEHOLDER
+            phases = { windup = 50, active = 250, recovery = 350 },
+            stamina = 20, chain = {},
+            learn = { skill = 'armes_une_main', level = 0 },
+        },
     },
 
     -- Styles (<famille>_<catégorie> de l'arme tenue) : technique qui ouvre chaque touche.
     styles = {
-        epee_une_main = { label = 'Épée à une main', keys = { legere = 'taille_descendante', lourde = 'fendant' } },
+        epee_une_main = { label = 'Épée à une main', keys = {
+            legere = 'taille_descendante', lourde = 'fendant',
+            blocage = 'garde_epee', parade = 'parade_epee', esquive = 'pas_de_cote',
+        } },
+    },
+
+    -- Défense, part du client (config.lua y ajoute sa part).
+    defense = {
+        guardBrokenMs = 1200,  -- garde brisée : chancellement, ni garde ni parade
+        brokenGesture = { dict = 'reaction@shove', clip = 'shoved_back', flag = 0 },   -- PLACEHOLDER
+        guardBlocked = { 21 }, -- contrôles coupés pendant la garde (21 : sprint) ; 8 au plus
+        -- pas de côté selon la direction tenue à l'appui (sinon le geste de la technique)
+        dodgeGestures = {
+            avant = { dict = 'move_strafe@roll', clip = 'combatroll_fwd_p1_00', flag = 0 },    -- PLACEHOLDER
+            gauche = { dict = 'move_strafe@roll', clip = 'combatroll_fwd_p1_-90', flag = 0 },  -- PLACEHOLDER
+            droite = { dict = 'move_strafe@roll', clip = 'combatroll_fwd_p1_90', flag = 0 },   -- PLACEHOLDER
+        },
     },
 
     -- Dégainer et rengainer (durées tenues par le serveur).
@@ -115,7 +154,7 @@ VavaCombat.config = {
         noticeMs = 3000,       -- un même refus n'est pas redit avant ce délai
         gestureTimeoutMs = 1000, -- attente maximale du chargement d'un dictionnaire d'animation
         -- contrôles coupés en mode actif (jamais 199, 200, 322 : Échap et P de vava_pause ; 32 au plus)
-        blocked = { 24, 25, 37, 140, 141, 142, 257, 263, 264, 14, 15, 16, 17 },
+        blocked = { 24, 25, 37, 140, 141, 142, 257, 263, 264, 14, 15, 16, 17, 22, 45 },
     },
 
     -- Touches (réglables dans Paramètres > Raccourcis > FiveM).
@@ -123,6 +162,10 @@ VavaCombat.config = {
         legere = { command = 'vava_combat_legere', device = 'MOUSE_BUTTON', key = 'MOUSE_LEFT', label = 'Combat : attaque légère', display = 'Clic gauche' },
         lourde = { command = 'vava_combat_lourde', device = 'MOUSE_BUTTON', key = 'MOUSE_RIGHT', label = 'Combat : attaque lourde', display = 'Clic droit' },
         cible = { command = 'vava_combat_verrou', device = 'MOUSE_BUTTON', key = 'MOUSE_MIDDLE', label = 'Combat : verrouiller un adversaire (maintenir : relâcher)', hold = true, display = 'Clic molette' },
+        garde = { command = 'vava_combat_garde', device = 'keyboard', key = 'R', hold = true, display = 'R',
+            label = 'Combat : parer (appui bref) ou se garder (maintenir)' },
+        esquive = { command = 'vava_combat_esquive', device = 'keyboard', key = 'SPACE', display = 'Espace',
+            label = 'Combat : pas de côté (mode combat actif)' },
     },
 
     -- Verrou d'un adversaire (local, rien sur le réseau avant un coup).
@@ -151,6 +194,8 @@ VavaCombat.config = {
     -- Refus montrés (code du serveur → texte ; absent : `default` ; `false` : rien).
     refusals = {
         busy = false, chain_limit = false, rate_limited = false,
+        guarding = false, parry_cooldown = false, dodge_cooldown = false, no_guard = false,
+        guard_broken = 'Votre garde est brisée.',
         drawing = 'Vous n\'avez pas encore l\'arme en garde.',
         staggered = 'Vous chancelez.',
         controlled = 'Vous ne pouvez pas frapper ainsi.',

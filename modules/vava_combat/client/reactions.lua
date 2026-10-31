@@ -1,7 +1,7 @@
 --[[
     vava_combat/client/reactions.lua
-    Rôle : ce que voit chacun d'un coup qui porte (`vava_combat:hit`) : réaction de la cible, son de l'attaquant, effet
-           d'impact local borné. Aucune boucle.
+    Rôle : ce que voit chacun d'un coup qui porte (`vava_combat:hit`) : réaction de la cible (garde brisée comprise),
+           attaquant paré qui chancelle, son de l'attaquant, effet d'impact local borné. Aucune boucle.
     Dépendances : shared/constants.lua, config_client.lua, client/core.lua, client/hands.lua, client/attack.lua
 ]]
 
@@ -20,12 +20,14 @@ if not core then return end
 local cfg = VavaCombat.config
 local effects = cfg.effects
 local stagger = cfg.stagger
+local guardCfg = cfg.defense
 local hands = VavaCombat.hands
 local attack = VavaCombat.attack
 local EVENTS = VavaCombat.EVENTS
 local MAX_PLAYER = VavaCombat.MAX_PLAYER
 -- issue → effet montré sur la cible (nil : aucun)
-local FX_OF = { hit = 'impact', stagger = 'impact', down = 'impact', block = 'guarded', parry = 'guarded' }
+local FX_OF = { hit = 'impact', stagger = 'impact', down = 'impact', block = 'guarded', parry = 'guarded',
+    ['break'] = 'guarded' }
 -- issue → son de touche chez l'attaquant
 local SOUND_OF = { hit = true, stagger = true, down = true }
 local OUTCOMES = {}
@@ -111,7 +113,18 @@ RegisterNetEvent(EVENTS.HIT, function(attackerId, targetId, outcome)
         elseif outcome == 'hit' then
             if not attack.busy(now) then hands.play(effects.flinch, effects.flinch.ms) end
             shake(effects.shakeHit)
+        elseif outcome == 'break' then
+            -- garde brisée : chancellement, garde tombée (le serveur l'a fermée : rien à demander)
+            attack.stagger(now + guardCfg.guardBrokenMs)
+            hands.play(guardCfg.brokenGesture, guardCfg.guardBrokenMs)
+            shake(effects.shakeStagger)
+            attack.notice('guard_broken')
         end
+    end
+    if attacker == me and outcome == 'parry' then
+        attack.stagger(now + stagger.durationMs)
+        hands.play(stagger.gesture, stagger.durationMs)
+        shake(effects.shakeStagger)
     end
     if attacker == me and SOUND_OF[outcome] then
         local sound = effects.sounds.hit
