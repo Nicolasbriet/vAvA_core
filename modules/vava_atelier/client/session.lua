@@ -94,7 +94,7 @@ end
 
 --- Range la réponse du RPC `home` et compose le message de la page ; nil si la réponse est incohérente (rien n'est
 --- gardé : la prochaine demande renverra tout).
----@param answer any  { version, content?, drafts, journal, rank }
+---@param answer any  { version, content?, tags, drafts, journal, rank }
 ---@return table|nil
 function session.absorbHome(answer)
     if type(answer) ~= 'table' or type(answer.version) ~= 'string' then
@@ -112,6 +112,8 @@ function session.absorbHome(answer)
     end
     return {
         version = known.home, content = content,
+        -- étiquettes des cartes (« 2 panneaux », « 1 en essai ») : hors du contenu gardé, à chaque réponse
+        tags = type(answer.tags) == 'table' and answer.tags or {},
         drafts = type(answer.drafts) == 'table' and answer.drafts or {},
         journal = type(answer.journal) == 'table' and answer.journal or {},
         rank = type(answer.rank) == 'string' and answer.rank or '',
