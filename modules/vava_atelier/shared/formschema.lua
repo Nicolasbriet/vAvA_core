@@ -303,8 +303,8 @@ function checkWidget.duration(field, path)
 end
 
 function checkWidget.item(field, path)
-    if field.category ~= nil and not isIdentifier(field.category, '^[%w_]*$', LIMITS.category) then
-        return fail(join(path, 'category'), format('motif ^[%%w_]*$, %d octets au plus', LIMITS.category))
+    if field.category ~= nil and not isIdentifier(field.category, '^[A-Za-z0-9_]*$', LIMITS.category) then
+        return fail(join(path, 'category'), format('motif ^[A-Za-z0-9_]*$, %d octets au plus', LIMITS.category))
     end
     if field.default ~= nil and field.default ~= '' and not isIdentifier(field.default, ITEM_PATTERN, MAX_ITEM) then
         return fail(join(path, 'default'), 'nom d\'objet attendu')

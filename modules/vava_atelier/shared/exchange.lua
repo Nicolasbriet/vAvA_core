@@ -9,16 +9,17 @@
            plan d'un import (inchangée, changée, retirée → reprise, inconnue → nouvelle ; un import ne retire jamais
            rien).
            Testée : tests/spec/atelier_exchange_spec.lua.
-    Dépendances : shared/constants.lua
+    Dépendances : shared/constants.lua, shared/bounds.lua, shared/text.lua
 ]]
 
-local type, pairs, ipairs, tostring = type, pairs, ipairs, tostring
+local type, pairs, ipairs = type, pairs, ipairs
 local mathType, tointeger = math.type, math.tointeger
 local find, format, gsub, sub = string.find, string.format, string.gsub, string.sub
 local sort = table.sort
 
 local X = VavaAtelier.EXCHANGE
 local DEF = VavaAtelier.DEF
+local truncate = VavaAtelier.text.truncate
 local MAX_ENTRY = VavaAtelier.MAX_ENTRY
 local MAX_EDITOR, MAX_KEY = VavaAtelier.MAX_EDITOR, VavaAtelier.MAX_KEY
 -- motifs écrits octet par octet (`%w` dépend de la locale)
@@ -26,6 +27,8 @@ local ID_PATTERN = '^[A-Za-z0-9_%-]+$'
 local EDITOR_PATTERN = '^[A-Za-z0-9_]+:[A-Za-z0-9_]+$'
 local KIND_PATTERN = '^[A-Za-z][A-Za-z0-9_]*$'
 local ENTRY_KEYS = { id = true, version = true, parent = true, place = true, data = true }
+-- genres au plus dans un atelier du fichier (une déclaration en a 8 au plus)
+local MAX_KINDS = 8
 
 local exchange = {}
 VavaAtelier.exchange = exchange
@@ -122,7 +125,7 @@ end
 --- Un atelier du fichier : liste de fiches, ou nil et « chemin : raison ».
 ---@return vAvA.AtelierExchangeEntry[]|nil
 ---@return string|nil err
-local function parseEditor(editorId, block, info)
+local function parseEditor(editorId, block, info, perKind)
     local root = editorId
     if type(block) ~= 'table' then return nil, root .. ' : table attendue' end
     local blockFormat = 1
@@ -138,16 +141,18 @@ local function parseEditor(editorId, block, info)
     local entries = {}
     local kindIds = {}
     for kindId in pairs(block.kinds) do
-        if not isId(kindId, KIND_PATTERN, MAX_KEY) or not info.kinds[kindId] then
-            return nil, format('%s.kinds.%s : type inconnu de cet atelier', root, tostring(kindId))
-        end
+        -- une clé n'est citée que si elle respecte son motif (rien d'un fichier piégé ne part tel quel)
+        if not isId(kindId, KIND_PATTERN, MAX_KEY) then return nil, root .. '.kinds : genre au nom invalide' end
+        if not info.kinds[kindId] then return nil, format('%s.kinds.%s : type inconnu de cet atelier', root, kindId) end
         kindIds[#kindIds + 1] = kindId
+        if #kindIds > MAX_KINDS then return nil, root .. '.kinds : trop de genres' end
     end
     sort(kindIds)
     for _, kindId in ipairs(kindIds) do
         local list = block.kinds[kindId]
         local here = format('%s.kinds.%s', root, kindId)
         if not isList(list) then return nil, here .. ' : liste de fiches attendue' end
+        if #list > perKind then return nil, format('%s : plus de %d fiches', here, perKind) end
         local seen = {}
         for i, entry in ipairs(list) do
             local path = format('%s[%d]', here, i)
@@ -156,7 +161,10 @@ local function parseEditor(editorId, block, info)
                 return nil, format('%s : plus de %d niveaux imbriqués', path, X.depth)
             end
             for key in pairs(entry) do
-                if not ENTRY_KEYS[key] then return nil, format('%s.%s : clé inconnue', path, tostring(key)) end
+                if not ENTRY_KEYS[key] then
+                    if isId(key, KIND_PATTERN, MAX_KEY) then return nil, format('%s.%s : clé inconnue', path, key) end
+                    return nil, path .. ' : clé au nom invalide'
+                end
             end
             if not isId(entry.id, ID_PATTERN, MAX_ENTRY) then
                 return nil, path .. '.id : identifiant invalide (lettres, chiffres, _ et -, 48 octets au plus)'
@@ -189,12 +197,18 @@ end
 ---@field error string|nil   fichier entier refusé (forme, version)
 ---@field editors { id: string, error: string|nil, entries: vAvA.AtelierExchangeEntry[]|nil }[]
 
---- Lit un fichier décodé. Un refus de forme générale rend `error` ; sinon chaque atelier a ses fiches, ou son refus
---- (« chemin : raison ») sans effet sur les autres.
+---@class vAvA.AtelierExchangeLimits
+---@field editors integer  ateliers au plus dans un fichier (config.limits.editors)
+---@field perKind integer  fiches au plus par genre (config.definitions.perKind)
+
+--- Lit un fichier décodé. Un refus de forme générale (version, trop d'ateliers ou de fiches) rend `error` ; sinon
+--- chaque atelier a ses fiches, ou son refus (« chemin : raison », 160 octets au plus) sans effet sur les autres. Un
+--- nom d'atelier hors motif n'est jamais cité (`id` nil, `label` neutre).
 ---@param doc any
 ---@param known table<string, vAvA.AtelierExchangeEditor>  ateliers déclarés (gardés ou non)
+---@param limits vAvA.AtelierExchangeLimits
 ---@return vAvA.AtelierExchangeParsed
-function exchange.parse(doc, known)
+function exchange.parse(doc, known, limits)
     if type(doc) ~= 'table' then return { error = 'fichier : objet attendu', editors = {} } end
     if doc.atelier ~= X.version then
         return { error = format('atelier : %d attendu (format des archives)', X.version), editors = {} }
@@ -204,18 +218,37 @@ function exchange.parse(doc, known)
     for editorId in pairs(doc.editors) do
         if type(editorId) ~= 'string' then return { error = 'editors : clés d\'ateliers attendues', editors = {} } end
         ids[#ids + 1] = editorId
+        if #ids > limits.editors then
+            return { error = format('editors : plus de %d ateliers', limits.editors), editors = {} }
+        end
+    end
+    -- trop de fiches d'un genre : le fichier entier est refusé, avant tout autre travail
+    for _, editorId in ipairs(ids) do
+        local block = doc.editors[editorId]
+        if type(block) == 'table' and type(block.kinds) == 'table' then
+            for _, list in pairs(block.kinds) do
+                if type(list) == 'table' and #list > limits.perKind then
+                    return { error = format('editors : plus de %d fiches pour un même genre', limits.perKind),
+                        editors = {} }
+                end
+            end
+        end
     end
     sort(ids)
     local out = {}
     for _, editorId in ipairs(ids) do
         local info = known[editorId]
-        local result = { id = editorId }
-        if not isId(editorId, EDITOR_PATTERN, MAX_EDITOR) or not info or not info.stored then
+        local valid = isId(editorId, EDITOR_PATTERN, MAX_EDITOR)
+        local result = { id = valid and editorId or nil, label = valid and editorId or 'atelier au nom invalide' }
+        if not valid then
+            result.error = 'editors : atelier au nom invalide'
+        elseif not info or not info.stored then
             result.error = editorId .. ' : atelier inconnu, ou qui ne garde rien'
         else
-            local entries, err = parseEditor(editorId, doc.editors[editorId], info)
+            local entries, err = parseEditor(editorId, doc.editors[editorId], info, limits.perKind)
             result.entries, result.error = entries, err
         end
+        if result.error then result.error = truncate(result.error, DEF.summary) end
         out[#out + 1] = result
     end
     return { editors = out }

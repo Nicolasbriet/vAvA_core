@@ -12,6 +12,7 @@ describe('vava_atelier lifecycle', function()
         VavaAtelier = nil
         helper.loadAll({
             'modules/vava_atelier/shared/constants.lua',
+            'modules/vava_atelier/shared/bounds.lua',
             'modules/vava_atelier/shared/fingerprint.lua',
             'modules/vava_atelier/shared/lifecycle.lua',
         })

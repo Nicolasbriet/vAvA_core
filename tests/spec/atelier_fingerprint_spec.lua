@@ -12,6 +12,7 @@ describe('vava_atelier empreinte', function()
             'modules/vava_codex/shared/constants.lua',
             'modules/vava_codex/shared/fingerprint.lua',
             'modules/vava_atelier/shared/constants.lua',
+            'modules/vava_atelier/shared/bounds.lua',
             'modules/vava_atelier/shared/fingerprint.lua',
         })
         fingerprint, codexFingerprint = VavaAtelier.fingerprint, VavaCodex.fingerprint

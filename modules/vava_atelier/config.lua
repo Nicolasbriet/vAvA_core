@@ -218,6 +218,7 @@ VavaAtelier.config = {
             published = 'A publié', archived = 'A archivé', restored = 'A restauré', removed = 'A retiré',
             imported = 'A rétabli l\'original de', placed = 'A placé', moved = 'A déplacé', note = 'A annoté',
             discarded = 'A abandonné le brouillon de', taken = 'A repris le brouillon de',
+            seeded = 'A posé les premières fiches de', refused = 'A tenté de publier',
             trial_ended = 'A fini l\'essai de', exported = 'A copié aux archives', received = 'A repris des archives',
         },
         -- libellés de la recopie au journal du Registre (32 caractères au plus, bornes de vava_admin)
@@ -227,6 +228,7 @@ VavaAtelier.config = {
             removed = 'Atelier : retiré', imported = 'Atelier : original rétabli', placed = 'Atelier : placé',
             moved = 'Atelier : déplacé', note = 'Atelier : annoté',
             discarded = 'Atelier : brouillon abandonné', taken = 'Atelier : brouillon repris',
+            seeded = 'Atelier : premières fiches', refused = 'Atelier : refusé en jeu',
             trial_ended = 'Atelier : fin d\'essai', exported = 'Atelier : copié aux archives',
             received = 'Atelier : repris des archives',
         },
@@ -235,7 +237,7 @@ VavaAtelier.config = {
 
         -- T-101 : fiches gardées. Étiquette d'état d'une fiche (`state` : { label, tone, line? }) ; %d : version.
         states = {
-            draft = 'Brouillon', trial = 'Essai, version %d', live = 'Publiée, version %d',
+            draft = 'Brouillon', trial = 'Essai, version %d', live = 'Version %d, publiée',
             archived = 'Version %d, archivée', removal = 'Retrait en attente', refused = 'Publiée, mais refusée en jeu',
             holder = 'Brouillon de %s, enregistré %s',
             stale = 'Une autre version a été publiée depuis le début de ce brouillon.',
@@ -279,15 +281,32 @@ VavaAtelier.config = {
             titled = '%s : %s',
         },
         -- résumés des lignes du journal, avertissements des résumés
+        -- compteurs accordés : %d avec `one` pour 0 et 1, `many` au-delà (shared/changes.lua › count)
+        counts = {
+            fiches = { one = '%d fiche', many = '%d fiches' },
+            changed = { one = '%d fiche changée', many = '%d fiches changées' },
+            revived = { one = '%d rétablie', many = '%d rétablies' },
+            new = { one = '%d nouvelle', many = '%d nouvelles' },
+            same = { one = '%d identique à l\'original', many = '%d identiques à l\'original' },
+            taken = { one = '%d fiche reprise', many = '%d fiches reprises' },
+            unchanged = { one = '%d inchangée', many = '%d inchangées' },
+            toTake = { one = '%d à reprendre', many = '%d à reprendre' },
+            published = { one = '%d publiée', many = '%d publiées' },
+            drafts = { one = '%d brouillon', many = '%d brouillons' },
+            trials = { one = '%d en essai', many = '%d en essai' },
+            retired = { one = '%d retirée', many = '%d retirées' },
+            refusedInGame = { one = '%d refusée en jeu', many = '%d refusées en jeu' },
+            seeded = { one = '%d fiche reprise de l\'original', many = '%d fiches reprises de l\'original' },
+            otherRefusals = { one = '… et %d autre refus.', many = '… et %d autres refus.' },
+        },
         summaries = {
             removalPrepared = 'retrait préparé',
             restored = 'version %d rétablie',
             restoredInto = 'version %d rétablie, devenue la version %d',
             takenFrom = 'de %s',
-            seeded = '%d fiches reprises de l\'original',
-            reimported = '%d fiches changées, %d rétablies, %d nouvelles',
-            exported = '%s, %d fiches',
-            received = '%d fiches reprises, %d inchangées',
+            reimported = '%s, %s, %s',          -- counts.changed, revived, new
+            exported = '%s, %s',                -- nom du fichier, counts.fiches
+            received = '%s, %s',                -- counts.taken, unchanged
             reset = 'Des réglages ont repris leur valeur de départ : %s.',
             otherDrafts = 'Des brouillons d\'autres membres sur des fiches liées ne sont pas compris.',
             child = '%s « %s » : %s',
@@ -322,10 +341,12 @@ VavaAtelier.config = {
             unknownEditor = 'Atelier inconnu, ou qui ne garde rien : %s.',
             unknownKind = 'Genre de fiche inconnu dans cet atelier : %s.',
             unknownEntry = 'Fiche absente de l\'original : %s.',
-            state = '%s : %d publiées, %d brouillons, %d en essai, %d retirées%s',
-            stateSyncing = ', en mise à jour', stateFailed = ', pas à jour en jeu', stateRefused = ', %d refusées en jeu',
+            state = '%s : %s, %s, %s, %s%s',    -- counts.published, drafts, trials, retired
+            stateSyncing = ', en mise à jour', stateFailed = ', pas à jour en jeu', stateRefused = ', %s',
             nothing = 'Aucun atelier ne garde de fiches.',
-            originalPlan = '%s : %d fiches changées, %d rétablies, %d nouvelles, %d identiques à l\'original.',
+            originalPlan = '%s : %s, %s, %s, %s.',   -- counts.changed, revived, new, same
+            -- ce qui arrivera à une fiche quand rien de ses réglages ne change (retour à l'original d'une fiche)
+            actions = { new = 'nouvelle', changed = 'changée', revived = 'rétablie' },
             originalSame = 'Identique à l\'original : rien à faire.',
             entryPlan = '%s « %s » : %s',
             refusedPlan = '%s : refusé — %s',
@@ -333,15 +354,19 @@ VavaAtelier.config = {
             noPending = 'Rien à confirmer.',
             expired = 'Le délai est passé : relancez la commande.',
             changed = 'Les fiches ont changé depuis le résumé : relancez la commande.',
-            done = '%s : fait (%d fiches).',
+            done = '%s : fait (%s).',
             failed = '%s : rien n\'a changé (%s).',
-            exported = 'Archives écrites : %s (%d fiches).',
+            exported = 'Archives écrites : %s (%s).',
             exportFailed = 'Archives non écrites : %s.',
+            unwritable = 'fichier illisible à l\'écriture',
+            upgradeRefused = 'données d\'une forme plus ancienne que cet atelier ne sait plus lire',
+            tooManyEditors = 'plus de %d ateliers dans le fichier',
+            tooManyEntries = 'plus de %d fiches pour un même genre',
             badName = 'Nom de fichier refusé : lettres, chiffres, _ et - seulement, terminé par .json (64 octets au '
                 .. 'plus).',
             unreadableFile = 'Fichier illisible : %s.',
             badValue = 'valeur refusée pour « %s » (hors des bornes ou choix inconnu)',
-            importPlan = '%s : %d à reprendre, %d inchangées',
+            importPlan = '%s : %s, %s',      -- counts.toTake, unchanged
             busy = 'L\'atelier %s se met à jour : réessayez dans un instant.',
             dbError = 'Les registres de l\'Atelier ne répondent pas : réessayez dans un instant.',
         },

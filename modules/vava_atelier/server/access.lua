@@ -28,6 +28,7 @@ VavaAtelier.access = access
 ---@class vAvA.AtelierSession
 ---@field accountId integer
 ---@field editor string|nil   atelier ouvert (descripteur demandé en dernier)
+---@field entry string|nil    fiche ouverte de cet atelier, 'type|id' (avis entryChanged ciblés)
 ---@field busy table|false     jeton de l'appel qui tient le verrou, false s'il est libre
 ---@field busySince integer    instant (GetGameTimer) où le verrou a été pris
 
@@ -179,6 +180,14 @@ end
 ---@param editorId string
 function access.setEditor(ctx, editorId)
     ctx.session.editor = editorId
+    ctx.session.entry = nil
+end
+
+--- La séance quitte tout atelier (accueil, journal) : plus aucun avis d'atelier ne lui part.
+---@param ctx vAvA.AtelierContext
+function access.leaveAll(ctx)
+    ctx.session.editor = nil
+    ctx.session.entry = nil
 end
 
 --- Atelier retiré du registre : les joueurs dont la session l'avait ouvert, qui l'oublient.

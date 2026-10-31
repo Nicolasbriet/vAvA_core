@@ -11,8 +11,8 @@
 
 local type, pcall, tostring = type, pcall, tostring
 local find = string.find
-local CreateThread, RegisterNetEvent, GetResourceState, IsPauseMenuActive =
-    CreateThread, RegisterNetEvent, GetResourceState, IsPauseMenuActive
+local CreateThread, RegisterNetEvent, GetResourceState, IsPauseMenuActive, TriggerEvent =
+    CreateThread, RegisterNetEvent, GetResourceState, IsPauseMenuActive, TriggerEvent
 local BeginTextCommandThefeedPost, AddTextComponentSubstringPlayerName, EndTextCommandThefeedPostTicker =
     BeginTextCommandThefeedPost, AddTextComponentSubstringPlayerName, EndTextCommandThefeedPostTicker
 
@@ -25,6 +25,8 @@ local RPC, EVENTS, HOOKS = VavaAtelier.RPC, VavaAtelier.EVENTS, VavaAtelier.HOOK
 local nui = VavaAtelier.nui
 
 local HUD = 'vava_hud'
+local CHAT, CHAT_EVENT = 'vava_chat', 'chat:addMessage'
+local SAY_MAX = 480
 local FEED_TEXT = 'STRING'
 
 local session = {}
@@ -194,6 +196,16 @@ end)
 local function isId(value, pattern, max)
     return type(value) == 'string' and #value <= max and find(value, pattern) ~= nil
 end
+
+-- Réponse d'une commande de l'Atelier (/atelier_archives) : au chat s'il est là, sinon en notification.
+RegisterNetEvent(EVENTS.SAY, function(line)
+    if type(line) ~= 'string' or #line > SAY_MAX then return end
+    if GetResourceState(CHAT) == 'started' then
+        TriggerEvent(CHAT_EVENT, { args = { texts.archives.author, line } })
+    else
+        session.feed(line, 'info')
+    end
+end)
 
 -- Une fiche de l'atelier ouvert a changé ailleurs (publication, reprise, fin d'essai…) : la page relit la fiche ou
 -- avertit. Fin d'un essai alors que l'Atelier est fermé ou sur un autre atelier : notification.

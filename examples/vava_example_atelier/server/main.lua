@@ -29,7 +29,7 @@ if not core then
 end
 
 local log = core.log
-local type, ipairs, pairs, pcall, tostring = type, ipairs, pairs, pcall, tostring
+local type, ipairs, pairs, pcall, tostring, next = type, ipairs, pairs, pcall, tostring, next
 local concat = table.concat
 local GetConvar, GetResourceState, RegisterCommand, TriggerClientEvent, GetGameTimer =
     GetConvar, GetResourceState, RegisterCommand, TriggerClientEvent, GetGameTimer
@@ -69,11 +69,11 @@ end
 
 -- Zones du core et annonces ---------------------------------------------------------------------------------------
 
--- zones déclarées : id du panneau → aire
+-- zones déclarées : id du panneau → { area, state } (dernier état envoyé)
 local zones = {}
 
 local function areaOf(data, where)
-    return { x = where.x, y = where.y, radius = data.portee or 3, margin = cfg.zone.margin }
+    return { x = where.x, y = where.y, z = where.z, radius = data.portee or 3, margin = cfg.zone.margin }
 end
 
 local function sameArea(a, b)
@@ -85,11 +85,12 @@ local function audience(id, area)
     local list = core.zones.subscribers(ZONE_PREFIX .. id)
     if type(list) == 'table' and #list > 0 then return list end
     if not area then return {} end
-    local near = core.net.playersNear({ x = area.x, y = area.y, z = 0.0 }, area.radius + area.margin)
+    local near = core.net.playersNear({ x = area.x, y = area.y, z = area.z or 0.0 }, area.radius + area.margin)
     return type(near) == 'table' and near or {}
 end
 
---- Un panneau publié : sa zone du core créée, déplacée ou remplacée ; annonce à ses seuls abonnés.
+--- Un panneau publié : sa zone du core créée, déplacée, ou ses seules clés changées envoyées (différence) ; annonce
+--- du seul titre à ses abonnés (le texte se lit dans l'état de la zone, ou par /atelier_exemple lire).
 local function showBoard(id, data, where, reason)
     if type(where) ~= 'table' then return end
     local area = areaOf(data, where)
@@ -100,14 +101,16 @@ local function showBoard(id, data, where, reason)
         local ok, code = core.zones.define(key, area, state)
         if not ok then log.warn('zone %s : %s', key, tostring(code)) end
     else
-        if not sameArea(known, area) then core.zones.move(key, area) end
-        core.zones.replace(key, state)
-    end
-    zones[id] = area
-    if reason ~= 'sync' then
-        for _, player in ipairs(audience(id, area)) do
-            chat(player, announce.published:format(data.titre, data.texte or ''))
+        if not sameArea(known.area, area) then core.zones.move(key, area) end
+        local changed = {}
+        for name, value in pairs(state) do
+            if known.state[name] ~= value then changed[name] = value end
         end
+        if next(changed) then core.zones.set(key, changed) end
+    end
+    zones[id] = { area = area, state = state }
+    if reason ~= 'sync' then
+        for _, player in ipairs(audience(id, area)) do chat(player, announce.published:format(data.titre)) end
     end
 end
 

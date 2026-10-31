@@ -70,6 +70,14 @@ function changes.feminine(kind)
     return kind.article == 'la'
 end
 
+--- Compteur accordé : `forms.one` pour 0 et 1, `forms.many` au-delà (« 1 fiche », « 3 fiches »).
+---@param n integer
+---@param forms { one: string, many: string }
+---@return string
+function changes.count(n, forms)
+    return format(n <= 1 and forms.one or forms.many, n)
+end
+
 --- Participe accordé : « ajouté », « ajoutée », « ajoutés », « ajoutées ».
 ---@param word string
 ---@param feminine boolean

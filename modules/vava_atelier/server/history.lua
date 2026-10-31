@@ -38,7 +38,8 @@ local function known(ctx, id)
     return head
 end
 
---- RPC history : { versions = { { version, status, removal, origin, restoredFrom?, summary?, author, when } }, more }.
+--- RPC history : { versions = { { version, status, removal, restoredFrom?, summary?, author, when } }, more } ;
+--- 20 lignes au plus (`history.pageLines`), ≈ 150 octets chacune : ≤ 4 Ko.
 ---@param ctx vAvA.AtelierContext
 ---@param id string
 ---@param before integer  0 : les plus récentes
@@ -53,7 +54,7 @@ function history.list(ctx, id, before)
         local row = rows[i]
         versions[i] = {
             version = index.toInt(row.version), status = row.status, removal = index.toInt(row.removal) == 1,
-            origin = row.origin, restoredFrom = index.toInt(row.restored_from),
+            restoredFrom = index.toInt(row.restored_from),
             summary = jt.summary(row.summary),
             author = text.truncate(tostring(row.published_by or row.author_label or texts.console), OUT.actor),
             when = jt.age(now, index.toInt(row.at) or now),
@@ -70,6 +71,7 @@ function history.version(ctx, id, version)
     local row, err = store.version(editor.id, kind.def.id, id, version)
     if err then return false, err end
     if not row then return false, 'unknown_version' end
+    if ctx.session then ctx.session.entry = kind.def.id .. '|' .. id end
     local entry = calls.entryOf(editor, kind, row)
     if not entry then return false, 'unreadable' end
     local removal = index.toInt(row.removal) == 1

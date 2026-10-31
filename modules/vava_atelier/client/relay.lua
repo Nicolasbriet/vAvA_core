@@ -49,14 +49,24 @@ local function cards(values)
     return out
 end
 
---- Appel d'un RPC, réponse homogène : `{ ok = true, data }` ou `{ ok = false, error = code }` (code du serveur, ou
---- du transport : rate_limited, timeout, invalid_args…).
+--- Refus mis en mots : `{ ok = false, error = code, text }`, le texte venant de la config (la page n'en garde pas de
+--- copie ; un code inconnu prend le texte « indisponible »).
+---@param code any
+---@return table
+local function refusal(code)
+    local error = tostring(code)
+    local refused = cfg.texts.refused
+    return { ok = false, error = error, text = refused[error] or refused.unavailable }
+end
+
+--- Appel d'un RPC, réponse homogène : `{ ok = true, data }` ou `{ ok = false, error = code, text }` (code du serveur,
+--- ou du transport : rate_limited, timeout, invalid_args…).
 ---@param name string
 ---@return table
 local function forward(name, ...)
     local results = pack(core.rpc.call(name, ...))
-    if not results[1] then return { ok = false, error = tostring(results[2]) } end
-    if not results[2] then return { ok = false, error = tostring(results[3]) } end
+    if not results[1] then return refusal(results[2]) end
+    if not results[2] then return refusal(results[3]) end
     return { ok = true, data = results[3] }
 end
 
@@ -93,7 +103,7 @@ nui.on('home', function(d)
     local response = forward(RPC.HOME, known.home)
     if not response.ok then return response end
     local message = session.absorbHome(response.data)
-    if not message then return { ok = false, error = 'stale' } end
+    if not message then return refusal('stale') end
     return { ok = true, data = message }
 end)
 
@@ -106,13 +116,13 @@ nui.on('editor', function(d)
     local response = forward(RPC.EDITOR, id, kept and kept.version or '')
     if not response.ok then return response end
     local answer = response.data
-    if type(answer) ~= 'table' or type(answer.version) ~= 'string' then return { ok = false, error = 'stale' } end
+    if type(answer) ~= 'table' or type(answer.version) ~= 'string' then return refusal('stale') end
     if type(answer.descriptor) ~= 'table' and (not kept or answer.version ~= kept.version) then
         editors[id] = nil
         response = forward(RPC.EDITOR, id, '')
         if not response.ok then return response end
         answer = response.data
-        if type(answer) ~= 'table' or type(answer.descriptor) ~= 'table' then return { ok = false, error = 'stale' } end
+        if type(answer) ~= 'table' or type(answer.descriptor) ~= 'table' then return refusal('stale') end
     end
     if type(answer.descriptor) == 'table' then
         local descTexts = type(answer.descriptor.texts) == 'table' and answer.descriptor.texts or {}

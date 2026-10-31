@@ -36,8 +36,10 @@ VavaAtelier.index = index
 
 -- atelier → { state, kinds = { [type] = { byId, sorted } }, moduleIds = { [type] = { [id] = true } } }
 local editors = {}
--- verrous : 'atelier|type|id' → { token, since }
+-- verrous : 'atelier|type|id' → { token, since, pinned? }
 local locks = {}
+-- génération des têtes, par atelier
+local generations = {}
 
 ---@param editorId string
 ---@return table
@@ -80,9 +82,17 @@ end
 ---@param editorId string
 function index.drop(editorId)
     editors[editorId] = nil
-    for key in pairs(locks) do
-        if key:sub(1, #editorId + 1) == editorId .. '|' then locks[key] = nil end
-    end
+    -- une écriture en cours voit la génération changer : elle ne touche plus ni la mémoire ni le module. Ses verrous
+    -- restent à elle (rendus par son `unlock`), jamais jetés ici.
+    generations[editorId] = (generations[editorId] or 0) + 1
+end
+
+--- Génération des têtes d'un atelier : change à chaque reconstruction (synchronisation) et à son retrait. Une écriture
+--- la relève au début et la revérifie après sa transaction.
+---@param editorId string
+---@return integer
+function index.generation(editorId)
+    return generations[editorId] or 0
 end
 
 --- Titre affiché d'une tête : celui de la publiée, sinon celui du brouillon, sinon celui du retrait.
@@ -130,6 +140,7 @@ end
 function index.build(editorId, rows, retired, tops)
     local entry = slot(editorId)
     entry.kinds = {}
+    generations[editorId] = (generations[editorId] or 0) + 1
     local function head(kindId, id)
         local kind = kindSlot(entry, kindId)
         local h = kind.byId[id]
@@ -382,7 +393,8 @@ function index.lock(keys)
     for _, key in ipairs(keys) do
         local held = locks[key]
         if held then
-            if now - held.since < cfg.limits.busyMs then return nil, 'busy' end
+            -- jamais repris pendant une transaction en cours (`pin`), ni avant `limits.busyMs`
+            if held.pinned or now - held.since < cfg.limits.busyMs then return nil, 'busy' end
             VavaAtelier.log.warn('fiche %s : verrou tenu depuis %d ms, repris', key, now - held.since)
         end
     end
@@ -399,6 +411,29 @@ function index.unlock(token)
         local held = locks[key]
         if held and held.token == token then locks[key] = nil end
     end
+end
+
+--- Épingle (ou relâche) les verrous d'un jeton le temps d'une transaction : ils ne peuvent pas être repris.
+---@param token table|nil
+---@param pinned boolean
+function index.pin(token, pinned)
+    if not token then return end
+    for _, key in ipairs(token.keys) do
+        local held = locks[key]
+        if held and held.token == token then held.pinned = pinned or nil end
+    end
+end
+
+--- Vrai si une écriture tient encore un verrou d'une fiche de cet atelier (épinglé, ou pris depuis moins de
+--- `limits.busyMs`).
+---@param editorId string
+---@return boolean
+function index.busy(editorId)
+    local now, prefix = GetGameTimer(), editorId .. '|'
+    for key, held in pairs(locks) do
+        if key:sub(1, #prefix) == prefix and (held.pinned or now - held.since < cfg.limits.busyMs) then return true end
+    end
+    return false
 end
 
 --- Clé du verrou d'une fiche.

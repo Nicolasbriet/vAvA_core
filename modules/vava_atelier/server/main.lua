@@ -34,12 +34,12 @@ local DEF = VavaAtelier.DEF
 
 -- Schémas communs (§ 6.1 de la spec) : identifiants au motif, textes et pages bornés.
 local EDITOR = { type = 'string', min = 3, max = VavaAtelier.MAX_EDITOR, pattern = VavaAtelier.EDITOR_PATTERN }
-local EDITOR_OR_ALL = { type = 'string', min = 0, max = VavaAtelier.MAX_EDITOR, pattern = '^[%w_:]*$' }   -- '' : tous
+local EDITOR_OR_ALL = { type = 'string', min = 0, max = VavaAtelier.MAX_EDITOR, pattern = '^[A-Za-z0-9_:]*$' }   -- '' : tous
 local KIND = { type = 'string', min = 1, max = VavaAtelier.MAX_KEY, pattern = VavaAtelier.KEY_PATTERN }
 local FIELD = KIND
 local ENTRY = { type = 'string', min = 1, max = VavaAtelier.MAX_ENTRY, pattern = VavaAtelier.ENTRY_PATTERN }
 -- '' : entrée nouvelle
-local ENTRY_OR_NEW = { type = 'string', min = 0, max = VavaAtelier.MAX_ENTRY, pattern = '^[%w_%-]*$' }
+local ENTRY_OR_NEW = { type = 'string', min = 0, max = VavaAtelier.MAX_ENTRY, pattern = '^[A-Za-z0-9_%-]*$' }
 local VERSION = { type = 'string', min = 0, max = VavaAtelier.VERSION_LENGTH, pattern = VavaAtelier.VERSION_PATTERN }
 local QUERY = { type = 'string', min = 0, max = VavaAtelier.MAX_QUERY, pattern = VavaAtelier.QUERY_PATTERN }
 local SEARCH = { type = 'string', min = 2, max = VavaAtelier.MAX_QUERY, pattern = VavaAtelier.QUERY_PATTERN }
@@ -68,6 +68,7 @@ local WHAT = { type = 'string', enum = { 'publish', 'restore' } }
 local function homeRpc(source, version)
     local ctx, code = access.open(source, RPC.HOME)
     if not ctx then return false, code end
+    access.leaveAll(ctx)
     return access.locked(ctx, home.answer, version)
 end
 
@@ -115,6 +116,7 @@ end
 local function journalRpc(source, before, editorId)
     local ctx, code = access.check(source, RPC.JOURNAL)
     if not ctx then return false, code end
+    access.leaveAll(ctx)
     local held = home.held(source)
     if editorId ~= '' then
         local editor = editors.get(editorId)

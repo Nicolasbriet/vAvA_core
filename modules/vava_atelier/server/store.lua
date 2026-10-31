@@ -21,8 +21,11 @@ VavaAtelier.store = store
 
 local T = '`vava_atelier_definitions`'
 
+-- données et lieu des seules versions publiées (rapprochement) : un brouillon est relu à la demande
 local HEADS_SQL = 'SELECT `id`, `kind`, `def_id`, `version`, `status`, `removal`, `origin`, `format`, `title`, '
-    .. '`parent`, `data`, `place`, `fingerprint`, `base_version`, `batch`, `rev`, `summary`, `author_account_id`, '
+    .. "`parent`, IF(`status` = 'published', `data`, NULL) AS `data`, "
+    .. "IF(`status` = 'published', `place`, NULL) AS `place`, "
+    .. '`fingerprint`, `base_version`, `batch`, `rev`, `summary`, `author_account_id`, '
     .. '`author_label`, UNIX_TIMESTAMP(`updated_at`) AS `at` FROM ' .. T
     .. " WHERE `editor` = ? AND `status` IN ('draft', 'trial', 'published')"
 local KNOWN_SQL = 'SELECT DISTINCT `kind`, `def_id` FROM ' .. T .. ' WHERE `editor` = ?'
@@ -68,10 +71,10 @@ local VERSIONS_SQL = 'SELECT `id`, `version`, `status`, `removal` FROM ' .. T
 local ARCHIVE_SQL = 'UPDATE ' .. T .. " SET `status` = 'archived' WHERE `id` = ? AND `status` = 'published'"
 local PUBLISH_SQL = 'UPDATE ' .. T .. " SET `status` = 'published', `version` = ?, `batch` = ?, "
     .. "`published_at` = NOW(), `published_by` = ?, `summary` = NULLIF(?, '') "
-    .. "WHERE `id` = ? AND `status` IN ('draft', 'trial')"
+    .. "WHERE `id` = ? AND `rev` = ? AND `status` IN ('draft', 'trial')"
 local RETIRE_SQL = 'UPDATE ' .. T .. " SET `status` = 'archived', `version` = ?, `batch` = ?, "
     .. "`published_at` = NOW(), `published_by` = ?, `summary` = NULLIF(?, '') "
-    .. "WHERE `id` = ? AND `status` IN ('draft', 'trial')"
+    .. "WHERE `id` = ? AND `rev` = ? AND `status` IN ('draft', 'trial')"
 local CASCADE_SQL = 'INSERT INTO ' .. T .. ' (`editor`, `kind`, `def_id`, `version`, `status`, `removal`, `origin`, '
     .. '`format`, `title`, `parent`, `data`, `place`, `fingerprint`, `base_version`, `batch`, `author_account_id`, '
     .. '`author_label`, `published_by`, `published_at`) '
@@ -288,12 +291,14 @@ end
 -- import.
 function store.archiveStep(rowId) return { query = ARCHIVE_SQL, values = { rowId } } end
 
-function store.publishStep(rowId, version, batch, by, summary)
-    return { query = PUBLISH_SQL, values = { version, batch, by, summary or '', rowId } }
+-- publication et retrait d'un brouillon à sa révision lue : une révision changée ne touche aucune ligne, ce que
+-- l'appelant vérifie après la transaction (server/lifecycle.lua › lotWritten)
+function store.publishStep(rowId, version, batch, by, summary, rev)
+    return { query = PUBLISH_SQL, values = { version, batch, by, summary or '', rowId, rev } }
 end
 
-function store.retireStep(rowId, version, batch, by, summary)
-    return { query = RETIRE_SQL, values = { version, batch, by, summary or '', rowId } }
+function store.retireStep(rowId, version, batch, by, summary, rev)
+    return { query = RETIRE_SQL, values = { version, batch, by, summary or '', rowId, rev } }
 end
 
 function store.cascadeStep(publishedRowId, version, batch, accountId, author)

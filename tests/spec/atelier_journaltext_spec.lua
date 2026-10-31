@@ -17,6 +17,7 @@ describe('vava_atelier journaltext', function()
         VavaAtelier = nil
         helper.loadAll({
             'modules/vava_atelier/shared/constants.lua',
+            'modules/vava_atelier/shared/bounds.lua',
             'modules/vava_atelier/config.lua',
             'modules/vava_atelier/shared/text.lua',
             'modules/vava_atelier/shared/journaltext.lua',

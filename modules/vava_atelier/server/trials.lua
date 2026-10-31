@@ -166,7 +166,7 @@ function trials.finish(accountId, reason, options)
     })
     if editor then
         local extra = (online and IMPOSED[reason] and reason ~= 'session') and trial.source or nil
-        calls.notify(trial.editor, trial.kind, trial.id, 'trialEnded', options.requester or (not extra and trial.source
+        calls.notify(editor, trial.kind, trial.id, 'trialEnded', options.requester or (not extra and trial.source
             or nil), extra, trial.title)
     end
     return true

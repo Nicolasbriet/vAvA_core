@@ -22,7 +22,7 @@
 local type, ipairs, pairs, tostring, select = type, ipairs, pairs, tostring, select
 local format = string.format
 local sort = table.sort
-local CreateThread, GetGameTimer, RegisterCommand = CreateThread, GetGameTimer, RegisterCommand
+local CreateThread, GetGameTimer, RegisterCommand, Wait = CreateThread, GetGameTimer, RegisterCommand, Wait
 local date = os.date
 
 local core = VavaAtelier.core
@@ -36,9 +36,13 @@ local editors, journal, check = VavaAtelier.editors, VavaAtelier.journal, VavaAt
 local store, index, calls, sync = VavaAtelier.store, VavaAtelier.index, VavaAtelier.calls, VavaAtelier.sync
 local text, place, stored, exchange, lc = VavaAtelier.text, VavaAtelier.place, VavaAtelier.stored,
     VavaAtelier.exchange, VavaAtelier.lifecycle
+local changes = VavaAtelier.changes
+local OUT = VavaAtelier.OUT
 local HOOK_PUBLISHED = VavaAtelier.HOOKS.PUBLISHED
 local CONSOLE = 0
 local STAFF = cfg.rights.allowed[#cfg.rights.allowed]
+-- refus d'un import montés un par un ; au-delà, regroupés (« … et N autres refus. »)
+local MAX_REFUSAL_LINES = 5
 
 local archives = {}
 VavaAtelier.archives = archives
@@ -49,6 +53,20 @@ local pending, lastUse = {}, {}
 local function say(source, line, ...)
     if select('#', ...) > 0 then line = format(line, ...) end
     Bridge.Say(source, line)
+end
+
+--- Compteur accordé (« 1 fiche », « 3 fiches ») d'après `texts.counts[key]`.
+local function count(n, key)
+    return changes.count(n, texts.counts[key])
+end
+
+--- Pause du fil toutes les `sync.yieldEvery` fiches (fichier lourd, atelier de 1 000 fiches).
+local function yielder()
+    local done = 0
+    return function()
+        done = done + 1
+        if done % cfg.sync.yieldEvery == 0 then Wait(0) end -- audit: ok (fil serveur d'une commande, pas d'affichage)
+    end
 end
 
 --- Droit relu (la console a tous les droits).
@@ -90,8 +108,9 @@ local function stateLine(editor)
     local tail = ''
     local state = index.state(editor.id)
     if state == 'syncing' then tail = T.stateSyncing elseif state == 'failed' then tail = T.stateFailed end
-    if refused > 0 then tail = tail .. format(T.stateRefused, refused) end
-    return format(T.state, editor.label, published, drafts, running, retired, tail)
+    if refused > 0 then tail = tail .. format(T.stateRefused, count(refused, 'refusedInGame')) end
+    return format(T.state, editor.label, count(published, 'published'), count(drafts, 'drafts'),
+        count(running, 'trials'), count(retired, 'retired'), tail)
 end
 
 local function stateCommand(source, editorId)
@@ -110,8 +129,10 @@ end
 --- État en base des fiches d'un atelier pour un plan : 'type|id' → { fingerprint?, retired? }.
 local function currentOf(editor)
     local current = {}
+    local step = yielder()
     for kindId, kind in pairs(index.kinds(editor.id)) do
         for id, head in pairs(kind.byId) do
+            step()
             local entry = nil
             if head.published then
                 local row = store.row(head.published.row)
@@ -145,8 +166,22 @@ local function planFor(editor, source, items)
         bundle[#bundle + 1] = { kind = item.kind, id = item.id, data = item.entry.data, parent = item.entry.parent,
             place = item.entry.place, removal = false }
     end
-    local todo = {}
+    -- fiches qui reviennent ou arrivent : jamais plus de `definitions.perKind` fiches vivantes par type
+    local arriving = {}
     for i, item in ipairs(items) do
+        local action = plan.items[i].action
+        if action == 'new' or action == 'revived' then
+            local head = index.get(editor.id, item.kind, item.id)
+            if not index.alive(head) then arriving[item.kind] = (arriving[item.kind] or 0) + 1 end
+        end
+    end
+    for kindId, n in pairs(arriving) do
+        if index.liveCount(editor.id, kindId) + n > cfg.definitions.perKind then return nil, texts.refused.full end
+    end
+    local todo = {}
+    local step = yielder()
+    for i, item in ipairs(items) do
+        step()
         local action = plan.items[i].action
         if action ~= 'unchanged' then
             local kind = editor.kinds[item.kind]
@@ -159,7 +194,9 @@ local function planFor(editor, source, items)
                 parent = item.entry.parent, place = item.entry.place, bundle = bundle,
             })
             if not found then return nil, texts.refused[code] or tostring(code) end
-            if #found > 0 then return nil, format(T.entryPlan, kind.def.noun, item.id, found[1].text) end
+            if #found > 0 then
+                return nil, text.truncate(format(T.entryPlan, kind.def.noun, item.id, found[1].text), OUT.summary)
+            end
             todo[#todo + 1] = { kind = item.kind, id = item.id, entry = item.entry, action = action }
         end
     end
@@ -188,13 +225,17 @@ end
 local function fileItems(editor, block, parsed)
     local fileFormat = type(block) == 'table' and type(block.format) == 'number' and block.format or 1
     local out = {}
+    local step = yielder()
     for _, raw in ipairs(parsed.entries) do
+        step()
         local kind = editor.kinds[raw.kind]
         local data = raw.data
         if fileFormat < editor.format and editor.fns.upgrade then
             local called, upgraded = Bridge.CallEditor(editor.id, 'upgrade', editor.fns.upgrade, raw.kind, data,
                 fileFormat)
-            if not called or type(upgraded) ~= 'table' then return nil, raw.path .. ' : montée de format refusée' end
+            if not called or type(upgraded) ~= 'table' then
+                return nil, text.truncate(raw.path .. ' : ' .. T.upgradeRefused, OUT.summary)
+            end
             data = upgraded
         end
         local normalized, reset = stored.normalize(kind.def.form, data)
@@ -203,13 +244,13 @@ local function fileItems(editor, block, parsed)
         for _, fieldId in ipairs(reset) do
             if data[fieldId] ~= nil then
                 local field = kind.fields[fieldId]
-                return nil, format('%s.data.%s : %s', raw.path, fieldId, T.badValue:format(field and field.label
-                    or fieldId))
+                return nil, text.truncate(format('%s.data.%s : %s', raw.path, fieldId, T.badValue:format(field
+                    and field.label or fieldId)), OUT.summary)
             end
         end
         local where, err = place.check(kind.def.placement, raw.place, cfg.place)
         if kind.def.placement and raw.place ~= nil and not where then
-            return nil, raw.path .. '.place : ' .. tostring(err)
+            return nil, text.truncate(raw.path .. '.place : ' .. tostring(err), OUT.summary)
         end
         local parent = kind.def.parent and stored.parentOf(raw.parent) or nil
         out[#out + 1] = { kind = raw.kind, id = raw.id, entry = {
@@ -253,7 +294,10 @@ local function publishPlan(source, editor, todo, origin, reason)
             depth = editor.kindDepth[item.kind] or 1, previous = head and head.published and head.published.version,
             title = calls.titleOf(kind, item.entry.data, item.id) }
     end
+    -- verrous épinglés pendant la transaction : jamais repris
+    index.pin(token, true)
     local written = store.transaction(steps)
+    index.pin(token, false)
     if not written then
         index.unlock(token)
         index.setState(editor.id, 'ready')
@@ -291,11 +335,11 @@ local function confirm(source)
     end
     for _, part in ipairs(op.parts) do
         local editor = editors.get(part.editor)
-        local count, items = publishPlan(source, editor, part.todo, op.origin, op.reason)
-        if not count then
+        local published, items = publishPlan(source, editor, part.todo, op.origin, op.reason)
+        if not published then
             say(source, T.failed, editor.label, texts.refused[items] or tostring(items))
         else
-            say(source, T.done, editor.label, count)
+            say(source, T.done, editor.label, count(published, 'fiches'))
             if op.kind == 'original_fiche' then
                 local item = items[1]
                 if item then
@@ -304,12 +348,13 @@ local function confirm(source)
                 end
             elseif op.kind == 'original' then
                 journal.write(source, { editor = editor.id, kind = editor.firstKind, action = 'imported',
-                    title = editor.label, summary = format(texts.summaries.reimported, part.plan.changed,
-                        part.plan.revived, part.plan.new) })
+                    title = editor.label, summary = format(texts.summaries.reimported,
+                        count(part.plan.changed, 'changed'), count(part.plan.revived, 'revived'),
+                        count(part.plan.new, 'new')) })
             else
                 journal.write(source, { editor = editor.id, kind = editor.firstKind, action = 'received',
-                    title = editor.label, summary = text.truncate(format(texts.summaries.received, count,
-                        part.plan.unchanged), VavaAtelier.OUT.summary) })
+                    title = editor.label, summary = text.truncate(format(texts.summaries.received,
+                        count(published, 'taken'), count(part.plan.unchanged, 'unchanged')), OUT.summary) })
             end
         end
     end
@@ -352,9 +397,11 @@ local function originalCommand(source, editorId, kindId, id)
                     texts.changes, calls.diff(editor, item.kind, before.data, item.entry.data))
             end
         end
-        say(source, T.entryPlan, editor.kinds[item.kind].def.noun, item.id, summary ~= '' and summary or item.action)
+        say(source, T.entryPlan, editor.kinds[item.kind].def.noun, item.id,
+            summary ~= '' and summary or T.actions[item.action] or item.action)
     else
-        say(source, T.originalPlan, editor.label, plan.changed, plan.revived, plan.new, plan.unchanged)
+        say(source, T.originalPlan, editor.label, count(plan.changed, 'changed'), count(plan.revived, 'revived'),
+            count(plan.new, 'new'), count(plan.unchanged, 'same'))
     end
     hold(source, { kind = single and 'original_fiche' or 'original', origin = 'seed', reason = 'reimport',
         right = not single and STAFF or nil,
@@ -363,7 +410,7 @@ end
 
 local function exportCommand(source, target)
     if not can(source, STAFF) then return say(source, T.denied) end
-    local list, count = {}, 0
+    local list, total = {}, 0
     local chosen = {}
     for _, editor in ipairs(editors.list()) do
         if editor.stored and (target == 'tout' or editor.id == target) then chosen[#chosen + 1] = editor end
@@ -392,19 +439,19 @@ local function exportCommand(source, target)
         end
         list[#list + 1] = { editor = editor.id, format = editor.format, kinds = kinds }
         perEditor[#perEditor + 1] = { editor = editor, count = n }
-        count = count + n
+        total = total + n
     end
     local doc = exchange.build(list, date('!%Y-%m-%dT%H:%M:%SZ'))
     local name = exchange.exportName(target ~= 'tout' and target or nil, date('%Y%m%d_%H%M%S'))
     local content = Bridge.JsonEncode(doc)
-    if not content then return say(source, T.exportFailed, 'JSON') end
+    if not content then return say(source, T.exportFailed, T.unwritable) end
     local ok, err = Bridge.SaveArchive(name, content)
     if not ok then return say(source, T.exportFailed, tostring(err)) end
     for _, part in ipairs(perEditor) do
         journal.write(source, { editor = part.editor.id, kind = part.editor.firstKind, action = 'exported',
-            title = part.editor.label, summary = format(texts.summaries.exported, name, part.count) })
+            title = part.editor.label, summary = format(texts.summaries.exported, name, count(part.count, 'fiches')) })
     end
-    say(source, T.exported, name, count)
+    say(source, T.exported, name, count(total, 'fiches'))
 end
 
 local function importCommand(source, name)
@@ -419,13 +466,21 @@ local function importCommand(source, name)
         for kindId in pairs(editor.kinds) do kinds[kindId] = true end
         known[editor.id] = { stored = editor.stored, format = editor.format, kinds = kinds }
     end
-    local parsed = exchange.parse(doc, known)
-    if parsed.error then return say(source, T.unreadableFile, parsed.error) end
+    local parsed = exchange.parse(doc, known, { editors = cfg.limits.editors, perKind = cfg.definitions.perKind })
+    if parsed.error then return say(source, T.unreadableFile, text.truncate(parsed.error, OUT.summary)) end
     local parts = {}
+    local refusals = 0
+    --- Un refus d'atelier : montré tel quel jusqu'à MAX_REFUSAL_LINES, compté ensuite.
+    local function refuse(label, reason)
+        refusals = refusals + 1
+        if refusals <= MAX_REFUSAL_LINES then
+            say(source, text.truncate(format(T.refusedPlan, label, reason), OUT.summary * 2))
+        end
+    end
     for _, result in ipairs(parsed.editors) do
-        local editor = editors.get(result.id)
+        local editor = result.id and editors.get(result.id) or nil
         if result.error then
-            say(source, T.refusedPlan, editor and editor.label or result.id, result.error)
+            refuse(editor and editor.label or result.label, result.error)
         elseif index.state(editor.id) ~= 'ready' then
             say(source, T.busy, editor.label)
         else
@@ -433,9 +488,9 @@ local function importCommand(source, name)
             local plan, planErr
             if items then plan, planErr = planFor(editor, source, items) end
             if not plan then
-                say(source, T.refusedPlan, editor.label, tostring(itemsErr or planErr))
+                refuse(editor.label, tostring(itemsErr or planErr))
             else
-                say(source, T.importPlan, editor.label, #plan.todo, plan.unchanged)
+                say(source, T.importPlan, editor.label, count(#plan.todo, 'toTake'), count(plan.unchanged, 'unchanged'))
                 if #plan.todo > 0 then
                     parts[#parts + 1] = { editor = editor.id, todo = plan.todo, plan = plan,
                         digest = index.digest(editor.id) }
@@ -443,6 +498,7 @@ local function importCommand(source, name)
             end
         end
     end
+    if refusals > MAX_REFUSAL_LINES then say(source, count(refusals - MAX_REFUSAL_LINES, 'otherRefusals')) end
     if #parts == 0 then return end
     hold(source, { kind = 'import', origin = 'import', reason = 'import', right = STAFF, parts = parts })
 end

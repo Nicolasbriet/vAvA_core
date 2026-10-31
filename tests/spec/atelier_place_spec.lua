@@ -9,6 +9,7 @@ describe('vava_atelier place', function()
         VavaAtelier = nil
         helper.loadAll({
             'modules/vava_atelier/shared/constants.lua',
+            'modules/vava_atelier/shared/bounds.lua',
             'modules/vava_atelier/config.lua',
             'modules/vava_atelier/shared/place.lua',
         })

@@ -95,6 +95,7 @@ describe('vava_atelier stored', function()
         VavaAtelier, VavaExampleAtelier = nil, nil
         helper.loadAll({
             'modules/vava_atelier/shared/constants.lua',
+            'modules/vava_atelier/shared/bounds.lua',
             'modules/vava_atelier/config.lua',
             'modules/vava_atelier/shared/text.lua',
             'modules/vava_atelier/shared/formvalues.lua',

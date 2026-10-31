@@ -49,6 +49,7 @@ shared_scripts {
 
 server_scripts {
     'server/core.lua',
+    'shared/bounds.lua',         -- constantes réservées au serveur (jamais envoyées aux joueurs)
     'shared/text.lua',           -- logique pure, servie au seul serveur (testée hors jeu : tests/spec)
     'shared/formvalues.lua',
     'shared/formschema.lua',

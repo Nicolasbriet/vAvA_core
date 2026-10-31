@@ -18,7 +18,7 @@
 
 local pairs, ipairs, tostring, format = pairs, ipairs, tostring, string.format
 local sort = table.sort
-local CreateThread, Wait = CreateThread, Wait
+local CreateThread, Wait, GetGameTimer = CreateThread, Wait, GetGameTimer
 
 local core = VavaAtelier.core
 if not core then return end
@@ -37,6 +37,8 @@ VavaAtelier.sync = sync
 local generations = {}
 -- paquets d'insertions de la graine
 local SEED_CHUNK = 100
+-- attente d'une écriture en cours avant de relire les têtes
+local LOCK_POLL_MS = 50
 
 --- Une synchronisation est-elle toujours d'actualité ?
 local function current(editor, generation)
@@ -172,6 +174,16 @@ end
 ---@return boolean
 local function once(editor, generation)
     local step = yielder()
+    -- une écriture en cours (transaction, appels au module) finit avant que les têtes soient relues et reconstruites ;
+    -- au-delà de `limits.busyMs`, la synchronisation sera retentée (`sync.retryMs`)
+    local started = GetGameTimer()
+    while index.busy(editor.id) do
+        if GetGameTimer() - started >= cfg.limits.busyMs then
+            VavaAtelier.log.warn("atelier '%s' : une écriture tient encore ses verrous, synchronisation remise", editor.id)
+            return false
+        end
+        Wait(LOCK_POLL_MS)
+    end
     local knownRows = store.known(editor.id)
     if not knownRows then return false end
     local known = {}
@@ -183,8 +195,8 @@ local function once(editor, generation)
     if not rows or not retired or not tops then return false end
     index.build(editor.id, rows, retired, tops)
     if seeded > 0 then
-        local ok, code = journal.write(0, { editor = editor.id, kind = editor.firstKind, action = 'imported',
-            title = editor.label, summary = format(texts.summaries.seeded, seeded) })
+        local ok, code = journal.write(0, { editor = editor.id, kind = editor.firstKind, action = 'seeded',
+            title = editor.label, summary = VavaAtelier.changes.count(seeded, texts.counts.seeded) })
         if not ok then VavaAtelier.log.warn('graine non journalisée : %s', tostring(code)) end
     end
     local applied, removed = reconcile(editor, rows, step, generation)

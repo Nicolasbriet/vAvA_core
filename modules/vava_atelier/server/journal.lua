@@ -157,7 +157,10 @@ function journal.write(source, entry, owner, actor, known)
         accountId, label = Bridge.AccountId(source), Bridge.ActorLabel(source)
         if not accountId or not label then return false, 'not_allowed' end
     end
-    if not withinFlood(owner or VavaAtelier.resource) then return false, 'flood' end
+    -- débit : par ressource appelante pour un export ; pour une écriture interne, par membre (ou console) : un
+    -- module bavard ou un membre pressé n'épuise jamais la part des autres
+    local floodKey = owner or ('#' .. tostring(accountId or 'console'))
+    if not withinFlood(floodKey) then return false, 'flood' end
 
     local summary = entry.summary ~= '' and entry.summary or nil
     local row = {

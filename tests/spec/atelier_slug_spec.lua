@@ -3,13 +3,14 @@ local helper = require('tests.helper')
 -- Identifiant d'une fiche créée dans l'Atelier (T-101, shared/slug.lua), tiré de son nom à la première sauvegarde.
 describe('vava_atelier slug', function()
     local slug
-    local PATTERN = '^[%w_%-]+$'
+    local PATTERN = '^[A-Za-z0-9_%-]+$'
 
     before_each(function()
         helper.reset()
         VavaAtelier = nil
         helper.loadAll({
             'modules/vava_atelier/shared/constants.lua',
+            'modules/vava_atelier/shared/bounds.lua',
             'modules/vava_atelier/shared/slug.lua',
         })
         slug = VavaAtelier.slug

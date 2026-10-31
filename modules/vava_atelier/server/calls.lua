@@ -186,23 +186,37 @@ function calls.encode(data, where)
     return dataJson, placeJson
 end
 
---- Avis `entryChanged` aux membres dont la séance est sur cet atelier (sauf `except`), et à `extra` en plus.
----@param editorId string
+--- Joueur dont la séance est ouverte par ce compte, ou nil.
+---@param accountId integer
+---@return integer|nil
+function calls.sourceOf(accountId)
+    for source, session in pairs(access.sessions()) do
+        if session.accountId == accountId then return source end
+    end
+    return nil
+end
+
+--- Avis `entryChanged` aux seuls membres dont la séance a cette fiche ouverte (sauf `except`), et à `extra` en plus
+--- (tenant d'un essai fini sans qu'il l'ait demandé, ancien tenant d'un brouillon repris) ; chacun a encore le droit de
+--- l'atelier (relu auprès du Registre).
+---@param editor { id: string, right: string }
 ---@param kindId string
 ---@param id string
 ---@param what string  saved | published | restored | removed | discarded | taken | trialEnded
 ---@param except integer|nil
 ---@param extra integer|nil
 ---@param title string|nil  nom de la fiche (fin d'essai : notification hors de l'Atelier)
-function calls.notify(editorId, kindId, id, what, except, extra, title)
+function calls.notify(editor, kindId, id, what, except, extra, title)
+    local entry = kindId .. '|' .. id
     local sent = {}
     for source, session in pairs(access.sessions()) do
-        if session.editor == editorId and source ~= except then
+        if session.editor == editor.id and session.entry == entry and source ~= except
+            and Bridge.Can(source, editor.right) then
             sent[source] = true
-            Bridge.Send(source, EVENTS.ENTRY_CHANGED, editorId, kindId, id, what, title)
+            Bridge.Send(source, EVENTS.ENTRY_CHANGED, editor.id, kindId, id, what, title)
         end
     end
-    if extra and extra ~= except and not sent[extra] then
-        Bridge.Send(extra, EVENTS.ENTRY_CHANGED, editorId, kindId, id, what, title)
+    if extra and extra ~= except and not sent[extra] and access.isOpen(extra) and Bridge.Can(extra, editor.right) then
+        Bridge.Send(extra, EVENTS.ENTRY_CHANGED, editor.id, kindId, id, what, title)
     end
 end

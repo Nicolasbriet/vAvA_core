@@ -49,7 +49,7 @@ VavaExampleAtelier = {
         -- Annonces du chat : aux abonnés de la zone du panneau, ou à l'auteur seul pour l'essai.
         announce = {
             author = 'Panneau',
-            published = 'Le panneau « %s » porte désormais : « %s »',
+            published = 'Le panneau « %s » vient d\'être repeint : approchez pour le lire.',
             removed = 'Le panneau « %s » a été retiré.',
             trial = '[Essai] Le panneau « %s » porterait : « %s »',
             trialPoster = '[Essai] L\'affiche « %s » serait collée.',

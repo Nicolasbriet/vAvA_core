@@ -15,7 +15,7 @@ local type, pairs, pcall, tostring, tonumber, select, print = type, pairs, pcall
 local pack, unpack, sort = table.pack, table.unpack, table.sort
 local find, match, sub = string.find, string.match, string.sub
 local GetResourceState, GetGameTimer = GetResourceState, GetGameTimer
-local SaveResourceFile, LoadResourceFile, TriggerClientEvent = SaveResourceFile, LoadResourceFile, TriggerClientEvent
+local SaveResourceFile, LoadResourceFile = SaveResourceFile, LoadResourceFile
 local jsonEncode, jsonDecode = json.encode, json.decode
 
 -- blancs ASCII de fin, écrits octet par octet : `%s` dépend de la locale du système et couperait le « à » final d'un
@@ -330,9 +330,11 @@ end
 
 -- Réponses de commande (T-101) ---------------------------------------------------------------------------------------
 
-local CHAT_EVENT = 'chat:addMessage'
+-- réponse d'une commande : 480 octets au plus par ligne
+local SAY_MAX = 480
 
---- Une ligne au seul membre (chat ; vava_chat la reprend), ou à la console.
+--- Une ligne au seul membre (évènement compté par core.net : son client l'écrit au chat, sinon en notification), ou
+--- à la console. `chat:addMessage` n'est pas envoyé d'ici : core.net n'envoie que les évènements de la ressource.
 ---@param source integer
 ---@param line string
 function Bridge.Say(source, line)
@@ -340,5 +342,5 @@ function Bridge.Say(source, line)
         print(('[%s] %s'):format(VavaAtelier.resource, line))
         return
     end
-    TriggerClientEvent(CHAT_EVENT, source, { args = { cfg.texts.archives.author, line } })
+    Bridge.Send(source, VavaAtelier.EVENTS.SAY, text.truncate(line, SAY_MAX))
 end

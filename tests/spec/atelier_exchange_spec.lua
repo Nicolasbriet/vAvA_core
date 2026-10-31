@@ -7,12 +7,15 @@ describe('vava_atelier exchange', function()
     local PANNEAUX, PROCL = 'vava_example_atelier:panneaux', 'vava_example_atelier:proclamations'
 
     local known
+    local LIMITS = { editors = 32, perKind = 1000 }
 
     before_each(function()
         helper.reset()
         VavaAtelier = nil
         helper.loadAll({
             'modules/vava_atelier/shared/constants.lua',
+            'modules/vava_atelier/shared/bounds.lua',
+            'modules/vava_atelier/shared/text.lua',
             'modules/vava_atelier/shared/exchange.lua',
         })
         exchange = VavaAtelier.exchange
@@ -59,20 +62,20 @@ describe('vava_atelier exchange', function()
                 '2026-10-30T14:05:00Z')
             assert.equal(1, built.atelier)
             assert.equal('a', built.editors[PANNEAUX].kinds.panneau[1].id)
-            local parsed = exchange.parse(built, known)
+            local parsed = exchange.parse(built, known, LIMITS)
             assert.is_nil(parsed.error)
             assert.is_nil(parsed.editors[1].error)
             assert.equal(1, #parsed.editors[1].entries)
         end)
 
         it('atelier ≠ 1, editors absent', function()
-            assert.truthy(exchange.parse({ atelier = 2, editors = {} }, known).error)
-            assert.truthy(exchange.parse({ atelier = 1 }, known).error)
-            assert.truthy(exchange.parse('x', known).error)
+            assert.truthy(exchange.parse({ atelier = 2, editors = {} }, known, LIMITS).error)
+            assert.truthy(exchange.parse({ atelier = 1 }, known, LIMITS).error)
+            assert.truthy(exchange.parse('x', known, LIMITS).error)
         end)
 
         local function refusal(editors, needle)
-            local parsed = exchange.parse(doc(editors), known)
+            local parsed = exchange.parse(doc(editors), known, LIMITS)
             assert.is_nil(parsed.error)
             local err = parsed.editors[1].error
             assert.is_string(err)
@@ -99,11 +102,11 @@ describe('vava_atelier exchange', function()
             local deep = entry('a', { data = { x = { { { { {} } } } } } })     -- fiche 1, data 2, x 3 … 7
             refusal({ [PANNEAUX] = { kinds = { panneau = { deep } } } }, 'plus de 6 niveaux')
             local ok = entry('a', { data = { x = { { { {} } } } } })            -- 6
-            local parsed = exchange.parse(doc({ [PANNEAUX] = { kinds = { panneau = { ok } } } }), known)
+            local parsed = exchange.parse(doc({ [PANNEAUX] = { kinds = { panneau = { ok } } } }), known, LIMITS)
             assert.is_nil(parsed.editors[1].error)
             -- un polygone tient dans la borne (fiche, lieu, sommets, sommet)
             local poly = entry('b', { place = { z = 0, points = { { x = 0, y = 0 }, { x = 1, y = 0 }, { x = 1, y = 1 } } } })
-            parsed = exchange.parse(doc({ [PANNEAUX] = { kinds = { panneau = { poly } } } }), known)
+            parsed = exchange.parse(doc({ [PANNEAUX] = { kinds = { panneau = { poly } } } }), known, LIMITS)
             assert.is_nil(parsed.editors[1].error)
             assert.equal(7, exchange.depth({ { { { { { {} } } } } } }, 10))
             assert.equal(4, exchange.depth({ { { { { { {} } } } } } }, 3))
@@ -113,7 +116,7 @@ describe('vava_atelier exchange', function()
             local parsed = exchange.parse(doc({
                 [PANNEAUX] = { kinds = { panneau = { entry('a'), entry('b c') } } },
                 [PROCL] = { format = 2, kinds = { proclamation = { entry('couronnement') } } },
-            }), known)
+            }), known, LIMITS)
             assert.is_nil(parsed.error)
             local byId = {}
             for _, e in ipairs(parsed.editors) do byId[e.id] = e end
@@ -122,6 +125,48 @@ describe('vava_atelier exchange', function()
             assert.is_nil(byId[PROCL].error)
             assert.equal('couronnement', byId[PROCL].entries[1].id)
             assert.equal(PROCL .. '.kinds.proclamation[1]', byId[PROCL].entries[1].path)
+        end)
+
+        -- fichier hostile : bornes globales, clés jamais citées hors motif, textes bornés
+        it('trop d\'ateliers ou trop de fiches d\'un genre : le fichier entier est refusé', function()
+            local many = {}
+            for i = 1, 3 do many['vava_x:a' .. i] = { kinds = {} } end
+            assert.truthy(exchange.parse(doc(many), known, { editors = 2, perKind = 1000 }).error:find('plus de 2 ateliers', 1, true))
+            local list = {}
+            for i = 1, 4 do list[i] = entry('f' .. i) end
+            local parsed = exchange.parse(doc({ [PANNEAUX] = { kinds = { panneau = list } } }), known, { editors = 32, perKind = 3 })
+            assert.truthy(parsed.error:find('plus de 3 fiches', 1, true), parsed.error)
+            assert.same({}, parsed.editors)
+            assert.is_nil(exchange.parse(doc({ [PANNEAUX] = { kinds = { panneau = list } } }), known, { editors = 32, perKind = 4 }).error)
+        end)
+
+        it('une clé hors de son motif n\'est jamais citée', function()
+            local hostile = '<script>' .. string.rep('x', 300)
+            local parsed = exchange.parse(doc({ [hostile] = { kinds = {} } }), known, LIMITS)
+            assert.is_nil(parsed.editors[1].id)
+            assert.is_nil(parsed.editors[1].error:find('<script>', 1, true))
+            parsed = exchange.parse(doc({ [PANNEAUX] = { kinds = { [hostile] = {} } } }), known, LIMITS)
+            assert.is_nil(parsed.editors[1].error:find('<script>', 1, true))
+            assert.truthy(parsed.editors[1].error:find('genre au nom invalide', 1, true))
+            local bad = entry('a')
+            bad[hostile] = 1
+            parsed = exchange.parse(doc({ [PANNEAUX] = { kinds = { panneau = { bad } } } }), known, LIMITS)
+            assert.truthy(parsed.editors[1].error:find('clé au nom invalide', 1, true), parsed.editors[1].error)
+            assert.is_nil(parsed.editors[1].error:find('script', 1, true))
+        end)
+
+        it('texte d\'un refus borné à 160 octets sans briser un caractère', function()
+            local longId = string.rep('a', 31) .. ':' .. string.rep('b', 32)          -- 64 octets
+            local longKind = 'k' .. string.rep('é', 15)                               -- hors motif : jamais cité
+            local kind = string.rep('k', 32)
+            known[longId] = { stored = true, format = 1, kinds = { [kind] = true } }
+            local dup = string.rep('a', 48)
+            local parsed = exchange.parse(doc({ [longId] = { kinds = { [kind] = { entry(dup), entry(dup) } } } }), known, LIMITS)
+            local err = parsed.editors[1].error
+            assert.is_true(#err <= 160, tostring(#err))
+            assert.is_not_nil(utf8.len(err))
+            parsed = exchange.parse(doc({ [longId] = { kinds = { [longKind] = {} } } }), known, LIMITS)
+            assert.is_nil(parsed.editors[1].error:find('é', 1, true))
         end)
     end)
 
