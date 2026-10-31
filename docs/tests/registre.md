@@ -164,7 +164,7 @@ Sénéchal et au-dessus (droit `tools`).
 | 3 | `F2` à nouveau. | « Vol libre terminé. » ; A redevient visible et retombe ; Journal « actif : non ». |
 | 4 | Levier « Vol libre » dans Outils. | Même effet que `F2` ; le levier passe à « Actif ». |
 | 5 | **(2 joueurs)** Levier « Invisibilité ». | B ne voit plus A ; « Inactif » le rend visible. |
-| 6 | **(2 joueurs)** Levier « Invulnérabilité » ; B frappe A. | A ne perd pas de vie (à confirmer avec `vava_health`, qui lit la vie du ped) ; « Inactif » rend A vulnérable. |
+| 6 | **(2 joueurs)** Levier « Invulnérabilité » ; B frappe A. | A ne perd pas de vie ; « Inactif » rend A vulnérable. Coups, sorts et faim de la chaîne de dégâts : § 9 bis. |
 | 7 | « Rejoindre le repère » sans repère sur la carte. | « Aucun repère sur la carte. ». |
 | 8 | Poser un repère (menu pause → carte), « Rejoindre le repère ». | « C'est fait. » ; A posé sur le sol à l'emplacement du repère. |
 | 9 | « Copier ma position », puis coller dans le chat (`Ctrl+V`). | « Position copiée : x, y, z » ; le collage donne les mêmes nombres. |
@@ -172,7 +172,32 @@ Sénéchal et au-dessus (droit `tools`).
 | 11 | « Zones de voix » → « Ouvrir ». | Le Registre se ferme, l'éditeur des zones de voix s'ouvre (`vava_voice`). |
 | 12 | Registre ouvert sur Outils : `stop vava_voice` en console, puis « Ouvrir » sur « Zones de voix ». `start vava_voice`, rouvrir le Registre. | « Cet outil n'est plus disponible (son module est arrêté). » ; après le redémarrage, l'outil est de nouveau listé. |
 
-## 10. Observer, écran des joueurs (2 joueurs)
+## 9 bis. Invulnérabilité tenue par le serveur (`vava_admin` 1.11.0, T-138, 2 joueurs)
+
+L'outil « Invulnérabilité », le vol libre et l'observation protègent désormais de la **chaîne de dégâts** de
+`vava_health` (coups, sorts, faim) : le serveur garde l'état et l'annule par le modificateur
+`vava_admin:invulnerabilite`. Préparation : celle de [combat 0](combat.md) (mode développement, `vava_example_combat`
+pour `/frapper` et `/chaine`, B avec l'ACE `vava.dev`) ; A Sénéchal ou plus ; la requête
+`SELECT id, target_id, origin, kind, applied, cancelled FROM vava_health_hits ORDER BY id DESC LIMIT 5` sous la main.
+
+| # | Faire | Attendu |
+|---|---|---|
+| 1 | Démarrer le serveur (ou `restart vava_admin`) ; B `/chaine`. | Console : « modificateur 'vava_admin:invulnerabilite' (Invulnérabilité du Conseil, étape annulation) déclaré par vava_admin ». `/chaine` : `vava_admin:invulnerabilite` en tête (étape annulation, priorité 10), ses types sans `monde`. Aucun avertissement de `vava_admin`. |
+| 2 | A : Outils → levier « Invulnérabilité ». B : `/frapper <A> 40`, puis `/frapper <A> 40 feu`. | Chez B : « annulé : invulnerable » deux fois ; `/vie` de A inchangée. `vava_health_hits` : deux lignes `cancelled = invulnerable`, `applied = 0.0`. Journal du Registre : « a utilisé un outil », « actif : oui ; outil : godmode ». |
+| 3 | (si un des deux est mage) A toujours invulnérable ; B lance une Boule de feu sur A. | A ne perd rien ; ligne `origin = vava_magic`, `cancelled = invulnerable`. |
+| 4 | A toujours invulnérable : `/besoins 0 0`, attendre deux minutes ; puis `/besoins 100 100`. | A ne perd rien : la faim passe par la chaîne (`privation`), annulée aussi. |
+| 5 | A : levier « Inactif » ; B : `/frapper <A> 10`. | Appliqué 10 ; Journal « actif : non ; outil : godmode ». |
+| 6 | A : `F2` (vol libre) ; B : `/frapper <A> 10` ; A : `F2` ; B de nouveau. | Pendant le vol : « annulé : invulnerable » ; après : appliqué 10. |
+| 7 | A : fiche de B → « Observer » ; B : `/frapper <A> 10` ; A : `F10` (fin de l'observation) ; B de nouveau. | Pendant l'observation : « annulé : spectating » ; après : appliqué 10. |
+| 8 | A : levier « Invulnérabilité » ; A revient à la sélection (`/perso quitter`) et rejoue le même personnage ; B : `/frapper <A> 10`. | Console : « invulnérabilité retirée (joueur <idA>, personnage n° <M>) : personnage déchargé ». Le levier est « Inactif » ; appliqué 10. |
+| 9 | A : levier « Invulnérabilité » ; A quitte le jeu (`F8` → `disconnect`) ; revient. | Console : la même ligne (« personnage déchargé », ou « départ du joueur »). Au retour, levier « Inactif », les coups portent. |
+| 10 | Console : `vava_conseil <B> senechal`. B : levier « Invulnérabilité ». A : `/frapper <B> 10`. Console : `vava_conseil <B> gardien` ; A : `/frapper <B> 10`. Puis `vava_conseil <B> aucun`. | Sénéchal : « annulé : invulnerable ». Gardien (plus le droit `tools`) : appliqué 10 aussitôt, sans que B ait touché au levier (son levier peut encore dire « Actif » : à noter). |
+| 11 | A invulnérable ; console : `restart vava_health` ; B : `/frapper <A> 10`. | La ligne de déclaration du test 1 revient juste après « vava_health … prêt » ; « annulé : invulnerable » (l'état est resté au Registre). |
+| 12 | A invulnérable ; console : `restart vava_admin` ; B : `/frapper <A> 10`. | Chez A, le levier revient à « Inactif » (outils remis à zéro par l'arrêt) ; appliqué 10 ; la ligne de déclaration revient. |
+| 13 | A invulnérable, en vol libre à 30 m ; `F2` pour tomber. | A ne perd rien : une chute est une perte native, le ped reste invincible chez A (`SetEntityInvincible`) ; aucune ligne de journal. |
+| 14 | `resmon 1` chez A pendant les tests 2 à 7. | `vava_admin` inchangé (§ 15) : rien de nouveau ne tourne côté client. |
+
+
 
 | # | Faire | Attendu |
 |---|---|---|

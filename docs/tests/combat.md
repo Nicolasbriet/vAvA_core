@@ -21,7 +21,9 @@ Comptez 1 h par section, presque tout à deux ; les tests à deux joueurs sont m
    `/arme pistolet | couteau | non`, `/explosion`, `/tricher`. Le n° d'un joueur se lit dans le Registre (`F10`).
 4. **Consoles** : `F8` chez A et chez B, console du serveur ouverte ; une requête SQL sous la main
    (`SELECT * FROM vava_health_hits ORDER BY id DESC LIMIT 5`).
-5. **Invulnérabilité** du Registre éteinte chez les deux (elle n'est que locale et ne protège pas de la chaîne).
+5. **Invulnérabilité** du Registre éteinte chez les deux, vol libre et observation compris : depuis `vava_admin` 1.11.0
+   (T-138), elles annulent tout coup de la chaîne (`invulnerable`, `spectating` ; essai : [registre 9 bis](registre.md)).
+   `/chaine` montre alors aussi `vava_admin:invulnerabilite` en tête de liste, à l'étape annulation.
 6. **Armes** (section 2) : `ensure vava_combat` **après** `vava_health` et `vava_crafting`, et `vava_example_combat`
    1.1.0 (`/frapper_arme`). A est Souverain ; `/metiers niveau <A> forge 60` et `/metiers niveau <A> menuiserie 30` ;
    matières par `/catalogue materiau` (lingots de fer de palier 3, chêne, pin, cuir) et un marteau de forge. Outils :

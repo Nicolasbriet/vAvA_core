@@ -1055,6 +1055,14 @@ faire tout le système de combat ») : la porte T-119 reste à passer en jeu.
 - Spec T-110 § 13 : l'invulnérabilité du Registre n'est que locale (`SetEntityInvincible`) ; les sorts la traversent
   déjà, les coups de la chaîne aussi. `vava_admin` garde l'état côté serveur et déclare un modificateur d'annulation
   `vava_admin:invulnerabilite` au registre `vava_health:modifiers`.
+- Fait le 31 octobre 2026 (branche `agents/T-138`) : `vava_admin` 1.11.0 — état en mémoire par joueur (personnage,
+  compte, raisons `godmode`, `noclip` et `spectate`, chacune avec son instant et le membre qui l'a posée), posé par
+  l'intention `tool` (refusée sans personnage, journal inchangé) et par l'observation ; retiré par le levier ou `F2`, à
+  la fin de la dernière observation, au déchargement du personnage et au départ ; modificateur d'annulation (étape
+  `annulation`, priorité 10, `kinds` de la chaîne sauf `monde`) déclaré au démarrage et redéclaré au retour de
+  `vava_health` par un appel isolé ; il ne lit que la mémoire et ne protège plus un compte qui a perdu le droit. Aucun
+  RPC, évènement ni boucle ajouté. Essais `admin_invulnerability_spec` (15). Rapport `docs/plan/rapports/T-138.md`.
+  Relectures sécurité et réseau à faire. **À tester en jeu** : `docs/tests/registre.md` § 9 bis.
 
 ### T-139 — Apparition confirmée par le core
 - Agent : vava-dev-lua (cette tâche autorise à toucher le core, `server/players/`) · Dépend de : — · Statut : à faire

@@ -1379,6 +1379,22 @@ voulu (l'écran des joueurs non plus, voir plus bas).
   (droit `tools`, inscrit au journal) ; sans droit, la touche ne fait rien. Pendant le vol, le membre est invisible
   des autres joueurs (il se voit lui-même) et retrouve ensuite sa visibilité d'avant, arrêt du module compris
   (collision, gravité et vulnérabilité rétablies sur-le-champ).
+- **Invulnérabilité tenue par le serveur** (1.11.0, T-138) : l'outil « Invulnérabilité » et le vol libre (droit
+  `tools`), et l'observation (droit `spectate`), ne s'arrêtent plus au client (`SetEntityInvincible`, gardé pour le ped :
+  chute, noyade, décor). Le serveur garde en mémoire, par joueur, son personnage, son compte et chaque raison avec
+  l'instant et le membre qui l'a posée ; le modificateur d'annulation `vava_admin:invulnerabilite` du registre
+  `vava_health:modifiers` (étape `annulation`, priorité 10, déclaré avec `kinds` : tous les types de la chaîne sauf
+  `monde`) annule alors tout coup, tout sort et la faim (`cancelled = 'invulnerable'`, `'spectating'` pendant une
+  observation ; inscrits au journal des coups de `vava_health` quand ils viennent d'un joueur). Il ne lit que la mémoire
+  du Registre et ne cède jamais la main. Retirée par le levier ou `F2` (au journal, comme la pose), à la fin de la
+  dernière observation, au déchargement du personnage (départ, retour à la sélection) et au départ du joueur ; un compte
+  dont le rang n'a plus le droit (abaissé, révoqué) n'est plus protégé, même outil resté actif. Poser une raison demande
+  un personnage chargé (`no_character`). Les outils ne visent que le membre lui-même : la règle du rang ne s'y applique
+  pas. Déclaré au démarrage si `vava_health` est là, redéclaré à chaque retour de `vava_health` (appel isolé :
+  `VavaAdmin.declare`) ; sans `vava_health`, rien ne change. Réglages `invulnerability` de `config.lua` (`priority`,
+  `label`) ; un `config.lua` d'avant 1.11.0 sans eux : une ligne `warn` au démarrage, modificateur non déclaré (l'outil
+  reste local, comme avant). Règles pures : `shared/invulnerability.lua` (servi au seul serveur ;
+  `tests/spec/admin_invulnerability_spec.lua`).
 
 **Exports serveur** :
 
