@@ -1142,10 +1142,20 @@ faire tout le système de combat ») : la porte T-119 reste à passer en jeu.
   par cible dans un balayage répété).
 
 ### T-113 — Blocage, parade, esquive
-- Agent : vava-dev-lua · Dépend de : T-112 · Statut : en cours
+- Agent : vava-dev-lua · Dépend de : T-112 · Statut : en cours (fait ; relectures sécurité et réseau à faire)
+- Fait le 31 octobre 2026 (branche `agents/T-113`, spec `docs/plan/specs/T-113.md`) : `vava_combat` 1.3.0 — Garde, Parade
+  et Pas de côté en données (format selon le type) ; RPC `use` étendu, nouveau RPC `lower` ; fenêtres tenues par le
+  serveur sans minuterie ; modificateurs `vava_combat:esquive`, `:parade`, `:blocage` ; suites au hook `vava_health:hit`
+  after (attaquant paré qui chancelle, garde brisée par un compteur provisoire, usure différée, issues `parry`, `block`,
+  `break`, hook `vava_combat:defended`) ; touches R et Espace ; suites S-1 et S-4 de la relecture sécurité de T-149
+  (contrôle dur de la magie relu aux relevés et après le crochet `using`, export `hardControl` relu au démarrage de
+  `vava_magic`). Rapport `docs/plan/rapports/T-113.md`. Procédure : `docs/tests/combat.md` § 4 (31 tests).
 
 ### T-114 — Endurance et HUD
 - Agents : vava-dev-lua + vava-dev-nui · Dépend de : T-112 · Statut : à faire
+- Laissé par T-113 (spec § 13) : remplacer `VavaCombat.defense.spend` (`server/defense.lua`) et supprimer
+  `config.defense.guardBreak` et la table `points` (compteur provisoire de garde brisée) ; refus `exhausted` d'une
+  parade ou d'un pas à l'admission (`defense.refusal`) ; dépenser `stamina` des techniques (défensives comprises).
 
 ### T-115 — Styles, compétences de combat, XP
 - Agent : vava-dev-lua · Dépend de : T-113, T-114 · Statut : à faire
@@ -1240,6 +1250,9 @@ faire tout le système de combat ») : la porte T-119 reste à passer en jeu.
   `lunge.maxSpeed` : 5,7 m au Fendant aujourd'hui, cible ≈ 4 à 5 m/s, sans annuler un coup porté en courant ;
   sécurité S-3) ; essayer un rayon de réactions de 20 m au lieu de 30 (`reactions.radius`, effet vu ou non à 20 m,
   test combat 3-27 ; réseau R-4).
+- Laissé par T-113 (spec § 13) : fenêtre de parade et sa préparation, invulnérabilité du pas de côté, délais (parade
+  ratée 0,6 s, 1,5 s entre deux pas), arcs protégés, parts bloquées des fiches (épée 0,40 peut-être trop faible face à
+  4 coups), seuils du compteur de garde ; réussite des parades à 30, 80, 150 ms de ping (test combat 4-23).
 
 ## Phase 5 — Interactions RP
 
