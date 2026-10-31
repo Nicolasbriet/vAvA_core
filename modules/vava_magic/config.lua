@@ -993,9 +993,13 @@ VavaMagic.config = {
     -- Combat entre joueurs. Dégâts des sorts en points de vie, sur `healthPoints` pour un personnage en pleine santé
     -- (un coup ne retire jamais plus d'une vie pleine). Chaque coup passe par la chaîne de dégâts de vava_health
     -- (exports.vava_health:hit) : son interrupteur `chain.pvp` et ses modificateurs (parades, boucliers, résistances)
-    -- s'appliquent aux sorts comme aux lames. Sans vava_health, aucun sort ne blesse personne.
+    -- s'appliquent aux sorts comme aux lames. Sans vava_health, aucun sort ne blesse personne. Un projectile, ses
+    -- éclats et le présage d'une Secousse lancés debout blessent encore si le lanceur tombe avant l'impact
+    -- (vava_health ≥ 1.4.0 : `chain.launchedMaxMs`).
     combat = {
-        pvp = true, -- false : les sorts offensifs se voient et se lancent, mais ne blessent personne (filtre de la magie)
+        -- false : les sorts offensifs se voient et se lancent, mais ne blessent ni ne poussent, gèlent ou ralentissent
+        -- personne (filtre de la magie) ; `chain.pvp = false` de vava_health (≥ 1.4.0) fait de même
+        pvp = true,
         healthPoints = 100,
         -- type de dégât de la chaîne pour chaque élément (vava_health `chain.kinds`) ; un élément absent frappe `pur`
         -- (ignoré des résistances). La glace (Trait de glace) est de l'eau ; une brûlure mord toujours par le feu.
@@ -1009,8 +1013,9 @@ VavaMagic.config = {
             terre = { anim = { dict = 'anim@mp_player_intupperface_palm', clip = 'idle_a', flag = 48, ms = 700 }, screen = 'earth' },
         },
         knockbackMs = 250,  -- durée de la poussée d'un recul
-        -- zones de paix (cercle au sol, en mètres) : on n'y lance aucun sort offensif, et personne n'y est blessé, ni
-        -- par un sort ni par une lame (modificateur `vava_magic:zones` de la chaîne, déclaré s'il y en a une) :
+        -- zones de paix (cercle au sol, en mètres) : on n'y lance aucun sort offensif, personne n'y est blessé, ni
+        -- par un sort ni par une lame, et personne n'en blesse un autre depuis l'intérieur (modificateur
+        -- `vava_magic:zones` de la chaîne, déclaré s'il y en a une) :
         -- { label = 'Chapelle de la Grâce', x = 0.0, y = 0.0, radius = 40.0 },
         protectedZones = {},
         -- ancien journal des dégâts des sorts (`vava_magic_damage_log`) : plus écrit depuis 2.9.0 (les coups sont au
@@ -1284,6 +1289,9 @@ VavaMagic.config = {
                 not_ready = 'L\'inventaire n\'est pas encore prêt.',
                 unknown_item = 'L\'inventaire ne connaît pas cet objet.',
                 too_many = 'Ce personnage porte déjà autant de protections qu\'il se peut.',
+                -- /magie proteger : rangs du Registre
+                outranked = 'Ce personnage siège au Conseil à votre rang ou au-dessus : ses protections ne vous regardent pas.',
+                staff_only = 'Vous protéger vous-même ou affaiblir autrui est réservé au Souverain.',
             },
             sheetTitle = 'Fiche magie de %s (joueur n° %d)',
             sheetMage = 'Mage : %s · sort choisi : %s',

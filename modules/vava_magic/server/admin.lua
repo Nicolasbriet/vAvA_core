@@ -5,7 +5,8 @@
            retirer un sort, niveau ou XP d'un sort, tous les sorts au niveau 1 (le personnage devient mage), tous au
            niveau maximal, retirer tous les sorts, remplir la mana, effacer les recharges, fiche d'un joueur, donner un
            grimoire ou un registre, protection d'essai (bouclier, résistance ou faiblesse à un type, portés par la
-           chaîne de dégâts de vava_health ; ou les retirer), nettoyage d'urgence du monde (zones, remparts, orbes).
+           chaîne de dégâts de vava_health ; ou les retirer ; seulement sur un rang plus bas que le sien, `staff` pour
+           se protéger soi-même ou poser une faiblesse), nettoyage d'urgence du monde (zones, remparts, orbes).
            Chaque commande est inscrite au journal du Registre du Conseil.
     Dépendances : shared/, config.lua, server/ (noyau)
 ]]
@@ -288,11 +289,37 @@ local function durationOf(value)
     return seconds * MS_PER_SECOND
 end
 
+--- Qui peut toucher aux protections de qui : la console toujours ; un membre seulement sur un joueur de rang plus
+--- bas que le sien (rangs du Registre) ; se protéger soi-même ou poser une faiblesse demande le droit `staff`. Retirer
+--- ses propres protections est permis. Sans vava_admin, les rangs sont inconnus : l'ACE de la commande fait foi, et
+--- seule la console peut se protéger ou affaiblir.
+---@param src integer
+---@param target integer
+---@param weakness boolean
+---@param removing boolean
+---@return boolean ok
+---@return string|nil code
+local function mayProtect(src, target, weakness, removing)
+    if src == CONSOLE then return true end
+    if target == src then
+        if removing or bridge.IsStaff(src) then return true end
+        return false, 'staff_only'
+    end
+    if weakness and not bridge.IsStaff(src) then return false, 'staff_only' end
+    local mine = bridge.RankLevel(src)
+    if mine == nil then return true end
+    if (bridge.RankLevel(target) or 0) >= mine then return false, 'outranked' end
+    return true
+end
+
 --- Protection d'essai : `bouclier <points> [secondes]`, `resistance <type> <pour cent> [secondes]` (négatif :
 --- faiblesse), ou `aucune` (les retire toutes). Les mots et le type se comparent tels quels (identifiants ASCII).
+--- Règle de rang : mayProtect.
 handlers[actions.protect] = function(src, target, rest)
     local word = rest[1]
     if word == words.none then
+        local allowed, refusal = mayProtect(src, target, false, true)
+        if not allowed then return false, refusal end
         if protections.clear(target) then bridge.Notify(target, notify.unprotected, 'info') end
         bridge.AdminLog(src, logs.protect, details(target, { protection = word }))
         return true
@@ -301,11 +328,15 @@ handlers[actions.protect] = function(src, target, rest)
     if word == words.shield then
         local points, duration = tonumber(rest[2]), durationOf(rest[3])
         if not points or duration == false then return false, 'invalid' end
+        local allowed, refusal = mayProtect(src, target, false, false)
+        if not allowed then return false, refusal end
         id, code = protections.shield(target, { points = points, durationMs = duration })
         logged = { protection = word, points = points, duree_ms = duration or cfg.protections.defaultDurationMs }
     elseif word == words.resistance then
         local kind, percent, duration = rest[2], tointeger(tonumber(rest[3])), durationOf(rest[4])
         if not percent or duration == false then return false, 'invalid' end
+        local allowed, refusal = mayProtect(src, target, percent < 0, false)
+        if not allowed then return false, refusal end
         id, code = protections.resist(target, { kind = kind, share = percent / PERCENT, durationMs = duration })
         logged = { protection = word, type = kind, pour_cent = percent,
             duree_ms = duration or cfg.protections.defaultDurationMs }

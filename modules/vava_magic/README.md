@@ -43,7 +43,7 @@ Rien n'a encore été joué en vrai : voir « À vérifier en jeu », « Tests �
 | `vava_ui` ≥ 1.0.0 | polices (Cinzel Decorative comprise), grain, papier et coins de la page (`nui://vava_ui/…`) | obligatoire (dépendance déclarée : démarrée d'office, à ne jamais arrêter sur un serveur ouvert) |
 | `vava_inventory` ≥ 1.3.0 | grimoire et registre (objets, métadonnées) | pas d'objets ; `/grimoire` reste |
 | `vava_hud` | notifications | notifications de GTA (la barre de mana est celle du module) |
-| `vava_health` ≥ 1.3.0 | blessures par la chaîne de dégâts (`hit`), vie tenue par le serveur, état « à terre » (aucun sort ne touche un joueur à terre) | **aucun sort ne blesse personne** (le lanceur le lit, une fois par minute ; console) ; rien n'interrompt une incantation |
+| `vava_health` ≥ 1.3.0 (1.4.0 conseillé) | blessures par la chaîne de dégâts (`hit`), vie tenue par le serveur, état « à terre » (aucun sort ne touche un joueur à terre) ; 1.4.0 : un sort lancé debout porte encore si le lanceur tombe avant l'impact, et `chain.pvp = false` coupe aussi les effets sans dégâts | **aucun sort ne blesse personne** (le lanceur le lit, une fois par minute ; console) ; rien n'interrompt une incantation |
 | `vava_admin` | droits et journal du Conseil ; ≥ 1.6.0 : la fin d'un Gel ne libère pas un joueur immobilisé par le Registre | permission ACE `magie.admin`, journal en console |
 | `vava_chat` | réponses des commandes et suggestions (évènements `chat:*`, aussi ceux de la ressource « chat » de FiveM) | touches seulement |
 
@@ -273,13 +273,16 @@ bridge. Plus aucun sort n'appelle `damage`.
 | --- | --- |
 | `amount` | les points du sort (une vie pleine au plus, comme avant), à l'échelle de la chaîne : 100 de part et d'autre, le montant est celui du sort tel quel |
 | `kind` | type de l'élément (`combat.kinds`) : `feu` (Boule de feu, Mur de flammes, Nova ardente, brûlure, roche ardente), `eau` (Trait de glace, vapeur), `terre` (Projectile de roche, Secousse) |
-| `source` · `sourceCharacter` | le lanceur et son personnage ; un lanceur parti reste la source (son mur, sa brûlure blessent encore) ; un lanceur qui joue un autre personnage ne l'est plus (le coup reste signé du premier) |
+| `source` · `sourceCharacter` | le lanceur et son personnage ; un lanceur parti reste la source (son mur, sa brûlure blessent encore) ; un lanceur qui joue désormais un autre personnage : le coup est **refusé** (sans source, il échapperait à `chain.pvp`, au débit par paire et au journal) |
 | `spell` | le sort (ou la combinaison : `vapeur`) |
-| `tags` | `spell`, plus `ranged` (impact d'un projectile), `area` (éclats, nova, secousse), `area` et `overTime` (mur de flammes, vapeur), `overTime` (brûlure) |
+| `tags` | `spell`, plus `ranged` (impact d'un projectile), `area` (éclats, nova, secousse), `area` et `overTime` (mur de flammes, vapeur), `overTime` (brûlure) ; `launched` pour un coup déjà lancé (impact, éclats, secousse), avec vava_health ≥ 1.4.0 |
+| `launchedAt` | coup déjà lancé : instant du lancement, horloge du serveur (`launch.launchedAt` d'un projectile, naissance du présage de la Secousse) ; jamais une valeur du client |
 
 Ce que la chaîne apporte aux sorts : son interrupteur des combats entre joueurs (`chain.pvp`, en plus de `combat.pvp`),
-son débit par paire (20 coups par seconde d'un même lanceur sur une même cible), le lanceur **à terre** (un impact ou
-une secousse qui arrive après sa chute ne blesse plus ; une zone qui dure et une brûlure, si : `overTime`), les
+son débit par paire (20 coups par seconde d'un même lanceur sur une même cible), le lanceur **à terre** (décision du
+porteur du projet du 31/10 : un sort lancé debout porte encore si le lanceur tombe avant l'impact — projectile, éclats,
+présage de la Secousse —, pendant `chain.launchedMaxMs` de vava_health, 4 s ; un sort ne se lance jamais à terre ; une
+zone qui dure et une brûlure passent toujours : `overTime`), les
 modificateurs des autres modules (parade, blocage…) et son journal (`vava_health_hits` : `origin = vava_magic`, sort,
 type, montant, absorbé, résisté). La réaction de la victime, la brûlure, les états qui suivent un coup (Ralenti du
 trait, Chancelant de la roche, recul de la nova…) et le bonus d'XP au toucher ne partent **que si le coup a retiré de
@@ -291,19 +294,30 @@ vava_health) :
 
 | Clé | Étape | Effet |
 | --- | --- | --- |
-| `vava_magic:zones` | annulation | dans une zone de paix (`combat.protectedZones`), personne n'est blessé, ni par un sort ni par une lame (annulé `zone_protegee`) ; la faim et la soif, si. Déclaré seulement s'il y a une zone |
+| `vava_magic:zones` | annulation | dans une zone de paix (`combat.protectedZones`), personne n'est blessé, ni par un sort ni par une lame, et personne ne blesse un autre joueur depuis l'intérieur (annulé `zone_protegee`) ; la faim et la soif, si. Déclaré seulement s'il y a une zone |
 | `vava_magic:protections` | bouclier | les boucliers en cours du joueur touché absorbent le coup (sorts et lames), le plus proche de sa fin d'abord, chacun jusqu'à sa réserve ; un bouclier vidé se brise (« Votre bouclier de magie se brise. ») |
 | `vava_magic:resistances` | resistance | la plus forte résistance (part retirée) et la plus forte faiblesse (part ajoutée) en cours au type du coup, jamais cumulées |
 
+Chacun est déclaré avec les types qu'il couvre (`kinds` du registre, croisés avec `vocabulary().kinds`) : la chaîne
+n'appelle ni les zones ni les boucliers pour la faim, la soif et les pertes natives, ni les résistances pour un type
+auquel on ne résiste pas (`tranchant`, `pur`…). Un bouclier entamé par un coup le reste même si ce coup est annulé
+ensuite : aucune étape d'annulation ne vient après les boucliers, et la chaîne ne cède jamais la main entre eux et
+l'application (seule une cible partie ou tombée au même instant le pourrait : sans conséquence).
+
 Les protections vivent en mémoire du serveur (jamais en base) : au plus 4 boucliers (200 points chacun) et 4
 résistances par joueur, 10 minutes au plus (`protections`), retirées au départ. Aucun des onze sorts n'en pose encore
-(sorts de protection à venir) : `/magie proteger` en pose pour l'essai.
+(sorts de protection à venir) : `/magie proteger` en pose pour l'essai, sur un joueur de rang plus bas que le sien au
+Conseil ; se protéger soi-même ou poser une faiblesse est réservé au droit `staff` (Souverain) et à la console.
 
 **Incantation brisée par une blessure** (`interruptOnHurt`, vrai par défaut) : la vie n'est **jamais lue sur le ped**
 (un client qui garde sa vie GTA au maximum ne serait jamais interrompu). Un coup de la chaîne ou une perte native (chute,
 noyade) qui retire de la vie au lanceur (hook `vava_health:hit` after, `applied > 0`) marque l'incantation ; à la fin,
 une vie de vava_health plus basse qu'au début la marque aussi ; elle se brise alors (« La douleur brise votre
 concentration »), sans rien consommer. Un coup tout absorbé par un bouclier ne la brise pas.
+
+**Combats entre joueurs coupés** : `combat.pvp = false`, ou `chain.pvp = false` dans vava_health ≥ 1.4.0 (lu dans
+`vocabulary()` à chaque démarrage de vava_health) : aucun dégât, et aucun effet sans dégâts non plus (poussée, gel,
+Ralenti, Mouillé : `combat.affects`).
 
 **Sans vava_health** (arrêté, en erreur, ou plus ancien que 1.3.0) : les sorts se lancent, volent et touchent, mais ne
 blessent personne, et rien de ce qui suit un coup ne part ; le lanceur lit « Votre magie gronde sans mordre… » au plus
@@ -328,7 +342,7 @@ plus la place. »… `texts.chat.adminErrors`) ; le code brut ne va qu'à la con
 | `/magie mana [id]` · `recharges [id]` | remplir la mana · effacer les recharges et le délai global |
 | `/magie fiche [id]` | mage, sort prêt, sorts, niveaux, XP, sigils, mana, combinaisons découvertes, protections en cours |
 | `/magie donner [id] <grimoire\|registre>` | donner un objet (un registre neuf, numéroté) |
-| `/magie proteger [id] bouclier <points> [secondes]` · `resistance <élément> <pour cent> [secondes]` · `aucune` | protection d'essai, portée par la chaîne de dégâts : bouclier (1 à 200 points), résistance (pour cent négatif : faiblesse) à `feu`, `eau`, `terre`, `lumiere` ou `esprit` ; 60 s par défaut, 600 au plus ; `aucune` les retire toutes. La fiche les compte |
+| `/magie proteger [id] bouclier <points> [secondes]` · `resistance <élément> <pour cent> [secondes]` · `aucune` | protection d'essai, portée par la chaîne de dégâts : bouclier (1 à 200 points), résistance (pour cent négatif : faiblesse) à `feu`, `eau`, `terre`, `lumiere` ou `esprit` ; 60 s par défaut, 600 au plus ; `aucune` les retire toutes. Seulement sur un rang plus bas que le sien au Conseil ; soi-même et les faiblesses : `staff` (retirer les siennes : permis). La fiche les compte |
 | `/magie nettoyer` | nettoyage d'urgence : retire du monde les effets des sorts (zones au sol, présages, remparts, orbes ancrés) |
 
 `<sort>` : `boule_de_feu`, `mur_de_flammes`, `nova_ardente`, `trait_de_glace`, `vague`, `brume`, `projectile_de_roche`,
@@ -583,7 +597,8 @@ Deux joueurs (A et B) suffisent ; un troisième aide pour le cercle et la zone d
 - [ ] A lance sur B verrouillé : B voit le bord de son écran rougir dès le début de l'incantation ; A se tourne vers B au jet ; la boule part sur B même si A regarde ailleurs.
 - [ ] Niveau 1 à 3 : B esquive en se décalant. Niveau 4-5 (`/magie niveau <A> boule_de_feu 5`) : la boule s'incurve et le rattrape.
 - [ ] Niveau 3 : un voisin de B est touché aussi (moins fort). Niveau 4 : B brûle quelques secondes.
-- [ ] Zone protégée (`combat.protectedZones`) : impossible d'y lancer, personne n'y est blessé (ni par une lame : `/frapper` de l'exemple de combat). `combat.pvp = false`, ou `chain.pvp = false` dans vava_health : aucun dégât.
+- [ ] Zone protégée (`combat.protectedZones`) : impossible d'y lancer, personne n'y est blessé (ni par une lame : `/frapper` de l'exemple de combat). `combat.pvp = false`, ou `chain.pvp = false` dans vava_health : aucun dégât, ni poussée, gel ou Ralenti. Zone de paix : un joueur posté dedans ne blesse personne au dehors.
+- [ ] Coup déjà lancé (vava_health 1.4.0) : un projectile ou une Secousse lancés debout blessent encore si le lanceur tombe avant l'impact (`magie` 18-12).
 - [ ] Table `vava_health_hits` : une ligne par coup (`origin = vava_magic`, sort, `kind = feu`, montant, absorbé, résisté). `vava_magic_damage_log` ne reçoit plus rien ; ses lignes de plus de 30 jours sont retirées au démarrage du module (message en console s'il y en avait), puis chaque jour.
 - [ ] Chaîne de dégâts (2.9.0) : mêmes dégâts qu'avant pour les onze sorts ; boucliers et résistances (`/magie proteger`) ; lanceur à terre ; incantation brisée par un coup ; vava_health arrêté. Détail : `docs/tests/magie.md` § 18.
 

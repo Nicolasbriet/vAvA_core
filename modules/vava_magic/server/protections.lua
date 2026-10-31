@@ -3,20 +3,25 @@
     Rôle : protections magiques des joueurs, tenues par le serveur, et les modificateurs que la magie déclare à la
            chaîne de dégâts de vava_health (registre `vava_health:modifiers`, un par étape, par le bridge) :
       - `vava_magic:zones` (étape annulation, seulement si `combat.protectedZones` en compte) : personne n'est blessé
-        dans une zone de paix, ni par un sort ni par une lame (la faim et la soif, si : `protections.ignoredKinds`) ;
+        dans une zone de paix, ni par un sort ni par une lame, et personne n'en blesse un autre depuis une zone de
+        paix (la faim et la soif, si : `protections.ignoredKinds`) ;
       - `vava_magic:protections` (étape bouclier) : les boucliers en cours du joueur touché absorbent le coup, le plus
         proche de sa fin d'abord, chacun jusqu'à sa réserve ; un bouclier vidé se brise (message au porteur) ;
       - `vava_magic:resistances` (étape resistance) : la plus forte résistance et la plus forte faiblesse en cours au
         type du coup retirent ou ajoutent leur part (jamais cumulées entre elles).
       Les calculs sont les règles pures de shared/harm.lua ; un modificateur lit ces données et rend un résultat, sans
-      jamais céder la main. Les protections vivent en mémoire (jamais en base), retirées au départ du joueur et à
+      jamais céder la main. Chacun est déclaré avec les types qu'il couvre (`kinds`) : la chaîne ne l'appelle pas pour
+      la faim, la soif ni les pertes natives, ni la résistance pour un type auquel on ne résiste pas. Un bouclier
+      entamé par un coup reste entamé même si ce coup est ensuite annulé (aucune étape d'annulation ne vient après
+      celle des boucliers ; seule une cible partie ou tombée entre-temps le pourrait, sans attente possible : non
+      exploitable). Les protections vivent en mémoire (jamais en base), retirées au départ du joueur et à
       l'arrêt du module. Aucun des onze sorts n'en pose encore (sorts de protection : T-123) : `protections.shield` et
       `protections.resist` servent aux sorts à venir et à la commande d'essai du Conseil (`/magie proteger`).
     Dépendances : shared/, config.lua, server/core.lua, bridge/server.lua, server/world.lua, server/spells.lua,
                   server/combat.lua
 ]]
 
-local type, ipairs, next, mathType, huge = type, ipairs, next, math.type, math.huge
+local type, ipairs, pairs, next, mathType, huge = type, ipairs, pairs, next, math.type, math.huge
 local GetGameTimer = GetGameTimer
 
 local bridge = VavaMagic.bridge
@@ -32,6 +37,8 @@ local EPSILON = 1e-6
 -- raison d'annulation d'un coup dans une zone de paix (motif de la chaîne : ^[A-Za-z0-9_]+$, 32 octets)
 local PEACE = 'zone_protegee'
 local SHARE_MAX = 1
+-- pertes natives lues par vava_health : jamais passées aux modificateurs, aucun à leur déclarer
+local WORLD_KIND = 'monde'
 
 local protections = {}
 VavaMagic.protections = protections
@@ -56,12 +63,17 @@ local lastId = 0
 local IGNORED = cfg.ignoredKinds or {}
 local RESISTIBLE = {}
 for _, kind in ipairs(cfg.kinds) do RESISTIBLE[kind] = true end
+-- types que ni bouclier ni zone de paix n'arrêtent (déclarés à la chaîne comme exclus)
+local EXCLUDED = { [WORLD_KIND] = true }
+for kind in pairs(IGNORED) do EXCLUDED[kind] = true end
 
 ---@param value any
 ---@return boolean
 local function isFinite(value)
     return type(value) == 'number' and value == value and value ~= huge and value ~= -huge
 end
+
+local FIELDS = { 'shields', 'resistances' }
 
 --- Retire ce qui a pris fin ; le joueur sans plus rien est oublié.
 ---@param src integer
@@ -70,12 +82,19 @@ end
 local function prune(src, now)
     local entry = players[src]
     if not entry then return nil end
-    for _, field in ipairs({ 'shields', 'resistances' }) do
-        local kept = {}
-        for _, item in ipairs(entry[field]) do
-            if item.untilMs > now and (field ~= 'shields' or item.points > EPSILON) then kept[#kept + 1] = item end
+    -- en place, sans nouvelle table : ce qui reste est tassé en tête de liste
+    for f = 1, #FIELDS do
+        local field = FIELDS[f]
+        local list = entry[field]
+        local kept = 0
+        for i = 1, #list do
+            local item = list[i]
+            if item.untilMs > now and (field ~= 'shields' or item.points > EPSILON) then
+                kept = kept + 1
+                list[kept] = item
+            end
         end
-        entry[field] = kept
+        for i = #list, kept + 1, -1 do list[i] = nil end
     end
     if #entry.shields == 0 and #entry.resistances == 0 then
         players[src] = nil
@@ -176,13 +195,22 @@ end
 -- Appelés par vava_health pendant un coup, sur une copie du contexte : ils lisent ces données, rendent un résultat et
 -- ne cèdent jamais la main (ni attente, ni base).
 
---- Étape annulation : la cible se tient dans une zone de paix (position lue côté serveur).
+--- Étape annulation : la cible, ou la source qui frappe un autre joueur, se tient dans une zone de paix (positions
+--- lues côté serveur). Un sort a déjà vérifié la place de sa cible dans le même tour (combat.damage) : elle n'est pas
+--- relue.
 ---@param ctx table
 ---@return table|nil
 local function peaceModifier(ctx)
-    if IGNORED[ctx.kind] then return nil end
-    local position = world.position(ctx.target)
-    if position and combat.protected(position) then return { cancel = PEACE } end
+    if EXCLUDED[ctx.kind] then return nil end
+    if ctx.origin ~= RESOURCE then
+        local position = world.position(ctx.target)
+        if position and combat.protected(position) then return { cancel = PEACE } end
+    end
+    local source = ctx.source
+    if source and source ~= ctx.target then
+        local from = world.position(source)
+        if from and combat.protected(from) then return { cancel = PEACE } end
+    end
     return nil
 end
 
@@ -190,22 +218,24 @@ end
 ---@param ctx table
 ---@return table|nil
 local function shieldModifier(ctx)
-    if IGNORED[ctx.kind] then return nil end
+    if EXCLUDED[ctx.kind] then return nil end
     local now = GetGameTimer()
     local entry = prune(ctx.target, now)
     if not entry or #entry.shields == 0 then return nil end
     local absorbed, takes = harm.absorb(entry.shields, ctx.amount, ctx.kind, now)
     if absorbed <= 0 then return nil end
-    local kept, broken = {}, false
-    for i, shield in ipairs(entry.shields) do
+    local shields, kept, broken = entry.shields, 0, false
+    for i = 1, #shields do
+        local shield = shields[i]
         shield.points = shield.points - takes[i]
         if shield.points > EPSILON then
-            kept[#kept + 1] = shield
+            kept = kept + 1
+            shields[kept] = shield
         else
             broken = true
         end
     end
-    entry.shields = kept
+    for i = #shields, kept + 1, -1 do shields[i] = nil end
     if broken then bridge.Notify(ctx.target, notify.shieldBroken, 'warning') end
     return { absorbed = absorbed }
 end
@@ -214,21 +244,25 @@ end
 ---@param ctx table
 ---@return table|nil
 local function resistanceModifier(ctx)
-    local entry = prune(ctx.target, GetGameTimer())
+    local now = GetGameTimer()
+    local entry = prune(ctx.target, now)
     if not entry or #entry.resistances == 0 then return nil end
-    return harm.resist(entry.resistances, ctx.kind, ctx.amount, GetGameTimer())
+    return harm.resist(entry.resistances, ctx.kind, ctx.amount, now)
 end
 
---- Déclare les modificateurs de la magie (par le bridge, et de nouveau à chaque démarrage de vava_health). Appelé
---- pendant le setup du module.
+--- Déclare les modificateurs de la magie (par le bridge, et de nouveau à chaque démarrage de vava_health), chacun
+--- avec les types qu'il couvre : la chaîne ne les appelle pas pour les autres coups. Appelé pendant le setup du module.
 function protections.start()
     local list = {
-        [RESOURCE .. ':protections'] = { stage = 'bouclier', label = cfg.labels.shields, apply = shieldModifier },
-        [RESOURCE .. ':resistances'] = { stage = 'resistance', label = cfg.labels.resistances, apply = resistanceModifier },
+        [RESOURCE .. ':protections'] = { stage = 'bouclier', label = cfg.labels.shields, apply = shieldModifier,
+            exceptKinds = EXCLUDED },
+        [RESOURCE .. ':resistances'] = { stage = 'resistance', label = cfg.labels.resistances, apply = resistanceModifier,
+            kinds = cfg.kinds },
     }
     -- aucune zone de paix réglée : aucun modificateur, aucun coût par coup
     if next(combatCfg.protectedZones) ~= nil then
-        list[RESOURCE .. ':zones'] = { stage = 'annulation', label = cfg.labels.zones, apply = peaceModifier }
+        list[RESOURCE .. ':zones'] = { stage = 'annulation', label = cfg.labels.zones, apply = peaceModifier,
+            exceptKinds = EXCLUDED }
     end
     bridge.SetModifiers(list)
 end

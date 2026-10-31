@@ -1658,7 +1658,7 @@ dissipation, boue, gel, séchage, extinction, roche ardente ; inscrites au grimo
 `discoveredCombos` de la fiche), **Lueur** et **Murmure**, grimoire et registre (objets), traces au sol, sons fabriqués
 par l'interface ou remplacés par des fichiers `.ogg` et des sons natifs (`config.sounds`), commandes du Conseil (`/magie`, numéro de joueur facultatif). Tout le détail, la config et la liste des tests en jeu :
 `modules/vava_magic/README.md`. Demande le core 0.5.0 ; facultatifs : `vava_inventory` ≥ 1.3.0 (objets), `vava_hud`
-(notifications), `vava_health` ≥ 1.3.0 (blessures par la chaîne de dégâts — sans lui, aucun sort ne blesse
+(notifications), `vava_health` ≥ 1.3.0, 1.4.0 conseillé (blessures par la chaîne de dégâts — sans lui, aucun sort ne blesse
 personne —, à terre : un joueur à terre ne subit plus aucun effet des sorts — ni Mouillé, ni recul, ni Renversé, ni
 Ralenti), `vava_admin` (droit `tools` et journal ; sans lui, ACE `magie.admin` ;
 ≥ 1.6.0 : la fin d'un Gel ne libère pas un joueur immobilisé par le Registre).
@@ -1689,20 +1689,26 @@ Ralenti), `vava_admin` (droit `tools` et journal ; sans lui, ACE `magie.admin` ;
 - **Blessures** (2.9.0, T-116) : chaque blessure d'un sort est un coup de la chaîne de dégâts (`exports.vava_health:hit`,
   § `vava_health`) : `amount` = points du sort (une vie pleine au plus, mêmes dégâts qu'avant), `kind` = type de son
   élément (`combat.kinds` : `feu`, `eau`, `terre`, `lumiere`, `esprit` ; brûlure : `feu`), `source` = le lanceur (même
-  parti ; aucune s'il joue un autre personnage), `sourceCharacter`, `spell` (ou la combinaison, `vapeur`), `tags` :
-  `spell` et `ranged` (impact), `area` (éclats, nova, secousse), `area` + `overTime` (mur de flammes, vapeur),
-  `overTime` (brûlure). Les sorts respectent donc `chain.pvp`, le débit par paire et le lanceur à terre (`source_downed`,
-  sauf `overTime`) ; réaction, brûlure, états qui suivent un coup et bonus d'XP seulement si `applied > 0`. Plus aucun
+  parti ; s'il joue un autre personnage, le coup est refusé), `sourceCharacter`, `spell` (ou la combinaison, `vapeur`),
+  `tags` : `spell` et `ranged` (impact), `area` (éclats, nova, secousse), `area` + `overTime` (mur de flammes, vapeur),
+  `overTime` (brûlure) ; `launched` et `launchedAt` (instant du lancement, horloge du serveur) pour un impact, des éclats
+  ou une secousse, si `vava_health` ≥ 1.4.0. Les sorts respectent donc `chain.pvp`, le débit par paire et le lanceur à
+  terre (`source_downed`, sauf `overTime` et un sort lancé debout dont le lanceur tombe avant l'impact, 4 s au plus) ;
+  `chain.pvp = false` (lu dans `vocabulary()`) coupe aussi poussées, gel et Ralenti ; réaction, brûlure, états qui
+  suivent un coup et bonus d'XP seulement si `applied > 0`. Plus aucun
   appel à `damage`, plus d'évènement `vava_magic:damage` au client : sans `vava_health`, les sorts ne blessent personne
   (le lanceur le lit au plus une fois par minute). Journal : `vava_health_hits` (`origin = vava_magic`) ;
   `vava_magic_damage_log` n'est plus écrit, purgé des lignes de plus de `combat.log.retentionDays` jours (30).
 - **Modificateurs** (registre `vava_health:modifiers`, redéclarés à chaque démarrage de `vava_health`) :
   `vava_magic:zones` (étape `annulation`, seulement si `combat.protectedZones` en compte : personne n'est blessé dans une
-  zone de paix, ni par un sort ni par une lame ; annulé `zone_protegee` ; la faim, si), `vava_magic:protections` (étape
+  zone de paix, ni par un sort ni par une lame, et personne n'en blesse un autre depuis l'intérieur ; annulé
+  `zone_protegee` ; la faim, si), `vava_magic:protections` (étape
   `bouclier` : boucliers du joueur touché, le plus proche de sa fin d'abord, jusqu'à leur réserve ; sorts et lames, pas
   la faim), `vava_magic:resistances` (étape `resistance` : la plus forte résistance et la plus forte faiblesse au type
   du coup, jamais cumulées). Protections en mémoire du serveur (4 boucliers de 200 points et 4 résistances par joueur,
-  10 min au plus, `protections`), posées pour l'essai par `/magie proteger` ; aucun des onze sorts n'en pose encore.
+  10 min au plus, `protections`), posées pour l'essai par `/magie proteger` (sur un rang plus bas que le sien au
+  Conseil ; soi-même et les faiblesses : `staff`) ; aucun des onze sorts n'en pose encore. Chaque modificateur est
+  déclaré avec ses `kinds` : ni la faim, ni la soif, ni les pertes natives ne les appellent.
 - **Rempart** : blocs de pierre créés par le serveur (objets réseau figés), jamais sur un joueur ni un véhicule,
   retirés à leur fin, à l'arrêt du module et par `/magie nettoyer`.
 - **Verrouillage** (sorts `lockOn`) : clic molette côté client (lu par `Bridge.GetLockedTarget`), à la portée du sort

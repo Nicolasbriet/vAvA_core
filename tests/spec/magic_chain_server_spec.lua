@@ -14,7 +14,7 @@ local helper = require('tests.helper')
 describe('vava_magic sur la chaîne de dégâts (serveur)', function()
     local combat, protections, casting, cfg
     local now, hits, hitResult, hitCode, notified, clientEvents, characters, positions, health, modifiers, onHit
-    local spellDefs
+    local spellDefs, chainPvp, chainLaunched, ranks, staff, adminLogs
 
     local CASTER, VICTIM, OTHER = 3, 7, 9
 
@@ -34,6 +34,7 @@ describe('vava_magic sur la chaîne de dégâts (serveur)', function()
         positions = { [CASTER] = { x = 0, y = 0, z = 0 }, [VICTIM] = { x = 5, y = 0, z = 0 }, [OTHER] = { x = 50, y = 0, z = 0 } }
         health = { [CASTER] = 1.0, [VICTIM] = 1.0 }
         modifiers, onHit = nil, nil
+        chainPvp, chainLaunched, ranks, staff, adminLogs = true, true, {}, {}, {}
 
         _G.GetGameTimer = function() return now end
         _G.TriggerClientEvent = function(event, target, ...)
@@ -58,6 +59,15 @@ describe('vava_magic sur la chaîne de dégâts (serveur)', function()
                 return hitResult or { applied = packet.amount, absorbed = 0, resisted = 0, added = 0, downed = false }
             end,
             ChainHealthPoints = function() return 100 end,
+            ChainPvp = function() return chainPvp end,
+            ChainKnowsLaunched = function() return chainLaunched end,
+            RankLevel = function(src)
+                if src == 0 then return math.huge end
+                return ranks[src] or 0
+            end,
+            IsStaff = function(src) return src == 0 or staff[src] == true end,
+            IsAdmin = function() return true end,
+            AdminLog = function(src, label, details) adminLogs[#adminLogs + 1] = { src = src, label = label, details = details } end,
             GetHealth = function(src) return health[src] end,
             OnHit = function(handler)
                 onHit = handler
@@ -189,18 +199,47 @@ describe('vava_magic sur la chaîne de dégâts (serveur)', function()
             assert.equal(0, #clientEvents)
         end)
 
-        it('lanceur parti : source gardée, personnage du paquet ; autre personnage : plus de source', function()
+        it('lanceur parti : source gardée, personnage du paquet ; autre personnage : coup refusé (S-1)', function()
             characters[CASTER] = nil
             combat.damage(CASTER, VICTIM, 'mur_de_flammes', 6, combat.KIND.AURA, 42)
             assert.equal(CASTER, hits[1].packet.source)
             assert.equal(42, hits[1].packet.sourceCharacter)
+            -- le lanceur joue un autre personnage : son mur ne blesse plus (un coup sans source échapperait à
+            -- chain.pvp, au débit par paire et au journal)
             characters[CASTER] = 99
-            combat.damage(CASTER, VICTIM, 'mur_de_flammes', 6, combat.KIND.AURA, 42)
-            assert.is_nil(hits[2].packet.source)
-            assert.equal(42, hits[2].packet.sourceCharacter)
+            assert.is_false(combat.damage(CASTER, VICTIM, 'mur_de_flammes', 6, combat.KIND.AURA, 42))
+            assert.equal(1, #hits)
+            -- une brûlure sans lanceur connu reste un coup sans source
             combat.damage(0, VICTIM, 'boule_de_feu', 2, combat.KIND.BURN, 0, 'feu')
-            assert.is_nil(hits[3].packet.source)
-            assert.is_nil(hits[3].packet.sourceCharacter)
+            assert.is_nil(hits[2].packet.source)
+            assert.is_nil(hits[2].packet.sourceCharacter)
+        end)
+
+        it('coup déjà lancé : l’instant du lancement part avec le coup, si la chaîne le connaît', function()
+            combat.damage(CASTER, VICTIM, 'projectile_de_roche', 14, combat.KIND.IMPACT, nil, nil, 4321)
+            assert.equal(4321, hits[1].packet.launchedAt)
+            assert.same({ spell = true, ranged = true, launched = true }, hits[1].packet.tags)
+            combat.damage(CASTER, VICTIM, 'secousse', 4, combat.KIND.ZONE, 42, nil, 4000)
+            assert.same({ spell = true, area = true, launched = true }, hits[2].packet.tags)
+            -- sans instant : un coup ordinaire
+            combat.damage(CASTER, VICTIM, 'nova_ardente', 10, combat.KIND.ZONE)
+            assert.is_nil(hits[3].packet.launchedAt)
+            assert.is_nil(hits[3].packet.tags.launched)
+            -- vava_health 1.3.0 ne connaît pas l'étiquette (invalid_tags) : le coup part sans elle
+            chainLaunched = false
+            combat.damage(CASTER, VICTIM, 'projectile_de_roche', 14, combat.KIND.IMPACT, nil, nil, 4321)
+            assert.is_nil(hits[4].packet.launchedAt)
+            assert.is_nil(hits[4].packet.tags.launched)
+        end)
+
+        it('combats entre joueurs coupés par vava_health : aucun effet sans dégâts non plus (S-3)', function()
+            assert.is_table(combat.affects(VICTIM))
+            chainPvp = false
+            assert.is_nil(combat.affects(VICTIM))
+            chainPvp = true
+            cfg.combat.pvp = false
+            assert.is_nil(combat.affects(VICTIM))
+            cfg.combat.pvp = true
         end)
 
         it('filtres de la magie avant la chaîne : pvp coupé, cible absente, points nuls', function()
@@ -237,6 +276,14 @@ describe('vava_magic sur la chaîne de dégâts (serveur)', function()
                 assert.is_function(def.apply, key)
                 assert.is_true(#def.label >= 1 and #def.label <= 48, key)
             end
+            -- types couverts (R-1) : la résistance pour les seuls types auxquels on résiste ; le bouclier pour tous sauf
+            -- la faim, la soif et les pertes natives
+            assert.same(cfg.protections.kinds, modifiers['vava_magic:resistances'].kinds)
+            local except = modifiers['vava_magic:protections'].exceptKinds
+            assert.is_true(except.privation)
+            assert.is_true(except.monde)
+            assert.is_nil(except.feu)
+            assert.is_nil(except.tranchant)
 
             loadMagic({ { label = 'Chapelle', x = 0.0, y = 0.0, radius = 10.0 } })
             protections.start()
@@ -245,6 +292,24 @@ describe('vava_magic sur la chaîne de dégâts (serveur)', function()
             assert.same({ cancel = 'zone_protegee' }, zones.apply({ target = VICTIM, kind = 'tranchant', amount = 10 }))
             assert.is_nil(zones.apply({ target = OTHER, kind = 'tranchant', amount = 10 }))
             assert.is_nil(zones.apply({ target = VICTIM, kind = 'privation', amount = 10 }))
+            assert.is_true(zones.exceptKinds.privation)
+        end)
+
+        it('zone de paix : l’attaquant posté dedans ne blesse personne au dehors (S-2)', function()
+            loadMagic({ { label = 'Chapelle', x = 0.0, y = 0.0, radius = 2.0 } })
+            protections.start()
+            local zones = modifiers['vava_magic:zones'].apply
+            -- CASTER (0, 0) dans la chapelle, VICTIM (5, 0) et OTHER (50, 0) dehors
+            assert.same({ cancel = 'zone_protegee' },
+                zones({ target = VICTIM, source = CASTER, kind = 'tranchant', amount = 10, origin = 'vava_combat' }))
+            assert.is_nil(zones({ target = VICTIM, source = OTHER, kind = 'tranchant', amount = 10, origin = 'vava_combat' }))
+            -- un sort a déjà vérifié sa cible : seule la place de son lanceur est relue (R-4)
+            positions[VICTIM] = { x = 0.5, y = 0, z = 0 }
+            assert.is_nil(zones({ target = VICTIM, source = OTHER, kind = 'feu', amount = 10, origin = 'vava_magic' }))
+            assert.same({ cancel = 'zone_protegee' },
+                zones({ target = VICTIM, source = OTHER, kind = 'feu', amount = 10, origin = 'vava_combat' }))
+            -- se blesser soi-même dans la chapelle : seule la place de la cible compte
+            assert.is_nil(zones({ target = OTHER, source = OTHER, kind = 'feu', amount = 1, origin = 'vava_combat' }))
         end)
 
         it('bouclier : absorbe sorts et lames, se brise et prévient son porteur', function()
@@ -306,6 +371,69 @@ describe('vava_magic sur la chaîne de dégâts (serveur)', function()
         end)
     end)
 
+    describe('/magie proteger : rangs du Conseil (S-7)', function()
+        local run
+
+        before_each(function()
+            loadMagic()
+            VavaMagic.sheets = { get = function(src) return characters[src] and { characterId = characters[src] } or nil end }
+            for _, name in ipairs({ 'mana', 'casting', 'experience', 'registers', 'progression' }) do VavaMagic[name] = {} end
+            local registered = {}
+            _G.RegisterCommand = function(name, fn) registered[name] = fn end
+            helper.load('modules/vava_magic/server/admin.lua')
+            VavaMagic.admin.start()
+            run = function(src, ...) registered[cfg.commands.admin](src, { ... }) end
+        end)
+
+        after_each(function() _G.RegisterCommand = nil end)
+
+        local function shields(src) return (protections.count(src)) end
+
+        it('un membre protège un rang plus bas que le sien, pas un égal ni un supérieur', function()
+            ranks[CASTER], ranks[VICTIM], ranks[OTHER] = 2, 1, 2
+            run(CASTER, 'proteger', tostring(VICTIM), 'bouclier', '10')
+            assert.equal(1, shields(VICTIM))
+            run(CASTER, 'proteger', tostring(OTHER), 'bouclier', '10')
+            assert.equal(0, shields(OTHER))
+            ranks[OTHER] = 3
+            run(CASTER, 'proteger', tostring(OTHER), 'bouclier', '10')
+            assert.equal(0, shields(OTHER))
+            -- ni retirer celles d'un supérieur
+            protections.shield(OTHER, { points = 10 })
+            run(CASTER, 'proteger', tostring(OTHER), 'aucune')
+            assert.equal(1, shields(OTHER))
+            assert.equal(1, #adminLogs)
+        end)
+
+        it('se protéger soi-même ou poser une faiblesse : staff ; retirer les siennes : permis', function()
+            ranks[CASTER], ranks[VICTIM] = 2, 0
+            run(CASTER, 'proteger', 'bouclier', '10')
+            assert.equal(0, shields(CASTER))
+            run(CASTER, 'proteger', tostring(VICTIM), 'resistance', 'feu', '-50')
+            assert.equal(0, select(3, protections.count(VICTIM)))
+            run(CASTER, 'proteger', tostring(VICTIM), 'resistance', 'feu', '50')
+            assert.equal(1, select(3, protections.count(VICTIM)))
+            protections.shield(CASTER, { points = 10 })
+            run(CASTER, 'proteger', 'aucune')
+            assert.equal(0, shields(CASTER))
+            staff[CASTER], ranks[CASTER] = true, 3
+            run(CASTER, 'proteger', 'bouclier', '10')
+            assert.equal(1, shields(CASTER))
+            run(CASTER, 'proteger', tostring(VICTIM), 'resistance', 'eau', '-50')
+            assert.equal(2, select(3, protections.count(VICTIM)))
+        end)
+
+        it('la console peut tout', function()
+            ranks[VICTIM] = 3
+            -- la réponse à la console part par print : gardée hors de la sortie des essais
+            local print = _G.print
+            _G.print = function() end
+            run(0, 'proteger', tostring(VICTIM), 'resistance', 'feu', '-20')
+            _G.print = print
+            assert.equal(1, select(3, protections.count(VICTIM)))
+        end)
+    end)
+
     describe('incantation brisée par une blessure (sans lire le ped)', function()
         before_each(function()
             loadMagic()
@@ -352,6 +480,102 @@ describe('vava_magic sur la chaîne de dégâts (serveur)', function()
             health[CASTER] = nil
             local id = cast(CASTER, 'lueur')
             assert.is_true((casting.finish(CASTER, 'lueur', id)))
+        end)
+    end)
+
+    describe('bridge : vocabulaire de la chaîne et types des modificateurs (R-1, S-3, S-5)', function()
+        local Bridge, registryEntries, readyHooks, health, healthState
+
+        local KINDS = { 'tranchant', 'contondant', 'percant', 'feu', 'eau', 'terre', 'lumiere', 'esprit', 'pur',
+            'privation', 'monde' }
+
+        local function loadBridge(vocabulary)
+            helper.reset()
+            VavaMagic = nil
+            helper.loadAll({ 'modules/vava_magic/shared/constants.lua', 'modules/vava_magic/config.lua' })
+            VavaMagic.log = { warn = function() end, info = function() end, error = function() end }
+            registryEntries, readyHooks, healthState = {}, {}, 'started'
+            health = {
+                vocabulary = function() return vocabulary end,
+                get = function() return { health = 0.5 } end,
+            }
+            _G.exports = { vava_health = setmetatable({}, { __index = function(_, fn)
+                return function(_, ...) return health[fn](...) end
+            end }) }
+            _G.GetResourceState = function(name) return name == 'vava_health' and healthState or 'missing' end
+            VavaMagic.core = {
+                registry = {
+                    exists = function() return true end,
+                    has = function(_, key) return registryEntries[key] ~= nil end,
+                    add = function(_, key, def)
+                        registryEntries[key] = def
+                        return true
+                    end,
+                },
+                hooks = { after = function(name, fn)
+                    readyHooks[#readyHooks + 1] = { name = name, fn = fn }
+                    return #readyHooks
+                end },
+            }
+            helper.load('modules/vava_magic/bridge/server.lua')
+            Bridge = VavaMagic.bridge
+            VavaMagic.ready = true
+        end
+
+        after_each(function()
+            _G.exports, _G.GetResourceState = nil, nil
+        end)
+
+        local function definitions()
+            return {
+                ['vava_magic:protections'] = { stage = 'bouclier', label = 'b', apply = function() end,
+                    exceptKinds = { privation = true, monde = true } },
+                ['vava_magic:resistances'] = { stage = 'resistance', label = 'r', apply = function() end,
+                    kinds = { 'feu', 'eau', 'terre', 'lumiere', 'esprit', 'inconnu' } },
+            }
+        end
+
+        it('déclare chaque modificateur avec les seuls types qu’il couvre, sans champ étranger au registre', function()
+            loadBridge({ healthPoints = 100, kinds = KINDS, tags = { 'spell', 'launched' }, pvp = true })
+            Bridge.SetModifiers(definitions())
+            local shield = registryEntries['vava_magic:protections']
+            assert.same({ 'tranchant', 'contondant', 'percant', 'feu', 'eau', 'terre', 'lumiere', 'esprit', 'pur' },
+                shield.kinds)
+            assert.is_nil(shield.exceptKinds)
+            assert.same({ 'feu', 'eau', 'terre', 'lumiere', 'esprit' }, registryEntries['vava_magic:resistances'].kinds)
+            assert.equal('bouclier', shield.stage)
+            assert.is_function(shield.apply)
+            assert.equal(100, Bridge.ChainHealthPoints())
+            assert.is_true(Bridge.ChainKnowsLaunched())
+            assert.is_true(Bridge.ChainPvp())
+            assert.equal(0.5, Bridge.GetHealth(3))
+        end)
+
+        it('vava_health 1.3.0 : ni launched, ni pvp ; relu à son redémarrage', function()
+            loadBridge({ healthPoints = 100, kinds = KINDS, tags = { 'spell' } })
+            Bridge.SetModifiers(definitions())
+            assert.is_false(Bridge.ChainKnowsLaunched())
+            assert.is_true(Bridge.ChainPvp())
+            -- redémarré en 1.4.0, combats entre joueurs coupés
+            health.vocabulary = function()
+                return { healthPoints = 100, kinds = KINDS, tags = { 'launched' }, pvp = false }
+            end
+            assert.is_true(Bridge.start())
+            for _, hook in ipairs(readyHooks) do
+                if hook.name == 'core:module:ready' then hook.fn({ name = 'vava_health' }) end
+            end
+            assert.is_true(Bridge.ChainKnowsLaunched())
+            assert.is_false(Bridge.ChainPvp())
+        end)
+
+        it('sans chaîne connue (vava_health plus ancien), la vie n’est jamais demandée : get lisait le ped (S-5)', function()
+            loadBridge(nil)
+            health.vocabulary = function() error('export inconnu') end
+            Bridge.SetModifiers(definitions())
+            assert.is_nil(Bridge.ChainHealthPoints())
+            assert.is_nil(Bridge.GetHealth(3))
+            -- sans vocabulaire, les listes restent celles du module (aucune intersection possible)
+            assert.is_nil(registryEntries['vava_magic:protections'].kinds)
         end)
     end)
 end)

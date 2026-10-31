@@ -12,7 +12,8 @@
            serveur et des évènements ciblés, reçus des seuls joueurs proches.
     Dépendances : vAvA_core ≥ 0.5.0 ; vava_ui ≥ 1.0.0 (polices, grain, papier et coins de la page, par
                   nui://vava_ui/…) ; facultatives : vava_inventory ≥ 1.3.0 (grimoire et registre), vava_hud
-                  (notifications), vava_health ≥ 1.3.0 (chaîne de dégâts : sans lui, aucun sort ne blesse ; à terre),
+                  (notifications), vava_health ≥ 1.3.0 (chaîne de dégâts : sans lui, aucun sort ne blesse ; à terre ;
+                  1.4.0 : coups déjà lancés, interrupteur pvp),
                   vava_admin (droits et journal du Conseil), vava_chat
 ]]
 

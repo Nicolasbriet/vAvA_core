@@ -241,6 +241,42 @@ describe('vava_magic blessures sur la chaîne de dégâts', function()
             assert.is_nil(source)
         end)
 
+        it('coup déjà lancé : admis par la chaîne, il porte si le lanceur tombe après le départ (décision du 31/10)',
+            function()
+            local maxMs = healthCfg.chain.launchedMaxMs
+            local launchedAt = 50000
+            local raw = harm.packet({ amount = 14, kind = 'terre', nature = 'impact', source = 3, sourceCharacter = 42,
+                spell = 'projectile_de_roche', launchedAt = launchedAt })
+            local p, code = packet.normalize(raw, limits)
+            assert.is_nil(code)
+            assert.equal(launchedAt, p.launchedAt)
+            assert.same({ spell = true, ranged = true, launched = true }, p.tags)
+            -- le plus long vol d'un projectile et le présage de la Secousse tiennent dans le délai de la chaîne
+            for _, name in ipairs({ 'boule_de_feu', 'trait_de_glace', 'projectile_de_roche' }) do
+                for _, level in ipairs(magicCfg.spells[name].levels) do
+                    assert.is_true(level.range / level.speed * 1000 < maxMs, name)
+                end
+            end
+            for _, level in ipairs(magicCfg.spells.secousse.levels) do assert.is_true(level.delayMs < maxMs) end
+            -- lanceur tombé après le départ (1,2 s de vol, chute à 0,5 s) : porte
+            assert.is_true(chain.passesDownedSource(p.tags, p.launchedAt, launchedAt + 500, launchedAt + 1200, maxMs))
+            -- lanceur déjà à terre au départ : refusé
+            assert.is_false(chain.passesDownedSource(p.tags, p.launchedAt, launchedAt - 500, launchedAt + 1200, maxMs))
+            -- délai dépassé : refusé
+            assert.is_false(chain.passesDownedSource(p.tags, p.launchedAt, launchedAt + 500, launchedAt + maxMs + 1,
+                maxMs))
+            -- un coup ordinaire (nova : lancée sur place) ne passe jamais un lanceur à terre
+            local plain = packet.normalize(harm.packet({ amount = 10, kind = 'feu', nature = 'zone', source = 3 }), limits)
+            assert.is_nil(plain.launchedAt)
+            assert.is_false(chain.passesDownedSource(plain.tags, nil, launchedAt + 500, launchedAt + 600, maxMs))
+            -- instant invalide : ignoré, coup ordinaire
+            for _, bad in ipairs({ -1, 2.5, '50000' }) do
+                local q = harm.packet({ amount = 1, kind = 'feu', nature = 'impact', launchedAt = bad })
+                assert.is_nil(q.launchedAt)
+                assert.is_nil(q.tags.launched)
+            end
+        end)
+
         it('paquet : seuls les champs de la chaîne, un sort mal formé est omis', function()
             local p = harm.packet({ amount = 8, kind = 'feu', nature = 'impact', source = 3, spell = 'boule_de_feu' })
             for key in pairs(p) do

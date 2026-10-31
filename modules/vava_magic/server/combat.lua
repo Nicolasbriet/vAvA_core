@@ -5,12 +5,15 @@
            son personnage, le type de l'élément du sort, le sort et des étiquettes selon sa nature (impact, zone, zone
            qui dure, brûlure : règles pures de shared/harm.lua) ; il respecte donc l'interrupteur des combats entre
            joueurs de la chaîne, son débit par paire et le lanceur à terre, et passe par les modificateurs (zones de
-           paix, boucliers et résistances de la magie, parades du combat…). Avant la chaîne, la magie garde ses propres
-           filtres : `combat.pvp`, cible en jeu, hors zone protégée. La victime réagit (son élément, ou le champ
+           paix, boucliers et résistances de la magie, parades du combat…). Un coup déjà lancé (projectile, éclats,
+           présage de la Secousse) porte l'instant de son lancement (`launchedAt`, vava_health ≥ 1.4.0) : il blesse
+           encore si le lanceur tombe à terre avant l'impact. Avant la chaîne, la magie garde ses propres filtres :
+           `combat.pvp`, cible en jeu, hors zone protégée, lanceur qui joue toujours le même personnage (sinon le coup
+           est refusé : il échapperait à `chain.pvp` et au journal). La victime réagit (son élément, ou le champ
            `reaction` du sort : geste, effet d'écran), et l'appelant pose brûlure, états et XP, seulement si le coup a
            retiré de la vie (`applied > 0`) ; une brûlure qui dure ne fait pas réagir à chaque morsure. Un sort
            offensif sans dégâts (recul, état) demande d'abord si la cible peut être touchée (`combat.affects` : jamais
-           un joueur à terre).
+           un joueur à terre, rien quand `combat.pvp` ou `chain.pvp` de vava_health est coupé).
            Sans vava_health (arrêté ou en erreur), aucun sort ne blesse personne : une ligne de console par minute, un
            message au lanceur au plus une fois par minute. Le journal des coups est celui de vava_health
            (`vava_health_hits`) : `vava_magic_damage_log` n'est plus écrit, ses lignes anciennes sont encore retirées au
@@ -64,7 +67,7 @@ end
 ---@param target integer
 ---@return table|nil
 function combat.affects(target)
-    if not cfg.pvp or not bridge.GetCharacterId(target) then return nil end
+    if not cfg.pvp or not bridge.ChainPvp() or not bridge.GetCharacterId(target) then return nil end
     local position = world.position(target)
     if not position or combat.protected(position) then return nil end
     -- en dernier : un appel à vava_health, seulement pour qui serait touché
@@ -123,8 +126,9 @@ end
 ---@param kind string      nature du coup : combat.KIND
 ---@param casterCharacter? integer  personnage du lanceur, quand il a pu partir depuis (zone, brûlure)
 ---@param element? string  élément du coup s'il n'est pas celui du sort (roche ardente : feu ; vapeur : eau)
+---@param launchedAt? integer  instant du lancement (GetGameTimer) d'un coup déjà lancé : projectile, éclats, présage
 ---@return boolean
-function combat.damage(caster, target, spell, points, kind, casterCharacter, element)
+function combat.damage(caster, target, spell, points, kind, casterCharacter, element, launchedAt)
     if not cfg.pvp then return false end
     local amount = harm.amount(points, cfg.healthPoints, bridge.ChainHealthPoints())
     if not amount then return false end
@@ -133,9 +137,14 @@ function combat.damage(caster, target, spell, points, kind, casterCharacter, ele
     if not bridge.GetCharacterId(target) then return false end
     local current = type(caster) == 'number' and caster > 0 and bridge.GetCharacterId(caster) or nil
     local source, sourceCharacter = harm.source(caster, casterCharacter, current)
+    -- lanceur qui joue désormais un autre personnage : son mur, sa vapeur ou sa secousse ne blessent plus personne
+    -- (un coup sans source échapperait à chain.pvp, au débit par paire et au journal)
+    if not source and type(caster) == 'number' and caster > 0 then return false end
     local result, code = bridge.Hit(target, harm.packet({
         amount = amount, kind = harm.kindOf(elementOf(spell, element), cfg.kinds), nature = kind,
         source = source, sourceCharacter = sourceCharacter, spell = spell,
+        -- coup déjà lancé : seulement si la chaîne connaît l'étiquette (vava_health ≥ 1.4.0, sinon invalid_tags)
+        launchedAt = launchedAt and bridge.ChainKnowsLaunched() and launchedAt or nil,
     }))
     if not result then
         if code == UNAVAILABLE then

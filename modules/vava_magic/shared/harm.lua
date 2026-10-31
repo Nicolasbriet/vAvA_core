@@ -4,8 +4,9 @@
       - montant d'un coup : les points du sort, une vie pleine au plus (`combat.healthPoints`), mis à l'échelle de la
         chaîne (ses `healthPoints`, les mêmes 100 par défaut : le montant est alors celui du sort, tel quel) ;
       - type de dégât d'un élément (`combat.kinds`, sinon `pur`), étiquettes selon la nature du coup (impact d'un
-        projectile, zone instantanée, zone qui dure, brûlure), source du coup (le lanceur, sauf s'il joue désormais
-        un autre personnage), paquet de `hit` ;
+        projectile, zone instantanée, zone qui dure, brûlure ; `launched` pour un coup parti avant d'arriver :
+        projectile, éclats, présage), source du coup (le lanceur, sauf s'il joue désormais un autre personnage : le
+        coup est alors refusé), paquet de `hit` (avec `launchedAt`, instant du lancement, pour un coup déjà lancé) ;
       - protections lues par les modificateurs de la magie : absorption des boucliers (le plus proche de sa fin
         d'abord, chacun jusqu'à sa réserve), résistance ou faiblesse à un type (la plus forte de chaque sens
         l'emporte, jamais cumulée).
@@ -14,7 +15,7 @@
 ]]
 
 local type, ipairs, pairs, min, max, huge = type, ipairs, pairs, math.min, math.max, math.huge
-local mathType, sort, find = math.type, table.sort, string.find
+local mathType, find = math.type, string.find
 
 local harm = {}
 VavaMagic.harm = harm
@@ -32,6 +33,8 @@ local TAGS = {
     brulure = { 'spell', 'overTime' },
 }
 local SPELL_ONLY = { 'spell' }
+-- étiquette d'un coup déjà lancé (vava_health 1.4.0) : il porte encore si le lanceur tombe après le lancement
+local LAUNCHED = 'launched'
 local DEFAULT_KIND = 'pur'
 local SOURCE_MAX = 65535
 local CHARACTER_MAX = 2147483647
@@ -69,12 +72,15 @@ function harm.kindOf(element, kinds)
     return type(kind) == 'string' and kind or DEFAULT_KIND
 end
 
---- Étiquettes du paquet pour une nature de coup (copie neuve ; une nature inconnue n'a que `spell`).
+--- Étiquettes du paquet pour une nature de coup (copie neuve ; une nature inconnue n'a que `spell`), plus
+--- `launched` pour un coup déjà lancé.
 ---@param nature string
+---@param launched? boolean
 ---@return table<string, true>
-function harm.tags(nature)
+function harm.tags(nature, launched)
     local tags = {}
     for _, tag in ipairs(TAGS[nature] or SPELL_ONLY) do tags[tag] = true end
+    if launched then tags[LAUNCHED] = true end
     return tags
 end
 
@@ -105,15 +111,18 @@ function harm.source(caster, casterCharacter, currentCharacter)
 end
 
 --- Paquet de `exports.vava_health:hit`. `opts` : amount (déjà calculé par harm.amount), kind, nature, source?,
---- sourceCharacter?, spell? (omis s'il n'est pas un identifiant admis par la chaîne).
+--- sourceCharacter?, spell? (omis s'il n'est pas un identifiant admis par la chaîne), launchedAt? (instant du
+--- lancement, horloge du serveur : étiquette `launched` et champ `launchedAt` ; ignoré s'il n'est pas un entier ≥ 0).
 ---@param opts table
 ---@return table
 function harm.packet(opts)
     local spell = opts.spell
     if type(spell) ~= 'string' or #spell > REF_MAX or not find(spell, REF_PATTERN) then spell = nil end
+    local launchedAt = opts.launchedAt
+    if mathType(launchedAt) ~= 'integer' or launchedAt < 0 then launchedAt = nil end
     return {
         amount = opts.amount, kind = opts.kind, source = opts.source, sourceCharacter = opts.sourceCharacter,
-        spell = spell, tags = harm.tags(opts.nature),
+        spell = spell, tags = harm.tags(opts.nature, launchedAt ~= nil), launchedAt = launchedAt,
     }
 end
 
@@ -139,19 +148,21 @@ function harm.absorb(shields, amount, kind, now)
     local takes = {}
     for i = 1, #shields do takes[i] = 0 end
     if not isFinite(amount) or amount <= 0 then return 0, takes end
-    local order = {}
-    for i, shield in ipairs(shields) do
-        if shieldHolds(shield, kind, now) then order[#order + 1] = i end
-    end
-    sort(order, function(a, b)
-        if shields[a].untilMs ~= shields[b].untilMs then return shields[a].untilMs < shields[b].untilMs end
-        return a < b
-    end)
+    -- au plus quelques boucliers : on prend chaque fois celui qui finit le plus tôt parmi ceux qui ont encore à
+    -- donner (à égalité, le plus ancien), sans liste ni fonction de tri à chaque coup
     local left = amount
-    for _, i in ipairs(order) do
-        if left <= 0 then break end
-        local taken = min(shields[i].points, left)
-        takes[i] = taken
+    while left > 0 do
+        local best = nil
+        for i = 1, #shields do
+            local shield = shields[i]
+            if takes[i] == 0 and shieldHolds(shield, kind, now)
+                and (not best or shield.untilMs < shields[best].untilMs) then
+                best = i
+            end
+        end
+        if not best then break end
+        local taken = min(shields[best].points, left)
+        takes[best] = taken
         left = left - taken
     end
     return amount - left, takes

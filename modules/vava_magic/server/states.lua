@@ -129,7 +129,8 @@ local function burnTicks(src, condition)
 end
 
 --- Pose un état sur un joueur en jeu. `opts` : durationMs, strength (Ralenti, 0 à 1), caster, spell, et pour la
---- Brûlure tickMs et damage (points de vie par morsure). Renvoie true, ou false et la raison (immune, refused…).
+--- Brûlure tickMs, damage (points de vie par morsure) et casterCharacter? (personnage du lanceur, s'il a pu partir). Renvoie
+--- true, ou false et la raison (immune, refused…).
 ---@param src integer
 ---@param name string
 ---@param opts? table
@@ -164,7 +165,9 @@ function states.apply(src, name, opts)
     if name == 'burn' then
         condition.burn = {
             tickMs = opts.tickMs or 1000, damage = opts.damage or 0, caster = opts.caster or 0,
-            casterCharacter = opts.caster and bridge.GetCharacterId(opts.caster) or 0, spell = opts.spell or '',
+            -- personnage du lanceur au moment du sort (un mur dont le lanceur est parti le donne), sinon lu maintenant
+            casterCharacter = opts.casterCharacter or (opts.caster and bridge.GetCharacterId(opts.caster)) or 0,
+            spell = opts.spell or '',
         }
     end
     entry.conditions[name] = condition

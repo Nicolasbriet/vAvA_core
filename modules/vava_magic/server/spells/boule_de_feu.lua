@@ -44,7 +44,7 @@ local ok, err = projectiles.register(NAME, spellCfg, {
         local levelCfg = spellCfg.levels[launch.level]
         if target ~= 0 then
             local hit = combos.hit(launch.source, target, NAME, levelCfg.damage)
-            if combat.damage(launch.source, target, NAME, hit.damage, combat.KIND.IMPACT) then
+            if combat.damage(launch.source, target, NAME, hit.damage, combat.KIND.IMPACT, nil, nil, launch.launchedAt) then
                 projectiles.bonus(launch)
                 if hit.burn and levelCfg.burn and spellCfg.burnEnabled then ignite(launch.source, target, levelCfg.burn) end
             end

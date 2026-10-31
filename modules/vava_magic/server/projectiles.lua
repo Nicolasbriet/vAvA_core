@@ -165,7 +165,9 @@ function projectiles.splash(launch, point, except, radius, points)
         local victim = entry.source
         if victim ~= launch.source and victim ~= except and not obstacles.blocked(point, entry.position) then
             local hit = combos.hit(launch.source, victim, launch.spell, points)
-            if combat.damage(launch.source, victim, launch.spell, hit.damage, combat.KIND.ZONE) then touched[#touched + 1] = victim end
+            if combat.damage(launch.source, victim, launch.spell, hit.damage, combat.KIND.ZONE, nil, nil, launch.launchedAt) then
+                touched[#touched + 1] = victim
+            end
         end
     end
     return touched
@@ -200,7 +202,8 @@ local function impact(src, id, target, x, y, z)
     local carry = launch.carry
     if carry and target ~= 0 then
         local hit = combos.hit(src, target, launch.spell, carry.damage or 0, CARRY_ELEMENT)
-        if combat.damage(src, target, launch.spell, hit.damage, combat.KIND.IMPACT, nil, CARRY_ELEMENT) and hit.burn
+        if combat.damage(src, target, launch.spell, hit.damage, combat.KIND.IMPACT, nil, CARRY_ELEMENT, launch.launchedAt)
+            and hit.burn
             and carry.burn then
             states.apply(target, 'burn', {
                 durationMs = carry.burn.durationMs, tickMs = carry.burn.tickMs, damage = carry.burn.damage, caster = src, spell = launch.spell,

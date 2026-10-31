@@ -84,7 +84,7 @@ zones.define(KIND, {
         if data.burn and hit.burn then
             states.apply(victim, 'burn', {
                 durationMs = data.burn.durationMs, tickMs = data.burn.tickMs, damage = data.burn.damage,
-                caster = zone.owner, spell = NAME,
+                caster = zone.owner, casterCharacter = zone.ownerCharacter, spell = NAME,
             })
         end
         -- bonus du premier blessé, au lanceur toujours là (même personnage)
