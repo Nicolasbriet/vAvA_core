@@ -90,8 +90,10 @@ describe('vava_combat techniques (serveur)', function()
             'modules/vava_combat/shared/constants.lua',
             'modules/vava_combat/config.lua',
             'modules/vava_combat/shared/shield.lua',
+            'modules/vava_combat/shared/heading.lua',
             'modules/vava_combat/shared/geometry.lua',
             'modules/vava_combat/shared/techniques.lua',
+            'modules/vava_combat/shared/admission.lua',
             'modules/vava_combat/shared/weapons.lua',
             'modules/vava_combat/shared/guard.lua',
         })
@@ -267,6 +269,28 @@ describe('vava_combat techniques (serveur)', function()
             at(320)
             assert.equal(1, #hits)
             assert.equal(1, calls.Held)
+        end)
+
+        -- relecture réseau R-5 : relevé 2 sans aucune lecture après un coup qui a porté (un adversaire par coup)
+        it('B touché au relevé 1 : le relevé 2 ne lit plus rien', function()
+            use(A, 'taille_descendante', B)
+            at(320)
+            assert.equal(1, #hits)
+            calls = {}
+            at(480)
+            assert.equal(0, exportCalls())
+            assert.equal(1, #hits)
+        end)
+
+        it('un joueur proche hors de l\'arc n\'est jugé qu\'en mémoire : aucun export pour lui', function()
+            positions[B] = { 0, -2, 0 }              -- derrière A, dans le rayon de recherche
+            use(A, 'taille_descendante', B)
+            calls = {}
+            at(320)
+            assert.equal(0, #hits)
+            assert.equal(1, calls.ActiveCharacterId)  -- l'attaquant seul
+            assert.equal(1, calls.InVehicle)
+            assert.equal(1, calls.IsDowned)
         end)
     end)
 
@@ -506,8 +530,9 @@ describe('vava_combat techniques (serveur)', function()
 
         it('annulé pendant la frappe (bond au relevé 2) : Fendant redemandé à la fin de la frappe + 10 → busy', function()
             assert.same({ true }, use(A, 'fendant', B))   -- frappe 650 à 850, fin 1550
+            positions[B] = { 0, 5, 0 }
             at(650)
-            assert.equal(1, #hits)                        -- touché au relevé 1
+            assert.equal(0, #hits)                        -- manqué au relevé 1
             positions[A] = { 0, 10, 0 }                   -- 10 m en 850 ms : bond invraisemblable
             at(850)
             assert.equal('moved', swings.of(A).cancelled)
@@ -516,6 +541,15 @@ describe('vava_combat techniques (serveur)', function()
             assert.same({ false, 'busy', 630 }, use(A, 'fendant', B))
             at(1490)
             assert.same({ true }, use(A, 'fendant', B))
+        end)
+
+        it('touché au relevé 1, bond au relevé 2 : le relevé 2 n\'a plus lieu, le cycle compte (busy)', function()
+            assert.same({ true }, use(A, 'fendant', B))
+            at(650)
+            assert.equal(1, #hits)
+            positions[A] = { 0, 10, 0 }
+            at(860)
+            assert.same({ false, 'busy', 630 }, use(A, 'fendant', B))
             assert.equal(1, #hits)
         end)
 
@@ -684,13 +718,24 @@ describe('vava_combat techniques (serveur)', function()
                 sampled[#sampled + 1] = clock - T0
                 return realHeld(src)
             end
+            positions[B] = { 0, 5, 0 }                    -- personne dans l'arc : chaque relevé a lieu
             use(A, 'taille_descendante', B)
             at(420)
             assert.same({ true }, use(A, 'estoc_rapide', B))
             at(2000)
             assert.same({ 0, 320, 420, 480, 640, 760 }, sampled)
+            assert.equal(0, #hits)
+            -- B dans l'arc : touché à 320 puis à 640 ; le second relevé de chaque coup ne lit plus rien (R-5)
+            positions[B] = { 0, 2, 0 }
+            sampled, hits = {}, {}
+            at(3000)
+            use(A, 'taille_descendante', B)
+            at(3420)
+            assert.same({ true }, use(A, 'estoc_rapide', B))
+            at(5000)
+            assert.same({ 3000, 3320, 3420, 3640 }, sampled)
             assert.equal(2, #hits)
-            assert.same({ 320, 640 }, { hits[1].at, hits[2].at })
+            assert.same({ 3320, 3640 }, { hits[1].at, hits[2].at })
             assert.equal(9.6, hits[2].packet.amount)
         end)
 
@@ -731,9 +776,15 @@ describe('vava_combat techniques (serveur)', function()
             at(clock - T0 + 900)
         end
 
-        it('esquive → dodge, coup bloqué → block, coup qui met à terre → down', function()
+        -- relecture réseau R-3 : une issue que personne ne montre (esquive, coup absorbé) n'est pas envoyée
+        it('esquive, coup absorbé : rien envoyé ; coup bloqué → block, coup qui met à terre → down', function()
             strikeWith({ id = 1, amount = 0, applied = 0, cancelled = 'esquive', stage = 'esquive', downed = false })
-            assert.same({ A, B, 'dodge' }, sent[1].args)
+            assert.equal(1, #hits)
+            assert.equal(0, #sent)
+            strikeWith({ id = 4, amount = 0, applied = 0, cancelled = 'egide', stage = 'bouclier', downed = false })
+            assert.equal(0, #sent)
+            strikeWith({ id = 5, amount = 0, applied = 0, blocked = 0, absorbed = 12, downed = false })
+            assert.equal(0, #sent)
             strikeWith({ id = 2, amount = 0, applied = 0, blocked = 12, absorbed = 0, downed = false })
             assert.same({ A, B, 'block' }, sent[1].args)
             strikeWith({ id = 3, amount = 12, applied = 12, blocked = 0, absorbed = 0, downed = true })

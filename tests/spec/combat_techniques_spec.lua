@@ -43,6 +43,7 @@ describe('vava_combat techniques', function()
             'modules/vava_combat/config.lua',
             'modules/vava_combat/shared/weapons.lua',
             'modules/vava_combat/shared/techniques.lua',
+            'modules/vava_combat/shared/admission.lua',
         })
         techniques, weapons, cfg = VavaCombat.techniques, VavaCombat.weapons, VavaCombat.config
     end)

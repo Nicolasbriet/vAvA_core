@@ -1,10 +1,7 @@
 --[[
     vava_combat/client/main.lua
-    Rôle : assemblage côté joueur : notification du serveur (seuils d'usure, coup retenu, réponse de /armes sans
-           vava_chat) affichée par vava_hud sinon par le jeu ; exports client `armed()` (arme tenue par le personnage
-           local, ou rangée depuis moins de `draw.sheatheMs` : règle « mains vides » de la magie), `inCombatMode()`
-           (mode combat éveillé et actif) et `shieldHung()` (bouclier accroché sur son propre ped) ; démarrage des
-           contrôles natifs et du suivi des boucliers. Aucune NUI.
+    Rôle : assemblage côté joueur : notifications du serveur, exports `armed()`, `inCombatMode()`, `shieldHung()`,
+           démarrage des contrôles natifs et des boucliers.
     Dépendances : shared/constants.lua, config_client.lua, shared/shield.lua, client/core.lua, bridge/client.lua,
                   client/natives.lua, client/shields.lua, client/hands.lua, client/mode.lua
 ]]

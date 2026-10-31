@@ -1,13 +1,7 @@
 --[[
     vava_combat/client/hands.lua
-    Rôle : la main du personnage local, vue du client (affichage et demandes : le serveur décide). Arme du royaume en
-           main (classe de config_client.lua, jamais un bouclier) et son style ; à la prise en main, geste de dégainer
-           et arme « en garde » après `draw.drawMs` ; quand l'arme quitte la main, geste de rengainer et
-           `{ sheathing = true }` pendant `draw.sheatheMs` (l'export armed() le rend : la magie reste endormie). Main
-           restaurée au chargement du personnage ou au redémarrage du module : en garde d'emblée, sans geste. Gestes du
-           style de l'arme chargés à l'avance, ceux du style précédent rendus. Lecture et jeu des gestes (dictionnaire
-           chargé avec une attente bornée ; absent : rien n'est joué, une ligne de console par nom et par minute).
-           Aucune boucle : tout part du changement de main (bridge/client.lua).
+    Rôle : main du personnage local : arme et style, dégainer et rengainer (gestes, `armed()`), gestes du style chargés
+           à l'avance, jeu des gestes. Aucune boucle.
     Dépendances : shared/constants.lua, config_client.lua, shared/techniques.lua, client/core.lua, bridge/client.lua
 ]]
 
@@ -99,6 +93,8 @@ function hands.playNow(gesture, durationMs)
         return false
     end
     TaskPlayAnim(ped, gesture.dict, gesture.clip, 8.0, -8.0, durationMs or -1, gesture.flag, 0.0, false, false, false)
+    -- geste ponctuel (dégainer, rengainer, chancellement, tressaillement) : dictionnaire rendu, le geste se poursuit
+    if not styleDicts[gesture.dict] then RemoveAnimDict(gesture.dict) end
     return true
 end
 

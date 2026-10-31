@@ -1,9 +1,7 @@
 --[[
     vava_combat/shared/constants.lua
-    Rôle : table du module (seule globale de la ressource) et constantes de protocole : RPC des techniques, évènements
-           ciblés, statebag du bouclier accroché, champ de personnage, hooks émis, catégories d'armes (liste fermée de
-           COMBAT_V1), types de techniques et issues d'un coup, noms des états de l'inventaire lus par le client, bornes
-           et motifs de validation.
+    Rôle : table du module (seule globale) et constantes de protocole : RPC, évènements, bouclier accroché, hooks,
+           catégories, types de techniques, issues, bornes et motifs.
     Dépendances : aucune
 ]]
 

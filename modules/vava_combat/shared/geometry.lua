@@ -1,17 +1,17 @@
 --[[
     vava_combat/shared/geometry.lua
-    Rôle : géométrie pure d'un coup, côté client et serveur (docs/plan/specs/T-112.md § 7.3). Repère de GTA : cap 0 =
+    Rôle : géométrie pure d'un coup, servie au seul serveur (docs/plan/specs/T-112.md § 7.3). Repère de GTA : cap 0 =
            nord (+y), croissant vers l'ouest (sens trigonométrique vu de dessus). Avant d'un cap, cap d'un point vers un
-           autre (le client s'oriente vers sa cible), distance au sol et écart de hauteur, angle à plat entre l'avant et
-           une cible, arc d'une technique (portée, demi-angle, hauteur, contact) et cible dans l'arc, ordre des
-           candidats, bond plausible de l'attaquant. Le serveur juge seul : le client ne s'en sert que pour se tourner.
-           Aucune native ; une valeur non finie rend nil ou faux, jamais une erreur.
-    Dépendances : shared/constants.lua
+           autre (shared/heading.lua, la seule part dont le client a besoin pour se tourner), distance au sol et écart
+           de hauteur, angle à plat entre l'avant et une cible, arc d'une technique (portée, demi-angle, hauteur,
+           contact) et cible dans l'arc, ordre des candidats, bond plausible de l'attaquant. Aucune native ; une valeur
+           non finie rend nil ou faux, jamais une erreur.
+    Dépendances : shared/constants.lua, shared/heading.lua
 ]]
 
 local type, ipairs, sort = type, ipairs, table.sort
-local sin, cos, rad, deg, atan, acos, sqrt, abs, huge = math.sin, math.cos, math.rad, math.deg, math.atan, math.acos,
-    math.sqrt, math.abs, math.huge
+local sin, cos, rad, deg, acos, sqrt, abs, huge = math.sin, math.cos, math.rad, math.deg, math.acos, math.sqrt,
+    math.abs, math.huge
 local max, min = math.max, math.min
 
 -- en dessous (carré de la distance au sol), deux points sont confondus : aucun cap
@@ -44,18 +44,9 @@ function geometry.forward(heading)
     return { x = -sin(h), y = cos(h) }
 end
 
---- Cap (0 à 360, degrés) de `from` vers `to`, à plat ; nil au contact ou pour un point illisible.
----@param from table
----@param to table
----@return number|nil
-function geometry.headingTo(from, to)
-    if not point(from) or not point(to) then return nil end
-    local dx, dy = to.x - from.x, to.y - from.y
-    if dx * dx + dy * dy < SAME_POINT_SQ then return nil end
-    local heading = deg(atan(-dx, dy))
-    if heading < 0 then heading = heading + 360 end
-    return heading
-end
+--- Cap (0 à 360, degrés) de `from` vers `to`, à plat ; nil au contact ou pour un point illisible (shared/heading.lua,
+--- servi aussi au client).
+geometry.headingTo = VavaCombat.heading.to
 
 --- Distance au sol et écart de hauteur |dz| entre deux points, ou nil.
 ---@param from table

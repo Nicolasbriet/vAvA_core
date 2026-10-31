@@ -118,7 +118,11 @@ dos de son porteur, à portée de vue seulement.
 | Revers (`revers`) | légère | 280, 160, 460 ms | 2,1 m, 90° | × 0,9 | Taille descendante, Fendant | parable |
 | Fendant (`fendant`) | lourde, ouvre | 650, 200, 700 ms | 2,3 m, 60° | × 1,8 | rien | non parable, fait chanceler |
 
-Portée réelle = portée de la technique + bonus de l'arme + 0,25 m ; demi-angle = angle / 2 + 10°. Épée courte et Taille
+Format (`config_client.lua` → `techniques`, `COMBAT_V1.md` § 3, identique dans l'Atelier) : clé = identifiant
+(`^[a-z0-9_]+$`, 32 octets) ; `phases` en ms ; `hit.range` en mètres (plus le bonus de l'arme) ; `hit.angle` = ouverture
+**totale** de l'arc, centrée sur l'avant ; `damage` = multiplicateur des dégâts de l'arme ; `chain` = techniques du même
+style qui peuvent partir pendant la récupération. Portée réelle = portée de la technique + bonus de l'arme + 0,25 m ;
+demi-angle = angle / 2 + 10°. Épée courte et Taille
 descendante : 2,45 m, 45° de chaque côté, 2,0 m de hauteur. Seule l'**épée à une main** a des techniques en 1.2.0 (les
 autres styles viendront avec T-115) : une autre arme en main, le joueur lit « Vous ne connaissez aucune technique pour
 cette arme. » et rien ne s'éveille. `learn` (compétence, niveau) est lu par T-115, jamais appliqué ici ; `stamina` par
@@ -181,7 +185,7 @@ garde d'emblée. Le serveur tient ces durées (hook `vava_inventory:hold`) ; le 
 | Quoi | Cible | Taille | Fréquence |
 |---|---|---|---|
 | RPC `vava_combat:use(technique, cible)` (`core.rpc`, schéma borné : chaîne de 1 à 32 octets `^[a-z0-9_]+$`, entier 0 à 65535) | le serveur ; réponse au seul appelant (`true`, `false, code[, attente]`) | ≈ 40 o + ≈ 15 o | un par coup ; 4 d'avance puis 3 / s |
-| `vava_combat:hit` (`core.net.sendNearWith`, instance de l'attaquant) : attaquant, cible, issue | les joueurs apparus à 30 m de la **cible**, dans l'instance de l'attaquant (cible, attaquant, témoins) | ≈ 30 à 40 o | **un** par cible touchée et par coup (un adversaire par coup) ; jamais pour un coup manqué, refusé ou annulé |
+| `vava_combat:hit` (`core.net.sendNearWith`, instance de l'attaquant) : attaquant, cible, issue | les joueurs apparus à 30 m de la **cible**, dans l'instance de l'attaquant (cible, attaquant, témoins) | ≈ 30 à 40 o | **un** par cible touchée et par coup (un adversaire par coup) ; jamais pour un coup manqué, refusé ou annulé, ni pour une esquive ou un coup absorbé (que personne ne montre) |
 | `vava_combat:notify` (`core.net.send`, compté) | le **seul** porteur dont l'arme passe un seuil ; le seul attaquant dont le coup est retenu (combats coupés, lieu de paix, crochet) ; le seul membre du Conseil qui tape `/armes` sans `vava_chat` | ≈ 70 à 160 o | 2 par arme et par cycle d'usure ; un avis par raison et par 10 s ; réponses de commande |
 | Statebag de ped `vava_combat:shield` (`{ id, item }`) | OneSync : les joueurs qui ont ce ped à portée | ≈ 30 o | à l'accroche, au décrochage, à un nouveau ped du porteur ; jamais périodique |
 | `GlobalState['vava_inventory:heldModels']` (mécanisme de l'inventaire) | tous | + ≈ 450 o | une fois, à la déclaration des objets |
@@ -319,6 +323,31 @@ médiévales (`gesture` de chaque technique, `draw`, `stagger`, `effects.flinch`
 une ligne de console, rien d'affiché, le coup est jugé quand même.
 
 Icônes : `web/items/*.svg` (une par objet nouveau, au format de l'objet, fond transparent, ombre comprise).
+
+## Fichiers
+
+Les en-têtes des fichiers servis aux joueurs sont courts (relecture réseau R-2 de T-112) : le détail est ici.
+
+| Fichier | Servi | Rôle |
+|---|---|---|
+| `shared/constants.lua` | tous | table du module (seule globale `VavaCombat`) ; RPC, évènements ciblés, statebag et champ privé du bouclier, hooks émis, catégories (liste fermée de `COMBAT_V1.md`), types de techniques et issues, états de l'inventaire lus par le client, bornes et motifs de validation |
+| `config_client.lua` | tous | réglages que lit le client (le serveur les lit aussi) : `weaponClasses`, `techniques`, `styles` et `keys` entiers (lus par une clé variable) ; tout le reste dans `config.lua` (T-132) |
+| `shared/shield.lua` | tous | où porter le bouclier (bras ou dos, selon la main du même ped), quel placement montrer (lu dans la config de chaque client, jamais dans la valeur), valeur `{ id, item }` publiable, deux valeurs égales (garde), ped visé par un statebag ; règles recopiées de `vava_inventory/shared/held.lua` |
+| `shared/heading.lua` | tous | cap d'un point vers un autre (0 = nord, croissant vers l'ouest) : le client se tourne vers sa cible ; le serveur le reprend dans `geometry.headingTo` |
+| `shared/techniques.lua` | tous | style d'une arme (`<famille>_<catégorie>`), cycle d'un coup (`plan`), technique d'une touche côté client (`pick` : libre, l'ouvreur ; pendant la récupération, la première de la chaîne du type de la touche ; sinon l'attente) |
+| `shared/geometry.lua` | serveur | avant d'un cap, distance au sol et écart de hauteur, angle à plat, arc d'une technique et cible dans l'arc, ordre des candidats, bond plausible ; jamais d'erreur sur une valeur non finie |
+| `shared/admission.lua` | serveur | admission d'une demande : libre → l'ouvreur seul (`not_opener`) ; pendant la récupération (frappe finie, à `earlyMs` près) → une technique de `chain` dans la limite de `chainMax` (`chain_limit`) ; sinon `busy` et l'attente |
+| `shared/weapons.lua`, `shared/guard.lua` | serveur | contrôle de la config, qualité, solidité, usure, issue d'un coup, options de `strike` ; délai de la garde du statebag |
+| `bridge/client.lua` | tous | seul point de contact du client : notification (`vava_hud`, sinon celle du jeu) ; main du personnage local (`owner` de `vava_inventory:hands`) gardée en cache, tenue par `core:character:loaded`, `fieldChanged`, `unloaded` (aucune lecture du personnage à chaque appel, rapport T-140 R-1) ; changement de main annoncé ; à terre (`vava_health:get`) ; nom du statebag de la main |
+| `client/natives.lua` | tous | drapeau de ped 122, changement d'arme bloqué, armes GTA retirées (menu de triche, `/arme` de l'exemple) ; ces bascules tiennent jusqu'au changement de ped : contrôle à `natives.pollMs` (trois natives par seconde au repos) ; rendues à GTA à l'arrêt (`restoreOnStop`) ; le filet reste l'annulation serveur de `vava_health` |
+| `client/shields.lua` | tous | patron de `vava_inventory/client/hands.lua` : objet **local** sans collision attaché au ped du porteur (bras ou dos), réattaché sans être recréé quand la main change ; boucle lente seulement tant qu'un bouclier est suivi (ped ou modèle attendu, objet détaché, ped disparu, distance de `showRadius`) ; modèle invalide : une ligne de console, aucun nouvel essai avant que la valeur change |
+| `client/hands.lua` | tous | arme du royaume en main (jamais un bouclier) et son style ; prise en main : geste de dégainer, en garde après `draw.drawMs` ; arme rangée : geste de rengainer et `sheathing` pendant `draw.sheatheMs` ; main restaurée (chargement, redémarrage) : en garde d'emblée ; gestes du style chargés à l'avance, ceux de l'ancien style rendus ; geste ponctuel (dégainer, rengainer, chancellement, tressaillement) : dictionnaire rendu juste après le geste ; dictionnaire absent : rien n'est joué, une ligne de console par nom et par minute |
+| `client/keys.lua` | tous | une commande par action, liée par `RegisterKeyMapping` (souris par défaut) ; déclarées au registre `core:commands` par `server/commands.lua` (Codex) |
+| `client/targeting.lua` | tous | règles de `vava_magic/client/targeting.lua` : appui court → le joueur le plus proche du centre de l'écran (`lock.range`, `coneDeg`, en vue) ; nouvel appui : le suivant ; maintenu `holdMs` : relâché ; perdu hors de portée (+ `rangeMargin`), hors de vue `lostChecks` relevés de suite, mort, ou au sommeil du mode ; candidats faits à l'appui seulement |
+| `client/attack.lua` | tous | technique choisie par `pick`, personnage tourné vers la cible verrouillée ou la caméra (`faceMaxDeg`), geste aussitôt, demande dans un thread ; refus ou transport en échec : geste coupé, texte (un par code et par `noticeMs`), attente du serveur respectée ; touche pressée trop tôt gardée (`bufferMs`) ; virage vers la cible pendant la préparation et la frappe ; chancellement : geste coupé, cycle gardé (comme au serveur) |
+| `client/mode.lua` | tous | patron de `vava_magic/client/controls.lua` : éveil par une touche du combat si l'arme a un style (sinon le texte, une fois par arme sortie) ; actif à pied, debout, pas à terre, pas ligoté, sans interface ni menu (relevé à `conditionsMs`) ; sommeil après `idleMs` sans coup ni appui sur le verrou, ou aussitôt que la main change ou le personnage est déchargé ; boucle par image seulement éveillée et active (contrôles coupés, anneau, verrou, touche gardée, virage) |
+| `client/reactions.lua` | tous | cible : chancellement (geste, coup coupé, secousse) ou tressaillement (si elle ne frappe pas) ; attaquant : son de touche réglé, pour `hit`, `stagger`, `down` ; tous : effet d'impact sur le ped de la cible (sang ; étincelles pour un blocage ou une parade), `effects.maxPerSecond` au plus ; aucun objet créé |
+| `client/main.lua` | tous | notifications du serveur, exports client, démarrage des contrôles natifs et du suivi des boucliers |
 
 ## Installation
 

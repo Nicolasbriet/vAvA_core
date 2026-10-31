@@ -1,15 +1,8 @@
 --[[
     vava_combat/client/attack.lua
-    Rôle : un coup, côté client : prédiction sans décision (docs/plan/specs/T-112.md § 8.4). À l'appui d'une touche
-           (mode combat éveillé et actif) : technique choisie d'après le style de l'arme et le coup en cours
-           (shared/techniques.lua), personnage tourné vers la cible verrouillée ou la caméra (virage borné), geste joué
-           AUSSITÔT, puis demande au serveur (`vava_combat:use`, dans un thread). Refus ou transport en échec : geste
-           coupé, texte du refus (au plus un par code et par `mode.noticeMs`), attente donnée par le serveur respectée.
-           Une touche pressée un peu tôt (au plus `mode.bufferMs`) est gardée et jouée à son heure. Pendant la
-           préparation et la frappe, virage vers la cible verrouillée. Le client ne calcule ni portée, ni touché, ni
-           dégâts : « touché » n'arrive que par l'évènement vava_combat:hit (client/reactions.lua). Aucune boucle propre :
-           `attack.tick` est appelé par la boucle du mode combat.
-    Dépendances : shared/constants.lua, config_client.lua, shared/geometry.lua, shared/techniques.lua, client/core.lua,
+    Rôle : un coup côté client, prédiction sans décision : technique choisie, geste aussitôt, demande
+           `vava_combat:use`, refus et attente du serveur respectés, touche gardée, virage vers la cible.
+    Dépendances : shared/constants.lua, config_client.lua, shared/heading.lua, shared/techniques.lua, client/core.lua,
                   bridge/client.lua, client/hands.lua, client/targeting.lua
 ]]
 
@@ -26,7 +19,7 @@ local cfg = VavaCombat.config
 local modeCfg = cfg.mode
 local refusals = cfg.refusals
 local bridge = VavaCombat.bridge
-local geometry = VavaCombat.geometry
+local headingTo = VavaCombat.heading.to
 local techniques = VavaCombat.techniques
 local hands = VavaCombat.hands
 local targeting = VavaCombat.targeting
@@ -84,7 +77,7 @@ local function faceAtStart(ped)
     local want = nil
     local targetPed = targeting.ped()
     if targetPed and DoesEntityExist(targetPed) then
-        want = geometry.headingTo(GetEntityCoords(ped), GetEntityCoords(targetPed))
+        want = headingTo(GetEntityCoords(ped), GetEntityCoords(targetPed))
     elseif modeCfg.faceCamera then
         want = GetGameplayCamRot(ROTATION_ORDER).z % 360
     end
@@ -186,7 +179,7 @@ function attack.tick(now, ped)
     if not current or current.cut or now >= current.closeAt then return end
     local targetPed = targeting.ped()
     if not targetPed or not DoesEntityExist(targetPed) then return end
-    local want = geometry.headingTo(GetEntityCoords(ped), GetEntityCoords(targetPed))
+    local want = headingTo(GetEntityCoords(ped), GetEntityCoords(targetPed))
     if not want then return end
     local heading = GetEntityHeading(ped)
     local step = cfg.lock.turnDegPerSec * elapsed / 1000

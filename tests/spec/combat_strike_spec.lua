@@ -137,8 +137,10 @@ describe('vava_combat server', function()
             'modules/vava_combat/shared/shield.lua',
             'modules/vava_combat/shared/weapons.lua',
             'modules/vava_combat/shared/guard.lua',
+            'modules/vava_combat/shared/heading.lua',
             'modules/vava_combat/shared/geometry.lua',
             'modules/vava_combat/shared/techniques.lua',
+            'modules/vava_combat/shared/admission.lua',
         })
         cfg, HOOKS, SHIELD_STATE = VavaCombat.config, VavaCombat.HOOKS, VavaCombat.SHIELD_STATE
         VavaCombat.resource = 'vava_combat'

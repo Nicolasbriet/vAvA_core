@@ -1,13 +1,7 @@
 --[[
     vava_combat/client/reactions.lua
-    Rôle : ce que voit chacun d'un coup qui porte (évènement `vava_combat:hit`, envoyé par le serveur aux seuls joueurs
-           à 30 m de la cible, même instance : attaquant, cible, issue). La cible : chancellement (geste, coup en cours
-           coupé, techniques retenues `stagger.durationMs`, secousse) ou tressaillement (seulement si elle ne frappe
-           pas, petite secousse) ; à terre : rien (vava_health s'en charge). L'attaquant : son de touche s'il est réglé.
-           Tous (cible et témoins) : effet d'impact local sur le ped de la cible (sang pour un coup qui porte, étincelles
-           pour un coup bloqué ou paré ; rien pour une esquive ou un coup absorbé), `effects.maxPerSecond` au plus. Les
-           gestes sont joués par chaque client sur son propre ped : OneSync les montre aux autres. Aucun objet créé,
-           rien à nettoyer, aucune boucle (un thread borné pour charger un actif de particules).
+    Rôle : ce que voit chacun d'un coup qui porte (`vava_combat:hit`) : réaction de la cible, son de l'attaquant, effet
+           d'impact local borné. Aucune boucle.
     Dépendances : shared/constants.lua, config_client.lua, client/core.lua, client/hands.lua, client/attack.lua
 ]]
 
@@ -32,6 +26,8 @@ local EVENTS = VavaCombat.EVENTS
 local MAX_PLAYER = VavaCombat.MAX_PLAYER
 -- issue → effet montré sur la cible (nil : aucun)
 local FX_OF = { hit = 'impact', stagger = 'impact', down = 'impact', block = 'guarded', parry = 'guarded' }
+-- issue → son de touche chez l'attaquant
+local SOUND_OF = { hit = true, stagger = true, down = true }
 local OUTCOMES = {}
 for _, outcome in ipairs(VavaCombat.OUTCOMES) do OUTCOMES[outcome] = true end
 local ASSET_POLL_MS = 20
@@ -117,7 +113,7 @@ RegisterNetEvent(EVENTS.HIT, function(attackerId, targetId, outcome)
             shake(effects.shakeHit)
         end
     end
-    if attacker == me then
+    if attacker == me and SOUND_OF[outcome] then
         local sound = effects.sounds.hit
         if type(sound) == 'table' and type(sound.name) == 'string' then
             PlaySoundFrontend(-1, sound.name, sound.set, true)

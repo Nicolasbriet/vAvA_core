@@ -1,13 +1,7 @@
 --[[
     vava_combat/client/targeting.lua
-    Rôle : verrouillage d'un adversaire pour les techniques (règles de vava_magic/client/targeting.lua, réglages
-           `lock`). Appui court sur la touche du verrou : le joueur le plus proche du centre de l'écran, à `lock.range`,
-           dans `lock.coneDeg` et en vue ; nouvel appui : le suivant ; appui maintenu `lock.holdMs` : relâché. Perdu
-           hors de portée (+ `rangeMargin`), hors de vue `lostChecks` relevés de suite, mort, ou quand le mode combat
-           s'endort. AUCUNE boucle propre : l'anneau (à chaque image) et les relevés (toutes les `checkMs`) sont faits par
-           la boucle du mode combat, qui tourne déjà ; la liste des candidats n'est faite qu'à l'appui
-           (GetActivePlayers, jamais à chaque image). Vu du seul joueur : rien ne passe par le réseau avant un coup. Le
-           serveur ne s'en sert que pour l'ordre des candidats d'un coup : le verrou n'allonge ni la portée ni l'angle.
+    Rôle : verrou d'un adversaire (`lock`), sans boucle propre (relevés et anneau faits par la boucle du mode combat) ;
+           le serveur ne s'en sert que pour l'ordre des candidats.
     Dépendances : shared/constants.lua, config_client.lua, client/core.lua
 ]]
 

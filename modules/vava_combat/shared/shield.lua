@@ -1,12 +1,7 @@
 --[[
     vava_combat/shared/shield.lua
-    Rôle : règles pures du bouclier accroché, côté client et serveur. La valeur publiée sur le statebag du ped du porteur
-           est réduite à { id, item } : le placement (modèle, os, décalage, rotation) se lit dans la config de chaque
-           client, et la position (bras ou dos) se déduit de ce que le porteur tient en main. Ces règles disent où
-           porter le bouclier, quel placement montrer, si une valeur est publiable et si deux valeurs sont la même
-           (garde du serveur), et quel ped vise un statebag. Les règles de valeur sont celles de
-           vava_inventory/shared/held.lua, recopiées (une ressource n'en charge pas une autre) ; le délai de la garde,
-           appliqué par le seul serveur, est dans shared/guard.lua (servi au seul serveur depuis 1.2.0).
+    Rôle : règles pures du bouclier accroché (client et serveur) : où le porter, quel placement montrer, valeur
+           { id, item } publiable (règles recopiées de vava_inventory/shared/held.lua).
     Dépendances : shared/constants.lua
 ]]
 

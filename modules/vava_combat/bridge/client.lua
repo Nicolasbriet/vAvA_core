@@ -1,11 +1,7 @@
 --[[
     vava_combat/bridge/client.lua
-    Rôle : SEUL point de contact, côté client, entre les armes et les autres modules : notification (vava_hud, sinon
-           celle du jeu), objet tenu par le personnage local (champ `owner` vava_inventory:hands) gardé dans une variable
-           locale et tenu par les hooks du core (personnage chargé, champ changé, personnage déchargé) : aucune lecture
-           du personnage à chaque appel (rapport T-140, R-1) ; changement de main annoncé aux fichiers du module ; à
-           terre (vava_health:get) ; nom du statebag de la main de l'inventaire (lu sur les peds des porteurs de
-           bouclier). Chaque appel à une autre ressource est isolé.
+    Rôle : SEUL point de contact du client avec les autres modules : notification, main du personnage local en cache
+           (hooks du core), changement de main annoncé, à terre. Chaque appel isolé.
     Dépendances : shared/constants.lua, config_client.lua, client/core.lua
 ]]
 

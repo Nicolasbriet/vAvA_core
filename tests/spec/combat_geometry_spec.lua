@@ -24,6 +24,7 @@ describe('vava_combat shared/geometry', function()
         helper.loadAll({
             'modules/vava_combat/shared/constants.lua',
             'modules/vava_combat/config.lua',
+            'modules/vava_combat/shared/heading.lua',
             'modules/vava_combat/shared/geometry.lua',
         })
         geometry, cfg = VavaCombat.geometry, VavaCombat.config

@@ -75,7 +75,7 @@ describe('vava_combat client : main, dégainer, mode combat', function()
             },
         }
         helper.loadAll({
-            'modules/vava_combat/shared/geometry.lua',
+            'modules/vava_combat/shared/heading.lua',
             'modules/vava_combat/shared/techniques.lua',
             'modules/vava_combat/bridge/client.lua',
             'modules/vava_combat/client/hands.lua',
@@ -304,6 +304,53 @@ describe('vava_combat client : main, dégainer, mode combat', function()
             commands[cfg.keys.legere.command]()
             assert.is_false(mode.isActive())
             assert.equal(0, #rpcCalls)
+        end)
+
+        -- relecture sécurité S-1 (client) : un coup coupé par un chancellement garde son cycle, comme au serveur
+        it('chancelé pendant un Fendant : geste coupé, rien ne repart avant la fin du cycle du Fendant', function()
+            load(nil)
+            fire('core:character:loaded', character('epee_courte'))
+            press('lourde')
+            runThreads()
+            assert.equal(1, #rpcCalls)
+            local start = clock
+            attack.stagger(start + 900)
+            assert.equal(1, #stopped)
+            clock = start + 900                   -- chancellement fini, Fendant pas fini (1 550 ms)
+            press('lourde')
+            runThreads()
+            assert.equal(1, #rpcCalls)
+            clock = start + 1550
+            press('lourde')
+            runThreads()
+            assert.equal(2, #rpcCalls)
+            assert.equal('fendant', rpcCalls[2].args[1])
+        end)
+
+        -- relecture réseau R-1 : le client n'a ni la géométrie du serveur ni l'admission
+        it('vue du joueur : ni géométrie ni admission ; le cap vers une cible est donné par shared/heading.lua', function()
+            load(nil)
+            assert.is_nil(VavaCombat.geometry)
+            assert.is_nil(VavaCombat.techniques.admit)
+            assert.equal(90, VavaCombat.heading.to({ x = 0, y = 0, z = 0 }, { x = -1, y = 0, z = 0 }))
+            assert.is_nil(VavaCombat.heading.to({ x = 0, y = 0, z = 0 }, { x = 0, y = 0, z = 5 }))
+            assert.is_nil(VavaCombat.heading.to({ x = 0 / 0, y = 0, z = 0 }, { x = 1, y = 0, z = 0 }))
+        end)
+
+        -- relecture réseau R-6 : un geste hors du style rend son dictionnaire aussitôt joué
+        it('dégainer : dictionnaire rendu après le geste ; geste d\'une technique : dictionnaire gardé', function()
+            local removed = {}
+            _G.RemoveAnimDict = function(dict) removed[#removed + 1] = dict end
+            load(nil)
+            fire('core:character:loaded', character(nil))
+            fire('core:character:fieldChanged', { field = HANDS, value = { item = 'epee_courte' } })
+            runThreads()
+            assert.same({ cfg.draw.drawGesture.dict }, removed)
+            clock = clock + 800
+            press('legere')
+            runThreads()
+            assert.equal(cfg.techniques.taille_descendante.gesture.dict, played[#played].dict)
+            assert.same({ cfg.draw.drawGesture.dict }, removed)
         end)
 
         it('les contrôles coupés n\'incluent jamais Échap ni P (vava_pause)', function()

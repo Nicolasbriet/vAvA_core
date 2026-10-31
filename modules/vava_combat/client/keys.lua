@@ -1,8 +1,6 @@
 --[[
     vava_combat/client/keys.lua
-    Rôle : touches du combat (patron de vava_magic/client/keys.lua). Chaque action a une commande liée par
-           RegisterKeyMapping (bouton de la souris par défaut ; réglable dans Paramètres > Raccourcis > FiveM). Les
-           touches sont déclarées au registre `core:commands` par le serveur (server/commands.lua) : le Codex les montre.
+    Rôle : touches du combat (RegisterKeyMapping), déclarées au Codex par le serveur.
     Dépendances : config_client.lua
 ]]
 

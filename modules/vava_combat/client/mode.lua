@@ -1,18 +1,7 @@
 --[[
     vava_combat/client/mode.lua
-    Rôle : le mode combat (patron de vava_magic/client/controls.lua : éveillé / actif) et les touches du combat.
-      - Éveil : seulement par une touche du combat (attaque légère, lourde, verrou) quand l'arme en main a un style.
-        Arme sans technique : « Vous ne connaissez aucune technique pour cette arme. », une fois par arme sortie. Arme
-        en main sans rien presser : RIEN ne tourne.
-      - Actif : arme en garde ou non, à pied, debout, pas à terre, pas ligoté, aucune interface au focus, pas de menu
-        natif (relevé toutes les `mode.conditionsMs` tant qu'il est éveillé, jamais à chaque image).
-      - Sommeil : `mode.idleMs` sans coup ni appui sur le verrou ; aussitôt quand la main change (rengainer, autre
-        arme) ou que le personnage est déchargé. Endormi : verrou relâché, touche gardée oubliée, boucle terminée.
-      - Boucle : la seule du module qui tourne à chaque image, et seulement éveillée ET active : contrôles de GTA
-        coupés (`mode.blocked` : attaque, visée, corps à corps, roue et changement d'arme ; jamais Échap ni P, lus par
-        vava_pause), anneau sous la cible verrouillée, relevé du verrou, touche gardée, virage vers la cible. Éveillée
-        mais inactive : relevé toutes les `conditionsMs`.
-    Le serveur revérifie tout : le mode ne fait que montrer et demander.
+    Rôle : mode combat éveillé par une touche du combat, actif à pied et sans interface, endormi après `mode.idleMs` ;
+           seule boucle par image du module, et seulement éveillée et active.
     Dépendances : shared/constants.lua, config_client.lua, client/core.lua, bridge/client.lua, client/hands.lua,
                   client/keys.lua, client/targeting.lua, client/attack.lua
 ]]

@@ -2,8 +2,9 @@
     vava_combat/server/reactions.lua
     Rôle : ce qui suit un coup jugé par la chaîne de dégâts (docs/plan/specs/T-112.md § 7.6). Issue (règle pure
            weapons.outcome) envoyée aux SEULS joueurs à `reactions.radius` de la cible dans l'instance de l'attaquant
-           (vava_combat:hit, un message par cible touchée) ; rien pour un coup refusé ou annulé avant la cible, seulement
-           un avis à l'attaquant (combats coupés, lieu de paix, crochet), un par raison et par `notices.intervalMs`.
+           (vava_combat:hit, un message par cible touchée) ; rien pour une esquive ni un coup absorbé (personne ne les
+           montre) ; rien pour un coup refusé ou annulé avant la cible, seulement un avis à l'attaquant (combats coupés,
+           lieu de paix, crochet), un par raison et par `notices.intervalMs`.
            Chancellement d'un coup `staggers` : la cible ne frappe plus pendant `stagger.durationMs`, son coup en cours
            est annulé, puis elle n'en reprend pas avant `timing.staggerImmunityMs` (pas d'enchaînement de contrôles).
            Mémoire bornée par le nombre de joueurs, oubliée au déchargement, au départ et à la mise à terre.
@@ -17,6 +18,8 @@ local bridge = VavaCombat.bridge
 local weapons = VavaCombat.weapons
 local cfg = VavaCombat.config
 local EVENTS = VavaCombat.EVENTS
+-- issues que personne ne montre (ni réaction, ni effet, ni son) : rien n'est envoyé (relecture réseau R-3)
+local SILENT = { dodge = true, absorb = true }
 
 local reactions = {}
 VavaCombat.reactions = reactions
@@ -94,6 +97,7 @@ function reactions.after(swing, target, result)
     if outcome == 'hit' and swing.def.staggers and reactions.stagger(target, cfg.stagger.durationMs, now) then
         outcome = 'stagger'
     end
+    if SILENT[outcome] then return outcome end
     local x, y, z = bridge.Position(target)
     if not x then x, y, z = bridge.Position(src) end
     if not x then return outcome end

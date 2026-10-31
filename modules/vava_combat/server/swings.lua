@@ -19,8 +19,8 @@
            aucune base, aucun callClient) ; s'il est repris après un crochet ou un export qui a cédé la main, il
            revérifie que sa réservation tient toujours.
     Dépendances : shared/constants.lua, config_client.lua, config.lua, shared/weapons.lua, shared/geometry.lua,
-                  shared/techniques.lua, server/core.lua, bridge/server.lua, server/catalog.lua, server/strike.lua,
-                  server/hands.lua, server/reactions.lua
+                  shared/techniques.lua, shared/admission.lua, server/core.lua, bridge/server.lua, server/catalog.lua,
+                  server/strike.lua, server/hands.lua, server/reactions.lua
 ]]
 
 local type, pairs, ipairs, tostring = type, pairs, ipairs, tostring
@@ -129,6 +129,8 @@ end
 ---@param k integer
 local function sample(swing, k)
     if not VavaCombat.ready or swing.cancelled then return end
+    -- assez d'adversaires touchés : plus rien à relever (le cycle du coup compte de toute façon, annulé ou non)
+    if swing.hitCount >= cfg.geometry.maxTargets then return end
     local src = swing.source
     if bridge.ActiveCharacterId(src) ~= swing.characterId then
         swing.cancelled = 'left'
@@ -161,11 +163,13 @@ local function sample(swing, k)
     local logging = cfg.debug.logSamples
     local candidates = {}
     for _, other in ipairs(bridge.PlayersNear(position, arc.reach + cfg.geometry.searchMargin, src)) do
-        if other ~= src and not swing.hits[other] and bridge.ActiveCharacterId(other) then
+        if other ~= src and not swing.hits[other] then
             local ox, oy, oz = bridge.Position(other)
             if ox then
+                -- jugé en mémoire d'abord ; les exports seulement pour qui est dans l'arc
                 local inside, distance, angle = geometry.inArc(position, heading, { x = ox, y = oy, z = oz }, arc)
-                if inside and not bridge.InVehicle(other) and not bridge.IsDowned(other) then
+                if inside and bridge.ActiveCharacterId(other) and not bridge.InVehicle(other)
+                    and not bridge.IsDowned(other) then
                     candidates[#candidates + 1] = { player = other, distance = distance, angle = angle }
                 elseif logging then
                     logSample(swing, k, other, inside and distance or nil, inside and angle or nil,
