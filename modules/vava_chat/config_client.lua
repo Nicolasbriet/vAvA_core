@@ -1,14 +1,13 @@
 --[[
     vava_chat/config_client.lua
-    Rôle : réglages du chat que lit le client (le serveur les lit aussi) : bornes d'un message, texte au-dessus de la
-           tête, interface, profil, touche, commandes, suggestions, et tous les textes vus par les joueurs.
-           Téléchargé par chaque joueur. Ce que lit le seul serveur (portées, droit sans vava_admin, journal, débits)
-           est dans config.lua, servi au seul serveur (T-132).
+    Rôle : réglages du chat lus par le client (et le serveur) : bornes d'un message, texte au-dessus de la tête,
+           interface, touche, commandes, et tous les textes vus par les joueurs. Le reste (portées, droit, journal,
+           débits) : config.lua, servi au seul serveur (T-132).
     Dépendances : shared/constants.lua
 ]]
 
 VavaChat.config = {
-    clientFile = true,  -- posé par ce fichier, ne pas changer (sans lui, le serveur signale un config.lua d'avant 1.4.0)
+    clientFile = true,  -- ne pas changer (sans lui : config.lua d'avant 1.4.0 signalé)
 
     maxLength = 250,        -- signes d'un message de joueur (un « é » compte pour un)
     maxBytes = 1100,        -- borne réseau d'un message de joueur (octets)

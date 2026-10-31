@@ -6,9 +6,6 @@
            Actions, Conseil et un par correspondant ; fenêtre déplaçable et agrandissable, gardée sur le PC du joueur ;
            journal de modération en base (/ooc, /mp, /staff, 7 jours). Le serveur choisit chaque destinataire :
            aucun message n'est envoyé à tout le serveur.
-           T-132 : les joueurs ne téléchargent que les constantes, config_client.lua (bornes d'un message, texte
-           au-dessus de la tête, interface, touche, commandes, textes) et shared/text.lua ; config.lua (portées,
-           journal, débits) est servi au seul serveur.
     Dépendances : vAvA_core ≥ 0.5.0 ; vava_ui ≥ 1.0.0 (polices, grain, papier et coins de la page, par
                   nui://vava_ui/…) ; facultative : vava_admin (canal du Conseil, rangs)
 ]]
@@ -39,16 +36,15 @@ files {
 }
 
 -- Ordre explicite : chaque fichier ne dépend que de ceux listés avant lui.
--- Les joueurs ne téléchargent que les shared_scripts et les client_scripts : config.lua, en tête des server_scripts,
--- n'est jamais servi (T-132).
+-- config.lua n'est jamais servi aux joueurs (T-132)
 shared_scripts {
     'shared/constants.lua',
-    'config_client.lua',         -- ouvre VavaChat.config : ce que lit le client
+    'config_client.lua',
     'shared/text.lua',
 }
 
 server_scripts {
-    'config.lua',                -- complète VavaChat.config : ce que lit le seul serveur
+    'config.lua',
     'server/core.lua',
     'server/links.lua',
     'server/sessions.lua',
