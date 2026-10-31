@@ -52,6 +52,7 @@ describe('vava_magic sur la chaîne de dégâts (serveur)', function()
         VavaMagic.bridge = {
             GetCharacterId = function(src) return characters[src] end,
             IsDowned = function() return false end,
+            HandsBusy = function() return nil end,
             Notify = function(src, message, kind) notified[#notified + 1] = { target = src, message = message, kind = kind } end,
             Hit = function(target, packet)
                 hits[#hits + 1] = { target = target, packet = packet }

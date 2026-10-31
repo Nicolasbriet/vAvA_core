@@ -2,7 +2,8 @@
     vava_magic/bridge/server.lua
     Rôle : SEUL point de contact, côté serveur, entre la magie et le core / les autres modules : personnage, droits du
            Conseil, notifications, objets de l'inventaire, sauvegarde de la fiche, base de données, santé (chaîne de
-           dégâts de vava_health : coups des sorts, vie tenue par le serveur, hook des coups, modificateurs).
+           dégâts de vava_health : coups des sorts, vie tenue par le serveur, hook des coups, modificateurs), mains vides
+           pour incanter (arme et bouclier au bras lus par vava_combat).
            Pour brancher la magie sur un autre core, réécrire les fonctions de ce fichier (et de bridge/client.lua) :
            le reste du module ne connaît qu'elles.
     Implémentation : vAvA_core (API documentée dans docs/api.md) et ses modules officiels. Chaque appel à une autre
@@ -13,8 +14,8 @@
 local type, pairs, ipairs, pcall, tostring, tonumber = type, pairs, ipairs, pcall, tostring, tonumber
 local mathType, huge = math.type, math.huge
 local pack, unpack, concat = table.pack, table.unpack, table.concat
-local GetResourceState, TriggerClientEvent, IsPlayerAceAllowed, CreateThread, GetPlayers =
-    GetResourceState, TriggerClientEvent, IsPlayerAceAllowed, CreateThread, GetPlayers
+local GetResourceState, TriggerClientEvent, IsPlayerAceAllowed, CreateThread, GetPlayers, GetGameTimer =
+    GetResourceState, TriggerClientEvent, IsPlayerAceAllowed, CreateThread, GetPlayers, GetGameTimer
 
 local core = VavaMagic.core
 if not core then return end
@@ -433,6 +434,41 @@ end
 ---@return boolean
 function Bridge.ChainKnowsLaunched()
     return chain.launched
+end
+
+-- Mains vides pour incanter (vava_combat ≥ 1.0.0) --------------------------------------------------------------------
+
+-- une ligne de console par minute au plus quand vava_combat est démarré mais en erreur (jamais une par lancer)
+local COMBAT_WARN_MS = 60000
+local combatWarnedAt = nil
+
+--- Export de vava_combat, isolé et silencieux : ok (appel réussi), puis sa valeur. Démarré mais en erreur : une ligne
+--- de console par minute au plus.
+---@return boolean called
+local function combat(fn, source)
+    if GetResourceState(LINKS.COMBAT) ~= 'started' then return false end
+    local called, result = pcall(invoke, LINKS.COMBAT, fn, source)
+    if called then return true, result end
+    local now = GetGameTimer()
+    if not combatWarnedAt or now - combatWarnedAt >= COMBAT_WARN_MS then
+        combatWarnedAt = now
+        VavaMagic.log.warn('%s.%s en erreur, mains vides non vérifiées : %s', LINKS.COMBAT, fn, tostring(result))
+    end
+    return false
+end
+
+--- Ce qui empêche d'incanter dans les mains du joueur, lu par le serveur de vava_combat : `armed` (arme tenue,
+--- `armed(source)`), `shielded` (bouclier accroché **au bras**, `shield(source).ready`), ou nil : mains libres,
+--- bouclier dans le dos, outil en main, vava_combat absent, pas prêt ou en erreur (aucune restriction).
+---@param source integer
+---@return string|nil code
+function Bridge.HandsBusy(source)
+    local called, weapon = combat('armed', source)
+    if not called then return nil end
+    if type(weapon) == 'table' then return 'armed' end
+    local read, shield = combat('shield', source)
+    if read and type(shield) == 'table' and shield.ready == true then return 'shielded' end
+    return nil
 end
 
 --- Déclare les objets et les modificateurs, et suit les redémarrages de l'inventaire et de vava_health. Appelé

@@ -2,7 +2,8 @@
     vava_magic/server/casting.lua
     Rôle : incantation commune à tous les sorts, décidée par le serveur.
       - Début (RPC du sort) : fiche chargée, mage, sort connu, une seule incantation à la fois, pas à terre ni en
-        véhicule, empêchements des autres fichiers (état « chancelant »…), délai global entre deux sorts, temps de
+        véhicule, mains vides (ni arme tenue ni bouclier au bras, lus par vava_combat ; sans lui, aucune restriction),
+        empêchements des autres fichiers (état « chancelant »…), délai global entre deux sorts, temps de
         recharge du sort, hook `vava_magic:castStarting` (annulable), validation propre au sort, mana. Position du
         lanceur (lue côté serveur) et sa vie tenue par vava_health notées ; state bag « incantation » (sort et niveau)
         sur son ped ; le sort est prévenu que l'incantation est acceptée (`started` : frisson de la cible
@@ -11,7 +12,7 @@
         maximum ne serait jamais interrompu). Un coup de la chaîne de dégâts ou une perte native qui retire de la vie
         au lanceur (hook `vava_health:hit` after, `applied > 0`) marque son incantation ; à la fin, une vie de
         vava_health plus basse qu'au début la marque aussi. Sans vava_health, rien ne blesse : rien n'interrompt.
-      - Fin (RPC du sort) : durée écoulée, déplacement (positions serveur) et blessure revérifiés.
+      - Fin (RPC du sort) : durée écoulée, déplacement (positions serveur), blessure et mains vides revérifiés.
         La mana est réservée avant l'effet du sort : rendue en entier s'il refuse, en partie s'il le dit (échec
         partiel) ; temps de recharge et délai global posés ; XP accordée (moitié pour un échec).
       - Interruption (chute, blessure, déplacement, touche) : aucune mana consommée ; incantation sans fin
@@ -210,6 +211,8 @@ function casting.begin(src, name, ...)
     if casts[src] then return false, 'busy' end
     if bridge.IsDowned(src) then return false, 'downed' end
     if world.inVehicle(src) then return false, 'in_vehicle' end
+    local hands = bridge.HandsBusy(src)
+    if hands then return false, hands end
     local blocker = blocked(src)
     if blocker then return false, blocker end
     if casting.globalLeft(sheet.characterId) > 0 then return false, 'global_cooldown' end
@@ -267,7 +270,7 @@ function casting.finish(src, name, castId, ...)
         return false, 'too_soon'
     end
     local position = world.position(src)
-    local code = nil
+    local code
     if not position then
         code = 'no_position'
     elseif geometry.distance(cast.origin, position) > cast.maxMove + cfg.moveMargin then
@@ -276,6 +279,9 @@ function casting.finish(src, name, castId, ...)
         code = 'hurt'
     elseif bridge.IsDowned(src) then
         code = 'downed'
+    else
+        -- arme prise en main (ou bouclier passé au bras) pendant l'incantation
+        code = bridge.HandsBusy(src)
     end
     if code then
         casting.abort(src, code)

@@ -1,8 +1,8 @@
 --[[
     vava_magic/bridge/client.lua
     Rôle : SEUL point de contact, côté client, entre la magie et les autres modules : notifications (vava_hud), état
-           « à terre » (vava_health), droit d'incanter (CanUseMagic), cible verrouillée (GetLockedTarget), lignes et
-           suggestions du chat. Aucune blessure n'est appliquée ici : les sorts blessent par la chaîne de dégâts de
+           « à terre » (vava_health), droit d'incanter (CanUseMagic), arme en main (IsArmed, vava_combat : affichage
+           seulement), cible verrouillée (GetLockedTarget), lignes et suggestions du chat. Aucune blessure n'est appliquée ici : les sorts blessent par la chaîne de dégâts de
            vava_health, côté serveur (sans lui, ils ne blessent personne).
            Pour un autre core, réécrire ces fonctions (et bridge/server.lua).
     Implémentation : modules officiels vAvA ; appels isolés, chaque module est facultatif (sans vava_hud : notification
@@ -85,6 +85,16 @@ function Bridge.CanUseMagic()
     local ped = PlayerPedId()
     if IsEntityDead(ped) or IsPedCuffed(ped) or IsPedBeingStunned(ped, 0) then return false end
     return not Bridge.IsDowned()
+end
+
+--- Arme tenue par le personnage local (`vava_combat:armed()` : arme de l'inventaire, ni outil ni bouclier) ? Pour
+--- montrer tôt « rangez votre arme » : le serveur seul en décide. vava_combat absent ou en erreur : non, sans bruit
+--- (appelé à chaque relevé du mode magie).
+---@return boolean
+function Bridge.IsArmed()
+    if GetResourceState(LINKS.COMBAT) ~= 'started' then return false end
+    local ok, weapon = pcall(invoke, LINKS.COMBAT, 'armed')
+    return ok and type(weapon) == 'table'
 end
 
 --- Cible verrouillée par le système de verrouillage du serveur : numéro serveur du joueur, ou nil (visée libre).

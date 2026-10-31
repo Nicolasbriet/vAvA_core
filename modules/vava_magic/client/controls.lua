@@ -5,7 +5,9 @@
       - Mode magie : sort prêt, mains vides, à pied, debout, droit d'incanter (bridge), aucune fenêtre ouverte. Éveillé
         par la roue, le clic droit ou un sort ; il s'endort après `controls.idleMs` sans viser ni lancer. Éveillé et
         actif, il coupe à chaque image l'attaque, la visée et le changement d'arme de GTA (seule boucle par image du
-        fichier) ; endormi, rien ne tourne. Sortir une arme ou monter en véhicule le coupe, le sort reste choisi.
+        fichier) ; endormi, rien ne tourne. Sortir une arme (de GTA, ou de l'inventaire : `vava_combat:armed()`, lu
+        par le bridge) ou monter en véhicule le coupe, le sort reste choisi ; viser ou lancer arme en main rappelle
+        « rangez votre arme » (au plus une fois par `controls.armedNoticeMs`). Le serveur refuse lui-même.
       - Clic droit maintenu : visée (réticule aux couleurs de l'élément, grisé hors de portée ; allure un peu
         ralentie ; aperçu au sol du point, du disque ou de la ligne visés — un ou deux segments —, du rayon autour de
         soi pour une zone centrée sur le lanceur, ou du cône devant lui). Clic gauche : le sort fait son geste (chaque sort
@@ -67,6 +69,8 @@ local probe = nil
 -- dernier point visé : { point, inRange, hit }
 local aimed = { point = nil, inRange = false, hit = false }
 local reticleKey = nil
+-- dernier rappel « rangez votre arme » (touche pressée arme en main)
+local armedNoticeAt = nil
 
 --- Geste d'un sort au clic gauche : `controller.cast(info)` avec info = { aiming, point, inRange, direction, target }.
 ---@param name string
@@ -137,12 +141,20 @@ local function reticle(spec, inRange)
     end
 end
 
+--- Mains prises : arme de GTA sortie, ou arme de l'inventaire tenue (vava_combat, lu par le bridge). Affichage
+--- seulement : le serveur refuse lui-même une arme ou un bouclier au bras.
+---@param ped integer
+---@return boolean
+local function handsTaken(ped)
+    return GetSelectedPedWeapon(ped) ~= UNARMED or bridge.IsArmed()
+end
+
 ---@param ped integer
 ---@return boolean
 local function conditionsMet(ped)
     if not state.isMage() or not state.selected() or not state.level(state.selected()) then return false end
     if IsEntityDead(ped) or IsPedInAnyVehicle(ped, false) or IsPedRagdoll(ped) or IsPedFalling(ped) then return false end
-    if GetSelectedPedWeapon(ped) ~= UNARMED then return false end
+    if handsTaken(ped) then return false end
     -- la roue a le focus de la page : le mode reste actif derrière elle
     if (IsNuiFocused() and not wheelOpen()) or IsPauseMenuActive() then return false end
     return bridge.CanUseMagic()
@@ -378,7 +390,7 @@ function controls.castNow(name)
         messages.refuse('unknown_spell')
         return
     end
-    if GetSelectedPedWeapon(PlayerPedId()) ~= UNARMED then
+    if handsTaken(PlayerPedId()) then
         messages.refuse('armed')
         return
     end
@@ -416,9 +428,29 @@ local function scroll(step)
     end
 end
 
+--- Mains prises (arme en main) ?
+---@return boolean
+function controls.armed()
+    return handsTaken(PlayerPedId())
+end
+
+--- Touche de magie pressée arme en main, mode éveillé : « rangez votre arme », au plus une fois par `armedNoticeMs`
+--- (la même touche peut servir à l'arme).
+local function noticeArmed()
+    if not awake or not handsTaken(PlayerPedId()) then return end
+    local now = GetGameTimer()
+    if armedNoticeAt and now - armedNoticeAt < controlsCfg.armedNoticeMs then return end
+    armedNoticeAt = now
+    messages.refuse('armed')
+end
+
 local function onCast()
     -- le clic qui choisit un sort dans la roue ne lance rien
-    if not controls.isActive() or wheelOpen() then return end
+    if wheelOpen() then return end
+    if not controls.isActive() then
+        noticeArmed()
+        return
+    end
     local name = state.selected()
     local controller = name and controllers[name]
     if not controller then return end
@@ -431,6 +463,7 @@ local function onAimDown()
     controls.wake()
     aimSpec = controls.aimOf(state.selected())
     aiming = aimSpec ~= nil
+    noticeArmed()
 end
 
 local function onAimUp()

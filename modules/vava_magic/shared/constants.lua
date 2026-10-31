@@ -106,6 +106,7 @@ VavaMagic.LINKS = {
     HEALTH = 'vava_health',
     HEALTH_HIT = 'vava_health:hit',             -- hook after : un coup qui a blessé le lanceur brise son incantation
     HEALTH_MODIFIERS = 'vava_health:modifiers', -- registre des modificateurs de la chaîne (zones, boucliers, résistances)
+    COMBAT = 'vava_combat',                     -- armes et bouclier : mains vides pour incanter (armed, shield)
     HUD = 'vava_hud',
     CHAT = 'vava_chat',
 }
