@@ -16,19 +16,22 @@ function techniques.styleOf(class)
     return class.family .. '_' .. class.category
 end
 
---- Cycle d'un coup parti à `now` : { startedAt, openAt, closeAt, endAt } (ms).
+--- Cycle d'un coup parti à `now` : { startedAt, openAt, closeAt, endAt } (ms). Garde (`blocage`) : ouverte, sans
+--- closeAt ni endAt (posés quand on l'abaisse).
 function techniques.plan(def, now)
     local p = def.phases
     local openAt = now + p.windup
+    if def.type == 'blocage' then return { startedAt = now, openAt = openAt } end
     local closeAt = openAt + p.active
     return { startedAt = now, openAt = openAt, closeAt = closeAt, endAt = closeAt + p.recovery }
 end
 
 --- Technique d'une touche (`slot`) côté client : libre, celle qui ouvre ; pendant la récupération, la première de la
---- chaîne du type de la touche ; sinon `nil, attente` (fin de frappe si la chaîne en a une, sinon fin du coup).
+--- chaîne du type de la touche ; sinon `nil, attente` (fin de frappe si la chaîne en a une, sinon fin du coup) ; garde
+--- ouverte : rien.
 function techniques.pick(styleDef, slot, prev, prevDef, now, all)
     local keys = type(styleDef) == 'table' and styleDef.keys
-    if type(keys) ~= 'table' then return nil, nil end
+    if type(keys) ~= 'table' or (prev and not prev.endAt) then return nil, nil end
     if not prev or now >= prev.endAt then return keys[slot], nil end
     local follow = nil
     if type(prevDef) == 'table' and type(prevDef.chain) == 'table' then

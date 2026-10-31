@@ -1,25 +1,29 @@
 --[[
     vava_combat/server/reactions.lua
     Rôle : ce qui suit un coup jugé par la chaîne de dégâts (docs/plan/specs/T-112.md § 7.6). Issue (règle pure
-           weapons.outcome) envoyée aux SEULS joueurs à `reactions.radius` de la cible dans l'instance de l'attaquant
-           (vava_combat:hit, un message par cible touchée) ; rien pour une esquive ni un coup absorbé (personne ne les
+           weapons.outcome, ou issue imposée par la défense : parry, block, break) envoyée aux SEULS joueurs à
+           `reactions.radius` de la cible dans l'instance de l'attaquant (vava_combat:hit, un message par cible touchée,
+           à la place de `hit`) ; rien pour les issues de `reactions.silent` (esquive, coup absorbé : personne ne les
            montre) ; rien pour un coup refusé ou annulé avant la cible, seulement un avis à l'attaquant (combats coupés,
            lieu de paix, crochet), un par raison et par `notices.intervalMs`.
            Chancellement d'un coup `staggers` : la cible ne frappe plus pendant `stagger.durationMs`, son coup en cours
-           est annulé, puis elle n'en reprend pas avant `timing.staggerImmunityMs` (pas d'enchaînement de contrôles).
+           est annulé, puis elle n'en reprend pas avant `timing.staggerImmunityMs` (pas d'enchaînement de contrôles) ;
+           attaquant paré et garde brisée : chancellement forcé, qui renouvelle l'immunité (T-113).
            Mémoire bornée par le nombre de joueurs, oubliée au déchargement, au départ et à la mise à terre.
     Dépendances : shared/constants.lua, config_client.lua, config.lua, shared/weapons.lua, server/core.lua,
                   bridge/server.lua
 ]]
 
-local type = type
+local type, ipairs = type, ipairs
 
 local bridge = VavaCombat.bridge
 local weapons = VavaCombat.weapons
 local cfg = VavaCombat.config
 local EVENTS = VavaCombat.EVENTS
--- issues que personne ne montre (ni réaction, ni effet, ni son) : rien n'est envoyé (relecture réseau R-3)
-local SILENT = { dodge = true, absorb = true }
+local defense = VavaCombat.defense
+-- issues que personne ne montre (ni réaction, ni effet, ni son) : rien n'est envoyé (relecture réseau R-3 de T-112)
+local SILENT = {}
+for _, outcome in ipairs(cfg.reactions.silent) do SILENT[outcome] = true end
 
 local reactions = {}
 VavaCombat.reactions = reactions
@@ -48,15 +52,17 @@ function reactions.staggeredSince(src, since)
     return entry ~= nil and entry.at >= since
 end
 
---- Fait chanceler un joueur `ms` millisecondes (fendant ; T-113 : attaquant paré) : son coup en cours est annulé. Rend
---- faux s'il est encore immunisé.
+--- Fait chanceler un joueur `ms` millisecondes (fendant ; attaquant paré, garde brisée) : son coup en cours est annulé.
+--- Rend faux s'il est encore immunisé, sauf `force` (interne : parade, garde brisée), qui passe outre et renouvelle
+--- l'immunité.
 ---@param src integer
 ---@param ms integer
 ---@param now integer
+---@param force? boolean
 ---@return boolean
-function reactions.stagger(src, ms, now)
+function reactions.stagger(src, ms, now, force)
     local entry = staggered[src]
-    if entry and now < entry.immuneUntil then return false end
+    if not force and entry and now < entry.immuneUntil then return false end
     staggered[src] = { at = now, untilMs = now + ms, immuneUntil = now + ms + cfg.timing.staggerImmunityMs }
     local swings = VavaCombat.swings
     if swings then swings.cancel(src, 'stagger') end
@@ -88,7 +94,8 @@ function reactions.after(swing, target, result)
     if type(result) ~= 'table' then return nil end
     local src = swing.source
     local now = bridge.Timer()
-    local outcome = weapons.outcome(result)
+    local imposed = defense.takeOutcome(result.id, target)
+    local outcome = result.downed == true and 'down' or imposed or weapons.outcome(result)
     if not outcome then
         local key = weapons.noticeOf(result)
         if key then notice(src, key, now) end

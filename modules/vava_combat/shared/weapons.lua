@@ -27,6 +27,12 @@ local DURABILITY_MAX = 10000
 local weapons = {}
 VavaCombat.weapons = weapons
 
+-- Constantes du seul serveur (hors de shared/constants.lua, livré aux joueurs : relecture réseau R-4 de T-113) : types
+-- qui défendent, types qu'on peut demander (pas `garde`, une posture : not_attack), hook d'un coup défendu.
+VavaCombat.DEFENSE_TYPES = { 'blocage', 'parade', 'esquive' }
+VavaCombat.USABLE_TYPES = { 'legere', 'lourde', 'blocage', 'parade', 'esquive' }
+VavaCombat.HOOKS.DEFENDED = 'vava_combat:defended'  -- after : un coup esquivé, paré, bloqué ou qui brise la garde
+
 -- Petites règles ----------------------------------------------------------------------------------------------------
 
 ---@param value any
@@ -304,7 +310,12 @@ local LEARN_KEYS = { skill = true, level = true }
 local STYLE_KEYS = { label = true, keys = true }
 local TECHNIQUE_PATTERN, TECHNIQUE_MAX = VavaCombat.TECHNIQUE_PATTERN, VavaCombat.TECHNIQUE_MAX
 local TYPES = setOf(VavaCombat.TECHNIQUE_TYPES)
-local ATTACKS = setOf(VavaCombat.ATTACK_TYPES)
+local DEFENSES = setOf(VavaCombat.DEFENSE_TYPES)
+local OUTCOME_SET = setOf(VavaCombat.OUTCOMES)
+-- touches d'un style : attaques et gestes défensifs (T-113)
+local SLOTS = setOf(VavaCombat.USABLE_TYPES)
+-- un type défensif n'a pas certains champs (« … n'a pas de sens pour une parade »)
+local DEFENSE_ARTICLE = { blocage = 'un blocage', parade = 'une parade', esquive = 'une esquive' }
 local LABEL_MAX, GESTURE_MAX, SKILL_MAX = 48, 64, 32
 local CHAIN_MAX = 4
 local PHASES_TOTAL_MAX = 3000
@@ -384,23 +395,41 @@ local function techniqueError(id, def, styles)
     if not TYPES[def.type] then return fail("type inconnu '%s'", tostring(def.type)) end
     local gestureErr = gestureError(def.gesture)
     if gestureErr then return fail('%s', gestureErr) end
+    -- champs selon le type (spec T-113 § 5.1) : un geste défensif n'a ni dégâts ni portée, sa préparation peut être nulle
+    local defensive = DEFENSES[def.type] and DEFENSE_ARTICLE[def.type]
     local p = def.phases
     if type(p) ~= 'table' or extraKey(p, PHASE_KEYS) ~= nil then
         return fail('phases attendues ({ windup, active, recovery })')
     end
-    local windup, active, recovery = integerIn(p.windup, 80, 1500), integerIn(p.active, 40, 500), integerIn(p.recovery, 0, 2000)
-    if not windup then return fail('phases.windup entier de 80 à 1 500 ms attendu') end
+    local minWindup = defensive and 0 or 80
+    local windup, active, recovery = integerIn(p.windup, minWindup, 1500), integerIn(p.active, 40, 500),
+        integerIn(p.recovery, 0, 2000)
+    if not windup then return fail('phases.windup entier de %d à 1 500 ms attendu', minWindup) end
     if not active then return fail('phases.active entier de 40 à 500 ms attendu') end
     if not recovery then return fail('phases.recovery entier de 0 à 2 000 ms attendu') end
     if windup + active + recovery > PHASES_TOTAL_MAX then return fail('phases : 3 000 ms au plus en tout') end
-    local hit = def.hit
-    if type(hit) ~= 'table' or extraKey(hit, HIT_KEYS) ~= nil then return fail('hit attendu ({ range, angle })') end
-    if not between(hit.range, 1.0, 4.0) then return fail('hit.range attendu de 1 à 4 m') end
-    if not between(hit.angle, 10, 180) then return fail('hit.angle attendu de 10 à 180 degrés') end
-    if not between(def.damage, 0.5, 2.0) then return fail('damage attendu de 0,5 à 2') end
     if integerIn(def.stamina, 0, 40) == nil then return fail('stamina entier de 0 à 40 attendu') end
-    if type(def.parryable) ~= 'boolean' then return fail('parryable attendu (booléen)') end
-    if type(def.staggers) ~= 'boolean' then return fail('staggers attendu (booléen)') end
+    local hit = def.hit
+    if defensive then
+        for _, key in ipairs({ 'damage', 'parryable', 'staggers' }) do
+            if def[key] ~= nil then return fail("%s n'a pas de sens pour %s", key, defensive) end
+        end
+        if def.type == 'esquive' then
+            if hit ~= nil then return fail("hit n'a pas de sens pour %s", defensive) end
+        else
+            if type(hit) ~= 'table' then return fail('hit attendu ({ angle } : arc protégé)') end
+            if hit.range ~= nil then return fail("hit.range n'a pas de sens pour %s", defensive) end
+            if extraKey(hit, HIT_KEYS) ~= nil then return fail('hit attendu ({ angle } : arc protégé)') end
+            if not between(hit.angle, 10, 180) then return fail('hit.angle attendu de 10 à 180 degrés') end
+        end
+    else
+        if type(hit) ~= 'table' or extraKey(hit, HIT_KEYS) ~= nil then return fail('hit attendu ({ range, angle })') end
+        if not between(hit.range, 1.0, 4.0) then return fail('hit.range attendu de 1 à 4 m') end
+        if not between(hit.angle, 10, 180) then return fail('hit.angle attendu de 10 à 180 degrés') end
+        if not between(def.damage, 0.5, 2.0) then return fail('damage attendu de 0,5 à 2') end
+        if type(def.parryable) ~= 'boolean' then return fail('parryable attendu (booléen)') end
+        if type(def.staggers) ~= 'boolean' then return fail('staggers attendu (booléen)') end
+    end
     if not pureList(def.chain, CHAIN_MAX) then return fail('chain : liste de %d techniques au plus attendue', CHAIN_MAX) end
     if def.learn ~= nil then
         local learn = def.learn
@@ -452,7 +481,7 @@ function weapons.checkTechniques(cfg)
             return false, format("style '%s' : { label (1 à %d octets), keys } attendu", name, LABEL_MAX)
         end
         for slot, id in pairs(style.keys) do
-            if not ATTACKS[slot] then return false, format("style '%s' : touche inconnue '%s'", name, tostring(slot)) end
+            if not SLOTS[slot] then return false, format("style '%s' : touche inconnue '%s'", name, tostring(slot)) end
             local def = type(id) == 'string' and techniques[id] or nil
             if type(def) ~= 'table' or def.style ~= name or def.type ~= slot then
                 return false, format("style '%s' : la touche %s doit ouvrir une technique %s de ce style", name, slot, slot)
@@ -470,16 +499,126 @@ function weapons.checkTechniques(cfg)
     return true, warnings
 end
 
+--- Liste pure de 1 à 8 étiquettes (identifiants ASCII de 32 octets au plus).
+---@param list any
+---@return boolean
+local function tagList(list)
+    if not pureList(list, 8) or #list < 1 then return false end
+    for _, tag in ipairs(list) do
+        if type(tag) ~= 'string' or #tag > 32 or not find(tag, '^[A-Za-z0-9_]+$') then return false end
+    end
+    return true
+end
+
+--- Liste pure de 1 à 11 types de dégâts (^[a-z0-9_]+$), sans doublon.
+---@param list any
+---@return boolean
+local function kindList(list)
+    if not pureList(list, 11) or #list < 1 then return false end
+    local seen = {}
+    for _, kind in ipairs(list) do
+        if type(kind) ~= 'string' or not find(kind, ID_PATTERN) or seen[kind] then return false end
+        seen[kind] = true
+    end
+    return true
+end
+
+--- Liste de contrôles de GTA : pure, `max` au plus, entiers de 0 à 360, jamais Échap ni P (lus par vava_pause). Rend
+--- nil ou la raison.
+---@param list any
+---@param max integer
+---@param name string
+---@return string|nil err
+local function controlsError(list, max, name)
+    if not pureList(list, max) then return format('%s : liste de %d contrôles au plus attendue', name, max) end
+    for _, control in ipairs(list) do
+        local int = integerIn(control, 0, CONTROL_MAX)
+        if int == nil then return format('%s : numéros de contrôle entiers de 0 à %d attendus', name, CONTROL_MAX) end
+        if RESERVED_CONTROLS[int] then
+            return format('%s : le contrôle %d (Échap ou P, lus par vava_pause) ne doit jamais être coupé', name, int)
+        end
+    end
+    return nil
+end
+
+--- Débit d'un RPC : { capacity entier de 1 à 100, refillPerSecond > 0 }.
+---@param r any
+---@return boolean
+local function rateLimit(r)
+    return type(r) == 'table' and integerIn(r.capacity, 1, 100) ~= nil and between(r.refillPerSecond, 0.01, 100)
+end
+
+local DODGE_SIDES = { avant = true, gauche = true, droite = true }
+
+--- Réglages de la défense (T-113), part du client et part du serveur. Rend nil ou la raison.
+---@param d any
+---@return string|nil err
+local function defenseError(d)
+    if type(d) ~= 'table' then return 'defense : table attendue' end
+    if integerIn(d.guardBrokenMs, 0, 5000) == nil then return 'defense.guardBrokenMs entier de 0 à 5 000 attendu' end
+    if integerIn(d.dodgeCooldownMs, 0, 10000) == nil then return 'defense.dodgeCooldownMs entier de 0 à 10 000 attendu' end
+    local err = gestureError(d.brokenGesture)
+    if err then return 'defense.brokenGesture : ' .. err end
+    err = controlsError(d.guardBlocked, 8, 'defense.guardBlocked')
+    if err then return err end
+    local dodges = d.dodgeGestures
+    if type(dodges) ~= 'table' or extraKey(dodges, DODGE_SIDES) ~= nil then
+        return 'defense.dodgeGestures : { avant, gauche, droite } attendu'
+    end
+    for side in pairs(DODGE_SIDES) do
+        err = gestureError(dodges[side])
+        if err then return 'defense.dodgeGestures.' .. side .. ' : ' .. err end
+    end
+    if type(d.parry) ~= 'table' or integerIn(d.parry.missCooldownMs, 0, 5000) == nil then
+        return 'defense.parry.missCooldownMs entier de 0 à 5 000 attendu'
+    end
+    local dodge = d.dodge
+    if type(dodge) ~= 'table' or not tagList(dodge.tags) or not tagList(dodge.never) or not kindList(dodge.kinds) then
+        return 'defense.dodge : tags et never (1 à 8 étiquettes), kinds (1 à 11 types de dégâts) attendus'
+    end
+    local block = d.block
+    if type(block) ~= 'table' or not tagList(block.tags) or not between(block.shieldArcBonus, 0, 90) then
+        return 'defense.block : tags (1 à 8 étiquettes) et shieldArcBonus (0 à 90) attendus'
+    end
+    if not tagList(d.parryTags) then return 'defense.parryTags : 1 à 8 étiquettes attendues' end
+    local gb = d.guardBreak
+    if type(gb) ~= 'table' or integerIn(gb.points, 1, 20) == nil or integerIn(gb.shieldPoints, 1, 20) == nil
+        or integerIn(gb.heavyWeight, 1, 10) == nil or integerIn(gb.resetMs, 500, 30000) == nil then
+        return 'defense.guardBreak : points et shieldPoints (1 à 20), heavyWeight (1 à 10), resetMs (500 à 30 000) attendus'
+    end
+    if integerIn(d.modifierPriority, 0, 99) == nil then return 'defense.modifierPriority entier de 0 à 99 attendu' end
+    if integerIn(d.memoMax, 8, 512) == nil or integerIn(d.memoMs, 100, 10000) == nil then
+        return 'defense : memoMax (8 à 512) et memoMs (100 à 10 000) entiers attendus'
+    end
+    return nil
+end
+
+--- Étiquettes de la défense (évitées, jamais évitées, bloquées, parées), pour les recouper au démarrage avec celles de
+--- vava_health.
+---@param cfg table
+---@return string[]
+function weapons.defenseTags(cfg)
+    local out = {}
+    local d = cfg.defense
+    for _, list in ipairs({ d.dodge.tags, d.dodge.never, d.block.tags, d.parryTags }) do
+        for _, tag in ipairs(list) do out[#out + 1] = tag end
+    end
+    return out
+end
+
 --- Contrôle des réglages du moteur (cycle, tolérances bornées, géométrie, bond, réactions, dégainer, chancellement,
---- contrôles de GTA coupés en mode combat : jamais Échap ni P).
+--- contrôles de GTA coupés en mode combat : jamais Échap ni P ; défense).
 --- Rend `true`, ou `false, raison` à la première erreur.
 ---@param cfg table
 ---@return boolean ok
 ---@return string|nil err
 function weapons.checkEngine(cfg)
-    local r = type(cfg.rateLimits) == 'table' and cfg.rateLimits.use
-    if type(r) ~= 'table' or integerIn(r.capacity, 1, 100) == nil or not between(r.refillPerSecond, 0.01, 100) then
+    local limits = type(cfg.rateLimits) == 'table' and cfg.rateLimits or {}
+    if not rateLimit(limits.use) then
         return false, 'rateLimits.use : { capacity entier de 1 à 100, refillPerSecond > 0 } attendu'
+    end
+    if not rateLimit(limits.lower) then
+        return false, 'rateLimits.lower : { capacity entier de 1 à 100, refillPerSecond > 0 } attendu'
     end
     local t = cfg.timing
     if type(t) ~= 'table' or integerIn(t.earlyMs, 0, 500) == nil or integerIn(t.chainMax, 0, 10) == nil
@@ -503,6 +642,14 @@ function weapons.checkEngine(cfg)
     if type(cfg.reactions) ~= 'table' or not between(cfg.reactions.radius, 1, 100) then
         return false, 'reactions.radius attendu de 1 à 100 m'
     end
+    local silent = cfg.reactions.silent
+    if not pureList(silent, #VavaCombat.OUTCOMES) then return false, "reactions.silent : liste d'issues attendue" end
+    for _, outcome in ipairs(silent) do
+        if not OUTCOME_SET[outcome] or outcome == 'parry' or outcome == 'break' then
+            return false, format("reactions.silent : '%s' n'est pas une issue qu'on peut taire (jamais parry ni break)",
+                tostring(outcome))
+        end
+    end
     if type(cfg.notices) ~= 'table' or integerIn(cfg.notices.intervalMs, 0, 3600000) == nil then
         return false, 'notices.intervalMs entier attendu'
     end
@@ -522,18 +669,10 @@ function weapons.checkEngine(cfg)
     err = gestureError(st.gesture)
     if err then return false, 'stagger : ' .. err end
     local m = cfg.mode
-    if type(m) ~= 'table' or not pureList(m.blocked, BLOCKED_MAX) then
-        return false, format('mode.blocked : liste de %d contrôles au plus attendue', BLOCKED_MAX)
-    end
-    for _, control in ipairs(m.blocked) do
-        local int = integerIn(control, 0, CONTROL_MAX)
-        if int == nil then
-            return false, format('mode.blocked : numéros de contrôle entiers de 0 à %d attendus', CONTROL_MAX)
-        end
-        if RESERVED_CONTROLS[int] then
-            return false, format('mode.blocked : le contrôle %d (Échap ou P, lus par vava_pause) ne doit jamais être coupé', int)
-        end
-    end
+    err = controlsError(type(m) == 'table' and m.blocked or nil, BLOCKED_MAX, 'mode.blocked')
+    if err then return false, err end
+    err = defenseError(cfg.defense)
+    if err then return false, err end
     return true
 end
 

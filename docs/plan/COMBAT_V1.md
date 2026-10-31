@@ -94,6 +94,11 @@ taille_descendante = {
 `hit.angle` est l'**ouverture totale** de l'arc, centrée sur l'avant ; la tolérance d'angle s'ajoute au **demi-angle**
 (70° et + 10° : 45° de chaque côté) (T-112).
 
+**Champs selon le type** (T-113) : même table, mêmes noms ; pour `blocage`, `parade` et `esquive`, `phases.windup` admet
+0, `damage`, `parryable`, `staggers` et `hit.range` sont refusés, `hit.angle` est l'arc protégé (une esquive n'a pas de
+`hit`), `stamina` le coût d'un coup bloqué, d'une parade ou d'un pas ; `active` est la tenue minimale de la garde, la
+fenêtre de parade ou l'invulnérabilité. `garde` (posture) est contrôlé comme une attaque et refusé à l'usage.
+
 Déroulement d'un coup :
 1. Le joueur appuie : le client **joue tout de suite** l'animation (réactivité) et appelle le RPC
    `vava_combat:use` (id de technique, cible verrouillée éventuelle).
@@ -115,6 +120,24 @@ Enchaînement : une technique listée dans `chain` peut démarrer pendant la `re
   annulé et l'attaquant chancelle. Délai de récupération après une parade ratée, pour empêcher le spam.
 - **Esquive** : pas de côté ou roulade, courte invulnérabilité (≈ 250 ms), coût d'endurance, délai.
 - Toutes ces fenêtres sont tenues **par le serveur** ; le client ne fait que demander.
+
+Décisions de T-113 (`vava_combat` 1.3.0, spec `docs/plan/specs/T-113.md`, recommandations retenues le 31 octobre 2026) :
+- **Touches** : R (appui bref : parade ; maintenu : garde, levée à la fin de la fenêtre de parade), Espace (pas de côté,
+  mode combat actif seulement : le saut y est coupé ; arme en main seulement en v1).
+- **Fenêtres** posées à l'acceptation de la demande (`vava_combat:use`), sans minuterie ; garde abaissée par
+  `vava_combat:lower` (tenue minimale 200 ms, puis 250 ms avant de frapper ; pas de riposte directe depuis la garde).
+  Aucune compensation de latence (parade sans préparation).
+- **Ce qu'on évite, pare, bloque** : pas de côté contre `melee` et `ranged` (projectiles de sorts compris), jamais
+  `area`, `overTime`, `undodgeable`, `native`, `reflected` ; parade et garde : corps à corps seulement, de face (arc 120°,
+  160° bouclier au bras). Le coup non parable (Fendant) se bloque ou s'esquive.
+- **Parade réussie** : coup annulé, attaquant chancelant 0,9 s même pendant son immunité, qu'elle renouvelle ; parade
+  ratée : 600 ms sans parade après la fin de sa fenêtre.
+- **Blocage** : part arrêtée de l'arme tenue ou du bouclier au bras (fiche `block`), montré « bloqué » même partiel, le
+  Fendant bloqué ne fait pas chanceler. **Garde brisée** : chancellement 1,2 s, ni garde ni parade ; en attendant
+  l'endurance (T-114), un compteur provisoire : 4 coups bloqués (6 au bouclier, un lourd compte 2), remis à zéro après
+  3 s sans coup.
+- **Usure** : l'arme qui pare, le bouclier (sinon l'arme) qui bloque ; rien sur une esquive.
+- **Issues** dans `vava_combat:hit` : `parry`, `block`, `break` (à la place de `hit`) ; `dodge` et `absorb` tues.
 
 ## 5. Endurance (T-114)
 

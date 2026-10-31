@@ -5,8 +5,8 @@
            (core.net.playersNear), à terre (vava_health), contrôle dur de la magie (vava_magic:hardControl s'il existe),
            objet tenu en main, piles de la besace, besace d'un joueur, patchMetadata (vava_inventory), déclarations aux
            registres (objets, recettes de l'artisanat et des compétences), versions des modules, coup par la chaîne de
-           dégâts (vava_health:hit) et vocabulaire, champ privé du bouclier accroché, hooks émis et écoutés (prise en
-           main, mise à terre), RPC, droits et journal du Conseil (vava_admin), chat (vava_chat), envoi au seul joueur
+           dégâts (vava_health:hit), vocabulaire et modificateurs (registre vava_health:modifiers, hook hit after),
+           champ privé du bouclier accroché, hooks émis et écoutés (prise en main, mise à terre), RPC, droits et journal du Conseil (vava_admin), chat (vava_chat), envoi au seul joueur
            concerné (core.net.send) ou aux proches d'une instance (core.net.sendNearWith), comptés. Chaque appel à une
            autre ressource est isolé (pcall) : un module absent ou en erreur ne retire que la fonction concernée.
     Dépendances : shared/constants.lua, config.lua, server/core.lua
@@ -16,6 +16,7 @@ local type, pairs, ipairs, pcall, tostring, tonumber = type, pairs, ipairs, pcal
 local mathType = math.type
 local pack, unpack, concat, sort = table.pack, table.unpack, table.concat, table.sort
 local GetResourceState, IsPlayerAceAllowed, GetPlayers = GetResourceState, IsPlayerAceAllowed, GetPlayers
+local AddEventHandler = AddEventHandler
 local GetPlayerPed, DoesEntityExist, GetEntityCoords, GetGameTimer = GetPlayerPed, DoesEntityExist, GetEntityCoords, GetGameTimer
 local GetPlayerRoutingBucket, GetEntityHeading, GetVehiclePedIsIn = GetPlayerRoutingBucket, GetEntityHeading, GetVehiclePedIsIn
 local find, sub = string.find, string.sub
@@ -30,7 +31,8 @@ local CONSOLE = 0
 local INVENTORY, HEALTH, ADMIN, CHAT = 'vava_inventory', 'vava_health', 'vava_admin', 'vava_chat'
 local CRAFTING, SKILLS, MAGIC = 'vava_crafting', 'vava_skills', 'vava_magic'
 -- hooks d'autres modules écoutés par ce module (phase after)
-local HOLD_HOOK, DOWNED_HOOK = 'vava_inventory:hold', 'vava_health:downed'
+local HOLD_HOOK, DOWNED_HOOK, HIT_HOOK = 'vava_inventory:hold', 'vava_health:downed', 'vava_health:hit'
+local MODIFIERS_REGISTRY = 'vava_health:modifiers'
 -- une ligne de console par minute au plus pour un envoi de proximité refusé, une erreur de la magie
 local WARN_MS = 60000
 -- export de la magie absent : plus cherché avant ce délai (vava_magic d'avant T-149)
@@ -179,8 +181,12 @@ function Bridge.SendNear(bucket, coords, radius, event, ...)
     return true
 end
 
--- vava_magic sans export hardControl (avant T-149) : instant du dernier essai
+-- vava_magic sans export hardControl (avant T-149) : instant du dernier essai ; oublié quand vava_magic (re)démarre
+-- (une version qui a l'export est relue aussitôt : relecture sécurité S-4 de T-149)
 local magicMissingAt = nil
+AddEventHandler('onResourceStart', function(resource)
+    if resource == MAGIC then magicMissingAt = nil end
+end)
 
 local function magicHardControl(source)
     return exports[MAGIC]:hardControl(source)
@@ -367,6 +373,34 @@ function Bridge.HealthKinds()
     return vocabulary.kinds
 end
 
+--- Étiquettes connues de vava_health, ou nil s'il ne répond pas.
+---@return string[]|nil
+function Bridge.HealthTags()
+    local called, vocabulary = call(HEALTH, 'vocabulary')
+    if not called or type(vocabulary) ~= 'table' or type(vocabulary.tags) ~= 'table' then return nil end
+    return vocabulary.tags
+end
+
+--- Déclare des modificateurs au registre vava_health:modifiers (`{ key, def }` chacun) : seulement si le registre existe
+--- et que la clé n'y est pas ; chaque ajout isolé, une erreur = une ligne de console. Rend le nombre déclaré.
+---@param list { key: string, def: table }[]
+---@return integer
+function Bridge.DeclareModifiers(list)
+    if not core.registry.exists(MODIFIERS_REGISTRY) then return 0 end
+    local count = 0
+    for _, entry in ipairs(list) do
+        if not core.registry.has(MODIFIERS_REGISTRY, entry.key) then
+            local called, ok, err = pcall(core.registry.add, MODIFIERS_REGISTRY, entry.key, entry.def)
+            if called and ok then
+                count = count + 1
+            else
+                VavaCombat.log.warn("modificateur '%s' refusé : %s", entry.key, tostring(called and err or ok))
+            end
+        end
+    end
+    return count
+end
+
 -- Champ du bouclier accroché ------------------------------------------------------------------------------------------
 
 ---@return boolean ok
@@ -422,6 +456,16 @@ end
 ---@return string|nil err
 function Bridge.OnDowned(handler)
     local id, err = core.hooks.after(DOWNED_HOOK, handler)
+    return id ~= nil and id ~= false, err
+end
+
+--- Prévient `handler(payload)` après chaque coup de la chaîne (hook `vava_health:hit` after : charge du coup et son
+--- résultat). Le hook appartient au core : l'abonnement survit aux redémarrages de vava_health.
+---@param handler fun(payload: table)
+---@return boolean ok
+---@return string|nil err
+function Bridge.OnHitAfter(handler)
+    local id, err = core.hooks.after(HIT_HOOK, handler)
     return id ~= nil and id ~= false, err
 end
 

@@ -469,6 +469,8 @@ describe('vava_magic et le mode combat (T-149)', function()
             local magicState = 'started'
             _G.GetResourceState = function(name) return name == 'vava_magic' and magicState or 'missing' end
             _G.exports = { vava_magic = { hardControl = function(_, src) return hardMagic(src) end } }
+            -- le bridge de vava_combat 1.3.0 écoute onResourceStart (relecture de la magie, suite S-4 de T-149)
+            _G.AddEventHandler = _G.AddEventHandler or function() end
             VavaCombat = {
                 core = {}, config = {}, EVENTS = {}, SHIELD_FIELD = 'vava_combat:shield',
                 log = { warn = function() end, info = function() end },

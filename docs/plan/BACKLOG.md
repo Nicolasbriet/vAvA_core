@@ -1154,19 +1154,34 @@ faire tout le système de combat ») : la porte T-119 reste à passer en jeu.
   commentaires livrés allégés, − 3,5 Ko bruts (R-1) ; `shared/hands.lua` en tête des `client_scripts` (R-2) ; roue
   sans double lecture (R-3). S-1 et S-4 (`vava_combat`) confiés à T-113. Rapport `docs/plan/rapports/T-149.md`.
   **À tester en jeu** :
-  `docs/tests/magie.md` § 20 (16 tests) et 19-4, `docs/tests/combat.md` § 5 (5 tests) et 3-19,
+  `docs/tests/magie.md` § 20 (16 tests) et 19-4, `docs/tests/combat.md` § 6 (5 tests) et 3-19,
   `docs/tests/registre.md` 9 bis-3 bis.
 
 ### T-113 — Blocage, parade, esquive
-- Agent : vava-dev-lua · Dépend de : T-112 · Statut : à faire
+- Agent : vava-dev-lua · Dépend de : T-112 · Statut : à tester en jeu (relu sécurité et réseau, suites appliquées)
+- Fait le 31 octobre 2026 (branche `agents/T-113`, spec `docs/plan/specs/T-113.md`, rapport
+  `docs/plan/rapports/T-113.md`, procédure `docs/tests/combat.md` § 4) : `vava_combat` 1.3.0 — Garde, Parade
+  et Pas de côté en données (format selon le type) ; RPC `use` étendu, nouveau RPC `lower` ; fenêtres tenues par le
+  serveur sans minuterie ; modificateurs `vava_combat:esquive`, `:parade`, `:blocage` ; suites au hook `vava_health:hit`
+  after (attaquant paré qui chancelle, garde brisée par un compteur provisoire, usure différée, issues `parry`, `block`,
+  `break`, hook `vava_combat:defended`) ; touches R et Espace ; suites S-1 et S-4 de la relecture sécurité de T-149
+  (contrôle dur de la magie relu aux relevés et après le crochet `using`, export `hardControl` relu au démarrage de
+  `vava_magic`). Rapport `docs/plan/rapports/T-113.md`. Procédure : `docs/tests/combat.md` § 4 (31 tests).
 
 ### T-114 — Endurance et HUD
 - Agents : vava-dev-lua + vava-dev-nui · Dépend de : T-112 · Statut : à faire
+- Laissé par T-113 (spec § 13) : remplacer `VavaCombat.defense.spend` (`server/defense.lua`) et supprimer
+  `config.defense.guardBreak` et la table `points` (compteur provisoire de garde brisée) ; refus `exhausted` d'une
+  parade ou d'un pas à l'admission (`defense.refusal`) ; dépenser `stamina` des techniques (défensives comprises).
+  Relecture sécurité de T-113 : alterner pas de côté et parades ratées protège ≈ 35 % du temps ; à borner par
+  l'endurance (`defense.spend`).
 
 ### T-115 — Styles, compétences de combat, XP
 - Agent : vava-dev-lua · Dépend de : T-113, T-114 · Statut : à faire
 - Styles par catégorie d'arme, compétences de combat dans `vava_skills`, déblocage par rang, XP sur vraie cible,
   mentorat du maître d'armes ; techniques de hache, masse, dague, bâton et bouclier en config.
+- Relecture sécurité de T-113 : `learn` des techniques (défensives comprises : la Parade demande le niveau 10) vérifié
+  par le crochet `vava_combat:using` ; XP de défense par le hook `vava_combat:defended`.
 
 ### T-155 — Chiffres des coups (dégâts affichés)
 - Agents : vava-architecte → vava-dev-lua · Dépend de : T-112 (après T-113, même module) · Statut : à faire
@@ -1281,6 +1296,19 @@ faire tout le système de combat ») : la porte T-119 reste à passer en jeu.
   `lunge.maxSpeed` : 5,7 m au Fendant aujourd'hui, cible ≈ 4 à 5 m/s, sans annuler un coup porté en courant ;
   sécurité S-3) ; essayer un rayon de réactions de 20 m au lieu de 30 (`reactions.radius`, effet vu ou non à 20 m,
   test combat 3-27 ; réseau R-4).
+- Laissé par T-113 (spec § 13) : fenêtre de parade et sa préparation, invulnérabilité du pas de côté, délais (parade
+  ratée 0,6 s, 1,5 s entre deux pas), arcs protégés, parts bloquées des fiches (épée 0,40 peut-être trop faible face à
+  4 coups), seuils du compteur de garde ; réussite des parades à 30, 80, 150 ms de ping (test combat 4-23). Relecture
+  sécurité de T-113 : observer ce que le serveur ne voit pas (garde tenue en sprint, gestes sans animation, pas de côté
+  sans déplacement) ; mesurer le coût serveur des modificateurs (test combat 4-29, relecture réseau R-2).
+
+### T-159 — Filtre par étiquettes à l'inscription d'un modificateur de `vava_health`
+- Agent : vava-dev-lua (cette tâche autorise à toucher `vava_health`) · Dépend de : T-113 · Statut : à faire
+- Trouvée pendant T-113 (relecture réseau R-2) : chaque coup du jeu appelle tous les modificateurs déclarés pour son
+  type, chacun par un passage entre ressources avec copie du contexte (≈ 0,04 à 0,12 ms par coup de mêlée avec les trois
+  de `vava_combat`). Permettre à une entrée du registre `vava_health:modifiers` de déclarer des étiquettes voulues
+  (`tags`) et interdites (`never`), filtrées par la chaîne avant l'appel : ne pas appeler un modificateur pour les zones
+  ni les effets qui durent. Puis `vava_combat` les déclare (esquive : `melee`, `ranged` ; jamais `area`, `overTime`…).
 
 ## Phase 5 — Interactions RP
 

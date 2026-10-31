@@ -5,8 +5,9 @@ commune** de `vava_health` 1.4.0 (T-110 ; coup déjà lancé et `vocabulary().pv
 d'essai `vava_example_combat` 1.0.0 et `vava_needs` 1.2.1. Section 2 : les **armes** de `vava_combat` 1.0.0 (T-111),
 essayées avec `/frapper_arme` de `vava_example_combat` 1.1.0. Section 3 : les **techniques** de `vava_combat` 1.2.0
 (T-112 : coups à la souris jugés par le serveur, enchaînement, chancellement, mode combat, dégainer et rengainer).
-Section 5 : la **magie et le mode combat** (`vava_magic` 2.12.0, T-149). Les sections suivantes viendront avec la
-défense et l'endurance (T-113, T-114).
+Section 4 : la **défense** de `vava_combat` 1.3.0 (T-113 : parade, garde, pas de côté, garde brisée) ;
+section 6 : la **magie et le mode combat** (`vava_magic` 2.12.0, T-149). L'endurance (T-114) viendra
+ensuite.
 Comptez 1 h par section, presque tout à deux ; les tests à deux joueurs sont marqués **(2 joueurs)**. Un test se cite
 « combat 1-8 ».
 
@@ -37,6 +38,10 @@ Comptez 1 h par section, presque tout à deux ; les tests à deux joueurs sont m
    (`/catalogue arme`) ; A est mage (`/magie` du Conseil) et connaît la Boule de feu ; `vava_example_combat` 1.1.0 pour
    `/esquive`, `/bouclier`, `/vie`. Un troisième joueur C pour les tests 13 et 27. Touches par défaut : clic gauche
    (attaque légère), clic droit (attaque lourde), clic molette (verrouiller ; maintenu : relâcher).
+8. **Défense** (section 4) : la préparation 0.7, `vava_combat` 1.3.0. A et B ont chacun une Épée courte (`/catalogue
+   arme`), B aussi un Bouclier rond (« utiliser » pour l'accrocher) ; `vava_example_combat` pour `/vie`, `/chaine`. Un
+   troisième joueur C pour les tests 24 et 25. Noter le ping de chacun (F8 : `netgraph`). Touches : **R** (appui bref :
+   parer ; maintenu : se garder), **Espace** (pas de côté, mode combat actif seulement).
 
 ## 1. Chaîne de dégâts
 
@@ -94,7 +99,7 @@ serveur `strike`. Préparation : 0.6.
 | 3 | A `/catalogue arme`. | Les six armes nouvelles ont leur image ; fiche : catégorie arme, aucune solidité (pile du catalogue). |
 | 4 | **(2 joueurs)** A prend l'Épée longue dans les Mains. | Machette en main droite chez A ; B, à 10 m, la voit dans la seconde. |
 | 5 | A clic gauche, `R`, `Q`, `F` près de B, mains vides puis Dague en main ; puis `/arme pistolet` (exemple). | Aucun coup de poing ni de lame natif, aucune animation d'attaque ; le pistolet disparaît en moins d'une seconde, aucun tir ; F8 : une ligne « arme de GTA retirée ». Aucune erreur. |
-| 6 | A (non mage) maintient `Tab`. | Rien, ou une roue des armes vide sans effet : noter ce qui s'affiche (§ 4). |
+| 6 | A (non mage) maintient `Tab`. | Rien, ou une roue des armes vide sans effet : noter ce qui s'affiche (§ 5). |
 | 7 | A à la forge, marteau en main. | Recettes : Dague (15), Hache d'armes (25), Masse d'armes (25), Épée courte (30, si apprise) ; l'Épée longue (50) absente tant qu'elle n'est pas apprise. |
 | 8 | A forge une Hache d'armes. | Pièce signée « Façonné par A », poinçon, qualité ≤ 60, solidité 140 / 140. |
 | 9 | Console `vava_fondateur <A> forge 90 epee_longue`, puis A forge une Épée longue ; **(2 joueurs)** B à 8 m, forge 50. | L'Épée longue apparaît dans la forge, se forge (160 / 160) ; B reçoit une leçon (1 / 3). |
@@ -163,7 +168,48 @@ avant). Préparation : 0.7.
 | 31 | Console : `debug.logSamples = true` (config.lua), redémarrage, coups à portée limite. | Une ligne par relevé (`coup <n> <technique> relevé <k> : <joueur> d=… a=… portée … → issue`) : base des réglages de T-119. |
 | 32 | A clic droit (Fendant), range l'épée aussitôt, la reprend et clique de nouveau, plusieurs fois. | Aucun coup avant la fin du cycle du Fendant coupé (1,55 s après son départ) ni avant 0,8 s de dégainer : couper son propre coup ne fait pas frapper plus vite. |
 
-## 4. Ce que je ne peux pas avoir vérifié hors jeu
+## 4. Défense
+
+Une épée à la main, on lève la garde en maintenant **R** : les coups de face sont amortis (bien mieux au bouclier),
+jusqu'à ce que la garde cède. Un appui bref sur **R** au bon moment **pare** : la lame est détournée, l'attaquant
+chancelle. **Espace** fait un pas de côté. Le **serveur** tient chaque fenêtre ; le client ne fait que demander.
+Préparation : 0.8.
+
+| # | Faire | Attendu |
+|---|---|---|
+| 1 | Démarrer le serveur ; `/chaine`. | Console : `vava_combat` v1.3.0 prêt, « 7 techniques, 1 style(s), 3 modificateur(s) de la défense » ; `/chaine` : `vava_combat:esquive`, `vava_combat:parade`, `vava_combat:blocage` à leurs étapes (esquive, parade, blocage). |
+| 2 | A ouvre le Codex, chapitre Combat. | Deux touches de plus : « parer (appui bref) ou se garder (maintenir) » (R), « pas de côté (mode combat actif) » (Espace). |
+| 3 | A, épée en main, maintient R 5 s, seul, puis relâche. | Geste de parade puis garde tenue (on marche, on ne court pas). `/vava_reseau joueur <A>` : un `use` à l'appui, un `use` à la garde, un `lower` au relâchement, **rien** pendant la tenue. |
+| 4 | **(2 joueurs)** B `/vie 100`, garde levée face à A ; A Taille. | B perd 7,2 (pas 12) ; étincelles, pas de sang, B ne tressaille pas ; l'épée de B s'use le plus souvent (`/armes voir <B>`, 4 fois sur 5 à qualité 50). |
+| 5 | **(2 joueurs)** Idem, B bouclier accroché (au bras) et épée en main. | B perd 3,6 ; la solidité du **bouclier** baisse (`/armes voir <B>`), pas celle de l'épée. |
+| 6 | **(2 joueurs)** A frappe B de dos, garde levée. | 12 perdus, sang ; la garde reste levée. |
+| 7 | **(2 joueurs)** A enchaîne 4 coups légers sur la garde de B (épée), en moins de 3 s entre deux. | Au 4e : B chancelle, « Votre garde est brisée. » ; R maintenue ne relève rien pendant 1,2 s (il faut relâcher et ré-appuyer). |
+| 8 | **(2 joueurs)** Même chose, B au bouclier. | La garde tient 5 coups, cède au 6e. |
+| 9 | **(2 joueurs)** A deux Fendants sur la garde de B. | Le premier : bloqué (8,6 arrêtés à l'épée), B ne chancelle pas ; le second brise la garde. |
+| 10 | **(2 joueurs)** B appuie brièvement R quand la lame de A arrive (Taille). | Aucun dégât ; A chancelle (geste, secousse) et ne frappe plus 0,9 s ; étincelles chez les deux. |
+| 11 | **(2 joueurs)** B pare trop tôt, puis ré-appuie aussitôt R. | La seconde parade ne part pas avant 0,6 s après la fin de la première (rien n'est dit) ; la Taille porte. |
+| 12 | **(2 joueurs)** B pare un Fendant. | Le Fendant porte et B chancelle : il faut le bloquer ou l'esquiver. |
+| 13 | **(2 joueurs)** B martèle R (10 / s) pendant les coups de A. | Pas plus d'une fenêtre utile par cycle ; A n'est pas paré à chaque coup ; F8 propre. |
+| 14 | **(2 joueurs)** B Espace au moment de la Taille de A. | Aucun dégât, aucun effet ; l'arme de A ne s'use pas. |
+| 15 | **(2 joueurs)** B martèle Espace, puis clique et maintient R aussitôt après un pas. | Un pas de côté toutes les 1,5 s au plus ; `/vava_reseau joueur <B>` : aucun `use` entre deux pas ; l'attaque et la garde partent sans attendre la fin du délai du pas. |
+| 16 | **(2 joueurs)** Mage : A lance une Boule de feu sur B qui fait un pas de côté au bon moment ; puis un Mur de flammes. | La Boule de feu est évitée ; le mur (zone, effet qui dure) blesse quand même. |
+| 17 | A, épée en main, mode combat endormi (10 s sans rien), Espace. | Saut normal de GTA, pas de roulade. |
+| 18 | A garde levée, clic gauche. | Aucun coup ; après le relâchement (garde tenue plus de 0,2 s), la Taille part 0,25 s plus tard. |
+| 19 | A garde levée, ouvre l'inventaire (`I`). | Garde abaissée (`lower` dans `/vava_reseau joueur <A>`). |
+| 20 | A garde levée, range l'épée. | Garde tombée, geste de rengainer. |
+| 21 | **(2 joueurs)** B garde levée ; A Fendant de dos. | B chancelle, garde tombée ; il doit ré-appuyer R. |
+| 22 | **(2 joueurs)** B pare, puis riposte (clic gauche) aussitôt que A chancelle. | La Taille de B part au plus tôt 0,39 s après la parade et touche A ; un Fendant de B dans les 3 s ne refait pas chanceler A (immunité). |
+| 23 | **(2 joueurs)** Ping : B à 150 ms ; parades sur des Tailles de A. | Noter la réussite à 30, 80, 150 ms (porte T-119 : fenêtre, préparation). |
+| 24 | **(3 joueurs)** B pare ; A et C frappent ensemble, C de dos. | Le coup de face est paré ; celui de C, de dos, porte. |
+| 25 | **(3 joueurs)** A frappe B en garde ; C à 50 m. | `/vava_reseau joueur <C>` : rien de `vava_combat`. Chez B : un `vava_combat:hit` (`block`) par coup, pas de `hit` en plus. |
+| 26 | `chain.pvp = false` (vava_health), redémarrage ; A frappe la garde de B. | Une notification « Les combats entre habitants sont suspendus… » ; rien de bloqué, rien d'usé. |
+| 27 | **(2 joueurs)** B se déconnecte garde levée ; A frappe l'endroit. | Aucune erreur console ; `restart vava_combat` ensuite propre. |
+| 28 | `restart vava_health` pendant que B tient sa garde ; A frappe. | Console : « vava_health de retour : 3 modificateur(s) de la défense redéclaré(s) » ; la garde de B bloque de nouveau aussitôt. |
+| 29 | `resmon 1` chez B : au repos armé, garde tenue 10 s, mêlée. Serveur : `profiler record 300` pendant une mêlée à six (dont un en garde), puis `profiler view`. | Client : au repos ≤ 0,01 ms ; garde ≈ inchangé ; mêlée ≤ 0,15 ms. Serveur : `vava_combat` (modificateurs) ≈ 1 ms par seconde de mêlée au plus ; noter la valeur (relecture réseau R-2). |
+| 30 | `restart vava_combat` garde levée. | Garde perdue sans erreur ; R la relève au retour (arme à reprendre en main si l'inventaire l'a gardée à part). |
+| 31 | **(2 joueurs)** Mage : B gelé ou renversé par un sort de A pendant qu'il tient sa garde ; A frappe. | Le coup porte entièrement (aucune défense sous un contrôle dur de la magie) ; un coup de B demandé alors est refusé. |
+
+## 5. Ce que je ne peux pas avoir vérifié hors jeu
 
 - L'annulation de `weaponDamageEvent` (champ `hitGlobalId` ou liste `hitGlobalIds` selon la version de FXServer : les
   deux sont lus) : B ne voit ni perte ni réaction ; ce que voit A (sang, tressaillement prédits) est à noter.
@@ -194,8 +240,14 @@ avant). Préparation : 0.7.
 - Cap lu par le serveur pendant un virage (3-9) : le serveur juge sur le cap répliqué ; un virage très rapide au départ
   du coup peut arriver après l'ouverture de la frappe (noter si un coup tourné vers B manque).
 - Secousse de caméra (`SMALL_EXPLOSION_SHAKE`, `effects.shakeName`) : sensible sans gêner (3-5, 3-11).
+- Défense (T-113) : noms des gestes provisoires de garde et de parade (`anim@melee@machete@streamed_core@`,
+  `plyr_block_idle`, `plyr_block_react`) et de roulade (`move_strafe@roll`, `combatroll_fwd_p1_00`, `_-90`, `_90`,
+  `combatroll_bwd_p1_180`) présents (`/anim`) ; la garde en boucle (flag 49, haut du corps) vue des autres joueurs et
+  synchronisée ; R et Espace sur AZERTY ; une touche liée (R, Espace) répond-elle encore quand recharger (45) et le saut
+  (22) sont coupés en mode combat (4-3, 4-14) ; le sprint coupé garde levée ; parade au dernier moment à 150 ms de ping
+  (4-23) ; la direction du pas de côté lue à l'appui (`GetControlNormal` 30 et 31).
 
-## 5. La magie et le mode combat (`vava_magic` 2.12.0, T-149)
+## 6. La magie et le mode combat (`vava_magic` 2.12.0, T-149)
 
 La magie se tait quand une arme du royaume est en main (mêmes boutons que le combat), dit « Vous rengainez… » pendant
 le rengainement, et refuse de frapper à qui un sort a gelé, renversé ou fait chanceler (export `hardControl` de la

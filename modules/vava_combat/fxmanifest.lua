@@ -11,8 +11,8 @@ lua54 'yes'
 use_experimental_fxv2_oal 'yes'
 
 name 'vava_combat'
-description 'Combat vAvA : armes de corps à corps, techniques, usure, bouclier accroché'
-version '1.2.0'
+description 'Combat vAvA : armes de corps à corps, techniques, défense, usure, bouclier accroché'
+version '1.3.0'
 
 dependency 'vAvA_core'
 dependency 'vava_inventory'
@@ -36,6 +36,7 @@ server_scripts {
     -- logique pure servie au seul serveur
     'shared/geometry.lua',
     'shared/admission.lua',
+    'shared/defense.lua',
     'shared/weapons.lua',
     'shared/guard.lua',
     'server/core.lua',
@@ -47,6 +48,7 @@ server_scripts {
     'server/strike.lua',
     'server/hands.lua',
     'server/reactions.lua',
+    'server/defense.lua',
     'server/swings.lua',
     'server/api.lua',
     'server/commands.lua',
@@ -62,6 +64,7 @@ client_scripts {
     'client/keys.lua',
     'client/targeting.lua',
     'client/attack.lua',
+    'client/defense.lua',
     'client/mode.lua',
     'client/reactions.lua',
     'client/main.lua',
