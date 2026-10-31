@@ -8,15 +8,18 @@
            sorts de feu (Boule de feu, Mur de flammes, Nova ardente), d'eau (Trait de glace, Vague, Brume) et de terre (Projectile de
            roche, Secousse, Rempart), combinaisons entre éléments (vapeur, boue, gel…), Lueur (lumière) et Murmure
            (messages), grimoire (avec ses combinaisons découvertes) et registre des murmures (objets),
-           commandes du Conseil ; mains vides pour incanter (ni arme ni bouclier au bras). Le serveur décide de tout ; les
-           effets visibles passent par des state bags posés par le serveur et des évènements ciblés, reçus des seuls
-           joueurs proches.
+           commandes du Conseil ; mains vides pour incanter (ni arme ni bouclier au bras) ; mode combat respecté (ni
+           rappel ni verrou de la magie arme du royaume en main, mot du rengainement), contrôles durs lus par
+           vava_combat (export hardControl), effets sans dégâts qui épargnent un membre invulnérable du Conseil. Le
+           serveur décide de tout ; les effets visibles passent par des state bags posés par le serveur et des
+           évènements ciblés, reçus des seuls joueurs proches.
     Dépendances : vAvA_core ≥ 0.5.0 ; vava_ui ≥ 1.0.0 (polices, grain, papier et coins de la page, par
                   nui://vava_ui/…) ; facultatives : vava_inventory ≥ 1.3.0 (grimoire et registre), vava_hud
                   (notifications), vava_health ≥ 1.3.0 (chaîne de dégâts : sans lui, aucun sort ne blesse ; à terre ;
                   1.4.0 : coups déjà lancés, interrupteur pvp), vava_combat ≥ 1.0.0 (mains vides pour incanter : arme
-                  tenue ou bouclier au bras refusés ; sans lui, aucune restriction),
-                  vava_admin (droits et journal du Conseil), vava_chat
+                  tenue ou bouclier au bras refusés ; sans lui, aucune restriction ; 1.2.0 : rengainement), vava_admin
+                  (droits et journal du Conseil ; ≥ 1.11.0 : membre invulnérable épargné des effets sans dégâts),
+                  vava_chat
 ]]
 
 fx_version 'cerulean'
@@ -26,7 +29,7 @@ use_experimental_fxv2_oal 'yes'
 
 name 'vava_magic'
 description 'Magie vAvA : mana, progression, roue des sorts, états, sorts de feu, eau et terre, Murmure, Lueur, grimoire et registre'
-version '2.11.0'
+version '2.12.0'
 
 dependency 'vAvA_core'
 dependency 'vava_ui'
@@ -102,6 +105,7 @@ server_scripts {
 }
 
 client_scripts {
+    'shared/hands.lua',        -- mains prises et mode combat : logique pure lue par le seul client
     'client/core.lua',
     'bridge/client.lua',
     'client/nui.lua',

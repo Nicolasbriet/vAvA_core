@@ -3,8 +3,9 @@
     Rôle : réglages des armes que lit le seul serveur (servi au seul serveur, jamais téléchargé par les joueurs) :
            fiches des armes (part du serveur), délais du serveur du bouclier, catégories, familles et types de dégâts,
            objets déclarés à l'inventaire, recettes déclarées à l'artisanat, qualité et usure, filet de la brique
-           `strike`, débit du RPC des techniques, cycle d'un coup, tolérances, géométrie, réactions, commandes du
-           Conseil, journal, textes. Complète la table ouverte par config_client.lua (classes des armes, bouclier
+           `strike`, débits des RPC (techniques, garde), défense (part du serveur : délais, étiquettes, garde brisée
+           provisoire, modificateurs), cycle d'un coup, tolérances, géométrie, réactions, commandes du Conseil, journal,
+           textes. Complète la table ouverte par config_client.lua (classes des armes, bouclier
            accroché, placements, contrôles natifs, techniques, styles, mode combat, touches) sans en réécrire une clé
            (T-132).
     Les modèles sont des remplaçants vanilla (-- PLACEHOLDER, docs/plan/ASSETS_PLACEHOLDERS.md) : le jour où les armes
@@ -51,6 +52,32 @@ config.shield.guardWarnMs = 10000
 -- Débit du RPC des techniques : 4 d'avance, puis 3 par seconde (une technique dure au moins 340 ms jusqu'à sa fin de
 -- frappe : 3 / s couvre un enchaînement rapide).
 config.rateLimits = { use = { capacity = 4, refillPerSecond = 3 } }
+-- Débit du RPC qui abaisse la garde : 4 d'avance, puis 3 par seconde (garde levée puis abaissée : 300 ms au moins).
+config.rateLimits.lower = { capacity = 4, refillPerSecond = 3 }
+
+-- Défense (T-113), part du serveur (ajoutée à la part du client de config_client.lua). Fenêtres tenues par le serveur.
+-- Parade ratée (aucun coup paré dans sa fenêtre) : aucune autre parade avant la fin de sa fenêtre + ce délai (0 à 5 000).
+config.defense.parry = { missCooldownMs = 600 }
+-- Pas de côté (délai entre deux départs : config_client.lua, connu du client) : coups évités s'ils portent au moins une
+-- étiquette de `tags` et aucune de `never` (zones, effets qui durent, pertes natives, renvois : jamais) ; types de
+-- dégâts pour lesquels le modificateur est appelé (ni la faim, ni la soif, ni les pertes du monde).
+config.defense.dodge = {
+    tags = { 'melee', 'ranged' },
+    never = { 'undodgeable', 'area', 'overTime', 'native', 'reflected' },
+    kinds = { 'tranchant', 'contondant', 'percant', 'feu', 'eau', 'terre', 'lumiere', 'esprit', 'pur' },
+}
+-- Garde : coups bloqués s'ils portent une de ces étiquettes (les sorts : hors v1) ; degrés ajoutés à l'arc protégé
+-- quand le bouclier est au bras (0 à 90 ; 120 → 160).
+config.defense.block = { tags = { 'melee' }, shieldArcBonus = 40 }
+-- Parade : coups `parryable` portant une de ces étiquettes.
+config.defense.parryTags = { 'melee' }
+-- Garde brisée PROVISOIRE, remplacée par l'endurance de T-114 : points par coup bloqué (un coup lourd en vaut
+-- `heavyWeight`), garde brisée à `points` (au bouclier : `shieldPoints`), compte remis à zéro après `resetMs` sans coup
+-- bloqué (lever et baisser la garde ne le remet pas à zéro).
+config.defense.guardBreak = { points = 4, shieldPoints = 6, heavyWeight = 2, resetMs = 3000 }
+config.defense.modifierPriority = 50   -- priorité des trois modificateurs dans leur étape (0 à 99)
+config.defense.memoMax = 64            -- décisions en attente de leur suite (une par coup en cours de chaîne ; 8 à 512)
+config.defense.memoMs = 1000           -- décision plus vieille oubliée (coup tombé en erreur avant sa suite)
 
 -- Cycle d'un coup tenu par le serveur.
 config.timing = {
@@ -75,6 +102,9 @@ config.lunge = { maxSpeed = 8.0, margin = 0.5 }
 
 -- Réactions : rayon des joueurs prévenus d'un coup qui porte (même instance que l'attaquant).
 config.reactions = { radius = 30.0 }
+-- Issues jamais envoyées aux proches (personne ne les montre en 1.3.0 ; T-155 pourra changer cette liste ; jamais
+-- `parry` ni `break` : l'attaquant paré et le défenseur brisé doivent l'apprendre).
+config.reactions.silent = { 'dodge', 'absorb' }
 
 -- Avis à l'attaquant d'un coup retenu (combats coupés, lieu de paix, refus d'un crochet) : un par raison et par délai.
 config.notices = { intervalMs = 10000 }
@@ -212,4 +242,6 @@ config.messages = {
     positions = { arm = 'au bras', back = 'dans le dos' },
     -- libellé, avant, après, n°
     wornByCouncil = '%s : solidité %d → %d (joueur %d).',
+    -- libellés des modificateurs de la chaîne de dégâts (export modifiers() de vava_health, /chaine ; 48 octets au plus)
+    modifiers = { esquive = 'Pas de côté', parade = 'Parade', blocage = 'Garde' },
 }

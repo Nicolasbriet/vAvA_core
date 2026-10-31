@@ -19,7 +19,9 @@ describe('vava_combat client : main, dégainer, mode combat', function()
         'IsEntityDead', 'IsPedInAnyVehicle', 'IsPedRagdoll', 'IsPedFalling', 'IsPedCuffed', 'IsNuiFocused',
         'IsPauseMenuActive', 'DisableControlAction', 'PlayerId', 'GetActivePlayers', 'GetPlayerPed', 'GetPlayerServerId',
         'GetEntityCoords', 'GetEntityHeading', 'SetEntityHeading', 'GetGameplayCamRot', 'GetGameplayCamCoord',
-        'HasEntityClearLosToEntity', 'DrawMarker', 'exports' }
+        'HasEntityClearLosToEntity', 'DrawMarker', 'exports', 'GetControlNormal', 'RegisterNetEvent',
+        'GetPlayerFromServerId', 'HasNamedPtfxAssetLoaded', 'UseParticleFxAsset', 'StartParticleFxNonLoopedOnPedBone',
+        'ShakeGameplayCam', 'PlaySoundFrontend', 'RequestNamedPtfxAsset' }
 
     local function fire(name, payload)
         for _, fn in ipairs(hooks[name] or {}) do fn(payload) end
@@ -82,6 +84,7 @@ describe('vava_combat client : main, dégainer, mode combat', function()
             'modules/vava_combat/client/keys.lua',
             'modules/vava_combat/client/targeting.lua',
             'modules/vava_combat/client/attack.lua',
+            'modules/vava_combat/client/defense.lua',
             'modules/vava_combat/client/mode.lua',
         })
         bridge, hands, mode, attack = VavaCombat.bridge, VavaCombat.hands, VavaCombat.mode, VavaCombat.attack
@@ -125,6 +128,7 @@ describe('vava_combat client : main, dégainer, mode combat', function()
         _G.GetGameplayCamRot = function() return { x = 0, y = 0, z = 0 } end
         _G.GetGameplayCamCoord = function() return { x = 0, y = -3, z = 1 } end
         _G.exports = setmetatable({}, { __call = function() end })
+        _G.GetControlNormal = function() return 0 end
     end)
 
     after_each(function()
@@ -358,6 +362,188 @@ describe('vava_combat client : main, dégainer, mode combat', function()
             for _, control in ipairs(cfg.mode.blocked) do
                 assert.is_true(control ~= 199 and control ~= 200 and control ~= 177 and control ~= 202, tostring(control))
             end
+        end)
+    end)
+
+    -- T-113 : touche R (parade, garde), Espace (pas de côté) ; prédiction sans décision (docs/plan/specs/T-113.md § 8)
+    describe('défense', function()
+        local stance
+
+        local function names()
+            local out = {}
+            for i, call in ipairs(rpcCalls) do out[i] = call.name == 'vava_combat:use' and call.args[1] or call.name end
+            return out
+        end
+
+        local function armed()
+            load(nil)
+            fire('core:character:loaded', character('epee_courte'))
+            runThreads()
+            stance = VavaCombat.stance
+            played = {}
+        end
+
+        local function down() commands['+vava_combat_garde']() end
+        local function up() commands['-vava_combat_garde']() end
+
+        it('R appuyée : une parade, son geste aussitôt ; relâchée avant 200 ms : ni garde ni lower', function()
+            armed()
+            down()
+            assert.equal(cfg.techniques.parade_epee.gesture.clip, played[1].clip)
+            runThreads()
+            assert.same({ 'parade_epee' }, names())
+            assert.same({ 'parade_epee', 0 }, rpcCalls[1].args)
+            clock = clock + 150
+            up()
+            stance.tick(clock + 100)
+            runThreads()
+            assert.same({ 'parade_epee' }, names())
+        end)
+
+        it('R maintenue : la garde à la fin de la fenêtre de parade, puis lower au relâchement', function()
+            armed()
+            down()
+            runThreads()
+            stance.tick(clock + 199)
+            assert.equal(1, #rpcCalls)
+            clock = clock + 200
+            stance.tick(clock)
+            runThreads()
+            assert.same({ 'parade_epee', 'garde_epee' }, names())
+            assert.is_true(stance.guarding())
+            -- garde levée : rien de plus à chaque image, l'attaque ne part pas, le mode ne s'endort pas
+            for _ = 1, 10 do stance.tick(clock + 50) end
+            press('legere')
+            runThreads()
+            assert.equal(2, #rpcCalls)
+            assert.is_true(attack.busy(clock + 60000))
+            clock = clock + 1000
+            up()
+            runThreads()
+            assert.same({ 'parade_epee', 'garde_epee', 'vava_combat:lower' }, names())
+            assert.is_false(stance.guarding())
+            -- cycle local fermé comme au serveur : récupération de 250 ms
+            assert.is_true(attack.busy(clock + 249))
+            assert.is_false(attack.busy(clock + 250))
+        end)
+
+        it('garde refusée : geste coupé, plus aucun essai tant que R n\'est pas de nouveau appuyée', function()
+            armed()
+            down()
+            runThreads()
+            clock = clock + 200
+            rpcAnswer = { true, false, 'guard_broken', 900 }
+            stance.tick(clock)
+            runThreads()
+            assert.is_false(stance.guarding())
+            rpcAnswer = { true, true }
+            clock = clock + 2000
+            stance.tick(clock)
+            runThreads()
+            assert.same({ 'parade_epee', 'garde_epee' }, names())
+            up()
+            runThreads()
+            assert.same({ 'parade_epee', 'garde_epee' }, names())
+        end)
+
+        it('Espace, mode endormi : rien ; mode actif : un pas de côté, geste selon la direction tenue', function()
+            -- direction tenue : à gauche (axe 30 à −1) ; lue au chargement des natives, une fois à l'appui
+            _G.GetControlNormal = function(_, control) return control == 30 and -1 or 0 end
+            armed()
+            commands['vava_combat_esquive']()
+            assert.is_false(mode.isActive())
+            assert.equal(0, #threads)
+            press('legere')
+            runThreads()
+            clock = clock + 2000
+            commands['vava_combat_esquive']()
+            runThreads()
+            assert.same({ 'taille_descendante', 'pas_de_cote' }, names())
+            assert.equal(cfg.defense.dodgeGestures.gauche.clip, played[#played].clip)
+        end)
+
+        -- relecture réseau R-1 : le délai du pas de côté est connu du client, rien n'est envoyé avant
+        it('Espace martelé : un pas de côté, rien à 700 ms, le suivant à 1 500 ms', function()
+            armed()
+            press('legere')
+            runThreads()
+            clock = clock + 2000
+            commands['vava_combat_esquive']()
+            runThreads()
+            clock = clock + 700
+            commands['vava_combat_esquive']()
+            runThreads()
+            assert.same({ 'taille_descendante', 'pas_de_cote' }, names())
+            clock = clock + 800
+            commands['vava_combat_esquive']()
+            runThreads()
+            assert.same({ 'taille_descendante', 'pas_de_cote', 'pas_de_cote' }, names())
+        end)
+
+        it('attente d\'un dodge_cooldown ou d\'un parry_cooldown : ni la garde ni les attaques ne sont retenues', function()
+            armed()
+            press('legere')
+            runThreads()
+            clock = clock + 2000
+            rpcAnswer = { true, false, 'dodge_cooldown', 800 }
+            commands['vava_combat_esquive']()
+            runThreads()
+            rpcAnswer = { true, true }
+            press('legere')
+            runThreads()
+            assert.same({ 'taille_descendante', 'pas_de_cote', 'taille_descendante' }, names())
+            -- le pas refusé n'a pas été compté par le serveur : Espace repart après l'attente donnée
+            clock = clock + 2000
+            rpcAnswer = { true, false, 'parry_cooldown', 600 }
+            down()
+            runThreads()
+            up()
+            rpcAnswer = { true, true }
+            down()
+            runThreads()
+            clock = clock + 200
+            stance.tick(clock)
+            runThreads()
+            assert.same({ 'taille_descendante', 'pas_de_cote', 'taille_descendante', 'parade_epee', 'garde_epee' }, names())
+            commands['vava_combat_esquive']()
+            runThreads()
+            assert.equal(5, #rpcCalls)
+        end)
+
+        it('garde brisée reçue du serveur : garde tombée, chancellement, aucun lower', function()
+            local net = {}
+            _G.RegisterNetEvent = function(name, fn) net[name] = fn end
+            _G.GetPlayerFromServerId = function() return 0 end
+            _G.HasNamedPtfxAssetLoaded = function() return true end
+            _G.UseParticleFxAsset = function() end
+            _G.StartParticleFxNonLoopedOnPedBone = function() end
+            _G.ShakeGameplayCam = function() end
+            _G.PlaySoundFrontend = function() end
+            _G.RequestNamedPtfxAsset = function() end
+            armed()
+            helper.load('modules/vava_combat/client/reactions.lua')
+            down()
+            runThreads()
+            clock = clock + 200
+            stance.tick(clock)
+            runThreads()
+            assert.is_true(stance.guarding())
+            net['vava_combat:hit'](2, 1, 'break')
+            assert.is_false(stance.guarding())
+            assert.same({ cfg.refusals.guard_broken }, feed)
+            up()
+            runThreads()
+            assert.same({ 'parade_epee', 'garde_epee' }, names())
+            -- chancelant : R ne relève rien
+            down()
+            runThreads()
+            assert.equal(2, #rpcCalls)
+            -- l'attaquant paré chancelle aussi
+            clock = clock + 5000
+            net['vava_combat:hit'](1, 2, 'parry')
+            press('legere')
+            runThreads()
+            assert.equal(2, #rpcCalls)
         end)
     end)
 end)

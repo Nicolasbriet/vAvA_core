@@ -106,8 +106,9 @@ function catalog.technique(id)
     return type(def) == 'table' and def or nil
 end
 
---- Copie d'une technique pour un export : { id, label, style, type, gesture, phases, hit, damage, stamina, parryable,
---- staggers, chain, learn? }, ou nil.
+--- Copie d'une technique pour un export : { id, label, style, type, gesture, phases, hit?, damage?, stamina,
+--- parryable?, staggers?, chain, learn? } (champs selon le type : un geste défensif n'a ni damage, ni parryable, ni
+--- staggers ; une esquive n'a pas de hit), ou nil.
 ---@param id any
 ---@return table|nil
 function catalog.techniqueView(id)
@@ -349,6 +350,19 @@ function catalog.setup()
         for _, kind in ipairs(kinds) do known[kind] = true end
         for _, kind in ipairs(cfg.kinds) do
             if not known[kind] then VavaCombat.log.warn("type de dégâts '%s' inconnu de vava_health", kind) end
+        end
+        -- types du pas de côté : un type inconnu ferait refuser le modificateur par le registre
+        for _, kind in ipairs(cfg.defense.dodge.kinds) do
+            if not known[kind] then VavaCombat.log.warn("défense : type de dégâts '%s' inconnu de vava_health", kind) end
+        end
+    end
+    -- étiquettes de la défense (évitées, bloquées, parées) recoupées comme les types
+    local tags = bridge.HealthTags()
+    if tags then
+        local known = {}
+        for _, tag in ipairs(tags) do known[tag] = true end
+        for _, tag in ipairs(weapons.defenseTags(cfg)) do
+            if not known[tag] then VavaCombat.log.warn("défense : étiquette '%s' inconnue de vava_health", tag) end
         end
     end
     ok, err = bridge.DefineShieldField()

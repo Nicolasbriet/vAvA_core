@@ -7,9 +7,10 @@
 
 VavaCombat = {}
 
--- RPC client → serveur (core.rpc : schéma borné, limite de débit) : le seul du module.
+-- RPC client → serveur (core.rpc : schéma borné, limite de débit).
 VavaCombat.RPC = {
-    USE = 'vava_combat:use',            -- (technique, cible verrouillée ou 0) : un coup, jugé par le serveur
+    USE = 'vava_combat:use',            -- (technique, cible verrouillée ou 0) : un geste, jugé par le serveur
+    LOWER = 'vava_combat:lower',        -- () : abaisser la garde
 }
 
 -- Évènements serveur → client, toujours ciblés (core.net, comptés) : jamais à tous.
@@ -35,15 +36,15 @@ VavaCombat.HOOKS = {
 VavaCombat.CATEGORIES = { 'une_main', 'deux_mains', 'dague', 'baton', 'bouclier' }
 VavaCombat.SHIELD_CATEGORY = 'bouclier'
 
--- Techniques (docs/plan/COMBAT_V1.md § 3) : types admis par le format, et ceux qui frappent (T-112). Les types de
--- défense (T-113) passent le contrôle et sont refusés à l'usage (not_attack).
+-- Techniques (docs/plan/COMBAT_V1.md § 3) : types admis par le format, et ceux qui frappent (types défensifs : shared/
+-- weapons.lua, serveur seul).
 VavaCombat.TECHNIQUE_TYPES = { 'legere', 'lourde', 'parade', 'blocage', 'esquive', 'garde' }
 VavaCombat.ATTACK_TYPES = { 'legere', 'lourde' }
 -- identifiant de technique : inclus dans REF_PATTERN (paquet de vava_health), 32 octets au plus
 VavaCombat.TECHNIQUE_PATTERN = '^[a-z0-9_]+$'
 VavaCombat.TECHNIQUE_MAX = 32
--- Issue d'un coup qui porte, envoyée aux proches (vava_combat:hit).
-VavaCombat.OUTCOMES = { 'hit', 'stagger', 'down', 'block', 'parry', 'dodge', 'absorb' }
+-- Issue d'un coup qui porte, envoyée aux proches (vava_combat:hit) ; `break` : garde brisée.
+VavaCombat.OUTCOMES = { 'hit', 'stagger', 'down', 'block', 'parry', 'dodge', 'absorb', 'break' }
 
 -- Parties du corps admises dans un coup (liste de vava_health).
 VavaCombat.PARTS = { 'tete', 'torse', 'bras', 'jambes' }

@@ -2,10 +2,12 @@
     vava_combat/server/main.lua
     Rôle : déclaration du module auprès du core : commande du Conseil et touches au registre, catalogue des armes et des
            techniques contrôlé (refus avec la raison), objets, recettes et champ déclarés, garde du statebag du bouclier
-           branchée et peds vidés, RPC des techniques `vava_combat:use` (schéma borné, limite de débit), hooks (retour de
-           l'inventaire, de l'artisanat et des compétences ; apparition, déchargement et départ ; pile du bouclier qui
-           quitte la besace ; prise en main : dégainer et rengainer ; mise à terre : coup annulé), boucliers et armes en
-           main repris pour les personnages déjà en jeu. Aucune table SQL. À l'arrêt de la ressource, les statebags de
+           branchée et peds vidés, RPC des techniques `vava_combat:use` et de la garde `vava_combat:lower` (schémas
+           bornés, limites de débit), modificateurs de la défense déclarés (et redéclarés au retour de vava_health),
+           hooks (retour de l'inventaire, de l'artisanat, des compétences et de la santé ; apparition, déchargement et
+           départ ; pile du bouclier qui quitte la besace ; prise en main : dégainer et rengainer ; mise à terre : coup
+           annulé ; coup de la chaîne : suites d'une défense), boucliers et armes en main repris pour les personnages
+           déjà en jeu. Aucune table SQL. À l'arrêt de la ressource, les statebags de
            bouclier sont vidés et les coups en cours annulés.
     Dépendances : tous les fichiers server/ du module
 ]]
@@ -24,6 +26,7 @@ local wear = VavaCombat.wear
 local hands = VavaCombat.hands
 local reactions = VavaCombat.reactions
 local swings = VavaCombat.swings
+local defense = VavaCombat.defense
 local commands = VavaCombat.commands
 local cfg = VavaCombat.config
 local RPC = VavaCombat.RPC
@@ -41,6 +44,11 @@ local function onModuleReady(payload)
         catalog.onCraftingReady()
     elseif payload.name == bridge.SKILLS then
         catalog.onSkillsReady()
+    elseif payload.name == bridge.HEALTH and VavaCombat.ready then
+        -- le registre des modificateurs disparaît avec vava_health : redéclarés à son retour ; ses numéros de coup
+        -- repartent de 1 : décisions et issues en attente oubliées
+        defense.resetMemo()
+        core.log.info('vava_health de retour : %d modificateur(s) de la défense redéclaré(s)', defense.declare())
     end
 end
 
@@ -59,6 +67,7 @@ local function forget(payload)
     swings.forget(src)
     hands.forget(src)
     reactions.forget(src)
+    defense.forget(src)
 end
 
 --- Mise à terre : coup en cours annulé, chancellement oublié.
@@ -67,6 +76,7 @@ local function onDowned(payload)
     if type(payload) ~= 'table' or type(payload.source) ~= 'number' then return end
     swings.onDowned(payload.source)
     reactions.onDowned(payload.source)
+    defense.onDowned(payload.source)
 end
 
 local function setup()
@@ -98,6 +108,8 @@ local function setup()
     if not hooked then return false, 'vava_inventory:hold : ' .. tostring(holdErr) end
     local downedHooked, downedErr = bridge.OnDowned(onDowned)
     if not downedHooked then return false, 'vava_health:downed : ' .. tostring(downedErr) end
+    local hitHooked, hitErr = bridge.OnHitAfter(defense.onHitAfter)
+    if not hitHooked then return false, 'vava_health:hit : ' .. tostring(hitErr) end
 
     local registered, rpcErr = bridge.RegisterRpc(RPC.USE, {
         args = {
@@ -107,6 +119,8 @@ local function setup()
         rateLimit = cfg.rateLimits.use,
     }, swings.use)
     if not registered then return false, RPC.USE .. ' : ' .. tostring(rpcErr) end
+    registered, rpcErr = bridge.RegisterRpc(RPC.LOWER, { args = {}, rateLimit = cfg.rateLimits.lower }, defense.lowerRpc)
+    if not registered then return false, RPC.LOWER .. ' : ' .. tostring(rpcErr) end
 
     local started, startErr = pedState.start()
     if not started then return false, 'statebag du bouclier : ' .. tostring(startErr) end
@@ -114,9 +128,10 @@ local function setup()
     VavaCombat.ready = true
     shields.restoreAll()
     for _, src in ipairs(bridge.ActivePlayers()) do hands.learn(src) end
+    local modifiers = defense.declare()
     local techniqueCount, styleCount = catalog.counts()
-    core.log.info('prêt : %d objets et %d recettes déclarés, %d armes au catalogue, %d techniques, %d style(s)', items,
-        recipes, #catalog.list(), techniqueCount, styleCount)
+    core.log.info('prêt : %d objets et %d recettes déclarés, %d armes au catalogue, %d techniques, %d style(s), '
+        .. '%d modificateur(s) de la défense', items, recipes, #catalog.list(), techniqueCount, styleCount, modifiers)
     return true
 end
 
@@ -137,6 +152,7 @@ AddEventHandler('onResourceStop', function(resource)
     swings.stop()
     hands.stop()
     reactions.stop()
+    defense.stop()
     pedState.stop()
     shields.stop()
 end)

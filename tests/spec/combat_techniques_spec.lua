@@ -125,7 +125,9 @@ describe('vava_combat techniques', function()
         it('refuse un style dont une touche n\'ouvre pas une technique de son type et de ce style', function()
             refused(function(c) c.styles.epee_une_main.keys.legere = 'fendant' end, 'touche legere')
             refused(function(c) c.styles.epee_une_main.keys.lourde = 'moulinet' end, 'touche lourde')
-            refused(function(c) c.styles.epee_une_main.keys.parade = 'revers' end, 'touche inconnue')
+            refused(function(c) c.styles.epee_une_main.keys.garde = 'garde_epee' end, 'touche inconnue')
+            refused(function(c) c.styles.epee_une_main.keys.parade = 'revers' end, 'touche parade')
+            refused(function(c) c.styles.epee_une_main.keys.parade = 'garde_epee' end, 'touche parade')
             refused(function(c) c.styles.epee_une_main.label = nil end, 'label')
         end)
 
@@ -338,6 +340,197 @@ describe('vava_combat techniques', function()
             assert.equal('abc', weapons.reasonText('abcé', 4))
             assert.equal('abcé', weapons.reasonText('abcé', 5))
             assert.equal(120, #weapons.reasonText(string.rep('x', 300), 120))
+        end)
+    end)
+end)
+
+-- Défense (T-113) : format selon le type, touches de défense, garde ouverte (plan, pick, admit), réglages de la
+-- défense. Règles documentées : docs/plan/specs/T-113.md § 4, § 5.1, § 7.1 et § 11.1.
+describe('vava_combat techniques défensives', function()
+    local techniques, weapons, cfg
+
+    local function copy(value)
+        if type(value) ~= 'table' then return value end
+        local out = {}
+        for key, item in pairs(value) do out[key] = copy(item) end
+        return out
+    end
+
+    local function variant(change)
+        local c = copy(cfg)
+        change(c)
+        return c
+    end
+
+    local function refused(change, pattern)
+        local ok, err = weapons.checkTechniques(variant(change))
+        assert.is_false(ok)
+        if pattern then assert.matches(pattern, err) end
+    end
+
+    local function refusedEngine(change, pattern)
+        local ok, err = weapons.checkEngine(variant(change))
+        assert.is_false(ok)
+        if pattern then assert.matches(pattern, err) end
+    end
+
+    before_each(function()
+        helper.reset()
+        VavaCombat = nil
+        helper.loadAll({
+            'modules/vava_combat/shared/constants.lua',
+            'modules/vava_combat/config.lua',
+            'modules/vava_combat/shared/weapons.lua',
+            'modules/vava_combat/shared/techniques.lua',
+            'modules/vava_combat/shared/admission.lua',
+        })
+        techniques, weapons, cfg = VavaCombat.techniques, VavaCombat.weapons, VavaCombat.config
+    end)
+
+    after_each(function() VavaCombat = nil end)
+
+    describe('format selon le type', function()
+        it('config livrée : sept techniques, un style à cinq touches, sans avertissement', function()
+            local count = 0
+            for _ in pairs(cfg.techniques) do count = count + 1 end
+            assert.equal(7, count)
+            local slots = {}
+            for slot in pairs(cfg.styles.epee_une_main.keys) do slots[#slots + 1] = slot end
+            table.sort(slots)
+            assert.same({ 'blocage', 'esquive', 'legere', 'lourde', 'parade' }, slots)
+            assert.same({ true, {} }, { weapons.checkTechniques(cfg) })
+        end)
+
+        it('un geste défensif n\'a ni dégâts, ni parryable, ni staggers, ni portée ; l\'esquive n\'a pas de hit', function()
+            refused(function(c) c.techniques.garde_epee.damage = 1.0 end, "damage n'a pas de sens pour un blocage")
+            refused(function(c) c.techniques.garde_epee.parryable = true end, 'parryable')
+            refused(function(c) c.techniques.parade_epee.staggers = false end, 'staggers n\'a pas de sens pour une parade')
+            refused(function(c) c.techniques.garde_epee.hit.range = 2 end, 'hit.range')
+            refused(function(c) c.techniques.pas_de_cote.hit = { angle = 90 } end, "hit n'a pas de sens pour une esquive")
+            refused(function(c) c.techniques.parade_epee.hit = nil end, 'arc protégé')
+            refused(function(c) c.techniques.parade_epee.hit.angle = 181 end, 'hit.angle')
+            refused(function(c) c.techniques.garde_epee.stamina = 41 end, 'stamina')
+        end)
+
+        it('préparation : dès 0 pour un geste défensif, 80 au moins pour une attaque', function()
+            refused(function(c) c.techniques.parade_epee.phases.windup = -1 end, 'windup entier de 0')
+            refused(function(c) c.techniques.revers.phases.windup = 0 end, 'windup entier de 80')
+            assert.is_true((weapons.checkTechniques(variant(function(c) c.techniques.garde_epee.phases.windup = 0 end))))
+            refused(function(c) c.techniques.pas_de_cote.phases.active = 501 end, 'active')
+        end)
+
+        it('touches : une technique du type de la touche ; touche absente permise ; `garde` inconnue', function()
+            refused(function(c) c.styles.epee_une_main.keys.parade = 'garde_epee' end, 'touche parade')
+            refused(function(c) c.styles.epee_une_main.keys.esquive = 'parade_epee' end, 'touche esquive')
+            refused(function(c) c.styles.epee_une_main.keys.garde = 'garde_epee' end, 'touche inconnue')
+            local ok, warnings = weapons.checkTechniques(variant(function(c) c.styles.epee_une_main.keys.esquive = nil end))
+            assert.is_true(ok)
+            assert.matches("'pas_de_cote'", warnings[1])
+        end)
+
+        it('type garde (posture) : contrôlé comme une attaque', function()
+            refused(function(c)
+                c.techniques.posture = copy(c.techniques.garde_epee)
+                c.techniques.posture.type = 'garde'
+            end, 'hit.range')
+        end)
+    end)
+
+    describe('réglages de la défense', function()
+        it('config livrée acceptée', function()
+            assert.is_true(weapons.checkEngine(cfg))
+        end)
+
+        it('bornes : délais, étiquettes, compteur, priorité, mémoire, gestes, contrôles, débit de lower', function()
+            refusedEngine(function(c) c.rateLimits.lower = nil end, 'rateLimits.lower')
+            refusedEngine(function(c) c.defense.parry.missCooldownMs = 5001 end, 'missCooldownMs')
+            refusedEngine(function(c) c.defense.dodgeCooldownMs = -1 end, 'dodgeCooldownMs')
+            refusedEngine(function(c) c.defense.dodge.kinds = {} end, 'defense.dodge')
+            refusedEngine(function(c) c.defense.dodge.kinds = { 'feu', 'feu' } end, 'defense.dodge')
+            refusedEngine(function(c) c.defense.dodge.kinds = { 'Feu' } end, 'defense.dodge')
+            refusedEngine(function(c) c.defense.dodge.tags = {} end, 'defense.dodge')
+            refusedEngine(function(c) c.defense.dodge.never = { 'melee', 'x y' } end, 'defense.dodge')
+            refusedEngine(function(c) c.defense.block.shieldArcBonus = 91 end, 'defense.block')
+            refusedEngine(function(c) c.defense.parryTags = { melee = true } end, 'parryTags')
+            refusedEngine(function(c) c.defense.guardBreak.points = 0 end, 'guardBreak')
+            refusedEngine(function(c) c.defense.guardBreak.resetMs = 100 end, 'guardBreak')
+            refusedEngine(function(c) c.defense.modifierPriority = 100 end, 'modifierPriority')
+            refusedEngine(function(c) c.defense.memoMax = 4 end, 'memoMax')
+            refusedEngine(function(c) c.defense.guardBrokenMs = 6000 end, 'guardBrokenMs')
+            refusedEngine(function(c) c.defense.brokenGesture.clip = '' end, 'brokenGesture')
+            refusedEngine(function(c) c.defense.dodgeGestures.arriere = c.defense.dodgeGestures.avant end, 'dodgeGestures')
+            refusedEngine(function(c) c.defense.dodgeGestures.gauche = nil end, 'dodgeGestures')
+            refusedEngine(function(c) c.defense.guardBlocked = { 21, 200 } end, 'vava_pause')
+            refusedEngine(function(c) c.defense.guardBlocked = { 1, 2, 3, 4, 5, 6, 7, 8, 9 } end, 'guardBlocked')
+        end)
+
+        it('reactions.silent : issues connues, jamais parry ni break', function()
+            refusedEngine(function(c) c.reactions.silent = { 'dodge', 'parry' } end, 'parry')
+            refusedEngine(function(c) c.reactions.silent = { 'break' } end, 'break')
+            refusedEngine(function(c) c.reactions.silent = { 'esquive' } end, 'silent')
+            assert.is_true(weapons.checkEngine(variant(function(c) c.reactions.silent = {} end)))
+        end)
+
+        it('mode.blocked livré : saut (22) et recharger (45) coupés en mode actif', function()
+            local set = {}
+            for _, control in ipairs(cfg.mode.blocked) do set[control] = true end
+            assert.is_true(set[22] and set[45])
+        end)
+
+        it('étiquettes de la défense, pour le recoupement avec vava_health', function()
+            assert.same({ 'melee', 'ranged', 'undodgeable', 'area', 'overTime', 'native', 'reflected', 'melee', 'melee' },
+                weapons.defenseTags(cfg))
+        end)
+    end)
+
+    describe('garde ouverte', function()
+        local rules
+        before_each(function() rules = { earlyMs = 60, chainMax = 3, styles = cfg.styles } end)
+
+        local function swing(id, now, prev)
+            local def = cfg.techniques[id]
+            local ok, chainCount = techniques.admit(prev, def, id, now, rules)
+            assert.is_true(ok, id .. ' à ' .. now .. ' : ' .. tostring(chainCount))
+            local plan = techniques.plan(def, now)
+            plan.def, plan.chainCount = def, chainCount
+            return plan
+        end
+
+        local function admit(id, now, prev)
+            return { techniques.admit(prev, cfg.techniques[id], id, now, rules) }
+        end
+
+        it('plan d\'une garde : ni closeAt ni endAt ; d\'une parade : fenêtre dès la demande', function()
+            assert.same({ startedAt = 1000, openAt = 1100 }, techniques.plan(cfg.techniques.garde_epee, 1000))
+            assert.same({ startedAt = 0, openAt = 0, closeAt = 200, endAt = 450 }, techniques.plan(cfg.techniques.parade_epee, 0))
+        end)
+
+        it('admit : garde ouverte → guarding, sans attente, pour une attaque comme pour une parade', function()
+            local garde = swing('garde_epee', 0)
+            assert.same({ false, 'guarding' }, admit('taille_descendante', 60000, garde))
+            assert.same({ false, 'guarding' }, admit('parade_epee', 50, garde))
+        end)
+
+        it('admit : parade puis garde (chaîne) à 140, pas à 139 ; parade puis Taille à 390, pas à 389', function()
+            local parade = swing('parade_epee', 0)
+            assert.same({ false, 'busy', 1 }, admit('garde_epee', 139, parade))
+            assert.same({ true, 1 }, admit('garde_epee', 140, parade))
+            assert.same({ false, 'busy', 1 }, admit('taille_descendante', 389, parade))
+            assert.same({ true, 0 }, admit('taille_descendante', 390, parade))
+        end)
+
+        it('pick : garde ouverte → rien ; pendant la récupération d\'une parade, blocage → garde ; libre, parade', function()
+            local style = cfg.styles.epee_une_main
+            local garde = techniques.plan(cfg.techniques.garde_epee, 0)
+            assert.same({ nil, nil }, { techniques.pick(style, 'legere', garde, cfg.techniques.garde_epee, 5000,
+                cfg.techniques) })
+            local parade = techniques.plan(cfg.techniques.parade_epee, 0)
+            assert.equal('garde_epee', (techniques.pick(style, 'blocage', parade, cfg.techniques.parade_epee, 200,
+                cfg.techniques)))
+            assert.same({ nil, 100 }, { techniques.pick(style, 'blocage', parade, cfg.techniques.parade_epee, 100,
+                cfg.techniques) })
+            assert.equal('parade_epee', (techniques.pick(style, 'parade', nil, nil, 0, cfg.techniques)))
+            assert.equal('pas_de_cote', (techniques.pick(style, 'esquive', nil, nil, 0, cfg.techniques)))
         end)
     end)
 end)

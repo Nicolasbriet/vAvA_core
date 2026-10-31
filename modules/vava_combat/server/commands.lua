@@ -2,8 +2,8 @@
     vava_combat/server/commands.lua
     Rôle : commandes du Conseil `/armes liste | voir <n°> | user <n°> <points>` (droit `metiers` de vava_admin, sinon
            ACE `combat.admin`, revérifié à chaque appel ; console admise) et leur déclaration au registre
-           `core:commands` (chapitre « Combat »), avec les trois touches du combat (attaque légère, attaque lourde,
-           verrou ; config_client.lua → keys). `voir` et `user` sont inscrits au journal du Registre ; `user` ne fait
+           `core:commands` (chapitre « Combat »), avec les touches du combat (attaques, verrou, garde,
+           pas de côté ; config_client.lua → keys). `voir` et `user` sont inscrits au journal du Registre ; `user` ne fait
            que BAISSER la solidité (la garde de l'artisanat refuserait toute remontée), seuils prévenus comme une usure.
            Réponses au seul lanceur (vava_chat, sinon notification ; console : print).
     Dépendances : shared/constants.lua, config.lua, shared/weapons.lua, shared/shield.lua, server/core.lua,
@@ -40,7 +40,7 @@ local function entries()
                     args = { { name = 'joueur', type = 'player' }, { name = 'points', type = 'integer', min = 1, max = admin.maxWear } } },
             } },
     }
-    -- touches du combat (attaques, verrou) : réglables dans Paramètres > Raccourcis > FiveM
+    -- touches du combat (attaques, verrou, garde, pas de côté) : réglables dans Paramètres > Raccourcis > FiveM
     for _, key in pairs(cfg.keys) do
         list[key.command] = { kind = 'key', scope = 'player', key = key.key, keyDevice = key.device,
             keyDisplay = key.display, hold = key.hold, label = key.label }

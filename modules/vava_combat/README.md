@@ -11,8 +11,14 @@ Version 1.2.0 (T-112) : les **techniques**. Une épée à la main, on frappe à 
 s'enchaînent, le fendant fait chanceler. Le coup se voit partir aussitôt, mais il ne porte que si l'adversaire est
 vraiment à portée et en face au moment où la lame passe, ce que le **serveur** juge seul. Dégainer et rengainer prennent un
 vrai temps : un mage ne passe pas de l'épée au sort d'un claquement de doigts (le mage a besoin d'un garde, le guerrier
-d'un mage). Spécifications : `docs/plan/specs/T-111.md` (armes, 1.0.0) et `docs/plan/specs/T-112.md` (techniques) ;
-référence : `docs/plan/COMBAT_V1.md`. Les armes, les objets, les recettes, l'usure, le bouclier accroché et la brique
+d'un mage). Spécifications : `docs/plan/specs/T-111.md` (armes, 1.0.0), `docs/plan/specs/T-112.md` (techniques) et
+`docs/plan/specs/T-113.md` (défense) ; référence : `docs/plan/COMBAT_V1.md`.
+
+Version 1.3.0 (T-113) : la **défense**. On lève la garde en maintenant **R** : les coups de face sont amortis, bien
+mieux derrière un bouclier, jusqu'à ce que la garde cède sous les coups. Un appui bref sur **R** au bon moment **pare** :
+la lame adverse est détournée et l'attaquant chancelle, ouvert à la riposte. **Espace** fait un pas de côté qui laisse
+passer le coup. L'arme qui pare et le bouclier qui bloque s'usent et retournent chez l'artisan ; le serveur seul tient
+les fenêtres, le client ne fait que demander. Les armes, les objets, les recettes, l'usure, le bouclier accroché et la brique
 serveur `strike` sont ceux de 1.0.0 (T-111) ; `/frapper_arme` de `examples/vava_example_combat` (développement) essaie
 toujours un coup sans technique.
 
@@ -22,8 +28,9 @@ Ordre de démarrage : après `vAvA_core` (≥ 0.10.0 : `core.net`, registre `cor
 isolés dans le bridge : `vava_crafting` ≥ 1.5.0 et `vava_skills` ≥ 1.0.0 (sans eux, ou plus anciens : armes sans recette,
 une ligne de console), `vava_hud` (notifications ; sans lui, celles du jeu), `vava_admin` (droit `metiers`, journal du
 Registre ; sans lui, ACE `combat.admin`), `vava_chat` (réponses de `/armes` ; sans lui, une notification au seul membre),
-`vava_magic` (export `hardControl` s'il existe : un joueur gelé ou renversé ne frappe pas ; tâche T-149).
-**Un RPC (`vava_combat:use`), aucune NUI, aucune table SQL.** **À ne pas arrêter sur un serveur ouvert** : pendant
+`vava_magic` (export `hardControl`, `vava_magic` ≥ 2.12.0, T-149 : un joueur gelé, renversé ou chancelant par un sort
+ne frappe pas, refus `controlled` ; plus ancien, arrêté ou en erreur : aucun refus de ce côté).
+**Deux RPC (`vava_combat:use`, `vava_combat:lower`), aucune NUI, aucune table SQL.** **À ne pas arrêter sur un serveur ouvert** : pendant
 l'arrêt, les armes sont « gardées à part » par l'inventaire, les recettes quittent les stations et les gestes natifs de
 GTA reviennent (sans dégâts entre joueurs : `vava_health` les annule).
 
@@ -59,17 +66,20 @@ variable) : une technique n'a rien de secret. Les joueurs téléchargent les con
 | Combat natif coupé (client) | drapeau 122 (corps à corps désactivé), changement d'arme bloqué, armes GTA retirées ; contrôle à 1 Hz ; rendu à GTA à l'arrêt | `natives` |
 | Conseil | `/armes`, droit `metiers` (sans `vava_admin` : ACE `combat.admin`), `user` jusqu'à 1 000 points | `admin`, `journal` |
 | Techniques (client) | quatre techniques du style `epee_une_main` (ci-dessous), format de `COMBAT_V1.md` § 3 contrôlé au démarrage (bornes des curseurs de la maquette Combat : préparation 80 à 1 500 ms, frappe 40 à 500, récupération 0 à 2 000, 3 000 en tout ; portée 1 à 4 m ; angle 10 à 180° d'ouverture **totale** ; dégâts × 0,5 à × 2 ; endurance 0 à 40 ; chaîne de 4 techniques du même style au plus ; toute autre clé refuse le module ; une technique que rien n'atteint : avertissement) ; gestes `-- PLACEHOLDER` | `techniques` |
-| Styles (client) | style = `<famille>_<catégorie>` de l'arme tenue ; technique qui ouvre chaque touche (`legere`, `lourde`) | `styles` |
+| Techniques défensives (client) | Garde (`blocage`), Parade (`parade`), Pas de côté (`esquive`) du style `epee_une_main` (ci-dessous) ; format selon le type : préparation dès 0 ms, ni `damage`, ni `parryable`, ni `staggers`, ni `hit.range` (refusés au démarrage) ; `hit.angle` = arc protégé ; une esquive n'a pas de `hit` ; `stamina` = coût d'un coup bloqué, d'une parade, d'un pas (lu par T-114) | `techniques` |
+| Styles (client) | style = `<famille>_<catégorie>` de l'arme tenue ; technique qui ouvre chaque touche (`legere`, `lourde`, `blocage`, `parade`, `esquive`, chacune d'une technique de son type ; une touche absente ne fait rien) | `styles` |
+| Défense (client) | garde brisée 1,2 s (chancellement, ni garde ni parade) et son geste ; 1,5 s entre deux pas de côté (connu du client : rien n'est demandé avant ; tenu par le serveur) ; sprint coupé garde levée (8 contrôles au plus, jamais Échap ni P) ; gestes du pas de côté selon la direction tenue (avant, gauche, droite ; sinon celui de la technique) | `defense.guardBrokenMs`, `dodgeCooldownMs`, `brokenGesture`, `guardBlocked`, `dodgeGestures` (-- PLACEHOLDER) |
+| Défense (serveur) | parade ratée → aucune autre parade avant fin de fenêtre + 0,6 s ; pas de côté : évite `melee` et `ranged` (projectiles de sorts compris), jamais `undodgeable`, `area`, `overTime`, `native`, `reflected`, et n'est appelé ni pour la faim (`privation`) ni pour les pertes du monde (`kinds`) ; garde et parade : `melee` seulement ; arc protégé + 40° au bouclier ; garde brisée **provisoire** (remplacée par l'endurance de T-114) : 4 coups bloqués (6 au bouclier, un coup lourd en vaut 2), compte remis à zéro après 3 s sans coup bloqué ; priorité des modificateurs 50 ; 64 décisions en attente au plus, oubliées après 1 s | `defense.parry`, `dodge`, `block`, `parryTags`, `guardBreak`, `modifierPriority`, `memoMax`, `memoMs` |
 | Dégainer, rengainer | aucune technique avant **0,8 s** après la prise en main ; une arme rangée laisse les mains prises **1,5 s** (`armed()` : pas de sort) ; gestes `-- PLACEHOLDER` (décision du porteur du projet) | `draw` |
 | Chancellement | 0,9 s sans frapper, coup en cours coupé ; aucun autre avant 3 s | `stagger`, `timing.staggerImmunityMs` |
 | Cycle d'un coup (serveur) | demande admise 60 ms avant d'être permise (gigue) ; 3 techniques enchaînées au plus après celle qui ouvre ; deux relevés pendant la frappe (ouverture, fin) ; un coup **annulé** (quelle qu'en soit la cause) garde sa récupération et son compte d'enchaînement, comme s'il était allé au bout | `timing` |
 | Tolérances (serveur) | **+ 0,25 m** à la portée, **+ 10°** au demi-angle, + 0,4 m à la hauteur (resserrées : décision du porteur du projet ; bornées au démarrage à 1 m, 30°, 1 m) ; aucun contrôle des murs | `tolerance` |
 | Géométrie (serveur) | hauteur 1,6 m (+ tolérance), contact sous 0,6 m (l'angle ne compte plus), **un** adversaire par coup, marge de recherche des proches 1 m | `geometry` |
 | Bond de l'attaquant (serveur) | 8 m/s + 0,5 m entre la demande et un relevé, sinon coup annulé (console) ; large pendant une longue préparation (5,7 m au Fendant) : à resserrer à la porte T-119 (≈ 4 à 5 m/s) | `lunge` |
-| Réactions (serveur) | joueurs prévenus à 30 m de la cible, dans l'instance de l'attaquant ; avis d'un coup retenu au seul attaquant, un par raison et par 10 s | `reactions`, `notices`, `messages.pvpOff`, `peace`, `held` |
-| Débit du RPC (serveur) | 4 d'avance, puis 3 par seconde | `rateLimits.use` |
-| Mode combat (client) | endormi après 10 s sans coup ni verrou ; conditions relevées à 200 ms ; touche gardée 250 ms ; virage de 90° au plus au départ du coup ; un même refus redit au plus toutes les 3 s ; contrôles de GTA coupés à chaque image en mode actif (jamais Échap ni P : 199, 200, 322 refusés au démarrage ; 32 au plus) | `mode` |
-| Touches (client) | clic gauche (attaque légère), clic droit (attaque lourde), clic molette (verrouiller ; maintenu : relâcher) ; réglables dans Paramètres > Raccourcis > FiveM | `keys` |
+| Réactions (serveur) | joueurs prévenus à 30 m de la cible, dans l'instance de l'attaquant ; issues jamais envoyées : `dodge`, `absorb` (jamais `parry` ni `break`, refusés au démarrage) ; avis d'un coup retenu au seul attaquant, un par raison et par 10 s | `reactions`, `notices`, `messages.pvpOff`, `peace`, `held` |
+| Débit des RPC (serveur) | `use` et `lower` : 4 d'avance, puis 3 par seconde chacun | `rateLimits.use`, `rateLimits.lower` |
+| Mode combat (client) | endormi après 10 s sans coup ni verrou (jamais garde levée) ; conditions relevées à 200 ms ; touche gardée 250 ms ; virage de 90° au plus au départ du coup ; un même refus redit au plus toutes les 3 s ; contrôles de GTA coupés à chaque image en mode actif, saut (22) et recharger (45) compris (jamais Échap ni P : 199, 200, 322 refusés au démarrage ; 32 au plus) | `mode` |
+| Touches (client) | clic gauche (attaque légère), clic droit (attaque lourde), clic molette (verrouiller ; maintenu : relâcher), **R** (appui bref : parer ; maintenu : se garder), **Espace** (pas de côté, mode combat actif seulement : le saut de GTA y est coupé) ; réglables dans Paramètres > Raccourcis > FiveM | `keys` |
 | Verrou (client) | 6 m, 30° autour du centre de l'écran, en vue ; maintenu 0,6 s : relâché ; perdu à 7 m ou hors de vue 4 relevés de suite ; virage de 540°/s vers la cible pendant la préparation et la frappe | `lock` |
 | Effets (client) | tressaillement, sang, étincelles (blocage, parade), secousse de caméra, son (aucun par défaut) ; 12 effets par seconde au plus | `effects` (-- PLACEHOLDER) |
 | Refus montrés (client) | texte par code du serveur, `false` : rien | `refusals` |
@@ -117,13 +127,16 @@ dos de son porteur, à portée de vue seulement.
 | Estoc rapide (`estoc_rapide`) | légère | 220, 120, 380 ms | 2,4 m, 40° | × 0,8 | Revers, Fendant | parable |
 | Revers (`revers`) | légère | 280, 160, 460 ms | 2,1 m, 90° | × 0,9 | Taille descendante, Fendant | parable |
 | Fendant (`fendant`) | lourde, ouvre | 650, 200, 700 ms | 2,3 m, 60° | × 1,8 | rien | non parable, fait chanceler |
+| Garde (`garde_epee`) | R maintenue | mise en garde 100, tenue minimale 200, garde abaissée 250 ms | arc 120° (160° au bouclier) | — | rien (pas de riposte directe) | coût 8 par coup bloqué (T-114) |
+| Parade (`parade_epee`) | R, appui bref | 0, **fenêtre 200**, 250 ms | arc 120° | — | Garde (R maintenue) | coût 6 (T-114) |
+| Pas de côté (`pas_de_cote`) | Espace | élan 50, **invulnérable 250**, 350 ms | — | — | rien | coût 20 (T-114) |
 
 Format (`config_client.lua` → `techniques`, `COMBAT_V1.md` § 3, identique dans l'Atelier) : clé = identifiant
 (`^[a-z0-9_]+$`, 32 octets) ; `phases` en ms ; `hit.range` en mètres (plus le bonus de l'arme) ; `hit.angle` = ouverture
 **totale** de l'arc, centrée sur l'avant ; `damage` = multiplicateur des dégâts de l'arme ; `chain` = techniques du même
 style qui peuvent partir pendant la récupération. Portée réelle = portée de la technique + bonus de l'arme + 0,25 m ;
 demi-angle = angle / 2 + 10°. Épée courte et Taille
-descendante : 2,45 m, 45° de chaque côté, 2,0 m de hauteur. Seule l'**épée à une main** a des techniques en 1.2.0 (les
+descendante : 2,45 m, 45° de chaque côté, 2,0 m de hauteur. Seule l'**épée à une main** a des techniques en 1.3.0 (les
 autres styles viendront avec T-115) : une autre arme en main, le joueur lit « Vous ne connaissez aucune technique pour
 cette arme. » et rien ne s'éveille. `learn` (compétence, niveau) est lu par T-115, jamais appliqué ici ; `stamina` par
 T-114.
@@ -149,6 +162,32 @@ T-114.
 coups de suite au plus, puis la récupération entière. Un coup annulé (chancellement, à terre, arme changée, véhicule,
 bond) compte comme allé au bout : on ne gagne rien à couper son propre coup. **Chancellement** : un Fendant qui porte fait chanceler la cible
 0,9 s (elle ne frappe plus, son coup en cours est coupé), puis aucun autre chancellement avant 3 s.
+
+### La défense
+
+1. **Parer** (R, appui bref) : le geste part aussitôt ; le serveur ouvre la fenêtre **à l'arrivée de la demande**, sans
+   préparation, pour 200 ms. Un coup `parryable` de corps à corps qui arrive de face (arc 120° + 10° de chaque côté ;
+   au contact, l'angle ne compte plus) dans cette fenêtre est annulé à l'étape `parade` : l'attaquant chancelle 0,9 s
+   (même s'il était encore protégé d'un chancellement : sa protection repart de zéro), son coup et sa suite déjà
+   demandée sont coupés, son arme et celle du défenseur s'usent. Le **Fendant** n'est pas parable : il porte et fait
+   chanceler (on le bloque ou on l'esquive). Une parade qui n'a rien paré interdit toute autre parade pendant 0,6 s
+   après sa fin.
+2. **Se garder** (R maintenue) : à la fin de la fenêtre de parade, la garde se lève (100 ms, puis tenue au moins
+   200 ms). Un coup de corps à corps de face (arc 120°, 160° bouclier au bras) est amorti : part arrêtée de l'arme tenue
+   (Épée courte 0,40) ou du **bouclier accroché au bras** (Bouclier rond 0,70) ; émoussé : moitié moins. Ce qui bloque
+   s'use (le bouclier s'il sert, sinon l'arme). Un coup de dos porte entièrement. Pas d'attaque garde levée, pas de
+   course ; relâcher R l'abaisse (250 ms avant de frapper). Au 4e coup bloqué de suite (6e au bouclier, un coup lourd
+   compte double, remis à zéro après 3 s sans coup), la **garde est brisée** : chancellement 1,2 s, ni garde ni parade
+   pendant ce temps, « Votre garde est brisée. ». Ce compteur est **provisoire** : l'endurance de T-114 le remplacera.
+3. **Pas de côté** (Espace, mode combat actif seulement) : roulade selon la direction tenue ; invulnérable 250 ms
+   après 50 ms d'élan, contre les coups de corps à corps et les projectiles (sorts compris), jamais contre une zone, un
+   effet qui dure ni un coup `undodgeable`. 1,5 s entre deux départs. Rien ne s'use, rien n'est envoyé aux autres.
+
+Exemples (Épée courte qualité 50, Taille 12) : garde à l'épée 4,8 arrêtés, 7,2 perdus ; au bouclier 8,4 arrêtés,
+3,6 perdus ; bouclier émoussé 4,2 arrêtés. Fendant (21,6) au bouclier : 15,1 arrêtés, 6,5 perdus, sans chancellement.
+Un geste défensif est un coup au sens du cycle (T-112) : annulé (main changée, à terre, chancellement), il garde sa
+récupération ; une garde annulée est fermée avec sa tenue minimale. Sous un contrôle dur de la magie (gelé, renversé,
+chancelant), ni parade, ni garde, ni pas de côté ne protègent.
 
 ### Le mode combat
 
@@ -178,14 +217,19 @@ garde d'emblée. Le serveur tient ces durées (hook `vava_inventory:hold`) ; le 
 - **Mémoire du serveur** (1.2.0) : dernier coup de chaque joueur (technique, cycle, origine, cibles touchées), instant
   de la prise en main, rengainement en cours, dernière arme vue en main, chancellement et immunité, derniers avis ;
   bornée par le nombre de joueurs, oubliée au déchargement, au départ et à l'arrêt ; au plus deux minuteries par coup.
+  1.3.0 : geste défensif en cours (fenêtre = paire d'instants, **aucune minuterie** ; garde : part bloquée et bouclier
+  lus une fois), dernière parade, dernier pas de côté, compteur provisoire de garde, fin de garde brisée (oubliés aussi
+  à la mise à terre) ; décisions des modificateurs en attente de leur suite (64 au plus, retirées dans le même tour,
+  oubliées après 1 s).
 - Aucune table SQL, aucune migration, aucun champ ni métadonnée nouveaux.
 
 ## Réseau
 
 | Quoi | Cible | Taille | Fréquence |
 |---|---|---|---|
-| RPC `vava_combat:use(technique, cible)` (`core.rpc`, schéma borné : chaîne de 1 à 32 octets `^[a-z0-9_]+$`, entier 0 à 65535) | le serveur ; réponse au seul appelant (`true`, `false, code[, attente]`) | ≈ 40 o + ≈ 15 o | un par coup ; 4 d'avance puis 3 / s |
-| `vava_combat:hit` (`core.net.sendNearWith`, instance de l'attaquant) : attaquant, cible, issue | les joueurs apparus à 30 m de la **cible**, dans l'instance de l'attaquant (cible, attaquant, témoins) | ≈ 30 à 40 o | **un** par cible touchée et par coup (un adversaire par coup) ; jamais pour un coup manqué, refusé ou annulé, ni pour une esquive ou un coup absorbé (que personne ne montre) |
+| RPC `vava_combat:use(technique, cible)` (`core.rpc`, schéma borné : chaîne de 1 à 32 octets `^[a-z0-9_]+$`, entier 0 à 65535) | le serveur ; réponse au seul appelant (`true`, `false, code[, attente]`) | ≈ 40 o + ≈ 15 o | un par coup, par parade, par pas de côté, par garde levée ; 4 d'avance puis 3 / s |
+| RPC `vava_combat:lower()` (aucun argument) | le serveur ; réponse au seul appelant (`true`, `false, 'no_guard'`) | ≈ 25 o + ≈ 10 o | un par garde abaissée ; 4 d'avance puis 3 / s ; **rien pendant la tenue** |
+| `vava_combat:hit` (`core.net.sendNearWith`, instance de l'attaquant) : attaquant, cible, issue (`hit`, `stagger`, `down`, `block`, `parry`, `break`) | les joueurs apparus à 30 m de la **cible**, dans l'instance de l'attaquant (cible, attaquant paré, témoins) | ≈ 30 à 40 o | **un** par cible touchée et par coup de technique (un adversaire par coup) ; un coup paré, bloqué ou qui brise la garde envoie son issue **à la place** de `hit` ; jamais pour un coup manqué, refusé ou annulé, ni pour une esquive ou un coup absorbé (`reactions.silent`), ni pour un coup d'une autre ressource |
 | `vava_combat:notify` (`core.net.send`, compté) | le **seul** porteur dont l'arme passe un seuil ; le seul attaquant dont le coup est retenu (combats coupés, lieu de paix, crochet) ; le seul membre du Conseil qui tape `/armes` sans `vava_chat` | ≈ 70 à 160 o | 2 par arme et par cycle d'usure ; un avis par raison et par 10 s ; réponses de commande |
 | Statebag de ped `vava_combat:shield` (`{ id, item }`) | OneSync : les joueurs qui ont ce ped à portée | ≈ 30 o | à l'accroche, au décrochage, à un nouveau ped du porteur ; jamais périodique |
 | `GlobalState['vava_inventory:heldModels']` (mécanisme de l'inventaire) | tous | + ≈ 450 o | une fois, à la déclaration des objets |
@@ -193,7 +237,10 @@ garde d'emblée. Le serveur tient ces durées (hook `vava_inventory:hold`) ; le 
 
 Aucun envoi à tous, aucune clé GlobalState propre, aucun state bag nouveau, aucun envoi latent. Les gestes (coup,
 réaction, dégainer, rengainer, chancellement) sont joués par chaque client sur son propre ped : OneSync les montre, rien
-d'autre à envoyer. Combattant armé au repos, bouclier accroché compris : **0 octet**. Un coup manqué : la requête et sa
+d'autre à envoyer ; de même pour la garde, la parade et le pas de côté. Combattant armé au repos, bouclier accroché
+compris : **0 octet** ; garde levée puis baissée : 3 RPC (parade, garde, `lower` : ≈ 145 o), rien pendant la tenue.
+Attente d'une parade ratée ou d'un pas de côté : propre à sa touche chez le client, elle ne retient ni la garde ni les
+attaques ; le délai du pas de côté est connu du client, qui ne demande rien avant. Un coup manqué : la requête et sa
 réponse, à l'attaquant seul. Mêlée à six vue d'un témoin : ≤ 12 `vava_combat:hit` par seconde (≈ 0,4 Ko/s), 12 effets
 par seconde au plus.
 
@@ -204,6 +251,17 @@ sans rien presser : rien ne tourne. Le verrou n'a pas de boucle propre ; la main
 lecture du personnage) ; les dictionnaires des gestes du style de l'arme sont chargés à la prise en main.
 
 ## Sécurité
+
+- **Défense (1.3.0)** : aucun RPC ne porte un résultat ; parade, garde et pas de côté sont des fenêtres posées par le
+  serveur **à l'acceptation** de la demande (une réservation n'ouvre rien) et comparées à son horloge quand un coup
+  arrive ; seuls les trois modificateurs de la chaîne décident, sur la mémoire du module et les positions et le cap lus
+  par le serveur (même personnage, à pied, sans contrôle dur de la magie). Parade : fenêtre ≤ 500 ms (format), 200 par
+  défaut, 0,6 s sans parade après un raté, une seule place à la fois (pas de parade sous une garde ni pendant un coup) ;
+  pas de côté : invulnérabilité ≤ 500 ms (250), 1,5 s entre deux départs ; garde : de face seulement, part arrêtée < 1,
+  aucune attaque garde levée (`guarding`), brisée par le compteur provisoire. Un geste défensif annulé garde son cycle.
+  Bouclier relu en mémoire (numéro de pile accrochée) à chaque coup ; usure par `wear.apply`, qui relit la pile, hors
+  de la chaîne. Non fermé : le cap déclaré par le client (OneSync) — la parade reste une affaire de **temps** tenue par
+  le serveur, le blocage n'arrête qu'une part ; journal `vava_health_hits` (étape d'annulation, montant bloqué).
 
 - **Le serveur décide de chaque coup** : aucun RPC ne porte un résultat ; la frappe est jugée au relevé du serveur, sur
   les positions et le **cap qu'il lit** (`GetEntityCoords`, `GetEntityHeading` du ped), dans l'instance de l'attaquant
@@ -258,18 +316,24 @@ Console admise (`armes …`). Déclarée au registre `core:commands` (chapitre �
 
 ## API
 
-**RPC** `vava_combat:use(technique, cible)` → `true` (coup accepté, fenêtre programmée ; aucun résultat : il arrive par
-`vava_combat:hit`, ou jamais), `false, code`, `false, code, attente` (ms : `busy`, `chain_limit`, `drawing`, `staggered`)
-ou `false, 'refused', raison` (crochet). Codes : `not_ready`, `unknown_technique`, `not_attack`, `not_opener`, `busy`,
-`chain_limit`, `staggered`, `drawing`, `no_character`, `no_weapon`, `no_style`, `not_in_style`, `downed`, `vehicle`,
-`controlled`, `refused` ; au-delà du débit, `rate_limited` du core.
+**RPC** `vava_combat:use(technique, cible)` → `true` (coup accepté, fenêtre programmée ; geste défensif : fenêtre
+ouverte ; aucun résultat : il arrive par `vava_combat:hit`, ou jamais), `false, code`, `false, code, attente` (ms :
+`busy`, `chain_limit`, `drawing`, `staggered`, `guard_broken`, `parry_cooldown`, `dodge_cooldown`) ou
+`false, 'refused', raison` (crochet). Codes : `not_ready`, `unknown_technique`, `not_attack` (type `garde`),
+`not_opener`, `busy`, `chain_limit`, `guarding` (garde levée : l'abaisser d'abord), `staggered`, `drawing`,
+`guard_broken`, `parry_cooldown`, `dodge_cooldown`, `no_character`, `no_weapon`, `no_style`, `not_in_style`, `downed`,
+`vehicle`, `controlled`, `refused`, `error` ; au-delà du débit, `rate_limited` du core. Pour un geste défensif, la cible
+est ignorée.
+
+**RPC** `vava_combat:lower()` → `true` (garde abaissée, ou abaissement noté sur une garde encore réservée),
+`false, 'no_guard'` (aucune garde levée), `false, 'not_ready'`.
 
 | Export serveur | Retour |
 |---|---|
 | `weapon(item)` | copie de la fiche `{ item, label, category, family, kind, damage, reachBonus, durability, block, provisional }` (classe et fiche fusionnées), ou `nil` |
 | `weapons()` | liste ordonnée (catégorie, puis libellé) des fiches |
 | `armed(src)` | arme en main : `{ instanceId, item, category, family, kind, damage, factor, amount, reachBonus, quality, durability, maxDurability, dull }` (`factor` : qualité × usure ; `amount` : coup à × 1,0) ; pendant le rengainement (1,5 s) : `{ item, category, family, sheathing = true, readyInMs }` ; sinon `nil, code` (`not_ready`, `no_character`, `no_weapon`) |
-| `techniques()` | liste (style, puis libellé) de copies `{ id, label, style, type, gesture, phases, hit, damage, stamina, parryable, staggers, chain, learn? }` |
+| `techniques()` | liste (style, puis libellé) de copies `{ id, label, style, type, gesture, phases, hit?, damage?, stamina, parryable?, staggers?, chain, learn? }` (champs selon le type : un geste défensif n'a ni `damage`, ni `parryable`, ni `staggers`, une esquive pas de `hit`) |
 | `technique(id)` | copie d'une technique, ou `nil` |
 | `shield(src)` | `{ instanceId, item, block, durability, maxDurability, dull, position, ready }` (`ready` : au bras), ou `nil` : rien d'accroché, inventaire muet (rien n'est affirmé sans la pile), ou pile partie de la besace (décrochée aussitôt) |
 | `strike(src, cible, opts)` | résultat de `vava_health:hit` + `weapon = { item, durability, maxDurability, worn, dull }`, ou `nil, code` — `not_allowed`, `not_ready`, `invalid_target`, `no_character`, `downed`, `invalid_options`, `no_weapon`, `too_far`, `health_unavailable`, plus les codes de `hit` ; réservé à `strike.callers` |
@@ -281,33 +345,54 @@ ou `false, 'refused', raison` (crochet). Codes : `not_ready`, `unknown_technique
 | `shieldHung()` | objet du bouclier accroché sur son propre ped, ou `nil` |
 
 **Hooks émis** : `vava_combat:using` `before` (annulable, ne cède jamais la main : `{ source, characterId, technique, item,
-target? }` — prison, ligotage, trêve ; la raison, 120 octets, est montrée au joueur) ; `vava_combat:shieldHang` `before`
+target?, kind }` — `kind` : type de la technique ; prison, ligotage, trêve : un refus vaut aussi pour parer, se garder,
+esquiver ; la raison, 120 octets, est montrée au joueur) ; `vava_combat:defended` `after` (`{ source (défenseur),
+characterId, outcome = 'dodge' | 'parry' | 'block' | 'break', technique, attacker?, attackerTechnique?, hitId }`, une
+fois par coup défendu : XP de défense de T-115, chiffres de T-155) ; `vava_combat:shieldHang` `before`
 (accroche seule, annulable : `{ source, characterId, instanceId, item }` — prison, interdiction du Conseil ; la raison est
 montrée au joueur) et `after` (`+ hang, reason` = `use`, `gone`, `restored`) ; `vava_combat:dulled` `after`
 (`{ source, characterId, instanceId, item }`). **Écoutés** : `core:module:ready` (`vava_inventory`, `vava_crafting`,
 `vava_skills`), `core:character:spawned`, `core:character:unloading`, `core:player:dropped`, `vava_inventory:move`,
 `drop`, `remove`, `hold` (`after` : dégainer, rengainer, coup annulé), `vava_health:downed` (`after` : coup annulé,
-chancellement oublié) ; client : `core:character:loaded`, `fieldChanged`, `unloaded` (cache de la main).
+chancellement oublié, défense oubliée), `vava_health:hit` (`after` : suites d'une défense), `core:module:ready` de
+`vava_health` (modificateurs redéclarés) ; client : `core:character:loaded`, `fieldChanged`, `unloaded` (cache de la
+main).
+
+**Modificateurs** (registre `vava_health:modifiers`, déclarés au démarrage et à chaque démarrage de `vava_health`) :
+`vava_combat:esquive` (étape `esquive`, tous les types de dégâts), `vava_combat:parade` (`parade`) et
+`vava_combat:blocage` (`blocage`), ces deux-là pour `tranchant`, `contondant`, `percant` ; priorité 50. Aucun ne cède
+la main ; personne ne se défend : une lecture de table, aucune native.
 
 ### Pour les tâches suivantes
 
-- **T-113** (blocage, parade, esquive) : types `blocage`, `parade`, `esquive`, `garde` déjà admis par le format (refusés
-  à l'usage, `not_attack`) ; modificateur de blocage qui lit `block` de l'arme tenue ou, si `shield(src).ready`, du
-  bouclier ; use le bouclier par `VavaCombat.wear.apply` (qui relit la pile avant d'écrire) ; à chaque blocage, lire
-  `VavaCombat.shields` en interne plutôt que l'export `shield(src)` (relecture réseau R-6 de T-111). Interfaces internes
-  prêtes : `VavaCombat.reactions.stagger(src, ms, now)` (l'attaquant paré chancelle), `VavaCombat.swings.cancel(src,
-  raison)` (pendant une réservation, annule aussi le coup d'avant : `cancelled` est fiable) et `swings.of(src)` (un coup
-  `pending` est réservé, pas encore accepté).
-- **T-114** (endurance) : `stamina` de chaque technique, lu et contrôlé (0 à 40), jamais dépensé ; jauge et indication de
-  la technique au HUD (`inCombatMode()` côté client).
-- **T-115** (styles et progression) : `learn` (compétence, niveau) lu et contrôlé, jamais appliqué ; autres styles
-  (`hache_une_main`, `masse_une_main`, `dague_dague`, `baton_baton`, et `epee_deux_mains` à décider) ; `techniques()`.
+- **T-113** (fait, 1.3.0) : Garde, Parade, Pas de côté en données ; fenêtres tenues par le serveur sans minuterie ;
+  trois modificateurs ; suites dans le hook `vava_health:hit` after ; compteur provisoire de garde brisée ; touches R et
+  Espace ; issues `parry`, `block`, `break`.
+- **T-114** (endurance) : remplacer `VavaCombat.defense.spend(src, action, ctx)` (`server/defense.lua`, seul point à
+  changer : `block` → `ok, broken` ; jauge à 0 → `broken = true`), supprimer `config.defense.guardBreak` et la table
+  `points` ; refus `exhausted` d'une parade ou d'un pas à l'admission (`defense.refusal`) ; dépenser `stamina` de chaque
+  technique (coup, coup bloqué, parade, pas) ; `parry_cooldown` et `dodge_cooldown` peuvent rester ; HUD : jauge,
+  `inCombatMode()` (et un export client `guarding()` s'il le faut : `VavaCombat.stance.guarding()`).
+- **T-115** (styles et progression) : `learn` (compétence, niveau) lu et contrôlé, jamais appliqué (la Parade demande
+  le niveau 10) ; autres styles (`hache_une_main`, `masse_une_main`, `dague_dague`, `baton_baton`, et `epee_deux_mains`
+  à décider), et leurs techniques défensives ; XP de défense par le hook `vava_combat:defended` sur une vraie cible ;
+  `techniques()`.
+- **T-119** (réglages) : fenêtre de parade et sa préparation, invulnérabilité, délais, arcs protégés, parts bloquées des
+  fiches (épée 0,40 peut-être trop faible face à 4 coups), seuils du compteur, sensations à 30, 80 et 150 ms de ping
+  (aucune compensation de latence : le défenseur lent anticipe d'un aller de son ping).
+- **T-155** (chiffres des coups) : une issue par coup dans `vava_combat:hit(attaquant, cible, issue)` ; ajouter le montant
+  en 4e valeur (dixièmes) sans nouveau message ; `dodge` et `absorb` sont nommés mais tus (`config.reactions.silent`) ;
+  un coup d'une autre ressource défendu n'envoie rien (le hook `vava_combat:defended` en porte l'issue).
+- **T-156** (mannequin) : les modificateurs ne décident que sur le geste défensif tenu pour un **joueur** ; un mannequin
+  n'est jamais défendu ; un calcul « à blanc » hors de `vava_health:hit` ne déclenche aucune suite.
 - **T-121** (éditeur des techniques) : `techniques()`, `weapons()`, `provisional` ; le format et ses bornes sont ceux
   de `weapons.checkTechniques`. Fait par T-112 : fiches d'armes coupées en deux (classe client, fiche serveur), délais du
   serveur du bouclier et `guard.delay` sortis de ce que télécharge le joueur (relectures R-2, R-3 et S-2 de T-142).
-- **T-149** (la magie et le mode combat) : ni rappel « rangez votre arme » ni anneau de la magie quand
-  `exports.vava_combat:inCombatMode()` ou `armed()` ; texte propre pendant le rengainement ; export serveur
-  `hardControl(src)` (gelé, renversé, chancelant), que `vava_combat` lit déjà s'il existe (refus `controlled`).
+- **T-149** (fait, `vava_magic` 2.12.0 ; aucun changement de code ici) : la magie lit `armed()` côté client (arme
+  du royaume en main : ni rappel ni anneau de la magie ; `sheathing` : « Vous rengainez votre arme… ») ; export serveur
+  `hardControl(src)` → `'frozen'`, `'knockdown'`, `'stagger'` ou `nil`, lu par `bridge.MagicHardControl` à l'étape 13
+  de l'admission (refus `controlled`, « Vous ne pouvez pas frapper ainsi. »). Essai de bout en bout (export réel de la
+  magie lu par ce bridge) : `tests/spec/magic_combat_mode_spec.lua`.
 - **T-140** (fait, `vava_magic` 2.10.0) : règle « mains vides » de la magie par `exports.vava_combat:armed()` (client) et
   `armed(src)` (serveur) ; le rengainement de 1.2.0 s'y ajoute sans changement de la magie.
 
@@ -339,13 +424,16 @@ Les en-têtes des fichiers servis aux joueurs sont courts (relecture réseau R-2
 | `shared/techniques.lua` | tous | style d'une arme (`<famille>_<catégorie>`), cycle d'un coup (`plan`), technique d'une touche côté client (`pick` : libre, l'ouvreur ; pendant la récupération, la première de la chaîne du type de la touche ; sinon l'attente) |
 | `shared/geometry.lua` | serveur | avant d'un cap, distance au sol et écart de hauteur, angle à plat, arc d'une technique et cible dans l'arc, ordre des candidats, bond plausible ; jamais d'erreur sur une valeur non finie |
 | `shared/admission.lua` | serveur | admission d'une demande : libre → l'ouvreur seul (`not_opener`) ; pendant la récupération (frappe finie, à `earlyMs` près) → une technique de `chain` dans la limite de `chainMax` (`chain_limit`) ; sinon `busy` et l'attente |
-| `shared/weapons.lua`, `shared/guard.lua` | serveur | contrôle de la config, qualité, solidité, usure, issue d'un coup, options de `strike` ; délai de la garde du statebag |
+| `shared/weapons.lua`, `shared/guard.lua` | serveur | constantes du seul serveur (types défensifs, types qu'on peut demander, hook `defended`), contrôle de la config, qualité, solidité, usure, issue d'un coup, options de `strike` ; délai de la garde du statebag |
 | `bridge/client.lua` | tous | seul point de contact du client : notification (`vava_hud`, sinon celle du jeu) ; main du personnage local (`owner` de `vava_inventory:hands`) gardée en cache, tenue par `core:character:loaded`, `fieldChanged`, `unloaded` (aucune lecture du personnage à chaque appel, rapport T-140 R-1) ; changement de main annoncé ; à terre (`vava_health:get`) ; nom du statebag de la main |
 | `client/natives.lua` | tous | drapeau de ped 122, changement d'arme bloqué, armes GTA retirées (menu de triche, `/arme` de l'exemple) ; ces bascules tiennent jusqu'au changement de ped : contrôle à `natives.pollMs` (trois natives par seconde au repos) ; rendues à GTA à l'arrêt (`restoreOnStop`) ; le filet reste l'annulation serveur de `vava_health` |
 | `client/shields.lua` | tous | patron de `vava_inventory/client/hands.lua` : objet **local** sans collision attaché au ped du porteur (bras ou dos), réattaché sans être recréé quand la main change ; boucle lente seulement tant qu'un bouclier est suivi (ped ou modèle attendu, objet détaché, ped disparu, distance de `showRadius`) ; modèle invalide : une ligne de console, aucun nouvel essai avant que la valeur change |
 | `client/hands.lua` | tous | arme du royaume en main (jamais un bouclier) et son style ; prise en main : geste de dégainer, en garde après `draw.drawMs` ; arme rangée : geste de rengainer et `sheathing` pendant `draw.sheatheMs` ; main restaurée (chargement, redémarrage) : en garde d'emblée ; gestes du style chargés à l'avance, ceux de l'ancien style rendus ; geste ponctuel (dégainer, rengainer, chancellement, tressaillement) : dictionnaire rendu juste après le geste ; dictionnaire absent : rien n'est joué, une ligne de console par nom et par minute |
 | `client/keys.lua` | tous | une commande par action, liée par `RegisterKeyMapping` (souris par défaut) ; déclarées au registre `core:commands` par `server/commands.lua` (Codex) |
 | `client/targeting.lua` | tous | règles de `vava_magic/client/targeting.lua` : appui court → le joueur le plus proche du centre de l'écran (`lock.range`, `coneDeg`, en vue) ; nouvel appui : le suivant ; maintenu `holdMs` : relâché ; perdu hors de portée (+ `rangeMargin`), hors de vue `lostChecks` relevés de suite, mort, ou au sommeil du mode ; candidats faits à l'appui seulement |
+| `shared/defense.lua` | serveur | règles pures de la défense : fenêtre ouverte, garde abaissée (tenue minimale), attaquant de face, étiquettes, part bloquée, montant bloqué, délais de la parade ratée et du pas de côté, compteur provisoire de garde, poids d'un coup |
+| `server/defense.lua` | serveur | refus en mémoire (garde brisée, délais), cache de la garde, geste accepté, RPC `lower`, trois modificateurs (esquive, parade, blocage ; une lecture de table si personne ne se défend), décisions notées puis suites au hook `vava_health:hit` after (attaquant paré, compteur et garde brisée, usure différée, issue imposée, hook `defended`), `spend` (T-114) |
+| `client/defense.lua` | tous | table `VavaCombat.stance` : R (appui : parade ; maintenue : garde à la fin de la fenêtre de parade ; relâchée : `lower`), Espace (pas de côté, direction lue une fois) ; aucune boucle (`tick` appelé par la boucle du mode : garde demandée, sprint coupé) ; garde tombée sans `lower` au chancellement et à la garde brisée |
 | `client/attack.lua` | tous | technique choisie par `pick`, personnage tourné vers la cible verrouillée ou la caméra (`faceMaxDeg`), geste aussitôt, demande dans un thread ; refus ou transport en échec : geste coupé, texte (un par code et par `noticeMs`), attente du serveur respectée ; touche pressée trop tôt gardée (`bufferMs`) ; virage vers la cible pendant la préparation et la frappe ; chancellement : geste coupé, cycle gardé (comme au serveur) |
 | `client/mode.lua` | tous | patron de `vava_magic/client/controls.lua` : éveil par une touche du combat si l'arme a un style (sinon le texte, une fois par arme sortie) ; actif à pied, debout, pas à terre, pas ligoté, sans interface ni menu (relevé à `conditionsMs`) ; sommeil après `idleMs` sans coup ni appui sur le verrou, ou aussitôt que la main change ou le personnage est déchargé ; boucle par image seulement éveillée et active (contrôles coupés, anneau, verrou, touche gardée, virage) |
 | `client/reactions.lua` | tous | cible : chancellement (geste, coup coupé, secousse) ou tressaillement (si elle ne frappe pas) ; attaquant : son de touche réglé, pour `hit`, `stagger`, `down` ; tous : effet d'impact sur le ped de la cible (sang ; étincelles pour un blocage ou une parade), `effects.maxPerSecond` au plus ; aucun objet créé |
@@ -356,6 +444,12 @@ Les en-têtes des fichiers servis aux joueurs sont courts (relecture réseau R-2
 `ensure vava_combat` après `vava_health` et `vava_crafting` (voir l'ordre du `README.md` à la racine). Pour essayer un
 coup sans technique en développement : `set vava_env dev` et `ensure vava_example_combat` (1.1.0), puis
 `/frapper_arme <n°>`.
+
+**Mise à jour vers 1.3.0 (T-113)** : `config_client.lua` gagne trois techniques, les touches `blocage`, `parade`,
+`esquive` du style, la table `defense`, les touches `garde` et `esquive`, deux contrôles coupés (22, 45) et cinq refus ;
+`config.lua` gagne `rateLimits.lower`, la part du serveur de `defense`, `reactions.silent` et `messages.modifiers`. Un
+fichier modifié et gardé par l'installeur (le nouveau posé en `.nouveau`) fait **refuser le démarrage** (« defense :
+table attendue », « rateLimits.lower … ») : reportez vos réglages d'après les nouveaux fichiers.
 
 **Mise à jour vers 1.2.0 (T-112)** : les fiches des armes sont coupées en deux (classe dans `config_client.lua` →
 `weaponClasses`, fiche dans `config.lua` → `weapons`) et les délais du serveur du bouclier passent dans `config.lua`. Un
@@ -374,10 +468,12 @@ contrôles natifs ont quitté `config.lua` pour `config_client.lua`.
   bouclier, garde, `/armes`), `combat_geometry_spec.lua` (avant, cap, angle, arc, tolérances, ordre, bond),
   `combat_techniques_spec.lua` (contrôle du format, cycle, admission, enchaînement, choix d'une technique, style, issue),
   `combat_use_spec.lua` (cycle serveur réel avec doublures : coup qui porte, hors de portée, hors de l'arc, autre
-  instance, refus dans l'ordre, annulations, bond, enchaînement, martèlement, issues, chancellement, dégainer et
-  rengainer, exports), `combat_hands_client_spec.lua` (cache de la main, rengainement, mode combat, coup prédit puis
-  coupé).
-- En jeu : [docs/tests/combat.md](../../docs/tests/combat.md) § 2 (armes) et § 3 (techniques).
+  instance, refus dans l'ordre, annulations, bond, contrôle dur de la magie, enchaînement, martèlement, issues,
+  chancellement, dégainer et rengainer, exports ; bridge : export `hardControl` relu au démarrage de la magie),
+  `combat_hands_client_spec.lua` (cache de la main, rengainement, mode combat, coup prédit puis coupé ; R, Espace,
+  garde brisée), `combat_defense_spec.lua` (règles pures de la défense ; serveur réel avec une chaîne d'essai : parade,
+  pas de côté, garde, bouclier, garde brisée, abaissement, annulations, réservation, modificateurs, réseau, démarrage).
+- En jeu : [docs/tests/combat.md](../../docs/tests/combat.md) § 2 (armes), § 3 (techniques) et § 4 (défense).
 
 ## À vérifier en jeu
 
@@ -391,5 +487,10 @@ contrôles natifs ont quitté `config.lua` pour `config_client.lua`.
 - Gestes et effets provisoires présents (`/anim <dict> <clip>` de `examples/vava_anim_test`), vus des autres joueurs ;
   effet d'impact sur l'os 24818 au bon endroit ; secousse de caméra mesurée.
 - Sensations à 30, 80 et 150 ms de ping (portée et angle avec les tolérances resserrées) ; coups à travers un mur fin
-  (aucun contrôle) ; cap lu par le serveur pendant un virage rapide ; boutons de la souris partagés avec la magie
-  (T-149). Procédure : [docs/tests/combat.md](../../docs/tests/combat.md) § 3 et § 4.
+  (aucun contrôle) ; cap lu par le serveur pendant un virage rapide ; boutons de la souris partagés avec la magie et
+  frappe refusée gelé ou renversé par un sort (T-149). Procédure : [docs/tests/combat.md](../../docs/tests/combat.md)
+  § 3 à § 6.
+- Défense (1.3.0) : gestes provisoires de garde, de parade et de roulade (`anim@melee@machete@streamed_core@`,
+  `move_strafe@roll`) présents et vus des autres (garde en boucle synchronisée) ; R et Espace en AZERTY ; une touche
+  liée (Espace, R) répond-elle encore quand le saut (22) et recharger (45) sont coupés ; parade au dernier moment à
+  150 ms de ping ; sprint coupé garde levée.
