@@ -578,6 +578,17 @@ versé à T-014 ; les autres points déjà couverts sont précisés dans T-012 �
   config_client.lua »).
 - Critères : comme T-141 (essai sur la vue client, bornes de protection dans les constantes, rien du serveur servi) ;
   `docs/tests/reseau.md` § 7-C.
+- Fait le 31 octobre 2026 (branche `agents/T-142`, relectures à faire) : `vava_inventory` 1.9.0, `vava_combat` 1.1.0,
+  `vava_health` 1.5.0, `vava_time` 1.4.0, `vava_codex` 1.6.0, `vava_admin` 1.9.0, `vava_voice` 1.4.0, `vava_chat` 1.4.0,
+  `vava_cameras` 1.5.0, `vava_appearance` 1.1.0, `vava_needs` 1.3.0, `vava_world` 1.2.0 (`config_client.lua` partagé,
+  `config.lua` et `shared/grid.lua`, `shared/frost.lua`, `shared/label.lua` au seul serveur, feuilles du seul serveur
+  ajoutées par `config.lua`, avertissement d'un `config.lua` d'avant) ; `vava_hud` 1.5.0, `vava_loading` 1.2.0,
+  `vava_characters_ui` 1.3.0 (`config.lua` renommé `config_client.lua`) ; exemples `vava_anim_test` 1.2.0,
+  `vava_dev_characters` 1.4.0, `vava_example_combat` 1.2.0 ; Chancellerie 1.8.6 (réglage modifié gardé mais absent de
+  la nouvelle version signalé au journal de la mise à jour, R-8) ; essais sur la vue client (apparence, temps,
+  bouclier) ; `config_split_spec` : une feuille `false` est une valeur pour T1. Dix-huit exceptions transitoires et
+  entrées `PENDING` retirées (reste `vava_magic`). Lot 3 : 42 077 octets de moins par joueur, net du manifeste
+  (15 449 compressés). Rapport `docs/plan/rapports/T-142.md`. **À tester en jeu** : `docs/tests/reseau.md` § 7-C.
 
 ### T-143 — Configs partagées, lot 4 : magie et vivres
 - Agent : vava-dev-lua · Dépend de : T-132 · Statut : à faire
