@@ -1132,8 +1132,8 @@ faire tout le système de combat ») : la porte T-119 reste à passer en jeu.
   Rapport `docs/plan/rapports/T-112.md` ; procédure `docs/tests/combat.md` § 3 (32 tests) et § 4.
 
 ### T-149 — La magie et le mode combat
-- Agent : vava-dev-lua (cette tâche autorise à toucher `vava_magic`) · Dépend de : T-112, T-138 · Statut : en cours
-  (fait, relectures sécurité et réseau à faire)
+- Agent : vava-dev-lua (cette tâche autorise à toucher `vava_magic`) · Dépend de : T-112, T-138 · Statut : à tester en
+  jeu (relu sécurité et réseau, suites appliquées ; S-1 et S-4 confiés à T-113)
 - Décision du porteur du projet (31/10, spec T-112) : en mode combat (arme en main), la magie ne montre ni rappel
   « rangez votre arme » ni anneau de verrou ; texte propre pendant le rengainement ; export `hardControl(src)` (gelé,
   renversé, chancelant) lu par `vava_combat` pour refuser une frappe.
@@ -1149,7 +1149,11 @@ faire tout le système de combat ») : la porte T-119 reste à passer en jeu.
   `knockdown`, `stagger` ou nil, échéance comprise ; `combat.affects` lit `vava_admin:isInvulnerable` en dernier, une
   fois par effet : une fois par cible d'une Vague, une fois par pose dans un sol mouillé, une brume, une boue, jamais à
   chaque vérification). `vava_combat` : aucun code touché (son bridge lisait déjà `hardControl`, refus `controlled`),
-  README seul, reste 1.2.0. Rapport `docs/plan/rapports/T-149.md`. **À tester en jeu** après relectures :
+  README seul, reste 1.2.0. Suites des relectures (même version) : `hardControl` et l'empêchement d'incanter
+  parcourent tous les contrôles durs, quel que soit `states.order` (S-2) ; état déjà posé gardé, écrit au README (S-3) ;
+  commentaires livrés allégés, − 3,5 Ko bruts (R-1) ; `shared/hands.lua` en tête des `client_scripts` (R-2) ; roue
+  sans double lecture (R-3). S-1 et S-4 (`vava_combat`) confiés à T-113. Rapport `docs/plan/rapports/T-149.md`.
+  **À tester en jeu** :
   `docs/tests/magie.md` § 20 (16 tests) et 19-4, `docs/tests/combat.md` § 5 (5 tests) et 3-19,
   `docs/tests/registre.md` 9 bis-3 bis.
 

@@ -2016,7 +2016,7 @@ restriction ; 1.2.0 : rengainement et mode combat, T-149).
 | `isMage(source)` | booléen — personnage en jeu |
 | `spellLevel(source, sort)` | niveau (1 à 5) d'un sort connu, ou `nil` |
 | `mana(source)` | mana actuelle, maximum (0 pour un non-mage) |
-| `hardControl(source)` | `'frozen'`, `'knockdown'` ou `'stagger'` — vrai, avec sa nature — tant qu'un Gelé, un Renversé ou un Chancelant d'un sort tient le joueur (le premier dans l'ordre de `states.order`), sinon `nil` (source non entière comprise) ; mémoire seule, sans attente ; lu par `vava_combat` à chaque frappe (refus `controlled`) ; depuis 2.12.0 (T-149) |
+| `hardControl(source)` | `'frozen'`, `'knockdown'` ou `'stagger'` — vrai, avec sa nature — tant qu'un Gelé, un Renversé ou un Chancelant d'un sort tient le joueur (tous les noms de `states.hard` ; `states.order` ne fait que départager), sinon `nil` (source non entière comprise) ; mémoire seule, sans attente ; lu par `vava_combat` à chaque frappe (refus `controlled`) ; depuis 2.12.0 (T-149) |
 
 **Hooks** : `vava_magic:castStarting` (`before`, annulable : `{ source, characterId, spell, level }` — prison, zone…),
 `vava_magic:castDone` (`after` : `+ success`), `vava_magic:levelUp` (`after` : `{ source, characterId, spell, level }`),

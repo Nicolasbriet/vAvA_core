@@ -59,8 +59,8 @@ Rien n'a encore été joué en vrai : voir « À vérifier en jeu », « Tests �
 ```
 vava_magic/
   fxmanifest.lua · config_client.lua (lu par le client) · config.lua (servi au seul serveur) · README.md
-  shared/   constants.lua · progression.lua · geometry.lua · hands.lua (lus par le client et le serveur ; hands.lua :
-            mains prises et mode combat, 2.12.0)
+  shared/   constants.lua · progression.lua · geometry.lua (lus par le client et le serveur)
+            hands.lua (mains prises et mode combat, 2.12.0) : en tête des client_scripts, lu par le seul client
             text.lua (UTF-8) · pages.lua (lots du registre) · harm.lua (blessures sur la chaîne) : servis au seul serveur
   bridge/   server.lua · client.lua                 ← seul contact avec le core et les autres modules
   server/   core · world · sheets · mana · spells · progression · combat (coups par la chaîne) · protections
@@ -411,20 +411,25 @@ main.
 | Arme qu'on rengaine (1,5 s) | « Vous rengainez votre arme… », simple avis, une fois (clic gauche compris, mode magie endormi) | rien | « Vous rengainez votre arme… » |
 | Arme de GTA sortie | « rangez votre arme », une fois (comme avant) | verrou de la magie | « rangez votre arme » |
 
-- Règles pures dans `shared/hands.lua` (`hands.notice`, `hands.canLock`, `hands.code`), testées hors jeu. Le client lit
+- Règles pures dans `shared/hands.lua` (`hands.notice`, `hands.canLock`, `hands.code`), en tête des `client_scripts`
+  (le serveur ne s'en sert pas), testées hors jeu. Le client lit
   `exports.vava_combat:armed()` par un appel isolé (`bridge.CombatHands`), aux relevés déjà existants (conditions du
   mode magie, 200 ms ; vérification du verrou, 250 ms, seulement tant qu'un verrou de la magie existe) et à l'appui
-  d'une touche : **aucune boucle nouvelle**. Le client ne décide rien : le serveur refuse lui-même (`armed`,
+  d'une touche (la roue lit les mains une seule fois par choix) : **aucune boucle nouvelle**. Le client ne décide rien : le serveur refuse lui-même (`armed`,
   `sheathing`, `shielded`).
 - **Serveur** : `bridge.HandsBusy` rend `sheathing` quand `vava_combat:armed(source)` porte `sheathing = true` (arme
   rangée depuis moins de `draw.sheatheMs`), sinon `armed` comme avant ; une incantation demandée pendant le
   rengainement est refusée avec le texte propre.
 - **Contrôles durs** : export serveur `hardControl(source)` → `'frozen'`, `'knockdown'` ou `'stagger'` (vrai, et sa
   nature) tant qu'un Gelé, un Renversé ou un Chancelant de la magie tient le joueur (échéance comprise : un état échu
-  dont la minuterie n'est pas encore tombée ne compte plus), sinon `nil` ; source non entière : `nil`. Mémoire seule,
+  dont la minuterie n'est pas encore tombée ne compte plus), sinon `nil` ; source non entière : `nil`. Tous les noms
+  de `states.hard` comptent, quel que soit `states.order` (réglage d'affichage, qui ne fait que départager) ; de même
+  pour l'empêchement d'incanter. Mémoire seule,
   sans attente. vava_combat le lit à chaque frappe (`bridge.MagicHardControl`, isolé, magie facultative) et refuse
   `controlled`. Le chancellement propre au combat (0,9 s) reste distinct (spec T-112 § 13-4).
-- **Membre invulnérable** : voir « Blessures et chaîne de dégâts ».
+- **Membre invulnérable** : voir « Blessures et chaîne de dégâts ». L'invulnérabilité **ne retire pas un état déjà
+  posé** : un joueur mouillé, ralenti, gelé… qui devient invulnérable garde cet état jusqu'à sa fin (au plus quelques
+  secondes) ; seuls les effets qui le touchent ensuite l'épargnent.
 
 ## Commandes du Conseil
 
@@ -468,8 +473,8 @@ la régénération de la mana, l'XP d'un échec et l'anti-farm, les délais et m
 textes que le serveur envoie (messages au joueur, réponses du Conseil, journal).
 
 Fichiers téléchargés par chaque joueur (2.11.0) : `shared/constants.lua`, `config_client.lua`,
-`shared/progression.lua`, `shared/geometry.lua`, `shared/hands.lua` (2.12.0), les fichiers `client/`, la page, ses sons
-et ses images ;
+`shared/progression.lua`, `shared/geometry.lua`, `shared/hands.lua` (2.12.0, dans les `client_scripts`), les fichiers
+`client/`, la page, ses sons et ses images ;
 `config.lua`, `shared/text.lua`, `shared/pages.lua` et `shared/harm.lua` sont servis au seul serveur.
 
 **Mise à jour vers 2.11.0** : les réglages lus par le client ont quitté `config.lua` pour `config_client.lua`. Un
