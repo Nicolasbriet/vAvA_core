@@ -108,7 +108,7 @@ messages.reportClosed = 'Votre signalement a été clos.'
 messages.reportNew = 'Signalement n° %d de %s.'
 -- 1.10.0 : alerte au Conseil (nature, numéro, auteur), nature de chaque demande, refus d'une demande de trop
 messages.requestNew = '%s : demande n° %d de %s.'
-messages.requestKinds = { question = 'Question', player = 'Signalement', bug = 'Bug', other = 'Autre' }
+messages.requestKinds = { question = 'Question', player = 'Signalement', bug = 'Anomalie', other = 'Autre' }
 messages.reportTooShort = 'Quelques mots de plus, s\'il vous plaît.'
 messages.reportInvalid = 'Ce message contient des caractères que le Registre ne peut garder.'
 messages.reportTooMany = 'Vos demandes attendent déjà le Conseil : patientez qu\'il y réponde.'

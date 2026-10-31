@@ -76,7 +76,7 @@ const STRINGS = Object.freeze({
   conseil: {
     title: 'Le Conseil vous écoute',
     kind: 'De quoi s\'agit-il ?',
-    kinds: { question: 'Une question', player: 'Signaler un joueur', bug: 'Un bug', other: 'Autre' },
+    kinds: { question: 'Une question', player: 'Signaler un joueur', bug: 'Une anomalie', other: 'Autre' },
     message: 'Votre message',
     placeholder: 'Décrivez la situation en quelques phrases…',
     count: (n, max) => `${n} / ${max}`,
