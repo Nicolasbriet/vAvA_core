@@ -5,7 +5,7 @@
            natives serveur (OneSync) : rien n'est demandé au client. Les modules administrés (santé, besoins,
            inventaire) sont appelés de façon isolée et restent facultatifs.
     Dépendances : shared/constants.lua, config.lua, server/core.lua, server/ranks.lua, server/store.lua,
-                  server/bans.lua, server/players.lua, server/spectate.lua
+                  server/bans.lua, server/players.lua, server/invulnerability.lua, server/spectate.lua
 ]]
 
 local type, pairs, ipairs, tonumber, tostring, sort = type, pairs, ipairs, tonumber, tostring, table.sort
@@ -18,6 +18,7 @@ local store = VavaAdmin.store
 local bans = VavaAdmin.bans
 local players = VavaAdmin.players
 local spectate = VavaAdmin.spectate
+local invulnerability = VavaAdmin.invulnerability
 local call = VavaAdmin.call
 local cfg = VavaAdmin.config
 local messages = cfg.messages
@@ -267,6 +268,8 @@ function actions.spectate(actor, target)
     if not coords then return false, 'no_ped' end
     local session = spectate.begin(actor.source)
     if not session then return false, 'no_character' end
+    -- caché sous l'observé, il ne peut être atteint (server/invulnerability.lua) jusqu'à la fin de l'observation
+    invulnerability.set(actor, 'spectate', true)
     return true, { source = target.source, label = target.label, x = coords.x, y = coords.y, z = coords.z, session = session }
 end
 

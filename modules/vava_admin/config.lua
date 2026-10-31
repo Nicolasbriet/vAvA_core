@@ -2,7 +2,8 @@
     vava_admin/config.lua
     Rôle : réglages de l'administration que lit le seul serveur (servi au seul serveur, jamais téléchargé par les
            joueurs) : rangs du Conseil et leurs droits, durées de bans, pont du web, journal, relecture des bans,
-           signalements et demandes au Conseil (1.10.0), déplacements, débits, textes envoyés par le serveur. Complète la table ouverte par
+           signalements et demandes au Conseil (1.10.0), invulnérabilité (1.11.0), déplacements, débits, textes
+           envoyés par le serveur. Complète la table ouverte par
            config_client.lua (commandes, touches, outils du client, textes du client) sans en réécrire une clé
            (T-132).
     Dépendances : shared/constants.lua, config_client.lua
@@ -71,6 +72,15 @@ config.requests = {
     minChars = 10,
     maxLines = 12,
     kinds = { 'question', 'player', 'bug', 'other' },
+}
+
+-- Invulnérabilité tenue par le serveur (1.11.0) : l'outil « Invulnérabilité », le vol libre et l'observation d'un
+-- membre du Conseil annulent tout coup et tout sort qui l'atteint par la chaîne de dégâts de vava_health (modificateur
+-- vava_admin:invulnerabilite, étape « annulation »). `priority` : rang dans l'étape (0 à 99, plus petit = plus tôt) ;
+-- `label` : nom montré dans la liste des modificateurs de la chaîne (48 octets au plus).
+config.invulnerability = {
+    priority = 10,
+    label = 'Invulnérabilité du Conseil',
 }
 
 -- Déplacements : écart à l'arrivée (m) pour ne pas apparaître dans la personne.
