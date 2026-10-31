@@ -703,6 +703,16 @@ versé à T-014 ; les autres points déjà couverts sont précisés dans T-012 �
 - Critères : aucun `TriggerClientEvent` direct hors du repli et de l'annonce ; essai du repli ; `/vava_reseau` montre
   les envois du Registre.
 
+### T-153 — Audit : peser ce qui est livré, pas le dossier
+- Agent : vava-dev-lua · Dépend de : — · Statut : à faire
+- Trouvé pendant T-152 (relecture réseau R-5) : `scripts/audit-reseau.sh` (contrôle du poids de `vava_loading`) mesure
+  le dossier par `du -sb`, qui compte ≈ 70 Ko jamais livrés (README, `web/dev/`, licences des polices) ; il ne reste
+  que ≈ 56 Ko de marge, et une simple retouche du README ou des essais déclencherait un BLOQUANT sans un octet de plus
+  chez les joueurs. Mesurer les seuls fichiers du manifeste (`scripts/lib/manifeste.awk`, comme
+  `scripts/poids-client.sh`) et poser le plafond sur ce total.
+- Critères : plafond sur le total livré ; cas d'essai de l'audit (`tests/audit/`) pour un fichier non livré lourd
+  (sans effet) et un fichier livré qui dépasse (BLOQUANT) ; mesures avant et après dans le rapport.
+
 ### T-148 — Fichiers `shared/` absents du manifeste
 - Agent : vava-dev-lua · Dépend de : T-132 · Statut : à faire
 - Trouvé pendant T-146 : rien ne vérifie qu'un `shared/*.lua` présent dans un module est bien listé à son manifeste ;
@@ -897,7 +907,7 @@ versé à T-014 ; les autres points déjà couverts sont précisés dans T-012 �
   lore OK.
 
 ### T-152 — Écran de chargement : les ambiances d'Eldoria en fondu enchaîné
-- Agent : vava-dev-nui · Dépend de : T-020 · Statut : à tester en jeu (relecture réseau à faire)
+- Agent : vava-dev-nui · Dépend de : T-020 · Statut : à tester en jeu (relu réseau, suites appliquées)
 - Fait le 31 octobre 2026 (branche `agents/T-152`) : `vava_loading` 1.3.0. Paysage peint retiré ; sept ambiances en
   fondu enchaîné (première au hasard, puis l'ordre de `ambiances.order`, ≈ 9 s chacune, fondu de 3 s, dérive lente
   coupée en `basse` et quand le joueur demande moins d'animations), un seul minuteur, image suivante décodée après
@@ -906,7 +916,10 @@ versé à T-014 ; les autres points déjà couverts sont précisés dans T-012 �
   ceux du paysage remplacés) ; `tests/spec/loading_screen_spec.lua` complété (motif des images, `ambiances.js`, poids
   avec images). Rapport `docs/plan/rapports/T-152.md`. **À tester en jeu** : `docs/tests/chargement.md` 2-7 à 2-11 en
   priorité (ordre, fondu sans écran vide, image renommée sautée, `basse` sans dérive), puis 2-1, 2-2, 5-5, 5-6.
-  **Relecture réseau et performance à faire** (section vide du rapport).
+  Relecture réseau et performance : OK ; suites R-2 (dossier des ambiances égal à `ambiances.order`), R-3 (dérive
+  mesurée seule, test 5-5) et R-4 (test 5-6 cache vidé) appliquées ; R-1 (poids des images, ≈ 40 % de plus au
+  premier téléchargement d'un nouveau joueur) laissé à la décision du porteur du projet avant le premier
+  déploiement ; R-5 → T-153.
 - Demande du porteur du projet (31 octobre 2026) : sept peintures de la même vue d'Eldoria sous des ambiances
   différentes (aube, brume du matin, hiver, crépuscule, nuit étoilée, brume de nuit, orage), fournies en PNG
   1672 × 941, converties en WebP 1600 × 900 qualité 50 (1 181 Ko pour les sept) dans
