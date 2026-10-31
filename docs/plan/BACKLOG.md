@@ -511,7 +511,7 @@ versé à T-014 ; les autres points déjà couverts sont précisés dans T-012 �
   (`docs/tests/reseau.md` § 3, `docs/tests/chancellerie.md` § 3).
 
 ### T-132 — Configs partagées : n'envoyer au client que ce qu'il lit
-- Agents : vava-architecte → vava-dev-lua · Dépend de : — · Statut : en cours
+- Agents : vava-architecte → vava-dev-lua · Dépend de : — · Statut : à tester en jeu (relu sécurité et réseau, suites appliquées)
 - **Priorité : juste après la fusion de T-101** (relecture réseau R-4 de T-101 : la config partagée de `vava_atelier`
   est passée de 10 844 à 25 629 octets, gzip 3 958 → 7 996, téléchargés par chaque joueur ; le client n'en lit
   qu'≈ 2,4 Ko). Commencer par `vava_atelier`.
@@ -525,12 +525,19 @@ versé à T-014 ; les autres points déjà couverts sont précisés dans T-012 �
 - Spec : `docs/plan/specs/T-132.md` (décisions du porteur du projet le 31 octobre 2026 : option B, `config.lua` au seul
   serveur et `config_client.lua` partagé, une valeur à un seul endroit ; T-132 = lot 1 et outillage, puis T-141 à
   T-143 ; installeur de la Chancellerie autorisé).
-- Fait le 31 octobre 2026 (branche `agents/T-132`, relectures à faire) : outillage (`scripts/lib/manifeste.awk`,
-  règle bloquante de `audit-reseau.sh` et ses cas d'essai, exceptions transitoires des lots 2 à 4,
-  `scripts/poids-client.sh`, `tests/spec/config_split_spec.lua`, `tests/helper.lua`) ; `vava_atelier` 1.2.0,
-  `vava_arrival` 1.2.0, `vava_chancellerie` 1.7.1, Chancellerie 1.8.5 (installeur). Lot 1 : 41 727 octets de Lua en
-  moins par joueur (14 057 compressés). Rapport `docs/plan/rapports/T-132.md`. **À tester en jeu** :
-  `docs/tests/reseau.md` § 7-A.
+- Fait le 31 octobre 2026 (branche `agents/T-132`) : règle des deux fichiers de réglages (`config.lua` au seul serveur,
+  `config_client.lua` lu par le client, une valeur à un seul endroit ; `CLAUDE.md` et fiches des agents à jour) ;
+  outillage : `scripts/lib/manifeste.awk` partagé, `audit-reseau.sh` refuse `config.lua` servi aux joueurs (casse,
+  `..`, `ui_page` et `loadscreen` compris), `config_client.lua` au seul serveur, un chemin hors de la ressource et
+  une directive à valeur calculée, sans que `audit: ok` les fasse taire (192 cas d'essai) ; 24 exceptions
+  transitoires reliées à `PENDING` ; `scripts/poids-client.sh` (Lua, autres, manifeste, `stream/`, core compris) ;
+  `tests/spec/config_split_spec.lua` (T0 à T3, alias multiples et `<const>` suivis, fermé par défaut) ;
+  `helper.loadClientView`. `vava_atelier` 1.2.0, `vava_arrival` 1.2.0 (`welcome.maxSends` au seul serveur),
+  `vava_chancellerie` 1.7.1 (plus aucun script servi), Chancellerie 1.8.5 (`config_client.lua` gardé à la mise à
+  jour). Lot 1 : 40 352 octets de moins par joueur, net du manifeste (13 574 compressés). Relu sécurité (OK, 6
+  mineurs) et réseau (3 importants, 5 mineurs), suites appliquées (une ligne « Suite : » par point). Rapport
+  `docs/plan/rapports/T-132.md`. **À tester en jeu** : `docs/tests/reseau.md` § 7-A, en priorité 7-A-2 (`F8` sans
+  `SCRIPT ERROR`), 7-A-3 (`resmon`), 7-A-12 (ancien `config.lua` signalé), 7-A-14 (`resource.rpf` avant et après).
 
 ### T-141 — Configs partagées, lot 2 : les métiers
 - Agent : vava-dev-lua · Dépend de : T-132 · Statut : à faire
@@ -538,8 +545,13 @@ versé à T-014 ; les autres points déjà couverts sont précisés dans T-012 �
   `vava_gathering`, `vava_skills` et à la config de `vava_provisions` ; retirer leurs exceptions transitoires de
   `scripts/audit-exceptions.txt` et leurs entrées `PENDING` de `tests/spec/config_split_spec.lua`. **À faire avant
   T-102** (décision du porteur du projet : T-102 à T-104 partent de fichiers déjà découpés).
-- Critères : `config_split_spec` et l'audit passent sans exception pour ces modules ; gains mesurés par
-  `scripts/poids-client.sh` au rapport ; `docs/tests/reseau.md` § 7-B écrit et joué.
+- Critères : `config_split_spec` et l'audit passent sans exception pour ces modules ; chaque fonction partagée (`shared/*.lua`) qui reçoit une table de config depuis le client est essayée sur la
+  seule vue client (`helper.loadClientView`, relecture réseau R-2 de T-132) ; à défaut, aucune coupe au deuxième niveau
+  d'une table passée à la logique partagée ; toute borne dont le client a besoin pour se protéger (longueur ou motif de
+  ce qu'il reçoit) reste dans `shared/constants.lua`, jamais dans `config_client.lua` (relecture sécurité S-4) ; rien
+  que le seul serveur lit n'est servi, même une feuille d'une table lue par le client (S-5 : `config.x.y = …` dans
+  `config.lua`) ; gains mesurés
+  par `scripts/poids-client.sh` au rapport (net du manifeste) ; `docs/tests/reseau.md` § 7-B écrit et joué.
 
 ### T-142 — Configs partagées, lot 3 : le socle
 - Agent : vava-dev-lua · Dépend de : T-132 · Statut : à faire
@@ -548,7 +560,12 @@ versé à T-014 ; les autres points déjà couverts sont précisés dans T-012 �
   `config.lua` renommé `config_client.lua` dans les trois modules sans partie serveur (`vava_hud`, `vava_loading`,
   `vava_characters_ui`) ; exemples `vava_anim_test`, `vava_dev_characters`, `vava_example_combat`. Retirer leurs
   exceptions transitoires et leurs entrées `PENDING`.
-- Critères : comme T-141 ; `docs/tests/reseau.md` § 7-C.
+- Relecture réseau R-8 de T-132 : après le renommage, l'installeur de la Chancellerie garde un `config.lua` modifié
+  qui n'est plus au manifeste, ignoré sans un mot (`chancellerie/lib/installer.js:156-160`) : prévoir un message de la
+  Chancellerie pour un fichier de réglages gardé mais absent de la nouvelle version (« reportez vos réglages dans
+  config_client.lua »).
+- Critères : comme T-141 (essai sur la vue client, bornes de protection dans les constantes, rien du serveur servi) ;
+  `docs/tests/reseau.md` § 7-C.
 
 ### T-143 — Configs partagées, lot 4 : magie et vivres
 - Agent : vava-dev-lua · Dépend de : T-132 · Statut : à faire
@@ -556,7 +573,8 @@ versé à T-014 ; les autres points déjà couverts sont précisés dans T-012 �
   `shared/pages.lua` au serveur si aucun fichier client ne s'en sert) ; `vava_provisions/shared/rules.lua` coupé en
   deux (`shared/texts.lua` partagé, `shared/rules.lua` au serveur). Retirer les dernières exceptions transitoires et
   entrées `PENDING`.
-- Critères : comme T-141 ; `docs/tests/reseau.md` § 7-D.
+- Critères : comme T-141 (essai sur la vue client, bornes de protection dans les constantes, rien du serveur servi) ;
+  `docs/tests/reseau.md` § 7-D.
 
 ### T-133 — `%c` dépend de la locale : contrôles de texte justes partout
 - Agent : vava-dev-lua · Dépend de : — · Statut : à tester en jeu (relu sécurité, suites appliquées)
