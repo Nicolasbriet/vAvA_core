@@ -75,12 +75,18 @@ config.requests = {
 }
 
 -- Invulnérabilité tenue par le serveur (1.11.0) : l'outil « Invulnérabilité », le vol libre et l'observation d'un
--- membre du Conseil annulent tout coup et tout sort qui l'atteint par la chaîne de dégâts de vava_health (modificateur
--- vava_admin:invulnerabilite, étape « annulation »). `priority` : rang dans l'étape (0 à 99, plus petit = plus tôt) ;
--- `label` : nom montré dans la liste des modificateurs de la chaîne (48 octets au plus).
+-- membre du Conseil annulent tout coup et tout sort qui le blesse par la chaîne de dégâts de vava_health, faim et soif
+-- comprises (modificateur vava_admin:invulnerabilite, étape « annulation ») ; les effets sans dégâts (recul,
+-- renversement, mouillé, ralenti) ne passent pas par la chaîne. `priority` : rang dans l'étape (0 à 99, plus petit =
+-- plus tôt) ; `label` : nom montré dans la liste des modificateurs de la chaîne (48 octets au plus).
+-- L'observation ne protège que si le corps du membre, lu par le serveur, est à `spectateRadius` mètres au plus de
+-- l'ancrage sous l'observé (`spectate.anchorDepth` de config_client.lua ; l'ancrage suit l'observé une fois par
+-- seconde), et au plus `spectateMaxMs` après le début de l'observation (puis elle tombe, au journal).
 config.invulnerability = {
     priority = 10,
     label = 'Invulnérabilité du Conseil',
+    spectateRadius = 20.0,
+    spectateMaxMs = 10 * 60 * 1000,
 }
 
 -- Déplacements : écart à l'arrivée (m) pour ne pas apparaître dans la personne.
@@ -123,3 +129,11 @@ messages.reportTooShort = 'Quelques mots de plus, s\'il vous plaît.'
 messages.reportInvalid = 'Ce message contient des caractères que le Registre ne peut garder.'
 messages.reportTooMany = 'Vos demandes attendent déjà le Conseil : patientez qu\'il y réponde.'
 messages.notStaff = 'Vous ne siégez pas au Conseil.'
+-- 1.11.0, journal (32 caractères au plus) : protection d'une observation levée sans geste du membre ou à sa fin, outils
+-- retirés à un membre dont le rang a perdu le droit ; causes inscrites dans les détails (et à la console)
+messages.logSpectateEnded = 'Observation : protection levée'
+messages.logToolsWithdrawn = 'Outils retirés (rang changé)'
+messages.spectateEnded = {
+    finished = 'fin de l\'observation', expired = 'durée dépassée', unloaded = 'personnage déchargé',
+    left = 'départ du joueur',
+}

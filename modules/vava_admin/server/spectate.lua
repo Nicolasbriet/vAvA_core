@@ -111,7 +111,7 @@ function spectate.finish(src, session)
     if current[src] ~= session then return true end
     current[src] = nil
     -- revenu à sa place : l'observation ne le protège plus (server/invulnerability.lua)
-    invulnerability.drop(src, 'spectate')
+    invulnerability.drop(src, 'spectate', 'finished')
     local characterId = characterOf(src)
     if not characterId then return true end
     local place, departed = placeOf(characterId)

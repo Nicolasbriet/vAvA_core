@@ -2,11 +2,12 @@
     vava_admin/server/staff.lua
     Rôle : membres du Conseil (compte → rang), chargés au démarrage et tenus à jour en mémoire : aucune requête pour
            vérifier un droit. Un « acteur » est celui qui agit : un membre en jeu, la console, plus tard le panneau
-           web ; toutes les actions passent par lui (droits, rang, nom au journal).
+           web ; toutes les actions passent par lui (droits, rang, nom au journal). Chaque changement de rang prévient
+           ses écouteurs (1.11.0 : outils retirés, server/invulnerability.lua).
     Dépendances : shared/constants.lua, config.lua, server/core.lua, server/ranks.lua, server/store.lua
 ]]
 
-local pairs, ipairs, tonumber, tostring = pairs, ipairs, tonumber, tostring
+local pairs, ipairs, tonumber, tostring, pcall = pairs, ipairs, tonumber, tostring, pcall
 local sort = table.sort
 local GetPlayers = GetPlayers
 
@@ -25,6 +26,27 @@ VavaAdmin.staff = staff
 
 ---@type table<integer, string>  compte → nom du rang
 local members = {}
+-- prévenus après chaque changement de rang d'un compte (server/invulnerability.lua : outils retirés, 1.11.0)
+local listeners = {}
+
+--- Ajoute un écouteur des changements de rang : fn(compte, rang d'avant, rang d'après), rangs nil hors du Conseil.
+---@param fn fun(accountId: integer, before: vAvA.AdminRank|nil, after: vAvA.AdminRank|nil)
+function staff.onRankChanged(fn)
+    listeners[#listeners + 1] = fn
+end
+
+--- Prévient les écouteurs, chacun isolé : un écouteur en erreur n'empêche ni les autres ni le changement.
+---@param accountId integer
+---@param before string|nil
+---@param after string|nil
+local function changed(accountId, before, after)
+    if before == after then return end
+    local beforeRank, afterRank = before and ranks.get(before) or nil, after and ranks.get(after) or nil
+    for _, fn in ipairs(listeners) do
+        local ok, err = pcall(fn, accountId, beforeRank, afterRank)
+        if not ok then VavaAdmin.log.error('changement de rang du compte n° %d : %s', accountId, tostring(err)) end
+    end
+end
 
 --- Nom du personnage actif d'un joueur, ou nil.
 ---@param src integer
@@ -100,6 +122,7 @@ function staff.set(actor, accountId, rankName)
     if actor.accountId == accountId then return false, 'self' end
     if not staff.outranks(actor, accountId) then return false, 'outranked' end
     local ok, err
+    local before = members[accountId]
     if rankName then
         local rank = ranks.get(rankName)
         if not rank then return false, 'unknown_rank' end
@@ -115,6 +138,7 @@ function staff.set(actor, accountId, rankName)
         VavaAdmin.log.error('Conseil non mis à jour : %s', tostring(err))
         return false, 'db_error'
     end
+    changed(accountId, before, members[accountId])
     return true
 end
 
@@ -137,7 +161,9 @@ function staff.force(accountId, rankName)
         VavaAdmin.log.error('Conseil non mis à jour : %s', tostring(err))
         return false, 'db_error'
     end
+    local before = members[accountId]
     members[accountId] = rankName
+    changed(accountId, before, rankName)
     return true, rankName and 'granted' or 'revoked'
 end
 

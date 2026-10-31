@@ -269,7 +269,7 @@ function actions.spectate(actor, target)
     local session = spectate.begin(actor.source)
     if not session then return false, 'no_character' end
     -- caché sous l'observé, il ne peut être atteint (server/invulnerability.lua) jusqu'à la fin de l'observation
-    invulnerability.set(actor, 'spectate', true)
+    invulnerability.set(actor, 'spectate', true, target.source)
     return true, { source = target.source, label = target.label, x = coords.x, y = coords.y, z = coords.z, session = session }
 end
 

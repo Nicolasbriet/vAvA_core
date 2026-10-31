@@ -52,6 +52,7 @@ local MODULE_TOOL = { type = 'string', min = 3, max = VavaAdmin.TOOL_LIMITS.key,
 ---@field limit table
 ---@field where string   game, web ou both
 ---@field handler fun(actor: vAvA.AdminActor, ...): boolean, any
+---@field release? fun(src: integer, ...): boolean, any   sans le droit (en jeu) : ce qui reste permis, couper seulement
 
 ---@type table<string, vAvA.AdminRequest>
 local requests = {}
@@ -187,6 +188,13 @@ define('tool', 'tools', { TOOL, BOOL }, limits.action, GAME, function(actor, nam
     audit.record(actor, 'tool', nil, { outil = name, actif = enabled and 'oui' or 'non' })
     return true
 end)
+-- couper un outil ne donne rien : permis sans le droit (rang abaissé ou révoqué, relecture S-3), sans journal ; rallumer
+-- reste refusé
+requests.tool.release = function(src, name, enabled)
+    if enabled ~= false then return false, 'forbidden' end
+    invulnerability.drop(src, name)
+    return true
+end
 -- outil d'un module : le droit est celui que le module a déclaré ; le module revérifie chaque action
 define('moduleTool', 'view', { MODULE_TOOL }, limits.read, GAME, function(actor, key)
     return extensions.check(actor, key)
