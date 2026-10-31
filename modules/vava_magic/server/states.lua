@@ -4,7 +4,8 @@
            plus fort l'emporte, jamais cumulé), Chancelant, Renversé, Gelé. Chaque état a sa fin, tenue ici ; le state
            bag du ped les montre aux joueurs proches (flammes, gouttes, givre, poussière) et au joueur lui-même, qui
            reçoit aussi leurs durées (icônes de son écran) et applique ce qui touche à son ped (allure, chute).
-      - Contrôles durs (Chancelant, Renversé, Gelé) : impossible d'incanter, une incantation en cours se brise. Dès
+      - Contrôles durs (Chancelant, Renversé, Gelé) : impossible d'incanter, une incantation en cours se brise ;
+        impossible de frapper non plus (`states.hardControl`, export `hardControl` lu par vava_combat, T-149). Dès
         qu'un contrôle dur touche, la cible est protégée des autres jusqu'à `hardImmunityMs` après sa fin (règle
         d'équité : aucun enchaînement) ; les dégâts, eux, s'appliquent toujours.
       - Gelé : le ped est figé par le serveur seul (le client ne fait que couper ses commandes) ; à la fin du gel, au
@@ -217,6 +218,22 @@ function states.slowStrength(src)
     local entry = players[src]
     local condition = entry and entry.conditions.slow
     return condition and condition.strength or 0
+end
+
+--- Contrôle dur qui tient ce joueur maintenant (Chancelant, Renversé, Gelé : `states.hard` de la config), ou nil : son
+--- nom (`stagger`, `knockdown`, `frozen`), le premier dans l'ordre de `states.order`. Lecture en mémoire seule, sans
+--- attente : vava_combat la demande à chaque frappe (export `hardControl`) pour refuser un coup (`controlled`).
+---@param src integer
+---@return string|nil
+function states.hardControl(src)
+    local entry = players[src]
+    if not entry then return nil end
+    local now = GetGameTimer()
+    for _, name in ipairs(cfg.order) do
+        local condition = HARD[name] and entry.conditions[name]
+        if condition and condition.untilMs > now then return name end
+    end
+    return nil
 end
 
 ---@param src integer

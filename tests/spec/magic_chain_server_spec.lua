@@ -10,11 +10,14 @@ local helper = require('tests.helper')
 --   modificateurs déclarés : vava_magic:protections (bouclier) et vava_magic:resistances (resistance), plus
 --     vava_magic:zones (annulation) seulement si une zone de paix est réglée ;
 --   incantation : un coup qui retire de la vie au lanceur (hook after) ou sa vie de vava_health plus basse qu'au
---     début la brise (`hurt`) ; jamais la vie du ped.
+--     début la brise (`hurt`) ; jamais la vie du ped ;
+--   membre du Conseil invulnérable (T-149, relectures S-2 et R-3 de T-138) : effets sans dégâts épargnés
+--     (`combat.affects` → nil, `invulnerable`), `vava_admin:isInvulnerable` lu une fois par effet, jamais à chaque
+--     vérification d'une zone (sol mouillé, brume, boue) ni deux fois par cible d'une Vague.
 describe('vava_magic sur la chaîne de dégâts (serveur)', function()
     local combat, protections, casting, cfg
     local now, hits, hitResult, hitCode, notified, clientEvents, characters, positions, health, modifiers, onHit
-    local spellDefs, chainPvp, chainLaunched, ranks, staff, adminLogs
+    local spellDefs, chainPvp, chainLaunched, ranks, staff, adminLogs, downed, invulnerable, invulnerableReads
 
     local CASTER, VICTIM, OTHER = 3, 7, 9
 
@@ -35,6 +38,7 @@ describe('vava_magic sur la chaîne de dégâts (serveur)', function()
         health = { [CASTER] = 1.0, [VICTIM] = 1.0 }
         modifiers, onHit = nil, nil
         chainPvp, chainLaunched, ranks, staff, adminLogs = true, true, {}, {}, {}
+        downed, invulnerable, invulnerableReads = {}, {}, {}
 
         _G.GetGameTimer = function() return now end
         _G.TriggerClientEvent = function(event, target, ...)
@@ -51,7 +55,11 @@ describe('vava_magic sur la chaîne de dégâts (serveur)', function()
         }
         VavaMagic.bridge = {
             GetCharacterId = function(src) return characters[src] end,
-            IsDowned = function() return false end,
+            IsDowned = function(src) return downed[src] == true end,
+            IsInvulnerable = function(src)
+                invulnerableReads[src] = (invulnerableReads[src] or 0) + 1
+                return invulnerable[src] == true
+            end,
             HandsBusy = function() return nil end,
             OnHold = function() return true end,
             Notify = function(src, message, kind) notified[#notified + 1] = { target = src, message = message, kind = kind } end,
@@ -731,6 +739,191 @@ describe('vava_magic sur la chaîne de dégâts (serveur)', function()
             characters[CASTER] = 99
             assert.is_false(combat.damage(CASTER, VICTIM, 'boule_de_feu', 8, combat.KIND.IMPACT, 42, nil, 1000))
             assert.equal(0, #hits)
+        end)
+    end)
+    describe('membre du Conseil invulnérable : effets sans dégâts épargnés (T-149)', function()
+        local combos, zoneKinds, stateCalls, has, registered, near
+
+        before_each(function()
+            loadMagic()
+            stateCalls, has, zoneKinds, registered, near = {}, {}, {}, {}, {}
+            VavaMagic.sheets = {
+                discover = function() return false end,
+                get = function(src) return characters[src] and { characterId = characters[src] } or nil end,
+            }
+            VavaMagic.states = {
+                has = function(src, name) return has[src] and has[src][name] or false end,
+                apply = function(src, name)
+                    stateCalls[#stateCalls + 1] = { src, name }
+                    return true
+                end,
+                remove = function() end,
+            }
+            VavaMagic.zones = {
+                CIRCLE = 'circle',
+                define = function(kind, handlers) zoneKinds[kind] = handlers end,
+                create = function(def) return def end,
+                list = function() return {} end,
+                ofCharacter = function() return {} end,
+                remove = function() end,
+            }
+            VavaMagic.world.broadcast = function() end
+            VavaMagic.world.near = function() return near end
+            VavaMagic.experience = { bonus = function() end }
+            VavaMagic.obstacles = { blocked = function() return false end }
+            VavaMagic.spells.register = function(name, def)
+                registered[name] = def
+                return true
+            end
+            helper.loadAll({
+                'modules/vava_magic/server/combos.lua',
+                'modules/vava_magic/server/grounds.lua',
+                'modules/vava_magic/server/spells/brume.lua',
+                'modules/vava_magic/server/spells/vague.lua',
+            })
+            combos = VavaMagic.combos
+        end)
+
+        local function applied(src)
+            local list = {}
+            for _, call in ipairs(stateCalls) do
+                if call[1] == src then list[#list + 1] = call[2] end
+            end
+            return list
+        end
+
+        it('combat.affects : épargné (nil, invulnerable), vava_admin lu une fois par appel', function()
+            invulnerable[VICTIM] = true
+            local position, refused = combat.affects(VICTIM, CASTER, 42)
+            assert.is_nil(position)
+            assert.equal('invulnerable', refused)
+            assert.equal(combat.INVULNERABLE, refused)
+            assert.equal(1, invulnerableReads[VICTIM])
+            invulnerable[VICTIM] = nil
+            position, refused = combat.affects(VICTIM, CASTER, 42)
+            assert.is_table(position)
+            assert.is_nil(refused)
+            assert.equal(2, invulnerableReads[VICTIM])
+        end)
+
+        it('combat.affects : vava_admin n’est lu que pour qui serait touché (en dernier)', function()
+            invulnerable[VICTIM] = true
+            downed[VICTIM] = true
+            local position, refused = combat.affects(VICTIM, CASTER, 42)
+            assert.is_nil(position)
+            assert.is_nil(refused)
+            downed[VICTIM] = nil
+            chainPvp = false
+            assert.is_nil(combat.affects(VICTIM, CASTER, 42))
+            chainPvp = true
+            assert.is_nil(combat.affects(VICTIM, CASTER, 41))
+            characters[VICTIM] = nil
+            assert.is_nil(combat.affects(VICTIM, CASTER, 42))
+            assert.is_nil(invulnerableReads[VICTIM])
+        end)
+
+        it('combos.hit : membre invulnérable, aucune combinaison retenue (reached faux), une seule lecture', function()
+            has[VICTIM] = { wet = true }
+            invulnerable[VICTIM] = true
+            local hit = combos.hit(CASTER, VICTIM, 'trait_de_glace', 5, nil, 42)
+            assert.is_false(hit.reached)
+            assert.is_nil(hit.pending)
+            combos.commit(hit)
+            assert.equal(0, #stateCalls)
+            assert.equal(1, invulnerableReads[VICTIM])
+            invulnerable[VICTIM] = nil
+            hit = combos.hit(CASTER, VICTIM, 'trait_de_glace', 5, nil, 42)
+            assert.is_true(hit.reached)
+            assert.is_table(hit.pending)
+        end)
+
+        it('sol mouillé : un membre invulnérable n’est relu qu’à la pose suivante, jamais à chaque vérification', function()
+            local onTick = zoneKinds.wet.onTick
+            local zone = { owner = CASTER, ownerCharacter = 42, spell = 'vague', data = { applied = {} } }
+            local refresh, tick = cfg.wetGround.refreshMs, cfg.zones.tickMs
+            invulnerable[VICTIM] = true
+            for _ = 1, refresh // tick do
+                onTick(zone, VICTIM)
+                now = now + tick
+            end
+            assert.equal(1, invulnerableReads[VICTIM])
+            assert.same({}, applied(VICTIM))
+            onTick(zone, VICTIM)
+            assert.equal(2, invulnerableReads[VICTIM])
+            -- protection retirée : mouillé à la pose suivante
+            invulnerable[VICTIM] = nil
+            now = now + refresh
+            onTick(zone, VICTIM)
+            assert.same({ 'wet' }, applied(VICTIM))
+            assert.equal(3, invulnerableReads[VICTIM])
+        end)
+
+        it('sol mouillé : les autres refus restent relus à chaque vérification (à terre, puis relevé)', function()
+            local onTick = zoneKinds.wet.onTick
+            local zone = { owner = CASTER, ownerCharacter = 42, spell = 'vague', data = { applied = {} } }
+            downed[VICTIM] = true
+            onTick(zone, VICTIM)
+            assert.same({}, applied(VICTIM))
+            downed[VICTIM] = nil
+            now = now + cfg.zones.tickMs
+            onTick(zone, VICTIM)
+            assert.same({ 'wet' }, applied(VICTIM))
+        end)
+
+        it('brume : même règle (une lecture par pose)', function()
+            local onTick = zoneKinds.mist.onTick
+            local zone = { owner = CASTER, ownerCharacter = 42, spell = 'brume',
+                data = { wetMs = 5000, applied = {}, rewarded = false, bonus = false } }
+            local refresh, tick = cfg.spells.brume.refreshMs, cfg.zones.tickMs
+            invulnerable[VICTIM] = true
+            for _ = 1, refresh // tick do
+                onTick(zone, VICTIM)
+                now = now + tick
+            end
+            assert.equal(1, invulnerableReads[VICTIM])
+            assert.same({}, applied(VICTIM))
+            invulnerable[VICTIM] = nil
+            onTick(zone, VICTIM)
+            assert.same({ 'wet' }, applied(VICTIM))
+        end)
+
+        it('boue : même règle (une lecture par pose du Ralenti)', function()
+            local onTick = zoneKinds.mud.onTick
+            local slow = { strength = 0.6, durationMs = 1500, refreshMs = 2000 }
+            local zone = { owner = CASTER, ownerCharacter = 42, spell = 'boue', data = { slow = slow, applied = {} } }
+            local tick = cfg.zones.tickMs
+            invulnerable[VICTIM] = true
+            for _ = 1, slow.refreshMs // tick do
+                onTick(zone, VICTIM)
+                now = now + tick
+            end
+            assert.equal(1, invulnerableReads[VICTIM])
+            assert.same({}, applied(VICTIM))
+            invulnerable[VICTIM] = nil
+            onTick(zone, VICTIM)
+            assert.same({ 'slow' }, applied(VICTIM))
+        end)
+
+        it('Vague : le membre invulnérable n’est ni poussé, ni mouillé, ni renversé ; une lecture par cible', function()
+            positions[CASTER] = { x = 0, y = 0, z = 0 }
+            positions[OTHER] = { x = 3, y = 0.5, z = 0 }
+            near = {
+                { source = VICTIM, position = positions[VICTIM], distance = 5 },
+                { source = OTHER, position = positions[OTHER], distance = 3 },
+            }
+            invulnerable[VICTIM] = true
+            local result = registered.vague.finish({ source = CASTER, level = 4, characterId = 42 }, 1.0, 0.0)
+            assert.is_table(result)
+            assert.equal(1, result.result.touched)
+            assert.equal(1, invulnerableReads[VICTIM])
+            assert.equal(1, invulnerableReads[OTHER])
+            assert.same({}, applied(VICTIM))
+            assert.same({ 'wet', 'knockdown' }, applied(OTHER))
+            local pushed = {}
+            for _, e in ipairs(clientEvents) do
+                if e.event == VavaMagic.EVENTS.PUSH or e.event == VavaMagic.EVENTS.HIT then pushed[#pushed + 1] = e.target end
+            end
+            assert.same({ OTHER, OTHER }, pushed)
         end)
     end)
 end)

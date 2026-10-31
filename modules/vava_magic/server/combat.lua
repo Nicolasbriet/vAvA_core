@@ -13,7 +13,9 @@
            `reaction` du sort : geste, effet d'écran), et l'appelant pose brûlure, états et XP, seulement si le coup a
            retiré de la vie (`applied > 0`) ; une brûlure qui dure ne fait pas réagir à chaque morsure. Un sort
            offensif sans dégâts (recul, état) demande d'abord si la cible peut être touchée (`combat.affects` : jamais
-           un joueur à terre, rien quand `combat.pvp` ou `chain.pvp` de vava_health est coupé).
+           un joueur à terre, ni un membre du Conseil que vava_admin tient pour invulnérable — lu une fois par effet,
+           jamais par vérification d'une zone : T-149 —, rien quand `combat.pvp` ou `chain.pvp` de vava_health est
+           coupé).
            Sans vava_health (arrêté ou en erreur), aucun sort ne blesse personne : une ligne de console par minute, un
            message au lanceur au plus une fois par minute. Le journal des coups est celui de vava_health
            (`vava_health_hits`) : `vava_magic_damage_log` n'est plus écrit, ses lignes anciennes sont encore retirées au
@@ -48,6 +50,8 @@ local combat = {}
 VavaMagic.combat = combat
 
 combat.KIND = { IMPACT = harm.NATURE.IMPACT, ZONE = harm.NATURE.ZONE, AURA = harm.NATURE.AURA, BURN = harm.NATURE.BURN }
+-- refus de `combat.affects` pour un membre invulnérable : une zone le note comme une pose (relu à la pose suivante)
+combat.INVULNERABLE = 'invulnerable'
 
 ---@type table<string, integer>  code refusé par la chaîne → dernière ligne de console
 local logged = {}
@@ -62,13 +66,18 @@ function combat.protected(point)
 end
 
 --- Un sort offensif peut-il toucher ce joueur ? (dégâts entre joueurs activés, personnage en jeu, hors zone
---- protégée, pas à terre : un corps au sol n'est ni mouillé, ni poussé, ni renversé) Avec le lanceur (autre que la
---- cible), mêmes refus qu'un coup de la chaîne : lanceur qui joue désormais un autre personnage que
---- `casterCharacter`, ou posté dans une zone de paix. Renvoie la position de la cible lue côté serveur, ou nil.
+--- protégée, pas à terre : un corps au sol n'est ni mouillé, ni poussé, ni renversé ; pas un membre du Conseil tenu
+--- pour invulnérable par vava_admin : la chaîne annule ses blessures, ses effets sans dégâts l'épargnent aussi) Avec le
+--- lanceur (autre que la cible), mêmes refus qu'un coup de la chaîne : lanceur qui joue désormais un autre personnage
+--- que `casterCharacter`, ou posté dans une zone de paix. Renvoie la position de la cible lue côté serveur, ou nil
+--- (et `combat.INVULNERABLE` pour un membre invulnérable). À appeler une fois par effet (`vava_admin:isInvulnerable`
+--- est lu à chaque appel qui va jusque-là) : une zone qui vérifie ses occupants note un refus pour invulnérabilité
+--- comme une pose, et ne le relit qu'à la pose suivante.
 ---@param target integer
 ---@param caster? integer
 ---@param casterCharacter? integer  personnage du lanceur au moment du sort (zone, projectile)
----@return table|nil
+---@return table|nil position
+---@return string|nil refused  `combat.INVULNERABLE`, ou nil
 function combat.affects(target, caster, casterCharacter)
     if not cfg.pvp or not bridge.ChainPvp() or not bridge.GetCharacterId(target) then return nil end
     if type(caster) == 'number' and caster > 0 and caster ~= target then
@@ -81,8 +90,9 @@ function combat.affects(target, caster, casterCharacter)
     end
     local position = world.position(target)
     if not position or combat.protected(position) then return nil end
-    -- en dernier : un appel à vava_health, seulement pour qui serait touché
+    -- en dernier : un appel à vava_health puis un à vava_admin, seulement pour qui serait touché
     if bridge.IsDowned(target) then return nil end
+    if bridge.IsInvulnerable(target) then return nil, combat.INVULNERABLE end
     return position
 end
 

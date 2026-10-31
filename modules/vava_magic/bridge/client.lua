@@ -1,13 +1,13 @@
 --[[
     vava_magic/bridge/client.lua
     Rôle : SEUL point de contact, côté client, entre la magie et les autres modules : notifications (vava_hud), état
-           « à terre » (vava_health), droit d'incanter (CanUseMagic), arme en main (IsArmed, vava_combat : affichage
-           seulement), cible verrouillée (GetLockedTarget), lignes et suggestions du chat. Aucune blessure n'est appliquée ici : les sorts blessent par la chaîne de dégâts de
+           « à terre » (vava_health), droit d'incanter (CanUseMagic), arme en main ou qu'on rengaine (CombatHands,
+           IsArmed, vava_combat : affichage seulement), cible verrouillée (GetLockedTarget), lignes et suggestions du chat. Aucune blessure n'est appliquée ici : les sorts blessent par la chaîne de dégâts de
            vava_health, côté serveur (sans lui, ils ne blessent personne).
            Pour un autre core, réécrire ces fonctions (et bridge/server.lua).
     Implémentation : modules officiels vAvA ; appels isolés, chaque module est facultatif (sans vava_hud : notification
            de GTA). Le verrouillage de cible est celui de ce module (client/targeting.lua, clic molette).
-    Dépendances : shared/constants.lua, config_client.lua, client/core.lua
+    Dépendances : shared/constants.lua, config_client.lua, shared/hands.lua, client/core.lua
 ]]
 
 local type, pcall, tostring, ipairs = type, pcall, tostring, ipairs
@@ -18,6 +18,7 @@ local BeginTextCommandThefeedPost, AddTextComponentSubstringPlayerName, EndTextC
 
 local cfg = VavaMagic.config
 local LINKS = VavaMagic.LINKS
+local HANDS = VavaMagic.hands
 -- natures de notification comprises par vava_hud
 local NATURES = { info = 'info', success = 'info', warning = 'warning', danger = 'danger' }
 local CHAT_COLOR = { 220, 192, 138 }
@@ -87,14 +88,23 @@ function Bridge.CanUseMagic()
     return not Bridge.IsDowned()
 end
 
---- Arme tenue par le personnage local (`vava_combat:armed()` : arme de l'inventaire, ni outil ni bouclier) ? Pour
---- montrer tôt « rangez votre arme » : le serveur seul en décide. vava_combat absent ou en erreur : non, sans bruit
---- (appelé à chaque relevé du mode magie).
+--- Arme du royaume tenue par le personnage local, d'après `vava_combat:armed()` (arme de l'inventaire, ni outil ni
+--- bouclier) : `weapon` (en main : le mode combat a les mêmes boutons que la magie), `sheathing` (rangée depuis moins
+--- de 1,5 s : `sheathing = true`, les mains ne sont pas encore libres), ou nil. Un seul appel à l'export, isolé ;
+--- vava_combat absent ou en erreur : nil, sans bruit (appelé à chaque relevé du mode magie et à certaines touches,
+--- jamais à chaque image). Affichage seulement : le serveur seul en décide.
+---@return string|nil
+function Bridge.CombatHands()
+    if GetResourceState(LINKS.COMBAT) ~= 'started' then return nil end
+    local ok, weapon = pcall(invoke, LINKS.COMBAT, 'armed')
+    if not ok or type(weapon) ~= 'table' then return nil end
+    return weapon.sheathing == true and HANDS.SHEATHING or HANDS.WEAPON
+end
+
+--- Arme du royaume en main ou qu'on rengaine (Bridge.CombatHands) ?
 ---@return boolean
 function Bridge.IsArmed()
-    if GetResourceState(LINKS.COMBAT) ~= 'started' then return false end
-    local ok, weapon = pcall(invoke, LINKS.COMBAT, 'armed')
-    return ok and type(weapon) == 'table'
+    return Bridge.CombatHands() ~= nil
 end
 
 --- Prévient `handler()` quand ce que tient le personnage local change (champ `vava_inventory:hands`, hook local

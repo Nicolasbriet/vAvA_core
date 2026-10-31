@@ -128,9 +128,11 @@ function combos.zone(ctx, zone)
 end
 
 --- Un sort touche un joueur : combinaisons avec ses états, calculées sans rien poser. Renvoie l'issue { damage
---- (ajustés), burn (brûlure permise), frozen (la cible vient d'être gelée, après commit) } ; ses effets (états posés ou
---- retirés, grimoire) attendent `combos.commit`, appelé quand le coup a porté. `element` remplace celui du sort
---- (projectile qui emporte le feu) ; `casterCharacter` : personnage du lanceur au moment du sort (combat.affects).
+--- (ajustés), burn (brûlure permise), frozen (la cible vient d'être gelée, après commit), reached (la cible peut être
+--- touchée : `combat.affects`, lu une seule fois ici — un sort sans dégâts s'y fie au lieu de le relire) } ; ses
+--- effets (états posés ou retirés, grimoire) attendent `combos.commit`, appelé quand le coup a porté. `element`
+--- remplace celui du sort (projectile qui emporte le feu) ; `casterCharacter` : personnage du lanceur au moment du sort
+--- (combat.affects).
 ---@param caster integer
 ---@param target integer
 ---@param spell string
@@ -139,9 +141,10 @@ end
 ---@param casterCharacter? integer
 ---@return table
 function combos.hit(caster, target, spell, damage, element, casterCharacter)
-    local outcome = { damage = damage, burn = true, frozen = false }
+    local outcome = { damage = damage, burn = true, frozen = false, reached = false }
     local position = combat.affects(target, caster, casterCharacter)
     if not position then return outcome end
+    outcome.reached = true
     element = element or elementOf(spell)
     local pending = {}
     for _, combo in ipairs(list) do
@@ -230,7 +233,10 @@ zones.define(MUD, {
         local refresh = slow.refreshMs or 0
         local now = GetGameTimer()
         if applied[victim] and now - applied[victim] < refresh then return end
-        if not combat.affects(victim, zone.owner, zone.ownerCharacter) then return end
+        local reached, refused = combat.affects(victim, zone.owner, zone.ownerCharacter)
+        -- membre invulnérable : compté comme une pose, vava_admin n'est relu qu'à la suivante (jamais à chaque tour)
+        if refused == combat.INVULNERABLE then applied[victim] = now end
+        if not reached then return end
         applied[victim] = now
         -- la pose tient jusqu'à la suivante (aucun trou dans la boue) ; à la sortie, il en reste au moins
         -- `durationMs` moins une vérification, comme lorsqu'elle était reposée à chaque vérification

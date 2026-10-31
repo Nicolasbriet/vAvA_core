@@ -5,10 +5,11 @@
       - Fin : le cône part de la position du lanceur, dans la direction du regard envoyée par le client (normalisée ici
         ; c'est son choix de visée), de la portée et de l'ouverture du niveau. Les joueurs proches voient la vague.
         Les zones qu'elle touche passent par les combinaisons (un mur de flammes s'éteint en vapeur). Les joueurs en
-        jeu dans le cône (sauf le lanceur, et pas à travers un rempart) que les sorts peuvent toucher passent aussi
-        par les combinaisons (leur Brûlure s'éteint), puis sont repoussés (direction donnée par le serveur), Mouillés,
-        et Renversés dès le niveau 4 (contrôle dur : protégés ensuite des autres). Un sol mouillé reste devant le
-        lanceur. Si elle a touché quelqu'un et que le lancer a rapporté, le lanceur gagne le bonus d'XP du sort.
+        jeu dans le cône (sauf le lanceur, et pas à travers un rempart) que les sorts peuvent toucher (ni à terre, ni
+        membre du Conseil invulnérable : `combat.affects`, lu une fois par cible) passent aussi par les combinaisons
+        (leur Brûlure s'éteint), puis sont repoussés (direction donnée par le serveur), Mouillés, et Renversés dès le
+        niveau 4 (contrôle dur : protégés ensuite des autres). Un sol mouillé reste devant le lanceur. Si elle a
+        touché quelqu'un et que le lancer a rapporté, le lanceur gagne le bonus d'XP du sort.
     Dépendances : shared/, config.lua, server/ (noyau, combat, states, combos, grounds, obstacles)
 ]]
 
@@ -59,11 +60,13 @@ local function finish(ctx, dx, dy)
     local touched = 0
     for _, entry in ipairs(world.near(position, levelCfg.range + HEIGHT, src)) do
         local victim = entry.source
-        if inWave(entry.position, position, forward, levelCfg) and not obstacles.blocked(position, entry.position)
-            and combat.affects(victim, src, ctx.characterId) then
+        -- combat.affects lu une seule fois par cible, par combos.hit (vava_admin:isInvulnerable : une fois par effet)
+        local hit = inWave(entry.position, position, forward, levelCfg) and not obstacles.blocked(position, entry.position)
+            and combos.hit(src, victim, NAME, 0, nil, ctx.characterId)
+        if hit and hit.reached then
             touched = touched + 1
             combat.react(victim, NAME)
-            combos.commit(combos.hit(src, victim, NAME, 0, nil, ctx.characterId))
+            combos.commit(hit)
             states.apply(victim, 'wet', { durationMs = levelCfg.wetMs, caster = src, spell = NAME })
             local away = geometry.direction2d(position, entry.position) or forward
             TriggerClientEvent(EVENTS.PUSH, victim, away.x, away.y, levelCfg.knockback)

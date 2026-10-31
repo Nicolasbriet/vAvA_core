@@ -3,7 +3,8 @@
     Rôle : sols laissés par les sorts, décidés par le serveur (zones au sol en cercle, server/zones.lua) : sol mouillé
            (Vague, Brume) ; plus tard boue et vapeur. Qui se tient sur un sol mouillé est Mouillé, reposé au plus toutes
            les `wetGround.refreshMs` sur un même joueur (pas d'envoi à chaque vérification), lanceur compris : c'est le
-           sol, pas le sort, qui mouille. Rien en zone protégée, ni si les sorts ne touchent personne (`combat.pvp`).
+           sol, pas le sort, qui mouille. Rien en zone protégée, ni si les sorts ne touchent personne (`combat.pvp`) ; un
+           membre du Conseil invulnérable est épargné, relu à la pose suivante seulement (T-149).
     Dépendances : shared/, config.lua, server/ (noyau, combat, states, zones)
 ]]
 
@@ -24,7 +25,10 @@ zones.define(grounds.WET, {
         local applied = zone.data.applied
         local now = GetGameTimer()
         if applied[victim] and now - applied[victim] < cfg.refreshMs then return end
-        if not combat.affects(victim, zone.owner, zone.ownerCharacter) then return end
+        local reached, refused = combat.affects(victim, zone.owner, zone.ownerCharacter)
+        -- membre invulnérable : compté comme une pose, vava_admin n'est relu qu'à la suivante (jamais à chaque tour)
+        if refused == combat.INVULNERABLE then applied[victim] = now end
+        if not reached then return end
         applied[victim] = now
         states.apply(victim, 'wet', { durationMs = cfg.wetMs, caster = zone.owner, spell = zone.spell })
     end,
