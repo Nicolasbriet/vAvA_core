@@ -1,7 +1,7 @@
 'use strict';
 /*
  * vava_atelier/web/js/form.js — fiche pilotée par le schéma d'un type, paquet { n, s, b } ; contrôles de confort seulement
- *   `env.between` (T-102) : blocs du placement posés entre les champs hors groupes et les groupes.
+ *   `env.between` (T-102) : blocs du placement posés avant le premier groupe replié.
  * Dépendances : strings.js, format.js, components.js, widgets.js
  */
 
@@ -71,16 +71,19 @@ const Form = (() => {
     }
 
     const declared = new Set(groups.map((g) => g.id));
-    const root = h('div', { class: 'form' }, alerts, rows(fields.filter((f) => !declared.has(f.group))), env.between || null);
+    const root = h('div', { class: 'form' }, alerts, rows(fields.filter((f) => !declared.has(f.group))));
+    let between = env.between || null;
     for (const group of groups) {
       const members = fields.filter((f) => f.group === group.id);
       if (members.length === 0) continue;
       const folded = group.folded === true;
+      if (folded && between) { root.append(between); between = null; }
       root.append(h(folded ? 'details' : 'section', { class: 'fgroup' },
         h(folded ? 'summary' : 'h2', { class: 'gh', text: Format.str(group.label) }),
         Format.str(group.help) ? h('p', { class: 'hp gh-help', text: group.help }) : null,
         h('div', { class: 'fgroup-body' }, rows(members))));
     }
+    if (between) root.append(between);
 
     function setError(id, text, add) {
       const entry = entries.get(id);

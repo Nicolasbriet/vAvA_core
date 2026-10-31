@@ -12,15 +12,14 @@ const Placing = (() => {
   const SHAPES = new Set(['point', 'oriented', 'circle', 'polygon']);
   const TONES = new Set(['live', 'draft', 'new', 'removal', 'other']);
   const MAX_ROWS = 200;
-  const NBSP = ' ';
+  const NBSP = String.fromCharCode(160);   // espace insécable
   const num = (value) => (typeof value === 'number' && Number.isFinite(value) ? value : null);
   const own = (map, key) => Boolean(map) && typeof map === 'object' && Object.prototype.hasOwnProperty.call(map, key);
 
-  // Fonctions pures --------------------------------------------------------------------------------------------------
+  // Fonctions pures
 
   const placeable = (kind) => Boolean(kind) && SHAPES.has(kind.placement);
   const childOf = (descriptor, kind) => list(descriptor && descriptor.kinds).find((k) => k && k.parent === kind.id && placeable(k)) || null;
-  const kindOf = (descriptor, id) => list(descriptor && descriptor.kinds).find((k) => k && k.id === id) || null;
 
   /** Lieu reçu : les seules clés de sa forme, nombres finis ; null s'il n'y en a pas. */
   function cleanPlace(shape, place) {
@@ -126,7 +125,7 @@ const Placing = (() => {
     return rows.length < MAX_ROWS ? rows.concat([row]) : rows;
   }
 
-  // Interface --------------------------------------------------------------------------------------------------------
+  // Interface
 
   const recents = new Map();   // « editor|type|champ » → deux derniers choix { value, label }
   const memory = new Map();    // « editor|type » → valeurs du modèle, gardées d'une ouverture à l'autre
@@ -193,7 +192,6 @@ const Placing = (() => {
     for (let i = 0; i < blocks.length; i += 1) {
       if (numeric(fields[i]) && numeric(fields[i + 1])) { out.push(h('div', { class: 'pair' }, blocks[i], blocks[i + 1])); i += 1; } else out.push(blocks[i]);
     }
-    const value = (id) => (widgets.has(id) ? widgets.get(id).w.get() : '');
     const labelFor = (id) => {
       const got = widgets.get(id);
       if (!got) return '';
@@ -218,7 +216,6 @@ const Placing = (() => {
         return got ? ghostOf(child, got.w.get(), labelOf(got.field, got.w.get(), ctx.known) || (got.w.label ? { label: got.w.label() } : null)) : null;
       },
       label: () => labelFor(str(child.autoTitle)),
-      value,
     };
   }
 
@@ -296,7 +293,15 @@ const Placing = (() => {
       el: h('div', { class: 'place-blocks' }, nodes),
       setPlace(value, far) { place = cleanPlace(kind.placement, value); if (far !== undefined) distance = far; showLieu(); },
       setRows(got) { if (!child) return; rows = list(got).map((r) => cleanRow(r, child)).filter(Boolean).slice(0, MAX_ROWS); listed = true; showRows(); },
-      upsert(row) { const clean = child ? cleanRow(row, child) : null; if (clean) { rows = upsert(rows, clean); listed = true; showRows(); } },
+      upsert(row) {
+        const clean = child ? cleanRow(row, child) : null;
+        if (!clean) return;
+        rows = upsert(rows, clean);
+        listed = true;
+        showRows();
+        const node = items.children[rows.findIndex((r) => r.id === clean.id)];   // volet atténué : la ligne posée reste en vue
+        if (node && node.scrollIntoView) node.scrollIntoView({ block: 'nearest' });
+      },
       drop(id) { rows = rows.filter((r) => r.id !== id); showRows(); },
       failed(text) { if (count) count.textContent = text; },
       progress: () => ({ placed: Boolean(place), children: rows.some((r) => r.tone !== 'removal') }),
@@ -307,5 +312,5 @@ const Placing = (() => {
     };
   }
 
-  return { placeable, childOf, kindOf, cleanPlace, center, lieuLine, cleanRow, countLine, mark, removal, stepStates, ghostOf, lookLine, startPayload, upsert, build };
+  return { placeable, childOf, cleanPlace, center, lieuLine, cleanRow, countLine, mark, removal, stepStates, ghostOf, lookLine, startPayload, upsert, build };
 })();
