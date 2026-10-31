@@ -7,10 +7,15 @@
            Registre (`revoked` à qui perd le droit d'ouvrir l'Atelier). Le setup refuse une config de droits fausse
            (shared/rights.lua › checkSettings) ; en fin de setup : journal purgé, hook vava_atelier:editorsReady (les
            modules redéclarent leurs éditeurs).
+           T-101 : douze RPC des définitions gardées (enregistrer, essayer, arrêter l'essai, résumer, publier, revenir
+           à une version, abandonner, retirer, reprendre, historique, version, retirées), chacun borné et limité ;
+           hooks : séance fermée ou départ → fin de l'essai du membre ; /atelier_archives ; au démarrage, dans un fil :
+           réparation (essais rendus aux brouillons, doublons), purge de l'historique, puis editorsReady.
     Dépendances : tous les fichiers server/ du module, bridge/server.lua
 ]]
 
 local type, ipairs, pairs, tostring = type, ipairs, pairs, tostring
+local CreateThread = CreateThread
 
 local core = VavaAtelier.core
 if not core then return end
@@ -22,7 +27,10 @@ local Bridge = VavaAtelier.bridge
 local editors, access, home = VavaAtelier.editors, VavaAtelier.access, VavaAtelier.home
 local entries, check, journal = VavaAtelier.entries, VavaAtelier.check, VavaAtelier.journal
 local rights = VavaAtelier.rights
+local cycle, history, trials, sync = VavaAtelier.cycle, VavaAtelier.history, VavaAtelier.trials, VavaAtelier.sync
+local archives = VavaAtelier.archives
 local limits = cfg.rateLimits
+local DEF = VavaAtelier.DEF
 
 -- Schémas communs (§ 6.1 de la spec) : identifiants au motif, textes et pages bornés.
 local EDITOR = { type = 'string', min = 3, max = VavaAtelier.MAX_EDITOR, pattern = VavaAtelier.EDITOR_PATTERN }
@@ -45,6 +53,15 @@ local VALUES = { type = 'table', fields = {
         value = { type = 'string', min = 0, max = VavaAtelier.MAX_VALUE_STRING } },
     b = { type = 'map', min = 0, max = LIMITS.cardB, optional = true, key = FIELD, value = { type = 'boolean' } },
 } }
+
+-- T-101 (§ 6.1 de la spec) : révision lue, versions, jeton d'un résumé.
+local REV = { type = 'integer', min = 0, max = DEF.revMax }                     -- 0 : aucun brouillon lu
+local VERSION_NO = { type = 'integer', min = 1, max = DEF.versionMax }
+local BEFORE_NO = { type = 'integer', min = 0, max = DEF.versionMax }           -- 0 : les plus récentes
+-- preview : la révision lue (publish) ou la version visée (restore)
+local REF = { type = 'integer', min = 0, max = DEF.versionMax }
+local TOKEN = { type = 'string', min = DEF.tokenLength, max = DEF.tokenLength, pattern = '^[0-9a-f]+$' }
+local WHAT = { type = 'string', enum = { 'publish', 'restore' } }
 
 -- Handlers ----------------------------------------------------------------------------------------------------------
 
@@ -114,6 +131,15 @@ local function closeRpc(source)
     return true
 end
 
+--- Handler d'un RPC de T-101 : contrôles communs (atelier et type demandés), puis `fn` sous le verrou du joueur.
+local function storedRpc(name, fn)
+    return function(source, editorId, kindId, ...)
+        local ctx, code = access.check(source, name, { editor = editorId, kind = kindId })
+        if not ctx then return false, code end
+        return access.locked(ctx, fn, ...)
+    end
+end
+
 local RPCS = {
     { RPC.HOME, { VERSION }, limits.home, homeRpc },
     { RPC.EDITOR, { EDITOR, VERSION }, limits.editor, editorRpc },
@@ -124,6 +150,19 @@ local RPCS = {
     { RPC.SEARCH, { SEARCH }, limits.lookup, searchRpc },
     { RPC.JOURNAL, { BEFORE, EDITOR_OR_ALL }, limits.read, journalRpc },
     { RPC.CLOSE, {}, limits.close, closeRpc },
+    -- T-101
+    { RPC.SAVE, { EDITOR, KIND, ENTRY_OR_NEW, REV, VALUES }, limits.write, storedRpc(RPC.SAVE, cycle.save) },
+    { RPC.TRIAL, { EDITOR, KIND, ENTRY, REV }, limits.write, storedRpc(RPC.TRIAL, cycle.trial) },
+    { RPC.END_TRIAL, { EDITOR, KIND, ENTRY }, limits.write, storedRpc(RPC.END_TRIAL, cycle.endTrial) },
+    { RPC.PREVIEW, { EDITOR, KIND, ENTRY, WHAT, REF }, limits.preview, storedRpc(RPC.PREVIEW, cycle.preview) },
+    { RPC.PUBLISH, { EDITOR, KIND, ENTRY, REV, TOKEN }, limits.publish, storedRpc(RPC.PUBLISH, cycle.publish) },
+    { RPC.RESTORE, { EDITOR, KIND, ENTRY, VERSION_NO, TOKEN }, limits.publish, storedRpc(RPC.RESTORE, cycle.restore) },
+    { RPC.DISCARD, { EDITOR, KIND, ENTRY, REV }, limits.write, storedRpc(RPC.DISCARD, cycle.discard) },
+    { RPC.RETIRE, { EDITOR, KIND, ENTRY }, limits.write, storedRpc(RPC.RETIRE, cycle.retire) },
+    { RPC.TAKE, { EDITOR, KIND, ENTRY, REV }, limits.write, storedRpc(RPC.TAKE, cycle.take) },
+    { RPC.HISTORY, { EDITOR, KIND, ENTRY, BEFORE_NO }, limits.read, storedRpc(RPC.HISTORY, history.list) },
+    { RPC.VERSION, { EDITOR, KIND, ENTRY, VERSION_NO }, limits.read, storedRpc(RPC.VERSION, history.version) },
+    { RPC.REMOVED, { EDITOR, KIND, PAGE }, limits.read, storedRpc(RPC.REMOVED, history.removed) },
 }
 
 -- Hooks -------------------------------------------------------------------------------------------------------------
@@ -160,7 +199,18 @@ local function onUnloading(payload)
 end
 
 local function onDropped(payload)
-    if payload.source then access.forget(payload.source) end
+    if not payload.source then return end
+    -- l'essai du membre prend fin (`dropped`) avant que la fermeture de sa séance ne le fasse (`session`)
+    local session = access.sessions()[payload.source]
+    if session then trials.sessionClosed(session.accountId, 'dropped') end
+    access.forget(payload.source)
+    archives.forget(payload.source)
+end
+
+--- Séance fermée (fermeture, déchargement, révocation) : l'essai du membre prend fin.
+local function onSession(payload)
+    if type(payload) ~= 'table' or payload.open ~= false or not payload.accountId then return end
+    trials.sessionClosed(payload.accountId, 'session')
 end
 
 -- actions du Registre qui changent le rang d'un compte
@@ -186,6 +236,7 @@ local HOOKED = {
     { 'core:character:unloading', onUnloading },
     { 'core:player:dropped', onDropped },
     { 'vava_admin:action', onAdminAction },
+    { HOOKS.SESSION, onSession },
 }
 
 local function setup()
@@ -204,9 +255,18 @@ local function setup()
         ok, err = core.rpc.register(def[1], { args = def[2], rateLimit = def[3] }, def[4])
         if not ok then return false, def[1] .. ' : ' .. tostring(err) end
     end
+    archives.register()
     journal.purge()
-    -- les modules déjà en jeu (redémarrage de l'Atelier) redéclarent leurs éditeurs
-    core.hooks.runAfter(HOOKS.EDITORS_READY, {})
+    -- dans un fil : réparation de la base (essais rendus aux brouillons, doublons), purge de l'historique, puis les
+    -- modules déjà en jeu (redémarrage de l'Atelier) redéclarent leurs éditeurs et sont synchronisés
+    CreateThread(function()
+        if not sync.repair() then
+            VavaAtelier.log.error('définitions : réparation impossible (registres muets) ; chaque atelier gardé sera '
+                .. 'synchronisé à sa déclaration')
+        end
+        history.purge()
+        core.hooks.runAfter(HOOKS.EDITORS_READY, {})
+    end)
     return true
 end
 

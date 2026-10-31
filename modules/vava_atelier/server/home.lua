@@ -25,7 +25,7 @@ local providers = VavaAtelier.providers
 local rights = VavaAtelier.rights
 
 -- brouillons montrés sur l'accueil
-local MAX_DRAFTS = 5
+local MAX_DRAFTS = cfg.drafts.homeLines
 
 local home = {}
 VavaAtelier.home = home

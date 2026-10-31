@@ -5,6 +5,9 @@
            champs, huit widgets et leurs bornes croisées), fonctions du module. Un refus rend le chemin et la raison
            (« kinds[1].form.fields[3].max : doit dépasser min ») ; une clé inconnue est refusée. Le validateur du
            registre (server/editors.lua) n'accepte que ce que ce fichier accepte.
+           T-101 : `format` (1 à 65535), `upgrade`, `texts.trialLine` (80), `feminine` d'un type ; `apply` et `remove`
+           ensemble (atelier gardé), `trial` et `endTrial` ensemble et seulement avec `apply` ; chaîne des `parent`
+           sans cycle, trois types au plus (fiche, enfant, petit-enfant).
            Testée : tests/spec/atelier_formschema_spec.lua.
     Dépendances : shared/constants.lua, shared/text.lua, shared/formvalues.lua
 ]]
@@ -14,6 +17,7 @@ local floor, abs, max = math.floor, math.abs, math.max
 local find, format = string.find, string.format
 
 local LIMITS = VavaAtelier.LIMITS
+local DEF = VavaAtelier.DEF
 local CARD = VavaAtelier.CARD
 local RESERVED = VavaAtelier.RESERVED
 local KEY_PATTERN, MAX_KEY = VavaAtelier.KEY_PATTERN, VavaAtelier.MAX_KEY
@@ -36,12 +40,14 @@ end
 local EDITOR_KEYS = set({
     'family', 'label', 'description', 'icon', 'order', 'right', 'texts', 'kinds',
     'index', 'read', 'validate', 'options', 'compare', 'apply', 'remove', 'trial', 'endTrial', 'diff',
+    'format', 'upgrade',
 })
 local REQUIRED_FUNCTIONS = { 'index', 'read', 'validate' }
-local OPTIONAL_FUNCTIONS = { 'options', 'compare', 'apply', 'remove', 'trial', 'endTrial', 'diff' }
-local TEXTS_KEYS = set({ 'trial', 'publish', 'publishHint' })
+local OPTIONAL_FUNCTIONS = { 'options', 'compare', 'apply', 'remove', 'trial', 'endTrial', 'diff', 'upgrade' }
+local TEXTS_KEYS = set({ 'trial', 'publish', 'publishHint', 'trialLine' })
 local KIND_KEYS = set({
     'id', 'noun', 'nounPlural', 'article', 'newLabel', 'layout', 'creatable', 'steps', 'placement', 'parent', 'form',
+    'feminine',
 })
 local FORM_KEYS = set({ 'titleField', 'groups', 'fields' })
 local GROUP_KEYS = set({ 'id', 'label', 'help', 'folded' })
@@ -467,6 +473,12 @@ function fs.checkEditor(def, ctx)
     if texts.publishHint ~= nil and not isText(texts.publishHint, 0, LIMITS.publishHint) then
         return fail('texts.publishHint', format('texte de %d octets au plus', LIMITS.publishHint))
     end
+    if texts.trialLine ~= nil and not isText(texts.trialLine, 0, DEF.trialLine) then
+        return fail('texts.trialLine', format('texte de %d octets au plus', DEF.trialLine))
+    end
+    if def.format ~= nil and (not isInteger(def.format) or def.format < 1 or def.format > DEF.formatMax) then
+        return fail('format', format('entier de 1 à %d attendu', DEF.formatMax))
+    end
 
     if not isList(def.kinds, 1, LIMITS.kinds) then
         return fail('kinds', format('liste de 1 à %d types attendue', LIMITS.kinds))
@@ -497,6 +509,7 @@ function fs.checkEditor(def, ctx)
             return fail(join(here, 'layout'), 'page ou side attendu')
         end
         if not isBool(kind.creatable) then return fail(join(here, 'creatable'), 'booléen attendu') end
+        if not isBool(kind.feminine) then return fail(join(here, 'feminine'), 'booléen attendu') end
         if kind.steps ~= nil then
             if not isList(kind.steps, 0, LIMITS.steps) then
                 return fail(join(here, 'steps'), format('liste de %d étapes au plus attendue', LIMITS.steps))
@@ -515,10 +528,24 @@ function fs.checkEditor(def, ctx)
         if not ok then return false, err end
         usesSource = usesSource or source
     end
+    local parents = {}
     for i, kind in ipairs(def.kinds) do
         local parent = kind.parent
         if parent ~= nil and (type(parent) ~= 'string' or parent == kind.id or not kindIds[parent]) then
             return fail(format('kinds[%d].parent', i), 'identifiant d\'un autre type de cet éditeur attendu')
+        end
+        parents[kind.id] = parent
+    end
+    -- chaîne des parents : jamais de cycle (A → B → A), trois types au plus (fiche, enfant, petit-enfant)
+    for i, kind in ipairs(def.kinds) do
+        local depth, current = 1, parents[kind.id]
+        while current do
+            depth = depth + 1
+            if current == kind.id then return fail(format('kinds[%d].parent', i), 'cycle de parents') end
+            if depth > DEF.parentDepth then
+                return fail(format('kinds[%d].parent', i), format('chaîne de plus de %d types', DEF.parentDepth))
+            end
+            current = parents[current]
         end
     end
 
@@ -529,5 +556,13 @@ function fs.checkEditor(def, ctx)
         if def[name] ~= nil and not isCallable(def[name]) then return fail(name, 'fonction attendue') end
     end
     if usesSource and def.options == nil then return fail('options', 'fonction obligatoire (un champ a une source)') end
+    -- atelier gardé : apply et remove ensemble ; l'essai (trial, endTrial ensemble) n'a de sens que gardé
+    if (def.apply == nil) ~= (def.remove == nil) then
+        return fail(def.apply == nil and 'apply' or 'remove', 'apply et remove se déclarent ensemble')
+    end
+    if (def.trial == nil) ~= (def.endTrial == nil) then
+        return fail(def.trial == nil and 'trial' or 'endTrial', 'trial et endTrial se déclarent ensemble')
+    end
+    if def.trial ~= nil and def.apply == nil then return fail('trial', 'un essai demande apply et remove') end
     return true
 end

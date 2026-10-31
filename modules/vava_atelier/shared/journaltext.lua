@@ -64,21 +64,26 @@ end
 ---@field editor string
 ---@field kind string
 ---@field action string
+---@field def_id string|nil  nil : ligne d'un atelier entier (« A rétabli l'original de l'atelier Récolte »)
 ---@field title string
 ---@field summary string|nil
 ---@field actor_label string
 ---@field at number  secondes (UNIX_TIMESTAMP)
 
 --- Ligne du journal pour l'interface : { id, lead, title, summary?, actor, when, editor? }. `sameEditor` : la page a
---- demandé un seul atelier, qu'elle connaît déjà (filtre) : `editor` n'est pas répété sur chaque ligne.
+--- demandé un seul atelier, qu'elle connaît déjà (filtre) : `editor` n'est pas répété sur chaque ligne. `workshop` :
+--- nom d'un atelier entier (« atelier ») ; une ligne sans `def_id` porte alors sur l'atelier entier, dont `title`
+--- est le nom (« A rétabli l'original de l'atelier Récolte », « A copié aux archives l'atelier Récolte »).
 ---@param row vAvA.AtelierJournalRow
 ---@param verbs table<string, string>
 ---@param kind? { article: string, noun: string }  type de l'éditeur s'il est encore déclaré
 ---@param now number
 ---@param dateOf? fun(fmt: string, at: number): string
 ---@param sameEditor? boolean
+---@param workshop? string
 ---@return table
-function jt.line(row, verbs, kind, now, dateOf, sameEditor)
+function jt.line(row, verbs, kind, now, dateOf, sameEditor, workshop)
+    if workshop and (row.def_id == nil or row.def_id == '') then kind = { article = "l'", noun = workshop } end
     return {
         id = row.id,
         lead = jt.lead(verbs[row.action] or verbs.note, kind and kind.article, kind and kind.noun),

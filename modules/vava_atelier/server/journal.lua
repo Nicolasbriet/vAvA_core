@@ -5,7 +5,9 @@
            faire attendre l'appelant ; débit borné par ressource appelante ; recopie au journal du Registre et hook
            vava_atelier:journal une fois la ligne écrite. Lecture paginée par curseur, filtrée par les droits détenus
            (colonne `required_right` écrite au moment du changement ; aucun filtre pour qui les détient tous) et, au
-           besoin, par atelier ; purge au démarrage.
+           besoin, par atelier ; purge au démarrage. T-101 : acteur imposé pour une écriture interne (fin d'essai après
+           le départ du membre : nom gardé au début de l'essai, sans recopie au Registre), atelier déjà retiré du
+           registre donné par l'appelant, lignes d'un atelier entier (sans fiche).
     Dépendances : shared/constants.lua, config.lua, shared/text.lua, shared/journaltext.lua, shared/rights.lua,
                   bridge/server.lua, server/core.lua, server/editors.lua
 ]]
@@ -117,14 +119,19 @@ end
 --- Écrit une ligne au journal. `owner` : ressource appelante (export) dont l'atelier doit porter le nom ; nil pour un
 --- appel interne. `source` : membre qui a le droit effectif de l'atelier, ou 0 (console : sans recopie au Registre).
 --- L'écriture en base part dans son propre fil : l'appelant n'attend pas (le numéro de la ligne est dans le hook).
+--- Appel interne seulement : `actor` impose l'auteur ({ accountId?, label }, sans contrôle de droit ni recopie au
+--- Registre) ; `known` donne l'atelier quand il vient de quitter le registre.
 ---@param source integer
 ---@param entry vAvA.AtelierJournalEntry
 ---@param owner? string
+---@param actor? { accountId: integer|nil, label: string }
+---@param known? vAvA.AtelierEditor
 ---@return boolean ok
 ---@return string|nil code  invalid_args | unknown_editor | not_owner | not_allowed | flood
-function journal.write(source, entry, owner)
+function journal.write(source, entry, owner, actor, known)
     if mathType(source) ~= 'integer' or source < 0 or type(entry) ~= 'table' then return false, 'invalid_args' end
     local editor = type(entry.editor) == 'string' and editors.get(entry.editor) or nil
+    if not editor and known and known.id == entry.editor then editor = known end
     if not editor then return false, 'unknown_editor' end
     if owner and editor.owner ~= owner then return false, 'not_owner' end
     local kind = type(entry.kind) == 'string' and editors.kind(editor, entry.kind) or nil
@@ -141,18 +148,21 @@ function journal.write(source, entry, owner)
         return false, 'invalid_args'
     end
 
-    local accountId, actor = nil, texts.console
-    if source ~= CONSOLE then
+    local accountId, label = nil, texts.console
+    if actor then
+        if type(actor.label) ~= 'string' or actor.label == '' then return false, 'invalid_args' end
+        accountId, label, source = actor.accountId, text.truncate(actor.label, OUT.actor), CONSOLE
+    elseif source ~= CONSOLE then
         if not Bridge.Can(source, editor.right) then return false, 'not_allowed' end
-        accountId, actor = Bridge.AccountId(source), Bridge.ActorLabel(source)
-        if not accountId or not actor then return false, 'not_allowed' end
+        accountId, label = Bridge.AccountId(source), Bridge.ActorLabel(source)
+        if not accountId or not label then return false, 'not_allowed' end
     end
     if not withinFlood(owner or VavaAtelier.resource) then return false, 'flood' end
 
     local summary = entry.summary ~= '' and entry.summary or nil
     local row = {
         editor = editor.id, kind = entry.kind, defId = entry.id, action = entry.action, title = entry.title,
-        summary = summary, version = entry.version, right = editor.right, accountId = accountId, actor = actor,
+        summary = summary, version = entry.version, right = editor.right, accountId = accountId, actor = label,
     }
     -- recopie au Registre préparée ici (libellé de l'atelier lu au moment de l'appel), envoyée après l'écriture
     local mirror = nil
@@ -212,7 +222,7 @@ function journal.read(held, before, editorId, limit)
         row.at = tonumber(row.at) or now
         local editor = editors.get(row.editor)
         local kind = editor and editors.kind(editor, row.kind)
-        lines[i] = jt.line(row, texts.verbs, kind and kind.def, now, nil, filtered)
+        lines[i] = jt.line(row, texts.verbs, kind and kind.def, now, nil, filtered, texts.workshop)
     end
     return { lines = lines, more = #rows > limit, next = #lines > 0 and lines[#lines].id or 0 }
 end

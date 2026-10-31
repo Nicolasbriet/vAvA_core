@@ -5,11 +5,14 @@
            existant dans vava_inventory:items et de la sorte demandée, valeur rendue par la source du module), puis
            `validate` du module, seul juge des règles du jeu (§ 7.3 de la spec : vrai, erreur générale ou erreurs par
            champ ; toute autre forme est une erreur de l'éditeur). Erreurs mises en mots ici (textes de la config).
-    Dépendances : shared/constants.lua, config.lua, shared/text.lua, shared/formvalues.lua, bridge/server.lua,
-                  server/core.lua, server/entries.lua
+           T-101 : les mêmes contrôles servent à l'enregistrement (`values`), à l'essai et à la publication
+           (`stored` : data gardée revue par le formulaire en vigueur, le monde et le module, avec `ctx.action`).
+           La mise en mots des valeurs (`show`) est dans shared/changes.lua.
+    Dépendances : shared/constants.lua, config.lua, shared/text.lua, shared/formvalues.lua, shared/changes.lua,
+                  bridge/server.lua, server/core.lua, server/entries.lua
 ]]
 
-local type, ipairs, format = type, ipairs, string.format
+local type, ipairs, pairs, format = type, ipairs, pairs, string.format
 
 local core = VavaAtelier.core
 if not core then return end
@@ -18,23 +21,13 @@ local cfg = VavaAtelier.config
 local messages = cfg.texts.fields
 local Bridge = VavaAtelier.bridge
 local entries = VavaAtelier.entries
-local text, fv = VavaAtelier.text, VavaAtelier.formvalues
+local text, fv, changes = VavaAtelier.text, VavaAtelier.formvalues, VavaAtelier.changes
 local OUT = VavaAtelier.OUT
 
 local check = {}
 VavaAtelier.check = check
 
---- Valeur d'un champ mise en mots pour un message (« 1,5 m », « × 2 », « 7 jours »).
----@param field table
----@param value number
----@return string
-local function show(field, value)
-    if field.widget == 'duration' then return text.duration(value) end
-    local written = text.number(value, field.decimals)
-    if field.prefix and field.prefix ~= '' then written = field.prefix .. ' ' .. written end
-    if field.unit and field.unit ~= '' then written = written .. ' ' .. field.unit end
-    return written
-end
+local show = changes.show
 
 --- Texte d'une erreur de forme (code de shared/formvalues.lua).
 ---@param field table
@@ -61,15 +54,17 @@ local function bounded(list)
     end
     return out
 end
+check.bounded = bounded
 
 --- Contrôles du monde sur une data déjà en forme : objet existant (et de la sorte demandée), valeur d'une source.
----@param ctx vAvA.AtelierContext
+---@param editor vAvA.AtelierEditor
+---@param kind vAvA.AtelierKind
 ---@param data table
 ---@return table[]|nil errors
 ---@return string|nil code  editor_error (source du module muette)
-local function world(ctx, data)
+function check.world(editor, kind, data)
     local errors = {}
-    for _, field in ipairs(ctx.kind.def.form.fields) do
+    for _, field in ipairs(kind.def.form.fields) do
         local value = data[field.id]
         if value ~= '' and type(value) == 'string' then
             if field.widget == 'item' then
@@ -82,7 +77,7 @@ local function world(ctx, data)
                     errors[#errors + 1] = { field = field.id, text = messages.itemCategory }
                 end
             elseif field.source then
-                local known = entries.inSource(ctx.editor, field, value)
+                local known = entries.inSource(editor, field, value)
                 if known == nil then return nil, 'editor_error' end
                 if not known then
                     local refusal = field.widget == 'model' and messages.model or messages.choice
@@ -119,6 +114,64 @@ local function moduleErrors(kind, ok, detail)
     return out
 end
 
+--- `validate` du module, isolé : erreurs (vide : valide), ou nil, 'editor_error'.
+---@param editor vAvA.AtelierEditor
+---@param kind vAvA.AtelierKind
+---@param data table
+---@param vctx table  { source, accountId, id?, action?, parent?, place?, bundle? }
+---@return table[]|nil
+---@return string|nil
+function check.module(editor, kind, data, vctx)
+    local kindId = kind.def.id
+    local called, ok, detail = Bridge.CallEditor(editor.id, 'validate', editor.fns.validate, kindId, data, vctx)
+    if not called then return nil, 'editor_error' end
+    local found = moduleErrors(kind, ok, detail)
+    if not found then
+        VavaAtelier.log.error('%s.validate(%s) : réponse d\'une forme inattendue (true, false + texte, false + liste)',
+            editor.id, kindId)
+        return nil, 'editor_error'
+    end
+    return found
+end
+
+--- Valeurs reçues → data : data, ou nil et les erreurs de forme mises en mots, ou nil, nil, code (unknown_field).
+---@param kind vAvA.AtelierKind
+---@param values table  { n?, s?, b? }
+---@return table|nil data
+---@return table[]|nil errors
+---@return string|nil code
+function check.values(kind, values)
+    local data, problems = fv.toData(kind.def.form, values)
+    if data then return data end
+    local errors = {}
+    for _, problem in ipairs(problems) do
+        if problem.code == 'unknown_field' then return nil, nil, 'unknown_field' end
+        local field = problem.field and kind.fields[problem.field]
+        local message = field and describe(field, problem.code, problem.args) or messages.type
+        errors[#errors + 1] = { field = problem.field, text = message }
+    end
+    return nil, bounded(errors)
+end
+
+--- Data gardée revue entière (essai, publication, retour en arrière, import) : forme par le formulaire en vigueur,
+--- monde, puis `validate` du module. Erreurs (vide : valide), ou nil, code.
+---@param editor vAvA.AtelierEditor
+---@param kind vAvA.AtelierKind
+---@param data table  data normalisée (shared/stored.lua)
+---@param vctx table
+---@return table[]|nil
+---@return string|nil
+function check.stored(editor, kind, data, vctx)
+    local packet = fv.toPacket(kind.def.form, data)
+    local _, errors, code = check.values(kind, packet)
+    if code then return nil, code end
+    if errors then return errors end
+    local worldErrors, worldCode = check.world(editor, kind, data)
+    if not worldErrors then return nil, worldCode end
+    if #worldErrors > 0 then return bounded(worldErrors) end
+    return check.module(editor, kind, data, vctx)
+end
+
 --- « Vérifier » : { valid = true, compare? } ou { valid = false, errors = { { field?, text } } }.
 ---@param ctx vAvA.AtelierContext
 ---@param id string  '' : entrée nouvelle
@@ -133,29 +186,21 @@ function check.run(ctx, id, values)
         if not index then return false, 'editor_error' end
         if not index.byId[id] then return false, 'unknown_entry' end
     end
-    local data, problems = fv.toData(kind.def.form, values)
-    if not data then
-        local errors = {}
-        for _, problem in ipairs(problems) do
-            if problem.code == 'unknown_field' then return false, 'unknown_field' end
-            local field = problem.field and kind.fields[problem.field]
-            local message = field and describe(field, problem.code, problem.args) or messages.type
-            errors[#errors + 1] = { field = problem.field, text = message }
-        end
-        return true, { valid = false, errors = bounded(errors) }
+    -- la clé réservée `parent` d'un type enfant n'est pas un champ (T-101 : enregistrement seulement)
+    if kind.def.parent and type(values) == 'table' and type(values.s) == 'table' and values.s.parent ~= nil then
+        local copy = {}
+        for key, value in pairs(values.s) do if key ~= 'parent' then copy[key] = value end end
+        values = { n = values.n, s = copy, b = values.b }
     end
-    local errors, code = world(ctx, data)
-    if not errors then return false, code end
-    if #errors > 0 then return true, { valid = false, errors = bounded(errors) } end
-    local called, ok, detail = Bridge.CallEditor(editor.id, 'validate', editor.fns.validate, kindId, data,
-        { source = ctx.source, accountId = ctx.accountId, id = id ~= '' and id or nil })
-    if not called then return false, 'editor_error' end
-    local found = moduleErrors(kind, ok, detail)
-    if not found then
-        VavaAtelier.log.error('%s.validate(%s) : réponse d\'une forme inattendue (true, false + texte, false + liste)',
-            editor.id, kindId)
-        return false, 'editor_error'
-    end
+    local data, errors, code = check.values(kind, values)
+    if code then return false, code end
+    if not data then return true, { valid = false, errors = errors } end
+    local worldErrors, worldCode = check.world(editor, kind, data)
+    if not worldErrors then return false, worldCode end
+    if #worldErrors > 0 then return true, { valid = false, errors = bounded(worldErrors) } end
+    local found, moduleCode = check.module(editor, kind, data,
+        { source = ctx.source, accountId = ctx.accountId, id = id ~= '' and id or nil, action = 'check' })
+    if not found then return false, moduleCode end
     if #found > 0 then return true, { valid = false, errors = found } end
     return true, { valid = true, compare = entries.compare(editor, kindId, data) }
 end

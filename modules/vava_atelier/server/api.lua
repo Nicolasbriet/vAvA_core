@@ -4,8 +4,10 @@
            (jamais au nom d'un autre : la ressource appelante doit porter le préfixe de l'atelier), savoir si un membre
            a le droit effectif d'un atelier (RPC propres des modules, T-102 et suivantes), savoir si sa session est
            ouverte. `VavaAtelier.journal.write` est la même écriture, sans contrôle de propriétaire (appel interne).
+           T-101 : `codexList('ateliers')`, ateliers gardés (arguments de /atelier_archives dans le Codex). Aucun
+           export ne livre une définition : chaque module ne reçoit que les siennes, par `apply`.
     Dépendances : shared/constants.lua, config.lua, bridge/server.lua, server/core.lua, server/editors.lua,
-                  server/access.lua, server/journal.lua
+                  server/access.lua, server/journal.lua, server/archives.lua
 ]]
 
 local type = type
@@ -38,4 +40,11 @@ end)
 --- Vrai si le joueur a une session ouverte.
 exports('isOpen', function(source)
     return type(source) == 'number' and access.isOpen(source)
+end)
+
+--- Listes du Codex (arguments de /atelier_archives) : `ateliers` → { { value, label } } des ateliers gardés ; toute
+--- autre liste : {}.
+exports('codexList', function(list)
+    if list ~= 'ateliers' then return {} end
+    return VavaAtelier.archives.codexList()
 end)

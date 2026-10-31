@@ -1,13 +1,14 @@
 --[[
     vava_atelier/config.lua
     Rôle : configuration de l'Atelier du Conseil (lue par le client et le serveur) : familles de l'accueil et leur
-           droit plancher, cartes « Bientôt », droits, touche et commande, bornes, journal, débits, textes vus par les
+           droit plancher, cartes « Bientôt », droits, touche et commande, bornes, journal, définitions gardées
+           (fiches, brouillons, historique, essai, synchronisation, archives, lieux), débits, textes vus par les
            membres du Conseil.
     Dépendances : shared/constants.lua
 ]]
 
 VavaAtelier.config = {
-    -- core.net.sendPacked et registre core:commands (T-101 aura besoin de core.zones, même version).
+    -- core.net.sendPacked, registre core:commands, core.db.transaction ; core.zones pour les modules (même version).
     coreVersion = '0.11.0',
     -- vava_admin (exports can, rankOf, log) : relu à chaque appel ; sans lui, l'Atelier refuse de s'ouvrir.
     adminVersion = '1.8.0',
@@ -83,6 +84,47 @@ VavaAtelier.config = {
         mirror = true,                               -- recopie de chaque ligne au journal du Registre
     },
 
+    -- Définitions gardées (T-101) : poids et nombre de fiches.
+    definitions = {
+        maxBytes = 16384,        -- poids au plus d'une fiche gardée (JSON de data + lieu) ; au-delà : too_large
+        perKind = 1000,          -- fiches vivantes (publiées, ou brouillons jamais publiés) par type ; = limits.indexEntries
+    },
+    drafts = {
+        perMember = 20,          -- brouillons tenus au plus par un membre, tous ateliers confondus
+        homeLines = 5,           -- brouillons montrés sur l'accueil
+    },
+    history = {
+        keep = 20,               -- versions figées gardées par fiche (la publiée et la dernière d'une fiche retirée toujours)
+        pageLines = 20,          -- lignes d'une page d'historique
+        purgeOnStart = true,     -- purge au démarrage, dans un fil (sans le retarder)
+    },
+    trial = {
+        maxMinutes = 30,         -- durée au plus d'un essai ; ensuite il prend fin (« délai passé »)
+        perMember = 1,           -- essais en cours au plus par membre
+    },
+    bundle = {
+        maxChildren = 200,       -- fiches enfants au plus dans une publication groupée
+    },
+    sync = {
+        yieldEvery = 100,        -- fiches traitées entre deux pauses du fil de synchronisation (serveur)
+        retryMs = 10000,         -- nouvel essai d'une synchronisation en échec (registres muets)
+        retries = 3,             -- essais au plus ; ensuite l'atelier reste « à synchroniser »
+    },
+    archives = {
+        command = 'atelier_archives',
+        folder = 'echanges',     -- dossier de la ressource (jamais dans `files` : rien n'est servi aux joueurs)
+        maxBytes = 4194304,      -- fichier lu au plus (4 Mo)
+        confirmMs = 60000,       -- délai pour « confirmer » une opération résumée
+        cooldownMs = 2000,       -- délai entre deux commandes d'un membre
+    },
+    -- Lieux d'une fiche (formes du § 5.4 de la spec T-101), aux bornes de core.zones.
+    place = {
+        maxXY = 50000.0,
+        maxZ = 5000.0,
+        maxRadius = 500.0,
+        polygonPoints = { min = 3, max = 32 },
+    },
+
     rateLimits = {
         home = { capacity = 4, refillPerSecond = 0.5 },     -- ouverture et retour à l'accueil
         editor = { capacity = 6, refillPerSecond = 1 },     -- descripteur d'un atelier
@@ -90,6 +132,9 @@ VavaAtelier.config = {
         check = { capacity = 5, refillPerSecond = 1 },      -- « Vérifier »
         lookup = { capacity = 10, refillPerSecond = 3 },    -- valeurs proposées, recherche
         close = { capacity = 5, refillPerSecond = 1 },      -- fermeture
+        write = { capacity = 4, refillPerSecond = 0.5 },    -- enregistrer, essayer, arrêter, abandonner, retirer, reprendre
+        preview = { capacity = 5, refillPerSecond = 1 },    -- résumé avant publication ou retour en arrière
+        publish = { capacity = 2, refillPerSecond = 0.2 },  -- publier, revenir à une version
     },
 
     -- Textes vus par les membres (l'interface a les siens : web/js/strings.js).
@@ -122,9 +167,27 @@ VavaAtelier.config = {
             unknown_field = 'Ce réglage n\'existe pas dans cette fiche.',
             busy = 'Un instant : la demande précédente n\'est pas finie.',
             editor_error = 'Cet atelier ne répond pas : prévenez un développeur.',
-            db_error = 'Le journal ne répond pas pour le moment.',
+            db_error = 'Les registres de l\'Atelier ne répondent pas : réessayez dans un instant.',
             rate_limited = 'Doucement : patientez un instant.',
             unavailable = 'L\'Atelier est indisponible pour le moment.',
+            stale = 'Cette fiche a changé depuis que vous l\'avez ouverte : rouvrez-la pour voir la dernière version.',
+            draft_taken = 'Un autre membre du Conseil tient déjà un brouillon de cette fiche : ouvrez-le pour le lire '
+                .. 'ou le reprendre.',
+            draft_open = 'Vous avez déjà un brouillon de cette fiche : abandonnez-le d\'abord.',
+            not_holder = 'Ce brouillon est tenu par un autre membre du Conseil.',
+            no_draft = 'Cette fiche n\'a pas de brouillon en cours.',
+            not_stored = 'Cet atelier ne garde encore rien : on peut seulement y vérifier une fiche.',
+            too_large = 'Cette fiche est trop lourde pour être gardée : raccourcissez ses textes.',
+            full = 'Trop de fiches ou de brouillons : publiez ou abandonnez-en d\'abord.',
+            parent_missing = 'Cette fiche dépend d\'une autre qui n\'est pas publiée : publiez-la ou rétablissez-la '
+                .. 'd\'abord.',
+            trial_busy = 'Vous avez déjà un essai en cours : arrêtez-le d\'abord.',
+            no_trial = 'Cet atelier ne propose pas d\'essai.',
+            syncing = 'L\'atelier se met à jour : réessayez dans un instant.',
+            unknown_version = 'Cette version n\'existe plus.',
+            not_archived = 'Seule une ancienne version peut être rétablie.',
+            unchanged = 'Rien n\'a changé depuis la version publiée.',
+            unreadable = 'Cette version ne peut plus être lue par cet atelier.',
         },
         -- erreurs d'un champ (« Vérifier ») ; %s : valeurs mises en forme par le serveur (virgule, unité, durée)
         fields = {
@@ -154,6 +217,8 @@ VavaAtelier.config = {
             created = 'A créé', saved = 'A enregistré le brouillon de', trial = 'A mis à l\'essai',
             published = 'A publié', archived = 'A archivé', restored = 'A restauré', removed = 'A retiré',
             imported = 'A rétabli l\'original de', placed = 'A placé', moved = 'A déplacé', note = 'A annoté',
+            discarded = 'A abandonné le brouillon de', taken = 'A repris le brouillon de',
+            trial_ended = 'A fini l\'essai de', exported = 'A copié aux archives', received = 'A repris des archives',
         },
         -- libellés de la recopie au journal du Registre (32 caractères au plus, bornes de vava_admin)
         mirror = {
@@ -161,6 +226,124 @@ VavaAtelier.config = {
             published = 'Atelier : publié', archived = 'Atelier : archivé', restored = 'Atelier : restauré',
             removed = 'Atelier : retiré', imported = 'Atelier : original rétabli', placed = 'Atelier : placé',
             moved = 'Atelier : déplacé', note = 'Atelier : annoté',
+            discarded = 'Atelier : brouillon abandonné', taken = 'Atelier : brouillon repris',
+            trial_ended = 'Atelier : fin d\'essai', exported = 'Atelier : copié aux archives',
+            received = 'Atelier : repris des archives',
+        },
+        -- nom des lignes du journal qui portent sur un atelier entier (« A rétabli l'original de l'atelier Récolte »)
+        workshop = 'atelier',
+
+        -- T-101 : fiches gardées. Étiquette d'état d'une fiche (`state` : { label, tone, line? }) ; %d : version.
+        states = {
+            draft = 'Brouillon', trial = 'Essai, version %d', live = 'Publiée, version %d',
+            archived = 'Version %d, archivée', removal = 'Retrait en attente', refused = 'Publiée, mais refusée en jeu',
+            holder = 'Brouillon de %s, enregistré %s',
+            stale = 'Une autre version a été publiée depuis le début de ce brouillon.',
+            unreadable = 'Version illisible par cet atelier.',
+        },
+        -- boutons du pied de fiche (essai et publication : ceux de l'éditeur, texts.trial et texts.publish)
+        buttons = {
+            save = 'Enregistrer le brouillon', endTrial = 'Arrêter l\'essai', history = 'Historique',
+            discard = 'Abandonner le brouillon', retire = 'Retirer du royaume', take = 'Reprendre le brouillon',
+            restore = 'Revenir à cette version', publishRemoval = 'Publier le retrait',
+            discardRemoval = 'Renoncer au retrait', check = 'Vérifier',
+        },
+        -- bandeau du volet pendant un essai, si l'éditeur n'a pas de texts.trialLine
+        trialLineDefault = 'Mode essai : vous seul voyez ce changement en jeu',
+        -- indice d'une ligne de liste (60 octets au plus) ; %s : nom du tenant, âge
+        hints = {
+            mine = 'Votre brouillon', other = 'Brouillon de %s', trial = 'En essai', removal = 'Retrait en attente',
+            new = 'Jamais publié', refused = 'Publiée, mais refusée en jeu',
+            retired = { masculine = 'retiré %s', feminine = 'retirée %s' },
+        },
+        -- ligne d'un brouillon sur l'accueil (« Vos brouillons ») ; %s : newLabel, résumé, nom du type
+        drafts = {
+            new = { masculine = '%s, pas encore publié', feminine = '%s, pas encore publiée' },
+            changes = { one = '%s, pas encore publié', many = '%s, pas encore publiés' },
+            unchanged = 'Rien de changé, pas encore publié',
+            trial = {
+                masculine = '%s en essai, vous seul le voyez en jeu', feminine = '%s en essai, vous seul la voyez en jeu',
+            },
+            removal = 'Retrait %s, pas encore publié',
+        },
+        -- résumés d'un changement (shared/changes.lua) ; accords : `e` (féminin) et `s` (pluriel) ajoutés au participe
+        changes = {
+            added = 'ajouté', removed = 'retiré', changed = 'changé',
+            setting = 'réglage', settingPlural = 'réglages',
+            settings = '%d réglages changés', settingsList = '%d réglages changés : %s', retouched = 'Retouché : %s',
+            fromTo = '%s de %s à %s', choice = '%s : %s', yes = 'oui', no = 'non',
+            versionNext = 'La version %d sera archivée ; celle-ci deviendra la version %d.',
+            first = 'Ce sera la version 1.',
+            restoreFrom = 'La version %d sera rétablie et deviendra la version %d.',
+            removal = 'Retrait %s', removalChildren = 'et de ses %d %s', removedWith = 'et ses %d %s',
+            titled = '%s : %s',
+        },
+        -- résumés des lignes du journal, avertissements des résumés
+        summaries = {
+            removalPrepared = 'retrait préparé',
+            restored = 'version %d rétablie',
+            restoredInto = 'version %d rétablie, devenue la version %d',
+            takenFrom = 'de %s',
+            seeded = '%d fiches reprises de l\'original',
+            reimported = '%d fiches changées, %d rétablies, %d nouvelles',
+            exported = '%s, %d fiches',
+            received = '%d fiches reprises, %d inchangées',
+            reset = 'Des réglages ont repris leur valeur de départ : %s.',
+            otherDrafts = 'Des brouillons d\'autres membres sur des fiches liées ne sont pas compris.',
+            child = '%s « %s » : %s',
+        },
+        invalid = 'Quelques réglages sont à corriger avant de continuer.',
+        warningsSaved = 'Brouillon enregistré. À corriger avant de publier :',
+        trialEndedFeed = 'L\'essai de « %s » a pris fin.',
+        tagTrial = '%d en essai',              -- étiquette d'une carte de l'accueil pendant un essai
+        -- raison de la fin d'un essai (résumé de la ligne du journal) ; %s : qui l'a repris
+        trialReasons = {
+            session = 'fin de la séance', dropped = 'départ', timeout = 'délai passé', taken = 'repris par %s',
+            editor = 'atelier retiré', stop = 'arrêté', publish = 'publié', discard = 'abandonné',
+        },
+        -- réponses de /atelier_archives (§ 10.4 de la spec T-101), dans le chat du membre ou la console
+        archives = {
+            author = 'Atelier',
+            usage = 'usage : /%s etat [atelier] | original <atelier> | original_fiche <atelier> <type> <fiche> | '
+                .. 'exporter <atelier|tout> | importer <fichier> | confirmer',
+            codex = 'État des ateliers, retour à l\'original, archives : copier et reprendre les fiches publiées.',
+            -- libellés du Codex (registre core:commands)
+            labels = {
+                command = 'Archives de l\'Atelier', etat = 'État des ateliers',
+                original = 'Rétablir l\'original d\'un atelier', original_fiche = 'Rétablir l\'original d\'une fiche',
+                exporter = 'Copier aux archives', importer = 'Reprendre des archives',
+                confirmer = 'Confirmer l\'opération résumée', exporterHint = 'un atelier, ou « tout »',
+                importerHint = 'nom du fichier (.json)',
+            },
+            denied = 'Refusé : réservé au Souverain.',
+            deniedEditor = 'Refusé : cet atelier ne vous est pas ouvert.',
+            notReady = 'Le Registre du Conseil s\'éveille : réessayez dans un instant.',
+            cooldown = 'Doucement : patientez un instant.',
+            unknownEditor = 'Atelier inconnu, ou qui ne garde rien : %s.',
+            unknownKind = 'Genre de fiche inconnu dans cet atelier : %s.',
+            unknownEntry = 'Fiche absente de l\'original : %s.',
+            state = '%s : %d publiées, %d brouillons, %d en essai, %d retirées%s',
+            stateSyncing = ', en mise à jour', stateFailed = ', à synchroniser', stateRefused = ', %d refusées en jeu',
+            nothing = 'Aucun atelier ne garde de fiches.',
+            originalPlan = '%s : %d fiches changées, %d rétablies, %d nouvelles, %d identiques à l\'original.',
+            originalSame = 'Identique à l\'original : rien à faire.',
+            entryPlan = '%s « %s » : %s',
+            refusedPlan = '%s : refusé — %s',
+            confirmHint = 'Tapez /%s confirmer sous %d s pour l\'appliquer.',
+            noPending = 'Rien à confirmer.',
+            expired = 'Le délai est passé : relancez la commande.',
+            changed = 'Les fiches ont changé depuis le résumé : relancez la commande.',
+            done = '%s : fait (%d fiches).',
+            failed = '%s : rien n\'a changé (%s).',
+            exported = 'Archives écrites : %s (%d fiches).',
+            exportFailed = 'Archives non écrites : %s.',
+            badName = 'Nom de fichier refusé : lettres, chiffres, _ et - seulement, terminé par .json (64 octets au '
+                .. 'plus).',
+            unreadableFile = 'Fichier illisible : %s.',
+            badValue = 'valeur refusée pour « %s » (hors des bornes ou choix inconnu)',
+            importPlan = '%s : %d à reprendre, %d inchangées',
+            busy = 'L\'atelier %s se met à jour : réessayez dans un instant.',
+            dbError = 'Les registres de l\'Atelier ne répondent pas : réessayez dans un instant.',
         },
     },
 }

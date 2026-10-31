@@ -79,16 +79,18 @@ Poser la convar sans redémarrer le serveur : console `set vava_env dev`, puis `
 | 1 | A : `/epee`, puis console `stop vava_anim_test`. | L'animation s'arrête, l'accessoire éventuel (`/animprop`) disparaît. |
 | 2 | A : `/aterre` (outil de `vava_dev_characters`), puis console `ensure vava_anim_test` et `stop vava_anim_test`. | A reste couché : l'arrêt de l'outil ne coupe pas une animation qu'il n'a pas jouée. Se relever ensuite. |
 
-## 6. Exemple de l'Atelier (`vava_example_atelier` 1.0.0, T-100)
+## 6. Exemple de l'Atelier (`vava_example_atelier` 1.1.0, T-100 et T-101)
 
 Procédure complète de l'Atelier : [atelier.md](atelier.md). Ici, la seule garde de l'exemple.
 
 | # | Faire | Attendu |
 |---|---|---|
-| 1 | Sans `vava_env` (§ 1) : `ensure vava_atelier`, `ensure vava_example_atelier`. | Console : `module 'vava_example_atelier' v1.0.0 refusé : … mode développement absent (convar vava_env ≠ dev) : aucun atelier d'exemple déclaré`. A : `F9` : aucune carte « Panneaux du bourg (exemple) » ni « Proclamations (exemple) ». `/atelier_exemple journal panneaux essai` : commande inconnue. |
-| 2 | `set vava_env dev`, `restart vava_example_atelier`. | Console : `atelier 'vava_example_atelier:panneaux' déclaré par vava_example_atelier (droit metiers)`, la même pour `proclamations` (droit `staff`), puis l'avertissement `mode développement : ateliers d'exemple déclarés et /atelier_exemple ouverte au Conseil — jamais sur un serveur ouvert au public`. |
+| 1 | Sans `vava_env` (§ 1) : `ensure vava_atelier`, `ensure vava_example_atelier`. | Console : `module 'vava_example_atelier' v1.1.0 refusé : … mode développement absent (convar vava_env ≠ dev) : aucun atelier d'exemple déclaré`. A : `F9` : aucune carte « Panneaux du bourg (exemple) » ni « Proclamations (exemple) ». `/atelier_exemple journal panneaux essai` : commande inconnue. |
+| 2 | `set vava_env dev`, `restart vava_example_atelier`. | Console : `atelier 'vava_example_atelier:panneaux' déclaré par vava_example_atelier (droit metiers, gardé)`, la même pour `proclamations` (droit `staff`), leurs synchronisations (`… fiches en base …`), puis l'avertissement `mode développement : ateliers d'exemple déclarés et /atelier_exemple ouverte — jamais sur un serveur ouvert au public`. |
 | 3 | **(2 joueurs)** B (hors du Conseil) : `/atelier_exemple journal panneaux essai`. | « refusé : cet atelier ne vous est pas ouvert. » ; aucune ligne au journal du Conseil. |
 | 4 | Console : `set vava_env prod` (sans redémarrer). A : `/atelier_exemple journal panneaux essai`. | « outil inactif sur ce serveur (mode développement absent). » : la convar est relue à chaque appel. Les ateliers d'exemple restent déclarés jusqu'au redémarrage de la ressource. Remettre `set vava_env dev`. |
+| 5 | B (hors du Conseil), près du « Panneau de la place » : `/atelier_exemple lire`, deux fois de suite. | Le titre et le texte du panneau ; la seconde fois : « Doucement : patientez un instant. ». Loin de tout panneau : « Aucun panneau à portée de lecture. » |
+| 6 | Console : `set vava_example_refuse 1` avec `vava_env prod`, puis publier un panneau (A, Atelier). | Le refus d'essai n'agit qu'en mode développement : la publication passe. Remettre `set vava_example_refuse 0` et `set vava_env dev`. |
 
 ## 7. Fin du test
 

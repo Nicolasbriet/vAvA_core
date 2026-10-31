@@ -115,4 +115,33 @@ describe('vava_atelier journaltext', function()
         assert.equal('A rétabli l\'original de l\'enclume', jt.lead(verbs.imported, 'l\'', 'enclume'))
         assert.equal('Atelier : original rétabli', VavaAtelier.config.texts.mirror.imported)
     end)
+
+    -- T-101 : cinq actions de plus, lignes d'un atelier entier
+    it('phrases des cinq nouvelles actions', function()
+        assert.equal('A abandonné le brouillon du panneau', jt.lead(verbs.discarded, 'le', 'panneau'))
+        assert.equal('A abandonné le brouillon de la zone', jt.lead(verbs.discarded, 'la', 'zone'))
+        assert.equal('A repris le brouillon de l\'affiche', jt.lead(verbs.taken, 'l\'', 'affiche'))
+        assert.equal('A fini l\'essai du panneau', jt.lead(verbs.trial_ended, 'le', 'panneau'))
+        assert.equal('A copié aux archives l\'atelier', jt.lead(verbs.exported, 'l\'', 'atelier'))
+        assert.equal('A repris des archives l\'atelier', jt.lead(verbs.received, 'l\'', 'atelier'))
+        for _, action in ipairs({ 'discarded', 'taken', 'trial_ended', 'exported', 'received' }) do
+            assert.is_true(#action <= 16, action)
+        end
+    end)
+
+    it('ligne d\'un atelier entier (sans fiche)', function()
+        local workshop = VavaAtelier.config.texts.workshop
+        local row = { id = 9, editor = 'vava_gathering:zones', kind = 'zone', action = 'imported', title = 'Récolte',
+            summary = '12 fiches reprises de l\'original', actor_label = 'Console', at = NOW }
+        local line = jt.line(row, verbs, { article = 'la', noun = 'zone' }, NOW, fixedDate, false, workshop)
+        assert.equal('A rétabli l\'original de l\'atelier', line.lead)
+        assert.equal('Récolte', line.title)
+        row.action = 'exported'
+        assert.equal('A copié aux archives l\'atelier',
+            jt.line(row, verbs, { article = 'la', noun = 'zone' }, NOW, fixedDate, false, workshop).lead)
+        -- une ligne qui porte sur une fiche garde son type
+        row.def_id = 'foret_brume'
+        assert.equal('A copié aux archives la zone',
+            jt.line(row, verbs, { article = 'la', noun = 'zone' }, NOW, fixedDate, false, workshop).lead)
+    end)
 end)

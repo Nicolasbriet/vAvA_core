@@ -5,13 +5,18 @@
            objets du royaume (registre vava_inventory:items, gardé en mémoire et tenu à jour par les hooks du
            registre), envois ciblés par core.net, appels des fonctions des éditeurs (isolés, chronométrés). Chaque appel
            à une autre ressource est isolé : un module absent ou en erreur ne retire que la fonction concernée.
-    Dépendances : shared/constants.lua, config.lua, shared/text.lua, server/core.lua
+           T-101 : JSON (json.encode, json.decode, isolés), fichiers d'archives de la ressource (SaveResourceFile,
+           LoadResourceFile, dans le seul dossier `archives.folder`, nom contrôlé par shared/exchange.lua), réponse
+           d'une commande (chat du seul membre, ou console).
+    Dépendances : shared/constants.lua, config.lua, shared/text.lua, shared/exchange.lua, server/core.lua
 ]]
 
-local type, pairs, pcall, tostring, tonumber, select = type, pairs, pcall, tostring, tonumber, select
+local type, pairs, pcall, tostring, tonumber, select, print = type, pairs, pcall, tostring, tonumber, select, print
 local pack, unpack, sort = table.pack, table.unpack, table.sort
 local find, match, sub = string.find, string.match, string.sub
 local GetResourceState, GetGameTimer = GetResourceState, GetGameTimer
+local SaveResourceFile, LoadResourceFile, TriggerClientEvent = SaveResourceFile, LoadResourceFile, TriggerClientEvent
+local jsonEncode, jsonDecode = json.encode, json.decode
 
 local core = VavaAtelier.core
 if not core then return end
@@ -257,4 +262,79 @@ function Bridge.ItemsChanged(kind, key)
     elseif kind == 'added' then
         items[key] = slim(key, core.registry.get(ITEMS, key))
     end
+end
+
+-- JSON (T-101) -----------------------------------------------------------------------------------------------------
+
+--- JSON d'une table, ou nil (valeur impossible à coder : fonction, table mixte, NaN…).
+---@param value table
+---@return string|nil
+function Bridge.JsonEncode(value)
+    local ok, encoded = pcall(jsonEncode, value)
+    if not ok or type(encoded) ~= 'string' then return nil end
+    return encoded
+end
+
+--- Valeur d'un texte JSON, ou nil (texte illisible, trop imbriqué).
+---@param value string
+---@return any
+function Bridge.JsonDecode(value)
+    if type(value) ~= 'string' then return nil end
+    local ok, decoded = pcall(jsonDecode, value)
+    if not ok then return nil end
+    return decoded
+end
+
+-- Fichiers d'archives (T-101) --------------------------------------------------------------------------------------
+
+local exchange = VavaAtelier.exchange
+
+--- Chemin d'un fichier d'archives dans la ressource, ou nil si le nom n'est pas permis (motif, longueur) : aucun
+--- fichier n'est jamais lu ni écrit hors de `archives.folder`.
+---@param name string
+---@return string|nil
+local function archivePath(name)
+    if not exchange.validName(name) then return nil end
+    return cfg.archives.folder .. '/' .. name
+end
+
+--- Écrit un fichier d'archives. Rend true, ou false et une raison.
+---@param name string
+---@param content string
+---@return boolean ok
+---@return string|nil err
+function Bridge.SaveArchive(name, content)
+    local path = archivePath(name)
+    if not path then return false, 'bad_name' end
+    local ok, written = pcall(SaveResourceFile, VavaAtelier.resource, path, content, #content)
+    if not ok or not written then return false, 'write_failed' end
+    return true
+end
+
+--- Lit un fichier d'archives : son texte, ou nil et une raison (bad_name, missing, too_large).
+---@param name string
+---@return string|nil content
+---@return string|nil err
+function Bridge.LoadArchive(name)
+    local path = archivePath(name)
+    if not path then return nil, 'bad_name' end
+    local ok, content = pcall(LoadResourceFile, VavaAtelier.resource, path)
+    if not ok or type(content) ~= 'string' then return nil, 'missing' end
+    if #content > cfg.archives.maxBytes then return nil, 'too_large' end
+    return content
+end
+
+-- Réponses de commande (T-101) ---------------------------------------------------------------------------------------
+
+local CHAT_EVENT = 'chat:addMessage'
+
+--- Une ligne au seul membre (chat ; vava_chat la reprend), ou à la console.
+---@param source integer
+---@param line string
+function Bridge.Say(source, line)
+    if source == CONSOLE then
+        print(('[%s] %s'):format(VavaAtelier.resource, line))
+        return
+    end
+    TriggerClientEvent(CHAT_EVENT, source, { args = { cfg.texts.archives.author, line } })
 end

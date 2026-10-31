@@ -2,8 +2,10 @@
     vava_atelier/client/session.lua
     Rôle : ouverture et fermeture de l'Atelier côté joueur, focus, versions gardées (empreintes de l'accueil et des
            descripteurs que la page a reçus : le serveur ne renvoie que ce qui a changé), évènements du serveur
-           (`revoked` : l'interface se ferme ; `editorGone` : retour à l'accueil). Aucune boucle : tout part d'une
-           touche, d'une commande, d'un évènement ou d'un retour de la page.
+           (`revoked` : l'interface se ferme ; `editorGone` : retour à l'accueil ; T-101 : `entryChanged`, une fiche
+           de l'atelier ouvert a changé ailleurs → message `entryChanged` à la page ; fin d'un essai hors de
+           l'Atelier → notification). Aucune boucle : tout part d'une touche, d'une commande, d'un évènement ou d'un
+           retour de la page.
     Dépendances : shared/constants.lua, config.lua, client/core.lua, client/nui.lua
 ]]
 
@@ -29,6 +31,12 @@ local session = {}
 VavaAtelier.session = session
 
 local open, pending = false, false
+-- atelier dont la page a demandé le descripteur en dernier (avis `entryChanged`)
+local currentEditor = nil
+-- ce qu'a pu changer une fiche (évènement entryChanged)
+local CHANGES = {
+    saved = true, published = true, restored = true, removed = true, discarded = true, taken = true, trialEnded = true,
+}
 
 -- Ce que la page garde entre deux ouvertures : empreinte de l'accueil, et pour chaque atelier dont elle a reçu le
 -- descripteur, son empreinte et son nom (bandeau du volet). '' ou absent : rien de gardé.
@@ -68,6 +76,12 @@ end
 ---@return { home: string, editors: table<string, { version: string, label: string }> }
 function session.known()
     return known
+end
+
+--- Atelier ouvert par la page (descripteur demandé), ou nil.
+---@param editorId string|nil
+function session.setEditor(editorId)
+    currentEditor = editorId
 end
 
 --- Oublie tout ce que la page garde : la prochaine demande renverra tout.
@@ -143,6 +157,7 @@ end
 function session.close(tellServer)
     if not open then return end
     open = false
+    currentEditor = nil
     nui.send('close')
     nui.setFocus(false)
     if tellServer ~= false then core.rpc.emit(RPC.CLOSE) end
@@ -171,5 +186,28 @@ RegisterNetEvent(EVENTS.EDITOR_GONE, function(editorId)
         return
     end
     known.editors[editorId] = nil
+    if currentEditor == editorId then currentEditor = nil end
     if open then nui.send('editorGone', { editor = editorId }) end
+end)
+
+--- Valeur d'identifiant reçue du serveur, bornée.
+local function isId(value, pattern, max)
+    return type(value) == 'string' and #value <= max and find(value, pattern) ~= nil
+end
+
+-- Une fiche de l'atelier ouvert a changé ailleurs (publication, reprise, fin d'essai…) : la page relit la fiche ou
+-- avertit. Fin d'un essai alors que l'Atelier est fermé ou sur un autre atelier : notification.
+RegisterNetEvent(EVENTS.ENTRY_CHANGED, function(editorId, kindId, id, what, title)
+    if not isId(editorId, VavaAtelier.EDITOR_PATTERN, VavaAtelier.MAX_EDITOR)
+        or not isId(kindId, VavaAtelier.KEY_PATTERN, VavaAtelier.MAX_KEY)
+        or not isId(id, VavaAtelier.ENTRY_PATTERN, VavaAtelier.MAX_ENTRY) or not CHANGES[what] then
+        return
+    end
+    if open and currentEditor == editorId then
+        nui.send('entryChanged', { editor = editorId, kind = kindId, id = id, what = what })
+        if what == 'trialEnded' and VavaAtelier.relay then VavaAtelier.relay.bannerFor(editorId, nil) end
+    elseif what == 'trialEnded' then
+        local name = type(title) == 'string' and #title <= 64 and title or id
+        session.feed(texts.trialEndedFeed:format(name), 'info')
+    end
 end)
