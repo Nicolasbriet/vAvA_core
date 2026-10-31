@@ -8,11 +8,14 @@ local helper = require('tests.helper')
 --     erreur (une ligne de console par minute au plus ; `not_ready` signalé s'il dure une minute) ;
 --   incantation : refusée au début, après les recharges (rien n'est réservé, aucune incantation en cours) ; brisée dès
 --     qu'une arme passe en main (hook `vava_inventory:hold` after), et à la fin si l'arme a été prise pendant (mana
---     intacte, aucun temps de recharge) ; sans vava_combat, aucune restriction.
+--     intacte, aucun temps de recharge) ; sans vava_combat, aucune restriction ;
+--   T-149 : pendant le rengainement (`armed` rend `sheathing = true`), le refus est `sheathing` (texte propre) ;
+--     IsInvulnerable lit `vava_admin:isInvulnerable` (isolé : absent, ancien ou en erreur → non, une ligne de console
+--     par minute au plus).
 describe('vava_magic : mains vides pour incanter (serveur)', function()
     local Bridge, casting
     local now, combatState, weapon, weaponCode, shield, armedCalls, shieldCalls, warnings, spent
-    local pedWeapon, peds, hooks, clientEvents
+    local pedWeapon, peds, hooks, clientEvents, adminState, adminAnswer, adminCalls
 
     local UNARMED_SIGNED = -1569615261   -- GetHashKey('WEAPON_UNARMED') tel que le rend Lua dans FiveM
     local PISTOL = 453432689             -- WEAPON_PISTOL
@@ -31,6 +34,7 @@ describe('vava_magic : mains vides pour incanter (serveur)', function()
         now, combatState, weapon, weaponCode, shield = 1000, 'started', nil, 'no_weapon', nil
         armedCalls, shieldCalls, warnings, spent = 0, 0, {}, 0
         pedWeapon, peds, hooks, clientEvents = UNARMED_SIGNED, { [CASTER] = 101 }, {}, {}
+        adminState, adminAnswer, adminCalls = 'missing', false, 0
 
         _G.GetGameTimer = function() return now end
         _G.TriggerClientEvent = function(event, target, ...)
@@ -41,7 +45,11 @@ describe('vava_magic : mains vides pour incanter (serveur)', function()
             assert.equal(101, ped)
             return pedWeapon
         end
-        _G.GetResourceState = function(name) return name == 'vava_combat' and combatState or 'missing' end
+        _G.GetResourceState = function(name)
+            if name == 'vava_combat' then return combatState end
+            if name == 'vava_admin' then return adminState end
+            return 'missing'
+        end
         local combat = {
             armed = function(src)
                 armedCalls = armedCalls + 1
@@ -56,9 +64,20 @@ describe('vava_magic : mains vides pour incanter (serveur)', function()
                 return shield
             end,
         }
-        _G.exports = { vava_combat = setmetatable({}, { __index = function(_, fn)
-            return function(_, ...) return combat[fn](...) end
-        end }) }
+        _G.exports = {
+            vava_combat = setmetatable({}, { __index = function(_, fn)
+                return function(_, ...) return combat[fn](...) end
+            end }),
+            vava_admin = setmetatable({}, { __index = function(_, fn)
+                return function(_, src)
+                    assert.equal('isInvulnerable', fn)
+                    assert.equal(CASTER, src)
+                    adminCalls = adminCalls + 1
+                    if type(adminAnswer) == 'function' then return adminAnswer() end
+                    return adminAnswer
+                end
+            end }),
+        }
 
         VavaMagic.resource = 'vava_magic'
         VavaMagic.ready = true
@@ -235,6 +254,14 @@ describe('vava_magic : mains vides pour incanter (serveur)', function()
             assert.equal(2, #warnings)
         end)
 
+        it('arme qu’on rengaine (sheathing = true) : sheathing, pas armed (T-149)', function()
+            weapon = { item = 'epee_courte', category = 'une_main', family = 'epee', sheathing = true, readyInMs = 900 }
+            assert.equal('sheathing', Bridge.HandsBusy(CASTER))
+            assert.equal(0, shieldCalls)
+            weapon = { item = 'epee_courte', category = 'une_main', family = 'epee', sheathing = false }
+            assert.equal('armed', Bridge.HandsBusy(CASTER))
+        end)
+
         it('OnHold s’abonne au hook vava_inventory:hold (after)', function()
             assert.is_true(Bridge.OnHold(function() end))
             assert.is_function(hooks['vava_inventory:hold'])
@@ -391,6 +418,18 @@ describe('vava_magic : mains vides pour incanter (serveur)', function()
             assert.equal(0, spent)
         end)
 
+        it('rengainement : début refusé (sheathing), rien de réservé ; mains libres ensuite, le sort part', function()
+            weapon = { item = 'epee_courte', sheathing = true, readyInMs = 1500 }
+            local ok, code = casting.begin(CASTER, SPELL)
+            assert.is_false(ok)
+            assert.equal('sheathing', code)
+            assert.is_nil(casting.current(CASTER))
+            assert.equal(0, spent)
+            weapon = nil
+            local started, info = casting.begin(CASTER, SPELL)
+            assert.is_true(started, tostring(info))
+        end)
+
         it('en recharge : refusé pour la recharge, sans interroger vava_combat (R-4)', function()
             local ok, info = casting.begin(CASTER, SPELL)
             assert.is_true(ok, tostring(info))
@@ -406,6 +445,47 @@ describe('vava_magic : mains vides pour incanter (serveur)', function()
             assert.is_false(refused)
             assert.equal('cooldown', code)
             assert.equal(calls, armedCalls)
+        end)
+    end)
+
+    describe('bridge : IsInvulnerable (vava_admin, T-149)', function()
+        before_each(loadMagic)
+
+        it('vava_admin absent ou arrêté : non, sans appel ni bruit', function()
+            adminAnswer = true
+            for _, state in ipairs({ 'missing', 'stopped', 'starting' }) do
+                adminState = state
+                assert.is_false(Bridge.IsInvulnerable(CASTER))
+            end
+            assert.equal(0, adminCalls)
+            assert.equal(0, #warnings)
+        end)
+
+        it('réponse de l’export : seul true protège ; un appel par lecture', function()
+            adminState = 'started'
+            adminAnswer = true
+            assert.is_true(Bridge.IsInvulnerable(CASTER))
+            for _, answer in ipairs({ false, 'true', 1, {} }) do
+                adminAnswer = answer
+                assert.is_false(Bridge.IsInvulnerable(CASTER))
+            end
+            adminAnswer = nil
+            assert.is_false(Bridge.IsInvulnerable(CASTER))
+            assert.equal(6, adminCalls)
+        end)
+
+        it('en erreur ou ancien (sans l’export) : non, une ligne de console par minute au plus', function()
+            adminState = 'started'
+            adminAnswer = function() error('No such export isInvulnerable in resource vava_admin') end
+            for _ = 1, 5 do assert.is_false(Bridge.IsInvulnerable(CASTER)) end
+            assert.equal(1, #warnings)
+            assert.truthy(warnings[1]:find('vava_admin.isInvulnerable', 1, true))
+            now = now + 59999
+            assert.is_false(Bridge.IsInvulnerable(CASTER))
+            assert.equal(1, #warnings)
+            now = now + 1
+            assert.is_false(Bridge.IsInvulnerable(CASTER))
+            assert.equal(2, #warnings)
         end)
     end)
 end)

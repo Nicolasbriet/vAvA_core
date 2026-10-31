@@ -61,7 +61,10 @@ zones.define(KIND, {
         if data.wetMs <= 0 then return end
         local now = GetGameTimer()
         if data.applied[victim] and now - data.applied[victim] < spellCfg.refreshMs then return end
-        if not combat.affects(victim, zone.owner, zone.ownerCharacter) then return end
+        local reached, refused = combat.affects(victim, zone.owner, zone.ownerCharacter)
+        -- membre invulnérable : compté comme une pose, vava_admin n'est relu qu'à la suivante (jamais à chaque tour)
+        if refused == combat.INVULNERABLE then data.applied[victim] = now end
+        if not reached then return end
         data.applied[victim] = now
         if not states.apply(victim, 'wet', { durationMs = data.wetMs, caster = zone.owner, spell = NAME }) then return end
         -- bonus du premier mouillé, au lanceur toujours là (même personnage), jamais pour lui-même
