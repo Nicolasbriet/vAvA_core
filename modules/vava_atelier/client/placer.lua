@@ -1,20 +1,9 @@
 --[[
     vava_atelier/client/placer.lua
-    Rôle : l'outil de placement côté membre (§ 8 de la spec T-102). États : repos → visée → repos. Entrée par le retour
-           de page `placeStart` (refus sur place : pas de séance, page mise de côté, personnage non apparu, en véhicule
-           ou à cheval, porte) ; à l'entrée, le jeu reprend clavier et souris (la page reste affichée), la bannière de
-           vava_pause est bloquée (appel isolé), la page reçoit `placing` et la barre des touches du mode.
-           LA boucle par image de l'outil ne vit que pendant la visée : contrôles neutralisés, visée par un lancer de
-           rayon asynchrone (un seul en vol), candidat (shared/aim.lua), règles (shared/placerules.lua, les mêmes que
-           le serveur) au plus toutes les `refreshMs` ou dès que le candidat bouge, éléments proches triés toutes les
-           `sortMs`, dessin (client/drawing.lua, fantômes : client/ghosts.lua), commandes (clic, molette, Maj, clic
-           droit, Ctrl+Z, Entrée, Échap). Un seul envoi au serveur à la fois ; un refus s'affiche 3 s et part à la page
-           (`placeRefused`). Rien n'est envoyé à chaque image, ni à la page ni au serveur : le serveur ne reçoit que
-           des intentions (`place`, `discard`), qu'il revérifie toutes.
-           Garde aussi la dernière réponse `children` (lieux de la fiche, de son parent, des enfants) pour dessiner,
-           juger et poser les fantômes des enfants pas encore publiés.
-    Dépendances : shared/constants.lua, config_client.lua, shared/placerules.lua, shared/aim.lua, client/core.lua,
-                  client/nui.lua, client/session.lua, client/drawing.lua, client/ghosts.lua
+    Rôle : outil de placement du membre : états, LA boucle par image de la visée (seulement pendant la visée), envois,
+           annulation ; garde les lieux de la fiche ouverte. Détail : README (Outil de placement).
+    Dépendances : shared/constants.lua, config_client.lua, shared/placerules.lua, shared/aim.lua,
+                  client/core.lua, client/nui.lua, client/session.lua, client/drawing.lua, client/ghosts.lua
 ]]
 
 local type, ipairs, tostring, tonumber, pcall = type, ipairs, tostring, tonumber, pcall
@@ -73,8 +62,6 @@ end
 
 -- Valeurs reçues (page, serveur) ---------------------------------------------------------------------------------------
 
----@param value any
----@return boolean
 local function finite(value)
     return type(value) == 'number' and value == value and value ~= huge and value ~= -huge
 end
@@ -174,10 +161,6 @@ local function ghostList(origin, skip)
 end
 
 --- Garde une réponse `children` reçue par la page (relais) et pose les fantômes proches.
----@param editorId string
----@param kindId string
----@param id string
----@param data any
 function placer.absorb(editorId, kindId, id, data)
     if type(data) ~= 'table' then return end
     local rows = {}
@@ -214,8 +197,6 @@ function placer.leave()
 end
 
 --- Mètres (entiers) entre le personnage et le centre d'un lieu, ou nil (bloc « Lieu » du volet).
----@param where any
----@return integer|nil
 function placer.distance(where)
     local center = placerules.center(where)
     if not center then return nil end
@@ -228,9 +209,6 @@ local function now()
     return GetGameTimer()
 end
 
----@param current table
----@param line string
----@param tone string  valid | refused
 local function flash(current, line, tone)
     current.flash = { text = line, color = tone == 'valid' and colors.valid or colors.refused, until_ = now() + FLASH_MS }
 end
@@ -290,8 +268,7 @@ local function computeTitle(current)
     return current.title
 end
 
---- Lieu du parent, frères et titre du candidat, recalculés seulement quand les lieux, le modèle ou l'élément choisi
---- changent.
+--- Lieu du parent, frères et titre du candidat, refaits seulement quand lieux, modèle ou choix changent.
 local function refreshCache(current)
     if current.cacheRev == revision and current.cachePicked == (current.picked or false) then return end
     current.cacheRev, current.cachePicked = revision, current.picked or false
@@ -769,7 +746,6 @@ end
 
 -- Entrée et sortie ---------------------------------------------------------------------------------------------------
 
----@return boolean
 function placer.isAiming()
     return state ~= nil
 end
@@ -788,10 +764,7 @@ local function ensureKept(editorId, kindId, id)
     return true
 end
 
---- Retour de page `placeStart { editor, kind, id, rev, mode, shape, rules, ghost?, template?, parent?, parentKind?,
---- parentRev?, label?, title }` : la visée commence. Chaque valeur est bornée ici ; le serveur revérifie tout.
----@param d table
----@return table
+--- Retour de page `placeStart` : la visée commence (chaque valeur bornée ici ; le serveur revérifie tout).
 function placer.start(d)
     if state then placer.stop() end
     if not session.isOpen() then return refuse('not_open') end
@@ -866,9 +839,7 @@ function placer.start(d)
     return { ok = true }
 end
 
---- Fin de la visée (Échap, page, pose d'une fiche seule, fermeture, déchargement, essai joué) : boucle arrêtée, fantôme
---- du candidat retiré, blocage levé, focus rendu à la page.
----@param silent? boolean  la page est fermée ou cachée : ni focus ni message
+--- Fin de la visée : boucle arrêtée, fantôme du candidat retiré, blocage levé, focus rendu (sauf `silent`).
 function placer.stop(silent)
     local current = state
     if not current then return end
@@ -884,7 +855,6 @@ function placer.stop(silent)
 end
 
 --- Retour de page `templateChanged { values, ghost?, label? }` : valeurs du prochain enfant (aucun RPC).
----@param d table
 function placer.templateChanged(d)
     if type(d.values) == 'table' then template = d.values end
     if d.ghost ~= nil then templateGhost = cleanLook(d.ghost) end
@@ -900,8 +870,7 @@ function placer.undo()
     undo(current)
 end
 
---- Essai joué (la page se met de côté) : visée arrêtée sans message, fantômes retirés (l'essai montre les vrais points
---- chez l'auteur) ; les lieux gardés restent pour la visée suivante.
+--- Essai joué : visée arrêtée, fantômes retirés ; les lieux gardés restent.
 function placer.hide()
     placer.stop(true)
     ghosts.clear()

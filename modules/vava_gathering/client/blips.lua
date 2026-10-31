@@ -1,12 +1,7 @@
 --[[
     vava_gathering/client/blips.lua
-    Rôle : les zones de récolte sur la carte, vues du joueur : un blip par zone (icône et couleur selon le type de lieu,
-           nommé comme elle, à courte portée) et le cercle translucide de son rayon. Depuis 1.8.0 (T-102), la liste ne
-           vient plus de la config : elle est gardée en stockage local (KVP `vava_gathering:map`, avec sa version) et
-           redemandée au serveur une fois par séance, à la première apparition (RPC `vava_gathering:map`, ≈ 30 octets
-           si rien n'a changé) ; une liste reçue remplace les blips et la KVP. Une zone suivie qui porte son nom, son
-           type et son lieu corrige son blip (rien n'est envoyé). Retirés à la sélection, au déchargement et à l'arrêt
-           du module ; repère de la carte posé sur une zone à la demande du panneau. Aucune boucle.
+    Rôle : zones sur la carte : liste gardée en stockage local, redemandée une fois par séance (RPC map), corrigée par la
+           def d'une zone suivie ; repère du panneau. Aucune boucle.
     Dépendances : shared/constants.lua, config_client.lua, shared/zonestate.lua, client/core.lua, client/props.lua
 ]]
 

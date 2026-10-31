@@ -1,13 +1,7 @@
 --[[
     vava_atelier/client/relay.lua
-    Rôle : retours de la page → RPC du serveur (forme de vava_codex/client/main.lua `forward`). Le relais ne transmet
-           que les clés attendues, converties (chaîne, entier), et laisse le serveur refuser le reste ; chaque réponse
-           a la forme `{ ok, error?, data? }`. Il tient les versions gardées de l'accueil et des descripteurs (seul le
-           changé repart du serveur) et envoie le bandeau du volet (`mode`) à l'ouverture d'un atelier.
-           T-101 : douze relais (enregistrer, essayer, arrêter, résumer, publier, revenir, abandonner, retirer,
-           reprendre, historique, version, retirées) ; le jeton d'un résumé part tel quel (le serveur refuse tout ce
-           qui n'est pas 16 hexadécimaux) ; bandeau d'essai (`texts.trialLine` de l'atelier) sur une fiche en essai,
-           bandeau d'édition à la fin de l'essai.
+    Rôle : retours de la page → RPC du serveur (clés attendues seulement, réponse { ok, error?, data? }), versions gardées,
+           bandeau du volet, relais de l'outil de placement.
     Dépendances : shared/constants.lua, config_client.lua, client/core.lua, client/nui.lua, client/session.lua
 ]]
 

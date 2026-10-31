@@ -1,10 +1,6 @@
 --[[
     vava_atelier/client/drawing.lua
-    Rôle : ce que l'outil de placement dessine dans le monde, avec les natives du jeu (décision du porteur du projet :
-           étiquettes en texte du jeu, jamais en HTML) : anneau d'une zone (cylindre de 1,5 m), poteau d'un sommet,
-           segment d'un tracé, chevron d'un point sans fantôme, étiquette au-dessus d'un lieu, ligne d'aide au bas de
-           l'écran. Appelé seulement par la boucle de la visée (client/placer.lua), chez le seul membre qui place :
-           rien n'est envoyé à personne.
+    Rôle : dessin de la visée par les natives du jeu : anneaux, poteaux, segments, chevrons, étiquettes, ligne à l'écran.
     Dépendances : shared/constants.lua, config_client.lua
 ]]
 
@@ -32,11 +28,6 @@ local drawing = {}
 VavaAtelier.drawing = drawing
 
 --- Anneau d'une zone (cylindre transparent) de rayon `r`.
----@param x number
----@param y number
----@param z number
----@param r number
----@param color integer[]
 function drawing.ring(x, y, z, r, color)
     local diameter = r * 2.0
     DrawMarker(markers.area, x, y, z - 0.5, 0.0, 0.0, 0.0, 0.0, 0.0, 0.0, diameter, diameter, HEIGHT, color[1], color[2],
@@ -74,11 +65,6 @@ local function text(line, color, x, y)
 end
 
 --- Étiquette au-dessus d'un lieu (texte du jeu sur un fond sombre léger).
----@param x number
----@param y number
----@param z number
----@param line string
----@param color integer[]
 function drawing.label(x, y, z, line, color)
     SetDrawOrigin(x, y, z + LABEL_LIFT, 0)
     DrawRect(0.0, 0.0125, 0.012 + #line * 0.0042, 0.03, 20, 16, 12, 150)
@@ -87,8 +73,6 @@ function drawing.label(x, y, z, line, color)
 end
 
 --- Ligne d'aide au bas de l'écran (« Visez le sol. », « Échap encore pour abandonner le tracé. »).
----@param line string
----@param color integer[]
 function drawing.screen(line, color)
     text(line, color, 0.5, 0.82)
 end

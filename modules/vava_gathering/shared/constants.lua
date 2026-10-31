@@ -1,7 +1,6 @@
 --[[
     vava_gathering/shared/constants.lua
-    Rôle : table du module (seule globale de la ressource) et constantes de protocole : registre des outils, RPC,
-           évènements ciblés, bandes de vitalité, bornes, anciennes clés GlobalState (effacées une fois au démarrage).
+    Rôle : table du module (seule globale : VavaGathering) et constantes de protocole (RPC, évènements, bornes, clés d'état).
     Dépendances : aucune
 ]]
 

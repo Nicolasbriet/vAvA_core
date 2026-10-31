@@ -1,21 +1,9 @@
 --[[
     vava_gathering/client/props.lua
-    Rôle : les nœuds de récolte dans le monde, vus du joueur : zones reçues des seuls serveurs proches, par les
-           abonnements de zone du core (core.zones.watch, 1.6.0) ; depuis 1.8.0 (T-102), chaque zone porte aussi son nom,
-           son type et son lieu (`def`) et ses points (`p:<nœud>` : ressource, lieu, cap) — rien ne vient plus de la
-           config : une zone ou un point publiés dans l'Atelier paraissent sans redémarrage. Props LOCAUX (jamais
-           réseau) créés pour les nœuds à portée (modèle de leur ressource, `resources[…].prop`) et remplacés par leur
-           modèle « épuisé » quand la zone l'est ; nœud le plus proche à distance d'interaction.
-           Essai de l'Atelier (au seul auteur) : la zone essayée remplace l'affichage de la zone du même nom (ses points,
-           leurs charges d'essai) et compte comme une zone suivie ; sa fin rend l'état publié.
-           Une seule boucle lente, active seulement quand un personnage est en jeu et suit au moins une zone : elle ne
-           mesure que les zones suivies (centre et étendue de leurs nœuds), ne parcourt que les nœuds d'une zone à
-           portée, passe toutes les streaming.pollMs près d'une zone et toutes les streaming.idlePollMs loin de
-           toutes ; les nœuds d'une zone ne sont regroupés de nouveau que quand cette zone entre, change ou sort, et
-           elle fait aussitôt un passage ; la boucle s'arrête d'elle-même quand plus aucune zone n'est suivie, à la
-           sélection et au déchargement, et retire alors tous les props.
-    Dépendances : shared/constants.lua, config_client.lua, shared/geometry.lua, shared/proximity.lua, shared/zonestate.lua,
-                  client/core.lua (core.zones, vAvA_core 0.11.0)
+    Rôle : points de récolte dans le monde, lus dans l'état des zones suivies (et dans l'essai de l'Atelier chez son
+           auteur) ; props locaux à portée, une boucle lente arrêtée sans zone suivie. Détail : README.
+    Dépendances : shared/constants.lua, config_client.lua, shared/geometry.lua, shared/proximity.lua,
+                  shared/zonestate.lua, client/core.lua
 ]]
 
 local type, pairs, ipairs, next, huge, max, tostring = type, pairs, ipairs, next, math.huge, math.max, tostring

@@ -1,13 +1,7 @@
 --[[
     vava_gathering/config_client.lua
-    Rôle : réglages de la récolte que lit le client : distance d'invite et annulation au mouvement, streaming des
-           props, carte (blips), genres de zone d'eau, touches, outils (leur genre), ressources (libellé, outil, geste,
-           modèles), animations. Téléchargé par chaque joueur ; le serveur le lit aussi. Tout le reste (zones et nœuds,
-           graine de l'Atelier depuis 1.8.0 : leur partie client arrive par l'état de zone ; part serveur des
-           ressources et des outils ; bandes de vitalité, cicatrice, réaction de la terre, saisons, tolérances du
-           serveur, durée et qualité d'une récolte, pêche ; journal, droits, débits, objets déclarés, éditeur de
-           l'Atelier, textes) est dans config.lua, servi au seul serveur (T-132, T-102).
-    Les modèles de props et d'accessoires sont ceux du jeu de base : à ajuster avec les packs médiévaux.
+    Rôle : réglages de la récolte lus par le client : invite, streaming, carte, touches, genre des outils, part client des
+           ressources, animations. Le reste : config.lua, servi au seul serveur. Détail : README (Règles).
     Dépendances : shared/constants.lua
 ]]
 

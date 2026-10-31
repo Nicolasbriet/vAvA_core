@@ -1,12 +1,7 @@
 --[[
     vava_atelier/client/main.lua
-    Rôle : l'Atelier côté joueur : touche (RegisterKeyMapping, réglable par le joueur, aucune boucle) et /atelier pour
-           ouvrir ou fermer ; fermeture au déchargement du personnage ; souris et clavier rendus au jeu si la ressource
-           s'arrête Atelier ouvert ; export `isOpen`. Le bouton de la page Outils du Registre est reporté.
-           T-102 : la même touche, pendant l'essai joué, rend la page (`resume`) ; pendant la visée, ferme l'Atelier.
-           Commande-touche `+vava_atelier_annuler` (Z, suit la disposition du clavier ; Ctrl tenu : annuler le dernier
-           geste de la visée, rien hors visée), déclarée au registre core:commands par le serveur. Arrêt de la
-           ressource : fantômes retirés, blocage de vava_pause levé, focus rendu.
+    Rôle : touche et commande de l'Atelier (F9 rend aussi la page après un essai joué), Ctrl+Z de la visée, fermeture au
+           déchargement, arrêt de la ressource, export isOpen.
     Dépendances : shared/constants.lua, config_client.lua, client/core.lua, client/session.lua, client/placer.lua
 ]]
 

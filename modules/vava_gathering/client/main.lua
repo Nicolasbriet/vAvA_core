@@ -1,13 +1,9 @@
 --[[
     vava_gathering/client/main.lua
-    Rôle : assemblage côté joueur : touche d'interaction (commande +/− pour l'appui et le relâchement, réglable par
-           le joueur, aucune boucle), panneau des zones (touche, RPC, interface, repère de la carte posé sur une zone),
-           évènements du serveur (touche de pêche, notifications par vava_hud sinon celles du jeu), retours de
-           l'interface, fermeture au déchargement du personnage.
-           T-102 : essai de l'Atelier (`vava_gathering:trial`, `trialEnd`, envoyés au seul auteur) montré par
-           client/props.lua ; liste de la carte demandée à l'apparition (client/blips.lua).
-    Dépendances : shared/constants.lua, config_client.lua, client/core.lua, client/nui.lua, client/props.lua, client/blips.lua,
-                  client/interact.lua, client/fishing.lua
+    Rôle : entrée du client : touches, panneau des zones, évènements du serveur (touche de pêche, avis, essai de l'Atelier),
+           retours de la page.
+    Dépendances : shared/constants.lua, config_client.lua, client/core.lua, client/nui.lua, client/props.lua,
+                  client/blips.lua, client/interact.lua, client/fishing.lua
 ]]
 
 local type, tostring, pcall = type, tostring, pcall

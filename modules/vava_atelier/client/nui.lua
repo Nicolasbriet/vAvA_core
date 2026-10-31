@@ -1,9 +1,6 @@
 --[[
     vava_atelier/client/nui.lua
-    Rôle : SEUL pont entre l'interface web et le Lua : messages sortants `{ action, payload }` (open, close, notify,
-           editorGone, mode, keys, entryChanged ; T-102 : placing, placed, placeRefused, undone, suspended), focus,
-           retours entrants isolés (une erreur renvoie `{ ok = false, error = 'client_error' }` à l'interface au lieu
-           de la laisser sans réponse).
+    Rôle : SEUL pont avec la page : messages sortants, focus, retours entrants isolés.
     Dépendances : client/core.lua
 ]]
 

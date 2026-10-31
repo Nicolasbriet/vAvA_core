@@ -1,18 +1,7 @@
 --[[
     vava_atelier/shared/placerules.lua
-    Rôle : logique pure des règles de placement (§ 7.2 de la spec T-102), la même des deux côtés : le client s'en sert
-           pour l'aperçu vert ou rouge de la visée, le serveur pour décider (RPC vava_atelier:place). Règles :
-             - portée : centre (point, orienté, cercle, moyenne des sommets d'un tracé) à `reach` m au plus du
-               personnage (3D) ; chaque sommet d'un tracé à `reach × polygonFactor` au plus (au sol) ;
-             - `radius` (cercle) : min ≤ r ≤ max ; `vertices` (tracé) : min ≤ n ≤ max ; tracé qui se croise ;
-             - `inside` : dans le lieu du parent (cercle : r + slack au sol ; tracé : dedans, ou à slack m du bord) ;
-             - `spacing` : à `spacing` m au moins (au sol) de chaque frère vivant (la fiche elle-même, les retraits et
-               les frères d'un autre parent ne comptent pas).
-           Un refus est une table `{ code, args }` (codes : far, ground, inside, spacing, radius, vertices, crossing),
-           mise en mots par `text` avec les textes de `placement.texts` (config_client.lua) : le client et le serveur
-           disent la même chose. Et le titre d'un enfant nouveau (« Chêne 4 », numéro libre parmi ses frères).
-           Coût : O(frères) distances, O(n²) pour un tracé de n ≤ 32 sommets. Aucune native, aucune locale.
-           Testée : tests/spec/atelier_placerules_spec.lua.
+    Rôle : règles de placement pures, les mêmes pour l'aperçu (client) et la décision (serveur) : portée, dedans, écart,
+           rayon, sommets, tracé qui se croise. Testée : tests/spec/atelier_placerules_spec.lua.
     Dépendances : shared/constants.lua
 ]]
 
@@ -26,15 +15,12 @@ VavaAtelier.placerules = placerules
 -- marge des comparaisons (bornes atteintes acceptées : 60,0 m pour une portée de 60 m)
 local EPSILON = 1e-9
 
----@param value any
----@return boolean
 local function finite(value)
     return type(value) == 'number' and value == value and value ~= huge and value ~= -huge
 end
 placerules.finite = finite
 
 --- Distance au sol entre deux points.
----@return number
 function placerules.ground(ax, ay, bx, by)
     local dx, dy = ax - bx, ay - by
     return sqrt(dx * dx + dy * dy)
@@ -42,18 +28,12 @@ end
 local ground = placerules.ground
 
 --- Distance 3D entre deux points `{ x, y, z }` (z absent : 0).
----@param a table
----@param b table
----@return number
 function placerules.distance(a, b)
     local dx, dy, dz = a.x - b.x, a.y - b.y, (a.z or 0) - (b.z or 0)
     return sqrt(dx * dx + dy * dy + dz * dz)
 end
 
---- Centre d'un lieu : le point (point, orienté, cercle), ou la moyenne des sommets d'un tracé (z du tracé) ; nil si le
---- lieu n'a pas de position finie.
----@param where any
----@return { x: number, y: number, z: number }|nil
+--- Centre d'un lieu (moyenne des sommets d'un tracé), ou nil sans position finie.
 function placerules.center(where)
     if type(where) ~= 'table' then return nil end
     if finite(where.x) and finite(where.y) then
@@ -71,10 +51,6 @@ end
 local center = placerules.center
 
 --- Point au sol dans un tracé (parité des croisements d'une demi-droite).
----@param points { x: number, y: number }[]
----@param x number
----@param y number
----@return boolean
 function placerules.inPolygon(points, x, y)
     local inside = false
     local n = #points
@@ -98,10 +74,6 @@ local function segmentDistance(ax, ay, bx, by, x, y)
 end
 
 --- Distance au sol d'un point au bord d'un tracé fermé.
----@param points { x: number, y: number }[]
----@param x number
----@param y number
----@return number
 function placerules.edgeDistance(points, x, y)
     local best = huge
     local n = #points
@@ -139,11 +111,7 @@ local function intersect(a, b, c, d)
     return false
 end
 
---- Un côté du tracé croise-t-il (ou touche-t-il) un côté qui n'est pas son voisin ? `open` : tracé en cours, sans le
---- côté qui le refermerait.
----@param points { x: number, y: number }[]
----@param open? boolean
----@return boolean
+--- Un côté du tracé croise-t-il (ou touche-t-il) un côté qui n'est pas son voisin ?
 function placerules.crosses(points, open)
     local n = #points
     local edges = open and n - 1 or n
@@ -166,21 +134,11 @@ local function num(value)
     return finite(value) and value or 0
 end
 
----@param code string
----@param ... any
----@return { code: string, args: any[] }
 local function refusal(code, ...)
     return { code = code, args = { ... } }
 end
 
---- Portée : centre à `reach` m au plus du personnage (3D, sauf tracé en cours) ; sommets d'un tracé à
---- `reach × polygonFactor` au plus (au sol). nil, ou le refus `far` (distance arrondie au mètre).
----@param shape string
----@param where table
----@param origin { x: number, y: number, z: number }
----@param limits { reach: number, polygonFactor: number }
----@param open? boolean  tracé en cours : seuls ses sommets comptent (son centre n'a pas encore de sens)
----@return table|nil
+--- Portée : centre à `reach` m (3D), sommets d'un tracé à `reach × polygonFactor` (au sol) ; nil, ou `far`.
 function placerules.reach(shape, where, origin, limits, open)
     if shape == 'polygon' then
         local far, worst = limits.reach * limits.polygonFactor, 0
@@ -218,23 +176,7 @@ local function within(parent, x, y, slack)
     return true
 end
 
----@class vAvA.AtelierPlaceContext
----@field origin? { x: number, y: number, z: number }  personnage (position lue par le serveur, ou du jeu chez le client)
----@field reach? number
----@field polygonFactor? number
----@field open? boolean                 tracé en cours (client : ni nombre minimal de sommets, ni côté de fermeture)
----@field parent? { title: string, shape: string, place: table }   lieu du parent (inside)
----@field parentId? string              parent de la fiche (frères d'un autre parent ignorés)
----@field siblings? { id: string, title: string, x: number, y: number, parent?: string, removal?: boolean }[]
----@field self? string                  identifiant de la fiche (jamais son propre frère)
-
---- Règles déclarées d'un type pour un lieu déjà contrôlé (forme, bornes). nil : permis ; sinon le premier refus
---- `{ code, args }`, dans l'ordre : portée (si `origin`), rayon, sommets, tracé qui se croise, dedans, écart.
----@param rules table|nil  rules du type (inside, spacing, radius, vertices), ou nil
----@param shape string     point | oriented | circle | polygon
----@param where table
----@param ctx vAvA.AtelierPlaceContext
----@return table|nil
+--- Règles déclarées d'un type pour un lieu déjà contrôlé (forme, bornes).
 function placerules.check(rules, shape, where, ctx)
     -- sans position finie (rien de visé, NaN, infini) : rien à poser
     if type(where) ~= 'table' or not center(where) then return refusal('ground') end
@@ -284,8 +226,6 @@ function placerules.check(rules, shape, where, ctx)
 end
 
 --- Nombre au dixième, à la française : « 1,4 », « 2 », « 81,5 ».
----@param value number
----@return string
 function placerules.number(value)
     if not finite(value) then return '0' end
     local rounded = floor(value * 10 + 0.5) / 10
@@ -294,9 +234,6 @@ function placerules.number(value)
 end
 
 --- Refus mis en mots avec `placement.texts` : « Trop loin de vous : approchez-vous (72 m). »
----@param found { code: string, args: any[] }
----@param texts table  placement.texts
----@return string
 function placerules.text(found, texts)
     local code, args = found.code, found.args or {}
     if code == 'far' then return format(texts.far, floor(num(args[1]))) end
@@ -310,11 +247,7 @@ function placerules.text(found, texts)
     return texts.ground
 end
 
---- Titre d'un enfant nouveau : libellé du choix suivi du plus petit numéro libre parmi les titres de ses frères
---- (« Chêne 4 » si « Chêne 1 » à « Chêne 3 » existent ; « Chêne 2 » si seul « Chêne 2 » manque).
----@param label string
----@param titles string[]
----@return string
+--- Titre d'un enfant nouveau : libellé du choix et premier numéro libre (« Chêne 4 »).
 function placerules.autoTitle(label, titles)
     local taken = {}
     for _, title in ipairs(titles or {}) do

@@ -1,24 +1,9 @@
 --[[
     vava_atelier/fxmanifest.lua
-    Rôle : l'Atelier du Conseil (T-100, socle) : une touche (F9, réglable) ou /atelier ouvre un livre de travail où
-           chaque membre ne voit que les ateliers que son rang lui ouvre (le monde pour un Sénéchal, tout pour un
-           Souverain), ses brouillons et le journal des derniers changements. Les modules y déclarent leurs éditeurs
-           (registre vava_atelier:editors) sans une ligne d'interface : un formulaire générique à huit widgets les
-           dessine, et « Vérifier » contrôle une fiche (forme ici, règles chez le module) sans rien changer. Droits
-           revérifiés à chaque appel ; journal propre (365 jours) recopié au Registre.
-           T-101 : les définitions sont gardées en base (une ligne par version) : brouillon, essai chez l'auteur seul,
-           publication groupée d'une fiche et de ses enfants, retour à une version, retrait, reprise d'un brouillon,
-           historique ; la config est la graine, la base fait foi (synchronisation à chaque déclaration d'un module) ;
-           archives JSON et retour à l'original par /atelier_archives (Souverain, console).
-           T-132 : config_client.lua (touche, commande, textes affichés par le client) est seul téléchargé par les
-           joueurs avec les constantes ; config.lua (tout le reste) est servi au seul serveur.
-           T-102 : outil de placement en jeu (point, orienté, cercle, tracé ; visée sans curseur, aperçu vert ou rouge
-           par les règles déclarées du type, les mêmes au serveur ; fantômes locaux ; Ctrl+Z) ; RPC place et children ;
-           essai joué (la page se met de côté, F9 pour revenir) ; index des enfants (sql/0003_parent_index.sql).
-    Dépendances : vAvA_core ≥ 0.11.0 ; vava_ui ≥ 1.0.0 (polices et textures, par nui://vava_ui/…) ; vava_admin ≥ 1.8.0
-                  relu à chaque appel (sans lui, l'Atelier refuse de s'ouvrir : « Le Registre du Conseil s'éveille »),
-                  volontairement pas en `dependency` : arrêter ou relancer le Registre n'arrête pas l'Atelier ;
-                  facultatifs : vava_inventory (objets du widget `item`), vava_hud (notifications)
+    Rôle : l'Atelier du Conseil : créer et régler le royaume en jeu (fiches gardées en base, essai, publication, retour
+           en arrière, outil de placement). Détail : README.
+    Dépendances : vAvA_core ≥ 0.11.0, vava_ui ≥ 1.0.0 ; vava_admin ≥ 1.8.0 relu à chaque appel (pas en `dependency`) ;
+                  facultatifs : vava_inventory, vava_hud
 ]]
 
 fx_version 'cerulean'

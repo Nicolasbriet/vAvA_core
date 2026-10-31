@@ -1,11 +1,7 @@
 --[[
     vava_atelier/client/ghosts.lua
-    Rôle : objets fantômes de l'outil de placement (§ 8.3 de la spec T-102) : objets LOCAUX (jamais réseau : personne
-           d'autre ne les voit), translucides, sans collision, figés, pour les enfants qui n'existent pas encore en jeu
-           (`new`, ou brouillon déplacé) à portée (`placement.ghosts.distance`, 12 au plus) et pour le candidat de la
-           visée (repositionné à chaque image). Modèle chargé dans un fil avec une attente bornée (`loadTimeoutMs`) ;
-           un modèle inconnu laisse le chevron (client/drawing.lua). Tous retirés en quittant la fiche, à la fermeture
-           de l'Atelier, au déchargement et à l'arrêt de la ressource.
+    Rôle : fantômes de l'outil de placement : objets locaux (jamais réseau), translucides, à portée seulement, retirés à la
+           sortie.
     Dépendances : shared/constants.lua, config_client.lua, client/core.lua
 ]]
 
@@ -29,14 +25,12 @@ local shown = {}
 -- fantôme du candidat de la visée : { model, entity?, loading, failed }
 local candidate = nil
 
----@param entry table|nil
 local function drop(entry)
     if entry and entry.entity and DoesEntityExist(entry.entity) then DeleteObject(entry.entity) end
     if entry then entry.entity, entry.gone = nil, true end
 end
 
 --- Crée l'objet d'un fantôme (modèle chargé dans un fil, attente bornée) ; `entry.failed` si le modèle est inconnu.
----@param entry table
 local function spawn(entry)
     entry.loading = true
     CreateThread(function()
@@ -68,7 +62,6 @@ local function spawn(entry)
     end)
 end
 
----@param entry table
 local function move(entry, x, y, z, h)
     entry.x, entry.y, entry.z, entry.h = x, y, z, h
     if entry.entity then
@@ -77,9 +70,7 @@ local function move(entry, x, y, z, h)
     end
 end
 
---- Fantômes voulus (12 au plus, déjà choisis par l'appelant) : { { key, model, x, y, z, h } }. Les autres sont retirés,
---- ceux qui ont bougé repositionnés, ceux d'un autre modèle recréés.
----@param list table[]
+--- Fantômes voulus (12 au plus, déjà choisis par l'appelant) : { { key, model, x, y, z, h } }.
 function ghosts.sync(list)
     local wanted = {}
     for i = 1, math.min(#list, settings.max) do wanted[list[i].key] = list[i] end
@@ -105,16 +96,12 @@ function ghosts.sync(list)
 end
 
 --- Un fantôme posé et visible pour cette clé ? (sinon la visée dessine un chevron)
----@param key string
----@return boolean
 function ghosts.has(key)
     local entry = shown[key]
     return entry ~= nil and (entry.entity ~= nil or entry.loading == true)
 end
 
 --- Fantôme du candidat : `model` nil le retire ; sinon créé (ou recréé s'il change de modèle) et placé.
----@param model string|nil
----@return boolean visible  faux : modèle inconnu ou en chargement (chevron)
 function ghosts.candidate(model, x, y, z, h)
     if candidate and candidate.model ~= model then
         drop(candidate)

@@ -1,10 +1,7 @@
 --[[
     vava_atelier/config_client.lua
-    Rôle : réglages de l'Atelier que lit le client : touche, commande, outil de placement (T-102 : portée, visée,
-           fantômes, pas de la molette, couleurs, contrôles, barre des touches, textes de l'aperçu et des refus, relus
-           par le serveur), textes affichés hors de la page (refus, bandeaux
-           du volet, fin d'essai, auteur des réponses au chat). Téléchargé par chaque joueur ; le serveur le lit aussi.
-           Tout le reste est dans config.lua, servi au seul serveur (T-132).
+    Rôle : réglages lus par le client (et relus par le serveur) : touche, commande, textes affichés hors de la page, outil
+           de placement. Le reste : config.lua, servi au seul serveur. Détail : README (Règles).
     Dépendances : shared/constants.lua
 ]]
 

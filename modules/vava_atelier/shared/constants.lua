@@ -1,9 +1,7 @@
 --[[
     vava_atelier/shared/constants.lua
-    Rôle : table du module (seule globale de la ressource) et constantes de protocole lues par le client ET le
-           serveur : RPC, évènements, hooks, motifs des identifiants que le client contrôle. Tout ce que le client ne
-           lit pas (registres, bornes d'une déclaration et d'une fiche, widgets, icônes, actions du journal, statuts,
-           pied de fiche, codes de refus, lieux, archives) est dans shared/bounds.lua, servi au seul serveur.
+    Rôle : table du module (seule globale : VavaAtelier) ; noms des RPC, évènements et hooks ; bornes que le client
+           applique à ce qu'il reçoit. Détail : README (Fichiers).
     Dépendances : aucune
 ]]
 

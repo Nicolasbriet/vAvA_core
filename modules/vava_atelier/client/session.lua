@@ -1,11 +1,7 @@
 --[[
     vava_atelier/client/session.lua
-    Rôle : ouverture et fermeture de l'Atelier côté joueur, focus, versions gardées (empreintes de l'accueil et des
-           descripteurs que la page a reçus : le serveur ne renvoie que ce qui a changé), évènements du serveur
-           (`revoked` : l'interface se ferme ; `editorGone` : retour à l'accueil ; T-101 : `entryChanged`, une fiche
-           de l'atelier ouvert a changé ailleurs → message `entryChanged` à la page ; fin d'un essai hors de
-           l'Atelier → notification). Aucune boucle : tout part d'une touche, d'une commande, d'un évènement ou d'un
-           retour de la page.
+    Rôle : séance de l'Atelier côté joueur : ouverture, fermeture, essai joué (page mise de côté), versions gardées,
+           évènements du serveur.
     Dépendances : shared/constants.lua, config_client.lua, client/core.lua, client/nui.lua
 ]]
 

@@ -1,12 +1,6 @@
 --[[
     vava_gathering/client/interact.lua
-    Rôle : le geste de récolte côté joueur. Invite près d'un nœud (verbe, ressource, charges, outil à tenir), demande au
-           serveur (begin), animation et barre de progression du HUD pendant la durée annoncée, fin du geste (finish)
-           ou interruption (cancel : nouvel appui, déplacement). Pour un nœud d'eau, la ligne est lancée et c'est
-           client/fishing.lua qui prend la suite à la touche. À terre (vava_health), ni invite ni demande. Le client
-           ne décide de rien : il montre, joue et demande ; le serveur notifie les résultats.
-           T-102 : zone d'eau lue dans l'état de la zone (`def`), invite marquée « Essai » sur un point d'essai de
-           l'Atelier (`trial = true`), durée du geste prise de la seule réponse du serveur.
+    Rôle : invite près d'un point, geste et barre, demande de récolte et interruption (le serveur décide de tout).
     Dépendances : shared/constants.lua, config_client.lua, shared/geometry.lua, client/core.lua, client/nui.lua,
                   client/props.lua
 ]]
