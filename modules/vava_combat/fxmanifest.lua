@@ -6,9 +6,6 @@
            (arme émoussée à 0), brique serveur `strike` (paquet, vava_health:hit, usure), bouclier accroché au bras ou
            au dos (statebag de ped écrit et gardé par le serveur), combat natif de GTA coupé sans boucle par image,
            commandes du Conseil /armes. Aucun RPC, aucune NUI, aucune table SQL.
-           T-132 : les joueurs ne téléchargent que les constantes, config_client.lua (fiches des armes, bouclier
-           accroché, placement des boucliers, contrôles natifs) et shared/shield.lua ; config.lua et
-           shared/weapons.lua sont servis au seul serveur.
     Dépendances : vAvA_core ≥ 0.10.0 (core.net.send), vava_inventory ≥ 1.7.0 (objet tenu, statebag de la main),
                   vava_health ≥ 1.3.0 (chaîne de dégâts) ; facultatifs : vava_crafting ≥ 1.5.0 et vava_skills ≥ 1.0.0
                   (recettes), vava_hud (notifications), vava_admin (droit metiers, journal du Registre), vava_chat

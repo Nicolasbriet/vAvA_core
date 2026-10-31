@@ -4,8 +4,6 @@
            (Chuchoter, Parler, Crier, Déclamer) changées d'une touche, médaillon dans le HUD, cercle au sol au
            changement de portée, silence hors du jeu (sélection du personnage), portée réduite à terre, zones où la
            voix porte plus ou moins loin, créées en jeu par le Conseil.
-           T-132 : les joueurs ne téléchargent que les constantes et config_client.lua (portées, touche, cercle,
-           zones et éditeur, médaillon) ; config.lua et shared/label.lua sont servis au seul serveur.
     Dépendances : vAvA_core ≥ 0.11.0 (abonnements de zone) ; vava_ui ≥ 1.0.0 (polices, grain, papier et coins de
                   l'éditeur, par nui://vava_ui/…) ; facultatives : vava_hud ≥ 1.2.0 (médaillon), vava_health (portée
                   à terre), vava_admin ≥ 1.1.0 (droits et outil « Zones de voix » du Registre, journal)

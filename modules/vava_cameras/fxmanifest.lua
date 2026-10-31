@@ -6,9 +6,6 @@
            capture par joueur, réduite pour les cases d'un mur, pleine pour une vue en grand (une seule à la fois) ;
            débit montant total du joueur filmé borné et réparti entre ses spectateurs. Le serveur ne relaie que la
            négociation ; il décide qui regarde qui, et l'inscrit au journal du Conseil.
-           T-132 : les joueurs ne téléchargent que les constantes et config_client.lua (qualités, spectateurs par
-           joueur, taille d'une offre, commande et rythme du mur) ; config.lua et shared/budget.lua sont servis au
-           seul serveur.
     Dépendances : vAvA_core ≥ 0.5.0 ; vava_ui ≥ 1.0.0 (polices, grain, coins et filet du mur, par nui://vava_ui/…) ;
                   facultatives : vava_admin ≥ 1.2.0 (droit « watch », journal, outil du
                   Registre), vava_chancellerie (caméras depuis le web)

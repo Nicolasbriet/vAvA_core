@@ -7,9 +7,6 @@
            Les saisons et le gel sont lus par l'agriculture et la récolte (export, hooks). Le serveur décide de tout et
            publie trois petites valeurs par GlobalState ; le client fait avancer l'horloge du jeu seul et suit les
            transitions du ciel.
-           T-132 : les joueurs ne téléchargent que les constantes, config_client.lua (horloge, calendrier, ciels,
-           commandes, textes), shared/calendar.lua et shared/weather.lua ; config.lua (décalage permis, nuits de gel,
-           Conseil, débits) et shared/frost.lua sont servis au seul serveur.
     Dépendances : vAvA_core ≥ 0.7.0 ; vava_ui ≥ 1.0.0 (polices, grain et coins de la page, par nui://vava_ui/…) ;
                   facultatives : vava_admin (droits, outil du Registre, journal), vava_hud
                   (notifications), vava_chancellerie (actions depuis le web)

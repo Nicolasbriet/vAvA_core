@@ -4,8 +4,6 @@
            vava_health:modifiers, journal des coups), dégâts natifs entre joueurs annulés, mise à terre décidée par le
            serveur, réanimation par un autre joueur, retour au lieu de soins, soins par objets, écran « à terre », API
            pour les autres modules.
-           T-132 : les joueurs ne téléchargent que les constantes, config_client.lua (seuil, délais à terre, geste,
-           touches, messages, jauge) et shared/vitality.lua ; config.lua est servi au seul serveur.
     Dépendances : vAvA_core ≥ 0.10.0 (core.net.send) ; vava_ui ≥ 1.0.0 (polices, grain et ornements de
                   la page, par nui://vava_ui/…) ; facultatives : vava_inventory (soins, objets bloqués à terre),
                   vava_needs (pas de faim à terre), vava_hud (jauge, notifications)

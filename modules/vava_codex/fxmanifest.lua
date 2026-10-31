@@ -9,8 +9,6 @@
            `openAt(chapitre)` : le livre s'ouvre à un chapitre (accueil des nouveaux venus, 1.4.0). Onglet « Lecture »
            (1.5.0) : chapitres et pages de lecture écrits dans content/*.lua (servis au seul serveur, jamais téléchargés
            par les clients), analysés au démarrage ; l'index part avec le contenu, le texte d'une page à la demande.
-           T-132 : les joueurs ne téléchargent que les constantes et config_client.lua (touche, commande, dernières
-           pages, « rester ouvert », livre indisponible) ; config.lua est servi au seul serveur.
     Dépendances : vAvA_core ≥ 0.7.0 (registre des commandes) ; facultatifs : vava_admin (rangs et droits du
                   Conseil), vava_hud (notifications), vava_chat (dernières pages des commandes tapées) ; vava_ui ≥ 1.0.0
                   (polices, grain et ornements de la page, par nui://vava_ui/…)
