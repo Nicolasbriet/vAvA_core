@@ -34,7 +34,7 @@ mesure du resmon et remontée des écarts : [LISEZMOI.md](LISEZMOI.md).
 |---|---|---|
 | 2-1 | Se mettre à terre (chute d'une hauteur, ou `/aterre` de `vava_dev_characters` sur un serveur de test), attendre 10 s, Échap. | La bannière **réduite** se déroule : Reprendre, Paramètres du jeu, Quitter Eldoria seulement (les autres rubriques absentes). Quitter fonctionne (9-2). |
 | 2-2 | **(2 joueurs)** B frappe A (arme ou sort) ; A appuie sur Échap aussitôt, puis 11 s après. Pareil pour B, qui a frappé. | D'abord « Pas de répit au cœur d'un combat : la bannière attendra. » ; ensuite la bannière s'ouvre. |
-| 2-3 | **(2 joueurs)** A ouvre la bannière ; B le frappe. | La bannière de A se replie : « Vous êtes pris à partie : la bannière se replie. » |
+| 2-3 | **(2 joueurs)** A ouvre la bannière ; B le frappe. | La bannière de A se replie : « Le monde vous rappelle à lui : la bannière se replie. » |
 | 2-4 | `devCuffCommand = 'essai_ligote'` (config_client.lua), `restart vava_pause`, `/essai_ligote`, Échap ; `/essai_ligote` de nouveau ; remettre `''` ensuite. | « Les mains liées, vous ne pouvez déployer la bannière. » ; une fois déliée, la bannière s'ouvre. Ligoté bannière ouverte : elle se replie avec le même message. |
 | 2-5 | Une chute n'est pas un combat : sauter d'un muret (perte de vie native, sans tomber à terre), Échap aussitôt. | La bannière s'ouvre. |
 | 2-6 | Spammer Échap pendant un refus (combat). | Le message ne revient pas plus d'une fois toutes les 3 s. |

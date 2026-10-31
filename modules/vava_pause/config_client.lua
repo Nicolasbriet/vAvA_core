@@ -105,7 +105,7 @@ VavaPause.config = {
             restrained = 'Les mains liées, vous ne pouvez déployer la bannière.',
             blocked = 'La bannière ne peut être déployée pour l\'instant.',
         },
-        interrupted = 'Vous êtes pris à partie : la bannière se replie.',
+        interrupted = 'Le monde vous rappelle à lui : la bannière se replie.',
         unavailable = 'La bannière du royaume est indisponible pour l\'instant.',
     },
 }

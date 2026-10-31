@@ -18,7 +18,7 @@ Spec : `docs/plan/specs/T-145.md` (avec les décisions du porteur du projet du 3
 - **À terre** : bannière **réduite** (décision 2) : Reprendre, Paramètres du jeu, Quitter Eldoria seulement ; les autres
   rubriques sont absentes. Le serveur en décide.
 - **Pendant** : un coup reçu (perte de vie d'au moins 2 %), une mise à terre (bannière entière) ou un ligotage replient
-  la bannière (« Vous êtes pris à partie : la bannière se replie. »).
+  la bannière (« Le monde vous rappelle à lui : la bannière se replie. »).
 - **Personnage** : nom, rang du métier principal, confrérie (ou « sujet du royaume »), santé, faim, soif, savoir-faire ;
   « ouvrir la fiche complète » ouvre le livre des compétences.
 - **Codex** : le livre de `vava_codex` s'ouvre à droite de la bannière (Codex en panneau, `vava_codex` ≥ 1.7.0).
