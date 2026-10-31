@@ -830,6 +830,8 @@ faire tout le système de combat ») : la porte T-119 reste à passer en jeu.
   main. Le serveur refuse le lancer par `exports.vava_combat:armed(src)` (le texte `errors.armed` existe dans la config
   de la magie) ; le client le montre par `armed()` sans en décider. Sans `vava_combat`, aucune restriction. Un bâton de
   mage (focaliseur) viendra plus tard.
+- `vava_magic` 2.10.0 codé, testé hors jeu et documenté (rapport `docs/plan/rapports/T-140.md`, procédure
+  `docs/tests/magie.md` § 19) ; relectures sécurité et réseau à faire. Bouclier : seul le bras compte (`shield(src).ready`).
 
 ### T-119 — PORTE : sensations du combat — **HUMAIN**
 - Dépend de : T-110 à T-116 · Statut : à faire

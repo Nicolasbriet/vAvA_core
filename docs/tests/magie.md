@@ -1,10 +1,10 @@
 # Magie d'Eldoria — procédure de test en jeu
 
-Procédure pour vérifier en jeu `vava_magic` 2.9.0 : fiche et commandes du Conseil, roue et mode magie, incantation,
+Procédure pour vérifier en jeu `vava_magic` 2.10.0 : fiche et commandes du Conseil, roue et mode magie, incantation,
 mana, verrouillage, les onze sorts, états élémentaires, zones au sol, combinaisons, effets et sons, triche,
 déconnexions, redémarrage et resmon ; la section 18 éprouve les blessures portées par la chaîne de dégâts de
 `vava_health` 1.3.0 (T-116 : mêmes dégâts, boucliers et résistances, combats entre joueurs coupés, lanceur à terre,
-incantation brisée par un coup, `vava_health` arrêté). Le module n'a encore jamais été joué : chaque écart compte, même petit. Comptez
+incantation brisée par un coup, `vava_health` arrêté) ; la section 19, les mains vides pour incanter (T-140). Le module n'a encore jamais été joué : chaque écart compte, même petit. Comptez
 trois heures seul et une heure et demie à plusieurs ; les tests à deux sont marqués **(2 joueurs)**, ceux qui
 demandent un témoin ou un voisin **(3 joueurs)**.
 
@@ -17,7 +17,7 @@ Aucun sort ne s'apprend en jeu : seul le Conseil en donne (`/magie`) ; le grimoi
 
 1. **Commune** : ordre de démarrage, compte du Conseil, objets, consoles, mesure du resmon et remontée des problèmes :
    voir [LISEZMOI.md](LISEZMOI.md).
-2. **Démarrage** : la console du serveur affiche `module 'vava_magic' v2.9.0 prêt`. La migration `sql/0001_magic.sql`
+2. **Démarrage** : la console du serveur affiche `module 'vava_magic' v2.10.0 prêt`. La migration `sql/0001_magic.sql`
    crée `vava_magic_sigils`, `vava_magic_registers`, `vava_magic_register_pages` et `vava_magic_damage_log`. Une ligne
    `… non déclaré(e) : …` (un sort refusé au chargement) ou `sort en erreur` est à me remonter telle quelle.
 3. **Rôles** : A, membre du Conseil (droit `tools` : Sénéchal ou Souverain) ; B, second joueur sans droits ; C,
@@ -641,3 +641,33 @@ LIMIT 5` après chaque coup.
 | 19 | **(3 joueurs)** C, témoin, à 5 m de B pendant les tests 2 à 5 (hors des cercles et des éclats) ; puis `/vava_reseau joueur <B>` et `/vava_reseau joueur <C>`. | Chez B : `vava_health:set` (≈ 26 o par coup), `vava_magic:hit` (réaction) ; rien d'autre de nouveau. Chez C : ni `vava_health:set` ni `vava_magic:hit` (seulement les effets visibles : projectiles, zones). Chez A : rien de `vava_health`. |
 | 19 bis | **(10 joueurs ou plus, quand ce sera possible)** Mesure : tous serrés autour de B ; A lance une Nova N5 au milieu, puis une Boule N5 sur B (éclats) ; `resmon` côté serveur (temps de tour de `vava_magic` et `vava_health`). | Pic d'un tour attendu entre 1,5 et 4,5 ms ; noter la valeur. Au-delà de 10 ms, me le remonter avec le nombre de joueurs touchés. |
 | 20 | `resmon 1` chez A et B pendant 2 et 4. | Inchangé par rapport à la section 15 (aucune boucle ajoutée ; tout se joue au serveur). |
+
+## 19. Mains vides pour incanter (2.10.0, T-140)
+
+Décision du porteur du projet (31 octobre 2026) : on n'incante pas une arme ou un bouclier en main. Le serveur le
+vérifie par `vava_combat` (`armed`, puis `shield().ready`) au début de l'incantation et à sa fin ; le client ne fait que
+le montrer tôt. Préparation : [combat 0.6](combat.md) en plus de la section 0 ici (`ensure vava_combat` après
+`vava_health` et `vava_crafting`) ; A mage (`/magie tous`), Souverain ; une Épée courte, une Dague, un Bouclier rond et
+une Hache de bûcheron prises au catalogue (`/catalogue arme`, `/catalogue outil`). Entre deux tests : `/magie mana`,
+`/magie recharges`.
+
+| # | Faire | Attendu |
+|---|---|---|
+| 1 | Démarrer le serveur. | `module 'vava_magic' v2.10.0 prêt`, aucun avertissement nouveau. |
+| 2 | A, mains vides, Lueur prête : clic gauche. | La Lueur part comme avant. |
+| 3 | A prend l'Épée courte dans les Mains ; `Tab`, choisit la Boule de feu. | Aussitôt : « Il vous faut les mains libres pour incanter : rangez votre arme. » Le sceau de la Boule de feu est près de la barre de mana (le sort reste prêt). |
+| 4 | Épée en main : clic droit maintenu, puis trois clics gauches en 2 s ; attendre 6 s, un clic gauche. | Ni réticule, ni aperçu, ni incantation, ni mana dépensée. Le rappel paraît **une** fois pour toute la rafale, puis une fois au clic d'après 6 s (`controls.armedNoticeMs`, 5 s). |
+| 5 | Épée en main : `/lancer`, deux fois. | Le rappel à chaque fois ; rien ne part. |
+| 6 | A repose l'épée (mains vides) ; clic droit bref, puis clic gauche. | La boule part (le mode redevient actif en 0,2 s au plus). |
+| 7 | A incante une Lueur (2,5 s) et, pendant l'incantation, prend la Dague dans les Mains (glisser depuis la besace). | L'incantation se brise dans le dixième de seconde : le rappel s'affiche, barre d'incantation interrompue, mana **inchangée**, aucun temps de recharge sur la Lueur (le grimoire ou la roue le montrent). |
+| 8 | A, Hache de bûcheron en main, lance une Lueur. | Elle part : un outil n'est pas une arme. |
+| 9 | **(2 joueurs)** A « utilise » le Bouclier rond, mains vides (il pend dans le dos, B le voit) ; lance une Lueur. | Elle part : un bouclier dans le dos ne gêne pas. |
+| 10 | **(2 joueurs)** A prend l'Épée courte (le bouclier passe au bras) ; `/lancer`. Puis repose l'épée. | Refusé (« rangez votre arme ») : l'épée suffit à refuser. Épée reposée : le bouclier repasse dans le dos et le sort part. |
+| 11 | Réglage `shield.armWithEmptyHand = true` dans `vava_combat/config.lua`, `restart vava_combat` ; A, mains vides, bouclier accroché (au bras), lance une Lueur ; puis « utilise » le bouclier (décroché) et relance. Remettre `false`. | Le client laisse partir la demande, le serveur la refuse : « Votre bouclier vous charge le bras : décrochez-le pour incanter. », aucune barre d'incantation ni mana dépensée. Décroché : la Lueur part. |
+| 12 | `stop vava_combat` ; A lance une Lueur, trois fois (`/magie recharges` entre deux). Puis `ensure vava_combat`, Épée courte en main, `/lancer`. | Arrêté : la Lueur part chaque fois (aucune restriction), **aucune** ligne de console de `vava_magic`. Au retour : refusé de nouveau. |
+| 13 | `resmon 1` chez A : mains vides en mode magie éveillé, puis Épée courte en main pendant 20 s (mode éveillé). | `vava_magic` inchangé par rapport à la section 15 (un appel d'export tous les 200 ms, seulement mode éveillé ; aucune boucle par image arme en main : le mode n'est pas actif). |
+| 14 | **(2 joueurs)** `/vava_reseau joueur <A>` après 3 à 12. | Aucun évènement nouveau : seulement les réponses des RPC `vava_magic:begin:…` refusées et les notifications habituelles. |
+
+Ce qui n'est pas vérifiable en jeu sans client modifié : le refus par le serveur d'un client qui tairait son arme (le
+client refuse toujours en premier). Il est prouvé hors jeu (`tests/spec/magic_hands_spec.lua` : refus au début, arme
+prise pendant l'incantation, bouclier au bras ou dans le dos, sans vava_combat, vava_combat en erreur).
