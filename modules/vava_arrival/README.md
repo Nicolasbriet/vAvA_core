@@ -29,7 +29,7 @@ le seul serveur, et complète la table sans réécrire une clé de `config_clien
 | Modules qui déclarent des objets de la dotation (1.1.0) | `vava_provisions` (l'eau) : à son annonce `core:module:ready`, les dotations dues des personnages apparus sont reprises, comme au retour de l'inventaire, sans second accueil ; liste pure de noms de ressources (8 au plus, 64 octets) | `kit.providers` |
 | Objets déclarés s'ils manquent | `pain` (faim + 35), dessin `web/items/pain.svg` ; `eau` (soif + 40) est déclarée par `vava_provisions` depuis 1.1.0 (un seul propriétaire, même définition) | `items` |
 | Attente de l'accueil | 4 s après la réception, puis un essai par seconde, 30 s au plus | `welcome.delayMs`, `retryMs`, `maxWaitMs` **(client)** |
-| Envois de l'accueil sans accusé | 3 au plus, un par session | `welcome.maxSends` **(client, lu par le serveur)** |
+| Envois de l'accueil sans accusé | 3 au plus, un par session | `welcome.maxSends` (dans `config.lua`, ajouté à la table `welcome` : le serveur seul le lit) |
 | Chapitre du Codex | `premiers_pas` : le Codex (1.5.0, T-023) s'ouvre sur l'onglet Lecture, chapitre « Premiers pas », page « Vivre à Eldoria » ; un chapitre de commandes (`vava_inventory`) ou une page de lecture sont aussi acceptés | `codex.chapter` **(client)** |
 | Commande du Conseil | `/accueil`, droit `give` (Sénéchal et au-dessus), ACE `vava_arrival.admin`, 2 s entre deux | `admin` |
 | Accusé de lecture | 2 d'avance, puis 1 par 20 s | `rateLimits.welcomed` |
@@ -95,7 +95,7 @@ de plus : l'inventaire n'envoie un conteneur qu'à qui l'a ouvert. Côté client
 thread borné par accueil reçu.
 
 Fichiers téléchargés par chaque joueur (1.2.0, T-132) : `shared/constants.lua`, `config_client.lua`,
-`shared/screen.lua` et les deux `client/*.lua` (≈ 11,4 Ko de Lua, ≈ 5,1 Ko compressés, contre ≈ 24,1 et 9,5 avant),
+`shared/screen.lua` et les deux `client/*.lua` (≈ 11,3 Ko de Lua, ≈ 5,1 Ko compressés, contre ≈ 24,1 et 9,5 avant),
 plus le dessin du pain ; `config.lua` et `shared/rules.lua` sont servis au seul serveur.
 
 ## Conseil (droit `give`)

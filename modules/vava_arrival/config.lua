@@ -56,6 +56,10 @@ config.rateLimits = {
 
 config.logRetentionDays = 90  -- purge de vava_arrival_log au démarrage
 
+-- Envois de l'accueil à un personnage sans accusé de lecture (un par session) ; ensuite rien. Lu par le seul serveur :
+-- ajouté à `welcome` (config_client.lua), dont le client lit les délais (relecture sécurité S-5 de T-132).
+config.welcome.maxSends = 3
+
 -- Textes du Conseil, lus par le seul serveur (réponses de /accueil, libellés du journal du Registre : 32 octets au
 -- plus). Ceux que montre le client au nouveau venu sont dans config_client.lua (messages.*).
 local messages = config.messages

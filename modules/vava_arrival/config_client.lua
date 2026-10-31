@@ -1,8 +1,8 @@
 --[[
     vava_arrival/config_client.lua
     Rôle : réglages de l'arrivée que lit le client : attente de l'accueil (écran calme), chapitre du Codex, textes
-           montrés au nouveau venu. Téléchargé par chaque joueur ; le serveur le lit aussi (`welcome.maxSends`,
-           `codex.chapter` vérifié au démarrage). Tout le reste est dans config.lua, servi au seul serveur (T-132).
+           montrés au nouveau venu. Téléchargé par chaque joueur ; le serveur le lit aussi (`codex.chapter` vérifié au
+           démarrage). Tout le reste est dans config.lua, servi au seul serveur (T-132), `welcome.maxSends` compris.
     Les textes ont été relus avec ceux de l'écran de chargement (T-021) : `messages.kit` (config_client.lua) suit
     `kit.items` (config.lua) : les tenir d'accord ; `messages.codexHint` cite la touche par défaut de vava_codex (F1).
     Dépendances : shared/constants.lua
@@ -15,7 +15,6 @@ VavaArrival.config = {
         delayMs = 4000,      -- attente après la réception de l'accueil (fondu d'ouverture terminé, écran calme)
         retryMs = 1000,      -- intervalle des essais tant que l'écran n'est pas prêt (menu pause, interface ouverte, fondu)
         maxWaitMs = 30000,   -- au-delà, les notifications s'affichent sans ouvrir le Codex (une rappelle la touche)
-        maxSends = 3,        -- envois de l'accueil à un personnage sans accusé de lecture (un par session) ; ensuite rien
     },
 
     codex = {
