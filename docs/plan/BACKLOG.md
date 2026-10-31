@@ -663,7 +663,7 @@ versé à T-014 ; les autres points déjà couverts sont précisés dans T-012 �
   d'une station d'un type inconnu de la config du client ; `config_split_spec` vert.
 
 ### T-146 — Ciel de `vava_time` : cycle au seul serveur
-- Agent : vava-dev-lua · Dépend de : T-142 · Statut : à faire
+- Agent : vava-dev-lua · Dépend de : T-142 · Statut : en cours
 - Relecture réseau R-1 de T-142 : le temps sert ≈ 4,6 Ko bruts pour le seul serveur, plus que le gain du module au lot
   3 : le cycle des ciels de `config_client.lua` (`weather.next`, `seasons`, `snow`, `durationMinutes`, `durations`,
   ≈ 1,9 Ko) et les fonctions de tirage de `shared/weather.lua` (`weight`, `allowed`, `candidates`, `pick`, `duration`,
