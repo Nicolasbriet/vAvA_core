@@ -754,7 +754,8 @@ faire tout le système de combat ») : la porte T-119 reste à passer en jeu.
 - **En cours (31 octobre 2026, repris)** : branche `agents/T-111`. Spec `docs/plan/specs/T-111.md` (16 décisions
   retenues) ; `vava_combat` 1.0.0 codé, testé hors jeu (`verifier.sh` OK avec `BASE=main`), documenté (README, api.md,
   `docs/tests/combat.md` § 2, rapport `docs/plan/rapports/T-111.md`) ; `vava_example_combat` 1.1.0 (`/frapper_arme`,
-  spec § 13-2 : autorisation à confirmer). Restent les relectures sécurité, réseau et lore.
+  spec § 13-2 : **autorisé par le porteur du projet le 31/10** — cette tâche autorise à toucher
+  `examples/vava_example_combat` dans les limites de la spec). Restent les relectures sécurité, réseau et lore.
 - Objets armes (catégories, dégâts de base, qualité de forge, usure), correspondance vers modèles vanilla
   (PLACEHOLDER), bouclier accroché, contrôles natifs du corps à corps et armes à feu coupés. Recettes de forge
   ajoutées à `vava_crafting`.
@@ -801,6 +802,13 @@ faire tout le système de combat ») : la porte T-119 reste à passer en jeu.
 - Spec T-110 § 13, option B : le temps de jeu, les positions, `vava_arrival` et les envois de proximité croient encore
   la déclaration `core:characters:spawned` du client. Le core la confirme lui-même quand le ped existe après l'ordre
   d'apparition (délai de grâce), et expose l'état confirmé.
+
+### T-140 — Mains vides pour incanter
+- Agent : vava-dev-lua (cette tâche autorise à toucher `vava_magic`) · Dépend de : T-111, T-116 · Statut : à faire
+- Décision du porteur du projet (31/10, spec T-111 § 13-1) : impossible d'incanter avec une arme ou un bouclier en
+  main. Le serveur refuse le lancer par `exports.vava_combat:armed(src)` (le texte `errors.armed` existe dans la config
+  de la magie) ; le client le montre par `armed()` sans en décider. Sans `vava_combat`, aucune restriction. Un bâton de
+  mage (focaliseur) viendra plus tard.
 
 ### T-119 — PORTE : sensations du combat — **HUMAIN**
 - Dépend de : T-110 à T-116 · Statut : à faire
