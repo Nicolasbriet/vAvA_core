@@ -771,7 +771,7 @@ Réglages d'un module (T-132, aucune API du core) : chaque module lit sa config 
 (`shared_scripts`, téléchargé par chaque joueur) ouvre la table avec ce que lit le client et pose `clientFile = true` ;
 `config.lua` (en tête des `server_scripts`, jamais téléchargé) la complète avec ce que lit le seul serveur. Basculés :
 `vava_atelier` 1.2.0, `vava_arrival` 1.2.0 ; `vava_chancellerie` 1.7.1 ne sert plus rien aux joueurs ; métiers (T-141) :
-`vava_skills` 1.3.0, `vava_farming` 1.8.0, `vava_crafting` 1.6.0, `vava_gathering` 1.7.0, `vava_provisions` 1.1.0 (1.2.0 :
+`vava_skills` 1.3.0, `vava_farming` 1.8.0, `vava_crafting` 1.6.0 (1.7.0 : types de stations au seul serveur), `vava_gathering` 1.7.0, `vava_provisions` 1.1.0 (1.2.0 :
 textes du Conseil au seul serveur, `shared/rules.lua` au seul serveur, `shared/texts.lua` partagé) ;
 socle (T-142) : `vava_inventory` 1.9.0, `vava_combat` 1.1.0, `vava_health` 1.5.0, `vava_time` 1.4.0 (1.5.0 : cours des
 ciels et son tirage au seul serveur, T-146), `vava_codex` 1.6.0,
@@ -2095,7 +2095,8 @@ config et tests : `modules/vava_crafting/README.md`.
 Demande le core 0.11.0 (abonnements de zone, depuis 1.5.0), `vava_inventory` 1.4.0, `vava_skills` 1.0.0,
 `vava_gathering` 1.0.0 ; facultatifs : `vava_hud`, `vava_admin` (droit `metiers`), `vava_chat`, `vava_health` (à terre).
 
-**Registres** : `vava_crafting:stations` (types : `{ label, skills, fuel?, anim, prop }`) et `vava_crafting:recipes`
+**Registres** : `vava_crafting:stations` (types : `{ label, skills, fuel?, anim, prop }` ; depuis 1.7.0, `anim` doit être
+une clé de `anims` de `config_client.lua`, sinon l'ajout est refusé : « animation '…' inconnue ») et `vava_crafting:recipes`
 (`{ label, skill, level, station, tool?, durationMs, difficulty, xp, signed?, signedIfQuality?, durability?,
 transmission?, fragments?, ingredients = { { item, quantity, minTier? } }, output = { item, quantity } }`), remplis par
 la config, ouverts aux autres modules ; chaque recette est aussi déclarée à `vava_skills:recipes`. Les armes de
@@ -2104,8 +2105,12 @@ signées, solidité tirée de sa fiche ; l'Épée courte reste une recette de l'
 
 **Stations chez les joueurs** (depuis 1.5.0) : chaque station placée est une zone du core (`core.zones`, nom = son
 identifiant, cercle de 2 m, marge de 100 m : `streaming.zoneRadius`, `streaming.radius` + `streaming.subscribeSlack`) ;
-état `def` → `{ type, label, x, y, z, heading, prop }` (dessin, ni qualité ni propriétaire) et `s` → `{ fuel, busy }`,
-reçus des seuls joueurs proches, puis en différences. Plus aucune clé GlobalState (les anciennes
+état `def` → `{ type, typeLabel, capacity?, label, x, y, z, heading, prop }` (dessin, ni qualité ni propriétaire ;
+depuis 1.7.0, nom du type et réserve de combustible, absente sans combustible) et `s` → `{ fuel, busy }`,
+reçus des seuls joueurs proches, puis en différences. Depuis 1.7.0 (T-144), le client ne connaît aucun type de
+station (`stationTypes` est dans `config.lua`, servi au seul serveur) : un type déclaré au registre par un autre module
+(le composteur de `vava_farming`) a son invite et son menu sans rien ajouter côté client ; son animation (clé de
+`anims`, dans `config_client.lua`) est donnée par le serveur au début d'un geste. Plus aucune clé GlobalState (les anciennes
 `vava_crafting:station:<id>` et `vava_crafting:stations` sont effacées une fois au démarrage) ni d'évènement
 `vava_crafting:station` (le menu ouvert suit la zone). L'état est public : chaque action revérifie distance, accès et
 occupation côté serveur. Un son ou un effet de station vise `core.zones.subscribers(id)` ou `core.net.sendNear`.
@@ -2235,7 +2240,7 @@ couverte ; `&frost=1` : gel annoncé ; `&season=ete` : « Couvrir » non propos�
 
 ### `vava_provisions`
 
-Les vivres du royaume (1.2.0, T-130 ; réglages en deux fichiers, T-141 et T-143) : objets `eau` (Outre d'eau) et `outre` (Outre vide), points d'eau (puits,
+Les vivres du royaume (1.3.0, T-130 ; réglages en deux fichiers, T-141 et T-143 ; palier de l'outre, T-135) : objets `eau` (Outre d'eau) et `outre` (Outre vide), points d'eau (puits,
 fontaines, sources) où l'on remplit ses outres et où l'on boit, outre rendue vide qui se fend parfois, outres faites à la
 tannerie. Ordre de démarrage : après `vava_farming`, avant `vava_codex` et `vava_arrival`. Demande le core 0.11.0
 (`core.zones`, `core.net`, registre `core:commands`), `vava_ui` et `vava_inventory` 1.8.0 ; facultatifs : `vava_needs`
@@ -2256,8 +2261,15 @@ SQL. Détail et réglages : `modules/vava_provisions/README.md`.
   les 3 min ; fontaine sans fond), pleine à chaque démarrage. `rules.validatePoint` est le seul juge d'un point ;
   `points.put` et `points.drop` sont prêts pour l'éditeur de l'Atelier.
 - **Outre rendue** : hook `vava_inventory:use` (after) ; seulement si `consumed`, pour un objet de `containers` ; dans
-  un thread, pour le même personnage : `add(outre, 1)`, sauf une fois sur dix (`tearChance`) où elle se fend ; sans
-  place, elle est abandonnée. Avis au seul buveur.
+  un thread, pour le même personnage : `add(outre, 1, { tier }?)` au palier de l'Outre d'eau bue, sauf quand elle se
+  fend (`tearChanceByTier[palier]`, sinon `tearChance` : 15 %, 10 %, 5 %, 2,5 %, 1 % du palier 1
+  au palier 5, 10 % sans palier) ; sans place, elle est abandonnée. Avis au seul buveur.
+- **Palier de l'outre** (1.3.0, T-135) : la métadonnée `tier` (1 à 5) posée par `vava_crafting` passe de l'outre vide à
+  l'Outre d'eau (remplissage pile par pile : retraits par `instanceId`, ajouts `{ item = 'eau', quantity, metadata =
+  { tier } }` regroupés par palier) et revient à l'outre vide ; aucune autre métadonnée n'est gardée, une outre sans
+  palier reste sans métadonnées. Le palier de l'Outre d'eau bue est relevé par un abonné `before` de
+  `vava_inventory:use` (priorité 1000, lecture `getItems`, jamais de refus), la pile pouvant disparaître avec sa
+  dernière unité.
 
 | RPC | `args` | `rateLimit` | Réponse |
 |---|---|---|---|
@@ -2265,7 +2277,8 @@ SQL. Détail et réglages : `modules/vava_provisions/README.md`.
 
 Le client ne dit ni ce qu'il veut faire, ni ce qu'il porte, ni sa soif : le serveur revérifie personnage, une demande à
 la fois, délai (3 s), à terre, point connu, distance réelle du ped (3,5 m, 3D), outres vides possédées, soif, réserve,
-puis choisit ; après le hook `drawing`, personnage et distance sont relus. Remplir : au plus 5 outres, puisages
+puis choisit ; après le hook `drawing`, personnage et distance sont relus, et les piles d'outres relues (`getItems`).
+Remplir : au plus 5 outres, puisages
 réservés **avant** l'échange tout ou rien, rendus s'il échoue (besace pleine ou trop lourde et soif : gorgées sur place).
 Boire : soif + 20, refusé dès 95.
 

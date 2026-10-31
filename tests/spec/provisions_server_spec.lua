@@ -37,7 +37,7 @@ local BASE_FILES = {
 describe('vava_provisions server', function()
     local cfg, points, draw, containers, items, admin, EVENTS, HOOKS
     local logs, active, positions, downed, counts, thirsts, thirstAdds
-    local exchanges, exchangeAnswers, exchangeDuring, adds, addAnswers
+    local exchanges, exchangeAnswers, exchangeDuring, adds, addAnswers, piles, pileReads
     local zoneCalls, zoneAnswers, sent, befores, beforeAnswer, beforeDuring, afters
     local allowed, adminLogs, chats, itemsKnown, itemsAdded, recipeAnswers
     local now, timer, roll, deferred, queue
@@ -55,6 +55,7 @@ describe('vava_provisions server', function()
         logs, active, positions, downed = nil, { [SOURCE] = CHARACTER, [OTHER] = CHARACTER2 }, {}, {}
         counts, thirsts, thirstAdds = { [SOURCE] = {}, [OTHER] = {} }, { [SOURCE] = 50, [OTHER] = 50 }, {}
         exchanges, exchangeAnswers, exchangeDuring, adds, addAnswers = {}, {}, nil, {}, {}
+        piles, pileReads = { [SOURCE] = {}, [OTHER] = {} }, {}
         zoneCalls, zoneAnswers, sent, befores, beforeAnswer, beforeDuring, afters = {}, {}, {}, {}, nil, nil, {}
         allowed, adminLogs, chats, itemsKnown, itemsAdded, recipeAnswers = { [8] = true }, {}, {}, {}, {}, {}
         now, timer, roll, deferred, queue = NOW, TIMER, 0.5, false, {}
@@ -92,8 +93,19 @@ describe('vava_provisions server', function()
                 end
                 return table.unpack(table.remove(exchangeAnswers, 1) or { true })
             end,
-            Add = function(src, item, quantity)
-                adds[#adds + 1] = { source = src, item = item, quantity = quantity }
+            Piles = function(src, item)
+                -- piles posées par l'essai, sinon une seule pile sans palier de la quantité de `counts`
+                pileReads[#pileReads + 1] = { source = src, item = item }
+                if counts[src] == false then return nil end
+                local own = piles[src] and piles[src][item]
+                if own == false then return nil end
+                if own then return copy(own) end
+                local quantity = counts[src][item] or 0
+                if quantity < 1 then return {} end
+                return { { id = 1, item = item, quantity = quantity, metadata = {} } }
+            end,
+            Add = function(src, item, quantity, metadata)
+                adds[#adds + 1] = { source = src, item = item, quantity = quantity, metadata = copy(metadata) }
                 return table.unpack(table.remove(addAnswers, 1) or { true })
             end,
             Thirst = function(src) return thirsts[src] end,
@@ -233,7 +245,9 @@ describe('vava_provisions server', function()
             counts[SOURCE].outre = 2
             assert.same({ true, { action = 'fill', count = 2 } }, { draw.handle(SOURCE, 'puits_lavoir') })
             assert.equal(1, #exchanges)
-            assert.same({ source = SOURCE, removals = { { item = 'outre', quantity = 2 } }, additions = { { item = 'eau', quantity = 2 } } }, exchanges[1])
+            -- la pile d'outres visée par son identifiant, relue après le hook ; eau sans palier pour une outre sans palier
+            assert.same({ source = SOURCE, removals = { { instanceId = 1, quantity = 2 } }, additions = { { item = 'eau', quantity = 2 } } }, exchanges[1])
+            assert.same({ { source = SOURCE, item = 'outre' } }, pileReads)
             assert.equal(38, reserveOf('puits_lavoir'))
             assert.equal(1, #befores)
             assert.same({ source = SOURCE, characterId = CHARACTER, point = 'puits_lavoir', kind = 'puits', action = 'fill', count = 2 }, befores[1].payload)
@@ -334,7 +348,7 @@ describe('vava_provisions server', function()
             assert.is_true(draw.handle(SOURCE, 'puits_lavoir'))
             assert.same({ source = SOURCE, characterId = CHARACTER, point = 'puits_lavoir', kind = 'puits', action = 'fill', count = 2, reserve = 38 },
                 afters[1].payload)
-            assert.same({ { item = 'outre', quantity = 2 } }, exchanges[1].removals)
+            assert.same({ { instanceId = 1, quantity = 2 } }, exchanges[1].removals)
         end)
 
         it('deux joueurs sur la dernière unité : un seul remplissage, l\'autre à sec', function()
@@ -360,6 +374,53 @@ describe('vava_provisions server', function()
             thirsts[SOURCE] = 99
             assert.same({ false, 'dry', 36 }, { draw.handle(SOURCE, 'puits_lavoir') })
             assert.equal(0, #exchanges)
+        end)
+
+        -- T-135 : chaque outre d'eau garde le palier de son outre vide
+        it('garde le palier de chaque outre : piles prises une à une, eau regroupée par palier', function()
+            at(SOURCE, 'puits_lavoir')
+            counts[SOURCE].outre = 8
+            piles[SOURCE].outre = {
+                { id = 21, item = 'outre', quantity = 2, metadata = { tier = 3 } },
+                { id = 22, item = 'outre', quantity = 1, metadata = {} },
+                { id = 23, item = 'outre', quantity = 5, metadata = { tier = 1 } },
+            }
+            assert.same({ true, { action = 'fill', count = 5 } }, { draw.handle(SOURCE, 'puits_lavoir') })
+            assert.equal(1, #exchanges)
+            assert.same({ { instanceId = 21, quantity = 2 }, { instanceId = 22, quantity = 1 }, { instanceId = 23, quantity = 2 } },
+                exchanges[1].removals)
+            assert.same({
+                { item = 'eau', quantity = 2, metadata = { tier = 3 } },
+                { item = 'eau', quantity = 1 },
+                { item = 'eau', quantity = 2, metadata = { tier = 1 } },
+            }, exchanges[1].additions)
+            assert.equal(35, reserveOf('puits_lavoir'))
+        end)
+
+        it('relit les outres après le hook drawing : moins d\'outres, moins de puisages ; plus aucune, rien de pris', function()
+            at(SOURCE, 'puits_lavoir')
+            counts[SOURCE].outre = 3
+            thirsts[SOURCE] = 99
+            -- deux outres troquées pendant le hook : une seule est remplie, un seul puisage
+            beforeDuring = function()
+                piles[SOURCE].outre = { { id = 31, item = 'outre', quantity = 1, metadata = { tier = 4 } } }
+            end
+            assert.same({ true, { action = 'fill', count = 1 } }, { draw.handle(SOURCE, 'puits_lavoir') })
+            assert.same({ { instanceId = 31, quantity = 1 } }, exchanges[1].removals)
+            assert.same({ { item = 'eau', quantity = 1, metadata = { tier = 4 } } }, exchanges[1].additions)
+            assert.equal(39, reserveOf('puits_lavoir'))
+            assert.equal(1, #pileReads)
+
+            -- toutes parties : refus « il vous faut une outre », réserve et délai intacts
+            timer = timer + cfg.cooldownMs
+            beforeDuring = function() piles[SOURCE].outre = {} end
+            assert.same({ false, 'no_container' }, { draw.handle(SOURCE, 'puits_lavoir') })
+            -- inventaire muet après le hook : indisponible
+            beforeDuring = function() piles[SOURCE].outre = false end
+            assert.same({ false, 'unavailable' }, { draw.handle(SOURCE, 'puits_lavoir') })
+            assert.equal(1, #exchanges)
+            assert.equal(39, reserveOf('puits_lavoir'))
+            assert.equal(1, #afters)
         end)
     end)
 
@@ -533,6 +594,145 @@ describe('vava_provisions server', function()
             assert.equal(0, #adds)
             assert.equal(0, #sent)
         end)
+
+        -- T-135 : palier relevé avant la gorgée (la pile part avec sa dernière unité), outre rendue au même palier,
+        -- risque de fente selon le palier
+        describe('selon le palier', function()
+            local function sip(instanceId, fields)
+                local payload = { source = SOURCE, instanceId = instanceId, item = 'eau' }
+                assert.is_nil(containers.beforeUse(payload))   -- jamais de refus
+                payload.consumed = true
+                for key, value in pairs(fields or {}) do payload[key] = value end
+                containers.onUse(payload)
+            end
+
+            before_each(function()
+                piles[SOURCE].eau = {
+                    { id = 40, item = 'eau', quantity = 1, metadata = {} },
+                    { id = 41, item = 'eau', quantity = 2, metadata = { tier = 1 } },
+                    { id = 43, item = 'eau', quantity = 1, metadata = { tier = 3 } },
+                    { id = 44, item = 'eau', quantity = 1, metadata = { tier = 4 } },
+                }
+            end)
+
+            it('rend l\'outre vide au palier de l\'outre d\'eau bue, sans palier pour une outre sans palier', function()
+                roll = 0.5
+                sip(43)
+                sip(41)
+                sip(40)
+                assert.same({
+                    { source = SOURCE, item = 'outre', quantity = 1, metadata = { tier = 3 } },
+                    { source = SOURCE, item = 'outre', quantity = 1, metadata = { tier = 1 } },
+                    { source = SOURCE, item = 'outre', quantity = 1 },
+                }, adds)
+                assert.same({ { source = SOURCE, item = 'eau' }, { source = SOURCE, item = 'eau' }, { source = SOURCE, item = 'eau' } }, pileReads)
+            end)
+
+            it('même tirage : la Soignée tient, l\'outre sans palier se fend ; la Grossière se fend, l\'Excellente tient', function()
+                roll = 0.06
+                sip(43)
+                sip(40)
+                assert.same({ { source = SOURCE, item = 'outre', quantity = 1, metadata = { tier = 3 } } }, adds)
+                assert.same({ target = SOURCE, event = EVENTS.NOTICE, args = { n = 1, 'torn' } }, sent[1])
+                roll = 0.12
+                sip(41)
+                sip(44)
+                assert.equal(2, #adds)
+                assert.same({ tier = 4 }, adds[2].metadata)
+                assert.equal(2, #sent)
+            end)
+
+            it('sans relevé (pile inconnue, inventaire muet, gorgée d\'avant un redémarrage) : risque et outre sans palier', function()
+                roll = 0.5
+                sip(99)                    -- pile absente de la besace
+                piles[SOURCE].eau = false  -- inventaire muet
+                sip(43)
+                drink({ instanceId = 44 }) -- aucun relevé
+                assert.equal(3, #adds)
+                for _, add in ipairs(adds) do assert.is_nil(add.metadata) end
+                roll = 0.06                -- risque sans palier (0,1) : fendue
+                drink({ instanceId = 43 })
+                assert.equal(3, #adds)
+            end)
+
+            -- relecture sécurité S-1 de T-135
+            it('inventaire muet à la gorgée : le relevé ancien de la pile est effacé, jamais repris', function()
+                roll = 0.5
+                -- relevé d'une gorgée refusée par un autre abonné (jamais bue) : palier Soigné gardé pour la pile 43
+                containers.beforeUse({ source = SOURCE, instanceId = 43, item = 'eau' })
+                -- la pile a changé de palier entre-temps, puis l'inventaire ne répond plus au relevé suivant
+                piles[SOURCE].eau = false
+                assert.is_nil(containers.beforeUse({ source = SOURCE, instanceId = 43, item = 'eau' }))
+                drink({ instanceId = 43 })
+                assert.same({ { source = SOURCE, item = 'outre', quantity = 1 } }, adds)
+                -- de même pour une pile introuvable dans une besace qui répond
+                piles[SOURCE].eau = { { id = 44, item = 'eau', quantity = 1, metadata = { tier = 4 } } }
+                containers.beforeUse({ source = SOURCE, instanceId = 44, item = 'eau' })
+                piles[SOURCE].eau = {}
+                containers.beforeUse({ source = SOURCE, instanceId = 44, item = 'eau' })
+                drink({ instanceId = 44 })
+                assert.is_nil(adds[2].metadata)
+            end)
+
+            -- relecture sécurité S-3 de T-135
+            it('relevé manqué : un avertissement en console au plus par minute, les suivants comptés', function()
+                roll = 0.5
+                drink({ instanceId = 44 })               -- aucun relevé
+                assert.equal(1, #logs.warn)
+                assert.matches("palier de l'outre d'eau non relevé %(joueur 5, pile 44%)", logs.warn[1])
+                piles[SOURCE].eau = false
+                sip(43)                                  -- inventaire muet
+                timer = timer + 59999
+                drink({ instanceId = 40 })
+                assert.equal(1, #logs.warn)
+                timer = timer + 1
+                drink({ instanceId = 41 })
+                assert.equal(2, #logs.warn)
+                assert.matches('pile 41', logs.warn[2])
+                assert.matches('%(2 autres depuis le précédent avis%)', logs.warn[2])
+                -- relevé réussi, même sans palier : aucun avertissement
+                piles[SOURCE].eau = { { id = 40, item = 'eau', quantity = 1, metadata = {} } }
+                timer = timer + 60000
+                sip(40)
+                assert.equal(2, #logs.warn)
+                assert.equal(5, #adds)
+            end)
+
+            it('un relevé ne sert qu\'une fois, et pas pour une autre pile', function()
+                roll = 0.5
+                containers.beforeUse({ source = SOURCE, instanceId = 43, item = 'eau' })
+                drink({ instanceId = 41 })
+                drink({ instanceId = 43 })
+                drink({ instanceId = 43 })
+                assert.same({ nil, { tier = 3 }, nil }, { adds[1].metadata, adds[2].metadata, adds[3].metadata })
+            end)
+
+            it('ne relève rien pour un autre objet ou un payload mal formé ; oublie les relevés d\'un joueur parti', function()
+                roll = 0.5
+                assert.is_nil(containers.beforeUse({ source = SOURCE, instanceId = 43, item = 'pain' }))
+                assert.is_nil(containers.beforeUse({ source = SOURCE, instanceId = '43', item = 'eau' }))
+                assert.is_nil(containers.beforeUse({ source = -1, instanceId = 43, item = 'eau' }))
+                assert.is_nil(containers.beforeUse('eau'))
+                assert.equal(0, #pileReads)
+                containers.beforeUse({ source = SOURCE, instanceId = 43, item = 'eau' })
+                containers.forget(SOURCE)
+                drink({ instanceId = 43 })
+                assert.is_nil(adds[1].metadata)
+            end)
+
+            it('gorgées refusées par un autre abonné : au plus 8 relevés gardés par joueur', function()
+                roll = 0.5
+                local list = {}
+                for id = 101, 109 do list[#list + 1] = { id = id, item = 'eau', quantity = 1, metadata = { tier = 2 } } end
+                piles[SOURCE].eau = list
+                -- huit relevés jamais bus, puis un neuvième : la table du joueur repart de zéro
+                for id = 101, 109 do containers.beforeUse({ source = SOURCE, instanceId = id, item = 'eau' }) end
+                drink({ instanceId = 101 })
+                drink({ instanceId = 109 })
+                assert.is_nil(adds[1].metadata)
+                assert.same({ tier = 2 }, adds[2].metadata)
+            end)
+        end)
     end)
 
     describe('objets et recette', function()
@@ -653,7 +853,7 @@ end)
 -- exports des autres ressources).
 describe('vava_provisions démarrage', function()
     local core, registries, regAdds, hooks, rpcs, zones, sent, exported, resources, setup, logs
-    local active, peds, inventoryCalls, needsCalls
+    local active, peds, inventoryCalls, needsCalls, stock, befores
     local realRandom = math.random
 
     local function registry(name)
@@ -670,6 +870,8 @@ describe('vava_provisions démarrage', function()
         VavaProvisions = nil
         registries, regAdds, hooks, rpcs, zones, sent, exported = {}, {}, {}, {}, {}, {}, {}
         active, peds, inventoryCalls, needsCalls = { [5] = 100 }, {}, {}, {}
+        -- piles de la besace lues par getItems : deux outres sans palier
+        stock, befores = { outre = { { id = 7, item = 'outre', quantity = 2, metadata = {} } } }, {}
         local log
         logs, log = newLogs()
         resources = {
@@ -679,7 +881,14 @@ describe('vava_provisions démarrage', function()
                     inventoryCalls[#inventoryCalls + 1] = { 'exchange', src, copy(removals), copy(additions) }
                     return true
                 end,
-                add = function(_, src, item, quantity) inventoryCalls[#inventoryCalls + 1] = { 'add', src, item, quantity } return true end,
+                add = function(_, src, item, quantity, metadata)
+                    inventoryCalls[#inventoryCalls + 1] = { 'add', src, item, quantity, copy(metadata) }
+                    return true
+                end,
+                getItems = function(_, src, filter)
+                    inventoryCalls[#inventoryCalls + 1] = { 'getItems', src, copy(filter) }
+                    return copy(stock[filter.item] or {})
+                end,
             },
             vava_needs = {
                 get = function() return { hunger = 80, thirst = 50 } end,
@@ -736,6 +945,10 @@ describe('vava_provisions démarrage', function()
                     hooks[name][#hooks[name] + 1] = fn
                     return #hooks[name]
                 end,
+                before = function(name, fn, priority)
+                    befores[#befores + 1] = { name = name, fn = fn, priority = priority }
+                    return #befores
+                end,
                 runBefore = function() return true end,
                 runAfter = function() end,
             },
@@ -789,6 +1002,9 @@ describe('vava_provisions démarrage', function()
         for _, name in ipairs({ 'vava_inventory:use', 'core:module:ready', 'core:character:unloading', 'core:player:dropped' }) do
             assert.equal(1, #(hooks[name] or {}), name)
         end
+        -- palier de l'outre relevé avant la gorgée : un seul abonné before, le dernier de la chaîne (T-135)
+        assert.equal(1, #befores)
+        assert.same({ 'vava_inventory:use', 1000 }, { befores[1].name, befores[1].priority })
         assert.equal(1, #logs.warn)
         assert.matches("recette de l'outre non déclarée", logs.warn[1])
     end)
@@ -870,7 +1086,9 @@ describe('vava_provisions démarrage', function()
         peds[5] = { fontaine.x + 1, fontaine.y, fontaine.z }
         local handler = rpcs['vava_provisions:draw'].handler
         assert.same({ true, { action = 'fill', count = 2 } }, { handler(5, 'fontaine_bourg') })
-        assert.same({ 'exchange', 5, { { item = 'outre', quantity = 2 } }, { { item = 'eau', quantity = 2 } } }, inventoryCalls[2])
+        assert.same({ 'count', 'outre' }, inventoryCalls[1])
+        assert.same({ 'getItems', 5, { item = 'outre' } }, inventoryCalls[2])
+        assert.same({ 'exchange', 5, { { instanceId = 7, quantity = 2 } }, { { item = 'eau', quantity = 2 } } }, inventoryCalls[3])
 
         resources.vava_inventory.count = function() return 0 end
         assert.same({ false, 'wait' }, { handler(5, 'fontaine_bourg') })
@@ -893,6 +1111,13 @@ describe('vava_provisions démarrage', function()
         -- outre bue : thread exécuté aussitôt, outre vide ajoutée par l'inventaire, rien d'envoyé
         fire('vava_inventory:use', { source = 5, item = 'eau', consumed = true })
         assert.same({ 'add', 5, 'outre', 1 }, inventoryCalls[#inventoryCalls])
+        assert.equal(0, #sent)
+        -- outre d'eau Soignée : palier relevé par l'abonné before (getItems), outre vide Soignée rendue (T-135)
+        stock.eau = { { id = 12, item = 'eau', quantity = 1, metadata = { tier = 3 } } }
+        assert.is_nil(befores[1].fn({ source = 5, instanceId = 12, item = 'eau' }))
+        assert.same({ 'getItems', 5, { item = 'eau' } }, inventoryCalls[#inventoryCalls])
+        fire('vava_inventory:use', { source = 5, instanceId = 12, item = 'eau', consumed = true })
+        assert.same({ 'add', 5, 'outre', 1, { tier = 3 } }, inventoryCalls[#inventoryCalls])
         assert.equal(0, #sent)
         -- besace pleine : avis par core.net au seul buveur
         resources.vava_inventory.add = function() return false, 'no_space' end

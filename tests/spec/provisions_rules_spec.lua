@@ -281,6 +281,123 @@ describe('vava_provisions rules', function()
         assert.is_false(rules.keepsContainer(0.99, 1))
     end)
 
+    -- T-135 : le palier de l'outre (savoir du tanneur) passe de l'outre vide à l'outre d'eau et revient, et fixe le
+    -- risque de fente.
+    describe('palier de l\'outre', function()
+        local CONTAINER = { empty = 'outre', tearChance = 0.1, tearChanceByTier = { 0.15, 0.1, 0.05, 0.025, 0.01 } }
+
+        it('lit le palier d\'une pile : entier de 1 à 5, 3.0 compte pour 3, le reste n\'en est pas un', function()
+            for tier = 1, 5 do assert.equal(tier, rules.tierOf({ tier = tier })) end
+            assert.equal(3, rules.tierOf({ tier = 3.0 }))
+            assert.equal('integer', math.type(rules.tierOf({ tier = 3.0 })))
+            assert.equal(2, rules.tierOf({ tier = 2, origin = 'foret' }))
+            for _, metadata in ipairs({ {}, { tier = 0 }, { tier = 6 }, { tier = -1 }, { tier = 2.5 }, { tier = '3' },
+                { tier = 0 / 0 }, { tier = math.huge }, { quality = 80 } }) do
+                assert.is_nil(rules.tierOf(metadata), tostring(metadata.tier))
+            end
+            assert.is_nil(rules.tierOf(nil))
+            assert.is_nil(rules.tierOf('tier'))
+        end)
+
+        it('métadonnées d\'une outre : { tier } comme un produit simple de l\'artisanat, rien sans palier', function()
+            assert.same({ tier = 3 }, rules.tierMetadata(3))
+            assert.is_nil(rules.tierMetadata(nil))
+        end)
+
+        it('risque de fente selon le palier, celui d\'une outre sans palier sinon', function()
+            assert.equal(0.15, rules.tearChance(CONTAINER, 1))
+            assert.equal(0.1, rules.tearChance(CONTAINER, 2))
+            assert.equal(0.05, rules.tearChance(CONTAINER, 3))
+            assert.equal(0.025, rules.tearChance(CONTAINER, 4))
+            assert.equal(0.01, rules.tearChance(CONTAINER, 5))
+            assert.equal(0.1, rules.tearChance(CONTAINER, nil))
+            -- liste plus courte que les paliers, ou absente (config.lua d'avant 1.3.0) : le risque sans palier
+            assert.equal(0.1, rules.tearChance({ tearChance = 0.1, tearChanceByTier = { 0.2, 0.1 } }, 4))
+            assert.equal(0.1, rules.tearChance({ tearChance = 0.1 }, 3))
+            -- même tirage : l'outre Soignée tient, l'outre sans palier se fend ; la Grossière se fend, la Commune tient
+            assert.is_true(rules.keepsContainer(0.06, rules.tearChance(CONTAINER, 3)))
+            assert.is_false(rules.keepsContainer(0.06, rules.tearChance(CONTAINER, nil)))
+            assert.is_false(rules.keepsContainer(0.12, rules.tearChance(CONTAINER, 1)))
+            assert.is_true(rules.keepsContainer(0.12, rules.tearChance(CONTAINER, 2)))
+        end)
+
+        it('valide la liste des risques : 1 à 5 valeurs de 0 à 1, jamais plus haut qu\'au palier d\'avant', function()
+            assert.is_true(rules.validateTearChances(nil))
+            assert.is_true(rules.validateTearChances({ 0.1 }))
+            assert.is_true(rules.validateTearChances({ 0.2, 0.2, 0.1, 0, 0 }))
+            assert.same({ false, 'invalid_list' }, { rules.validateTearChances({}) })
+            assert.same({ false, 'invalid_list' }, { rules.validateTearChances({ 0.5, 0.4, 0.3, 0.2, 0.1, 0 }) })
+            assert.same({ false, 'invalid_list' }, { rules.validateTearChances({ 0.1, nil, 0.05 }) })
+            assert.same({ false, 'invalid_list' }, { rules.validateTearChances({ 0.1, soigne = 0.05 }) })
+            assert.same({ false, 'invalid_list' }, { rules.validateTearChances(0.1) })
+            assert.same({ false, 'invalid_chance', '[2]' }, { rules.validateTearChances({ 0.1, -0.1 }) })
+            assert.same({ false, 'invalid_chance', '[1]' }, { rules.validateTearChances({ 1.5 }) })
+            assert.same({ false, 'invalid_chance', '[3]' }, { rules.validateTearChances({ 0.1, 0.1, 0 / 0 }) })
+            assert.same({ false, 'invalid_chance', '[2]' }, { rules.validateTearChances({ 0.1, '0.05' }) })
+            assert.same({ false, 'invalid_order', '[3]' }, { rules.validateTearChances({ 0.15, 0.1, 0.12 }) })
+        end)
+
+        it('la config refuse une liste fautive avec son chemin, et accepte son absence', function()
+            local bad = copy(cfg)
+            bad.containers.eau.tearChanceByTier = { 0.1, 0.2 }
+            assert.same({ false, 'invalid_order', 'containers.eau.tearChanceByTier[2]' }, { rules.validateConfig(bad) })
+            bad.containers.eau.tearChanceByTier = { 0.1, 0.05, 0.02, 0.01, 0.005, 0 }
+            assert.same({ false, 'invalid_list', 'containers.eau.tearChanceByTier' }, { rules.validateConfig(bad) })
+            local old = copy(cfg)
+            old.containers.eau.tearChanceByTier = nil
+            assert.is_true(rules.validateConfig(old))
+        end)
+
+        it('remplit pile par pile, les plus anciennes d\'abord, chaque outre d\'eau au palier de son outre', function()
+            local piles = {
+                { id = 11, item = 'outre', quantity = 2, metadata = { tier = 3 } },
+                { id = 12, item = 'outre', quantity = 1, metadata = {} },
+                { id = 13, item = 'outre', quantity = 4, metadata = { tier = 1 } },
+                { id = 14, item = 'outre', quantity = 1, metadata = { tier = 3 } },
+            }
+            local removals, additions, total = rules.planFill(piles, 5, 'eau')
+            assert.equal(5, total)
+            assert.same({ { instanceId = 11, quantity = 2 }, { instanceId = 12, quantity = 1 }, { instanceId = 13, quantity = 2 } }, removals)
+            assert.same({
+                { item = 'eau', quantity = 2, metadata = { tier = 3 } },
+                { item = 'eau', quantity = 1 },
+                { item = 'eau', quantity = 2, metadata = { tier = 1 } },
+            }, additions)
+            -- deux piles du même palier : un seul ajout, une seule pile d'eau
+            removals, additions, total = rules.planFill(piles, 20, 'eau')
+            assert.equal(8, total)
+            assert.equal(4, #removals)
+            assert.same({ item = 'eau', quantity = 3, metadata = { tier = 3 } }, additions[1])
+            assert.equal(3, #additions)
+        end)
+
+        it('autant d\'outres d\'eau que d\'outres prises, jamais plus que demandé', function()
+            local piles = { { id = 1, quantity = 3, metadata = { tier = 2 } }, { id = 2, quantity = 3 } }
+            for count = 1, 6 do
+                local removals, additions, total = rules.planFill(piles, count, 'eau')
+                local taken, given = 0, 0
+                for _, removal in ipairs(removals) do taken = taken + removal.quantity end
+                for _, addition in ipairs(additions) do given = given + addition.quantity end
+                assert.equal(count, total)
+                assert.equal(count, taken)
+                assert.equal(count, given)
+            end
+        end)
+
+        it('ignore une pile mal formée ; sans pile, rien', function()
+            local removals, additions, total = rules.planFill({
+                { id = 0, quantity = 1 }, { id = 'x', quantity = 1 }, { id = 3, quantity = 0 }, { id = 4, quantity = 1.5 },
+                'pile', { id = 5, quantity = 1, metadata = { tier = 9 } },
+            }, 5, 'eau')
+            assert.equal(1, total)
+            assert.same({ { instanceId = 5, quantity = 1 } }, removals)
+            assert.same({ { item = 'eau', quantity = 1 } }, additions)
+            assert.same({ {}, {}, 0 }, { rules.planFill({}, 5, 'eau') })
+            assert.same({ {}, {}, 0 }, { rules.planFill(nil, 5, 'eau') })
+            assert.same({ {}, {}, 0 }, { rules.planFill({ { id = 1, quantity = 2 } }, 0, 'eau') })
+        end)
+    end)
+
     describe('parseCommand', function()
         it('lit points et reserve', function()
             assert.same({ 'points' }, { rules.parseCommand({ 'points' }) })
@@ -414,9 +531,16 @@ describe('vava_provisions rules', function()
             assert.equal('Outre d\'eau', eau.label)
         end)
 
-        it('remplit des outres en eau et rend une outre vide qui se fend une fois sur dix', function()
+        it('remplit des outres en eau et rend une outre vide qui se fend une fois sur dix sans palier, moins si elle est mieux faite', function()
             assert.same({ from = 'outre', to = 'eau', maxPerDraw = 5 }, cfg.fill)
-            assert.same({ empty = 'outre', tearChance = 0.1 }, cfg.containers.eau)
+            -- valeurs de T-135 retenues par le porteur du projet (Grossier, Commun, Soigné, Excellent, Chef-d'œuvre)
+            assert.same({ empty = 'outre', tearChance = 0.1, tearChanceByTier = { 0.15, 0.1, 0.05, 0.025, 0.01 } }, cfg.containers.eau)
+            -- une outre Soignée ou Excellente se fend moins qu'une outre sans palier ou Commune
+            local eau = cfg.containers.eau
+            assert.is_true(rules.tearChance(eau, 3) < rules.tearChance(eau, nil))
+            assert.is_true(rules.tearChance(eau, 4) < rules.tearChance(eau, 3))
+            assert.is_true(rules.tearChance(eau, 3) < rules.tearChance(eau, 2))
+            assert.is_true(rules.tearChance(eau, 5) > 0)
             assert.equal('outre', cfg.recipe.output.item)
             assert.equal('tannerie', cfg.recipe.station)
         end)

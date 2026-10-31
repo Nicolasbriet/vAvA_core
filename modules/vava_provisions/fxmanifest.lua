@@ -3,8 +3,8 @@
     Rôle : les vivres du royaume (« Vivres ») : objets `eau` (Outre d'eau) et `outre` (Outre vide) ; points d'eau
            (puits, fontaines, sources) où l'on remplit ses outres vides et où l'on boit quelques gorgées, chacun une
            zone du core connue des seuls joueurs proches ; réserve par point en mémoire (la fontaine est sans fond) ;
-           outre vide rendue quand on boit une outre d'eau, qui se fend parfois ; recette de l'outre à la tannerie
-           (vava_crafting) ; commande du Conseil /eau. Le serveur décide de tout ; le client crée les props des points
+           outre vide rendue quand on boit une outre d'eau, au même palier (1.3.0), qui se fend parfois, moins souvent
+           si le tanneur l'a bien faite ; recette de l'outre à la tannerie (vava_crafting) ; commande du Conseil /eau. Le serveur décide de tout ; le client crée les props des points
            à portée, montre l'invite et joue le geste.
            T-132 : les joueurs ne téléchargent que les constantes, config_client.lua (sortes de points d'eau, portée,
            streaming, gestes, touche, textes montrés au joueur) et la logique lue par le client (textes, carnet des
@@ -23,7 +23,7 @@ use_experimental_fxv2_oal 'yes'
 
 name 'vava_provisions'
 description 'Vivres vAvA : points d\'eau, outres, eau potable'
-version '1.2.0'
+version '1.3.0'
 
 dependency 'vAvA_core'
 dependency 'vava_ui'

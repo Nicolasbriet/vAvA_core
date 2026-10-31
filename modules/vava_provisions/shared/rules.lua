@@ -3,7 +3,8 @@
     Rôle : logique PURE des vivres (aucune native, testée hors jeu : tests/spec/provisions_rules_spec.lua), servie au
            seul serveur (T-143 : les textes montrés au joueur sont dans shared/texts.lua, partagé) : validation d'un
            point d'eau (seul juge, repris tel quel par le futur éditeur de l'Atelier) et de la config, réserve d'un
-           point (niveau, attente), choix de l'action au point d'eau, contenant gardé ou fendu, lecture de /eau, textes
+           point (niveau, attente), choix de l'action au point d'eau, contenant gardé ou fendu, palier de l'outre
+           (lu, gardé, risque de fente selon le palier, remplissage pile par pile : T-135), lecture de /eau, textes
            du Conseil. Motifs écrits octet par octet (ni %c, ni %s, ni %w : ils dépendent de la locale du système et
            prendraient des octets d'un caractère accentué).
     Dépendances : shared/constants.lua, shared/texts.lua
@@ -19,6 +20,7 @@ local ID_PATTERN, ID_MAX = VavaProvisions.ID_PATTERN, VavaProvisions.ID_MAX
 local LABEL_MAX, KIND_LABEL_MAX, MODEL_MAX = VavaProvisions.LABEL_MAX, VavaProvisions.KIND_LABEL_MAX, VavaProvisions.MODEL_MAX
 local MAX_COORD, MAX_Z = VavaProvisions.MAX_COORD, VavaProvisions.MAX_Z
 local MAX_NOTIFICATION, MAX_POINTS = VavaProvisions.MAX_NOTIFICATION, VavaProvisions.MAX_POINTS
+local MAX_TIER = VavaProvisions.MAX_TIER
 
 -- nom de modèle : lettres ASCII, chiffres, « _ » (écrit en clair : %w dépend de la locale)
 local MODEL_PATTERN = '^[A-Za-z0-9_]+$'
@@ -229,6 +231,8 @@ function rules.validateConfig(cfg)
         if type(container.empty) ~= 'string' or not items[container.empty] then return false, 'unknown_item', path .. '.empty' end
         local chance = container.tearChance
         if not finite(chance) or chance < 0 or chance > 1 then return false, 'invalid_chance', path .. '.tearChance' end
+        local ok, code, field = rules.validateTearChances(container.tearChanceByTier)
+        if not ok then return false, code, path .. '.tearChanceByTier' .. (field or '') end
     end
     local recipe = cfg.recipe
     if recipe ~= nil then
@@ -326,6 +330,95 @@ end
 ---@return boolean
 function rules.keepsContainer(roll, chance)
     return roll >= chance
+end
+
+-- Palier de l'outre (T-135) ---------------------------------------------------------------------------------------
+-- Le palier (`tier`, 1 à MAX_TIER, posé par vava_crafting) passe de l'outre vide à l'outre d'eau et revient à l'outre
+-- vide : c'est la seule métadonnée gardée. Une outre sans palier reste sans palier (elle s'empile avec les autres
+-- outres sans palier, jamais avec une outre d'un palier).
+
+--- Palier d'une pile d'après ses métadonnées : entier de 1 à MAX_TIER (3.0 lu en JSON compte pour 3), sinon nil.
+---@param metadata any
+---@return integer|nil
+function rules.tierOf(metadata)
+    if type(metadata) ~= 'table' then return nil end
+    local value = metadata.tier
+    local tier = type(value) == 'number' and tointeger(value) or nil
+    if not tier or tier < 1 or tier > MAX_TIER then return nil end
+    return tier
+end
+
+--- Métadonnées d'une outre (vide ou d'eau) d'un palier : `{ tier }`, ou nil sans palier (pile sans métadonnées).
+--- Même forme que les produits simples de vava_crafting (`signature.simple`) : une outre rendue s'empile avec une
+--- outre neuve du même palier.
+---@param tier integer|nil
+---@return table|nil
+function rules.tierMetadata(tier)
+    if tier == nil then return nil end
+    return { tier = tier }
+end
+
+--- Risque qu'une outre se fende à la gorgée, selon son palier : `tearChanceByTier[palier]`, sinon `tearChance` (sans
+--- palier, ou palier absent de la liste).
+---@param container { tearChance: number, tearChanceByTier?: number[] }
+---@param tier integer|nil
+---@return number
+function rules.tearChance(container, tier)
+    local byTier = container.tearChanceByTier
+    if tier ~= nil and type(byTier) == 'table' then
+        local chance = byTier[tier]
+        if finite(chance) then return chance end
+    end
+    return container.tearChance
+end
+
+--- Valide `tearChanceByTier` : absent, ou liste de 1 à MAX_TIER risques de 0 à 1, jamais plus haut qu'au palier d'avant
+--- (le savoir du tanneur compte : une outre mieux faite ne se fend pas plus souvent).
+---@param list any
+---@return boolean ok
+---@return string|nil code   invalid_list | invalid_chance | invalid_order
+---@return string|nil field  « [3] »
+function rules.validateTearChances(list)
+    if list == nil then return true end
+    if not isList(list) or #list < 1 or #list > MAX_TIER then return false, 'invalid_list', nil end
+    for index, chance in ipairs(list) do
+        if not finite(chance) or chance < 0 or chance > 1 then return false, 'invalid_chance', format('[%d]', index) end
+        if index > 1 and chance > list[index - 1] then return false, 'invalid_order', format('[%d]', index) end
+    end
+    return true
+end
+
+--- Remplissage pile par pile : prend `count` outres vides au plus dans `piles` (dans l'ordre donné, les plus anciennes
+--- d'abord), retirées par pile (identifiant et quantité), et donne autant d'outres d'eau, regroupées par palier dans
+--- l'ordre où il apparaît (métadonnées `{ tier }`, aucune sans palier). Une pile mal formée est ignorée.
+---@param piles any   { { id, quantity, metadata } } (export getItems de vava_inventory)
+---@param count integer
+---@param to string   objet donné (outre d'eau)
+---@return table removals   { { instanceId, quantity } }
+---@return table additions  { { item, quantity, metadata? } }
+---@return integer total    outres prises (0 à count)
+function rules.planFill(piles, count, to)
+    local removals, additions, groupOf, total = {}, {}, {}, 0
+    if type(piles) ~= 'table' or mathType(count) ~= 'integer' then return removals, additions, total end
+    for _, pile in ipairs(piles) do
+        if total >= count then break end
+        if type(pile) == 'table' and mathType(pile.id) == 'integer' and pile.id > 0
+            and mathType(pile.quantity) == 'integer' and pile.quantity > 0 then
+            local take = min(pile.quantity, count - total)
+            removals[#removals + 1] = { instanceId = pile.id, quantity = take }
+            local tier = rules.tierOf(pile.metadata)
+            local key = tier or 0
+            local group = groupOf[key]
+            if not group then
+                group = { item = to, quantity = 0, metadata = rules.tierMetadata(tier) }
+                groupOf[key] = group
+                additions[#additions + 1] = group
+            end
+            group.quantity = group.quantity + take
+            total = total + take
+        end
+    end
+    return removals, additions, total
 end
 
 -- Conseil ---------------------------------------------------------------------------------------------------------
