@@ -2995,8 +2995,9 @@ ghost = { field = 'ressource',    -- select, segmented ou model : le fantôme su
 — par éditeur : `trialPlay = true` (l'essai se joue en jeu : la page se met de côté, `F9` la rend) ; `texts.banner`
 (1 à 32 octets, facultatif : titre du bandeau du volet, sinon le libellé de l'atelier : « Atelier de la récolte ») ;
 `placeCheck(kind, place, ctx)` (facultatif, seulement avec `apply`) → `true` ou `false, 'texte'` (≤ 160) ;
-`ctx = { source, accountId, id, parent?, data, siblings }` : `id` vaut `''` pour une fiche nouvelle, `data` est la data
-normalisée (celle du modèle pour un enfant nouveau), `siblings` le nombre de frères vivants après la pose ; `place` est
+`ctx = { source, accountId, id, parent?, data, siblings, parentData? }` : `id` vaut `''` pour une fiche nouvelle, `data`
+est la data normalisée (celle du modèle pour un enfant nouveau), `siblings` le nombre de frères vivants après la pose,
+`parentData` la data du parent telle que le membre la voit (son brouillon s'il en tient un, sinon la publiée) ; `place` est
 déjà arrondi et a passé les règles déclarées. Sert à ce que les règles ne savent pas dire (chevauchement de deux zones,
 nombre de points d'une zone). Le placement **n'appelle pas** `validate` : `validate` reste juge de tout, lieu compris,
 à l'essai et à la publication. `trial` reçoit aussi `ctx.removed = { { kind, id } }` (retraits préparés du lot, à

@@ -1018,8 +1018,8 @@ maquettes.
 
 ### T-102 — Outil de placement et créateur de récolte
 - Agents : vava-architecte → vava-dev-lua + vava-dev-nui · Dépend de : T-101, T-015, T-141 · Statut : en cours (Lua
-  fini ; relu sécurité, réseau et lore ; suites des relectures appliquées, contre-relecture sécurité à faire ; pages
-  faites dans `agents/T-102-nui`)
+  fini ; relu sécurité, réseau et lore ; suites des relectures appliquées ; contre-relecture sécurité faite, ses suites
+  appliquées, seconde contre-relecture à faire ; pages faites dans `agents/T-102-nui`)
 - Spec : `docs/plan/specs/T-102.md`, avec les décisions du porteur du projet du 31 octobre 2026 (essai à blanc, recommandations
   retenues). Rapport : `docs/plan/rapports/T-102.md` (et `T-102-nui.md` pour les pages) ; procédure en jeu :
   `docs/tests/atelier.md` § 19 à 24, `docs/tests/metiers.md` § 3.5. `vava_atelier` 1.3.0, `vava_gathering` 1.8.0.
