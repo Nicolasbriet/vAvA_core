@@ -1,7 +1,7 @@
 'use strict';
 /*
  * vava_pause/web/js/bridge.js
- * Rôle : seul fichier qui parle au client Lua : rappels NUI (fetch vers https://vava_pause/<nom>) et messages reçus
+ * Rôle : seul fichier qui parle au client Lua : rappels NUI (fetch vers la ressource elle-même, par son nom) et messages reçus
  *        ({ action, payload }). Hors jeu, les rappels vont aux données simulées de dev/devmock.js.
  * Dépendances : aucune (DevMock hors jeu seulement)
  */
