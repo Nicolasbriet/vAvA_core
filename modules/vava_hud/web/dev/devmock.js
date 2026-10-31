@@ -5,7 +5,9 @@
  *        travailler le rendu sans lancer le jeu. Jamais livré (absent des `files`), jamais chargé en jeu : la ligne
  *        hors jeu de index.html ne l'insère que hors FiveM. Paramètres d'URL : ?values=0.8,0.62,0.08,0.5 (santé,
  *        faim, soif, voix), ?talking=1 (lueur du médaillon de la voix), ?progress=1 (barre de progression de 8 s menée
- *        à son terme) ou ?progress=cancel (interrompue à 60 %).
+ *        à son terme) ou ?progress=cancel (interrompue à 60 %). Réglages de la bannière (1.5.0) : ?scale=90|100|115
+ *        (taille de l'interface), ?notify=courte|normale|longue (durée des notifications : 0,6, 1 ou 1,6 × 4,5 s ; sans
+ *        ce paramètre, les notifications simulées restent à l'écran).
  */
 
 (() => {
@@ -30,6 +32,14 @@
       visible: true,
       notifications: { durationMs: 600000, maxVisible: 4 },
     } }, '*');
+    // réglages de la bannière, envoyés comme le ferait client/main.lua (échelle et durée déjà calculées)
+    const factors = { courte: 0.6, normale: 1, longue: 1.6 };
+    if (params.get('scale') || factors[params.get('notify')]) {
+      window.postMessage({ action: 'settings', payload: {
+        scale: (Number(params.get('scale')) || 100) / 100,
+        durationMs: factors[params.get('notify')] ? 4500 * factors[params.get('notify')] : undefined,
+      } }, '*');
+    }
     if (params.get('talking') === '1') {
       window.postMessage({ action: 'active', payload: { id: 'vava_voice:voice', active: true } }, '*');
     }
