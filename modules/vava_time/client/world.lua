@@ -7,7 +7,7 @@
       - Ciel : transition douce vers le ciel visé dans le temps qui reste (un joueur qui arrive pendant une transition
         part du ciel d'avant), puis ciel posé une fois la transition finie (un seul thread qui attend).
       - Arrêt de la ressource : horloge et météo rendues au jeu.
-    Dépendances : shared/, config.lua, client/core.lua
+    Dépendances : shared/constants.lua, config_client.lua, shared/calendar.lua, shared/weather.lua, client/core.lua
 ]]
 
 local type, ipairs, floor = type, ipairs, math.floor

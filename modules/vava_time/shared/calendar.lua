@@ -4,7 +4,7 @@
            les secondes UTC (sans dépendre du fuseau de la machine), heure de Paris (règle européenne de l'heure d'été :
            du dernier dimanche de mars au dernier dimanche d'octobre, à 01:00 UTC), heure du royaume (décalage, gel),
            saison, jour de la saison et an du royaume (vrai calendrier ou cycle), texte de /date. Aucun état.
-    Dépendances : shared/constants.lua, config.lua
+    Dépendances : shared/constants.lua, config_client.lua (calendar, messages)
 ]]
 
 local floor, max, ipairs = math.floor, math.max, ipairs
