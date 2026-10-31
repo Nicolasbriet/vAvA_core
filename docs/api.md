@@ -1126,8 +1126,10 @@ Demande le core 0.10.0 (`core.net.send` : tous les envois du module sont compté
   à terre) ; le client l'applique (`vava_health:set`, à la seule cible, une fois par tour au plus). Le serveur lit le
   ped de chaque joueur toutes les 500 ms, après la fenêtre d'application d'un ordre (1,5 s + 2 × ping, 1 s au plus) :
   ped plus bas = perte native (chute, noyade, feu du décor…) acceptée sans modificateurs ; ped au seuil (vie GTA 100)
-  ou dessous = mise à terre ; ped plus haut = client en retard ou modifié, vie du serveur renvoyée au plus toutes les
-  2 s (console). Aucune écriture de la vie ne dépend plus de la confirmation d'apparition du client : sans elle, le ped
+  ou dessous = mise à terre ; ped plus haut = client en retard ou modifié, vie du serveur renvoyée après 2 s, puis
+  après un délai doublé à chaque correction restée sans effet (jusqu'à 30 s ; 2 s de nouveau dès l'accord), console.
+  Un client qui garde son ped au maximum ne gagne rien face aux coups, aux sorts et à la faim, mais échappe aux pertes
+  natives (chute, noyade, PNJ) : les attaques de PNJ hostiles devront passer par `hit`. Aucune écriture de la vie ne dépend plus de la confirmation d'apparition du client : sans elle, le ped
   est lu d'office 20 s après l'ordre d'apparition. Vie écrite dans le personnage à chaque transition et à chaque soin,
   au plus toutes les 10 s après des coups, au départ et à l'arrêt du module ; restaurée à chaque apparition. La
   récupération automatique de GTA est coupée : on se soigne par objets (`effects = { health = 20 }` : +20 %, refusé
@@ -1178,9 +1180,12 @@ local result, code = exports.vava_health:hit(target, {
 - **Paquet fermé** : toute autre clé est refusée (`unknown_field`), `origin` compris : le serveur pose lui-même
   `origin` = ressource appelante (`GetInvokingResource`), le numéro du coup et le personnage de la source s'il est en
   jeu. Listes fermées lisibles par `vocabulary()`.
-- **Ordre** : garde-fous (20 coups par seconde et par cible : `too_many_hits` ; un coup lancé pendant un autre permis
-  une fois : `too_deep` au-delà) ; cible à terre : annulé `downed` (ni hook, ni journal) ; `chain.pvp = false` et
-  source ≠ cible : annulé `pvp_off` ; hook `before` (refus : `cancelled` = raison, `stage = 'before'`) ; modificateurs
+- **Ordre** : garde-fous (`kind = 'monde'` réservé à `vava_health` : `invalid_kind` ; 20 coups par seconde d'une
+  même source sur une même cible, les coups sans source partageant un compte : `too_many_hits` ; un coup lancé pendant
+  un autre permis une fois : `too_deep` au-delà) ; préconditions, sans hook ni journal : cible à terre, annulé
+  `downed` ; `chain.pvp = false` et source ≠ cible, annulé `pvp_off` ; source à terre (hors `tags.overTime` et
+  `tags.reflected`), annulé `source_downed` ; hook `before` (refus volontaire : `cancelled` = raison,
+  `stage = 'before'` ; un abonné **en erreur** ne refuse pas : le coup passe, une ligne de console par minute) ; modificateurs
   dans l'ordre fixe **annulation → esquive → parade → blocage → bouclier → resistance**, puis `priority`, puis clé ;
   application (cible relue, vie du serveur baissée, mise à terre aussitôt à 0, `reason = 'hit'`) ; hook `after` ;
   journal. Aucune attente entre la lecture de la vie et son écriture.
@@ -1191,8 +1196,8 @@ local result, code = exports.vava_health:hit(target, {
   `too_deep`, `hit_error` (erreur interne, console).
 
 **Registre `vava_health:modifiers`** (défini par `vava_health`, 32 entrées) : un module y déclare ses modificateurs,
-**au plus un par étape**, sous son nom (`<ressource>:<nom>` ; une clé au nom d'une autre ressource est retirée
-aussitôt), dans son `setup` si `core.registry.exists('vava_health:modifiers')`, et de nouveau sur `core:module:ready`
+**au plus un par étape** (un second à la même étape est retiré aussitôt, console), sous son nom (`<ressource>:<nom>` ;
+une clé au nom d'une autre ressource est retirée aussitôt), dans son `setup` si `core.registry.exists('vava_health:modifiers')`, et de nouveau sur `core:module:ready`
 quand `name == 'vava_health'` (le registre disparaît avec lui). Le modificateur lit ses propres données (protections
 actives, fenêtres ouvertes, définitions de l'Atelier) : elles changent sans toucher au registre.
 
@@ -1218,7 +1223,8 @@ s'exécutent (une ligne de console par minute) ; plus de 5 ms : signalé, jamais
 
 **Journal des coups** `vava_health_hits` : tout coup venu d'un autre joueur qui a atteint la chaîne (annulé compris) et
 toute mise à terre par la chaîne ou par une perte native (personnages, ressource appelante, type, technique ou sort,
-arme, points, annulation, position) ; écrit par lots, purgé après 30 jours.
+arme, points, annulation, position) ; écrit par lots (un lot refusé par la base est réessayé ligne à ligne, une ligne
+refusée est abandonnée et comptée en console), purgé après 30 jours.
 
 **Exports serveur** (cible : un joueur, son personnage actif) :
 
@@ -1232,7 +1238,7 @@ arme, points, annulation, position) ; écrit par lots, purgé après 30 jours.
 | `setHealth(source, vie)` | `true` ou `false, code` — de 0 à 1 ; 0 met à terre aussitôt (`reason = 'api'`, `cause = 'set'`) |
 | `heal(source, part)` | `true` ou `false, code` — à partir de la vie du serveur (ce n'est pas un dégât : aucune chaîne) |
 | `damage(source, part)` | `true` ou `false, code` — **déprécié** pour les coups et les sorts : enveloppe de `hit` (`amount = part × 100`, `kind = 'pur'`, `tags.legacy`, sans source) ; un coup annulé rend `false, raison` |
-| `down(source, cause?)` | `true` ou `false, code` — mise à terre décidée par un module (`cause` libre : 'piege'…) |
+| `down(source, cause?)` | `true` ou `false, code` — mise à terre décidée par un module (`cause` : identifiant ASCII `^[A-Za-z0-9_-]+$` de 32 octets au plus, 'piege'… ; sinon `invalid_cause`) |
 | `revive(source, vie?)` | `true` ou `false, code` — relève sur place (25 % par défaut) |
 
 Codes : `not_ready`, `invalid_target`, `no_character`, `invalid_amount`, `invalid_cause`, `downed`, `already_downed`,
@@ -1247,10 +1253,12 @@ Codes : `not_ready`, `invalid_target`, `no_character`, `invalid_amount`, `invali
   (annulé compris), et pour chaque perte native (`origin = 'vava_health'`, `kind = 'monde'`, `tags.native`, sans
   source). Usages : « quand le porteur est frappé au corps à corps » (`tags.melee`), interrompre une incantation
   (`applied > 0`), XP sur une vraie cible, renvoi (`hit` sur `source` avec `tags.reflected`) ;
-- `vava_health:downed` (`after`) : `{ source, characterId, reason, cause?, killer?, origin?, hitId? }` — `reason` =
-  `hit` (vie du serveur vidée par la chaîne : `cause` = type, `killer` = source), `death` (ped lu au seuil : `cause` =
-  arme GTA ; aussi émis au départ du joueur quand un coup mortel y est lu) ou `api` ; `origin` et `hitId` pour une mise
-  à terre par la chaîne ou par une perte native ;
+- `vava_health:downed` (`after`) : `{ source, characterId, reason, cause?, killer?, origin?, hitId?, claimedKiller?,
+  killerUnverified? }` — `reason` = `hit` (vie du serveur vidée par la chaîne : `cause` = type, `killer` = source,
+  vérifiée par le module qui frappe), `death` (ped lu au seuil : `cause` = arme GTA ; aussi émis au départ du joueur
+  quand un coup mortel y est lu) ou `api` ; `origin` et `hitId` pour une mise à terre par la chaîne ou par une perte
+  native. Pour `death`, l'auteur lu sur le ped (`GetPedSourceOfDeath`) est **déclaré par le client de la victime** :
+  jamais `killer`, seulement `claimedKiller` avec `killerUnverified = true` (1.3.0) ;
 - `vava_health:reviving` (`before`, annulable) : `{ source, target }` — exiger un métier, un objet… ; la raison du refus
   est montrée au joueur ;
 - `vava_health:revived` (`after`) : `{ source, characterId, reason, by? }` ;
