@@ -129,6 +129,27 @@ describe('vava_example_atelier', function()
                 langue = 'runes', texte = string.rep('x', 121) }), others, nil)
             assert.equal(3, #errors)
         end)
+
+        it('lot (validateLot) : deux affiches d\'un même panneau ne portent pas le même nom', function()
+            local function poster(id, titre, parent, removal)
+                return { kind = 'affiche', id = id, data = { titre = titre }, parent = parent, removal = removal }
+            end
+            local main = { kind = 'panneau', id = 'place', data = { titre = 'Panneau de la place' } }
+            local twice = rules.TEXTS.posterTwice:format('Foire')
+            -- dans le lot
+            assert.same({ { text = twice } },
+                rules.lot({ main, poster('a1', 'Foire', 'place'), poster('a2', 'Foire', 'place') }, {}))
+            -- contre une affiche en vigueur du même panneau, pas d'un autre
+            assert.same({ { text = twice } },
+                rules.lot({ main, poster('a2', 'Foire', 'place') }, { { id = 'a1', titre = 'Foire', parent = 'place' } }))
+            assert.same({}, rules.lot({ main, poster('a2', 'Foire', 'place') },
+                { { id = 'a1', titre = 'Foire', parent = 'porte' } }))
+            -- l'affiche du lot remplace sa version en vigueur ; une affiche retirée par le lot ne compte plus
+            assert.same({}, rules.lot({ main, poster('a1', 'Foire', 'place') },
+                { { id = 'a1', titre = 'Foire', parent = 'place' } }))
+            assert.same({}, rules.lot({ main, poster('a1', 'Foire', 'place', true), poster('a2', 'Foire', 'place') },
+                { { id = 'a1', titre = 'Foire', parent = 'place' } }))
+        end)
     end)
 
     describe('pour comparer', function()
@@ -141,6 +162,91 @@ describe('vava_example_atelier', function()
             local alone = { id = 'neuf', quartier = 'port' }
             assert.equal('Pour comparer : Panneau de la place', rules.compare(alone, cfg.boards, nil).title)
             assert.is_nil(rules.compare(place, { place }, place.id))
+        end)
+    end)
+
+    -- T-101 : fiches en mémoire tenues par l'Atelier (apply, remove, read, index), aller-retour exact, diff
+    describe('magasin', function()
+        local Store
+
+        before_each(function()
+            helper.load('examples/vava_example_atelier/shared/store.lua')
+            Store = VavaExampleAtelier.store
+        end)
+
+        local function seeded()
+            return Store.new({ panneau = cfg.boards, affiche = cfg.posters })
+        end
+
+        it('la config est la graine : index dans l\'ordre, affiche avec son panneau', function()
+            local s = seeded()
+            assert.same({ { id = 'place_du_marche', title = 'Panneau de la place' },
+                { id = 'porte_nord', title = 'Pancarte de la porte nord' } }, s:index('panneau'))
+            assert.equal('place_du_marche', s:read('affiche', 'foire').parent)
+            assert.same({ x = -250.0, y = -930.0, z = 31.2, h = 90.0 }, s:read('panneau', 'place_du_marche').place)
+            assert.is_nil(s:read('panneau', 'place_du_marche').id)
+        end)
+
+        it('apply d\'une fiche nouvelle → dans index', function()
+            local s = seeded()
+            assert.is_true(s:apply('panneau', { id = 'lanterne_du_port', version = 1, titre = 'Lanterne du port',
+                texte = '' }))
+            local index = s:index('panneau')
+            assert.equal('lanterne_du_port', index[3].id)
+        end)
+
+        it('changement : read rend la nouvelle data, le lieu et le parent exacts ; aller-retour', function()
+            local s = seeded()
+            local def = s:read('affiche', 'foire')
+            def.id, def.version = 'foire', 2
+            def.couleur, def.parent = 'rouge', 'porte_nord'
+            s:apply('affiche', def)
+            local back = s:read('affiche', 'foire')
+            assert.equal('rouge', back.couleur)
+            assert.equal('porte_nord', back.parent)
+            assert.is_nil(back.place)
+            local board = s:read('panneau', 'porte_nord')
+            board.id, board.version = 'porte_nord', 3
+            board.place = { x = 1.0, y = 2.0, z = 3.0, h = 45.0 }
+            board.texte = 'Autre'
+            s:apply('panneau', board)
+            local again = s:read('panneau', 'porte_nord')
+            again.id, again.version = 'porte_nord', 3
+            assert.same(board, again)
+            -- la place d'une fiche connue dans l'ordre ne change pas
+            assert.equal('porte_nord', s:index('panneau')[2].id)
+            -- les tables rendues sont des copies
+            again.place.x = 99
+            assert.equal(1.0, s:read('panneau', 'porte_nord').place.x)
+        end)
+
+        it('remove → absente', function()
+            local s = seeded()
+            assert.is_true(s:remove('panneau', 'place_du_marche'))
+            assert.is_nil(s:read('panneau', 'place_du_marche'))
+            assert.equal(1, #s:index('panneau'))
+            assert.is_false(s:remove('panneau', 'place_du_marche'))
+        end)
+
+        it('diff : « Texte repeint » si seul le texte change', function()
+            local before = seeded():read('panneau', 'place_du_marche')
+            local after = seeded():read('panneau', 'place_du_marche')
+            after.texte = 'Autre texte'
+            assert.equal('Texte repeint', Store.diff('panneau', before, after))
+            after.taille = 2
+            assert.is_nil(Store.diff('panneau', before, after))
+            assert.is_nil(Store.diff('affiche', before, after))
+            assert.is_nil(Store.diff('panneau', before, before))
+        end)
+
+        it('essai relancé : seule une fiche dont ce qui se lit a changé est annoncée de nouveau (R-8)', function()
+            local board = { id = 'p', titre = 'Place', texte = 'Marché', taille = 1 }
+            assert.is_true(Store.shownChanged('panneau', nil, board))
+            assert.is_false(Store.shownChanged('panneau', board, { id = 'p', titre = 'Place', texte = 'Marché', taille = 2 }))
+            assert.is_true(Store.shownChanged('panneau', board, { id = 'p', titre = 'Place', texte = 'Foire' }))
+            local poster = { id = 'a', titre = 'Foire', couleur = 'ocre' }
+            assert.is_false(Store.shownChanged('affiche', poster, { id = 'a', titre = 'Foire', couleur = 'vert' }))
+            assert.is_true(Store.shownChanged('affiche', poster, { id = 'a', titre = 'Grande foire' }))
         end)
     end)
 end)

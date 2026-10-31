@@ -4,7 +4,8 @@
            (l'Atelier ne contrôle que la forme ; le module reste seul juge) :
              - nom unique parmi les panneaux (accents et casse ignorés, l'entrée elle-même exclue) ;
              - panneau éclairé ⇒ affiché au moins un jour ;
-             - langue « runes » ⇒ texte de 120 caractères au plus.
+             - langue « runes » ⇒ texte de 120 caractères au plus ;
+             - lot (`validateLot`, T-101) : deux affiches d'un même panneau ne portent pas le même nom.
            Et l'encadré « Pour comparer » : l'autre panneau du même quartier, sinon le premier autre.
            Testée : tests/spec/examples_atelier_spec.lua.
     Dépendances : config.lua
@@ -23,6 +24,7 @@ rules.TEXTS = {
     duplicate = 'Un panneau porte déjà ce nom.',
     lit = 'Un panneau éclairé reste au moins un jour : la lanterne doit valoir la peine.',
     runes = 'Les runes se gravent lentement : 120 caractères au plus.',
+    posterTwice = 'Deux affiches d\'un même panneau portent le nom « %s ».',
 }
 
 local FOLD = {}
@@ -88,6 +90,39 @@ function rules.board(data, others, selfId)
     end
     if data.langue == 'runes' and (utf8len(data.texte or '') or 0) > rules.MAX_RUNES then
         errors[#errors + 1] = { field = 'texte', text = rules.TEXTS.runes }
+    end
+    return errors
+end
+
+--- Erreurs d'un lot (`validateLot` : un panneau et ses affiches publiés ensemble, vus une fois) : deux affiches d'un
+--- même panneau ne portent pas le même nom. `lot` : { { kind, id, data, parent, removal } } ; `posted` : affiches en
+--- vigueur ({ id, titre, parent }), dont celles du lot sont remplacées par leur nouvelle version (ou retirées).
+---@param lot table[]
+---@param posted { id: string, titre: string, parent: string|nil }[]
+---@return { text: string }[]
+function rules.lot(lot, posted)
+    local inLot = {}
+    for _, entry in ipairs(lot) do
+        if entry.kind == 'affiche' then inLot[entry.id] = true end
+    end
+    local seen, errors = {}, {}
+    local function add(id, titre, parent)
+        if type(parent) ~= 'string' then return end
+        local key = parent .. '|' .. rules.key(titre)
+        local other = seen[key]
+        if other and other ~= id then
+            errors[#errors + 1] = { text = format(rules.TEXTS.posterTwice, titre) }
+        else
+            seen[key] = id
+        end
+    end
+    for _, poster in ipairs(posted) do
+        if not inLot[poster.id] then add(poster.id, poster.titre, poster.parent) end
+    end
+    for _, entry in ipairs(lot) do
+        if entry.kind == 'affiche' and not entry.removal and type(entry.data) == 'table' then
+            add(entry.id, entry.data.titre, entry.parent)
+        end
     end
     return errors
 end

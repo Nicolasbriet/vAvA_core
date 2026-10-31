@@ -10,6 +10,7 @@ describe('vava_atelier rights', function()
         VavaAtelier = nil
         helper.loadAll({
             'modules/vava_atelier/shared/constants.lua',
+            'modules/vava_atelier/shared/bounds.lua',
             'modules/vava_atelier/config.lua',
             'modules/vava_atelier/shared/rights.lua',
         })

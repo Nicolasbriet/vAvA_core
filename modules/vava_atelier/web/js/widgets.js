@@ -1,8 +1,6 @@
 'use strict';
 /*
- * vava_atelier/web/js/widgets.js
- * Rôle : les huit widgets du formulaire (§ 5.3). create(champ, valeur, ctx) → { nodes, after?, get, focus, control } ;
- *        ctx : { changed, lookup, known, remember }.
+ * vava_atelier/web/js/widgets.js — les huit widgets : create(champ, valeur, ctx) → { nodes, after?, get, focus, control }
  * Dépendances : strings.js, format.js, components.js
  */
 

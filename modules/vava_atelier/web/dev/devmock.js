@@ -17,6 +17,21 @@
  *          ?screen=journal              journal entier, filtre, « Lignes plus anciennes »
  *          ?screen=confirm              boîte de confirmation
  *          ?screen=picker               liste cherchable d'un champ « objet » ouverte (en plus du § 9.5)
+ *        Écrans de T-101 (§ 9.5 de sa spec) :
+ *          ?screen=entry&state=draft            son brouillon de panneau : « Brouillon », pied complet, phrase
+ *          ?screen=entry&state=trial&layout=side affiche en essai : « Essai, version 2 », bandeau, « Arrêter l'essai »
+ *          ?screen=entry&state=other            brouillon d'un autre : lecture seule, « Reprendre le brouillon »
+ *          ?screen=entry&state=stale            son brouillon dépassé par une publication
+ *          ?screen=entry&state=removal          « Retrait en attente », « Publier le retrait »
+ *          ?screen=entry&state=archived         version 2 archivée en lecture, « Revenir à cette version »
+ *          ?screen=confirm&what=publish[&errors=1]   boîte de publication (trois lignes, un avertissement ; ou erreurs)
+ *          ?screen=confirm&what=restore|discard|retire|take
+ *          ?screen=history                      six versions (une rétablie, un retrait), « Plus anciennes »
+ *          ?screen=removed                      trois fiches retirées
+ *          ?screen=home&drafts=1                « Vos brouillons » : essai, brouillon à enfants, fiche nouvelle, retrait
+ *          ?screen=entry&changed=1              fiche modifiée, puis changée ailleurs (entryChanged)
+ *        Le cycle entier est simulé (enregistrer, essayer, publier, abandonner, retirer, reprendre, rétablir) ;
+ *        l'historique est servi par pages de 5 (20 en jeu) pour montrer « Plus anciennes ».
  *        Essais des fonctions pures : node modules/vava_atelier/web/dev/essais.js
  */
 
@@ -26,6 +41,9 @@ const DevMock = (() => {
   const senechal = params.get('rank') === 'senechal';
   const empty = params.get('empty') === '1';
   let forceErrors = params.get('errors') === '1';
+  const scene = params.get('state') || '';
+  const what = params.get('what') || '';
+  const manyDrafts = params.get('drafts') === '1';
   const fold = (t) => String(t || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
   const clone = (v) => JSON.parse(JSON.stringify(v));
 
@@ -46,6 +64,12 @@ const DevMock = (() => {
     { editor: 'vava_magic:sorts', family: 'arts', label: 'Sorts', description: 'Assembler un sort : type, valeurs, geste et effets.', icon: 'sort', upcoming: false },
   ];
   const visibleCards = () => cards.filter((c) => !senechal || c.family === 'monde');
+  const allDrafts = [
+    { editor: 'vava_gathering:zones', kind: 'zone', id: 'mine_val', title: 'Mine du Val', line: 'Zone en essai, vous seul la voyez en jeu', status: 'trial' },
+    { editor: 'vava_gathering:zones', kind: 'zone', id: 'foret_brume', title: 'Forêt de Brume', line: '2 points ajoutés, pas encore publiés', status: 'draft' },
+    { editor: 'vava_example_atelier:panneaux', kind: 'panneau', id: 'lanterne_du_port', title: 'Lanterne du port', line: 'Nouveau panneau, pas encore publié', status: 'draft' },
+    { editor: 'vava_example_atelier:panneaux', kind: 'affiche', id: 'foire', title: 'Foire d\'automne', line: 'Retrait de l\'affiche, pas encore publié', status: 'draft' },
+  ];
   const drafts = [
     { editor: 'vava_magic:sorts', kind: 'sort', id: 'flamme_bleue', title: 'Flamme bleue', line: 'Sort en essai, vous seul pouvez le lancer', status: 'trial' },
     { editor: 'vava_gathering:zones', kind: 'zone', id: 'foret_brume', title: 'Forêt de Brume', line: '2 points ajoutés, pas encore publiés', status: 'draft' },
@@ -89,10 +113,11 @@ const DevMock = (() => {
   const descriptors = {
     'vava_example_atelier:panneaux': {
       family: 'monde', label: 'Panneaux du bourg (exemple)', description: 'Exemple de développement : tous les réglages qu\'un atelier peut montrer.', icon: 'parchemin', order: 900,
-      texts: { trial: 'Voir le panneau', publish: 'Dresser le panneau' }, hasCompare: true,
+      texts: { trial: 'Voir le panneau', publish: 'Dresser le panneau', publishHint: 'Dresser le panneau le rend lisible aux passants.' }, hasCompare: true,
+      stored: true, hasTrial: true, format: 1,
       kinds: [
-        { id: 'panneau', noun: 'panneau', nounPlural: 'panneaux', article: 'le', newLabel: 'Nouveau panneau', layout: 'page', creatable: true, form: PANNEAU_FORM },
-        { id: 'affiche', noun: 'affiche', nounPlural: 'affiches', article: 'l\'', newLabel: 'Nouvelle affiche', layout: 'side', creatable: true, parent: 'panneau',
+        { id: 'panneau', noun: 'panneau', nounPlural: 'panneaux', article: 'le', feminine: false, newLabel: 'Nouveau panneau', layout: 'page', creatable: true, form: PANNEAU_FORM },
+        { id: 'affiche', noun: 'affiche', nounPlural: 'affiches', article: 'l\'', feminine: true, newLabel: 'Nouvelle affiche', layout: 'side', creatable: true, parent: 'panneau',
           form: { titleField: 'titre', groups: {}, fields: [
             { id: 'titre', widget: 'text', label: 'Nom de l\'affiche', help: 'Ce qu\'annonce l\'affiche, en quelques mots.', min: 3, max: 40, charset: 'name', default: '' },
             { id: 'couleur', widget: 'segmented', label: 'Couleur', help: 'La teinte du papier, pour qu\'on la remarque.', options: [{ value: 'rouge', label: 'Rouge' }, { value: 'bleu', label: 'Bleu' }, { value: 'vert', label: 'Vert' }, { value: 'ocre', label: 'Ocre' }], default: 'ocre' },
@@ -102,8 +127,8 @@ const DevMock = (() => {
     },
     'vava_example_atelier:proclamations': {
       family: 'societe', label: 'Proclamations (exemple)', description: 'Exemple de développement : un atelier réservé au Souverain.', icon: 'parchemin', order: 900,
-      texts: { trial: 'Lire la proclamation', publish: 'Proclamer' }, hasCompare: false,
-      kinds: [{ id: 'proclamation', noun: 'proclamation', nounPlural: 'proclamations', article: 'la', newLabel: 'Nouvelle proclamation', layout: 'page', creatable: true,
+      texts: { publish: 'Proclamer' }, hasCompare: false, stored: true, hasTrial: false, format: 1,
+      kinds: [{ id: 'proclamation', noun: 'proclamation', nounPlural: 'proclamations', article: 'la', feminine: true, newLabel: 'Nouvelle proclamation', layout: 'page', creatable: true,
         form: { titleField: 'titre', groups: [], fields: [
           { id: 'titre', widget: 'text', label: 'Titre', help: 'Le titre crié par le héraut.', min: 3, max: 40, charset: 'name', default: '' },
           { id: 'texte', widget: 'text', label: 'Texte', help: 'Ce que le héraut lira sur la place.', min: 10, max: 300, multiline: true, charset: 'free', default: '' },
@@ -112,8 +137,9 @@ const DevMock = (() => {
     },
     'vava_gathering:zones': {
       family: 'monde', label: 'Récolte', description: 'Forêts, mines, prairies et coins de pêche, arbres et filons un par un.', icon: 'recolte', order: 10,
-      texts: { trial: 'Tester la récolte', publish: 'Publier la zone', publishHint: 'Publier rend les nouveaux points visibles aux joueurs proches.' }, hasCompare: false,
-      kinds: [{ id: 'zone', noun: 'zone', nounPlural: 'zones', article: 'la', newLabel: 'Nouvelle zone', layout: 'side', creatable: true, placement: 'circle', steps: ['La zone', 'Les points', 'Publier'],
+      texts: { trial: 'Tester la récolte', publish: 'Publier la zone', publishHint: 'Publier rend les nouveaux points visibles aux joueurs proches.', trialLine: 'Mode essai : vous seul voyez ces points' },
+      hasCompare: false, stored: true, hasTrial: true, format: 1,
+      kinds: [{ id: 'zone', noun: 'zone', nounPlural: 'zones', article: 'la', feminine: true, newLabel: 'Nouvelle zone', layout: 'side', creatable: true, placement: 'circle', steps: ['La zone', 'Les points', 'Publier'],
         form: { titleField: 'nom', groups: [{ id: 'point', label: 'Prochain point à poser' }, { id: 'reglages', label: 'Réglages de la zone', folded: true, help: 'Type, rayon, vitesse à laquelle la terre se repose, durée d\'une cicatrice.' }], fields: [
           { id: 'nom', widget: 'text', label: 'Nom de la zone', help: 'Le nom que verront les récolteurs.', min: 3, max: 40, charset: 'name', default: '' },
           { id: 'ressource', widget: 'segmented', label: 'Ressource', help: 'Ce que donne le prochain point posé.', group: 'point', options: [{ value: 'chene', label: 'Chêne' }, { value: 'pin', label: 'Pin' }, { value: 'autre', label: 'Autre…' }], default: 'chene' },
@@ -132,8 +158,8 @@ const DevMock = (() => {
     const card = cards.find((c) => c.editor === editor && !c.upcoming);
     if (!card) return null;
     const station = editor === 'vava_crafting:stations';
-    return { family: card.family, label: card.label, description: card.description, icon: card.icon, order: 10, texts: { trial: 'Essayer', publish: 'Publier' }, hasCompare: false,
-      kinds: [{ id: station ? 'station' : 'fiche', noun: station ? 'station' : 'fiche', nounPlural: station ? 'stations' : 'fiches', article: 'la', newLabel: station ? 'Nouvelle station' : 'Nouvelle fiche', layout: 'side', creatable: true,
+    return { family: card.family, label: card.label, description: card.description, icon: card.icon, order: 10, texts: {}, hasCompare: false, stored: false, hasTrial: false,
+      kinds: [{ id: station ? 'station' : 'fiche', noun: station ? 'station' : 'fiche', nounPlural: station ? 'stations' : 'fiches', article: 'la', feminine: true, newLabel: station ? 'Nouvelle station' : 'Nouvelle fiche', layout: 'side', creatable: true,
         form: { titleField: 'nom', groups: [], fields: [
           { id: 'nom', widget: 'text', label: 'Nom', help: 'Le nom affiché dans les listes du Conseil.', min: 3, max: 40, charset: 'name', default: '' },
           { id: 'portee', widget: 'slider', label: 'Portée', help: 'Distance à laquelle on peut s\'en servir.', min: 1, max: 10, step: 0.5, decimals: 1, unit: 'm', default: 2 },
@@ -215,14 +241,264 @@ const DevMock = (() => {
       'vava_example_atelier:proclamations': count('vava_example_atelier:proclamations|proclamation', 'proclamation', 'proclamations'),
       'vava_magic:sorts': { text: '1 en essai', tone: 'trial' },
     };
+    if (manyDrafts) tags['vava_gathering:zones'] = { text: '1 en essai', tone: 'trial' };
     for (const editor of Object.keys(tags)) if (!visibleCards().some((c) => c.editor === editor)) delete tags[editor];
     return tags;
+  }
+
+  // Cycle de vie (comme server/lifecycle.lua) : une fiche = publiée (values de `entries`) + brouillon éventuel ----------
+  const ME = 'Souveraine Ysolde', OTHER = 'Sénéchal Aldric Morn';
+  const life = new Map();
+  const removedList = [];
+  const listOf = (editor, kind) => (entries[`${editor}|${kind}`] = entries[`${editor}|${kind}`] || []);
+  const findEntry = (editor, kind, id) => listOf(editor, kind).find((e) => e.id === id);
+  function lifeOf(editor, kind, id) {
+    const key = `${editor}|${kind}|${id}`;
+    if (!life.has(key)) {
+      const entry = findEntry(editor, kind, id);
+      const gone = entry ? null : removedList.find((r) => r.key === key);
+      const first = { version: 1, status: gone ? 'archived' : 'published', origin: 'seed', author: 'Console', when: 'le 12/10', values: clone((entry || gone || {}).values || {}) };
+      life.set(key, { version: gone ? 2 : 1, draft: null, versions: gone ? [{ ...first, version: 2, removal: 1, origin: 'atelier', author: OTHER, when: gone.removedHint }, first] : [first] });
+    }
+    return life.get(key);
+  }
+  const B = (id, label, more) => ({ id, label, ...more });
+  const LINK = { link: true };
+  function footerOf(descriptor, l) {
+    const t = descriptor.texts || {}, d = l.draft;
+    if (!descriptor.stored) return [B('check', 'Vérifier', { primary: true })];
+    if (!d) return [B('save', 'Enregistrer le brouillon', { primary: true }), B('history', 'Historique', LINK), B('retire', 'Retirer du royaume', LINK), B('check', 'Vérifier', LINK)];
+    if (!d.mine) return [B('take', 'Reprendre le brouillon', { primary: true }), B('history', 'Historique', LINK)];
+    if (d.removal) return [B('publish', 'Publier le retrait', { primary: true }), B('history', 'Historique', LINK), B('discard', 'Renoncer au retrait', LINK)];
+    if (d.trial) return [B('save', 'Enregistrer le brouillon'), B('endTrial', 'Arrêter l\'essai'), B('publish', t.publish, { primary: true }), B('history', 'Historique', LINK), B('discard', 'Abandonner le brouillon', LINK)];
+    return [B('save', 'Enregistrer le brouillon'), descriptor.hasTrial ? B('trial', t.trial) : null, B('publish', t.publish, { primary: true }),
+      B('history', 'Historique', LINK), B('discard', 'Abandonner le brouillon', LINK), B('check', 'Vérifier', LINK)].filter(Boolean);
+  }
+  function stateOf(l) {
+    const d = l.draft;
+    if (!d) return l.refused ? { label: 'Publiée, mais refusée en jeu', tone: 'refused' } : { label: `Version ${l.version}, publiée`, tone: 'live' };
+    if (d.removal) return { label: 'Retrait en attente', tone: 'removal' };
+    if (d.trial) return { label: `Essai, version ${l.version + 1}`, tone: 'trial' };
+    return { label: 'Brouillon', tone: 'draft' };
+  }
+  function hintOf(editor, kind, entry) {
+    const d = lifeOf(editor, kind, entry.id).draft;
+    if (!d) return { hint: entry.hint };
+    if (d.removal) return { hint: 'Retrait en attente', tone: 'removal' };
+    if (d.trial) return { hint: 'En essai', tone: 'trial' };
+    if (!d.mine) return { hint: `Brouillon de ${OTHER}`, tone: 'draft' };
+    return { hint: d.fresh ? 'Jamais publié' : 'Votre brouillon', tone: d.fresh ? 'new' : 'draft' };
+  }
+  function banner(editor, trial) {
+    const descriptor = descriptorFor(editor);
+    const line = trial ? (descriptor.texts.trialLine || 'Mode essai : vous seul voyez ce changement en jeu') : 'Mode édition : visible par vous seul';
+    window.postMessage({ action: 'mode', payload: { banner: { title: descriptor.label, line } } }, '*');
+  }
+  function slug(editor, kind, title, noun) {
+    const base = fold(title).replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '').slice(0, 40) || fold(noun);
+    let id = base;
+    for (let n = 2; findEntry(editor, kind, id) || removedList.some((r) => r.id === id); n += 1) id = `${base}_${n}`;
+    return id;
+  }
+  const TOKEN = '0123456789abcdef';
+  function changesOf(kindDef, before, after) {
+    const fields = kindDef.form.fields.filter((f) => JSON.stringify(valueOf(before, f.id)) !== JSON.stringify(valueOf(after, f.id)));
+    if (fields.length === 0) return [];
+    if (fields.length === 1 && fields[0].id === 'texte') return ['Texte repeint'];
+    return [`Retouché : ${fields.map((f) => f.label).join(', ')}`];
+  }
+  function valueOf(values, id) {
+    for (const map of ['n', 's', 'b']) if (values && values[map] && id in values[map]) return values[map][id];
+    return undefined;
+  }
+  function publishLines(editor, kind, l, entry) {
+    const kindDef = descriptorFor(editor).kinds.find((k) => k.id === kind);
+    if (l.draft.removal) return [`Retrait ${kind === 'panneau' ? 'du panneau' : 'de l\'affiche'}`, `La version ${l.version} sera archivée.`];
+    const lines = l.version === 0 ? [] : changesOf(kindDef, entry.values, l.draft.values);
+    if (what === 'publish' && kind === 'panneau') lines.push('1 affiche ajoutée');
+    lines.push(l.version === 0 ? 'Ce sera la version 1.' : `La version ${l.version} sera archivée ; celle-ci deviendra la version ${l.version + 1}.`);
+    return lines;
+  }
+  function readAnswer(editor, kind, entry, l) {
+    const kindDef = (descriptorFor(editor) || { kinds: [] }).kinds.find((k) => k.id === kind);
+    const values = l.draft ? l.draft.values : entry.values;
+    const answer = { id: entry.id, title: valueOf(values, kindDef.form.titleField) || entry.title, values: clone(values), labels: labelsOf(kindDef, values), warnings: entry.warnings,
+      state: stateOf(l), footer: footerOf(descriptorFor(editor), l), rev: l.draft ? l.draft.rev : 0, version: l.version, removal: Boolean(l.draft && l.draft.removal), stale: Boolean(l.draft && l.draft.stale) };
+    if (l.draft && !l.draft.mine) {
+      answer.holder = { label: OTHER, mine: false };
+      answer.state.line = `Brouillon de ${OTHER}, enregistré il y a 3 min`;
+    }
+    else if (l.draft) answer.holder = { label: ME, mine: true };
+    if (editor === 'vava_example_atelier:panneaux' && kind === 'panneau') {
+      answer.compare = entry.id === 'porte_nord' ? { title: 'Pour comparer : Panneau de la place', text: '1,5 m, lisible à 3 m, 7 jours' } : { title: 'Pour comparer : Pancarte de la porte nord', text: '2,2 m, lisible à 5 m, 30 jours' };
+    }
+    return answer;
+  }
+  // un retrait remet la fiche à part, un rétablissement la rend à sa liste
+  function removeEntry(editor, kind, id) {
+    const all = listOf(editor, kind), index = all.findIndex((e) => e.id === id);
+    if (index >= 0) removedList.unshift({ key: `${editor}|${kind}|${id}`, editor, kind, ...all.splice(index, 1)[0], removedHint: 'retiré à l\'instant' });
+  }
+  function bringBack(editor, kind, id) {
+    const index = removedList.findIndex((r) => r.key === `${editor}|${kind}|${id}`);
+    if (index >= 0) { const r = removedList.splice(index, 1)[0]; listOf(editor, kind).push({ id: r.id, title: r.title, hint: r.hint, values: r.values }); }
+  }
+
+  // Situations de départ des écrans (§ 9.5 de T-101)
+  function seed() {
+    const P = 'vava_example_atelier:panneaux';
+    const place = findEntry(P, 'panneau', 'place_du_marche');
+    const v = (text) => { const values = clone(place.values); values.s.texte = text; return values; };
+    life.set(`${P}|panneau|place_du_marche`, { version: 6, draft: null, versions: [
+      { version: 6, status: 'published', origin: 'atelier', summary: 'Hauteur de 1,5 m à 2 m', author: ME, when: 'il y a 2 h', values: clone(place.values) },
+      { version: 5, status: 'archived', origin: 'atelier', summary: 'Texte repeint', author: OTHER, when: 'hier', values: v('Marché chaque jeudi, de l\'aube à midi.') },
+      { version: 4, status: 'archived', origin: 'restore', restoredFrom: 2, summary: 'version 2 rétablie', author: ME, when: 'il y a 3 jours', values: v('Marché le jeudi.') },
+      { version: 3, status: 'archived', removal: 1, summary: 'et ses 2 affiches', author: OTHER, when: 'il y a 4 jours', values: v('Marché le jeudi.') },
+      { version: 2, status: 'archived', origin: 'atelier', summary: 'Texte repeint', author: OTHER, when: 'le 14/10', values: v('Marché le jeudi.') },
+      { version: 1, status: 'archived', origin: 'seed', author: 'Console', when: 'le 12/10', values: v('Marché.') },
+    ] });
+    const l = lifeOf(P, 'panneau', 'place_du_marche');
+    if (scene === 'draft' || scene === 'stale' || ['publish', 'discard'].includes(what) || params.get('changed') === '1') {
+      l.draft = { values: v('Marché chaque jeudi, de l\'aube à la cloche de midi.\nFoire d\'automne le premier jeudi d\'octobre.'), rev: 3, mine: true, stale: scene === 'stale' };
+    }
+    if (scene === 'trial') lifeOf(P, 'affiche', 'foire').draft = { values: clone(findEntry(P, 'affiche', 'foire').values), rev: 2, mine: true, trial: true };
+    const north = lifeOf(P, 'panneau', 'porte_nord');
+    if (scene === 'other' || what === 'take') north.draft = { values: clone(findEntry(P, 'panneau', 'porte_nord').values), rev: 4, mine: false };
+    if (scene === 'removal') north.draft = { values: clone(findEntry(P, 'panneau', 'porte_nord').values), rev: 1, mine: true, removal: true };
+    for (const [id, title, hint] of [['halle_aux_grains', 'Halle aux grains', 'retiré il y a 3 jours'], ['vieux_pont', 'Panneau du vieux pont', 'retiré il y a 2 semaines'], ['puits_sec', 'Puits asséché', 'retiré le 02/10']]) {
+      removedList.push({ key: `${P}|panneau|${id}`, editor: P, kind: 'panneau', id, title, hint: 'Le marché, bois', removedHint: hint, values: clone(place.values) });
+    }
+  }
+
+  function lifecycle(name, data) {
+    const descriptor = descriptorFor(data.editor);
+    if (!descriptor) return fail('unknown_editor');
+    if (!descriptor.stored) return fail('not_stored');
+    const kindDef = descriptor.kinds.find((k) => k.id === data.kind);
+    if (!kindDef) return fail('unknown_kind');
+    if (name === 'removed') {
+      const rows = removedList.filter((r) => r.editor === data.editor && r.kind === data.kind);
+      return ok({ total: rows.length, page: 1, pages: 1, entries: rows.map((r) => ({ id: r.id, title: r.title, hint: r.removedHint })) });
+    }
+    if (name === 'save' && !data.id) {
+      const values = { n: data.values.n || {}, s: data.values.s || {}, b: data.values.b || {} };
+      const title = String(valueOf(values, kindDef.form.titleField) || '').trim();
+      const id = slug(data.editor, data.kind, title, kindDef.noun);
+      listOf(data.editor, data.kind).push({ id, title, hint: '', values });
+      const l = { version: 0, draft: { values, rev: 1, mine: true, fresh: true }, versions: [] };
+      life.set(`${data.editor}|${data.kind}|${id}`, l);
+      return ok({ done: true, id, rev: 1, title, state: stateOf(l), footer: footerOf(descriptor, l) });
+    }
+    const entry = findEntry(data.editor, data.kind, data.id) || removedList.find((r) => r.key === `${data.editor}|${data.kind}|${data.id}`);
+    if (!entry) return fail('unknown_entry');
+    const l = lifeOf(data.editor, data.kind, data.id), d = l.draft;
+    const answer = (more) => ok({ done: true, rev: l.draft ? l.draft.rev : 0, state: stateOf(l), footer: footerOf(descriptor, l), ...more });
+    const holding = (rev = data.rev) => (!d ? 'no_draft' : (!d.mine ? 'not_holder' : (d.rev !== rev ? 'stale' : '')));
+    switch (name) {
+      case 'save': {
+        if (d && !d.mine) return fail('draft_taken');
+        if (d && d.rev !== data.rev) return fail('stale');
+        const values = { n: data.values.n || {}, s: data.values.s || {}, b: data.values.b || {} };
+        if (d) Object.assign(d, { values, rev: d.rev + 1 }); else l.draft = { values, rev: 1, mine: true };
+        if (l.draft.trial) banner(data.editor, true);
+        const warnings = data.kind === 'panneau' ? validatePanel(data.id, values) : [];
+        return answer({ id: data.id, title: String(valueOf(values, kindDef.form.titleField) || entry.title), warnings });
+      }
+      case 'trial': {
+        if (!descriptor.hasTrial) return fail('no_trial');
+        if (holding()) return fail(holding());
+        d.trial = true;
+        banner(data.editor, true);
+        return answer({ children: 0 });
+      }
+      case 'endTrial':
+        if (!d || !d.trial) return fail('no_draft');
+        d.trial = false;
+        banner(data.editor, false);
+        return answer({});
+      case 'preview': {
+        if (data.what === 'restore') {
+          const v = l.versions.find((x) => x.version === data.ref);
+          if (!v) return fail('unknown_version');
+          if (v.status !== 'archived' || v.removal) return fail('not_archived');
+          return ok({ title: entry.title, lines: [`La version ${v.version} sera rétablie et deviendra la version ${l.version + 1}.`], warnings: [], token: TOKEN, valid: true });
+        }
+        if (holding(data.ref)) return fail(holding(data.ref));
+        if (forceErrors) {
+          forceErrors = false;
+          return ok({ title: entry.title, lines: [], warnings: [], token: TOKEN, valid: false, errors: [
+            { field: 'titre', text: 'Un panneau porte déjà ce nom.' }, { text: 'Le port est fermé aux nouveaux panneaux pendant la foire d\'automne.' }] });
+        }
+        const warnings = what === 'publish' ? ['La pancarte de la porte nord est à moins de 5 m : les passants confondront les deux.'] : [];
+        return ok({ title: entry.title, lines: publishLines(data.editor, data.kind, l, entry), warnings, token: TOKEN, valid: true });
+      }
+      case 'publish': {
+        if (holding()) return fail(holding());
+        if (data.token !== TOKEN) return fail('stale');
+        if (d.trial) banner(data.editor, false);
+        for (const v of l.versions) if (v.status === 'published') v.status = 'archived';
+        l.version += 1;
+        l.versions.unshift({ version: l.version, status: d.removal ? 'archived' : 'published', removal: d.removal ? 1 : 0, origin: 'atelier', summary: d.removal ? '' : 'Texte repeint', author: ME, when: 'à l\'instant', values: clone(d.values) });
+        if (d.removal) removeEntry(data.editor, data.kind, data.id); else entry.values = clone(d.values);
+        l.draft = null;
+        return answer({ version: l.version });
+      }
+      case 'restore': {
+        const v = l.versions.find((x) => x.version === data.version);
+        if (!v || v.status !== 'archived' || v.removal) return fail('not_archived');
+        for (const x of l.versions) if (x.status === 'published') x.status = 'archived';
+        l.version += 1;
+        l.versions.unshift({ version: l.version, status: 'published', origin: 'restore', restoredFrom: v.version, summary: `version ${v.version} rétablie`, author: ME, when: 'à l\'instant', values: clone(v.values) });
+        bringBack(data.editor, data.kind, data.id);
+        findEntry(data.editor, data.kind, data.id).values = clone(v.values);
+        return answer({ version: l.version });
+      }
+      case 'discard':
+        if (holding()) return fail(holding());
+        if (d.trial) banner(data.editor, false);
+        l.draft = null;
+        if (d.fresh) { listOf(data.editor, data.kind).splice(listOf(data.editor, data.kind).indexOf(entry), 1); return ok({ done: true, gone: true }); }
+        return answer({});
+      case 'retire':
+        if (d && !d.mine) return fail('draft_taken');
+        if (d && d.fresh) return lifecycle('discard', { ...data, rev: d.rev });
+        if (d) return fail('draft_open');
+        l.draft = { values: clone(entry.values), rev: 1, mine: true, removal: true };
+        return answer({});
+      case 'take':
+        if (!d || d.mine) return fail('no_draft');
+        if (d.rev !== data.rev) return fail('stale');
+        Object.assign(d, { mine: true, rev: d.rev + 1, trial: false });
+        return answer({});
+      case 'history': {
+        const older = l.versions.filter((v) => !data.before || v.version < data.before);
+        return ok({ versions: older.slice(0, 5).map((v) => ({ version: v.version, status: v.status, removal: v.removal || 0, restoredFrom: v.restoredFrom, summary: v.summary, author: v.author, when: v.when })), more: older.length > 5 });
+      }
+      case 'version': {
+        const v = l.versions.find((x) => x.version === data.version);
+        if (!v) return fail('unknown_version');
+        const archived = v.status === 'archived';
+        return ok({ id: data.id, title: valueOf(v.values, kindDef.form.titleField) || entry.title, version: v.version, values: clone(v.values), labels: labelsOf(kindDef, v.values),
+          state: v.removal ? { label: `Version ${v.version}, retrait`, tone: 'removal' } : (archived ? { label: `Version ${v.version}, archivée`, tone: 'archived' } : { label: `Version ${v.version}, publiée`, tone: 'live' }),
+          footer: archived && !v.removal ? [B('restore', 'Revenir à cette version', { primary: true })] : [] });
+      }
+      default: return fail('invalid_args');
+    }
   }
 
   const sentDescriptors = new Set();
   let homeSent = false;
   const ok = (data) => ({ ok: true, data });
-  const fail = (error) => ({ ok: false, error });
+  const REFUSED = {
+    not_allowed: 'L\'Atelier est réservé au Conseil.', unknown_editor: 'Cet atelier n\'existe plus.', unknown_kind: 'Ce genre de fiche n\'existe plus dans cet atelier.',
+    unknown_entry: 'Cette fiche n\'existe plus.', rate_limited: 'Doucement : patientez un instant.',
+    stale: 'Cette fiche a changé depuis que vous l\'avez ouverte : rouvrez-la pour voir la dernière version.',
+    draft_taken: 'Un autre membre du Conseil tient déjà un brouillon de cette fiche : ouvrez-le pour le lire ou le reprendre.',
+    draft_open: 'Vous avez déjà un brouillon de cette fiche : abandonnez-le d\'abord.', not_holder: 'Ce brouillon est tenu par un autre membre du Conseil.',
+    no_draft: 'Cette fiche n\'a pas de brouillon en cours.', not_stored: 'Cet atelier ne garde encore rien : on peut seulement y vérifier une fiche.',
+    no_trial: 'Cet atelier ne propose pas d\'essai.', unknown_version: 'Cette version n\'existe plus.', not_archived: 'Seule une ancienne version peut être rétablie.',
+  };
+  const fail = (error) => ({ ok: false, error, text: REFUSED[error] || '' });
 
   function homePayload(version) {
     const withContent = version !== 'accueil-1' || !homeSent;
@@ -231,7 +507,7 @@ const DevMock = (() => {
       version: 'accueil-1',
       content: withContent ? { families: clone(families), cards: clone(visibleCards()), footnote: 'Chaque atelier n\'apparaît qu\'aux rangs qui y ont droit. Un Sénéchal ne voit que le monde ; un Souverain voit tout.' } : undefined,
       tags: tagsOf(),
-      drafts: empty ? [] : clone(drafts),
+      drafts: empty ? [] : clone(manyDrafts ? allDrafts : drafts),
       journal: empty ? [] : clone(journal.filter((l) => !senechal || visibleCards().some((c) => c.editor === l.editor)).slice(0, 5)),
       rank: senechal ? 'Sénéchal' : 'Souveraine',
       closeKey: 'F9',
@@ -258,17 +534,14 @@ const DevMock = (() => {
         const found = all.filter((e) => !q || fold(e.title).includes(q)).sort((a, b) => fold(a.title).localeCompare(fold(b.title)));
         const pages = Math.max(1, Math.ceil(found.length / 50));
         const page = Math.min(pages, data.page || 1);
-        return ok({ total: found.length, page, pages, entries: found.slice((page - 1) * 50, page * 50).map((e) => ({ id: e.id, title: e.title, hint: e.hint })) });
+        return ok({ total: found.length, page, pages, entries: found.slice((page - 1) * 50, page * 50).map((e) => ({ id: e.id, title: e.title, ...hintOf(data.editor, data.kind, e) })) });
       }
       case 'read': {
         const entry = (entries[`${data.editor}|${data.kind}`] || []).find((e) => e.id === data.id);
         if (!entry) return fail('unknown_entry');
-        const kind = (descriptorFor(data.editor) || { kinds: [] }).kinds.find((k) => k.id === data.kind);
-        const answer = { id: entry.id, title: entry.title, values: clone(entry.values), labels: labelsOf(kind, entry.values), warnings: entry.warnings, state: { label: 'En vigueur', tone: 'live' }, footer: [{ id: 'check', label: 'Vérifier', primary: true }] };
-        if (data.editor === 'vava_example_atelier:panneaux' && data.kind === 'panneau') {
-          answer.compare = data.id === 'porte_nord' ? { title: 'Pour comparer : Panneau de la place', text: '1,5 m, lisible à 3 m, 7 jours' } : { title: 'Pour comparer : Pancarte de la porte nord', text: '2,2 m, lisible à 5 m, 30 jours' };
-        }
-        return ok(answer);
+        const l = lifeOf(data.editor, data.kind, data.id);
+        if (l.draft && l.draft.trial) banner(data.editor, true);
+        return ok(readAnswer(data.editor, data.kind, entry, l));
       }
       case 'check': {
         if (!spend()) return fail('rate_limited');
@@ -315,18 +588,64 @@ const DevMock = (() => {
         if (data.editor) for (const line of sent) delete line.editor;
         return ok({ lines: sent, more: lines.length > 25, next: page.length > 0 ? page[page.length - 1].id : 0 });
       }
+      case 'save': case 'trial': case 'endTrial': case 'preview': case 'publish': case 'restore':
+      case 'discard': case 'retire': case 'take': case 'history': case 'version': case 'removed':
+        return lifecycle(name, data);
       default: return fail('invalid_args');
     }
   }
 
   const pause = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
+  const P = 'vava_example_atelier:panneaux';
+  const click = (selector) => { const node = document.querySelector(selector); if (node) node.click(); return node; };
+  const editField = () => {
+    const input = document.querySelector('.sheet .field input[type=text], .sheet .field textarea');
+    input.value = `${input.value} (retouché)`;
+    input.dispatchEvent(new Event('input', { bubbles: true }));
+  };
+
+  /** Écrans de T-101 ; faux si l'écran demandé n'en est pas un. */
+  async function playLifecycle(screen, A) {
+    if (screen === 'history' || scene === 'archived' || what === 'restore') {
+      await A.openEntry(P, 'panneau', 'place_du_marche');
+      A.run('history');
+      await pause(200);
+      if (scene !== 'archived' && what !== 'restore') return true;
+      const row = Array.from(document.querySelectorAll('.hrow')).find((r) => r.textContent.includes('Version 2'));
+      row.querySelector('.link').click();
+      await pause(200);
+      if (what === 'restore') A.run('restore');
+      return true;
+    }
+    if (screen === 'removed') { await A.openEditor(P); A.openRemoved(); return true; }
+    if (scene === 'trial') { await A.openEntry(P, 'affiche', 'foire'); return true; }
+    if (scene === 'other' || scene === 'removal' || what === 'take') {
+      await A.openEntry(P, 'panneau', 'porte_nord');
+      if (what === 'take') A.run('take');
+      return true;
+    }
+    if (what === 'retire') { await A.openEntry(P, 'panneau', 'enseigne_port'); A.run('retire'); return true; }
+    if (scene === 'draft' || scene === 'stale' || what === 'publish' || what === 'discard' || params.get('changed') === '1') {
+      await A.openEntry(P, 'panneau', 'place_du_marche');
+      if (what) A.run(what);
+      if (params.get('changed') === '1') {
+        editField();
+        window.postMessage({ action: 'entryChanged', payload: { editor: P, kind: 'panneau', id: 'place_du_marche', what: 'taken' } }, '*');
+      }
+      return true;
+    }
+    return false;
+  }
+
   async function play() {
     document.body.classList.add('dev');
+    seed();
     const screen = params.get('screen') || 'home';
     window.postMessage({ action: 'open', payload: homePayload('') }, '*');
     await pause(80);
     const A = window.Atelier;
+    if (await playLifecycle(screen, A)) return;
     if (screen === 'search') {
       await A.state.view.setSearch(params.get('q') || 'forge');
     } else if (screen === 'list') {
@@ -336,9 +655,7 @@ const DevMock = (() => {
       else await A.openEntry('vava_example_atelier:panneaux', 'panneau', 'place_du_marche');
       if (forceErrors) await A.check();
       if (screen === 'confirm') {
-        const input = document.querySelector('.sheet .field input[type=text], .sheet .field textarea');
-        input.value = `${input.value} (retouché)`;
-        input.dispatchEvent(new Event('input', { bubbles: true }));
+        editField();
         A.back();
       }
     } else if (screen === 'keys') {

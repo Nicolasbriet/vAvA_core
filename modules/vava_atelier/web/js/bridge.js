@@ -1,8 +1,7 @@
 'use strict';
 /*
- * vava_atelier/web/js/bridge.js
- * Rôle : SEUL pont vers le Lua (client/nui.lua) ; lectures une à une (`busy` du serveur). Hors jeu : dev/devmock.js.
- * Dépendances : aucune (DevMock hors jeu seulement).
+ * vava_atelier/web/js/bridge.js — SEUL pont vers le Lua (client/nui.lua), lectures une à une ; hors jeu : dev/devmock.js
+ * Dépendances : aucune
  */
 
 const Bridge = (() => {
@@ -26,7 +25,7 @@ const Bridge = (() => {
 
   function normalize(result) {
     if (!result || typeof result !== 'object') return { ok: false, error: 'invalid_response' };
-    if (result.ok !== true) return { ok: false, error: typeof result.error === 'string' ? result.error : 'default' };
+    if (result.ok !== true) return { ok: false, error: typeof result.error === 'string' ? result.error : 'default', text: typeof result.text === 'string' ? result.text : '' };
     return { ok: true, data: result.data && typeof result.data === 'object' ? result.data : {} };
   }
 

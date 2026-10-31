@@ -5,7 +5,9 @@
            retirée aussitôt), cache des éditeurs tenu par les hooks du registre (droit effectif, types et champs
            indexés, fonctions du module, descripteur pour l'interface et son empreinte ; un descripteur plus lourd
            que `limits.descriptorBytes` est refusé et retiré), cartes de l'accueil dans l'ordre (cartes « Bientôt »
-           de la config, puis les autres par `order`).
+           de la config, puis les autres par `order`). T-101 : un éditeur à `apply` et `remove` est gardé (`stored`,
+           la base fait foi : synchronisé à chaque déclaration), `hasTrial`, `format`, genre de chaque type, ordre des
+           types (parents d'abord) ; retiré du registre : ses essais prennent fin, sa synchronisation s'arrête.
     Dépendances : shared/constants.lua, config.lua, shared/formvalues.lua, shared/formschema.lua, shared/rights.lua,
                   shared/fingerprint.lua, server/core.lua
 ]]
@@ -22,7 +24,10 @@ local REGISTRY = VavaAtelier.REGISTRY
 local fv, fs, rights = VavaAtelier.formvalues, VavaAtelier.formschema, VavaAtelier.rights
 
 -- fonctions qu'un éditeur peut déclarer (jamais copiées dans le descripteur)
-local FUNCTIONS = { 'index', 'read', 'validate', 'options', 'compare', 'apply', 'remove', 'trial', 'endTrial', 'diff' }
+local FUNCTIONS = {
+    'index', 'read', 'validate', 'options', 'compare', 'apply', 'remove', 'trial', 'endTrial', 'diff', 'upgrade',
+    'validateLot',
+}
 local IS_FUNCTION = {}
 for _, name in ipairs(FUNCTIONS) do IS_FUNCTION[name] = true end
 -- rang d'une carte déclarée sans `order`
@@ -64,6 +69,13 @@ for i, card in ipairs(cfg.upcoming) do upcomingRank[card.id] = i end
 ---@field firstKind string
 ---@field descriptor table
 ---@field version string
+---@field stored boolean       apply et remove déclarés : la base fait foi (T-101)
+---@field hasTrial boolean
+---@field format integer
+---@field texts table          textes de l'éditeur (trial, publish, publishHint?, trialLine?)
+---@field kindOrder string[]   types, parents d'abord
+---@field kindDepth table<string, integer>
+---@field parents table<string, string|false>
 
 ---@type table<string, vAvA.AtelierEditor>
 local loaded = {}
@@ -102,7 +114,11 @@ local function describe(id, data)
     for key, value in pairs(data) do
         if not IS_FUNCTION[key] and key ~= 'right' then descriptor[key] = value end
     end
+    descriptor.stored = data.apply ~= nil and data.remove ~= nil
+    descriptor.hasTrial = data.trial ~= nil
+    descriptor.format = data.format or 1
     for _, kind in ipairs(descriptor.kinds) do
+        if kind.feminine == nil then kind.feminine = kind.article == 'la' end
         for _, field in ipairs(kind.form.fields) do
             if field.default == nil then field.default = fv.default(field) end
         end
@@ -119,12 +135,29 @@ local function load(id, owner)
     if type(data) ~= 'table' then return false end
     local fns = {}
     for _, name in ipairs(FUNCTIONS) do fns[name] = data[name] end
-    local kinds = {}
+    local kinds, parents = {}, {}
     for i, kind in ipairs(data.kinds) do
         local fields = {}
         for _, field in ipairs(kind.form.fields) do fields[field.id] = field end
+        if kind.feminine == nil then kind.feminine = kind.article == 'la' end
         kinds[kind.id] = { def = kind, fields = fields, rank = i }
+        parents[kind.id] = kind.parent or false
     end
+    -- profondeur d'un type dans la chaîne des parents (1 : sans parent), types parents d'abord
+    local kindDepth, kindOrder = {}, {}
+    for _, kind in ipairs(data.kinds) do
+        local depth, current = 1, parents[kind.id]
+        while current and depth <= VavaAtelier.DEF.parentDepth do
+            depth = depth + 1
+            current = parents[current]
+        end
+        kindDepth[kind.id] = depth
+        kindOrder[#kindOrder + 1] = kind.id
+    end
+    sort(kindOrder, function(a, b)
+        if kindDepth[a] ~= kindDepth[b] then return kindDepth[a] < kindDepth[b] end
+        return kinds[a].rank < kinds[b].rank
+    end)
     local descriptor = describe(id, data)
     local version, size = VavaAtelier.fingerprintSized(descriptor)
     if not version then
@@ -144,6 +177,8 @@ local function load(id, owner)
         description = data.description, order = data.order or DEFAULT_ORDER,
         right = rights.effective(id, data.right, data.family, rightsSettings),
         fns = fns, kinds = kinds, firstKind = data.kinds[1].id, descriptor = descriptor, version = version,
+        stored = fns.apply ~= nil and fns.remove ~= nil, hasTrial = fns.trial ~= nil, format = data.format or 1,
+        texts = data.texts, kindOrder = kindOrder, kindDepth = kindDepth, parents = parents,
     }
     return true
 end
@@ -159,7 +194,11 @@ function editors.added(key, owner)
         return
     end
     if load(key, owner) then
-        VavaAtelier.log.info("atelier '%s' déclaré par %s (droit %s)", key, owner, loaded[key].right)
+        local editor = loaded[key]
+        VavaAtelier.log.info("atelier '%s' déclaré par %s (droit %s%s)", key, owner, editor.right,
+            editor.stored and ', gardé' or ', en lecture')
+        -- la base fait foi : synchronisation dans son propre fil (l'atelier rend `syncing` jusqu'à la fin)
+        if editor.stored then VavaAtelier.sync.start(editor, 'declare') end
     else
         -- refusé (empreinte impossible, descripteur trop lourd) : retiré du registre, sa place est libérée
         core.registry.remove(REGISTRY, key)
@@ -170,9 +209,14 @@ end
 ---@param key string
 ---@return boolean
 function editors.removed(key)
-    local known = loaded[key] ~= nil
+    local gone = loaded[key]
     loaded[key] = nil
-    return known
+    if gone and gone.stored then
+        VavaAtelier.sync.cancel(key)
+        VavaAtelier.trials.editorGone(gone)
+        VavaAtelier.index.drop(key)
+    end
+    return gone ~= nil
 end
 
 --- Éditeur déclaré, ou nil.

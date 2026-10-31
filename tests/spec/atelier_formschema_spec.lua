@@ -56,6 +56,7 @@ describe('vava_atelier formschema', function()
         VavaAtelier, VavaExampleAtelier = nil, nil
         helper.loadAll({
             'modules/vava_atelier/shared/constants.lua',
+            'modules/vava_atelier/shared/bounds.lua',
             'modules/vava_atelier/config.lua',
             'modules/vava_atelier/shared/text.lua',
             'modules/vava_atelier/shared/formvalues.lua',
@@ -377,6 +378,88 @@ describe('vava_atelier formschema', function()
             end
             assert.same({ true }, { check(def) })
             assert.is_true(descriptorSize('vava_example_atelier:lourd', def) > VavaAtelier.config.limits.descriptorBytes)
+        end)
+    end)
+
+    -- T-101 : ateliers gardés (apply, remove, essai, format, montée de format, genre, chaîne des parents)
+    describe('définitions gardées (T-101)', function()
+        local function stored(over)
+            local def = editor()
+            def.apply, def.remove = noop, noop
+            for k, v in pairs(over or {}) do def[k] = v end
+            return def
+        end
+
+        local function kind(id, parent)
+            return { id = id, noun = id, nounPlural = id .. 's', article = 'le', newLabel = 'Nouveau ' .. id,
+                layout = 'side', parent = parent, form = editor().kinds[1].form }
+        end
+
+        it('éditeur T-100 sans apply toujours accepté ; gardé avec apply et remove, essai, format, upgrade', function()
+            assert.same({ true }, { check(editor()) })
+            assert.same({ true }, { check(stored()) })
+            assert.same({ true }, { check(stored({ trial = noop, endTrial = noop, diff = noop, upgrade = noop, format = 3 })) })
+            assert.same({ true }, { check(stored({ format = 1 })) })
+            assert.same({ true }, { check(stored({ format = 65535 })) })
+        end)
+
+        it('format 0 et 65 536 refusés', function()
+            refused(stored({ format = 0 }), 'format')
+            refused(stored({ format = 65536 }), 'format')
+            refused(stored({ format = 1.5 }), 'format')
+            refused(stored({ format = '1' }), 'format')
+        end)
+
+        it('apply sans remove (et l\'inverse), trial sans endTrial, trial sans apply refusés', function()
+            local def = editor()
+            def.apply = noop
+            refused(def, 'remove')
+            def = editor()
+            def.remove = noop
+            refused(def, 'apply')
+            refused(stored({ trial = noop }), 'endTrial')
+            refused(stored({ endTrial = noop }), 'trial')
+            def = editor()
+            def.trial, def.endTrial = noop, noop
+            refused(def, 'trial')
+        end)
+
+        it('upgrade non fonction refusée', function()
+            refused(stored({ upgrade = 'monter' }), 'upgrade')
+        end)
+
+        it('validateLot : fonction facultative d\'un atelier gardé seulement (R-1)', function()
+            assert.same({ true }, { check(stored({ validateLot = noop })) })
+            refused(stored({ validateLot = 'lot' }), 'validateLot')
+            local def = editor()
+            def.validateLot = noop
+            refused(def, 'validateLot')
+        end)
+
+        it('texts.trialLine de 81 octets refusé, 80 accepté', function()
+            local def = stored()
+            def.texts.trialLine = string.rep('a', 81)
+            refused(def, 'texts.trialLine')
+            def.texts.trialLine = string.rep('a', 80)
+            assert.same({ true }, { check(def) })
+        end)
+
+        it('feminine non booléen refusé', function()
+            local def = stored()
+            def.kinds[1].feminine = 'oui'
+            refused(def, 'kinds[1].feminine')
+            def.kinds[1].feminine = true
+            assert.same({ true }, { check(def) })
+        end)
+
+        it('parent en cycle (A → B → A) et chaîne de profondeur 4 refusés ; profondeur 3 acceptée', function()
+            local def = stored()
+            def.kinds = { kind('a', 'b'), kind('b', 'a') }
+            refused(def, 'kinds[1].parent')
+            def.kinds = { kind('a'), kind('b', 'a'), kind('c', 'b') }
+            assert.same({ true }, { check(def) })
+            def.kinds = { kind('a'), kind('b', 'a'), kind('c', 'b'), kind('d', 'c') }
+            refused(def, 'kinds[4].parent')
         end)
     end)
 end)

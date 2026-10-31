@@ -10,7 +10,8 @@ describe('vava_atelier text', function()
         previousLocale = helper.legacyLocale()
         helper.reset()
         VavaAtelier = nil
-        helper.loadAll({ 'modules/vava_atelier/shared/constants.lua', 'modules/vava_atelier/shared/text.lua' })
+        helper.loadAll({ 'modules/vava_atelier/shared/constants.lua', 'modules/vava_atelier/shared/bounds.lua',
+            'modules/vava_atelier/shared/text.lua' })
         text = VavaAtelier.text
     end)
 

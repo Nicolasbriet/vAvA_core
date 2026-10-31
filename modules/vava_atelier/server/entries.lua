@@ -5,7 +5,9 @@
            libellés des valeurs choisies dans une liste distante, valeurs reprises par défaut signalées, encadré
            « Pour comparer ») ; valeurs proposées d'un champ (source du
            module gardée `limits.cacheMs`, ou objets du royaume) ; recherche dans les ateliers visibles. Points
-           d'extension `index`, `read`, `state`, `footer` (T-101 les remplace : la base fera foi).
+           d'extension `index`, `read`, `state`, `footer`. T-101 : pour un atelier gardé, la liste vient des têtes
+           en mémoire (server/providers.lua), chaque ligne porte l'indice et le ton vus par l'appelant, la fiche est
+           lue en base ; les listes gardées sont oubliées après chaque écriture (`invalidate`).
     Dépendances : shared/constants.lua, config.lua, shared/text.lua, shared/formvalues.lua, bridge/server.lua,
                   server/core.lua, server/editors.lua
 ]]
@@ -145,7 +147,9 @@ end
 ---@return boolean ok
 ---@return table|string result
 function entries.list(ctx, page, query)
-    local index = entries.index(ctx.editor, ctx.kind.def.id)
+    local editor = ctx.editor
+    if editor.stored and VavaAtelier.index.state(editor.id) ~= 'ready' then return false, 'syncing' end
+    local index = entries.index(editor, ctx.kind.def.id)
     if not index then return false, 'editor_error' end
     local needle = text.normalize(query)
     local matched = {}
@@ -158,7 +162,11 @@ function entries.list(ctx, page, query)
     local out = {}
     for i = (page - 1) * size + 1, min(#matched, page * size) do
         local entry = matched[i]
-        out[#out + 1] = { id = entry.id, title = entry.title, hint = entry.hint }
+        local line = { id = entry.id, title = entry.title, hint = entry.hint }
+        if editor.stored then
+            line.hint, line.tone = providers.hint(editor, ctx.kind.def.id, entry.id, ctx.accountId)
+        end
+        out[#out + 1] = line
     end
     return true, { total = #matched, page = page, pages = pages, entries = out }
 end
@@ -192,7 +200,7 @@ end
 ---@param form table
 ---@param strings table<string, string>|nil  carte `s` du paquet de la fiche
 ---@return table<string, table>
-local function labelsOf(editor, form, strings)
+function entries.labels(editor, form, strings)
     local labels = {}
     if not strings then return labels end
     for _, field in ipairs(form.fields) do
@@ -219,6 +227,7 @@ end
 ---@return table|string result
 function entries.read(ctx, id)
     local editor, kind = ctx.editor, ctx.kind
+    if editor.stored then return providers.readStored(ctx, id) end
     local kindId = kind.def.id
     local index = entries.index(editor, kindId)
     if not index then return false, 'editor_error' end
@@ -235,7 +244,7 @@ function entries.read(ctx, id)
     return true, {
         id = id, title = entry.title, values = values,
         -- la page n'appelle plus `options` à l'ouverture d'une fiche pour nommer les valeurs choisies
-        labels = labelsOf(editor, kind.def.form, values.s),
+        labels = entries.labels(editor, kind.def.form, values.s),
         warnings = #warnings > 0 and warnings or nil,
         compare = entries.compare(editor, kindId, data),
         state = providers.state(editor, kindId, id),
@@ -384,4 +393,14 @@ end
 ---@param editorId string
 function entries.forget(editorId)
     indexCache[editorId], sourceCache[editorId] = nil, nil
+end
+
+--- Oublie la liste gardée d'un type (ou de tous les types) d'un atelier, après une écriture : la suivante relit les
+--- têtes en mémoire.
+---@param editorId string
+---@param kindId? string
+function entries.invalidate(editorId, kindId)
+    local byEditor = indexCache[editorId]
+    if not byEditor then return end
+    if kindId then byEditor[kindId] = nil else indexCache[editorId] = nil end
 end

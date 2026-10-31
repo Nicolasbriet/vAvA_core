@@ -2346,9 +2346,11 @@ L'Atelier du Conseil (T-100, socle) : une interface unique où le Conseil crée 
 démarrage : juste après `vava_admin` (l'ordre n'est pas critique : les modules redéclarent leurs éditeurs au hook
 `vava_atelier:editorsReady`). Dépend du core ≥ 0.11.0 et de `vava_ui` ; `vava_admin` ≥ 1.8.0 est relu à chaque appel
 (sans lui, refus `not_ready`), volontairement pas en `dependency` du manifeste (FiveM arrêterait l'Atelier avec le
-Registre). Touche `F9` (réglable) et `/atelier`, déclarées au registre `core:commands` (droit `metiers`). En 1.0.0,
-l'Atelier **n'enregistre aucune définition** : il lit ce qui est en vigueur chez les modules et vérifie une fiche ;
-brouillons, essai, publication et versions viennent avec T-101, le placement en jeu avec T-102.
+Registre). Touche `F9` (réglable) et `/atelier`, déclarées au registre `core:commands` (droit `metiers`). Depuis 1.1.0
+(T-101), un atelier dont le module déclare `apply` et `remove` est **gardé** : ses fiches vivent en base (une ligne par
+version), avec brouillon, essai, publication groupée, retour en arrière, retrait, historique ; la config du module est
+la graine, la base fait foi. Un atelier sans `apply` reste en lecture (comportement de 1.0.0). Le placement en jeu vient
+avec T-102.
 
 **Déclarer un éditeur** (registre `vava_atelier:editors`, 32 entrées au plus ; clé `<ressource>:<nom>` au motif
 `^[%w_]+:[%w_]+$`, 64 octets ; une clé dont le préfixe n'est pas la ressource qui l'ajoute est retirée aussitôt). Un
@@ -2378,7 +2380,15 @@ core.registry.add('vava_atelier:editors', 'vava_gathering:zones', {
     validate = function(kind, data, ctx) end,-- → true | false, 'texte' | false, { { field, text } } ; ctx { source, accountId, id? }
     options = function(source) end,          -- facultatif (obligatoire si un champ a une `source`) → { { value, label, provisional? } }
     compare = function(kind, data) end,      -- facultatif → { title, text } (« Pour comparer : … »)
-    -- apply, remove, trial, endTrial, diff : acceptées, appelées à partir de T-101
+    -- T-101 (atelier gardé) : voir « Définitions gardées » plus bas
+    format = 1,                               -- facultatif, 1 à 65535 : format de `data`
+    apply = function(kind, def, info) end,    -- avec remove → true | false, 'texte' (≤ 160), sans rien avoir changé
+    remove = function(kind, id, info) end,    -- avec apply
+    trial = function(kind, def, ctx) end,     -- facultatif, avec endTrial (et seulement avec apply)
+    endTrial = function(kind, id, ctx) end,
+    diff = function(kind, before, after) end, -- facultatif → texte ≤ 160 ou nil
+    upgrade = function(kind, data, from) end, -- facultatif → data au format en vigueur, ou nil, 'texte'
+    validateLot = function(lot, ctx) end,     -- facultatif, avec apply : le lot entier, une fois (comme validate)
 })
 ```
 
@@ -2462,6 +2472,134 @@ qu'il détient. La recopie au Registre et le hook `vava_atelier:journal` partent
 | `vava_atelier:session` | serveur, after | `{ source, accountId, open }` |
 | `vava_atelier:journal` | serveur, after | `{ id, editor, kind, defId?, action, title, summary?, version?, actor = { accountId?, label } }` |
 | `vava_atelier:state` | client, local | `{ open }` |
+
+#### Définitions gardées (T-101, `vava_atelier` 1.1.0)
+
+**Déclaration** (en plus de T-100, contrôlée par le validateur) : `format` (1 à 65535, défaut 1) ; `texts.trialLine`
+(0 à 80 octets, bandeau pendant l'essai) ; par type `feminine` (booléen ; défaut : vrai pour l'article `la`) ;
+`apply` et `remove` **ensemble** (atelier gardé), `trial` et `endTrial` ensemble et seulement avec `apply` ; `upgrade` ;
+`validateLot` (seulement avec `apply`) ;
+chaîne des `parent` sans cycle, trois types au plus. Le descripteur gagne `stored`, `hasTrial`, `format` et
+`feminine` sur chaque type.
+
+**Contrat du module gardé** :
+- `index(kind, ctx?)` et `read(kind, id, ctx?)` gardent leur forme et ne servent plus qu'à la graine et à la
+  synchronisation ; `read` peut rendre les clés réservées `place` (lieu) et `parent`. Aller-retour : après
+  `apply(kind, def)`, `read(kind, def.id)` rend la même data, le même `place`, le même `parent`. **Écart à la spec,
+  T-101** : avec `ctx = { original = true }`, ils rendent l'**original de la config** (avant tout `apply`), pour
+  `/atelier_archives original` ; un module qui l'ignore rend ce qui est en vigueur (rien ne paraît alors à rétablir).
+- `validate(kind, data, ctx)` : `ctx` gagne `action` (`check`, `save`, `trial`, `publish`, `remove`, `restore`,
+  `import`), `parent`, `place`, `bundle` : **références légères** des fiches publiées ensemble, `{ { kind, id,
+  parent?, removal } }` (≈ 90 octets par fiche, **sans data ni lieu** : seule la fiche validée a les siens, en `data`
+  et `ctx.place`). À l'import, `bundle` n'est donné que si le lot n'est pas plus gros qu'une publication groupée
+  (`bundle.maxChildren` + 1 fiches) ; au-delà il est absent (un module ne doit pas compter dessus pour un import). Sur `save`, un refus n'empêche pas d'enregistrer (avertissements) ; avec `remove`, `data` est la publiée
+  et le module peut refuser un retrait qui détruirait des objets de joueurs.
+- `validateLot(lot, ctx)` (facultatif, atelier gardé seulement) : pour un module qui doit **croiser** les fiches d'un
+  lot (deux enfants d'un même parent, une somme…). Appelé **une fois par lot** de plus d'une fiche (essai, publication
+  groupée, retrait en cascade, retour en arrière en cascade, import), après les `validate` de chaque fiche et seulement
+  s'ils n'ont rien à redire ; `lot = { { kind, id, data, parent?, place?, removal } }` (la fiche principale d'abord ;
+  seul endroit où le module voit les lieux du lot ensemble),
+  `ctx = { source?, accountId?, kind, id, action }` (fiche principale ; `action` comme pour `validate`). Même retour
+  que `validate` ; un champ nommé dans une erreur est un champ de la fiche principale. Ne jamais faire passer un lot
+  entier par `ctx.bundle` : chaque appel à une fonction d'un module resérialise ses arguments (un lot de 200 fiches
+  à 2 Ko croisé par chaque `validate` ≈ 80 Mo). À l'import, `validateLot` reçoit d'un bloc toutes les fiches qui
+  changent d'un atelier (jusqu'à 4 Mo, le plafond d'un fichier : 40 à 160 ms, une fois par import) ; un module qui
+  ne croise rien ne le déclare pas.
+- `apply(kind, def, info)` : `def` = data normalisée + `id`, `version`, `parent?`, `place?` (jamais `status`) ;
+  `info = { reason, last, previous? }`, `reason` ∈ `publish`, `restore`, `reimport`, `import`, `sync` ; `last` : dernier
+  appel d'un lot. Crée ou remplace, idempotente, tout ou rien.
+- `remove(kind, id, info)` : `info = { reason, last }` ; ne détruit jamais d'objet de joueur.
+- `trial(kind, def, ctx)` : montre la fiche **à son seul auteur** ; `ctx = { source, accountId, children = { { kind, def
+  } }, reason = 'start' | 'save' }`. Avec `reason = 'save'` (relance après une sauvegarde de la fiche ou de l'un de
+  ses enfants), `def` est la fiche essayée et `children` ne porte **que** l'enfant sauvegardé (vide si c'est la fiche) :
+  le module garde les autres tels qu'il les montre déjà (différence, jamais tout le lot à chaque sauvegarde). `endTrial(kind, id, ctx)` : `ctx = { source?, accountId, children = { { kind, id }
+  }, reason }` (`stop`, `publish`, `discard`, `taken`, `session`, `dropped`, `timeout`, `editor`), retour ignoré.
+- `diff(kind, avant, après)` → texte ≤ 160 ou nil ; `upgrade(kind, data, from)` → data, ou nil (version illisible).
+- Toutes sont appelées isolées et chronométrées ; une erreur levée vaut un refus.
+
+**Diffusion** : l'Atelier n'envoie **aucune définition** aux joueurs. Consignes pour un module qui diffuse ce que
+`apply` change (T-102, T-120) : **regrouper** ses différences pendant le lot et ne les envoyer qu'à l'appel marqué
+`info.last` (un message par lot et par joueur concerné), jamais à chaque `apply` ni sur le hook
+`vava_atelier:published` (un par fiche) ; une zone du core par fiche ne tient pas pour des centaines de nœuds (2 048
+zones en tout, tous modules confondus) : une zone par secteur, l'état portant les fiches du secteur. Ce qui est posé dans le monde passe par l'état de
+zone du module (`core.zones` : `define`, `move`, `replace`, `remove`) ; les arts par un catalogue versionné envoyé en
+différences (T-120) ; un essai par `core.net.send` au seul auteur, jamais dans l'état de zone.
+
+**Lieux** (`place`, arrondis au centimètre, cap au dixième de degré dans [0, 360)) : `point { x, y, z }`, `oriented
+{ x, y, z, h }`, `circle { x, y, z, r }` (0 < r ≤ 500), `polygon { z, points = { { x, y } } }` (3 à 32 sommets, 5 cm
+entre deux consécutifs, aire non nulle), `door { x, y, z, h, model }` ; \|x\|, \|y\| ≤ 50 000, \|z\| ≤ 5 000.
+
+**Base** : `vava_atelier_definitions` (`sql/0002_definitions.sql`), une ligne par version : `draft`, `trial` (version
+NULL, numérotés à la publication), `published` (une par fiche), `archived` (anciennes versions et versions de retrait,
+`removal = 1`) ; `origin` `seed` | `atelier` | `restore` | `import`. 16 Ko par fiche, 1 000 fiches vivantes par type,
+20 brouillons par membre, 20 versions gardées par fiche (jamais la publiée ni la dernière d'une fiche retirée).
+
+**Synchronisation** (à chaque déclaration d'un atelier gardé, dans un fil ; l'atelier rend `syncing` pendant ce temps) :
+graine des identifiants de `index` jamais vus en base (version 1, `origin = seed`, auteur « Console »), puis
+rapprochement par empreintes (`apply` de ce qui diffère chez le module, `remove` de ce qu'il a sans version publiée).
+
+RPC ajoutés (schémas stricts, débits `write`, `preview`, `publish`, `read`) — réponse d'écriture `{ done = true, … }`,
+refus jugé par le module `{ done = false, errors = { { field?, text } } }`, refus de structure `false, code` :
+
+| RPC | Arguments | Réponse |
+|---|---|---|
+| `save` | atelier, type, fiche (`''` : nouvelle), révision lue, valeurs | `{ done, id, rev, title, state, footer, warnings? }` |
+| `trial` | atelier, type, fiche, révision | `{ done, rev, state, footer, children }` |
+| `endTrial` | atelier, type, fiche | `{ done, rev, state, footer }` |
+| `preview` | atelier, type, fiche, `publish` \| `restore`, révision ou version visée | `{ title, lines, warnings, token, valid, errors? }` |
+| `publish` | atelier, type, fiche, révision, jeton (16 hexadécimaux) | `{ done, version, state, footer }` |
+| `restore` | atelier, type, fiche, version, jeton | `{ done, version, state, footer }` |
+| `discard` | atelier, type, fiche, révision | `{ done, state, footer }` ou `{ done, gone = true }` |
+| `retire` | atelier, type, fiche | `{ done, rev, state, footer }` (brouillon jamais publié : `{ done, gone = true }`) |
+| `take` | atelier, type, fiche, révision vue | `{ done, rev, state, footer }` |
+| `history` | atelier, type, fiche, avant la version (0 : récentes) | `{ versions = { { version, status, removal, restoredFrom?, summary?, author, when } }, more }` (sans `origin` : la page ne s'en sert pas) |
+| `version` | atelier, type, fiche, version | `{ id, title, version, values, labels, warnings?, state, footer }` |
+| `removed` | atelier, type, page | `{ total, page, pages, entries = { { id, title, hint } } }` |
+
+`read` d'un atelier gardé lit la base : brouillon s'il y en a un, sinon la publiée ; réponse de T-100 plus `rev`,
+`version`, `holder = { label, mine, at }?` (`at` : « il y a 3 min »), `removal`, `stale`. Une ligne de `list` porte
+`hint` et `tone` (`draft`, `trial`, `removal`, `new`, `refused`) vus par l'appelant. `state = { label, tone, line? }`
+(`tone` : `new`, `draft`, `trial`, `live`, `archived`, `removal`, `refused`) ; `footer = { { id, label, primary?, link?
+} }`. **Écart à la spec, T-101** : un type enfant reçoit son parent dans `values.s.parent` (identifiant d'une fiche du
+type parent) ; sans lui, la fiche est enregistrée sans parent et sa publication seule rend `parent_missing`.
+
+Refus ajoutés : `stale`, `draft_taken`, `draft_open`, `not_holder`, `no_draft`, `not_stored`, `too_large`, `full`,
+`parent_missing`, `trial_busy`, `no_trial`, `syncing`, `unknown_version`, `not_archived`, `unchanged`, `unreadable`.
+
+Évènement ajouté : `vava_atelier:entryChanged` (`atelier, type, fiche, ce qui a changé` — `saved`, `published`,
+`restored`, `removed`, `discarded`, `taken`, `trialEnded` —, plus le titre pour `trialEnded`) aux seuls membres dont la
+séance a **cette fiche** ouverte (droit de l'atelier relu), sauf l'auteur du changement, au tenant d'un essai qui prend
+fin sans qu'il l'ait demandé et à l'ancien tenant d'un brouillon repris.
+
+| Hook (T-101) | Côté, phase | Payload |
+|---|---|---|
+| `vava_atelier:published` | serveur, after | `{ editor, kind, id, version, previous?, action, actor = { accountId?, label } }` — `action` : `publish`, `remove`, `restore`, `reimport`, `import` ; un par fiche du lot |
+| `vava_atelier:trial` | serveur, after | `{ editor, kind, id, accountId, source?, on, reason? }` |
+
+| Export (T-101) | Retour |
+|---|---|
+| serveur `codexList(list)` | `list = 'ateliers'` : `{ { value, label } }` des ateliers gardés ; toute autre liste : `{}` |
+
+Journal : actions ajoutées `discarded`, `taken`, `trial_ended`, `exported`, `received` ; une ligne sans fiche (`def_id`
+NULL) porte sur l'atelier entier (« A rétabli l'original de l'atelier Récolte »).
+
+**Archives** (`/atelier_archives` ; `etat` : droit d'ouvrir l'Atelier (`metiers`), ateliers visibles seulement ;
+`original_fiche` : droit de l'atelier ; `original`, `exporter`, `importer` : Souverain ou console ; `confirmer` : le
+droit de l'opération, relu ; personnage chargé et nom au Registre exigés, une commande à la fois par membre ; fichiers
+dans `vava_atelier/echanges/`, nom `^[A-Za-z0-9_-]+\.json$` de 64 octets au plus, 4 Mo au plus à la lecture comme à
+l'écriture, un export par minute tous membres confondus, jamais servis aux joueurs) :
+
+```json
+{ "atelier": 1, "exported_at": "2026-10-30T14:05:00Z",
+  "editors": { "vava_example_atelier:panneaux": { "format": 1, "kinds": { "panneau": [
+    { "id": "place_du_marche", "version": 3, "place": { "x": -250.0, "y": -930.0, "z": 31.2, "h": 90.0 },
+      "data": { "titre": "Panneau de la place", "texte": "…", "taille": 1.5 } } ] } } } }
+```
+
+Seules les versions publiées partent. Un import contrôle la forme (ateliers connus et gardés, types déclarés,
+identifiants, doublons, profondeur d'une fiche ≤ 6, format), chaque fiche comme une saisie (une valeur hors bornes est
+refusée avec son chemin), tout ou rien par atelier ; il publie de nouvelles versions (`origin = import`), ne retire
+jamais rien et garde les brouillons ; résumé puis `confirmer` sous 60 s.
 
 Exemple complet, sans une ligne d'interface : `examples/vava_example_atelier` (mode développement). Hors jeu :
 `web/index.html?screen=home` (puis `list`, `entry`, `entry&layout=side`, `journal`, `confirm`, `keys`…), données

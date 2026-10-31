@@ -1,22 +1,26 @@
 --[[
     vava_example_atelier/server/main.lua
-    Rôle : exemple de développement de l'Atelier (T-100) : deux éditeurs déclarés SANS une ligne d'interface, la preuve
-           que le formulaire générique suffit.
+    Rôle : exemple de développement de l'Atelier : deux éditeurs déclarés SANS une ligne d'interface ni de client.
              - vava_example_atelier:panneaux (monde, droit metiers) : types `panneau` (mise en page « page », les huit
-               widgets) et `affiche` (mise en page « volet ») ; règles propres (shared/rules.lua) ;
-             - vava_example_atelier:proclamations (société, droit staff) : sert au test des droits.
-           Données en mémoire, tirées de la config ; rien n'est écrit en base. Fonctions lues par l'Atelier : index,
-           read, validate, options, compare. Commande /atelier_exemple journal <panneaux|proclamations> <texte> : une
-           ligne `note` au journal du Conseil par l'export `journal` (droit effectif de l'atelier, revérifié par
-           l'Atelier). Garde : sans `set vava_env dev`, le setup refuse (aucun éditeur, aucune commande) ; relue
-           à chaque redéclaration et à chaque commande.
-    Dépendances : vAvA_core ≥ 0.11.0 (API v1), config.lua, shared/guard.lua, shared/rules.lua, shared/forms.lua ;
-                  vava_atelier (registre et export journal ; redéclaration au hook vava_atelier:editorsReady)
+               widgets, lieu orienté) et `affiche` (volet, féminin, enfant d'un panneau : publication groupée) ;
+               règles propres (shared/rules.lua) ;
+             - vava_example_atelier:proclamations (société, droit staff, sans essai) : sert au test des droits.
+           T-101 : les deux ateliers sont gardés (`apply`, `remove`, et pour les panneaux `trial`, `endTrial`, `diff`,
+           `validateLot`, `format = 1`). Les fiches vivent en mémoire (shared/store.lua) : la config au démarrage, puis l'Atelier les
+           synchronise sur la base (la base fait foi). Diffusion aux seuls joueurs concernés : chaque panneau qui a un
+           lieu a sa zone du core (`panneau:<id>`, état public : titre, texte, langue) ; une publication l'annonce au
+           chat de ses seuls abonnés ; un essai n'est montré qu'à son auteur. /atelier_exemple journal (Conseil) écrit
+           au journal ; /atelier_exemple lire (tous, 2 s entre deux) dit les panneaux à portée, vus par le serveur.
+           Garde : sans `set vava_env dev`, le setup refuse ; relue à chaque redéclaration, `apply` et commande.
+    Dépendances : vAvA_core ≥ 0.11.0 (API v1, core.zones, core.net), config.lua, shared/guard.lua, shared/rules.lua,
+                  shared/forms.lua, shared/store.lua ; vava_atelier ≥ 1.1.0 (registre, export journal ; redéclaration au
+                  hook vava_atelier:editorsReady)
 ]]
 
 local RESOURCE = GetCurrentResourceName()
 local cfg = VavaExampleAtelier.config
-local guard, rules, forms = VavaExampleAtelier.guard, VavaExampleAtelier.rules, VavaExampleAtelier.forms
+local guard, rules, forms, Store = VavaExampleAtelier.guard, VavaExampleAtelier.rules, VavaExampleAtelier.forms,
+    VavaExampleAtelier.store
 
 local core, apiErr = exports.vAvA_core:getApi(1)
 if not core then
@@ -25,10 +29,12 @@ if not core then
 end
 
 local log = core.log
-local type, ipairs, pairs, pcall, tostring = type, ipairs, pairs, pcall, tostring
+local type, ipairs, pairs, pcall, tostring, next = type, ipairs, pairs, pcall, tostring, next
 local concat = table.concat
-local GetConvar, GetResourceState, RegisterCommand, TriggerClientEvent =
-    GetConvar, GetResourceState, RegisterCommand, TriggerClientEvent
+local GetConvar, GetResourceState, RegisterCommand, TriggerClientEvent, GetGameTimer =
+    GetConvar, GetResourceState, RegisterCommand, TriggerClientEvent, GetGameTimer
+local GetPlayerPed, GetEntityCoords, DoesEntityExist, AddEventHandler =
+    GetPlayerPed, GetEntityCoords, DoesEntityExist, AddEventHandler
 
 local ATELIER = 'vava_atelier'
 local REGISTRY = 'vava_atelier:editors'
@@ -39,53 +45,121 @@ local PROCLAMATIONS = RESOURCE .. ':proclamations'
 -- résumé d'une ligne du journal (bornes de l'export journal)
 local MAX_SUMMARY = 160
 local CHAT_EVENT = 'chat:addMessage'
+local ZONE_PREFIX = 'panneau:'
+local announce = cfg.announce
 
--- Données en mémoire : type → liste ordonnée d'entrées (copies de la config).
-local store = { panneau = {}, affiche = {}, proclamation = {} }
-for kind, list in pairs({ panneau = cfg.boards, affiche = cfg.posters, proclamation = cfg.proclamations }) do
-    for i, entry in ipairs(list) do
-        local copy = {}
-        for key, value in pairs(entry) do copy[key] = value end
-        store[kind][i] = copy
+-- Fiches en mémoire, tirées de la config ; l'Atelier les met ensuite à l'état de la base.
+local boards = Store.new({ panneau = cfg.boards, affiche = cfg.posters })
+local decrees = Store.new({ proclamation = cfg.proclamations })
+local stores = { panneau = boards, affiche = boards, proclamation = decrees }
+-- l'original : la config telle quelle, jamais touchée par l'Atelier (retour à l'original, /atelier_archives)
+local originalBoards = Store.new({ panneau = cfg.boards, affiche = cfg.posters })
+local originals = { panneau = originalBoards, affiche = originalBoards,
+    proclamation = Store.new({ proclamation = cfg.proclamations }) }
+-- essais en cours, par joueur : { [type] = { [id] = data } }
+local trials = {}
+
+local function isDev()
+    return guard.isDevMode(GetConvar(guard.CONVAR, guard.FALLBACK))
+end
+
+local function chat(target, message)
+    TriggerClientEvent(CHAT_EVENT, target, { args = { announce.author, message } })
+end
+
+-- Zones du core et annonces ---------------------------------------------------------------------------------------
+
+-- zones déclarées : id du panneau → { area, state } (dernier état envoyé)
+local zones = {}
+
+local function areaOf(data, where)
+    return { x = where.x, y = where.y, z = where.z, radius = data.portee or 3, margin = cfg.zone.margin }
+end
+
+local function sameArea(a, b)
+    return a.x == b.x and a.y == b.y and a.radius == b.radius and a.margin == b.margin
+end
+
+--- Joueurs qui suivent la zone d'un panneau ; à sa création, ceux qui sont à portée (calcul du serveur).
+local function audience(id, area)
+    local list = core.zones.subscribers(ZONE_PREFIX .. id)
+    if type(list) == 'table' and #list > 0 then return list end
+    if not area then return {} end
+    local near = core.net.playersNear({ x = area.x, y = area.y, z = area.z or 0.0 }, area.radius + area.margin)
+    return type(near) == 'table' and near or {}
+end
+
+--- Un panneau publié : sa zone du core créée, déplacée, ou ses seules clés changées envoyées (différence) ; annonce
+--- du seul titre à ses abonnés (le texte se lit dans l'état de la zone, ou par /atelier_exemple lire).
+local function showBoard(id, data, where, reason)
+    if type(where) ~= 'table' then return end
+    local area = areaOf(data, where)
+    local state = { t = data.titre, x = data.texte or '', l = data.langue }
+    local key = ZONE_PREFIX .. id
+    local known = zones[id]
+    if not known then
+        local ok, code = core.zones.define(key, area, state)
+        if not ok then log.warn('zone %s : %s', key, tostring(code)) end
+    else
+        if not sameArea(known.area, area) then core.zones.move(key, area) end
+        local changed = {}
+        for name, value in pairs(state) do
+            if known.state[name] ~= value then changed[name] = value end
+        end
+        if next(changed) then core.zones.set(key, changed) end
+    end
+    zones[id] = { area = area, state = state }
+    if reason ~= 'sync' then
+        for _, player in ipairs(audience(id, area)) do chat(player, announce.published:format(data.titre)) end
     end
 end
 
---- Entrée d'un type, ou nil.
-local function find(kind, id)
-    for _, entry in ipairs(store[kind] or {}) do
-        if entry.id == id then return entry end
+--- Un panneau retiré : annonce à ses abonnés, puis sa zone retirée.
+local function hideBoard(id, title, reason)
+    if not zones[id] then return end
+    if reason ~= 'sync' then
+        for _, player in ipairs(audience(id, nil)) do chat(player, announce.removed:format(title or id)) end
     end
-    return nil
+    core.zones.remove(ZONE_PREFIX .. id)
+    zones[id] = nil
 end
 
---- `data` d'une entrée : ses seuls champs de formulaire (sans `id`, clé réservée).
-local function dataOf(entry)
-    local data = {}
-    for key, value in pairs(entry) do
-        if key ~= 'id' then data[key] = value end
-    end
-    return data
-end
 
 -- Fonctions lues par l'Atelier ----------------------------------------------------------------------------------------
 
-local function index(kind)
-    local out = {}
-    for i, entry in ipairs(store[kind] or {}) do out[i] = { id = entry.id, title = entry.titre } end
-    return out
+--- `ctx.original` : l'Atelier demande l'original de la config (retour à l'original), pas ce qui est en vigueur.
+local function storeFor(kind, ctx)
+    if type(ctx) == 'table' and ctx.original == true then return originals[kind] end
+    return stores[kind]
 end
 
-local function read(kind, id)
-    local entry = find(kind, id)
-    if not entry then return nil end
-    return dataOf(entry)
+local function index(kind, ctx)
+    local store = storeFor(kind, ctx)
+    return store and store:index(kind) or {}
+end
+
+local function read(kind, id, ctx)
+    local store = storeFor(kind, ctx)
+    return store and store:read(kind, id) or nil
 end
 
 local function validateBoards(kind, data, ctx)
-    if kind ~= 'panneau' then return true end
+    if kind ~= 'panneau' or (ctx and ctx.action == 'remove') then return true end
     local others = {}
-    for i, entry in ipairs(store.panneau) do others[i] = { id = entry.id, titre = entry.titre } end
+    for i, entry in ipairs(boards:index('panneau')) do others[i] = { id = entry.id, titre = entry.title } end
     local errors = rules.board(data, others, ctx and ctx.id)
+    if #errors == 0 then return true end
+    return false, errors
+end
+
+--- `validateLot` : le lot entier (un panneau et ses affiches), une seule fois ; `validate` n'en reçoit que les
+--- références (`ctx.bundle`, sans data).
+local function validateBoardLot(lot)
+    local posted = {}
+    for i, entry in ipairs(boards:all('affiche')) do
+        posted[i] = { id = entry.id, titre = entry.data.titre, parent = entry.parent }
+    end
+    local errors = rules.lot(lot, posted)
     if #errors == 0 then return true end
     return false, errors
 end
@@ -97,34 +171,107 @@ end
 
 local function compare(kind, data)
     if kind ~= 'panneau' then return nil end
-    -- l'entrée affichée est celle dont le nom est celui de la fiche, si elle existe
-    local selfId
-    for _, entry in ipairs(store.panneau) do
-        if rules.key(entry.titre) == rules.key(data.titre) then selfId = entry.id end
+    local list, selfId = {}, nil
+    for i, entry in ipairs(boards:all('panneau')) do
+        local copy = { id = entry.id }
+        for key, value in pairs(entry.data) do copy[key] = value end
+        list[i] = copy
+        if rules.key(copy.titre) == rules.key(data.titre) then selfId = entry.id end
     end
-    return rules.compare(data, store.panneau, selfId)
+    return rules.compare(data, list, selfId)
 end
 
 local function noRules()
     return true
 end
 
+--- Refus demandé (mode développement) : `set vava_example_refuse 1`.
+local function refusing()
+    return isDev() and GetConvar(cfg.refuseConvar, '0') == '1'
+end
+
+--- `apply` : crée ou remplace la fiche (tout ou rien) ; un panneau à lieu met sa zone à jour et l'annonce.
+local function apply(kind, def, info)
+    local store = stores[kind]
+    if not store or type(def) ~= 'table' then return false, 'Genre de fiche inconnu.' end
+    if refusing() then return false, announce.refused end
+    store:apply(kind, def)
+    if kind == 'panneau' then
+        local entry = store:get(kind, def.id)
+        showBoard(def.id, entry.data, entry.place, info and info.reason)
+    end
+    return true
+end
+
+--- `remove` : retire la fiche (aucun objet de joueur ici) ; un panneau retire sa zone après l'annonce.
+local function remove(kind, id, info)
+    local store = stores[kind]
+    if not store then return false, 'Genre de fiche inconnu.' end
+    local entry = store:get(kind, id)
+    if kind == 'panneau' and entry then hideBoard(id, entry.data.titre, info and info.reason) end
+    store:remove(kind, id)
+    return true
+end
+
+--- `trial` : montre la fiche à son seul auteur (chat), enfants compris ; rien d'autre ne change en jeu. Relancé après
+--- une sauvegarde (`ctx.reason = 'save'`), il ne reçoit que la fiche et l'enfant sauvegardé : les autres restent tels
+--- quels, et seule une fiche dont ce qui se lit a changé est annoncée de nouveau.
+local function trial(kind, def, ctx)
+    local source = ctx and ctx.source
+    if not source then return false, 'Auteur absent.' end
+    local saving = ctx.reason == 'save' and trials[source] ~= nil
+    local mine = saving and trials[source] or {}
+    local function show(k, d)
+        if k == 'panneau' then chat(source, announce.trial:format(d.titre, d.texte or ''))
+        else chat(source, announce.trialPoster:format(d.titre)) end
+    end
+    local function keep(k, d)
+        mine[k] = mine[k] or {}
+        local before = mine[k][d.id]
+        mine[k][d.id] = d
+        if not saving or Store.shownChanged(k, before, d) then show(k, d) end
+    end
+    keep(kind, def)
+    for _, child in ipairs(ctx.children or {}) do keep(child.kind, child.def) end
+    trials[source] = mine
+    return true
+end
+
+--- `endTrial` : l'auteur, s'il est là, est prévenu ; la version d'essai est oubliée.
+local function endTrial(kind, id, ctx)
+    local source = ctx and ctx.source
+    for player, mine in pairs(trials) do
+        if mine[kind] and mine[kind][id] then
+            local title = mine[kind][id].titre or id
+            trials[player] = nil
+            if source then chat(source, announce.trialEnded:format(title)) end
+        end
+    end
+    return true
+end
+
+local function diff(kind, before, after)
+    return Store.diff(kind, before, after)
+end
+
 -- Déclarations ------------------------------------------------------------------------------------------------------
 
 local EDITORS = {
     [PANNEAUX] = {
-        family = 'monde', right = 'metiers', icon = 'parchemin', order = 900,
+        family = 'monde', right = 'metiers', icon = 'parchemin', order = 900, format = 1,
         label = 'Panneaux du bourg (exemple)',
         description = 'Exemple de développement : tous les réglages qu\'un atelier peut montrer.',
         texts = { trial = 'Voir le panneau', publish = 'Dresser le panneau',
             publishHint = 'Dresser le panneau le rend lisible aux passants.' },
         kinds = {
             { id = 'panneau', noun = 'panneau', nounPlural = 'panneaux', article = 'le', newLabel = 'Nouveau panneau',
-                layout = 'page', steps = { 'Le panneau', 'Son allure', 'Dresser' }, form = forms.panneau },
+                layout = 'page', steps = { 'Le panneau', 'Son allure', 'Dresser' }, placement = 'oriented',
+                form = forms.panneau },
             { id = 'affiche', noun = 'affiche', nounPlural = 'affiches', article = 'l\'', newLabel = 'Nouvelle affiche',
-                layout = 'side', parent = 'panneau', placement = 'point', form = forms.affiche },
+                layout = 'side', parent = 'panneau', feminine = true, form = forms.affiche },
         },
-        index = index, read = read, validate = validateBoards, options = options, compare = compare,
+        index = index, read = read, validate = validateBoards, validateLot = validateBoardLot, options = options,
+        compare = compare, apply = apply, remove = remove, trial = trial, endTrial = endTrial, diff = diff,
     },
     [PROCLAMATIONS] = {
         family = 'societe', right = 'staff', icon = 'parchemin', order = 900,
@@ -135,14 +282,14 @@ local EDITORS = {
             { id = 'proclamation', noun = 'proclamation', nounPlural = 'proclamations', article = 'la',
                 newLabel = 'Nouvelle proclamation', layout = 'page', form = forms.proclamation },
         },
-        index = index, read = read, validate = noRules,
+        index = index, read = read, validate = noRules, apply = apply, remove = remove,
     },
 }
 
 --- Déclare les deux éditeurs si le registre de l'Atelier existe (au setup, et à chaque démarrage de l'Atelier).
 local function declare()
     -- mode développement relu à chaque appel : `set vava_env prod` puis `restart vava_atelier` ne redéclare rien
-    if not guard.isDevMode(GetConvar(guard.CONVAR, guard.FALLBACK)) then
+    if not isDev() then
         log.warn('mode développement absent : ateliers d\'exemple non déclarés')
         return
     end
@@ -155,12 +302,13 @@ local function declare()
     end
 end
 
--- Commande de démonstration du journal ---------------------------------------------------------------------------
+-- Commande de démonstration ----------------------------------------------------------------------------------------
 
 local TARGETS = {
-    panneaux = { editor = PANNEAUX, kind = 'panneau' },
-    proclamations = { editor = PROCLAMATIONS, kind = 'proclamation' },
+    panneaux = { editor = PANNEAUX, kind = 'panneau', store = boards },
+    proclamations = { editor = PROCLAMATIONS, kind = 'proclamation', store = decrees },
 }
+local USAGE = 'usage : /%s journal <panneaux|proclamations> <texte> | /%s lire'
 
 local function reply(source, message)
     if source == 0 then
@@ -185,20 +333,11 @@ end
 
 --- /atelier_exemple journal <panneaux|proclamations> <texte> : une ligne `note` sur la première entrée de l'atelier.
 local function journalCommand(source, args)
-    -- mode développement relu à chaque appel : `set vava_env prod` ferme aussitôt la commande
-    if not guard.isDevMode(GetConvar(guard.CONVAR, guard.FALLBACK)) then
-        reply(source, 'outil inactif sur ce serveur (mode développement absent).')
-        return
-    end
     local target = TARGETS[args[2] or '']
-    if args[1] ~= 'journal' or not target then
-        reply(source, ('usage : /%s journal <panneaux|proclamations> <texte>'):format(cfg.command))
-        return
-    end
     local summary = cut(concat(args, ' ', 3), MAX_SUMMARY)
-    local first = store[target.kind][1]
-    if summary == '' or not first then
-        reply(source, ('usage : /%s journal <panneaux|proclamations> <texte>'):format(cfg.command))
+    local first = target and target.store:index(target.kind)[1]
+    if not target or summary == '' or not first then
+        reply(source, USAGE:format(cfg.command, cfg.command))
         return
     end
     if GetResourceState(ATELIER) ~= 'started' then
@@ -214,44 +353,91 @@ local function journalCommand(source, args)
         end
     end
     local called, ok, code = pcall(atelierCall, 'journal', source, {
-        editor = target.editor, kind = target.kind, id = first.id, action = 'note', title = first.titre,
+        editor = target.editor, kind = target.kind, id = first.id, action = 'note', title = first.title,
         summary = summary,
     })
     if not called then
         reply(source, 'l\'Atelier ne répond pas.')
     elseif ok then
-        reply(source, ('ligne écrite au journal : « %s »'):format(first.titre))
+        reply(source, ('ligne écrite au journal : « %s »'):format(first.title))
     else
         reply(source, ('ligne refusée : %s'):format(tostring(code)))
     end
 end
 
+local lastRead = {}
+
+--- /atelier_exemple lire : panneaux publiés à portée (position lue par le serveur), et la version d'essai de l'auteur.
+local function readCommand(source)
+    if source == 0 then return reply(source, 'commande de joueur.') end
+    local now = GetGameTimer()
+    if lastRead[source] and now - lastRead[source] < cfg.readCooldownMs then return reply(source, announce.cooldown) end
+    lastRead[source] = now
+    local ped = GetPlayerPed(source)
+    if not ped or ped == 0 or not DoesEntityExist(ped) then return reply(source, announce.readNone) end
+    local coords = GetEntityCoords(ped)
+    local limit = cfg.zone.readRadius
+    local lines = {}
+    for _, entry in ipairs(boards:all('panneau')) do
+        local where = entry.place
+        if type(where) == 'table' then
+            local dx, dy, dz = coords.x - where.x, coords.y - where.y, coords.z - where.z
+            if dx * dx + dy * dy + dz * dz <= limit * limit then
+                lines[#lines + 1] = announce.read:format(entry.data.titre, entry.data.texte or '')
+                local mine = trials[source] and trials[source].panneau and trials[source].panneau[entry.id]
+                if mine then lines[#lines + 1] = announce.readTrial:format(mine.titre, mine.texte or '') end
+            end
+        end
+    end
+    if #lines == 0 then return reply(source, announce.readNone) end
+    for _, line in ipairs(lines) do chat(source, line) end
+end
+
+local function command(source, args)
+    -- mode développement relu à chaque appel : `set vava_env prod` ferme aussitôt la commande
+    if not isDev() then
+        reply(source, 'outil inactif sur ce serveur (mode développement absent).')
+        return
+    end
+    if args[1] == 'journal' then return journalCommand(source, args) end
+    if args[1] == 'lire' then return readCommand(source) end
+    reply(source, USAGE:format(cfg.command, cfg.command))
+end
+
 local function declareCommand()
     if not core.registry.exists(COMMANDS) then return true end
     return core.registry.add(COMMANDS, cfg.command, {
-        kind = 'command', scope = 'admin', permission = cfg.commandRight, module = RESOURCE, chapter = 'Tests',
-        label = 'Annoter le journal de l\'Atelier (exemple)',
-        description = 'Écrit une ligne au journal du Conseil sur le premier panneau ou la première proclamation.',
-        args = {
-            { name = 'action', type = 'choice', choices = { 'journal' } },
-            { name = 'atelier', type = 'choice', choices = { 'panneaux', 'proclamations' } },
-            { name = 'texte', type = 'text', rest = true },
+        kind = 'command', scope = 'player', module = RESOURCE, chapter = 'Tests',
+        label = 'Exemple de l\'Atelier',
+        description = 'Annoter le journal du Conseil (Conseil) ; lire les panneaux à portée (tous).',
+        actions = {
+            { id = 'journal', label = 'Annoter le journal de l\'Atelier (exemple)', permission = cfg.commandRight,
+                args = {
+                    { name = 'atelier', type = 'choice', choices = { 'panneaux', 'proclamations' } },
+                    { name = 'texte', type = 'text', rest = true },
+                } },
+            { id = 'lire', label = 'Lire les panneaux à portée (exemple)' },
         },
     })
 end
 
+AddEventHandler('playerDropped', function()
+    local source = source
+    trials[source], lastRead[source] = nil, nil
+end)
+
 local function setup()
-    if not guard.isDevMode(GetConvar(guard.CONVAR, guard.FALLBACK)) then
-        return false, guard.REFUSAL
-    end
+    if not isDev() then return false, guard.REFUSAL end
     local id, err = core.hooks.after(READY_HOOK, declare)
     if not id then return false, READY_HOOK .. ' : ' .. tostring(err) end
     local ok
     ok, err = declareCommand()
     if not ok then return false, 'commande : ' .. tostring(err) end
-    RegisterCommand(cfg.command, journalCommand, false)
+    RegisterCommand(cfg.command, command, false)
+    -- zones des panneaux de la config ; l'Atelier les mettra à l'état de la base à sa synchronisation
+    for _, entry in ipairs(boards:all('panneau')) do showBoard(entry.id, entry.data, entry.place, 'sync') end
     declare()
-    log.warn('mode développement : ateliers d\'exemple déclarés et /%s ouverte au Conseil — '
+    log.warn('mode développement : ateliers d\'exemple déclarés et /%s ouverte — '
         .. 'jamais sur un serveur ouvert au public', cfg.command)
     return true
 end

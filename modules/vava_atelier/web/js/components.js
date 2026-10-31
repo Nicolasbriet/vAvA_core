@@ -1,7 +1,6 @@
 'use strict';
 /*
- * vava_atelier/web/js/components.js
- * Rôle : pièces communes (texte TOUJOURS par textContent, jamais innerHTML) : éléments, icônes, Picker, Confirm, Toast…
+ * vava_atelier/web/js/components.js — pièces communes (texte TOUJOURS par textContent) : icônes, Picker, Confirm, Toast…
  * Dépendances : strings.js, format.js
  */
 
@@ -109,13 +108,15 @@ const UI = (() => {
       if (lastFocus && document.contains(lastFocus)) lastFocus.focus();
       if (resolve) resolve(value);
     }
-    function ask({ title, text, cancel, ok }) {
+    const items = (texts, cls) => (texts && texts.length > 0 ? h('ul', { class: cls }, texts.map((text) => h('li', { text }))) : null);
+    function ask({ title, text, lines, warnings, errors, hint, cancel, ok }) {
       if (resolver) settle(false);
       lastFocus = document.activeElement;
-      const stay = h('button', { type: 'button', class: 'btn', text: cancel, onclick: () => settle(false) });
+      const stay = h('button', { type: 'button', class: ok ? 'btn' : 'btn primary', text: cancel, onclick: () => settle(false) });
       byId('confirm').replaceChildren(h('div', { class: 'dialog', role: 'alertdialog', 'aria-modal': 'true', 'aria-labelledby': 'confirm-title' },
         h('div', { class: 'dialog-sheet' }, h('h2', { id: 'confirm-title', text: title }), text ? h('p', { text }) : null,
-          h('div', { class: 'dialog-actions' }, stay, h('button', { type: 'button', class: 'btn primary', text: ok, onclick: () => settle(true) })))));
+          items(lines, 'dialog-lines'), items(errors, 'dialog-lines err'), items(warnings, 'dialog-lines err'), hint ? h('p', { class: 'hp', text: hint }) : null,
+          h('div', { class: 'dialog-actions' }, stay, ok ? h('button', { type: 'button', class: 'btn primary', text: ok, onclick: () => settle(true) }) : null))));
       byId('confirm').hidden = false;
       stay.focus();
       return new Promise((resolve) => { resolver = resolve; });
@@ -184,7 +185,7 @@ const UI = (() => {
       current.more.hidden = true;
       const result = await current.opts.load(query, current.page);
       if (state !== current || seq !== current.seq) return;
-      if (!result || result.error) { current.status.textContent = errorText(result && result.error); return; }
+      if (!result || result.error) { current.status.textContent = errorText(result && result.error, result && result.text); return; }
       if (reset && current.opts.none && query === '') current.list.append(option({ value: '', label: current.opts.none }));
       for (const item of Format.list(result.items)) if (item && typeof item.value === 'string') current.list.append(option(item));
       const empty = current.list.childElementCount === 0;

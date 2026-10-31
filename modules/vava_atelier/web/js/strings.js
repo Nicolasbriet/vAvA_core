@@ -1,7 +1,6 @@
 'use strict';
 /*
- * vava_atelier/web/js/strings.js
- * Rôle : tous les textes de l'interface (les libellés, aides et erreurs des modules arrivent du serveur).
+ * vava_atelier/web/js/strings.js — textes de la page (ceux des ateliers et des refus viennent du serveur)
  * Dépendances : aucune.
  */
 
@@ -75,6 +74,48 @@ const STRINGS = Object.freeze({
 
   modeEdit: 'Mode édition : visible par vous seul',
 
+  states: { stale: 'Une autre version a été publiée depuis le début de ce brouillon.' },
+  buttons: { save: 'Enregistrer le brouillon', check: 'Vérifier' },
+  working: 'Un instant…',
+  saved: 'Brouillon enregistré.',
+  warningsSaved: 'Brouillon enregistré. À corriger avant de publier :',
+  invalid: 'Quelques réglages sont à corriger avant de continuer.',
+  removalDone: 'Le retrait est publié.',
+  changed: {
+    live: 'Cette fiche vient de changer ailleurs : la voici à jour.',
+    dirty: 'Cette fiche a changé ailleurs : vos changements ne sont pas enregistrés.',
+    reload: 'Relire',
+  },
+
+  confirm: {
+    ask: (label) => `${label} ?`,
+    stay: 'Rester',
+    backEntry: 'Revenir à la fiche',
+    invalid: 'Quelques réglages sont à corriger avant de publier.',
+    restore: (n) => `Revenir à la version ${n} ?`,
+    restoreOk: 'Revenir à cette version',
+    discard: { title: 'Abandonner ce brouillon ?', text: 'Rien de ce qu\'il contient ne sera gardé.', cancel: 'Garder', ok: 'Abandonner' },
+    retire: (of, the, feminine) => ({
+      title: `Préparer le retrait ${of} ?`,
+      text: `Rien ne change en jeu avant que le retrait soit publié ; ${the} pourra être ${feminine ? 'rétablie' : 'rétabli'} depuis son historique.`,
+      ok: 'Préparer le retrait',
+    }),
+    take: (who) => ({ title: `Reprendre le brouillon de ${who} ?`, text: 'La reprise sera inscrite au journal du Conseil.', ok: 'Reprendre le brouillon' }),
+  },
+
+  history: {
+    title: 'Historique',
+    back: 'Retour à la fiche',
+    version: (n) => `Version ${n}`,
+    tags: { live: 'Publiée', archived: 'Archivée', removal: 'Retrait' },
+    from: (n) => `rétablie de la version ${n}`,
+    view: 'Voir',
+    restore: 'Revenir à cette version',
+    older: 'Plus anciennes',
+    none: 'Aucune version publiée.',
+  },
+  removed: { link: 'Fiches retirées du royaume', empty: 'Rien n\'a été retiré du royaume.' },
+
   fields: {
     required: 'À remplir.',
     range: (min, max) => `Entre ${min} et ${max}.`,
@@ -115,19 +156,9 @@ const STRINGS = Object.freeze({
     short: { j: 'j', h: 'h', min: 'min', s: 's' },
   },
 
+  // refus du serveur : texte reçu avec le code ; ici, les seuls codes de la page et du relais
   errors: {
-    not_ready: 'Le Registre du Conseil s\'éveille : réessayez dans un instant.',
-    no_character: 'Choisissez d\'abord un personnage.',
-    not_allowed: 'L\'Atelier est réservé au Conseil.',
-    not_open: 'L\'Atelier s\'est refermé : rouvrez-le.',
-    unknown_editor: 'Cet atelier n\'existe plus.',
     unknown_kind: 'Ce genre de fiche n\'existe plus dans cet atelier.',
-    unknown_entry: 'Cette fiche n\'existe plus.',
-    unknown_field: 'Ce réglage n\'existe plus.',
-    busy: 'Un instant : une demande est déjà en cours.',
-    editor_error: 'Cet atelier ne répond pas : prévenez un développeur.',
-    db_error: 'Le journal ne répond pas pour le moment.',
-    rate_limited: 'Doucement : patientez un instant.',
     timeout: 'Le serveur ne répond pas.',
     invalid_args: 'Demande refusée.',
     invalid_response: 'Réponse du serveur illisible : rouvrez l\'Atelier.',
@@ -139,6 +170,6 @@ const STRINGS = Object.freeze({
   editorGone: 'Cet atelier vient d\'être retiré : réessayez plus tard.',
 });
 
-function errorText(code) {
-  return STRINGS.errors[code] || STRINGS.errors.default;
+function errorText(code, text) {
+  return (typeof text === 'string' && text) || STRINGS.errors[code] || STRINGS.errors.default;
 }

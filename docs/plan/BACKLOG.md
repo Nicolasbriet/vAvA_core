@@ -512,6 +512,9 @@ versé à T-014 ; les autres points déjà couverts sont précisés dans T-012 �
 
 ### T-132 — Configs partagées : n'envoyer au client que ce qu'il lit
 - Agents : vava-architecte → vava-dev-lua · Dépend de : — · Statut : à faire
+- **Priorité : juste après la fusion de T-101** (relecture réseau R-4 de T-101 : la config partagée de `vava_atelier`
+  est passée de 10 844 à 25 629 octets, gzip 3 958 → 7 996, téléchargés par chaque joueur ; le client n'en lit
+  qu'≈ 2,4 Ko). Commencer par `vava_atelier`.
 - Relecture réseau de T-100 : chaque module déclare `config.lua` (et souvent `shared/constants.lua`) en
   `shared_scripts` ; chaque joueur télécharge donc, à chaque version, des réglages que son client ne lit jamais (pour
   `vava_atelier` seul : ~12,8 Ko bruts sur 16,5, ~4,5 Ko compressés ; `vava_arrival` : ~12 Ko). Mesurer module par
@@ -669,11 +672,16 @@ maquettes.
   écran ; relectures sécurité et réseau OK.
 
 ### T-101 — Définitions : stockage, versions, cycle de vie
-- Agents : vava-architecte → vava-dev-lua · Dépend de : T-100, T-014 · Statut : en cours
-- **En cours (31 octobre 2026, interrompu)** : branche `agents/T-101`. Code, page et tests faits ; relectures sécurité
-  et réseau À CORRIGER, lore OK. Page allégée et textes du gardien commités ; suites Lua des relectures en partie
-  faites dans le dernier commit « EN COURS » (voir son message pour ce qui reste). Ensuite : fusion, puis T-132 en
-  priorité (la relecture réseau la demande), puis T-102.
+- Agents : vava-architecte → vava-dev-lua · Dépend de : T-100, T-014 · Statut : à tester en jeu
+- Fait le 31 octobre 2026 (branche `agents/T-101`) : `vava_atelier` 1.1.0, `vava_example_atelier` 1.1.0. Rapport
+  `docs/plan/rapports/T-101.md` (écarts à la spec 1 à 14). Relectures sécurité et réseau refaites à la reprise, toutes
+  leurs suites faites ou justifiées (une ligne « Suite : » par point), contre-relectures OK et leurs suites faites ;
+  lore OK. `verifier.sh` passe. **À tester en jeu** : `docs/tests/atelier.md` § 10 à 17, en priorité publication puis
+  retour en arrière vus d'un joueur proche sans redémarrage (12-2, 13-2), rien chez un joueur loin (12-3), essai vu de
+  son seul auteur (11-2, 11-8), `validateLot` (12-8), reprise de brouillon (14-2), base qui fait foi (15-1), archives
+  (16-7 à 16-9), redémarrages et refus d'`apply` (17-2, 17-4, 17-5), transactions et `WHERE id IN (…)` réels
+  d'oxmysql. **Ensuite, en priorité : T-132** (config partagée de `vava_atelier` passée à ≈ 25,6 Ko, relecture réseau
+  R-4), puis T-102 (qui adopte le contrat `ctx.bundle` / `validateLot` et les consignes de diffusion de `docs/api.md`).
 - Table `vava_atelier_definitions` (une ligne par version), statuts brouillon / essai / publié / archivé, import
   de la config comme version 1 au premier démarrage (la base fait foi ensuite), réimport explicite par commande,
   retour à une version, export et import JSON, rechargement à chaud chez le module (`apply`), diffusion aux joueurs
