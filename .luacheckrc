@@ -23,3 +23,4 @@ globals = {
 exclude_files = { 'chancellerie/**', '**/web/**', 'tests/**', '.outils/**', '.claude/**' }
 files['**/fxmanifest.lua'] = { ignore = { '111', '112', '113', '611', '612' }, allow_defined_top = true }
 files['**/config.lua'] = { max_line_length = 160 }
+files['**/config_client.lua'] = { max_line_length = 160 }

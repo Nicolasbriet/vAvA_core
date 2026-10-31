@@ -73,12 +73,27 @@ function helper.restoreLocale(previous)
     os.setlocale(previous or 'C', 'ctype')
 end
 
+local function loadOne(path)
+    local chunk, err = loadfile(ROOT .. '/' .. path)
+    if not chunk then error(err, 3) end
+    return chunk()
+end
+
+local function exists(path)
+    local file = io.open(ROOT .. '/' .. path, 'rb')
+    if file then file:close() end
+    return file ~= nil
+end
+
 --- Charge un fichier du dépôt (chemin relatif à la racine).
+--- Pour `modules/<m>/config.lua` ou `examples/<m>/config.lua`, charge d'abord `config_client.lua` du même dossier s'il
+--- existe, comme le manifeste (T-132) : config_client.lua partagé ouvre la table, config.lua en tête des server_scripts
+--- la complète. Un test « côté client » charge `config_client.lua` seul.
 ---@param path string
 function helper.load(path)
-    local chunk, err = loadfile(ROOT .. '/' .. path)
-    if not chunk then error(err, 2) end
-    return chunk()
+    local dir = path:match('^(modules/[^/]+/)config%.lua$') or path:match('^(examples/[^/]+/)config%.lua$')
+    if dir and exists(dir .. 'config_client.lua') then loadOne(dir .. 'config_client.lua') end
+    return loadOne(path)
 end
 
 --- Charge plusieurs fichiers dans l'ordre, comme le ferait un fxmanifest.
