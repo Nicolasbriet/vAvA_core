@@ -1498,6 +1498,11 @@ local function placeLocked(ctx, req, head, plan, token, keys)
         -- échouer (relecture sécurité S-2, contre-relecture C-3)
         record(ctx, { editor = editor.id, kind = parentHead.kind, id = parentHead.id, action = 'saved',
             title = parentRow.title, version = parentHead.published.version })
+        -- l'enfant copié de sa publiée a la sienne, au même moment (seconde contre-relecture D-3)
+        if plan.entry == 'copy' then
+            record(ctx, { editor = editor.id, kind = kindId, id = entryId, action = 'saved', title = d.title,
+                version = head.published.version })
+        end
         local readErr
         parentRowId, readErr = draftRowId(editor.id, parentHead.kind, parentHead.id)
         if not parentRowId then
@@ -1537,7 +1542,7 @@ local function placeLocked(ctx, req, head, plan, token, keys)
     -- écrit en base : au journal même si l'atelier a changé entre-temps (§ 7.5 : un enfant posé n'a pas de ligne)
     if plan.entry == 'insert' and not kind.def.parent then
         record(ctx, { editor = editor.id, kind = kindId, id = entryId, action = 'created', title = d.title })
-    elseif plan.entry == 'copy' then
+    elseif plan.entry == 'copy' and not parentRow then
         record(ctx, { editor = editor.id, kind = kindId, id = entryId, action = 'saved', title = d.title,
             version = head.published.version })
     end

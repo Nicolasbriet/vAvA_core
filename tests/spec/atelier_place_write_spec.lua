@@ -134,6 +134,41 @@ describe('vava_atelier écriture d’une pose', function()
         assert.equal(1, #synced)
     end)
 
+    -- seconde contre-relecture D-3 : point publié déplacé (copie) sous une zone publiée sans brouillon
+    it('point publié déplacé, relecture du parent impossible : lignes `saved` du parent ET du point écrites', function()
+        local point = index.ensure(EDITOR, 'node', 'bois_chene_1')
+        point.title, point.published = 'Chêne 1', { row = 60, version = 1 }
+        index.touch(EDITOR, point)
+        rows[60] = { id = 60, decoded = { nom = 'Chêne 1', ressource = 'chene', charges = 3, repousse = 600 },
+            where = { x = 110.0, y = 100.0, z = 30.0, h = 0.0 }, parent = 'bois' }
+        local draftRow = VavaAtelier.store.draftRow
+        VavaAtelier.store.draftRow = function(_, kindId, id)
+            if kindId == 'zone' then return nil, 'db_error' end
+            return draftRow(_, kindId, id)
+        end
+        local req = { kind = kinds.node, head = point, id = 'bois_chene_1', rev = 0,
+            where = { x = 113.0, y = 100.0, z = 30.0, h = 0.0 }, parentId = 'bois',
+            parentHead = index.get(EDITOR, 'zone', 'bois') }
+        assert.same({ false, 'db_error' }, { cycle.place(ctx, req) })
+        assert.equal(1, #transactions)
+        assert.equal(2, #journal)
+        assert.same({ 'zone', 'saved' }, { journal[1].kind, journal[1].action })
+        assert.same({ 'node', 'saved', 1 }, { journal[2].kind, journal[2].action, journal[2].version })
+    end)
+
+    it('point publié déplacé sous une zone publiée : une ligne `saved` chacun, jamais deux pour le point', function()
+        local point = index.ensure(EDITOR, 'node', 'bois_chene_1')
+        point.title, point.published = 'Chêne 1', { row = 60, version = 1 }
+        index.touch(EDITOR, point)
+        rows[60] = { id = 60, decoded = { nom = 'Chêne 1', ressource = 'chene', charges = 3, repousse = 600 },
+            where = { x = 110.0, y = 100.0, z = 30.0, h = 0.0 }, parent = 'bois' }
+        local req = { kind = kinds.node, head = point, id = 'bois_chene_1', rev = 0,
+            where = { x = 113.0, y = 100.0, z = 30.0, h = 0.0 }, parentId = 'bois',
+            parentHead = index.get(EDITOR, 'zone', 'bois') }
+        assert.is_true((cycle.place(ctx, req)))
+        assert.equal(2, #journal)
+    end)
+
     it('ligne relue d’un autre brouillon que celui de la tête : stale (contre-relecture C-3)', function()
         local point = index.ensure(EDITOR, 'node', 'bois_chene_1')
         point.title, point.draft = 'Chêne 1', { row = 50, rev = 2, status = 'draft', holder = ACCOUNT, removal = false,
