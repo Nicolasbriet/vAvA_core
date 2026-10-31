@@ -79,14 +79,19 @@ config.requests = {
 -- comprises (modificateur vava_admin:invulnerabilite, étape « annulation ») ; les effets sans dégâts (recul,
 -- renversement, mouillé, ralenti) ne passent pas par la chaîne. `priority` : rang dans l'étape (0 à 99, plus petit =
 -- plus tôt) ; `label` : nom montré dans la liste des modificateurs de la chaîne (48 octets au plus).
--- L'observation ne protège que si le corps du membre, lu par le serveur, est à `spectateRadius` mètres au plus de
--- l'ancrage sous l'observé (`spectate.anchorDepth` de config_client.lua ; l'ancrage suit l'observé une fois par
--- seconde), et au plus `spectateMaxMs` après le début de l'observation (puis elle tombe, au journal).
+-- L'observation ne protège que si le corps du membre, lu par le serveur, est caché sous l'observé : à `spectateRadius`
+-- mètres au plus à l'horizontale (l'ancrage suit l'observé une fois par seconde) et au moins `spectateMinDepth` mètres
+-- plus bas que lui (positif, strictement inférieur à `spectate.anchorDepth` de config_client.lua, 12 m : sinon une
+-- ligne warn au démarrage et l'observation ne protège plus) ; au plus `spectateMaxMs` après le début de l'observation
+-- (puis elle tombe, au journal) ; une nouvelle observation ne protège qu'après `spectateCooldownMs` depuis la fin de la
+-- protection précédente du même compte (une observation qui en remplace une autre garde la sienne).
 config.invulnerability = {
     priority = 10,
     label = 'Invulnérabilité du Conseil',
     spectateRadius = 20.0,
+    spectateMinDepth = 6.0,
     spectateMaxMs = 10 * 60 * 1000,
+    spectateCooldownMs = 60 * 1000,
 }
 
 -- Déplacements : écart à l'arrivée (m) pour ne pas apparaître dans la personne.
