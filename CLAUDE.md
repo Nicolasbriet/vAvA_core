@@ -26,9 +26,15 @@ explicite du porteur du projet.
 ```
 modules/vava_xxx/
   fxmanifest.lua        version semver, dépendances, ordre des fichiers
-  config.lua            TOUT ce qui est réglable : durées, bornes, modèles, coordonnées, textes
+  config.lua            ce qui est réglable et que seul le serveur lit : durées, bornes, débits, droits, données de
+                        jeu, textes envoyés par le serveur ; en tête des server_scripts : jamais téléchargé
+  config_client.lua     ce qui est réglable et que le client lit : touches, commandes, distances et délais du
+                        client, modèles, animations, textes affichés par le client ; shared_scripts (client_scripts
+                        si le module n'a pas de partie serveur) : chaque joueur le télécharge, le serveur le lit aussi
   shared/constants.lua  table du module (SEULE globale : VavaXxx), noms d'évènements et de RPC
   bridge/server.lua     SEUL point de contact avec le core et les autres modules, chaque appel isolé (pcall)
+  shared/*.lua          logique pure ; en shared_scripts seulement si un fichier client s'en sert, sinon en
+                        server_scripts (servie au seul serveur, testée de même)
   server/*.lua          logique, un fichier par responsabilité ; server/main.lua déclare le module et ses RPC
   client/*.lua          affichage et demandes ; client/nui.lua seul à parler à l'interface
   web/                  interface NUI (HTML/CSS/JS sans framework) ; polices, textures et ornements communs pris
@@ -42,6 +48,10 @@ Conventions observées dans tout le dépôt, à respecter :
 - En-tête de chaque fichier : `--[[ chemin / Rôle : … / Dépendances : … ]]`.
 - Natives et fonctions standard mises en `local` en haut du fichier.
 - Aucune fonction d'API ne lève d'erreur : retour `valeur` ou `false/nil, err`.
+- Réglages : tout ce qui est réglable est dans `config.lua` ou `config_client.lua`, jamais dans le code, et une valeur
+  n'est écrite qu'une fois. `config_client.lua` ouvre la table (`VavaXxx.config = { clientFile = true, … }`) ;
+  `config.lua` la complète (`local config = VavaXxx.config`) sans jamais réécrire une de ses clés. On découpe au
+  premier niveau, au second pour une table de plus de 1 Ko dont le client lit moins de la moitié (spec T-132).
 - Hooks, RPC, registres préfixés par le nom de la ressource (`vava_xxx:…`). `core:` est réservé au core.
 - Les tables qui traversent un export ne sont jamais mixtes (liste + clés nommées).
 - Commandes et touches déclarées au registre `core:commands` (elles apparaissent dans le Codex).
@@ -84,12 +94,15 @@ Conventions observées dans tout le dépôt, à respecter :
   `TriggerLatentClientEvent` avec un débit borné.
 - Fichiers web : polices, textures et images communes ne sont pas dupliquées dans chaque ressource ; images en
   SVG ou WebP légères ; aucune ressource externe. Écran de chargement : poids total maîtrisé (voir le backlog).
+- Fichiers Lua : ne servir au client que ce qu'il lit. `config.lua` et la logique réservée au serveur sont en
+  `server_scripts` (`scripts/audit-reseau.sh` refuse `config.lua` côté client).
 
 ## Assets manquants (cartes, montures, vêtements, armes)
 
 Les assets définitifs n'existent pas encore. **Aucun modèle, coordonnée, composant de vêtement ou arme n'est écrit
-en dur** : tout passe par `config.lua` avec une valeur de remplacement vanilla et un commentaire `-- PLACEHOLDER`.
-Le jour où l'asset arrive, on ne change que la config. Voir `docs/plan/ASSETS_PLACEHOLDERS.md`.
+en dur** : tout passe par `config.lua` (`config_client.lua` si le client le lit) avec une valeur de remplacement
+vanilla et un commentaire `-- PLACEHOLDER`. Le jour où l'asset arrive, on ne change que la config.
+Voir `docs/plan/ASSETS_PLACEHOLDERS.md`.
 
 ## L'Atelier et le combat
 
