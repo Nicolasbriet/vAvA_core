@@ -6,6 +6,9 @@
            (arme émoussée à 0), brique serveur `strike` (paquet, vava_health:hit, usure), bouclier accroché au bras ou
            au dos (statebag de ped écrit et gardé par le serveur), combat natif de GTA coupé sans boucle par image,
            commandes du Conseil /armes. Aucun RPC, aucune NUI, aucune table SQL.
+           T-132 : les joueurs ne téléchargent que les constantes, config_client.lua (fiches des armes, bouclier
+           accroché, placement des boucliers, contrôles natifs) et shared/shield.lua ; config.lua et
+           shared/weapons.lua sont servis au seul serveur.
     Dépendances : vAvA_core ≥ 0.10.0 (core.net.send), vava_inventory ≥ 1.7.0 (objet tenu, statebag de la main),
                   vava_health ≥ 1.3.0 (chaîne de dégâts) ; facultatifs : vava_crafting ≥ 1.5.0 et vava_skills ≥ 1.0.0
                   (recettes), vava_hud (notifications), vava_admin (droit metiers, journal du Registre), vava_chat
@@ -19,7 +22,7 @@ use_experimental_fxv2_oal 'yes'
 
 name 'vava_combat'
 description 'Combat vAvA : armes de corps à corps, usure, bouclier accroché'
-version '1.0.0'
+version '1.1.0'
 
 dependency 'vAvA_core'
 dependency 'vava_inventory'
@@ -29,14 +32,16 @@ files {
     'web/items/*.svg',
 }
 
--- Ordre explicite : chaque fichier ne dépend que de ceux listés avant lui.
+-- Ordre explicite : chaque fichier ne dépend que de ceux listés avant lui. Les joueurs ne téléchargent que les
+-- shared_scripts et les client_scripts : config.lua, en tête des server_scripts, n'est jamais servi (T-132).
 shared_scripts {
     'shared/constants.lua',
-    'config.lua',
+    'config_client.lua',         -- ouvre VavaCombat.config : ce que lit le client
     'shared/shield.lua',
 }
 
 server_scripts {
+    'config.lua',                -- complète VavaCombat.config : ce que lit le seul serveur
     -- logique pure servie au seul serveur
     'shared/weapons.lua',
     'server/core.lua',

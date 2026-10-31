@@ -7,7 +7,7 @@
            des touches (attaque, visée, roue) appartiendra au mode combat de T-112, éveillé et borné dans le temps. Le
            filet reste l'annulation serveur des dégâts natifs (vava_health). À l'arrêt du module, avec
            `restoreOnStop`, drapeau et changement d'arme sont rendus à GTA.
-    Dépendances : shared/constants.lua, config.lua, client/core.lua
+    Dépendances : shared/constants.lua, config_client.lua, client/core.lua
 ]]
 
 local CreateThread, Wait, GetGameTimer, AddEventHandler = CreateThread, Wait, GetGameTimer, AddEventHandler

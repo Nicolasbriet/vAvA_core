@@ -4,7 +4,7 @@
            par vava_hud sinon par le jeu ; exports client `armed()` (arme tenue par le personnage local, pour la règle
            « mains vides » de la magie et le mode combat de T-112) et `shieldHung()` (bouclier accroché sur son propre
            ped) ; démarrage des contrôles natifs et du suivi des boucliers. Aucune NUI, aucun RPC.
-    Dépendances : shared/constants.lua, config.lua, shared/shield.lua, client/core.lua, bridge/client.lua,
+    Dépendances : shared/constants.lua, config_client.lua, shared/shield.lua, client/core.lua, bridge/client.lua,
                   client/natives.lua, client/shields.lua
 ]]
 
