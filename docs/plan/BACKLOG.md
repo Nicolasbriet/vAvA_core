@@ -778,8 +778,9 @@ faire tout le système de combat ») : la porte T-119 reste à passer en jeu.
 
 ### T-116 — La magie sur la chaîne de dégâts
 - Agent : vava-dev-lua · Dépend de : T-110 · Statut : en cours
-- **En cours (31 octobre 2026, interrompu)** : branche `agents/T-116`. Dégâts des sorts par `hit`, protections en
-  modificateurs, tests faits ; reste la procédure magie § 18, la vérification « mêmes dégâts », le rapport, les relectures.
+- **En cours (31 octobre 2026, repris)** : branche `agents/T-116`. Dégâts des sorts par `hit`, protections en
+  modificateurs, tests, procédure magie § 18, vérification « mêmes dégâts » et rapport faits
+  (`docs/plan/rapports/T-116.md`) ; restent les relectures et la décision sur les coups partis avant la chute du lanceur.
   Spec T-111 (point 1) : exiger les mains vides pour incanter (`exports.vava_combat:armed()`), ici ou après T-111.
 - Les dégâts de `vava_magic` passent par `hit` ; les boucliers et résistances deviennent des modificateurs ; même
   comportement en jeu pour les 11 sorts.
