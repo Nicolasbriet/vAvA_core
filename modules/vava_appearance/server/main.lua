@@ -35,12 +35,13 @@ local registered, registerErr = core.modules.register({
     coreVersion = cfg.coreVersion,
     setup = function()
         -- T-132 : un config.lua d'avant 1.1.0 (gardé par une mise à jour) remplace la table de config_client.lua ; il
-        -- contient tout ce que lit le serveur, le module démarre, mais un réglage client qu'on y change reste sans
-        -- effet
+        -- contient tout ce que lit le serveur, le module démarre. shared/appearance.lua a gardé la table de
+        -- config_client.lua (lue à son chargement, avant config.lua) : emplacements proposés et apparences de départ
+        -- restent ceux de config_client.lua, des deux côtés ; les changer dans l'ancien config.lua reste sans effet
         if cfg.clientFile ~= true then
             core.log.warn('config.lua garde la forme d\'avant 1.1.0 (il remplace la table de config_client.lua) : les '
-                .. 'réglages lus par les joueurs sont dans config_client.lua ; reportez vos changements d\'après '
-                .. 'config.lua.nouveau')
+                .. 'emplacements proposés et les apparences de départ restent ceux de config_client.lua, chez les '
+                .. 'joueurs comme au serveur ; reportez vos changements d\'après config.lua.nouveau')
         end
         local ok, err = core.characters.defineField(VavaAppearance.FIELD, {
             schema = VavaAppearance.SCHEMA,
