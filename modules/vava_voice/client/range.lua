@@ -5,7 +5,7 @@
            oublier le choix d'avant, qui revient à la levée de la limite. L'effet de la zone de voix où se trouve le
            joueur multiplie la distance. Chaque changement règle Mumble et le médaillon ; le cercle au sol n'apparaît
            qu'à l'appui sur la touche.
-    Dépendances : shared/constants.lua, config.lua, client/core.lua, client/hud.lua, client/mumble.lua,
+    Dépendances : shared/constants.lua, config_client.lua, client/core.lua, client/hud.lua, client/mumble.lua,
                   client/ring.lua
 ]]
 

@@ -9,7 +9,7 @@
       - ordres du serveur : limite de portée ; zones de voix proches reçues, changées et quittées par les
         abonnements de zone du core (core.zones.watch, 1.3.0) ;
       - arrêt de la ressource éditeur ouvert : clavier et souris rendus au jeu.
-    Dépendances : shared/, config.lua, tous les fichiers client/ du module
+    Dépendances : shared/constants.lua, config_client.lua, tous les fichiers client/ du module
 ]]
 
 local type, mathType, tonumber, tostring = type, math.type, tonumber, tostring
