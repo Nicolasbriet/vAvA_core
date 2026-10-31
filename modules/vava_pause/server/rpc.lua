@@ -2,12 +2,13 @@
     vava_pause/server/rpc.lua
     Rôle : intentions du client, en RPC à schéma strict et à débit limité :
       - `vava_pause:open(versionDesTouches)` : la seule demande à l'ouverture ; refus `not_ready`, `no_character`,
-        `combat` (fenêtre de 10 s après un coup), `restrained` ou `busy` (crochet `vava_pause:opening`) ; à terre,
+        `combat` (fenêtre de 10 s après un coup, avec les millisecondes restantes), `restrained` ou `busy` (crochet `vava_pause:opening`) ; à terre,
         bannière réduite (`{ downed = true }`) ;
-      - `vava_pause:council(nature, texte, joindrePosition)` : demande au Conseil, texte normalisé ici, passée à
-        vava_admin (position et témoins lus par lui, côté serveur) ;
-      - `vava_pause:leave(mode)` : l'appelant seul est déconnecté, après le départ de la réponse.
-    Dépendances : shared/constants.lua, config_client.lua, config.lua, shared/council.lua, server/core.lua,
+      - `vava_pause:council(nature, texte, joindrePosition)` : demande au Conseil, passée à vava_admin, qui
+        normalise le texte (comme pour /signaler) et lit position et témoins côté serveur ;
+      - `vava_pause:leave(mode)` : l'appelant seul est déconnecté, après le départ de la réponse ; la console note son
+        temps de combat restant et s'il est à terre.
+    Dépendances : shared/constants.lua, config_client.lua, config.lua, server/core.lua,
                   bridge/server.lua, server/combat.lua, server/snapshot.lua
 ]]
 
@@ -24,7 +25,6 @@ local KEPT = VavaPause.KEPT_REFUSALS
 local bridge = VavaPause.bridge
 local fight = VavaPause.fight
 local compose = VavaPause.compose
-local council = VavaPause.council
 local limits = cfg.rateLimits
 
 local KEYS_VERSION = { type = 'string', max = VavaPause.KEYS_VERSION.MAX, pattern = VavaPause.KEYS_VERSION.PATTERN }
@@ -42,7 +42,9 @@ local function open(src, knownKeys)
     if not VavaPause.ready then return false, 'not_ready' end
     local character = core.characters.getActive(src)
     if not character then return false, 'no_character' end
-    if fight.remaining(src) > 0 then return false, 'combat' end
+    -- temps restant rendu (relecture réseau R-1) : le client refuse sur place jusque-là, sans redemander
+    local remaining = fight.remaining(src)
+    if remaining > 0 then return false, 'combat', remaining end
     local downed = bridge.isDowned(src)
     local allowed, reason = core.hooks.runBefore(HOOKS.OPENING, { source = src, characterId = character.id, downed = downed })
     if not allowed then return false, KEPT[reason] and reason or 'busy' end
@@ -56,13 +58,8 @@ end
 local function writeCouncil(src, kind, text, withPosition)
     if not VavaPause.ready then return false, 'not_ready' end
     if not core.characters.getActive(src) then return false, 'no_character' end
-    if not council.isKind(kind) then return false, 'invalid_kind' end
-    local options = cfg.council
-    local clean, code = council.normalize(text, {
-        minChars = options.minChars, maxBytes = VavaPause.MAX_COUNCIL_TEXT, maxLines = options.maxLines,
-    })
-    if not clean then return false, code end
-    local ok, value, seconds = bridge.submitRequest(src, kind, clean, withPosition)
+    -- nature bornée par le schéma (enum) ; texte normalisé par vava_admin (invalid_text, too_short)
+    local ok, value, seconds = bridge.submitRequest(src, kind, text, withPosition)
     if not ok then return false, value, seconds end
     return true, value
 end
@@ -74,7 +71,9 @@ local function leave(src, mode)
     if not session then return false, 'no_session' end
     local accountId = session.accountId
     local message = cfg.leave.messages[mode]
-    VavaPause.log.info('joueur %d : quitte Eldoria (%s)', src, mode)
+    -- trace d'un départ en combat ou à terre (relecture sécurité S-5) : la bannière ne l'empêche pas (Alt+F4 existe)
+    VavaPause.log.info('joueur %d : quitte Eldoria (%s) ; combat : %d ms restantes ; à terre : %s', src, mode,
+        fight.remaining(src), bridge.isDowned(src) and 'oui' or 'non')
     SetTimeout(cfg.leave.delayMs, function()
         -- le numéro peut avoir été repris entre-temps : seule la même session est déconnectée
         local current = core.players.get(src)

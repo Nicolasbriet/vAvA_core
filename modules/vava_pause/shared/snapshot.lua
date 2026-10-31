@@ -1,7 +1,7 @@
 --[[
     vava_pause/shared/snapshot.lua
     Rôle : logique pure de l'instantané d'ouverture, servie au seul serveur : savoir-faire compactés (niveau
-           décroissant puis libellé, plafond), confrérie revalidée (champs connus, textes sans contrôle ni chevron,
+           décroissant puis libellé, plafond), confrérie revalidée (champs connus, textes sans contrôle, invisible ni chevron,
            couleurs « #rrggbb », meuble connu ou meuble par défaut), touches du registre `core:commands` (sorte `key`,
            portée permise, non cachées, bornées, triées par chapitre puis libellé, plafond), état de la demande au
            Conseil revalidé.
@@ -20,9 +20,17 @@ VavaPause.snapshot = snapshot
 local ID_PATTERN = '^[%w_%-%.:]+$'
 local COLOR_PATTERN = '^#%x%x%x%x%x%x$'
 local CHARGE_PATTERN = '^[%w_]+$'
--- texte lisible : UTF-8 valide, sans contrôle ASCII ni C1, sans chevron
-local FORBIDDEN = '[\0-\31\127<>]'
-local C1 = '\194[\128-\159]'
+-- texte lisible : UTF-8 valide, sans chevron, sans aucun caractère de la liste de str.hasControl du core (relecture
+-- sécurité S-1 de T-145) : contrôles ASCII et C1, espace sans largeur et marques de sens (U+200B à U+200F),
+-- séparateurs et sens d'écriture (U+2028 à U+202E), isolats (U+2066 à U+2069), marque arabe (U+061C), U+FEFF
+local REFUSED = {
+    '[\0-\31\127<>]',
+    '\194[\128-\159]',
+    '\226\128[\139-\143\168-\174]',
+    '\226\129[\166-\169]',
+    '\216\156',
+    '\239\187\191',
+}
 
 local SKILL = { id = 32, label = 48, rank = 32, rankLabel = 32 }
 local GUILD = { label = 48, short = 16, grade = 32, charge = 24 }
@@ -30,13 +38,21 @@ local GUILD_FIELDS = { label = true, short = true, grade = true, cloth = true, c
 local KEY = { name = 64, label = 80, chapter = 40, module = 64, key = 32, keyDisplay = 40 }
 local REQUEST_STATES = { sent = true, claimed = true, closed = true }
 
+---@param value string
+---@return boolean
+local function refused(value)
+    for _, pattern in ipairs(REFUSED) do
+        if find(value, pattern) then return true end
+    end
+    return false
+end
+
 --- Texte lisible de 1 à `max` octets.
 ---@param value any
 ---@param max integer
 ---@return boolean
 local function readable(value, max)
-    return type(value) == 'string' and #value > 0 and #value <= max and utf8len(value) ~= nil
-        and not find(value, FORBIDDEN) and not find(value, C1)
+    return type(value) == 'string' and #value > 0 and #value <= max and utf8len(value) ~= nil and not refused(value)
 end
 
 ---@param value any

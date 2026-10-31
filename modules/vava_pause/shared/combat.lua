@@ -20,7 +20,8 @@ local function isPlayer(value)
 end
 
 --- Joueurs à marquer « en combat » pour ce coup : la cible, puis la source si c'est un autre joueur ; liste vide si la
---- nature du coup est ignorée.
+--- nature du coup est ignorée, ou si le coup a été refusé à l'étape before (prison, trêve, victime protégée : relecture
+--- sécurité S-3 de T-145 ; un coup annulé par une parade ou un bouclier compte).
 ---@param payload any  charge du crochet after de vava_health:hit
 ---@param ignoredKinds string[]
 ---@return integer[]
@@ -30,6 +31,7 @@ function combat.marks(payload, ignoredKinds)
     for _, kind in ipairs(ignoredKinds or {}) do
         if payload.kind == kind then return out end
     end
+    if payload.stage == 'before' and payload.cancelled then return out end
     if isPlayer(payload.target) then out[#out + 1] = payload.target end
     if isPlayer(payload.source) and payload.source ~= payload.target then out[#out + 1] = payload.source end
     return out

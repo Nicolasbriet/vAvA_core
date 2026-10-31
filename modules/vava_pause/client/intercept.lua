@@ -18,6 +18,7 @@ local cfg = VavaPause.config.intercept
 local native = VavaPause.native
 local P_START, ESCAPE = cfg.controls[1], cfg.controls[2]
 local IDLE_MS, FOCUS_MS = cfg.idleMs, cfg.focusWatchMs
+local HOLD_PAUSE_MENU = cfg.holdPauseMenu ~= false
 
 local intercept = {}
 VavaPause.intercept = intercept
@@ -60,7 +61,7 @@ CreateThread(function()
         if armed and not native.active() then
             DisableControlAction(0, P_START, true)
             DisableControlAction(0, ESCAPE, true)
-            SetPauseMenuActive(false)
+            if HOLD_PAUSE_MENU then SetPauseMenuActive(false) end
             if not isOpen() and (IsDisabledControlJustPressed(0, ESCAPE) or IsDisabledControlJustPressed(0, P_START)) then
                 trigger()
             end

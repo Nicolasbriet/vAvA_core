@@ -87,6 +87,37 @@ describe('vava_pause : porte de la bannière', function()
         assert.is_nil(shown.busy)
     end)
 
+    describe('refus du serveur gardés (relecture réseau R-1)', function()
+        it('combat : valable le temps restant donné par le serveur', function()
+            local verdict = gate.remember('combat', 7000, 10000, 3000)
+            assert.equal('combat', gate.standing(verdict, 10000))
+            assert.equal('combat', gate.standing(verdict, 16999))
+            assert.is_nil(gate.standing(verdict, 17000))
+        end)
+
+        it('sans temps donné (ligoté, crochet) : noticeMs', function()
+            local verdict = gate.remember('restrained', nil, 10000, 3000)
+            assert.equal('restrained', gate.standing(verdict, 12999))
+            assert.is_nil(gate.standing(verdict, 13000))
+            assert.equal(13000, gate.remember('busy', 0, 10000, 3000).untilMs)
+            assert.equal(13000, gate.remember('busy', 2.5, 10000, 3000).untilMs)
+        end)
+
+        it('aucun verdict : rien ne tient', function()
+            assert.is_nil(gate.standing(nil, 10000))
+        end)
+
+        it('débit dépassé : jamais d\'ouverture contre un refus encore valable', function()
+            local verdict = gate.remember('combat', 9000, 0, 3000)
+            -- Échap répété en combat : la cinquième demande refusée pour débit n'ouvre rien, même avec un instantané
+            assert.same({ false, 'combat' }, { gate.onRateLimited(verdict, 5000, true) })
+            assert.same({ false, 'combat' }, { gate.onRateLimited(verdict, 8999, false) })
+            -- fenêtre passée : instantané repris, ou bannière sans données
+            assert.same({ true, 'reuse' }, { gate.onRateLimited(verdict, 9000, true) })
+            assert.same({ true, 'empty' }, { gate.onRateLimited(nil, 9000, false) })
+        end)
+    end)
+
     it('chaque refus non muet a son message dans config_client.lua', function()
         for _, reason in ipairs({ 'restrained', 'combat', 'blocked' }) do
             assert.is_string(VavaPause.config.messages.refused[reason])

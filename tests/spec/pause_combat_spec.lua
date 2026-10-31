@@ -39,6 +39,16 @@ describe('vava_pause : fenêtre de combat', function()
             cfg.ignoredKinds))
     end)
 
+    it('un coup refusé à l\'étape before ne marque personne (relecture sécurité S-3)', function()
+        assert.same({}, combat.marks({ target = 3, source = 7, kind = 'tranchant', cancelled = 'treve', stage = 'before' },
+            cfg.ignoredKinds))
+        -- annulé à une autre étape (parade, bouclier) : toujours un combat
+        assert.same({ 3, 7 }, combat.marks({ target = 3, source = 7, kind = 'tranchant', cancelled = 'parry', stage = 'parade' },
+            cfg.ignoredKinds))
+        -- étape before sans annulation (charge complète du crochet after) : marqué
+        assert.same({ 3, 7 }, combat.marks({ target = 3, source = 7, kind = 'tranchant', stage = 'before' }, cfg.ignoredKinds))
+    end)
+
     it('charge informe : personne', function()
         assert.same({}, combat.marks(nil, cfg.ignoredKinds))
         assert.same({}, combat.marks({ target = 'x', source = 0, kind = 'feu' }, cfg.ignoredKinds))

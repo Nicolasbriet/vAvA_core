@@ -47,7 +47,6 @@ shared_scripts {
 server_scripts {
     'config.lua',                -- complète VavaPause.config : ce que lit le seul serveur
     'shared/snapshot.lua',       -- logique pure servie au seul serveur (testée : tests/spec)
-    'shared/council.lua',
     'shared/combat.lua',
     'server/core.lua',
     'bridge/server.lua',

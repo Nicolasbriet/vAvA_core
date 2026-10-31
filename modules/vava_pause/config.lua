@@ -2,7 +2,7 @@
     vava_pause/config.lua
     Rôle : réglages de la bannière lus par le seul serveur (servi au seul serveur, jamais téléchargé par les joueurs) :
            débits des RPC, fenêtre de combat, cache des habitants, plafonds de l'instantané, confrérie (ressource et
-           export facultatifs, meubles connus), demande au Conseil, départ (délai, messages de déconnexion), touche
+           export facultatifs, meubles connus), départ (délai, messages de déconnexion), touche
            déclarée au registre `core:commands`. Complète la table ouverte par config_client.lua sans en réécrire une
            clé (T-132). Les durées sont en millisecondes.
     Dépendances : shared/constants.lua, config_client.lua
@@ -32,14 +32,11 @@ config.snapshot = { maxSkills = 32, maxKeys = 48, keyScopes = { 'player' } }
 -- blason (web/img/charges.svg) ; avertissement de console au plus une fois par intervalle pour une réponse invalide.
 config.guild = { resource = 'vava_guilds', export = 'bannerOf', charges = { 'croix' }, warnEveryMs = 60000 }
 
--- Demande au Conseil : caractères au moins, lignes au plus (500 octets au plus : VavaPause.MAX_COUNCIL_TEXT).
-config.council = { minChars = 10, maxLines = 12 }
-
 -- Quitter : la réponse part, puis le joueur est déconnecté après ce délai, avec ce message.
 config.leave = {
     delayMs = 200,
     messages = {
-        disconnect = 'Vous avez quitté Eldoria. Le royaume garde votre place.',
+        disconnect = 'Votre personnage vous attend là où vous l\'avez laissé.',
         quit = 'Vous avez quitté Eldoria : vous pouvez fermer le jeu.',
     },
 }

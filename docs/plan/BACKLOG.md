@@ -762,7 +762,7 @@ versé à T-014 ; les autres points déjà couverts sont précisés dans T-012 �
 ### T-145 — Menu pause `vava_pause` (la bannière)
 - Agents : vava-architecte → vava-dev-lua + vava-dev-nui (cette tâche autorise à toucher `vava_codex`, `vava_admin`,
   `vava_hud`, `vava_voice` et `chancellerie/lib/resources.js`, dans les limites de la spec) · Dépend de : T-012 ·
-  Statut : à tester en jeu (relectures sécurité, réseau et lore à faire)
+  Statut : à tester en jeu (relu sécurité, réseau et lore, suites appliquées)
 - Fait le 31 octobre 2026 (branches `agents/T-145` et `agents/T-145-nui`, fusionnées, puis `main` après T-142) :
   `vava_pause` 1.0.0 (interception d'Échap et de P par la seule boucle par image permanente, blocage seul ; porte pure ;
   une seule demande à l'ouverture ; bannière réduite à terre ; fenêtre de combat de 10 s par `vava_health:hit` ; demande
@@ -897,6 +897,11 @@ maquettes.
   tenue (PLACEHOLDER). Côté joueurs : recruter, promouvoir, renvoyer, quitter ; registre des membres ; coffre
   journalisé. Droits fournis par les autres modules au registre (`lier`, `fouiller`, `cachot`, `coffre`…) pour que
   la grille s'enrichisse sans toucher à `vava_guilds`.
+- Bannière du royaume (T-145) : export serveur `bannerOf(source)` → `nil` ou `{ label (≤ 48 o), short (≤ 16 o), grade?
+  (≤ 32 o), cloth, clothDark, field ('#rrggbb'), charge (≤ 24 o) }` (`docs/api.md`, § `vava_pause`). Relecture lore de
+  T-145 : le pied « Bannière des <label> » casse avec un article ou « Confrérie… » ; le module fournit la **tournure
+  complète** du pied de bannière (« Bannière de la Garde ») dans un champ ajouté au contrat, revalidé par
+  `vava_pause` (`shared/snapshot.lua`) et lu par la page (`guildFoot`).
 - Critères : créer la Garde et les Guérisseurs en jeu, recruter un second joueur, vérifier qu'un droit décoché est
   refusé par le serveur même en appelant le RPC directement.
 

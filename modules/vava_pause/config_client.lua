@@ -20,6 +20,10 @@ VavaPause.config = {
         focusWatchMs = 100,    -- guet du focus d'une autre interface
         graceMs = 300,         -- après qu'une interface a rendu le focus : un Échap reçu ne déploie rien
         noticeMs = 3000,       -- même refus non répété avant ce délai
+        -- SetPauseMenuActive(false) à chaque image, en plus du blocage d'Échap et de P : empêche le menu de GTA de
+        -- s'ouvrir par un autre chemin (manette), mais referme aussi un menu de GTA qu'un autre module ouvrirait. Essai
+        -- en jeu sans lui : pause 1-8 (false) ; s'il ne sert à rien, le retirer (relecture réseau R-2 de T-145).
+        holdPauseMenu = true,
     },
 
     open = {
@@ -45,6 +49,7 @@ VavaPause.config = {
 
     gamepad = {
         enabled = true,
+        pausedMs = 100,        -- menu natif ou Codex en panneau ouvert : manette relue à cet intervalle, pas par image
         controls = { up = 172, down = 173, left = 174, right = 175, accept = 201, back = 202, prevTab = 205,
                      nextTab = 206, resume = 199 },
     },
@@ -82,7 +87,7 @@ VavaPause.config = {
         list = {
             { key = 'ui.scale', tab = 'interface', kind = 'choice', default = 100, choices = { 90, 100, 115 },
               labels = { '90 %', '100 %', '115 %' }, uses = { 'vava_pause', 'vava_hud' },
-              label = 'Taille de l\'interface', help = 'Plus grande sur les écrans lointains.' },
+              label = 'Taille de l\'interface', help = 'Plus lisible de loin, sur un grand écran.' },
             { key = 'hud.notifyDuration', tab = 'interface', kind = 'choice', default = 'normale',
               choices = { 'courte', 'normale', 'longue' }, labels = { 'Courte', 'Normale', 'Longue' },
               uses = { 'vava_hud' },

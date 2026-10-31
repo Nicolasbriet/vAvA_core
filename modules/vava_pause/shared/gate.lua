@@ -7,7 +7,7 @@
     Dépendances : shared/constants.lua
 ]]
 
-local pairs = pairs
+local pairs, mathType = pairs, math.type
 
 local gate = {}
 VavaPause.gate = gate
@@ -44,6 +44,43 @@ function gate.decide(f)
     if kinds.combat then return false, 'combat', false end
     if kinds.other then return false, 'blocked', false end
     return true, f.downed and 'downed' or 'full'
+end
+
+-- Refus du serveur gardés par le client (relecture réseau R-1 de T-145) ----------------------------------------------
+
+--- Verdict d'un refus du serveur : valable `remainingMs` (combat : temps restant de la fenêtre, donné par le serveur),
+--- sinon `minMs`.
+---@param reason string
+---@param remainingMs any
+---@param now integer
+---@param minMs integer
+---@return { reason: string, untilMs: integer }
+function gate.remember(reason, remainingMs, now, minMs)
+    local span = minMs
+    if mathType(remainingMs) == 'integer' and remainingMs > 0 then span = remainingMs end
+    return { reason = reason, untilMs = now + span }
+end
+
+--- Raison du verdict s'il vaut encore, sinon nil : la bannière est refusée sur place, sans redemander au serveur.
+---@param verdict { reason: string, untilMs: integer }|nil
+---@param now integer
+---@return string|nil
+function gate.standing(verdict, now)
+    if verdict and now < verdict.untilMs then return verdict.reason end
+    return nil
+end
+
+--- Débit dépassé à l'ouverture : jamais d'ouverture contre un refus encore valable. `true, 'reuse'` (instantané
+--- précédent repris), `true, 'empty'` (ouverte sans données du serveur) ou `false, raison`.
+---@param verdict { reason: string, untilMs: integer }|nil
+---@param now integer
+---@param hasReusable boolean
+---@return boolean ok
+---@return string modeOrReason
+function gate.onRateLimited(verdict, now, hasReusable)
+    local reason = gate.standing(verdict, now)
+    if reason then return false, reason end
+    return true, hasReusable and 'reuse' or 'empty'
 end
 
 --- Vrai si ce refus est muet.

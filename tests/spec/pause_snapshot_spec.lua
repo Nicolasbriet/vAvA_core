@@ -83,6 +83,14 @@ describe('vava_pause : instantané d\'ouverture', function()
             assert.is_nil(snapshot.guild('Rive', CHARGES, 'croix'))
         end)
 
+        it('invisibles et sens d\'écriture refusés (relecture sécurité S-1)', function()
+            for _, char in ipairs({ '\226\128\139', '\226\128\174', '\226\129\167', '\216\156', '\239\187\191' }) do
+                assert.is_nil(snapshot.guild(guild({ label = 'Tisserands' .. char .. ' de la Rive' }), CHARGES, 'croix'))
+            end
+            local out = snapshot.skills({ view('peche', 'P\226\128\174che', 3) }, 32)
+            assert.same({}, out)
+        end)
+
         it('meuble inconnu : meuble par défaut', function()
             assert.equal('croix', snapshot.guild(guild({ charge = 'dragon' }), CHARGES, 'croix').charge)
             assert.equal('croix', snapshot.guild(guild({ charge = 'a b' }), CHARGES, 'croix').charge)

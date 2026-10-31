@@ -128,7 +128,7 @@ test('âge d\'une demande', () => {
 });
 test('refus du Conseil', () => {
   eq(M.councilError('too_soon', 49.2), 'Patientez encore 50 s avant une nouvelle demande.');
-  eq(M.councilError('too_many'), 'Deux demandes attendent déjà le Conseil.');
+  eq(M.councilError('too_many'), 'Vos demandes attendent déjà le Conseil : patientez qu\'il y réponde.');
   eq(M.councilError('too_short'), 'Quelques mots de plus, s\'il vous plaît.');
   eq(M.councilError('council_unavailable'), 'Le Conseil ne siège pas en ce moment : revenez plus tard.');
   eq(M.councilError('full'), 'La demande n\'a pas pu partir.');

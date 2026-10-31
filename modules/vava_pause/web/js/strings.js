@@ -95,7 +95,7 @@ const STRINGS = Object.freeze({
     errors: {
       too_short: 'Quelques mots de plus, s\'il vous plaît.',
       too_soon: (s) => `Patientez encore ${s} s avant une nouvelle demande.`,
-      too_many: 'Deux demandes attendent déjà le Conseil.',
+      too_many: 'Vos demandes attendent déjà le Conseil : patientez qu\'il y réponde.',
       council_unavailable: 'Le Conseil ne siège pas en ce moment : revenez plus tard.',
       default: 'La demande n\'a pas pu partir.',
     },

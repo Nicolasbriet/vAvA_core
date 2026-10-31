@@ -27,6 +27,7 @@ mesure du resmon et remontée des écarts : [LISEZMOI.md](LISEZMOI.md).
 | 1-5 | Ouvrir l'inventaire, le fermer par Échap ; idem Codex (F1) et livre des compétences (K). | L'interface se ferme ; la bannière ne s'ouvre pas dans la foulée. |
 | 1-6 | `resmon 1`, personnage immobile, bannière fermée, 30 s. | `vava_pause` ≤ 0,02 ms. Bannière ouverte : ≤ 0,15 ms. |
 | 1-7 | `restart vava_pause` bannière ouverte. | Souris et clavier rendus ; HUD réaffiché ; Échap rouvre la bannière. |
+| 1-8 | Essai sans `SetPauseMenuActive(false)` (relecture réseau R-2) : `intercept.holdPauseMenu = false` dans `config_client.lua` de `vava_pause`, `restart vava_pause` ; refaire 1-1 et 1-2 (Échap, P, Start à la manette), et ouvrir la carte depuis la bannière (5-1). Remettre `true` ensuite. | Si le menu de GTA ne s'ouvre jamais, même une image : le blocage de 199 et 200 suffit, noter que l'appel peut être retiré. S'il apparaît : le garder. |
 
 ## 2. Quand la bannière ne s'ouvre pas, ou se réduit
 
@@ -37,7 +38,7 @@ mesure du resmon et remontée des écarts : [LISEZMOI.md](LISEZMOI.md).
 | 2-3 | **(2 joueurs)** A ouvre la bannière ; B le frappe. | La bannière de A se replie : « Le monde vous rappelle à lui : la bannière se replie. » |
 | 2-4 | `devCuffCommand = 'essai_ligote'` (config_client.lua), `restart vava_pause`, `/essai_ligote`, Échap ; `/essai_ligote` de nouveau ; remettre `''` ensuite. | « Les mains liées, vous ne pouvez déployer la bannière. » ; une fois déliée, la bannière s'ouvre. Ligoté bannière ouverte : elle se replie avec le même message. |
 | 2-5 | Une chute n'est pas un combat : sauter d'un muret (perte de vie native, sans tomber à terre), Échap aussitôt. | La bannière s'ouvre. |
-| 2-6 | Spammer Échap pendant un refus (combat). | Le message ne revient pas plus d'une fois toutes les 3 s. |
+| 2-6 | Spammer Échap pendant un refus (combat), au moins dix appuis en 5 s ; puis attendre la fin des 10 s et appuyer de nouveau. | Le message ne revient pas plus d'une fois toutes les 3 s ; la bannière ne se déroule jamais, même un instant, ni après le 5ᵉ appui (débit du serveur dépassé) ; `/vava_reseau ressource vava_pause` : une seule demande `open` pour toute la rafale (relecture réseau R-1). Après les 10 s, la bannière s'ouvre. |
 
 ## 3. Personnage
 
@@ -84,14 +85,14 @@ mesure du resmon et remontée des écarts : [LISEZMOI.md](LISEZMOI.md).
 
 | # | Faire | Attendu |
 |---|---|---|
-| 7-1 | Le Conseil → Une question, 20 mots → Sceller et envoyer. | Encart « entre les mains du Conseil » ; le Souverain reçoit l'alerte « Question n° N de … » ; le Registre montre la nature et la position jointe. |
+| 7-1 | Le Conseil → Une question, 20 mots → Sceller et envoyer. | Encart « entre les mains du Conseil » ; le Souverain reçoit l'alerte « Question : demande n° N de … » ; le Registre montre la nature et la position jointe. |
 | 7-2 | Envoyer « aide ». | « Quelques mots de plus, s'il vous plaît. » |
 | 7-3 | Renvoyer une demande 10 s après. | « Patientez encore 50 s… » |
 | 7-4 | **(2 joueurs)** Le membre prend la demande en charge ; A rouvre la bannière. | Encart vert « prise en charge » ; notification sans nom du membre. |
 | 7-5 | Clore la demande ; A rouvre (avant 15 min, puis après). | Encart « close », puis plus d'encart. |
 | 7-6 | **(3 joueurs)** B (Gardien) et C (Gardien) ; A signale un joueur à 5 m de B, C loin. | B et C reçoivent l'alerte (décision 3 : aucun membre n'est écarté) ; au Registre, la demande « Signalement » nomme A et liste B parmi les témoins ; le journal de prise en charge nomme A. Aucun joueur hors du Conseil ne reçoit rien (A seul, à la prise en charge et à la clôture). |
 | 7-7 | `/signaler texte` (ancienne voie). | Demande « Autre » au Registre ; notification « transmis ». |
-| 7-8 | Trois demandes de suite (en attendant 60 s entre chaque), aucune prise en charge. | La troisième : « Deux demandes attendent déjà le Conseil. » |
+| 7-8 | Trois demandes de suite (en attendant 60 s entre chaque), aucune prise en charge. | La troisième : « Vos demandes attendent déjà le Conseil : patientez qu'il y réponde. » ; même texte pour une troisième `/signaler`. |
 | 7-9 | `stop vava_admin` ; rubrique Le Conseil. | « Le Conseil ne siège pas en ce moment… », envoi désactivé. |
 
 ## 8. Quitter
@@ -99,7 +100,7 @@ mesure du resmon et remontée des écarts : [LISEZMOI.md](LISEZMOI.md).
 | # | Faire | Attendu |
 |---|---|---|
 | 8-1 | Quitter Eldoria → Rester à Eldoria ; Échap dans le dialogue. | Le dialogue se ferme, la bannière reste. |
-| 8-2 | Se déconnecter ; revenir. | Message « Vous avez quitté Eldoria. Le royaume garde votre place. » ; retour au même endroit, même besace. |
+| 8-2 | Se déconnecter ; revenir. | Message « Votre personnage vous attend là où vous l'avez laissé. » ; retour au même endroit, même besace. |
 | 8-3 | Quitter le jeu. | Le jeu se ferme (ou, à défaut, après 1,5 s, déconnexion avec « Vous avez quitté Eldoria : vous pouvez fermer le jeu. »). |
 | 8-4 | **(2 joueurs)** A à terre se déconnecte par la bannière réduite ; revient. | A est encore à terre (garantie de `vava_health`). |
 

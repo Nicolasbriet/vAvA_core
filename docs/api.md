@@ -1388,7 +1388,7 @@ voulu (l'écran des joueurs non plus, voir plus bas).
 | `ban(compte, heures, motif)` | `true, n° du ban` ou `false, code` — au journal sous le nom du module appelant |
 | `kick(source, motif)` | `true` ou `false, code` |
 | `log(source, libellé, détails?)` | `true` ou `false, code` — inscrit au journal une action d'un membre du Conseil faite dans un module (libellé lu tel quel, 32 caractères ; détails `{ clé = texte ou nombre }`, 8 au plus) ; depuis 1.1.0 |
-| `submitRequest(source, nature, texte, position)` | `true, { id, kind, state = 'sent', age = 0 }` ou `false, code[, secondes]` — demande au Conseil au nom d'un joueur (1.10.0, bannière de `vava_pause`) ; réservé aux ressources de `requests.callers` (`not_allowed`, une ligne de console par minute et par ressource) ; `nature` dans `requests.kinds` (`invalid_kind`) ; texte de 1 à 500 octets, `position` booléen (`invalid_args`) ; `no_session`, `too_soon` (+ secondes restantes, `reportCooldownMs`), `too_many` (`requests.maxOpenPerAccount` demandes ouvertes du compte), `full` ; aucune notification au joueur |
+| `submitRequest(source, nature, texte, position)` | `true, { id, kind, state = 'sent', age = 0 }` ou `false, code[, secondes]` — demande au Conseil au nom d'un joueur (1.10.0, bannière de `vava_pause`) ; réservé aux ressources de `requests.callers` (`not_allowed`, une ligne de console par minute et par ressource) ; `nature` dans `requests.kinds` (`invalid_kind`) ; texte de 1 à 500 octets, `position` booléen (`invalid_args`) ; `no_session`, `invalid_text`, `too_short` (texte normalisé, voir plus bas), `too_soon` (+ secondes restantes, `reportCooldownMs`), `too_many` (`requests.maxOpenPerAccount` demandes ouvertes du compte), `full` ; aucune notification au joueur |
 | `requestOf(source)` | `{ id, kind, state, age }` ou `nil` — demande du compte du joueur (1.10.0) : la plus récente ouverte (`sent`, ou `claimed` si un membre l'a prise), sinon la dernière close depuis moins de `requests.closedMemoryMs` (15 min, `closed`) ; `age` en secondes ; réservé aux ressources de `requests.callers` |
 
 **Demandes au Conseil** (1.10.0, T-145) : `/signaler` et la bannière passent par le même chemin. Chaque demande a une
@@ -1400,9 +1400,13 @@ de compte et nom de personnage. Une demande de plus que `requests.maxOpenPerAcco
 (`too_many`, `/signaler` compris). Le Conseil voit l'auteur, la nature, la position et les témoins au Registre ; le
 journal de prise en charge et de clôture nomme l'auteur (décision du porteur du projet, 31 octobre 2026). Rien n'est
 jamais envoyé aux témoins ni à aucun joueur hors du Conseil, hormis l'auteur (prise en charge, clôture, sans nom du
-membre). L'alerte part à tous les membres en ligne qui ont le droit `reports` (`messages.requestNew` : « Question n° 12
-de … »). Mémoire seulement, rien de plus en base ; la création est une ligne de console `info` (n°, nature, compte).
-Pure et testée : `shared/requests.lua` (servi au seul serveur ; `tests/spec/admin_requests_spec.lua`). Un `config.lua`
+membre). L'alerte part à tous les membres en ligne qui ont le droit `reports` (`messages.requestNew` : « Question : demande
+n° 12 de … »). Mémoire seulement, rien de plus en base ; la création est une ligne de console `info` (n°, nature, compte).
+Texte normalisé pour les deux chemins (`/signaler` compris) : UTF-8 valide ; contrôles (sauf le saut de ligne),
+caractères invisibles et marques de sens d'écriture (U+200B–200F, U+2028–202E, U+2066–2069, U+061C, U+FEFF) refusés
+(`invalid_text`) ; espaces et sauts répétés retirés ; `requests.minChars` (10) caractères au moins (`too_short`),
+`requests.maxLines` (12) lignes au plus. Pure et testée : `shared/requests.lua` (servi au seul serveur ;
+`tests/spec/admin_requests_spec.lua`). Un `config.lua`
 d'avant 1.10.0 (sans `requests`) : `/signaler` marche comme avant, la bannière reçoit `not_allowed`, une ligne `warn` au
 démarrage.
 
@@ -2379,20 +2383,23 @@ facultatif. Aucune table en base. Détail et réglages : `modules/vava_pause/REA
   `restrained`), en combat (blocage `combat`), bloqué (blocage `other`). **À terre** n'est pas un refus : bannière
   **réduite** (Reprendre, Paramètres du jeu, Quitter ; décision 2), décidée par le serveur.
 - **Serveur** : RPC `vava_pause:open(versionDesTouches)` (24 octets, `^[%w%-]*$` ; débit 4 puis 1 / 4 s) : `not_ready`,
-  `no_character`, `combat` (fenêtre de **10 s** après tout coup donné ou reçu au crochet after de `vava_health:hit`,
-  annulé compris, hors `privation` et `monde`), crochet `vava_pause:opening` (`before`, `{ source, characterId,
+  `no_character`, `combat` (+ millisecondes restantes : le client refuse sur place jusque-là, et un débit dépassé
+  n'ouvre jamais la bannière contre ce refus ; fenêtre de **10 s** après tout coup donné ou reçu au crochet after de
+  `vava_health:hit`, annulé compris sauf refusé à l'étape `before`, hors `privation` et `monde`), crochet `vava_pause:opening` (`before`, `{ source, characterId,
   downed }` ; refus `combat` ou `restrained` gardés, tout autre → `busy`) ; puis `true, { downed = true }` à terre, sinon
   `true, { skills = { { id, label, level, rank, rankLabel } } (32 au plus), guild? = { label, short, grade?, cloth,
   clothDark, field, charge }, people, council, request? = { id, kind, state, age }, keysVersion, keys? }` — `keys`
-  (touches `kind = 'key'`, portée `player`, 48 au plus) seulement si la version gardée par le client diffère. Aucune
-  attente de la base ; ≈ 1 Ko, ≈ 3,4 Ko la première fois.
+  (touches `kind = 'key'`, portée `player`, 48 au plus) seulement si la version gardée par le client diffère (et la page
+  ne la reçoit elle aussi qu'à son changement). Textes revalidés : contrôles, caractères invisibles et marques de sens
+  d'écriture refusés. Aucune attente de la base ; ≈ 1 Ko, ≈ 3,4 Ko la première fois.
 - `vava_pause:council(nature, texte, position)` (`question | player | bug | other` ; 1 à 500 octets ; booléen ; 2 puis
-  1 / min) : texte normalisé (`shared/council.lua` : UTF-8, contrôles refusés sauf le saut de ligne, espaces et sauts
-  répétés retirés, 12 lignes, 10 caractères au moins), puis `vava_admin:submitRequest` → `true, { id, kind, state,
+  1 / min) : `vava_admin:submitRequest`, qui normalise le texte comme pour `/signaler` (`vava_admin/shared/requests.lua`)
+  → `true, { id, kind, state,
   age }` ou `false, code[, secondes]` (`too_short`, `invalid_text`, `too_soon`, `too_many`, `full`,
   `council_unavailable`, `no_character`).
 - `vava_pause:leave(mode)` (`disconnect | quit` ; 2 puis 1 / 10 s) : l'appelant seul, déconnecté 200 ms après la
-  réponse (même session), avec `leave.messages[mode]`.
+  réponse (même session), avec `leave.messages[mode]` ; ligne `info` de console avec le temps de combat restant et
+  l'état à terre.
 - **Aucun évènement serveur → client, aucun state bag, aucun GlobalState.**
 
 | Export | Retour |

@@ -57,6 +57,10 @@ local state = {
 -- le serveur refuse pour débit).
 local keysCache = { version = '', list = nil }
 local last = { data = nil, at = nil }
+-- Version de la liste des touches que la page a déjà (relecture réseau R-4 : la liste ne repart que si elle change).
+local sentKeys = ''
+-- Dernier refus du serveur encore valable { reason, untilMs } (relecture réseau R-1) : refusé sur place jusque-là.
+local verdict = nil
 -- Blocages posés par d'autres modules : `<ressource>:<id>` → { owner, kind }.
 local blocks, blockCount = {}, 0
 -- Refus déjà montrés (raison → moment), pour ne pas les répéter.
@@ -136,12 +140,25 @@ local function format(answer)
         plaque = { people = people and plaque.people(people, cfg.plaque.people) or nil },
         council = answer.council == true,
         request = type(answer.request) == 'table' and answer.request or nil,
-        keys = keysCache.list,   -- absente : la page garde la liste précédente
-        keyLabels = keyLabels(),
     }
 end
 
---- Réponse du RPC d'ouverture : 'ok', données | 'refused', raison | 'rate_limited' | 'failed'.
+--- Copie de données pour la page, avec la liste des touches seulement si la page ne l'a pas encore dans cette version
+--- (absente : la page garde la sienne).
+---@param data table
+---@return table
+local function withKeys(data)
+    local copy = {}
+    for key, value in pairs(data) do copy[key] = value end
+    if keysCache.list and keysCache.version ~= sentKeys then
+        copy.keys = keysCache.list
+        sentKeys = keysCache.version
+    end
+    return copy
+end
+
+--- Réponse du RPC d'ouverture : 'ok', données | 'refused', raison | 'rate_limited' | 'failed'. Un refus est gardé
+--- (`verdict`) : pour un combat, le temps restant donné par le serveur ; sinon `noticeMs`.
 ---@param reply table  résultats de core.rpc.callWith (table.pack)
 ---@return string outcome
 ---@return any value
@@ -150,10 +167,14 @@ local function interpret(reply)
     if not ok then return success == 'rate_limited' and 'rate_limited' or 'failed' end
     if not success then
         if value == 'combat' or value == 'restrained' or value == 'busy' or value == 'no_character' then
+            if value ~= 'no_character' then
+                verdict = gate.remember(value, reply[4], GetGameTimer(), cfg.intercept.noticeMs)
+            end
             return 'refused', value
         end
         return 'failed'
     end
+    verdict = nil
     if type(value) ~= 'table' then return 'failed' end
     local data = format(value)
     last.data, last.at = data, GetGameTimer()
@@ -202,7 +223,7 @@ local function watch(run)
             Wait(cfg.open.watchMs)
             if not state.open or state.run ~= run then return end
             local health = sources.health()
-            if not core.characters.current() then
+            if not intercept.armed() then
                 close()
             elseif state.mode == 'full' and health and health.downed then
                 close(messages.interrupted)
@@ -243,17 +264,19 @@ local function show(mode, data, failed)
     state.rubric = mode == 'downed' and DOWNED_RUBRIC or DEFAULT_RUBRIC
     state.lastRubric = state.rubric
     state.codex, state.native = false, false
+    state.labelsSent = keysCache.list ~= nil
     local health = sources.health()
     state.baseline = health and health.health or nil
     -- false : le registre ne répond pas ; absente : il se consulte (les données suivront)
-    local served = data
+    local served = data and withKeys(data) or nil
     if failed then served = false end
     local message = {
         rubric = state.rubric,
         ['local'] = localData(),
         data = served,
         settings = { defs = store.definitions(), values = store.values() },
-        keyLabels = keyLabels(),
+        -- touches liées relues une fois par ouverture (R-4), ici si la liste est connue, sinon avec les données
+        keyLabels = keysCache.list and keyLabels() or nil,
         resources = {
             codex = sources.started(CODEX), sheet = sources.started(cfg.sheet.resource),
             voice = sources.started(VOICE), council = sources.started(ADMIN),
@@ -270,7 +293,7 @@ local function show(mode, data, failed)
     nui.setFocus(true)
     nui.send('open', message)
     core.hooks.runAfter(HOOKS.STATE, { open = true })
-    gamepad.start(isOpen, onNav)
+    gamepad.start(isOpen, onNav, function() return state.native or state.codex end)
     watch(state.run)
 end
 
@@ -280,16 +303,28 @@ end
 local function late(run, reply)
     local outcome, value = interpret(reply)
     if not state.open or state.run ~= run then return end
+    local refusal = outcome == 'refused' and value or nil
+    local reuse = nil
+    if outcome == 'rate_limited' then
+        -- débit dépassé : jamais d'ouverture contre un refus encore valable (R-1)
+        local allowed, how = gate.onRateLimited(verdict, GetGameTimer(), reusable() ~= nil)
+        if allowed then reuse = how else refusal = how end
+    end
     if outcome == 'ok' then
         state.mode = value.downed and 'downed' or 'full'
-        nui.send('data', value)
-    elseif outcome == 'refused' then
-        nui.send('refused', { reason = value })
+        local data = withKeys(value)
+        if not state.labelsSent and keysCache.list then
+            data.keyLabels = keyLabels()
+            state.labelsSent = true
+        end
+        nui.send('data', data)
+    elseif refusal then
+        nui.send('refused', { reason = refusal })
         close()
-        notifyRefusal(value)
+        notifyRefusal(refusal)
     else
-        local reused = outcome == 'rate_limited' and reusable() or nil
-        nui.send('data', reused or { unavailable = true })
+        local reused = reuse == 'reuse' and reusable() or nil
+        nui.send('data', reused and withKeys(reused) or { unavailable = true })
     end
 end
 
@@ -307,6 +342,13 @@ local function tryOpen()
     })
     if not ok then
         if not muted then notifyRefusal(how) end
+        return
+    end
+    -- dernier refus du serveur encore valable (combat : jusqu'à la fin de la fenêtre) : refusé sur place, sans
+    -- redemander ni dérouler (relecture réseau R-1)
+    local standing = gate.standing(verdict, GetGameTimer())
+    if standing then
+        notifyRefusal(standing)
         return
     end
     if not nui.isReady() then
@@ -340,9 +382,16 @@ local function tryOpen()
             show(value.downed and 'downed' or 'full', value, false)
         elseif outcome == 'refused' then
             if value ~= 'no_character' then notifyRefusal(value) end
+        elseif outcome == 'rate_limited' then
+            local allowed, mode = gate.onRateLimited(verdict, GetGameTimer(), reusable() ~= nil)
+            if not allowed then
+                notifyRefusal(mode)
+            else
+                local reused = mode == 'reuse' and reusable() or nil
+                show(reused and (reused.downed and 'downed' or 'full') or how, reused, reused == nil)
+            end
         else
-            local reused = outcome == 'rate_limited' and reusable() or nil
-            show(reused and (reused.downed and 'downed' or 'full') or how, reused, reused == nil)
+            show(how, nil, true)
         end
         return
     end
@@ -552,6 +601,7 @@ local function disarm()
     close()
     keysCache.version, keysCache.list = '', nil
     last.data, last.at = nil, nil
+    sentKeys, verdict = '', nil
 end
 
 core.hooks.after('core:character:spawning', function() intercept.arm(true) end)

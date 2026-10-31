@@ -64,7 +64,7 @@ const DevMock = (() => {
     closed: { id: 11, kind: 'bug', state: 'closed', age: 300 },
   };
   const defs = [
-    { key: 'ui.scale', tab: 'interface', kind: 'choice', default: 100, choices: [90, 100, 115], labels: ['90 %', '100 %', '115 %'], label: 'Taille de l\'interface', help: 'Plus grande sur les écrans lointains.' },
+    { key: 'ui.scale', tab: 'interface', kind: 'choice', default: 100, choices: [90, 100, 115], labels: ['90 %', '100 %', '115 %'], label: 'Taille de l\'interface', help: 'Plus lisible de loin, sur un grand écran.' },
     { key: 'hud.notifyDuration', tab: 'interface', kind: 'choice', default: 'normale', choices: ['courte', 'normale', 'longue'], labels: ['Courte', 'Normale', 'Longue'], label: 'Durée des notifications', help: 'Le temps qu\'un message reste à l\'écran.' },
     ...(params.get('voice') === '0' ? [] : [{ key: 'voice.circle', tab: 'voix', kind: 'lever', default: true, label: 'Cercle de portée au sol', help: 'Montre jusqu\'où porte votre voix quand vous en changez.' }]),
   ];
