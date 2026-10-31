@@ -874,7 +874,9 @@ maquettes.
   redémarrage.
 
 ### T-102 — Outil de placement et créateur de récolte
-- Agents : vava-architecte → vava-dev-lua + vava-dev-nui · Dépend de : T-101, T-015, T-141 · Statut : à faire
+- Agents : vava-architecte → vava-dev-lua + vava-dev-nui · Dépend de : T-101, T-015, T-141 · Statut : en cours
+- Spec : `docs/plan/specs/T-102.md`, avec les décisions du porteur du projet du 31 octobre 2026 (essai à blanc, recommandations
+  retenues).
 - Outil de placement commun (point, point orienté avec modèle, cercle, polygone ; aperçu vert/rouge ; molette,
   `Maj`, clic droit, `Ctrl+Z`, `Échap` ; barre des touches) sur le modèle de l'éditeur de `vava_voice`.
 - `vava_gathering` déclare ses éditeurs zone et point (maquette `Recolte`) ; « Tester la récolte » en essai.
