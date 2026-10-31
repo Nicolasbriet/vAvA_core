@@ -14,7 +14,12 @@ déclare l'eau de la dotation) et `vava_codex`, avant `vava_chancellerie`. Facul
 lui, celles du jeu), `vava_admin` (droit `give`, journal du Registre ; sans lui, ACE `vava_arrival.admin`), `vava_chat`
 (réponses de `/accueil` ; sans lui, une notification au seul membre).
 
-## Règles (config.lua)
+## Règles (config.lua, config_client.lua)
+
+Depuis 1.2.0 (T-132), les réglages sont dans deux fichiers et chacun n'est écrit qu'une fois : `config_client.lua`
+(clés marquées **(client)**) porte ce que lit le client, et le serveur aussi ; `config.lua` porte tout le reste, lu par
+le seul serveur, et complète la table sans réécrire une clé de `config_client.lua`. `messages.kit` (client) suit
+`kit.items` (serveur) : les tenir d'accord.
 
 | Règle | Défaut | Clé |
 |---|---|---|
@@ -23,13 +28,13 @@ lui, celles du jeu), `vava_admin` (droit `give`, journal du Registre ; sans lui,
 | Limite par compte | 3 dotations sur 30 jours glissants (réservées, données ou incertaines, personnages supprimés compris) ; au-delà, accueil sans dotation ; `max = 0` : aucune limite | `kit.perAccount` |
 | Modules qui déclarent des objets de la dotation (1.1.0) | `vava_provisions` (l'eau) : à son annonce `core:module:ready`, les dotations dues des personnages apparus sont reprises, comme au retour de l'inventaire, sans second accueil ; liste pure de noms de ressources (8 au plus, 64 octets) | `kit.providers` |
 | Objets déclarés s'ils manquent | `pain` (faim + 35), dessin `web/items/pain.svg` ; `eau` (soif + 40) est déclarée par `vava_provisions` depuis 1.1.0 (un seul propriétaire, même définition) | `items` |
-| Attente de l'accueil | 4 s après la réception, puis un essai par seconde, 30 s au plus | `welcome.delayMs`, `retryMs`, `maxWaitMs` |
-| Envois de l'accueil sans accusé | 3 au plus, un par session | `welcome.maxSends` |
-| Chapitre du Codex | `premiers_pas` : le Codex (1.5.0, T-023) s'ouvre sur l'onglet Lecture, chapitre « Premiers pas », page « Vivre à Eldoria » ; un chapitre de commandes (`vava_inventory`) ou une page de lecture sont aussi acceptés | `codex.chapter` |
+| Attente de l'accueil | 4 s après la réception, puis un essai par seconde, 30 s au plus | `welcome.delayMs`, `retryMs`, `maxWaitMs` **(client)** |
+| Envois de l'accueil sans accusé | 3 au plus, un par session | `welcome.maxSends` **(client, lu par le serveur)** |
+| Chapitre du Codex | `premiers_pas` : le Codex (1.5.0, T-023) s'ouvre sur l'onglet Lecture, chapitre « Premiers pas », page « Vivre à Eldoria » ; un chapitre de commandes (`vava_inventory`) ou une page de lecture sont aussi acceptés | `codex.chapter` **(client)** |
 | Commande du Conseil | `/accueil`, droit `give` (Sénéchal et au-dessus), ACE `vava_arrival.admin`, 2 s entre deux | `admin` |
 | Accusé de lecture | 2 d'avance, puis 1 par 20 s | `rateLimits.welcomed` |
 | Journal | 90 jours | `logRetentionDays` |
-| Textes | relus avec l'écran de chargement (T-021) ; notifications de 200 octets au plus, libellés du journal de 32 octets au plus ; `codexHint` cite la touche par défaut du Codex (F1) | `messages` |
+| Textes | relus avec l'écran de chargement (T-021) ; notifications de 200 octets au plus, libellés du journal de 32 octets au plus ; `codexHint` cite la touche par défaut du Codex (F1) | `messages.welcome`, `kit`, `codexHint` **(client)** ; `messages.admin`, `journal` |
 
 `startingItems` de `vava_inventory` reste vide : le remplir en même temps donnerait deux dotations.
 
@@ -89,6 +94,10 @@ Rien pour les joueurs anciens, rien pour les autres joueurs ; ni GlobalState, ni
 de plus : l'inventaire n'envoie un conteneur qu'à qui l'a ouvert. Côté client : aucune boucle au repos (0,00 ms), un
 thread borné par accueil reçu.
 
+Fichiers téléchargés par chaque joueur (1.2.0, T-132) : `shared/constants.lua`, `config_client.lua`,
+`shared/screen.lua` et les deux `client/*.lua` (≈ 11,4 Ko de Lua, ≈ 5,1 Ko compressés, contre ≈ 24,1 et 9,5 avant),
+plus le dessin du pain ; `config.lua` et `shared/rules.lua` sont servis au seul serveur.
+
 ## Conseil (droit `give`)
 
 `/accueil etat <n°>` : état de la dotation et de l'accueil du personnage en jeu (lecture seule). `/accueil redoter <n°>` :
@@ -103,7 +112,22 @@ rejoué »). Console du serveur : `accueil etat <n°>`. Sans droit : rien, aucun
 `ensure vava_arrival` après `ensure vava_codex` (la Chancellerie le place seule). La migration crée les deux tables au
 premier démarrage. Le chapitre « Premiers pas » existe depuis `vava_codex` 1.5.0 (T-023) ; avec un Codex plus
 ancien, le livre s'ouvre à son index, sans erreur. Pour essayer un chapitre de commandes : `codex.chapter =
-'vava_inventory'`, puis `restart vava_arrival` (à remettre ensuite).
+'vava_inventory'` dans `config_client.lua`, puis `restart vava_arrival` (à remettre ensuite).
+
+**Mise à jour vers 1.2.0 (T-132)** : l'attente de l'accueil, le chapitre du Codex et les trois textes du nouveau venu ont
+quitté `config.lua` pour `config_client.lua` ; `shared/screen.lua` est nouveau. Un `config.lua` modifié et gardé par
+l'installeur de la Chancellerie (le nouveau posé en `config.lua.nouveau`) garde l'ancienne forme : le module démarre,
+mais la console le signale (« config.lua garde la forme d'avant 1.2.0 … ») et un réglage client changé dans ce fichier
+reste sans effet. Reportez vos réglages dans `config.lua` et `config_client.lua` d'après les nouveaux fichiers.
+
+## Fichiers
+
+| Fichier | Rôle |
+|---|---|
+| `config_client.lua` | réglages lus par le client (attente de l'accueil, chapitre du Codex, textes du nouveau venu) : téléchargé par chaque joueur, ouvre `VavaArrival.config` |
+| `config.lua` | tous les autres réglages, servi au seul serveur (en tête des `server_scripts`) : complète la table |
+| `shared/screen.lua` | pur, lu par le client : écran prêt pour l'accueil |
+| `shared/rules.lua` | pur, servi au seul serveur : dotation, limite du compte, plan d'une apparition, `/accueil`, textes du Conseil |
 
 **Personnages anciens jamais joués.** La première venue se lit sur le temps de jeu mesuré par le core : un personnage
 créé avant la migration `0003_play_seconds.sql` du core (0.6.0) et jamais joué depuis est resté à `play_seconds = 0`
@@ -118,7 +142,7 @@ Assets à brancher : aucun dans le module. Le point d'arrivée définitif se rè
 
 ## Tests
 
-Hors jeu : `tests/spec/arrival_rules_spec.lua` (règles pures et config, l'eau lue dans la config de
+Hors jeu : `tests/spec/arrival_rules_spec.lua` (règles pures, écran prêt et config, l'eau lue dans la config de
 `vava_provisions`), `tests/spec/arrival_kit_spec.lua` (chargement, dotation, reprise à l'annonce de `vava_provisions`,
 accueil, accusé, `/accueil` avec des doublures de la base et de l'inventaire). En jeu : `docs/tests/accueil.md` (§ 4 bis
 pour l'eau).

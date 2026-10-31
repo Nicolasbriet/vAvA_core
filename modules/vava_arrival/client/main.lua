@@ -6,7 +6,7 @@
            notifications du HUD, ouvre le Codex au chapitre de la config (ou rappelle sa touche), puis accuse lecture.
            Un nouvel accueil ou le retour à la sélection annule l'attente en cours. Le client ne décide de rien : il
            affiche, et l'accusé ne fait que retirer son propre accueil.
-    Dépendances : shared/constants.lua, config.lua, shared/rules.lua, client/core.lua
+    Dépendances : shared/constants.lua, config_client.lua, shared/screen.lua, client/core.lua
 ]]
 
 local type, pcall, tostring = type, pcall, tostring
@@ -20,7 +20,7 @@ local core = VavaArrival.core
 if not core then return end
 
 local cfg = VavaArrival.config
-local rules = VavaArrival.rules
+local screen = VavaArrival.screen
 local EVENTS = VavaArrival.EVENTS
 local RPC = VavaArrival.RPC
 local MAX_REPLY = VavaArrival.MAX_REPLY
@@ -68,7 +68,7 @@ end
 
 ---@return boolean
 local function screenReady()
-    return rules.welcomeReady({ paused = IsPauseMenuActive(), nuiFocused = IsNuiFocused(), fadedIn = IsScreenFadedIn() })
+    return screen.ready({ paused = IsPauseMenuActive(), nuiFocused = IsNuiFocused(), fadedIn = IsScreenFadedIn() })
 end
 
 --- Vrai tant que l'accueil `mine` est toujours le dernier reçu et que le personnage n'a pas changé.

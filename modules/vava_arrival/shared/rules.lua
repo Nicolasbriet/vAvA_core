@@ -2,8 +2,9 @@
     vava_arrival/shared/rules.lua
     Rôle : logique PURE de l'arrivée (aucune native, testée hors jeu : tests/spec/arrival_rules_spec.lua) : validation
            de la dotation et des modules qui en déclarent des objets, décision au chargement d'un personnage (première venue, ligne reprise, dotation
-           incertaine), plan d'une apparition (dotation, accueil), limite du compte, écran prêt pour l'accueil,
-           lecture de /accueil, textes d'état pour le Conseil.
+           incertaine), plan d'une apparition (dotation, accueil), limite du compte, lecture de /accueil, textes d'état
+           pour le Conseil. Servi au seul serveur (T-132) ; l'écran prêt pour l'accueil, seul lu par le client, est
+           dans shared/screen.lua.
     Dépendances : shared/constants.lua
 ]]
 
@@ -145,13 +146,6 @@ function rules.capSince(now, days)
     return now - floor(days * 86400)
 end
 
---- Vrai si l'écran est prêt pour l'accueil : ni menu pause, ni interface qui a le focus, écran ouvert (fondu fini).
----@param screen { paused: boolean, nuiFocused: boolean, fadedIn: boolean }
----@return boolean
-function rules.welcomeReady(screen)
-    return screen.paused ~= true and screen.nuiFocused ~= true and screen.fadedIn == true
-end
-
 --- Lit les arguments de /accueil : action (etat, redoter, rejouer) et numéro de joueur entier de 1 à 65 535.
 ---@param args any
 ---@return string|nil action
@@ -165,8 +159,8 @@ function rules.parseCommand(args)
     return action, player
 end
 
---- Date d'une ligne au format de la config (heure du serveur ; os.date lu ici seulement : le fichier est aussi chargé
---- par le client, qui n'en a pas besoin).
+--- Date d'une ligne au format de la config (heure du serveur ; os.date lu ici seulement, à l'usage : le fichier est
+--- servi au seul serveur).
 ---@param at any
 ---@param dateFormat string
 ---@return string
