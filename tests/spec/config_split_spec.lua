@@ -52,11 +52,6 @@ local MODULES = {
 -- Ressources sans Lua : aucun script, rien à découper.
 local WITHOUT_LUA = { ['modules/vava_ui'] = true }
 
--- Modules pas encore basculés (lots 2 à 4 de T-132), sautés par T0 à T3 ; chaque lot retire les siens, avec leurs
--- exceptions transitoires de scripts/audit-exceptions.txt.
-local PENDING = {
-}
-
 local SCRIPT_LISTS = {
     shared_script = 'shared', shared_scripts = 'shared',
     client_script = 'client', client_scripts = 'client',
@@ -532,32 +527,18 @@ local function cites(code, global, field)
 end
 
 describe('configs partagées (T-132)', function()
-    -- relectures S-3 et R-5 : les exceptions transitoires de l'audit et PENDING désignent les mêmes ressources, et une
-    -- exception qui ne couvre plus rien (manifeste déjà basculé) est signalée
-    it('exceptions « T-132 » de scripts/audit-exceptions.txt = PENDING, aucune morte', function()
+    -- T-143 : toutes les ressources sont basculées ; l'audit ne laisse plus rien taire les règles des manifestes de T-132
+    -- (config.lua servi, config_client.lua au seul serveur…). Une exception qui s'en réclamerait est refusée ici.
+    it('aucune exception « T-132 » ni exception de config dans un manifeste (scripts/audit-exceptions.txt)', function()
         local text = read('scripts/audit-exceptions.txt')
         assert(text, 'scripts/audit-exceptions.txt introuvable')
-        local excepted = {}
         for line in (text .. '\n'):gmatch('([^\n]*)\n') do
             local path, extract, reason = line:match('^([^\t#][^\t]*)\t([^\t]*)\t(.*)$')
-            if path and reason:match('^T%-132') then
-                local name = path:match('^[a-z]+/([^/]+)/fxmanifest%.lua$')
-                assert(name, 'exception T-132 hors d\'un manifeste : ' .. path)
-                assert.is_nil(excepted[name], 'deux exceptions T-132 pour ' .. name)
-                excepted[name] = true
-                local manifest = read(path)
-                assert(manifest, 'exception T-132 morte : ' .. path .. ' introuvable')
-                assert(manifest:find(extract, 1, true), 'exception T-132 morte : extrait absent de ' .. path)
-                local lists = parseManifest(manifest)
-                assert(indexOf(lists.shared, 'config.lua') or indexOf(lists.client, 'config.lua'),
-                    'exception T-132 morte : ' .. path .. ' ne sert plus config.lua (retirer l\'exception et PENDING)')
+            if path then
+                assert(not reason:match('T%-132'), 'exception de T-132 : ' .. line)
+                assert(not (path:match('fxmanifest%.lua$') and extract:lower():find('config', 1, true)),
+                    'exception de config dans un manifeste : ' .. line)
             end
-        end
-        for name in pairs(PENDING) do
-            assert(excepted[name], name .. ' est dans PENDING sans exception T-132 dans scripts/audit-exceptions.txt')
-        end
-        for name in pairs(excepted) do
-            assert(PENDING[name], name .. ' a une exception T-132 sans être dans PENDING')
         end
     end)
 
@@ -580,9 +561,7 @@ describe('configs partagées (T-132)', function()
     for _, mod in ipairs(MODULES) do
         local name = mod.dir:match('[^/]+$')
 
-        if PENDING[name] then
-            it(name .. ' : pas encore basculé', function() pending(PENDING[name] .. ' (lot de T-132)') end)
-        else describe(name, function()
+        describe(name, function()
             local manifest = read(mod.dir .. '/fxmanifest.lua')
             local lists = manifest and parseManifest(manifest) or { shared = {}, client = {}, server = {}, wild = {} }
             local hasClient, hasServer = exists(mod.dir .. '/config_client.lua'), exists(mod.dir .. '/config.lua')
@@ -695,7 +674,7 @@ describe('configs partagées (T-132)', function()
                     end
                 end
             end)
-        end) end
+        end)
     end
 end)
 

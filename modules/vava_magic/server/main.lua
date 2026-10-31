@@ -7,7 +7,7 @@
     Dépendances : tous les fichiers server/ du module
 ]]
 
-local ipairs, pairs, tonumber, tostring = ipairs, pairs, tonumber, tostring
+local ipairs, pairs, tonumber, tostring, mathType = ipairs, pairs, tonumber, tostring, math.type
 local AddEventHandler, GetPlayers, TriggerClientEvent = AddEventHandler, GetPlayers, TriggerClientEvent
 
 local core = VavaMagic.core
@@ -80,6 +80,12 @@ local function setup()
         VavaMagic.log.warn('config.lua garde la forme d\'avant 2.11.0 (il remplace la table de config_client.lua) : '
             .. 'les réglages lus par les joueurs (sorts, combinaisons, touches, textes affichés…) sont dans '
             .. 'config_client.lua ; reportez vos changements d\'après config.lua.nouveau')
+    end
+    -- borne d'un RPC prise dans config_client.lua (T-143) : un config_client.lua gardé par une mise à jour ou retouché
+    -- sans elle laisserait le message d'un Murmure à la borne par défaut du core ; le module ne démarre pas
+    local textMax = cfg.spells.murmure and cfg.spells.murmure.textMaxBytes
+    if mathType(textMax) ~= 'integer' or textMax < 1 then
+        return false, 'config_client.lua : spells.murmure.textMaxBytes doit être un nombre entier positif (borne d\'un RPC)'
     end
     local declared, declareErr = VavaMagic.commands.declare()
     if not declared then return false, 'commandes : ' .. tostring(declareErr) end

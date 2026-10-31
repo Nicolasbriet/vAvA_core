@@ -83,7 +83,7 @@ server_script 'config_client.lua'  -- attendu: BLOQUANT
 server_scripts { '*.lua' }  -- attendu: BLOQUANT
 -- shared_script 'config.lua'  -- attendu: rien
 --[[ client_script 'config.lua' ]] client_script 'client/a.lua'  -- attendu: rien
-shared_scripts { 'config.lua' } -- exception transitoire  -- attendu: rien
+shared_scripts { 'config.lua' } -- exception inscrite, sans effet (T-143)  -- attendu: BLOQUANT
 -- relecture : une table imbriquée garde sa directive ; deux directives sur une ligne
 client_scripts { { 'config.lua' } }  -- attendu: BLOQUANT
 server_scripts { 'config.lua' } shared_script 'config.lua'  -- attendu: BLOQUANT
