@@ -344,6 +344,46 @@ describe('vava_gathering atelier « Récolte »', function()
             assert.is_true(editing.validateZone({}, { action = 'remove' }, viewOf()))
         end)
 
+        -- contre-relecture C-1 (a) : une zone publiée déplacée seule (lot d'une fiche : validateLot n'est pas appelé)
+        it('zone publiée déplacée seule loin de ses points : refusée par validate (C-1 a)', function()
+            local data = editing.zoneData(cfg.zones[1])
+            local far = { x = -320.0, y = 650.0, z = 31.0, r = 120.0 }
+            local ok, errors = editing.validateZone(data, { action = 'publish', id = 'foret_brume', place = far,
+                bundle = { { kind = 'zone', id = 'foret_brume', removal = false } } }, viewOf())
+            assert.is_false(ok)
+            assert.equal('Ce point est hors de « Forêt de Brume ».', errors[1].text)
+            -- ses points dans le même lot : validateLot jugera le cercle neuf avec eux
+            assert.is_true(editing.validateZone(data, { action = 'publish', id = 'foret_brume', place = far,
+                bundle = { { kind = 'zone', id = 'foret_brume', removal = false },
+                    { kind = 'node', id = 'foret_brume_chene_1', parent = 'foret_brume', removal = false } } }, viewOf()))
+            -- déplacée de 5 m (vers l'ouest, loin de la mine) : ses points restent dedans
+            assert.is_true(editing.validateZone(data, { action = 'publish', id = 'foret_brume',
+                place = { x = -325.0, y = -880.0, z = 31.0, r = 120.0 },
+                bundle = { { kind = 'zone', id = 'foret_brume', removal = false } } }, viewOf()))
+        end)
+
+        it('zone déplacée loin avec tous ses points : le lot passe validateLot (C-1 b)', function()
+            local lot = { { kind = 'zone', id = 'foret_brume', removal = false,
+                data = editing.zoneData(cfg.zones[1]), place = { x = 3000.0, y = 3000.0, z = 31.0, r = 120.0 } } }
+            for i, id in ipairs({ 'foret_brume_chene_1', 'foret_brume_chene_2', 'foret_brume_pin_1' }) do
+                lot[#lot + 1] = { kind = 'node', id = id, parent = 'foret_brume', removal = false,
+                    place = { x = 3000.0 + 3 * i, y = 3000.0, z = 31.0, h = 0.0 },
+                    data = { nom = id, ressource = 'chene', charges = 3, repousse = 600 } }
+            end
+            assert.is_true(editing.validateLot(lot, viewOf()))
+        end)
+
+        -- contre-relecture C-5 : le nom part dans l'état et la carte, borné en octets
+        it('nom de plus de 80 octets refusé (lettres accentuées comprises), 80 accepté (C-5)', function()
+            local data = editing.zoneData(cfg.zones[1])
+            data.nom = string.rep('é', 41)
+            local ok, errors = editing.validateZone(data, { action = 'save', id = 'foret_brume' }, viewOf())
+            assert.is_false(ok)
+            assert.same({ field = 'nom', text = cfg.editor.texts.nameLong }, errors[1])
+            data.nom = string.rep('é', 40)
+            assert.is_true(editing.validateZone(data, { action = 'save', id = 'foret_brume' }, viewOf()))
+        end)
+
         it('la graine respecte ses propres règles (rayons, chevauchements de 10 m au plus)', function()
             local view = viewOf()
             for _, zone in ipairs(cfg.zones) do
@@ -533,6 +573,15 @@ describe('vava_gathering atelier « Récolte »', function()
             -- zone nouvelle (pas encore publiée) : jugée à l'essai et à la publication
             assert.is_true(editing.placeCheck('node', { x = 0.0, y = 0.0, z = 0.0, h = 0.0 },
                 { id = '', siblings = 1, parent = 'zone_neuve', data = { ressource = 'chene' } }, viewOf()))
+            -- contre-relecture C-4 : le genre jugé est celui du brouillon de la zone tenu par le membre
+            ok, why = editing.placeCheck('node', { x = 0.0, y = 0.0, z = 0.0, h = 0.0 },
+                { id = '', siblings = 1, parent = 'zone_neuve', data = { ressource = 'chene' }, parentData = { genre = 'eau' } },
+                viewOf())
+            assert.is_false(ok)
+            assert.equal(cfg.editor.texts.fishOnly, why)
+            assert.is_true(editing.placeCheck('node', { x = -120.0, y = -880.0, z = 29.0, h = 0.0 },
+                { id = '', siblings = 3, parent = 'riviere_claire', data = { ressource = 'chene' },
+                    parentData = { genre = 'foret' } }, viewOf()))
         end)
 
         it('point : refusé au-delà de 120 points dans sa zone après la pose', function()

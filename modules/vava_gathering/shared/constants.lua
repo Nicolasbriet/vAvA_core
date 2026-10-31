@@ -60,7 +60,7 @@ VavaGathering.EVENTS = {
 -- (ressource et lieu d'un point), en plus de `zone` (bande, cicatrice) et `n:<nœud>` (charges).
 VavaGathering.DEF_KEY = 'def'
 VavaGathering.PLACE_PREFIX = 'p:'
-VavaGathering.MAX_LABEL = 80          -- nom d'une zone dans l'état (octets)
+VavaGathering.MAX_LABEL = 160         -- nom d'une zone lu par le client (octets ; le serveur en permet 80)
 VavaGathering.MAX_KIND = 16           -- type de lieu
 VavaGathering.MAX_RESOURCE = 32       -- identifiant d'une ressource
 -- format compact de l'état (relecture réseau R-3 de T-102) : longueurs en centimètres, cap en dixièmes de degré

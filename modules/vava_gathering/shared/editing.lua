@@ -292,6 +292,9 @@ function editing.validateZone(data, ctx, view)
         end
     end
     if not view.kinds[data.genre] then push(errors, { field = 'genre', text = T.kind }) end
+    -- nom borné en octets (lettres accentuées comprises) : il part dans l'état de zone et la liste de la carte
+    -- (contre-relecture C-5)
+    if type(data.nom) == 'string' and #data.nom > s.nameBytes then push(errors, { field = 'nom', text = T.nameLong }) end
     local place = ctx.place
     if type(place) ~= 'table' then
         if ctx.action == 'trial' or ctx.action == 'publish' then push(errors, { text = T.noPlaceZone }) end
@@ -303,6 +306,21 @@ function editing.validateZone(data, ctx, view)
     end
     local other, depth = editing.overlap(place, ctx.id, view.zones, removedZones(ctx.bundle))
     if other and depth > s.overlapTolerance then push(errors, { text = format(T.overlap, other.label, ceil(depth)) }) end
+    -- zone publiée changée sans aucun de ses points dans le lot : ses points publiés sont jugés contre le cercle neuf
+    -- (dedans, cercle englobant ; validateLot n'est pas appelé pour un lot d'une fiche ; contre-relecture C-1)
+    if ctx.id and view.zone(ctx.id) and type(ctx.bundle) == 'table' then
+        local alone = true
+        for _, ref in ipairs(ctx.bundle) do
+            if ref.kind == 'node' and ref.parent == ctx.id then alone = false end
+        end
+        if alone then
+            local ok, lotErrors = editing.validateLot({ { kind = 'zone', id = ctx.id, data = data, place = place,
+                removal = false } }, view)
+            if not ok then
+                for _, item in ipairs(lotErrors) do push(errors, item) end
+            end
+        end
+    end
     return verdict(errors)
 end
 
@@ -457,9 +475,13 @@ function editing.placeCheck(kind, place, ctx, view)
     -- un poisson dans l'eau, rien d'autre dans l'eau : refusé dès le clic (relecture lore, risque R-3), si la zone est
     -- publiée (une zone nouvelle est jugée à l'essai et à la publication)
     if kind == 'node' and type(ctx.data) == 'table' and ctx.parent then
+        -- le genre de la zone telle que le membre la voit : son brouillon s'il en tient un, sinon la publiée
+        -- (contre-relecture C-4)
+        local parentData = type(ctx.parentData) == 'table' and ctx.parentData or nil
         local zone = view.zone(ctx.parent)
+        local genre = parentData and parentData.genre or (zone and zone.kind)
         local resource = view.resources[ctx.data.ressource]
-        local why = zone and resource and waterRule(resource, zone.kind, view)
+        local why = type(genre) == 'string' and resource and waterRule(resource, genre, view)
         if why then return false, why end
     end
     return true

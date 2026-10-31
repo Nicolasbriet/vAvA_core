@@ -370,13 +370,22 @@ function catalog.putNode(node)
     if not def then return false, err end
     local known = nodesById[def.id]
     local zoneId = def.zone.id
-    local list = {}
+    -- seul le point posé est contrôlé (nombre de points, distance au centre de sa zone) : ses frères d'un même lot
+    -- arrivent après lui, la zone entière est revue à la fin du lot (catalog.bounds ; contre-relecture C-1)
+    local count = 1
     for _, other in ipairs(nodesByZone[zoneId]) do
-        if other.id ~= def.id then list[#list + 1] = other end
+        if other.id ~= def.id then count = count + 1 end
     end
-    list[#list + 1] = def
-    local ok, boundsErr = checkBounds(def.zone, list)
-    if not ok then return false, boundsErr end
+    if count > VavaGathering.ZONE_MAX_NODES then
+        return false, format("zone '%s' : %d nœuds, %d au plus (clés de l'état d'une zone du core)", zoneId, count,
+            VavaGathering.ZONE_MAX_NODES)
+    end
+    local dx, dy = def.x - def.zone.x, def.y - def.zone.y
+    local distance = math.sqrt(dx * dx + dy * dy)
+    if distance > ZONE_MAX_RADIUS then
+        return false, format("zone '%s' : point à %.0f m de son centre, %.0f m au plus (rayon d'une zone du core)", zoneId,
+            distance, ZONE_MAX_RADIUS)
+    end
     local previous = nil
     if known then
         previous = known.zone.id
@@ -403,6 +412,19 @@ function catalog.dropNode(id)
     unlink(node)
     nodesById[id] = nil
     return node.zone.id
+end
+
+--- Bornes d'une zone du core pour une zone et ses nœuds actuels : true, ou false, la raison et le rayon englobant.
+---@param zoneId string
+---@return boolean ok
+---@return string|nil err
+---@return number|nil radius
+function catalog.bounds(zoneId)
+    local def = zonesById[zoneId]
+    if not def then return true end
+    local ok, err = checkBounds(def, nodesByZone[zoneId] or {})
+    if ok then return true end
+    return false, err, zonestate.area(def, nodesByZone[zoneId] or {}, margin()).radius
 end
 
 --- La graine telle que la config la donne (retour à l'original de l'Atelier) : { zones, nodes } (tables de la config,

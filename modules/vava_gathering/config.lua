@@ -106,6 +106,7 @@ config.editor = {
     -- bornes de l'abondance (relecture lore, risque R-1 : « ressources exploitées avec mesure ») : repos de la terre au
     -- plus 12 % de vitalité par heure, repousse d'une récolte en 5 min au moins
     restMax = 12,
+    nameBytes = 80,           -- nom d'une zone : 80 octets au plus (il part dans l'état de zone et la carte)
     regrowMin = 300,
     zoneKinds = {             -- choix « Type de lieu » (chaque valeur a son icône dans map.kinds, sinon celle par défaut)
         { value = 'foret', label = 'Forêt' }, { value = 'mine', label = 'Mine' },
@@ -122,6 +123,7 @@ config.editor = {
         publishHint = 'Publier rend les nouveaux points visibles aux joueurs proches.',
         trialLine = 'Mode essai : vous seul voyez ces points',
         name = 'Une autre zone porte déjà ce nom.',
+        nameLong = 'Ce nom est trop long (les lettres accentuées comptent double) : raccourcissez-le.',
         noPlaceZone = 'Placez la zone avant de l\'essayer ou de la publier.',
         noPlaceNode = 'Placez le point avant de l\'essayer ou de le publier.',
         radius = 'Le rayon doit aller de %d à %d m.',

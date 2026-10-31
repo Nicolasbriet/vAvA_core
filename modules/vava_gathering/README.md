@@ -150,7 +150,11 @@ Atelier gardé `vava_gathering:zones` (« Récolte », famille monde, droit `met
   vitalité et les charges d'une zone ou d'un point qui revient sont reprises de la base (les lignes ne sont jamais
   effacées : un retour en arrière retrouve la terre comme elle était) ; les charges sont ramenées au nouveau maximum ;
   une récolte en cours sur un point changé ou retiré est oubliée (`unknown_node` à la fin). Aucun objet de joueur n'est
-  touché.
+  touché. Une zone posée n'est contrôlée que pour son rayon, un point que pour lui (nombre de points de sa zone,
+  distance à son centre de 500 m au plus) ; au dernier appel du lot, chaque zone touchée doit tenir dans les bornes
+  d'une zone du core (sinon le lot est annulé par l'Atelier). Une zone publiée déplacée sans ses points est jugée
+  avec eux dès `validate` (ils doivent rester dans le cercle neuf). Nom d'une zone : 80 octets au plus
+  (`editor.nameBytes`, lettres accentuées comprises) ; le client en accepte 160.
 - **Diffusion** (consignes R-12 de l'Atelier) : `apply` et `remove` ne font que **noter** la zone ; au dernier appel du
   lot (`info.last`), chaque zone notée part une fois : déclarée entière si elle est nouvelle, déplacée si son cercle
   d'intérêt change puis sa **différence** (clés changées et retirées, par paquets de 64 dans le même tour : une seule

@@ -70,9 +70,22 @@ describe('vava_gathering atelier côté serveur', function()
             ensure = function(def) ensured.nodes[#ensured.nodes + 1] = def.id end,
             forget = function(id) forgotten.nodes[#forgotten.nodes + 1] = id end,
         }
+        local pending = {}
         VavaGathering.share = {
-            touch = function(id) touched[#touched + 1] = id end,
-            flush = function() flushes = flushes + 1 end,
+            touch = function(id)
+                touched[#touched + 1] = id
+                pending[id] = true
+            end,
+            pending = function()
+                local ids = {}
+                for id in pairs(pending) do ids[#ids + 1] = id end
+                table.sort(ids)
+                return ids
+            end,
+            flush = function()
+                flushes = flushes + 1
+                pending = {}
+            end,
         }
         VavaGathering.harvest = { forgetNode = function(id) staleNodes[#staleNodes + 1] = id end }
         helper.load('modules/vava_gathering/server/trials.lua')
@@ -209,6 +222,41 @@ describe('vava_gathering atelier côté serveur', function()
             assert.same({}, ensured.nodes)
         end)
 
+        -- relecture sécurité S-5, contre-relecture C-1 (b) : une zone déplacée loin avec tous ses points est publiée
+        it('zone déplacée loin avec ses trois points dans le même lot : appliquée, puis diffusée (S-5, C-1 b)', function()
+            local far = { x = 3000.0, y = 3000.0, z = 31.0, r = 120.0 }
+            assert.is_true(fn('apply')('zone', zoneDef({ id = 'foret_brume', nom = 'Forêt de Brume', place = far }),
+                { reason = 'publish', last = false }))
+            local ids = { 'foret_brume_chene_1', 'foret_brume_chene_2', 'foret_brume_pin_1' }
+            for i, id in ipairs(ids) do
+                local ok, err = fn('apply')('node', nodeDef(id, 3000.0 + 3 * i, { parent = 'foret_brume',
+                    place = { x = 3000.0 + 3 * i, y = 3000.0, z = 31.0, h = 0.0 } }),
+                    { reason = 'publish', last = i == #ids })
+                assert.is_true(ok, tostring(err))
+            end
+            assert.equal(1, flushes)
+            assert.is_true((catalog.bounds('foret_brume')))
+        end)
+
+        -- contre-relecture C-1 (défense) : au dernier appel du lot, une zone hors des bornes du core fait annuler le lot
+        it('zone déplacée seule loin de ses points : refusée au dernier appel, rien ne part (C-1)', function()
+            local ok, err = fn('apply')('zone', zoneDef({ id = 'foret_brume', nom = 'Forêt de Brume',
+                place = { x = -320.0, y = 650.0, z = 31.0, r = 120.0 } }), { reason = 'publish', last = true })
+            assert.is_false(ok)
+            assert.truthy(err:find('Forêt de Brume', 1, true))
+            assert.truthy(err:find('500 m au plus', 1, true))
+            assert.equal(0, flushes)
+        end)
+
+        it('un point posé n’est contrôlé que pour lui : à plus de 500 m de sa zone ou 121e, refusé (C-1)', function()
+            local ok, err = catalog.putNode({ id = 'foret_brume_loin', zone = 'foret_brume', resource = 'chene',
+                x = -320.0 + 501.0, y = -880.0, z = 31.0, charges = 1 })
+            assert.is_false(ok)
+            assert.truthy(err:find('500 m au plus', 1, true))
+            assert.is_true(catalog.putNode({ id = 'foret_brume_pres', zone = 'foret_brume', resource = 'chene',
+                x = -320.0 + 499.0, y = -880.0, z = 31.0, charges = 1 }))
+        end)
+
         it('point qui change de zone : les deux zones sont notées', function()
             fn('apply')('node', nodeDef('foret_brume_chene_1', -175.0, { parent = 'mine_du_val',
                 place = { x = -175.0, y = -1005.0, z = 29.0, h = 0.0 } }), { reason = 'publish', last = true })
@@ -332,6 +380,28 @@ describe('vava_gathering atelier côté serveur', function()
             assert.is_true(trials.take(SOURCE, 'bois_chene_1'))
             assert.is_false(trials.take(SOURCE, 'bois_chene_1'))
             assert.is_false(trials.take(5, 'bois_chene_1'))
+        end)
+
+        it('l’Atelier arrêté ou redémarré : tous les essais prennent fin chez leurs auteurs (sécurité S-4)', function()
+            fn('trial')('zone', zoneDef(), { source = SOURCE, accountId = ACCOUNT, reason = 'start', children = {
+                { kind = 'node', def = nodeDef('bois_chene_1', 2003.0) } } })
+            fn('trial')('zone', zoneDef({ id = 'autre' }), { source = 5, accountId = 8, reason = 'start', children = {} })
+            local count = #sent
+            -- un autre registre, ou un autre atelier retiré : rien
+            hooks['core:registry:dropped']({ registry = 'vava_gathering:tools' })
+            hooks['core:registry:removed']({ registry = 'vava_atelier:editors', key = 'autre:atelier' })
+            assert.equal(count, #sent)
+            hooks['core:registry:dropped']({ registry = 'vava_atelier:editors', owner = 'vava_atelier' })
+            assert.equal(count + 2, #sent)
+            assert.equal(VavaGathering.EVENTS.TRIAL_END, sent[#sent].event)
+            assert.is_nil(trials.node(SOURCE, 'bois_chene_1'))
+            -- l'atelier retiré du registre (Atelier redémarré) : même chose, sans rien renvoyer deux fois
+            fn('trial')('zone', zoneDef(), { source = SOURCE, accountId = ACCOUNT, reason = 'start', children = {} })
+            count = #sent
+            hooks['core:registry:removed']({ registry = 'vava_atelier:editors', key = 'vava_gathering:zones' })
+            assert.equal(count + 1, #sent)
+            hooks['core:registry:removed']({ registry = 'vava_atelier:editors', key = 'vava_gathering:zones' })
+            assert.equal(count + 1, #sent)
         end)
 
         it('auteur parti : plus rien ne lui est envoyé, son point d’essai n’est plus à personne', function()
@@ -482,6 +552,38 @@ describe('vava_gathering récolte d’un point d’essai (à blanc)', function()
         end
         assert.same({ false, 'no_charges' }, { harvest.begin(AUTHOR, 'bois_chene_1') })
         assert.equal(VavaGathering.config.messages.noCharges, notes[#notes])
+    end)
+
+    it('ne touche jamais la vitalité réelle : calcul sur une copie, au rythme de la zone publiée (sécurité S-1)', function()
+        local real = { vitality = 50.0, updatedAt = os.time() - 3600, scarredUntil = nil }
+        local refreshed
+        VavaGathering.zones.state = function() return real end
+        VavaGathering.zones.refresh = function(def, state)
+            refreshed = def
+            state.vitality = state.vitality + def.regenPerHour
+            state.updatedAt = os.time()
+        end
+        VavaGathering.zones.effects = function() return VavaGathering.config.bands.effects.normal end
+        VavaGathering.zones.isWater = function() return false end
+        VavaGathering.catalog.zone = function() return { id = 'bois', regenPerHour = 4.0 } end
+        assert.is_true((harvestOnce(AUTHOR)))
+        assert.equal(4.0, refreshed.regenPerHour)
+        assert.same({ vitality = 50.0, scarredUntil = nil }, { vitality = real.vitality, scarredUntil = real.scarredUntil })
+    end)
+
+    it('essai raté dans une zone d’eau : le texte de l’eau (lore L-6)', function()
+        local failing = { yield = 0.2, tierMalus = 2, failure = 1.0 }
+        VavaGathering.zones.state = function() return { vitality = 10.0, updatedAt = os.time() } end
+        VavaGathering.zones.refresh = function() end
+        VavaGathering.zones.effects = function() return failing end
+        VavaGathering.catalog.zone = function() return { id = 'bois', regenPerHour = 4.0 } end
+        VavaGathering.zones.isWater = function() return true end
+        assert.same({ false, 'failed' }, { harvestOnce(AUTHOR) })
+        assert.equal(VavaGathering.config.messages.trialFailedWater, notes[#notes])
+        VavaGathering.zones.isWater = function() return false end
+        now = now + 2000
+        assert.same({ false, 'failed' }, { harvestOnce(AUTHOR) })
+        assert.equal(VavaGathering.config.messages.trialFailed, notes[#notes])
     end)
 
     it('trop tôt : refusé, rien de pris', function()

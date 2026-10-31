@@ -129,8 +129,21 @@ end
 -- Rechargement à chaud -------------------------------------------------------------------------------------------------
 
 --- Fin d'un lot : les zones notées partent, une différence par zone et par abonné.
+--- Fin d'un lot : en défense, chaque zone touchée doit tenir dans les bornes d'une zone du core (sinon le core la
+--- refuserait et elle disparaîtrait chez les joueurs) ; un refus fait annuler le lot par l'Atelier (contre-relecture
+--- C-1). Puis les zones notées partent, une différence par zone et par abonné.
 local function flushIfLast(info)
-    if type(info) == 'table' and info.last then share.flush() end
+    if type(info) ~= 'table' or not info.last then return true end
+    for _, zoneId in ipairs(share.pending()) do
+        local ok, _, radius = catalog.bounds(zoneId)
+        if not ok then
+            local zone = catalog.zone(zoneId)
+            return false, string.format(texts.tooWide, zone and zone.label or zoneId, math.ceil(radius or 0),
+                math.floor(VavaGathering.ZONE_MAX_RADIUS))
+        end
+    end
+    share.flush()
+    return true
 end
 
 local function apply(kind, def, info)
@@ -154,8 +167,7 @@ local function apply(kind, def, info)
     else
         return false, texts.badEntry
     end
-    flushIfLast(info)
-    return true
+    return flushIfLast(info)
 end
 
 local function remove(kind, id, info)
@@ -172,8 +184,7 @@ local function remove(kind, id, info)
         harvest.forgetNode(id)
         if zoneId then share.touch(zoneId) end
     end
-    flushIfLast(info)
-    return true
+    return flushIfLast(info)
 end
 
 -- Essai à blanc --------------------------------------------------------------------------------------------------------

@@ -148,6 +148,15 @@ function share.configure(build, after)
     builder, afterFlush = build, after
 end
 
+--- Zones notées, pas encore diffusées (contrôle des bornes à la fin d'un lot de l'Atelier).
+---@return string[]
+function share.pending()
+    local ids = {}
+    for id in pairs(touched) do ids[#ids + 1] = id end
+    table.sort(ids)
+    return ids
+end
+
 --- Zone changée par l'Atelier : notée, diffusée au prochain `flush`.
 ---@param zoneId string
 function share.touch(zoneId)

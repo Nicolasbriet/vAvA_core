@@ -310,7 +310,7 @@ describe('vava_gathering zonestate', function()
         it('ignore une `def` mal formée (nom vide ou trop long, type invalide, lieu non fini, rayon hors bornes)', function()
             local bad = {
                 { '', 'foret', 0, 0, 0, 1000 },
-                { string.rep('a', 81), 'foret', 0, 0, 0, 1000 },
+                { string.rep('a', 161), 'foret', 0, 0, 0, 1000 },
                 { 'Bois', 'Forêt', 0, 0, 0, 1000 },
                 { 'Bois', 'foret', 0 / 0, 0, 0, 1000 },
                 { 'Bois', 'foret', 0, math.huge, 0, 1000 },
@@ -320,6 +320,11 @@ describe('vava_gathering zonestate', function()
                 'foret',
             }
             for i, value in ipairs(bad) do assert.is_nil(zonestate.decode({ def = value }).def, tostring(i)) end
+        end)
+
+        it('accepte un nom de 160 octets (le serveur en permet 80 ; contre-relecture C-5)', function()
+            local def = zonestate.decode({ def = { string.rep('é', 80), 'foret', 0, 0, 0, 1000 } }).def
+            assert.equal(160, #def.label)
         end)
 
         it('ignore un point mal formé (ressource invalide, lieu non fini, identifiant trop long) et ramène un cap faux à 0', function()
