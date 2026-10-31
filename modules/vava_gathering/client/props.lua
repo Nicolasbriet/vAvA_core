@@ -10,7 +10,7 @@
            toutes ; une zone reçue, changée ou quittée fait aussitôt un passage (props et invite à jour sans attendre),
            la première reçue relance la boucle ; elle s'arrête d'elle-même quand plus aucune zone n'est suivie, à la
            sélection et au déchargement, et retire alors tous les props.
-    Dépendances : shared/constants.lua, config.lua, shared/geometry.lua, shared/proximity.lua, shared/zonestate.lua,
+    Dépendances : shared/constants.lua, config_client.lua, shared/geometry.lua, shared/proximity.lua, shared/zonestate.lua,
                   client/core.lua (core.zones, vAvA_core 0.11.0)
 ]]
 

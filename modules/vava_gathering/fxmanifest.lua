@@ -8,6 +8,10 @@
            portée, pose les blips des zones sur la carte, montre l'invite, joue le geste et la barre de tension.
            État des zones et des nœuds (bande, cicatrice, charges) envoyé aux seuls joueurs proches, par les
            abonnements de zone du core (1.6.0).
+           T-132 : les joueurs ne téléchargent que les constantes, config_client.lua (invite, barre de tension,
+           streaming, carte, touches, outils, ressources, zones et nœuds, animations) et la logique lue par le client
+           (distances, proximité, état des zones) ; config.lua, shared/season.lua et shared/catch.lua sont servis au
+           seul serveur.
     Dépendances : vAvA_core ≥ 0.11.0 (abonnements de zone), vava_ui ≥ 1.0.0 (polices, grain, papier et coins de la page, par
                   nui://vava_ui/…), vava_inventory ≥ 1.4.0 (objets, mains, métadonnées), vava_skills ≥ 1.0.0 (XP) ;
                   facultatifs : vava_hud (barre de progression, notifications), vava_admin (droit metiers), vava_chat,
@@ -21,7 +25,7 @@ use_experimental_fxv2_oal 'yes'
 
 name 'vava_gathering'
 description 'Récolte vAvA : zones à vitalité sur la carte, nœuds, outils en main, qualité, pêche, pistes de gibier'
-version '1.6.0'
+version '1.7.0'
 
 dependency 'vAvA_core'
 dependency 'vava_ui'
@@ -40,18 +44,20 @@ files {
     'web/items/*.svg',
 }
 
--- Ordre explicite : chaque fichier ne dépend que de ceux listés avant lui.
+-- Ordre explicite : chaque fichier ne dépend que de ceux listés avant lui. Les joueurs ne téléchargent que les
+-- shared_scripts et les client_scripts : config.lua, en tête des server_scripts, n'est jamais servi (T-132).
 shared_scripts {
     'shared/constants.lua',
-    'config.lua',
+    'config_client.lua',         -- ouvre VavaGathering.config : ce que lit le client
     'shared/geometry.lua',
     'shared/proximity.lua',
     'shared/zonestate.lua',
-    'shared/season.lua',
-    'shared/catch.lua',
 }
 
 server_scripts {
+    'config.lua',                -- complète VavaGathering.config : ce que lit le seul serveur
+    'shared/season.lua',         -- logique pure, servie au seul serveur (testée hors jeu : tests/spec)
+    'shared/catch.lua',          -- idem
     'server/core.lua',
     'bridge/server.lua',
     'server/journal.lua',

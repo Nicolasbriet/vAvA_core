@@ -6,7 +6,7 @@
            joueur a choisie) et, à la fin, déclare au serveur si la ligne a été tenue. Seul un raté est cru : ligne
            tenue, le serveur tire encore la prise. Aucune boucle Lua : l'interface anime la barre tant qu'elle est
            visible, le jeu envoie les appuis.
-    Dépendances : shared/constants.lua, config.lua, client/core.lua, client/nui.lua, client/interact.lua
+    Dépendances : shared/constants.lua, config_client.lua, client/core.lua, client/nui.lua, client/interact.lua
 ]]
 
 local type = type
