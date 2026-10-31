@@ -1152,6 +1152,31 @@ faire tout le système de combat ») : la porte T-119 reste à passer en jeu.
 - Styles par catégorie d'arme, compétences de combat dans `vava_skills`, déblocage par rang, XP sur vraie cible,
   mentorat du maître d'armes ; techniques de hache, masse, dague, bâton et bouclier en config.
 
+### T-155 — Chiffres des coups (dégâts affichés)
+- Agents : vava-architecte → vava-dev-lua · Dépend de : T-112 (après T-113, même module) · Statut : à faire
+- Demande du porteur du projet (31 octobre 2026), « comme les MMO » : le montant de chaque coup s'affiche au-dessus de
+  la cible, le temps d'un souffle (chiffre qui monte et s'efface) ; issues sans dégâts écrites en mots (« Paré »,
+  « Bloqué », « Esquivé », « Absorbé ») ; coup qui met à terre ou fait chanceler distingué. Valable pour les coups
+  d'arme et les sorts (chaîne `vava_health:hit`).
+- Montant pris dans le résultat de la chaîne, jamais calculé par le client ; envoyé seulement à qui doit le voir
+  (spec : attaquant et cible, ou proches), dans un message déjà envoyé quand c'est possible (`vava_combat:hit`,
+  réponse de `use`) ; quelques octets de plus, rien à chaque image hors du temps d'affichage.
+- Réglage du joueur pour les masquer (Réglages de la bannière `vava_pause`, stockage local) et réglage du serveur
+  (activé, qui voit quoi) ; dessin sans NUI à chaque image ou par NUI avec envois des seuls changements (spec).
+
+### T-156 — Mannequin d'entraînement
+- Agents : vava-architecte → vava-dev-lua · Dépend de : T-112 (après T-113, même module) ; T-102 pour le placement
+  par l'Atelier · Statut : à faire
+- Demande du porteur du projet (31 octobre 2026), « comme les MMO » : un mannequin de paille (modèle `-- PLACEHOLDER`)
+  qu'on frappe dans une cour d'armes pour essayer ses techniques ; il encaisse sans jamais tomber, montre le montant de
+  chaque coup (T-155), se « remet » seul ; coups d'arme et sorts.
+- Le serveur juge le coup sur le mannequin comme sur un joueur (portée, angle, technique, arme réellement tenue) et
+  calcule le montant par la chaîne de dégâts sans rien appliquer à personne (essai à blanc ou équivalent dans
+  `vava_health`, à préciser par la spec) ; l'arme s'use ou non (spec) ; aucune XP au-delà d'un niveau (COMBAT_V1 § 6,
+  T-115).
+- Mannequins posés en config (coordonnées `-- PLACEHOLDER`) en v1, puis définition de l'Atelier (outil de placement de
+  T-102) ; props créés à portée seulement ; état transmis aux seuls proches.
+
 ### T-116 — La magie sur la chaîne de dégâts
 - Agent : vava-dev-lua · Dépend de : T-110 · Statut : à tester en jeu (relu sécurité et réseau, contre-relecture
   sécurité, suites appliquées)
