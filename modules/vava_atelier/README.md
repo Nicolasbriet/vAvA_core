@@ -175,14 +175,16 @@ refuse de démarrer (« config.lua, droits : rights.overrides['…'] = '…' : p
 |---|---|---|
 | RPC `home` | l'appelant | 2 à 4 Ko la 1re fois ; ≈ 1 Ko ensuite (accueil stable gardé par la page, empreinte comme le Codex ; étiquettes, journal récent et rang à chaque fois) |
 | RPC `editor` | l'appelant | 2 à 12 Ko la 1re fois (32 Ko au plus, `limits.descriptorBytes`) ; ≈ 60 o ensuite |
-| RPC `list`, `read`, `check`, `options`, `search` | l'appelant | ≤ 5 Ko (pages bornées) |
+| RPC `check`, `options`, `search` | l'appelant | ≤ 5 Ko (pages bornées) |
+| RPC `list` | l'appelant | ≤ 5 Ko d'habitude, ≈ 10 Ko au pire (50 lignes aux titres et indices les plus longs) |
+| RPC `read` | l'appelant | 1 à 5 Ko d'habitude ; ≈ 22 Ko au pire (40 champs aux textes les plus longs, libellés, avertissements), envoyé en latent au-delà de 8 Ko |
 | RPC `journal` | l'appelant | ≤ 5 Ko d'habitude, ≤ 12 Ko au pire (25 lignes aux textes les plus longs) |
 | évènement `vava_atelier:revoked` | le seul membre dont la session est ouverte et qui perd le droit d'ouvrir l'Atelier | ≈ 30 o |
 | évènement `vava_atelier:editorGone` | les seuls membres dont la session est sur l'atelier retiré | ≈ 60 o |
 | RPC `save`, `trial`, `endTrial`, `discard`, `retire`, `take`, `publish`, `restore` | l'appelant | ≤ 2 Ko (`{ done, rev, state, footer… }`) |
 | RPC `preview` | l'appelant | ≤ 2 Ko (8 lignes de 160 octets au plus, 4 avertissements, jeton) |
-| RPC `history`, `version`, `removed` | l'appelant | ≤ 4 Ko, ≤ 4 Ko, ≤ 5 Ko |
-| évènement `vava_atelier:entryChanged` | les seuls membres dont la séance est sur cet atelier, sauf l'auteur du changement ; le tenant d'un essai qui prend fin sans qu'il l'ait demandé | ≈ 90 o |
+| RPC `history`, `version`, `removed` | l'appelant | ≤ 3 Ko d'habitude, ≈ 7 Ko au pire (20 versions aux résumés les plus longs) ; comme `read` (≈ 22 Ko au pire, latent au-delà de 8 Ko) ; ≤ 5 Ko |
+| évènement `vava_atelier:entryChanged` | les seuls membres dont la séance a **cette fiche** ouverte (droit de l'atelier relu), sauf l'auteur du changement ; le tenant d'un essai qui prend fin sans qu'il l'ait demandé ; l'ancien tenant d'un brouillon repris | ≈ 90 o |
 
 Trois formes de réponse sont pensées pour ne rien envoyer deux fois :
 

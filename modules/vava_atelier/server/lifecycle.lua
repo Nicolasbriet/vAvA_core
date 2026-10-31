@@ -435,7 +435,7 @@ local function firstDraft(ctx, head, data)
     local editor, kind = ctx.editor, ctx.kind
     local kindId = kind.def.id
     local published, readErr = baseEntry(editor, kind, head)
-    if not published then return false, readErr == 'stale' and 'stale' or 'unreadable' end
+    if not published then return false, readErr end
     local author = actorOf(ctx)
     local title = calls.titleOf(kind, data, head.id)
     -- le parent d'une fiche existante est celui de sa version de base (`values.s.parent` ignoré)

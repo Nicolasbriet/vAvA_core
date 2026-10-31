@@ -57,16 +57,16 @@ local selects = {}
 --- Requête de lecture : autant de `?` que de droits à filtrer (jamais une valeur dans le texte ; 0 : tous les droits
 --- permis sont détenus, aucun filtre, lecture à rebours sur la clé primaire), curseur et atelier facultatifs,
 --- `LIMIT ?`.
----@param rights integer
+---@param count integer
 ---@param cursor boolean
 ---@param editor boolean
 ---@return string
-local function selectSql(rights, cursor, editor)
-    local key = rights .. (cursor and 'c' or '') .. (editor and 'e' or '')
+local function selectSql(count, cursor, editor)
+    local key = count .. (cursor and 'c' or '') .. (editor and 'e' or '')
     local sql = selects[key]
     if not sql then
         local where = {}
-        if rights > 0 then where[#where + 1] = '`required_right` IN (' .. rep('?', rights, ', ') .. ')' end
+        if count > 0 then where[#where + 1] = '`required_right` IN (' .. rep('?', count, ', ') .. ')' end
         if cursor then where[#where + 1] = '`id` < ?' end
         if editor then where[#where + 1] = '`editor` = ?' end
         sql = SELECT_HEAD .. (#where > 0 and ' WHERE ' .. concat(where, ' AND ') or '')

@@ -40,7 +40,8 @@ local function known(ctx, id)
 end
 
 --- RPC history : { versions = { { version, status, removal, restoredFrom?, summary?, author, when } }, more } ;
---- 20 lignes au plus (`history.pageLines`), ≈ 150 octets chacune : ≤ 4 Ko.
+--- 20 lignes au plus (`history.pageLines`), ≈ 150 octets d'habitude (≤ 3 Ko), ≈ 350 au pire (résumés et noms les plus
+--- longs) : ≈ 7 Ko.
 ---@param ctx vAvA.AtelierContext
 ---@param id string
 ---@param before integer  0 : les plus récentes

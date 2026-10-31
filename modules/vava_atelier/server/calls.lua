@@ -5,7 +5,7 @@
            (`index`, `read`) pour la graine et le rapprochement. Une erreur levée vaut un refus, avec une ligne en
            console ; le texte d'un refus est borné (160 octets). Lecture d'une ligne gardée pour un type (JSON décodé,
            format monté, data normalisée par le formulaire en vigueur, lieu contrôlé : shared/stored.lua). Avis
-           `vava_atelier:entryChanged` aux seuls membres dont la séance est sur l'atelier.
+           `vava_atelier:entryChanged` aux seuls membres dont la séance a la fiche ouverte.
     Dépendances : shared/constants.lua, config.lua, shared/text.lua, shared/place.lua, shared/stored.lua,
                   shared/changes.lua, bridge/server.lua, server/core.lua, server/access.lua
 ]]

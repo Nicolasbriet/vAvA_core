@@ -6,7 +6,8 @@
            autre, à la fermeture de la séance, au départ, au délai (`trial.maxMinutes`), au retrait de l'atelier. À la
            fin : `endTrial` du module (ce que l'essai montrait à l'auteur est retiré), lignes rendues aux brouillons,
            ligne `trial_ended` au journal (au nom gardé au début de l'essai quand le membre n'est plus là), hook
-           vava_atelier:trial, avis `entryChanged` aux membres sur l'atelier et au tenant qui ne l'a pas demandé.
+           vava_atelier:trial, avis `entryChanged` aux membres qui ont la fiche ouverte et au tenant qui ne l'a pas
+           demandé.
     Dépendances : shared/constants.lua, config.lua, bridge/server.lua, server/core.lua, server/editors.lua,
                   server/journal.lua, server/store.lua, server/index.lua, server/calls.lua
 ]]

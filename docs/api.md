@@ -2413,7 +2413,11 @@ chaîne des `parent` sans cycle, trois types au plus. Le descripteur gagne `stor
 - `diff(kind, avant, après)` → texte ≤ 160 ou nil ; `upgrade(kind, data, from)` → data, ou nil (version illisible).
 - Toutes sont appelées isolées et chronométrées ; une erreur levée vaut un refus.
 
-**Diffusion** : l'Atelier n'envoie **aucune définition** aux joueurs. Ce qui est posé dans le monde passe par l'état de
+**Diffusion** : l'Atelier n'envoie **aucune définition** aux joueurs. Consignes pour un module qui diffuse ce que
+`apply` change (T-102, T-120) : **regrouper** ses différences pendant le lot et ne les envoyer qu'à l'appel marqué
+`info.last` (un message par lot et par joueur concerné), jamais à chaque `apply` ni sur le hook
+`vava_atelier:published` (un par fiche) ; une zone du core par fiche ne tient pas pour des centaines de nœuds (2 048
+zones en tout, tous modules confondus) : une zone par secteur, l'état portant les fiches du secteur. Ce qui est posé dans le monde passe par l'état de
 zone du module (`core.zones` : `define`, `move`, `replace`, `remove`) ; les arts par un catalogue versionné envoyé en
 différences (T-120) ; un essai par `core.net.send` au seul auteur, jamais dans l'état de zone.
 
@@ -2460,7 +2464,8 @@ Refus ajoutés : `stale`, `draft_taken`, `draft_open`, `not_holder`, `no_draft`,
 
 Évènement ajouté : `vava_atelier:entryChanged` (`atelier, type, fiche, ce qui a changé` — `saved`, `published`,
 `restored`, `removed`, `discarded`, `taken`, `trialEnded` —, plus le titre pour `trialEnded`) aux seuls membres dont la
-séance est sur cet atelier, sauf l'auteur du changement, et au tenant d'un essai qui prend fin sans qu'il l'ait demandé.
+séance a **cette fiche** ouverte (droit de l'atelier relu), sauf l'auteur du changement, au tenant d'un essai qui prend
+fin sans qu'il l'ait demandé et à l'ancien tenant d'un brouillon repris.
 
 | Hook (T-101) | Côté, phase | Payload |
 |---|---|---|
