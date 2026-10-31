@@ -6,7 +6,7 @@ local helper = require('tests.helper')
 --   la boucle lente : la marge d'abonnement de 20 m n'a à couvrir que le passage du core, même au galop.
 
 describe('vava_farming parcelles côté client', function()
-    local props, parcelzone, cfg, onZone, threads, created, deleted, nearest, position
+    local props, parcelzone, cfg, parcels, onZone, threads, created, deleted, nearest, position
 
     --- Parcelle telle que l'indexe server/catalog.lua, à partir d'une parcelle de la config.
     local function parcelOf(raw)
@@ -35,16 +35,20 @@ describe('vava_farming parcelles côté client', function()
     before_each(function()
         helper.reset()
         VavaFarming = nil
+        -- parcelles d'essai prises dans la config complète (le serveur les envoie), puis la seule vue client (T-132) :
+        -- constantes et config_client.lua, comme chez un joueur ; config.lua n'est pas lu
+        helper.loadAll({ 'modules/vava_farming/shared/constants.lua', 'modules/vava_farming/config.lua' })
+        parcels = VavaFarming.config.parcels
+        helper.loadClientView('modules/vava_farming', 'VavaFarming')
         helper.loadAll({
-            'modules/vava_farming/shared/constants.lua',
-            'modules/vava_farming/config.lua',
             'modules/vava_farming/shared/geometry.lua',
             'modules/vava_farming/shared/parcelzone.lua',
             'modules/vava_farming/shared/proximity.lua',
         })
         parcelzone, cfg = VavaFarming.parcelzone, VavaFarming.config
+        assert.is_nil(cfg.parcels, 'vue client : config.lua ne doit pas être chargé')
         threads, created, deleted, nearest = {}, {}, {}, 'jamais appelé'
-        local champ = cfg.parcels[1]
+        local champ = parcels[1]
         position = { x = champ.x, y = champ.y, z = champ.z }
         local entities = {}
         _G.CreateThread = function(fn) threads[#threads + 1] = fn end
@@ -89,7 +93,7 @@ describe('vava_farming parcelles côté client', function()
     end)
 
     local function enterChamp(stage)
-        local champ = parcelOf(cfg.parcels[1])
+        local champ = parcelOf(parcels[1])
         local values = {}
         for index = 1, champ.count do values[index] = parcelzone.slotValue(nil, 0, nil) end
         values[1] = parcelzone.slotValue('ble', stage, 'growing')
@@ -100,12 +104,12 @@ describe('vava_farming parcelles côté client', function()
         enterChamp(1)
         runThreads()
         assert.is_true(hasModel(created, cfg.crops.ble.stages[1]))
-        assert.is_true(hasModel(created, cfg.parcels[1].granary.prop))
+        assert.is_true(hasModel(created, parcels[1].granary.prop))
         assert.is_not_nil(props.parcel('champ_communal'))
     end)
 
     it('change le prop d’une plante et l’invite dès la différence reçue', function()
-        local champ = parcelzone.readDefinition(parcelzone.definition(parcelOf(cfg.parcels[1])))
+        local champ = parcelzone.readDefinition(parcelzone.definition(parcelOf(parcels[1])))
         local x, y, z = VavaFarming.geometry.slotPosition(champ, 1)
         position = { x = x, y = y, z = z }
         enterChamp(1)
@@ -125,7 +129,7 @@ describe('vava_farming parcelles côté client', function()
         runThreads()
         onZone('leave', 'champ_communal')
         assert.is_true(hasModel(deleted, cfg.crops.ble.stages[1]))
-        assert.is_true(hasModel(deleted, cfg.parcels[1].granary.prop))
+        assert.is_true(hasModel(deleted, parcels[1].granary.prop))
         assert.is_nil(props.parcel('champ_communal'))
     end)
 

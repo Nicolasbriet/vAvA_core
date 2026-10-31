@@ -24,11 +24,9 @@ for _, module in ipairs(MODULES) do
 
         before_each(function()
             helper.reset()
-            helper.loadAll({
-                'modules/' .. module.name .. '/shared/constants.lua',
-                'modules/' .. module.name .. '/config.lua',
-                'modules/' .. module.name .. '/shared/proximity.lua',
-            })
+            -- réglages du streaming lus par le client : sur la seule vue client (constantes et config_client.lua, T-132)
+            helper.loadClientView('modules/' .. module.name, module.global)
+            helper.load('modules/' .. module.name .. '/shared/proximity.lua')
             proximity = _G[module.global].proximity
             cfg = _G[module.global].config
         end)
@@ -151,13 +149,13 @@ for _, module in ipairs(MODULES) do
 end
 
 describe('vava_gathering proximity : zones de la config', function()
+    -- client/props.lua passe cfg.nodes à proximity.group au chargement : essai sur la seule vue client (T-132, relecture
+    -- réseau R-2), constantes et config_client.lua comme chez un joueur
     it('chaque nœud est dans le groupe de sa zone, et l\'étendue de chaque zone tient dans son rayon', function()
         helper.reset()
-        helper.loadAll({
-            'modules/vava_gathering/shared/constants.lua',
-            'modules/vava_gathering/config.lua',
-            'modules/vava_gathering/shared/proximity.lua',
-        })
+        helper.loadClientView('modules/vava_gathering', 'VavaGathering')
+        assert.is_nil(VavaGathering.config.items, 'vue client : config.lua ne doit pas être chargé')
+        helper.load('modules/vava_gathering/shared/proximity.lua')
         local cfg, proximity = VavaGathering.config, VavaGathering.proximity
         local groups = proximity.group(cfg.nodes, function(node) return node.zone end)
         local zones = {}

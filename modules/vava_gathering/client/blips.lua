@@ -4,7 +4,7 @@
            comme elle, à courte portée) et le cercle translucide de son rayon, créés depuis la config partagée à
            l'entrée en jeu et retirés à la sélection, au déchargement et à l'arrêt du module ; repère de la carte posé
            sur une zone à la demande du panneau. Aucune boucle, rien ne circule : la config suffit.
-    Dépendances : config.lua, client/core.lua, client/props.lua
+    Dépendances : config_client.lua, client/core.lua, client/props.lua
 ]]
 
 local ipairs = ipairs

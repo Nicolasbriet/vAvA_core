@@ -540,7 +540,7 @@ versé à T-014 ; les autres points déjà couverts sont précisés dans T-012 �
   `SCRIPT ERROR`), 7-A-3 (`resmon`), 7-A-12 (ancien `config.lua` signalé), 7-A-14 (`resource.rpf` avant et après).
 
 ### T-141 — Configs partagées, lot 2 : les métiers
-- Agent : vava-dev-lua · Dépend de : T-132 · Statut : à faire
+- Agent : vava-dev-lua · Dépend de : T-132 · Statut : à tester en jeu (relu sécurité et réseau, suites appliquées)
 - Appliquer la règle de T-132 (`docs/plan/specs/T-132.md` § 2.4 et § 3.3) à `vava_farming`, `vava_crafting`,
   `vava_gathering`, `vava_skills` et à la config de `vava_provisions` ; retirer leurs exceptions transitoires de
   `scripts/audit-exceptions.txt` et leurs entrées `PENDING` de `tests/spec/config_split_spec.lua`. **À faire avant
@@ -552,6 +552,18 @@ versé à T-014 ; les autres points déjà couverts sont précisés dans T-012 �
   que le seul serveur lit n'est servi, même une feuille d'une table lue par le client (S-5 : `config.x.y = …` dans
   `config.lua`) ; gains mesurés
   par `scripts/poids-client.sh` au rapport (net du manifeste) ; `docs/tests/reseau.md` § 7-B écrit et joué.
+- Fait le 31 octobre 2026 (branche `agents/T-141`) : `vava_skills` 1.3.0, `vava_farming` 1.8.0, `vava_crafting` 1.6.0,
+  `vava_gathering` 1.7.0, `vava_provisions` 1.1.0 (`config_client.lua` partagé, `config.lua` et la logique du seul
+  serveur en `server_scripts`, feuilles du seul serveur ajoutées par `config.lua`, avertissement d'un `config.lua`
+  d'avant) ; cinq exceptions transitoires et entrées `PENDING` retirées ; essais sur la vue client
+  (`provisions_client_view_spec`, `gathering_fishing_client_spec`, streaming, props). Suites des relectures : contrôle
+  T4 dans `config_split_spec` (une feuille de `config_client.lua` qu'aucun fichier client ne lit fait échouer) ; la
+  pêche entière au seul serveur (le client ne lit que `holdRatio` de la touche, borné, repli `FISHING_HOLD_RATIO` des
+  constantes) ; `verifier.sh` trouve les outils de la copie principale depuis un worktree. Lot 2 : 66 630 octets de
+  moins par joueur, net du manifeste (22 348 compressés). Rapport `docs/plan/rapports/T-141.md`. **À tester en jeu** :
+  `docs/tests/reseau.md` § 7-B, en priorité 7-B-1 (aucune ligne d'ancienne forme), 7-B-2 et 7-B-6 à 7-B-9 (`F8` sans
+  `SCRIPT ERROR` pendant les gestes, barre de tension comprise), 7-B-10 (deux joueurs), 7-B-11 (ancien `config.lua`
+  signalé), 7-B-14 (`resource.rpf` avant et après).
 
 ### T-142 — Configs partagées, lot 3 : le socle
 - Agent : vava-dev-lua · Dépend de : T-132 · Statut : à faire
@@ -573,8 +585,10 @@ versé à T-014 ; les autres points déjà couverts sont précisés dans T-012 �
   `shared/pages.lua` au serveur si aucun fichier client ne s'en sert) ; `vava_provisions/shared/rules.lua` coupé en
   deux (`shared/texts.lua` partagé, `shared/rules.lua` au serveur). Retirer les dernières exceptions transitoires et
   entrées `PENDING`.
-- Critères : comme T-141 (essai sur la vue client, bornes de protection dans les constantes, rien du serveur servi) ;
-  `docs/tests/reseau.md` § 7-D.
+- Critères : comme T-141 (essai sur la vue client, bornes de protection dans les constantes, rien du serveur servi,
+  contrôle T4 vert) ; `messages.admin` et `messages.journal` de `vava_provisions` (textes du Conseil, ≈ 0,7 Ko,
+  servis par T-141 parce que le client passe `messages` entier à `shared/rules.lua`) quittent `config_client.lua` avec
+  la coupe de `rules.lua` (relectures de T-141 : sécurité S-1, réseau R-3) ; `docs/tests/reseau.md` § 7-D.
 
 ### T-133 — `%c` dépend de la locale : contrôles de texte justes partout
 - Agent : vava-dev-lua · Dépend de : — · Statut : à tester en jeu (relu sécurité, suites appliquées)
@@ -600,6 +614,16 @@ versé à T-014 ; les autres points déjà couverts sont précisés dans T-012 �
   l'Atelier ne replie pas la casse du latin étendu (« Ł » et « ł » diffèrent), alors que la clé de nom de l'exemple le
   fait ; `vava_magic/client/controls.lua` (`lower` sur un mot de sort), `vava_codex/client/main.lua` (`%S`, `%s*`),
   `vava_chancellerie/server/link.lua` (`%s` sur un code).
+
+### T-144 — Invite du composteur
+- Agent : vava-dev-lua · Dépend de : — · Statut : à faire
+- Relecture réseau R-6 de T-141 (déjà sur `main`, à confirmer en jeu) : le type `composteur` est déclaré à l'artisanat
+  par `vava_farming`, côté serveur seulement ; absent de `cfg.stationTypes` du client, la station n'a ni invite ni menu
+  (`vava_crafting/client/interact.lua:122-124` : `props.type(station)` rend nil). Piste : envoyer avec le dessin de la
+  station (`stationzone.drawing`) ce que l'invite lit du type (libellé, capacité de combustible), au lieu de le
+  chercher dans la config du client.
+- Critères : au composteur du champ, l'invite « Composteur » et le menu apparaissent (métiers 5-7) ; essai hors jeu
+  d'une station d'un type inconnu de la config du client ; `config_split_spec` vert.
 
 ## Phase 2 — Arrivée
 
@@ -749,14 +773,29 @@ maquettes.
 - `vava_gathering` déclare ses éditeurs zone et point (maquette `Recolte`) ; « Tester la récolte » en essai.
 - Critères : créer une zone et 5 points en jeu, publier, un autre joueur proche les voit apparaître sans
   redémarrage, un joueur loin ne reçoit rien (vérifié avec `/vava_reseau`).
+- Relectures de T-141 (sécurité S-3, réseau R-3) : `tools`, `resources`, `zones` et `nodes` de la récolte restent
+  entiers dans `config_client.lua` (le client les lit par identifiant ou les parcourt) ; ≈ 1,7 Ko n'y sert que le
+  serveur (`resources.*` : objet, compétence, difficulté, XP, rendement, pièce en plus, 1 045 o ; `tools.*` : puissance,
+  bonus, usure, 285 o ; `zones` et `nodes` : coût, régénération, cicatrice, charges, 411 o). En passant ces données à
+  l'Atelier, donner à chaque entrée une part client et une part serveur (contrôle T4 de `config_split_spec` vert).
 
 ### T-103 — Créateur d'agriculture
 - Agent : vava-dev-lua (+ vava-dev-nui si widget) · Dépend de : T-102, T-016 · Statut : à faire
 - Parcelles en polygone (communale ou privée), emplacements, puits, greniers, composteurs.
+- Relectures de T-141 (sécurité S-3, réseau R-3) : `crops` de l'agriculture reste entier dans `config_client.lua`
+  (le client le lit par culture) ; ≈ 0,7 Ko n'y sert que le serveur (durée, eau, fertilité, famille, graine, produit,
+  rendement, XP, difficulté, `frostHardy` : 660 o ; `actions.harvest.sickleFactor`, 20 o). Même chose pour `kinds` de
+  `vava_provisions` (réserves des points d'eau, ≈ 190 o), si les points d'eau passent à l'Atelier avec les puits
+  (aucune autre tâche ne les reprend aujourd'hui). Donner à chaque entrée une part client et une part serveur
+  (contrôle T4 vert).
 
 ### T-104 — Créateur d'artisanat
 - Agent : vava-dev-lua · Dépend de : T-102, T-017 · Statut : à faire
 - Stations (type, qualité, combustible, recettes disponibles, publique ou privée).
+- Relectures de T-141 (sécurité S-3, réseau R-3) : `stationTypes` de l'artisanat reste entier dans
+  `config_client.lua` (le client le lit par type) ; ≈ 0,4 Ko n'y sert que le serveur (compétences, réserve de
+  combustible, 416 o), dont `prop`, jamais lu par le client (le dessin de la station porte déjà son modèle). Donner une
+  part client et une part serveur (contrôle T4 vert) ; voir aussi T-144 (invite du composteur).
 
 ### T-105 — Confréries et leur créateur `vava_guilds` (remplace l'ancienne T-042)
 - Agents : vava-architecte → vava-dev-lua + vava-dev-nui · Dépend de : T-102 · Statut : à faire

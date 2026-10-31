@@ -5,7 +5,7 @@
            ou interruption (cancel : nouvel appui, déplacement). Pour un nœud d'eau, la ligne est lancée et c'est
            client/fishing.lua qui prend la suite à la touche. À terre (vava_health), ni invite ni demande. Le client
            ne décide de rien : il montre, joue et demande ; le serveur notifie les résultats.
-    Dépendances : shared/constants.lua, config.lua, shared/geometry.lua, client/core.lua, client/nui.lua,
+    Dépendances : shared/constants.lua, config_client.lua, shared/geometry.lua, client/core.lua, client/nui.lua,
                   client/props.lua
 ]]
 

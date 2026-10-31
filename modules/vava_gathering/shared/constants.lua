@@ -27,6 +27,9 @@ VavaGathering.ID_PATTERN = '^[%l%d_]+$'
 VavaGathering.MAX_ZONE_ID = 48
 VavaGathering.MAX_NODE_ID = 46
 VavaGathering.MAX_TOKEN = 0x7FFFFFFF
+-- repli du client pour la part de la barre de tension à tenir, si la touche reçue n'en porte pas une valide (de 0 à 1) :
+-- le serveur envoie toujours `fishing.tension.holdRatio` de config.lua (relecture réseau R-2 de T-141)
+VavaGathering.FISHING_HOLD_RATIO = 0.6
 -- limites d'une zone du core (config/server.lua, zones : maxRadius, maxMargin, maxKeys), vérifiées à l'indexation pour
 -- qu'une zone hors bornes refuse le module avec un message clair au lieu d'être refusée en silence par le core. Avec
 -- 255 nœuds au plus (la clé `zone` en plus) et des clés de 48 octets, l'état reste loin des 32 Ko du core.

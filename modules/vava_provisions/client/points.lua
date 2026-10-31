@@ -9,7 +9,7 @@
            près d'un groupe et toutes les `streaming.idlePollMs` loin de tous ; un point reçu, changé ou oublié fait
            aussitôt un passage ; elle s'arrête d'elle-même à la sélection, au déchargement et quand le dernier point
            connu est oublié, et retire alors tous les props. Calqué sur vava_crafting/client/props.lua.
-    Dépendances : shared/constants.lua, config.lua, shared/proximity.lua, shared/pointzone.lua, client/core.lua
+    Dépendances : shared/constants.lua, config_client.lua, shared/proximity.lua, shared/pointzone.lua, client/core.lua
                   (core.zones : vAvA_core 0.11.0)
 ]]
 

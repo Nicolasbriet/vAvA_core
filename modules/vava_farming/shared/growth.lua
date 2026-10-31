@@ -1,13 +1,13 @@
 --[[
     vava_farming/shared/growth.lua
-    Rôle : règles pures de la croissance, partagées par le client (affichage) et le serveur (décision) : avancée d'un
+    Rôle : règles pures de la croissance, servies au seul serveur (décision ; T-132) : avancée d'un
            emplacement d'après le temps écoulé (humidité qui baisse, croissance tant que la terre est humide, pause,
            flétrissement puis mort quand elle est sèche, jachère qui rend de la fertilité ; saison de vava_time qui
            accélère ou ralentit la pousse et le dessèchement), stade et état, régularité d'arrosage, qualité d'une
            récolte ; gel d'une nuit d'hiver (plante qu'il tue, saison où l'on couvre, objet qui couvre) ; emplacement
            vidé par une récolte ou un arrachage, copié avant et rendu si la besace refuse. Aucun état : les fonctions
            reçoivent et rendent des tables.
-    Dépendances : shared/constants.lua, config.lua
+    Dépendances : shared/constants.lua, config_client.lua, config.lua
 ]]
 
 local floor, min, max, huge = math.floor, math.min, math.max, math.huge

@@ -6,7 +6,9 @@ local helper = require('tests.helper')
 -- shared/ n'est partagée que si un fichier client s'en sert. Fichiers lus depuis VAVA_ROOT (ou le dossier courant).
 --
 -- T0 forme du manifeste · T1 aucune valeur écrite deux fois · T2 le client ne lit que sa part · T3 logique au bon
--- endroit. T2 (lecture statique) suit les alias `local a, b <const> = <Global>.config.x, cfg.y` (sur une ligne) et
+-- endroit · T4 le client ne reçoit que ce qu'il lit (relecture sécurité S-5 de T-132, réseau R-1 de T-141 : une feuille
+-- de config_client.lua qu'aucune lecture d'un fichier client ne couvre est à ajouter par config.lua ; une lecture de
+-- table non pure — passée, parcourue, indexée par une variable — couvre toute la table). T2 (lecture statique) suit les alias `local a, b <const> = <Global>.config.x, cfg.y` (sur une ligne) et
 -- ferme par défaut : toute table de config utilisée autrement que par `.clé` — indexée par une variable, passée à une
 -- fonction, parcourue, rangée ailleurs, alias non suivi (`local c = cfg or {}`) — doit être ENTIÈRE dans la vue client
 -- (relecture réseau R-1 et R-2). Une clé absente des deux vues (facultative) est ignorée.
@@ -52,8 +54,6 @@ local WITHOUT_LUA = { ['modules/vava_ui'] = true }
 -- Modules pas encore basculés (lots 2 à 4 de T-132), sautés par T0 à T3 ; chaque lot retire les siens, avec leurs
 -- exceptions transitoires de scripts/audit-exceptions.txt.
 local PENDING = {
-    vava_farming = 'T-141', vava_crafting = 'T-141', vava_gathering = 'T-141', vava_skills = 'T-141',
-    vava_provisions = 'T-141',
     vava_inventory = 'T-142', vava_combat = 'T-142', vava_health = 'T-142', vava_time = 'T-142', vava_codex = 'T-142',
     vava_admin = 'T-142', vava_voice = 'T-142', vava_chat = 'T-142', vava_cameras = 'T-142',
     vava_appearance = 'T-142', vava_needs = 'T-142', vava_world = 'T-142', vava_hud = 'T-142', vava_loading = 'T-142',
@@ -443,6 +443,36 @@ local function checkReads(file, code, global, full, client)
     return nil
 end
 
+--- T4 : feuilles de la vue client qu'aucune lecture ne couvre (triées). `reads` : lectures relevées par configReads dans
+--- les fichiers client. Une lecture pure (`local t = cfg.texts`) ne couvre rien par elle-même : les lectures faites par
+--- l'alias le font ; une autre lecture couvre sa feuille, ou toute sa table si elle s'arrête sur une table (passée,
+--- parcourue, indexée par une variable) ; la config entière utilisée ainsi couvre tout. `clientFile` est toujours couvert.
+---@param clientView table
+---@param reads table[]
+---@return string[] unread
+local function unreadLeaves(clientView, reads)
+    local covering = {}
+    for _, r in ipairs(reads) do
+        if not r.pure then covering[#covering + 1] = table.concat(r.chain, '.') end
+    end
+    local unread = {}
+    for _, entry in ipairs(paths(clientView, 'config')) do
+        if type(entry.value) ~= 'table' then
+            local path = entry.path:sub(#'config.' + 1)
+            local covered = path == 'clientFile'
+            for _, c in ipairs(covering) do
+                if c == '' or c == path or path:sub(1, #c + 1) == c .. '.' then
+                    covered = true
+                    break
+                end
+            end
+            if not covered then unread[#unread + 1] = path end
+        end
+    end
+    table.sort(unread)
+    return unread
+end
+
 --- Champs exportés par un fichier : `^Global.champ =` ou `^function Global.champ`.
 local function exports(code, global)
     local fields = {}
@@ -578,6 +608,21 @@ describe('configs partagées (T-132)', function()
                 end
             end)
 
+            it('T4 : config_client.lua ne sert que ce que le client lit', function()
+                if not hasClient then return end
+                local clientView = loadViews(mod)
+                local reads = {}
+                for _, file in ipairs(clientFiles(lists)) do
+                    local code = strip(read(mod.dir .. '/' .. file) or '', true)
+                    for _, r in ipairs(configReads(code, mod.global)) do reads[#reads + 1] = r end
+                end
+                local unread = unreadLeaves(clientView or {}, reads)
+                if #unread > 0 then
+                    error(('config_client.lua sert config.%s, qu\'aucun fichier client ne lit : l\'ajouter par '
+                        .. 'config.lua (config.x.y = …)'):format(table.concat(unread, ', config.')))
+                end
+            end)
+
             it('T3 : logique de shared/ partagée seulement si un fichier client s\'en sert', function()
                 local client = {}
                 for _, file in ipairs(clientFiles(lists)) do
@@ -656,5 +701,36 @@ describe('configs partagées : T2 sur des sources d\'essai', function()
             check('local t = VavaX.config.texts\nprint(t[key])'), 1, true)
         assert.matches('utilise la table config entière', check('cfg = VavaX.config'), 1, true)
         assert.matches('utilise la table config entière', check('local cfg\ncfg = VavaX.config'), 1, true)
+    end)
+end)
+
+-- T4 sur des sources écrites ici (relecture réseau R-1 de T-141) : une feuille servie et jamais lue est relevée.
+describe('configs partagées : T4 sur des sources d\'essai', function()
+    local client = {
+        clientFile = true,
+        interact = { distance = 2.0, serverTolerance = 1.5 },
+        texts = { refused = { busy = 'B', wait = 'W' }, title = 'T' },
+        crops = { ble = { stages = { 'a' }, growMinutes = 90 } },
+    }
+    local function unread(src)
+        return unreadLeaves(client, configReads(strip(src, true), 'VavaX'))
+    end
+
+    it('feuille lue par .clé couverte, sa voisine du seul serveur relevée', function()
+        assert.same({ 'crops.ble.growMinutes', 'crops.ble.stages.1', 'interact.serverTolerance', 'texts.refused.busy',
+            'texts.refused.wait', 'texts.title' }, unread('local cfg = VavaX.config\nprint(cfg.interact.distance)'))
+    end)
+
+    it('alias pur : seules ses lectures couvrent ; table indexée par une variable ou passée : toute la table', function()
+        assert.same({ 'interact.distance', 'interact.serverTolerance', 'texts.title' }, unread(
+            'local cfg = VavaX.config\nlocal texts = cfg.texts\nprint(texts.refused[code], cfg.crops[id])'))
+        assert.same({ 'crops.ble.growMinutes', 'crops.ble.stages.1', 'texts.refused.busy', 'texts.refused.wait',
+            'texts.title' }, unread('show(VavaX.config.interact)'))
+    end)
+
+    it('config entière passée : tout est couvert ; clientFile toujours', function()
+        assert.same({}, unread('show(VavaX.config)'))
+        assert.same({ 'crops.ble.growMinutes', 'crops.ble.stages.1', 'interact.distance', 'interact.serverTolerance',
+            'texts.refused.busy', 'texts.refused.wait', 'texts.title' }, unread('local x = 1'))
     end)
 end)

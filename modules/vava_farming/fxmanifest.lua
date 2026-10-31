@@ -10,6 +10,9 @@
            retraits journalés), composteur ajouté à l'artisanat, commandes du Conseil. Le serveur décide de tout et
            demande l'XP à vava_skills ; chaque parcelle est une zone du core, connue des seuls joueurs proches ; le client
            crée les props des plantes selon leur stade, montre l'invite et le menu, joue les gestes.
+           T-132 : les joueurs ne téléchargent que les constantes, config_client.lua (gestes, streaming, touche,
+           cultures, puits, animations) et la logique lue par le client (géométrie, parcelles, proximité) ;
+           config.lua et shared/growth.lua sont servis au seul serveur.
     Dépendances : vAvA_core ≥ 0.11.0 (abonnements de zone), vava_ui ≥ 1.0.0 (polices, grain, papier et coins de la
                   page, par nui://vava_ui/…), vava_inventory ≥ 1.4.0, vava_skills ≥ 1.0.0, vava_gathering ≥ 1.0.0 (faucille),
                   vava_crafting ≥ 1.1.0 (composteur) ; facultatifs : vava_hud, vava_admin (droit metiers), vava_chat,
@@ -23,7 +26,7 @@ use_experimental_fxv2_oal 'yes'
 
 name 'vava_farming'
 description 'Agriculture vAvA : parcelles, croissance par dates, humidité et fertilité, qualité, grenier commun'
-version '1.7.0'
+version '1.8.0'
 
 dependency 'vAvA_core'
 dependency 'vava_ui'
@@ -46,17 +49,19 @@ files {
     'web/items/*.svg',
 }
 
--- Ordre explicite : chaque fichier ne dépend que de ceux listés avant lui.
+-- Ordre explicite : chaque fichier ne dépend que de ceux listés avant lui. Les joueurs ne téléchargent que les
+-- shared_scripts et les client_scripts : config.lua, en tête des server_scripts, n'est jamais servi (T-132).
 shared_scripts {
     'shared/constants.lua',
-    'config.lua',
+    'config_client.lua',         -- ouvre VavaFarming.config : ce que lit le client
     'shared/geometry.lua',
     'shared/parcelzone.lua',
     'shared/proximity.lua',
-    'shared/growth.lua',
 }
 
 server_scripts {
+    'config.lua',                -- complète VavaFarming.config : ce que lit le seul serveur
+    'shared/growth.lua',         -- logique pure, servie au seul serveur (testée hors jeu : tests/spec)
     'server/core.lua',
     'bridge/server.lua',
     'server/journal.lua',

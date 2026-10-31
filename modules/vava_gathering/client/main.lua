@@ -4,7 +4,7 @@
            le joueur, aucune boucle), panneau des zones (touche, RPC, interface, repère de la carte posé sur une zone),
            évènements du serveur (touche de pêche, notifications par vava_hud sinon celles du jeu), retours de
            l'interface, fermeture au déchargement du personnage.
-    Dépendances : shared/constants.lua, config.lua, client/core.lua, client/nui.lua, client/props.lua, client/blips.lua,
+    Dépendances : shared/constants.lua, config_client.lua, client/core.lua, client/nui.lua, client/props.lua, client/blips.lua,
                   client/interact.lua, client/fishing.lua
 ]]
 

@@ -1,8 +1,8 @@
 --[[
     vava_skills/shared/progression.lua
-    Rôle : règles pures de progression, partagées par le client (affichage) et le serveur (décision) : XP d'un niveau
-           au suivant, rang d'un niveau, budget consommé, rendements décroissants. Aucun état.
-    Dépendances : shared/constants.lua, config.lua
+    Rôle : règles pures de progression : XP d'un niveau au suivant, rang d'un niveau, budget consommé, rendements
+           décroissants. Aucun état. Servies au seul serveur (T-132) : le livre reçoit ses chiffres du serveur.
+    Dépendances : shared/constants.lua, config_client.lua, config.lua
 ]]
 
 local floor, max, min = math.floor, math.max, math.min

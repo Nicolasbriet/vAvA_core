@@ -11,8 +11,10 @@ cd "$(dirname "$0")/.."
 BASE="${BASE:-agents/integration}"
 MODE="${1:-}"
 export PATH="$HOME/.luarocks/bin:$PATH"
-# sous Windows : outils posés dans .outils/ par scripts/outils-windows.sh
-[[ -d .outils ]] && export PATH="$PWD/.outils/rocks/bin:$PWD/.outils/lua54/bin:$PATH"
+# sous Windows : outils posés dans .outils/ par scripts/outils-windows.sh ; dans un worktree (sans .outils), ceux de la
+# copie principale (relecture réseau R-4 de T-141)
+outils_de() { [[ -d "$1/.outils" ]] && export PATH="$1/.outils/rocks/bin:$1/.outils/lua54/bin:$PATH"; }
+outils_de "$PWD" || outils_de "$(cd "$(git rev-parse --git-common-dir 2>/dev/null)/.." 2>/dev/null && pwd)"
 echec=0
 
 titre() { printf '\n== %s\n' "$1"; }

@@ -6,7 +6,7 @@
            ou nouvel appui ; remplissage du seau au puits (courte animation locale) ; ouverture du grenier commun. À
            terre (vava_health), ni invite ni demande. Le client ne décide de rien : il montre, joue et demande ; le
            serveur applique et notifie.
-    Dépendances : shared/constants.lua, config.lua, client/core.lua, client/nui.lua, client/props.lua
+    Dépendances : shared/constants.lua, config_client.lua, client/core.lua, client/nui.lua, client/props.lua
 ]]
 
 local type, tostring, pcall = type, tostring, pcall

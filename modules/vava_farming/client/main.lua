@@ -3,7 +3,7 @@
     Rôle : assemblage côté joueur : touche d'interaction (réglable par le joueur, aucune boucle), évènements du serveur
            (emplacement mis à jour, notifications par vava_hud sinon celles du jeu), retours de l'interface relayés au
            serveur (RPC à schéma strict), fermeture au déchargement du personnage.
-    Dépendances : shared/constants.lua, config.lua, client/core.lua, client/nui.lua, client/props.lua,
+    Dépendances : shared/constants.lua, config_client.lua, client/core.lua, client/nui.lua, client/props.lua,
                   client/interact.lua
 ]]
 

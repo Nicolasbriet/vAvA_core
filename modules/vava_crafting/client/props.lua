@@ -10,7 +10,7 @@
            streaming.idlePollMs loin de tous ; une station reçue, déplacée ou oubliée fait aussitôt un passage ; elle
            s'arrête d'elle-même à la sélection, au déchargement et quand la dernière station connue est oubliée, et
            retire alors tous les props. Le menu ouvert sur une station oubliée se ferme (props.onForget).
-    Dépendances : shared/constants.lua, config.lua, shared/proximity.lua, shared/stationzone.lua, client/core.lua
+    Dépendances : shared/constants.lua, config_client.lua, shared/proximity.lua, shared/stationzone.lua, client/core.lua
                   (core.zones : vAvA_core 0.11.0)
 ]]
 

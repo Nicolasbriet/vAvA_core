@@ -5,7 +5,7 @@
            vava_provisions:draw), qui décide tout ; puis geste local (puiser ou boire, durée de la config, aucune boucle
            par image) et notification du résultat, ou du refus, formée d'après la config (shared/rules.lua). Le client ne
            décide de rien.
-    Dépendances : shared/constants.lua, config.lua, shared/rules.lua, client/core.lua, client/nui.lua, client/points.lua
+    Dépendances : shared/constants.lua, config_client.lua, shared/rules.lua, client/core.lua, client/nui.lua, client/points.lua
 ]]
 
 local type, tostring, pcall = type, tostring, pcall

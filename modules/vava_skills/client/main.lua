@@ -5,7 +5,7 @@
            l'interface quand elle est ouverte, gestes de l'interface relayés au serveur (RPC à schéma strict),
            notifications par vava_hud (sinon celles du jeu). Le client n'a aucune donnée propre : tout vient du
            serveur, qui décide de tout.
-    Dépendances : shared/constants.lua, config.lua, client/core.lua, client/nui.lua
+    Dépendances : shared/constants.lua, config_client.lua, client/core.lua, client/nui.lua
 ]]
 
 local type, tostring, pcall = type, tostring, pcall

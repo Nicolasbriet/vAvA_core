@@ -10,7 +10,13 @@ arrêter sur un serveur ouvert) et `vava_inventory` (≥ 1.4.0), avant les modul
 Facultatifs : `vava_hud` (notifications), `vava_admin` (droits `metiers` et `staff`, journal du Conseil), `vava_chat`
 (réponses des commandes dans le chat).
 
-## Règles (config.lua)
+## Règles (config.lua, config_client.lua)
+
+Depuis 1.3.0 (T-132), les réglages sont dans deux fichiers et chacun n'est écrit qu'une fois : `config_client.lua`
+porte ce que lit le client (touche du livre `keys.open`, son libellé `labels.open`, le texte du livre indisponible
+`messages.unavailable`), et le serveur aussi ; `config.lua` porte tout le reste, lu par le seul serveur (toutes les
+règles du tableau ci-dessous, droits, débits, textes des notifications), et complète la table sans réécrire une clé de
+`config_client.lua`.
 
 | Règle | Défaut | Clé |
 |---|---|---|
@@ -93,6 +99,28 @@ for _, student in ipairs(studentsNearby) do skills:recordLesson(source, student,
 Exports complets, hooks (`vava_skills:xp` annulable, `levelChanged`, `mentorship`, `recipeLearned`) et registres :
 `docs/api.md`, section `vava_skills`.
 
+## Installation
+
+`ensure vava_skills` après `vava_ui` et `vava_inventory`, avant les modules métiers (la Chancellerie le place seule).
+
+**Mise à jour vers 1.3.0 (T-132)** : la touche du livre, son libellé et le texte du livre indisponible ont quitté
+`config.lua` pour `config_client.lua`, et `shared/progression.lua` est servi au seul serveur. Un `config.lua` modifié
+et gardé par l'installeur de la Chancellerie (le nouveau posé en `config.lua.nouveau`) garde l'ancienne forme : le
+module démarre, mais la console le signale (« config.lua garde la forme d'avant 1.3.0 … ») et un réglage client changé
+dans ce fichier reste sans effet. Reportez vos réglages dans `config.lua` et `config_client.lua` d'après les nouveaux
+fichiers.
+
+## Fichiers
+
+| Fichier | Rôle |
+|---|---|
+| `config_client.lua` | réglages lus par le client (touche et libellé du livre, texte du livre indisponible) : téléchargé par chaque joueur, ouvre `VavaSkills.config` |
+| `config.lua` | tous les autres réglages, servi au seul serveur (en tête des `server_scripts`) : complète la table |
+| `shared/progression.lua` | pur, servi au seul serveur : XP d'un niveau, rang, budget, rendements décroissants |
+
+Fichiers téléchargés par chaque joueur (1.3.0, T-132) : `shared/constants.lua`, `config_client.lua`, les trois
+`client/*.lua` et la page du livre ; `config.lua` et `shared/progression.lua` sont servis au seul serveur.
+
 ## Conseil
 
 - `vava_fondateur <joueur> <compétence> <niveau> [recette ...]` — console ou droit `staff` : nomme un fondateur (niveau
@@ -105,7 +133,7 @@ Toute action est inscrite au journal du module et, avec vava_admin, au Registre 
 ## Livre des compétences (client)
 
 Touche `K` (réglable dans Paramètres > Raccourcis > FiveM ; citée par l'écran de chargement : changer la touche par
-défaut, `keys.open`, oblige à retoucher le conseil de `modules/vava_loading/web/js/strings.js`). Quatre onglets : Compétences (budget, modes ↑ = ↓, barres
+défaut, `keys.open` de `config_client.lua`, oblige à retoucher le conseil de `modules/vava_loading/web/js/strings.js`). Quatre onglets : Compétences (budget, modes ↑ = ↓, barres
 d'XP, pénurie, mentor et apprentis), Mentorat (propositions reçues, maîtres, apprentis, proposer à un joueur proche),
 Savoirs (recettes connues et lignées, apprentissages en cours), Pénurie. Le client n'a aucune donnée propre : la fiche
 est demandée au serveur à chaque ouverture, les évènements ciblés la tiennent à jour. Polices, grain, papier et coins de
