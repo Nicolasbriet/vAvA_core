@@ -42,7 +42,7 @@ porte ce que lit le client, et le serveur aussi : `actions`, `interact.distance`
 | Seau | 5 charges, rempli aux puits ; tenu en main | `bucket`, `wells` |
 | Déchets | une plante flétrie ou morte arrachée rend 1 à 2 déchets végétaux (perdus si la besace est pleine : l'arrachage se fait quand même, et le cultivateur en est prévenu) | `compost.waste` |
 | Ordre de la récolte (1.5.1) | la plante est prise (récolte) ou arrachée **avant** que quoi que ce soit n'entre dans la besace : de deux cultivateurs qui finissent le même geste sur la même plante, un seul est servi, l'autre lit « Ce geste n'est plus en cours. » ; une récolte refusée par la besace pleine rend la plante (mûre, couverte si elle l'était et si la couverture est payée, fertilité intacte), sauf si quelqu'un a semé entre-temps (journalisé en console) ; ce qu'un autre a fait sur l'emplacement vide pendant l'attente est gardé (compost : la fertilité rendue en tient compte) et un gel tombé entre-temps frappe la plante rendue ; rien n'a bougé : aucune écriture en base pour rien, et la parcelle est republiée aussitôt | — |
-| Composteur | type de station + recette (3 déchets → 1 compost, Agriculture) ajoutés à `vava_crafting`, station placée par `addStation` | `composter` |
+| Composteur | type de station + recette (3 déchets → 1 compost, Agriculture) ajoutés à `vava_crafting`, station placée par `addStation` ; la recette est aussi déclarée à `vava_skills:recipes` (1.9.0, T-136 : libre, Agriculture, niveau 0, donc connue de tous sans pratique ; même nom, compétence et niveau qu'à l'artisanat) et redéclarée quand `vava_skills` redémarre (son registre est neuf) ; sans elle, `vava_skills` ne la connaît pas et le composteur la refuse (« Vous ne connaissez pas cette recette. ») | `composter` |
 | Cultures de départ | blé 90 min, carotte 30, chou 45, lin 60 (durées d'essai) | `crops` |
 | Props | créés par le client à 80 m ; une parcelle et son grenier forment un groupe, les puits sont groupés par case de 200 m : seules les cibles d'un groupe à portée sont mesurées ; relues toutes les secondes près d'un groupe, toutes les 2,5 s quand aucune cible n'est à moins de 140 m (80 m + 60 m de marge d'approche) (1.5.2) | `streaming` |
 | Parcelles connues d'un joueur (1.7.0) | celles dont il est à moins de leur rayon (emplacements et grenier) + 100 m (80 m de portée des props + 20 m de battement : un cavalier au galop entre deux passages du core), décidées par le serveur sur sa position ; oubliées 25 m plus loin (props retirés). À l'arrivée, la parcelle entière (définition, emplacements) ; ensuite, seuls les emplacements qui changent de culture, de stade ou d'état, aux seuls joueurs proches, regroupés par parcelle (une nuit de gel : un envoi par parcelle touchée). Puits : config, connus de tous | `streaming.radius`, `streaming.subscribeSlack` |
@@ -156,8 +156,9 @@ withdraw, source, characterId, item, quantity }`). Détail : `docs/api.md`.
 5. **Récolte** : à la main puis avec la faucille (plus rapide) ; produit au palier avec « Champ communal » en
    provenance ; parfois des graines du même palier ; fertilité en baisse ; replanter la même famille coûte plus, une
    autre rend un peu.
-6. **Compost** : 3 déchets au composteur du champ (station de l'artisanat ajoutée par ce module) → compost ;
-   Fertiliser + 25.
+6. **Compost** : 3 déchets au composteur du champ (station de l'artisanat ajoutée par ce module) → compost, dès
+   Agriculture 0, avec de l'XP en Agriculture ; Fertiliser + 25. `restart vava_skills`, puis de nouveau le
+   composteur : le compost se fait toujours (1.9.0, T-136).
 7. **Grenier** : `E` près du grenier → l'inventaire s'ouvre sur le conteneur ; déposer, s'éloigner → il se ferme ;
    `vava_farming_granary_log` garde dépôts et retraits, une ligne par minute, personnage, objet et sens.
 8. **Privé** : le jardin de la config appartient au personnage n° 1 ; un autre lit « ne vous appartient pas » (sur ses
@@ -183,6 +184,14 @@ withdraw, source, characterId, item, quantity }`). Détail : `docs/api.md`.
     semer, arroser, récolter → `/vava_reseau joueur <n°>` du joueur loin : aucun envoi de `vava_farming` ; celui du
     champ : `vAvA:zone:diff` d'environ 40 o par geste visible. Le joueur loin revient : les plantes sont là, au bon
     stade, dès 80 m. Détail et mesure `profiler record` : `docs/tests/metiers.md` § 5.2.
+
+## À vérifier en jeu (1.9.0)
+
+- Le composteur fait le compost (T-136) : un personnage neuf, sans aucune pratique, le voit au menu et le réalise ; le
+  livre des compétences gagne de l'XP en Agriculture. Avant 1.9.0 il était refusé (« Vous ne connaissez pas cette
+  recette. ») : constaté hors jeu seulement (`tests/spec/farming_compost_recipe_spec.lua`).
+- Après `restart vava_skills`, le compost se fait toujours, sans `restart vava_farming`, et la console n'écrit pas
+  « recette du compost non déclarée aux compétences ».
 
 ## À vérifier en jeu (1.7.0)
 
