@@ -108,7 +108,10 @@ nui.on('wheel:choose', function(data)
         controls.select(nil)
     elseif type(data.spell) == 'string' and data.spell ~= '' then
         -- le sort est prêt, mais l'arme en main l'empêchera de partir : on le dit tout de suite
-        if controls.select(data.spell) and controls.armed() then controls.noticeArmed(true) end
+        if controls.select(data.spell) then
+            local held = controls.held()
+            if held then controls.noticeArmed(true, held) end
+        end
     end
     return { ok = true }
 end)

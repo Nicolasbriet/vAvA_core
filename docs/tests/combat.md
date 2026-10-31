@@ -5,8 +5,9 @@ commune** de `vava_health` 1.4.0 (T-110 ; coup déjà lancé et `vocabulary().pv
 d'essai `vava_example_combat` 1.0.0 et `vava_needs` 1.2.1. Section 2 : les **armes** de `vava_combat` 1.0.0 (T-111),
 essayées avec `/frapper_arme` de `vava_example_combat` 1.1.0. Section 3 : les **techniques** de `vava_combat` 1.2.0
 (T-112 : coups à la souris jugés par le serveur, enchaînement, chancellement, mode combat, dégainer et rengainer).
-Section 4 : la **défense** de `vava_combat` 1.3.0 (T-113 : parade, garde, pas de côté, garde brisée). L'endurance (T-114)
-viendra ensuite.
+Section 4 : la **défense** de `vava_combat` 1.3.0 (T-113 : parade, garde, pas de côté, garde brisée) ;
+section 6 : la **magie et le mode combat** (`vava_magic` 2.12.0, T-149). L'endurance (T-114) viendra
+ensuite.
 Comptez 1 h par section, presque tout à deux ; les tests à deux joueurs sont marqués **(2 joueurs)**. Un test se cite
 « combat 1-8 ».
 
@@ -25,7 +26,8 @@ Comptez 1 h par section, presque tout à deux ; les tests à deux joueurs sont m
    (`SELECT * FROM vava_health_hits ORDER BY id DESC LIMIT 5`).
 5. **Invulnérabilité** du Registre éteinte chez les deux, vol libre et observation compris : depuis `vava_admin` 1.11.0
    (T-138), elles annulent tout coup et tout sort qui blessent (`invulnerable`, `spectating` ; essai :
-   [registre 9 bis](registre.md)) ; les effets sans dégâts (recul, mouillé, ralenti) ne sont pas couverts.
+   [registre 9 bis](registre.md)) ; depuis `vava_magic` 2.12.0 (T-149), les effets sans dégâts des sorts (recul,
+   mouillé, ralenti) les épargnent aussi.
    `/chaine` montre alors aussi `vava_admin:invulnerabilite` en tête de liste, à l'étape annulation.
 6. **Armes** (section 2) : `ensure vava_combat` **après** `vava_health` et `vava_crafting`, et `vava_example_combat`
    1.1.0 (`/frapper_arme`). A est Souverain ; `/metiers niveau <A> forge 60` et `/metiers niveau <A> menuiserie 30` ;
@@ -151,7 +153,7 @@ avant). Préparation : 0.7.
 | 16 | **(2 joueurs)** B à terre (`/vie 0`) devant A ; A frappe. | Aucun dégât, aucun `vava_combat:hit`. |
 | 17 | A à terre, clic gauche. | Rien (mode combat endormi). |
 | 18 | **(2 joueurs)** `chain.pvp = false` (config de `vava_health`, redémarrage) ; A frappe B trois fois. | Une seule notification « Les combats entre habitants sont suspendus : votre lame s'arrête. » ; B ne perd rien. |
-| 19 | Mage : A, Épée en main, la range, puis clic gauche (Boule de feu prête) dans la seconde. | Geste de rengainer ; sort refusé pendant 1,5 s (« … rangez votre arme. ») ; ensuite le mode magie s'éveille, le sort part. |
+| 19 | Mage : A, Épée en main, la range, puis clic gauche (Boule de feu prête) dans la seconde. | Geste de rengainer ; pendant 1,5 s, un avis « Vous rengainez votre arme : vos mains seront libres dans un instant. » (`vava_magic` 2.12.0 ; avant : « … rangez votre arme. ») ; ensuite le mode magie s'éveille (clic droit), le sort part. |
 | 20 | Mage : A lance une Boule de feu, puis prend l'épée et frappe aussitôt. | Pas de coup avant 0,8 s après la prise en main. |
 | 21 | Mage : A incante, prend l'épée pendant l'incantation. | Incantation brisée sans coût (T-140, inchangé). |
 | 22 | A, Épée longue en main, clic gauche (plusieurs fois). | « Vous ne connaissez aucune technique pour cette arme. » une fois ; rien d'autre. |
@@ -233,8 +235,8 @@ Préparation : 0.8.
   ne joue rien et écrit une ligne en F8 par minute.
 - `TaskPlayAnim` d'un geste joué sur son propre ped : vu des autres joueurs (3-5, 3-11) ; effet d'impact
   (`StartParticleFxNonLoopedOnPedBone`, identifiant d'os 24818) au bon endroit.
-- Boutons de la souris partagés avec la magie : arme en main, un mage peut encore lire une fois « rangez votre arme » et
-  voir l'anneau de la magie en plus de celui du combat (tâche T-149).
+- Boutons de la souris partagés avec la magie : depuis `vava_magic` 2.12.0 (T-149), arme en main, la magie ne dit plus
+  rien et ne pose plus son anneau (section 5).
 - Cap lu par le serveur pendant un virage (3-9) : le serveur juge sur le cap répliqué ; un virage très rapide au départ
   du coup peut arriver après l'ouverture de la frappe (noter si un coup tourné vers B manque).
 - Secousse de caméra (`SMALL_EXPLOSION_SHAKE`, `effects.shakeName`) : sensible sans gêner (3-5, 3-11).
@@ -244,3 +246,22 @@ Préparation : 0.8.
   synchronisée ; R et Espace sur AZERTY ; une touche liée (R, Espace) répond-elle encore quand recharger (45) et le saut
   (22) sont coupés en mode combat (4-3, 4-14) ; le sprint coupé garde levée ; parade au dernier moment à 150 ms de ping
   (4-23) ; la direction du pas de côté lue à l'appui (`GetControlNormal` 30 et 31).
+
+## 6. La magie et le mode combat (`vava_magic` 2.12.0, T-149)
+
+La magie se tait quand une arme du royaume est en main (mêmes boutons que le combat), dit « Vous rengainez… » pendant
+le rengainement, et refuse de frapper à qui un sort a gelé, renversé ou fait chanceler (export `hardControl` de la
+magie, lu par `vava_combat` à l'étape 13 de l'admission : refus `controlled`). **Aucun changement de code dans
+`vava_combat`** (1.2.0) : il lisait déjà l'export s'il existe. Préparation : 0.7 ; A et B mages avec tous les sorts
+(`/magie tous`), chacun une Épée courte. Le détail côté magie : [magie 20](magie.md).
+
+| # | Faire | Attendu |
+|---|---|---|
+| 1 | A, Boule de feu prête, l'Épée courte en main : clic gauche, clic droit, clic molette sur B. | Taille, Fendant, verrou du combat ; **aucun** mot de la magie, **un seul** anneau (celui du combat). |
+| 2 | **(2 joueurs)** B, l'épée en main, gelé par A (Trait de glace sur B mouillé) ; B clique pendant le gel. | « Vous ne pouvez pas frapper ainsi. » à chaque clic refusé ; aucun geste de coup accepté, aucun dégât chez A ; `/vava_reseau joueur <B>` : seulement `rpc vava_combat:use`. |
+| 3 | **(2 joueurs)** B renversé (Vague N4), puis chancelant (Secousse) ; B clique. | Même refus tant que dure l'état (1,5 à 2 s) ; les coups repartent ensuite. |
+| 4 | **(2 joueurs)** B chancelant par le Fendant de A (chancellement du combat, 0,9 s) ; B clique. | « Vous chancelez. » (`staggered`), pas `controlled` : le chancellement du combat reste distinct de celui de la magie (spec T-112 § 13-4). |
+| 5 | `stop vava_magic` ; B frappe ; `ensure vava_magic`. | Les coups partent ; aucune ligne de console de `vava_combat` sur la magie. |
+
+Prouvé hors jeu : `tests/spec/magic_combat_mode_spec.lua` (export réel de la magie lu par le bridge de `vava_combat`)
+et `tests/spec/combat_use_spec.lua` (`MagicHardControl` → `controlled`).

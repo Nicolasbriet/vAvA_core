@@ -4,7 +4,8 @@
            plus fort l'emporte, jamais cumulé), Chancelant, Renversé, Gelé. Chaque état a sa fin, tenue ici ; le state
            bag du ped les montre aux joueurs proches (flammes, gouttes, givre, poussière) et au joueur lui-même, qui
            reçoit aussi leurs durées (icônes de son écran) et applique ce qui touche à son ped (allure, chute).
-      - Contrôles durs (Chancelant, Renversé, Gelé) : impossible d'incanter, une incantation en cours se brise. Dès
+      - Contrôles durs (Chancelant, Renversé, Gelé) : impossible d'incanter, une incantation en cours se brise ;
+        impossible de frapper non plus (`states.hardControl`, export `hardControl` lu par vava_combat, T-149). Dès
         qu'un contrôle dur touche, la cible est protégée des autres jusqu'à `hardImmunityMs` après sa fin (règle
         d'équité : aucun enchaînement) ; les dégâts, eux, s'appliquent toujours.
       - Gelé : le ped est figé par le serveur seul (le client ne fait que couper ses commandes) ; à la fin du gel, au
@@ -15,7 +16,7 @@
     Dépendances : shared/, config.lua, server/core.lua, bridge/server.lua, server/world.lua, server/combat.lua
 ]]
 
-local pairs, ipairs, type, tostring, max = pairs, ipairs, type, tostring, math.max
+local pairs, ipairs, type, tostring, max, sort = pairs, ipairs, type, tostring, math.max, table.sort
 local GetGameTimer, SetTimeout, TriggerClientEvent = GetGameTimer, SetTimeout, TriggerClientEvent
 
 local core = VavaMagic.core
@@ -47,6 +48,25 @@ local players = {}
 -- numéro de chaque pose d'état, jamais réutilisé (même après le départ d'un joueur) : une minuterie d'un état
 -- oublié ne peut pas se prendre pour une minuterie d'aujourd'hui
 local lastToken = 0
+
+-- contrôles durs, TOUS ceux de `states.hard`, dans un ordre fixe : ceux de `states.order` (réglage d'affichage) d'abord,
+-- puis les autres par nom ; un `order` incomplet ne retire rien à l'empêchement d'incanter ni à `hardControl`
+local HARD_ORDER = {}
+do
+    local listed = {}
+    for _, name in ipairs(cfg.order or {}) do
+        if HARD[name] and not listed[name] then
+            listed[name] = true
+            HARD_ORDER[#HARD_ORDER + 1] = name
+        end
+    end
+    local rest = {}
+    for name in pairs(HARD) do
+        if not listed[name] then rest[#rest + 1] = name end
+    end
+    sort(rest)
+    for _, name in ipairs(rest) do HARD_ORDER[#HARD_ORDER + 1] = name end
+end
 
 ---@param src integer
 ---@return table
@@ -219,6 +239,22 @@ function states.slowStrength(src)
     return condition and condition.strength or 0
 end
 
+--- Contrôle dur qui tient ce joueur maintenant (Chancelant, Renversé, Gelé : `states.hard` de la config, en entier),
+--- ou nil : son nom (`stagger`, `knockdown`, `frozen`), le premier de HARD_ORDER. Lecture en mémoire seule, sans
+--- attente : vava_combat la demande à chaque frappe (export `hardControl`) pour refuser un coup (`controlled`).
+---@param src integer
+---@return string|nil
+function states.hardControl(src)
+    local entry = players[src]
+    if not entry then return nil end
+    local now = GetGameTimer()
+    for _, name in ipairs(HARD_ORDER) do
+        local condition = entry.conditions[name]
+        if condition and condition.untilMs > now then return name end
+    end
+    return nil
+end
+
 ---@param src integer
 ---@return boolean
 function states.immune(src)
@@ -246,7 +282,7 @@ function states.start()
     VavaMagic.casting.addBlocker(function(src)
         local entry = players[src]
         if not entry then return nil end
-        for _, name in ipairs(cfg.order) do
+        for _, name in ipairs(HARD_ORDER) do
             if BLOCKS[name] and entry.conditions[name] then return BLOCKS[name] end
         end
         return nil

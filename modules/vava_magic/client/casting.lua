@@ -2,8 +2,8 @@
     vava_magic/client/casting.lua
     Rôle : incantation côté client, commune à tous les sorts. Le client affiche et demande ; le serveur décide.
       - Pré-vérification (mage, sort connu, niveau, mana prédite, délai global, recharge, à terre, en véhicule, arme en
-        main (vava_combat), droit d'incanter du bridge, empêchements d'autres fichiers) pour éviter une incantation
-        inutile, puis demande au serveur.
+        main ou qu'on rengaine (vava_combat), droit d'incanter du bridge, empêchements d'autres fichiers) pour éviter
+        une incantation inutile, puis demande au serveur.
       - Pendant la durée : animation en trois phases (début, maintien en boucle, relâchement au succès), barre
         d'incantation au-delà de `castBarMinMs`, lueur de la barre de mana. Interrompue par une chute, une blessure
         (sorts qui le disent), un déplacement au-delà de ce que le sort permet, une arme prise en main, ou la touche
@@ -13,8 +13,8 @@
         (`checkMs`) ; l'arme en main, toutes les 200 ms (`armedCheckMs`).
       - À la fin : arguments de fin du sort (direction visée…), demande au serveur, temps de recharge et délai global
         notés.
-    Dépendances : shared/, config_client.lua, client/core.lua, bridge/client.lua, client/nui.lua, client/state.lua,
-                  client/fx.lua, client/hud.lua, client/messages.lua, client/keys.lua
+    Dépendances : shared/ (dont hands.lua), config_client.lua, client/core.lua, bridge/client.lua, client/nui.lua,
+                  client/state.lua, client/fx.lua, client/hud.lua, client/messages.lua, client/keys.lua
 ]]
 
 local type, ipairs, pcall, unpack = type, ipairs, pcall, table.unpack
@@ -34,6 +34,7 @@ local hud = VavaMagic.hud
 local messages = VavaMagic.messages
 local keys = VavaMagic.keys
 local geometry = VavaMagic.geometry
+local hands = VavaMagic.hands
 local cfg = VavaMagic.config.casting
 local RPC = VavaMagic.RPC
 local EVENTS = VavaMagic.EVENTS
@@ -106,7 +107,8 @@ function casting.check(spell, opts)
     if bridge.IsDowned() then return false, 'downed' end
     if IsPedInAnyVehicle(PlayerPedId(), false) then return false, 'in_vehicle' end
     if not bridge.CanUseMagic() then return false, 'cannot_cast' end
-    if bridge.IsArmed() then return false, 'armed' end
+    local held = bridge.CombatHands()
+    if held then return false, hands.code(held) end
     for _, check in ipairs(blockers) do
         local ok, code = pcall(check)
         if ok and type(code) == 'string' then return false, code end

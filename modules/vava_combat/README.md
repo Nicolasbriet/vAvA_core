@@ -28,7 +28,8 @@ Ordre de démarrage : après `vAvA_core` (≥ 0.10.0 : `core.net`, registre `cor
 isolés dans le bridge : `vava_crafting` ≥ 1.5.0 et `vava_skills` ≥ 1.0.0 (sans eux, ou plus anciens : armes sans recette,
 une ligne de console), `vava_hud` (notifications ; sans lui, celles du jeu), `vava_admin` (droit `metiers`, journal du
 Registre ; sans lui, ACE `combat.admin`), `vava_chat` (réponses de `/armes` ; sans lui, une notification au seul membre),
-`vava_magic` (export `hardControl` s'il existe : un joueur gelé ou renversé ne frappe pas ; tâche T-149).
+`vava_magic` (export `hardControl`, `vava_magic` ≥ 2.12.0, T-149 : un joueur gelé, renversé ou chancelant par un sort
+ne frappe pas, refus `controlled` ; plus ancien, arrêté ou en erreur : aucun refus de ce côté).
 **Deux RPC (`vava_combat:use`, `vava_combat:lower`), aucune NUI, aucune table SQL.** **À ne pas arrêter sur un serveur ouvert** : pendant
 l'arrêt, les armes sont « gardées à part » par l'inventaire, les recettes quittent les stations et les gestes natifs de
 GTA reviennent (sans dégâts entre joueurs : `vava_health` les annule).
@@ -385,9 +386,11 @@ la main ; personne ne se défend : une lecture de table, aucune native.
 - **T-121** (éditeur des techniques) : `techniques()`, `weapons()`, `provisional` ; le format et ses bornes sont ceux
   de `weapons.checkTechniques`. Fait par T-112 : fiches d'armes coupées en deux (classe client, fiche serveur), délais du
   serveur du bouclier et `guard.delay` sortis de ce que télécharge le joueur (relectures R-2, R-3 et S-2 de T-142).
-- **T-149** (la magie et le mode combat) : ni rappel « rangez votre arme » ni anneau de la magie quand
-  `exports.vava_combat:inCombatMode()` ou `armed()` ; texte propre pendant le rengainement ; export serveur
-  `hardControl(src)` (gelé, renversé, chancelant), que `vava_combat` lit déjà s'il existe (refus `controlled`).
+- **T-149** (fait, `vava_magic` 2.12.0 ; aucun changement de code ici) : la magie lit `armed()` côté client (arme
+  du royaume en main : ni rappel ni anneau de la magie ; `sheathing` : « Vous rengainez votre arme… ») ; export serveur
+  `hardControl(src)` → `'frozen'`, `'knockdown'`, `'stagger'` ou `nil`, lu par `bridge.MagicHardControl` à l'étape 13
+  de l'admission (refus `controlled`, « Vous ne pouvez pas frapper ainsi. »). Essai de bout en bout (export réel de la
+  magie lu par ce bridge) : `tests/spec/magic_combat_mode_spec.lua`.
 - **T-140** (fait, `vava_magic` 2.10.0) : règle « mains vides » de la magie par `exports.vava_combat:armed()` (client) et
   `armed(src)` (serveur) ; le rengainement de 1.2.0 s'y ajoute sans changement de la magie.
 
@@ -482,8 +485,9 @@ contrôles natifs ont quitté `config.lua` pour `config_client.lua`.
 - Gestes et effets provisoires présents (`/anim <dict> <clip>` de `examples/vava_anim_test`), vus des autres joueurs ;
   effet d'impact sur l'os 24818 au bon endroit ; secousse de caméra mesurée.
 - Sensations à 30, 80 et 150 ms de ping (portée et angle avec les tolérances resserrées) ; coups à travers un mur fin
-  (aucun contrôle) ; cap lu par le serveur pendant un virage rapide ; boutons de la souris partagés avec la magie
-  (T-149). Procédure : [docs/tests/combat.md](../../docs/tests/combat.md) § 3 à § 5.
+  (aucun contrôle) ; cap lu par le serveur pendant un virage rapide ; boutons de la souris partagés avec la magie et
+  frappe refusée gelé ou renversé par un sort (T-149). Procédure : [docs/tests/combat.md](../../docs/tests/combat.md)
+  § 3 à § 6.
 - Défense (1.3.0) : gestes provisoires de garde, de parade et de roulade (`anim@melee@machete@streamed_core@`,
   `move_strafe@roll`) présents et vus des autres (garde en boucle synchronisée) ; R et Espace en AZERTY ; une touche
   liée (Espace, R) répond-elle encore quand le saut (22) et recharger (45) sont coupés ; parade au dernier moment à

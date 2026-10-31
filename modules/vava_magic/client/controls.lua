@@ -6,9 +6,8 @@
         par la roue, le clic droit ou un sort ; il s'endort après `controls.idleMs` sans viser ni lancer. Éveillé et
         actif, il coupe à chaque image l'attaque, la visée et le changement d'arme de GTA (seule boucle par image du
         fichier) ; endormi, rien ne tourne. Sortir une arme (de GTA, ou de l'inventaire : `vava_combat:armed()`, lu
-        par le bridge) ou monter en véhicule le coupe, le sort reste choisi ; viser ou lancer arme en main rappelle
-        « rangez votre arme », une fois par arme sortie et jamais deux fois en moins de `controls.armedNoticeMs` (viser
-        ne réveille alors pas le mode). Le serveur refuse lui-même.
+        par le bridge) ou monter en véhicule le coupe, le sort reste choisi ; viser arme en main ne réveille pas le
+        mode. Mots aux touches : shared/hands.lua (T-149 : voir README). Le serveur refuse lui-même.
       - Clic droit maintenu : visée (réticule aux couleurs de l'élément, grisé hors de portée ; allure un peu
         ralentie ; aperçu au sol du point, du disque ou de la ligne visés — un ou deux segments —, du rayon autour de
         soi pour une zone centrée sur le lanceur, ou du cône devant lui). Clic gauche : le sort fait son geste (chaque sort
@@ -38,6 +37,7 @@ local keys = VavaMagic.keys
 local aim = VavaMagic.aim
 local casting = VavaMagic.casting
 local geometry = VavaMagic.geometry
+local hands = VavaMagic.hands
 local cfg = VavaMagic.config
 local controlsCfg = cfg.controls
 local preview = controlsCfg.preview
@@ -144,12 +144,12 @@ local function reticle(spec, inRange)
     end
 end
 
---- Mains prises : arme de GTA sortie, ou arme de l'inventaire tenue (vava_combat, lu par le bridge). Affichage
---- seulement : le serveur refuse lui-même une arme ou un bouclier au bras.
+--- Ce que tiennent les mains (shared/hands.lua), ou nil. Affichage seulement.
 ---@param ped integer
----@return boolean
-local function handsTaken(ped)
-    return GetSelectedPedWeapon(ped) ~= UNARMED or bridge.IsArmed()
+---@return string|nil
+local function handsHeld(ped)
+    if GetSelectedPedWeapon(ped) ~= UNARMED then return hands.NATIVE end
+    return bridge.CombatHands()
 end
 
 ---@param ped integer
@@ -157,7 +157,7 @@ end
 local function conditionsMet(ped)
     if not state.isMage() or not state.selected() or not state.level(state.selected()) then return false end
     if IsEntityDead(ped) or IsPedInAnyVehicle(ped, false) or IsPedRagdoll(ped) or IsPedFalling(ped) then return false end
-    if handsTaken(ped) then return false end
+    if handsHeld(ped) then return false end
     armedNoticed = false
     -- la roue a le focus de la page : le mode reste actif derrière elle
     if (IsNuiFocused() and not wheelOpen()) or IsPauseMenuActive() then return false end
@@ -394,8 +394,9 @@ function controls.castNow(name)
         messages.refuse('unknown_spell')
         return
     end
-    if handsTaken(PlayerPedId()) then
-        controls.noticeArmed(true)
+    local held = handsHeld(PlayerPedId())
+    if held then
+        controls.noticeArmed(true, held)
         return
     end
     controller.cast({ aiming = false, inRange = false, direction = aim.direction(), target = lockedTargetFor(name) })
@@ -432,31 +433,39 @@ local function scroll(step)
     end
 end
 
---- Mains prises (arme en main) ?
----@return boolean
-function controls.armed()
-    return handsTaken(PlayerPedId())
+--- Ce que tiennent les mains (shared/hands.lua), ou nil.
+---@return string|nil
+function controls.held()
+    return handsHeld(PlayerPedId())
 end
 
---- « Rangez votre arme » : une fois par arme sortie (les touches peuvent servir aussi à l'arme), jamais deux fois en
---- moins de `armedNoticeMs` ; `explicit` (roue, /lancer) : toujours dit, et compté pour les touches. L'appelant a vu
---- les mains prises.
+--- Mains prises (arme en main, ou qu'on rengaine) ?
+---@return boolean
+function controls.armed()
+    return handsHeld(PlayerPedId()) ~= nil
+end
+
+--- « Rangez votre arme » ou « vous rengainez » (hands.notice) ; `explicit` : roue, /lancer ; `held` : vu par l'appelant
+--- (relu sinon).
 ---@param explicit? boolean
-function controls.noticeArmed(explicit)
+---@param held? string
+function controls.noticeArmed(explicit, held)
+    held = held or handsHeld(PlayerPedId())
     local now = GetGameTimer()
-    if not explicit then
-        if armedNoticed then return end
-        if armedNoticeAt and now - armedNoticeAt < controlsCfg.armedNoticeMs then return end
-    end
+    local code = hands.notice(held, explicit == true, armedNoticed, armedNoticeAt, now, controlsCfg.armedNoticeMs)
+    if not code then return end
     armedNoticed, armedNoticeAt = true, now
-    messages.refuse('armed')
+    messages.refuse(code)
 end
 
 local function onCast()
     -- le clic qui choisit un sort dans la roue ne lance rien
     if wheelOpen() then return end
     if not controls.isActive() then
-        if awake and handsTaken(PlayerPedId()) then controls.noticeArmed() end
+        if not state.isMage() or not state.selected() then return end
+        -- endormi : seulement pendant le rengainement (le clic était pour le sort)
+        local held = handsHeld(PlayerPedId())
+        if held and (awake or held == hands.SHEATHING) then controls.noticeArmed(false, held) end
         return
     end
     local name = state.selected()
@@ -468,9 +477,10 @@ end
 
 local function onAimDown()
     if not state.isMage() or not state.selected() or wheelOpen() then return end
-    -- mains prises : le rappel seul, sans réveiller le mode ni viser (aucun relevé de 20 s pour rien)
-    if handsTaken(PlayerPedId()) then
-        controls.noticeArmed()
+    -- mains prises : le mot des touches seul, sans réveiller le mode ni viser (aucun relevé de 20 s pour rien)
+    local held = handsHeld(PlayerPedId())
+    if held then
+        controls.noticeArmed(false, held)
         return
     end
     controls.wake()

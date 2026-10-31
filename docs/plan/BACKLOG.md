@@ -1132,7 +1132,8 @@ faire tout le système de combat ») : la porte T-119 reste à passer en jeu.
   Rapport `docs/plan/rapports/T-112.md` ; procédure `docs/tests/combat.md` § 3 (32 tests) et § 4.
 
 ### T-149 — La magie et le mode combat
-- Agent : vava-dev-lua (cette tâche autorise à toucher `vava_magic`) · Dépend de : T-112, T-138 · Statut : à faire
+- Agent : vava-dev-lua (cette tâche autorise à toucher `vava_magic`) · Dépend de : T-112, T-138 · Statut : à tester en
+  jeu (relu sécurité et réseau, suites appliquées ; S-1 et S-4 confiés à T-113)
 - Décision du porteur du projet (31/10, spec T-112) : en mode combat (arme en main), la magie ne montre ni rappel
   « rangez votre arme » ni anneau de verrou ; texte propre pendant le rengainement ; export `hardControl(src)` (gelé,
   renversé, chancelant) lu par `vava_combat` pour refuser une frappe.
@@ -1140,6 +1141,21 @@ faire tout le système de combat ») : la porte T-119 reste à passer en jeu.
   les effets sans dégâts (recul, renversement, mouillé, ralenti) épargnent un membre invulnérable. Consigne de la
   relecture réseau de T-138 (R-3) : `isInvulnerable` une fois par effet appliqué, jamais en boucle (ni par image, ni
   par cible dans un balayage répété).
+- Fait le 31 octobre 2026 (branche `agents/T-149`) : `vava_magic` 2.12.0 (arme du royaume en main, la magie se tait au
+  clic droit et au clic gauche et ne verrouille personne, un verrou posé tombe à la vérification suivante ; la roue et
+  `/lancer` disent encore « rangez votre arme » ; pendant le rengainement, « Vous rengainez votre arme… » en simple
+  avis, client et serveur (code `sheathing`) ; règles pures `shared/hands.lua` ; `armed()` lu par un appel isolé aux
+  relevés existants et aux touches, aucune boucle nouvelle ; export serveur `hardControl(source)` → `frozen`,
+  `knockdown`, `stagger` ou nil, échéance comprise ; `combat.affects` lit `vava_admin:isInvulnerable` en dernier, une
+  fois par effet : une fois par cible d'une Vague, une fois par pose dans un sol mouillé, une brume, une boue, jamais à
+  chaque vérification). `vava_combat` : aucun code touché (son bridge lisait déjà `hardControl`, refus `controlled`),
+  README seul, reste 1.2.0. Suites des relectures (même version) : `hardControl` et l'empêchement d'incanter
+  parcourent tous les contrôles durs, quel que soit `states.order` (S-2) ; état déjà posé gardé, écrit au README (S-3) ;
+  commentaires livrés allégés, − 3,5 Ko bruts (R-1) ; `shared/hands.lua` en tête des `client_scripts` (R-2) ; roue
+  sans double lecture (R-3). S-1 et S-4 (`vava_combat`) confiés à T-113. Rapport `docs/plan/rapports/T-149.md`.
+  **À tester en jeu** :
+  `docs/tests/magie.md` § 20 (16 tests) et 19-4, `docs/tests/combat.md` § 6 (5 tests) et 3-19,
+  `docs/tests/registre.md` 9 bis-3 bis.
 
 ### T-113 — Blocage, parade, esquive
 - Agent : vava-dev-lua · Dépend de : T-112 · Statut : en cours (fait ; relectures sécurité et réseau à faire)
@@ -1161,6 +1177,31 @@ faire tout le système de combat ») : la porte T-119 reste à passer en jeu.
 - Agent : vava-dev-lua · Dépend de : T-113, T-114 · Statut : à faire
 - Styles par catégorie d'arme, compétences de combat dans `vava_skills`, déblocage par rang, XP sur vraie cible,
   mentorat du maître d'armes ; techniques de hache, masse, dague, bâton et bouclier en config.
+
+### T-155 — Chiffres des coups (dégâts affichés)
+- Agents : vava-architecte → vava-dev-lua · Dépend de : T-112 (après T-113, même module) · Statut : à faire
+- Demande du porteur du projet (31 octobre 2026), « comme les MMO » : le montant de chaque coup s'affiche au-dessus de
+  la cible, le temps d'un souffle (chiffre qui monte et s'efface) ; issues sans dégâts écrites en mots (« Paré »,
+  « Bloqué », « Esquivé », « Absorbé ») ; coup qui met à terre ou fait chanceler distingué. Valable pour les coups
+  d'arme et les sorts (chaîne `vava_health:hit`).
+- Montant pris dans le résultat de la chaîne, jamais calculé par le client ; envoyé seulement à qui doit le voir
+  (spec : attaquant et cible, ou proches), dans un message déjà envoyé quand c'est possible (`vava_combat:hit`,
+  réponse de `use`) ; quelques octets de plus, rien à chaque image hors du temps d'affichage.
+- Réglage du joueur pour les masquer (Réglages de la bannière `vava_pause`, stockage local) et réglage du serveur
+  (activé, qui voit quoi) ; dessin sans NUI à chaque image ou par NUI avec envois des seuls changements (spec).
+
+### T-156 — Mannequin d'entraînement
+- Agents : vava-architecte → vava-dev-lua · Dépend de : T-112 (après T-113, même module) ; T-102 pour le placement
+  par l'Atelier · Statut : à faire
+- Demande du porteur du projet (31 octobre 2026), « comme les MMO » : un mannequin de paille (modèle `-- PLACEHOLDER`)
+  qu'on frappe dans une cour d'armes pour essayer ses techniques ; il encaisse sans jamais tomber, montre le montant de
+  chaque coup (T-155), se « remet » seul ; coups d'arme et sorts.
+- Le serveur juge le coup sur le mannequin comme sur un joueur (portée, angle, technique, arme réellement tenue) et
+  calcule le montant par la chaîne de dégâts sans rien appliquer à personne (essai à blanc ou équivalent dans
+  `vava_health`, à préciser par la spec) ; l'arme s'use ou non (spec) ; aucune XP au-delà d'un niveau (COMBAT_V1 § 6,
+  T-115).
+- Mannequins posés en config (coordonnées `-- PLACEHOLDER`) en v1, puis définition de l'Atelier (outil de placement de
+  T-102) ; props créés à portée seulement ; état transmis aux seuls proches.
 
 ### T-116 — La magie sur la chaîne de dégâts
 - Agent : vava-dev-lua · Dépend de : T-110 · Statut : à tester en jeu (relu sécurité et réseau, contre-relecture

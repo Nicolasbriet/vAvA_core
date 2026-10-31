@@ -3,8 +3,9 @@
     Rôle : SEUL point de contact, côté serveur, entre la magie et le core / les autres modules : personnage, droits du
            Conseil, notifications, objets de l'inventaire, sauvegarde de la fiche, base de données, santé (chaîne de
            dégâts de vava_health : coups des sorts, vie tenue par le serveur, hook des coups, modificateurs), mains vides
-           pour incanter (arme de GTA sur le ped, arme et bouclier au bras lus par vava_combat, prises en main suivies
-           par le hook vava_inventory:hold).
+           pour incanter (arme de GTA sur le ped, arme, rengainement et bouclier au bras lus par vava_combat, prises en
+           main suivies par le hook vava_inventory:hold), membre du Conseil invulnérable (vava_admin:isInvulnerable :
+           effets sans dégâts épargnés).
            Pour brancher la magie sur un autre core, réécrire les fonctions de ce fichier (et de bridge/client.lua) :
            le reste du module ne connaît qu'elles.
     Implémentation : vAvA_core (API documentée dans docs/api.md) et ses modules officiels. Chaque appel à une autre
@@ -137,6 +138,29 @@ end
 function Bridge.IsHeldByCouncil(source)
     local called, frozen = call(LINKS.ADMIN, 'isFrozen', source)
     return called and frozen == true
+end
+
+-- une ligne de console par minute au plus quand vava_admin répond mal à `isInvulnerable` (jamais une par effet)
+local ADMIN_WARN_MS = 60000
+local adminWarnedAt = nil
+
+--- Le Conseil tient-il ce joueur pour invulnérable (outil, vol libre, observation ; vava_admin ≥ 1.11.0) ? Les effets
+--- sans dégâts des sorts (recul, renversement, mouillé, ralenti) l'épargnent alors, comme la chaîne de dégâts épargne
+--- ses blessures. À lire **une fois par effet**, au moment où il touche sa cible, jamais en boucle (relecture réseau R-3
+--- de T-138) : pour un membre protégé, l'export lit le personnage actif dans le core. vava_admin absent, ancien (sans
+--- l'export) ou en erreur : non (l'effet porte), une ligne de console par minute au plus.
+---@param source integer
+---@return boolean
+function Bridge.IsInvulnerable(source)
+    if GetResourceState(LINKS.ADMIN) ~= 'started' then return false end
+    local ok, protected = pcall(invoke, LINKS.ADMIN, 'isInvulnerable', source)
+    if ok then return protected == true end
+    local now = GetGameTimer()
+    if not adminWarnedAt or now - adminWarnedAt >= ADMIN_WARN_MS then
+        adminWarnedAt = now
+        VavaMagic.log.warn('%s.isInvulnerable en erreur, effets sans dégâts non épargnés : %s', LINKS.ADMIN, tostring(protected))
+    end
+    return false
 end
 
 --- Prévient `handler` après chaque action du Conseil (hook `vava_admin:action` : { actor, action, target?, details }),
@@ -499,9 +523,10 @@ local function nativeWeapon(source)
 end
 
 --- Ce qui empêche d'incanter dans les mains du joueur : `armed` (arme de GTA sortie, ou arme tenue d'après
---- `vava_combat:armed(source)`), `shielded` (bouclier accroché **au bras**, `shield(source).ready`), ou nil : mains
---- libres, bouclier dans le dos, outil en main, vava_combat absent, pas prêt ou en erreur (aucune restriction pour les
---- armes de l'inventaire).
+--- `vava_combat:armed(source)`), `sheathing` (arme qu'on rengaine encore : `armed` rend `sheathing = true` pendant
+--- `draw.sheatheMs` de vava_combat, 1,5 s ; T-149), `shielded` (bouclier accroché **au bras**, `shield(source).ready`),
+--- ou nil : mains libres, bouclier dans le dos, outil en main, vava_combat absent, pas prêt ou en erreur (aucune
+--- restriction pour les armes de l'inventaire).
 ---@param source integer
 ---@return string|nil code
 function Bridge.HandsBusy(source)
@@ -509,7 +534,7 @@ function Bridge.HandsBusy(source)
     local called, weapon, code = combat('armed', source)
     if not called then return nil end
     watchReady(weapon == nil and code or nil)
-    if type(weapon) == 'table' then return 'armed' end
+    if type(weapon) == 'table' then return weapon.sheathing == true and 'sheathing' or 'armed' end
     local read, shield = combat('shield', source)
     if read and type(shield) == 'table' and shield.ready == true then return 'shielded' end
     return nil

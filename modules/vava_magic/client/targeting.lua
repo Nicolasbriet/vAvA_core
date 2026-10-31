@@ -8,11 +8,12 @@
         hors de vue (quelques vérifications de suite), cible morte, ou sans attaque depuis un moment. Un anneau sous
         la cible n'est vu que du lanceur : rien ne passe par le réseau. C'est la seule boucle par image du fichier,
         et seulement tant qu'une cible est verrouillée.
+      - Arme du royaume en main : aucun verrou de la magie (T-149 : voir README).
       - Cible prévenue par le serveur (au début de l'incantation) : le bord de son écran rougit un instant.
     Le serveur revérifie la cible au lancer : ceci n'est qu'une proposition. Les sorts la lisent par le bridge
     (Bridge.GetLockedTarget).
-    Dépendances : shared/, config_client.lua, client/nui.lua, client/state.lua, client/messages.lua, client/keys.lua,
-                  client/aim.lua
+    Dépendances : shared/, config_client.lua, bridge/client.lua, client/nui.lua, client/state.lua, client/messages.lua,
+                  client/keys.lua, client/aim.lua
 ]]
 
 local ipairs, sort = ipairs, table.sort
@@ -22,6 +23,8 @@ local PlayerId, PlayerPedId, GetActivePlayers, GetPlayerPed, GetPlayerServerId, 
 local DoesEntityExist, IsEntityDead, HasEntityClearLosToEntity = DoesEntityExist, IsEntityDead, HasEntityClearLosToEntity
 local DrawMarker = DrawMarker
 
+local bridge = VavaMagic.bridge
+local hands = VavaMagic.hands
 local nui = VavaMagic.nui
 local state = VavaMagic.state
 local messages = VavaMagic.messages
@@ -104,7 +107,8 @@ local function watch()
                     break
                 end
                 locked.unseen = HasEntityClearLosToEntity(myPed, ped, LOS_FLAGS) and 0 or locked.unseen + 1
-                if locked.unseen >= cfg.lostChecks then
+                -- arme du royaume prise en main : le verrou passe au combat
+                if locked.unseen >= cfg.lostChecks or not hands.canLock(bridge.CombatHands()) then
                     locked = nil
                     break
                 end
@@ -118,10 +122,14 @@ local function watch()
     end)
 end
 
---- Appui court : verrouiller, ou passer à la cible suivante.
+--- Appui court : verrouiller, ou passer à la cible suivante (rien arme du royaume en main).
 function targeting.cycle()
     local range = lockRange()
     if range <= 0 then return end
+    if not hands.canLock(bridge.CombatHands()) then
+        locked = nil
+        return
+    end
     local list = candidates(range)
     if #list == 0 then
         messages.refuse('no_lock_target')
