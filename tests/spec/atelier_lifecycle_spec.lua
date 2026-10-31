@@ -240,16 +240,29 @@ describe('vava_atelier lifecycle', function()
             }
             local refs = lc.lot(items)
             assert.same({
-                { kind = 'zone', id = 'foret', place = place, removal = false },
+                { kind = 'zone', id = 'foret', removal = false },
                 { kind = 'node', id = 'n1', parent = 'foret', removal = true },
             }, refs)
-            for _, ref in ipairs(refs) do assert.is_nil(ref.data) end
+            -- ni data ni lieu dans les références (C-1 de la contre-relecture réseau : un polygone pèse 850 octets)
+            for _, ref in ipairs(refs) do
+                assert.is_nil(ref.data)
+                assert.is_nil(ref.place)
+            end
             local full = lc.lot(items, true)
             assert.equal(big, full[1].data)
+            assert.equal(place, full[1].place)
             assert.same({ taille = 2 }, full[2].data)
             assert.is_nil(full[2].extra)
             assert.is_false(full[1].removal)
             assert.same({}, lc.lot({}))
+        end)
+
+        it('import : références seulement pour un lot pas plus gros qu\'une publication groupée (C-1)', function()
+            local items = {}
+            for i = 1, 4 do items[i] = { kind = 'zone', id = 'z' .. i } end
+            assert.equal(4, #lc.importBundle(items, 3))
+            assert.is_nil(lc.importBundle(items, 2))
+            assert.same({}, lc.importBundle({}, 0))
         end)
 
         it('portée d\'une synchronisation : les seules fiches d\'un lot si l\'atelier est déjà rapproché (R-2 d)', function()
@@ -349,6 +362,20 @@ describe('vava_atelier lifecycle', function()
                 { id = 32, kind = 'node', def_id = 'n1', version = 2, status = 'archived' },
             }))
             assert.is_true((lc.lotComplete({}, {})))
+        end)
+
+        it('révision lue : la ligne d\'une autre écriture du même brouillon (même numéro de lot) est refusée (C-1)', function()
+            local mine = { { kind = 'zone', id = 'foret', version = 4, status = 'published', rev = 3 } }
+            assert.is_true((lc.lotComplete(mine, {
+                { id = 31, kind = 'zone', def_id = 'foret', version = 4, status = 'published', rev = '3' },
+            })))
+            assert.is_false(lc.lotComplete(mine, {
+                { id = 31, kind = 'zone', def_id = 'foret', version = 4, status = 'published', rev = 4 },
+            }))
+            -- sans révision attendue (copie, retrait en cascade) : non comparée
+            assert.is_true((lc.lotComplete({ { kind = 'zone', id = 'foret', version = 4, status = 'published' } }, {
+                { id = 31, kind = 'zone', def_id = 'foret', version = 4, status = 'published', rev = 1 },
+            })))
         end)
     end)
 

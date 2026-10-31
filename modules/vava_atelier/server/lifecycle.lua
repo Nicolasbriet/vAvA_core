@@ -67,13 +67,17 @@ local function actorOf(ctx)
     return ctx.label
 end
 
---- Ligne de journal d'une écriture déjà faite en base : `known` garde l'atelier s'il vient de quitter le registre ;
---- un refus du journal est écrit en console (jamais perdu sans trace).
+--- Ligne de journal d'une écriture déjà faite en base : `known` garde l'atelier s'il vient de quitter le registre.
+--- Membre parti ou rétrogradé pendant l'écriture (`not_allowed`) : la ligne est réécrite au nom relevé au début
+--- (compte et nom, sans recopie au Registre) ; tout autre refus est écrit en console, avec l'auteur.
 local function record(ctx, entry)
     local ok, code = journal.write(ctx.source, entry, nil, nil, ctx.editor)
+    if not ok and code == 'not_allowed' and ctx.label then
+        ok, code = journal.write(ctx.source, entry, nil, { accountId = ctx.accountId, label = ctx.label }, ctx.editor)
+    end
     if not ok then
-        VavaAtelier.log.warn('journal : ligne %s (%s, %s) refusée : %s', entry.action, entry.editor,
-            tostring(entry.id), tostring(code))
+        VavaAtelier.log.warn('journal : ligne %s (%s, %s) de %s (compte %s) refusée : %s', entry.action, entry.editor,
+            tostring(entry.id), tostring(ctx.label), tostring(ctx.accountId), tostring(code))
     end
 end
 
@@ -180,18 +184,29 @@ local function locked(keys, fn, ...)
     return unpack(results, 2, results.n)
 end
 
---- Transaction sous verrous épinglés : aucun verrou de l'écriture ne peut être repris pendant qu'elle dure.
-local function transaction(token, steps)
-    index.pin(token, true)
-    local written, err = store.transaction(steps)
-    index.pin(token, false)
-    return written, err
-end
-
 --- L'atelier est-il toujours celui de l'appel, et ses têtes celles relevées au début ? Sinon (synchronisation, atelier
 --- retiré ou redéclaré pendant l'écriture), on ne touche plus ni la mémoire ni le module : la synchronisation fait foi.
 local function stillCurrent(ctx)
     return editors.get(ctx.editor.id) == ctx.editor and index.generation(ctx.editor.id) == ctx.generation
+end
+
+--- Transaction d'un lot. Juste avant (sans attente entre ces contrôles et l'épinglage) : chaque verrou est encore à
+--- nous (un verrou repris au-delà de `limits.busyMs` → `busy`, rien n'est écrit) et l'atelier n'a pas changé
+--- (`syncing`). Les verrous restent ensuite épinglés jusqu'à la fin de l'écriture (`locked` les rend) : relecture du
+--- lot, appels au module et annulation se font sans qu'une autre écriture puisse prendre la fiche (contre-relecture
+--- sécurité C-1 : un lot porte le numéro du brouillon, deux écritures du même brouillon ne doivent jamais se croiser).
+local function transaction(ctx, token, steps)
+    if not index.owns(token) then return nil, 'busy' end
+    if not stillCurrent(ctx) then return nil, 'syncing' end
+    index.pin(token, true)
+    return store.transaction(steps)
+end
+
+--- Rapprochement des seules fiches d'un lot écrit en base dont la suite n'a pu se faire (relecture ou annulation
+--- échouée, atelier changé, verrou perdu) : sur l'atelier tel qu'il est déclaré maintenant.
+local function resync(ctx, keys)
+    local editor = editors.get(ctx.editor.id)
+    if editor and editor.stored then sync.start(editor, 'refusal', keys) end
 end
 
 --- Verrous d'une fiche et des brouillons de ses fiches enfants tenus par l'appelant (essai, publication).
@@ -270,7 +285,8 @@ local function pushErrors(errors, item, found)
 end
 
 --- Revue d'un lot par le module : `validate` de chaque fiche (forme et monde d'abord, sauf pour un retrait), avec
---- `ctx.bundle` en références légères, puis, si rien n'est à redire, `validateLot` une seule fois sur le lot entier.
+--- `ctx.bundle` en références légères (sans data ni lieu), puis, si rien n'est à redire, `validateLot` une seule fois
+--- sur le lot entier.
 --- Rend les erreurs (vide : valide), ou nil et un code.
 ---@param ctx vAvA.AtelierContext
 ---@param items table[]  { { head, kind, entry, removal?, depth } }, la fiche principale d'abord
@@ -281,7 +297,10 @@ local function reviewLot(ctx, items, action, lotAction)
     local list = lotOf(items)
     local bundle = lc.lot(list)
     local errors = {}
+    -- pauses au temps (`sync.sliceMs`) : un lot de 200 fiches ne gèle pas le serveur
+    local step = sync.yielder()
     for _, item in ipairs(items) do
+        step()
         local vctx = { source = ctx.source, accountId = ctx.accountId, id = item.head.id, action = action(item),
             parent = item.entry.parent, place = item.entry.place, bundle = bundle }
         local found, code
@@ -1039,36 +1058,56 @@ end
 --- n'aurait rien écrit). Rend true et 'type|id' → numéro de la ligne écrite, false (lot à défaire), ou nil, code.
 ---@param editorId string
 ---@param batch integer
----@param items table[]  { { head, version, removal? } }
+---@param items table[]  { { head, version, removal?, rowId?, rev?, cascade? } }
 ---@param status fun(item: table): string  statut attendu d'une fiche
 local function lotWritten(editorId, batch, items, status)
     local rows, err = store.batchRows(editorId, batch)
     if not rows then return nil, err end
     local expected = {}
     for i, item in ipairs(items) do
-        expected[i] = { kind = item.head.kind, id = item.head.id, version = item.version, status = status(item) }
+        -- un brouillon publié ou retiré garde sa révision : comparée (une copie n'en a pas à comparer)
+        local rev = item.rowId and not item.cascade and item.rev or nil
+        expected[i] = { kind = item.head.kind, id = item.head.id, version = item.version, status = status(item),
+            rev = rev }
     end
     return lc.lotComplete(expected, rows)
 end
 
---- Refus du module au cours d'un lot (ou lot incomplet) : base rendue comme avant (les seules lignes de ce lot), ligne
---- « refusée en jeu » au journal, puis les seules fiches du lot rapprochées.
-local function rollback(ctx, head, title, undoPlan, why)
+--- Suite d'un lot écrit en base qui ne peut plus aller au bout (relecture échouée, atelier changé, verrou perdu) :
+--- ligne en console, journal et hooks (la base a changé), puis les seules fiches du lot rapprochées.
+local function unfinished(ctx, why, keys, journalEntry, hooks)
+    VavaAtelier.log.error("atelier '%s' : lot écrit en base (%s), suite interrompue : %s ; fiches du lot rapprochées",
+        ctx.editor.id, tostring(journalEntry and journalEntry.id), why)
+    if journalEntry then record(ctx, journalEntry) end
+    if hooks then hooks() end
+    resync(ctx, keys)
+end
+
+--- Refus du module au cours d'un lot (ou lot incomplet) : base rendue comme avant (les seules lignes de ce lot, tant
+--- que ses verrous sont épinglés à nous), ligne « refusée en jeu » au journal, puis les seules fiches du lot
+--- rapprochées. Verrou perdu (jamais attendu : ils sont épinglés) : aucune annulation, ligne en console.
+local function rollback(ctx, lock, head, title, undoPlan, why)
     local editor = ctx.editor
+    if not index.owns(lock) then
+        VavaAtelier.log.error("atelier '%s' : verrou de '%s' perdu après l'écriture : lot gardé tel quel, rapproché",
+            editor.id, head.id)
+        resync(ctx, undoPlan.keys)
+        return false, 'busy'
+    end
     local done = store.transaction(store.undoSteps(editor.id, lc.undo(undoPlan), undoPlan.batch))
     if why then
         record(ctx, { editor = editor.id, kind = head.kind, id = head.id, action = 'refused',
             title = title, summary = text.truncate(tostring(why), OUT.summary) })
     end
     if not done then
-        VavaAtelier.log.error("atelier '%s' : refus du module (%s) et base non rendue : à synchroniser", editor.id,
-            tostring(why))
+        VavaAtelier.log.error("atelier '%s' : refus du module (%s) et base non rendue (le lot reste écrit) : fiches du "
+            .. 'lot rapprochées', editor.id, tostring(why))
     else
         VavaAtelier.log.warn("atelier '%s' : refus du module (%s), base rendue, resynchronisation", editor.id,
             tostring(why))
     end
     -- les seules fiches du lot sont rapprochées (le reste de l'atelier n'a pas bougé)
-    sync.start(editor, 'refusal', undoPlan.keys)
+    resync(ctx, undoPlan.keys)
     if not why then return false, 'stale' end
     return true, { done = false, errors = { { text = why } } }
 end
@@ -1127,22 +1166,26 @@ function cycle.publish(ctx, id, rev, token)
             end
         end
         local undoPlan = { rows = rows, inserted = inserted, batch = batch, keys = sync.keysOf(plan.items) }
-        local written, dbErr = transaction(lock, steps)
+        local written, dbErr = transaction(ctx, lock, steps)
         if not written then return false, dbErr end
         local main = plan.items[1]
         local mainTitle = calls.titleOf(main.kind, main.entry.data, id)
-        local complete, checkErr = lotWritten(editor.id, batch, plan.items, function(item)
-            return item.removal and 'archived' or 'published'
-        end)
-        if complete == nil then return false, checkErr end
-        if not complete then return rollback(ctx, head, mainTitle, undoPlan, nil) end
         local journalEntry = { editor = editor.id, kind = head.kind, id = id,
             action = plan.removal and 'removed' or 'published', title = mainTitle,
             summary = plan.summary ~= '' and plan.summary or nil, version = main.version }
-        if not stillCurrent(ctx) then
-            -- écrit en base : journal et hooks quand même ; mémoire et module suivront la synchronisation
-            record(ctx, journalEntry)
-            publishedHooks(ctx, plan.items, 'publish', by)
+        local function hooks() publishedHooks(ctx, plan.items, 'publish', by) end
+        local complete, checkErr = lotWritten(editor.id, batch, plan.items, function(item)
+            return item.removal and 'archived' or 'published'
+        end)
+        if complete == nil then
+            -- relecture impossible : la transaction est validée, le lot est sans doute écrit
+            unfinished(ctx, 'relecture du lot ' .. tostring(checkErr), undoPlan.keys, journalEntry, hooks)
+            return false, checkErr
+        end
+        if not complete then return rollback(ctx, lock, head, mainTitle, undoPlan, nil) end
+        if not stillCurrent(ctx) or not index.owns(lock) then
+            -- écrit en base : journal et hooks quand même ; mémoire et module suivent le rapprochement du lot
+            unfinished(ctx, 'atelier changé', undoPlan.keys, journalEntry, hooks)
             return false, 'syncing'
         end
         for _, item in ipairs(plan.items) do
@@ -1150,9 +1193,9 @@ function cycle.publish(ctx, id, rev, token)
         end
         entries.invalidate(editor.id)
         local applied, why = applyLot(editor, plan.items, 'publish')
-        if not applied then return rollback(ctx, head, mainTitle, undoPlan, why) end
+        if not applied then return rollback(ctx, lock, head, mainTitle, undoPlan, why) end
         record(ctx, journalEntry)
-        publishedHooks(ctx, plan.items, 'publish', by)
+        hooks()
         for _, item in ipairs(plan.items) do
             calls.notify(editor, item.head.kind, item.head.id, item.removal and 'removed' or 'published', ctx.source)
         end
@@ -1191,19 +1234,22 @@ function cycle.restore(ctx, id, version, token)
             inserted[#inserted + 1] = { kind = item.head.kind, id = item.head.id, version = item.version }
         end
         local undoPlan = { rows = rows, inserted = inserted, batch = batch, keys = sync.keysOf(plan.items) }
-        local written, dbErr = transaction(lock, steps)
+        local written, dbErr = transaction(ctx, lock, steps)
         if not written then return false, dbErr end
         local main = plan.items[1]
         local mainTitle = calls.titleOf(main.kind, main.entry.data, id)
-        -- chaque copie relue (une requête) : une source purgée ou annulée entre-temps n'a rien copié → tout est défait
-        local complete, copies = lotWritten(editor.id, batch, plan.items, function() return 'published' end)
-        if complete == nil then return false, copies end
-        if not complete then return rollback(ctx, head, mainTitle, undoPlan, nil) end
         local journalEntry = { editor = editor.id, kind = head.kind, id = id, action = 'restored',
             title = mainTitle, summary = plan.summary, version = main.version }
-        if not stillCurrent(ctx) then
-            record(ctx, journalEntry)
-            publishedHooks(ctx, plan.items, 'restore', by)
+        local function hooks() publishedHooks(ctx, plan.items, 'restore', by) end
+        -- chaque copie relue (une requête) : une source purgée ou annulée entre-temps n'a rien copié → tout est défait
+        local complete, copies = lotWritten(editor.id, batch, plan.items, function() return 'published' end)
+        if complete == nil then
+            unfinished(ctx, 'relecture du lot ' .. tostring(copies), undoPlan.keys, journalEntry, hooks)
+            return false, copies
+        end
+        if not complete then return rollback(ctx, lock, head, mainTitle, undoPlan, nil) end
+        if not stillCurrent(ctx) or not index.owns(lock) then
+            unfinished(ctx, 'atelier changé', undoPlan.keys, journalEntry, hooks)
             return false, 'syncing'
         end
         for _, item in ipairs(plan.items) do
@@ -1211,9 +1257,9 @@ function cycle.restore(ctx, id, version, token)
         end
         entries.invalidate(editor.id)
         local applied, why = applyLot(editor, plan.items, 'restore')
-        if not applied then return rollback(ctx, head, mainTitle, undoPlan, why) end
+        if not applied then return rollback(ctx, lock, head, mainTitle, undoPlan, why) end
         record(ctx, journalEntry)
-        publishedHooks(ctx, plan.items, 'restore', by)
+        hooks()
         for _, item in ipairs(plan.items) do
             calls.notify(editor, item.head.kind, item.head.id, 'restored', ctx.source)
         end

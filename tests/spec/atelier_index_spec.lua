@@ -85,6 +85,32 @@ describe('vava_atelier têtes en mémoire', function()
         assert.equal(1, index.draftCount(ME))
     end)
 
+    it('verrous : repris au-delà du délai sauf épinglés ; `owns` dit si le jeton les tient encore (C-1)', function()
+        local now = 1000
+        _G.GetGameTimer = function() return now end
+        -- horloge simulée lue par index.lua à son chargement
+        helper.load('modules/vava_atelier/server/index.lua')
+        index = VavaAtelier.index
+        local busyMs = VavaAtelier.config.limits.busyMs
+        local first = index.lock({ 'a:x|panneau|p1', 'a:x|affiche|f1' })
+        assert.is_true(index.owns(first))
+        assert.is_nil(index.lock({ 'a:x|panneau|p1' }))
+        -- épinglé (transaction et suite d'une publication) : jamais repris, même passé le délai
+        index.pin(first, true)
+        now = now + busyMs + 1
+        assert.is_nil(index.lock({ 'a:x|panneau|p1' }))
+        assert.is_true(index.owns(first))
+        -- relâché : repris au-delà du délai, l'ancien jeton ne les tient plus
+        index.pin(first, false)
+        local second = index.lock({ 'a:x|panneau|p1' })
+        assert.is_not_nil(second)
+        assert.is_false(index.owns(first))
+        assert.is_true(index.owns(second))
+        index.unlock(first)
+        assert.is_true(index.owns(second))
+        assert.is_false(index.owns(nil))
+    end)
+
     it('places réservées : jamais au-delà du plafond, rendues après l\'écriture', function()
         index.build('a:x', { draftRow(1, 'p1', ME) }, {}, {})
         assert.is_true(index.reserveDraft(ME, 3))

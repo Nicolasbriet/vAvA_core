@@ -32,8 +32,8 @@ Le module ajoute ses éditeurs dans son `setup` si `core.registry.exists('vava_a
 Pour être **gardé** (T-101), il déclare en plus `apply(kind, def, info)` et `remove(kind, id, info)` (rechargement à
 chaud, tout ou rien, idempotents), et s'il le veut `trial` / `endTrial` (montrer une fiche à son seul auteur), `diff`
 (résumé d'un changement), `format` et `upgrade` (montée d'une data d'un format plus ancien), `validateLot(lot, ctx)`
-(le lot entier d'une publication groupée, data comprises, **une fois** ; `validate` n'en reçoit que des références
-légères dans `ctx.bundle`, sans data). `index` et `read` ne
+(le lot entier d'une publication groupée, data et lieux compris, **une fois** ; `validate` n'en reçoit que des
+références légères dans `ctx.bundle`, sans data ni lieu). `index` et `read` ne
 servent plus qu'à la graine et à la synchronisation ; `read(kind, id, { original = true })` et
 `index(kind, { original = true })` rendent l'original de la config (retour à l'original). Contrat d'aller-retour :
 après `apply(kind, def)`, `read(kind, def.id)` rend la même data, le même `place`, le même `parent`.
@@ -80,7 +80,7 @@ rien ne s'écrit sans son nom au journal (une ligne refusée par le journal est 
 | `etat [atelier]` | Conseil (ateliers visibles) | publiées, brouillons, essais, retirées, « à synchroniser », refusées en jeu |
 | `original <atelier>` | Souverain | résumé du retour à l'original de tout l'atelier (fiches changées, rétablies, nouvelles ; les fiches créées dans l'Atelier ne sont pas touchées), puis `confirmer` |
 | `original_fiche <atelier> <type> <fiche>` | droit de l'atelier | la même chose pour une fiche (« Identique à l'original : rien à faire ») |
-| `exporter <atelier\|tout>` | Souverain | écrit `echanges/atelier_<date>_<heure>.json` (versions publiées seulement, lues par paquets de 100) ; un export par minute, tous membres confondus ; refusé au-delà de 4 Mo (l'import le refuserait : copier les ateliers un par un) |
+| `exporter <atelier\|tout>` | Souverain | écrit `echanges/atelier_<date>_<heure>.json` (versions publiées seulement, lues par paquets de 25 ; poids brut compté avant tout décodage) ; un export par minute, tous membres confondus ; refusé au-delà de 4 Mo (l'import le refuserait : copier les ateliers un par un) |
 | `importer <fichier>` | Souverain | lit, contrôle, résume par atelier (tout ou rien par atelier), puis `confirmer` |
 | `confirmer` | celui de l'opération, relu | l'exécute si elle a moins de 60 s et que rien n'a changé depuis le résumé (revu pour chaque atelier juste avant de l'écrire) |
 
@@ -156,7 +156,10 @@ refuse de démarrer (« config.lua, droits : rights.overrides['…'] = '…' : p
 - **T-101** : chaque écriture exige le nom du membre au Registre (jamais « Console » pour un joueur : `not_ready`),
   une ligne refusée par le journal est écrite en console ; une écriture validée en base est toujours journalisée (et ses
   hooks partent), même si l'atelier change pendant ce temps. Un lot relu après sa transaction (une requête sur son
-  numéro) est défait s'il est incomplet, et l'annulation ne touche que les lignes de ce lot. Le verrou « une demande à la
+  numéro, révision comprise) est défait s'il est incomplet, et l'annulation ne touche que les lignes de ce lot ; les
+  verrous des fiches, revérifiés juste avant la transaction, restent épinglés jusqu'à la fin de l'écriture (relecture,
+  module, annulation) ; une suite impossible (relecture échouée, atelier changé) écrit le journal et rapproche les
+  fiches du lot. Le verrou « une demande à la
   fois » est tenu par joueur (fermer puis rouvrir l'Atelier ne le libère pas) ; plafonds d'essais et de brouillons
   recomptés sans attente avant d'écrire (places de brouillon réservées le temps d'une écriture).
 - **T-101** : chaque écriture revérifie l'atelier gardé et disponible, la fiche, le tenant (compte), la révision et,
@@ -207,7 +210,7 @@ rien de `vava_atelier` (`/vava_reseau ressource vava_atelier`). Une séance de t
 sauvegardes, un essai, un résumé, une publication) : ≈ 12 Ko, tous vers le seul membre. Serveur : une sauvegarde coûte
 deux ou trois requêtes hors `validate` ; une publication, une transaction de 2 à 3 + n requêtes et les appels au module ;
 la synchronisation d'un atelier de 1 000 fiches, quatre requêtes sans données (têtes, ≈ 200 o par fiche) et ≈ 1 000
-`read` du module comparés aux empreintes gardées ; seules les publiées qui diffèrent sont relues (par paquets de 100)
+`read` du module comparés aux empreintes gardées ; seules les publiées qui diffèrent sont relues (par paquets de 25)
 et décodées ; pauses du fil toutes les 4 ms (`sync.sliceMs`) ; après un refus du module ou un import, seules les
 fiches du lot sont rapprochées. Mémoire : têtes sans données, ≈ 200 o par fiche. Client : **aucune boucle**, aucun prop, aucun dessin ;
 0,00 ms au repos, ≤ 0,05 ms interface ouverte. Serveur : un accueil coûte une requête (5 lignes) et un `index` par

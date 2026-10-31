@@ -189,12 +189,24 @@ end
 function lc.lot(items, withData)
     local out = {}
     for i, item in ipairs(items) do
-        local ref = { kind = item.kind, id = item.id, parent = item.parent, place = item.place,
-            removal = item.removal == true }
-        if withData then ref.data = item.data end
+        local ref = { kind = item.kind, id = item.id, parent = item.parent, removal = item.removal == true }
+        -- le lieu (jusqu'à 850 octets pour un polygone) ne part qu'avec la data : un croisement de lieux relève de
+        -- `validateLot`, jamais de chaque `validate`
+        if withData then ref.data, ref.place = item.data, item.place end
         out[i] = ref
     end
     return out
+end
+
+--- Références d'un lot pour `ctx.bundle` à l'import : seulement si le lot n'est pas plus gros qu'une publication
+--- groupée (`maxChildren` enfants et la fiche), sinon nil (un import de 1 000 fiches croiserait 1 000 × 1 000
+--- références ; `validateLot` voit le lot entier une fois).
+---@param items vAvA.AtelierLotItem[]
+---@param maxChildren integer
+---@return table[]|nil
+function lc.importBundle(items, maxChildren)
+    if #items > maxChildren + 1 then return nil end
+    return lc.lot(items)
 end
 
 --- Parent d'une fiche prêt : type sans parent, parent dans le lot (`inBundle['type|id']`), ou parent publié.
@@ -365,9 +377,11 @@ end
 --- Lot bien écrit ? Chaque fiche attendue `{ kind, id, version, status }` doit avoir sa ligne, au statut attendu,
 --- parmi celles relues du lot (`{ id, kind, def_id, version, status }`, d'une seule requête sur son numéro). Une
 --- révision changée entre le résumé et l'écriture, ou la copie d'une version disparue entre-temps, n'écrit rien : le
---- lot est alors à défaire. Rend true et 'type|id' → numéro de la ligne écrite, ou false.
----@param expected { kind: string, id: string, version: integer, status: string }[]
----@param rows { id: any, kind: string, def_id: string, version: any, status: string }[]
+--- lot est alors à défaire. `rev` (brouillon publié ou retiré) : révision lue, comparée à celle de la ligne (un même
+--- numéro de lot peut porter la ligne d'une autre écriture du même brouillon). Rend true et 'type|id' → numéro de la
+--- ligne écrite, ou false.
+---@param expected { kind: string, id: string, version: integer, status: string, rev?: integer }[]
+---@param rows { id: any, kind: string, def_id: string, version: any, status: string, rev?: any }[]
 ---@return boolean
 ---@return table<string, integer>|nil
 function lc.lotComplete(expected, rows)
@@ -380,6 +394,8 @@ function lc.lotComplete(expected, rows)
     for _, item in ipairs(expected) do
         local row = found[item.kind .. '|' .. item.id .. '|' .. item.version]
         if not row or row.status ~= item.status then return false end
+        -- révision lue : un même numéro de lot peut porter la ligne d'une autre écriture du même brouillon
+        if item.rev and tointeger(tonumber(row.rev)) ~= item.rev then return false end
         local id = tonumber(row.id)
         ids[item.kind .. '|' .. item.id] = tointeger(id) or id
     end

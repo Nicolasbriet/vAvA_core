@@ -460,6 +460,18 @@ function index.unlock(token)
     end
 end
 
+--- Vrai si chaque verrou du jeton est encore à lui (aucun n'a été repris au-delà de `limits.busyMs`).
+---@param token table|nil
+---@return boolean
+function index.owns(token)
+    if not token then return false end
+    for _, key in ipairs(token.keys) do
+        local held = locks[key]
+        if not held or held.token ~= token then return false end
+    end
+    return true
+end
+
 --- Épingle (ou relâche) les verrous d'un jeton le temps d'une transaction : ils ne peuvent pas être repris.
 ---@param token table|nil
 ---@param pinned boolean

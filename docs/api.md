@@ -2390,17 +2390,21 @@ chaîne des `parent` sans cycle, trois types au plus. Le descripteur gagne `stor
   `/atelier_archives original` ; un module qui l'ignore rend ce qui est en vigueur (rien ne paraît alors à rétablir).
 - `validate(kind, data, ctx)` : `ctx` gagne `action` (`check`, `save`, `trial`, `publish`, `remove`, `restore`,
   `import`), `parent`, `place`, `bundle` : **références légères** des fiches publiées ensemble, `{ { kind, id,
-  parent?, removal, place? } }` (≈ 100 octets par fiche, **sans data** : seule la fiche validée a la sienne, en
-  `data`). Sur `save`, un refus n'empêche pas d'enregistrer (avertissements) ; avec `remove`, `data` est la publiée
+  parent?, removal } }` (≈ 90 octets par fiche, **sans data ni lieu** : seule la fiche validée a les siens, en `data`
+  et `ctx.place`). À l'import, `bundle` n'est donné que si le lot n'est pas plus gros qu'une publication groupée
+  (`bundle.maxChildren` + 1 fiches) ; au-delà il est absent (un module ne doit pas compter dessus pour un import). Sur `save`, un refus n'empêche pas d'enregistrer (avertissements) ; avec `remove`, `data` est la publiée
   et le module peut refuser un retrait qui détruirait des objets de joueurs.
 - `validateLot(lot, ctx)` (facultatif, atelier gardé seulement) : pour un module qui doit **croiser** les fiches d'un
   lot (deux enfants d'un même parent, une somme…). Appelé **une fois par lot** de plus d'une fiche (essai, publication
   groupée, retrait en cascade, retour en arrière en cascade, import), après les `validate` de chaque fiche et seulement
-  s'ils n'ont rien à redire ; `lot = { { kind, id, data, parent?, place?, removal } }` (la fiche principale d'abord),
+  s'ils n'ont rien à redire ; `lot = { { kind, id, data, parent?, place?, removal } }` (la fiche principale d'abord ;
+  seul endroit où le module voit les lieux du lot ensemble),
   `ctx = { source?, accountId?, kind, id, action }` (fiche principale ; `action` comme pour `validate`). Même retour
   que `validate` ; un champ nommé dans une erreur est un champ de la fiche principale. Ne jamais faire passer un lot
   entier par `ctx.bundle` : chaque appel à une fonction d'un module resérialise ses arguments (un lot de 200 fiches
-  à 2 Ko croisé par chaque `validate` ≈ 80 Mo).
+  à 2 Ko croisé par chaque `validate` ≈ 80 Mo). À l'import, `validateLot` reçoit d'un bloc toutes les fiches qui
+  changent d'un atelier (jusqu'à 4 Mo, le plafond d'un fichier : 40 à 160 ms, une fois par import) ; un module qui
+  ne croise rien ne le déclare pas.
 - `apply(kind, def, info)` : `def` = data normalisée + `id`, `version`, `parent?`, `place?` (jamais `status`) ;
   `info = { reason, last, previous? }`, `reason` ∈ `publish`, `restore`, `reimport`, `import`, `sync` ; `last` : dernier
   appel d'un lot. Crée ou remplace, idempotente, tout ou rien.

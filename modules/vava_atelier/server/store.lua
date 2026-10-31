@@ -96,7 +96,7 @@ local UNDO_DRAFT_SQL = 'UPDATE ' .. T .. " SET `status` = 'draft', `version` = N
 local UNDO_PUBLISHED_SQL = 'UPDATE ' .. T .. " SET `status` = 'published' WHERE `id` = ? AND `status` = 'archived'"
 local UNDO_INSERT_SQL = 'DELETE FROM ' .. T .. ' WHERE `editor` = ? AND `kind` = ? AND `def_id` = ? AND `version` = ? '
     .. 'AND `batch` = ?'
-local BATCH_ROWS_SQL = 'SELECT `id`, `kind`, `def_id`, `version`, `status` FROM ' .. T
+local BATCH_ROWS_SQL = 'SELECT `id`, `kind`, `def_id`, `version`, `status`, `rev` FROM ' .. T
     .. ' WHERE `editor` = ? AND `batch` = ?'
 
 -- requêtes à liste `IN (?, …)`, construites une fois par forme et par longueur
@@ -122,8 +122,9 @@ local ARCHIVE_IDS_HEAD = 'UPDATE ' .. T .. " SET `status` = 'archived' WHERE `st
 local DELETE_DRAFTS_HEAD = 'DELETE FROM ' .. T .. " WHERE `status` IN ('draft', 'trial') AND `id`"
 local PURGE_HEAD = 'DELETE FROM ' .. T .. " WHERE `status` = 'archived' AND `id`"
 local ROWS_HEAD = 'SELECT ' .. ROW_COLUMNS .. ' FROM ' .. T .. ' WHERE `id`'
--- identifiants au plus par requête `IN (…)` d'une lecture en lot
-local ROWS_CHUNK = 100
+-- identifiants au plus par requête `IN (…)` d'une lecture en lot : 25 lignes complètes de 16 Ko au plus, ≈ 400 Ko par
+-- réponse (décodée d'un bloc, hors des pauses de `sync.sliceMs`)
+local ROWS_CHUNK = 25
 
 ---@param rows any
 ---@param err any
@@ -214,7 +215,7 @@ function store.history(editorId, kindId, defId, before, limit)
 end
 
 --- Lignes portant un numéro de lot (relecture d'un lot écrit, en une requête) : { { id, kind, def_id, version,
---- status } }, ou nil, 'db_error'.
+--- status, rev } }, ou nil, 'db_error'.
 function store.batchRows(editorId, batch)
     return rowsOr(core.db.query(BATCH_ROWS_SQL, { editorId, batch }), nil, 'lot ' .. tostring(batch))
 end

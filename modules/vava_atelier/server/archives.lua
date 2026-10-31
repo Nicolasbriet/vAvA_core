@@ -90,12 +90,18 @@ local function actorOf(source)
     return Bridge.AccountId(source), label
 end
 
---- Ligne de journal d'une commande ; un refus est écrit en console (jamais perdu sans trace).
-local function record(source, entry)
+--- Ligne de journal d'une commande. `actor` : compte et nom relevés au début de la commande ; un membre parti ou
+--- rétrogradé entre-temps (`not_allowed`) garde ainsi son nom au journal (sans recopie au Registre). Tout autre refus
+--- est écrit en console, avec l'auteur (jamais perdu sans trace).
+---@param actor? { accountId: integer|nil, label: string }
+local function record(source, entry, actor)
     local ok, code = journal.write(source, entry)
+    if not ok and code == 'not_allowed' and actor and actor.label then
+        ok, code = journal.write(source, entry, nil, actor)
+    end
     if not ok then
-        VavaAtelier.log.warn('/%s : ligne de journal refusée (%s, %s) : %s', cfg.archives.command, entry.editor,
-            entry.action, tostring(code))
+        VavaAtelier.log.warn('/%s : ligne de journal refusée (%s, %s) de %s : %s', cfg.archives.command, entry.editor,
+            entry.action, tostring(actor and actor.label), tostring(code))
     end
 end
 
@@ -154,8 +160,7 @@ end
 ---@return table|nil
 ---@return string|nil
 local function currentOf(editor, items)
-    local current = {}
-    local step = yielder()
+    local current, toRead = {}, {}
     for _, item in ipairs(items) do
         local head = index.get(editor.id, item.kind, item.id)
         if head then
@@ -165,15 +170,26 @@ local function currentOf(editor, items)
                 if published.format == editor.format and published.fingerprint == item.entry.fingerprint then
                     fingerprint = published.fingerprint
                 else
-                    step()
-                    local row, err = store.row(published.row)
-                    if err then return nil, err end
-                    local entry = row and calls.entryOf(editor, editor.kinds[item.kind], row) or nil
-                    fingerprint = entry and entry.fingerprint or '?'
+                    toRead[#toRead + 1] = { item = item, row = published.row }
                 end
             end
             current[item.kind .. '|' .. item.id] = { fingerprint = fingerprint,
                 retired = head.retired ~= nil and not published }
+        end
+    end
+    -- publiées qui diffèrent (ou d'un autre format, après une montée) relues en lot, jamais une requête par fiche
+    if #toRead > 0 then
+        local ids = {}
+        for i, wanted in ipairs(toRead) do ids[i] = wanted.row end
+        local rows, err = store.rows(ids)
+        if not rows then return nil, err end
+        local step = yielder()
+        for _, wanted in ipairs(toRead) do
+            step()
+            local item = wanted.item
+            local row = rows[wanted.row]
+            local entry = row and calls.entryOf(editor, editor.kinds[item.kind], row) or nil
+            current[item.kind .. '|' .. item.id].fingerprint = entry and entry.fingerprint or '?'
         end
     end
     return current
@@ -208,8 +224,9 @@ local function planFor(editor, source, items)
     for kindId, n in pairs(arriving) do
         if index.liveCount(editor.id, kindId) + n > cfg.definitions.perKind then return nil, texts.refused.full end
     end
-    -- fiches publiées ensemble : celles qui changent ; le module les reçoit en références légères (`ctx.bundle`), puis
-    -- entières une seule fois (`validateLot`)
+    -- fiches publiées ensemble : celles qui changent ; le module les reçoit en références légères (`ctx.bundle`, et
+    -- seulement pour un lot pas plus gros qu'une publication groupée : sinon chaque `validate` resérialiserait des
+    -- milliers de références), puis entières une seule fois (`validateLot`)
     local todo, lot = {}, {}
     for i, item in ipairs(items) do
         local action = plan.items[i].action
@@ -224,7 +241,7 @@ local function planFor(editor, source, items)
                 place = item.entry.place, removal = false }
         end
     end
-    local bundle = lc.lot(lot)
+    local bundle = lc.importBundle(lot, cfg.bundle.maxChildren)
     local who = source ~= CONSOLE and source or nil
     local step = yielder()
     for _, item in ipairs(todo) do
@@ -343,10 +360,9 @@ local function publishPlan(source, editor, todo, origin, reason)
             depth = editor.kindDepth[item.kind] or 1, previous = head and head.published and head.published.version,
             title = calls.titleOf(kind, item.entry.data, item.id) }
     end
-    -- verrous épinglés pendant la transaction : jamais repris
+    -- verrous épinglés de la transaction à la fin des appels au module (rendus par `unlock`) : jamais repris
     index.pin(token, true)
     local written = store.transaction(steps)
-    index.pin(token, false)
     if not written then
         index.unlock(token)
         index.setState(editor.id, 'ready')
@@ -376,6 +392,9 @@ local function confirm(source)
     pending[source] = nil
     if not op then return say(source, T.noPending) end
     if GetGameTimer() - op.at > cfg.archives.confirmMs then return say(source, T.expired) end
+    -- auteur relevé au début : gardé au journal même si le membre part pendant l'écriture
+    local accountId, label = actorOf(source)
+    local actor = { accountId = accountId, label = label }
     --- Partie encore publiable : atelier déclaré (le même), droit relu, atelier prêt, rien de changé depuis le résumé.
     --- Rend l'atelier, ou nil et la réponse donnée. Aucune attente entre ce contrôle et la prise des verrous.
     local function ready(part)
@@ -415,17 +434,17 @@ local function confirm(source)
                 local item = items[1]
                 if item then
                     record(source, { editor = editor.id, kind = item.kind, id = item.id, action = 'imported',
-                        title = item.title, version = item.version })
+                        title = item.title, version = item.version }, actor)
                 end
             elseif op.kind == 'original' then
                 record(source, { editor = editor.id, kind = editor.firstKind, action = 'imported',
                     title = editor.label, summary = format(texts.summaries.reimported,
                         count(part.plan.changed, 'changed'), count(part.plan.revived, 'revived'),
-                        count(part.plan.new, 'new')) })
+                        count(part.plan.new, 'new')) }, actor)
             else
                 record(source, { editor = editor.id, kind = editor.firstKind, action = 'received',
                     title = editor.label, summary = text.truncate(format(texts.summaries.received,
-                        count(published, 'taken'), count(part.plan.unchanged, 'unchanged')), OUT.summary) })
+                        count(published, 'taken'), count(part.plan.unchanged, 'unchanged')), OUT.summary) }, actor)
             end
         end
     end
@@ -487,14 +506,19 @@ local function exportCommand(source, target)
         if editor.stored and (target == 'tout' or editor.id == target) then chosen[#chosen + 1] = editor end
     end
     if #chosen == 0 then return say(source, T.unknownEditor, tostring(target)) end
-    -- un export à la fois et par minute, tous membres confondus : le dossier des archives ne se remplit pas
+    -- un fichier écrit par minute, tous membres confondus : le dossier des archives ne se remplit pas (un export
+    -- refusé, trop lourd par exemple, ne compte pas : on peut aussitôt copier les ateliers un par un)
     local now = GetGameTimer()
     if lastExport and now - lastExport < cfg.archives.exportCooldownMs then
         return say(source, T.exportCooldown, (cfg.archives.exportCooldownMs - (now - lastExport)) // 1000 + 1)
     end
-    lastExport = now
+    local accountId, label = actorOf(source)
+    local actor = { accountId = accountId, label = label }
     local perEditor = {}
     local step = yielder()
+    -- poids brut (data et lieu tels qu'en base) compté avant tout décodage : au-delà de `archives.maxBytes`, l'export
+    -- s'arrête sans rien décoder ni encoder de plus
+    local within = exchange.budget(cfg.archives.maxBytes)
     for _, editor in ipairs(chosen) do
         local kinds, n = {}, 0
         for _, kindId in ipairs(editor.kindOrder) do
@@ -504,9 +528,15 @@ local function exportCommand(source, target)
             end
             sort(heads, function(a, b) return a.id < b.id end)
             for i, head in ipairs(heads) do ids[i] = head.published.row end
-            -- les publiées d'un type lues en lot (paquets de 100), jamais une requête par fiche
+            -- les publiées d'un type lues en lot (paquets de 25), jamais une requête par fiche
             local byRow, err = store.rows(ids)
             if not byRow then return say(source, T.exportFailed, texts.refused[err] or tostring(err)) end
+            for _, head in ipairs(heads) do
+                local row = byRow[head.published.row]
+                if row and not within(row) then
+                    return say(source, T.exportFailed, format(T.exportTooLarge, cfg.archives.maxBytes // 1048576))
+                end
+            end
             local rows = {}
             for _, head in ipairs(heads) do
                 step()
@@ -534,9 +564,11 @@ local function exportCommand(source, target)
     end
     local ok, err = Bridge.SaveArchive(name, content)
     if not ok then return say(source, T.exportFailed, tostring(err)) end
+    lastExport = GetGameTimer()
     for _, part in ipairs(perEditor) do
         record(source, { editor = part.editor.id, kind = part.editor.firstKind, action = 'exported',
-            title = part.editor.label, summary = format(texts.summaries.exported, name, count(part.count, 'fiches')) })
+            title = part.editor.label, summary = format(texts.summaries.exported, name, count(part.count, 'fiches')) },
+            actor)
     end
     say(source, T.exported, name, count(total, 'fiches'))
 end

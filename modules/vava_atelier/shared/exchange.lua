@@ -7,7 +7,7 @@
            doublon, profondeur d'une fiche bornée, format des données au plus celui de l'atelier) — un refus rend le
            chemin et la raison, et ne vaut que pour son atelier (tout ou rien par atelier, les autres passent) — et
            plan d'un import (inchangée, changée, retirée → reprise, inconnue → nouvelle ; un import ne retire jamais
-           rien).
+           rien) ; poids brut d'un export compté avant tout décodage.
            Testée : tests/spec/atelier_exchange_spec.lua.
     Dépendances : shared/constants.lua, shared/bounds.lua, shared/text.lua
 ]]
@@ -280,4 +280,16 @@ function exchange.plan(entries, current)
         plan.items[#plan.items + 1] = { kind = entry.kind, id = entry.id, action = action }
     end
     return plan
+end
+--- Compteur du poids brut d'un export, relevé avant tout décodage : `add(ligne)` ajoute la data et le lieu tels qu'en
+--- base (JSON) et rend false dès que `maxBytes` est dépassé (le fichier écrit pèserait au moins autant).
+---@param maxBytes integer
+---@return fun(row: { data?: string, place?: string }): boolean
+function exchange.budget(maxBytes)
+    local total = 0
+    return function(row)
+        local data, where = row.data, row.place
+        total = total + (type(data) == 'string' and #data or 0) + (type(where) == 'string' and #where or 0)
+        return total <= maxBytes
+    end
 end
