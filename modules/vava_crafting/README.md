@@ -45,6 +45,7 @@ menu comme les autres.
 | Combustible | forge : charbon ; fourneau : bois de pin ; 1 par pièce, réserve 20 | `stationTypes[].fuel` |
 | Props | créés par le client à 80 m ; stations groupées par case de 200 m, seules celles d'une case à portée sont mesurées ; relues toutes les secondes près d'une case, toutes les 2,5 s quand aucune station n'est à moins de 140 m (80 m + 60 m de marge d'approche) (1.3.2) ; aucune boucle tant qu'aucune station n'est connue (1.5.0) | `streaming` |
 | Stations connues du joueur | une zone du core par station, de 2 m ; reçue (dessin, combustible, occupation) à 100 m de son bord (80 m des props + 20 m : le chemin d'un cavalier au galop entre deux passages du core), oubliée au-delà de 125 m (marge de sortie du core) (1.5.0) | `streaming.zoneRadius`, `streaming.subscribeSlack` |
+| Recettes inconnues des compétences | une ligne en console par recette absente de `vava_skills:recipes`, 5 s après le démarrage, l'ajout d'une recette par un autre module ou le retour de `vava_skills` ; verrouillée au menu (1.8.0) | `skillsCheck.delayMs` |
 | Journal | pièces Excellent+ (palier ≥ 4), réparations, baptêmes, leçons, Conseil, écritures refusées par la garde ; 180 jours | `logTier`, `logRetentionDays` |
 | Signature protégée | créateur, date, poinçon et qualité figés sur tout objet ; sur un objet signé, palier et nom figés, solidité qui ne remonte pas hors d'une réparation (voir plus bas) ; refus journalisés une fois par minute et par objet, module et clé | `guard` (`windowMs`, `maxTracked`, `bornDurability`) |
 
@@ -101,6 +102,18 @@ zone de vAvA_core 0.11.0) nommée par son identifiant : cercle de 2 m autour d'e
 `transmission`, `fragments`). Une recette : ingrédients (objet, quantité, palier minimal), produit, type de station,
 outil requis en main (`tools` : marteau de forge), durée, difficulté, XP, signée ou non, solidité. Une recette transmise
 inconnue n'apparaît pas dans le menu ; une recette libre au niveau insuffisant apparaît verrouillée.
+
+**Recette inconnue des compétences** (depuis 1.8.0, T-147) : un autre module qui ajoute une recette à
+`vava_crafting:recipes` doit aussi la déclarer à `vava_skills:recipes` (comme `vava_farming`, `vava_provisions`,
+`vava_combat`), sinon `vava_skills` ne la connaît pas et la station la refuse (`not_known`). L'artisanat le signale :
+une ligne `WARN` par recette absente, avec son nom et le module qui l'a déclarée (« recette 'x' (déclarée par y)
+absente de vava_skills:recipes … »), une seule fois, `skillsCheck.delayMs` (5 s) après le démarrage, après l'ajout
+d'une recette par un autre module, après le retrait d'une recette des compétences, et de nouveau au retour de
+`vava_skills` (le temps que chaque module ait redéclaré les siennes) ; registre des compétences absent : une seule
+ligne. Au menu, une telle recette libre est montrée **verrouillée** (« Non enseignée », raison « Ce savoir n'est pas
+encore enseigné au royaume : prévenez le Conseil. ») au lieu d'être proposée puis refusée au clic ; une recette
+transmise inconnue des compétences reste cachée, comme toute recette transmise inconnue. Le serveur reste juge : le
+début d'une pièce revérifie `knowsRecipe`.
 
 **Contenu de départ** : charbon de bois et ragoût (fourneau) ; lingots de fer et de cuivre, hache, pioche, faucille,
 couteau, épée courte (transmise) à la forge ; marteau de forge, canne à pêche, anneau de cuivre à l'établi ; cuir et
@@ -232,6 +245,15 @@ Hook écouté : `vava_inventory:metadata` (before, garde de la signature, voir p
 15. **Composteur** (1.7.0, T-144) : au composteur du champ (`vava_farming`), l'invite « Composteur du champ ·
     Composteur » apparaît, sans combustible ; `E` ouvre le menu (recette du compost) ; à la forge, l'invite montre
     toujours « combustible n / 20 ». Détail : `docs/tests/metiers.md` 5-7.
+16. **Recette inconnue des compétences** (1.8.0, T-147) : avec la ressource jetable de `docs/tests/metiers.md` § 4.2,
+    une recette déclarée à l'artisanat seul → une ligne `WARN` en console (nom, module), « Non enseignée » et bouton
+    grisé à l'établi ; déclarée ensuite aux compétences → déverrouillée, elle se façonne.
+
+## À vérifier en jeu (1.8.0)
+
+- Démarrage : aucune ligne « … absente de vava_skills:recipes » avec les modules livrés (artisanat, agriculture,
+  provisions, combat) ; la ressource jetable du § 4.2 de `docs/tests/metiers.md` en fait apparaître une, une seule.
+- Menu : la recette verrouillée se lit (« Non enseignée », raison sous le bouton) ; les autres recettes inchangées.
 
 ## À vérifier en jeu (1.7.0)
 

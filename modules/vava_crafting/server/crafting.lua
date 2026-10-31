@@ -1,8 +1,9 @@
 --[[
     vava_crafting/server/crafting.lua
     Rôle : la fabrication décidée par le serveur. Rien à terre (vava_health) : ni menu, ni début, ni fin (pièce
-           abandonnée, station libérée), ni combustible. Menu d'une station (recettes connues de ce type, paliers
-           possédés par ingrédient, réparables, poinçon, règles pour l'aperçu). Début : station à portée et
+           abandonnée, station libérée), ni combustible. Menu d'une station (recettes connues de ce type, celles
+           qu'ignorent les compétences verrouillées, paliers possédés par ingrédient, réparables, poinçon, règles
+           pour l'aperçu). Début : station à portée et
            accessible, libre, recette connue et au niveau, outil en main du bon genre, combustible, paliers choisis
            valides et possédés,
            place, hook annulable ; jeton, station occupée (jusqu'à la fin, l'annulation, ou l'oubli après 2 min ou la
@@ -161,6 +162,9 @@ local function recipeViews(src, def, index)
     for _, recipe in ipairs(catalog.recipesOf(def.type.id)) do
         if bridge.KnowsRecipe(src, recipe.id) or not recipe.transmission then
             local playerLevel = bridge.GetLevel(src, recipe.skill)
+            -- recette libre que vava_skills ne connaît pas (absente de vava_skills:recipes) : montrée verrouillée, avec
+            -- sa raison, au lieu d'être proposée puis refusée (`not_known`) ; le serveur reste juge au début (T-147)
+            local declared = catalog.declaredToSkills(recipe.id)
             local ingredients = {}
             for i, ingredient in ipairs(recipe.ingredients) do
                 ingredients[i] = {
@@ -171,7 +175,7 @@ local function recipeViews(src, def, index)
             list[#list + 1] = {
                 id = recipe.id, label = recipe.label, skill = recipe.skill, skillLabel = bridge.SkillLabel(recipe.skill),
                 level = recipe.level, playerLevel = playerLevel, levelOk = playerLevel >= recipe.level,
-                known = recipe.transmission and true or playerLevel >= recipe.level,
+                known = declared and (recipe.transmission or playerLevel >= recipe.level), unregistered = not declared or nil,
                 toolKind = recipe.tool, toolLabel = recipe.tool and toolLabel(recipe.tool) or nil,
                 toolOk = recipe.tool == nil or (heldKind == recipe.tool and not heldBroken),
                 durationMs = crafting.duration(recipe, playerLevel), difficulty = recipe.difficulty, xp = recipe.xp,

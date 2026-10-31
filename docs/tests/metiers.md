@@ -15,7 +15,9 @@ qui doit se passer ; si ce n'est pas le cas, notez l'étape, ce que vous avez vu
    (`0003_play_seconds` du core, `0001_*` de chaque module). Un module refusé affiche la raison : notez-la, c'est le
    premier retour utile.
 3. **Avertissements attendus au premier démarrage** : aucun. Un `WARN … objet 'x' inconnu de l'inventaire` signale
-   une recette ou une ressource dont l'objet n'est déclaré nulle part : à me remonter.
+   une recette ou une ressource dont l'objet n'est déclaré nulle part : à me remonter. De même, un
+   `WARN … recette 'x' (déclarée par y) absente de vava_skills:recipes` (artisanat 1.8.0, § 4.2), environ 5 s après le
+   démarrage : le module `y` a oublié de déclarer sa recette aux compétences.
 4. **Compte du Conseil** : console → `vava_conseil <votre compte> souverain` (numéro de compte : Chancellerie →
    Joueurs → fiche, ou console du serveur à la première connexion, `nouveau compte #n`). Vous avez alors `metiers`
    (via Sénéchal) et `staff`.
@@ -216,6 +218,49 @@ Console F8 ouverte chez B (`set vava_log_level debug` côté client pour voir un
 | 17 | B devant la forge, menu ouvert ; A (Conseil) le téléporte à plus de 200 m (Registre → Déplacer). | Le menu de B se ferme de lui-même dès que la station est oubliée (au plus 1 à 2 s) : il ne reste pas ouvert, figé. |
 | 18 | B arrive au galop au bourg en passant d'abord près d'une station isolée (le composteur du champ, s'il est placé), puis vers la forge. | Chaque station apparaît vers 80 m, y compris la deuxième (avant la reprise, la boucle déjà lancée par la première pouvait la faire attendre jusqu'à 2,5 s). |
 | 19 | Console du serveur : un module de test appelle `exports.vava_crafting:addStation(...)` après avoir rempli les zones du core (ou `zones.maxZonesPerOwner` abaissé pour l'essai). | `false, 'zones_full'` ; la station n'apparaît pas dans `/artisanat stations` ; une ligne d'erreur en console, pas une par changement. |
+
+### 4.2 Recette inconnue des compétences (`vava_crafting` 1.8.0, T-147)
+
+Une recette ajoutée à l'artisanat (`vava_crafting:recipes`) sans être déclarée aux compétences (`vava_skills:recipes`)
+était montrée au menu puis refusée au clic (« Vous ne connaissez pas cette recette. »), sans rien en console. Depuis
+1.8.0 : une ligne en console par recette (son nom, le module qui l'a déclarée), une seule fois, et la recette
+verrouillée au menu. Constaté hors jeu par `tests/spec/crafting_skill_recipes_spec.lua`.
+
+Ressource jetable `test_recette` (`resources/test_recette/`, à **ne pas** committer ni garder) : `fxmanifest.lua` avec
+`fx_version 'cerulean'`, `game 'gta5'`, `lua54 'yes'`, `dependency 'vava_crafting'`, `server_script 'server.lua'`, et ce
+`server.lua` :
+
+```lua
+-- ajoute la recette 'essai_t147' à l'artisanat seul ; console : testrecette → la déclare aussi aux compétences
+local core = exports.vAvA_core:getApi(1)
+core.modules.register({
+    version = '0.0.1',
+    dependencies = { vava_crafting = '1.8.0', vava_skills = '1.0.0' },
+    setup = function()
+        print('artisanat', core.registry.add('vava_crafting:recipes', 'essai_t147', {
+            label = 'Essai T-147', skill = 'menuiserie', level = 0, station = 'etabli', durationMs = 3000,
+            difficulty = 0, xp = 1, ingredients = { { item = 'bois_pin', quantity = 1 } },
+            output = { item = 'charbon', quantity = 1 },
+        }))
+        return true
+    end,
+})
+RegisterCommand('testrecette', function(src)
+    if src ~= 0 then return end
+    print('competences', core.registry.add('vava_skills:recipes', 'essai_t147',
+        { label = 'Essai T-147', skill = 'menuiserie', level = 0, transmission = false }))
+end, true)
+```
+
+| # | Faire | Attendu |
+|---|---|---|
+| 1 | Démarrer le serveur sans la ressource jetable ; attendre 10 s ; lire la console. | `module 'vava_crafting' v1.8.0 prêt` ; aucune ligne « … absente de vava_skills:recipes » (les recettes de l'artisanat, du compost, de l'outre et des armes sont toutes déclarées aux compétences). |
+| 2 | Console : `ensure test_recette` ; attendre 5 s. | `artisanat true`, puis environ 5 s après une seule ligne `WARN` de `vava_crafting` : « recette 'essai_t147' (déclarée par test_recette) absente de vava_skills:recipes : inconnue des compétences, verrouillée au menu et refusée à la station … ». Rien d'autre. |
+| 3 | Bûche de pin dans la besace, `E` à l'établi du bourg. | « Essai T-147 » est dans la liste, grisée, avec la marque « Non enseignée » ; sélectionnée : bouton « Façonner » grisé, raison « Ce savoir n'est pas encore enseigné au royaume : prévenez le Conseil. ». Les autres recettes de l'établi sont comme avant. |
+| 4 | Fermer et rouvrir le menu deux fois ; attendre 10 s. | Pas de nouvelle ligne en console (une seule fois par recette). |
+| 5 | Console : `testrecette`, puis `E` à l'établi (ou « Relire » dans le menu ouvert). | `competences true` ; « Essai T-147 » n'est plus grisée, sans marque ; « Façonner » marche : geste de 3 s, 1 bûche de pin consommée, 1 charbon dans la besace. Aucune ligne de plus en console. |
+| 6 | Console : `restart vava_skills` ; attendre 10 s (si FXServer arrête aussi `vava_crafting` ou `test_recette`, les relancer par `ensure`, dans cet ordre : l'attendu est le même, et le noter). | Environ 5 s après `module 'vava_skills' … prêt`, de nouveau **une** ligne « recette 'essai_t147' (déclarée par test_recette) absente … » (la ressource jetable ne redéclare pas sa recette au retour des compétences, à la différence des modules livrés) ; aucune autre recette citée. À l'établi, « Essai T-147 » est de nouveau grisée. |
+| 7 | Console : `stop test_recette`, puis supprimer la ressource. | La recette disparaît du menu de l'établi ; aucune ligne en console. |
 
 ## 5. Agriculture — `vava_farming`
 

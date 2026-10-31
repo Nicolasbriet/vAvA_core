@@ -4,8 +4,9 @@
            compte, position lue côté serveur, joueurs à portée (leçons), santé (à terre), inventaire (objet en main,
            piles et leurs métadonnées, comptage par palier, échange atomique, écriture partielle des métadonnées,
            garde de la signature au hook des métadonnées, déclaration des objets), compétences (XP, niveau, rang,
-           recette connue, leçon, registre des recettes), libellés des compétences, poinçon (champ de personnage),
-           droits et journal du Conseil, notifications, chat, zones du core des stations (abonnements de zone), base.
+           recette connue, leçon, registre des recettes et ses identifiants), libellés des compétences, poinçon
+           (champ de personnage), droits et journal du Conseil, notifications, chat, zones du core des stations
+           (abonnements de zone), base.
            Chaque appel à une autre ressource est isolé.
     Dépendances : shared/constants.lua, config.lua, server/core.lua (core.zones : vAvA_core 0.11.0)
 ]]
@@ -269,6 +270,17 @@ function Bridge.DeclareSkillRecipe(id, data)
     return registry.add(SKILL_RECIPES_REGISTRY, id, data)
 end
 
+--- Identifiants des recettes déclarées au registre des compétences : `{ [id] = true }`, ou nil si le registre est absent
+--- (vava_skills arrêté). Lit une copie du registre entier : à tenir en cache, relu après un changement du registre.
+---@return table<string, boolean>|nil
+function Bridge.SkillRecipeIds()
+    local registry = core.registry
+    if not registry.exists(SKILL_RECIPES_REGISTRY) then return nil end
+    local ids = {}
+    for id in pairs(registry.all(SKILL_RECIPES_REGISTRY) or {}) do ids[id] = true end
+    return ids
+end
+
 --- Libellé d'une compétence (registre de vava_skills), ou son identifiant.
 ---@param skill string
 ---@return string
@@ -406,3 +418,4 @@ end
 Bridge.CONSOLE = CONSOLE
 Bridge.INVENTORY = INVENTORY
 Bridge.SKILLS = SKILLS
+Bridge.SKILL_RECIPES = SKILL_RECIPES_REGISTRY

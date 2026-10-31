@@ -4,13 +4,16 @@
            (registre `vava_crafting:stations`), recettes (registre `vava_crafting:recipes`, données complètes ; chaque
            recette est aussi déclarée à `vava_skills:recipes`), stations placées, outils d'artisan, objets déclarés à
            l'inventaire (rappelé quand l'inventaire redémarre). Vérifie la cohérence au démarrage : une erreur de
-           donnée refuse le module.
+           donnée refuse le module. Recettes absentes de `vava_skills:recipes` (T-147) : auteur de chaque recette
+           suivi, cache des recettes des compétences, une ligne en console par recette absente (après le démarrage,
+           l'ajout d'une recette par un autre module, le retour de vava_skills), lu par le menu pour la verrouiller.
     Dépendances : shared/constants.lua, config.lua, shared/stationzone.lua (bornes), server/core.lua, bridge/server.lua
 ]]
 
 local type, pairs, ipairs, tostring = type, pairs, ipairs, tostring
 local format = string.format
 local sort, remove = table.sort, table.remove
+local SetTimeout = SetTimeout
 
 local core = VavaCrafting.core
 local bridge = VavaCrafting.bridge
@@ -124,9 +127,19 @@ local stationsById, stationsOrdered = {}, {}
 -- caches reconstruits après un changement de registre
 local typesById, recipesById, recipesByStation = nil, nil, nil
 
+-- Recettes auprès des compétences (T-147) : ressource qui a ajouté chaque recette (hook core:registry:added ; ce module
+-- pour celles de la config) ; identifiants de `vava_skills:recipes` ({ [id] = true } ; false : registre absent ; nil :
+-- à relire) ; recettes déjà signalées en console (une ligne chacune, oubliées au retour de vava_skills) ; tour du
+-- contrôle différé (seul le dernier demandé passe).
+local recipeOwners = {}
+local skillIds = nil
+local reported, registryReported = {}, false
+local checkRound = 0
+
 local function invalidate(payload)
     if payload.registry == REGISTRY.STATIONS then typesById = nil end
     if payload.registry == REGISTRY.RECIPES then recipesById, recipesByStation = nil, nil end
+    if payload.registry == bridge.SKILL_RECIPES then skillIds = nil end
 end
 
 local function rebuildTypes()
@@ -251,9 +264,30 @@ function catalog.define()
     for id, recipe in pairs(cfg.recipes) do
         ok, err = core.registry.add(REGISTRY.RECIPES, id, recipe)
         if not ok then return false, format("recette '%s' : %s", id, tostring(err)) end
+        recipeOwners[id] = VavaCrafting.resource
     end
     for _, hook in ipairs({ 'core:registry:added', 'core:registry:removed', 'core:registry:dropped' }) do
         local id, hookErr = core.hooks.after(hook, invalidate)
+        if not id then return false, hookErr end
+    end
+    -- T-147 : auteur des recettes ajoutées par d'autres modules, et contrôle différé quand une recette arrive ici ou
+    -- quitte les compétences (le module a pu déclarer les deux registres l'un après l'autre)
+    for _, def in ipairs({
+        { 'core:registry:added', function(payload)
+            if payload.registry == REGISTRY.RECIPES and type(payload.key) == 'string' then
+                recipeOwners[payload.key] = payload.owner
+                if payload.owner ~= VavaCrafting.resource then catalog.scheduleSkillCheck() end
+            end
+        end },
+        { 'core:registry:removed', function(payload)
+            if payload.registry == REGISTRY.RECIPES and type(payload.key) == 'string' then
+                recipeOwners[payload.key], reported[payload.key] = nil, nil
+            elseif payload.registry == bridge.SKILL_RECIPES then
+                catalog.scheduleSkillCheck()
+            end
+        end },
+    }) do
+        local id, hookErr = core.hooks.after(def[1], def[2])
         if not id then return false, hookErr end
     end
     ok, err = indexStations()
@@ -264,7 +298,13 @@ function catalog.define()
     local id
     id, err = core.hooks.after('core:module:ready', function(payload)
         if payload.name == bridge.INVENTORY then catalog.declareItems() end
-        if payload.name == bridge.SKILLS then declareSkillRecipes() end
+        if payload.name == bridge.SKILLS then
+            declareSkillRecipes()
+            -- retour de vava_skills : chaque recette encore absente est signalée de nouveau, une fois que les autres
+            -- modules ont redéclaré les leurs
+            reported, registryReported = {}, false
+            catalog.scheduleSkillCheck()
+        end
     end)
     if not id then return false, err end
     for recipeId, recipe in pairs(catalog.recipes()) do
@@ -278,7 +318,78 @@ function catalog.define()
             return false, format("recette '%s' : un objet signé doit être non empilable (stack = 1), '%s' a stack = %d", recipeId, recipe.output.item, output.stack)
         end
     end
+    -- les autres modules ajoutent leurs recettes à l'annonce de ce module : contrôle différé
+    catalog.scheduleSkillCheck()
     return true
+end
+
+-- Recettes auprès des compétences (T-147) -------------------------------------------------------------------------
+
+---@return table<string, boolean>|false
+local function skillRecipeIds()
+    if skillIds == nil then skillIds = bridge.SkillRecipeIds() or false end
+    return skillIds
+end
+
+--- Vrai si la recette est déclarée au registre des compétences (`vava_skills:recipes`). Sinon vava_skills ne la connaît
+--- pas (`knowsRecipe` faux, la station la refuse : `not_known`) et le menu la montre verrouillée. Lecture du cache, tenu
+--- à jour par les hooks du registre.
+---@param id string
+---@return boolean
+function catalog.declaredToSkills(id)
+    local ids = skillRecipeIds()
+    return ids ~= false and ids[id] == true
+end
+
+--- Recettes de l'artisanat absentes du registre des compétences, par identifiant : { { id, owner } } (`owner` : la
+--- ressource qui l'a déclarée à l'artisanat, '?' si elle n'est pas connue).
+---@return { id: string, owner: string }[]
+function catalog.missingFromSkills()
+    local list = {}
+    for id in pairs(catalog.recipes()) do
+        if not catalog.declaredToSkills(id) then list[#list + 1] = { id = id, owner = recipeOwners[id] or '?' } end
+    end
+    sort(list, function(a, b) return a.id < b.id end)
+    return list
+end
+
+--- Signale en console les recettes de l'artisanat absentes du registre des compétences, une ligne par recette et une
+--- seule fois (de nouveau après le retour de vava_skills, ou si elle redevient absente) ; registre absent : une ligne.
+--- Rend la liste des recettes absentes ({ { id, owner } }).
+---@return { id: string, owner: string }[]
+function catalog.checkSkillRecipes()
+    local missing = catalog.missingFromSkills()
+    if skillRecipeIds() == false then
+        if not registryReported and #missing > 0 then
+            registryReported = true
+            VavaCrafting.log.warn("registre vava_skills:recipes absent : %d recette(s) de l'artisanat verrouillée(s) au menu, refusée(s) à la station", #missing)
+        end
+        return missing
+    end
+    registryReported = false
+    local absent = {}
+    for _, entry in ipairs(missing) do
+        absent[entry.id] = true
+        if not reported[entry.id] then
+            reported[entry.id] = true
+            VavaCrafting.log.warn("recette '%s' (déclarée par %s) absente de vava_skills:recipes : inconnue des compétences, "
+                .. "verrouillée au menu et refusée à la station ; à déclarer aussi à vava_skills:recipes", entry.id, entry.owner)
+        end
+    end
+    for id in pairs(reported) do
+        if not absent[id] then reported[id] = nil end
+    end
+    return missing
+end
+
+--- Demande le contrôle des recettes auprès des compétences dans `skillsCheck.delayMs` : le temps que chaque module ait
+--- déclaré ses recettes aux deux registres. Seule la dernière demande passe.
+function catalog.scheduleSkillCheck()
+    checkRound = checkRound + 1
+    local round = checkRound
+    SetTimeout(cfg.skillsCheck.delayMs, function()
+        if round == checkRound then catalog.checkSkillRecipes() end
+    end)
 end
 
 --- Place une station depuis un autre module (type déjà déclaré au registre). Depuis 1.1.0 ; depuis 1.5.0, identifiant
