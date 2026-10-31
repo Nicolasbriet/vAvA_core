@@ -896,6 +896,17 @@ versé à T-014 ; les autres points déjà couverts sont précisés dans T-012 �
   montre chaque rubrique hors jeu ; impossible d'ouvrir le menu en combat ou ligoté ; relectures sécurité, réseau et
   lore OK.
 
+### T-152 — Écran de chargement : les ambiances d'Eldoria en fondu enchaîné
+- Agent : vava-dev-nui · Dépend de : T-020 · Statut : en cours
+- Demande du porteur du projet (31 octobre 2026) : sept peintures de la même vue d'Eldoria sous des ambiances
+  différentes (aube, brume du matin, hiver, crépuscule, nuit étoilée, brume de nuit, orage), fournies en PNG
+  1672 × 941, converties en WebP 1600 × 900 qualité 50 (1 181 Ko pour les sept) dans
+  `modules/vava_loading/web/img/ambiances/`, pour tenir sous le plafond de 1,5 Mo de l'écran. Elles remplacent le
+  paysage peint par le code et se succèdent par un fondu enchaîné doux (opacité et transformation seulement).
+- Critères : `vava_loading` sous 1,5 Mo (audit) ; aucune image chargée hors de `web/img/` ; ordre, durées et fondu en
+  config ; première image affichée sans écran vide ; repli propre si une image manque ; aucune boucle par image
+  au-delà de l'animation CSS ; essais de la page ; procédure `docs/tests/chargement.md` à jour.
+
 ## Phase 3 — L'Atelier : socle et créateurs du monde
 
 Référence : `docs/plan/ATELIER.md` et les maquettes `docs/maquettes/`. Les écrans réalisés doivent ressembler aux
