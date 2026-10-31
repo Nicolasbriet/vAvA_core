@@ -369,8 +369,14 @@ local function unload(session, reason)
     local character = session.characterId and activeById[session.characterId]
     if not character then return false, 'no_character' end
     session.state = 'unloading'
+    -- apparition en attente oubliée avant tout ce qui cède la main (hook, sauvegarde) : un passage de la confirmation
+    -- ne doit pas la confirmer pendant le déchargement (relecture sécurité de T-139, S-1)
+    spawn.forget(character)
+    -- dernière position et temps de jeu relevés s'il était apparu, puis plus apparu (plus de relevé ni d'envoi de
+    -- proximité pendant le hook et la sauvegarde)
     positions.sample(character)
     playtime.pause(character)
+    character.spawned = false
     hooks.runAfter(HOOK_UNLOADING, {
         source = session.source, accountId = session.accountId, characterId = character.id, reason = reason,
         playSeconds = character.playSeconds,
@@ -379,7 +385,6 @@ local function unload(session, reason)
     activeById[character.id] = nil
     session.characterId = nil
     character.spawned = false
-    spawn.forget(character)
     -- abonnements de zone oubliés sans envoi : le client vide ses zones au déchargement
     zones.purgePlayer(session.source)
     sync.clearCharacter(character)
@@ -588,13 +593,13 @@ function characters.registerRpc()
         { RPC.DELETE, { idArg }, limits.delete, function(src, characterId)
             return withSession(src, 'joined', delete, characterId)
         end },
-        { RPC.SPAWNED, {}, limits.spawned, function(src)
+        { RPC.SPAWNED, { { type = 'integer', min = 1, max = spawn.MAX_ORDER } }, limits.spawned, function(src, order)
             local session = accounts.get(src)
             local character = session and session.state == 'active' and activeById[session.characterId]
             if not character then return false, 'no_character' end
-            -- simple déclaration : le serveur ne confirme l'apparition qu'après avoir vu le ped au point ordonné
-            -- (spawn.claim, une fois par ordre : spawn.send remet l'état à faux)
-            return spawn.claim(character)
+            -- simple déclaration, rattachée à son ordre par son numéro : le serveur ne confirme l'apparition qu'après
+            -- avoir vu le ped au point ordonné (spawn.claim, une fois par ordre : spawn.send remet l'état à faux)
+            return spawn.claim(character, order)
         end },
     }
 

@@ -217,13 +217,21 @@ vAvA.config.server = {
         -- joueur (GetPlayerPed, GetEntityCoords) et ne tient l'apparition pour faite qu'après l'avoir vu au point
         -- ordonné : aussitôt à la déclaration du client (fin du fondu), ou d'office graceMs après l'ordre s'il ne déclare
         -- rien. Jamais vu au point : une ligne de console et le personnage reste non apparu (ni temps de jeu, ni
-        -- position relevée, ni envois de proximité, ni zones) jusqu'à ce qu'il y soit vu.
+        -- position relevée, ni envois de proximité, ni zones) jusqu'à ce qu'il y soit vu. Bornes vérifiées au démarrage
+        -- (hors bornes : le core ne démarre pas).
         confirm = {
             checkMs = 500,     -- intervalle des lectures, seulement pour les joueurs dont l'apparition attend
+                               -- (50 à 5000)
             radius = 10.0,     -- écart horizontal maximal (m) entre le ped et le point ordonné (le ped peut tomber
-                               -- du point, et courir un instant entre la fin du fondu et la lecture du serveur)
+                               -- du point, et courir un instant entre la fin du fondu et la lecture du serveur) ;
+                               -- plus de 0 à 50
             graceMs = 20000,   -- confirmation d'office sans déclaration du client ; au-delà du plus long chargement
-                               -- normal du client (config/shared.lua : fondu × 4 + modèle + collisions = 17 s)
+                               -- normal du client (config/shared.lua : fondu × 4 + modèle + collisions = 17 s) ;
+                               -- checkMs à 120000
+            lateCheckMs = 5000,  -- ped jamais vu au point après graceMs : relu toutes les lateCheckMs seulement
+                                 -- (checkMs à 60000) ; une déclaration du client le relit aussitôt
+            maxPerCheck = 16,  -- confirmations au plus par passage (hooks et zones) ; les suivantes au passage
+                               -- suivant (1 à 1024)
         },
     },
 

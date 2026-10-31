@@ -8,7 +8,7 @@ local helper = require('tests.helper')
 -- doublures ; les minuteries (SetTimeout) sont déclenchées à la main.
 describe('vAvA.spawn', function()
     local spawn, playtime, positions, net, cfg, now, sent, printed, peds, coords, current, abandoned, refreshed
-    local active, hookCalls, realPrint, dispatchFails
+    local active, hookCalls, realPrint, dispatchFails, sessions, reads
 
     local SRC = 1
     local FAR = { x = 1200.0, y = 300.0, z = 40.0 }   -- ancien emplacement du ped (personnage précédent)
@@ -17,13 +17,17 @@ describe('vAvA.spawn', function()
         helper.reset()
         now = 1000
         sent, printed, peds, coords, current, abandoned, refreshed, active, hookCalls = {}, {}, {}, {}, {}, {}, {}, {}, {}
+        sessions, reads = {}, {}
         dispatchFails = false
         realPrint = _G.print
         _G.print = function(line) printed[#printed + 1] = tostring(line) end
         _G.GetGameTimer = function() return now end
         -- ordre impossible à envoyer : le joueur n'existe plus pour FXServer au moment de l'envoi
-        _G.DoesPlayerExist = function(src) return (src == 1 or src == 2) and not dispatchFails end
-        _G.GetPlayerPed = function(src) return peds[src] or 0 end
+        _G.DoesPlayerExist = function(src) return src >= 1 and src <= 3 and not dispatchFails end
+        _G.GetPlayerPed = function(src)
+            reads[src] = (reads[src] or 0) + 1   -- lectures du ped par le serveur
+            return peds[src] or 0
+        end
         _G.DoesEntityExist = function(ped) return ped ~= 0 end
         _G.GetEntityCoords = function(ped) return coords[ped] end
         _G.GetEntityHeading = function() return 90.0 end
@@ -55,6 +59,8 @@ describe('vAvA.spawn', function()
         vAvA.characters = {
             forEachActive = function(fn) for i = 1, #active do fn(active[i]) end end,
         }
+        -- sessions des joueurs : seul un personnage dont la session est active sur lui est confirmé
+        vAvA.accounts = { get = function(src) return sessions[src] end }
         helper.loadAll({
             'server/players/playtime.lua',
             'server/players/positions.lua',
@@ -79,9 +85,23 @@ describe('vAvA.spawn', function()
         }
         current[character.source] = character
         active[#active + 1] = character
+        sessions[character.source] = { source = character.source, accountId = 3, state = 'active', characterId = character.id }
         peds[character.source] = 100 + character.source
         coords[100 + character.source] = { x = FAR.x, y = FAR.y, z = FAR.z }
         return character
+    end
+
+    --- Numéro du dernier ordre d'apparition envoyé au joueur `src` (nil : aucun).
+    local function lastOrder(src)
+        for i = #sent, 1, -1 do
+            if sent[i].target == src and sent[i].event == vAvA.EVENTS.SPAWN then return sent[i].args[1].seq end
+        end
+        return nil
+    end
+
+    --- Déclaration du client, avec le numéro du dernier ordre qu'il a reçu (ce que fait le client du core).
+    local function claim(character)
+        return spawn.claim(character, lastOrder(character.source))
     end
 
     --- Place le ped (ce que le serveur lira par OneSync) ; la position gardée 50 ms par core.net est oubliée.
@@ -123,17 +143,33 @@ describe('vAvA.spawn', function()
         end)
 
         it('refuse des réglages invalides', function()
-            local saved = { checkMs = cfg.checkMs, radius = cfg.radius, graceMs = cfg.graceMs }
+            local saved = {
+                checkMs = cfg.checkMs, radius = cfg.radius, graceMs = cfg.graceMs, lateCheckMs = cfg.lateCheckMs,
+                maxPerCheck = cfg.maxPerCheck,
+            }
             for _, case in ipairs({
                 { checkMs = 0 }, { checkMs = 10 }, { checkMs = 500.5 }, { radius = 0 }, { radius = -1 },
                 { radius = 0 / 0 }, { radius = math.huge }, { graceMs = 100 }, { graceMs = 'x' },
+                -- bornes hautes (relecture sécurité S-5) et réglages des suites réseau (R-1, R-2)
+                { checkMs = 5001 }, { radius = 50.01 }, { graceMs = 120001 }, { lateCheckMs = 100 },
+                { lateCheckMs = 60001 }, { lateCheckMs = 'absent' }, { maxPerCheck = 0 }, { maxPerCheck = 1025 },
+                { maxPerCheck = 2.5 }, { maxPerCheck = 'absent' },
             }) do
-                for key, value in pairs(case) do cfg[key] = value end
+                for key, value in pairs(case) do
+                    if value == 'absent' then cfg[key] = nil else cfg[key] = value end
+                end
                 local ok, err = spawn.validateConfig()
                 assert.is_false(ok)
                 assert.is_string(err)
                 for key, value in pairs(saved) do cfg[key] = value end
             end
+        end)
+
+        it('accepte les bornes des réglages (relecture sécurité S-5)', function()
+            cfg.checkMs, cfg.radius, cfg.graceMs, cfg.lateCheckMs, cfg.maxPerCheck = 5000, 50, 120000, 60000, 1024
+            assert.same({ true }, { spawn.validateConfig() })
+            cfg.checkMs, cfg.radius, cfg.graceMs, cfg.lateCheckMs, cfg.maxPerCheck = 50, 0.5, 50, 50, 1
+            assert.same({ true }, { spawn.validateConfig() })
         end)
     end)
 
@@ -174,7 +210,7 @@ describe('vAvA.spawn', function()
 
             now = now + 1500
             move(SRC, POINT.x + 0.5, POINT.y, POINT.z - 1)
-            assert.same({ true }, { spawn.claim(character) })
+            assert.same({ true }, { claim(character) })
             assert.is_true(character.spawned)
             assert.equal(1, #hookCalls)
             assert.same({ source = SRC, accountId = 3, characterId = 7, forced = false }, hookCalls[1])
@@ -182,7 +218,7 @@ describe('vAvA.spawn', function()
             assert.equal(0, spawn.pendingCount())
             assert.equal(0, printedMatching('[spawn]'))
             -- une seconde déclaration ne rejoue rien
-            assert.same({ true }, { spawn.claim(character) })
+            assert.same({ true }, { claim(character) })
             assert.equal(1, #hookCalls)
         end)
 
@@ -190,7 +226,7 @@ describe('vAvA.spawn', function()
             local character = newCharacter()
             character.position = { x = POINT.x, y = POINT.y, z = POINT.z, heading = 0.0 }
             order(character)
-            assert.same({ true }, { spawn.claim(character) })
+            assert.same({ true }, { claim(character) })
             assert.is_false(character.spawned)
             assert.equal(0, #hookCalls)
 
@@ -210,7 +246,7 @@ describe('vAvA.spawn', function()
         it('déclaré tôt puis arrivé au point : confirmé au passage suivant, sans être forcé', function()
             local character = newCharacter()
             order(character)
-            spawn.claim(character)
+            claim(character)
             assert.is_false(character.spawned)
             move(SRC, POINT.x, POINT.y, POINT.z)
             advance(cfg.checkMs)
@@ -227,14 +263,14 @@ describe('vAvA.spawn', function()
             advance(cfg.checkMs)          -- ped figé au point, lu par le serveur
             assert.is_false(character.spawned)
             move(SRC, POINT.x + 40, POINT.y, POINT.z)
-            spawn.claim(character)
+            claim(character)
             assert.is_true(character.spawned)
             assert.is_false(hookCalls[1].forced)
         end)
 
         it('déclaration sans ordre en attente : refusée sans effet', function()
             local character = newCharacter()
-            assert.same({ false, 'not_ordered' }, { spawn.claim(character) })
+            assert.same({ false, 'not_ordered' }, { claim(character) })
             assert.is_false(character.spawned)
         end)
 
@@ -243,7 +279,7 @@ describe('vAvA.spawn', function()
             order(character)
             now = now + 30000
             move(SRC, POINT.x, POINT.y, POINT.z)
-            spawn.claim(character)
+            claim(character)
             now = now + 12500
             assert.equal(12, playtime.current(character))
         end)
@@ -253,7 +289,7 @@ describe('vAvA.spawn', function()
             order(character)
             assert.is_false(positions.sample(character))
             move(SRC, POINT.x, POINT.y, POINT.z)
-            spawn.claim(character)
+            claim(character)
             assert.is_true(positions.sample(character))
             assert.equal(POINT.x, character.position.x)
             assert.equal(POINT.y, character.position.y)
@@ -287,7 +323,8 @@ describe('vAvA.spawn', function()
             assert.equal(0, playtime.current(character))
             assert.equal(1, #helper.timers)   -- une seule échéance à la fois
             move(SRC, POINT.x, POINT.y, POINT.z)
-            advance(cfg.checkMs)
+            -- après l'avertissement, le ped n'est plus relu que toutes les lateCheckMs (relecture réseau R-1)
+            for _ = 1, cfg.lateCheckMs // cfg.checkMs do advance(cfg.checkMs) end
             assert.is_true(character.spawned)
             assert.is_true(hookCalls[1].forced)
         end)
@@ -300,7 +337,7 @@ describe('vAvA.spawn', function()
             local other = { x = 500.0, y = 500.0, z = 30.0 }
             assert.is_true(order(character, other))
             move(SRC, POINT.x, POINT.y, POINT.z)
-            spawn.claim(character)
+            claim(character)
             assert.is_false(character.spawned)
             move(SRC, other.x, other.y, other.z)
             advance(cfg.checkMs)
@@ -312,7 +349,7 @@ describe('vAvA.spawn', function()
             local character = newCharacter()
             order(character)
             move(SRC, POINT.x, POINT.y, POINT.z)
-            spawn.claim(character)
+            claim(character)
             assert.is_true(character.spawned)
             assert.is_true(order(character, { x = 0.0, y = 0.0, z = 70.0 }))
             assert.is_false(character.spawned)
@@ -355,16 +392,162 @@ describe('vAvA.spawn', function()
             end) ~= nil)
             order(character)
             move(SRC, POINT.x, POINT.y, POINT.z)
-            spawn.claim(character)
+            claim(character)
             assert.equal(1, #hookCalls)
             assert.is_false(character.spawned)
             assert.same({}, refreshed)
             assert.equal(1, spawn.pendingCount())
             move(SRC, again.x, again.y, again.z)
-            assert.same({ true }, { spawn.claim(character) })   -- le nouvel ordre se déclare à son tour
+            assert.same({ true }, { claim(character) })   -- le nouvel ordre se déclare à son tour
             assert.is_true(character.spawned)
             assert.equal(2, #hookCalls)
             assert.same({ SRC }, refreshed)
+        end)
+    end)
+
+    -- suites des relectures sécurité (S-1, S-2, S-4, S-6) et réseau (R-1, R-2) de T-139
+    describe('suites des relectures', function()
+        it('S-1 : personnage qui n’est plus chargé (déchargement en cours, autre personnage) : jamais confirmé', function()
+            local character = newCharacter()
+            order(character)
+            claim(character)                         -- déclaré tôt, ped encore ailleurs
+            sessions[SRC].state = 'unloading'        -- le déchargement a commencé et cède la main
+            move(SRC, POINT.x, POINT.y, POINT.z)     -- le ped arrive au point pendant ce temps
+            advance(cfg.checkMs)
+            advance(cfg.graceMs)
+            assert.is_false(character.spawned)
+            assert.equal(0, #hookCalls)
+            assert.is_nil(character.playMarker)
+            assert.same({}, refreshed)
+            assert.equal(0, spawn.pendingCount())
+            assert.equal(0, #helper.timers)
+
+            -- même chose, rien déclaré (confirmation d'office) et session passée à un autre personnage
+            local second = newCharacter(2, 8)
+            order(second)
+            move(2, POINT.x, POINT.y, POINT.z)
+            sessions[2].characterId = 9
+            advance(cfg.graceMs)
+            assert.is_false(second.spawned)
+            assert.equal(0, #hookCalls)
+            assert.equal(0, spawn.pendingCount())
+        end)
+
+        it('S-1 : déclaration reçue alors que la session n’est plus active : rien de confirmé', function()
+            local character = newCharacter()
+            order(character)
+            move(SRC, POINT.x, POINT.y, POINT.z)
+            sessions[SRC] = nil                      -- joueur parti, personnage encore courant pour sync
+            assert.same({ true }, { claim(character) })
+            assert.is_false(character.spawned)
+            assert.equal(0, #hookCalls)
+            assert.equal(0, spawn.pendingCount())
+        end)
+
+        it('S-2 : déclaration d’un ordre précédent (arrivée en retard) : ne compte pas pour l’ordre qui attend', function()
+            local character = newCharacter()
+            order(character)
+            local first = lastOrder(SRC)
+            assert.is_true(math.type(first) == 'integer' and first >= 1)
+            assert.is_true(order(character, { x = POINT.x + 3, y = POINT.y, z = POINT.z }))  -- presque au même point
+            local second = lastOrder(SRC)
+            assert.is_true(second ~= first)
+            move(SRC, POINT.x, POINT.y, POINT.z)
+            assert.same({ false, 'not_ordered' }, { spawn.claim(character, first) })
+            assert.is_false(character.spawned)
+            assert.same({ false, 'not_ordered' }, { spawn.claim(character, nil) })
+            -- le ped est au point, mais seule la déclaration du bon ordre, ou le délai de grâce, confirme
+            advance(cfg.checkMs)
+            assert.is_false(character.spawned)
+            assert.same({ true }, { spawn.claim(character, second) })
+            assert.is_true(character.spawned)
+            assert.is_false(hookCalls[1].forced)
+        end)
+
+        it('S-2 : chaque ordre a un numéro, repart à 1 après le plus grand', function()
+            local character = newCharacter()
+            local seen = {}
+            for _ = 1, 5 do
+                order(character, POINT)
+                local seq = lastOrder(SRC)
+                assert.is_nil(seen[seq])
+                seen[seq] = true
+                assert.is_true(seq >= 1 and seq <= spawn.MAX_ORDER)
+            end
+        end)
+
+        it('S-4 : la ligne « jamais vu au point » nomme le compte et le personnage', function()
+            local character = newCharacter()
+            order(character)
+            for _ = 1, cfg.graceMs // cfg.checkMs do advance(cfg.checkMs) end
+            assert.equal(1, printedMatching('joueur 1 (compte #3, personnage #7) : ped jamais vu au point'))
+            assert.is_false(character.spawned)
+        end)
+
+        it('S-6 : une erreur dans un passage garde l’apparition et la retente, une seule ligne', function()
+            local character = newCharacter()
+            order(character)
+            coords[101] = setmetatable({}, { __index = function() error('lecture impossible') end })
+            net.forgetPosition(SRC)
+            advance(cfg.checkMs)
+            assert.equal(1, printedMatching('en erreur (retentée)'))
+            assert.equal(1, spawn.pendingCount())
+            assert.equal(1, #helper.timers)
+            advance(cfg.checkMs)
+            assert.equal(1, printedMatching('en erreur (retentée)'))
+            move(SRC, POINT.x, POINT.y, POINT.z)
+            advance(cfg.checkMs)
+            assert.same({ true }, { claim(character) })
+            assert.is_true(character.spawned)
+            assert.equal(1, #hookCalls)
+        end)
+
+        it('R-1 : jamais vu au point, le ped n’est plus relu qu’à chaque lateCheckMs ; une déclaration le relit', function()
+            local character = newCharacter()
+            order(character)
+            for _ = 1, cfg.graceMs // cfg.checkMs do advance(cfg.checkMs) end
+            assert.equal(1, printedMatching('jamais vu au point'))
+            reads[SRC] = 0
+            for _ = 1, cfg.lateCheckMs // cfg.checkMs - 1 do advance(cfg.checkMs) end
+            assert.equal(0, reads[SRC])
+            advance(cfg.checkMs)
+            assert.equal(1, reads[SRC])
+            assert.equal(1, #helper.timers)
+            -- arrivé au point entre deux lectures espacées : la déclaration le relit aussitôt
+            move(SRC, POINT.x, POINT.y, POINT.z)
+            advance(cfg.checkMs)
+            assert.is_false(character.spawned)
+            assert.same({ true }, { claim(character) })
+            assert.is_true(character.spawned)
+            assert.equal(1, printedMatching('jamais vu au point'))
+        end)
+
+        it('R-1 : sans déclaration, confirmé d’office à la lecture espacée suivante', function()
+            local character = newCharacter()
+            order(character)
+            for _ = 1, cfg.graceMs // cfg.checkMs do advance(cfg.checkMs) end
+            move(SRC, POINT.x, POINT.y, POINT.z)
+            for _ = 1, cfg.lateCheckMs // cfg.checkMs - 1 do advance(cfg.checkMs) end
+            assert.is_false(character.spawned)
+            advance(cfg.checkMs)
+            assert.is_true(character.spawned)
+            assert.is_true(hookCalls[1].forced)
+        end)
+
+        it('R-2 : au plus maxPerCheck confirmations par passage, les suivantes au passage suivant', function()
+            cfg.maxPerCheck = 2
+            local list = { newCharacter(1, 7), newCharacter(2, 8), newCharacter(3, 9) }
+            for i = 1, 3 do
+                order(list[i])
+                move(i, POINT.x, POINT.y, POINT.z)
+            end
+            for _ = 1, cfg.graceMs // cfg.checkMs do advance(cfg.checkMs) end
+            assert.equal(2, #hookCalls)
+            assert.equal(1, spawn.pendingCount())
+            advance(cfg.checkMs)
+            assert.equal(3, #hookCalls)
+            for i = 1, 3 do assert.is_true(list[i].spawned) end
+            assert.equal(0, #helper.timers)
         end)
     end)
 end)
@@ -372,7 +555,7 @@ end)
 -- Le RPC de déclaration et l'API (server/players/characters.lua, server/players/api.lua) : le vrai fichier des
 -- personnages, sur des doublures de la base, des sessions, de la sauvegarde et de la diffusion.
 describe('vAvA.characters (apparition confirmée)', function()
-    local characters, handlers, sessions, coords, refreshed, hookCalls, now, realPrint
+    local characters, handlers, sessions, coords, refreshed, hookCalls, now, realPrint, lastOrder, rpcArgs
 
     local SRC = 1
     local POINT = { x = -269.4, y = -955.3, z = 31.2 }
@@ -380,7 +563,7 @@ describe('vAvA.characters (apparition confirmée)', function()
     before_each(function()
         helper.reset()
         now = 1000
-        handlers, sessions, coords, refreshed, hookCalls = {}, {}, {}, {}, {}
+        handlers, sessions, coords, refreshed, hookCalls, lastOrder, rpcArgs = {}, {}, {}, {}, {}, nil, {}
         realPrint = _G.print
         _G.print = function() end
         _G.GetGameTimer = function() return now end
@@ -390,7 +573,10 @@ describe('vAvA.characters (apparition confirmée)', function()
         _G.GetEntityCoords = function() return coords end
         _G.GetEntityHeading = function() return 0.0 end
         _G.GetPlayerRoutingBucket = function() return 0 end
-        _G.TriggerClientEvent = function() end
+        -- numéro du dernier ordre d'apparition reçu par le client (renvoyé avec sa déclaration)
+        _G.TriggerClientEvent = function(event, _, payload)
+            if event == vAvA.EVENTS.SPAWN then lastOrder = payload.seq end
+        end
         _G.msgpack = nil
         _G.TriggerClientEventInternal = nil
         _G.json = { decode = function() return {} end, encode = function() return '{}' end }
@@ -430,6 +616,7 @@ describe('vAvA.characters (apparition confirmée)', function()
                 assert.is_table(options.args)
                 assert.is_table(options.rateLimit)
                 handlers[name] = handler
+                rpcArgs[name] = options.args
                 return true
             end,
         }
@@ -466,13 +653,13 @@ describe('vAvA.characters (apparition confirmée)', function()
         assert.same({ true }, { handlers[vAvA.CHARACTER_RPC.SELECT](SRC, 7) })
         assert.same({ false }, { characters.isSpawned(SRC) })
 
-        assert.same({ true }, { handlers[SPAWNED](SRC) })
+        assert.same({ true }, { handlers[SPAWNED](SRC, lastOrder) })
         assert.same({ false }, { characters.isSpawned(SRC) })
         assert.equal(0, #hookCalls)
 
         coords = { x = POINT.x, y = POINT.y, z = POINT.z }
         vAvA.net.forgetPosition(SRC)
-        assert.same({ true }, { handlers[SPAWNED](SRC) })
+        assert.same({ true }, { handlers[SPAWNED](SRC, lastOrder) })
         assert.same({ true }, { characters.isSpawned(SRC) })
         assert.same({ source = SRC, accountId = 3, characterId = 7, forced = false }, hookCalls[1])
         assert.same({ SRC }, refreshed)
@@ -484,6 +671,93 @@ describe('vAvA.characters (apparition confirmée)', function()
         assert.same({ true }, { characters.unload(SRC) })
         assert.equal(0, vAvA.spawn.pendingCount())
         assert.same({ false, 'no_character' }, { characters.isSpawned(SRC) })
+    end)
+
+    -- relecture sécurité S-1 : le hook unloading et la sauvegarde cèdent la main (ici, les passages de la confirmation
+    -- tournent pendant qu'ils s'exécutent) ; le ped arrive au point pendant ce temps
+    describe('déchargement pendant une apparition en attente (S-1)', function()
+        local begins, character
+
+        --- Fait passer le temps puis déclenche les minuteries en attente.
+        local function advance(ms)
+            now = now + ms
+            local due = helper.timers
+            helper.timers = {}
+            for i = 1, #due do due[i].fn() end
+        end
+
+        local function pedAtPoint()
+            coords = { x = POINT.x, y = POINT.y, z = POINT.z }
+            vAvA.net.forgetPosition(SRC)
+        end
+
+        before_each(function()
+            begins = 0
+            local realBegin = vAvA.playtime.begin
+            vAvA.playtime.begin = function(c)
+                begins = begins + 1
+                return realBegin(c)
+            end
+            assert.same({ true }, { handlers[vAvA.CHARACTER_RPC.SELECT](SRC, 7) })
+            character = nil
+            characters.forEachActive(function(c) character = c end)
+            assert.is_table(character)
+        end)
+
+        it('déclaré tôt, ped au point pendant le hook unloading : jamais apparu, aucun hook, aucun temps de jeu', function()
+            assert.same({ true }, { handlers[vAvA.CHARACTER_RPC.SPAWNED](SRC, lastOrder) })   -- ped encore ailleurs
+            assert.equal(0, #hookCalls)
+            vAvA.hooks.subscribe('vava_test', 'after', 'core:character:unloading', function()
+                pedAtPoint()
+                advance(vAvA.config.server.spawn.confirm.checkMs)
+            end)
+            assert.same({ true }, { characters.unload(SRC) })
+            assert.equal(0, #hookCalls)
+            assert.equal(0, begins)
+            assert.is_false(character.spawned)
+            assert.is_nil(character.playMarker)
+            assert.same({}, refreshed)
+            assert.equal(0, vAvA.spawn.pendingCount())
+            assert.equal(0, #helper.timers)
+        end)
+
+        it('rien déclaré, ped au point pendant la sauvegarde au-delà du délai de grâce : pas de confirmation d’office', function()
+            local confirm = vAvA.config.server.spawn.confirm
+            vAvA.persistence.saveCharacter = function()
+                pedAtPoint()
+                advance(confirm.checkMs)
+                advance(confirm.graceMs)
+            end
+            assert.same({ true }, { characters.unload(SRC) })
+            assert.equal(0, #hookCalls)
+            assert.equal(0, begins)
+            assert.is_false(character.spawned)
+            assert.equal(0, #helper.timers)
+        end)
+
+        it('déclaration pendant le déchargement : refusée (session plus active)', function()
+            local answer
+            vAvA.hooks.subscribe('vava_test', 'after', 'core:character:unloading', function()
+                pedAtPoint()
+                answer = { handlers[vAvA.CHARACTER_RPC.SPAWNED](SRC, lastOrder) }
+            end)
+            assert.same({ true }, { characters.unload(SRC) })
+            assert.same({ false, 'no_character' }, answer)
+            assert.equal(0, #hookCalls)
+            assert.equal(0, begins)
+        end)
+    end)
+
+    it('S-2 : la déclaration porte le numéro de l’ordre (entier borné) ; un autre numéro ne compte pas', function()
+        local SPAWNED = vAvA.CHARACTER_RPC.SPAWNED
+        assert.same({ { type = 'integer', min = 1, max = vAvA.spawn.MAX_ORDER } }, rpcArgs[SPAWNED])
+        assert.same({ true }, { handlers[vAvA.CHARACTER_RPC.SELECT](SRC, 7) })
+        coords = { x = POINT.x, y = POINT.y, z = POINT.z }
+        vAvA.net.forgetPosition(SRC)
+        assert.same({ false, 'not_ordered' }, { handlers[SPAWNED](SRC, lastOrder + 1) })
+        assert.same({ false }, { characters.isSpawned(SRC) })
+        assert.same({ true }, { handlers[SPAWNED](SRC, lastOrder) })
+        assert.same({ true }, { characters.isSpawned(SRC) })
     end)
 
     it('config de la confirmation invalide : les RPC des personnages ne s’ouvrent pas', function()
