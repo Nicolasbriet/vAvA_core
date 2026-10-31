@@ -97,6 +97,16 @@ function Bridge.IsArmed()
     return ok and type(weapon) == 'table'
 end
 
+--- Prévient `handler()` quand ce que tient le personnage local change (champ `vava_inventory:hands`, hook local
+--- `core:character:fieldChanged` du core) : un rappel « rangez votre arme » par arme sortie. Aucune lecture du
+--- personnage ici : seul le nom du champ est comparé.
+---@param handler fun()
+function Bridge.OnHandsChanged(handler)
+    VavaMagic.core.hooks.after('core:character:fieldChanged', function(payload)
+        if type(payload) == 'table' and payload.field == LINKS.INVENTORY_HANDS then handler() end
+    end)
+end
+
 --- Cible verrouillée par le système de verrouillage du serveur : numéro serveur du joueur, ou nil (visée libre).
 --- Ici, celui de la magie (clic molette).
 ---@return integer|nil

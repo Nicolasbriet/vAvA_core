@@ -3,13 +3,19 @@ local helper = require('tests.helper')
 -- Mains vides pour incanter (T-140, vava_magic 2.10.0), côté serveur : bridge/server.lua (HandsBusy, lu par les exports
 -- `armed` et `shield` de vava_combat) et server/casting.lua (début et fin), avec des doublures : exports de vava_combat
 -- réglables, état des ressources, horloge fixe, fiche, mana, monde et sorts simulés.
---   HandsBusy : `armed` si une arme est tenue ; `shielded` si un bouclier est au bras (`shield().ready`) ; rien pour un
---     bouclier dans le dos, vava_combat absent, pas prêt ou en erreur (une ligne de console par minute au plus) ;
---   incantation : refusée au début (rien n'est réservé, aucune incantation en cours) ; brisée à la fin si l'arme a été
---     prise pendant (mana intacte, aucun temps de recharge) ; sans vava_combat, aucune restriction.
+--   HandsBusy : `armed` si une arme de GTA est sortie (ped lu par le serveur) ou une arme tenue ; `shielded` si un
+--     bouclier est au bras (`shield().ready`) ; rien pour un bouclier dans le dos, vava_combat absent, pas prêt ou en
+--     erreur (une ligne de console par minute au plus ; `not_ready` signalé s'il dure une minute) ;
+--   incantation : refusée au début, après les recharges (rien n'est réservé, aucune incantation en cours) ; brisée dès
+--     qu'une arme passe en main (hook `vava_inventory:hold` after), et à la fin si l'arme a été prise pendant (mana
+--     intacte, aucun temps de recharge) ; sans vava_combat, aucune restriction.
 describe('vava_magic : mains vides pour incanter (serveur)', function()
     local Bridge, casting
     local now, combatState, weapon, weaponCode, shield, armedCalls, shieldCalls, warnings, spent
+    local pedWeapon, peds, hooks, clientEvents
+
+    local UNARMED_SIGNED = -1569615261   -- GetHashKey('WEAPON_UNARMED') tel que le rend Lua dans FiveM
+    local PISTOL = 453432689             -- WEAPON_PISTOL
 
     local CASTER = 3
     local SPELL = 'lueur'
@@ -24,9 +30,17 @@ describe('vava_magic : mains vides pour incanter (serveur)', function()
         })
         now, combatState, weapon, weaponCode, shield = 1000, 'started', nil, 'no_weapon', nil
         armedCalls, shieldCalls, warnings, spent = 0, 0, {}, 0
+        pedWeapon, peds, hooks, clientEvents = UNARMED_SIGNED, { [CASTER] = 101 }, {}, {}
 
         _G.GetGameTimer = function() return now end
-        _G.TriggerClientEvent = function() end
+        _G.TriggerClientEvent = function(event, target, ...)
+            clientEvents[#clientEvents + 1] = { event = event, target = target, args = { ... } }
+        end
+        _G.GetPlayerPed = function(src) return peds[src] or 0 end
+        _G.GetSelectedPedWeapon = function(ped)
+            assert.equal(101, ped)
+            return pedWeapon
+        end
         _G.GetResourceState = function(name) return name == 'vava_combat' and combatState or 'missing' end
         local combat = {
             armed = function(src)
@@ -57,7 +71,10 @@ describe('vava_magic : mains vides pour incanter (serveur)', function()
             hooks = {
                 runBefore = function() return true end,
                 runAfter = function() return true end,
-                after = function() return 1 end,
+                after = function(name, fn)
+                    hooks[name] = fn
+                    return 1
+                end,
             },
         }
         helper.load('modules/vava_magic/bridge/server.lua')
@@ -105,6 +122,7 @@ describe('vava_magic : mains vides pour incanter (serveur)', function()
 
     after_each(function()
         _G.TriggerClientEvent, _G.GetResourceState, _G.exports = nil, nil, nil
+        _G.GetPlayerPed, _G.GetSelectedPedWeapon = nil, nil
         VavaMagic = nil
     end)
 
@@ -167,6 +185,59 @@ describe('vava_magic : mains vides pour incanter (serveur)', function()
             end })
             assert.is_nil(Bridge.HandsBusy(CASTER))
             assert.equal(1, #warnings)
+        end)
+
+        it('arme de GTA sortie (lue sur le ped) : armed, même sans vava_combat ; hash signé ou non', function()
+            pedWeapon = PISTOL
+            assert.equal('armed', Bridge.HandsBusy(CASTER))
+            assert.equal(0, armedCalls)
+            combatState = 'missing'
+            assert.equal('armed', Bridge.HandsBusy(CASTER))
+            pedWeapon = 0xA2719263
+            assert.is_nil(Bridge.HandsBusy(CASTER))
+            pedWeapon = UNARMED_SIGNED
+            assert.is_nil(Bridge.HandsBusy(CASTER))
+        end)
+
+        it('ped absent ou arme illisible : pas d’arme de GTA, sans bruit', function()
+            peds[CASTER] = nil
+            assert.is_nil(Bridge.HandsBusy(CASTER))
+            peds[CASTER] = 101
+            pedWeapon = 0
+            assert.is_nil(Bridge.HandsBusy(CASTER))
+            pedWeapon = nil
+            assert.is_nil(Bridge.HandsBusy(CASTER))
+            assert.equal(0, #warnings)
+        end)
+
+        it('vava_combat pas prêt qui dure : une ligne de console après une minute, puis une par minute au plus', function()
+            weaponCode = 'not_ready'
+            assert.is_nil(Bridge.HandsBusy(CASTER))
+            now = now + 59999
+            assert.is_nil(Bridge.HandsBusy(CASTER))
+            assert.equal(0, #warnings)
+            now = now + 1
+            assert.is_nil(Bridge.HandsBusy(CASTER))
+            assert.equal(1, #warnings)
+            assert.truthy(warnings[1]:find('pas prêt', 1, true))
+            now = now + 30000
+            assert.is_nil(Bridge.HandsBusy(CASTER))
+            assert.equal(1, #warnings)
+            now = now + 30000
+            assert.is_nil(Bridge.HandsBusy(CASTER))
+            assert.equal(2, #warnings)
+            -- prêt de nouveau : le compte repart de zéro
+            weaponCode = 'no_weapon'
+            assert.is_nil(Bridge.HandsBusy(CASTER))
+            weaponCode = 'not_ready'
+            now = now + 120000
+            assert.is_nil(Bridge.HandsBusy(CASTER))
+            assert.equal(2, #warnings)
+        end)
+
+        it('OnHold s’abonne au hook vava_inventory:hold (after)', function()
+            assert.is_true(Bridge.OnHold(function() end))
+            assert.is_function(hooks['vava_inventory:hold'])
         end)
     end)
 
@@ -251,6 +322,90 @@ describe('vava_magic : mains vides pour incanter (serveur)', function()
                 now = now + VavaMagic.config.casting.globalCooldownMs + VavaMagic.config.spells[SPELL].levels[1].cooldownMs
             end
             assert.equal(1, #warnings)
+        end)
+
+        local function abortsTo(code)
+            local found = nil
+            for _, e in ipairs(clientEvents) do
+                if e.event == VavaMagic.EVENTS.CAST_ABORT then found = e end
+            end
+            assert.is_table(found)
+            assert.equal(CASTER, found.target)
+            assert.equal(code, found.args[2])
+        end
+
+        it('arme prise puis reposée avant la fin : brisée dès la prise, rien de dépensé', function()
+            local hold = hooks['vava_inventory:hold']
+            assert.is_function(hold)
+            local ok, info = casting.begin(CASTER, SPELL)
+            assert.is_true(ok, tostring(info))
+            weapon = { item = 'epee_courte' }
+            hold({ source = CASTER, instanceId = 12, item = 'epee_courte', previous = 0 })
+            assert.is_nil(casting.current(CASTER))
+            abortsTo('armed')
+            weapon = nil
+            hold({ source = CASTER, instanceId = 0, previous = 12 })
+            now = now + info.ms
+            local done, code = casting.finish(CASTER, SPELL, info.id)
+            assert.is_false(done)
+            assert.equal('no_cast', code)
+            assert.equal(0, spent)
+            assert.equal(0, casting.cooldownLeft(42, SPELL))
+        end)
+
+        it('bouclier passé au bras pendant l’incantation (hook) : brisée (shielded)', function()
+            local ok, info = casting.begin(CASTER, SPELL)
+            assert.is_true(ok, tostring(info))
+            shield = { item = 'bouclier_rond', ready = true }
+            hooks['vava_inventory:hold']({ source = CASTER, instanceId = 0, previous = 12 })
+            assert.is_nil(casting.current(CASTER))
+            abortsTo('shielded')
+        end)
+
+        it('outil pris pendant l’incantation, ou geste d’un joueur qui n’incante pas : rien ne change', function()
+            local hold = hooks['vava_inventory:hold']
+            hold({ source = 9, instanceId = 5, item = 'epee_courte', previous = 0 })
+            assert.equal(0, armedCalls)
+            local ok, info = casting.begin(CASTER, SPELL)
+            assert.is_true(ok, tostring(info))
+            hold({ source = CASTER, instanceId = 7, item = 'hache_fer', previous = 0 })
+            hold('bruit')
+            assert.is_table(casting.current(CASTER))
+            now = now + info.ms
+            assert.is_true((casting.finish(CASTER, SPELL, info.id)))
+        end)
+
+        it('arme de GTA sortie : début refusé ; sortie pendant l’incantation : brisée à la fin', function()
+            pedWeapon = PISTOL
+            local ok, code = casting.begin(CASTER, SPELL)
+            assert.is_false(ok)
+            assert.equal('armed', code)
+            pedWeapon = UNARMED_SIGNED
+            local started, info = casting.begin(CASTER, SPELL)
+            assert.is_true(started, tostring(info))
+            now = now + info.ms
+            pedWeapon = PISTOL
+            local done, refusal = casting.finish(CASTER, SPELL, info.id)
+            assert.is_false(done)
+            assert.equal('armed', refusal)
+            assert.equal(0, spent)
+        end)
+
+        it('en recharge : refusé pour la recharge, sans interroger vava_combat (R-4)', function()
+            local ok, info = casting.begin(CASTER, SPELL)
+            assert.is_true(ok, tostring(info))
+            now = now + info.ms
+            assert.is_true((casting.finish(CASTER, SPELL, info.id)))
+            local calls = armedCalls
+            weapon = { item = 'epee_courte' }
+            local refused, code = casting.begin(CASTER, SPELL)
+            assert.is_false(refused)
+            assert.equal('global_cooldown', code)
+            now = now + VavaMagic.config.casting.globalCooldownMs
+            refused, code = casting.begin(CASTER, SPELL)
+            assert.is_false(refused)
+            assert.equal('cooldown', code)
+            assert.equal(calls, armedCalls)
         end)
     end)
 end)

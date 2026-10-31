@@ -7,8 +7,7 @@
            la roue d'armes de GTA sont coupées à chaque image, seulement tant que la roue est ouverte. La page sait
            aussi quelle touche ferme la roue (si le jeu ne voit pas le relâchement). Un sort choisi arme en main
            (vava_combat) : « rangez votre arme » aussitôt.
-    Dépendances : shared/, config.lua, client/nui.lua, client/state.lua, client/messages.lua, client/controls.lua,
-                  client/keys.lua
+    Dépendances : shared/, config.lua, client/nui.lua, client/state.lua, client/controls.lua, client/keys.lua
 ]]
 
 local type, ipairs, sort = type, ipairs, table.sort
@@ -20,7 +19,6 @@ local DisableControlAction, HideHudComponentThisFrame = DisableControlAction, Hi
 local nui = VavaMagic.nui
 local state = VavaMagic.state
 local controls = VavaMagic.controls
-local messages = VavaMagic.messages
 local keys = VavaMagic.keys
 local cfg = VavaMagic.config
 local CENTER = 0.5
@@ -110,7 +108,7 @@ nui.on('wheel:choose', function(data)
         controls.select(nil)
     elseif type(data.spell) == 'string' and data.spell ~= '' then
         -- le sort est prêt, mais l'arme en main l'empêchera de partir : on le dit tout de suite
-        if controls.select(data.spell) and controls.armed() then messages.refuse('armed') end
+        if controls.select(data.spell) and controls.armed() then controls.noticeArmed(true) end
     end
     return { ok = true }
 end)

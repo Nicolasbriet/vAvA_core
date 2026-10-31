@@ -9,7 +9,8 @@
         (sorts qui le disent), un déplacement au-delà de ce que le sort permet, une arme prise en main, ou la touche
         d'annulation : le serveur est prévenu, aucune mana n'est consommée.
       - Sort qui permet de marcher (projectiles) : pas de course ni de saut, allure bridée ; c'est la seule boucle
-        par image du fichier, et seulement pendant l'incantation. Sinon les contrôles ont lieu toutes les 100 ms.
+        par image du fichier, et seulement pendant l'incantation. Sinon les contrôles ont lieu toutes les 100 ms
+        (`checkMs`) ; l'arme en main, toutes les 200 ms (`armedCheckMs`).
       - À la fin : arguments de fin du sort (direction visée…), demande au serveur, temps de recharge et délai global
         notés.
     Dépendances : shared/, config.lua, client/core.lua, bridge/client.lua, client/nui.lua, client/state.lua,
@@ -149,8 +150,6 @@ local function brokenBy(cast, ped)
     if IsEntityDead(ped) then return 'hurt' end
     if cast.hurtBreaks and GetEntityHealth(ped) < cast.health then return 'hurt' end
     if IsPedRagdoll(ped) or IsPedFalling(ped) then return 'ragdoll' end
-    -- arme prise en main pendant l'incantation : le serveur la refuserait à la fin
-    if bridge.IsArmed() then return 'armed' end
     local coords = GetEntityCoords(ped)
     if geometry.distance(cast.origin, coords) > cast.move then return 'moved' end
     return nil
@@ -205,7 +204,7 @@ function casting.start(spell, opts)
 
         local slow = spellCfg.moveSpeed
         local blend = slow and slow / WALK_SPEED
-        local nextCheck = 0
+        local nextCheck, nextArmed = 0, 0
         while active == cast do
             local now = GetGameTimer()
             if now - cast.startedAt >= cast.ms then break end
@@ -217,6 +216,11 @@ function casting.start(spell, opts)
             if now >= nextCheck then
                 nextCheck = now + cfg.checkMs
                 local reason = brokenBy(cast, ped)
+                -- arme prise en main (le serveur brise aussi l'incantation) : relevé plus lent, l'export lit le personnage
+                if not reason and now >= nextArmed then
+                    nextArmed = now + cfg.armedCheckMs
+                    if bridge.IsArmed() then reason = 'armed' end
+                end
                 if reason then
                     interrupt(reason)
                     return

@@ -7,7 +7,8 @@
         actif, il coupe à chaque image l'attaque, la visée et le changement d'arme de GTA (seule boucle par image du
         fichier) ; endormi, rien ne tourne. Sortir une arme (de GTA, ou de l'inventaire : `vava_combat:armed()`, lu
         par le bridge) ou monter en véhicule le coupe, le sort reste choisi ; viser ou lancer arme en main rappelle
-        « rangez votre arme » (au plus une fois par `controls.armedNoticeMs`). Le serveur refuse lui-même.
+        « rangez votre arme », une fois par arme sortie et jamais deux fois en moins de `controls.armedNoticeMs` (viser
+        ne réveille alors pas le mode). Le serveur refuse lui-même.
       - Clic droit maintenu : visée (réticule aux couleurs de l'élément, grisé hors de portée ; allure un peu
         ralentie ; aperçu au sol du point, du disque ou de la ligne visés — un ou deux segments —, du rayon autour de
         soi pour une zone centrée sur le lanceur, ou du cône devant lui). Clic gauche : le sort fait son geste (chaque sort
@@ -69,8 +70,10 @@ local probe = nil
 -- dernier point visé : { point, inRange, hit }
 local aimed = { point = nil, inRange = false, hit = false }
 local reticleKey = nil
--- dernier rappel « rangez votre arme » (touche pressée arme en main)
+-- rappel « rangez votre arme » : dernier instant, et déjà dit pour l'arme sortie (remis à faux quand les mains changent
+-- ou se libèrent)
 local armedNoticeAt = nil
+local armedNoticed = false
 
 --- Geste d'un sort au clic gauche : `controller.cast(info)` avec info = { aiming, point, inRange, direction, target }.
 ---@param name string
@@ -155,6 +158,7 @@ local function conditionsMet(ped)
     if not state.isMage() or not state.selected() or not state.level(state.selected()) then return false end
     if IsEntityDead(ped) or IsPedInAnyVehicle(ped, false) or IsPedRagdoll(ped) or IsPedFalling(ped) then return false end
     if handsTaken(ped) then return false end
+    armedNoticed = false
     -- la roue a le focus de la page : le mode reste actif derrière elle
     if (IsNuiFocused() and not wheelOpen()) or IsPauseMenuActive() then return false end
     return bridge.CanUseMagic()
@@ -391,7 +395,7 @@ function controls.castNow(name)
         return
     end
     if handsTaken(PlayerPedId()) then
-        messages.refuse('armed')
+        controls.noticeArmed(true)
         return
     end
     controller.cast({ aiming = false, inRange = false, direction = aim.direction(), target = lockedTargetFor(name) })
@@ -434,13 +438,17 @@ function controls.armed()
     return handsTaken(PlayerPedId())
 end
 
---- Touche de magie pressée arme en main, mode éveillé : « rangez votre arme », au plus une fois par `armedNoticeMs`
---- (la même touche peut servir à l'arme).
-local function noticeArmed()
-    if not awake or not handsTaken(PlayerPedId()) then return end
+--- « Rangez votre arme » : une fois par arme sortie (les touches peuvent servir aussi à l'arme), jamais deux fois en
+--- moins de `armedNoticeMs` ; `explicit` (roue, /lancer) : toujours dit, et compté pour les touches. L'appelant a vu
+--- les mains prises.
+---@param explicit? boolean
+function controls.noticeArmed(explicit)
     local now = GetGameTimer()
-    if armedNoticeAt and now - armedNoticeAt < controlsCfg.armedNoticeMs then return end
-    armedNoticeAt = now
+    if not explicit then
+        if armedNoticed then return end
+        if armedNoticeAt and now - armedNoticeAt < controlsCfg.armedNoticeMs then return end
+    end
+    armedNoticed, armedNoticeAt = true, now
     messages.refuse('armed')
 end
 
@@ -448,7 +456,7 @@ local function onCast()
     -- le clic qui choisit un sort dans la roue ne lance rien
     if wheelOpen() then return end
     if not controls.isActive() then
-        noticeArmed()
+        if awake and handsTaken(PlayerPedId()) then controls.noticeArmed() end
         return
     end
     local name = state.selected()
@@ -460,10 +468,14 @@ end
 
 local function onAimDown()
     if not state.isMage() or not state.selected() or wheelOpen() then return end
+    -- mains prises : le rappel seul, sans réveiller le mode ni viser (aucun relevé de 20 s pour rien)
+    if handsTaken(PlayerPedId()) then
+        controls.noticeArmed()
+        return
+    end
     controls.wake()
     aimSpec = controls.aimOf(state.selected())
     aiming = aimSpec ~= nil
-    noticeArmed()
 end
 
 local function onAimUp()
@@ -477,6 +489,9 @@ end
 state.onChange(function()
     if awake and (not state.isMage() or not state.selected()) then controls.sleep() end
 end)
+
+-- une autre arme (ou plus rien) en main : le prochain geste de magie arme en main sera rappelé
+bridge.OnHandsChanged(function() armedNoticed = false end)
 
 keys.bindHold('viser', onAimDown, onAimUp)
 keys.bind('lancer', onCast)

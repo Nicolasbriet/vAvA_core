@@ -2,11 +2,11 @@
     vava_magic/server/casting.lua
     Rôle : incantation commune à tous les sorts, décidée par le serveur.
       - Début (RPC du sort) : fiche chargée, mage, sort connu, une seule incantation à la fois, pas à terre ni en
-        véhicule, mains vides (ni arme tenue ni bouclier au bras, lus par vava_combat ; sans lui, aucune restriction),
-        empêchements des autres fichiers (état « chancelant »…), délai global entre deux sorts, temps de
-        recharge du sort, hook `vava_magic:castStarting` (annulable), validation propre au sort, mana. Position du
-        lanceur (lue côté serveur) et sa vie tenue par vava_health notées ; state bag « incantation » (sort et niveau)
-        sur son ped ; le sort est prévenu que l'incantation est acceptée (`started` : frisson de la cible
+        véhicule, empêchements des autres fichiers (état « chancelant »…), délai global entre deux sorts, temps de
+        recharge du sort, mains vides (ni arme de GTA, ni arme tenue, ni bouclier au bras : vava_combat ; sans lui,
+        seules les armes de GTA), hook `vava_magic:castStarting` (annulable), validation propre au sort, mana.
+        Position du lanceur (lue côté serveur) et sa vie tenue par vava_health notées ; state bag « incantation » (sort
+        et niveau) sur son ped ; le sort est prévenu que l'incantation est acceptée (`started` : frisson de la cible
         verrouillée…).
       - Blessure (sorts `interruptOnHurt`, vrai par défaut) : jamais lue sur le ped (un client qui garde sa vie GTA au
         maximum ne serait jamais interrompu). Un coup de la chaîne de dégâts ou une perte native qui retire de la vie
@@ -15,7 +15,8 @@
       - Fin (RPC du sort) : durée écoulée, déplacement (positions serveur), blessure et mains vides revérifiés.
         La mana est réservée avant l'effet du sort : rendue en entier s'il refuse, en partie s'il le dit (échec
         partiel) ; temps de recharge et délai global posés ; XP accordée (moitié pour un échec).
-      - Interruption (chute, blessure, déplacement, touche) : aucune mana consommée ; incantation sans fin
+      - Mains : une arme ou un bouclier pris pendant l'incantation (hook `vava_inventory:hold` after) la brise aussitôt.
+      - Interruption (chute, blessure, déplacement, mains prises, touche) : aucune mana consommée ; incantation sans fin
         abandonnée après sa durée et une marge.
     Les temps de recharge sont tenus par personnage : se reconnecter ne les efface pas.
     Dépendances : shared/, config.lua, server/core.lua, bridge/server.lua, server/world.lua, server/sheets.lua,
@@ -211,13 +212,14 @@ function casting.begin(src, name, ...)
     if casts[src] then return false, 'busy' end
     if bridge.IsDowned(src) then return false, 'downed' end
     if world.inVehicle(src) then return false, 'in_vehicle' end
-    local hands = bridge.HandsBusy(src)
-    if hands then return false, hands end
     local blocker = blocked(src)
     if blocker then return false, blocker end
     if casting.globalLeft(sheet.characterId) > 0 then return false, 'global_cooldown' end
     local left = casting.cooldownLeft(sheet.characterId, name)
     if left > 0 then return false, 'cooldown', ceil(left / MS_PER_SECOND) end
+    -- après les refus tenus en mémoire : une demande en recharge ne paie pas les exports de vava_combat
+    local hands = bridge.HandsBusy(src)
+    if hands then return false, hands end
     local origin = world.position(src)
     if not origin then return false, 'no_position' end
 
@@ -323,11 +325,26 @@ local function onHit(payload)
     if cast and not cast.finishing then cast.hurt = true end
 end
 
---- Suit les coups de la chaîne de dégâts (hook `vava_health:hit` after). Appelé pendant le setup du module.
+--- Une arme ou un bouclier vient de passer en main (hook `vava_inventory:hold` after) : l'incantation en cours de ce
+--- joueur se brise aussitôt, rien n'est dépensé (une arme prise puis reposée avant la fin ne passe pas). Le contrôle de
+--- la fin reste. Appelé dans un hook de l'inventaire : lectures synchrones, ne cède jamais la main.
+---@param payload table  { source, instanceId, item, previous, owner }
+local function onHold(payload)
+    local src = type(payload) == 'table' and payload.source or nil
+    local cast = src and casts[src]
+    if not cast or cast.finishing then return end
+    local code = bridge.HandsBusy(src)
+    if code then casting.abort(src, code, true) end
+end
+
+--- Suit les coups de la chaîne de dégâts (hook `vava_health:hit` after) et les mains (hook `vava_inventory:hold`
+--- after). Appelé pendant le setup du module.
 ---@return boolean ok
 ---@return string|nil err
 function casting.start()
-    return bridge.OnHit(onHit)
+    local ok, err = bridge.OnHit(onHit)
+    if not ok then return false, err end
+    return bridge.OnHold(onHold)
 end
 
 --- Interruption demandée par le client (rien n'est consommé).
