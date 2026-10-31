@@ -674,6 +674,14 @@ versé à T-014 ; les autres points déjà couverts sont précisés dans T-012 �
 - Critères : `config_split_spec` T0 à T4 verts ; essai du ciel sur la vue client (`time_client_view_spec`) et tirages
   inchangés au serveur (`time_weather_spec`) ; comparaison clé par clé de la config ; gain mesuré par
   `scripts/poids-client.sh` ; temps 2-x en jeu (`docs/tests/temps.md`).
+- Fait le 31 octobre 2026 (branche `agents/T-146`) : `vava_time` 1.5.0 — `shared/weather.lua` réduit à `get`, `ids`,
+  `progress` (ne garde que `weather.types`) ; tirage dans `shared/cycle.lua` au seul serveur ; `weather.next`, `seasons`,
+  `snow`, `durationMinutes`, `durations` et `fadeSeconds` posés par `config.lua` (`fadeSeconds` aussi : aucun fichier
+  client ne le lit, T4) ; refus de démarrer avec un `config.lua` de 1.4.0, avertissement pour un `config_client.lua` de
+  1.4.0, texte de l'ancienne forme précisé (R-5 de T-142). Config du serveur identique à `main` (262 feuilles, 0
+  différence), tirages identiques (103 829 comparaisons). 4 844 octets de moins par joueur (1 282 compressés). Rapport
+  `docs/plan/rapports/T-146.md`. Relectures sécurité et réseau à faire. **À tester en jeu** : `docs/tests/reseau.md`
+  § 7-E.
 
 ## Phase 2 — Arrivée
 

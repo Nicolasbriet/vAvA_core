@@ -773,7 +773,8 @@ Réglages d'un module (T-132, aucune API du core) : chaque module lit sa config 
 `vava_atelier` 1.2.0, `vava_arrival` 1.2.0 ; `vava_chancellerie` 1.7.1 ne sert plus rien aux joueurs ; métiers (T-141) :
 `vava_skills` 1.3.0, `vava_farming` 1.8.0, `vava_crafting` 1.6.0, `vava_gathering` 1.7.0, `vava_provisions` 1.1.0 (1.2.0 :
 textes du Conseil au seul serveur, `shared/rules.lua` au seul serveur, `shared/texts.lua` partagé) ;
-socle (T-142) : `vava_inventory` 1.9.0, `vava_combat` 1.1.0, `vava_health` 1.5.0, `vava_time` 1.4.0, `vava_codex` 1.6.0,
+socle (T-142) : `vava_inventory` 1.9.0, `vava_combat` 1.1.0, `vava_health` 1.5.0, `vava_time` 1.4.0 (1.5.0 : cours des
+ciels et son tirage au seul serveur, T-146), `vava_codex` 1.6.0,
 `vava_admin` 1.9.0, `vava_voice` 1.4.0, `vava_chat` 1.4.0, `vava_cameras` 1.5.0, `vava_appearance` 1.1.0,
 `vava_needs` 1.3.0, `vava_world` 1.2.0, exemples `vava_anim_test` 1.2.0, `vava_dev_characters` 1.4.0,
 `vava_example_combat` 1.2.0 ; les ressources sans partie serveur n'ont que `config_client.lua` (`client_scripts`) :
