@@ -1,7 +1,8 @@
 --[[
     vava_magic/bridge/server.lua
     Rôle : SEUL point de contact, côté serveur, entre la magie et le core / les autres modules : personnage, droits du
-           Conseil, notifications, objets de l'inventaire, sauvegarde de la fiche, base de données, santé.
+           Conseil, notifications, objets de l'inventaire, sauvegarde de la fiche, base de données, santé (chaîne de
+           dégâts de vava_health : coups des sorts, vie tenue par le serveur, hook des coups, modificateurs).
            Pour brancher la magie sur un autre core, réécrire les fonctions de ce fichier (et de bridge/client.lua) :
            le reste du module ne connaît qu'elles.
     Implémentation : vAvA_core (API documentée dans docs/api.md) et ses modules officiels. Chaque appel à une autre
@@ -265,21 +266,30 @@ Bridge.db = {
     update = function(sql, params) return core.db.update(sql, params) end,
 }
 
--- Santé (vava_health) --------------------------------------------------------------------------------------------
+-- Santé et chaîne de dégâts (vava_health ≥ 1.3.0) -----------------------------------------------------------------
 
---- Blesse un joueur d'une part de sa vie (0 à 1). Avec vava_health, il fait appliquer la blessure et gère la mise à
---- terre ; sans lui, le seul client de la victime l'applique (la vie d'un joueur lui appartient dans GTA).
+--- Coup porté par un sort : `exports.vava_health:hit(cible, paquet)` (paquet de shared/harm.lua). Rend le résultat de
+--- la chaîne (`applied`, `absorbed`, `cancelled`…), ou nil et un code : celui de vava_health, ou `health_unavailable`
+--- quand il est arrêté ou en erreur. Sans vava_health, aucun sort ne blesse personne (plus aucun repli chez le client).
 ---@param target integer
----@param part number
----@return boolean ok
----@return string|nil code  refus de vava_health (à terre, pas encore apparu…)
-function Bridge.ApplyDamage(target, part)
-    if GetResourceState(LINKS.HEALTH) == 'started' then
-        local called, ok, code = call(LINKS.HEALTH, 'damage', target, part)
-        if called then return ok == true, code end
-    end
-    TriggerClientEvent(EVENTS.DAMAGE, target, part)
-    return true
+---@param packet table
+---@return table|nil result
+---@return string|nil code
+function Bridge.Hit(target, packet)
+    local called, result, code = call(LINKS.HEALTH, 'hit', target, packet)
+    if not called then return nil, 'health_unavailable' end
+    if type(result) ~= 'table' then return nil, type(code) == 'string' and code or 'refused' end
+    return result
+end
+
+--- Vie du joueur tenue par le serveur de vava_health (0 à 1, 0 à terre), ou nil (vava_health absent, personnage
+--- non suivi). Jamais lue sur le ped : un client qui garde sa vie GTA au maximum n'y gagne rien.
+---@param source integer
+---@return number|nil
+function Bridge.GetHealth(source)
+    local called, state = call(LINKS.HEALTH, 'get', source)
+    if not called or type(state) ~= 'table' or type(state.health) ~= 'number' then return nil end
+    return state.health
 end
 
 ---@param source integer
@@ -289,14 +299,64 @@ function Bridge.IsDowned(source)
     return called and downed == true
 end
 
---- Déclare les objets et suit les redémarrages de l'inventaire. Appelé pendant le setup du module.
+--- Prévient `handler` après chaque coup de la chaîne et chaque perte native (hook `vava_health:hit` after :
+--- { target, applied, … }). Le hook appartient au core : l'abonnement survit aux redémarrages de vava_health.
+---@param handler fun(payload: table)
+---@return boolean ok
+---@return string|nil err
+function Bridge.OnHit(handler)
+    local id, err = core.hooks.after(LINKS.HEALTH_HIT, handler)
+    if not id then return false, err end
+    return true
+end
+
+-- modificateurs de la chaîne : clé → { stage, priority?, label, apply } ; (re)déclarés quand vava_health démarre
+local modifiers = {}
+-- points d'une vie pleine pour la chaîne (vocabulary), relus à chaque déclaration
+local chainPoints = nil
+
+local function declareModifiers()
+    local registry = core.registry
+    if not registry.exists(LINKS.HEALTH_MODIFIERS) then return end
+    local called, vocabulary = call(LINKS.HEALTH, 'vocabulary')
+    if called and type(vocabulary) == 'table' and type(vocabulary.healthPoints) == 'number' then
+        chainPoints = vocabulary.healthPoints
+    end
+    for key, definition in pairs(modifiers) do
+        if not registry.has(LINKS.HEALTH_MODIFIERS, key) then
+            local ok, err = registry.add(LINKS.HEALTH_MODIFIERS, key, definition)
+            if not ok then VavaMagic.log.warn("modificateur '%s' non déclaré : %s", key, tostring(err)) end
+        end
+    end
+end
+
+--- Modificateurs de la chaîne de dégâts tenus par la magie (au plus un par étape ; clés `vava_magic:…`) : déclarés au
+--- registre `vava_health:modifiers` s'il existe, puis à chaque démarrage de vava_health (le registre disparaît avec
+--- lui). Chaque `apply(ctx)` lit les données de la magie et rend un résultat, sans jamais céder la main.
+---@param list table<string, table>
+function Bridge.SetModifiers(list)
+    modifiers = list
+    if VavaMagic.ready then declareModifiers() end
+end
+
+--- Points d'une vie pleine pour la chaîne (vava_health `vocabulary().healthPoints`), nil s'ils ne sont pas connus.
+---@return number|nil
+function Bridge.ChainHealthPoints()
+    return chainPoints
+end
+
+--- Déclare les objets et les modificateurs, et suit les redémarrages de l'inventaire et de vava_health. Appelé
+--- pendant le setup du module.
 ---@return boolean ok
 ---@return string|nil err
 function Bridge.start()
     for name in pairs(usable) do declare(name) end
+    declareModifiers()
     local id, err = core.hooks.after('core:module:ready', function(payload)
         if payload.name == LINKS.INVENTORY then
             for name in pairs(usable) do declare(name) end
+        elseif payload.name == LINKS.HEALTH then
+            declareModifiers()
         end
     end)
     if not id then return false, err end

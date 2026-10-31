@@ -9,9 +9,11 @@ ardente**), d'eau (**Trait de glace**, **Vague**, **Brume**) et de terre (**Proj
 **Lueur** et **Murmure**, grimoire et registre des murmures (objets), commandes du Conseil. Le serveur décide de tout ;
 le client affiche et demande.
 
-Version 2.7.0 : les cinq étapes de la refonte (noyau, roue et contrôles ; états, zones et feu ; eau et terre ;
+Version 2.9.0 : les cinq étapes de la refonte (noyau, roue et contrôles ; états, zones et feu ; eau et terre ;
 combinaisons ; finitions : traces au sol, sons par fichier ou natifs, documentation et tests), puis leurs correctifs ;
-le registre des murmures s'envoie par lots (2.7.0).
+le registre des murmures s'envoie par lots (2.7.0) ; polices et papier de vava_ui (2.8.0) ; les blessures des sorts
+passent par la **chaîne de dégâts** de vava_health, boucliers, résistances et zones de paix en modificateurs, une
+blessure ne se lit plus sur le ped (2.9.0, T-116 : voir « Blessures et chaîne de dégâts »).
 Rien n'a encore été joué en vrai : voir « À vérifier en jeu », « Tests à faire en jeu » et la procédure complète
 `docs/tests/magie.md`.
 
@@ -41,7 +43,7 @@ Rien n'a encore été joué en vrai : voir « À vérifier en jeu », « Tests �
 | `vava_ui` ≥ 1.0.0 | polices (Cinzel Decorative comprise), grain, papier et coins de la page (`nui://vava_ui/…`) | obligatoire (dépendance déclarée : démarrée d'office, à ne jamais arrêter sur un serveur ouvert) |
 | `vava_inventory` ≥ 1.3.0 | grimoire et registre (objets, métadonnées) | pas d'objets ; `/grimoire` reste |
 | `vava_hud` | notifications | notifications de GTA (la barre de mana est celle du module) |
-| `vava_health` | blessures, état « à terre » (aucun sort ne touche un joueur à terre) | la victime applique la blessure elle-même |
+| `vava_health` ≥ 1.3.0 | blessures par la chaîne de dégâts (`hit`), vie tenue par le serveur, état « à terre » (aucun sort ne touche un joueur à terre) | **aucun sort ne blesse personne** (le lanceur le lit, une fois par minute ; console) ; rien n'interrompt une incantation |
 | `vava_admin` | droits et journal du Conseil ; ≥ 1.6.0 : la fin d'un Gel ne libère pas un joueur immobilisé par le Registre | permission ACE `magie.admin`, journal en console |
 | `vava_chat` | réponses des commandes et suggestions (évènements `chat:*`, aussi ceux de la ressource « chat » de FiveM) | touches seulement |
 
@@ -51,8 +53,10 @@ Rien n'a encore été joué en vrai : voir « À vérifier en jeu », « Tests �
 vava_magic/
   fxmanifest.lua · config.lua · README.md
   shared/   constants.lua · text.lua (UTF-8) · progression.lua · geometry.lua · pages.lua (lots du registre)
+            harm.lua (blessures sur la chaîne : servi au seul serveur)
   bridge/   server.lua · client.lua                 ← seul contact avec le core et les autres modules
-  server/   core · world · sheets · mana · spells · progression · combat · states (états) · obstacles (remparts…)
+  server/   core · world · sheets · mana · spells · progression · combat (coups par la chaîne) · protections
+            (boucliers, résistances, zones de paix : modificateurs) · states (états) · obstacles (remparts…)
             zones (au sol) · grounds (sol mouillé) · combos (combinaisons) · projectiles (noyau commun) · registers
             sigils · casting · admin · api · main
             spells/murmure · lueur · boule_de_feu · mur_de_flammes · nova_ardente · trait_de_glace · vague · brume
@@ -90,7 +94,10 @@ Le noyau utilise en plus l'infrastructure du core (`core.rpc` à schéma strict 
 | `RegisterUsableItem(objet, définition, rappel)` | objet du registre `vava_inventory:items`, avec `onUse` |
 | `DefineSheet` · `LoadSheet` · `SaveSheet` | champ de personnage privé `vava_magic:sheet` |
 | `db.*` | `core.db` (requêtes paramétrées des tables du module) |
-| `ApplyDamage(cible, part)` · `IsDowned(source)` | `vava_health:damage` · `isDowned` ; sinon l'évènement `vava_magic:damage` |
+| `Hit(cible, paquet)` | `vava_health:hit` (chaîne de dégâts) ; sans lui : `nil, 'health_unavailable'`, aucun dégât |
+| `GetHealth(source)` · `IsDowned(source)` | `vava_health:get().health` (vie tenue par le serveur) · `isDowned` |
+| `OnHit(rappel)` | hook `vava_health:hit` (after) : une blessure du lanceur brise son incantation |
+| `SetModifiers(liste)` · `ChainHealthPoints()` | registre `vava_health:modifiers` (redéclarés à chaque démarrage de vava_health) · `vocabulary().healthPoints` |
 
 | Fonction client | Implémentation vAvA |
 | --- | --- |
@@ -98,11 +105,11 @@ Le noyau utilise en plus l'infrastructure du core (`core.rpc` à schéma strict 
 | `IsDowned()` | `vava_health:get().downed` |
 | `CanUseMagic()` | ni mort, ni à terre, ni menotté (`IsPedCuffed`), ni assommé |
 | `GetLockedTarget()` | cible du verrouillage de ce module (clic molette), numéro serveur ou nil |
-| `ApplyMagicDamage(part, lanceur, sort)` | sans vava_health : `ApplyDamageToPed` sur ordre du serveur |
 | `ChatLines` · `ChatSuggestion` | `chat:addMessage` · `chat:addSuggestion` |
 
-Les dégâts restent décidés et appliqués par le serveur (`ApplyDamage` → vava_health) : un tricheur ne peut pas ignorer
-une blessure. `ApplyMagicDamage` n'est que le repli sans vava_health.
+Les dégâts sont décidés par le serveur et appliqués par la chaîne de dégâts de vava_health (`Hit`), qui tient la vie :
+un tricheur ne peut pas ignorer une blessure. Aucun repli chez le client (2.9.0) : sans vava_health, les sorts ne
+blessent personne.
 
 ## Commandes et touches du joueur
 
@@ -256,6 +263,53 @@ Règles de bon sens, sans combinaison : être trempé (sol mouillé, brume) éte
 par chaque client pendant le vol (il voit les zones) ; le serveur décide de l'effet à l'impact d'après les zones que le
 trajet a traversées.
 
+## Blessures et chaîne de dégâts
+
+Depuis 2.9.0 (T-116), chaque blessure d'un sort est un coup de la **chaîne de dégâts commune** de vava_health
+(`docs/plan/COMBAT_V1.md`, `docs/api.md` § vava_health) : `exports.vava_health:hit(cible, paquet)`, appelé par le
+bridge. Plus aucun sort n'appelle `damage`.
+
+| Champ du paquet | Valeur |
+| --- | --- |
+| `amount` | les points du sort (une vie pleine au plus, comme avant), à l'échelle de la chaîne : 100 de part et d'autre, le montant est celui du sort tel quel |
+| `kind` | type de l'élément (`combat.kinds`) : `feu` (Boule de feu, Mur de flammes, Nova ardente, brûlure, roche ardente), `eau` (Trait de glace, vapeur), `terre` (Projectile de roche, Secousse) |
+| `source` · `sourceCharacter` | le lanceur et son personnage ; un lanceur parti reste la source (son mur, sa brûlure blessent encore) ; un lanceur qui joue un autre personnage ne l'est plus (le coup reste signé du premier) |
+| `spell` | le sort (ou la combinaison : `vapeur`) |
+| `tags` | `spell`, plus `ranged` (impact d'un projectile), `area` (éclats, nova, secousse), `area` et `overTime` (mur de flammes, vapeur), `overTime` (brûlure) |
+
+Ce que la chaîne apporte aux sorts : son interrupteur des combats entre joueurs (`chain.pvp`, en plus de `combat.pvp`),
+son débit par paire (20 coups par seconde d'un même lanceur sur une même cible), le lanceur **à terre** (un impact ou
+une secousse qui arrive après sa chute ne blesse plus ; une zone qui dure et une brûlure, si : `overTime`), les
+modificateurs des autres modules (parade, blocage…) et son journal (`vava_health_hits` : `origin = vava_magic`, sort,
+type, montant, absorbé, résisté). La réaction de la victime, la brûlure, les états qui suivent un coup (Ralenti du
+trait, Chancelant de la roche, recul de la nova…) et le bonus d'XP au toucher ne partent **que si le coup a retiré de
+la vie** (`applied > 0`). Les combinaisons (séchage : moitié des dégâts) restent calculées avant le coup.
+`vava_magic_damage_log` n'est plus écrit (la table reste, purgée de ses lignes de plus de 30 jours).
+
+**Modificateurs de la magie** (registre `vava_health:modifiers`, un par étape ; redéclarés à chaque démarrage de
+vava_health) :
+
+| Clé | Étape | Effet |
+| --- | --- | --- |
+| `vava_magic:zones` | annulation | dans une zone de paix (`combat.protectedZones`), personne n'est blessé, ni par un sort ni par une lame (annulé `zone_protegee`) ; la faim et la soif, si. Déclaré seulement s'il y a une zone |
+| `vava_magic:protections` | bouclier | les boucliers en cours du joueur touché absorbent le coup (sorts et lames), le plus proche de sa fin d'abord, chacun jusqu'à sa réserve ; un bouclier vidé se brise (« Votre bouclier de magie se brise. ») |
+| `vava_magic:resistances` | resistance | la plus forte résistance (part retirée) et la plus forte faiblesse (part ajoutée) en cours au type du coup, jamais cumulées |
+
+Les protections vivent en mémoire du serveur (jamais en base) : au plus 4 boucliers (200 points chacun) et 4
+résistances par joueur, 10 minutes au plus (`protections`), retirées au départ. Aucun des onze sorts n'en pose encore
+(sorts de protection à venir) : `/magie proteger` en pose pour l'essai.
+
+**Incantation brisée par une blessure** (`interruptOnHurt`, vrai par défaut) : la vie n'est **jamais lue sur le ped**
+(un client qui garde sa vie GTA au maximum ne serait jamais interrompu). Un coup de la chaîne ou une perte native (chute,
+noyade) qui retire de la vie au lanceur (hook `vava_health:hit` after, `applied > 0`) marque l'incantation ; à la fin,
+une vie de vava_health plus basse qu'au début la marque aussi ; elle se brise alors (« La douleur brise votre
+concentration »), sans rien consommer. Un coup tout absorbé par un bouclier ne la brise pas.
+
+**Sans vava_health** (arrêté, en erreur, ou plus ancien que 1.3.0) : les sorts se lancent, volent et touchent, mais ne
+blessent personne, et rien de ce qui suit un coup ne part ; le lanceur lit « Votre magie gronde sans mordre… » au plus
+une fois par minute, la console le signale. Plus aucun ordre de blessure n'est envoyé au client (l'ancien évènement
+`vava_magic:damage` n'existe plus) : aucune blessure ne se décide hors du serveur.
+
 ## Commandes du Conseil
 
 Droit `tools` de vava_admin (Sénéchal et Souverain), réglable (`config.admin.permission`) ; aussi depuis la console du
@@ -272,8 +326,9 @@ plus la place. »… `texts.chat.adminErrors`) ; le code brut ne va qu'à la con
 | `/magie maitrise [id]` | tous les sorts au niveau maximal (le personnage devient mage) |
 | `/magie vider [id]` | retirer tous les sorts |
 | `/magie mana [id]` · `recharges [id]` | remplir la mana · effacer les recharges et le délai global |
-| `/magie fiche [id]` | mage, sort prêt, sorts, niveaux, XP, sigils, mana, combinaisons découvertes |
+| `/magie fiche [id]` | mage, sort prêt, sorts, niveaux, XP, sigils, mana, combinaisons découvertes, protections en cours |
 | `/magie donner [id] <grimoire\|registre>` | donner un objet (un registre neuf, numéroté) |
+| `/magie proteger [id] bouclier <points> [secondes]` · `resistance <élément> <pour cent> [secondes]` · `aucune` | protection d'essai, portée par la chaîne de dégâts : bouclier (1 à 200 points), résistance (pour cent négatif : faiblesse) à `feu`, `eau`, `terre`, `lumiere` ou `esprit` ; 60 s par défaut, 600 au plus ; `aucune` les retire toutes. La fiche les compte |
 | `/magie nettoyer` | nettoyage d'urgence : retire du monde les effets des sorts (zones au sol, présages, remparts, orbes ancrés) |
 
 `<sort>` : `boule_de_feu`, `mur_de_flammes`, `nova_ardente`, `trait_de_glace`, `vague`, `brume`, `projectile_de_roche`,
@@ -309,7 +364,8 @@ plus la place. »… `texts.chat.adminErrors`) ; le code brut ne va qu'à la con
 | `spells.secousse` | portée, rayon, durée du présage, dégâts, contrôle infligé (Chancelant, puis Renversé), anneau, poussière, éclats, tremblement |
 | `spells.rempart` | portée, longueur, épaisseur, hauteur, blocs par segment, segments (2 au niveau 5) et angle du chevron, durée, modèle de pierre, enfoncement, montée par paliers, plafond du royaume, marges autour des joueurs et véhicules |
 | `combos` | combinaisons : déclencheur (`trigger` : spell ou element, on = zone ou target, zone ou state, projectile), résultat (`result` : remove, zone, state, consume, damageShare, noBurn, carry), textes du grimoire, mot bref, effet et son, nuée de la vapeur, rendu de la boue |
-| `combat` | dégâts entre joueurs, points de vie d'un personnage (100), zones protégées (`{ label, x, y, radius }`), journal (lots, rétention : `log.retentionDays`, 30 jours), réaction de la victime par élément (feu, eau, glace, terre), durée du recul |
+| `combat` | dégâts entre joueurs (`pvp`), points de vie d'un personnage (100), type de dégât de la chaîne par élément (`kinds`), zones de paix (`{ label, x, y, radius }`), rétention de l'ancien journal (`log.retentionDays`, 30 jours), réaction de la victime par élément (feu, eau, glace, terre), durée du recul |
+| `protections` | boucliers et résistances par joueur (4 et 4), réserve d'un bouclier (200 points), durées (60 s par défaut, 10 min au plus), types auxquels on résiste, types que ni bouclier ni zone de paix n'arrêtent (`privation`), noms des modificateurs |
 | `sigils` · `registers` · `items` | sigils (dont le délai après un refus, `refusedMs` : 60 s), registre (200 pages, lots de 20 pages et de 7 500 octets au plus), objets |
 | `ambient` | effets vus des autres (15 m, fragments à 3 m, runes, textes) |
 | `admin` · `keys` · `commands` · `rateLimits` | droits, touches et boutons, commandes, limites de débit |
@@ -322,7 +378,8 @@ défaut), `lockOn`, `reaction` (réaction de la victime, sinon celle de l'élém
 `point`, `self` ou `none` ; `reach` ; `minLevel` ; aperçu au sol : `shape` = `circle`, `line` ou `cone`, et les noms des
 champs de niveau qui en donnent la taille : `radius`, `length`, `width`, `segments`, `angle`, ou du sort : `bend`),
 `anims` (`start`, `loop`, `release` : `{ dict, clip, flag, ms }`), `ambientText`, `runes`, `levelScale` (taille des
-effets par niveau). Les dégâts sont en **points de vie** (sur `combat.healthPoints`).
+effets par niveau). Les dégâts sont en **points de vie** (sur `combat.healthPoints`) : un sort qui blesse appelle
+`VavaMagic.combat.damage(lanceur, cible, sort, points, combat.KIND.…)`, qui porte le coup par la chaîne de dégâts.
 
 ## Ajouter un sort
 
@@ -385,8 +442,10 @@ au point de l'effet). Aucun fichier n'est fourni.
 
 - Le serveur vérifie à chaque incantation : mage, sort connu, niveau, recharge (tenue par personnage, la reconnexion ne
   l'efface pas), mana, une seule incantation, pas à terre ni en véhicule (la cible non plus : un joueur à terre ne
-  subit aucun sort), puis à la fin : durée écoulée, déplacement
-  et vie lus côté serveur. Interrompue : rien n'est consommé.
+  subit aucun sort), puis à la fin : durée écoulée, déplacement (positions serveur) et blessure (coups de la chaîne et
+  vie tenue par vava_health, jamais celle du ped). Interrompue : rien n'est consommé.
+- Blessures : un seul chemin, `exports.vava_health:hit`, après les contrôles du sort ; aucun RPC ni évènement ne peut
+  en demander une, aucun client n'en applique une.
 - Projectiles : un seul impact par lancer, point d'impact dans la portée et dans l'axe annoncé, délai cohérent avec la
   vitesse, cible réelle près du point (position serveur), zones protégées ; un rempart sur le trajet l'arrête là, quoi
   qu'annonce le client ; les dégâts ne partent qu'ensuite. Le serveur ne voit pas les murs de GTA : un tricheur ne
@@ -413,6 +472,7 @@ au point de l'effet). Aucun fichier n'est fourni.
 | Registre des murmures | au seul lecteur : à l'ouverture, un lot de 7,5 Ko au plus (3 Ko pour 20 murmures de 100 signes ; un registre plein envoyait jusqu'à 100 Ko d'un bloc avant 2.7.0) ; puis un lot par demande, au même plafond |
 | Lueur | ~100 o à l'allumage et à l'extinction ; un objet réseau par orbe ancré |
 | Projectiles | ~150 o de lancer aux joueurs proches (150 m), un impact, les dégâts |
+| Blessures | rien de la magie : la chaîne envoie la vie (~26 o) à la seule victime ; la réaction (~30 o) à la seule victime, si le coup a blessé ; un bouclier brisé : un message au seul porteur |
 | Vague · Secousse · Rempart | ~100 à 250 o d'effet instantané aux joueurs à moins de 120 m ; recul, réaction et états à la seule victime |
 | Brume · sol mouillé · présage · boue | comme les zones ; Mouillé reposé au plus toutes les 4 s, Ralenti de la boue toutes les 2 s, sur un même joueur |
 | Combinaisons | ~20 o au lanceur (mot bref), ~100 o d'effet aux joueurs à moins de 150 m ; une vue de la fiche (~200 o) à la première découverte |
@@ -523,8 +583,9 @@ Deux joueurs (A et B) suffisent ; un troisième aide pour le cercle et la zone d
 - [ ] A lance sur B verrouillé : B voit le bord de son écran rougir dès le début de l'incantation ; A se tourne vers B au jet ; la boule part sur B même si A regarde ailleurs.
 - [ ] Niveau 1 à 3 : B esquive en se décalant. Niveau 4-5 (`/magie niveau <A> boule_de_feu 5`) : la boule s'incurve et le rattrape.
 - [ ] Niveau 3 : un voisin de B est touché aussi (moins fort). Niveau 4 : B brûle quelques secondes.
-- [ ] Zone protégée (`combat.protectedZones`) : impossible d'y lancer, personne n'y est blessé. `combat.pvp = false` : aucun dégât.
-- [ ] Table `vava_magic_damage_log` : lanceur, cible, dégâts, position ; écrite par lots, et en entier à l'arrêt du module. Les lignes de plus de 30 jours sont retirées au démarrage du module (message en console s'il y en avait), puis chaque jour.
+- [ ] Zone protégée (`combat.protectedZones`) : impossible d'y lancer, personne n'y est blessé (ni par une lame : `/frapper` de l'exemple de combat). `combat.pvp = false`, ou `chain.pvp = false` dans vava_health : aucun dégât.
+- [ ] Table `vava_health_hits` : une ligne par coup (`origin = vava_magic`, sort, `kind = feu`, montant, absorbé, résisté). `vava_magic_damage_log` ne reçoit plus rien ; ses lignes de plus de 30 jours sont retirées au démarrage du module (message en console s'il y en avait), puis chaque jour.
+- [ ] Chaîne de dégâts (2.9.0) : mêmes dégâts qu'avant pour les onze sorts ; boucliers et résistances (`/magie proteger`) ; lanceur à terre ; incantation brisée par un coup ; vava_health arrêté. Détail : `docs/tests/magie.md` § 18.
 
 **États (avec `/magie` et un test du Conseil, ou les sorts)**
 - [ ] Brûlure (Boule de feu niveau 4, Mur, Nova niveau 4) : flammes sur la victime vues de tous, icône et secondes chez elle, bord de l'écran rougi, dégâts chaque seconde, puis plus rien.

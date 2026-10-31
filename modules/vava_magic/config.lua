@@ -990,10 +990,16 @@ VavaMagic.config = {
         },
     },
 
-    -- Combat entre joueurs. Dégâts des sorts en points de vie, sur `healthPoints` pour un personnage en pleine santé.
+    -- Combat entre joueurs. Dégâts des sorts en points de vie, sur `healthPoints` pour un personnage en pleine santé
+    -- (un coup ne retire jamais plus d'une vie pleine). Chaque coup passe par la chaîne de dégâts de vava_health
+    -- (exports.vava_health:hit) : son interrupteur `chain.pvp` et ses modificateurs (parades, boucliers, résistances)
+    -- s'appliquent aux sorts comme aux lames. Sans vava_health, aucun sort ne blesse personne.
     combat = {
-        pvp = true, -- false : les sorts offensifs se voient et se lancent, mais ne blessent personne
+        pvp = true, -- false : les sorts offensifs se voient et se lancent, mais ne blessent personne (filtre de la magie)
         healthPoints = 100,
+        -- type de dégât de la chaîne pour chaque élément (vava_health `chain.kinds`) ; un élément absent frappe `pur`
+        -- (ignoré des résistances). La glace (Trait de glace) est de l'eau ; une brûlure mord toujours par le feu.
+        kinds = { feu = 'feu', eau = 'eau', terre = 'terre', lumiere = 'lumiere', esprit = 'esprit' },
         -- réaction de la cible touchée : geste bref (haut du corps) et effet d'écran, selon l'élément du sort (ou son
         -- champ `reaction`)
         reactions = {
@@ -1003,12 +1009,31 @@ VavaMagic.config = {
             terre = { anim = { dict = 'anim@mp_player_intupperface_palm', clip = 'idle_a', flag = 48, ms = 700 }, screen = 'earth' },
         },
         knockbackMs = 250,  -- durée de la poussée d'un recul
-        -- zones où l'on ne lance aucun sort offensif (cercle au sol, en mètres) et où personne n'en est blessé :
+        -- zones de paix (cercle au sol, en mètres) : on n'y lance aucun sort offensif, et personne n'y est blessé, ni
+        -- par un sort ni par une lame (modificateur `vava_magic:zones` de la chaîne, déclaré s'il y en a une) :
         -- { label = 'Chapelle de la Grâce', x = 0.0, y = 0.0, radius = 40.0 },
         protectedZones = {},
-        -- journal des dégâts infligés par les sorts (pour le Conseil) : écrit par lots en base ; les lignes plus
-        -- anciennes que `retentionDays` jours sont retirées au démarrage du module, puis une fois par jour (0 : jamais)
-        log = { flushMs = 10000, batch = 50, retentionDays = 30 },
+        -- ancien journal des dégâts des sorts (`vava_magic_damage_log`) : plus écrit depuis 2.9.0 (les coups sont au
+        -- journal de vava_health, `vava_health_hits`) ; ses lignes plus anciennes que `retentionDays` jours sont retirées
+        -- au démarrage du module, puis une fois par jour (0 : jamais)
+        log = { retentionDays = 30 },
+    },
+
+    -- Protections magiques, tenues par le serveur et portées par la chaîne de dégâts de vava_health : un bouclier
+    -- absorbe les coups (sorts et lames) jusqu'à sa réserve (modificateur `vava_magic:protections`, étape bouclier) ;
+    -- une résistance retire une part des dégâts d'un type, une faiblesse en ajoute une (`vava_magic:resistances`,
+    -- étape resistance ; la plus forte de chaque sens l'emporte, jamais cumulées). Aucun des onze sorts n'en pose
+    -- encore (sorts de protection à venir) ; le Conseil en pose pour l'essai (`/magie proteger`).
+    protections = {
+        maxShields = 4,              -- boucliers en cours sur un même joueur (au-delà : refusé)
+        maxResistances = 4,          -- résistances et faiblesses en cours sur un même joueur
+        maxPoints = 200,             -- réserve d'un bouclier, en points de vie (deux vies pleines)
+        defaultDurationMs = 60000,   -- durée d'une protection posée sans durée
+        maxDurationMs = 600000,      -- durée la plus longue (10 min)
+        kinds = { 'feu', 'eau', 'terre', 'lumiere', 'esprit' }, -- types auxquels on peut résister (vava_health `chain.kinds`)
+        ignoredKinds = { privation = true }, -- ni bouclier ni zone de paix contre la faim et la soif
+        -- noms des modificateurs (console, journal des coups, /chaine de l'exemple de combat ; 48 octets au plus)
+        labels = { zones = 'Zones de paix (magie)', shields = 'Boucliers de la magie', resistances = 'Résistances de la magie' },
     },
 
     -- Sigils : chaque personnage en a un, mage ou non.
@@ -1100,8 +1125,11 @@ VavaMagic.config = {
         adminActions = {
             mage = 'mage', learn = 'apprendre', forget = 'oublier', level = 'niveau', xp = 'xp',
             all = 'tous', master = 'maitrise', clear = 'vider', mana = 'mana', cooldowns = 'recharges',
-            sheet = 'fiche', give = 'donner', cleanup = 'nettoyer',
+            sheet = 'fiche', give = 'donner', cleanup = 'nettoyer', protect = 'proteger',
         },
+        -- `/magie proteger [id] bouclier <points> [secondes]` · `resistance <type> <pour cent> [secondes]` (négatif :
+        -- faiblesse) · `aucune`
+        protectWords = { shield = 'bouclier', resistance = 'resistance', none = 'aucune' },
         yes = 'oui',
         no = 'non',
     },
@@ -1221,6 +1249,11 @@ VavaMagic.config = {
             selected = 'Sort prêt : %s.',
             deselected = 'Vous rangez votre magie.',
             comboDiscovered = 'Une combinaison s\'inscrit dans votre grimoire : %s.',
+            -- sans vava_health : le lanceur le sait, au plus une fois par minute
+            noHarm = 'Votre magie gronde sans mordre : en ce moment, nul ne peut en être blessé.',
+            shieldBroken = 'Votre bouclier de magie se brise.',
+            protected = 'Une protection magique vous enveloppe.',
+            unprotected = 'Vos protections magiques se dissipent.',
         },
         chat = {
             prefix = 'Arcanes',
@@ -1233,7 +1266,7 @@ VavaMagic.config = {
             colorsList = 'Couleurs : %s',
             murmurUsage = 'Usage : /murmure, ou /murmure <n°[,n°…]> <message>',
             spellUsage = 'Usage : /sort <nom> | aucun. Sorts connus : %s',
-            adminUsage = 'Usage : /magie <action> [id] … — mage [id] <oui|non> · apprendre [id] <sort> · oublier [id] <sort> · niveau [id] <sort> <1-5> · xp [id] <sort> <xp> · tous [id] · maitrise [id] · vider [id] · mana [id] · recharges [id] · fiche [id] · donner [id] <grimoire|registre> · nettoyer',
+            adminUsage = 'Usage : /magie <action> [id] … — mage [id] <oui|non> · apprendre [id] <sort> · oublier [id] <sort> · niveau [id] <sort> <1-5> · xp [id] <sort> <xp> · tous [id] · maitrise [id] · vider [id] · mana [id] · recharges [id] · fiche [id] · donner [id] <grimoire|registre> · proteger [id] <bouclier <points> [s] | resistance <type> <pour cent> [s] | aucune> · nettoyer',
             adminForbidden = 'Ces commandes sont réservées au Conseil.',
             adminNoTarget = 'Aucun personnage en jeu sous ce numéro.',
             adminUnknownSpell = 'Sort inconnu. Sorts : %s',
@@ -1250,6 +1283,7 @@ VavaMagic.config = {
                 inventory_unavailable = 'L\'inventaire ne répond pas.',
                 not_ready = 'L\'inventaire n\'est pas encore prêt.',
                 unknown_item = 'L\'inventaire ne connaît pas cet objet.',
+                too_many = 'Ce personnage porte déjà autant de protections qu\'il se peut.',
             },
             sheetTitle = 'Fiche magie de %s (joueur n° %d)',
             sheetMage = 'Mage : %s · sort choisi : %s',
@@ -1257,6 +1291,7 @@ VavaMagic.config = {
             sheetNoSpell = '— aucun sort',
             sheetSigils = 'Sigils gardés : %d · mana : %d / %d',
             sheetCombos = 'Combinaisons découvertes : %d / %d',
+            sheetProtections = 'Protections : %d bouclier(s), %s points · %d résistance(s) ou faiblesse(s)',
             yes = 'oui',
             no = 'non',
             none = 'aucun',
@@ -1270,7 +1305,7 @@ VavaMagic.config = {
             lueur = { help = 'Lueur : allumer ou éteindre', params = { { name = 'action', help = 'ancrer, couleur <nom>, eteindre ou dissiper' } } },
             sigils = 'Lister les sigils que vous gardez',
             sigil = { help = 'Gérer vos sigils', params = { { name = 'action', help = 'offrir, renommer <n°> <nom>, oublier <n°> ou brouiller' } } },
-            admin = { help = 'Magie (Conseil)', params = { { name = 'action', help = 'mage, apprendre, oublier, niveau, xp, tous, maitrise, vider, mana, recharges, fiche, donner, nettoyer' }, { name = 'id', help = 'facultatif : numéro du joueur (sinon vous)' } } },
+            admin = { help = 'Magie (Conseil)', params = { { name = 'action', help = 'mage, apprendre, oublier, niveau, xp, tous, maitrise, vider, mana, recharges, fiche, donner, proteger, nettoyer' }, { name = 'id', help = 'facultatif : numéro du joueur (sinon vous)' } } },
         },
         -- journal du Registre du Conseil (32 signes au plus)
         logs = {
@@ -1278,6 +1313,7 @@ VavaMagic.config = {
             xp = 'Magie : XP de sort', all = 'Magie : tous les sorts', master = 'Magie : maîtrise de tout',
             clear = 'Magie : sorts retirés', mana = 'Magie : mana remplie', cooldowns = 'Magie : recharges effacées',
             sheet = 'Magie : fiche consultée', give = 'Magie : objet donné', cleanup = 'Magie : nettoyage du monde',
+            protect = 'Magie : protection',
         },
         -- interface (envoyée à la page une fois prête)
         ui = {

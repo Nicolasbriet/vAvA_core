@@ -30,6 +30,8 @@ local NAMES = VavaMagic.CONDITION_NAMES
 local HARD = cfg.hard
 -- code de refus d'une incantation pendant un contrôle dur
 local BLOCKS = { stagger = 'staggered', knockdown = 'knocked', frozen = 'frozen' }
+-- une brûlure mord toujours par le feu, quel que soit le sort qui l'a posée (roche ardente : un sort de terre)
+local BURN_ELEMENT = 'feu'
 
 local states = {}
 VavaMagic.states = states
@@ -117,7 +119,9 @@ local function burnTicks(src, condition)
         SetTimeout(burn.tickMs, function()
             local entry = players[src]
             if not entry or entry.conditions.burn ~= condition then return end
-            if burn.damage > 0 then combat.damage(burn.caster, src, burn.spell, burn.damage, combat.KIND.BURN, burn.casterCharacter) end
+            if burn.damage > 0 then
+                combat.damage(burn.caster, src, burn.spell, burn.damage, combat.KIND.BURN, burn.casterCharacter, BURN_ELEMENT)
+            end
             if GetGameTimer() + burn.tickMs <= condition.untilMs then tick() else finish(src, 'burn') end
         end)
     end

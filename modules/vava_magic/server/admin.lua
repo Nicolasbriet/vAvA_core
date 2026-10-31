@@ -4,13 +4,14 @@
            Bridge.IsAdmin. Sans numéro de joueur, elles visent l'auteur lui-même. Actions : mage ou non, apprendre /
            retirer un sort, niveau ou XP d'un sort, tous les sorts au niveau 1 (le personnage devient mage), tous au
            niveau maximal, retirer tous les sorts, remplir la mana, effacer les recharges, fiche d'un joueur, donner un
-           grimoire ou un registre, nettoyage d'urgence du monde (zones, remparts, orbes). Chaque commande est
-           inscrite au journal du Registre du Conseil.
+           grimoire ou un registre, protection d'essai (bouclier, résistance ou faiblesse à un type, portés par la
+           chaîne de dégâts de vava_health ; ou les retirer), nettoyage d'urgence du monde (zones, remparts, orbes).
+           Chaque commande est inscrite au journal du Registre du Conseil.
     Dépendances : shared/, config.lua, server/ (noyau)
 ]]
 
 local ipairs, pairs, tonumber, tostring, concat = ipairs, pairs, tonumber, tostring, table.concat
-local tointeger, lower, move = math.tointeger, string.lower, table.move
+local tointeger, lower, move, floor = math.tointeger, string.lower, table.move, math.floor
 local CreateThread, RegisterCommand, TriggerClientEvent = CreateThread, RegisterCommand, TriggerClientEvent
 
 local core = VavaMagic.core
@@ -21,10 +22,12 @@ local casting = VavaMagic.casting
 local experience = VavaMagic.experience
 local spells = VavaMagic.spells
 local registers = VavaMagic.registers
+local protections = VavaMagic.protections
 local progression = VavaMagic.progression
 local cfg = VavaMagic.config
 local commands = cfg.commands
 local actions = commands.adminActions
+local words = commands.protectWords
 local chat = cfg.texts.chat
 local notify = cfg.texts.notify
 local logs = cfg.texts.logs
@@ -34,6 +37,8 @@ local HOOKS = VavaMagic.HOOKS
 local CONSOLE = 0
 -- rang du premier argument propre à l'action quand le numéro de joueur est donné, ou omis
 local ARGS_WITH_ID, ARGS_WITHOUT_ID = 3, 2
+local MS_PER_SECOND = 1000
+local PERCENT = 100
 
 local admin = {}
 VavaMagic.admin = admin
@@ -248,6 +253,8 @@ handlers[actions.sheet] = function(src, target)
     if known == 0 then lines[#lines + 1] = chat.sheetNoSpell end
     lines[#lines + 1] = chat.sheetSigils:format(#sheet.sigils, mana.current(target), mana.MAX)
     lines[#lines + 1] = chat.sheetCombos:format(#sheet.discoveredCombos, #VavaMagic.combos.all())
+    local shields, points, resistances = protections.count(target)
+    lines[#lines + 1] = chat.sheetProtections:format(shields, tostring(floor(points + 0.5)), resistances)
     reply(src, lines)
     bridge.AdminLog(src, logs.sheet, details(target))
     return true, true
@@ -267,6 +274,47 @@ handlers[actions.give] = function(src, target, rest)
     end
     if not ok then return false, code end
     bridge.AdminLog(src, logs.give, details(target, { objet = kind }))
+    return true
+end
+
+--- Durée facultative d'une protection, en secondes : nil (défaut de la config), un nombre de millisecondes, ou
+--- false si le texte n'est pas un entier de secondes.
+---@param value string|nil
+---@return integer|false|nil
+local function durationOf(value)
+    if value == nil then return nil end
+    local seconds = tointeger(tonumber(value))
+    if not seconds or seconds < 1 then return false end
+    return seconds * MS_PER_SECOND
+end
+
+--- Protection d'essai : `bouclier <points> [secondes]`, `resistance <type> <pour cent> [secondes]` (négatif :
+--- faiblesse), ou `aucune` (les retire toutes). Les mots et le type se comparent tels quels (identifiants ASCII).
+handlers[actions.protect] = function(src, target, rest)
+    local word = rest[1]
+    if word == words.none then
+        if protections.clear(target) then bridge.Notify(target, notify.unprotected, 'info') end
+        bridge.AdminLog(src, logs.protect, details(target, { protection = word }))
+        return true
+    end
+    local id, code, logged
+    if word == words.shield then
+        local points, duration = tonumber(rest[2]), durationOf(rest[3])
+        if not points or duration == false then return false, 'invalid' end
+        id, code = protections.shield(target, { points = points, durationMs = duration })
+        logged = { protection = word, points = points, duree_ms = duration or cfg.protections.defaultDurationMs }
+    elseif word == words.resistance then
+        local kind, percent, duration = rest[2], tointeger(tonumber(rest[3])), durationOf(rest[4])
+        if not percent or duration == false then return false, 'invalid' end
+        id, code = protections.resist(target, { kind = kind, share = percent / PERCENT, durationMs = duration })
+        logged = { protection = word, type = kind, pour_cent = percent,
+            duree_ms = duration or cfg.protections.defaultDurationMs }
+    else
+        return false, 'invalid'
+    end
+    if not id then return false, code == 'no_target' and 'no_character' or code end
+    bridge.Notify(target, notify.protected, 'info')
+    bridge.AdminLog(src, logs.protect, details(target, logged))
     return true
 end
 

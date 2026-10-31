@@ -1638,7 +1638,7 @@ Pour travailler le rendu du mur sans le jeu : `web/index.html?players=11&layout=
 
 ### `vava_magic`
 
-La magie (2.7.0) : fiche magie par personnage (champ privé `vava_magic:sheet` : mage ou non, sorts et leur XP, sort
+La magie (2.9.0) : fiche magie par personnage (champ privé `vava_magic:sheet` : mage ou non, sorts et leur XP, sort
 prêt dans les mains, combinaisons découvertes, sigils gardés, sigil unique dans tout le royaume), mana (100, +3 toutes
 les 5 s, jamais sauvegardée) et sa barre, 5 niveaux par sort, incantation commune avec délai global (1 s), roue des
 sorts (Tab) et mode magie à la souris (clic droit viser, clic gauche lancer, clic molette verrouiller), états
@@ -1650,14 +1650,17 @@ dissipation, boue, gel, séchage, extinction, roche ardente ; inscrites au grimo
 `discoveredCombos` de la fiche), **Lueur** et **Murmure**, grimoire et registre (objets), traces au sol, sons fabriqués
 par l'interface ou remplacés par des fichiers `.ogg` et des sons natifs (`config.sounds`), commandes du Conseil (`/magie`, numéro de joueur facultatif). Tout le détail, la config et la liste des tests en jeu :
 `modules/vava_magic/README.md`. Demande le core 0.5.0 ; facultatifs : `vava_inventory` ≥ 1.3.0 (objets), `vava_hud`
-(notifications), `vava_health` (blessures, à terre : un joueur à terre ne subit plus aucun effet des sorts — ni
-Mouillé, ni recul, ni Renversé, ni Ralenti), `vava_admin` (droit `tools` et journal ; sans lui, ACE `magie.admin` ;
+(notifications), `vava_health` ≥ 1.3.0 (blessures par la chaîne de dégâts — sans lui, aucun sort ne blesse
+personne —, à terre : un joueur à terre ne subit plus aucun effet des sorts — ni Mouillé, ni recul, ni Renversé, ni
+Ralenti), `vava_admin` (droit `tools` et journal ; sans lui, ACE `magie.admin` ;
 ≥ 1.6.0 : la fin d'un Gel ne libère pas un joueur immobilisé par le Registre).
 
 - **Bridge** : `bridge/server.lua` et `bridge/client.lua` sont les seuls fichiers qui appellent le core et les autres
   modules ; les réécrire suffit pour un autre core (avec un équivalent de `core.rpc`).
 - **Incantation** : RPC `vava_magic:begin:<sort>` puis `vava_magic:finish:<sort>` (numéro d'incantation). Le serveur
-  revérifie à la fin la durée, le déplacement et la vie (lus côté serveur) ; la mana est réservée avant l'effet, rendue
+  revérifie à la fin la durée, le déplacement (positions serveur) et la blessure (2.9.0 : un coup de la chaîne ou une
+  perte native qui a retiré de la vie au lanceur, hook `vava_health:hit` after, ou sa vie de `vava_health:get` plus
+  basse qu'au début ; jamais la vie du ped) ; la mana est réservée avant l'effet, rendue
   si le sort refuse. Recharges tenues par personnage. Effets vus des autres : state bags posés par le serveur sur le
   ped (`vava_magic:casting`, `glow`, `light`, `conditions`) ou sur l'objet d'un orbe ancré (`vava_magic:orb`) ;
   évènements ciblés aux seuls joueurs proches (`vava_magic:projectile`, `projectileEnd`, `zone`, `zoneEnd`, `burst`) ;
@@ -1673,10 +1676,25 @@ Mouillé, ni recul, ni Renversé, ni Ralenti), `vava_admin` (droit `tools` et jo
   (`combos.boue.result.slow.refreshMs`), chaque pose couvrant l'intervalle ; 1 à 3 s encore à la sortie.
 - **Projectiles** (Boule de feu, Trait de glace, Projectile de roche, même noyau) : impact signalé par le client du
   lanceur (RPC `vava_magic:projectileImpact`), validé par le serveur (portée, axe, délai, cible réelle, zones protégées,
-  rempart sur le trajet) avant les dégâts (en points de vie sur `combat.healthPoints`), appliqués par
-  `vava_health:damage` ; bonus d'XP au toucher si le lancer a rapporté ; journal `vava_magic_damage_log`, écrit par
-  lots, en entier à l'arrêt du module (une seule requête), purgé des lignes de plus de `combat.log.retentionDays`
-  jours (30) au démarrage puis chaque jour.
+  rempart sur le trajet) avant les dégâts (en points de vie sur `combat.healthPoints`) ; bonus d'XP au toucher si le
+  coup a blessé et que le lancer a rapporté.
+- **Blessures** (2.9.0, T-116) : chaque blessure d'un sort est un coup de la chaîne de dégâts (`exports.vava_health:hit`,
+  § `vava_health`) : `amount` = points du sort (une vie pleine au plus, mêmes dégâts qu'avant), `kind` = type de son
+  élément (`combat.kinds` : `feu`, `eau`, `terre`, `lumiere`, `esprit` ; brûlure : `feu`), `source` = le lanceur (même
+  parti ; aucune s'il joue un autre personnage), `sourceCharacter`, `spell` (ou la combinaison, `vapeur`), `tags` :
+  `spell` et `ranged` (impact), `area` (éclats, nova, secousse), `area` + `overTime` (mur de flammes, vapeur),
+  `overTime` (brûlure). Les sorts respectent donc `chain.pvp`, le débit par paire et le lanceur à terre (`source_downed`,
+  sauf `overTime`) ; réaction, brûlure, états qui suivent un coup et bonus d'XP seulement si `applied > 0`. Plus aucun
+  appel à `damage`, plus d'évènement `vava_magic:damage` au client : sans `vava_health`, les sorts ne blessent personne
+  (le lanceur le lit au plus une fois par minute). Journal : `vava_health_hits` (`origin = vava_magic`) ;
+  `vava_magic_damage_log` n'est plus écrit, purgé des lignes de plus de `combat.log.retentionDays` jours (30).
+- **Modificateurs** (registre `vava_health:modifiers`, redéclarés à chaque démarrage de `vava_health`) :
+  `vava_magic:zones` (étape `annulation`, seulement si `combat.protectedZones` en compte : personne n'est blessé dans une
+  zone de paix, ni par un sort ni par une lame ; annulé `zone_protegee` ; la faim, si), `vava_magic:protections` (étape
+  `bouclier` : boucliers du joueur touché, le plus proche de sa fin d'abord, jusqu'à leur réserve ; sorts et lames, pas
+  la faim), `vava_magic:resistances` (étape `resistance` : la plus forte résistance et la plus forte faiblesse au type
+  du coup, jamais cumulées). Protections en mémoire du serveur (4 boucliers de 200 points et 4 résistances par joueur,
+  10 min au plus, `protections`), posées pour l'essai par `/magie proteger` ; aucun des onze sorts n'en pose encore.
 - **Rempart** : blocs de pierre créés par le serveur (objets réseau figés), jamais sur un joueur ni un véhicule,
   retirés à leur fin, à l'arrêt du module et par `/magie nettoyer`.
 - **Verrouillage** (sorts `lockOn`) : clic molette côté client (lu par `Bridge.GetLockedTarget`), à la portée du sort

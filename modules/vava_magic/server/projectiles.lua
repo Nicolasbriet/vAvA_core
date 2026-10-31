@@ -50,6 +50,8 @@ local DIRECTION = { type = 'number', min = -1.01, max = 1.01 }
 local COORD = { type = 'number', min = -20000, max = 20000 }
 local LAUNCH_ID = { type = 'integer', min = 1, max = 0x7FFFFFFF }
 local TARGET = { type = 'integer', min = 0, max = 65535 }
+-- élément de l'effet emporté par un projectile (roche ardente) : ses dégâts sont du feu
+local CARRY_ELEMENT = 'feu'
 
 local projectiles = {}
 VavaMagic.projectiles = projectiles
@@ -197,8 +199,9 @@ local function impact(src, id, target, x, y, z)
     def.onImpact(launch, target, point)
     local carry = launch.carry
     if carry and target ~= 0 then
-        local hit = combos.hit(src, target, launch.spell, carry.damage or 0, 'feu')
-        if combat.damage(src, target, launch.spell, hit.damage, combat.KIND.IMPACT) and hit.burn and carry.burn then
+        local hit = combos.hit(src, target, launch.spell, carry.damage or 0, CARRY_ELEMENT)
+        if combat.damage(src, target, launch.spell, hit.damage, combat.KIND.IMPACT, nil, CARRY_ELEMENT) and hit.burn
+            and carry.burn then
             states.apply(target, 'burn', {
                 durationMs = carry.burn.durationMs, tickMs = carry.burn.tickMs, damage = carry.burn.damage, caster = src, spell = launch.spell,
             })

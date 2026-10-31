@@ -194,7 +194,7 @@ zones.define(STEAM, {
         local now = GetGameTimer()
         if data.hits[victim] and now - data.hits[victim] < data.tickMs then return end
         data.hits[victim] = now
-        combat.damage(zone.owner, victim, zone.spell, data.damage, combat.KIND.ZONE, zone.ownerCharacter)
+        combat.damage(zone.owner, victim, zone.spell, data.damage, combat.KIND.AURA, zone.ownerCharacter, zone.element)
     end,
 })
 
