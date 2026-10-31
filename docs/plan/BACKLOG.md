@@ -1127,6 +1127,8 @@ faire tout le système de combat ») : la porte T-119 reste à passer en jeu.
 - Spec T-110 § 13, option B : le temps de jeu, les positions, `vava_arrival` et les envois de proximité croient encore
   la déclaration `core:characters:spawned` du client. Le core la confirme lui-même quand le ped existe après l'ordre
   d'apparition (délai de grâce), et expose l'état confirmé.
+- Suites de la relecture sécurité appliquées, contre-relecture à faire (S-1 à S-6, R-1 à R-3 : voir
+  `docs/plan/rapports/T-139.md`).
 
 ### T-140 — Mains vides pour incanter
 - Agent : vava-dev-lua (cette tâche autorise à toucher `vava_magic`) · Dépend de : T-111, T-116 · Statut : à tester en

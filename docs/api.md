@@ -276,17 +276,33 @@ Apparition confirmée par le serveur (0.14.0, T-139) :
   `spawn.confirm.checkMs` (500 ms), pour ces seuls joueurs, jusqu'à le voir au point ordonné : écart **horizontal**
   au plus `spawn.confirm.radius` (10 m ; la hauteur ne compte pas, le ped peut tomber du point).
 - La déclaration du client (RPC `core:characters:spawned`, à la fin du fondu) confirme l'apparition **si le ped a été
-  vu au point** depuis l'ordre, aussitôt ou au passage suivant. Une déclaration faite ailleurs ne confirme rien.
+  vu au point** depuis l'ordre, aussitôt ou au passage suivant. Une déclaration faite ailleurs ne confirme rien. Chaque
+  ordre porte un numéro (`seq`) que la déclaration renvoie : une déclaration d'un ordre précédent, arrivée après le
+  suivant, ne compte pas (`not_ordered`).
+- Seul un personnage **encore chargé** (session active sur lui) est confirmé : un déchargement (`unload`, départ du
+  joueur) oublie l'apparition en attente dès son début, avant le hook `core:character:unloading` et la sauvegarde, et
+  le personnage n'est plus apparu pendant ceux-ci ; aucune confirmation, ni hook `core:character:spawned`, ne vient
+  pour un personnage qui part.
 - Sans déclaration, l'apparition est confirmée **d'office** `spawn.confirm.graceMs` (20 s, au-delà du plus long
   chargement normal du client) après l'ordre, si le ped a été vu au point : hook avec `forced = true` et une ligne
   `[spawn] … confirmée d'office` en console.
-- Jamais vu au point : une ligne `[spawn] … jamais vu au point d'apparition` après `graceMs` (une par ordre), et le
-  personnage reste non apparu jusqu'à ce qu'il y soit vu (une nouvelle apparition ou une reconnexion le remet en
-  route). Un nouvel ordre remplace le point attendu.
-- Réglages invalides (`config/server.lua` → `spawn.confirm`) : le core ne démarre pas (comme une limite de débit
-  invalide).
-- Limite : la position lue est celle que le client du joueur synchronise pour son ped (OneSync) ; le serveur constate
-  qu'il est allé au point ordonné, pas qu'il n'en bouge pas ensuite par un moyen interdit.
+- Jamais vu au point : une ligne `[spawn] joueur N (compte #A, personnage #P) : ped jamais vu au point d'apparition`
+  après `graceMs` (une par ordre), et le personnage reste non apparu jusqu'à ce qu'il y soit vu (une nouvelle
+  apparition ou une reconnexion le remet en route). Son ped n'est alors plus relu que toutes les
+  `spawn.confirm.lateCheckMs` (5 s) ; une déclaration du client le relit aussitôt. Un nouvel ordre remplace le point
+  attendu.
+- Au plus `spawn.confirm.maxPerCheck` (16) confirmations par passage (hooks et zones) ; les suivantes au passage
+  suivant. Une erreur pendant un passage garde l'apparition en attente et la retente au suivant (une ligne d'erreur
+  par ordre).
+- Réglages invalides ou hors bornes (`config/server.lua` → `spawn.confirm` : `checkMs` 50 à 5000, `radius` plus de 0
+  à 50, `graceMs` `checkMs` à 120000, `lateCheckMs` `checkMs` à 60000, `maxPerCheck` 1 à 1024) : le core ne démarre
+  pas (comme une limite de débit invalide).
+- Limites : la position lue est celle que le client du joueur synchronise pour son ped (OneSync) ; le serveur constate
+  qu'il est allé au point ordonné, pas qu'il n'en bouge pas ensuite par un moyen interdit. Seul l'écart horizontal
+  compte (un point ordonné sous terre, comme le retour d'une observation du Registre, reste valable). Un client qui
+  n'exécute pas l'ordre reste non apparu : il n'est ni témoin (joueurs proches) ni destinataire des envois de
+  proximité et des zones ; la ligne « jamais vu au point » est la trace laissée au Conseil, et il n'en sort qu'en
+  passant au point ou par un nouvel ordre (une téléportation qui ne passe pas par `spawn` ne le débloque pas).
 - Un module qui veut savoir si un joueur est en place lit `isSpawned` ou écoute `core:character:spawned` ; il ne
   refait pas sa propre lecture d'office. Il déclare `coreVersion = '0.14.0'` s'il se sert d'`isSpawned` ou de
   `forced` (le hook existait avant : avec un core antérieur à 0.14.0, il suit la seule déclaration du client).
