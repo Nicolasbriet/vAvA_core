@@ -2,7 +2,8 @@
     vava_admin/config.lua
     Rôle : réglages de l'administration que lit le seul serveur (servi au seul serveur, jamais téléchargé par les
            joueurs) : rangs du Conseil et leurs droits, durées de bans, pont du web, journal, relecture des bans,
-           signalements et demandes au Conseil (1.10.0), déplacements, débits, textes envoyés par le serveur. Complète la table ouverte par
+           signalements et demandes au Conseil (1.10.0), invulnérabilité (1.11.0), déplacements, débits, textes
+           envoyés par le serveur. Complète la table ouverte par
            config_client.lua (commandes, touches, outils du client, textes du client) sans en réécrire une clé
            (T-132).
     Dépendances : shared/constants.lua, config_client.lua
@@ -73,6 +74,26 @@ config.requests = {
     kinds = { 'question', 'player', 'bug', 'other' },
 }
 
+-- Invulnérabilité tenue par le serveur (1.11.0) : l'outil « Invulnérabilité », le vol libre et l'observation d'un
+-- membre du Conseil annulent tout coup et tout sort qui le blesse par la chaîne de dégâts de vava_health, faim et soif
+-- comprises (modificateur vava_admin:invulnerabilite, étape « annulation ») ; les effets sans dégâts (recul,
+-- renversement, mouillé, ralenti) ne passent pas par la chaîne. `priority` : rang dans l'étape (0 à 99, plus petit =
+-- plus tôt) ; `label` : nom montré dans la liste des modificateurs de la chaîne (48 octets au plus).
+-- L'observation ne protège que si le corps du membre, lu par le serveur, est caché sous l'observé : à `spectateRadius`
+-- mètres au plus à l'horizontale (l'ancrage suit l'observé une fois par seconde) et au moins `spectateMinDepth` mètres
+-- plus bas que lui (positif, strictement inférieur à `spectate.anchorDepth` de config_client.lua, 12 m : sinon une
+-- ligne warn au démarrage et l'observation ne protège plus) ; au plus `spectateMaxMs` après le début de l'observation
+-- (puis elle tombe, au journal) ; une nouvelle observation ne protège qu'après `spectateCooldownMs` depuis la fin de la
+-- protection précédente du même compte (une observation qui en remplace une autre garde la sienne).
+config.invulnerability = {
+    priority = 10,
+    label = 'Invulnérabilité du Conseil',
+    spectateRadius = 20.0,
+    spectateMinDepth = 6.0,
+    spectateMaxMs = 10 * 60 * 1000,
+    spectateCooldownMs = 60 * 1000,
+}
+
 -- Déplacements : écart à l'arrivée (m) pour ne pas apparaître dans la personne.
 config.teleportOffset = 1.2
 
@@ -113,3 +134,11 @@ messages.reportTooShort = 'Quelques mots de plus, s\'il vous plaît.'
 messages.reportInvalid = 'Ce message contient des caractères que le Registre ne peut garder.'
 messages.reportTooMany = 'Vos demandes attendent déjà le Conseil : patientez qu\'il y réponde.'
 messages.notStaff = 'Vous ne siégez pas au Conseil.'
+-- 1.11.0, journal (32 caractères au plus) : protection d'une observation levée sans geste du membre ou à sa fin, outils
+-- retirés à un membre dont le rang a perdu le droit ; causes inscrites dans les détails (et à la console)
+messages.logSpectateEnded = 'Observation : protection levée'
+messages.logToolsWithdrawn = 'Outils retirés (rang changé)'
+messages.spectateEnded = {
+    finished = 'fin de l\'observation', expired = 'durée dépassée', unloaded = 'personnage déchargé',
+    left = 'départ du joueur',
+}

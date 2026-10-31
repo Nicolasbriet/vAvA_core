@@ -4,9 +4,9 @@
            siège au Conseil et avec quels droits, s'il est immobilisé par le Conseil, bannir ou expulser au nom d'un
            module (inscrit au journal), inscrire au journal une action faite par un membre dans un module ; depuis
            1.10.0, créer une demande au Conseil au nom d'un joueur et lire l'état de la sienne (bannière de vava_pause,
-           seules les ressources de `requests.callers`).
+           seules les ressources de `requests.callers`) ; depuis 1.11.0, savoir si le Conseil le tient pour invulnérable.
     Dépendances : config.lua, server/core.lua, server/ranks.lua, server/staff.lua, server/players.lua,
-                  server/actions.lua, server/audit.lua, server/reports.lua
+                  server/actions.lua, server/audit.lua, server/reports.lua, server/invulnerability.lua
 ]]
 
 local type, mathType, ipairs = type, math.type, ipairs
@@ -53,6 +53,14 @@ end)
 --- un ped (gel d'un sort…) ne rend pas libre celui que le Conseil retient.
 exports('isFrozen', function(src)
     return players.frozen[src] == true
+end)
+
+--- Vrai si le Conseil tient ce joueur pour invulnérable (outil, vol libre, observation près de l'observé), même
+--- jugement que le modificateur de la chaîne de vava_health (1.11.0). Lecture seule : pour qu'un module épargne aussi
+--- ses effets sans dégâts (recul, renversement…) à un membre que la chaîne protège.
+exports('isInvulnerable', function(src)
+    if not VavaAdmin.ready or mathType(src) ~= 'integer' then return false end
+    return VavaAdmin.invulnerability.isInvulnerable(src)
 end)
 
 --- Bannit un compte (0 heure = définitif). Un joueur connecté sur ce compte est expulsé.

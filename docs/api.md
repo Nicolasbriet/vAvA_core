@@ -1379,6 +1379,49 @@ voulu (l'écran des joueurs non plus, voir plus bas).
   (droit `tools`, inscrit au journal) ; sans droit, la touche ne fait rien. Pendant le vol, le membre est invisible
   des autres joueurs (il se voit lui-même) et retrouve ensuite sa visibilité d'avant, arrêt du module compris
   (collision, gravité et vulnérabilité rétablies sur-le-champ).
+- **Invulnérabilité tenue par le serveur** (1.11.0, T-138) : l'outil « Invulnérabilité » et le vol libre (droit
+  `tools`), et l'observation (droit `spectate`), ne s'arrêtent plus au client (`SetEntityInvincible`, gardé pour le ped :
+  chute, noyade, décor). Le serveur garde en mémoire, par joueur, son personnage, son compte et chaque raison avec
+  l'instant et le membre qui l'a posée ; le modificateur d'annulation `vava_admin:invulnerabilite` du registre
+  `vava_health:modifiers` (étape `annulation`, priorité 10, déclaré avec `kinds` : tous les types de la chaîne sauf
+  `monde`) annule alors **tout coup et tout sort qui blessent** (`cancelled = 'invulnerable'`, `'spectating'` pendant
+  une observation ; inscrits au journal des coups de `vava_health` quand ils viennent d'un joueur). Les **effets sans
+  dégâts** (recul, renversement, mouillé, ralenti des sorts) ne passent pas par la chaîne et **ne sont pas couverts** :
+  un module qui veut les épargner lit l'export `isInvulnerable` (pas encore branché dans `vava_magic`). **Décision**
+  (relecture S-6) : la faim et la soif (`privation`) sont annulées aussi ; avant 1.11.0, elles traversaient
+  l'invincibilité locale. Le modificateur ne lit que la mémoire du Registre et deux positions (natives) ; il ne cède
+  jamais la main.
+  - **Observation bornée** (S-1, C-1 à C-3) : elle ne protège que si le corps du membre, lu par le serveur, est caché
+    sous l'observé : à `invulnerability.spectateRadius` (20 m) au plus à l'horizontale **et** au moins
+    `invulnerability.spectateMinDepth` (6 m) plus bas que lui (l'ancrage le place à `spectate.anchorDepth`, 12 m, de
+    `config_client.lua`) ; en surface, même tout près, il n'est pas protégé. Au plus `invulnerability.spectateMaxMs`
+    (10 min) après le début de l'observation (une observation remplacée garde l'instant de la première) ; à l'échéance,
+    elle tombe (une seule échéance armée par joueur, réarmée pour le temps restant). Une nouvelle observation ne protège
+    qu'après `invulnerability.spectateCooldownMs` (60 s) depuis la fin de la protection précédente du même compte
+    (observation accordée quand même, ligne de console). Au démarrage, des réglages incohérents (seuil nul, ou pas
+    strictement inférieur à `anchorDepth`, rayon, durée ou délai invalides) donnent une ligne `warn`, et l'observation
+    ne protège plus (l'outil et le vol libre, si). Chaque retrait de la protection d'une observation (fin, durée
+    dépassée, déchargement, départ) est inscrit au journal (« Observation : protection levée », au nom de la Console,
+    cause dans les détails ; S-5).
+  - **Retraits** : par le levier ou `F2` (au journal, comme la pose), à la fin de la dernière observation, au
+    déchargement du personnage (départ, retour à la sélection) et au départ du joueur.
+  - **Changement de rang** (S-3, S-4 ; `staff.set` : panneau et console, `staff.force` : Chancellerie) : si le joueur
+    du compte est en jeu, les raisons dont le droit manque au nouveau rang sont retirées (« Outils retirés (rang
+    changé) », au nom de la Console, `outils` dans les détails) et ne reviennent pas à une re-promotion ; si le rang perd
+    `tools` ou `spectate`, l'évènement `vava_admin:toolsReset` (sans valeur, au **seul** joueur concerné) coupe chez lui
+    vol libre, invisibilité, invulnérabilité locale et observation, avec un message s'il en avait un d'actif
+    (`messages.toolsWithdrawn` de `config_client.lua`). Même sans changement de rang annoncé, le modificateur relit le
+    rang à chaque coup.
+  - **Couper sans droit** : l'intention `tool` éteinte (`enabled = false`) est permise à tout joueur, sans journal
+    (couper ne donne rien) ; l'allumer reste refusé sans le droit `tools` (`forbidden`, aucune entrée créée).
+  - Poser une raison demande un personnage chargé (`no_character`). Les outils ne visent que le membre lui-même : la
+    règle du rang ne s'y applique pas. Déclaré au démarrage si `vava_health` est là, redéclaré à chaque retour de
+    `vava_health` (appel isolé : `VavaAdmin.declare`) ; sans `vava_health`, rien ne change. Réglages `invulnerability`
+    de `config.lua` (`priority`, `label`, `spectateRadius`, `spectateMinDepth`, `spectateMaxMs`,
+    `spectateCooldownMs`) et textes du journal
+    (`logSpectateEnded`, `logToolsWithdrawn`, `spectateEnded`) ; un `config.lua` d'avant 1.11.0 sans eux : une ligne
+    `warn` au démarrage, modificateur non déclaré (l'outil reste local, comme avant). Règles pures :
+    `shared/invulnerability.lua` (servi au seul serveur ; `tests/spec/admin_invulnerability_spec.lua`).
 
 **Exports serveur** :
 
@@ -1388,6 +1431,7 @@ voulu (l'écran des joueurs non plus, voir plus bas).
 | `can(source, droit)` | booléen |
 | `rankOf(source)` | `{ name, label, level }` ou `nil` |
 | `isFrozen(source)` | booléen — immobilisé par le Conseil (Registre) ; lecture seule : un module qui fige et libère un ped (gel d'un sort) ne libère pas celui que le Conseil retient ; depuis 1.6.0 |
+| `isInvulnerable(source)` | booléen — le Conseil tient ce joueur pour invulnérable (outil, vol libre, observation caché sous l'observé), même jugement que le modificateur de la chaîne ; lecture seule, faux si le Registre n'est pas prêt ; pour qu'un module épargne aussi ses effets sans dégâts (recul, renversement…). À appeler **une fois par effet** (au moment où il touche sa cible), jamais en boucle ni à chaque image : pour un joueur protégé, il lit le personnage actif dans le core et, pendant une observation, deux positions ; depuis 1.11.0 |
 | `ban(compte, heures, motif)` | `true, n° du ban` ou `false, code` — au journal sous le nom du module appelant |
 | `kick(source, motif)` | `true` ou `false, code` |
 | `log(source, libellé, détails?)` | `true` ou `false, code` — inscrit au journal une action d'un membre du Conseil faite dans un module (libellé lu tel quel, 32 caractères ; détails `{ clé = texte ou nombre }`, 8 au plus) ; depuis 1.1.0 |

@@ -693,6 +693,16 @@ versé à T-014 ; les autres points déjà couverts sont précisés dans T-012 �
   `docs/plan/rapports/T-146.md`. Relectures sécurité et réseau à faire. **À tester en jeu** : `docs/tests/reseau.md`
   § 7-E.
 
+### T-151 — Envois de `vava_admin` par `core.net.send`, avec repli
+- Agent : vava-dev-lua (cette tâche autorise à toucher `vava_admin`) · Dépend de : — · Statut : à faire
+- Trouvé pendant T-138 (relecture réseau R-2) : tous les envois de `vava_admin` au client (`notify`, `reportNew`,
+  `toolsReset`) passent par `TriggerClientEvent` direct, vers un seul joueur, et ne sont pas comptés par
+  `/vava_reseau`. Les faire passer par une fonction d'envoi au seul joueur sur le modèle de
+  `vava_arrival/bridge/server.lua:127-140` (`core.net.send`, repli `TriggerClientEvent` vers ce même joueur si
+  `core.net` manque). `vava_admin:announcement` reste l'exception `-1` documentée (l'objet même d'une proclamation).
+- Critères : aucun `TriggerClientEvent` direct hors du repli et de l'annonce ; essai du repli ; `/vava_reseau` montre
+  les envois du Registre.
+
 ### T-148 — Fichiers `shared/` absents du manifeste
 - Agent : vava-dev-lua · Dépend de : T-132 · Statut : à faire
 - Trouvé pendant T-146 : rien ne vérifie qu'un `shared/*.lua` présent dans un module est bien listé à son manifeste ;
@@ -1087,10 +1097,30 @@ faire tout le système de combat ») : la porte T-119 reste à passer en jeu.
   aujourd'hui par `damage` sans `source` et contournent donc `chain.pvp` : leur donner leur `source` (spec T-110 § 12.2).
 
 ### T-138 — Invulnérabilité du Registre tenue par le serveur
-- Agent : vava-dev-lua (cette tâche autorise à toucher `vava_admin`) · Dépend de : T-110 · Statut : à faire
+- Agent : vava-dev-lua (cette tâche autorise à toucher `vava_admin`) · Dépend de : T-110 · Statut : à tester en jeu
+  (relu sécurité, contre-relu, relu réseau ; suites appliquées)
 - Spec T-110 § 13 : l'invulnérabilité du Registre n'est que locale (`SetEntityInvincible`) ; les sorts la traversent
   déjà, les coups de la chaîne aussi. `vava_admin` garde l'état côté serveur et déclare un modificateur d'annulation
   `vava_admin:invulnerabilite` au registre `vava_health:modifiers`.
+- Fait le 31 octobre 2026 (branche `agents/T-138`) : `vava_admin` 1.11.0 — état en mémoire par joueur (personnage,
+  compte, raisons `godmode`, `noclip` et `spectate`, chacune avec son instant et le membre qui l'a posée), posé par
+  l'intention `tool` (refusée sans personnage, journal inchangé) et par l'observation ; retiré par le levier ou `F2`, à
+  la fin de la dernière observation, au déchargement du personnage et au départ ; modificateur d'annulation (étape
+  `annulation`, priorité 10, `kinds` de la chaîne sauf `monde`) déclaré au démarrage et redéclaré au retour de
+  `vava_health` par un appel isolé ; il ne lit que la mémoire et ne protège plus un compte qui a perdu le droit. Aucun
+  RPC, évènement ni boucle ajouté. Essais `admin_invulnerability_spec` (15). Rapport `docs/plan/rapports/T-138.md`.
+  Relecture sécurité faite (à corriger, aucun bloquant), suites appliquées : observation bornée (corps près de
+  l'ancrage, `spectateMaxMs`, au journal), raisons au droit perdu retirées au changement de rang et évènement
+  `vava_admin:toolsReset` au seul joueur, `tool(nom, false)` sans droit, export `isInvulnerable`, doc « tout coup et
+  tout sort qui blessent », faim et soif écrites comme décision. Relecture réseau OK (3 mineurs), contre-relecture
+  sécurité (C-1 à C-4), suites appliquées : l'observation ne protège que le corps caché sous l'observé (distance
+  horizontale au plus 20 m et au moins 6 m sous lui), réglages contrôlés au démarrage, 60 s entre deux protections
+  d'observation, une seule échéance par joueur ; la RPC `tool` essayée par le vrai `core.rpc`. 30 essais.
+  **À tester en jeu** : `docs/tests/registre.md` § 9 bis (22 tests).
+- Pour T-149 (entrée sur la branche `agents/T-112`, relecture réseau R-3 de T-138) : appeler
+  `exports.vava_admin:isInvulnerable(src)` une fois par effet, au moment où il touche sa cible, jamais en boucle ni à
+  chaque image.
+- Suite : T-151 (envois de `vava_admin` par `core.net.send`), trouvée pendant T-138.
 
 ### T-139 — Apparition confirmée par le core
 - Agent : vava-dev-lua (cette tâche autorise à toucher le core, `server/players/`) · Dépend de : — · Statut : à faire

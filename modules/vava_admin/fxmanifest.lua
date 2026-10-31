@@ -8,6 +8,8 @@
            servi au seul serveur.
            Demandes au Conseil (1.10.0) : nature, position lue par le serveur, témoins d'un signalement de joueur,
            demandes ouvertes par compte, exports submitRequest et requestOf pour la bannière de vava_pause.
+           Invulnérabilité tenue par le serveur (1.11.0) : l'outil, le vol libre et l'observation protègent de la
+           chaîne de dégâts de vava_health (modificateur d'annulation vava_admin:invulnerabilite).
     Dépendances : vAvA_core ≥ 0.5.0 ; vava_ui ≥ 1.0.0 (polices, grain, papier et coins du Registre, par
                   nui://vava_ui/…) ; facultatives : vava_health, vava_needs, vava_inventory (actions sur les joueurs),
                   vava_hud (notifications)
@@ -20,7 +22,7 @@ use_experimental_fxv2_oal 'yes'
 
 name 'vava_admin'
 description 'Administration vAvA (Registre du Conseil)'
-version '1.10.0'
+version '1.11.0'
 
 dependency 'vAvA_core'
 dependency 'vava_ui'
@@ -46,6 +48,7 @@ shared_scripts {
 server_scripts {
     'config.lua',                -- complète VavaAdmin.config : ce que lit le seul serveur
     'shared/requests.lua',       -- 1.10.0 : logique pure des demandes, servie au seul serveur (tests/spec)
+    'shared/invulnerability.lua', -- 1.11.0 : règles pures de l'invulnérabilité, servies au seul serveur (tests/spec)
     'server/core.lua',
     'server/ranks.lua',
     'server/store.lua',
@@ -55,6 +58,7 @@ server_scripts {
     'server/bans.lua',
     'server/reports.lua',
     'server/players.lua',
+    'server/invulnerability.lua',
     'server/spectate.lua',
     'server/actions.lua',
     'server/requests.lua',

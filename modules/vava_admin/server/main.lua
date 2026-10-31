@@ -1,7 +1,8 @@
 --[[
     vava_admin/server/main.lua
     Rôle : déclaration du module auprès du core : membres du Conseil chargés, journal purgé, bans vérifiés à la
-           connexion, retour des membres partis en pleine observation, intentions du panneau, outils des autres
+           connexion, retour des membres partis en pleine observation, invulnérabilité tenue par le serveur (modificateur
+           de la chaîne de vava_health), intentions du panneau, outils des autres
            modules, commandes de la console, oubli des joueurs partis ; à l'arrêt, les joueurs immobilisés sont libérés.
     Dépendances : tous les fichiers server/ du module
 ]]
@@ -18,6 +19,7 @@ local bans = VavaAdmin.bans
 local reports = VavaAdmin.reports
 local players = VavaAdmin.players
 local spectate = VavaAdmin.spectate
+local invulnerability = VavaAdmin.invulnerability
 local actions = VavaAdmin.actions
 local rpc = VavaAdmin.rpc
 local extensions = VavaAdmin.extensions
@@ -31,6 +33,7 @@ local function forget(payload)
     actions.forget(src)
     reports.forget(src)
     spectate.forget(src)
+    invulnerability.forget(src)
 end
 
 local function setup()
@@ -55,6 +58,8 @@ local function setup()
     if not ok then return false, err end
     ok, err = spectate.start()
     if not ok then return false, 'retour des observations : ' .. tostring(err) end
+    ok, err = invulnerability.start()
+    if not ok then return false, 'invulnérabilité : ' .. tostring(err) end
     local id
     id, err = core.hooks.after('core:player:dropped', forget)
     if not id then return false, err end

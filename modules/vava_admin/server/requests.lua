@@ -8,7 +8,7 @@
            supérieur) puis s'inscrivent au journal.
     Dépendances : shared/constants.lua, config.lua, server/core.lua, server/ranks.lua, server/staff.lua,
                   server/extensions.lua, server/audit.lua, server/bans.lua, server/reports.lua, server/players.lua,
-                  server/actions.lua, server/store.lua
+                  server/actions.lua, server/invulnerability.lua, server/store.lua
 ]]
 
 local ipairs, unpack = ipairs, table.unpack
@@ -21,6 +21,7 @@ local bans = VavaAdmin.bans
 local reports = VavaAdmin.reports
 local players = VavaAdmin.players
 local actions = VavaAdmin.actions
+local invulnerability = VavaAdmin.invulnerability
 local store = VavaAdmin.store
 local extensions = VavaAdmin.extensions
 local cfg = VavaAdmin.config
@@ -51,6 +52,7 @@ local MODULE_TOOL = { type = 'string', min = 3, max = VavaAdmin.TOOL_LIMITS.key,
 ---@field limit table
 ---@field where string   game, web ou both
 ---@field handler fun(actor: vAvA.AdminActor, ...): boolean, any
+---@field release? fun(src: integer, ...): boolean, any   sans le droit (en jeu) : ce qui reste permis, couper seulement
 
 ---@type table<string, vAvA.AdminRequest>
 local requests = {}
@@ -178,10 +180,21 @@ define('announce', 'announce', { TEXT }, limits.action, BOTH, function(actor, te
     audit.record(actor, 'announce', nil, { message = text })
     return true
 end)
+-- outils du membre sur lui-même (aucune cible : la règle du rang ne s'y applique pas) ; l'invulnérabilité et le vol
+-- libre sont tenus par le serveur (server/invulnerability.lua) avant d'être appliqués par le client
 define('tool', 'tools', { TOOL, BOOL }, limits.action, GAME, function(actor, name, enabled)
+    local ok, code = invulnerability.set(actor, name, enabled)
+    if not ok then return false, code end
     audit.record(actor, 'tool', nil, { outil = name, actif = enabled and 'oui' or 'non' })
     return true
 end)
+-- couper un outil ne donne rien : permis sans le droit (rang abaissé ou révoqué, relecture S-3), sans journal ; rallumer
+-- reste refusé
+requests.tool.release = function(src, name, enabled)
+    if enabled ~= false then return false, 'forbidden' end
+    invulnerability.drop(src, name)
+    return true
+end
 -- outil d'un module : le droit est celui que le module a déclaré ; le module revérifie chaque action
 define('moduleTool', 'view', { MODULE_TOOL }, limits.read, GAME, function(actor, key)
     return extensions.check(actor, key)

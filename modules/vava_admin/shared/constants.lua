@@ -13,6 +13,9 @@ VavaAdmin.EVENTS = {
     NOTIFY = 'vava_admin:notify',             -- message au joueur : { text, kind, title? }
     ANNOUNCE = 'vava_admin:announcement',     -- annonce du Conseil à tout le serveur (seul envoi à tous)
     REPORT = 'vava_admin:reportNew',          -- nouveau signalement, aux seuls membres qui les traitent
+    -- 1.11.0 : outils remis à zéro (vol libre, invisibilité, invulnérabilité, observation), au seul joueur dont le rang
+    -- vient de perdre un droit d'outil ; sans valeur
+    TOOLS_RESET = 'vava_admin:toolsReset',
 }
 
 -- Hooks déclenchés par le module.

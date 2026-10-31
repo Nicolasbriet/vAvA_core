@@ -1,7 +1,8 @@
 --[[
     vava_admin/client/main.lua
     Rôle : touche et commande d'ouverture du Registre et touche du vol libre (réglables, aucune boucle), messages du
-           Conseil au joueur, annonces, alertes de signalement pour le personnel, commande /signaler pour tous.
+           Conseil au joueur, annonces, alertes de signalement pour le personnel, commande /signaler pour tous, outils
+           remis à zéro quand le rang perd un droit d'outil (1.11.0).
     Dépendances : shared/constants.lua, config_client.lua, tous les fichiers client/ du module
 ]]
 
@@ -79,6 +80,15 @@ RegisterNetEvent(EVENTS.REPORT, function(payload)
     if type(payload) ~= 'table' or type(payload.text) ~= 'string' then return end
     notify.show(payload.text, 'warning')
     if panel.isOpen() then nui.send('reportsChanged') end
+end)
+
+-- 1.11.0 : le rang vient de perdre un droit d'outil (envoyé à ce seul joueur) : vol libre, invisibilité,
+-- invulnérabilité et observation coupés ici même ; un message seulement si l'un d'eux était actif
+RegisterNetEvent(EVENTS.TOOLS_RESET, function()
+    local state = tools.state()
+    local active = state.noclip or state.invisible or state.godmode or state.spectating ~= nil
+    tools.reset()
+    if active then notify.show(cfg.messages.toolsWithdrawn, 'warning') end
 end)
 
 core.hooks.after('core:character:spawning', tools.reapply)
