@@ -1,9 +1,10 @@
 # Santé — procédure de test en jeu
 
-Procédure pour vérifier en jeu `vava_health` 1.1.3 : vie conservée, blessures, mise à terre décidée par le serveur,
+Procédure pour vérifier en jeu `vava_health` 1.3.0 : vie tenue par le serveur, blessures, mise à terre décidée par le serveur,
 relève par un autre joueur, retour au lieu de soins, soins par objets et par le Conseil, et ses liens avec les
 besoins, l'inventaire, la voix et la magie. Comptez 1 h 15, dont 30 min à deux ; les tests à deux joueurs sont marqués
-**(2 joueurs)**. Un test se cite « sante 5-3 ». Le ligotage n'existe pas encore : il n'est pas testé.
+**(2 joueurs)**. Un test se cite « sante 5-3 ». Le ligotage n'existe pas encore : il n'est pas testé. La chaîne de
+dégâts (coups, modificateurs, coups natifs annulés, client qui ment) a sa propre procédure : [combat.md](combat.md) § 1.
 
 ## 0. Préparation
 
@@ -30,9 +31,10 @@ besoins, l'inventaire, la voix et la magie. Comptez 1 h 15, dont 30 min à deux 
 
 ## 1. Vie et blessures
 
-La vie de 0 à 100 % est la part de la vie GTA au-dessus du seuil de mise à terre (100). Le serveur la lit toutes les
-500 ms et l'enregistre dans le personnage toutes les 10 s ; la récupération automatique de GTA est coupée
-(`naturalRegen = false`).
+La vie de 0 à 100 % est la part de la vie GTA au-dessus du seuil de mise à terre (100). Elle est tenue par le
+serveur (1.3.0) : il lit le ped toutes les 500 ms pour les pertes natives (chute, noyade) et l'enregistre dans le
+personnage à chaque soin et transition, au plus toutes les 10 s après des pertes ; la récupération automatique de GTA
+est coupée (`naturalRegen = false`).
 
 | # | Faire | Attendu |
 |---|---|---|
@@ -47,7 +49,8 @@ La vie de 0 à 100 % est la part de la vie GTA au-dessus du seuil de mise à ter
 
 ## 2. Mise à terre
 
-Sous le seuil, le serveur met à terre (au plus 500 ms après la chute). Délais : rendre l'âme possible après 3 min
+Le joueur est mis à terre par le serveur dès que sa vie atteint 0 (coup, sort, faim, `/vie 0` : aussitôt) ; une
+chute est lue au plus 500 ms après. Délais : rendre l'âme possible après 3 min
 (`giveUpAfterMs`), porté au lieu de soins d'office après 10 min (`autoRespawnMs`). Le temps à terre n'est compté que
 connecté et apparu.
 
@@ -58,7 +61,7 @@ connecté et apparu.
 | 3 | Attendre 1 min en regardant le décompte. | Décompte régulier ; il se recale toutes les 10 s sur le serveur (un saut d'une seconde au plus). |
 | 4 | Registre (`F10`, il s'ouvre à terre) → Joueurs → vous. | Étiquette « À terre », Vie 0 %. |
 | 5 | Codex (`F1`) → chapitre « Santé ». | « Relever une personne à terre » (`G`) et « Rendre l'âme (à terre, maintenir) » (`E`). |
-| 6 | Se faire relever (Registre, § 6-2) ; `/vie 60`, puis `/vie 0`. | Le personnage s'effondre aussitôt et reste au sol, sous l'écran à terre (le client le couche à une vie GTA de 0, jamais au seuil de 100) ; médaillon vide, rouge ; `/vie` → « à terre ». Jamais debout sous l'écran à terre : à me remonter s'il l'est. |
+| 6 | Se faire relever (Registre, § 6-2) ; `/vie 60`, puis `/vie 0`. | Le personnage s'effondre aussitôt et reste au sol, sous l'écran à terre (mis à terre par le serveur sans attendre la lecture du ped, raison `api` ; le client le couche à une vie GTA de 0, jamais au seuil de 100) ; médaillon vide, rouge ; `/vie` → « à terre ». Jamais debout sous l'écran à terre : à me remonter s'il l'est. |
 
 ## 3. Ce qui est bloqué à terre
 
@@ -161,6 +164,9 @@ aussi. Soigner relève à 100 % un joueur à terre, ou rend toute sa vie à un j
 | 4 | À terre : quitter pour revenir debout ; changer de personnage et revenir. | Toujours à terre (8-2, 8-3). |
 | 5 | À terre : manger, se soigner, prendre une hache, jeter un objet. | Tout refusé : « Vous êtes à terre. » (§ 3). |
 | 6 | À terre : `G` pour se relever soi-même. | Rien. |
+| 7 | **(2 joueurs)** Coups natifs : A frappe B au poing, puis avec une arme vanilla. | Aucune perte chez B : [combat 1-15 et 1-16](combat.md). |
+| 8 | **(2 joueurs)** A lance une explosion vanilla près de B. | Rien chez B : [combat 1-17](combat.md). |
+| 9 | B remet sa vie GTA au maximum sur son client (`/tricher` de `vava_example_combat`). | Vie du serveur remise en 2 à 3 s, une ligne de console : [combat 1-21](combat.md). |
 
 ## 11. Resmon et base
 
@@ -186,6 +192,13 @@ FROM vava_admin_logs WHERE action IN ('heal', 'feed') ORDER BY id DESC LIMIT 10;
   `feed`).
 
 ## 12. Ce que je ne peux pas avoir vérifié hors jeu
+
+- **Vie tenue par le serveur (1.3.0)** : la vie lue par `/vie`, le Registre et les soins est celle du serveur ; le ped
+  ne sert plus qu'à lire les pertes natives et à corriger un client en retard. Une ligne « vie du client au-dessus de
+  celle du serveur » ou « apparition non confirmée après 20 s » dans la console du serveur, sans client modifié, est à
+  me remonter ([combat](combat.md) § 2).
+- Après un soin (`/vie`, bande, Registre), la vie ne doit jamais redescendre seule dans les 3 s (fenêtre
+  d'application, `combat` 1-7).
 
 - **Le seuil, à regarder en premier** : `/vie 0`, la dernière perte de faim ou de soif et un sort qui vide la vie
   couchent maintenant le ped à une vie GTA de 0 ; toute mise à terre envoie l'ordre de le coucher, et un ped resté au

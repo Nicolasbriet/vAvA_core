@@ -720,8 +720,18 @@ maquettes.
 Référence : `docs/plan/COMBAT_V1.md`. Ordre à respecter : chaîne de dégâts, moteur, défense, réglages, puis
 seulement l'éditeur (phase 6).
 
+Ouverte le 31 octobre 2026 avant la porte T-109, sur décision du porteur du projet (« si il reste des tokens tu peux
+faire tout le système de combat ») : la porte T-119 reste à passer en jeu.
+
 ### T-110 — Chaîne de dégâts commune
-- Agents : vava-architecte → vava-dev-lua · Dépend de : — · Statut : à faire
+- Agents : vava-architecte → vava-dev-lua (cette tâche autorise à toucher `vava_needs`, `docs/plan/COMBAT_V1.md` § 1, dans les limites de la spec) · Dépend de : — · Statut : à tester en jeu (relu sécurité et réseau, suites appliquées)
+- Fait le 31 octobre 2026 : `vava_health` 1.3.0 (vie tenue par le serveur, export `hit` au paquet fermé signé par le
+  serveur, registre `vava_health:modifiers` en six étapes, hook `vava_health:hit`, pertes natives lues, dégâts natifs
+  entre joueurs annulés côté serveur, ped lu d'office 20 s après l'ordre d'apparition, `damage` enveloppe de `hit`,
+  journal `vava_health_hits`), `vava_needs` 1.2.1 (privation par `hit`), `vava_example_combat` 1.0.0 (développement
+  seulement). Spec `docs/plan/specs/T-110.md`, rapport `docs/plan/rapports/T-110.md`. **À tester en jeu** :
+  `docs/tests/combat.md` (31 tests, dont 16 à deux joueurs : coups et mise à terre 1-2, 1-3 ; modificateurs 1-8 à 1-13 ;
+  natifs annulés 1-15 à 1-17 ; `/tricher` corrigé 1-21 ; mesures réseau 1-22, 1-27 à 1-31).
 - Export serveur `vava_health:hit(target, paquet)`, registre de modificateurs ordonnés, hooks `vava_health:hit` ;
   annulation des dégâts natifs de GTA entre joueurs.
 - La vie GTA appartient au client : `vava_health:set` (soin, blessure, dégâts des sorts appliqués par
@@ -764,6 +774,22 @@ seulement l'éditeur (phase 6).
 - Agent : vava-dev-lua · Dépend de : T-110 · Statut : à faire
 - Les dégâts de `vava_magic` passent par `hit` ; les boucliers et résistances deviennent des modificateurs ; même
   comportement en jeu pour les 11 sorts.
+- Relecture sécurité de T-110 : `vava_magic` juge encore la blessure sur la vie du ped (`server/world.lua:43-47`,
+  `casting.lua:202` et `254-264`, `interruptOnHurt`) : un client qui garde sa vie GTA au maximum n'est jamais
+  interrompu. Lire la vie par `exports.vava_health:get` ou s'abonner à `vava_health:hit` `after`. Les sorts passent
+  aujourd'hui par `damage` sans `source` et contournent donc `chain.pvp` : leur donner leur `source` (spec T-110 § 12.2).
+
+### T-138 — Invulnérabilité du Registre tenue par le serveur
+- Agent : vava-dev-lua (cette tâche autorise à toucher `vava_admin`) · Dépend de : T-110 · Statut : à faire
+- Spec T-110 § 13 : l'invulnérabilité du Registre n'est que locale (`SetEntityInvincible`) ; les sorts la traversent
+  déjà, les coups de la chaîne aussi. `vava_admin` garde l'état côté serveur et déclare un modificateur d'annulation
+  `vava_admin:invulnerabilite` au registre `vava_health:modifiers`.
+
+### T-139 — Apparition confirmée par le core
+- Agent : vava-dev-lua (cette tâche autorise à toucher le core, `server/players/`) · Dépend de : — · Statut : à faire
+- Spec T-110 § 13, option B : le temps de jeu, les positions, `vava_arrival` et les envois de proximité croient encore
+  la déclaration `core:characters:spawned` du client. Le core la confirme lui-même quand le ped existe après l'ordre
+  d'apparition (délai de grâce), et expose l'état confirmé.
 
 ### T-119 — PORTE : sensations du combat — **HUMAIN**
 - Dépend de : T-110 à T-116 · Statut : à faire

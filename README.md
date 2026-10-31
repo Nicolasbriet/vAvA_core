@@ -46,7 +46,7 @@ Le `server.cfg` contient la clé de licence et le mot de passe de la base : il n
 
 ## Serveur de test et serveur ouvert au public
 
-Le dossier `examples/` contient cinq ressources de **développement**. **Ne jamais les `ensure` sur un serveur ouvert
+Le dossier `examples/` contient six ressources de **développement**. **Ne jamais les `ensure` sur un serveur ouvert
 au public** (la Chancellerie les pose dans `[vava-dev]` sans jamais les lancer d'office) :
 
 | Ressource | Ce qu'elle offrirait |
@@ -56,6 +56,7 @@ au public** (la Chancellerie les pose dans `[vava-dev]` sans jamais les lancer d
 | `vava_example_items` | sept objets de démonstration, dont une Bande de lin qui soigne, et leurs images (~47 Ko) téléchargées par chaque joueur |
 | `vava_anim_test` | `/anim`, `/epee`, `/animstop`, `/animprop`, et un `.ycd` téléchargé par chaque joueur |
 | `vava_example_atelier` | deux ateliers d'exemple dans l'Atelier du Conseil (données en mémoire) et `/atelier_exemple`, qui écrit au journal du Conseil |
+| `vava_example_combat` | `/frapper` (coups sur n'importe quel joueur par la chaîne de dégâts), `/esquive`, `/bouclier`, `/resistance`, `/chaine`, et des armes vanilla, une explosion et `/tricher` côté client |
 
 Elles sont en plus **inoffensives par construction** : chacune refuse de démarrer tant que la convar serveur
 `vava_env` ne vaut pas exactement `dev` (console : « mode développement absent »). Sans cette ligne, elles ne
