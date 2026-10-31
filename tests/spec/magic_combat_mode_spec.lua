@@ -78,7 +78,7 @@ describe('vava_magic et le mode combat (T-149)', function()
     describe('côté joueur', function()
         local cfg, bridge, controls, targeting
         local combatState, combatArmed, armedCalls, notes, commands, threads, pedWeapon, woken, castCalls
-        local players, locked, clock
+        local players, locked, clock, nuiHandlers
 
         local function stubs()
             combatState, combatArmed, armedCalls, notes, commands, threads = 'started', nil, 0, {}, {}, {}
@@ -169,7 +169,12 @@ describe('vava_magic et le mode combat (T-149)', function()
                 knownSpells = function() return { 'boule_de_feu' } end,
                 onChange = function() end,
             }
-            VavaMagic.nui = { send = function() end }
+            nuiHandlers = {}
+            VavaMagic.nui = {
+                send = function() end,
+                modal = function() return false end,
+                on = function(name, fn) nuiHandlers[name] = fn end,
+            }
             VavaMagic.hud = { setAwake = function() end }
             VavaMagic.aim = { direction = function() return { x = 1.0, y = 0.0, z = 0.0 } end }
             VavaMagic.casting = { isCasting = function() return false end, start = function() castCalls = castCalls + 1 end }
@@ -178,7 +183,11 @@ describe('vava_magic et le mode combat (T-149)', function()
                 bindHold = function(name, down, up) commands['+' .. name], commands['-' .. name] = down, up end,
                 command = function(name, _, handler) commands['/' .. name] = handler end,
             }
-            helper.loadAll({ 'modules/vava_magic/client/targeting.lua', 'modules/vava_magic/client/controls.lua' })
+            helper.loadAll({
+                'modules/vava_magic/client/targeting.lua',
+                'modules/vava_magic/client/controls.lua',
+                'modules/vava_magic/client/wheel.lua',
+            })
             controls, targeting = VavaMagic.controls, VavaMagic.targeting
             -- un sort de feu : clic gauche d'un sort sans visée
             controls.register('boule_de_feu', { cast = function() castCalls = castCalls + 1 end })
@@ -292,6 +301,25 @@ describe('vava_magic et le mode combat (T-149)', function()
             end)
         end)
 
+        describe('roue (client/wheel.lua)', function()
+            it('sort choisi l’épée en main : « rangez votre arme », un seul appel à vava_combat (R-3)', function()
+                combatArmed = SWORD
+                nuiHandlers['wheel:choose']({ spell = 'lueur' })
+                assert.same({ cfg.texts.errors.armed }, texts())
+                assert.equal(1, armedCalls)
+                assert.equal('lueur', VavaMagic.state.selected())
+            end)
+
+            it('pendant le rengainement : « vous rengainez » ; mains libres : rien', function()
+                combatArmed = SHEATHING
+                nuiHandlers['wheel:choose']({ spell = 'lueur' })
+                assert.same({ cfg.texts.errors.sheathing }, texts())
+                combatArmed = nil
+                nuiHandlers['wheel:choose']({ spell = 'boule_de_feu' })
+                assert.equal(1, #notes)
+            end)
+        end)
+
         describe('verrou de la magie (même bouton que le combat)', function()
             local function click()
                 commands['+cible']()
@@ -350,13 +378,14 @@ describe('vava_magic et le mode combat (T-149)', function()
     end)
 
     describe('serveur : contrôles durs (states.hardControl, export hardControl)', function()
-        local states, registered, now, hardMagic
+        local states, registered, now, hardMagic, blockers, displayOrder
 
-        before_each(function()
+        local function loadStates()
             helper.reset()
             VavaMagic = nil
             helper.loadAll({ 'modules/vava_magic/shared/constants.lua', 'modules/vava_magic/config.lua' })
-            now, registered = 1000, {}
+            if displayOrder then VavaMagic.config.states.order = displayOrder end
+            now, registered, blockers = 1000, {}, {}
             _G.GetGameTimer = function() return now end
             _G.TriggerClientEvent = function() end
             _G.exports = setmetatable({}, { __call = function(_, name, fn) registered[name] = fn end })
@@ -366,11 +395,35 @@ describe('vava_magic et le mode combat (T-149)', function()
             VavaMagic.bridge = { GetCharacterId = function(src) return src == 3 and 42 or nil end }
             VavaMagic.world = { freeze = function() end, setState = function() end }
             VavaMagic.combat = {}
-            VavaMagic.casting = { current = function() return nil end }
+            VavaMagic.casting = {
+                current = function() return nil end,
+                addBlocker = function(fn) blockers[#blockers + 1] = fn end,
+            }
+            VavaMagic.bridge.OnCouncilAction = function() return true end
             VavaMagic.sheets, VavaMagic.mana = {}, {}
             helper.loadAll({ 'modules/vava_magic/server/states.lua', 'modules/vava_magic/server/api.lua' })
             states = VavaMagic.states
             hardMagic = registered.hardControl
+        end
+
+        before_each(function()
+            displayOrder = nil
+            loadStates()
+        end)
+
+        it('ordre d’affichage incomplet (S-2) : gelé, renversé, chancelant restent des contrôles et empêchent d’incanter', function()
+            displayOrder = { 'burn', 'wet', 'slow' }
+            loadStates()
+            states.start()
+            assert.equal(1, #blockers)
+            for _, case in ipairs({ { 'frozen', 'frozen' }, { 'knockdown', 'knocked' }, { 'stagger', 'staggered' } }) do
+                assert.is_true(states.apply(3, case[1], { durationMs = 1500 }))
+                assert.equal(case[1], states.hardControl(3))
+                assert.equal(case[2], blockers[1](3))
+                states.remove(3, case[1])
+                assert.is_nil(blockers[1](3))
+                now = now + 100000
+            end
         end)
 
         it('aucun état, ou un état sans contrôle dur (mouillé, ralenti, brûlure) : nil', function()

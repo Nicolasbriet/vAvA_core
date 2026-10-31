@@ -61,7 +61,6 @@ shared_scripts {
     'config_client.lua',       -- ouvre VavaMagic.config : ce que lit le client
     'shared/progression.lua',
     'shared/geometry.lua',
-    'shared/hands.lua',        -- mains prises et mode combat (logique pure lue par le client)
 }
 
 -- règles pures du texte, du registre et des blessures (shared/) : servies au seul serveur
@@ -106,6 +105,7 @@ server_scripts {
 }
 
 client_scripts {
+    'shared/hands.lua',        -- mains prises et mode combat : logique pure lue par le seul client
     'client/core.lua',
     'bridge/client.lua',
     'client/nui.lua',

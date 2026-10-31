@@ -7,18 +7,14 @@
         actif, il coupe à chaque image l'attaque, la visée et le changement d'arme de GTA (seule boucle par image du
         fichier) ; endormi, rien ne tourne. Sortir une arme (de GTA, ou de l'inventaire : `vava_combat:armed()`, lu
         par le bridge) ou monter en véhicule le coupe, le sort reste choisi ; viser arme en main ne réveille pas le
-        mode. Ce qui se dit aux touches (règles de shared/hands.lua, T-149) : arme de GTA, « rangez votre arme » ;
-        arme qu'on rengaine (1,5 s), « vous rengainez » (même au clic gauche, mode endormi) ; une fois par arme sortie,
-        jamais deux fois en moins de `controls.armedNoticeMs` ; arme du royaume en main (mode combat, mêmes boutons) :
-        rien. La roue et /lancer le disent toujours. Le serveur refuse lui-même.
+        mode. Mots aux touches : shared/hands.lua (T-149 : voir README). Le serveur refuse lui-même.
       - Clic droit maintenu : visée (réticule aux couleurs de l'élément, grisé hors de portée ; allure un peu
         ralentie ; aperçu au sol du point, du disque ou de la ligne visés — un ou deux segments —, du rayon autour de
         soi pour une zone centrée sur le lanceur, ou du cône devant lui). Clic gauche : le sort fait son geste (chaque sort
         déclare le sien, `controls.register`). Molette : sort suivant ou précédent du même élément.
     Le serveur revérifie tout : la visée n'est qu'une proposition.
-    Dépendances : shared/ (dont hands.lua), config_client.lua, client/core.lua, bridge/client.lua, client/nui.lua,
-                  client/state.lua, client/hud.lua, client/messages.lua, client/keys.lua, client/aim.lua,
-                  client/casting.lua
+    Dépendances : shared/, config_client.lua, client/core.lua, bridge/client.lua, client/nui.lua, client/state.lua,
+                  client/hud.lua, client/messages.lua, client/keys.lua, client/aim.lua, client/casting.lua
 ]]
 
 local ipairs, sort, concat, lower = ipairs, table.sort, table.concat, string.lower
@@ -148,9 +144,7 @@ local function reticle(spec, inRange)
     end
 end
 
---- Ce que tiennent les mains : `native` (arme de GTA sortie), `weapon` (arme du royaume en main), `sheathing` (qu'on
---- rengaine encore), ou nil (shared/hands.lua). Affichage seulement : le serveur refuse lui-même une arme ou un
---- bouclier au bras.
+--- Ce que tiennent les mains (shared/hands.lua), ou nil. Affichage seulement.
 ---@param ped integer
 ---@return string|nil
 local function handsHeld(ped)
@@ -439,16 +433,20 @@ local function scroll(step)
     end
 end
 
+--- Ce que tiennent les mains (shared/hands.lua), ou nil.
+---@return string|nil
+function controls.held()
+    return handsHeld(PlayerPedId())
+end
+
 --- Mains prises (arme en main, ou qu'on rengaine) ?
 ---@return boolean
 function controls.armed()
     return handsHeld(PlayerPedId()) ~= nil
 end
 
---- « Rangez votre arme » ou « vous rengainez » (shared/hands.lua) : aux touches, une fois par arme sortie, jamais deux
---- fois en moins de `armedNoticeMs`, et rien pour une arme du royaume en main (la touche est au combat) ; `explicit`
---- (roue, /lancer) : toujours dit, et compté pour les touches. `held` : ce que l'appelant a vu dans les mains (relu
---- sinon).
+--- « Rangez votre arme » ou « vous rengainez » (hands.notice) ; `explicit` : roue, /lancer ; `held` : vu par l'appelant
+--- (relu sinon).
 ---@param explicit? boolean
 ---@param held? string
 function controls.noticeArmed(explicit, held)
@@ -465,8 +463,7 @@ local function onCast()
     if wheelOpen() then return end
     if not controls.isActive() then
         if not state.isMage() or not state.selected() then return end
-        -- mains prises : éveillé, le mot des touches ; endormi, seulement pendant le rengainement (le clic était sans
-        -- doute pour le sort : l'arme quitte la main) ; arme du royaume en main, rien (hands.notice)
+        -- endormi : seulement pendant le rengainement (le clic était pour le sort)
         local held = handsHeld(PlayerPedId())
         if held and (awake or held == hands.SHEATHING) then controls.noticeArmed(false, held) end
         return
@@ -480,8 +477,7 @@ end
 
 local function onAimDown()
     if not state.isMage() or not state.selected() or wheelOpen() then return end
-    -- mains prises : le mot des touches seul (rien pour une arme du royaume : le clic droit est au combat), sans
-    -- réveiller le mode ni viser (aucun relevé de 20 s pour rien)
+    -- mains prises : le mot des touches seul, sans réveiller le mode ni viser (aucun relevé de 20 s pour rien)
     local held = handsHeld(PlayerPedId())
     if held then
         controls.noticeArmed(false, held)
