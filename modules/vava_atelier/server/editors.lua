@@ -26,7 +26,7 @@ local fv, fs, rights = VavaAtelier.formvalues, VavaAtelier.formschema, VavaAteli
 -- fonctions qu'un éditeur peut déclarer (jamais copiées dans le descripteur)
 local FUNCTIONS = {
     'index', 'read', 'validate', 'options', 'compare', 'apply', 'remove', 'trial', 'endTrial', 'diff', 'upgrade',
-    'validateLot',
+    'validateLot', 'placeCheck',
 }
 local IS_FUNCTION = {}
 for _, name in ipairs(FUNCTIONS) do IS_FUNCTION[name] = true end
@@ -37,7 +37,7 @@ local editors = {}
 VavaAtelier.editors = editors
 
 -- Contexte du validateur, tiré de la config une fois.
-local schemaContext = { families = {}, rights = {}, icons = {} }
+local schemaContext = { families = {}, rights = {}, icons = {}, place = cfg.place }
 local floors, familyIndex = {}, {}
 for i, family in ipairs(cfg.families) do
     schemaContext.families[family.id] = true
@@ -76,6 +76,8 @@ for i, card in ipairs(cfg.upcoming) do upcomingRank[card.id] = i end
 ---@field kindOrder string[]   types, parents d'abord
 ---@field kindDepth table<string, integer>
 ---@field parents table<string, string|false>
+---@field trialPlay boolean     T-102 : l'essai se joue en jeu (la page se met de côté)
+---@field children table<string, string[]>  T-102 : types enfants de chaque type
 
 ---@type table<string, vAvA.AtelierEditor>
 local loaded = {}
@@ -158,6 +160,15 @@ local function load(id, owner)
         if kindDepth[a] ~= kindDepth[b] then return kindDepth[a] < kindDepth[b] end
         return kinds[a].rank < kinds[b].rank
     end)
+    -- T-102 : types enfants de chaque type (liste des lieux d'une fiche, RPC children), dans l'ordre de déclaration
+    local childrenOf = {}
+    for _, kind in ipairs(data.kinds) do
+        if kind.parent then
+            childrenOf[kind.parent] = childrenOf[kind.parent] or {}
+            local list = childrenOf[kind.parent]
+            list[#list + 1] = kind.id
+        end
+    end
     local descriptor = describe(id, data)
     local version, size = VavaAtelier.fingerprintSized(descriptor)
     if not version then
@@ -179,6 +190,7 @@ local function load(id, owner)
         fns = fns, kinds = kinds, firstKind = data.kinds[1].id, descriptor = descriptor, version = version,
         stored = fns.apply ~= nil and fns.remove ~= nil, hasTrial = fns.trial ~= nil, format = data.format or 1,
         texts = data.texts, kindOrder = kindOrder, kindDepth = kindDepth, parents = parents,
+        trialPlay = data.trialPlay == true, children = childrenOf,
     }
     return true
 end

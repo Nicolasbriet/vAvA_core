@@ -30,6 +30,7 @@ local entries, check, journal = VavaAtelier.entries, VavaAtelier.check, VavaAtel
 local rights = VavaAtelier.rights
 local cycle, history, trials, sync = VavaAtelier.cycle, VavaAtelier.history, VavaAtelier.trials, VavaAtelier.sync
 local archives = VavaAtelier.archives
+local placement = VavaAtelier.placement
 local limits = cfg.rateLimits
 local DEF = VavaAtelier.DEF
 
@@ -63,6 +64,21 @@ local BEFORE_NO = { type = 'integer', min = 0, max = DEF.versionMax }           
 local REF = { type = 'integer', min = 0, max = DEF.versionMax }
 local TOKEN = { type = 'string', min = DEF.tokenLength, max = DEF.tokenLength, pattern = '^[0-9a-f]+$' }
 local WHAT = { type = 'string', enum = { 'publish', 'restore' } }
+
+-- T-102 (§ 6.1 de la spec) : lieu d'une pose (clés de toutes les formes, facultatives : shared/place.lua refuse celles
+-- qui ne sont pas de la forme du type), bornes tirées de config.place ; parent ('' : aucun).
+local PLACE_LIMITS = cfg.place
+local COORD = { type = 'number', min = -PLACE_LIMITS.maxXY, max = PLACE_LIMITS.maxXY }
+local PLACE = { type = 'table', fields = {
+    x = { type = 'number', min = -PLACE_LIMITS.maxXY, max = PLACE_LIMITS.maxXY, optional = true },
+    y = { type = 'number', min = -PLACE_LIMITS.maxXY, max = PLACE_LIMITS.maxXY, optional = true },
+    z = { type = 'number', min = -PLACE_LIMITS.maxZ, max = PLACE_LIMITS.maxZ, optional = true },
+    h = { type = 'number', min = -720, max = 720, optional = true },
+    r = { type = 'number', min = 0, max = PLACE_LIMITS.maxRadius, optional = true },
+    points = { type = 'array', min = PLACE_LIMITS.polygonPoints.min, max = PLACE_LIMITS.polygonPoints.max,
+        optional = true, items = { type = 'table', fields = { x = COORD, y = COORD } } },
+} }
+local PARENT = ENTRY_OR_NEW
 
 -- Handlers ----------------------------------------------------------------------------------------------------------
 
@@ -166,6 +182,10 @@ local RPCS = {
     { RPC.HISTORY, { EDITOR, KIND, ENTRY, BEFORE_NO }, limits.read, storedRpc(RPC.HISTORY, history.list) },
     { RPC.VERSION, { EDITOR, KIND, ENTRY, VERSION_NO }, limits.read, storedRpc(RPC.VERSION, history.version) },
     { RPC.REMOVED, { EDITOR, KIND, PAGE }, limits.read, storedRpc(RPC.REMOVED, history.removed) },
+    -- T-102 : outil de placement
+    { RPC.PLACE, { EDITOR, KIND, ENTRY_OR_NEW, REV, PLACE, PARENT, VALUES }, limits.place,
+        storedRpc(RPC.PLACE, placement.place) },
+    { RPC.CHILDREN, { EDITOR, KIND, ENTRY }, limits.children, storedRpc(RPC.CHILDREN, placement.children) },
 }
 
 -- Hooks -------------------------------------------------------------------------------------------------------------

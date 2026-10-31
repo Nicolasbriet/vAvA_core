@@ -33,6 +33,8 @@ local session = {}
 VavaAtelier.session = session
 
 local open, pending = false, false
+-- T-102 : essai joué (page mise de côté, séance gardée ouverte côté serveur)
+local suspended = false
 -- atelier dont la page a demandé le descripteur en dernier (avis `entryChanged`)
 local currentEditor = nil
 -- ce qu'a pu changer une fiche (évènement entryChanged)
@@ -149,30 +151,66 @@ function session.open()
             return
         end
         message.closeKey = cfg.keys.open
-        open = true
+        open, suspended = true, false
         nui.send('open', message)
         nui.setFocus(true)
-        core.hooks.runAfter(HOOKS.STATE, { open = true })
+        core.hooks.runAfter(HOOKS.STATE, { open = true, placing = false, suspended = false })
     end)
 end
 
---- Ferme l'Atelier : page fermée, focus rendu au jeu, session rendue au serveur (sauf `tellServer == false`).
+--- Outil de placement (client/placer.lua), chargé après ce fichier.
+local function placer()
+    return VavaAtelier.placer
+end
+
+--- Ferme l'Atelier : visée arrêtée, fantômes retirés, page fermée, focus rendu au jeu, session rendue au serveur (sauf
+--- `tellServer == false`).
 ---@param tellServer? boolean
 function session.close(tellServer)
     if not open then return end
-    open = false
+    if placer() then placer().stop(true) end
+    if placer() then placer().leave() end
+    open, suspended = false, false
     currentEditor = nil
     nui.send('close')
     nui.setFocus(false)
     if tellServer ~= false then core.rpc.emit(RPC.CLOSE) end
-    core.hooks.runAfter(HOOKS.STATE, { open = false })
+    core.hooks.runAfter(HOOKS.STATE, { open = false, placing = false, suspended = false })
 end
 
 --- Arrêt de la ressource Atelier ouvert : la page disparaît avec elle, mais souris et clavier resteraient pris.
 function session.release()
     if not open then return end
-    open = false
+    open, suspended = false, false
     nui.setFocus(false)
+end
+
+--- T-102 : essai joué. La page se met de côté (seul un bandeau reste), le jeu reprend la main, la séance reste
+--- ouverte côté serveur (l'essai ne prend pas fin). `F9` ou /atelier : `resume`.
+---@return boolean
+function session.suspend()
+    if not open or suspended then return false end
+    if placer() then placer().stop(true) end
+    if placer() then placer().leave() end
+    suspended = true
+    nui.send('suspended', { on = true, line = cfg.placement.texts.suspended:format(cfg.keys.open) })
+    nui.setFocus(false)
+    core.hooks.runAfter(HOOKS.STATE, { open = false, placing = false, suspended = true })
+    return true
+end
+
+--- Fin de l'essai joué : page et focus rendus, sans nouvel accueil.
+function session.resume()
+    if not open or not suspended then return end
+    suspended = false
+    nui.send('suspended', { on = false })
+    nui.setFocus(true)
+    core.hooks.runAfter(HOOKS.STATE, { open = true, placing = false, suspended = false })
+end
+
+---@return boolean
+function session.isSuspended()
+    return suspended
 end
 
 -- Le membre a perdu le droit d'ouvrir l'Atelier : le serveur a déjà fermé sa session.
@@ -220,6 +258,11 @@ RegisterNetEvent(EVENTS.ENTRY_CHANGED, function(editorId, kindId, id, what, titl
     if open and currentEditor == editorId then
         nui.send('entryChanged', { editor = editorId, kind = kindId, id = id, what = what })
         if what == 'trialEnded' and VavaAtelier.relay then VavaAtelier.relay.bannerFor(editorId, nil) end
+        -- essai joué : la page est cachée jusqu'à F9, le membre est prévenu hors d'elle
+        if what == 'trialEnded' and suspended then
+            local name = type(title) == 'string' and #title <= 64 and title or id
+            session.feed(texts.trialEndedFeed:format(name), 'info')
+        end
     elseif what == 'trialEnded' then
         local name = type(title) == 'string' and #title <= 64 and title or id
         session.feed(texts.trialEndedFeed:format(name), 'info')

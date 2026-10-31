@@ -123,6 +123,9 @@ config.place = {
     maxRadius = 500.0,
     polygonPoints = { min = 3, max = 32 },
 }
+-- T-102 : outil de placement, ce que lit le seul serveur (le reste : config_client.lua, `placement`).
+config.placement.bucket = 0          -- instance où l'on place (les zones du royaume vivent dans l'instance 0)
+config.placement.childrenMax = 200   -- lignes au plus d'une réponse `children` (= bundle.maxChildren)
 
 config.rateLimits = {
     home = { capacity = 4, refillPerSecond = 0.5 },     -- ouverture et retour à l'accueil
@@ -134,6 +137,8 @@ config.rateLimits = {
     write = { capacity = 4, refillPerSecond = 0.5 },    -- enregistrer, essayer, arrêter, abandonner, retirer, reprendre
     preview = { capacity = 5, refillPerSecond = 1 },    -- résumé avant publication ou retour en arrière
     publish = { capacity = 2, refillPerSecond = 0.2 },  -- publier, revenir à une version
+    place = { capacity = 6, refillPerSecond = 2 },      -- T-102 : poser ou déplacer (six clics d'affilée, puis 2 / s)
+    children = { capacity = 4, refillPerSecond = 1 },   -- T-102 : lieux d'une fiche, de son parent, de ses enfants
 }
 
 -- Textes vus par les membres (l'interface a les siens : web/js/strings.js), lus par le seul serveur. Ceux que lit le
@@ -241,6 +246,15 @@ texts.changes = {
     restoreFrom = 'La version %d sera rétablie et deviendra la version %d.',
     removal = 'Retrait %s', removalChildren = 'et de ses %d %s', removedWith = 'et ses %d %s',
     titled = '%s : %s',
+    -- T-102 : résumés d'un lieu changé (aperçu de publication, journal) ; déplacement compté à partir de 0,5 m,
+    -- rotation à partir de 1°
+    place = {
+        placed = { masculine = 'posé', feminine = 'posée' },
+        moved = { masculine = 'déplacé de %s m', feminine = 'déplacée de %s m' },
+        turned = { masculine = 'tourné de %d°', feminine = 'tournée de %d°' },
+        radius = 'rayon de %s m à %s m',
+        redrawn = 'tracé redessiné (%d sommets)',
+    },
 }
 -- résumés des lignes du journal, avertissements des résumés
 -- compteurs accordés : %d avec `one` pour 0 et 1, `many` au-delà (shared/changes.lua › count)

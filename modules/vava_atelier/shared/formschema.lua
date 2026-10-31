@@ -42,15 +42,18 @@ local EDITOR_KEYS = set({
     'family', 'label', 'description', 'icon', 'order', 'right', 'texts', 'kinds',
     'index', 'read', 'validate', 'options', 'compare', 'apply', 'remove', 'trial', 'endTrial', 'diff',
     'format', 'upgrade', 'validateLot',
+    'trialPlay', 'placeCheck',
 })
 local REQUIRED_FUNCTIONS = { 'index', 'read', 'validate' }
 local OPTIONAL_FUNCTIONS = {
-    'options', 'compare', 'apply', 'remove', 'trial', 'endTrial', 'diff', 'upgrade', 'validateLot',
+    'options', 'compare', 'apply', 'remove', 'trial', 'endTrial', 'diff', 'upgrade', 'validateLot', 'placeCheck',
 }
 local TEXTS_KEYS = set({ 'trial', 'publish', 'publishHint', 'trialLine' })
 local KIND_KEYS = set({
     'id', 'noun', 'nounPlural', 'article', 'newLabel', 'layout', 'creatable', 'steps', 'placement', 'parent', 'form',
     'feminine',
+    -- T-102 : placement en jeu
+    'rules', 'template', 'autoTitle', 'hintField', 'hintFormat', 'ghost',
 })
 local FORM_KEYS = set({ 'titleField', 'groups', 'fields' })
 local GROUP_KEYS = set({ 'id', 'label', 'help', 'folded' })
@@ -436,6 +439,204 @@ function fs.checkForm(form, path)
     return true, nil, usesSource
 end
 
+-- T-102 : placement en jeu d'un type (rules, template, autoTitle, hintField, hintFormat, ghost) ------------------
+
+local RULES = VavaAtelier.RULES
+local RULES_KEYS = set({ 'inside', 'spacing', 'radius', 'vertices' })
+local INSIDE_KEYS = set({ 'slack' })
+local RADIUS_KEYS = set({ 'min', 'max', 'default' })
+local VERTICES_KEYS = set({ 'min', 'max' })
+local GHOST_KEYS = set({ 'field', 'models' })
+local LOOK_KEYS = set({ 'model', 'label', 'provisional' })
+local MODEL_PATTERN = VavaAtelier.MODEL_PATTERN
+-- bornes d'un lieu à défaut de config.place (essais)
+local PLACE_DEFAULT = { maxRadius = 500.0, polygonPoints = { min = 3, max = 32 } }
+
+--- Champ d'un formulaire, ou nil.
+local function fieldOf(form, id)
+    for _, field in ipairs(form.fields) do
+        if field.id == id then return field end
+    end
+    return nil
+end
+
+--- Texte à un seul « %s » (les « %% » mis à part) et sans autre directive.
+local function oneString(value)
+    local rest = value:gsub('%%%%', '')
+    local count = 0
+    for directive in rest:gmatch('%%(.?)') do
+        if directive ~= 's' then return false end
+        count = count + 1
+    end
+    return count == 1
+end
+
+--- `rules` d'un type placé.
+local function checkRules(kind, path, byId, limits)
+    local rules, placement = kind.rules, kind.placement
+    if placement == nil or placement == 'door' then
+        return fail(path, 'demande un placement point, oriented, circle ou polygon')
+    end
+    if type(rules) ~= 'table' then return fail(path, 'table attendue') end
+    local key = unknownKey(rules, RULES_KEYS)
+    if key then return fail(join(path, key), 'clé inconnue') end
+    local spacing = rules.spacing
+    if spacing ~= nil and (not isFinite(spacing) or spacing < 0 or spacing > RULES.spacingMax) then
+        return fail(join(path, 'spacing'), format('nombre de 0 à %d attendu (m)', RULES.spacingMax))
+    end
+    local radius = rules.radius
+    if radius ~= nil then
+        local here = join(path, 'radius')
+        if placement ~= 'circle' then return fail(here, 'seulement pour un placement circle') end
+        if type(radius) ~= 'table' then return fail(here, 'table { min, max, default } attendue') end
+        key = unknownKey(radius, RADIUS_KEYS)
+        if key then return fail(join(here, key), 'clé inconnue') end
+        for _, name in ipairs({ 'min', 'max', 'default' }) do
+            if not isFinite(radius[name]) then return fail(join(here, name), 'nombre fini attendu') end
+        end
+        if not (radius.min > 0 and radius.min <= radius.default and radius.default <= radius.max
+            and radius.max <= limits.maxRadius) then
+            return fail(here, format('0 < min ≤ default ≤ max ≤ %s attendu', tostring(limits.maxRadius)))
+        end
+    end
+    local vertices = rules.vertices
+    if vertices ~= nil then
+        local here = join(path, 'vertices')
+        if placement ~= 'polygon' then return fail(here, 'seulement pour un placement polygon') end
+        if type(vertices) ~= 'table' then return fail(here, 'table { min, max } attendue') end
+        key = unknownKey(vertices, VERTICES_KEYS)
+        if key then return fail(join(here, key), 'clé inconnue') end
+        local bounds = limits.polygonPoints
+        if not isInteger(vertices.min) or not isInteger(vertices.max) or vertices.min < bounds.min
+            or vertices.max > bounds.max or vertices.min > vertices.max then
+            return fail(here, format('entiers %d ≤ min ≤ max ≤ %d attendus', bounds.min, bounds.max))
+        end
+    end
+    local inside = rules.inside
+    if inside ~= nil then
+        local here = join(path, 'inside')
+        if not kind.parent then return fail(here, 'seulement pour un type à parent') end
+        local parent = byId[kind.parent]
+        if not parent or (parent.placement ~= 'circle' and parent.placement ~= 'polygon') then
+            return fail(here, 'le parent doit se placer en cercle ou en tracé')
+        end
+        if type(inside) ~= 'table' then return fail(here, 'table { slack } attendue') end
+        key = unknownKey(inside, INSIDE_KEYS)
+        if key then return fail(join(here, key), 'clé inconnue') end
+        local slack = inside.slack
+        if slack ~= nil and (not isFinite(slack) or slack < 0 or slack > RULES.slackMax) then
+            return fail(join(here, 'slack'), format('nombre de 0 à %d attendu (m)', RULES.slackMax))
+        end
+    end
+    return true
+end
+
+--- Un modèle de `ghost.models` : { model, label?, provisional? }.
+local function checkLook(look, here)
+    if type(look) ~= 'table' then return fail(here, 'table { model, label?, provisional? } attendue') end
+    local key = unknownKey(look, LOOK_KEYS)
+    if key then return fail(join(here, key), 'clé inconnue') end
+    if not isIdentifier(look.model, MODEL_PATTERN, MAX_MODEL) then
+        return fail(join(here, 'model'), format('nom de modèle au motif %s, %d octets au plus', MODEL_PATTERN,
+            MAX_MODEL))
+    end
+    if look.label ~= nil and not isText(look.label, 1, RULES.ghostLabel) then
+        return fail(join(here, 'label'), format('texte de 1 à %d octets attendu', RULES.ghostLabel))
+    end
+    if not isBool(look.provisional) then return fail(join(here, 'provisional'), 'booléen attendu') end
+    return true
+end
+
+--- `ghost` d'un type placé : champ dont la valeur choisit le modèle, et modèle par valeur (sans `models`, la valeur du
+--- champ, un widget model, est le modèle).
+local function checkGhost(kind, path)
+    local ghost = kind.ghost
+    if kind.placement == nil or kind.placement == 'door' then
+        return fail(path, 'demande un placement point, oriented, circle ou polygon')
+    end
+    if type(ghost) ~= 'table' then return fail(path, 'table { field, models? } attendue') end
+    local key = unknownKey(ghost, GHOST_KEYS)
+    if key then return fail(join(path, key), 'clé inconnue') end
+    local field = type(ghost.field) == 'string' and fieldOf(kind.form, ghost.field) or nil
+    if not field or (field.widget ~= 'select' and field.widget ~= 'segmented' and field.widget ~= 'model') then
+        return fail(join(path, 'field'), 'champ select, segmented ou model du formulaire attendu')
+    end
+    local models = ghost.models
+    local here = join(path, 'models')
+    if models == nil then
+        if field.widget ~= 'model' then return fail(here, 'obligatoire pour un champ qui n\'est pas un modèle') end
+        return true
+    end
+    if type(models) ~= 'table' then return fail(here, 'table valeur → { model, label?, provisional? } attendue') end
+    local count = 0
+    for value, look in pairs(models) do
+        count = count + 1
+        if count > RULES.ghostModels then return fail(here, format('%d modèles au plus', RULES.ghostModels)) end
+        local item = join(here, tostring(value))
+        if not isIdentifier(value, OPTION_PATTERN, MAX_MODEL) then return fail(item, 'valeur d\'un choix attendue') end
+        local ok, err = checkLook(look, item)
+        if not ok then return false, err end
+    end
+    return true
+end
+
+--- Clés de placement d'un type (T-102), son formulaire étant déjà contrôlé.
+---@param kind table
+---@param here string  chemin du type (« kinds[2] »)
+---@param byId table<string, table>  types de l'éditeur
+---@param limits table  config.place
+---@return boolean ok
+---@return string|nil err
+local function checkPlacement(kind, here, byId, limits)
+    local ok, err
+    if kind.rules ~= nil then
+        ok, err = checkRules(kind, join(here, 'rules'), byId, limits)
+        if not ok then return false, err end
+    end
+    local form = kind.form
+    if kind.template ~= nil then
+        local path = join(here, 'template')
+        if not kind.parent then return fail(path, 'seulement pour un type à parent') end
+        if not isList(kind.template, RULES.template.min, RULES.template.max) then
+            return fail(path, format('liste de %d à %d champs attendue', RULES.template.min, RULES.template.max))
+        end
+        local seen = {}
+        for i, id in ipairs(kind.template) do
+            local item = format('%s[%d]', path, i)
+            if type(id) ~= 'string' or not fieldOf(form, id) then return fail(item, 'champ du formulaire attendu') end
+            if id == form.titleField then return fail(item, 'jamais le champ titre (donné à la pose)') end
+            if seen[id] then return fail(item, 'champ en double') end
+            seen[id] = true
+        end
+    end
+    if kind.autoTitle ~= nil then
+        local path = join(here, 'autoTitle')
+        if not kind.parent then return fail(path, 'seulement pour un type à parent') end
+        local field = type(kind.autoTitle) == 'string' and fieldOf(form, kind.autoTitle) or nil
+        if not field or (field.widget ~= 'select' and field.widget ~= 'segmented') then
+            return fail(path, 'champ select ou segmented du formulaire attendu')
+        end
+    end
+    if kind.hintField ~= nil then
+        local field = type(kind.hintField) == 'string' and fieldOf(form, kind.hintField) or nil
+        if not field or (field.widget ~= 'slider' and field.widget ~= 'duration') then
+            return fail(join(here, 'hintField'), 'champ slider ou duration du formulaire attendu')
+        end
+    end
+    if kind.hintFormat ~= nil then
+        local path = join(here, 'hintFormat')
+        if kind.hintField == nil then return fail(path, 'demande hintField') end
+        if not isText(kind.hintFormat, 1, RULES.hintFormat) or not oneString(kind.hintFormat) then
+            return fail(path, format('texte de 1 à %d octets à un seul %%s attendu', RULES.hintFormat))
+        end
+    end
+    if kind.ghost ~= nil then
+        ok, err = checkGhost(kind, join(here, 'ghost'))
+        if not ok then return false, err end
+    end
+    return true
+end
+
 ---@class vAvA.AtelierSchemaContext
 ---@field families table<string, boolean>  familles connues (config.families)
 ---@field rights table<string, boolean>    droits permis (config.rights.allowed)
@@ -552,6 +753,16 @@ function fs.checkEditor(def, ctx)
         end
     end
 
+    -- T-102 : placement en jeu de chaque type (le formulaire et les parents sont déjà contrôlés)
+    local byId = {}
+    for _, kind in ipairs(def.kinds) do byId[kind.id] = kind end
+    local limits = ctx.place or (VavaAtelier.config and VavaAtelier.config.place) or PLACE_DEFAULT
+    for i, kind in ipairs(def.kinds) do
+        local ok, err = checkPlacement(kind, format('kinds[%d]', i), byId, limits)
+        if not ok then return false, err end
+    end
+    if def.trialPlay ~= nil and type(def.trialPlay) ~= 'boolean' then return fail('trialPlay', 'booléen attendu') end
+
     for _, name in ipairs(REQUIRED_FUNCTIONS) do
         if not isCallable(def[name]) then return fail(name, 'fonction obligatoire') end
     end
@@ -570,5 +781,9 @@ function fs.checkEditor(def, ctx)
     if def.validateLot ~= nil and def.apply == nil then
         return fail('validateLot', 'un lot n\'existe que dans un atelier gardé (apply et remove)')
     end
+    if def.placeCheck ~= nil and def.apply == nil then
+        return fail('placeCheck', 'un placement n\'est jugé que dans un atelier gardé (apply et remove)')
+    end
+    if def.trialPlay == true and def.trial == nil then return fail('trialPlay', 'un essai joué demande trial') end
     return true
 end

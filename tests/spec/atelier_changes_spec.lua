@@ -193,3 +193,66 @@ describe('vava_atelier changes', function()
         assert.equal('7 jours', changes.show(form.fields[9], 7 * DAY))
     end)
 end)
+
+-- T-102 : résumé d'un lieu changé (shared/changes.lua › place, combine). Règles documentées : spec T-102 § 3
+-- (shared/changes.lua) et § 7.5 : déplacement dit à partir de 0,5 m, rotation à partir de 1°.
+describe('vava_atelier changes : lieu (T-102)', function()
+    local changes, place
+
+    before_each(function()
+        helper.reset()
+        VavaAtelier = nil
+        helper.loadAll({
+            'modules/vava_atelier/shared/constants.lua',
+            'modules/vava_atelier/shared/bounds.lua',
+            'modules/vava_atelier/config.lua',
+            'modules/vava_atelier/shared/text.lua',
+            'modules/vava_atelier/shared/changes.lua',
+        })
+        changes = VavaAtelier.changes
+        place = VavaAtelier.config.texts.changes.place
+    end)
+
+    it('« déplacée de 12 m » (zone, féminin), « déplacé de 4 m » (point), 0,4 m : rien', function()
+        assert.equal('déplacée de 12 m', changes.place({ x = 0, y = 0, z = 0, r = 120 }, { x = 12, y = 0, z = 5, r = 120 },
+            true, place))
+        assert.equal('déplacé de 4 m', changes.place({ x = 0, y = 0, z = 0, h = 0 }, { x = 0, y = 4, z = 0, h = 0 },
+            false, place))
+        assert.equal('', changes.place({ x = 0, y = 0, z = 0, h = 0 }, { x = 0.4, y = 0, z = 0, h = 0 }, false, place))
+        assert.equal('déplacé de 1 m', changes.place({ x = 0, y = 0, z = 0 }, { x = 0.6, y = 0, z = 0 }, false, place))
+    end)
+
+    it('« tournée de 40° », au plus court ; moins de 1° : rien', function()
+        assert.equal('tournée de 40°', changes.place({ x = 0, y = 0, z = 0, h = 350 }, { x = 0, y = 0, z = 0, h = 30 },
+            true, place))
+        assert.equal('', changes.place({ x = 0, y = 0, z = 0, h = 10 }, { x = 0, y = 0, z = 0, h = 10.5 }, true, place))
+    end)
+
+    it('« rayon de 120 m à 140 m » ; avec un déplacement', function()
+        assert.equal('rayon de 120 m à 140 m', changes.place({ x = 0, y = 0, z = 0, r = 120 },
+            { x = 0, y = 0, z = 0, r = 140 }, true, place))
+        assert.equal('déplacée de 12 m, rayon de 120 m à 140 m', changes.place({ x = 0, y = 0, z = 0, r = 120 },
+            { x = 0, y = 12, z = 0, r = 140 }, true, place))
+    end)
+
+    it('« tracé redessiné (6 sommets) » ; même tracé : rien', function()
+        local before = { z = 0, points = { { x = 0, y = 0 }, { x = 10, y = 0 }, { x = 0, y = 10 } } }
+        local after = { z = 0, points = {} }
+        for i = 1, 6 do after.points[i] = { x = i, y = i * i } end
+        assert.equal('tracé redessiné (6 sommets)', changes.place(before, after, false, place))
+        assert.equal('', changes.place(before, before, false, place))
+    end)
+
+    it('« posée » (premier lieu) ; lieu absent : rien', function()
+        assert.equal('posée', changes.place(nil, { x = 0, y = 0, z = 0, r = 60 }, true, place))
+        assert.equal('posé', changes.place(nil, { x = 0, y = 0, z = 0 }, false, place))
+        assert.equal('', changes.place({ x = 0, y = 0, z = 0 }, nil, false, place))
+    end)
+
+    it('avec les enfants : « déplacée de 12 m, 2 points ajoutés » ; réglages séparés par « ; »', function()
+        assert.equal('déplacée de 12 m, 2 points ajoutés', changes.combine('', 'déplacée de 12 m', '2 points ajoutés'))
+        assert.equal('Fatigue de 2 à 3 ; déplacée de 12 m', changes.combine('Fatigue de 2 à 3', 'déplacée de 12 m', ''))
+        assert.equal('2 points ajoutés', changes.combine('', '', '2 points ajoutés'))
+        assert.equal('', changes.combine('', '', ''))
+    end)
+end)

@@ -463,3 +463,204 @@ describe('vava_atelier formschema', function()
         end)
     end)
 end)
+
+-- T-102 : placement en jeu d'un type (rules, template, autoTitle, hintField, hintFormat, ghost) et clés d'éditeur
+-- (trialPlay, placeCheck). Règles documentées : spec T-102 § 5.3, docs/api.md (§ vava_atelier, placement).
+describe('vava_atelier formschema : placement (T-102)', function()
+    local fs, ctx
+
+    local function noop() end
+
+    before_each(function()
+        helper.reset()
+        VavaAtelier = nil
+        helper.loadAll({
+            'modules/vava_atelier/shared/constants.lua',
+            'modules/vava_atelier/shared/bounds.lua',
+            'modules/vava_atelier/config.lua',
+            'modules/vava_atelier/shared/text.lua',
+            'modules/vava_atelier/shared/formvalues.lua',
+            'modules/vava_atelier/shared/formschema.lua',
+        })
+        fs = VavaAtelier.formschema
+        ctx = { families = { monde = true }, rights = { metiers = true }, icons = { recolte = true },
+            place = VavaAtelier.config.place }
+    end)
+
+    --- Atelier gardé à deux types : une zone (cercle) et ses points (orientés, enfants).
+    local function zones()
+        return {
+            family = 'monde', label = 'Récolte', description = 'Exemple.', icon = 'recolte', right = 'metiers',
+            texts = { trial = 'Tester', publish = 'Publier' }, trialPlay = true,
+            kinds = {
+                { id = 'zone', noun = 'zone', nounPlural = 'zones', article = 'la', newLabel = 'Nouvelle zone',
+                    layout = 'side', placement = 'circle', rules = { radius = { min = 10, max = 300, default = 60 } },
+                    form = { titleField = 'nom', fields = {
+                        { id = 'nom', widget = 'text', charset = 'name', min = 3, max = 40, label = 'Nom', help = 'Aide.' },
+                    } } },
+                { id = 'node', noun = 'point', nounPlural = 'points', article = 'le', newLabel = 'Nouveau point',
+                    layout = 'side', parent = 'zone', placement = 'oriented',
+                    rules = { inside = { slack = 5 }, spacing = 2 },
+                    template = { 'ressource', 'charges' }, autoTitle = 'ressource', hintField = 'charges',
+                    hintFormat = '%s récoltes',
+                    ghost = { field = 'ressource', models = {
+                        chene = { model = 'prop_tree_oak_01', label = 'chêne de GTA', provisional = true },
+                    } },
+                    form = { titleField = 'nom', fields = {
+                        { id = 'nom', widget = 'text', charset = 'name', min = 1, max = 40, label = 'Nom', help = 'Aide.' },
+                        { id = 'ressource', widget = 'select', label = 'Ressource', help = 'Aide.',
+                            options = { { value = 'chene', label = 'Chêne' }, { value = 'pin', label = 'Pin' } } },
+                        { id = 'charges', widget = 'slider', integer = true, min = 1, max = 20, step = 1,
+                            label = 'Récoltes', help = 'Aide.' },
+                        { id = 'repousse', widget = 'duration', min = 60, max = 86400, units = { 'min', 'h' },
+                            label = 'Repousse', help = 'Aide.' },
+                    } } },
+            },
+            index = noop, read = noop, validate = noop, apply = noop, remove = noop, trial = noop, endTrial = noop,
+            placeCheck = noop,
+        }
+    end
+
+    local function refused(def, path)
+        local ok, err = fs.checkEditor(def, ctx)
+        assert.is_false(ok, path)
+        assert.equal(path .. ' :', err:sub(1, #path + 2), err)
+    end
+
+    it('un atelier de récolte complet est accepté', function()
+        assert.same({ true }, { fs.checkEditor(zones(), ctx) })
+    end)
+
+    it('rules.radius sur un type non cercle refusé ; min > max refusé ; au-delà de config.place refusé', function()
+        local def = zones()
+        def.kinds[2].rules.radius = { min = 1, max = 5, default = 2 }
+        refused(def, 'kinds[2].rules.radius')
+        def = zones()
+        def.kinds[1].rules.radius = { min = 50, max = 20, default = 30 }
+        refused(def, 'kinds[1].rules.radius')
+        def = zones()
+        def.kinds[1].rules.radius = { min = 10, max = 501, default = 60 }
+        refused(def, 'kinds[1].rules.radius')
+        def = zones()
+        def.kinds[1].rules.radius.default = 5
+        refused(def, 'kinds[1].rules.radius')
+    end)
+
+    it('rules sans placement, clé inconnue, écart hors bornes refusés', function()
+        local def = zones()
+        def.kinds[1].placement = nil
+        refused(def, 'kinds[1].rules')
+        def = zones()
+        def.kinds[2].rules.angle = 3
+        refused(def, 'kinds[2].rules.angle')
+        def = zones()
+        def.kinds[2].rules.spacing = 101
+        refused(def, 'kinds[2].rules.spacing')
+    end)
+
+    it('rules.vertices seulement pour un tracé, dans config.place.polygonPoints', function()
+        local def = zones()
+        def.kinds[1].rules.vertices = { min = 3, max = 8 }
+        refused(def, 'kinds[1].rules.vertices')
+        def = zones()
+        def.kinds[1].placement, def.kinds[1].rules = 'polygon', { vertices = { min = 3, max = 33 } }
+        refused(def, 'kinds[1].rules.vertices')
+        def.kinds[1].rules.vertices.max = 32
+        assert.same({ true }, { fs.checkEditor(def, ctx) })
+    end)
+
+    it('inside sans parent placé en cercle ou en tracé refusé ; slack de 51 m refusé', function()
+        local def = zones()
+        def.kinds[1].placement = 'point'
+        def.kinds[1].rules = nil
+        refused(def, 'kinds[2].rules.inside')
+        def = zones()
+        def.kinds[1].rules.inside = { slack = 1 }
+        refused(def, 'kinds[1].rules.inside')
+        def = zones()
+        def.kinds[2].rules.inside.slack = 51
+        refused(def, 'kinds[2].rules.inside.slack')
+    end)
+
+    it('template avec le champ titre, un champ inconnu, vide, ou sur un type sans parent refusé', function()
+        local def = zones()
+        def.kinds[2].template = { 'nom', 'charges' }
+        refused(def, 'kinds[2].template[1]')
+        def = zones()
+        def.kinds[2].template = { 'ressource', 'inconnu' }
+        refused(def, 'kinds[2].template[2]')
+        def = zones()
+        def.kinds[1].template = { 'nom' }
+        refused(def, 'kinds[1].template')
+        def = zones()
+        def.kinds[2].template = {}
+        refused(def, 'kinds[2].template')
+    end)
+
+    it('autoTitle sur un slider refusé ; sur un type sans parent refusé', function()
+        local def = zones()
+        def.kinds[2].autoTitle = 'charges'
+        refused(def, 'kinds[2].autoTitle')
+        def = zones()
+        def.kinds[1].autoTitle = 'nom'
+        refused(def, 'kinds[1].autoTitle')
+    end)
+
+    it('hintFormat sans %s, à deux %s, ou sans hintField refusé ; hintField d\'un autre widget refusé', function()
+        local def = zones()
+        def.kinds[2].hintFormat = 'récoltes'
+        refused(def, 'kinds[2].hintFormat')
+        def.kinds[2].hintFormat = '%s et %s'
+        refused(def, 'kinds[2].hintFormat')
+        def.kinds[2].hintFormat = '%d récoltes'
+        refused(def, 'kinds[2].hintFormat')
+        def.kinds[2].hintFormat = '%s récoltes (100 %%)'
+        assert.same({ true }, { fs.checkEditor(def, ctx) })
+        def = zones()
+        def.kinds[2].hintField = nil
+        refused(def, 'kinds[2].hintFormat')
+        def = zones()
+        def.kinds[2].hintField = 'ressource'
+        refused(def, 'kinds[2].hintField')
+        def.kinds[2].hintField = 'repousse'
+        assert.same({ true }, { fs.checkEditor(def, ctx) })
+    end)
+
+    it('ghost.models de 65 entrées et modèle « a b » refusés ; sans models, un champ model est le modèle', function()
+        local def = zones()
+        local models = {}
+        for i = 1, 65 do models['m' .. i] = { model = 'prop_' .. i } end
+        def.kinds[2].ghost.models = models
+        refused(def, 'kinds[2].ghost.models')
+        def = zones()
+        def.kinds[2].ghost.models.chene.model = 'a b'
+        refused(def, 'kinds[2].ghost.models.chene.model')
+        def = zones()
+        def.kinds[2].ghost.models = nil
+        refused(def, 'kinds[2].ghost.models')
+        def = zones()
+        def.kinds[2].ghost.field = 'charges'
+        refused(def, 'kinds[2].ghost.field')
+        def = zones()
+        def.kinds[2].form.fields[2] = { id = 'ressource', widget = 'model', label = 'Apparence', help = 'Aide.',
+            choices = { { value = 'prop_tree_oak_01', label = 'Chêne' } } }
+        def.kinds[2].ghost = { field = 'ressource' }
+        def.kinds[2].autoTitle = nil
+        assert.same({ true }, { fs.checkEditor(def, ctx) })
+    end)
+
+    it('placeCheck sans apply refusé, non fonction refusé ; trialPlay non booléen, ou sans essai, refusé', function()
+        local def = zones()
+        def.apply, def.remove, def.trial, def.endTrial, def.trialPlay = nil, nil, nil, nil, nil
+        refused(def, 'placeCheck')
+        def = zones()
+        def.placeCheck = 'oui'
+        refused(def, 'placeCheck')
+        def = zones()
+        def.trialPlay = 'oui'
+        refused(def, 'trialPlay')
+        def = zones()
+        def.trial, def.endTrial = nil, nil
+        refused(def, 'trialPlay')
+    end)
+end)

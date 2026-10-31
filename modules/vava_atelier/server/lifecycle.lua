@@ -355,6 +355,8 @@ function cycle.read(ctx, id)
         rev = draft and draft.rev or 0, version = head.published and head.published.version or nil,
         removal = draft ~= nil and draft.removal == true,
         stale = draft ~= nil and head.published ~= nil and draft.base ~= head.published.version,
+        -- T-102 : lieu de la fiche lue (bloc « Lieu » du volet) et son parent
+        place = entry.place, parent = entry.parent,
     }
     if draft then
         result.holder = {
@@ -588,13 +590,18 @@ local function trialLot(ctx, head)
         ctx.accountId, cfg.bundle.maxChildren)
     if not refs then return nil, err end
     local items = { { head = head, kind = editor.kinds[head.kind], rowId = head.draft.row, depth = 1 } }
+    -- T-102 : retraits du lot (le module les cache pendant l'essai : `ctx.removed` de `trial`)
+    local removed = {}
     for _, ref in ipairs(refs) do
         if not ref.removal then
             local child = index.get(editor.id, ref.kind, ref.id)
             items[#items + 1] = { head = child, kind = editor.kinds[ref.kind], rowId = child.draft.row,
                 depth = ref.depth }
+        else
+            removed[#removed + 1] = { kind = ref.kind, id = ref.id }
         end
     end
+    items.removed = removed
     local wanted = {}
     for i, item in ipairs(items) do
         wanted[i] = { kind = item.kind, rowId = item.rowId, target = item, field = 'entry' }
@@ -653,6 +660,7 @@ function cycle.trial(ctx, id, rev)
         local def, children = trialDefs(items)
         local shown, why = calls.trial(editor, kind.def.id, def, {
             source = ctx.source, accountId = ctx.accountId, children = children, reason = 'start',
+            removed = items.removed,
         })
         if not shown then
             store.setStatus(rows, 'trial', 'draft')
@@ -693,7 +701,20 @@ function cycle.retrial(ctx, head, data, where, parentId)
         for _, ref in ipairs(trial.children) do
             if ref.kind == head.kind and ref.id == head.id then inTrial = true end
         end
-        if not inTrial then return end
+        if not inTrial then
+            -- T-102 : un enfant nouveau du tenant, posé sous la fiche essayée, rejoint l'essai
+            local draft = head.draft
+            if not draft or draft.holder ~= ctx.accountId or draft.removal or parentId ~= trial.id
+                or editor.parents[head.kind] ~= trial.kind then
+                return
+            end
+            if draft.status ~= 'trial' then
+                if store.setStatus({ draft.row }, 'draft', 'trial') == nil then return end
+                draft.status = 'trial'
+            end
+            trial.rows[#trial.rows + 1] = draft.row
+            trial.children[#trial.children + 1] = { kind = head.kind, id = head.id }
+        end
         children[1] = { kind = head.kind, def = def }
     end
     trials.touch(ctx.accountId, ctx.source)
@@ -848,27 +869,30 @@ local function publishPlan(ctx, head)
         local _, journalLine = changes.removal(mainKind.def, counts, texts.changes, true)
         summary = journalLine
     else
-        local fieldSummary = ''
+        local fieldSummary, placeSummary = '', ''
         if main.before then
             fieldSummary = changes.summary(mainKind.def.form, main.before.data, entry.data, texts.changes,
                 calls.diff(editor, head.kind, main.before.data, entry.data))
+            -- T-102 : lieu changé (« déplacée de 12 m », « rayon de 120 m à 140 m »)
+            placeSummary = changes.place(main.before.place, entry.place, changes.feminine(mainKind.def),
+                texts.changes.place)
         end
-        if fieldSummary ~= '' then
+        local lead = changes.combine(fieldSummary, placeSummary, '')
+        if lead ~= '' then
             lines[#lines + 1] = text.truncate(format(texts.changes.titled, calls.titleOf(mainKind, entry.data,
-                head.title), fieldSummary), OUT.summary)
+                head.title), lead), OUT.summary)
         end
         local childSummary = changes.children(childGroups(editor, items, false), texts.changes)
         if childSummary ~= '' then lines[#lines + 1] = childSummary end
-        local parts = {}
-        if fieldSummary ~= '' then parts[#parts + 1] = fieldSummary end
-        if childSummary ~= '' then parts[#parts + 1] = childSummary end
-        summary = changes.fit(concat(parts, ' ; '))
-        main.summary = fieldSummary
+        summary = changes.combine(fieldSummary, placeSummary, childSummary)
+        main.summary = lead
         for i = 2, #items do
             local item = items[i]
             if item.before and not item.removal then
-                item.summary = changes.summary(item.kind.def.form, item.before.data, item.entry.data, texts.changes,
+                local fields = changes.summary(item.kind.def.form, item.before.data, item.entry.data, texts.changes,
                     calls.diff(editor, item.head.kind, item.before.data, item.entry.data))
+                item.summary = changes.combine(fields, changes.place(item.before.place, item.entry.place,
+                    changes.feminine(item.kind.def), texts.changes.place), '')
             end
         end
     end
@@ -1375,5 +1399,194 @@ function cycle.take(ctx, id, rev)
         calls.notify(editor, kind.def.id, id, 'taken', ctx.source,
             previousHolder and calls.sourceOf(previousHolder) or nil)
         return true, answer(ctx, head)
+    end)
+end
+
+-- Poser (T-102, server/placement.lua) ------------------------------------------------------------------------------
+
+--- Résumé court d'un brouillon déplacé : réglages changés et lieu, vis-à-vis de la publiée.
+local function placedSummary(kind, published, data, where)
+    return changes.combine(draftSummary(kind, published.data, data),
+        changes.place(published.place, where, changes.feminine(kind.def), texts.changes.place), '')
+end
+
+--- Ligne du brouillon d'un parent copié de sa publiée (écrit avec l'enfant, dans la même transaction) : ligne à
+--- écrire, ou nil, code.
+local function parentCopyRow(ctx, parentHead)
+    local row, err = store.row(parentHead.published.row)
+    if err then return nil, err end
+    if not row then return nil, 'stale' end
+    return {
+        editor = ctx.editor.id, kind = parentHead.kind, defId = parentHead.id, removal = false,
+        format = index.toInt(row.format) or 1, title = row.title, parent = row.parent, data = row.data,
+        place = row.place or '', fingerprint = row.fingerprint, base = parentHead.published.version, summary = '',
+        accountId = ctx.accountId, author = actorOf(ctx),
+    }
+end
+
+--- Numéro du brouillon d'une fiche relu après une transaction qui l'a créé : numéro, ou nil, code.
+local function draftRowId(editorId, kindId, id)
+    local row, err = store.draftRow(editorId, kindId, id)
+    if err then return nil, err end
+    local rowId = row and index.toInt(row.id)
+    if not rowId then return nil, 'db_error' end
+    return rowId
+end
+
+---@class vAvA.AtelierPlaceRequest
+---@field kind vAvA.AtelierKind   type posé
+---@field head vAvA.AtelierHead|nil  fiche existante, ou nil (fiche nouvelle)
+---@field id string               identifiant (fiche nouvelle : tiré de son titre, libre au moment de l'appel)
+---@field rev integer             révision lue (fiche existante)
+---@field where table             lieu contrôlé et arrondi
+---@field data table|nil          fiche nouvelle : data
+---@field title string|nil        fiche nouvelle : titre
+---@field parentId string|nil     fiche nouvelle : parent
+---@field parentHead vAvA.AtelierHead|nil  parent dont il faut peut-être le brouillon (enfant nouveau, mode « points »)
+
+--- Écriture d'une pose sous verrous, places de brouillon réservées (voir `cycle.place`).
+local function placeLocked(ctx, req, head, plan)
+    local editor, kind = ctx.editor, req.kind
+    local kindId = kind.def.id
+    local where, author = req.where, actorOf(ctx)
+    local d, data, parentId, published
+    local update = false
+    if plan.entry == 'insert' then
+        data, parentId = req.data, req.parentId
+        d = { editor = editor.id, kind = kindId, defId = req.id, removal = false, format = editor.format,
+            title = req.title, parent = parentId, accountId = ctx.accountId, author = author }
+    elseif plan.entry == 'copy' then
+        local err
+        published, err = baseEntry(editor, kind, head)
+        if not published then return false, err end
+        data, parentId = published.data, published.parent
+        d = { editor = editor.id, kind = kindId, defId = head.id, removal = false, format = editor.format,
+            title = calls.titleOf(kind, data, head.id), parent = parentId, base = head.published.version,
+            summary = placedSummary(kind, published, data, where), accountId = ctx.accountId, author = author }
+    else
+        local row, entry = rowEntry(editor, kind, head.draft.row)
+        if not row then return false, entry end
+        data, parentId = entry.data, entry.parent
+        local summary = ''
+        if head.published then
+            published = baseEntry(editor, kind, head)
+            if published then summary = placedSummary(kind, published, data, where) end
+        end
+        update = true
+        d = { title = calls.titleOf(kind, data, head.id), parent = parentId, format = editor.format, summary = summary }
+    end
+    local dataJson, placeJson = calls.encode(data, where)
+    if not dataJson then return false, placeJson end
+    d.data, d.place, d.fingerprint = dataJson, placeJson, stored.fingerprint(data, where, parentId)
+    local parentHead = req.parentHead
+    local parentRow = nil
+    if plan.parent == 'copy' then
+        local err
+        parentRow, err = parentCopyRow(ctx, parentHead)
+        if not parentRow then return false, err end
+    end
+    -- la base d'abord
+    local rowId, parentRowId
+    local entryId = head and head.id or req.id
+    if parentRow then
+        local steps = { store.insertDraftStep(parentRow),
+            update and store.updateDraftStep(head.draft.row, req.rev, d) or store.insertDraftStep(d) }
+        local written, dbErr = store.transaction(steps)
+        if not written then return false, dbErr end
+        local readErr
+        parentRowId, readErr = draftRowId(editor.id, parentHead.kind, parentHead.id)
+        if not parentRowId then return false, readErr end
+        if update then
+            rowId = head.draft.row
+        else
+            rowId, readErr = draftRowId(editor.id, kindId, entryId)
+            if not rowId then return false, readErr end
+        end
+    elseif update then
+        local affected, dbErr = store.updateDraft(head.draft.row, req.rev, d)
+        if not affected then return false, dbErr end
+        if affected == 0 then return false, 'stale' end
+        rowId = head.draft.row
+    else
+        local dbErr
+        rowId, dbErr = store.insertDraft(d)
+        if not rowId then return false, dbErr end
+    end
+    -- écrit en base : au journal même si l'atelier a changé entre-temps (§ 7.5 : un enfant posé n'a pas de ligne)
+    if plan.entry == 'insert' and not kind.def.parent then
+        record(ctx, { editor = editor.id, kind = kindId, id = entryId, action = 'created', title = d.title })
+    elseif plan.entry == 'copy' then
+        record(ctx, { editor = editor.id, kind = kindId, id = entryId, action = 'saved', title = d.title,
+            version = head.published.version })
+    end
+    if not stillCurrent(ctx) then return false, 'syncing' end
+    local now = time()
+    if plan.entry == 'insert' then
+        head = index.ensure(editor.id, kindId, entryId)
+        head.draft = { row = rowId, rev = 1, status = 'draft', removal = false, holder = ctx.accountId,
+            holderLabel = author, title = d.title, parent = parentId, summary = nil, at = now,
+            cache = { place = where, placeKnown = true } }
+    elseif plan.entry == 'copy' then
+        head.draft = { row = rowId, rev = 1, status = 'draft', removal = false, holder = ctx.accountId,
+            holderLabel = author, base = head.published.version, title = d.title, parent = parentId,
+            summary = d.summary ~= '' and d.summary or nil, at = now,
+            cache = { place = where, placeKnown = true, baseRow = head.published.row, base = published } }
+    else
+        local draft = head.draft
+        draft.rev, draft.title, draft.parent, draft.at = draft.rev + 1, d.title, parentId, now
+        draft.summary = d.summary ~= '' and d.summary or nil
+        draft.cache = draft.cache or {}
+        draft.cache.place, draft.cache.placeKnown = where, true
+    end
+    index.touch(editor.id, head)
+    if parentRow then
+        parentHead.draft = { row = parentRowId, rev = 1, status = 'draft', removal = false, holder = ctx.accountId,
+            holderLabel = author, base = parentHead.published.version, title = parentRow.title,
+            parent = parentRow.parent, summary = nil, at = now }
+        index.touch(editor.id, parentHead)
+    end
+    entries.invalidate(editor.id)
+    -- essai en cours du membre dans cet atelier (la fiche, ou son parent) : relancé chez l'auteur seul
+    local trial = trials.of(ctx.accountId)
+    if trial and trial.editor == editor.id then cycle.retrial(ctx, head, data, where, parentId) end
+    calls.notify(editor, kindId, entryId, 'saved', ctx.source)
+    if parentHead and parentId == parentHead.id then
+        calls.notify(editor, parentHead.kind, parentHead.id, 'saved', ctx.source)
+    end
+    return true, { head = head, data = data, parentId = parentId }
+end
+
+--- Écritures d'une pose, sous les verrous de la fiche et de son parent (§ 7.1, contrôles 8 et 11 de la spec T-102) :
+--- table de décision (`lc.placePlan`), brouillon créé, copié ou mis à jour avec son lieu, brouillon du parent copié de
+--- sa publiée dans la même transaction s'il le faut ; puis essai relancé, avis `saved` sur la fiche et son parent,
+--- journal (fiche sans parent créée : `created` ; premier brouillon d'une publiée : `saved` ; enfant : aucune ligne).
+--- Rend true, { head, data, parentId } ou false, code.
+---@param ctx vAvA.AtelierContext
+---@param req vAvA.AtelierPlaceRequest
+function cycle.place(ctx, req)
+    local editor, kind = ctx.editor, req.kind
+    local kindId = kind.def.id
+    local parentHead = req.parentHead
+    local keys = { index.key(editor.id, kindId, req.id) }
+    if parentHead then keys[#keys + 1] = index.key(editor.id, parentHead.kind, parentHead.id) end
+    return locked(keys, function()
+        local head = req.head
+        if head == nil and index.taken(editor.id, kindId, req.id) then return false, 'busy' end
+        local situation = head and situationOf(head, ctx) or 'new'
+        local revOk = head ~= nil and head.draft ~= nil and head.draft.rev == req.rev
+        local plan, code = lc.placePlan(situation, revOk, parentHead and situationOf(parentHead, ctx) or nil)
+        if not plan then return false, code end
+        -- places de brouillon : la fiche (créée ou copiée) et le parent copié
+        local slots = (plan.entry ~= 'update' and 1 or 0) + (plan.parent == 'copy' and 1 or 0)
+        for i = 1, slots do
+            if not index.reserveDraft(ctx.accountId, cfg.drafts.perMember) then
+                for _ = 1, i - 1 do index.releaseDraft(ctx.accountId) end
+                return false, 'full'
+            end
+        end
+        local results = pack(xpcall(placeLocked, traceback, ctx, req, head, plan))
+        for _ = 1, slots do index.releaseDraft(ctx.accountId) end
+        if not results[1] then error(results[2], 0) end
+        return unpack(results, 2, results.n)
     end)
 end

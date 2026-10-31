@@ -97,6 +97,52 @@ function lc.allowed(action, situation, member, published)
     return false, verdict or 'unknown_entry'
 end
 
+-- Pose (T-102) -----------------------------------------------------------------------------------------------------
+
+--- Décision d'une pose (§ 7.3 de la spec T-102) : ce qui s'écrit pour la fiche, et pour son parent quand il le faut
+--- (enfant nouveau, ou déplacement d'un enfant depuis la fiche parent). `entry` : situation de la fiche vue par le
+--- membre (`new` : fiche nouvelle) ; `revOk` : la révision lue est celle de son brouillon ; `parent` : situation du
+--- parent, ou nil s'il n'y a pas de brouillon de parent à prévoir. Rend { entry = 'insert' | 'copy' | 'update',
+--- parent = 'copy' | nil } (copy : brouillon copié de la publiée), ou nil et un code (`draft_taken`, `not_holder`,
+--- `stale`, `bad_request`, `parent_missing`, `unknown_entry`).
+---@param entry string
+---@param revOk boolean
+---@param parent string|nil
+---@return { entry: string, parent: string|nil }|nil
+---@return string|nil code
+function lc.placePlan(entry, revOk, parent)
+    local plan = {}
+    if entry == 'new' then
+        plan.entry = 'insert'
+    elseif entry == 'published' then
+        plan.entry = 'copy'
+    elseif entry == 'own_draft' or entry == 'own_trial' then
+        if not revOk then return nil, 'stale' end
+        plan.entry = 'update'
+    elseif entry == 'own_removal' then
+        -- on ne déplace pas ce qu'on retire
+        return nil, 'bad_request'
+    elseif entry == 'other_removal' then
+        return nil, 'not_holder'
+    elseif entry == 'other_draft' or entry == 'other_trial' then
+        return nil, 'draft_taken'
+    else
+        return nil, 'unknown_entry'
+    end
+    if parent ~= nil then
+        if parent == 'published' then
+            plan.parent = 'copy'
+        elseif parent == 'own_removal' then
+            return nil, 'bad_request'
+        elseif parent == 'other_draft' or parent == 'other_trial' or parent == 'other_removal' then
+            return nil, 'draft_taken'
+        elseif parent ~= 'own_draft' and parent ~= 'own_trial' then
+            return nil, 'parent_missing'
+        end
+    end
+    return plan
+end
+
 -- Numéros ----------------------------------------------------------------------------------------------------------
 
 --- Numéro de la prochaine version : plus haute version figée + 1 (1 pour une fiche nouvelle).

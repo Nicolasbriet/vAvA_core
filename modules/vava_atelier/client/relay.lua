@@ -14,6 +14,10 @@
 local type, tostring, tonumber, ipairs = type, tostring, tonumber, ipairs
 local tointeger = math.tointeger
 local pack = table.pack
+local SetNewWaypoint = SetNewWaypoint
+
+-- « Aller à » : coordonnées au plus (bornes d'un lieu, shared/place.lua)
+local MAX_XY = 50000
 
 local core = VavaAtelier.core
 if not core then return end
@@ -97,7 +101,14 @@ local function toneOf(response)
     return type(state) == 'table' and state.tone or nil
 end
 
+--- La page quitte la fiche ouverte (accueil, liste, autre atelier) : l'outil oublie ses lieux et retire ses fantômes.
+local function leaveEntry()
+    local tool = VavaAtelier.placer
+    if tool and not tool.isAiming() then tool.leave() end
+end
+
 nui.on('home', function(d)
+    leaveEntry()
     local known = session.known()
     if str(d.version) == '' then known.home = '' end
     local response = forward(RPC.HOME, known.home)
@@ -110,6 +121,7 @@ end)
 --- Descripteur d'un atelier : la version gardée part avec la demande ; le serveur ne renvoie le descripteur que s'il a
 --- changé. Une réponse sans descripteur pour une autre version (incohérente) fait redemander tout, une fois.
 nui.on('editor', function(d)
+    leaveEntry()
     local id = str(d.editor)
     local editors = session.known().editors
     local kept = editors[id]
@@ -135,6 +147,7 @@ nui.on('editor', function(d)
 end)
 
 nui.on('list', function(d)
+    leaveEntry()
     return forward(RPC.LIST, str(d.editor), str(d.kind), int(d.page, 1), str(d.query))
 end)
 
@@ -142,6 +155,11 @@ nui.on('read', function(d)
     local editor = str(d.editor)
     local response = forward(RPC.READ, editor, str(d.kind), str(d.id))
     if response.ok then bannerFor(editor, toneOf(response)) end
+    -- T-102 : distance du bloc « Lieu » (« Posée à 32 m de vous »), calculée par le client
+    local data = response.ok and response.data
+    if type(data) == 'table' and data.place ~= nil and VavaAtelier.placer then
+        data.distance = VavaAtelier.placer.distance(data.place)
+    end
     return response
 end)
 
@@ -206,6 +224,53 @@ end)
 
 nui.on('removed', function(d)
     return forward(RPC.REMOVED, str(d.editor), str(d.kind), int(d.page, 1))
+end)
+
+-- T-102 : outil de placement ----------------------------------------------------------------------------------------
+
+--- Outil de placement (client/placer.lua, chargé après ce fichier).
+local function placer()
+    return VavaAtelier.placer
+end
+
+--- Lieux d'une fiche, de son parent et de ses enfants : relais du RPC ; la réponse est gardée pour l'outil (dessin,
+--- aperçu, fantômes des enfants pas encore publiés).
+nui.on('children', function(d)
+    local editor, kind, id = str(d.editor), str(d.kind), str(d.id)
+    local response = forward(RPC.CHILDREN, editor, kind, id)
+    if response.ok and placer() then placer().absorb(editor, kind, id, response.data) end
+    return response
+end)
+
+nui.on('placeStart', function(d)
+    if not placer() then return refusal('unavailable') end
+    return placer().start(d)
+end)
+
+nui.on('placeStop', function()
+    if placer() then placer().stop() end
+    return { ok = true }
+end)
+
+nui.on('templateChanged', function(d)
+    if placer() then placer().templateChanged(d) end
+    return { ok = true }
+end)
+
+-- « Aller à » : repère GPS seulement (décision du porteur du projet : pas de téléportation)
+nui.on('goTo', function(d)
+    local x, y = tonumber(d.x), tonumber(d.y)
+    if not x or not y or x ~= x or y ~= y or math.abs(x) > MAX_XY or math.abs(y) > MAX_XY then
+        return refusal('bad_request')
+    end
+    SetNewWaypoint(x + 0.0, y + 0.0)
+    return { ok = true }
+end)
+
+-- essai joué : la page se met de côté (F9 pour revenir)
+nui.on('suspend', function()
+    if not session.suspend() then return refusal('not_open') end
+    return { ok = true }
 end)
 
 --- Fin d'un essai annoncée par le serveur pendant que la fiche est ouverte : bandeau d'édition.

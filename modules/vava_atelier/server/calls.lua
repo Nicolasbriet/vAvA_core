@@ -66,6 +66,20 @@ function calls.endTrial(editor, kindId, id, ctx)
     Bridge.CallEditor(editor.id, 'endTrial', editor.fns.endTrial, kindId, id, ctx)
 end
 
+--- `placeCheck(kind, place, ctx)` (T-102, facultatif) : true (permis, ou pas de fonction), ou false et le texte du
+--- module (160 octets au plus). Appelé isolé et chronométré comme les autres.
+---@param editor vAvA.AtelierEditor
+---@param kindId string
+---@param where table  lieu arrondi, déjà passé par les règles déclarées
+---@param pctx table   { source, accountId, id, parent?, data, siblings }
+---@return boolean ok
+---@return string|nil text
+function calls.placeCheck(editor, kindId, where, pctx)
+    if not editor.fns.placeCheck then return true end
+    local called, ok, detail = Bridge.CallEditor(editor.id, 'placeCheck', editor.fns.placeCheck, kindId, where, pctx)
+    return verdict(editor.id, 'placeCheck', called, ok, detail)
+end
+
 --- `diff(kind, avant, après)` : texte du module, ou nil (résumé générique).
 function calls.diff(editor, kindId, before, after)
     if not editor.fns.diff then return nil end

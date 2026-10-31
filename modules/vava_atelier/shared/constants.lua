@@ -33,6 +33,9 @@ VavaAtelier.RPC = {
     HISTORY = 'vava_atelier:history',         -- atelier, type, entrée, avant la version (0 : récentes)
     VERSION = 'vava_atelier:version',         -- atelier, type, entrée, version : version figée en lecture
     REMOVED = 'vava_atelier:removed',         -- atelier, type, page : fiches retirées du royaume
+    -- T-102 : outil de placement (server/placement.lua)
+    PLACE = 'vava_atelier:place',             -- atelier, type, entrée ('' : nouvelle), révision, lieu, parent, valeurs
+    CHILDREN = 'vava_atelier:children',       -- atelier, type, entrée : lieux de la fiche, de son parent, de ses enfants
 }
 
 -- Évènements serveur → client, toujours vers les seuls membres concernés (core.net).
@@ -50,7 +53,8 @@ VavaAtelier.HOOKS = {
     EDITORS_READY = 'vava_atelier:editorsReady',   -- serveur, after, {} : les modules (re)déclarent leurs éditeurs
     SESSION = 'vava_atelier:session',              -- serveur, after : { source, accountId, open }
     JOURNAL = 'vava_atelier:journal',              -- serveur, after : ligne écrite au journal
-    STATE = 'vava_atelier:state',                  -- client, local : { open }
+    -- client, local : { open, placing, suspended } (T-102 : `open = false` pendant l'essai joué, page mise de côté)
+    STATE = 'vava_atelier:state',
     -- serveur, after, une fois par fiche d'un lot : { editor, kind, id, version, previous?, action, actor }
     PUBLISHED = 'vava_atelier:published',
     -- serveur, after : { editor, kind, id, accountId, source?, on, reason? }
@@ -65,3 +69,9 @@ VavaAtelier.KEY_PATTERN = '^[A-Za-z][A-Za-z0-9_]*$'   -- type, champ, groupe, so
 VavaAtelier.MAX_KEY = 32
 VavaAtelier.ENTRY_PATTERN = '^[A-Za-z0-9_%-]+$'   -- identifiant d'une entrée d'un module
 VavaAtelier.MAX_ENTRY = 48
+
+-- T-102 : bornes que le client applique à ce qu'il reçoit de la page et du serveur (outil de placement).
+VavaAtelier.MODEL_PATTERN = '^[A-Za-z0-9_]+$'     -- nom d'un modèle de fantôme
+VavaAtelier.MAX_MODEL = 64
+VavaAtelier.MAX_ROWS = 200                        -- lignes d'une réponse `children` gardées par l'outil
+VavaAtelier.MAX_VERTICES = 32                     -- sommets d'un tracé (config.place.polygonPoints.max)

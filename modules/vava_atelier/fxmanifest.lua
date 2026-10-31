@@ -12,6 +12,9 @@
            archives JSON et retour à l'original par /atelier_archives (Souverain, console).
            T-132 : config_client.lua (touche, commande, textes affichés par le client) est seul téléchargé par les
            joueurs avec les constantes ; config.lua (tout le reste) est servi au seul serveur.
+           T-102 : outil de placement en jeu (point, orienté, cercle, tracé ; visée sans curseur, aperçu vert ou rouge
+           par les règles déclarées du type, les mêmes au serveur ; fantômes locaux ; Ctrl+Z) ; RPC place et children ;
+           essai joué (la page se met de côté, F9 pour revenir) ; index des enfants (sql/0003_parent_index.sql).
     Dépendances : vAvA_core ≥ 0.11.0 ; vava_ui ≥ 1.0.0 (polices et textures, par nui://vava_ui/…) ; vava_admin ≥ 1.8.0
                   relu à chaque appel (sans lui, l'Atelier refuse de s'ouvrir : « Le Registre du Conseil s'éveille »),
                   volontairement pas en `dependency` : arrêter ou relancer le Registre n'arrête pas l'Atelier ;
@@ -25,13 +28,14 @@ use_experimental_fxv2_oal 'yes'
 
 name 'vava_atelier'
 description 'Atelier du Conseil vAvA : créer et régler le royaume en jeu (socle : accueil, droits, formulaire, journal)'
-version '1.2.0'
+version '1.3.0'
 
 dependency 'vAvA_core'
 dependency 'vava_ui'
 
 vava_migration 'sql/0001_journal.sql'
 vava_migration 'sql/0002_definitions.sql'
+vava_migration 'sql/0003_parent_index.sql'
 
 ui_page 'web/index.html'
 
@@ -48,6 +52,8 @@ files {
 shared_scripts {
     'shared/constants.lua',
     'config_client.lua',         -- ouvre VavaAtelier.config : ce que lit le client
+    'shared/placerules.lua',     -- T-102 : règles de placement, les mêmes pour l'aperçu (client) et la décision (serveur)
+    'shared/aim.lua',            -- T-102 : visée de l'outil de placement (lue par le client)
 }
 
 server_scripts {
@@ -79,6 +85,7 @@ server_scripts {
     'server/trials.lua',
     'server/sync.lua',
     'server/lifecycle.lua',
+    'server/placement.lua',
     'server/history.lua',
     'server/archives.lua',
     'server/providers.lua',
@@ -92,5 +99,8 @@ client_scripts {
     'client/nui.lua',
     'client/session.lua',
     'client/relay.lua',
+    'client/drawing.lua',
+    'client/ghosts.lua',
+    'client/placer.lua',
     'client/main.lua',
 }

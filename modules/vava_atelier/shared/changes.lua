@@ -285,6 +285,71 @@ function changes.removal(kind, groups, texts, journal)
     return format(texts.removal, changes.of(kind)), changes.fit(line)
 end
 
+-- T-102 : lieu changé ------------------------------------------------------------------------------------------------
+
+-- en deçà, un déplacement (m) ou une rotation (degrés) ne se dit pas
+local MOVED_MIN, TURNED_MIN = 0.5, 1
+
+--- Deux tracés de mêmes sommets ?
+local function samePoints(a, b)
+    if type(a) ~= 'table' or type(b) ~= 'table' or #a ~= #b then return false end
+    for i = 1, #a do
+        if a[i].x ~= b[i].x or a[i].y ~= b[i].y then return false end
+    end
+    return true
+end
+
+--- Résumé d'un lieu changé (aperçu de publication, journal) : « posée » (premier lieu), « déplacée de 12 m »,
+--- « tournée de 40° », « rayon de 120 m à 140 m », « tracé redessiné (6 sommets) », séparés par des virgules ; '' si
+--- rien ne se dit (déplacement de moins de 0,5 m, rotation de moins de 1°, lieu retiré).
+---@param before table|nil  lieu de la version publiée
+---@param after table|nil   lieu de la nouvelle version
+---@param feminine boolean  genre du type (« déplacée »)
+---@param texts table  config.texts.changes.place
+---@return string
+function changes.place(before, after, feminine, texts)
+    if type(after) ~= 'table' then return '' end
+    local gender = feminine and 'feminine' or 'masculine'
+    if type(before) ~= 'table' then return texts.placed[gender] end
+    if after.points then
+        if before.points and samePoints(before.points, after.points) and before.z == after.z then return '' end
+        return format(texts.redrawn, #after.points)
+    end
+    local parts = {}
+    if type(before.x) == 'number' and type(after.x) == 'number' then
+        local dx, dy = after.x - before.x, after.y - before.y
+        local moved = (dx * dx + dy * dy) ^ 0.5
+        if moved >= MOVED_MIN then
+            parts[#parts + 1] = format(texts.moved[gender], text.number(math.max(1, math.floor(moved + 0.5))))
+        end
+    end
+    if type(before.h) == 'number' and type(after.h) == 'number' then
+        local turned = math.abs(after.h - before.h) % 360
+        if turned > 180 then turned = 360 - turned end
+        if turned >= TURNED_MIN then parts[#parts + 1] = format(texts.turned[gender], math.floor(turned + 0.5)) end
+    end
+    if type(before.r) == 'number' and type(after.r) == 'number' and before.r ~= after.r then
+        parts[#parts + 1] = format(texts.radius, text.number(before.r), text.number(after.r))
+    end
+    return changes.fit(concat(parts, ', '))
+end
+
+--- Résumé d'une publication : les réglages changés, puis le lieu et les enfants (« déplacée de 12 m, 2 points
+--- ajoutés »), séparés par « ; » des réglages ; '' si rien.
+---@param fields string
+---@param where string
+---@param children string
+---@return string
+function changes.combine(fields, where, children)
+    local tail = {}
+    if where ~= '' then tail[#tail + 1] = where end
+    if children ~= '' then tail[#tail + 1] = children end
+    local parts = {}
+    if fields ~= '' then parts[#parts + 1] = fields end
+    if #tail > 0 then parts[#parts + 1] = concat(tail, ', ') end
+    return changes.fit(concat(parts, ' ; '))
+end
+
 ---@class vAvA.AtelierDraftInfo
 ---@field new? boolean        fiche jamais publiée
 ---@field trial? boolean      en essai
