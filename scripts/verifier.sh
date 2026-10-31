@@ -54,7 +54,7 @@ fi
 
 titre "Essais de pages"
 # fonctions pures d'une page (sans dépendance), lancées par node ; node manquant : rien n'échoue, on le dit
-ESSAIS_PAGES=(modules/vava_loading/web/dev/essais.js modules/vava_codex/web/dev/essais.js modules/vava_atelier/web/dev/essais.js modules/vava_provisions/web/dev/essais.js)
+ESSAIS_PAGES=(modules/vava_loading/web/dev/essais.js modules/vava_codex/web/dev/essais.js modules/vava_atelier/web/dev/essais.js modules/vava_provisions/web/dev/essais.js modules/vava_pause/web/dev/essais.js)
 if ! command -v node >/dev/null; then
     echo "node absent : essais de pages non lancés (${ESSAIS_PAGES[*]})"
 else
