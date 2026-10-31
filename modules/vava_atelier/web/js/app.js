@@ -1,7 +1,8 @@
 'use strict';
 /*
- * vava_atelier/web/js/app.js — assemblage : messages du Lua, écrans, cycle d'une fiche, historique, sortie
- * Dépendances : strings.js, bridge.js, format.js, lifecycle.js, components.js, widgets.js, form.js, view-*.js
+ * vava_atelier/web/js/app.js — assemblage : messages du Lua, écrans, cycle d'une fiche, historique, sortie ; placement
+ *   (T-102) : visée demandée au jeu, poses reçues, essai joué (bandeau seul)
+ * Dépendances : strings.js, bridge.js, format.js, lifecycle.js, components.js, widgets.js, form.js, placing.js, view-*.js
  */
 
 (() => {
@@ -21,7 +22,12 @@
     journal: { filter: '', next: 0, seq: 0 },
     banner: undefined,   // undefined : celui de départ ; null : caché
     keys: [],
+    placing: { on: false, keys: [] },   // visée en cours (message `placing`), pour la fiche `key`
+    lastMode: 'self',
+    suspended: false, suspendedLine: '',  // essai joué : bandeau seul
   };
+
+  const entryKey = (entry) => (entry ? `${entry.editor}|${entry.kind.id}|${entry.id}` : '');
 
   function mount(screen, view, layout) {
     Picker.close(false);
@@ -31,24 +37,38 @@
     sideBox.hidden = !side;
     (side ? sheet : sideSheet).replaceChildren();
     (side ? sideSheet : sheet).replaceChildren(view.el);
-    if (side) sideChrome(); else { Banner.hide(); Keys.hide(); }
     state.screen = screen;
     state.view = view;
+    if (state.placing.on && (screen !== 'entry' || entryKey(state.entry) !== state.placing.key)) {
+      state.placing = { on: false, keys: [] };
+      Bridge.post('placeStop');
+    }
     if (screen !== 'entry') state.entry = null;
+    chrome();
   }
 
-  function sideChrome() {
+  /** Bandeau, barre des touches et mise en page : essai joué (bandeau seul), visée, volet, page. */
+  function chrome() {
+    const side = !sideBox.hidden, placing = state.placing.on && state.screen === 'entry';
+    app.classList.toggle('placing', placing);
+    app.classList.toggle('placing-page', placing && !side);
+    app.classList.toggle('suspended', state.suspended);
     const banner = state.banner || {};
-    if (state.banner === null) Banner.hide();
-    else Banner.show(str(banner.title) || str(state.descriptor && state.descriptor.label), str(banner.line) || STRINGS.modeEdit, back);
-    if (state.keys.length > 0) Keys.show(state.keys); else Keys.hide();
+    const title = str(banner.title) || str(state.descriptor && state.descriptor.label);
+    const keys = placing ? state.placing.keys : state.keys;
+    if (state.suspended) Banner.show(title, state.suspendedLine, null);
+    else if (placing) Banner.show(title, STRINGS.place.editLine, back);
+    else if (side && state.banner !== null) Banner.show(title, str(banner.line) || STRINGS.modeEdit, back);
+    else Banner.hide();
+    if (!state.suspended && (side || placing) && keys.length > 0) Keys.show(keys); else Keys.hide();
   }
 
   function hide() {
     Picker.close(false);
     if (Confirm.isOpen()) Confirm.cancel();
     app.hidden = true;
-    Object.assign(state, { screen: null, view: null, entry: null, history: null, removed: null });
+    app.classList.remove('placing', 'placing-page', 'suspended');
+    Object.assign(state, { screen: null, view: null, entry: null, history: null, removed: null, placing: { on: false, keys: [] }, suspended: false });
     sheet.replaceChildren();
     sideSheet.replaceChildren();
     Banner.hide();
@@ -204,16 +224,16 @@
 
   // Fiche
 
-  const labelKey = (field, value) => (field.widget === 'item' ? `item|${value}` : `${state.editor}|${state.kind.id}|${field.id}|${value}`);
+  const labelKey = (field, value, kind = state.kind.id) => (field.widget === 'item' ? `item|${value}` : `${state.editor}|${kind}|${field.id}|${value}`);
   const cleanItem = (item) => ({ value: item.value, label: str(item.label), image: str(item.image), provisional: item.provisional === true });
   const layoutOf = (kind) => (kind.layout === 'side' ? 'side' : 'page');
   const dirty = (entry) => entry.form.snapshot() !== entry.snapshot;
 
-  async function lookup(field, query, page) {
-    const result = await Bridge.post('options', { editor: state.editor, kind: state.kind.id, field: field.id, query: Format.query(query), page: page || 1 });
+  async function lookup(field, query, page, kind = state.kind.id) {
+    const result = await Bridge.post('options', { editor: state.editor, kind, field: field.id, query: Format.query(query), page: page || 1 });
     if (!result.ok) return result;
     const items = list(result.data.items).filter((i) => i && typeof i.value === 'string').map(cleanItem);
-    for (const item of items) state.labels.set(labelKey(field, item.value), item);
+    for (const item of items) state.labels.set(labelKey(field, item.value, kind), item);
     return { items, more: result.data.more === true };
   }
 
@@ -242,7 +262,9 @@
       rev: int(data && data.rev), version: int(data && data.version), stale: Boolean(data && data.stale === true),
       holder: data && data.holder && typeof data.holder === 'object' ? data.holder : null,
     };
+    entry.placer = mode === 'entry' ? placer(entry, data) : null;
     entry.form = Form.build(kind, values, {
+      between: entry.placer && entry.placer.el,
       warnings: new Set(warnings),
       changed: (fieldId) => {
         if (!entry.view) return;
@@ -261,7 +283,9 @@
     entry.snapshot = entry.form.snapshot();
     state.entry = entry;
     mount('entry', entry.view, layout);
+    steps(entry);
     entry.form.focusFirst();
+    loadChildren(entry);
   }
 
   async function openEntry(editor, kindId, id) {
@@ -275,6 +299,140 @@
     }
     showEntry(editor, kind, id || '', data, 'entry');
     return true;
+  }
+
+  // Placement (T-102) : blocs de la fiche, visée demandée au jeu, enfants
+
+  function placer(entry, data) {
+    const kind = entry.kind;
+    if (!Placing.placeable(kind)) return null;
+    const child = Placing.childOf(state.descriptor, kind);
+    const childKind = child ? child.id : kind.id;
+    return Placing.build({ key: entry.editor, kind, child, place: data && data.place, distance: data && data.distance }, {
+      start: (mode) => work('place', (e) => startPlacing(e, mode)),
+      go: (row, at) => goTo(row.title, at),
+      remove: (row, how) => work('remove', (e) => removeChild(e, child, row, how)),
+      open: (row) => openChild(entry, row),
+      changed: () => {
+        if (state.placing.on && state.placing.mode === 'children') Bridge.post('templateChanged', { values: entry.placer.template(), ghost: entry.placer.ghost(), label: entry.placer.label() });
+      },
+      lookup: (field, query, page) => lookup(field, query, page, childKind),
+      known: (field, value) => state.labels.get(labelKey(field, value, childKind)) || null,
+      remember: (field, item) => state.labels.set(labelKey(field, item.value, childKind), cleanItem(item)),
+    });
+  }
+
+  function steps(entry) {
+    if (entry.placer) entry.view.setSteps(Placing.stepStates(list(entry.kind.steps).length, entry.placer.progress()));
+  }
+
+  /** Lieux de la fiche, de son parent et de ses enfants (le jeu garde la réponse pour la visée). */
+  async function loadChildren(entry, force) {
+    if (!entry.placer || !entry.id || !(force || entry.kind.parent || Placing.childOf(state.descriptor, entry.kind))) return;
+    const result = await Bridge.post('children', { editor: entry.editor, kind: entry.kind.id, id: entry.id });
+    if (state.entry !== entry) return;
+    if (!result.ok) { entry.placer.failed(errorText(result.error, result.text)); return; }
+    const self = result.data.self;
+    if (self && typeof self === 'object') entry.placer.setPlace(self.place, typeof self.distance === 'number' ? self.distance : undefined);
+    entry.placer.setRows(result.data.rows);
+    steps(entry);
+  }
+
+  /** Fantôme de la fiche elle-même : la valeur de son champ `ghost.field`. */
+  function selfGhost(entry) {
+    const field = list((entry.kind.form || {}).fields).find((f) => f && entry.kind.ghost && f.id === entry.kind.ghost.field);
+    if (!field) return null;
+    const value = flatten(entry.form.packet())[field.id];
+    return Placing.ghostOf(entry.kind, value, list(field.choices).find((o) => o && o.value === value) || state.labels.get(labelKey(field, value)));
+  }
+
+  async function startPlacing(entry, mode) {
+    if (state.placing.on || !(await saved(entry))) return;   // fiche nouvelle ou modifiée : enregistrée d'abord
+    const p = entry.placer;
+    state.lastMode = mode;
+    p.message(mode, '');
+    const result = await Bridge.post('placeStart', Placing.startPayload({
+      editor: entry.editor, kind: entry.kind, child: Placing.childOf(state.descriptor, entry.kind), id: entry.id, rev: entry.rev, mode,
+      title: entry.form.title() || entry.title, template: p.template(), label: p.label(), ghost: mode === 'children' ? p.ghost() : selfGhost(entry),
+    }));
+    if (state.entry === entry && !result.ok) p.message(mode, errorText(result.error, result.text));
+  }
+
+  async function goTo(title, at) {
+    const result = await Bridge.post('goTo', { x: at.x, y: at.y });
+    Toast.show(result.ok ? STRINGS.place.marked(title) : errorText(result.error, result.text), result.ok ? 'success' : 'error');
+  }
+
+  /** Corbeille d'une ligne : brouillon jamais publié abandonné (révision relue), ou retrait préparé (T-101). */
+  async function removeChild(entry, child, row, how) {
+    const at = { editor: entry.editor, kind: row.kind, id: row.id };
+    let result;
+    if (how === 'discard') {
+      if (!(await Confirm.ask(STRINGS.confirm.discard))) return;
+      const read = await Bridge.post('read', at);
+      result = read.ok ? await Bridge.post('discard', { ...at, rev: int(read.data.rev) }) : read;
+    } else {
+      if (!(await Confirm.ask(Lifecycle.confirmRetire(child)))) return;
+      result = await Bridge.post('retire', at);
+    }
+    if (state.entry !== entry) return;
+    if (!result.ok) { refused(result, entry.editor); return; }
+    if (result.data.done === false) { Toast.show(Lifecycle.errorLines(result.data.errors, [])[0] || errorText('default'), 'error'); return; }
+    if (result.data.gone === true) entry.placer.drop(row.id);
+    await loadChildren(entry);
+    if (state.entry !== entry || dirty(entry)) return;
+    const fresh = await Bridge.post('read', keys(entry));   // pied et état de la fiche parent
+    if (state.entry === entry && fresh.ok && !dirty(entry)) absorb(entry, fresh.data);
+  }
+
+  async function openChild(entry, row) {
+    if (state.entry !== entry || !(await leave(entry))) return;
+    if (await openEntry(entry.editor, row.kind, row.id)) state.entry.from = { kind: entry.kind.id, id: entry.id };
+  }
+
+  /** Retour d'une fiche enfant : sa fiche parent ; sinon la liste. */
+  async function leaveTo(entry) {
+    if (!(entry.from && await openEntry(entry.editor, entry.from.kind, entry.from.id)) && !app.hidden) showList();
+  }
+
+  let refreshTimer = 0;
+
+  function onPlaced(p) {
+    const entry = state.entry;
+    if (!entry || !entry.placer || state.screen !== 'entry') return;
+    const parent = p.parent && typeof p.parent === 'object' ? p.parent : null;
+    const mine = state.placing.key === entryKey(entry) && state.placing.mode === 'children';
+    if (str(p.kind) === entry.kind.id && str(p.id) === entry.id) {
+      absorb(entry, p);
+      entry.placer.setPlace(p.place, typeof p.distance === 'number' ? p.distance : null);
+    } else if ((parent && str(parent.id) === entry.id) || mine) {
+      if (parent && str(parent.id) === entry.id) absorb(entry, parent);
+      entry.placer.upsert(p.row);
+    } else return;
+    entry.placer.message(state.lastMode, '');
+    steps(entry);
+  }
+
+  function onUndone(p) {
+    const entry = state.entry;
+    if (!entry || !entry.placer || state.screen !== 'entry') return;
+    if (str(p.kind) === entry.kind.id && str(p.id) === entry.id) {
+      if (Number.isInteger(p.rev)) entry.rev = p.rev;
+      if (p.place && typeof p.place === 'object') entry.placer.setPlace(p.place, null);
+      else {
+        clearTimeout(refreshTimer);   // lieu d'avant non fourni : relu une fois, après la dernière annulation
+        refreshTimer = setTimeout(() => { if (state.entry === entry) loadChildren(entry, true); }, 800);
+      }
+    } else if (p.gone === true) entry.placer.drop(str(p.id));
+    steps(entry);
+  }
+
+  function onSuspended(p) {
+    state.suspended = p.on === true;
+    const texts = (state.descriptor && state.descriptor.texts) || {};
+    state.suspendedLine = str(p.line) || `${str(texts.trialLine) || STRINGS.place.trialLine} · ${STRINGS.place.back(state.closeKey)}`;
+    if (state.suspended) { Picker.close(false); if (Confirm.isOpen()) Confirm.cancel(); }
+    chrome();
   }
 
   async function reloadEntry(entry) {
@@ -363,7 +521,9 @@
   async function trial(entry) {
     if (!(await saved(entry))) return;
     const result = await Bridge.post('trial', { ...keys(entry), rev: entry.rev });
-    if (written(entry, result, STRINGS.invalid)) absorb(entry, result.data);
+    if (!written(entry, result, STRINGS.invalid)) return;
+    absorb(entry, result.data);
+    if (state.descriptor && state.descriptor.trialPlay === true) Bridge.post('suspend');   // l'essai se joue en jeu (§ 8.4)
   }
 
   async function endTrial(entry) {
@@ -390,7 +550,7 @@
       label: Lifecycle.label(entry.footer, 'publish', str(texts.publish)), removal, publishHint: str(texts.publishHint), fields: (entry.kind.form || {}).fields,
     }, () => state.entry === entry);
     if (!result || !written(entry, result)) return;
-    if (removal) { Toast.show(STRINGS.removalDone, 'success'); showList(); return; }
+    if (removal) { Toast.show(STRINGS.removalDone, 'success'); leaveTo(entry); return; }
     Object.assign(entry, { rev: 0, stale: false });
     entry.form.clear();
     absorb(entry, result.data);
@@ -409,7 +569,7 @@
 
   async function afterRemoval(entry, result) {
     if (state.entry !== entry) return;
-    if (result.ok && result.data.gone === true) showList();
+    if (result.ok && result.data.gone === true) leaveTo(entry);
     else if (written(entry, result)) await reloadEntry(entry);
   }
 
@@ -514,7 +674,7 @@
       mount('history', history.view, history.layout);
       history.view.focus();
     } else if (screen === 'entry') {
-      if (await leave(entry)) showList();
+      if (await leave(entry)) leaveTo(entry);
     } else if (screen === 'history') {
       const parked = history.parked;
       if (history.from === 'entry' && parked) {
@@ -545,7 +705,7 @@
   }
 
   document.addEventListener('keydown', (event) => {
-    if (app.hidden) return;
+    if (app.hidden || state.placing.on || state.suspended) return;   // le jeu a la main (visée, essai joué)
     if (Confirm.isOpen()) {
       if (event.key === 'Escape') { event.preventDefault(); Confirm.cancel(); }
       return;
@@ -565,12 +725,11 @@
       Bridge.post('close');
       return;
     }
-    Object.assign(state, { banner: undefined, keys: [] });
+    Object.assign(state, { banner: undefined, keys: [], placing: { on: false, keys: [] }, suspended: false });
     app.hidden = false;
     renderHome();
   }
 
-  const sideShown = () => !sideBox.hidden && (state.screen === 'entry' || state.screen === 'history');
   const ON_EDITOR = new Set(['list', 'entry', 'history', 'removed']);
 
   Bridge.onMessage((action, payload) => {
@@ -587,11 +746,17 @@
       }
     } else if (action === 'mode') {
       if (Object.prototype.hasOwnProperty.call(payload, 'banner')) state.banner = payload.banner && typeof payload.banner === 'object' ? payload.banner : null;
-      if (sideShown()) sideChrome();
+      if (!app.hidden) chrome();
     } else if (action === 'keys') {
       state.keys = list(payload.keys);
-      if (sideShown()) sideChrome();
-    }
+      if (!app.hidden) chrome();
+    } else if (action === 'placing') {
+      state.placing = payload.on === true ? { on: true, mode: str(payload.mode), shape: str(payload.shape), keys: list(payload.keys), key: entryKey(state.entry) } : { on: false, keys: [] };
+      if (!app.hidden) chrome();
+    } else if (action === 'placed') onPlaced(payload);
+    else if (action === 'placeRefused') { if (state.entry && state.entry.placer && str(payload.text)) state.entry.placer.message(state.lastMode, payload.text); }
+    else if (action === 'undone') onUndone(payload);
+    else if (action === 'suspended') onSuspended(payload);
   });
 
   if (!Bridge.inGame) window.Atelier = { state, openEditor, openEntry, openJournal, openRemoved, openHistory, run, back, check: () => run('check') };

@@ -74,6 +74,38 @@ const STRINGS = Object.freeze({
 
   modeEdit: 'Mode édition : visible par vous seul',
 
+  // placement en jeu (T-102) : genre et nombre lus dans la déclaration du type (`article`, `feminine`, `noun…`)
+  place: {
+    editLine: 'Mode édition : les cercles et étiquettes ne sont visibles que par vous',
+    trialLine: 'Mode essai : vous seul voyez ces points',
+    back: (key) => `${key} : revenir à l'Atelier`,
+    lieu: 'Lieu',
+    none: (f) => `Pas encore ${f ? 'placée' : 'placé'}.`,
+    posed: (f, far) => `${f ? 'Posée' : 'Posé'}${far ? ` à ${far} de vous` : ''}`,
+    radius: (r) => `, rayon ${r} m`,
+    vertices: (n) => `, ${n} sommets`,
+    put: (the) => `Placer ${the}`,
+    move: (the) => `Déplacer ${the}`,
+    next: (f, noun) => `${f ? 'Prochaine' : 'Prochain'} ${noun} à poser`,
+    many: (plural) => `Poser des ${plural}`,
+    other: 'Autre…',
+    look: (label) => `Apparence : ${label}.`,
+    lookProvisional: (label) => `Apparence : ${label}, modèle provisoire. Il sera remplacé automatiquement quand le modèle médiéval sera ajouté.`,
+    list: (plural, ofParent) => `${plural.charAt(0).toUpperCase()}${plural.slice(1)} ${ofParent}`,
+    count: (n, noun, plural, fresh, f) => `${n} ${n > 1 ? plural : noun}${fresh > 0 ? `, dont ${fresh} ${f ? 'nouvelle' : 'nouveau'}${fresh > 1 ? (f ? 's' : 'x') : ''}` : ''}`,
+    empty: (f, noun) => `${f ? 'Aucune' : 'Aucun'} ${noun} pour l'instant.`,
+    marks: {
+      new: (f) => (f ? 'nouvelle' : 'nouveau'),
+      removal: (f) => (f ? 'retirée' : 'retiré'),
+      draft: (f) => (f ? 'modifiée' : 'modifié'),
+      other: 'brouillon d\'un autre membre',
+    },
+    goTo: (title) => `Aller à ${title}`,
+    remove: (title) => `Retirer ${title}`,
+    marked: (title) => `Repère posé sur ${title}.`,
+    loading: 'Un instant…',
+  },
+
   states: { stale: 'Une autre version a été publiée depuis le début de ce brouillon.' },
   buttons: { save: 'Enregistrer le brouillon', check: 'Vérifier' },
   working: 'Un instant…',

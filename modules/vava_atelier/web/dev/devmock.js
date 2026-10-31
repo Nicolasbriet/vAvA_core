@@ -30,6 +30,17 @@
  *          ?screen=removed                      trois fiches retirées
  *          ?screen=home&drafts=1                « Vos brouillons » : essai, brouillon à enfants, fiche nouvelle, retrait
  *          ?screen=entry&changed=1              fiche modifiée, puis changée ailleurs (entryChanged)
+ *        Écrans de T-102 (§ 9.4 de sa spec) :
+ *          ?screen=entry&editor=recolte&step=2      maquette Recolte : Forêt de Brume en brouillon, cinq points dont un
+ *                                                   nouveau, « Prochain point à poser »
+ *          ?screen=entry&editor=recolte&step=1      zone nouvelle : « Pas encore placée. », « Placer la zone »
+ *          ?screen=entry&editor=recolte&refused=1   refus « Trop près de « Chêne 2 » (1,4 m) » sous le bloc
+ *          ?screen=placing&shape=oriented|circle|polygon   volet atténué, bandeau d'édition, barre des touches du mode
+ *          ?screen=placing&shape=oriented&layout=page      panneau (mise en page « page ») : bandeau et barre seuls
+ *          ?screen=placing&picked=1                 barre « Déplacer ici · … · Lâcher le point »
+ *          ?screen=suspended                        bandeau de l'essai joué seul (F9 : revenir)
+ *        Visée simulée : clic pose (un clic sur trois refusé en mode points), clic droit choisit un point, Entrée ferme
+ *        un tracé (trois clics au moins), Échap quitte.
  *        Le cycle entier est simulé (enregistrer, essayer, publier, abandonner, retirer, reprendre, rétablir) ;
  *        l'historique est servi par pages de 5 (20 en jeu) pour montrer « Plus anciennes ».
  *        Essais des fonctions pures : node modules/vava_atelier/web/dev/essais.js
@@ -116,12 +127,23 @@ const DevMock = (() => {
       texts: { trial: 'Voir le panneau', publish: 'Dresser le panneau', publishHint: 'Dresser le panneau le rend lisible aux passants.' }, hasCompare: true,
       stored: true, hasTrial: true, format: 1,
       kinds: [
-        { id: 'panneau', noun: 'panneau', nounPlural: 'panneaux', article: 'le', feminine: false, newLabel: 'Nouveau panneau', layout: 'page', creatable: true, form: PANNEAU_FORM },
+        { id: 'panneau', noun: 'panneau', nounPlural: 'panneaux', article: 'le', feminine: false, newLabel: 'Nouveau panneau', layout: 'page', creatable: true, placement: 'oriented', ghost: { field: 'modele' }, form: PANNEAU_FORM },
         { id: 'affiche', noun: 'affiche', nounPlural: 'affiches', article: 'l\'', feminine: true, newLabel: 'Nouvelle affiche', layout: 'side', creatable: true, parent: 'panneau',
           form: { titleField: 'titre', groups: {}, fields: [
             { id: 'titre', widget: 'text', label: 'Nom de l\'affiche', help: 'Ce qu\'annonce l\'affiche, en quelques mots.', min: 3, max: 40, charset: 'name', default: '' },
             { id: 'couleur', widget: 'segmented', label: 'Couleur', help: 'La teinte du papier, pour qu\'on la remarque.', options: [{ value: 'rouge', label: 'Rouge' }, { value: 'bleu', label: 'Bleu' }, { value: 'vert', label: 'Vert' }, { value: 'ocre', label: 'Ocre' }], default: 'ocre' },
             { id: 'duree', widget: 'duration', label: 'Reste affichée', help: 'Passé ce délai, l\'affiche est décrochée.', min: 3600, max: 604800, units: ['h', 'j'], default: 259200 },
+          ] } },
+        { id: 'enclos', noun: 'enclos', nounPlural: 'enclos', article: 'l\'', feminine: false, newLabel: 'Nouvel enclos', layout: 'side', creatable: true, placement: 'polygon', rules: { vertices: { min: 3, max: 32 } },
+          form: { titleField: 'nom', groups: [], fields: [
+            { id: 'nom', widget: 'text', label: 'Nom de l\'enclos', help: 'Le nom que donne /atelier_exemple lire à qui s\'y tient.', min: 3, max: 40, charset: 'name', default: '' },
+          ] } },
+        { id: 'borne', noun: 'borne', nounPlural: 'bornes', article: 'la', feminine: true, newLabel: 'Nouvelle borne', layout: 'side', creatable: false, parent: 'enclos', placement: 'point',
+          rules: { inside: { slack: 0 }, spacing: 1 }, template: ['couleur'], autoTitle: 'couleur',
+          ghost: { field: 'couleur', models: { rouge: { model: 'prop_roadcone02a', label: 'cône de GTA', provisional: true }, blanc: { model: 'prop_mp_cone_02', label: 'cône blanc de GTA', provisional: true } } },
+          form: { titleField: 'nom', groups: [], fields: [
+            { id: 'nom', widget: 'text', label: 'Nom de la borne', help: 'Donné tout seul à la pose (« Rouge 2 »).', min: 1, max: 40, charset: 'name', default: '' },
+            { id: 'couleur', widget: 'segmented', label: 'Couleur', help: 'La couleur du cône, et son modèle.', options: [{ value: 'rouge', label: 'Rouge' }, { value: 'blanc', label: 'Blanc' }], default: 'rouge' },
           ] } },
       ],
     },
@@ -135,22 +157,36 @@ const DevMock = (() => {
           { id: 'solennelle', widget: 'toggle', label: 'Solennelle', help: 'Les cloches sonnent avant la lecture.', default: true },
         ] } }],
     },
+    // atelier de la récolte (spec T-102 § 5.5) : zone (cercle) et point (orienté, enfant d'une zone)
     'vava_gathering:zones': {
       family: 'monde', label: 'Récolte', description: 'Forêts, mines, prairies et coins de pêche, arbres et filons un par un.', icon: 'recolte', order: 10,
       texts: { trial: 'Tester la récolte', publish: 'Publier la zone', publishHint: 'Publier rend les nouveaux points visibles aux joueurs proches.', trialLine: 'Mode essai : vous seul voyez ces points' },
-      hasCompare: false, stored: true, hasTrial: true, format: 1,
-      kinds: [{ id: 'zone', noun: 'zone', nounPlural: 'zones', article: 'la', feminine: true, newLabel: 'Nouvelle zone', layout: 'side', creatable: true, placement: 'circle', steps: ['La zone', 'Les points', 'Publier'],
-        form: { titleField: 'nom', groups: [{ id: 'point', label: 'Prochain point à poser' }, { id: 'reglages', label: 'Réglages de la zone', folded: true, help: 'Type, rayon, vitesse à laquelle la terre se repose, durée d\'une cicatrice.' }], fields: [
-          { id: 'nom', widget: 'text', label: 'Nom de la zone', help: 'Le nom que verront les récolteurs.', min: 3, max: 40, charset: 'name', default: '' },
-          { id: 'ressource', widget: 'segmented', label: 'Ressource', help: 'Ce que donne le prochain point posé.', group: 'point', options: [{ value: 'chene', label: 'Chêne' }, { value: 'pin', label: 'Pin' }, { value: 'autre', label: 'Autre…' }], default: 'chene' },
-          { id: 'charges', widget: 'slider', label: 'Récoltes avant repos', help: 'Combien de fois on récolte avant que le point se repose.', group: 'point', min: 1, max: 10, step: 1, integer: true, default: 3, width: 'half' },
-          { id: 'repousse', widget: 'duration', label: 'Repousse d\'une récolte', help: 'Le temps qu\'il faut pour qu\'une récolte revienne.', group: 'point', min: 60, max: 86400, units: ['min', 'h'], default: 600, width: 'half' },
-          { id: 'modele', widget: 'model', label: 'Apparence', help: 'Chêne de GTA en attendant le modèle médiéval.', group: 'point', choices: [{ value: 'prop_tree_oak_01', label: 'Chêne de GTA', provisional: true }, { value: 'prop_tree_pine_01', label: 'Pin de GTA', provisional: true }], default: 'prop_tree_oak_01' },
-          { id: 'type', widget: 'segmented', label: 'Type de zone', help: 'Ce que la zone abrite.', group: 'reglages', options: [{ value: 'foret', label: 'Forêt' }, { value: 'mine', label: 'Mine' }, { value: 'prairie', label: 'Prairie' }, { value: 'peche', label: 'Pêche' }, { value: 'marais', label: 'Marais' }], default: 'foret' },
-          { id: 'rayon', widget: 'slider', label: 'Rayon', help: 'Jusqu\'où s\'étend la zone autour de son centre.', group: 'reglages', min: 10, max: 300, step: 5, integer: true, unit: 'm', default: 120 },
-          { id: 'repos', widget: 'slider', label: 'Repos de la terre', help: 'Vitesse à laquelle la terre reprend des forces.', group: 'reglages', min: 0.5, max: 2, step: 0.1, decimals: 1, prefix: '×', default: 1 },
-          { id: 'cicatrice', widget: 'duration', label: 'Durée d\'une cicatrice', help: 'Le temps qu\'une terre épuisée met à guérir.', group: 'reglages', min: 3600, max: 2592000, units: ['h', 'j'], default: 172800 },
-        ] } }],
+      hasCompare: false, stored: true, hasTrial: true, trialPlay: true, format: 1,
+      kinds: [
+        { id: 'zone', noun: 'zone', nounPlural: 'zones', article: 'la', feminine: true, newLabel: 'Nouvelle zone', layout: 'side', creatable: true, placement: 'circle', steps: ['La zone', 'Les points', 'Publier'],
+          rules: { radius: { min: 10, max: 300, default: 60 } },
+          form: { titleField: 'nom', groups: [{ id: 'terre', label: 'Réglages de la zone', folded: true, help: 'Type, rayon, vitesse à laquelle la terre se repose, durée d\'une cicatrice.' }], fields: [
+            { id: 'nom', widget: 'text', label: 'Nom de la zone', help: 'Le nom que verront les récoltants sur la carte et dans le panneau des zones.', min: 3, max: 40, charset: 'name', default: '' },
+            { id: 'genre', widget: 'segmented', label: 'Type de lieu', help: 'Donne l\'icône de la carte ; dans une zone d\'eau, on pêche et la terre devient l\'eau.', group: 'terre', options: [{ value: 'foret', label: 'Forêt' }, { value: 'mine', label: 'Mine' }, { value: 'prairie', label: 'Prairie' }, { value: 'eau', label: 'Eau' }], default: 'foret' },
+            { id: 'fatigue', widget: 'slider', label: 'Fatigue par récolte', help: 'Vitalité (sur 100) que perd la zone à chaque récolte réussie : plus elle est haute, plus la terre s\'épuise vite.', group: 'terre', min: 0.5, max: 10, step: 0.5, decimals: 1, unit: 'pts', default: 2 },
+            { id: 'repos', widget: 'slider', label: 'Repos de la terre', help: 'Vitalité que la terre regagne chaque heure quand on la laisse en paix.', group: 'terre', min: 0.5, max: 24, step: 0.5, decimals: 1, unit: 'pts/h', default: 4 },
+            { id: 'cicatrice', widget: 'duration', label: 'Durée d\'une cicatrice', help: 'Une zone épuisée jusqu\'à zéro se remet bien plus lentement pendant ce temps.', group: 'terre', min: 3600, max: 2592000, units: ['h', 'j'], default: 172800 },
+          ] } },
+        { id: 'node', noun: 'point', nounPlural: 'points', article: 'le', feminine: false, newLabel: 'Nouveau point', layout: 'side', creatable: false, parent: 'zone', placement: 'oriented',
+          rules: { inside: { slack: 5 }, spacing: 2 }, template: ['ressource', 'charges', 'repousse'], autoTitle: 'ressource', hintField: 'charges', hintFormat: '%s récoltes',
+          ghost: { field: 'ressource', models: {
+            chene: { model: 'prop_tree_oak_01', label: 'chêne de GTA', provisional: true }, pin: { model: 'prop_tree_pine_01', label: 'pin de GTA', provisional: true },
+            fer: { model: 'prop_rock_1_a', label: 'rocher de GTA', provisional: true }, cuivre: { model: 'prop_rock_1_b', label: 'rocher de GTA', provisional: true },
+            pierre: { model: 'prop_rock_1_c', label: 'rocher de GTA', provisional: true }, lavande: { model: 'prop_plant_01a', label: 'plante de GTA', provisional: true },
+            sauge: { model: 'prop_plant_01b', label: 'plante de GTA', provisional: true }, truite: { model: 'prop_dock_float_1', label: 'flotteur de GTA', provisional: true },
+          } },
+          form: { titleField: 'nom', groups: [], fields: [
+            { id: 'nom', widget: 'text', label: 'Nom du point', help: 'Pour le retrouver dans la liste ; donné tout seul à la pose (« Chêne 4 »).', min: 1, max: 40, charset: 'name', default: '' },
+            { id: 'ressource', widget: 'select', label: 'Ressource', help: 'Ce que l\'on récolte ici : elle fixe l\'outil, l\'apparence et le savoir-faire.', source: 'ressources' },
+            { id: 'charges', widget: 'slider', label: 'Récoltes avant repos', help: 'Combien de récoltes ce point donne avant de devoir repousser.', min: 1, max: 20, step: 1, integer: true, default: 3 },
+            { id: 'repousse', widget: 'duration', label: 'Repousse d\'une récolte', help: 'Temps pour qu\'une récolte revienne ; la saison l\'accélère ou la ralentit.', min: 60, max: 86400, units: ['min', 'h'], default: 600 },
+          ] } },
+      ],
     },
   };
   function descriptorFor(editor) {
@@ -169,8 +205,8 @@ const DevMock = (() => {
   // Entrées et valeurs ------------------------------------------------------------------------------------------------
   const entries = {
     'vava_example_atelier:panneaux|panneau': [
-      { id: 'place_du_marche', title: 'Panneau de la place', hint: 'Le marché, bois', values: { n: { taille: 1.5, portee: 3, duree: 604800 }, s: { titre: 'Panneau de la place', texte: 'Marché chaque jeudi, de l\'aube à la cloche de midi.\nLes étals se montent la veille.', langue: 'commun', matiere: 'bois', quartier: 'marche', offrande: 'pain', modele: 'prop_sign_road_01a' }, b: { eclaire: true } } },
-      { id: 'porte_nord', title: 'Pancarte de la porte nord', hint: 'Les remparts, pierre', values: { n: { taille: 2.2, portee: 5, duree: 2592000 }, s: { titre: 'Pancarte de la porte nord', texte: 'Fermeture des portes au couvre-feu.', langue: 'commun', matiere: 'pierre', quartier: 'remparts', offrande: '', modele: 'prop_sign_road_03a' }, b: { eclaire: false } } },
+      { id: 'place_du_marche', title: 'Panneau de la place', hint: 'Le marché, bois', place: { x: -250, y: -930, z: 31.2, h: 90 }, values: { n: { taille: 1.5, portee: 3, duree: 604800 }, s: { titre: 'Panneau de la place', texte: 'Marché chaque jeudi, de l\'aube à la cloche de midi.\nLes étals se montent la veille.', langue: 'commun', matiere: 'bois', quartier: 'marche', offrande: 'pain', modele: 'prop_sign_road_01a' }, b: { eclaire: true } } },
+      { id: 'porte_nord', title: 'Pancarte de la porte nord', hint: 'Les remparts, pierre', place: { x: -300, y: -870, z: 31, h: 0 }, values: { n: { taille: 2.2, portee: 5, duree: 2592000 }, s: { titre: 'Pancarte de la porte nord', texte: 'Fermeture des portes au couvre-feu.', langue: 'commun', matiere: 'pierre', quartier: 'remparts', offrande: '', modele: 'prop_sign_road_03a' }, b: { eclaire: false } } },
       { id: 'enseigne_port', title: 'Enseigne du port', hint: 'Le port, parchemin cloué', values: { n: { taille: 1.5, portee: 4, duree: 86400 }, s: { titre: 'Enseigne du port', texte: '', langue: 'runes', matiere: 'parchemin', quartier: 'port', offrande: '', modele: 'prop_sign_road_01a' }, b: { eclaire: false } }, warnings: ['taille'] },
     ],
     'vava_example_atelier:panneaux|affiche': [
@@ -180,10 +216,19 @@ const DevMock = (() => {
       { id: 'couronnement', title: 'Proclamation du couronnement', values: { s: { titre: 'Proclamation du couronnement', texte: 'Oyez, oyez : la Couronne sera remise au jour de la Saint-Aldric.' }, b: { solennelle: true } } },
     ],
     'vava_gathering:zones|zone': [
-      { id: 'foret_brume', title: 'Forêt de Brume', hint: '5 points, rayon 120 m', values: { n: { charges: 3, repousse: 600, rayon: 120, repos: 1, cicatrice: 172800 }, s: { nom: 'Forêt de Brume', ressource: 'chene', modele: 'prop_tree_oak_01', type: 'foret' } } },
-      { id: 'mine_val', title: 'Mine du Val', hint: '3 filons, rayon 60 m', values: { n: { charges: 4, repousse: 1800, rayon: 60, repos: 0.8, cicatrice: 259200 }, s: { nom: 'Mine du Val', ressource: 'autre', modele: 'prop_tree_pine_01', type: 'mine' } } },
-      { id: 'prairie_saules', title: 'Prairie des Saules', hint: '8 points, rayon 90 m', values: { n: { charges: 2, repousse: 900, rayon: 90, repos: 1.2, cicatrice: 86400 }, s: { nom: 'Prairie des Saules', ressource: 'autre', modele: 'prop_tree_oak_01', type: 'prairie' } } },
-      { id: 'etang_moulin', title: 'Étang du Moulin', hint: '2 coins de pêche', values: { n: { charges: 5, repousse: 1200, rayon: 40, repos: 1, cicatrice: 86400 }, s: { nom: 'Étang du Moulin', ressource: 'autre', modele: 'prop_tree_oak_01', type: 'peche' } } },
+      { id: 'foret_brume', title: 'Forêt de Brume', hint: '5 points', place: { x: -480.5, y: 5520.2, z: 75.1, r: 120 }, values: { n: { fatigue: 2, repos: 4, cicatrice: 172800 }, s: { nom: 'Forêt de Brume', genre: 'foret' } } },
+      { id: 'mine_val', title: 'Mine du Val', hint: '3 points', place: { x: 2950, y: 2780, z: 42.5, r: 60 }, values: { n: { fatigue: 3, repos: 2, cicatrice: 259200 }, s: { nom: 'Mine du Val', genre: 'mine' } } },
+      { id: 'prairie_saules', title: 'Prairie des Saules', hint: '2 points', place: { x: 1900, y: 4850, z: 44, r: 90 }, values: { n: { fatigue: 1.5, repos: 6, cicatrice: 86400 }, s: { nom: 'Prairie des Saules', genre: 'prairie' } } },
+      { id: 'etang_moulin', title: 'Étang du Moulin', hint: '2 points', place: { x: -190, y: 4220, z: 32, r: 40 }, values: { n: { fatigue: 2, repos: 4, cicatrice: 86400 }, s: { nom: 'Étang du Moulin', genre: 'eau' } } },
+    ],
+    // points de la Forêt de Brume (maquette Recolte) : quatre publiés, un cinquième nouveau (brouillon, voir seed)
+    'vava_gathering:zones|node': [
+      ['chene_1', 'Chêne 1', 'chene', 3, 0, 0], ['chene_2', 'Chêne 2', 'chene', 3, 6, 4], ['pin_1', 'Pin 1', 'pin', 4, 12, -3], ['chene_3', 'Chêne 3', 'chene', 3, -5, 9],
+      ['chene_4', 'Chêne 4', 'chene', 3, 3, 14],
+    ].map(([id, title, ressource, charges, dx, dy]) => ({ id, title, parent: 'foret_brume', place: { x: -480.5 + dx, y: 5520.2 + dy, z: 75.1, h: 90 },
+      values: { n: { charges, repousse: 600 }, s: { nom: title, ressource } } })),
+    'vava_example_atelier:panneaux|enclos': [
+      { id: 'enclos_moutons', title: 'Enclos aux moutons', hint: '4 sommets', place: { z: 31, points: [{ x: -260, y: -940 }, { x: -240, y: -940 }, { x: -240, y: -920 }, { x: -260, y: -920 }] }, values: { s: { nom: 'Enclos aux moutons' } } },
     ],
     'vava_crafting:stations|station': [
       { id: 'forge_bourg', title: 'Forge du bourg', hint: 'Forge, place du marché', values: { n: { portee: 2 }, s: { nom: 'Forge du bourg' } } },
@@ -197,7 +242,10 @@ const DevMock = (() => {
     'Filet de pêche', 'Pioche', 'Hache', 'Faucille', 'Seau', 'Cruche d\'eau', 'Vin de pays', 'Bière d\'orge']
     .map((label) => ({ value: fold(label).replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, ''), label, image: `nui://vava_inventory/web/items/${fold(label).replace(/[^a-z0-9]+/g, '_').replace(/^_|_$/g, '')}.webp` }));
 
-  const optionsOf = (fieldId) => (fieldId === 'quartier' ? districts : (fieldId === 'offrande' ? items : []));
+  const resources = [['chene', 'Chêne'], ['pin', 'Pin'], ['fer', 'Filon de fer'], ['cuivre', 'Filon de cuivre'], ['pierre', 'Pierre'], ['lavande', 'Lavande'], ['sauge', 'Sauge'], ['truite', 'Banc de truites']]
+    .map(([value, label]) => ({ value, label }));
+  const OPTIONS = { quartier: districts, offrande: items, ressource: resources };
+  const optionsOf = (fieldId) => OPTIONS[fieldId] || [];
 
   /** `labels` de read : { [champ] = { label, image?, provisional? } } pour chaque champ à liste distante dont la valeur est connue. */
   function labelsOf(kind, values) {
@@ -323,7 +371,8 @@ const DevMock = (() => {
     const kindDef = (descriptorFor(editor) || { kinds: [] }).kinds.find((k) => k.id === kind);
     const values = l.draft ? l.draft.values : entry.values;
     const answer = { id: entry.id, title: valueOf(values, kindDef.form.titleField) || entry.title, values: clone(values), labels: labelsOf(kindDef, values), warnings: entry.warnings,
-      state: stateOf(l), footer: footerOf(descriptorFor(editor), l), rev: l.draft ? l.draft.rev : 0, version: l.version, removal: Boolean(l.draft && l.draft.removal), stale: Boolean(l.draft && l.draft.stale) };
+      state: stateOf(l), footer: footerOf(descriptorFor(editor), l), rev: l.draft ? l.draft.rev : 0, version: l.version, removal: Boolean(l.draft && l.draft.removal), stale: Boolean(l.draft && l.draft.stale),
+      place: entry.place ? clone(entry.place) : undefined, parent: entry.parent, distance: entry.place ? (entry.parent ? 4 : 32) : undefined };
     if (l.draft && !l.draft.mine) {
       answer.holder = { label: OTHER, mine: false };
       answer.state.line = `Brouillon de ${OTHER}, enregistré il y a 3 min`;
@@ -346,6 +395,13 @@ const DevMock = (() => {
 
   // Situations de départ des écrans (§ 9.5 de T-101)
   function seed() {
+    const G = 'vava_gathering:zones';
+    lifeOf(G, 'zone', 'foret_brume').draft = { values: clone(findEntry(G, 'zone', 'foret_brume').values), rev: 3, mine: true };
+    life.set(`${G}|node|chene_4`, { version: 0, draft: { values: clone(findEntry(G, 'node', 'chene_4').values), rev: 1, mine: true, fresh: true }, versions: [] });
+    if (params.get('step') === '1') {
+      listOf(G, 'zone').push({ id: 'bois_des_essais', title: 'Bois des Essais', hint: '', values: { n: { fatigue: 2, repos: 4, cicatrice: 172800 }, s: { nom: 'Bois des Essais', genre: 'foret' } } });
+      life.set(`${G}|zone|bois_des_essais`, { version: 0, draft: { values: clone(findEntry(G, 'zone', 'bois_des_essais').values), rev: 1, mine: true, fresh: true }, versions: [] });
+    }
     const P = 'vava_example_atelier:panneaux';
     const place = findEntry(P, 'panneau', 'place_du_marche');
     const v = (text) => { const values = clone(place.values); values.s.texte = text; return values; };
@@ -498,7 +554,110 @@ const DevMock = (() => {
     no_draft: 'Cette fiche n\'a pas de brouillon en cours.', not_stored: 'Cet atelier ne garde encore rien : on peut seulement y vérifier une fiche.',
     no_trial: 'Cet atelier ne propose pas d\'essai.', unknown_version: 'Cette version n\'existe plus.', not_archived: 'Seule une ancienne version peut être rétablie.',
   };
+  REFUSED.busy = 'Un instant…';
   const fail = (error) => ({ ok: false, error, text: REFUSED[error] || '' });
+
+  // Placement (T-102) : lieux des fiches, visée simulée (clic : poser ; clic droit : choisir ; Entrée : fermer un tracé ;
+  // Échap : quitter), essai joué (F9 : revenir). Le jeu dessine l'aperçu ; ici, rien d'autre que les messages de § 9.2.
+  const post = (action, payload) => window.postMessage({ action, payload }, '*');
+  const K = (keys, label) => ({ keys, label });
+  let aim = null, suspended = false, clicks = 0;
+  function keysFor(p) {
+    const undo = K(['Ctrl', 'Z'], 'Annuler'), quit = K(['Échap'], 'Quitter');
+    if (p.shape === 'polygon') return [K(['Clic'], 'Ajouter un sommet'), K(['Entrée'], 'Fermer le tracé'), K(['Clic droit'], 'Choisir un sommet'), K(['Ctrl', 'Z'], 'Retirer le dernier'), quit];
+    if (p.mode === 'children') return [K(['Clic'], p.picked ? 'Déplacer ici' : 'Poser ici'), K(['Molette'], 'Tourner'), K(['Maj'], 'Placement précis'), K(['Clic droit'], p.picked ? 'Lâcher le point' : 'Choisir un point'), undo, quit];
+    if (p.shape === 'circle') return [K(['Clic'], 'Poser ici'), K(['Molette'], 'Rayon'), K(['Maj'], 'Réglage fin'), undo, quit];
+    return [K(['Clic'], 'Poser ici')].concat(p.shape === 'oriented' ? [K(['Molette'], 'Tourner'), K(['Maj'], 'Placement précis')] : [], [undo, quit]);
+  }
+  const showAim = () => post('placing', { on: true, mode: aim.mode, shape: aim.shape, keys: keysFor(aim) });
+  function stopAim() { if (aim) { aim = null; post('placing', { on: false }); } }
+  function rowOf(editor, kind, e) {
+    const d = lifeOf(editor, kind.id, e.id).draft;
+    const tone = !d ? 'live' : (d.removal ? 'removal' : (!d.mine ? 'other' : (d.fresh ? 'new' : 'draft')));
+    const n = valueOf((d || e).values, kind.hintField);
+    return { kind: kind.id, id: e.id, title: e.title, hint: kind.hintFormat && n !== undefined ? kind.hintFormat.replace('%s', n) : '', tone, place: clone(e.place || {}) };
+  }
+  function childrenOf(data) {
+    const descriptor = descriptorFor(data.editor), kindDef = descriptor && descriptor.kinds.find((k) => k.id === data.kind);
+    const entry = kindDef && findEntry(data.editor, data.kind, data.id);
+    if (!entry) return fail('unknown_entry');
+    const rows = (k, parentId) => listOf(data.editor, k.id).filter((e) => e.parent === parentId).map((e) => rowOf(data.editor, k, e));
+    const child = descriptor.kinds.find((k) => k.parent === kindDef.id && k.placement);
+    if (child) return ok({ self: { place: entry.place, distance: 32 }, rows: rows(child, entry.id) });
+    const parentKind = descriptor.kinds.find((k) => k.id === kindDef.parent);
+    const parent = parentKind && findEntry(data.editor, parentKind.id, entry.parent);
+    return ok({ self: { place: entry.place, distance: 4 }, parent: parent ? { kind: parentKind.id, id: parent.id, title: parent.title, place: parent.place } : undefined,
+      rows: parent ? rows(kindDef, parent.id).filter((r) => r.id !== entry.id) : [] });
+  }
+  /** Brouillon tenu (révision montée si `bump`) ou créé (copie de la publiée) ; vrai s'il vient d'être créé. */
+  function hold(editor, kind, id, bump) {
+    const l = lifeOf(editor, kind, id);
+    if (l.draft) { if (bump) l.draft.rev += 1; return false; }
+    l.draft = { values: clone(findEntry(editor, kind, id).values), rev: 1, mine: true };
+    return true;
+  }
+  function pose() {
+    const descriptor = descriptorFor(aim.editor), kindDef = descriptor.kinds.find((k) => k.id === aim.kind);
+    clicks += 1;
+    if (aim.mode === 'children') {
+      if (clicks % 3 === 0) { post('placeRefused', { text: 'Trop près de « Chêne 2 » (1,4 m).' }); return; }
+      const all = listOf(aim.editor, aim.kind), parent = findEntry(aim.editor, kindDef.parent, aim.parent);
+      const label = aim.label || kindDef.noun;
+      let n = 1;
+      while (all.some((e) => e.parent === aim.parent && e.title === `${label} ${n}`)) n += 1;
+      const id = slug(aim.editor, aim.kind, `${label} ${n}`, kindDef.noun);
+      const values = { n: { ...(aim.template.n || {}) }, s: { ...(aim.template.s || {}), [kindDef.form.titleField]: `${label} ${n}` }, b: { ...(aim.template.b || {}) } };
+      const e = { id, title: `${label} ${n}`, parent: aim.parent, place: { ...(parent.place.points ? { x: parent.place.points[0].x + 2, y: parent.place.points[0].y + 2 } : { x: parent.place.x + 4 * n, y: parent.place.y - 3 }), z: parent.place.z, h: 90 }, values };
+      if (kindDef.placement !== 'oriented') delete e.place.h;
+      all.push(e);
+      const l = { version: 0, draft: { values, rev: 1, mine: true, fresh: true }, versions: [] };
+      life.set(`${aim.editor}|${aim.kind}|${id}`, l);
+      const created = hold(aim.editor, kindDef.parent, aim.parent), pl = lifeOf(aim.editor, kindDef.parent, aim.parent);
+      post('placed', { kind: aim.kind, id, rev: 1, title: e.title, state: stateOf(l), footer: footerOf(descriptor, l), place: e.place, row: rowOf(aim.editor, kindDef, e),
+        parent: created ? { id: aim.parent, rev: pl.draft.rev, state: stateOf(pl), footer: footerOf(descriptor, pl) } : undefined });
+      return;
+    }
+    if (aim.shape === 'polygon') { aim.vertices = (aim.vertices || 0) + 1; return; }
+    const entry = findEntry(aim.editor, aim.kind, aim.id);
+    entry.place = aim.shape === 'circle' ? (entry.place ? { ...entry.place, x: entry.place.x + 12, r: entry.place.r + 20 } : { x: -400, y: 5400, z: 70, r: kindDef.rules.radius.default })
+      : { x: -248, y: -927, z: 31.2, ...(aim.shape === 'oriented' ? { h: 130 } : {}) };
+    placedSelf(descriptor, entry);
+  }
+  function placedSelf(descriptor, entry) {
+    hold(aim.editor, aim.kind, aim.id, true);
+    const l = lifeOf(aim.editor, aim.kind, aim.id);
+    post('placed', { kind: aim.kind, id: aim.id, rev: l.draft.rev, title: entry.title, state: stateOf(l), footer: footerOf(descriptor, l), place: clone(entry.place), distance: 3 });
+    stopAim();   // fiche seule : retour au volet après la pose
+  }
+  function closeTrace() {
+    if (!aim || aim.shape !== 'polygon' || (aim.vertices || 0) < 3) return;
+    const entry = findEntry(aim.editor, aim.kind, aim.id), n = aim.vertices;
+    entry.place = { z: 31, points: Array.from({ length: n }, (_, i) => ({ x: -250 + 12 * Math.cos((2 * Math.PI * i) / n), y: -930 + 12 * Math.sin((2 * Math.PI * i) / n) })) };
+    placedSelf(descriptorFor(aim.editor), entry);
+  }
+  if (!inGame) {
+    document.addEventListener('mousedown', (event) => { if (aim && !event.target.closest('#side, #banner, #toast')) { if (event.button === 2 && aim.mode === 'children') { aim.picked = !aim.picked; showAim(); } else if (event.button === 0) pose(); } });
+    document.addEventListener('contextmenu', (event) => { if (aim) event.preventDefault(); });
+    document.addEventListener('keydown', (event) => {
+      if (aim && event.key === 'Escape') stopAim();
+      else if (aim && event.key === 'Enter') closeTrace();
+      else if (suspended && event.key === 'F9') { suspended = false; post('suspended', { on: false }); }
+    });
+  }
+  function placing(name, data) {
+    switch (name) {
+      case 'children': return childrenOf(data);
+      case 'placeStart':
+        if (aim) return fail('busy');
+        aim = { ...data, template: data.template || {} };
+        clicks = 0;
+        showAim();
+        return { ok: true };
+      case 'placeStop': aim = null; return { ok: true };
+      case 'suspend': suspended = true; setTimeout(() => post('suspended', { on: true }), 50); return { ok: true };
+      default: return { ok: true };   // templateChanged, goTo : rien à simuler
+    }
+  }
 
   function homePayload(version) {
     const withContent = version !== 'accueil-1' || !homeSent;
@@ -588,6 +747,8 @@ const DevMock = (() => {
         if (data.editor) for (const line of sent) delete line.editor;
         return ok({ lines: sent, more: lines.length > 25, next: page.length > 0 ? page[page.length - 1].id : 0 });
       }
+      case 'children': case 'placeStart': case 'placeStop': case 'templateChanged': case 'goTo': case 'suspend':
+        return placing(name, data);
       case 'save': case 'trial': case 'endTrial': case 'preview': case 'publish': case 'restore':
       case 'discard': case 'retire': case 'take': case 'history': case 'version': case 'removed':
         return lifecycle(name, data);
@@ -650,7 +811,7 @@ const DevMock = (() => {
       await A.state.view.setSearch(params.get('q') || 'forge');
     } else if (screen === 'list') {
       await A.openEditor('vava_example_atelier:panneaux');
-    } else if (screen === 'entry' || screen === 'confirm') {
+    } else if ((screen === 'entry' && params.get('editor') !== 'recolte') || screen === 'confirm') {
       if (params.get('layout') === 'side') await A.openEntry('vava_example_atelier:panneaux', 'affiche', 'foire');
       else await A.openEntry('vava_example_atelier:panneaux', 'panneau', 'place_du_marche');
       if (forceErrors) await A.check();
@@ -658,6 +819,25 @@ const DevMock = (() => {
         editField();
         A.back();
       }
+    } else if (screen === 'entry' && params.get('editor') === 'recolte') {
+      await A.openEntry('vava_gathering:zones', 'zone', params.get('step') === '1' ? 'bois_des_essais' : 'foret_brume');
+      if (params.get('refused') === '1') {
+        await pause(300);
+        A.state.lastMode = 'children';
+        post('placeRefused', { text: 'Trop près de « Chêne 2 » (1,4 m).' });
+      }
+    } else if (screen === 'placing') {
+      const shape = params.get('shape') || 'oriented', page = params.get('layout') === 'page';
+      if (shape === 'polygon') await A.openEntry(P, 'enclos', 'enclos_moutons');
+      else if (page) await A.openEntry(P, 'panneau', 'place_du_marche');
+      else await A.openEntry('vava_gathering:zones', 'zone', 'foret_brume');
+      await pause(300);
+      click(shape === 'oriented' && !page ? '.place-box .btn.dark' : '.place-row .btn');
+      if (params.get('picked') === '1') { await pause(300); aim.picked = true; showAim(); }
+    } else if (screen === 'suspended') {
+      await A.openEntry('vava_gathering:zones', 'zone', 'foret_brume');
+      await pause(200);
+      A.run('trial');
     } else if (screen === 'keys') {
       await A.openEntry('vava_gathering:zones', 'zone', 'foret_brume');
       window.postMessage({ action: 'mode', payload: { banner: { title: 'Atelier de la récolte', line: 'Mode édition : les cercles et étiquettes ne sont visibles que par vous' } } }, '*');
