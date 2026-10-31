@@ -6,7 +6,7 @@
            l'action. Le HUD n'écoute aucune touche : interrompre (touche, déplacement) est l'affaire du module, qui
            appelle cancelProgress. Fin et interruption sont annoncées par les hooks client vava_hud:progressDone et
            vava_hud:progressCancelled. Aucune boucle : la fin est programmée une fois, l'interface anime seule.
-    Dépendances : config.lua, client/core.lua, client/nui.lua
+    Dépendances : config_client.lua, client/core.lua, client/nui.lua
 ]]
 
 local type = type

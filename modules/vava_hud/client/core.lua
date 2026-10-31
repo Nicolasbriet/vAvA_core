@@ -1,7 +1,7 @@
 --[[
     vava_hud/client/core.lua
     Rôle : accès à l'API client du core (hooks du personnage), partagé par les fichiers du module.
-    Dépendances : vAvA_core (API client v1), config.lua
+    Dépendances : vAvA_core (API client v1), config_client.lua
 ]]
 
 local core, apiErr = exports.vAvA_core:getApi(1)

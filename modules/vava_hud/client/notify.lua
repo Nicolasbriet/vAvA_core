@@ -2,7 +2,7 @@
     vava_hud/client/notify.lua
     Rôle : notifications à l'écran pour tous les modules (remplacent celles de GTA, retirées avec son HUD). Message
            validé et borné ; l'interface gère l'empilement et la disparition.
-    Dépendances : config.lua, client/nui.lua
+    Dépendances : config_client.lua, client/nui.lua
 ]]
 
 local type = type
