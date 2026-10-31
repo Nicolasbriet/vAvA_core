@@ -769,7 +769,7 @@ versé à T-014 ; les autres points déjà couverts sont précisés dans T-012 �
   l'outre rendue vide, sans casser l'empilement : le savoir du tanneur doit compter.
 
 ### T-136 — Recettes de `vava_farming` déclarées aux compétences
-- Agent : vava-dev-lua · Dépend de : — · Statut : à faire
+- Agent : vava-dev-lua · Dépend de : — · Statut : en cours
 - Trouvé pendant T-130 : `vava_farming` déclare sa recette `compost` à l'artisanat mais pas à `vava_skills:recipes` ;
   le composteur devrait la refuser comme « recette inconnue » (à vérifier en jeu d'abord). Déclarer la recette et la
   redéclarer au retour de `vava_skills`, comme `vava_provisions` le fait pour l'outre.
