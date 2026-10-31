@@ -7,7 +7,8 @@
  *        Paramètres d'adresse : ?scenario=normal|rapide|lent|muet|sans-selection, ?niveau=haute|moyenne|basse,
  *        ?vitesse=4, ?ouverture=0, ?fps=1 (cadence, niveau et ambiance à l'écran), ?journal=1 (journal de
  *        calibrage), ?ambiances=aube,absente,orage (ordre des ambiances : un nom sans fichier montre le saut d'une
- *        image manquante ; que des noms absents : le fond de repli), ?tenue=4000 (durée d'une ambiance, ms).
+ *        image manquante ; que des noms absents : le fond de repli), ?tenue=4000 (durée d'une ambiance, ms),
+ *        ?derive=0 (dérive des ambiances en %, 0 : fondu seul ; mesure du test 5-5).
  *        Jamais livré (web/dev/ hors des files du manifeste), jamais chargé en jeu (la ligne hors jeu de index.html ne
  *        l'insère qu'en file:). Chargé après les fichiers purs et avant js/app.js : il règle la config avant le départ.
  * Dépendances : js/config.js, js/progress.js (window.VavaLoading)
@@ -29,6 +30,7 @@
   if (params.get('journal') === '1') cfg.debug.journal = true;
   if (params.get('ambiances')) cfg.ambiances.order = params.get('ambiances').split(','); // borné par ambiances.js
   if (params.get('tenue')) cfg.ambiances.showMs = Number(params.get('tenue'));
+  if (params.get('derive') !== null) cfg.ambiances.driftPct = Number(params.get('derive'));
   var speed = Math.min(20, Math.max(0.25, Number(params.get('vitesse')) || 1));
   var showFps = params.get('fps') === '1';
 

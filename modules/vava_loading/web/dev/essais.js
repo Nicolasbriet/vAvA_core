@@ -386,6 +386,12 @@
         check(buf.length <= 300 * 1024, f + ' : ' + buf.length + ' octets');
       });
     });
+    // le joker du manifeste livre tout le dossier : rien d'autre que les ambiances de order (relecture réseau R-2)
+    test('web/img/ambiances/ contient exactement les fichiers <nom>.webp de ambiances.order', function () {
+      var fs = require('fs'), path = require('path');
+      var found = fs.readdirSync(path.join(__dirname, '..', 'img', 'ambiances')).sort();
+      eq(found, cfg.ambiances.order.map(function (n) { return n + '.webp'; }).sort());
+    });
   }
 
   out('text');

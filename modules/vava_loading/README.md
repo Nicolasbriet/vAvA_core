@@ -149,7 +149,9 @@ mise à jour des polices de `vava_ui` se reporte ici (le test compare les octets
 livré), qui rejoue des suites de messages et ajoute un panneau « Hors jeu ». Adresses : `?scenario=normal|rapide|lent|
 muet|sans-selection`, `?niveau=haute|moyenne|basse`, `?vitesse=4`, `?ouverture=0`, `?fps=1` (cadence, niveau et ambiance à l'écran), `?journal=1`,
 `?ambiances=hiver,absente,orage` (un nom sans fichier montre le saut d'une image manquante ; que des noms absents : le
-fond de repli), `?tenue=4000` (durée d'une ambiance) ; bouton « Ambiance suivante ». Les
+fond de repli), `?tenue=4000` (durée d'une ambiance), `?derive=0` (dérive en %, mesure de 5-5) ; bouton « Ambiance suivante ».
+Le dossier `web/img/ambiances/` ne contient que les WebP de `ambiances.order` (vérifié par le test unitaire et les
+essais) : le joker du manifeste livrerait tout autre `.webp` qui y serait laissé. Les
 fonctions pures de la page s'essaient par `web/dev/essais.html` (navigateur) ou `node
 modules/vava_loading/web/dev/essais.js` (lancé aussi par `scripts/verifier.sh` quand `node` est présent).
 
@@ -192,3 +194,7 @@ Procédure complète : `docs/tests/chargement.md`. Par ordre d'importance :
 8. **Indicateur du jeu** par-dessus le pourcentage (2-5) : sinon régler `--foot-gap`.
 9. **Ambiances** (2-7 à 2-11) : ordre et rebouclage, fondu sans écran vide ni creux de lumière, image renommée sautée,
    `basse` sans dérive, coût du fondu sur petite machine.
+10. **Coût de la dérive** (5-5) : mesurée seule (`driftPct` 3 puis 0) et vérifiée une fois composée dans le panneau
+    Performance de Chrome. Si l'écart se voit, repli : `animation-timing-function: steps(360)` sur `.amb img.drift`
+    (≈ 30 pas par seconde, invisibles) ou `driftPct: 0` en `moyenne` ; rien n'est changé tant que ce n'est pas mesuré.
+11. **Premier téléchargement** (5-6) : cache FiveM vidé, délai jusqu'à l'apparition de l'écran d'Eldoria noté.

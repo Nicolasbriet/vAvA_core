@@ -238,6 +238,38 @@ describe('vava_loading : ambiances', function()
     end)
 end)
 
+-- Le joker du manifeste livre tout .webp du dossier : il ne doit contenir que les ambiances de `order` (relecture réseau
+-- R-2 de T-152). Fichiers suivis et non suivis (hors .gitignore) d'après git, puis chacun relu sur le disque.
+describe('vava_loading : dossier des ambiances', function()
+    it('contient exactement les fichiers <nom>.webp de ambiances.order', function()
+        local pageConfig = assert(read(BASE .. 'web/js/config.js'))
+        local list = assert((pageConfig:match('ambiances%s*:%s*(%b{})') or ''):match('order%s*:%s*(%b[])'),
+            'ambiances.order introuvable')
+        local expected = {}
+        for name in list:gmatch("'([^']*)'") do expected[#expected + 1] = name .. '.webp' end
+        table.sort(expected)
+        local dir = BASE .. 'web/img/ambiances'
+        local pipe = io.popen and io.popen('git -C "' .. ROOT .. '" ls-files --cached --others --exclude-standard -- "'
+            .. dir .. '" 2>&1')
+        local listed = pipe and pipe:read('a') or ''
+        if pipe then pipe:close() end
+        if not listed:find(dir, 1, true) then
+            pending('git ls-files indisponible')
+            return
+        end
+        local found, seen = {}, {}
+        for path in listed:gmatch('[^\n]+') do
+            local file = path:match('^' .. dir:gsub('%p', '%%%0') .. '/(.+)$')
+            if file and not seen[file] and size(path) then
+                seen[file] = true
+                found[#found + 1] = file
+            end
+        end
+        table.sort(found)
+        assert.same(expected, found)
+    end)
+end)
+
 describe('vava_loading : page', function()
     local html = assert(read(BASE .. 'web/index.html'))
 
