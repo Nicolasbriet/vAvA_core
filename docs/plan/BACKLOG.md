@@ -1215,7 +1215,7 @@ faire tout le système de combat ») : la porte T-119 reste à passer en jeu.
   par le crochet `vava_combat:using` ; XP de défense par le hook `vava_combat:defended`.
 
 ### T-155 — Chiffres des coups (dégâts affichés)
-- Agents : vava-architecte → vava-dev-lua · Dépend de : T-112 (après T-113, même module) · Statut : à faire
+- Agents : vava-architecte → vava-dev-lua + vava-dev-nui (cette tâche autorise à toucher `vava_hud`, `vava_pause`, `vava_magic`) · Dépend de : T-112 (après T-113, même module) · Statut : en cours
 - Demande du porteur du projet (31 octobre 2026), « comme les MMO » : le montant de chaque coup s'affiche au-dessus de
   la cible, le temps d'un souffle (chiffre qui monte et s'efface) ; issues sans dégâts écrites en mots (« Paré »,
   « Bloqué », « Esquivé », « Absorbé ») ; coup qui met à terre ou fait chanceler distingué. Valable pour les coups
