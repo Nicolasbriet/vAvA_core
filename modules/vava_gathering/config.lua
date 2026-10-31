@@ -2,9 +2,9 @@
     vava_gathering/config.lua
     Rôle : donnée de jeu de la récolte lue par le seul serveur (servi au seul serveur, jamais téléchargé par les
            joueurs) : bandes de vitalité et leurs effets, cicatrice, réaction de la terre, saisons, tolérances des
-           gestes, durée et qualité d'une récolte, pêche (touche, tolérances, prise), battement d'abonnement des zones,
-           journal, droits, débits, solidité par défaut d'un outil, objets déclarés à l'inventaire, textes. Complète la
-           table ouverte par config_client.lua (invite, barre de tension, streaming, carte, touches, outils, ressources,
+           gestes, durée et qualité d'une récolte, pêche (barre de tension, touche, prise), battement d'abonnement
+           des zones, journal, droits, débits, solidité par défaut d'un outil, objets déclarés à l'inventaire, textes.
+           Complète la table ouverte par config_client.lua (invite, streaming, carte, touches, outils, ressources,
            zones et nœuds, animations) sans en réécrire une clé (T-132). Modifiable sans toucher au code. Durées en
            millisecondes sauf mention contraire.
     Dépendances : shared/constants.lua, config_client.lua
@@ -69,25 +69,36 @@ config.quality = {
 }
 
 -- Pêche : la ligne est lancée (begin) ; le serveur tire le moment de la touche, prévient le client, qui tient la
--- tension (`fishing.tension`, config_client.lua) dans la zone pendant `durationMs` ; `reel` dit si la tenue a réussi.
--- La barre ne peut que faire rater : ligne tenue, le serveur tire encore la prise (`catch`). Un raté n'use aucune
--- charge. Lus par le seul serveur : ajoutés à `fishing`.
-local fishing = config.fishing
-fishing.biteMinMs = 4000
-fishing.biteMaxMs = 14000
-fishing.reelToleranceMs = 500      -- avance tolérée sur la durée de la barre
-fishing.reelGraceMs = 4000         -- retard toléré (au-delà : la prise s'est échappée)
--- Prise tirée par le serveur quand la ligne a tenu : chance que le poisson se décroche, de `novice` au niveau 0
--- de Pêche à `master` au niveau `masterLevel` (linéaire entre les deux), plus le supplément de la bande de la
--- zone (`bands`). Parts de 0 à 1. L'échec de la bande (`bands.effects.failure`) s'applique ensuite, comme à
--- toute récolte. Décision du 30 octobre 2026 (une seule cause par message) : supplément à 0 partout, le
--- décrochage ne dépend que du niveau ; l'état de l'eau ne joue que par l'échec de la bande. Réglage gardé pour
--- pouvoir le remettre (essai d'avant : reduced = 0.05, depleted = 0.10).
-fishing.catch = {
-    novice = 0.25,
-    master = 0.02,
-    masterLevel = 100,
-    bands = { normal = 0.0, reduced = 0.0, depleted = 0.0 },
+-- tension dans la zone pendant `durationMs` ; `reel` dit si la tenue a réussi. La barre ne peut que faire rater :
+-- ligne tenue, le serveur tire encore la prise (`catch`). Un raté n'use aucune charge. Lu par le seul serveur : la
+-- barre (`tension`) part avec la touche, et le client n'en lit que `holdRatio` (borné de 0 à 1 ; à défaut, le repli
+-- `FISHING_HOLD_RATIO` de shared/constants.lua).
+config.fishing = {
+    biteMinMs = 4000,
+    biteMaxMs = 14000,
+    tension = {
+        durationMs = 6000,      -- durée de la barre
+        zoneMin = 0.35,         -- zone à tenir (part de la barre)
+        zoneMax = 0.65,
+        drift = 0.12,           -- dérive aléatoire de la zone par seconde (part de la barre)
+        pull = 0.9,             -- montée de l'aiguille par seconde quand on tient
+        gravity = 0.7,          -- descente par seconde quand on relâche
+        holdRatio = 0.6,        -- part du temps dans la zone pour réussir
+    },
+    reelToleranceMs = 500,      -- avance tolérée sur la durée de la barre
+    reelGraceMs = 4000,         -- retard toléré (au-delà : la prise s'est échappée)
+    -- Prise tirée par le serveur quand la ligne a tenu : chance que le poisson se décroche, de `novice` au niveau 0
+    -- de Pêche à `master` au niveau `masterLevel` (linéaire entre les deux), plus le supplément de la bande de la
+    -- zone (`bands`). Parts de 0 à 1. L'échec de la bande (`bands.effects.failure`) s'applique ensuite, comme à
+    -- toute récolte. Décision du 30 octobre 2026 (une seule cause par message) : supplément à 0 partout, le
+    -- décrochage ne dépend que du niveau ; l'état de l'eau ne joue que par l'échec de la bande. Réglage gardé pour
+    -- pouvoir le remettre (essai d'avant : reduced = 0.05, depleted = 0.10).
+    catch = {
+        novice = 0.25,
+        master = 0.02,
+        masterLevel = 100,
+        bands = { normal = 0.0, reduced = 0.0, depleted = 0.0 },
+    },
 }
 
 -- État des zones et des nœuds (bande, cicatrice, charges) : envoyé par le core aux seuls joueurs à moins de

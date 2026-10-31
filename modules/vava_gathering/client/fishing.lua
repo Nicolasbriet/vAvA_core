@@ -18,6 +18,7 @@ if not core then return end
 local cfg = VavaGathering.config
 local nui = VavaGathering.nui
 local interact = VavaGathering.interact
+local FISHING_HOLD_RATIO = VavaGathering.FISHING_HOLD_RATIO
 
 local fishing = {}
 VavaGathering.fishing = fishing
@@ -31,7 +32,12 @@ function fishing.onBite(payload)
     if type(payload) ~= 'table' or type(payload.tension) ~= 'table' then return end
     local token = tointeger(tonumber(payload.token))
     if not token or not interact.bite(token) then return end
-    active = { token = token, holdRatio = payload.tension.holdRatio or cfg.fishing.tension.holdRatio }
+    -- part à tenir : celle de la touche (config.lua du serveur), bornée à [0, 1], sinon le repli des constantes
+    local holdRatio = payload.tension.holdRatio
+    if type(holdRatio) ~= 'number' or holdRatio ~= holdRatio or holdRatio < 0 or holdRatio > 1 then
+        holdRatio = FISHING_HOLD_RATIO
+    end
+    active = { token = token, holdRatio = holdRatio }
     nui.send('tension', { token = token, tension = payload.tension, key = cfg.keys.interact })
 end
 

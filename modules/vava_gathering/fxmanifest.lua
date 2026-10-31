@@ -8,10 +8,10 @@
            portée, pose les blips des zones sur la carte, montre l'invite, joue le geste et la barre de tension.
            État des zones et des nœuds (bande, cicatrice, charges) envoyé aux seuls joueurs proches, par les
            abonnements de zone du core (1.6.0).
-           T-132 : les joueurs ne téléchargent que les constantes, config_client.lua (invite, barre de tension,
-           streaming, carte, touches, outils, ressources, zones et nœuds, animations) et la logique lue par le client
-           (distances, proximité, état des zones) ; config.lua, shared/season.lua et shared/catch.lua sont servis au
-           seul serveur.
+           T-132 : les joueurs ne téléchargent que les constantes, config_client.lua (invite, streaming, carte,
+           touches, outils, ressources, zones et nœuds, animations) et la logique lue par le client (distances,
+           proximité, état des zones) ; config.lua (pêche comprise), shared/season.lua et shared/catch.lua sont servis
+           au seul serveur.
     Dépendances : vAvA_core ≥ 0.11.0 (abonnements de zone), vava_ui ≥ 1.0.0 (polices, grain, papier et coins de la page, par
                   nui://vava_ui/…), vava_inventory ≥ 1.4.0 (objets, mains, métadonnées), vava_skills ≥ 1.0.0 (XP) ;
                   facultatifs : vava_hud (barre de progression, notifications), vava_admin (droit metiers), vava_chat,

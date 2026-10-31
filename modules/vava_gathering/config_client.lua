@@ -1,11 +1,11 @@
 --[[
     vava_gathering/config_client.lua
-    Rôle : réglages de la récolte que lit le client : distance d'invite et annulation au mouvement, barre de tension de
-           la pêche, streaming des props, carte (blips), genres de zone d'eau, touches, outils, ressources, zones et
-           nœuds, animations. Téléchargé par chaque joueur ; le serveur le lit aussi. Tout le reste (bandes de
-           vitalité, cicatrice, réaction de la terre, saisons, tolérances du serveur, durée et qualité d'une récolte,
-           touche et prise de la pêche, journal, droits, débits, objets déclarés, textes) est dans config.lua, servi
-           au seul serveur (T-132).
+    Rôle : réglages de la récolte que lit le client : distance d'invite et annulation au mouvement, streaming des
+           props, carte (blips), genres de zone d'eau, touches, outils, ressources, zones et nœuds, animations.
+           Téléchargé par chaque joueur ; le serveur le lit aussi. Tout le reste (bandes de vitalité, cicatrice,
+           réaction de la terre, saisons, tolérances du serveur, durée et qualité d'une récolte, pêche : barre de
+           tension envoyée à la touche, tolérances, prise ; journal, droits, débits, objets déclarés, textes) est dans
+           config.lua, servi au seul serveur (T-132).
     Les zones et nœuds ci-dessous sont des EXEMPLES autour du point d'apparition par défaut : à remplacer par les lieux du
     royaume. Les modèles de props et d'accessoires sont ceux du jeu de base : à ajuster avec les packs médiévaux.
     Dépendances : shared/constants.lua
@@ -19,20 +19,6 @@ VavaGathering.config = {
     interact = {
         distance = 2.5,             -- distance maximale au nœud (m) pour l'invite côté client
         moveCancel = 1.5,           -- client : se déplacer de plus de 1,5 m interrompt le geste
-    },
-
-    -- Pêche : barre de tension tenue par le pêcheur après la touche. Le serveur l'envoie avec la touche (`tension`, entière)
-    -- et le client garde `holdRatio` en secours ; le reste de la pêche (touche, tolérances, prise) est dans config.lua.
-    fishing = {
-        tension = {
-            durationMs = 6000,      -- durée de la barre
-            zoneMin = 0.35,         -- zone à tenir (part de la barre)
-            zoneMax = 0.65,
-            drift = 0.12,           -- dérive aléatoire de la zone par seconde (part de la barre)
-            pull = 0.9,             -- montée de l'aiguille par seconde quand on tient
-            gravity = 0.7,          -- descente par seconde quand on relâche
-            holdRatio = 0.6,        -- part du temps dans la zone pour réussir
-        },
     },
 
     -- Client : props des nœuds créés à portée (`radius`, mètres), remplacés par le modèle « épuisé » quand la zone l'est.

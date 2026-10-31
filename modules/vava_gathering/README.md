@@ -18,12 +18,13 @@ Rendu hors jeu : `web/index.html?view=prompt` (ou `tension`, `zones`) dans un na
 ## Règles (config.lua, config_client.lua)
 
 Depuis 1.7.0 (T-132), les réglages sont dans deux fichiers et chacun n'est écrit qu'une fois : `config_client.lua`
-porte ce que lit le client, et le serveur aussi : `interact.distance` et `interact.moveCancel`, `fishing.tension`
-(la barre, envoyée aussi par le serveur à la touche), `streaming` (sauf `subscribeSlack`), `map`, `waterKinds`, `keys`,
-`labels`, `tools`, `resources`, `zones`, `nodes` et `anims` (entiers : le client les lit par identifiant ou les
-parcourt) ; `config.lua` porte tout le reste, lu par le seul serveur (dont les tolérances `interact.serverTolerance`,
-`cooldownMs`, `finishToleranceMs`, `expireMs`, la pêche hors de la barre et `streaming.subscribeSlack`, ajoutés aux
-tables ouvertes par `config_client.lua`), et complète la table sans réécrire une clé de `config_client.lua`.
+porte ce que lit le client, et le serveur aussi : `interact.distance` et `interact.moveCancel`, `streaming` (sauf
+`subscribeSlack`), `map`, `waterKinds`, `keys`, `labels`, `tools`, `resources`, `zones`, `nodes` et `anims` (entiers :
+le client les lit par identifiant ou les parcourt) ; `config.lua` porte tout le reste, lu par le seul serveur, dont
+`fishing` entier (la barre de tension part avec la touche : le client n'en lit que `holdRatio`, borné de 0 à 1, sinon
+le repli `FISHING_HOLD_RATIO` de `shared/constants.lua`) et, ajoutés aux tables ouvertes par `config_client.lua`, les
+tolérances `interact.serverTolerance`, `cooldownMs`, `finishToleranceMs`, `expireMs` et `streaming.subscribeSlack` ;
+il complète la table sans réécrire une clé de `config_client.lua`.
 
 | Règle | Défaut | Clé |
 |---|---|---|
@@ -128,7 +129,7 @@ le serveur tire la réussite.
 
 | Fichier | Rôle |
 |---|---|
-| `config_client.lua` | réglages lus par le client (invite, barre de tension, streaming, carte, touches, outils, ressources, zones et nœuds, animations) : téléchargé par chaque joueur, ouvre `VavaGathering.config` |
+| `config_client.lua` | réglages lus par le client (invite, streaming, carte, touches, outils, ressources, zones et nœuds, animations) : téléchargé par chaque joueur, ouvre `VavaGathering.config` |
 | `config.lua` | tous les autres réglages, servi au seul serveur (en tête des `server_scripts`) : complète la table |
 | `shared/geometry.lua`, `shared/proximity.lua`, `shared/zonestate.lua` | purs, lus par le client et le serveur : distances, groupes du streaming, état des zones reçu |
 | `shared/season.lua`, `shared/catch.lua` | purs, servis au seul serveur : facteurs de saison, prise d'un poisson |
@@ -137,7 +138,7 @@ Fichiers téléchargés par chaque joueur (1.7.0, T-132) : `shared/constants.lua
 `shared/*.lua` lus par le client, les sept `client/*.lua`, la page et les dessins des objets ; `config.lua`,
 `shared/season.lua` et `shared/catch.lua` sont servis au seul serveur.
 
-**Mise à jour vers 1.7.0 (T-132)** : l'invite, la barre de tension, le streaming, la carte, les genres d'eau, les
+**Mise à jour vers 1.7.0 (T-132)** : l'invite, le streaming, la carte, les genres d'eau, les
 touches, les outils, les ressources, les zones et nœuds et les animations ont quitté `config.lua` pour
 `config_client.lua`. Un `config.lua` modifié et gardé par l'installeur de la Chancellerie (le nouveau posé en
 `config.lua.nouveau`) garde l'ancienne forme : le module démarre, mais la console le signale (« config.lua garde la
