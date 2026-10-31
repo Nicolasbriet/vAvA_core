@@ -2,26 +2,22 @@
     vava_magic/bridge/client.lua
     Rôle : SEUL point de contact, côté client, entre la magie et les autres modules : notifications (vava_hud), état
            « à terre » (vava_health), droit d'incanter (CanUseMagic), cible verrouillée (GetLockedTarget), lignes et
-           suggestions du chat, blessure appliquée par la victime quand vava_health manque (ApplyMagicDamage,
-           implémentation par défaut de Bridge.ApplyDamage côté serveur).
+           suggestions du chat. Aucune blessure n'est appliquée ici : les sorts blessent par la chaîne de dégâts de
+           vava_health, côté serveur (sans lui, ils ne blessent personne).
            Pour un autre core, réécrire ces fonctions (et bridge/server.lua).
     Implémentation : modules officiels vAvA ; appels isolés, chaque module est facultatif (sans vava_hud : notification
            de GTA). Le verrouillage de cible est celui de ce module (client/targeting.lua, clic molette).
     Dépendances : shared/constants.lua, config.lua, client/core.lua
 ]]
 
-local type, pcall, tostring, ipairs, floor = type, pcall, tostring, ipairs, math.floor
-local GetResourceState, TriggerEvent, RegisterNetEvent = GetResourceState, TriggerEvent, RegisterNetEvent
-local PlayerPedId, GetEntityHealth, GetEntityMaxHealth, ApplyDamageToPed, IsEntityDead, IsPedCuffed, IsPedBeingStunned =
-    PlayerPedId, GetEntityHealth, GetEntityMaxHealth, ApplyDamageToPed, IsEntityDead, IsPedCuffed, IsPedBeingStunned
+local type, pcall, tostring, ipairs = type, pcall, tostring, ipairs
+local GetResourceState, TriggerEvent = GetResourceState, TriggerEvent
+local PlayerPedId, IsEntityDead, IsPedCuffed, IsPedBeingStunned = PlayerPedId, IsEntityDead, IsPedCuffed, IsPedBeingStunned
 local BeginTextCommandThefeedPost, AddTextComponentSubstringPlayerName, EndTextCommandThefeedPostTicker =
     BeginTextCommandThefeedPost, AddTextComponentSubstringPlayerName, EndTextCommandThefeedPostTicker
 
 local cfg = VavaMagic.config
 local LINKS = VavaMagic.LINKS
-local EVENTS = VavaMagic.EVENTS
--- vie sous laquelle GTA met un joueur à terre (seuil de vava_health)
-local DOWN_THRESHOLD = 100
 -- natures de notification comprises par vava_hud
 local NATURES = { info = 'info', success = 'info', warning = 'warning', danger = 'danger' }
 local CHAT_COLOR = { 220, 192, 138 }
@@ -98,19 +94,3 @@ function Bridge.GetLockedTarget()
     local targeting = VavaMagic.targeting
     return targeting and targeting.current() or nil
 end
-
---- Blessure sur le ped local, sur ordre du seul serveur, quand vava_health manque : `part` de la vie (0 à 1),
---- au-dessus du seuil où GTA met à terre.
----@param part number
----@param _attacker? integer  numéro serveur du lanceur (pour un autre core)
----@param _spell? string  sort lancé (pour un autre core)
-function Bridge.ApplyMagicDamage(part, _attacker, _spell)
-    local ped = PlayerPedId()
-    local amount = floor(part * (GetEntityMaxHealth(ped) - DOWN_THRESHOLD) + 0.5)
-    if amount > 0 and GetEntityHealth(ped) > 0 then ApplyDamageToPed(ped, amount, false) end
-end
-
-RegisterNetEvent(EVENTS.DAMAGE, function(part, attacker, spell)
-    if type(part) ~= 'number' or part <= 0 or part > 1 then return end
-    Bridge.ApplyMagicDamage(part, attacker, spell)
-end)

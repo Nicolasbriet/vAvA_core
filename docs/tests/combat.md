@@ -1,9 +1,10 @@
 # Combat — procédure de test en jeu
 
 Procédure pour vérifier en jeu le combat de la phase 4 (`docs/plan/COMBAT_V1.md`). Section 1 : la **chaîne de dégâts
-commune** de `vava_health` 1.3.0 (T-110), éprouvée avec la ressource d'essai `vava_example_combat` 1.0.0 et
-`vava_needs` 1.2.1. Section 2 : les **armes** de `vava_combat` 1.0.0 (T-111), essayées avec `/frapper_arme` de
-`vava_example_combat` 1.1.0. Les sections suivantes viendront avec les techniques et la défense (T-112 à T-116).
+commune** de `vava_health` 1.4.0 (T-110 ; coup déjà lancé et `vocabulary().pvp` : T-116), éprouvée avec la ressource
+d'essai `vava_example_combat` 1.0.0 et `vava_needs` 1.2.1. Section 2 : les **armes** de `vava_combat` 1.0.0 (T-111),
+essayées avec `/frapper_arme` de `vava_example_combat` 1.1.0. Les sections suivantes viendront avec les techniques et
+la défense (T-112 à T-116).
 Comptez 1 h par section, presque tout à deux ; les tests à deux joueurs sont marqués **(2 joueurs)**. Un test se cite
 « combat 1-8 ».
 
@@ -53,7 +54,7 @@ par le serveur ; la chute et la noyade restent, lues sur le ped.
 | 16 | **(2 joueurs)** A `/arme pistolet`, tire sur B ; puis `/arme couteau`, frappe B ; `/arme non`. | Aucune perte chez B, jamais à terre. A peut voir du sang ou un tressaillement chez lui seul (prédiction de son client) : à noter, sans conséquence. Avec `vava_combat` démarré, l'arme de `/arme` est retirée en moins d'une seconde (combat 2-5) : faire ce test après `stop vava_combat`. |
 | 17 | **(2 joueurs)** A `/explosion` près de B (B à 5 m devant A). | B ne perd rien (l'explosion n'arrive pas chez B) ; console : annulation comptée (« explosion(s) »). |
 | 18 | B nage sous l'eau jusqu'à la noyade. | Perte de vie puis à terre (natif, lu par le serveur) ; une ligne de journal `kind = monde`, `downed = 1`. |
-| 19 | **(2 joueurs)** Magie (personnage mage) : A lance une Boule de feu sur B. | Mêmes dégâts qu'avant (README de `vava_magic`) ; une ligne `vava_magic_damage_log` (inchangé jusqu'à T-116). Le sort passe par `damage` (`origin = vava_magic`, `kind = pur`, sans source) : une ligne `vava_health_hits` seulement si B est mis à terre par le sort. |
+| 19 | **(2 joueurs)** Magie (personnage mage) : A lance une Boule de feu sur B. | Mêmes dégâts qu'avant (README de `vava_magic`). Depuis `vava_magic` 2.9.0 (T-116), le sort appelle `hit` lui-même : une ligne `vava_health_hits` par coup (`origin = vava_magic`, `ref = boule_de_feu`, `kind = feu`, `source_id` = personnage de A) ; plus rien dans `vava_magic_damage_log`. Détail : [magie 18](magie.md). |
 | 20 | B relevé, vie 20 % ; faim et soif à 0 (`/besoins 0 0`). | Perte à chaque passage (une minute), puis à terre ; ligne de journal `kind = privation`, `origin = vava_needs`, `downed = 1` à la chute seulement. |
 | 21 | B relevé, `/vie 30`, puis `/tricher` (remet sa vie GTA au maximum sur son seul client, comme un client modifié). | Médaillon de B un instant plein, puis revenu à 30 % en 2 à 3 s ; `/vie` → 30 % tout du long ; console du serveur : « joueur B : vie du client au-dessus de celle du serveur (1 fois), remise ». Un client qui insisterait serait corrigé de plus en plus rarement (4, 8, 16, puis 30 s). |
 | 22 | **(2 joueurs)** Après les tests 2 à 4 : `/vava_reseau joueur <B>`, puis `/vava_reseau joueur <A>`. | Chez B : `vava_health:set` (≈ 26 o par coup), `vava_health:down`. Chez A : **aucun** évènement `vava_health`. Un troisième joueur à 50 m : rien. |
@@ -66,6 +67,8 @@ par le serveur ; la chute et la noyade restent, lues sur le ped.
 | 29 | Mesure : B change de modèle (créateur d'apparence, ou reprise de personnage) à 60 %. | Au plus **une** ligne « vie du client au-dessus de celle du serveur » ; vie de retour à 60 %. |
 | 30 | Mesure : personnage féminin (`mp_f_freemode_01`) ; F8 `GetEntityMaxHealth(PlayerPedId())` (ou noter le médaillon) et `/vie` après `/vie 50`. | La vie maximale lue par le serveur est la même que celle du client (200) : `/vie 50` → médaillon 50 %, aucune correction ni perte dans les 5 s. |
 | 31 | **(2 joueurs, facultatif)** Renversement : A en véhicule (ou plus tard en monture) roule sur B. | Noter ce qui se passe : perte de B lue comme perte native (`kind = monde` au hook, aucune ligne de journal sauf mise à terre) ou coup annulé (`weaponDamageEvent` compté chez A dans la console). À me remonter dans les deux cas. |
+| 32 | **(2 joueurs)** Coup déjà lancé (1.4.0, avec `vava_magic` 2.9.0, A mage) : B garde `/frapper <A> 100` tapé d'avance. A lance un Projectile de roche N1 sur B à 15 m (1,2 s de vol) ; B valide dès le lancer. Puis réglage `chain.launchedMaxMs = 500` (`restart vava_health`), recommencer ; remettre 4000. | 1er essai : A tombe pendant le vol, la roche blesse B quand même (−14, ligne `vava_health_hits` `ref = projectile_de_roche`). 2e essai : la roche arrive plus de 0,5 s après le lancement, B ne perd rien (`source_downed`, aucune ligne). Un sort ne peut pas être lancé à terre (« Vous êtes à terre. »). |
+| 33 | `chain.pvp = false` (`restart vava_health` : la magie relit le réglage à son retour) ; A (mage) lance une Vague et un Trait de glace sur B. | B n'est ni poussé, ni mouillé, ni ralenti, ne perd rien : la magie lit `pvp` dans `vocabulary()` et coupe aussi ses effets sans dégâts. Remettre `chain.pvp = true`. |
 
 ## 2. Armes
 

@@ -30,9 +30,13 @@ VavaHealth.config = {
         parts = { 'tete', 'torse', 'bras', 'jambes' },  -- partie du corps touchée (facultative)
         -- étiquettes admises dans `tags` (liste fermée : conditions de l'Atelier)
         tags = { 'melee', 'ranged', 'spell', 'area', 'overTime', 'native', 'legacy', 'reflected', 'parryable',
-            'unblockable', 'undodgeable' },
+            'unblockable', 'undodgeable', 'launched' },
         maxTags = 8,
         pvp = true,             -- false : tout coup venu d'un autre joueur est annulé (pvp_off)
+        -- coup déjà lancé (étiquette `launched` et `launchedAt` posés par le module serveur qui frappe : projectile en
+        -- vol, présage d'un sort) : il porte encore si sa source tombe à terre après le lancement, pendant ce délai au
+        -- plus (le plus long vol ou présage, plus la latence du signalement d'impact) ; au-delà, annulé source_downed
+        launchedMaxMs = 4000,
         maxHitsPerSecond = 20,  -- coups traités par cible et par seconde ; au-delà : too_many_hits
         maxDepth = 2,           -- un coup lancé pendant un autre (renvoi) est permis une fois ; au-delà : too_deep
         maxModifiers = 32,      -- entrées du registre vava_health:modifiers

@@ -10,7 +10,8 @@ au lieu de soins ; le client applique et affiche.
 Depuis 1.3.0, `vava_health` porte aussi la **chaîne de dégâts commune** (`docs/plan/COMBAT_V1.md` § 1) : un coup
 d'épée, une boule de feu, la faim passent tous par l'export `hit`, ses modificateurs (esquive, parade, blocage,
 boucliers, résistances déclarés par les autres modules) et son journal ; les coups natifs de GTA entre joueurs sont
-annulés par le serveur.
+annulés par le serveur. Depuis 1.4.0, un coup **déjà lancé** debout (projectile en vol, présage d'un sort) porte encore
+si son auteur tombe à terre avant l'impact, et `vocabulary()` donne l'interrupteur `pvp` aux modules.
 
 Ordre de démarrage : après `vAvA_core` (≥ 0.10.0) et `vava_ui` (≥ 1.0.0, polices, grain et ornements de l'écran à
 terre ; déclaré en dépendance, à ne jamais arrêter sur un serveur ouvert), avant les modules qui lisent l'état « à
@@ -70,7 +71,9 @@ son écriture :
    coup lancé pendant un autre (renvoi) permis une fois (`too_deep` au-delà) ;
 3. préconditions, sans hook ni journal : cible à terre, coup annulé (`downed`) ; `chain.pvp = false` : tout coup venu
    d'un autre joueur annulé (`pvp_off`) ; source à terre, annulé (`source_downed`), sauf un effet qui dure
-   (`tags.overTime`) ou un renvoi (`tags.reflected`) ;
+   (`tags.overTime`), un renvoi (`tags.reflected`), ou un coup **déjà lancé** alors que la source était debout (1.4.0 :
+   `tags.launched` et `launchedAt`, l'instant du lancement posé par le module serveur qui frappe ; la source est tombée
+   après lui, et il date d'au plus `chain.launchedMaxMs`, 4 s) ;
 4. hook `vava_health:hit` `before` : un module peut refuser (trêve, prison, évènement du Conseil) ; un abonné **en
    erreur** ne refuse rien, le coup passe (une ligne de console par minute) ;
 5. modificateurs du registre `vava_health:modifiers`, dans l'ordre fixe des étapes **annulation → esquive → parade →
@@ -157,7 +160,17 @@ modificateur ne cède jamais la main (ni `Wait`, ni base, ni `callClient`) et ne
 fait depuis le hook `after`, avec `tags.reflected`).
 
 `damage(source, part)` reste, **déprécié** pour les coups et les sorts : il passe par la chaîne (`kind = 'pur'`,
-`tags.legacy`, sans source) jusqu'à ce que la magie y entre (T-116).
+`tags.legacy`, sans source) ; la magie appelle `hit` elle-même depuis `vava_magic` 2.9.0 (T-116).
+
+**Coup déjà lancé** (1.4.0) : un module qui lance quelque chose qui frappera plus tard (projectile, présage, flèche) note
+`GetGameTimer()` au lancement et l'envoie avec le coup : `tags = { …, launched = true }, launchedAt = instant`. L'un
+sans l'autre, ou un instant qui n'est pas un entier positif : `invalid_launch`. Le coup porte même si son auteur est
+tombé à terre entre-temps, à condition qu'il soit tombé **après** le lancement (instant de la mise à terre tenu par
+`vava_health`) et que le lancement date d'au plus `chain.launchedMaxMs` ; sinon `source_downed`. Un client ne fournit
+jamais cet instant. Ce n'est pas `overTime`, réservé aux effets qui durent.
+
+`vocabulary()` donne aussi `pvp` (1.4.0) : un module coupe ses effets sans dégâts entre joueurs (poussées, gel…) quand
+`chain.pvp = false`, comme la chaîne coupe les dégâts.
 
 Exports complets (`hit`, `vocabulary`, `modifiers`, `get`, `isDowned`, `setHealth`, `heal`, `damage`, `down`,
 `revive`), codes et hooks (`vava_health:hit`, `downed`, `reviving` annulable, `revived`, `respawned`) : `docs/api.md`,
@@ -198,6 +211,8 @@ La procédure complète est `docs/tests/sante.md`, et `docs/tests/combat.md` § 
 - **Fenêtre d'application** (1,5 s + 2 × ping) : un soin n'est jamais pris pour une perte, même à 150 ms de ping
   (`combat` 1-7).
 - **Client qui ment** : `/tricher` → vie remise en 2 à 3 s, une ligne de console (`combat` 1-21).
+- **Coup déjà lancé** (1.4.0, `combat` 1-32 et `magie` 18-12) : un projectile lancé debout porte encore si son auteur
+  tombe pendant le vol ; un coup arrivé plus de 4 s après le lancement, non.
 - `vava_needs` 1.2.1 avec un `vava_health` plus ancien : repli sur `damage` (facultatif).
 
 1. **Seuil** : `/vie 0` (outil `vava_dev_characters`), la dernière perte de faim ou de soif, un sort qui vide la vie →

@@ -3,11 +3,15 @@
     Rôle : incantation commune à tous les sorts, décidée par le serveur.
       - Début (RPC du sort) : fiche chargée, mage, sort connu, une seule incantation à la fois, pas à terre ni en
         véhicule, empêchements des autres fichiers (état « chancelant »…), délai global entre deux sorts, temps de
-        recharge du sort, hook `vava_magic:castStarting` (annulable), validation propre au sort, mana. Position et vie
-        du lanceur notées (lues côté serveur) ; state bag « incantation » (sort et niveau) sur son ped ; le sort est
-        prévenu que l'incantation est acceptée (`started` : frisson de la cible verrouillée…).
-      - Fin (RPC du sort) : durée écoulée, déplacement (positions serveur) et vie (une blessure interrompt les sorts
-        qui le disent, `interruptOnHurt`) revérifiés.
+        recharge du sort, hook `vava_magic:castStarting` (annulable), validation propre au sort, mana. Position du
+        lanceur (lue côté serveur) et sa vie tenue par vava_health notées ; state bag « incantation » (sort et niveau)
+        sur son ped ; le sort est prévenu que l'incantation est acceptée (`started` : frisson de la cible
+        verrouillée…).
+      - Blessure (sorts `interruptOnHurt`, vrai par défaut) : jamais lue sur le ped (un client qui garde sa vie GTA au
+        maximum ne serait jamais interrompu). Un coup de la chaîne de dégâts ou une perte native qui retire de la vie
+        au lanceur (hook `vava_health:hit` after, `applied > 0`) marque son incantation ; à la fin, une vie de
+        vava_health plus basse qu'au début la marque aussi. Sans vava_health, rien ne blesse : rien n'interrompt.
+      - Fin (RPC du sort) : durée écoulée, déplacement (positions serveur) et blessure revérifiés.
         La mana est réservée avant l'effet du sort : rendue en entier s'il refuse, en partie s'il le dit (échec
         partiel) ; temps de recharge et délai global posés ; XP accordée (moitié pour un échec).
       - Interruption (chute, blessure, déplacement, touche) : aucune mana consommée ; incantation sans fin
@@ -53,7 +57,8 @@ VavaMagic.casting = casting
 ---@field startedAt integer
 ---@field durationMs integer
 ---@field origin table
----@field health integer
+---@field health number|nil  vie tenue par vava_health au début (nil : inconnue)
+---@field hurt boolean       un coup a retiré de la vie au lanceur pendant l'incantation
 ---@field maxMove number
 ---@field data any       préparé par le sort au début, rendu à sa fin
 ---@field finishing boolean
@@ -151,6 +156,18 @@ function casting.current(src)
     return casts[src]
 end
 
+--- Le lanceur a-t-il été blessé pendant l'incantation ? Un coup noté par le hook de vava_health, ou sa vie tenue par
+--- le serveur plus basse qu'au début (jamais celle du ped).
+---@param src integer
+---@param cast vAvA.MagicCast
+---@return boolean
+local function hurtDuring(src, cast)
+    if cast.hurt then return true end
+    if not cast.health then return false end
+    local health = bridge.GetHealth(src)
+    return health ~= nil and health < cast.health
+end
+
 --- Contexte passé aux fonctions du sort.
 ---@param src integer
 ---@param cast vAvA.MagicCast
@@ -199,8 +216,7 @@ function casting.begin(src, name, ...)
     local left = casting.cooldownLeft(sheet.characterId, name)
     if left > 0 then return false, 'cooldown', ceil(left / MS_PER_SECOND) end
     local origin = world.position(src)
-    local health = world.health(src)
-    if not origin or not health then return false, 'no_position' end
+    if not origin then return false, 'no_position' end
 
     local level = progression.levelOf(entry.xp)
     local allowed, reason = core.hooks.runBefore(HOOKS.CASTING, { source = src, characterId = sheet.characterId, spell = name, level = level })
@@ -219,8 +235,8 @@ function casting.begin(src, name, ...)
     nextId = nextId % CAST_ID.max + 1
     local cast = {
         id = nextId, spell = name, level = level, cost = cost, characterId = sheet.characterId,
-        startedAt = GetGameTimer(), durationMs = duration, origin = origin, health = health, maxMove = maxMove,
-        data = data, finishing = false,
+        startedAt = GetGameTimer(), durationMs = duration, origin = origin, health = bridge.GetHealth(src), hurt = false,
+        maxMove = maxMove, data = data, finishing = false,
     }
     casts[src] = cast
     world.setState(src, STATES.CASTING, { spell = name, level = level })
@@ -251,13 +267,12 @@ function casting.finish(src, name, castId, ...)
         return false, 'too_soon'
     end
     local position = world.position(src)
-    local health = world.health(src)
     local code = nil
-    if not position or not health then
+    if not position then
         code = 'no_position'
     elseif geometry.distance(cast.origin, position) > cast.maxMove + cfg.moveMargin then
         code = 'moved'
-    elseif health < cast.health and def.config.interruptOnHurt ~= false then
+    elseif def.config.interruptOnHurt ~= false and hurtDuring(src, cast) then
         code = 'hurt'
     elseif bridge.IsDowned(src) then
         code = 'downed'
@@ -291,6 +306,22 @@ function casting.finish(src, name, castId, ...)
     if type(outcome.rewarded) == 'function' then outcome.rewarded(gained > 0) end
     core.hooks.runAfter(HOOKS.CAST, { source = src, characterId = cast.characterId, spell = name, level = cast.level, success = success })
     return true, { success = success, cooldownMs = cooldownMs, globalMs = cfg.globalCooldownMs, result = outcome.result }
+end
+
+--- Un coup de la chaîne de dégâts (ou une perte native) vient de retirer de la vie à ce joueur : son incantation en
+--- cours est marquée, elle se brisera à sa fin (`hurt`). Appelé dans un hook de vava_health : ne cède jamais la main.
+---@param payload table  { target, applied, … }
+local function onHit(payload)
+    if type(payload) ~= 'table' or type(payload.applied) ~= 'number' or payload.applied <= 0 then return end
+    local cast = casts[payload.target]
+    if cast and not cast.finishing then cast.hurt = true end
+end
+
+--- Suit les coups de la chaîne de dégâts (hook `vava_health:hit` after). Appelé pendant le setup du module.
+---@return boolean ok
+---@return string|nil err
+function casting.start()
+    return bridge.OnHit(onHit)
 end
 
 --- Interruption demandée par le client (rien n'est consommé).

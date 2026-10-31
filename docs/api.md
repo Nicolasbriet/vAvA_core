@@ -1117,7 +1117,8 @@ Jauges affichées quand un personnage est en jeu ; masquées pendant la sélecti
 
 ### `vava_health`
 
-Santé, mise à terre, réanimation, et **chaîne de dégâts commune** (1.3.0, `docs/plan/COMBAT_V1.md` § 1). Champ
+Santé, mise à terre, réanimation, et **chaîne de dégâts commune** (1.3.0 ; coup déjà lancé et `vocabulary().pvp` :
+1.4.0 ; `docs/plan/COMBAT_V1.md` § 1). Champ
 `vava_health:state` `{ health, downed, downedFor }` (visibilité `owner`) : `health` de 0 à 1, part de la vie au-dessus
 du seuil où GTA met un joueur à terre. Lieux de soins, délais, distances, touches, chaîne et messages : `config.lua`.
 Demande le core 0.10.0 (`core.net.send` : tous les envois du module sont comptés dans `/vava_reseau`).
@@ -1171,7 +1172,8 @@ local result, code = exports.vava_health:hit(target, {
     technique = 'taille_descendante', -- facultatif : technique (identifiant, `<éditeur>:<id>` accepté)
     spell = 'boule_de_feu',       -- facultatif : sort
     tags = { melee = true, parryable = true },  -- facultatif : melee, ranged, spell, area, overTime, native, legacy,
-                                  --   reflected, parryable, unblockable, undodgeable (8 au plus, valeur true)
+                                  --   reflected, parryable, unblockable, undodgeable, launched (8 au plus, valeur true)
+    launchedAt = 123456,          -- avec tags.launched seulement (1.4.0) : GetGameTimer() du serveur au lancement
 })
 -- → { id, amount (après modificateurs), applied, blocked, absorbed, resisted, added, cancelled?, stage?, downed,
 --     health (0 à 1 après le coup) } ou nil, code
@@ -1184,7 +1186,8 @@ local result, code = exports.vava_health:hit(target, {
   même source sur une même cible, les coups sans source partageant un compte : `too_many_hits` ; un coup lancé pendant
   un autre permis une fois : `too_deep` au-delà) ; préconditions, sans hook ni journal : cible à terre, annulé
   `downed` ; `chain.pvp = false` et source ≠ cible, annulé `pvp_off` ; source à terre (hors `tags.overTime` et
-  `tags.reflected`), annulé `source_downed` ; hook `before` (refus volontaire : `cancelled` = raison,
+  `tags.reflected`, et hors coup **déjà lancé** debout, 1.4.0 : `tags.launched` avec `launchedAt`, la source tombée
+  après le lancement, lancé depuis au plus `chain.launchedMaxMs` = 4 s), annulé `source_downed` ; hook `before` (refus volontaire : `cancelled` = raison,
   `stage = 'before'` ; un abonné **en erreur** ne refuse pas : le coup passe, une ligne de console par minute) ; modificateurs
   dans l'ordre fixe **annulation → esquive → parade → blocage → bouclier → resistance**, puis `priority`, puis clé ;
   application (cible relue, vie du serveur baissée, mise à terre aussitôt à 0, `reason = 'hit'`) ; hook `after` ;
@@ -1192,8 +1195,13 @@ local result, code = exports.vava_health:hit(target, {
 - `downed` du résultat : ce coup a mis la cible à terre. `stage` : étape de l'annulation (`before`, une étape,
   `application` si la cible est partie ou tombée entre-temps).
 - Codes (`nil, code`) : `not_ready`, `invalid_target`, `no_character`, `invalid_packet`, `invalid_amount`,
-  `invalid_kind`, `invalid_source`, `invalid_part`, `invalid_ref`, `invalid_tags`, `unknown_field`, `too_many_hits`,
+  `invalid_kind`, `invalid_source`, `invalid_part`, `invalid_ref`, `invalid_tags`, `invalid_launch` (1.4.0 :
+  `launchedAt` sans `tags.launched` ou l'inverse, ou pas un entier positif), `unknown_field`, `too_many_hits`,
   `too_deep`, `hit_error` (erreur interne, console).
+- **Coup déjà lancé** (1.4.0) : un projectile en vol, le présage d'un sort, une flèche… lancés par un joueur debout
+  portent encore s'il tombe à terre avant l'impact. Le module serveur qui frappe pose `tags.launched` et `launchedAt`
+  (son `GetGameTimer()` au lancement, jamais une valeur venue d'un client) ; `vava_health` compare à l'instant de la
+  mise à terre de la source, qu'il tient lui-même. Ce n'est pas `overTime` (réservé aux effets qui durent).
 
 **Registre `vava_health:modifiers`** (défini par `vava_health`, 32 entrées) : un module y déclare ses modificateurs,
 **au plus un par étape** (un second à la même étape est retiré aussitôt, console), sous son nom (`<ressource>:<nom>` ;
@@ -1231,7 +1239,7 @@ refusée est abandonnée et comptée en console), purgé après 30 jours.
 | Export | Retour |
 |---|---|
 | `hit(cible, paquet)` | résultat ou `nil, code` (ci-dessus) |
-| `vocabulary()` | copie `{ healthPoints, maxAmount, kinds, parts, tags, stages }` : listes pour les éditeurs de l'Atelier et les modules |
+| `vocabulary()` | copie `{ healthPoints, maxAmount, kinds, parts, tags, stages, pvp, launchedMaxMs }` : listes pour les éditeurs de l'Atelier et les modules ; `pvp` (1.4.0) : interrupteur `chain.pvp`, pour qu'un module coupe aussi ses effets sans dégâts (poussées, gel…) quand les combats entre joueurs sont coupés |
 | `modifiers()` | liste ordonnée `{ { key, stage, priority, label, kinds? } }` (sans les fonctions) |
 | `get(source)` | `{ health, downed, downedFor }` ou `nil, code` — `health` : vie du serveur (0 à terre) |
 | `isDowned(source)` | booléen — à appeler (isolé, `pcall`) par tout module qui refuse une action à terre, plutôt que de recopier la règle ; module absent : pas à terre |
@@ -1704,7 +1712,7 @@ la raison du refus est montrée au joueur — prison, interdiction ; `after` : `
 
 ### `vava_magic`
 
-La magie (2.7.0) : fiche magie par personnage (champ privé `vava_magic:sheet` : mage ou non, sorts et leur XP, sort
+La magie (2.9.0) : fiche magie par personnage (champ privé `vava_magic:sheet` : mage ou non, sorts et leur XP, sort
 prêt dans les mains, combinaisons découvertes, sigils gardés, sigil unique dans tout le royaume), mana (100, +3 toutes
 les 5 s, jamais sauvegardée) et sa barre, 5 niveaux par sort, incantation commune avec délai global (1 s), roue des
 sorts (Tab) et mode magie à la souris (clic droit viser, clic gauche lancer, clic molette verrouiller), états
@@ -1716,14 +1724,17 @@ dissipation, boue, gel, séchage, extinction, roche ardente ; inscrites au grimo
 `discoveredCombos` de la fiche), **Lueur** et **Murmure**, grimoire et registre (objets), traces au sol, sons fabriqués
 par l'interface ou remplacés par des fichiers `.ogg` et des sons natifs (`config.sounds`), commandes du Conseil (`/magie`, numéro de joueur facultatif). Tout le détail, la config et la liste des tests en jeu :
 `modules/vava_magic/README.md`. Demande le core 0.5.0 ; facultatifs : `vava_inventory` ≥ 1.3.0 (objets), `vava_hud`
-(notifications), `vava_health` (blessures, à terre : un joueur à terre ne subit plus aucun effet des sorts — ni
-Mouillé, ni recul, ni Renversé, ni Ralenti), `vava_admin` (droit `tools` et journal ; sans lui, ACE `magie.admin` ;
+(notifications), `vava_health` ≥ 1.3.0, 1.4.0 conseillé (blessures par la chaîne de dégâts — sans lui, aucun sort ne blesse
+personne —, à terre : un joueur à terre ne subit plus aucun effet des sorts — ni Mouillé, ni recul, ni Renversé, ni
+Ralenti), `vava_admin` (droit `tools` et journal ; sans lui, ACE `magie.admin` ;
 ≥ 1.6.0 : la fin d'un Gel ne libère pas un joueur immobilisé par le Registre).
 
 - **Bridge** : `bridge/server.lua` et `bridge/client.lua` sont les seuls fichiers qui appellent le core et les autres
   modules ; les réécrire suffit pour un autre core (avec un équivalent de `core.rpc`).
 - **Incantation** : RPC `vava_magic:begin:<sort>` puis `vava_magic:finish:<sort>` (numéro d'incantation). Le serveur
-  revérifie à la fin la durée, le déplacement et la vie (lus côté serveur) ; la mana est réservée avant l'effet, rendue
+  revérifie à la fin la durée, le déplacement (positions serveur) et la blessure (2.9.0 : un coup de la chaîne ou une
+  perte native qui a retiré de la vie au lanceur, hook `vava_health:hit` after, ou sa vie de `vava_health:get` plus
+  basse qu'au début ; jamais la vie du ped) ; la mana est réservée avant l'effet, rendue
   si le sort refuse. Recharges tenues par personnage. Effets vus des autres : state bags posés par le serveur sur le
   ped (`vava_magic:casting`, `glow`, `light`, `conditions`) ou sur l'objet d'un orbe ancré (`vava_magic:orb`) ;
   évènements ciblés aux seuls joueurs proches (`vava_magic:projectile`, `projectileEnd`, `zone`, `zoneEnd`, `burst`) ;
@@ -1739,10 +1750,31 @@ Mouillé, ni recul, ni Renversé, ni Ralenti), `vava_admin` (droit `tools` et jo
   (`combos.boue.result.slow.refreshMs`), chaque pose couvrant l'intervalle ; 1 à 3 s encore à la sortie.
 - **Projectiles** (Boule de feu, Trait de glace, Projectile de roche, même noyau) : impact signalé par le client du
   lanceur (RPC `vava_magic:projectileImpact`), validé par le serveur (portée, axe, délai, cible réelle, zones protégées,
-  rempart sur le trajet) avant les dégâts (en points de vie sur `combat.healthPoints`), appliqués par
-  `vava_health:damage` ; bonus d'XP au toucher si le lancer a rapporté ; journal `vava_magic_damage_log`, écrit par
-  lots, en entier à l'arrêt du module (une seule requête), purgé des lignes de plus de `combat.log.retentionDays`
-  jours (30) au démarrage puis chaque jour.
+  rempart sur le trajet) avant les dégâts (en points de vie sur `combat.healthPoints`) ; bonus d'XP au toucher si le
+  coup a blessé et que le lancer a rapporté.
+- **Blessures** (2.9.0, T-116) : chaque blessure d'un sort est un coup de la chaîne de dégâts (`exports.vava_health:hit`,
+  § `vava_health`) : `amount` = points du sort (une vie pleine au plus, mêmes dégâts qu'avant), `kind` = type de son
+  élément (`combat.kinds` : `feu`, `eau`, `terre`, `lumiere`, `esprit` ; brûlure : `feu`), `source` = le lanceur (même
+  parti ; s'il joue un autre personnage, le coup est refusé), `sourceCharacter`, `spell` (ou la combinaison, `vapeur`),
+  `tags` : `spell` et `ranged` (impact), `area` (éclats, nova, secousse), `area` + `overTime` (mur de flammes, vapeur),
+  `overTime` (brûlure) ; `launched` et `launchedAt` (instant du lancement, horloge du serveur) pour un impact, des éclats
+  ou une secousse, si `vava_health` ≥ 1.4.0. Les sorts respectent donc `chain.pvp`, le débit par paire et le lanceur à
+  terre (`source_downed`, sauf `overTime` et un sort lancé debout dont le lanceur tombe avant l'impact, 4 s au plus) ;
+  `chain.pvp = false` (lu dans `vocabulary()`) coupe aussi poussées, gel et Ralenti ; réaction, brûlure, états qui
+  suivent un coup et bonus d'XP seulement si `applied > 0`. Plus aucun
+  appel à `damage`, plus d'évènement `vava_magic:damage` au client : sans `vava_health`, les sorts ne blessent personne
+  (le lanceur le lit au plus une fois par minute). Journal : `vava_health_hits` (`origin = vava_magic`) ;
+  `vava_magic_damage_log` n'est plus écrit, purgé des lignes de plus de `combat.log.retentionDays` jours (30).
+- **Modificateurs** (registre `vava_health:modifiers`, redéclarés à chaque démarrage de `vava_health`) :
+  `vava_magic:zones` (étape `annulation`, seulement si `combat.protectedZones` en compte : personne n'est blessé dans une
+  zone de paix, ni par un sort ni par une lame, et personne n'en blesse un autre depuis l'intérieur ; annulé
+  `zone_protegee` ; la faim, si), `vava_magic:protections` (étape
+  `bouclier` : boucliers du joueur touché, le plus proche de sa fin d'abord, jusqu'à leur réserve ; sorts et lames, pas
+  la faim), `vava_magic:resistances` (étape `resistance` : la plus forte résistance et la plus forte faiblesse au type
+  du coup, jamais cumulées). Protections en mémoire du serveur (4 boucliers de 200 points et 4 résistances par joueur,
+  10 min au plus, `protections`), posées pour l'essai par `/magie proteger` (sur un rang plus bas que le sien au
+  Conseil ; soi-même et les faiblesses : `staff`) ; aucun des onze sorts n'en pose encore. Chaque modificateur est
+  déclaré avec ses `kinds` : ni la faim, ni la soif, ni les pertes natives ne les appellent.
 - **Rempart** : blocs de pierre créés par le serveur (objets réseau figés), jamais sur un joueur ni un véhicule,
   retirés à leur fin, à l'arrêt du module et par `/magie nettoyer`.
 - **Verrouillage** (sorts `lockOn`) : clic molette côté client (lu par `Bridge.GetLockedTarget`), à la portée du sort

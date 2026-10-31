@@ -19,7 +19,7 @@ VavaMagic.commands = commands
 
 local function entries()
     local C = cfg.commands
-    local L, S, A = C.lightActions, C.sigilActions, C.adminActions
+    local L, S, A, P = C.lightActions, C.sigilActions, C.adminActions, C.protectWords
     local spell = { name = 'sort', type = 'registry', registry = SPELLS }
     local target = { name = 'joueur', type = 'player', optional = true, hint = 'sinon vous-même' }
     local list = {
@@ -54,7 +54,7 @@ local function entries()
                 { id = S.scramble, label = 'Brouiller votre sigil', description = 'Les sigils déjà offerts cessent de vous atteindre.' },
             } },
         [C.admin] = { kind = 'command', scope = 'admin', permission = cfg.admin.permission, ace = cfg.admin.ace,
-            label = 'Magie d\'un joueur', description = 'Faire mage, apprendre ou retirer des sorts, niveaux, mana, recharges, fiche, objets, nettoyage.',
+            label = 'Magie d\'un joueur', description = 'Faire mage, apprendre ou retirer des sorts, niveaux, mana, recharges, fiche, objets, protections d\'essai, nettoyage.',
             actions = {
                 { id = A.mage, label = 'Faire ou défaire un mage', args = { target, { name = 'mage', type = 'choice', choices = { C.yes, C.no or 'non' }, labels = { [C.yes] = 'Oui', [C.no or 'non'] = 'Non' } } } },
                 { id = A.learn, label = 'Apprendre un sort', args = { target, spell } },
@@ -68,6 +68,11 @@ local function entries()
                 { id = A.cooldowns, label = 'Effacer les recharges', args = { target } },
                 { id = A.sheet, label = 'Lire la fiche de magie', args = { target } },
                 { id = A.give, label = 'Donner un objet de magie', args = { target, { name = 'objet', type = 'choice', choices = { 'grimoire', 'registre' } } } },
+                { id = A.protect, label = 'Poser une protection (essai)',
+                    description = 'Bouclier, résistance ou faiblesse à un élément, portés par la chaîne de dégâts ; « aucune » les retire.',
+                    args = { target, { name = 'protection', type = 'choice', choices = { P.shield, P.resistance, P.none } },
+                        { name = 'réglage', type = 'text', rest = true, optional = true,
+                            hint = 'bouclier : points [secondes] ; résistance : élément, pour cent (négatif : faiblesse) [secondes]' } } },
                 { id = A.cleanup, label = 'Nettoyer le monde', description = 'Retire les effets de magie oubliés dans le monde.' },
             } },
     }

@@ -782,10 +782,21 @@ faire tout le système de combat ») : la porte T-119 reste à passer en jeu.
   mentorat du maître d'armes ; techniques de hache, masse, dague, bâton et bouclier en config.
 
 ### T-116 — La magie sur la chaîne de dégâts
-- Agent : vava-dev-lua · Dépend de : T-110 · Statut : en cours
-- **En cours (31 octobre 2026, interrompu)** : branche `agents/T-116`. Dégâts des sorts par `hit`, protections en
-  modificateurs, tests faits ; reste la procédure magie § 18, la vérification « mêmes dégâts », le rapport, les relectures.
-  Spec T-111 (point 1) : exiger les mains vides pour incanter (`exports.vava_combat:armed()`), ici ou après T-111.
+- Agent : vava-dev-lua · Dépend de : T-110 · Statut : à tester en jeu (relu sécurité et réseau, contre-relecture
+  sécurité, suites appliquées)
+- Fait le 31 octobre 2026 (branche `agents/T-116`) : `vava_magic` 2.9.0 (chaque blessure d'un sort est un coup de
+  `exports.vava_health:hit` avec sa source, son type et ses étiquettes, mêmes dégâts qu'avant pour les onze sorts ;
+  boucliers, résistances et zones de paix en modificateurs déclarés avec leurs types ; incantation brisée par le hook
+  `vava_health:hit` et non plus par la vie du ped ; plus aucun repli chez le client ; `/magie proteger` d'essai réglé sur
+  les rangs du Conseil ; effets sans dégâts soumis à `chain.pvp`, aux zones de paix et au personnage du lanceur ; états
+  des combinaisons posés après un coup qui a porté), `vava_health` 1.4.0 (coup déjà lancé : un sort lancé debout porte
+  encore si le lanceur tombe avant l'impact, `launched` et `launchedAt`, 4 s au plus, décision du porteur du projet ;
+  `vocabulary()` donne `pvp`). Rapport `docs/plan/rapports/T-116.md`, avenant spec T-110 § 14. **À tester en jeu** :
+  `docs/tests/magie.md` § 18 (28 tests : montants des sorts 2 à 5, protections et rangs 6 à 9 quater, zones de paix 10
+  à 10 ter, combats coupés et lanceur à terre 11 à 13, incantation brisée 14 à 17, vava_health arrêté 18, réseau et
+  temps de tour 19, 19 bis), `combat` 1-19, 1-32, 1-33.
+- Suite : spec T-111 (point 1), exiger les mains vides pour incanter (`exports.vava_combat:armed()`) après T-111 ;
+  suites de `vava_health` R-3 et R-6 (rapport).
 - Les dégâts de `vava_magic` passent par `hit` ; les boucliers et résistances deviennent des modificateurs ; même
   comportement en jeu pour les 11 sorts.
 - Relecture sécurité de T-110 : `vava_magic` juge encore la blessure sur la vie du ped (`server/world.lua:43-47`,

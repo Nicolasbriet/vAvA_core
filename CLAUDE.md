@@ -124,6 +124,9 @@ Choix tranchés par le porteur du projet : un agent ne les signale pas comme des
 - **Compteur réseau** (`core.net`) : **tous les joueurs connectés sont suivis d'office**, évènement par évènement
   (les plus lourds de chacun, mémoire bornée), sans `/vava_reseau joueur` préalable ; la page Réseau de la
   Chancellerie les liste avec le nom de leur personnage. Consulter le détail d'un joueur reste inscrit au journal.
+- **Coup déjà lancé** : un sort (projectile, éclats, présage de la Secousse) lancé debout porte encore si son
+  lanceur tombe à terre avant l'impact ; la chaîne de dégâts ne le refuse pas pour `source_downed` (étiquette posée
+  par le serveur, bornée dans le temps). Un coup lancé à terre reste refusé.
 - **Mains vides pour incanter** : on ne lance pas un sort avec une arme ou un bouclier en main (le mage a besoin d'un
   garde, le guerrier d'un mage) ; vérifié par le serveur (`vava_combat:armed`). Un focaliseur viendra plus tard.
 - **Commits** : un commit par chantier, au format du dépôt, jamais un commit fourre-tout.

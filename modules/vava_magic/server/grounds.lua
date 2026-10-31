@@ -24,7 +24,7 @@ zones.define(grounds.WET, {
         local applied = zone.data.applied
         local now = GetGameTimer()
         if applied[victim] and now - applied[victim] < cfg.refreshMs then return end
-        if not combat.affects(victim) then return end
+        if not combat.affects(victim, zone.owner, zone.ownerCharacter) then return end
         applied[victim] = now
         states.apply(victim, 'wet', { durationMs = cfg.wetMs, caster = zone.owner, spell = zone.spell })
     end,

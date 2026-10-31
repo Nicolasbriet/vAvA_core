@@ -70,7 +70,7 @@ local function strike(zone)
     for _, entry in ipairs(world.near(center, zone.radius + HEIGHT)) do
         local victim = entry.source
         if not (ownerHere and victim == zone.owner) and zones.contains(zone, entry.position)
-            and combat.damage(zone.owner, victim, NAME, data.damage, combat.KIND.ZONE, zone.ownerCharacter) then
+            and combat.damage(zone.owner, victim, NAME, data.damage, combat.KIND.ZONE, zone.ownerCharacter, nil, zone.createdAt) then
             touched = touched + 1
             states.apply(victim, data.control, { durationMs = data.controlMs, caster = zone.owner, spell = NAME })
         end

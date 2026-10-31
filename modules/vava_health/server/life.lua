@@ -59,6 +59,7 @@ VavaHealth.life = life
 ---@field health number         vie de référence (serveur), 0 à 1
 ---@field downed boolean
 ---@field downedFor integer
+---@field downedAt integer|nil  instant de la dernière mise à terre (nil : à terre depuis avant le chargement)
 ---@field sampledAt integer
 ---@field resentAt integer
 ---@field reported boolean|nil  relevé seul déjà journalisé pour cette mise à terre
@@ -228,7 +229,7 @@ function life.down(src, reason, cause, killer, extra)
     if entry.downed then return false, 'already_downed' end
     local now = GetGameTimer()
     local claimed = extra and extra.claimedKiller
-    entry.downed, entry.downedFor, entry.health, entry.reported = true, 0, 0, false
+    entry.downed, entry.downedFor, entry.health, entry.reported, entry.downedAt = true, 0, 0, false, now
     entry.sampledAt, entry.resentAt, entry.graceUntil = now, now, now + cfg.graceMs
     persist(entry)
     assist().cancelFor(src)

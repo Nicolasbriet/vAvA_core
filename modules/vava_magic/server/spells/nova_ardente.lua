@@ -44,8 +44,10 @@ local function finish(ctx)
     local touched = 0
     for _, entry in ipairs(world.near(position, levelCfg.radius, src)) do
         local victim = entry.source
-        local hit = not obstacles.blocked(position, entry.position) and combos.hit(src, victim, NAME, levelCfg.damage)
+        local hit = not obstacles.blocked(position, entry.position)
+            and combos.hit(src, victim, NAME, levelCfg.damage, nil, ctx.characterId)
         if hit and combat.damage(src, victim, NAME, hit.damage, combat.KIND.ZONE) then
+            combos.commit(hit)
             touched = touched + 1
             if levelCfg.knockback > 0 then
                 local away = geometry.direction2d(position, entry.position) or { x = 1.0, y = 0.0 }
