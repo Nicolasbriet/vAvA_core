@@ -8,9 +8,9 @@
  *        - Fusion à trois voies, fichier par fichier : la version installée (empreintes gardées dans
  *          data/install.json), celle du disque, la nouvelle. Un fichier que personne n'a touché est remplacé ; un
  *          fichier modifié sur place et inchangé en amont est gardé ; modifié des deux côtés, un fichier de réglages
- *          (config.lua, config/…) est gardé et la nouvelle version posée à côté (« .nouveau »), un autre fichier est
- *          remplacé et l'ancien gardé à côté (« .local »). Sans version installée connue (vAvA posé à la main), les
- *          fichiers de réglages qui diffèrent sont gardés, les autres remplacés.
+ *          (config.lua, config_client.lua, config/…) est gardé et la nouvelle version posée à côté (« .nouveau »),
+ *          un autre fichier est remplacé et l'ancien gardé à côté (« .local »). Sans version installée connue (vAvA
+ *          posé à la main), les fichiers de réglages qui diffèrent sont gardés, les autres remplacés.
  *        - Sauvegarde des ressources touchées avant d'écrire, et restauration à l'identique (retour en arrière).
  *        - Première installation : FXServer (build recommandée par Cfx.re), oxmysql (dernière version).
  *        - La Chancellerie elle-même : nouvelle version vérifiée (elle doit se charger) avant de remplacer les
@@ -64,7 +64,7 @@ const resourcesRoot = (serverDataPath) => path.join(serverDataPath, 'resources')
 
 /** Fichier de réglages, que son propriétaire a pu adapter ? */
 function userOwned(relative) {
-  return path.posix.basename(relative) === 'config.lua' || relative.startsWith('config/');
+  return ['config.lua', 'config_client.lua'].includes(path.posix.basename(relative)) || relative.startsWith('config/');
 }
 
 // Dépôt ---------------------------------------------------------------------------------------------------------------
