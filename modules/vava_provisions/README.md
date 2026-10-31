@@ -21,7 +21,15 @@ lui, ACE `metiers.admin`), `vava_chat` (réponses de `/eau` ; sans lui, une noti
 Rendu hors jeu de l'invite : `web/index.html?label=Puits%20du%20lavoir&verb=Puiser&key=E` dans un navigateur, depuis le
 dépôt (`web/dev/devmock.js`, jamais livré ; option `--allow-file-access-from-files` pour les polices de `vava_ui`).
 
-## Règles (config.lua)
+## Règles (config.lua, config_client.lua)
+
+Depuis 1.1.0 (T-132), les réglages sont dans deux fichiers et chacun n'est écrit qu'une fois : `config_client.lua`
+porte ce que lit le client, et le serveur aussi : `kinds` (entières : le client les lit par sorte et les passe au
+carnet des points), `interact.distance`, `streaming` (sauf `zoneRadius` et `subscribeSlack`), `anims`, `keys`,
+`labels`, `messages` (entiers : le client passe la table aux textes de `shared/rules.lua`, textes du Conseil compris,
+jusqu'à la coupe de ce fichier par T-143) ; `config.lua` porte tout le reste, lu par le seul serveur (dont
+`interact.serverTolerance`, `streaming.zoneRadius` et `streaming.subscribeSlack`, ajoutés aux tables ouvertes par
+`config_client.lua`), et complète la table sans réécrire une clé de `config_client.lua`.
 
 | Règle | Défaut | Clé |
 |---|---|---|
@@ -157,16 +165,35 @@ Chancellerie le place seule). Aucune migration. `vava_arrival` 1.1.0 ne déclare
 module. Les piles d'`eau` et d'`outre` en besace quand le module ne tourne pas sont gardées à part par l'inventaire et
 rendues à sa déclaration : rien n'est perdu.
 
-**Assets à brancher** (`config.lua`, `-- PLACEHOLDER`) : modèles des sortes (`kinds.*.model` : puits, fontaine, rocher
-de source), coordonnées des points (`points`), gestes (`anims`). Un point posé sur un décor de la carte prend
+**Assets à brancher** (`-- PLACEHOLDER`) : modèles des sortes (`kinds.*.model` : puits, fontaine, rocher de source)
+et gestes (`anims`) dans `config_client.lua`, coordonnées des points (`points`) dans `config.lua`. Un point posé sur un décor de la carte prend
 `model = ''` (aucun prop). Ne jamais poser un point à moins de 5 m d'une autre cible de la touche `E` (puits de
 `vava_farming`, stations, nœuds de récolte) : deux invites sur la même touche. Placement : voir « Où poser les points
 d'eau » (fontaines au cœur du bourg, puits et sources dans les hameaux).
 
+**Mise à jour vers 1.1.0 (T-132)** : les sortes de points d'eau, la portée de l'invite, le streaming, les gestes, la
+touche et les textes ont quitté `config.lua` pour `config_client.lua`. Un `config.lua` modifié et gardé par
+l'installeur de la Chancellerie (le nouveau posé en `config.lua.nouveau`) garde l'ancienne forme : le module démarre,
+mais la console le signale (« config.lua garde la forme d'avant 1.1.0 … ») et un réglage client changé dans ce fichier
+reste sans effet. Reportez vos réglages dans `config.lua` et `config_client.lua` d'après les nouveaux fichiers.
+
+## Fichiers
+
+| Fichier | Rôle |
+|---|---|
+| `config_client.lua` | réglages lus par le client (sortes de points d'eau, portée, streaming, gestes, touche, textes) : téléchargé par chaque joueur, ouvre `VavaProvisions.config` |
+| `config.lua` | tous les autres réglages, servi au seul serveur (en tête des `server_scripts`) : complète la table |
+| `shared/rules.lua`, `shared/pointzone.lua`, `shared/proximity.lua` | purs, lus par le client et le serveur : règles et textes, carnet des points, groupes du streaming (`rules.lua` coupé en deux par T-143) |
+
+Fichiers téléchargés par chaque joueur (1.1.0, T-132) : `shared/constants.lua`, `config_client.lua`, les trois
+`shared/*.lua`, les cinq `client/*.lua`, la page de l'invite et les dessins des objets ; `config.lua` est servi au
+seul serveur.
+
 ## Tests
 
 Hors jeu : `tests/spec/provisions_rules_spec.lua` (règles pures et config), `tests/spec/provisions_pointzone_spec.lua`
-(état de zone et carnet du client), `tests/spec/provisions_server_spec.lua` (puiser, boire, réserves, outre rendue,
+(état de zone et carnet du client), `tests/spec/provisions_client_view_spec.lua` (carnet, invite et textes sur la
+seule vue client : `config_client.lua` sans `config.lua`), `tests/spec/provisions_server_spec.lua` (puiser, boire, réserves, outre rendue,
 objets, recette, `/eau`, démarrage réel sur un core simulé), `tests/spec/props_proximity_spec.lua` (streaming). En
 jeu : `docs/tests/eau.md`.
 

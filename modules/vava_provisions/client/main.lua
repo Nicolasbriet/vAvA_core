@@ -3,7 +3,7 @@
     Rôle : assemblage côté joueur : touche d'interaction (réglable par le joueur, aucune boucle), avis du serveur (outre
            fendue ou perdue, réponse de /eau sans vava_chat), notifications par vava_hud sinon celles du jeu, invite
            cachée au déchargement, démarrage du suivi des points d'eau.
-    Dépendances : shared/constants.lua, config.lua, shared/rules.lua, client/core.lua, client/nui.lua,
+    Dépendances : shared/constants.lua, config_client.lua, shared/rules.lua, client/core.lua, client/nui.lua,
                   client/points.lua, client/interact.lua
 ]]
 

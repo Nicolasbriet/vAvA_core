@@ -24,11 +24,9 @@ for _, module in ipairs(MODULES) do
 
         before_each(function()
             helper.reset()
-            helper.loadAll({
-                'modules/' .. module.name .. '/shared/constants.lua',
-                'modules/' .. module.name .. '/config.lua',
-                'modules/' .. module.name .. '/shared/proximity.lua',
-            })
+            -- réglages du streaming lus par le client : sur la seule vue client (constantes et config_client.lua, T-132)
+            helper.loadClientView('modules/' .. module.name, module.global)
+            helper.load('modules/' .. module.name .. '/shared/proximity.lua')
             proximity = _G[module.global].proximity
             cfg = _G[module.global].config
         end)

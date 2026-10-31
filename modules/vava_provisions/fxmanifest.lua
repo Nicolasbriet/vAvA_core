@@ -6,6 +6,9 @@
            outre vide rendue quand on boit une outre d'eau, qui se fend parfois ; recette de l'outre à la tannerie
            (vava_crafting) ; commande du Conseil /eau. Le serveur décide de tout ; le client crée les props des points
            à portée, montre l'invite et joue le geste.
+           T-132 : les joueurs ne téléchargent que les constantes, config_client.lua (sortes de points d'eau, portée,
+           streaming, gestes, touche, textes) et la logique lue par le client (règles et textes, carnet des points,
+           proximité) ; config.lua est servi au seul serveur (shared/rules.lua sera coupé en deux par T-143).
     Dépendances : vAvA_core ≥ 0.11.0 (abonnements de zone, core.net), vava_ui ≥ 1.0.0 (polices et grain de l'invite, par
                   nui://vava_ui/…), vava_inventory ≥ 1.8.0 (échange atomique, hook use avec `consumed`, piles gardées
                   à part) ; facultatifs : vava_needs (boire au point d'eau), vava_crafting et vava_skills (recette de
@@ -20,7 +23,7 @@ use_experimental_fxv2_oal 'yes'
 
 name 'vava_provisions'
 description 'Vivres vAvA : points d\'eau, outres, eau potable'
-version '1.0.0'
+version '1.1.0'
 
 dependency 'vAvA_core'
 dependency 'vava_ui'
@@ -36,16 +39,18 @@ files {
     'web/items/*.svg',
 }
 
--- Ordre explicite : chaque fichier ne dépend que de ceux listés avant lui.
+-- Ordre explicite : chaque fichier ne dépend que de ceux listés avant lui. Les joueurs ne téléchargent que les
+-- shared_scripts et les client_scripts : config.lua, en tête des server_scripts, n'est jamais servi (T-132).
 shared_scripts {
     'shared/constants.lua',
-    'config.lua',
+    'config_client.lua',         -- ouvre VavaProvisions.config : ce que lit le client
     'shared/rules.lua',
     'shared/pointzone.lua',
     'shared/proximity.lua',
 }
 
 server_scripts {
+    'config.lua',                -- complète VavaProvisions.config : ce que lit le seul serveur
     'server/core.lua',
     'bridge/server.lua',
     'server/items.lua',
