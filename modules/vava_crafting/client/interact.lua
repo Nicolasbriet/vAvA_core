@@ -132,7 +132,9 @@ function interact.refreshPrompt(stationId)
         key = cfg.keys.interact, label = station.label, typeLabel = station.typeLabel, busy = state.busy,
         fuel = station.capacity and { stock = state.fuel, capacity = station.capacity } or nil,
     }
-    local signature = table.concat({ station.id, tostring(state.busy), tostring(state.fuel) }, '|')
+    local signature = table.concat({
+        station.id, station.label, station.typeLabel, tostring(station.capacity), tostring(state.busy), tostring(state.fuel),
+    }, '|')
     if signature == lastPrompt then return end
     lastPrompt = signature
     nui.send('prompt', payload)

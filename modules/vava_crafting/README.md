@@ -54,7 +54,8 @@ Un **type** (compétences servies, combustible, animation, prop ; `config.lua` o
 connu du seul serveur) et des **instances** placées (position, nom, qualité
 0–100, propriétaire : nulle = publique, `{ kind = 'character', id }` = privée ; d'autres genres — foyer — se branchent
 par `registerAccess`). Une seule pièce à la fois par station. Les stations livrées sont des **exemples** avec des props
-du jeu de base.
+du jeu de base. L'animation d'un type, de la config ou d'un autre module, doit être une clé de `anims`
+(`config_client.lua`) : sinon le type est refusé au registre (1.7.0), et un type de la config refuse le module.
 
 ### Réseau : une zone du core par station (depuis 1.5.0)
 
@@ -76,7 +77,9 @@ zone de vAvA_core 0.11.0) nommée par son identifiant : cercle de 2 m autour d'e
   sont vues : après une mise à jour depuis 1.4.0 qui retire des stations de la config, **redémarrer le serveur**, pas
   seulement la ressource.
 - **Station ajoutée, déplacée ou renommée en jeu** (module, Atelier, Conseil) : arrive chez les joueurs proches au
-  passage suivant (1 s au plus), sans reconnexion ; les autres la reçoivent en arrivant. Une station de la config que
+  passage suivant (1 s au plus), sans reconnexion ; les autres la reçoivent en arrivant. Seuls un lieu, un cap, un
+  modèle ou un type changés recréent le prop ; un nom, un nom de type ou une réserve changés ne mettent à jour que
+  l'invite, aussitôt (1.7.0). Une station de la config que
   le core refuse (plus de place, lieu hors bornes) est écrite en console et retentée par la boucle d'écriture une fois
   par minute au plus ; un état qui n'a pas pu partir est renvoyé au passage suivant de cette boucle (10 s). Une station
   placée par `addStation` que le core refuse n'est pas placée : `false, 'zones_full'` (trop de zones) ou
@@ -234,6 +237,7 @@ Hook écouté : `vava_inventory:metadata` (before, garde de la signature, voir p
 
 - Invite et menu du composteur du champ (type déclaré par `vava_farming`, inconnu du client) ; invite des stations du
   bourg inchangée (nom du type, combustible de la forge et du fourneau) ; geste joué avec l'animation du type.
+- Démarrage : aucune ligne « animation … inconnue » en console ; le composteur est bien déclaré par l'agriculture.
 
 ## À vérifier en jeu (1.5.0)
 

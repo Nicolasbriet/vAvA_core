@@ -117,12 +117,23 @@ function stationzone.readStatus(raw)
     return { fuel = (finite(fuel) and fuel >= 0) and fuel or 0, busy = raw.busy == true }
 end
 
+--- Même lieu, même modèle : le prop est gardé.
+local function samePlace(a, b)
+    return a.type == b.type and a.x == b.x and a.y == b.y and a.z == b.z and a.heading == b.heading and a.prop == b.prop
+end
+stationzone.samePlace = samePlace
+
+--- Mêmes textes de l'invite (nom, nom du type, réserve).
+local function sameText(a, b)
+    return a.label == b.label and a.typeLabel == b.typeLabel and a.capacity == b.capacity
+end
+stationzone.sameText = sameText
+
 ---@param a table
 ---@param b table
 ---@return boolean
 local function sameDrawing(a, b)
-    return a.type == b.type and a.typeLabel == b.typeLabel and a.capacity == b.capacity and a.label == b.label
-        and a.x == b.x and a.y == b.y and a.z == b.z and a.heading == b.heading and a.prop == b.prop
+    return samePlace(a, b) and sameText(a, b)
 end
 stationzone.sameDrawing = sameDrawing
 
@@ -144,24 +155,31 @@ end
 ---@param id string
 ---@return boolean placed  vrai si elle était connue : la liste des stations a changé
 ---@return boolean statusChanged  toujours faux (une station oubliée n'a plus d'état à montrer)
+---@return boolean relabeled  toujours faux
 function Book:leave(id)
-    if self.stations[id] == nil then return false, false end
+    if self.stations[id] == nil then return false, false, false end
     self.stations[id], self.statuses[id] = nil, nil
     self.count = self.count - 1
     self.ordered = nil
-    return true, false
+    return true, false, false
 end
 
+--- Place une station : remplacée si le lieu ou le modèle changent ; textes seuls changés mis à jour sur place (R-1).
 ---@param id string
 ---@param drawing table
----@return boolean placed
+---@return boolean placed     apparue, ou lieu ou modèle changés
+---@return boolean relabeled  textes de l'invite seuls changés
 function Book:place(id, drawing)
     local previous = self.stations[id]
-    if previous and sameDrawing(previous, drawing) then return false end
+    if previous and samePlace(previous, drawing) then
+        if sameText(previous, drawing) then return false, false end
+        previous.label, previous.typeLabel, previous.capacity = drawing.label, drawing.typeLabel, drawing.capacity
+        return false, true
+    end
     if not previous then self.count = self.count + 1 end
     self.stations[id] = drawing
     self.ordered = nil
-    return true
+    return true, false
 end
 
 ---@param id string
@@ -177,14 +195,15 @@ end
 --- dessin mal formé fait oublier la station.
 ---@param id string
 ---@param state any
----@return boolean placed         une station est apparue, a changé (lieu, nom, modèle, type) ou a disparu
+---@return boolean placed         une station est apparue, a bougé (lieu, modèle, type) ou a disparu
 ---@return boolean statusChanged  combustible ou occupation changés
+---@return boolean relabeled      seuls les textes de l'invite ont changé (nom, nom du type, réserve)
 function Book:enter(id, state)
     local drawing = type(state) == 'table' and stationzone.readDrawing(id, state[stationzone.DEF]) or nil
     if not drawing then return self:leave(id) end
-    local placed = self:place(id, drawing)
+    local placed, relabeled = self:place(id, drawing)
     local statusChanged = self:setStatus(id, stationzone.readStatus(state[stationzone.STATUS]))
-    return placed, statusChanged
+    return placed, statusChanged, relabeled
 end
 
 --- Changements d'une zone suivie : `set` (clé → valeur), `removed` (liste de clés). Une station inconnue est ignorée
@@ -194,8 +213,9 @@ end
 ---@param removed any
 ---@return boolean placed
 ---@return boolean statusChanged
+---@return boolean relabeled
 function Book:change(id, set, removed)
-    if self.stations[id] == nil then return false, false end
+    if self.stations[id] == nil then return false, false, false end
     local statusChanged = false
     if type(removed) == 'table' then
         for _, key in ipairs(removed) do
@@ -203,19 +223,19 @@ function Book:change(id, set, removed)
             if key == stationzone.STATUS then statusChanged = self:setStatus(id, IDLE) or statusChanged end
         end
     end
-    local placed = false
+    local placed, relabeled = false, false
     if type(set) == 'table' then
         local raw = set[stationzone.DEF]
         if raw ~= nil then
             local drawing = stationzone.readDrawing(id, raw)
             if not drawing then return self:leave(id) end
-            placed = self:place(id, drawing)
+            placed, relabeled = self:place(id, drawing)
         end
         if set[stationzone.STATUS] ~= nil then
             statusChanged = self:setStatus(id, stationzone.readStatus(set[stationzone.STATUS])) or statusChanged
         end
     end
-    return placed, statusChanged
+    return placed, statusChanged, relabeled
 end
 
 --- Tout oublier (déchargement, sélection).

@@ -199,23 +199,60 @@ describe('vava_crafting stationzone', function()
             assert.equal(1, book:size())
         end)
 
-        it('état entier reçu de nouveau, station déplacée ou renommée : placée de nouveau', function()
+        it('état entier reçu de nouveau, station déplacée ou d\'un autre modèle : placée de nouveau', function()
             book:enter('forge_bourg', state(FORGE))
             local moved = {}
             for k, v in pairs(FORGE) do moved[k] = v end
             moved.x = -250.0
-            assert.is_true((book:enter('forge_bourg', state(moved))))
+            assert.same({ true, false, false }, { book:enter('forge_bourg', state(moved)) })
             assert.equal(-250.0, book:station('forge_bourg').x)
-            moved.label = 'Forge neuve'
-            assert.is_true((book:enter('forge_bourg', state(moved))))
+            moved.prop = 'prop_anvil'
+            assert.same({ true, false, false }, { book:enter('forge_bourg', state(moved)) })
+            moved.heading = 180.0
+            assert.same({ true, false, false }, { book:enter('forge_bourg', state(moved)) })
             assert.equal(1, book:size())
-            -- type renommé ou réserve changée : placée de nouveau (l'invite suit) ; identique : rien
-            moved.typeLabel = 'Grande forge'
-            assert.is_true((book:enter('forge_bourg', state(moved))))
-            moved.capacity = 40
-            assert.is_true((book:enter('forge_bourg', state(moved))))
-            assert.equal(40, book:station('forge_bourg').capacity)
-            assert.is_false((book:enter('forge_bourg', state(moved))))
+        end)
+
+        it('nom, nom du type ou réserve changés : textes mis à jour sur place, la station n\'est pas replacée (R-1)', function()
+            book:enter('forge_bourg', state(FORGE))
+            local kept = book:station('forge_bourg')
+            local list = book:list()
+            local renamed = {}
+            for k, v in pairs(FORGE) do renamed[k] = v end
+            renamed.label = 'Forge neuve'
+            assert.same({ false, false, true }, { book:enter('forge_bourg', state(renamed)) })
+            renamed.typeLabel = 'Grande forge'
+            assert.same({ false, false, true }, { book:change('forge_bourg', { def = renamed }, {}) })
+            renamed.capacity = 40
+            assert.same({ false, false, true }, { book:enter('forge_bourg', state(renamed)) })
+            renamed.capacity = nil
+            assert.same({ false, false, true }, { book:enter('forge_bourg', state(renamed)) })
+            -- même station (liste et groupes la gardent), textes à jour
+            assert.equal(kept, book:station('forge_bourg'))
+            assert.equal(list, book:list())
+            assert.equal('Forge neuve', kept.label)
+            assert.equal('Grande forge', kept.typeLabel)
+            assert.is_nil(kept.capacity)
+            -- identique : rien
+            assert.same({ false, false, false }, { book:enter('forge_bourg', state(renamed)) })
+            -- textes et lieu changés ensemble : placée de nouveau
+            renamed.label, renamed.x = 'Forge du port', 10.0
+            assert.same({ true, false, false }, { book:enter('forge_bourg', state(renamed)) })
+            assert.equal('Forge du port', book:station('forge_bourg').label)
+            assert.are_not.equal(kept, book:station('forge_bourg'))
+        end)
+
+        it('samePlace et sameText partagent le dessin : sameDrawing exige les deux', function()
+            local other = {}
+            for k, v in pairs(FORGE) do other[k] = v end
+            other.label = 'Autre'
+            assert.is_true(stationzone.samePlace(FORGE, other))
+            assert.is_false(stationzone.sameText(FORGE, other))
+            assert.is_false(stationzone.sameDrawing(FORGE, other))
+            other.label, other.z = FORGE.label, 0.0
+            assert.is_false(stationzone.samePlace(FORGE, other))
+            assert.is_true(stationzone.sameText(FORGE, other))
+            assert.is_false(stationzone.sameDrawing(FORGE, other))
         end)
 
         it('état entier mal formé : la station est oubliée', function()
@@ -225,15 +262,15 @@ describe('vava_crafting stationzone', function()
             assert.is_nil(book:station('forge_bourg'))
             assert.same({ fuel = 0, busy = false }, book:status('forge_bourg'))
             assert.equal(0, book:size())
-            assert.same({ false, false }, { book:enter('inconnue', 'rien') })
+            assert.same({ false, false, false }, { book:enter('inconnue', 'rien') })
         end)
 
         it('changement de l\'état : seul l\'état change ; un état identique ne compte pas', function()
             book:enter('forge_bourg', state(FORGE, { fuel = 5, busy = false }))
-            assert.same({ false, true }, { book:change('forge_bourg', { s = { fuel = 5, busy = true } }, {}) })
+            assert.same({ false, true, false }, { book:change('forge_bourg', { s = { fuel = 5, busy = true } }, {}) })
             assert.same({ fuel = 5, busy = true }, book:status('forge_bourg'))
-            assert.same({ false, false }, { book:change('forge_bourg', { s = { fuel = 5, busy = true } }, {}) })
-            assert.same({ false, true }, { book:change('forge_bourg', { s = { fuel = 4, busy = false } }, {}) })
+            assert.same({ false, false, false }, { book:change('forge_bourg', { s = { fuel = 5, busy = true } }, {}) })
+            assert.same({ false, true, false }, { book:change('forge_bourg', { s = { fuel = 4, busy = false } }, {}) })
         end)
 
         it('changement du dessin : placée de nouveau ; dessin mal formé ou retiré : oubliée', function()
@@ -241,33 +278,33 @@ describe('vava_crafting stationzone', function()
             local moved = {}
             for k, v in pairs(FORGE) do moved[k] = v end
             moved.prop = 'prop_anvil'
-            assert.same({ true, false }, { book:change('forge_bourg', { def = moved }, {}) })
+            assert.same({ true, false, false }, { book:change('forge_bourg', { def = moved }, {}) })
             assert.equal('prop_anvil', book:station('forge_bourg').prop)
-            assert.same({ true, false }, { book:change('forge_bourg', { def = { label = 'x' } }, {}) })
+            assert.same({ true, false, false }, { book:change('forge_bourg', { def = { label = 'x' } }, {}) })
             assert.is_nil(book:station('forge_bourg'))
             book:enter('forge_bourg', state(FORGE))
-            assert.same({ true, false }, { book:change('forge_bourg', {}, { 'def' }) })
+            assert.same({ true, false, false }, { book:change('forge_bourg', {}, { 'def' }) })
             assert.is_nil(book:station('forge_bourg'))
         end)
 
         it('état retiré : vide et libre', function()
             book:enter('forge_bourg', state(FORGE, { fuel = 3, busy = true }))
-            assert.same({ false, true }, { book:change('forge_bourg', {}, { 's' }) })
+            assert.same({ false, true, false }, { book:change('forge_bourg', {}, { 's' }) })
             assert.same({ fuel = 0, busy = false }, book:status('forge_bourg'))
         end)
 
         it('changement d\'une station inconnue : ignoré (le core envoie toujours l\'état entier d\'abord)', function()
-            assert.same({ false, false }, { book:change('forge_bourg', { s = { fuel = 1, busy = true } }, {}) })
+            assert.same({ false, false, false }, { book:change('forge_bourg', { s = { fuel = 1, busy = true } }, {}) })
             assert.is_nil(book:station('forge_bourg'))
             assert.equal(0, book:size())
         end)
 
         it('sortie : oubliée avec son état ; sortie d\'une station inconnue : rien', function()
             book:enter('forge_bourg', state(FORGE, { fuel = 3, busy = true }))
-            assert.same({ true, false }, { book:leave('forge_bourg') })
+            assert.same({ true, false, false }, { book:leave('forge_bourg') })
             assert.is_nil(book:station('forge_bourg'))
             assert.same({ fuel = 0, busy = false }, book:status('forge_bourg'))
-            assert.same({ false, false }, { book:leave('forge_bourg') })
+            assert.same({ false, false, false }, { book:leave('forge_bourg') })
             assert.equal(0, book:size())
         end)
 

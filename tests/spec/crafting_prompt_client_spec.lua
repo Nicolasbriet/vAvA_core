@@ -161,6 +161,34 @@ describe('vava_crafting invite et menu vus du client (type inconnu de la config 
         assert.same({ stock = 7, capacity = forge.capacity }, last('prompt').fuel)
     end)
 
+    it('l\'invite suit un changement de réserve, de nom ou de nom du type (R-2) ; rien de renvoyé sans changement', function()
+        position = { x = forge.station.x, y = forge.station.y + 1.0, z = forge.station.z }
+        onZone('enter', forge.id, forge.state)
+        runThreads()
+        local DEF = VavaCrafting.stationzone.DEF
+        local drawing = {}
+        for k, v in pairs(forge.state[DEF]) do drawing[k] = v end
+        local sent = #messages
+        drawing.capacity = 40
+        onZone('change', forge.id, { [DEF] = drawing }, nil)
+        assert.equal(sent + 1, #messages)
+        assert.same({ stock = 0, capacity = 40 }, last('prompt').fuel)
+        drawing.label = 'Forge neuve'
+        onZone('change', forge.id, { [DEF] = drawing }, nil)
+        assert.equal('Forge neuve', last('prompt').label)
+        drawing.typeLabel = 'Grande forge'
+        onZone('change', forge.id, { [DEF] = drawing }, nil)
+        assert.equal('Grande forge', last('prompt').typeLabel)
+        -- réserve retirée (type sans combustible) : plus de ligne de combustible
+        drawing.capacity = nil
+        onZone('change', forge.id, { [DEF] = drawing }, nil)
+        assert.is_nil(last('prompt').fuel)
+        -- même dessin reçu de nouveau : aucune invite renvoyée
+        sent = #messages
+        onZone('change', forge.id, { [DEF] = drawing }, nil)
+        assert.equal(sent, #messages)
+    end)
+
     it('appui près du composteur : le menu est demandé au serveur et affiché avec le focus', function()
         onZone('enter', composter.id, composter.state)
         runThreads()

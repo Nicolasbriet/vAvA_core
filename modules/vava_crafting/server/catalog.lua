@@ -225,7 +225,15 @@ end
 ---@return boolean ok
 ---@return string|nil err
 function catalog.define()
-    local ok, err = core.registry.define(REGISTRY.STATIONS, { schema = STATION_SCHEMA })
+    -- l'animation d'un type, d'ici ou d'un autre module (le composteur), est une clé de `anims` (config_client.lua) :
+    -- sinon le geste se jouerait sans animation, en silence (relecture sécurité S-2 de T-144)
+    local ok, err = core.registry.define(REGISTRY.STATIONS, {
+        schema = STATION_SCHEMA,
+        validator = function(_, data)
+            if not cfg.anims[data.anim] then return false, "animation '" .. tostring(data.anim) .. "' inconnue" end
+            return true
+        end,
+    })
     if not ok then return false, err end
     ok, err = core.registry.define(REGISTRY.RECIPES, {
         schema = RECIPE_SCHEMA,
@@ -236,12 +244,7 @@ function catalog.define()
         end,
     })
     if not ok then return false, err end
-    -- 1.7.0 (T-144) : les types ont quitté config_client.lua ; un config.lua d'avant, gardé par une mise à jour, n'en a pas
-    if type(cfg.stationTypes) ~= 'table' then
-        return false, 'stationTypes absent de config.lua (forme d\'avant 1.7.0) : reprenez la table de config.lua.nouveau'
-    end
     for id, kind in pairs(cfg.stationTypes) do
-        if not cfg.anims[kind.anim] then return false, format("type de station '%s' : animation '%s' inconnue", id, tostring(kind.anim)) end
         ok, err = core.registry.add(REGISTRY.STATIONS, id, { label = kind.label, skills = kind.skills, fuel = kind.fuel, anim = kind.anim, prop = kind.prop })
         if not ok then return false, format("type de station '%s' : %s", id, tostring(err)) end
     end

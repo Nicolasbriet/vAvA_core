@@ -2050,7 +2050,8 @@ config et tests : `modules/vava_crafting/README.md`.
 Demande le core 0.11.0 (abonnements de zone, depuis 1.5.0), `vava_inventory` 1.4.0, `vava_skills` 1.0.0,
 `vava_gathering` 1.0.0 ; facultatifs : `vava_hud`, `vava_admin` (droit `metiers`), `vava_chat`, `vava_health` (à terre).
 
-**Registres** : `vava_crafting:stations` (types : `{ label, skills, fuel?, anim, prop }`) et `vava_crafting:recipes`
+**Registres** : `vava_crafting:stations` (types : `{ label, skills, fuel?, anim, prop }` ; depuis 1.7.0, `anim` doit être
+une clé de `anims` de `config_client.lua`, sinon l'ajout est refusé : « animation '…' inconnue ») et `vava_crafting:recipes`
 (`{ label, skill, level, station, tool?, durationMs, difficulty, xp, signed?, signedIfQuality?, durability?,
 transmission?, fragments?, ingredients = { { item, quantity, minTier? } }, output = { item, quantity } }`), remplis par
 la config, ouverts aux autres modules ; chaque recette est aussi déclarée à `vava_skills:recipes`. Les armes de
