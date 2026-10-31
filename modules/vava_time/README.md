@@ -17,17 +17,29 @@ Facultatifs : `vava_admin` (droits, outil du Registre, journal ; sans lui, perso
 ## Règles (config.lua, config_client.lua)
 
 Depuis 1.4.0 (T-132), les réglages sont dans deux fichiers et chacun n'est écrit qu'une fois : `config_client.lua`
-porte ce que lit le client (`clock.msPerGameMinute`, `calendar`, `weather`, `commands`, `client`, `messages`), et le
-serveur aussi ; `config.lua` porte ce que lit le seul serveur (`clock.maxShiftMinutes`, `frost`, `council`, `tool`,
-`web`, `server`, `rateLimits`) et complète la table sans réécrire une clé de `config_client.lua`. `calendar`, `weather`
-et `messages` sont servis entiers : le client les passe à `shared/calendar.lua` et `shared/weather.lua`. Les joueurs
-ne téléchargent que les constantes, `config_client.lua`, ces deux fichiers, les `client/*.lua` et la page de l'outil ;
-`config.lua` et `shared/frost.lua` sont servis au seul serveur.
+porte ce que lit le client (`clock.msPerGameMinute`, `calendar`, `weather.types`, `commands`, `client`, `messages`),
+et le serveur aussi ; `config.lua` porte ce que lit le seul serveur (`clock.maxShiftMinutes`, le cours des ciels depuis
+1.5.0 : `weather.next`, `weather.seasons`, `weather.snow`, `weather.durationMinutes`, `weather.durations`,
+`weather.fadeSeconds` ; `frost`, `council`, `tool`, `web`, `server`, `rateLimits`) et complète la table sans réécrire
+une clé de `config_client.lua`. `calendar`, `weather.types` et `messages` sont servis entiers : le client les passe à
+`shared/calendar.lua` et `shared/weather.lua` (définition d'un ciel, transition). Les joueurs ne téléchargent que les
+constantes, `config_client.lua`, ces deux fichiers, les `client/*.lua` et la page de l'outil ; `config.lua`,
+`shared/cycle.lua` (tirage du cours des ciels) et `shared/frost.lua` sont servis au seul serveur.
 
 **Mise à jour vers 1.4.0 (T-132)** : un `config.lua` modifié et gardé par l'installeur de la Chancellerie (le nouveau
 posé en `config.lua.nouveau`) garde l'ancienne forme : le module démarre, mais la console le signale (« config.lua
 garde la forme d'avant 1.4.0 … ») et un réglage client changé dans ce fichier reste sans effet. Reportez vos réglages
-dans `config.lua` et `config_client.lua` d'après les nouveaux fichiers.
+dans `config.lua` et `config_client.lua` d'après les nouveaux fichiers. Avec une telle forme, le calendrier, les ciels
+et les textes restent ceux de `config_client.lua` (chez les joueurs et pour les dates et les ciels reconnus au
+serveur) ; le cours des ciels est pris dans l'ancien `config.lua`.
+
+**Mise à jour vers 1.5.0 (T-146)** : le cours des ciels (`weather.next`, `seasons`, `snow`, `durationMinutes`,
+`durations`, `fadeSeconds`) passe de `config_client.lua` à `config.lua` (≈ 4,8 Ko de moins par joueur). Un `config.lua`
+de 1.4.0 modifié et gardé ne l'a pas : le module refuse de démarrer (« config.lua d'avant 1.5.0 : le cours des ciels y
+manque (weather.next, …) ») ; reportez-le d'après `config.lua.nouveau`. Un `config_client.lua` de 1.4.0 modifié et
+gardé le sert encore aux joueurs sans servir : le module démarre avec les valeurs de `config.lua` et la console le
+signale (« config_client.lua garde le cours des ciels d'avant 1.5.0 … ») ; retirez-le d'après
+`config_client.lua.nouveau` et reportez vos réglages dans `config.lua`.
 
 | Règle | Défaut | Clé |
 |---|---|---|
@@ -39,8 +51,8 @@ dans `config.lua` et `config_client.lua` d'après les nouveaux fichiers.
 | Ère et dates | « an 1 du royaume », « 4e jour de la saison des semailles (printemps), an 1 du royaume » : écrits une seule fois, dans la config | `messages.year`, `messages.dateText` |
 | Moments du jour | nuit, aube (6 h), matin (8 h), midi, après-midi (14 h), soir (18 h), nuit (22 h) | `calendar.moments` |
 | Ciels | treize ciels (clair, grand soleil, nuages épars, couvert, éclaircies, pluie, orage, brume, brouillard, neige légère, neige, tempête de neige, neige au sol) ; les noms de météo de GTA ne paraissent que dans la config | `weather.types` |
-| Cours du ciel | chaque ciel dure 25 à 50 min (orage, tempête : 10 à 20), puis un successeur plausible est tiré selon les poids de la saison (pas d'orage sous un ciel clair) ; transition de 90 s | `weather.next`, `weather.seasons`, `weather.durationMinutes`, `weather.durations`, `weather.fadeSeconds` |
-| Neige | en hiver seulement (neige légère, neige, tempête rare) ; « neige au sol » (traces de pas et de roues) jamais tirée, imposable par le Conseil ; `snow = false` : aucune neige tirée | `weather.snow`, `weather.seasons.hiver` |
+| Cours du ciel | chaque ciel dure 25 à 50 min (orage, tempête : 10 à 20), puis un successeur plausible est tiré selon les poids de la saison (pas d'orage sous un ciel clair) ; transition de 90 s | `weather.next`, `weather.seasons`, `weather.durationMinutes`, `weather.durations`, `weather.fadeSeconds` (`config.lua`) |
+| Neige | en hiver seulement (neige légère, neige, tempête rare) ; « neige au sol » (traces de pas et de roues) jamais tirée, imposable par le Conseil ; `snow = false` : aucune neige tirée | `weather.snow`, `weather.seasons.hiver` (`config.lua`) |
 | Changement de saison | un ciel qui n'est plus de saison (neige au printemps) change dans les 15 s, sauf s'il est imposé ou figé | `server.tickMs` |
 | Nuits de gel (décidé le 30 octobre 2026) | l'hiver seulement, chaque nuit gèle avec 40 % de chances (tirées une fois par jour, au premier passage de la boucle après minuit) ; annoncée par le monde dès son tirage et jusqu'au gel (« La nuit sera froide. » dans `/date`, mention sur la fiche des plantes de l'agriculture) ; avertissement aux cultivateurs concernés à 17 h, gel à 21 h (heure du royaume) ; ce qui est déjà passé au démarrage du module ne se rejoue pas | `frost`, `messages.frostTonight` |
 | Ciel imposé | transition de 20 s ; il tient le temps d'un ciel puis reprend son cours (même hors saison), sauf s'il est figé | `council.fadeSeconds` |
@@ -131,7 +143,7 @@ démarrage, sans rejouer ce qui est déjà passé dans la journée.
 l'outil avec les données simulées de `web/dev/devmock.js`, jamais livré (`?frozen=1` heure figée, `?forced=1` ciel
 imposé et figé, `?struck=1` gel tombé, `?refused=1` décisions refusées). La logique pure (heure de Paris, saisons, tirage du ciel, nuits
 de gel) est testée dans `tests/spec/time_*_spec.lua` ; `time_client_view_spec.lua` essaie le calendrier et les ciels
-sur la seule vue client (`config_client.lua` sans `config.lua`).
+sur la seule vue client (`config_client.lua` sans `config.lua`, ni cours des ciels ni son tirage).
 
 ## À vérifier en jeu
 

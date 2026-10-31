@@ -663,7 +663,7 @@ versé à T-014 ; les autres points déjà couverts sont précisés dans T-012 �
   d'une station d'un type inconnu de la config du client ; `config_split_spec` vert.
 
 ### T-146 — Ciel de `vava_time` : cycle au seul serveur
-- Agent : vava-dev-lua · Dépend de : T-142 · Statut : à faire
+- Agent : vava-dev-lua · Dépend de : T-142 · Statut : à tester en jeu
 - Relecture réseau R-1 de T-142 : le temps sert ≈ 4,6 Ko bruts pour le seul serveur, plus que le gain du module au lot
   3 : le cycle des ciels de `config_client.lua` (`weather.next`, `seasons`, `snow`, `durationMinutes`, `durations`,
   ≈ 1,9 Ko) et les fonctions de tirage de `shared/weather.lua` (`weight`, `allowed`, `candidates`, `pick`, `duration`,
@@ -674,6 +674,20 @@ versé à T-014 ; les autres points déjà couverts sont précisés dans T-012 �
 - Critères : `config_split_spec` T0 à T4 verts ; essai du ciel sur la vue client (`time_client_view_spec`) et tirages
   inchangés au serveur (`time_weather_spec`) ; comparaison clé par clé de la config ; gain mesuré par
   `scripts/poids-client.sh` ; temps 2-x en jeu (`docs/tests/temps.md`).
+- Fait le 31 octobre 2026 (branche `agents/T-146`) : `vava_time` 1.5.0 — `shared/weather.lua` réduit à `get`, `ids`,
+  `progress` (ne garde que `weather.types`) ; tirage dans `shared/cycle.lua` au seul serveur ; `weather.next`, `seasons`,
+  `snow`, `durationMinutes`, `durations` et `fadeSeconds` posés par `config.lua` (`fadeSeconds` aussi : aucun fichier
+  client ne le lit, T4) ; refus de démarrer avec un `config.lua` de 1.4.0, avertissement pour un `config_client.lua` de
+  1.4.0, texte de l'ancienne forme précisé (R-5 de T-142). Config du serveur identique à `main` (262 feuilles, 0
+  différence), tirages identiques (103 829 comparaisons). 4 844 octets de moins par joueur (1 282 compressés). Rapport
+  `docs/plan/rapports/T-146.md`. Relectures sécurité et réseau à faire. **À tester en jeu** : `docs/tests/reseau.md`
+  § 7-E.
+
+### T-148 — Fichiers `shared/` absents du manifeste
+- Agent : vava-dev-lua · Dépend de : T-132 · Statut : à faire
+- Trouvé pendant T-146 : rien ne vérifie qu'un `shared/*.lua` présent dans un module est bien listé à son manifeste ;
+  sans la ligne de `shared/cycle.lua`, `vava_time` tomberait au premier tirage du ciel. Ajouter le contrôle à
+  `config_split_spec` (T0) ou à l'audit, avec un cas d'essai.
 
 ## Phase 2 — Arrivée
 

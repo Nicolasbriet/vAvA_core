@@ -1,7 +1,7 @@
 --[[
     vava_time/server/sky.lua
     Rôle : la météo tenue par le serveur. Cycle : chaque ciel dure une durée tirée de la config, puis un successeur est
-           tiré selon les poids de la saison (règles pures de shared/weather.lua) ; un ciel qui n'est plus de saison
+           tiré selon les poids de la saison (règles pures de shared/cycle.lua) ; un ciel qui n'est plus de saison
            (neige au printemps) change aussitôt. Conseil : imposer un ciel (il dure sa durée, ou reste s'il est figé),
            figer le ciel, rendre la main au cycle. Publication par GlobalState au seul changement : ciel visé, ciel
            d'avant et début de la transition, que chaque client suit seul.
