@@ -79,8 +79,9 @@ zones.define(KIND, {
         local now = GetGameTimer()
         if data.hits[victim] and now - data.hits[victim] < spellCfg.hitCooldownMs then return end
         data.hits[victim] = now
-        local hit = combos.hit(zone.owner, victim, NAME, data.damage)
+        local hit = combos.hit(zone.owner, victim, NAME, data.damage, nil, zone.ownerCharacter)
         if not combat.damage(zone.owner, victim, NAME, hit.damage, combat.KIND.AURA, zone.ownerCharacter) then return end
+        combos.commit(hit)
         if data.burn and hit.burn then
             states.apply(victim, 'burn', {
                 durationMs = data.burn.durationMs, tickMs = data.burn.tickMs, damage = data.burn.damage,

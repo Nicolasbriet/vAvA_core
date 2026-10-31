@@ -19,7 +19,8 @@ local ok, err = projectiles.register(NAME, spellCfg, {
     onImpact = function(launch, target, point)
         local levelCfg = spellCfg.levels[launch.level]
         if target ~= 0
-            and combat.damage(launch.source, target, NAME, levelCfg.damage, combat.KIND.IMPACT, nil, nil, launch.launchedAt) then
+            and combat.damage(launch.source, target, NAME, levelCfg.damage, combat.KIND.IMPACT, launch.casterCharacter, nil,
+                launch.strikeLaunchedAt) then
             projectiles.bonus(launch)
             if levelCfg.staggerMs > 0 then
                 states.apply(target, 'stagger', { durationMs = levelCfg.staggerMs, caster = launch.source, spell = NAME })

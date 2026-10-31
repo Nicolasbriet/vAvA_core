@@ -302,13 +302,16 @@ end
 local function mayProtect(src, target, weakness, removing)
     if src == CONSOLE then return true end
     if target == src then
+        -- sans staff, on ne retire sur soi que ce qui protège (une faiblesse posée par le Souverain reste)
         if removing or bridge.IsStaff(src) then return true end
         return false, 'staff_only'
     end
     if weakness and not bridge.IsStaff(src) then return false, 'staff_only' end
     local mine = bridge.RankLevel(src)
+    -- vava_admin absent : l'ACE fait foi ; présent mais rang illisible : refusé
     if mine == nil then return true end
-    if (bridge.RankLevel(target) or 0) >= mine then return false, 'outranked' end
+    local theirs = bridge.RankLevel(target)
+    if mine == false or theirs == false or (theirs or 0) >= mine then return false, 'outranked' end
     return true
 end
 
@@ -320,7 +323,9 @@ handlers[actions.protect] = function(src, target, rest)
     if word == words.none then
         local allowed, refusal = mayProtect(src, target, false, true)
         if not allowed then return false, refusal end
-        if protections.clear(target) then bridge.Notify(target, notify.unprotected, 'info') end
+        -- sur soi-même sans staff : les seules protections positives (boucliers, résistances)
+        local onlyPositive = target == src and src ~= CONSOLE and not bridge.IsStaff(src)
+        if protections.clear(target, onlyPositive) then bridge.Notify(target, notify.unprotected, 'info') end
         bridge.AdminLog(src, logs.protect, details(target, { protection = word }))
         return true
     end

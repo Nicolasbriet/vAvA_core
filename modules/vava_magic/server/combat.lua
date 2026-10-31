@@ -62,12 +62,23 @@ function combat.protected(point)
 end
 
 --- Un sort offensif peut-il toucher ce joueur ? (dégâts entre joueurs activés, personnage en jeu, hors zone
---- protégée, pas à terre : un corps au sol n'est ni mouillé, ni poussé, ni renversé) Renvoie sa position lue côté
---- serveur, ou nil.
+--- protégée, pas à terre : un corps au sol n'est ni mouillé, ni poussé, ni renversé) Avec le lanceur (autre que la
+--- cible), mêmes refus qu'un coup de la chaîne : lanceur qui joue désormais un autre personnage que
+--- `casterCharacter`, ou posté dans une zone de paix. Renvoie la position de la cible lue côté serveur, ou nil.
 ---@param target integer
+---@param caster? integer
+---@param casterCharacter? integer  personnage du lanceur au moment du sort (zone, projectile)
 ---@return table|nil
-function combat.affects(target)
+function combat.affects(target, caster, casterCharacter)
     if not cfg.pvp or not bridge.ChainPvp() or not bridge.GetCharacterId(target) then return nil end
+    if type(caster) == 'number' and caster > 0 and caster ~= target then
+        local current = bridge.GetCharacterId(caster)
+        if current and type(casterCharacter) == 'number' and casterCharacter > 0 and current ~= casterCharacter then
+            return nil
+        end
+        local from = world.position(caster)
+        if from and combat.protected(from) then return nil end
+    end
     local position = world.position(target)
     if not position or combat.protected(position) then return nil end
     -- en dernier : un appel à vava_health, seulement pour qui serait touché

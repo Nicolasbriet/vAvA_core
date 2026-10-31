@@ -63,6 +63,7 @@ describe('vava_magic sur la chaîne de dégâts (serveur)', function()
             ChainKnowsLaunched = function() return chainLaunched end,
             RankLevel = function(src)
                 if src == 0 then return math.huge end
+                if ranks[src] == false then return false end
                 return ranks[src] or 0
             end,
             IsStaff = function(src) return src == 0 or staff[src] == true end,
@@ -423,6 +424,30 @@ describe('vava_magic sur la chaîne de dégâts (serveur)', function()
             assert.equal(2, select(3, protections.count(VICTIM)))
         end)
 
+        it('sans staff, sur soi, ne retirer que ce qui protège ; rang illisible : refusé (C-4)', function()
+            ranks[CASTER], ranks[VICTIM] = 2, 0
+            protections.shield(CASTER, { points = 10 })
+            protections.resist(CASTER, { kind = 'feu', share = 0.5 })
+            protections.resist(CASTER, { kind = 'eau', share = -0.5 })
+            run(CASTER, 'proteger', 'aucune')
+            local shieldsLeft, _, resistancesLeft = protections.count(CASTER)
+            assert.equal(0, shieldsLeft)
+            -- la faiblesse posée par un Souverain reste
+            assert.equal(1, resistancesLeft)
+            -- un Souverain retire tout, sur lui aussi
+            staff[CASTER] = true
+            run(CASTER, 'proteger', 'aucune')
+            assert.equal(0, select(3, protections.count(CASTER)))
+            staff[CASTER] = nil
+            -- vava_admin tourne mais le rang de la cible est illisible : refusé
+            ranks[VICTIM] = false
+            run(CASTER, 'proteger', tostring(VICTIM), 'bouclier', '10')
+            assert.equal(0, shields(VICTIM))
+            ranks[VICTIM], ranks[CASTER] = 0, false
+            run(CASTER, 'proteger', tostring(VICTIM), 'bouclier', '10')
+            assert.equal(0, shields(VICTIM))
+        end)
+
         it('la console peut tout', function()
             ranks[VICTIM] = 3
             -- la réponse à la console part par print : gardée hors de la sortie des essais
@@ -576,6 +601,134 @@ describe('vava_magic sur la chaîne de dégâts (serveur)', function()
             assert.is_nil(Bridge.GetHealth(3))
             -- sans vocabulaire, les listes restent celles du module (aucune intersection possible)
             assert.is_nil(registryEntries['vava_magic:protections'].kinds)
+        end)
+
+        it('vocabulaire devenu illisible : tout revient aux valeurs par défaut (C-5)', function()
+            loadBridge({ healthPoints = 100, kinds = KINDS, tags = { 'launched' }, pvp = false })
+            Bridge.SetModifiers(definitions())
+            assert.is_true(Bridge.ChainKnowsLaunched())
+            assert.is_false(Bridge.ChainPvp())
+            -- retour à une version plus ancienne de vava_health
+            health.vocabulary = function() error('export inconnu') end
+            for _, hook in ipairs(readyHooks) do
+                if hook.name == 'core:module:ready' then hook.fn({ name = 'vava_health' }) end
+            end
+            assert.is_true(Bridge.start())
+            for _, hook in ipairs(readyHooks) do
+                if hook.name == 'core:module:ready' then hook.fn({ name = 'vava_health' }) end
+            end
+            assert.is_nil(Bridge.ChainHealthPoints())
+            assert.is_false(Bridge.ChainKnowsLaunched())
+            assert.is_true(Bridge.ChainPvp())
+            assert.is_nil(Bridge.GetHealth(3))
+        end)
+    end)
+
+    describe('combinaisons et effets sans dégâts (C-3)', function()
+        local combos, stateCalls, has
+
+        before_each(function()
+            loadMagic({ { label = 'Chapelle', x = 0.0, y = 0.0, radius = 2.0 } })
+            stateCalls, has = {}, {}
+            VavaMagic.sheets = { discover = function() return false end }
+            VavaMagic.states = {
+                has = function(src, name) return has[src] and has[src][name] or false end,
+                apply = function(src, name) stateCalls[#stateCalls + 1] = { 'apply', src, name } return true end,
+                remove = function(src, name) stateCalls[#stateCalls + 1] = { 'remove', src, name } end,
+            }
+            VavaMagic.zones = { define = function() end }
+            VavaMagic.world.broadcast = function() end
+            helper.load('modules/vava_magic/server/combos.lua')
+            combos = VavaMagic.combos
+            -- le lanceur hors de la chapelle, la cible aussi
+            positions[CASTER] = { x = 20, y = 0, z = 0 }
+        end)
+
+        it('combat.affects : refuse un lanceur qui joue un autre personnage, ou posté en zone de paix', function()
+            assert.is_table(combat.affects(VICTIM, CASTER, 42))
+            assert.is_nil(combat.affects(VICTIM, CASTER, 41))
+            -- personnage inconnu (0) ou lanceur parti : comme pour un coup, pas de refus sur ce point
+            assert.is_table(combat.affects(VICTIM, CASTER, 0))
+            positions[CASTER] = { x = 0.5, y = 0, z = 0 }
+            assert.is_nil(combat.affects(VICTIM, CASTER, 42))
+            -- sur soi-même, la place du lanceur ne compte pas
+            positions[VICTIM] = { x = 30, y = 0, z = 0 }
+            positions[CASTER] = { x = 0.5, y = 0, z = 0 }
+            assert.is_nil(combat.affects(CASTER, CASTER, 42))
+        end)
+
+        it('les états d’une combinaison attendent que le coup ait porté', function()
+            has[VICTIM] = { wet = true }
+            -- gel : rien n'est posé ni retiré avant le coup
+            local hit = combos.hit(CASTER, VICTIM, 'trait_de_glace', 5, nil, 42)
+            assert.equal(0, #stateCalls)
+            combos.commit(hit)
+            assert.same({ 'apply', VICTIM, 'frozen' }, stateCalls[1])
+            assert.same({ 'remove', VICTIM, 'wet' }, stateCalls[2])
+            assert.is_true(hit.frozen)
+            -- une seule fois
+            combos.commit(hit)
+            assert.equal(2, #stateCalls)
+            -- séchage : dégâts et brûlure réglés avant le coup, mouillé retiré seulement s'il a porté
+            stateCalls = {}
+            hit = combos.hit(CASTER, VICTIM, 'boule_de_feu', 12, nil, 42)
+            assert.equal(6, hit.damage)
+            assert.is_false(hit.burn)
+            assert.equal(0, #stateCalls)
+            -- lanceur qui joue un autre personnage : aucune combinaison
+            hit = combos.hit(CASTER, VICTIM, 'trait_de_glace', 5, nil, 41)
+            combos.commit(hit)
+            assert.equal(0, #stateCalls)
+            assert.equal(5, hit.damage)
+        end)
+    end)
+
+    describe('projectiles : personnage du lanceur et instant du lancement (C-1, C-2)', function()
+        local projectiles, bonuses, ping
+
+        before_each(function()
+            loadMagic()
+            bonuses, ping = {}, 80
+            _G.GetPlayerPing = function() return ping end
+            for _, name in ipairs({ 'states', 'zones', 'combos', 'obstacles' }) do VavaMagic[name] = VavaMagic[name] or {} end
+            VavaMagic.experience = { bonus = function(src, spell, xp) bonuses[#bonuses + 1] = { src, spell, xp } end }
+            VavaMagic.spells.addRpc = function() end
+            VavaMagic.spells.register = function() return true end
+            helper.load('modules/vava_magic/server/projectiles.lua')
+            projectiles = VavaMagic.projectiles
+        end)
+
+        after_each(function() _G.GetPlayerPing = nil end)
+
+        it('instant du lancement joint seulement dans le temps d’un vol, plus la marge et le ping (sans la grâce)', function()
+            local hit = setmetatable({}, { __index = cfg.projectiles })
+            -- roche N1 : 18 m à 12 m/s, 1,5 s de vol
+            local launch = { launchedAt = 1000, range = 18, speed = 12 }
+            local limit = 1500 + hit.timeMarginMs + ping
+            now = 1000 + limit
+            assert.equal(1000, projectiles.strikeLaunchedAt(launch, hit, CASTER))
+            now = 1000 + limit + 1
+            assert.is_nil(projectiles.strikeLaunchedAt(launch, hit, CASTER))
+            -- le ping compte au plus une seconde
+            ping = 60000
+            now = 1000 + 1500 + hit.timeMarginMs + 1000 + 1
+            assert.is_nil(projectiles.strikeLaunchedAt(launch, hit, CASTER))
+            -- la grâce de l'impact (3 s) n'est jamais comptée
+            assert.is_true(1500 + hit.timeMarginMs + 1000 < 1500 + hit.launchGraceMs + 1000)
+        end)
+
+        it('bonus d’XP au seul personnage qui a lancé', function()
+            projectiles.bonus({ source = CASTER, spell = 'boule_de_feu', rewarded = true, casterCharacter = 42 })
+            assert.equal(1, #bonuses)
+            characters[CASTER] = 99
+            projectiles.bonus({ source = CASTER, spell = 'boule_de_feu', rewarded = true, casterCharacter = 42 })
+            assert.equal(1, #bonuses)
+        end)
+
+        it('un impact compté après un changement de personnage ne blesse pas (personnage du lancement)', function()
+            characters[CASTER] = 99
+            assert.is_false(combat.damage(CASTER, VICTIM, 'boule_de_feu', 8, combat.KIND.IMPACT, 42, nil, 1000))
+            assert.equal(0, #hits)
         end)
     end)
 end)

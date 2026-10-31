@@ -169,12 +169,32 @@ function protections.resist(src, opts)
     return lastId
 end
 
---- Retire toutes les protections d'un joueur (départ, commande du Conseil). Renvoie vrai s'il en avait.
+--- Retire toutes les protections d'un joueur (départ, commande du Conseil), ou, avec `onlyPositive`, ses seuls
+--- boucliers et résistances (ses faiblesses restent). Renvoie vrai s'il y avait quelque chose à retirer.
 ---@param src integer
+---@param onlyPositive? boolean
 ---@return boolean
-function protections.clear(src)
-    local had = players[src] ~= nil
-    players[src] = nil
+function protections.clear(src, onlyPositive)
+    local entry = players[src]
+    if not onlyPositive or not entry then
+        players[src] = nil
+        return entry ~= nil
+    end
+    -- seulement ce qui protège : boucliers et résistances ; les faiblesses restent
+    local resistances, kept = entry.resistances, 0
+    local had = #entry.shields > 0
+    for i = 1, #resistances do
+        local item = resistances[i]
+        if item.share < 0 then
+            kept = kept + 1
+            resistances[kept] = item
+        else
+            had = true
+        end
+    end
+    for i = #resistances, kept + 1, -1 do resistances[i] = nil end
+    entry.shields = {}
+    if kept == 0 then players[src] = nil end
     return had
 end
 
@@ -269,4 +289,4 @@ end
 
 -- départ du joueur (ou changement de personnage) : ses protections tombent ; à l'arrêt du module, elles disparaissent
 -- avec lui, et ses entrées du registre aussi
-VavaMagic.spells.onLeave(protections.clear)
+VavaMagic.spells.onLeave(function(src) protections.clear(src) end)

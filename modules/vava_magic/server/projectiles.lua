@@ -15,12 +15,15 @@
         il se dresse. Les zones au sol traversées passent par les combinaisons (une boule de feu dissipe la brume,
         un trait de glace fait fumer un mur de flammes, une roche s'y embrase et emporte le feu jusqu'à l'impact).
         Le sort décide ensuite de l'effet (`onImpact`) : dégâts, états, éclats autour (jamais à travers un
-        obstacle), bonus d'XP d'un sort qui touche ; puis l'effet emporté s'applique à la cible.
+        obstacle), bonus d'XP d'un sort qui touche ; puis l'effet emporté s'applique à la cible. Le personnage du
+        lanceur est retenu au lancement (un impact signalé après un changement de personnage ne blesse plus) ; un
+        impact arrivé dans le temps d'un vol porte l'instant du lancement (`launchedAt`, coup déjà lancé), pas un impact
+        tardif.
     Dépendances : shared/, config.lua, server/ (noyau, combat, states, zones, combos, obstacles)
 ]]
 
 local ipairs, pairs, setmetatable = ipairs, pairs, setmetatable
-local floor = math.floor
+local floor, min = math.floor, math.min
 local GetGameTimer, SetTimeout, TriggerClientEvent, GetPlayerPing = GetGameTimer, SetTimeout, TriggerClientEvent, GetPlayerPing
 
 local bridge = VavaMagic.bridge
@@ -46,6 +49,8 @@ local ANGLE_MIN_DISTANCE = 2.0
 local MAX_ANGLE = 180
 -- un impact annoncé contre la face d'un obstacle n'est pas « derrière » lui (demi-épaisseur d'un mur, en mètres)
 local BLOCK_MARGIN = 0.75
+-- ping compté au plus pour juger qu'un impact arrive dans le temps d'un vol (un lanceur tombé ne retient pas l'impact)
+local PING_MAX_MS = 1000
 local DIRECTION = { type = 'number', min = -1.01, max = 1.01 }
 local COORD = { type = 'number', min = -20000, max = 20000 }
 local LAUNCH_ID = { type = 'integer', min = 1, max = 0x7FFFFFFF }
@@ -68,6 +73,8 @@ VavaMagic.projectiles = projectiles
 ---@field homing number     degrés par seconde dont il peut s'incurver vers sa cible
 ---@field target integer|nil
 ---@field launchedAt integer
+---@field casterCharacter integer|nil  personnage du lanceur au lancement (coups, bonus d'XP, brûlure)
+---@field strikeLaunchedAt integer|nil  à l'impact : `launchedAt` si l'impact arrive dans le temps d'un vol, sinon nil
 ---@field resolved boolean
 ---@field rewarded boolean  le lancer a rapporté de l'XP : un impact sur une cible rapporte le bonus
 ---@field bonus boolean     bonus déjà accordé
@@ -146,6 +153,8 @@ end
 ---@param launch vAvA.MagicLaunch
 function projectiles.bonus(launch)
     if not launch.rewarded or launch.bonus then return end
+    -- le lanceur joue toujours le personnage qui a lancé
+    if launch.casterCharacter and bridge.GetCharacterId(launch.source) ~= launch.casterCharacter then return end
     launch.bonus = true
     local def = defs[launch.spell]
     experience.bonus(launch.source, launch.spell, def and def.config.hitXp or 0)
@@ -164,14 +173,31 @@ function projectiles.splash(launch, point, except, radius, points)
     for _, entry in ipairs(world.near(point, radius)) do
         local victim = entry.source
         if victim ~= launch.source and victim ~= except and not obstacles.blocked(point, entry.position) then
-            local hit = combos.hit(launch.source, victim, launch.spell, points)
-            if combat.damage(launch.source, victim, launch.spell, hit.damage, combat.KIND.ZONE, nil, nil, launch.launchedAt) then
+            local hit = combos.hit(launch.source, victim, launch.spell, points, nil, launch.casterCharacter)
+            if combat.damage(launch.source, victim, launch.spell, hit.damage, combat.KIND.ZONE, launch.casterCharacter, nil,
+                launch.strikeLaunchedAt) then
+                combos.commit(hit)
                 touched[#touched + 1] = victim
             end
         end
     end
     return touched
 end
+
+--- Instant du lancement à joindre aux coups de l'impact : seulement si l'impact arrive dans le temps d'un vol complet,
+--- plus la marge de latence et le ping (sans la grâce de l'impact, qui ne sert qu'à ne pas perdre un impact tardif) ;
+--- au-delà, le coup est ordinaire (un lanceur tombé à terre entre-temps ne blesse plus).
+---@param launch vAvA.MagicLaunch
+---@param hit table
+---@param src integer
+---@return integer|nil
+local function strikeLaunchedAt(launch, hit, src)
+    local flightMs = launch.range / launch.speed * MS_PER_SECOND
+    local ping = min(GetPlayerPing(src) or 0, PING_MAX_MS)
+    if GetGameTimer() - launch.launchedAt > flightMs + hit.timeMarginMs + ping then return nil end
+    return launch.launchedAt
+end
+projectiles.strikeLaunchedAt = strikeLaunchedAt
 
 --- Impact signalé par le client du lanceur : cible (0 = le décor) et point touché.
 local function impact(src, id, target, x, y, z)
@@ -198,16 +224,20 @@ local function impact(src, id, target, x, y, z)
         local result = combos.zone({ caster = src, spell = launch.spell, point = point, projectile = launch }, zone)
         if result and result.carry then launch.carry = result.carry end
     end
+    launch.strikeLaunchedAt = strikeLaunchedAt(launch, def.hit, src)
     def.onImpact(launch, target, point)
     local carry = launch.carry
     if carry and target ~= 0 then
-        local hit = combos.hit(src, target, launch.spell, carry.damage or 0, CARRY_ELEMENT)
-        if combat.damage(src, target, launch.spell, hit.damage, combat.KIND.IMPACT, nil, CARRY_ELEMENT, launch.launchedAt)
-            and hit.burn
-            and carry.burn then
-            states.apply(target, 'burn', {
-                durationMs = carry.burn.durationMs, tickMs = carry.burn.tickMs, damage = carry.burn.damage, caster = src, spell = launch.spell,
-            })
+        local hit = combos.hit(src, target, launch.spell, carry.damage or 0, CARRY_ELEMENT, launch.casterCharacter)
+        if combat.damage(src, target, launch.spell, hit.damage, combat.KIND.IMPACT, launch.casterCharacter, CARRY_ELEMENT,
+            launch.strikeLaunchedAt) then
+            combos.commit(hit)
+            if hit.burn and carry.burn then
+                states.apply(target, 'burn', {
+                    durationMs = carry.burn.durationMs, tickMs = carry.burn.tickMs, damage = carry.burn.damage, caster = src,
+                    casterCharacter = launch.casterCharacter, spell = launch.spell,
+                })
+            end
         end
     end
     return true
@@ -266,7 +296,8 @@ function projectiles.register(name, spellCfg, handlers)
         local launch = {
             id = nextLaunch, spell = name, source = src, level = ctx.level, origin = origin, direction = direction,
             speed = levelCfg.speed, range = levelCfg.range, homing = target and (levelCfg.homing or 0) or 0, target = target,
-            launchedAt = GetGameTimer(), resolved = false, rewarded = false, bonus = false,
+            launchedAt = GetGameTimer(), casterCharacter = ctx.characterId, resolved = false, rewarded = false,
+            bonus = false,
         }
         launches[launch.id] = launch
         local flightMs = floor(launch.range / launch.speed * MS_PER_SECOND)

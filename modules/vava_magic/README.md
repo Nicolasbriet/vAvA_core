@@ -276,7 +276,7 @@ bridge. Plus aucun sort n'appelle `damage`.
 | `source` · `sourceCharacter` | le lanceur et son personnage ; un lanceur parti reste la source (son mur, sa brûlure blessent encore) ; un lanceur qui joue désormais un autre personnage : le coup est **refusé** (sans source, il échapperait à `chain.pvp`, au débit par paire et au journal) |
 | `spell` | le sort (ou la combinaison : `vapeur`) |
 | `tags` | `spell`, plus `ranged` (impact d'un projectile), `area` (éclats, nova, secousse), `area` et `overTime` (mur de flammes, vapeur), `overTime` (brûlure) ; `launched` pour un coup déjà lancé (impact, éclats, secousse), avec vava_health ≥ 1.4.0 |
-| `launchedAt` | coup déjà lancé : instant du lancement, horloge du serveur (`launch.launchedAt` d'un projectile, naissance du présage de la Secousse) ; jamais une valeur du client |
+| `launchedAt` | coup déjà lancé : instant du lancement, horloge du serveur (`launch.launchedAt` d'un projectile, naissance du présage de la Secousse) ; jamais une valeur du client ; pour un projectile, seulement si l'impact arrive dans le temps d'un vol complet, plus `projectiles.timeMarginMs` et le ping (une seconde au plus), jamais pendant la grâce de l'impact : un lanceur tombé ne retient pas son impact |
 
 Ce que la chaîne apporte aux sorts : son interrupteur des combats entre joueurs (`chain.pvp`, en plus de `combat.pvp`),
 son débit par paire (20 coups par seconde d'un même lanceur sur une même cible), le lanceur **à terre** (décision du
@@ -307,7 +307,9 @@ l'application (seule une cible partie ou tombée au même instant le pourrait : 
 Les protections vivent en mémoire du serveur (jamais en base) : au plus 4 boucliers (200 points chacun) et 4
 résistances par joueur, 10 minutes au plus (`protections`), retirées au départ. Aucun des onze sorts n'en pose encore
 (sorts de protection à venir) : `/magie proteger` en pose pour l'essai, sur un joueur de rang plus bas que le sien au
-Conseil ; se protéger soi-même ou poser une faiblesse est réservé au droit `staff` (Souverain) et à la console.
+Conseil ; se protéger soi-même ou poser une faiblesse est réservé au droit `staff` (Souverain) et à la console. Sans
+`staff`, `/magie proteger aucune` sur soi ne retire que ce qui protège (boucliers, résistances) : une faiblesse posée
+par le Souverain reste. Si vava_admin tourne mais qu'un rang est illisible, la commande est refusée.
 
 **Incantation brisée par une blessure** (`interruptOnHurt`, vrai par défaut) : la vie n'est **jamais lue sur le ped**
 (un client qui garde sa vie GTA au maximum ne serait jamais interrompu). Un coup de la chaîne ou une perte native (chute,
@@ -318,6 +320,13 @@ concentration »), sans rien consommer. Un coup tout absorbé par un bouclier ne
 **Combats entre joueurs coupés** : `combat.pvp = false`, ou `chain.pvp = false` dans vava_health ≥ 1.4.0 (lu dans
 `vocabulary()` à chaque démarrage de vava_health) : aucun dégât, et aucun effet sans dégâts non plus (poussée, gel,
 Ralenti, Mouillé : `combat.affects`).
+
+**Mêmes refus pour les effets sans dégâts** : `combat.affects(cible, lanceur, personnage)` refuse aussi un lanceur qui
+joue désormais un autre personnage, ou qui se tient dans une zone de paix (brume, sols mouillés, boue, vague,
+combinaisons). Le personnage du lanceur est retenu au lancement d'un projectile (impact, éclats, brûlure, bonus d'XP).
+Les états d'une combinaison (gel, Mouillé retiré par le séchage, Brûlure éteinte) ne sont posés qu'**après** un coup
+qui a porté (`combos.hit` calcule, `combos.commit` pose) ; les dégâts réduits et la brûlure empêchée restent calculés
+avant le coup.
 
 **Sans vava_health** (arrêté, en erreur, ou plus ancien que 1.3.0) : les sorts se lancent, volent et touchent, mais ne
 blessent personne, et rien de ce qui suit un coup ne part ; le lanceur lit « Votre magie gronde sans mordre… » au plus

@@ -92,14 +92,15 @@ function Bridge.IsAdmin(source)
 end
 
 --- Rang d'un joueur au Conseil (`vava_admin` rankOf : 1 Gardien, 2 Sénéchal, 3 Souverain ; 0 sans rang ; la console
---- au-dessus de tous), ou nil si vava_admin ne répond pas (les rangs sont alors inconnus).
+--- au-dessus de tous) ; nil si vava_admin n'est pas démarré (les rangs n'existent pas), false s'il tourne mais que
+--- le rang est illisible (appel en erreur : l'appelant refuse).
 ---@param source integer
----@return integer|nil
+---@return integer|false|nil
 function Bridge.RankLevel(source)
     if source == CONSOLE then return huge end
     if GetResourceState(LINKS.ADMIN) ~= 'started' then return nil end
     local called, rank = call(LINKS.ADMIN, 'rankOf', source)
-    if not called then return nil end
+    if not called then return false end
     return type(rank) == 'table' and mathType(rank.level) == 'integer' and rank.level or 0
 end
 
@@ -310,10 +311,14 @@ end
 -- vie pleine, types de dégâts, étiquette `launched` connue (1.4.0), interrupteur des combats entre joueurs (1.4.0)
 local chain = { points = nil, kinds = nil, launched = false, pvp = true }
 
---- Relit le vocabulaire de la chaîne (vava_health démarré, 1.3.0 au moins ; sinon rien ne change).
+--- Relit le vocabulaire de la chaîne (vava_health démarré, 1.3.0 au moins). Illisible (vava_health plus ancien ou en
+--- erreur) : tout revient aux valeurs par défaut, rien de ce qu'une version précédente avait dit ne reste.
 local function readVocabulary()
     local called, vocabulary = call(LINKS.HEALTH, 'vocabulary')
-    if not called or type(vocabulary) ~= 'table' or type(vocabulary.healthPoints) ~= 'number' then return end
+    if not called or type(vocabulary) ~= 'table' or type(vocabulary.healthPoints) ~= 'number' then
+        chain.points, chain.kinds, chain.launched, chain.pvp = nil, nil, false, true
+        return
+    end
     chain.points = vocabulary.healthPoints
     chain.kinds = type(vocabulary.kinds) == 'table' and vocabulary.kinds or nil
     chain.launched = false
