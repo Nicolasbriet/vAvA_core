@@ -1158,8 +1158,9 @@ faire tout le système de combat ») : la porte T-119 reste à passer en jeu.
   `docs/tests/registre.md` 9 bis-3 bis.
 
 ### T-113 — Blocage, parade, esquive
-- Agent : vava-dev-lua · Dépend de : T-112 · Statut : en cours (fait ; relectures sécurité et réseau à faire)
-- Fait le 31 octobre 2026 (branche `agents/T-113`, spec `docs/plan/specs/T-113.md`) : `vava_combat` 1.3.0 — Garde, Parade
+- Agent : vava-dev-lua · Dépend de : T-112 · Statut : à tester en jeu (relu sécurité et réseau, suites appliquées)
+- Fait le 31 octobre 2026 (branche `agents/T-113`, spec `docs/plan/specs/T-113.md`, rapport
+  `docs/plan/rapports/T-113.md`, procédure `docs/tests/combat.md` § 4) : `vava_combat` 1.3.0 — Garde, Parade
   et Pas de côté en données (format selon le type) ; RPC `use` étendu, nouveau RPC `lower` ; fenêtres tenues par le
   serveur sans minuterie ; modificateurs `vava_combat:esquive`, `:parade`, `:blocage` ; suites au hook `vava_health:hit`
   after (attaquant paré qui chancelle, garde brisée par un compteur provisoire, usure différée, issues `parry`, `block`,
@@ -1172,11 +1173,15 @@ faire tout le système de combat ») : la porte T-119 reste à passer en jeu.
 - Laissé par T-113 (spec § 13) : remplacer `VavaCombat.defense.spend` (`server/defense.lua`) et supprimer
   `config.defense.guardBreak` et la table `points` (compteur provisoire de garde brisée) ; refus `exhausted` d'une
   parade ou d'un pas à l'admission (`defense.refusal`) ; dépenser `stamina` des techniques (défensives comprises).
+  Relecture sécurité de T-113 : alterner pas de côté et parades ratées protège ≈ 35 % du temps ; à borner par
+  l'endurance (`defense.spend`).
 
 ### T-115 — Styles, compétences de combat, XP
 - Agent : vava-dev-lua · Dépend de : T-113, T-114 · Statut : à faire
 - Styles par catégorie d'arme, compétences de combat dans `vava_skills`, déblocage par rang, XP sur vraie cible,
   mentorat du maître d'armes ; techniques de hache, masse, dague, bâton et bouclier en config.
+- Relecture sécurité de T-113 : `learn` des techniques (défensives comprises : la Parade demande le niveau 10) vérifié
+  par le crochet `vava_combat:using` ; XP de défense par le hook `vava_combat:defended`.
 
 ### T-155 — Chiffres des coups (dégâts affichés)
 - Agents : vava-architecte → vava-dev-lua · Dépend de : T-112 (après T-113, même module) · Statut : à faire
@@ -1293,7 +1298,17 @@ faire tout le système de combat ») : la porte T-119 reste à passer en jeu.
   test combat 3-27 ; réseau R-4).
 - Laissé par T-113 (spec § 13) : fenêtre de parade et sa préparation, invulnérabilité du pas de côté, délais (parade
   ratée 0,6 s, 1,5 s entre deux pas), arcs protégés, parts bloquées des fiches (épée 0,40 peut-être trop faible face à
-  4 coups), seuils du compteur de garde ; réussite des parades à 30, 80, 150 ms de ping (test combat 4-23).
+  4 coups), seuils du compteur de garde ; réussite des parades à 30, 80, 150 ms de ping (test combat 4-23). Relecture
+  sécurité de T-113 : observer ce que le serveur ne voit pas (garde tenue en sprint, gestes sans animation, pas de côté
+  sans déplacement) ; mesurer le coût serveur des modificateurs (test combat 4-29, relecture réseau R-2).
+
+### T-159 — Filtre par étiquettes à l'inscription d'un modificateur de `vava_health`
+- Agent : vava-dev-lua (cette tâche autorise à toucher `vava_health`) · Dépend de : T-113 · Statut : à faire
+- Trouvée pendant T-113 (relecture réseau R-2) : chaque coup du jeu appelle tous les modificateurs déclarés pour son
+  type, chacun par un passage entre ressources avec copie du contexte (≈ 0,04 à 0,12 ms par coup de mêlée avec les trois
+  de `vava_combat`). Permettre à une entrée du registre `vava_health:modifiers` de déclarer des étiquettes voulues
+  (`tags`) et interdites (`never`), filtrées par la chaîne avant l'appel : ne pas appeler un modificateur pour les zones
+  ni les effets qui durent. Puis `vava_combat` les déclare (esquive : `melee`, `ranged` ; jamais `area`, `overTime`…).
 
 ## Phase 5 — Interactions RP
 

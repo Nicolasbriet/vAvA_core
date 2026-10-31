@@ -191,7 +191,7 @@ Préparation : 0.8.
 | 12 | **(2 joueurs)** B pare un Fendant. | Le Fendant porte et B chancelle : il faut le bloquer ou l'esquiver. |
 | 13 | **(2 joueurs)** B martèle R (10 / s) pendant les coups de A. | Pas plus d'une fenêtre utile par cycle ; A n'est pas paré à chaque coup ; F8 propre. |
 | 14 | **(2 joueurs)** B Espace au moment de la Taille de A. | Aucun dégât, aucun effet ; l'arme de A ne s'use pas. |
-| 15 | **(2 joueurs)** B martèle Espace. | Un pas de côté toutes les 1,5 s au plus. |
+| 15 | **(2 joueurs)** B martèle Espace, puis clique et maintient R aussitôt après un pas. | Un pas de côté toutes les 1,5 s au plus ; `/vava_reseau joueur <B>` : aucun `use` entre deux pas ; l'attaque et la garde partent sans attendre la fin du délai du pas. |
 | 16 | **(2 joueurs)** Mage : A lance une Boule de feu sur B qui fait un pas de côté au bon moment ; puis un Mur de flammes. | La Boule de feu est évitée ; le mur (zone, effet qui dure) blesse quand même. |
 | 17 | A, épée en main, mode combat endormi (10 s sans rien), Espace. | Saut normal de GTA, pas de roulade. |
 | 18 | A garde levée, clic gauche. | Aucun coup ; après le relâchement (garde tenue plus de 0,2 s), la Taille part 0,25 s plus tard. |
@@ -205,7 +205,7 @@ Préparation : 0.8.
 | 26 | `chain.pvp = false` (vava_health), redémarrage ; A frappe la garde de B. | Une notification « Les combats entre habitants sont suspendus… » ; rien de bloqué, rien d'usé. |
 | 27 | **(2 joueurs)** B se déconnecte garde levée ; A frappe l'endroit. | Aucune erreur console ; `restart vava_combat` ensuite propre. |
 | 28 | `restart vava_health` pendant que B tient sa garde ; A frappe. | Console : « vava_health de retour : 3 modificateur(s) de la défense redéclaré(s) » ; la garde de B bloque de nouveau aussitôt. |
-| 29 | `resmon 1` chez B : au repos armé, garde tenue 10 s, mêlée. | Au repos ≤ 0,01 ms ; garde ≈ inchangé ; mêlée ≤ 0,15 ms. |
+| 29 | `resmon 1` chez B : au repos armé, garde tenue 10 s, mêlée. Serveur : `profiler record 300` pendant une mêlée à six (dont un en garde), puis `profiler view`. | Client : au repos ≤ 0,01 ms ; garde ≈ inchangé ; mêlée ≤ 0,15 ms. Serveur : `vava_combat` (modificateurs) ≈ 1 ms par seconde de mêlée au plus ; noter la valeur (relecture réseau R-2). |
 | 30 | `restart vava_combat` garde levée. | Garde perdue sans erreur ; R la relève au retour (arme à reprendre en main si l'inventaire l'a gardée à part). |
 | 31 | **(2 joueurs)** Mage : B gelé ou renversé par un sort de A pendant qu'il tient sa garde ; A frappe. | Le coup porte entièrement (aucune défense sous un contrôle dur de la magie) ; un coup de B demandé alors est refusé. |
 

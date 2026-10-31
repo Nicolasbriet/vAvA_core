@@ -1843,7 +1843,8 @@ sort → refus `controlled` ; plus ancien, arrêté ou en erreur : aucun refus d
   son coup en cours est coupé, puis aucun autre chancellement avant 3 s. Un contrôle dur de la magie (`hardControl`)
   refuse la demande, est relu après le crochet `using` et annule le coup à chaque relevé (relecture S-1 de T-149).
 - **Défense** (1.3.0, T-113) : un geste défensif passe par le même RPC `use` et la même réservation ; refus en mémoire
-  d'abord (garde brisée, `parry_cooldown` 0,6 s après une parade ratée, `dodge_cooldown` 1,5 s entre deux pas) ; à
+  d'abord (garde brisée, `parry_cooldown` 0,6 s après une parade ratée, `dodge_cooldown` 1,5 s entre deux pas, délai connu du client qui ne demande rien avant ; ces deux attentes ne
+  retiennent chez le client que leur touche) ; à
   l'acceptation, **aucune minuterie** : parade (fenêtre de 200 ms dès l'arrivée de la demande), pas de côté
   (invulnérable 250 ms après 50 ms) ou garde (effective après 100 ms, ouverte jusqu'à `vava_combat:lower`, tenue au moins
   200 ms, puis 250 ms de récupération) deviennent la défense du joueur ; une attaque acceptée la ferme. Garde levée :
