@@ -20,7 +20,7 @@ VavaDevCharacters = {
 
         -- Réponses du serveur traduites pour le joueur (les autres codes s'affichent tels quels).
         refusals = {
-            not_allowed = 'réservé au Conseil (droit staff) ou à l\'ACE vava.dev',
+            not_allowed = 'réservé au Conseil',  -- qui y a droit : `access` de config.lua
             unknown_rpc = 'outils de développement inactifs sur ce serveur (mode développement absent)',
         },
 

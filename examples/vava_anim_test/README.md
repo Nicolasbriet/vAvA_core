@@ -12,7 +12,7 @@ coupe n'importe quelle animation (une mise à terre comprise) : l'outil n'est do
 | --- | --- |
 | Convar `vava_env` absente ou différente de `dev` | `setup` refuse (« mode développement absent ») : ni accès, ni entrée au Codex ; chaque commande répond « outil inactif sur ce serveur ». |
 | `set vava_env dev` | Chaque commande demande l'accès au serveur (`vava_anim_test:access`) ; réponse positive gardée `accessCacheMs` (60 s). |
-| Joueur sans droit | « outil réservé au Conseil (droit staff) ou à l'ACE vava.dev. » ; rien n'est joué. |
+| Joueur sans droit | « outil réservé au Conseil. » ; rien n'est joué (le droit et l'ACE, `access`, sont réglés dans `config.lua`). |
 | Droit vava_admin `staff` ou ACE `vava.dev` | Commandes ouvertes ; elles paraissent au Codex du seul Conseil qui y a droit (`scope = 'admin'`), jamais des joueurs. |
 
 Le serveur relit la convar à chaque demande d'accès : après `set vava_env prod`, l'outil se ferme au plus tard à

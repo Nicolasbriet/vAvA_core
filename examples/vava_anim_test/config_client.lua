@@ -13,7 +13,7 @@ VavaAnimTest = {
 
         accessCacheMs = 60000,
         refusals = {
-            not_allowed = 'outil réservé au Conseil (droit staff) ou à l\'ACE vava.dev.',
+            not_allowed = 'outil réservé au Conseil.',  -- qui y a droit : `access` de config.lua
             unknown_rpc = 'outil inactif sur ce serveur (mode développement absent).',
         },
 

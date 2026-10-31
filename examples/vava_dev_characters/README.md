@@ -10,7 +10,7 @@ le droit.
 | --- | --- |
 | Convar serveur `vava_env` absente ou différente de `dev` | `setup` refuse : console `module 'vava_dev_characters' … refusé : setup a refusé le démarrage : mode développement absent (convar vava_env ≠ dev) : rien n'est offert`. Aucun RPC n'existe ; `/perso` répond « outils de développement inactifs sur ce serveur ». |
 | `set vava_env dev` | Le module démarre, avec un avertissement en console. Chaque commande est revérifiée par le serveur à chaque appel. |
-| Joueur sans droit | Refus `not_allowed` : « réservé au Conseil (droit staff) ou à l'ACE vava.dev ». |
+| Joueur sans droit | Refus `not_allowed` : « réservé au Conseil » (le droit et l'ACE, `access`, sont réglés dans `config.lua`). |
 | Droit vava_admin `staff` (Souverain) | Accès. Chaque changement est inscrit au journal du Registre (`vava_admin:log`). |
 | ACE `vava.dev` | Accès, avec ou sans vava_admin. Le journal du Registre n'accepte que les membres du Conseil : sans rang, la ligne va à la console du serveur. |
 
