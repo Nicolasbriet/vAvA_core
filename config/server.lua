@@ -224,10 +224,10 @@ vAvA.config.server = {
                                -- (50 à 5000)
             radius = 10.0,     -- écart horizontal maximal (m) entre le ped et le point ordonné (le ped peut tomber
                                -- du point, et courir un instant entre la fin du fondu et la lecture du serveur) ;
-                               -- plus de 0 à 50
+                               -- 1 à 50
             graceMs = 20000,   -- confirmation d'office sans déclaration du client ; au-delà du plus long chargement
                                -- normal du client (config/shared.lua : fondu × 4 + modèle + collisions = 17 s) ;
-                               -- checkMs à 120000
+                               -- de ce plus long chargement (5000 au moins, checkMs au moins) à 120000
             lateCheckMs = 5000,  -- ped jamais vu au point après graceMs : relu toutes les lateCheckMs seulement
                                  -- (checkMs à 60000) ; une déclaration du client le relit aussitôt
             maxPerCheck = 16,  -- confirmations au plus par passage (hooks et zones) ; les suivantes au passage

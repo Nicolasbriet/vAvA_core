@@ -14,16 +14,17 @@
     son joueur) est confirmé ; chaque ordre porte un numéro que la déclaration du client renvoie (une déclaration
     d'un ordre précédent ne compte pas) ; un ped jamais vu au point est relu toutes les spawn.confirm.lateCheckMs
     seulement ; au plus spawn.confirm.maxPerCheck confirmations par passage ; une erreur dans un passage garde le
-    suivi et retente au passage suivant ; réglages bornés des deux côtés.
-    Dépendances : shared/init.lua, shared/core/logger.lua, shared/core/hooks.lua, config/server.lua,
-                  server/core/net.lua, server/core/zones.lua, server/players/accounts.lua, server/players/sync.lua,
+    suivi et retente au passage suivant ; réglages bornés des deux côtés (contre-relecture C-1 : rayon d'au moins 1 m,
+    délai de grâce d'au moins le plus long chargement du client et 5 s).
+    Dépendances : shared/init.lua, config/shared.lua, shared/core/logger.lua, shared/core/hooks.lua,
+                  config/server.lua, server/core/net.lua, server/core/zones.lua, server/players/accounts.lua, server/players/sync.lua,
                   server/players/playtime.lua
 ]]
 
 local type, pairs, next, tostring, xpcall = type, pairs, next, tostring, xpcall
 local traceback = debug.traceback
 local HUGE = math.huge
-local mathType = math.type
+local mathType, ceil, max = math.type, math.ceil, math.max
 local GetGameTimer, SetTimeout = GetGameTimer, SetTimeout
 
 local EVENTS = vAvA.EVENTS
@@ -41,8 +42,10 @@ local HOOK_SPAWNED = 'core:character:spawned'
 
 -- bornes des réglages spawn.confirm (relecture sécurité S-5) : une valeur démesurée ne désactive pas la confirmation
 local MIN_CHECK_MS, MAX_CHECK_MS = 50, 5000
-local MAX_RADIUS = 50
-local MAX_GRACE_MS = 120000
+local MIN_RADIUS, MAX_RADIUS = 1, 50
+-- délai de grâce : au moins le plus long chargement normal du client, et jamais moins de MIN_GRACE_MS (contre-relecture
+-- C-1 : plus court, un client honnête serait confirmé d'office pendant son écran noir)
+local MIN_GRACE_MS, MAX_GRACE_MS = 5000, 120000
 local MAX_LATE_CHECK_MS = 60000
 local MAX_PER_CHECK = 1024
 
@@ -99,9 +102,22 @@ local function isIntegerIn(value, low, high)
     return mathType(value) == 'integer' and value >= low and value <= high
 end
 
+--- Plus long chargement normal du client (config/shared.lua, spawn : fondu × 4 + modèle + collisions), en ms ; nil si
+--- la config du client ne permet pas de le calculer.
+---@return integer|nil
+local function clientLongestLoadMs()
+    local client = vAvA.config.shared and vAvA.config.shared.spawn
+    if type(client) ~= 'table' then return nil end
+    local fade, model, collision = client.fadeMs, client.modelTimeoutMs, client.collisionTimeoutMs
+    if not (isFinite(fade) and isFinite(model) and isFinite(collision)) then return nil end
+    if fade < 0 or model < 0 or collision < 0 then return nil end
+    return ceil(fade * 4 + model + collision)
+end
+
 --- Vérifie les réglages de la confirmation. Appelé par init.lua avant d'ouvrir les RPC : une config invalide
 --- empêche le démarrage du core (comme celle du rate limiting). Bornés des deux côtés : un délai ou un rayon
---- démesuré reviendrait à ne plus rien vérifier.
+--- démesuré reviendrait à ne plus rien vérifier, un rayon trop petit ou un délai plus court que le chargement du
+--- client à ne plus confirmer les clients honnêtes ou à les confirmer d'office pendant leur écran noir.
 ---@return boolean ok
 ---@return string|nil err
 function spawn.validateConfig()
@@ -110,11 +126,13 @@ function spawn.validateConfig()
     if not isIntegerIn(checkMs, MIN_CHECK_MS, MAX_CHECK_MS) then
         return false, ('config spawn.confirm.checkMs : entier de %d à %d attendu'):format(MIN_CHECK_MS, MAX_CHECK_MS)
     end
-    if not isFinite(confirmCfg.radius) or confirmCfg.radius <= 0 or confirmCfg.radius > MAX_RADIUS then
-        return false, ('config spawn.confirm.radius : nombre de plus de 0 à %d attendu'):format(MAX_RADIUS)
+    if not isFinite(confirmCfg.radius) or confirmCfg.radius < MIN_RADIUS or confirmCfg.radius > MAX_RADIUS then
+        return false, ('config spawn.confirm.radius : nombre de %d à %d attendu'):format(MIN_RADIUS, MAX_RADIUS)
     end
-    if not isIntegerIn(confirmCfg.graceMs, checkMs, MAX_GRACE_MS) then
-        return false, ('config spawn.confirm.graceMs : entier de checkMs à %d attendu'):format(MAX_GRACE_MS)
+    local minGraceMs = max(MIN_GRACE_MS, checkMs, clientLongestLoadMs() or 0)
+    if not isIntegerIn(confirmCfg.graceMs, minGraceMs, MAX_GRACE_MS) then
+        return false, ('config spawn.confirm.graceMs : entier de %d (plus long chargement du client, %d au moins)'
+            .. ' à %d attendu'):format(minGraceMs, MIN_GRACE_MS, MAX_GRACE_MS)
     end
     if not isIntegerIn(confirmCfg.lateCheckMs, checkMs, MAX_LATE_CHECK_MS) then
         return false, ('config spawn.confirm.lateCheckMs : entier de checkMs à %d attendu'):format(MAX_LATE_CHECK_MS)
@@ -174,8 +192,10 @@ end
 ---@param forced boolean  confirmée sans déclaration du client
 ---@return boolean confirmed
 local function confirm(character, forced)
-    watches[character] = nil
-    if not isLoaded(character) then return false end
+    if not isLoaded(character) then
+        watches[character] = nil
+        return false
+    end
     character.spawned = true
     playtime.begin(character)
     local src = character.source
@@ -183,6 +203,9 @@ local function confirm(character, forced)
         log.warn('joueur %d : apparition confirmée d\'office (ped vu au point, rien déclaré par son client en %d s)',
             src, confirmCfg.graceMs // 1000)
     end
+    -- suivi retiré seulement ici, juste avant le hook (contre-relecture C-2) : une erreur plus haut le laisse retenté au
+    -- passage suivant ; retiré avant le hook, qui peut redonner un ordre (nouveau suivi)
+    watches[character] = nil
     hooks.runAfter(HOOK_SPAWNED, {
         source = src, accountId = character.accountId, characterId = character.id, forced = forced,
     })
@@ -342,6 +365,15 @@ end
 ---@param character vAvA.Character
 function spawn.forget(character)
     watches[character] = nil
+end
+
+--- Essais seulement : pose le numéro du dernier ordre envoyé (pour exercer la remise à 1 après MAX_ORDER).
+---@param value integer  0 à MAX_ORDER
+---@return boolean ok
+function spawn.setLastOrderForTests(value)
+    if not isIntegerIn(value, 0, spawn.MAX_ORDER) then return false end
+    lastOrder = value
+    return true
 end
 
 --- Nombre d'apparitions qui attendent leur confirmation (essais, diagnostic).

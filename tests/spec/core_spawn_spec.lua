@@ -154,6 +154,9 @@ describe('vAvA.spawn', function()
                 { checkMs = 5001 }, { radius = 50.01 }, { graceMs = 120001 }, { lateCheckMs = 100 },
                 { lateCheckMs = 60001 }, { lateCheckMs = 'absent' }, { maxPerCheck = 0 }, { maxPerCheck = 1025 },
                 { maxPerCheck = 2.5 }, { maxPerCheck = 'absent' },
+                -- bornes basses (contre-relecture C-1) : rayon d'au moins 1 m, délai de grâce d'au moins 5 s et du plus
+                -- long chargement du client (17 s avec config/shared.lua)
+                { radius = 0.99 }, { radius = 0.01 }, { graceMs = 50 }, { graceMs = 4999 }, { graceMs = 16999 },
             }) do
                 for key, value in pairs(case) do
                     if value == 'absent' then cfg[key] = nil else cfg[key] = value end
@@ -168,8 +171,21 @@ describe('vAvA.spawn', function()
         it('accepte les bornes des réglages (relecture sécurité S-5)', function()
             cfg.checkMs, cfg.radius, cfg.graceMs, cfg.lateCheckMs, cfg.maxPerCheck = 5000, 50, 120000, 60000, 1024
             assert.same({ true }, { spawn.validateConfig() })
-            cfg.checkMs, cfg.radius, cfg.graceMs, cfg.lateCheckMs, cfg.maxPerCheck = 50, 0.5, 50, 50, 1
+            local client = vAvA.config.shared.spawn
+            local longest = client.fadeMs * 4 + client.modelTimeoutMs + client.collisionTimeoutMs
+            cfg.checkMs, cfg.radius, cfg.graceMs, cfg.lateCheckMs, cfg.maxPerCheck = 50, 1, longest, 50, 1
             assert.same({ true }, { spawn.validateConfig() })
+            -- client au chargement plus court que 5 s : le délai de grâce garde 5 s au moins (contre-relecture C-1)
+            client.fadeMs, client.modelTimeoutMs, client.collisionTimeoutMs = 100, 1000, 1000
+            cfg.graceMs = 4999
+            assert.is_false((spawn.validateConfig()))
+            cfg.graceMs = 5000
+            assert.same({ true }, { spawn.validateConfig() })
+            -- config du client illisible : 5 s au moins
+            client.modelTimeoutMs = 'x'
+            assert.same({ true }, { spawn.validateConfig() })
+            cfg.graceMs = 4999
+            assert.is_false((spawn.validateConfig()))
         end)
     end)
 
@@ -474,6 +490,22 @@ describe('vAvA.spawn', function()
                 seen[seq] = true
                 assert.is_true(seq >= 1 and seq <= spawn.MAX_ORDER)
             end
+            -- remise à 1 vraiment exercée (contre-relecture C-3) : compteur posé juste avant le plus grand numéro
+            assert.equal(0x7FFFFFFF, spawn.MAX_ORDER)
+            assert.is_false(spawn.setLastOrderForTests(spawn.MAX_ORDER + 1))
+            assert.is_false(spawn.setLastOrderForTests(-1))
+            assert.is_true(spawn.setLastOrderForTests(spawn.MAX_ORDER - 1))
+            order(character, POINT)
+            assert.equal(spawn.MAX_ORDER, lastOrder(SRC))
+            order(character, POINT)
+            assert.equal(1, lastOrder(SRC))
+            order(character, POINT)
+            assert.equal(2, lastOrder(SRC))
+            -- la déclaration de l'ordre MAX_ORDER, arrivée après la remise à 1, ne compte pas pour l'ordre qui attend
+            move(SRC, POINT.x, POINT.y, POINT.z)
+            assert.same({ false, 'not_ordered' }, { spawn.claim(character, spawn.MAX_ORDER) })
+            assert.same({ true }, { spawn.claim(character, 2) })
+            assert.is_true(character.spawned)
         end)
 
         it('S-4 : la ligne « jamais vu au point » nomme le compte et le personnage', function()
@@ -482,6 +514,37 @@ describe('vAvA.spawn', function()
             for _ = 1, cfg.graceMs // cfg.checkMs do advance(cfg.checkMs) end
             assert.equal(1, printedMatching('joueur 1 (compte #3, personnage #7) : ped jamais vu au point'))
             assert.is_false(character.spawned)
+        end)
+
+        it('C-2 : une erreur dans la confirmation elle-même est retentée au passage suivant, un seul hook', function()
+            local character = newCharacter()
+            local realBegin, failures = playtime.begin, 0
+            playtime.begin = function(c)
+                if failures == 0 then
+                    failures = 1
+                    error('temps de jeu indisponible')
+                end
+                return realBegin(c)
+            end
+            order(character)
+            move(SRC, POINT.x, POINT.y, POINT.z)
+            for _ = 1, cfg.graceMs // cfg.checkMs do advance(cfg.checkMs) end
+            -- confirmation d'office en erreur : suivi gardé, une ligne d'erreur, aucun hook
+            assert.equal(1, failures)
+            assert.equal(1, printedMatching('en erreur (retentée)'))
+            assert.equal(0, #hookCalls)
+            assert.equal(1, spawn.pendingCount())
+            assert.equal(1, #helper.timers)
+            advance(cfg.checkMs)
+            assert.is_true(character.spawned)
+            assert.equal(1, #hookCalls)
+            assert.is_true(hookCalls[1].forced)
+            assert.equal(0, spawn.pendingCount())
+            assert.is_not_nil(character.playMarker)
+            advance(cfg.checkMs)
+            assert.equal(1, #hookCalls)
+            assert.equal(1, printedMatching('en erreur (retentée)'))
+            assert.equal(0, #helper.timers)
         end)
 
         it('S-6 : une erreur dans un passage garde l’apparition et la retente, une seule ligne', function()
