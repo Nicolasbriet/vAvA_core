@@ -898,6 +898,8 @@ versé à T-014 ; les autres points déjà couverts sont précisés dans T-012 �
 
 ### T-152 — Écran de chargement : les ambiances d'Eldoria en fondu enchaîné
 - Agent : vava-dev-nui · Dépend de : T-020 · Statut : en cours
+- **En cours (31 octobre 2026, interrompu)** : branche `agents/T-152`. Seules les images sont commitées ; rien n'est
+  encore codé (fondu, retrait du paysage peint, config, essais, docs). Reprendre avec le brief de la tâche ci-dessous.
 - Demande du porteur du projet (31 octobre 2026) : sept peintures de la même vue d'Eldoria sous des ambiances
   différentes (aube, brume du matin, hiver, crépuscule, nuit étoilée, brume de nuit, orage), fournies en PNG
   1672 × 941, converties en WebP 1600 × 900 qualité 50 (1 181 Ko pour les sept) dans
