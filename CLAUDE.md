@@ -68,6 +68,8 @@ Conventions observées dans tout le dépôt, à respecter :
 3. Le serveur revérifie tout ce qui dépend du monde : distance réelle (`GetEntityCoords(GetPlayerPed(src))`),
    personnage chargé, objet réellement possédé, droit du Conseil, délai entre deux actions.
 4. Ce que renvoie `callClient` n'est jamais une source de vérité (toujours `returns`).
+   Toute borne dont le client a besoin pour se protéger (longueur ou motif de ce qu'il reçoit) reste dans
+   `shared/constants.lua`, jamais dans `config_client.lua` (qu'un exploitant peut garder périmé).
 5. SQL : uniquement via `core.db`, toujours paramétré (`?`). Jamais de concaténation de valeur.
 6. Toute action sensible (échange, don, retrait d'un grenier, action du Conseil) est journalisée.
 7. Échanges d'objets : uniquement par les opérations atomiques « tout ou rien » de `vava_inventory`.
