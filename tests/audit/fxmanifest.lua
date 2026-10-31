@@ -110,3 +110,10 @@ client_script('client/a.lua')  -- attendu: rien
 dependencies { 'vAvA_core', nom }  -- attendu: rien
 -- relecture sécurité S-2 : « audit: ok » ne fait pas taire les règles des manifestes
 shared_script 'config.lua' -- audit: ok  -- attendu: BLOQUANT
+-- relecture sécurité S-3 de T-143 : S, D et X ne se taisent ni par « audit: ok » ni par une exception inscrite
+server_script 'config_client.lua' -- exception S inscrite  -- attendu: BLOQUANT
+server_script 'config_client.lua' -- audit: ok  -- attendu: BLOQUANT
+client_script '../vava_autre/client/b.lua' -- exception D inscrite  -- attendu: BLOQUANT
+client_script '../vava_autre/client/c.lua' -- audit: ok  -- attendu: BLOQUANT
+shared_scripts(autre) -- exception X inscrite  -- attendu: BLOQUANT
+shared_scripts(encore) -- audit: ok  -- attendu: BLOQUANT

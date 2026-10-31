@@ -4,3 +4,6 @@ modules/vava_exempte/web/	[fichier]	cas d'essai : un chemin qui finit par / couv
 tests/audit/interface.js		cas d'essai : extrait vide, exception refusée (elle couvrirait tout le fichier)  -- attendu: BLOQUANT
 modules/vava_exempte_mal/web/	devmock	cas d'essai : dossier dont l'extrait n'est pas [fichier], exception refusée  -- attendu: BLOQUANT
 tests/audit/fxmanifest.lua	{ 'config.lua' } -- exception inscrite	cas d'essai : une exception ne fait plus taire config.lua servi aux joueurs (plus aucune exception transitoire, T-143)
+tests/audit/fxmanifest.lua	-- exception S inscrite	cas d'essai : une exception ne fait pas taire config_client.lua servi au seul serveur (T-143)
+tests/audit/fxmanifest.lua	-- exception D inscrite	cas d'essai : une exception ne fait pas taire un chemin hors de la ressource (T-143)
+tests/audit/fxmanifest.lua	-- exception X inscrite	cas d'essai : une exception ne fait pas taire une directive calculée (T-143)
