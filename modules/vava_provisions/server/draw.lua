@@ -5,9 +5,9 @@
            erreur), délai entre deux actions, à terre (vava_health), point connu, distance réelle lue par le serveur
            (distance d'usage + tolérance, 3D), outres vides réellement possédées, soif (vava_needs, si la sorte permet
            de boire), réserve, choix de l'action (rules.decide), hook `vava_provisions:drawing` annulable, puis :
-           personnage et distance relus (le hook a pu céder la main), remplir (puisages RÉSERVÉS avant l'échange
-           atomique de l'inventaire, rendus s'il échoue ; besace pleine ou trop lourde : le joueur qui a soif boit sur
-           place) ou boire quelques gorgées (vava_needs). Payloads des hooks reconstruits à chaque fois. Le client ne
+           personnage et distance relus (le hook a pu céder la main), remplir (outres relues pile par pile, chaque
+           outre d'eau gardant le palier de son outre ; puisages RÉSERVÉS avant l'échange atomique de l'inventaire,
+           rendus s'il échoue ; besace pleine ou trop lourde : le joueur qui a soif boit sur place) ou boire quelques gorgées (vava_needs). Payloads des hooks reconstruits à chaque fois. Le client ne
            dit ni ce qu'il veut faire, ni ce qu'il porte, ni sa soif.
     Dépendances : shared/constants.lua, config.lua, shared/texts.lua, shared/rules.lua, server/core.lua, bridge/server.lua,
                   server/points.lua
@@ -155,8 +155,14 @@ local function process(source, characterId, pointId)
         local available = rules.available(level)
         if available < count then count = available end
         if count < 1 then return false, 'dry', rules.waitSeconds(level, kind.reserve) end
+        -- outres relues pile par pile (lecture sans attente) : chaque outre d'eau garde le palier de son outre (T-135)
+        local piles = bridge.Piles(source, fill.from)
+        if not piles then return false, 'unavailable' end
+        local removals, additions, planned = rules.planFill(piles, count, fill.to)
+        if planned < 1 then return false, 'no_container' end
+        count = planned
         points.take(point, level, count, now)
-        local ok, exchangeCode = bridge.Exchange(source, { { item = fill.from, quantity = count } }, { { item = fill.to, quantity = count } })
+        local ok, exchangeCode = bridge.Exchange(source, removals, additions)
         if not ok then
             points.giveBack(point, count)
             if INVENTORY_CODES[exchangeCode] then return sipInstead(source, characterId, point, kind, exchangeCode) end

@@ -767,6 +767,10 @@ versé à T-014 ; les autres points déjà couverts sont précisés dans T-012 �
 - Relecture lore de T-130 : une outre se fend une fois sur dix quel que soit son palier, alors qu'une outre « Soignée »
   s'affiche à part. Lier `tearChance` au palier (moins pour une outre Soignée ou Excellente) en gardant le palier sur
   l'outre rendue vide, sans casser l'empilement : le savoir du tanneur doit compter.
+- Codé le 31 octobre 2026 (branche `agents/T-135`), relectures à faire : `vava_provisions` 1.3.0, palier `{ tier }` gardé
+  de l'outre vide à l'Outre d'eau et retour, risque de fente par palier (`containers.eau.tearChanceByTier`, valeurs
+  provisoires 15 / 10 / 5 / 2,5 / 1 %, 10 % sans palier, à trancher). Rapport `docs/plan/rapports/T-135.md` ; en jeu :
+  `docs/tests/eau.md` § 4 bis.
 
 ### T-136 — Recettes de `vava_farming` déclarées aux compétences
 - Agent : vava-dev-lua · Dépend de : — · Statut : à tester en jeu

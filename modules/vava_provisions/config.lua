@@ -26,13 +26,19 @@ config.items = {
 }
 
 -- Un appui au point d'eau remplit au plus `maxPerDraw` outres vides (1 à 20) : `from` retirés, `to` donnés, tout ou
--- rien. Les outres sont retirées sans filtre (palier ignoré, les plus anciennes d'abord).
+-- rien. Les outres sont prises pile par pile, les plus anciennes d'abord, tous paliers confondus ; chaque outre d'eau
+-- garde le palier de son outre (métadonnée `tier`, seule gardée), et l'outre vide rendue après la gorgée aussi (T-135).
 config.fill = { from = 'outre', to = 'eau', maxPerDraw = 5 }
 
--- Boire un objet de la liste rend `empty`, sauf une fois sur dix (`tearChance`, 0 à 1) où l'outre se fend. Une
--- recette future qui consomme `eau` doit rendre `outre` dans sa sortie, sinon l'outre est perdue.
+-- Boire un objet de la liste rend `empty` (même palier), sauf quand l'outre se fend. Le risque à chaque outre bue
+-- dépend du savoir du tanneur, lu sur le palier de l'outre (`tier` posé par vava_crafting : 1 Grossier, 2 Commun,
+-- 3 Soigné, 4 Excellent, 5 Chef-d'œuvre) : `tearChanceByTier[palier]` (0 à 1, jamais plus haut qu'au palier d'avant ;
+-- facultatif) ; une outre sans palier (dotation, outres d'avant 1.3.0) ou d'un palier absent de la liste : `tearChance`.
+-- VALEURS PROVISOIRES (T-135), à trancher par le porteur du projet : usages moyens avant la fente, environ 7, 10,
+-- 20, 40 et 100 (10 sans palier). Une recette future qui consomme `eau` doit rendre `outre` dans sa sortie, sinon
+-- l'outre est perdue.
 config.containers = {
-    eau = { empty = 'outre', tearChance = 0.1 },
+    eau = { empty = 'outre', tearChance = 0.1, tearChanceByTier = { 0.15, 0.1, 0.05, 0.025, 0.01 } },
 }
 
 -- Tannerie (vava_crafting) : un cuir donne deux outres. Ni signée ni transmise : savoir commun du tanneur. Ajoutée
