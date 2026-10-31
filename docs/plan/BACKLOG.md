@@ -566,7 +566,7 @@ versé à T-014 ; les autres points déjà couverts sont précisés dans T-012 �
   signalé), 7-B-14 (`resource.rpf` avant et après).
 
 ### T-142 — Configs partagées, lot 3 : le socle
-- Agent : vava-dev-lua · Dépend de : T-132 · Statut : à faire
+- Agent : vava-dev-lua · Dépend de : T-132 · Statut : en cours
 - Même forme que T-141 pour `vava_inventory`, `vava_combat`, `vava_health`, `vava_time`, `vava_codex`, `vava_admin`,
   `vava_voice`, `vava_chat`, `vava_cameras`, `vava_appearance`, `vava_needs`, `vava_world` (spec T-132 § 3.3) ;
   `config.lua` renommé `config_client.lua` dans les trois modules sans partie serveur (`vava_hud`, `vava_loading`,
