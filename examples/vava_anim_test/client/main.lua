@@ -12,7 +12,7 @@
     Chaque commande demande d'abord l'accès au serveur (vava_anim_test:access : mode développement et droit du
     Conseil ou ACE), réponse positive gardée `accessCacheMs` ; sans vAvA_core, aucune commande n'est enregistrée.
     Un .ycd posé dans stream/ se joue sous le nom de son fichier. Retours dans le chat (chat:addMessage) et la console F8.
-    Dépendances : vAvA_core (API v1), config.lua
+    Dépendances : vAvA_core (API v1), config_client.lua
 ]]
 
 local tonumber, tostring, ipairs, pcall = tonumber, tostring, ipairs, pcall

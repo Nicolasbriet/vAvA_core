@@ -7,7 +7,6 @@ modules/vava_loading/web/fonts/eb_garamond_italic.woff2	[fichier]	écran de char
 modules/vava_loading/web/fonts/cinzel_decorative_900.woff2	[fichier]	écran de chargement : Cinzel Decorative 900, absente de vava_ui (décision 3 de T-020)
 # T-132 — exceptions transitoires : un manifeste par ligne qui sert encore config.lua aux joueurs, retirées lot par lot
 # (la liste est celle du travail restant ; docs/plan/specs/T-132.md § 3.1)
-examples/vava_anim_test/fxmanifest.lua	shared_script 'config.lua'	T-132 : config partagée, lot 3 (T-142) : exemple
 examples/vava_dev_characters/fxmanifest.lua	shared_script 'config.lua'	T-132 : config partagée, lot 3 (T-142) : exemple
 examples/vava_example_combat/fxmanifest.lua	shared_script 'config.lua'	T-132 : config partagée, lot 3 (T-142) : exemple
 modules/vava_magic/fxmanifest.lua	'config.lua',	T-132 : config partagée, lot 4 (T-143)

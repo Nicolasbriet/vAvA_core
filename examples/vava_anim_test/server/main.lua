@@ -6,7 +6,7 @@
         accordé au seul droit vava_admin `staff` ou à l'ACE `vava.dev` (config `access`) ;
       - registre `core:commands` : commandes du chapitre « Tests », portée Conseil (`scope = 'admin'`, même droit) :
         hors du Codex des joueurs.
-    Dépendances : vAvA_core ≥ 0.7.0, config.lua, shared/guard.lua ; facultatif : vava_admin (droit)
+    Dépendances : vAvA_core ≥ 0.7.0, config_client.lua, config.lua, shared/guard.lua ; facultatif : vava_admin (droit)
 ]]
 
 local pcall, ipairs, tostring, pairs = pcall, ipairs, tostring, pairs
@@ -86,6 +86,12 @@ end
 
 local function setup()
     if not guard.isDevMode(GetConvar(guard.CONVAR, guard.FALLBACK)) then return false, guard.REFUSAL end
+    -- T-132 : un config.lua d'avant 1.2.0 (gardé par une mise à jour) remplace la table de config_client.lua
+    if cfg.clientFile ~= true then
+        core.log.warn('config.lua garde la forme d\'avant 1.2.0 (il remplace la table de config_client.lua) : les '
+            .. 'réglages lus par les joueurs sont dans config_client.lua ; reportez vos changements d\'après '
+            .. 'config.lua.nouveau')
+    end
     local ok, err = core.rpc.register(RPC_ACCESS, { args = {}, rateLimit = cfg.accessRateLimit }, function(source)
         if not allowed(source) then return false, 'not_allowed' end
         return true
