@@ -8,7 +8,7 @@
            reprendre, historique, version, retirées) ; le jeton d'un résumé part tel quel (le serveur refuse tout ce
            qui n'est pas 16 hexadécimaux) ; bandeau d'essai (`texts.trialLine` de l'atelier) sur une fiche en essai,
            bandeau d'édition à la fin de l'essai.
-    Dépendances : shared/constants.lua, config.lua, client/core.lua, client/nui.lua, client/session.lua
+    Dépendances : shared/constants.lua, config_client.lua, client/core.lua, client/nui.lua, client/session.lua
 ]]
 
 local type, tostring, tonumber, ipairs = type, tostring, tonumber, ipairs

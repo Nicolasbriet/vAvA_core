@@ -5,8 +5,8 @@
            « Vérifier », valeurs proposées, recherche, journal, fermeture. Hooks écoutés : registres (éditeurs : cache,
            propriétaire, `editorGone` ; objets du royaume), déchargement et départ (session retirée), actions du
            Registre (`revoked` à qui perd le droit d'ouvrir l'Atelier). Le setup refuse une config de droits fausse
-           (shared/rights.lua › checkSettings) ; en fin de setup : journal purgé, hook vava_atelier:editorsReady (les
-           modules redéclarent leurs éditeurs).
+           (shared/rights.lua › checkSettings) et avertit si config.lua garde la forme d'avant 1.2.0 (T-132) ; en fin
+           de setup : journal purgé, hook vava_atelier:editorsReady (les modules redéclarent leurs éditeurs).
            T-101 : douze RPC des définitions gardées (enregistrer, essayer, arrêter l'essai, résumer, publier, revenir
            à une version, abandonner, retirer, reprendre, historique, version, retirées), chacun borné et limité ;
            hooks : séance fermée ou départ → fin de l'essai du membre ; /atelier_archives ; au démarrage, dans un fil :
@@ -243,6 +243,13 @@ local HOOKED = {
 }
 
 local function setup()
+    -- T-132 : un config.lua d'avant 1.2.0 (gardé par une mise à jour) remplace la table de config_client.lua ; il
+    -- contient tout ce que lit le serveur, le module démarre, mais un réglage client qu'on y change reste sans effet
+    if cfg.clientFile ~= true then
+        VavaAtelier.log.warn('config.lua garde la forme d\'avant 1.2.0 (il remplace la table de config_client.lua) : '
+            .. 'les réglages lus par les joueurs sont dans config_client.lua ; reportez vos changements d\'après '
+            .. 'config.lua.nouveau')
+    end
     -- un plancher, une surcharge ou le droit d'ouvrir hors des droits permis ouvrirait ou fermerait un atelier à tort
     local valid, invalid = rights.checkSettings(cfg)
     if not valid then return false, 'config.lua, droits : ' .. tostring(invalid) end

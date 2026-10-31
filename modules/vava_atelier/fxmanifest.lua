@@ -10,6 +10,8 @@
            publication groupée d'une fiche et de ses enfants, retour à une version, retrait, reprise d'un brouillon,
            historique ; la config est la graine, la base fait foi (synchronisation à chaque déclaration d'un module) ;
            archives JSON et retour à l'original par /atelier_archives (Souverain, console).
+           T-132 : config_client.lua (touche, commande, textes affichés par le client) est seul téléchargé par les
+           joueurs avec les constantes ; config.lua (tout le reste) est servi au seul serveur.
     Dépendances : vAvA_core ≥ 0.11.0 ; vava_ui ≥ 1.0.0 (polices et textures, par nui://vava_ui/…) ; vava_admin ≥ 1.8.0
                   relu à chaque appel (sans lui, l'Atelier refuse de s'ouvrir : « Le Registre du Conseil s'éveille »),
                   volontairement pas en `dependency` : arrêter ou relancer le Registre n'arrête pas l'Atelier ;
@@ -23,7 +25,7 @@ use_experimental_fxv2_oal 'yes'
 
 name 'vava_atelier'
 description 'Atelier du Conseil vAvA : créer et régler le royaume en jeu (socle : accueil, droits, formulaire, journal)'
-version '1.1.0'
+version '1.2.0'
 
 dependency 'vAvA_core'
 dependency 'vava_ui'
@@ -41,13 +43,15 @@ files {
     'web/js/*.js',
 }
 
--- Ordre explicite : chaque fichier ne dépend que de ceux listés avant lui.
+-- Ordre explicite : chaque fichier ne dépend que de ceux listés avant lui. Les joueurs ne téléchargent que les
+-- shared_scripts et les client_scripts : config.lua, en tête des server_scripts, n'est jamais servi (T-132).
 shared_scripts {
     'shared/constants.lua',
-    'config.lua',
+    'config_client.lua',         -- ouvre VavaAtelier.config : ce que lit le client
 }
 
 server_scripts {
+    'config.lua',                -- complète VavaAtelier.config : ce que lit le seul serveur
     'server/core.lua',
     'shared/bounds.lua',         -- constantes réservées au serveur (jamais envoyées aux joueurs)
     'shared/text.lua',           -- logique pure, servie au seul serveur (testée hors jeu : tests/spec)

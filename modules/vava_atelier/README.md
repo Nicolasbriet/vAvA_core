@@ -87,11 +87,15 @@ rien ne s'écrit sans son nom au journal (une ligne refusée par le journal est 
 Un retour à l'original ou un import publie de nouvelles versions (`origin` seed ou import), n'en retire jamais, garde
 les brouillons, puis le module les applique et l'atelier est resynchronisé.
 
-## Règles (config.lua)
+## Règles (config.lua, config_client.lua)
+
+Depuis 1.2.0 (T-132), les réglages sont dans deux fichiers et chacun n'est écrit qu'une fois : `config_client.lua`
+(marqués **(client)** ci-dessous) porte ce que lit le client et le serveur ; `config.lua` porte tout le reste, lu par le
+seul serveur, et complète la table sans réécrire une clé de `config_client.lua`.
 
 | Clé | Défaut | Rôle |
 |---|---|---|
-| `keys.open` / `command` | `F9` / `atelier` | touche (réglable par le joueur, Raccourcis › FiveM) et commande |
+| `keys.open` / `labels.open` / `command` **(client)** | `F9` / « Ouvrir l'Atelier du Conseil » / `atelier` | touche (réglable par le joueur, Raccourcis › FiveM), son libellé et commande |
 | `families` | monde (`metiers`), société (`staff`), arts (`staff`) | familles de l'accueil, dans l'ordre ; `floor` : droit minimal d'un atelier de la famille |
 | `rights.allowed` | `{ 'metiers', 'staff' }` | droits qu'un éditeur peut demander, du plus faible au plus fort ; tout autre droit est refusé à la déclaration |
 | `rights.open` | `metiers` | droit pour ouvrir l'Atelier |
@@ -120,7 +124,8 @@ les brouillons, puis le module les applique et l'atelier est resynchronisé.
 | `sync.sliceMs` / `retryMs` / `retries` | 4 / 10 000 / 3 | travail au plus (ms) entre deux pauses d'un fil de synchronisation ou d'archives ; nouvel essai si la base est muette ; essais au plus |
 | `archives.command` / `folder` / `maxBytes` / `confirmMs` / `cooldownMs` / `exportCooldownMs` | `atelier_archives` / `echanges` / 4 Mo / 60 000 / 2 000 / 60 000 | commande, dossier des archives (jamais servi aux joueurs), fichier lu ou écrit au plus, délai de confirmation, délai entre deux commandes d'un membre, délai entre deux exports (tous membres confondus) |
 | `place.maxXY` / `maxZ` / `maxRadius` / `polygonPoints` | 50 000 / 5 000 / 500 / 3 à 32 | bornes d'un lieu (formes point, orienté, cercle, polygone, porte) |
-| `texts` | — | textes vus par les membres (refus, erreurs de champ, verbes du journal, libellés du Registre) ; l'interface a les siens (`web/js/strings.js`) |
+| `texts.refused`, `modeLine`, `revoked`, `trialLineDefault`, `trialEndedFeed`, `sayAuthor` **(client)** | — | textes affichés par le client hors de la page : refus d'un RPC, bandeaux du volet, notifications, nom des réponses de `/atelier_archives` au chat (`sayAuthor`, ancien `texts.archives.author`) |
+| `texts` (le reste) | — | textes envoyés par le serveur (erreurs de champ, verbes du journal, libellés du Registre, résumés, réponses de `/atelier_archives`) ; l'interface a les siens (`web/js/strings.js`) |
 
 **Droit effectif d'un atelier** : la surcharge de `rights.overrides` si elle est permise ; sinon le plus fort du droit
 déclaré et du plancher de sa famille. Un Sénéchal (`metiers`) ne voit donc que le monde ; seule la config peut lui ouvrir
@@ -138,12 +143,10 @@ refuse de démarrer (« config.lua, droits : rights.overrides['…'] = '…' : p
   (`n` nombres, `s` chaînes, `b` booléens : 40 / 24 / 24 entrées, 1 200 octets par chaîne). L'Atelier contrôle la forme
   (bornes, pas, choix, jeux de caractères, objet existant, valeur d'une source) ; le module juge le reste.
 - Le client ne reçoit jamais un atelier qu'il ne voit pas, ni une fonction d'un module, ni le droit d'un atelier, ni
-  qui détient quel droit. Comme dans tous les modules du dépôt, `config.lua` et `shared/constants.lua` sont des
-  scripts partagés : **chaque joueur connecté** reçoit ces deux fichiers (familles et planchers, cartes « Bientôt »,
-  noms des droits et surcharges, bornes, débits, textes). Rien n'y est secret : aucune clé, aucun compte, aucune liste
-  de membres ; connaître une borne ou un débit ne permet pas de les franchir, puisque le serveur les applique et relit
-  chaque droit auprès du Registre à chaque appel. Une tâche du backlog traitera la séparation client / serveur des
-  configs pour tout le dépôt.
+  qui détient quel droit. Seuls `shared/constants.lua` et `config_client.lua` (touche, commande, textes de refus et
+  des bandeaux) sont téléchargés par les joueurs ; `config.lua` (familles, droits, bornes, débits, journal, textes du
+  serveur) est servi au seul serveur (1.2.0, T-132). Rien de secret n'y est de toute façon : le serveur applique chaque
+  borne et relit chaque droit.
 - `<` et `>` sont refusés dans tout texte saisi ; un caractère de contrôle ou invisible (espace sans largeur, marque de
   sens d'écriture, séparateur de ligne, U+FEFF…) aussi. L'interface pose chaque texte venu du serveur par
   `textContent`.
@@ -205,6 +208,11 @@ Trois formes de réponse sont pensées pour ne rien envoyer deux fois :
 - **Journal** (`journal`) : `{ lines, more, next }`, ligne `{ id, lead, title, summary?, actor, when, editor? }` ;
   quand la demande est filtrée sur un atelier, `editor` est omis (la page le tient de son filtre).
 
+Téléchargé par chaque joueur à la connexion (1.2.0, T-132) : `shared/constants.lua`, `config_client.lua` et les cinq
+`client/*.lua` (≈ 30,6 Ko de Lua, ≈ 11,2 Ko compressés, contre ≈ 52,2 et 17,7 avant), et la page (≈ 122 Ko) ;
+`config.lua` (≈ 21 Ko) et la logique de `shared/` sont servis au seul serveur. Retoucher `config.lua` ne fait rien
+retélécharger aux joueurs.
+
 Rien d'autre ne part : aucun envoi à tous, aucun GlobalState, aucun state bag ; un joueur hors du Conseil ne reçoit
 rien de `vava_atelier` (`/vava_reseau ressource vava_atelier`). Une séance de travail type (ouvrir une fiche, trois
 sauvegardes, un essai, un résumé, une publication) : ≈ 12 Ko, tous vers le seul membre. Serveur : une sauvegarde coûte
@@ -229,6 +237,12 @@ table `vava_atelier_journal` (≈ 200 octets par ligne, ≈ 4 Mo pour 365 jours 
 `sql/0002_definitions.sql` crée `vava_atelier_definitions` (une ligne par version, 0,3 à 2 Ko ; 20 versions gardées par
 fiche). Le dossier `echanges/` reçoit les archives (jamais dans `files`, ses `.json` ne sont pas suivis par le dépôt).
 
+**Mise à jour vers 1.2.0 (T-132)** : la touche, la commande et les textes affichés par le client ont quitté
+`config.lua` pour `config_client.lua` (`texts.archives.author` devient `texts.sayAuthor`). Un `config.lua` modifié et
+gardé par l'installeur de la Chancellerie (le nouveau posé en `config.lua.nouveau`) garde l'ancienne forme : le module
+démarre, mais la console le signale (« config.lua garde la forme d'avant 1.2.0 … ») et un réglage client changé dans ce
+fichier reste sans effet. Reportez vos réglages dans `config.lua` et `config_client.lua` d'après les nouveaux fichiers.
+
 **L'ordre compte** : tant que l'Atelier n'a pas synchronisé un module gardé, ce module tourne sur sa config. Ne pas
 arrêter `vava_atelier` en jeu : un module redémarré pendant ce temps reviendrait à sa config jusqu'au retour de
 l'Atelier (il est alors resynchronisé).
@@ -237,6 +251,8 @@ l'Atelier (il est alors resynchronisé).
 
 | Fichier | Rôle |
 |---|---|
+| `config_client.lua` | réglages lus par le client (touche, commande, textes affichés hors de la page) : téléchargé par chaque joueur, ouvre `VavaAtelier.config` |
+| `config.lua` | tous les autres réglages, servi au seul serveur (en tête des `server_scripts`) : complète la table |
 | `shared/formschema.lua` | pur : contrôle d'une déclaration d'éditeur (testé : `tests/spec/atelier_formschema_spec.lua`) |
 | `shared/formvalues.lua` | pur : valeurs reçues → data du module, et l'inverse, défauts (`atelier_formvalues_spec.lua`) |
 | `shared/text.lua` | pur : UTF-8, longueur en caractères, jeux de caractères, recherche sans accents (`atelier_text_spec.lua`) |
