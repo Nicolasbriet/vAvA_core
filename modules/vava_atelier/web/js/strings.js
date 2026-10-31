@@ -105,7 +105,7 @@ const STRINGS = Object.freeze({
       text: `Rien ne change en jeu avant que le retrait soit publié ; ${the} pourra être ${feminine ? 'rétablie' : 'rétabli'} depuis son historique.`,
       ok: 'Préparer le retrait',
     }),
-    take: (who) => ({ title: `Reprendre le brouillon de ${who} ?`, text: 'Il en sera averti.', ok: 'Reprendre le brouillon' }),
+    take: (who) => ({ title: `Reprendre le brouillon de ${who} ?`, text: 'La reprise sera inscrite au journal du Conseil.', ok: 'Reprendre le brouillon' }),
   },
 
   history: {
@@ -119,7 +119,7 @@ const STRINGS = Object.freeze({
     older: 'Plus anciennes',
     none: 'Aucune version publiée.',
   },
-  removed: { link: 'Retirés du royaume', empty: 'Rien n\'a été retiré du royaume.' },
+  removed: { link: 'Fiches retirées du royaume', empty: 'Rien n\'a été retiré du royaume.' },
 
   fields: {
     required: 'À remplir.',

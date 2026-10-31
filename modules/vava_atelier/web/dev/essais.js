@@ -252,7 +252,7 @@ eq(js([nb(L.confirmRetire(zone).title), L.confirmRetire(zone).text, L.confirmRet
 eq(L.confirmRetire(panneau).text, 'Rien ne change en jeu avant que le retrait soit publié ; le panneau pourra être rétabli depuis son historique.');
 eq(nb(L.confirmRetire(affiche).title), 'Préparer le retrait de l\'affiche ?');
 const takeBox = L.confirmTake('Sénéchal Aldric Morn');
-eq(js([nb(takeBox.title), takeBox.text, takeBox.cancel, takeBox.ok]), js(['Reprendre le brouillon de Sénéchal Aldric Morn ?', 'Il en sera averti.', 'Rester', 'Reprendre le brouillon']));
+eq(js([nb(takeBox.title), takeBox.text, takeBox.cancel, takeBox.ok]), js(['Reprendre le brouillon de Sénéchal Aldric Morn ?', 'La reprise sera inscrite au journal du Conseil.', 'Rester', 'Reprendre le brouillon']));
 eq(js([nb(S.confirm.discard.title), S.confirm.discard.text, S.confirm.discard.cancel, S.confirm.discard.ok]), js(['Abandonner ce brouillon ?', 'Rien de ce qu\'il contient ne sera gardé.', 'Garder', 'Abandonner']));
 
 // Historique : étiquettes, version rétablie, retrait, auteur et âge, versions illisibles écartées

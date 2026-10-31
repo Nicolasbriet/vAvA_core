@@ -253,7 +253,7 @@ VavaAtelier.config = {
         -- indice d'une ligne de liste (60 octets au plus) ; %s : nom du tenant, âge
         hints = {
             mine = 'Votre brouillon', other = 'Brouillon de %s', trial = 'En essai', removal = 'Retrait en attente',
-            new = 'Jamais publié', refused = 'Publiée, mais refusée en jeu',
+            new = 'Votre brouillon, jamais publié', refused = 'Publiée, mais refusée en jeu',
             retired = { masculine = 'retiré %s', feminine = 'retirée %s' },
         },
         -- ligne d'un brouillon sur l'accueil (« Vos brouillons ») ; %s : newLabel, résumé, nom du type
@@ -323,7 +323,7 @@ VavaAtelier.config = {
             unknownKind = 'Genre de fiche inconnu dans cet atelier : %s.',
             unknownEntry = 'Fiche absente de l\'original : %s.',
             state = '%s : %d publiées, %d brouillons, %d en essai, %d retirées%s',
-            stateSyncing = ', en mise à jour', stateFailed = ', à synchroniser', stateRefused = ', %d refusées en jeu',
+            stateSyncing = ', en mise à jour', stateFailed = ', pas à jour en jeu', stateRefused = ', %d refusées en jeu',
             nothing = 'Aucun atelier ne garde de fiches.',
             originalPlan = '%s : %d fiches changées, %d rétablies, %d nouvelles, %d identiques à l\'original.',
             originalSame = 'Identique à l\'original : rien à faire.',

@@ -58,7 +58,7 @@ VavaExampleAtelier = {
             readTrial = '[Essai] « %s » : %s',
             readNone = 'Aucun panneau à portée de lecture.',
             cooldown = 'Doucement : patientez un instant.',
-            refused = 'Refus d\'essai demandé.',
+            refused = 'Refus volontaire de l\'exemple (mode développement).',
         },
 
         -- Résumé d'un panneau dont seul le texte change (fonction diff de l'atelier)
