@@ -773,6 +773,10 @@ versé à T-014 ; les autres points déjà couverts sont précisés dans T-012 �
 - Trouvé pendant T-130 : `vava_farming` déclare sa recette `compost` à l'artisanat mais pas à `vava_skills:recipes` ;
   le composteur devrait la refuser comme « recette inconnue » (à vérifier en jeu d'abord). Déclarer la recette et la
   redéclarer au retour de `vava_skills`, comme `vava_provisions` le fait pour l'outre.
+- Fait le 31 octobre 2026 (branche `agents/T-136`), relectures à faire : refus constaté hors jeu sur 1.8.0 (code
+  `not_known` de `vava_crafting`, « Vous ne connaissez pas cette recette. ») ; `vava_farming` 1.9.0 déclare `compost`
+  à `vava_skills:recipes` (libre, Agriculture, niveau 0) et la redéclare au retour de `vava_skills`. Rapport
+  `docs/plan/rapports/T-136.md` ; à tester en jeu : `docs/tests/metiers.md` § 5.3.
 
 ### T-145 — Menu pause `vava_pause` (la bannière)
 - Agents : vava-architecte → vava-dev-lua + vava-dev-nui (cette tâche autorise à toucher `vava_codex`, `vava_admin`,

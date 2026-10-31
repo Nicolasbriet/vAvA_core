@@ -2119,7 +2119,9 @@ son propriétaire ou le genre branché par `registerAccess` —, dépôts et ret
 minute, grenier, personnage, objet et sens, quantités additionnées, attente bornée par `persistence.granaryLogMax` ;
 migration 0002 : colonne `minute` et clé unique, les lignes d'avant restent une par geste ; hook `granary` toujours
 par geste) ; **composteur** (type de
-station et recette ajoutés aux registres de `vava_crafting`, station placée par `addStation`). Détail, config et tests :
+station et recette ajoutés aux registres de `vava_crafting`, station placée par `addStation` ; depuis 1.9.0, la recette
+`compost` est aussi déclarée à `vava_skills:recipes` — libre, Agriculture, niveau 0 — et redéclarée au retour de
+`vava_skills`, sans quoi le composteur la refuse, code `not_known`). Détail, config et tests :
 `modules/vava_farming/README.md`. Demande le core 0.11.0 (abonnements de zone, 1.7.0), `vava_inventory` 1.4.0, `vava_skills` 1.0.0, `vava_gathering`
 1.0.0, `vava_crafting` 1.1.0 ; facultatifs : `vava_hud`, `vava_admin` (droit `metiers`), `vava_chat`, `vava_health`
 (à terre), `vava_time` (saisons, nuits de gel).
