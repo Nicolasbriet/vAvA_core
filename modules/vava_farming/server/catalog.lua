@@ -3,7 +3,8 @@
     Rôle : la donnée de l'agriculture indexée depuis la config : cultures (registre `vava_farming:crops`, rempli par la
            config, extensible, cache tenu à jour par les hooks du registre), parcelles et positions de leurs
            emplacements, puits, outils reconnus, objets déclarés à l'inventaire (rappelé quand il redémarre), composteur
-           déclaré à l'artisanat. Vérifie la cohérence au démarrage.
+           déclaré à l'artisanat et sa recette aux compétences (rappelés quand l'un ou l'autre redémarre). Vérifie la
+           cohérence au démarrage.
     Dépendances : shared/, config.lua, server/core.lua, bridge/server.lua
 ]]
 
@@ -126,6 +127,15 @@ function catalog.declareItems()
     end
 end
 
+--- Déclare la recette du compost aux compétences (T-136) : sans elle, vava_skills ne la connaît pas et le composteur
+--- refuse de la faire. Appelé au setup et au retour de vava_skills (son registre est neuf). Refus : un avertissement.
+---@return boolean declared
+local function declareSkillRecipe()
+    local ok, err = bridge.DeclareSkillRecipe(cfg.composter.recipe)
+    if not ok then VavaFarming.log.warn('recette du compost non déclarée aux compétences : %s', tostring(err)) end
+    return ok
+end
+
 --- Indexe la config, définit le registre des cultures, déclare objets et composteur. Appelé pendant le setup.
 ---@return boolean ok
 ---@return string|nil err
@@ -145,10 +155,12 @@ function catalog.define()
     catalog.declareItems()
     ok, err = bridge.DeclareComposter(cfg.composter)
     if not ok then VavaFarming.log.warn('composteur non déclaré à l\'artisanat : %s', tostring(err)) end
+    declareSkillRecipe()
     local id
     id, err = core.hooks.after('core:module:ready', function(payload)
         if payload.name == bridge.INVENTORY then catalog.declareItems() end
         if payload.name == bridge.CRAFTING then bridge.DeclareComposter(cfg.composter) end
+        if payload.name == bridge.SKILLS then declareSkillRecipe() end
     end)
     if not id then return false, err end
     for cropId, crop in pairs(catalog.crops()) do

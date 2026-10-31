@@ -3,9 +3,9 @@
     Rôle : SEUL point de contact, côté serveur, entre l'agriculture et le core / les autres modules : personnage et
            compte, position lue côté serveur, santé (à terre), inventaire (objet en main, piles, comptage, échange
            atomique, ajout, retrait, métadonnées, conteneurs conservés et leur ouverture ancrée, déclaration des
-           objets), compétences (XP, niveau), artisanat (type de station, recette et station du composteur), droits
-           et journal du Conseil, joueurs en jeu et leur position, notifications, chat, saison et nuits de gel du
-           royaume (vava_time, facultatif), base. Chaque appel à une autre ressource est isolé.
+           objets), compétences (XP, niveau, recette du compost), artisanat (type de station, recette et station du
+           composteur), droits et journal du Conseil, joueurs en jeu et leur position, notifications, chat, saison et
+           nuits de gel du royaume (vava_time, facultatif), base. Chaque appel à une autre ressource est isolé.
     Dépendances : shared/constants.lua, config.lua, server/core.lua
 ]]
 
@@ -28,6 +28,7 @@ local HEALTH = 'vava_health'
 local ITEMS_REGISTRY = 'vava_inventory:items'
 local STATIONS_REGISTRY = 'vava_crafting:stations'
 local RECIPES_REGISTRY = 'vava_crafting:recipes'
+local SKILL_RECIPES_REGISTRY = 'vava_skills:recipes'
 
 local Bridge = {}
 VavaFarming.bridge = Bridge
@@ -252,6 +253,23 @@ function Bridge.DeclareComposter(composter)
     return true
 end
 
+--- Déclare la recette au registre des compétences (sans quoi vava_skills ne la connaît pas et le composteur refuse
+--- de la faire : code `not_known` de vava_crafting). Rend `true` si elle y est (déjà ou maintenant), sinon
+--- `false, raison`.
+---@param recipe table  config.composter.recipe
+---@return boolean ok
+---@return string|nil err
+function Bridge.DeclareSkillRecipe(recipe)
+    local registry = core.registry
+    if not registry.exists(SKILL_RECIPES_REGISTRY) then return false, 'compétences absentes (vava_skills)' end
+    if registry.has(SKILL_RECIPES_REGISTRY, recipe.id) then return true end
+    local ok, err = registry.add(SKILL_RECIPES_REGISTRY, recipe.id, {
+        label = recipe.label, skill = recipe.skill, level = recipe.level, transmission = recipe.transmission == true,
+    })
+    if not ok then return false, 'compétences : ' .. tostring(err) end
+    return true
+end
+
 -- Conseil ---------------------------------------------------------------------------------------------------------
 
 ---@param source integer
@@ -420,3 +438,4 @@ end
 Bridge.CONSOLE = CONSOLE
 Bridge.INVENTORY = INVENTORY
 Bridge.CRAFTING = CRAFTING
+Bridge.SKILLS = SKILLS

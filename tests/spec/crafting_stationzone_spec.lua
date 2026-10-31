@@ -3,7 +3,8 @@ local helper = require('tests.helper')
 -- Stations partagées par les abonnements de zone du core (modules/vava_crafting/shared/stationzone.lua, T-017).
 -- Valeurs documentées : README du module (« Réseau ») et docs/api.md, section vava_crafting :
 --   une zone du core par station, rayon 2 m, marge = portée des props (80 m) + 20 m = 100 m ;
---   état { def = { type, label, x, y, z, heading, prop }, s = { fuel, busy } } ;
+--   état { def = { type, typeLabel, capacity?, label, x, y, z, heading, prop }, s = { fuel, busy } } : le nom du type et
+--   sa réserve de combustible partent avec le dessin, le client ne connaît pas les types (T-144) ;
 --   le client ignore ce qui est mal formé (jamais d'erreur) et ne connaît que les stations des zones qu'il suit.
 
 describe('vava_crafting stationzone', function()
@@ -24,13 +25,16 @@ describe('vava_crafting stationzone', function()
     local function definition(station)
         local kind = cfg.stationTypes[station.type]
         return {
-            id = station.id, type = { id = station.type, label = kind.label, prop = kind.prop }, label = station.label or kind.label,
+            id = station.id, type = { id = station.type, label = kind.label, fuel = kind.fuel, prop = kind.prop }, label = station.label or kind.label,
             x = station.x, y = station.y, z = station.z, heading = station.heading or 0.0, quality = station.quality,
             prop = station.prop,
         }
     end
 
-    local FORGE = { type = 'forge', label = 'Forge du bourg', x = -255.0, y = -945.0, z = 31.2, heading = 90.0, prop = 'prop_tool_bench02' }
+    local FORGE = {
+        type = 'forge', typeLabel = 'Forge', capacity = 20, label = 'Forge du bourg', x = -255.0, y = -945.0, z = 31.2, heading = 90.0,
+        prop = 'prop_tool_bench02',
+    }
 
     describe('serveur', function()
         it('zone d\'une station : centre de la station, rayon 2 m, marge 100 m (80 + 20) avec la config livrée', function()
@@ -39,16 +43,21 @@ describe('vava_crafting stationzone', function()
             assert.same({ x = 1.5, y = -2.5, z = 30.0, radius = 2.0, margin = 100.0 }, area)
         end)
 
-        it('dessin : identifiant du type, modèle de la station sinon du type, cap 0 par défaut, rien d\'autre', function()
+        it('dessin : identifiant et nom du type, réserve de combustible, modèle de la station sinon du type, cap 0 par défaut, rien d\'autre', function()
             local def = definition(cfg.stations[1])
             local drawing = stationzone.drawing(def)
-            assert.same({ type = 'forge', label = 'Forge du bourg', x = -255.0, y = -945.0, z = 31.2, heading = 90.0, prop = 'prop_tool_bench02' }, drawing)
+            assert.same(FORGE, drawing)
             assert.is_nil(drawing.quality)
             assert.is_nil(drawing.owner)
             def.prop, def.heading = 'prop_anvil', nil
             drawing = stationzone.drawing(def)
             assert.equal('prop_anvil', drawing.prop)
             assert.equal(0.0, drawing.heading)
+            -- type sans combustible : pas de réserve
+            def.type = { id = 'etabli', label = 'Établi', prop = 'prop_tool_bench02_ld' }
+            drawing = stationzone.drawing(def)
+            assert.equal('Établi', drawing.typeLabel)
+            assert.is_nil(drawing.capacity)
         end)
 
         it('état publié et comparaison avant envoi (nil n\'est égal à rien)', function()
@@ -74,12 +83,17 @@ describe('vava_crafting stationzone', function()
     end)
 
     describe('lecture côté client', function()
-        it('dessin bien formé : copié avec l\'identifiant de la zone ; cap absent → 0, modèle absent permis', function()
+        it('dessin bien formé : copié avec l\'identifiant de la zone ; cap absent → 0, modèle et réserve absents permis', function()
             local read = stationzone.readDrawing('forge_bourg', FORGE)
-            assert.same({ id = 'forge_bourg', type = 'forge', label = 'Forge du bourg', x = -255.0, y = -945.0, z = 31.2, heading = 90.0, prop = 'prop_tool_bench02' }, read)
-            read = stationzone.readDrawing('composteur', { type = 'composteur', label = 'Composteur', x = 1, y = 2, z = 3 })
+            assert.same({
+                id = 'forge_bourg', type = 'forge', typeLabel = 'Forge', capacity = 20, label = 'Forge du bourg',
+                x = -255.0, y = -945.0, z = 31.2, heading = 90.0, prop = 'prop_tool_bench02',
+            }, read)
+            read = stationzone.readDrawing('composteur', { type = 'composteur', typeLabel = 'Composteur', label = 'Composteur', x = 1, y = 2, z = 3 })
             assert.equal(0.0, read.heading)
             assert.is_nil(read.prop)
+            assert.is_nil(read.capacity)
+            assert.equal('Composteur', read.typeLabel)
         end)
 
         it('dessin mal formé : ignoré, sans erreur', function()
@@ -105,6 +119,33 @@ describe('vava_crafting stationzone', function()
             assert.is_nil(stationzone.readDrawing('forge_bourg', with('heading', -math.huge)))
             assert.is_nil(stationzone.readDrawing('forge_bourg', with('prop', string.rep('p', 65))))
             assert.is_nil(stationzone.readDrawing('forge_bourg', with('prop', 42)))
+            -- nom du type exigé et borné ; réserve entière de 1 à FUEL_CAPACITY_MAX, ou absente (T-144)
+            assert.is_nil(stationzone.readDrawing('forge_bourg', with('typeLabel', nil)))
+            assert.is_nil(stationzone.readDrawing('forge_bourg', with('typeLabel', '')))
+            assert.is_nil(stationzone.readDrawing('forge_bourg', with('typeLabel', 7)))
+            assert.is_nil(stationzone.readDrawing('forge_bourg', with('typeLabel', string.rep('a', 129))))
+            assert.is_not_nil(stationzone.readDrawing('forge_bourg', with('typeLabel', string.rep('a', 128))))
+            assert.is_nil(stationzone.readDrawing('forge_bourg', with('capacity', 0)))
+            assert.is_nil(stationzone.readDrawing('forge_bourg', with('capacity', -5)))
+            assert.is_nil(stationzone.readDrawing('forge_bourg', with('capacity', 2.5)))
+            assert.is_nil(stationzone.readDrawing('forge_bourg', with('capacity', 0 / 0)))
+            assert.is_nil(stationzone.readDrawing('forge_bourg', with('capacity', math.huge)))
+            assert.is_nil(stationzone.readDrawing('forge_bourg', with('capacity', '20')))
+            assert.is_nil(stationzone.readDrawing('forge_bourg', with('capacity', VavaCrafting.FUEL_CAPACITY_MAX + 1)))
+            assert.is_not_nil(stationzone.readDrawing('forge_bourg', with('capacity', VavaCrafting.FUEL_CAPACITY_MAX)))
+            assert.is_not_nil(stationzone.readDrawing('forge_bourg', with('capacity', 1)))
+            assert.equal(20, stationzone.readDrawing('forge_bourg', with('capacity', 20.0)).capacity)
+            assert.is_nil(stationzone.readDrawing('forge_bourg', with('capacity', nil)).capacity)
+        end)
+
+        it('types livrés : nom et réserve dans les bornes que relit le client', function()
+            for id, kind in pairs(cfg.stationTypes) do
+                assert.is_true(#kind.label >= 1 and #kind.label <= stationzone.LABEL_MAX, id)
+                if kind.fuel then
+                    assert.equal('integer', math.type(kind.fuel.capacity), id)
+                    assert.is_true(kind.fuel.capacity >= 1 and kind.fuel.capacity <= VavaCrafting.FUEL_CAPACITY_MAX, id)
+                end
+            end
         end)
 
         it('état : vide et libre si absent ou mal formé ; combustible négatif ou non fini ramené à 0', function()
@@ -135,7 +176,7 @@ describe('vava_crafting stationzone', function()
             assert.equal(1, book:size())
             assert.equal('Forge du bourg', book:station('forge_bourg').label)
             assert.same({ fuel = 0, busy = false }, book:status('forge_bourg'))
-            placed, statusChanged = book:enter('etabli_bourg', { def = { type = 'etabli', label = 'Établi', x = 0, y = 0, z = 0 } })
+            placed, statusChanged = book:enter('etabli_bourg', { def = { type = 'etabli', typeLabel = 'Établi', label = 'Établi', x = 0, y = 0, z = 0 } })
             assert.is_true(placed)
             assert.is_false(statusChanged)
             assert.same({ fuel = 0, busy = false }, book:status('etabli_bourg'))
@@ -158,16 +199,60 @@ describe('vava_crafting stationzone', function()
             assert.equal(1, book:size())
         end)
 
-        it('état entier reçu de nouveau, station déplacée ou renommée : placée de nouveau', function()
+        it('état entier reçu de nouveau, station déplacée ou d\'un autre modèle : placée de nouveau', function()
             book:enter('forge_bourg', state(FORGE))
             local moved = {}
             for k, v in pairs(FORGE) do moved[k] = v end
             moved.x = -250.0
-            assert.is_true((book:enter('forge_bourg', state(moved))))
+            assert.same({ true, false, false }, { book:enter('forge_bourg', state(moved)) })
             assert.equal(-250.0, book:station('forge_bourg').x)
-            moved.label = 'Forge neuve'
-            assert.is_true((book:enter('forge_bourg', state(moved))))
+            moved.prop = 'prop_anvil'
+            assert.same({ true, false, false }, { book:enter('forge_bourg', state(moved)) })
+            moved.heading = 180.0
+            assert.same({ true, false, false }, { book:enter('forge_bourg', state(moved)) })
             assert.equal(1, book:size())
+        end)
+
+        it('nom, nom du type ou réserve changés : textes mis à jour sur place, la station n\'est pas replacée (R-1)', function()
+            book:enter('forge_bourg', state(FORGE))
+            local kept = book:station('forge_bourg')
+            local list = book:list()
+            local renamed = {}
+            for k, v in pairs(FORGE) do renamed[k] = v end
+            renamed.label = 'Forge neuve'
+            assert.same({ false, false, true }, { book:enter('forge_bourg', state(renamed)) })
+            renamed.typeLabel = 'Grande forge'
+            assert.same({ false, false, true }, { book:change('forge_bourg', { def = renamed }, {}) })
+            renamed.capacity = 40
+            assert.same({ false, false, true }, { book:enter('forge_bourg', state(renamed)) })
+            renamed.capacity = nil
+            assert.same({ false, false, true }, { book:enter('forge_bourg', state(renamed)) })
+            -- même station (liste et groupes la gardent), textes à jour
+            assert.equal(kept, book:station('forge_bourg'))
+            assert.equal(list, book:list())
+            assert.equal('Forge neuve', kept.label)
+            assert.equal('Grande forge', kept.typeLabel)
+            assert.is_nil(kept.capacity)
+            -- identique : rien
+            assert.same({ false, false, false }, { book:enter('forge_bourg', state(renamed)) })
+            -- textes et lieu changés ensemble : placée de nouveau
+            renamed.label, renamed.x = 'Forge du port', 10.0
+            assert.same({ true, false, false }, { book:enter('forge_bourg', state(renamed)) })
+            assert.equal('Forge du port', book:station('forge_bourg').label)
+            assert.are_not.equal(kept, book:station('forge_bourg'))
+        end)
+
+        it('samePlace et sameText partagent le dessin : sameDrawing exige les deux', function()
+            local other = {}
+            for k, v in pairs(FORGE) do other[k] = v end
+            other.label = 'Autre'
+            assert.is_true(stationzone.samePlace(FORGE, other))
+            assert.is_false(stationzone.sameText(FORGE, other))
+            assert.is_false(stationzone.sameDrawing(FORGE, other))
+            other.label, other.z = FORGE.label, 0.0
+            assert.is_false(stationzone.samePlace(FORGE, other))
+            assert.is_true(stationzone.sameText(FORGE, other))
+            assert.is_false(stationzone.sameDrawing(FORGE, other))
         end)
 
         it('état entier mal formé : la station est oubliée', function()
@@ -177,15 +262,15 @@ describe('vava_crafting stationzone', function()
             assert.is_nil(book:station('forge_bourg'))
             assert.same({ fuel = 0, busy = false }, book:status('forge_bourg'))
             assert.equal(0, book:size())
-            assert.same({ false, false }, { book:enter('inconnue', 'rien') })
+            assert.same({ false, false, false }, { book:enter('inconnue', 'rien') })
         end)
 
         it('changement de l\'état : seul l\'état change ; un état identique ne compte pas', function()
             book:enter('forge_bourg', state(FORGE, { fuel = 5, busy = false }))
-            assert.same({ false, true }, { book:change('forge_bourg', { s = { fuel = 5, busy = true } }, {}) })
+            assert.same({ false, true, false }, { book:change('forge_bourg', { s = { fuel = 5, busy = true } }, {}) })
             assert.same({ fuel = 5, busy = true }, book:status('forge_bourg'))
-            assert.same({ false, false }, { book:change('forge_bourg', { s = { fuel = 5, busy = true } }, {}) })
-            assert.same({ false, true }, { book:change('forge_bourg', { s = { fuel = 4, busy = false } }, {}) })
+            assert.same({ false, false, false }, { book:change('forge_bourg', { s = { fuel = 5, busy = true } }, {}) })
+            assert.same({ false, true, false }, { book:change('forge_bourg', { s = { fuel = 4, busy = false } }, {}) })
         end)
 
         it('changement du dessin : placée de nouveau ; dessin mal formé ou retiré : oubliée', function()
@@ -193,38 +278,38 @@ describe('vava_crafting stationzone', function()
             local moved = {}
             for k, v in pairs(FORGE) do moved[k] = v end
             moved.prop = 'prop_anvil'
-            assert.same({ true, false }, { book:change('forge_bourg', { def = moved }, {}) })
+            assert.same({ true, false, false }, { book:change('forge_bourg', { def = moved }, {}) })
             assert.equal('prop_anvil', book:station('forge_bourg').prop)
-            assert.same({ true, false }, { book:change('forge_bourg', { def = { label = 'x' } }, {}) })
+            assert.same({ true, false, false }, { book:change('forge_bourg', { def = { label = 'x' } }, {}) })
             assert.is_nil(book:station('forge_bourg'))
             book:enter('forge_bourg', state(FORGE))
-            assert.same({ true, false }, { book:change('forge_bourg', {}, { 'def' }) })
+            assert.same({ true, false, false }, { book:change('forge_bourg', {}, { 'def' }) })
             assert.is_nil(book:station('forge_bourg'))
         end)
 
         it('état retiré : vide et libre', function()
             book:enter('forge_bourg', state(FORGE, { fuel = 3, busy = true }))
-            assert.same({ false, true }, { book:change('forge_bourg', {}, { 's' }) })
+            assert.same({ false, true, false }, { book:change('forge_bourg', {}, { 's' }) })
             assert.same({ fuel = 0, busy = false }, book:status('forge_bourg'))
         end)
 
         it('changement d\'une station inconnue : ignoré (le core envoie toujours l\'état entier d\'abord)', function()
-            assert.same({ false, false }, { book:change('forge_bourg', { s = { fuel = 1, busy = true } }, {}) })
+            assert.same({ false, false, false }, { book:change('forge_bourg', { s = { fuel = 1, busy = true } }, {}) })
             assert.is_nil(book:station('forge_bourg'))
             assert.equal(0, book:size())
         end)
 
         it('sortie : oubliée avec son état ; sortie d\'une station inconnue : rien', function()
             book:enter('forge_bourg', state(FORGE, { fuel = 3, busy = true }))
-            assert.same({ true, false }, { book:leave('forge_bourg') })
+            assert.same({ true, false, false }, { book:leave('forge_bourg') })
             assert.is_nil(book:station('forge_bourg'))
             assert.same({ fuel = 0, busy = false }, book:status('forge_bourg'))
-            assert.same({ false, false }, { book:leave('forge_bourg') })
+            assert.same({ false, false, false }, { book:leave('forge_bourg') })
             assert.equal(0, book:size())
         end)
 
         it('liste triée par identifiant, gardée tant qu\'aucune station ne bouge, refaite après', function()
-            local function at(x) return { type = 'etabli', label = 'É', x = x, y = 0, z = 0 } end
+            local function at(x) return { type = 'etabli', typeLabel = 'Établi', label = 'É', x = x, y = 0, z = 0 } end
             book:enter('b', state(at(2)))
             book:enter('a', state(at(1)))
             book:enter('c', state(at(3)))

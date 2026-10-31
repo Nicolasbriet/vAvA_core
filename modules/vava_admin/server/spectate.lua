@@ -9,11 +9,15 @@
              - au déchargement en pleine observation (départ, retour à la sélection), la place est marquée « parti » ;
              - au chargement suivant, il est replacé dès l'apparition confirmée de ce même personnage, et la place
                n'est effacée qu'une fois le replacement accordé : jamais sous terre, même après un redémarrage.
-    Dépendances : shared/constants.lua, server/core.lua
+           Pendant l'observation, le membre est invulnérable pour le serveur (server/invulnerability.lua) : la fin de
+           la dernière observation le retire.
+    Dépendances : shared/constants.lua, server/core.lua, server/invulnerability.lua
 ]]
 
 local type, ipairs, tonumber, tostring = type, ipairs, tonumber, tostring
 local GetPlayers, GetPlayerPed, GetEntityCoords, GetEntityHeading = GetPlayers, GetPlayerPed, GetEntityCoords, GetEntityHeading
+
+local invulnerability = VavaAdmin.invulnerability
 
 local FIELD = VavaAdmin.SPECTATE_FIELD
 local MAX_COORD = VavaAdmin.MAX_COORD
@@ -106,6 +110,8 @@ end
 function spectate.finish(src, session)
     if current[src] ~= session then return true end
     current[src] = nil
+    -- revenu à sa place : l'observation ne le protège plus (server/invulnerability.lua)
+    invulnerability.drop(src, 'spectate', 'finished')
     local characterId = characterOf(src)
     if not characterId then return true end
     local place, departed = placeOf(characterId)

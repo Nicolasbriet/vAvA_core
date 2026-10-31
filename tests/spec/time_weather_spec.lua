@@ -15,6 +15,7 @@ describe('vava_time météo', function()
             'modules/vava_time/shared/constants.lua',
             'modules/vava_time/config.lua',
             'modules/vava_time/shared/weather.lua',
+            'modules/vava_time/shared/cycle.lua',
         })
         rules = VavaTime.weatherRules
         cfg = VavaTime.config.weather
@@ -133,6 +134,32 @@ describe('vava_time météo', function()
         assert.equal(10 * 60, rules.duration('orage', fixed(0)))
         assert.is_true(rules.duration('orage', fixed(0.9999)) < 20 * 60)
         assert.equal(60, rules.duration('pluie', fixed(0), variant({ durationMinutes = { 0, 0 } })))
+    end)
+
+    -- T-146 : le cours des ciels est dans config.lua depuis 1.5.0 ; un config.lua de 1.4.0 gardé ne l'a pas
+    it('relève le cours des ciels qui manque ou a un autre type', function()
+        assert.same({}, rules.missingCourse())
+        local old = variant({})
+        old.next, old.seasons, old.durationMinutes, old.fadeSeconds = nil, nil, nil, nil
+        assert.same({ 'next', 'seasons', 'durationMinutes', 'fadeSeconds' }, rules.missingCourse(old))
+        -- snow = false est une valeur ; durations est facultative
+        local bare = variant({ snow = false })
+        bare.durations = nil
+        assert.same({}, rules.missingCourse(bare))
+        assert.same({ 'snow', 'fadeSeconds' }, rules.missingCourse(variant({ snow = 'oui', fadeSeconds = '90' })))
+    end)
+
+    it('config.lua relève un cours des ciels laissé dans config_client.lua avant de poser le sien', function()
+        assert.is_false(VavaTime.legacyClientSky)
+        helper.reset()
+        VavaTime = nil
+        local root = (os.getenv('VAVA_ROOT') or '.') .. '/modules/vava_time/'
+        assert(loadfile(root .. 'shared/constants.lua'))()
+        assert(loadfile(root .. 'config_client.lua'))()
+        VavaTime.config.weather.durationMinutes = { 1, 2 }    -- forme de 1.4.0, réglage « pour aller vite »
+        assert(loadfile(root .. 'config.lua'))()
+        assert.is_true(VavaTime.legacyClientSky)
+        assert.same({ 25, 50 }, VavaTime.config.weather.durationMinutes)
     end)
 
     it('mesure l\'avancement d\'une transition', function()

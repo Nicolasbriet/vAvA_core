@@ -55,3 +55,4 @@ VavaProvisions.MAX_NOTIFICATION = 200          -- octets d'une notification du H
 VavaProvisions.MAX_JOURNAL_LABEL = 32          -- libellé du journal du Registre (vava_admin)
 VavaProvisions.MAX_REPLY = 512                 -- octets d'une réponse de /eau reçue en notification (repli sans chat)
 VavaProvisions.MAX_POINTS = 1024               -- plafond de maxPoints (zones du core par module)
+VavaProvisions.MAX_TIER = 5                    -- paliers d'un objet (métadonnée `tier` : 1 Grossier … 5 Chef-d'œuvre, vava_crafting)

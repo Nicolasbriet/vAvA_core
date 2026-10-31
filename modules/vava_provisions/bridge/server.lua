@@ -1,8 +1,8 @@
 --[[
     vava_provisions/bridge/server.lua
     Rôle : SEUL point de contact, côté serveur, entre les vivres et le core / les autres modules : personnage actif,
-           position du ped lue par le serveur, à terre (vava_health), inventaire (compte, échange atomique, ajout,
-           déclaration d'un objet), besoins (soif lue et ajoutée, vava_needs), recette de l'outre (registres de
+           position du ped lue par le serveur, à terre (vava_health), inventaire (compte, piles et leur palier, échange
+           atomique, ajout, déclaration d'un objet), besoins (soif lue et ajoutée, vava_needs), recette de l'outre (registres de
            vava_crafting et de vava_skills), zones du core des points d'eau, envoi au seul joueur concerné (core.net.send,
            compté ; repli TriggerClientEvent vers ce seul joueur), hooks émis, droits et journal du Conseil (vava_admin),
            chat (vava_chat), horloges. Chaque appel à une autre ressource est isolé : un module absent ou en erreur ne
@@ -100,11 +100,22 @@ function Bridge.Exchange(source, removals, additions)
     return ok == true, code
 end
 
---- Ajoute des objets à la besace, tout ou rien.
+--- Piles d'un objet dans la besace, les plus anciennes d'abord : `{ { id, quantity, metadata } }`, ou nil si
+--- l'inventaire ne répond pas. Lecture seule, ne cède pas la main (permise dans un hook `before` de l'inventaire).
+---@param source integer
+---@param item string
+---@return table[]|nil
+function Bridge.Piles(source, item)
+    local called, list = call(INVENTORY, 'getItems', source, { item = item })
+    if not called or type(list) ~= 'table' then return nil end
+    return list
+end
+
+--- Ajoute des objets à la besace, tout ou rien ; `metadata` (facultatif) : celles de la pile (palier de l'outre).
 ---@return boolean ok
 ---@return string|nil code
-function Bridge.Add(source, item, quantity)
-    local called, ok, code = call(INVENTORY, 'add', source, item, quantity)
+function Bridge.Add(source, item, quantity, metadata)
+    local called, ok, code = call(INVENTORY, 'add', source, item, quantity, metadata)
     if not called then return false, 'inventory_unavailable' end
     return ok == true, code
 end

@@ -653,7 +653,7 @@ versé à T-014 ; les autres points déjà couverts sont précisés dans T-012 �
   `vava_chancellerie/server/link.lua` (`%s` sur un code).
 
 ### T-144 — Invite du composteur
-- Agent : vava-dev-lua · Dépend de : — · Statut : à faire
+- Agent : vava-dev-lua · Dépend de : — · Statut : à tester en jeu (relu sécurité et réseau, suites appliquées)
 - Relecture réseau R-6 de T-141 (déjà sur `main`, à confirmer en jeu) : le type `composteur` est déclaré à l'artisanat
   par `vava_farming`, côté serveur seulement ; absent de `cfg.stationTypes` du client, la station n'a ni invite ni menu
   (`vava_crafting/client/interact.lua:122-124` : `props.type(station)` rend nil). Piste : envoyer avec le dessin de la
@@ -661,9 +661,19 @@ versé à T-014 ; les autres points déjà couverts sont précisés dans T-012 �
   chercher dans la config du client.
 - Critères : au composteur du champ, l'invite « Composteur » et le menu apparaissent (métiers 5-7) ; essai hors jeu
   d'une station d'un type inconnu de la config du client ; `config_split_spec` vert.
+- Fait le 31 octobre 2026 (branche `agents/T-144`) : `vava_crafting` 1.7.0, dessin d'une station avec `typeLabel` et
+  `capacity` (borne `FUEL_CAPACITY_MAX`, la même au registre des types), invite lue dans le dessin et qui suit un nom,
+  un nom de type ou une réserve changés (R-2), prop gardé quand seuls ces textes changent (R-1), animation prise de la
+  réponse du serveur, animation d'un type vérifiée au registre (S-2), `stationTypes` entier dans `config.lua` (le
+  client ne le lit plus ; module refusé avant toute déclaration sans cette table, S-3) ; essais hors jeu de la station
+  d'un type inconnu du client (`crafting_prompt_client_spec`) et du registre (`crafting_catalog_spec`) ;
+  `config_split_spec` vert sans changement. S-1 et `server/signature.lua:55` reportés à T-104. Rapport
+  `docs/plan/rapports/T-144.md`. **À tester en jeu** : `docs/tests/metiers.md` 5-7 (invite « Composteur du champ ·
+  Composteur » et menu au composteur), invites du bourg inchangées (combustible de la forge et du fourneau), geste avec
+  l'animation du type, aucune ligne « animation … inconnue » au démarrage.
 
 ### T-146 — Ciel de `vava_time` : cycle au seul serveur
-- Agent : vava-dev-lua · Dépend de : T-142 · Statut : à faire
+- Agent : vava-dev-lua · Dépend de : T-142 · Statut : à tester en jeu
 - Relecture réseau R-1 de T-142 : le temps sert ≈ 4,6 Ko bruts pour le seul serveur, plus que le gain du module au lot
   3 : le cycle des ciels de `config_client.lua` (`weather.next`, `seasons`, `snow`, `durationMinutes`, `durations`,
   ≈ 1,9 Ko) et les fonctions de tirage de `shared/weather.lua` (`weight`, `allowed`, `candidates`, `pick`, `duration`,
@@ -674,6 +684,47 @@ versé à T-014 ; les autres points déjà couverts sont précisés dans T-012 �
 - Critères : `config_split_spec` T0 à T4 verts ; essai du ciel sur la vue client (`time_client_view_spec`) et tirages
   inchangés au serveur (`time_weather_spec`) ; comparaison clé par clé de la config ; gain mesuré par
   `scripts/poids-client.sh` ; temps 2-x en jeu (`docs/tests/temps.md`).
+- Fait le 31 octobre 2026 (branche `agents/T-146`) : `vava_time` 1.5.0 — `shared/weather.lua` réduit à `get`, `ids`,
+  `progress` (ne garde que `weather.types`) ; tirage dans `shared/cycle.lua` au seul serveur ; `weather.next`, `seasons`,
+  `snow`, `durationMinutes`, `durations` et `fadeSeconds` posés par `config.lua` (`fadeSeconds` aussi : aucun fichier
+  client ne le lit, T4) ; refus de démarrer avec un `config.lua` de 1.4.0, avertissement pour un `config_client.lua` de
+  1.4.0, texte de l'ancienne forme précisé (R-5 de T-142). Config du serveur identique à `main` (262 feuilles, 0
+  différence), tirages identiques (103 829 comparaisons). 4 844 octets de moins par joueur (1 282 compressés). Rapport
+  `docs/plan/rapports/T-146.md`. Relectures sécurité et réseau à faire. **À tester en jeu** : `docs/tests/reseau.md`
+  § 7-E.
+
+### T-151 — Envois de `vava_admin` par `core.net.send`, avec repli
+- Agent : vava-dev-lua (cette tâche autorise à toucher `vava_admin`) · Dépend de : — · Statut : à faire
+- Trouvé pendant T-138 (relecture réseau R-2) : tous les envois de `vava_admin` au client (`notify`, `reportNew`,
+  `toolsReset`) passent par `TriggerClientEvent` direct, vers un seul joueur, et ne sont pas comptés par
+  `/vava_reseau`. Les faire passer par une fonction d'envoi au seul joueur sur le modèle de
+  `vava_arrival/bridge/server.lua:127-140` (`core.net.send`, repli `TriggerClientEvent` vers ce même joueur si
+  `core.net` manque). `vava_admin:announcement` reste l'exception `-1` documentée (l'objet même d'une proclamation).
+- Critères : aucun `TriggerClientEvent` direct hors du repli et de l'annonce ; essai du repli ; `/vava_reseau` montre
+  les envois du Registre.
+
+### T-153 — Audit : peser ce qui est livré, pas le dossier
+- Agent : vava-dev-lua · Dépend de : — · Statut : à faire
+- Trouvé pendant T-152 (relecture réseau R-5) : `scripts/audit-reseau.sh` (contrôle du poids de `vava_loading`) mesure
+  le dossier par `du -sb`, qui compte ≈ 70 Ko jamais livrés (README, `web/dev/`, licences des polices) ; il ne reste
+  que ≈ 56 Ko de marge, et une simple retouche du README ou des essais déclencherait un BLOQUANT sans un octet de plus
+  chez les joueurs. Mesurer les seuls fichiers du manifeste (`scripts/lib/manifeste.awk`, comme
+  `scripts/poids-client.sh`) et poser le plafond sur ce total.
+- Critères : plafond sur le total livré ; cas d'essai de l'audit (`tests/audit/`) pour un fichier non livré lourd
+  (sans effet) et un fichier livré qui dépasse (BLOQUANT) ; mesures avant et après dans le rapport.
+
+### T-148 — Fichiers `shared/` absents du manifeste
+- Agent : vava-dev-lua · Dépend de : T-132 · Statut : à faire
+- Trouvé pendant T-146 : rien ne vérifie qu'un `shared/*.lua` présent dans un module est bien listé à son manifeste ;
+  sans la ligne de `shared/cycle.lua`, `vava_time` tomberait au premier tirage du ciel. Ajouter le contrôle à
+  `config_split_spec` (T0) ou à l'audit, avec un cas d'essai.
+
+### T-150 — Métadonnées de la pile dans le hook `vava_inventory:use`
+- Agent : vava-dev-lua (cette tâche autorise à toucher `vava_inventory`) · Dépend de : — · Statut : à faire
+- Trouvé pendant T-135 : le payload de `vava_inventory:use` ne porte pas les métadonnées de la pile, qui disparaît
+  avec sa dernière unité ; `vava_provisions` relève le palier par un abonné `before` (relecture sécurité S-2 : suppose
+  que rien ne cède la main entre `before` et `after`). Joindre une copie bornée des métadonnées au payload, puis
+  simplifier `vava_provisions` (retirer le relevé).
 
 ## Phase 2 — Arrivée
 
@@ -763,16 +814,52 @@ versé à T-014 ; les autres points déjà couverts sont précisés dans T-012 �
   propriétaire de l'objet `eau` (et, à terme, du `pain`). Rien qui rende un joueur autosuffisant.
 
 ### T-135 — Usure de l'outre selon la qualité du tanneur
-- Agent : vava-dev-lua · Dépend de : T-130 · Statut : à faire
+- Agent : vava-dev-lua · Dépend de : T-130 · Statut : à tester en jeu (relu sécurité, suites appliquées)
 - Relecture lore de T-130 : une outre se fend une fois sur dix quel que soit son palier, alors qu'une outre « Soignée »
   s'affiche à part. Lier `tearChance` au palier (moins pour une outre Soignée ou Excellente) en gardant le palier sur
   l'outre rendue vide, sans casser l'empilement : le savoir du tanneur doit compter.
+- Fait le 31 octobre 2026 (branche `agents/T-135`), sans RPC, évènement, state bag, boucle ni interface (relecture
+  réseau non requise) : `vava_provisions` 1.3.0 garde le palier `{ tier }` de `vava_crafting` de l'outre vide à l'Outre
+  d'eau (remplissage pile par pile, retraits par identifiant, eau regroupée par palier) et à l'outre rendue (palier
+  relevé par un abonné `before` de `vava_inventory:use`, priorité 1000, jamais de refus) ; risque de fente par palier
+  (`containers.eau.tearChanceByTier`) : Grossière 15 %, Commune 10 %, Soignée 5 %, Excellente 2,5 %, Chef-d'œuvre 1 %,
+  sans palier 10 % (valeurs retenues par le porteur du projet). Empilement par palier essayé sur l'inventaire réel
+  (`provisions_outre_tier_spec`). Relecture sécurité OK, trois mineurs appliqués (relevé effacé si l'inventaire ne
+  répond pas, condition « rien ne cède la main entre `before` et `after` » écrite, avertissement en console au plus
+  une fois par minute). Suite proposée : métadonnées dans le payload de `vava_inventory:use` (tâche à ouvrir). Rapport
+  `docs/plan/rapports/T-135.md` ; à tester en jeu : `docs/tests/eau.md` § 4 bis (tests 28 à 35).
 
 ### T-136 — Recettes de `vava_farming` déclarées aux compétences
-- Agent : vava-dev-lua · Dépend de : — · Statut : à faire
+- Agent : vava-dev-lua · Dépend de : — · Statut : à tester en jeu
 - Trouvé pendant T-130 : `vava_farming` déclare sa recette `compost` à l'artisanat mais pas à `vava_skills:recipes` ;
   le composteur devrait la refuser comme « recette inconnue » (à vérifier en jeu d'abord). Déclarer la recette et la
   redéclarer au retour de `vava_skills`, comme `vava_provisions` le fait pour l'outre.
+- Fait le 31 octobre 2026 (branche `agents/T-136`), sans RPC, évènement, boucle ni interface (relectures sécurité et
+  réseau non requises) : refus constaté hors jeu sur 1.8.0 (code
+  `not_known` de `vava_crafting`, « Vous ne connaissez pas cette recette. ») ; `vava_farming` 1.9.0 déclare `compost`
+  à `vava_skills:recipes` (libre, Agriculture, niveau 0) et la redéclare au retour de `vava_skills`. Rapport
+  `docs/plan/rapports/T-136.md` ; à tester en jeu : `docs/tests/metiers.md` § 5.3.
+
+### T-147 — Artisanat : recette libre inconnue des compétences signalée
+- Agent : vava-dev-lua · Dépend de : — · Statut : à tester en jeu (relu lore, sécurité et réseau, suites appliquées)
+- Trouvé pendant T-136 : `vava_crafting` affiche au menu une recette déclarée à l'artisanat mais inconnue de
+  `vava_skills:recipes`, puis la refuse au clic (`not_known`), sans rien en console. Un module qui oublie la
+  déclaration aux compétences retombe dans ce piège sans signe : avertir au démarrage de `vava_crafting` (et au
+  retour de `vava_skills`) pour chaque recette de l'artisanat absente des compétences, et la montrer verrouillée.
+- Critères : essai hors jeu d'une recette déclarée à l'artisanat seul (avertissement, recette verrouillée) ;
+  métiers en jeu.
+- Fait le 31 octobre 2026 (branche `agents/T-147`), sans RPC, évènement, boucle ni envoi ajouté : `vava_crafting`
+  1.8.0, une ligne `WARN` par recette de `vava_crafting:recipes` absente de `vava_skills:recipes` (nom, module qui l'a
+  déclarée), une seule fois, `skillsCheck.delayMs` (5 s, borné de 1 s à 10 min, R-3) après le démarrage, l'ajout d'une
+  recette par un autre module, le retrait d'une recette des compétences ou le retour de `vava_skills`, 4 × le délai au
+  plus après la première demande (R-1) ; une recette signalée puis déclarée aux compétences relance le contrôle et une
+  ligne d'information le dit (S-1, R-2) ; lecture du registre en échec : une ligne, rien de signalé ni gardé en cache
+  (S-2) ; au menu, la recette libre est verrouillée (`unregistered`, « Indisponible », raison « Cette recette ne peut ni
+  se façonner ni s'apprendre : prévenez le Conseil. », relu lore) ; `known`, lu par personne, n'est plus envoyé (R-4) ;
+  le serveur reste juge (`not_known` au début). Essais hors jeu `crafting_skill_recipes_spec` (14). Rapport
+  `docs/plan/rapports/T-147.md`. **À tester en jeu** : `docs/tests/metiers.md` § 4.2 (ressource jetable
+  `test_recette` : une seule ligne au démarrage, recette « Indisponible » à l'établi, ligne d'information puis
+  déverrouillée une fois déclarée aux compétences, retour de `vava_skills`).
 
 ### T-145 — Menu pause `vava_pause` (la bannière)
 - Agents : vava-architecte → vava-dev-lua + vava-dev-nui (cette tâche autorise à toucher `vava_codex`, `vava_admin`,
@@ -830,6 +917,29 @@ versé à T-014 ; les autres points déjà couverts sont précisés dans T-012 �
 - Critères : resmon au repos ≤ 0,02 ms malgré la boucle de blocage ; ouverture en moins de 300 ms ; devmock qui
   montre chaque rubrique hors jeu ; impossible d'ouvrir le menu en combat ou ligoté ; relectures sécurité, réseau et
   lore OK.
+
+### T-152 — Écran de chargement : les ambiances d'Eldoria en fondu enchaîné
+- Agent : vava-dev-nui · Dépend de : T-020 · Statut : à tester en jeu (relu réseau, suites appliquées)
+- Fait le 31 octobre 2026 (branche `agents/T-152`) : `vava_loading` 1.3.0. Paysage peint retiré ; sept ambiances en
+  fondu enchaîné (première au hasard, puis l'ordre de `ambiances.order`, ≈ 9 s chacune, fondu de 3 s, dérive lente
+  coupée en `basse` et quand le joueur demande moins d'animations), un seul minuteur, image suivante décodée après
+  l'affichage de la courante, image manquante sautée, fond de repli si toutes manquent. Page livrée 1 434 095 o (code
+  92 437 o, en baisse de 1 081 o), dossier 1 516 438 o sous le plafond de l'audit. Essais de la page 52 (40 avant,
+  ceux du paysage remplacés) ; `tests/spec/loading_screen_spec.lua` complété (motif des images, `ambiances.js`, poids
+  avec images). Rapport `docs/plan/rapports/T-152.md`. **À tester en jeu** : `docs/tests/chargement.md` 2-7 à 2-11 en
+  priorité (ordre, fondu sans écran vide, image renommée sautée, `basse` sans dérive), puis 2-1, 2-2, 5-5, 5-6.
+  Relecture réseau et performance : OK ; suites R-2 (dossier des ambiances égal à `ambiances.order`), R-3 (dérive
+  mesurée seule, test 5-5) et R-4 (test 5-6 cache vidé) appliquées ; R-1 (poids des images, ≈ 40 % de plus au
+  premier téléchargement d'un nouveau joueur) : images gardées telles quelles, décision du porteur du projet
+  (31 octobre 2026) ; R-5 → T-153.
+- Demande du porteur du projet (31 octobre 2026) : sept peintures de la même vue d'Eldoria sous des ambiances
+  différentes (aube, brume du matin, hiver, crépuscule, nuit étoilée, brume de nuit, orage), fournies en PNG
+  1672 × 941, converties en WebP 1600 × 900 qualité 50 (1 181 Ko pour les sept) dans
+  `modules/vava_loading/web/img/ambiances/`, pour tenir sous le plafond de 1,5 Mo de l'écran. Elles remplacent le
+  paysage peint par le code et se succèdent par un fondu enchaîné doux (opacité et transformation seulement).
+- Critères : `vava_loading` sous 1,5 Mo (audit) ; aucune image chargée hors de `web/img/` ; ordre, durées et fondu en
+  config ; première image affichée sans écran vide ; repli propre si une image manque ; aucune boucle par image
+  au-delà de l'animation CSS ; essais de la page ; procédure `docs/tests/chargement.md` à jour.
 
 ## Phase 3 — L'Atelier : socle et créateurs du monde
 
@@ -903,7 +1013,16 @@ maquettes.
 - Relectures de T-141 (sécurité S-3, réseau R-3) : `stationTypes` de l'artisanat reste entier dans
   `config_client.lua` (le client le lit par type) ; ≈ 0,4 Ko n'y sert que le serveur (compétences, réserve de
   combustible, 416 o), dont `prop`, jamais lu par le client (le dessin de la station porte déjà son modèle). Donner une
-  part client et une part serveur (contrôle T4 vert) ; voir aussi T-144 (invite du composteur).
+  part client et une part serveur (contrôle T4 vert) ; voir aussi T-144 (invite du composteur). Fait par T-144
+  (`vava_crafting` 1.7.0) : `stationTypes` entier dans `config.lua`, le client n'en lit plus rien.
+- Relecture sécurité S-1 de T-144 : un type modifié après l'indexation n'est pas republié (le dessin des stations de ce
+  type garde l'ancien nom, l'ancienne réserve, l'ancien modèle ; affichage seulement). Sur `core:registry:added` (et
+  retrait) de `vava_crafting:stations`, rafraîchir `def.type` des stations du type et rappeler `stations.share(def)`
+  pour chacune (le client ne recrée le prop que si le lieu ou le modèle changent, R-1 de T-144).
+- Relecture sécurité de T-144, pour information (antérieur) : `server/signature.lua:55` (`craftingSkills`, rang du
+  poinçon) ne parcourt que `cfg.stationTypes`, pas les types du registre : la compétence d'un type déclaré par un autre
+  module (Agriculture, par le composteur) n'est pas comptée parmi celles d'artisanat. Lire le registre quand les types
+  passeront à l'Atelier.
 
 ### T-105 — Confréries et leur créateur `vava_guilds` (remplace l'ancienne T-042)
 - Agents : vava-architecte → vava-dev-lua + vava-dev-nui · Dépend de : T-102 · Statut : à faire
@@ -1032,16 +1151,42 @@ faire tout le système de combat ») : la porte T-119 reste à passer en jeu.
   aujourd'hui par `damage` sans `source` et contournent donc `chain.pvp` : leur donner leur `source` (spec T-110 § 12.2).
 
 ### T-138 — Invulnérabilité du Registre tenue par le serveur
-- Agent : vava-dev-lua (cette tâche autorise à toucher `vava_admin`) · Dépend de : T-110 · Statut : à faire
+- Agent : vava-dev-lua (cette tâche autorise à toucher `vava_admin`) · Dépend de : T-110 · Statut : à tester en jeu
+  (relu sécurité, contre-relu, relu réseau ; suites appliquées)
 - Spec T-110 § 13 : l'invulnérabilité du Registre n'est que locale (`SetEntityInvincible`) ; les sorts la traversent
   déjà, les coups de la chaîne aussi. `vava_admin` garde l'état côté serveur et déclare un modificateur d'annulation
   `vava_admin:invulnerabilite` au registre `vava_health:modifiers`.
+- Fait le 31 octobre 2026 (branche `agents/T-138`) : `vava_admin` 1.11.0 — état en mémoire par joueur (personnage,
+  compte, raisons `godmode`, `noclip` et `spectate`, chacune avec son instant et le membre qui l'a posée), posé par
+  l'intention `tool` (refusée sans personnage, journal inchangé) et par l'observation ; retiré par le levier ou `F2`, à
+  la fin de la dernière observation, au déchargement du personnage et au départ ; modificateur d'annulation (étape
+  `annulation`, priorité 10, `kinds` de la chaîne sauf `monde`) déclaré au démarrage et redéclaré au retour de
+  `vava_health` par un appel isolé ; il ne lit que la mémoire et ne protège plus un compte qui a perdu le droit. Aucun
+  RPC, évènement ni boucle ajouté. Essais `admin_invulnerability_spec` (15). Rapport `docs/plan/rapports/T-138.md`.
+  Relecture sécurité faite (à corriger, aucun bloquant), suites appliquées : observation bornée (corps près de
+  l'ancrage, `spectateMaxMs`, au journal), raisons au droit perdu retirées au changement de rang et évènement
+  `vava_admin:toolsReset` au seul joueur, `tool(nom, false)` sans droit, export `isInvulnerable`, doc « tout coup et
+  tout sort qui blessent », faim et soif écrites comme décision. Relecture réseau OK (3 mineurs), contre-relecture
+  sécurité (C-1 à C-4), suites appliquées : l'observation ne protège que le corps caché sous l'observé (distance
+  horizontale au plus 20 m et au moins 6 m sous lui), réglages contrôlés au démarrage, 60 s entre deux protections
+  d'observation, une seule échéance par joueur ; la RPC `tool` essayée par le vrai `core.rpc`. 30 essais.
+  **À tester en jeu** : `docs/tests/registre.md` § 9 bis (22 tests).
+- Pour T-149 (entrée sur la branche `agents/T-112`, relecture réseau R-3 de T-138) : appeler
+  `exports.vava_admin:isInvulnerable(src)` une fois par effet, au moment où il touche sa cible, jamais en boucle ni à
+  chaque image.
+- Suite : T-151 (envois de `vava_admin` par `core.net.send`), trouvée pendant T-138.
 
 ### T-139 — Apparition confirmée par le core
-- Agent : vava-dev-lua (cette tâche autorise à toucher le core, `server/players/`) · Dépend de : — · Statut : à faire
+- Agent : vava-dev-lua (cette tâche autorise à toucher le core, `server/players/`) · Dépend de : — · Statut : à tester
+  en jeu (relu sécurité, contre-relu, relu réseau ; suites appliquées)
 - Spec T-110 § 13, option B : le temps de jeu, les positions, `vava_arrival` et les envois de proximité croient encore
   la déclaration `core:characters:spawned` du client. Le core la confirme lui-même quand le ped existe après l'ordre
   d'apparition (délai de grâce), et expose l'état confirmé.
+- Fait le 31 octobre 2026 (branche `agents/T-139`) : `vAvA_core` 0.14.0, apparition confirmée par le serveur (ped vu
+  au point ordonné, déclaration du client rattachée à son ordre, d'office après le délai de grâce, jamais pour un
+  personnage qui se décharge ; hook `core:character:spawned` avec `forced`, `core.characters.isSpawned`). Rapport
+  `docs/plan/rapports/T-139.md` (suites S-1 à S-6, R-1 à R-3, C-1 à C-3). **À tester en jeu** :
+  `docs/tests/personnage.md` § 8 bis (10 tests).
 
 ### T-140 — Mains vides pour incanter
 - Agent : vava-dev-lua (cette tâche autorise à toucher `vava_magic`) · Dépend de : T-111, T-116 · Statut : à tester en

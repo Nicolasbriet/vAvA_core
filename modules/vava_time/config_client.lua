@@ -1,11 +1,11 @@
 --[[
     vava_time/config_client.lua
     Rôle : donnée de jeu du temps que lit le client (le serveur la lit aussi) : rythme de l'horloge, calendrier et
-           saisons, ciels (seul endroit où paraissent les noms de météo de GTA) et leur cours, commandes, réglages du
-           client, textes. Téléchargé par chaque joueur. `calendar`, `weather` et `messages` y sont entiers : le
-           client les passe à shared/calendar.lua et shared/weather.lua. Ce que lit le seul serveur (décalage permis,
-           nuits de gel, Conseil, outil du Registre, pont du web, boucle, débits) est dans config.lua, servi au seul
-           serveur (T-132). Durées en millisecondes sauf mention contraire.
+           saisons, ciels (seul endroit où paraissent les noms de météo de GTA), commandes, réglages du client, textes.
+           Téléchargé par chaque joueur. `calendar`, `weather.types` et `messages` y sont entiers : le client les
+           passe à shared/calendar.lua et shared/weather.lua. Ce que lit le seul serveur (décalage permis, cours des
+           ciels, nuits de gel, Conseil, outil du Registre, pont du web, boucle, débits) est dans config.lua, servi au
+           seul serveur (T-132). Durées en millisecondes sauf mention contraire.
     Dépendances : shared/constants.lua
 ]]
 
@@ -53,9 +53,8 @@ VavaTime.config = {
         },
     },
 
-    -- Ciels. `gta` : nom de météo du jeu ; `phrase` : ce qu'en dit /date ; `snow` : neige (le cycle n'en tire qu'en
-    -- hiver, et jamais si `snow = false`) ; `tracks` : traces de pas et de roues dans la neige au sol. L'ordre est celui
-    -- des interfaces.
+    -- Ciels. `gta` : nom de météo du jeu ; `phrase` : ce qu'en dit /date ; `snow` : neige (cours des ciels :
+    -- config.lua) ; `tracks` : traces de pas et de roues dans la neige au sol. L'ordre est celui des interfaces.
     weather = {
         types = {
             { id = 'clair', gta = 'CLEAR', label = 'Ciel clair', phrase = 'le ciel est clair' },
@@ -72,34 +71,6 @@ VavaTime.config = {
             { id = 'tempete', gta = 'BLIZZARD', label = 'Tempête de neige', phrase = 'la tempête de neige fait rage', snow = true },
             { id = 'neige_au_sol', gta = 'XMAS', label = 'Neige au sol', phrase = 'la neige couvre le sol', snow = true, tracks = true },
         },
-        -- Ciels qui peuvent suivre chacun (le même compris : il dure alors une durée de plus). Si aucun n'est de saison,
-        -- le cycle tire parmi tous les ciels de la saison.
-        next = {
-            clair = { 'clair', 'soleil', 'nuages', 'brume', 'brouillard' },
-            soleil = { 'soleil', 'clair', 'nuages', 'brume' },
-            nuages = { 'nuages', 'clair', 'couvert', 'eclaircies', 'brouillard' },
-            couvert = { 'couvert', 'nuages', 'pluie', 'brouillard', 'neige_legere' },
-            eclaircies = { 'eclaircies', 'clair', 'nuages' },
-            pluie = { 'pluie', 'couvert', 'orage', 'eclaircies' },
-            orage = { 'pluie', 'eclaircies', 'couvert' },
-            brume = { 'brume', 'clair', 'nuages' },
-            brouillard = { 'brouillard', 'nuages', 'clair', 'couvert' },
-            neige_legere = { 'neige_legere', 'neige', 'couvert', 'nuages' },
-            neige = { 'neige', 'neige_legere', 'tempete', 'couvert' },
-            tempete = { 'neige', 'neige_legere' },
-            neige_au_sol = { 'neige_au_sol', 'neige_legere', 'couvert' },
-        },
-        -- Poids de chaque ciel par saison ; absent ou 0 : jamais tiré par le cycle dans cette saison.
-        seasons = {
-            printemps = { clair = 3, soleil = 1, nuages = 3, couvert = 2, eclaircies = 2, pluie = 3, orage = 1, brouillard = 1 },
-            ete = { clair = 4, soleil = 4, nuages = 2, couvert = 1, eclaircies = 1, pluie = 1, orage = 1, brume = 1 },
-            automne = { clair = 2, nuages = 3, couvert = 3, eclaircies = 1, pluie = 3, orage = 1, brouillard = 2, brume = 1 },
-            hiver = { clair = 2, nuages = 2, couvert = 3, pluie = 1, brouillard = 2, neige_legere = 2, neige = 1, tempete = 0.3 },
-        },
-        snow = true,
-        durationMinutes = { 25, 50 },                       -- durée d'un ciel, tirée dans la fourchette
-        durations = { orage = { 10, 20 }, tempete = { 10, 20 } },
-        fadeSeconds = 90,                                   -- transition d'un ciel à l'autre (cycle)
     },
     -- Commandes : /date pour tous ; /ciel et ses sous-commandes (noms à taper) pour le Conseil. `holdWord` : second mot
     -- de « imposer » pour figer le ciel imposé.

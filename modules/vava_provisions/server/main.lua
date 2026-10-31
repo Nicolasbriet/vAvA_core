@@ -2,9 +2,9 @@
     vava_provisions/server/main.lua
     Rôle : déclaration du module auprès du core : touche et commande au registre, config vérifiée (rules.validateConfig :
            refus avec le chemin fautif), objets déclarés s'ils manquent, recette de l'outre à l'artisanat, points d'eau
-           (une zone du core par point), intention du client (RPC à schéma strict et débit limité), hooks (outre bue,
-           retour de l'inventaire, de l'artisanat et des compétences, joueurs déchargés ou partis), commande du
-           Conseil. Aucune boucle serveur, aucune requête SQL.
+           (une zone du core par point), intention du client (RPC à schéma strict et débit limité), hooks (palier de
+           l'outre relevé avant la gorgée, outre bue, retour de l'inventaire, de l'artisanat et des compétences,
+           joueurs déchargés ou partis), commande du Conseil. Aucune boucle serveur, aucune requête SQL.
     Dépendances : tous les fichiers server/ du module
 ]]
 
@@ -25,11 +25,14 @@ local RPC = VavaProvisions.RPC
 
 -- identifiant du point d'eau désigné par le client (le seul argument du RPC)
 local POINT = { type = 'string', min = 1, max = VavaProvisions.ID_MAX, pattern = VavaProvisions.ID_PATTERN }
+-- priorité de l'abonné before de vava_inventory:use (bornes du core 0 à 1000, défaut 100) : le dernier
+local USE_PRIORITY = 1000
 
 --- Joueur déchargé ou parti : délais et traitements oubliés.
 ---@param payload { source: integer }
 local function forget(payload)
     draw.forget(payload.source)
+    containers.forget(payload.source)
     admin.forget(payload.source)
 end
 
@@ -84,6 +87,10 @@ local function setup()
         local id, hookErr = core.hooks.after(def[1], def[2])
         if not id then return false, def[1] .. ' : ' .. tostring(hookErr) end
     end
+    -- palier de l'outre d'eau relevé avant la gorgée (la pile peut partir avec sa dernière unité) ; jamais de refus,
+    -- après les autres abonnés (qui peuvent refuser la gorgée)
+    local beforeId, beforeErr = core.hooks.before('vava_inventory:use', containers.beforeUse, USE_PRIORITY)
+    if not beforeId then return false, 'vava_inventory:use : ' .. tostring(beforeErr) end
 
     admin.start()
     VavaProvisions.ready = true

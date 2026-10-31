@@ -149,7 +149,7 @@ core.hooks.runAfter('vava_inventory:move', payload)
 | `core:player:dropped` | `{ source, accountId, reason }` — après déchargement et sauvegarde du personnage |
 | `core:character:created` | `{ source, accountId, characterId, firstName, lastName, sex }` — inventaire de départ, compte… |
 | `core:character:loaded` | `{ source, accountId, characterId, playSeconds }` — chargez vos données ici (avant l'apparition) |
-| `core:character:spawned` | `{ source, accountId, characterId }` — apparition confirmée par le client (chaque apparition, réanimation comprise) : le ped est en place, sa vie et sa position sont lisibles |
+| `core:character:spawned` | `{ source, accountId, characterId, forced }` — apparition **confirmée par le serveur** (chaque apparition, réanimation et téléportation comprises) : le ped a été lu au point ordonné, sa vie et sa position sont lisibles. Depuis 0.14.0, la déclaration du client ne suffit plus (voir « Apparition confirmée par le serveur » sous `core.characters`) ; `forced = true` : confirmée d'office, sans déclaration du client |
 | `core:character:unloading` | `{ source, accountId, characterId, reason, playSeconds }` — sauvez vos données ici (le core attend) ; `playSeconds` : temps de jeu total, cette session comprise |
 | `core:character:deleted` | `{ source, accountId, characterId }` |
 | `core:character:fieldChanged` | `{ characterId, field, value }` |
@@ -199,11 +199,12 @@ la porte fermée jusqu'à ce qu'il soit relancé, réparé ou retiré de la list
 | `defineField(name, { schema, default?, visibility? })` | `true` ou `false, err` |
 | `create(source, { firstName, lastName, sex }, initialFields?)` | `true, résumé` ou `false, code` — création par un module, avec des valeurs de champs déclarés (validées par leur schéma, sinon `invalid_fields`) |
 | `getActive(source)` | `{ id, accountId, source, firstName, lastName, sex, playSeconds }` ou `nil` |
-| `playSeconds(characterId)` | temps de jeu en secondes entières (temps en cours compris), ou `nil, 'not_loaded'` — compté côté serveur entre l'apparition confirmée et le déchargement, la sélection exclue ; relevé toutes les `persistence.positionSampleMs`, écrit avec le personnage (colonne `play_seconds`) ; depuis 0.6.0 |
+| `playSeconds(characterId)` | temps de jeu en secondes entières (temps en cours compris), ou `nil, 'not_loaded'` — compté côté serveur entre l'apparition confirmée (par le serveur depuis 0.14.0) et le déchargement, la sélection exclue ; relevé toutes les `persistence.positionSampleMs`, écrit avec le personnage (colonne `play_seconds`) ; depuis 0.6.0 |
 | `get(characterId, field)` | valeur (défaut si jamais écrite), ou `nil, 'not_loaded' \| 'unknown_field'` |
 | `set(characterId, field, value)` | `true` ou `false, err` — validé, sauvegardé, diffusé |
 | `unload(source)` | `true` ou `false, code` — retour à la sélection |
 | `spawn(source, coords?)` | `true` ou `false, code` — `{ x, y, z, heading? }` ; sans coordonnées : dernière position |
+| `isSpawned(source)` | `true` si l'apparition du personnage actif est confirmée par le serveur, `false` pendant une apparition ou une téléportation en cours, `false, 'no_character'` sans personnage actif — depuis 0.14.0 |
 
 Champs de personnage :
 
@@ -261,10 +262,51 @@ Détails de la garde (0.9.0) :
 
 Persistance et positions :
 
-- La position est lue **côté serveur** (OneSync obligatoire), seulement après confirmation de l'apparition.
+- La position est lue **côté serveur** (OneSync obligatoire), seulement après confirmation de l'apparition par le
+  serveur.
 - Sauvegarde groupée des personnages modifiés toutes les `persistence.saveIntervalMs`, et immédiate au
   déchargement ou à la déconnexion. Une écriture en échec est retentée sans perte.
 - FiveM n'attend pas les écritures à l'arrêt du serveur : **lancer `vava_saveall` avant `quit`**.
+
+Apparition confirmée par le serveur (0.14.0, T-139) :
+
+- Après chaque ordre d'apparition (sélection, `spawn` d'un module), le personnage n'est **pas apparu** : ni temps de
+  jeu, ni position relevée, ni envois de proximité (`core.net`), ni entrée dans une zone (`core.zones`),
+  `isSpawned` faux. Le serveur lit alors le ped du joueur (`GetPlayerPed`, `GetEntityCoords`) toutes les
+  `spawn.confirm.checkMs` (500 ms), pour ces seuls joueurs, jusqu'à le voir au point ordonné : écart **horizontal**
+  au plus `spawn.confirm.radius` (10 m ; la hauteur ne compte pas, le ped peut tomber du point).
+- La déclaration du client (RPC `core:characters:spawned`, à la fin du fondu) confirme l'apparition **si le ped a été
+  vu au point** depuis l'ordre, aussitôt ou au passage suivant. Une déclaration faite ailleurs ne confirme rien. Chaque
+  ordre porte un numéro (`seq`) que la déclaration renvoie : une déclaration d'un ordre précédent, arrivée après le
+  suivant, ne compte pas (`not_ordered`).
+- Seul un personnage **encore chargé** (session active sur lui) est confirmé : un déchargement (`unload`, départ du
+  joueur) oublie l'apparition en attente dès son début, avant le hook `core:character:unloading` et la sauvegarde, et
+  le personnage n'est plus apparu pendant ceux-ci ; aucune confirmation, ni hook `core:character:spawned`, ne vient
+  pour un personnage qui part.
+- Sans déclaration, l'apparition est confirmée **d'office** `spawn.confirm.graceMs` (20 s, au-delà du plus long
+  chargement normal du client) après l'ordre, si le ped a été vu au point : hook avec `forced = true` et une ligne
+  `[spawn] … confirmée d'office` en console.
+- Jamais vu au point : une ligne `[spawn] joueur N (compte #A, personnage #P) : ped jamais vu au point d'apparition`
+  après `graceMs` (une par ordre), et le personnage reste non apparu jusqu'à ce qu'il y soit vu (une nouvelle
+  apparition ou une reconnexion le remet en route). Son ped n'est alors plus relu que toutes les
+  `spawn.confirm.lateCheckMs` (5 s) ; une déclaration du client le relit aussitôt. Un nouvel ordre remplace le point
+  attendu.
+- Au plus `spawn.confirm.maxPerCheck` (16) confirmations par passage (hooks et zones) ; les suivantes au passage
+  suivant. Une erreur pendant un passage garde l'apparition en attente et la retente au suivant (une ligne d'erreur
+  par ordre).
+- Réglages invalides ou hors bornes (`config/server.lua` → `spawn.confirm` : `checkMs` 50 à 5000, `radius` 1 à 50,
+  `graceMs` du plus long chargement normal du client — `config/shared.lua`, `spawn` : fondu × 4 + modèle + collisions,
+  17 s par défaut ; jamais moins de 5000 ni de `checkMs` — à 120000, `lateCheckMs` `checkMs` à 60000, `maxPerCheck`
+  1 à 1024) : le core ne démarre pas (comme une limite de débit invalide).
+- Limites : la position lue est celle que le client du joueur synchronise pour son ped (OneSync) ; le serveur constate
+  qu'il est allé au point ordonné, pas qu'il n'en bouge pas ensuite par un moyen interdit. Seul l'écart horizontal
+  compte (un point ordonné sous terre, comme le retour d'une observation du Registre, reste valable). Un client qui
+  n'exécute pas l'ordre reste non apparu : il n'est ni témoin (joueurs proches) ni destinataire des envois de
+  proximité et des zones ; la ligne « jamais vu au point » est la trace laissée au Conseil, et il n'en sort qu'en
+  passant au point ou par un nouvel ordre (une téléportation qui ne passe pas par `spawn` ne le débloque pas).
+- Un module qui veut savoir si un joueur est en place lit `isSpawned` ou écoute `core:character:spawned` ; il ne
+  refait pas sa propre lecture d'office. Il déclare `coreVersion = '0.14.0'` s'il se sert d'`isSpawned` ou de
+  `forced` (le hook existait avant : avec un core antérieur à 0.14.0, il suit la seule déclaration du client).
 
 Apparition : le core remplace `spawnmanager`. Ne pas démarrer `spawnmanager`, `basic-gamemode` ni de carte
 `mapmanager` avec vAvA_core. Un personnage sans position enregistrée (donc tout nouveau personnage) apparaît à
@@ -433,9 +475,10 @@ local ok, count = core.net.sendNearWith({ from = source }, coords, 30.0, 'vava_c
 - **Instances** : sans `bucket` ni `from`, un joueur d'une autre instance (routing bucket) au même endroit reçoit le
   message. Dès qu'un module a des instances (intérieurs, cachots, essais), il fournit `from` (l'auteur de l'action)
   ou `bucket` à chaque envoi de proximité.
-- **Proches** : personnages chargés **et apparus**, ped existant, distance 3D ≤ rayon (0 < rayon ≤ 1 000 m, sinon
-  `invalid_radius`), positions lues par le serveur (gardées 50 ms, `net.near.positionCacheMs`, 0.11.0 : un passage
-  des zones et les envois qui le suivent ne relisent rien) ; `coords` : `vector3` ou `{ x, y, z }` finis
+- **Proches** : personnages chargés **et apparus** (apparition confirmée par le serveur depuis 0.14.0), ped
+  existant, distance 3D ≤ rayon (0 < rayon ≤ 1 000 m, sinon `invalid_radius`), positions lues par le serveur
+  (gardées 50 ms, `net.near.positionCacheMs`, 0.11.0 : un passage des zones et les envois qui le suivent ne relisent
+  rien) ; `coords` : `vector3` ou `{ x, y, z }` finis
   (`invalid_coords`). Personne à portée : `true, 0, 0, false`, rien n'est sérialisé.
 - **Retour** : `envoyés` = joueurs servis, `octets` = taille d'**un** message (charge msgpack + nom de l'évènement),
   `latent` = booléen ; pour une liste ou un rayon (0.11.0), 5e valeur : la **liste des joueurs sautés** (latent refusé),
@@ -771,9 +814,10 @@ Réglages d'un module (T-132, aucune API du core) : chaque module lit sa config 
 (`shared_scripts`, téléchargé par chaque joueur) ouvre la table avec ce que lit le client et pose `clientFile = true` ;
 `config.lua` (en tête des `server_scripts`, jamais téléchargé) la complète avec ce que lit le seul serveur. Basculés :
 `vava_atelier` 1.2.0, `vava_arrival` 1.2.0 ; `vava_chancellerie` 1.7.1 ne sert plus rien aux joueurs ; métiers (T-141) :
-`vava_skills` 1.3.0, `vava_farming` 1.8.0, `vava_crafting` 1.6.0, `vava_gathering` 1.7.0, `vava_provisions` 1.1.0 (1.2.0 :
+`vava_skills` 1.3.0, `vava_farming` 1.8.0, `vava_crafting` 1.6.0 (1.7.0 : types de stations au seul serveur), `vava_gathering` 1.7.0, `vava_provisions` 1.1.0 (1.2.0 :
 textes du Conseil au seul serveur, `shared/rules.lua` au seul serveur, `shared/texts.lua` partagé) ;
-socle (T-142) : `vava_inventory` 1.9.0, `vava_combat` 1.1.0, `vava_health` 1.5.0, `vava_time` 1.4.0, `vava_codex` 1.6.0,
+socle (T-142) : `vava_inventory` 1.9.0, `vava_combat` 1.1.0, `vava_health` 1.5.0, `vava_time` 1.4.0 (1.5.0 : cours des
+ciels et son tirage au seul serveur, T-146), `vava_codex` 1.6.0,
 `vava_admin` 1.9.0, `vava_voice` 1.4.0, `vava_chat` 1.4.0, `vava_cameras` 1.5.0, `vava_appearance` 1.1.0,
 `vava_needs` 1.3.0, `vava_world` 1.2.0, exemples `vava_anim_test` 1.2.0, `vava_dev_characters` 1.4.0,
 `vava_example_combat` 1.2.0 ; les ressources sans partie serveur n'ont que `config_client.lua` (`client_scripts`) :
@@ -1378,6 +1422,49 @@ voulu (l'écran des joueurs non plus, voir plus bas).
   (droit `tools`, inscrit au journal) ; sans droit, la touche ne fait rien. Pendant le vol, le membre est invisible
   des autres joueurs (il se voit lui-même) et retrouve ensuite sa visibilité d'avant, arrêt du module compris
   (collision, gravité et vulnérabilité rétablies sur-le-champ).
+- **Invulnérabilité tenue par le serveur** (1.11.0, T-138) : l'outil « Invulnérabilité » et le vol libre (droit
+  `tools`), et l'observation (droit `spectate`), ne s'arrêtent plus au client (`SetEntityInvincible`, gardé pour le ped :
+  chute, noyade, décor). Le serveur garde en mémoire, par joueur, son personnage, son compte et chaque raison avec
+  l'instant et le membre qui l'a posée ; le modificateur d'annulation `vava_admin:invulnerabilite` du registre
+  `vava_health:modifiers` (étape `annulation`, priorité 10, déclaré avec `kinds` : tous les types de la chaîne sauf
+  `monde`) annule alors **tout coup et tout sort qui blessent** (`cancelled = 'invulnerable'`, `'spectating'` pendant
+  une observation ; inscrits au journal des coups de `vava_health` quand ils viennent d'un joueur). Les **effets sans
+  dégâts** (recul, renversement, mouillé, ralenti des sorts) ne passent pas par la chaîne et **ne sont pas couverts** :
+  un module qui veut les épargner lit l'export `isInvulnerable` (pas encore branché dans `vava_magic`). **Décision**
+  (relecture S-6) : la faim et la soif (`privation`) sont annulées aussi ; avant 1.11.0, elles traversaient
+  l'invincibilité locale. Le modificateur ne lit que la mémoire du Registre et deux positions (natives) ; il ne cède
+  jamais la main.
+  - **Observation bornée** (S-1, C-1 à C-3) : elle ne protège que si le corps du membre, lu par le serveur, est caché
+    sous l'observé : à `invulnerability.spectateRadius` (20 m) au plus à l'horizontale **et** au moins
+    `invulnerability.spectateMinDepth` (6 m) plus bas que lui (l'ancrage le place à `spectate.anchorDepth`, 12 m, de
+    `config_client.lua`) ; en surface, même tout près, il n'est pas protégé. Au plus `invulnerability.spectateMaxMs`
+    (10 min) après le début de l'observation (une observation remplacée garde l'instant de la première) ; à l'échéance,
+    elle tombe (une seule échéance armée par joueur, réarmée pour le temps restant). Une nouvelle observation ne protège
+    qu'après `invulnerability.spectateCooldownMs` (60 s) depuis la fin de la protection précédente du même compte
+    (observation accordée quand même, ligne de console). Au démarrage, des réglages incohérents (seuil nul, ou pas
+    strictement inférieur à `anchorDepth`, rayon, durée ou délai invalides) donnent une ligne `warn`, et l'observation
+    ne protège plus (l'outil et le vol libre, si). Chaque retrait de la protection d'une observation (fin, durée
+    dépassée, déchargement, départ) est inscrit au journal (« Observation : protection levée », au nom de la Console,
+    cause dans les détails ; S-5).
+  - **Retraits** : par le levier ou `F2` (au journal, comme la pose), à la fin de la dernière observation, au
+    déchargement du personnage (départ, retour à la sélection) et au départ du joueur.
+  - **Changement de rang** (S-3, S-4 ; `staff.set` : panneau et console, `staff.force` : Chancellerie) : si le joueur
+    du compte est en jeu, les raisons dont le droit manque au nouveau rang sont retirées (« Outils retirés (rang
+    changé) », au nom de la Console, `outils` dans les détails) et ne reviennent pas à une re-promotion ; si le rang perd
+    `tools` ou `spectate`, l'évènement `vava_admin:toolsReset` (sans valeur, au **seul** joueur concerné) coupe chez lui
+    vol libre, invisibilité, invulnérabilité locale et observation, avec un message s'il en avait un d'actif
+    (`messages.toolsWithdrawn` de `config_client.lua`). Même sans changement de rang annoncé, le modificateur relit le
+    rang à chaque coup.
+  - **Couper sans droit** : l'intention `tool` éteinte (`enabled = false`) est permise à tout joueur, sans journal
+    (couper ne donne rien) ; l'allumer reste refusé sans le droit `tools` (`forbidden`, aucune entrée créée).
+  - Poser une raison demande un personnage chargé (`no_character`). Les outils ne visent que le membre lui-même : la
+    règle du rang ne s'y applique pas. Déclaré au démarrage si `vava_health` est là, redéclaré à chaque retour de
+    `vava_health` (appel isolé : `VavaAdmin.declare`) ; sans `vava_health`, rien ne change. Réglages `invulnerability`
+    de `config.lua` (`priority`, `label`, `spectateRadius`, `spectateMinDepth`, `spectateMaxMs`,
+    `spectateCooldownMs`) et textes du journal
+    (`logSpectateEnded`, `logToolsWithdrawn`, `spectateEnded`) ; un `config.lua` d'avant 1.11.0 sans eux : une ligne
+    `warn` au démarrage, modificateur non déclaré (l'outil reste local, comme avant). Règles pures :
+    `shared/invulnerability.lua` (servi au seul serveur ; `tests/spec/admin_invulnerability_spec.lua`).
 
 **Exports serveur** :
 
@@ -1387,6 +1474,7 @@ voulu (l'écran des joueurs non plus, voir plus bas).
 | `can(source, droit)` | booléen |
 | `rankOf(source)` | `{ name, label, level }` ou `nil` |
 | `isFrozen(source)` | booléen — immobilisé par le Conseil (Registre) ; lecture seule : un module qui fige et libère un ped (gel d'un sort) ne libère pas celui que le Conseil retient ; depuis 1.6.0 |
+| `isInvulnerable(source)` | booléen — le Conseil tient ce joueur pour invulnérable (outil, vol libre, observation caché sous l'observé), même jugement que le modificateur de la chaîne ; lecture seule, faux si le Registre n'est pas prêt ; pour qu'un module épargne aussi ses effets sans dégâts (recul, renversement…). À appeler **une fois par effet** (au moment où il touche sa cible), jamais en boucle ni à chaque image : pour un joueur protégé, il lit le personnage actif dans le core et, pendant une observation, deux positions ; depuis 1.11.0 |
 | `ban(compte, heures, motif)` | `true, n° du ban` ou `false, code` — au journal sous le nom du module appelant |
 | `kick(source, motif)` | `true` ou `false, code` |
 | `log(source, libellé, détails?)` | `true` ou `false, code` — inscrit au journal une action d'un membre du Conseil faite dans un module (libellé lu tel quel, 32 caractères ; détails `{ clé = texte ou nombre }`, 8 au plus) ; depuis 1.1.0 |
@@ -2101,17 +2189,31 @@ config et tests : `modules/vava_crafting/README.md`.
 Demande le core 0.11.0 (abonnements de zone, depuis 1.5.0), `vava_inventory` 1.4.0, `vava_skills` 1.0.0,
 `vava_gathering` 1.0.0 ; facultatifs : `vava_hud`, `vava_admin` (droit `metiers`), `vava_chat`, `vava_health` (à terre).
 
-**Registres** : `vava_crafting:stations` (types : `{ label, skills, fuel?, anim, prop }`) et `vava_crafting:recipes`
+**Registres** : `vava_crafting:stations` (types : `{ label, skills, fuel?, anim, prop }` ; depuis 1.7.0, `anim` doit être
+une clé de `anims` de `config_client.lua`, sinon l'ajout est refusé : « animation '…' inconnue ») et `vava_crafting:recipes`
 (`{ label, skill, level, station, tool?, durationMs, difficulty, xp, signed?, signedIfQuality?, durability?,
 transmission?, fragments?, ingredients = { { item, quantity, minTier? } }, output = { item, quantity } }`), remplis par
-la config, ouverts aux autres modules ; chaque recette est aussi déclarée à `vava_skills:recipes`. Les armes de
+la config, ouverts aux autres modules ; chaque recette est aussi déclarée à `vava_skills:recipes`. Un module qui ajoute
+une recette à `vava_crafting:recipes` la déclare **aussi** à `vava_skills:recipes` (et la redéclare au
+`core:module:ready` de `vava_skills`) : sinon les compétences ne la connaissent pas et la station la refuse
+(`not_known`). Depuis 1.8.0 (T-147), l'artisanat le signale : une ligne `WARN` par recette absente (« recette 'x'
+(déclarée par y) absente de vava_skills:recipes … »), une fois, `skillsCheck.delayMs` (5 s) après son démarrage, après
+l'ajout d'une recette par un autre module, après le retrait d'une recette des compétences et au retour de
+`vava_skills` (délai borné de 1 s à 10 min ; des demandes rapprochées ne le repoussent pas au-delà de 4 × le délai) ;
+une recette signalée puis déclarée aux compétences relance le contrôle, et une ligne d'information le dit ; au menu,
+une telle recette libre est verrouillée (champ `unregistered = true` de la réponse de `vava_crafting:open`, marque
+« Indisponible ») au lieu d'être proposée puis refusée. Le champ `known`, lu par personne, n'est plus envoyé (1.8.0). Les armes de
 `vava_combat` (Épée longue, Hache d'armes, Masse d'armes, Dague, Bâton ferré, Bouclier rond) y sont ajoutées par ce module,
 signées, solidité tirée de sa fiche ; l'Épée courte reste une recette de l'artisanat (§ `vava_combat`).
 
 **Stations chez les joueurs** (depuis 1.5.0) : chaque station placée est une zone du core (`core.zones`, nom = son
 identifiant, cercle de 2 m, marge de 100 m : `streaming.zoneRadius`, `streaming.radius` + `streaming.subscribeSlack`) ;
-état `def` → `{ type, label, x, y, z, heading, prop }` (dessin, ni qualité ni propriétaire) et `s` → `{ fuel, busy }`,
-reçus des seuls joueurs proches, puis en différences. Plus aucune clé GlobalState (les anciennes
+état `def` → `{ type, typeLabel, capacity?, label, x, y, z, heading, prop }` (dessin, ni qualité ni propriétaire ;
+depuis 1.7.0, nom du type et réserve de combustible, absente sans combustible) et `s` → `{ fuel, busy }`,
+reçus des seuls joueurs proches, puis en différences. Depuis 1.7.0 (T-144), le client ne connaît aucun type de
+station (`stationTypes` est dans `config.lua`, servi au seul serveur) : un type déclaré au registre par un autre module
+(le composteur de `vava_farming`) a son invite et son menu sans rien ajouter côté client ; son animation (clé de
+`anims`, dans `config_client.lua`) est donnée par le serveur au début d'un geste. Plus aucune clé GlobalState (les anciennes
 `vava_crafting:station:<id>` et `vava_crafting:stations` sont effacées une fois au démarrage) ni d'évènement
 `vava_crafting:station` (le menu ouvert suit la zone). L'état est public : chaque action revérifie distance, accès et
 occupation côté serveur. Un son ou un effet de station vise `core.zones.subscribers(id)` ou `core.net.sendNear`.
@@ -2170,7 +2272,9 @@ son propriétaire ou le genre branché par `registerAccess` —, dépôts et ret
 minute, grenier, personnage, objet et sens, quantités additionnées, attente bornée par `persistence.granaryLogMax` ;
 migration 0002 : colonne `minute` et clé unique, les lignes d'avant restent une par geste ; hook `granary` toujours
 par geste) ; **composteur** (type de
-station et recette ajoutés aux registres de `vava_crafting`, station placée par `addStation`). Détail, config et tests :
+station et recette ajoutés aux registres de `vava_crafting`, station placée par `addStation` ; depuis 1.9.0, la recette
+`compost` est aussi déclarée à `vava_skills:recipes` — libre, Agriculture, niveau 0 — et redéclarée au retour de
+`vava_skills`, sans quoi le composteur la refuse, code `not_known`). Détail, config et tests :
 `modules/vava_farming/README.md`. Demande le core 0.11.0 (abonnements de zone, 1.7.0), `vava_inventory` 1.4.0, `vava_skills` 1.0.0, `vava_gathering`
 1.0.0, `vava_crafting` 1.1.0 ; facultatifs : `vava_hud`, `vava_admin` (droit `metiers`), `vava_chat`, `vava_health`
 (à terre), `vava_time` (saisons, nuits de gel).
@@ -2239,7 +2343,7 @@ couverte ; `&frost=1` : gel annoncé ; `&season=ete` : « Couvrir » non propos�
 
 ### `vava_provisions`
 
-Les vivres du royaume (1.2.0, T-130 ; réglages en deux fichiers, T-141 et T-143) : objets `eau` (Outre d'eau) et `outre` (Outre vide), points d'eau (puits,
+Les vivres du royaume (1.3.0, T-130 ; réglages en deux fichiers, T-141 et T-143 ; palier de l'outre, T-135) : objets `eau` (Outre d'eau) et `outre` (Outre vide), points d'eau (puits,
 fontaines, sources) où l'on remplit ses outres et où l'on boit, outre rendue vide qui se fend parfois, outres faites à la
 tannerie. Ordre de démarrage : après `vava_farming`, avant `vava_codex` et `vava_arrival`. Demande le core 0.11.0
 (`core.zones`, `core.net`, registre `core:commands`), `vava_ui` et `vava_inventory` 1.8.0 ; facultatifs : `vava_needs`
@@ -2260,8 +2364,15 @@ SQL. Détail et réglages : `modules/vava_provisions/README.md`.
   les 3 min ; fontaine sans fond), pleine à chaque démarrage. `rules.validatePoint` est le seul juge d'un point ;
   `points.put` et `points.drop` sont prêts pour l'éditeur de l'Atelier.
 - **Outre rendue** : hook `vava_inventory:use` (after) ; seulement si `consumed`, pour un objet de `containers` ; dans
-  un thread, pour le même personnage : `add(outre, 1)`, sauf une fois sur dix (`tearChance`) où elle se fend ; sans
-  place, elle est abandonnée. Avis au seul buveur.
+  un thread, pour le même personnage : `add(outre, 1, { tier }?)` au palier de l'Outre d'eau bue, sauf quand elle se
+  fend (`tearChanceByTier[palier]`, sinon `tearChance` : 15 %, 10 %, 5 %, 2,5 %, 1 % du palier 1
+  au palier 5, 10 % sans palier) ; sans place, elle est abandonnée. Avis au seul buveur.
+- **Palier de l'outre** (1.3.0, T-135) : la métadonnée `tier` (1 à 5) posée par `vava_crafting` passe de l'outre vide à
+  l'Outre d'eau (remplissage pile par pile : retraits par `instanceId`, ajouts `{ item = 'eau', quantity, metadata =
+  { tier } }` regroupés par palier) et revient à l'outre vide ; aucune autre métadonnée n'est gardée, une outre sans
+  palier reste sans métadonnées. Le palier de l'Outre d'eau bue est relevé par un abonné `before` de
+  `vava_inventory:use` (priorité 1000, lecture `getItems`, jamais de refus), la pile pouvant disparaître avec sa
+  dernière unité.
 
 | RPC | `args` | `rateLimit` | Réponse |
 |---|---|---|---|
@@ -2269,7 +2380,8 @@ SQL. Détail et réglages : `modules/vava_provisions/README.md`.
 
 Le client ne dit ni ce qu'il veut faire, ni ce qu'il porte, ni sa soif : le serveur revérifie personnage, une demande à
 la fois, délai (3 s), à terre, point connu, distance réelle du ped (3,5 m, 3D), outres vides possédées, soif, réserve,
-puis choisit ; après le hook `drawing`, personnage et distance sont relus. Remplir : au plus 5 outres, puisages
+puis choisit ; après le hook `drawing`, personnage et distance sont relus, et les piles d'outres relues (`getItems`).
+Remplir : au plus 5 outres, puisages
 réservés **avant** l'échange tout ou rien, rendus s'il échoue (besace pleine ou trop lourde et soif : gorgées sur place).
 Boire : soif + 20, refusé dès 95.
 

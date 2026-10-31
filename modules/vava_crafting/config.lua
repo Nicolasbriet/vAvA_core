@@ -3,12 +3,12 @@
     Rôle : donnée de jeu de l'artisanat lue par le seul serveur (servi au seul serveur, jamais téléchargé par les
            joueurs) : paliers, formule de qualité, chefs-d'œuvre (palier, fenêtre et lettres du baptême), poinçons,
            journal d'un objet, garde de la signature, réparation, durées, tolérances des gestes, leçons, zone des
-           stations, droits, débits, outils, stations placées, objets déclarés, recettes de départ, textes. Complète la
-           table ouverte par config_client.lua (longueur d'un nom, durée de la réparation, distance d'interaction,
-           streaming, touche, types de stations, animations) sans en réécrire une clé (T-132). Modifiable sans toucher
+           stations, contrôle des recettes auprès des compétences, droits, débits, outils, types de stations,
+           stations placées, objets déclarés, recettes de départ, textes. Complète la table ouverte par config_client.lua (longueur d'un nom, durée de la réparation, distance
+           d'interaction, streaming, touche, animations) sans en réécrire une clé (T-132). Modifiable sans toucher
            au code. Durées en millisecondes.
     Les stations placées sont des EXEMPLES autour du point d'apparition par défaut : à remplacer par les lieux du
-    royaume.
+    royaume. Les modèles des types de stations sont des EXEMPLES : à remplacer par les props du royaume.
     Dépendances : shared/constants.lua, config_client.lua
 ]]
 
@@ -91,6 +91,11 @@ config.streaming.zoneRadius = 2.0
 config.streaming.subscribeSlack = 20.0
 
 config.persistence = { flushMs = 10000 }
+-- Recettes de l'artisanat absentes de `vava_skills:recipes` (un module qui a oublié de les déclarer aux compétences) :
+-- une ligne en console par recette, `delayMs` après le démarrage, après l'ajout d'une recette par un autre module ou
+-- après le retour de vava_skills (le temps que chaque module ait déclaré les siennes), et au plus 4 × ce délai après
+-- la première demande ; borné de 1000 à 600000 (5000 si ce n'est pas un nombre) ; au menu, verrouillées (T-147).
+config.skillsCheck = { delayMs = 5000 }
 config.logRetentionDays = 180
 -- journal : pièces de ce palier et au-dessus (Excellent+)
 config.logTier = 4
@@ -111,6 +116,20 @@ config.rateLimits = {
 -- Outils d'artisan à tenir en main : objet → genre demandé par les recettes.
 config.tools = {
     marteau_forge = { kind = 'marteau' },
+}
+
+-- Types de stations : compétences servies, combustible éventuel (objet, unités par pièce, réserve), animation (une
+-- clé de `anims`, config_client.lua), modèle. Lus par le seul serveur (T-144) : le nom du type, la réserve et le
+-- modèle partent avec le dessin de chaque station (shared/stationzone.lua), l'animation avec la réponse du serveur au
+-- début d'un geste. D'autres modules en déclarent au registre `vava_crafting:stations` (le composteur de vava_farming).
+config.stationTypes = {
+    forge = { label = 'Forge', skills = { 'forge' }, fuel = { item = 'charbon', perCraft = 1, capacity = 20 }, anim = 'hammer', prop = 'prop_tool_bench02' },  -- PLACEHOLDER (modèle)
+    etabli = { label = 'Établi', skills = { 'menuiserie' }, anim = 'hammer', prop = 'prop_tool_bench02_ld' },  -- PLACEHOLDER (modèle)
+    metier_a_tisser = { label = 'Métier à tisser', skills = { 'tissage' }, anim = 'sew', prop = 'prop_table_03' },  -- PLACEHOLDER (modèle)
+    alambic = { label = 'Alambic', skills = { 'alchimie' }, anim = 'brew', prop = 'prop_table_04' },  -- PLACEHOLDER (modèle)
+    tannerie = { label = 'Tannerie', skills = { 'tannerie' }, anim = 'tan', prop = 'prop_rub_table_01' },  -- PLACEHOLDER (modèle)
+    fourneau = { label = 'Fourneau', skills = { 'cuisine' }, fuel = { item = 'bois_pin', perCraft = 1, capacity = 20 }, anim = 'cook', prop = 'prop_bbq_3' },  -- PLACEHOLDER (modèle)
+    table_arcanes = { label = 'Table d\'arcanes', skills = { 'arcanes' }, anim = 'study', prop = 'prop_table_08' },  -- PLACEHOLDER (modèle)
 }
 
 -- Stations placées : type, nom, position, qualité (0–100 : bonus de la station), propriétaire (nil : publique ;
