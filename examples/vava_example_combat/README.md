@@ -16,7 +16,8 @@ ou à l'ACE `vava.dev`, revérifiée à chaque appel, et chaque coup ou protecti
 | `/bouclier <points>` · `/bouclier erreur` · `/bouclier non` | réserve d'absorption sur soi : `vava_example_combat:bouclier` (étape `bouclier`) absorbe jusqu'à la réserve ; à 0, « bouclier brisé. » ; `erreur` le fait lever une erreur à chaque coup (essai d'isolement : le coup passe, une ligne d'erreur par minute) |
 | `/resistance <type> <pour cent>` · `/resistance non` | `vava_example_combat:resistance` (étape `resistance`) : résiste à ce type (`resisted`), ou, négatif (−100 à −1), le rend plus fort (`added`, faiblesse) |
 | `/chaine` | modificateurs déclarés dans l'ordre d'appel (export `modifiers`), puis ses propres réserves |
-| `/arme pistolet` · `/arme couteau` · `/arme non` | client : donne ou retire une arme vanilla (`weapons`, provisoires) — pour vérifier que les coups natifs entre joueurs sont annulés |
+| `/frapper_arme <n°> [multiplicateur] [technique]` | (1.1.0, T-111) coup de l'arme **tenue en main** par `exports.vava_combat:strike(soi, n°, { damage = multiplicateur ou 1, technique, tags = { parryable = true } })` : qualité de forge, usure, chaîne de dégâts ; au seul lanceur : « appliqué 12,5, bloqué 0, … — vie 41 % — Épée courte, solidité 149 / 150 » (+ « , émoussée »), ou « refusé : aucune arme en main », « refusé : trop loin », ou le code. `vava_combat` absent : « vava_combat ne répond pas. ». Joueur en jeu seulement (pas la console) |
+| `/arme pistolet` · `/arme couteau` · `/arme non` | client : donne ou retire une arme vanilla (`weapons`, provisoires) — pour vérifier que les coups natifs entre joueurs sont annulés. **`vava_combat` démarré retire les armes de `/arme` en moins d'une seconde** : faire cet essai après `stop vava_combat` |
 | `/explosion` | client : explosion vanilla à 3 m devant soi (`explosion`, provisoire) — annulée par le serveur chez les autres |
 | `/tricher` | client : vie GTA du ped local remise au maximum (un client qui refuse la vie du serveur) — corrigée en 2 à 3 s |
 
@@ -46,7 +47,9 @@ Déclarés au démarrage si le registre existe, puis de nouveau à chaque démar
 
 Avec `set vava_env dev` au `server.cfg` du serveur de test : `ensure vava_example_combat` après `vava_health`.
 `vava_health` n'est volontairement pas en `dependency` du manifeste (FiveM arrêterait l'essai à chaque
-`restart vava_health` sans le relancer).
+`restart vava_health` sans le relancer). Pour `/frapper_arme`, `ensure vava_combat` avant ; `vava_combat` n'est pas en
+`dependency` non plus (l'essai de la chaîne tourne sans lui) et n'admet l'appel de son export `strike` que des
+ressources de sa config `strike.callers` (`vava_example_combat` par défaut).
 
 ## Fichiers
 
@@ -57,4 +60,4 @@ Avec `set vava_env dev` au `server.cfg` du serveur de test : `ensure vava_exampl
 | `server/main.lua` | commandes, modificateurs d'essai, accord des commandes clientes, journal |
 | `client/main.lua` | `/arme`, `/explosion`, `/tricher` |
 
-Contrôles en jeu : [docs/tests/combat.md](../../docs/tests/combat.md) § 1.
+Contrôles en jeu : [docs/tests/combat.md](../../docs/tests/combat.md) § 1 (chaîne) et § 2 (armes).

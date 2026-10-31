@@ -127,6 +127,8 @@ Choix tranchés par le porteur du projet : un agent ne les signale pas comme des
 - **Coup déjà lancé** : un sort (projectile, éclats, présage de la Secousse) lancé debout porte encore si son
   lanceur tombe à terre avant l'impact ; la chaîne de dégâts ne le refuse pas pour `source_downed` (étiquette posée
   par le serveur, bornée dans le temps). Un coup lancé à terre reste refusé.
+- **Mains vides pour incanter** : on ne lance pas un sort avec une arme ou un bouclier en main (le mage a besoin d'un
+  garde, le guerrier d'un mage) ; vérifié par le serveur (`vava_combat:armed`). Un focaliseur viendra plus tard.
 - **Commits** : un commit par chantier, au format du dépôt, jamais un commit fourre-tout.
 
 ## Façon de travailler

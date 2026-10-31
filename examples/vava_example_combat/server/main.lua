@@ -13,12 +13,16 @@
                       <pour cent>, négatif = faiblesse) ; déclarés au setup si le registre existe, puis à chaque
                       démarrage de vava_health (hook core:module:ready) ; un modificateur ne cède jamais la main ;
       - /chaine     : modificateurs déclarés, dans l'ordre d'appel (export modifiers), et ses propres réserves ;
+      - /frapper_arme <n°> [multiplicateur] [technique] (1.1.0, T-111) : coup de l'arme tenue en main par
+                      exports.vava_combat:strike (appel isolé ; vava_combat facultatif), résultat et solidité au seul
+                      lanceur ;
       - RPC vava_example_combat:access : accord demandé par le client avant /arme, /explosion, /tricher.
       Chaque coup et chaque protection posée est inscrit au journal du Registre (vava_admin:log), ou à la console du
       serveur sans lui. Rien n'est écrit en base. Mode développement relu faux pendant un coup : toutes les réserves
       sont vidées. Réponses au seul joueur par core.net.send (vava_example_combat:message, comptées).
     Dépendances : vAvA_core (API v1, core ≥ 0.10.0), config.lua, shared/guard.lua ; vava_health ≥ 1.3.0 (export hit,
-                  modifiers, registre) ; facultatif : vava_admin (droit et journal)
+                  modifiers, registre) ; facultatifs : vava_admin (droit et journal), vava_combat ≥ 1.0.0 (exports
+                  strike et weapon, /frapper_arme)
 ]]
 
 local RESOURCE = GetCurrentResourceName()
@@ -41,6 +45,7 @@ local GetGameTimer, RegisterCommand = GetGameTimer, RegisterCommand
 
 local ADMIN = 'vava_admin'
 local HEALTH = 'vava_health'
+local COMBAT = 'vava_combat'
 local REGISTRY = 'vava_health:modifiers'
 local COMMANDS = 'core:commands'
 local RPC_ACCESS = RESOURCE .. ':access'
@@ -147,6 +152,19 @@ end
 local function health(fn, ...)
     if GetResourceState(HEALTH) ~= 'started' then return false end
     return pcall(invokeHealth, fn, ...)
+end
+
+local function invokeCombat(fn, ...)
+    local target = exports[COMBAT]
+    return target[fn](target, ...)
+end
+
+--- Export de vava_combat, isolé : vrai (appel abouti) puis ses valeurs.
+---@param fn string
+---@return boolean called
+local function combat(fn, ...)
+    if GetResourceState(COMBAT) ~= 'started' then return false end
+    return pcall(invokeCombat, fn, ...)
 end
 
 -- Modificateurs d'essai --------------------------------------------------------------------------------------------
@@ -262,6 +280,37 @@ local function hitCommand(source, args)
     journal(source, cfg.journal.hit, { cible = target, points = points, type = packet.kind, resultat = text })
 end
 
+--- /frapper_arme <n°> [multiplicateur] [technique] : coup de l'arme tenue en main (vava_combat:strike). Le
+--- multiplicateur et la technique sont revérifiés par vava_combat (invalid_options).
+local function weaponHitCommand(source, args)
+    if not admitted(source, false) then return end
+    local target = tointeger(tonumber(args[1]))
+    local multiplier = args[2] == nil and 1 or tonumber(args[2])
+    if not target or not multiplier then
+        reply(source, 'usage : /%s <n° du joueur> [multiplicateur 0,1 à 3] [technique]', C.weaponHit)
+        return
+    end
+    local called, result, code = combat('strike', source, target,
+        { damage = multiplier, technique = args[3], tags = { parryable = true } })
+    if not called then
+        reply(source, 'vava_combat ne répond pas.')
+        return
+    end
+    if not result then
+        reply(source, 'refusé : %s', cfg.reasons[code] or tostring(code))
+        return
+    end
+    local weapon = type(result.weapon) == 'table' and result.weapon or {}
+    local labelCalled, def = combat('weapon', weapon.item)
+    local label = labelCalled and type(def) == 'table' and def.label or tostring(weapon.item)
+    local function whole(value) return type(value) == 'number' and tointeger(value) or 0 end
+    local text = format('%s — %s, solidité %d / %d%s', describe(result), label, whole(weapon.durability),
+        whole(weapon.maxDurability), weapon.dull and ', émoussée' or '')
+    reply(source, '%s', text)
+    journal(source, cfg.journal.weaponHit, { cible = target, arme = tostring(weapon.item), multiplicateur = multiplier,
+        resultat = text })
+end
+
 --- /esquive
 local function dodgeCommand(source)
     if not admitted(source, false) then return end
@@ -363,6 +412,12 @@ local function declareCommands()
         } },
         [C.explosion] = { label = 'Explosion vanilla devant soi (essai)' },
         [C.cheat] = { label = 'Remettre sa vie GTA au maximum (essai)' },
+        [C.weaponHit] = { label = 'Frapper avec l\'arme en main (essai)',
+            description = 'Coup de l\'arme tenue, par vava_combat : qualité, usure, chaîne de dégâts.', args = {
+            { name = 'joueur', type = 'player' },
+            { name = 'multiplicateur', type = 'number', min = 0.1, max = 3, optional = true },
+            { name = 'technique', type = 'text', optional = true, hint = 'identifiant, par exemple taille_descendante' },
+        } },
     }
     for name, def in pairs(defs) do
         for key, value in pairs(base) do def[key] = value end
@@ -400,10 +455,11 @@ local function setup()
     RegisterCommand(C.shield, shieldCommand, false)
     RegisterCommand(C.resistance, resistanceCommand, false)
     RegisterCommand(C.chain, chainCommand, false)
+    RegisterCommand(C.weaponHit, weaponHitCommand, false)
     declare()
-    core.log.warn('mode développement : /%s, /%s, /%s, /%s, /%s et les modificateurs d\'essai ouverts au droit « %s »'
-        .. ' et à l\'ACE « %s » — à ne jamais laisser sur un serveur ouvert au public', C.hit, C.dodge, C.shield,
-        C.resistance, C.chain, cfg.access.permission, cfg.access.ace)
+    core.log.warn('mode développement : /%s, /%s, /%s, /%s, /%s, /%s et les modificateurs d\'essai ouverts au droit'
+        .. ' « %s » et à l\'ACE « %s » — à ne jamais laisser sur un serveur ouvert au public', C.hit, C.dodge, C.shield,
+        C.resistance, C.chain, C.weaponHit, cfg.access.permission, cfg.access.ace)
     return true
 end
 

@@ -763,7 +763,7 @@ même que `README.md` à la racine, et celui qu'écrit la Chancellerie) :
 `ensure chat`), `ensure vava_world`, `ensure vava_time`, `ensure vava_appearance`, `ensure vava_characters_ui`,
 `ensure vava_hud`, `ensure vava_inventory`, `ensure vava_needs`, `ensure vava_health`, `ensure vava_admin`,
 `ensure vava_atelier`, `ensure vava_voice`, `ensure vava_cameras`, `ensure vava_magic`, `ensure vava_skills`,
-`ensure vava_gathering`, `ensure vava_crafting`, `ensure vava_farming`, `ensure vava_provisions`, `ensure vava_codex`,
+`ensure vava_gathering`, `ensure vava_crafting`, `ensure vava_combat`, `ensure vava_farming`, `ensure vava_provisions`, `ensure vava_codex`,
 `ensure vava_arrival`, `ensure vava_chancellerie`, puis les modules qui déclarent des objets.
 
 ### `vava_ui`
@@ -1644,6 +1644,72 @@ depuis le web, relayées par le pont à la Chancellerie.
 Pour travailler le rendu du mur sans le jeu : `web/index.html?players=11&layout=3` (ou `&focus=<numéro>`,
 `&budget=<numéro>`) dans un navigateur ; chaque case est une vraie connexion WebRTC locale filmant une scène dessinée.
 
+### `vava_combat`
+
+Les armes de corps à corps (1.0.0, T-111 ; squelette que T-112 complétera, `docs/plan/COMBAT_V1.md` § 2) : catalogue des
+armes (fiches en config : catégorie parmi `une_main`, `deux_mains`, `dague`, `baton`, `bouclier` — liste fermée —,
+famille, type de dégâts, dégâts, bonus de portée, solidité, blocage, modèle provisoire), six objets déclarés à
+l'inventaire (Épée longue, Hache d'armes, Masse d'armes, Dague, Bâton ferré, Bouclier rond) et l'Épée courte de
+`vava_crafting` adoptée sans être redéclarée, six recettes signées déclarées à `vava_crafting:recipes` et
+`vava_skills:recipes` (redéclarées à leur annonce `core:module:ready`), dégâts = fiche × qualité de forge (0,85 à 1,15)
+× usure (émoussée : × 0,5) × multiplicateur de la technique, usure d'un point par coup **qui touche** (chance de
+l'épargner : 40 % × qualité), arme émoussée à 0 et réparée par l'artisanat, bouclier accroché au bras ou au dos, combat
+natif de GTA coupé sans boucle par image, commandes du Conseil `/armes liste | voir | user` (droit `metiers`, journal).
+Demande le core 0.10.0, `vava_inventory` 1.7.0 et `vava_health` 1.3.0 ; facultatifs : `vava_crafting` ≥ 1.5.0 et
+`vava_skills` ≥ 1.0.0 (recettes), `vava_hud`, `vava_admin` (sans lui, ACE `combat.admin`), `vava_chat`. Ordre de
+démarrage : après `vava_health` et `vava_crafting`. **Aucun RPC, aucune NUI, aucune table SQL.** Détail, valeurs et
+tests en jeu : `modules/vava_combat/README.md`, `docs/tests/combat.md` § 2.
+
+- **Arme en main** = l'objet tenu de l'inventaire (`held`, T-045), jamais une arme GTA ; le serveur lit
+  `vava_inventory:held(src)`. Modèles vanilla provisoires dans `items[…].held` (`-- PLACEHOLDER`). Les outils ne sont pas
+  des armes.
+- **Métadonnées** : `vava_combat` n'écrit que `durability` (à la baisse) et, sur une pile qui n'en porte pas,
+  `max_durability` (= fiche), par `patchMetadata` ; jamais `broken`, jamais `history`.
+- **Bouclier** : « utiliser » l'accroche ou le décroche (`onUse` posé par le module, jamais consommé, 1 s entre deux
+  gestes, refusé à terre) ; le serveur écrit `{ id, item }` sur le statebag de ped **`vava_combat:shield`** (≈ 30 o,
+  répliqué par OneSync aux seuls joueurs qui ont ce ped à portée) et le **garde** (valeur réécrite par un client remise
+  après 250 ms, espacée jusqu'à 1 s ; entité non suivie : effacée). Placement lu dans la config de chaque client, position
+  (bras ou dos) déduite de `vava_inventory:inHand` du même ped : au bras avec une arme `une_main` ou `dague` ; montré à
+120 m au plus (`shield.showRadius`). Une même pile ne s'accroche qu'à un porteur. Décroché
+  dès que la pile quitte la besace (hooks `move`, `drop`, `remove` ; relevé de 5 s en filet) ; champ privé
+  `vava_combat:hungShield` (retrouvé à la reconnexion).
+- **Combat natif** : drapeau de ped 122 (corps à corps désactivé), `SetPedCanSwitchWeapon(false)`, armes GTA retirées,
+  réappliqués à 1 Hz côté client ; rendus à GTA à l'arrêt du module. Le filet reste l'annulation serveur de
+  `vava_health`.
+- **Réseau** : `vava_combat:notify` (`core.net.send`) au seul porteur dont l'arme passe un seuil (quart de la solidité,
+  émoussée) ou au seul membre du Conseil sans `vava_chat` ; le statebag du bouclier au changement seulement ; + ≈ 450 o
+  une fois dans `GlobalState['vava_inventory:heldModels']` (mécanisme de l'inventaire). Aucun envoi à tous.
+
+| Export serveur | Retour |
+|---|---|
+| `weapon(item)` | copie de la fiche `{ item, label, category, family, kind, damage, reachBonus, durability, block, provisional }`, ou `nil` |
+| `weapons()` | liste ordonnée (catégorie, puis libellé) des fiches — pour l'éditeur des techniques (T-121) |
+| `armed(src)` | `{ instanceId, item, category, family, kind, damage, factor, amount, reachBonus, quality, durability, maxDurability, dull }` (`amount` : coup à × 1,0) ou `nil, code` (`not_ready`, `no_character`, `no_weapon`) |
+| `shield(src)` | `{ instanceId, item, block, durability, maxDurability, dull, position, ready }` (`ready` : bouclier au bras) ou `nil` — rien d'accroché, inventaire muet, ou pile partie de la besace (décrochée aussitôt) ; lu par T-113 |
+| `strike(src, cible, opts?)` | résultat de `vava_health:hit` complété de `weapon = { item, durability, maxDurability, worn, dull }`, ou `nil, code` |
+
+**`strike`** : brique serveur d'un coup d'arme, réservée aux ressources de `config.strike.callers` (`GetInvokingResource` ;
+sinon `not_allowed`, une ligne de console par minute et par ressource) ; T-112 appelle la fonction interne
+`VavaCombat.strike.run`. Vérifie dans l'ordre : module prêt (`not_ready`), joueurs entiers et différents
+(`invalid_target`), personnages actifs (`no_character`), attaquant debout (`downed`), `opts` = `nil` ou table aux seules
+clés `technique` (identifiant de 64 octets, `^[A-Za-z0-9_%-%.:]+$`), `damage` (multiplicateur 0,1 à 3, défaut 1), `tags`
+(map → `true` de `parryable`, `unblockable`, `undodgeable`, 3 au plus ; `melee` toujours posé), `part`
+(`invalid_options`) ; pile **réellement tenue**, arme du catalogue connue de l'inventaire avec un `held`, pas un bouclier
+(`no_weapon`) ; même instance (routing bucket) et positions lues par le serveur à 6 m au plus (`too_far`). Puis paquet `{ amount, kind, source, weapon,
+technique?, part?, tags }` → `vava_health:hit` (refus rendu tel quel, sans usure ; `health_unavailable` s'il ne répond
+pas), puis usure si le coup a touché (résultat sans `cancelled`, ou annulé aux étapes `parade`, `blocage`, `bouclier`),
+calculée sur la pile **relue** après le coup (un abonné de la chaîne qui céderait la main ne fait ni user deux fois au
+même point ni frapper gratuitement) ; pile partie ou inventaire muet : aucune usure.
+
+| Export client | Retour |
+|---|---|
+| `armed()` | `{ item, category, family }` de l'arme du personnage local (champ `vava_inventory:hands`), ou `nil` — pour la règle « mains vides » de la magie et le mode combat ; jamais une décision |
+| `shieldHung()` | objet du bouclier accroché sur son propre ped, ou `nil` |
+
+**Hooks** : `vava_combat:shieldHang` (`before`, annulable, accroche seule : `{ source, characterId, instanceId, item }` ;
+la raison du refus est montrée au joueur — prison, interdiction ; `after` : `+ hang, reason` = `use` | `gone` |
+`restored`), `vava_combat:dulled` (`after` : `{ source, characterId, instanceId, item }`, une arme vient d'atteindre 0).
+
 ### `vava_magic`
 
 La magie (2.9.0) : fiche magie par personnage (champ privé `vava_magic:sheet` : mage ou non, sorts et leur XP, sort
@@ -1926,7 +1992,9 @@ Demande le core 0.11.0 (abonnements de zone, depuis 1.5.0), `vava_inventory` 1.4
 **Registres** : `vava_crafting:stations` (types : `{ label, skills, fuel?, anim, prop }`) et `vava_crafting:recipes`
 (`{ label, skill, level, station, tool?, durationMs, difficulty, xp, signed?, signedIfQuality?, durability?,
 transmission?, fragments?, ingredients = { { item, quantity, minTier? } }, output = { item, quantity } }`), remplis par
-la config, ouverts aux autres modules ; chaque recette est aussi déclarée à `vava_skills:recipes`.
+la config, ouverts aux autres modules ; chaque recette est aussi déclarée à `vava_skills:recipes`. Les armes de
+`vava_combat` (Épée longue, Hache d'armes, Masse d'armes, Dague, Bâton ferré, Bouclier rond) y sont ajoutées par ce module,
+signées, solidité tirée de sa fiche ; l'Épée courte reste une recette de l'artisanat (§ `vava_combat`).
 
 **Stations chez les joueurs** (depuis 1.5.0) : chaque station placée est une zone du core (`core.zones`, nom = son
 identifiant, cercle de 2 m, marge de 100 m : `streaming.zoneRadius`, `streaming.radius` + `streaming.subscribeSlack`) ;
