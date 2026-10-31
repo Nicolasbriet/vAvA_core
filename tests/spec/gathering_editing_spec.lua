@@ -99,6 +99,26 @@ describe('vava_gathering atelier « Récolte »', function()
             assert.same({ true }, { fs.checkEditor(declared(), ctx) })
         end)
 
+        it('bornes de l’abondance (risque lore R-1) : repos 12 % par heure au plus, repousse en 5 min au moins', function()
+            local zoneFields, nodeFields = {}, {}
+            local def = editing.declaration(cfg)
+            for _, field in ipairs(def.kinds[1].form.fields) do zoneFields[field.id] = field end
+            for _, field in ipairs(def.kinds[2].form.fields) do nodeFields[field.id] = field end
+            assert.equal(12, zoneFields.repos.max)
+            assert.equal(300, nodeFields.repousse.min)
+            assert.equal('%', zoneFields.fatigue.unit)
+            assert.equal('% / h', zoneFields.repos.unit)
+            -- la graine reste dans les bornes
+            for _, zone in ipairs(cfg.zones) do assert.is_true(zone.regenPerHour <= 12, zone.id) end
+            for _, node in ipairs(cfg.nodes) do assert.is_true(node.regenMs >= 300000, node.id) end
+        end)
+
+        it('indice accordé et titre du bandeau (lore L-1, suggestion S-3)', function()
+            local def = editing.declaration(cfg)
+            assert.same({ one = '%s récolte', many = '%s récoltes' }, def.kinds[2].hintFormat)
+            assert.equal('Atelier de la récolte', def.texts.banner)
+        end)
+
         it('fixe les choix de la spec : cercle et point orienté enfant, droit metiers, essai joué', function()
             local def = editing.declaration(cfg)
             assert.equal('metiers', def.right)
@@ -426,7 +446,7 @@ describe('vava_gathering atelier « Récolte »', function()
             local ok, errors = editing.validateLot({ zoneItem(CENTER), nodeItem('a', 2000.0, 2000.0),
                 nodeItem('b', 2001.9, 2000.0) }, viewOf())
             assert.is_false(ok)
-            assert.same({ 'Trop près de « b » (1,9 m).' }, texts(errors))
+            assert.same({ '« a » et « b » sont trop près l\'un de l\'autre (1,9 m).' }, texts(errors))
         end)
 
         it('refuse un point hors du cercle neuf de la zone (redessinée plus petite)', function()
@@ -455,7 +475,7 @@ describe('vava_gathering atelier « Récolte »', function()
                 place = { x = -330.5, y = -870.0, z = 31.0, h = 0.0 },
                 data = { nom = 'Chêne 9', ressource = 'chene', charges = 3, repousse = 600 } } }, viewOf())
             assert.is_false(ok)
-            assert.same({ 'Trop près de « Chêne 9 » (0,5 m).' }, texts(errors))
+            assert.same({ '« Chêne 2 » et « Chêne 9 » sont trop près l\'un de l\'autre (0,5 m).' }, texts(errors))
         end)
 
         it('refuse un poisson dans une zone de forêt', function()
@@ -495,8 +515,24 @@ describe('vava_gathering atelier « Récolte »', function()
             end
             local ok, why = editing.placeCheck('zone', { x = 0.0, y = 0.0, z = 0.0, r = 10.0 }, { id = '' }, viewOf(zones))
             assert.is_false(ok)
-            assert.equal('Le royaume a déjà 256 zones de récolte.', why)
+            assert.equal('Le royaume compte déjà 256 zones de récolte, le plus permis : retirez-en une d\'abord.', why)
             assert.is_true(editing.placeCheck('zone', { x = 0.0, y = 0.0, z = 0.0, r = 10.0 }, { id = 'z1' }, viewOf(zones)))
+        end)
+
+        it('point : refusé dès le clic s’il n’est pas un poisson dans une zone d’eau, ou un poisson hors de l’eau (risque lore R-3)', function()
+            local ok, why = editing.placeCheck('node', { x = -120.0, y = -880.0, z = 29.0, h = 0.0 },
+                { id = '', siblings = 3, parent = 'riviere_claire', data = { ressource = 'chene' } }, viewOf())
+            assert.is_false(ok)
+            assert.equal('Une zone d\'eau ne porte que des bancs de poissons.', why)
+            ok, why = editing.placeCheck('node', { x = -320.0, y = -880.0, z = 31.0, h = 0.0 },
+                { id = '', siblings = 4, parent = 'foret_brume', data = { ressource = 'truite' } }, viewOf())
+            assert.is_false(ok)
+            assert.equal(cfg.editor.texts.waterOnly, why)
+            assert.is_true(editing.placeCheck('node', { x = -120.0, y = -880.0, z = 29.0, h = 0.0 },
+                { id = '', siblings = 3, parent = 'riviere_claire', data = { ressource = 'truite' } }, viewOf()))
+            -- zone nouvelle (pas encore publiée) : jugée à l'essai et à la publication
+            assert.is_true(editing.placeCheck('node', { x = 0.0, y = 0.0, z = 0.0, h = 0.0 },
+                { id = '', siblings = 1, parent = 'zone_neuve', data = { ressource = 'chene' } }, viewOf()))
         end)
 
         it('point : refusé au-delà de 120 points dans sa zone après la pose', function()
@@ -510,9 +546,10 @@ describe('vava_gathering atelier « Récolte »', function()
     describe('aides du volet', function()
         it('« Pour comparer » : une autre zone du même type de lieu', function()
             local compare = editing.compare({ nom = 'Bois des Essais', genre = 'foret' }, viewOf())
-            assert.same({ title = 'Pour comparer', text = 'Forêt de Brume — fatigue 2, repos 4 pts/h' }, compare)
+            assert.same({ title = 'Pour comparer', text = 'Forêt de Brume : fatigue 2 % par récolte, repos 4 % par heure' },
+                compare)
             assert.is_nil(editing.compare({ nom = 'Forêt de Brume', genre = 'foret' }, viewOf()))
-            assert.same({ title = 'Pour comparer', text = 'Mine du Val — fatigue 2,5, repos 3 pts/h' },
+            assert.same({ title = 'Pour comparer', text = 'Mine du Val : fatigue 2,5 % par récolte, repos 3 % par heure' },
                 editing.compare({ nom = 'Mine Neuve', genre = 'mine' }, viewOf()))
         end)
 

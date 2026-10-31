@@ -224,7 +224,7 @@ describe('vava_atelier placement côté serveur', function()
 
         it('portée : 59,9 m accepté, 60,1 m refusé, position lue par le serveur', function()
             position = { x = 100.0, y = 40.1, z = 30.0 }
-            assert.equal('Trop loin de vous : approchez-vous (60 m).', placeRefusal(poseNode(100.0, 100.2)))
+            assert.equal('Trop loin de vous (60 m) : approchez-vous.', placeRefusal(poseNode(100.0, 100.2)))
             position = { x = 100.0, y = 40.3, z = 30.0 }
             local ok, answer = poseNode(100.0, 100.2)
             assert.is_true(ok)
@@ -274,6 +274,12 @@ describe('vava_atelier placement côté serveur', function()
             assert.equal('', checked[1].ctx.id)
             assert.equal(3, checked[1].ctx.siblings)
             assert.equal('chene', checked[1].ctx.data.ressource)
+        end)
+
+        it('indice accordé : « 1 récolte », « 3 récoltes » (relecture lore L-1)', function()
+            local _, single = placement.place(ctx, '', 0, { x = 140.0, y = 100.0, z = 30.0, h = 0.0 }, 'bois',
+                { s = { ressource = 'chene' }, n = { charges = 1, repousse = 600 } })
+            assert.equal('1 récolte', single.row.hint)
         end)
 
         it('arrondit le lieu (centimètre, cap dans [0, 360))', function()

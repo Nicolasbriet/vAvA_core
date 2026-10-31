@@ -29,6 +29,7 @@ describe('vava_gathering share', function()
             'modules/vava_gathering/shared/constants.lua',
             'modules/vava_gathering/config.lua',
             'modules/vava_gathering/shared/zonestate.lua',
+            'modules/vava_gathering/shared/zonebuild.lua',
         })
         globals = { ['vava_gathering:zone:foret_brume'] = { band = 'normal' } }
         local writes = {}
@@ -211,6 +212,7 @@ describe('vava_gathering share : diffusion de l’Atelier', function()
             'modules/vava_gathering/shared/constants.lua',
             'modules/vava_gathering/config.lua',
             'modules/vava_gathering/shared/zonestate.lua',
+            'modules/vava_gathering/shared/zonebuild.lua',
         })
         zonestate = VavaGathering.zonestate
         _G.GetGameTimer = function() return now end
@@ -246,7 +248,7 @@ describe('vava_gathering share : diffusion de l’Atelier', function()
         share.flush()
         assert.same({ 'define' }, names())
         local state = calls[1].args[3]
-        assert.same({ l = 'Bois des Essais', k = 'foret', x = 2000.0, y = 2000.0, z = 30.0, r = 60.0 }, state.def)
+        assert.same({ 'Bois des Essais', 'foret', 200000, 200000, 3000, 6000 }, state.def)
         assert.is_not_nil(state['p:chene_5'])
         assert.equal(1, flushed)
         -- déjà diffusée : un second flush ne fait rien partir

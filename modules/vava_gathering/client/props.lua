@@ -296,8 +296,8 @@ local function wake()
 end
 
 --- Une zone a changé : regroupée, passage aussitôt (props et invite à jour sans attendre).
-local function changed(zoneId)
-    rebuild(zoneId)
+local function changed(zoneId, places)
+    if places ~= false then rebuild(zoneId) end
     if playing then
         step()
         wake()
@@ -338,20 +338,24 @@ end
 ---@param removed any clés retirées (change)
 local function onZone(kind, id, data, removed)
     if type(id) ~= 'string' then return end
+    -- relecture réseau R-2 : une récolte (bande, charges) ne fait qu'un passage ; les lieux ne sont regroupés de
+    -- nouveau que s'ils changent (`def`, `p:`), à l'entrée ou à la sortie
+    local places, def = true, true
     if kind == 'enter' then
         followed[id] = zonestate.decode(data)
     elseif kind == 'change' then
         local record = followed[id]
         if not record then return end
-        zonestate.patch(record, data, removed)
+        local _
+        _, places, def = zonestate.patch(record, data, removed)
     elseif kind == 'leave' then
-        followed[id] = nil
+        followed[id], def = nil, false
     else
         return
     end
     local record = followed[id]
-    if record and record.def and onDef then onDef(id, record.def) end
-    changed(id)
+    if def and record and record.def and onDef then onDef(id, record.def) end
+    changed(id, places)
 end
 
 --- Essai de l'Atelier reçu (auteur seul) : entier ou différence.
@@ -359,10 +363,10 @@ end
 function props.trial(payload)
     local zoneId = zonestate.trialZone(payload)
     if not zoneId then return end
-    local record = zonestate.trial(trials[zoneId], payload)
+    local record, places = zonestate.trial(trials[zoneId], payload)
     if not record then return end
     trials[zoneId] = record
-    changed(zoneId)
+    changed(zoneId, places)
 end
 
 --- Fin de l'essai d'une zone : l'état publié est rendu.

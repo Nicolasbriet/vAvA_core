@@ -317,8 +317,8 @@ function catalog.putZone(zone)
     if not known and #zonesOrdered >= cfg.editor.maxZones then
         return false, format('%d zones au plus', cfg.editor.maxZones)
     end
-    local ok, boundsErr = checkBounds(def, nodesByZone[def.id] or {})
-    if not ok then return false, boundsErr end
+    -- seul le rayon est contrôlé ici (checkZone) : une zone déplacée loin avec ses points arrive avant eux dans un lot,
+    -- le cercle englobant revient à putNode et à validateLot (relecture sécurité S-5)
     if known then
         assign(known, def)
     else

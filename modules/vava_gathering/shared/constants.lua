@@ -64,6 +64,9 @@ VavaGathering.PLACE_PREFIX = 'p:'
 VavaGathering.MAX_LABEL = 80          -- nom d'une zone dans l'état (octets)
 VavaGathering.MAX_KIND = 16           -- type de lieu
 VavaGathering.MAX_RESOURCE = 32       -- identifiant d'une ressource
+-- format compact de l'état (relecture réseau R-3 de T-102) : longueurs en centimètres, cap en dixièmes de degré
+VavaGathering.COORD_SCALE = 100
+VavaGathering.HEADING_SCALE = 10
 -- liste des zones de la carte gardée par le client (stockage local) : clé, zones au plus, octets au plus
 VavaGathering.MAP_KVP = 'vava_gathering:map'
 VavaGathering.MAX_MAP_ZONES = 256

@@ -190,15 +190,18 @@ local function succeedTrial(session)
         end
     end
     lastFinish[src] = GetGameTimer()
-    -- la bande de la zone publiée (une zone nouvelle est pleine)
+    -- la bande de la zone publiée (une zone nouvelle est pleine), lue sur une COPIE de son état et avec sa définition
+    -- publiée : un essai ne touche jamais la vitalité réelle (relecture sécurité S-1)
     local state = zones.state(node.zone.id)
+    local published = catalog.zone(node.zone.id)
     local effects, vitality = cfg.bands.effects.normal, 100.0
-    if state and not state.gone then
-        zones.refresh(node.zone, state)
-        effects, vitality = zones.effects(state), state.vitality
+    if state and not state.gone and published then
+        local copy = { vitality = state.vitality, updatedAt = state.updatedAt, scarredUntil = state.scarredUntil }
+        zones.refresh(published, copy)
+        effects, vitality = zones.effects(copy), copy.vitality
     end
     if quality.failed(effects) then
-        bridge.Notify(src, messages.trialFailed, 'warning')
+        bridge.Notify(src, zones.isWater(node.zone) and messages.trialFailedWater or messages.trialFailed, 'warning')
         return false, 'failed'
     end
     if not trials.take(src, node.id) then

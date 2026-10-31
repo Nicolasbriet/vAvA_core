@@ -23,6 +23,7 @@ describe('vava_gathering atelier côté serveur', function()
             'modules/vava_gathering/shared/constants.lua',
             'modules/vava_gathering/config.lua',
             'modules/vava_gathering/shared/zonestate.lua',
+            'modules/vava_gathering/shared/zonebuild.lua',
             'modules/vava_gathering/shared/editing.lua',
         })
         cfg = VavaGathering.config
@@ -274,8 +275,8 @@ describe('vava_gathering atelier côté serveur', function()
             local payload = last().payload
             assert.equal('full', payload.mode)
             assert.equal('bois', payload.zone)
-            assert.equal('Bois des Essais', payload.def.l)
-            assert.same({ r = 'chene', x = 2003.0, y = 2000.0, z = 30.0, h = 90.0, c = 3 }, payload.nodes.bois_chene_1)
+            assert.equal('Bois des Essais', payload.def[1])
+            assert.same({ 'chene', 200300, 200000, 3000, 900, 3 }, payload.nodes.bois_chene_1)
             -- rien dans le catalogue ni dans l'état des zones du core
             assert.is_nil(catalog.zone('bois'))
             assert.same({}, touched)
@@ -301,7 +302,7 @@ describe('vava_gathering atelier côté serveur', function()
             assert.equal(2, #sent)
             assert.equal('patch', last().payload.mode)
             assert.is_not_nil(last().payload.nodes.bois_chene_3)
-            assert.equal('Bois des Essais', last().payload.def.l)
+            assert.equal('Bois des Essais', last().payload.def[1])
         end)
 
         it('point d’une zone qui n’est pas publiée : refusé', function()
@@ -327,7 +328,7 @@ describe('vava_gathering atelier côté serveur', function()
             assert.is_not_nil(trials.node(SOURCE, 'bois_chene_1'))
             assert.is_nil(trials.node(5, 'bois_chene_1'))
             assert.is_true(trials.take(SOURCE, 'bois_chene_1'))
-            assert.same({ zone = 'bois', mode = 'patch', nodes = { bois_chene_1 = { c = 1 } } }, last().payload)
+            assert.same({ zone = 'bois', mode = 'patch', nodes = { bois_chene_1 = 1 } }, last().payload)
             assert.is_true(trials.take(SOURCE, 'bois_chene_1'))
             assert.is_false(trials.take(SOURCE, 'bois_chene_1'))
             assert.is_false(trials.take(5, 'bois_chene_1'))
@@ -383,6 +384,7 @@ describe('vava_gathering récolte d’un point d’essai (à blanc)', function()
             'modules/vava_gathering/shared/constants.lua',
             'modules/vava_gathering/config.lua',
             'modules/vava_gathering/shared/zonestate.lua',
+            'modules/vava_gathering/shared/zonebuild.lua',
             'modules/vava_gathering/shared/geometry.lua',
         })
         now = 100000
@@ -415,6 +417,7 @@ describe('vava_gathering récolte d’un point d’essai (à blanc)', function()
         }
         VavaGathering.catalog = {
             node = function() return nil end,
+            zone = function() return nil end,
             tool = function(item) return item == 'hache_fer' and { item = item, kind = 'hache', power = 1.0,
                 yieldBonus = 0, qualityBonus = 0, wear = 2 } or nil end,
             itemLabel = function() return 'Bûche de chêne' end,
@@ -509,6 +512,7 @@ describe('vava_gathering charges d’un point de l’Atelier', function()
             'modules/vava_gathering/shared/constants.lua',
             'modules/vava_gathering/config.lua',
             'modules/vava_gathering/shared/zonestate.lua',
+            'modules/vava_gathering/shared/zonebuild.lua',
         })
         known = {}
         rows = { { node = 'bois_chene_1', charges = 5, updated_at = os.time() } }

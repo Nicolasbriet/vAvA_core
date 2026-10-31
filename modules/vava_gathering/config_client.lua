@@ -50,7 +50,7 @@ VavaGathering.config = {
     waterKinds = { eau = true },
 
     keys = { interact = 'E', zones = 'O' },
-    labels = { interact = 'Récolter (nœud proche)', zones = 'Ouvrir le panneau des zones de récolte' },
+    labels = { interact = 'Récolter (à portée)', zones = 'Ouvrir le panneau des zones de récolte' },
 
     -- Outils : objet de l'inventaire → genre (requis par les ressources), pour l'invite. Puissance, bonus et usure :
     -- `toolStats` de config.lua (mêmes objets, lus par le seul serveur).

@@ -62,6 +62,7 @@ server_scripts {
     'config.lua',                -- complète VavaGathering.config : ce que lit le seul serveur
     'shared/season.lua',         -- logique pure, servie au seul serveur (testée hors jeu : tests/spec)
     'shared/catch.lua',          -- idem
+    'shared/zonebuild.lua',      -- idem : état d'une zone construit par le serveur (shared/zonestate.lua : sa lecture)
     'shared/editing.lua',        -- idem : atelier « Récolte » (formulaires, conversions, règles, liste de la carte)
     'server/core.lua',
     'bridge/server.lua',

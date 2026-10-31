@@ -1,13 +1,16 @@
 local helper = require('tests.helper')
 
--- Taille d'une valeur une fois sérialisée en msgpack (même règle que tests/spec/codex_fingerprint_spec.lua).
+-- Taille d'une valeur une fois sérialisée en msgpack (règle de tests/spec/codex_fingerprint_spec.lua, entiers au plus
+-- juste : 1, 2, 3, 5 ou 9 octets selon leur plage, comme le format compact de l'état les écrit).
 local function msgpackSize(value)
     local kind = type(value)
     if kind == 'nil' or kind == 'boolean' then return 1 end
     if kind == 'number' then
         if math.type(value) == 'float' then return 9 end
         if value >= -32 and value <= 127 then return 1 end
+        if value >= -128 and value <= 255 then return 2 end
         if value >= -32768 and value <= 65535 then return 3 end
+        if value >= -2147483648 and value <= 4294967295 then return 5 end
         return 9
     end
     if kind == 'string' then
@@ -41,6 +44,7 @@ describe('vava_gathering bornes des zones du core', function()
             'modules/vava_gathering/shared/constants.lua',
             'modules/vava_gathering/config.lua',
             'modules/vava_gathering/shared/zonestate.lua',
+            'modules/vava_gathering/shared/zonebuild.lua',
         })
         VavaGathering.resource = 'vava_gathering'
         VavaGathering.log = { warn = function() end }
@@ -120,10 +124,12 @@ describe('vava_gathering bornes des zones du core', function()
             assert.is_true(#key <= 48, key)
         end
         assert.equal(2 + 2 * VavaGathering.ZONE_MAX_NODES, keys)
-        -- pire des cas (identifiants de 46 octets, nombres flottants partout) : ≈ 19 Ko, latent au-delà de 8 Ko
+        -- pire des cas (identifiants de 46 octets ; format compact de la relecture réseau R-3 : centimètres et dixièmes
+        -- de degré entiers) : ≈ 15,9 Ko au lieu de ≈ 19,5 Ko, latent au-delà de 8 Ko
         local size = msgpackSize(state)
-        assert.is_true(size < 32 * 1024, tostring(size))
-        -- cas courant de la spec (§ 5.4 : identifiants de 7 octets) : ≈ 9 Ko pour 120 points
+        assert.is_true(size < 16 * 1024, tostring(size))
+        -- cas courant de la spec (§ 5.4 : identifiants de 7 octets) : ≈ 4,9 Ko pour 120 points au lieu de ≈ 9 Ko, sous
+        -- le seuil du latent
         local short = {}
         for i = 1, VavaGathering.ZONE_MAX_NODES do
             short[i] = { id = string.format('pt_%03d', i), resource = 'chene', x = -320.5 + i, y = -880.25 - i,
@@ -131,7 +137,7 @@ describe('vava_gathering bornes des zones du core', function()
         end
         local typical = msgpackSize(zonestate.build({ band = 'normal', scarred = false }, short, function() return 3 end,
             { label = 'Forêt de Brume', kind = 'foret', x = -320.0, y = -880.0, z = 31.0, radius = 120.0 }))
-        assert.is_true(typical > 8 * 1024 and typical < 10 * 1024, tostring(typical))
+        assert.is_true(typical < 6 * 1024, tostring(typical))
     end)
 
     it('tient un identifiant de point de 46 octets dans les clés `p:` et `n:` de 48', function()
@@ -166,6 +172,7 @@ describe('vava_gathering charges publiées à la fin d’une récolte', function
             'modules/vava_gathering/shared/constants.lua',
             'modules/vava_gathering/config.lua',
             'modules/vava_gathering/shared/zonestate.lua',
+            'modules/vava_gathering/shared/zonebuild.lua',
         })
         sets = {}
         DEF = { id = 'chene_1', zone = { id = 'foret_brume' }, charges = 3, regenMs = 600000, resource = { skill = 'bucheronnage' } }

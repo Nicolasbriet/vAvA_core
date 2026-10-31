@@ -27,6 +27,7 @@ local catalog, zones, nodes, share, trials, harvest = VavaGathering.catalog, Vav
 
 local KEY = 'vava_gathering:zones'
 local READY_HOOK = 'vava_atelier:editorsReady'
+local REGISTRY = 'vava_atelier:editors'
 local SOURCE = 'ressources'
 local texts = cfg.editor.texts
 
@@ -104,7 +105,7 @@ end
 local function validate(kind, data, ctx)
     if kind == 'zone' then return editing.validateZone(data, ctx, view()) end
     if kind == 'node' then return editing.validateNode(data, ctx, view()) end
-    return false, texts.resource
+    return false, texts.badEntry
 end
 
 local function validateLot(lot)
@@ -135,7 +136,7 @@ end
 local function apply(kind, def, info)
     if kind == 'zone' then
         local zone, why = editing.zoneOf(def)
-        if not zone then return false, why == 'no_place' and texts.noPlaceZone or texts.kind end
+        if not zone then return false, why == 'no_place' and texts.noPlaceZone or texts.badEntry end
         if not KINDS[zone.kind] then return false, texts.kind end
         local ok, err = catalog.putZone(zone)
         if not ok then return false, tostring(err) end
@@ -143,7 +144,7 @@ local function apply(kind, def, info)
         share.touch(zone.id)
     elseif kind == 'node' then
         local node, why = editing.nodeOf(def)
-        if not node then return false, why == 'no_place' and texts.noPlaceNode or texts.resource end
+        if not node then return false, why == 'no_place' and texts.noPlaceNode or texts.badEntry end
         local ok, previous = catalog.putNode(node)
         if not ok then return false, tostring(previous) end
         nodes.ensure(catalog.node(node.id))
@@ -151,7 +152,7 @@ local function apply(kind, def, info)
         share.touch(node.zone)
         if previous then share.touch(previous) end
     else
-        return false, texts.resource
+        return false, texts.badEntry
     end
     flushIfLast(info)
     return true
@@ -201,7 +202,7 @@ end
 local function trial(kind, def, ctx)
     ctx = ctx or {}
     local source, accountId = ctx.source, ctx.accountId
-    if not accountId then return false, texts.noZone end
+    if not accountId then return false, texts.noTrial end
     local overrides = {}
     for _, child in ipairs(ctx.children or {}) do
         if child.kind == 'node' then
@@ -222,7 +223,7 @@ local function trial(kind, def, ctx)
         for key, value in pairs(published) do zone[key] = value end
         overrides[#overrides + 1] = node
     else
-        return false, texts.resource
+        return false, texts.badEntry
     end
     if ctx.reason == 'save' and trials.patch(source, accountId, kind == 'zone' and zone or nil, overrides, nil) then
         return true
@@ -264,6 +265,15 @@ function atelier.start()
     declaration = editing.declaration(cfg)
     local id, err = core.hooks.after(READY_HOOK, atelier.declare)
     if not id then return false, READY_HOOK .. ' : ' .. tostring(err) end
+    -- l'Atelier arrêté ou redémarré ne mettra fin à aucun essai : on les arrête ici (relecture sécurité S-4)
+    for _, hook in ipairs({ 'core:registry:dropped', 'core:registry:removed' }) do
+        id, err = core.hooks.after(hook, function(payload)
+            if type(payload) ~= 'table' or payload.registry ~= REGISTRY then return end
+            if hook == 'core:registry:removed' and payload.key ~= KEY then return end
+            trials.stopAll()
+        end)
+        if not id then return false, hook .. ' : ' .. tostring(err) end
+    end
     if not bridge.AtelierExists() then
         VavaGathering.log.warn('vava_atelier absent : la récolte tourne sur sa graine (config.lua) ; avec l\'Atelier, '
             .. 'la base fait foi')

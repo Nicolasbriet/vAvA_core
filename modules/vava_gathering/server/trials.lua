@@ -30,7 +30,7 @@ local byAccount = {}
 
 --- Valeur d'un nœud d'essai pour le client : ressource, lieu, cap, charges d'essai.
 local function nodeOut(node)
-    return { r = node.resource.id, x = node.x, y = node.y, z = node.z, h = node.heading or 0.0, c = node.c }
+    return zonestate.trialValue(node, node.c)
 end
 
 local function send(trial, payload)
@@ -113,6 +113,14 @@ function trials.stop(accountId, source)
     if target then bridge.SendPacked(target, EVENTS.TRIAL_END, trial.zone.id) end
 end
 
+--- L'Atelier s'arrête ou redémarre (son registre disparaît, ou l'atelier « Récolte » en est retiré) : il ne mettra fin à
+--- aucun essai, tous sont arrêtés ici et leurs auteurs rendus à l'affichage publié (relecture sécurité S-4).
+function trials.stopAll()
+    local accounts = {}
+    for accountId in pairs(byAccount) do accounts[#accounts + 1] = accountId end
+    for _, accountId in ipairs(accounts) do trials.stop(accountId) end
+end
+
 --- Essai d'un joueur (par sa source), ou nil.
 local function ofSource(source)
     for _, trial in pairs(byAccount) do
@@ -139,7 +147,7 @@ function trials.take(source, nodeId)
     local node = trial and trial.nodes[nodeId]
     if not node or node.c <= 0 then return false end
     node.c = node.c - 1
-    send(trial, { zone = trial.zone.id, mode = 'patch', nodes = { [nodeId] = { c = node.c } } })
+    send(trial, { zone = trial.zone.id, mode = 'patch', nodes = { [nodeId] = node.c } })
     return true
 end
 

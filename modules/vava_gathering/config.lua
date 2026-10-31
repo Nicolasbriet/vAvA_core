@@ -103,6 +103,10 @@ config.editor = {
     maxZones = 256,           -- zones vivantes au plus (le core en permet 1 024 par module)
     maxNodesPerZone = 120,    -- points par zone (deux clés d'état par point, 256 clés au plus par zone du core)
     flushGraceMs = 2000,      -- une diffusion en attente depuis plus de 2 s part au passage suivant de la boucle lente
+    -- bornes de l'abondance (relecture lore, risque R-1 : « ressources exploitées avec mesure ») : repos de la terre au
+    -- plus 12 % de vitalité par heure, repousse d'une récolte en 5 min au moins
+    restMax = 12,
+    regrowMin = 300,
     zoneKinds = {             -- choix « Type de lieu » (chaque valeur a son icône dans map.kinds, sinon celle par défaut)
         { value = 'foret', label = 'Forêt' }, { value = 'mine', label = 'Mine' },
         { value = 'prairie', label = 'Prairie' }, { value = 'eau', label = 'Eau' },
@@ -111,7 +115,8 @@ config.editor = {
     defaults = { cost = 2.0, regenPerHour = 4.0, scarHours = 48, charges = 3, regenMs = 600000 },
     texts = {
         label = 'Récolte',
-        description = 'Forêts, mines, prairies et coins de pêche, arbres et filons un par un.',
+        banner = 'Atelier de la récolte',   -- titre du bandeau du volet (maquette Recolte)
+        description = 'Forêts, mines, prairies et coins de pêche : la zone, puis chaque arbre et chaque filon.',
         trial = 'Tester la récolte',
         publish = 'Publier la zone',
         publishHint = 'Publier rend les nouveaux points visibles aux joueurs proches.',
@@ -126,14 +131,15 @@ config.editor = {
         fishOnly = 'Une zone d\'eau ne porte que des bancs de poissons.',
         waterOnly = 'Les poissons ne se pêchent que dans une zone d\'eau.',
         outside = 'Ce point est hors de « %s ».',
-        tooClose = 'Trop près de « %s » (%s m).',
+        tooClose = '« %s » et « %s » sont trop près l\'un de l\'autre (%s m).',
         tooMany = 'Cette zone aurait %d points : %d au plus.',
-        tooManyZones = 'Le royaume a déjà %d zones de récolte.',
+        tooManyZones = 'Le royaume compte déjà %d zones de récolte, le plus permis : retirez-en une d\'abord.',
         tooWide = 'Les points de « %s » s\'étendent à %d m de son centre : %d m au plus.',
-        noZone = 'La zone de ce point n\'est pas publiée : essayez ou publiez la zone.',
-        hint = '%d points',
+        noZone = 'La zone de ce point n\'est pas publiée : publiez-la ou mettez-la à l\'essai d\'abord.',
+        badEntry = 'Cette fiche est incomplète : rouvrez-la et vérifiez ses réglages.',
+        noTrial = 'L\'essai ne peut pas commencer : rouvrez l\'Atelier.',
         compareTitle = 'Pour comparer',
-        compare = '%s — fatigue %s, repos %s pts/h',
+        compare = '%s : fatigue %s %% par récolte, repos %s %% par heure',
     },
 }
 
@@ -303,4 +309,5 @@ config.messages = {
     -- T-102 : essai de l'Atelier, récolte à blanc (rien n'est donné)
     trialHarvest = '[Essai] %s : %d × %s (%s). Rien n\'est donné pendant un essai.',
     trialFailed = '[Essai] La récolte aurait échoué : la terre est fatiguée ici.',
+    trialFailedWater = '[Essai] La prise aurait échoué : ces eaux sont fatiguées.',   -- zone d'eau (`waterKinds`)
 }

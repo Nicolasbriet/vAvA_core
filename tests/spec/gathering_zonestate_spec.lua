@@ -19,6 +19,7 @@ describe('vava_gathering zonestate', function()
             'modules/vava_gathering/shared/constants.lua',
             'modules/vava_gathering/config.lua',
             'modules/vava_gathering/shared/zonestate.lua',
+            'modules/vava_gathering/shared/zonebuild.lua',
         })
         zonestate = VavaGathering.zonestate
         cfg = VavaGathering.config
@@ -220,6 +221,8 @@ describe('vava_gathering zonestate', function()
     end)
 
     -- T-102 ---------------------------------------------------------------------------------------------------------
+    -- Format compact (relecture réseau R-3) : `def` → { nom, type, x, y, z, rayon } et `p:` → { ressource, x, y, z, cap },
+    -- longueurs en centimètres entiers, cap en dixièmes de degré entiers ; listes pures, jamais de clés nommées.
 
     local ZONE = { id = 'bois', label = 'Bois des Essais', kind = 'foret', x = 10.0, y = 20.0, z = 30.0, radius = 60.0,
         cost = 2.0, regenPerHour = 4.0, scarHours = 48 }
@@ -230,25 +233,48 @@ describe('vava_gathering zonestate', function()
         return out
     end
 
+    local function isList(value)
+        local count = 0
+        for key in pairs(value) do
+            if math.type(key) ~= 'integer' then return false end
+            count = count + 1
+        end
+        return count == #value
+    end
+
     describe('état entier avec la zone et ses points (T-102)', function()
-        it('porte `def` et `p:` de chaque point, sans rien de la part serveur', function()
+        it('porte `def` et `p:` de chaque point en listes compactes, sans rien de la part serveur', function()
             local state = zonestate.build({ band = 'normal', scarred = false }, { node('chene_1', 11.0, 21.0) },
                 function() return 3 end, ZONE)
-            assert.same({ l = 'Bois des Essais', k = 'foret', x = 10.0, y = 20.0, z = 30.0, r = 60.0 }, state.def)
-            assert.same({ r = 'chene', x = 11.0, y = 21.0, z = 30.0, h = 90.0 }, state['p:chene_1'])
+            assert.same({ 'Bois des Essais', 'foret', 1000, 2000, 3000, 6000 }, state.def)
+            assert.same({ 'chene', 1100, 2100, 3000, 900 }, state['p:chene_1'])
             assert.equal(3, state['n:chene_1'])
-            for _, value in pairs(state) do
-                if type(value) == 'table' then
-                    for _, forbidden in ipairs({ 'cost', 'regenPerHour', 'scarHours', 'charges', 'regenMs', 'label', 'vitality' }) do
-                        assert.is_nil(value[forbidden], forbidden)
-                    end
-                end
-            end
+            assert.is_true(isList(state.def))
+            assert.is_true(isList(state['p:chene_1']))
+            for _, index in ipairs({ 3, 4, 5, 6 }) do assert.equal('integer', math.type(state.def[index])) end
+            for index = 2, 5 do assert.equal('integer', math.type(state['p:chene_1'][index])) end
         end)
 
-        it('lit la ressource d’un point du catalogue (définition) par son identifiant', function()
-            local value = zonestate.placeValue({ resource = { id = 'pin' }, x = 1.0, y = 2.0, z = 3.0 })
-            assert.same({ r = 'pin', x = 1.0, y = 2.0, z = 3.0, h = 0.0 }, value)
+        it('arrondit au centimètre et au dixième de degré, cap ramené dans [0, 3600)', function()
+            assert.same({ 'pin', -1235, 1, 300, 3599 },
+                zonestate.placeValue({ resource = { id = 'pin' }, x = -12.346, y = 0.006, z = 3.0, heading = -0.06 }))
+            assert.same({ 'pin', 0, 0, 0, 0 }, zonestate.placeValue({ resource = 'pin', x = 0.0, y = 0.0, z = 0.0,
+                heading = 360.0 }))
+            assert.same({ 'pin', 0, 0, 0, 0 }, zonestate.placeValue({ resource = 'pin', x = 0.0, y = 0.0, z = 0.0,
+                heading = 0 / 0 }))
+        end)
+
+        it('nœud d’essai : la même liste, charges d’essai en 6e place', function()
+            assert.same({ 'chene', 1100, 2100, 3000, 900, 2 }, zonestate.trialValue(node('chene_1', 11.0, 21.0), 2))
+        end)
+
+        it('aller-retour : ce que le serveur écrit, le client le relit au centimètre près', function()
+            local place = zonestate.readPlace(zonestate.placeValue(node('chene_1', -320.123, 880.456, { heading = 45.04 })))
+            assert.is_true(math.abs(place.x + 320.12) < 1e-9)
+            assert.is_true(math.abs(place.y - 880.46) < 1e-9)
+            assert.is_true(math.abs(place.heading - 45.0) < 1e-9)
+            local def = zonestate.readDef(zonestate.defValue(ZONE))
+            assert.same({ label = 'Bois des Essais', kind = 'foret', x = 10.0, y = 20.0, z = 30.0, radius = 60.0 }, def)
         end)
 
         it('sans définition de zone, garde la forme d’avant 1.8.0 (ni `def` ni `p:`)', function()
@@ -283,13 +309,14 @@ describe('vava_gathering zonestate', function()
 
         it('ignore une `def` mal formée (nom vide ou trop long, type invalide, lieu non fini, rayon hors bornes)', function()
             local bad = {
-                { l = '', k = 'foret', x = 0.0, y = 0.0, z = 0.0, r = 10.0 },
-                { l = string.rep('a', 81), k = 'foret', x = 0.0, y = 0.0, z = 0.0, r = 10.0 },
-                { l = 'Bois', k = 'Forêt', x = 0.0, y = 0.0, z = 0.0, r = 10.0 },
-                { l = 'Bois', k = 'foret', x = 0 / 0, y = 0.0, z = 0.0, r = 10.0 },
-                { l = 'Bois', k = 'foret', x = 0.0, y = math.huge, z = 0.0, r = 10.0 },
-                { l = 'Bois', k = 'foret', x = 0.0, y = 0.0, z = 0.0, r = 0.0 },
-                { l = 'Bois', k = 'foret', x = 0.0, y = 0.0, z = 0.0, r = 501.0 },
+                { '', 'foret', 0, 0, 0, 1000 },
+                { string.rep('a', 81), 'foret', 0, 0, 0, 1000 },
+                { 'Bois', 'Forêt', 0, 0, 0, 1000 },
+                { 'Bois', 'foret', 0 / 0, 0, 0, 1000 },
+                { 'Bois', 'foret', 0, math.huge, 0, 1000 },
+                { 'Bois', 'foret', 0, 0, 0, 0 },
+                { 'Bois', 'foret', 0, 0, 0, 50001 },
+                { l = 'Bois', k = 'foret', x = 0, y = 0, z = 0, r = 1000 },
                 'foret',
             }
             for i, value in ipairs(bad) do assert.is_nil(zonestate.decode({ def = value }).def, tostring(i)) end
@@ -297,12 +324,13 @@ describe('vava_gathering zonestate', function()
 
         it('ignore un point mal formé (ressource invalide, lieu non fini, identifiant trop long) et ramène un cap faux à 0', function()
             local record = zonestate.decode({
-                ['p:a'] = { r = 'Chêne', x = 0.0, y = 0.0, z = 0.0 },
-                ['p:b'] = { r = 'chene', x = 0 / 0, y = 0.0, z = 0.0 },
-                ['p:c'] = { r = string.rep('c', 33), x = 0.0, y = 0.0, z = 0.0 },
-                ['p:' .. string.rep('d', 47)] = { r = 'chene', x = 0.0, y = 0.0, z = 0.0 },
-                ['p:E'] = { r = 'chene', x = 0.0, y = 0.0, z = 0.0 },
-                ['p:f'] = { r = 'chene', x = 1.0, y = 2.0, z = 3.0, h = 'nord' },
+                ['p:a'] = { 'Chêne', 0, 0, 0 },
+                ['p:b'] = { 'chene', 0 / 0, 0, 0 },
+                ['p:c'] = { string.rep('c', 33), 0, 0, 0 },
+                ['p:' .. string.rep('d', 47)] = { 'chene', 0, 0, 0 },
+                ['p:E'] = { 'chene', 0, 0, 0 },
+                ['p:g'] = { r = 'chene', x = 0, y = 0, z = 0 },
+                ['p:f'] = { 'chene', 100, 200, 300, 'nord' },
             })
             assert.same({ f = { resource = 'chene', x = 1.0, y = 2.0, z = 3.0, heading = 0.0 } }, record.nodes)
             assert.equal(1, record.count)
@@ -310,7 +338,7 @@ describe('vava_gathering zonestate', function()
 
         it('ignore le 121e point (120 au plus), et en reprend un quand une place se libère', function()
             local state = {}
-            for i = 1, 121 do state[string.format('p:n%03d', i)] = { r = 'chene', x = i + 0.0, y = 0.0, z = 0.0 } end
+            for i = 1, 121 do state[string.format('p:n%03d', i)] = { 'chene', i * 100, 0, 0, 0 } end
             local record = zonestate.decode(state)
             assert.equal(120, record.count)
             local known = 0
@@ -318,13 +346,13 @@ describe('vava_gathering zonestate', function()
             assert.equal(120, known)
             -- un point connu peut toujours changer de lieu
             local someId = next(record.nodes)
-            zonestate.patch(record, { ['p:' .. someId] = { r = 'pin', x = 5.0, y = 5.0, z = 5.0 } }, nil)
+            zonestate.patch(record, { ['p:' .. someId] = { 'pin', 500, 500, 500, 0 } }, nil)
             assert.equal('pin', record.nodes[someId].resource)
             assert.equal(120, record.count)
             -- une place libérée : un nouveau point entre
             zonestate.patch(record, {}, { 'p:' .. someId })
             assert.equal(119, record.count)
-            zonestate.patch(record, { ['p:neuf'] = { r = 'chene', x = 0.0, y = 0.0, z = 0.0 } }, nil)
+            zonestate.patch(record, { ['p:neuf'] = { 'chene', 0, 0, 0, 0 } }, nil)
             assert.equal(120, record.count)
             assert.is_not_nil(record.nodes.neuf)
         end)
@@ -332,9 +360,9 @@ describe('vava_gathering zonestate', function()
         it('applique une différence : point ajouté, déplacé, retiré ; zone renommée ; `def` retirée', function()
             local record = zonestate.decode(full())
             zonestate.patch(record, {
-                ['p:chene_3'] = { r = 'chene', x = 17.0, y = 21.0, z = 30.0, h = 0.0 }, ['n:chene_3'] = 3,
-                ['p:chene_1'] = { r = 'chene', x = 12.0, y = 25.0, z = 30.0, h = 45.0 },
-                def = { l = 'Bois Neuf', k = 'foret', x = 10.0, y = 20.0, z = 30.0, r = 80.0 },
+                ['p:chene_3'] = { 'chene', 1700, 2100, 3000, 0 }, ['n:chene_3'] = 3,
+                ['p:chene_1'] = { 'chene', 1200, 2500, 3000, 450 },
+                def = { 'Bois Neuf', 'foret', 1000, 2000, 3000, 8000 },
             }, { 'p:chene_2', 'n:chene_2' })
             assert.equal(2, record.count)
             assert.is_nil(record.nodes.chene_2)
@@ -349,9 +377,32 @@ describe('vava_gathering zonestate', function()
 
         it('retire un point dont le lieu reçu est mal formé', function()
             local record = zonestate.decode(full())
-            zonestate.patch(record, { ['p:chene_1'] = { r = 'chene', x = 'loin', y = 0.0, z = 0.0 } }, nil)
+            zonestate.patch(record, { ['p:chene_1'] = { 'chene', 'loin', 0, 0 } }, nil)
             assert.is_nil(record.nodes.chene_1)
             assert.equal(1, record.count)
+        end)
+
+        -- relecture réseau R-2 : une récolte (bande, charges) ne fait regrouper aucun point chez les abonnés
+        it('dit si les lieux montrés ont changé : jamais pour une récolte (charges, bande)', function()
+            local record = zonestate.decode(full())
+            local _, places, def = zonestate.patch(record, { ['n:chene_1'] = 2, zone = { band = 'reduced', scarred = false } }, {})
+            assert.is_false(places)
+            assert.is_false(def)
+            _, places, def = zonestate.patch(record, {}, { 'n:chene_2' })
+            assert.is_false(places)
+            assert.is_false(def)
+            _, places, def = zonestate.patch(record, { ['p:chene_1'] = { 'chene', 1150, 2100, 3000, 900 } }, nil)
+            assert.is_true(places)
+            assert.is_false(def)
+            _, places, def = zonestate.patch(record, {}, { 'p:chene_2' })
+            assert.is_true(places)
+            assert.is_false(def)
+            _, places, def = zonestate.patch(record, { def = { 'Bois', 'foret', 0, 0, 0, 1000 } }, nil)
+            assert.is_true(places)
+            assert.is_true(def)
+            -- un point inconnu retiré, ou un 121e point refusé : rien de montré ne change
+            _, places = zonestate.patch(record, {}, { 'p:inconnu' })
+            assert.is_false(places)
         end)
     end)
 
@@ -367,7 +418,7 @@ describe('vava_gathering zonestate', function()
             return keys
         end
 
-        it('ne rend rien quand rien ne change (tables comparées clé par clé)', function()
+        it('ne rend rien quand rien ne change (listes comparées place par place)', function()
             local changes, removed = zonestate.diff(state({ node('chene_1', 11.0, 21.0) }), state({ node('chene_1', 11.0, 21.0) }))
             assert.same({}, changes)
             assert.same({}, removed)
@@ -383,22 +434,22 @@ describe('vava_gathering zonestate', function()
         it('point ajouté : deux clés ; point retiré : deux clés retirées, triées', function()
             local one, two = state({ node('chene_1', 11.0, 21.0) }), state({ node('chene_1', 11.0, 21.0), node('chene_2', 14.0, 21.0) })
             local changes, removed = zonestate.diff(one, two)
-            assert.same({ ['p:chene_2'] = { r = 'chene', x = 14.0, y = 21.0, z = 30.0, h = 90.0 }, ['n:chene_2'] = 3 }, changes)
+            assert.same({ ['p:chene_2'] = { 'chene', 1400, 2100, 3000, 900 }, ['n:chene_2'] = 3 }, changes)
             assert.same({}, removed)
             changes, removed = zonestate.diff(two, one)
             assert.same({}, changes)
             assert.same({ 'n:chene_2', 'p:chene_2' }, removed)
         end)
 
-        it('point déplacé : sa seule clé de lieu ; zone renommée : la seule `def`', function()
+        it('point déplacé : sa seule clé de lieu ; moins d’un demi-centimètre : rien ; zone renommée : la seule `def`', function()
             local before = state({ node('chene_1', 11.0, 21.0) })
-            local changes = zonestate.diff(before, state({ node('chene_1', 11.5, 21.0) }))
-            assert.same({ 'p:chene_1' }, keysOf(changes))
+            assert.same({ 'p:chene_1' }, keysOf((zonestate.diff(before, state({ node('chene_1', 11.5, 21.0) })))))
+            assert.same({}, (zonestate.diff(before, state({ node('chene_1', 11.004, 21.0) }))))
             local renamed = {}
             for key, value in pairs(ZONE) do renamed[key] = value end
             renamed.label = 'Bois Neuf'
-            changes = zonestate.diff(before, state({ node('chene_1', 11.0, 21.0) }, renamed))
-            assert.same({ def = { l = 'Bois Neuf', k = 'foret', x = 10.0, y = 20.0, z = 30.0, r = 60.0 } }, changes)
+            local changes = zonestate.diff(before, state({ node('chene_1', 11.0, 21.0) }, renamed))
+            assert.same({ def = { 'Bois Neuf', 'foret', 1000, 2000, 3000, 6000 } }, changes)
         end)
 
         it('fatigue, repos, cicatrice, charges maximales, repousse ou nom d’un point changés : rien à envoyer', function()
@@ -436,29 +487,40 @@ describe('vava_gathering zonestate', function()
     describe('client : essai de l’Atelier (T-102)', function()
         local function fullTrial()
             return {
-                zone = 'bois', mode = 'full', def = { l = 'Bois des Essais', k = 'foret', x = 10.0, y = 20.0, z = 30.0, r = 60.0 },
-                nodes = { chene_1 = { r = 'chene', x = 11.0, y = 21.0, z = 30.0, h = 0.0, c = 3 } },
+                zone = 'bois', mode = 'full', def = { 'Bois des Essais', 'foret', 1000, 2000, 3000, 6000 },
+                nodes = { chene_1 = { 'chene', 1100, 2100, 3000, 0, 3 } },
             }
         end
 
         it('lit un essai entier, puis ses différences (point changé, charges seules, point caché)', function()
-            local record = zonestate.trial(nil, fullTrial())
+            local record, places = zonestate.trial(nil, fullTrial())
+            assert.is_true(places)
             assert.equal('Bois des Essais', record.def.label)
             assert.equal(3, record.nodes.chene_1.charges)
-            record = zonestate.trial(record, { zone = 'bois', mode = 'patch',
-                nodes = { chene_2 = { r = 'pin', x = 15.0, y = 21.0, z = 30.0, h = 10.0, c = 4 }, chene_1 = { c = 2 } } })
+            record, places = zonestate.trial(record, { zone = 'bois', mode = 'patch',
+                nodes = { chene_2 = { 'pin', 1500, 2100, 3000, 100, 4 }, chene_1 = 2 } })
+            assert.is_true(places)
             assert.equal(2, record.nodes.chene_1.charges)
             assert.equal('pin', record.nodes.chene_2.resource)
+            assert.equal(10.0, record.nodes.chene_2.heading)
             assert.equal(2, record.count)
-            record = zonestate.trial(record, { zone = 'bois', mode = 'patch', hidden = { 'chene_1', 'inconnu' } })
+            record, places = zonestate.trial(record, { zone = 'bois', mode = 'patch', hidden = { 'chene_1', 'inconnu' } })
+            assert.is_true(places)
             assert.is_nil(record.nodes.chene_1)
             assert.equal(1, record.count)
+        end)
+
+        it('une charge d’essai prise ne change aucun lieu (relecture réseau R-2)', function()
+            local record = zonestate.trial(nil, fullTrial())
+            local _, places = zonestate.trial(record, { zone = 'bois', mode = 'patch', nodes = { chene_1 = 1 } })
+            assert.is_false(places)
+            assert.equal(1, record.nodes.chene_1.charges)
         end)
 
         it('garde les charges d’un point repositionné sans charges, et refuse un patch sans essai ou mal formé', function()
             local record = zonestate.trial(nil, fullTrial())
             record = zonestate.trial(record, { zone = 'bois', mode = 'patch',
-                nodes = { chene_1 = { r = 'chene', x = 12.0, y = 21.0, z = 30.0 } } })
+                nodes = { chene_1 = { 'chene', 1200, 2100, 3000 } } })
             assert.equal(3, record.nodes.chene_1.charges)
             assert.equal(12.0, record.nodes.chene_1.x)
             assert.is_nil(zonestate.trial(nil, { zone = 'bois', mode = 'patch' }))
@@ -511,6 +573,20 @@ describe('vava_gathering zonestate', function()
                     raw.zones[i] = { i = 'z' .. i, l = 'Z', k = 'foret', x = 0, y = 0, r = 10 }
                 end
             end))
+        end)
+    end)
+
+    describe('vue du client : la construction de l’état n’est pas livrée (relecture réseau R-1)', function()
+        it('shared/zonestate.lua seul ne porte ni build, ni diff, ni chunks, ni area', function()
+            helper.reset()
+            VavaGathering = nil
+            helper.loadClientView('modules/vava_gathering', 'VavaGathering')
+            helper.load('modules/vava_gathering/shared/zonestate.lua')
+            local client = VavaGathering.zonestate
+            for _, name in ipairs({ 'build', 'diff', 'chunks', 'area', 'defValue', 'placeValue', 'trialValue', 'zoneValue' }) do
+                assert.is_nil(client[name], name)
+            end
+            assert.equal('function', type(client.decode))
         end)
     end)
 end)

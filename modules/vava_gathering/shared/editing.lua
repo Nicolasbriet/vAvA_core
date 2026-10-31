@@ -62,12 +62,12 @@ function editing.declaration(cfg)
                     help = 'Le nom que verront les récoltants sur la carte et dans le panneau des zones.' },
                 { id = 'genre', widget = 'segmented', options = e.zoneKinds, default = e.zoneKinds[1].value,
                     group = 'terre', label = 'Type de lieu',
-                    help = 'Donne l\'icône de la carte ; dans une zone d\'eau, on pêche et la terre devient l\'eau.' },
-                { id = 'fatigue', widget = 'slider', min = 0.5, max = 10, step = 0.5, decimals = 1, unit = 'pts',
+                    help = 'Donne l\'icône de la carte ; une zone d\'eau ne porte que des bancs de poissons.' },
+                { id = 'fatigue', widget = 'slider', min = 0.5, max = 10, step = 0.5, decimals = 1, unit = '%',
                     default = d.cost, group = 'terre', label = 'Fatigue par récolte',
                     help = 'Vitalité (sur 100) que perd la zone à chaque récolte réussie : plus elle est haute, plus la '
                         .. 'terre s\'épuise vite.' },
-                { id = 'repos', widget = 'slider', min = 0.5, max = 24, step = 0.5, decimals = 1, unit = 'pts/h',
+                { id = 'repos', widget = 'slider', min = 0.5, max = e.restMax, step = 0.5, decimals = 1, unit = '% / h',
                     default = d.regenPerHour, group = 'terre', label = 'Repos de la terre',
                     help = 'Vitalité que la terre regagne chaque heure quand on la laisse en paix.' },
                 { id = 'cicatrice', widget = 'duration', min = HOUR, max = 30 * DAY, units = { 'h', 'j' },
@@ -81,17 +81,17 @@ function editing.declaration(cfg)
         creatable = false, parent = 'zone', placement = 'oriented',
         rules = { inside = { slack = e.nodeSlack }, spacing = e.spacing },
         template = { 'ressource', 'charges', 'repousse' }, autoTitle = 'ressource', hintField = 'charges',
-        hintFormat = '%s récoltes', ghost = { field = 'ressource', models = models },
+        hintFormat = { one = '%s récolte', many = '%s récoltes' }, ghost = { field = 'ressource', models = models },
         form = {
             titleField = 'nom',
             fields = {
                 { id = 'nom', widget = 'text', charset = 'name', min = 1, max = 40, label = 'Nom du point',
-                    help = 'Pour le retrouver dans la liste ; donné tout seul à la pose (« Chêne 4 »).' },
+                    help = 'Pour le retrouver dans la liste ; proposé de lui-même à la pose (« Chêne 4 »).' },
                 { id = 'ressource', widget = 'select', source = 'ressources', label = 'Ressource',
                     help = 'Ce que l\'on récolte ici : elle fixe l\'outil, l\'apparence et le savoir-faire.' },
                 { id = 'charges', widget = 'slider', integer = true, min = 1, max = 20, step = 1, default = d.charges,
                     label = 'Récoltes avant repos', help = 'Combien de récoltes ce point donne avant de devoir repousser.' },
-                { id = 'repousse', widget = 'duration', min = 60, max = DAY, units = { 'min', 'h' },
+                { id = 'repousse', widget = 'duration', min = e.regrowMin, max = DAY, units = { 'min', 'h' },
                     default = d.regenMs // 1000, label = 'Repousse d\'une récolte',
                     help = 'Temps pour qu\'une récolte revienne ; la saison l\'accélère ou la ralentit.' },
             },
@@ -100,7 +100,8 @@ function editing.declaration(cfg)
     return {
         family = 'monde', label = T.label, description = T.description, icon = 'recolte', right = e.right, format = 1,
         trialPlay = true,
-        texts = { trial = T.trial, publish = T.publish, publishHint = T.publishHint, trialLine = T.trialLine },
+        texts = { trial = T.trial, publish = T.publish, publishHint = T.publishHint, trialLine = T.trialLine,
+            banner = T.banner },
         kinds = { zone, node },
     }
 end
@@ -419,7 +420,7 @@ function editing.validateLot(lot, view)
                     local other = list[j]
                     local gap = ground(node.x, node.y, other.x, other.y)
                     if gap < s.spacing - 1e-9 then
-                        push(errors, { text = format(T.tooClose, other.title,
+                        push(errors, { text = format(T.tooClose, node.title, other.title,
                             (gsub(format('%.1f', gap), '%.', ','))) })
                     end
                 end
@@ -452,6 +453,14 @@ function editing.placeCheck(kind, place, ctx, view)
     end
     if kind == 'node' and type(ctx.siblings) == 'number' and ctx.siblings > s.maxNodesPerZone then
         return false, format(T.tooMany, ctx.siblings, s.maxNodesPerZone)
+    end
+    -- un poisson dans l'eau, rien d'autre dans l'eau : refusé dès le clic (relecture lore, risque R-3), si la zone est
+    -- publiée (une zone nouvelle est jugée à l'essai et à la publication)
+    if kind == 'node' and type(ctx.data) == 'table' and ctx.parent then
+        local zone = view.zone(ctx.parent)
+        local resource = view.resources[ctx.data.ressource]
+        local why = zone and resource and waterRule(resource, zone.kind, view)
+        if why then return false, why end
     end
     return true
 end
