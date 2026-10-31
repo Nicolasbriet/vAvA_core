@@ -4,6 +4,8 @@
            vava_health:modifiers, journal des coups), dégâts natifs entre joueurs annulés, mise à terre décidée par le
            serveur, réanimation par un autre joueur, retour au lieu de soins, soins par objets, écran « à terre », API
            pour les autres modules.
+           T-132 : les joueurs ne téléchargent que les constantes, config_client.lua (seuil, délais à terre, geste,
+           touches, messages, jauge) et shared/vitality.lua ; config.lua est servi au seul serveur.
     Dépendances : vAvA_core ≥ 0.10.0 (core.net.send) ; vava_ui ≥ 1.0.0 (polices, grain et ornements de
                   la page, par nui://vava_ui/…) ; facultatives : vava_inventory (soins, objets bloqués à terre),
                   vava_needs (pas de faim à terre), vava_hud (jauge, notifications)
@@ -16,7 +18,7 @@ use_experimental_fxv2_oal 'yes'
 
 name 'vava_health'
 description 'Santé, mise à terre et réanimation vAvA'
-version '1.4.0'
+version '1.5.0'
 
 dependency 'vAvA_core'
 dependency 'vava_ui'
@@ -34,14 +36,17 @@ files {
     'web/icons/*.svg',
 }
 
+-- Les joueurs ne téléchargent que les shared_scripts et les client_scripts : config.lua, en tête des server_scripts,
+-- n'est jamais servi (T-132).
 shared_scripts {
     'shared/constants.lua',
-    'config.lua',
+    'config_client.lua',         -- ouvre VavaHealth.config : ce que lit le client
     'shared/vitality.lua',
 }
 
 -- logique pure servie au seul serveur (paquet, chaîne, lecture du ped) : le client n'en télécharge rien
 server_scripts {
+    'config.lua',                -- complète VavaHealth.config : ce que lit le seul serveur
     'shared/packet.lua',
     'shared/chain.lua',
     'shared/sync.lua',

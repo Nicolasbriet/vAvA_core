@@ -3,7 +3,7 @@
     Rôle : pont vers l'écran « à terre » (page NUI chargée en arrière-plan, sans focus : le jeu garde les touches).
            Rien n'est envoyé avant que la page se dise prête ; elle reçoit alors l'état en cours, avec la touche
            « rendre l'âme » du joueur (celle de la config n'est qu'un repli à l'ouverture de la page).
-    Dépendances : config.lua, client/core.lua
+    Dépendances : config_client.lua, client/core.lua
 ]]
 
 local SendNUIMessage, RegisterNUICallback = SendNUIMessage, RegisterNUICallback
