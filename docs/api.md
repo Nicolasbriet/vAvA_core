@@ -1661,7 +1661,8 @@ tests en jeu : `modules/vava_combat/README.md`, `docs/tests/combat.md` § 2.
   gestes, refusé à terre) ; le serveur écrit `{ id, item }` sur le statebag de ped **`vava_combat:shield`** (≈ 30 o,
   répliqué par OneSync aux seuls joueurs qui ont ce ped à portée) et le **garde** (valeur réécrite par un client remise
   après 250 ms, espacée jusqu'à 1 s ; entité non suivie : effacée). Placement lu dans la config de chaque client, position
-  (bras ou dos) déduite de `vava_inventory:inHand` du même ped : au bras avec une arme `une_main` ou `dague`. Décroché
+  (bras ou dos) déduite de `vava_inventory:inHand` du même ped : au bras avec une arme `une_main` ou `dague` ; montré à
+120 m au plus (`shield.showRadius`). Une même pile ne s'accroche qu'à un porteur. Décroché
   dès que la pile quitte la besace (hooks `move`, `drop`, `remove` ; relevé de 5 s en filet) ; champ privé
   `vava_combat:hungShield` (retrouvé à la reconnexion).
 - **Combat natif** : drapeau de ped 122 (corps à corps désactivé), `SetPedCanSwitchWeapon(false)`, armes GTA retirées,
@@ -1676,7 +1677,7 @@ tests en jeu : `modules/vava_combat/README.md`, `docs/tests/combat.md` § 2.
 | `weapon(item)` | copie de la fiche `{ item, label, category, family, kind, damage, reachBonus, durability, block, provisional }`, ou `nil` |
 | `weapons()` | liste ordonnée (catégorie, puis libellé) des fiches — pour l'éditeur des techniques (T-121) |
 | `armed(src)` | `{ instanceId, item, category, family, kind, damage, factor, amount, reachBonus, quality, durability, maxDurability, dull }` (`amount` : coup à × 1,0) ou `nil, code` (`not_ready`, `no_character`, `no_weapon`) |
-| `shield(src)` | `{ instanceId, item, block, durability, maxDurability, dull, position, ready }` (`ready` : bouclier au bras) ou `nil` — lu par T-113 |
+| `shield(src)` | `{ instanceId, item, block, durability, maxDurability, dull, position, ready }` (`ready` : bouclier au bras) ou `nil` — rien d'accroché, inventaire muet, ou pile partie de la besace (décrochée aussitôt) ; lu par T-113 |
 | `strike(src, cible, opts?)` | résultat de `vava_health:hit` complété de `weapon = { item, durability, maxDurability, worn, dull }`, ou `nil, code` |
 
 **`strike`** : brique serveur d'un coup d'arme, réservée aux ressources de `config.strike.callers` (`GetInvokingResource` ;
@@ -1686,10 +1687,11 @@ sinon `not_allowed`, une ligne de console par minute et par ressource) ; T-112 a
 clés `technique` (identifiant de 64 octets, `^[A-Za-z0-9_%-%.:]+$`), `damage` (multiplicateur 0,1 à 3, défaut 1), `tags`
 (map → `true` de `parryable`, `unblockable`, `undodgeable`, 3 au plus ; `melee` toujours posé), `part`
 (`invalid_options`) ; pile **réellement tenue**, arme du catalogue connue de l'inventaire avec un `held`, pas un bouclier
-(`no_weapon`) ; positions lues par le serveur à 6 m au plus (`too_far`). Puis paquet `{ amount, kind, source, weapon,
+(`no_weapon`) ; même instance (routing bucket) et positions lues par le serveur à 6 m au plus (`too_far`). Puis paquet `{ amount, kind, source, weapon,
 technique?, part?, tags }` → `vava_health:hit` (refus rendu tel quel, sans usure ; `health_unavailable` s'il ne répond
-pas), puis usure si le coup a touché (résultat sans `cancelled`, ou annulé aux étapes `parade`, `blocage`, `bouclier`).
-Aucun `Wait` entre la lecture de l'arme et l'usure.
+pas), puis usure si le coup a touché (résultat sans `cancelled`, ou annulé aux étapes `parade`, `blocage`, `bouclier`),
+calculée sur la pile **relue** après le coup (un abonné de la chaîne qui céderait la main ne fait ni user deux fois au
+même point ni frapper gratuitement) ; pile partie ou inventaire muet : aucune usure.
 
 | Export client | Retour |
 |---|---|

@@ -37,8 +37,8 @@ dégâts entre joueurs : `vava_health` les annule).
 | Usure | 1 point par coup **qui touche** (arrivé, même entièrement bloqué ou absorbé ; annulé à l'étape `parade`, `blocage` ou `bouclier` : l'arme a touché du fer ou du bois) ; jamais sur une esquive, une annulation (zone, trêve) ni un coup refusé (cible à terre, combats coupés). Chance de **ne pas** user = 40 % × qualité / 100 (une pièce de maître dure 1,7 fois plus longtemps) | `wear.perHit`, `wear.qualitySave`, `wear.cancelledStages` |
 | Seuils prévenus au seul porteur | quand la solidité passe sous le quart de la maximale (« l'arme s'émousse »), et à 0 (« l'arme est émoussée ») | `wear.warnRatio`, `messages.worn`, `messages.dull` |
 | Arme émoussée | solidité 0 (ou `broken` posé par un autre module) : coups × 0,5, toujours utilisable, jamais `broken` ; la réparation de `vava_crafting` la remet en état (maximale − 5) | `wear.dullFactor` |
-| Filet de `strike` | positions **lues par le serveur** à 6 m au plus (la vraie portée est jugée par T-112) ; multiplicateur de la technique 0,1 à 3 ; plancher 0,5 point ; plafond 200 ; étiquettes admises `parryable`, `unblockable`, `undodgeable` (`melee` toujours posé) ; export réservé à `vava_example_combat` | `strike` |
-| Bouclier accroché | au **bras** avec une arme à une main ou une dague, dans le **dos** sinon (deux mains, bâton, outil, torche, mains vides) ; 1 s entre deux gestes ; relevé de possession toutes les 5 s, décroché après deux relevés manquants | `shield` |
+| Filet de `strike` | même instance (routing bucket) et positions **lues par le serveur** à 6 m au plus (la vraie portée est jugée par T-112) ; multiplicateur de la technique 0,1 à 3 ; plancher 0,5 point ; plafond 200 ; étiquettes admises `parryable`, `unblockable`, `undodgeable` (`melee` toujours posé) ; export réservé à `vava_example_combat` | `strike` |
+| Bouclier accroché | au **bras** avec une arme à une main ou une dague, dans le **dos** sinon (deux mains, bâton, outil, torche, mains vides) ; 1 s entre deux gestes ; relevé de possession toutes les 5 s, décroché après deux relevés manquants ; montré aux joueurs à 120 m au plus | `shield` |
 | Placement du bouclier | modèle et placements au bras (os 61163, avant-bras gauche) et au dos (os 24818, haut du dos) | `shields` (-- PLACEHOLDER) |
 | Combat natif coupé | drapeau 122 (corps à corps désactivé), changement d'arme bloqué, armes GTA retirées ; contrôle à 1 Hz ; rendu à GTA à l'arrêt | `natives` |
 | Conseil | `/armes`, droit `metiers` (sans `vava_admin` : ACE `combat.admin`), `user` jusqu'à 1 000 points | `admin`, `journal` |
@@ -99,14 +99,15 @@ dos de son porteur, à portée de vue seulement.
 
 Aucun RPC, aucun envoi à tous, aucune clé GlobalState propre, aucun envoi latent. Combattant armé et bouclier accroché au
 repos : 0 octet. Côté client : un contrôle à 1 Hz (trois natives au repos) et, seulement tant qu'un bouclier est en vue,
-une boucle lente (1 s) ; **aucune boucle par image** (la coupure image par image des touches appartiendra au mode combat
+une boucle lente (1 s), qui ne montre un bouclier qu'à 120 m au plus (`shield.showRadius`) et ne recalcule son placement
+qu'au changement de valeur ou de main ; **aucune boucle par image** (la coupure image par image des touches appartiendra au mode combat
 de T-112).
 
 ## Sécurité
 
 - Le serveur lit l'objet **tenu** (`vava_inventory:held`), jamais une donnée du client ; aucune entrée réseau ne peut
   demander un coup, une usure ou une accroche hors des chemins existants de l'inventaire (`hold`, `use` et leurs limites).
-- `strike` : positions lues par le serveur (6 m), options fermées et bornées (`weapons.options`, testé), paquet revalidé
+- `strike` : même instance que la cible (`GetPlayerRoutingBucket`), positions lues par le serveur (6 m), options fermées et bornées (`weapons.options`, testé), paquet revalidé
   par `vava_health` ; export réservé à `strike.callers` (`GetInvokingResource`, refus `not_allowed`, une ligne de console
   par minute et par ressource).
 - Usure décidée et écrite par le serveur ; la garde de l'artisanat refuse toute remontée hors réparation ; `/armes user`
@@ -123,9 +124,9 @@ de T-112).
 
 | Commande | Effet |
 |---|---|
-| `/armes liste` | une ligne par arme (libellé, catégorie, type, coup, solidité, « modèle provisoire ») |
+| `/armes liste` | une ligne par arme (libellé, catégorie, type, coup, solidité, « modèle provisoire »), regroupées en deux messages de chat (sans `vava_chat` : notifications de 200 signes) |
 | `/armes voir <n°>` | arme en main (qualité, palier, solidité, coup de base → coup effectif à × 1,0, émoussée) et bouclier accroché (position, solidité) ; **journal** « Combat : armes consultées » |
-| `/armes user <n°> <points>` | baisse la solidité de l'arme en main (1 à 1 000 points ; jamais au-dessus), seuils prévenus comme une usure ; **journal** « Combat : arme usée » (avant, après) — essais d'émoussage et de réparation |
+| `/armes user <n°> <points>` | baisse la solidité de l'arme en main (1 à 1 000 points ; jamais au-dessus), seuils prévenus comme une usure ; écriture refusée (arme partie, garde de l'artisanat) : message à part (`adminFailed`), rien au journal ; sinon **journal** « Combat : arme usée » (avant, après) — essais d'émoussage et de réparation |
 
 Console admise (`armes …`). Déclarée au registre `core:commands` (chapitre « Combat »).
 
@@ -136,7 +137,7 @@ Console admise (`armes …`). Déclarée au registre `core:commands` (chapitre �
 | `weapon(item)` | copie de la fiche `{ item, label, category, family, kind, damage, reachBonus, durability, block, provisional }`, ou `nil` |
 | `weapons()` | liste ordonnée (catégorie, puis libellé) des fiches |
 | `armed(src)` | `{ instanceId, item, category, family, kind, damage, factor, amount, reachBonus, quality, durability, maxDurability, dull }` (`factor` : qualité × usure ; `amount` : coup à × 1,0), ou `nil, code` (`not_ready`, `no_character`, `no_weapon`) |
-| `shield(src)` | `{ instanceId, item, block, durability, maxDurability, dull, position, ready }` (`ready` : au bras), ou `nil` |
+| `shield(src)` | `{ instanceId, item, block, durability, maxDurability, dull, position, ready }` (`ready` : au bras), ou `nil` : rien d'accroché, inventaire muet (rien n'est affirmé sans la pile), ou pile partie de la besace (décrochée aussitôt) |
 | `strike(src, cible, opts)` | résultat de `vava_health:hit` + `weapon = { item, durability, maxDurability, worn, dull }`, ou `nil, code` — `not_allowed`, `not_ready`, `invalid_target`, `no_character`, `downed`, `invalid_options`, `no_weapon`, `too_far`, `health_unavailable`, plus les codes de `hit` ; réservé à `strike.callers` |
 
 | Export client | Retour |
@@ -155,8 +156,9 @@ Console admise (`armes …`). Déclarée au registre `core:commands` (chapitre �
 - **T-112** appelle `VavaCombat.strike.run(src, cible, { technique, damage, tags, part })` après sa géométrie
   (`hit.range + weapon.reachBonus`, angle) ; lit le style par `catalog.weapon(held.item)` ; ajoute son mode combat.
 - **T-113** : modificateur de blocage qui lit `block` de l'arme tenue ou, si `shield(src).ready`, du bouclier ; use le
-  bouclier par `VavaCombat.wear.apply`.
-- **T-116** : règle « mains vides » de la magie par `exports.vava_combat:armed()` (client) et `armed(src)` (serveur).
+  bouclier par `VavaCombat.wear.apply` (qui relit la pile avant d'écrire) ; à chaque blocage, lire `VavaCombat.shields`
+  en interne plutôt que l'export `shield(src)` (deux exports par appel, relecture réseau R-6).
+- **T-140** (décision du porteur du projet, 31 octobre 2026) : règle « mains vides » de la magie par `exports.vava_combat:armed()` (client) et `armed(src)` (serveur).
 - **T-121** : l'éditeur des techniques lit `weapons()` et affiche `provisional`.
 
 ## Assets à brancher
@@ -190,5 +192,5 @@ coup en développement : `set vava_env dev` et `ensure vava_example_combat` (1.1
 - Modèles provisoires présents dans le jeu (`w_me_dagger`, `w_me_hatchet`, `w_me_poolcue`, `w_me_bat`,
   `prop_ballistic_shield`) ; placements à régler (`offset`, `rotation`) : en main, et bouclier au bras et au dos.
 - Le bouclier change de place en moins d'une seconde quand la main change, chez le porteur et chez un voisin.
-- La magie ne regarde aujourd'hui que l'arme GTA : un mage peut lancer un sort l'épée à la main (décision attendue, spec
-  § 13-1).
+- La magie ne regarde aujourd'hui que l'arme GTA : un mage peut lancer un sort l'épée à la main. Tranché par le porteur
+  du projet (31 octobre 2026) : mains vides pour incanter, tâche T-140.

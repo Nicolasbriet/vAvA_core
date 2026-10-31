@@ -77,7 +77,7 @@ serveur `strike`. Préparation : 0.6.
 | # | Faire | Attendu |
 |---|---|---|
 | 1 | Démarrer le serveur. | Console : `vava_combat` v1.0.0 « prêt : 6 objets et 6 recettes déclarés, 7 armes au catalogue », aucun avertissement (l'Épée courte adoptée, solidité 150 d'accord avec sa recette). |
-| 2 | A `/armes liste`. | Huit lignes : « Armes du royaume (7) : » puis Épée courte, Hache d'armes, Masse d'armes, Épée longue, Dague, Bâton ferré, Bouclier rond (par catégorie), chacune « modèle provisoire ». |
+| 2 | A `/armes liste`. | Deux messages de chat (huit lignes en tout) : « Armes du royaume (7) : » puis Épée courte, Hache d'armes, Masse d'armes, Épée longue, Dague, Bâton ferré, Bouclier rond (par catégorie), chacune « modèle provisoire ». |
 | 3 | A `/catalogue arme`. | Les six armes nouvelles ont leur image ; fiche : catégorie arme, aucune solidité (pile du catalogue). |
 | 4 | **(2 joueurs)** A prend l'Épée longue dans les Mains. | Machette en main droite chez A ; B, à 10 m, la voit dans la seconde. |
 | 5 | A clic gauche, `R`, `Q`, `F` près de B, mains vides puis Dague en main ; puis `/arme pistolet` (exemple). | Aucun coup de poing ni de lame natif, aucune animation d'attaque ; le pistolet disparaît en moins d'une seconde, aucun tir ; F8 : une ligne « arme de GTA retirée ». Aucune erreur. |
@@ -98,13 +98,14 @@ serveur `strike`. Préparation : 0.6.
 | 20 | **(2 joueurs)** A prend l'Épée courte en main ; puis l'Épée longue ; puis la repose. | Bouclier au **bras gauche** dans la seconde, chez A et chez B ; avec l'Épée longue, de nouveau dans le dos ; mains vides : dos. |
 | 21 | **(2 joueurs)** A « utilise » encore le bouclier ; puis le raccroche et le jette au sol. | Décroché : il disparaît chez A et B. Jeté : il disparaît aussitôt chez les deux, il est dans le sac au sol. |
 | 22 | **(2 joueurs)** A, bouclier accroché, se déconnecte et revient ; puis `restart vava_combat`. | Au retour, bouclier en place. Pendant l'arrêt : aucun bouclier fantôme ; au redémarrage, de nouveau en place, un seul. |
-| 23 | **(2 joueurs)** B s'éloigne à 600 m puis revient près de A (bouclier accroché). | Au retour, le bouclier de A apparaît avec son ped. |
+| 23 | **(2 joueurs)** B s'éloigne à 600 m puis revient près de A (bouclier accroché) ; puis B s'arrête à 150 m de A (vol libre, `F2`), avance à 100 m. | Au retour, le bouclier de A apparaît avec son ped. À 150 m, B voit A **sans** bouclier ; à 100 m, il réapparaît dans la seconde (`shield.showRadius`, 120 m). |
 | 24 | A à terre (`/vie 0`), tente d'utiliser le bouclier. | Refusé (l'inventaire refuse tout geste à terre, ou « Vous ne pouvez pas faire cela à terre. »). |
 | 25 | **(2 joueurs)** Après 12 à 21 : `/vava_reseau joueur <A>` puis `<B>`. | Chez A : `vava_combat:notify` aux seuils seulement, `vava_health:set` jamais (A ne reçoit pas de coup). Chez B : `vava_health:set` par coup. Aucun évènement `vava_combat` chez un troisième joueur loin. |
 | 26 | `resmon 1` chez B au repos, puis avec A armé et bouclier accroché à côté. | `vava_combat` ≤ 0,01 ms dans les deux cas (aucune boucle par image). |
 | 27 | `stop vava_combat`, puis `ensure vava_combat`. | Arrêt : armes « gardées à part » par l'inventaire, recettes absentes des stations, bouclier retiré des peds, coups de poing natifs revenus mais sans dégâts (annulés par `vava_health`). Retour : tout revient, sans perte. |
-| 28 | Mage : A, Épée courte en main, lance une Boule de feu. | Aujourd'hui le sort part (la magie ne regarde que l'arme GTA) : noter, décision en attente (spec T-111 § 13-1). |
+| 28 | Mage : A, Épée courte en main, lance une Boule de feu. | Aujourd'hui le sort part (la magie ne regarde que l'arme GTA) ; la règle « mains vides » viendra avec T-140 (décision du 31 octobre 2026). |
 | 29 | Un membre du Conseil sans le droit `metiers` (ni l'ACE `combat.admin`) : `/armes user <A> 5`. | « Ce registre est réservé au Conseil. » ; solidité inchangée, rien au journal. |
+| 30 | **(2 joueurs, si un outil d'instance existe)** B placé dans une autre instance (routing bucket) au même endroit que A ; A `/frapper_arme <B>`. | « refusé : trop loin » ; B ne perd rien, solidité inchangée. |
 
 ## 3. Ce que je ne peux pas avoir vérifié hors jeu
 
