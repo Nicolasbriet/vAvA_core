@@ -2132,10 +2132,14 @@ jeu : `modules/vava_gathering/README.md`. Demande le core 0.11.0 (abonnements de
 `vava_skills` 1.0.0 ; facultatifs : `vava_hud`, `vava_admin` (droit `metiers`), `vava_chat`, `vava_health` (à terre),
 `vava_time` (saisons).
 
-- **Données** en `config_client.lua` (1.7.0 : le client les lit) : zones (centre, rayon, coût, régénération, cicatrice), nœuds (position, ressource, charges,
-  délai, props normal et épuisé — tous les nœuds ont un prop créé par le client), ressources (objet, compétence, outil,
-  difficulté, XP, fourchette, durée, animation, pièce supplémentaire), outils ; en `config.lua` : objets déclarés à
-  l'inventaire. Les zones livrées sont des exemples.
+- **Données** (1.8.0, T-102 : chaque entrée a une part client et une part serveur) : en `config_client.lua`, ce que
+  lit le client — outils (`{ kind }`), ressources (`{ label, tool?, anim, prop = { model, depleted } }` : l'apparence
+  d'un point est celle de sa ressource) ; en `config.lua`, servi au seul serveur — zones et nœuds (**graine** de
+  l'Atelier : version 1 au premier démarrage, puis la base fait foi ; sans l'Atelier, la récolte tourne dessus),
+  `resourceStats` (objet, compétence, difficulté, XP, fourchette, durée, pêche, pièce supplémentaire), `toolStats`
+  (puissance, bonus, usure), `looks` (apparence dite au Conseil), `editor` (atelier « Récolte »), objets déclarés à
+  l'inventaire. Mêmes identifiants des deux côtés, sinon le module refuse de démarrer avec le nom en cause. Les zones
+  livrées sont des exemples.
 - **État** (1.6.0) envoyé aux seuls joueurs proches par les abonnements de zone du core (§ `core.zones`) : une zone du
   core par zone de récolte (nom local = identifiant de la zone ; centre de la zone, rayon qui englobe ses nœuds au sol,
   marge `streaming.radius` + `streaming.subscribeSlack` = 100 m) ; état `zone` → `{ band, scarred }` et `n:<nœud>` →
@@ -2143,7 +2147,30 @@ jeu : `modules/vava_gathering/README.md`. Demande le core 0.11.0 (abonnements de
   La vitalité n'est jamais envoyée (export `getZone` et panneau `vava_gathering:zones` pour la lire). Plus aucune clé
   GlobalState (les anciennes `vava_gathering:zone:<id>` et `vava_gathering:node:<id>` sont effacées une fois au
   démarrage). État public (rien de secret) : chaque action revérifie la distance côté serveur. Identifiants : zone
-  48 octets au plus, nœud 46.
+  48 octets au plus, nœud 46. Depuis 1.8.0 (T-102), l'état porte aussi `def` → `{ l, k, x, y, z, r }` (nom, type de
+  lieu, centre et rayon de la zone) et `p:<nœud>` → `{ r, x, y, z, h }` (ressource, lieu et cap d'un point) : le
+  client ne lit plus aucune zone ni aucun nœud dans sa config. Ni coût, ni repos, ni cicatrice réglée, ni charges
+  maximales, ni repousse, ni nom d'un point dans l'état : changer la fatigue d'une zone n'envoie rien. 120 points au
+  plus par zone (2 + 2 × 120 = 242 clés sur 256 ; ≈ 9 Ko pour 120 points aux identifiants courts, ≈ 19 Ko au pire,
+  latent au-delà de 8 Ko).
+- **Atelier « Récolte »** (1.8.0, T-102) : atelier gardé `vava_gathering:zones` (famille monde, droit `metiers`,
+  `trialPlay`), types `zone` (cercle, rayon de 10 à 300 m) et `node` (« point », orienté, enfant d'une zone, à 5 m au
+  plus hors de son cercle, 2 m entre deux points), déclaré au démarrage et au hook `vava_atelier:editorsReady`. `apply`
+  et `remove` changent le catalogue à chaud, tout ou rien (vitalité et charges reprises de la base, gardées en base au
+  retrait ; récoltes en cours sur un point changé oubliées : `unknown_node` à la fin) et **notent** la zone ; la
+  diffusion part au seul appel marqué `info.last` : zone nouvelle déclarée entière, zone connue déplacée si son
+  cercle change puis sa différence (clés changées et retirées, par paquets de 64 dans le même tour), zone retirée
+  (`core.zones.remove`) ; garde de la boucle lente au-delà de `editor.flushGraceMs` (2 s). Règles : `validate` (nom
+  unique sans accents ni casse, type connu, lieu exigé à l'essai et à la publication, chevauchement de 10 m au plus
+  avec une autre zone publiée ; point : ressource connue, poisson ⇔ eau, dedans sa zone si elle n'est pas dans le lot),
+  `validateLot` (120 points, cercle neuf, écart, cercle englobant de 500 m), `placeCheck` (chevauchement, 256 zones,
+  120 points). **Essai à blanc** (décision du 31 octobre 2026) : la zone essayée et ses points ne sont envoyés qu'à
+  leur auteur (`vava_gathering:trial`, puis `trialEnd`), jamais dans l'état de zone ; seul l'auteur peut récolter un
+  point d'essai, avec tous les contrôles d'une vraie récolte, et rien n'est donné (ni objet, ni XP, ni usure, ni
+  vitalité, ni charge réelle, ni hook `harvesting` / `harvested`).
+- **Carte** (1.8.0) : la liste des zones n'est jamais poussée ; chaque client la garde en stockage local (KVP
+  `vava_gathering:map`, 16 Ko et 256 zones au plus, contrôlée à la relecture) avec sa version et la redemande une fois
+  par séance (RPC `vava_gathering:map`) ; une zone suivie corrige son blip depuis sa `def`.
 - **Serveur maître** : distance lue côté serveur au début et à la fin, durée revérifiée, jeton par geste, cooldown,
   une récolte à la fois. Pêche (1.4.0, décision du 30 octobre 2026 : le serveur tire la réussite) : le booléen « a
   tenu la tension » de `vava_gathering:reel` ne peut que faire rater (`false` : code `escaped`) ; à `true`, le serveur
@@ -2168,7 +2195,7 @@ config, ouvert aux autres modules (une hache d'artisan de phase 3 s'y déclare, 
 | Export serveur | Retour |
 |---|---|
 | `getZone(id)` | `{ id, label, kind, vitality, band, scarred, x, y, z, radius }` ou `nil, code` |
-| `getZones()` | liste, dans l'ordre de la config |
+| `getZones()` | liste, dans l'ordre de la graine puis de création dans l'Atelier (catalogue courant) |
 | `setVitality(id, valeur)` | `true` ou `false, code` — 0 à 100, lève la cicatrice si > 0 ; journalisé au nom du module |
 | `nodeState(id)` | `{ id, zone, resource, charges, max }` |
 | `getResource(id)` · `getTool(objet)` | définitions, ou `nil` |
@@ -2178,9 +2205,21 @@ config, ouvert aux autres modules (une hache d'artisan de phase 3 s'y déclare, 
 terre sacrée, nuit, état…), `harvested` (`after` : `+ quantity, tier, band, extra?`), `zoneDepleted` (`after` :
 `{ zone, vitality }`), `zoneScarred` (`{ zone, scarredUntil, depletions }`), `earthReaction` (`{ zone, depletions }`).
 
+| RPC (1.8.0) | Arguments | Réponse |
+|---|---|---|
+| `vava_gathering:map` | version gardée (0 à 16 hexadécimaux) ; débit `map` (2, puis 1 / 20 s) | `{ version }` si elle n'a pas changé (≈ 30 o), sinon `{ version, zones = { { i, l, k, x, y, r } } }` (au mètre, ≈ 60 o par zone) ; `no_character` |
+
+| Évènement (1.8.0) | Cible | Charge |
+|---|---|---|
+| `vava_gathering:trial` | le seul auteur de l'essai (`core.net`, toujours fiable : `latent = 'never'`, l'essai entier puis ses différences arrivent dans l'ordre ; ≈ 0,1 Ko + 70 o par point) | `{ zone, mode = 'full', def, nodes = { [id] = { r, x, y, z, h, c } } }`, puis `{ zone, mode = 'patch', def?, nodes?, hidden? }` (relance après une sauvegarde ou une pose, charge d'essai prise : `nodes = { [id] = { c } }`) |
+| `vava_gathering:trialEnd` | le seul auteur, s'il est encore là | identifiant de la zone |
+
+La réponse de `vava_gathering:begin` porte `trial = true` pour un point d'essai, et `durationMs` est la seule durée du
+geste que lit le client (sa config ne la porte plus).
+
 **Commande** `/recolte zones | zone <id> | noeud <id> | vitalite <zone> <0-100> | recharger <noeud>` (droit `metiers`).
 Touches : `E` récolter, `O` panneau des zones (« Marquer » y pose le repère de la carte sur une zone). Carte : un blip
-nommé par zone et le cercle de son rayon, posés par le client depuis la config (`map`). Rendu hors jeu :
+nommé par zone et le cercle de son rayon, posés par le client depuis sa liste gardée (`map`, 1.8.0). Rendu hors jeu :
 `web/index.html?view=prompt` (ou `tension`, `zones`).
 
 ### `vava_crafting`
@@ -2662,7 +2701,7 @@ Registre). Touche `F9` (réglable ; `keys.open` de `config_client.lua` depuis 1.
 (T-101), un atelier dont le module déclare `apply` et `remove` est **gardé** : ses fiches vivent en base (une ligne par
 version), avec brouillon, essai, publication groupée, retour en arrière, retrait, historique ; la config du module est
 la graine, la base fait foi. Un atelier sans `apply` reste en lecture (comportement de 1.0.0). Le placement en jeu vient
-avec T-102.
+avec T-102 (1.3.0, § « Outil de placement » ci-dessous).
 
 **Déclarer un éditeur** (registre `vava_atelier:editors`, 32 entrées au plus ; clé `<ressource>:<nom>` au motif
 `^[%w_]+:[%w_]+$`, 64 octets ; une clé dont le préfixe n'est pas la ressource qui l'ajoute est retirée aussitôt). Un
@@ -2783,7 +2822,7 @@ qu'il détient. La recopie au Registre et le hook `vava_atelier:journal` partent
 | `vava_atelier:editorsReady` | serveur, after | `{}` — fin du démarrage : (re)déclarer ses éditeurs |
 | `vava_atelier:session` | serveur, after | `{ source, accountId, open }` |
 | `vava_atelier:journal` | serveur, after | `{ id, editor, kind, defId?, action, title, summary?, version?, actor = { accountId?, label } }` |
-| `vava_atelier:state` | client, local | `{ open }` |
+| `vava_atelier:state` | client, local | `{ open, placing, suspended }` (T-102 : `placing` pendant la visée ; `open = false, suspended = true` pendant l'essai joué) |
 
 #### Définitions gardées (T-101, `vava_atelier` 1.1.0)
 
@@ -2916,6 +2955,83 @@ jamais rien et garde les brouillons ; résumé puis `confirmer` sous 60 s.
 Exemple complet, sans une ligne d'interface : `examples/vava_example_atelier` (mode développement). Hors jeu :
 `web/index.html?screen=home` (puis `list`, `entry`, `entry&layout=side`, `journal`, `confirm`, `keys`…), données
 simulées de `web/dev/devmock.js`, jamais livré.
+
+#### Outil de placement (T-102, `vava_atelier` 1.3.0)
+
+Un type à `placement` (`point`, `oriented`, `circle`, `polygon` ; `door` reste à T-106 : l'outil refuse de démarrer
+dessus) se pose **en jeu** : visée depuis la caméra, aperçu vert ou rouge avec sa raison, molette (cap, rayon), `Maj`
+(pas fin), clic droit (choisir un point ou un sommet), `Ctrl+Z` (commande-touche `+vava_atelier_annuler`, `Z`, suit la
+disposition du clavier), `Entrée` (fermer un tracé), `Échap` (quitter ; un second appui sous 2 s abandonne un tracé
+commencé). La boucle par image ne vit que pendant la visée, chez le seul membre ; les fantômes sont des objets locaux.
+**Le serveur ne croit aucun lieu du client** : il relit la position du personnage, la forme, la portée, les règles et
+le module à chaque pose. Une pose n'écrit qu'un **brouillon** : rien ne part aux joueurs avant la publication.
+
+**Déclaration** (en plus de T-101 ; toute autre clé reste refusée ; descripteur ≤ 32 Ko) — par type :
+
+```lua
+rules = {
+    inside = { slack = 5.0 },   -- dans le lieu du parent (cercle : r + slack ; tracé : dedans ou à slack m du bord) ;
+                                -- seulement pour un type à parent dont le parent est un cercle ou un tracé ; 0 à 50
+    spacing = 2.0,              -- au moins n m au sol des autres fiches du même type et du même parent ; 0 à 100
+    radius = { min = 10.0, max = 300.0, default = 60.0 },   -- cercle seulement ; 0 < min ≤ default ≤ max ≤ place.maxRadius
+    vertices = { min = 3, max = 32 },                       -- tracé seulement, dans place.polygonPoints
+},
+template = { 'ressource', 'charges', 'repousse' },  -- type à parent : champs du bloc « Prochain … à poser » (1 à 8,
+                                                    -- jamais le titleField) ; leurs valeurs partent avec chaque clic
+autoTitle = 'ressource',          -- type à parent, champ select ou segmented : titre d'un enfant nouveau = libellé du
+                                  -- choix + premier numéro libre parmi les frères (« Chêne 4 »)
+hintField = 'charges', hintFormat = '%s récoltes',  -- slider ou duration ; 24 octets, un seul %s : indice d'une ligne
+ghost = { field = 'ressource',    -- select, segmented ou model : le fantôme suit ce champ
+          models = { chene = { model = 'prop_tree_oak_01', label = 'chêne de GTA', provisional = true } } },
+                                  -- models facultatif (sans lui : la valeur du champ est le modèle) ; 64 entrées,
+                                  -- model au motif ^[A-Za-z0-9_]+$ de 64 octets, label 40
+```
+
+— par éditeur : `trialPlay = true` (l'essai se joue en jeu : la page se met de côté, `F9` la rend) ;
+`placeCheck(kind, place, ctx)` (facultatif, seulement avec `apply`) → `true` ou `false, 'texte'` (≤ 160) ;
+`ctx = { source, accountId, id, parent?, data, siblings }` : `id` vaut `''` pour une fiche nouvelle, `data` est la data
+normalisée (celle du modèle pour un enfant nouveau), `siblings` le nombre de frères vivants après la pose ; `place` est
+déjà arrondi et a passé les règles déclarées. Sert à ce que les règles ne savent pas dire (chevauchement de deux zones,
+nombre de points d'une zone). Le placement **n'appelle pas** `validate` : `validate` reste juge de tout, lieu compris,
+à l'essai et à la publication. `trial` reçoit aussi `ctx.removed = { { kind, id } }` (retraits préparés du lot, à
+cacher pendant l'essai) avec `reason = 'start'`.
+
+| RPC | Arguments | Débit | Réponse |
+|---|---|---|---|
+| `vava_atelier:place` | atelier, type, fiche (`''` : nouvelle), révision lue, lieu `{ x?, y?, z?, h?, r?, points? }` (nombres bornés, 3 à 32 sommets), parent (`''` : aucun), valeurs — fiche nouvelle : valeurs du modèle et parent (type à parent) ; fiche existante : valeurs vides, parent `''` ou son propre parent (« Poser des points » depuis la fiche parent) | 6, puis 2 / s | `{ done = true, id, rev, title, state, footer, place, row = { kind, id, title, hint?, tone, place, look?, rev }, parent = { id, rev, state, footer }? }` ; refus de lieu `{ done = false, errors = { { field = 'place', text } } }` ; refus de structure `false, code` |
+| `vava_atelier:children` | atelier, type, fiche | 4, puis 1 / s | `{ self = { place? }, parent = { kind, id, title, place? }?, rows }` — `rows` : les enfants de la fiche (type parent) ou ses frères, elle comprise (type enfant), 200 au plus, triés par titre ; `tone` ∈ `live`, `draft`, `new`, `removal`, `other` ; `look` (fantôme) pour une ligne pas encore publiée |
+
+Contrôles de `place`, dans l'ordre : séance, personnage, droit effectif relu (T-100) ; atelier gardé et disponible,
+type placé (`not_placeable`) ; instance du royaume (`placement.bucket`, sinon `instance`) ; personnage présent, position
+lue par le serveur (`not_ready`) ; forme du lieu (`place.check` : clés de la forme seulement, nombres finis, bornes,
+arrondis) ; portée : centre à `placement.reach` (60 m, 3D), chaque sommet d'un tracé à `reach × polygonFactor` (120 m,
+au sol) ; fiche nouvelle : valeurs du modèle par la forme et le monde, parent vivant (publié, ou brouillon du membre ;
+sinon `parent_missing`), titre donné tout seul, plafonds (`full`) ; fiche existante : vivante (`unknown_entry`), sans
+valeurs (`bad_request`) ; règles déclarées avec le lieu du parent et ceux des frères lus en base ; `placeCheck` ;
+écriture sous les verrous de la fiche et de son parent (table de décision `lc.placePlan` : `draft_taken`, `not_holder`,
+`stale`, `bad_request` ; brouillon du parent copié de sa publiée **dans la même transaction** s'il le faut) ; puis essai
+du membre relancé (un enfant nouveau du tenant rejoint l'essai), `entryChanged saved` aux autres membres sur la fiche
+et sur son parent. Journal : une fiche sans parent créée par une pose → `created` ; premier brouillon d'une publiée →
+`saved` ; un enfant posé → aucune ligne (la publication dit « 5 points ajoutés, déplacée de 12 m »). Codes ajoutés :
+`not_placeable`, `instance`, `bad_request`.
+
+`read` rend aussi `place` (lieu de la fiche lue) et `parent`. Aucun RPC pour annuler : `Ctrl+Z` d'une création appelle
+`discard`, d'un déplacement `place` avec le lieu d'avant. Base : `sql/0003_parent_index.sql` (index `editor, parent`
+des enfants).
+
+**Messages entre le jeu et la page** (aucun à chaque image) — Lua → page : `placing { on, mode = 'self' | 'children',
+shape, keys }`, `placed { kind, id, rev, title, state, footer, place, distance?, row, parent? }`, `placeRefused { text }`,
+`undone { kind, id, rev?, place?, gone? }`, `suspended { on }` (la page compose la ligne d'essai : `texts.trialLine` de
+l'atelier et la touche de retour). Page → Lua : `children { editor, kind, id }` (relais ; la réponse est gardée pour
+l'outil, avec `self.distance`), `placeStart { editor, kind, id, rev, mode, shape, rules, title, ghost? }` — en mode
+`children` : `kind` = le type enfant, `id = ''`, `rev = 0`, plus `parent` (la fiche ouverte), `parentRev`, `template`,
+`label` (libellé du choix `autoTitle` courant) —, `placeStop`, `templateChanged { values, ghost?, label? }`,
+`goTo { x, y }` (repère GPS seulement), `suspend`. `read` reçoit aussi `distance` (mètres du personnage au lieu, calculés
+par le client). Chaque valeur reçue de la page est bornée par le Lua (forme connue, nombres finis, modèle au motif).
+
+**Coût** : une pose ≈ 0,4 Ko aller-retour, `children` ≈ 0,7 Ko pour 5 points (≈ 22 Ko au pire, latent au-delà de
+8 Ko), tout vers le seul membre ; rien aux autres joueurs avant la publication. Client : 0,00 ms hors visée ; en visée,
+un lancer de rayon par image, ≤ 3 marqueurs d'aire, ≤ 12 étiquettes, ≤ 13 fantômes.
 
 ### `vava_chat`
 

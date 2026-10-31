@@ -996,9 +996,13 @@ maquettes.
   redémarrage.
 
 ### T-102 — Outil de placement et créateur de récolte
-- Agents : vava-architecte → vava-dev-lua + vava-dev-nui · Dépend de : T-101, T-015, T-141 · Statut : en cours
+- Agents : vava-architecte → vava-dev-lua + vava-dev-nui · Dépend de : T-101, T-015, T-141 · Statut : en cours (Lua
+  fini, relectures sécurité, réseau et lore à faire ; pages faites dans `agents/T-102-nui`)
 - Spec : `docs/plan/specs/T-102.md`, avec les décisions du porteur du projet du 31 octobre 2026 (essai à blanc, recommandations
-  retenues).
+  retenues). Rapport : `docs/plan/rapports/T-102.md` (et `T-102-nui.md` pour les pages) ; procédure en jeu :
+  `docs/tests/atelier.md` § 19 à 24, `docs/tests/metiers.md` § 3.5. `vava_atelier` 1.3.0, `vava_gathering` 1.8.0.
+  Reste hors de ce lot : `vava_example_atelier` 1.2.0 (enclos en tracé, bornes) de la spec § 2.1, pour essayer en jeu
+  les formes que la récolte n'utilise pas (point, polygone).
 - Outil de placement commun (point, point orienté avec modèle, cercle, polygone ; aperçu vert/rouge ; molette,
   `Maj`, clic droit, `Ctrl+Z`, `Échap` ; barre des touches) sur le modèle de l'éditeur de `vava_voice`.
 - `vava_gathering` déclare ses éditeurs zone et point (maquette `Recolte`) ; « Tester la récolte » en essai.
@@ -1009,6 +1013,8 @@ maquettes.
   serveur (`resources.*` : objet, compétence, difficulté, XP, rendement, pièce en plus, 1 045 o ; `tools.*` : puissance,
   bonus, usure, 285 o ; `zones` et `nodes` : coût, régénération, cicatrice, charges, 411 o). En passant ces données à
   l'Atelier, donner à chaque entrée une part client et une part serveur (contrôle T4 de `config_split_spec` vert).
+  **Fait** (1.8.0) : `zones` et `nodes` dans `config.lua` (graine), `resourceStats` et `toolStats` dans `config.lua`,
+  `resources` (libellé, outil, geste, modèles) et `tools` (genre) seuls dans `config_client.lua` ; T4 vert.
 
 ### T-103 — Créateur d'agriculture
 - Agent : vava-dev-lua (+ vava-dev-nui si widget) · Dépend de : T-102, T-016 · Statut : à faire

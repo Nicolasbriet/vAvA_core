@@ -1,11 +1,13 @@
 # L'Atelier du Conseil — procédure de test en jeu
 
-Procédure pour vérifier en jeu `vava_atelier` 1.1.0 avec son exemple `vava_example_atelier` 1.1.0. § 1 à 9 (T-100, le
-socle) : ouverture et fermeture, ce que chacun voit selon son rang, la liste et la fiche d'un atelier, « Vérifier », la
-recherche, le journal du Conseil, les redémarrages, ce qui passe sur le réseau. § 10 à 17 (T-101, les définitions
-gardées) : brouillon, essai, publication, retour en arrière, deux membres sur une fiche, la config et la base, les
-archives, les redémarrages. Comptez une heure pour T-100, une heure et demie pour T-101 ; les tests à plusieurs joueurs
-sont marqués **(2 joueurs)**. Un test se cite « atelier 3-4 ». Préparation commune, mesure du resmon et remontée des
+Procédure pour vérifier en jeu `vava_atelier` 1.3.0 avec son exemple `vava_example_atelier` 1.1.0 et
+`vava_gathering` 1.8.0. § 1 à 9 (T-100, le socle) : ouverture et fermeture, ce que chacun voit selon son rang, la liste
+et la fiche d'un atelier, « Vérifier », la recherche, le journal du Conseil, les redémarrages, ce qui passe sur le
+réseau. § 10 à 17 (T-101, les définitions gardées) : brouillon, essai, publication, retour en arrière, deux membres sur
+une fiche, la config et la base, les archives, les redémarrages. § 19 à 24 (T-102, l'outil de placement et l'atelier
+« Récolte ») : placer une zone, poser des points, essai à blanc, publication vue des proches et non des lointains,
+changements, refus. Comptez une heure pour T-100, une heure et demie pour T-101, une heure et demie pour T-102 ; les
+tests à plusieurs joueurs sont marqués **(2 joueurs)** ou **(3 joueurs)**. Un test se cite « atelier 3-4 ». Préparation commune, mesure du resmon et remontée des
 écarts : [LISEZMOI.md](LISEZMOI.md).
 
 ## 0. Préparation
@@ -215,10 +217,101 @@ Console).
 | 4 | Un `apply` qui refuse : console `set vava_example_refuse 1`, publier. | « Refus d'essai demandé. » ; la fiche reste « Brouillon », la version publiée est intacte en jeu (`lire`), console : `refus du module (…), base rendue, resynchronisation` puis `… (fiches du lot seulement)` (les autres fiches ne sont pas relues). Remettre `set vava_example_refuse 0`. |
 | 5 | `history.keep = 2` dans la config de l'Atelier, redémarrer ; publier quatre fois le même panneau. | Historique : jamais plus de 2 versions après chaque publication (purge des fiches du lot, sans redémarrage) ; au démarrage, la console écrit la purge une minute après « editorsReady » (`history.purgeDelayMs`), après les lignes de synchronisation. Remettre 20. |
 
-## 18. Fin du test
+## 19. Placer une zone (T-102)
+
+Préparation (§ 19 à 24) : `vava_gathering` 1.8.0 démarré **après** `vava_atelier` 1.3.0 (console : `atelier
+'vava_gathering:zones' déclaré par vava_gathering (droit metiers, gardé)`, puis sa synchronisation : 4 zones et
+12 points importés en version 1 au premier démarrage). **A** Sénéchal (droit `metiers`), **B** joueur sans rang près de
+A, **C** joueur à plus de 400 m ; A tient une hache de bûcheron (emplacement Mains). `/vava_reseau joueur <n°>` (droit
+`tools`) pour voir ce que reçoit chacun. Lieu : une clairière libre à plus de 150 m des zones de la graine (Forêt de
+Brume, Mine du Val, Prairie Haute, Rivière Claire).
+
+| # | Faire | Attendu |
+|---|---|---|
+| 1 | A : `F9` → carte « Récolte · 4 zones » → « Nouvelle zone », nom « Bois des Essais », enregistrer. | Volet de la maquette `Recolte` ; étapes « La zone · Les points · Publier », la première en cours ; bloc Lieu « Pas encore placée. » et bouton « Placer la zone ». |
+| 2 | « Placer la zone ». | Le volet s'atténue ; bandeau « Mode édition : les cercles et étiquettes ne sont visibles que par vous » ; barre « Clic Poser ici · Molette Rayon · Maj Réglage fin · Ctrl Z Annuler · Échap Quitter » ; anneau vert de 60 m sous la visée, libellé « Bois des Essais, rayon 60 m » ; A peut marcher et tourner la caméra. |
+| 3 | Molette ×4 vers le haut, puis `Maj` + molette ×3. | Rayon 80 m, puis 81,5 m. |
+| 4 | Viser à plus de 60 m de A. | Anneau rouge, « Bois des Essais : Trop loin de vous : approchez-vous (… m). » ; un clic ne fait rien. |
+| 5 | Viser le ciel. | « Visez le sol. » |
+| 6 | Poser près de A. | Retour au volet ; « Posée à … m de vous, rayon 81,5 m » ; étape 1 cochée ; journal « A a créé la zone Bois des Essais » (aucune autre ligne). |
+| 7 | « Déplacer la zone », la viser à cheval sur la Forêt de Brume (s'en approcher d'abord), cliquer. | Rouge après le clic : « Cette zone empiète sur « Forêt de Brume » de … m. » (refus du module, `placeCheck`) ; rien d'écrit. |
+| 8 | Pendant une visée : `Échap`. | Retour au volet ; la bannière du royaume (`vava_pause`) ne s'ouvre pas. |
+| 9 | `resmon` pendant une visée, puis après. | `vava_atelier` ≤ 0,15 ms en visée ; 0,00 ms après. |
+
+## 20. Poser des points (T-102) — **(2 joueurs)** pour 8
+
+| # | Faire | Attendu |
+|---|---|---|
+| 1 | « Prochain point à poser » : Chêne, 3 récoltes, 10 minutes. | Phrase « Apparence : chêne de GTA, modèle provisoire. Il sera remplacé automatiquement quand le modèle médiéval sera ajouté. » |
+| 2 | « Poser des points ». | Barre « Clic Poser ici · Molette Tourner · Maj Placement précis · Clic droit Choisir un point · Ctrl Z Annuler · Échap Quitter » ; chêne fantôme (translucide) sous la visée ; anneau laiton de la zone ; libellé « Chêne 1, emplacement valide » en vert. |
+| 3 | Molette ; `Maj` + molette. | Le fantôme tourne de 15°, puis de 1°. |
+| 4 | Viser à plus de 5 m hors de l'anneau. | Rouge : « Chêne 1 : Hors de Bois des Essais. » |
+| 5 | Poser cinq chênes à 3 m l'un de l'autre. | Cinq fantômes ; liste « 5 points, dont 5 nouveaux », « Chêne 1 » à « Chêne 5 », « 3 récoltes » ; étape 2 cochée ; journal : aucune ligne par pose. |
+| 6 | Viser à 1 m de « Chêne 2 ». | Rouge : « Chêne 6 : Trop près de « Chêne 2 » (1 m). » |
+| 7 | `Ctrl+Z`. | « Chêne 5 » disparaît (liste et fantôme). Le reposer. |
+| 8 | B, près de A : regarder ; `/vava_reseau joueur <B>`. | B ne voit ni chêne, ni anneau, ni étiquette ; rien de `vava_gathering` ni de `vava_atelier` reçu. |
+| 9 | A : clic droit sur « Chêne 3 », clic 4 m plus loin ; puis `Ctrl+Z`. | Barre « Clic Déplacer ici · … · Clic droit Lâcher le point » ; « Chêne 3 » déplacé, puis revenu à sa place. |
+| 10 | Clavier AZERTY : `Ctrl+Z`. | Même effet (touche `Z` réelle, commande-touche `+vava_atelier_annuler` ; réglable dans Paramètres › Raccourcis › FiveM). |
+| 11 | Spam de clics (10 en 1 s). | Six poses au plus, puis « Doucement : patientez un instant. » ; aucune pose en double. |
+| 12 | `Échap`, puis corbeille sur « Chêne 5 » (jamais publié), confirmer. | La ligne disparaît (brouillon abandonné) ; « 4 points, dont 4 nouveaux ». Le reposer. |
+| 13 | Ouvrir « Chêne 2 » par son titre ; « Déplacer le point », le poser 2 m plus loin ; « retour ». | Visée de la fiche seule, retour au volet du point après le clic ; « retour » ramène à la zone, liste à jour. |
+
+## 21. Tester la récolte (T-102, essai à blanc) — **(2 joueurs)** pour 3
+
+| # | Faire | Attendu |
+|---|---|---|
+| 1 | A : « Tester la récolte ». | La page se range ; bandeau seul « Mode essai : vous seul voyez ces points · F9 : revenir à l'Atelier » ; cinq vrais chênes chez A (plus de fantômes). |
+| 2 | A récolte « Chêne 1 » à la hache. | Invite « Essai » ; geste et barre normaux ; « [Essai] Chêne : … × Bûche de chêne (…). Rien n'est donné pendant un essai. » ; besace inchangée, aucune XP (fiche de personnage), hache non usée (solidité). |
+| 3 | B regarde ; `/vava_reseau joueur <B>` et `/vava_reseau joueur <A>`. | B : rien vu, rien reçu ; A : `vava_gathering:trial` seulement (≈ 0,5 Ko au début, ≈ 0,1 Ko par récolte). |
+| 4 | A récolte encore « Chêne 1 » jusqu'au bout. | « Il n'y a plus rien à prendre ici pour le moment. » à la 4e. |
+| 5 | A range la hache, tente un chêne. | « Il vous faut une hache en main. » |
+| 6 | B tente de récolter là où A voit un chêne d'essai. | Aucune invite chez B (rien n'existe pour lui). |
+| 7 | A : `F9`. | Volet rendu tel qu'il était ; étiquette « Essai, version 1 ». « Arrêter l'essai » : les chênes disparaissent chez A. |
+
+## 22. Publier : proches et lointains (T-102) — **(3 joueurs)**
+
+| # | Faire | Attendu |
+|---|---|---|
+| 1 | A : « Publier la zone ». | Boîte « Publier la zone ? » : « Nouvelle zone », « 5 points ajoutés », « Ce sera la version 1. », phrase « Publier rend les nouveaux points visibles aux joueurs proches. » |
+| 2 | Confirmer. B regarde. | En une seconde au plus, B voit les cinq chênes sortir de terre, **sans redémarrage** ; `/vava_reseau joueur <B>` : un état de zone (`vAvA:zone:state`) sous `vava_gathering`, ≈ 0,5 Ko. |
+| 3 | `/vava_reseau joueur <C>` ; `/vava_reseau zones <C>`. | Rien de `vava_gathering` ni de `vava_atelier` chez C ; la zone `vava_gathering:bois_des_essais` n'est pas suivie par C. |
+| 4 | C approche à 150 m du centre de la zone. | C reçoit l'état entier une fois (cercle d'intérêt : rayon + 100 m), puis voit les chênes à 80 m. |
+| 5 | B récolte « Chêne 2 ». | Bûches réelles dans la besace, XP de Bûcheronnage, hache usée, vitalité de la zone baissée (`/recolte zone bois_des_essais`). |
+| 6 | Journal de l'Atelier. | Une ligne « A a publié la zone Bois des Essais — 5 points ajoutés » ; aucune ligne par pose. |
+| 7 | B se reconnecte et ouvre la grande carte. | Blip « Bois des Essais » et son cercle. Se reconnecter encore : `/vava_reseau joueur <B>` ne montre que ≈ 30 o pour `vava_gathering:map`. |
+
+## 23. Changer, retirer, revenir (T-102) — **(2 joueurs)**
+
+| # | Faire | Attendu |
+|---|---|---|
+| 1 | A déplace « Chêne 4 » de 5 m (fiche du point, « Déplacer le point »), publie. | Résumé « Chêne 4 : déplacé de 5 m » ; B voit l'arbre changer de place (≈ 0,1 Ko reçu, une `vAvA:zone:diff`). |
+| 2 | A change seulement « Fatigue par récolte » de la zone, publie. | B ne reçoit **rien** (`/vava_reseau joueur <B>`). |
+| 3 | A : corbeille sur « Chêne 5 » (publié), « Publier la zone ». | « 1 point retiré » ; l'arbre disparaît chez B. |
+| 4 | Historique de la zone → version 1 → « Revenir à cette version ». | Le chêne revient chez B sans redémarrage. |
+| 5 | « Retirer du royaume » la zone, publier le retrait. | Zone et points disparaissent chez B ; son blip reste jusqu'à la prochaine connexion de B (liste de la carte gardée). |
+
+## 24. Refus, appels directs, redémarrages (T-102)
+
+| # | Faire | Attendu |
+|---|---|---|
+| 1 | B (sans droit), par une ressource de test côté client : `core.rpc.call('vava_atelier:place', 'vava_gathering:zones', 'node', '', 0, { x = …, y = …, z = …, h = 0 }, 'bois_des_essais', { s = { ressource = 'chene' } })` à sa position. | `not_open` ou `not_allowed` ; rien d'écrit ; une ligne de refus en console (une par minute). |
+| 2 | A, même appel (Atelier ouvert) avec `x` à 500 m de lui. | `done = false`, « Trop loin de vous : approchez-vous (… m). » ; rien d'écrit. |
+| 3 | A, `{ x = 0/0, … }`, puis une clé `r` sur un point. | `invalid_args` (schéma) ; clé `r` : refus de lieu « r : clé inconnue pour un lieu oriented ». |
+| 4 | A dans une instance (intérieur, cachot), pose un point. | « Vous êtes dans une instance : revenez dans le royaume pour placer. » |
+| 5 | A1 et A2 (deux Sénéchaux) : A2 pose un point dans une zone publiée dont A1 tient le brouillon. | « Un autre membre du Conseil tient déjà un brouillon de cette fiche… » (`draft_taken`) ; rien d'écrit. |
+| 6 | Visée en cours ; console : `restart vava_atelier`. | Fantômes retirés, souris et clavier rendus ; `Échap` rouvre normalement la bannière du royaume. |
+| 7 | `restart vava_gathering`. | Zones et points de la base (pas de la graine : « Bois des Essais » est là si elle est publiée) ; console : aucun `apply` si rien n'a changé. |
+| 8 | Serveur arrêté, base gardée ; démarrer **sans** `vava_atelier`. | La récolte tourne sur sa graine, avec l'avertissement « vava_atelier absent : la récolte tourne sur sa graine… » ; `ensure vava_atelier` : retour à l'état de la base (synchronisation), sans redémarrer la récolte. |
+| 9 | Monter à cheval, « Placer la zone ». | « Descendez de votre monture pour placer. » |
+| 10 | « Tester la récolte », puis `F9`, puis « Poser des points ». | La visée démarre (les lieux de la zone sont gardés pendant l'essai joué). |
+
+## 25. Fin du test
 
 Remettre `log.level = 'info'`, retirer B du Conseil s'il n'en était pas (`vava_conseil <B> aucun`), arrêter
 `vava_example_atelier` si le serveur doit servir à autre chose. Les lignes de test restent au journal (365 jours) :
 `DELETE FROM vava_atelier_journal WHERE editor LIKE 'vava_example_atelier:%';` pour les retirer. T-101 :
 `DELETE FROM vava_atelier_definitions WHERE editor LIKE 'vava_example_atelier:%';` pour repartir de la config, et
-supprimer les fichiers `.json` de `modules/vava_atelier/echanges/`.
+supprimer les fichiers `.json` de `modules/vava_atelier/echanges/`. T-102 : retirer « Bois des Essais » par
+l'Atelier (§ 23-5) ou, pour repartir de la graine de la récolte, `DELETE FROM vava_atelier_definitions WHERE editor =
+'vava_gathering:zones';` serveur arrêté (les lignes de vitalité et de charges de `vava_gathering_zones` et
+`vava_gathering_nodes` peuvent rester).
