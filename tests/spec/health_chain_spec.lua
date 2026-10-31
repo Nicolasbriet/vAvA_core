@@ -286,4 +286,33 @@ describe('vava_health chaîne de dégâts', function()
             assert.equal(24, state.amount)
         end)
     end)
+
+    describe('source à terre (1.4.0)', function()
+        local MAX_MS = 4000
+
+        it('un effet qui dure et un renvoi passent toujours ; un coup simple, jamais', function()
+            assert.is_true(chain.passesDownedSource({ overTime = true }, nil, nil, 1000, MAX_MS))
+            assert.is_true(chain.passesDownedSource({ reflected = true }, nil, 500, 1000, MAX_MS))
+            assert.is_false(chain.passesDownedSource({ spell = true, ranged = true }, nil, 500, 1000, MAX_MS))
+            assert.is_false(chain.passesDownedSource({}, 900, 950, 1000, MAX_MS))
+        end)
+
+        it('lancé debout puis la source tombe : porte, dans le délai', function()
+            assert.is_true(chain.passesDownedSource({ launched = true }, 10000, 10500, 11200, MAX_MS))
+            assert.is_true(chain.passesDownedSource({ launched = true }, 10000, 10001, 14000, MAX_MS))
+        end)
+
+        it('lancé à terre, ou mise à terre inconnue : refusé', function()
+            assert.is_false(chain.passesDownedSource({ launched = true }, 10000, 9000, 10500, MAX_MS))
+            assert.is_false(chain.passesDownedSource({ launched = true }, 10000, 10000, 10500, MAX_MS))
+            assert.is_false(chain.passesDownedSource({ launched = true }, 10000, nil, 10500, MAX_MS))
+        end)
+
+        it('délai dépassé, instant dans le futur ou absent : refusé', function()
+            assert.is_false(chain.passesDownedSource({ launched = true }, 10000, 10500, 14001, MAX_MS))
+            assert.is_false(chain.passesDownedSource({ launched = true }, 12000, 12500, 11000, MAX_MS))
+            assert.is_false(chain.passesDownedSource({ launched = true }, nil, 10500, 11000, MAX_MS))
+            assert.is_false(chain.passesDownedSource({ launched = true }, 10000.5, 10500, 11000, MAX_MS))
+        end)
+    end)
 end)

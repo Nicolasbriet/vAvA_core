@@ -3,15 +3,18 @@
     Rôle : magie du royaume : fiche magie par personnage (mage ou non, sorts et leur XP, sort prêt dans les mains,
            sigils), mana et sa barre, progression sur 5 niveaux, incantation commune, roue des sorts (Tab) et mode
            magie à la souris (viser, lancer, verrouiller une cible), états élémentaires (brûlure, mouillé, ralenti,
-           chancelant, renversé, gelé ; immunité aux contrôles durs), zones au sol, projectiles et obstacles, sorts de feu
-           (Boule de feu, Mur de flammes, Nova ardente), d'eau (Trait de glace, Vague, Brume) et de terre (Projectile de
+           chancelant, renversé, gelé ; immunité aux contrôles durs), zones au sol, projectiles et obstacles, blessures
+           portées par la chaîne de dégâts de vava_health (boucliers, résistances et zones de paix en modificateurs),
+           sorts de feu (Boule de feu, Mur de flammes, Nova ardente), d'eau (Trait de glace, Vague, Brume) et de terre (Projectile de
            roche, Secousse, Rempart), combinaisons entre éléments (vapeur, boue, gel…), Lueur (lumière) et Murmure
            (messages), grimoire (avec ses combinaisons découvertes) et registre des murmures (objets),
            commandes du Conseil. Le serveur décide de tout ; les effets visibles passent par des state bags posés par le
            serveur et des évènements ciblés, reçus des seuls joueurs proches.
     Dépendances : vAvA_core ≥ 0.5.0 ; vava_ui ≥ 1.0.0 (polices, grain, papier et coins de la page, par
                   nui://vava_ui/…) ; facultatives : vava_inventory ≥ 1.3.0 (grimoire et registre), vava_hud
-                  (notifications), vava_health (dégâts, à terre), vava_admin (droits et journal du Conseil), vava_chat
+                  (notifications), vava_health ≥ 1.3.0 (chaîne de dégâts : sans lui, aucun sort ne blesse ; à terre ;
+                  1.4.0 : coups déjà lancés, interrupteur pvp),
+                  vava_admin (droits et journal du Conseil), vava_chat
 ]]
 
 fx_version 'cerulean'
@@ -21,7 +24,7 @@ use_experimental_fxv2_oal 'yes'
 
 name 'vava_magic'
 description 'Magie vAvA : mana, progression, roue des sorts, états, sorts de feu, eau et terre, Murmure, Lueur, grimoire et registre'
-version '2.8.0'
+version '2.9.0'
 
 dependency 'vAvA_core'
 dependency 'vava_ui'
@@ -56,7 +59,9 @@ shared_scripts {
     'shared/pages.lua',
 }
 
+-- règles pures des blessures (shared/harm.lua) : servies au seul serveur, le client n'en télécharge rien
 server_scripts {
+    'shared/harm.lua',
     'server/core.lua',
     'bridge/server.lua',
     'server/world.lua',
@@ -65,6 +70,7 @@ server_scripts {
     'server/spells.lua',
     'server/progression.lua',
     'server/combat.lua',
+    'server/protections.lua',
     'server/states.lua',
     'server/obstacles.lua',
     'server/zones.lua',

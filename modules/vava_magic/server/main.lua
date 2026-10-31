@@ -24,6 +24,7 @@ local sigils = VavaMagic.sigils
 local registers = VavaMagic.registers
 local combat = VavaMagic.combat
 local states = VavaMagic.states
+local protections = VavaMagic.protections
 local admin = VavaMagic.admin
 local cfg = VavaMagic.config
 local limits = cfg.rateLimits
@@ -113,6 +114,11 @@ local function setup()
         local id, hookErr = core.hooks.after(def[1], def[2])
         if not id then return false, hookErr end
     end
+    -- coups de la chaîne de dégâts : une blessure brise l'incantation
+    ok, err = casting.start()
+    if not ok then return false, 'hook vava_health:hit : ' .. tostring(err) end
+    -- modificateurs de la chaîne (zones de paix, boucliers, résistances), déclarés par le bridge
+    protections.start()
     VavaMagic.ready = true
     ok, err = bridge.start()
     if not ok then return false, err end
@@ -134,7 +140,7 @@ bridge.RegisterUsableItem(cfg.items.grimoire.name, cfg.items.grimoire, function(
     TriggerClientEvent(EVENTS.GRIMOIRE, src)
 end)
 
--- arrêt du module : fiches écrites, effets retirés des peds, orbes supprimés, journal des dégâts écrit en entier
+-- arrêt du module : fiches écrites, effets retirés des peds, orbes supprimés (les coups sont au journal de vava_health)
 AddEventHandler('onResourceStop', function(resource)
     if resource ~= VavaMagic.resource or not VavaMagic.ready then return end
     for src in pairs(sheets.all()) do
@@ -144,7 +150,6 @@ AddEventHandler('onResourceStop', function(resource)
     -- un joueur gelé est libéré (sauf s'il est immobilisé par le Conseil)
     states.clearAll()
     spells.stop()
-    combat.flushAll()
 end)
 
 local registered, registerErr = core.modules.register({

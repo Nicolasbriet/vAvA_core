@@ -5,7 +5,8 @@
       - Tant qu'il en existe, le serveur vérifie toutes les `zones.tickMs` les joueurs en jeu proches : dedans, ou qui
         ont traversé une ligne depuis la vérification précédente (un joueur qui court ne passe pas entre deux), et
         appelle le genre de la zone (`zones.define`), qui décide de l'effet (dégâts, état…) ; un genre peut n'agir
-        qu'à la fin de sa zone (présage).
+        qu'à la fin de sa zone (présage). Une vérification en erreur (un effet qui lève) est notée en console, au
+        plus une fois par minute, et la suivante a lieu quand même : les zones ne cessent jamais d'agir pour de bon.
       - Chaque zone n'est envoyée qu'aux joueurs à moins de `zones.syncRadius`, y compris à ceux qui s'en approchent
         après sa naissance ; sa fin n'est envoyée qu'à ceux qui la connaissent. Jamais à tout le serveur.
       - Plafond pour tout le royaume ; nettoyage d'urgence du Conseil ; départ d'un joueur oublié de toutes les zones.
@@ -16,6 +17,7 @@
 
 local pairs, ipairs, abs, max, floor, sin, cos, pi, sort = pairs, ipairs, math.abs, math.max, math.floor, math.sin, math.cos, math.pi, table.sort
 local GetGameTimer, SetTimeout, TriggerClientEvent = GetGameTimer, SetTimeout, TriggerClientEvent
+local pcall, tostring = pcall, tostring
 
 local bridge = VavaMagic.bridge
 local world = VavaMagic.world
@@ -29,6 +31,9 @@ local EVENTS = VavaMagic.EVENTS
 local HEIGHT = 2.5
 -- points d'un cercle pris pour juger s'il touche une autre forme (sur son bord)
 local CIRCLE_SAMPLES = 8
+-- au plus une ligne de console par minute pour une vérification en erreur
+local ERROR_LOG_MS = 60000
+local errorLoggedAt = nil
 
 local zones = {}
 VavaMagic.zones = zones
@@ -50,6 +55,7 @@ zones.LINE, zones.CIRCLE = 'line', 'circle'
 ---@field center table
 ---@field radius number           rayon de l'enveloppe (cercle : son rayon)
 ---@field expiresAt integer
+---@field createdAt integer    instant de la naissance (horloge du serveur) : lancement d'un présage
 ---@field viewers table<integer, true>
 ---@field last table<integer, table>  dernière position vue de chaque joueur proche
 ---@field data table              propre au sort (dégâts, brûlure…)
@@ -236,7 +242,14 @@ local function startTicking()
             ticking = false
             return
         end
-        tick()
+        local ok, err = pcall(tick)
+        if not ok then
+            local now = GetGameTimer()
+            if not errorLoggedAt or now - errorLoggedAt >= ERROR_LOG_MS then
+                errorLoggedAt = now
+                VavaMagic.log.error('vérification des zones en erreur (reprise au tour suivant) : %s', tostring(err))
+            end
+        end
         SetTimeout(cfg.tickMs, loop)
     end
     SetTimeout(cfg.tickMs, loop)
@@ -266,7 +279,8 @@ function zones.create(def)
     local zone = {
         id = lastId, kind = def.kind, spell = def.spell, element = def.element, level = def.level,
         owner = def.owner, ownerCharacter = bridge.GetCharacterId(def.owner) or 0, shape = def.shape,
-        expiresAt = GetGameTimer() + def.durationMs, viewers = {}, last = {}, data = def.data or {},
+        createdAt = GetGameTimer(), expiresAt = GetGameTimer() + def.durationMs, viewers = {}, last = {},
+        data = def.data or {},
     }
     if def.shape == zones.LINE then
         zone.a, zone.b, zone.width = def.a, def.b, def.width

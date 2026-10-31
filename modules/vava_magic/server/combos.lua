@@ -3,8 +3,10 @@
     Rôle : combinaisons entre éléments, décidées par le serveur d'après `config.combos` (déclencheur, résultat).
       - `combos.zone(ctx, zone)` : un sort (ou un projectile en vol) touche une zone au sol : la zone s'éteint, une
         autre naît à sa place (vapeur, boue), ou le projectile emporte l'effet jusqu'à l'impact (roche ardente).
-      - `combos.hit(lanceur, cible, sort, dégâts)` : un sort touche un joueur dans un état : état posé (gel, soumis
-        à l'immunité) ou retiré (séchage, extinction), dégâts réduits, brûlure empêchée ce coup-ci.
+      - `combos.hit(lanceur, cible, sort, dégâts, élément?, personnage du lanceur?)` : un sort touche un joueur dans un
+        état : dégâts réduits, brûlure empêchée ce coup-ci (calculés avant le coup) ; puis `combos.commit(issue)`,
+        appelé seulement quand le coup a porté (après `combat.damage`) ou pour un sort sans dégâts : état posé (gel,
+        soumis à l'immunité) ou retiré (séchage, extinction), combinaison inscrite au grimoire.
       - `combos.quake(zone)` : une secousse frappe : les sols mouillés qu'elle recouvre deviennent de la boue.
       - Zones nées des combinaisons : « steam » (légères brûlures à qui s'y tient, vue cachée côté client) et « mud »
         (ralenti fort tant qu'on y reste : reposé au plus toutes les `slow.refreshMs` sur un même joueur, chaque pose
@@ -125,37 +127,59 @@ function combos.zone(ctx, zone)
     return nil
 end
 
---- Un sort touche un joueur : combinaisons avec ses états. Renvoie { damage (ajustés), burn (brûlure permise),
---- frozen (la cible vient d'être gelée) }. `element` remplace celui du sort (projectile qui emporte le feu).
+--- Un sort touche un joueur : combinaisons avec ses états, calculées sans rien poser. Renvoie l'issue { damage
+--- (ajustés), burn (brûlure permise), frozen (la cible vient d'être gelée, après commit) } ; ses effets (états posés ou
+--- retirés, grimoire) attendent `combos.commit`, appelé quand le coup a porté. `element` remplace celui du sort
+--- (projectile qui emporte le feu) ; `casterCharacter` : personnage du lanceur au moment du sort (combat.affects).
 ---@param caster integer
 ---@param target integer
 ---@param spell string
 ---@param damage number
 ---@param element? string
+---@param casterCharacter? integer
 ---@return table
-function combos.hit(caster, target, spell, damage, element)
+function combos.hit(caster, target, spell, damage, element, casterCharacter)
     local outcome = { damage = damage, burn = true, frozen = false }
-    local position = combat.affects(target)
+    local position = combat.affects(target, caster, casterCharacter)
     if not position then return outcome end
     element = element or elementOf(spell)
+    local pending = {}
     for _, combo in ipairs(list) do
         local t = combo.trigger
         if t.on == 'target' and matches(t, spell, element) and states.has(target, t.state) then
             local result = combo.result
-            local applied = true
-            if result.state then
-                applied = states.apply(target, result.state, { durationMs = result.durationMs, caster = caster, spell = spell })
-            end
-            if applied then
-                if result.consume then states.remove(target, result.consume) end
-                if result.damageShare then outcome.damage = outcome.damage * result.damageShare end
-                if result.noBurn then outcome.burn = false end
-                if result.state == 'frozen' then outcome.frozen = true end
-                trigger(combo, caster, position, target)
-            end
+            if result.damageShare then outcome.damage = outcome.damage * result.damageShare end
+            if result.noBurn then outcome.burn = false end
+            pending[#pending + 1] = combo
         end
     end
+    if #pending > 0 then
+        outcome.pending, outcome.caster, outcome.target, outcome.spell, outcome.position =
+            pending, caster, target, spell, position
+    end
     return outcome
+end
+
+--- Pose les effets des combinaisons d'un coup qui a porté (ou d'un sort sans dégâts) : état posé (le gel, soumis à
+--- l'immunité : refusé, rien d'autre ne se fait pour cette combinaison), état consommé, combinaison inscrite. Une fois.
+---@param outcome table  issue de combos.hit
+function combos.commit(outcome)
+    local pending = outcome.pending
+    if not pending then return end
+    outcome.pending = nil
+    local caster, target, spell = outcome.caster, outcome.target, outcome.spell
+    for _, combo in ipairs(pending) do
+        local result = combo.result
+        local applied = true
+        if result.state then
+            applied = states.apply(target, result.state, { durationMs = result.durationMs, caster = caster, spell = spell })
+        end
+        if applied then
+            if result.consume then states.remove(target, result.consume) end
+            if result.state == 'frozen' then outcome.frozen = true end
+            trigger(combo, caster, outcome.position, target)
+        end
+    end
 end
 
 --- Une secousse frappe : les zones qu'elle recouvre passent par les combinaisons (sol mouillé → boue).
@@ -194,7 +218,7 @@ zones.define(STEAM, {
         local now = GetGameTimer()
         if data.hits[victim] and now - data.hits[victim] < data.tickMs then return end
         data.hits[victim] = now
-        combat.damage(zone.owner, victim, zone.spell, data.damage, combat.KIND.ZONE, zone.ownerCharacter)
+        combat.damage(zone.owner, victim, zone.spell, data.damage, combat.KIND.AURA, zone.ownerCharacter, zone.element)
     end,
 })
 
@@ -206,7 +230,7 @@ zones.define(MUD, {
         local refresh = slow.refreshMs or 0
         local now = GetGameTimer()
         if applied[victim] and now - applied[victim] < refresh then return end
-        if not combat.affects(victim) then return end
+        if not combat.affects(victim, zone.owner, zone.ownerCharacter) then return end
         applied[victim] = now
         -- la pose tient jusqu'à la suivante (aucun trou dans la boue) ; à la sortie, il en reste au moins
         -- `durationMs` moins une vérification, comme lorsqu'elle était reposée à chaque vérification

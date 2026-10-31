@@ -1,6 +1,6 @@
 --[[
     vava_magic/server/world.lua
-    Rôle : le monde vu par le serveur (OneSync) : ped et position d'un joueur lus côté serveur, vie, véhicule, joueurs
+    Rôle : le monde vu par le serveur (OneSync) : ped et position d'un joueur lus côté serveur, véhicule, joueurs
            en jeu et véhicules proches d'un point, envoi d'un évènement aux seuls joueurs proches, ped figé (gel ;
            jamais libéré s'il est immobilisé par le Conseil),
            state bags posés sur le ped d'un joueur (répliqués aux seuls joueurs proches, jamais à tout le serveur).
@@ -8,8 +8,8 @@
 ]]
 
 local ipairs, pairs, sort = ipairs, pairs, table.sort
-local GetPlayerPed, GetEntityCoords, DoesEntityExist, GetVehiclePedIsIn, GetEntityHealth, Entity =
-    GetPlayerPed, GetEntityCoords, DoesEntityExist, GetVehiclePedIsIn, GetEntityHealth, Entity
+local GetPlayerPed, GetEntityCoords, DoesEntityExist, GetVehiclePedIsIn, Entity =
+    GetPlayerPed, GetEntityCoords, DoesEntityExist, GetVehiclePedIsIn, Entity
 local FreezeEntityPosition, TriggerClientEvent, GetAllVehicles = FreezeEntityPosition, TriggerClientEvent, GetAllVehicles
 
 local bridge = VavaMagic.bridge
@@ -35,15 +35,6 @@ function world.position(src)
     if not ped then return nil end
     local coords = GetEntityCoords(ped)
     return { x = coords.x, y = coords.y, z = coords.z }
-end
-
---- Vie brute du ped (points GTA), lue côté serveur.
----@param src integer
----@return integer|nil
-function world.health(src)
-    local ped = world.ped(src)
-    if not ped then return nil end
-    return GetEntityHealth(ped)
 end
 
 ---@param src integer

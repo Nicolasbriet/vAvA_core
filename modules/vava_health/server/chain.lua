@@ -6,8 +6,8 @@
              2. paquet validé et copié (shared/packet.lua) ; `origin` (ressource appelante), numéro et personnage de la
                 source posés par le serveur ;
              3. garde-fous : type `monde` réservé à ce module, profondeur (renvois), débit par paire (cible, source) ;
-             4. préconditions : cible à terre, combats entre joueurs coupés, source à terre hors `overTime` et
-                `reflected` (résultat annulé, sans hook ni journal) ;
+             4. préconditions : cible à terre, combats entre joueurs coupés, source à terre hors `overTime`,
+                `reflected` et coup lancé debout depuis peu (`launched`) (résultat annulé, sans hook ni journal) ;
              5. hook vava_health:hit `before` (refus seul ; un abonné en erreur ne refuse pas : le coup passe) ;
              6. modificateurs du registre, dans l'ordre des étapes (shared/chain.lua), chacun isolé et chronométré ;
              7. application : cible relue, vie du serveur baissée, mise à terre aussitôt à 0 ;
@@ -35,7 +35,7 @@ local WORLD_KIND = 'monde'
 local WINDOW_MS = 1000
 local LOG_MS = 60000
 -- champs du paquet recopiés dans le contexte
-local PACKET_FIELDS = { 'source', 'sourceCharacter', 'part', 'weapon', 'technique', 'spell' }
+local PACKET_FIELDS = { 'source', 'sourceCharacter', 'part', 'weapon', 'technique', 'spell', 'launchedAt' }
 
 local hits = {}
 VavaHealth.hits = hits
@@ -160,10 +160,12 @@ local function process(target, entry, p, origin)
         state.amount, state.cancelled = 0, 'pvp_off'
         return resultOf(id, state, 0, false, entry.health)
     end
-    -- un joueur à terre ne frappe plus (un effet qui dure et un renvoi ne sont pas des gestes : ils passent)
-    if p.source and p.source ~= target and not p.tags.overTime and not p.tags.reflected then
+    -- un joueur à terre ne frappe plus (un effet qui dure et un renvoi ne sont pas des gestes : ils passent ; un coup
+    -- qu'il a lancé debout, depuis au plus `launchedMaxMs`, porte encore)
+    if p.source and p.source ~= target then
         local attacker = life.entry(p.source)
-        if attacker and attacker.downed then
+        if attacker and attacker.downed
+            and not chain.passesDownedSource(p.tags, p.launchedAt, attacker.downedAt, started, cfg.launchedMaxMs) then
             state.amount, state.cancelled = 0, 'source_downed'
             return resultOf(id, state, 0, false, entry.health)
         end

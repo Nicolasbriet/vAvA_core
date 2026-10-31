@@ -46,8 +46,8 @@ VavaHealth.STAGES = { 'annulation', 'esquive', 'parade', 'blocage', 'bouclier', 
 -- Codes de refus de l'export hit (nil, code) : le coup n'a pas atteint la chaîne.
 VavaHealth.KNOWN_CODES = {
     'not_ready', 'invalid_target', 'no_character', 'invalid_packet', 'invalid_amount', 'invalid_kind',
-    'invalid_source', 'invalid_part', 'invalid_ref', 'invalid_tags', 'unknown_field', 'too_many_hits', 'too_deep',
-    'hit_error',
+    'invalid_source', 'invalid_part', 'invalid_ref', 'invalid_tags', 'invalid_launch', 'unknown_field', 'too_many_hits',
+    'too_deep', 'hit_error',
 }
 
 -- Hooks d'autres modules écoutés (tous facultatifs).

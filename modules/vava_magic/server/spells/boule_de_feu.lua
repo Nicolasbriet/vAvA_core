@@ -26,9 +26,11 @@ local NAME = 'boule_de_feu'
 ---@param caster integer
 ---@param target integer
 ---@param burnCfg table
-local function ignite(caster, target, burnCfg)
+---@param casterCharacter? integer
+local function ignite(caster, target, burnCfg, casterCharacter)
     if states.apply(target, 'burn', {
-        durationMs = burnCfg.durationMs, tickMs = burnCfg.tickMs, damage = burnCfg.damage, caster = caster, spell = NAME,
+        durationMs = burnCfg.durationMs, tickMs = burnCfg.tickMs, damage = burnCfg.damage, caster = caster,
+        casterCharacter = casterCharacter, spell = NAME,
     }) then
         bridge.Notify(target, notify.burning, 'danger')
     end
@@ -43,10 +45,14 @@ local ok, err = projectiles.register(NAME, spellCfg, {
     onImpact = function(launch, target, point)
         local levelCfg = spellCfg.levels[launch.level]
         if target ~= 0 then
-            local hit = combos.hit(launch.source, target, NAME, levelCfg.damage)
-            if combat.damage(launch.source, target, NAME, hit.damage, combat.KIND.IMPACT) then
+            local hit = combos.hit(launch.source, target, NAME, levelCfg.damage, nil, launch.casterCharacter)
+            if combat.damage(launch.source, target, NAME, hit.damage, combat.KIND.IMPACT, launch.casterCharacter, nil,
+                launch.strikeLaunchedAt) then
+                combos.commit(hit)
                 projectiles.bonus(launch)
-                if hit.burn and levelCfg.burn and spellCfg.burnEnabled then ignite(launch.source, target, levelCfg.burn) end
+                if hit.burn and levelCfg.burn and spellCfg.burnEnabled then
+                    ignite(launch.source, target, levelCfg.burn, launch.casterCharacter)
+                end
             end
         end
         if levelCfg.aoeRadius > 0 then

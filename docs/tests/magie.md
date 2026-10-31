@@ -1,13 +1,15 @@
 # Magie d'Eldoria — procédure de test en jeu
 
-Procédure pour vérifier en jeu `vava_magic` 2.7.0 : fiche et commandes du Conseil, roue et mode magie, incantation,
+Procédure pour vérifier en jeu `vava_magic` 2.9.0 : fiche et commandes du Conseil, roue et mode magie, incantation,
 mana, verrouillage, les onze sorts, états élémentaires, zones au sol, combinaisons, effets et sons, triche,
-déconnexions, redémarrage et resmon. Le module n'a encore jamais été joué : chaque écart compte, même petit. Comptez
+déconnexions, redémarrage et resmon ; la section 18 éprouve les blessures portées par la chaîne de dégâts de
+`vava_health` 1.3.0 (T-116 : mêmes dégâts, boucliers et résistances, combats entre joueurs coupés, lanceur à terre,
+incantation brisée par un coup, `vava_health` arrêté). Le module n'a encore jamais été joué : chaque écart compte, même petit. Comptez
 trois heures seul et une heure et demie à plusieurs ; les tests à deux sont marqués **(2 joueurs)**, ceux qui
 demandent un témoin ou un voisin **(3 joueurs)**.
 
 Conventions : « N1 » à « N5 » sont les niveaux d'un sort ; les dégâts sont en points de vie sur 100 (« −8 » : B perd
-8 % de sa vie, appliqués par vava_health) ; les valeurs citées sont celles de `modules/vava_magic/config.lua`. Il n'y a
+8 % de sa vie, par la chaîne de dégâts de vava_health ; chaque coup est une ligne de `vava_health_hits`) ; les valeurs citées sont celles de `modules/vava_magic/config.lua`. Il n'y a
 pas de fatigue dans le code : seuls la mana, la recharge de chaque sort et le délai global de 1 s bornent le combat.
 Aucun sort ne s'apprend en jeu : seul le Conseil en donne (`/magie`) ; le grimoire ne fait que les montrer.
 
@@ -15,7 +17,7 @@ Aucun sort ne s'apprend en jeu : seul le Conseil en donne (`/magie`) ; le grimoi
 
 1. **Commune** : ordre de démarrage, compte du Conseil, objets, consoles, mesure du resmon et remontée des problèmes :
    voir [LISEZMOI.md](LISEZMOI.md).
-2. **Démarrage** : la console du serveur affiche `module 'vava_magic' v2.7.0 prêt`. La migration `sql/0001_magic.sql`
+2. **Démarrage** : la console du serveur affiche `module 'vava_magic' v2.9.0 prêt`. La migration `sql/0001_magic.sql`
    crée `vava_magic_sigils`, `vava_magic_registers`, `vava_magic_register_pages` et `vava_magic_damage_log`. Une ligne
    `… non déclaré(e) : …` (un sort refusé au chargement) ou `sort en erreur` est à me remonter telle quelle.
 3. **Rôles** : A, membre du Conseil (droit `tools` : Sénéchal ou Souverain) ; B, second joueur sans droits ; C,
@@ -77,7 +79,7 @@ Aucun sort ne s'apprend en jeu : seul le Conseil en donne (`/magie`) ; le grimoi
 | 10 | `/magie niveau lueur 7` ; `/magie apprendre foudre` ; `/magie danse`. | Ligne d'usage (`Usage : /magie <action> [id] … — mage [id] <oui\|non> · …`) ; « Sort inconnu. Sorts : boule_de_feu, mur_de_flammes, … » ; ligne d'usage. |
 | 11 | B : `/magie fiche`. | « Ces commandes sont réservées au Conseil. » ; `/magie` n'est pas suggérée dans le chat de B. |
 | 12 | Console du serveur : `magie tous <B>`, `magie fiche <B>`, puis `magie fiche` sans numéro. | Réponses dans la console, préfixées `[vava_magic]` ; sans numéro : « Aucun personnage en jeu sous ce numéro. » |
-| 13 | Registre du Conseil (`F10`) → journal ; Chancellerie. | Une ligne par commande : « Magie : mage », « Magie : sort appris », « Magie : niveau de sort », « Magie : XP de sort », « Magie : tous les sorts », « Magie : maîtrise de tout », « Magie : sorts retirés », « Magie : mana remplie », « Magie : recharges effacées », « Magie : fiche consultée », « Magie : objet donné », « Magie : nettoyage du monde », avec joueur et personnage. Depuis la console : ligne dans la console du serveur. |
+| 13 | Registre du Conseil (`F10`) → journal ; Chancellerie. | Une ligne par commande : « Magie : mage », « Magie : sort appris », « Magie : niveau de sort », « Magie : XP de sort », « Magie : tous les sorts », « Magie : maîtrise de tout », « Magie : sorts retirés », « Magie : mana remplie », « Magie : recharges effacées », « Magie : fiche consultée », « Magie : objet donné », « Magie : protection », « Magie : nettoyage du monde », avec joueur et personnage. Depuis la console : ligne dans la console du serveur. |
 | 14 | **(2 joueurs)** B incante une Lueur N1 ; A : `/magie mage <B> non`. | Chez B : incantation brisée (« La magie ne vous a jamais répondu. »), « La magie s'est retirée de vous. », barre de mana retirée ; Tab n'ouvre plus rien. `/magie mage <B> oui` : mana pleine. |
 | 15 | B : `/magie mage <B> non` (par A), puis `/magie apprendre <B> lueur` ; B : `/sort lueur` ; A : `/magie mana <B>`. | B : « Un savoir nouveau s'éveille en vous : Lueur. » ; Tab n'ouvre rien ; `/lancer lueur` et `/sort lueur` : « La magie ne vous a jamais répondu. » (jamais « Sort prêt ») ; le grimoire reste scellé. A, dans le chat : « Ce personnage n'est pas mage. » (aucun code brut ; la console du serveur garde `not_mage`). Remettre B mage. |
 | 16 | B, mage, utilise le Grimoire (inventaire) ou tape `/grimoire`. | Pages rangées par groupe (Feu, Eau, Terre, Utilitaires) ; par sort : icône, « Élément : Feu », « Niveau 1 », « 0 / 100 XP », description du niveau, « Au niveau suivant » et ce qu'il débloque, « Mana : 14 », « Recharge : 4 s », « Incantation : instantanée » (Boule de feu, Trait de glace ; Projectile de roche N1 : « 0,5 s »), « Incantation : 2,5 s » pour la Lueur N1, « Verrouiller : Clic molette » pour les trois projectiles, « Roue : Tab · viser : Clic droit · lancer : Clic gauche » (nom de la touche Tab tel que GTA le donne, à confirmer) ; Murmure : « Sigils mémorisables : 10 ». Au N5 : « Maîtrise achevée », « 1500 XP ». |
@@ -118,7 +120,7 @@ Aucun sort ne s'apprend en jeu : seul le Conseil en donne (`/magie`) ; le grimoi
 | 3 | Boule de feu N1 : clic gauche en marchant. | Incantation de 0,45 s sans barre ; on peut marcher (ni courir ni sauter) ; flammes dans les deux mains, vues de B. |
 | 4 | Lueur : `X` pendant l'incantation. | « Vous laissez l'incantation s'éteindre. », barre « Incantation brisée » ; mana inchangée, aucune recharge : on peut relancer aussitôt. |
 | 5 | Lueur : faire plus d'un mètre pendant l'incantation. | « Vous avez bougé : l'incantation se brise. » ; rien n'est consommé. |
-| 6 | **(2 joueurs)** Lueur : B frappe A d'un coup de poing pendant l'incantation. | « La douleur brise votre concentration. » ; rien n'est consommé. |
+| 6 | **(2 joueurs)** Lueur : pendant l'incantation de A, B le frappe par la chaîne (`/frapper <A> 10` de `vava_example_combat`, ou une Boule de feu). Un coup de poing natif ne compte plus : vava_health l'annule (T-110). | « La douleur brise votre concentration. » ; rien n'est consommé. Détail : 18-14 à 18-17. |
 | 7 | Lueur : se laisser tomber d'un muret pendant l'incantation. | « Votre chute brise l'incantation. » |
 | 8 | Boule de feu N1 : recliquer pendant l'incantation, puis dans la seconde qui suit, puis encore. | « Vous incantez déjà. » ; « Laissez la magie retomber un instant. » (délai global 1 s) ; « Le sort n'est pas encore prêt (n s). » (recharge de 4 s, secondes arrondies au-dessus) ; une seule boule, une seule dépense. |
 | 9 | Trois Boules de feu sur un mur, à 5 s puis 20 s de la première ; `/magie fiche` entre chaque. | +20 XP, +0, +20 (un même sort rapporte au plus toutes les 20 s). Une boule qui touche B rapporte 10 de plus, seulement si son lancer a rapporté ; une boule éteinte, 10. À 100 XP : « Boule de feu, niveau 2 : … » |
@@ -158,12 +160,12 @@ Aucun sort ne s'apprend en jeu : seul le Conseil en donne (`/magie`) ; le grimoi
 
 | # | Faire | Attendu |
 |---|---|---|
-| 1 | **(2 joueurs)** N1 : A vise B à 10 m (clic droit), clic gauche. | Jet vers le réticule ; boule de flammes et lumière orange vues de A et de B ; impact en flammes, son d'impact ; B −8, geste bref de réaction et éclat « brûlure » à l'écran ; aucune explosion de GTA ; A : +20 XP et +10. `vava_magic_damage_log` : `boule_de_feu`, `impact`, `8.000`. |
+| 1 | **(2 joueurs)** N1 : A vise B à 10 m (clic droit), clic gauche. | Jet vers le réticule ; boule de flammes et lumière orange vues de A et de B ; impact en flammes, son d'impact ; B −8, geste bref de réaction et éclat « brûlure » à l'écran ; aucune explosion de GTA ; A : +20 XP et +10. `vava_health_hits` : `origin = vava_magic`, `ref = boule_de_feu`, `kind = feu`, `amount = 8.0`, `applied = 8.0`. |
 | 2 | **(2 joueurs)** B à 25 m, N1. | La boule disparaît au bout de 20 m ; aucun dégât. |
 | 3 | Dix lancers N1 (`/magie recharges` si besoin). | Environ deux fois : « La boule de feu s'éteint entre vos mains. », vapeur aux mains, son d'extinction ; mana dépensée, recharge posée, 10 XP. |
 | 4 | **(3 joueurs)** N3 : B et C à moins de 2,5 m l'un de l'autre ; A touche B. | B −15, C −7,5 ; A n'est jamais touché par ses éclats. |
 | 5 | **(2 joueurs)** N3 : tirer au sol à 2 m de B. | B −7,5. |
-| 6 | **(2 joueurs)** N4 : toucher B. | B : « Les flammes vous mordent ! », icône Brûlure et ses secondes, bord de l'écran rougi ; flammes sur B vues de tous ; −2 chaque seconde pendant 4 s (lignes `brulure` au journal). |
+| 6 | **(2 joueurs)** N4 : toucher B. | B : « Les flammes vous mordent ! », icône Brûlure et ses secondes, bord de l'écran rougi ; flammes sur B vues de tous ; −2 chaque seconde pendant 4 s (lignes `feu` de 2,0 au journal `vava_health_hits`). |
 | 7 | Zone protégée (réglage) : A dedans, puis A dehors et B dedans. | A dedans : « Une paix sacrée règne en ce lieu : la magie offensive ne vous obéit pas. », rien consommé. B dedans : la boule vole et éclate, B ne perd rien. |
 | 8 | `combat.pvp = false`. | La boule part et éclate ; B ne perd rien, ne brûle pas ; aucune ligne au journal. |
 
@@ -511,12 +513,12 @@ simplement rien. Le réglage à corriger est entre parenthèses.
 |---|---|---|
 | 1 | **(3 joueurs)** A se déconnecte pendant l'incantation d'un Murmure, C à 2 m. | Les runes et les mots disparaissent ; B ne reçoit rien. A revient : mana pleine, recharge du Murmure non posée (l'incantation n'a pas abouti), sorts, XP et sigils intacts. |
 | 2 | **(2 joueurs)** Réglage `combos.gel.result.durationMs = 30000` : geler B, B se déconnecte, revient. | Aucune erreur en console ; B revient libre, sans icône ni effet. |
-| 3 | **(2 joueurs)** B se déconnecte en Brûlure ; recommencer dans une boue. | Plus de ligne `brulure` au journal pour B ; rien ne reste à son retour. |
-| 4 | **(2 joueurs)** A dresse un mur long (réglage), un Rempart N5, un orbe ancré, allume une Lueur, puis se déconnecte (`F8` → `quit`). | Le mur brûle jusqu'à sa fin et blesse encore B (journal au nom du personnage de A) ; le rempart tombe à son heure (16 s) ; l'orbe et la Lueur disparaissent aussitôt. |
+| 3 | **(2 joueurs)** B se déconnecte en Brûlure ; recommencer dans une boue. | Plus aucune ligne de brûlure (`feu`, 2,0) au journal `vava_health_hits` pour B ; rien ne reste à son retour. |
+| 4 | **(2 joueurs)** A dresse un mur long (réglage), un Rempart N5, un orbe ancré, allume une Lueur, puis se déconnecte (`F8` → `quit`). | Le mur brûle jusqu'à sa fin et blesse encore B (`vava_health_hits` : `source_id` = personnage de A) ; le rempart tombe à son heure (16 s) ; l'orbe et la Lueur disparaissent aussitôt. |
 | 5 | **(2 joueurs)** A se déconnecte pendant qu'une offre de sigil attend la réponse de B. | La fenêtre de B se ferme. |
-| 6 | **(2 joueurs)** `restart vava_magic` (tapé d'avance dans la console du serveur) avec : un mur long actif, B dans une brume (voile), un rempart debout, B gelé (réglage), un présage de Secousse en cours, un orbe ancré, A en pleine incantation. | Tout disparaît sur-le-champ chez tous : flammes, lumières, brume et voile, filtre flou, pierres, orbe ; B est libre (libéré par le serveur à l'arrêt) ; l'incantation de A s'éteint sans rien consommer ; le présage ne frappe pas. Au retour, `module 'vava_magic' v2.7.0 prêt` ; `/magie fiche` : fiches intactes (sorts, XP, sigils, sort prêt) ; mana pleine ; recharges effacées ; aucune pierre ni zone ne reparaît. |
+| 6 | **(2 joueurs)** `restart vava_magic` (tapé d'avance dans la console du serveur) avec : un mur long actif, B dans une brume (voile), un rempart debout, B gelé (réglage), un présage de Secousse en cours, un orbe ancré, A en pleine incantation. | Tout disparaît sur-le-champ chez tous : flammes, lumières, brume et voile, filtre flou, pierres, orbe ; B est libre (libéré par le serveur à l'arrêt) ; l'incantation de A s'éteint sans rien consommer ; le présage ne frappe pas. Au retour, `module 'vava_magic' v2.9.0 prêt` ; `/magie fiche` : fiches intactes (sorts, XP, sigils, sort prêt) ; mana pleine ; recharges effacées ; aucune pierre ni zone ne reparaît. |
 | 6 bis | **(2 joueurs)** Réglage `combos.gel.result.durationMs = 30000` : A immobilise B depuis le Registre, puis le gèle ; pendant le gel, `restart vava_magic` ; au retour, B essaie de marcher ; enfin A « Libérer ». | B perd l'icône et le givre, mais reste figé au redémarrage et après (retenu par le Conseil) ; étiquette « Immobilisé » toujours au Registre ; « Libérer » le délivre. Même essai avec B gelé sans le Registre : libre dès l'arrêt du module (14-6). |
-| 7 | Même redémarrage juste après quelques coups ; puis réglage `combat.log = { flushMs = 600000, batch = 500, retentionDays = 30 }` (rien n'est écrit avant 500 lignes ou 10 min), une soixantaine de coups (Murs de flammes sur B, brûlures), compter les lignes de B, `restart vava_magic`, recompter. | Tous les dégâts sont au journal (`vava_magic_damage_log`), au-delà de 50 lignes : à l'arrêt, tout ce qui attend part en une seule requête. Aucune ligne `journal des dégâts non écrit` dans la console. Remettre le réglage. |
+| 7 | Même redémarrage juste après quelques coups (Murs de flammes sur B, brûlures). | Tous les coups sont au journal de vava_health (`vava_health_hits`, écrit par lui : `docs/tests/combat.md` 1-26) ; `vava_magic_damage_log` ne reçoit plus rien depuis 2.9.0. |
 | 8 | `restart vava_inventory`, puis utiliser le grimoire et le registre. | Les deux objets fonctionnent encore (redéclarés au retour de l'inventaire). |
 | 9 | `restart vava_chat`. | Les suggestions `/sort`, `/lancer`, `/lueur`, `/murmure`, `/sigil`… reviennent (et `/magie` pour A). |
 
@@ -541,9 +543,12 @@ le personnage, ou près d'une lumière, d'une zone qui dessine ou d'une trace.
 
 ## 16. Ce qu'il faut regarder dans la base
 
-- `vava_magic_damage_log` : `at`, `spell`, `caster_id` et `target_id` (personnages), `kind` (`impact`, `zone`,
-  `brulure`), `damage` en points de vie (`8.000` pour −8), position de la cible. Écrit par lots toutes les 10 s, ou dès
-  50 lignes, et en entier à l'arrêt du module. Les lignes de plus de 30 jours sont retirées au démarrage puis chaque jour : vieillir une ligne
+- `vava_health_hits` (journal de vava_health, 2.9.0) : une ligne par coup d'un sort sur un autre joueur, même tout absorbé ou annulé par un modificateur (pas s'il est
+  arrêté avant : cible ou lanceur à terre, `chain.pvp = false`)
+  (`origin = vava_magic`, `ref` = sort ou `vapeur`, `kind` = `feu`, `eau` ou `terre`, `amount` avant protections,
+  `applied`, `absorbed`, `resisted`, `cancelled`, `source_id` et `target_id` = personnages, position).
+- `vava_magic_damage_log` : ancien journal des sorts, plus écrit depuis 2.9.0 ; ses lignes de plus de 30 jours sont
+  encore retirées au démarrage puis chaque jour : vieillir une ligne
   (`UPDATE vava_magic_damage_log SET at = at - 31*86400 WHERE id = <n>`), `restart vava_magic`, la console affiche
   `journal des dégâts : 1 ligne(s) de plus de 30 jours retirée(s)`.
 - `vava_magic_sigils` : un sigil de 12 signes par personnage, mage ou non ; changé par `/sigil brouiller`.
@@ -564,8 +569,75 @@ le personnage, ou près d'une lumière, d'une zone qui dessine ou d'une trace.
 - Les touches : `MOUSE_BUTTON` et `MOUSE_WHEEL` dans les raccourcis de FiveM, et le nom qu'en donne GTA au grimoire.
 - La réplication des state bags (incantation, états, lumières) aux joueurs proches, et les sons Web Audio dans CEF.
 - L'ordre des messages quand une blessure et un contrôle dur brisent la même incantation (9-8).
+- La chaîne de dégâts avec de vrais joueurs (section 18) : les montants sont prouvés égaux hors jeu
+  (`tests/spec/magic_harm_spec.lua`, `magic_chain_server_spec.lua`), pas leur ressenti ni le journal réel.
 - Le poids réel d'un lot du registre (8.2-16 à 8.2-21) : estimé hors jeu à 7,5 Ko au plus (6,5 Ko pour les pages
   d'essai, environ 3 Ko pour 20 murmures de 100 signes), contre 100 Ko et plus pour un registre plein envoyé d'un bloc
   avant 2.7.0 ; à mesurer quand le compteur réseau du core (T-013) existera.
 
 Pour remonter un écart : voir [LISEZMOI.md](LISEZMOI.md) (citer « magie 5.2-4 »).
+
+## 18. Blessures par la chaîne de dégâts (2.9.0, T-116)
+
+Depuis 2.9.0, chaque blessure d'un sort est un coup de la chaîne de dégâts de `vava_health` 1.3.0
+(`exports.vava_health:hit`) : mêmes dégâts qu'avant, mais le sort respecte l'interrupteur des combats entre joueurs de
+la chaîne, son débit, le lanceur à terre et les modificateurs ; boucliers, résistances et zones de paix de la magie sont
+des modificateurs. Préparation : celle de [combat 0](combat.md) en plus de la section 0 ici (`vava_example_combat`
+pour `/frapper`, `/chaine`, `/bouclier`) ; A mage, Souverain (droit `staff` : se protéger soi-même et poser une
+faiblesse le demandent), B mage sans rang, C (tests à trois) Sénéchal ; `/vie 100` avant chaque test de dégâts ;
+`SELECT origin, ref, kind, amount, applied, absorbed, resisted, cancelled FROM vava_health_hits ORDER BY id DESC
+LIMIT 5` après chaque coup.
+
+**Mêmes dégâts qu'avant** (valeurs de `config.lua`, inchangées ; prouvées égales hors jeu par
+`tests/spec/magic_harm_spec.lua` pour chaque niveau, éclat, brûlure et combinaison) :
+
+| # | Faire | Attendu |
+|---|---|---|
+| 1 | Démarrer le serveur (`vava_health` avant `vava_magic`). `/chaine` (exemple de combat). | `module 'vava_magic' v2.9.0 prêt`. `/chaine` liste `bouclier … vava_magic:protections — Boucliers de la magie` et `resistance … vava_magic:resistances — Résistances de la magie` (avec ceux de l'exemple), chacun suivi de ses types entre crochets : les résistances `[feu, eau, terre, lumiere, esprit]`, les boucliers tous sauf `privation` et `monde` ; pas de `vava_magic:zones` (aucune zone de paix réglée). |
+| 2 | **(2 joueurs)** A, chaque niveau tour à tour (`/magie niveau <sort> <1-5>`, `/magie recharges`), touche B : Boule de feu, Trait de glace, Projectile de roche, Nova ardente, Secousse (B dans le cercle), Mur de flammes (B le traverse une fois). | Pertes de B (`/vie` avant, puis aussitôt après le coup, avant toute brûlure) : Boule 8 / 12 / 15 / 17 / 22 ; Trait 5 / 6 / 8 / 10 / 12 ; Roche 14 / 17 / 20 / 23 / 26 ; Nova 10 / 12 / 14 / 16 / 20 ; Secousse 4 / 5 / 6 / 7 / 8 ; Mur 6 / 7 / 8 / 10 / 12 par passage. Une ligne `vava_health_hits` par coup : `origin = vava_magic`, `ref` = le sort, `kind` = `feu` (boule, nova, mur), `eau` (trait), `terre` (roche, secousse), `amount = applied`. |
+| 3 | **(3 joueurs)** Éclats : Boule N3 sur B, C à 2 m ; Roche N5 sur B, C à 2 m. | C −7,5 (boule N3), −13 (roche N5 : 26 × 0,5). |
+| 4 | **(2 joueurs)** Brûlures : Boule N4, Nova N4, Mur N1 sur B. | Morsures de 2 (boule N4), 3 (nova N4), 2 (mur N1) par seconde ; chacune une ligne `kind = feu`, `ref` = le sort. Pas de geste de réaction à chaque morsure (seulement à l'impact). |
+| 5 | **(2 joueurs)** Combinaisons : B mouillé (Vague), Boule N4 ; roche ardente (Roche N1 à travers un Mur de flammes) ; vapeur (Vague sur un Mur), B s'y tient. | Séchage : −8,5 (moitié de 17), aucune brûlure. Roche ardente : −14 (`terre`) puis −8 (`feu`, même `ref = projectile_de_roche`), et brûlure (`feu`, 2 par seconde). Vapeur : −1 par seconde, `ref = vapeur`, `kind = eau`. |
+
+**Boucliers, résistances, zones de paix** :
+
+| # | Faire | Attendu |
+|---|---|---|
+| 6 | **(2 joueurs)** A `/magie proteger <B> bouclier 10`, puis Boule N2 (12) sur B ; encore une Boule N2. | 1er coup : B perd 2, « Votre bouclier de magie se brise. » chez B ; ligne `absorbed = 10.0`, `applied = 2.0`. 2e coup : B perd 12. `/magie fiche <B>` avant le 1er coup : « Protections : 1 bouclier(s), 10 points ». |
+| 6 bis | **(2 joueurs)** A `/magie proteger <B> bouclier 20` ; Trait de glace N1 (5) sur B ; `/magie proteger <B> aucune`. | B ne perd rien ; ni Ralenti ni Mouillé (aucune icône), aucun geste de réaction ; A ne gagne pas le bonus d'XP du toucher (+10). Ligne `absorbed = 5.0`, `applied = 0.0`. Réaction, états, brûlure et bonus ne suivent qu'un coup qui a retiré de la vie. |
+| 7 | **(2 joueurs)** A `/magie proteger <B> bouclier 20` ; A `/frapper <B> 15 tranchant` (exemple de combat). | Absorbé 15, B ne perd rien (le bouclier de la magie arrête aussi une lame) ; réponse de `/frapper` : « absorbé 15 » ; le bouclier garde 5. |
+| 8 | **(2 joueurs)** A `/magie proteger <B> resistance feu 50` ; Boule N2 (12), puis Trait N1 (5) ; puis `/magie proteger <B> aucune` ; `/magie proteger <B> resistance feu -50` et Boule N2. | Boule : −6 (`resisted = 6.0`) ; Trait : −5 (la résistance ne vaut que pour le feu). « Vos protections magiques se dissipent. » Faiblesse : −18 (ligne `amount = 12.0`, `applied = 18.0` : le journal n'a pas de colonne `added`). |
+| 9 | **(2 joueurs)** A `/magie proteger <B> bouclier 20 5` ; attendre 6 s ; Boule N2. | Le bouclier a pris fin : B perd 12. |
+| 9 bis | A `/magie proteger <B> bouclier 500` ; `/magie proteger <B> resistance glace 50` ; `/magie proteger <B> bouclier 10 700` ; puis cinq fois `/magie proteger <B> bouclier 10` ; enfin `/magie proteger <B> aucune`. | Les trois premières : l'aide de `/magie` (refusé : 200 points au plus, types `feu`, `eau`, `terre`, `lumiere`, `esprit`, 600 s au plus), rien n'est posé. Les quatre boucliers suivants sont posés, le cinquième : « Ce personnage porte déjà autant de protections qu'il se peut. » `/magie fiche <B>` : « 4 bouclier(s), 40 points ». Chaque pose réussie et le retrait : une ligne « Magie : protection » au journal du Registre. |
+| 9 ter | **(3 joueurs)** Rangs : C (Sénéchal) `/magie proteger <A> bouclier 10` ; `/magie proteger bouclier 10` (sur lui) ; `/magie proteger <B> resistance feu -50` ; `/magie proteger <B> bouclier 10` ; puis A (Souverain) `/magie proteger <C> bouclier 10`. | 1er : « Ce personnage siège au Conseil à votre rang ou au-dessus : ses protections ne vous regardent pas. » 2e et 3e : « Vous protéger vous-même ou affaiblir autrui est réservé au Souverain. » Rien n'est posé ni journalisé. 4e et 5e : posés. |
+| 10 | Réglage `combat.protectedZones` (une zone autour de B, `restart vava_magic`) ; `/chaine` ; A, hors de la zone, Boule sur B ; puis `/frapper <B> 10`. | `/chaine` montre `annulation … vava_magic:zones`. La boule éclate, B ne perd rien ; `/frapper` : « annulé : zone_protegee ». B y a faim (`/besoins 0 0`) : il perd quand même de la vie (la faim n'est pas un coup). |
+| 9 quater | **(2 joueurs)** A (Souverain) `/magie proteger <C> resistance feu -50` puis `/magie proteger <C> bouclier 10` ; C (Sénéchal) `/magie proteger aucune` ; `/magie fiche <C>`. | « Vos protections magiques se dissipent. » chez C, mais la fiche montre encore « 0 bouclier(s) … 1 résistance(s) ou faiblesse(s) » : sans le droit `staff`, on ne retire sur soi que ce qui protège. A `/magie proteger <C> aucune` retire la faiblesse. |
+| 10 bis | **(2 joueurs)** Même zone : B y entre, A dehors à 5 m ; B `/frapper <A> 10`. Puis B sort à 15 m ; A, au bord de la zone mais dehors, lance une Roche N1 sur B et fait aussitôt un pas dedans, avant l'impact (1,2 s). | `/frapper` : « annulé : zone_protegee » (on ne blesse personne depuis une zone de paix). Roche : elle touche, mais B ne perd rien, ligne `cancelled = zone_protegee` si A était dedans à l'impact. |
+| 10 ter | **(2 joueurs)** A pose une Brume N3 au-dessus de B (dehors), puis entre dans la zone de paix ; B attend dans la brume. Puis B mouillé (sol mouillé) à 10 m ; A, au bord de la zone mais dehors, lance un Trait de glace sur B et fait aussitôt un pas dedans avant l'impact. | Tant que A se tient dans la zone, sa brume ne mouille plus B (pas d'icône Mouillé reposée) ; le trait ne gèle pas B et ne lui retire pas Mouillé (le coup est annulé : la combinaison ne part pas). |
+
+**Combats entre joueurs coupés, lanceur à terre** :
+
+| # | Faire | Attendu |
+|---|---|---|
+| 11 | Réglage `chain.pvp = false` dans `vava_health` (`restart vava_health`) ; A lance une Boule N4 sur B, puis une Vague N4, un Trait de glace et une Secousse N4. | La boule éclate ; B ne perd rien, ne brûle pas, ne réagit pas ; une ligne `cancelled = pvp_off` n'est **pas** écrite (précondition sans journal). Vague, Trait, Secousse : B n'est ni poussé, ni mouillé, ni ralenti, ni renversé (la magie relit `pvp` au retour de vava_health 1.4.0). Remettre `chain.pvp = true`. |
+| 12 | **(2 joueurs)** B garde `/frapper <A> 100` tapé d'avance dans son chat. A lance une Secousse N1 sur B : dès que le sol se fend sous lui (présage de 1,4 s), B valide sa commande et A tombe à terre avant la frappe. A relevé (Registre → Soigner), recommencer avec une Roche N1 lancée de 15 m (1,2 s de vol), B validant dès le lancer. | Décision du porteur du projet (31/10) : un sort lancé debout porte encore. La secousse frappe B (−4, Chancelant) et la roche le touche (−14, Chancelant) alors que A est à terre ; une ligne `vava_health_hits` pour chacune (`ref` = le sort). A ne peut pas relancer à terre : « Vous êtes à terre. » (avec vava_health 1.3.0 : B ne perd rien, `source_downed`). |
+| 12 bis | **(2 joueurs)** Réglage `chain.launchedMaxMs = 500` dans `vava_health` (`restart vava_health`) ; refaire la roche de 12 (1,2 s de vol), puis la Secousse N1 (présage de 1,4 s). Remettre 4000. | Le coup arrive plus de 0,5 s après le lancement, A est à terre : B ne perd rien, aucune ligne au journal (`source_downed`). Avec A debout, les deux blessent normalement. |
+| 13 | **(2 joueurs)** A pose un Mur de flammes N5, puis tape `/vie 0` (le voilà à terre) ; B traverse le mur. | B est blessé et brûle quand même (zone qui dure : `overTime`). |
+
+**Incantation brisée par un coup** (la vie du ped n'est plus lue) :
+
+| # | Faire | Attendu |
+|---|---|---|
+| 14 | **(2 joueurs)** A incante une Lueur N1 (2,5 s) ; pendant ce temps B `/frapper <A> 10`. | « La douleur brise votre concentration. », mana inchangée. |
+| 15 | **(2 joueurs)** A `/magie proteger bouclier 20` (sur lui), incante une Lueur ; B `/frapper <A> 10`. | Le coup est tout absorbé : l'incantation aboutit. |
+| 16 | A incante une Lueur et tombe d'un muret (perte native). | Incantation brisée (« La douleur brise… » ou « Votre chute brise l'incantation. » si son client le voit d'abord). |
+| 17 | **(2 joueurs)** A incante une Lueur ; pendant ce temps, `/tricher` chez A (vie GTA au maximum), et B `/frapper <A> 10`. | Incantation brisée quand même (le serveur ne lit plus la vie du ped). |
+
+**vava_health arrêté** :
+
+| # | Faire | Attendu |
+|---|---|---|
+| 18 | **(2 joueurs)** `stop vava_health` ; A lance une Boule N4 puis une Nova sur B ; puis une Lueur ; `ensure vava_health`, `/chaine`, Boule sur B. | Les sorts partent et se voient ; B ne perd rien, ne brûle pas, ne réagit pas ; chez A, une seule fois : « Votre magie gronde sans mordre : en ce moment, nul ne peut en être blessé. » ; console : une ligne `vava_health ne répond pas…` par minute au plus. La Lueur marche. Au retour, `/chaine` montre de nouveau les modificateurs de la magie, et la boule blesse. Aucun évènement `vava_magic:damage` (`/vava_reseau joueur <B>`). |
+| 19 | **(3 joueurs)** C, témoin, à 5 m de B pendant les tests 2 à 5 (hors des cercles et des éclats) ; puis `/vava_reseau joueur <B>` et `/vava_reseau joueur <C>`. | Chez B : `vava_health:set` (≈ 26 o par coup), `vava_magic:hit` (réaction) ; rien d'autre de nouveau. Chez C : ni `vava_health:set` ni `vava_magic:hit` (seulement les effets visibles : projectiles, zones). Chez A : rien de `vava_health`. |
+| 19 bis | **(10 joueurs ou plus, quand ce sera possible)** Mesure : tous serrés autour de B ; A lance une Nova N5 au milieu, puis une Boule N5 sur B (éclats) ; `resmon` côté serveur (temps de tour de `vava_magic` et `vava_health`). | Pic d'un tour attendu entre 1,5 et 4,5 ms ; noter la valeur. Au-delà de 10 ms, me le remonter avec le nombre de joueurs touchés. |
+| 20 | `resmon 1` chez A et B pendant 2 et 4. | Inchangé par rapport à la section 15 (aucune boucle ajoutée ; tout se joue au serveur). |

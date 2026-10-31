@@ -19,11 +19,15 @@ local REF_PATTERN = '^[A-Za-z0-9_%-%.:]+$'
 local REF_MAX = 64
 local SOURCE_MAX = 65535
 local CHARACTER_MAX = 2147483647
+-- instant de lancement (GetGameTimer du serveur appelant, en ms) : un entier exact en flottant
+local TIME_MAX = 9007199254740991
+-- étiquette d'un coup déjà lancé (projectile en vol, présage), qui va de pair avec `launchedAt`
+local LAUNCHED = 'launched'
 
 -- champs admis et leur contrôle
 local FIELDS = {
     amount = true, kind = true, source = true, sourceCharacter = true, part = true, weapon = true, technique = true,
-    spell = true, tags = true,
+    spell = true, tags = true, launchedAt = true,
 }
 
 ---@class vAvA.HealthPacketLimits
@@ -91,7 +95,7 @@ end
 
 --- Valide un paquet et en rend une copie normalisée (`tags` toujours présent, map éventuellement vide), ou nil et un
 --- code : invalid_packet, unknown_field, invalid_amount, invalid_kind, invalid_source, invalid_part, invalid_ref,
---- invalid_tags.
+--- invalid_tags, invalid_launch (`launchedAt` sans l'étiquette `launched`, ou l'inverse, ou pas un entier positif).
 ---@param raw any
 ---@param limits vAvA.HealthPacketLimits
 ---@return table|nil copy
@@ -130,5 +134,11 @@ function packet.normalize(raw, limits)
     local tags = copyTags(raw.tags, limits)
     if not tags then return nil, 'invalid_tags' end
     copy.tags = tags
+    -- coup déjà lancé : l'étiquette et l'instant vont ensemble (posés par le serveur appelant, jamais par un client)
+    if raw.launchedAt ~= nil or tags[LAUNCHED] then
+        if raw.launchedAt == nil or not tags[LAUNCHED] then return nil, 'invalid_launch' end
+        copy.launchedAt = integerIn(raw.launchedAt, 0, TIME_MAX)
+        if not copy.launchedAt then return nil, 'invalid_launch' end
+    end
     return copy
 end

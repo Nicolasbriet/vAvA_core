@@ -22,7 +22,6 @@ VavaMagic.EVENTS = {
                                             -- target?, homing? } aux joueurs proches
     PROJECTILE_END = 'vava_magic:projectileEnd', -- (id, x, y, z, sort) impact validé par le serveur
     TARGETED = 'vava_magic:targeted',       -- () à la seule cible verrouillée d'un sort d'attaque : un frisson
-    DAMAGE = 'vava_magic:damage',           -- (part de vie) sans vava_health : la victime applique la blessure
     GRIMOIRE = 'vava_magic:openGrimoire',   -- grimoire utilisé
     REGISTER = 'vava_magic:openRegister',   -- { id, pages, more, count, max } registre utilisé : premier lot de pages
     CHAT = 'vava_magic:chat',               -- lignes de réponse d'une commande
@@ -105,6 +104,8 @@ VavaMagic.LINKS = {
     ITEMS_REGISTRY = 'vava_inventory:items',
     ADMIN = 'vava_admin',
     HEALTH = 'vava_health',
+    HEALTH_HIT = 'vava_health:hit',             -- hook after : un coup qui a blessé le lanceur brise son incantation
+    HEALTH_MODIFIERS = 'vava_health:modifiers', -- registre des modificateurs de la chaîne (zones, boucliers, résistances)
     HUD = 'vava_hud',
     CHAT = 'vava_chat',
 }

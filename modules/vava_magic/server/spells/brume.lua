@@ -61,7 +61,7 @@ zones.define(KIND, {
         if data.wetMs <= 0 then return end
         local now = GetGameTimer()
         if data.applied[victim] and now - data.applied[victim] < spellCfg.refreshMs then return end
-        if not combat.affects(victim) then return end
+        if not combat.affects(victim, zone.owner, zone.ownerCharacter) then return end
         data.applied[victim] = now
         if not states.apply(victim, 'wet', { durationMs = data.wetMs, caster = zone.owner, spell = NAME }) then return end
         -- bonus du premier mouillé, au lanceur toujours là (même personnage), jamais pour lui-même

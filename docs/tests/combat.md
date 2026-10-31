@@ -1,9 +1,11 @@
 # Combat — procédure de test en jeu
 
 Procédure pour vérifier en jeu le combat de la phase 4 (`docs/plan/COMBAT_V1.md`). Section 1 : la **chaîne de dégâts
-commune** de `vava_health` 1.3.0 (T-110), éprouvée avec la ressource d'essai `vava_example_combat` 1.0.0 et
-`vava_needs` 1.2.1. Les sections suivantes viendront avec les armes, les techniques et la défense (T-111 à T-116).
-Comptez 1 h, presque tout à deux ; les tests à deux joueurs sont marqués **(2 joueurs)**. Un test se cite
+commune** de `vava_health` 1.4.0 (T-110 ; coup déjà lancé et `vocabulary().pvp` : T-116), éprouvée avec la ressource
+d'essai `vava_example_combat` 1.0.0 et `vava_needs` 1.2.1. Section 2 : les **armes** de `vava_combat` 1.0.0 (T-111),
+essayées avec `/frapper_arme` de `vava_example_combat` 1.1.0. Les sections suivantes viendront avec les techniques et
+la défense (T-112 à T-116).
+Comptez 1 h par section, presque tout à deux ; les tests à deux joueurs sont marqués **(2 joueurs)**. Un test se cite
 « combat 1-8 ».
 
 ## 0. Préparation
@@ -20,6 +22,11 @@ Comptez 1 h, presque tout à deux ; les tests à deux joueurs sont marqués **(2
 4. **Consoles** : `F8` chez A et chez B, console du serveur ouverte ; une requête SQL sous la main
    (`SELECT * FROM vava_health_hits ORDER BY id DESC LIMIT 5`).
 5. **Invulnérabilité** du Registre éteinte chez les deux (elle n'est que locale et ne protège pas de la chaîne).
+6. **Armes** (section 2) : `ensure vava_combat` **après** `vava_health` et `vava_crafting`, et `vava_example_combat`
+   1.1.0 (`/frapper_arme`). A est Souverain ; `/metiers niveau <A> forge 60` et `/metiers niveau <A> menuiserie 30` ;
+   matières par `/catalogue materiau` (lingots de fer de palier 3, chêne, pin, cuir) et un marteau de forge. Outils :
+   `/armes liste | voir <n°> | user <n°> <points>` (droit `metiers`), `/frapper_arme <n°> [multiplicateur]
+   [technique]`.
 
 ## 1. Chaîne de dégâts
 
@@ -44,10 +51,10 @@ par le serveur ; la chute et la noyade restent, lues sur le ped.
 | 13 | **(2 joueurs)** B `/vie 100`, `/bouclier erreur` ; A `/frapper <B> 10` trois fois. | Appliqué 10 à chaque fois ; console du serveur : **une** ligne d'erreur du modificateur `vava_example_combat:bouclier` (pas trois). B `/bouclier non`. |
 | 14 | `restart vava_example_combat`, puis `/chaine` ; `restart vava_health`, puis `/chaine`. | Après chaque redémarrage, les trois modificateurs reviennent, dans le même ordre. Vie de B inchangée par les redémarrages. |
 | 15 | **(2 joueurs)** A frappe B au poing (attaque native) dix fois. | B ne perd rien, ne tombe pas (A ne parvient sans doute même pas à le viser : tir ami coupé). Console du serveur : au plus une ligne « joueur A : dégâts natifs annulés : … » par minute. |
-| 16 | **(2 joueurs)** A `/arme pistolet`, tire sur B ; puis `/arme couteau`, frappe B ; `/arme non`. | Aucune perte chez B, jamais à terre. A peut voir du sang ou un tressaillement chez lui seul (prédiction de son client) : à noter, sans conséquence. |
+| 16 | **(2 joueurs)** A `/arme pistolet`, tire sur B ; puis `/arme couteau`, frappe B ; `/arme non`. | Aucune perte chez B, jamais à terre. A peut voir du sang ou un tressaillement chez lui seul (prédiction de son client) : à noter, sans conséquence. Avec `vava_combat` démarré, l'arme de `/arme` est retirée en moins d'une seconde (combat 2-5) : faire ce test après `stop vava_combat`. |
 | 17 | **(2 joueurs)** A `/explosion` près de B (B à 5 m devant A). | B ne perd rien (l'explosion n'arrive pas chez B) ; console : annulation comptée (« explosion(s) »). |
 | 18 | B nage sous l'eau jusqu'à la noyade. | Perte de vie puis à terre (natif, lu par le serveur) ; une ligne de journal `kind = monde`, `downed = 1`. |
-| 19 | **(2 joueurs)** Magie (personnage mage) : A lance une Boule de feu sur B. | Mêmes dégâts qu'avant (README de `vava_magic`) ; une ligne `vava_magic_damage_log` (inchangé jusqu'à T-116). Le sort passe par `damage` (`origin = vava_magic`, `kind = pur`, sans source) : une ligne `vava_health_hits` seulement si B est mis à terre par le sort. |
+| 19 | **(2 joueurs)** Magie (personnage mage) : A lance une Boule de feu sur B. | Mêmes dégâts qu'avant (README de `vava_magic`). Depuis `vava_magic` 2.9.0 (T-116), le sort appelle `hit` lui-même : une ligne `vava_health_hits` par coup (`origin = vava_magic`, `ref = boule_de_feu`, `kind = feu`, `source_id` = personnage de A) ; plus rien dans `vava_magic_damage_log`. Détail : [magie 18](magie.md). |
 | 20 | B relevé, vie 20 % ; faim et soif à 0 (`/besoins 0 0`). | Perte à chaque passage (une minute), puis à terre ; ligne de journal `kind = privation`, `origin = vava_needs`, `downed = 1` à la chute seulement. |
 | 21 | B relevé, `/vie 30`, puis `/tricher` (remet sa vie GTA au maximum sur son seul client, comme un client modifié). | Médaillon de B un instant plein, puis revenu à 30 % en 2 à 3 s ; `/vie` → 30 % tout du long ; console du serveur : « joueur B : vie du client au-dessus de celle du serveur (1 fois), remise ». Un client qui insisterait serait corrigé de plus en plus rarement (4, 8, 16, puis 30 s). |
 | 22 | **(2 joueurs)** Après les tests 2 à 4 : `/vava_reseau joueur <B>`, puis `/vava_reseau joueur <A>`. | Chez B : `vava_health:set` (≈ 26 o par coup), `vava_health:down`. Chez A : **aucun** évènement `vava_health`. Un troisième joueur à 50 m : rien. |
@@ -60,8 +67,50 @@ par le serveur ; la chute et la noyade restent, lues sur le ped.
 | 29 | Mesure : B change de modèle (créateur d'apparence, ou reprise de personnage) à 60 %. | Au plus **une** ligne « vie du client au-dessus de celle du serveur » ; vie de retour à 60 %. |
 | 30 | Mesure : personnage féminin (`mp_f_freemode_01`) ; F8 `GetEntityMaxHealth(PlayerPedId())` (ou noter le médaillon) et `/vie` après `/vie 50`. | La vie maximale lue par le serveur est la même que celle du client (200) : `/vie 50` → médaillon 50 %, aucune correction ni perte dans les 5 s. |
 | 31 | **(2 joueurs, facultatif)** Renversement : A en véhicule (ou plus tard en monture) roule sur B. | Noter ce qui se passe : perte de B lue comme perte native (`kind = monde` au hook, aucune ligne de journal sauf mise à terre) ou coup annulé (`weaponDamageEvent` compté chez A dans la console). À me remonter dans les deux cas. |
+| 32 | **(2 joueurs)** Coup déjà lancé (1.4.0, avec `vava_magic` 2.9.0, A mage) : B garde `/frapper <A> 100` tapé d'avance. A lance un Projectile de roche N1 sur B à 15 m (1,2 s de vol) ; B valide dès le lancer. Puis réglage `chain.launchedMaxMs = 500` (`restart vava_health`), recommencer ; remettre 4000. | 1er essai : A tombe pendant le vol, la roche blesse B quand même (−14, ligne `vava_health_hits` `ref = projectile_de_roche`). 2e essai : la roche arrive plus de 0,5 s après le lancement, B ne perd rien (`source_downed`, aucune ligne). Un sort ne peut pas être lancé à terre (« Vous êtes à terre. »). |
+| 33 | `chain.pvp = false` (`restart vava_health` : la magie relit le réglage à son retour) ; A (mage) lance une Vague et un Trait de glace sur B. | B n'est ni poussé, ni mouillé, ni ralenti, ne perd rien : la magie lit `pvp` dans `vocabulary()` et coupe aussi ses effets sans dégâts. Remettre `chain.pvp = true`. |
 
-## 2. Ce que je ne peux pas avoir vérifié hors jeu
+## 2. Armes
+
+On ne se bat qu'avec ce que le royaume a façonné : l'arme en main est l'objet tenu de l'inventaire, sa qualité de forge
+règle le coup (± 15 %), chaque coup qui touche l'use, à 0 elle est émoussée (coups à moitié) jusqu'à la réparation. Le
+bouclier s'accroche par « utiliser ». Aucun coup donné par un joueur avant T-112 : `/frapper_arme` essaie la brique
+serveur `strike`. Préparation : 0.6.
+
+| # | Faire | Attendu |
+|---|---|---|
+| 1 | Démarrer le serveur. | Console : `vava_combat` v1.0.0 « prêt : 6 objets et 6 recettes déclarés, 7 armes au catalogue », aucun avertissement (l'Épée courte adoptée, solidité 150 d'accord avec sa recette). |
+| 2 | A `/armes liste`. | Deux messages de chat (huit lignes en tout) : « Armes du royaume (7) : » puis Épée courte, Hache d'armes, Masse d'armes, Épée longue, Dague, Bâton ferré, Bouclier rond (par catégorie), chacune « modèle provisoire ». |
+| 3 | A `/catalogue arme`. | Les six armes nouvelles ont leur image ; fiche : catégorie arme, aucune solidité (pile du catalogue). |
+| 4 | **(2 joueurs)** A prend l'Épée longue dans les Mains. | Machette en main droite chez A ; B, à 10 m, la voit dans la seconde. |
+| 5 | A clic gauche, `R`, `Q`, `F` près de B, mains vides puis Dague en main ; puis `/arme pistolet` (exemple). | Aucun coup de poing ni de lame natif, aucune animation d'attaque ; le pistolet disparaît en moins d'une seconde, aucun tir ; F8 : une ligne « arme de GTA retirée ». Aucune erreur. |
+| 6 | A (non mage) maintient `Tab`. | Rien, ou une roue des armes vide sans effet : noter ce qui s'affiche (§ 3). |
+| 7 | A à la forge, marteau en main. | Recettes : Dague (15), Hache d'armes (25), Masse d'armes (25), Épée courte (30, si apprise) ; l'Épée longue (50) absente tant qu'elle n'est pas apprise. |
+| 8 | A forge une Hache d'armes. | Pièce signée « Façonné par A », poinçon, qualité ≤ 60, solidité 140 / 140. |
+| 9 | Console `vava_fondateur <A> forge 90 epee_longue`, puis A forge une Épée longue ; **(2 joueurs)** B à 8 m, forge 50. | L'Épée longue apparaît dans la forge, se forge (160 / 160) ; B reçoit une leçon (1 / 3). |
+| 10 | A à l'établi : Bâton ferré, puis Bouclier rond. | Les deux recettes listées, pièces signées (120 et 150). |
+| 11 | A, Épée courte de qualité q en main, `/armes voir <A>`. | « en main : Épée courte, qualité q, … coup 12 → c » avec c = 12 × (0,85 + 0,003 × q) arrondi au dixième ; journal du Registre « Combat : armes consultées ». |
+| 12 | **(2 joueurs)** B `/vie 100` ; A, Épée courte en main, à 2 m, `/frapper_arme <B>`. | B perd le coup effectif du test 11 ; chez A seul : « appliqué …, — vie … % — Épée courte, solidité 149 / 150 » (ou 150 / 150 : pièce de qualité, usure épargnée). Une ligne `vava_health_hits` avec `weapon = epee_courte`, `origin = vava_example_combat`. |
+| 13 | **(2 joueurs)** A mains vides, puis Hache de bûcheron en main, `/frapper_arme <B>`. | « refusé : aucune arme en main » les deux fois ; B ne perd rien. |
+| 14 | **(2 joueurs)** B à 8 m ; A `/frapper_arme <B>`. | « refusé : trop loin » ; solidité inchangée. |
+| 15 | **(2 joueurs)** B `/esquive` ; A `/frapper_arme <B>` dans les 3 s. | « annulé : esquive — Épée courte, solidité … » ; solidité **inchangée**. |
+| 16 | A `/armes user <A> 110` (Épée courte à 149). | « Épée courte : solidité 149 → 39 » ; puis `/frapper_arme <B>` jusqu'à ce qu'elle passe de 38 à 37 : à ce coup-là, et à lui seul, **une** notification « l'arme s'émousse ». |
+| 17 | `/armes user <A> 37`, puis `/frapper_arme <B>`. | Notification « l'arme est émoussée » à 0 ; le coup suivant fait la **moitié** du coup du test 12 (« , émoussée ») ; la solidité reste 0. |
+| 18 | A à la forge, onglet Réparation. | L'Épée courte y figure ; réparée : 145 / 145, histoire « Réparation par A » ; `/frapper_arme <B>` : coup plein. |
+| 19 | **(2 joueurs)** A « utilise » le Bouclier rond, mains vides. | « Bouclier rond accroché, prêt à servir. » ; B voit le bouclier **dans le dos** de A. Le bouclier reste dans la besace (poids compté). |
+| 20 | **(2 joueurs)** A prend l'Épée courte en main ; puis l'Épée longue ; puis la repose. | Bouclier au **bras gauche** dans la seconde, chez A et chez B ; avec l'Épée longue, de nouveau dans le dos ; mains vides : dos. |
+| 21 | **(2 joueurs)** A « utilise » encore le bouclier ; puis le raccroche et le jette au sol. | Décroché : il disparaît chez A et B. Jeté : il disparaît aussitôt chez les deux, il est dans le sac au sol. |
+| 22 | **(2 joueurs)** A, bouclier accroché, se déconnecte et revient ; puis `restart vava_combat`. | Au retour, bouclier en place. Pendant l'arrêt : aucun bouclier fantôme ; au redémarrage, de nouveau en place, un seul. |
+| 23 | **(2 joueurs)** B s'éloigne à 600 m puis revient près de A (bouclier accroché) ; puis B s'arrête à 150 m de A (vol libre, `F2`), avance à 100 m. | Au retour, le bouclier de A apparaît avec son ped. À 150 m, B voit A **sans** bouclier ; à 100 m, il réapparaît dans la seconde (`shield.showRadius`, 120 m). |
+| 24 | A à terre (`/vie 0`), tente d'utiliser le bouclier. | Refusé (l'inventaire refuse tout geste à terre, ou « Vous ne pouvez pas faire cela à terre. »). |
+| 25 | **(2 joueurs)** Après 12 à 21 : `/vava_reseau joueur <A>` puis `<B>`. | Chez A : `vava_combat:notify` aux seuils seulement, `vava_health:set` jamais (A ne reçoit pas de coup). Chez B : `vava_health:set` par coup. Aucun évènement `vava_combat` chez un troisième joueur loin. |
+| 26 | `resmon 1` chez B au repos, puis avec A armé et bouclier accroché à côté. | `vava_combat` ≤ 0,01 ms dans les deux cas (aucune boucle par image). |
+| 27 | `stop vava_combat`, puis `ensure vava_combat`. | Arrêt : armes « gardées à part » par l'inventaire, recettes absentes des stations, bouclier retiré des peds, coups de poing natifs revenus mais sans dégâts (annulés par `vava_health`). Retour : tout revient, sans perte. |
+| 28 | Mage : A, Épée courte en main, lance une Boule de feu. | Aujourd'hui le sort part (la magie ne regarde que l'arme GTA) ; la règle « mains vides » viendra avec T-140 (décision du 31 octobre 2026). |
+| 29 | Un membre du Conseil sans le droit `metiers` (ni l'ACE `combat.admin`) : `/armes user <A> 5`. | « Ce registre est réservé au Conseil. » ; solidité inchangée, rien au journal. |
+| 30 | **(2 joueurs, si un outil d'instance existe)** B placé dans une autre instance (routing bucket) au même endroit que A ; A `/frapper_arme <B>`. | « refusé : trop loin » ; B ne perd rien, solidité inchangée. |
+
+## 3. Ce que je ne peux pas avoir vérifié hors jeu
 
 - L'annulation de `weaponDamageEvent` (champ `hitGlobalId` ou liste `hitGlobalIds` selon la version de FXServer : les
   deux sont lus) : B ne voit ni perte ni réaction ; ce que voit A (sang, tressaillement prédits) est à noter.
@@ -74,3 +123,10 @@ par le serveur ; la chute et la noyade restent, lues sur le ped.
 - `vava_needs` 1.2.1 avec un `vava_health` plus ancien : repli sur `damage` (facultatif).
 - `explosionEvent` annulé : l'explosion ne doit plus apparaître du tout chez les autres (son, flammes) ; l'explosion
   d'un PNJ ou du décor n'est pas concernée.
+- Armes (T-111) : le drapeau de ped 122 (`DisableMelee`) coupe-t-il coups de poing, attaques au couteau natives et
+  exécutions furtives ? Sinon les gestes restent visibles mais sans dégâts (filet de `vava_health`) ; le mode combat de
+  T-112 les coupera image par image.
+- La roue des armes (`Tab`) sans arme et sans HUD natif : invisible, ou vide et sans effet (2-6).
+- Modèles provisoires (`w_me_dagger`, `w_me_hatchet`, `w_me_poolcue`, `w_me_bat`, `prop_ballistic_shield`) présents ;
+  placements en main et du bouclier au bras et au dos à régler (`offset`, `rotation` de la config).
+- Le bouclier change de place en moins d'une seconde quand la main change, chez le porteur et chez un voisin (2-20).

@@ -60,10 +60,10 @@ local function finish(ctx, dx, dy)
     for _, entry in ipairs(world.near(position, levelCfg.range + HEIGHT, src)) do
         local victim = entry.source
         if inWave(entry.position, position, forward, levelCfg) and not obstacles.blocked(position, entry.position)
-            and combat.affects(victim) then
+            and combat.affects(victim, src, ctx.characterId) then
             touched = touched + 1
             combat.react(victim, NAME)
-            combos.hit(src, victim, NAME, 0)
+            combos.commit(combos.hit(src, victim, NAME, 0, nil, ctx.characterId))
             states.apply(victim, 'wet', { durationMs = levelCfg.wetMs, caster = src, spell = NAME })
             local away = geometry.direction2d(position, entry.position) or forward
             TriggerClientEvent(EVENTS.PUSH, victim, away.x, away.y, levelCfg.knockback)

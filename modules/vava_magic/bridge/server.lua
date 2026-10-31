@@ -1,7 +1,8 @@
 --[[
     vava_magic/bridge/server.lua
     Rôle : SEUL point de contact, côté serveur, entre la magie et le core / les autres modules : personnage, droits du
-           Conseil, notifications, objets de l'inventaire, sauvegarde de la fiche, base de données, santé.
+           Conseil, notifications, objets de l'inventaire, sauvegarde de la fiche, base de données, santé (chaîne de
+           dégâts de vava_health : coups des sorts, vie tenue par le serveur, hook des coups, modificateurs).
            Pour brancher la magie sur un autre core, réécrire les fonctions de ce fichier (et de bridge/client.lua) :
            le reste du module ne connaît qu'elles.
     Implémentation : vAvA_core (API documentée dans docs/api.md) et ses modules officiels. Chaque appel à une autre
@@ -10,7 +11,7 @@
 ]]
 
 local type, pairs, ipairs, pcall, tostring, tonumber = type, pairs, ipairs, pcall, tostring, tonumber
-local mathType = math.type
+local mathType, huge = math.type, math.huge
 local pack, unpack, concat = table.pack, table.unpack, table.concat
 local GetResourceState, TriggerClientEvent, IsPlayerAceAllowed, CreateThread, GetPlayers =
     GetResourceState, TriggerClientEvent, IsPlayerAceAllowed, CreateThread, GetPlayers
@@ -88,6 +89,28 @@ function Bridge.IsAdmin(source)
         return called and allowed == true
     end
     return IsPlayerAceAllowed(source, cfg.admin.ace) == true
+end
+
+--- Rang d'un joueur au Conseil (`vava_admin` rankOf : 1 Gardien, 2 Sénéchal, 3 Souverain ; 0 sans rang ; la console
+--- au-dessus de tous) ; nil si vava_admin n'est pas démarré (les rangs n'existent pas), false s'il tourne mais que
+--- le rang est illisible (appel en erreur : l'appelant refuse).
+---@param source integer
+---@return integer|false|nil
+function Bridge.RankLevel(source)
+    if source == CONSOLE then return huge end
+    if GetResourceState(LINKS.ADMIN) ~= 'started' then return nil end
+    local called, rank = call(LINKS.ADMIN, 'rankOf', source)
+    if not called then return false end
+    return type(rank) == 'table' and mathType(rank.level) == 'integer' and rank.level or 0
+end
+
+--- Droit `staff` du Registre (Souverain), ou la console. Sans vava_admin : la console seule.
+---@param source integer
+---@return boolean
+function Bridge.IsStaff(source)
+    if source == CONSOLE then return true end
+    local called, allowed = call(LINKS.ADMIN, 'isStaff', source)
+    return called and allowed == true
 end
 
 --- Inscrit une action du Conseil au journal du Registre (sans lui : la console du serveur la garde).
@@ -265,21 +288,57 @@ Bridge.db = {
     update = function(sql, params) return core.db.update(sql, params) end,
 }
 
--- Santé (vava_health) --------------------------------------------------------------------------------------------
+-- Santé et chaîne de dégâts (vava_health ≥ 1.3.0) -----------------------------------------------------------------
 
---- Blesse un joueur d'une part de sa vie (0 à 1). Avec vava_health, il fait appliquer la blessure et gère la mise à
---- terre ; sans lui, le seul client de la victime l'applique (la vie d'un joueur lui appartient dans GTA).
+--- Coup porté par un sort : `exports.vava_health:hit(cible, paquet)` (paquet de shared/harm.lua). Rend le résultat de
+--- la chaîne (`applied`, `absorbed`, `cancelled`…), ou nil et un code : celui de vava_health, ou `health_unavailable`
+--- quand il est arrêté, en erreur ou sans chaîne (plus ancien que 1.3.0). Sans vava_health, aucun sort ne blesse
+--- personne (plus aucun repli chez le client). Appel isolé et silencieux : combat.lua le signale, une fois par minute
+--- (pas une ligne de console par coup).
 ---@param target integer
----@param part number
----@return boolean ok
----@return string|nil code  refus de vava_health (à terre, pas encore apparu…)
-function Bridge.ApplyDamage(target, part)
-    if GetResourceState(LINKS.HEALTH) == 'started' then
-        local called, ok, code = call(LINKS.HEALTH, 'damage', target, part)
-        if called then return ok == true, code end
+---@param packet table
+---@return table|nil result
+---@return string|nil code
+function Bridge.Hit(target, packet)
+    if GetResourceState(LINKS.HEALTH) ~= 'started' then return nil, 'health_unavailable' end
+    local called, result, code = pcall(invoke, LINKS.HEALTH, 'hit', target, packet)
+    if not called then return nil, 'health_unavailable' end
+    if type(result) ~= 'table' then return nil, type(code) == 'string' and code or 'refused' end
+    return result
+end
+
+-- ce que la magie sait de la chaîne (vava_health `vocabulary()`), relu à chaque démarrage de vava_health : points d'une
+-- vie pleine, types de dégâts, étiquette `launched` connue (1.4.0), interrupteur des combats entre joueurs (1.4.0)
+local chain = { points = nil, kinds = nil, launched = false, pvp = true }
+
+--- Relit le vocabulaire de la chaîne (vava_health démarré, 1.3.0 au moins). Illisible (vava_health plus ancien ou en
+--- erreur) : tout revient aux valeurs par défaut, rien de ce qu'une version précédente avait dit ne reste.
+local function readVocabulary()
+    local called, vocabulary = call(LINKS.HEALTH, 'vocabulary')
+    if not called or type(vocabulary) ~= 'table' or type(vocabulary.healthPoints) ~= 'number' then
+        chain.points, chain.kinds, chain.launched, chain.pvp = nil, nil, false, true
+        return
     end
-    TriggerClientEvent(EVENTS.DAMAGE, target, part)
-    return true
+    chain.points = vocabulary.healthPoints
+    chain.kinds = type(vocabulary.kinds) == 'table' and vocabulary.kinds or nil
+    chain.launched = false
+    for _, tag in ipairs(type(vocabulary.tags) == 'table' and vocabulary.tags or {}) do
+        if tag == 'launched' then chain.launched = true end
+    end
+    -- absent (1.3.0) : la chaîne ne dit rien, seul `combat.pvp` de la magie compte
+    chain.pvp = vocabulary.pvp ~= false
+end
+
+--- Vie du joueur tenue par le serveur de vava_health (0 à 1, 0 à terre), ou nil (vava_health absent ou sans chaîne,
+--- personnage non suivi). Jamais lue sur le ped : un client qui garde sa vie GTA au maximum n'y gagne rien. Avant
+--- 1.3.0, `get` lisait encore le ped : la vie n'est demandée que si la chaîne est connue.
+---@param source integer
+---@return number|nil
+function Bridge.GetHealth(source)
+    if not chain.points then return nil end
+    local called, state = call(LINKS.HEALTH, 'get', source)
+    if not called or type(state) ~= 'table' or type(state.health) ~= 'number' then return nil end
+    return state.health
 end
 
 ---@param source integer
@@ -289,14 +348,105 @@ function Bridge.IsDowned(source)
     return called and downed == true
 end
 
---- Déclare les objets et suit les redémarrages de l'inventaire. Appelé pendant le setup du module.
+--- Prévient `handler` après chaque coup de la chaîne et chaque perte native (hook `vava_health:hit` after :
+--- { target, applied, … }). Le hook appartient au core : l'abonnement survit aux redémarrages de vava_health.
+---@param handler fun(payload: table)
+---@return boolean ok
+---@return string|nil err
+function Bridge.OnHit(handler)
+    local id, err = core.hooks.after(LINKS.HEALTH_HIT, handler)
+    if not id then return false, err end
+    return true
+end
+
+-- modificateurs de la chaîne : clé → { stage, priority?, label, apply, kinds? (liste), exceptKinds? (ensemble) } ;
+-- (re)déclarés quand vava_health démarre
+local modifiers = {}
+
+--- Types pour lesquels un modificateur est appelé (`kinds` du registre) : sa liste, réduite aux types de la chaîne,
+--- ou tous les types de la chaîne sauf `exceptKinds`. Nil : tous (vocabulaire inconnu, ou aucune liste) ; liste vide :
+--- jamais appelé (rien à déclarer).
+---@param definition table
+---@return string[]|nil
+local function kindsOf(definition)
+    local known = chain.kinds
+    if not known then return definition.kinds end
+    local allowed = {}
+    if definition.kinds then
+        for _, kind in ipairs(definition.kinds) do allowed[kind] = true end
+    elseif definition.exceptKinds then
+        for _, kind in ipairs(known) do allowed[kind] = not definition.exceptKinds[kind] end
+    else
+        return nil
+    end
+    local list = {}
+    for _, kind in ipairs(known) do
+        if allowed[kind] then list[#list + 1] = kind end
+    end
+    return list
+end
+
+local function declareModifiers()
+    readVocabulary()
+    local registry = core.registry
+    if not registry.exists(LINKS.HEALTH_MODIFIERS) then return end
+    for key, definition in pairs(modifiers) do
+        if not registry.has(LINKS.HEALTH_MODIFIERS, key) then
+            local kinds = kindsOf(definition)
+            if kinds and #kinds == 0 then
+                VavaMagic.log.warn("modificateur '%s' non déclaré : aucun type de la chaîne à couvrir", key)
+            else
+                -- entrée du registre : seulement les champs qu'il connaît
+                local ok, err = registry.add(LINKS.HEALTH_MODIFIERS, key, {
+                    stage = definition.stage, priority = definition.priority, label = definition.label,
+                    kinds = kinds, apply = definition.apply,
+                })
+                if not ok then VavaMagic.log.warn("modificateur '%s' non déclaré : %s", key, tostring(err)) end
+            end
+        end
+    end
+end
+
+--- Modificateurs de la chaîne de dégâts tenus par la magie (au plus un par étape ; clés `vava_magic:…`) : déclarés au
+--- registre `vava_health:modifiers` s'il existe, puis à chaque démarrage de vava_health (le registre disparaît avec
+--- lui), avec les types qu'ils couvrent (`kinds`, ou tous sauf `exceptKinds`) : la chaîne ne les appelle pas pour les
+--- autres. Chaque `apply(ctx)` lit les données de la magie et rend un résultat, sans jamais céder la main.
+---@param list table<string, table>
+function Bridge.SetModifiers(list)
+    modifiers = list
+    if VavaMagic.ready then declareModifiers() end
+end
+
+--- Points d'une vie pleine pour la chaîne (vava_health `vocabulary().healthPoints`), nil s'ils ne sont pas connus.
+---@return number|nil
+function Bridge.ChainHealthPoints()
+    return chain.points
+end
+
+--- Combats entre joueurs permis par la chaîne (`chain.pvp` de vava_health ≥ 1.4.0) ; vrai s'il ne le dit pas.
+---@return boolean
+function Bridge.ChainPvp()
+    return chain.pvp
+end
+
+--- La chaîne connaît-elle les coups déjà lancés (étiquette `launched`, vava_health ≥ 1.4.0) ?
+---@return boolean
+function Bridge.ChainKnowsLaunched()
+    return chain.launched
+end
+
+--- Déclare les objets et les modificateurs, et suit les redémarrages de l'inventaire et de vava_health. Appelé
+--- pendant le setup du module.
 ---@return boolean ok
 ---@return string|nil err
 function Bridge.start()
     for name in pairs(usable) do declare(name) end
+    declareModifiers()
     local id, err = core.hooks.after('core:module:ready', function(payload)
         if payload.name == LINKS.INVENTORY then
             for name in pairs(usable) do declare(name) end
+        elseif payload.name == LINKS.HEALTH then
+            declareModifiers()
         end
     end)
     if not id then return false, err end

@@ -21,8 +21,12 @@ local ok, err = projectiles.register(NAME, spellCfg, {
     onImpact = function(launch, target)
         if target == 0 then return end
         local levelCfg = spellCfg.levels[launch.level]
-        local hit = combos.hit(launch.source, target, NAME, levelCfg.damage)
-        if not combat.damage(launch.source, target, NAME, hit.damage, combat.KIND.IMPACT) then return end
+        local hit = combos.hit(launch.source, target, NAME, levelCfg.damage, nil, launch.casterCharacter)
+        if not combat.damage(launch.source, target, NAME, hit.damage, combat.KIND.IMPACT, launch.casterCharacter, nil,
+            launch.strikeLaunchedAt) then
+            return
+        end
+        combos.commit(hit)
         projectiles.bonus(launch)
         local slow = levelCfg.slow
         states.apply(target, 'slow', { durationMs = slow.durationMs, strength = slow.strength, caster = launch.source, spell = NAME })
