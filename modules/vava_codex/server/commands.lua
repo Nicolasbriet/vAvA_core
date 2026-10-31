@@ -2,7 +2,7 @@
     vava_codex/server/commands.lua
     Rôle : déclaration de la touche et de la commande du Codex lui-même, et de sa commande de console
            `vava_codex_pages` (1.5.0), au registre `core:commands`.
-    Dépendances : shared/constants.lua, config.lua, server/core.lua
+    Dépendances : shared/constants.lua, config_client.lua, config.lua, server/core.lua
 ]]
 
 local pairs, tostring = pairs, tostring

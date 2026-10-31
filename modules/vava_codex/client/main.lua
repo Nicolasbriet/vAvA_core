@@ -9,7 +9,7 @@
            un chapitre (1.4.0, accueil des nouveaux venus ; 1.5.0 : aussi une page ou un chapitre de lecture, résolus
            par la page), texte d'une page de lecture relayé à la demande (1.5.0). Souris et clavier rendus au jeu si la
            ressource s'arrête livre ouvert.
-    Dépendances : shared/constants.lua, config.lua, client/core.lua, client/nui.lua, client/keys.lua
+    Dépendances : shared/constants.lua, config_client.lua, client/core.lua, client/nui.lua, client/keys.lua
 ]]
 
 local type, tostring, pcall, ipairs = type, tostring, pcall, ipairs
