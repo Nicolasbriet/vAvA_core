@@ -522,6 +522,41 @@ versé à T-014 ; les autres points déjà couverts sont précisés dans T-012 �
   `config.lua` » (par exemple une section `client` relue par un petit fichier client, ou un découpage serveur / client
   du même fichier) et l'appliquer. Rien de secret n'est en jeu (README de `vava_atelier`, § Sécurité) : c'est une
   question de poids.
+- Spec : `docs/plan/specs/T-132.md` (décisions du porteur du projet le 31 octobre 2026 : option B, `config.lua` au seul
+  serveur et `config_client.lua` partagé, une valeur à un seul endroit ; T-132 = lot 1 et outillage, puis T-141 à
+  T-143 ; installeur de la Chancellerie autorisé).
+- Fait le 31 octobre 2026 (branche `agents/T-132`, relectures à faire) : outillage (`scripts/lib/manifeste.awk`,
+  règle bloquante de `audit-reseau.sh` et ses cas d'essai, exceptions transitoires des lots 2 à 4,
+  `scripts/poids-client.sh`, `tests/spec/config_split_spec.lua`, `tests/helper.lua`) ; `vava_atelier` 1.2.0,
+  `vava_arrival` 1.2.0, `vava_chancellerie` 1.7.1, Chancellerie 1.8.5 (installeur). Lot 1 : 41 727 octets de Lua en
+  moins par joueur (14 057 compressés). Rapport `docs/plan/rapports/T-132.md`. **À tester en jeu** :
+  `docs/tests/reseau.md` § 7-A.
+
+### T-141 — Configs partagées, lot 2 : les métiers
+- Agent : vava-dev-lua · Dépend de : T-132 · Statut : à faire
+- Appliquer la règle de T-132 (`docs/plan/specs/T-132.md` § 2.4 et § 3.3) à `vava_farming`, `vava_crafting`,
+  `vava_gathering`, `vava_skills` et à la config de `vava_provisions` ; retirer leurs exceptions transitoires de
+  `scripts/audit-exceptions.txt` et leurs entrées `PENDING` de `tests/spec/config_split_spec.lua`. **À faire avant
+  T-102** (décision du porteur du projet : T-102 à T-104 partent de fichiers déjà découpés).
+- Critères : `config_split_spec` et l'audit passent sans exception pour ces modules ; gains mesurés par
+  `scripts/poids-client.sh` au rapport ; `docs/tests/reseau.md` § 7-B écrit et joué.
+
+### T-142 — Configs partagées, lot 3 : le socle
+- Agent : vava-dev-lua · Dépend de : T-132 · Statut : à faire
+- Même forme que T-141 pour `vava_inventory`, `vava_combat`, `vava_health`, `vava_time`, `vava_codex`, `vava_admin`,
+  `vava_voice`, `vava_chat`, `vava_cameras`, `vava_appearance`, `vava_needs`, `vava_world` (spec T-132 § 3.3) ;
+  `config.lua` renommé `config_client.lua` dans les trois modules sans partie serveur (`vava_hud`, `vava_loading`,
+  `vava_characters_ui`) ; exemples `vava_anim_test`, `vava_dev_characters`, `vava_example_combat`. Retirer leurs
+  exceptions transitoires et leurs entrées `PENDING`.
+- Critères : comme T-141 ; `docs/tests/reseau.md` § 7-C.
+
+### T-143 — Configs partagées, lot 4 : magie et vivres
+- Agent : vava-dev-lua · Dépend de : T-132 · Statut : à faire
+- Premier passage de `vava_magic` (spec T-132 § 3.3 : `spells` reste partagé jusqu'à T-123 ; `shared/text.lua` et
+  `shared/pages.lua` au serveur si aucun fichier client ne s'en sert) ; `vava_provisions/shared/rules.lua` coupé en
+  deux (`shared/texts.lua` partagé, `shared/rules.lua` au serveur). Retirer les dernières exceptions transitoires et
+  entrées `PENDING`.
+- Critères : comme T-141 ; `docs/tests/reseau.md` § 7-D.
 
 ### T-133 — `%c` dépend de la locale : contrôles de texte justes partout
 - Agent : vava-dev-lua · Dépend de : — · Statut : à tester en jeu (relu sécurité, suites appliquées)
@@ -690,7 +725,7 @@ maquettes.
   redémarrage.
 
 ### T-102 — Outil de placement et créateur de récolte
-- Agents : vava-architecte → vava-dev-lua + vava-dev-nui · Dépend de : T-101, T-015 · Statut : à faire
+- Agents : vava-architecte → vava-dev-lua + vava-dev-nui · Dépend de : T-101, T-015, T-141 · Statut : à faire
 - Outil de placement commun (point, point orienté avec modèle, cercle, polygone ; aperçu vert/rouge ; molette,
   `Maj`, clic droit, `Ctrl+Z`, `Échap` ; barre des touches) sur le modèle de l'éditeur de `vava_voice`.
 - `vava_gathering` déclare ses éditeurs zone et point (maquette `Recolte`) ; « Tester la récolte » en essai.

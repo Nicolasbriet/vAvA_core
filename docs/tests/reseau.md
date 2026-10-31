@@ -73,7 +73,40 @@ lourds de la minute, le reste sous `* · <autres>`) : plus de suivi à lancer, p
 
 | # | Faire | Attendu |
 |---|---|---|
-| 1 | `./scripts/audit-reseau.sh` puis `./scripts/audit-reseau.sh --essai` (ou `./scripts/verifier.sh`). | Aucun BLOQUANT hors exceptions inscrites (plus aucune exception des zones de voix depuis T-014) ; « ESSAI : OK (17 cas) ». |
+| 1 | `./scripts/audit-reseau.sh` puis `./scripts/audit-reseau.sh --essai` (ou `./scripts/verifier.sh`). | Aucun BLOQUANT hors exceptions inscrites (plus aucune exception des zones de voix depuis T-014 ; exceptions transitoires de T-132 pour les configs des lots 2 à 4) ; « ESSAI : OK (… cas) ». |
+
+## 7. Ce que télécharge un joueur (T-132)
+
+Depuis T-132, un module basculé ne sert aux joueurs que `shared/constants.lua`, `config_client.lua` et la logique
+dont son client se sert ; `config.lua` (réglages du seul serveur) est en tête des `server_scripts`. Préparation :
+préparation commune ([LISEZMOI.md](LISEZMOI.md)), mode développement pour l'exemple de l'Atelier
+(`vava_example_atelier`) ; **A** Souverain, **B** hors du Conseil ; console `F8` de chaque client ouverte (repérer
+`SCRIPT ERROR`). Hors jeu, `./scripts/poids-client.sh vava_atelier vava_arrival vava_chancellerie` donne ce que
+chaque ressource sert (brut et gzip).
+
+### 7-A — lot 1 : Atelier, arrivée, pont de la Chancellerie
+
+| # | Faire | Attendu |
+|---|---|---|
+| 1 | Démarrer le serveur. | `module 'vava_atelier' v1.2.0 prêt`, `module 'vava_arrival' v1.2.0 prêt`, `module 'vava_chancellerie' v1.7.1 prêt` (ou pont fermé si le serveur est lancé sans la Chancellerie, comme avant) ; aucune ligne « config.lua garde la forme d'avant 1.2.0 ». |
+| 2 | **(2 joueurs)** A et B se connectent ; `F8` de chacun. | Aucune `SCRIPT ERROR` de `vava_atelier` ni de `vava_arrival`. |
+| 3 | B : `resmon 1`. | `vava_chancellerie` n'apparaît pas (aucun script client) ; `vava_atelier` à 0,00 ms. |
+| 4 | A : `F9`, puis `Échap`, puis `/atelier`. | L'Atelier s'ouvre et se ferme comme avant (atelier 1-1 à 1-3). |
+| 5 | A : Paramètres › Raccourcis › FiveM. | « Ouvrir l'Atelier du Conseil » sur `F9` (atelier 1-7). |
+| 6 | `stop vava_admin` ; A : `F9` ; puis `ensure vava_admin`. | « Le Registre du Conseil s'éveille : réessayez dans un instant. » (texte de refus venu de `config_client.lua`). |
+| 7 | A : essai d'un panneau d'exemple (atelier 11-1), fiche en volet ; puis le laisser prendre fin sans le demander (`trial.maxMinutes = 1` dans `config.lua`, comme atelier 11-6). | Bandeau « Mode essai : vous seul voyez ce changement en jeu » ; à la fin, notification « L'essai de « … » a pris fin. » (textes de `config_client.lua`, durée lue au serveur dans `config.lua`). Remettre 30. |
+| 8 | A : `/atelier_archives etat`. | Réponse au chat sous le nom « Atelier » (`texts.sayAuthor`, atelier 16). |
+| 9 | **(2 joueurs)** A publie un changement de panneau (atelier 12-2), B est proche. | B le voit comme avant : rien d'autre n'a bougé. |
+| 10 | Nouveau personnage de B (accueil 1). | Mot d'accueil, ligne de la dotation, Codex ouvert à « Vivre à Eldoria » ; avec une interface ouverte, l'accueil attend (accueil 2). |
+| 11 | Chancellerie : relier un compte (chancellerie 2), page Réseau (chancellerie 3). | Comme avant. |
+| 12 | Serveur arrêté ; remplacer `modules/vava_atelier/config.lua` par celui de 1.1.0 (`git show 457611f:modules/vava_atelier/config.lua`) ; démarrer. | Console : « config.lua garde la forme d'avant 1.2.0 … » ; l'Atelier s'ouvre quand même. Remettre le fichier de 1.2.0. |
+| 13 | Serveur arrêté ; `keys.open = 'F7'` dans `modules/vava_atelier/config_client.lua` ; démarrer ; un **nouveau** joueur se connecte. | `F7` ouvre l'Atelier chez lui (FiveM garde la touche déjà enregistrée chez A : attendu). Remettre `F9`. |
+| 14 | Si possible : vider le cache FiveM d'un client, se connecter en mesurant le téléchargement (ou le dossier du cache). | Ordre de grandeur cohérent avec `poids-client.sh` (`vava_atelier` ≈ 30,6 Ko de Lua, `vava_arrival` ≈ 11,4 Ko, `vava_chancellerie` rien) ; noter au rapport si FXServer compresse. |
+| 15 | Mise à jour par la Chancellerie (1.8.5) d'un serveur où `config_client.lua` de l'Atelier a été modifié à la main. | Le fichier modifié est gardé, la nouvelle version posée à côté en `config_client.lua.nouveau` (comme `config.lua`). |
+
+7-B (lot 2, T-141), 7-C (lot 3, T-142), 7-D (lot 4, T-143) : écrits par chaque tâche sur le même modèle (démarrage
+sans ligne d'ancienne forme ; `F8` sans `SCRIPT ERROR` des modules du lot ; un tour des gestes de chaque module,
+en renvoyant à sa procédure ; un test **(2 joueurs)** par lot).
 
 ## Ce qui n'est pas compté
 

@@ -57,6 +57,10 @@ du Conseil par appel direct du RPC.
    quelques Ko.
 6. **Fichiers web.** Une ressource commune (`vava_ui`) porte polices, textures et icônes partagées, référencées par
    `nui://vava_ui/…` ; chaque module ne garde que ses propres fichiers.
+7. **Fichiers Lua servis.** Un joueur ne télécharge que ce que son client lit : `config.lua` et la logique réservée au
+   serveur sont en `server_scripts` ; `config_client.lua`, `shared/constants.lua` et la logique dont un fichier
+   client se sert en `shared_scripts` (T-132 ; `scripts/audit-reseau.sh` et `tests/spec/config_split_spec.lua` ;
+   mesure : `scripts/poids-client.sh`). Un réglage du serveur retouché ne fait plus retélécharger la ressource.
 
 ## État des lieux (lecture du dépôt, octobre 2026)
 
@@ -84,4 +88,7 @@ Points à traiter (tâches de la phase 1) :
   de débit et ses bornes.
 - La magie n'a jamais été jouée en vrai (README de `vava_magic`) : c'est le module le plus risqué en performance
   (projectiles, effets, zones).
+- **≈ 190 Ko de Lua servis pour rien** (configs et logique du serveur en `shared_scripts`) : T-132 (règle, outillage,
+  lot 1 : `vava_atelier`, `vava_arrival`, `vava_chancellerie`, ≈ 41,7 Ko en moins), puis T-141, T-142, T-143 (lots
+  2 à 4, exceptions transitoires dans `scripts/audit-exceptions.txt`).
 - Pas de tests ni de lint avant ce kit : base de départ de **14 avertissements luacheck mineurs** (relevés le 29 octobre 2026).

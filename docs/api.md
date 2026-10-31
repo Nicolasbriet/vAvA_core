@@ -766,6 +766,13 @@ même que `README.md` à la racine, et celui qu'écrit la Chancellerie) :
 `ensure vava_gathering`, `ensure vava_crafting`, `ensure vava_combat`, `ensure vava_farming`, `ensure vava_provisions`, `ensure vava_codex`,
 `ensure vava_arrival`, `ensure vava_chancellerie`, puis les modules qui déclarent des objets.
 
+Réglages d'un module (T-132, aucune API du core) : chaque module lit sa config par sa table globale
+(`VavaXxx.config`). Un module basculé la tient en deux fichiers, chaque valeur écrite une fois : `config_client.lua`
+(`shared_scripts`, téléchargé par chaque joueur) ouvre la table avec ce que lit le client et pose `clientFile = true` ;
+`config.lua` (en tête des `server_scripts`, jamais téléchargé) la complète avec ce que lit le seul serveur. Basculés :
+`vava_atelier` 1.2.0, `vava_arrival` 1.2.0 ; `vava_chancellerie` 1.7.1 ne sert plus rien aux joueurs ; les autres
+suivent (T-141 à T-143). Règle complète : `docs/plan/specs/T-132.md` § 2.4.
+
 ### `vava_ui`
 
 Polices, textures et ornements communs des interfaces, servis par `nui://vava_ui/web/…` (aucun script, aucun export,
@@ -2326,7 +2333,7 @@ Demande le core 0.10.0 (`core.net`, `playSeconds` du hook `loaded`, registre `co
   passe « incertaine » et n'est **jamais** redonnée d'office (console, journal ; le Conseil vérifie et redote).
 - **Accueil** : évènement `vava_arrival:welcome` (`kitGiven`, ~25 o) au **seul** nouveau venu par `core.net.send`, au
   plus 3 fois sans accusé (une fois par session) ; le client attend un écran calme (4 s, puis essais d'une seconde,
-  30 s au plus), montre deux notifications du HUD, ouvre le Codex au chapitre `codex.chapter` (`premiers_pas`) par
+  30 s au plus), montre deux notifications du HUD, ouvre le Codex au chapitre `codex.chapter` (`premiers_pas`, `config_client.lua`) par
   `openAt`, puis accuse lecture. Rien n'est envoyé aux autres joueurs, rien aux personnages anciens ; aucun
   GlobalState, aucun state bag, aucune boucle client au repos.
 
@@ -2354,7 +2361,7 @@ L'Atelier du Conseil (T-100, socle) : une interface unique où le Conseil crée 
 démarrage : juste après `vava_admin` (l'ordre n'est pas critique : les modules redéclarent leurs éditeurs au hook
 `vava_atelier:editorsReady`). Dépend du core ≥ 0.11.0 et de `vava_ui` ; `vava_admin` ≥ 1.8.0 est relu à chaque appel
 (sans lui, refus `not_ready`), volontairement pas en `dependency` du manifeste (FiveM arrêterait l'Atelier avec le
-Registre). Touche `F9` (réglable) et `/atelier`, déclarées au registre `core:commands` (droit `metiers`). Depuis 1.1.0
+Registre). Touche `F9` (réglable ; `keys.open` de `config_client.lua` depuis 1.2.0) et `/atelier`, déclarées au registre `core:commands` (droit `metiers`). Depuis 1.1.0
 (T-101), un atelier dont le module déclare `apply` et `remove` est **gardé** : ses fiches vivent en base (une ligne par
 version), avec brouillon, essai, publication groupée, retour en arrière, retrait, historique ; la config du module est
 la graine, la base fait foi. Un atelier sans `apply` reste en lecture (comportement de 1.0.0). Le placement en jeu vient
