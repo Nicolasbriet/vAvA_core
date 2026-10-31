@@ -2163,7 +2163,10 @@ jeu : `modules/vava_gathering/README.md`. Demande le core 0.11.0 (abonnements de
   retrait ; récoltes en cours sur un point changé oubliées : `unknown_node` à la fin) et **notent** la zone ; la
   diffusion part au seul appel marqué `info.last` : zone nouvelle déclarée entière, zone connue déplacée si son
   cercle change puis sa différence (clés changées et retirées, par paquets de 64 dans le même tour), zone retirée
-  (`core.zones.remove`) ; garde de la boucle lente au-delà de `editor.flushGraceMs` (2 s). Règles : `validate` (nom
+  (`core.zones.remove`) ; garde de la boucle lente au-delà de `editor.flushGraceMs` (2 s). Au dernier appel d'un lot,
+  chaque zone touchée doit tenir dans les bornes d'une zone du core et garder chaque point dans son rayon + 5 m, sinon
+  `apply` / `remove` rend `false` : ce refus suit un catalogue déjà changé, réparé par le rapprochement de l'Atelier ;
+  d'ici là, la boucle lente garde la zone hors bornes notée et ne l'envoie jamais (une ligne en console). Règles : `validate` (nom
   unique sans accents ni casse, type connu, lieu exigé à l'essai et à la publication, chevauchement de 10 m au plus
   avec une autre zone publiée ; point : ressource connue, poisson ⇔ eau, dedans sa zone si elle n'est pas dans le lot),
   `validateLot` (120 points, cercle neuf, écart, cercle englobant de 500 m), `placeCheck` (chevauchement, 256 zones,
