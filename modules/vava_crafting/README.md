@@ -110,8 +110,8 @@ une ligne `WARN` par recette absente, avec son nom et le module qui l'a déclar�
 absente de vava_skills:recipes … »), une seule fois, `skillsCheck.delayMs` (5 s) après le démarrage, après l'ajout
 d'une recette par un autre module, après le retrait d'une recette des compétences, et de nouveau au retour de
 `vava_skills` (le temps que chaque module ait redéclaré les siennes) ; registre des compétences absent : une seule
-ligne. Au menu, une telle recette libre est montrée **verrouillée** (« Non enseignée », raison « Ce savoir n'est pas
-encore enseigné au royaume : prévenez le Conseil. ») au lieu d'être proposée puis refusée au clic ; une recette
+ligne. Au menu, une telle recette libre est montrée **verrouillée** (« Indisponible », raison « Cette recette ne peut ni se façonner
+ni s'apprendre : prévenez le Conseil. ») au lieu d'être proposée puis refusée au clic ; une recette
 transmise inconnue des compétences reste cachée, comme toute recette transmise inconnue. Le serveur reste juge : le
 début d'une pièce revérifie `knowsRecipe`.
 
@@ -246,14 +246,14 @@ Hook écouté : `vava_inventory:metadata` (before, garde de la signature, voir p
     Composteur » apparaît, sans combustible ; `E` ouvre le menu (recette du compost) ; à la forge, l'invite montre
     toujours « combustible n / 20 ». Détail : `docs/tests/metiers.md` 5-7.
 16. **Recette inconnue des compétences** (1.8.0, T-147) : avec la ressource jetable de `docs/tests/metiers.md` § 4.2,
-    une recette déclarée à l'artisanat seul → une ligne `WARN` en console (nom, module), « Non enseignée » et bouton
+    une recette déclarée à l'artisanat seul → une ligne `WARN` en console (nom, module), « Indisponible » et bouton
     grisé à l'établi ; déclarée ensuite aux compétences → déverrouillée, elle se façonne.
 
 ## À vérifier en jeu (1.8.0)
 
 - Démarrage : aucune ligne « … absente de vava_skills:recipes » avec les modules livrés (artisanat, agriculture,
   provisions, combat) ; la ressource jetable du § 4.2 de `docs/tests/metiers.md` en fait apparaître une, une seule.
-- Menu : la recette verrouillée se lit (« Non enseignée », raison sous le bouton) ; les autres recettes inchangées.
+- Menu : la recette verrouillée se lit (« Indisponible », raison sous le bouton) ; les autres recettes inchangées.
 
 ## À vérifier en jeu (1.7.0)
 

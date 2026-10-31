@@ -2105,8 +2105,8 @@ une recette à `vava_crafting:recipes` la déclare **aussi** à `vava_skills:rec
 (`not_known`). Depuis 1.8.0 (T-147), l'artisanat le signale : une ligne `WARN` par recette absente (« recette 'x'
 (déclarée par y) absente de vava_skills:recipes … »), une fois, `skillsCheck.delayMs` (5 s) après son démarrage, après
 l'ajout d'une recette par un autre module, après le retrait d'une recette des compétences et au retour de
-`vava_skills` ; au menu, une telle recette libre est verrouillée (champ `unregistered = true`, `known = false`, raison
-« Non enseignée ») au lieu d'être proposée puis refusée. Les armes de
+`vava_skills` ; au menu, une telle recette libre est verrouillée (champ `unregistered = true`, `known = false`, marque
+« Indisponible ») au lieu d'être proposée puis refusée. Les armes de
 `vava_combat` (Épée longue, Hache d'armes, Masse d'armes, Dague, Bâton ferré, Bouclier rond) y sont ajoutées par ce module,
 signées, solidité tirée de sa fiche ; l'Épée courte reste une recette de l'artisanat (§ `vava_combat`).
 
