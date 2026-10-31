@@ -75,7 +75,7 @@ VavaCombat.config = {
         baton_ferre = { label = 'Bâton ferré', description = 'Du chêne dur, chaussé de fer aux deux bouts.',
             width = 1, height = 5, weight = 1800, stack = 1, category = 'arme',
             held = { model = 'w_me_poolcue', offset = { 0.1, 0.0, 0.0 }, rotation = { 0.0, 0.0, 0.0 } } }, -- PLACEHOLDER : queue de billard de GTA
-        bouclier_rond = { label = 'Bouclier rond', description = 'Des planches cerclées de fer autour d\'un umbo forgé.',
+        bouclier_rond = { label = 'Bouclier rond', description = 'Planches de pin cerclées de fer, bosse de métal au centre.',
             width = 3, height = 3, weight = 4500, stack = 1, category = 'arme' },
     },
 
@@ -184,7 +184,7 @@ VavaCombat.config = {
         adminNoPlayer = 'Aucun personnage en jeu sous ce numéro.',
         adminNoWeapon = 'Ce personnage ne tient aucune arme du royaume en main.',
         adminDenied = 'Ce registre est réservé au Conseil.',
-        adminNothing = '%s est déjà émoussée : il n\'y a plus rien à user.',
+        adminNothing = '%s : l\'arme est déjà émoussée, il n\'y a plus rien à user.',
         -- libellé, catégorie, type, dégâts, solidité, « modèle provisoire »
         list = '%s — %s, %s, coup %s, solidité %d%s',
         provisional = ', modèle provisoire',

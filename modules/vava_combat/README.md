@@ -2,7 +2,8 @@
 
 On ne se bat qu'avec ce que le royaume a façonné. Une **épée**, une **hache**, une **masse**, une **dague**, un **bâton
 ferré** ou un **bouclier** se forgent ou se façonnent chez un artisan, se tiennent en main (le bouclier s'accroche), s'usent
-à chaque coup qui porte et retournent à la forge pour être remis en état. Une pièce de maître frappe un peu plus fort et
+à chaque coup qui porte et retournent chez l'artisan pour être remis en état (le forgeron pour le fer, le menuisier pour
+le bâton et le bouclier). Une pièce de maître frappe un peu plus fort et
 dure un peu plus longtemps qu'une pièce grossière, sans rendre son porteur invincible. Les coups de poing et les armes de
 GTA disparaissent. L'arme signée garde son forgeron, son poinçon et ses réparations : elle se troque, elle ne s'achète pas.
 
@@ -55,7 +56,8 @@ dégâts entre joueurs : `vava_health` les annule).
 | Bâton ferré (`baton_ferre`) | bâton | bâton | contondant | 9 | +0,6 | 120 | 0,45 | menuiserie 10, établi : 2 chênes, 1 lingot de fer |
 | Bouclier rond (`bouclier_rond`) | bouclier | bouclier | contondant | 5 | −0,6 | 150 | 0,70 | menuiserie 20, établi : 3 pins, 1 lingot de fer, 1 cuir |
 
-Une vie pleine vaut 100 : de 6 à 12 coups francs mettent à terre selon l'arme. Le combattant dépend du forgeron, du
+Une vie pleine vaut 100 : à qualité moyenne, de 6 (Épée longue) à 13 (Dague) coups francs mettent à terre selon
+l'arme, 20 au bouclier. Le combattant dépend du forgeron, du
 menuisier, du tanneur et du bûcheron pour s'armer et se faire réparer ; porter une arme ne demande aucune compétence (les
 compétences de combat de T-115 débloqueront des techniques, pas le port). Les outils (hache de bûcheron, couteau de
 chasse) **ne sont pas des armes**.
