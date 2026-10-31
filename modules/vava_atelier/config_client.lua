@@ -147,8 +147,6 @@ VavaAtelier.config = {
             trace = 'Tracé : %d sommets (Entrée pour fermer)',
             quitTrace = 'Échap encore pour abandonner le tracé.',
             vehicle = 'Descendez de votre monture pour placer.',
-            suspended = 'Mode essai : vous seul voyez ces points · %s : revenir à l\'Atelier',
-            editLine = 'Mode édition : les cercles et étiquettes ne sont visibles que par vous',
             new = 'nouveau',
             removal = 'retiré',
         },

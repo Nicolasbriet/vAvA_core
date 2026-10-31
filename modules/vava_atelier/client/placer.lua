@@ -60,6 +60,10 @@ local state = nil
 local kept = nil
 -- valeurs du modèle (« Prochain point à poser ») et fantôme du candidat, gardés entre deux visées
 local template, templateGhost, templateLabel = {}, nil, nil
+-- type de chaque fiche dont les lieux ont été reçus ('atelier|fiche' → type, 256 au plus) : une visée de points sur une
+-- fiche dont la réponse n'est plus gardée (retour d'un essai joué, autre fiche lue entre-temps) la redemande
+local kindsSeen, kindsCount = {}, 0
+local MAX_KINDS_SEEN = 256
 
 -- Valeurs reçues (page, serveur) ---------------------------------------------------------------------------------------
 
@@ -181,6 +185,12 @@ function placer.absorb(editorId, kindId, id, data)
         parent = { id = data.parent.id, title = str(data.parent.title, MAX_TITLE) or data.parent.id,
             place = cleanPlace(data.parent.place) }
     end
+    local seen = editorId .. '|' .. id
+    if not kindsSeen[seen] then
+        if kindsCount >= MAX_KINDS_SEEN then kindsSeen, kindsCount = {}, 0 end
+        kindsCount = kindsCount + 1
+    end
+    kindsSeen[seen] = kindId
     kept = { editor = editorId, kind = kindId, id = id, rows = rows, parent = parent,
         self = { place = type(data.self) == 'table' and cleanPlace(data.self.place) or nil } }
     -- distance du bloc « Lieu » (« Posée à 32 m de vous »), calculée ici : la page la lit dans `self.distance`
@@ -739,9 +749,11 @@ function placer.start(d)
     local parentId = mode == 'children' and (d.parent or d.id) or nil
     if mode == 'children' then
         if not isId(parentId, VavaAtelier.ENTRY_PATTERN, VavaAtelier.MAX_ENTRY) then return refuse('bad_request') end
-        -- lieux de la fiche parent : ceux que la page a demandés (`children`), sinon redemandés si elle nomme son type
+        -- lieux de la fiche parent : ceux que la page a demandés (`children`), sinon redemandés (type nommé par la
+        -- page, ou celui reçu avec ses lieux plus tôt dans la séance)
         if not (kept and kept.editor == editorId and kept.id == parentId) then
-            local parentKind = isId(d.parentKind, VavaAtelier.KEY_PATTERN, VavaAtelier.MAX_KEY) and d.parentKind or nil
+            local parentKind = isId(d.parentKind, VavaAtelier.KEY_PATTERN, VavaAtelier.MAX_KEY) and d.parentKind
+                or kindsSeen[editorId .. '|' .. parentId]
             if not parentKind then return refuse('stale') end
             local fetched, code = ensureKept(editorId, parentKind, parentId)
             if not fetched then return refuse(code) end
@@ -821,6 +833,18 @@ function placer.undo()
     local current = state
     if not current or not IsDisabledControlPressed(0, controls.ctrl) then return end
     undo(current)
+end
+
+--- Essai joué (la page se met de côté) : visée arrêtée sans message, fantômes retirés (l'essai montre les vrais points
+--- chez l'auteur) ; les lieux gardés restent pour la visée suivante.
+function placer.hide()
+    placer.stop(true)
+    ghosts.clear()
+end
+
+--- Retour de l'essai joué : fantômes des enfants pas encore publiés reposés autour du personnage.
+function placer.show()
+    if kept and not state then ghosts.sync(ghostList(pedCoords(), nil)) end
 end
 
 --- Arrêt de la ressource, déchargement : tout ce que l'outil a posé disparaît, sans message.

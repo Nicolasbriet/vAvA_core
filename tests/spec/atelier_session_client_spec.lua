@@ -68,3 +68,75 @@ describe('vava_atelier accueil côté client', function()
         assert.equal('', session.known().home)
     end)
 end)
+
+-- Essai joué (T-102, spec § 8.4, écart 6 du rapport T-102-nui) : la page se met de côté, le jeu reprend la main, la
+-- séance reste ouverte côté serveur ; `suspended` part sans ligne (la page compose la ligne d'essai de l'atelier et la
+-- touche de retour) ; la visée s'arrête et les fantômes partent, les lieux gardés restent pour la visée suivante ;
+-- l'état annoncé aux autres modules est « fermé » pendant l'essai, puis rendu.
+describe('vava_atelier essai joué côté client', function()
+    local session, sent, focus, states, tool, closed
+
+    before_each(function()
+        helper.reset()
+        helper.loadClientView('modules/vava_atelier', 'VavaAtelier')
+        sent, focus, states, tool, closed = {}, {}, {}, {}, 0
+        VavaAtelier.core = {
+            log = { warn = function() end },
+            characters = { current = function() return 1 end },
+            rpc = {
+                call = function() return true, true, { version = 'v', content = {}, tags = {}, drafts = {}, journal = {},
+                    rank = '' } end,
+                emit = function() closed = closed + 1 end,
+            },
+            hooks = { runAfter = function(_, payload) states[#states + 1] = payload end },
+        }
+        VavaAtelier.nui = {
+            send = function(action, payload) sent[#sent + 1] = { action = action, payload = payload } end,
+            setFocus = function(on) focus[#focus + 1] = on end,
+        }
+        VavaAtelier.placer = {
+            hide = function() tool[#tool + 1] = 'hide' end, show = function() tool[#tool + 1] = 'show' end,
+            stop = function() tool[#tool + 1] = 'stop' end, leave = function() tool[#tool + 1] = 'leave' end,
+        }
+        _G.RegisterNetEvent = function() end
+        _G.IsPauseMenuActive = function() return false end
+        helper.load('modules/vava_atelier/client/session.lua')
+        session = VavaAtelier.session
+        session.open()
+        sent, focus, states = {}, {}, {}
+    end)
+
+    after_each(function()
+        VavaAtelier = nil
+        _G.RegisterNetEvent, _G.IsPauseMenuActive = nil, nil
+    end)
+
+    it('met la page de côté sans ligne, rend le jeu, garde la séance ; F9 la rend', function()
+        assert.is_true(session.suspend())
+        assert.same({ { action = 'suspended', payload = { on = true } } }, sent)
+        assert.same({ false }, focus)
+        assert.same({ open = false, placing = false, suspended = true }, states[1])
+        assert.same({ 'hide' }, tool)
+        assert.is_true(session.isOpen())
+        assert.is_true(session.isSuspended())
+        assert.equal(0, closed)
+        -- déjà de côté : rien
+        assert.is_false(session.suspend())
+        session.resume()
+        assert.same({ action = 'suspended', payload = { on = false } }, sent[2])
+        assert.same({ false, true }, focus)
+        assert.same({ open = true, placing = false, suspended = false }, states[2])
+        assert.same({ 'hide', 'show' }, tool)
+        assert.is_false(session.isSuspended())
+    end)
+
+    it('fermer pendant l’essai joué : visée et fantômes retirés, séance rendue au serveur', function()
+        session.suspend()
+        tool = {}
+        session.close(true)
+        assert.same({ 'stop', 'leave' }, tool)
+        assert.is_false(session.isOpen())
+        assert.is_false(session.isSuspended())
+        assert.equal(1, closed)
+    end)
+end)

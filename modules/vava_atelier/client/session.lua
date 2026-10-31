@@ -190,10 +190,12 @@ end
 ---@return boolean
 function session.suspend()
     if not open or suspended then return false end
-    if placer() then placer().stop(true) end
-    if placer() then placer().leave() end
+    -- visée arrêtée et fantômes retirés (l'essai montre les vrais points) ; les lieux de la fiche restent gardés pour
+    -- la visée suivante (`placer.hide`, `placer.show` au retour)
+    if placer() then placer().hide() end
     suspended = true
-    nui.send('suspended', { on = true, line = cfg.placement.texts.suspended:format(cfg.keys.open) })
+    -- sans `line` : la page compose la ligne d'essai de l'atelier et la touche de retour (écart 6 du rapport T-102-nui)
+    nui.send('suspended', { on = true })
     nui.setFocus(false)
     core.hooks.runAfter(HOOKS.STATE, { open = false, placing = false, suspended = true })
     return true
@@ -205,6 +207,7 @@ function session.resume()
     suspended = false
     nui.send('suspended', { on = false })
     nui.setFocus(true)
+    if placer() then placer().show() end
     core.hooks.runAfter(HOOKS.STATE, { open = true, placing = false, suspended = false })
 end
 
