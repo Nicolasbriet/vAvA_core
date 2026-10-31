@@ -11,14 +11,22 @@ const ReportsView = (() => {
   let selected = null;
   let ctx = null;
 
+  // nature d'une demande (1.10.0) : libellé connu seulement, sinon rien (jamais une valeur reçue telle quelle)
+  const kindLabel = (report) => (Object.prototype.hasOwnProperty.call(R.kinds, report.kind) ? R.kinds[report.kind] : null);
+  const isCoord = (v) => typeof v === 'number' && Number.isFinite(v);
+
   function row(report) {
+    const kind = kindLabel(report);
     const node = UI.el('button', `entry${report.id === selected ? ' is-selected' : ''}`, null, [
       UI.el('span', 'entry-number', `n° ${report.id}`),
       UI.el('span', 'entry-main', null, [
         UI.el('span', 'entry-name', report.author),
         UI.el('span', 'entry-sub', R.age(ageText(report.ageMs))),
       ]),
-      UI.el('span', 'entry-tags', null, [UI.el('span', `tag${report.claimedBy ? ' tag-rank' : ' tag-danger'}`, report.claimedBy ? '✓' : R.open)]),
+      UI.el('span', 'entry-tags', null, [
+        kind ? UI.el('span', 'tag', kind) : null,
+        UI.el('span', `tag${report.claimedBy ? ' tag-rank' : ' tag-danger'}`, report.claimedBy ? '✓' : R.open),
+      ].filter(Boolean)),
     ]);
     node.type = 'button';
     node.addEventListener('click', () => {
@@ -40,10 +48,17 @@ const ReportsView = (() => {
       return;
     }
     const present = typeof report.source === 'number';
+    const kind = kindLabel(report);
+    const p = report.position;
+    const position = p && isCoord(p.x) && isCoord(p.y) && isCoord(p.z) ? R.position(p) : null;
+    const witnesses = list(report.witnesses).map((w) => (w && typeof w.name === 'string' ? w.name : null)).filter(Boolean);
     // un élément absent (null) deviendrait le texte « null »
     ctx.right.replaceChildren(...[
       UI.heading(R.from(report.author), UI.el('span', 'page-count', R.age(ageText(report.ageMs)))),
+      kind ? UI.el('p', 'report-status', kind) : null,
       UI.el('blockquote', 'report-text', report.message),
+      position ? UI.el('p', 'report-status', position) : null,
+      report.kind === 'player' ? UI.el('p', 'report-status', witnesses.length ? R.witnesses(witnesses) : R.noWitnesses) : null,
       UI.el('p', 'report-status', report.claimedBy ? R.claimedBy(report.claimedBy) : R.open),
       present ? null : UI.el('p', 'empty', R.gone),
       UI.el('div', 'group-buttons', null, [

@@ -480,6 +480,24 @@ test('pageCount : « 0 page », « 1 page », « 12 pages »', () => {
   eq([0, 1, 12].map(STRINGS.search.pageCount), ['0 page', '1 page', '12 pages']);
 });
 
+// Mode panneau (1.7.0) : mêmes règles que shared/dock.lua
+const Dock = require('../js/dock.js');
+group('mode panneau (dock.js)');
+test('rectangle valide gardé tel quel (celui de vava_pause, bords exacts)', () => {
+  eq(Dock.rect({ left: 32.6, top: 10.7, width: 58.3, height: 71.1 }), { left: 32.6, top: 10.7, width: 58.3, height: 71.1 });
+  eq(Dock.rect({ left: 0, top: 0, width: 100, height: 100 }), { left: 0, top: 0, width: 100, height: 100 });
+  eq(Dock.rect({ left: 90, top: 90, width: 10, height: 10 }), { left: 90, top: 90, width: 10, height: 10 });
+});
+test('rectangle refusé : NaN, infini, négatif, trop étroit, débordement, champ en trop ou manquant, autre type', () => {
+  const base = { left: 32.6, top: 10.7, width: 58.3, height: 71.1 };
+  const bad = [
+    { ...base, left: NaN }, { ...base, width: Infinity }, { ...base, top: -Infinity }, { ...base, left: -0.1 },
+    { ...base, top: -1 }, { ...base, width: 9.9 }, { ...base, height: 9 }, { ...base, left: 42 }, { ...base, top: 29 },
+    { ...base, extra: 1 }, { left: 1, top: 1, width: 20 }, { ...base, width: '58.3' }, null, 'dock', [1, 2, 3, 4], undefined,
+  ];
+  bad.forEach((raw, i) => eq(Dock.rect(raw), null, `cas ${i}`));
+});
+
 (async () => {
   for (const item of queue) {
     if (item.group) {

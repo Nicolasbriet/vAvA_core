@@ -18,6 +18,7 @@ main. Chaque procédure dit quoi faire et ce qui doit se passer ; les tests à d
 | [voix.md](voix.md) | Chat vocal, portée, zones de voix | `vava_voice` |
 | [registre.md](registre.md) | Registre du Conseil : droits, joueurs, signalements, bans | `vava_admin` |
 | [codex.md](codex.md) | Toutes les commandes et touches | `vava_codex` |
+| [pause.md](pause.md) | Bannière du royaume (menu pause) : ouverture et refus, bannière réduite à terre, Codex en panneau, réglages, demande au Conseil, quitter, réseau | `vava_pause`, `vava_codex`, `vava_admin`, `vava_hud`, `vava_voice` |
 | [accueil.md](accueil.md) | Arrivée d'un nouveau personnage : point d'arrivée, dotation unique, accueil et Codex, limite du compte, `/accueil` du Conseil | `vava_arrival`, `vava_codex`, `vava_inventory` |
 | [atelier.md](atelier.md) | L'Atelier du Conseil (socle) : ouverture, droits par rang, liste et fiche d'un atelier, « Vérifier », recherche, journal, redémarrages, réseau | `vava_atelier`, `vava_example_atelier` |
 | [eau.md](eau.md) | Eau potable : points d'eau (puits, fontaine, source), puiser et boire, réserves, outre rendue ou fendue, outres de la tannerie, `/eau` du Conseil, dotation reprise | `vava_provisions`, `vava_needs`, `vava_crafting`, `vava_arrival` |

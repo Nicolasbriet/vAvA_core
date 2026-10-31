@@ -764,7 +764,7 @@ même que `README.md` à la racine, et celui qu'écrit la Chancellerie) :
 `ensure vava_hud`, `ensure vava_inventory`, `ensure vava_needs`, `ensure vava_health`, `ensure vava_admin`,
 `ensure vava_atelier`, `ensure vava_voice`, `ensure vava_cameras`, `ensure vava_magic`, `ensure vava_skills`,
 `ensure vava_gathering`, `ensure vava_crafting`, `ensure vava_combat`, `ensure vava_farming`, `ensure vava_provisions`, `ensure vava_codex`,
-`ensure vava_arrival`, `ensure vava_chancellerie`, puis les modules qui déclarent des objets.
+`ensure vava_pause`, `ensure vava_arrival`, `ensure vava_chancellerie`, puis les modules qui déclarent des objets.
 
 Réglages d'un module (T-132, aucune API du core) : chaque module lit sa config par sa table globale
 (`VavaXxx.config`). Un module basculé la tient en deux fichiers, chaque valeur écrite une fois : `config_client.lua`
@@ -1127,6 +1127,13 @@ noir.
 - Hooks client (émis par le HUD) : `vava_hud:progressDone` (`{ id }`) à la fin ; `vava_hud:progressCancelled`
   (`{ id, reason }`) à l'interruption, `reason` = `module` (`cancelProgress`, ou arrêt de la ressource qui l'avait
   lancée) ou `hidden` (retour à la sélection, déchargement du personnage).
+- **Bannière du royaume** (1.6.0, T-145) : jauges et barre de progression masquées (jamais interrompues) pendant que
+  la bannière de `vava_pause` est déployée (crochet client `vava_pause:state`, remis à « repliée » à l'arrêt de
+  `vava_pause`) ; notifications visibles. Réglages du joueur lus chez elle (export client `setting`, isolé ; crochet
+  `vava_pause:settingChanged`) : `ui.scale` → échelle de la page (`config.scales`), `hud.notifyDuration` → durée des
+  notifications (`config.notifyDurations`, multiplicateur de `notifications.durationMs`). La page reçoit
+  `settings = { scale, durationMs }` dans `init`, puis le message `settings` (`{ scale, durationMs }`) au seul
+  changement. Sans `vava_pause` : comportement d'avant (`config.pauseResource`).
 - Pour travailler le rendu sans le jeu : `web/index.html?values=0.8,0.62,0.08` dans un navigateur ; `&progress=1`
   (barre de 8 s menée à son terme) ou `&progress=cancel` (interrompue à 60 %). Depuis 1.4.0, polices et grain viennent
   de `vava_ui` (dépendance déclarée) et les données simulées de `web/dev/devmock.js`, jamais livré.
@@ -1383,6 +1390,27 @@ voulu (l'écran des joueurs non plus, voir plus bas).
 | `ban(compte, heures, motif)` | `true, n° du ban` ou `false, code` — au journal sous le nom du module appelant |
 | `kick(source, motif)` | `true` ou `false, code` |
 | `log(source, libellé, détails?)` | `true` ou `false, code` — inscrit au journal une action d'un membre du Conseil faite dans un module (libellé lu tel quel, 32 caractères ; détails `{ clé = texte ou nombre }`, 8 au plus) ; depuis 1.1.0 |
+| `submitRequest(source, nature, texte, position)` | `true, { id, kind, state = 'sent', age = 0 }` ou `false, code[, secondes]` — demande au Conseil au nom d'un joueur (1.10.0, bannière de `vava_pause`) ; réservé aux ressources de `requests.callers` (`not_allowed`, une ligne de console par minute et par ressource) ; `nature` dans `requests.kinds` (`invalid_kind`) ; texte de 1 à 500 octets, `position` booléen (`invalid_args`) ; `no_session`, `invalid_text`, `too_short` (texte normalisé, voir plus bas), `too_soon` (+ secondes restantes, `reportCooldownMs`), `too_many` (`requests.maxOpenPerAccount` demandes ouvertes du compte), `full` ; aucune notification au joueur |
+| `requestOf(source)` | `{ id, kind, state, age }` ou `nil` — demande du compte du joueur (1.10.0) : la plus récente ouverte (`sent`, ou `claimed` si un membre l'a prise), sinon la dernière close depuis moins de `requests.closedMemoryMs` (15 min, `closed`) ; `age` en secondes ; réservé aux ressources de `requests.callers` |
+
+**Demandes au Conseil** (1.10.0, T-145) : `/signaler` et la bannière passent par le même chemin. Chaque demande a une
+nature (`question`, `player` — signalement d'un joueur —, `bug`, `other` ; `/signaler` crée une demande `other`), et le
+cas échéant la position de son auteur, **lue par le serveur** et arrondie au mètre (jamais une valeur du client ;
+toujours jointe pour `player`). Pour `player`, les témoins : joueurs à `requests.witnessRadius` (30 m) de l'auteur, même
+instance, auteur exclu (`core.net.playersNear` ; sans `core.net`, aucun), `maxWitnesses` (8) au plus, gardés par numéro
+de compte et nom de personnage. Une demande de plus que `requests.maxOpenPerAccount` (2) ouvertes par compte est refusée
+(`too_many`, `/signaler` compris). Le Conseil voit l'auteur, la nature, la position et les témoins au Registre ; le
+journal de prise en charge et de clôture nomme l'auteur (décision du porteur du projet, 31 octobre 2026). Rien n'est
+jamais envoyé aux témoins ni à aucun joueur hors du Conseil, hormis l'auteur (prise en charge, clôture, sans nom du
+membre). L'alerte part à tous les membres en ligne qui ont le droit `reports` (`messages.requestNew` : « Question : demande
+n° 12 de … »). Mémoire seulement, rien de plus en base ; la création est une ligne de console `info` (n°, nature, compte).
+Texte normalisé pour les deux chemins (`/signaler` compris) : UTF-8 valide ; contrôles (sauf le saut de ligne),
+caractères invisibles et marques de sens d'écriture (U+200B–200F, U+2028–202E, U+2066–2069, U+061C, U+FEFF) refusés
+(`invalid_text`) ; espaces et sauts répétés retirés ; `requests.minChars` (10) caractères au moins (`too_short`),
+`requests.maxLines` (12) lignes au plus. Pure et testée : `shared/requests.lua` (servi au seul serveur ;
+`tests/spec/admin_requests_spec.lua`). Un `config.lua`
+d'avant 1.10.0 (sans `requests`) : `/signaler` marche comme avant, la bannière reçoit `not_allowed`, une ligne `warn` au
+démarrage.
 
 **Outils des modules** (depuis 1.1.0) : un module ajoute un bouton à la page Outils du Registre par le registre du core
 `vava_admin:tools` — clé `<ressource>:<nom>`, `{ label, hint?, permission }` (un droit des rangs). Le bouton n'apparaît
@@ -1418,8 +1446,8 @@ rang (droit `watch`, tout le Conseil) : chacun le regarde chez tout le monde, me
 | `webRanks()` | liste `{ name, label, level }` |
 | `webLog({ label, rank }, libellé, détails?)` | `true` ou `false, code` — action d'un compte du panneau faite dans un autre module |
 
-Hook `vava_admin:report` (serveur, `after` : `{ action = created|claimed|closed, id, author }`) : tient le panneau
-web à jour.
+Hook `vava_admin:report` (serveur, `after` : `{ action = created|claimed|closed, id, author, kind }` — `kind` depuis
+1.10.0) : tient le panneau web à jour.
 
 Pour travailler le rendu sans le jeu : `web/index.html?tab=players` (ou `reports`, `bans`, `logs`, `staff`, `tools`,
 `announce`), avec `&dialog=ban`, `&proclaim=1`, `&watch=1` ou `&rank=gardien` (données simulées de
@@ -1498,6 +1526,10 @@ setr voice_useSendingRangeOnly true
 
 Hooks : `vava_voice:zonesChanged` (serveur, `after` : `{ action = set|remove, id, zone?, source }`),
 `vava_voice:rangeChanged` (client, `after` : `{ index, name, distance }`).
+
+Bannière du royaume (1.5.0, T-145) : le cercle au sol ne se montre que si le réglage `voice.circle` de `vava_pause`
+n'est pas `false` (export client `setting`, isolé, relu quand `vava_pause` démarre, suivi par le crochet
+`vava_pause:settingChanged`) ; sans `vava_pause`, comme avant (`config.pauseResource`).
 
 Pour travailler le rendu de l'éditeur sans le jeu : `web/index.html` (ou `?zone=1` pour le formulaire) dans un
 navigateur ; le médaillon : `vava_hud/web/index.html?values=0.8,0.6,0.3,0.75&talking=1`.
@@ -2281,6 +2313,23 @@ d'abord (les ids de lecture ne commencent jamais par `vava`, aucune collision). 
 `vava_arrival` à la première venue, ouvre l'onglet Lecture au chapitre « Premiers pas », page « Vivre à Eldoria »
 (`bienvenue`). Hors jeu : `?focus=<identifiant>`.
 
+**Codex en panneau** (1.7.0, T-145) : la bannière de `vava_pause` ouvre le livre dans son panneau, sans copie ni
+voile ; c'est la page du Codex qui le dessine dans un rectangle donné par l'hôte (`config.docked.host`, seul appelant
+admis).
+
+| Export client | Retour |
+|---|---|
+| `openDocked(chapitre\|nil, rect)` | `true` (ouverture lancée, même chemin que `F1`) ou `false, code` : `not_allowed` (`GetInvokingResource()` autre que `docked.host`), `invalid_chapter` (motif d'`openAt`), `invalid_rect`, `no_character`, `busy` (livre ouvert ou en cours d'ouverture, menu de GTA). Ne refuse pas pour `IsNuiFocused` : l'hôte rend le focus juste avant |
+| `closeDocked()` | `true` (même réserve d'appelant, sinon `false, 'not_allowed'`) : referme le livre en panneau, ou annule son ouverture en cours |
+
+- `rect` = `{ left, top, width, height }` en vw et vh (`shared/dock.lua`, pur, testé) : nombres finis, `left` et `top`
+  ≥ 0, `width` et `height` ≥ 10, `left + width` et `top + height` ≤ 100, aucun autre champ. Il part dans le message
+  `open` de la page (`dock`) ; rien de plus sur le réseau.
+- Crochet client **`vava_codex:closed`** (`after`, `{ docked, reason }`) à chaque fermeture, plein écran ou panneau,
+  échec de l'ouverture compris : `reason` ∈ `close`, `run` (une commande lancée a fermé le livre), `failed`,
+  `unloaded`, `stopped`. Un échec en panneau ne notifie rien au joueur : l'hôte le dit.
+- Arrêt de l'hôte (`onClientResourceStop`) livre en panneau ouvert : le livre se referme, souris et clavier rendus.
+
 **Pages de lecture** (1.5.0, T-023) : un onglet « Lecture » (premier des trois onglets ; `F1` ouvre toujours le livre
 sur Commandes) porte des chapitres et des pages écrits dans `content/*.lua` du module, chargés comme
 `server_scripts` : jamais téléchargés par les clients (une page du Conseil ne part qu'aux membres). Au setup, chaque
@@ -2321,6 +2370,64 @@ sa ligne et écartée seule. `config.reading.enabled = false` : ni onglet, ni in
 
 Hors jeu : `web/index.html` dans un navigateur (`?staff=0` pour la vue d'un simple joueur) ; les listes des
 formulaires y sont simulées.
+
+### `vava_pause`
+
+La bannière du royaume (1.0.0, T-145), à la place du menu pause de GTA : Échap, P ou Start déploient une page à soi
+(`vava_pause/web`) : Personnage, Codex (en panneau, `vava_codex` 1.7.0), Carte (celle de GTA en attendant), Réglages,
+Le Conseil, Paramètres du jeu, Quitter Eldoria ; plaque du royaume (moment du jour, saison, habitants). Ordre de
+démarrage : après `vava_codex`, avant `vava_arrival`. Demande le core 0.10.0 et `vava_ui` ; tout le reste est
+facultatif. Aucune table en base. Détail et réglages : `modules/vava_pause/README.md` ; spec :
+`docs/plan/specs/T-145.md`.
+
+- **Porte** (client, `shared/gate.lua`, pure) : refus muets — bannière déjà ouverte, pas de personnage apparu (la
+  boucle ne tourne pas : le menu de GTA reste), écran au noir, menu de GTA ouvert, autre interface au focus ou focus
+  rendu depuis moins de `intercept.graceMs` (300 ms) — puis avec message — ligoté (`IsPedCuffed` ou blocage
+  `restrained`), en combat (blocage `combat`), bloqué (blocage `other`). **À terre** n'est pas un refus : bannière
+  **réduite** (Reprendre, Paramètres du jeu, Quitter ; décision 2), décidée par le serveur.
+- **Serveur** : RPC `vava_pause:open(versionDesTouches)` (24 octets, `^[%w%-]*$` ; débit 4 puis 1 / 4 s) : `not_ready`,
+  `no_character`, `combat` (+ millisecondes restantes : le client refuse sur place jusque-là, et un débit dépassé
+  n'ouvre jamais la bannière contre ce refus ; fenêtre de **10 s** après tout coup donné ou reçu au crochet after de
+  `vava_health:hit`, annulé compris sauf refusé à l'étape `before`, hors `privation` et `monde`), crochet `vava_pause:opening` (`before`, `{ source, characterId,
+  downed }` ; refus `combat` ou `restrained` gardés, tout autre → `busy`) ; puis `true, { downed = true }` à terre, sinon
+  `true, { skills = { { id, label, level, rank, rankLabel } } (32 au plus), guild? = { label, short, grade?, cloth,
+  clothDark, field, charge }, people, council, request? = { id, kind, state, age }, keysVersion, keys? }` — `keys`
+  (touches `kind = 'key'`, portée `player`, 48 au plus) seulement si la version gardée par le client diffère (et la page
+  ne la reçoit elle aussi qu'à son changement). Textes revalidés : contrôles, caractères invisibles et marques de sens
+  d'écriture refusés. Aucune attente de la base ; ≈ 1 Ko, ≈ 3,4 Ko la première fois.
+- `vava_pause:council(nature, texte, position)` (`question | player | bug | other` ; 1 à 500 octets ; booléen ; 2 puis
+  1 / min) : `vava_admin:submitRequest`, qui normalise le texte comme pour `/signaler` (`vava_admin/shared/requests.lua`)
+  → `true, { id, kind, state,
+  age }` ou `false, code[, secondes]` (`too_short`, `invalid_text`, `too_soon`, `too_many`, `full`,
+  `council_unavailable`, `no_character`).
+- `vava_pause:leave(mode)` (`disconnect | quit` ; 2 puis 1 / 10 s) : l'appelant seul, déconnecté 200 ms après la
+  réponse (même session), avec `leave.messages[mode]` ; ligne `info` de console avec le temps de combat restant et
+  l'état à terre.
+- **Aucun évènement serveur → client, aucun state bag, aucun GlobalState.**
+
+| Export | Retour |
+|---|---|
+| serveur `inCombat(source)` | `true, msRestantes` ou `false` — fenêtre de combat (pour T-030 et les suivants) |
+| client `isOpen()` | booléen |
+| client `close()` | `true` — replie la bannière |
+| client `block(id, posé, sorte?)` | `true` ou `false, code` (`invalid_id` : `^[%w_]+$`, 32 octets ; `invalid_kind` ; `too_many` : 16) — `sorte` ∈ `restrained`, `combat`, `other` (défaut) ; clé `<ressource appelante>:<id>`, levé à l'arrêt de l'appelant ; poser un blocage replie la bannière ouverte. Un état actif qui lit Échap (outil de placement, roue) en pose un pendant son usage |
+| client `setting(clé)` | valeur effective, ou `nil` |
+| client `settings()` | copie `{ [clé] = valeur }` |
+
+Crochets client émis : `vava_pause:state` (`after`, `{ open }`), `vava_pause:settingChanged` (`after`, `{ key, value }`).
+Réglages du joueur (stockage local de FiveM, `vava_pause:reglages`, jamais envoyés au serveur) : `ui.scale` (90, 100,
+115 ; bannière et `vava_hud`), `hud.notifyDuration` (`courte`, `normale`, `longue` ; `vava_hud`), `voice.circle`
+(levier ; `vava_voice`). Un réglage n'est montré que si une ressource de son `uses` tourne ; sa valeur effective est
+décidée par le module qui l'applique. Registre `core:commands` : touche `vava_pause` (« Déployer la bannière du
+royaume », `Échap ou P`, chapitre Royaume).
+
+**Contrat attendu de `vava_guilds`** (T-105) : export serveur `bannerOf(source)` → `nil` ou `{ label (≤ 48 o), short
+(≤ 16 o), grade? (≤ 32 o), cloth, clothDark, field ('#rrggbb'), charge (≤ 24 o) }` ; tout autre champ, texte avec
+contrôle ou chevron, couleur hors motif : bannière royale (console, une ligne par minute) ; meuble inconnu : `croix`.
+
+Boucle par image : `client/intercept.lua` bloque Échap et P (`DisableControlAction` × 2, `SetPauseMenuActive(false)`,
+lecture des deux appuis) **et rien d'autre**, personnage apparu et hors menu natif ouvert par la bannière ; exception
+décidée par le porteur du projet (`-- audit: ok`). La manette n'est lue par image que bannière ouverte.
 
 ### `vava_arrival`
 

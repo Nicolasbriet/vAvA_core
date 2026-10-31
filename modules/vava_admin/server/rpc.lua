@@ -62,6 +62,8 @@ function rpc.start()
     -- l'appelant, et seulement pour sa dernière observation, même si son rang a changé entre-temps)
     local ok, err = register('spectateEnd', { SESSION }, limits.read, function(src, session) return spectate.finish(src, session) end)
     if not ok then return false, err end
-    -- ouvert à tous les joueurs : /signaler
-    return register('report', { TEXT }, limits.report, function(src, text) return reports.create(src, text) end)
+    -- ouvert à tous les joueurs : /signaler (1.10.0 : demande de nature « autre », comme celles de la bannière)
+    return register('report', { TEXT }, limits.report, function(src, text)
+        return reports.create(src, text, { kind = 'other' })
+    end)
 end

@@ -25,6 +25,9 @@ réglages dans config_client.lua »), mais il n'est plus au manifeste et n'est p
 | Notifications | 4,5 s à l'écran, 4 à la fois, 200 caractères au plus, natures `info`, `warning`, `danger` | `notifications` |
 | Barre de progression | une seule à la fois, de 250 ms à 120 s, libellé de 60 caractères au plus, indice « Peut être interrompue » | `progress` |
 | Menu pause, fondus | vérifiés toutes les 250 ms : jauges et barre masquées pendant ce temps | `pollMs` |
+| Bannière du royaume (1.6.0) | jauges et barre masquées pendant la bannière de `vava_pause` (jamais interrompues), notifications visibles | `pauseResource` |
+| Taille de l'interface (1.6.0) | réglage `ui.scale` de la bannière : 90 → 0,9, 100 → 1, 115 → 1,15 | `scales` |
+| Durée des notifications (1.6.0) | réglage `hud.notifyDuration` : courte × 0,6, normale × 1, longue × 1,6 | `notifyDurations` |
 | Bornes d'une jauge | 12 jauges, identifiant de 64 caractères, libellé de 32, icône de 200, ordre de 0 à 1 000 | `maxGauges`… |
 
 ## Pour les autres modules
@@ -32,6 +35,15 @@ réglages dans config_client.lua »), mais il n'est plus au manifeste et n'est p
 Exports client (`defineGauge`, `setGauge`, `setGaugeActive`, `removeGauge`, `notify`, `progress`, `cancelProgress`,
 `currentProgress`), hooks `vava_hud:progressDone` et `vava_hud:progressCancelled` : `docs/api.md`, section `vava_hud`.
 L'icône d'une jauge est une image `nui://<ressource>/<chemin>` citée dans les `files` de son module.
+
+## Bannière du royaume (1.6.0)
+
+`client/pause.lua` suit la bannière de `vava_pause` sans en dépendre : crochet client `vava_pause:state` (`{ open }`,
+remis à « repliée » à l'arrêt de `vava_pause`) ; réglages `ui.scale` et `hud.notifyDuration` lus par l'export client
+`setting` de `vava_pause` (isolé) au démarrage et quand `vava_pause` démarre, puis suivis par le crochet
+`vava_pause:settingChanged`. La page reçoit les valeurs effectives : `init` porte `settings = { scale, durationMs }`, puis
+un message `settings` (`{ scale, durationMs }`) à chaque changement seulement. Sans `vava_pause` : `{ scale = 1,
+durationMs = notifications.durationMs }`, comportement d'avant.
 
 ## Interface
 
@@ -47,6 +59,9 @@ n'est pas dans `files`). Paramètres : `?values=0.8,0.62,0.08,0.5` (santé, faim
 médaillon de la voix), `&progress=1` (barre de 8 s menée à son terme) ou `&progress=cancel` (interrompue à 60 %).
 
 ## À vérifier en jeu
+
+- Bannière (1.6.0) : HUD masqué dès qu'elle se déroule, rendu à sa fermeture et après `restart vava_pause` bannière
+  ouverte ; 115 % agrandit les médaillons aussitôt ; « Longue » laisse un message ≈ 7 s (`docs/tests/pause.md` § 6).
 
 - `docs/tests/interfaces.md` § Pilote : polices et grain servis par `nui://vava_ui/…` sans erreur CORS, allure
   identique à avant, aucune requête vers `dev/`.

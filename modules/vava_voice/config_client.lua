@@ -78,5 +78,9 @@ VavaVoice.config = {
         selectedAlpha = 120,
     },
 
+    -- Bannière du royaume (1.5.0) : réglage du joueur « Cercle de portée au sol » (voice.circle) lu chez elle ; sans
+    -- elle, le cercle se montre comme avant.
+    pauseResource = 'vava_pause',
+
     hud = { label = 'Voix', icon = 'nui://vava_voice/web/icons/voice.svg', order = 40 },
 }

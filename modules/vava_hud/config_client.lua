@@ -22,6 +22,14 @@ VavaHud.config = {
     -- Purement visuelle : le serveur reste maître du temps.
     progress = { minDurationMs = 250, maxDurationMs = 120000, maxLabelLength = 60, cancelHint = 'Peut être interrompue' },
 
+    -- Bannière du royaume (vava_pause, 1.6.0) : HUD masqué pendant qu'elle est déployée (jauges et barre de
+    -- progression masquées, jamais interrompues ; notifications visibles), et deux réglages du joueur lus chez elle :
+    -- taille de l'interface (choix 90, 100 ou 115 → échelle de la page) et durée des notifications (multiplicateur de
+    -- notifications.durationMs). Sans vava_pause : échelle 1, durée de base.
+    pauseResource = 'vava_pause',
+    scales = { [90] = 0.9, [100] = 1.0, [115] = 1.15 },
+    notifyDurations = { courte = 0.6, normale = 1.0, longue = 1.6 },
+
     -- Le jeu ne signale ni l'ouverture du menu pause, ni les fondus au noir, ni le retour de son interface :
     -- vérification à cet intervalle.
     pollMs = 250,

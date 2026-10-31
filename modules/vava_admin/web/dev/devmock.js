@@ -34,8 +34,11 @@ const DevMock = (() => {
     players: () => players,
     player: (args) => detail(args[0]),
     reports: () => [
-      { id: 12, source: 3, accountId: 7, author: 'Éloïse d\'Aubigné', message: 'Un joueur me bloque à la porte de l\'auberge depuis dix minutes.', ageMs: 240000, claimedBy: null },
-      { id: 11, source: 6, accountId: 12, author: 'Corwin le Roux', message: 'Je suis coincé sous le pont de la rivière.', ageMs: 1500000, claimedBy: 'Gardien Bertrand Dugarry' },
+      { id: 12, source: 3, accountId: 7, author: 'Éloïse d\'Aubigné', message: 'Un joueur me bloque à la porte de l\'auberge depuis dix minutes.', ageMs: 240000, claimedBy: null,
+        kind: 'player', position: { x: 214, y: -812, z: 31 }, witnesses: [{ accountId: 21, name: 'Mordred Vane' }, { accountId: 9, name: 'Ysolde Marchal' }] },
+      { id: 11, source: 6, accountId: 12, author: 'Corwin le Roux', message: 'Je suis coincé sous le pont de la rivière.', ageMs: 1500000, claimedBy: 'Gardien Bertrand Dugarry',
+        kind: 'bug', position: { x: -1032, y: 405, z: 12 }, witnesses: [] },
+      { id: 10, source: null, accountId: 30, author: 'Aude Ferrand', message: 'Comment rejoint-on la guilde des tisserands ?', ageMs: 3600000, claimedBy: null, kind: 'question', witnesses: [] },
     ],
     bans: () => [
       { id: 7, account_id: 21, target_label: 'Mordred Vane', reason: 'Triche (vol libre).', actor_label: 'Souverain Aldric Morvan', created: '25/10/2026 22:10', until: null },

@@ -6,6 +6,8 @@
            T-132 : les joueurs ne téléchargent que les constantes et config_client.lua (commandes, touches, outils du
            client, textes du client) ; config.lua (rangs, bans, journal, signalements, débits, textes du serveur) est
            servi au seul serveur.
+           Demandes au Conseil (1.10.0) : nature, position lue par le serveur, témoins d'un signalement de joueur,
+           demandes ouvertes par compte, exports submitRequest et requestOf pour la bannière de vava_pause.
     Dépendances : vAvA_core ≥ 0.5.0 ; vava_ui ≥ 1.0.0 (polices, grain, papier et coins du Registre, par
                   nui://vava_ui/…) ; facultatives : vava_health, vava_needs, vava_inventory (actions sur les joueurs),
                   vava_hud (notifications)
@@ -18,7 +20,7 @@ use_experimental_fxv2_oal 'yes'
 
 name 'vava_admin'
 description 'Administration vAvA (Registre du Conseil)'
-version '1.9.0'
+version '1.10.0'
 
 dependency 'vAvA_core'
 dependency 'vava_ui'
@@ -43,6 +45,7 @@ shared_scripts {
 
 server_scripts {
     'config.lua',                -- complète VavaAdmin.config : ce que lit le seul serveur
+    'shared/requests.lua',       -- 1.10.0 : logique pure des demandes, servie au seul serveur (tests/spec)
     'server/core.lua',
     'server/ranks.lua',
     'server/store.lua',

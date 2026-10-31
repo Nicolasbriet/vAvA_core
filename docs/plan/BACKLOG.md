@@ -775,7 +775,24 @@ versé à T-014 ; les autres points déjà couverts sont précisés dans T-012 �
   redéclarer au retour de `vava_skills`, comme `vava_provisions` le fait pour l'outre.
 
 ### T-145 — Menu pause `vava_pause` (la bannière)
-- Agents : vava-architecte → vava-dev-lua + vava-dev-nui · Dépend de : T-012 · Statut : à faire
+- Agents : vava-architecte → vava-dev-lua + vava-dev-nui (cette tâche autorise à toucher `vava_codex`, `vava_admin`,
+  `vava_hud`, `vava_voice` et `chancellerie/lib/resources.js`, dans les limites de la spec) · Dépend de : T-012 ·
+  Statut : à tester en jeu (relu sécurité, réseau et lore, suites appliquées)
+- Fait le 31 octobre 2026 (branches `agents/T-145` et `agents/T-145-nui`, fusionnées, puis `main` après T-142) :
+  `vava_pause` 1.0.0 (interception d'Échap et de P par la seule boucle par image permanente, blocage seul ; porte pure ;
+  une seule demande à l'ouverture ; bannière réduite à terre ; fenêtre de combat de 10 s par `vava_health:hit` ; demande
+  au Conseil ; quitter ; Codex en panneau ; carte et paramètres du jeu ; réglages du joueur en stockage local ; aucun
+  évènement serveur → client ; page ≈ 96 Ko), `vava_codex` 1.7.0 (`openDocked`, `closeDocked`, crochet
+  `vava_codex:closed`, mode panneau de la page), `vava_admin` 1.10.0 (natures, position lue par le serveur, témoins,
+  deux demandes ouvertes par compte, `submitRequest`, `requestOf`, Registre), `vava_hud` 1.6.0 (masqué pendant la
+  bannière, taille et durée des notifications), `vava_voice` 1.5.0 (cercle de portée réglable) ; ordre de démarrage
+  (README, Chancellerie). Rapports `docs/plan/rapports/T-145.md` (Lua) et `docs/plan/rapports/T-145-nui.md` (page).
+  **À tester en jeu** : `docs/tests/pause.md`, en priorité menu de GTA jamais visible et resmon au repos (1-1, 1-6),
+  délai de grâce (1-5), refus en combat et bannière réduite à terre (2-1, 2-2), Codex en panneau (4-1 à 4-4), menus
+  natifs (5-1 à 5-3), signalement à trois joueurs (7-6), quitter le jeu (8-3).
+- Spec : `docs/plan/specs/T-145.md`, avec les décisions du porteur du projet du 31 octobre 2026 (bannière réduite à
+  terre : Paramètres du jeu et Quitter ; auteur d'un signalement visible du Conseil, jamais du joueur signalé ;
+  fenêtre de combat de 10 s).
 - Référence visuelle : canevas « Menu pause d'Eldoria », section « La bannière, version finale avec le thème du
   serveur » (écrans Personnage, Réglages, Le Conseil, Quitter : `docs/maquettes/menu-pause/HD_*.dc.html`) ; écrans
   B1 Codex, B2 Carte et B6 bannière de confrérie (`Codex.dc.html`, `Carte.dc.html`, `Confrerie.dc.html`) pour ce qui
@@ -896,6 +913,11 @@ maquettes.
   tenue (PLACEHOLDER). Côté joueurs : recruter, promouvoir, renvoyer, quitter ; registre des membres ; coffre
   journalisé. Droits fournis par les autres modules au registre (`lier`, `fouiller`, `cachot`, `coffre`…) pour que
   la grille s'enrichisse sans toucher à `vava_guilds`.
+- Bannière du royaume (T-145) : export serveur `bannerOf(source)` → `nil` ou `{ label (≤ 48 o), short (≤ 16 o), grade?
+  (≤ 32 o), cloth, clothDark, field ('#rrggbb'), charge (≤ 24 o) }` (`docs/api.md`, § `vava_pause`). Relecture lore de
+  T-145 : le pied « Bannière des <label> » casse avec un article ou « Confrérie… » ; le module fournit la **tournure
+  complète** du pied de bannière (« Bannière de la Garde ») dans un champ ajouté au contrat, revalidé par
+  `vava_pause` (`shared/snapshot.lua`) et lu par la page (`guildFoot`).
 - Critères : créer la Garde et les Guérisseurs en jeu, recruter un second joueur, vérifier qu'un droit décoché est
   refusé par le serveur même en appelant le RPC directement.
 

@@ -67,6 +67,11 @@ const STRINGS = Object.freeze({
     open: 'En attente',
     gone: 'Le joueur a quitté le royaume.',
     claim: 'Prendre en charge', close: 'Clore', reach: 'Rejoindre', player: 'Voir la fiche',
+    // nature de la demande (1.10.0) : bannière du royaume ; /signaler arrive en « Autre »
+    kinds: { question: 'Question', player: 'Signalement', bug: 'Bug', other: 'Autre' },
+    position: (p) => `Position jointe : ${p.x}, ${p.y}, ${p.z}`,
+    witnesses: (names) => `Témoins à proximité : ${names.join(', ')}`,
+    noWitnesses: 'Aucun témoin à proximité.',
   },
   bans: {
     heading: 'Bans en cours',

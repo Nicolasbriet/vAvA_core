@@ -62,6 +62,7 @@ dans `config.lua` et `config_client.lua` d'après les nouveaux fichiers.
 | Limite de portée | redemandée à l'apparition et au redémarrage du module : 5 essais à 2 s d'écart si le serveur n'est pas prêt | `client.syncTries`, `client.syncRetryMs` |
 | Zones connues d'un joueur | celles dont il est à moins de rayon + 40 m (envoyées par le core, 1.3.0) ; oubliées au-delà de 25 m de plus | `zones.subscribeMargin` (et `zones.exitMargin` du core) |
 | Cercle au sol | 1,5 s, s'efface sur les 0,6 dernières, couleur laiton | `ring` |
+| Cercle au sol, réglage du joueur (1.5.0) | « Cercle de portée au sol » de la bannière du royaume (`voice.circle`, gardé sur sa machine) : désactivé, la portée change sans cercle ; sans `vava_pause`, toujours montré | `pauseResource` |
 | Zones de voix | 200 au plus ; nom de 40 signes ; rayon 2 à 60 m (10 par défaut), hauteur 2 à 30 m (6), par pas de 0,5 ; effet ×0,5, ×0,75, ×1, ×1,5, ×2 (défaut) ou ×3 | `zones` |
 | Droits | `tools` pour créer, régler, supprimer ; `teleport` pour « S'y rendre » | `zones.permission`, `zones.teleportPermission` |
 | Débits | limite de portée : 3 puis 1 toutes les 5 s ; éditeur : 5 puis 1 par seconde ; actions : 10 puis 1 par seconde | `rateLimits` |
@@ -71,7 +72,7 @@ dans `config.lua` et `config_client.lua` d'après les nouveaux fichiers.
 
 - **Portée** : la touche passe à la suivante, puis revient à Chuchoter ; le choix est gardé sur sa machine. Le
   médaillon « Voix » se remplit d'un quart par portée et s'illumine quand il parle ; le cercle au sol montre la distance
-  pendant 1,5 s, au seul appui sur la touche, vu de lui seul.
+  pendant 1,5 s, au seul appui sur la touche, vu de lui seul ; il le retire dans la bannière (Réglages → Voix, 1.5.0).
 - **Hors du jeu** (connexion, sélection du personnage) : micro coupé par le serveur (`MumbleSetPlayerMuted`) et joueur
   au salon racine, sans personne à qui parler. Le micro s'ouvre à l'apparition confirmée du personnage.
 - **À terre** (`vava_health`) : Chuchoter et Parler seulement. Relu à chaque apparition (reconnecté à terre : toujours
@@ -175,3 +176,5 @@ Procédure complète : `docs/tests/voix.md`. À regarder en premier :
 5. Les zones après un `restart` (voix 8-1).
 6. 1.3.0 : zones reçues à l'approche seulement, changées sans reconnexion, oubliées en s'éloignant (zones 2-1 à 2-10) ;
    éditeur qui suit les changements d'un autre membre (zones 4-1 à 4-3).
+7. 1.5.0 : réglage « Cercle de portée au sol » désactivé dans la bannière → aucun cercle au changement de portée ; réactivé
+   ou `vava_pause` arrêté → le cercle revient (pause 6-3).

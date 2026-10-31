@@ -123,6 +123,33 @@ rien ne trahit l'existence d'une page réservée. `reading.enabled = false` ferm
 Plus tard (T-101 et suivantes), l'Atelier éditera chapitres et pages : `content/*.lua` sera la graine importée, la
 validation et les codes d'erreur sont déjà ceux de `shared/pages.lua` et `reading.errors`.
 
+## Le Codex en panneau (1.7.0)
+
+La bannière du royaume (`vava_pause`, menu pause) ouvre le Codex **dans son panneau**, à droite de ses rubriques, sans
+copie du livre : c'est toujours la page de `vava_codex` qui le dessine, dans un rectangle donné par l'hôte, sans voile.
+
+| Export client | Retour |
+| --- | --- |
+| `openDocked(chapitre\|nil, { left, top, width, height })` | `true` (ouverture lancée) ou `false, code` : `not_allowed` (appelant autre que `docked.host`), `invalid_chapter` (même motif qu'`openAt`), `invalid_rect`, `no_character`, `busy` (livre ouvert ou en cours d'ouverture, menu de GTA ouvert) |
+| `closeDocked()` | `true`, ou `false, 'not_allowed'` — referme le livre s'il est en panneau, ou annule son ouverture en cours |
+
+- Rectangle en pourcentages de l'écran (`vw`, `vh`), validé par `shared/dock.lua` (pur) : nombres finis, bord gauche
+  et haut ≥ 0, largeur et hauteur ≥ 10, rien au-delà de 100 ; aucun autre champ.
+- Même chemin que `F1` (RPC `vava_codex:open`, empreintes, préférences) ; le message `open` de la page porte `dock`
+  (le rectangle) en plus. `openDocked` ne se refuse pas parce qu'une interface a le focus : l'hôte le rend juste avant.
+- Crochet client **`vava_codex:closed`** (`after`, `{ docked, reason }`) à chaque fermeture du livre, en panneau ou
+  non, échec de l'ouverture compris : `reason` = `close` (Échap, `closeDocked`, `F1`), `run` (une commande lancée a
+  fermé le livre : l'hôte se ferme aussi, la commande ouvre peut-être une interface), `failed` (réponse du serveur
+  absente ou refusée ; en panneau, aucune notification : l'hôte dit que le Codex est fermé), `unloaded`, `stopped`.
+- Arrêt de l'hôte livre en panneau ouvert : le livre se referme, souris et clavier rendus au jeu.
+
+| Réglage | Défaut | Rôle |
+| --- | --- | --- |
+| `docked.host` | `'vava_pause'` | seule ressource qui peut ouvrir ou fermer le livre en panneau |
+
+Rien ne change sur le réseau (le rectangle ne quitte pas le client). Page : classe `is-docked`, livre placé par
+`--dock-left/top/width/height`, barre d'aide masquée ; hors jeu, `web/index.html?dock=1`.
+
 ## Prérequis
 
 `vAvA_core` ≥ 0.7.0 et `vava_ui` ≥ 1.0.0 (polices, grain et ornements du livre, par `nui://vava_ui/…` ; déclaré en
@@ -149,13 +176,14 @@ fichier reste sans effet. Reportez vos réglages dans `config.lua` et `config_cl
 | `server/catalog.lua` | entrées visibles d'un joueur, chapitres, non décrites, valeurs d'un argument |
 | `shared/prefs.lua` | logique pure : préférences ramenées aux maximums de la config (testée : `tests/spec/codex_prefs_spec.lua`) |
 | `shared/fingerprint.lua` | logique pure : empreinte d'une valeur (version du contenu et des préférences), réponse à l'ouverture (testée : `tests/spec/codex_fingerprint_spec.lua`) |
+| `shared/dock.lua` | logique pure, lue par le client : rectangle du livre en panneau (1.7.0 ; testée : `tests/spec/codex_dock_spec.lua`) |
 | `shared/pages.lua` | logique pure : analyse d'un corps de page en blocs, validation des chapitres et des pages, construction (liens, tri, empreinte, poids), références citées (testée : `tests/spec/codex_pages_spec.lua`) |
 | `content/*.lua` | pages de lecture : graine et chapitres (`chapters.lua`), pages de chaque chapitre ; serveur seul |
 | `server/reading.lua` | chargement des pages, index visible d'un joueur, page demandée (droits revérifiés), commande `vava_codex_pages` (testé : `tests/spec/codex_reading_spec.lua`) |
 | `server/prefs.lua` | champ de personnage : signets, dernières pages, réglage |
 | `server/main.lua` | déclaration du module, RPC |
 | `client/keys.lua` | touche réellement liée par le joueur (lue dans le jeu) |
-| `client/main.lua` | ouverture, relais des gestes, lancement par `ExecuteCommand`, exports `noteCommand` et `openAt` |
+| `client/main.lua` | ouverture, relais des gestes, lancement par `ExecuteCommand`, exports `noteCommand`, `openAt`, `openDocked` et `closeDocked`, crochet `vava_codex:closed` |
 | `web/` | le livre : `index.html` s'ouvre dans un navigateur depuis le dépôt (`?staff=0` : vue d'un simple joueur ; `?focus=<chapitre>` : ouverture par `openAt`, par exemple `?focus=vava_gathering` ; option `--allow-file-access-from-files` pour les polices), avec les données simulées de `web/dev/devmock.js` (jamais livré) |
 
 ## Tests en jeu
@@ -199,8 +227,11 @@ fichier reste sans effet. Reportez vos réglages dans `config.lua` et `config_cl
     (onze pages en simple joueur, douze au Conseil avec le sceau sur « Siéger au Conseil ») ; liens, cabochons des
     touches du joueur, commandes qui ouvrent leur ligne ; nouveau personnage : le livre s'ouvre sur « Vivre à
     Eldoria ». Procédure complète : `docs/tests/codex.md` § 16.
+15. Codex en panneau (1.7.0) : bannière (`Échap`) → Codex : le livre s'ouvre à droite de la bannière, sans voile ;
+    recherche, chapitres et lecture fonctionnent ; `Échap` jusqu'à fermer le livre rend la main à la bannière ; une
+    commande qui ouvre une interface ferme livre et bannière. Procédure complète : `docs/tests/pause.md` § 4.
 
-Hors jeu : `tests/spec/codex_prefs_spec.lua`, `codex_fingerprint_spec.lua`, `codex_pages_spec.lua` (format, bornes,
+Hors jeu : `tests/spec/codex_prefs_spec.lua`, `codex_dock_spec.lua`, `codex_fingerprint_spec.lua`, `codex_pages_spec.lua` (format, bornes,
 graine du dépôt : aucune page refusée, touches et commandes citées connues, aucun mot moderne, poids réseau),
 `codex_reading_spec.lua` (chargement, index selon les droits, page demandée, console) ; essais de la page :
 `web/dev/essais.js` (node).
@@ -210,5 +241,7 @@ graine du dépôt : aucune page refusée, touches et commandes citées connues, 
 - Lisibilité d'une page longue dans CEF (défilement de la page de droite, police, liens au survol).
 - Cabochon d'une touche de souris (`[[touche:vava_magic_viser]]`) : nom montré par `GetControlInstructionalButton`
   (sinon `keyDisplay`).
+- Codex en panneau (1.7.0) : focus rendu par la bannière puis pris par le livre sans image où ni l'un ni l'autre n'a la
+  main ; ordre des deux pages à l'écran (le rectangle ne recouvre ni la bannière ni sa plaque).
 - Première ouverture d'un joueur en latent (≈ 10 Ko avec les textes définitifs) : aucune attente visible à l'arrivée
   d'un nouveau venu.

@@ -17,7 +17,7 @@ const MAX_DEPTH = 4;
 const KNOWN_ORDER = ['chat', 'sessionmanager', 'hardcap', 'oxmysql', 'vAvA_core', 'vava_ui', 'vava_loading', 'vava_chat', 'vava_world',
   'vava_time', 'vava_appearance', 'vava_characters_ui', 'vava_hud', 'vava_inventory', 'vava_needs', 'vava_health', 'vava_admin',
   'vava_atelier', 'vava_voice', 'vava_cameras', 'vava_magic', 'vava_skills', 'vava_gathering', 'vava_crafting', 'vava_farming',
-  'vava_provisions', 'vava_codex', 'vava_arrival', 'vava_chancellerie'];
+  'vava_provisions', 'vava_codex', 'vava_pause', 'vava_arrival', 'vava_chancellerie'];
 const CORE_DESCRIPTIONS = {
   vAvA_core: 'Le cœur du serveur (obligatoire)',
   oxmysql: 'Accès à la base de données (obligatoire)',
@@ -43,6 +43,7 @@ const CORE_DESCRIPTIONS = {
   vava_farming: 'Agriculture : parcelles, croissance par dates, humidité et fertilité, qualité, grenier commun',
   vava_provisions: 'Vivres : points d\'eau (puits, fontaines, sources), outres, eau potable',
   vava_codex: 'Codex : toutes les commandes et touches du serveur, classées, cherchées, composées et lancées (F1)',
+  vava_pause: 'Bannière du royaume : menu pause d\'Eldoria (Échap) — personnage, Codex, réglages, Conseil, quitter',
   vava_arrival: 'Arrivée des nouveaux personnages : dotation de départ unique, mot d\'accueil, Codex aux premiers pas, /accueil',
   vava_chancellerie: 'Pont de la Chancellerie (administration du royaume depuis le web)',
   // outils de développement ([vava-dev]) : à n'activer que sur un serveur de test

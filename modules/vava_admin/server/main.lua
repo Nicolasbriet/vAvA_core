@@ -6,7 +6,7 @@
     Dépendances : tous les fichiers server/ du module
 ]]
 
-local tostring = tostring
+local tostring, type = tostring, type
 local CreateThread, AddEventHandler = CreateThread, AddEventHandler
 
 local core = VavaAdmin.core
@@ -40,6 +40,12 @@ local function setup()
         core.log.warn('config.lua garde la forme d\'avant 1.9.0 (il remplace la table de config_client.lua) : les '
             .. 'réglages lus par les joueurs sont dans config_client.lua ; reportez vos changements d\'après '
             .. 'config.lua.nouveau')
+    end
+    -- 1.10.0 : un config.lua d'avant (gardé par une mise à jour) n'a pas `requests` : /signaler fonctionne, la bannière
+    -- ne peut pas écrire au Conseil
+    if type(cfg.requests) ~= 'table' then
+        core.log.warn('config.lua sans « requests » (d\'avant 1.10.0) : la bannière ne peut pas écrire au Conseil ; '
+            .. 'reportez « requests » et « messages.requestNew » d\'après config.lua.nouveau')
     end
     local declared, declareErr = VavaAdmin.commands.declare()
     if not declared then return false, 'commandes : ' .. tostring(declareErr) end

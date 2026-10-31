@@ -18,6 +18,9 @@
   --ring-critical: #c4503a;
   --size: clamp(2.6rem, 2.6vw, 3.4rem);
   --ease: cubic-bezier(0.2, 0.7, 0.2, 1);
+  /* « Taille de l'interface » de la bannière (vava_pause) : jauges, notifications et progression grandies par transform,
+     chacune depuis son coin d'écran */
+  --hud-scale: 1;
 }
 
 * { box-sizing: border-box; }
@@ -38,6 +41,8 @@ body.dev { background: radial-gradient(ellipse at 40% 60%, #5a6b4c 0%, #2c3829 5
   gap: 0.55rem;
   opacity: 0;
   pointer-events: none;
+  transform: scale(var(--hud-scale));
+  transform-origin: left bottom;
   transition: opacity 250ms var(--ease);
 }
 .hud.is-visible { opacity: 1; }
@@ -130,6 +135,8 @@ body.dev { background: radial-gradient(ellipse at 40% 60%, #5a6b4c 0%, #2c3829 5
   gap: 0.5rem;
   width: min(24rem, 40vw);
   pointer-events: none;
+  transform: scale(var(--hud-scale));
+  transform-origin: right top;
 }
 
 .toast {
@@ -187,7 +194,8 @@ body.dev { background: radial-gradient(ellipse at 40% 60%, #5a6b4c 0%, #2c3829 5
   text-shadow: 0 1px 1px rgba(0, 0, 0, 0.6);
   opacity: 0;
   pointer-events: none;
-  transform: translateX(-50%);
+  transform: translateX(-50%) scale(var(--hud-scale));
+  transform-origin: 50% 100%;
   transition: opacity 220ms var(--ease);
 }
 .progress.is-shown.is-visible { opacity: 1; }

@@ -5,7 +5,8 @@
  *        (empilées, retirées après leur durée ou quand elles sont trop nombreuses) et barre de progression d'une action
  *        longue (une seule : avance par une transition CSS sur la durée restante, aucune boucle par image ; fin ou
  *        interruption annoncée par le jeu). Chaque jauge garde son élément ; une mise à jour ne touche que la jauge
- *        concernée.
+ *        concernée. Réglages de la bannière (vava_pause, 1.6.0) : message `settings` { scale, durationMs } (aussi dans
+ *        `init.settings`) : échelle du HUD par transform (--hud-scale), durée des notifications ; valeurs bornées ici.
  */
 
 (() => {
@@ -145,9 +146,18 @@
     order();
   }
 
+  // réglages de la bannière : échelle de 0,5 à 2, durée d'une notification de 0,5 à 60 s ; une valeur hors bornes est
+  // ignorée (la précédente reste)
+  const finite = (value) => typeof value === 'number' && Number.isFinite(value);
+  function settings({ scale, durationMs } = {}) {
+    if (finite(scale) && scale >= 0.5 && scale <= 2) document.documentElement.style.setProperty('--hud-scale', String(scale));
+    if (finite(durationMs) && durationMs >= 500 && durationMs <= 60000) toastRules.durationMs = Math.round(durationMs);
+  }
+
   const handlers = {
-    init({ position = {}, gauges = [], visible = false, notifications, progress = null }) {
+    init({ position = {}, gauges = [], visible = false, notifications, progress = null, settings: tuned = null }) {
       if (notifications) toastRules = { durationMs: notifications.durationMs, maxVisible: notifications.maxVisible };
+      if (tuned && typeof tuned === 'object') settings(tuned);
       if (position.left) root.style.setProperty('--left', position.left);
       if (position.bottom) root.style.setProperty('--bottom', position.bottom);
       entries.clear();
@@ -183,6 +193,7 @@
     notify,
     progress: progressStart,
     progressEnd,
+    settings,
   };
 
   window.addEventListener('message', (event) => {

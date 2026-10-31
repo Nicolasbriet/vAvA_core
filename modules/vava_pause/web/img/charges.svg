@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 124">
+  <!-- Meubles du blason de la bannière, posés sur l'écu (100 × 124). Une vue par meuble : img/charges.svg#croix.
+       Un meuble nouveau se place à droite (x + 100) avec sa propre vue ; la page n'accepte que les identifiants connus. -->
+  <view id="croix" viewBox="0 0 100 124"/>
+  <g fill="none" stroke="#e9d3a2" stroke-linecap="round">
+    <path d="M50 26V43.5M50 64.5V94M24 54H39.5M60.5 54H76" stroke-width="6"/>
+    <circle cx="50" cy="54" r="9" stroke-width="3"/>
+  </g>
+</svg>

@@ -5,7 +5,8 @@
 local ROOT = (os.getenv('VAVA_ROOT') or '.') .. '/'
 
 -- Pages basculées sur vava_ui, avec le nom de leur feuille : les 15 interfaces depuis la fin de T-012, puis l'Atelier
--- (T-100). Toute nouvelle ressource à page s'ajoute ici ; seule l'exception de vava_loading (T-020) reste à part.
+-- (T-100) et la bannière (T-145). Toute nouvelle ressource à page s'ajoute ici ; seule l'exception de vava_loading
+-- (T-020) reste à part.
 local PAGES = {
     { module = 'vava_hud', sheet = 'style.css' },
     { module = 'vava_health', sheet = 'style.css' },
@@ -23,6 +24,7 @@ local PAGES = {
     { module = 'vava_admin', sheet = 'style.css' },
     { module = 'vava_magic', sheet = 'style.css' },
     { module = 'vava_atelier', sheet = 'style.css' },
+    { module = 'vava_pause', sheet = 'pause.css' },
 }
 
 local COMMON = {
@@ -214,13 +216,26 @@ for _, page in ipairs(PAGES) do
 
         it('prend polices et images dans vava_ui, toujours avec un repli', function()
             assert.is_nil(find(css, '@font-face'))
-            for _, name in ipairs({ 'grain.png', 'paper.png', 'frame.svg', 'divider.svg', 'diamond.svg' }) do
+            for _, name in ipairs({ 'grain.png', 'paper.png', 'grain.webp', 'paper.webp', 'frame.svg', 'divider.svg',
+                'diamond.svg' }) do
                 assert.is_nil(find(css, name), name)
             end
+            -- chaque occurrence d'un jeton (relecture sécurité S-6 de T-145) : jeton d'image, repli `none` (README de
+            -- vava_ui) ; autre jeton (encres, filets, polices, T-145), un repli écrit, jamais vide, sans `url(` (une
+            -- image ne se glisse pas par le repli d'une couleur) ; aucun jeton sans repli (boucle suivante)
+            local IMAGES = { ['--ui-grain'] = true, ['--ui-paper'] = true, ['--ui-frame'] = true, ['--ui-divider'] = true,
+                ['--ui-diamond'] = true }
             local uses = 0
-            for token in css:gmatch('var%((%-%-ui%-[%w-]+)') do
+            for token, after in css:gmatch('var%((%-%-ui%-[%w-]+)()') do
                 uses = uses + 1
-                assert.truthy(css:find('var%(' .. token:gsub('%-', '%%-') .. ',%s*none%)'), token)
+                local rest = css:sub(after, after + 300)
+                if IMAGES[token] then
+                    assert.truthy(rest:match('^%s*,%s*none%s*%)'), token)
+                else
+                    assert.truthy(rest:match('^%s*,%s*[^%s%)]'), token)
+                    local fallback = rest:match('^%s*,([^;{}]*)') or ''
+                    assert.is_nil(fallback:find('url%('), token .. ' : url( dans un repli qui n\'est pas une image')
+                end
             end
             for _ in css:gmatch('var%(%-%-ui%-[%w-]+%)') do
                 error('jeton --ui- employé sans repli')
