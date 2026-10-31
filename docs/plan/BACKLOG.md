@@ -918,8 +918,8 @@ versé à T-014 ; les autres points déjà couverts sont précisés dans T-012 �
   priorité (ordre, fondu sans écran vide, image renommée sautée, `basse` sans dérive), puis 2-1, 2-2, 5-5, 5-6.
   Relecture réseau et performance : OK ; suites R-2 (dossier des ambiances égal à `ambiances.order`), R-3 (dérive
   mesurée seule, test 5-5) et R-4 (test 5-6 cache vidé) appliquées ; R-1 (poids des images, ≈ 40 % de plus au
-  premier téléchargement d'un nouveau joueur) laissé à la décision du porteur du projet avant le premier
-  déploiement ; R-5 → T-153.
+  premier téléchargement d'un nouveau joueur) : images gardées telles quelles, décision du porteur du projet
+  (31 octobre 2026) ; R-5 → T-153.
 - Demande du porteur du projet (31 octobre 2026) : sept peintures de la même vue d'Eldoria sous des ambiances
   différentes (aube, brume du matin, hiver, crépuscule, nuit étoilée, brume de nuit, orage), fournies en PNG
   1672 × 941, converties en WebP 1600 × 900 qualité 50 (1 181 Ko pour les sept) dans
