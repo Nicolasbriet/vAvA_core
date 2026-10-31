@@ -669,7 +669,11 @@ maquettes.
   écran ; relectures sécurité et réseau OK.
 
 ### T-101 — Définitions : stockage, versions, cycle de vie
-- Agents : vava-architecte → vava-dev-lua · Dépend de : T-100, T-014 · Statut : à faire
+- Agents : vava-architecte → vava-dev-lua · Dépend de : T-100, T-014 · Statut : en cours
+- **En cours (31 octobre 2026, interrompu)** : branche `agents/T-101`. Code, page et tests faits ; relectures sécurité
+  et réseau À CORRIGER, lore OK. Page allégée et textes du gardien commités ; suites Lua des relectures en partie
+  faites dans le dernier commit « EN COURS » (voir son message pour ce qui reste). Ensuite : fusion, puis T-132 en
+  priorité (la relecture réseau la demande), puis T-102.
 - Table `vava_atelier_definitions` (une ligne par version), statuts brouillon / essai / publié / archivé, import
   de la config comme version 1 au premier démarrage (la base fait foi ensuite), réimport explicite par commande,
   retour à une version, export et import JSON, rechargement à chaud chez le module (`apply`), diffusion aux joueurs
@@ -746,7 +750,9 @@ faire tout le système de combat ») : la porte T-119 reste à passer en jeu.
 - Critères : tests unitaires de l'ordre des modificateurs ; aucun dégât entre joueurs possible hors de la chaîne.
 
 ### T-111 — Armes de corps à corps
-- Agent : vava-dev-lua · Dépend de : T-110 · Statut : à faire
+- Agent : vava-dev-lua · Dépend de : T-110 · Statut : en cours
+- **En cours (31 octobre 2026, interrompu)** : branche `agents/T-111`. Spec `docs/plan/specs/T-111.md` commitée
+  (16 décisions retenues) ; cinq icônes d'armes faites, bouclier et tout le Lua restent à faire.
 - Objets armes (catégories, dégâts de base, qualité de forge, usure), correspondance vers modèles vanilla
   (PLACEHOLDER), bouclier accroché, contrôles natifs du corps à corps et armes à feu coupés. Recettes de forge
   ajoutées à `vava_crafting`.
@@ -771,7 +777,10 @@ faire tout le système de combat ») : la porte T-119 reste à passer en jeu.
   mentorat du maître d'armes ; techniques de hache, masse, dague, bâton et bouclier en config.
 
 ### T-116 — La magie sur la chaîne de dégâts
-- Agent : vava-dev-lua · Dépend de : T-110 · Statut : à faire
+- Agent : vava-dev-lua · Dépend de : T-110 · Statut : en cours
+- **En cours (31 octobre 2026, interrompu)** : branche `agents/T-116`. Dégâts des sorts par `hit`, protections en
+  modificateurs, tests faits ; reste la procédure magie § 18, la vérification « mêmes dégâts », le rapport, les relectures.
+  Spec T-111 (point 1) : exiger les mains vides pour incanter (`exports.vava_combat:armed()`), ici ou après T-111.
 - Les dégâts de `vava_magic` passent par `hit` ; les boucliers et résistances deviennent des modificateurs ; même
   comportement en jeu pour les 11 sorts.
 - Relecture sécurité de T-110 : `vava_magic` juge encore la blessure sur la vie du ped (`server/world.lua:43-47`,
