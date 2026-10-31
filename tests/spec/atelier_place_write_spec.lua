@@ -120,6 +120,35 @@ describe('vava_atelier écriture d’une pose', function()
         assert.equal(1, result.head.draft.rev)
     end)
 
+    -- contre-relecture C-3 : écrit en base, la ligne du parent part même si une relecture échoue ensuite
+    it('relecture du parent impossible après la transaction : ligne `saved` du parent écrite quand même', function()
+        local draftRow = VavaAtelier.store.draftRow
+        VavaAtelier.store.draftRow = function(_, kindId, id)
+            if kindId == 'zone' then return nil, 'db_error' end
+            return draftRow(_, kindId, id)
+        end
+        assert.same({ false, 'db_error' }, { cycle.place(ctx, newChild()) })
+        assert.equal(1, #transactions)
+        assert.equal(1, #journal)
+        assert.same({ 'zone', 'saved' }, { journal[1].kind, journal[1].action })
+        assert.equal(1, #synced)
+    end)
+
+    it('ligne relue d’un autre brouillon que celui de la tête : stale (contre-relecture C-3)', function()
+        local point = index.ensure(EDITOR, 'node', 'bois_chene_1')
+        point.title, point.draft = 'Chêne 1', { row = 50, rev = 2, status = 'draft', holder = ACCOUNT, removal = false,
+            parent = 'bois' }
+        index.touch(EDITOR, point)
+        rows[50] = { id = 50, decoded = { nom = 'Chêne 1', ressource = 'chene', charges = 3, repousse = 600 },
+            where = { x = 110.0, y = 100.0, z = 30.0, h = 0.0 }, parent = 'bois' }
+        draftRows['node|bois_chene_1'] = { id = 51, rev = 3 }
+        local req = { kind = kinds.node, head = point, id = 'bois_chene_1', rev = 2,
+            where = { x = 113.0, y = 100.0, z = 30.0, h = 0.0 }, parentId = 'bois',
+            parentHead = index.get(EDITOR, 'zone', 'bois') }
+        assert.same({ false, 'stale' }, { cycle.place(ctx, req) })
+        assert.equal(1, #synced)
+    end)
+
     it('atelier changé pendant la pose : rien n’est écrit (syncing)', function()
         VavaAtelier.editors.swap({ id = EDITOR })
         assert.same({ false, 'syncing' }, { cycle.place(ctx, newChild()) })

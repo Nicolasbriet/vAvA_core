@@ -1494,6 +1494,10 @@ local function placeLocked(ctx, req, head, plan, token, keys)
             update and store.updateDraftStep(head.draft.row, req.rev, d) or store.insertDraftStep(d) }
         local written, dbErr = transaction(ctx, token, steps)
         if not written then return false, dbErr end
+        -- écrit en base : la ligne `saved` du brouillon du parent part tout de suite, avant toute relecture qui pourrait
+        -- échouer (relecture sécurité S-2, contre-relecture C-3)
+        record(ctx, { editor = editor.id, kind = parentHead.kind, id = parentHead.id, action = 'saved',
+            title = parentRow.title, version = parentHead.published.version })
         local readErr
         parentRowId, readErr = draftRowId(editor.id, parentHead.kind, parentHead.id)
         if not parentRowId then
@@ -1503,7 +1507,7 @@ local function placeLocked(ctx, req, head, plan, token, keys)
         if update then
             -- un UPDATE … WHERE rev = ? d'une transaction ne dit pas s'il a touché la ligne : la révision est relue
             local row, rowErr = store.draftRow(editor.id, kindId, entryId)
-            if rowErr or not row or index.toInt(row.rev) ~= req.rev + 1 then
+            if rowErr or not row or index.toInt(row.id) ~= head.draft.row or index.toInt(row.rev) ~= req.rev + 1 then
                 resync(ctx, keys)
                 return false, rowErr or 'stale'
             end
@@ -1531,12 +1535,6 @@ local function placeLocked(ctx, req, head, plan, token, keys)
         end
     end
     -- écrit en base : au journal même si l'atelier a changé entre-temps (§ 7.5 : un enfant posé n'a pas de ligne)
-    -- brouillon du parent copié de sa publiée : sa ligne `saved`, comme le premier brouillon de T-101 (relecture
-    -- sécurité S-2)
-    if parentRow then
-        record(ctx, { editor = editor.id, kind = parentHead.kind, id = parentHead.id, action = 'saved',
-            title = parentRow.title, version = parentHead.published.version })
-    end
     if plan.entry == 'insert' and not kind.def.parent then
         record(ctx, { editor = editor.id, kind = kindId, id = entryId, action = 'created', title = d.title })
     elseif plan.entry == 'copy' then

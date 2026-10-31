@@ -307,7 +307,7 @@ function placement.place(ctx, id, rev, where, parentArg, values)
         end
     end
     -- lieux du parent et des frères (règles déclarées, titre d'un enfant nouveau)
-    local parentInfo, siblings, titles = nil, {}, {}
+    local parentInfo, parentData, siblings, titles = nil, nil, {}, {}
     if childOf and parentId then
         local rows, rowsErr = childRows(editor, parentId, { kindId }, ctx.accountId)
         if not rows then return false, rowsErr end
@@ -315,6 +315,7 @@ function placement.place(ctx, id, rev, where, parentArg, values)
         if parentHead and index.alive(parentHead) then
             local parentKind = editor.kinds[childOf]
             local parentEntry = readEntry(editor, parentKind, parentHead, ctx.accountId, false)
+            parentData = parentEntry and parentEntry.data or nil
             if parentEntry and parentEntry.place then
                 parentInfo = { title = parentHead.title, shape = parentKind.def.placement, place = parentEntry.place }
             end
@@ -348,6 +349,7 @@ function placement.place(ctx, id, rev, where, parentArg, values)
     end
     local allowed, why = calls.placeCheck(editor, kindId, clean, {
         source = ctx.source, accountId = ctx.accountId, id = id, parent = parentId, data = data, siblings = count + 1,
+        parentData = parentData,
     })
     if not allowed then return refusedPlace(why) end
     -- 8. et 11. tenant, révision, écriture

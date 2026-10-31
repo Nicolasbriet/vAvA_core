@@ -270,7 +270,9 @@ describe('vava_atelier placement côté serveur', function()
             assert.equal('3 récoltes', answer.row.hint)
             assert.same({ model = 'prop_tree_oak_01', label = 'chêne de GTA', provisional = true }, answer.row.look)
             assert.equal('bois', answer.parent.id)
-            -- placeCheck voit l'enfant tel qu'il serait : nouveau, ses frères comptés avec lui
+            -- placeCheck voit l'enfant tel qu'il serait : nouveau, ses frères comptés avec lui ; et la data de la zone telle
+            -- que le membre la voit (contre-relecture C-4)
+            assert.equal('foret', checked[1].ctx.parentData.genre)
             assert.equal('', checked[1].ctx.id)
             assert.equal(3, checked[1].ctx.siblings)
             assert.equal('chene', checked[1].ctx.data.ressource)
