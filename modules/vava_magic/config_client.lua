@@ -89,7 +89,7 @@ VavaMagic.config = {
         maxDistance = 150.0,     -- au-delà : rien n'est dessiné
         maxLights = 24,          -- lumières dynamiques dessinées par image
         maxLooped = 40,          -- particules en boucle actives en même temps
-        assetLoadMs = 3000,      -- attente du chargement d'un lot de particules
+        assetLoadMs = 3000,      -- attente du chargement d'un lot de particules ou d'une animation
         releaseMs = 60000,       -- un lot inutilisé depuis ce délai est libéré
         -- traces temporaires au sol, vues de chaque client : sol noirci après le feu (mur, nova), fissure après la
         -- secousse ; disques sombres qui s'effacent en fondu (ms = 0 : aucune)

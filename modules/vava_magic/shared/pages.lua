@@ -7,7 +7,7 @@
 ]]
 
 local type, tonumber, tostring = type, tonumber, tostring
-local tointeger, floor = math.tointeger, math.floor
+local tointeger, floor, mathType = math.tointeger, math.floor, math.type
 
 local pages = {}
 VavaMagic.pages = pages
@@ -16,6 +16,27 @@ VavaMagic.pages = pages
 -- sens, en-têtes des deux textes) : 1 pour la table, 29 pour les clés, 9 + 5 + 1 pour les nombres, 3 + 3 pour les
 -- en-têtes des textes, et 1 de marge.
 pages.ENTRY_OVERHEAD = 52
+
+-- Plafond d'un message de Murmure (octets), quelle que soit la config : `spells.murmure.textMaxBytes` borne le RPC
+-- d'envoi et vient de config_client.lua (relecture sécurité S-1 de T-143).
+pages.TEXT_CAP = 4096
+
+--- Vrai si `textMax` (borne en octets d'un message de Murmure) est sûre : un entier de 1 à TEXT_CAP, et une page du
+--- registre qui le porte (correspondant de `contactMax` octets, texte, ENTRY_OVERHEAD) tient dans un lot de `pageBytes`.
+--- Sinon false et la raison.
+---@param textMax any
+---@param registers { contactMax: integer, pageBytes: integer }
+---@return boolean ok
+---@return string|nil reason
+function pages.textBound(textMax, registers)
+    if mathType(textMax) ~= 'integer' or textMax < 1 then return false, 'un nombre entier positif est attendu' end
+    if textMax > pages.TEXT_CAP then return false, ('%d octets au plus'):format(pages.TEXT_CAP) end
+    local room = registers.pageBytes - registers.contactMax - pages.ENTRY_OVERHEAD
+    if textMax > room then
+        return false, ('%d octets au plus, pour qu\'une page tienne dans un lot du registre (registers.pageBytes)'):format(room)
+    end
+    return true
+end
 
 ---@param value any
 ---@return integer|nil

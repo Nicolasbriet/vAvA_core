@@ -424,7 +424,9 @@ Fichiers téléchargés par chaque joueur (2.11.0) : `shared/constants.lua`, `co
 `config.lua` modifié et gardé par l'installeur de la Chancellerie (le nouveau posé en `config.lua.nouveau`) garde
 l'ancienne forme : le module démarre, mais la console le signale (« config.lua garde la forme d'avant 2.11.0 … ») et
 un réglage client changé dans ce fichier reste sans effet. Reportez vos réglages dans `config.lua` et
-`config_client.lua` d'après les nouveaux fichiers.
+`config_client.lua` d'après les nouveaux fichiers. `casting.animLoadMs`, lu par aucun fichier, est retiré : les
+animations attendent `effects.assetLoadMs` (3 s), comme les particules ; une valeur gardée dans un ancien fichier est
+sans effet.
 
 | Section | Contenu |
 | --- | --- |
@@ -435,7 +437,7 @@ un réglage client changé dans ce fichier reste sans effet. Reportez vos régla
 | `elements` | feu, eau, terre, lumière, esprit : nom, groupe de la roue, couleur, particules des mains pendant l'incantation |
 | `wheel` | groupes de l'anneau intérieur, dans l'ordre |
 | `controls` | mode magie : endormissement (20 s), allure en visant, molette, rappel « rangez votre arme » (une fois par arme sortie, jamais deux en 5 s, `armedNoticeMs`), aperçu au sol |
-| `effects` | niveau de détail (complet en deçà de 30 m, rien au-delà de 150 m), plafonds de lumières et de particules, chargement et libération des ressources, traces au sol (`traces` : durée, couleur, taille) |
+| `effects` | niveau de détail (complet en deçà de 30 m, rien au-delà de 150 m), plafonds de lumières et de particules, chargement (particules et animations, `assetLoadMs`) et libération des ressources, traces au sol (`traces` : durée, couleur, taille) |
 | `sounds` | portée des sons (60 m), fichiers .ogg qui remplacent les sons fabriqués (`files`), sons natifs de GTA (`native`) |
 | `projectiles` | contrôles communs de l'impact (axe, marge sur la cible, portée, délai, joueurs qui voient le lancer, hauteur des mains et du torse) ; un sort peut en changer dans son `hit` |
 | `spells.<sort>` | champs communs (voir plus bas) et **5 niveaux** : durée d'incantation, recharge, description, ce que le niveau débloque, valeurs propres au sort |

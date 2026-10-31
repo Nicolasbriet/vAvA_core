@@ -29,7 +29,6 @@ config.casting.maxMove = 1.0             -- mètres parcourus au plus (sorts san
 config.casting.moveMargin = 0.5          -- marge du serveur sur la distance (positions réseau)
 config.casting.finishToleranceMs = 300   -- fin acceptée un peu avant la durée (latence)
 config.casting.graceMs = 4000            -- au-delà de la durée, une incantation sans fin est abandonnée
-config.casting.animLoadMs = 2000         -- attente du chargement d'une animation
 
 -- Fiche : écrite dans le personnage (le core la sauvegarde par lots) au plus toutes les `flushMs`, et au départ.
 config.persistence = { flushMs = 15000 }

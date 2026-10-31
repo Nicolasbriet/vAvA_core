@@ -7,7 +7,7 @@
     Dépendances : tous les fichiers server/ du module
 ]]
 
-local ipairs, pairs, tonumber, tostring, mathType = ipairs, pairs, tonumber, tostring, math.type
+local ipairs, pairs, tonumber, tostring = ipairs, pairs, tonumber, tostring
 local AddEventHandler, GetPlayers, TriggerClientEvent = AddEventHandler, GetPlayers, TriggerClientEvent
 
 local core = VavaMagic.core
@@ -26,6 +26,7 @@ local combat = VavaMagic.combat
 local states = VavaMagic.states
 local protections = VavaMagic.protections
 local admin = VavaMagic.admin
+local pages = VavaMagic.pages
 local cfg = VavaMagic.config
 local limits = cfg.rateLimits
 local RPC = VavaMagic.RPC
@@ -82,10 +83,12 @@ local function setup()
             .. 'config_client.lua ; reportez vos changements d\'après config.lua.nouveau')
     end
     -- borne d'un RPC prise dans config_client.lua (T-143) : un config_client.lua gardé par une mise à jour ou retouché
-    -- sans elle laisserait le message d'un Murmure à la borne par défaut du core ; le module ne démarre pas
-    local textMax = cfg.spells.murmure and cfg.spells.murmure.textMaxBytes
-    if mathType(textMax) ~= 'integer' or textMax < 1 then
-        return false, 'config_client.lua : spells.murmure.textMaxBytes doit être un nombre entier positif (borne d\'un RPC)'
+    -- sans elle laisserait le message d'un Murmure à la borne par défaut du core, une valeur démesurée ouvrirait le RPC
+    -- à de très longs textes (relecture sécurité S-1) : entier de 1 à 4 096, page du registre tenant dans un lot, sinon
+    -- le module ne démarre pas
+    local boundOk, boundWhy = pages.textBound(cfg.spells.murmure and cfg.spells.murmure.textMaxBytes, cfg.registers)
+    if not boundOk then
+        return false, 'config_client.lua : spells.murmure.textMaxBytes (borne d\'un RPC) : ' .. boundWhy
     end
     local declared, declareErr = VavaMagic.commands.declare()
     if not declared then return false, 'commandes : ' .. tostring(declareErr) end
