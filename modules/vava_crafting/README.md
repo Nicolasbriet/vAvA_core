@@ -21,10 +21,13 @@ navigateur, depuis le dépôt (option `--allow-file-access-from-files` pour les 
 Depuis 1.6.0 (T-132), les réglages sont dans deux fichiers et chacun n'est écrit qu'une fois : `config_client.lua`
 porte ce que lit le client, et le serveur aussi : `masterpiece.nameMin` et `nameMax`, `repair.durationMs`,
 `interact.distance` et `interact.moveCancel`, `streaming` (sauf `zoneRadius` et `subscribeSlack`), `keys`, `labels`,
-`stationTypes` (entiers : le client les lit par type), `anims` ; `config.lua` porte tout le reste, lu par le seul
-serveur (dont le palier, la fenêtre et les lettres du baptême, les parts de la réparation, les tolérances des gestes,
-la zone des stations, ajoutés aux tables ouvertes par `config_client.lua`), et complète la table sans réécrire une clé
-de `config_client.lua`.
+`anims` ; `config.lua` porte tout le reste, lu par le seul serveur (dont le palier, la fenêtre et les lettres du
+baptême, les parts de la réparation, les tolérances des gestes, la zone des stations, ajoutés aux tables ouvertes par
+`config_client.lua`), et complète la table sans réécrire une clé de `config_client.lua`. Depuis 1.7.0 (T-144), les
+**types de stations** (`stationTypes`) sont dans `config.lua` : le client ne les lit plus, le nom du type, sa réserve
+de combustible et son modèle arrivent avec le dessin de chaque station, et l'animation d'un geste avec la réponse du
+serveur. Une station d'un type déclaré par un autre module (le composteur de `vava_farming`) a donc son invite et son
+menu comme les autres.
 
 | Règle | Défaut | Clé |
 |---|---|---|
@@ -47,7 +50,8 @@ de `config_client.lua`.
 
 ### Stations
 
-Un **type** (compétences servies, combustible, animation, prop) et des **instances** placées (position, nom, qualité
+Un **type** (compétences servies, combustible, animation, prop ; `config.lua` ou registre `vava_crafting:stations`,
+connu du seul serveur) et des **instances** placées (position, nom, qualité
 0–100, propriétaire : nulle = publique, `{ kind = 'character', id }` = privée ; d'autres genres — foyer — se branchent
 par `registerAccess`). Une seule pièce à la fois par station. Les stations livrées sont des **exemples** avec des props
 du jeu de base.
@@ -59,12 +63,13 @@ zone de vAvA_core 0.11.0) nommée par son identifiant : cercle de 2 m autour d'e
 
 | Clé | Valeur | Quand elle part |
 |---|---|---|
-| `def` | `{ type, label, x, y, z, heading, prop }` : ce qu'il faut pour la dessiner (ni qualité ni propriétaire) | à l'entrée d'un joueur dans la zone (état entier), et si la station est déplacée ou renommée |
+| `def` | `{ type, typeLabel, capacity?, label, x, y, z, heading, prop }` : ce qu'il faut pour la dessiner et pour son invite — nom du type, réserve de combustible (absente sans combustible, 1.7.0) — (ni qualité ni propriétaire) | à l'entrée d'un joueur dans la zone (état entier), et si la station est déplacée ou renommée |
 | `s` | `{ fuel, busy }` | à l'entrée, puis à chaque changement, en différence (environ 34 o), aux seuls joueurs qui suivent la zone |
 
 - **Qui la reçoit** : le core décide seul, chaque seconde, d'après la position que lit le serveur ; personne ne la
   demande. Un joueur loin de toute station ne reçoit rien et n'en connaît aucune ; au bourg, l'arrivée coûte environ
-  1,3 Ko pour les 7 stations livrées (une fois), puis 34 o par changement.
+  1,5 Ko pour les 7 stations livrées (une fois ; nom du type et réserve compris depuis 1.7.0), puis 34 o par
+  changement.
 - **Plus de GlobalState** : ni l'état `{ fuel, busy }` publié à tous, ni la liste des stations réécrite à chaque
   station ajoutée. Au démarrage, les anciennes clés `vava_crafting:station:<id>` et `vava_crafting:stations` sont
   effacées une fois si elles existent encore (serveur pas redémarré depuis 1.4.0). Seules les stations encore connues
@@ -148,8 +153,8 @@ station.
 
 | Fichier | Rôle |
 |---|---|
-| `config_client.lua` | réglages lus par le client (nom d'un chef-d'œuvre, geste de réparation, interaction, streaming, touche, types de stations, animations) : téléchargé par chaque joueur, ouvre `VavaCrafting.config` |
-| `config.lua` | tous les autres réglages, servi au seul serveur (en tête des `server_scripts`) : complète la table |
+| `config_client.lua` | réglages lus par le client (nom d'un chef-d'œuvre, geste de réparation, interaction, streaming, touche, animations) : téléchargé par chaque joueur, ouvre `VavaCrafting.config` |
+| `config.lua` | tous les autres réglages, types de stations compris (1.7.0), servi au seul serveur (en tête des `server_scripts`) : complète la table |
 | `shared/proximity.lua`, `shared/stationzone.lua` | purs, lus par le client et le serveur : groupes du streaming, carnet des stations reçues |
 | `shared/quality.lua` | pur, servi au seul serveur : qualité d'une pièce, paliers |
 
@@ -163,6 +168,13 @@ d'interaction, le streaming, la touche, les types de stations et les animations 
 `config.lua.nouveau`) garde l'ancienne forme : le module démarre, mais la console le signale (« config.lua garde la
 forme d'avant 1.6.0 … ») et un réglage client changé dans ce fichier reste sans effet. Reportez vos réglages dans
 `config.lua` et `config_client.lua` d'après les nouveaux fichiers.
+
+**Mise à jour vers 1.7.0 (T-144)** : `stationTypes` a quitté `config_client.lua` pour `config.lua`. Un
+`config_client.lua` modifié et gardé par l'installeur garde une table `stationTypes` que plus rien ne lit : sans
+effet (le serveur prend ceux de `config.lua`), à retirer ; des types changés à la main dans ce fichier sont à
+reporter dans `config.lua`. Un `config.lua` d'avant 1.7.0 gardé avec le `config_client.lua` neuf n'a plus aucune table
+`stationTypes` : le module est refusé (« stationTypes absent de config.lua … ») ; reprendre celle de
+`config.lua.nouveau`.
 
 ## Base de données (sql/0001_crafting.sql)
 
@@ -214,6 +226,14 @@ Hook écouté : `vava_inventory:metadata` (before, garde de la signature, voir p
 14. **Stations par zone** (1.5.0, deux joueurs) : B loin du bourg ne reçoit rien quand A travaille à la forge
     (`/vava_reseau joueur <B>`) ; B arrive : les stations apparaissent comme avant, `/vava_reseau zones <B>` les cite ;
     A ajoute du charbon : l'invite de B (à la forge) et le menu ouvert suivent. Détail : `docs/tests/metiers.md` § 4.1.
+15. **Composteur** (1.7.0, T-144) : au composteur du champ (`vava_farming`), l'invite « Composteur du champ ·
+    Composteur » apparaît, sans combustible ; `E` ouvre le menu (recette du compost) ; à la forge, l'invite montre
+    toujours « combustible n / 20 ». Détail : `docs/tests/metiers.md` 5-7.
+
+## À vérifier en jeu (1.7.0)
+
+- Invite et menu du composteur du champ (type déclaré par `vava_farming`, inconnu du client) ; invite des stations du
+  bourg inchangée (nom du type, combustible de la forge et du fourneau) ; geste joué avec l'animation du type.
 
 ## À vérifier en jeu (1.5.0)
 

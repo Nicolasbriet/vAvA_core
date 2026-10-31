@@ -21,6 +21,8 @@ local STATION_ID_MAX = VavaCrafting.STATION_ID_MAX
 -- nom et modèle d'une station placée par un module : bornes de ce que lit le client
 local LABEL_MAX, PROP_MAX = VavaCrafting.stationzone.LABEL_MAX, VavaCrafting.stationzone.PROP_MAX
 local MAX_TIER = VavaCrafting.MAX_TIER
+-- réserve de combustible d'un type : borne relue par le client dans le dessin d'une station (T-144)
+local FUEL_CAPACITY_MAX = VavaCrafting.FUEL_CAPACITY_MAX
 
 local STATION_SCHEMA = {
     type = 'table',
@@ -30,7 +32,7 @@ local STATION_SCHEMA = {
         fuel = { type = 'table', optional = true, fields = {
             item = { type = 'string', min = 1, max = 64 },
             perCraft = { type = 'integer', min = 1, max = 100 },
-            capacity = { type = 'integer', min = 1, max = 10000 },
+            capacity = { type = 'integer', min = 1, max = FUEL_CAPACITY_MAX },
         } },
         anim = { type = 'string', min = 1, max = 32 },
         prop = { type = 'string', min = 1, max = 64 },
@@ -234,6 +236,10 @@ function catalog.define()
         end,
     })
     if not ok then return false, err end
+    -- 1.7.0 (T-144) : les types ont quitté config_client.lua ; un config.lua d'avant, gardé par une mise à jour, n'en a pas
+    if type(cfg.stationTypes) ~= 'table' then
+        return false, 'stationTypes absent de config.lua (forme d\'avant 1.7.0) : reprenez la table de config.lua.nouveau'
+    end
     for id, kind in pairs(cfg.stationTypes) do
         if not cfg.anims[kind.anim] then return false, format("type de station '%s' : animation '%s' inconnue", id, tostring(kind.anim)) end
         ok, err = core.registry.add(REGISTRY.STATIONS, id, { label = kind.label, skills = kind.skills, fuel = kind.fuel, anim = kind.anim, prop = kind.prop })

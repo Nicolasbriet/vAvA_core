@@ -129,7 +129,7 @@ describe('vava_crafting stations vues du client', function()
 
     local function stateOf(id, x)
         return {
-            [stationzone.DEF] = { type = 'forge', label = 'Forge ' .. id, x = x, y = 0.0, z = 30.0, heading = 0.0, prop = 'prop_forge_' .. id },
+            [stationzone.DEF] = { type = 'forge', typeLabel = 'Forge', label = 'Forge ' .. id, x = x, y = 0.0, z = 30.0, heading = 0.0, prop = 'prop_forge_' .. id },
             [stationzone.STATUS] = { fuel = 0, busy = false },
         }
     end

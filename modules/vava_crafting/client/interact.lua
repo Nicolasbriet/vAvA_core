@@ -115,12 +115,12 @@ local function isDowned()
     return called and type(health) == 'table' and health.downed == true
 end
 
---- Invite pour la station la plus proche (ou rien) ; envoyée à l'interface seulement si elle change.
+--- Invite pour la station la plus proche (ou rien) ; envoyée à l'interface seulement si elle change. Nom du type et
+--- réserve : lus dans le dessin de la station (T-144).
 ---@param stationId string|nil
 function interact.refreshPrompt(stationId)
     local station = stationId and props.station(stationId)
-    local kind = station and props.type(station)
-    if not station or not kind or work or menuStation or isDowned() then
+    if not station or work or menuStation or isDowned() then
         if lastPrompt ~= '' then
             lastPrompt = ''
             nui.send('prompt', { hidden = true })
@@ -129,8 +129,8 @@ function interact.refreshPrompt(stationId)
     end
     local state = props.state(station.id)
     local payload = {
-        key = cfg.keys.interact, label = station.label, typeLabel = kind.label, busy = state.busy,
-        fuel = kind.fuel and { stock = state.fuel, capacity = kind.fuel.capacity } or nil,
+        key = cfg.keys.interact, label = station.label, typeLabel = station.typeLabel, busy = state.busy,
+        fuel = station.capacity and { stock = state.fuel, capacity = station.capacity } or nil,
     }
     local signature = table.concat({ station.id, tostring(state.busy), tostring(state.fuel) }, '|')
     if signature == lastPrompt then return end
@@ -278,9 +278,7 @@ function interact.startWork(stationId, kind, result)
     work = current
     interact.refreshPrompt(nil)
     CreateThread(function()
-        local station = props.station(stationId)
-        local stationType = station and props.type(station)
-        current.anim = playAnim(result.anim or (stationType and stationType.anim) or '')
+        current.anim = playAnim(type(result.anim) == 'string' and result.anim or '')
         if work ~= current then return end
         local durationMs = result.durationMs or cfg.repair.durationMs
         progressStart(result.label or '', durationMs)

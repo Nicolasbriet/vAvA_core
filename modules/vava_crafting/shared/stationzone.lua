@@ -1,8 +1,8 @@
 --[[
     vava_crafting/shared/stationzone.lua
     Rôle : règles pures du partage des stations par les abonnements de zone du core (vAvA_core 0.11.0). Côté serveur :
-           lieu de la zone d'une station (cercle au sol, marge), état publié — `def`, ce qu'il faut pour la dessiner, et
-           `s`, combustible et occupation —, comparaison avant envoi. Côté client : lecture prudente de ce qui arrive,
+           lieu de la zone d'une station (cercle au sol, marge), état publié — `def`, ce qu'il faut pour la dessiner et
+           pour son invite, et `s`, combustible et occupation —, comparaison avant envoi. Côté client : lecture prudente de ce qui arrive,
            et carnet des stations connues (entrée dans une zone, changement, sortie) qui dit ce qui a bougé. Rien de
            secret dans l'état d'une zone : il est public pour quiconque peut s'en approcher.
            Testé dans tests/spec/crafting_stationzone_spec.lua.
@@ -23,6 +23,7 @@ stationzone.STATUS = 's'
 -- Bornes de lecture côté client (une valeur hors bornes fait ignorer la station, jamais lever une erreur).
 local TYPE_MAX, LABEL_MAX, PROP_MAX = 32, 128, 64
 local ID_PATTERN = VavaCrafting.ID_PATTERN
+local CAPACITY_MAX = VavaCrafting.FUEL_CAPACITY_MAX
 -- le serveur refuse d'emblée une station placée par un module au-delà de ces bornes (server/catalog.lua)
 stationzone.LABEL_MAX, stationzone.PROP_MAX = LABEL_MAX, PROP_MAX
 
@@ -52,13 +53,15 @@ function stationzone.area(station, radius, margin)
     return { x = station.x, y = station.y, z = station.z, radius = radius, margin = margin }
 end
 
---- Ce que les clients proches reçoivent pour dessiner une station placée (définition du serveur, type résolu).
+--- Ce que les clients proches reçoivent pour dessiner une station placée (définition du serveur, type résolu), avec le
+--- nom du type et sa réserve de combustible pour l'invite : le client ne connaît pas les types (T-144).
 ---@param def vAvA.StationDefinition
----@return { type: string, label: string, x: number, y: number, z: number, heading: number, prop: string|nil }
+---@return { type: string, typeLabel: string, capacity: integer|nil, label: string, x: number, y: number, z: number, heading: number, prop: string|nil }
 function stationzone.drawing(def)
+    local kind = def.type
     return {
-        type = def.type.id, label = def.label, x = def.x, y = def.y, z = def.z, heading = def.heading or 0.0,
-        prop = def.prop or def.type.prop,
+        type = kind.id, typeLabel = kind.label, capacity = kind.fuel and kind.fuel.capacity or nil,
+        label = def.label, x = def.x, y = def.y, z = def.z, heading = def.heading or 0.0, prop = def.prop or kind.prop,
     }
 end
 
@@ -83,16 +86,21 @@ end
 --- Station lue dans l'état d'une zone, ou nil si la valeur est mal formée.
 ---@param id any       identifiant local de la zone (= identifiant de la station)
 ---@param raw any      valeur de `def`
----@return { id: string, type: string, label: string, x: number, y: number, z: number, heading: number, prop: string|nil }|nil
+---@return { id: string, type: string, typeLabel: string, capacity: integer|nil, label: string, x: number, y: number, z: number, heading: number, prop: string|nil }|nil
 function stationzone.readDrawing(id, raw)
     if type(id) ~= 'string' or not id:find(ID_PATTERN) or type(raw) ~= 'table' then return nil end
     if not text(raw.type, TYPE_MAX) or not raw.type:find(ID_PATTERN) or not text(raw.label, LABEL_MAX) then return nil end
+    if not text(raw.typeLabel, LABEL_MAX) then return nil end
+    local capacity = raw.capacity
+    if capacity ~= nil and (not finite(capacity) or capacity < 1 or capacity > CAPACITY_MAX or capacity % 1 ~= 0) then
+        return nil
+    end
     if not finite(raw.x) or not finite(raw.y) or not finite(raw.z) then return nil end
     if raw.heading ~= nil and not finite(raw.heading) then return nil end
     if raw.prop ~= nil and not text(raw.prop, PROP_MAX) then return nil end
     return {
-        id = id, type = raw.type, label = raw.label, x = raw.x, y = raw.y, z = raw.z, heading = raw.heading or 0.0,
-        prop = raw.prop,
+        id = id, type = raw.type, typeLabel = raw.typeLabel, capacity = capacity, label = raw.label,
+        x = raw.x, y = raw.y, z = raw.z, heading = raw.heading or 0.0, prop = raw.prop,
     }
 end
 
@@ -113,8 +121,8 @@ end
 ---@param b table
 ---@return boolean
 local function sameDrawing(a, b)
-    return a.type == b.type and a.label == b.label and a.x == b.x and a.y == b.y and a.z == b.z
-        and a.heading == b.heading and a.prop == b.prop
+    return a.type == b.type and a.typeLabel == b.typeLabel and a.capacity == b.capacity and a.label == b.label
+        and a.x == b.x and a.y == b.y and a.z == b.z and a.heading == b.heading and a.prop == b.prop
 end
 stationzone.sameDrawing = sameDrawing
 
@@ -169,7 +177,7 @@ end
 --- dessin mal formé fait oublier la station.
 ---@param id string
 ---@param state any
----@return boolean placed         une station est apparue, a bougé (lieu, nom, modèle) ou a disparu
+---@return boolean placed         une station est apparue, a changé (lieu, nom, modèle, type) ou a disparu
 ---@return boolean statusChanged  combustible ou occupation changés
 function Book:enter(id, state)
     local drawing = type(state) == 'table' and stationzone.readDrawing(id, state[stationzone.DEF]) or nil

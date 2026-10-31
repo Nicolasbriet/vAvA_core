@@ -227,7 +227,7 @@ Console F8 ouverte chez B (`set vava_log_level debug` côté client pour voir un
 | 4 | Seau en main vide → Arroser. | « remplissez-le à un puits ». Au puits, `E` → 5 charges ; Arroser → humidité 100, charge − 1. |
 | 5 | Laisser une plante sans eau (réglages du § 0.7). | Flétrie (prop), arroser la fait repartir ; plus longtemps → morte : seul Arracher reste, qui rend des déchets végétaux ; ses heures sèches (menu) ne montent plus après la mort. |
 | 6 | Récolter à la main, puis une autre à la faucille. | Plus rapide à la faucille ; produit au palier avec « Champ communal » ; parfois des graines du même palier ; fertilité en baisse ; replanter la même famille coûte 10 de plus, une autre rend 10. |
-| 7 | 3 déchets au composteur du champ (station de l'artisanat), puis Fertiliser. | Compost produit ; fertilité + 25. |
+| 7 | S'approcher du composteur du champ (station de l'artisanat, type déclaré par l'agriculture) ; `E` ; avec 3 déchets végétaux, réaliser Compost ; puis Fertiliser. | (artisanat 1.7.0, T-144) À 2,5 m, l'invite « Composteur du champ · Composteur » apparaît, sans ligne de combustible (avant : aucune invite). `E` ouvre le menu de l'artisanat sur cette station, recette Compost ; le geste joue l'animation du type (tannerie). Compost produit ; fertilité + 25. Si le menu refuse la recette (« recette inconnue »), c'est T-136, pas l'invite. |
 | 8 | `E` près du grenier. | L'inventaire s'ouvre sur « Grenier commun » ; déposer, s'éloigner de 4 m → il se ferme ; `vava_farming_granary_log` : dépôt / retrait. |
 | 9 | Jardin privé (propriétaire n° 1 dans la config). | Un autre personnage lit « ne vous appartient pas ». |
 | 10 | `/agriculture parcelle champ_communal`, `/agriculture arroser champ_communal`. | État des emplacements ; tout arrosé. |

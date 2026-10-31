@@ -8,8 +8,9 @@
            décide de tout ; le client crée les props des stations, montre l'invite et le menu, joue le geste. Chaque
            station est une zone du core : seuls les joueurs proches la connaissent et reçoivent ses changements.
            T-132 : les joueurs ne téléchargent que les constantes, config_client.lua (nom d'un chef-d'œuvre, geste de
-           réparation, interaction, streaming, touche, types de stations, animations) et la logique lue par le client
-           (proximité, carnet des stations) ; config.lua et shared/quality.lua sont servis au seul serveur.
+           réparation, interaction, streaming, touche, animations) et la logique lue par le client (proximité, carnet
+           des stations) ; config.lua (types de stations compris, T-144) et shared/quality.lua sont servis au seul
+           serveur.
     Dépendances : vAvA_core ≥ 0.11.0 (abonnements de zone), vava_ui ≥ 1.0.0 (polices, grain, papier et coins de la page, par
                   nui://vava_ui/…), vava_inventory ≥ 1.4.0 (échange atomique, mains, métadonnées), vava_skills ≥ 1.0.0
                   (recettes, XP, leçons), vava_gathering ≥ 1.0.0 (matières et outils de base) ; facultatifs : vava_hud,
@@ -23,7 +24,7 @@ use_experimental_fxv2_oal 'yes'
 
 name 'vava_crafting'
 description 'Artisanat vAvA : stations, recettes, qualité, objets signés, réparation, leçons'
-version '1.6.0'
+version '1.7.0'
 
 dependency 'vAvA_core'
 dependency 'vava_ui'
