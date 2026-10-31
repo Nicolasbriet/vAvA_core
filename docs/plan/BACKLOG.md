@@ -777,6 +777,11 @@ faire tout le système de combat ») : la porte T-119 reste à passer en jeu.
   seulement ; verrouillage de cible repris de `vava_magic`.
 - Critères : tests unitaires de la géométrie ; impossible de toucher hors portée ou à travers le délai ; resmon au
   repos inchangé.
+- Suites de T-140 (31 octobre 2026) : **(réseau, R-1)** dans `vava_combat`, `Bridge.HandItem()` client en cache local
+  (mis à jour par `core:character:loaded`, `fieldChanged` du champ `vava_inventory:hands`, `unloaded`) au lieu de copier
+  tout le personnage à chaque `armed()` ; **(lore)** prévoir une vraie durée pour dégainer et rengainer, ou un court
+  délai avant d'incanter après avoir rangé une arme, sinon la règle « le mage a besoin d'un garde » ne tient pas
+  (l'incantation est déjà brisée dès qu'une arme passe en main, `vava_inventory:hold`).
 
 ### T-113 — Blocage, parade, esquive
 - Agent : vava-dev-lua · Dépend de : T-112 · Statut : à faire
@@ -825,11 +830,23 @@ faire tout le système de combat ») : la porte T-119 reste à passer en jeu.
   d'apparition (délai de grâce), et expose l'état confirmé.
 
 ### T-140 — Mains vides pour incanter
-- Agent : vava-dev-lua (cette tâche autorise à toucher `vava_magic`) · Dépend de : T-111, T-116 · Statut : à faire
+- Agent : vava-dev-lua (cette tâche autorise à toucher `vava_magic`) · Dépend de : T-111, T-116 · Statut : à tester en
+  jeu (relu sécurité, réseau et lore, suites appliquées)
 - Décision du porteur du projet (31/10, spec T-111 § 13-1) : impossible d'incanter avec une arme ou un bouclier en
   main. Le serveur refuse le lancer par `exports.vava_combat:armed(src)` (le texte `errors.armed` existe dans la config
   de la magie) ; le client le montre par `armed()` sans en décider. Sans `vava_combat`, aucune restriction. Un bâton de
   mage (focaliseur) viendra plus tard.
+- Fait le 31 octobre 2026 (branche `agents/T-140`) : `vava_magic` 2.10.0 (le serveur refuse une incantation, la brise
+  dès qu'une arme ou un bouclier passe en main — hook `vava_inventory:hold` — et la revérifie à sa fin, quand une arme
+  de GTA est sortie, que `vava_combat:armed` rend une arme ou que le bouclier est au bras, `shield().ready` ; le dos ne
+  gêne pas ; brisée, elle ne coûte ni mana ni recharge ; sans `vava_combat`, pas prêt ou en erreur, aucune restriction
+  pour les armes de l'inventaire, une ligne de console par minute au plus ; le client le montre tôt : mode magie
+  endormi, roue, `/lancer`, un rappel par arme sortie aux touches, viser l'arme en main ne réveille plus le mode ; texte
+  `shielded`). Rapport `docs/plan/rapports/T-140.md`. **À tester en jeu** : `docs/tests/magie.md` § 19 (15 tests :
+  roue et touches 3 à 6, arme prise pendant l'incantation 7 et 7 bis, outil 8, bouclier 9 à 11, `vava_combat` arrêté
+  12, resmon 13, réseau 14), `combat` 2-28.
+- Suite : cache de `HandItem` dans `vava_combat` et durée de dégainage (lore) inscrits à T-112 ; incantation brisée sans
+  coût (antérieure, toutes interruptions) et libellé `hud.asleep` laissés au porteur du projet.
 
 ### T-119 — PORTE : sensations du combat — **HUMAIN**
 - Dépend de : T-110 à T-116 · Statut : à faire
