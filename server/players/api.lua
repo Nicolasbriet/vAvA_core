@@ -26,6 +26,7 @@ api.extend(1, 'characters', function(owner, context)
         create = guard(function(src, identity, initialFields) return characters.create(src, identity, initialFields) end),
         getActive = guard(function(src) return characters.describeActive(src) end),
         playSeconds = guard(function(characterId) return characters.playSeconds(characterId) end),
+        isSpawned = guard(function(src) return characters.isSpawned(src) end),
         get = guard(function(characterId, name) return characters.getField(characterId, name) end),
         set = guard(function(characterId, name, value) return characters.setField(characterId, name, value) end),
         unload = guard(function(src) return characters.unload(src, owner) end),

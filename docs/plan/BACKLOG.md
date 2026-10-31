@@ -1168,10 +1168,16 @@ faire tout le système de combat ») : la porte T-119 reste à passer en jeu.
 - Suite : T-151 (envois de `vava_admin` par `core.net.send`), trouvée pendant T-138.
 
 ### T-139 — Apparition confirmée par le core
-- Agent : vava-dev-lua (cette tâche autorise à toucher le core, `server/players/`) · Dépend de : — · Statut : à faire
+- Agent : vava-dev-lua (cette tâche autorise à toucher le core, `server/players/`) · Dépend de : — · Statut : à tester
+  en jeu (relu sécurité, contre-relu, relu réseau ; suites appliquées)
 - Spec T-110 § 13, option B : le temps de jeu, les positions, `vava_arrival` et les envois de proximité croient encore
   la déclaration `core:characters:spawned` du client. Le core la confirme lui-même quand le ped existe après l'ordre
   d'apparition (délai de grâce), et expose l'état confirmé.
+- Fait le 31 octobre 2026 (branche `agents/T-139`) : `vAvA_core` 0.14.0, apparition confirmée par le serveur (ped vu
+  au point ordonné, déclaration du client rattachée à son ordre, d'office après le délai de grâce, jamais pour un
+  personnage qui se décharge ; hook `core:character:spawned` avec `forced`, `core.characters.isSpawned`). Rapport
+  `docs/plan/rapports/T-139.md` (suites S-1 à S-6, R-1 à R-3, C-1 à C-3). **À tester en jeu** :
+  `docs/tests/personnage.md` § 8 bis (10 tests).
 
 ### T-140 — Mains vides pour incanter
 - Agent : vava-dev-lua (cette tâche autorise à toucher `vava_magic`) · Dépend de : T-111, T-116 · Statut : à tester en
