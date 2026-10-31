@@ -217,7 +217,8 @@ lecture du personnage) ; les dictionnaires des gestes du style de l'arme sont ch
   garde sa récupération et son compte d'enchaînement (relecture sécurité S-1) : se mettre soi-même en véhicule, faire
   un bond ou changer d'arme ne libère jamais plus tôt. Une demande admise **réserve** sa place avant le premier export
   ou crochet (S-2) : deux demandes simultanées ne passent jamais toutes les deux, même si un crochet `using` cède la
-  main ; un refus rend la place au coup d'avant, tel quel.
+  main ; un refus (ou une erreur, `pcall`) rend la place au premier coup d'avant non refusé, tel quel, seulement si
+  elle est encore à cette réservation (contre-relecture C-1).
 - **Technique choisie** : contrôlée contre le style de l'arme **tenue** (lue par le serveur), technique qui ouvre
   obligatoire hors enchaînement, chaîne déclarée en données. Arme échangée ou rangée pendant le coup : hook `hold`, pile
   relue au relevé, puis par `strike`.
@@ -295,7 +296,8 @@ chancellement oublié) ; client : `core:character:loaded`, `fieldChanged`, `unlo
   bouclier ; use le bouclier par `VavaCombat.wear.apply` (qui relit la pile avant d'écrire) ; à chaque blocage, lire
   `VavaCombat.shields` en interne plutôt que l'export `shield(src)` (relecture réseau R-6 de T-111). Interfaces internes
   prêtes : `VavaCombat.reactions.stagger(src, ms, now)` (l'attaquant paré chancelle), `VavaCombat.swings.cancel(src,
-  raison)` et `swings.of(src)`.
+  raison)` (pendant une réservation, annule aussi le coup d'avant : `cancelled` est fiable) et `swings.of(src)` (un coup
+  `pending` est réservé, pas encore accepté).
 - **T-114** (endurance) : `stamina` de chaque technique, lu et contrôlé (0 à 40), jamais dépensé ; jauge et indication de
   la technique au HUD (`inCombatMode()` côté client).
 - **T-115** (styles et progression) : `learn` (compétence, niveau) lu et contrôlé, jamais appliqué ; autres styles

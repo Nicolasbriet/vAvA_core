@@ -23,7 +23,7 @@
                   server/strike.lua, server/hands.lua, server/reactions.lua
 ]]
 
-local type, pairs, ipairs, tostring = type, pairs, ipairs, tostring
+local type, pairs, ipairs, tostring, pcall = type, pairs, ipairs, tostring, pcall
 local tointeger, floor, max = math.tointeger, math.floor, math.max
 local SetTimeout = SetTimeout
 
@@ -73,20 +73,37 @@ VavaCombat.swings = swings
 ---@field hitCount integer
 ---@field cancelled string|nil   annulé : ses relevés ne frappent plus, son cycle compte toujours
 ---@field pending true|nil       réservé, pas encore accepté (demande en cours de vérification)
+---@field refused true|nil       réservation refusée (jamais rendue par la restitution)
+---@field prev vAvA.Swing|nil    coup d'avant, gardé tant que la réservation n'est pas jugée
 
 ---@type table<integer, vAvA.Swing>  source → dernier coup (annulé ou non : son cycle compte) ou coup réservé
 local current = {}
 local seq = 0
 -- source → instant du dernier avertissement « bond »
 local movedWarnAt = {}
+-- instant du dernier avertissement « erreur dans la vérification d'un coup » (une ligne par minute au plus)
+local errorWarnAt = nil
 
 --- Annule le coup en cours d'un joueur (ses relevés encore à venir ne frappent plus). Son cycle reste compté :
---- l'admission suivante attend sa récupération comme s'il était allé au bout.
+--- l'admission suivante attend sa récupération comme s'il était allé au bout. Pendant une réservation, le coup d'avant
+--- (celui que rendrait un refus) est annulé aussi : `cancelled` est toujours fiable.
 ---@param src integer
 ---@param reason string  hands | stagger | downed | left | moved | state
 function swings.cancel(src, reason)
     local swing = current[src]
-    if swing and not swing.cancelled then swing.cancelled = reason end
+    while swing do
+        if not swing.cancelled then swing.cancelled = reason end
+        if not swing.pending and not swing.refused then break end
+        swing = swing.prev
+    end
+end
+
+--- Premier coup non refusé en remontant depuis `swing` (restitution d'une réservation refusée), ou nil.
+---@param swing vAvA.Swing|nil
+---@return vAvA.Swing|nil
+local function standing(swing)
+    while swing and swing.refused do swing = swing.prev end
+    return swing
 end
 
 --- Coup en cours d'un joueur (lecture : T-113), ou nil. `pending` : réservé, pas encore accepté ; `cancelled` : annulé.
@@ -275,18 +292,28 @@ function swings.use(src, id, target)
     local swing = {
         seq = seq, source = src, id = id, def = def, startedAt = plan.startedAt, openAt = plan.openAt,
         closeAt = plan.closeAt, endAt = plan.endAt, chainCount = chainCount, target = 0, hits = {}, hitCount = 0,
-        cancelled = nil, pending = true,
+        cancelled = nil, pending = true, prev = prev,
     }
     -- le coup précédent n'est pas annulé : ses relevés encore à venir se font (une frappe ouverte va à son terme)
     current[src] = swing
-    -- exports ensuite
-    local ok, code, detail = confirm(src, swing, target)
+    -- exports ensuite (sous pcall : une erreur rend la place comme un refus)
+    local called, ok, code, detail = pcall(confirm, src, swing, target)
+    if not called then
+        local now2 = bridge.Timer()
+        if not errorWarnAt or now2 - errorWarnAt >= MOVED_WARN_MS then
+            errorWarnAt = now2
+            VavaCombat.log.warn('joueur %d : erreur dans la vérification d\'un coup : %s', src, tostring(ok))
+        end
+        ok, code, detail = false, 'error', nil
+    end
     if not ok then
-        -- refus : la place revient au coup d'avant, tel quel (s'il n'a pas été oublié entre-temps)
-        if current[src] == swing then current[src] = prev end
+        -- refus : jamais rendu ; la place revient au premier coup d'avant non refusé, tel quel (si elle est encore à
+        -- cette réservation : rien n'est rendu à un joueur oublié ni par-dessus une autre réservation)
+        swing.pending, swing.refused = nil, true
+        if current[src] == swing then current[src] = standing(swing.prev) end
         return false, code, detail
     end
-    swing.pending = nil
+    swing.pending, swing.prev = nil, nil
     hands.noteHeld(src, swing.item)
     -- le cycle part de l'arrivée de la demande : le temps passé en suspens (0 d'ordinaire) est déduit des minuteries
     local late = bridge.Timer() - now
@@ -314,5 +341,5 @@ end
 --- Arrêt du module : chaque coup en cours est annulé.
 function swings.stop()
     for src in pairs(current) do swings.cancel(src, 'left') end
-    current, movedWarnAt = {}, {}
+    current, movedWarnAt, errorWarnAt = {}, {}, nil
 end

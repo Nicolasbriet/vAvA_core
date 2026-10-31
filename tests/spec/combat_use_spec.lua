@@ -708,6 +708,88 @@ describe('vava_combat techniques (serveur)', function()
             at(320)
             assert.equal(1, #hits)
         end)
+
+        -- contre-relecture C-2 : la garde « la place est encore à moi » et la restitution conditionnelle
+        it('crochet en suspens au-delà de la fin du coup réservé : B prend la place, A rend busy, un seul coup', function()
+            local a = request(A, 'taille_descendante', B)       -- réservé : fin 900, libre à 840 pour l'admission
+            clock = T0 + 840
+            local b = request(A, 'taille_descendante', B)
+            assert.equal(T0 + 840, swings.of(A).startedAt)
+            assert.same({ false, 'busy' }, finish(a))
+            assert.same({ true }, finish(b))
+            assert.equal(2, #timers)
+            at(3000)
+            assert.equal(1, #hits)
+        end)
+
+        -- contre-relecture C-1 : un coup réservé refusé n'est jamais rendu
+        it('A rend busy, puis B refusée : rien n\'est rendu (ni B, ni A jamais accepté)', function()
+            local a = request(A, 'taille_descendante', B)
+            clock = T0 + 840
+            local b = request(A, 'taille_descendante', B)
+            assert.same({ false, 'busy' }, finish(a))
+            beforeAnswer = { false, 'Trêve.' }
+            assert.same({ false, 'refused', 'Trêve.' }, finish(b))
+            assert.is_nil(swings.of(A))
+            assert.equal(0, #timers)
+        end)
+
+        it('même chose avec un coup d\'avant : la restitution remonte au premier coup non refusé', function()
+            paused = false
+            assert.same({ true }, use(A, 'taille_descendante', B))   -- fin 900
+            local taille = swings.of(A)
+            paused = true
+            at(420)
+            local a = request(A, 'estoc_rapide', B)                   -- réservé : fin 1 140, libre à 1 080
+            clock = T0 + 1080
+            local b = request(A, 'taille_descendante', B)
+            assert.same({ false, 'busy' }, finish(a))
+            beforeAnswer = { false, 'Trêve.' }
+            assert.same({ false, 'refused', 'Trêve.' }, finish(b))
+            assert.equal(taille, swings.of(A))
+            assert.is_nil(taille.pending)
+        end)
+
+        it('coup d\'avant présent, joueur oublié pendant l\'attente : rien n\'est rendu', function()
+            paused = false
+            assert.same({ true }, use(A, 'taille_descendante', B))
+            paused = true
+            at(420)
+            local co = request(A, 'estoc_rapide', B)
+            swings.forget(A)
+            assert.same({ false, 'no_character' }, finish(co))
+            assert.is_nil(swings.of(A))
+        end)
+
+        it('erreur pendant la vérification : place rendue au coup d\'avant, refus error, une ligne par minute', function()
+            paused = false
+            assert.same({ true }, use(A, 'taille_descendante', B))
+            local taille = swings.of(A)
+            at(420)
+            VavaCombat.bridge.Position = function() error('panne') end
+            assert.same({ false, 'error' }, use(A, 'estoc_rapide', B))
+            assert.equal(taille, swings.of(A))
+            assert.equal(1, #logs.warn)
+            assert.matches('erreur dans la vérification', logs.warn[1])
+            assert.same({ false, 'error' }, use(A, 'estoc_rapide', B))
+            assert.equal(1, #logs.warn)
+            assert.equal(taille, swings.of(A))
+        end)
+
+        -- contre-relecture C-3 : pendant une réservation, le coup d'avant est annulé aussi
+        it('chancelé pendant une réservation : le coup d\'avant rendu est marqué annulé', function()
+            paused = false
+            assert.same({ true }, use(A, 'taille_descendante', B))
+            local taille = swings.of(A)
+            paused = true
+            at(420)
+            local co = request(A, 'estoc_rapide', B)
+            reactions.stagger(A, 900, clock)
+            assert.equal('stagger', taille.cancelled)
+            assert.same({ false, 'staggered', 900 }, finish(co))
+            assert.equal(taille, swings.of(A))
+            assert.equal('stagger', swings.of(A).cancelled)
+        end)
     end)
 
     describe('enchaînement', function()
