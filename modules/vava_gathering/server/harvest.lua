@@ -7,11 +7,16 @@
            charge prise avant toute attente (rendue si la besace refuse), rendement, palier et provenance sur la pile,
            vitalité consommée, XP demandée à vava_skills, pièce supplémentaire (peau), hooks. La pêche partage la fin
            (fishing.lua).
+           T-102 : un point d'essai de l'Atelier (server/trials.lua) n'est récoltable que par son seul auteur, avant le
+           catalogue ; mêmes contrôles qu'une vraie récolte (personnage, pas à terre, distance au début et à la fin,
+           outil en main du bon genre et non brisé, durée, jeton, délai), mais à BLANC : quantité et palier calculés,
+           rien n'est donné (ni objet, ni XP, ni usure, ni vitalité, ni hook), une charge d'essai prise. Une récolte en
+           cours sur un point changé ou retiré par l'Atelier est oubliée (`unknown_node` à la fin).
     Dépendances : shared/, config.lua, server/core.lua, bridge/server.lua, server/catalog.lua, server/zones.lua,
                   server/nodes.lua, server/quality.lua ; server/fishing.lua (lié à l'exécution)
 ]]
 
-local type, tostring = type, tostring
+local type, pairs, tostring = type, pairs, tostring
 local mathType, random, max = math.type, math.random, math.max
 local format = string.format
 local GetGameTimer, SetTimeout = GetGameTimer, SetTimeout
@@ -20,6 +25,7 @@ local core = VavaGathering.core
 local bridge = VavaGathering.bridge
 local catalog = VavaGathering.catalog
 local zones = VavaGathering.zones
+local trials = VavaGathering.trials
 local nodes = VavaGathering.nodes
 local quality = VavaGathering.quality
 local geometry = VavaGathering.geometry
@@ -98,13 +104,16 @@ function harvest.begin(src, nodeId)
     local characterId = bridge.GetCharacterId(src)
     if not characterId then return false, 'no_character' end
     if bridge.IsDowned(src) then return false, 'downed' end
-    local node = catalog.node(nodeId)
+    -- essai de l'Atelier : le point d'essai de son seul auteur passe avant le catalogue
+    local node = type(nodeId) == 'string' and trials.node(src, nodeId) or nil
+    local trial = node ~= nil
+    node = node or catalog.node(nodeId)
     if not node then return false, 'unknown_node' end
     if sessions[src] then return false, 'busy' end
     local now = GetGameTimer()
     if lastFinish[src] and now - lastFinish[src] < interact.cooldownMs then return false, 'cooldown' end
     if not nearNode(src, node) then return false, 'too_far' end
-    if nodes.charges(node) <= 0 then
+    if (trial and node.c or nodes.charges(node)) <= 0 then
         bridge.Notify(src, messages.noCharges, 'info')
         return false, 'no_charges'
     end
@@ -126,22 +135,25 @@ function harvest.begin(src, nodeId)
             return false, 'broken_tool'
         end
     end
-    local canCarry = bridge.CanCarry(src, resource.item, 1)
-    if not canCarry then
-        bridge.Notify(src, messages.noSpace, 'warning')
-        return false, 'no_space'
+    -- à blanc : rien ne sera porté, aucun hook
+    if not trial then
+        local canCarry = bridge.CanCarry(src, resource.item, 1)
+        if not canCarry then
+            bridge.Notify(src, messages.noSpace, 'warning')
+            return false, 'no_space'
+        end
+        local payload = { source = src, characterId = characterId, node = node.id, zone = node.zone.id, resource = resource.id, item = resource.item }
+        local allowed, reason = core.hooks.runBefore(HOOK_HARVESTING, payload)
+        if not allowed then return false, (type(reason) == 'string' and reason ~= 'hook_error') and reason or 'refused' end
+        -- le hook a pu céder la main
+        if sessions[src] then return false, 'busy' end
     end
-    local payload = { source = src, characterId = characterId, node = node.id, zone = node.zone.id, resource = resource.id, item = resource.item }
-    local allowed, reason = core.hooks.runBefore(HOOK_HARVESTING, payload)
-    if not allowed then return false, (type(reason) == 'string' and reason ~= 'hook_error') and reason or 'refused' end
-    -- le hook a pu céder la main
-    if sessions[src] then return false, 'busy' end
 
     local level = bridge.GetLevel(src, resource.skill)
     lastToken = (lastToken % MAX_TOKEN) + 1
     local session = {
         token = lastToken, source = src, characterId = characterId, node = node, resource = resource, tool = tool,
-        heldId = held and held.id or nil, level = level, startedAt = GetGameTimer(),
+        heldId = held and held.id or nil, level = level, startedAt = GetGameTimer(), trial = trial,
         kind = resource.fishing and 'fishing' or 'harvest',
         durationMs = resource.fishing and 0 or quality.duration(resource, tool, level),
     }
@@ -150,7 +162,61 @@ function harvest.begin(src, nodeId)
         if sessions[src] == session then sessions[src] = nil end
     end)
     if session.kind == 'fishing' then VavaGathering.fishing.cast(session) end
-    return true, { token = session.token, kind = session.kind, durationMs = session.durationMs, anim = resource.anim, label = resource.label }
+    return true, { token = session.token, kind = session.kind, durationMs = session.durationMs, anim = resource.anim, label = resource.label, trial = trial or nil }
+end
+
+--- Fin d'une récolte d'essai (à blanc) : contrôles d'une vraie récolte, quantité et palier calculés, une charge d'essai
+--- prise, rien n'est donné. Bloque le thread courant (main tenue).
+---@param session vAvA.HarvestSession
+---@return boolean ok
+---@return table|string result
+local function succeedTrial(session)
+    local src, node, resource = session.source, session.node, session.resource
+    if not nearNode(src, node) then return false, 'too_far' end
+    sessions[src] = nil
+    if bridge.IsDowned(src) then return false, 'downed' end
+    if (node.c or 0) <= 0 then
+        bridge.Notify(src, messages.noCharges, 'info')
+        return false, 'no_charges'
+    end
+    local held
+    if resource.tool then
+        held = bridge.Held(src)
+        if not held or held.id ~= session.heldId then
+            bridge.Notify(src, format(messages.noTool, toolLabel(resource.tool)), 'warning')
+            return false, 'no_tool'
+        end
+    end
+    lastFinish[src] = GetGameTimer()
+    -- la bande de la zone publiée (une zone nouvelle est pleine)
+    local state = zones.state(node.zone.id)
+    local effects, vitality = cfg.bands.effects.normal, 100.0
+    if state and not state.gone then
+        zones.refresh(node.zone, state)
+        effects, vitality = zones.effects(state), state.vitality
+    end
+    if quality.failed(effects) then
+        bridge.Notify(src, messages.trialFailed, 'warning')
+        return false, 'failed'
+    end
+    if not trials.take(src, node.id) then
+        bridge.Notify(src, messages.noCharges, 'info')
+        return false, 'no_charges'
+    end
+    local amount = quality.yield(resource, session.tool, effects, bridge.SeasonFactor('yield', resource.skill))
+    local score = quality.score(session.level, quality.toolQuality(held), vitality, session.tool and session.tool.qualityBonus or 0)
+    local tier = quality.tier(score, effects.tierMalus)
+    local itemLabel = catalog.itemLabel(resource.item)
+    bridge.Notify(src, format(messages.trialHarvest, resource.label, amount, itemLabel, tierLabel(tier)), 'info')
+    return true, { item = resource.item, label = itemLabel, quantity = amount, tier = tier, trial = true }
+end
+
+--- Point changé ou retiré par l'Atelier : les récoltes en cours dessus (hors essai) sont oubliées à leur fin.
+---@param nodeId string
+function harvest.forgetNode(nodeId)
+    for _, session in pairs(sessions) do
+        if session.node.id == nodeId and not session.trial then session.stale = true end
+    end
 end
 
 --- Interrompt la récolte en cours si le jeton correspond. Toujours vrai.
@@ -190,6 +256,11 @@ end
 ---@return boolean ok
 ---@return table|string result  { item, label, quantity, tier, extra? } ou code
 function harvest.succeed(session)
+    if session.stale then
+        sessions[session.source] = nil
+        return false, 'unknown_node'
+    end
+    if session.trial then return succeedTrial(session) end
     local src, node, resource = session.source, session.node, session.resource
     local zone = node.zone
     if not nearNode(src, node) then return false, 'too_far' end

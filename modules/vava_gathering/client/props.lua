@@ -1,20 +1,25 @@
 --[[
     vava_gathering/client/props.lua
-    Rôle : les nœuds de récolte dans le monde, vus du joueur : état des zones et des nœuds (bande de vitalité,
-           cicatrice, charges) reçu des seules zones proches, par les abonnements de zone du core (core.zones.watch,
-           1.6.0) ; props LOCAUX (jamais réseau) créés pour les nœuds à portée et remplacés par leur modèle « épuisé »
-           quand la zone l'est, nœud le plus proche à distance d'interaction.
+    Rôle : les nœuds de récolte dans le monde, vus du joueur : zones reçues des seuls serveurs proches, par les
+           abonnements de zone du core (core.zones.watch, 1.6.0) ; depuis 1.8.0 (T-102), chaque zone porte aussi son nom,
+           son type et son lieu (`def`) et ses points (`p:<nœud>` : ressource, lieu, cap) — rien ne vient plus de la
+           config : une zone ou un point publiés dans l'Atelier paraissent sans redémarrage. Props LOCAUX (jamais
+           réseau) créés pour les nœuds à portée (modèle de leur ressource, `resources[…].prop`) et remplacés par leur
+           modèle « épuisé » quand la zone l'est ; nœud le plus proche à distance d'interaction.
+           Essai de l'Atelier (au seul auteur) : la zone essayée remplace l'affichage de la zone du même nom (ses points,
+           leurs charges d'essai) et compte comme une zone suivie ; sa fin rend l'état publié.
            Une seule boucle lente, active seulement quand un personnage est en jeu et suit au moins une zone : elle ne
            mesure que les zones suivies (centre et étendue de leurs nœuds), ne parcourt que les nœuds d'une zone à
            portée, passe toutes les streaming.pollMs près d'une zone et toutes les streaming.idlePollMs loin de
-           toutes ; une zone reçue, changée ou quittée fait aussitôt un passage (props et invite à jour sans attendre),
-           la première reçue relance la boucle ; elle s'arrête d'elle-même quand plus aucune zone n'est suivie, à la
+           toutes ; les nœuds d'une zone ne sont regroupés de nouveau que quand cette zone entre, change ou sort, et
+           elle fait aussitôt un passage ; la boucle s'arrête d'elle-même quand plus aucune zone n'est suivie, à la
            sélection et au déchargement, et retire alors tous les props.
     Dépendances : shared/constants.lua, config_client.lua, shared/geometry.lua, shared/proximity.lua, shared/zonestate.lua,
                   client/core.lua (core.zones, vAvA_core 0.11.0)
 ]]
 
 local type, pairs, ipairs, next, huge, max, tostring = type, pairs, ipairs, next, math.huge, math.max, tostring
+local sort = table.sort
 local CreateThread, Wait, GetGameTimer, AddEventHandler = CreateThread, Wait, GetGameTimer, AddEventHandler
 local PlayerPedId, GetEntityCoords, DoesEntityExist, DeleteObject = PlayerPedId, GetEntityCoords, DoesEntityExist, DeleteObject
 local RequestModel, HasModelLoaded, IsModelValid, SetModelAsNoLongerNeeded, GetHashKey = RequestModel, HasModelLoaded, IsModelValid, SetModelAsNoLongerNeeded, GetHashKey
@@ -25,38 +30,47 @@ if not core then return end
 
 local cfg = VavaGathering.config
 local streaming = cfg.streaming
+local resources = cfg.resources
 local geometry = VavaGathering.geometry
 local proximity = VavaGathering.proximity
 local zonestate = VavaGathering.zonestate
 local BANDS = VavaGathering.BANDS
 local RESOURCE = VavaGathering.resource
 local LOAD_POLL_MS = 50
+-- charges montrées d'un nœud dont le serveur n'a pas encore envoyé les siennes
+local UNKNOWN_CHARGES = 1
 
 local props = {}
 VavaGathering.props = props
 
--- index de la config
-local zonesById, nodesById = {}, {}
-for _, zone in ipairs(cfg.zones) do zonesById[zone.id] = zone end
-for _, node in ipairs(cfg.nodes) do nodesById[node.id] = node end
--- nœuds regroupés par zone (la config ne change pas en jeu) ; un groupe naît « actif » pour que le premier passage
--- retire ce qui serait hors de portée
-local groups = proximity.group(cfg.nodes, function(node) return node.zone or ('node:' .. node.id) end)
-for _, group in ipairs(groups) do group.active = true end
 -- un nœud est mesuré si sa zone peut en avoir un à portée des props ou de l'invite
 local REACH = max(streaming.radius, cfg.interact.distance)
 
--- zones suivies, reçues du serveur : id de zone → { zone = { band, scarred } | nil, charges = { [nœud] = charges } }
+-- zones suivies, reçues du serveur : id de zone → enregistrement (shared/zonestate.lua › decode)
 ---@type table<string, vAvA.GatheringZoneRecord>
 local followed = {}
+-- essais de l'Atelier reçus (auteur seul) : id de zone → enregistrement (shared/zonestate.lua › trial)
+---@type table<string, vAvA.GatheringTrialRecord>
+local trials = {}
+-- nœuds regroupés par zone (reconstruits pour la seule zone qui entre, change ou sort) : id de zone → groupe
+local groups = {}
+-- nœuds montrés, par identifiant : { id, zone, resource, x, y, z, heading }
+local nodesById = {}
 -- props affichés : id de nœud → { entity, model, loading }
 local shown = {}
 local running, playing = false, false
 local nearestId, nearestDistance = nil, nil
 ---@type fun(nodeId: string|nil)|nil
 local onNearest = nil
+---@type fun(zoneId: string, def: table|nil)|nil
+local onDef = nil
 
 local DEFAULT_ZONE = { band = BANDS.NORMAL, scarred = false }
+
+--- Ce qui est montré d'une zone : l'essai de l'auteur s'il y en a un, sinon l'état publié reçu.
+local function viewOf(zoneId)
+    return trials[zoneId] or followed[zoneId]
+end
 
 ---@param id string
 ---@return table|nil
@@ -64,16 +78,18 @@ function props.node(id)
     return nodesById[id]
 end
 
----@param id string
+--- Nom, type et lieu d'une zone montrée ({ label, kind, x, y, z, radius }), ou nil.
+---@param zoneId string
 ---@return table|nil
-function props.zone(id)
-    return zonesById[id]
+function props.zone(zoneId)
+    local view = viewOf(zoneId)
+    return view and view.def or nil
 end
 
 ---@param node table
 ---@return table|nil
 function props.resource(node)
-    return cfg.resources[node.resource]
+    return resources[node.resource]
 end
 
 --- État d'une zone (pleine, sans cicatrice, tant que le serveur ne l'a pas envoyée).
@@ -91,20 +107,42 @@ function props.isDepleted(zoneId)
     return state.band == BANDS.DEPLETED or state.scarred == true
 end
 
---- Charges d'un nœud (celles de la config tant que le serveur ne les a pas envoyées).
+--- Zone d'eau (type de lieu dans config.waterKinds) ?
+---@param zoneId string
+---@return boolean
+function props.isWater(zoneId)
+    local def = props.zone(zoneId)
+    return def ~= nil and type(cfg.waterKinds) == 'table' and cfg.waterKinds[def.kind] == true
+end
+
+--- La zone est-elle montrée en essai (auteur seul) ?
+---@param zoneId string
+---@return boolean
+function props.isTrial(zoneId)
+    return trials[zoneId] ~= nil
+end
+
+--- Charges d'un nœud : celles de l'essai, sinon celles reçues du serveur.
 ---@param node table
 ---@return integer
 function props.charges(node)
+    local trial = trials[node.zone]
+    if trial then
+        local item = trial.nodes[node.id]
+        return item and item.charges or 0
+    end
     local record = followed[node.zone]
     local charges = record and record.charges[node.id]
     if type(charges) == 'number' then return charges end
-    return node.charges
+    return UNKNOWN_CHARGES
 end
 
 ---@param node table
----@return string
+---@return string|nil
 local function modelFor(node)
-    return props.isDepleted(node.zone) and node.prop.depleted or node.prop.model
+    local resource = resources[node.resource]
+    if not resource or type(resource.prop) ~= 'table' then return nil end
+    return props.isDepleted(node.zone) and resource.prop.depleted or resource.prop.model
 end
 
 ---@param id string
@@ -155,11 +193,11 @@ end
 ---@param distance number
 local function reconcile(node, distance)
     local entry = shown[node.id]
-    if distance > streaming.radius then
+    local model = distance <= streaming.radius and modelFor(node) or nil
+    if not model then
         if entry then remove(node.id) end
         return
     end
-    local model = modelFor(node)
     if entry then
         if entry.loading or entry.model == model then return end
         remove(node.id)
@@ -167,36 +205,67 @@ local function reconcile(node, distance)
     spawn(node, model)
 end
 
---- Retire une fois les props d'un groupe sorti de portée (ou dont la zone n'est plus suivie).
+--- Nœuds montrés d'une zone, triés par identifiant (ressource connue du client seulement).
+local function nodesOfView(zoneId, view)
+    local list = {}
+    for id, place in pairs(view.nodes) do
+        if resources[place.resource] then
+            list[#list + 1] = { id = id, zone = zoneId, resource = place.resource, x = place.x, y = place.y,
+                z = place.z, heading = place.heading or 0.0 }
+        end
+    end
+    sort(list, function(a, b) return a.id < b.id end)
+    return list
+end
+
+local function sameNode(a, b)
+    return a.x == b.x and a.y == b.y and a.z == b.z and a.heading == b.heading and a.resource == b.resource
+end
+
+--- Regroupe de nouveau les nœuds d'une seule zone (entrée, changement, sortie, essai) : un nœud disparu ou changé perd
+--- son prop (recréé au passage suivant s'il est à portée).
+---@param zoneId string
+local function rebuild(zoneId)
+    local old = groups[zoneId]
+    local view = viewOf(zoneId)
+    local list = view and nodesOfView(zoneId, view) or {}
+    local byId = {}
+    for _, node in ipairs(list) do byId[node.id] = node end
+    for _, node in ipairs(old and old.targets or {}) do
+        local newer = byId[node.id]
+        if not newer or not sameNode(node, newer) then remove(node.id) end
+        if not newer and nodesById[node.id] == node then nodesById[node.id] = nil end
+    end
+    for _, node in ipairs(list) do nodesById[node.id] = node end
+    local group = #list > 0 and proximity.group(list, function() return zoneId end)[1] or nil
+    if group then group.active = true end
+    groups[zoneId] = group
+end
+
+--- Retire une fois les props d'un groupe sorti de portée.
 ---@param group table
 local function deactivate(group)
     group.active = false
     for _, node in ipairs(group.targets) do remove(node.id) end
 end
 
---- Un passage : une distance par zone suivie, puis une par nœud des seules zones à portée ; une zone qui sort de
---- portée ou n'est plus suivie retire ses props une fois. Ne cède jamais la main. Rend l'intervalle du prochain
---- passage : streaming.pollMs près d'une zone, streaming.idlePollMs quand aucun nœud ne peut être à moins de radius +
---- idleMargin (aucune zone suivie : la boucle s'arrête, et la prochaine zone reçue fait aussitôt un passage).
+--- Un passage : une distance par zone montrée, puis une par nœud des seules zones à portée ; une zone qui sort de
+--- portée retire ses props une fois. Ne cède jamais la main. Rend l'intervalle du prochain passage.
 ---@return integer
 local function step()
     local coords = GetEntityCoords(PlayerPedId())
     local px, py, pz = coords.x, coords.y, coords.z
     local bestId, bestDistance = nil, cfg.interact.distance
     local closest = huge
-    for _, group in ipairs(groups) do
-        if followed[group.key] then
-            local reachable, gap = proximity.reachable(group, px, py, pz, REACH)
-            if gap < closest then closest = gap end
-            if reachable then
-                group.active = true
-                for _, node in ipairs(group.targets) do
-                    local distance = geometry.distance(px, py, pz, node.x, node.y, node.z)
-                    reconcile(node, distance)
-                    if distance <= bestDistance then bestId, bestDistance = node.id, distance end
-                end
-            elseif group.active then
-                deactivate(group)
+    for _, group in pairs(groups) do
+        local reachable, gap = proximity.reachable(group, px, py, pz, REACH)
+        if gap < closest then closest = gap end
+        if reachable then
+            group.active = true
+            for _, node in ipairs(group.targets) do
+                local distance = geometry.distance(px, py, pz, node.x, node.y, node.z)
+                reconcile(node, distance)
+                if distance <= bestDistance then bestId, bestDistance = node.id, distance end
             end
         elseif group.active then
             deactivate(group)
@@ -207,10 +276,9 @@ local function step()
     return proximity.interval(closest, streaming.radius, streaming.idleMargin, streaming.pollMs, streaming.idlePollMs)
 end
 
---- Boucle lente justifiée, seulement quand un personnage est en jeu et suit au moins une zone (voir step) : loin de
---- toute zone de récolte, elle ne tourne pas ; la première zone reçue la relance.
+--- Boucle lente justifiée, seulement quand un personnage est en jeu et suit au moins une zone (voir step).
 local function loop()
-    while playing and next(followed) ~= nil do
+    while playing and next(groups) ~= nil do
         Wait(step())
     end
     for id in pairs(shown) do remove(id) end
@@ -221,9 +289,18 @@ end
 
 --- Lance la boucle si elle doit tourner et ne tourne pas.
 local function wake()
-    if playing and not running and next(followed) ~= nil then
+    if playing and not running and next(groups) ~= nil then
         running = true
         CreateThread(loop)
+    end
+end
+
+--- Une zone a changé : regroupée, passage aussitôt (props et invite à jour sans attendre).
+local function changed(zoneId)
+    rebuild(zoneId)
+    if playing then
+        step()
+        wake()
     end
 end
 
@@ -247,9 +324,14 @@ function props.onNearest(fn)
     onNearest = fn
 end
 
---- Zones de récolte proches, envoyées par le core aux seuls joueurs à portée (nom local = id de la zone ; état
---- `zone` → { band, scarred }, `n:<nœud>` → charges) : entrée (état entier, ou de nouveau entier après un trou),
---- changement (clés changées, clés retirées), sortie (valeurs par défaut). Le monde suit aussitôt.
+--- Appelé quand une zone suivie porte (ou change) son nom, son type et son lieu : blip corrigé (client/blips.lua).
+---@param fn fun(zoneId: string, def: table|nil)
+function props.onDef(fn)
+    onDef = fn
+end
+
+--- Zones de récolte proches, envoyées par le core aux seuls joueurs à portée (nom local = id de la zone) : entrée
+--- (état entier, ou de nouveau entier après un trou), changement (clés changées, clés retirées), sortie.
 ---@param kind string  'enter' | 'change' | 'leave'
 ---@param id any
 ---@param data any   état (enter) ou clés changées (change)
@@ -267,9 +349,36 @@ local function onZone(kind, id, data, removed)
     else
         return
     end
-    if playing then
-        step()
-        wake()
+    local record = followed[id]
+    if record and record.def and onDef then onDef(id, record.def) end
+    changed(id)
+end
+
+--- Essai de l'Atelier reçu (auteur seul) : entier ou différence.
+---@param payload any
+function props.trial(payload)
+    local zoneId = zonestate.trialZone(payload)
+    if not zoneId then return end
+    local record = zonestate.trial(trials[zoneId], payload)
+    if not record then return end
+    trials[zoneId] = record
+    changed(zoneId)
+end
+
+--- Fin de l'essai d'une zone : l'état publié est rendu.
+---@param zoneId any
+function props.trialEnd(zoneId)
+    zoneId = zonestate.trialZone(zoneId)
+    if not zoneId or not trials[zoneId] then return end
+    trials[zoneId] = nil
+    changed(zoneId)
+end
+
+--- Personnage déchargé ou retour à la sélection : les essais montrés sont oubliés.
+local function forgetTrials()
+    for zoneId in pairs(trials) do
+        trials[zoneId] = nil
+        rebuild(zoneId)
     end
 end
 
@@ -283,8 +392,14 @@ function props.start()
     end
 
     core.hooks.after('core:character:spawning', function() props.setPlaying(true) end)
-    core.hooks.after('core:character:selection', function() props.setPlaying(false) end)
-    core.hooks.after('core:character:unloaded', function() props.setPlaying(false) end)
+    core.hooks.after('core:character:selection', function()
+        forgetTrials()
+        props.setPlaying(false)
+    end)
+    core.hooks.after('core:character:unloaded', function()
+        forgetTrials()
+        props.setPlaying(false)
+    end)
     if core.characters.current() and not core.characters.awaitingSelection() then props.setPlaying(true) end
 end
 

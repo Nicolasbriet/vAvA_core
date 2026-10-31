@@ -12,11 +12,17 @@
            dans la config (celles d'une zone ou d'un nœud retiré partent au redémarrage du serveur).
            L'état d'une zone est public (positions déclarées par les clients sous OneSync) : rien de secret dedans, et
            chaque action revérifie la distance côté serveur sans se fier à l'abonnement (server/harvest.lua).
+           T-102 : le dernier état déclaré de chaque zone est gardé ; une zone changée par l'Atelier est seulement
+           notée (`touch`), puis `flush` (au `info.last` d'un lot, ou par la boucle lente au-delà de
+           `editor.flushGraceMs`) traite chaque zone notée une fois : déclarée si elle est nouvelle, déplacée si son
+           cercle change, différence de son état envoyée par paquets de 64 clés dans le même tour (le core la regroupe
+           pour chaque abonné), retirée si elle n'existe plus. Rien ne part pour une zone dont rien de visible n'a
+           changé (fatigue, repos, cicatrice, charges maximales, repousse : part serveur).
     Dépendances : shared/constants.lua, config.lua, shared/zonestate.lua, server/core.lua, bridge/server.lua,
                   server/catalog.lua
 ]]
 
-local pairs, ipairs, tostring = pairs, ipairs, tostring
+local type, pairs, ipairs, tostring = type, pairs, ipairs, tostring
 local GlobalState, GetGameTimer = GlobalState, GetGameTimer
 
 local bridge = VavaGathering.bridge
@@ -31,6 +37,18 @@ VavaGathering.share = share
 -- zones déclarées au core (zone → true) ; une zone absente n'envoie rien : elle partira entière à sa déclaration
 ---@type table<string, true>
 local declared = {}
+-- dernier état déclaré ou envoyé, et dernier cercle, par zone (différences de l'Atelier)
+---@type table<string, table>
+local lastState, lastArea = {}, {}
+-- zones changées par l'Atelier, en attente de diffusion : zone → GetGameTimer de la première note
+---@type table<string, integer>
+local touched = {}
+-- état entier neuf d'une zone (server/main.lua) : définition et état, ou nil si la zone n'existe plus
+---@type fun(zoneId: string): table|nil, table|nil
+local builder = nil
+-- appelé après chaque diffusion (empreinte de la liste de la carte, server/map.lua)
+---@type fun()|nil
+local afterFlush = nil
 -- dernier refus écrit en console par zone : un nouveau refus est écrit aussitôt ; le même refus est compté et rappelé
 -- au plus une fois toutes les REMIND_MS avec son nombre (un refus durable, `full`, ne remplit pas la console)
 ---@type table<string, { code: string, count: integer, at: integer }>
@@ -88,9 +106,10 @@ function share.declare(def, state)
     end
     if ok then
         declared[id], failures[id] = true, nil
+        lastState[id], lastArea[id] = state, area
         return true
     end
-    declared[id] = nil
+    declared[id], lastState[id], lastArea[id] = nil, nil, nil
     failed(id, action, code)
     return false, tostring(code)
 end
@@ -110,10 +129,94 @@ end
 function share.set(zoneId, key, value)
     if stopped or not declared[zoneId] then return false end
     local ok, code = bridge.ZoneSet(zoneId, { [key] = value })
-    if ok then return true end
-    declared[zoneId] = nil
+    if ok then
+        if lastState[zoneId] then lastState[zoneId][key] = value end
+        return true
+    end
+    declared[zoneId], lastState[zoneId], lastArea[zoneId] = nil, nil, nil
     failed(zoneId, 'set', code)
     return false
+end
+
+-- Atelier (T-102) -------------------------------------------------------------------------------------------------------
+
+--- Fonctions de la diffusion : `build(zoneId)` rend la définition et l'état entier neuf d'une zone (nil, nil si elle
+--- n'existe plus) ; `after()` est appelé après chaque diffusion.
+---@param build fun(zoneId: string): table|nil, table|nil
+---@param after fun()|nil
+function share.configure(build, after)
+    builder, afterFlush = build, after
+end
+
+--- Zone changée par l'Atelier : notée, diffusée au prochain `flush`.
+---@param zoneId string
+function share.touch(zoneId)
+    if type(zoneId) == 'string' and not touched[zoneId] then touched[zoneId] = GetGameTimer() end
+end
+
+---@param a table|nil
+---@param b table
+---@return boolean
+local function sameArea(a, b)
+    return a ~= nil and a.x == b.x and a.y == b.y and a.z == b.z and a.radius == b.radius and a.margin == b.margin
+end
+
+--- Diffuse une zone notée : déclarée (nouvelle), déplacée et sa différence envoyée (connue), ou retirée.
+---@param id string
+local function flushOne(id)
+    local def, state = builder(id)
+    if not def then
+        if declared[id] then
+            local ok, code = bridge.ZoneRemove(id)
+            if not ok and code ~= 'unknown_zone' then failed(id, 'remove', code) end
+        end
+        declared[id], lastState[id], lastArea[id], failures[id] = nil, nil, nil, nil
+        return
+    end
+    if not declared[id] then
+        share.declare(def, state)
+        return
+    end
+    local area = share.area(def)
+    if not sameArea(lastArea[id], area) then
+        local ok, code = bridge.ZoneMove(id, area)
+        if not ok then
+            declared[id], lastState[id], lastArea[id] = nil, nil, nil
+            failed(id, 'move', code)
+            return
+        end
+        lastArea[id] = area
+    end
+    local changes, removed = zonestate.diff(lastState[id], state)
+    for _, chunk in ipairs(zonestate.chunks(changes, removed)) do
+        local ok, code = bridge.ZoneSet(id, chunk.changes, #chunk.removed > 0 and chunk.removed or nil)
+        if not ok then
+            -- redéclarée entière au passage suivant de la boucle lente
+            declared[id], lastState[id], lastArea[id] = nil, nil, nil
+            failed(id, 'set', code)
+            return
+        end
+    end
+    lastState[id] = state
+end
+
+--- Diffuse les zones notées (toutes, ou celles notées depuis plus de `graceMs`) : chacune une fois, sans céder la main
+--- (les différences d'un même tour partent ensemble chez chaque abonné).
+---@param graceMs? integer
+function share.flush(graceMs)
+    if stopped or not builder then return end
+    local now, any = GetGameTimer(), false
+    local ids = {}
+    for id, at in pairs(touched) do
+        if not graceMs or now - at >= graceMs then ids[#ids + 1] = id end
+    end
+    table.sort(ids)
+    for _, id in ipairs(ids) do
+        touched[id] = nil
+        flushOne(id)
+        any = true
+    end
+    if any and afterFlush then afterFlush() end
 end
 
 --- Arrêt du module : plus aucune déclaration ni aucun envoi (le core oublie nos zones sans rien envoyer, et chaque

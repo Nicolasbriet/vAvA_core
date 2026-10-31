@@ -4,9 +4,10 @@
            joueurs) : bandes de vitalité et leurs effets, cicatrice, réaction de la terre, saisons, tolérances des
            gestes, durée et qualité d'une récolte, pêche (barre de tension, touche, prise), battement d'abonnement
            des zones, journal, droits, débits, solidité par défaut d'un outil, objets déclarés à l'inventaire, textes.
-           Complète la table ouverte par config_client.lua (invite, streaming, carte, touches, outils, ressources,
-           zones et nœuds, animations) sans en réécrire une clé (T-132). Modifiable sans toucher au code. Durées en
-           millisecondes sauf mention contraire.
+           Complète la table ouverte par config_client.lua (invite, streaming, carte, touches, genre des outils, part
+           client des ressources, animations) sans en réécrire une clé (T-132). T-102 : zones et nœuds (graine de
+           l'Atelier), part serveur des ressources et des outils, apparences, réglages de l'atelier « Récolte », essai
+           à blanc. Modifiable sans toucher au code. Durées en millisecondes sauf mention contraire.
     Dépendances : shared/constants.lua, config_client.lua
 ]]
 
@@ -14,6 +15,126 @@ local config = VavaGathering.config
 
 config.coreVersion = '0.11.0'   -- abonnements de zone (core.zones)
 config.dependencies = { vava_inventory = '1.4.0', vava_skills = '1.0.0' }
+
+-- T-102 : un config_client.lua d'avant 1.8.0 (gardé par une mise à jour) porte encore les zones et les nœuds ; ils
+-- sont ignorés (ceux d'ici, puis la base de l'Atelier, font foi) et le démarrage le signale en console.
+config.legacyClientPlaces = config.zones ~= nil or config.nodes ~= nil
+
+-- Zones et nœuds : la GRAINE de l'Atelier (vava_atelier, atelier « Récolte ») — version 1 au premier démarrage, puis la
+-- base fait foi (une zone ou un point changé en jeu l'emporte sur cette liste). Sans l'Atelier, la récolte tourne sur
+-- cette graine. EXEMPLES autour du point d'apparition par défaut, à remplacer par les lieux du royaume.
+-- Zones : `kind` type de lieu (editor.zoneKinds), `cost` vitalité perdue par récolte réussie, `regenPerHour` points
+-- rendus par heure, `scarHours` durée de la cicatrice. Ce que voit le joueur (nom, type, lieu) part dans l'état de zone.
+config.zones = {
+    { id = 'foret_brume', label = 'Forêt de Brume', kind = 'foret', x = -320.0, y = -880.0, z = 31.0, radius = 120.0, cost = 2.0, regenPerHour = 4.0, scarHours = 48 },   -- PLACEHOLDER
+    { id = 'mine_du_val', label = 'Mine du Val', kind = 'mine', x = -180.0, y = -1010.0, z = 29.0, radius = 80.0, cost = 2.5, regenPerHour = 3.0, scarHours = 72 },      -- PLACEHOLDER
+    { id = 'prairie_haute', label = 'Prairie Haute', kind = 'prairie', x = -380.0, y = -1060.0, z = 31.0, radius = 100.0, cost = 1.5, regenPerHour = 6.0, scarHours = 24 }, -- PLACEHOLDER
+    { id = 'riviere_claire', label = 'Rivière Claire', kind = 'eau', x = -120.0, y = -880.0, z = 29.0, radius = 60.0, cost = 2.0, regenPerHour = 5.0, scarHours = 36 },    -- PLACEHOLDER
+}
+
+-- Nœuds (« points » dans l'Atelier) : `label` nom du point, `charges` maximum, `regenMs` par charge rendue. Le modèle est
+-- celui de la ressource (config_client.lua, `resources[…].prop`).
+config.nodes = {
+    { id = 'foret_brume_chene_1', label = 'Chêne 1', zone = 'foret_brume', resource = 'chene', x = -300.0, y = -900.0, z = 31.0, heading = 0.0, charges = 3, regenMs = 600000 },           -- PLACEHOLDER
+    { id = 'foret_brume_chene_2', label = 'Chêne 2', zone = 'foret_brume', resource = 'chene', x = -330.0, y = -870.0, z = 31.0, heading = 40.0, charges = 3, regenMs = 600000 },          -- PLACEHOLDER
+    { id = 'foret_brume_pin_1', label = 'Pin 1', zone = 'foret_brume', resource = 'pin', x = -350.0, y = -910.0, z = 31.0, heading = 90.0, charges = 4, regenMs = 480000 },                -- PLACEHOLDER
+    { id = 'mine_du_val_fer_1', label = 'Filon de fer 1', zone = 'mine_du_val', resource = 'fer', x = -190.0, y = -1000.0, z = 29.0, heading = 0.0, charges = 3, regenMs = 900000 },       -- PLACEHOLDER
+    { id = 'mine_du_val_cuivre_1', label = 'Filon de cuivre 1', zone = 'mine_du_val', resource = 'cuivre', x = -170.0, y = -1020.0, z = 29.0, heading = 0.0, charges = 3, regenMs = 900000 }, -- PLACEHOLDER
+    { id = 'mine_du_val_pierre_1', label = 'Roche 1', zone = 'mine_du_val', resource = 'pierre', x = -200.0, y = -1030.0, z = 29.0, heading = 0.0, charges = 5, regenMs = 600000 },       -- PLACEHOLDER
+    { id = 'prairie_haute_lavande_1', label = 'Lavande 1', zone = 'prairie_haute', resource = 'lavande', x = -370.0, y = -1050.0, z = 31.0, heading = 0.0, charges = 4, regenMs = 420000 }, -- PLACEHOLDER
+    { id = 'prairie_haute_sauge_1', label = 'Sauge 1', zone = 'prairie_haute', resource = 'sauge', x = -395.0, y = -1075.0, z = 31.0, heading = 0.0, charges = 3, regenMs = 540000 },      -- PLACEHOLDER
+    { id = 'prairie_haute_lievre_1', label = 'Piste de lièvre 1', zone = 'prairie_haute', resource = 'piste_lievre', x = -400.0, y = -1040.0, z = 31.0, heading = 0.0, charges = 2, regenMs = 1200000 }, -- PLACEHOLDER
+    { id = 'prairie_haute_cerf_1', label = 'Piste de cerf 1', zone = 'prairie_haute', resource = 'piste_cerf', x = -360.0, y = -1090.0, z = 31.0, heading = 0.0, charges = 1, regenMs = 2400000 },     -- PLACEHOLDER
+    { id = 'riviere_claire_truite_1', label = 'Banc de truites 1', zone = 'riviere_claire', resource = 'truite', x = -110.0, y = -870.0, z = 29.0, heading = 0.0, charges = 4, regenMs = 600000 },   -- PLACEHOLDER
+    { id = 'riviere_claire_brochet_1', label = 'Banc de brochets 1', zone = 'riviere_claire', resource = 'brochet', x = -130.0, y = -895.0, z = 29.0, heading = 0.0, charges = 2, regenMs = 1200000 }, -- PLACEHOLDER
+}
+
+-- Part serveur des ressources (mêmes identifiants que `resources` de config_client.lua, sinon le module refuse de
+-- démarrer) : objet produit, compétence, difficulté, XP, rendement { min, max } avant bonus, durée du geste, nœud
+-- d'eau (barre de tension), pièce en plus.
+config.resourceStats = {
+    chene = { item = 'bois_chene', skill = 'bucheronnage', difficulty = 15, xp = 12, yield = { 2, 4 }, durationMs = 5000 },
+    pin = { item = 'bois_pin', skill = 'bucheronnage', difficulty = 5, xp = 8, yield = { 2, 4 }, durationMs = 4500 },
+    fer = { item = 'minerai_fer', skill = 'minage', difficulty = 25, xp = 14, yield = { 1, 3 }, durationMs = 6000 },
+    cuivre = { item = 'minerai_cuivre', skill = 'minage', difficulty = 10, xp = 10, yield = { 1, 3 }, durationMs = 5500 },
+    pierre = { item = 'pierre', skill = 'minage', difficulty = 0, xp = 6, yield = { 2, 5 }, durationMs = 4000 },
+    lavande = { item = 'lavande', skill = 'herboristerie', difficulty = 5, xp = 8, yield = { 1, 3 }, durationMs = 3500 },
+    sauge = { item = 'sauge', skill = 'herboristerie', difficulty = 20, xp = 12, yield = { 1, 3 }, durationMs = 4000 },
+    truite = { item = 'truite', skill = 'peche', difficulty = 10, xp = 10, yield = { 1, 2 }, durationMs = 0, fishing = true },
+    brochet = { item = 'brochet', skill = 'peche', difficulty = 35, xp = 16, yield = { 1, 1 }, durationMs = 0, fishing = true },
+    piste_lievre = { item = 'viande_lievre', skill = 'chasse', difficulty = 10, xp = 10, yield = { 1, 2 }, durationMs = 5000, extra = { item = 'peau_lievre', chance = 0.5 } },
+    piste_cerf = { item = 'viande_cerf', skill = 'chasse', difficulty = 40, xp = 18, yield = { 2, 3 }, durationMs = 7000, extra = { item = 'peau_cerf', chance = 0.7 } },
+}
+
+-- Part serveur des outils (mêmes objets que `tools` de config_client.lua) : puissance (divise la durée), bonus de
+-- rendement (unités) et de qualité (points de score), usure par usage (points de solidité).
+config.toolStats = {
+    hache_fer = { power = 1.0, yieldBonus = 0, qualityBonus = 0, wear = 2 },
+    pioche_fer = { power = 1.0, yieldBonus = 0, qualityBonus = 0, wear = 2 },
+    faucille_fer = { power = 1.0, yieldBonus = 0, qualityBonus = 0, wear = 1 },
+    couteau_fer = { power = 1.0, yieldBonus = 0, qualityBonus = 0, wear = 1 },
+    canne_a_peche = { power = 1.0, yieldBonus = 0, qualityBonus = 0, wear = 1 },
+}
+
+-- Apparence d'un point dans l'Atelier (« Apparence : chêne de GTA, modèle provisoire… »), par ressource. Le jour des
+-- modèles médiévaux : changer `prop` de la ressource et retirer `provisional`.
+config.looks = {
+    chene = { label = 'chêne de GTA', provisional = true },            -- PLACEHOLDER
+    pin = { label = 'pin de GTA', provisional = true },                -- PLACEHOLDER
+    fer = { label = 'rocher de GTA', provisional = true },             -- PLACEHOLDER
+    cuivre = { label = 'rocher de GTA', provisional = true },          -- PLACEHOLDER
+    pierre = { label = 'rocher de GTA', provisional = true },          -- PLACEHOLDER
+    lavande = { label = 'plante de GTA', provisional = true },         -- PLACEHOLDER
+    sauge = { label = 'plante de GTA', provisional = true },           -- PLACEHOLDER
+    truite = { label = 'flotteur de GTA', provisional = true },        -- PLACEHOLDER
+    brochet = { label = 'flotteur de GTA', provisional = true },       -- PLACEHOLDER
+    piste_lievre = { label = 'buisson de GTA', provisional = true },   -- PLACEHOLDER
+    piste_cerf = { label = 'buisson de GTA', provisional = true },     -- PLACEHOLDER
+}
+
+-- Atelier de la récolte (vava_atelier : zones et points créés, déplacés, réglés en jeu par le Conseil).
+config.editor = {
+    right = 'metiers',                                         -- droit de l'atelier (Sénéchal et au-dessus)
+    zoneRadius = { min = 10.0, max = 300.0, default = 60.0 },  -- rayon d'une zone (m) ; défaut au premier tracé
+    nodeSlack = 5.0,          -- un point peut déborder de sa zone de 5 m au plus (tronc au bord)
+    spacing = 2.0,            -- deux points d'une même zone à 2 m au moins (au sol)
+    overlapTolerance = 10.0,  -- deux zones peuvent se chevaucher de 10 m au plus
+    maxZones = 256,           -- zones vivantes au plus (le core en permet 1 024 par module)
+    maxNodesPerZone = 120,    -- points par zone (deux clés d'état par point, 256 clés au plus par zone du core)
+    flushGraceMs = 2000,      -- une diffusion en attente depuis plus de 2 s part au passage suivant de la boucle lente
+    zoneKinds = {             -- choix « Type de lieu » (chaque valeur a son icône dans map.kinds, sinon celle par défaut)
+        { value = 'foret', label = 'Forêt' }, { value = 'mine', label = 'Mine' },
+        { value = 'prairie', label = 'Prairie' }, { value = 'eau', label = 'Eau' },
+    },
+    -- valeurs de départ d'une zone ou d'un point nouveaux
+    defaults = { cost = 2.0, regenPerHour = 4.0, scarHours = 48, charges = 3, regenMs = 600000 },
+    texts = {
+        label = 'Récolte',
+        description = 'Forêts, mines, prairies et coins de pêche, arbres et filons un par un.',
+        trial = 'Tester la récolte',
+        publish = 'Publier la zone',
+        publishHint = 'Publier rend les nouveaux points visibles aux joueurs proches.',
+        trialLine = 'Mode essai : vous seul voyez ces points',
+        name = 'Une autre zone porte déjà ce nom.',
+        noPlaceZone = 'Placez la zone avant de l\'essayer ou de la publier.',
+        noPlaceNode = 'Placez le point avant de l\'essayer ou de le publier.',
+        radius = 'Le rayon doit aller de %d à %d m.',
+        overlap = 'Cette zone empiète sur « %s » de %d m.',
+        resource = 'Ressource inconnue.',
+        kind = 'Type de lieu inconnu.',
+        fishOnly = 'Une zone d\'eau ne porte que des bancs de poissons.',
+        waterOnly = 'Les poissons ne se pêchent que dans une zone d\'eau.',
+        outside = 'Ce point est hors de « %s ».',
+        tooClose = 'Trop près de « %s » (%s m).',
+        tooMany = 'Cette zone aurait %d points : %d au plus.',
+        tooManyZones = 'Le royaume a déjà %d zones de récolte.',
+        tooWide = 'Les points de « %s » s\'étendent à %d m de son centre : %d m au plus.',
+        noZone = 'La zone de ce point n\'est pas publiée : essayez ou publiez la zone.',
+        hint = '%d points',
+        compareTitle = 'Pour comparer',
+        compare = '%s — fatigue %s, repos %s pts/h',
+    },
+}
 
 -- Vitalité d'une zone (0 à 100). Au-dessus de `normal` : plein rendement ; entre `reduced` et `normal` : rendement
 -- et qualité réduits, chance d'échec ; sous `reduced` : zone épuisée (props remplacés), rendement effondré ;
@@ -120,6 +241,7 @@ config.admin = {
 }
 
 config.rateLimits = {
+    map = { capacity = 2, refillPerSecond = 0.05 },   -- liste de la carte : deux demandes, puis une toutes les 20 s
     begin = { capacity = 4, refillPerSecond = 1 },
     cancel = { capacity = 4, refillPerSecond = 1 },
     finish = { capacity = 4, refillPerSecond = 1 },
@@ -177,4 +299,7 @@ config.messages = {
     noSpace = 'Vous ne pouvez rien porter de plus.',
     tiers = { 'grossier', 'commun', 'soigné', 'excellent', 'chef-d\'œuvre' },
     toolKinds = { hache = 'une hache', pioche = 'une pioche', faucille = 'une faucille', couteau = 'un couteau', canne = 'une canne à pêche' },
+    -- T-102 : essai de l'Atelier, récolte à blanc (rien n'est donné)
+    trialHarvest = '[Essai] %s : %d × %s (%s). Rien n\'est donné pendant un essai.',
+    trialFailed = '[Essai] La récolte aurait échoué : la terre est fatiguée ici.',
 }

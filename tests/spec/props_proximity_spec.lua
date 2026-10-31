@@ -148,13 +148,22 @@ for _, module in ipairs(MODULES) do
     end)
 end
 
-describe('vava_gathering proximity : zones de la config', function()
-    -- client/props.lua passe cfg.nodes à proximity.group au chargement : essai sur la seule vue client (T-132, relecture
-    -- réseau R-2), constantes et config_client.lua comme chez un joueur
-    it('chaque nœud est dans le groupe de sa zone, et l\'étendue de chaque zone tient dans son rayon', function()
+describe('vava_gathering proximity : zones de la graine', function()
+    -- 1.8.0 (T-102) : le client ne lit plus les zones ni les nœuds dans sa config (ils arrivent par l'état des zones) ;
+    -- client/props.lua regroupe les nœuds d'une zone reçue par proximity.group, zone par zone. Essai sur la graine de
+    -- config.lua (ce que le serveur déclare au premier démarrage).
+    it('la vue client ne porte plus de zones ni de nœuds', function()
         helper.reset()
         helper.loadClientView('modules/vava_gathering', 'VavaGathering')
         assert.is_nil(VavaGathering.config.items, 'vue client : config.lua ne doit pas être chargé')
+        assert.is_nil(VavaGathering.config.zones)
+        assert.is_nil(VavaGathering.config.nodes)
+    end)
+
+    it('chaque nœud est dans le groupe de sa zone, et l\'étendue de chaque zone tient dans son rayon', function()
+        helper.reset()
+        VavaGathering = nil
+        helper.loadAll({ 'modules/vava_gathering/shared/constants.lua', 'modules/vava_gathering/config.lua' })
         helper.load('modules/vava_gathering/shared/proximity.lua')
         local cfg, proximity = VavaGathering.config, VavaGathering.proximity
         local groups = proximity.group(cfg.nodes, function(node) return node.zone end)

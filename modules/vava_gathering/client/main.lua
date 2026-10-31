@@ -4,6 +4,8 @@
            le joueur, aucune boucle), panneau des zones (touche, RPC, interface, repère de la carte posé sur une zone),
            évènements du serveur (touche de pêche, notifications par vava_hud sinon celles du jeu), retours de
            l'interface, fermeture au déchargement du personnage.
+           T-102 : essai de l'Atelier (`vava_gathering:trial`, `trialEnd`, envoyés au seul auteur) montré par
+           client/props.lua ; liste de la carte demandée à l'apparition (client/blips.lua).
     Dépendances : shared/constants.lua, config_client.lua, client/core.lua, client/nui.lua, client/props.lua, client/blips.lua,
                   client/interact.lua, client/fishing.lua
 ]]
@@ -99,6 +101,15 @@ end)
 
 RegisterNetEvent(EVENTS.NOTIFY, function(message, kind)
     if type(message) == 'string' then feed(message, kind) end
+end)
+
+-- essai de l'Atelier (auteur seul) : zone et points montrés à la place de l'état publié, puis rendus
+RegisterNetEvent(EVENTS.TRIAL, function(payload)
+    props.trial(payload)
+end)
+
+RegisterNetEvent(EVENTS.TRIAL_END, function(zoneId)
+    props.trialEnd(zoneId)
 end)
 
 -- Retours de l'interface --------------------------------------------------------------------------------------------

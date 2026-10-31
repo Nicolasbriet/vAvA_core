@@ -12,6 +12,10 @@
            touches, outils, ressources, zones et nœuds, animations) et la logique lue par le client (distances,
            proximité, état des zones) ; config.lua (pêche comprise), shared/season.lua et shared/catch.lua sont servis
            au seul serveur.
+           T-102 : zones et points créés, déplacés, réglés et essayés en jeu par le Conseil (atelier « Récolte » de
+           vava_atelier ; la config est la graine, la base fait foi), sans redémarrage : diffusion par l'état des zones
+           du core au dernier appel d'un lot, aux seuls joueurs proches ; essai à blanc chez son seul auteur ; liste de
+           la carte demandée à l'apparition et gardée en stockage local ; zones et nœuds sortis de config_client.lua.
     Dépendances : vAvA_core ≥ 0.11.0 (abonnements de zone), vava_ui ≥ 1.0.0 (polices, grain, papier et coins de la page, par
                   nui://vava_ui/…), vava_inventory ≥ 1.4.0 (objets, mains, métadonnées), vava_skills ≥ 1.0.0 (XP) ;
                   facultatifs : vava_hud (barre de progression, notifications), vava_admin (droit metiers), vava_chat,
@@ -25,7 +29,7 @@ use_experimental_fxv2_oal 'yes'
 
 name 'vava_gathering'
 description 'Récolte vAvA : zones à vitalité sur la carte, nœuds, outils en main, qualité, pêche, pistes de gibier'
-version '1.7.0'
+version '1.8.0'
 
 dependency 'vAvA_core'
 dependency 'vava_ui'
@@ -58,6 +62,7 @@ server_scripts {
     'config.lua',                -- complète VavaGathering.config : ce que lit le seul serveur
     'shared/season.lua',         -- logique pure, servie au seul serveur (testée hors jeu : tests/spec)
     'shared/catch.lua',          -- idem
+    'shared/editing.lua',        -- idem : atelier « Récolte » (formulaires, conversions, règles, liste de la carte)
     'server/core.lua',
     'bridge/server.lua',
     'server/journal.lua',
@@ -65,10 +70,13 @@ server_scripts {
     'server/share.lua',
     'server/zones.lua',
     'server/nodes.lua',
+    'server/trials.lua',
     'server/quality.lua',
     'server/harvest.lua',
     'server/fishing.lua',
     'server/admin.lua',
+    'server/map.lua',
+    'server/atelier.lua',
     'server/api.lua',
     'server/commands.lua',
     'server/main.lua',

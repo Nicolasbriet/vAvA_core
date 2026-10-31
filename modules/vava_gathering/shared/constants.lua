@@ -32,10 +32,11 @@ VavaGathering.MAX_TOKEN = 0x7FFFFFFF
 VavaGathering.FISHING_HOLD_RATIO = 0.6
 -- limites d'une zone du core (config/server.lua, zones : maxRadius, maxMargin, maxKeys), vérifiées à l'indexation pour
 -- qu'une zone hors bornes refuse le module avec un message clair au lieu d'être refusée en silence par le core. Avec
--- 255 nœuds au plus (la clé `zone` en plus) et des clés de 48 octets, l'état reste loin des 32 Ko du core.
+-- 120 nœuds au plus (deux clés chacun, `p:` et `n:`, plus `zone` et `def` : 242 clés sur 256), l'état reste sous les
+-- 32 Ko du core (≈ 9 Ko pour 120 points).
 VavaGathering.ZONE_MAX_RADIUS = 500.0
 VavaGathering.ZONE_MAX_MARGIN = 500.0
-VavaGathering.ZONE_MAX_NODES = 255
+VavaGathering.ZONE_MAX_NODES = 120   -- T-102 : deux clés d'état par point (`p:` et `n:`), 2 + 2 × 120 ≤ 256
 
 -- Intentions du client (RPC à schéma strict, débit limité).
 VavaGathering.RPC = {
@@ -44,10 +45,26 @@ VavaGathering.RPC = {
     FINISH = 'vava_gathering:finish',   -- jeton : fin du geste de récolte
     REEL = 'vava_gathering:reel',       -- jeton, tenue (booléen) : fin de la barre de tension
     ZONES = 'vava_gathering:zones',     -- zones proches et leur vitalité (panneau)
+    MAP = 'vava_gathering:map',         -- version gardée : liste des zones de la carte si elle a changé (T-102)
 }
 
 -- Évènements serveur → client, toujours vers le seul joueur concerné.
 VavaGathering.EVENTS = {
     BITE = 'vava_gathering:bite',       -- { token, tension = { durationMs, zoneMin, zoneMax, drift, pull, gravity } }
     NOTIFY = 'vava_gathering:notify',   -- message, nature (info | warning | danger)
+    -- T-102 : essai de l'Atelier, au seul auteur : { zone, mode = 'full' | 'patch', def?, nodes?, hidden? }
+    TRIAL = 'vava_gathering:trial',
+    TRIAL_END = 'vava_gathering:trialEnd',   -- identifiant de la zone : l'essai prend fin
 }
+
+-- T-102 : état d'une zone tenu par le core (shared/zonestate.lua) : `def` (nom, type, lieu de la zone), `p:<nœud>`
+-- (ressource et lieu d'un point), en plus de `zone` (bande, cicatrice) et `n:<nœud>` (charges).
+VavaGathering.DEF_KEY = 'def'
+VavaGathering.PLACE_PREFIX = 'p:'
+VavaGathering.MAX_LABEL = 80          -- nom d'une zone dans l'état (octets)
+VavaGathering.MAX_KIND = 16           -- type de lieu
+VavaGathering.MAX_RESOURCE = 32       -- identifiant d'une ressource
+-- liste des zones de la carte gardée par le client (stockage local) : clé, zones au plus, octets au plus
+VavaGathering.MAP_KVP = 'vava_gathering:map'
+VavaGathering.MAX_MAP_ZONES = 256
+VavaGathering.MAX_MAP_BYTES = 16384

@@ -5,11 +5,14 @@
            ou interruption (cancel : nouvel appui, déplacement). Pour un nœud d'eau, la ligne est lancée et c'est
            client/fishing.lua qui prend la suite à la touche. À terre (vava_health), ni invite ni demande. Le client
            ne décide de rien : il montre, joue et demande ; le serveur notifie les résultats.
+           T-102 : zone d'eau lue dans l'état de la zone (`def`), invite marquée « Essai » sur un point d'essai de
+           l'Atelier (`trial = true`), durée du geste prise de la seule réponse du serveur.
     Dépendances : shared/constants.lua, config_client.lua, shared/geometry.lua, client/core.lua, client/nui.lua,
                   client/props.lua
 ]]
 
-local type, tostring, pcall, ipairs = type, tostring, pcall, ipairs
+local type, tostring, pcall = type, tostring, pcall
+local tointeger, tonumber = math.tointeger, tonumber
 local CreateThread, Wait, SetTimeout, GetGameTimer = CreateThread, Wait, SetTimeout, GetGameTimer
 local PlayerPedId, GetEntityCoords, GetResourceState = PlayerPedId, GetEntityCoords, GetResourceState
 local TaskStartScenarioInPlace, TaskPlayAnim, ClearPedTasks = TaskStartScenarioInPlace, TaskPlayAnim, ClearPedTasks
@@ -32,12 +35,6 @@ local HANDS_FIELD = 'vava_inventory:hands'
 local MOVE_POLL_MS = 250
 local ANIM_LOAD_MS = 5000
 local ANIM_BLEND = 8.0
-
--- zones d'eau (config.waterKinds) : l'invite parle de l'eau, non de la terre
-local WATER_ZONES = {}
-for _, zone in ipairs(cfg.zones) do
-    if type(cfg.waterKinds) == 'table' and cfg.waterKinds[zone.kind] == true then WATER_ZONES[zone.id] = true end
-end
 
 local interact = {}
 VavaGathering.interact = interact
@@ -146,10 +143,13 @@ function interact.refreshPrompt(nodeId)
     local charges = props.charges(node)
     local payload = {
         key = cfg.keys.interact, anim = resource.anim, label = resource.label, charges = charges,
-        exhausted = charges <= 0, zoneDepleted = props.isDepleted(node.zone), water = WATER_ZONES[node.zone] == true,
+        exhausted = charges <= 0, zoneDepleted = props.isDepleted(node.zone), water = props.isWater(node.zone),
         toolKind = resource.tool, toolOk = toolOk(resource),
+        -- essai de l'Atelier : la page ajoute « Essai » à l'invite
+        trial = props.isTrial(node.zone) or nil,
     }
-    local signature = table.concat({ node.id, charges, tostring(payload.zoneDepleted), tostring(payload.toolOk) }, '|')
+    local signature = table.concat({ node.id, charges, tostring(payload.zoneDepleted), tostring(payload.toolOk),
+        tostring(payload.trial) }, '|')
     if signature == lastPrompt then return end
     lastPrompt = signature
     nui.send('prompt', payload)
@@ -284,7 +284,8 @@ function interact.begin(nodeId)
         if current.kind == 'fishing' then
             nui.send('cast', { label = result.label or resource.label, key = cfg.keys.interact })
         else
-            local durationMs = result.durationMs or resource.durationMs
+            -- durée annoncée par le serveur, seule source (la config du client ne la porte plus)
+            local durationMs = tointeger(tonumber(result.durationMs)) or 0
             progressStart(result.label or resource.label, durationMs)
             SetTimeout(durationMs, function() finish(current) end)
         end

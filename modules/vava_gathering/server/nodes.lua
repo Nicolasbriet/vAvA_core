@@ -6,6 +6,9 @@
            une récolte avant toute attente et rendues si elle n'aboutit pas, publiées aux seuls joueurs qui suivent la
            zone du nœud (clé `n:<nœud>` de la zone du core, server/share.lua), au seul changement.
            Écriture groupée sans perte : un changement pendant l'écriture reste à écrire.
+           T-102 : lignes de la base gardées au chargement (nœuds encore inconnus compris) ; un nœud posé par l'Atelier
+           reprend la sienne, ses charges ramenées à son nouveau maximum (`ensure`) ; un nœud retiré garde la sienne
+           (`forget`).
     Dépendances : shared/constants.lua, config.lua, shared/zonestate.lua, server/core.lua, bridge/server.lua,
                   server/catalog.lua, server/share.lua
 ]]
@@ -38,25 +41,60 @@ VavaGathering.nodes = nodes
 ---@type table<string, vAvA.NodeState>
 local states = {}
 local WRITING = 'writing'
+-- lignes de la base lues au chargement, par nœud (nœuds encore inconnus compris : créés ensuite par l'Atelier)
+local rows = {}
 
 --- Charge l'état de tous les nœuds de la config (plein pour un nœud jamais vu). Bloque le thread courant.
 ---@return boolean ok
 ---@return string|nil err
 function nodes.load()
-    local rows, err = bridge.db.query(SELECT_SQL, {})
+    local list, err = bridge.db.query(SELECT_SQL, {})
     if err then return false, err end
-    local byId = {}
-    for _, row in ipairs(rows) do byId[row.node] = row end
+    for _, row in ipairs(list) do rows[row.node] = row end
     local now = time()
-    for id, def in pairs(catalog.nodes()) do
-        local row = byId[id]
-        if row then
-            states[id] = { charges = min(def.charges, bridge.Integer(row.charges, def.charges)), updatedAt = bridge.Integer(row.updated_at, now), published = nil, dirty = false }
-        else
-            states[id] = { charges = def.charges, updatedAt = now, published = nil, dirty = true }
-        end
-    end
+    for id, def in pairs(catalog.nodes()) do states[id] = nodes.stateOf(def, now) end
     return true
+end
+
+--- État d'un nœud tiré de sa ligne gardée (charges bornées à son maximum), ou plein.
+---@param def vAvA.NodeDefinition
+---@param now integer
+---@return vAvA.NodeState
+function nodes.stateOf(def, now)
+    local row = rows[def.id]
+    if row then
+        return { charges = min(def.charges, bridge.Integer(row.charges, def.charges)), updatedAt = bridge.Integer(row.updated_at, now), published = nil, dirty = false, zoneId = def.zone.id }
+    end
+    return { charges = def.charges, updatedAt = now, published = nil, dirty = true, zoneId = def.zone.id }
+end
+
+--- Nœud posé par l'Atelier : son état repris (mémoire, puis ligne gardée ; sinon plein), charges ramenées à son
+--- nouveau maximum, posées comme publiées (l'état entier de sa zone du core les portera).
+---@param def vAvA.NodeDefinition
+---@return vAvA.NodeState
+function nodes.ensure(def)
+    local now = time()
+    local state = states[def.id]
+    if not state then
+        state = nodes.stateOf(def, now)
+        states[def.id] = state
+    end
+    state.gone = nil
+    if state.zoneId ~= def.zone.id then state.zoneId, state.dirty = def.zone.id, true end
+    if state.charges > def.charges then state.charges, state.dirty = def.charges, true end
+    nodes.refresh(def, state, now)
+    state.published = state.charges
+    return state
+end
+
+--- Nœud retiré par l'Atelier : plus publié ; son état reste écrit (et repris s'il revient).
+---@param id string
+function nodes.forget(id)
+    local state = states[id]
+    if state then
+        state.gone = true
+        state.published = nil
+    end
 end
 
 --- Applique le temps écoulé : charges rendues, reste du délai conservé. Pur calcul en mémoire. La saison (vava_time,
@@ -193,8 +231,10 @@ function nodes.tick()
     local now = time()
     for id, def in pairs(catalog.nodes()) do
         local state = states[id]
-        nodes.refresh(def, state, now)
-        nodes.publish(def, state)
+        if state then
+            nodes.refresh(def, state, now)
+            nodes.publish(def, state)
+        end
     end
 end
 
@@ -206,7 +246,7 @@ function nodes.collect(queries)
         if state.dirty then
             state.dirty = WRITING
             local def = catalog.node(id)
-            queries[#queries + 1] = { query = UPSERT_SQL, values = { id, def.zone.id, state.charges, state.updatedAt } }
+            queries[#queries + 1] = { query = UPSERT_SQL, values = { id, def and def.zone.id or state.zoneId, state.charges, state.updatedAt } }
         end
     end
 end

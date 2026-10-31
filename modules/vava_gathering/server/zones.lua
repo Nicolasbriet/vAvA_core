@@ -7,6 +7,9 @@
            changement ; relues et republiées au passage de la boucle lente d'écriture pour que les props reviennent
            quand la zone se remet ; écriture groupée sans perte (un changement pendant l'écriture reste à écrire).
            Hooks `vava_gathering:zoneDepleted`, `zoneScarred`, `earthReaction` (after).
+           T-102 : les lignes de la base sont gardées au chargement, celles des zones encore inconnues comprises ; une
+           zone posée par l'Atelier reprend la sienne (`ensure`), une zone retirée garde la sienne en base (`forget` :
+           un retour en arrière retrouve la terre comme elle était).
     Dépendances : shared/constants.lua, config.lua, shared/zonestate.lua, server/core.lua, bridge/server.lua,
                   server/journal.lua, server/catalog.lua, server/share.lua
 ]]
@@ -52,6 +55,8 @@ VavaGathering.zones = zones
 ---@type table<string, vAvA.ZoneState>
 local states = {}
 local WRITING = 'writing'
+-- lignes de la base lues au chargement, par zone (zones encore inconnues comprises : créées ensuite par l'Atelier)
+local rows = {}
 
 ---@param now integer
 ---@return vAvA.ZoneState
@@ -59,32 +64,60 @@ local function fresh(now)
     return { vitality = 100.0, updatedAt = now, scarredUntil = nil, depletions = 0, lastDepletionAt = nil, published = nil, dirty = true }
 end
 
+--- État d'une zone tiré de sa ligne gardée, ou neuf.
+---@param id string
+---@param now integer
+---@return vAvA.ZoneState
+local function stateOf(id, now)
+    local row = rows[id]
+    if not row then return fresh(now) end
+    local scarredUntil = row.scarred_until ~= nil and bridge.Integer(row.scarred_until, 0) or nil
+    if scarredUntil == 0 then scarredUntil = nil end
+    local lastDepletion = row.last_depletion_at ~= nil and bridge.Integer(row.last_depletion_at, 0) or nil
+    if lastDepletion == 0 then lastDepletion = nil end
+    return {
+        vitality = min(100.0, max(0.0, bridge.Number(row.vitality, 100.0))), updatedAt = bridge.Integer(row.updated_at, now),
+        scarredUntil = scarredUntil, depletions = bridge.Integer(row.depletions, 0), lastDepletionAt = lastDepletion,
+        published = nil, dirty = false,
+    }
+end
+
 --- Charge l'état de toutes les zones de la config (100 % pour une zone jamais vue). Bloque le thread courant.
 ---@return boolean ok
 ---@return string|nil err
 function zones.load()
-    local rows, err = bridge.db.query(SELECT_SQL, {})
+    local list, err = bridge.db.query(SELECT_SQL, {})
     if err then return false, err end
-    local byId = {}
-    for _, row in ipairs(rows) do byId[row.zone] = row end
+    for _, row in ipairs(list) do rows[row.zone] = row end
     local now = time()
-    for _, def in ipairs(catalog.zones()) do
-        local row = byId[def.id]
-        if row then
-            local scarredUntil = row.scarred_until ~= nil and bridge.Integer(row.scarred_until, 0) or nil
-            if scarredUntil == 0 then scarredUntil = nil end
-            local lastDepletion = row.last_depletion_at ~= nil and bridge.Integer(row.last_depletion_at, 0) or nil
-            if lastDepletion == 0 then lastDepletion = nil end
-            states[def.id] = {
-                vitality = min(100.0, max(0.0, bridge.Number(row.vitality, 100.0))), updatedAt = bridge.Integer(row.updated_at, now),
-                scarredUntil = scarredUntil, depletions = bridge.Integer(row.depletions, 0), lastDepletionAt = lastDepletion,
-                published = nil, dirty = false,
-            }
-        else
-            states[def.id] = fresh(now)
-        end
-    end
+    for _, def in ipairs(catalog.zones()) do states[def.id] = stateOf(def.id, now) end
     return true
+end
+
+--- Zone posée par l'Atelier : son état (repris s'il existe : mémoire, puis ligne gardée ; sinon neuf), sa bande posée
+--- comme publiée (l'état entier de sa zone du core la portera).
+---@param def vAvA.ZoneDefinition
+---@return vAvA.ZoneState
+function zones.ensure(def)
+    local state = states[def.id]
+    if not state then
+        state = stateOf(def.id, time())
+        states[def.id] = state
+    end
+    state.gone = nil
+    zones.refresh(def, state)
+    state.published = zonestate.zoneValue(zones.band(state), state.scarredUntil ~= nil)
+    return state
+end
+
+--- Zone retirée par l'Atelier : plus relue ni publiée ; son état reste écrit (et repris si elle revient).
+---@param id string
+function zones.forget(id)
+    local state = states[id]
+    if state then
+        state.gone = true
+        state.published = nil
+    end
 end
 
 --- Applique le temps écoulé : fin de cicatrice, régénération (ralentie pendant une cicatrice). Pur calcul en
