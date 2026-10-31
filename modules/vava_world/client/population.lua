@@ -4,7 +4,7 @@
            pas de véhicules garés, bateaux, trains, camions-poubelles ni policiers ; services d'intervention coupés,
            pas d'avis de recherche (les sons : client/audio.lua). Réglages persistants : posés une fois (et à chaque
            apparition), jamais à chaque image.
-    Dépendances : shared/constants.lua, config.lua
+    Dépendances : shared/constants.lua, config_client.lua
 ]]
 
 local PlayerId = PlayerId

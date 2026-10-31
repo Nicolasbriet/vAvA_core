@@ -4,7 +4,7 @@
            mixage de GTA), véhicules lointains, sirènes au loin, radio de police, musiques d'avion et d'avis de
            recherche, émetteurs fixes choisis. Réglages persistants : posés au démarrage et à chaque apparition,
            jamais à chaque image ; une scène déjà active n'est pas relancée.
-    Dépendances : config.lua
+    Dépendances : config_client.lua
 ]]
 
 local ipairs = ipairs

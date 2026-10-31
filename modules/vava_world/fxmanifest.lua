@@ -4,6 +4,8 @@
            train, avion, animal, ni police ou secours), décidé par le serveur pour chaque instance, et les sons de la
            ville moderne coupés chez chaque joueur (circulation, foule, véhicules lointains, sirènes, radio de
            police). Plus tard : heure, météo.
+           T-132 : les joueurs ne téléchargent que les constantes et config_client.lua (population, avis de
+           recherche, sons) ; config.lua (instances préparées, nettoyage au démarrage) est servi au seul serveur.
     Dépendances : vAvA_core ≥ 0.5.0 (OneSync requis)
 ]]
 
@@ -14,16 +16,19 @@ use_experimental_fxv2_oal 'yes'
 
 name 'vava_world'
 description 'Monde vAvA (carte sans population)'
-version '1.1.0'
+version '1.2.0'
 
 dependency 'vAvA_core'
 
+-- Les joueurs ne téléchargent que les shared_scripts et les client_scripts : config.lua, en tête des server_scripts,
+-- n'est jamais servi (T-132).
 shared_scripts {
     'shared/constants.lua',
-    'config.lua',
+    'config_client.lua',         -- ouvre VavaWorld.config : ce que lit le client
 }
 
 server_scripts {
+    'config.lua',                -- complète VavaWorld.config : ce que lit le seul serveur
     'server/core.lua',
     'server/population.lua',
     'server/api.lua',
