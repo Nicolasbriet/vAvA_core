@@ -511,7 +511,7 @@ versé à T-014 ; les autres points déjà couverts sont précisés dans T-012 �
   (`docs/tests/reseau.md` § 3, `docs/tests/chancellerie.md` § 3).
 
 ### T-132 — Configs partagées : n'envoyer au client que ce qu'il lit
-- Agents : vava-architecte → vava-dev-lua · Dépend de : — · Statut : à faire
+- Agents : vava-architecte → vava-dev-lua · Dépend de : — · Statut : en cours
 - **Priorité : juste après la fusion de T-101** (relecture réseau R-4 de T-101 : la config partagée de `vava_atelier`
   est passée de 10 844 à 25 629 octets, gzip 3 958 → 7 996, téléchargés par chaque joueur ; le client n'en lit
   qu'≈ 2,4 Ko). Commencer par `vava_atelier`.
