@@ -89,6 +89,7 @@ Points à traiter (tâches de la phase 1) :
 - La magie n'a jamais été jouée en vrai (README de `vava_magic`) : c'est le module le plus risqué en performance
   (projectiles, effets, zones).
 - **≈ 190 Ko de Lua servis pour rien** (configs et logique du serveur en `shared_scripts`) : T-132 (règle, outillage,
-  lot 1 : `vava_atelier`, `vava_arrival`, `vava_chancellerie`, ≈ 41,7 Ko en moins), puis T-141, T-142, T-143 (lots
-  2 à 4, exceptions transitoires dans `scripts/audit-exceptions.txt`).
+  lot 1 : `vava_atelier`, `vava_arrival`, `vava_chancellerie`, ≈ 41,7 Ko en moins), T-141 (lot 2 : `vava_skills`,
+  `vava_farming`, `vava_crafting`, `vava_gathering`, `vava_provisions`, ≈ 66,4 Ko en moins, net du manifeste), puis
+  T-142, T-143 (lots 3 et 4, exceptions transitoires dans `scripts/audit-exceptions.txt`).
 - Pas de tests ni de lint avant ce kit : base de départ de **14 avertissements luacheck mineurs** (relevés le 29 octobre 2026).

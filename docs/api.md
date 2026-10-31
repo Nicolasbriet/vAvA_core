@@ -770,8 +770,9 @@ Réglages d'un module (T-132, aucune API du core) : chaque module lit sa config 
 (`VavaXxx.config`). Un module basculé la tient en deux fichiers, chaque valeur écrite une fois : `config_client.lua`
 (`shared_scripts`, téléchargé par chaque joueur) ouvre la table avec ce que lit le client et pose `clientFile = true` ;
 `config.lua` (en tête des `server_scripts`, jamais téléchargé) la complète avec ce que lit le seul serveur. Basculés :
-`vava_atelier` 1.2.0, `vava_arrival` 1.2.0 ; `vava_chancellerie` 1.7.1 ne sert plus rien aux joueurs ; les autres
-suivent (T-141 à T-143). Règle complète : `docs/plan/specs/T-132.md` § 2.4.
+`vava_atelier` 1.2.0, `vava_arrival` 1.2.0 ; `vava_chancellerie` 1.7.1 ne sert plus rien aux joueurs ; métiers (T-141) :
+`vava_skills` 1.3.0, `vava_farming` 1.8.0, `vava_crafting` 1.6.0, `vava_gathering` 1.7.0, `vava_provisions` 1.1.0 ; les
+autres suivent (T-142, T-143). Règle complète : `docs/plan/specs/T-132.md` § 2.4.
 
 ### `vava_ui`
 
@@ -1843,7 +1844,8 @@ icônes sont des masques CSS, refusés depuis `file://`).
 Les compétences du royaume (1.1.3), fondation des métiers : treize compétences de 0 à 100 (Récolte : Bûcheronnage,
 Minage, Herboristerie, Pêche, Chasse · Terre : Agriculture · Transformation : Forge, Menuiserie, Tissage et couture,
 Tannerie, Alchimie, Cuisine · Savoir : Arcanes) et six rangs (Novice, Apprenti 20, Compagnon 40, Artisan 60, Maître 80,
-Grand Maître 95). Tout est en `config.lua` ; le détail des règles et la liste des tests en jeu sont dans
+Grand Maître 95). Tout est en `config.lua`, sauf la touche du livre et son texte d'indisponibilité
+(`config_client.lua`, 1.3.0) ; le détail des règles et la liste des tests en jeu sont dans
 `modules/vava_skills/README.md`. Demande le core 0.6.0 (temps de jeu) et `vava_inventory` 1.4.0 ; facultatifs :
 `vava_hud` (notifications), `vava_admin` (droits `metiers` et `staff`, journal du Conseil), `vava_chat` (réponses des
 commandes).
@@ -1934,10 +1936,10 @@ jeu : `modules/vava_gathering/README.md`. Demande le core 0.11.0 (abonnements de
 `vava_skills` 1.0.0 ; facultatifs : `vava_hud`, `vava_admin` (droit `metiers`), `vava_chat`, `vava_health` (à terre),
 `vava_time` (saisons).
 
-- **Données** en `config.lua` : zones (centre, rayon, coût, régénération, cicatrice), nœuds (position, ressource, charges,
+- **Données** en `config_client.lua` (1.7.0 : le client les lit) : zones (centre, rayon, coût, régénération, cicatrice), nœuds (position, ressource, charges,
   délai, props normal et épuisé — tous les nœuds ont un prop créé par le client), ressources (objet, compétence, outil,
-  difficulté, XP, fourchette, durée, animation, pièce supplémentaire), outils, objets déclarés à l'inventaire. Les zones
-  livrées sont des exemples.
+  difficulté, XP, fourchette, durée, animation, pièce supplémentaire), outils ; en `config.lua` : objets déclarés à
+  l'inventaire. Les zones livrées sont des exemples.
 - **État** (1.6.0) envoyé aux seuls joueurs proches par les abonnements de zone du core (§ `core.zones`) : une zone du
   core par zone de récolte (nom local = identifiant de la zone ; centre de la zone, rayon qui englobe ses nœuds au sol,
   marge `streaming.radius` + `streaming.subscribeSlack` = 100 m) ; état `zone` → `{ band, scarred }` et `n:<nœud>` →

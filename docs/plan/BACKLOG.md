@@ -540,7 +540,7 @@ versé à T-014 ; les autres points déjà couverts sont précisés dans T-012 �
   `SCRIPT ERROR`), 7-A-3 (`resmon`), 7-A-12 (ancien `config.lua` signalé), 7-A-14 (`resource.rpf` avant et après).
 
 ### T-141 — Configs partagées, lot 2 : les métiers
-- Agent : vava-dev-lua · Dépend de : T-132 · Statut : à faire
+- Agent : vava-dev-lua · Dépend de : T-132 · Statut : en cours
 - Appliquer la règle de T-132 (`docs/plan/specs/T-132.md` § 2.4 et § 3.3) à `vava_farming`, `vava_crafting`,
   `vava_gathering`, `vava_skills` et à la config de `vava_provisions` ; retirer leurs exceptions transitoires de
   `scripts/audit-exceptions.txt` et leurs entrées `PENDING` de `tests/spec/config_split_spec.lua`. **À faire avant
@@ -552,6 +552,13 @@ versé à T-014 ; les autres points déjà couverts sont précisés dans T-012 �
   que le seul serveur lit n'est servi, même une feuille d'une table lue par le client (S-5 : `config.x.y = …` dans
   `config.lua`) ; gains mesurés
   par `scripts/poids-client.sh` au rapport (net du manifeste) ; `docs/tests/reseau.md` § 7-B écrit et joué.
+- Fait le 31 octobre 2026 (branche `agents/T-141`), relectures sécurité et réseau à faire : `vava_skills` 1.3.0,
+  `vava_farming` 1.8.0, `vava_crafting` 1.6.0, `vava_gathering` 1.7.0, `vava_provisions` 1.1.0 (`config_client.lua`
+  partagé, `config.lua` et la logique du seul serveur en `server_scripts`, feuilles du seul serveur ajoutées par
+  `config.lua`, avertissement d'un `config.lua` d'avant) ; cinq exceptions transitoires et entrées `PENDING` retirées ;
+  essais sur la vue client (`provisions_client_view_spec`, streaming, props). Lot 2 : 66 418 octets de moins par
+  joueur, net du manifeste (22 334 compressés). Rapport `docs/plan/rapports/T-141.md` ; procédure
+  `docs/tests/reseau.md` § 7-B.
 
 ### T-142 — Configs partagées, lot 3 : le socle
 - Agent : vava-dev-lua · Dépend de : T-132 · Statut : à faire

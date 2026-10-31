@@ -73,7 +73,7 @@ lourds de la minute, le reste sous `* · <autres>`) : plus de suivi à lancer, p
 
 | # | Faire | Attendu |
 |---|---|---|
-| 1 | `./scripts/audit-reseau.sh` puis `./scripts/audit-reseau.sh --essai` (ou `./scripts/verifier.sh`). | Aucun BLOQUANT hors exceptions inscrites (plus aucune exception des zones de voix depuis T-014 ; exceptions transitoires de T-132 pour les configs des lots 2 à 4) ; « ESSAI : OK (… cas) ». |
+| 1 | `./scripts/audit-reseau.sh` puis `./scripts/audit-reseau.sh --essai` (ou `./scripts/verifier.sh`). | Aucun BLOQUANT hors exceptions inscrites (plus aucune exception des zones de voix depuis T-014 ; exceptions transitoires de T-132 pour les configs des lots 3 et 4 depuis T-141) ; « ESSAI : OK (… cas) ». |
 
 ## 7. Ce que télécharge un joueur (T-132)
 
@@ -104,9 +104,33 @@ chaque ressource sert (brut et gzip).
 | 14 | Si possible : avant de passer à la branche (serveur sur `main`) puis après, vider le cache FiveM d'un client, se connecter, puis relever la taille de `cache/files/<ressource>/resource.rpf` (dossier de données de FiveM du client) pour `vava_atelier`, `vava_arrival`, `vava_chancellerie` ; ou mesurer le téléchargement. | Ordre de grandeur cohérent avec la colonne `total` de `./scripts/poids-client.sh vava_atelier vava_arrival vava_chancellerie` (Lua, page, images et manifeste) : `vava_atelier` ≈ 157 Ko (≈ 178 avant), `vava_arrival` ≈ 16,4 Ko (≈ 28,5 avant), `vava_chancellerie` ≈ 2,4 Ko, son seul manifeste (≈ 9,5 avant) ; noter au rapport les tailles relevées et si FXServer compresse. |
 | 15 | Mise à jour par la Chancellerie (1.8.5) d'un serveur où `config_client.lua` de l'Atelier a été modifié à la main. | Le fichier modifié est gardé, la nouvelle version posée à côté en `config_client.lua.nouveau` (comme `config.lua`). |
 
-7-B (lot 2, T-141), 7-C (lot 3, T-142), 7-D (lot 4, T-143) : écrits par chaque tâche sur le même modèle (démarrage
-sans ligne d'ancienne forme ; `F8` sans `SCRIPT ERROR` des modules du lot ; un tour des gestes de chaque module,
-en renvoyant à sa procédure ; un test **(2 joueurs)** par lot).
+### 7-B — lot 2 (T-141) : métiers et vivres
+
+Modules : `vava_skills` 1.3.0, `vava_farming` 1.8.0, `vava_crafting` 1.6.0, `vava_gathering` 1.7.0, `vava_provisions`
+1.1.0. Préparation de [metiers.md](metiers.md) § 0 et d'[eau.md](eau.md) § 0 (objets du catalogue, lieux d'exemple,
+réglages pour aller vite). Hors jeu, `./scripts/poids-client.sh vava_skills vava_farming vava_crafting vava_gathering
+vava_provisions` donne ce que chaque ressource sert.
+
+| # | Faire | Attendu |
+|---|---|---|
+| 1 | Démarrer le serveur. | `module 'vava_skills' v1.3.0 prêt`, `module 'vava_farming' v1.8.0 prêt`, `module 'vava_crafting' v1.6.0 prêt`, `module 'vava_gathering' v1.7.0 prêt`, `module 'vava_provisions' v1.1.0 prêt` ; aucune ligne « config.lua garde la forme d'avant … » ; aucun refus de config (`vava_provisions` relit sa config entière au démarrage, `vava_gathering` ses zones). |
+| 2 | **(2 joueurs)** A et B se connectent ; `F8` de chacun ; ouvrir chaque interface ci-dessous. | Aucune `SCRIPT ERROR` des cinq modules, au chargement comme pendant les gestes. |
+| 3 | B : `resmon 1`, loin de tout lieu de métier, puis près du bourg. | Comme avant (métiers 6) : 0,00 ms loin de tout ; les cinq modules présents (ils ont tous des scripts client). |
+| 4 | B : `K`, puis `K` de nouveau. | Le livre s'ouvre (métiers 2-1) et se ferme à la même touche (`keys.open`, lue dans `config_client.lua`). Si la fiche ne répond pas (rare), le texte « Le livre des compétences est indisponible pour le moment. » vient aussi de `config_client.lua`. |
+| 5 | B : Paramètres › Raccourcis › FiveM. | « Ouvrir le livre des compétences » (`K`), « Récolter (nœud proche) » (`E`), « Ouvrir le panneau des zones de récolte » (`O`), « Utiliser une station d'artisanat » (`E`), « Cultiver (emplacement, puits ou grenier proche) » (`E`), « Puiser ou boire (point d'eau proche) » (`E`). |
+| 6 | Récolte : métiers 3.1-1 et 3.1-2 (props, blips, panneau `O`), 3.2-2 et 3.2-4 (couper, marcher pendant le geste), 3.3-1 à 3.3-3 (pêche). | Comme avant : arbres et rochers à 80 m, blips des zones, invite, geste annulé au-delà de 1,5 m, barre de tension tenue à 60 %. |
+| 7 | Artisanat : métiers 4-1 à 4-4 (fourneau, forge), 4-8 (baptême d'un chef-d'œuvre), 4-9 (réparation). | Comme avant : props des stations, invite, animation de la station, nom refusé sous 2 ou au-delà de 32 lettres (boîte du client), réparation de 4 s. |
+| 8 | Agriculture : métiers 5-1 à 5-4 (planter, arroser), 5-6 (récolte à la faucille), 5-8 (grenier) ; puits du bourg (seau). | Comme avant : props des plantes par stade, invite, gestes et leurs animations, prop du puits. |
+| 9 | Vivres : eau 4 à 8 (approche, puiser, boire, pas soif, patienter), eau 18 (outre fendue : `tearChance = 1` dans `config.lua`). | Comme avant : props des points d'eau, invite « Puiser ou boire », textes de réussite, de refus et d'outre fendue (venus de `config_client.lua`). |
+| 10 | **(2 joueurs)** Leçon devant un élève (métiers 2-15) ou récolte communale au champ (métiers 5-6, A récolte, B regarde). | B voit le geste et les props comme avant ; la leçon est comptée (élève à 10 m), ou la plante récoltée disparaît chez B. |
+| 11 | Serveur arrêté ; remplacer `modules/vava_farming/config.lua` par celui de 1.7.0 (`git show 00db326:modules/vava_farming/config.lua`) ; démarrer. | Console : « config.lua garde la forme d'avant 1.8.0 … » ; l'agriculture marche quand même. Remettre le fichier de 1.8.0. |
+| 12 | Serveur arrêté ; `keys.open = 'J'` dans `modules/vava_skills/config_client.lua` ; démarrer ; un **nouveau** joueur se connecte. | `J` ouvre le livre chez lui (FiveM garde la touche déjà enregistrée chez A : attendu). Remettre `K`. |
+| 13 | Serveur arrêté ; `streaming.subscribeSlack = 35.0` dans `modules/vava_gathering/config.lua` ; démarrer ; B arrive au galop vers la Forêt de Brume (métiers 3.4-8). | Le réglage est pris (le serveur le lit dans `config.lua`, ajouté à la table `streaming`) ; arbres présents avant d'arriver. Remettre 20.0. |
+| 14 | Si possible : comme 7-A-14, avant (serveur sur `main`) et après, taille de `cache/files/<ressource>/resource.rpf` pour les cinq modules. | Ordre de grandeur cohérent avec la colonne `total` de `poids-client.sh` : `vava_farming` ≈ 127 Ko (≈ 151 avant), `vava_crafting` ≈ 133 Ko (≈ 149), `vava_gathering` ≈ 119 Ko (≈ 131), `vava_skills` ≈ 77 Ko (≈ 87), `vava_provisions` ≈ 81 Ko (≈ 84) ; noter au rapport. |
+
+7-C (lot 3, T-142), 7-D (lot 4, T-143) : écrits par chaque tâche sur le même modèle (démarrage sans ligne d'ancienne
+forme ; `F8` sans `SCRIPT ERROR` des modules du lot ; un tour des gestes de chaque module, en renvoyant à sa
+procédure ; un test **(2 joueurs)** par lot).
 
 ## Ce qui n'est pas compté
 

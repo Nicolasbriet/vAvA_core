@@ -33,8 +33,8 @@ qui doit se passer ; si ce n'est pas le cas, notez l'étape, ce que vous avez vu
    (−240, −905), puits (−236, −897), grenier (−222, −885), composteur (−224, −895). Registre → Déplacer vers un lieu.
 7. **Réglages pour aller vite** (facultatif, à remettre après) : `vava_skills/config.lua` → `lessons.minIntervalMs = 0`,
    `mentoring.minTeachPlaySeconds = 0`, `shortages.minActivePlayers = 0` ; `vava_farming/config.lua` →
-   `growth.wiltAfterHours = 0.05`, `dieAfterHours = 0.1`, et `growMinutes` des cultures à 2. Un `restart` du module
-   suffit.
+   `growth.wiltAfterHours = 0.05`, `dieAfterHours = 0.1` ; `vava_farming/config_client.lua` → `growMinutes` des cultures
+   à 2 (T-141). Un `restart` du module suffit.
 
 ## 1. Préalables
 
@@ -145,7 +145,7 @@ Pour « loin de tout », à plus de 500 m de tous les lieux du § 0.6.
 | 14 | B récolte jusqu'à faire changer la bande de la Forêt de Brume (`/recolte vitalite foret_brume 61`, puis une récolte : la vitalité passe à 59, sous le seuil `bands.normal` de 60). A : `/vava_reseau joueur <B>`. | Une seule `vAvA:zone:diff` sous `vava_gathering` pour cette récolte (charges et bande ensemble), pas deux. |
 | 15 | B, besace pleine, récolte un chêne. | « Vous ne pouvez rien porter de plus. » ; charge inchangée dans l'invite ; aucune `vAvA:zone:diff` pour cette récolte. |
 | 16 | B loin de toute zone de récolte : `resmon`. Puis B s'approche de la Forêt de Brume. | Loin : `vava_gathering` à 0,00 ms (boucle des props arrêtée). À l'approche : arbres à 80 m comme avant. |
-| 17 | Serveur arrêté : dans `config.lua`, déplacer un nœud de la Forêt de Brume à plus de 500 m du centre de la zone (par exemple `x = 300.0`), démarrer. Remettre la valeur ensuite. | Le module refuse de démarrer, console : « zone 'foret_brume' : rayon de … m (nœuds compris), 500 m au plus ». |
+| 17 | Serveur arrêté : dans `config_client.lua` (`nodes`, depuis 1.7.0), déplacer un nœud de la Forêt de Brume à plus de 500 m du centre de la zone (par exemple `x = 300.0`), démarrer. Remettre la valeur ensuite. | Le module refuse de démarrer, console : « zone 'foret_brume' : rayon de … m (nœuds compris), 500 m au plus ». |
 
 ## 4. Artisanat — `vava_crafting`
 
@@ -160,7 +160,7 @@ Pour « loin de tout », à plus de 500 m de tous les lieux du § 0.6.
 | 7 | Onglet Poinçon sous Compagnon. | Verrouillé. `/metiers niveau <vous> forge 40` → choisir un glyphe → il apparaît sur la pièce suivante. |
 | 8 | Chef-d'œuvre : `/metiers niveau <vous> minage 100`, `bucheronnage 100` et `forge 100` ; minerai et chêne pris dans des zones à pleine vitalité avec des outils neufs ; garder les piles **Chef-d'œuvre** (palier 5), en faire des lingots Chef-d'œuvre, puis l'Épée courte en choisissant le palier 5 pour chaque ingrédient (l'aperçu du menu l'annonce). | Toutes les matières au palier 5 : qualité de 86 à 96 → notification « Un chef-d'œuvre ! » et boîte de baptême ; le nom choisi apparaît sur la fiche. Avec des lingots tirés d'un minerai Excellent, ce n'est pas garanti (environ 40 % avec du chêne Chef-d'œuvre, jamais avec du chêne Grossier) : normal, la formule le veut. « Plus tard » : la station repropose le baptême tant que 5 min ne sont pas passées, plus après. À l'inverse, des matières de palier 5 à bas niveau donnent une qualité plafonnée au niveau. |
 | 8b | (`vava_crafting` 1.5.1, T-133) Au baptême du test 8, nom ` Ída Ýr-Là ` (espaces autour). | Accepté : « … porte désormais le nom « Ída Ýr-Là ». », lettres entières sur la fiche et dans l'histoire (« Baptême »). Avant 1.5.1, sous Windows, un nom finissant par « à » pouvait être refusé. Un nom avec `‐` (U+2010) ou `Š` reste refusé (hors des lettres de `masterpiece.nameLetters`). |
-| 9 | Hache brisée (la solidité baisse de 2 par coupe : 50 coupes, ou `wear = 50` sur `hache_fer` dans `vava_gathering/config.lua` le temps du test) → onglet Réparation à la forge. | Coût 25 % des ingrédients arrondi au-dessus (1 lingot, 1 bûche), bouton ; après le geste : 95 / 95, plus brisée, histoire « Réparation par … », créateur intact. Une hache réparée deux fois : 90 / 90. |
+| 9 | Hache brisée (la solidité baisse de 2 par coupe : 50 coupes, ou `wear = 50` sur `hache_fer` dans `vava_gathering/config_client.lua` le temps du test) → onglet Réparation à la forge. | Coût 25 % des ingrédients arrondi au-dessus (1 lingot, 1 bûche), bouton ; après le geste : 95 / 95, plus brisée, histoire « Réparation par … », créateur intact. Une hache réparée deux fois : 90 / 90. |
 | 10 | **(2 joueurs)** L'autre lance une pièce à la même forge. | « Quelqu'un travaille déjà ici ». |
 | 11 | Station avec `owner = { kind = 'character', id = <autre> }` dans la config. | « ne vous appartient pas ». |
 | 12 | `/artisanat station forge_bourg`, `/artisanat carburant forge_bourg 20`. | État et recettes dans le chat ; combustible fixé. |
