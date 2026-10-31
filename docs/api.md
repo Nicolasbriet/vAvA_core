@@ -771,7 +771,7 @@ Réglages d'un module (T-132, aucune API du core) : chaque module lit sa config 
 (`shared_scripts`, téléchargé par chaque joueur) ouvre la table avec ce que lit le client et pose `clientFile = true` ;
 `config.lua` (en tête des `server_scripts`, jamais téléchargé) la complète avec ce que lit le seul serveur. Basculés :
 `vava_atelier` 1.2.0, `vava_arrival` 1.2.0 ; `vava_chancellerie` 1.7.1 ne sert plus rien aux joueurs ; métiers (T-141) :
-`vava_skills` 1.3.0, `vava_farming` 1.8.0, `vava_crafting` 1.6.0, `vava_gathering` 1.7.0, `vava_provisions` 1.1.0 (1.2.0 :
+`vava_skills` 1.3.0, `vava_farming` 1.8.0, `vava_crafting` 1.6.0 (1.7.0 : types de stations au seul serveur), `vava_gathering` 1.7.0, `vava_provisions` 1.1.0 (1.2.0 :
 textes du Conseil au seul serveur, `shared/rules.lua` au seul serveur, `shared/texts.lua` partagé) ;
 socle (T-142) : `vava_inventory` 1.9.0, `vava_combat` 1.1.0, `vava_health` 1.5.0, `vava_time` 1.4.0 (1.5.0 : cours des
 ciels et son tirage au seul serveur, T-146), `vava_codex` 1.6.0,
@@ -2051,7 +2051,8 @@ config et tests : `modules/vava_crafting/README.md`.
 Demande le core 0.11.0 (abonnements de zone, depuis 1.5.0), `vava_inventory` 1.4.0, `vava_skills` 1.0.0,
 `vava_gathering` 1.0.0 ; facultatifs : `vava_hud`, `vava_admin` (droit `metiers`), `vava_chat`, `vava_health` (à terre).
 
-**Registres** : `vava_crafting:stations` (types : `{ label, skills, fuel?, anim, prop }`) et `vava_crafting:recipes`
+**Registres** : `vava_crafting:stations` (types : `{ label, skills, fuel?, anim, prop }` ; depuis 1.7.0, `anim` doit être
+une clé de `anims` de `config_client.lua`, sinon l'ajout est refusé : « animation '…' inconnue ») et `vava_crafting:recipes`
 (`{ label, skill, level, station, tool?, durationMs, difficulty, xp, signed?, signedIfQuality?, durability?,
 transmission?, fragments?, ingredients = { { item, quantity, minTier? } }, output = { item, quantity } }`), remplis par
 la config, ouverts aux autres modules ; chaque recette est aussi déclarée à `vava_skills:recipes`. Les armes de
@@ -2060,8 +2061,12 @@ signées, solidité tirée de sa fiche ; l'Épée courte reste une recette de l'
 
 **Stations chez les joueurs** (depuis 1.5.0) : chaque station placée est une zone du core (`core.zones`, nom = son
 identifiant, cercle de 2 m, marge de 100 m : `streaming.zoneRadius`, `streaming.radius` + `streaming.subscribeSlack`) ;
-état `def` → `{ type, label, x, y, z, heading, prop }` (dessin, ni qualité ni propriétaire) et `s` → `{ fuel, busy }`,
-reçus des seuls joueurs proches, puis en différences. Plus aucune clé GlobalState (les anciennes
+état `def` → `{ type, typeLabel, capacity?, label, x, y, z, heading, prop }` (dessin, ni qualité ni propriétaire ;
+depuis 1.7.0, nom du type et réserve de combustible, absente sans combustible) et `s` → `{ fuel, busy }`,
+reçus des seuls joueurs proches, puis en différences. Depuis 1.7.0 (T-144), le client ne connaît aucun type de
+station (`stationTypes` est dans `config.lua`, servi au seul serveur) : un type déclaré au registre par un autre module
+(le composteur de `vava_farming`) a son invite et son menu sans rien ajouter côté client ; son animation (clé de
+`anims`, dans `config_client.lua`) est donnée par le serveur au début d'un geste. Plus aucune clé GlobalState (les anciennes
 `vava_crafting:station:<id>` et `vava_crafting:stations` sont effacées une fois au démarrage) ni d'évènement
 `vava_crafting:station` (le menu ouvert suit la zone). L'état est public : chaque action revérifie distance, accès et
 occupation côté serveur. Un son ou un effet de station vise `core.zones.subscribers(id)` ou `core.net.sendNear`.

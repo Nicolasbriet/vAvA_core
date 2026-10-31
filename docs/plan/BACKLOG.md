@@ -653,7 +653,7 @@ versé à T-014 ; les autres points déjà couverts sont précisés dans T-012 �
   `vava_chancellerie/server/link.lua` (`%s` sur un code).
 
 ### T-144 — Invite du composteur
-- Agent : vava-dev-lua · Dépend de : — · Statut : à faire
+- Agent : vava-dev-lua · Dépend de : — · Statut : à tester en jeu (relu sécurité et réseau, suites appliquées)
 - Relecture réseau R-6 de T-141 (déjà sur `main`, à confirmer en jeu) : le type `composteur` est déclaré à l'artisanat
   par `vava_farming`, côté serveur seulement ; absent de `cfg.stationTypes` du client, la station n'a ni invite ni menu
   (`vava_crafting/client/interact.lua:122-124` : `props.type(station)` rend nil). Piste : envoyer avec le dessin de la
@@ -661,6 +661,16 @@ versé à T-014 ; les autres points déjà couverts sont précisés dans T-012 �
   chercher dans la config du client.
 - Critères : au composteur du champ, l'invite « Composteur » et le menu apparaissent (métiers 5-7) ; essai hors jeu
   d'une station d'un type inconnu de la config du client ; `config_split_spec` vert.
+- Fait le 31 octobre 2026 (branche `agents/T-144`) : `vava_crafting` 1.7.0, dessin d'une station avec `typeLabel` et
+  `capacity` (borne `FUEL_CAPACITY_MAX`, la même au registre des types), invite lue dans le dessin et qui suit un nom,
+  un nom de type ou une réserve changés (R-2), prop gardé quand seuls ces textes changent (R-1), animation prise de la
+  réponse du serveur, animation d'un type vérifiée au registre (S-2), `stationTypes` entier dans `config.lua` (le
+  client ne le lit plus ; module refusé avant toute déclaration sans cette table, S-3) ; essais hors jeu de la station
+  d'un type inconnu du client (`crafting_prompt_client_spec`) et du registre (`crafting_catalog_spec`) ;
+  `config_split_spec` vert sans changement. S-1 et `server/signature.lua:55` reportés à T-104. Rapport
+  `docs/plan/rapports/T-144.md`. **À tester en jeu** : `docs/tests/metiers.md` 5-7 (invite « Composteur du champ ·
+  Composteur » et menu au composteur), invites du bourg inchangées (combustible de la forge et du fourneau), geste avec
+  l'animation du type, aucune ligne « animation … inconnue » au démarrage.
 
 ### T-146 — Ciel de `vava_time` : cycle au seul serveur
 - Agent : vava-dev-lua · Dépend de : T-142 · Statut : à tester en jeu
@@ -931,7 +941,16 @@ maquettes.
 - Relectures de T-141 (sécurité S-3, réseau R-3) : `stationTypes` de l'artisanat reste entier dans
   `config_client.lua` (le client le lit par type) ; ≈ 0,4 Ko n'y sert que le serveur (compétences, réserve de
   combustible, 416 o), dont `prop`, jamais lu par le client (le dessin de la station porte déjà son modèle). Donner une
-  part client et une part serveur (contrôle T4 vert) ; voir aussi T-144 (invite du composteur).
+  part client et une part serveur (contrôle T4 vert) ; voir aussi T-144 (invite du composteur). Fait par T-144
+  (`vava_crafting` 1.7.0) : `stationTypes` entier dans `config.lua`, le client n'en lit plus rien.
+- Relecture sécurité S-1 de T-144 : un type modifié après l'indexation n'est pas republié (le dessin des stations de ce
+  type garde l'ancien nom, l'ancienne réserve, l'ancien modèle ; affichage seulement). Sur `core:registry:added` (et
+  retrait) de `vava_crafting:stations`, rafraîchir `def.type` des stations du type et rappeler `stations.share(def)`
+  pour chacune (le client ne recrée le prop que si le lieu ou le modèle changent, R-1 de T-144).
+- Relecture sécurité de T-144, pour information (antérieur) : `server/signature.lua:55` (`craftingSkills`, rang du
+  poinçon) ne parcourt que `cfg.stationTypes`, pas les types du registre : la compétence d'un type déclaré par un autre
+  module (Agriculture, par le composteur) n'est pas comptée parmi celles d'artisanat. Lire le registre quand les types
+  passeront à l'Atelier.
 
 ### T-105 — Confréries et leur créateur `vava_guilds` (remplace l'ancienne T-042)
 - Agents : vava-architecte → vava-dev-lua + vava-dev-nui · Dépend de : T-102 · Statut : à faire

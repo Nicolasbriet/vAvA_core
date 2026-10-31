@@ -1,11 +1,12 @@
 --[[
     vava_crafting/config_client.lua
     Rôle : réglages de l'artisanat que lit le client : longueur d'un nom de chef-d'œuvre, durée du geste de réparation,
-           distance d'interaction et annulation au mouvement, streaming des props, touche, types de stations (props,
-           animation, libellés), animations. Téléchargé par chaque joueur ; le serveur le lit aussi. Tout le reste
-           (paliers, qualité, poinçons, garde, réparation, durées, tolérances du serveur, droits, débits, outils,
-           stations placées, objets, recettes, textes) est dans config.lua, servi au seul serveur (T-132).
-    Les modèles de props sont des EXEMPLES : à remplacer par les props du royaume.
+           distance d'interaction et annulation au mouvement, streaming des props, touche, animations. Téléchargé par
+           chaque joueur ; le serveur le lit aussi. Tout le reste (paliers, qualité, poinçons, garde, réparation, durées,
+           tolérances du serveur, droits, débits, outils, types de stations, stations placées, objets, recettes,
+           textes) est dans config.lua, servi au seul serveur (T-132). Depuis 1.7.0 (T-144), le client ne lit plus les
+           types de stations : le nom du type, sa réserve de combustible et son modèle arrivent avec le dessin de chaque
+           station, l'animation avec la réponse du serveur au début d'un geste.
     Dépendances : shared/constants.lua
 ]]
 
@@ -41,19 +42,8 @@ VavaCrafting.config = {
     keys = { interact = 'E' },
     labels = { interact = 'Utiliser une station d\'artisanat' },
 
-    -- Types de stations : compétences servies, combustible éventuel (objet, unités par pièce, réserve), animation.
-    -- Entiers ici : le client les lit par type (prop, animation).
-    stationTypes = {
-        forge = { label = 'Forge', skills = { 'forge' }, fuel = { item = 'charbon', perCraft = 1, capacity = 20 }, anim = 'hammer', prop = 'prop_tool_bench02' },
-        etabli = { label = 'Établi', skills = { 'menuiserie' }, anim = 'hammer', prop = 'prop_tool_bench02_ld' },
-        metier_a_tisser = { label = 'Métier à tisser', skills = { 'tissage' }, anim = 'sew', prop = 'prop_table_03' },
-        alambic = { label = 'Alambic', skills = { 'alchimie' }, anim = 'brew', prop = 'prop_table_04' },
-        tannerie = { label = 'Tannerie', skills = { 'tannerie' }, anim = 'tan', prop = 'prop_rub_table_01' },
-        fourneau = { label = 'Fourneau', skills = { 'cuisine' }, fuel = { item = 'bois_pin', perCraft = 1, capacity = 20 }, anim = 'cook', prop = 'prop_bbq_3' },
-        table_arcanes = { label = 'Table d\'arcanes', skills = { 'arcanes' }, anim = 'study', prop = 'prop_table_08' },
-    },
-
-    -- Animations côté client : scénario du jeu, ou dictionnaire + animation en boucle.
+    -- Animations côté client : scénario du jeu, ou dictionnaire + animation en boucle. Chaque type de station
+    -- (config.lua, ou déclaré par un autre module) en nomme une ; le serveur la donne au début d'un geste.
     anims = {
         hammer = { scenario = 'WORLD_HUMAN_HAMMERING' },
         sew = { scenario = 'WORLD_HUMAN_SEAT_WALL' },
