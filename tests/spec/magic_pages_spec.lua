@@ -190,6 +190,45 @@ describe('vava_magic pages', function()
         end)
     end)
 
+    -- relecture sécurité S-1 de T-143 : la borne réseau d'un Murmure vient de config_client.lua ; le setup la refuse
+    -- au-delà de 4 096 octets ou si une page qui la porte ne tient pas dans un lot
+    describe('textBound', function()
+        it('accepte la borne livrée', function()
+            assert.same({ true }, { pages.textBound(murmure.textMaxBytes, limits) })
+        end)
+
+        it('refuse une borne absente, nulle, négative, fractionnaire ou en texte', function()
+            local cases = { n = 8, nil, 0, -1, 1.5, 0 / 0, math.huge, '1400', {} }
+            for i = 1, cases.n do
+                local bad = cases[i]
+                local ok, why = pages.textBound(bad, limits)
+                assert.is_false(ok, tostring(bad))
+                assert.matches('entier positif', why, 1, true)
+            end
+        end)
+
+        it('plafonne à 4 096 octets, quelle que soit la place du lot', function()
+            local wide = { contactMax = 160, pageBytes = 1000000 }
+            assert.is_true(pages.textBound(pages.TEXT_CAP, wide))
+            local ok, why = pages.textBound(pages.TEXT_CAP + 1, wide)
+            assert.is_false(ok)
+            assert.matches('4096 octets au plus', why, 1, true)
+            assert.is_false(pages.textBound(1000000, wide))
+        end)
+
+        it('une page qui porte le message tient dans un lot du registre', function()
+            local room = limits.pageBytes - limits.contactMax - pages.ENTRY_OVERHEAD
+            local small = { contactMax = limits.contactMax, pageBytes = 1000 }
+            local fit = small.pageBytes - small.contactMax - pages.ENTRY_OVERHEAD
+            assert.is_true(pages.textBound(fit, small))
+            local ok, why = pages.textBound(fit + 1, small)
+            assert.is_false(ok)
+            assert.matches(('%d octets au plus'):format(fit), why, 1, true)
+            -- avec la config livrée, le plafond de 4 096 est le plus strict
+            assert.is_true(room > pages.TEXT_CAP)
+        end)
+    end)
+
     describe('config', function()
         it('borne les lots', function()
             assert.equal('integer', math.type(limits.pageSize))

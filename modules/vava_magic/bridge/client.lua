@@ -7,7 +7,7 @@
            Pour un autre core, réécrire ces fonctions (et bridge/server.lua).
     Implémentation : modules officiels vAvA ; appels isolés, chaque module est facultatif (sans vava_hud : notification
            de GTA). Le verrouillage de cible est celui de ce module (client/targeting.lua, clic molette).
-    Dépendances : shared/constants.lua, config.lua, client/core.lua
+    Dépendances : shared/constants.lua, config_client.lua, client/core.lua
 ]]
 
 local type, pcall, tostring, ipairs = type, pcall, tostring, ipairs

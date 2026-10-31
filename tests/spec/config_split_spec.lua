@@ -11,7 +11,8 @@ local helper = require('tests.helper')
 -- table non pure — passée, parcourue, indexée par une variable — couvre toute la table). T2 (lecture statique) suit les alias `local a, b <const> = <Global>.config.x, cfg.y` (sur une ligne) et
 -- ferme par défaut : toute table de config utilisée autrement que par `.clé` — indexée par une variable, passée à une
 -- fonction, parcourue, rangée ailleurs, alias non suivi (`local c = cfg or {}`) — doit être ENTIÈRE dans la vue client
--- (relecture réseau R-1 et R-2). Une clé absente des deux vues (facultative) est ignorée.
+-- (relecture réseau R-1 et R-2). Une clé absente des deux vues (facultative) est ignorée. Un alias de la table du
+-- module (`local m = <Global>` puis `m.config`) n'est pas suivi : T2 le refuse (relecture réseau R-6 de T-142).
 
 local ROOT = (os.getenv('VAVA_ROOT') or '.') .. '/'
 
@@ -50,12 +51,6 @@ local MODULES = {
 }
 -- Ressources sans Lua : aucun script, rien à découper.
 local WITHOUT_LUA = { ['modules/vava_ui'] = true }
-
--- Modules pas encore basculés (lots 2 à 4 de T-132), sautés par T0 à T3 ; chaque lot retire les siens, avec leurs
--- exceptions transitoires de scripts/audit-exceptions.txt.
-local PENDING = {
-    vava_magic = 'T-143',
-}
 
 local SCRIPT_LISTS = {
     shared_script = 'shared', shared_scripts = 'shared',
@@ -334,8 +329,10 @@ local function trim(text)
 end
 
 --- Références à la config d'un fichier client (code sans commentaires ni contenu de chaînes) : liste de
---- { line, chain = { 'texts', 'refused' }, pure } — `pure` : l'expression entière d'un alias suivi
---- (`local texts = cfg.texts`), dont la table n'a pas à être entière côté client.
+--- { line, chain = { 'texts', 'refused' }, pure, moduleAlias } — `pure` : l'expression entière d'un alias suivi
+--- (`local texts = cfg.texts`), dont la table n'a pas à être entière côté client ; `moduleAlias` : lecture par un alias
+--- de la table du module (`local m = VavaXxx` puis `m.config`), que le lecteur ne suit pas et que T2 refuse (relecture
+--- réseau R-6 de T-142).
 local function configReads(code, global)
     local reads = {}
     local lines = {}
@@ -409,6 +406,42 @@ local function configReads(code, global)
         scan(lineNo, l, base, {})
         for name, chain in pairs(aliases) do scan(lineNo, l, '%f[A-Za-z0-9_]' .. escape(name), chain) end
     end
+    -- alias de la table du module : `[local] m [<const>] = <global>` (ou un tel alias), seul ou dans une affectation
+    -- multiple, jusqu'au point fixe ; chaque `m.config` est relevé (ni suivi, ni compté par T4)
+    local modules = {}
+    changed = true
+    while changed do
+        changed = false
+        for _, l in ipairs(lines) do
+            local names, exprs = l:match('^%s*local%s+([A-Za-z0-9_,%s<>]+)=%s*([^=].*)$')
+            if not names then names, exprs = l:match('^%s*([A-Za-z_][A-Za-z0-9_,%s]*)=%s*([^=].*)$') end
+            if names and not names:match('^function') then
+                local exprList, i = splitTop(exprs), 0
+                for n in names:gmatch('[^,]+') do
+                    i = i + 1
+                    local name = n:match('^%s*([A-Za-z_][A-Za-z0-9_]*)%s*<?%a*>?%s*$')
+                    local expr = exprList[i] and trim(exprList[i])
+                    if name and expr and name ~= global and not modules[name] and (expr == global or modules[expr]) then
+                        modules[name] = true
+                        changed = true
+                    end
+                end
+            end
+        end
+    end
+    for lineNo, l in ipairs(lines) do
+        for name in pairs(modules) do
+            local pos = 1
+            while true do
+                local s, e = l:find('%f[A-Za-z0-9_]' .. escape(name) .. '%.config%f[^A-Za-z0-9_]', pos)
+                if not s then break end
+                pos = e + 1
+                if s == 1 or not l:sub(s - 1, s - 1):match('[.:]') then
+                    reads[#reads + 1] = { line = lineNo, chain = {}, pure = false, moduleAlias = name }
+                end
+            end
+        end
+    end
     return reads
 end
 
@@ -422,6 +455,10 @@ end
 --- T2 pour un fichier : nil, ou le premier manquement. `full` : vue complète ; `client` : vue client.
 local function checkReads(file, code, global, full, client)
     for _, r in ipairs(configReads(code, global)) do
+        if r.moduleAlias then
+            return ('%s:%d lit la config par %s.config, alias de la table du module que le lecteur ne suit pas : '
+                .. 'écrire local cfg = %s.config'):format(file, r.line, r.moduleAlias, global)
+        end
         local f, c, path = full, client, 'config'
         local broken = false
         for _, key in ipairs(r.chain) do
@@ -453,7 +490,7 @@ end
 local function unreadLeaves(clientView, reads)
     local covering = {}
     for _, r in ipairs(reads) do
-        if not r.pure then covering[#covering + 1] = table.concat(r.chain, '.') end
+        if not r.pure and not r.moduleAlias then covering[#covering + 1] = table.concat(r.chain, '.') end
     end
     local unread = {}
     for _, entry in ipairs(paths(clientView, 'config')) do
@@ -490,32 +527,18 @@ local function cites(code, global, field)
 end
 
 describe('configs partagées (T-132)', function()
-    -- relectures S-3 et R-5 : les exceptions transitoires de l'audit et PENDING désignent les mêmes ressources, et une
-    -- exception qui ne couvre plus rien (manifeste déjà basculé) est signalée
-    it('exceptions « T-132 » de scripts/audit-exceptions.txt = PENDING, aucune morte', function()
+    -- T-143 : toutes les ressources sont basculées ; l'audit ne laisse plus rien taire les règles des manifestes de T-132
+    -- (config.lua servi, config_client.lua au seul serveur…). Une exception qui s'en réclamerait est refusée ici.
+    it('aucune exception « T-132 » ni exception de config dans un manifeste (scripts/audit-exceptions.txt)', function()
         local text = read('scripts/audit-exceptions.txt')
         assert(text, 'scripts/audit-exceptions.txt introuvable')
-        local excepted = {}
         for line in (text .. '\n'):gmatch('([^\n]*)\n') do
             local path, extract, reason = line:match('^([^\t#][^\t]*)\t([^\t]*)\t(.*)$')
-            if path and reason:match('^T%-132') then
-                local name = path:match('^[a-z]+/([^/]+)/fxmanifest%.lua$')
-                assert(name, 'exception T-132 hors d\'un manifeste : ' .. path)
-                assert.is_nil(excepted[name], 'deux exceptions T-132 pour ' .. name)
-                excepted[name] = true
-                local manifest = read(path)
-                assert(manifest, 'exception T-132 morte : ' .. path .. ' introuvable')
-                assert(manifest:find(extract, 1, true), 'exception T-132 morte : extrait absent de ' .. path)
-                local lists = parseManifest(manifest)
-                assert(indexOf(lists.shared, 'config.lua') or indexOf(lists.client, 'config.lua'),
-                    'exception T-132 morte : ' .. path .. ' ne sert plus config.lua (retirer l\'exception et PENDING)')
+            if path then
+                assert(not reason:match('T%-132'), 'exception de T-132 : ' .. line)
+                assert(not (path:match('fxmanifest%.lua$') and extract:lower():find('config', 1, true)),
+                    'exception de config dans un manifeste : ' .. line)
             end
-        end
-        for name in pairs(PENDING) do
-            assert(excepted[name], name .. ' est dans PENDING sans exception T-132 dans scripts/audit-exceptions.txt')
-        end
-        for name in pairs(excepted) do
-            assert(PENDING[name], name .. ' a une exception T-132 sans être dans PENDING')
         end
     end)
 
@@ -538,9 +561,7 @@ describe('configs partagées (T-132)', function()
     for _, mod in ipairs(MODULES) do
         local name = mod.dir:match('[^/]+$')
 
-        if PENDING[name] then
-            it(name .. ' : pas encore basculé', function() pending(PENDING[name] .. ' (lot de T-132)') end)
-        else describe(name, function()
+        describe(name, function()
             local manifest = read(mod.dir .. '/fxmanifest.lua')
             local lists = manifest and parseManifest(manifest) or { shared = {}, client = {}, server = {}, wild = {} }
             local hasClient, hasServer = exists(mod.dir .. '/config_client.lua'), exists(mod.dir .. '/config.lua')
@@ -653,7 +674,7 @@ describe('configs partagées (T-132)', function()
                     end
                 end
             end)
-        end) end
+        end)
     end
 end)
 
@@ -702,6 +723,22 @@ describe('configs partagées : T2 sur des sources d\'essai', function()
         assert.matches('utilise la table config entière', check('cfg = VavaX.config'), 1, true)
         assert.matches('utilise la table config entière', check('local cfg\ncfg = VavaX.config'), 1, true)
     end)
+
+    -- relecture réseau R-6 de T-142 : un alias de la table du module n'est pas suivi, il est refusé
+    it('alias de la table du module refusé, même pour une clé de la part client', function()
+        local failure = check('local x = VavaX\nlocal cfg = x.config\nprint(cfg.welcome.delayMs)')
+        assert.matches('client/x.lua:2 lit la config par x.config', failure, 1, true)
+        assert.matches('écrire local cfg = VavaX.config', failure, 1, true)
+        assert.matches('client/x.lua:2 lit la config par m.config',
+            check('local a, m <const> = 1, VavaX\nprint(m.config.kit.items)'), 1, true)
+        assert.matches('client/x.lua:3 lit la config par m2.config',
+            check('local m = VavaX\nlocal m2 = m\nshow(m2.config)'), 1, true)
+        assert.matches('client/x.lua:3 lit la config par m.config', check('local m\nm = VavaX\nshow(m.config)'), 1, true)
+        -- ni un champ d'une autre table, ni une autre table du module, ni une comparaison
+        assert.is_nil(check('local m = VavaX\nprint(self.m.config, m.configured, m.state)'))
+        assert.is_nil(check('local m = VavaX.state\nprint(m.config)'))
+        assert.is_nil(check('if m == VavaX then print(m.config) end'))
+    end)
 end)
 
 -- T1 compare chaque feuille de la vue client à la vue complète : une feuille `false` y est une valeur (T-142).
@@ -736,6 +773,11 @@ describe('configs partagées : T4 sur des sources d\'essai', function()
             'local cfg = VavaX.config\nlocal texts = cfg.texts\nprint(texts.refused[code], cfg.crops[id])'))
         assert.same({ 'crops.ble.growMinutes', 'crops.ble.stages.1', 'texts.refused.busy', 'texts.refused.wait',
             'texts.title' }, unread('show(VavaX.config.interact)'))
+    end)
+
+    it('lecture par un alias de la table du module : ne couvre rien', function()
+        assert.same({ 'crops.ble.growMinutes', 'crops.ble.stages.1', 'interact.distance', 'interact.serverTolerance',
+            'texts.refused.busy', 'texts.refused.wait', 'texts.title' }, unread('local m = VavaX\nshow(m.config)'))
     end)
 
     it('config entière passée : tout est couvert ; clientFile toujours', function()

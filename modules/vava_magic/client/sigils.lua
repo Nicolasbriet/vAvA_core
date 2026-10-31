@@ -4,7 +4,7 @@
            celui reçu en retour, confirmer le brouillage de son sigil ; commandes /sigils (liste dans le chat) et
            /sigil offrir | renommer <n°> <nom> | oublier <n°> | brouiller. Le serveur décide de tout (distance,
            mémoire pleine, mana, recharge).
-    Dépendances : shared/, config.lua, client/ (noyau)
+    Dépendances : shared/, config_client.lua, client/ (noyau)
 ]]
 
 local type, ipairs, tonumber, select, tointeger, lower = type, ipairs, tonumber, select, math.tointeger, string.lower

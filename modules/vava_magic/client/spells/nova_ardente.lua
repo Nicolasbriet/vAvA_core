@@ -6,7 +6,7 @@
            tremble sous les plus proches ; la terre reste noircie un moment. Plus le niveau est haut, plus la gerbe est
            grande. Rien au-delà de la distance des effets ; la boucle par image ne vit que le temps de l'éclat (une
            demi-seconde).
-    Dépendances : shared/, config.lua, client/ (noyau, zones, bursts)
+    Dépendances : shared/, config_client.lua, client/ (noyau, zones, bursts)
 ]]
 
 local sin, cos, pi, min, max, floor = math.sin, math.cos, math.pi, math.min, math.max, math.floor

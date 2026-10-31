@@ -331,22 +331,24 @@ fi
 #  S — (T-132) `config_client.lua` couvert par une chaîne de `server_script(s)` ;
 #  D — (T-132) chemin qui sort de la ressource (`..` de trop) ;
 #  X — (T-132) directive suivie d'autre chose qu'une chaîne ou une table de chaînes (illisible, donc refusée).
-# Pour ces règles, « audit: ok » ne fait rien taire : seules les exceptions du fichier comptent.
-# Les modules pas encore basculés (lots 2 à 4 de T-132) ont une exception transitoire par manifeste dans
-# scripts/audit-exceptions.txt : la liste des exceptions est la liste du travail restant.
+# Pour W, « audit: ok » ne fait rien taire : seules les exceptions du fichier comptent. C, S, D et X ne se taisent
+# jamais, ni par « audit: ok » ni par une exception : les exceptions transitoires des lots de T-132 sont toutes retirées
+# (T-143), aucun manifeste n'a plus de raison d'en avoir.
 if [[ ${#manifestes[@]} -gt 0 ]]; then
     lus=$(awk -v Q="'" -f scripts/lib/manifeste.awk "${manifestes[@]}" 2>/dev/null || true)
-    # « audit: ok » ne fait rien taire ici : seules les exceptions de scripts/audit-exceptions.txt comptent (S-2)
+    # « audit: ok » ne fait rien taire ici : seules les exceptions de scripts/audit-exceptions.txt comptent (S-2), et
+    # pour W seulement ; C, S, D, X : rien ne les fait taire (T-143)
     etiquette() { printf '%s\n' "$lus" | sed -n "s/^$1"$'\t'"//p" | filtrer code strict || true; }
+    etiquette_stricte() { printf '%s\n' "$lus" | sed -n "s/^$1"$'\t'"//p" || true; }
     noter BLOQUANT "motif livré qui couvrirait web/dev/ (données simulées) : ni web/dev, ni **, ni joker dans un dossier sous web/ (T-012)" \
         "$(etiquette W)"
     noter BLOQUANT "config.lua servi aux joueurs : il est réservé au serveur ; ce que le client lit va dans config_client.lua (T-132)" \
-        "$(etiquette C)"
+        "$(etiquette_stricte C)"
     noter BLOQUANT "config_client.lua servi au seul serveur : les joueurs ne le recevraient pas (shared_scripts, ou client_scripts pour un module sans partie serveur) (T-132)" \
-        "$(etiquette S)"
-    noter BLOQUANT "motif qui sort de la ressource (.. de trop) (T-132)" "$(etiquette D)"
+        "$(etiquette_stricte S)"
+    noter BLOQUANT "motif qui sort de la ressource (.. de trop) (T-132)" "$(etiquette_stricte D)"
     noter BLOQUANT "directive suivie d'autre chose qu'une chaîne ou une table de chaînes (nom, concaténation, appel) : écrire chaque chemin en toutes lettres (T-132)" \
-        "$(etiquette X)"
+        "$(etiquette_stricte X)"
 fi
 
 if [[ $ESSAI -eq 1 ]]; then

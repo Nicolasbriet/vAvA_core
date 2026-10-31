@@ -7,7 +7,7 @@
       - Vue des joueurs proches : gerbes d'eau qui balaient le cône, des plus proches aux plus lointaines, le temps de
         `fx.sweepMs` ; son de vague. Moins de gerbes de loin, rien au-delà de la distance des effets. Aucune boucle
         par image : les rangées partent à intervalles.
-    Dépendances : shared/, config.lua, client/ (noyau, controls, bursts)
+    Dépendances : shared/, config_client.lua, client/ (noyau, controls, bursts)
 ]]
 
 local ipairs, sin, cos, rad, atan, max = ipairs, math.sin, math.cos, math.rad, math.atan, math.max

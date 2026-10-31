@@ -1,7 +1,8 @@
 --[[
     vava_magic/shared/text.lua
-    Rôle : outils de texte en UTF-8, communs au serveur et au client : nettoyage d'une saisie, longueur en signes
-           (un « é » compte pour un), troncature qui ne coupe jamais un caractère, découpage en mots.
+    Rôle : outils de texte en UTF-8 (servis au seul serveur, aucun fichier client ne s'en sert) : nettoyage d'une
+           saisie, longueur en signes (un « é » compte pour un), troncature qui ne coupe jamais un caractère,
+           découpage en mots.
     Dépendances : shared/constants.lua
 ]]
 

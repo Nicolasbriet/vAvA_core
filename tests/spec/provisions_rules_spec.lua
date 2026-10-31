@@ -1,10 +1,11 @@
 local helper = require('tests.helper')
 
--- Règles pures des vivres (modules/vava_provisions/shared/rules.lua, T-130) et config du module. Règles documentées :
+-- Règles pures des vivres (modules/vava_provisions/shared/rules.lua, T-130 ; textes montrés au joueur :
+-- shared/texts.lua, T-143) et config du module. Règles documentées :
 -- README du module (« Règles ») et docs/plan/specs/T-130.md § 4, § 7 et § 11.1.
 
 describe('vava_provisions rules', function()
-    local rules, cfg
+    local rules, texts, cfg
 
     before_each(function()
         helper.reset()
@@ -12,9 +13,10 @@ describe('vava_provisions rules', function()
         helper.loadAll({
             'modules/vava_provisions/shared/constants.lua',
             'modules/vava_provisions/config.lua',
+            'modules/vava_provisions/shared/texts.lua',
             'modules/vava_provisions/shared/rules.lua',
         })
-        rules, cfg = VavaProvisions.rules, VavaProvisions.config
+        rules, texts, cfg = VavaProvisions.rules, VavaProvisions.texts, VavaProvisions.config
     end)
 
     after_each(function()
@@ -304,48 +306,48 @@ describe('vava_provisions rules', function()
         end)
 
         it('résultats', function()
-            assert.equal('Vous remplissez une outre.', rules.successText({ action = 'fill', count = 1 }, messages))
-            assert.equal('Vous remplissez 5 outres.', rules.successText({ action = 'fill', count = 5 }, messages))
-            assert.equal(messages.drank, rules.successText({ action = 'drink', dry = false }, messages))
-            assert.equal(messages.drankDry, rules.successText({ action = 'drink', dry = true }, messages))
-            assert.equal(messages.noSpace .. ' ' .. messages.drank, rules.successText({ action = 'drink', dry = false, blocked = 'no_space' }, messages))
-            assert.equal(messages.tooHeavy .. ' ' .. messages.drank, rules.successText({ action = 'drink', dry = false, blocked = 'too_heavy' }, messages))
-            assert.equal(messages.drank, rules.successText({ action = 'drink', dry = false, blocked = 'autre' }, messages))
-            assert.is_true(#rules.successText({ action = 'drink', blocked = 'too_heavy' }, messages) <= VavaProvisions.MAX_NOTIFICATION)
-            assert.is_nil(rules.successText({ action = 'autre' }, messages))
-            assert.is_nil(rules.successText(nil, messages))
+            assert.equal('Vous remplissez une outre.', texts.successText({ action = 'fill', count = 1 }))
+            assert.equal('Vous remplissez 5 outres.', texts.successText({ action = 'fill', count = 5 }))
+            assert.equal(messages.drank, texts.successText({ action = 'drink', dry = false }))
+            assert.equal(messages.drankDry, texts.successText({ action = 'drink', dry = true }))
+            assert.equal(messages.noSpace .. ' ' .. messages.drank, texts.successText({ action = 'drink', dry = false, blocked = 'no_space' }))
+            assert.equal(messages.tooHeavy .. ' ' .. messages.drank, texts.successText({ action = 'drink', dry = false, blocked = 'too_heavy' }))
+            assert.equal(messages.drank, texts.successText({ action = 'drink', dry = false, blocked = 'autre' }))
+            assert.is_true(#texts.successText({ action = 'drink', blocked = 'too_heavy' }) <= VavaProvisions.MAX_NOTIFICATION)
+            assert.is_nil(texts.successText({ action = 'autre' }))
+            assert.is_nil(texts.successText(nil))
         end)
 
         it('refus', function()
-            assert.equal(messages.wait, rules.refusalText('wait', nil, nil, messages))
-            assert.equal(messages.tooFar, rules.refusalText('too_far', nil, nil, messages))
-            assert.equal(messages.noSpace, rules.refusalText('no_space', nil, nil, messages))
-            assert.equal('Le seau racle le fond : le puits doit se remplir (environ 1 min).', rules.refusalText('dry', 36, cfg.kinds.puits, messages))
-            assert.equal('La source ne coule plus qu\'en filet : revenez dans environ 3 min.', rules.refusalText('dry', 121, cfg.kinds.source, messages))
-            assert.equal('Gardé par la milice.', rules.refusalText('refused', 'Gardé par la milice.', nil, messages))
-            assert.equal(200, #rules.refusalText('refused', string.rep('a', 300), nil, messages))
+            assert.equal(messages.wait, texts.refusalText('wait', nil, nil))
+            assert.equal(messages.tooFar, texts.refusalText('too_far', nil, nil))
+            assert.equal(messages.noSpace, texts.refusalText('no_space', nil, nil))
+            assert.equal('Le seau racle le fond : le puits doit se remplir (environ 1 min).', texts.refusalText('dry', 36, cfg.kinds.puits))
+            assert.equal('La source ne coule plus qu\'en filet : revenez dans environ 3 min.', texts.refusalText('dry', 121, cfg.kinds.source))
+            assert.equal('Gardé par la milice.', texts.refusalText('refused', 'Gardé par la milice.', nil))
+            assert.equal(200, #texts.refusalText('refused', string.rep('a', 300), nil))
             for _, silent in ipairs({ 'no_character', 'downed', 'busy', 'unknown_point', 'autre' }) do
-                assert.is_nil(rules.refusalText(silent, nil, nil, messages), silent)
+                assert.is_nil(texts.refusalText(silent, nil, nil), silent)
             end
         end)
 
         it('coupe un texte sans briser un caractère et sans contrôle', function()
-            local cut = rules.cutText(string.rep('é', 150), 200)
+            local cut = texts.cutText(string.rep('é', 150), 200)
             assert.equal(200, #cut)
             assert.is_not_nil(utf8.len(cut))
-            cut = rules.cutText('a' .. string.rep('é', 150), 200)
+            cut = texts.cutText('a' .. string.rep('é', 150), 200)
             assert.equal(199, #cut)
-            assert.equal('a b', rules.cutText('a\nb', 200))
-            assert.is_nil(rules.cutText('   ', 200))
-            assert.is_nil(rules.cutText(42, 200))
+            assert.equal('a b', texts.cutText('a\nb', 200))
+            assert.is_nil(texts.cutText('   ', 200))
+            assert.is_nil(texts.cutText(42, 200))
         end)
 
         it('avis et verbe de l\'invite', function()
-            assert.equal(messages.torn, rules.noticeText('torn', messages))
-            assert.equal(messages.lost, rules.noticeText('lost', messages))
-            assert.is_nil(rules.noticeText('autre', messages))
-            assert.equal('Puiser ou boire', rules.promptVerb(cfg.kinds.puits, messages.prompt))
-            assert.equal('Puiser', rules.promptVerb({ drink = false }, messages.prompt))
+            assert.equal(messages.torn, texts.noticeText('torn'))
+            assert.equal(messages.lost, texts.noticeText('lost'))
+            assert.is_nil(texts.noticeText('autre'))
+            assert.equal('Puiser ou boire', texts.promptVerb(cfg.kinds.puits))
+            assert.equal('Puiser', texts.promptVerb({ drink = false }))
         end)
 
         it('regroupe les lignes en messages bornés, puis « … et N autres »', function()

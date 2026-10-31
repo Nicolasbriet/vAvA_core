@@ -5,7 +5,7 @@
       - effet et son vus des joueurs proches, d'après la config de la combinaison, à l'endroit annoncé ;
       - zones nées des combinaisons : vapeur (nuée, client/clouds.lua : nappes blanches, voile) et boue (disque brun
         au sol, éclaboussure à la naissance).
-    Dépendances : shared/, config.lua, client/ (noyau, fx, zones, clouds, bursts)
+    Dépendances : shared/, config_client.lua, client/ (noyau, fx, zones, clouds, bursts)
 ]]
 
 local type, ipairs = type, ipairs

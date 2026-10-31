@@ -6,7 +6,7 @@
            fragments reçus du serveur pour l'affichage au-dessus des mains, message reçu sur un parchemin (nom du
            contact ou « présence inconnue »), point de passage sur la carte si la position est jointe.
     Le serveur décide de tout (contacts, longueur, fragments, déformation, portée).
-    Dépendances : shared/, config.lua, client/ (noyau)
+    Dépendances : shared/, config_client.lua, client/ (noyau)
 ]]
 
 local type, ipairs, tonumber, tointeger = type, ipairs, tonumber, math.tointeger

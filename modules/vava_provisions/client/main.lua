@@ -3,7 +3,7 @@
     Rôle : assemblage côté joueur : touche d'interaction (réglable par le joueur, aucune boucle), avis du serveur (outre
            fendue ou perdue, réponse de /eau sans vava_chat), notifications par vava_hud sinon celles du jeu, invite
            cachée au déchargement, démarrage du suivi des points d'eau.
-    Dépendances : shared/constants.lua, config_client.lua, shared/rules.lua, client/core.lua, client/nui.lua,
+    Dépendances : shared/constants.lua, config_client.lua, shared/texts.lua, client/core.lua, client/nui.lua,
                   client/points.lua, client/interact.lua
 ]]
 
@@ -17,7 +17,7 @@ local core = VavaProvisions.core
 if not core then return end
 
 local cfg = VavaProvisions.config
-local rules = VavaProvisions.rules
+local texts = VavaProvisions.texts
 local EVENTS = VavaProvisions.EVENTS
 local MAX_REPLY = VavaProvisions.MAX_REPLY
 local points, interact = VavaProvisions.points, VavaProvisions.interact
@@ -60,13 +60,13 @@ RegisterKeyMapping(INTERACT_COMMAND, cfg.labels.interact, 'keyboard', cfg.keys.i
 -- outre fendue ou abandonnée : texte de la config, toute autre valeur ignorée
 RegisterNetEvent(EVENTS.NOTICE, function(code)
     if not core.characters.current() then return end
-    local text = rules.noticeText(code, cfg.messages)
+    local text = texts.noticeText(code)
     if text then feed(text, 'warning') end
 end)
 
 -- réponse de /eau au seul membre du Conseil qui l'a tapée, quand vava_chat manque
 RegisterNetEvent(EVENTS.NOTIFY, function(message)
-    local text = rules.cutText(message, MAX_REPLY)
+    local text = texts.cutText(message, MAX_REPLY)
     if text then feed(text, 'info') end
 end)
 

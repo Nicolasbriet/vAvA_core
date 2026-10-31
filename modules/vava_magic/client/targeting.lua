@@ -11,7 +11,7 @@
       - Cible prévenue par le serveur (au début de l'incantation) : le bord de son écran rougit un instant.
     Le serveur revérifie la cible au lancer : ceci n'est qu'une proposition. Les sorts la lisent par le bridge
     (Bridge.GetLockedTarget).
-    Dépendances : shared/, config.lua, client/nui.lua, client/state.lua, client/messages.lua, client/keys.lua,
+    Dépendances : shared/, config_client.lua, client/nui.lua, client/state.lua, client/messages.lua, client/keys.lua,
                   client/aim.lua
 ]]
 

@@ -13,7 +13,7 @@
         (`checkMs`) ; l'arme en main, toutes les 200 ms (`armedCheckMs`).
       - À la fin : arguments de fin du sort (direction visée…), demande au serveur, temps de recharge et délai global
         notés.
-    Dépendances : shared/, config.lua, client/core.lua, bridge/client.lua, client/nui.lua, client/state.lua,
+    Dépendances : shared/, config_client.lua, client/core.lua, bridge/client.lua, client/nui.lua, client/state.lua,
                   client/fx.lua, client/hud.lua, client/messages.lua, client/keys.lua
 ]]
 

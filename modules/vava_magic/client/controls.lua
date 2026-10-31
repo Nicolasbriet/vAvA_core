@@ -14,7 +14,7 @@
         soi pour une zone centrée sur le lanceur, ou du cône devant lui). Clic gauche : le sort fait son geste (chaque sort
         déclare le sien, `controls.register`). Molette : sort suivant ou précédent du même élément.
     Le serveur revérifie tout : la visée n'est qu'une proposition.
-    Dépendances : shared/, config.lua, client/core.lua, bridge/client.lua, client/nui.lua, client/state.lua,
+    Dépendances : shared/, config_client.lua, client/core.lua, bridge/client.lua, client/nui.lua, client/state.lua,
                   client/hud.lua, client/messages.lua, client/keys.lua, client/aim.lua, client/casting.lua
 ]]
 

@@ -29,6 +29,7 @@ end
 local BASE_FILES = {
     'modules/vava_provisions/shared/constants.lua',
     'modules/vava_provisions/config.lua',
+    'modules/vava_provisions/shared/texts.lua',
     'modules/vava_provisions/shared/rules.lua',
     'modules/vava_provisions/shared/pointzone.lua',
 }
@@ -796,6 +797,38 @@ describe('vava_provisions démarrage', function()
         VavaProvisions.config.points[2].label = ''
         assert.same({ false, 'config : points[2].label : invalid_label' }, { setup() })
         assert.is_false(VavaProvisions.ready)
+    end)
+
+    -- T-143 : textes du Conseil passés de config_client.lua à config.lua en 1.2.0
+    it('refuse un config.lua de 1.1.0 gardé, sans les textes du Conseil', function()
+        VavaProvisions.config.messages.journal = nil
+        local ok, why = setup()
+        assert.is_false(ok)
+        assert.matches("config.lua d'avant 1.2.0 : messages.admin et messages.journal", why, 1, true)
+        assert.is_false(VavaProvisions.ready)
+    end)
+
+    it('signale un config_client.lua de 1.1.0 gardé qui sert encore les textes du Conseil (relecture S-2)', function()
+        assert.is_false(VavaProvisions.legacyClientTexts)
+        VavaProvisions.legacyClientTexts = true
+        assert.same({ true }, { setup() })
+        local found = 0
+        for _, line in ipairs(logs.warn) do
+            if line:find('config_client.lua garde les textes du Conseil', 1, true) then found = found + 1 end
+        end
+        assert.equal(1, found)
+    end)
+
+    it('config.lua relève les textes du Conseil laissés dans config_client.lua avant de poser les siens', function()
+        helper.reset()
+        VavaProvisions = nil
+        local root = (os.getenv('VAVA_ROOT') or '.') .. '/modules/vava_provisions/'
+        assert(loadfile(root .. 'shared/constants.lua'))()
+        assert(loadfile(root .. 'config_client.lua'))()
+        VavaProvisions.config.messages.admin = { usage = 'ancien texte' }   -- forme de 1.1.0
+        assert(loadfile(root .. 'config.lua'))()
+        assert.is_true(VavaProvisions.legacyClientTexts)
+        assert.equal('usage : /%s points | reserve <point> <nombre>', VavaProvisions.config.messages.admin.usage)
     end)
 
     it('déclare la recette une fois quand l\'artisanat (puis les compétences) arrive', function()

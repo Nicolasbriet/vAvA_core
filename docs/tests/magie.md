@@ -9,7 +9,7 @@ trois heures seul et une heure et demie à plusieurs ; les tests à deux sont ma
 demandent un témoin ou un voisin **(3 joueurs)**.
 
 Conventions : « N1 » à « N5 » sont les niveaux d'un sort ; les dégâts sont en points de vie sur 100 (« −8 » : B perd
-8 % de sa vie, par la chaîne de dégâts de vava_health ; chaque coup est une ligne de `vava_health_hits`) ; les valeurs citées sont celles de `modules/vava_magic/config.lua`. Il n'y a
+8 % de sa vie, par la chaîne de dégâts de vava_health ; chaque coup est une ligne de `vava_health_hits`) ; les valeurs citées sont celles de `modules/vava_magic/config_client.lua` (sorts, combinaisons) et de `config.lua` (depuis 2.11.0). Il n'y a
 pas de fatigue dans le code : seuls la mana, la recharge de chaque sort et le délai global de 1 s bornent le combat.
 Aucun sort ne s'apprend en jeu : seul le Conseil en donne (`/magie`) ; le grimoire ne fait que les montrer.
 
@@ -45,23 +45,24 @@ Aucun sort ne s'apprend en jeu : seul le Conseil en donne (`/magie`) ; le grimoi
    | Lueur (orbe ancré) | 8 | 7 | 6 | 6 (8) | 5 (7) |
    | Murmure | 12 | 11 | 10 | 8 | 7 |
 
-8. **Réglages pour aller vite** (`modules/vava_magic/config.lua`, puis `restart vava_magic` ; remettre la valeur par
+8. **Réglages pour aller vite** (dans `modules/vava_magic/`, le fichier indiqué : `config_client.lua` pour ce que lit
+   le client, `config.lua` pour le seul serveur, depuis 2.11.0 ; puis `restart vava_magic` ; remettre la valeur par
    défaut après le test). Un redémarrage efface les recharges en cours et les états : c'est sans conséquence ici.
 
-   | Clé | Défaut | Pour le test | Sert à |
-   |---|---|---|---|
-   | `controls.idleMs` | `20000` | `5000` | endormissement du mode magie (2-12) |
-   | `targeting.idleMs` | `20000` | `5000` | verrou relâché sans attaque (4-6) |
-   | `progression.antiFarmMs` | `20000` | `0` | XP à chaque lancer |
-   | `mana.regenPoints` | `3` | `20` | mana qui remonte vite |
-   | `sigils.refusedMs` | `60000` | `10000` | délai après un sigil refusé (8.2-3) |
-   | `spells.mur_de_flammes.levels[1].durationMs` | `4000` | `60000` | trois murs à la fois, zone vue en approchant (5.2, 10) |
-   | `combos.gel.result.durationMs` | `2500` | `30000` | se déconnecter gelé (14) |
-   | `spells.rempart.levels[1].cooldownMs` | `15000` | `120000` | recharge gardée à la reconnexion (13-3) |
-   | `zones.maxActive` | `60` | `2` | plafond des zones du royaume (10-3) |
-   | `spells.rempart.maxPieces` | `48` | `3` | plafond des remparts (7.3-8) |
-   | `combat.protectedZones` | `{}` | `{ { label = 'Essai', x = <x>, y = <y>, radius = 20.0 } }` | zone protégée (position lue dans la fiche du Registre) |
-   | `combat.pvp` | `true` | `false` | sorts sans effet sur les joueurs (5.1-8) |
+   | Clé | Fichier | Défaut | Pour le test | Sert à |
+   |---|---|---|---|---|
+   | `controls.idleMs` | `config_client.lua` | `20000` | `5000` | endormissement du mode magie (2-12) |
+   | `targeting.idleMs` | `config_client.lua` | `20000` | `5000` | verrou relâché sans attaque (4-6) |
+   | `progression.antiFarmMs` | `config.lua` | `20000` | `0` | XP à chaque lancer |
+   | `mana.regenPoints` | `config.lua` | `3` | `20` | mana qui remonte vite |
+   | `sigils.refusedMs` | `config.lua` | `60000` | `10000` | délai après un sigil refusé (8.2-3) |
+   | `spells.mur_de_flammes.levels[1].durationMs` | `config_client.lua` | `4000` | `60000` | trois murs à la fois, zone vue en approchant (5.2, 10) |
+   | `combos.gel.result.durationMs` | `config_client.lua` | `2500` | `30000` | se déconnecter gelé (14) |
+   | `spells.rempart.levels[1].cooldownMs` | `config_client.lua` | `15000` | `120000` | recharge gardée à la reconnexion (13-3) |
+   | `zones.maxActive` | `config.lua` | `60` | `2` | plafond des zones du royaume (10-3) |
+   | `spells.rempart.maxPieces` | `config_client.lua` | `48` | `3` | plafond des remparts (7.3-8) |
+   | `combat.protectedZones` | `config_client.lua` | `{}` | `{ { label = 'Essai', x = <x>, y = <y>, radius = 20.0 } }` | zone protégée (position lue dans la fiche du Registre) |
+   | `combat.pvp` | `config.lua` | `true` | `false` | sorts sans effet sur les joueurs (5.1-8) |
 
 ## 1. Fiche, commandes du Conseil, grimoire
 
@@ -588,7 +589,7 @@ faiblesse le demandent), B mage sans rang, C (tests à trois) Sénéchal ; `/vie
 `SELECT origin, ref, kind, amount, applied, absorbed, resisted, cancelled FROM vava_health_hits ORDER BY id DESC
 LIMIT 5` après chaque coup.
 
-**Mêmes dégâts qu'avant** (valeurs de `config.lua`, inchangées ; prouvées égales hors jeu par
+**Mêmes dégâts qu'avant** (valeurs des sorts, `config_client.lua` depuis 2.11.0, inchangées ; prouvées égales hors jeu par
 `tests/spec/magic_harm_spec.lua` pour chaque niveau, éclat, brûlure et combinaison) :
 
 | # | Faire | Attendu |

@@ -3,7 +3,7 @@
     Rôle : sort Lueur côté client : clic gauche en mode magie = allumer (incantation) ou éteindre sa lumière ; en
            visant (niveau 4) = ancrer un orbe au point visé (position revérifiée par le serveur) ; couleur au niveau 5
            (grimoire ou /lueur couleur). Le rendu de toutes les lumières est dans client/ambient.lua.
-    Dépendances : shared/, config.lua, client/ (noyau)
+    Dépendances : shared/, config_client.lua, client/ (noyau)
 ]]
 
 local ipairs, lower = ipairs, string.lower

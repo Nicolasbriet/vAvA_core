@@ -4,7 +4,7 @@
            hors du jeu (sélection), tout est oublié, le mode magie endormi, la roue et les fenêtres fermées, les états
            et les zones effacés ; ordres du serveur (fiche changée, mana, recharges effacées, messages, lignes du
            chat) ; suggestions des commandes du Conseil pour qui y a droit ; redémarrages du chat et du module.
-    Dépendances : shared/, config.lua, tous les fichiers client/ du module
+    Dépendances : shared/, config_client.lua, tous les fichiers client/ du module
 ]]
 
 local type, ipairs = type, ipairs

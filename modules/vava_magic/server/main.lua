@@ -26,6 +26,7 @@ local combat = VavaMagic.combat
 local states = VavaMagic.states
 local protections = VavaMagic.protections
 local admin = VavaMagic.admin
+local pages = VavaMagic.pages
 local cfg = VavaMagic.config
 local limits = cfg.rateLimits
 local RPC = VavaMagic.RPC
@@ -74,6 +75,21 @@ local function sheetRequest(src)
 end
 
 local function setup()
+    -- T-132 : un config.lua d'avant 2.11.0 (gardé par une mise à jour) remplace la table de config_client.lua ; il
+    -- contient tout ce que lit le serveur, le module démarre, mais un réglage client qu'on y change reste sans effet
+    if cfg.clientFile ~= true then
+        VavaMagic.log.warn('config.lua garde la forme d\'avant 2.11.0 (il remplace la table de config_client.lua) : '
+            .. 'les réglages lus par les joueurs (sorts, combinaisons, touches, textes affichés…) sont dans '
+            .. 'config_client.lua ; reportez vos changements d\'après config.lua.nouveau')
+    end
+    -- borne d'un RPC prise dans config_client.lua (T-143) : un config_client.lua gardé par une mise à jour ou retouché
+    -- sans elle laisserait le message d'un Murmure à la borne par défaut du core, une valeur démesurée ouvrirait le RPC
+    -- à de très longs textes (relecture sécurité S-1) : entier de 1 à 4 096, page du registre tenant dans un lot, sinon
+    -- le module ne démarre pas
+    local boundOk, boundWhy = pages.textBound(cfg.spells.murmure and cfg.spells.murmure.textMaxBytes, cfg.registers)
+    if not boundOk then
+        return false, 'config_client.lua : spells.murmure.textMaxBytes (borne d\'un RPC) : ' .. boundWhy
+    end
     local declared, declareErr = VavaMagic.commands.declare()
     if not declared then return false, 'commandes : ' .. tostring(declareErr) end
     local ok, err = bridge.DefineSheet(sheets.SCHEMA)
