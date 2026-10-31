@@ -3,6 +3,9 @@
     Rôle : administration du royaume : Conseil (rangs et droits), panneau « Registre du Conseil » (joueurs,
            signalements, sanctions, journal, outils, annonces), bans à la connexion, journal des actions, commandes de
            la console, API pour les autres modules et le futur panneau web.
+           T-132 : les joueurs ne téléchargent que les constantes et config_client.lua (commandes, touches, outils du
+           client, textes du client) ; config.lua (rangs, bans, journal, signalements, débits, textes du serveur) est
+           servi au seul serveur.
     Dépendances : vAvA_core ≥ 0.5.0 ; vava_ui ≥ 1.0.0 (polices, grain, papier et coins du Registre, par
                   nui://vava_ui/…) ; facultatives : vava_health, vava_needs, vava_inventory (actions sur les joueurs),
                   vava_hud (notifications)
@@ -15,7 +18,7 @@ use_experimental_fxv2_oal 'yes'
 
 name 'vava_admin'
 description 'Administration vAvA (Registre du Conseil)'
-version '1.8.0'
+version '1.9.0'
 
 dependency 'vAvA_core'
 dependency 'vava_ui'
@@ -31,12 +34,15 @@ files {
     'web/js/*.js',
 }
 
+-- Les joueurs ne téléchargent que les shared_scripts et les client_scripts : config.lua, en tête des server_scripts,
+-- n'est jamais servi (T-132).
 shared_scripts {
     'shared/constants.lua',
-    'config.lua',
+    'config_client.lua',         -- ouvre VavaAdmin.config : ce que lit le client
 }
 
 server_scripts {
+    'config.lua',                -- complète VavaAdmin.config : ce que lit le seul serveur
     'server/core.lua',
     'server/ranks.lua',
     'server/store.lua',

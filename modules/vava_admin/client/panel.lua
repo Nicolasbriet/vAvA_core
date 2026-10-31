@@ -4,7 +4,7 @@
            est relayée telle quelle au serveur, qui revérifie tout (liste fermée de noms : l'interface ne peut appeler
            aucune autre RPC). Suites locales : outils appliqués après accord, observation (sa fin est annoncée au
            serveur), inventaire ouvert, outil d'un autre module ouvert (hook client vava_admin:toolOpened).
-    Dépendances : shared/constants.lua, config.lua, client/core.lua, client/nui.lua, client/notify.lua, client/tools.lua
+    Dépendances : shared/constants.lua, config_client.lua, client/core.lua, client/nui.lua, client/notify.lua, client/tools.lua
 ]]
 
 local type, tostring, unpack, mathType = type, tostring, table.unpack, math.type
