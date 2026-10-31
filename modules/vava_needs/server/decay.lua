@@ -7,7 +7,7 @@
         aux modificateurs posés par d'autres modules, puis perte de vie si un besoin est épuisé : décidée et appliquée
         par le serveur quand vava_health tourne (export damage) ; sans lui, seul repli, envoyée au seul joueur, dont
         le client l'applique avec son plancher.
-    Dépendances : shared/constants.lua, config.lua, shared/starvation.lua, server/core.lua, bridge/server.lua,
+    Dépendances : shared/constants.lua, config_client.lua, config.lua, shared/starvation.lua, server/core.lua, bridge/server.lua,
                   server/state.lua
 ]]
 

@@ -3,7 +3,7 @@
     Rôle : valeurs des besoins d'un personnage, rangées dans un champ du core (sauvegardé avec le personnage, envoyé
            à son seul joueur). Écriture bornée et arrondie ; rien n'est écrit ni envoyé quand rien ne change ; chaque
            changement déclenche le hook vava_needs:changed.
-    Dépendances : shared/constants.lua, config.lua, server/core.lua
+    Dépendances : shared/constants.lua, config_client.lua, config.lua, server/core.lua
 ]]
 
 local type, ipairs, pairs = type, ipairs, pairs

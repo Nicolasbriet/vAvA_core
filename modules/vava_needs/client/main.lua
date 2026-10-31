@@ -2,7 +2,7 @@
     vava_needs/client/main.lua
     Rôle : assemblage côté client : valeurs reçues par le champ du personnage (aucun appel réseau), effets, jauges,
            événements du serveur (perte de vie, geste de consommation). Export `get` pour les autres scripts clients.
-    Dépendances : shared/, config.lua, client/core.lua, client/effects.lua, client/hud.lua
+    Dépendances : shared/, config_client.lua, client/core.lua, client/effects.lua, client/hud.lua
 ]]
 
 local type, ipairs, pairs = type, ipairs, pairs
