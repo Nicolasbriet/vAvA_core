@@ -1,9 +1,10 @@
 /*
  * vava_loading/web/js/config.js
  * Rôle : réglages de la page de l'écran de chargement (rythmes de l'ouverture et des textes, seuils des six feux,
- *        effets, musique, journal de calibrage). La page s'affiche avant que le moindre script Lua tourne : elle ne
- *        peut pas lire config_client.lua (décision 5 de T-020). Seule durée partagée avec le Lua : celle de l'éclair,
- *        envoyée par le client avec le message de passage (la page n'en garde pas de copie).
+ *        ambiances d'Eldoria en fondu enchaîné, effets, musique, journal de calibrage). La page s'affiche avant que
+ *        le moindre script Lua tourne : elle ne peut pas lire config_client.lua (décision 5 de T-020). Seule durée
+ *        partagée avec le Lua : celle de l'éclair, envoyée par le client avec le message de passage (la page n'en
+ *        garde pas de copie).
  *        Toute retouche de ce fichier le fait retélécharger par chaque joueur : retouches rares et groupées.
  * Dépendances : aucune (premier script de la page). Seule globale : window.VavaLoading.
  */
@@ -32,25 +33,36 @@
     // Extraits du lore à gauche, conseils à droite (fondu de fadeMs entre deux textes).
     rotation: { quoteMs: 9000, tipMs: 6500, fadeMs: 900 },
 
+    // Les ambiances d'Eldoria (T-152) : la même vue peinte sous sept lumières, WebP 1600 × 900 de web/img/ambiances/
+    // (nom.webp, seul dossier lu). La première est tirée au hasard, puis elles se suivent dans cet ordre, en boucle ;
+    // une image manquante ou illisible est sautée. Bornes (js/ambiances.js) : valeur hors bornes ramenée à la borne,
+    // absente → défaut ; ordre sans nom valable → ces sept-là.
+    ambiances: {
+      order: ['aube', 'brume_matin', 'hiver', 'crepuscule', 'nuit_etoilee', 'brume_nuit', 'orage'], // 12 au plus
+      showMs: 9000,  // durée d'une ambiance, du début de son fondu au début du suivant (3 000 à 60 000)
+      fadeMs: 3000,  // fondu enchaîné (300 à 6 000, jamais plus de la moitié de showMs)
+      driftPct: 3,   // dérive lente de l'image, en % (0 à 5 ; 0 : fondu seul) ; jamais en `basse` ni moins d'animations
+    },
+
     effects: {
       level: 'auto',        // 'auto', 'haute', 'moyenne' ou 'basse' (auto : choix au démarrage, puis dégradation)
       fpsMax: 30,           // images par seconde au plus : braises et étincelles (#fx)
-      worldFpsMax: 15,      // images par seconde au plus : paysage (#world, presque immobile ; jamais plus que fpsMax)
       minFps: 20,           // en dessous, sur badWindows fenêtres de windowMs de suite : un niveau de moins
       windowMs: 2000,
       badWindows: 2,
       measureDelayMs: 1000, // mesure commencée après la levée du rideau (l'ouverture fausserait tout)
-      maxPixelRatio: 1,     // résolution des canvas (le paysage est flou par nature : 1 suffit)
-      // grain : voile de grain sur la scène ; shine : reflet qui passe sur le titre (classes no-grain, no-shine)
+      maxPixelRatio: 1,     // résolution du canvas des braises (lueurs floues par nature : 1 suffit)
+      // parallax : les ambiances et les braises suivent la souris ; drift : dérive des ambiances ; grain : voile de
+      // grain sur la scène ; shine : reflet qui passe sur le titre (classes no-grain, no-shine)
       levels: {
-        haute: { stars: 250, embers: 60, fogs: 6, letterSparks: 26, beaconSparks: 30, finalSparks: 40,
-          parallax: true, camera: true, comet: true, grain: true, shine: true },
-        moyenne: { stars: 150, embers: 25, fogs: 3, letterSparks: 12, beaconSparks: 15, finalSparks: 20,
-          parallax: true, camera: true, comet: false, grain: true, shine: true },
-        // paysage peint une fois (et à chaque redimensionnement), plus aucune image animée par le script ; en CSS,
-        // seule la flamme du feu en cours bouge encore
-        basse: { stars: 150, embers: 0, fogs: 3, letterSparks: 0, beaconSparks: 0, finalSparks: 0,
-          parallax: false, camera: false, comet: false, grain: false, shine: false },
+        haute: { embers: 60, letterSparks: 26, beaconSparks: 30, finalSparks: 40,
+          parallax: true, drift: true, grain: true, shine: true },
+        moyenne: { embers: 25, letterSparks: 12, beaconSparks: 15, finalSparks: 20,
+          parallax: true, drift: true, grain: true, shine: true },
+        // plus aucune image animée par le script, ambiances en fondu seul (sans dérive) ; en CSS, seule la flamme du
+        // feu en cours bouge encore
+        basse: { embers: 0, letterSparks: 0, beaconSparks: 0, finalSparks: 0,
+          parallax: false, drift: false, grain: false, shine: false },
       },
     },
 

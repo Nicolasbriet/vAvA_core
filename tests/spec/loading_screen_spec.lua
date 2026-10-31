@@ -6,22 +6,26 @@ local ROOT = (os.getenv('VAVA_ROOT') or '.') .. '/'
 local BASE = 'modules/vava_loading/'
 
 -- Motifs livrés, dans l'ordre du manifeste (web/dev/ n'est jamais livré : aucun joker de dossier).
-local FILES = { 'web/index.html', 'web/css/style.css', 'web/js/*.js', 'web/fonts/*.woff2' }
+local FILES = { 'web/index.html', 'web/css/style.css', 'web/js/*.js', 'web/fonts/*.woff2', 'web/img/ambiances/*.webp' }
 local MUSIC_PATTERN = 'web/audio/*.ogg'
 
 -- Fichiers livrés, comptés dans le poids (toute page ou police ajoutée s'écrit ici).
 local DELIVERED = {
     'web/index.html', 'web/css/style.css',
     'web/js/config.js', 'web/js/strings.js', 'web/js/text.js', 'web/js/progress.js', 'web/js/quality.js',
-    'web/js/scene.js', 'web/js/app.js',
+    'web/js/ambiances.js', 'web/js/scene.js', 'web/js/app.js',
 }
-local SCRIPTS = { 'config.js', 'strings.js', 'text.js', 'progress.js', 'quality.js', 'scene.js', 'app.js' }
+local SCRIPTS = {
+    'config.js', 'strings.js', 'text.js', 'progress.js', 'quality.js', 'ambiances.js', 'scene.js', 'app.js',
+}
 
 -- Copies identiques des polices de vava_ui ; la quatrième est la seule propre à l'écran (décision 3 de la spec).
 local COPIES = { 'cinzel.woff2', 'eb_garamond.woff2', 'eb_garamond_italic.woff2' }
 local DECORATIVE = { ['cinzel_decorative_900.woff2'] = 'own', ['cinzel_decorative_700.woff2'] = 'copy' }
 
 local MAX_BYTES, MAX_BYTES_MUSIC = 300 * 1024, 700 * 1024
+-- Ambiances (T-152) : comptées à part ; page entière (code, polices, ambiances) sous le plafond de l'audit réseau.
+local MAX_BYTES_WITH_AMBIANCES = 1572864
 
 -- Ligne hors jeu de la spec (§ 9), seule mention des données simulées.
 local OFFLINE_LINE = [[<script>location.protocol === 'file:' && document.write('<script src="dev/devmock.js"><\/script>');</script>]]
@@ -203,6 +207,66 @@ describe('vava_loading : poids', function()
         end
         local limit = (musicFile and musicFile ~= '') and MAX_BYTES_MUSIC or MAX_BYTES
         assert.is_true(total <= limit, ('%d octets livrés (> %d)'):format(total, limit))
+    end)
+end)
+
+describe('vava_loading : ambiances', function()
+    it('livre en WebP chaque ambiance de config.js, et la page entière tient sous 1,5 Mo', function()
+        local pageConfig = assert(read(BASE .. 'web/js/config.js'))
+        local block = pageConfig:match('ambiances%s*:%s*(%b{})')
+        assert.is_not_nil(block, 'ambiances introuvable dans web/js/config.js')
+        local list = assert(block:match('order%s*:%s*(%b[])'), 'ambiances.order introuvable')
+        local total, names = 0, 0
+        for name in list:gmatch("'([^']*)'") do
+            assert.truthy(name:match('^[a-z0-9_]+$'), name)
+            local path = BASE .. 'web/img/ambiances/' .. name .. '.webp'
+            local data = read(path)
+            assert.is_not_nil(data, path)
+            assert.equal('RIFF', data:sub(1, 4), path)
+            assert.equal('WEBP', data:sub(9, 12), path)
+            total, names = total + #data, names + 1
+        end
+        assert.is_true(names >= 1 and names <= 12, names .. ' ambiances')
+        local css = withoutCssComments(assert(read(BASE .. 'web/css/style.css')))
+        local paths = { table.unpack(DELIVERED) }
+        for file in css:gmatch('url%(%s*[\'"]?%.%./fonts/([%w_]+%.woff2)[\'"]?%s*%)') do
+            paths[#paths + 1] = 'web/fonts/' .. file
+        end
+        for _, path in ipairs(paths) do total = total + assert(size(BASE .. path), path) end
+        assert.is_true(total <= MAX_BYTES_WITH_AMBIANCES,
+            ('%d octets livrés (> %d)'):format(total, MAX_BYTES_WITH_AMBIANCES))
+    end)
+end)
+
+-- Le joker du manifeste livre tout .webp du dossier : il ne doit contenir que les ambiances de `order` (relecture réseau
+-- R-2 de T-152). Fichiers suivis et non suivis (hors .gitignore) d'après git, puis chacun relu sur le disque.
+describe('vava_loading : dossier des ambiances', function()
+    it('contient exactement les fichiers <nom>.webp de ambiances.order', function()
+        local pageConfig = assert(read(BASE .. 'web/js/config.js'))
+        local list = assert((pageConfig:match('ambiances%s*:%s*(%b{})') or ''):match('order%s*:%s*(%b[])'),
+            'ambiances.order introuvable')
+        local expected = {}
+        for name in list:gmatch("'([^']*)'") do expected[#expected + 1] = name .. '.webp' end
+        table.sort(expected)
+        local dir = BASE .. 'web/img/ambiances'
+        local pipe = io.popen and io.popen('git -C "' .. ROOT .. '" ls-files --cached --others --exclude-standard -- "'
+            .. dir .. '" 2>&1')
+        local listed = pipe and pipe:read('a') or ''
+        if pipe then pipe:close() end
+        if not listed:find(dir, 1, true) then
+            pending('git ls-files indisponible')
+            return
+        end
+        local found, seen = {}, {}
+        for path in listed:gmatch('[^\n]+') do
+            local file = path:match('^' .. dir:gsub('%p', '%%%0') .. '/(.+)$')
+            if file and not seen[file] and size(path) then
+                seen[file] = true
+                found[#found + 1] = file
+            end
+        end
+        table.sort(found)
+        assert.same(expected, found)
     end)
 end)
 
