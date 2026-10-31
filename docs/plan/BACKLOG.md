@@ -598,7 +598,7 @@ versé à T-014 ; les autres points déjà couverts sont précisés dans T-012 �
   `config.lua` modifié de `vava_hud`), 7-C-16 (`resource.rpf` avant et après).
 
 ### T-143 — Configs partagées, lot 4 : magie et vivres
-- Agent : vava-dev-lua · Dépend de : T-132 · Statut : à faire
+- Agent : vava-dev-lua · Dépend de : T-132 · Statut : à tester en jeu (relu sécurité et réseau, suites appliquées)
 - Premier passage de `vava_magic` (spec T-132 § 3.3 : `spells` reste partagé jusqu'à T-123 ; `shared/text.lua` et
   `shared/pages.lua` au serveur si aucun fichier client ne s'en sert) ; `vava_provisions/shared/rules.lua` coupé en
   deux (`shared/texts.lua` partagé, `shared/rules.lua` au serveur). Retirer les dernières exceptions transitoires et
@@ -611,6 +611,21 @@ versé à T-014 ; les autres points déjà couverts sont précisés dans T-012 �
   que le lecteur ne suit pas aujourd'hui (réseau R-6) ; piste pour une borne de schéma du serveur prise dans
   `config_client.lua` (copie gardée sans la clé : nombre non borné) : version dans `clientFile`, ou contrôle au `setup`
   que ces bornes sont des nombres (sécurité, pour information).
+- Fait le 31 octobre 2026 (branche `agents/T-143`) : `vava_magic` 2.11.0 (`config_client.lua` partagé, sorts et
+  combinaisons entiers jusqu'à T-123 ; `config.lua` au seul serveur, feuilles du seul serveur ajoutées par lui, dont 76
+  textes du serveur ; `shared/text.lua`, `shared/pages.lua` au seul serveur ; borne `textMaxBytes` du Murmure contrôlée
+  au `setup`, plafonnée à 4 096 octets et à la place d'un lot du registre ; `casting.animLoadMs`, lu par rien, retiré),
+  `vava_provisions` 1.2.0 (`shared/texts.lua` partagé, textes lus clé par clé ; `shared/rules.lua` au seul serveur ;
+  `messages.admin` et `messages.journal` dans `config.lua` ; refus de démarrer avec un `config.lua` de 1.1.0,
+  avertissement pour un `config_client.lua` de 1.1.0) ; outillage : T2 refuse un alias de la table du module, `PENDING`
+  retiré, l'audit ne laisse plus rien taire les règles C, S, D, X des manifestes (essai 198 cas), aucune exception
+  « T-132 » permise ; borne de schéma : contrôle au `setup` retenu, cas de `vava_voice` (`zones.radius`,
+  `zones.height`) à faire après T-145. Lot 4 : 37 180 octets de moins par joueur, net du manifeste (11 316
+  compressés). Relu sécurité (OK, 4 mineurs) et réseau (OK, 3 mineurs), suites appliquées sauf R-3 (`kinds.*.reserve`
+  des vivres : T2 exige `kinds` entier, reporté à T-103) ; une ligne « Suite : » par point. Rapport
+  `docs/plan/rapports/T-143.md`. **À tester en jeu** : `docs/tests/reseau.md` § 7-D, en priorité 7-D-1 (aucune ligne
+  d'ancienne forme), 7-D-2 et 7-D-4 à 7-D-8 (`F8` sans `SCRIPT ERROR` pendant les gestes), 7-D-9 (deux joueurs), 7-D-10
+  et 7-D-15 (anciens fichiers signalés), 7-D-11 et 7-D-12 (refus de démarrer), 7-D-14 (`resource.rpf` avant et après).
 
 ### T-133 — `%c` dépend de la locale : contrôles de texte justes partout
 - Agent : vava-dev-lua · Dépend de : — · Statut : à tester en jeu (relu sécurité, suites appliquées)
@@ -877,7 +892,8 @@ maquettes.
 - Relectures de T-141 (sécurité S-3, réseau R-3) : `crops` de l'agriculture reste entier dans `config_client.lua`
   (le client le lit par culture) ; ≈ 0,7 Ko n'y sert que le serveur (durée, eau, fertilité, famille, graine, produit,
   rendement, XP, difficulté, `frostHardy` : 660 o ; `actions.harvest.sickleFactor`, 20 o). Même chose pour `kinds` de
-  `vava_provisions` (réserves des points d'eau, ≈ 190 o), si les points d'eau passent à l'Atelier avec les puits
+  `vava_provisions` (réserves des points d'eau, ≈ 250 o ; relecture réseau R-3 de T-143 : impossible sans cela, le
+  client passe `kinds` à `pointzone.book` et T2 l'exige entier), si les points d'eau passent à l'Atelier avec les puits
   (aucune autre tâche ne les reprend aujourd'hui). Donner à chaque entrée une part client et une part serveur
   (contrôle T4 vert).
 
@@ -1129,6 +1145,10 @@ faire tout le système de combat ») : la porte T-119 reste à passer en jeu.
   (familles de `ATELIER.md`), effets visibles par moment (lancement, trajet, impact, sur la cible, rupture, fin),
   règle de cumul des protections, comparaison avec un sort existant, essai par le seul créateur, versions.
   Moteur générique qui réutilise les noyaux de `vava_magic` ; les 11 sorts existants gardent leur code.
+- Relecture réseau R-2 de T-143 : `spells` (45 957 o) et `combos` (6 961 o) sont servis entiers par
+  `vava_magic/config_client.lua` ; la part qu'y lit le seul serveur (dégâts, XP, résultats des combinaisons) est
+  d'≈ 3,5 Ko et ≈ 270 o. Donner à chaque sort une part client et une part serveur : gain attendu ≈ 5 à 7 Ko bruts,
+  1,5 à 2 Ko compressés par joueur (contrôle T4 vert).
 
 ### T-124 — Invocations
 - Agents : vava-architecte → vava-dev-lua · Dépend de : T-123 · Statut : à faire

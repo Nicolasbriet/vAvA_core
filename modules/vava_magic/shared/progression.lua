@@ -2,7 +2,7 @@
     vava_magic/shared/progression.lua
     Rôle : règles de progression communes au serveur (qui décide) et au client (qui pré-vérifie et affiche) : niveau
            d'après l'XP, seuils, coût en mana selon le niveau, sigils mémorisables.
-    Dépendances : shared/constants.lua, config.lua
+    Dépendances : shared/constants.lua, config_client.lua
 ]]
 
 local floor = math.floor

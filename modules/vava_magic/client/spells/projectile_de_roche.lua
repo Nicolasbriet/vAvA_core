@@ -4,7 +4,7 @@
            en mode magie (ou /lancer), vers la cible verrouillée ou là où l'on vise. Rendu d'après sa config : bloc de
            pierre visible qui tournoie, traînée de poussière, éclats à l'impact et caméra qui tremble chez les
            joueurs proches.
-    Dépendances : shared/, config.lua, client/projectiles.lua
+    Dépendances : shared/, config_client.lua, client/projectiles.lua
 ]]
 
 VavaMagic.projectiles.define('projectile_de_roche')

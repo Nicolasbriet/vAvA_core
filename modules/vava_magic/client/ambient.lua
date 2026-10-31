@@ -16,7 +16,7 @@
     s'endort quand il n'y a plus rien (aucun thread chez un joueur sans magie autour). Lumières et particules passent
     par les plafonds de client/fx.lua. Un client peut écrire les state bags de ses propres entités : une lumière n'est
     retenue que si chacun de ses champs est un nombre dans les bornes de la config.
-    Dépendances : shared/, config.lua, client/state.lua, client/fx.lua
+    Dépendances : shared/, config_client.lua, client/state.lua, client/fx.lua
 ]]
 
 local pairs, ipairs, next, type, sin, max, pi, concat = pairs, ipairs, next, type, math.sin, math.max, math.pi, table.concat

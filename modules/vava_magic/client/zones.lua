@@ -12,7 +12,7 @@
         fissure après une secousse ; disques sombres qui s'effacent en fondu (`effects.traces`), vus de ce seul client.
     Une recherche toutes les 250 ms choisit le niveau de détail ; le dessin par image (lumières, reflets, présages,
     traces) ne tourne que tant qu'une zone visible ou une trace a quelque chose à dessiner.
-    Dépendances : shared/, config.lua, client/fx.lua
+    Dépendances : shared/, config_client.lua, client/fx.lua
 ]]
 
 local type, pairs, ipairs, next, floor, max, abs, sqrt, sin, cos, pi = type, pairs, ipairs, next, math.floor, math.max, math.abs, math.sqrt, math.sin, math.cos, math.pi

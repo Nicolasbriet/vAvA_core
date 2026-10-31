@@ -3,7 +3,7 @@
     Rôle : réglages des vivres du royaume lus par le seul serveur (servi au seul serveur, jamais téléchargé par les
            joueurs) : objets déclarés s'ils manquent (eau, outre), remplissage, contenants rendus et usés, recette de
            l'outre à la tannerie, gorgées au point d'eau, délai entre deux actions, points d'eau, marge du serveur,
-           zone des points, commande du Conseil, débit du RPC. Complète la table ouverte par config_client.lua (sortes
+           zone des points, commande du Conseil et ses textes, débit du RPC. Complète la table ouverte par config_client.lua (sortes
            de points d'eau, portée, streaming, gestes, touche, textes) sans en réécrire une clé (T-132).
     Les points d'eau sont des EXEMPLES autour du point d'apparition par défaut (-- PLACEHOLDER) : à remplacer par les
     lieux du royaume. La config est la graine : l'Atelier les reprendra (T-130 § 10.4).
@@ -82,4 +82,25 @@ config.admin = {
 
 config.rateLimits = {
     draw = { capacity = 3, refillPerSecond = 0.5 },  -- RPC vava_provisions:draw, par joueur
+}
+
+-- Textes du Conseil, lus par le seul serveur (T-143) : ajoutés à `messages` (config_client.lua), dont le client lit
+-- les textes montrés au joueur. Réponses de /eau (200 octets au plus, texte brut) et libellé du journal du Registre
+-- (32 octets au plus). Un config_client.lua de 1.1.0 gardé par une mise à jour les sert encore aux joueurs : relevé
+-- avant de les poser, signalé au démarrage (relecture sécurité S-2 de T-143) ; ceux d'ici font foi.
+VavaProvisions.legacyClientTexts = config.messages.admin ~= nil or config.messages.journal ~= nil
+config.messages.admin = {
+    usage = 'usage : /%s points | reserve <point> <nombre>',
+    line = '%s (%s, %s) : %s.',          -- nom, identifiant, sorte, réserve
+    level = '%d / %d puisages',
+    bottomless = 'sans fond',
+    set = 'Réserve de %s : %d / %d.',
+    unknown = 'Point d\'eau inconnu : %s.',
+    range = 'La réserve de %s va de 0 à %d.',
+    noReserve = '%s est sans fond : rien à régler.',
+    wait = 'Patientez un instant.',
+    more = '… et %d autres points d\'eau.',
+}
+config.messages.journal = {
+    reserve = 'Réserve d\'eau fixée',     -- journal du Registre
 }

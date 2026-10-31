@@ -4,7 +4,7 @@
            rempart qui se dresse ou s'effondre). Chaque sort déclare son rendu (`bursts.define`) ; ce fichier vérifie
            l'envoi et le lui confie. Outils communs : son selon la distance (de l'interface, ou natif de GTA quand la
            config en déclare un), tremblement de la caméra des plus proches.
-    Dépendances : shared/, config.lua, client/nui.lua
+    Dépendances : shared/, config_client.lua, client/nui.lua
 ]]
 
 local type = type

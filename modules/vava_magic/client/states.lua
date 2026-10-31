@@ -8,7 +8,7 @@
       - impossible d'incanter pendant un contrôle dur (pré-vérification : le serveur refuse de toute façon) ;
       - réactions : geste bref et effet d'écran à chaque coup (selon l'élément du sort), recul d'une nova.
     La boucle par image ne tourne que tant que le joueur est ralenti, gelé ou chancelant, ou pendant un recul.
-    Dépendances : shared/, config.lua, client/nui.lua, client/casting.lua, client/fx.lua
+    Dépendances : shared/, config_client.lua, client/nui.lua, client/casting.lua, client/fx.lua
 ]]
 
 local type, ipairs, pairs, max = type, ipairs, pairs, math.max

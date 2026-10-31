@@ -7,7 +7,7 @@
         posés en entrant, retirés en sortant (et à l'arrêt du module). La présence est relue toutes les 200 ms,
         seulement tant qu'une nuée est proche : aucun dessin par image.
     Chaque genre se déclare avec `clouds.define(genre, { fx, density(zone), timecycle })`.
-    Dépendances : shared/, config.lua, client/nui.lua, client/fx.lua, client/zones.lua
+    Dépendances : shared/, config_client.lua, client/nui.lua, client/fx.lua, client/zones.lua
 ]]
 
 local pairs, ipairs, next, max, abs, ceil, min, pi = pairs, ipairs, next, math.max, math.abs, math.ceil, math.min, math.pi

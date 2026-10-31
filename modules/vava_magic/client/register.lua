@@ -3,7 +3,7 @@
     Rôle : registre des murmures ouvert en l'utilisant (premier lot de pages envoyé par le serveur, les plus récentes
            d'abord) ; la page demande les lots plus anciens quand le lecteur feuillette (le serveur revérifie qu'il
            porte le registre) ; celui qui le porte peut arracher une page (même vérification).
-    Dépendances : shared/, config.lua, client/ (noyau)
+    Dépendances : shared/, config_client.lua, client/ (noyau)
 ]]
 
 local type, tonumber, tointeger = type, tonumber, math.tointeger

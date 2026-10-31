@@ -4,7 +4,7 @@
            sigil, grimoire, registre). Les textes de la config partent à la page dès qu'elle se dit prête ; les ordres
            arrivés avant attendent (en nombre borné). Une seule fenêtre à la fois prend le focus ; Échap la ferme.
            Chaque retour de l'interface est isolé : une erreur renvoie un code au lieu de la laisser sans réponse.
-    Dépendances : config.lua, client/core.lua
+    Dépendances : config_client.lua, client/core.lua
 ]]
 
 local type, ipairs, tostring, xpcall = type, ipairs, tostring, xpcall

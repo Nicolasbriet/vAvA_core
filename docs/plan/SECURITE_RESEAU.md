@@ -91,6 +91,9 @@ Points à traiter (tâches de la phase 1) :
 - **≈ 190 Ko de Lua servis pour rien** (configs et logique du serveur en `shared_scripts`) : T-132 (règle, outillage,
   lot 1 : `vava_atelier`, `vava_arrival`, `vava_chancellerie`, ≈ 41,7 Ko en moins), T-141 (lot 2 : `vava_skills`,
   `vava_farming`, `vava_crafting`, `vava_gathering`, `vava_provisions`, ≈ 66,6 Ko en moins, net du manifeste), T-142
-  (lot 3 : le socle, quinze modules et trois exemples, ≈ 43,6 Ko en moins, net du manifeste), puis T-143 (lot 4 :
-  `vava_magic`, dernière exception transitoire de `scripts/audit-exceptions.txt`).
+  (lot 3 : le socle, quinze modules et trois exemples, ≈ 43,6 Ko en moins, net du manifeste), T-143 (lot 4 :
+  `vava_magic`, coupe de `vava_provisions/shared/rules.lua`, ≈ 37,2 Ko en moins, net du manifeste ; plus aucune
+  exception transitoire, l'audit ne laisse plus rien taire les règles des manifestes). Restent servis pour le seul
+  serveur, sous des tables que le client lit en entier : les sorts de la magie (T-123), le combat (T-121), les ciels du
+  temps (T-146), les données des métiers (T-102 à T-104).
 - Pas de tests ni de lint avant ce kit : base de départ de **14 avertissements luacheck mineurs** (relevés le 29 octobre 2026).

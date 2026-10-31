@@ -73,7 +73,7 @@ lourds de la minute, le reste sous `* · <autres>`) : plus de suivi à lancer, p
 
 | # | Faire | Attendu |
 |---|---|---|
-| 1 | `./scripts/audit-reseau.sh` puis `./scripts/audit-reseau.sh --essai` (ou `./scripts/verifier.sh`). | Aucun BLOQUANT hors exceptions inscrites (plus aucune exception des zones de voix depuis T-014 ; une seule exception transitoire de T-132 depuis T-142 : la config de `vava_magic`, lot 4) ; « ESSAI : OK (… cas) ». |
+| 1 | `./scripts/audit-reseau.sh` puis `./scripts/audit-reseau.sh --essai` (ou `./scripts/verifier.sh`). | Aucun BLOQUANT hors exceptions inscrites (plus aucune exception des zones de voix depuis T-014 ; plus aucune exception transitoire de T-132 depuis T-143, et aucune ne peut plus faire taire une règle des manifestes) ; « ESSAI : OK (… cas) ». |
 
 ## 7. Ce que télécharge un joueur (T-132)
 
@@ -158,9 +158,32 @@ vava_cameras` donne ce que chaque ressource sert.
 | 15 | Mise à jour par la Chancellerie (1.8.6) d'un serveur posé sur `main` d'avant T-142 où `modules/vava_hud/config.lua` a été modifié à la main (par exemple `notifications.durationMs = 9000`). | Journal de la mise à jour : « Réglages modifiés gardés, mais vava_hud/config.lua n'existe plus dans la nouvelle version et n'est plus lu : reportez vos réglages dans vava_hud/config_client.lua, puis supprimez l'ancien fichier. » ; le fichier est gardé tel quel, `config_client.lua` posé ; en jeu, notifications de 4,5 s (la valeur de `config_client.lua`) tant que le réglage n'est pas reporté. Un `config.lua` jamais touché est retiré sans un mot. |
 | 16 | Si possible : comme 7-A-14, avant (serveur sur `main`) et après, taille de `cache/files/<ressource>/resource.rpf`. | Ordre de grandeur cohérent avec la colonne `total` de `poids-client.sh` : `vava_inventory` ≈ 136 Ko (≈ 145 avant), `vava_combat` ≈ 45 Ko (≈ 55), `vava_health` ≈ 44 Ko (≈ 49), `vava_time` ≈ 81 Ko (≈ 85), `vava_codex` ≈ 120 Ko (≈ 124), `vava_admin` ≈ 98 Ko (≈ 101), `vava_voice` ≈ 72 Ko (≈ 76) ; noter au rapport. |
 
-7-D (lot 4, T-143) : écrit par sa tâche sur le même modèle (démarrage sans ligne d'ancienne forme ; `F8` sans
-`SCRIPT ERROR` des modules du lot ; un tour des gestes de chaque module, en renvoyant à sa procédure ; un test
-**(2 joueurs)**).
+### 7-D — lot 4 (T-143) : magie et vivres
+
+Modules : `vava_magic` 2.11.0 (`config_client.lua` : sorts et combinaisons entiers, touches, commandes du joueur,
+textes affichés par le client ; `config.lua` : le reste ; `shared/text.lua` et `shared/pages.lua` au seul serveur),
+`vava_provisions` 1.2.0 (`shared/rules.lua` au seul serveur, `shared/texts.lua` partagé ; textes du Conseil dans
+`config.lua`). Préparation des procédures citées (`docs/tests/magie.md` § 0, dont les « réglages pour aller vite »
+avec leur fichier ; `docs/tests/eau.md` § 0). Hors jeu, `./scripts/poids-client.sh vava_magic vava_provisions` donne ce
+que chaque ressource sert.
+
+| # | Faire | Attendu |
+|---|---|---|
+| 1 | Démarrer le serveur. | `module 'vava_magic' v2.11.0 prêt`, `module 'vava_provisions' v1.2.0 prêt` ; aucune ligne « config.lua garde la forme d'avant … » ; aucun refus (`vava_provisions` relit sa config entière, `vava_magic` contrôle la borne du Murmure). |
+| 2 | **(2 joueurs)** A et B se connectent, cache FiveM vidé chez B ; `F8` de chacun pendant tout le tour. | Aucune `SCRIPT ERROR` de `vava_magic` ni de `vava_provisions`, au chargement comme pendant les gestes. |
+| 3 | B : Paramètres › Raccourcis › FiveM. | Comme avant : les sept touches de la magie (roue `Tab`, viser, lancer, verrouiller, interrompre `X`, molette), « Puiser ou boire (point d'eau proche) » (`E`). |
+| 4 | Magie, fiche et grimoire : magie 1-1 à 1-8 (`/magie`, fiche au chat, messages au joueur), puis les lignes du grimoire de magie § 1. | Comme avant : réponses du Conseil (« Fiche magie de … », « C'est fait. ») venues de `config.lua` ; grimoire (coûts, seuils d'XP, combinaisons) calculé par le client sur `config_client.lua`. |
+| 5 | Roue, incantation, verrouillage : magie 2-1 à 2-6, 3-1 à 3-4, 4-1 à 4-3. | Roue, barre d'incantation, « Sort prêt : … », « Vous rangez votre magie. », anneau sous la cible et frisson chez elle, comme avant. |
+| 6 | Un sort de chaque élément : magie 5.1-1, 6.2-1, 7.2-1 ; une combinaison (magie 11-1). | Effets, états sur la cible, mot bref de la combinaison et son inscription au grimoire, comme avant. |
+| 7 | Murmure, sigils, registre, Lueur : magie 8.2-1 à 8.2-6 et 8.2-14 **(2 joueurs)**, 8.2-18, 8.1-1 à 8.1-3. | « Vous tendez votre sigil. » (client), « Votre sigil a été accepté. » (serveur), murmure reçu, registre lu et page arrachée (« Vous arrachez la page. »), lueur, comme avant. |
+| 8 | Eau : eau 4 à 9 (puiser, boire, invite), 10 et 11 (`/eau points`, `/eau reserve`), 16 à 18 (besace pleine, outre fendue). | Invite « Puiser ou boire », textes de réussite et de refus comme avant (formés par `shared/texts.lua`) ; réponses de `/eau` et libellé « Réserve d'eau fixée » au journal du Registre comme avant (`config.lua`). |
+| 9 | **(2 joueurs)** A lance une Boule de feu et une Brume près de B (magie 5.1-1, 6.3-1) ; puis B puise devant A (eau 15). | B voit le projectile, la nuée et les effets comme avant ; A voit le geste de B, sans notification. |
+| 10 | Serveur arrêté ; remplacer `modules/vava_magic/config.lua` par celui de 2.10.0 (`git show a573322:modules/vava_magic/config.lua`) ; démarrer. | Console : « config.lua garde la forme d'avant 2.11.0 … » ; la magie marche quand même. Remettre le fichier de 2.11.0. |
+| 11 | Serveur arrêté ; remplacer `modules/vava_provisions/config.lua` par celui de 1.1.0 (`git show 7a6d4b3:modules/vava_provisions/config.lua`) ; démarrer. | Console : refus de démarrer « config.lua d'avant 1.2.0 : messages.admin et messages.journal (textes du Conseil) y manquent … » (`vava_provisions` n'est pas prêt). Remettre le fichier de 1.2.0 et redémarrer : prêt. |
+| 12 | Serveur arrêté ; dans `modules/vava_magic/config_client.lua`, mettre la ligne `textMaxBytes = 1400` du Murmure en commentaire ; démarrer. | Console : refus de démarrer « config_client.lua : spells.murmure.textMaxBytes (borne d'un RPC) : un nombre entier positif est attendu ». Puis `textMaxBytes = 5000` : refus « … : 4096 octets au plus ». Remettre `1400`. |
+| 13 | Serveur arrêté ; `mana.regenPoints = 20` dans `modules/vava_magic/config.lua`, `controls.idleMs = 5000` dans `config_client.lua` ; démarrer ; un **nouveau** joueur mage lance un sort, puis attend. | La mana remonte vite (réglage du serveur lu dans `config.lua`) ; le mode magie s'endort au bout de 5 s (réglage du client). Remettre 3 et 20000. |
+| 14 | Si possible : comme 7-A-14, avant (serveur sur `main`) et après, taille de `cache/files/<ressource>/resource.rpf`. | Ordre de grandeur cohérent avec la colonne `total` de `poids-client.sh` : `vava_magic` ≈ 458 Ko (≈ 477 avant), `vava_provisions` ≈ 63 Ko (≈ 81) ; noter au rapport. |
+| 15 | Serveur arrêté ; remplacer `modules/vava_provisions/config_client.lua` par celui de 1.1.0 (`git show 7a6d4b3:modules/vava_provisions/config_client.lua`) ; démarrer ; `/eau points`. | Console : « config_client.lua garde les textes du Conseil d'avant 1.2.0 … » ; le module démarre, `/eau` répond avec les textes de `config.lua`. Remettre le fichier de 1.2.0 : plus d'avertissement. |
 
 ## Ce qui n'est pas compté
 

@@ -3,7 +3,7 @@
     Rôle : calculs de positions communs au serveur et au client (tables { x, y, z } ou vecteurs) : distances, angle
            entre deux directions, zones protégées, distance à un segment et croisement de segments (zones en ligne),
            cône au sol (vague), cap de GTA, segments d'un mur (rempart).
-    Dépendances : shared/constants.lua, config.lua
+    Dépendances : shared/constants.lua, config_client.lua
 ]]
 
 local sqrt, acos, deg, atan, rad, cos, sin = math.sqrt, math.acos, math.deg, math.atan, math.rad, math.cos, math.sin

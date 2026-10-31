@@ -1,10 +1,10 @@
 --[[
     vava_provisions/config_client.lua
     Rôle : réglages des vivres que lit le client : sortes de points d'eau (modèle, invite, texte d'un point à sec),
-           portée de l'invite, streaming des props, gestes, touche, textes. Téléchargé par chaque joueur ; le serveur
+           portée de l'invite, streaming des props, gestes, touche, textes montrés au joueur. Téléchargé par chaque joueur ; le serveur
            le lit aussi. Tout le reste (objets déclarés, remplissage, contenants, recette de l'outre, gorgées, délai,
-           points d'eau, marge du serveur, zone des points, commande du Conseil, débit) est dans config.lua, servi au
-           seul serveur (T-132).
+           points d'eau, marge du serveur, zone des points, commande du Conseil et ses textes, débit) est dans
+           config.lua, servi au seul serveur (T-132).
     Les modèles et les gestes sont des EXEMPLES (-- PLACEHOLDER) : à remplacer par les props du royaume.
     Dépendances : shared/constants.lua
 ]]
@@ -50,9 +50,8 @@ VavaProvisions.config = {
     keys = { interact = 'E' },
     labels = { interact = 'Puiser ou boire (point d\'eau proche)' },
 
-    -- Textes (notifications : 200 octets au plus, texte brut ; libellés du journal du Registre : 32 octets au plus).
-    -- Formatés par le client d'après le code rendu par le serveur. Entiers ici : le client passe la table à
-    -- shared/rules.lua (textes du Conseil compris, jusqu'à la coupe de rules.lua prévue par T-143).
+    -- Textes montrés au joueur (notifications : 200 octets au plus, texte brut), formés par le client d'après le code
+    -- rendu par le serveur (shared/texts.lua). Les textes du Conseil (/eau, journal) sont dans config.lua.
     messages = {
         filledOne = 'Vous remplissez une outre.',
         filledMany = 'Vous remplissez %d outres.',
@@ -71,21 +70,6 @@ VavaProvisions.config = {
         prompt = {
             both = 'Puiser ou boire',   -- sorte où l'on peut boire
             fill = 'Puiser',            -- sorte où l'on ne boit pas
-        },
-        admin = {
-            usage = 'usage : /%s points | reserve <point> <nombre>',
-            line = '%s (%s, %s) : %s.',          -- nom, identifiant, sorte, réserve
-            level = '%d / %d puisages',
-            bottomless = 'sans fond',
-            set = 'Réserve de %s : %d / %d.',
-            unknown = 'Point d\'eau inconnu : %s.',
-            range = 'La réserve de %s va de 0 à %d.',
-            noReserve = '%s est sans fond : rien à régler.',
-            wait = 'Patientez un instant.',
-            more = '… et %d autres points d\'eau.',
-        },
-        journal = {
-            reserve = 'Réserve d\'eau fixée',     -- journal du Registre
         },
     },
 }

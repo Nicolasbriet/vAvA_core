@@ -83,7 +83,7 @@ server_script 'config_client.lua'  -- attendu: BLOQUANT
 server_scripts { '*.lua' }  -- attendu: BLOQUANT
 -- shared_script 'config.lua'  -- attendu: rien
 --[[ client_script 'config.lua' ]] client_script 'client/a.lua'  -- attendu: rien
-shared_scripts { 'config.lua' } -- exception transitoire  -- attendu: rien
+shared_scripts { 'config.lua' } -- exception inscrite, sans effet (T-143)  -- attendu: BLOQUANT
 -- relecture : une table imbriquée garde sa directive ; deux directives sur une ligne
 client_scripts { { 'config.lua' } }  -- attendu: BLOQUANT
 server_scripts { 'config.lua' } shared_script 'config.lua'  -- attendu: BLOQUANT
@@ -110,3 +110,10 @@ client_script('client/a.lua')  -- attendu: rien
 dependencies { 'vAvA_core', nom }  -- attendu: rien
 -- relecture sécurité S-2 : « audit: ok » ne fait pas taire les règles des manifestes
 shared_script 'config.lua' -- audit: ok  -- attendu: BLOQUANT
+-- relecture sécurité S-3 de T-143 : S, D et X ne se taisent ni par « audit: ok » ni par une exception inscrite
+server_script 'config_client.lua' -- exception S inscrite  -- attendu: BLOQUANT
+server_script 'config_client.lua' -- audit: ok  -- attendu: BLOQUANT
+client_script '../vava_autre/client/b.lua' -- exception D inscrite  -- attendu: BLOQUANT
+client_script '../vava_autre/client/c.lua' -- audit: ok  -- attendu: BLOQUANT
+shared_scripts(autre) -- exception X inscrite  -- attendu: BLOQUANT
+shared_scripts(encore) -- audit: ok  -- attendu: BLOQUANT

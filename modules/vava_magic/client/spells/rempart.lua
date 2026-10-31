@@ -6,7 +6,7 @@
       - Les blocs de pierre sont des objets réseau créés par le serveur, qui les monte du sol et les retire : chaque
         client les voit d'eux-mêmes. Ce fichier n'ajoute que l'effet vu des joueurs proches quand le mur se dresse ou
         s'effondre : poussière et éclats le long de sa ligne, caméra qui tremble pour les plus proches, grondement.
-    Dépendances : shared/, config.lua, client/ (noyau, controls, zones, bursts)
+    Dépendances : shared/, config_client.lua, client/ (noyau, controls, zones, bursts)
 ]]
 
 local type, ipairs, min = type, ipairs, math.min

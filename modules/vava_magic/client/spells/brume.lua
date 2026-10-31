@@ -4,7 +4,7 @@
            début (aperçu au sol : le disque du niveau) ; sans visée, ou trop loin, rien ne part. Sa zone « mist » est
            une nuée (client/clouds.lua) : nappes vues du dehors, voile et flou à l'écran de qui s'y tient, plus épais
            selon le niveau.
-    Dépendances : shared/, config.lua, client/ (noyau, controls, clouds)
+    Dépendances : shared/, config_client.lua, client/ (noyau, controls, clouds)
 ]]
 
 local controls = VavaMagic.controls

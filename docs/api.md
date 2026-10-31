@@ -771,13 +771,15 @@ Réglages d'un module (T-132, aucune API du core) : chaque module lit sa config 
 (`shared_scripts`, téléchargé par chaque joueur) ouvre la table avec ce que lit le client et pose `clientFile = true` ;
 `config.lua` (en tête des `server_scripts`, jamais téléchargé) la complète avec ce que lit le seul serveur. Basculés :
 `vava_atelier` 1.2.0, `vava_arrival` 1.2.0 ; `vava_chancellerie` 1.7.1 ne sert plus rien aux joueurs ; métiers (T-141) :
-`vava_skills` 1.3.0, `vava_farming` 1.8.0, `vava_crafting` 1.6.0, `vava_gathering` 1.7.0, `vava_provisions` 1.1.0 ;
+`vava_skills` 1.3.0, `vava_farming` 1.8.0, `vava_crafting` 1.6.0, `vava_gathering` 1.7.0, `vava_provisions` 1.1.0 (1.2.0 :
+textes du Conseil au seul serveur, `shared/rules.lua` au seul serveur, `shared/texts.lua` partagé) ;
 socle (T-142) : `vava_inventory` 1.9.0, `vava_combat` 1.1.0, `vava_health` 1.5.0, `vava_time` 1.4.0, `vava_codex` 1.6.0,
 `vava_admin` 1.9.0, `vava_voice` 1.4.0, `vava_chat` 1.4.0, `vava_cameras` 1.5.0, `vava_appearance` 1.1.0,
 `vava_needs` 1.3.0, `vava_world` 1.2.0, exemples `vava_anim_test` 1.2.0, `vava_dev_characters` 1.4.0,
 `vava_example_combat` 1.2.0 ; les ressources sans partie serveur n'ont que `config_client.lua` (`client_scripts`) :
-`vava_hud` 1.5.0, `vava_loading` 1.2.0, `vava_characters_ui` 1.3.0. Reste `vava_magic` (T-143). Règle complète :
-`docs/plan/specs/T-132.md` § 2.4.
+`vava_hud` 1.5.0, `vava_loading` 1.2.0, `vava_characters_ui` 1.3.0 ; magie (T-143) : `vava_magic` 2.11.0 (sorts et
+combinaisons entiers dans `config_client.lua` jusqu'à l'Atelier des sorts, T-123). Toutes les ressources sont basculées :
+l'audit refuse `config.lua` servi aux joueurs sans exception possible. Règle complète : `docs/plan/specs/T-132.md` § 2.4.
 
 ### `vava_ui`
 
@@ -1761,7 +1763,7 @@ la raison du refus est montrée au joueur — prison, interdiction ; `after` : `
 
 ### `vava_magic`
 
-La magie (2.10.0) : fiche magie par personnage (champ privé `vava_magic:sheet` : mage ou non, sorts et leur XP, sort
+La magie (2.11.0) : fiche magie par personnage (champ privé `vava_magic:sheet` : mage ou non, sorts et leur XP, sort
 prêt dans les mains, combinaisons découvertes, sigils gardés, sigil unique dans tout le royaume), mana (100, +3 toutes
 les 5 s, jamais sauvegardée) et sa barre, 5 niveaux par sort, incantation commune avec délai global (1 s), roue des
 sorts (Tab) et mode magie à la souris (clic droit viser, clic gauche lancer, clic molette verrouiller), états
@@ -1771,8 +1773,9 @@ de flammes**, **Nova ardente**), d'eau (**Trait de glace**, **Vague**, **Brume**
 **Secousse**, **Rempart**), combinaisons entre éléments décidées par le serveur d'après `config.combos` (vapeur,
 dissipation, boue, gel, séchage, extinction, roche ardente ; inscrites au grimoire à la première découverte,
 `discoveredCombos` de la fiche), **Lueur** et **Murmure**, grimoire et registre (objets), traces au sol, sons fabriqués
-par l'interface ou remplacés par des fichiers `.ogg` et des sons natifs (`config.sounds`), commandes du Conseil (`/magie`, numéro de joueur facultatif). Tout le détail, la config et la liste des tests en jeu :
-`modules/vava_magic/README.md`. Demande le core 0.5.0 ; facultatifs : `vava_inventory` ≥ 1.3.0 (objets), `vava_hud`
+par l'interface ou remplacés par des fichiers `.ogg` et des sons natifs (`config.sounds`), commandes du Conseil (`/magie`, numéro de joueur facultatif). Réglages en deux fichiers depuis 2.11.0 (T-143) : sorts,
+combinaisons, touches et textes affichés par le client dans `config_client.lua`, le reste dans `config.lua`. Tout le
+détail, la config et la liste des tests en jeu : `modules/vava_magic/README.md`. Demande le core 0.5.0 ; facultatifs : `vava_inventory` ≥ 1.3.0 (objets), `vava_hud`
 (notifications), `vava_health` ≥ 1.3.0, 1.4.0 conseillé (blessures par la chaîne de dégâts — sans lui, aucun sort ne blesse
 personne —, à terre : un joueur à terre ne subit plus aucun effet des sorts — ni Mouillé, ni recul, ni Renversé, ni
 Ralenti), `vava_admin` (droit `tools` et journal ; sans lui, ACE `magie.admin` ;
@@ -2185,7 +2188,7 @@ couverte ; `&frost=1` : gel annoncé ; `&season=ete` : « Couvrir » non propos�
 
 ### `vava_provisions`
 
-Les vivres du royaume (1.0.0, T-130) : objets `eau` (Outre d'eau) et `outre` (Outre vide), points d'eau (puits,
+Les vivres du royaume (1.2.0, T-130 ; réglages en deux fichiers, T-141 et T-143) : objets `eau` (Outre d'eau) et `outre` (Outre vide), points d'eau (puits,
 fontaines, sources) où l'on remplit ses outres et où l'on boit, outre rendue vide qui se fend parfois, outres faites à la
 tannerie. Ordre de démarrage : après `vava_farming`, avant `vava_codex` et `vava_arrival`. Demande le core 0.11.0
 (`core.zones`, `core.net`, registre `core:commands`), `vava_ui` et `vava_inventory` 1.8.0 ; facultatifs : `vava_needs`

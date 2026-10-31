@@ -1,7 +1,7 @@
 --[[
     vava_magic/client/messages.lua
     Rôle : texte d'un refus (code renvoyé par le serveur, ou par une pré-vérification), et sa notification.
-    Dépendances : config.lua, bridge/client.lua
+    Dépendances : config_client.lua, bridge/client.lua
 ]]
 
 local type, tostring = type, tostring

@@ -26,9 +26,9 @@ dépôt (`web/dev/devmock.js`, jamais livré ; option `--allow-file-access-from-
 Depuis 1.1.0 (T-132), les réglages sont dans deux fichiers et chacun n'est écrit qu'une fois : `config_client.lua`
 porte ce que lit le client, et le serveur aussi : `kinds` (entières : le client les lit par sorte et les passe au
 carnet des points), `interact.distance`, `streaming` (sauf `zoneRadius` et `subscribeSlack`), `anims`, `keys`,
-`labels`, `messages` (entiers : le client passe la table aux textes de `shared/rules.lua`, textes du Conseil compris,
-jusqu'à la coupe de ce fichier par T-143) ; `config.lua` porte tout le reste, lu par le seul serveur (dont
-`interact.serverTolerance`, `streaming.zoneRadius` et `streaming.subscribeSlack`, ajoutés aux tables ouvertes par
+`labels`, `messages` montrés au joueur (lus clé par clé par `shared/texts.lua`) ; `config.lua` porte tout le reste,
+lu par le seul serveur (dont `interact.serverTolerance`, `streaming.zoneRadius`, `streaming.subscribeSlack` et, depuis
+1.2.0, les textes du Conseil `messages.admin` et `messages.journal`, ajoutés aux tables ouvertes par
 `config_client.lua`), et complète la table sans réécrire une clé de `config_client.lua`.
 
 | Règle | Défaut | Clé |
@@ -177,21 +177,30 @@ l'installeur de la Chancellerie (le nouveau posé en `config.lua.nouveau`) garde
 mais la console le signale (« config.lua garde la forme d'avant 1.1.0 … ») et un réglage client changé dans ce fichier
 reste sans effet. Reportez vos réglages dans `config.lua` et `config_client.lua` d'après les nouveaux fichiers.
 
+**Mise à jour vers 1.2.0 (T-143)** : les textes du Conseil (`messages.admin`, réponses de `/eau` ; `messages.journal`,
+libellé du journal du Registre) ont quitté `config_client.lua` pour `config.lua`, et les règles (`shared/rules.lua`)
+ne sont plus servies aux joueurs : les textes qu'ils voient sont formés par `shared/texts.lua`. Un `config.lua` de
+1.1.0 modifié et gardé par l'installeur n'a pas ces textes : le module refuse alors de démarrer (« config.lua d'avant
+1.2.0 : messages.admin et messages.journal … y manquent ») ; reportez-les d'après `config.lua.nouveau`. À l'inverse,
+un `config_client.lua` de 1.1.0 gardé les sert encore aux joueurs sans servir : la console le signale
+(« config_client.lua garde les textes du Conseil d'avant 1.2.0 … ») ; retirez-les d'après `config_client.lua.nouveau`.
+
 ## Fichiers
 
 | Fichier | Rôle |
 |---|---|
-| `config_client.lua` | réglages lus par le client (sortes de points d'eau, portée, streaming, gestes, touche, textes) : téléchargé par chaque joueur, ouvre `VavaProvisions.config` |
+| `config_client.lua` | réglages lus par le client (sortes de points d'eau, portée, streaming, gestes, touche, textes montrés au joueur) : téléchargé par chaque joueur, ouvre `VavaProvisions.config` |
 | `config.lua` | tous les autres réglages, servi au seul serveur (en tête des `server_scripts`) : complète la table |
-| `shared/rules.lua`, `shared/pointzone.lua`, `shared/proximity.lua` | purs, lus par le client et le serveur : règles et textes, carnet des points, groupes du streaming (`rules.lua` coupé en deux par T-143) |
+| `shared/texts.lua`, `shared/pointzone.lua`, `shared/proximity.lua` | purs, lus par le client et le serveur : textes montrés au joueur, carnet des points, groupes du streaming |
+| `shared/rules.lua` | pur, servi au seul serveur : validation des points et de la config, réserves, choix de l'action, `/eau` (1.2.0, T-143) |
 
-Fichiers téléchargés par chaque joueur (1.1.0, T-132) : `shared/constants.lua`, `config_client.lua`, les trois
-`shared/*.lua`, les cinq `client/*.lua`, la page de l'invite et les dessins des objets ; `config.lua` est servi au
-seul serveur.
+Fichiers téléchargés par chaque joueur (1.2.0, T-132 et T-143) : `shared/constants.lua`, `config_client.lua`,
+`shared/texts.lua`, `shared/pointzone.lua`, `shared/proximity.lua`, les cinq `client/*.lua`, la page de l'invite et
+les dessins des objets ; `config.lua` et `shared/rules.lua` sont servis au seul serveur.
 
 ## Tests
 
-Hors jeu : `tests/spec/provisions_rules_spec.lua` (règles pures et config), `tests/spec/provisions_pointzone_spec.lua`
+Hors jeu : `tests/spec/provisions_rules_spec.lua` (règles pures, textes et config), `tests/spec/provisions_pointzone_spec.lua`
 (état de zone et carnet du client), `tests/spec/provisions_client_view_spec.lua` (carnet, invite et textes sur la
 seule vue client : `config_client.lua` sans `config.lua`), `tests/spec/provisions_server_spec.lua` (puiser, boire, réserves, outre rendue,
 objets, recette, `/eau`, démarrage réel sur un core simulé), `tests/spec/props_proximity_spec.lua` (streaming). En

@@ -5,6 +5,3 @@ modules/vava_loading/web/fonts/cinzel.woff2	[fichier]	écran de chargement : aff
 modules/vava_loading/web/fonts/eb_garamond.woff2	[fichier]	écran de chargement : affiché avant le téléchargement des autres ressources, il ne peut pas lire nui://vava_ui (décision 2 de T-012)
 modules/vava_loading/web/fonts/eb_garamond_italic.woff2	[fichier]	écran de chargement : affiché avant le téléchargement des autres ressources, il ne peut pas lire nui://vava_ui (décision 2 de T-012)
 modules/vava_loading/web/fonts/cinzel_decorative_900.woff2	[fichier]	écran de chargement : Cinzel Decorative 900, absente de vava_ui (décision 3 de T-020)
-# T-132 — exceptions transitoires : un manifeste par ligne qui sert encore config.lua aux joueurs, retirées lot par lot
-# (la liste est celle du travail restant ; docs/plan/specs/T-132.md § 3.1)
-modules/vava_magic/fxmanifest.lua	'config.lua',	T-132 : config partagée, lot 4 (T-143)
