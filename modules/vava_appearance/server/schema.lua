@@ -2,7 +2,7 @@
     vava_appearance/server/schema.lua
     Rôle : schéma de validation d'une apparence, utilisé pour le champ de personnage et pour l'argument réseau
            de la création. Strict : aucune clé inconnue, bornes sur chaque nombre et chaque liste.
-    Dépendances : shared/constants.lua, config.lua
+    Dépendances : shared/constants.lua, config.lua (bornes du schéma)
 ]]
 
 local cfg = VavaAppearance.config

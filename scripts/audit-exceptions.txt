@@ -16,7 +16,6 @@ modules/vava_admin/fxmanifest.lua	'config.lua',	T-132 : config partagée, lot 3 
 modules/vava_voice/fxmanifest.lua	'config.lua',	T-132 : config partagée, lot 3 (T-142)
 modules/vava_chat/fxmanifest.lua	'config.lua',	T-132 : config partagée, lot 3 (T-142)
 modules/vava_cameras/fxmanifest.lua	'config.lua',	T-132 : config partagée, lot 3 (T-142)
-modules/vava_appearance/fxmanifest.lua	'config.lua',	T-132 : config partagée, lot 3 (T-142)
 modules/vava_needs/fxmanifest.lua	'config.lua',	T-132 : config partagée, lot 3 (T-142)
 modules/vava_hud/fxmanifest.lua	'config.lua',	T-132 : config partagée, lot 3 (T-142) : module sans partie serveur, config.lua à renommer config_client.lua
 modules/vava_loading/fxmanifest.lua	'config.lua',	T-132 : config partagée, lot 3 (T-142) : module sans partie serveur, config.lua à renommer config_client.lua

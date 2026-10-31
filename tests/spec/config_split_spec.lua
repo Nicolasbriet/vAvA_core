@@ -56,7 +56,7 @@ local WITHOUT_LUA = { ['modules/vava_ui'] = true }
 local PENDING = {
     vava_inventory = 'T-142', vava_combat = 'T-142', vava_health = 'T-142', vava_time = 'T-142', vava_codex = 'T-142',
     vava_admin = 'T-142', vava_voice = 'T-142', vava_chat = 'T-142', vava_cameras = 'T-142',
-    vava_appearance = 'T-142', vava_needs = 'T-142', vava_hud = 'T-142', vava_loading = 'T-142',
+    vava_needs = 'T-142', vava_hud = 'T-142', vava_loading = 'T-142',
     vava_characters_ui = 'T-142', vava_anim_test = 'T-142', vava_dev_characters = 'T-142',
     vava_example_combat = 'T-142',
     vava_magic = 'T-143',
