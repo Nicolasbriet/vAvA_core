@@ -2099,7 +2099,16 @@ Demande le core 0.11.0 (abonnements de zone, depuis 1.5.0), `vava_inventory` 1.4
 une clé de `anims` de `config_client.lua`, sinon l'ajout est refusé : « animation '…' inconnue ») et `vava_crafting:recipes`
 (`{ label, skill, level, station, tool?, durationMs, difficulty, xp, signed?, signedIfQuality?, durability?,
 transmission?, fragments?, ingredients = { { item, quantity, minTier? } }, output = { item, quantity } }`), remplis par
-la config, ouverts aux autres modules ; chaque recette est aussi déclarée à `vava_skills:recipes`. Les armes de
+la config, ouverts aux autres modules ; chaque recette est aussi déclarée à `vava_skills:recipes`. Un module qui ajoute
+une recette à `vava_crafting:recipes` la déclare **aussi** à `vava_skills:recipes` (et la redéclare au
+`core:module:ready` de `vava_skills`) : sinon les compétences ne la connaissent pas et la station la refuse
+(`not_known`). Depuis 1.8.0 (T-147), l'artisanat le signale : une ligne `WARN` par recette absente (« recette 'x'
+(déclarée par y) absente de vava_skills:recipes … »), une fois, `skillsCheck.delayMs` (5 s) après son démarrage, après
+l'ajout d'une recette par un autre module, après le retrait d'une recette des compétences et au retour de
+`vava_skills` (délai borné de 1 s à 10 min ; des demandes rapprochées ne le repoussent pas au-delà de 4 × le délai) ;
+une recette signalée puis déclarée aux compétences relance le contrôle, et une ligne d'information le dit ; au menu,
+une telle recette libre est verrouillée (champ `unregistered = true` de la réponse de `vava_crafting:open`, marque
+« Indisponible ») au lieu d'être proposée puis refusée. Le champ `known`, lu par personne, n'est plus envoyé (1.8.0). Les armes de
 `vava_combat` (Épée longue, Hache d'armes, Masse d'armes, Dague, Bâton ferré, Bouclier rond) y sont ajoutées par ce module,
 signées, solidité tirée de sa fiche ; l'Épée courte reste une recette de l'artisanat (§ `vava_combat`).
 

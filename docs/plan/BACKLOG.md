@@ -841,13 +841,25 @@ versé à T-014 ; les autres points déjà couverts sont précisés dans T-012 �
   `docs/plan/rapports/T-136.md` ; à tester en jeu : `docs/tests/metiers.md` § 5.3.
 
 ### T-147 — Artisanat : recette libre inconnue des compétences signalée
-- Agent : vava-dev-lua · Dépend de : — · Statut : à faire
+- Agent : vava-dev-lua · Dépend de : — · Statut : à tester en jeu (relu lore, sécurité et réseau, suites appliquées)
 - Trouvé pendant T-136 : `vava_crafting` affiche au menu une recette déclarée à l'artisanat mais inconnue de
   `vava_skills:recipes`, puis la refuse au clic (`not_known`), sans rien en console. Un module qui oublie la
   déclaration aux compétences retombe dans ce piège sans signe : avertir au démarrage de `vava_crafting` (et au
   retour de `vava_skills`) pour chaque recette de l'artisanat absente des compétences, et la montrer verrouillée.
 - Critères : essai hors jeu d'une recette déclarée à l'artisanat seul (avertissement, recette verrouillée) ;
   métiers en jeu.
+- Fait le 31 octobre 2026 (branche `agents/T-147`), sans RPC, évènement, boucle ni envoi ajouté : `vava_crafting`
+  1.8.0, une ligne `WARN` par recette de `vava_crafting:recipes` absente de `vava_skills:recipes` (nom, module qui l'a
+  déclarée), une seule fois, `skillsCheck.delayMs` (5 s, borné de 1 s à 10 min, R-3) après le démarrage, l'ajout d'une
+  recette par un autre module, le retrait d'une recette des compétences ou le retour de `vava_skills`, 4 × le délai au
+  plus après la première demande (R-1) ; une recette signalée puis déclarée aux compétences relance le contrôle et une
+  ligne d'information le dit (S-1, R-2) ; lecture du registre en échec : une ligne, rien de signalé ni gardé en cache
+  (S-2) ; au menu, la recette libre est verrouillée (`unregistered`, « Indisponible », raison « Cette recette ne peut ni
+  se façonner ni s'apprendre : prévenez le Conseil. », relu lore) ; `known`, lu par personne, n'est plus envoyé (R-4) ;
+  le serveur reste juge (`not_known` au début). Essais hors jeu `crafting_skill_recipes_spec` (14). Rapport
+  `docs/plan/rapports/T-147.md`. **À tester en jeu** : `docs/tests/metiers.md` § 4.2 (ressource jetable
+  `test_recette` : une seule ligne au démarrage, recette « Indisponible » à l'établi, ligne d'information puis
+  déverrouillée une fois déclarée aux compétences, retour de `vava_skills`).
 
 ### T-145 — Menu pause `vava_pause` (la bannière)
 - Agents : vava-architecte → vava-dev-lua + vava-dev-nui (cette tâche autorise à toucher `vava_codex`, `vava_admin`,
