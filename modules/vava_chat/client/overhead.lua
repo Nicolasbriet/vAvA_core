@@ -4,7 +4,7 @@
            voient (ligne de vue relue toutes les `overhead.sightMs`, pas à chaque image). Les dernières lignes
            s'empilent, les plus anciennes en haut. Le dessin tourne à chaque image seulement tant qu'une ligne est en
            vie ; sans /me ni /do récent, aucune boucle. Les codes de mise en forme de GTA (~r~…) sont retirés.
-    Dépendances : shared/text.lua, config.lua
+    Dépendances : shared/text.lua, config_client.lua
 ]]
 
 local pairs, next, max, format, gsub, byte, sub, remove =

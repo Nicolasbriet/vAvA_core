@@ -4,7 +4,7 @@
            ses textes et réglages, puis chaque fichier du module lui renvoie son état complet (place, suggestions,
            profil) ; les ordres arrivés avant attendent (en nombre borné). Chaque retour de la page est isolé : une
            erreur renvoie un code au lieu de la laisser sans réponse.
-    Dépendances : config.lua, client/core.lua
+    Dépendances : config_client.lua, client/core.lua
 ]]
 
 local type, ipairs, tostring, xpcall = type, ipairs, tostring, xpcall
