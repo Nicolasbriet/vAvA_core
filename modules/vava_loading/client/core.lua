@@ -10,7 +10,7 @@ local GetCurrentResourceName, GetResourceState = GetCurrentResourceName, GetReso
 local GetResourceMetadata = GetResourceMetadata
 
 local loading = VavaLoading
-local cfg = VavaLoading.config   -- nommée en entier : config_split_spec suit les lectures du client (T-132)
+local cfg = VavaLoading.config
 local CORE = loading.CORE_RESOURCE
 
 loading.resource = GetCurrentResourceName()

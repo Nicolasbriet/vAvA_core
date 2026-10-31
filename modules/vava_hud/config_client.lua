@@ -1,7 +1,6 @@
 --[[
     vava_hud/config_client.lua
-    Rôle : table du module (seule globale de la ressource) et configuration de l'affichage. Ressource cliente
-           uniquement : config_client.lua (nommé config.lua avant 1.5.0, T-132) est en client_scripts.
+    Rôle : table du module (seule globale de la ressource) et configuration de l'affichage.
     Dépendances : aucune
 ]]
 

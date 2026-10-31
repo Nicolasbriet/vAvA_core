@@ -18,7 +18,7 @@ local DisplayRadar, DoScreenFadeIn, DoScreenFadeOut = DisplayRadar, DoScreenFade
 local ui = VavaCharactersUi
 local core = ui.core
 if not core then return end
-local cfg = VavaCharactersUi.config   -- nommée en entier : config_split_spec suit les lectures du client (T-132)
+local cfg = VavaCharactersUi.config
 local nui, camera, preview, appearance = ui.nui, ui.camera, ui.preview, ui.appearance
 
 local CLEAR_ALL_PEDS = 1

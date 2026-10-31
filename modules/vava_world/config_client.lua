@@ -1,13 +1,12 @@
 --[[
     vava_world/config_client.lua
-    Rôle : réglages du monde que lit le client : population de la carte, avis de recherche, sons de la ville coupés.
-           Téléchargé par chaque joueur ; le serveur le lit aussi. Ce que lit le seul serveur (instances préparées,
-           nettoyage au démarrage) est dans config.lua, servi au seul serveur (T-132).
+    Rôle : réglages du monde lus par le client (et le serveur) : population, avis de recherche, sons coupés. Le
+           reste : config.lua, servi au seul serveur (T-132).
     Dépendances : shared/constants.lua
 ]]
 
 VavaWorld.config = {
-    clientFile = true,  -- posé par ce fichier, ne pas changer (sans lui, le serveur signale un config.lua d'avant 1.2.0)
+    clientFile = true,  -- ne pas changer (sans lui : config.lua d'avant 1.2.0 signalé)
 
     population = {
         -- false : aucun PNJ, véhicule, bateau, train, avion ni animal créé par le jeu

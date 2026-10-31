@@ -22,7 +22,7 @@ dependencies {
     'vava_health',
 }
 
--- config_client.lua : ce que lit le client ; config.lua, en tête des server_scripts, n'est jamais servi (T-132)
+-- config.lua n'est jamais servi aux joueurs (T-132)
 shared_script 'config_client.lua'
 server_scripts {
     'config.lua',

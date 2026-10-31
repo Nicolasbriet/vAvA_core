@@ -15,7 +15,7 @@ local SendLoadingScreenMessage, ShutdownLoadingScreenNui = SendLoadingScreenMess
 local encode = json.encode
 
 local loading = VavaLoading
-local cfg = VavaLoading.config   -- nommée en entier : config_split_spec suit les lectures du client (T-132)
+local cfg = VavaLoading.config
 local core = loading.core
 local MESSAGES, HOOKS = loading.MESSAGES, loading.HOOKS
 

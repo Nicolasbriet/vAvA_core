@@ -1,14 +1,12 @@
 --[[
     vava_appearance/config_client.lua
-    Rôle : réglages de l'apparence que lit le client : emplacements de vêtements et accessoires proposés, apparences
-           de départ (lues par shared/appearance.lua des deux côtés). Téléchargé par chaque joueur ; le serveur le lit
-           aussi. Ce que lit le seul serveur (bornes du schéma, débit des créations) est dans config.lua, servi au
-           seul serveur (T-132).
+    Rôle : réglages de l'apparence lus par le client (et le serveur) : emplacements proposés, apparences de départ.
+           Le reste : config.lua, servi au seul serveur (T-132).
     Dépendances : shared/constants.lua
 ]]
 
 VavaAppearance.config = {
-    clientFile = true,  -- posé par ce fichier, ne pas changer (sans lui, le serveur signale un config.lua d'avant 1.1.0)
+    clientFile = true,  -- ne pas changer (sans lui : config.lua d'avant 1.1.0 signalé)
 
     -- Emplacements de vêtements proposés (id GTA) : haut, sous-haut, bras, bas, chaussures.
     -- Les vêtements GTA servent en attendant les packs médiévaux : seule cette liste et les défauts changeront.

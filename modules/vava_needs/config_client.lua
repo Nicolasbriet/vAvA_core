@@ -1,14 +1,12 @@
 --[[
     vava_needs/config_client.lua
-    Rôle : réglages des besoins que lit le client (le serveur les lit aussi). Valeurs de 0 (épuisé) à 100
-           (satisfait). Besoins suivis, paliers, vie et endurance, durée du geste de consommation, gestes, jauges.
-           Téléchargé par chaque joueur. Ce que lit le seul serveur (boucle de baisse, activité, refus d'un objet,
-           geste par catégorie) est dans config.lua, servi au seul serveur (T-132).
+    Rôle : réglages des besoins lus par le client (et le serveur). Valeurs de 0 (épuisé) à 100 (satisfait). Le
+           reste (boucle, activité, refus d'un objet) : config.lua, servi au seul serveur (T-132).
     Dépendances : shared/constants.lua
 ]]
 
 VavaNeeds.config = {
-    clientFile = true,  -- posé par ce fichier, ne pas changer (sans lui, le serveur signale un config.lua d'avant 1.3.0)
+    clientFile = true,  -- ne pas changer (sans lui : config.lua d'avant 1.3.0 signalé)
 
     -- Besoins suivis, dans l'ordre d'affichage. Ajouter un besoin ici suffit (fiche d'objet, HUD et effets suivent).
     --   durationHours : temps de jeu pour passer de 100 à 0 au repos ;

@@ -1,7 +1,6 @@
 --[[
     vava_characters_ui/config_client.lua
-    Rôle : configuration de l'écran de personnages (client) : scène, caméras, temporisations. Ressource cliente
-           uniquement : config_client.lua (nommé config.lua avant 1.3.0, T-132) est en client_scripts.
+    Rôle : configuration de l'écran de personnages (client) : scène, caméras, temporisations.
     Dépendances : aucune
 ]]
 
