@@ -4,7 +4,8 @@
            noir à la sélection du personnage. Ressource cliente uniquement : aucun RPC, aucun évènement, aucune donnée.
     Dépendances : vAvA_core ≥ 0.13.0 (spawn.loadingScreen : le core lui laisse la fermeture de l'écran) ; facultatif :
                   vava_characters_ui ≥ 1.2.0 (hook vava_characters_ui:shown, export isShown). Démarre juste après
-                  vava_ui. Polices embarquées (pas de vava_ui : la page s'affiche avant les autres ressources).
+                  vava_ui. Polices embarquées (pas de vava_ui : la page s'affiche avant les autres ressources). Réglages du
+           client Lua : config_client.lua (nommé config.lua avant 1.2.0, T-132).
 ]]
 
 fx_version 'cerulean'
@@ -14,7 +15,7 @@ use_experimental_fxv2_oal 'yes'
 
 name 'vava_loading'
 description "Écran de chargement d'Eldoria"
-version '1.1.1'
+version '1.2.0'
 
 dependency 'vAvA_core'
 
@@ -32,7 +33,7 @@ files {
 
 client_scripts {
     'shared/constants.lua',
-    'config.lua',
+    'config_client.lua',
     'client/core.lua',
     'client/main.lua',
 }

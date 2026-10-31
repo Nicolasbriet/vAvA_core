@@ -2,7 +2,7 @@
     vava_loading/client/core.lua
     Rôle : accès protégé à l'API client du core (absente : l'écran se ferme seul à l'arrivée de la session) et lecture
            protégée de l'export de l'écran de sélection (« est-il affiché ? »). Aucun appel ne lève d'erreur.
-    Dépendances : vAvA_core (API client v1, facultative), shared/constants.lua, config.lua
+    Dépendances : vAvA_core (API client v1, facultative), shared/constants.lua, config_client.lua
 ]]
 
 local pcall, print, tostring = pcall, print, tostring
@@ -10,7 +10,7 @@ local GetCurrentResourceName, GetResourceState = GetCurrentResourceName, GetReso
 local GetResourceMetadata = GetResourceMetadata
 
 local loading = VavaLoading
-local cfg = loading.config
+local cfg = VavaLoading.config   -- nommée en entier : config_split_spec suit les lectures du client (T-132)
 local CORE = loading.CORE_RESOURCE
 
 loading.resource = GetCurrentResourceName()

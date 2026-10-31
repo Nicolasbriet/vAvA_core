@@ -53,7 +53,13 @@ Aussi : fermeture à l'arrêt de la ressource ; sans API du core, fermeture dès
 (attente toutes les `noCorePollMs`, sans éclair). Un retour à la sélection en cours de jeu (`/perso quitter`) n'a pas
 d'écran de chargement : l'état est `closed`, rien ne se passe.
 
-## Règles du client Lua (`config.lua`)
+## Règles du client Lua (`config_client.lua`)
+
+Ressource cliente uniquement : ces réglages sont dans `config_client.lua` (nommé `config.lua` avant 1.2.0, T-132 :
+`config.lua` est réservé aux réglages du seul serveur, jamais téléchargés). **Mise à jour vers 1.2.0** : un
+`config.lua` modifié est gardé par l'installeur de la Chancellerie, qui le signale (« reportez vos réglages dans
+config_client.lua »), mais il n'est plus au manifeste et n'est plus lu : reportez vos réglages dans
+`config_client.lua`, puis supprimez l'ancien fichier.
 
 | Règle | Défaut | Clé |
 |---|---|---|
@@ -70,8 +76,8 @@ exposer un export équivalent, et être nommé dans `selection.*`.
 
 ## Réglages de la page (`web/js/config.js`) et textes (`web/js/strings.js`)
 
-La page s'affiche **avant** que le moindre script Lua tourne : elle ne peut pas lire `config.lua`. Ses réglages sont
-donc dans deux fichiers à elle (décision 5 de la spec, écart assumé à « tout dans `config.lua` ») ; la seule durée
+La page s'affiche **avant** que le moindre script Lua tourne : elle ne peut pas lire `config_client.lua`. Ses réglages
+sont donc dans deux fichiers à elle (décision 5 de la spec, écart assumé à « tout dans la config Lua ») ; la seule durée
 partagée, celle de l'éclair, est envoyée par le Lua avec le message de passage.
 
 | Règle | Défaut | Clé |
@@ -144,7 +150,7 @@ modules/vava_loading/web/dev/essais.js` (lancé aussi par `scripts/verifier.sh` 
 | Fichier | Rôle |
 |---|---|
 | `fxmanifest.lua` | `loadscreen`, fermeture à la main, souris ; motifs livrés exacts (jamais `web/dev/`) |
-| `config.lua` | réglages du client Lua (sélection attendue, éclair, filets) |
+| `config_client.lua` | réglages du client Lua (sélection attendue, éclair, filets) ; `config.lua` avant 1.2.0 |
 | `shared/constants.lua` | `VavaLoading` (seule globale Lua), noms des messages et des hooks, bornes, fonctions pures |
 | `client/core.lua` | API client du core et export de la sélection, lus sous `pcall` |
 | `client/main.lua` | cycle chargement → attente → passage → fermé |

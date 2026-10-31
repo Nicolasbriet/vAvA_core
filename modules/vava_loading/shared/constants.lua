@@ -19,7 +19,7 @@ VavaLoading.MESSAGES = {
     HANDOFF = 'vava_loading:handoff',       -- { ms } : sélection affichée, éclair puis fondu de la page
 }
 
--- Hooks client du core écoutés (celui de l'écran de sélection est dans config.lua, selection.shownHook).
+-- Hooks client du core écoutés (celui de l'écran de sélection est dans config_client.lua, selection.shownHook).
 VavaLoading.HOOKS = {
     SELECTION = 'core:character:selection', -- le joueur est mis en attente : la sélection se prépare
     LOADED = 'core:character:loaded',       -- personnage chargé sans passer par la sélection : fermeture immédiate
