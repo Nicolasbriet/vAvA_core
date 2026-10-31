@@ -175,7 +175,7 @@ local function recipeViews(src, def, index)
             list[#list + 1] = {
                 id = recipe.id, label = recipe.label, skill = recipe.skill, skillLabel = bridge.SkillLabel(recipe.skill),
                 level = recipe.level, playerLevel = playerLevel, levelOk = playerLevel >= recipe.level,
-                known = declared and (recipe.transmission or playerLevel >= recipe.level), unregistered = not declared or nil,
+                unregistered = not declared or nil,
                 toolKind = recipe.tool, toolLabel = recipe.tool and toolLabel(recipe.tool) or nil,
                 toolOk = recipe.tool == nil or (heldKind == recipe.tool and not heldBroken),
                 durationMs = crafting.duration(recipe, playerLevel), difficulty = recipe.difficulty, xp = recipe.xp,

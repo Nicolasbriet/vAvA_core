@@ -270,14 +270,17 @@ function Bridge.DeclareSkillRecipe(id, data)
     return registry.add(SKILL_RECIPES_REGISTRY, id, data)
 end
 
---- Identifiants des recettes déclarées au registre des compétences : `{ [id] = true }`, ou nil si le registre est absent
---- (vava_skills arrêté). Lit une copie du registre entier : à tenir en cache, relu après un changement du registre.
----@return table<string, boolean>|nil
+--- Identifiants des recettes déclarées au registre des compétences : `{ [id] = true }` ; false si le registre est absent
+--- (vava_skills arrêté) ; nil si sa lecture n'a pas rendu de table (à ne pas garder en cache). Lit une copie du registre
+--- entier : à tenir en cache, relu après un changement du registre.
+---@return table<string, boolean>|false|nil
 function Bridge.SkillRecipeIds()
     local registry = core.registry
-    if not registry.exists(SKILL_RECIPES_REGISTRY) then return nil end
+    if not registry.exists(SKILL_RECIPES_REGISTRY) then return false end
+    local all = registry.all(SKILL_RECIPES_REGISTRY)
+    if type(all) ~= 'table' then return nil end
     local ids = {}
-    for id in pairs(registry.all(SKILL_RECIPES_REGISTRY) or {}) do ids[id] = true end
+    for id in pairs(all) do ids[id] = true end
     return ids
 end
 

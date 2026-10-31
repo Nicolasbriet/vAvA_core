@@ -32,7 +32,7 @@ local function newLogs()
 end
 
 describe('vava_crafting : recette inconnue des compétences', function()
-    local registry, hooks, logs, started, realPrint, sheet
+    local registry, hooks, logs, started, realPrint, sheet, clock
 
     local function coreFor(owner, log)
         return {
@@ -151,6 +151,8 @@ describe('vava_crafting : recette inconnue des compétences', function()
         sheet = { skills = { forge = { level = 22 } }, recipes = {} }
         _G.GetResourceState = function(name) return started[name] and 'started' or 'missing' end
         _G.TriggerClientEvent = function() end
+        clock = 0
+        _G.GetGameTimer = function() return clock end
         _G.exports = setmetatable({}, {
             __index = function(_, name)
                 if name ~= SKILLS then return nil end
@@ -177,7 +179,7 @@ describe('vava_crafting : recette inconnue des compétences', function()
         assert.same({}, VavaCrafting.catalog.missingFromSkills())
         assert.is_true(VavaCrafting.catalog.declaredToSkills('lingot_fer'))
         local entry = menuEntry('lingot_fer')
-        assert.is_true(entry.known)
+        assert.is_nil(entry.known)
         assert.is_nil(entry.unregistered)
     end)
 
@@ -195,7 +197,7 @@ describe('vava_crafting : recette inconnue des compétences', function()
         local entry = menuEntry('clou_fer')
         assert.is_table(entry)
         assert.is_true(entry.unregistered)
-        assert.is_false(entry.known)
+        assert.is_nil(entry.known)
         -- le niveau suffit : seule la déclaration manque
         assert.is_true(entry.levelOk)
         assert.same({ false, 'not_known' }, { VavaCrafting.crafting.begin(PLAYER, 'forge_bourg', 'clou_fer', nil) })
@@ -214,7 +216,7 @@ describe('vava_crafting : recette inconnue des compétences', function()
         assert.is_true(VavaCrafting.catalog.declaredToSkills('clou_fer'))
         local entry = menuEntry('clou_fer')
         assert.is_nil(entry.unregistered)
-        assert.is_true(entry.known)
+        assert.is_nil(entry.known)
         -- la connaissance passe : le refus suivant vient de la besace vide
         assert.same({ false, 'missing_items' }, { VavaCrafting.crafting.begin(PLAYER, 'forge_bourg', 'clou_fer', nil) })
         assert.same({}, VavaCrafting.catalog.checkSkillRecipes())
@@ -298,5 +300,109 @@ describe('vava_crafting : recette inconnue des compétences', function()
         elapse()
         assert.same({}, skillWarnings())
         assert.is_nil(menuEntry('clou_fer'))
+    end)
+
+    -- Suites des relectures (S-1, S-2, R-1, R-2, R-3, R-4) ---------------------------------------------------------
+
+    --- Lignes d'information qui disent qu'une recette signalée est désormais déclarée.
+    local function declaredLines()
+        local list = {}
+        for _, line in ipairs(logs.info) do
+            if line:find('désormais déclarée', 1, true) then list[#list + 1] = line end
+        end
+        return list
+    end
+
+    it('S-1 / R-2 : une recette signalée puis déclarée aux compétences après le contrôle : relance, une ligne le dit', function()
+        elapse()
+        assert.is_true(registry.add(FORGERONS, CRAFT_RECIPES, 'clou_fer', CLOUS))
+        elapse()
+        assert.equal(1, #skillWarnings())
+        -- une recette des compétences jamais signalée ne relance rien
+        assert.is_true(registry.add(FORGERONS, SKILL_RECIPES, 'autre_recette', CLOUS_SKILL))
+        assert.equal(0, #helper.timers)
+        -- la recette signalée arrive aux compétences : contrôle différé, comme les autres
+        assert.is_true(registry.add(FORGERONS, SKILL_RECIPES, 'clou_fer', CLOUS_SKILL))
+        assert.equal(1, #helper.timers)
+        assert.same({}, declaredLines())
+        elapse()
+        local lines = declaredLines()
+        assert.equal(1, #lines)
+        assert.truthy(lines[1]:find("recette 'clou_fer'", 1, true))
+        assert.equal(1, #skillWarnings())
+        -- de nouveau retirée des compétences : signalée de nouveau, une fois
+        assert.is_true(registry.remove(FORGERONS, SKILL_RECIPES, 'clou_fer'))
+        elapse()
+        assert.equal(2, #skillWarnings())
+    end)
+
+    it('S-2 : lecture du registre des compétences en échec : rien en cache, une ligne, rien de signalé à tort', function()
+        elapse()
+        local registryApi = VavaCrafting.core.registry
+        local realAll = registryApi.all
+        registryApi.all = function(name)
+            if name == SKILL_RECIPES then return nil end
+            return realAll(name)
+        end
+        -- le cache est vidé par un changement du registre
+        assert.is_true(registry.add(FORGERONS, SKILL_RECIPES, 'autre_recette', CLOUS_SKILL))
+        assert.is_nil(VavaCrafting.bridge.SkillRecipeIds())
+        assert.is_false(VavaCrafting.catalog.declaredToSkills('lingot_fer'))
+        assert.same({}, VavaCrafting.catalog.checkSkillRecipes())
+        assert.same({}, VavaCrafting.catalog.checkSkillRecipes())
+        -- une seule ligne, celle de l'échec : aucune recette signalée absente à tort
+        local lines = skillWarnings()
+        assert.equal(1, #lines)
+        assert.truthy(lines[1]:find('en échec', 1, true))
+        -- lecture rétablie : relue aussitôt, sans attendre un changement du registre
+        registryApi.all = realAll
+        assert.is_true(VavaCrafting.catalog.declaredToSkills('lingot_fer'))
+        assert.same({}, VavaCrafting.catalog.checkSkillRecipes())
+    end)
+
+    it('R-1 : des ajouts rapprochés ne repoussent pas le contrôle au-delà de 4 × le délai', function()
+        elapse()
+        local delay = VavaCrafting.config.skillsCheck.delayMs
+        assert.is_true(registry.add(FORGERONS, CRAFT_RECIPES, 'clou_fer', CLOUS))
+        -- un ajout d'une recette tierce toutes les 0,8 × délai, sans que le contrôle ait pu passer
+        local waits = {}
+        for i = 1, 6 do
+            clock = clock + math.floor(delay * 0.8)
+            assert.is_true(registry.add(FORGERONS, CRAFT_RECIPES, 'clou_' .. i, CLOUS))
+            waits[i] = helper.timers[#helper.timers].ms
+        end
+        -- 4,0 × délai depuis la première demande : à 4,8 × le délai, l'échéance est immédiate
+        assert.same({ delay, delay, delay, math.floor(delay * 0.8), 0, 0 }, waits)
+        -- seule la dernière demande passe : une ligne par recette absente
+        local timers = helper.timers
+        helper.timers = {}
+        for _, timer in ipairs(timers) do timer.fn() end
+        assert.equal(7, #skillWarnings())
+        -- le contrôle passé, une nouvelle demande attend de nouveau le délai entier
+        assert.is_true(registry.add(FORGERONS, CRAFT_RECIPES, 'clou_7', CLOUS))
+        assert.equal(delay, helper.timers[#helper.timers].ms)
+    end)
+
+    it('R-3 : délai du contrôle borné (1 s à 10 min, 5 s si ce n\'est pas un nombre)', function()
+        elapse()
+        local check = VavaCrafting.config.skillsCheck
+        for _, case in ipairs({ { 10, 1000 }, { 'abc', 5000 }, { 0 / 0, 5000 }, { math.huge, 600000 }, { 7500.6, 7500 } }) do
+            check.delayMs = case[1]
+            VavaCrafting.catalog.scheduleSkillCheck()
+            assert.equal(case[2], helper.timers[#helper.timers].ms, tostring(case[1]))
+            -- l'échéance passe : plus aucune demande en attente pour le cas suivant
+            local timers = helper.timers
+            helper.timers = {}
+            timers[#timers].fn()
+        end
+        VavaCrafting.config.skillsCheck = nil
+        VavaCrafting.catalog.scheduleSkillCheck()
+        assert.equal(5000, helper.timers[#helper.timers].ms)
+    end)
+
+    it('R-4 : le menu n\'envoie plus `known`, lu par personne', function()
+        assert.is_true(registry.add(FORGERONS, CRAFT_RECIPES, 'clou_fer', CLOUS))
+        assert.is_nil(menuEntry('clou_fer').known)
+        assert.is_nil(menuEntry('lingot_fer').known)
     end)
 end)

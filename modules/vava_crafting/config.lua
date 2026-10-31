@@ -93,7 +93,8 @@ config.streaming.subscribeSlack = 20.0
 config.persistence = { flushMs = 10000 }
 -- Recettes de l'artisanat absentes de `vava_skills:recipes` (un module qui a oublié de les déclarer aux compétences) :
 -- une ligne en console par recette, `delayMs` après le démarrage, après l'ajout d'une recette par un autre module ou
--- après le retour de vava_skills (le temps que chaque module ait déclaré les siennes) ; au menu, verrouillées (T-147).
+-- après le retour de vava_skills (le temps que chaque module ait déclaré les siennes), et au plus 4 × ce délai après
+-- la première demande ; borné de 1000 à 600000 (5000 si ce n'est pas un nombre) ; au menu, verrouillées (T-147).
 config.skillsCheck = { delayMs = 5000 }
 config.logRetentionDays = 180
 -- journal : pièces de ce palier et au-dessus (Excellent+)

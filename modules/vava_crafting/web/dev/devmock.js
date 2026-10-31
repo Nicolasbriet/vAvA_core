@@ -34,7 +34,7 @@ const DevMock = (() => {
         output: { item: 'lingot_cuivre', label: 'Lingot de cuivre', quantity: 1 } },
       // recette d'un module qui ne l'a pas déclarée aux compétences (T-147) : verrouillée, avec sa raison
       { id: 'clou_fer', label: 'Clous de fer', skill: 'forge', skillLabel: 'Forge', level: 0, playerLevel: 22, levelOk: true, toolKind: null, toolLabel: null, toolOk: true,
-        durationMs: 4000, difficulty: 0, xp: 4, signed: false, transmission: false, known: false, unregistered: true,
+        durationMs: 4000, difficulty: 0, xp: 4, signed: false, transmission: false, unregistered: true,
         ingredients: [{ item: 'lingot_fer', label: 'Lingot de fer', quantity: 1, minTier: 1, available: [{ tier: 2, count: 3 }] }],
         output: { item: 'clou_fer', label: 'Clous de fer', quantity: 10 } },
       { id: 'faucille_fer', label: 'Faucille', skill: 'forge', skillLabel: 'Forge', level: 5, playerLevel: 22, levelOk: true, toolKind: 'marteau', toolLabel: 'un marteau de forge', toolOk: true,

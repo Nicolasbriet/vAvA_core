@@ -45,7 +45,7 @@ menu comme les autres.
 | Combustible | forge : charbon ; fourneau : bois de pin ; 1 par pièce, réserve 20 | `stationTypes[].fuel` |
 | Props | créés par le client à 80 m ; stations groupées par case de 200 m, seules celles d'une case à portée sont mesurées ; relues toutes les secondes près d'une case, toutes les 2,5 s quand aucune station n'est à moins de 140 m (80 m + 60 m de marge d'approche) (1.3.2) ; aucune boucle tant qu'aucune station n'est connue (1.5.0) | `streaming` |
 | Stations connues du joueur | une zone du core par station, de 2 m ; reçue (dessin, combustible, occupation) à 100 m de son bord (80 m des props + 20 m : le chemin d'un cavalier au galop entre deux passages du core), oubliée au-delà de 125 m (marge de sortie du core) (1.5.0) | `streaming.zoneRadius`, `streaming.subscribeSlack` |
-| Recettes inconnues des compétences | une ligne en console par recette absente de `vava_skills:recipes`, 5 s après le démarrage, l'ajout d'une recette par un autre module ou le retour de `vava_skills` ; verrouillée au menu (1.8.0) | `skillsCheck.delayMs` |
+| Recettes inconnues des compétences | une ligne en console par recette absente de `vava_skills:recipes`, 5 s après le démarrage, l'ajout d'une recette par un autre module ou le retour de `vava_skills`, 20 s au plus après la première demande ; délai borné de 1 s à 10 min ; verrouillée au menu (1.8.0) | `skillsCheck.delayMs` |
 | Journal | pièces Excellent+ (palier ≥ 4), réparations, baptêmes, leçons, Conseil, écritures refusées par la garde ; 180 jours | `logTier`, `logRetentionDays` |
 | Signature protégée | créateur, date, poinçon et qualité figés sur tout objet ; sur un objet signé, palier et nom figés, solidité qui ne remonte pas hors d'une réparation (voir plus bas) ; refus journalisés une fois par minute et par objet, module et clé | `guard` (`windowMs`, `maxTracked`, `bornDurability`) |
 
@@ -109,8 +109,11 @@ inconnue n'apparaît pas dans le menu ; une recette libre au niveau insuffisant 
 une ligne `WARN` par recette absente, avec son nom et le module qui l'a déclarée (« recette 'x' (déclarée par y)
 absente de vava_skills:recipes … »), une seule fois, `skillsCheck.delayMs` (5 s) après le démarrage, après l'ajout
 d'une recette par un autre module, après le retrait d'une recette des compétences, et de nouveau au retour de
-`vava_skills` (le temps que chaque module ait redéclaré les siennes) ; registre des compétences absent : une seule
-ligne. Au menu, une telle recette libre est montrée **verrouillée** (« Indisponible », raison « Cette recette ne peut ni se façonner
+`vava_skills` (le temps que chaque module ait redéclaré les siennes) ; des demandes rapprochées ne repoussent pas le
+contrôle au-delà de 4 × le délai (borné de 1 s à 10 min) ; une recette signalée puis déclarée aux compétences relance
+le contrôle, et une ligne d'information dit qu'elle est déverrouillée ; registre des compétences absent : une seule
+ligne ; lecture du registre en échec : une seule ligne, rien de signalé à tort. Le menu n'envoie plus le champ `known`,
+lu par personne. Au menu, une telle recette libre est montrée **verrouillée** (« Indisponible », raison « Cette recette ne peut ni se façonner
 ni s'apprendre : prévenez le Conseil. ») au lieu d'être proposée puis refusée au clic ; une recette
 transmise inconnue des compétences reste cachée, comme toute recette transmise inconnue. Le serveur reste juge : le
 début d'une pièce revérifie `knowsRecipe`.

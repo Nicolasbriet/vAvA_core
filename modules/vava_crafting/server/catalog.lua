@@ -13,7 +13,8 @@
 local type, pairs, ipairs, tostring = type, pairs, ipairs, tostring
 local format = string.format
 local sort, remove = table.sort, table.remove
-local SetTimeout = SetTimeout
+local floor, max, min = math.floor, math.max, math.min
+local SetTimeout, GetGameTimer = SetTimeout, GetGameTimer
 
 local core = VavaCrafting.core
 local bridge = VavaCrafting.bridge
@@ -129,12 +130,13 @@ local typesById, recipesById, recipesByStation = nil, nil, nil
 
 -- Recettes auprès des compétences (T-147) : ressource qui a ajouté chaque recette (hook core:registry:added ; ce module
 -- pour celles de la config) ; identifiants de `vava_skills:recipes` ({ [id] = true } ; false : registre absent ; nil :
--- à relire) ; recettes déjà signalées en console (une ligne chacune, oubliées au retour de vava_skills) ; tour du
--- contrôle différé (seul le dernier demandé passe).
+-- à relire) ; recettes déjà signalées en console (une ligne chacune, oubliées au retour de vava_skills) ; lecture du
+-- registre en échec déjà signalée ; tour du contrôle différé (seul le dernier demandé passe) et instant de la première
+-- demande encore en attente (plafond du report).
 local recipeOwners = {}
 local skillIds = nil
-local reported, registryReported = {}, false
-local checkRound = 0
+local reported, registryReported, readFailReported = {}, false, false
+local checkRound, pendingSince = 0, nil
 
 local function invalidate(payload)
     if payload.registry == REGISTRY.STATIONS then typesById = nil end
@@ -277,6 +279,9 @@ function catalog.define()
             if payload.registry == REGISTRY.RECIPES and type(payload.key) == 'string' then
                 recipeOwners[payload.key] = payload.owner
                 if payload.owner ~= VavaCrafting.resource then catalog.scheduleSkillCheck() end
+            elseif payload.registry == bridge.SKILL_RECIPES and type(payload.key) == 'string' and reported[payload.key] then
+                -- recette signalée, déclarée aux compétences après le contrôle : la console le dira (S-1, R-2 de T-147)
+                catalog.scheduleSkillCheck()
             end
         end },
         { 'core:registry:removed', function(payload)
@@ -325,9 +330,11 @@ end
 
 -- Recettes auprès des compétences (T-147) -------------------------------------------------------------------------
 
----@return table<string, boolean>|false
+--- Identifiants de `vava_skills:recipes` (cache) ; false : registre absent ; nil : lecture en échec, rien n'est gardé
+--- (relu à l'appel suivant), toutes les recettes sont tenues pour absentes cette fois (côté sûr).
+---@return table<string, boolean>|false|nil
 local function skillRecipeIds()
-    if skillIds == nil then skillIds = bridge.SkillRecipeIds() or false end
+    if skillIds == nil then skillIds = bridge.SkillRecipeIds() end
     return skillIds
 end
 
@@ -338,7 +345,7 @@ end
 ---@return boolean
 function catalog.declaredToSkills(id)
     local ids = skillRecipeIds()
-    return ids ~= false and ids[id] == true
+    return type(ids) == 'table' and ids[id] == true
 end
 
 --- Recettes de l'artisanat absentes du registre des compétences, par identifiant : { { id, owner } } (`owner` : la
@@ -354,12 +361,22 @@ function catalog.missingFromSkills()
 end
 
 --- Signale en console les recettes de l'artisanat absentes du registre des compétences, une ligne par recette et une
---- seule fois (de nouveau après le retour de vava_skills, ou si elle redevient absente) ; registre absent : une ligne.
---- Rend la liste des recettes absentes ({ { id, owner } }).
+--- seule fois (de nouveau après le retour de vava_skills, ou si elle redevient absente) ; une recette signalée puis
+--- déclarée : une ligne qui le dit ; registre absent : une ligne ; lecture du registre en échec : une ligne, rien de
+--- signalé. Rend la liste des recettes absentes ({ { id, owner } }).
 ---@return { id: string, owner: string }[]
 function catalog.checkSkillRecipes()
+    local ids = skillRecipeIds()
+    if ids == nil then
+        if not readFailReported then
+            readFailReported = true
+            VavaCrafting.log.warn('lecture du registre vava_skills:recipes en échec : contrôle des recettes remis au prochain changement')
+        end
+        return {}
+    end
+    readFailReported = false
     local missing = catalog.missingFromSkills()
-    if skillRecipeIds() == false then
+    if ids == false then
         if not registryReported and #missing > 0 then
             registryReported = true
             VavaCrafting.log.warn("registre vava_skills:recipes absent : %d recette(s) de l'artisanat verrouillée(s) au menu, refusée(s) à la station", #missing)
@@ -377,18 +394,36 @@ function catalog.checkSkillRecipes()
         end
     end
     for id in pairs(reported) do
-        if not absent[id] then reported[id] = nil end
+        if not absent[id] then
+            reported[id] = nil
+            -- signalée, puis déclarée aux compétences (plus de délai que le contrôle) : la console le dit (S-1 de T-147)
+            VavaCrafting.log.info("recette '%s' désormais déclarée à vava_skills:recipes : déverrouillée", id)
+        end
     end
     return missing
 end
 
+--- Délai du contrôle : `skillsCheck.delayMs`, borné de 1 s à 10 min (5 s si la valeur n'est pas un nombre).
+---@return integer
+local function checkDelay()
+    local delay = tonumber(type(cfg.skillsCheck) == 'table' and cfg.skillsCheck.delayMs or nil) or 5000
+    if delay ~= delay then delay = 5000 end
+    return floor(min(max(delay, 1000), 600000))
+end
+
 --- Demande le contrôle des recettes auprès des compétences dans `skillsCheck.delayMs` : le temps que chaque module ait
---- déclaré ses recettes aux deux registres. Seule la dernière demande passe.
+--- déclaré ses recettes aux deux registres. Seule la dernière demande passe ; des demandes rapprochées ne le repoussent
+--- pas au-delà de 4 × le délai depuis la première encore en attente.
 function catalog.scheduleSkillCheck()
+    local delay, now = checkDelay(), GetGameTimer()
+    if pendingSince == nil then pendingSince = now end
+    local wait = max(0, min(delay, pendingSince + 4 * delay - now))
     checkRound = checkRound + 1
     local round = checkRound
-    SetTimeout(cfg.skillsCheck.delayMs, function()
-        if round == checkRound then catalog.checkSkillRecipes() end
+    SetTimeout(wait, function()
+        if round ~= checkRound then return end
+        pendingSince = nil
+        catalog.checkSkillRecipes()
     end)
 end
 
