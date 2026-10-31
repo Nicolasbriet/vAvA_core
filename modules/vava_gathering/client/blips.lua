@@ -110,7 +110,8 @@ local function adopt(checked, save)
         local called, text = pcall(jsonEncode, list)
         if called and type(text) == 'string' and #text <= MAX_BYTES then SetResourceKvp(KVP, text) end
     end
-    if shown or mapCfg.blips then showAll() end
+    -- blips déjà posés (liste reçue après l'apparition) : reposés une fois ; sinon `spawned` les pose
+    if shown then showAll() end
 end
 
 --- Liste gardée en stockage local, contrôlée ; abîmée : oubliée.
@@ -141,7 +142,7 @@ end
 local function spawned()
     if not shown then
         loadKept()
-        if mapCfg.blips then showAll() end
+        showAll()
     end
     if asked then return end
     asked = true

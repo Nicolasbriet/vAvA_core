@@ -172,3 +172,223 @@ describe('vava_gathering share', function()
         assert.equal(1, #globals.__writes)
     end)
 end)
+
+-- T-102 : diffusion des changements de l'Atelier (server/share.lua › touch, flush). Règles documentées : spec T-102
+-- § 6.4, README du module (« Atelier de la récolte ») :
+--   une zone changée est seulement notée ; `flush` (au dernier appel d'un lot, ou par la boucle lente au-delà de
+--   `editor.flushGraceMs`) traite chaque zone notée une fois : déclarée si elle est nouvelle ; déplacée si son cercle
+--   change, puis sa différence envoyée par paquets de 64 clés dans le même tour ; rien si rien de visible ne change ;
+--   retirée si elle n'existe plus ; l'empreinte de la carte est recalculée après.
+describe('vava_gathering share : diffusion de l’Atelier', function()
+    local share, calls, answers, errors, now, flushed
+    local zonestate
+    -- zones et nœuds du « catalogue » de l'essai
+    local zones, nodes
+
+    local function answer(fn)
+        local queued = answers[fn]
+        if queued and #queued > 0 then return table.unpack(table.remove(queued, 1)) end
+        return true
+    end
+
+    local function names()
+        local list = {}
+        for i, call in ipairs(calls) do list[i] = call.fn end
+        return list
+    end
+
+    local function build(id)
+        local def = zones[id]
+        if not def then return nil, nil end
+        return def, zonestate.build({ band = 'normal', scarred = false }, nodes[id] or {}, function() return 3 end, def)
+    end
+
+    before_each(function()
+        helper.reset()
+        calls, answers, errors, flushed = {}, {}, {}, 0
+        now = 1000
+        helper.loadAll({
+            'modules/vava_gathering/shared/constants.lua',
+            'modules/vava_gathering/config.lua',
+            'modules/vava_gathering/shared/zonestate.lua',
+        })
+        zonestate = VavaGathering.zonestate
+        _G.GetGameTimer = function() return now end
+        VavaGathering.log = { error = function(fmt, ...) errors[#errors + 1] = fmt:format(...) end }
+        local function record(fn)
+            return function(...)
+                calls[#calls + 1] = { fn = fn, args = table.pack(...) }
+                return answer(fn)
+            end
+        end
+        VavaGathering.bridge = {
+            ZoneDefine = record('define'), ZoneMove = record('move'), ZoneSet = record('set'),
+            ZoneReplace = record('replace'), ZoneRemove = record('remove'),
+        }
+        zones = { bois = { id = 'bois', label = 'Bois des Essais', kind = 'foret', x = 2000.0, y = 2000.0, z = 30.0,
+            radius = 60.0 } }
+        nodes = { bois = {} }
+        VavaGathering.catalog = { nodesOf = function(id) return nodes[id] or {} end }
+        helper.load('modules/vava_gathering/server/share.lua')
+        share = VavaGathering.share
+        share.configure(build, function() flushed = flushed + 1 end)
+    end)
+
+    local function point(id, x)
+        return { id = id, resource = 'chene', x = x, y = 2000.0, z = 30.0, heading = 0.0 }
+    end
+
+    it('ne diffuse rien à la note, tout au flush : zone nouvelle déclarée entière avec ses points', function()
+        for i = 1, 5 do nodes.bois[i] = point('chene_' .. i, 2000.0 + 3 * i) end
+        share.touch('bois')
+        share.touch('bois')
+        assert.same({}, names())
+        share.flush()
+        assert.same({ 'define' }, names())
+        local state = calls[1].args[3]
+        assert.same({ l = 'Bois des Essais', k = 'foret', x = 2000.0, y = 2000.0, z = 30.0, r = 60.0 }, state.def)
+        assert.is_not_nil(state['p:chene_5'])
+        assert.equal(1, flushed)
+        -- déjà diffusée : un second flush ne fait rien partir
+        calls = {}
+        share.flush()
+        assert.same({}, names())
+        assert.equal(1, flushed)
+    end)
+
+    it('cinq points ajoutés à une zone déclarée : une seule différence, sans déplacement', function()
+        share.touch('bois')
+        share.flush()
+        calls = {}
+        for i = 1, 5 do nodes.bois[i] = point('chene_' .. i, 2000.0 + 3 * i) end
+        share.touch('bois')
+        share.flush()
+        assert.same({ 'set' }, names())
+        local changes, removed = calls[1].args[2], calls[1].args[3]
+        local count = 0
+        for _ in pairs(changes) do count = count + 1 end
+        assert.equal(10, count)
+        assert.is_nil(removed)
+    end)
+
+    it('point retiré : ses deux clés retirées ; rien à envoyer si rien de visible ne change', function()
+        nodes.bois = { point('chene_1', 2003.0), point('chene_2', 2006.0) }
+        share.touch('bois')
+        share.flush()
+        calls = {}
+        nodes.bois = { point('chene_1', 2003.0) }
+        share.touch('bois')
+        share.flush()
+        assert.same({ 'set' }, names())
+        assert.same({}, calls[1].args[2])
+        assert.same({ 'n:chene_2', 'p:chene_2' }, calls[1].args[3])
+        calls = {}
+        zones.bois.cost = 9.5
+        share.touch('bois')
+        share.flush()
+        assert.same({}, names())
+    end)
+
+    it('zone redessinée : déplacée puis sa `def` changée, dans le même passage', function()
+        share.touch('bois')
+        share.flush()
+        calls = {}
+        zones.bois.radius = 80.0
+        share.touch('bois')
+        share.flush()
+        assert.same({ 'move', 'set' }, names())
+        assert.equal(80.0, calls[1].args[2].radius)
+        assert.same({ 'def' }, (function()
+            local keys = {}
+            for key in pairs(calls[2].args[2]) do keys[#keys + 1] = key end
+            return keys
+        end)())
+    end)
+
+    it('un point qui sort du rayon élargit le cercle d’intérêt (déplacement) sans redéclarer', function()
+        share.touch('bois')
+        share.flush()
+        calls = {}
+        nodes.bois = { point('chene_1', 2064.0) }
+        share.touch('bois')
+        share.flush()
+        assert.same({ 'move', 'set' }, names())
+        assert.equal(64.0, calls[1].args[2].radius)
+    end)
+
+    it('zone retirée : retirée du core, puis plus rien ; une zone jamais déclarée ne fait rien partir', function()
+        share.touch('bois')
+        share.flush()
+        calls = {}
+        zones.bois = nil
+        share.touch('bois')
+        share.flush()
+        assert.same({ 'remove' }, names())
+        assert.is_false(share.isDeclared('bois'))
+        calls = {}
+        share.touch('autre')
+        share.flush()
+        assert.same({}, names())
+    end)
+
+    it('envoie une différence de plus de 64 clés en plusieurs paquets dans le même passage', function()
+        share.touch('bois')
+        share.flush()
+        calls = {}
+        for i = 1, 40 do nodes.bois[i] = point(string.format('p%02d', i), 2000.0 + i) end
+        share.touch('bois')
+        share.flush()
+        assert.same({ 'set', 'set' }, names())
+    end)
+
+    it('un envoi refusé fait oublier la zone : elle sera redéclarée entière', function()
+        share.touch('bois')
+        share.flush()
+        answers.set = { { false, 'too_many_keys' } }
+        nodes.bois = { point('chene_1', 2003.0) }
+        share.touch('bois')
+        share.flush()
+        assert.is_false(share.isDeclared('bois'))
+        assert.equal(1, #errors)
+        calls = {}
+        share.touch('bois')
+        share.flush()
+        assert.same({ 'define' }, names())
+    end)
+
+    it('garde de la boucle lente : seules les zones notées depuis plus du délai partent', function()
+        zones.autre = { id = 'autre', label = 'Autre', kind = 'mine', x = 0.0, y = 0.0, z = 0.0, radius = 20.0 }
+        share.touch('bois')
+        now = now + 1500
+        share.touch('autre')
+        now = now + 600
+        share.flush(2000)
+        assert.same({ 'define' }, names())
+        assert.equal('bois', calls[1].args[1])
+        calls = {}
+        now = now + 2000
+        share.flush(2000)
+        assert.same({ 'define' }, names())
+        assert.equal('autre', calls[1].args[1])
+    end)
+
+    it('n’envoie plus rien après l’arrêt du module', function()
+        share.touch('bois')
+        share.stop()
+        share.flush()
+        assert.same({}, names())
+    end)
+
+    it('garde l’état déclaré à jour après une récolte : la différence suivante est juste', function()
+        nodes.bois = { point('chene_1', 2003.0) }
+        share.touch('bois')
+        share.flush()
+        assert.is_true(share.set('bois', 'n:chene_1', 2))
+        calls = {}
+        -- l'état neuf dit 3 charges (build) : la différence les renvoie, une seule clé
+        share.touch('bois')
+        share.flush()
+        assert.same({ 'set' }, names())
+        assert.same({ ['n:chene_1'] = 3 }, calls[1].args[2])
+    end)
+end)

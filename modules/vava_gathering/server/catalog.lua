@@ -156,7 +156,7 @@ local function checkZone(zone)
         if type(zone[key]) ~= 'number' or zone[key] ~= zone[key] then return nil, format("zone '%s' : x, y, z requis", zone.id) end
     end
     local radius = zone.radius or 50.0
-    if type(radius) ~= 'number' or radius <= 0 or radius > ZONE_MAX_RADIUS then
+    if type(radius) ~= 'number' or radius ~= radius or radius <= 0 or radius > ZONE_MAX_RADIUS then
         return nil, format("zone '%s' : rayon de plus de 0 à %.0f m", zone.id, ZONE_MAX_RADIUS)
     end
     return {

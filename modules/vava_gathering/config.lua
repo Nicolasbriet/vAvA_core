@@ -28,7 +28,8 @@ config.legacyClientPlaces = config.zones ~= nil or config.nodes ~= nil
 config.zones = {
     { id = 'foret_brume', label = 'Forêt de Brume', kind = 'foret', x = -320.0, y = -880.0, z = 31.0, radius = 120.0, cost = 2.0, regenPerHour = 4.0, scarHours = 48 },   -- PLACEHOLDER
     { id = 'mine_du_val', label = 'Mine du Val', kind = 'mine', x = -180.0, y = -1010.0, z = 29.0, radius = 80.0, cost = 2.5, regenPerHour = 3.0, scarHours = 72 },      -- PLACEHOLDER
-    { id = 'prairie_haute', label = 'Prairie Haute', kind = 'prairie', x = -380.0, y = -1060.0, z = 31.0, radius = 100.0, cost = 1.5, regenPerHour = 6.0, scarHours = 24 }, -- PLACEHOLDER
+    -- rayon 75 m (100 avant 1.8.0) : la graine respecte la règle de l'Atelier (deux zones se chevauchent de 10 m au plus)
+    { id = 'prairie_haute', label = 'Prairie Haute', kind = 'prairie', x = -380.0, y = -1060.0, z = 31.0, radius = 75.0, cost = 1.5, regenPerHour = 6.0, scarHours = 24 }, -- PLACEHOLDER
     { id = 'riviere_claire', label = 'Rivière Claire', kind = 'eau', x = -120.0, y = -880.0, z = 29.0, radius = 60.0, cost = 2.0, regenPerHour = 5.0, scarHours = 36 },    -- PLACEHOLDER
 }
 

@@ -174,6 +174,8 @@ local function succeedTrial(session)
     local src, node, resource = session.source, session.node, session.resource
     if not nearNode(src, node) then return false, 'too_far' end
     sessions[src] = nil
+    -- l'essai a pris fin (ou le point en est sorti) pendant le geste
+    if trials.node(src, node.id) ~= node then return false, 'unknown_node' end
     if bridge.IsDowned(src) then return false, 'downed' end
     if (node.c or 0) <= 0 then
         bridge.Notify(src, messages.noCharges, 'info')
