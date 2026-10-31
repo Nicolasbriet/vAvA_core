@@ -763,7 +763,7 @@ versé à T-014 ; les autres points déjà couverts sont précisés dans T-012 �
   propriétaire de l'objet `eau` (et, à terme, du `pain`). Rien qui rende un joueur autosuffisant.
 
 ### T-135 — Usure de l'outre selon la qualité du tanneur
-- Agent : vava-dev-lua · Dépend de : T-130 · Statut : à faire
+- Agent : vava-dev-lua · Dépend de : T-130 · Statut : en cours
 - Relecture lore de T-130 : une outre se fend une fois sur dix quel que soit son palier, alors qu'une outre « Soignée »
   s'affiche à part. Lier `tearChance` au palier (moins pour une outre Soignée ou Excellente) en gardant le palier sur
   l'outre rendue vide, sans casser l'empilement : le savoir du tanneur doit compter.
