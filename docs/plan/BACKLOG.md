@@ -699,6 +699,13 @@ versé à T-014 ; les autres points déjà couverts sont précisés dans T-012 �
   sans la ligne de `shared/cycle.lua`, `vava_time` tomberait au premier tirage du ciel. Ajouter le contrôle à
   `config_split_spec` (T0) ou à l'audit, avec un cas d'essai.
 
+### T-150 — Métadonnées de la pile dans le hook `vava_inventory:use`
+- Agent : vava-dev-lua (cette tâche autorise à toucher `vava_inventory`) · Dépend de : — · Statut : à faire
+- Trouvé pendant T-135 : le payload de `vava_inventory:use` ne porte pas les métadonnées de la pile, qui disparaît
+  avec sa dernière unité ; `vava_provisions` relève le palier par un abonné `before` (relecture sécurité S-2 : suppose
+  que rien ne cède la main entre `before` et `after`). Joindre une copie bornée des métadonnées au payload, puis
+  simplifier `vava_provisions` (retirer le relevé).
+
 ## Phase 2 — Arrivée
 
 ### T-020 — Écran de chargement `vava_loading`
