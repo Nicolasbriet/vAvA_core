@@ -611,6 +611,16 @@ versé à T-014 ; les autres points déjà couverts sont précisés dans T-012 �
   que le lecteur ne suit pas aujourd'hui (réseau R-6) ; piste pour une borne de schéma du serveur prise dans
   `config_client.lua` (copie gardée sans la clé : nombre non borné) : version dans `clientFile`, ou contrôle au `setup`
   que ces bornes sont des nombres (sécurité, pour information).
+- Fait le 31 octobre 2026 (branche `agents/T-143`), relectures à faire : `vava_magic` 2.11.0 (`config_client.lua`
+  partagé, sorts et combinaisons entiers jusqu'à T-123 ; `config.lua` au seul serveur, feuilles du seul serveur
+  ajoutées par lui, dont 76 textes du serveur ; `shared/text.lua`, `shared/pages.lua` au seul serveur ; borne
+  `textMaxBytes` du Murmure contrôlée au `setup`), `vava_provisions` 1.2.0 (`shared/texts.lua` partagé, textes lus clé
+  par clé ; `shared/rules.lua` au seul serveur ; `messages.admin` et `messages.journal` dans `config.lua` ; refus de
+  démarrer avec un `config.lua` de 1.1.0) ; outillage : T2 refuse un alias de la table du module, `PENDING` retiré,
+  l'audit ne laisse plus rien taire les règles des manifestes, aucune exception « T-132 » permise ; borne de schéma :
+  contrôle au `setup` retenu (rapport), cas de `vava_voice` (`zones.radius`, `zones.height`) à faire après T-145. Lot 4 :
+  37 199 octets de moins par joueur, net du manifeste (11 322 compressés). Rapport `docs/plan/rapports/T-143.md`.
+  **À tester en jeu** : `docs/tests/reseau.md` § 7-D.
 
 ### T-133 — `%c` dépend de la locale : contrôles de texte justes partout
 - Agent : vava-dev-lua · Dépend de : — · Statut : à tester en jeu (relu sécurité, suites appliquées)
