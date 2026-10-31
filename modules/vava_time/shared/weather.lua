@@ -4,7 +4,7 @@
            ciel, poids d'un ciel dans une saison (aucune neige hors de l'hiver, ni avec `snow = false`), candidats qui
            peuvent suivre le ciel courant, tirage pondéré avec un aléa fourni par l'appelant (tests déterministes),
            durée d'un ciel, avancement d'une transition. Aucun état.
-    Dépendances : shared/constants.lua, config.lua
+    Dépendances : shared/constants.lua, config_client.lua (weather)
 ]]
 
 local ipairs, type = ipairs, type

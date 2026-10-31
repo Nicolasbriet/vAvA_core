@@ -1,5 +1,5 @@
 --[[
-    vava_hud/config.lua
+    vava_hud/config_client.lua
     Rôle : table du module (seule globale de la ressource) et configuration de l'affichage.
     Dépendances : aucune
 ]]

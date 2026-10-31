@@ -3,7 +3,7 @@
     Rôle : caméras de la scène (vue d'ensemble, silhouette, visage) avec transition douce entre elles.
     Les positions sont calculées depuis l'orientation de la scène, pas celle du ped : le faire tourner ne déplace
     pas la caméra.
-    Dépendances : config.lua
+    Dépendances : config_client.lua
 ]]
 
 local rad, sin, cos = math.rad, math.sin, math.cos

@@ -4,7 +4,7 @@
            accorde l'ouverture (et l'inscrit au journal) puis revérifie chaque caméra demandée ; le client ne fait que
            relayer entre l'interface et le serveur. Mur ouvert : la liste des joueurs est relue à intervalle ; fermé,
            toutes ses caméras s'éteignent et plus rien ne tourne.
-    Dépendances : shared/constants.lua, config.lua, client/core.lua, client/nui.lua
+    Dépendances : shared/constants.lua, config_client.lua, client/core.lua, client/nui.lua
 ]]
 
 local type, ipairs, tostring, tointeger = type, ipairs, tostring, math.tointeger

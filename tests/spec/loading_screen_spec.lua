@@ -316,7 +316,7 @@ describe('vava_loading : réglages de la page (config.js)', function()
 end)
 
 describe('vava_loading : client Lua', function()
-    local env = loadInEnv({ BASE .. 'shared/constants.lua', BASE .. 'config.lua' })
+    local env = loadInEnv({ BASE .. 'shared/constants.lua', BASE .. 'config_client.lua' })
     local loading = env.VavaLoading
     local cfg = loading.config
 

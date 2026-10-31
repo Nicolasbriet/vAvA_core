@@ -26,11 +26,13 @@ test se cite « besoins 3-4 ».
    `carotte` ×2. Glisser une miche sur le raccourci `1` de la ceinture.
 4. **Lire les valeurs** : `/besoins` (une décimale), ou Registre (`F10`) → Joueurs → vous : Faim et Soif en pour cent.
    Les médaillons n'affichent pas de chiffre. Invulnérabilité (Registre → Outils) éteinte.
-5. **Réglages pour aller vite** (facultatif, `vava_needs/config.lua`, puis `restart vava_needs`, à remettre après) :
-   - `tickMs = 15000` (défaut `60000`) : un passage du serveur toutes les 15 s ; la baisse par minute ne change pas,
-     mais les pertes de vie à 0 (§ 4) vont 4 fois plus vite. Garder un multiple de `activity.sampleMs` (15000).
-   - `needs[1].durationHours = 0.5` (faim, défaut `4`) et `needs[2].durationHours = 0.5` (soif, défaut `3`) : de 100
-     à 0 en 30 min. Indispensable sans `/besoins` pour atteindre les paliers.
+5. **Réglages pour aller vite** (facultatif, puis `restart vava_needs`, à remettre après) :
+   - `tickMs = 15000` (défaut `60000`, `vava_needs/config.lua`) : un passage du serveur toutes les 15 s ; la baisse
+     par minute ne change pas, mais les pertes de vie à 0 (§ 4) vont 4 fois plus vite. Garder un multiple de
+     `activity.sampleMs` (15000).
+   - `needs[1].durationHours = 0.5` (faim, défaut `4`) et `needs[2].durationHours = 0.5` (soif, défaut `3`), dans
+     `vava_needs/config_client.lua` (depuis 1.3.0) : de 100 à 0 en 30 min. Indispensable sans `/besoins` pour
+     atteindre les paliers.
    - Les vitesses des § 1 et 2 supposent les valeurs par défaut.
 
 ## 1. Médaillons et baisse avec le temps

@@ -13,17 +13,19 @@ use_experimental_fxv2_oal 'yes'
 
 name 'vava_appearance'
 description 'Apparence des personnages vAvA'
-version '1.0.1'
+version '1.1.0'
 
 dependency 'vAvA_core'
 
+-- config.lua n'est jamais servi aux joueurs (T-132)
 shared_scripts {
     'shared/constants.lua',
-    'config.lua',
+    'config_client.lua',
     'shared/appearance.lua',
 }
 
 server_scripts {
+    'config.lua',
     'server/schema.lua',
     'server/main.lua',
 }

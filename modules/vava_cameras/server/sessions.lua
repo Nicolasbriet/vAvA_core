@@ -10,7 +10,8 @@
            accordée à un membre en jeu que mur ouvert : c'est l'ouverture du mur qui l'inscrit au journal. Une caméra
            s'éteint quand le joueur filmé part ou revient à la sélection, quand son spectateur la ferme, part ou perd
            le droit de regarder.
-    Dépendances : shared/constants.lua, shared/budget.lua, config.lua, server/core.lua, server/players.lua
+    Dépendances : shared/constants.lua, config_client.lua, config.lua, shared/budget.lua, server/core.lua,
+                  server/players.lua
 ]]
 
 local pairs, type, random, format = pairs, type, math.random, string.format

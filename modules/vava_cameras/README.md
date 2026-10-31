@@ -16,6 +16,12 @@ Ordre de démarrage : après `vava_admin` et `vava_voice`, avant `vava_magic` et
    connexion directe révèle l'adresse IP du joueur à qui le regarde (voir « Sécurité »).
 4. Facultatif : une autre adresse STUN dans `config.lua` (`iceServers`), si celle de Google ne convient pas.
 
+**Mise à jour vers 1.5.0 (T-132)** : les qualités, les spectateurs par joueur, la taille d'une offre, la commande et le
+rythme du mur ont quitté `config.lua` pour `config_client.lua`. Un `config.lua` modifié et gardé par l'installeur de
+la Chancellerie (le nouveau posé en `config.lua.nouveau`) garde l'ancienne forme : le module démarre, mais la console
+le signale (« config.lua garde la forme d'avant 1.5.0 … ») et un réglage client changé dans ce fichier reste sans
+effet. Reportez vos réglages dans `config.lua` et `config_client.lua` d'après les nouveaux fichiers.
+
 | Dépendance | Rôle | Sans elle |
 | --- | --- | --- |
 | `vAvA_core` ≥ 0.5.0 | personnages, RPC, hooks, registre des commandes | obligatoire |
@@ -23,7 +29,14 @@ Ordre de démarrage : après `vava_admin` et `vava_voice`, avant `vava_magic` et
 | `vava_admin` ≥ 1.2.0 | droit `watch`, journal du Conseil, outil « Mur des caméras » du Registre | personne ne regarde en jeu |
 | `vava_chancellerie` ≥ 1.1.0 | caméras regardées depuis le web | mur en jeu seulement |
 
-## Règles (config.lua)
+## Règles (config.lua, config_client.lua)
+
+Depuis 1.5.0 (T-132), les réglages sont dans deux fichiers et chacun n'est écrit qu'une fois : `config_client.lua`
+porte ce que lit le client (`qualities`, `limits.viewersPerPlayer`, `limits.sdpMax`, `wall.command`,
+`wall.refreshMs`, `wall.staggerMs`), et le serveur aussi ; `config.lua` porte tout le reste, lu par le seul serveur, et
+complète la table sans réécrire une clé de `config_client.lua`. Les joueurs ne téléchargent que les constantes,
+`config_client.lua`, les `client/*.lua` et la page du mur ; `config.lua` et `shared/budget.lua` sont servis au seul
+serveur.
 
 | Règle | Défaut | Clé |
 | --- | --- | --- |
@@ -137,7 +150,7 @@ Exports serveur `count()` (caméras ouvertes) et, réservés au pont de la Chanc
 
 ```
 vava_cameras/
-├── fxmanifest.lua · config.lua
+├── fxmanifest.lua · config_client.lua (lu par le client) · config.lua (servi au seul serveur)
 ├── shared/   constants.lua (protocole) · budget.lua (débit montant, chargé par le serveur seul)
 ├── server/   core · links (Conseil) · players (joueurs regardables) · sessions (caméras) · api · commands · main
 ├── client/   core · nui · capture (joueur filmé) · wall (mur du membre) · main

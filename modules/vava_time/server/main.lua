@@ -55,6 +55,15 @@ local function decided(src, ok, view, label, details)
 end
 
 local function setup()
+    -- T-132 : un config.lua d'avant 1.4.0 (gardé par une mise à jour) remplace la table de config_client.lua ; il
+    -- contient tout ce que lit le serveur, le module démarre. shared/calendar.lua et shared/weather.lua ont gardé la
+    -- table de config_client.lua (lue à leur chargement, avant config.lua), au serveur aussi : un calendrier, un ciel
+    -- ou un texte changé dans l'ancien config.lua n'agit qu'en partie au serveur, et pas chez les joueurs
+    if VavaTime.config.clientFile ~= true then
+        core.log.warn('config.lua garde la forme d\'avant 1.4.0 (il remplace la table de config_client.lua) : '
+            .. 'calendrier, ciels et textes de config_client.lua restent en vigueur chez les joueurs et pour les '
+            .. 'dates et les ciels calculés au serveur ; reportez vos changements d\'après config.lua.nouveau')
+    end
     local declared, declareErr = VavaTime.commands.declare()
     if not declared then return false, 'commandes : ' .. tostring(declareErr) end
     local row, err = store.load()

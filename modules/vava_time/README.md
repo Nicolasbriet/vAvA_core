@@ -14,7 +14,20 @@ coins de l'outil ; déclaré en dépendance, à ne jamais arrêter sur un serveu
 Facultatifs : `vava_admin` (droits, outil du Registre, journal ; sans lui, personne ne règle le ciel et l'heure),
 `vava_hud` (notifications), `vava_chancellerie` ≥ 1.4.0 (page Ciel et heure du panneau web).
 
-## Règles (config.lua)
+## Règles (config.lua, config_client.lua)
+
+Depuis 1.4.0 (T-132), les réglages sont dans deux fichiers et chacun n'est écrit qu'une fois : `config_client.lua`
+porte ce que lit le client (`clock.msPerGameMinute`, `calendar`, `weather`, `commands`, `client`, `messages`), et le
+serveur aussi ; `config.lua` porte ce que lit le seul serveur (`clock.maxShiftMinutes`, `frost`, `council`, `tool`,
+`web`, `server`, `rateLimits`) et complète la table sans réécrire une clé de `config_client.lua`. `calendar`, `weather`
+et `messages` sont servis entiers : le client les passe à `shared/calendar.lua` et `shared/weather.lua`. Les joueurs
+ne téléchargent que les constantes, `config_client.lua`, ces deux fichiers, les `client/*.lua` et la page de l'outil ;
+`config.lua` et `shared/frost.lua` sont servis au seul serveur.
+
+**Mise à jour vers 1.4.0 (T-132)** : un `config.lua` modifié et gardé par l'installeur de la Chancellerie (le nouveau
+posé en `config.lua.nouveau`) garde l'ancienne forme : le module démarre, mais la console le signale (« config.lua
+garde la forme d'avant 1.4.0 … ») et un réglage client changé dans ce fichier reste sans effet. Reportez vos réglages
+dans `config.lua` et `config_client.lua` d'après les nouveaux fichiers.
 
 | Règle | Défaut | Clé |
 |---|---|---|
@@ -117,7 +130,8 @@ démarrage, sans rejouer ce qui est déjà passé dans la journée.
 `web/index.html` dans un navigateur, depuis le dépôt (option `--allow-file-access-from-files` pour les polices), montre
 l'outil avec les données simulées de `web/dev/devmock.js`, jamais livré (`?frozen=1` heure figée, `?forced=1` ciel
 imposé et figé, `?struck=1` gel tombé, `?refused=1` décisions refusées). La logique pure (heure de Paris, saisons, tirage du ciel, nuits
-de gel) est testée dans `tests/spec/time_*_spec.lua`.
+de gel) est testée dans `tests/spec/time_*_spec.lua` ; `time_client_view_spec.lua` essaie le calendrier et les ciels
+sur la seule vue client (`config_client.lua` sans `config.lua`).
 
 ## À vérifier en jeu
 

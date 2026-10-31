@@ -5,7 +5,7 @@
            automatique de la vie), tir ami coupé (confort : la garantie est l'annulation des coups natifs par le
            serveur) et geste pour relever quelqu'un. Les réglages sont des bascules (aucune boucle) ; le changement de
            modèle en remet certains à zéro : ils sont réappliqués à chaque apparition.
-    Dépendances : shared/constants.lua, config.lua, shared/vitality.lua, client/core.lua
+    Dépendances : shared/constants.lua, config_client.lua, shared/vitality.lua, client/core.lua
 ]]
 
 local CreateThread, Wait, GetGameTimer, SetTimeout = CreateThread, Wait, GetGameTimer, SetTimeout

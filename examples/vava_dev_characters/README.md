@@ -10,7 +10,7 @@ le droit.
 | --- | --- |
 | Convar serveur `vava_env` absente ou différente de `dev` | `setup` refuse : console `module 'vava_dev_characters' … refusé : setup a refusé le démarrage : mode développement absent (convar vava_env ≠ dev) : rien n'est offert`. Aucun RPC n'existe ; `/perso` répond « outils de développement inactifs sur ce serveur ». |
 | `set vava_env dev` | Le module démarre, avec un avertissement en console. Chaque commande est revérifiée par le serveur à chaque appel. |
-| Joueur sans droit | Refus `not_allowed` : « réservé au Conseil (droit staff) ou à l'ACE vava.dev ». |
+| Joueur sans droit | Refus `not_allowed` : « réservé au Conseil » (le droit et l'ACE, `access`, sont réglés dans `config.lua`). |
 | Droit vava_admin `staff` (Souverain) | Accès. Chaque changement est inscrit au journal du Registre (`vava_admin:log`). |
 | ACE `vava.dev` | Accès, avec ou sans vava_admin. Le journal du Registre n'accepte que les membres du Conseil : sans rang, la ligne va à la console du serveur. |
 
@@ -39,7 +39,11 @@ add_ace identifier.license:0123456789abcdef vava.dev allow
 `/perso` passe par les RPC du core, que l'écran de sélection utilise aussi : la garde de cette ressource retire la
 commande, pas le pouvoir (le core reste seul juge : compte propriétaire, état de la session).
 
-## Réglages (`config.lua`)
+## Réglages (`config.lua`, `config_client.lua`)
+
+Depuis 1.4.0 (T-132), ce que lit le client (noms des commandes, `refusals`, `sexes`, `sexLabels`, `chatAuthor`) est
+dans `config_client.lua` ; le reste du tableau est dans `config.lua`, servi au seul serveur. Un `config.lua` d'avant,
+gardé par l'installeur de la Chancellerie, est signalé en console : reportez vos réglages dans les deux fichiers.
 
 | Clé | Défaut | Rôle |
 | --- | --- | --- |
@@ -49,7 +53,7 @@ commande, pas le pouvoir (le core reste seul juge : compte propriétaire, état 
 | `giveRateLimit`, `maxGiveQuantity` | 5, +1/s ; 100 | dons |
 | `needsRateLimit`, `healthRateLimit`, `respawnRateLimit` | 5, +1/s ; 5, +1/s ; 2, +0,1/s | autres commandes |
 | `journal` | libellés ci-dessus | libellés du journal du Registre (32 octets au plus) |
-| `refusals` | — | textes affichés pour `not_allowed` et `unknown_rpc` |
+| `refusals` (`config_client.lua`) | — | textes affichés pour `not_allowed` et `unknown_rpc` |
 
 ## RPC
 

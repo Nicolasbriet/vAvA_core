@@ -100,20 +100,32 @@ WHERE `character_id` = 12 AND `at` > UNIX_TIMESTAMP() - 86400 ORDER BY `id`;
 
 Une page de lecture dans la Chancellerie viendra dans un second temps.
 
-## Configuration (`config.lua`)
+## Configuration (`config.lua`, `config_client.lua`)
+
+Depuis 1.4.0 (T-132), les réglages sont dans deux fichiers et chacun n'est écrit qu'une fois : `config_client.lua`
+porte ce que lit le client (bornes d'un message, `overhead`, `ui`, `visibilityMs`, `profile`, `key`, `commands`,
+`commandList`, `texts`), et le serveur aussi ; `config.lua` porte ce que lit le seul serveur (`ranges`, `staff`, `log`,
+`rateLimits`) et complète la table sans réécrire une clé de `config_client.lua`. Les joueurs ne téléchargent que les
+constantes, `config_client.lua`, `shared/text.lua`, les `client/*.lua` et la page ; `config.lua` est servi au seul
+serveur.
+
+**Mise à jour vers 1.4.0 (T-132)** : un `config.lua` modifié et gardé par l'installeur de la Chancellerie (le nouveau
+posé en `config.lua.nouveau`) garde l'ancienne forme : le module démarre, mais la console le signale (« config.lua
+garde la forme d'avant 1.4.0 … ») et un réglage client changé dans ce fichier reste sans effet. Reportez vos réglages
+dans `config.lua` et `config_client.lua` d'après les nouveaux fichiers.
 
 | Clé | Rôle |
 | --- | --- |
-| `maxLength`, `maxBytes` | 250 signes par message (un « é » compte pour un), borne réseau en octets |
+| `maxLength`, `maxBytes` (client) | 250 signes par message (un « é » compte pour un), borne réseau en octets |
 | `ranges` | portées de `/ooc` (20 m), `/me` et `/do` (15 m) |
 | `staff.ace` | sans vava_admin : permission ACE du canal du Conseil |
 | `log` | genres gardés, durée, lots, purge |
-| `overhead` | texte au-dessus de la tête : durée, distance, lignes, police, couleurs |
-| `ui` | messages gardés par onglet, historique, effacement, place par défaut, taille minimale |
-| `key`, `commands` | touche d'ouverture, noms des commandes ; la touche par défaut (`T`) et `/me`, `/do` sont cités par l'écran de chargement : les changer oblige à retoucher le conseil de `modules/vava_loading/web/js/strings.js` |
-| `commandList` | commandes des autres ressources proposées en suggestion (motifs cachés : `vava_…`, touches `+`/`-`) |
+| `overhead` (client) | texte au-dessus de la tête : durée, distance, lignes, police, couleurs |
+| `ui` (client) | messages gardés par onglet, historique, effacement, place par défaut, taille minimale |
+| `key`, `commands` (client) | touche d'ouverture, noms des commandes ; la touche par défaut (`T`) et `/me`, `/do` sont cités par l'écran de chargement : les changer oblige à retoucher le conseil de `modules/vava_loading/web/js/strings.js` |
+| `commandList` (client) | commandes des autres ressources proposées en suggestion (motifs cachés : `vava_…`, touches `+`/`-`) |
 | `rateLimits` | 6 messages d'affilée puis 1 par seconde ; profil ; avis « commande inconnue » |
-| `texts` | **tous** les textes vus par les joueurs |
+| `texts` (client) | **tous** les textes vus par les joueurs |
 
 ## Sécurité et coût
 
@@ -134,7 +146,7 @@ Une page de lecture dans la Chancellerie viendra dans un second temps.
 
 ```
 vava_chat/
-├── fxmanifest.lua · config.lua
+├── fxmanifest.lua · config_client.lua (lu par le client) · config.lua (servi au seul serveur)
 ├── shared/   constants.lua (protocole) · text.lua (texte UTF-8)
 ├── server/   core · links (personnage, Conseil) · sessions (conversations) · audience (destinataires)
 │             logs (journal) · messages (envoi) · compat (commande inconnue, commandes) · api · main

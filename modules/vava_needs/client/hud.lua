@@ -3,7 +3,7 @@
     Rôle : jauges et messages des besoins par vava_hud. Facultatif : sans vava_hud, pas de jauge et les messages
            passent par les notifications de GTA. Chaque appel inter-ressources est isolé ; les jauges sont
            redéclarées quand vava_hud (re)démarre.
-    Dépendances : shared/constants.lua, config.lua, client/core.lua
+    Dépendances : shared/constants.lua, config_client.lua, client/core.lua
 ]]
 
 local ipairs, pcall, tostring = ipairs, pcall, tostring

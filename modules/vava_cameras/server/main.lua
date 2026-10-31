@@ -94,6 +94,13 @@ local function adminAction(payload)
 end
 
 local function setup()
+    -- T-132 : un config.lua d'avant 1.5.0 (gardé par une mise à jour) remplace la table de config_client.lua ; il
+    -- contient tout ce que lit le serveur, le module démarre, mais un réglage client qu'on y change reste sans effet
+    if cfg.clientFile ~= true then
+        core.log.warn('config.lua garde la forme d\'avant 1.5.0 (il remplace la table de config_client.lua) : les '
+            .. 'réglages lus par les joueurs sont dans config_client.lua ; reportez vos changements d\'après '
+            .. 'config.lua.nouveau')
+    end
     local declared, declareErr = VavaCameras.commands.declare()
     if not declared then return false, 'commandes : ' .. tostring(declareErr) end
     for _, def in ipairs({

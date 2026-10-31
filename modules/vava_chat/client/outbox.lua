@@ -3,7 +3,7 @@
     Rôle : départ d'un message vers le serveur (RPC) et avis montrés dans le chat, dans l'onglet d'où le message est
            parti : refus du serveur, limite de débit, usage d'une commande. Le message lui-même revient du serveur
            (texte nettoyé) : rien n'est affiché avant son accord.
-    Dépendances : config.lua, client/core.lua, client/nui.lua
+    Dépendances : config_client.lua, client/core.lua, client/nui.lua
 ]]
 
 local type, format = type, string.format

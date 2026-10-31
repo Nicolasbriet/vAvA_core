@@ -14,7 +14,7 @@ use_experimental_fxv2_oal 'yes'
 
 name 'vava_loading'
 description "Écran de chargement d'Eldoria"
-version '1.1.1'
+version '1.2.0'
 
 dependency 'vAvA_core'
 
@@ -32,7 +32,7 @@ files {
 
 client_scripts {
     'shared/constants.lua',
-    'config.lua',
+    'config_client.lua',
     'client/core.lua',
     'client/main.lua',
 }

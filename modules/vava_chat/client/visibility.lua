@@ -2,7 +2,7 @@
     vava_chat/client/visibility.lua
     Rôle : le chat se cache sous le menu pause, pendant un écran noir et hors du jeu (sélection du personnage). État
            relu toutes les `visibilityMs` et envoyé à la page seulement quand il change : aucune boucle par image.
-    Dépendances : config.lua, client/nui.lua
+    Dépendances : config_client.lua, client/nui.lua
 ]]
 
 local CreateThread, Wait, IsPauseMenuActive, IsScreenFadedOut = CreateThread, Wait, IsPauseMenuActive, IsScreenFadedOut

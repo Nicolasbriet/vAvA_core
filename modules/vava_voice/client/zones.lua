@@ -4,7 +4,7 @@
            l'approche, puis à chaque changement décidé par le Conseil, et retirées quand on s'éloigne) et zone où se
            trouve un point : la plus petite qui le contient l'emporte (la plus précise). Cylindre : rayon à
            l'horizontale, de baseOffset sous le centre jusqu'à height au-dessus.
-    Dépendances : config.lua
+    Dépendances : config_client.lua
 ]]
 
 local type, pairs, ipairs, mathType = type, pairs, ipairs, math.type

@@ -1,7 +1,7 @@
 --[[
     vava_cameras/server/commands.lua
     Rôle : déclaration de la commande du mur des caméras au registre `core:commands` du core (Codex, suggestions du chat).
-    Dépendances : config.lua, server/core.lua
+    Dépendances : config_client.lua, config.lua, server/core.lua
 ]]
 
 local pairs, tostring = pairs, tostring

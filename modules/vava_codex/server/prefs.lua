@@ -4,7 +4,8 @@
            seul serveur) : signets (favoris, bornés), dernières pages (commandes lancées, les plus récentes en tête,
            sans doublon), réglage « rester ouvert après Lancer ». Un maximum abaissé dans la config tronque les
            listes (shared/prefs.lua) au lieu de bloquer les écritures.
-    Dépendances : shared/constants.lua, config.lua, shared/prefs.lua, server/core.lua, bridge/server.lua
+    Dépendances : shared/constants.lua, config_client.lua, config.lua, shared/prefs.lua, server/core.lua,
+                  bridge/server.lua
 ]]
 
 local ipairs = ipairs

@@ -16,7 +16,7 @@ use_experimental_fxv2_oal 'yes'
 
 name 'vava_voice'
 description 'Chat vocal de proximité vAvA'
-version '1.3.0'
+version '1.4.0'
 
 dependency 'vAvA_core'
 dependency 'vava_ui'
@@ -33,13 +33,16 @@ files {
     'web/icons/*.svg',
 }
 
+-- Les joueurs ne téléchargent que les shared_scripts et les client_scripts : config.lua, en tête des server_scripts,
+-- n'est jamais servi (T-132).
 shared_scripts {
     'shared/constants.lua',
-    'config.lua',
-    'shared/label.lua',
+    'config_client.lua',         -- ouvre VavaVoice.config : ce que lit le client
 }
 
 server_scripts {
+    'config.lua',                -- complète VavaVoice.config : ce que lit le seul serveur
+    'shared/label.lua',          -- logique pure, servie au seul serveur (testée hors jeu : tests/spec)
     'server/core.lua',
     'server/store.lua',
     'server/presence.lua',

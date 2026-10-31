@@ -4,7 +4,7 @@
            la lettre ne soit pas tapée dans la saisie ; jamais par-dessus une autre fenêtre ni le menu pause. Le chat
            ouvert a le clavier et la souris (onglets, déplacement) ; Entrée envoie et ferme, Échap ferme.
            Le chat de GTA (touche T du mode en ligne) est coupé.
-    Dépendances : config.lua, client/nui.lua, client/suggestions.lua, client/commands.lua
+    Dépendances : config_client.lua, client/nui.lua, client/suggestions.lua, client/commands.lua
 ]]
 
 local type, mathType = type, math.type

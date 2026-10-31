@@ -6,7 +6,7 @@
            réponses des commandes du serveur. Leurs messages arrivent dans l'onglet Général, en texte brut : les
            modèles HTML (chat:addTemplate, templateId) ne sont jamais interprétés, seuls leurs arguments sont lus.
            Les modes (chat:addMode) n'existent pas ici : leurs évènements sont acceptés sans effet.
-    Dépendances : shared/, config.lua, client/nui.lua, client/suggestions.lua
+    Dépendances : shared/, config_client.lua, client/nui.lua, client/suggestions.lua
 ]]
 
 local type, tostring, pairs, floor, concat = type, tostring, pairs, math.floor, table.concat

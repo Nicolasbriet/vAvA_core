@@ -4,7 +4,7 @@
       - relever : intention envoyée au serveur, qui choisit la personne à terre la plus proche ;
       - rendre l'âme : touche à maintenir (appui et relâchement, sans boucle), puis intention envoyée ; la touche
         choisie par le joueur est relue pour l'écran à terre.
-    Dépendances : shared/constants.lua, config.lua, client/core.lua, client/screen.lua, client/hud.lua
+    Dépendances : shared/constants.lua, config_client.lua, client/core.lua, client/screen.lua, client/hud.lua
 ]]
 
 local type, tostring, match = type, tostring, string.match

@@ -55,7 +55,8 @@ ressources de sa config `strike.callers` (`vava_example_combat` par défaut).
 
 | Fichier | Rôle |
 |---|---|
-| `config.lua` | accès, commandes, délais, armes et explosion vanilla (`-- PLACEHOLDER`), libellés du journal |
+| `config_client.lua` | commandes du client (`/arme`, `/explosion`, `/tricher`), armes et explosion vanilla (`-- PLACEHOLDER`) : téléchargé par chaque joueur |
+| `config.lua` | accès, commandes du serveur, délais, libellés du journal : servi au seul serveur (1.2.0, T-132 ; un `config.lua` d'avant, gardé par l'installeur de la Chancellerie, est signalé en console) |
 | `shared/guard.lua` | pur : mode développement et accès (même fichier que `vava_example`, testé : `tests/spec/examples_guard_spec.lua`) |
 | `server/main.lua` | commandes, modificateurs d'essai, accord des commandes clientes, journal |
 | `client/main.lua` | `/arme`, `/explosion`, `/tricher` |

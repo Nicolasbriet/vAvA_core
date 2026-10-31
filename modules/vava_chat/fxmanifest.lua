@@ -17,7 +17,7 @@ use_experimental_fxv2_oal 'yes'
 
 name 'vava_chat'
 description 'Chat vAvA : hors-RP, /me, /do, messages privés, Conseil, onglets'
-version '1.3.0'
+version '1.4.0'
 
 dependency 'vAvA_core'
 dependency 'vava_ui'
@@ -36,13 +36,15 @@ files {
 }
 
 -- Ordre explicite : chaque fichier ne dépend que de ceux listés avant lui.
+-- config.lua n'est jamais servi aux joueurs (T-132)
 shared_scripts {
     'shared/constants.lua',
-    'config.lua',
+    'config_client.lua',
     'shared/text.lua',
 }
 
 server_scripts {
+    'config.lua',
     'server/core.lua',
     'server/links.lua',
     'server/sessions.lua',

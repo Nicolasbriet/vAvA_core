@@ -1,7 +1,7 @@
 --[[
     vava_characters_ui/client/core.lua
     Rôle : accès aux API utilisées par l'interface : API client du core et exports de vava_appearance.
-    Dépendances : vAvA_core (API client v1), vava_appearance, config.lua
+    Dépendances : vAvA_core (API client v1), vava_appearance, config_client.lua
 ]]
 
 local RESOURCE = GetCurrentResourceName()

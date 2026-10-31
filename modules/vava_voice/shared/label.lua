@@ -7,7 +7,8 @@
            La borne réseau du RPC, en octets, en découle : un signe UTF-8 tient en 4 octets au plus. Ensembles écrits
            octet par octet : les classes %s et %c de Lua suivent la langue du système et peuvent prendre un octet
            d'un caractère accentué pour une espace ; l'UTF-8 étant vérifié, chaque suite ne peut être que ce signe.
-    Dépendances : shared/constants.lua, config.lua
+           Servi au seul serveur (T-132) : l'éditeur ne s'en sert pas, il borne le champ par `zones.labelMax`.
+    Dépendances : shared/constants.lua, config_client.lua (zones.labelMax)
 ]]
 
 local type, ipairs = type, ipairs

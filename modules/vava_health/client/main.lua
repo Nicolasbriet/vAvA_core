@@ -7,7 +7,7 @@
       - relève, retour au lieu de soins, soins et blessures : ordres du serveur ;
       - jauge « Santé » : vie lue localement à intervalle régulier (0 à terre), envoyée à vava_hud seulement quand elle
         change ; redéclarée après un redémarrage, à terre compris.
-    Dépendances : shared/, config.lua, tous les fichiers client/ du module
+    Dépendances : shared/constants.lua, shared/vitality.lua, config_client.lua, tous les fichiers client/ du module
 ]]
 
 local type, floor = type, math.floor

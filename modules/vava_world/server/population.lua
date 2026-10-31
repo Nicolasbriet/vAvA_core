@@ -3,7 +3,7 @@
     Rôle : population de la carte, décidée par le serveur (OneSync) : coupée dans chaque instance préparée, sans aucun
            travail chez les joueurs. Au démarrage, ce que le jeu avait déjà créé (passants, véhicules garés ou en
            circulation) est retiré ; les joueurs, leurs véhicules occupés et les entités des scripts restent.
-    Dépendances : shared/constants.lua, config.lua, server/core.lua
+    Dépendances : shared/constants.lua, config_client.lua, config.lua, server/core.lua
 ]]
 
 local ipairs = ipairs

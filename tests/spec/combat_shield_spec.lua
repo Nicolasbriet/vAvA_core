@@ -104,3 +104,58 @@ describe('vava_combat shared/shield', function()
         end)
     end)
 end)
+
+-- Vue client (T-142, lot 3 de T-132 ; relecture réseau R-2) : le client passe `weapons`, `shield` et `shields` de sa
+-- config à shared/shield.lua (client/shields.lua) ; sur la SEULE vue client (constantes et config_client.lua, comme
+-- chez un joueur), position et placement sont ceux de la config complète du serveur, pour chaque objet.
+describe('vava_combat shared/shield vu du client (config_client.lua seul)', function()
+    local DIR = 'modules/vava_combat'
+    local full, client
+
+    local function load(view)
+        helper.reset()
+        VavaCombat = nil
+        if view == 'client' then
+            helper.loadClientView(DIR, 'VavaCombat')
+            helper.load(DIR .. '/shared/shield.lua')
+        else
+            helper.loadAll({ DIR .. '/shared/constants.lua', DIR .. '/config.lua', DIR .. '/shared/shield.lua' })
+        end
+        return { shield = VavaCombat.shield, cfg = VavaCombat.config }
+    end
+
+    before_each(function()
+        full = load('full')
+        client = load('client')
+    end)
+
+    after_each(function() VavaCombat = nil end)
+
+    it('la vue client ne contient pas les réglages du seul serveur', function()
+        assert.is_true(client.cfg.clientFile)
+        assert.is_nil(client.cfg.items)
+        assert.is_nil(client.cfg.strike)
+        assert.is_nil(client.cfg.messages)
+    end)
+
+    it('même position pour chaque objet en main, mains vides comprises', function()
+        local hands = { false }
+        for item in pairs(full.cfg.weapons) do hands[#hands + 1] = item end
+        for item in pairs(full.cfg.items) do hands[#hands + 1] = item end
+        for _, item in ipairs(hands) do
+            local hand = item or nil
+            assert.equal(full.shield.position(hand, full.cfg.weapons, full.cfg.shield),
+                client.shield.position(hand, client.cfg.weapons, client.cfg.shield), tostring(item))
+        end
+    end)
+
+    it('même placement pour chaque bouclier, au bras comme dans le dos', function()
+        for item in pairs(full.cfg.shields) do
+            for _, position in ipairs({ 'arm', 'back' }) do
+                local placed = client.shield.placement(item, position, client.cfg.shields)
+                assert.is_table(placed, item .. ' ' .. position)
+                assert.same(full.shield.placement(item, position, full.cfg.shields), placed)
+            end
+        end
+    end)
+end)

@@ -14,7 +14,7 @@ use_experimental_fxv2_oal 'yes'
 
 name 'vava_needs'
 description 'Faim et soif vAvA'
-version '1.2.1'
+version '1.3.0'
 
 dependency 'vAvA_core'
 
@@ -23,13 +23,15 @@ files {
     'web/icons/*.svg',
 }
 
+-- config.lua n'est jamais servi aux joueurs (T-132)
 shared_scripts {
     'shared/constants.lua',
-    'config.lua',
+    'config_client.lua',
     'shared/starvation.lua',
 }
 
 server_scripts {
+    'config.lua',
     'server/core.lua',
     'bridge/server.lua',
     'server/state.lua',

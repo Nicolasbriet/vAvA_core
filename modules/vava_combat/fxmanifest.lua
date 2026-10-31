@@ -19,7 +19,7 @@ use_experimental_fxv2_oal 'yes'
 
 name 'vava_combat'
 description 'Combat vAvA : armes de corps à corps, usure, bouclier accroché'
-version '1.0.0'
+version '1.1.0'
 
 dependency 'vAvA_core'
 dependency 'vava_inventory'
@@ -29,14 +29,16 @@ files {
     'web/items/*.svg',
 }
 
--- Ordre explicite : chaque fichier ne dépend que de ceux listés avant lui.
+-- Ordre explicite : chaque fichier ne dépend que de ceux listés avant lui. Les joueurs ne téléchargent que les
+-- shared_scripts et les client_scripts : config.lua, en tête des server_scripts, n'est jamais servi (T-132).
 shared_scripts {
     'shared/constants.lua',
-    'config.lua',
+    'config_client.lua',         -- ouvre VavaCombat.config : ce que lit le client
     'shared/shield.lua',
 }
 
 server_scripts {
+    'config.lua',                -- complète VavaCombat.config : ce que lit le seul serveur
     -- logique pure servie au seul serveur
     'shared/weapons.lua',
     'server/core.lua',

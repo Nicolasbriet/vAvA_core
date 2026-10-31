@@ -73,7 +73,7 @@ lourds de la minute, le reste sous `* · <autres>`) : plus de suivi à lancer, p
 
 | # | Faire | Attendu |
 |---|---|---|
-| 1 | `./scripts/audit-reseau.sh` puis `./scripts/audit-reseau.sh --essai` (ou `./scripts/verifier.sh`). | Aucun BLOQUANT hors exceptions inscrites (plus aucune exception des zones de voix depuis T-014 ; exceptions transitoires de T-132 pour les configs des lots 3 et 4 depuis T-141) ; « ESSAI : OK (… cas) ». |
+| 1 | `./scripts/audit-reseau.sh` puis `./scripts/audit-reseau.sh --essai` (ou `./scripts/verifier.sh`). | Aucun BLOQUANT hors exceptions inscrites (plus aucune exception des zones de voix depuis T-014 ; une seule exception transitoire de T-132 depuis T-142 : la config de `vava_magic`, lot 4) ; « ESSAI : OK (… cas) ». |
 
 ## 7. Ce que télécharge un joueur (T-132)
 
@@ -128,9 +128,39 @@ vava_provisions` donne ce que chaque ressource sert.
 | 13 | Serveur arrêté ; `streaming.subscribeSlack = 35.0` dans `modules/vava_gathering/config.lua` ; démarrer ; B arrive au galop vers la Forêt de Brume (métiers 3.4-8). | Le réglage est pris (le serveur le lit dans `config.lua`, ajouté à la table `streaming`) ; arbres présents avant d'arriver. Remettre 20.0. |
 | 14 | Si possible : comme 7-A-14, avant (serveur sur `main`) et après, taille de `cache/files/<ressource>/resource.rpf` pour les cinq modules. | Ordre de grandeur cohérent avec la colonne `total` de `poids-client.sh` : `vava_farming` ≈ 127 Ko (≈ 151 avant), `vava_crafting` ≈ 133 Ko (≈ 149), `vava_gathering` ≈ 119 Ko (≈ 131), `vava_skills` ≈ 77 Ko (≈ 87), `vava_provisions` ≈ 81 Ko (≈ 84) ; noter au rapport. |
 
-7-C (lot 3, T-142), 7-D (lot 4, T-143) : écrits par chaque tâche sur le même modèle (démarrage sans ligne d'ancienne
-forme ; `F8` sans `SCRIPT ERROR` des modules du lot ; un tour des gestes de chaque module, en renvoyant à sa
-procédure ; un test **(2 joueurs)** par lot).
+### 7-C — lot 3 (T-142) : le socle
+
+Modules : `vava_inventory` 1.9.0, `vava_combat` 1.1.0, `vava_health` 1.5.0, `vava_time` 1.4.0, `vava_codex` 1.6.0,
+`vava_admin` 1.9.0, `vava_voice` 1.4.0, `vava_chat` 1.4.0, `vava_cameras` 1.5.0, `vava_appearance` 1.1.0, `vava_needs`
+1.3.0, `vava_world` 1.2.0 ; sans partie serveur, `config.lua` renommé `config_client.lua` : `vava_hud` 1.5.0,
+`vava_loading` 1.2.0, `vava_characters_ui` 1.3.0 ; exemples (mode développement) `vava_anim_test` 1.2.0,
+`vava_dev_characters` 1.4.0, `vava_example_combat` 1.2.0. Préparation des procédures citées (objets du catalogue,
+réglages pour aller vite, désormais dans `config_client.lua` pour ce que lit le client). Hors jeu,
+`./scripts/poids-client.sh vava_inventory vava_combat vava_health vava_time vava_codex vava_admin vava_voice vava_chat
+vava_cameras` donne ce que chaque ressource sert.
+
+| # | Faire | Attendu |
+|---|---|---|
+| 1 | Démarrer le serveur (avec `set vava_env dev` pour les exemples). | Les douze modules et les trois exemples « prêts » à leur nouvelle version ; aucune ligne « config.lua garde la forme d'avant … » ; aucun refus de config (`vava_combat` relit son catalogue, `vava_admin` ses rangs au démarrage). Aucun fichier `config.lua` dans `vava_hud`, `vava_loading`, `vava_characters_ui`. |
+| 2 | **(2 joueurs)** A et B se connectent, cache FiveM vidé chez B ; `F8` de chacun pendant tout le tour. | Écran de chargement, puis sélection sans écran noir (chargement 3-1 à 3-3 : l'écran attendu et son hook sont lus dans `config_client.lua` de `vava_loading`) ; aucune `SCRIPT ERROR` des dix-huit ressources, au chargement comme pendant les gestes. |
+| 3 | B : création d'un personnage (personnage 2-1, 3-1 à 3-6). | Scène, caméras et aperçu comme avant (`config_client.lua` de `vava_characters_ui`) ; apparence de départ de chaque sexe identique (`vava_appearance`) ; la création passe. |
+| 4 | B : Paramètres › Raccourcis › FiveM. | Comme avant : « Ouvrir l'inventaire » (`I`) et les cinq raccourcis, « Ouvrir le Codex » (`F1`), « Ouvrir le Registre du Conseil » (`F10`), « Vol libre (Conseil) » (`F2`), portée de voix (`Z`), chat (`T`), « Relever une personne à terre » (`G`), « Rendre l'âme » (`E`). |
+| 5 | Inventaire : inventaire 1-1, 5-1 (ceinture), 8-1 à 8-4 (jeter, sac au sol, ramasser à 2,5 m), 11b-1 (objet en main). | Comme avant : sac au sol vu et rouvert (distance et attente de l'entité de `config_client.lua`), accessoire en main à la bonne place. |
+| 6 | HUD et besoins : besoins 1-1 et 3-1 à 3-3 (manger, boire : geste de 3 s, refus « Vous êtes rassasié. » venu du serveur) ; une notification et une barre de progression (une récolte). | Médaillons, notifications et barre comme avant (`config_client.lua` de `vava_hud`, `vava_needs`). |
+| 7 | Santé : sante 2-1 (à terre), 4-1 (rendre l'âme : touche maintenue 3 s), 5-1 à 5-3 **(2 joueurs)** (relever : geste de A, portée 2 m revérifiée par le serveur). | Comme avant ; textes de l'écran « à terre » et notifications venus de `config_client.lua` ; lieu de soins et vie rendue décidés par le serveur. |
+| 8 | Combat (combat 2, mode développement) : `/arme couteau` puis `/arme non` (`vava_example_combat`), bouclier rond accroché au bras puis au dos selon l'arme en main. | Arme GTA retirée aussitôt (contrôles natifs de `config_client.lua`) ; bouclier au bras avec une arme à une main, au dos sinon. |
+| 9 | Temps : `/date` (temps 1-1), outil « Ciel et heure » du Registre (temps 3-1 à 3-4). | Date, moment et ciel comme avant (calendrier, ciels et textes de `config_client.lua`) ; décalage borné à ± 12 h par le serveur (`config.lua`). |
+| 10 | Codex, Registre, chat, voix, caméras : codex 1-1 et 6-1 (dernières pages), registre 9-1 à 9-4 (outils, vol libre), chat 2-1 et 2-3 (`/me` au-dessus de la tête), voix 1-1 à 1-3 (portées, cercle) et 3-1 (éditeur), registre 10-7 (mur des caméras). | Comme avant ; aucune `SCRIPT ERROR`. |
+| 11 | **(2 joueurs)** A tient un objet en main (inventaire 11b-1), porte un bouclier accroché et fait un `/me` ; B est à 10 m. | B voit l'accessoire, le bouclier et le texte au-dessus de la tête comme avant. |
+| 12 | Serveur arrêté ; remplacer `modules/vava_needs/config.lua` par celui de 1.2.1 (`git show 23adf28:modules/vava_needs/config.lua`) ; démarrer. | Console : « config.lua garde la forme d'avant 1.3.0 … » ; les besoins marchent quand même. Remettre le fichier de 1.3.0. |
+| 13 | Serveur arrêté ; `keys.open = 'U'` dans `modules/vava_inventory/config_client.lua` ; démarrer ; un **nouveau** joueur se connecte. | `U` ouvre la besace chez lui (FiveM garde la touche déjà enregistrée chez A : attendu). Remettre `I`. |
+| 14 | Serveur arrêté ; `drop.lifetimeMs = 60000` dans `modules/vava_inventory/config.lua` ; démarrer ; jeter un objet au sol. | Le réglage est pris (le serveur le lit dans `config.lua`, ajouté à la table `drop`) : le sac disparaît au bout d'une minute (inventaire 8-8). Remettre 600000. |
+| 15 | Mise à jour par la Chancellerie (1.8.6) d'un serveur posé sur `main` d'avant T-142 où `modules/vava_hud/config.lua` a été modifié à la main (par exemple `notifications.durationMs = 9000`). | Journal de la mise à jour : « Réglages modifiés gardés, mais vava_hud/config.lua n'existe plus dans la nouvelle version et n'est plus lu : reportez vos réglages dans vava_hud/config_client.lua, puis supprimez l'ancien fichier. » ; le fichier est gardé tel quel, `config_client.lua` posé ; en jeu, notifications de 4,5 s (la valeur de `config_client.lua`) tant que le réglage n'est pas reporté. Un `config.lua` jamais touché est retiré sans un mot. |
+| 16 | Si possible : comme 7-A-14, avant (serveur sur `main`) et après, taille de `cache/files/<ressource>/resource.rpf`. | Ordre de grandeur cohérent avec la colonne `total` de `poids-client.sh` : `vava_inventory` ≈ 136 Ko (≈ 145 avant), `vava_combat` ≈ 45 Ko (≈ 55), `vava_health` ≈ 44 Ko (≈ 49), `vava_time` ≈ 81 Ko (≈ 85), `vava_codex` ≈ 120 Ko (≈ 124), `vava_admin` ≈ 98 Ko (≈ 101), `vava_voice` ≈ 72 Ko (≈ 76) ; noter au rapport. |
+
+7-D (lot 4, T-143) : écrit par sa tâche sur le même modèle (démarrage sans ligne d'ancienne forme ; `F8` sans
+`SCRIPT ERROR` des modules du lot ; un tour des gestes de chaque module, en renvoyant à sa procédure ; un test
+**(2 joueurs)**).
 
 ## Ce qui n'est pas compté
 

@@ -21,7 +21,7 @@ use_experimental_fxv2_oal 'yes'
 
 name 'vava_codex'
 description 'Codex vAvA : toutes les commandes et touches du serveur, classées, cherchées, composées et lancées'
-version '1.5.1'
+version '1.6.0'
 
 dependency 'vAvA_core'
 dependency 'vava_ui'
@@ -37,12 +37,15 @@ files {
 }
 
 -- Ordre explicite : chaque fichier ne dépend que de ceux listés avant lui.
+-- Les joueurs ne téléchargent que les shared_scripts et les client_scripts : config.lua, en tête des server_scripts,
+-- n'est jamais servi (T-132).
 shared_scripts {
     'shared/constants.lua',
-    'config.lua',
+    'config_client.lua',         -- ouvre VavaCodex.config : ce que lit le client
 }
 
 server_scripts {
+    'config.lua',                -- complète VavaCodex.config : ce que lit le seul serveur
     'server/core.lua',
     'bridge/server.lua',
     'server/catalog.lua',

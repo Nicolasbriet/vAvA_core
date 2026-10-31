@@ -16,10 +16,11 @@ resmon et remontée des écarts : [LISEZMOI.md](LISEZMOI.md).
 2. **Modules dont les formulaires servent d'exemple** : `vava_gathering` (liste des zones), `vava_skills` (registre des
    compétences), `vava_magic` (choix fixe), `vava_chat` (greffe des dernières pages), `vava_admin` (droits), `vava_hud`
    (notifications). Le Codex démarre après eux et avant `vava_chancellerie`.
-3. **Réglages pour aller vite** (facultatif, `modules/vava_codex/config.lua` puis `restart vava_codex`, à remettre
-   après) : `favorites.max = 2` (défaut `24`) pour atteindre la limite des signets (un personnage qui en a déjà plus
-   voit ses signets ramenés aux deux premiers : test 5-7) ; `recent.max = 3` (défaut `12`) pour voir les dernières
-   pages se tasser. Le Codex n'a aucun délai à raccourcir.
+3. **Réglages pour aller vite** (facultatif, puis `restart vava_codex`, à remettre après) : `favorites.max = 2`
+   (défaut `24`, dans `modules/vava_codex/config.lua`) pour atteindre la limite des signets (un personnage qui en a
+   déjà plus voit ses signets ramenés aux deux premiers : test 5-7) ; `recent.max = 3` (défaut `12`, dans
+   `modules/vava_codex/config_client.lua` depuis 1.6.0) pour voir les dernières pages se tasser. Le Codex n'a aucun
+   délai à raccourcir.
 4. **Nombres** : un champ numérique n'a aucune valeur d'office (1.1.2). Obligatoire, il manque tant qu'il n'est pas
    choisi (curseur déplacé ou valeur tapée) : `/recolte vitalite <zone>` ou `/metiers niveau` ne partent jamais avec un
    0 que personne n'a choisi.

@@ -35,7 +35,20 @@ Ordre de démarrage : après `vava_admin`, avant `vava_cameras` (ordre complet :
 | `vava_admin` ≥ 1.1.0 | droits des zones, outil « Zones de voix » du Registre, journal | personne ne crée de zone |
 | `vava_chancellerie` | zones modifiées et supprimées depuis le web | zones gérées en jeu seulement |
 
-## Règles (config.lua)
+## Règles (config.lua, config_client.lua)
+
+Depuis 1.4.0 (T-132), les réglages sont dans deux fichiers et chacun n'est écrit qu'une fois : `config_client.lua`
+porte ce que lit le client (`ranges`, `defaultRange`, `key`, `command`, `keyLabel`, `client`, `ring`, `zones` hors des
+quatre clés du serveur, `hud`), et le serveur aussi ; `config.lua` porte ce que lit le seul serveur (`downedMaxRange`,
+`zones.permission`, `zones.teleportPermission`, `zones.subscribeMargin`, `zones.tool`, `web`, `rateLimits`,
+`messages`) et complète la table sans réécrire une clé de `config_client.lua`. Les joueurs ne téléchargent que les
+constantes, `config_client.lua`, les `client/*.lua`, l'éditeur et ses icônes ; `config.lua` et `shared/label.lua`
+sont servis au seul serveur.
+
+**Mise à jour vers 1.4.0 (T-132)** : un `config.lua` modifié et gardé par l'installeur de la Chancellerie (le nouveau
+posé en `config.lua.nouveau`) garde l'ancienne forme : le module démarre, mais la console le signale (« config.lua
+garde la forme d'avant 1.4.0 … ») et un réglage client changé dans ce fichier reste sans effet. Reportez vos réglages
+dans `config.lua` et `config_client.lua` d'après les nouveaux fichiers.
 
 | Règle | Défaut | Clé |
 | --- | --- | --- |
@@ -138,8 +151,8 @@ exports.vava_voice:releaseRange(source, 'baillon')
 
 ```
 vava_voice/
-├── fxmanifest.lua · config.lua
-├── shared/   constants.lua (protocole) · label.lua (nom d'une zone, compté en signes)
+├── fxmanifest.lua · config_client.lua (lu par le client) · config.lua (servi au seul serveur)
+├── shared/   constants.lua (protocole) · label.lua (nom d'une zone, compté en signes ; servi au seul serveur)
 ├── server/   core · store (base) · presence (micros, limites) · links (santé, Conseil) · zones · api · commands
 │             main
 ├── client/   core · nui · hud (médaillon) · mumble (salons, cibles) · ring (cercle) · zones · range (portée)

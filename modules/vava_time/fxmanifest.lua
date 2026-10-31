@@ -19,7 +19,7 @@ use_experimental_fxv2_oal 'yes'
 
 name 'vava_time'
 description 'Temps du royaume vAvA : heure de Paris, saisons, météo, ciel et heure du Conseil'
-version '1.3.0'
+version '1.4.0'
 
 dependency 'vAvA_core'
 dependency 'vava_ui'
@@ -35,16 +35,18 @@ files {
     'web/js/*.js',
 }
 
--- Ordre explicite : chaque fichier ne dépend que de ceux listés avant lui.
+-- Ordre explicite : chaque fichier ne dépend que de ceux listés avant lui. Les joueurs ne téléchargent que les
+-- shared_scripts et les client_scripts : config.lua, en tête des server_scripts, n'est jamais servi (T-132).
 shared_scripts {
     'shared/constants.lua',
-    'config.lua',
+    'config_client.lua',         -- ouvre VavaTime.config : ce que lit le client
     'shared/calendar.lua',
     'shared/weather.lua',
-    'shared/frost.lua',
 }
 
 server_scripts {
+    'config.lua',                -- complète VavaTime.config : ce que lit le seul serveur
+    'shared/frost.lua',          -- logique pure, servie au seul serveur (testée hors jeu : tests/spec)
     'server/core.lua',
     'bridge/server.lua',
     'server/store.lua',

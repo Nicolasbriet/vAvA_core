@@ -12,7 +12,7 @@
            `shield.showRadius` (120 m) du joueur local : au-delà, l'accessoire est retiré et revient quand on
            s'approche. Position et placement sont recalculés seulement quand la valeur ou la main change. Modèle invalide : une ligne de
            console, rien d'affiché, pas de nouvel essai tant que la valeur ne change pas.
-    Dépendances : shared/constants.lua, config.lua, shared/shield.lua, client/core.lua, bridge/client.lua
+    Dépendances : shared/constants.lua, config_client.lua, shared/shield.lua, client/core.lua, bridge/client.lua
 ]]
 
 local type, pairs, next, tostring = type, pairs, next, tostring

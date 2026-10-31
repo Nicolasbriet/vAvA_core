@@ -8,7 +8,12 @@ couturière demain).
 Ordre de démarrage : après `vAvA_core` (≥ 0.3.0), avant `vava_characters_ui`, qui en dépend. Aucune autre
 dépendance ; aucune table en base (l'apparence vit dans `vava_characters.data`).
 
-## Règles (config.lua)
+## Règles (config.lua, config_client.lua)
+
+Depuis 1.1.0 (T-132), les réglages sont dans deux fichiers et chacun n'est écrit qu'une fois : `config_client.lua`
+porte ce que lit le client (`components`, `props`, `defaults`), et le serveur aussi ; `config.lua` porte ce que lit le
+seul serveur (`maxDrawable`, `maxTexture`, `createRateLimit`) et complète la table sans réécrire une clé de
+`config_client.lua`.
 
 | Règle | Défaut | Clé |
 |---|---|---|
@@ -71,19 +76,30 @@ Format complet et API : `docs/api.md`, section `vava_appearance`.
 ## Assets à brancher
 
 Rien n'est marqué `-- PLACEHOLDER` ici, mais les vêtements proposés sont ceux de GTA : quand les packs médiévaux
-arriveront, seules `components`, `props`, `defaults` et, si besoin, `maxDrawable` changeront.
+arriveront, seules `components`, `props`, `defaults` (`config_client.lua`) et, si besoin, `maxDrawable` (`config.lua`)
+changeront.
 
 ## Fichiers
 
 | Fichier | Rôle |
 |---|---|
-| `config.lua` | emplacements proposés, bornes serveur, débit des créations, apparences de départ |
+| `config_client.lua` | emplacements proposés, apparences de départ : téléchargé par chaque joueur, ouvre `VavaAppearance.config` |
+| `config.lua` | bornes du schéma, débit des créations : servi au seul serveur (en tête des `server_scripts`), complète la table |
 | `shared/constants.lua` | bornes du jeu, overlays et leur type de couleur, nom du champ |
 | `shared/appearance.lua` | apparence de départ d'un sexe, normalisation des nombres (entiers arrivés en flottants) |
 | `server/schema.lua` | schéma strict d'une apparence (champ et argument réseau) |
 | `server/main.lua` | déclaration du champ et de la RPC de création |
 | `client/apply.lua` | application complète ou par partie, limites du modèle, palettes |
 | `client/main.lua` | application à chaque apparition, exports |
+
+Fichiers téléchargés par chaque joueur (1.1.0, T-132) : `shared/constants.lua`, `config_client.lua`,
+`shared/appearance.lua` et les deux `client/*.lua` ; `config.lua` est servi au seul serveur.
+
+**Mise à jour vers 1.1.0 (T-132)** : les emplacements proposés et les apparences de départ ont quitté `config.lua` pour
+`config_client.lua`. Un `config.lua` modifié et gardé par l'installeur de la Chancellerie (le nouveau posé en
+`config.lua.nouveau`) garde l'ancienne forme : le module démarre, mais la console le signale (« config.lua garde la
+forme d'avant 1.1.0 … ») et un réglage client changé dans ce fichier reste sans effet. Reportez vos réglages dans
+`config.lua` et `config_client.lua` d'après les nouveaux fichiers.
 
 ## À vérifier en jeu
 

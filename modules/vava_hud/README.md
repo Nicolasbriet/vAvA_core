@@ -10,7 +10,13 @@ Ordre de démarrage : après `vAvA_core` (≥ 0.3.0) et `vava_ui` (≥ 1.0.0, po
 déclarés en dépendance : FXServer démarre `vava_ui` d'office s'il ne l'est pas encore. Ne jamais arrêter `vava_ui` sur
 un serveur ouvert (il arrêterait aussi le HUD).
 
-## Règles (config.lua)
+## Règles (config_client.lua)
+
+Ressource cliente uniquement : tous ses réglages sont lus par le client, dans `config_client.lua` (nommé `config.lua`
+avant 1.5.0, T-132 : `config.lua` est réservé aux réglages du seul serveur, jamais téléchargés). **Mise à jour vers
+1.5.0** : un `config.lua` modifié est gardé par l'installeur de la Chancellerie, qui le signale (« reportez vos
+réglages dans config_client.lua »), mais il n'est plus au manifeste et n'est plus lu : reportez vos réglages dans
+`config_client.lua`, puis supprimez l'ancien fichier.
 
 | Règle | Défaut | Clé |
 |---|---|---|

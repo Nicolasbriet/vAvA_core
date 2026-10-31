@@ -6,7 +6,7 @@
     l'éclair, ShutdownLoadingScreenNui. Filets : passage forcé selectionFallbackMs après la mise en attente, fermeture
     immédiate au chargement d'un personnage ou à l'arrêt de la ressource ; sans API du core, fermeture à l'arrivée de
     la session. Aucune boucle permanente : des SetTimeout, et un seul fil borné dans le cas « sans core ».
-    Dépendances : shared/constants.lua, config.lua, client/core.lua
+    Dépendances : shared/constants.lua, config_client.lua, client/core.lua
 ]]
 
 local CreateThread, Wait, SetTimeout, AddEventHandler = CreateThread, Wait, SetTimeout, AddEventHandler
@@ -15,7 +15,7 @@ local SendLoadingScreenMessage, ShutdownLoadingScreenNui = SendLoadingScreenMess
 local encode = json.encode
 
 local loading = VavaLoading
-local cfg = loading.config
+local cfg = VavaLoading.config
 local core = loading.core
 local MESSAGES, HOOKS = loading.MESSAGES, loading.HOOKS
 

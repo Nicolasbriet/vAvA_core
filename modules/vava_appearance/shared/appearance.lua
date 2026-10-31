@@ -8,7 +8,7 @@
         overlays = { { id, style, opacity, color }, ... },
         components = { { id, drawable, texture }, ... },
         props = { { id, drawable (-1 = aucun), texture }, ... } }
-    Dépendances : shared/constants.lua, config.lua
+    Dépendances : shared/constants.lua, config_client.lua (emplacements proposés, apparences de départ)
 ]]
 
 local ipairs, pairs, type = ipairs, pairs, type

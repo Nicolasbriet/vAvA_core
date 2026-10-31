@@ -66,7 +66,7 @@ d'Eldoria ; les touches qu'elle cite sont celles que le joueur a réellement li�
 
 **Où vit le texte.** Dans `content/*.lua` (`chapters.lua` : la graine et les chapitres ; `premiers_pas.lua`,
 `metiers.lua`, `royaume.lua` : les pages), chargés comme `server_scripts` : jamais téléchargés par les clients, ni pris
-dans `config.lua` (partagé avec le client). Au démarrage, chaque page est analysée et validée (`shared/pages.lua`) ;
+dans la config du module. Au démarrage, chaque page est analysée et validée (`shared/pages.lua`) ;
 une page fautive est écrite en console (`page « … » refusée : … (ligne N)`) et écartée seule, les autres restent. Un
 lien vers une page refusée, ou vers une page que tous les lecteurs de la page qui le porte ne peuvent pas lire (page
 du Conseil depuis une page publique, page à droit depuis une page sans ce droit), fait refuser la page qui le porte.
@@ -129,14 +129,22 @@ validation et les codes d'erreur sont déjà ceux de `shared/pages.lua` et `read
 dépendance, à ne jamais arrêter sur un serveur ouvert). Facultatifs : `vava_admin` (rangs et droits du Conseil ; sans lui, ACE `vava_codex.staff` et les
 ACE déclarés avec les commandes), `vava_hud` (notifications), `vava_chat` (dernières pages des commandes tapées).
 
-Touche par défaut (`keys.open`, `F1`) : elle est citée par l'écran de chargement et par l'accueil. La changer oblige à
-retoucher les conseils de `modules/vava_loading/web/js/strings.js` et `messages.codexHint` de `vava_arrival`.
+Touche par défaut (`keys.open` de `config_client.lua`, `F1`) : elle est citée par l'écran de chargement et par
+l'accueil. La changer oblige à retoucher les conseils de `modules/vava_loading/web/js/strings.js` et
+`messages.codexHint` de `vava_arrival`.
+
+**Mise à jour vers 1.6.0 (T-132)** : la touche, la commande, le nombre de dernières pages, « rester ouvert » et le
+texte du livre indisponible ont quitté `config.lua` pour `config_client.lua`. Un `config.lua` modifié et gardé par
+l'installeur de la Chancellerie (le nouveau posé en `config.lua.nouveau`) garde l'ancienne forme : le module démarre,
+mais la console le signale (« config.lua garde la forme d'avant 1.6.0 … ») et un réglage client changé dans ce
+fichier reste sans effet. Reportez vos réglages dans `config.lua` et `config_client.lua` d'après les nouveaux fichiers.
 
 ## Fichiers
 
 | Fichier | Rôle |
 | --- | --- |
-| `config.lua` | touche (`F1`) et commande (`/codex`), bornes des signets et dernières pages, commandes non décrites, ACE, rayon des joueurs proposés hors du Conseil (`players.nearbyRadius`), débits, textes |
+| `config_client.lua` | lu par le client (téléchargé par chaque joueur, ouvre `VavaCodex.config`) : touche (`F1`) et commande (`/codex`), dernières pages (`recent.max`), « rester ouvert » par défaut, texte du livre indisponible |
+| `config.lua` | servi au seul serveur (en tête des `server_scripts`), complète la table : signets (`favorites.max`), commandes non décrites, ACE, rayon des joueurs proposés hors du Conseil (`players.nearbyRadius`), pages de lecture, débits, textes du serveur |
 | `bridge/server.lua` | seul point de contact avec le core et les modules : joueurs (tous, ou les seuls proches), Conseil, exports `codexList`, commandes du jeu |
 | `server/catalog.lua` | entrées visibles d'un joueur, chapitres, non décrites, valeurs d'un argument |
 | `shared/prefs.lua` | logique pure : préférences ramenées aux maximums de la config (testée : `tests/spec/codex_prefs_spec.lua`) |

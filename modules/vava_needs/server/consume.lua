@@ -4,7 +4,8 @@
       before → refus si un geste est en cours, ou si tous les besoins que l'objet comble sont déjà pleins ;
       after  → objet consommé : effets appliqués, geste joué par le client (selon la catégorie de l'objet).
     L'inventaire reste facultatif : sans lui, ces hooks ne se déclenchent jamais.
-    Dépendances : shared/constants.lua, config.lua, server/core.lua, server/state.lua, server/decay.lua
+    Dépendances : shared/constants.lua, config_client.lua, config.lua, server/core.lua, server/state.lua,
+                  server/decay.lua
 ]]
 
 local type, pairs, tostring = type, pairs, tostring

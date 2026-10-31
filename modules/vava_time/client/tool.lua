@@ -4,7 +4,8 @@
            Le serveur accorde l'ouverture puis revérifie chaque décision ; le client ne fait que montrer et demander.
            Outil ouvert, un changement de l'état partagé (autre membre du Conseil, cycle) fait redemander la vue, au
            plus une fois par intervalle, et jamais juste après sa propre décision (déjà reçue avec la réponse).
-    Dépendances : shared/, config.lua, client/core.lua, client/nui.lua
+    Dépendances : shared/constants.lua, config_client.lua, shared/calendar.lua, shared/weather.lua, client/core.lua,
+                  client/nui.lua
 ]]
 
 local type, tostring, tonumber = type, tostring, tonumber

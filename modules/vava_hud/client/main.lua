@@ -3,8 +3,8 @@
     Rôle : exports (jauges, notifications, progression), retrait de l'interface native de GTA, et visibilité du HUD :
            affiché quand un personnage est en jeu, masqué pendant la sélection, le menu pause et les fondus au noir
            (apparition, chargement). Une progression en cours est interrompue au retour à la sélection.
-    Dépendances : config.lua, client/core.lua, client/nui.lua, client/gauges.lua, client/native.lua, client/notify.lua,
-                  client/progress.lua
+    Dépendances : config_client.lua, client/core.lua, client/nui.lua, client/gauges.lua, client/native.lua,
+                  client/notify.lua, client/progress.lua
 ]]
 
 local CreateThread, Wait, AddEventHandler = CreateThread, Wait, AddEventHandler

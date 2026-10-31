@@ -1,5 +1,5 @@
 --[[
-    vava_loading/config.lua
+    vava_loading/config_client.lua
     Rôle : réglages du client Lua de l'écran de chargement : écran de sélection attendu, durée de l'éclair, filets.
            La page s'affiche avant tout script Lua et ne peut pas lire ce fichier : ses propres réglages (rythmes,
            effets, musique) sont dans web/js/config.js, ses textes dans web/js/strings.js.

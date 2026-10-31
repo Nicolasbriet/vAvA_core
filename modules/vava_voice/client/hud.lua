@@ -3,7 +3,7 @@
     Rôle : médaillon « Voix » dans vava_hud : rempli d'un quart par portée (Chuchoter = un quart, Déclamer = plein),
            lueur de laiton quand le joueur parle. Facultatif : sans vava_hud, pas de médaillon. Appels
            inter-ressources isolés ; médaillon redéclaré si vava_hud (re)démarre.
-    Dépendances : config.lua, client/core.lua
+    Dépendances : config_client.lua, client/core.lua
 ]]
 
 local pcall, tostring = pcall, tostring

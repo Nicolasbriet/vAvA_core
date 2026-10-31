@@ -9,7 +9,20 @@ Ordre de démarrage : après `vAvA_core` (≥ 0.3.0). Facultatifs : `vava_invent
 `vava_hud` (médaillons Faim et Soif, notifications), `vava_health` (à terre : besoins figés, et un besoin épuisé fait
 tomber au lieu de s'arrêter au plancher ; la perte de vie est alors appliquée par le serveur).
 
-## Règles (config.lua)
+## Règles (config.lua, config_client.lua)
+
+Depuis 1.3.0 (T-132), les réglages sont dans deux fichiers et chacun n'est écrit qu'une fois : `config_client.lua`
+porte ce que lit le client (`needs`, `initial`, `thresholds`, `health`, `criticalStamina`, la durée du geste
+`consumption.cooldownMs`, `gestures`, `animation`, `hud`), et le serveur aussi ; `config.lua` porte ce que lit le seul
+serveur (`tickMs`, `activity`, le reste de `consumption` : refus d'un objet plein, textes, geste par catégorie) et
+complète la table sans réécrire une clé de `config_client.lua`. Fichiers téléchargés par chaque joueur :
+`shared/constants.lua`, `config_client.lua`, `shared/starvation.lua`, les `client/*.lua` et les icônes ; `config.lua`
+est servi au seul serveur.
+
+**Mise à jour vers 1.3.0 (T-132)** : un `config.lua` modifié et gardé par l'installeur de la Chancellerie (le nouveau
+posé en `config.lua.nouveau`) garde l'ancienne forme : le module démarre, mais la console le signale (« config.lua
+garde la forme d'avant 1.3.0 … ») et un réglage client changé dans ce fichier reste sans effet. Reportez vos réglages
+dans `config.lua` et `config_client.lua` d'après les nouveaux fichiers.
 
 | Règle | Défaut | Clé |
 |---|---|---|
@@ -20,7 +33,7 @@ tomber au lieu de s'arrêter au plancher ; la perte de vie est alors appliquée 
 | Activité | vitesse horizontale lue côté serveur toutes les 15 s ; à partir de 4 m/s à pied, la baisse va jusqu'à × 1,5 ; un véhicule ne compte pas | `activity` |
 | Endurance | maximale à 35 % tant qu'un besoin est critique | `criticalStamina` |
 | Vie | avec `vava_health`, perte appliquée par le serveur (chaîne de dégâts `hit`, type `privation` ; export `damage` avec un `vava_health` antérieur à 1.3.0), plancher levé ; sans lui, appliquée par le client, jamais sous 10 % de la vie au-dessus du seuil de mise à terre (100) | `health` |
-| Manger, boire | geste de 3 s ; refusé si chacun des besoins comblés est à 95 ou plus, ou pendant le geste | `consumption` |
+| Manger, boire | geste de 3 s (`config_client.lua`) ; refusé si chacun des besoins comblés est à 95 ou plus, ou pendant le geste (`config.lua`) | `consumption` |
 | Gestes | manger (`mp_player_inteat@burger`), boire (`mp_player_intdrink`), haut du corps : on peut marcher | `gestures`, `animation` |
 | Médaillons | Faim puis Soif, après Santé | `hud` |
 

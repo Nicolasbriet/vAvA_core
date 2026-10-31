@@ -2,7 +2,7 @@
     vava_admin/client/main.lua
     Rôle : touche et commande d'ouverture du Registre et touche du vol libre (réglables, aucune boucle), messages du
            Conseil au joueur, annonces, alertes de signalement pour le personnel, commande /signaler pour tous.
-    Dépendances : shared/constants.lua, config.lua, tous les fichiers client/ du module
+    Dépendances : shared/constants.lua, config_client.lua, tous les fichiers client/ du module
 ]]
 
 local type, concat = type, table.concat
