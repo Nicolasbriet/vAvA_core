@@ -644,7 +644,7 @@ LIMIT 5` après chaque coup.
 
 ## 19. Mains vides pour incanter (2.10.0, T-140)
 
-Décision du porteur du projet (31 octobre 2026) : on n'incante pas une arme ou un bouclier en main. Le serveur le
+Décision du porteur du projet (31 octobre 2026) : on n'incante pas avec une arme ou un bouclier en main. Le serveur le
 vérifie par `vava_combat` (`armed`, puis `shield().ready`) au début de l'incantation et à sa fin ; le client ne fait que
 le montrer tôt. Préparation : [combat 0.6](combat.md) en plus de la section 0 ici (`ensure vava_combat` après
 `vava_health` et `vava_crafting`) ; A mage (`/magie tous`), Souverain ; une Épée courte, une Dague, un Bouclier rond et

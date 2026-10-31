@@ -342,8 +342,8 @@ une fois par minute, la console le signale. Plus aucun ordre de blessure n'est e
 
 ## Mains vides pour incanter
 
-Décision du porteur du projet (31 octobre 2026, T-140) : **on n'incante pas une arme ou un bouclier en main**. Le mage
-a besoin d'un garde, le guerrier d'un mage. Un bâton de mage (focaliseur) viendra plus tard.
+Décision du porteur du projet (31 octobre 2026, T-140) : **on n'incante pas avec une arme ou un bouclier en main**.
+Le mage a besoin d'un garde, le guerrier d'un mage. Un bâton de mage (focaliseur) viendra plus tard.
 
 | Ce que porte le lanceur | Incanter | Code et texte |
 | --- | --- | --- |
