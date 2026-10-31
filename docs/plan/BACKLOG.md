@@ -713,6 +713,18 @@ versé à T-014 ; les autres points déjà couverts sont précisés dans T-012 �
 - Critères : plafond sur le total livré ; cas d'essai de l'audit (`tests/audit/`) pour un fichier non livré lourd
   (sans effet) et un fichier livré qui dépasse (BLOQUANT) ; mesures avant et après dans le rapport.
 
+### T-154 — Lua livré sans commentaires — **décision du porteur du projet**
+- Agents : vava-architecte → vava-dev-lua · Dépend de : — · Statut : à faire (proposée, à valider par le porteur du
+  projet avant de la prendre)
+- Trouvé pendant T-112 (relecture réseau R-2) : sur tout le dépôt, ≈ 478 Ko des 1 255 Ko de Lua livré aux joueurs sont
+  des commentaires (≈ 206 Ko compressés, ≈ 11 % du premier téléchargement de 4,3 Mo) ; une retouche d'un seul
+  commentaire d'un fichier client fait tout retélécharger ce fichier. Proposition : la copie déployée (installeur et
+  mises à jour de la Chancellerie, ou un script de livraison) retire les commentaires des `shared_scripts`,
+  `client_scripts` et fichiers de config livrés ; le dépôt reste commenté.
+- Critères : essai que chaque fichier transformé est identique au caractère près hors commentaires (chaînes longues,
+  `--[[ ]]` dans une chaîne, `--` dans une chaîne) ; numéros de ligne des erreurs gardés (lignes vides laissées) ;
+  mesure avant et après par `scripts/poids-client.sh` ; aucune dépendance ajoutée.
+
 ### T-148 — Fichiers `shared/` absents du manifeste
 - Agent : vava-dev-lua · Dépend de : T-132 · Statut : à faire
 - Trouvé pendant T-146 : rien ne vérifie qu'un `shared/*.lua` présent dans un module est bien listé à son manifeste ;
@@ -1095,7 +1107,9 @@ faire tout le système de combat ») : la porte T-119 reste à passer en jeu.
   ajoutées à `vava_crafting`.
 
 ### T-112 — Moteur de techniques `vava_combat`
-- Agents : vava-architecte → vava-dev-lua · Dépend de : T-111 · Statut : à faire
+- Agents : vava-architecte → vava-dev-lua · Dépend de : T-111 · Statut : à tester en jeu (relu sécurité, contre-relu,
+  relu réseau ; suites appliquées)
+- Spec : `docs/plan/specs/T-112.md`, avec les décisions du porteur du projet du 31 octobre 2026.
 - Techniques en données (format de `COMBAT_V1.md`), 4 techniques d'épée en config, RPC `vava_combat:use`, fenêtre
   de frappe tenue par le serveur, positions serveur et tolérances, enchaînement, réactions envoyées aux proches
   seulement ; verrouillage de cible repris de `vava_magic`.
@@ -1106,6 +1120,26 @@ faire tout le système de combat ») : la porte T-119 reste à passer en jeu.
   tout le personnage à chaque `armed()` ; **(lore)** prévoir une vraie durée pour dégainer et rengainer, ou un court
   délai avant d'incanter après avoir rangé une arme, sinon la règle « le mage a besoin d'un garde » ne tient pas
   (l'incantation est déjà brisée dès qu'une arme passe en main, `vava_inventory:hold`).
+- Fait le 31 octobre 2026 (branche `agents/T-112`) : `vava_combat` 1.2.0 — techniques en données (Taille descendante,
+  Estoc rapide, Revers, Fendant ; style `epee_une_main`), RPC `vava_combat:use` (schéma borné, 4 d'avance puis 3 / s),
+  fenêtre de frappe tenue par deux minuteries du serveur, positions et cap lus par le serveur, tolérances décidées
+  (+ 0,25 m, + 10°, aucun contrôle des murs), un adversaire par coup, enchaînement (4 coups au plus), chancellement
+  (0,9 s, immunité 3 s), dégainer 0,8 s et rengainer 1,5 s tenus par le serveur, réactions aux seuls joueurs à 30 m
+  de la cible (rien pour une esquive ni un coup absorbé), mode combat éveillé et borné, verrou sans boucle propre,
+  cache client de la main (T-140 R-1). Suites des relectures : coup annulé qui garde son cycle, réservation avant
+  tout appel qui cède la main et restitution au premier coup d'avant non refusé (sous `pcall`), `mode.blocked` sans
+  Échap ni P ; géométrie et admission servies au seul serveur, en-têtes livrés allégés (106,6 → 85,7 Ko livrés).
+  Rapport `docs/plan/rapports/T-112.md` ; procédure `docs/tests/combat.md` § 3 (32 tests) et § 4.
+
+### T-149 — La magie et le mode combat
+- Agent : vava-dev-lua (cette tâche autorise à toucher `vava_magic`) · Dépend de : T-112, T-138 · Statut : à faire
+- Décision du porteur du projet (31/10, spec T-112) : en mode combat (arme en main), la magie ne montre ni rappel
+  « rangez votre arme » ni anneau de verrou ; texte propre pendant le rengainement ; export `hardControl(src)` (gelé,
+  renversé, chancelant) lu par `vava_combat` pour refuser une frappe.
+- Relecture sécurité de T-138 (S-2) : `combat.affects` lit `vava_admin:isInvulnerable(src)` (appel isolé) pour que
+  les effets sans dégâts (recul, renversement, mouillé, ralenti) épargnent un membre invulnérable. Consigne de la
+  relecture réseau de T-138 (R-3) : `isInvulnerable` une fois par effet appliqué, jamais en boucle (ni par image, ni
+  par cible dans un balayage répété).
 
 ### T-113 — Blocage, parade, esquive
 - Agent : vava-dev-lua · Dépend de : T-112 · Statut : à faire
@@ -1202,6 +1236,10 @@ faire tout le système de combat ») : la porte T-119 reste à passer en jeu.
 - Dépend de : T-110 à T-116 · Statut : à faire
 - Au moins 4 joueurs, latences différentes. Régler les tolérances et fenêtres en config jusqu'à ce que les coups
   « portent ». Chaque réglage retenu est noté dans `COMBAT_V1.md`.
+- Relevé par les relectures de T-112 : resserrer le bond permis pendant une technique (`vava_combat`,
+  `lunge.maxSpeed` : 5,7 m au Fendant aujourd'hui, cible ≈ 4 à 5 m/s, sans annuler un coup porté en courant ;
+  sécurité S-3) ; essayer un rayon de réactions de 20 m au lieu de 30 (`reactions.radius`, effet vu ou non à 20 m,
+  test combat 3-27 ; réseau R-4).
 
 ## Phase 5 — Interactions RP
 
@@ -1277,7 +1315,14 @@ faire tout le système de combat ») : la porte T-119 reste à passer en jeu.
   `category` et `family`, et `shield` y sert les délais du serveur (`toggleMs`, `verifyMs`, `missesToDrop`,
   `pedCheckMs`, `guard*`, ≈ 0,6 Ko), parce que le client passe ces tables à `shared/shield.lua` ; `shield.guardDelay`
   (`shared/shield.lua:115-128`) n'est appelé que par le serveur. À donner une part client et une part serveur en
-  reprenant le module.
+  reprenant le module. **Fait par T-112** (`vava_combat` 1.2.0) : classe des armes (`weaponClasses`) au client, fiches
+  (`weapons`) et délais du serveur du bouclier dans `config.lua`, `guard.delay` dans `shared/guard.lua` servi au seul
+  serveur.
+- Relecture réseau de T-112 (R-7) : les techniques sont entières dans `config_client.lua` alors que le client ne lit ni
+  `label`, ni `hit`, ni `damage`, ni `stamina`, ni `parryable`, ni `staggers`, ni `learn`. Quand l'Atelier publiera les
+  techniques, n'envoyer aux joueurs que la part client (`style`, `type`, `gesture`, `phases`, `chain`, `styles.keys`),
+  une fois avec un numéro de version puis par différences, jamais la part du serveur ; découper la table comme
+  `weaponClasses` / `weapons`.
 
 ### T-122 — Atelier des effets
 - Agents : vava-architecte → vava-dev-lua + vava-dev-nui · Dépend de : T-101 · Statut : à faire

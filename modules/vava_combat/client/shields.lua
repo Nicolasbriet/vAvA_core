@@ -1,17 +1,7 @@
 --[[
     vava_combat/client/shields.lua
-    Rôle : boucliers accrochés des peds à portée (patron de vava_inventory/client/hands.lua). Le serveur écrit
-           { id, item } sur le statebag du ped du porteur (`vava_combat:shield`) ; OneSync ne l'envoie qu'aux joueurs
-           qui ont ce ped à portée, et le renvoie quand le ped apparaît chez eux. Ce client attache alors un objet
-           LOCAL (jamais réseau, sans collision) au ped : au bras si le porteur tient une arme qui s'y prête, dans le dos
-           sinon (position lue sur le statebag de la main de l'inventaire, même ped, et calculée par shared/shield.lua).
-           Placement (modèle, os, décalage, rotation) lu dans SA config, jamais dans la valeur ; rien n'est montré
-           ailleurs que sur un ped de joueur. Quand la main change, l'accessoire est réattaché à l'autre os sans être
-           recréé. Une boucle lente ne tourne que tant qu'un bouclier est suivi : elle attache ce qui attendait son ped
-           ou son modèle, rattache ce que le jeu a détaché, oublie les peds disparus, et ne montre un bouclier qu'à
-           `shield.showRadius` (120 m) du joueur local : au-delà, l'accessoire est retiré et revient quand on
-           s'approche. Position et placement sont recalculés seulement quand la valeur ou la main change. Modèle invalide : une ligne de
-           console, rien d'affiché, pas de nouvel essai tant que la valeur ne change pas.
+    Rôle : boucliers accrochés des peds à portée (statebag `vava_combat:shield`) : objet local au bras ou au dos, montré
+           à `shield.showRadius` ; boucle lente seulement tant qu'un bouclier est suivi.
     Dépendances : shared/constants.lua, config_client.lua, shared/shield.lua, client/core.lua, bridge/client.lua
 ]]
 
@@ -74,7 +64,7 @@ local function resolve(want, ped)
     if not want.handKnown then
         want.handItem, want.handKnown = itemOf(Entity(ped).state[HELD_STATE]), true
     end
-    want.position = shield.position(want.handItem, cfg.weapons, cfg.shield)
+    want.position = shield.position(want.handItem, cfg.weaponClasses, cfg.shield.armWith, cfg.shield.armWithEmptyHand)
     want.place = shield.placement(want.value.item, want.position, cfg.shields)
     want.key = want.place and (tostring(want.value.id) .. '|' .. want.value.item .. '|' .. want.place.model) or nil
 end

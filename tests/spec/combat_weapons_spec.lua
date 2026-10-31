@@ -1,8 +1,8 @@
 local helper = require('tests.helper')
 
 -- Règles pures des armes (modules/vava_combat/shared/weapons.lua, T-111) avec la config livrée du module : contrôle du
--- catalogue, qualité, solidité, montant d'un coup, usure, options de strike, paquet hit. Règles documentées : README du
--- module et docs/plan/specs/T-111.md § 5.1, § 7.1 à § 7.3 et § 11.1.
+-- catalogue (en deux parts depuis 1.2.0, T-112), qualité, solidité, montant d'un coup, usure, options de strike, paquet
+-- hit. Règles documentées : README du module et docs/plan/specs/T-111.md § 5.1, § 7.1 à § 7.3 et § 11.1, T-112.md § 4.
 
 describe('vava_combat shared/weapons', function()
     local weapons, cfg, CATEGORIES
@@ -47,8 +47,8 @@ describe('vava_combat shared/weapons', function()
         end)
 
         it('refuse une fiche mal formée, avec sa raison', function()
-            refused(function(c) c.weapons.dague.category = 'arc' end, 'catégorie inconnue')
-            refused(function(c) c.weapons.dague.family = 'fleau' end, 'famille inconnue')
+            refused(function(c) c.weaponClasses.dague.category = 'arc' end, 'catégorie inconnue')
+            refused(function(c) c.weaponClasses.dague.family = 'fleau' end, 'famille inconnue')
             refused(function(c) c.weapons.dague.kind = 'perçant' end, 'type de dégâts inconnu')
             refused(function(c) c.weapons.dague.damage = 0 end, 'damage')
             refused(function(c) c.weapons.dague.damage = 101 end, 'damage')
@@ -82,6 +82,25 @@ describe('vava_combat shared/weapons', function()
                 c.recipes.epee_courte = copy(c.recipes.dague)
                 c.recipes.epee_courte.output.item = 'epee_courte'
             end, 'déclarée dans items')
+        end)
+
+        -- 1.2.0 (T-112, relecture réseau R-2 de T-142) : classe dans config_client.lua, fiche dans config.lua
+        it('refuse une config en deux parts qui ne vont pas ensemble, avec la marche à suivre', function()
+            refused(function(c) c.weaponClasses.pain = { category = 'une_main', family = 'epee' } end, 'classe sans fiche')
+            refused(function(c) c.weapons.pain = copy(c.weapons.dague) end, 'fiche sans classe')
+            refused(function(c) c.weapons.dague.category = 'dague' end, "config.lua d'avant 1%.2%.0")
+            refused(function(c) c.weapons.dague.family = 'dague' end, "config.lua d'avant 1%.2%.0")
+            refused(function(c) c.weaponClasses = nil end, "config_client.lua d'avant 1%.2%.0")
+            refused(function(c) c.shield.toggleMs = nil end, "config.lua d'avant 1%.2%.0")
+            refused(function(c) c.weaponClasses.dague.kind = 'percant' end, 'hors de la classe')
+        end)
+
+        it('fusionne la classe et la fiche d\'une arme', function()
+            local merged = weapons.merge(cfg.weaponClasses.dague, cfg.weapons.dague)
+            assert.equal('dague', merged.category)
+            assert.equal('percant', merged.kind)
+            assert.equal(8, merged.damage)
+            assert.is_nil(weapons.merge(nil, cfg.weapons.dague))
         end)
 
         it('exige exactement les catégories de COMBAT_V1', function()

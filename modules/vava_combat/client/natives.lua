@@ -1,12 +1,7 @@
 --[[
     vava_combat/client/natives.lua
-    Rôle : coupe le combat natif de GTA SANS boucle par image : drapeau de ped « corps à corps désactivé », changement
-           d'arme bloqué, armes GTA retirées. Ces bascules gardent leur effet jusqu'au changement de ped : un contrôle à
-           `natives.pollMs` (1 s) les réapplique sur un nouveau ped ou si le drapeau a été perdu, et retire toute arme
-           GTA en main (menu de triche, /arme de l'exemple). Au repos : trois natives par seconde. La coupure par image
-           des touches (attaque, visée, roue) appartiendra au mode combat de T-112, éveillé et borné dans le temps. Le
-           filet reste l'annulation serveur des dégâts natifs (vava_health). À l'arrêt du module, avec
-           `restoreOnStop`, drapeau et changement d'arme sont rendus à GTA.
+    Rôle : combat natif de GTA coupé sans boucle par image (drapeau 122, changement d'arme bloqué, armes GTA retirées),
+           réappliqué à `natives.pollMs` ; rendu à GTA à l'arrêt.
     Dépendances : shared/constants.lua, config_client.lua, client/core.lua
 ]]
 

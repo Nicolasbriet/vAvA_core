@@ -2,7 +2,8 @@
     vava_combat/server/commands.lua
     Rôle : commandes du Conseil `/armes liste | voir <n°> | user <n°> <points>` (droit `metiers` de vava_admin, sinon
            ACE `combat.admin`, revérifié à chaque appel ; console admise) et leur déclaration au registre
-           `core:commands` (chapitre « Combat »). `voir` et `user` sont inscrits au journal du Registre ; `user` ne fait
+           `core:commands` (chapitre « Combat »), avec les trois touches du combat (attaque légère, attaque lourde,
+           verrou ; config_client.lua → keys). `voir` et `user` sont inscrits au journal du Registre ; `user` ne fait
            que BAISSER la solidité (la garde de l'artisanat refuserait toute remontée), seuils prévenus comme une usure.
            Réponses au seul lanceur (vava_chat, sinon notification ; console : print).
     Dépendances : shared/constants.lua, config.lua, shared/weapons.lua, shared/shield.lua, server/core.lua,
@@ -28,7 +29,7 @@ VavaCombat.commands = commands
 
 local function entries()
     local admin = cfg.admin
-    return {
+    local list = {
         [admin.command] = { kind = 'command', scope = 'admin', permission = admin.permission, ace = admin.ace,
             label = 'Armes du royaume', description = 'Les armes de corps à corps, l\'arme d\'un joueur, et son usure pour les essais.',
             actions = {
@@ -39,9 +40,15 @@ local function entries()
                     args = { { name = 'joueur', type = 'player' }, { name = 'points', type = 'integer', min = 1, max = admin.maxWear } } },
             } },
     }
+    -- touches du combat (attaques, verrou) : réglables dans Paramètres > Raccourcis > FiveM
+    for _, key in pairs(cfg.keys) do
+        list[key.command] = { kind = 'key', scope = 'player', key = key.key, keyDevice = key.device,
+            keyDisplay = key.display, hold = key.hold, label = key.label }
+    end
+    return list
 end
 
---- Déclare la commande au registre du core. Appelée en tête du setup ; sans ce registre (core plus ancien), rien.
+--- Déclare la commande et les touches au registre du core. Appelée en tête du setup ; sans ce registre (core plus ancien), rien.
 ---@return boolean ok
 ---@return string|nil err
 function commands.declare()
