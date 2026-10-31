@@ -19,13 +19,15 @@ lua54 'yes'
 
 name 'vava_example_combat'
 description 'Essai de la chaîne de dégâts vAvA (mode développement seulement)'
-version '1.1.0'
+version '1.2.0'
 
 dependency 'vAvA_core'
 
-shared_script 'config.lua'
+-- config_client.lua : ce que lit le client ; config.lua, en tête des server_scripts, n'est jamais servi (T-132)
+shared_script 'config_client.lua'
 
 server_scripts {
+    'config.lua',
     'shared/guard.lua',
     'server/main.lua',
 }
