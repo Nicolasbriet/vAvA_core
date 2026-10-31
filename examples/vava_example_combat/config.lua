@@ -1,7 +1,7 @@
 --[[
     vava_example_combat/config.lua
     Rôle : configuration de la ressource d'essai de la chaîne de dégâts (lue par le client et le serveur) : accès,
-           commandes, délais, armes et explosion vanilla d'essai (provisoires), textes.
+           commandes (dont /frapper_arme, T-111), délais, armes et explosion vanilla d'essai (provisoires), textes.
     Dépendances : aucune
 ]]
 
@@ -19,6 +19,8 @@ VavaExampleCombat = {
         commands = {
             hit = 'frapper', dodge = 'esquive', shield = 'bouclier', resistance = 'resistance', chain = 'chaine',
             weapon = 'arme', explosion = 'explosion', cheat = 'tricher',
+            -- coup de l'arme tenue en main par exports.vava_combat:strike (vava_combat ≥ 1.0.0, facultatif)
+            weaponHit = 'frapper_arme',
         },
         chapter = 'Essais de combat',
         chatAuthor = 'Combat',
@@ -35,9 +37,11 @@ VavaExampleCombat = {
         journal = {
             hit = 'Essai de combat : coup porté',
             modifier = 'Essai de combat : protection',
+            weaponHit = 'Essai de combat : coup d\'arme',
         },
 
         -- Raisons d'annulation montrées au lanceur (les autres s'affichent telles quelles).
-        reasons = { downed = 'à terre', esquive = 'esquive', pvp_off = 'combats entre joueurs coupés' },
+        reasons = { downed = 'à terre', esquive = 'esquive', pvp_off = 'combats entre joueurs coupés',
+            no_weapon = 'aucune arme en main', too_far = 'trop loin' },
     },
 }
