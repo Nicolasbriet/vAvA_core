@@ -1,7 +1,6 @@
 /*
- * vava_atelier/web/css/style.css
- * Rôle : thème de l'Atelier (docs/maquettes/) : cuir à filet de laiton (grain permis) autour d'un parchemin uni
- *        éclairé en haut (JAMAIS de grain sur fond clair). Polices et grain : vava_ui. 1 rem = 16 px à 1440 × 900.
+ * vava_atelier/web/css/style.css — cuir à filet de laiton (grain permis) autour d'un parchemin uni éclairé en haut
+ *   (JAMAIS de grain sur fond clair) ; polices et grain : vava_ui ; 1 rem = 16 px à 1440 × 900.
  */
 
 :root {

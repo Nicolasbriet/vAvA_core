@@ -1,7 +1,6 @@
 'use strict';
 /*
- * vava_atelier/web/js/strings.js
- * Rôle : tous les textes de l'interface (les libellés, aides et erreurs des modules arrivent du serveur).
+ * vava_atelier/web/js/strings.js — textes de la page (ceux des ateliers et des refus viennent du serveur)
  * Dépendances : aucune.
  */
 
@@ -75,11 +74,7 @@ const STRINGS = Object.freeze({
 
   modeEdit: 'Mode édition : visible par vous seul',
 
-  states: {
-    holder: (who, when) => `Brouillon de ${who}${when ? `, enregistré ${when}` : ''}`,
-    stale: 'Une autre version a été publiée depuis le début de ce brouillon.',
-    unreadable: 'Version illisible par cet atelier.',
-  },
+  states: { stale: 'Une autre version a été publiée depuis le début de ce brouillon.' },
   buttons: { save: 'Enregistrer le brouillon', check: 'Vérifier' },
   working: 'Un instant…',
   saved: 'Brouillon enregistré.',
@@ -161,47 +156,20 @@ const STRINGS = Object.freeze({
     short: { j: 'j', h: 'h', min: 'min', s: 's' },
   },
 
+  // refus du serveur : texte reçu avec le code ; ici, les seuls codes de la page et du relais
   errors: {
-    not_ready: 'Le Registre du Conseil s\'éveille : réessayez dans un instant.',
-    no_character: 'Choisissez d\'abord un personnage.',
-    not_allowed: 'L\'Atelier est réservé au Conseil.',
-    not_open: 'L\'Atelier s\'est refermé : rouvrez-le.',
-    unknown_editor: 'Cet atelier n\'existe plus.',
     unknown_kind: 'Ce genre de fiche n\'existe plus dans cet atelier.',
-    unknown_entry: 'Cette fiche n\'existe plus.',
-    unknown_field: 'Ce réglage n\'existe plus.',
-    busy: 'Un instant : une demande est déjà en cours.',
-    editor_error: 'Cet atelier ne répond pas : prévenez un développeur.',
-    db_error: 'Les registres de l\'Atelier ne répondent pas : réessayez dans un instant.',
-    rate_limited: 'Doucement : patientez un instant.',
     timeout: 'Le serveur ne répond pas.',
     invalid_args: 'Demande refusée.',
     invalid_response: 'Réponse du serveur illisible : rouvrez l\'Atelier.',
     stale: 'L\'Atelier s\'est désaccordé du serveur : rouvrez-le.',
     client_error: 'Cette page a trébuché : rouvrez l\'Atelier.',
     default: 'Action impossible.',
-    draft_taken: 'Un autre membre du Conseil tient déjà un brouillon de cette fiche : ouvrez-le pour le lire ou le reprendre.',
-    draft_open: 'Vous avez déjà un brouillon de cette fiche : abandonnez-le d\'abord.',
-    not_holder: 'Ce brouillon est tenu par un autre membre du Conseil.',
-    no_draft: 'Cette fiche n\'a pas de brouillon en cours.',
-    not_stored: 'Cet atelier ne garde encore rien : on peut seulement y vérifier une fiche.',
-    too_large: 'Cette fiche est trop lourde pour être gardée : raccourcissez ses textes.',
-    full: 'Trop de fiches ou de brouillons : publiez ou abandonnez-en d\'abord.',
-    parent_missing: 'Cette fiche dépend d\'une autre qui n\'est pas publiée : publiez-la ou rétablissez-la d\'abord.',
-    trial_busy: 'Vous avez déjà un essai en cours : arrêtez-le d\'abord.',
-    no_trial: 'Cet atelier ne propose pas d\'essai.',
-    syncing: 'L\'atelier se met à jour : réessayez dans un instant.',
-    unknown_version: 'Cette version n\'existe plus.',
-    not_archived: 'Seule une ancienne version peut être rétablie.',
-    unchanged: 'Rien n\'a changé depuis la version publiée.',
-    unreadable: 'Cette version ne peut plus être lue par cet atelier.',
   },
-  // sur une fiche, `stale` dit une révision dépassée ; ailleurs, des versions gardées désaccordées
-  entryStale: 'Cette fiche a changé depuis que vous l\'avez ouverte : rouvrez-la pour voir la dernière version.',
   revoked: 'Votre place au Conseil a changé : l\'Atelier se ferme.',
   editorGone: 'Cet atelier vient d\'être retiré : réessayez plus tard.',
 });
 
-function errorText(code) {
-  return STRINGS.errors[code] || STRINGS.errors.default;
+function errorText(code, text) {
+  return (typeof text === 'string' && text) || STRINGS.errors[code] || STRINGS.errors.default;
 }

@@ -276,7 +276,7 @@ const DevMock = (() => {
   }
   function stateOf(l) {
     const d = l.draft;
-    if (!d) return l.refused ? { label: 'Publiée, mais refusée en jeu', tone: 'refused' } : { label: `Publiée, version ${l.version}`, tone: 'live' };
+    if (!d) return l.refused ? { label: 'Publiée, mais refusée en jeu', tone: 'refused' } : { label: `Version ${l.version}, publiée`, tone: 'live' };
     if (d.removal) return { label: 'Retrait en attente', tone: 'removal' };
     if (d.trial) return { label: `Essai, version ${l.version + 1}`, tone: 'trial' };
     return { label: 'Brouillon', tone: 'draft' };
@@ -324,8 +324,11 @@ const DevMock = (() => {
     const values = l.draft ? l.draft.values : entry.values;
     const answer = { id: entry.id, title: valueOf(values, kindDef.form.titleField) || entry.title, values: clone(values), labels: labelsOf(kindDef, values), warnings: entry.warnings,
       state: stateOf(l), footer: footerOf(descriptorFor(editor), l), rev: l.draft ? l.draft.rev : 0, version: l.version, removal: Boolean(l.draft && l.draft.removal), stale: Boolean(l.draft && l.draft.stale) };
-    if (l.draft && !l.draft.mine) answer.holder = { label: OTHER, mine: false, at: 'il y a 3 min' };
-    else if (l.draft) answer.holder = { label: ME, mine: true, at: 'à l\'instant' };
+    if (l.draft && !l.draft.mine) {
+      answer.holder = { label: OTHER, mine: false };
+      answer.state.line = `Brouillon de ${OTHER}, enregistré il y a 3 min`;
+    }
+    else if (l.draft) answer.holder = { label: ME, mine: true };
     if (editor === 'vava_example_atelier:panneaux' && kind === 'panneau') {
       answer.compare = entry.id === 'porte_nord' ? { title: 'Pour comparer : Panneau de la place', text: '1,5 m, lisible à 3 m, 7 jours' } : { title: 'Pour comparer : Pancarte de la porte nord', text: '2,2 m, lisible à 5 m, 30 jours' };
     }
@@ -469,14 +472,14 @@ const DevMock = (() => {
         return answer({});
       case 'history': {
         const older = l.versions.filter((v) => !data.before || v.version < data.before);
-        return ok({ versions: older.slice(0, 5).map((v) => ({ version: v.version, status: v.status, removal: v.removal || 0, origin: v.origin || 'atelier', restoredFrom: v.restoredFrom, summary: v.summary, author: v.author, when: v.when })), more: older.length > 5 });
+        return ok({ versions: older.slice(0, 5).map((v) => ({ version: v.version, status: v.status, removal: v.removal || 0, restoredFrom: v.restoredFrom, summary: v.summary, author: v.author, when: v.when })), more: older.length > 5 });
       }
       case 'version': {
         const v = l.versions.find((x) => x.version === data.version);
         if (!v) return fail('unknown_version');
         const archived = v.status === 'archived';
         return ok({ id: data.id, title: valueOf(v.values, kindDef.form.titleField) || entry.title, version: v.version, values: clone(v.values), labels: labelsOf(kindDef, v.values),
-          state: v.removal ? { label: `Version ${v.version}, retrait`, tone: 'removal' } : (archived ? { label: `Version ${v.version}, archivée`, tone: 'archived' } : { label: `Publiée, version ${v.version}`, tone: 'live' }),
+          state: v.removal ? { label: `Version ${v.version}, retrait`, tone: 'removal' } : (archived ? { label: `Version ${v.version}, archivée`, tone: 'archived' } : { label: `Version ${v.version}, publiée`, tone: 'live' }),
           footer: archived && !v.removal ? [B('restore', 'Revenir à cette version', { primary: true })] : [] });
       }
       default: return fail('invalid_args');
@@ -486,7 +489,16 @@ const DevMock = (() => {
   const sentDescriptors = new Set();
   let homeSent = false;
   const ok = (data) => ({ ok: true, data });
-  const fail = (error) => ({ ok: false, error });
+  const REFUSED = {
+    not_allowed: 'L\'Atelier est réservé au Conseil.', unknown_editor: 'Cet atelier n\'existe plus.', unknown_kind: 'Ce genre de fiche n\'existe plus dans cet atelier.',
+    unknown_entry: 'Cette fiche n\'existe plus.', rate_limited: 'Doucement : patientez un instant.',
+    stale: 'Cette fiche a changé depuis que vous l\'avez ouverte : rouvrez-la pour voir la dernière version.',
+    draft_taken: 'Un autre membre du Conseil tient déjà un brouillon de cette fiche : ouvrez-le pour le lire ou le reprendre.',
+    draft_open: 'Vous avez déjà un brouillon de cette fiche : abandonnez-le d\'abord.', not_holder: 'Ce brouillon est tenu par un autre membre du Conseil.',
+    no_draft: 'Cette fiche n\'a pas de brouillon en cours.', not_stored: 'Cet atelier ne garde encore rien : on peut seulement y vérifier une fiche.',
+    no_trial: 'Cet atelier ne propose pas d\'essai.', unknown_version: 'Cette version n\'existe plus.', not_archived: 'Seule une ancienne version peut être rétablie.',
+  };
+  const fail = (error) => ({ ok: false, error, text: REFUSED[error] || '' });
 
   function homePayload(version) {
     const withContent = version !== 'accueil-1' || !homeSent;

@@ -95,8 +95,15 @@ eq(S.list.create('zone', 'Nouvelle zone'), 'Créer une zone');
 eq(S.list.create('arbre', 'Nouvel arbre'), 'Créer un arbre');
 eq(S.list.count(1, 'panneau', 'panneaux'), '1 panneau');
 eq(S.list.count(3, 'panneau', 'panneaux'), '3 panneaux');
-eq(ctx.errorText('not_allowed'), 'L\'Atelier est réservé au Conseil.');
+// refus : texte du serveur s'il est reçu, sinon les seuls codes de la page, sinon « Action impossible. »
+eq(ctx.errorText('not_allowed', 'L\'Atelier est réservé au Conseil.'), 'L\'Atelier est réservé au Conseil.');
+eq(ctx.errorText('not_allowed'), S.errors.default);
+eq(ctx.errorText('stale', 'Cette fiche a changé depuis que vous l\'avez ouverte.'), 'Cette fiche a changé depuis que vous l\'avez ouverte.');
+eq(ctx.errorText('stale'), S.errors.stale, 'relais désaccordé : texte de la page');
+eq(ctx.errorText('stale', ''), S.errors.stale);
+eq(ctx.errorText('timeout', 7), S.errors.timeout, 'texte non textuel ignoré');
 eq(ctx.errorText('code_inconnu'), S.errors.default);
+eq(JSON.stringify(Object.keys(S.errors).sort()), JSON.stringify(['client_error', 'default', 'invalid_args', 'invalid_response', 'stale', 'timeout', 'unknown_kind']));
 
 // Étiquettes des cartes : reçues à part (`tags`), posées par-dessus le contenu gardé
 const js = (v) => JSON.stringify(v);
@@ -216,11 +223,6 @@ eq(L.readOnly({ removal: 1 }, false), true);
 eq(L.readOnly({ removal: 0, state: { tone: 'draft' } }, false), false);
 eq(L.readOnly({ state: { tone: 'removal' } }, false), true);
 eq(L.readOnly({}, true), true, 'version archivée');
-eq(L.stateLine({ holder: { label: 'Sénéchal Aldric Morn', mine: false, at: 'il y a 3 min' } }), 'Brouillon de Sénéchal Aldric Morn, enregistré il y a 3 min');
-eq(L.stateLine({ holder: { label: 'Sénéchal Aldric Morn', mine: false, at: 12 } }), 'Brouillon de Sénéchal Aldric Morn');
-eq(L.stateLine({ holder: { label: 'Moi', mine: true, at: 'à l\'instant' } }), '');
-eq(L.stateLine({ state: { line: 'Ligne du serveur' }, holder: { label: 'X', mine: false } }), 'Ligne du serveur');
-eq(L.stateLine({}), '');
 
 // Noms et accords
 const zone = { noun: 'zone', article: 'la', feminine: true }, panneau = { noun: 'panneau', article: 'le', feminine: false };
@@ -256,8 +258,8 @@ eq(js([nb(takeBox.title), takeBox.text, takeBox.cancel, takeBox.ok]), js(['Repre
 eq(js([nb(S.confirm.discard.title), S.confirm.discard.text, S.confirm.discard.cancel, S.confirm.discard.ok]), js(['Abandonner ce brouillon ?', 'Rien de ce qu\'il contient ne sera gardé.', 'Garder', 'Abandonner']));
 
 // Historique : étiquettes, version rétablie, retrait, auteur et âge, versions illisibles écartées
-const rows = L.history({ 1: { version: 6, status: 'published', removal: 0, origin: 'atelier', summary: 'Hauteur de 1,5 m à 2 m', author: 'Sénéchal Aldric Morn', when: 'il y a 2 h' },
-  2: { version: 4, status: 'archived', removal: 0, origin: 'restore', restoredFrom: 2, author: 'Souveraine Ysolde', when: 'hier' },
+const rows = L.history({ 1: { version: 6, status: 'published', removal: 0, summary: 'Hauteur de 1,5 m à 2 m', author: 'Sénéchal Aldric Morn', when: 'il y a 2 h' },
+  2: { version: 4, status: 'archived', removal: 0, restoredFrom: 2, author: 'Souveraine Ysolde', when: 'hier' },
   3: { version: 3, status: 'archived', removal: 1, summary: 'et ses 2 affiches', author: 'Console', when: '' },
   4: { version: 0, status: 'archived' }, 5: null, 6: { version: 'x' }, 7: { version: 1, status: 'archived', removal: false, author: '', when: 'le 12/10' } });
 eq(js(rows.map((r) => [r.version, r.tone, r.tag, r.title, r.canRestore])), js([[6, 'live', 'Publiée', 'Version 6', false], [4, 'archived', 'Archivée', 'Version 4', true],
@@ -277,13 +279,6 @@ eq(L.changed({ ...open, mode: 'version' }, msg, false), 'none', 'version archiv�
 eq(L.changed({ ...open, id: '' }, { ...msg, id: '' }, false), 'none', 'fiche nouvelle');
 eq(L.changed(null, msg, false), 'none');
 
-// Codes de refus de T-101
-eq(ctx.errorText('unchanged'), 'Rien n\'a changé depuis la version publiée.');
-eq(ctx.errorText('db_error'), 'Les registres de l\'Atelier ne répondent pas : réessayez dans un instant.');
-for (const code of ['draft_taken', 'draft_open', 'not_holder', 'no_draft', 'not_stored', 'too_large', 'full', 'parent_missing', 'trial_busy', 'no_trial', 'syncing', 'unknown_version', 'not_archived', 'unreadable']) {
-  eq(ctx.errorText(code) !== S.errors.default, true, code);
-}
-eq(S.states.holder('Sénéchal Aldric Morn', 'il y a 3 min'), 'Brouillon de Sénéchal Aldric Morn, enregistré il y a 3 min');
 
 // app.js : enchaînements d'une fiche gardée sur une page factice
 async function cycleEssais() {
@@ -296,7 +291,7 @@ async function cycleEssais() {
     save: (d) => ({ done: true, id: d.id || 'lanterne_du_port', rev: d.rev + 1, title: 'Lanterne', state: { label: 'Brouillon', tone: 'draft' }, footer: [B('publish', 'Dresser le panneau', { primary: true })] }),
     trial: (d) => (d.rev === 4 ? { done: true, rev: 4, state: { label: 'Essai, version 3', tone: 'trial' }, footer: [] } : null),
     preview: () => ({ valid: true, token: '0123456789abcdef', lines: ['Texte repeint'], warnings: [] }),
-    publish: () => ({ done: true, version: 3, state: { label: 'Publiée, version 3', tone: 'live' }, footer: [] }),
+    publish: () => ({ done: true, version: 3, state: { label: 'Version 3, publiée', tone: 'live' }, footer: [] }),
     take: () => ({ done: true, rev: 6, state: { label: 'Brouillon', tone: 'draft' }, footer: [] }),
   };
   const stub = () => ({ el: {}, focus() {}, setData() {}, setError() {}, hideOk() {}, setBusy() {}, flashOk() {}, setCompare() {}, setTitle() {}, setReadOnly() {},
@@ -306,7 +301,7 @@ async function cycleEssais() {
     document: { getElementById: () => ({ hidden: false, replaceChildren() {} }), addEventListener() {} },
     Bridge: { inGame: false, onMessage: (h) => { onMessage = h; }, post: async (name, data) => {
       posts.push([name, data]);
-      if (name === 'trial' && data.rev !== 4) return { ok: false, error: 'stale' };
+      if (name === 'trial' && data.rev !== 4) return { ok: false, error: 'stale', text: 'Texte du refus reçu du serveur.' };
       return { ok: true, data: replies[name] ? replies[name](data) : {} };
     } },
     UI: { Toast: { show() {} }, Confirm: { ask: async (box) => { asked.push(box); return answer; }, isOpen: () => false, cancel() {} },
@@ -357,7 +352,7 @@ async function cycleEssais() {
   A.state.entry.rev = 9;
   notices.length = 0;
   await A.run('trial');
-  eq(notices[0], S.entryStale);
+  eq(notices[0], 'Texte du refus reçu du serveur.', 'avis : texte du serveur');
 
   // changement venu d'ailleurs : relue si rien n'a changé, avertie sinon
   posts.length = 0;

@@ -1,8 +1,6 @@
 'use strict';
 /*
- * vava_atelier/web/js/form.js
- * Rôle : fiche pilotée par le schéma d'un type (§ 5.3), paquet { n, s, b } ; contrôles de confort seulement.
- *        Form.build(type, valeurs, env) ; env : { warnings, changed, lookup, known, remember }.
+ * vava_atelier/web/js/form.js — fiche pilotée par le schéma d'un type, paquet { n, s, b } ; contrôles de confort seulement
  * Dépendances : strings.js, format.js, components.js, widgets.js
  */
 

@@ -1,8 +1,6 @@
 'use strict';
 /*
- * vava_atelier/web/js/components.js
- * Rôle : pièces communes (texte TOUJOURS par textContent, jamais innerHTML) : éléments, icônes, Picker, Confirm (lignes
- *        de résumé, avertissements, erreurs), Toast…
+ * vava_atelier/web/js/components.js — pièces communes (texte TOUJOURS par textContent) : icônes, Picker, Confirm, Toast…
  * Dépendances : strings.js, format.js
  */
 
@@ -111,7 +109,6 @@ const UI = (() => {
       if (resolve) resolve(value);
     }
     const items = (texts, cls) => (texts && texts.length > 0 ? h('ul', { class: cls }, texts.map((text) => h('li', { text }))) : null);
-    // { title, text?, lines?, warnings?, errors?, hint?, cancel, ok } ; sans `ok` : un seul bouton
     function ask({ title, text, lines, warnings, errors, hint, cancel, ok }) {
       if (resolver) settle(false);
       lastFocus = document.activeElement;
@@ -188,7 +185,7 @@ const UI = (() => {
       current.more.hidden = true;
       const result = await current.opts.load(query, current.page);
       if (state !== current || seq !== current.seq) return;
-      if (!result || result.error) { current.status.textContent = errorText(result && result.error); return; }
+      if (!result || result.error) { current.status.textContent = errorText(result && result.error, result && result.text); return; }
       if (reset && current.opts.none && query === '') current.list.append(option({ value: '', label: current.opts.none }));
       for (const item of Format.list(result.items)) if (item && typeof item.value === 'string') current.list.append(option(item));
       const empty = current.list.childElementCount === 0;

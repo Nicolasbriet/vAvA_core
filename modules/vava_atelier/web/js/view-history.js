@@ -1,8 +1,6 @@
 'use strict';
 /*
- * vava_atelier/web/js/view-history.js
- * Rôle : historique d'une fiche (versions figées, les plus récentes d'abord, « Plus anciennes ») dans le cadre de la
- *        fiche (page ou volet) ; « Voir » ouvre une version en lecture, « Revenir à cette version » la rétablit.
+ * vava_atelier/web/js/view-history.js — historique d'une fiche : versions, « Voir », « Revenir à cette version »
  * Dépendances : strings.js, format.js, lifecycle.js, components.js
  */
 
@@ -41,8 +39,8 @@ const HistoryView = (() => {
         if (lines.childElementCount === 0) lines.append(h('p', { class: 'hp empty', text: H.none }));
         older.hidden = data.more !== true;
       },
-      setError(code) {
-        lines.replaceChildren(h('p', { class: 'hp empty err', text: errorText(code) }));
+      setError(code, text) {
+        lines.replaceChildren(h('p', { class: 'hp empty err', text: errorText(code, text) }));
         older.hidden = true;
       },
       setLoading(on) { older.disabled = on; },

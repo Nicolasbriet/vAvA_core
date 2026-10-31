@@ -1,7 +1,6 @@
 'use strict';
 /*
- * vava_atelier/web/js/view-journal.js
- * Rôle : journal entier : filtre par atelier, lignes par 25, curseur `next`.
+ * vava_atelier/web/js/view-journal.js — journal entier : filtre par atelier, lignes par 25
  * Dépendances : strings.js, format.js, components.js
  */
 
@@ -47,8 +46,8 @@ const JournalView = (() => {
         if (lines.childElementCount === 0) lines.append(h('p', { class: 'hp empty', text: STRINGS.journal.none }));
         older.hidden = data.more !== true;
       },
-      setError(code) {
-        lines.replaceChildren(h('p', { class: 'hp empty err', text: errorText(code) }));
+      setError(code, text) {
+        lines.replaceChildren(h('p', { class: 'hp empty err', text: errorText(code, text) }));
         older.hidden = true;
       },
       setLoading(on) { older.disabled = on; },

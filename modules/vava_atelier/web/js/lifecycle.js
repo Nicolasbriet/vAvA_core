@@ -1,8 +1,6 @@
 'use strict';
 /*
- * vava_atelier/web/js/lifecycle.js
- * Rôle : fonctions pures du cycle d'une fiche (aucun DOM) : pied par état, lecture seule, boîtes de confirmation,
- *        lignes d'historique, suite d'un changement venu d'ailleurs.
+ * vava_atelier/web/js/lifecycle.js — fonctions pures du cycle d'une fiche : pied, lecture seule, boîtes, historique
  * Dépendances : strings.js, format.js
  */
 
@@ -41,13 +39,6 @@ const Lifecycle = (() => {
     const holder = data && data.holder;
     if (holder && typeof holder === 'object' && holder.mine !== true) return true;
     return yes(data && data.removal) || Boolean(data && data.state && data.state.tone === 'removal');
-  }
-
-  function stateLine(data) {
-    const line = str(data && data.state && data.state.line);
-    if (line) return line;
-    const holder = data && data.holder;
-    return holder && typeof holder === 'object' && holder.mine !== true && str(holder.label) ? T.states.holder(holder.label, str(holder.at)) : '';
   }
 
   const ofNoun = (kind) => {
@@ -109,5 +100,5 @@ const Lifecycle = (() => {
     return dirty ? 'notice' : 'reload';
   }
 
-  return { newFooter, foot, label, readOnly, stateLine, ofNoun, theNoun, feminine, errorLines, confirmOf, confirmRetire, confirmTake, history, changed };
+  return { newFooter, foot, label, readOnly, ofNoun, theNoun, feminine, errorLines, confirmOf, confirmRetire, confirmTake, history, changed };
 })();

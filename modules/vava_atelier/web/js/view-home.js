@@ -1,7 +1,6 @@
 'use strict';
 /*
- * vava_atelier/web/js/view-home.js
- * Rôle : accueil (maquette Main) ; recherche dès 2 lettres : cartes filtrées sur place, puis RPC search après 400 ms.
+ * vava_atelier/web/js/view-home.js — accueil (maquette Main) ; recherche : cartes filtrées, puis RPC search après 400 ms
  * Dépendances : strings.js, format.js, components.js
  */
 
@@ -107,7 +106,7 @@ const HomeView = (() => {
       showHits([], 'pending');
       pending = actions.search(text).then((result) => {
         if (mine !== seq) return;
-        if (!result.ok) showHits([], errorText(result.error));
+        if (!result.ok) showHits([], errorText(result.error, result.text));
         else showHits(Format.list(result.data.hits).filter((hit) => hit && typeof hit.editor === 'string'), '');
       });
       return pending;

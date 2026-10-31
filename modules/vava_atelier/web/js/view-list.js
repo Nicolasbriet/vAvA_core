@@ -1,8 +1,6 @@
 'use strict';
 /*
- * vava_atelier/web/js/view-list.js
- * Rôle : liste d'un atelier : onglets par genre, filtre (300 ms), lignes et leur état, création, pages de 50 ;
- *        même écran pour « Retirés du royaume » (`model.removed` : ni onglets, ni filtre, ni création).
+ * vava_atelier/web/js/view-list.js — liste d'un atelier (onglets, filtre, état des lignes, pages) ; aussi les fiches retirées
  * Dépendances : strings.js, format.js, components.js
  */
 
@@ -78,8 +76,8 @@ const ListView = (() => {
         h('button', { type: 'button', class: 'link', text: STRINGS.list.next, disabled: page >= pages, onclick: () => actions.page(page + 1) }));
     }
 
-    function setError(code) {
-      rows.replaceChildren(h('p', { class: 'hp empty err', text: errorText(code) }));
+    function setError(code, text) {
+      rows.replaceChildren(h('p', { class: 'hp empty err', text: errorText(code, text) }));
     }
 
     return { el, setData, setError, focus: () => (removed ? el.querySelector('.round') : filter).focus() };

@@ -1,8 +1,6 @@
 'use strict';
 /*
- * vava_atelier/web/js/view-entry.js
- * Rôle : fiche d'une entrée, en « page » (cadre centré) ou en « volet » (448 px) : étiquette d'état, ligne du tenant,
- *        lecture seule, pied rendu d'après le serveur (commandes, liens, phrase), avis d'un changement venu d'ailleurs.
+ * vava_atelier/web/js/view-entry.js — fiche en « page » ou en « volet » : état, lecture seule, pied rendu d'après le serveur
  * Dépendances : strings.js, format.js, lifecycle.js, components.js
  */
 

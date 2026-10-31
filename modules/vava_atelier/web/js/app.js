@@ -1,9 +1,6 @@
 'use strict';
 /*
- * vava_atelier/web/js/app.js
- * Rôle : assemblage de la page : messages du Lua, écrans, contenus gardés par empreinte, Échap, confirmation de sortie ;
- *        cycle d'une fiche (enregistrer, essayer, publier, abandonner, retirer, reprendre, rétablir), historique,
- *        fiches retirées, changement venu d'ailleurs (entryChanged).
+ * vava_atelier/web/js/app.js — assemblage : messages du Lua, écrans, cycle d'une fiche, historique, sortie
  * Dépendances : strings.js, bridge.js, format.js, lifecycle.js, components.js, widgets.js, form.js, view-*.js
  */
 
@@ -58,8 +55,12 @@
     Keys.hide();
   }
 
-  function refused(code, editor) {
-    Toast.show(errorText(code), 'error');
+  const DIVERGED = new Set(['stale', 'draft_taken', 'not_holder', 'no_draft']);
+
+  function refused(result, editor, entry) {
+    const code = result.error, text = errorText(code, result.text);
+    Toast.show(text, 'error');
+    if (entry && state.entry === entry && DIVERGED.has(code)) entry.view.setNotice(text, () => reloadEntry(entry));
     if (code === 'unknown_editor' && editor) {
       state.descriptors.delete(editor);
       if (state.screen !== 'home') goHome(true);
@@ -122,7 +123,7 @@
       if (attempt > 0) Bridge.post('stale');
       const result = await Bridge.post('editor', { editor });
       if (!result.ok && result.error === 'stale' && attempt === 0) continue;
-      if (!result.ok) return { error: result.error };
+      if (!result.ok) return result;
       const descriptor = takeDescriptor(editor, result.data);
       if (descriptor) return { descriptor };
     }
@@ -134,12 +135,12 @@
     let descriptor = state.editor === editor ? state.descriptor : null;
     if (!descriptor) {
       const got = await descriptorOf(editor);
-      if (got.error) { refused(got.error, editor); return false; }
+      if (got.error) { refused(got, editor); return false; }
       descriptor = got.descriptor;
     }
     const kinds = list(descriptor.kinds).filter((k) => k && typeof k.id === 'string');
     const kind = kindId ? kinds.find((k) => k.id === kindId) : kinds[0];
-    if (!kind) { refused('unknown_kind'); return false; }
+    if (!kind) { refused({ error: 'unknown_kind' }); return false; }
     if (state.editor !== editor || !state.kind || state.kind.id !== kind.id) state.list = { query: '', page: 1, seq: state.list.seq + 1 };
     Object.assign(state, { editor, descriptor, kind });
     return true;
@@ -166,13 +167,21 @@
     loadList();
   }
 
+  /** Une page d'une liste : seule la dernière demande de `holder` compte, et seulement si `view` est à l'écran. */
+  async function fetchPage(holder, name, args, view, done) {
+    const seq = holder.seq = (holder.seq || 0) + 1;
+    if (view.setLoading) view.setLoading(true);
+    const result = await Bridge.post(name, args);
+    if (seq !== holder.seq || state.view !== view) return null;
+    if (view.setLoading) view.setLoading(false);
+    if (result.ok) done(result.data); else view.setError(result.error, result.text);
+    return result;
+  }
+
   async function loadList() {
-    const seq = ++state.list.seq, view = state.view, editor = state.editor;
-    const result = await Bridge.post('list', { editor, kind: state.kind.id, page: state.list.page, query: state.list.query });
-    if (seq !== state.list.seq || state.view !== view) return;
-    if (result.ok) { view.setData(result.data); return; }
-    view.setError(result.error);
-    if (result.error === 'unknown_editor') refused(result.error, editor);
+    const view = state.view, editor = state.editor;
+    const result = await fetchPage(state.list, 'list', { editor, kind: state.kind.id, page: state.list.page, query: state.list.query }, view, (data) => view.setData(data));
+    if (result && result.error === 'unknown_editor') refused(result, editor);
   }
 
   // Retirés du royaume
@@ -188,11 +197,9 @@
     loadRemoved(1);
   }
 
-  async function loadRemoved(page) {
-    const removed = state.removed, seq = ++removed.seq;
-    const result = await Bridge.post('removed', { editor: state.editor, kind: state.kind.id, page });
-    if (state.removed !== removed || seq !== removed.seq) return;
-    if (result.ok) removed.view.setData(result.data); else removed.view.setError(result.error);
+  function loadRemoved(page) {
+    const { view } = state.removed;
+    fetchPage(state.removed, 'removed', { editor: state.editor, kind: state.kind.id, page }, view, (data) => view.setData(data));
   }
 
   // Fiche
@@ -204,7 +211,7 @@
 
   async function lookup(field, query, page) {
     const result = await Bridge.post('options', { editor: state.editor, kind: state.kind.id, field: field.id, query: Format.query(query), page: page || 1 });
-    if (!result.ok) return { error: result.error };
+    if (!result.ok) return result;
     const items = list(result.data.items).filter((i) => i && typeof i.value === 'string').map(cleanItem);
     for (const item of items) state.labels.set(labelKey(field, item.value), item);
     return { items, more: result.data.more === true };
@@ -248,7 +255,7 @@
     });
     const layout = layoutOf(kind);
     entry.view = EntryView.render({
-      descriptor: state.descriptor, kind, layout, title, state: tag, line: data ? Lifecycle.stateLine(data) : '', stale: entry.stale,
+      descriptor: state.descriptor, kind, layout, title, state: tag, line: str(data && data.state && data.state.line), stale: entry.stale,
       form: entry.form, compare, footer, readOnly: Lifecycle.readOnly(data, mode === 'version'), backLabel: mode === 'version' ? STRINGS.history.title : '',
     }, { back, run });
     entry.snapshot = entry.form.snapshot();
@@ -263,7 +270,7 @@
     let data = null;
     if (id) {
       const result = await Bridge.post('read', { editor, kind: kind.id, id });
-      if (!result.ok) { refused(result.error, editor); return false; }
+      if (!result.ok) { refused(result, editor); return false; }
       data = result.data;
     }
     showEntry(editor, kind, id || '', data, 'entry');
@@ -276,25 +283,12 @@
     return done;
   }
 
-  /** Vrai si l'on peut quitter : rien de changé depuis l'ouverture (vérifiée ou non), ou « Quitter ». */
   async function leave(entry) {
     if (!entry || entry.mode !== 'entry' || !dirty(entry)) return true;
     return Confirm.ask(STRINGS.confirmLeave);
   }
 
   const keys = (entry) => ({ editor: entry.editor, kind: entry.kind.id, id: entry.id });
-  const DIVERGED = new Set(['stale', 'draft_taken', 'not_holder', 'no_draft']);
-
-  function refusedAt(code, editor) {
-    if (code === 'stale') Toast.show(STRINGS.entryStale, 'error'); else refused(code, editor);
-  }
-
-  function entryRefused(entry, code) {
-    if (!DIVERGED.has(code)) { refused(code, entry.editor); return; }
-    const text = code === 'stale' ? STRINGS.entryStale : errorText(code);
-    Toast.show(text, 'error');
-    if (state.entry === entry) entry.view.setNotice(text, () => reloadEntry(entry));
-  }
 
   function absorb(entry, data) {
     if (Number.isInteger(data.rev)) entry.rev = data.rev;
@@ -316,7 +310,7 @@
 
   function written(entry, result, lead) {
     if (state.entry !== entry) return false;
-    if (!result.ok) { entryRefused(entry, result.error); return false; }
+    if (!result.ok) { refused(result, entry.editor, entry); return false; }
     if (result.data.done === true || (result.data.done === undefined && result.data.errors === undefined)) return true;
     showErrors(entry, result.data.errors, lead);
     return false;
@@ -338,7 +332,7 @@
     if (!entry.form.validate()) { entry.form.focusFirstError(); return; }
     const result = await Bridge.post('check', { ...keys(entry), values: entry.form.packet() });
     if (state.entry !== entry) return;
-    if (!result.ok) { refused(result.error, entry.editor); return; }
+    if (!result.ok) { refused(result, entry.editor); return; }
     if (result.data.valid === true) {
       entry.form.clear();
       entry.view.flashOk();
@@ -377,20 +371,25 @@
     if (written(entry, result)) absorb(entry, result.data);
   }
 
+  /** Résumé, boîte, puis envoi avec le jeton lu ; null si « Rester ». Résumé à corriger : réponse `done = false`. */
+  async function confirmed(at, what, ref, box, alive) {
+    const preview = await Bridge.post('preview', { ...at, what, ref });
+    if (!alive()) return null;
+    if (!preview.ok) return preview;
+    const p = preview.data;
+    const go = await Confirm.ask(Lifecycle.confirmOf(what, p, box));
+    if (p.valid !== true) return { ok: true, data: { done: false, errors: p.errors, shown: true } };
+    if (!go || !alive()) return null;
+    return Bridge.post(what, { ...at, [what === 'publish' ? 'rev' : 'version']: ref, token: str(p.token) });
+  }
+
   async function publish(entry) {
     if (!(await saved(entry))) return;
     const removal = entry.tone === 'removal', texts = state.descriptor.texts || {};
-    const preview = await Bridge.post('preview', { ...keys(entry), what: 'publish', ref: entry.rev });
-    if (state.entry !== entry) return;
-    if (!preview.ok) { entryRefused(entry, preview.error); return; }
-    const p = preview.data;
-    const go = await Confirm.ask(Lifecycle.confirmOf('publish', p, {
+    const result = await confirmed(keys(entry), 'publish', entry.rev, {
       label: Lifecycle.label(entry.footer, 'publish', str(texts.publish)), removal, publishHint: str(texts.publishHint), fields: (entry.kind.form || {}).fields,
-    }));
-    if (p.valid !== true) { if (state.entry === entry) showErrors(entry, p.errors); return; }
-    if (!go || state.entry !== entry) return;
-    const result = await Bridge.post('publish', { ...keys(entry), rev: entry.rev, token: str(p.token) });
-    if (!written(entry, result)) return;
+    }, () => state.entry === entry);
+    if (!result || !written(entry, result)) return;
     if (removal) { Toast.show(STRINGS.removalDone, 'success'); showList(); return; }
     Object.assign(entry, { rev: 0, stale: false });
     entry.form.clear();
@@ -448,20 +447,16 @@
     loadHistory(true);
   }
 
-  async function loadHistory(reset) {
-    const history = state.history, seq = ++history.seq;
-    history.view.setLoading(true);
-    const result = await Bridge.post('history', { editor: history.editor, kind: history.kind.id, id: history.id, before: reset ? 0 : history.view.oldest() });
-    if (state.history !== history || seq !== history.seq) return;
-    history.view.setLoading(false);
-    if (result.ok) history.view.add(result.data, reset); else history.view.setError(result.error);
+  function loadHistory(reset) {
+    const { view } = state.history, h = state.history;
+    fetchPage(h, 'history', { editor: h.editor, kind: h.kind.id, id: h.id, before: reset ? 0 : view.oldest() }, view, (data) => view.add(data, reset));
   }
 
   async function openVersion(version) {
     const history = state.history;
     const result = await Bridge.post('version', { editor: history.editor, kind: history.kind.id, id: history.id, version });
     if (state.history !== history || state.screen !== 'history') return;
-    if (!result.ok) { refused(result.error, history.editor); return; }
+    if (!result.ok) { refused(result, history.editor); return; }
     showEntry(history.editor, history.kind, history.id, result.data, 'version');
     state.entry.version = int(result.data.version) || version;
   }
@@ -470,15 +465,9 @@
     const history = state.history;
     if (!history || !version) return;
     const at = { editor: history.editor, kind: history.kind.id, id: history.id };
-    const preview = await Bridge.post('preview', { ...at, what: 'restore', ref: version });
-    if (state.history !== history) return;
-    if (!preview.ok) { refusedAt(preview.error, at.editor); return; }
-    const p = preview.data;
-    const go = await Confirm.ask(Lifecycle.confirmOf('restore', p, { version, fields: (history.kind.form || {}).fields }));
-    if (!go || p.valid !== true || state.history !== history) return;
-    const result = await Bridge.post('restore', { ...at, version, token: str(p.token) });
-    if (state.history !== history) return;
-    if (!result.ok) { refusedAt(result.error, at.editor); return; }
+    const result = await confirmed(at, 'restore', version, { version, fields: (history.kind.form || {}).fields }, () => state.history === history);
+    if (!result || state.history !== history || result.data && result.data.shown) return;
+    if (!result.ok) { refused(result, at.editor); return; }
     if (result.data.done !== true) { Toast.show(Lifecycle.errorLines(result.data.errors, [])[0] || errorText('default'), 'error'); return; }
     history.parked = null;
     await openEntry(at.editor, at.kind, at.id);
@@ -509,15 +498,12 @@
     loadJournal(true);
   }
 
-  async function loadJournal(reset) {
-    const journal = state.journal, view = state.view, seq = ++journal.seq;
-    view.setLoading(true);
-    const result = await Bridge.post('journal', { before: reset ? 0 : journal.next, editor: journal.filter });
-    if (seq !== journal.seq || state.view !== view) return;
-    view.setLoading(false);
-    if (!result.ok) { view.setError(result.error); return; }
-    journal.next = Number.isInteger(result.data.next) ? result.data.next : 0;
-    view.add(result.data, reset);
+  function loadJournal(reset) {
+    const journal = state.journal, view = state.view;
+    fetchPage(journal, 'journal', { before: reset ? 0 : journal.next, editor: journal.filter }, view, (data) => {
+      journal.next = Number.isInteger(data.next) ? data.next : 0;
+      view.add(data, reset);
+    });
   }
 
   // Navigation et fermeture
@@ -608,6 +594,5 @@
     }
   });
 
-  // hors jeu seulement : web/dev/devmock.js pilote les écrans d'ici
   if (!Bridge.inGame) window.Atelier = { state, openEditor, openEntry, openJournal, openRemoved, openHistory, run, back, check: () => run('check') };
 })();

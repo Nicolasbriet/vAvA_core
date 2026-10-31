@@ -1,7 +1,6 @@
 'use strict';
 /*
- * vava_atelier/web/js/format.js
- * Rôle : fonctions pures (aucun DOM) : nombres et durées à la française, listes du Lua, textes, étiquettes, libellés.
+ * vava_atelier/web/js/format.js — fonctions pures : nombres et durées à la française, listes du Lua, textes, libellés
  * Dépendances : strings.js
  */
 
