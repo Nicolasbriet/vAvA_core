@@ -1051,7 +1051,7 @@ faire tout le système de combat ») : la porte T-119 reste à passer en jeu.
   aujourd'hui par `damage` sans `source` et contournent donc `chain.pvp` : leur donner leur `source` (spec T-110 § 12.2).
 
 ### T-138 — Invulnérabilité du Registre tenue par le serveur
-- Agent : vava-dev-lua (cette tâche autorise à toucher `vava_admin`) · Dépend de : T-110 · Statut : à faire
+- Agent : vava-dev-lua (cette tâche autorise à toucher `vava_admin`) · Dépend de : T-110 · Statut : en cours
 - Spec T-110 § 13 : l'invulnérabilité du Registre n'est que locale (`SetEntityInvincible`) ; les sorts la traversent
   déjà, les coups de la chaîne aussi. `vava_admin` garde l'état côté serveur et déclare un modificateur d'annulation
   `vava_admin:invulnerabilite` au registre `vava_health:modifiers`.
