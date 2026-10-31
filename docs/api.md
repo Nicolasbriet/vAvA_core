@@ -1373,6 +1373,23 @@ voulu (l'écran des joueurs non plus, voir plus bas).
 | `ban(compte, heures, motif)` | `true, n° du ban` ou `false, code` — au journal sous le nom du module appelant |
 | `kick(source, motif)` | `true` ou `false, code` |
 | `log(source, libellé, détails?)` | `true` ou `false, code` — inscrit au journal une action d'un membre du Conseil faite dans un module (libellé lu tel quel, 32 caractères ; détails `{ clé = texte ou nombre }`, 8 au plus) ; depuis 1.1.0 |
+| `submitRequest(source, nature, texte, position)` | `true, { id, kind, state = 'sent', age = 0 }` ou `false, code[, secondes]` — demande au Conseil au nom d'un joueur (1.9.0, bannière de `vava_pause`) ; réservé aux ressources de `requests.callers` (`not_allowed`, une ligne de console par minute et par ressource) ; `nature` dans `requests.kinds` (`invalid_kind`) ; texte de 1 à 500 octets, `position` booléen (`invalid_args`) ; `no_session`, `too_soon` (+ secondes restantes, `reportCooldownMs`), `too_many` (`requests.maxOpenPerAccount` demandes ouvertes du compte), `full` ; aucune notification au joueur |
+| `requestOf(source)` | `{ id, kind, state, age }` ou `nil` — demande du compte du joueur (1.9.0) : la plus récente ouverte (`sent`, ou `claimed` si un membre l'a prise), sinon la dernière close depuis moins de `requests.closedMemoryMs` (15 min, `closed`) ; `age` en secondes ; réservé aux ressources de `requests.callers` |
+
+**Demandes au Conseil** (1.9.0, T-145) : `/signaler` et la bannière passent par le même chemin. Chaque demande a une
+nature (`question`, `player` — signalement d'un joueur —, `bug`, `other` ; `/signaler` crée une demande `other`), et le
+cas échéant la position de son auteur, **lue par le serveur** et arrondie au mètre (jamais une valeur du client ;
+toujours jointe pour `player`). Pour `player`, les témoins : joueurs à `requests.witnessRadius` (30 m) de l'auteur, même
+instance, auteur exclu (`core.net.playersNear` ; sans `core.net`, aucun), `maxWitnesses` (8) au plus, gardés par numéro
+de compte et nom de personnage. Une demande de plus que `requests.maxOpenPerAccount` (2) ouvertes par compte est refusée
+(`too_many`, `/signaler` compris). Le Conseil voit l'auteur, la nature, la position et les témoins au Registre ; le
+journal de prise en charge et de clôture nomme l'auteur (décision du porteur du projet, 31 octobre 2026). Rien n'est
+jamais envoyé aux témoins ni à aucun joueur hors du Conseil, hormis l'auteur (prise en charge, clôture, sans nom du
+membre). L'alerte part à tous les membres en ligne qui ont le droit `reports` (`messages.requestNew` : « Question n° 12
+de … »). Mémoire seulement, rien de plus en base ; la création est une ligne de console `info` (n°, nature, compte).
+Pure et testée : `shared/requests.lua` (servi au seul serveur ; `tests/spec/admin_requests_spec.lua`). Un `config.lua`
+d'avant 1.9.0 (sans `requests`) : `/signaler` marche comme avant, la bannière reçoit `not_allowed`, une ligne `warn` au
+démarrage.
 
 **Outils des modules** (depuis 1.1.0) : un module ajoute un bouton à la page Outils du Registre par le registre du core
 `vava_admin:tools` — clé `<ressource>:<nom>`, `{ label, hint?, permission }` (un droit des rangs). Le bouton n'apparaît
@@ -1408,8 +1425,8 @@ rang (droit `watch`, tout le Conseil) : chacun le regarde chez tout le monde, me
 | `webRanks()` | liste `{ name, label, level }` |
 | `webLog({ label, rank }, libellé, détails?)` | `true` ou `false, code` — action d'un compte du panneau faite dans un autre module |
 
-Hook `vava_admin:report` (serveur, `after` : `{ action = created|claimed|closed, id, author }`) : tient le panneau
-web à jour.
+Hook `vava_admin:report` (serveur, `after` : `{ action = created|claimed|closed, id, author, kind }` — `kind` depuis
+1.9.0) : tient le panneau web à jour.
 
 Pour travailler le rendu sans le jeu : `web/index.html?tab=players` (ou `reports`, `bans`, `logs`, `staff`, `tools`,
 `announce`), avec `&dialog=ban`, `&proclaim=1`, `&watch=1` ou `&rank=gardien` (données simulées de

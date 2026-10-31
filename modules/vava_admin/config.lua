@@ -53,6 +53,19 @@ VavaAdmin.config = {
     reportCooldownMs = 60000,
     maxOpenReports = 100,
 
+    -- Demandes au Conseil (1.9.0) : la bannière du royaume (vava_pause) en crée par l'export submitRequest, réservé aux
+    -- ressources de `callers` ; natures acceptées (`kinds`) ; demandes ouvertes par compte au plus (aussi pour
+    -- /signaler) ; témoins d'un signalement de joueur : joueurs à `witnessRadius` mètres de l'auteur, même instance,
+    -- `maxWitnesses` au plus ; dernière demande close d'un compte gardée `closedMemoryMs` pour son suivi.
+    requests = {
+        callers = { 'vava_pause' },
+        maxOpenPerAccount = 2,
+        witnessRadius = 30.0,
+        maxWitnesses = 8,
+        closedMemoryMs = 900000,
+        kinds = { 'question', 'player', 'bug', 'other' },
+    },
+
     -- Déplacements : écart à l'arrivée (m) pour ne pas apparaître dans la personne.
     teleportOffset = 1.2,
 
@@ -96,6 +109,10 @@ VavaAdmin.config = {
         reportClaimed = 'Un membre du Conseil prend en charge votre signalement.',
         reportClosed = 'Votre signalement a été clos.',
         reportNew = 'Signalement n° %d de %s.',
+        -- 1.9.0 : alerte au Conseil (nature, numéro, auteur), nature de chaque demande, refus d'une demande de trop
+        requestNew = '%s n° %d de %s.',
+        requestKinds = { question = 'Question', player = 'Signalement', bug = 'Bug', other = 'Autre' },
+        reportTooMany = 'Vos demandes attendent déjà le Conseil : patientez qu\'il y réponde.',
         reportUsage = 'usage : /%s <message>',
         notStaff = 'Vous ne siégez pas au Conseil.',
         noclipOn = 'Vol libre : vous êtes invisible.',
