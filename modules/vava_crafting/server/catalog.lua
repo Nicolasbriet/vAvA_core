@@ -6,11 +6,12 @@
            l'inventaire (rappelé quand l'inventaire redémarre). Vérifie la cohérence au démarrage : une erreur de
            donnée refuse le module. Recettes absentes de `vava_skills:recipes` (T-147) : auteur de chaque recette
            suivi, cache des recettes des compétences, une ligne en console par recette absente (après le démarrage,
-           l'ajout d'une recette par un autre module, le retour de vava_skills), lu par le menu pour la verrouiller.
+           l'ajout d'une recette par un autre module, le retour de vava_skills ; délai borné et plafonné ; une ligne
+           d'information quand une recette signalée arrive aux compétences), lu par le menu pour la verrouiller.
     Dépendances : shared/constants.lua, config.lua, shared/stationzone.lua (bornes), server/core.lua, bridge/server.lua
 ]]
 
-local type, pairs, ipairs, tostring = type, pairs, ipairs, tostring
+local type, pairs, ipairs, tostring, tonumber = type, pairs, ipairs, tostring, tonumber
 local format = string.format
 local sort, remove = table.sort, table.remove
 local floor, max, min = math.floor, math.max, math.min

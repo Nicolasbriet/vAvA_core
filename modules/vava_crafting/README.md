@@ -250,13 +250,15 @@ Hook écouté : `vava_inventory:metadata` (before, garde de la signature, voir p
     toujours « combustible n / 20 ». Détail : `docs/tests/metiers.md` 5-7.
 16. **Recette inconnue des compétences** (1.8.0, T-147) : avec la ressource jetable de `docs/tests/metiers.md` § 4.2,
     une recette déclarée à l'artisanat seul → une ligne `WARN` en console (nom, module), « Indisponible » et bouton
-    grisé à l'établi ; déclarée ensuite aux compétences → déverrouillée, elle se façonne.
+    grisé à l'établi ; déclarée ensuite aux compétences → environ 5 s après, une ligne d'information « … désormais
+    déclarée à vava_skills:recipes : déverrouillée », et elle se façonne.
 
 ## À vérifier en jeu (1.8.0)
 
 - Démarrage : aucune ligne « … absente de vava_skills:recipes » avec les modules livrés (artisanat, agriculture,
   provisions, combat) ; la ressource jetable du § 4.2 de `docs/tests/metiers.md` en fait apparaître une, une seule.
 - Menu : la recette verrouillée se lit (« Indisponible », raison sous le bouton) ; les autres recettes inchangées.
+- Recette signalée puis déclarée aux compétences : une ligne d'information environ 5 s après, aucun `WARN` de plus.
 
 ## À vérifier en jeu (1.7.0)
 

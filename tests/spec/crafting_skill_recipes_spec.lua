@@ -4,7 +4,9 @@ local helper = require('tests.helper')
 -- sans la déclarer à `vava_skills:recipes` la voyait montrée au menu puis refusée au clic (`not_known`), sans rien en
 -- console. Désormais : une ligne en console par recette absente (nom et module), après le démarrage, l'ajout d'une
 -- recette par un autre module ou le retour de vava_skills (délai `skillsCheck.delayMs`), et la recette verrouillée au
--- menu (`unregistered`, `known = false`) ; le serveur la refuse toujours au début (`not_known`).
+-- menu (`unregistered`) ; le serveur la refuse toujours au début (`not_known`). Suites des relectures : relance quand une
+-- recette signalée arrive aux compétences (S-1, R-2), lecture du registre en échec (S-2), plafond du report (R-1),
+-- délai borné (R-3), `known` retiré du menu (R-4).
 -- Montage réel : registres et hooks du core (server/core/registry.lua, shared/core/hooks.lua), registres, fiches et
 -- savoirs de vava_skills (registries.lua, sheets.lua, lessons.lua, export `knowsRecipe` simulé par lessons.knows),
 -- bridge, catalogue et fabrication de vava_crafting ; stations, poinçon et réparation réduits à des doublures, inventaire
@@ -358,6 +360,17 @@ describe('vava_crafting : recette inconnue des compétences', function()
         registryApi.all = realAll
         assert.is_true(VavaCrafting.catalog.declaredToSkills('lingot_fer'))
         assert.same({}, VavaCrafting.catalog.checkSkillRecipes())
+        assert.equal(1, #skillWarnings())
+        -- un nouvel échec après une lecture réussie : de nouveau une ligne, une seule
+        registryApi.all = function(name)
+            if name == SKILL_RECIPES then return 'pas une table' end
+            return realAll(name)
+        end
+        assert.is_true(registry.remove(FORGERONS, SKILL_RECIPES, 'autre_recette'))
+        assert.same({}, VavaCrafting.catalog.checkSkillRecipes())
+        assert.same({}, VavaCrafting.catalog.checkSkillRecipes())
+        assert.equal(2, #skillWarnings())
+        registryApi.all = realAll
     end)
 
     it('R-1 : des ajouts rapprochés ne repoussent pas le contrôle au-delà de 4 × le délai', function()
