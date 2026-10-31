@@ -725,8 +725,9 @@ versé à T-014 ; les autres points déjà couverts sont précisés dans T-012 �
   redéclarer au retour de `vava_skills`, comme `vava_provisions` le fait pour l'outre.
 
 ### T-145 — Menu pause `vava_pause` (la bannière)
-- Agents : vava-architecte → vava-dev-lua + vava-dev-nui · Dépend de : T-012 (cette tâche autorise à toucher `vava_codex`, `vava_admin`, `vava_hud`, `vava_voice` et
-  `chancellerie/lib/resources.js`, dans les limites de la spec) · Statut : en cours
+- Agents : vava-architecte → vava-dev-lua + vava-dev-nui (cette tâche autorise à toucher `vava_codex`, `vava_admin`,
+  `vava_hud`, `vava_voice` et `chancellerie/lib/resources.js`, dans les limites de la spec) · Dépend de : T-012 ·
+  Statut : en cours
 - Spec : `docs/plan/specs/T-145.md`, avec les décisions du porteur du projet du 31 octobre 2026 (bannière réduite à
   terre : Paramètres du jeu et Quitter ; auteur d'un signalement visible du Conseil, jamais du joueur signalé ;
   fenêtre de combat de 10 s).
