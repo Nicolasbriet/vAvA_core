@@ -227,7 +227,7 @@ Console F8 ouverte chez B (`set vava_log_level debug` côté client pour voir un
 | 4 | Seau en main vide → Arroser. | « remplissez-le à un puits ». Au puits, `E` → 5 charges ; Arroser → humidité 100, charge − 1. |
 | 5 | Laisser une plante sans eau (réglages du § 0.7). | Flétrie (prop), arroser la fait repartir ; plus longtemps → morte : seul Arracher reste, qui rend des déchets végétaux ; ses heures sèches (menu) ne montent plus après la mort. |
 | 6 | Récolter à la main, puis une autre à la faucille. | Plus rapide à la faucille ; produit au palier avec « Champ communal » ; parfois des graines du même palier ; fertilité en baisse ; replanter la même famille coûte 10 de plus, une autre rend 10. |
-| 7 | 3 déchets au composteur du champ (station de l'artisanat), puis Fertiliser. | Compost produit ; fertilité + 25. |
+| 7 | 3 déchets au composteur du champ (station de l'artisanat), puis Fertiliser. | Compost produit, même sans aucune pratique d'Agriculture (§ 5.3) ; fertilité + 25. |
 | 8 | `E` près du grenier. | L'inventaire s'ouvre sur « Grenier commun » ; déposer, s'éloigner de 4 m → il se ferme ; `vava_farming_granary_log` : dépôt / retrait. |
 | 9 | Jardin privé (propriétaire n° 1 dans la config). | Un autre personnage lit « ne vous appartient pas ». |
 | 10 | `/agriculture parcelle champ_communal`, `/agriculture arroser champ_communal`. | État des emplacements ; tout arrosé. |
@@ -293,6 +293,23 @@ communal, **B** à plus de 500 m de tous les lieux du § 0.6. Lecture du réseau
 | 8 | B au champ ; retour à la sélection du personnage, puis reprendre le personnage. | À la sélection, plus aucun prop ; en jeu, les plantes reviennent au bon stade. |
 | 9 | Client modifié ou téléportation : un joueur reçoit l'état d'une parcelle et tente `E` sur un emplacement à plus de 3,5 m (si possible : appeler `vava_farming:begin` sans s'approcher). | Refus `too_far` : l'état reçu ne donne aucun droit ; chaque geste revérifie la distance côté serveur. |
 | 10 | Console du serveur, 32 joueurs ou plus si possible, dont certains en mouvement autour du champ : `profiler record 300`, puis `profiler view`. | Chercher `vAvA_core` (fonctions `runPass` / `pass` de `zones.lua`) et `vava_farming` (`publish`, `tick`) : le passage des zones ne doit pas bouger avec les deux parcelles (hors jeu : 0,03 ms à 64 joueurs immobiles, 0,2 ms en mouvement sur des zones éparses) ; la boucle de 10 s de l'agriculture ne compare plus que des signatures d'emplacements. Noter les valeurs avec le nombre de joueurs et de zones. |
+
+### 5.3 Recette du compost aux compétences (`vava_farming` 1.9.0, T-136)
+
+Jusqu'à 1.8.0, `vava_farming` déclarait la recette `compost` à l'artisanat seulement : `vava_skills` ne la connaissait
+pas, et le composteur la montrait au menu mais refusait de la faire (« Vous ne connaissez pas cette recette. »,
+constaté hors jeu par `tests/spec/farming_compost_recipe_spec.lua`). Depuis 1.9.0, elle est aussi déclarée à
+`vava_skills:recipes` : libre, Agriculture, niveau 0, connue de tous. Il faut 3 déchets végétaux (arracher une plante
+flétrie ou morte, ou le catalogue de développement).
+
+| # | Faire | Attendu |
+|---|---|---|
+| 1 | Démarrer le serveur ; lire la console. | `module 'vava_farming' v1.9.0 prêt` ; ni « composteur non déclaré à l'artisanat », ni « recette du compost non déclarée aux compétences ». |
+| 2 | Un personnage neuf, sans aucune pratique (Agriculture 0 dans le livre), 3 déchets végétaux : `E` au composteur du champ. | Menu : « Compost », Agriculture niveau 0, non verrouillée. |
+| 3 | Façonner le compost. | Geste de 6 s ; 3 déchets consommés, 1 compost dans la besace ; un peu d'XP en Agriculture (livre des compétences) ; aucun « Vous ne connaissez pas cette recette. ». |
+| 4 | Console : `restart vava_skills`, puis de nouveau 3 déchets au composteur et Façonner. | Le compost se fait toujours ; la console n'écrit pas « recette du compost non déclarée aux compétences » (la recette est redéclarée au retour de `vava_skills`). |
+| 5 | Console : `restart vava_crafting`, puis de nouveau le composteur. | La station revient, le compost se fait toujours. |
+| 6 | `/metiers voir <joueur>` (droit `metiers`). | Le compost n'est pas parmi les « Savoirs transmis » : c'est une recette libre, connue par le niveau, rien n'est écrit en base. |
 
 ## 6. Props à distance et resmon (récolte 1.4.1, artisanat 1.3.2, agriculture 1.5.2)
 
