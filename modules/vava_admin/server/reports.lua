@@ -108,8 +108,9 @@ end
 --- Nouvelle demande d'un joueur : RPC /signaler (ouvert à tous, débit limité, nature `other`) ou export submitRequest
 --- (bannière, 1.10.0). `options.kind` (défaut `other`), `options.position` (joindre la position lue par le serveur ;
 --- toujours jointe pour un signalement de joueur), `options.quiet` (aucune notification à l'auteur : la bannière
---- affiche elle-même la réponse). Rend `true, n°` ou `false, code[, secondes restantes]` : no_session, too_soon,
---- too_many (demandes ouvertes du compte, 1.10.0), full.
+--- affiche elle-même la réponse). Texte normalisé ici (shared/requests.lua, 1.10.0). Rend `true, n°` ou `false,
+--- code[, secondes restantes]` : no_session, invalid_text, too_short, too_soon, too_many (demandes ouvertes du compte,
+--- 1.10.0), full.
 ---@param src integer
 ---@param text string
 ---@param options? { kind?: string, position?: boolean, quiet?: boolean }
@@ -122,6 +123,17 @@ function reports.create(src, text, options)
     local kind = options.kind or DEFAULT_KIND
     local session = VavaAdmin.core.players.get(src)
     if not session or not session.accountId then return false, 'no_session' end
+    -- texte normalisé pour les deux chemins (relecture sécurité S-2 de T-145) : invisibles et sens d'écriture refusés
+    local requests = settings()
+    local clean, textErr = rules.normalize(text, {
+        minChars = requests and requests.minChars or 1, maxBytes = VavaAdmin.MAX_TEXT,
+        maxLines = requests and requests.maxLines or VavaAdmin.MAX_TEXT,
+    })
+    if not clean then
+        if not quiet then tell(src, textErr == 'too_short' and messages.reportTooShort or messages.reportInvalid, 'warning') end
+        return false, textErr
+    end
+    text = clean
     local accountId = session.accountId
     local now = GetGameTimer()
     local last = lastByAccount[accountId]
@@ -129,7 +141,6 @@ function reports.create(src, text, options)
         if not quiet then tell(src, messages.reportTooSoon, 'warning') end
         return false, 'too_soon', ceil((cfg.reportCooldownMs - (now - last)) / 1000)
     end
-    local requests = settings()
     if requests and rules.openCount(open, accountId) >= requests.maxOpenPerAccount then
         if not quiet and messages.reportTooMany then tell(src, messages.reportTooMany, 'warning') end
         return false, 'too_many'

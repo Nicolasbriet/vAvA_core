@@ -60,13 +60,16 @@ config.maxOpenReports = 100
 -- Demandes au Conseil (1.10.0) : la bannière du royaume (vava_pause) en crée par l'export submitRequest, réservé aux
 -- ressources de `callers` ; natures acceptées (`kinds`) ; demandes ouvertes par compte au plus (aussi pour
 -- /signaler) ; témoins d'un signalement de joueur : joueurs à `witnessRadius` mètres de l'auteur, même instance,
--- `maxWitnesses` au plus ; dernière demande close d'un compte gardée `closedMemoryMs` pour son suivi.
+-- `maxWitnesses` au plus ; dernière demande close d'un compte gardée `closedMemoryMs` pour son suivi ; texte d'une
+-- demande (/signaler compris) : `minChars` caractères au moins, `maxLines` lignes au plus (500 octets : MAX_TEXT).
 config.requests = {
     callers = { 'vava_pause' },
     maxOpenPerAccount = 2,
     witnessRadius = 30.0,
     maxWitnesses = 8,
     closedMemoryMs = 900000,
+    minChars = 10,
+    maxLines = 12,
     kinds = { 'question', 'player', 'bug', 'other' },
 }
 
@@ -104,7 +107,9 @@ messages.reportClaimed = 'Un membre du Conseil prend en charge votre signalement
 messages.reportClosed = 'Votre signalement a été clos.'
 messages.reportNew = 'Signalement n° %d de %s.'
 -- 1.10.0 : alerte au Conseil (nature, numéro, auteur), nature de chaque demande, refus d'une demande de trop
-messages.requestNew = '%s n° %d de %s.'
+messages.requestNew = '%s : demande n° %d de %s.'
 messages.requestKinds = { question = 'Question', player = 'Signalement', bug = 'Bug', other = 'Autre' }
+messages.reportTooShort = 'Quelques mots de plus, s\'il vous plaît.'
+messages.reportInvalid = 'Ce message contient des caractères que le Registre ne peut garder.'
 messages.reportTooMany = 'Vos demandes attendent déjà le Conseil : patientez qu\'il y réponde.'
 messages.notStaff = 'Vous ne siégez pas au Conseil.'

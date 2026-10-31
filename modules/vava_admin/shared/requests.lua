@@ -1,13 +1,15 @@
 --[[
     vava_admin/shared/requests.lua
     Rôle : logique pure des demandes au Conseil (1.10.0, T-145) : état de la demande d'un compte (la plus récente
-           ouverte, sinon la dernière close depuis peu), demandes ouvertes d'un compte, position arrondie au mètre,
-           témoins retenus. Servi au seul serveur (testé hors jeu : tests/spec/admin_requests_spec.lua).
+           ouverte, sinon la dernière close depuis peu), texte normalisé, demandes ouvertes d'un compte, position
+           arrondie au mètre, témoins retenus. Servi au seul serveur (testé hors jeu : tests/spec/admin_requests_spec.lua).
     Dépendances : shared/constants.lua
 ]]
 
 local type, pairs, ipairs = type, pairs, ipairs
 local floor, huge = math.floor, math.huge
+local find, gsub = string.find, string.gsub
+local utf8len = utf8.len
 
 local rules = {}
 VavaAdmin.requestRules = rules
@@ -16,6 +18,43 @@ VavaAdmin.requestRules = rules
 ---@return boolean
 local function finite(value)
     return type(value) == 'number' and value == value and value > -huge and value < huge
+end
+
+-- Caractères refusés dans une demande (même liste que str.hasControl du core, saut de ligne permis) : contrôles ASCII
+-- sauf le saut de ligne, contrôles C1 en UTF-8, espace sans largeur et marques de sens (U+200B à U+200F), séparateurs
+-- de ligne et de paragraphe et sens d'écriture (U+2028 à U+202E), isolats de sens (U+2066 à U+2069), marque arabe
+-- (U+061C), marque d'ordre des octets (U+FEFF). Écrits octet par octet (jamais %c : il suit la locale, T-133).
+local REFUSED = {
+    '[\0-\9\11-\31\127]',
+    '\194[\128-\159]',
+    '\226\128[\139-\143\168-\174]',
+    '\226\129[\166-\169]',
+    '\216\156',
+    '\239\187\191',
+}
+
+--- Texte d'une demande normalisé (1.10.0, relecture sécurité S-1 et S-2 de T-145), pour /signaler comme pour la
+--- bannière : UTF-8 valide, aucun caractère de REFUSED, espaces répétés, espaces de bord de ligne et bords du texte
+--- retirés, au plus deux sauts de ligne de suite et `maxLines` lignes, au moins `minChars` caractères (comptés en
+--- caractères). Rend le texte, ou nil, code : invalid_text, too_short.
+---@param text any
+---@param opts { minChars: integer, maxBytes: integer, maxLines: integer }
+---@return string|nil
+---@return string|nil code
+function rules.normalize(text, opts)
+    if type(text) ~= 'string' or #text > opts.maxBytes or not utf8len(text) then return nil, 'invalid_text' end
+    for _, pattern in ipairs(REFUSED) do
+        if find(text, pattern) then return nil, 'invalid_text' end
+    end
+    local clean = gsub(text, ' +', ' ')
+    clean = gsub(clean, ' ?\n ?', '\n')
+    clean = gsub(clean, '^[ \n]+', '')
+    clean = gsub(clean, '[ \n]+$', '')
+    clean = gsub(clean, '\n\n\n+', '\n\n')
+    local _, breaks = gsub(clean, '\n', '\n')
+    if breaks + 1 > opts.maxLines then return nil, 'invalid_text' end
+    if utf8len(clean) < opts.minChars then return nil, 'too_short' end
+    return clean
 end
 
 --- Demandes ouvertes d'un compte.
