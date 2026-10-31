@@ -29,7 +29,6 @@ VavaCombat.HOOKS = {
     SHIELD_HANG = 'vava_combat:shieldHang',  -- before (accroche seule, annulable) puis after (accroche et décrochage)
     DULLED = 'vava_combat:dulled',           -- after : une arme vient d'atteindre 0 de solidité
     USING = 'vava_combat:using',             -- before (annulable) : une technique va partir (prison, ligotage, trêve)
-    DEFENDED = 'vava_combat:defended',       -- after : un coup esquivé, paré, bloqué ou qui brise la garde
 }
 
 -- Catégories d'armes : liste fermée (docs/plan/COMBAT_V1.md § 2). Les clés de config.categories doivent être
@@ -37,12 +36,10 @@ VavaCombat.HOOKS = {
 VavaCombat.CATEGORIES = { 'une_main', 'deux_mains', 'dague', 'baton', 'bouclier' }
 VavaCombat.SHIELD_CATEGORY = 'bouclier'
 
--- Techniques (docs/plan/COMBAT_V1.md § 3) : types admis par le format, ceux qui frappent, ceux qui défendent (T-113),
--- ceux qu'on peut demander (pas `garde`, une posture : not_attack).
+-- Techniques (docs/plan/COMBAT_V1.md § 3) : types admis par le format, et ceux qui frappent (types défensifs : shared/
+-- weapons.lua, serveur seul).
 VavaCombat.TECHNIQUE_TYPES = { 'legere', 'lourde', 'parade', 'blocage', 'esquive', 'garde' }
 VavaCombat.ATTACK_TYPES = { 'legere', 'lourde' }
-VavaCombat.DEFENSE_TYPES = { 'blocage', 'parade', 'esquive' }
-VavaCombat.USABLE_TYPES = { 'legere', 'lourde', 'blocage', 'parade', 'esquive' }
 -- identifiant de technique : inclus dans REF_PATTERN (paquet de vava_health), 32 octets au plus
 VavaCombat.TECHNIQUE_PATTERN = '^[a-z0-9_]+$'
 VavaCombat.TECHNIQUE_MAX = 32

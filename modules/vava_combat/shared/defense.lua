@@ -128,14 +128,14 @@ function defense.parryWait(last, now, cfg)
     return wait > 0 and wait or nil
 end
 
---- Attente avant un autre pas de côté (départ du dernier + `dodge.cooldownMs`), ou nil.
+--- Attente avant un autre pas de côté (départ du dernier + `dodgeCooldownMs`), ou nil.
 ---@param lastStart integer|nil
 ---@param now integer
 ---@param cfg table
 ---@return integer|nil
 function defense.dodgeWait(lastStart, now, cfg)
     if not finite(lastStart) or not finite(now) then return nil end
-    local wait = lastStart + cfg.defense.dodge.cooldownMs - now
+    local wait = lastStart + cfg.defense.dodgeCooldownMs - now
     return wait > 0 and wait or nil
 end
 

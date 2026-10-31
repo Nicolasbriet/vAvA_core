@@ -351,6 +351,10 @@ function catalog.setup()
         for _, kind in ipairs(cfg.kinds) do
             if not known[kind] then VavaCombat.log.warn("type de dégâts '%s' inconnu de vava_health", kind) end
         end
+        -- types du pas de côté : un type inconnu ferait refuser le modificateur par le registre
+        for _, kind in ipairs(cfg.defense.dodge.kinds) do
+            if not known[kind] then VavaCombat.log.warn("défense : type de dégâts '%s' inconnu de vava_health", kind) end
+        end
     end
     -- étiquettes de la défense (évitées, bloquées, parées) recoupées comme les types
     local tags = bridge.HealthTags()

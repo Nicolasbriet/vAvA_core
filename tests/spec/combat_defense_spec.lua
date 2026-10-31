@@ -391,7 +391,8 @@ describe('vava_combat défense (serveur)', function()
             RecipesReady = function() return false end,
             Recipe = function() return nil end,
             SkillRecipesReady = function() return false end,
-            HealthKinds = function() return { 'tranchant', 'contondant', 'percant' } end,
+            -- vocabulaire de vava_health (types du pas de côté recoupés, T-113)
+            HealthKinds = function() return { 'tranchant', 'contondant', 'percant', 'feu', 'eau', 'terre', 'lumiere', 'esprit', 'pur', 'privation', 'monde' } end,
             HealthTags = function() return { 'melee', 'ranged', 'spell', 'area', 'overTime', 'native', 'reflected',
                 'parryable', 'unblockable', 'undodgeable' } end,
             DefineShieldField = function() return true end,
@@ -893,7 +894,9 @@ describe('vava_combat défense (serveur)', function()
     describe('modificateurs', function()
         it('déclarés une fois (étapes, priorité, types) ; registre absent : rien', function()
             assert.same({ 'esquive', 50 }, { registry[KEYS.esquive].stage, registry[KEYS.esquive].priority })
-            assert.is_nil(registry[KEYS.esquive].kinds)
+            -- relecture réseau R-2 : ni la faim (privation) ni les pertes du monde n'appellent le pas de côté
+            assert.same({ 'tranchant', 'contondant', 'percant', 'feu', 'eau', 'terre', 'lumiere', 'esprit', 'pur' },
+                registry[KEYS.esquive].kinds)
             assert.same({ 'tranchant', 'contondant', 'percant' }, registry[KEYS.parade].kinds)
             assert.equal('Garde', registry[KEYS.blocage].label)
             assert.equal(0, defense.declare())
@@ -901,6 +904,17 @@ describe('vava_combat défense (serveur)', function()
             assert.equal(0, defense.declare())
             registryExists = true
             assert.equal(3, defense.declare())
+        end)
+
+        -- relecture réseau R-3 : tests en mémoire et de face avant les exports (véhicule, magie)
+        it('attaquant de dos : ni véhicule ni contrôle de la magie lus', function()
+            headings[B] = 0
+            use(B, 'garde_epee')
+            at(200)
+            calls = {}
+            VavaCombat.bridge.Hit(B, { amount = 12, kind = 'tranchant', source = A, tags = { melee = true } })
+            assert.is_nil(calls.InVehicle)
+            assert.is_nil(calls.MagicHardControl)
         end)
 
         it('personne ne se défend : aucun appel de native ni d\'export dans les modificateurs', function()
@@ -955,6 +969,92 @@ describe('vava_combat défense (serveur)', function()
             assert.equal('block', afters[1].payload.outcome)
             assert.same({ 0, 0 }, { defense.memoSize() })
             assert.equal(0, #sent)
+        end)
+    end)
+
+    -- relecture sécurité S-1 : l'arc du bouclier ne vaut que s'il est encore accroché
+    describe('arc de la garde', function()
+        local function at75()
+            local r = math.rad(75)
+            -- B à (0, 2) tourné vers le sud (cap 180) : A à 75° de son avant, à 2 m
+            positions[A] = { math.sin(r) * 2, 2 - math.cos(r) * 2, 0 }
+        end
+
+        it('bouclier au bras : un coup à 75° du cap est bloqué ; décroché : arc de l\'arme, il porte', function()
+            piles[B][#piles[B] + 1] = pile(SHIELD_ID, 'bouclier_rond')
+            hung[B] = { instanceId = SHIELD_ID, item = 'bouclier_rond', characterId = CHAR_B }
+            use(B, 'garde_epee')
+            at(200)
+            at75()
+            local bridge = VavaCombat.bridge
+            local packet = { amount = 12, kind = 'tranchant', source = A, tags = { melee = true } }
+            assert.equal(8.4, bridge.Hit(B, copy(packet)).blocked)
+            hung[B] = nil
+            local result = bridge.Hit(B, copy(packet))
+            assert.same({ 0, 12 }, { result.blocked, result.applied })
+        end)
+    end)
+
+    -- relecture sécurité S-2 : une issue ou une décision laissée en mémoire ne vaut que pour son coup
+    describe('mémoire des issues', function()
+        it('issue laissée par strike, numéro repris (vava_health redémarré) sur une autre cible : ignorée', function()
+            use(B, 'garde_epee')
+            at(200)
+            -- coup de l'export strike : l'issue imposée n'est jamais consommée par reactions.after
+            VavaCombat.strike.run(A, B, { technique = 'taille_descendante' }, { held = held[A], characterId = CHAR_A })
+            assert.equal(4.8, lastHit().blocked)
+            assert.same({ 0, 1 }, { defense.memoSize() })
+            -- vava_health redémarre : ses numéros repartent de 1 ; un coup de A sur C reprend le numéro 1
+            hitSeq = 0
+            positions[C] = { 0.3, 1.2, 0 }
+            positions[B] = { 30, 30, 0 }
+            at(1000)
+            use(A, 'taille_descendante', C)
+            at(1320)
+            assert.equal(1, lastHit().id)
+            assert.same({ 'hit' }, outcomes())
+            assert.same({ 0, 0 }, { defense.memoSize() })
+        end)
+
+        it('issue trop vieille sur la même cible : ignorée ; resetMemo vide tout', function()
+            use(B, 'garde_epee')
+            at(200)
+            VavaCombat.strike.run(A, B, { technique = 'taille_descendante' }, { held = held[A], characterId = CHAR_A })
+            assert.equal('block', defense.takeOutcome(1, B))
+            VavaCombat.strike.run(A, B, { technique = 'taille_descendante' }, { held = held[A], characterId = CHAR_A })
+            at(200 + cfg.defense.memoMs)
+            assert.is_nil(defense.takeOutcome(2, B))
+            VavaCombat.strike.run(A, B, { technique = 'taille_descendante' }, { held = held[A], characterId = CHAR_A })
+            assert.same({ 0, 1 }, { defense.memoSize() })
+            defense.resetMemo()
+            assert.same({ 0, 0 }, { defense.memoSize() })
+            assert.is_nil(defense.takeOutcome(3, B))
+        end)
+
+        it('décision reprise par un coup d\'une autre cible : aucune suite', function()
+            use(B, 'pas_de_cote')
+            at(100)
+            local apply = registry[KEYS.esquive].apply
+            assert.same({ cancel = 'esquive' }, apply({ id = 7, target = B, targetCharacter = CHAR_B, kind = 'tranchant',
+                amount = 5, source = A, tags = { melee = true } }))
+            hitAfter({ id = 7, target = C, origin = 'vava_combat', stage = 'esquive', cancelled = 'esquive' })
+            assert.equal(0, #afters)
+            assert.same({ 0, 0 }, { defense.memoSize() })
+        end)
+    end)
+
+    -- relecture sécurité S-3 : un coup paré ne frappe plus un autre adversaire dans le même relevé
+    describe('plusieurs adversaires par coup', function()
+        it('maxTargets 2 : B pare, C dans l\'arc n\'est pas touché', function()
+            cfg.geometry.maxTargets = 2
+            positions[C] = { 0.3, 1.8, 0 }
+            use(A, 'taille_descendante', B)             -- relevé à 320
+            at(200)
+            assert.same({ true }, use(B, 'parade_epee'))  -- fenêtre 200 à 400
+            at(320)
+            assert.equal(1, #hits)
+            assert.equal(B, hits[1].target)
+            assert.equal('parade', hits[1].result.cancelled)
         end)
     end)
 

@@ -45,7 +45,9 @@ local function onModuleReady(payload)
     elseif payload.name == bridge.SKILLS then
         catalog.onSkillsReady()
     elseif payload.name == bridge.HEALTH and VavaCombat.ready then
-        -- le registre des modificateurs disparaît avec vava_health : redéclarés à son retour
+        -- le registre des modificateurs disparaît avec vava_health : redéclarés à son retour ; ses numéros de coup
+        -- repartent de 1 : décisions et issues en attente oubliées
+        defense.resetMemo()
         core.log.info('vava_health de retour : %d modificateur(s) de la défense redéclaré(s)', defense.declare())
     end
 end

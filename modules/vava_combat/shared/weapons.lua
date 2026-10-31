@@ -27,6 +27,12 @@ local DURABILITY_MAX = 10000
 local weapons = {}
 VavaCombat.weapons = weapons
 
+-- Constantes du seul serveur (hors de shared/constants.lua, livré aux joueurs : relecture réseau R-4 de T-113) : types
+-- qui défendent, types qu'on peut demander (pas `garde`, une posture : not_attack), hook d'un coup défendu.
+VavaCombat.DEFENSE_TYPES = { 'blocage', 'parade', 'esquive' }
+VavaCombat.USABLE_TYPES = { 'legere', 'lourde', 'blocage', 'parade', 'esquive' }
+VavaCombat.HOOKS.DEFENDED = 'vava_combat:defended'  -- after : un coup esquivé, paré, bloqué ou qui brise la garde
+
 -- Petites règles ----------------------------------------------------------------------------------------------------
 
 ---@param value any
@@ -504,6 +510,19 @@ local function tagList(list)
     return true
 end
 
+--- Liste pure de 1 à 11 types de dégâts (^[a-z0-9_]+$), sans doublon.
+---@param list any
+---@return boolean
+local function kindList(list)
+    if not pureList(list, 11) or #list < 1 then return false end
+    local seen = {}
+    for _, kind in ipairs(list) do
+        if type(kind) ~= 'string' or not find(kind, ID_PATTERN) or seen[kind] then return false end
+        seen[kind] = true
+    end
+    return true
+end
+
 --- Liste de contrôles de GTA : pure, `max` au plus, entiers de 0 à 360, jamais Échap ni P (lus par vava_pause). Rend
 --- nil ou la raison.
 ---@param list any
@@ -537,6 +556,7 @@ local DODGE_SIDES = { avant = true, gauche = true, droite = true }
 local function defenseError(d)
     if type(d) ~= 'table' then return 'defense : table attendue' end
     if integerIn(d.guardBrokenMs, 0, 5000) == nil then return 'defense.guardBrokenMs entier de 0 à 5 000 attendu' end
+    if integerIn(d.dodgeCooldownMs, 0, 10000) == nil then return 'defense.dodgeCooldownMs entier de 0 à 10 000 attendu' end
     local err = gestureError(d.brokenGesture)
     if err then return 'defense.brokenGesture : ' .. err end
     err = controlsError(d.guardBlocked, 8, 'defense.guardBlocked')
@@ -553,9 +573,8 @@ local function defenseError(d)
         return 'defense.parry.missCooldownMs entier de 0 à 5 000 attendu'
     end
     local dodge = d.dodge
-    if type(dodge) ~= 'table' or integerIn(dodge.cooldownMs, 0, 10000) == nil or not tagList(dodge.tags)
-        or not tagList(dodge.never) then
-        return 'defense.dodge : cooldownMs (0 à 10 000), tags et never (1 à 8 étiquettes) attendus'
+    if type(dodge) ~= 'table' or not tagList(dodge.tags) or not tagList(dodge.never) or not kindList(dodge.kinds) then
+        return 'defense.dodge : tags et never (1 à 8 étiquettes), kinds (1 à 11 types de dégâts) attendus'
     end
     local block = d.block
     if type(block) ~= 'table' or not tagList(block.tags) or not between(block.shieldArcBonus, 0, 90) then

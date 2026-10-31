@@ -462,6 +462,54 @@ describe('vava_combat client : main, dégainer, mode combat', function()
             assert.equal(cfg.defense.dodgeGestures.gauche.clip, played[#played].clip)
         end)
 
+        -- relecture réseau R-1 : le délai du pas de côté est connu du client, rien n'est envoyé avant
+        it('Espace martelé : un pas de côté, rien à 700 ms, le suivant à 1 500 ms', function()
+            armed()
+            press('legere')
+            runThreads()
+            clock = clock + 2000
+            commands['vava_combat_esquive']()
+            runThreads()
+            clock = clock + 700
+            commands['vava_combat_esquive']()
+            runThreads()
+            assert.same({ 'taille_descendante', 'pas_de_cote' }, names())
+            clock = clock + 800
+            commands['vava_combat_esquive']()
+            runThreads()
+            assert.same({ 'taille_descendante', 'pas_de_cote', 'pas_de_cote' }, names())
+        end)
+
+        it('attente d\'un dodge_cooldown ou d\'un parry_cooldown : ni la garde ni les attaques ne sont retenues', function()
+            armed()
+            press('legere')
+            runThreads()
+            clock = clock + 2000
+            rpcAnswer = { true, false, 'dodge_cooldown', 800 }
+            commands['vava_combat_esquive']()
+            runThreads()
+            rpcAnswer = { true, true }
+            press('legere')
+            runThreads()
+            assert.same({ 'taille_descendante', 'pas_de_cote', 'taille_descendante' }, names())
+            -- le pas refusé n'a pas été compté par le serveur : Espace repart après l'attente donnée
+            clock = clock + 2000
+            rpcAnswer = { true, false, 'parry_cooldown', 600 }
+            down()
+            runThreads()
+            up()
+            rpcAnswer = { true, true }
+            down()
+            runThreads()
+            clock = clock + 200
+            stance.tick(clock)
+            runThreads()
+            assert.same({ 'taille_descendante', 'pas_de_cote', 'taille_descendante', 'parade_epee', 'garde_epee' }, names())
+            commands['vava_combat_esquive']()
+            runThreads()
+            assert.equal(5, #rpcCalls)
+        end)
+
         it('garde brisée reçue du serveur : garde tombée, chancellement, aucun lower', function()
             local net = {}
             _G.RegisterNetEvent = function(name, fn) net[name] = fn end

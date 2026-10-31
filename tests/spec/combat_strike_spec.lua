@@ -214,7 +214,8 @@ describe('vava_combat server', function()
                 return { id = #hits, amount = packet.amount, applied = packet.amount, blocked = 0, absorbed = 0,
                     resisted = 0, added = 0, downed = false, health = 0.5 }
             end,
-            HealthKinds = function() return { 'tranchant', 'contondant', 'percant', 'feu' } end,
+            -- vocabulaire de vava_health (types du pas de côté recoupés, T-113)
+            HealthKinds = function() return { 'tranchant', 'contondant', 'percant', 'feu', 'eau', 'terre', 'lumiere', 'esprit', 'pur', 'privation', 'monde' } end,
             HealthTags = function() return { 'melee', 'ranged', 'area', 'overTime', 'native', 'reflected', 'parryable',
                 'unblockable', 'undodgeable' } end,
             DefineShieldField = function() return true end,

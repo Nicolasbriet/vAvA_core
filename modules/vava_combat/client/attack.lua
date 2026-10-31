@@ -41,6 +41,9 @@ local current = nil
 local buffered = nil
 -- attente donnée par le serveur (busy, chain_limit…) : aucune demande avant
 local waitUntil = 0
+-- attentes propres à une touche (parade ratée, pas de côté) : elles ne retiennent ni la garde ni les attaques
+local slotUntil = {}
+local SLOT_OF = { parry_cooldown = 'parade', dodge_cooldown = 'esquive' }
 -- chancellement reçu du serveur : aucune technique avant
 local staggeredUntil = 0
 -- code → instant du dernier texte montré
@@ -97,7 +100,14 @@ local function request(swing, locked)
         local transport, accepted, code, detail = core.rpc.call(RPC.USE, swing.id, locked)
         if transport and accepted == true then return end
         if not transport then code, detail = accepted, nil end
-        if mathType(detail) == 'integer' and detail > 0 then waitUntil = max(waitUntil, GetGameTimer() + detail) end
+        if mathType(detail) == 'integer' and detail > 0 then
+            local slot = SLOT_OF[code]
+            if slot then
+                slotUntil[slot] = max(slotUntil[slot] or 0, GetGameTimer() + detail)
+            else
+                waitUntil = max(waitUntil, GetGameTimer() + detail)
+            end
+        end
         if current == swing then
             hands.stopGesture(swing.gesture)
             current = nil
@@ -155,7 +165,8 @@ function attack.choose(slot, now, quiet)
         if not quiet then attack.notice(refusal) end
         return nil
     end
-    if now < waitUntil then return nil, waitUntil - now end
+    local until_ = max(waitUntil, slotUntil[slot] or 0)
+    if now < until_ then return nil, until_ - now end
     return techniques.pick(cfg.styles[hands.style()], slot, current, current and current.def, now, cfg.techniques)
 end
 

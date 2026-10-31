@@ -207,7 +207,8 @@ local function sample(swing, k)
     end
     local room = cfg.geometry.maxTargets - swing.hitCount
     for index, entry in ipairs(geometry.order(candidates, swing.target ~= 0 and swing.target or nil)) do
-        if index > room then break end
+        -- coup paré (ou annulé) par la cible précédente : plus rien dans ce relevé (relecture S-3)
+        if index > room or swing.cancelled then break end
         local target = entry.player
         swing.hits[target] = true
         swing.hitCount = swing.hitCount + 1

@@ -24,6 +24,8 @@ VavaCombat.stance = defense
 
 -- R maintenue ; garde demandée ou levée (geste local) ; parade de cet appui ; garde refusée : plus d'essai avant un appui
 local held, guard, parry, retry = false, nil, nil, false
+-- départ du dernier pas de côté demandé : rien avant `dodgeCooldownMs` (le serveur refuserait)
+local dodgeAt = nil
 
 --- Ferme le cycle local d'une garde comme le serveur (tenue minimale, récupération).
 ---@param swing table
@@ -75,8 +77,8 @@ end
 
 --- Espace (mode actif) : pas de côté, direction lue une fois (gauche, droite, avant ; sinon le geste de la technique).
 function defense.dodge()
-    if guard then return end
     local now = GetGameTimer()
+    if guard or (dodgeAt and now - dodgeAt < dcfg.dodgeCooldownMs) then return end
     local id = attack.choose('esquive', now)
     if not id then return end
     local x, y = GetControlNormal(0, 30), GetControlNormal(0, 31)
@@ -86,7 +88,10 @@ function defense.dodge()
     elseif y < -DEAD_ZONE then
         side = 'avant'
     end
-    attack.start(id, now, side and dcfg.dodgeGestures[side] or nil)
+    local swing = attack.start(id, now, side and dcfg.dodgeGestures[side] or nil)
+    dodgeAt = now
+    -- refusé pour une autre raison : le serveur n'a pas compté ce pas
+    swing.onRefused = function() if dodgeAt == now then dodgeAt = nil end end
 end
 
 --- Une image du mode combat actif : R maintenue après la fenêtre de parade → garde demandée ; garde : contrôles coupés.

@@ -90,27 +90,36 @@ local function remember(id, entry, now)
     return true
 end
 
---- Issue imposée au coup `id` pour server/reactions.lua (même tour).
+--- Issue imposée au coup `id` sur `target` pour server/reactions.lua (même tour).
 ---@param id integer
+---@param target integer
 ---@param outcome string
 ---@param now integer
-local function impose(id, outcome, now)
+local function impose(id, target, outcome, now)
     if outcomes[id] == nil then
         if outcomeCount >= cfg.defense.memoMax then purge(now) end
         if outcomeCount >= cfg.defense.memoMax then return end
         outcomeCount = outcomeCount + 1
     end
-    outcomes[id] = { outcome = outcome, at = now }
+    outcomes[id] = { outcome = outcome, target = target, at = now }
 end
 
---- Issue imposée par la défense au coup `id` (parry, block, break), retirée ; ou nil.
+--- Issue imposée par la défense au coup `id` sur `target` (parry, block, break), retirée ; ou nil. Une entrée trop
+--- vieille ou d'une autre cible (numéro de coup repris après un redémarrage de vava_health) est retirée et ignorée.
 ---@param id any
+---@param target integer
 ---@return string|nil
-function defense.takeOutcome(id)
+function defense.takeOutcome(id, target)
     local entry = id ~= nil and outcomes[id] or nil
     if not entry then return nil end
     outcomes[id], outcomeCount = nil, outcomeCount - 1
+    if entry.target ~= target or bridge.Timer() - entry.at >= cfg.defense.memoMs then return nil end
     return entry.outcome
+end
+
+--- Retour de vava_health : ses numéros de coup repartent de 1, décisions et issues en attente sont oubliées.
+function defense.resetMemo()
+    memo, memoCount, outcomes, outcomeCount = {}, 0, {}, 0
 end
 
 -- Admission et acceptation ------------------------------------------------------------------------------------------
@@ -215,20 +224,33 @@ end
 
 -- Modificateurs de la chaîne de dégâts --------------------------------------------------------------------------------
 
---- Tête commune : geste défensif du bon type, ouvert, même personnage, à pied, sans contrôle dur de la magie. Une seule
---- lecture de table si personne ne se défend.
+---@param list string[]
+---@return string[]
+local function copyList(list)
+    local out = {}
+    for i, value in ipairs(list) do out[i] = value end
+    return out
+end
+
+--- Tête commune, en mémoire : geste défensif du bon type, ouvert, même personnage. Une seule lecture de table si
+--- personne ne se défend.
 ---@param ctx table
 ---@param kind string
 ---@return table|nil swing
 ---@return integer|nil now
 local function defending(ctx, kind)
-    local target = ctx.target
-    local swing = active[target]
+    local swing = active[ctx.target]
     if not swing or swing.def.type ~= kind then return nil end
     local now = bridge.Timer()
     if not defense.open(swing, now) or swing.characterId ~= ctx.targetCharacter then return nil end
-    if bridge.InVehicle(target) or bridge.MagicHardControl(target) then return nil end
     return swing, now
+end
+
+--- Dernières vérifications, les plus coûteuses (exports) : à pied, sans contrôle dur de la magie.
+---@param target integer
+---@return boolean
+local function free(target)
+    return not bridge.InVehicle(target) and not bridge.MagicHardControl(target)
 end
 
 --- Attaquant de face, sur les positions et le cap lus par le serveur.
@@ -256,7 +278,7 @@ local function dodgeModifier(ctx)
     local swing, now = defending(ctx, 'esquive')
     if not swing then return nil end
     local rules = cfg.defense.dodge
-    if not defense.tagsMatch(ctx.tags, rules.tags, rules.never) then return nil end
+    if not defense.tagsMatch(ctx.tags, rules.tags, rules.never) or not free(ctx.target) then return nil end
     if not remember(ctx.id, { kind = 'dodge', target = ctx.target, source = attackerOf(ctx), swing = swing }, now) then
         return nil
     end
@@ -269,7 +291,7 @@ local function parryModifier(ctx)
         return nil
     end
     local source = attackerOf(ctx)
-    if not source or not facing(ctx.target, source, swing.def.hit.angle) then return nil end
+    if not source or not facing(ctx.target, source, swing.def.hit.angle) or not free(ctx.target) then return nil end
     if not remember(ctx.id, { kind = 'parry', target = ctx.target, source = source, swing = swing }, now) then
         return nil
     end
@@ -283,11 +305,13 @@ local function blockModifier(ctx)
         return nil
     end
     local source = attackerOf(ctx)
-    if not source or not facing(ctx.target, source, swing.guard.arc) then return nil end
+    if not source then return nil end
+    -- part d'abord : l'arc du bouclier ne vaut que s'il est encore accroché (sinon celui de l'arme ; relecture S-1)
     local hung = shields.hungOf(ctx.target)
     local factor, by = defense.blockFactor(swing.guard, hung and hung.instanceId, cfg.wear)
+    local arc = by == 'shield' and swing.guard.arc or min(180, swing.def.hit.angle)
     local blocked = defense.blockedAmount(ctx.amount, factor)
-    if blocked <= 0 then return nil end
+    if blocked <= 0 or not facing(ctx.target, source, arc) or not free(ctx.target) then return nil end
     local entry = { kind = 'block', target = ctx.target, source = source, swing = swing, by = by,
         weight = defense.weightOf(catalog.technique(ctx.technique), cfg) }
     if not remember(ctx.id, entry, now) then return nil end
@@ -298,14 +322,10 @@ end
 ---@return integer
 function defense.declare()
     local priority, labels = cfg.defense.modifierPriority, cfg.messages.modifiers
-    local function kinds()
-        local out = {}
-        for i, kind in ipairs(cfg.kinds) do out[i] = kind end
-        return out
-    end
+    local function kinds() return copyList(cfg.kinds) end
     return bridge.DeclareModifiers({
         { key = KEYS.esquive, def = { stage = 'esquive', priority = priority, label = labels.esquive,
-            apply = dodgeModifier } },
+            kinds = copyList(cfg.defense.dodge.kinds), apply = dodgeModifier } },
         { key = KEYS.parade, def = { stage = 'parade', priority = priority, label = labels.parade, kinds = kinds(),
             apply = parryModifier } },
         { key = KEYS.blocage, def = { stage = 'blocage', priority = priority, label = labels.blocage, kinds = kinds(),
@@ -370,6 +390,8 @@ function defense.onHitAfter(payload)
     memo[id], memoCount = nil, memoCount - 1
     local now = bridge.Timer()
     local target, swing, kind = entry.target, entry.swing, entry.kind
+    -- numéro de coup repris (vava_health redémarré) ou décision d'un coup tombé en erreur : ignorée (relecture S-2)
+    if target ~= payload.target or now - entry.at >= cfg.defense.memoMs then return end
     local ours = payload.origin == VavaCombat.resource
     if kind == 'dodge' then
         if payload.stage == 'esquive' then announce(target, swing, 'dodge', entry.source, payload) end
@@ -380,7 +402,7 @@ function defense.onHitAfter(payload)
         VavaCombat.swings.cancel(source, 'parried')
         reactions.stagger(source, cfg.stagger.durationMs, now, true)
         wearLater(target, swing, swing.instanceId, swing.item, 'weapon')
-        if ours then impose(id, 'parry', now) end
+        if ours then impose(id, target, 'parry', now) end
         announce(target, swing, 'parry', source, payload)
     elseif kind == 'block' then
         -- coup annulé plus loin, ou mise à terre : elle l'emporte, rien d'autre
@@ -402,7 +424,7 @@ function defense.onHitAfter(payload)
             brokenUntil[target], points[target] = now + ms, nil
             reactions.stagger(target, ms, now, true)
         end
-        if ours then impose(id, outcome, now) end
+        if ours then impose(id, target, outcome, now) end
         announce(target, swing, outcome, entry.source, payload)
     end
 end

@@ -94,7 +94,7 @@ function reactions.after(swing, target, result)
     if type(result) ~= 'table' then return nil end
     local src = swing.source
     local now = bridge.Timer()
-    local imposed = defense.takeOutcome(result.id)
+    local imposed = defense.takeOutcome(result.id, target)
     local outcome = result.downed == true and 'down' or imposed or weapons.outcome(result)
     if not outcome then
         local key = weapons.noticeOf(result)

@@ -58,12 +58,13 @@ config.rateLimits.lower = { capacity = 4, refillPerSecond = 3 }
 -- Défense (T-113), part du serveur (ajoutée à la part du client de config_client.lua). Fenêtres tenues par le serveur.
 -- Parade ratée (aucun coup paré dans sa fenêtre) : aucune autre parade avant la fin de sa fenêtre + ce délai (0 à 5 000).
 config.defense.parry = { missCooldownMs = 600 }
--- Pas de côté : délai entre deux départs (0 à 10 000 ; ≤ 17 % du temps invulnérable) ; coups évités s'ils portent au
--- moins une étiquette de `tags` et aucune de `never` (zones, effets qui durent, pertes natives, renvois : jamais).
+-- Pas de côté (délai entre deux départs : config_client.lua, connu du client) : coups évités s'ils portent au moins une
+-- étiquette de `tags` et aucune de `never` (zones, effets qui durent, pertes natives, renvois : jamais) ; types de
+-- dégâts pour lesquels le modificateur est appelé (ni la faim, ni la soif, ni les pertes du monde).
 config.defense.dodge = {
-    cooldownMs = 1500,
     tags = { 'melee', 'ranged' },
     never = { 'undodgeable', 'area', 'overTime', 'native', 'reflected' },
+    kinds = { 'tranchant', 'contondant', 'percant', 'feu', 'eau', 'terre', 'lumiere', 'esprit', 'pur' },
 }
 -- Garde : coups bloqués s'ils portent une de ces étiquettes (les sorts : hors v1) ; degrés ajoutés à l'arc protégé
 -- quand le bouclier est au bras (0 à 90 ; 120 → 160).

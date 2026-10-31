@@ -166,7 +166,8 @@ describe('vava_combat techniques (serveur)', function()
             RecipesReady = function() return false end,
             Recipe = function() return nil end,
             SkillRecipesReady = function() return false end,
-            HealthKinds = function() return { 'tranchant', 'contondant', 'percant' } end,
+            -- vocabulaire de vava_health (types du pas de côté recoupés, T-113)
+            HealthKinds = function() return { 'tranchant', 'contondant', 'percant', 'feu', 'eau', 'terre', 'lumiere', 'esprit', 'pur', 'privation', 'monde' } end,
             HealthTags = function() return { 'melee', 'ranged', 'area', 'overTime', 'native', 'reflected', 'parryable',
                 'unblockable', 'undodgeable' } end,
             DefineShieldField = function() return true end,

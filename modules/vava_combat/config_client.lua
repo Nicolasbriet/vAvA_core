@@ -120,6 +120,7 @@ VavaCombat.config = {
     -- Défense, part du client (config.lua y ajoute sa part).
     defense = {
         guardBrokenMs = 1200,  -- garde brisée : chancellement, ni garde ni parade
+        dodgeCooldownMs = 1500, -- entre le départ de deux pas de côté (0 à 10 000 ; ≤ 17 % du temps invulnérable)
         brokenGesture = { dict = 'reaction@shove', clip = 'shoved_back', flag = 0 },   -- PLACEHOLDER
         guardBlocked = { 21 }, -- contrôles coupés pendant la garde (21 : sprint) ; 8 au plus
         -- pas de côté selon la direction tenue à l'appui (sinon le geste de la technique)
