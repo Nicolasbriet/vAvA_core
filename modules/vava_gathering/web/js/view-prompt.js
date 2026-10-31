@@ -15,16 +15,19 @@ const PromptView = (() => {
     label: prompt.querySelector('.prompt-label'),
     charges: prompt.querySelector('.prompt-charges'),
     help: prompt.querySelector('.prompt-help'),
+    trial: prompt.querySelector('.prompt-trial'),
     castText: cast.querySelector('.cast-text'),
     castHint: cast.querySelector('.cast-hint'),
   };
 
-  /** Invite pour un nœud : { key, anim, label, charges, exhausted, zoneDepleted, water, toolKind, toolOk }. */
+  /** Invite pour un nœud : { key, anim, label, charges, exhausted, zoneDepleted, water, toolKind, toolOk, trial? } ; trial : point d'essai de l'Atelier. */
   function show(payload) {
     const P = STRINGS.prompt;
     refs.key.textContent = payload.key || 'E';
     refs.verb.textContent = STRINGS.verbs[payload.anim] || STRINGS.verbDefault;
     refs.label.textContent = payload.label || '';
+    refs.trial.textContent = P.trial;
+    refs.trial.hidden = payload.trial !== true;
     refs.charges.textContent = `· ${P.charges(Number(payload.charges) || 0)}`;
     let help = '';
     if (payload.exhausted) help = P.exhausted;

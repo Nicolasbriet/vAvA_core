@@ -41,7 +41,8 @@ const DevMock = (() => {
     post('prompt', { key: 'E', anim: 'chop', label: 'Chêne', charges: 3, exhausted: false, zoneDepleted: false, toolKind: 'hache', toolOk: true });
     setTimeout(() => post('prompt', { key: 'E', anim: 'mine', label: 'Filon de fer', charges: 2, exhausted: false, zoneDepleted: true, toolKind: 'pioche', toolOk: false }), 3500);
     setTimeout(() => post('prompt', { key: 'E', anim: 'pick', label: 'Lavande', charges: 0, exhausted: true, zoneDepleted: false, toolKind: null, toolOk: true }), 7000);
-    setTimeout(() => post('cast', { label: 'Banc de truites', key: 'E' }), 10500);
+    setTimeout(() => post('prompt', { key: 'E', anim: 'chop', label: 'Chêne', charges: 3, exhausted: false, zoneDepleted: false, toolKind: 'hache', toolOk: true, trial: true }), 10500);
+    setTimeout(() => post('cast', { label: 'Banc de truites', key: 'E' }), 14000);
   }
 
   function tensionDemo() {

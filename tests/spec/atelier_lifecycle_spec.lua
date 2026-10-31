@@ -415,3 +415,71 @@ describe('vava_atelier lifecycle', function()
         end)
     end)
 end)
+
+-- T-102 : table de décision d'une pose (shared/lifecycle.lua › placePlan, spec T-102 § 7.3).
+describe('vava_atelier lifecycle : pose (T-102)', function()
+    local lc
+
+    before_each(function()
+        helper.reset()
+        VavaAtelier = nil
+        helper.loadAll({
+            'modules/vava_atelier/shared/constants.lua',
+            'modules/vava_atelier/shared/bounds.lua',
+            'modules/vava_atelier/shared/fingerprint.lua',
+            'modules/vava_atelier/shared/lifecycle.lua',
+        })
+        lc = VavaAtelier.lifecycle
+    end)
+
+    local function refused(code, ...)
+        local plan, err = lc.placePlan(...)
+        assert.is_nil(plan)
+        assert.equal(code, err)
+    end
+
+    it('enfant nouveau sous un parent publié sans brouillon : brouillon de l\'enfant et du parent', function()
+        assert.same({ entry = 'insert', parent = 'copy' }, lc.placePlan('new', false, 'published'))
+    end)
+
+    it('enfant nouveau sous le brouillon (ou l\'essai) du membre : brouillon de l\'enfant seul', function()
+        assert.same({ entry = 'insert' }, lc.placePlan('new', false, 'own_draft'))
+        assert.same({ entry = 'insert' }, lc.placePlan('new', false, 'own_trial'))
+    end)
+
+    it('enfant nouveau sous le brouillon d\'un autre : draft_taken', function()
+        refused('draft_taken', 'new', false, 'other_draft')
+        refused('draft_taken', 'new', false, 'other_trial')
+        refused('draft_taken', 'new', false, 'other_removal')
+    end)
+
+    it('parent qu\'on retire : bad_request ; parent jamais publié ni tenu : parent_missing', function()
+        refused('bad_request', 'new', false, 'own_removal')
+        refused('parent_missing', 'new', false, 'new')
+        refused('parent_missing', 'new', false, 'retired')
+    end)
+
+    it('fiche nouvelle sans parent : brouillon seul', function()
+        assert.same({ entry = 'insert' }, lc.placePlan('new', false, nil))
+    end)
+
+    it('publiée sans brouillon : copie ; en mode « points », brouillon du parent aussi', function()
+        assert.same({ entry = 'copy' }, lc.placePlan('published', false, nil))
+        assert.same({ entry = 'copy', parent = 'copy' }, lc.placePlan('published', false, 'published'))
+    end)
+
+    it('brouillon ou essai du membre : mis à jour à la révision lue, sinon stale', function()
+        assert.same({ entry = 'update' }, lc.placePlan('own_draft', true, nil))
+        assert.same({ entry = 'update' }, lc.placePlan('own_trial', true, nil))
+        refused('stale', 'own_draft', false, nil)
+        refused('stale', 'own_trial', false, nil)
+    end)
+
+    it('brouillon d\'un autre : draft_taken ; retrait : not_holder (d\'un autre) ou bad_request (le sien)', function()
+        refused('draft_taken', 'other_draft', true, nil)
+        refused('draft_taken', 'other_trial', true, nil)
+        refused('not_holder', 'other_removal', true, nil)
+        refused('bad_request', 'own_removal', true, nil)
+        refused('unknown_entry', 'retired', true, nil)
+    end)
+end)

@@ -15,6 +15,8 @@ local type, pairs, pcall, tostring, tonumber, select, print = type, pairs, pcall
 local pack, unpack, sort = table.pack, table.unpack, table.sort
 local find, match, sub = string.find, string.match, string.sub
 local GetResourceState, GetGameTimer = GetResourceState, GetGameTimer
+local GetPlayerPed, DoesEntityExist, GetEntityCoords, GetPlayerRoutingBucket =
+    GetPlayerPed, DoesEntityExist, GetEntityCoords, GetPlayerRoutingBucket
 local SaveResourceFile, LoadResourceFile = SaveResourceFile, LoadResourceFile
 local jsonEncode, jsonDecode = json.encode, json.decode
 
@@ -70,6 +72,23 @@ end
 function Bridge.AccountId(source)
     local session = core.players.get(source)
     return session and session.accountId or nil
+end
+
+--- Position du personnage lue par le serveur (`{ x, y, z }`), ou nil s'il n'a pas de ped (T-102 : portée d'une pose).
+---@param source integer
+---@return { x: number, y: number, z: number }|nil
+function Bridge.Position(source)
+    local ped = GetPlayerPed(source)
+    if not ped or ped == 0 or not DoesEntityExist(ped) then return nil end
+    local coords = GetEntityCoords(ped)
+    return { x = coords.x, y = coords.y, z = coords.z }
+end
+
+--- Instance (routing bucket) d'un joueur (T-102 : on ne place que dans le royaume).
+---@param source integer
+---@return integer
+function Bridge.Bucket(source)
+    return GetPlayerRoutingBucket(source)
 end
 
 -- Registre du Conseil ------------------------------------------------------------------------------------------------

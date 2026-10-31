@@ -147,7 +147,23 @@ Pour « loin de tout », à plus de 500 m de tous les lieux du § 0.6.
 | 14 | B récolte jusqu'à faire changer la bande de la Forêt de Brume (`/recolte vitalite foret_brume 61`, puis une récolte : la vitalité passe à 59, sous le seuil `bands.normal` de 60). A : `/vava_reseau joueur <B>`. | Une seule `vAvA:zone:diff` sous `vava_gathering` pour cette récolte (charges et bande ensemble), pas deux. |
 | 15 | B, besace pleine, récolte un chêne. | « Vous ne pouvez rien porter de plus. » ; charge inchangée dans l'invite ; aucune `vAvA:zone:diff` pour cette récolte. |
 | 16 | B loin de toute zone de récolte : `resmon`. Puis B s'approche de la Forêt de Brume. | Loin : `vava_gathering` à 0,00 ms (boucle des props arrêtée). À l'approche : arbres à 80 m comme avant. |
-| 17 | Serveur arrêté : dans `config_client.lua` (`nodes`, depuis 1.7.0), déplacer un nœud de la Forêt de Brume à plus de 500 m du centre de la zone (par exemple `x = 300.0`), démarrer. Remettre la valeur ensuite. | Le module refuse de démarrer, console : « zone 'foret_brume' : rayon de … m (nœuds compris), 500 m au plus ». |
+| 17 | Serveur arrêté : dans `config.lua` (`nodes`, graine de l'Atelier depuis 1.8.0 ; `config_client.lua` en 1.7.0), déplacer un nœud de la Forêt de Brume à plus de 500 m du centre de la zone (par exemple `x = 300.0`), démarrer. Remettre la valeur ensuite. | Le module refuse de démarrer, console : « zone 'foret_brume' : rayon de … m (nœuds compris), 500 m au plus ». |
+
+### 3.5 Récolte publiée par l'Atelier (`vava_gathering` 1.8.0, T-102)
+
+Depuis 1.8.0, zones et nœuds viennent de l'Atelier (la config n'est que la graine) et arrivent chez les joueurs par
+l'état de la zone. Rien ne doit changer pour un récoltant. Préparation : la zone « Bois des Essais » et ses cinq chênes
+publiés (`docs/tests/atelier.md` § 22) ; A Sénéchal, B sans rang.
+
+| # | Faire | Attendu |
+|---|---|---|
+| 1 | B récolte un chêne de « Bois des Essais », puis un chêne de la Forêt de Brume (graine). | Même invite (« [E] Couper — Chêne · 3 charges »), même durée, même outil exigé, même palier et même provenance (« Bois des Essais » / « Forêt de Brume »), même XP, même vitalité perdue. |
+| 2 | A : `/recolte zone bois_des_essais`, `/recolte noeud <id d'un chêne>`. | La zone créée en jeu répond comme une zone de la graine (vitalité, bande, nœuds). |
+| 3 | A crée une zone d'eau (type « Eau ») près d'une rive avec un banc de truites, la publie ; B y pêche. | Pêche normale ; en eaux fatiguées, les textes de l'eau (« Ces eaux sont fatiguées… ») ; un chêne posé dans cette zone est refusé à la publication (« Une zone d'eau ne porte que des bancs de poissons. »). |
+| 4 | B se reconnecte. | Les blips des zones créées en jeu sont sur la carte (liste redemandée à l'apparition) ; une seconde reconnexion : `/vava_reseau joueur <B>` ≈ 30 o pour `vava_gathering:map`. |
+| 5 | B loin de toute zone : `resmon`. | `vava_gathering` ≤ 0,02 ms (boucle des props arrêtée). |
+| 6 | Serveur arrêté : un `config_client.lua` d'avant 1.8.0 (avec `zones` et `nodes`) remis à la place du nouveau ; démarrer. Remettre le nouveau ensuite. | Le module démarre ; console : « config_client.lua d'avant 1.8.0 : ses zones et nœuds sont ignorés … ». |
+| 7 | A publie un changement de la Forêt de Brume pendant que B récolte un de ses chênes (geste en cours) : déplacer ce chêne. | À la fin du geste de B : rien n'est pris (point changé : `unknown_node`) ; le chêne apparaît à sa nouvelle place. |
 
 ## 4. Artisanat — `vava_crafting`
 

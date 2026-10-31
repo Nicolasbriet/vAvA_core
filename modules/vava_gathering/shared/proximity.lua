@@ -1,10 +1,6 @@
 --[[
     vava_gathering/shared/proximity.lua
-    Rôle : règles pures du streaming des props côté client : cibles regroupées (par zone ou par case de grille), centre
-           et étendue de chaque groupe, distance minimale possible d'un point à une cible d'un groupe (pour ne mesurer
-           que les cibles d'un groupe à portée), intervalle du prochain passage (court près d'un groupe, long loin de
-           tout). Même fichier dans vava_gathering, vava_farming et vava_crafting, testé pour les trois dans
-           tests/spec/props_proximity_spec.lua.
+    Rôle : logique pure du streaming des props : groupes de cibles, distance d'un groupe, intervalle du passage.
     Dépendances : shared/constants.lua
 ]]
 

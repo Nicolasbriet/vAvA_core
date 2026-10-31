@@ -12,9 +12,15 @@ tout de suite ce qui ne va pas. Les joueurs ne voient jamais l'Atelier ; ils en 
 s'essaie chez son seul auteur, se publie d'un clic après un résumé (« 2 points ajoutés, 1 retiré »), se retire du
 royaume et se rétablit depuis son historique. La config du module est la **graine** : au premier démarrage, chaque
 entrée devient la version 1 ; ensuite **la base fait foi**. Archives JSON et retour à l'original par
-`/atelier_archives`. L'outil de placement en jeu vient avec T-102 ; les ateliers réels des modules (récolte,
-agriculture, artisanat…) avec T-102 à T-106 ; en attendant, l'accueil les montre « Bientôt ». Un atelier sans `apply`
-reste **en lecture** (comportement de 1.0.0 : « Vérifier » seul).
+`/atelier_archives`. Les ateliers réels des modules (agriculture, artisanat…) viennent avec T-103 à T-106 ; en
+attendant, l'accueil les montre « Bientôt ». Un atelier sans `apply` reste **en lecture** (comportement de 1.0.0 :
+« Vérifier » seul).
+
+**Version 1.3.0 (T-102) : l'outil de placement.** Une fiche qui a un lieu se pose **en jeu** : le membre vise depuis la
+caméra, voit l'aperçu vert ou rouge avec sa raison, tourne à la molette, pose d'un clic, annule avec `Ctrl+Z` ; un cercle
+se règle à la molette, un tracé se dessine sommet par sommet. Le serveur revérifie chaque pose (position lue par lui,
+portée, règles du type, module) et n'écrit qu'un brouillon. « Tester » d'un atelier joué en jeu (la récolte) range la
+page : le membre essaie seul, `F9` le ramène. Premier atelier réel : la récolte (`vava_gathering` 1.8.0).
 
 ## Ce qu'un module déclare
 
@@ -37,6 +43,49 @@ références légères dans `ctx.bundle`, sans data ni lieu). `index` et `read` 
 servent plus qu'à la graine et à la synchronisation ; `read(kind, id, { original = true })` et
 `index(kind, { original = true })` rendent l'original de la config (retour à l'original). Contrat d'aller-retour :
 après `apply(kind, def)`, `read(kind, def.id)` rend la même data, le même `place`, le même `parent`.
+
+### Outil de placement (1.3.0, T-102)
+
+Un type qui déclare `placement` (`point`, `oriented`, `circle`, `polygon` ; `door` attend T-106) peut ajouter des
+**règles de placement** déclarées (données, jugées par la même logique pure côté client pour l'aperçu et côté serveur
+pour la décision : `shared/placerules.lua`) et de quoi poser des enfants en série :
+
+| Clé (par type) | Rôle |
+|---|---|
+| `rules.inside = { slack }` | dans le lieu du parent (cercle : rayon + `slack` ; tracé : dedans ou à `slack` m du bord) ; type à parent placé seulement |
+| `rules.spacing` | au moins n m au sol des autres fiches du même type et du même parent (retirées et la fiche elle-même ignorées) |
+| `rules.radius = { min, max, default }` | cercle : rayon permis, et rayon du premier tracé |
+| `rules.vertices = { min, max }` | tracé : sommets permis (dans `config.place.polygonPoints`) ; un tracé qui se croise est toujours refusé |
+| `template` | type à parent : champs du bloc « Prochain … à poser » ; leurs valeurs partent avec chaque clic |
+| `autoTitle` | type à parent : titre d'un enfant nouveau = libellé du choix + premier numéro libre (« Chêne 4 ») |
+| `hintField`, `hintFormat` | indice d'une ligne de la liste des enfants : un texte, ou `{ one, many }` accordé (« 1 récolte », « 3 récoltes ») |
+| `ghost = { field, models? }` | modèle fantôme suivi d'un champ (avec son apparence : « chêne de GTA, modèle provisoire ») |
+
+Par éditeur : `trialPlay` (l'essai se joue en jeu), `texts.banner` (titre du bandeau du volet, « Atelier de la
+récolte ») et `placeCheck(kind, place, ctx)` (facultatif : ce que les règles
+déclarées ne savent pas dire, chevauchement de deux zones par exemple). Le placement n'appelle pas `validate` : celui-ci
+reste juge de tout, lieu compris, à l'essai et à la publication. Contrat complet : `docs/api.md` → `vava_atelier`,
+« Outil de placement ».
+
+**Touches de la visée** (contrôles du jeu, indépendants de la disposition du clavier, sauf `Z`) : clic « Poser ici »
+(cercle, point, point orienté ; tracé : ajouter un sommet) ; molette « Tourner » (±15°) ou « Rayon » (±5 m), `Maj`
+tenue pour le pas fin (±1°, ±0,5 m) ; clic droit « Choisir un point » (le plus proche à 2,5 m : le clic suivant le
+déplace ; clic droit de nouveau : le lâcher) ou un sommet ; `Ctrl` + `Z` « Annuler » (commande-touche
+`+vava_atelier_annuler` sur `Z`, suit la disposition du clavier, AZERTY compris ; déclarée au registre `core:commands`) :
+sommet non envoyé retiré, création abandonnée (`discard`), déplacement rendu (`place` avec le lieu d'avant), 20 gestes au
+plus ; `Entrée` « Fermer le tracé » ; `Échap` « Quitter » (tracé commencé : un second appui sous 2 s l'abandonne). La
+bannière de `vava_pause` est bloquée pendant la visée, `Échap` et `P` du jeu sont neutralisés. Refus sur place : pas de
+séance, page de côté, personnage non apparu, en véhicule ou à cheval (« Descendez de votre monture pour placer. »).
+
+**Ce que voit le membre, lui seul** : l'anneau du parent, l'anneau ou le tracé du candidat, le fantôme du candidat
+(objet local, translucide, sans collision), les étiquettes des 12 éléments les plus proches à 40 m (« nouveau » en vert,
+« retiré » en rouge, l'élément choisi en bleu), et les fantômes des enfants pas encore publiés à 60 m (12 au plus).
+Étiquettes dessinées par le jeu (décision du 31 octobre 2026). Tout disparaît en quittant la fiche, en fermant
+l'Atelier, au déchargement et à l'arrêt de la ressource.
+
+**Essai joué** (`trialPlay`) : après « Tester », la page se range (un bandeau seul : « Mode essai : vous seul voyez ces
+points · F9 : revenir à l'Atelier »), le jeu reprend la main, la séance reste ouverte ; `F9` (ou `/atelier`) rend la page
+telle qu'elle était. Le hook client `vava_atelier:state` dit `{ open = false, suspended = true }` pendant ce temps.
 
 ## Cycle de vie d'une fiche gardée
 
@@ -124,6 +173,13 @@ seul serveur, et complète la table sans réécrire une clé de `config_client.l
 | `sync.sliceMs` / `retryMs` / `retries` | 4 / 10 000 / 3 | travail au plus (ms) entre deux pauses d'un fil de synchronisation ou d'archives ; nouvel essai si la base est muette ; essais au plus |
 | `archives.command` / `folder` / `maxBytes` / `confirmMs` / `cooldownMs` / `exportCooldownMs` | `atelier_archives` / `echanges` / 4 Mo / 60 000 / 2 000 / 60 000 | commande, dossier des archives (jamais servi aux joueurs), fichier lu ou écrit au plus, délai de confirmation, délai entre deux commandes d'un membre, délai entre deux exports (tous membres confondus) |
 | `place.maxXY` / `maxZ` / `maxRadius` / `polygonPoints` | 50 000 / 5 000 / 500 / 3 à 32 | bornes d'un lieu (formes point, orienté, cercle, polygone, porte) |
+| `placement.reach` / `polygonFactor` **(client)** | 60 m / 2 | portée d'une pose (centre, 3D) ; un sommet de tracé à 120 m au plus (au sol) — relus par le serveur |
+| `placement.aim`, `labels`, `ghosts`, `steps`, `pickRadius`, `undoMax`, `refreshMs`, `sortMs`, `quitConfirmMs` **(client)** | 80 m, 17 / 12 à 40 m / 12 à 60 m, alpha 160, 3 s / 15°, 1°, 5 m, 0,5 m / 2,5 m / 20 / 100 ms / 500 ms / 2 s | visée, étiquettes, fantômes, pas de la molette, choix au clic droit, annulations, rythme de l'aperçu et du tri, second `Échap` |
+| `placement.colors`, `ringAlpha`, `markers`, `controls`, `disabled`, `undoKey`, `keybar` **(client)** | maquette `Recolte` | teintes, marqueurs, contrôles lus et neutralisés, touche `Z`, barre des touches par mode |
+| `placement.texts` **(client)** | — | aperçu et refus (« Trop loin de vous (72 m) : approchez-vous. », « Hors de %s. », « Trop près de « %s » (%s m). »…) ; le serveur rend les mêmes |
+| `placement.bucket` / `childrenMax` | 0 / 200 | instance où l'on place (ailleurs : « Vous êtes hors du monde commun (intérieur, cachot…) : revenez-y pour placer. ») ; lignes au plus d'une réponse `children` |
+| `rateLimits.place` / `children` | 6, 2 / s / 4, 1 / s | poser ou déplacer ; lieux d'une fiche |
+| `texts.changes.place` | — | résumés d'un lieu changé (« déplacée de 12 m », « rayon de 120 m à 140 m », « tournée de 40° », « tracé redessiné (6 sommets) », « posée ») |
 | `texts.refused`, `modeLine`, `revoked`, `trialLineDefault`, `trialEndedFeed`, `sayAuthor` **(client)** | — | textes affichés par le client hors de la page : refus d'un RPC, bandeaux du volet, notifications, nom des réponses de `/atelier_archives` au chat (`sayAuthor`, ancien `texts.archives.author`) |
 | `texts` (le reste) | — | textes envoyés par le serveur (erreurs de champ, verbes du journal, libellés du Registre, résumés, réponses de `/atelier_archives`) ; l'interface a les siens (`web/js/strings.js`) |
 
@@ -174,6 +230,17 @@ refuse de démarrer (« config.lua, droits : rights.overrides['…'] = '…' : p
   export réservés au Souverain et à la console, import en deux temps. L'Atelier n'envoie **aucune définition** aux
   joueurs : chaque module diffuse les siennes, aux seuls joueurs concernés (zone du core pour ce qui est posé dans le
   monde, catalogue versionné pour les arts, essai à l'auteur seul).
+- **T-102** : le serveur ne croit **aucun lieu** du client. Chaque pose relit la séance, le personnage et le droit
+  effectif, l'instance (`placement.bucket`), la position du personnage (lue par le serveur), la forme du lieu (clés de
+  la forme seulement, nombres finis, bornes, arrondis), la portée (60 m ; 120 m au sol par sommet), la fiche (nouvelle :
+  valeurs du modèle par la forme et le monde, parent vivant, plafonds ; existante : vivante, sans valeurs), les règles
+  déclarées avec le parent et les frères lus en base, puis `placeCheck` ; l'écriture passe par la table de décision
+  `lc.placePlan` (tenant, révision) sous les verrous de la fiche et de son parent, brouillon du parent copié de sa
+  publiée dans la même transaction. Un client qui ment sur sa position ne pose que des **brouillons** : rien n'existe en
+  jeu avant la publication, qui repasse par `validate` et `validateLot`. Un envoi à la fois côté client, débit 6 puis
+  2 / s côté serveur. Les fantômes sont des objets locaux (`isNetwork = false`) : personne d'autre ne les voit. Chaque
+  valeur reçue de la page (`placeStart`, `templateChanged`, `goTo`) est bornée par le Lua ; « Marquer … sur la carte » ne pose que le
+  repère GPS (pas de téléportation, décision du 31 octobre 2026).
 
 ## Réseau et coût
 
@@ -190,7 +257,9 @@ refuse de démarrer (« config.lua, droits : rights.overrides['…'] = '…' : p
 | RPC `save`, `trial`, `endTrial`, `discard`, `retire`, `take`, `publish`, `restore` | l'appelant | ≤ 2 Ko (`{ done, rev, state, footer… }`) |
 | RPC `preview` | l'appelant | ≤ 2 Ko (8 lignes de 160 octets au plus, 4 avertissements, jeton) |
 | RPC `history`, `version`, `removed` | l'appelant | ≤ 3 Ko d'habitude, ≈ 7 Ko au pire (20 versions aux résumés les plus longs) ; comme `read` (≈ 22 Ko au pire, latent au-delà de 8 Ko) ; ≤ 5 Ko |
-| évènement `vava_atelier:entryChanged` | les seuls membres dont la séance a **cette fiche** ouverte (droit de l'atelier relu), sauf l'auteur du changement ; le tenant d'un essai qui prend fin sans qu'il l'ait demandé ; l'ancien tenant d'un brouillon repris | ≈ 90 o |
+| évènement `vava_atelier:entryChanged` | les seuls membres dont la séance a **cette fiche** ouverte (droit de l'atelier relu), sauf l'auteur du changement ; le tenant d'un essai qui prend fin sans qu'il l'ait demandé ; l'ancien tenant d'un brouillon repris ; T-102 : une pose l'écrit aussi sur la fiche parent | ≈ 90 o |
+| RPC `place` (T-102) | l'appelant | ≈ 0,4 Ko aller-retour |
+| RPC `children` (T-102) | l'appelant | 0,2 Ko (vide), ≈ 0,7 Ko pour 5 points, ≈ 22 Ko au pire (200 lignes, latent au-delà de 8 Ko) |
 
 Trois formes de réponse sont pensées pour ne rien envoyer deux fois :
 
@@ -211,7 +280,21 @@ Trois formes de réponse sont pensées pour ne rien envoyer deux fois :
 Téléchargé par chaque joueur à la connexion (1.2.0, T-132) : `shared/constants.lua`, `config_client.lua` et les cinq
 `client/*.lua` (≈ 30,6 Ko de Lua, ≈ 11,2 Ko compressés, contre ≈ 52,2 et 17,7 avant), et la page (≈ 122 Ko) ;
 `config.lua` (≈ 21 Ko) et la logique de `shared/` sont servis au seul serveur. Retoucher `config.lua` ne fait rien
-retélécharger aux joueurs.
+retélécharger aux joueurs. **1.3.0 (T-102)** : l'outil de placement est livré à tous (`shared/placerules.lua`,
+`shared/aim.lua`, `client/placer.lua`, `ghosts.lua`, `drawing.lua`, et `placement` dans `config_client.lua`) :
+≈ 105,2 Ko de Lua (32,9 Ko compressés ; 115,6 et 36,5 avant la relecture réseau R-1 : en-têtes des fichiers livrés
+courts, commentaires de fonction de l'outil sur une ligne), et la page ≈ 154,1 Ko (48,3 Ko compressés, + 9,6 Ko,
+accepté par le porteur du projet). La cible de la spec pour le Lua (≤ 18 Ko bruts ajoutés) n'est **pas** tenue
+(≈ + 75 Ko bruts, dont ≈ 58 Ko de code) : pistes T-154 (Lua livré sans commentaires) et T-157 (code de l'Atelier livré
+au seul Conseil, décision du porteur du projet). `shared/aim.lua` est en tête des `client_scripts` (lu par le seul
+client).
+
+Visée (T-102) : une seule boucle par image, **seulement pendant la visée**, chez le seul membre qui place (≤ 0,15 ms
+visée : un lancer de rayon asynchrone par image, un seul en vol ; ≤ 3 marqueurs d'aire ; ≤ 12 étiquettes ; le fantôme
+du candidat repositionné à chaque image, les autres au tri toutes les 500 ms ; règles réévaluées toutes les 100 ms ou
+dès que le candidat bouge). Aucun message à la page ni au serveur à chaque image : la page reçoit `placing`, `placed`,
+`placeRefused`, `undone`, `suspended` aux seuls changements ; le serveur ne reçoit que des intentions (`place`,
+`discard`). Hors visée et pendant l'essai joué : 0,00 ms.
 
 Rien d'autre ne part : aucun envoi à tous, aucun GlobalState, aucun state bag ; un joueur hors du Conseil ne reçoit
 rien de `vava_atelier` (`/vava_reseau ressource vava_atelier`). Une séance de travail type (ouvrir une fiche, trois
@@ -270,7 +353,11 @@ l'Atelier (il est alors resynchronisé).
 | `server/home.lua`, `entries.lua`, `check.lua`, `journal.lua` | accueil ; listes, fiches, valeurs, recherche ; « Vérifier » ; journal |
 | `server/commands.lua`, `api.lua`, `main.lua` | Codex ; exports ; module, RPC, hooks |
 | `client/nui.lua` | seul pont avec la page |
-| `client/session.lua`, `relay.lua`, `main.lua` | ouverture, versions gardées, évènements ; retours de la page → RPC ; touche et commande |
+| `client/session.lua`, `relay.lua`, `main.lua` | ouverture, versions gardées, évènements, essai joué ; retours de la page → RPC ; touche, commande et `Z` d'annulation |
+| `shared/placerules.lua`, `shared/aim.lua` | purs, livrés au client (T-102) : règles de placement, les mêmes pour l'aperçu et la décision ; visée (candidat, molette, pile d'annulation, choix, étiquettes, barre des touches) (`atelier_placerules_spec.lua`, `atelier_aim_spec.lua`) |
+| `server/placement.lua` | RPC `place` et `children` (T-102, `atelier_placement_spec.lua`) |
+| `client/placer.lua`, `ghosts.lua`, `drawing.lua` | outil de placement : états, LA boucle par image de la visée, envois, annulation ; fantômes locaux ; marqueurs, anneaux, tracés, étiquettes |
+| `sql/0003_parent_index.sql` | index des enfants d'une fiche (`editor`, `parent`) |
 | `web/` | la page unique ; `index.html?screen=…` s'ouvre hors jeu avec `web/dev/devmock.js` (jamais livré) |
 
 ## À vérifier en jeu
@@ -286,3 +373,9 @@ T-101 : publication puis retour en arrière vus d'un joueur proche sans redémar
 joueur loin (12-3) ; essai vu de son seul auteur (11-2) ; reprise de brouillon (14-2) ; base qui fait foi après un
 changement de config (15-1) ; essais rendus aux brouillons après un redémarrage (17-2) ; refus d'`apply` sans trace en
 jeu (17-4) ; rendu des étiquettes et des boîtes fidèle aux maquettes.
+
+T-102 : visée et touches, AZERTY compris (atelier 19, 20-10) ; `Échap` sans bannière (19-8) ; `resmon` en visée
+≤ 0,15 ms et 0,00 ms après (19-9) ; fantômes et étiquettes vus du seul membre (20-8) ; essai joué : page rangée, `F9`
+la rend (21) ; publication vue d'un proche en moins d'une seconde, rien chez un joueur loin (22-2, 22-3) ; appels
+directs refusés (24) ; fantômes retirés et focus rendu à l'arrêt de la ressource (24-6) ; rendu du volet fidèle à la
+maquette `Recolte`.

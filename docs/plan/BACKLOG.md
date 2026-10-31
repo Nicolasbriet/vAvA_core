@@ -725,6 +725,27 @@ versé à T-014 ; les autres points déjà couverts sont précisés dans T-012 �
   `--[[ ]]` dans une chaîne, `--` dans une chaîne) ; numéros de ligne des erreurs gardés (lignes vides laissées) ;
   mesure avant et après par `scripts/poids-client.sh` ; aucune dépendance ajoutée.
 
+### T-157 — Code de l'Atelier livré au seul Conseil — **décision du porteur du projet**
+- Agents : vava-architecte → vava-dev-lua + vava-dev-nui · Dépend de : T-102 · Statut : à faire (proposée, à valider par
+  le porteur du projet avant de la prendre : changement d'architecture et d'outillage)
+- Trouvé pendant T-102 (relecture réseau R-1, piste pour le porteur du projet) : ≈ 51 Ko de code de `vava_atelier`
+  (outil de placement, séance, relais, page) ne servent qu'au Conseil mais sont téléchargés par tous les joueurs.
+  Proposition : livraison à la demande, en latent, à l'ouverture de l'Atelier par un membre (droit relu), gardée en
+  stockage local (KVP) avec son empreinte et chargée par `load` ; rien pour un joueur hors du Conseil.
+- Critères : un joueur hors du Conseil ne télécharge plus ce code (`scripts/poids-client.sh`, `/vava_reseau`) ; un
+  membre le reçoit une fois par version (empreinte) ; code chargé seulement après contrôle de l'empreinte ; aucune
+  dépendance ajoutée ; mesure avant et après.
+
+### T-158 — Disposition des zones de récolte gardée par le client
+- Agents : vava-architecte → vava-dev-lua · Dépend de : T-102 · Statut : à faire
+- Trouvé pendant T-102 (relecture réseau R-6) : chaque entrée dans une zone de récolte renvoie son état entier, lieux
+  des points compris (≈ 5 Ko pour 120 points), alors que la disposition ne change qu'à une publication de l'Atelier.
+  Proposition : une empreinte de la disposition (`def` et `p:`) dans l'état de zone, la disposition gardée en stockage
+  local (KVP) par zone, un RPC seulement si l'empreinte reçue diffère de celle gardée ; ≈ 1,4 Ko par entrée au lieu
+  de ≈ 5 Ko.
+- Critères : à la seconde entrée dans une zone inchangée, aucun lieu de point n'est reçu (`/vava_reseau`) ; une zone
+  republiée est relue une fois ; KVP bornée et contrôlée à la relecture (comme la liste de la carte) ; essais.
+
 ### T-148 — Fichiers `shared/` absents du manifeste
 - Agent : vava-dev-lua · Dépend de : T-132 · Statut : à faire
 - Trouvé pendant T-146 : rien ne vérifie qu'un `shared/*.lua` présent dans un module est bien listé à son manifeste ;
@@ -996,7 +1017,15 @@ maquettes.
   redémarrage.
 
 ### T-102 — Outil de placement et créateur de récolte
-- Agents : vava-architecte → vava-dev-lua + vava-dev-nui · Dépend de : T-101, T-015, T-141 · Statut : à faire
+- Agents : vava-architecte → vava-dev-lua + vava-dev-nui · Dépend de : T-101, T-015, T-141 · Statut : à tester en jeu
+  (relu sécurité, réseau et lore, deux contre-relectures ; suites appliquées)
+- Fait le 1er novembre 2026 : `vava_atelier` 1.3.0, `vava_gathering` 1.8.0 (pages dans `agents/T-102-nui`) ; rapport
+  `docs/plan/rapports/T-102.md` ; procédures en jeu `docs/tests/atelier.md` § 19 à 25 et `docs/tests/metiers.md` § 3.5.
+- Spec : `docs/plan/specs/T-102.md`, avec les décisions du porteur du projet du 31 octobre 2026 (essai à blanc, recommandations
+  retenues). Rapport : `docs/plan/rapports/T-102.md` (et `T-102-nui.md` pour les pages) ; procédure en jeu :
+  `docs/tests/atelier.md` § 19 à 24, `docs/tests/metiers.md` § 3.5. `vava_atelier` 1.3.0, `vava_gathering` 1.8.0.
+  Reste hors de ce lot : `vava_example_atelier` 1.2.0 (enclos en tracé, bornes) de la spec § 2.1, pour essayer en jeu
+  les formes que la récolte n'utilise pas (point, polygone).
 - Outil de placement commun (point, point orienté avec modèle, cercle, polygone ; aperçu vert/rouge ; molette,
   `Maj`, clic droit, `Ctrl+Z`, `Échap` ; barre des touches) sur le modèle de l'éditeur de `vava_voice`.
 - `vava_gathering` déclare ses éditeurs zone et point (maquette `Recolte`) ; « Tester la récolte » en essai.
@@ -1007,6 +1036,8 @@ maquettes.
   serveur (`resources.*` : objet, compétence, difficulté, XP, rendement, pièce en plus, 1 045 o ; `tools.*` : puissance,
   bonus, usure, 285 o ; `zones` et `nodes` : coût, régénération, cicatrice, charges, 411 o). En passant ces données à
   l'Atelier, donner à chaque entrée une part client et une part serveur (contrôle T4 de `config_split_spec` vert).
+  **Fait** (1.8.0) : `zones` et `nodes` dans `config.lua` (graine), `resourceStats` et `toolStats` dans `config.lua`,
+  `resources` (libellé, outil, geste, modèles) et `tools` (genre) seuls dans `config_client.lua` ; T4 vert.
 
 ### T-103 — Créateur d'agriculture
 - Agent : vava-dev-lua (+ vava-dev-nui si widget) · Dépend de : T-102, T-016 · Statut : à faire

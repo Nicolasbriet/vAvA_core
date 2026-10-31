@@ -4,6 +4,8 @@
            position lue côté serveur, santé (à terre), inventaire (objet en main, place, ajout, usure par métadonnées,
            déclaration des objets), compétences (XP, niveau), droits et journal du Conseil, notifications, chat, saison
            du royaume (vava_time, facultatif), zones du core (abonnements de zone, 1.6.0), base de données.
+           T-102 : zone du core retirée, différence avec clés retirées, envoi à un seul joueur par core.net (essai de
+           l'Atelier), registre des éditeurs de vava_atelier (déclaration de l'atelier « Récolte »).
            Chaque appel à une autre ressource est isolé : un module absent ou en erreur ne retire que la fonction
            concernée.
     Dépendances : shared/constants.lua, config.lua, server/core.lua
@@ -293,8 +295,60 @@ end
 function Bridge.ZoneDefine(id, area, state) return zoneCall('define', id, area, state) end
 --- Déplace une zone (lieu, rayon, marge) : `true` ou `false, code`.
 function Bridge.ZoneMove(id, area) return zoneCall('move', id, area) end
---- Change des clés de l'état d'une zone (envoyées aux seuls abonnés, regroupées par tour) : `true` ou `false, code`.
-function Bridge.ZoneSet(id, changes) return zoneCall('set', id, changes) end
+--- Change (et retire) des clés de l'état d'une zone (envoyées aux seuls abonnés, regroupées par tour) : `true` ou
+--- `false, code`.
+function Bridge.ZoneSet(id, changes, removed)
+    if removed then return zoneCall('set', id, changes, removed) end
+    return zoneCall('set', id, changes)
+end
+--- Retire une zone (ses abonnés reçoivent la sortie) : `true` ou `false, code`.
+function Bridge.ZoneRemove(id) return zoneCall('remove', id) end
+
+-- Envois ciblés (T-102) ---------------------------------------------------------------------------------------------
+
+--- Envoi fiable au seul joueur `target` par core.net (une sérialisation dans le module ; repli `sendWith`).
+---@param target integer
+---@param event string
+---@return boolean ok
+---@return string|nil code
+function Bridge.SendPacked(target, event, ...)
+    local net = core.net
+    if type(net) ~= 'table' then return false, 'unsupported' end
+    if type(msgpack) == 'table' and type(msgpack.pack_args) == 'function' then
+        local ok, code = net.sendPacked({ latent = 'never' }, target, event, msgpack.pack_args(...))
+        if ok or code ~= 'unsupported' then return ok, code end
+    end
+    return net.sendWith({ latent = 'never' }, target, event, ...)
+end
+
+-- Atelier du Conseil (vava_atelier, facultatif ; T-102) -----------------------------------------------------------------
+
+local ATELIER_REGISTRY = 'vava_atelier:editors'
+
+--- Le registre des éditeurs de l'Atelier existe-t-il (vava_atelier démarré) ?
+---@return boolean
+function Bridge.AtelierExists()
+    return core.registry.exists(ATELIER_REGISTRY) == true
+end
+
+--- L'atelier est-il déjà au registre ?
+---@param key string
+---@return boolean
+function Bridge.AtelierHas(key)
+    return Bridge.AtelierExists() and core.registry.has(ATELIER_REGISTRY, key) == true
+end
+
+--- Déclare un atelier au registre de l'Atelier : `true` ou `false, code` (refus du validateur avec son chemin).
+---@param key string
+---@param def table
+---@return boolean ok
+---@return string|nil err
+function Bridge.AtelierDeclare(key, def)
+    if not Bridge.AtelierExists() then return false, 'absent' end
+    local called, ok, err = pcall(core.registry.add, ATELIER_REGISTRY, key, def)
+    if not called then return false, tostring(ok) end
+    return ok == true, err
+end
 --- Remplace tout l'état d'une zone : `true` ou `false, code`.
 function Bridge.ZoneReplace(id, state) return zoneCall('replace', id, state) end
 

@@ -1,11 +1,6 @@
 --[[
     vava_gathering/client/fishing.lua
-    Rôle : la pêche côté joueur, après la touche annoncée par le serveur : la barre de tension est jouée par
-           l'interface (une aiguille montée en tenant la touche, une zone qui dérive) ; le client lui transmet
-           l'appui et le relâchement de la touche d'interaction (commandes +/− du jeu : la touche reste celle que le
-           joueur a choisie) et, à la fin, déclare au serveur si la ligne a été tenue. Seul un raté est cru : ligne
-           tenue, le serveur tire encore la prise. Aucune boucle Lua : l'interface anime la barre tant qu'elle est
-           visible, le jeu envoie les appuis.
+    Rôle : barre de tension de la pêche : touche reçue du serveur, tenue mesurée, résultat demandé (le serveur tire la prise).
     Dépendances : shared/constants.lua, config_client.lua, client/core.lua, client/nui.lua, client/interact.lua
 ]]
 

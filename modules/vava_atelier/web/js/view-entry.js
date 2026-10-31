@@ -1,6 +1,7 @@
 'use strict';
 /*
- * vava_atelier/web/js/view-entry.js — fiche en « page » ou en « volet » : état, lecture seule, pied rendu d'après le serveur
+ * vava_atelier/web/js/view-entry.js — fiche en « page » ou en « volet » : état, lecture seule, pied rendu d'après le serveur,
+ *   étapes cochées (T-102)
  * Dépendances : strings.js, format.js, lifecycle.js, components.js
  */
 
@@ -11,12 +12,20 @@ const EntryView = (() => {
 
   const capital = (text) => (text ? text.charAt(0).toUpperCase() + text.slice(1) : '');
 
+  /** Étapes : `set(états)` coche les faites (✓) et met en gras celle en cours ; par défaut, la première en cours. */
   function steps(list) {
     const items = Format.list(list).filter((s) => typeof s === 'string').slice(0, 4);
     if (items.length === 0) return null;
-    return h('ol', { class: 'steps', 'aria-label': STRINGS.entry.steps, style: `--steps:${items.length}` },
-      items.map((label, index) => h('li', { class: index === 0 ? 'current' : '', 'aria-current': index === 0 ? 'step' : null },
-        h('span', { class: 'num', text: String(index + 1) }), label)));
+    const nodes = items.map((label) => h('li', {}, h('span', { class: 'num' }), label));
+    const box = h('ol', { class: 'steps', 'aria-label': STRINGS.entry.steps, style: `--steps:${items.length}` }, nodes);
+    box.set = (states) => nodes.forEach((li, index) => {
+      const at = states[index] === 'done' || states[index] === 'current' ? states[index] : '';
+      li.className = at;
+      if (at === 'current') li.setAttribute('aria-current', 'step'); else li.removeAttribute('aria-current');
+      li.firstChild.textContent = at === 'done' ? '✓' : String(index + 1);
+    });
+    box.set(['current']);
+    return box;
   }
 
   function compareBox(compare) {
@@ -45,6 +54,7 @@ const EntryView = (() => {
     const commands = h('div', { class: 'foot-actions' });
     const links = h('div', { class: 'foot-links' });
     const hint = h('p', { class: 'hp foot-hint' });
+    const stepList = steps(kind.steps);
     let okTimer = 0, buttons = [], tone = '', shown = [];
 
     function setState(state, text, stale) {
@@ -78,7 +88,7 @@ const EntryView = (() => {
           h('div', { class: 'title-row' }, title, stateTag),
           line, staleLine,
           h('p', { class: 'hp', text: capital(str(kind.noun)) }),
-          steps(kind.steps)),
+          stepList),
         h('div', { class: 'entry-scroll' }, notice, fields, compare.box),
         h('footer', { class: 'entry-foot' }, ok, commands, hint, links));
     } else {
@@ -90,7 +100,7 @@ const EntryView = (() => {
             h('div', { class: 'title-row' }, title, stateTag),
             h('p', { class: 'hp', text: `${str(descriptor.label)} › ${str(kind.noun)}` }),
             line, staleLine),
-          steps(kind.steps)),
+          stepList),
         h('div', { class: 'entry-body' },
           h('div', { class: 'entry-scroll' }, notice, fields),
           h('aside', { class: 'entry-aside' }, compare.box, h('p', { class: 'hp note', text: STRINGS.entry.note }))),
@@ -104,6 +114,7 @@ const EntryView = (() => {
       setState,
       setFooter,
       setReadOnly(on) { fields.disabled = on; },
+      setSteps(states) { if (stepList) stepList.set(states); },
       setBusy(on, id) {
         for (const node of buttons) {
           node.disabled = on;
