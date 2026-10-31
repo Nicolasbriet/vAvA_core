@@ -294,9 +294,10 @@ Apparition confirmée par le serveur (0.14.0, T-139) :
 - Au plus `spawn.confirm.maxPerCheck` (16) confirmations par passage (hooks et zones) ; les suivantes au passage
   suivant. Une erreur pendant un passage garde l'apparition en attente et la retente au suivant (une ligne d'erreur
   par ordre).
-- Réglages invalides ou hors bornes (`config/server.lua` → `spawn.confirm` : `checkMs` 50 à 5000, `radius` plus de 0
-  à 50, `graceMs` `checkMs` à 120000, `lateCheckMs` `checkMs` à 60000, `maxPerCheck` 1 à 1024) : le core ne démarre
-  pas (comme une limite de débit invalide).
+- Réglages invalides ou hors bornes (`config/server.lua` → `spawn.confirm` : `checkMs` 50 à 5000, `radius` 1 à 50,
+  `graceMs` du plus long chargement normal du client — `config/shared.lua`, `spawn` : fondu × 4 + modèle + collisions,
+  17 s par défaut ; jamais moins de 5000 ni de `checkMs` — à 120000, `lateCheckMs` `checkMs` à 60000, `maxPerCheck`
+  1 à 1024) : le core ne démarre pas (comme une limite de débit invalide).
 - Limites : la position lue est celle que le client du joueur synchronise pour son ped (OneSync) ; le serveur constate
   qu'il est allé au point ordonné, pas qu'il n'en bouge pas ensuite par un moyen interdit. Seul l'écart horizontal
   compte (un point ordonné sous terre, comme le retour d'une observation du Registre, reste valable). Un client qui
