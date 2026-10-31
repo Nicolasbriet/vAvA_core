@@ -58,10 +58,11 @@ pour la décision : `shared/placerules.lua`) et de quoi poser des enfants en sé
 | `rules.vertices = { min, max }` | tracé : sommets permis (dans `config.place.polygonPoints`) ; un tracé qui se croise est toujours refusé |
 | `template` | type à parent : champs du bloc « Prochain … à poser » ; leurs valeurs partent avec chaque clic |
 | `autoTitle` | type à parent : titre d'un enfant nouveau = libellé du choix + premier numéro libre (« Chêne 4 ») |
-| `hintField`, `hintFormat` | indice d'une ligne de la liste des enfants (« 3 récoltes ») |
+| `hintField`, `hintFormat` | indice d'une ligne de la liste des enfants : un texte, ou `{ one, many }` accordé (« 1 récolte », « 3 récoltes ») |
 | `ghost = { field, models? }` | modèle fantôme suivi d'un champ (avec son apparence : « chêne de GTA, modèle provisoire ») |
 
-Par éditeur : `trialPlay` (l'essai se joue en jeu) et `placeCheck(kind, place, ctx)` (facultatif : ce que les règles
+Par éditeur : `trialPlay` (l'essai se joue en jeu), `texts.banner` (titre du bandeau du volet, « Atelier de la
+récolte ») et `placeCheck(kind, place, ctx)` (facultatif : ce que les règles
 déclarées ne savent pas dire, chevauchement de deux zones par exemple). Le placement n'appelle pas `validate` : celui-ci
 reste juge de tout, lieu compris, à l'essai et à la publication. Contrat complet : `docs/api.md` → `vava_atelier`,
 « Outil de placement ».
@@ -175,8 +176,8 @@ seul serveur, et complète la table sans réécrire une clé de `config_client.l
 | `placement.reach` / `polygonFactor` **(client)** | 60 m / 2 | portée d'une pose (centre, 3D) ; un sommet de tracé à 120 m au plus (au sol) — relus par le serveur |
 | `placement.aim`, `labels`, `ghosts`, `steps`, `pickRadius`, `undoMax`, `refreshMs`, `sortMs`, `quitConfirmMs` **(client)** | 80 m, 17 / 12 à 40 m / 12 à 60 m, alpha 160, 3 s / 15°, 1°, 5 m, 0,5 m / 2,5 m / 20 / 100 ms / 500 ms / 2 s | visée, étiquettes, fantômes, pas de la molette, choix au clic droit, annulations, rythme de l'aperçu et du tri, second `Échap` |
 | `placement.colors`, `ringAlpha`, `markers`, `controls`, `disabled`, `undoKey`, `keybar` **(client)** | maquette `Recolte` | teintes, marqueurs, contrôles lus et neutralisés, touche `Z`, barre des touches par mode |
-| `placement.texts` **(client)** | — | aperçu et refus (« Trop loin de vous : approchez-vous (72 m). », « Hors de %s. », « Trop près de « %s » (%s m). »…) ; le serveur rend les mêmes |
-| `placement.bucket` / `childrenMax` | 0 / 200 | instance où l'on place (ailleurs : « Vous êtes dans une instance… ») ; lignes au plus d'une réponse `children` |
+| `placement.texts` **(client)** | — | aperçu et refus (« Trop loin de vous (72 m) : approchez-vous. », « Hors de %s. », « Trop près de « %s » (%s m). »…) ; le serveur rend les mêmes |
+| `placement.bucket` / `childrenMax` | 0 / 200 | instance où l'on place (ailleurs : « Vous êtes hors du monde commun (intérieur, cachot…) : revenez-y pour placer. ») ; lignes au plus d'une réponse `children` |
 | `rateLimits.place` / `children` | 6, 2 / s / 4, 1 / s | poser ou déplacer ; lieux d'une fiche |
 | `texts.changes.place` | — | résumés d'un lieu changé (« déplacée de 12 m », « rayon de 120 m à 140 m », « tournée de 40° », « tracé redessiné (6 sommets) », « posée ») |
 | `texts.refused`, `modeLine`, `revoked`, `trialLineDefault`, `trialEndedFeed`, `sayAuthor` **(client)** | — | textes affichés par le client hors de la page : refus d'un RPC, bandeaux du volet, notifications, nom des réponses de `/atelier_archives` au chat (`sayAuthor`, ancien `texts.archives.author`) |
@@ -238,7 +239,7 @@ refuse de démarrer (« config.lua, droits : rights.overrides['…'] = '…' : p
   publiée dans la même transaction. Un client qui ment sur sa position ne pose que des **brouillons** : rien n'existe en
   jeu avant la publication, qui repasse par `validate` et `validateLot`. Un envoi à la fois côté client, débit 6 puis
   2 / s côté serveur. Les fantômes sont des objets locaux (`isNetwork = false`) : personne d'autre ne les voit. Chaque
-  valeur reçue de la page (`placeStart`, `templateChanged`, `goTo`) est bornée par le Lua ; « Aller à » ne pose que le
+  valeur reçue de la page (`placeStart`, `templateChanged`, `goTo`) est bornée par le Lua ; « Marquer … sur la carte » ne pose que le
   repère GPS (pas de téléportation, décision du 31 octobre 2026).
 
 ## Réseau et coût
@@ -281,9 +282,12 @@ Téléchargé par chaque joueur à la connexion (1.2.0, T-132) : `shared/constan
 `config.lua` (≈ 21 Ko) et la logique de `shared/` sont servis au seul serveur. Retoucher `config.lua` ne fait rien
 retélécharger aux joueurs. **1.3.0 (T-102)** : l'outil de placement est livré à tous (`shared/placerules.lua`,
 `shared/aim.lua`, `client/placer.lua`, `ghosts.lua`, `drawing.lua`, et `placement` dans `config_client.lua`) :
-≈ 115,6 Ko de Lua (36,5 Ko compressés), et la page ≈ 153,7 Ko (48,2 Ko compressés, + 9,6 Ko, accepté par le porteur du
-projet). La cible de la spec pour le Lua (≤ 18 Ko bruts ajoutés) n'est **pas** tenue (+ 85 Ko bruts, + 25,3 Ko
-compressés), surtout par les commentaires : voir le rapport T-102 et T-154 (Lua livré sans commentaires).
+≈ 105,2 Ko de Lua (32,9 Ko compressés ; 115,6 et 36,5 avant la relecture réseau R-1 : en-têtes des fichiers livrés
+courts, commentaires de fonction de l'outil sur une ligne), et la page ≈ 154,1 Ko (48,3 Ko compressés, + 9,6 Ko,
+accepté par le porteur du projet). La cible de la spec pour le Lua (≤ 18 Ko bruts ajoutés) n'est **pas** tenue
+(≈ + 75 Ko bruts, dont ≈ 58 Ko de code) : pistes T-154 (Lua livré sans commentaires) et T-157 (code de l'Atelier livré
+au seul Conseil, décision du porteur du projet). `shared/aim.lua` est en tête des `client_scripts` (lu par le seul
+client).
 
 Visée (T-102) : une seule boucle par image, **seulement pendant la visée**, chez le seul membre qui place (≤ 0,15 ms
 visée : un lancer de rayon asynchrone par image, un seul en vol ; ≤ 3 marqueurs d'aire ; ≤ 12 étiquettes ; le fantôme

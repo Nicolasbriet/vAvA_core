@@ -229,9 +229,9 @@ Brume, Mine du Val, Prairie Haute, Rivière Claire).
 | # | Faire | Attendu |
 |---|---|---|
 | 1 | A : `F9` → carte « Récolte · 4 zones » → « Nouvelle zone », nom « Bois des Essais », enregistrer. | Volet de la maquette `Recolte` ; étapes « La zone · Les points · Publier », la première en cours ; bloc Lieu « Pas encore placée. » et bouton « Placer la zone ». |
-| 2 | « Placer la zone ». | Le volet s'atténue ; bandeau « Mode édition : les cercles et étiquettes ne sont visibles que par vous » ; barre « Clic Poser ici · Molette Rayon · Maj Réglage fin · Ctrl Z Annuler · Échap Quitter » ; anneau vert de 60 m sous la visée, libellé « Bois des Essais, rayon 60 m » ; A peut marcher et tourner la caméra. |
+| 2 | « Placer la zone ». | Le volet s'atténue ; bandeau « Atelier de la récolte » / « Mode édition : les cercles et étiquettes ne sont visibles que par vous » ; barre « Clic Poser ici · Molette Rayon · Maj Réglage fin · Ctrl Z Annuler · Échap Quitter » ; anneau vert de 60 m sous la visée, libellé « Bois des Essais, rayon 60 m » ; A peut marcher et tourner la caméra. |
 | 3 | Molette ×4 vers le haut, puis `Maj` + molette ×3. | Rayon 80 m, puis 81,5 m. |
-| 4 | Viser à plus de 60 m de A. | Anneau rouge, « Bois des Essais : Trop loin de vous : approchez-vous (… m). » ; un clic ne fait rien. |
+| 4 | Viser à plus de 60 m de A. | Anneau rouge, « Bois des Essais — Trop loin de vous (… m) : approchez-vous. » ; un clic ne fait rien. |
 | 5 | Viser le ciel. | « Visez le sol. » |
 | 6 | Poser près de A. | Retour au volet ; « Posée à … m de vous, rayon 81,5 m » ; étape 1 cochée ; journal « A a créé la zone Bois des Essais » (aucune autre ligne). |
 | 7 | « Déplacer la zone », la viser à cheval sur la Forêt de Brume (s'en approcher d'abord), cliquer. | Rouge après le clic : « Cette zone empiète sur « Forêt de Brume » de … m. » (refus du module, `placeCheck`) ; rien d'écrit. |
@@ -245,15 +245,15 @@ Brume, Mine du Val, Prairie Haute, Rivière Claire).
 | 1 | « Prochain point à poser » : Chêne, 3 récoltes, 10 minutes. | Phrase « Apparence : chêne de GTA, modèle provisoire. Il sera remplacé automatiquement quand le modèle médiéval sera ajouté. » |
 | 2 | « Poser des points ». | Barre « Clic Poser ici · Molette Tourner · Maj Placement précis · Clic droit Choisir un point · Ctrl Z Annuler · Échap Quitter » ; chêne fantôme (translucide) sous la visée ; anneau laiton de la zone ; libellé « Chêne 1, emplacement valide » en vert. |
 | 3 | Molette ; `Maj` + molette. | Le fantôme tourne de 15°, puis de 1°. |
-| 4 | Viser à plus de 5 m hors de l'anneau. | Rouge : « Chêne 1 : Hors de Bois des Essais. » |
-| 5 | Poser cinq chênes à 3 m l'un de l'autre. | Cinq fantômes ; liste « 5 points, dont 5 nouveaux », « Chêne 1 » à « Chêne 5 », « 3 récoltes » ; étape 2 cochée ; journal : aucune ligne par pose. |
-| 6 | Viser à 1 m de « Chêne 2 ». | Rouge : « Chêne 6 : Trop près de « Chêne 2 » (1 m). » |
+| 4 | Viser à plus de 5 m hors de l'anneau. | Rouge : « Chêne 1 — Hors de Bois des Essais. » |
+| 5 | Poser cinq chênes à 3 m l'un de l'autre. | Cinq fantômes ; liste « 5 points, dont 5 nouveaux », « Chêne 1 » à « Chêne 5 », « 3 récoltes » ; étape 2 cochée ; journal : une ligne « A a enregistré le brouillon de la zone Bois des Essais » si la zone était publiée (brouillon de la zone créé par la première pose), aucune par point. Un point à 1 récolte : « 1 récolte ». |
+| 6 | Viser à 1 m de « Chêne 2 ». | Rouge : « Chêne 6 — Trop près de « Chêne 2 » (1 m). » |
 | 7 | `Ctrl+Z`. | « Chêne 5 » disparaît (liste et fantôme). Le reposer. |
 | 8 | B, près de A : regarder ; `/vava_reseau joueur <B>`. | B ne voit ni chêne, ni anneau, ni étiquette ; rien de `vava_gathering` ni de `vava_atelier` reçu. |
-| 9 | A : clic droit sur « Chêne 3 », clic 4 m plus loin ; puis `Ctrl+Z`. | Barre « Clic Déplacer ici · … · Clic droit Lâcher le point » ; « Chêne 3 » déplacé, puis revenu à sa place. |
+| 9 | A : clic droit sur « Chêne 3 », clic 4 m plus loin ; puis `Ctrl+Z`. | Barre « Clic Déplacer ici · … · Clic droit Lâcher le point », étiquette « Chêne 3 : cliquez à sa nouvelle place » ; « Chêne 3 » déplacé, puis revenu à sa place. |
 | 10 | Clavier AZERTY : `Ctrl+Z`. | Même effet (touche `Z` réelle, commande-touche `+vava_atelier_annuler` ; réglable dans Paramètres › Raccourcis › FiveM). |
 | 11 | Spam de clics (10 en 1 s). | Six poses au plus, puis « Doucement : patientez un instant. » ; aucune pose en double. |
-| 12 | `Échap`, puis corbeille sur « Chêne 5 » (jamais publié), confirmer. | La ligne disparaît (brouillon abandonné) ; « 4 points, dont 4 nouveaux ». Le reposer. |
+| 12 | `Échap`, puis corbeille sur « Chêne 5 » (jamais publié), confirmer ; bouton repère « Marquer Chêne 1 sur la carte ». | La ligne disparaît (brouillon abandonné) ; « 4 points, dont 4 nouveaux ». Le reposer. |
 | 13 | Ouvrir « Chêne 2 » par son titre ; « Déplacer le point », le poser 2 m plus loin ; « retour ». | Visée de la fiche seule, retour au volet du point après le clic ; « retour » ramène à la zone, liste à jour. |
 
 ## 21. Tester la récolte (T-102, essai à blanc) — **(2 joueurs)** pour 3
@@ -262,7 +262,7 @@ Brume, Mine du Val, Prairie Haute, Rivière Claire).
 |---|---|---|
 | 1 | A : « Tester la récolte ». | La page se range ; bandeau seul « Mode essai : vous seul voyez ces points · F9 : revenir à l'Atelier » ; cinq vrais chênes chez A (plus de fantômes). |
 | 2 | A récolte « Chêne 1 » à la hache. | Invite « Essai » ; geste et barre normaux ; « [Essai] Chêne : … × Bûche de chêne (…). Rien n'est donné pendant un essai. » ; besace inchangée, aucune XP (fiche de personnage), hache non usée (solidité). |
-| 3 | B regarde ; `/vava_reseau joueur <B>` et `/vava_reseau joueur <A>`. | B : rien vu, rien reçu ; A : `vava_gathering:trial` seulement (≈ 0,5 Ko au début, ≈ 0,1 Ko par récolte). |
+| 3 | B regarde ; `/vava_reseau joueur <B>` et `/vava_reseau joueur <A>`. | B : rien vu, rien reçu ; A : `vava_gathering:trial` seulement (≈ 0,3 Ko au début, ≈ 0,1 Ko par récolte). |
 | 4 | A récolte encore « Chêne 1 » jusqu'au bout. | « Il n'y a plus rien à prendre ici pour le moment. » à la 4e. |
 | 5 | A range la hache, tente un chêne. | « Il vous faut une hache en main. » |
 | 6 | B tente de récolter là où A voit un chêne d'essai. | Aucune invite chez B (rien n'existe pour lui). |
@@ -273,7 +273,7 @@ Brume, Mine du Val, Prairie Haute, Rivière Claire).
 | # | Faire | Attendu |
 |---|---|---|
 | 1 | A : « Publier la zone ». | Boîte « Publier la zone ? » : « Nouvelle zone », « 5 points ajoutés », « Ce sera la version 1. », phrase « Publier rend les nouveaux points visibles aux joueurs proches. » |
-| 2 | Confirmer. B regarde. | En une seconde au plus, B voit les cinq chênes sortir de terre, **sans redémarrage** ; `/vava_reseau joueur <B>` : un état de zone (`vAvA:zone:state`) sous `vava_gathering`, ≈ 0,5 Ko. |
+| 2 | Confirmer. B regarde. | En une seconde au plus, B voit les cinq chênes sortir de terre, **sans redémarrage** ; `/vava_reseau joueur <B>` : un état de zone (`vAvA:zone:state`) sous `vava_gathering`, ≈ 0,3 Ko. |
 | 3 | `/vava_reseau joueur <C>` ; `/vava_reseau zones <C>`. | Rien de `vava_gathering` ni de `vava_atelier` chez C ; la zone `vava_gathering:bois_des_essais` n'est pas suivie par C. |
 | 4 | C approche à 150 m du centre de la zone. | C reçoit l'état entier une fois (cercle d'intérêt : rayon + 100 m), puis voit les chênes à 80 m. |
 | 5 | B récolte « Chêne 2 ». | Bûches réelles dans la besace, XP de Bûcheronnage, hache usée, vitalité de la zone baissée (`/recolte zone bois_des_essais`). |
@@ -295,15 +295,20 @@ Brume, Mine du Val, Prairie Haute, Rivière Claire).
 | # | Faire | Attendu |
 |---|---|---|
 | 1 | B (sans droit), par une ressource de test côté client : `core.rpc.call('vava_atelier:place', 'vava_gathering:zones', 'node', '', 0, { x = …, y = …, z = …, h = 0 }, 'bois_des_essais', { s = { ressource = 'chene' } })` à sa position. | `not_open` ou `not_allowed` ; rien d'écrit ; une ligne de refus en console (une par minute). |
-| 2 | A, même appel (Atelier ouvert) avec `x` à 500 m de lui. | `done = false`, « Trop loin de vous : approchez-vous (… m). » ; rien d'écrit. |
+| 2 | A, même appel (Atelier ouvert) avec `x` à 500 m de lui. | `done = false`, « Trop loin de vous (… m) : approchez-vous. » ; rien d'écrit. |
 | 3 | A, `{ x = 0/0, … }`, puis une clé `r` sur un point. | `invalid_args` (schéma) ; clé `r` : refus de lieu « r : clé inconnue pour un lieu oriented ». |
-| 4 | A dans une instance (intérieur, cachot), pose un point. | « Vous êtes dans une instance : revenez dans le royaume pour placer. » |
+| 4 | A dans une instance (intérieur, cachot), pose un point. | « Vous êtes hors du monde commun (intérieur, cachot…) : revenez-y pour placer. » |
 | 5 | A1 et A2 (deux Sénéchaux) : A2 pose un point dans une zone publiée dont A1 tient le brouillon. | « Un autre membre du Conseil tient déjà un brouillon de cette fiche… » (`draft_taken`) ; rien d'écrit. |
 | 6 | Visée en cours ; console : `restart vava_atelier`. | Fantômes retirés, souris et clavier rendus ; `Échap` rouvre normalement la bannière du royaume. |
 | 7 | `restart vava_gathering`. | Zones et points de la base (pas de la graine : « Bois des Essais » est là si elle est publiée) ; console : aucun `apply` si rien n'a changé. |
 | 8 | Serveur arrêté, base gardée ; démarrer **sans** `vava_atelier`. | La récolte tourne sur sa graine, avec l'avertissement « vava_atelier absent : la récolte tourne sur sa graine… » ; `ensure vava_atelier` : retour à l'état de la base (synchronisation), sans redémarrer la récolte. |
 | 9 | Monter à cheval, « Placer la zone ». | « Descendez de votre monture pour placer. » |
 | 10 | « Tester la récolte », puis `F9`, puis « Poser des points ». | La visée démarre (les lieux de la zone sont gardés pendant l'essai joué). |
+| 11 | « Placer » un enclos (tracé, exemple 1.2.0 quand il existera) ou toute zone : poser un sommet, `Échap`. | « Appuyez encore sur Échap pour abandonner le tracé. » ; libellé « Sommets posés : 1 (Entrée pour fermer le tracé) ». |
+| 12 | A en essai joué ; console : `restart vava_atelier` (ou `stop vava_atelier`). | Les chênes d'essai disparaissent chez A dans la seconde (fin de l'essai par la récolte) ; rien chez les autres joueurs. |
+| 13 | « Poser des points » dans la Rivière Claire avec « Chêne » comme ressource. | Rouge après le clic : « Une zone d'eau ne porte que des bancs de poissons. » ; rien d'écrit. |
+| 14 | A pose des points pendant que A2 a la fiche de la zone ouverte. | Chez A2 : une seule relecture de la fiche après la dernière pose (pas une par pose). |
+| 15 | B (sans rang) ouvre `resmon` près d'une zone suivie pendant que A récolte dix fois. | `vava_gathering` reste au plus bas (une récolte ne fait regrouper aucun point chez B). |
 
 ## 25. Fin du test
 

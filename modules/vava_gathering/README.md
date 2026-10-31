@@ -64,7 +64,8 @@ il complète la table sans réécrire une clé de `config_client.lua`.
 | Atelier : plafonds | 256 zones ; 120 points par zone (deux clés d'état par point, 256 clés par zone du core) | `editor.maxZones`, `editor.maxNodesPerZone` |
 | Atelier : diffusion de garde | une zone notée depuis plus de 2 s sans fin de lot part au passage suivant de la boucle lente | `editor.flushGraceMs` |
 | Atelier : types de lieu | Forêt, Mine, Prairie, Eau (chaque valeur a son icône dans `map.kinds`) | `editor.zoneKinds` |
-| Atelier : valeurs de départ | fatigue 2, repos 4 pts/h, cicatrice 48 h, 3 récoltes, repousse 10 min | `editor.defaults` |
+| Atelier : valeurs de départ | fatigue 2 % par récolte, repos 4 % par heure, cicatrice 48 h, 3 récoltes, repousse 10 min | `editor.defaults` |
+| Atelier : bornes de l'abondance | repos de la terre 12 % par heure au plus, repousse d'une récolte 5 min au moins (relecture lore : « ressources exploitées avec mesure ») | `editor.restMax`, `editor.regrowMin` |
 | Apparence d'un point | celle de sa ressource (`resources[…].prop`), dite au Conseil (« chêne de GTA, modèle provisoire ») | `looks` |
 | Liste de la carte | redemandée une fois par séance, 2 demandes puis une toutes les 20 s | `rateLimits.map` |
 | Essai à blanc | « [Essai] Chêne : 3 × Bûche de chêne (commun). Rien n'est donné pendant un essai. » | `messages.trialHarvest`, `trialFailed` |
@@ -105,14 +106,17 @@ reprend ses valeurs par défaut (pleine) et perd ses points : elle n'a alors auc
 (`/recolte vitalite`, `/recolte recharger`) et les autres modules (`setVitality`) changent l'état en jeu : les joueurs
 proches le voient aussitôt, sans reconnexion.
 
-Depuis 1.8.0 (T-102), l'état porte aussi **`def`** → `{ l, k, x, y, z, r }` (nom, type de lieu, centre et rayon de la
-zone) et **`p:<nœud>`** → `{ r, x, y, z, h }` (ressource, lieu et cap du point) : le client ne lit plus aucune zone ni
+Depuis 1.8.0 (T-102), l'état porte aussi **`def`** → `{ nom, type, x, y, z, rayon }` et **`p:<nœud>`** →
+`{ ressource, x, y, z, cap }`, en listes au format compact (longueurs en centimètres entiers, cap en dixièmes de
+degré entiers ; le client divise) : le client ne lit plus aucune zone ni
 aucun nœud dans sa config, une zone ou un point publiés dans l'Atelier paraissent sans redémarrage. Le modèle d'un point
 est celui de sa ressource. Ni coût, ni repos, ni cicatrice réglée, ni charges maximales, ni repousse, ni nom d'un
-point n'y entrent (part serveur) : changer la fatigue d'une zone n'envoie **rien** aux joueurs. Taille : ≈ 0,5 Ko pour
-une zone de 5 points, ≈ 3,8 Ko pour 50, ≈ 9 Ko pour 120 points aux identifiants courts (≈ 19 Ko au pire, identifiants
-de 46 octets ; latent annoncé par le core au-delà de 8 Ko). Le client garde 120 points au plus par zone et ignore une
-valeur mal formée.
+point n'y entrent (part serveur) : changer la fatigue d'une zone n'envoie **rien** aux joueurs. Taille : ≈ 0,3 Ko pour
+une zone de 5 points, ≈ 2 Ko pour 50, ≈ 4,9 Ko pour 120 points aux identifiants courts, sous le seuil du latent
+(≈ 15,9 Ko au pire, identifiants de 46 octets ; ≈ 9 et ≈ 19,5 Ko avant le format compact). Le client garde 120 points
+au plus par zone et ignore une valeur mal formée. Une récolte (charges, bande) ne fait qu'un passage de la boucle des
+props chez les abonnés : les points d'une zone ne sont regroupés de nouveau que si un lieu ou la `def` change (0,26 →
+0,002 ms par différence pour 120 points, mesure hors jeu).
 
 `cellSize` du core (cases de 256 m) est gardé : les zones de récolte sont grandes (zones d'exemple : rayon 60 à 120 m,
 cercle d'intérêt de 160 à 220 m) et peu nombreuses ; elles ajoutent une poignée de candidates par case, là où les cases de 128 m ne font
@@ -159,6 +163,11 @@ Atelier gardé `vava_gathering:zones` (« Récolte », famille monde, droit `met
   contrôles d'une vraie récolte (personnage, pas à terre, distance au début et à la fin, outil en main du bon genre et
   non brisé, durée, jeton, délai) ; à la fin, quantité et palier sont calculés et dits, **rien n'est donné** (ni objet,
   ni XP, ni usure, ni vitalité, ni charge réelle, ni hook `harvesting` / `harvested`), une charge d'essai est prise.
+- **Consigne au Conseil** (relecture lore, risque R-2) : une zone publiée fait sortir ses arbres de terre dans la
+  seconde sous les yeux des joueurs proches ; publier hors de leur vue, ou l'annoncer en jeu (une coupe ordonnée, une
+  mine rouverte par le Conseil…).
+- **Arrêt de l'Atelier** : `stop` ou `restart vava_atelier` met fin à tous les essais en cours (leurs auteurs retrouvent
+  l'affichage publié).
 - **Graine** : sans l'Atelier (absent ou pas encore synchronisé), la récolte tourne sur `config.zones` et
   `config.nodes`, avec un avertissement en console ; l'atelier se redéclare au hook `vava_atelier:editorsReady`.
 
@@ -203,17 +212,19 @@ le serveur tire la réussite.
 |---|---|
 | `config_client.lua` | réglages lus par le client (invite, streaming, carte, touches, genre des outils, part client des ressources, animations) : téléchargé par chaque joueur, ouvre `VavaGathering.config` |
 | `config.lua` | tous les autres réglages, servi au seul serveur (en tête des `server_scripts`) : complète la table ; zones et nœuds (graine de l'Atelier), part serveur des ressources et des outils, apparences, atelier |
-| `shared/geometry.lua`, `shared/proximity.lua`, `shared/zonestate.lua` | purs, lus par le client et le serveur : distances, groupes du streaming, état des zones (`def`, `p:`, différences, essai, liste de la carte) |
-| `shared/season.lua`, `shared/catch.lua`, `shared/editing.lua` | purs, servis au seul serveur : facteurs de saison, prise d'un poisson ; atelier « Récolte » (formulaires, conversions, règles, liste de la carte) |
+| `shared/geometry.lua`, `shared/proximity.lua`, `shared/zonestate.lua` | purs, lus par le client et le serveur : distances, groupes du streaming, lecture de l'état des zones (`def`, `p:`, essai, liste de la carte) |
+| `shared/season.lua`, `shared/catch.lua`, `shared/editing.lua`, `shared/zonebuild.lua` | purs, servis au seul serveur : facteurs de saison, prise d'un poisson ; atelier « Récolte » (formulaires, conversions, règles, liste de la carte) ; construction de l'état des zones (format compact, cercle, différences, paquets) |
+| `client/props.lua`, `blips.lua`, `interact.lua`, `fishing.lua`, `main.lua` | points dans le monde (props locaux à portée, boucle lente arrêtée sans zone suivie, essai de l'Atelier chez son auteur) ; carte ; invite et geste ; barre de tension ; entrée du client |
 | `server/catalog.lua`, `zones.lua`, `nodes.lua`, `share.lua` | catalogue mutable ; vitalité et charges (lignes de la base gardées) ; zones du core et différences de l'Atelier |
 | `server/atelier.lua`, `trials.lua`, `map.lua` | déclaration de l'atelier et fonctions lues par l'Atelier ; essais à blanc par auteur ; liste de la carte (RPC `map`) |
 
 Fichiers téléchargés par chaque joueur (1.7.0, T-132) : `shared/constants.lua`, `config_client.lua`, les trois
 `shared/*.lua` lus par le client, les sept `client/*.lua`, la page et les dessins des objets ; `config.lua`,
-`shared/season.lua`, `shared/catch.lua` et `shared/editing.lua` sont servis au seul serveur. Poids du Lua livré
-(1.8.0) : 82,9 Ko (27,6 Ko compressés), contre 65,5 Ko (22,7) en 1.7.0 : `config_client.lua` perd 4,3 Ko (zones,
-nœuds, parts serveur), `shared/zonestate.lua` (+ 11,7 Ko), `client/props.lua` et `client/blips.lua` gagnent la lecture
-de `def` et `p:`, l'essai et la liste de la carte.
+`shared/season.lua`, `shared/catch.lua`, `shared/editing.lua` et `shared/zonebuild.lua` sont servis au seul serveur.
+Poids du Lua livré (1.8.0) : 71,0 Ko (23,9 Ko compressés), contre 65,5 Ko (22,7) en 1.7.0 : `config_client.lua` perd
+4,3 Ko (zones, nœuds, parts serveur), `client/props.lua` et `client/blips.lua` gagnent la lecture de `def` et `p:`,
+l'essai et la liste de la carte ; la construction de l'état est servie au seul serveur, et les en-têtes des fichiers
+livrés sont courts (relecture réseau R-1 : 82,9 → 71,0 Ko). Le détail des fichiers est dans ce README.
 
 **Mise à jour vers 1.8.0 (T-102)** : `zones` et `nodes` ont quitté `config_client.lua` pour `config.lua` ; la part
 serveur des ressources et des outils est passée dans `resourceStats` et `toolStats`. Un `config_client.lua` d'avant

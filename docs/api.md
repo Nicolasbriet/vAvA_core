@@ -2147,12 +2147,15 @@ jeu : `modules/vava_gathering/README.md`. Demande le core 0.11.0 (abonnements de
   La vitalité n'est jamais envoyée (export `getZone` et panneau `vava_gathering:zones` pour la lire). Plus aucune clé
   GlobalState (les anciennes `vava_gathering:zone:<id>` et `vava_gathering:node:<id>` sont effacées une fois au
   démarrage). État public (rien de secret) : chaque action revérifie la distance côté serveur. Identifiants : zone
-  48 octets au plus, nœud 46. Depuis 1.8.0 (T-102), l'état porte aussi `def` → `{ l, k, x, y, z, r }` (nom, type de
-  lieu, centre et rayon de la zone) et `p:<nœud>` → `{ r, x, y, z, h }` (ressource, lieu et cap d'un point) : le
-  client ne lit plus aucune zone ni aucun nœud dans sa config. Ni coût, ni repos, ni cicatrice réglée, ni charges
-  maximales, ni repousse, ni nom d'un point dans l'état : changer la fatigue d'une zone n'envoie rien. 120 points au
-  plus par zone (2 + 2 × 120 = 242 clés sur 256 ; ≈ 9 Ko pour 120 points aux identifiants courts, ≈ 19 Ko au pire,
-  latent au-delà de 8 Ko).
+  48 octets au plus, nœud 46. Depuis 1.8.0 (T-102), l'état porte aussi `def` → `{ nom, type, x, y, z, rayon }` et
+  `p:<nœud>` → `{ ressource, x, y, z, cap }` (ressource, lieu et cap d'un point), **listes** au format compact :
+  longueurs en centimètres entiers, cap en dixièmes de degré entiers dans [0, 3600) ; le client divise (relecture
+  réseau R-3). Le client ne lit plus aucune zone ni aucun nœud dans sa config. Ni coût, ni repos, ni cicatrice réglée,
+  ni charges maximales, ni repousse, ni nom d'un point dans l'état : changer la fatigue d'une zone n'envoie rien. 120
+  points au plus par zone (2 + 2 × 120 = 242 clés sur 256 ; ≈ 4,9 Ko pour 120 points aux identifiants courts, sous le
+  seuil du latent ; ≈ 15,9 Ko au pire, identifiants de 46 octets). Une récolte (charges, bande) ne fait regrouper aucun
+  point chez les abonnés (relecture réseau R-2). Construction de l'état : `shared/zonebuild.lua`, servi au seul
+  serveur.
 - **Atelier « Récolte »** (1.8.0, T-102) : atelier gardé `vava_gathering:zones` (famille monde, droit `metiers`,
   `trialPlay`), types `zone` (cercle, rayon de 10 à 300 m) et `node` (« point », orienté, enfant d'une zone, à 5 m au
   plus hors de son cercle, 2 m entre deux points), déclaré au démarrage et au hook `vava_atelier:editorsReady`. `apply`
@@ -2211,7 +2214,7 @@ terre sacrée, nuit, état…), `harvested` (`after` : `+ quantity, tier, band, 
 
 | Évènement (1.8.0) | Cible | Charge |
 |---|---|---|
-| `vava_gathering:trial` | le seul auteur de l'essai (`core.net`, toujours fiable : `latent = 'never'`, l'essai entier puis ses différences arrivent dans l'ordre ; ≈ 0,1 Ko + 70 o par point) | `{ zone, mode = 'full', def, nodes = { [id] = { r, x, y, z, h, c } } }`, puis `{ zone, mode = 'patch', def?, nodes?, hidden? }` (relance après une sauvegarde ou une pose, charge d'essai prise : `nodes = { [id] = { c } }`) |
+| `vava_gathering:trial` | le seul auteur de l'essai (`core.net`, toujours fiable : `latent = 'never'`, l'essai entier puis ses différences arrivent dans l'ordre ; ≈ 0,1 Ko + 35 à 75 o par point : ≈ 8,9 Ko au pire pour 120 points aux identifiants de 46 octets, ≈ 13,3 Ko avant le format compact) | `{ zone, mode = 'full', def, nodes = { [id] = { ressource, x, y, z, cap, charges } } }` (format compact de l'état), puis `{ zone, mode = 'patch', def?, nodes?, hidden? }` (relance après une sauvegarde ou une pose ; charge d'essai prise : `nodes = { [id] = charges }`, un nombre) |
 | `vava_gathering:trialEnd` | le seul auteur, s'il est encore là | identifiant de la zone |
 
 La réponse de `vava_gathering:begin` porte `trial = true` pour un point d'essai, et `durationMs` est la seule durée du
@@ -2980,14 +2983,17 @@ template = { 'ressource', 'charges', 'repousse' },  -- type à parent : champs d
                                                     -- jamais le titleField) ; leurs valeurs partent avec chaque clic
 autoTitle = 'ressource',          -- type à parent, champ select ou segmented : titre d'un enfant nouveau = libellé du
                                   -- choix + premier numéro libre parmi les frères (« Chêne 4 »)
-hintField = 'charges', hintFormat = '%s récoltes',  -- slider ou duration ; 24 octets, un seul %s : indice d'une ligne
+hintField = 'charges', hintFormat = { one = '%s récolte', many = '%s récoltes' },
+                                  -- slider ou duration ; un texte, ou { one, many } accordé selon la valeur (`one`
+                                  -- pour 0 et 1) ; 24 octets, un seul %s chacun : indice d'une ligne
 ghost = { field = 'ressource',    -- select, segmented ou model : le fantôme suit ce champ
           models = { chene = { model = 'prop_tree_oak_01', label = 'chêne de GTA', provisional = true } } },
                                   -- models facultatif (sans lui : la valeur du champ est le modèle) ; 64 entrées,
                                   -- model au motif ^[A-Za-z0-9_]+$ de 64 octets, label 40
 ```
 
-— par éditeur : `trialPlay = true` (l'essai se joue en jeu : la page se met de côté, `F9` la rend) ;
+— par éditeur : `trialPlay = true` (l'essai se joue en jeu : la page se met de côté, `F9` la rend) ; `texts.banner`
+(1 à 32 octets, facultatif : titre du bandeau du volet, sinon le libellé de l'atelier : « Atelier de la récolte ») ;
 `placeCheck(kind, place, ctx)` (facultatif, seulement avec `apply`) → `true` ou `false, 'texte'` (≤ 160) ;
 `ctx = { source, accountId, id, parent?, data, siblings }` : `id` vaut `''` pour une fiche nouvelle, `data` est la data
 normalisée (celle du modèle pour un enfant nouveau), `siblings` le nombre de frères vivants après la pose ; `place` est
