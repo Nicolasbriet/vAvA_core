@@ -144,6 +144,8 @@ describe('vava_magic blessures sur la chaîne de dégâts', function()
             end
             local carry = magicCfg.combos.roche_ardente.result.carry
             assert.equal(legacyAmount(carry.damage), harm.amount(carry.damage, 100, 100))
+            -- et la brûlure qu'elle emporte
+            assert.equal(legacyAmount(carry.burn.damage), harm.amount(carry.burn.damage, 100, 100))
             assert.equal('feu', harm.kindOf('feu', magicCfg.combat.kinds))
             local steam = magicCfg.combos.vapeur.result
             assert.equal(legacyAmount(steam.damage), harm.amount(steam.damage, 100, 100))

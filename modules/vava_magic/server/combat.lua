@@ -94,7 +94,8 @@ end
 ---@param caster integer
 local function unharmed(caster)
     if due(UNAVAILABLE) then
-        VavaMagic.log.warn('vava_health ne répond pas : les sorts ne blessent personne (aucun repli chez le client)')
+        VavaMagic.log.warn('vava_health ne répond pas (arrêté, en erreur, ou sans chaîne de dégâts : 1.3.0 au '
+            .. 'moins) : les sorts ne blessent personne (aucun repli chez le client)')
     end
     if type(caster) ~= 'number' or caster <= 0 or not bridge.GetCharacterId(caster) then return end
     local now = GetGameTimer()

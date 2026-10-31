@@ -270,13 +270,16 @@ Bridge.db = {
 
 --- Coup porté par un sort : `exports.vava_health:hit(cible, paquet)` (paquet de shared/harm.lua). Rend le résultat de
 --- la chaîne (`applied`, `absorbed`, `cancelled`…), ou nil et un code : celui de vava_health, ou `health_unavailable`
---- quand il est arrêté ou en erreur. Sans vava_health, aucun sort ne blesse personne (plus aucun repli chez le client).
+--- quand il est arrêté, en erreur ou sans chaîne (plus ancien que 1.3.0). Sans vava_health, aucun sort ne blesse
+--- personne (plus aucun repli chez le client). Appel isolé et silencieux : combat.lua le signale, une fois par minute
+--- (pas une ligne de console par coup).
 ---@param target integer
 ---@param packet table
 ---@return table|nil result
 ---@return string|nil code
 function Bridge.Hit(target, packet)
-    local called, result, code = call(LINKS.HEALTH, 'hit', target, packet)
+    if GetResourceState(LINKS.HEALTH) ~= 'started' then return nil, 'health_unavailable' end
+    local called, result, code = pcall(invoke, LINKS.HEALTH, 'hit', target, packet)
     if not called then return nil, 'health_unavailable' end
     if type(result) ~= 'table' then return nil, type(code) == 'string' and code or 'refused' end
     return result
