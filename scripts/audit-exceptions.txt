@@ -10,7 +10,6 @@ modules/vava_loading/web/fonts/cinzel_decorative_900.woff2	[fichier]	écran de c
 modules/vava_farming/fxmanifest.lua	'config.lua',	T-132 : config partagée, lot 2 (T-141)
 modules/vava_crafting/fxmanifest.lua	'config.lua',	T-132 : config partagée, lot 2 (T-141)
 modules/vava_gathering/fxmanifest.lua	'config.lua',	T-132 : config partagée, lot 2 (T-141)
-modules/vava_skills/fxmanifest.lua	'config.lua',	T-132 : config partagée, lot 2 (T-141)
 modules/vava_provisions/fxmanifest.lua	'config.lua',	T-132 : config partagée, lot 2 (T-141)
 modules/vava_inventory/fxmanifest.lua	'config.lua',	T-132 : config partagée, lot 3 (T-142)
 modules/vava_combat/fxmanifest.lua	'config.lua',	T-132 : config partagée, lot 3 (T-142)
