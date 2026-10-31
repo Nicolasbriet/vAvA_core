@@ -14,7 +14,7 @@ use_experimental_fxv2_oal 'yes'
 
 name 'vava_hud'
 description 'Affichage en jeu vAvA (jauges, notifications, progression)'
-version '1.4.0'
+version '1.5.0'
 
 dependency 'vAvA_core'
 dependency 'vava_ui'
@@ -36,5 +36,6 @@ client_scripts {
     'client/native.lua',
     'client/notify.lua',
     'client/progress.lua',
+    'client/pause.lua',
     'client/main.lua',
 }

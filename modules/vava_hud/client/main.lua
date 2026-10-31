@@ -2,9 +2,10 @@
     vava_hud/client/main.lua
     Rôle : exports (jauges, notifications, progression), retrait de l'interface native de GTA, et visibilité du HUD :
            affiché quand un personnage est en jeu, masqué pendant la sélection, le menu pause et les fondus au noir
-           (apparition, chargement). Une progression en cours est interrompue au retour à la sélection.
+           (apparition, chargement) et, depuis 1.5.0, pendant la bannière du royaume (vava_pause). Une progression en
+           cours est interrompue au retour à la sélection.
     Dépendances : config.lua, client/core.lua, client/nui.lua, client/gauges.lua, client/native.lua, client/notify.lua,
-                  client/progress.lua
+                  client/progress.lua, client/pause.lua
 ]]
 
 local CreateThread, Wait, AddEventHandler = CreateThread, Wait, AddEventHandler
@@ -16,13 +17,14 @@ if not core then return end
 
 local cfg = VavaHud.config
 local nui, gauges, native, notify, progress = VavaHud.nui, VavaHud.gauges, VavaHud.native, VavaHud.notify, VavaHud.progress
+local pause = VavaHud.pause
 
 -- personnage en jeu (apparu), d'après les hooks du core
 local playing = core.characters.current() ~= nil and not core.characters.awaitingSelection()
 local visible = false
 
 local function shouldShow()
-    return playing and not IsPauseMenuActive() and not IsScreenFadedOut() and not IsScreenFadingOut()
+    return playing and not pause.isOpen() and not IsPauseMenuActive() and not IsScreenFadedOut() and not IsScreenFadingOut()
 end
 
 local function refresh()
@@ -36,9 +38,11 @@ end
 nui.onReady(function()
     return {
         position = cfg.position, gauges = gauges.all(), visible = visible, notifications = cfg.notifications,
-        progress = progress.snapshot(),
+        progress = progress.snapshot(), settings = pause.settings(),
     }
 end)
+-- bannière déployée ou repliée (1.5.0) : visibilité relue aussitôt, sans attendre le prochain relevé
+pause.onChange(function() refresh() end)
 
 ---@return string
 local function caller()

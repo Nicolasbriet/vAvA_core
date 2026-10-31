@@ -1119,6 +1119,13 @@ Jauges affichées quand un personnage est en jeu ; masquées pendant la sélecti
 - Hooks client (émis par le HUD) : `vava_hud:progressDone` (`{ id }`) à la fin ; `vava_hud:progressCancelled`
   (`{ id, reason }`) à l'interruption, `reason` = `module` (`cancelProgress`, ou arrêt de la ressource qui l'avait
   lancée) ou `hidden` (retour à la sélection, déchargement du personnage).
+- **Bannière du royaume** (1.5.0, T-145) : jauges et barre de progression masquées (jamais interrompues) pendant que
+  la bannière de `vava_pause` est déployée (crochet client `vava_pause:state`, remis à « repliée » à l'arrêt de
+  `vava_pause`) ; notifications visibles. Réglages du joueur lus chez elle (export client `setting`, isolé ; crochet
+  `vava_pause:settingChanged`) : `ui.scale` → échelle de la page (`config.scales`), `hud.notifyDuration` → durée des
+  notifications (`config.notifyDurations`, multiplicateur de `notifications.durationMs`). La page reçoit
+  `settings = { scale, durationMs }` dans `init`, puis le message `settings` (`{ scale, durationMs }`) au seul
+  changement. Sans `vava_pause` : comportement d'avant (`config.pauseResource`).
 - Pour travailler le rendu sans le jeu : `web/index.html?values=0.8,0.62,0.08` dans un navigateur ; `&progress=1`
   (barre de 8 s menée à son terme) ou `&progress=cancel` (interrompue à 60 %). Depuis 1.4.0, polices et grain viennent
   de `vava_ui` (dépendance déclarée) et les données simulées de `web/dev/devmock.js`, jamais livré.
@@ -1505,6 +1512,10 @@ setr voice_useSendingRangeOnly true
 
 Hooks : `vava_voice:zonesChanged` (serveur, `after` : `{ action = set|remove, id, zone?, source }`),
 `vava_voice:rangeChanged` (client, `after` : `{ index, name, distance }`).
+
+Bannière du royaume (1.4.0, T-145) : le cercle au sol ne se montre que si le réglage `voice.circle` de `vava_pause`
+n'est pas `false` (export client `setting`, isolé, relu quand `vava_pause` démarre, suivi par le crochet
+`vava_pause:settingChanged`) ; sans `vava_pause`, comme avant (`config.pauseResource`).
 
 Pour travailler le rendu de l'éditeur sans le jeu : `web/index.html` (ou `?zone=1` pour le formulaire) dans un
 navigateur ; le médaillon : `vava_hud/web/index.html?values=0.8,0.6,0.3,0.75&talking=1`.

@@ -12,8 +12,8 @@
     Dépendances : shared/, config.lua, tous les fichiers client/ du module
 ]]
 
-local type, mathType, tonumber, tostring = type, math.type, tonumber, tostring
-local CreateThread, Wait = CreateThread, Wait
+local type, mathType, tonumber, tostring, pcall = type, math.type, tonumber, tostring, pcall
+local CreateThread, Wait, GetResourceState = CreateThread, Wait, GetResourceState
 local RegisterCommand, RegisterKeyMapping, RegisterNetEvent, AddEventHandler =
     RegisterCommand, RegisterKeyMapping, RegisterNetEvent, AddEventHandler
 local PlayerId, PlayerPedId, GetEntityCoords, NetworkIsPlayerTalking = PlayerId, PlayerPedId, GetEntityCoords, NetworkIsPlayerTalking
@@ -110,6 +110,39 @@ RegisterKeyMapping(cfg.command, cfg.keyLabel, 'keyboard', cfg.key)
 RegisterCommand(cfg.zones.command, function()
     if playing then CreateThread(editor.open) end
 end, false)
+
+-- Réglage « Cercle de portée au sol » de la bannière du royaume (1.4.0) : lu chez vava_pause (export isolé) au
+-- démarrage et quand elle démarre, suivi par son crochet ; sans elle, le cercle se montre comme avant.
+local PAUSE = cfg.pauseResource
+local CIRCLE_KEY = 'voice.circle'
+
+local function readCircle()
+    return exports[PAUSE]:setting(CIRCLE_KEY)
+end
+
+local function loadCircle()
+    if type(PAUSE) ~= 'string' or GetResourceState(PAUSE) ~= 'started' then
+        range.setRing(true)
+        return
+    end
+    local ok, value = pcall(readCircle)
+    if not ok then VavaVoice.log.warn('%s.setting en erreur : %s', PAUSE, tostring(value)) end
+    range.setRing(not ok or value ~= false)
+end
+
+core.hooks.after('vava_pause:settingChanged', function(payload)
+    if type(payload) == 'table' and payload.key == CIRCLE_KEY then range.setRing(payload.value ~= false) end
+end)
+
+AddEventHandler('onClientResourceStart', function(resource)
+    if resource == PAUSE then loadCircle() end
+end)
+
+AddEventHandler('onClientResourceStop', function(resource)
+    if resource == PAUSE then range.setRing(true) end
+end)
+
+loadCircle()
 
 AddEventHandler('onClientResourceStart', function(resource)
     if resource ~= hud.RESOURCE then return end

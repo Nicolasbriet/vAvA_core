@@ -87,6 +87,10 @@ VavaVoice.config = {
         },
     },
 
+    -- Bannière du royaume (1.4.0) : réglage du joueur « Cercle de portée au sol » (voice.circle) lu chez elle ; sans
+    -- elle, le cercle se montre comme avant.
+    pauseResource = 'vava_pause',
+
     hud = { label = 'Voix', icon = 'nui://vava_voice/web/icons/voice.svg', order = 40 },
 
     -- Chancellerie (panneau web) : seule ressource admise à modifier ou supprimer une zone en son nom.
