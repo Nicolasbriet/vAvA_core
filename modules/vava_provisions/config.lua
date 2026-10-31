@@ -86,7 +86,9 @@ config.rateLimits = {
 
 -- Textes du Conseil, lus par le seul serveur (T-143) : ajoutés à `messages` (config_client.lua), dont le client lit
 -- les textes montrés au joueur. Réponses de /eau (200 octets au plus, texte brut) et libellé du journal du Registre
--- (32 octets au plus).
+-- (32 octets au plus). Un config_client.lua de 1.1.0 gardé par une mise à jour les sert encore aux joueurs : relevé
+-- avant de les poser, signalé au démarrage (relecture sécurité S-2 de T-143) ; ceux d'ici font foi.
+VavaProvisions.legacyClientTexts = config.messages.admin ~= nil or config.messages.journal ~= nil
 config.messages.admin = {
     usage = 'usage : /%s points | reserve <point> <nombre>',
     line = '%s (%s, %s) : %s.',          -- nom, identifiant, sorte, réserve

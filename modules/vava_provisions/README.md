@@ -181,7 +181,9 @@ reste sans effet. Reportez vos réglages dans `config.lua` et `config_client.lua
 libellé du journal du Registre) ont quitté `config_client.lua` pour `config.lua`, et les règles (`shared/rules.lua`)
 ne sont plus servies aux joueurs : les textes qu'ils voient sont formés par `shared/texts.lua`. Un `config.lua` de
 1.1.0 modifié et gardé par l'installeur n'a pas ces textes : le module refuse alors de démarrer (« config.lua d'avant
-1.2.0 : messages.admin et messages.journal … y manquent ») ; reportez-les d'après `config.lua.nouveau`.
+1.2.0 : messages.admin et messages.journal … y manquent ») ; reportez-les d'après `config.lua.nouveau`. À l'inverse,
+un `config_client.lua` de 1.1.0 gardé les sert encore aux joueurs sans servir : la console le signale
+(« config_client.lua garde les textes du Conseil d'avant 1.2.0 … ») ; retirez-les d'après `config_client.lua.nouveau`.
 
 ## Fichiers
 
