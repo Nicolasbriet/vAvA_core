@@ -91,6 +91,9 @@ taille_descendante = {
 }
 ```
 
+`hit.angle` est l'**ouverture totale** de l'arc, centrée sur l'avant ; la tolérance d'angle s'ajoute au **demi-angle**
+(70° et + 10° : 45° de chaque côté) (T-112).
+
 Déroulement d'un coup :
 1. Le joueur appuie : le client **joue tout de suite** l'animation (réactivité) et appelle le RPC
    `vava_combat:use` (id de technique, cible verrouillée éventuelle).
@@ -140,5 +143,6 @@ désarmement.
 
 ## Réglages de départ (config, à ajuster en jeu)
 
-Tolérance de portée + 0,4 m, tolérance d'angle + 15°, fenêtre de parade 200 ms, invulnérabilité d'esquive 250 ms,
-recharge de l'endurance 20 / s après 1 s sans effort, garde brisée 1,2 s.
+Tolérance de portée + 0,25 m, tolérance d'angle + 10° (resserrées, sans contrôle des murs : décision du porteur du
+projet, 31 octobre 2026, T-112), dégainer 0,8 s et rengainer 1,5 s, fenêtre de parade 200 ms, invulnérabilité d'esquive
+250 ms, recharge de l'endurance 20 / s après 1 s sans effort, garde brisée 1,2 s.

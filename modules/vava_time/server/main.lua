@@ -8,6 +8,7 @@
 ]]
 
 local ipairs, pairs, tostring = ipairs, pairs, tostring
+local concat = table.concat
 local time = os.time
 local AddEventHandler, CreateThread, Wait, GlobalState = AddEventHandler, CreateThread, Wait, GlobalState
 
@@ -58,11 +59,27 @@ local function setup()
     -- T-132 : un config.lua d'avant 1.4.0 (gardé par une mise à jour) remplace la table de config_client.lua ; il
     -- contient tout ce que lit le serveur, le module démarre. shared/calendar.lua et shared/weather.lua ont gardé la
     -- table de config_client.lua (lue à leur chargement, avant config.lua), au serveur aussi : un calendrier, un ciel
-    -- ou un texte changé dans l'ancien config.lua n'agit qu'en partie au serveur, et pas chez les joueurs
+    -- ou un texte changé dans l'ancien config.lua n'agit qu'en partie au serveur, et pas chez les joueurs. Le cours
+    -- des ciels (shared/cycle.lua, chargé après config.lua : T-146) est, lui, pris dans l'ancien config.lua
     if VavaTime.config.clientFile ~= true then
         core.log.warn('config.lua garde la forme d\'avant 1.4.0 (il remplace la table de config_client.lua) : '
             .. 'calendrier, ciels et textes de config_client.lua restent en vigueur chez les joueurs et pour les '
-            .. 'dates et les ciels calculés au serveur ; reportez vos changements d\'après config.lua.nouveau')
+            .. 'dates et les ciels reconnus au serveur ; le cours des ciels (successeurs, poids, neige, durées, '
+            .. 'transition) est pris dans cet ancien config.lua ; reportez vos changements d\'après '
+            .. 'config.lua.nouveau')
+    end
+    -- T-146 : le cours des ciels a quitté config_client.lua pour config.lua en 1.5.0 ; un config.lua de 1.4.0 gardé
+    -- par une mise à jour ne l'a pas, et le cycle le lit : le module ne démarre pas sans lui
+    local missing = rules.missingCourse()
+    if #missing > 0 then
+        return false, 'config.lua d\'avant 1.5.0 : le cours des ciels y manque (weather.'
+            .. concat(missing, ', weather.') .. ') ; reportez-le d\'après config.lua.nouveau'
+    end
+    -- l'inverse : un config_client.lua de 1.4.0 gardé le sert encore aux joueurs (celui de config.lua fait foi)
+    if VavaTime.legacyClientSky then
+        core.log.warn('config_client.lua garde le cours des ciels d\'avant 1.5.0 (weather.next, seasons, snow, '
+            .. 'durationMinutes, durations, fadeSeconds) : il est encore téléchargé par les joueurs sans servir ; '
+            .. 'retirez-le d\'après config_client.lua.nouveau (celui de config.lua fait foi)')
     end
     local declared, declareErr = VavaTime.commands.declare()
     if not declared then return false, 'commandes : ' .. tostring(declareErr) end

@@ -1,6 +1,7 @@
 # Eau potable — procédure de test en jeu
 
-Procédure pour vérifier en jeu `vava_provisions` 1.0.0 (« Vivres » : points d'eau, outres, eau potable, T-130) avec
+Procédure pour vérifier en jeu `vava_provisions` 1.3.0 (« Vivres » : points d'eau, outres, eau potable, T-130 ; palier de
+l'outre, T-135 : § 4 bis) avec
 ses voisins : `vava_inventory` 1.8.0 (échange, hook d'utilisation), `vava_needs` (soif), `vava_crafting` (tannerie),
 `vava_arrival` 1.1.0 (dotation reprise). Comptez une heure ; les tests à deux joueurs sont marqués **(2 joueurs)**.
 Chaque test dit quoi faire et ce qui doit se passer ; si ce n'est pas le cas, notez l'étape, ce que vous avez vu, et la
@@ -24,7 +25,7 @@ ligne de console correspondante. Un test se cite « eau 11 ».
 
 | # | Faire | Attendu |
 |---|---|---|
-| 1 | Démarrer le serveur. | Console : `module 'vava_provisions' v1.0.0 prêt`, aucune ligne « recette de l'outre non déclarée », aucun avertissement d'objet ; `vava_arrival` v1.1.0 prêt. |
+| 1 | Démarrer le serveur. | Console : `module 'vava_provisions' v1.3.0 prêt`, aucune ligne « recette de l'outre non déclarée », aucun avertissement d'objet ; `vava_arrival` v1.1.0 prêt. |
 | 2 | B crée un personnage. | Besace : 2 Outre d'eau, image de l'outre ; fiche « Soif +40 », description nouvelle (« … l'outre vide vous reste, si la couture tient. »). |
 | 3 | B : `/besoins 100 50`, boit une Outre d'eau. | Geste de boire, soif vers 90 ; une **Outre vide** apparaît dans la besace (ou, une fois sur dix, l'avis « La couture cède : l'outre se fend… » et rien). |
 
@@ -57,8 +58,25 @@ ligne de console correspondante. Un test se cite « eau 11 ».
 | 16 | B charge sa besace près de 25 kg avec 5 Outres vides, soif 99 : `E`. | « Votre besace serait trop lourde. » ; les outres restent vides ; `/eau points` : réserve inchangée. |
 | 16 bis | Même besace, `/besoins 100 50` : `E` au même puits. | « Votre besace serait trop lourde. Vous buvez quelques gorgées d'eau fraîche. » ; geste de boire, soif vers 70 ; outres toujours vides ; réserve inchangée. |
 | 17 | B, besace pleine sauf la place de ses Outres d'eau (pile de 2), boit une Outre d'eau. | « Votre besace est pleine : l'outre vide est perdue. » ; soif remontée. |
-| 18 | `tearChance = 1` dans la config, `restart vava_provisions` ; B boit une Outre d'eau. Remettre `0.1`. | « La couture cède : l'outre se fend… » ; aucune Outre vide. |
+| 18 | `tearChance = 1` dans la config, `restart vava_provisions` ; B boit une Outre d'eau **sans palier** (dotation, ou remplie d'une `/objet outre 1`). Remettre `0.1`. | « La couture cède : l'outre se fend… » ; aucune Outre vide. |
 | 19 | B, 1 Cuir tanné (`/objet cuir 1`) à la Tannerie du bourg : recette « Outre ». | 2 Outres vides (palier noté) ; XP de Tannerie. |
+
+## 4 bis. Palier de l'outre (1.3.0, T-135)
+
+Le palier d'une outre se lit sur sa case (badge et liseré) et sur sa fiche. Une outre de la tannerie en a un ; une outre
+de la dotation ou du catalogue (`/objet outre`) n'en a pas. Pour obtenir un autre palier, faire l'outre avec un autre
+personnage, ou changer le niveau de Tannerie de B (A : `/metiers niveau <B> tannerie <niveau>`, droit `metiers`).
+
+| # | Faire | Attendu |
+|---|---|---|
+| 28 | B : 2 Outres de la tannerie (palier P), puis 2 autres du même palier P ; `/objet outre 1` ; glisser l'outre sans palier sur la pile de palier P. | Une seule pile de 4 Outres vides au palier P ; l'outre sans palier à part ; la fusion à la main est refusée. Une outre d'un autre palier fait encore une autre pile. |
+| 29 | B, ses 4 Outres P et l'outre sans palier, soif 99, à la fontaine : `E`. | « Vous remplissez 5 outres. » ; besace : une pile de 4 Outres d'eau au palier P (badge), une Outre d'eau sans palier ; plus aucune Outre vide. |
+| 30 | B : `/besoins 100 50`, boit une Outre d'eau P, puis boit les autres jusqu'à la dernière de la pile (`/besoins 100 50` entre deux). | À chaque gorgée, une Outre vide **au palier P** (sauf fente), qui rejoint la pile d'Outres vides P, y compris pour la dernière unité ; console du serveur : aucune erreur ni « handler before … en erreur » sur `vava_inventory:use`. |
+| 31 | B boit l'Outre d'eau sans palier. | Une Outre vide sans palier, dans une pile à part (sauf fente). |
+| 32 | Config : `tearChance = 1`, `tearChanceByTier = { 0, 0, 0, 0, 0 }` ; `restart vava_provisions` ; B remplit une outre P et une outre sans palier, boit les deux. Puis `tearChance = 0`, `tearChanceByTier = { 1, 1, 1, 1, 1 }`, même chose. Remettre `0.1` et `{ 0.15, 0.1, 0.05, 0.025, 0.01 }`. | Premier tour : l'outre P revient, celle sans palier se fend (« La couture cède… »). Second tour : l'inverse. |
+| 33 | Config : `tearChanceByTier = { 0.1, 0.2 }` ; `restart vava_provisions`. Remettre la valeur. | Le module refuse de démarrer : console « config : containers.eau.tearChanceByTier[2] : invalid_order ». |
+| 34 | Config : ligne `tearChanceByTier` retirée (`config.lua` de 1.2.0) ; `restart vava_provisions` ; B boit une Outre d'eau P. Remettre la ligne. | Le module démarre ; l'Outre vide revient au palier P (le palier est gardé) ; le risque est celui sans palier. |
+| 35 | **(2 joueurs)** B donne une Outre vide P à A (échange) ; A la remplit et la boit. | Chez A aussi, l'Outre d'eau puis l'Outre vide gardent le palier P. |
 
 ## 5. À terre, Codex, réseau, coût
 
@@ -87,3 +105,5 @@ ligne de console correspondante. Un test se cite « eau 11 ».
 - Aucune autre invite sur `E` à moins de 2 m des trois points d'exemple : stations de l'artisanat, puits de
   l'agriculture, nœuds de récolte (la Source de la Rivière Claire est à 10 m du nœud de truite le plus proche).
 - Sans `vava_chat`, la réponse de `/eau` arrive en notification au seul membre (test 10, `stop vava_chat`).
+- Palier de l'outre : remplir et boire gardent le palier jusqu'à la dernière unité d'une pile ; la relecture de la pile
+  par l'abonné `before` de `vava_inventory:use` ne laisse ni erreur ni refus en console (tests 28 à 31).

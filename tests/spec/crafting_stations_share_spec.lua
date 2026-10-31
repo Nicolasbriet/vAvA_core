@@ -129,7 +129,7 @@ describe('vava_crafting stations vues du client', function()
 
     local function stateOf(id, x)
         return {
-            [stationzone.DEF] = { type = 'forge', label = 'Forge ' .. id, x = x, y = 0.0, z = 30.0, heading = 0.0, prop = 'prop_forge_' .. id },
+            [stationzone.DEF] = { type = 'forge', typeLabel = 'Forge', label = 'Forge ' .. id, x = x, y = 0.0, z = 30.0, heading = 0.0, prop = 'prop_forge_' .. id },
             [stationzone.STATUS] = { fuel = 0, busy = false },
         }
     end
@@ -201,6 +201,35 @@ describe('vava_crafting stations vues du client', function()
         -- le joueur arrive près d'une deuxième station : son prop est créé sans attendre la boucle
         position = { x = 1000.0, y = 0.0, z = 30.0 }
         onZone('enter', 'forge_pres', stateOf('pres', 1010.0))
+        runThreads()
+        assert.is_true(hasModel('prop_forge_pres'))
+    end)
+
+    it('un nom, un nom de type ou une réserve changés ne recréent pas le prop ; un lieu changé, si (R-1 de T-144)', function()
+        onZone('enter', 'forge_loin', stateOf('loin', 400.0))
+        threads = {}
+        position = { x = 1000.0, y = 0.0, z = 30.0 }
+        local state = stateOf('pres', 1001.0)
+        onZone('enter', 'forge_pres', state)
+        runThreads()
+        assert.equal(1, #created)
+        assert.is_true(_G.DoesEntityExist(1))
+        local renamed = {}
+        for k, v in pairs(state[stationzone.DEF]) do renamed[k] = v end
+        renamed.label, renamed.typeLabel, renamed.capacity = 'Forge neuve', 'Grande forge', 40
+        onZone('change', 'forge_pres', { [stationzone.DEF] = renamed }, nil)
+        -- ni retrait ni nouveau prop : aucun chargement de modèle lancé, le prop reste
+        assert.equal(0, #threads)
+        assert.is_true(_G.DoesEntityExist(1))
+        assert.equal('Forge neuve', props.station('forge_pres').label)
+        assert.equal(40, props.station('forge_pres').capacity)
+        -- déplacée : le prop est retiré puis recréé à sa nouvelle place (nouveau chargement)
+        local moved = {}
+        for k, v in pairs(renamed) do moved[k] = v end
+        moved.x = 1002.0
+        onZone('change', 'forge_pres', { [stationzone.DEF] = moved }, nil)
+        assert.is_false(_G.DoesEntityExist(1))
+        assert.equal(1, #threads)
         runThreads()
         assert.is_true(hasModel('prop_forge_pres'))
     end)

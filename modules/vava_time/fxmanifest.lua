@@ -19,7 +19,7 @@ use_experimental_fxv2_oal 'yes'
 
 name 'vava_time'
 description 'Temps du royaume vAvA : heure de Paris, saisons, météo, ciel et heure du Conseil'
-version '1.4.0'
+version '1.5.0'
 
 dependency 'vAvA_core'
 dependency 'vava_ui'
@@ -46,7 +46,8 @@ shared_scripts {
 
 server_scripts {
     'config.lua',                -- complète VavaTime.config : ce que lit le seul serveur
-    'shared/frost.lua',          -- logique pure, servie au seul serveur (testée hors jeu : tests/spec)
+    'shared/cycle.lua',          -- logique pure, servie au seul serveur (testée hors jeu : tests/spec)
+    'shared/frost.lua',
     'server/core.lua',
     'bridge/server.lua',
     'server/store.lua',

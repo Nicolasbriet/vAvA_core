@@ -1,75 +1,163 @@
 --[[
     vava_combat/config_client.lua
-    Rôle : réglages des armes que lit le client (le serveur les lit aussi) : fiches des armes (catégorie, famille de
-           l'arme en main), bouclier accroché (position au bras ou dans le dos, cadences du client) et placement de
-           chaque bouclier, contrôles natifs coupés. Téléchargé par chaque joueur. `weapons` et `shield` y sont
-           entiers : le client les passe à shared/shield.lua. Tout le reste (catégories, familles, types, objets,
-           recettes, qualité, usure, `strike`, commandes du Conseil, journal, textes) est dans config.lua, servi au
-           seul serveur (T-132).
-    Les modèles et placements sont des remplaçants vanilla (-- PLACEHOLDER, docs/plan/ASSETS_PLACEHOLDERS.md) : le jour
-    où les boucliers médiévaux arrivent, seuls `shields[…]` et `provisional` changent ici (`items[…].held.model` dans
-    config.lua).
-    Les chiffres (dégâts, solidité, part bloquée) sont des valeurs de départ, à régler à la porte T-119.
+    Rôle : réglages lus par le client (le serveur les lit aussi) ; le reste est dans config.lua, jamais téléchargé
+           (T-132). Valeurs de départ, à régler à la porte T-119 ; modèles, gestes et effets en -- PLACEHOLDER.
+           Détail de chaque réglage : README.md.
     Dépendances : shared/constants.lua
 ]]
 
 VavaCombat.config = {
-    clientFile = true,  -- posé par ce fichier, ne pas changer (sans lui, le serveur signale un config.lua d'avant 1.1.0)
+    clientFile = true,  -- posé par ce fichier, ne pas changer
 
-    -- Fiches des armes (clé = nom de l'objet d'inventaire). `damage` : points de vie (sur 100) d'un coup de
-    -- multiplicateur 1,0, qualité 50, arme non émoussée ; `reachBonus` : mètres ajoutés à la portée de la technique
-    -- (T-112) ; `durability` : solidité d'une pièce neuve (recette déclarée ici, pile sans métadonnées) ; `block` : part
-    -- arrêtée en bloquant (lue par T-113) ; `provisional` : modèle provisoire, signalé par l'éditeur (T-121).
-    weapons = {
-        -- adoptée : objet et recette de vava_crafting (forge 30, transmise, solidité 150)
-        epee_courte = { category = 'une_main', family = 'epee', kind = 'tranchant', damage = 12, reachBonus = 0,
-            durability = 150, block = 0.40, provisional = true },
-        epee_longue = { category = 'deux_mains', family = 'epee', kind = 'tranchant', damage = 17, reachBonus = 0.4,
-            durability = 160, block = 0.50, provisional = true },
-        hache_d_armes = { category = 'une_main', family = 'hache', kind = 'tranchant', damage = 14, reachBonus = -0.1,
-            durability = 140, block = 0.30, provisional = true },
-        masse_d_armes = { category = 'une_main', family = 'masse', kind = 'contondant', damage = 13, reachBonus = -0.1,
-            durability = 180, block = 0.30, provisional = true },
-        dague = { category = 'dague', family = 'dague', kind = 'percant', damage = 8, reachBonus = -0.5,
-            durability = 100, block = 0.15, provisional = true },
-        baton_ferre = { category = 'baton', family = 'baton', kind = 'contondant', damage = 9, reachBonus = 0.6,
-            durability = 120, block = 0.45, provisional = true },
-        bouclier_rond = { category = 'bouclier', family = 'bouclier', kind = 'contondant', damage = 5, reachBonus = -0.6,
-            durability = 150, block = 0.70, provisional = true },
+    -- Classe des armes (clé = objet) : catégorie et famille ; la fiche est dans config.lua → weapons.
+    weaponClasses = {
+        epee_courte = { category = 'une_main', family = 'epee' },   -- objet de vava_crafting
+        epee_longue = { category = 'deux_mains', family = 'epee' },
+        hache_d_armes = { category = 'une_main', family = 'hache' },
+        masse_d_armes = { category = 'une_main', family = 'masse' },
+        dague = { category = 'dague', family = 'dague' },
+        baton_ferre = { category = 'baton', family = 'baton' },
+        bouclier_rond = { category = 'bouclier', family = 'bouclier' },
     },
 
-    -- Bouclier accroché.
+    -- Bouclier accroché, part du client (délais du serveur : config.lua).
     shield = {
-        armWith = { 'une_main', 'dague' },  -- catégories de l'arme en main qui font porter le bouclier au bras
+        armWith = { 'une_main', 'dague' },  -- catégories qui font porter le bouclier au bras
         armWithEmptyHand = false,           -- mains vides : au bras (true) ou dans le dos (false)
-        toggleMs = 1000,                    -- délai entre deux gestes d'accroche d'un même joueur
-        verifyMs = 5000,                    -- relevé de possession des boucliers accrochés (filet des hooks)
-        missesToDrop = 2,                   -- relevés manquants d'affilée avant de décrocher
-        pedCheckMs = 1000,                  -- serveur : nouveau ped d'un porteur → statebag réécrit
-        guardDelayMs = 250,                 -- garde du statebag (mêmes valeurs que vava_inventory.hands)
-        guardMaxCorrections = 3,
-        guardMaxDelayMs = 1000,
-        guardWarnMs = 10000,
-        pollMs = 1000,                      -- client : boucle lente, seulement tant qu'un bouclier est suivi
-        showRadius = 120.0,                 -- client : mètres au-delà desquels un bouclier suivi n'est pas montré
-        awaitPedMs = 10000,                 -- client : attente bornée d'un ped annoncé par son statebag
-        modelTimeoutMs = 5000,              -- client : attente maximale du chargement d'un modèle
+        pollMs = 1000,                      -- boucle lente, seulement tant qu'un bouclier est suivi
+        showRadius = 120.0,                 -- montré à cette distance au plus (m)
+        awaitPedMs = 10000,                 -- attente bornée d'un ped annoncé par son statebag
+        modelTimeoutMs = 5000,              -- attente maximale du chargement d'un modèle
     },
-    -- Placement des boucliers (clé = objet) : avant-bras gauche (SKEL_L_Forearm, 61163) et haut du dos (SKEL_Spine3,
-    -- 24818). Lu par chaque client dans SA config, jamais dans le statebag.
+    -- Placement des boucliers (clé = objet) : os 61163 avant-bras gauche, 24818 haut du dos.
     shields = {
-        bouclier_rond = { model = 'prop_ballistic_shield', -- PLACEHOLDER : bouclier balistique de GTA, placements à régler en jeu
+        bouclier_rond = { model = 'prop_ballistic_shield', -- PLACEHOLDER
             arm = { bone = 61163, offset = { 0.05, 0.05, 0.0 }, rotation = { 0.0, 90.0, 0.0 } },
             back = { bone = 24818, offset = { -0.1, -0.18, 0.0 }, rotation = { 0.0, 90.0, 180.0 } } },
     },
 
-    -- Contrôles natifs coupés côté client, sans boucle par image (bascules réappliquées à 1 Hz).
+    -- Combat natif de GTA coupé, sans boucle par image.
     natives = {
         disableMelee = true,         -- drapeau de ped « corps à corps désactivé »
         meleeFlag = 122,             -- CPED_CONFIG_FLAG_DisableMelee
         blockSwitch = true,          -- SetPedCanSwitchWeapon(ped, false)
-        stripWeapons = true,         -- arme GTA en main (autre que les poings) → toutes retirées
+        stripWeapons = true,         -- armes GTA retirées
         pollMs = 1000,               -- cadence du contrôle
-        restoreOnStop = true,        -- arrêt du module : drapeau et changement d'arme rendus à GTA
+        restoreOnStop = true,        -- rendus à GTA à l'arrêt
+    },
+
+    -- Techniques (COMBAT_V1.md § 3) : phases en ms, hit.range en m, hit.angle = ouverture totale ; voir README.md.
+    techniques = {
+        taille_descendante = {
+            label = 'Taille descendante', style = 'epee_une_main', type = 'legere',
+            gesture = { dict = 'melee@large_wpn@streamed_core', clip = 'short_0_attack', flag = 0 }, -- PLACEHOLDER
+            phases = { windup = 320, active = 160, recovery = 420 },
+            hit = { range = 2.2, angle = 70 },
+            damage = 1.0, stamina = 12,
+            parryable = true, staggers = false, chain = { 'estoc_rapide', 'fendant' },
+            learn = { skill = 'armes_une_main', level = 0 },
+        },
+        estoc_rapide = {
+            label = 'Estoc rapide', style = 'epee_une_main', type = 'legere',
+            gesture = { dict = 'melee@knife@streamed_core', clip = 'knife_short_range_0', flag = 0 }, -- PLACEHOLDER
+            phases = { windup = 220, active = 120, recovery = 380 },
+            hit = { range = 2.4, angle = 40 },
+            damage = 0.8, stamina = 9,
+            parryable = true, staggers = false, chain = { 'revers', 'fendant' },
+            learn = { skill = 'armes_une_main', level = 10 },
+        },
+        revers = {
+            label = 'Revers', style = 'epee_une_main', type = 'legere',
+            gesture = { dict = 'melee@large_wpn@streamed_core', clip = 'short_90_attack', flag = 0 }, -- PLACEHOLDER
+            phases = { windup = 280, active = 160, recovery = 460 },
+            hit = { range = 2.1, angle = 90 },
+            damage = 0.9, stamina = 11,
+            parryable = true, staggers = false, chain = { 'taille_descendante', 'fendant' },
+            learn = { skill = 'armes_une_main', level = 25 },
+        },
+        fendant = {
+            label = 'Fendant', style = 'epee_une_main', type = 'lourde',
+            gesture = { dict = 'melee@large_wpn@streamed_core', clip = 'long_0_attack', flag = 0 }, -- PLACEHOLDER
+            phases = { windup = 650, active = 200, recovery = 700 },
+            hit = { range = 2.3, angle = 60 },
+            damage = 1.8, stamina = 25,
+            parryable = false, staggers = true, chain = {},
+            learn = { skill = 'armes_une_main', level = 15 },
+        },
+    },
+
+    -- Styles (<famille>_<catégorie> de l'arme tenue) : technique qui ouvre chaque touche.
+    styles = {
+        epee_une_main = { label = 'Épée à une main', keys = { legere = 'taille_descendante', lourde = 'fendant' } },
+    },
+
+    -- Dégainer et rengainer (durées tenues par le serveur).
+    draw = {
+        drawMs = 800,          -- aucune technique avant ce délai après la prise en main
+        sheatheMs = 1500,      -- arme rangée : mains prises ce délai (pas de sort)
+        drawGesture = { dict = 'reaction@intimidation@1h', clip = 'intro', flag = 48 },   -- PLACEHOLDER
+        sheatheGesture = { dict = 'reaction@intimidation@1h', clip = 'outro', flag = 48 }, -- PLACEHOLDER
+    },
+
+    -- Chancellement d'un coup `staggers`.
+    stagger = {
+        durationMs = 900,
+        gesture = { dict = 'reaction@shove', clip = 'shoved_back', flag = 0 }, -- PLACEHOLDER
+    },
+
+    -- Mode combat (éveillé par une touche du combat, arme en main).
+    mode = {
+        idleMs = 10000,        -- endormi après ce délai sans coup ni appui sur le verrou
+        conditionsMs = 200,    -- relevé des conditions (arme, à pied, debout, aucune interface)
+        bufferMs = 250,        -- touche pressée au plus ce temps trop tôt : gardée
+        faceCamera = true,     -- sans verrou, tourné vers la caméra au départ du coup
+        faceMaxDeg = 90,       -- au plus ce virage au départ du coup
+        noticeMs = 3000,       -- un même refus n'est pas redit avant ce délai
+        gestureTimeoutMs = 1000, -- attente maximale du chargement d'un dictionnaire d'animation
+        -- contrôles coupés en mode actif (jamais 199, 200, 322 : Échap et P de vava_pause ; 32 au plus)
+        blocked = { 24, 25, 37, 140, 141, 142, 257, 263, 264, 14, 15, 16, 17 },
+    },
+
+    -- Touches (réglables dans Paramètres > Raccourcis > FiveM).
+    keys = {
+        legere = { command = 'vava_combat_legere', device = 'MOUSE_BUTTON', key = 'MOUSE_LEFT', label = 'Combat : attaque légère', display = 'Clic gauche' },
+        lourde = { command = 'vava_combat_lourde', device = 'MOUSE_BUTTON', key = 'MOUSE_RIGHT', label = 'Combat : attaque lourde', display = 'Clic droit' },
+        cible = { command = 'vava_combat_verrou', device = 'MOUSE_BUTTON', key = 'MOUSE_MIDDLE', label = 'Combat : verrouiller un adversaire (maintenir : relâcher)', hold = true, display = 'Clic molette' },
+    },
+
+    -- Verrou d'un adversaire (local, rien sur le réseau avant un coup).
+    lock = {
+        range = 6.0,           -- mètres
+        coneDeg = 30,          -- écart au centre de l'écran
+        holdMs = 600,          -- appui maintenu : relâcher
+        checkMs = 250,         -- relevé du verrou (portée, vue)
+        lostChecks = 4,        -- relevés hors de vue de suite avant de relâcher
+        rangeMargin = 1.0,     -- mètres au-delà de la portée avant de relâcher
+        turnDegPerSec = 540,   -- virage vers la cible pendant la préparation et la frappe
+        ring = { marker = 25, size = 1.0, r = 200, g = 64, b = 40, alpha = 200, groundOffset = 0.95, spin = 90.0 },
+    },
+
+    -- Effets d'un coup chez chacun (locaux).
+    effects = {
+        flinch = { dict = 'melee@unarmed@streamed_variations', clip = 'victim_takedown_front_slap', flag = 48, ms = 400 }, -- PLACEHOLDER
+        impact = { asset = 'core', name = 'blood_stab', scale = 0.6, bone = 24818 },          -- PLACEHOLDER
+        guarded = { asset = 'core', name = 'bang_sparks', scale = 0.5, bone = 24818 },        -- PLACEHOLDER (blocage, parade)
+        sounds = {},           -- { hit = { name, set } } ; vide : aucun son
+        maxPerSecond = 12,     -- effets montrés par seconde au plus
+        shakeName = 'SMALL_EXPLOSION_SHAKE', -- PLACEHOLDER : secousse de caméra vanilla
+        shakeHit = 0.15, shakeStagger = 0.4, -- secousse de caméra chez la cible (0 : aucune)
+    },
+
+    -- Refus montrés (code du serveur → texte ; absent : `default` ; `false` : rien).
+    refusals = {
+        busy = false, chain_limit = false, rate_limited = false,
+        drawing = 'Vous n\'avez pas encore l\'arme en garde.',
+        staggered = 'Vous chancelez.',
+        controlled = 'Vous ne pouvez pas frapper ainsi.',
+        no_style = 'Vous ne connaissez aucune technique pour cette arme.',
+        downed = 'Vous êtes à terre.',
+        vehicle = 'Descendez d\'abord.',
+        refused = 'Votre geste est retenu.',
+        default = 'Coup impossible pour le moment.',
     },
 }

@@ -3,7 +3,8 @@
     Rôle : intentions du Registre en jeu, en RPC à schéma strict et à débit limité : chaque demande du catalogue qui
            a un sens en jeu devient une RPC réservée à son droit (le membre est retrouvé par son numéro de joueur, son
            rang relu à chaque appel). Le panneau n'affiche que ce que le rang permet, mais ce n'est qu'un confort.
-           Plus deux intentions ouvertes à tous les joueurs : le signalement, et la fin d'une observation.
+           Plus deux intentions ouvertes à tous les joueurs : le signalement, et la fin d'une observation. Couper un
+           outil (`tool`, éteint) reste permis sans le droit (1.11.0) : rang abaissé ou révoqué en plein vol libre.
     Dépendances : shared/constants.lua, config.lua, server/core.lua, server/staff.lua, server/reports.lua,
                   server/spectate.lua, server/requests.lua
 ]]
@@ -52,7 +53,11 @@ function rpc.start()
         if VavaAdmin.requestAllowedIn(request, GAME) then
             local ok, err = register(name, request.args, request.limit, function(src, ...)
                 local actor = authorize(src, request.permission)
-                if not actor then return false, 'forbidden' end
+                if not actor then
+                    -- sans le droit : seulement ce que la demande permet encore (couper un outil), sinon refusé
+                    if request.release then return request.release(src, ...) end
+                    return false, 'forbidden'
+                end
                 return request.handler(actor, ...)
             end)
             if not ok then return false, err end

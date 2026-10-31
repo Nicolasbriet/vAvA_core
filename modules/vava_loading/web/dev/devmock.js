@@ -3,9 +3,12 @@
  * Rôle : progression simulée quand la page est ouverte dans un navigateur depuis le dépôt (protocole file:), pour voir
  *        chaque écran sans lancer le jeu. Rejoue des suites de messages du jeu et du client Lua par
  *        window.postMessage, et ajoute un panneau « Hors jeu » : scénario, rejouer l'ouverture, vitesse ×4, figer,
- *        étape suivante, passer à la sélection.
+ *        étape suivante, ambiance suivante, passer à la sélection.
  *        Paramètres d'adresse : ?scenario=normal|rapide|lent|muet|sans-selection, ?niveau=haute|moyenne|basse,
- *        ?vitesse=4, ?ouverture=0, ?fps=1 (cadence et niveau à l'écran), ?journal=1 (journal de calibrage).
+ *        ?vitesse=4, ?ouverture=0, ?fps=1 (cadence, niveau et ambiance à l'écran), ?journal=1 (journal de
+ *        calibrage), ?ambiances=aube,absente,orage (ordre des ambiances : un nom sans fichier montre le saut d'une
+ *        image manquante ; que des noms absents : le fond de repli), ?tenue=4000 (durée d'une ambiance, ms),
+ *        ?derive=0 (dérive des ambiances en %, 0 : fondu seul ; mesure du test 5-5).
  *        Jamais livré (web/dev/ hors des files du manifeste), jamais chargé en jeu (la ligne hors jeu de index.html ne
  *        l'insère qu'en file:). Chargé après les fichiers purs et avant js/app.js : il règle la config avant le départ.
  * Dépendances : js/config.js, js/progress.js (window.VavaLoading)
@@ -25,6 +28,9 @@
   if (niveau && cfg.effects.levels[niveau]) cfg.effects.level = niveau;
   if (params.get('ouverture') === '0') cfg.opening.enabled = false;
   if (params.get('journal') === '1') cfg.debug.journal = true;
+  if (params.get('ambiances')) cfg.ambiances.order = params.get('ambiances').split(','); // borné par ambiances.js
+  if (params.get('tenue')) cfg.ambiances.showMs = Number(params.get('tenue'));
+  if (params.get('derive') !== null) cfg.ambiances.driftPct = Number(params.get('derive'));
   var speed = Math.min(20, Math.max(0.25, Number(params.get('vitesse')) || 1));
   var showFps = params.get('fps') === '1';
 
@@ -194,6 +200,7 @@
     schedule();
   }, false);
   button('Étape suivante', nextStage);
+  button('Ambiance suivante', function () { VavaLoading.app.nextAmbiance(); status(); });
   button('Passer à la sélection', handoffNow);
   statusEl.className = 'devmock-status';
   add(statusEl);
@@ -208,9 +215,8 @@
         : 'suite terminée');
     }
     if (showFps && stats) {
-      parts.push((stats.fps
-        ? 'braises ' + stats.fps.toFixed(1) + ' im/s, paysage ' + (stats.worldFps ? stats.worldFps.toFixed(1) + ' im/s' : 'caché')
-        : 'peint une fois') + ' · effets ' + stats.level);
+      parts.push((stats.fps ? 'braises ' + stats.fps.toFixed(1) + ' im/s' : 'sans braises') + ' · effets ' + stats.level +
+        ' · ambiance ' + (stats.ambiance || 'aucune (fond de repli)'));
     }
     if (stats) parts.push('feu ' + (stats.stage + 1) + ' · ' + stats.pct + ' %');
     statusEl.textContent = parts.join(' · ');

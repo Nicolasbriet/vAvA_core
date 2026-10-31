@@ -56,6 +56,11 @@ local function setup()
             .. 'les réglages lus par les joueurs sont dans config_client.lua ; reportez vos changements d\'après '
             .. 'config.lua.nouveau')
     end
+    -- 1.7.0 (T-144) : les types ont quitté config_client.lua ; un config.lua d'avant, gardé par une mise à jour avec le
+    -- config_client.lua neuf, n'en a plus : refusé avant de rien déclarer (registres, commandes)
+    if type(cfg.stationTypes) ~= 'table' then
+        return false, 'stationTypes absent de config.lua (forme d\'avant 1.7.0) : reprenez la table de config.lua.nouveau'
+    end
     local declared, declareErr = VavaCrafting.commands.declare()
     if not declared then return false, 'commandes : ' .. tostring(declareErr) end
     local ok, err = catalog.define()

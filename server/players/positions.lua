@@ -1,8 +1,9 @@
 --[[
     server/players/positions.lua
     Rôle : position des personnages lue CÔTÉ SERVEUR (OneSync obligatoire) : le client n'envoie jamais la sienne.
-    Un personnage n'est échantillonné qu'après avoir confirmé son apparition : avant, son ped peut encore être
-    à l'ancien emplacement (changement de personnage) et cette position serait sauvegardée à tort.
+    Un personnage n'est échantillonné qu'après la confirmation de son apparition par le serveur (0.14.0 : ped vu au
+    point ordonné, server/players/spawn.lua ; la seule déclaration du client ne suffit plus) : avant, son ped peut
+    encore être à l'ancien emplacement (changement de personnage) et cette position serait sauvegardée à tort.
     La même boucle relève le temps de jeu (server/players/playtime.lua) : un seul parcours des personnages actifs.
     Dépendances : config/server.lua, server/players/playtime.lua
 ]]

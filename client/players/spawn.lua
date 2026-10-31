@@ -6,10 +6,13 @@
     tourne (elle le ferme quand la sélection est affichée, sans écran noir), fermé par le core au plus tard après
     maxHoldMs ; toujours fermé à l'apparition.
     Aucune boucle permanente : les seules attentes sont bornées et ne durent que le temps d'une apparition.
+    Apparition confirmée par le serveur (0.14.0, T-139) : la déclaration renvoie le numéro de l'ordre exécuté
+    (`seq`) ; le serveur ne la compte que pour cet ordre, et seulement s'il a vu le ped au point.
     Dépendances : shared/init.lua, config/shared.lua, shared/core/logger.lua, shared/core/hooks.lua, client/core/rpc.lua
 ]]
 
 local type, tostring = type, tostring
+local tointeger = math.tointeger
 local HUGE, min = math.huge, math.min
 local CreateThread, Wait, GetGameTimer, RegisterNetEvent = CreateThread, Wait, GetGameTimer, RegisterNetEvent
 local SetTimeout, GetResourceState = SetTimeout, GetResourceState
@@ -129,6 +132,7 @@ end
 ---@field y number
 ---@field z number
 ---@field heading number
+---@field seq integer  numéro de l'ordre, renvoyé avec la déclaration
 
 ---@param order vAvA.SpawnOrder
 local function perform(order)
@@ -170,7 +174,7 @@ local function perform(order)
     loadingScreenReleased = true
     setFrozen(false, false)
     DoScreenFadeIn(cfg.fadeMs)
-    rpc.emit(RPC_SPAWNED)
+    rpc.emit(RPC_SPAWNED, order.seq)
 end
 
 ---@param value any
@@ -187,6 +191,10 @@ function spawn.start()
             return
         end
         if order.model ~= nil and type(order.model) ~= 'string' then return end
+        -- numéro de l'ordre, renvoyé avec la déclaration (un flottant entier venu du transport est accepté)
+        local seq = tointeger(order.seq)
+        if not seq then return end
+        order.seq = seq
         CreateThread(function() perform(order) end)
     end)
 

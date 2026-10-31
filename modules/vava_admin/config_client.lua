@@ -29,5 +29,7 @@ VavaAdmin.config = {
         reportUsage = 'usage : /%s <message>',
         noclipOn = 'Vol libre : vous êtes invisible.',
         noclipOff = 'Vol libre terminé.',
+        -- 1.11.0 : le rang a perdu un droit d'outil, vol libre, invisibilité, invulnérabilité et observation coupés
+        toolsWithdrawn = 'Votre rang ne vous donne plus les outils du Conseil : ils sont rangés.',
     },
 }

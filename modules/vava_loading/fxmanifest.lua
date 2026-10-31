@@ -1,7 +1,8 @@
 --[[
     vava_loading/fxmanifest.lua
-    Rôle : écran de chargement d'Eldoria (page loadscreen) : progression réelle sur six feux, puis passage sans écran
-           noir à la sélection du personnage. Ressource cliente uniquement : aucun RPC, aucun évènement, aucune donnée.
+    Rôle : écran de chargement d'Eldoria (page loadscreen) : ambiances d'Eldoria en fondu enchaîné, progression
+           réelle sur six feux, puis passage sans écran noir à la sélection du personnage. Ressource cliente
+           uniquement : aucun RPC, aucun évènement, aucune donnée.
     Dépendances : vAvA_core ≥ 0.13.0 (spawn.loadingScreen : le core lui laisse la fermeture de l'écran) ; facultatif :
                   vava_characters_ui ≥ 1.2.0 (hook vava_characters_ui:shown, export isShown). Démarre juste après
                   vava_ui. Polices embarquées (pas de vava_ui : la page s'affiche avant les autres ressources).
@@ -14,7 +15,7 @@ use_experimental_fxv2_oal 'yes'
 
 name 'vava_loading'
 description "Écran de chargement d'Eldoria"
-version '1.2.0'
+version '1.3.0'
 
 dependency 'vAvA_core'
 
@@ -28,6 +29,7 @@ files {
     'web/css/style.css',
     'web/js/*.js',
     'web/fonts/*.woff2',
+    'web/img/ambiances/*.webp',   -- les sept ambiances (T-152), seules images de la page
 }
 
 client_scripts {

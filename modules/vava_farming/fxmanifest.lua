@@ -7,9 +7,9 @@
            de compost), fertilité (coût par récolte, rotation, compost, jachère), qualité de
            la récolte (graine, compétence, régularité d'arrosage, fertilité) en palier,
            graines récupérées, seau rempli aux puits, grenier commun (conteneur de l'inventaire, ancré, dépôts et
-           retraits journalés), composteur ajouté à l'artisanat, commandes du Conseil. Le serveur décide de tout et
-           demande l'XP à vava_skills ; chaque parcelle est une zone du core, connue des seuls joueurs proches ; le client
-           crée les props des plantes selon leur stade, montre l'invite et le menu, joue les gestes.
+           retraits journalés), composteur ajouté à l'artisanat et sa recette aux compétences (T-136), commandes du
+           Conseil. Le serveur décide de tout et demande l'XP à vava_skills ; chaque parcelle est une zone du core,
+           connue des seuls joueurs proches ; le client crée les props des plantes selon leur stade, montre l'invite et le menu, joue les gestes.
            T-132 : les joueurs ne téléchargent que les constantes, config_client.lua (gestes, streaming, touche,
            cultures, puits, animations) et la logique lue par le client (géométrie, parcelles, proximité) ;
            config.lua et shared/growth.lua sont servis au seul serveur.
@@ -26,7 +26,7 @@ use_experimental_fxv2_oal 'yes'
 
 name 'vava_farming'
 description 'Agriculture vAvA : parcelles, croissance par dates, humidité et fertilité, qualité, grenier commun'
-version '1.8.0'
+version '1.9.0'
 
 dependency 'vAvA_core'
 dependency 'vava_ui'

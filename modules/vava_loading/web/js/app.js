@@ -2,13 +2,15 @@
  * vava_loading/web/js/app.js
  * Rôle : la page de l'écran de chargement : textes (strings.js), ouverture (filet, lettres qui s'embrasent, rideau ;
  *        passable d'un clic, d'Espace ou d'Entrée), sceau, extraits et conseils en rotation, six feux allumés par la
- *        progression réelle (messages reçus → progress.js), niveau d'effets (quality.js) et sa dégradation, éclair
- *        de passage à la sélection puis fondu, musique facultative (bouton caché sans piste), journal de calibrage.
+ *        progression réelle (messages reçus → progress.js), ambiances d'Eldoria et braises (scene.js), niveau d'effets
+ *        (quality.js) et sa dégradation, éclair de passage à la sélection puis fondu, musique facultative (bouton
+ *        caché sans piste), journal de calibrage.
  *        Messages reçus : ceux du jeu et du client Lua de vava_loading (progress.js, liste blanche) ; aucune chaîne
  *        venue d'un message n'est affichée. La page ne demande rien au jeu : le client Lua la ferme.
  *        Tout texte est posé par textContent ; les touches des conseils deviennent des éléments kbd construits par le
  *        DOM.
- * Dépendances : js/config.js, js/strings.js, js/text.js, js/progress.js, js/quality.js, js/scene.js
+ * Dépendances : js/config.js, js/strings.js, js/text.js, js/progress.js, js/quality.js, js/ambiances.js,
+ *               js/scene.js
  */
 (function () {
   'use strict';
@@ -66,7 +68,8 @@
   }
 
   var painter = VavaLoading.scene.create({
-    world: $('world'), fx: $('fx'), effects: cfg.effects, level: level,
+    fx: $('fx'), ambiancesEl: $('ambiances'), ambiances: cfg.ambiances, reducedMotion: reducedMotion,
+    effects: cfg.effects, level: level,
     onDraw: function (now) {
       if (now < measureFrom) return;
       meter = quality.step(meter, now, cfg.effects);
@@ -269,7 +272,7 @@
     if (phase !== 'opening') return;
     phase = 'revealed';
     clearList(openingTimers);
-    painter.showWorld(); // paysage peint avant que le rideau commence à se lever
+    painter.reveal(); // la tenue de la première ambiance part de la levée du rideau
     sceneEl.classList.add('drawn', 'revealed');
     measureFrom = performance.now() + cfg.effects.measureDelayMs;
     lightBeacons(state.stage, true); // feux atteints pendant l'ouverture : allumés un à un
@@ -409,14 +412,15 @@
     receive: receive,
     skip: skip,
     stats: function () {
-      return { fps: painter.fps(), worldFps: painter.worldFps(), level: level, stage: state.stage, pct: state.pct, phase: phase };
+      return { fps: painter.fps(), ambiance: painter.ambiance(), level: level, stage: state.stage, pct: state.pct, phase: phase };
     },
+    /** Ambiance suivante tout de suite (si elle est déjà décodée). */
+    nextAmbiance: function () { painter.nextAmbiance(); },
     /** Rejoue l'ouverture seule (la progression est gardée). */
     replayOpening: function () {
       if (phase !== 'opening' && phase !== 'revealed') return;
       clearList(openingTimers);
       phase = 'opening'; measureFrom = Infinity;
-      painter.hideWorld();
       sceneEl.classList.remove('revealed', 'drawn', 'quick');
       letters.forEach(function (l) { l.classList.remove('lit', 'now'); });
       beacons.forEach(function (b) { b.classList.remove('lit', 'current'); });

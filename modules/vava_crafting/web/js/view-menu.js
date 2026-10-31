@@ -129,6 +129,7 @@ const MenuView = (() => {
   /** Ce qui empêche de façonner, ou null. */
   function blocker(recipe, chosen) {
     const R = M.recipes.reasons;
+    if (recipe.unregistered) return R.unregistered;
     if (menu.station.busy) return R.busy;
     if (!recipe.levelOk) return R.level;
     if (recipe.toolKind && !recipe.toolOk) return R.tool;
@@ -140,11 +141,12 @@ const MenuView = (() => {
 
   function recipeRow(recipe) {
     const flags = [];
+    if (recipe.unregistered) flags.push(UI.el('span', 'flag is-lock', M.recipes.unregistered));
     if (!recipe.levelOk) flags.push(UI.el('span', 'flag is-lock', M.recipes.level(recipe.level, recipe.playerLevel)));
     if (recipe.toolKind && !recipe.toolOk) flags.push(UI.el('span', 'flag is-tool', M.recipes.toolMissing));
     if (recipe.signed) flags.push(UI.el('span', 'flag is-signed', M.recipes.signed));
     if (recipe.transmission) flags.push(UI.el('span', 'flag is-lesson', M.recipes.transmission));
-    const row = UI.button(null, `recipe-row${selected === recipe.id ? ' is-selected' : ''}${recipe.levelOk ? '' : ' is-locked'}`, () => {
+    const row = UI.button(null, `recipe-row${selected === recipe.id ? ' is-selected' : ''}${recipe.levelOk && !recipe.unregistered ? '' : ' is-locked'}`, () => {
       selected = recipe.id;
       renderPane();
     });
