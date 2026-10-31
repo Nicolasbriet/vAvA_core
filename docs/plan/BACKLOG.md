@@ -1123,7 +1123,7 @@ faire tout le système de combat ») : la porte T-119 reste à passer en jeu.
 - Suite : T-151 (envois de `vava_admin` par `core.net.send`), trouvée pendant T-138.
 
 ### T-139 — Apparition confirmée par le core
-- Agent : vava-dev-lua (cette tâche autorise à toucher le core, `server/players/`) · Dépend de : — · Statut : à faire
+- Agent : vava-dev-lua (cette tâche autorise à toucher le core, `server/players/`) · Dépend de : — · Statut : en cours
 - Spec T-110 § 13, option B : le temps de jeu, les positions, `vava_arrival` et les envois de proximité croient encore
   la déclaration `core:characters:spawned` du client. Le core la confirme lui-même quand le ped existe après l'ordre
   d'apparition (délai de grâce), et expose l'état confirmé.

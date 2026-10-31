@@ -1,10 +1,10 @@
 # Connexion et personnage — procédure de test en jeu
 
 Procédure pour vérifier en jeu l'arrivée d'un joueur et la vie de ses personnages : compte, création, apparence,
-sélection, suppression, reconnexion, position, sauvegarde et temps de jeu. Modules : `vAvA_core` 0.9.0,
-`vava_appearance` 1.0.1, `vava_characters_ui` 1.0.1, et l'outil de développement `vava_dev_characters` 1.3.0. Comptez
-une heure et demie seul, une demi-heure de plus pour les tests marqués **(2 joueurs)**. Un test se cite
-« personnage 4-2 ».
+sélection, suppression, reconnexion, position, sauvegarde et temps de jeu. Modules : `vAvA_core` 0.9.0 (0.14.0
+pour le § 8 bis), `vava_appearance` 1.0.1, `vava_characters_ui` 1.0.1, et l'outil de développement
+`vava_dev_characters` 1.3.0. Comptez une heure et demie seul, une demi-heure de plus pour les tests marqués
+**(2 joueurs)**. Un test se cite « personnage 4-2 ».
 
 ## 0. Préparation
 
@@ -181,6 +181,26 @@ Les commandes `perso` se tapent dans `F8` sur la sélection, ou dans le chat en 
 | 13 | **Sans objet depuis `vava_inventory` 1.7.0 (§ 0.6).** **(2 joueurs)** A tape `/t027rafale hache_fer` (30 réécritures en 0,3 s environ), mains vides. | Chez B, la hache clignote au plus pendant la rafale puis disparaît ; console : au plus une remise par quart de seconde (pas trente lignes, pas de ralentissement du serveur). Resmon de `vAvA_core` côté serveur (`resmon 1` dans la console, si disponible) : pic bref, retour au repos. Chez B, `netgraph 1` dans `F8` : relever le débit pendant la rafale et 10 s après ; attendu de l'ordre de 800 o/s par joueur témoin pendant la rafale, puis retour au niveau d'avant (noter les chiffres tels quels). Si A enchaîne les rafales sans rien prendre en main, dès la quatrième remise : une ligne `remis 3 fois de suite sans nouvelle publication`, puis des remises de plus en plus tardives (jusqu'à 10 s), jamais abandonnées. |
 | 14 | **Sans objet depuis `vava_inventory` 1.7.0 (§ 0.6).** Sans second joueur : A tape `/t027 hache_fer` sur l'écran de sélection (`F8`, `t027 hache_fer`), avant de choisir un personnage. | Même ligne `[sync]` dans la console : un champ public est remis vide tant qu'aucun personnage n'est chargé. Puis « Jouer » : la main est celle du personnage (vide ou son objet), jamais la hache forgée. |
 | 15 | Si `vava_example` est démarré : console du serveur `example_ping <n° de A>`. | `[vAvA][INFO][vava_example] joueur N : GetGameTimer client = … ms (déclaré par le client)` : un appel serveur → client avec `returns` fonctionne toujours (0.9.0 exige `returns`). |
+
+## 8 bis. Apparition confirmée par le serveur (core 0.14.0, T-139)
+
+Le serveur ne croit plus le client sur son apparition : il lit le ped et ne compte le personnage comme apparu (temps
+de jeu, position relevée, joueurs proches, zones) qu'après l'avoir vu au point ordonné, à 10 m près à l'horizontale
+(`spawn.confirm` de `config/server.lua`). Pour imiter un client modifié, on change **localement** le fichier client du
+core, sans jamais le commiter : `client/players/spawn.lua`, fonction `perform`. Remettre le fichier
+(`git checkout client/players/spawn.lua`) et redémarrer le serveur après chaque essai modifié. Console du serveur
+ouverte ; `vava_gathering` démarré (ses nœuds proches ne s'affichent qu'à un personnage apparu).
+
+| # | Faire | Attendu |
+|---|---|---|
+| 1 | Sans modification : « Jouer », puis `/respawn` (outil `vava_dev_characters`), puis `/perso quitter` et rejouer. | Apparitions comme avant, aussi rapides. Aucune ligne `[spawn]` dans la console du serveur. Registre : le temps de jeu reprend dès la fin du fondu ; nœuds de récolte proches visibles aussitôt. |
+| 2 | Sans modification, nouveau personnage (point d'arrivée) avec `vava_arrival` démarré. | Le panneau d'accueil et la dotation viennent comme avant, juste après le fondu. |
+| 3 | Modification A, « client muet » : dans `perform`, mettre en commentaire la dernière ligne `rpc.emit(RPC_SPAWNED)`. Redémarrer, « Jouer ». | Le joueur voit le monde et peut bouger. Pendant 20 s : temps de jeu arrêté dans le Registre, nœuds de récolte absents. Après 20 s (`graceMs`) : `[vAvA][WARN][spawn] joueur N : apparition confirmée d'office (ped vu au point, rien déclaré par son client en 20 s)`, puis le temps de jeu compte et les nœuds apparaissent. Avec `vava_health` : sa propre ligne « apparition non confirmée après 20 s, vie lue d'office » peut suivre (lecture d'office du module, gardée). |
+| 4 | Modification B, « client qui va ailleurs » : au début de `perform`, ajouter `order.x = order.x + 200.0`. Redémarrer, noter `play_seconds` en base, « Jouer ». | Le joueur apparaît 200 m à l'est du point ordonné. 20 s après : `[vAvA][WARN][spawn] joueur N : ped jamais vu au point d'apparition 20 s après l'ordre (déclarée par son client) : apparition non confirmée`, **une seule fois**. Registre : temps de jeu arrêté ; nœuds de récolte absents ; aucune ligne `confirmée d'office`. |
+| 5 | Toujours avec B : marcher 1 min, `/perso quitter`, regarder la base. | `play_seconds` inchangé (à la seconde près) ; position du personnage inchangée (celle d'avant le test, ou vide pour un nouveau) : jamais l'endroit où il a marché. |
+| 6 | Toujours avec B, **(2 joueurs)**, `vava_admin` et `vava_pause` démarrés : le second joueur (C, client normal) se tient à 5 m de A (modifié) et signale un joueur depuis le menu de pause (comme pause 7-6). | Au Registre, la demande « Signalement » de C ne liste pas A parmi les témoins (joueurs proches : personnages apparus seulement). Même essai sans modification : A y figure. |
+| 7 | Avec B, A marche jusqu'au point ordonné (200 m à l'ouest de là où il est apparu). | Dès qu'il y passe (à 10 m près) : aucune ligne « confirmée » s'il a déclaré (A l'a fait) — le personnage est confirmé sans bruit, le temps de jeu reprend et les nœuds apparaissent. |
+| 8 | Retirer les modifications, redémarrer, `resmon 1` dans la console du serveur pendant cinq apparitions (`/respawn`). | `vAvA_core` au repos comme avant : une lecture de ped toutes les 500 ms pour le seul joueur qui apparaît, pendant son apparition, puis rien. |
 
 ## 9. Redémarrage des modules en cours de partie
 

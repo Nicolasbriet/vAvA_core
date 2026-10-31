@@ -149,7 +149,7 @@ core.hooks.runAfter('vava_inventory:move', payload)
 | `core:player:dropped` | `{ source, accountId, reason }` — après déchargement et sauvegarde du personnage |
 | `core:character:created` | `{ source, accountId, characterId, firstName, lastName, sex }` — inventaire de départ, compte… |
 | `core:character:loaded` | `{ source, accountId, characterId, playSeconds }` — chargez vos données ici (avant l'apparition) |
-| `core:character:spawned` | `{ source, accountId, characterId }` — apparition confirmée par le client (chaque apparition, réanimation comprise) : le ped est en place, sa vie et sa position sont lisibles |
+| `core:character:spawned` | `{ source, accountId, characterId, forced }` — apparition **confirmée par le serveur** (chaque apparition, réanimation et téléportation comprises) : le ped a été lu au point ordonné, sa vie et sa position sont lisibles. Depuis 0.14.0, la déclaration du client ne suffit plus (voir « Apparition confirmée par le serveur » sous `core.characters`) ; `forced = true` : confirmée d'office, sans déclaration du client |
 | `core:character:unloading` | `{ source, accountId, characterId, reason, playSeconds }` — sauvez vos données ici (le core attend) ; `playSeconds` : temps de jeu total, cette session comprise |
 | `core:character:deleted` | `{ source, accountId, characterId }` |
 | `core:character:fieldChanged` | `{ characterId, field, value }` |
@@ -199,11 +199,12 @@ la porte fermée jusqu'à ce qu'il soit relancé, réparé ou retiré de la list
 | `defineField(name, { schema, default?, visibility? })` | `true` ou `false, err` |
 | `create(source, { firstName, lastName, sex }, initialFields?)` | `true, résumé` ou `false, code` — création par un module, avec des valeurs de champs déclarés (validées par leur schéma, sinon `invalid_fields`) |
 | `getActive(source)` | `{ id, accountId, source, firstName, lastName, sex, playSeconds }` ou `nil` |
-| `playSeconds(characterId)` | temps de jeu en secondes entières (temps en cours compris), ou `nil, 'not_loaded'` — compté côté serveur entre l'apparition confirmée et le déchargement, la sélection exclue ; relevé toutes les `persistence.positionSampleMs`, écrit avec le personnage (colonne `play_seconds`) ; depuis 0.6.0 |
+| `playSeconds(characterId)` | temps de jeu en secondes entières (temps en cours compris), ou `nil, 'not_loaded'` — compté côté serveur entre l'apparition confirmée (par le serveur depuis 0.14.0) et le déchargement, la sélection exclue ; relevé toutes les `persistence.positionSampleMs`, écrit avec le personnage (colonne `play_seconds`) ; depuis 0.6.0 |
 | `get(characterId, field)` | valeur (défaut si jamais écrite), ou `nil, 'not_loaded' \| 'unknown_field'` |
 | `set(characterId, field, value)` | `true` ou `false, err` — validé, sauvegardé, diffusé |
 | `unload(source)` | `true` ou `false, code` — retour à la sélection |
 | `spawn(source, coords?)` | `true` ou `false, code` — `{ x, y, z, heading? }` ; sans coordonnées : dernière position |
+| `isSpawned(source)` | `true` si l'apparition du personnage actif est confirmée par le serveur, `false` pendant une apparition ou une téléportation en cours, `false, 'no_character'` sans personnage actif — depuis 0.14.0 |
 
 Champs de personnage :
 
@@ -261,10 +262,34 @@ Détails de la garde (0.9.0) :
 
 Persistance et positions :
 
-- La position est lue **côté serveur** (OneSync obligatoire), seulement après confirmation de l'apparition.
+- La position est lue **côté serveur** (OneSync obligatoire), seulement après confirmation de l'apparition par le
+  serveur.
 - Sauvegarde groupée des personnages modifiés toutes les `persistence.saveIntervalMs`, et immédiate au
   déchargement ou à la déconnexion. Une écriture en échec est retentée sans perte.
 - FiveM n'attend pas les écritures à l'arrêt du serveur : **lancer `vava_saveall` avant `quit`**.
+
+Apparition confirmée par le serveur (0.14.0, T-139) :
+
+- Après chaque ordre d'apparition (sélection, `spawn` d'un module), le personnage n'est **pas apparu** : ni temps de
+  jeu, ni position relevée, ni envois de proximité (`core.net`), ni entrée dans une zone (`core.zones`),
+  `isSpawned` faux. Le serveur lit alors le ped du joueur (`GetPlayerPed`, `GetEntityCoords`) toutes les
+  `spawn.confirm.checkMs` (500 ms), pour ces seuls joueurs, jusqu'à le voir au point ordonné : écart **horizontal**
+  au plus `spawn.confirm.radius` (10 m ; la hauteur ne compte pas, le ped peut tomber du point).
+- La déclaration du client (RPC `core:characters:spawned`, à la fin du fondu) confirme l'apparition **si le ped a été
+  vu au point** depuis l'ordre, aussitôt ou au passage suivant. Une déclaration faite ailleurs ne confirme rien.
+- Sans déclaration, l'apparition est confirmée **d'office** `spawn.confirm.graceMs` (20 s, au-delà du plus long
+  chargement normal du client) après l'ordre, si le ped a été vu au point : hook avec `forced = true` et une ligne
+  `[spawn] … confirmée d'office` en console.
+- Jamais vu au point : une ligne `[spawn] … jamais vu au point d'apparition` après `graceMs` (une par ordre), et le
+  personnage reste non apparu jusqu'à ce qu'il y soit vu (une nouvelle apparition ou une reconnexion le remet en
+  route). Un nouvel ordre remplace le point attendu.
+- Réglages invalides (`config/server.lua` → `spawn.confirm`) : le core ne démarre pas (comme une limite de débit
+  invalide).
+- Limite : la position lue est celle que le client du joueur synchronise pour son ped (OneSync) ; le serveur constate
+  qu'il est allé au point ordonné, pas qu'il n'en bouge pas ensuite par un moyen interdit.
+- Un module qui veut savoir si un joueur est en place lit `isSpawned` ou écoute `core:character:spawned` ; il ne
+  refait pas sa propre lecture d'office. Il déclare `coreVersion = '0.14.0'` s'il se sert d'`isSpawned` ou de
+  `forced` (le hook existait avant : avec un core antérieur à 0.14.0, il suit la seule déclaration du client).
 
 Apparition : le core remplace `spawnmanager`. Ne pas démarrer `spawnmanager`, `basic-gamemode` ni de carte
 `mapmanager` avec vAvA_core. Un personnage sans position enregistrée (donc tout nouveau personnage) apparaît à
@@ -433,9 +458,10 @@ local ok, count = core.net.sendNearWith({ from = source }, coords, 30.0, 'vava_c
 - **Instances** : sans `bucket` ni `from`, un joueur d'une autre instance (routing bucket) au même endroit reçoit le
   message. Dès qu'un module a des instances (intérieurs, cachots, essais), il fournit `from` (l'auteur de l'action)
   ou `bucket` à chaque envoi de proximité.
-- **Proches** : personnages chargés **et apparus**, ped existant, distance 3D ≤ rayon (0 < rayon ≤ 1 000 m, sinon
-  `invalid_radius`), positions lues par le serveur (gardées 50 ms, `net.near.positionCacheMs`, 0.11.0 : un passage
-  des zones et les envois qui le suivent ne relisent rien) ; `coords` : `vector3` ou `{ x, y, z }` finis
+- **Proches** : personnages chargés **et apparus** (apparition confirmée par le serveur depuis 0.14.0), ped
+  existant, distance 3D ≤ rayon (0 < rayon ≤ 1 000 m, sinon `invalid_radius`), positions lues par le serveur
+  (gardées 50 ms, `net.near.positionCacheMs`, 0.11.0 : un passage des zones et les envois qui le suivent ne relisent
+  rien) ; `coords` : `vector3` ou `{ x, y, z }` finis
   (`invalid_coords`). Personne à portée : `true, 0, 0, false`, rien n'est sérialisé.
 - **Retour** : `envoyés` = joueurs servis, `octets` = taille d'**un** message (charge msgpack + nom de l'évènement),
   `latent` = booléen ; pour une liste ou un rayon (0.11.0), 5e valeur : la **liste des joueurs sautés** (latent refusé),
