@@ -97,6 +97,7 @@ VavaAtelier.config = {
         keep = 20,               -- versions figées gardées par fiche (la publiée et la dernière d'une fiche retirée toujours)
         pageLines = 20,          -- lignes d'une page d'historique
         purgeOnStart = true,     -- purge au démarrage, dans un fil (sans le retarder)
+        purgeDelayMs = 60000,    -- attente de cette purge après editorsReady (les synchronisations des ateliers d'abord)
     },
     trial = {
         maxMinutes = 30,         -- durée au plus d'un essai ; ensuite il prend fin (« délai passé »)

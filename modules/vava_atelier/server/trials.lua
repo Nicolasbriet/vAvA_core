@@ -37,6 +37,7 @@ VavaAtelier.trials = trials
 ---@field source integer
 ---@field accountId integer
 ---@field label string              nom du membre au début de l'essai (journal après son départ)
+---@field def table                 fiche montrée (relance après une sauvegarde d'un enfant, sans relire la base)
 ---@field started integer
 
 ---@type table<integer, vAvA.AtelierTrial>

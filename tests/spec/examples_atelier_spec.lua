@@ -238,5 +238,15 @@ describe('vava_example_atelier', function()
             assert.is_nil(Store.diff('affiche', before, after))
             assert.is_nil(Store.diff('panneau', before, before))
         end)
+
+        it('essai relancé : seule une fiche dont ce qui se lit a changé est annoncée de nouveau (R-8)', function()
+            local board = { id = 'p', titre = 'Place', texte = 'Marché', taille = 1 }
+            assert.is_true(Store.shownChanged('panneau', nil, board))
+            assert.is_false(Store.shownChanged('panneau', board, { id = 'p', titre = 'Place', texte = 'Marché', taille = 2 }))
+            assert.is_true(Store.shownChanged('panneau', board, { id = 'p', titre = 'Place', texte = 'Foire' }))
+            local poster = { id = 'a', titre = 'Foire', couleur = 'ocre' }
+            assert.is_false(Store.shownChanged('affiche', poster, { id = 'a', titre = 'Foire', couleur = 'vert' }))
+            assert.is_true(Store.shownChanged('affiche', poster, { id = 'a', titre = 'Grande foire' }))
+        end)
     end)
 end)

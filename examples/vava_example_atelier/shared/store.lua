@@ -4,7 +4,8 @@
            démarrage puis tenu par l'Atelier (`apply` crée ou remplace, `remove` retire). Contrat d'aller-retour :
            après `apply(kind, def)`, `read(kind, def.id)` rend la même data, le même `place` et le même `parent`.
            `index` liste les fiches dans l'ordre d'arrivée. Et `diff` du panneau : « Texte repeint » quand seul le texte
-           change (sinon nil : l'Atelier écrit le résumé générique).
+           change (sinon nil : l'Atelier écrit le résumé générique). Et `shownChanged` : l'annonce d'un essai relancé
+           ne repart que pour la fiche dont ce qui se lit a changé.
            Testée : tests/spec/examples_atelier_spec.lua.
     Dépendances : config.lua
 ]]
@@ -120,6 +121,23 @@ function store.all(self, kind)
     return out
 end
 Store.all = store.all
+
+-- ce que l'annonce d'un essai montre, par type
+local SHOWN = { panneau = { 'titre', 'texte' }, affiche = { 'titre' } }
+
+--- L'annonce d'essai d'une fiche change-t-elle ? (relance après une sauvegarde : seule la fiche dont ce qui se lit a
+--- changé est annoncée de nouveau ; une fiche jamais montrée l'est toujours)
+---@param kind string
+---@param before table|nil  fiche montrée avant (def), ou nil
+---@param after table
+---@return boolean
+function store.shownChanged(kind, before, after)
+    if type(before) ~= 'table' then return true end
+    for _, key in ipairs(SHOWN[kind] or {}) do
+        if before[key] ~= after[key] then return true end
+    end
+    return false
+end
 
 --- Résumé d'un changement de panneau : « Texte repeint » si seul le texte change, sinon nil.
 ---@param kind string

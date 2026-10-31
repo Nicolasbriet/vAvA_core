@@ -41,13 +41,18 @@ VavaAtelier.cycle = cycle
 
 -- Outils --------------------------------------------------------------------------------------------------------
 
---- Atelier gardé et disponible (ni en synchronisation, ni « à synchroniser »).
+--- Atelier gardé et disponible (ni en synchronisation, ni « à synchroniser »). `write` : une écriture, qui exige le
+--- nom du membre au Registre (jamais « Console » pour un joueur : `not_ready` sans lui), gardé dans `ctx.label`.
 ---@return boolean|nil ok
 ---@return string|nil code
-local function available(editor, ctx)
+local function available(editor, ctx, write)
     if not editor.stored then return nil, 'not_stored' end
     local state = index.state(editor.id)
     if state == 'ready' then
+        if write then
+            ctx.label = Bridge.ActorLabel(ctx.source)
+            if not ctx.label then return nil, 'not_ready' end
+        end
         -- génération des têtes relevée au début : revérifiée après chaque transaction (`stillCurrent`)
         if ctx then ctx.generation = index.generation(editor.id) end
         return true
@@ -57,19 +62,34 @@ local function available(editor, ctx)
 end
 cycle.available = available
 
---- Nom du membre au journal et sur un brouillon.
+--- Nom du membre au journal et sur un brouillon (relevé par `available(…, true)`).
 local function actorOf(ctx)
-    return Bridge.ActorLabel(ctx.source) or texts.console
+    return ctx.label
+end
+
+--- Ligne de journal d'une écriture déjà faite en base : `known` garde l'atelier s'il vient de quitter le registre ;
+--- un refus du journal est écrit en console (jamais perdu sans trace).
+local function record(ctx, entry)
+    local ok, code = journal.write(ctx.source, entry, nil, nil, ctx.editor)
+    if not ok then
+        VavaAtelier.log.warn('journal : ligne %s (%s, %s) refusée : %s', entry.action, entry.editor,
+            tostring(entry.id), tostring(code))
+    end
+end
+
+--- Ligne lue et fiche décodée : row, entry ; nil, code (db_error, stale : ligne disparue, unreadable).
+local function readEntry(editor, kind, row)
+    if not row then return nil, 'stale' end
+    local entry = calls.entryOf(editor, kind, row)
+    if not entry then return nil, 'unreadable' end
+    return row, entry
 end
 
 --- Ligne et fiche lues : row, entry ; nil, code (db_error, stale : ligne disparue, unreadable).
 local function rowEntry(editor, kind, rowId)
     local row, err = store.row(rowId)
     if err then return nil, err end
-    if not row then return nil, 'stale' end
-    local entry = calls.entryOf(editor, kind, row)
-    if not entry then return nil, 'unreadable' end
-    return row, entry
+    return readEntry(editor, kind, row)
 end
 cycle.rowEntry = rowEntry
 
@@ -197,11 +217,6 @@ local function publishedIn(editorId)
         local head = index.get(editorId, kindId, id)
         return head ~= nil and head.published ~= nil
     end
-end
-
---- Membre tenant trop de brouillons ?
-local function tooManyDrafts(accountId)
-    return index.draftCount(accountId) >= cfg.drafts.perMember
 end
 
 --- Parent reçu d'un type enfant (clé réservée `parent` de la carte `s`), retiré des valeurs : values, parent ; nil,
@@ -333,12 +348,50 @@ end
 
 -- Enregistrer ---------------------------------------------------------------------------------------------------
 
+--- Lance `fn(…)` avec une place de brouillon réservée au membre (deux écritures parallèles d'un même compte ne
+--- dépassent jamais `drafts.perMember`) ; place rendue même en cas d'erreur. false, 'full' si le membre en tient assez.
+local function withDraftSlot(ctx, fn, ...)
+    if not index.reserveDraft(ctx.accountId, cfg.drafts.perMember) then return false, 'full' end
+    local results = pack(xpcall(fn, traceback, ...))
+    index.releaseDraft(ctx.accountId)
+    if not results[1] then error(results[2], 0) end
+    return unpack(results, 2, results.n)
+end
+
+--- Publiée d'une fiche décodée (base des résumés d'un brouillon), gardée sur le brouillon tant que la publiée ne change
+--- pas : une sauvegarde ne la relit pas. entry ; nil, code.
+local function baseEntry(editor, kind, head)
+    local published = head.published
+    if not published then return nil, 'stale' end
+    local draft = head.draft
+    local cache = draft and draft.cache
+    if cache and cache.baseRow == published.row and cache.base then return cache.base end
+    local row, entry = rowEntry(editor, kind, published.row)
+    if not row then return nil, entry end
+    if draft then
+        draft.cache = draft.cache or {}
+        draft.cache.baseRow, draft.cache.base = published.row, entry
+    end
+    return entry
+end
+
+--- Lieu et parent du brouillon (gardés sur lui : une sauvegarde ne relit pas sa ligne) : place, parent ; ou nil, nil,
+--- code.
+local function draftWhere(editor, kind, draft)
+    local cache = draft.cache
+    if cache and cache.placeKnown then return cache.place, draft.parent end
+    local row, entry = rowEntry(editor, kind, draft.row)
+    if not row then return nil, nil, entry end
+    draft.cache = cache or {}
+    draft.cache.place, draft.cache.placeKnown = entry.place, true
+    return entry.place, entry.parent
+end
+
 --- Fiche nouvelle : brouillon à l'identifiant tiré de son nom.
 local function saveNew(ctx, data, parent)
     local editor, kind = ctx.editor, ctx.kind
     local kindId = kind.def.id
     if index.liveCount(editor.id, kindId) >= cfg.definitions.perKind then return false, 'full' end
-    if tooManyDrafts(ctx.accountId) then return false, 'full' end
     -- un enfant peut naître sans parent (la page de T-101 n'en choisit pas) : sa publication seule le refusera
     if kind.def.parent and parent and not index.alive(index.get(editor.id, kind.def.parent, parent)) then
         return false, 'parent_missing'
@@ -348,7 +401,7 @@ local function saveNew(ctx, data, parent)
         return index.taken(editor.id, kindId, candidate)
     end)
     if not id then return false, err end
-    return locked({ index.key(editor.id, kindId, id) }, function()
+    return withDraftSlot(ctx, locked, { index.key(editor.id, kindId, id) }, function()
         if index.taken(editor.id, kindId, id) then return false, 'busy' end
         local dataJson, placeJson = calls.encode(data, nil)
         if not dataJson then return false, placeJson end
@@ -361,18 +414,55 @@ local function saveNew(ctx, data, parent)
             author = author,
         })
         if not rowId then return false, dbErr end
+        -- écrit en base : au journal même si l'atelier a changé entre-temps (la synchronisation fait foi pour le reste)
+        record(ctx, { editor = editor.id, kind = kindId, id = id, action = 'created', title = title })
         if not stillCurrent(ctx) then return false, 'syncing' end
         viewing(ctx, kindId, id)
         local head = index.ensure(editor.id, kindId, id)
         head.draft = { row = rowId, rev = 1, status = 'draft', removal = false, holder = ctx.accountId,
-            holderLabel = author, title = title, parent = parent, summary = nil, at = time() }
+            holderLabel = author, title = title, parent = parent, summary = nil, at = time(),
+            cache = { placeKnown = true } }
         index.touch(editor.id, head)
         entries.invalidate(editor.id, kindId)
         VavaAtelier.log.debug("%s : fiche nouvelle '%s' (%s)", editor.id, id, kindId)
-        journal.write(ctx.source, { editor = editor.id, kind = kindId, id = id, action = 'created', title = title })
         calls.notify(editor, kindId, id, 'saved', ctx.source)
         return true, answer(ctx, head, { id = id, title = title, warnings = warnings })
     end)
+end
+
+--- Premier brouillon d'une publiée (sous verrou) : lieu et parent de la version de base recopiés.
+local function firstDraft(ctx, head, data)
+    local editor, kind = ctx.editor, ctx.kind
+    local kindId = kind.def.id
+    local published, readErr = baseEntry(editor, kind, head)
+    if not published then return false, readErr == 'stale' and 'stale' or 'unreadable' end
+    local author = actorOf(ctx)
+    local title = calls.titleOf(kind, data, head.id)
+    -- le parent d'une fiche existante est celui de sa version de base (`values.s.parent` ignoré)
+    local where = published.place
+    local parentId = published.parent
+    local dataJson, placeJson = calls.encode(data, where)
+    if not dataJson then return false, placeJson end
+    local summary = draftSummary(kind, published.data, data)
+    local warnings = saveWarnings(editor, kind, data, ctx, head.id, { parent = parentId, place = where })
+    local rowId, dbErr = store.insertDraft({
+        editor = editor.id, kind = kindId, defId = head.id, removal = false, format = editor.format,
+        title = title, parent = parentId, data = dataJson, place = placeJson,
+        fingerprint = stored.fingerprint(data, where, parentId), base = head.published.version,
+        summary = summary, accountId = ctx.accountId, author = author,
+    })
+    if not rowId then return false, dbErr end
+    record(ctx, { editor = editor.id, kind = kindId, id = head.id, action = 'saved',
+        title = title, version = head.published.version })
+    if not stillCurrent(ctx) then return false, 'syncing' end
+    head.draft = { row = rowId, rev = 1, status = 'draft', removal = false, holder = ctx.accountId,
+        holderLabel = author, base = head.published.version, title = title, parent = parentId,
+        summary = summary ~= '' and summary or nil, at = time(),
+        cache = { place = where, placeKnown = true, baseRow = head.published.row, base = published } }
+    index.touch(editor.id, head)
+    entries.invalidate(editor.id, kindId)
+    calls.notify(editor, kindId, head.id, 'saved', ctx.source)
+    return true, answer(ctx, head, { id = head.id, title = title, warnings = warnings })
 end
 
 --- Fiche existante : brouillon d'une publiée, ou sauvegarde de son brouillon à sa révision.
@@ -382,53 +472,26 @@ local function saveExisting(ctx, head, rev, data)
     local situation = situationOf(head, ctx)
     local allowed, code = lc.allowed('save', situation, true, head.published ~= nil)
     if not allowed then return false, code end
+    if not head.draft then
+        if rev ~= 0 then return false, 'stale' end
+        return withDraftSlot(ctx, locked, { index.key(editor.id, kindId, head.id) }, function()
+            if head.draft then return false, 'stale' end
+            return firstDraft(ctx, head, data)
+        end)
+    end
     return locked({ index.key(editor.id, kindId, head.id) }, function()
         local draft = head.draft
-        local published = nil
-        if head.published then
-            local _, entry = rowEntry(editor, kind, head.published.row)
-            published = entry
-        end
-        local author = actorOf(ctx)
+        if not draft or rev ~= draft.rev then return false, 'stale' end
         local title = calls.titleOf(kind, data, head.id)
-        if not draft then
-            -- premier brouillon d'une publiée : lieu et parent de la version de base recopiés
-            if rev ~= 0 then return false, 'stale' end
-            if tooManyDrafts(ctx.accountId) then return false, 'full' end
-            if not published then return false, 'unreadable' end
-            -- le parent d'une fiche existante est celui de sa version de base (`values.s.parent` ignoré)
-            local where = published.place
-            local parentId = published.parent
-            local dataJson, placeJson = calls.encode(data, where)
-            if not dataJson then return false, placeJson end
-            local summary = draftSummary(kind, published.data, data)
-            local warnings = saveWarnings(editor, kind, data, ctx, head.id, { parent = parentId, place = where })
-            local rowId, dbErr = store.insertDraft({
-                editor = editor.id, kind = kindId, defId = head.id, removal = false, format = editor.format,
-                title = title, parent = parentId, data = dataJson, place = placeJson,
-                fingerprint = stored.fingerprint(data, where, parentId), base = head.published.version,
-                summary = summary, accountId = ctx.accountId, author = author,
-            })
-            if not rowId then return false, dbErr end
-            if not stillCurrent(ctx) then return false, 'syncing' end
-            head.draft = { row = rowId, rev = 1, status = 'draft', removal = false, holder = ctx.accountId,
-                holderLabel = author, base = head.published.version, title = title, parent = parentId,
-                summary = summary ~= '' and summary or nil, at = time() }
-            index.touch(editor.id, head)
-            entries.invalidate(editor.id, kindId)
-            journal.write(ctx.source, { editor = editor.id, kind = kindId, id = head.id, action = 'saved',
-                title = title, version = head.published.version })
-            calls.notify(editor, kindId, head.id, 'saved', ctx.source)
-            return true, answer(ctx, head, { id = head.id, title = title, warnings = warnings })
-        end
-        if rev ~= draft.rev then return false, 'stale' end
-        local row, current = rowEntry(editor, kind, draft.row)
-        if not row then return false, current end
-        local where = current.place
-        local parentId = current.parent
+        local where, parentId, whereErr = draftWhere(editor, kind, draft)
+        if whereErr then return false, whereErr end
         local dataJson, placeJson = calls.encode(data, where)
         if not dataJson then return false, placeJson end
-        local summary = published and draftSummary(kind, published.data, data) or ''
+        local summary = ''
+        if head.published then
+            local published = baseEntry(editor, kind, head)
+            if published then summary = draftSummary(kind, published.data, data) end
+        end
         local warnings = saveWarnings(editor, kind, data, ctx, head.id, { parent = parentId, place = where })
         local affected, dbErr = store.updateDraft(draft.row, rev, {
             data = dataJson, place = placeJson, parent = parentId, title = title,
@@ -455,7 +518,7 @@ end
 ---@param values table
 function cycle.save(ctx, id, rev, values)
     local editor, kind = ctx.editor, ctx.kind
-    local ok, code = available(editor, ctx)
+    local ok, code = available(editor, ctx, true)
     if not ok then return false, code end
     local head = nil
     if id ~= '' then
@@ -482,6 +545,22 @@ end
 
 -- Essai -----------------------------------------------------------------------------------------------------------
 
+--- Lignes d'un lot lues en une fois (`WHERE id IN (…)`) et décodées : pour chaque élément `{ kind, rowId, target,
+--- field }`, `target[field]` reçoit la fiche. true ; nil, code (db_error, stale : ligne disparue, unreadable).
+local function readLot(editor, wanted)
+    if #wanted == 0 then return true end
+    local ids = {}
+    for i, w in ipairs(wanted) do ids[i] = w.rowId end
+    local rows, err = store.rows(ids)
+    if not rows then return nil, err end
+    for _, w in ipairs(wanted) do
+        local row, entry = readEntry(editor, w.kind, rows[w.rowId])
+        if not row then return nil, entry end
+        w.target[w.field] = entry
+    end
+    return true
+end
+
 --- Lot d'un essai : la fiche et les brouillons (hors retraits) de ses enfants du même tenant, lus et revus.
 --- items = { { head, kind, entry, rowId, depth } } ; nil, code ; ou nil, nil, errors.
 local function trialLot(ctx, head)
@@ -497,11 +576,12 @@ local function trialLot(ctx, head)
                 depth = ref.depth }
         end
     end
-    for _, item in ipairs(items) do
-        local row, entry = rowEntry(editor, item.kind, item.rowId)
-        if not row then return nil, entry end
-        item.entry = entry
+    local wanted = {}
+    for i, item in ipairs(items) do
+        wanted[i] = { kind = item.kind, rowId = item.rowId, target = item, field = 'entry' }
     end
+    local read, readErr = readLot(editor, wanted)
+    if not read then return nil, readErr end
     local errors, code = reviewLot(ctx, items, function() return 'trial' end, 'trial')
     if not errors then return nil, code end
     if #errors > 0 then return nil, nil, check.bounded(errors) end
@@ -522,7 +602,7 @@ end
 --- RPC trial : { done, rev, state, footer, children }.
 function cycle.trial(ctx, id, rev)
     local editor, kind = ctx.editor, ctx.kind
-    local ok, code = available(editor, ctx)
+    local ok, code = available(editor, ctx, true)
     if not ok then return false, code end
     if not editor.hasTrial then return false, 'no_trial' end
     local head = index.get(editor.id, kind.def.id, id)
@@ -545,6 +625,12 @@ function cycle.trial(ctx, id, rev)
             store.setStatus(rows, 'trial', 'draft')
             return false, 'syncing'
         end
+        -- plafond recompté après l'attente de la base, sans autre attente jusqu'à `trials.start` (l'appel au module
+        -- est synchrone) : deux essais lancés ensemble par un même compte n'en laissent jamais un orphelin
+        if trials.count(ctx.accountId) >= cfg.trial.perMember then
+            store.setStatus(rows, 'trial', 'draft')
+            return false, 'trial_busy'
+        end
         local def, children = trialDefs(items)
         local shown, why = calls.trial(editor, kind.def.id, def, {
             source = ctx.source, accountId = ctx.accountId, children = children, reason = 'start',
@@ -562,45 +648,46 @@ function cycle.trial(ctx, id, rev)
         local version = lc.nextVersion(head.top)
         trials.start({
             editor = editor.id, kind = kind.def.id, id = id, title = head.title, version = version, rows = rows,
-            children = childRefs, source = ctx.source, accountId = ctx.accountId, label = actorOf(ctx),
+            children = childRefs, source = ctx.source, accountId = ctx.accountId, label = actorOf(ctx), def = def,
         })
         index.touch(editor.id, head)
         entries.invalidate(editor.id)
-        journal.write(ctx.source, { editor = editor.id, kind = kind.def.id, id = id, action = 'trial',
+        record(ctx, { editor = editor.id, kind = kind.def.id, id = id, action = 'trial',
             title = head.title, version = version })
         calls.notify(editor, kind.def.id, id, 'saved', ctx.source)
         return true, answer(ctx, head, { children = #childRefs })
     end)
 end
 
---- Essai relancé après une sauvegarde (le module montre la nouvelle version à l'auteur seul).
+--- Essai relancé après la sauvegarde de la fiche essayée ou de l'un de ses enfants : le module ne reçoit que ce qui a
+--- changé (la fiche, et `children` réduit à l'enfant sauvegardé, ou vide), sans relire les autres brouillons.
 function cycle.retrial(ctx, head, data, where, parentId)
     local editor = ctx.editor
     local trial = trials.of(ctx.accountId)
-    if not trial or trial.editor ~= editor.id or trial.id ~= head.id then return end
-    trials.touch(ctx.accountId, ctx.source)
+    if not trial or trial.editor ~= editor.id or not trial.def then return end
     local def = stored.def({ data = data, place = where, parent = parentId }, head.id, lc.nextVersion(head.top))
     local children = {}
-    for _, ref in ipairs(trial.children) do
-        local child = index.get(editor.id, ref.kind, ref.id)
-        if child and child.draft then
-            local _, entry = rowEntry(editor, editor.kinds[ref.kind], child.draft.row)
-            if entry then
-                children[#children + 1] = { kind = ref.kind,
-                    def = stored.def(entry, ref.id, lc.nextVersion(child.top)) }
-            end
+    if trial.kind == head.kind and trial.id == head.id then
+        trial.def = def
+    else
+        local inTrial = false
+        for _, ref in ipairs(trial.children) do
+            if ref.kind == head.kind and ref.id == head.id then inTrial = true end
         end
+        if not inTrial then return end
+        children[1] = { kind = head.kind, def = def }
     end
-    local shown, why = calls.trial(editor, head.kind, def, {
+    trials.touch(ctx.accountId, ctx.source)
+    local shown, why = calls.trial(editor, trial.kind, trial.def, {
         source = ctx.source, accountId = ctx.accountId, children = children, reason = 'save',
     })
-    if not shown then VavaAtelier.log.warn('%s : essai de %s non relancé : %s', editor.id, head.id, tostring(why)) end
+    if not shown then VavaAtelier.log.warn('%s : essai de %s non relancé : %s', editor.id, trial.id, tostring(why)) end
 end
 
 --- RPC endTrial : { done, rev, state, footer }.
 function cycle.endTrial(ctx, id)
     local editor, kind = ctx.editor, ctx.kind
-    local ok, code = available(editor, ctx)
+    local ok, code = available(editor, ctx, true)
     if not ok then return false, code end
     local head = index.get(editor.id, kind.def.id, id)
     if not index.alive(head) then return false, 'unknown_entry' end
@@ -656,11 +743,11 @@ local function publishPlan(ctx, head)
     local draft = head.draft
     local removal = draft.removal == true
     local mainKind = editor.kinds[head.kind]
-    local row, entry = rowEntry(editor, mainKind, draft.row)
-    if not row then return nil, entry end
-    local main = { head = head, kind = mainKind, rowId = draft.row, rev = draft.rev, entry = entry, removal = removal,
+    local main = { head = head, kind = mainKind, rowId = draft.row, rev = draft.rev, removal = removal,
         depth = 1, added = head.published == nil }
     local items = { main }
+    -- lignes à lire (brouillons, publiées d'avant), toutes ensemble ensuite : jamais une requête par fiche
+    local wanted = { { kind = mainKind, rowId = draft.row, target = main, field = 'entry' } }
     if removal then
         if not head.published then return nil, 'stale' end
         local refs, err = lc.cascade(head.kind, head.id, editor.parents, index.publishedRefs(editor.id),
@@ -670,11 +757,12 @@ local function publishPlan(ctx, head)
             local child = index.get(editor.id, ref.kind, ref.id)
             local kind = editor.kinds[ref.kind]
             local own = child.draft and child.draft.removal and child.draft.holder == ctx.accountId
-            local childRow, childEntry = rowEntry(editor, kind, own and child.draft.row or child.published.row)
-            if not childRow then return nil, childEntry end
-            items[#items + 1] = { head = child, kind = kind, rowId = own and child.draft.row or nil,
+            local item = { head = child, kind = kind, rowId = own and child.draft.row or nil,
                 rev = own and child.draft.rev or 0, cascade = not own and child.published.row or nil,
-                entry = childEntry, removal = true, depth = ref.depth }
+                removal = true, depth = ref.depth }
+            items[#items + 1] = item
+            wanted[#wanted + 1] = { kind = kind, rowId = own and child.draft.row or child.published.row,
+                target = item, field = 'entry' }
         end
     else
         local refs, err = lc.bundle({ kind = head.kind, id = head.id }, index.draftRefs(editor.id), editor.parents,
@@ -685,23 +773,24 @@ local function publishPlan(ctx, head)
             local kind = editor.kinds[ref.kind]
             -- un retrait d'une fiche qui n'est plus publiée n'a plus rien à retirer
             if not (ref.removal and not child.published) then
-                local childRow, childEntry = rowEntry(editor, kind, child.draft.row)
-                if not childRow then return nil, childEntry end
-                items[#items + 1] = { head = child, kind = kind, rowId = child.draft.row, rev = child.draft.rev,
-                    entry = childEntry, removal = ref.removal == true, depth = ref.depth,
-                    added = child.published == nil }
+                local item = { head = child, kind = kind, rowId = child.draft.row, rev = child.draft.rev,
+                    removal = ref.removal == true, depth = ref.depth, added = child.published == nil }
+                items[#items + 1] = item
+                wanted[#wanted + 1] = { kind = kind, rowId = child.draft.row, target = item, field = 'entry' }
             end
         end
     end
     -- versions publiées d'avant (résumés, inchangée)
     for _, item in ipairs(items) do
         if item.head.published and not item.removal then
-            local pubRow, pubEntry = rowEntry(editor, item.kind, item.head.published.row)
-            if not pubRow then return nil, pubEntry end
-            item.before = pubEntry
+            wanted[#wanted + 1] = { kind = item.kind, rowId = item.head.published.row, target = item,
+                field = 'before' }
         end
         item.version = lc.nextVersion(item.head.top)
     end
+    local read, readErr = readLot(editor, wanted)
+    if not read then return nil, readErr end
+    local entry = main.entry
     if not removal and #items == 1 and main.before and main.before.fingerprint == entry.fingerprint then
         return nil, 'unchanged'
     end
@@ -945,27 +1034,30 @@ local function applyLot(editor, items, reason)
     return true
 end
 
---- Rows du lot relues après la transaction : chacune au statut et au numéro attendus (une révision changée entre le
---- résumé et l'écriture n'aurait touché aucune ligne). Rend true, false (lot à défaire) ou nil, 'db_error'.
-local function lotWritten(items)
-    for _, item in ipairs(items) do
-        if item.rowId and not item.cascade then
-            local row, err = store.row(item.rowId)
-            if err then return nil, err end
-            local expected = item.removal and 'archived' or 'published'
-            if not row or row.status ~= expected or index.toInt(row.version) ~= item.version then return false end
-        end
+--- Lot relu après la transaction, en une requête sur son numéro : chaque fiche a sa ligne au statut et au numéro
+--- attendus (une révision changée entre le résumé et l'écriture, ou la copie d'une version disparue entre-temps,
+--- n'aurait rien écrit). Rend true et 'type|id' → numéro de la ligne écrite, false (lot à défaire), ou nil, code.
+---@param editorId string
+---@param batch integer
+---@param items table[]  { { head, version, removal? } }
+---@param status fun(item: table): string  statut attendu d'une fiche
+local function lotWritten(editorId, batch, items, status)
+    local rows, err = store.batchRows(editorId, batch)
+    if not rows then return nil, err end
+    local expected = {}
+    for i, item in ipairs(items) do
+        expected[i] = { kind = item.head.kind, id = item.head.id, version = item.version, status = status(item) }
     end
-    return true
+    return lc.lotComplete(expected, rows)
 end
 
---- Refus du module au cours d'un lot : base rendue comme avant, ligne « refusée en jeu » au journal, puis
---- resynchronisation de l'atelier.
+--- Refus du module au cours d'un lot (ou lot incomplet) : base rendue comme avant (les seules lignes de ce lot), ligne
+--- « refusée en jeu » au journal, puis les seules fiches du lot rapprochées.
 local function rollback(ctx, head, title, undoPlan, why)
     local editor = ctx.editor
-    local done = store.transaction(store.undoSteps(editor.id, lc.undo(undoPlan)))
+    local done = store.transaction(store.undoSteps(editor.id, lc.undo(undoPlan), undoPlan.batch))
     if why then
-        journal.write(ctx.source, { editor = editor.id, kind = head.kind, id = head.id, action = 'refused',
+        record(ctx, { editor = editor.id, kind = head.kind, id = head.id, action = 'refused',
             title = title, summary = text.truncate(tostring(why), OUT.summary) })
     end
     if not done then
@@ -992,10 +1084,16 @@ local function publishedHooks(ctx, items, action, by)
     end
 end
 
+--- Historique des fiches d'un lot ramené à `history.keep` versions (dans un fil, sans retarder la réponse).
+local function purgeLot(editor, items)
+    local history = VavaAtelier.history
+    if history then history.purgeLot(editor.id, items) end
+end
+
 --- RPC publish : { done, version, state, footer } ; refus du module : { done = false, errors }.
 function cycle.publish(ctx, id, rev, token)
     local editor = ctx.editor
-    local ok, code = available(editor, ctx)
+    local ok, code = available(editor, ctx, true)
     if not ok then return false, code end
     local head, err = draftHead(ctx, id, rev)
     if not head then return false, err end
@@ -1028,27 +1126,37 @@ function cycle.publish(ctx, id, rev, token)
                 rows[#rows + 1] = { id = item.rowId, before = 'draft' }
             end
         end
+        local undoPlan = { rows = rows, inserted = inserted, batch = batch, keys = sync.keysOf(plan.items) }
         local written, dbErr = transaction(lock, steps)
         if not written then return false, dbErr end
         local main = plan.items[1]
         local mainTitle = calls.titleOf(main.kind, main.entry.data, id)
-        local complete, checkErr = lotWritten(plan.items)
+        local complete, checkErr = lotWritten(editor.id, batch, plan.items, function(item)
+            return item.removal and 'archived' or 'published'
+        end)
         if complete == nil then return false, checkErr end
-        if not complete then return rollback(ctx, head, mainTitle, { rows = rows, inserted = inserted, keys = sync.keysOf(plan.items) }, nil) end
-        if not stillCurrent(ctx) then return false, 'syncing' end
+        if not complete then return rollback(ctx, head, mainTitle, undoPlan, nil) end
+        local journalEntry = { editor = editor.id, kind = head.kind, id = id,
+            action = plan.removal and 'removed' or 'published', title = mainTitle,
+            summary = plan.summary ~= '' and plan.summary or nil, version = main.version }
+        if not stillCurrent(ctx) then
+            -- écrit en base : journal et hooks quand même ; mémoire et module suivront la synchronisation
+            record(ctx, journalEntry)
+            publishedHooks(ctx, plan.items, 'publish', by)
+            return false, 'syncing'
+        end
         for _, item in ipairs(plan.items) do
             if item.removal then markRetired(editor, item, batch) else markPublished(editor, item, item.rowId, by) end
         end
         entries.invalidate(editor.id)
         local applied, why = applyLot(editor, plan.items, 'publish')
-        if not applied then return rollback(ctx, head, mainTitle, { rows = rows, inserted = inserted, keys = sync.keysOf(plan.items) }, why) end
-        journal.write(ctx.source, { editor = editor.id, kind = head.kind, id = id,
-            action = plan.removal and 'removed' or 'published', title = mainTitle,
-            summary = plan.summary ~= '' and plan.summary or nil, version = main.version })
+        if not applied then return rollback(ctx, head, mainTitle, undoPlan, why) end
+        record(ctx, journalEntry)
         publishedHooks(ctx, plan.items, 'publish', by)
         for _, item in ipairs(plan.items) do
             calls.notify(editor, item.head.kind, item.head.id, item.removal and 'removed' or 'published', ctx.source)
         end
+        purgeLot(editor, plan.items)
         local situation = situationOf(head, ctx)
         return true, { done = true, version = main.version, state = stateOf(head, situation),
             footer = footerOf(editor, situation, head) }
@@ -1058,7 +1166,7 @@ end
 --- RPC restore : { done, version, state, footer }.
 function cycle.restore(ctx, id, version, token)
     local editor, kind = ctx.editor, ctx.kind
-    local ok, code = available(editor, ctx)
+    local ok, code = available(editor, ctx, true)
     if not ok then return false, code end
     local head = index.get(editor.id, kind.def.id, id)
     if not head then return false, 'unknown_entry' end
@@ -1082,24 +1190,34 @@ function cycle.restore(ctx, id, version, token)
                 i == 1 and plan.summary or format(texts.summaries.restored, item.restoredFrom))
             inserted[#inserted + 1] = { kind = item.head.kind, id = item.head.id, version = item.version }
         end
+        local undoPlan = { rows = rows, inserted = inserted, batch = batch, keys = sync.keysOf(plan.items) }
         local written, dbErr = transaction(lock, steps)
         if not written then return false, dbErr end
-        if not stillCurrent(ctx) then return false, 'syncing' end
-        for _, item in ipairs(plan.items) do
-            local copy = store.version(editor.id, item.head.kind, item.head.id, item.version)
-            markPublished(editor, item, copy and index.toInt(copy.id) or nil, by)
-        end
-        entries.invalidate(editor.id)
         local main = plan.items[1]
         local mainTitle = calls.titleOf(main.kind, main.entry.data, id)
+        -- chaque copie relue (une requête) : une source purgée ou annulée entre-temps n'a rien copié → tout est défait
+        local complete, copies = lotWritten(editor.id, batch, plan.items, function() return 'published' end)
+        if complete == nil then return false, copies end
+        if not complete then return rollback(ctx, head, mainTitle, undoPlan, nil) end
+        local journalEntry = { editor = editor.id, kind = head.kind, id = id, action = 'restored',
+            title = mainTitle, summary = plan.summary, version = main.version }
+        if not stillCurrent(ctx) then
+            record(ctx, journalEntry)
+            publishedHooks(ctx, plan.items, 'restore', by)
+            return false, 'syncing'
+        end
+        for _, item in ipairs(plan.items) do
+            markPublished(editor, item, copies[item.head.kind .. '|' .. item.head.id], by)
+        end
+        entries.invalidate(editor.id)
         local applied, why = applyLot(editor, plan.items, 'restore')
-        if not applied then return rollback(ctx, head, mainTitle, { rows = rows, inserted = inserted, keys = sync.keysOf(plan.items) }, why) end
-        journal.write(ctx.source, { editor = editor.id, kind = head.kind, id = id, action = 'restored',
-            title = mainTitle, summary = plan.summary, version = main.version })
+        if not applied then return rollback(ctx, head, mainTitle, undoPlan, why) end
+        record(ctx, journalEntry)
         publishedHooks(ctx, plan.items, 'restore', by)
         for _, item in ipairs(plan.items) do
             calls.notify(editor, item.head.kind, item.head.id, 'restored', ctx.source)
         end
+        purgeLot(editor, plan.items)
         local situation = situationOf(head, ctx)
         return true, { done = true, version = main.version, state = stateOf(head, situation),
             footer = footerOf(editor, situation, head) }
@@ -1112,18 +1230,18 @@ end
 local function discardLocked(_, ctx, head, rev)
     local editor = ctx.editor
     local draft = head.draft
-    if rev ~= draft.rev then return false, 'stale' end
+    if not draft or rev ~= draft.rev then return false, 'stale' end
     if draft.status == 'trial' then trials.finish(ctx.accountId, 'discard', { requester = ctx.source }) end
     local affected, err = store.deleteDraft(draft.row, rev)
     if not affected then return false, err end
     if affected == 0 then return false, 'stale' end
-    if not stillCurrent(ctx) then return false, 'syncing' end
     local title = head.title
+    -- écrit en base : au journal même si l'atelier a changé entre-temps
+    record(ctx, { editor = editor.id, kind = head.kind, id = head.id, action = 'discarded', title = title })
+    if not stillCurrent(ctx) then return false, 'syncing' end
     head.draft = nil
     index.touch(editor.id, head)
     entries.invalidate(editor.id, head.kind)
-    journal.write(ctx.source, { editor = editor.id, kind = head.kind, id = head.id, action = 'discarded',
-        title = title })
     calls.notify(editor, head.kind, head.id, 'discarded', ctx.source)
     if not head.published then return true, { done = true, gone = true } end
     return true, answer(ctx, head)
@@ -1132,7 +1250,7 @@ end
 --- RPC discard.
 function cycle.discard(ctx, id, rev)
     local editor, kind = ctx.editor, ctx.kind
-    local ok, code = available(editor, ctx)
+    local ok, code = available(editor, ctx, true)
     if not ok then return false, code end
     local head = index.get(editor.id, kind.def.id, id)
     if not index.alive(head) then return false, 'unknown_entry' end
@@ -1144,7 +1262,7 @@ end
 --- RPC retire : brouillon de retrait d'une publiée (data copiée) ; brouillon jamais publié : abandon.
 function cycle.retire(ctx, id)
     local editor, kind = ctx.editor, ctx.kind
-    local ok, code = available(editor, ctx)
+    local ok, code = available(editor, ctx, true)
     if not ok then return false, code end
     local head = index.get(editor.id, kind.def.id, id)
     if not index.alive(head) then return false, 'unknown_entry' end
@@ -1153,9 +1271,9 @@ function cycle.retire(ctx, id)
         return locked({ index.key(editor.id, kind.def.id, id) }, discardLocked, ctx, head, head.draft.rev)
     end
     if not allowed then return false, refusal end
-    if tooManyDrafts(ctx.accountId) then return false, 'full' end
-    return locked({ index.key(editor.id, kind.def.id, id) }, function()
+    return withDraftSlot(ctx, locked, { index.key(editor.id, kind.def.id, id) }, function()
         if head.draft then return false, 'draft_taken' end
+        if not head.published then return false, 'stale' end
         local row, err = store.row(head.published.row)
         if err then return false, err end
         if not row then return false, 'stale' end
@@ -1166,13 +1284,13 @@ function cycle.retire(ctx, id)
             fingerprint = row.fingerprint, base = head.published.version, accountId = ctx.accountId, author = author,
         })
         if not rowId then return false, dbErr end
+        record(ctx, { editor = editor.id, kind = kind.def.id, id = id, action = 'saved',
+            title = head.title, summary = texts.summaries.removalPrepared, version = head.published.version })
         if not stillCurrent(ctx) then return false, 'syncing' end
         head.draft = { row = rowId, rev = 1, status = 'draft', removal = true, holder = ctx.accountId,
             holderLabel = author, base = head.published.version, title = row.title, parent = row.parent, at = time() }
         index.touch(editor.id, head)
         entries.invalidate(editor.id, kind.def.id)
-        journal.write(ctx.source, { editor = editor.id, kind = kind.def.id, id = id, action = 'saved',
-            title = head.title, summary = texts.summaries.removalPrepared, version = head.published.version })
         calls.notify(editor, kind.def.id, id, 'saved', ctx.source)
         return true, answer(ctx, head)
     end)
@@ -1181,15 +1299,14 @@ end
 --- RPC take : reprise du brouillon d'un autre membre (son essai prend fin, il est prévenu).
 function cycle.take(ctx, id, rev)
     local editor, kind = ctx.editor, ctx.kind
-    local ok, code = available(editor, ctx)
+    local ok, code = available(editor, ctx, true)
     if not ok then return false, code end
     local head = index.get(editor.id, kind.def.id, id)
     if not index.alive(head) then return false, 'unknown_entry' end
     local allowed, refusal = lc.allowed('take', situationOf(head, ctx), true, head.published ~= nil)
     if not allowed then return false, refusal end
     if rev ~= head.draft.rev then return false, 'stale' end
-    if tooManyDrafts(ctx.accountId) then return false, 'full' end
-    return locked({ index.key(editor.id, kind.def.id, id) }, function()
+    return withDraftSlot(ctx, locked, { index.key(editor.id, kind.def.id, id) }, function()
         local draft = head.draft
         if not draft or draft.rev ~= rev then return false, 'stale' end
         local author = actorOf(ctx)
@@ -1200,18 +1317,17 @@ function cycle.take(ctx, id, rev)
         local affected, err = store.takeDraft(draft.row, draft.rev, ctx.accountId, author)
         if not affected then return false, err end
         if affected == 0 then return false, 'stale' end
+        record(ctx, { editor = editor.id, kind = kind.def.id, id = id, action = 'taken',
+            title = head.title, summary = text.truncate(format(texts.summaries.takenFrom, tostring(previous)),
+                OUT.summary) })
         if not stillCurrent(ctx) then return false, 'syncing' end
         draft.holder, draft.holderLabel, draft.rev, draft.status, draft.at = ctx.accountId, author, draft.rev + 1,
             'draft', time()
         index.touch(editor.id, head)
         entries.invalidate(editor.id, kind.def.id)
-        journal.write(ctx.source, { editor = editor.id, kind = kind.def.id, id = id, action = 'taken',
-            title = head.title, summary = text.truncate(format(texts.summaries.takenFrom, tostring(previous)),
-                OUT.summary) })
         -- l'ancien tenant est prévenu même s'il n'a pas la fiche ouverte
         calls.notify(editor, kind.def.id, id, 'taken', ctx.source,
             previousHolder and calls.sourceOf(previousHolder) or nil)
         return true, answer(ctx, head)
     end)
 end
-

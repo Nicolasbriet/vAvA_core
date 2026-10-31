@@ -213,21 +213,26 @@ local function remove(kind, id, info)
     return true
 end
 
---- `trial` : montre la fiche à son seul auteur (chat), enfants compris ; rien d'autre ne change en jeu.
+--- `trial` : montre la fiche à son seul auteur (chat), enfants compris ; rien d'autre ne change en jeu. Relancé après
+--- une sauvegarde (`ctx.reason = 'save'`), il ne reçoit que la fiche et l'enfant sauvegardé : les autres restent tels
+--- quels, et seule une fiche dont ce qui se lit a changé est annoncée de nouveau.
 local function trial(kind, def, ctx)
     local source = ctx and ctx.source
     if not source then return false, 'Auteur absent.' end
-    local mine = { [kind] = { [def.id] = def } }
+    local saving = ctx.reason == 'save' and trials[source] ~= nil
+    local mine = saving and trials[source] or {}
     local function show(k, d)
         if k == 'panneau' then chat(source, announce.trial:format(d.titre, d.texte or ''))
         else chat(source, announce.trialPoster:format(d.titre)) end
     end
-    show(kind, def)
-    for _, child in ipairs(ctx.children or {}) do
-        mine[child.kind] = mine[child.kind] or {}
-        mine[child.kind][child.def.id] = child.def
-        show(child.kind, child.def)
+    local function keep(k, d)
+        mine[k] = mine[k] or {}
+        local before = mine[k][d.id]
+        mine[k][d.id] = d
+        if not saving or Store.shownChanged(k, before, d) then show(k, d) end
     end
+    keep(kind, def)
+    for _, child in ipairs(ctx.children or {}) do keep(child.kind, child.def) end
     trials[source] = mine
     return true
 end

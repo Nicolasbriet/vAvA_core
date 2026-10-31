@@ -10,7 +10,8 @@
            T-101 : douze RPC des définitions gardées (enregistrer, essayer, arrêter l'essai, résumer, publier, revenir
            à une version, abandonner, retirer, reprendre, historique, version, retirées), chacun borné et limité ;
            hooks : séance fermée ou départ → fin de l'essai du membre ; /atelier_archives ; au démarrage, dans un fil :
-           réparation (essais rendus aux brouillons, doublons), purge de l'historique, puis editorsReady.
+           réparation (essais rendus aux brouillons, doublons), editorsReady, puis (après `history.purgeDelayMs`)
+           purge de l'historique.
     Dépendances : tous les fichiers server/ du module, bridge/server.lua
 ]]
 
@@ -259,15 +260,16 @@ local function setup()
     end
     archives.register()
     journal.purge()
-    -- dans un fil : réparation de la base (essais rendus aux brouillons, doublons), purge de l'historique, puis les
-    -- modules déjà en jeu (redémarrage de l'Atelier) redéclarent leurs éditeurs et sont synchronisés
+    -- dans un fil : réparation de la base (essais rendus aux brouillons, doublons), puis les modules déjà en jeu
+    -- (redémarrage de l'Atelier) redéclarent leurs éditeurs et sont synchronisés ; la purge de l'historique attend
+    -- `history.purgeDelayMs` (les synchronisations d'abord)
     CreateThread(function()
         if not sync.repair() then
             VavaAtelier.log.error('définitions : réparation impossible (registres muets) ; chaque atelier gardé sera '
                 .. 'synchronisé à sa déclaration')
         end
-        history.purge()
         core.hooks.runAfter(HOOKS.EDITORS_READY, {})
+        history.purge()
     end)
     return true
 end

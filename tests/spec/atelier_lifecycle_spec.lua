@@ -323,6 +323,35 @@ describe('vava_atelier lifecycle', function()
         end)
     end)
 
+    describe('lot écrit (S-4, R-7)', function()
+        local expected = {
+            { kind = 'zone', id = 'foret', version = 4, status = 'published' },
+            { kind = 'node', id = 'n1', version = 2, status = 'archived' },
+        }
+
+        it('chaque fiche a sa ligne au statut attendu : numéros des lignes écrites', function()
+            local ok, ids = lc.lotComplete(expected, {
+                { id = '31', kind = 'zone', def_id = 'foret', version = '4', status = 'published' },
+                { id = 32, kind = 'node', def_id = 'n1', version = 2, status = 'archived' },
+                -- une ligne plus ancienne du même numéro de lot (autre version) ne gêne pas
+                { id = 12, kind = 'zone', def_id = 'foret', version = 2, status = 'archived' },
+            })
+            assert.is_true(ok)
+            assert.same({ ['zone|foret'] = 31, ['node|n1'] = 32 }, ids)
+        end)
+
+        it('une ligne absente (copie d\'une source disparue, révision changée) ou d\'un autre statut : à défaire', function()
+            assert.is_false(lc.lotComplete(expected, {
+                { id = 31, kind = 'zone', def_id = 'foret', version = 4, status = 'published' },
+            }))
+            assert.is_false(lc.lotComplete(expected, {
+                { id = 31, kind = 'zone', def_id = 'foret', version = 4, status = 'draft' },
+                { id = 32, kind = 'node', def_id = 'n1', version = 2, status = 'archived' },
+            }))
+            assert.is_true((lc.lotComplete({}, {})))
+        end)
+    end)
+
     describe('jeton', function()
         it('16 hexadécimaux, change avec une révision', function()
             local a = lc.token({ what = 'publish', main = { 1, 3 }, children = { { 2, 1 } }, published = 3 })

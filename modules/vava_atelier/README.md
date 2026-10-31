@@ -114,7 +114,7 @@ les brouillons, puis le module les applique et l'atelier est resynchronisé.
 | `definitions.maxBytes` | 16 384 | poids au plus d'une fiche gardée (JSON de data + lieu) |
 | `definitions.perKind` | 1 000 | fiches vivantes au plus par type |
 | `drafts.perMember` / `homeLines` | 20 / 5 | brouillons tenus au plus par un membre ; brouillons montrés sur l'accueil |
-| `history.keep` / `pageLines` / `purgeOnStart` | 20 / 20 / `true` | versions figées gardées par fiche (jamais la publiée ni la dernière d'une fiche retirée) ; lignes d'une page ; purge au démarrage |
+| `history.keep` / `pageLines` / `purgeOnStart` / `purgeDelayMs` | 20 / 20 / `true` / 60 000 | versions figées gardées par fiche (jamais la publiée ni la dernière d'une fiche retirée ; purge des fiches d'un lot après chaque publication ou retour en arrière) ; lignes d'une page ; purge au démarrage ; son attente après editorsReady (les synchronisations d'abord) |
 | `trial.maxMinutes` / `perMember` | 30 / 1 | durée au plus d'un essai ; essais au plus par membre |
 | `bundle.maxChildren` | 200 | fiches enfants au plus dans une publication groupée |
 | `sync.sliceMs` / `retryMs` / `retries` | 4 / 10 000 / 3 | travail au plus (ms) entre deux pauses d'un fil de synchronisation ou d'archives ; nouvel essai si la base est muette ; essais au plus |
@@ -153,6 +153,12 @@ refuse de démarrer (« config.lua, droits : rights.overrides['…'] = '…' : p
   de l'atelier, et au plus 60 lignes par 10 s. La recopie au journal du Registre ne part qu'une fois la ligne écrite.
 - Un descripteur d'atelier plus lourd que 32 Ko est refusé au chargement : chaque borne d'une déclaration peut être
   tenue alors que leur produit (8 types × 40 champs) ferait un envoi démesuré.
+- **T-101** : chaque écriture exige le nom du membre au Registre (jamais « Console » pour un joueur : `not_ready`),
+  une ligne refusée par le journal est écrite en console ; une écriture validée en base est toujours journalisée (et ses
+  hooks partent), même si l'atelier change pendant ce temps. Un lot relu après sa transaction (une requête sur son
+  numéro) est défait s'il est incomplet, et l'annulation ne touche que les lignes de ce lot. Le verrou « une demande à la
+  fois » est tenu par joueur (fermer puis rouvrir l'Atelier ne le libère pas) ; plafonds d'essais et de brouillons
+  recomptés sans attente avant d'écrire (places de brouillon réservées le temps d'une écriture).
 - **T-101** : chaque écriture revérifie l'atelier gardé et disponible, la fiche, le tenant (compte), la révision et,
   pour une publication ou un retour en arrière, le jeton du résumé (on publie exactement ce qu'on a lu) ; une écriture à
   la fois par fiche. Rien de la page n'est gardé sans passer par la forme, le monde et, à l'essai et à la publication,

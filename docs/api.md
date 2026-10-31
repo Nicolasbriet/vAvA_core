@@ -2406,7 +2406,9 @@ chaîne des `parent` sans cycle, trois types au plus. Le descripteur gagne `stor
   appel d'un lot. Crée ou remplace, idempotente, tout ou rien.
 - `remove(kind, id, info)` : `info = { reason, last }` ; ne détruit jamais d'objet de joueur.
 - `trial(kind, def, ctx)` : montre la fiche **à son seul auteur** ; `ctx = { source, accountId, children = { { kind, def
-  } }, reason = 'start' | 'save' }`. `endTrial(kind, id, ctx)` : `ctx = { source?, accountId, children = { { kind, id }
+  } }, reason = 'start' | 'save' }`. Avec `reason = 'save'` (relance après une sauvegarde de la fiche ou de l'un de
+  ses enfants), `def` est la fiche essayée et `children` ne porte **que** l'enfant sauvegardé (vide si c'est la fiche) :
+  le module garde les autres tels qu'il les montre déjà (différence, jamais tout le lot à chaque sauvegarde). `endTrial(kind, id, ctx)` : `ctx = { source?, accountId, children = { { kind, id }
   }, reason }` (`stop`, `publish`, `discard`, `taken`, `session`, `dropped`, `timeout`, `editor`), retour ignoré.
 - `diff(kind, avant, après)` → texte ≤ 160 ou nil ; `upgrade(kind, data, from)` → data, ou nil (version illisible).
 - Toutes sont appelées isolées et chronométrées ; une erreur levée vaut un refus.

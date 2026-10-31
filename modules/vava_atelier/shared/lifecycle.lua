@@ -16,6 +16,7 @@
 ]]
 
 local type, ipairs, pairs = type, ipairs, pairs
+local tonumber, tointeger = tonumber, math.tointeger
 local sort = table.sort
 
 local DEF = VavaAtelier.DEF
@@ -359,6 +360,30 @@ function lc.undo(plan)
         out.delete[#out.delete + 1] = { kind = ref.kind, id = ref.id, version = ref.version }
     end
     return out
+end
+
+--- Lot bien écrit ? Chaque fiche attendue `{ kind, id, version, status }` doit avoir sa ligne, au statut attendu,
+--- parmi celles relues du lot (`{ id, kind, def_id, version, status }`, d'une seule requête sur son numéro). Une
+--- révision changée entre le résumé et l'écriture, ou la copie d'une version disparue entre-temps, n'écrit rien : le
+--- lot est alors à défaire. Rend true et 'type|id' → numéro de la ligne écrite, ou false.
+---@param expected { kind: string, id: string, version: integer, status: string }[]
+---@param rows { id: any, kind: string, def_id: string, version: any, status: string }[]
+---@return boolean
+---@return table<string, integer>|nil
+function lc.lotComplete(expected, rows)
+    local found = {}
+    for _, row in ipairs(rows) do
+        local version = tointeger(tonumber(row.version))
+        if version then found[row.kind .. '|' .. row.def_id .. '|' .. version] = row end
+    end
+    local ids = {}
+    for _, item in ipairs(expected) do
+        local row = found[item.kind .. '|' .. item.id .. '|' .. item.version]
+        if not row or row.status ~= item.status then return false end
+        local id = tonumber(row.id)
+        ids[item.kind .. '|' .. item.id] = tointeger(id) or id
+    end
+    return true, ids
 end
 
 --- Jeton d'un résumé : empreinte de ce qu'il décrit (ligne principale et sa révision, révisions des enfants, version

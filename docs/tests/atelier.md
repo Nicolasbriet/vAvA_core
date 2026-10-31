@@ -147,7 +147,7 @@ Console).
 | 5 | Relancer l'essai, fermer l'Atelier (`Échap`). | Fin de l'essai (journal « fin de la séance ») ; à la réouverture, le panneau est « Brouillon ». |
 | 6 | Serveur arrêté ; `trial.maxMinutes = 1` dans `modules/vava_atelier/config.lua` ; démarrer, relancer l'essai, laisser l'Atelier ouvert et attendre une minute. | Fin au bout d'une minute (« délai passé ») ; la fiche ouverte repasse « Brouillon » (évènement `entryChanged`). Remettre 30. |
 | 7 | Atelier « Proclamations (exemple) » : un brouillon. | Aucun bouton d'essai. |
-
+| 8 | Essai du panneau qui a une affiche en brouillon (§ 12-6) : l'essai part (« [Essai] Le panneau… » et « [Essai] L'affiche… »). Changer seulement la couleur de l'affiche, enregistrer ; puis son nom, enregistrer. | Couleur : aucune annonce (rien de ce qui se lit n'a changé) ; nom : seule l'annonce de l'affiche repart, pas celle du panneau. |
 ## 12. Publier (T-101) — **(2 joueurs)** pour 2 à 4
 
 | # | Faire | Attendu |
@@ -212,7 +212,8 @@ Console).
 | 1 | A en essai ; `restart vava_example_atelier`. | Fin de l'essai (« atelier retiré »), notification « L'essai de « … » a pris fin. » ; après redémarrage : le panneau est « Brouillon », le magasin de l'exemple a l'état de la base (`lire` : texte publié, pas celui de la config). |
 | 2 | A en essai ; `restart vava_atelier`. | Page fermée ; au retour, brouillon (jamais « Essai ») ; console : `… 0 rapprochée(s) …` (l'exemple était déjà à l'état de la base). |
 | 3 | Base arrêtée (MySQL coupé) ; enregistrer. | « Les registres de l'Atelier ne répondent pas : réessayez dans un instant. » ; rien ne change en jeu. Base relancée : tout refonctionne. |
-| 4 | Un `apply` qui refuse : console `set vava_example_refuse 1`, publier. | « Refus d'essai demandé. » ; la fiche reste « Brouillon », la version publiée est intacte en jeu (`lire`), console : `refus du module (…), base rendue, resynchronisation`. Remettre `set vava_example_refuse 0`. |
+| 4 | Un `apply` qui refuse : console `set vava_example_refuse 1`, publier. | « Refus d'essai demandé. » ; la fiche reste « Brouillon », la version publiée est intacte en jeu (`lire`), console : `refus du module (…), base rendue, resynchronisation` puis `… (fiches du lot seulement)` (les autres fiches ne sont pas relues). Remettre `set vava_example_refuse 0`. |
+| 5 | `history.keep = 2` dans la config de l'Atelier, redémarrer ; publier quatre fois le même panneau. | Historique : jamais plus de 2 versions après chaque publication (purge des fiches du lot, sans redémarrage) ; au démarrage, la console écrit la purge une minute après « editorsReady » (`history.purgeDelayMs`), après les lignes de synchronisation. Remettre 20. |
 
 ## 18. Fin du test
 

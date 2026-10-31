@@ -5,7 +5,8 @@
            les données (≈ 200 octets par fiche). Les listes, la recherche, les étiquettes, l'accueil et les contrôles
            des RPC lisent ici, jamais la base. État d'un atelier (`syncing`, `ready`, `failed`) ; verrou par fiche
            (une écriture à la fois, repris au-delà de `limits.busyMs`) ; identifiants rendus par la liste du module
-           (identifiant d'une fiche nouvelle).
+           (identifiant d'une fiche nouvelle) ; brouillons tenus par compte (compteur tenu à chaque changement de
+           tête, places réservées le temps d'une écriture). Testée : tests/spec/atelier_index_spec.lua.
     Dépendances : shared/constants.lua, config.lua, shared/text.lua, server/core.lua
 ]]
 
@@ -33,6 +34,7 @@ VavaAtelier.index = index
 ---@field draft table|nil          { row, rev, status, removal, holder, holderLabel, base, title, parent, summary, at }
 ---@field retired table|nil        { row, version, title, batch, at }
 ---@field refused boolean|nil      publiée, mais refusée en jeu à la dernière synchronisation
+---@field counted integer|nil      tenant compté dans les brouillons par compte (index.draftCount)
 
 -- atelier → { state, kinds = { [type] = { byId, sorted } }, moduleIds = { [type] = { [id] = true } } }
 local editors = {}
@@ -40,6 +42,31 @@ local editors = {}
 local locks = {}
 -- génération des têtes, par atelier
 local generations = {}
+-- brouillons tenus par compte, tous ateliers confondus (tenus à chaque changement de tête : jamais un parcours de
+-- toutes les fiches) ; places réservées par une écriture en cours
+local draftsOf, reserved = {}, {}
+
+--- Compte tenu à jour pour une tête : son brouillon (et son tenant) a pu changer.
+---@param head vAvA.AtelierHead
+---@param gone? boolean  la tête quitte la mémoire
+local function recount(head, gone)
+    local holder = not gone and head.draft and head.draft.holder or nil
+    local counted = head.counted
+    if counted == holder then return end
+    if counted then
+        local n = (draftsOf[counted] or 1) - 1
+        draftsOf[counted] = n > 0 and n or nil
+    end
+    if holder then draftsOf[holder] = (draftsOf[holder] or 0) + 1 end
+    head.counted = holder
+end
+
+--- Toutes les têtes d'un atelier retirées du compte (reconstruction, retrait de l'atelier).
+local function uncount(entry)
+    for _, kind in pairs(entry.kinds) do
+        for _, h in pairs(kind.byId) do recount(h, true) end
+    end
+end
 
 ---@param editorId string
 ---@return table
@@ -81,6 +108,7 @@ end
 --- Oublie un atelier (retiré du registre).
 ---@param editorId string
 function index.drop(editorId)
+    if editors[editorId] then uncount(editors[editorId]) end
     editors[editorId] = nil
     -- une écriture en cours voit la génération changer : elle ne touche plus ni la mémoire ni le module. Ses verrous
     -- restent à elle (rendus par son `unlock`), jamais jetés ici.
@@ -139,6 +167,7 @@ end
 ---@param tops table[]
 function index.build(editorId, rows, retired, tops)
     local entry = slot(editorId)
+    uncount(entry)
     entry.kinds = {}
     generations[editorId] = (generations[editorId] or 0) + 1
     local function head(kindId, id)
@@ -169,6 +198,7 @@ function index.build(editorId, rows, retired, tops)
                 kind.byId[id] = nil
             else
                 index.retitle(h)
+                recount(h)
             end
         end
     end
@@ -213,10 +243,17 @@ function index.touch(editorId, head)
     if not entry then return end
     local kind = kindSlot(entry, head.kind)
     kind.sorted = nil
+    -- une tête d'avant une reconstruction (écriture qui finit après une synchronisation) ne touche ni la liste ni le
+    -- compte des brouillons
+    local current = kind.byId[head.id] == head
     if not head.published and not head.draft and not head.retired then
-        kind.byId[head.id] = nil
+        if current then
+            recount(head, true)
+            kind.byId[head.id] = nil
+        end
         return
     end
+    if current then recount(head) end
     index.retitle(head)
 end
 
@@ -299,19 +336,29 @@ function index.liveCount(editorId, kindId)
     return #index.live(editorId, kindId)
 end
 
---- Brouillons tenus par un compte, tous ateliers confondus.
+--- Brouillons tenus par un compte, tous ateliers confondus (compteur tenu à chaque changement de tête).
 ---@param accountId integer
 ---@return integer
 function index.draftCount(accountId)
-    local count = 0
-    for _, entry in pairs(editors) do
-        for _, kind in pairs(entry.kinds) do
-            for _, h in pairs(kind.byId) do
-                if h.draft and h.draft.holder == accountId then count = count + 1 end
-            end
-        end
-    end
-    return count
+    return accountId and draftsOf[accountId] or 0
+end
+
+--- Réserve une place de brouillon le temps d'une écriture : vrai si le compte tient (et réserve) moins de `limit`
+--- brouillons ; à rendre par `releaseDraft` dès l'écriture finie (le brouillon écrit compte alors pour lui-même).
+---@param accountId integer
+---@param limit integer
+---@return boolean
+function index.reserveDraft(accountId, limit)
+    if not accountId then return false end
+    if index.draftCount(accountId) + (reserved[accountId] or 0) >= limit then return false end
+    reserved[accountId] = (reserved[accountId] or 0) + 1
+    return true
+end
+
+---@param accountId integer
+function index.releaseDraft(accountId)
+    local n = (reserved[accountId] or 1) - 1
+    reserved[accountId] = n > 0 and n or nil
 end
 
 --- Brouillons tenus par un compte dans des ateliers donnés : { { editorId, head } }.

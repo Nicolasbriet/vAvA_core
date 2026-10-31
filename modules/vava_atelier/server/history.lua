@@ -3,8 +3,9 @@
     Rôle : lecture seule de ce qui est gardé (§ 6.2, § 7.5 de la spec T-101) : historique d'une fiche (versions figées,
            des plus hautes aux plus basses, par pages), une version en lecture (champs, état, « Revenir à cette
            version » s'il y a lieu), fiches retirées du royaume d'un type (les plus récemment retirées d'abord) ; purge
-           de l'historique au démarrage, dans un fil (on garde `history.keep` versions par fiche, jamais la publiée ni
-           la dernière ligne d'une fiche retirée).
+           de l'historique (on garde `history.keep` versions par fiche, jamais la publiée ni la dernière ligne d'une
+           fiche retirée) : des fiches d'un lot après chaque publication ou retour en arrière, et au démarrage, dans un
+           fil, une fois les synchronisations passées.
     Dépendances : shared/constants.lua, config.lua, shared/text.lua, shared/formvalues.lua, shared/journaltext.lua,
                   shared/changes.lua, shared/lifecycle.lua, server/core.lua, server/entries.lua, server/store.lua,
                   server/index.lua, server/calls.lua, server/lifecycle.lua
@@ -12,7 +13,7 @@
 
 local ipairs, format, tostring = ipairs, string.format, tostring
 local ceil, max, min = math.ceil, math.max, math.min
-local CreateThread = CreateThread
+local CreateThread, Wait = CreateThread, Wait
 local time = os.time
 
 local core = VavaAtelier.core
@@ -115,26 +116,46 @@ function history.removed(ctx, page)
     return true, { total = #list, page = page, pages = pages, entries = out }
 end
 
---- Purge de l'historique (au démarrage, dans un fil).
+--- Versions d'une fiche au-delà de `history.keep` retirées : nombre retiré (0 si la base ne répond pas).
+---@return integer
+local function purgeFiche(editorId, kindId, defId, keep)
+    local versions = store.versions(editorId, kindId, defId)
+    if not versions then return 0 end
+    local list = {}
+    for i, row in ipairs(versions) do
+        list[i] = { id = index.toInt(row.id), version = index.toInt(row.version), status = row.status }
+    end
+    return store.deleteVersions(lc.purge(list, keep)) or 0
+end
+
+--- Purge des fiches d'un lot qui vient d'être publié ou rétabli (dans un fil, sans retarder la réponse) : seules
+--- celles dont la plus haute version dépasse `history.keep` peuvent en avoir trop (deux requêtes chacune).
+---@param editorId string
+---@param items { head: vAvA.AtelierHead }[]
+function history.purgeLot(editorId, items)
+    local keep = cfg.history.keep
+    local refs = {}
+    for _, item in ipairs(items) do
+        local head = item.head
+        if head and (head.top or 0) > keep then refs[#refs + 1] = { head.kind, head.id } end
+    end
+    if #refs == 0 then return end
+    CreateThread(function()
+        for _, ref in ipairs(refs) do purgeFiche(editorId, ref[1], ref[2], keep) end
+    end)
+end
+
+--- Purge de l'historique au démarrage, dans un fil, `history.purgeDelayMs` après editorsReady (les synchronisations
+--- des ateliers passent d'abord) : ce qu'une publication n'a pas déjà purgé (`history.keep` abaissé, par exemple).
 function history.purge()
     if not cfg.history.purgeOnStart then return end
     CreateThread(function()
+        Wait(cfg.history.purgeDelayMs) -- audit: ok (fil serveur, une attente unique avant une purge)
         local keep = cfg.history.keep
         local fiches = store.purgeCandidates(keep)
         if not fiches then return end
         local removed = 0
-        for _, fiche in ipairs(fiches) do
-            local versions = store.versions(fiche.editor, fiche.kind, fiche.def_id)
-            if versions then
-                local list = {}
-                for i, row in ipairs(versions) do
-                    list[i] = { id = index.toInt(row.id), version = index.toInt(row.version), status = row.status }
-                end
-                local ids = lc.purge(list, keep)
-                local count = store.deleteVersions(ids)
-                removed = removed + (count or 0)
-            end
-        end
+        for _, fiche in ipairs(fiches) do removed = removed + purgeFiche(fiche.editor, fiche.kind, fiche.def_id, keep) end
         VavaAtelier.log.info('définitions : %d version(s) ancienne(s) retirée(s) (%d gardées par fiche)', removed, keep)
     end)
 end

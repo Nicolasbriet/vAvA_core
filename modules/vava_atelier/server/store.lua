@@ -89,10 +89,15 @@ local INSERT_PUBLISHED_SQL = 'INSERT INTO ' .. T .. ' (`editor`, `kind`, `def_id
     .. '`published_by`, `published_at`, `summary`) '
     .. "VALUES (?, ?, ?, ?, 'published', 0, ?, ?, ?, NULLIF(?, ''), ?, NULLIF(?, ''), ?, NULLIF(?, 0), ?, ?, NOW(), "
     .. "NULLIF(?, ''))"
+-- annulation : seules les lignes écrites par ce lot (`batch`), jamais celles d'une autre écriture
 local UNDO_DRAFT_SQL = 'UPDATE ' .. T .. " SET `status` = 'draft', `version` = NULL, `batch` = NULL, "
-    .. '`published_at` = NULL, `published_by` = NULL WHERE `id` = ?'
+    .. "`published_at` = NULL, `published_by` = NULL WHERE `id` = ? AND `status` IN ('published', 'archived') "
+    .. 'AND `batch` = ?'
 local UNDO_PUBLISHED_SQL = 'UPDATE ' .. T .. " SET `status` = 'published' WHERE `id` = ? AND `status` = 'archived'"
-local UNDO_INSERT_SQL = 'DELETE FROM ' .. T .. ' WHERE `editor` = ? AND `kind` = ? AND `def_id` = ? AND `version` = ?'
+local UNDO_INSERT_SQL = 'DELETE FROM ' .. T .. ' WHERE `editor` = ? AND `kind` = ? AND `def_id` = ? AND `version` = ? '
+    .. 'AND `batch` = ?'
+local BATCH_ROWS_SQL = 'SELECT `id`, `kind`, `def_id`, `version`, `status` FROM ' .. T
+    .. ' WHERE `editor` = ? AND `batch` = ?'
 
 -- requêtes à liste `IN (?, …)`, construites une fois par forme et par longueur
 local inQueries = {}
@@ -206,6 +211,12 @@ function store.history(editorId, kindId, defId, before, limit)
         return rowsOr(core.db.query(HISTORY_BEFORE_SQL, { editorId, kindId, defId, before, limit }), nil, 'historique')
     end
     return rowsOr(core.db.query(HISTORY_SQL, { editorId, kindId, defId, limit }), nil, 'historique')
+end
+
+--- Lignes portant un numéro de lot (relecture d'un lot écrit, en une requête) : { { id, kind, def_id, version,
+--- status } }, ou nil, 'db_error'.
+function store.batchRows(editorId, batch)
+    return rowsOr(core.db.query(BATCH_ROWS_SQL, { editorId, batch }), nil, 'lot ' .. tostring(batch))
 end
 
 --- Versions de retrait d'un même lot (rétablissement en cascade).
@@ -359,16 +370,18 @@ function store.insertPublishedStep(p)
     } }
 end
 
---- Morceaux de l'annulation d'un lot (shared/lifecycle.lua › undo) pour un atelier.
+--- Morceaux de l'annulation d'un lot (shared/lifecycle.lua › undo) pour un atelier : seules les lignes portant le
+--- numéro de ce lot (`batch`) sont rendues au brouillon ou supprimées.
 ---@param editorId string
 ---@param undo { toDraft: integer[], toPublished: integer[], delete: table[] }
+---@param batch integer
 ---@return table[]
-function store.undoSteps(editorId, undo)
+function store.undoSteps(editorId, undo, batch)
     local steps = {}
     for _, ref in ipairs(undo.delete) do
-        steps[#steps + 1] = { query = UNDO_INSERT_SQL, values = { editorId, ref.kind, ref.id, ref.version } }
+        steps[#steps + 1] = { query = UNDO_INSERT_SQL, values = { editorId, ref.kind, ref.id, ref.version, batch } }
     end
-    for _, id in ipairs(undo.toDraft) do steps[#steps + 1] = { query = UNDO_DRAFT_SQL, values = { id } } end
+    for _, id in ipairs(undo.toDraft) do steps[#steps + 1] = { query = UNDO_DRAFT_SQL, values = { id, batch } } end
     for _, id in ipairs(undo.toPublished) do steps[#steps + 1] = { query = UNDO_PUBLISHED_SQL, values = { id } } end
     return steps
 end

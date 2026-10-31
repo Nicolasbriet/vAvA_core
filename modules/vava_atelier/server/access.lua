@@ -4,7 +4,7 @@
            son compte ; chaque RPC revérifie, dans l'ordre : personnage chargé, Registre du Conseil prêt, droit
            d'ouvrir l'Atelier (relu auprès de vava_admin, jamais gardé), session de ce compte, atelier déclaré, droit
            effectif de l'atelier (relu), type et champ déclarés. Une seule lecture ou vérification de module à la fois
-           par joueur (`busy`, repris au-delà de `limits.busyMs`). Un refus pour droit écrit une ligne en console, une
+           par joueur (`busy`, tenu par joueur et non par séance, repris au-delà de `limits.busyMs`). Un refus pour droit écrit une ligne en console, une
            fois par intervalle et par joueur.
     Dépendances : shared/constants.lua, config.lua, bridge/server.lua, server/core.lua, server/editors.lua
 ]]
@@ -29,11 +29,12 @@ VavaAtelier.access = access
 ---@field accountId integer
 ---@field editor string|nil   atelier ouvert (descripteur demandé en dernier)
 ---@field entry string|nil    fiche ouverte de cet atelier, 'type|id' (avis entryChanged ciblés)
----@field busy table|false     jeton de l'appel qui tient le verrou, false s'il est libre
----@field busySince integer    instant (GetGameTimer) où le verrou a été pris
 
 ---@type table<integer, vAvA.AtelierSession>
 local sessions = {}
+-- verrou de chaque joueur : { token, since } de l'appel en cours. Tenu par joueur, hors de la séance : fermer puis
+-- rouvrir l'Atelier (`close` puis `home`) ne le libère pas pendant qu'un appel tourne encore.
+local busy = {}
 -- dernier refus écrit en console, par joueur
 local lastRefusal = {}
 
@@ -80,7 +81,7 @@ function access.open(source, rpc)
     local session = sessions[source]
     if not session or session.accountId ~= ctx.accountId then
         if session then access.close(source) end
-        session = { accountId = ctx.accountId, busy = false, busySince = 0 }
+        session = { accountId = ctx.accountId }
         sessions[source] = session
         core.hooks.runAfter(HOOK_SESSION, { source = source, accountId = ctx.accountId, open = true })
     end
@@ -129,18 +130,19 @@ end
 ---@param fn fun(ctx: vAvA.AtelierContext, ...): any
 ---@return any
 function access.locked(ctx, fn, ...)
-    local session = ctx.session
+    local source = ctx.source
     local now = GetGameTimer()
-    if session.busy then
-        local held = now - session.busySince
-        if held < cfg.limits.busyMs then return false, 'busy' end
-        VavaAtelier.log.warn('joueur %d : verrou de lecture tenu depuis %d ms (au-delà de %d ms), repris', ctx.source,
-            held, cfg.limits.busyMs)
+    local held = busy[source]
+    if held then
+        local age = now - held.since
+        if age < cfg.limits.busyMs then return false, 'busy' end
+        VavaAtelier.log.warn('joueur %d : verrou de lecture tenu depuis %d ms (au-delà de %d ms), repris', source,
+            age, cfg.limits.busyMs)
     end
-    local token = {}
-    session.busy, session.busySince = token, now
+    local token = { since = now }
+    busy[source] = token
     local results = pack(xpcall(fn, traceback, ctx, ...))
-    if session.busy == token then session.busy = false end
+    if busy[source] == token then busy[source] = nil end
     if not results[1] then error(results[2], 0) end
     return unpack(results, 2, results.n)
 end
@@ -160,7 +162,7 @@ end
 ---@param source integer
 function access.forget(source)
     access.close(source)
-    lastRefusal[source] = nil
+    lastRefusal[source], busy[source] = nil, nil
 end
 
 ---@param source integer
