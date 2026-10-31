@@ -16,7 +16,7 @@
         serveur, chez tous.
     Effets selon le niveau (taille, lumière) et la distance (rien au-delà de `effects.maxDistance`), dans les plafonds
     de lumières et de particules. La boucle par image ne vit que le temps d'un vol (quelques secondes au plus).
-    Dépendances : shared/, config.lua, client/ (noyau, fx, controls, targeting)
+    Dépendances : shared/, config_client.lua, client/ (noyau, fx, controls, targeting)
 ]]
 
 local pairs, ipairs, next, type, min, max, sqrt, acos, deg = pairs, ipairs, next, type, math.min, math.max, math.sqrt, math.acos, math.deg

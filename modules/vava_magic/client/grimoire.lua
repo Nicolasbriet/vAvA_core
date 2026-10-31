@@ -6,7 +6,7 @@
            le permet ; combinaisons découvertes (déclencheur, résultat, éléments), avec le compte de celles qui
            restent à trouver. Pour un non-mage, les pages restent illisibles.
            Construit d'après la vue de la fiche reçue du serveur et la config (aucune requête).
-    Dépendances : shared/, config.lua, client/ (noyau), client/spells/lueur.lua (couleur)
+    Dépendances : shared/, config_client.lua, client/ (noyau), client/spells/lueur.lua (couleur)
 ]]
 
 local type, ipairs, pairs, tostring, sort, format, gsub = type, ipairs, pairs, tostring, table.sort, string.format, string.gsub

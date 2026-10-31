@@ -5,7 +5,7 @@
         rien ne s'en sert depuis `effects.releaseMs` (le lot « core » de GTA reste toujours chargé) ;
       - plafond de lumières dynamiques dessinées par image, et de particules en boucle actives ;
       - niveau de détail selon la distance à la caméra : complet, simplifié, ou rien.
-    Dépendances : config.lua, shared/geometry.lua
+    Dépendances : config_client.lua, shared/geometry.lua
 ]]
 
 local pairs, next = pairs, next

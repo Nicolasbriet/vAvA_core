@@ -4,7 +4,7 @@
            magie éveillé ou endormi, incantation en cours. La page anime elle-même la remontée de la mana d'après le
            rythme reçu du serveur, et décide de se montrer (mana pas pleine, mode éveillé, ou juste après un sort) :
            rien n'est envoyé périodiquement, aucune boucle ici.
-    Dépendances : shared/, config.lua, client/nui.lua, client/state.lua
+    Dépendances : shared/, config_client.lua, client/nui.lua, client/state.lua
 ]]
 
 local nui = VavaMagic.nui

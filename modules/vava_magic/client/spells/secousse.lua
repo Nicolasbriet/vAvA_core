@@ -9,7 +9,7 @@
       - Choc (effet instantané du serveur) : éclats de roche sur tout le cercle, caméra qui tremble pour les plus
         proches, grondement ; le sol reste fissuré un moment. Moins d'éclats de loin, rien au-delà de la distance des
         effets.
-    Dépendances : shared/, config.lua, client/ (noyau, controls, zones, bursts)
+    Dépendances : shared/, config_client.lua, client/ (noyau, controls, zones, bursts)
 ]]
 
 local ipairs, max, min, floor, sin, random = ipairs, math.max, math.min, math.floor, math.sin, math.random

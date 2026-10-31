@@ -7,7 +7,7 @@
            la roue d'armes de GTA sont coupées à chaque image, seulement tant que la roue est ouverte. La page sait
            aussi quelle touche ferme la roue (si le jeu ne voit pas le relâchement). Un sort choisi arme en main
            (vava_combat) : « rangez votre arme » aussitôt.
-    Dépendances : shared/, config.lua, client/nui.lua, client/state.lua, client/controls.lua, client/keys.lua
+    Dépendances : shared/, config_client.lua, client/nui.lua, client/state.lua, client/controls.lua, client/keys.lua
 ]]
 
 local type, ipairs, sort = type, ipairs, table.sort

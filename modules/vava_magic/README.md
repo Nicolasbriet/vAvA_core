@@ -9,13 +9,14 @@ ardente**), d'eau (**Trait de glace**, **Vague**, **Brume**) et de terre (**Proj
 **Lueur** et **Murmure**, grimoire et registre des murmures (objets), commandes du Conseil. Le serveur décide de tout ;
 le client affiche et demande.
 
-Version 2.10.0 : les cinq étapes de la refonte (noyau, roue et contrôles ; états, zones et feu ; eau et terre ;
+Version 2.11.0 : les cinq étapes de la refonte (noyau, roue et contrôles ; états, zones et feu ; eau et terre ;
 combinaisons ; finitions : traces au sol, sons par fichier ou natifs, documentation et tests), puis leurs correctifs ;
 le registre des murmures s'envoie par lots (2.7.0) ; polices et papier de vava_ui (2.8.0) ; les blessures des sorts
 passent par la **chaîne de dégâts** de vava_health, boucliers, résistances et zones de paix en modificateurs, une
 blessure ne se lit plus sur le ped (2.9.0, T-116 : voir « Blessures et chaîne de dégâts ») ; **mains vides pour
 incanter** : ni arme tenue ni bouclier au bras, vérifié par le serveur avec vava_combat (2.10.0, T-140 : voir « Mains
-vides pour incanter »).
+vides pour incanter »). Les réglages sont en deux fichiers depuis 2.11.0 (T-143, lot 4 de T-132) : voir
+« Configuration ».
 Rien n'a encore été joué en vrai : voir « À vérifier en jeu », « Tests à faire en jeu » et la procédure complète
 `docs/tests/magie.md`.
 
@@ -54,9 +55,9 @@ Rien n'a encore été joué en vrai : voir « À vérifier en jeu », « Tests �
 
 ```
 vava_magic/
-  fxmanifest.lua · config.lua · README.md
-  shared/   constants.lua · text.lua (UTF-8) · progression.lua · geometry.lua · pages.lua (lots du registre)
-            harm.lua (blessures sur la chaîne : servi au seul serveur)
+  fxmanifest.lua · config_client.lua (lu par le client) · config.lua (servi au seul serveur) · README.md
+  shared/   constants.lua · progression.lua · geometry.lua (lus par le client et le serveur)
+            text.lua (UTF-8) · pages.lua (lots du registre) · harm.lua (blessures sur la chaîne) : servis au seul serveur
   bridge/   server.lua · client.lua                 ← seul contact avec le core et les autres modules
   server/   core · world · sheets · mana · spells · progression · combat (coups par la chaîne) · protections
             (boucliers, résistances, zones de paix : modificateurs) · states (états) · obstacles (remparts…)
@@ -398,7 +399,32 @@ plus la place. »… `texts.chat.adminErrors`) ; le code brut ne va qu'à la con
 `<sort>` : `boule_de_feu`, `mur_de_flammes`, `nova_ardente`, `trait_de_glace`, `vague`, `brume`, `projectile_de_roche`,
 `secousse`, `rempart`, `lueur`, `murmure`.
 
-## Configuration (`config.lua`)
+## Configuration (`config_client.lua`, `config.lua`)
+
+Depuis 2.11.0 (T-143, lot 4 de T-132), les réglages sont dans deux fichiers et chacun n'est écrit qu'une fois :
+`config_client.lua` porte ce que lit le client, et le serveur aussi : `mana.max` et `hud`, `progression.thresholds` et
+`costMultipliers`, les relevés du client de `casting`, `elements`, `wheel`, `controls`, `effects`, `sounds`, le départ
+des `projectiles`, `spells` **entiers** (jusqu'à l'Atelier des sorts, T-123), `targeting` (sauf l'intervalle du
+frisson), ce que le client montre des `states`, le rendu de `wetGround`, `combos` entiers, `combat.reactions`,
+`knockbackMs` et `protectedZones`, `sigils.spell`, `nonMageLimit`, `nameMax` et le coût du brouillage, `ambient` (sauf
+les yeux), `keys`, les commandes du joueur, et les textes que le client affiche (`errors`, cinq messages de
+`notify`, l'aide des commandes de `chat`, `suggestions`, `ui`). `config.lua` porte tout le reste, lu par le seul
+serveur, et le complète sans réécrire une clé de `config_client.lua` : `coreVersion`, `persistence`, `zones`,
+`protections`, `registers`, `items`, `admin`, `rateLimits`, et, ajoutés aux tables ouvertes par `config_client.lua`,
+la régénération de la mana, l'XP d'un échec et l'anti-farm, les délais et marges du serveur (`casting`, `projectiles`,
+`targeting.warnIntervalMs`), les durées et contrôles durs des états, la durée du sol mouillé, `pvp`, `healthPoints`,
+`kinds` et `log` du combat, le tirage et l'échange des sigils, `ambient.glowMs`, les commandes du Conseil et les
+textes que le serveur envoie (messages au joueur, réponses du Conseil, journal).
+
+Fichiers téléchargés par chaque joueur (2.11.0) : `shared/constants.lua`, `config_client.lua`,
+`shared/progression.lua`, `shared/geometry.lua`, les fichiers `client/`, la page, ses sons et ses images ;
+`config.lua`, `shared/text.lua`, `shared/pages.lua` et `shared/harm.lua` sont servis au seul serveur.
+
+**Mise à jour vers 2.11.0** : les réglages lus par le client ont quitté `config.lua` pour `config_client.lua`. Un
+`config.lua` modifié et gardé par l'installeur de la Chancellerie (le nouveau posé en `config.lua.nouveau`) garde
+l'ancienne forme : le module démarre, mais la console le signale (« config.lua garde la forme d'avant 2.11.0 … ») et
+un réglage client changé dans ce fichier reste sans effet. Reportez vos réglages dans `config.lua` et
+`config_client.lua` d'après les nouveaux fichiers.
 
 | Section | Contenu |
 | --- | --- |
@@ -433,7 +459,7 @@ plus la place. »… `texts.chat.adminErrors`) ; le code brut ne va qu'à la con
 | `sigils` · `registers` · `items` | sigils (dont le délai après un refus, `refusedMs` : 60 s), registre (200 pages, lots de 20 pages et de 7 500 octets au plus), objets |
 | `ambient` | effets vus des autres (15 m, fragments à 3 m, runes, textes) |
 | `admin` · `keys` · `commands` · `rateLimits` | droits, touches et boutons, commandes, limites de débit |
-| `texts` | **tous** les textes vus par les joueurs (refus, messages, chat, journal, interface) |
+| `texts` | **tous** les textes vus par les joueurs : refus, messages affichés par le client, aide des commandes, suggestions, interface (`config_client.lua`) ; messages envoyés par le serveur, réponses du Conseil, journal (`config.lua`) |
 
 Champs communs d'un sort : `order` (roue et grimoire), `label`, `summary`, `element` (clé de `elements`), `type`
 (`projectile`, `zone`, `utilitaire`), `icon` (`web/img/spells/<icon>.svg`), `baseCost`, `xp`, `hitXp` (bonus quand le
@@ -465,7 +491,7 @@ hauteur)` (serveur). Un genre de **zone** se déclare par `zones.define(genre, {
 `world.broadcast(point, rayon, EVENTS.BURST, { spell, … })` (serveur) et `VavaMagic.bursts.define('<nom>', rendu)`
 (client) ; un **obstacle** par `VavaMagic.obstacles.add(function(de, vers) … end)` ; un sol mouillé par
 `VavaMagic.grounds.wet{ … }`.
-3. `config.lua` : `spells.<nom>` (champs communs) et son icône `web/img/spells/<icon>.svg` (silhouette blanche) ; lister
+3. `config_client.lua` : `spells.<nom>` (champs communs) et son icône `web/img/spells/<icon>.svg` (silhouette blanche) ; lister
    ses deux fichiers dans le `fxmanifest.lua`. La roue, le grimoire, `/sort`, `/lancer` et les commandes du Conseil le
    prennent d'eux-mêmes.
 

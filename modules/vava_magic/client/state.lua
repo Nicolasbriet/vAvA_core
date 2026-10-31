@@ -4,7 +4,7 @@
            fiche (mage, sorts et leur XP, sort prêt dans les mains, combinaisons découvertes), mana prédite d'après le
            dernier envoi du serveur (même rythme de régénération), temps de recharge et délai global appris aux fins
            d'incantation, sorts d'autres modules.
-    Dépendances : shared/, config.lua
+    Dépendances : shared/, config_client.lua
 ]]
 
 local type, ipairs, pairs, floor, min = type, ipairs, pairs, math.floor, math.min
@@ -88,7 +88,7 @@ function state.view()
     return view
 end
 
---- Config d'un sort (fichier config.lua, ou envoyée par le serveur pour les sorts d'autres modules).
+--- Config d'un sort (fichier config_client.lua, ou envoyée par le serveur pour les sorts d'autres modules).
 ---@param name string
 ---@return table|nil
 function state.spellConfig(name)

@@ -26,7 +26,7 @@ use_experimental_fxv2_oal 'yes'
 
 name 'vava_magic'
 description 'Magie vAvA : mana, progression, roue des sorts, états, sorts de feu, eau et terre, Murmure, Lueur, grimoire et registre'
-version '2.10.0'
+version '2.11.0'
 
 dependency 'vAvA_core'
 dependency 'vava_ui'
@@ -51,18 +51,20 @@ files {
 }
 
 -- Ordre explicite : chaque fichier ne dépend que de ceux listés avant lui. Un nouveau sort : ses deux fichiers
--- spells/<nom>.lua (serveur et client) à la suite des autres, et sa config dans config.lua.
+-- spells/<nom>.lua (serveur et client) à la suite des autres, et sa config dans config_client.lua. Joueurs :
+-- constantes, config_client.lua et la logique dont un fichier client se sert ; config.lua au seul serveur (T-132).
 shared_scripts {
     'shared/constants.lua',
-    'config.lua',
-    'shared/text.lua',
+    'config_client.lua',       -- ouvre VavaMagic.config : ce que lit le client
     'shared/progression.lua',
     'shared/geometry.lua',
-    'shared/pages.lua',
 }
 
--- règles pures des blessures (shared/harm.lua) : servies au seul serveur, le client n'en télécharge rien
+-- règles pures du texte, du registre et des blessures (shared/) : servies au seul serveur
 server_scripts {
+    'config.lua',              -- complète VavaMagic.config : ce que lit le seul serveur
+    'shared/text.lua',
+    'shared/pages.lua',
     'shared/harm.lua',
     'server/core.lua',
     'bridge/server.lua',

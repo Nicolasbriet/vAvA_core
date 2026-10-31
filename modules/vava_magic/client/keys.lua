@@ -3,7 +3,7 @@
     Rôle : touches, boutons de la souris et commandes du joueur. Chaque action a une commande liée par
            RegisterKeyMapping (clavier, bouton ou molette de la souris ; réglable dans Paramètres > Raccourcis >
            FiveM) ; la touche choisie est relue pour le grimoire. Commandes du chat avec leur suggestion en français.
-    Dépendances : config.lua, bridge/client.lua
+    Dépendances : config_client.lua, bridge/client.lua
 ]]
 
 local type, pairs, match = type, pairs, string.match
