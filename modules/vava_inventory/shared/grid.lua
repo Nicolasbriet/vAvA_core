@@ -1,7 +1,8 @@
 --[[
     vava_inventory/shared/grid.lua
     Rôle : géométrie pure des grilles : emprise d'un objet (pivoté ou non), collisions, marquage, recherche de place,
-           places rendues aux piles mises de côté (1.6.3).
+           places rendues aux piles mises de côté (1.6.3). Servie au seul serveur (T-132) : la page a sa propre
+           géométrie, le serveur décide de chaque place.
     Un conteneur tient une carte d'occupation (index de case → identifiant d'objet) : vérifier une place coûte
     la surface de l'objet, pas celle de la grille. Coordonnées en cases, origine en haut à gauche, à partir de 0.
     Dépendances : shared/constants.lua

@@ -3,7 +3,8 @@
     Rôle : ouverture de l'inventaire et raccourcis (RegisterKeyMapping : touches réglables par le joueur, aucune
            boucle ; la touche choisie pour ouvrir ferme aussi l'interface), réception des états envoyés par le serveur
            (dont l'objet en main), et relais des gestes de l'interface vers le serveur.
-    Dépendances : shared/, config.lua, client/core.lua, client/drops.lua, client/hands.lua, client/nui.lua
+    Dépendances : shared/constants.lua, shared/held.lua, config_client.lua, client/core.lua, client/drops.lua,
+                  client/hands.lua, client/nui.lua
 ]]
 
 local type, tostring, tonumber, pcall = type, tostring, tonumber, pcall
