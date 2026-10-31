@@ -750,12 +750,14 @@ faire tout le système de combat ») : la porte T-119 reste à passer en jeu.
 - Critères : tests unitaires de l'ordre des modificateurs ; aucun dégât entre joueurs possible hors de la chaîne.
 
 ### T-111 — Armes de corps à corps
-- Agent : vava-dev-lua · Dépend de : T-110 · Statut : en cours
-- **En cours (31 octobre 2026, repris)** : branche `agents/T-111`. Spec `docs/plan/specs/T-111.md` (16 décisions
-  retenues) ; `vava_combat` 1.0.0 codé, testé hors jeu (`verifier.sh` OK avec `BASE=main`), documenté (README, api.md,
-  `docs/tests/combat.md` § 2, rapport `docs/plan/rapports/T-111.md`) ; `vava_example_combat` 1.1.0 (`/frapper_arme`,
-  spec § 13-2 : **autorisé par le porteur du projet le 31/10** — cette tâche autorise à toucher
-  `examples/vava_example_combat` dans les limites de la spec). Restent les relectures sécurité, réseau et lore.
+- Agent : vava-dev-lua · Dépend de : T-110 · Statut : à tester en jeu
+- **À tester en jeu (31 octobre 2026)** : `vava_combat` 1.0.0 (six armes et un bouclier, qualité ±15 %, usure par coup
+  qui touche relue après le coup, arme émoussée, bouclier au bras ou au dos par statebag gardé par le serveur et montré
+  à 120 m, `strike` réservé à ses appelants et refusé d'une instance à l'autre, `/armes`), `vava_example_combat` 1.1.0
+  (`/frapper_arme` ; autorisé par le porteur du projet le 31/10). Relu sécurité, réseau et lore, suites appliquées
+  (rapport `docs/plan/rapports/T-111.md`). Procédure `docs/tests/combat.md` § 2 (2-1 à 2-30). Ensuite : T-140 (mains
+  vides pour incanter), T-112. Chancellerie : `vava_combat` absent de `chancellerie/lib/resources.js` (`ensure` à la
+  main en attendant une tâche qui l'autorise).
 - Objets armes (catégories, dégâts de base, qualité de forge, usure), correspondance vers modèles vanilla
   (PLACEHOLDER), bouclier accroché, contrôles natifs du corps à corps et armes à feu coupés. Recettes de forge
   ajoutées à `vava_crafting`.
