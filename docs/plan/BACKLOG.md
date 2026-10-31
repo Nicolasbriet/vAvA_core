@@ -1142,7 +1142,7 @@ faire tout le système de combat ») : la porte T-119 reste à passer en jeu.
   par cible dans un balayage répété).
 
 ### T-113 — Blocage, parade, esquive
-- Agent : vava-dev-lua · Dépend de : T-112 · Statut : à faire
+- Agent : vava-dev-lua · Dépend de : T-112 · Statut : en cours
 
 ### T-114 — Endurance et HUD
 - Agents : vava-dev-lua + vava-dev-nui · Dépend de : T-112 · Statut : à faire
