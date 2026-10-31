@@ -141,8 +141,8 @@ avant). Préparation : 0.7.
 | 11 | **(2 joueurs)** A Fendant sur B. | B chancelle (geste, secousse), ne peut pas frapper 0,9 s (« Vous chancelez. ») ; un second Fendant dans les 3 s suivantes : dégâts sans chancellement ; plus tard : chancelle de nouveau. |
 | 12 | **(2 joueurs)** B prépare un Fendant, A le touche d'un Fendant avant la frappe de B ; B reclique dès la fin du chancellement. | Le Fendant de B est coupé, aucun dégât chez A. B ne repart qu'à la fin du cycle de son Fendant coupé (≈ 1,5 s après son départ), sans geste refusé entre-temps : un coup coupé compte comme donné. |
 | 13 | **(3 joueurs)** A clic molette avec B et C en vue. | Anneau sous le plus proche du centre de l'écran ; second clic : l'autre ; maintenu : relâché ; B s'éloigne à 8 m : relâché. Rien chez B ni chez C. |
-| 14 | **(2 joueurs)** B `/esquive` puis A frappe. | Aucun dégât, aucun sang ; `/vava_reseau joueur <B>` : un `vava_combat:hit` (issue `dodge`). |
-| 15 | **(2 joueurs)** B `/bouclier 50` puis A frappe. | Dégâts absorbés (B ne perd rien), aucun sang. |
+| 14 | **(2 joueurs)** B `/esquive` puis A frappe. | Aucun dégât, aucun sang ; `/vava_reseau joueur <B>` : **aucun** `vava_combat:hit` (une esquive ne se montre pas). |
+| 15 | **(2 joueurs)** B `/bouclier 50` puis A frappe. | Dégâts absorbés (B ne perd rien), aucun sang, aucun `vava_combat:hit`. |
 | 16 | **(2 joueurs)** B à terre (`/vie 0`) devant A ; A frappe. | Aucun dégât, aucun `vava_combat:hit`. |
 | 17 | A à terre, clic gauche. | Rien (mode combat endormi). |
 | 18 | **(2 joueurs)** `chain.pvp = false` (config de `vava_health`, redémarrage) ; A frappe B trois fois. | Une seule notification « Les combats entre habitants sont suspendus : votre lame s'arrête. » ; B ne perd rien. |

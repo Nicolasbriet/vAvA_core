@@ -1858,8 +1858,9 @@ souris, dégainer et rengainer. Demande le core 0.10.0, `vava_inventory` 1.7.0 e
 `no_weapon`, `no_style`, `not_in_style`, `downed`, `vehicle`, `controlled`, `refused`.
 
 **Évènement** `vava_combat:hit(attaquant, cible, issue)` (serveur → clients proches, `core.net.sendNearWith` avec
-l'instance de l'attaquant, 30 m autour de la cible) : `issue` ∈ `hit`, `stagger`, `down`, `block`, `parry`, `dodge`,
-`absorb` ; la cible joue sa réaction, l'attaquant entend la touche, tous voient l'effet d'impact.
+l'instance de l'attaquant, 30 m autour de la cible) : `issue` ∈ `hit`, `stagger`, `down`, `block`, `parry` (`dodge` et
+`absorb`, que personne ne montre, ne sont pas envoyés) ; la cible joue sa réaction, l'attaquant entend la touche (`hit`,
+`stagger`, `down`), tous voient l'effet d'impact.
 
 | Export serveur | Retour |
 |---|---|
