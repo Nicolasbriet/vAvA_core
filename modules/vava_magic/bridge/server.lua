@@ -2,7 +2,9 @@
     vava_magic/bridge/server.lua
     Rôle : SEUL point de contact, côté serveur, entre la magie et le core / les autres modules : personnage, droits du
            Conseil, notifications, objets de l'inventaire, sauvegarde de la fiche, base de données, santé (chaîne de
-           dégâts de vava_health : coups des sorts, vie tenue par le serveur, hook des coups, modificateurs).
+           dégâts de vava_health : coups des sorts, vie tenue par le serveur, hook des coups, modificateurs), mains vides
+           pour incanter (arme de GTA sur le ped, arme et bouclier au bras lus par vava_combat, prises en main suivies
+           par le hook vava_inventory:hold).
            Pour brancher la magie sur un autre core, réécrire les fonctions de ce fichier (et de bridge/client.lua) :
            le reste du module ne connaît qu'elles.
     Implémentation : vAvA_core (API documentée dans docs/api.md) et ses modules officiels. Chaque appel à une autre
@@ -13,8 +15,9 @@
 local type, pairs, ipairs, pcall, tostring, tonumber = type, pairs, ipairs, pcall, tostring, tonumber
 local mathType, huge = math.type, math.huge
 local pack, unpack, concat = table.pack, table.unpack, table.concat
-local GetResourceState, TriggerClientEvent, IsPlayerAceAllowed, CreateThread, GetPlayers =
-    GetResourceState, TriggerClientEvent, IsPlayerAceAllowed, CreateThread, GetPlayers
+local GetResourceState, TriggerClientEvent, IsPlayerAceAllowed, CreateThread, GetPlayers, GetGameTimer =
+    GetResourceState, TriggerClientEvent, IsPlayerAceAllowed, CreateThread, GetPlayers, GetGameTimer
+local GetPlayerPed, GetSelectedPedWeapon = GetPlayerPed, GetSelectedPedWeapon
 
 local core = VavaMagic.core
 if not core then return end
@@ -433,6 +436,95 @@ end
 ---@return boolean
 function Bridge.ChainKnowsLaunched()
     return chain.launched
+end
+
+-- Mains vides pour incanter (vava_combat ≥ 1.0.0) --------------------------------------------------------------------
+
+-- une ligne de console par minute au plus : vava_combat en erreur, ou démarré mais pas prêt depuis une minute (jamais
+-- une par lancer)
+local COMBAT_WARN_MS = 60000
+local NOT_READY_WARN_MS = 60000
+-- WEAPON_UNARMED (joaat), comparé sur 32 bits : le hash lu peut revenir signé ou non
+local UNARMED_HASH = 0xA2719263
+local HASH_MASK = 0xFFFFFFFF
+local combatWarnedAt = nil
+local notReadySince = nil
+
+--- Ligne de console sur vava_combat, une par minute au plus.
+local function warnCombat(fmt, ...)
+    local now = GetGameTimer()
+    if combatWarnedAt and now - combatWarnedAt < COMBAT_WARN_MS then return end
+    combatWarnedAt = now
+    VavaMagic.log.warn(fmt, ...)
+end
+
+--- Export de vava_combat, isolé et silencieux : ok (appel réussi), puis ses valeurs. Démarré mais en erreur : une ligne
+--- de console par minute au plus.
+---@return boolean called
+local function combat(fn, source)
+    if GetResourceState(LINKS.COMBAT) ~= 'started' then return false end
+    local called, result, code = pcall(invoke, LINKS.COMBAT, fn, source)
+    if called then return true, result, code end
+    warnCombat('%s.%s en erreur, mains vides non vérifiées : %s', LINKS.COMBAT, fn, tostring(result))
+    return false
+end
+
+--- vava_combat démarré mais pas prêt : aucune restriction ; si cela dure plus d'une minute, une ligne de console par
+--- minute au plus. Toute autre réponse remet le compte à zéro.
+---@param code any  code rendu par `armed`
+local function watchReady(code)
+    if code ~= 'not_ready' then
+        notReadySince = nil
+        return
+    end
+    local now = GetGameTimer()
+    if not notReadySince then
+        notReadySince = now
+    elseif now - notReadySince >= NOT_READY_WARN_MS then
+        warnCombat('%s démarré mais pas prêt depuis %d s : mains vides non vérifiées', LINKS.COMBAT,
+            (now - notReadySince) // 1000)
+    end
+end
+
+--- Arme de GTA sortie, lue sur le ped répliqué par OneSync (`GetSelectedPedWeapon`) ? Ped absent ou arme illisible :
+--- non, sans bruit.
+---@param source integer
+---@return boolean
+local function nativeWeapon(source)
+    local ped = GetPlayerPed(source)
+    if not ped or ped == 0 then return false end
+    local hash = GetSelectedPedWeapon(ped)
+    if mathType(hash) ~= 'integer' or hash == 0 then return false end
+    return hash & HASH_MASK ~= UNARMED_HASH
+end
+
+--- Ce qui empêche d'incanter dans les mains du joueur : `armed` (arme de GTA sortie, ou arme tenue d'après
+--- `vava_combat:armed(source)`), `shielded` (bouclier accroché **au bras**, `shield(source).ready`), ou nil : mains
+--- libres, bouclier dans le dos, outil en main, vava_combat absent, pas prêt ou en erreur (aucune restriction pour les
+--- armes de l'inventaire).
+---@param source integer
+---@return string|nil code
+function Bridge.HandsBusy(source)
+    if nativeWeapon(source) then return 'armed' end
+    local called, weapon, code = combat('armed', source)
+    if not called then return nil end
+    watchReady(weapon == nil and code or nil)
+    if type(weapon) == 'table' then return 'armed' end
+    local read, shield = combat('shield', source)
+    if read and type(shield) == 'table' and shield.ready == true then return 'shielded' end
+    return nil
+end
+
+--- Prévient `handler` après chaque prise en main ou dépôt (hook `vava_inventory:hold` after : { source, instanceId,
+--- item, previous, owner }) : une arme ou un bouclier pris pendant une incantation la brise aussitôt. Le hook
+--- appartient au core : l'abonnement survit aux redémarrages de l'inventaire.
+---@param handler fun(payload: table)
+---@return boolean ok
+---@return string|nil err
+function Bridge.OnHold(handler)
+    local id, err = core.hooks.after(LINKS.INVENTORY_HOLD, handler)
+    if not id then return false, err end
+    return true
 end
 
 --- Déclare les objets et les modificateurs, et suit les redémarrages de l'inventaire et de vava_health. Appelé

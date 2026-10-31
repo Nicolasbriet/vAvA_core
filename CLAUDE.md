@@ -129,6 +129,8 @@ Choix tranchés par le porteur du projet : un agent ne les signale pas comme des
   par le serveur, bornée dans le temps). Un coup lancé à terre reste refusé.
 - **Mains vides pour incanter** : on ne lance pas un sort avec une arme ou un bouclier en main (le mage a besoin d'un
   garde, le guerrier d'un mage) ; vérifié par le serveur (`vava_combat:armed`). Un focaliseur viendra plus tard.
+- **Incantation brisée sans coût** : une incantation interrompue (arme prise en main, déplacement, chute, blessure)
+  ne coûte ni mana ni recharge ; ne pas le signaler ni proposer une perte de mana.
 - **Commits** : un commit par chantier, au format du dépôt, jamais un commit fourre-tout.
 
 ## Façon de travailler

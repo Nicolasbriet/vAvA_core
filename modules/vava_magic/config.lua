@@ -41,6 +41,7 @@ VavaMagic.config = {
         finishToleranceMs = 300,   -- fin acceptée un peu avant la durée (latence)
         graceMs = 4000,            -- au-delà de la durée, une incantation sans fin est abandonnée
         checkMs = 100,             -- contrôles du client (chute, blessure, déplacement) hors déplacement lent
+        armedCheckMs = 200,        -- arme prise en main pendant l'incantation (export de vava_combat) : relevé plus lent
         castBarMinMs = 500,        -- en deçà, pas de barre d'incantation (projectiles quasi instantanés)
         animLoadMs = 2000,         -- attente du chargement d'une animation
     },
@@ -86,6 +87,8 @@ VavaMagic.config = {
         conditionsMs = 200,     -- conditions (arme, véhicule, chute) relues à cet intervalle, pas à chaque image
         aimMoveBlend = 1.5,     -- allure permise en visant (1 marche, 2 course) : un peu ralentie
         scrollSpells = true,    -- molette en mode magie : sort suivant ou précédent de l'élément choisi
+        armedNoticeMs = 5000,   -- arme en main (vava_combat) : « rangez votre arme » une fois par arme sortie quand on
+                                -- presse viser ou lancer, jamais deux fois dans cet intervalle (la touche sert à l'arme)
         -- aperçu des zones au sol à l'endroit visé, vu du seul lanceur
         preview = { alpha = 110, height = 0.06, groundOffset = 0.02, pointSize = 0.25, feetOffset = 0.98 },
     },
@@ -1171,6 +1174,7 @@ VavaMagic.config = {
             downed = 'Vous êtes à terre.',
             cannot_cast = 'Vous ne pouvez pas incanter ainsi.',
             armed = 'Il vous faut les mains libres pour incanter : rangez votre arme.',
+            shielded = 'Votre bouclier vous charge le bras : décrochez-le pour incanter.',
             in_vehicle = 'Impossible d\'incanter ainsi installé.',
             protected_zone = 'Une paix sacrée règne en ce lieu : la magie offensive ne vous obéit pas.',
             refused = 'Quelque chose empêche votre incantation.',

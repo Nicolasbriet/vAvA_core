@@ -106,7 +106,7 @@ serveur `strike`. Préparation : 0.6.
 | 25 | **(2 joueurs)** Après 12 à 21 : `/vava_reseau joueur <A>` puis `<B>`. | Chez A : `vava_combat:notify` aux seuils seulement, `vava_health:set` jamais (A ne reçoit pas de coup). Chez B : `vava_health:set` par coup. Aucun évènement `vava_combat` chez un troisième joueur loin. |
 | 26 | `resmon 1` chez B au repos, puis avec A armé et bouclier accroché à côté. | `vava_combat` ≤ 0,01 ms dans les deux cas (aucune boucle par image). |
 | 27 | `stop vava_combat`, puis `ensure vava_combat`. | Arrêt : armes « gardées à part » par l'inventaire, recettes absentes des stations, bouclier retiré des peds, coups de poing natifs revenus mais sans dégâts (annulés par `vava_health`). Retour : tout revient, sans perte. |
-| 28 | Mage : A, Épée courte en main, lance une Boule de feu. | Aujourd'hui le sort part (la magie ne regarde que l'arme GTA) ; la règle « mains vides » viendra avec T-140 (décision du 31 octobre 2026). |
+| 28 | Mage : A, Épée courte en main, lance une Boule de feu. | Refusé : « Il vous faut les mains libres pour incanter : rangez votre arme. » (`vava_magic` 2.10.0, T-140 : détail en [magie 19](magie.md)). |
 | 29 | Un membre du Conseil sans le droit `metiers` (ni l'ACE `combat.admin`) : `/armes user <A> 5`. | « Ce registre est réservé au Conseil. » ; solidité inchangée, rien au journal. |
 | 30 | **(2 joueurs, si un outil d'instance existe)** B placé dans une autre instance (routing bucket) au même endroit que A ; A `/frapper_arme <B>`. | « refusé : trop loin » ; B ne perd rien, solidité inchangée. |
 

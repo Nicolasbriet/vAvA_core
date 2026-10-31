@@ -1,15 +1,16 @@
 --[[
     vava_magic/client/casting.lua
     Rôle : incantation côté client, commune à tous les sorts. Le client affiche et demande ; le serveur décide.
-      - Pré-vérification (mage, sort connu, niveau, mana prédite, délai global, recharge, à terre, en véhicule, droit
-        d'incanter du bridge, empêchements d'autres fichiers) pour éviter une incantation inutile, puis demande au
-        serveur.
+      - Pré-vérification (mage, sort connu, niveau, mana prédite, délai global, recharge, à terre, en véhicule, arme en
+        main (vava_combat), droit d'incanter du bridge, empêchements d'autres fichiers) pour éviter une incantation
+        inutile, puis demande au serveur.
       - Pendant la durée : animation en trois phases (début, maintien en boucle, relâchement au succès), barre
         d'incantation au-delà de `castBarMinMs`, lueur de la barre de mana. Interrompue par une chute, une blessure
-        (sorts qui le disent), un déplacement au-delà de ce que le sort permet, ou la touche d'annulation : le serveur
-        est prévenu, aucune mana n'est consommée.
+        (sorts qui le disent), un déplacement au-delà de ce que le sort permet, une arme prise en main, ou la touche
+        d'annulation : le serveur est prévenu, aucune mana n'est consommée.
       - Sort qui permet de marcher (projectiles) : pas de course ni de saut, allure bridée ; c'est la seule boucle
-        par image du fichier, et seulement pendant l'incantation. Sinon les contrôles ont lieu toutes les 100 ms.
+        par image du fichier, et seulement pendant l'incantation. Sinon les contrôles ont lieu toutes les 100 ms
+        (`checkMs`) ; l'arme en main, toutes les 200 ms (`armedCheckMs`).
       - À la fin : arguments de fin du sort (direction visée…), demande au serveur, temps de recharge et délai global
         notés.
     Dépendances : shared/, config.lua, client/core.lua, bridge/client.lua, client/nui.lua, client/state.lua,
@@ -105,6 +106,7 @@ function casting.check(spell, opts)
     if bridge.IsDowned() then return false, 'downed' end
     if IsPedInAnyVehicle(PlayerPedId(), false) then return false, 'in_vehicle' end
     if not bridge.CanUseMagic() then return false, 'cannot_cast' end
+    if bridge.IsArmed() then return false, 'armed' end
     for _, check in ipairs(blockers) do
         local ok, code = pcall(check)
         if ok and type(code) == 'string' then return false, code end
@@ -202,7 +204,7 @@ function casting.start(spell, opts)
 
         local slow = spellCfg.moveSpeed
         local blend = slow and slow / WALK_SPEED
-        local nextCheck = 0
+        local nextCheck, nextArmed = 0, 0
         while active == cast do
             local now = GetGameTimer()
             if now - cast.startedAt >= cast.ms then break end
@@ -214,6 +216,11 @@ function casting.start(spell, opts)
             if now >= nextCheck then
                 nextCheck = now + cfg.checkMs
                 local reason = brokenBy(cast, ped)
+                -- arme prise en main (le serveur brise aussi l'incantation) : relevé plus lent, l'export lit le personnage
+                if not reason and now >= nextArmed then
+                    nextArmed = now + cfg.armedCheckMs
+                    if bridge.IsArmed() then reason = 'armed' end
+                end
                 if reason then
                     interrupt(reason)
                     return
