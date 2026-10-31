@@ -275,6 +275,24 @@ function lc.callOrder(items)
     return out
 end
 
+--- Portée d'une synchronisation : `true` (tout l'atelier) ou { ['type|id'] = true }. Une synchronisation limitée
+--- (`only` : les fiches d'un lot refusé ou importé) ne l'est que si l'atelier a déjà été entièrement rapproché
+--- (`synced`) ; la nouvelle arrête celle qui tourne (`running`) et la reprend : tout si l'une des deux est entière,
+--- sinon l'union des deux.
+---@param running true|table<string, boolean>|nil
+---@param synced boolean
+---@param only table<string, boolean>|nil
+---@return true|table<string, boolean>
+function lc.syncScope(running, synced, only)
+    if type(only) ~= 'table' or not synced or running == true then return true end
+    local out = {}
+    for key in pairs(only) do out[key] = true end
+    if type(running) == 'table' then
+        for key in pairs(running) do out[key] = true end
+    end
+    return out
+end
+
 -- Historique, réparation, annulation ----------------------------------------------------------------------------------
 
 --- Versions d'une fiche à purger : on garde les `keep` plus hautes ; jamais la publiée ; la plus haute (dernière ligne

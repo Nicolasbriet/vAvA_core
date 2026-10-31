@@ -366,7 +366,7 @@ local function publishPlan(source, editor, todo, origin, reason)
     end
     index.unlock(token)
     -- têtes reconstruites depuis la base, module rapproché (les fiches refusées sont signalées)
-    sync.start(editor, reason)
+    sync.start(editor, reason, sync.keysOf(items))
     return #items, items
 end
 

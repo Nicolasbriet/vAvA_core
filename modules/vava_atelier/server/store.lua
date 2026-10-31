@@ -21,11 +21,10 @@ VavaAtelier.store = store
 
 local T = '`vava_atelier_definitions`'
 
--- données et lieu des seules versions publiées (rapprochement) : un brouillon est relu à la demande
+-- têtes sans données ni lieu (≈ 200 octets par fiche) : le rapprochement compare les empreintes et ne relit, en lot
+-- (`rows`), que les publiées qui diffèrent ; un brouillon est relu à la demande
 local HEADS_SQL = 'SELECT `id`, `kind`, `def_id`, `version`, `status`, `removal`, `origin`, `format`, `title`, '
-    .. "`parent`, IF(`status` = 'published', `data`, NULL) AS `data`, "
-    .. "IF(`status` = 'published', `place`, NULL) AS `place`, "
-    .. '`fingerprint`, `base_version`, `batch`, `rev`, `summary`, `author_account_id`, '
+    .. '`parent`, `fingerprint`, `base_version`, `batch`, `rev`, `summary`, `author_account_id`, '
     .. '`author_label`, UNIX_TIMESTAMP(`updated_at`) AS `at` FROM ' .. T
     .. " WHERE `editor` = ? AND `status` IN ('draft', 'trial', 'published')"
 local KNOWN_SQL = 'SELECT DISTINCT `kind`, `def_id` FROM ' .. T .. ' WHERE `editor` = ?'
@@ -135,7 +134,7 @@ end
 
 -- Lectures ---------------------------------------------------------------------------------------------------------
 
---- Lignes vivantes d'un atelier (brouillons, essais, publiées), données comprises.
+--- Lignes vivantes d'un atelier (brouillons, essais, publiées), sans données ni lieu.
 function store.heads(editorId)
     return rowsOr(core.db.query(HEADS_SQL, { editorId }), nil, 'têtes de ' .. editorId)
 end

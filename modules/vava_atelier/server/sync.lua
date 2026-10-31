@@ -8,7 +8,10 @@
                module jamais vu en base devient la version 1 publiée, `origin = seed`, auteur « Console » ; jamais une
                fiche déjà connue, même retirée), rapprochement (empreintes : `apply` de ce qui diffère chez le module,
                `remove` de ce qu'il a sans version publiée ; retraits des enfants d'abord, applications des parents
-               d'abord), têtes en mémoire, listes oubliées. Pendant ce temps l'atelier rend `syncing`. Base muette :
+               d'abord), têtes en mémoire, listes oubliées. Les empreintes gardées en base sont comparées d'abord :
+               seules les publiées qui diffèrent sont relues (en lot) et décodées ; après un refus ou un import, les
+               seules fiches du lot sont rapprochées (`only`). Pauses du fil au temps (`sync.sliceMs`). Pendant ce
+               temps l'atelier rend `syncing`. Base muette :
                `sync.retries` essais espacés de `sync.retryMs`, puis « à synchroniser » (le module tourne sur sa
                config). Un `apply` refusé : la fiche reste publiée en base, « refusée en jeu », retentée à la prochaine.
     Dépendances : shared/constants.lua, config.lua, shared/lifecycle.lua, shared/stored.lua, bridge/server.lua,
@@ -39,6 +42,8 @@ local generations = {}
 local SEED_CHUNK = 100
 -- attente d'une écriture en cours avant de relire les têtes
 local LOCK_POLL_MS = 50
+-- portée de la synchronisation en cours (true : tout l'atelier) ; ateliers entièrement rapprochés depuis leur déclaration
+local active, synced = {}, {}
 
 --- Une synchronisation est-elle toujours d'actualité ?
 local function current(editor, generation)
@@ -104,31 +109,51 @@ local function seed(editor, known, step)
     return #steps
 end
 
---- Rapprochement : le module reçoit l'état de la base. Rend les nombres d'applications et de retraits.
+--- Rapprochement : le module reçoit l'état de la base. L'empreinte du module est d'abord comparée à celle gardée dans
+--- la ligne (sans data) ; seules les publiées qui diffèrent (ou d'un autre format) sont relues, en lot, et décodées.
+--- `scope` : `true` (tout l'atelier) ou les seules fiches { ['type|id'] = true } d'un lot refusé ou importé. Rend les
+--- nombres d'applications et de retraits, ou nil si la base ne répond pas.
 ---@param editor vAvA.AtelierEditor
----@param rows table[]  lignes vivantes (données comprises)
+---@param rows table[]  lignes vivantes (sans data)
 ---@param step fun()
 ---@param generation integer
----@return integer applied
+---@param scope true|table<string, boolean>
+---@return integer|nil applied
 ---@return integer removed
-local function reconcile(editor, rows, step, generation)
+local function reconcile(editor, rows, step, generation, scope)
     local published = {}
     for _, row in ipairs(rows) do
         if row.status == 'published' then published[row.kind .. '|' .. row.def_id] = row end
     end
+    local function inScope(key) return scope == true or scope[key] == true end
     local depth = editor.kindDepth
-    local items = {}
+    local items, toRead = {}, {}
     -- applications : publiées en base dont le module a une autre empreinte (ou rien)
     for key, row in pairs(published) do
         local kind = editor.kinds[row.kind]
-        if kind then
+        if kind and inScope(key) then
             step()
-            local entry = calls.entryOf(editor, kind, row)
+            local mine = calls.moduleRead(editor, kind, row.def_id)
+            if not mine or (index.toInt(row.format) or 1) ~= editor.format or mine.fingerprint ~= row.fingerprint then
+                toRead[#toRead + 1] = { key = key, row = row, kind = kind, mine = mine }
+            end
+        end
+    end
+    if #toRead > 0 then
+        local ids = {}
+        for i, wanted in ipairs(toRead) do ids[i] = index.toInt(wanted.row.id) end
+        local full = store.rows(ids)
+        if not full then return nil, 0 end
+        for _, wanted in ipairs(toRead) do
+            step()
+            local row = wanted.row
+            local fullRow = full[index.toInt(row.id)]
+            local entry = fullRow and calls.entryOf(editor, wanted.kind, fullRow) or nil
             if entry then
-                local mine = calls.moduleRead(editor, kind, row.def_id)
-                if not mine or mine.fingerprint ~= entry.fingerprint then
-                    items[#items + 1] = { kind = row.kind, id = row.def_id, depth = depth[row.kind] or 1, entry = entry,
-                        version = index.toInt(row.version), key = key }
+                -- même data revue par le formulaire en vigueur : rien à appliquer
+                if not wanted.mine or wanted.mine.fingerprint ~= entry.fingerprint then
+                    items[#items + 1] = { kind = row.kind, id = row.def_id, depth = depth[row.kind] or 1,
+                        entry = entry, version = index.toInt(row.version), key = wanted.key }
                 end
             else
                 local head = index.get(editor.id, row.kind, row.def_id)
@@ -140,7 +165,8 @@ local function reconcile(editor, rows, step, generation)
     local entry = index.all()[editor.id]
     for kindId, ids in pairs(entry and entry.moduleIds or {}) do
         for id in pairs(ids) do
-            if not published[kindId .. '|' .. id] then
+            local key = kindId .. '|' .. id
+            if not published[key] and inScope(key) then
                 items[#items + 1] = { kind = kindId, id = id, depth = depth[kindId] or 1, removal = true }
             end
         end
@@ -177,8 +203,9 @@ end
 --- Une passe de synchronisation. Rend true, ou false (base muette ; atelier retiré : true, rien à faire).
 ---@param editor vAvA.AtelierEditor
 ---@param generation integer
+---@param scope true|table<string, boolean>
 ---@return boolean
-local function once(editor, generation)
+local function once(editor, generation, scope)
     local step = yielder()
     -- une écriture en cours (transaction, appels au module) finit avant que les têtes soient relues et reconstruites ;
     -- au-delà de `limits.busyMs`, la synchronisation sera retentée (`sync.retryMs`)
@@ -199,40 +226,67 @@ local function once(editor, generation)
     if not current(editor, generation) then return true end
     local rows, retired, tops = store.heads(editor.id), store.retired(editor.id), store.tops(editor.id)
     if not rows or not retired or not tops then return false end
+    -- « refusée en jeu » des fiches hors de la portée : gardé à travers la reconstruction des têtes
+    local refused = {}
+    if scope ~= true then
+        for kindId, kind in pairs(index.kinds(editor.id)) do
+            for id, head in pairs(kind.byId) do
+                if head.refused and not scope[kindId .. '|' .. id] then refused[#refused + 1] = { kindId, id } end
+            end
+        end
+    end
     index.build(editor.id, rows, retired, tops)
+    for _, ref in ipairs(refused) do
+        local head = index.get(editor.id, ref[1], ref[2])
+        if head and head.published then head.refused = true end
+    end
     if seeded > 0 then
         local ok, code = journal.write(0, { editor = editor.id, kind = editor.firstKind, action = 'seeded',
             title = editor.label, summary = VavaAtelier.changes.count(seeded, texts.counts.seeded) })
         if not ok then VavaAtelier.log.warn('graine non journalisée : %s', tostring(code)) end
     end
-    local applied, removed = reconcile(editor, rows, step, generation)
+    local applied, removed = reconcile(editor, rows, step, generation, scope)
+    if not applied then return false end
     if not current(editor, generation) then return true end
     local total = 0
     for _, kindId in ipairs(editor.kindOrder) do total = total + index.liveCount(editor.id, kindId) end
     index.setState(editor.id, 'ready')
     entries.invalidate(editor.id)
-    VavaAtelier.log.info("atelier '%s' : %d fiches en base, %d venues de la config, %d rapprochée(s), %d retirée(s)",
-        editor.id, total, seeded, applied, removed)
+    VavaAtelier.log.info("atelier '%s' : %d fiches en base, %d venues de la config, %d rapprochée(s), %d retirée(s)%s",
+        editor.id, total, seeded, applied, removed, scope == true and '' or ' (fiches du lot seulement)')
     return true
 end
 
---- Lance la synchronisation d'un atelier gardé dans un fil (l'atelier rend `syncing` jusqu'à la fin).
+--- Lance la synchronisation d'un atelier gardé dans un fil (l'atelier rend `syncing` jusqu'à la fin). `only` : les
+--- seules fiches à rapprocher ({ ['type|id'] = true } : lot refusé par le module, fiches importées), si l'atelier a
+--- déjà été entièrement rapproché ; sinon (ou si une synchronisation entière tourne), tout l'atelier.
 ---@param editor vAvA.AtelierEditor
----@param reason string  declare | refusal | reimport | import
-function sync.start(editor, reason)
+---@param reason string  declare | refusal | reimport | import | retry
+---@param only? table<string, boolean>
+function sync.start(editor, reason, only)
     if not editor or not editor.stored then return end
+    local scope = lc.syncScope(active[editor.id], synced[editor.id] == true, only)
     local generation = (generations[editor.id] or 0) + 1
     generations[editor.id] = generation
+    active[editor.id] = scope
+    if scope == true then synced[editor.id] = nil end
     index.setState(editor.id, 'syncing')
     CreateThread(function()
         for attempt = 1, cfg.sync.retries do
             if not current(editor, generation) then return end
-            if once(editor, generation) then return end
+            if once(editor, generation, scope) then
+                if current(editor, generation) then
+                    active[editor.id] = nil
+                    synced[editor.id] = true
+                end
+                return
+            end
             VavaAtelier.log.warn("atelier '%s' : synchronisation (%s) en échec, essai %d sur %d", editor.id,
                 tostring(reason), attempt, cfg.sync.retries)
             if attempt < cfg.sync.retries then Wait(cfg.sync.retryMs) end
         end
         if current(editor, generation) then
+            active[editor.id], synced[editor.id] = nil, nil
             index.setState(editor.id, 'failed')
             VavaAtelier.log.error("atelier '%s' : à synchroniser (registres muets) ; le module tourne sur sa config. "
                 .. '/%s etat le montre ; il sera retenté à la prochaine écriture.', editor.id, cfg.archives.command)
@@ -244,6 +298,20 @@ end
 ---@param editorId string
 function sync.cancel(editorId)
     generations[editorId] = (generations[editorId] or 0) + 1
+    active[editorId], synced[editorId] = nil, nil
+end
+
+--- Clés { ['type|id'] = true } des fiches d'un lot ({ { kind, id } } ou { { head } }), pour `sync.start`.
+---@param items table[]
+---@return table<string, boolean>
+function sync.keysOf(items)
+    local out = {}
+    for _, item in ipairs(items) do
+        local kindId = item.head and item.head.kind or item.kind
+        local id = item.head and item.head.id or item.id
+        out[kindId .. '|' .. id] = true
+    end
+    return out
 end
 
 --- Réparation au démarrage (avant editorsReady) : essais rendus, doublons réglés. À appeler dans un fil.

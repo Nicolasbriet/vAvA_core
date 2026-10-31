@@ -198,8 +198,10 @@ Rien d'autre ne part : aucun envoi à tous, aucun GlobalState, aucun state bag ;
 rien de `vava_atelier` (`/vava_reseau ressource vava_atelier`). Une séance de travail type (ouvrir une fiche, trois
 sauvegardes, un essai, un résumé, une publication) : ≈ 12 Ko, tous vers le seul membre. Serveur : une sauvegarde coûte
 deux ou trois requêtes hors `validate` ; une publication, une transaction de 2 à 3 + n requêtes et les appels au module ;
-la synchronisation d'un atelier de 1 000 fiches, deux requêtes et ≈ 1 000 `read` croisés, découpés par des pauses du
-fil. Mémoire : têtes sans données, ≈ 200 o par fiche. Client : **aucune boucle**, aucun prop, aucun dessin ;
+la synchronisation d'un atelier de 1 000 fiches, quatre requêtes sans données (têtes, ≈ 200 o par fiche) et ≈ 1 000
+`read` du module comparés aux empreintes gardées ; seules les publiées qui diffèrent sont relues (par paquets de 100)
+et décodées ; pauses du fil toutes les 4 ms (`sync.sliceMs`) ; après un refus du module ou un import, seules les
+fiches du lot sont rapprochées. Mémoire : têtes sans données, ≈ 200 o par fiche. Client : **aucune boucle**, aucun prop, aucun dessin ;
 0,00 ms au repos, ≤ 0,05 ms interface ouverte. Serveur : un accueil coûte une requête (5 lignes) et un `index` par
 atelier visible (gardé 5 s) ; une fiche, son `read` et, si elle a un champ à `source`, la liste de cette source (gardée
 5 s) ; un « Vérifier », moins de 2 ms hors la fonction `validate` du module. Qui détient tous les droits permis lit le

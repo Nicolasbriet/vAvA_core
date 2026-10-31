@@ -975,7 +975,8 @@ local function rollback(ctx, head, title, undoPlan, why)
         VavaAtelier.log.warn("atelier '%s' : refus du module (%s), base rendue, resynchronisation", editor.id,
             tostring(why))
     end
-    sync.start(editor, 'refusal')
+    -- les seules fiches du lot sont rapprochées (le reste de l'atelier n'a pas bougé)
+    sync.start(editor, 'refusal', undoPlan.keys)
     if not why then return false, 'stale' end
     return true, { done = false, errors = { { text = why } } }
 end
@@ -1033,14 +1034,14 @@ function cycle.publish(ctx, id, rev, token)
         local mainTitle = calls.titleOf(main.kind, main.entry.data, id)
         local complete, checkErr = lotWritten(plan.items)
         if complete == nil then return false, checkErr end
-        if not complete then return rollback(ctx, head, mainTitle, { rows = rows, inserted = inserted }, nil) end
+        if not complete then return rollback(ctx, head, mainTitle, { rows = rows, inserted = inserted, keys = sync.keysOf(plan.items) }, nil) end
         if not stillCurrent(ctx) then return false, 'syncing' end
         for _, item in ipairs(plan.items) do
             if item.removal then markRetired(editor, item, batch) else markPublished(editor, item, item.rowId, by) end
         end
         entries.invalidate(editor.id)
         local applied, why = applyLot(editor, plan.items, 'publish')
-        if not applied then return rollback(ctx, head, mainTitle, { rows = rows, inserted = inserted }, why) end
+        if not applied then return rollback(ctx, head, mainTitle, { rows = rows, inserted = inserted, keys = sync.keysOf(plan.items) }, why) end
         journal.write(ctx.source, { editor = editor.id, kind = head.kind, id = id,
             action = plan.removal and 'removed' or 'published', title = mainTitle,
             summary = plan.summary ~= '' and plan.summary or nil, version = main.version })
@@ -1092,7 +1093,7 @@ function cycle.restore(ctx, id, version, token)
         local main = plan.items[1]
         local mainTitle = calls.titleOf(main.kind, main.entry.data, id)
         local applied, why = applyLot(editor, plan.items, 'restore')
-        if not applied then return rollback(ctx, head, mainTitle, { rows = rows, inserted = inserted }, why) end
+        if not applied then return rollback(ctx, head, mainTitle, { rows = rows, inserted = inserted, keys = sync.keysOf(plan.items) }, why) end
         journal.write(ctx.source, { editor = editor.id, kind = head.kind, id = id, action = 'restored',
             title = mainTitle, summary = plan.summary, version = main.version })
         publishedHooks(ctx, plan.items, 'restore', by)

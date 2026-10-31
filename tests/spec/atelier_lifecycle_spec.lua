@@ -251,6 +251,22 @@ describe('vava_atelier lifecycle', function()
             assert.is_false(full[1].removal)
             assert.same({}, lc.lot({}))
         end)
+
+        it('portée d\'une synchronisation : les seules fiches d\'un lot si l\'atelier est déjà rapproché (R-2 d)', function()
+            local only = { ['zone|a'] = true }
+            assert.same({ ['zone|a'] = true }, lc.syncScope(nil, true, only))
+            -- jamais rapproché entièrement (démarrage, échec) : tout
+            assert.is_true(lc.syncScope(nil, false, only))
+            -- sans liste : tout
+            assert.is_true(lc.syncScope(nil, true, nil))
+            -- une synchronisation entière en cours : la nouvelle la reprend entière
+            assert.is_true(lc.syncScope(true, true, only))
+            -- une limitée en cours : l'union, sans toucher aux listes reçues
+            local running = { ['node|b'] = true }
+            assert.same({ ['zone|a'] = true, ['node|b'] = true }, lc.syncScope(running, true, only))
+            assert.same({ ['zone|a'] = true }, only)
+            assert.same({ ['node|b'] = true }, running)
+        end)
     end)
 
     describe('purge', function()
