@@ -1141,7 +1141,9 @@ faire tout le système de combat ») : la porte T-119 reste à passer en jeu.
   `category` et `family`, et `shield` y sert les délais du serveur (`toggleMs`, `verifyMs`, `missesToDrop`,
   `pedCheckMs`, `guard*`, ≈ 0,6 Ko), parce que le client passe ces tables à `shared/shield.lua` ; `shield.guardDelay`
   (`shared/shield.lua:115-128`) n'est appelé que par le serveur. À donner une part client et une part serveur en
-  reprenant le module.
+  reprenant le module. **Fait par T-112** (`vava_combat` 1.2.0) : classe des armes (`weaponClasses`) au client, fiches
+  (`weapons`) et délais du serveur du bouclier dans `config.lua`, `guard.delay` dans `shared/guard.lua` servi au seul
+  serveur.
 
 ### T-122 — Atelier des effets
 - Agents : vava-architecte → vava-dev-lua + vava-dev-nui · Dépend de : T-101 · Statut : à faire

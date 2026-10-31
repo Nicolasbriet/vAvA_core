@@ -3,8 +3,9 @@
 Procédure pour vérifier en jeu le combat de la phase 4 (`docs/plan/COMBAT_V1.md`). Section 1 : la **chaîne de dégâts
 commune** de `vava_health` 1.4.0 (T-110 ; coup déjà lancé et `vocabulary().pvp` : T-116), éprouvée avec la ressource
 d'essai `vava_example_combat` 1.0.0 et `vava_needs` 1.2.1. Section 2 : les **armes** de `vava_combat` 1.0.0 (T-111),
-essayées avec `/frapper_arme` de `vava_example_combat` 1.1.0. Les sections suivantes viendront avec les techniques et
-la défense (T-112 à T-116).
+essayées avec `/frapper_arme` de `vava_example_combat` 1.1.0. Section 3 : les **techniques** de `vava_combat` 1.2.0
+(T-112 : coups à la souris jugés par le serveur, enchaînement, chancellement, mode combat, dégainer et rengainer). Les
+sections suivantes viendront avec la défense et l'endurance (T-113, T-114).
 Comptez 1 h par section, presque tout à deux ; les tests à deux joueurs sont marqués **(2 joueurs)**. Un test se cite
 « combat 1-8 ».
 
@@ -27,6 +28,10 @@ Comptez 1 h par section, presque tout à deux ; les tests à deux joueurs sont m
    matières par `/catalogue materiau` (lingots de fer de palier 3, chêne, pin, cuir) et un marteau de forge. Outils :
    `/armes liste | voir <n°> | user <n°> <points>` (droit `metiers`), `/frapper_arme <n°> [multiplicateur]
    [technique]`.
+7. **Techniques** (section 3) : la préparation 0.2 à 0.6, `vava_combat` 1.2.0. A et B ont chacun une Épée courte
+   (`/catalogue arme`) ; A est mage (`/magie` du Conseil) et connaît la Boule de feu ; `vava_example_combat` 1.1.0 pour
+   `/esquive`, `/bouclier`, `/vie`. Un troisième joueur C pour les tests 13 et 27. Touches par défaut : clic gauche
+   (attaque légère), clic droit (attaque lourde), clic molette (verrouiller ; maintenu : relâcher).
 
 ## 1. Chaîne de dégâts
 
@@ -84,7 +89,7 @@ serveur `strike`. Préparation : 0.6.
 | 3 | A `/catalogue arme`. | Les six armes nouvelles ont leur image ; fiche : catégorie arme, aucune solidité (pile du catalogue). |
 | 4 | **(2 joueurs)** A prend l'Épée longue dans les Mains. | Machette en main droite chez A ; B, à 10 m, la voit dans la seconde. |
 | 5 | A clic gauche, `R`, `Q`, `F` près de B, mains vides puis Dague en main ; puis `/arme pistolet` (exemple). | Aucun coup de poing ni de lame natif, aucune animation d'attaque ; le pistolet disparaît en moins d'une seconde, aucun tir ; F8 : une ligne « arme de GTA retirée ». Aucune erreur. |
-| 6 | A (non mage) maintient `Tab`. | Rien, ou une roue des armes vide sans effet : noter ce qui s'affiche (§ 3). |
+| 6 | A (non mage) maintient `Tab`. | Rien, ou une roue des armes vide sans effet : noter ce qui s'affiche (§ 4). |
 | 7 | A à la forge, marteau en main. | Recettes : Dague (15), Hache d'armes (25), Masse d'armes (25), Épée courte (30, si apprise) ; l'Épée longue (50) absente tant qu'elle n'est pas apprise. |
 | 8 | A forge une Hache d'armes. | Pièce signée « Façonné par A », poinçon, qualité ≤ 60, solidité 140 / 140. |
 | 9 | Console `vava_fondateur <A> forge 90 epee_longue`, puis A forge une Épée longue ; **(2 joueurs)** B à 8 m, forge 50. | L'Épée longue apparaît dans la forge, se forge (160 / 160) ; B reçoit une leçon (1 / 3). |
@@ -110,7 +115,49 @@ serveur `strike`. Préparation : 0.6.
 | 29 | Un membre du Conseil sans le droit `metiers` (ni l'ACE `combat.admin`) : `/armes user <A> 5`. | « Ce registre est réservé au Conseil. » ; solidité inchangée, rien au journal. |
 | 30 | **(2 joueurs, si un outil d'instance existe)** B placé dans une autre instance (routing bucket) au même endroit que A ; A `/frapper_arme <B>`. | « refusé : trop loin » ; B ne perd rien, solidité inchangée. |
 
-## 3. Ce que je ne peux pas avoir vérifié hors jeu
+## 3. Techniques
+
+L'épée à la main, on frappe à la souris : clic gauche pour la Taille descendante, puis l'Estoc rapide et le Revers qui
+s'enchaînent pendant la récupération, clic droit pour le Fendant qui fait chanceler. Le geste part tout de suite ; le
+**serveur** juge le coup au moment où la lame passe, sur les positions et le cap qu'il lit lui-même (portée de la
+technique + 0,25 m, demi-angle + 10°, aucun contrôle des murs). Dégainer prend 0,8 s, rengainer 1,5 s (pas de sort
+avant). Préparation : 0.7.
+
+| # | Faire | Attendu |
+|---|---|---|
+| 1 | Démarrer le serveur. | Console : `vava_combat` v1.2.0 « prêt : 6 objets et 6 recettes déclarés, 7 armes au catalogue, 4 techniques, 1 style(s) » ; aucun avertissement. |
+| 2 | A ouvre le Codex (`F1`). | Chapitre Combat : attaque légère (Clic gauche), attaque lourde (Clic droit), verrouiller (Clic molette), et `/armes`. |
+| 3 | A prend l'Épée courte en main, et clique aussitôt. | Geste de dégainer ; dans les 0,8 s : rien, ou « Vous n'avez pas encore l'arme en garde. » ; après : la Taille part. |
+| 4 | A clic gauche dans le vide, seul. | Geste aussitôt ; aucune notification ; `/vava_reseau joueur <A>` : seulement `rpc vava_combat:use`. |
+| 5 | **(2 joueurs)** B `/vie 100`, face à A à 2 m ; A clic gauche. | B perd 12 (qualité 50) au moment où la lame passe ; B tressaille ; effet d'impact chez A et chez B ; solidité de l'épée − 1 ou inchangée. |
+| 6 | **(2 joueurs)** A clic gauche ×3 en rythme, puis clic droit. | Taille, Estoc, Revers, Fendant enchaînés sans pause ; 4 coups chez B (12 ; 9,6 ; 10,8 ; 21,6). |
+| 7 | **(2 joueurs)** A martèle le clic gauche (10 / s) pendant 5 s. | Pas plus d'un coup par cycle ; jamais plus de 4 coups de suite sans la pause de la récupération ; aucun message d'erreur ; F8 propre. |
+| 8 | **(2 joueurs)** B à 3,5 m devant A ; A clic gauche ; puis B à 2 m. | À 3,5 m : le geste, **aucun** dégât ; à 2 m : dégâts. |
+| 9 | **(2 joueurs)** B à 1,5 m sur le côté (90°), A ne se tourne pas (sans verrou, caméra ailleurs que vers B). | Aucun dégât ; avec le verrou (clic molette sur B) : A se tourne vers B, dégâts. |
+| 10 | **(2 joueurs)** A clic droit (Fendant, 0,65 s de préparation) ; B recule aussitôt de 2 m. | Le Fendant manque si B est sorti de portée avant la frappe. |
+| 11 | **(2 joueurs)** A Fendant sur B. | B chancelle (geste, secousse), ne peut pas frapper 0,9 s (« Vous chancelez. ») ; un second Fendant dans les 3 s suivantes : dégâts sans chancellement ; plus tard : chancelle de nouveau. |
+| 12 | **(2 joueurs)** B prépare un Fendant, A le touche d'un Fendant avant la frappe de B. | Le Fendant de B est coupé, aucun dégât chez A. |
+| 13 | **(3 joueurs)** A clic molette avec B et C en vue. | Anneau sous le plus proche du centre de l'écran ; second clic : l'autre ; maintenu : relâché ; B s'éloigne à 8 m : relâché. Rien chez B ni chez C. |
+| 14 | **(2 joueurs)** B `/esquive` puis A frappe. | Aucun dégât, aucun sang ; `/vava_reseau joueur <B>` : un `vava_combat:hit` (issue `dodge`). |
+| 15 | **(2 joueurs)** B `/bouclier 50` puis A frappe. | Dégâts absorbés (B ne perd rien), aucun sang. |
+| 16 | **(2 joueurs)** B à terre (`/vie 0`) devant A ; A frappe. | Aucun dégât, aucun `vava_combat:hit`. |
+| 17 | A à terre, clic gauche. | Rien (mode combat endormi). |
+| 18 | **(2 joueurs)** `chain.pvp = false` (config de `vava_health`, redémarrage) ; A frappe B trois fois. | Une seule notification « Les combats entre habitants sont suspendus : votre lame s'arrête. » ; B ne perd rien. |
+| 19 | Mage : A, Épée en main, la range, puis clic gauche (Boule de feu prête) dans la seconde. | Geste de rengainer ; sort refusé pendant 1,5 s (« … rangez votre arme. ») ; ensuite le mode magie s'éveille, le sort part. |
+| 20 | Mage : A lance une Boule de feu, puis prend l'épée et frappe aussitôt. | Pas de coup avant 0,8 s après la prise en main. |
+| 21 | Mage : A incante, prend l'épée pendant l'incantation. | Incantation brisée sans coût (T-140, inchangé). |
+| 22 | A, Épée longue en main, clic gauche (plusieurs fois). | « Vous ne connaissez aucune technique pour cette arme. » une fois ; rien d'autre. |
+| 23 | A, l'épée en main, ouvre l'inventaire (`I`) et clique ; puis le referme et appuie sur Échap, puis sur `P`. | Aucun coup pendant que l'inventaire est ouvert ; la bannière (Échap) s'ouvre normalement hors combat ; `P` aussi. |
+| 24 | **(2 joueurs)** Juste après un coup porté, B appuie sur Échap. | « Pas de répit au cœur d'un combat… » (fenêtre de 10 s de `vava_pause`). |
+| 25 | **(2 joueurs)** Ping : B à 150 ms (ou loin du serveur). Coups de A sur B immobile, puis sur B qui recule. | Immobile : chaque coup porte ; qui recule à portée limite : manques plausibles. Noter les sensations (porte T-119). |
+| 26 | **(2 joueurs)** A frappe B à travers un mur fin (porte fermée) à 1,5 m. | Noter si le coup porte (aucun contrôle des murs : décision du porteur du projet). |
+| 27 | **(3 joueurs)** A frappe B ; C à 50 m. | `/vava_reseau joueur <C>` : aucun évènement `vava_combat`. Chez B : `vava_combat:hit` et `vava_health:set` par coup. |
+| 28 | `resmon 1` chez A : au repos l'épée en main, puis en mêlée. | `vava_combat` ≤ 0,01 ms au repos (mode endormi) ; ≤ 0,15 ms en mêlée ; 10 s après le dernier coup, de nouveau au repos. |
+| 29 | **(2 joueurs)** A se déconnecte pendant la préparation d'un Fendant. | Aucun coup chez B ; console sans erreur. |
+| 30 | `restart vava_combat` pendant une mêlée. | Coups en cours perdus sans erreur ; techniques de nouveau jouables au retour (arme à reprendre en main si l'inventaire l'a gardée à part). |
+| 31 | Console : `debug.logSamples = true` (config.lua), redémarrage, coups à portée limite. | Une ligne par relevé (`coup <n> <technique> relevé <k> : <joueur> d=… a=… portée … → issue`) : base des réglages de T-119. |
+
+## 4. Ce que je ne peux pas avoir vérifié hors jeu
 
 - L'annulation de `weaponDamageEvent` (champ `hitGlobalId` ou liste `hitGlobalIds` selon la version de FXServer : les
   deux sont lus) : B ne voit ni perte ni réaction ; ce que voit A (sang, tressaillement prédits) est à noter.
@@ -130,3 +177,14 @@ serveur `strike`. Préparation : 0.6.
 - Modèles provisoires (`w_me_dagger`, `w_me_hatchet`, `w_me_poolcue`, `w_me_bat`, `prop_ballistic_shield`) présents ;
   placements en main et du bouclier au bras et au dos à régler (`offset`, `rotation` de la config).
 - Le bouclier change de place en moins d'une seconde quand la main change, chez le porteur et chez un voisin (2-20).
+- Techniques (T-112) : noms des gestes provisoires (`melee@large_wpn@streamed_core`, `melee@knife@streamed_core`,
+  `reaction@intimidation@1h`, `reaction@shove`, `melee@unarmed@streamed_variations`) et des effets (`blood_stab`,
+  `bang_sparks` de `core`) présents dans le jeu (`/anim <dict> <clip>` de `examples/vava_anim_test`) ; un nom absent
+  ne joue rien et écrit une ligne en F8 par minute.
+- `TaskPlayAnim` d'un geste joué sur son propre ped : vu des autres joueurs (3-5, 3-11) ; effet d'impact
+  (`StartParticleFxNonLoopedOnPedBone`, identifiant d'os 24818) au bon endroit.
+- Boutons de la souris partagés avec la magie : arme en main, un mage peut encore lire une fois « rangez votre arme » et
+  voir l'anneau de la magie en plus de celui du combat (tâche T-149).
+- Cap lu par le serveur pendant un virage (3-9) : le serveur juge sur le cap répliqué ; un virage très rapide au départ
+  du coup peut arriver après l'ouverture de la frappe (noter si un coup tourné vers B manque).
+- Secousse de caméra (`SMALL_EXPLOSION_SHAKE`, `effects.shakeName`) : sensible sans gêner (3-5, 3-11).

@@ -1697,19 +1697,22 @@ Pour travailler le rendu du mur sans le jeu : `web/index.html?players=11&layout=
 
 ### `vava_combat`
 
-Les armes de corps à corps (1.0.0, T-111 ; squelette que T-112 complétera, `docs/plan/COMBAT_V1.md` § 2) : catalogue des
-armes (fiches en config : catégorie parmi `une_main`, `deux_mains`, `dague`, `baton`, `bouclier` — liste fermée —,
-famille, type de dégâts, dégâts, bonus de portée, solidité, blocage, modèle provisoire), six objets déclarés à
-l'inventaire (Épée longue, Hache d'armes, Masse d'armes, Dague, Bâton ferré, Bouclier rond) et l'Épée courte de
-`vava_crafting` adoptée sans être redéclarée, six recettes signées déclarées à `vava_crafting:recipes` et
-`vava_skills:recipes` (redéclarées à leur annonce `core:module:ready`), dégâts = fiche × qualité de forge (0,85 à 1,15)
-× usure (émoussée : × 0,5) × multiplicateur de la technique, usure d'un point par coup **qui touche** (chance de
-l'épargner : 40 % × qualité), arme émoussée à 0 et réparée par l'artisanat, bouclier accroché au bras ou au dos, combat
-natif de GTA coupé sans boucle par image, commandes du Conseil `/armes liste | voir | user` (droit `metiers`, journal).
-Demande le core 0.10.0, `vava_inventory` 1.7.0 et `vava_health` 1.3.0 ; facultatifs : `vava_crafting` ≥ 1.5.0 et
-`vava_skills` ≥ 1.0.0 (recettes), `vava_hud`, `vava_admin` (sans lui, ACE `combat.admin`), `vava_chat`. Ordre de
-démarrage : après `vava_health` et `vava_crafting`. **Aucun RPC, aucune NUI, aucune table SQL.** Détail, valeurs et
-tests en jeu : `modules/vava_combat/README.md`, `docs/tests/combat.md` § 2.
+Le combat de corps à corps (1.2.0 ; armes : T-111, `docs/plan/COMBAT_V1.md` § 2 ; techniques : T-112, § 3) : catalogue
+des armes (classe en `config_client.lua` : catégorie parmi `une_main`, `deux_mains`, `dague`, `baton`, `bouclier` — liste
+fermée — et famille ; fiche en `config.lua` : type de dégâts, dégâts, bonus de portée, solidité, blocage, modèle
+provisoire), six objets déclarés à l'inventaire (Épée longue, Hache d'armes, Masse d'armes, Dague, Bâton ferré, Bouclier
+rond) et l'Épée courte de `vava_crafting` adoptée sans être redéclarée, six recettes signées déclarées à
+`vava_crafting:recipes` et `vava_skills:recipes` (redéclarées à leur annonce `core:module:ready`), dégâts = fiche ×
+qualité de forge (0,85 à 1,15) × usure (émoussée : × 0,5) × multiplicateur de la technique, usure d'un point par coup
+**qui touche** (chance de l'épargner : 40 % × qualité), arme émoussée à 0 et réparée par l'artisanat, bouclier accroché
+au bras ou au dos, combat natif de GTA coupé, commandes du Conseil `/armes liste | voir | user` (droit `metiers`,
+journal) ; **techniques** en données (format de `COMBAT_V1.md` § 3, contrôlé au démarrage : Taille descendante, Estoc
+rapide, Revers, Fendant, style `epee_une_main`), coup jugé par le serveur, enchaînement, chancellement, mode combat à la
+souris, dégainer et rengainer. Demande le core 0.10.0, `vava_inventory` 1.7.0 et `vava_health` 1.3.0 ; facultatifs :
+`vava_crafting` ≥ 1.5.0 et `vava_skills` ≥ 1.0.0 (recettes), `vava_hud`, `vava_admin` (sans lui, ACE `combat.admin`),
+`vava_chat`, `vava_magic` (export `hardControl` s'il existe, T-149). Ordre de démarrage : après `vava_health` et
+`vava_crafting`. **Un RPC, aucune NUI, aucune table SQL.** Détail, valeurs et tests en jeu :
+`modules/vava_combat/README.md`, `docs/tests/combat.md` § 2 et § 3.
 
 - **Arme en main** = l'objet tenu de l'inventaire (`held`, T-045), jamais une arme GTA ; le serveur lit
   `vava_inventory:held(src)`. Modèles vanilla provisoires dans `items[…].held` (`-- PLACEHOLDER`). Les outils ne sont pas
@@ -1721,45 +1724,91 @@ tests en jeu : `modules/vava_combat/README.md`, `docs/tests/combat.md` § 2.
   répliqué par OneSync aux seuls joueurs qui ont ce ped à portée) et le **garde** (valeur réécrite par un client remise
   après 250 ms, espacée jusqu'à 1 s ; entité non suivie : effacée). Placement lu dans la config de chaque client, position
   (bras ou dos) déduite de `vava_inventory:inHand` du même ped : au bras avec une arme `une_main` ou `dague` ; montré à
-120 m au plus (`shield.showRadius`). Une même pile ne s'accroche qu'à un porteur. Décroché
-  dès que la pile quitte la besace (hooks `move`, `drop`, `remove` ; relevé de 5 s en filet) ; champ privé
-  `vava_combat:hungShield` (retrouvé à la reconnexion).
+  120 m au plus (`shield.showRadius`). Une même pile ne s'accroche qu'à un porteur. Décroché dès que la pile quitte la
+  besace (hooks `move`, `drop`, `remove` ; relevé de 5 s en filet) ; champ privé `vava_combat:hungShield` (retrouvé à la
+  reconnexion).
 - **Combat natif** : drapeau de ped 122 (corps à corps désactivé), `SetPedCanSwitchWeapon(false)`, armes GTA retirées,
-  réappliqués à 1 Hz côté client ; rendus à GTA à l'arrêt du module. Le filet reste l'annulation serveur de
-  `vava_health`.
-- **Réseau** : `vava_combat:notify` (`core.net.send`) au seul porteur dont l'arme passe un seuil (quart de la solidité,
-  émoussée) ou au seul membre du Conseil sans `vava_chat` ; le statebag du bouclier au changement seulement ; + ≈ 450 o
-  une fois dans `GlobalState['vava_inventory:heldModels']` (mécanisme de l'inventaire). Aucun envoi à tous.
+  réappliqués à 1 Hz côté client ; rendus à GTA à l'arrêt du module. En mode combat actif, les touches d'attaque, de
+  visée, de corps à corps et de la roue des armes sont aussi coupées à chaque image (jamais Échap ni P). Le filet reste
+  l'annulation serveur de `vava_health`.
+- **Une technique** (1.2.0) : le client joue le geste **aussitôt** et demande ; le serveur vérifie (en mémoire d'abord :
+  technique connue, type d'attaque, chancellement, dégainer, délai et enchaînement ; puis personnage, arme **réellement
+  tenue** et son style `<famille>_<catégorie>`, technique de ce style, à terre, véhicule, contrôle dur de la magie,
+  crochet `vava_combat:using`, position), puis **programme la fenêtre de frappe** : un relevé à l'ouverture (fin de la
+  préparation) et un à la fin de la frappe. À chaque relevé, positions et **cap lus par le serveur** ; cible gardée si
+  même instance, à portée (`hit.range` + bonus de l'arme + 0,25 m), dans le demi-angle (`hit.angle / 2` + 10° ; au
+  contact, sous 0,6 m, l'angle ne compte plus) et à 2,0 m de hauteur au plus ; un adversaire par coup (le verrouillé
+  d'abord, puis le plus en face, le plus proche), touché une fois ; bond de l'attaquant borné (8 m/s + 0,5 m depuis la
+  demande, sinon coup annulé, console). Le coup passe par `strike` (chaîne de dégâts, usure). Aucun contrôle des murs
+  (décision du porteur du projet). **Enchaînement** : une technique de `chain` part pendant la récupération (60 ms de
+  gigue admis), 3 enchaînées au plus après celle qui ouvre, puis la récupération entière. **Chancellement** (`staggers`,
+  le Fendant) : la cible ne frappe plus 0,9 s, son coup en cours est coupé, puis aucun autre chancellement avant 3 s.
+- **Dégainer et rengainer** (1.2.0, décision du porteur du projet) : arme prise en main (hook `vava_inventory:hold`), aucune
+  technique avant **0,8 s** (`drawing`) ; arme rangée, `armed(src)` rend encore `{ …, sheathing = true, readyInMs }`
+  pendant **1,5 s** : la magie refuse d'incanter (« rangez votre arme ») sans que `vava_magic` change. Dégainer ne
+  touche pas la magie (l'arme en main suffit).
+- **Réseau** : RPC `vava_combat:use` (≈ 40 o, réponse au seul appelant ≈ 15 o) ; `vava_combat:hit` aux joueurs à 30 m
+  de la cible dans l'instance de l'attaquant, **un par cible touchée**, jamais pour un coup manqué ou refusé ;
+  `vava_combat:notify` (`core.net.send`) au seul porteur dont l'arme passe un seuil, au seul attaquant dont le coup est
+  retenu (un par raison et par 10 s) ou au seul membre du Conseil sans `vava_chat` ; le statebag du bouclier au
+  changement seulement ; + ≈ 450 o une fois dans `GlobalState['vava_inventory:heldModels']` (mécanisme de
+  l'inventaire). Gestes (coup, réaction, dégainer, rengainer, chancellement) joués par chaque client sur son propre ped :
+  OneSync les montre. Aucun envoi à tous, aucune clé GlobalState propre, aucun state bag nouveau. Joueur armé au repos :
+  0 octet.
+
+**RPC** `vava_combat:use(technique, cible)` — `technique` : chaîne de 1 à 32 octets `^[a-z0-9_]+$` ; `cible` : entier
+0 à 65535 (joueur verrouillé, 0 : aucun ; ne sert qu'à l'ordre des candidats, n'allonge ni la portée ni l'angle) ;
+4 d'avance puis 3 / s (`rateLimits.use`). Réponse : `true` (fenêtre programmée ; aucun résultat : il arrive par
+`vava_combat:hit`, ou jamais), `false, code`, `false, code, attente` (ms : `busy`, `chain_limit`, `drawing`,
+`staggered`) ou `false, 'refused', raison` (texte d'un crochet, 120 octets, contrôles retirés). Codes : `not_ready`,
+`unknown_technique`, `not_attack`, `not_opener`, `busy`, `chain_limit`, `staggered`, `drawing`, `no_character`,
+`no_weapon`, `no_style`, `not_in_style`, `downed`, `vehicle`, `controlled`, `refused`.
+
+**Évènement** `vava_combat:hit(attaquant, cible, issue)` (serveur → clients proches, `core.net.sendNearWith` avec
+l'instance de l'attaquant, 30 m autour de la cible) : `issue` ∈ `hit`, `stagger`, `down`, `block`, `parry`, `dodge`,
+`absorb` ; la cible joue sa réaction, l'attaquant entend la touche, tous voient l'effet d'impact.
 
 | Export serveur | Retour |
 |---|---|
-| `weapon(item)` | copie de la fiche `{ item, label, category, family, kind, damage, reachBonus, durability, block, provisional }`, ou `nil` |
+| `weapon(item)` | copie de la fiche `{ item, label, category, family, kind, damage, reachBonus, durability, block, provisional }` (classe et fiche fusionnées), ou `nil` |
 | `weapons()` | liste ordonnée (catégorie, puis libellé) des fiches — pour l'éditeur des techniques (T-121) |
-| `armed(src)` | `{ instanceId, item, category, family, kind, damage, factor, amount, reachBonus, quality, durability, maxDurability, dull }` (`amount` : coup à × 1,0) ou `nil, code` (`not_ready`, `no_character`, `no_weapon`) |
+| `armed(src)` | arme en main : `{ instanceId, item, category, family, kind, damage, factor, amount, reachBonus, quality, durability, maxDurability, dull }` (`amount` : coup à × 1,0) ; **pendant le rengainement** (1,5 s) : `{ item, category, family, sheathing = true, readyInMs }` ; sinon `nil, code` (`not_ready`, `no_character`, `no_weapon`) |
+| `techniques()` | liste (style, puis libellé) de copies `{ id, label, style, type, gesture, phases, hit, damage, stamina, parryable, staggers, chain, learn? }` — pour T-115 et T-121 |
+| `technique(id)` | copie d'une technique, ou `nil` |
 | `shield(src)` | `{ instanceId, item, block, durability, maxDurability, dull, position, ready }` (`ready` : bouclier au bras) ou `nil` — rien d'accroché, inventaire muet, ou pile partie de la besace (décrochée aussitôt) ; lu par T-113 |
 | `strike(src, cible, opts?)` | résultat de `vava_health:hit` complété de `weapon = { item, durability, maxDurability, worn, dull }`, ou `nil, code` |
 
 **`strike`** : brique serveur d'un coup d'arme, réservée aux ressources de `config.strike.callers` (`GetInvokingResource` ;
-sinon `not_allowed`, une ligne de console par minute et par ressource) ; T-112 appelle la fonction interne
-`VavaCombat.strike.run`. Vérifie dans l'ordre : module prêt (`not_ready`), joueurs entiers et différents
-(`invalid_target`), personnages actifs (`no_character`), attaquant debout (`downed`), `opts` = `nil` ou table aux seules
-clés `technique` (identifiant de 64 octets, `^[A-Za-z0-9_%-%.:]+$`), `damage` (multiplicateur 0,1 à 3, défaut 1), `tags`
-(map → `true` de `parryable`, `unblockable`, `undodgeable`, 3 au plus ; `melee` toujours posé), `part`
-(`invalid_options`) ; pile **réellement tenue**, arme du catalogue connue de l'inventaire avec un `held`, pas un bouclier
-(`no_weapon`) ; même instance (routing bucket) et positions lues par le serveur à 6 m au plus (`too_far`). Puis paquet `{ amount, kind, source, weapon,
-technique?, part?, tags }` → `vava_health:hit` (refus rendu tel quel, sans usure ; `health_unavailable` s'il ne répond
-pas), puis usure si le coup a touché (résultat sans `cancelled`, ou annulé aux étapes `parade`, `blocage`, `bouclier`),
-calculée sur la pile **relue** après le coup (un abonné de la chaîne qui céderait la main ne fait ni user deux fois au
-même point ni frapper gratuitement) ; pile partie ou inventaire muet : aucune usure.
+sinon `not_allowed`, une ligne de console par minute et par ressource) ; les techniques appellent la fonction interne
+`VavaCombat.strike.run` (avec la pile et le personnage lus dans le même tour, jamais transmis par l'export). Vérifie dans
+l'ordre : module prêt (`not_ready`), joueurs entiers et différents (`invalid_target`), personnages actifs
+(`no_character`), attaquant debout (`downed`), `opts` = `nil` ou table aux seules clés `technique` (identifiant de
+64 octets, `^[A-Za-z0-9_%-%.:]+$`), `damage` (multiplicateur 0,1 à 3, défaut 1), `tags` (map → `true` de `parryable`,
+`unblockable`, `undodgeable`, 3 au plus ; `melee` toujours posé), `part` (`invalid_options`) ; pile **réellement tenue**,
+arme du catalogue connue de l'inventaire avec un `held`, pas un bouclier (`no_weapon`) ; même instance (routing bucket)
+et positions lues par le serveur à 6 m au plus (`too_far`). Puis paquet `{ amount, kind, source, weapon, technique?,
+part?, tags }` → `vava_health:hit` (refus rendu tel quel, sans usure ; `health_unavailable` s'il ne répond pas), puis usure
+si le coup a touché (résultat sans `cancelled`, ou annulé aux étapes `parade`, `blocage`, `bouclier`), calculée sur la pile
+**relue** après le coup (un abonné de la chaîne qui céderait la main ne fait ni user deux fois au même point ni frapper
+gratuitement) ; pile partie ou inventaire muet : aucune usure.
 
 | Export client | Retour |
 |---|---|
-| `armed()` | `{ item, category, family }` de l'arme du personnage local (champ `vava_inventory:hands`), ou `nil` — pour la règle « mains vides » de la magie et le mode combat ; jamais une décision |
+| `armed()` | `{ item, category, family }` de l'arme du personnage local ; pendant le rengainement (1,5 s), `+ sheathing = true` ; sinon `nil` — lu dans un cache local de la main (aucune lecture du personnage), pour la règle « mains vides » de la magie ; jamais une décision |
+| `inCombatMode()` | vrai si le mode combat est éveillé et actif (arme du royaume en main, éveillé par une touche du combat, endormi après 10 s sans coup) |
 | `shieldHung()` | objet du bouclier accroché sur son propre ped, ou `nil` |
 
-**Hooks** : `vava_combat:shieldHang` (`before`, annulable, accroche seule : `{ source, characterId, instanceId, item }` ;
-la raison du refus est montrée au joueur — prison, interdiction ; `after` : `+ hang, reason` = `use` | `gone` |
-`restored`), `vava_combat:dulled` (`after` : `{ source, characterId, instanceId, item }`, une arme vient d'atteindre 0).
+**Hooks** : `vava_combat:using` (`before`, annulable, ne doit jamais céder la main : `{ source, characterId, technique,
+item, target? }` — prison, ligotage, trêve du Conseil ; la raison, 120 octets, est montrée au joueur),
+`vava_combat:shieldHang` (`before`, annulable, accroche seule : `{ source, characterId, instanceId, item }` ; la raison du
+refus est montrée au joueur — prison, interdiction ; `after` : `+ hang, reason` = `use` | `gone` | `restored`),
+`vava_combat:dulled` (`after` : `{ source, characterId, instanceId, item }`, une arme vient d'atteindre 0). **Écoutés** :
+`vava_inventory:hold` (dégainer, rengainer, coup annulé) et `vava_health:downed` (coup annulé, chancellement oublié), en
+plus de ceux de 1.1.0.
+
+**Touches** (registre `core:commands`, chapitre Combat ; Paramètres > Raccourcis > FiveM) : attaque légère (clic gauche),
+attaque lourde (clic droit), verrouiller un adversaire (clic molette ; maintenu : relâcher). Mêmes boutons que la magie :
+le mode magie dort arme en main, le mode combat ne s'éveille qu'arme en main.
 
 ### `vava_magic`
 
@@ -1791,6 +1840,8 @@ incanter ; sans lui, aucune restriction).
   gêne pas. Brisée : ni mana ni recharge. vava_combat absent, pas prêt ou en erreur : aucune restriction pour les armes
   de l'inventaire (une ligne de console par minute au plus, aussi quand `not_ready` dure). Le client lit `armed()` pour
   le montrer tôt (mode magie endormi, roue, touches, incantation interrompue), sans en décider.
+  **Rengainer** (`vava_combat` 1.2.0, T-112) : une arme rangée laisse `armed()` (serveur et client) dire « mains
+  prises » pendant 1,5 s (`sheathing = true`) : la magie refuse d'incanter pendant ce temps, sans changement ici.
 - **Incantation** : RPC `vava_magic:begin:<sort>` puis `vava_magic:finish:<sort>` (numéro d'incantation). Le serveur
   revérifie à la fin la durée, le déplacement (positions serveur) et la blessure (2.9.0 : un coup de la chaîne ou une
   perte native qui a retiré de la vie au lanceur, hook `vava_health:hit` after, ou sa vie de `vava_health:get` plus
