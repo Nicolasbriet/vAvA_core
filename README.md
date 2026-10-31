@@ -32,7 +32,7 @@ Voir [docs/chancellerie.md](docs/chancellerie.md).
 `oxmysql` : `vAvA_core`, `vava_ui`, `vava_loading`, `vava_chat` (à la place de `chat`), `vava_world`, `vava_time`, `vava_appearance`, `vava_characters_ui`,
 `vava_hud`, `vava_inventory`, `vava_needs`, `vava_health`, `vava_admin`, `vava_atelier`, `vava_voice`, `vava_cameras`, `vava_magic`,
 `vava_skills`, `vava_gathering`, `vava_crafting`, `vava_combat`, `vava_farming`, `vava_provisions`, `vava_codex`,
-`vava_arrival`, `vava_chancellerie`.
+`vava_pause`, `vava_arrival`, `vava_chancellerie`.
 
 `vava_combat` (armes de corps à corps) démarre après `vava_health` et `vava_crafting` ; il n'est pas encore dans la
 liste que la Chancellerie écrit (à ajouter par une tâche qui l'autorise) : l'`ensure` à la main en attendant.

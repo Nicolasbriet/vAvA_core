@@ -15,7 +15,7 @@ local helper = require('tests.helper')
 
 local ROOT = (os.getenv('VAVA_ROOT') or '.') .. '/'
 
--- Les 30 ressources de modules/ et examples/ qui ont du Lua (toutes sauf vava_ui), avec leur table de module.
+-- Les 31 ressources de modules/ et examples/ qui ont du Lua (toutes sauf vava_ui), avec leur table de module.
 local MODULES = {
     { dir = 'modules/vava_admin', global = 'VavaAdmin' },
     { dir = 'modules/vava_appearance', global = 'VavaAppearance' },
@@ -36,6 +36,7 @@ local MODULES = {
     { dir = 'modules/vava_loading', global = 'VavaLoading' },
     { dir = 'modules/vava_magic', global = 'VavaMagic' },
     { dir = 'modules/vava_needs', global = 'VavaNeeds' },
+    { dir = 'modules/vava_pause', global = 'VavaPause' },
     { dir = 'modules/vava_provisions', global = 'VavaProvisions' },
     { dir = 'modules/vava_skills', global = 'VavaSkills' },
     { dir = 'modules/vava_time', global = 'VavaTime' },
