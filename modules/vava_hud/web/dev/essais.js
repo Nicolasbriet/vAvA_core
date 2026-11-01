@@ -151,24 +151,49 @@ test('page : calque des chiffres présent, numbers.js chargé avant hud.js, aucu
   }
 });
 
-// fichiers livrés : ceux des `files` du manifeste (web/index.html, web/css/*.css, web/js/*.js)
-test('poids de la page livrée ≤ 32 Ko', () => {
+// fichiers livrés : ceux des `files` du manifeste (web/index.html, web/css/*.css, web/js/*.js), comptés en fins de
+// ligne LF comme dans le dépôt (une copie Windows en CRLF ne change rien) ; source ≤ 32 Ko et, quand l'allègement de la
+// Chancellerie (chancellerie/lib/webstrip.js, T-160) est là, page livrée allégée ≤ 26 Ko (relecture réseau R-1, T-114)
+test('poids de la page livrée : source ≤ 32 Ko, allégée ≤ 26 Ko', () => {
   const files = ['index.html'];
   for (const [dir, ext] of [['css', '.css'], ['js', '.js']]) {
     for (const file of fs.readdirSync(path.join(web, dir))) if (file.endsWith(ext)) files.push(`${dir}/${file}`);
   }
-  const total = files.reduce((sum, file) => sum + fs.statSync(path.join(web, file)).size, 0);
+  const texts = files.map((file) => fs.readFileSync(path.join(web, file), 'latin1').replace(/\r/g, ''));
+  const total = texts.reduce((sum, text) => sum + text.length, 0);
   console.log(`vava_hud : page livrée ${total} octets (${files.length} fichiers)`);
   assert.ok(total <= 32 * 1024, `${total} octets`);
+  const stripPath = path.join(web, '..', '..', '..', 'chancellerie', 'lib', 'webstrip.js');
+  if (!fs.existsSync(stripPath)) return;
+  const webstrip = require(stripPath);
+  const lean = texts.reduce((sum, text, i) => {
+    const kind = files[i].endsWith('.html') ? 'html' : files[i].endsWith('.css') ? 'css' : 'js';
+    const result = webstrip.strip(text, kind);
+    return sum + (result.ok ? result.text.length : text.length);
+  }, 0);
+  console.log(`vava_hud : page allégée ${lean} octets`);
+  assert.ok(lean <= 26 * 1024, `${lean} octets allégés`);
 });
 
 // Remontée d'une jauge (T-114) : règles pures ----------------------------------------------------------------
 
 const R = require('../js/refill.js');
+// départ d'une remontée au plus tôt (js/refill.js) ; projection d'un plan à un instant, pour les essais seulement (la
+// page n'en a pas besoin : la transition CSS anime ; relecture réseau R-4)
+const MIN_DELAY_MS = 600;
+R.valueAt = (p, elapsedMs) => {
+  if (!p || elapsedMs <= p.startMs) return p ? p.from : null;
+  return Math.min(1, p.from + (1 - p.from) * ((elapsedMs - p.startMs) / p.durationMs));
+};
 // jauge Endurance de vava_combat (config_client.lua, gauge) : ambre sous 25 %, rouge sous 10 %
 const LOW = 0.25;
 const CRIT = 0.1;
 const plan = (value, refill) => R.plan(value, refill, LOW, CRIT);
+
+test('plan : départ au plus tôt à 600 ms (la baisse se peint avant), même sans attente', () => {
+  eq([plan(0.5, { perSecond: 0.5, delayMs: 0 }).startMs, plan(0.5, { perSecond: 0.5, delayMs: 599 }).startMs,
+    plan(0.5, { perSecond: 0.5, delayMs: 601 }).startMs], [MIN_DELAY_MS, MIN_DELAY_MS, 601]);
+});
 
 test('palier : rouge jusqu\'à 10 %, ambre jusqu\'à 25 %, laiton au-dessus (bornes comme les autres jauges)', () => {
   eq([0, 0.05, 0.1].map((v) => R.level(v, LOW, CRIT)), ['critical', 'critical', 'critical']);

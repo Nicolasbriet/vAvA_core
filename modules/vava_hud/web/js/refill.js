@@ -44,11 +44,6 @@ const HudRefill = (() => {
     return { from, startMs, durationMs, steps };
   }
 
-  function valueAt(p, elapsedMs) {
-    if (!p || elapsedMs <= p.startMs) return p ? p.from : null;
-    return Math.min(1, p.from + (1 - p.from) * ((elapsedMs - p.startMs) / p.durationMs));
-  }
-
   // ordre des médaillons : indices d'une plus longue suite croissante de `positions` (place actuelle, -1 : nouveau),
   // ceux qui peuvent rester en place
   function steady(positions) {
@@ -69,7 +64,7 @@ const HudRefill = (() => {
     return out;
   }
 
-  return { MIN_DELAY_MS, level, read, plan, valueAt, steady };
+  return { level, read, plan, steady };
 })();
 
 if (typeof module === 'object' && module && module.exports) module.exports = HudRefill;
