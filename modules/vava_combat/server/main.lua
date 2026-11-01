@@ -7,8 +7,9 @@
            hooks (retour de l'inventaire, de l'artisanat, des compétences et de la santé ; apparition, déchargement et
            départ ; pile du bouclier qui quitte la besace ; prise en main : dégainer et rengainer ; mise à terre : coup
            annulé ; coup de la chaîne : suites d'une défense), boucliers et armes en main repris pour les personnages
-           déjà en jeu. Aucune table SQL. À l'arrêt de la ressource, les statebags de
-           bouclier sont vidés et les coups en cours annulés.
+           déjà en jeu, mannequins d'entraînement chargés (liste contrôlée : refus avec la raison). Aucune table SQL.
+           À l'arrêt de la ressource, les statebags de bouclier sont vidés, les coups en cours annulés, les mannequins
+           oubliés.
     Dépendances : tous les fichiers server/ du module
 ]]
 
@@ -27,6 +28,7 @@ local hands = VavaCombat.hands
 local reactions = VavaCombat.reactions
 local swings = VavaCombat.swings
 local defense = VavaCombat.defense
+local dummies = VavaCombat.dummies
 local commands = VavaCombat.commands
 local cfg = VavaCombat.config
 local RPC = VavaCombat.RPC
@@ -91,6 +93,8 @@ local function setup()
     if not declared then return false, 'commandes : ' .. tostring(declareErr) end
     local ok, items, recipes = catalog.setup()
     if not ok then return false, items end
+    local dummiesOk, dummiesErr = dummies.start()
+    if not dummiesOk then return false, 'config : ' .. tostring(dummiesErr) end
 
     for _, def in ipairs({
         { 'core:module:ready', onModuleReady },
@@ -131,7 +135,8 @@ local function setup()
     local modifiers = defense.declare()
     local techniqueCount, styleCount = catalog.counts()
     core.log.info('prêt : %d objets et %d recettes déclarés, %d armes au catalogue, %d techniques, %d style(s), '
-        .. '%d modificateur(s) de la défense', items, recipes, #catalog.list(), techniqueCount, styleCount, modifiers)
+        .. '%d modificateur(s) de la défense, %d mannequin(s)', items, recipes, #catalog.list(), techniqueCount,
+        styleCount, modifiers, dummies.count())
     return true
 end
 
@@ -153,6 +158,8 @@ AddEventHandler('onResourceStop', function(resource)
     hands.stop()
     reactions.stop()
     defense.stop()
+    dummies.stop()
     pedState.stop()
+
     shields.stop()
 end)

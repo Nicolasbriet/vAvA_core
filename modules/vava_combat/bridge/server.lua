@@ -5,7 +5,8 @@
            (core.net.playersNear), à terre (vava_health), contrôle dur de la magie (vava_magic:hardControl s'il existe),
            objet tenu en main, piles de la besace, besace d'un joueur, patchMetadata (vava_inventory), déclarations aux
            registres (objets, recettes de l'artisanat et des compétences), versions des modules, coup par la chaîne de
-           dégâts (vava_health:hit), vocabulaire et modificateurs (registre vava_health:modifiers, hook hit after),
+           dégâts (vava_health:hit), coup d'essai d'un mannequin (vava_health:trial, T-156), vocabulaire et
+           modificateurs (registre vava_health:modifiers, hook hit after),
            champ privé du bouclier accroché, hooks émis et écoutés (prise en main, mise à terre), RPC, droits et journal du Conseil (vava_admin), chat (vava_chat), envoi au seul joueur
            concerné (core.net.send), à une liste calculée par le serveur (proches d'une instance :
            core.net.playersNear, puis core.net.send à la liste, T-155) ou aux proches d'une instance
@@ -411,7 +412,21 @@ function Bridge.Hit(target, packet)
     return result
 end
 
+--- Coup d'essai sur un mannequin (vava_health:trial ≥ 1.6.0) : montant « comme si », rien d'appliqué. Rend le résultat,
+--- ou `nil, code` (`health_unavailable` si vava_health ne répond pas). Ne cède pas la main.
+---@param packet table
+---@param place { x: number, y: number, z: number }
+---@return table|nil result
+---@return string|nil code
+function Bridge.Trial(packet, place)
+    local called, result, code = call(HEALTH, 'trial', packet, place)
+    if not called then return nil, 'health_unavailable' end
+    if type(result) ~= 'table' then return nil, type(code) == 'string' and code or 'hit_error' end
+    return result
+end
+
 --- Types de dégâts connus de vava_health, ou nil s'il ne répond pas.
+
 ---@return string[]|nil
 function Bridge.HealthKinds()
     local called, vocabulary = call(HEALTH, 'vocabulary')

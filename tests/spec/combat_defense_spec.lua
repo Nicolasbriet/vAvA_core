@@ -1130,6 +1130,7 @@ describe('vava_combat défense : démarrage (server/main.lua)', function()
             'modules/vava_combat/shared/defense.lua',
             'modules/vava_combat/shared/weapons.lua',
             'modules/vava_combat/shared/guard.lua',
+            'modules/vava_combat/shared/dummies.lua',
         })
         local log = { warn = function() end, info = function() end, error = function() end }
         VavaCombat.resource, VavaCombat.log = 'vava_combat', log
@@ -1178,6 +1179,7 @@ describe('vava_combat défense : démarrage (server/main.lua)', function()
             'modules/vava_combat/server/strike.lua',
             'modules/vava_combat/server/hands.lua',
             'modules/vava_combat/server/reactions.lua',
+            'modules/vava_combat/server/dummies.lua',
             'modules/vava_combat/server/defense.lua',
             'modules/vava_combat/server/swings.lua',
             'modules/vava_combat/server/api.lua',
@@ -1187,6 +1189,8 @@ describe('vava_combat défense : démarrage (server/main.lua)', function()
         helper.load('modules/vava_combat/server/main.lua')
         local ok, err = setup()
         assert.is_true(ok, err)
+        -- T-156 : les mannequins de la config sont chargés au setup
+        assert.equal(#VavaCombat.config.dummies.list, VavaCombat.dummies.count())
         assert.same({ 'vava_combat:blocage', 'vava_combat:esquive', 'vava_combat:parade' },
             (function()
                 local keys = {}

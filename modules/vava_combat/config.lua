@@ -5,9 +5,9 @@
            objets déclarés à l'inventaire, recettes déclarées à l'artisanat, qualité et usure, filet de la brique
            `strike`, débits des RPC (techniques, garde), défense (part du serveur : délais, étiquettes, garde brisée
            provisoire, modificateurs), cycle d'un coup, tolérances, géométrie, réactions, chiffres des coups (T-155),
-           commandes du Conseil, journal, textes. Complète la table ouverte par config_client.lua (classes des armes,
-           bouclier accroché, placements, contrôles natifs, techniques, styles, mode combat, touches) sans en réécrire
-           une clé (T-132).
+           mannequins (part du serveur, T-156), commandes du Conseil, journal, textes. Complète la table ouverte par
+           config_client.lua (classes des armes, bouclier accroché, placements, contrôles natifs, techniques, styles,
+           mode combat, touches, mannequins) sans en réécrire une clé (T-132).
     Les modèles sont des remplaçants vanilla (-- PLACEHOLDER, docs/plan/ASSETS_PLACEHOLDERS.md) : le jour où les armes
     médiévales arrivent, seuls `items[…].held.model` et `weapons[…].provisional` (ici), et `shields[…]`
     (config_client.lua) changent. Les chiffres (solidité, usure, tolérances) sont des valeurs de départ, à régler à la
@@ -18,8 +18,9 @@
 local config = VavaCombat.config
 
 config.coreVersion = '0.10.0'  -- core.net.send et sendNearWith (0.10.0), registre core:commands (0.7.0)
--- statebag de la main de l'inventaire (1.7.0) ; chaîne de dégâts `hit` (1.3.0)
-config.dependencies = { vava_inventory = '1.7.0', vava_health = '1.3.0' }
+-- statebag de la main de l'inventaire (1.7.0) ; chaîne de dégâts `hit` (1.3.0), coup d'essai `trial` des mannequins
+-- (1.6.0)
+config.dependencies = { vava_inventory = '1.7.0', vava_health = '1.6.0' }
 -- versions minimales pour déclarer les recettes ; plus anciennes ou absentes : armes sans recette (console)
 config.optional = { vava_crafting = '1.5.0', vava_skills = '1.0.0' }
 
@@ -117,7 +118,21 @@ config.numbers = {
     witnesses = false,   -- les témoins (joueurs à reactions.radius) : jamais en v1 (décision du porteur du projet)
 }
 
+-- Mannequins (T-156), part du serveur (ajoutée à la part client de config_client.lua). Valeurs de départ, à juger à la
+-- porte T-119 ; bornées au démarrage.
+config.dummies.wearChance = 0.25        -- part des coups sur un mannequin qui usent l'arme comme un vrai coup (paille)
+config.dummies.witnessRadius = 15.0     -- témoins prévenus du balancement (m) ; 0 : seul l'attaquant le voit
+config.dummies.witnessMinMs = 800       -- par mannequin, au plus un balancement envoyé aux témoins par ce délai
+config.dummies.callers = { 'vava_magic' }  -- ressources admises à frapper un mannequin par l'export dummyHit (sorts)
+config.dummies.spellMaxDistance = 80.0  -- filet : lanceur à 80 m au plus du mannequin (positions lues par le serveur)
+config.dummies.nearMax = 8              -- dummiesNear rend au plus 8 mannequins…
+config.dummies.nearMaxRadius = 50.0     -- … dans un rayon de 50 m au plus
+-- Lu par T-115 : aucune XP de combat sur un mannequin pour un personnage de ce niveau ou plus dans la compétence de
+-- l'arme (juste sous le premier déblocage, la Parade au niveau 10 : elle se gagne face à quelqu'un).
+config.dummies.xpMaxLevel = 9
+
 -- Avis à l'attaquant d'un coup retenu (combats coupés, lieu de paix, refus d'un crochet) : un par raison et par délai.
+
 config.notices = { intervalMs = 10000 }
 
 -- Réglage en jeu (porte T-119) : une ligne de console par relevé (distance, angle, portée, issue). Faux en service.

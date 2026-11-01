@@ -4,9 +4,11 @@
            techniques (copies, T-115 et T-121), arme tenue par un joueur et son coup de base (« mains vides » de la
            magie, T-140), mains encore prises pendant le rengainement (T-112), bouclier accroché et prêt au bras
            (T-113), brique `strike` réservée aux ressources de `strike.callers` (les techniques appellent la fonction
-           interne).
+           interne), mannequins d'entraînement (T-156) : proches d'un point, coup d'un sort réservé à
+           `dummies.callers`, liste.
     Dépendances : shared/constants.lua, config_client.lua, config.lua, shared/weapons.lua, server/core.lua,
-                  bridge/server.lua, server/catalog.lua, server/shields.lua, server/strike.lua, server/hands.lua
+                  bridge/server.lua, server/catalog.lua, server/shields.lua, server/strike.lua, server/hands.lua,
+                  server/dummies.lua
 ]]
 
 local type, ipairs, pairs, tostring = type, ipairs, pairs, tostring
@@ -19,6 +21,7 @@ local catalog = VavaCombat.catalog
 local shields = VavaCombat.shields
 local strike = VavaCombat.strike
 local hands = VavaCombat.hands
+local dummies = VavaCombat.dummies
 local cfg = VavaCombat.config
 local SHIELD = VavaCombat.SHIELD_CATEGORY
 
@@ -124,3 +127,20 @@ end)
 exports('strike', function(src, target, opts)
     return api.strike(GetInvokingResource(), src, target, opts)
 end)
+
+--- Mannequins dont le centre est à `rayon` d'un point (lecture seule, ouverte à toute ressource : les places sont
+--- dans la config servie) : `{ { n, id, x, y, z, distance } }`, au plus `dummies.nearMax`.
+exports('dummiesNear', function(point, radius)
+    return dummies.near(point, radius)
+end)
+
+--- Coup d'un sort sur un mannequin, réservé à `dummies.callers` : `{ outcome, amount }` ou `nil, code`.
+exports('dummyHit', function(n, packet)
+    return dummies.spellHit(GetInvokingResource(), n, packet)
+end)
+
+--- Mannequins chargés (copies) : `{ { n, id, label, x, y, z, heading, bucket, model } }` (T-121, Conseil).
+exports('dummies', function()
+    return dummies.view()
+end)
+

@@ -17,13 +17,16 @@
            depuis la demande ; candidats = joueurs proches de la même instance, jugés sur les positions et le cap LUS
            PAR LE SERVEUR (portée + bonus de l'arme + tolérance, demi-angle + tolérance, hauteur), triés (cible
            verrouillée d'abord, puis angle, distance, numéro), une cible touchée une fois par coup, `maxTargets` par
-           coup ; chaque cible passe par strike.run (chaîne de dégâts, usure), puis server/reactions.lua. Rien n'est
+           coup ; chaque cible passe par strike.run (chaîne de dégâts, usure), puis server/reactions.lua. Quand aucun
+           joueur n'a été frappé, un mannequin d'entraînement peut l'être (server/dummies.lua, T-156 : mêmes portée,
+           angle, hauteur, instance ; une fois par coup ; il compte dans `maxTargets`). Rien n'est
            rendu au client que l'acceptation ou le refus : aucun résultat. N'attend jamais lui-même (aucune attente,
            aucune base, aucun callClient) ; s'il est repris après un crochet ou un export qui a cédé la main, il
            revérifie que sa réservation tient toujours.
     Dépendances : shared/constants.lua, config_client.lua, config.lua, shared/weapons.lua, shared/geometry.lua,
                   shared/techniques.lua, shared/admission.lua, shared/defense.lua, server/core.lua, bridge/server.lua,
-                  server/catalog.lua, server/strike.lua, server/hands.lua, server/reactions.lua, server/defense.lua
+                  server/catalog.lua, server/strike.lua, server/hands.lua, server/reactions.lua, server/dummies.lua,
+                  server/defense.lua
 ]]
 
 local type, pairs, ipairs, tostring, pcall = type, pairs, ipairs, tostring, pcall
@@ -39,6 +42,7 @@ local strike = VavaCombat.strike
 local hands = VavaCombat.hands
 local reactions = VavaCombat.reactions
 local defense = VavaCombat.defense
+local dummies = VavaCombat.dummies
 local cfg = VavaCombat.config
 local HOOKS = VavaCombat.HOOKS
 local SHIELD = VavaCombat.SHIELD_CATEGORY
@@ -76,6 +80,7 @@ VavaCombat.swings = swings
 ---@field origin table         position lue à la demande
 ---@field arc table            arc de la technique avec l'arme tenue
 ---@field hits table<integer, true>
+---@field dummyHits table<integer, true>|nil  mannequins déjà frappés par ce coup (T-156)
 ---@field hitCount integer
 ---@field cancelled string|nil   annulé : ses relevés ne frappent plus, son cycle compte toujours
 ---@field pending true|nil       réservé, pas encore accepté (demande en cours de vérification)
@@ -143,9 +148,9 @@ local function lockedTarget(src, target)
     return int
 end
 
---- Ligne de console d'un relevé (debug.logSamples).
+--- Ligne de console d'un relevé (debug.logSamples) ; `other` : joueur, ou `d<n>` pour un mannequin.
 local function logSample(swing, k, other, distance, angle, outcome)
-    VavaCombat.log.info('coup %d %s relevé %d : %d d=%s a=%s portée %s → %s', swing.seq, swing.id, k, other,
+    VavaCombat.log.info('coup %d %s relevé %d : %s d=%s a=%s portée %s → %s', swing.seq, swing.id, k, tostring(other),
         weapons.tenth(distance or 0), tostring(angle and floor(angle + 0.5) or '-'), weapons.tenth(swing.arc.reach),
         tostring(outcome))
 end
@@ -220,7 +225,20 @@ local function sample(swing, k)
         local outcome = reactions.after(swing, target, result)
         if logging then logSample(swing, k, target, entry.distance, entry.angle, outcome or code or 'retenu') end
     end
+    -- un mannequin, seulement si aucun joueur n'a été frappé (il ne protège personne et ne vole aucun coup)
+    if dummies and not swing.cancelled and swing.hitCount < cfg.geometry.maxTargets and dummies.count() > 0 then
+        local done = swing.dummyHits or {}
+        swing.dummyHits = done
+        local d, distance, angle = dummies.candidate(src, position, heading, arc, done)
+        if d then
+            done[d.n] = true
+            swing.hitCount = swing.hitCount + 1
+            local outcome = dummies.strike(swing, d.n, held, position)
+            if logging then logSample(swing, k, 'd' .. d.n, distance, angle, outcome or 'retenu') end
+        end
+    end
 end
+
 
 --- Vérifications qui appellent d'autres ressources (exports, crochet `vava_combat:using`), le coup déjà réservé : l'un
 --- de ces appels peut céder la main (un crochet qui attend, un export qui attend), d'où la réservation posée avant.

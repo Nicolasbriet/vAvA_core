@@ -5,7 +5,7 @@
            (format de COMBAT_V1.md § 3) et des réglages du moteur, qualité lue et facteur de dégâts, solidité lue
            (émoussée ou non), montant d'un coup, chance et pas d'usure, coup qui use (d'après le résultat de
            vava_health:hit), issue d'un coup montrée aux proches, montant envoyé aux deux participants (dixièmes,
-           T-155), options d'un appel à `strike`, paquet `hit`, raison
+           T-155), issue « comme si » d'un coup sur un mannequin (T-156), options d'un appel à `strike`, paquet `hit`, raison
            d'un refus montrée au joueur, comparaison de versions. Aucun état, aucune native, ne lève jamais d'erreur sur
            une donnée reçue.
     Dépendances : shared/constants.lua
@@ -33,6 +33,7 @@ VavaCombat.weapons = weapons
 VavaCombat.DEFENSE_TYPES = { 'blocage', 'parade', 'esquive' }
 VavaCombat.USABLE_TYPES = { 'legere', 'lourde', 'blocage', 'parade', 'esquive' }
 VavaCombat.HOOKS.DEFENDED = 'vava_combat:defended'  -- after : un coup esquivé, paré, bloqué ou qui brise la garde
+VavaCombat.HOOKS.TRAINED = 'vava_combat:trained'    -- after : un coup (arme ou sort) a atteint un mannequin (T-156)
 
 -- Petites règles ----------------------------------------------------------------------------------------------------
 
@@ -609,8 +610,33 @@ function weapons.defenseTags(cfg)
     return out
 end
 
+-- ressource admise à frapper un mannequin (dummies.callers) : classes ASCII explicites
+local RESOURCE_PATTERN, RESOURCE_MAX = '^[A-Za-z0-9_%-]+$', 64
+
+--- Part du serveur des mannequins (T-156). Rend nil ou la raison.
+---@param d any
+---@return string|nil err
+local function dummiesError(d)
+    if type(d) ~= 'table' then return 'dummies : table attendue' end
+    if not between(d.wearChance, 0, 1) then return 'dummies.wearChance attendu de 0 à 1' end
+    if not between(d.witnessRadius, 0, 30) then return 'dummies.witnessRadius attendu de 0 à 30 m' end
+    if integerIn(d.witnessMinMs, 0, 10000) == nil then return 'dummies.witnessMinMs entier de 0 à 10 000 attendu' end
+    if not pureList(d.callers, 8) then return 'dummies.callers : liste de 8 ressources au plus attendue' end
+    for _, name in ipairs(d.callers) do
+        if not text(name, RESOURCE_MAX) or not find(name, RESOURCE_PATTERN) then
+            return format("dummies.callers : nom de ressource invalide '%s'", tostring(name))
+        end
+    end
+    if not between(d.spellMaxDistance, 1, 200) then return 'dummies.spellMaxDistance attendu de 1 à 200 m' end
+    if integerIn(d.nearMax, 1, 16) == nil or not between(d.nearMaxRadius, 1, 100) then
+        return 'dummies : nearMax (entier de 1 à 16) et nearMaxRadius (1 à 100 m) attendus'
+    end
+    if integerIn(d.xpMaxLevel, 0, 100) == nil then return 'dummies.xpMaxLevel entier de 0 à 100 attendu' end
+    return nil
+end
+
 --- Contrôle des réglages du moteur (cycle, tolérances bornées, géométrie, bond, réactions, dégainer, chancellement,
---- contrôles de GTA coupés en mode combat : jamais Échap ni P ; défense).
+--- contrôles de GTA coupés en mode combat : jamais Échap ni P ; défense ; part du serveur des mannequins).
 --- Rend `true`, ou `false, raison` à la première erreur.
 ---@param cfg table
 ---@return boolean ok
@@ -683,6 +709,8 @@ function weapons.checkEngine(cfg)
     for key in pairs(NUMBERS_KEYS) do
         if type(n[key]) ~= 'boolean' then return false, format('numbers.%s attendu (booléen)', key) end
     end
+    err = dummiesError(cfg.dummies)
+    if err then return false, err end
     return true
 end
 
@@ -761,7 +789,35 @@ function weapons.reasonText(reason, max)
     return clean
 end
 
+--- Issue « comme si » d'un coup sur un mannequin (résultat de vava_health:trial, T-156) et son montant en dixièmes :
+--- annulé à une étape défensive → `dodge`, `parry`, `block`, `absorb` (le mot seul ; seulement si un modificateur
+--- inscrit le rend) ; toute autre annulation (attaquant à terre…) → nil, rien n'est montré ; rien passé mais bloqué ou
+--- absorbé → `block`, `absorb` ; technique qui fait chanceler → `stagger` (personne ne chancelle) ; sinon `hit`.
+--- Jamais `down` ni `break` : un mannequin ne tombe pas et n'a pas de garde.
+---@param result any
+---@param technique table|nil  technique du coup (nil : un sort)
+---@return string|nil issue
+---@return integer|nil tenths
+function weapons.trialOutcome(result, technique)
+    if type(result) ~= 'table' or not finite(result.amount) or result.amount < 0 then return nil end
+    if result.cancelled ~= nil then
+        local guarded = GUARDED[result.stage]
+        if not guarded then return nil end
+        return guarded, nil
+    end
+    local issue = 'hit'
+    if result.amount == 0 and finite(result.blocked) and result.blocked > 0 then
+        issue = 'block'
+    elseif result.amount == 0 and finite(result.absorbed) and result.absorbed > 0 then
+        issue = 'absorb'
+    elseif type(technique) == 'table' and technique.staggers == true then
+        issue = 'stagger'
+    end
+    return issue, weapons.wireAmount(result, issue)
+end
+
 -- Qualité, solidité, montant ----------------------------------------------------------------------------------------
+
 
 --- Qualité d'une pièce (0 à 100) : nombre fini ramené dans les bornes, sinon la qualité par défaut.
 ---@param quality any
