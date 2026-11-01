@@ -287,6 +287,20 @@ describe('vava_magic sorts sur les mannequins (serveur)', function()
             assert.equal(0, #dummyHits)
         end)
 
+        it('S-2 : lanceur posté dans une zone de paix quand la Secousse frappe : aucun appel ; contre-essai hors zone', function()
+            dummyList = { { n = 1, x = 0.0, y = 20.0, z = 1.0 } }
+            table.insert(cfg.combat.protectedZones, { x = 0.0, y = 0.0, radius = 2.0 })   -- autour du lanceur
+            local zone = { kind = 'quake', spell = 'secousse', level = 1, owner = CASTER, ownerCharacter = 42,
+                shape = 'circle', center = { x = 0.0, y = 20.0, z = 0.0 }, radius = 3.0, createdAt = 9000,
+                data = { damage = 4, control = 'stagger', controlMs = 1000, rewarded = false } }
+            quake.onEnd(zone, 'expired')
+            assert.equal(0, #dummyHits)
+            assert.is_nil(combat.dummyStrike(CASTER, 1, 'nova_ardente', 10, combat.KIND.ZONE, 42))
+            positions[CASTER] = { x = 0, y = 5, z = 0 }
+            quake.onEnd(zone, 'expired')
+            assert.equal(1, #dummyHits)
+        end)
+
         it('lanceur qui joue un autre personnage : aucun appel', function()
             local result = defs.boule_de_feu.finish({ source = CASTER, level = 1, characterId = 42, data = {} }, 0, 1, 0)
             characters[CASTER] = 99

@@ -249,7 +249,8 @@ end
 
 --- Un sort frappe le mannequin `n` (T-156) : même montant et même paquet qu'un coup sur un joueur (type de l'élément,
 --- étiquettes de la nature, instant du lancement), confiés à vava_combat (`dummyHit`), qui juge et envoie le chiffre.
---- Lanceur qui joue désormais un autre personnage : rien. Rend `{ outcome, amount }`, ou nil.
+--- Lanceur qui joue désormais un autre personnage, ou posté dans une zone de paix : rien. Rend `{ outcome, amount }`,
+--- ou nil.
 ---@param caster integer
 ---@param n integer
 ---@param spell string
@@ -266,6 +267,9 @@ function combat.dummyStrike(caster, n, spell, points, kind, casterCharacter, ele
     local current = type(caster) == 'number' and caster > 0 and bridge.GetCharacterId(caster) or nil
     local source, sourceCharacter = harm.source(caster, casterCharacter, current)
     if not source then return nil end
+    -- lanceur posté (désormais) dans une zone de paix : rien, comme combat.affects
+    local from = world.position(source)
+    if from and combat.protected(from) then return nil end
     local result, code = bridge.DummyHit(n, harm.packet({
         amount = amount, kind = harm.kindOf(elementOf(spell, element), cfg.kinds), nature = kind,
         source = source, sourceCharacter = sourceCharacter, spell = spell,
