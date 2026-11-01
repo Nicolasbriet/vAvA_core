@@ -29,7 +29,8 @@ serveur (réglages gardés, contrôle, retour arrière). Seul MySQL / MariaDB re
 Voir [docs/chancellerie.md](docs/chancellerie.md).
 
 La Chancellerie livre le Lua servi aux joueurs sans ses commentaires (T-154, ≈ 430 Ko de moins au premier
-téléchargement). Débogage : les fichiers livrés gardent leurs numéros de ligne ; leurs commentaires sont dans le dépôt,
+téléchargement ; la première mise à jour allégée fait retélécharger une fois le paquet de chaque ressource, voir
+[docs/chancellerie.md](docs/chancellerie.md)). Débogage : les fichiers livrés gardent leurs numéros de ligne ; leurs commentaires sont dans le dépôt,
 au commit installé.
 
 À la main : placer `vAvA_core` et chaque module dans `resources/`, puis les démarrer dans cet ordre, après

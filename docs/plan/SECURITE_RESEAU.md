@@ -63,7 +63,8 @@ du Conseil par appel direct du RPC.
    mesure : `scripts/poids-client.sh`). Un réglage du serveur retouché ne fait plus retélécharger la ressource.
    Les commentaires du Lua servi ne sont jamais livrés (T-154) : la Chancellerie (et `scripts/livraison.js`) les retire
    en gardant chaque ligne à sa place, prouvé par le compilateur Lua à chaque vérification ; les réglages de
-   l'exploitant (`config.lua`, `config_client.lua`, `config/…`) et le Lua du seul serveur gardent les leurs.
+   l'exploitant (`config.lua`, `config_client.lua`, `config_conseil.lua`, `config/…`) et le Lua du seul serveur
+   gardent les leurs.
 
 ## État des lieux (lecture du dépôt, octobre 2026)
 
