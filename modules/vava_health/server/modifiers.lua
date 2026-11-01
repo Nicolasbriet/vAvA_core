@@ -4,7 +4,8 @@
            déclarent leurs modificateurs (au plus un par étape et par module, chacun lit ses propres données : un
            second à la même étape est retiré aussitôt). Contrôle du propriétaire : une clé dont le préfixe n'est pas la
            ressource qui l'a ajoutée est retirée aussitôt (comme vava_atelier:editors). Cache trié tenu par les hooks du registre : reconstruit (copie, jamais en place) à
-           chaque ajout ou retrait ; un coup en cours garde la liste qu'il a prise.
+           chaque ajout ou retrait ; un coup en cours garde la liste qu'il a prise. Champ facultatif `trial` (1.6.0) :
+           le modificateur est aussi appelé pour les coups d'essai (mannequins) ; seconde liste triée des seuls inscrits.
     Dépendances : shared/constants.lua, config.lua, shared/chain.lua, server/core.lua
 ]]
 
@@ -29,17 +30,26 @@ for _, kind in ipairs(cfg.kinds) do KINDS[kind] = true end
 ---@field label string
 ---@field kinds table<string, true>|nil   ensemble des types (absent : tous)
 ---@field kindList string[]|nil
+---@field trial boolean                   inscrit aux coups d'essai (1.6.0)
 ---@field apply any                       fonction (référence d'une autre ressource)
 
 ---@type table<string, vAvA.HealthModifier>
 local loaded = {}
 ---@type vAvA.HealthModifier[]
 local ordered = {}
+-- les seuls inscrits aux coups d'essai, dans le même ordre (aucun en 1.6.0)
+---@type vAvA.HealthModifier[]
+local trialOrdered = {}
 
 local function rebuild()
     local list = {}
     for _, entry in pairs(loaded) do list[#list + 1] = entry end
     ordered = chain.sort(list)
+    local trials = {}
+    for _, entry in ipairs(ordered) do
+        if entry.trial then trials[#trials + 1] = entry end
+    end
+    trialOrdered = trials
 end
 
 --- Validateur du registre : clé, forme, types connus et sans doublon.
@@ -55,7 +65,7 @@ end
 ---@return boolean ok
 ---@return string|nil err
 function modifiers.define()
-    loaded, ordered = {}, {}
+    loaded, ordered, trialOrdered = {}, {}, {}
     return VavaHealth.core.registry.define(REGISTRY, {
         schema = { type = 'table', fields = {
             stage = { type = 'string', enum = VavaHealth.STAGES },
@@ -63,6 +73,7 @@ function modifiers.define()
             label = { type = 'string', min = 1, max = 48 },
             kinds = { type = 'array', min = 1, max = #cfg.kinds, items = { type = 'string', enum = cfg.kinds },
                 optional = true },
+            trial = { type = 'boolean', optional = true },
             apply = { type = 'function' },
         } },
         validator = validator,
@@ -102,7 +113,7 @@ function modifiers.added(key, owner)
     end
     loaded[key] = {
         key = key, owner = owner, stage = data.stage, priority = data.priority or chain.DEFAULT_PRIORITY,
-        label = data.label, kinds = kindSet, kindList = kindList, apply = data.apply,
+        label = data.label, kinds = kindSet, kindList = kindList, trial = data.trial == true, apply = data.apply,
     }
     rebuild()
     VavaHealth.log.info("modificateur '%s' (%s, étape %s) déclaré par %s", key, data.label, data.stage, owner)
@@ -118,7 +129,7 @@ end
 
 --- Hook `core:registry:dropped` du registre (ce module s'arrête) : tout est oublié.
 function modifiers.dropped()
-    loaded, ordered = {}, {}
+    loaded, ordered, trialOrdered = {}, {}, {}
 end
 
 --- Liste triée courante (ne jamais la modifier : elle est remplacée, pas changée, à chaque ajout ou retrait).
@@ -127,7 +138,13 @@ function modifiers.list()
     return ordered
 end
 
---- Liste ordonnée sans les fonctions, pour l'export modifiers() : `{ { key, stage, priority, label, kinds? } }`.
+--- Liste triée des seuls modificateurs inscrits aux coups d'essai (`trial = true`), même règle que list().
+---@return vAvA.HealthModifier[]
+function modifiers.trialList()
+    return trialOrdered
+end
+
+--- Liste ordonnée sans les fonctions, pour l'export modifiers() : `{ { key, stage, priority, label, kinds?, trial } }`.
 ---@return table[]
 function modifiers.describe()
     local out = {}
@@ -137,7 +154,8 @@ function modifiers.describe()
             kinds = {}
             for j, kind in ipairs(entry.kindList) do kinds[j] = kind end
         end
-        out[i] = { key = entry.key, stage = entry.stage, priority = entry.priority, label = entry.label, kinds = kinds }
+        out[i] = { key = entry.key, stage = entry.stage, priority = entry.priority, label = entry.label, kinds = kinds,
+            trial = entry.trial }
     end
     return out
 end

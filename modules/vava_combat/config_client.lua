@@ -192,7 +192,32 @@ VavaCombat.config = {
         shakeHit = 0.15, shakeStagger = 0.4, -- secousse de caméra chez la cible (0 : aucune)
     },
 
+    -- Mannequins d'entraînement (T-156). v1 : posés ici ; plus tard, définitions de l'Atelier (cette liste en sera la
+    -- version 1, la base fera foi). Le client lit modèles et places (props LOCAUX créés à portée) ; le serveur lit les
+    -- mêmes places pour juger les coups (part du serveur : config.lua). Aucun mannequin ne tombe, ne pare ni ne garde
+    -- quoi que ce soit. Contrôlé au démarrage par le serveur ; détail : README.md.
+    dummies = {
+        model = 'prop_beach_punchbag',      -- PLACEHOLDER : sac de frappe de GTA, en attendant le mannequin de paille
+        fallbackModel = 'prop_haybale_03',  -- PLACEHOLDER : botte de foin, si le premier modèle est inconnu
+        modelTimeoutMs = 5000,              -- attente maximale du chargement d'un modèle (500 à 30 000)
+        streamRadius = 60.0,                -- prop créé à cette distance du joueur…
+        keepRadius = 70.0,                  -- … retiré au-delà (pas de clignotement en bordure, T-137)
+        nearPollMs = 500,                   -- passage de la boucle quand un mannequin est à moins de keepRadius + 20 m…
+        farPollMs = 2000,                   -- … sinon
+        centerHeight = 1.0,                 -- point visé au-dessus du pied (comme le centre d'un ped)
+        anchorHeight = 1.9,                 -- chiffre posé à cette hauteur au-dessus du pied
+        wobble = { ms = 900, angle = 14.0, cycles = 2 },  -- balancement : s'écarte de l'attaquant, se redresse seul
+        fx = { asset = 'core', name = 'ent_dst_wood_splinter', scale = 0.6 },  -- PLACEHOLDER : éclats (paille plus tard) ; false : aucun
+        list = {
+            -- PLACEHOLDER : cour d'armes provisoire derrière le poste de Paleto Bay ; à replacer sur la carte médiévale
+            { id = 'paleto_1', x = -437.5, y = 6011.0, z = 31.49, heading = 45.0 },
+            { id = 'paleto_2', x = -440.0, y = 6013.5, z = 31.49, heading = 45.0 },
+            { id = 'paleto_3', x = -442.5, y = 6016.0, z = 31.49, heading = 45.0 },
+        },
+    },
+
     -- Refus montrés (code du serveur → texte ; absent : `default` ; `false` : rien).
+
     refusals = {
         busy = false, chain_limit = false, rate_limited = false,
         guarding = false, parry_cooldown = false, dodge_cooldown = false, no_guard = false,

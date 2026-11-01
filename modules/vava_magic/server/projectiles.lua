@@ -19,6 +19,9 @@
         lanceur est retenu au lancement (un impact signalé après un changement de personnage ne blesse plus) ; un
         impact arrivé dans le temps d'un vol porte l'instant du lancement (`launchedAt`, coup déjà lancé), pas un impact
         tardif.
+      - Mannequins (T-156) : un impact sur le décor à `targetMargin` du centre d'un mannequin (pas derrière un rempart)
+        le frappe aux dégâts de base du niveau ; les éclats frappent aussi les mannequins du rayon (sauf celui-là, pas à
+        travers un rempart) ; ni état, ni bonus d'XP (server/combat.lua › dummyStrike).
     Dépendances : shared/, config.lua, server/ (noyau, combat, states, zones, combos, obstacles)
 ]]
 
@@ -161,7 +164,8 @@ function projectiles.bonus(launch)
 end
 
 --- Éclats d'un impact : blesse (part `points`) les joueurs à moins de `radius` du point, sauf le lanceur et la cible
---- directe, et pas à travers un obstacle. Renvoie les sources touchées.
+--- directe, et pas à travers un obstacle ; puis frappe les mannequins du rayon (sauf le mannequin visé). Renvoie les
+--- sources touchées (joueurs seulement).
 ---@param launch vAvA.MagicLaunch
 ---@param point table
 ---@param except integer   cible directe (0 : aucune)
@@ -179,6 +183,12 @@ function projectiles.splash(launch, point, except, radius, points)
                 combos.commit(hit)
                 touched[#touched + 1] = victim
             end
+        end
+    end
+    for _, dummy in ipairs(combat.dummiesAround(point, radius)) do
+        if dummy.n ~= launch.directDummy and not obstacles.blocked(point, dummy) then
+            combat.dummyStrike(launch.source, dummy.n, launch.spell, points, combat.KIND.ZONE, launch.casterCharacter, nil,
+                launch.strikeLaunchedAt)
         end
     end
     return touched
@@ -211,8 +221,9 @@ local function impact(src, id, target, x, y, z)
     if not plausible(launch, def.hit, point, src) then return false, 'invalid_impact' end
     -- un obstacle dressé sur le trajet arrête le projectile, quoi qu'annonce le client
     local wall = obstacles.blocked(launch.origin, point)
+    local walled = false
     if wall and geometry.distance(launch.origin, wall) + BLOCK_MARGIN < geometry.distance(launch.origin, point) then
-        point, target = wall, 0
+        point, target, walled = wall, 0, true
     end
     if target ~= 0 then
         local position = target ~= src and bridge.GetCharacterId(target) and world.position(target)
@@ -225,7 +236,19 @@ local function impact(src, id, target, x, y, z)
         if result and result.carry then launch.carry = result.carry end
     end
     launch.strikeLaunchedAt = strikeLaunchedAt(launch, def.hit, src)
+    -- impact sur le décor : le mannequin le plus proche du point, à `targetMargin` au plus, est la cible directe
+    if target == 0 and not walled then
+        local dummy = combat.dummiesAround(point, def.hit.targetMargin)[1]
+        if dummy then launch.directDummy = dummy.n end
+    end
     def.onImpact(launch, target, point)
+    if launch.directDummy then
+        -- dégâts de base du niveau : un mannequin n'est ni mouillé ni gelé
+        local levelCfg = def.config.levels[launch.level]
+        combat.dummyStrike(src, launch.directDummy, launch.spell, levelCfg and levelCfg.damage or 0, combat.KIND.IMPACT,
+            launch.casterCharacter, nil, launch.strikeLaunchedAt)
+    end
+
     local carry = launch.carry
     if carry and target ~= 0 then
         local hit = combos.hit(src, target, launch.spell, carry.damage or 0, CARRY_ELEMENT, launch.casterCharacter)
