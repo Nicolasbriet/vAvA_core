@@ -5,6 +5,7 @@
            en points (`chain.healthPoints` pour une vie pleine). La vie est celle du serveur : aucune lecture du ped,
            aucune condition d'apparition.
              - hit(cible, paquet) : la chaîne de dégâts (server/chain.lua) ; `origin` = ressource appelante ;
+             - trial(paquet, lieu) : coup d'essai sur un mannequin (1.6.0) : montant « comme si », rien d'appliqué ;
              - vocabulary() : listes fermées de la chaîne (types, parties, étiquettes, étapes) pour les éditeurs, et ses
                réglages utiles aux modules (`pvp`, `launchedMaxMs`, 1.4.0) ;
              - modifiers() : modificateurs déclarés, dans l'ordre d'appel ;
@@ -65,7 +66,13 @@ exports('hit', function(target, raw)
     return hits.hit(target, raw, caller())
 end)
 
+--- Coup d'essai (mannequin, spec T-156 § 7.1) : montant « comme si », rien d'appliqué, aucun hook ; ou nil et un code.
+exports('trial', function(raw, place)
+    return hits.trial(raw, place, caller())
+end)
+
 --- Listes fermées de la chaîne (copies).
+
 exports('vocabulary', function()
     local chain = cfg.chain
     return {

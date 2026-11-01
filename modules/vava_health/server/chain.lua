@@ -12,6 +12,9 @@
              6. modificateurs du registre, dans l'ordre des étapes (shared/chain.lua), chacun isolé et chronométré ;
              7. application : cible relue, vie du serveur baissée, mise à terre aussitôt à 0 ;
              8. hook `after` (tout coup qui a atteint l'étape 5, annulé compris) et journal.
+           Coup d'essai (1.6.0, hits.trial : mannequins) : même paquet, même montant, seuls les modificateurs inscrits
+           `trial` ; ni vie, ni mise à terre, ni hook, ni journal, ni débit des vrais coups, ni `chain.pvp` (spec T-156
+           § 7.1) ; débit propre par source.
            Lignes de console limitées : modificateur en erreur (une par `chain.errorLogMs`), lent ou au rendu invalide
            (une par minute et par modificateur), coup lent, avalanche sur une cible (une par minute et par cible).
     Dépendances : shared/constants.lua, config.lua, shared/packet.lua, shared/chain.lua, server/core.lua,
@@ -19,7 +22,7 @@
 ]]
 
 local type, pairs, pcall, tostring = type, pairs, pcall, tostring
-local mathType, min = math.type, math.min
+local mathType, min, huge = math.type, math.min, math.huge
 local GetGameTimer = GetGameTimer
 
 local cfg = VavaHealth.config.chain
@@ -34,6 +37,9 @@ local HEALTH_POINTS = cfg.healthPoints
 local WORLD_KIND = 'monde'
 local WINDOW_MS = 1000
 local LOG_MS = 60000
+-- lieu d'un coup d'essai (point visé du mannequin) : bornes des coordonnées
+local PLACE_XY_MAX, PLACE_Z_MAX = 50000, 5000
+local PLACE_KEYS = { x = true, y = true, z = true }
 -- champs du paquet recopiés dans le contexte
 local PACKET_FIELDS = { 'source', 'sourceCharacter', 'part', 'weapon', 'technique', 'spell', 'launchedAt' }
 
@@ -47,6 +53,9 @@ local depth = 0
 ---@type table<integer, table<integer, { count: integer, since: integer }>>
 local rates = {}
 local NO_SOURCE = 0
+-- débit des coups d'essai, par source (jamais mêlé à `rates`)
+---@type table<integer, { count: integer, since: integer }>
+local trialRates = {}
 ---@type table<string, integer>  clé de console → dernière ligne
 local logged = {}
 
@@ -92,6 +101,9 @@ local function copyContext(ctx)
     local tags = {}
     for tag in pairs(ctx.tags) do tags[tag] = true end
     out.tags = tags
+    -- coup d'essai : le lieu aussi (un modificateur ne change jamais celui des suivants)
+    local place = ctx.position
+    if place then out.position = { x = place.x, y = place.y, z = place.z } end
     return out
 end
 
@@ -269,6 +281,114 @@ function hits.hit(target, raw, origin)
     return result
 end
 
+---@param value any
+---@param limit number
+---@return boolean
+local function coordinate(value, limit)
+    return type(value) == 'number' and value == value and value ~= huge and value ~= -huge and value >= -limit
+        and value <= limit
+end
+
+--- Lieu d'un coup d'essai : table aux seules clés x, y, z, nombres finis et bornés ; copie, ou nil.
+---@param place any
+---@return table|nil
+local function placeOf(place)
+    if type(place) ~= 'table' then return nil end
+    for key in pairs(place) do
+        if not PLACE_KEYS[key] then return nil end
+    end
+    if not coordinate(place.x, PLACE_XY_MAX) or not coordinate(place.y, PLACE_XY_MAX)
+        or not coordinate(place.z, PLACE_Z_MAX) then
+        return nil
+    end
+    return { x = place.x, y = place.y, z = place.z }
+end
+
+--- Débit des coups d'essai d'une source sur une seconde : vrai si l'essai est admis.
+---@param source integer
+---@param now integer
+---@return boolean
+local function admitTrial(source, now)
+    local rate = trialRates[source]
+    if not rate or now - rate.since >= WINDOW_MS then
+        rate = { count = 0, since = now }
+        trialRates[source] = rate
+    end
+    rate.count = rate.count + 1
+    return rate.count <= cfg.maxTrialsPerSecond
+end
+
+--- L'essai, une fois les garde-fous passés (appelé sous pcall).
+---@param attacker vAvA.HealthEntry  entrée de la source
+---@param p table       paquet normalisé
+---@param place table   lieu (copie)
+---@param origin string
+---@return table result
+local function processTrial(attacker, p, place, origin)
+    local started = GetGameTimer()
+    local character = VavaHealth.core.characters.getActive(p.source)
+    if character then p.sourceCharacter = character.id end
+    local state = chain.newState(p.amount)
+    -- même règle que hit : un joueur à terre ne frappe plus, sauf un coup lancé debout depuis peu
+    if attacker.downed
+        and not chain.passesDownedSource(p.tags, p.launchedAt, attacker.downedAt, started, cfg.launchedMaxMs) then
+        state.amount, state.cancelled = 0, 'source_downed'
+    else
+        -- ni chain.pvp, ni hook before : seuls les modificateurs inscrits, mêmes options que hit
+        local ctx = {
+            id = 0, trial = true, target = 0, targetCharacter = 0, position = place, origin = origin, kind = p.kind,
+            amount = p.amount, base = p.amount, tags = p.tags, health = HEALTH_POINTS,
+        }
+        for i = 1, #PACKET_FIELDS do
+            local field = PACKET_FIELDS[i]
+            ctx[field] = p[field]
+        end
+        chain.run(modifiers.trialList(), ctx, state, options)
+    end
+    local elapsed = GetGameTimer() - started
+    if elapsed > cfg.slowHitMs and due('slow:trial', LOG_MS) then
+        VavaHealth.log.warn("coup d'essai lent : %d ms (au-delà de %d)", elapsed, cfg.slowHitMs)
+    end
+    return {
+        trial = true, amount = state.amount, base = state.base, blocked = state.blocked, absorbed = state.absorbed,
+        resisted = state.resisted, added = state.added, cancelled = state.cancelled, stage = state.stage,
+    }
+end
+
+--- Un coup d'essai sur un mannequin (spec T-156 § 7.1) : le montant « comme si », rien d'appliqué. Ne lève jamais
+--- d'erreur ; aucun hook, aucun journal, aucun envoi, aucun numéro de coup.
+---@param raw any       paquet (même forme que hit)
+---@param place any     point visé { x, y, z }
+---@param origin string ressource appelante
+---@return table|nil result  { trial = true, amount, base, blocked, absorbed, resisted, added, cancelled?, stage? }
+---@return string|nil code
+function hits.trial(raw, place, origin)
+    if not VavaHealth.ready then return nil, 'not_ready' end
+    local where = placeOf(place)
+    if not where then return nil, 'invalid_place' end
+    local p, code = packet.normalize(raw, LIMITS)
+    if not p then return nil, code end
+    if p.kind == WORLD_KIND then return nil, 'invalid_kind' end
+    -- un mannequin est toujours frappé par quelqu'un
+    if not p.source then return nil, 'invalid_source' end
+    local attacker = life.entry(p.source)
+    if not attacker then return nil, 'no_character' end
+    origin = type(origin) == 'string' and origin or VavaHealth.resource
+    if not admitTrial(p.source, GetGameTimer()) then
+        if due('trial:' .. p.source, LOG_MS) then
+            VavaHealth.log.warn("joueur %d : plus de %d coups d'essai en une seconde, essais refusés (too_many_hits)",
+                p.source, cfg.maxTrialsPerSecond)
+        end
+        return nil, 'too_many_hits'
+    end
+    local ok, result = pcall(processTrial, attacker, p, where, origin)
+    if not ok then
+        VavaHealth.log.error("coup d'essai du joueur %d en erreur : %s", p.source, tostring(result))
+        return nil, 'hit_error'
+    end
+    return result
+end
+
 --- Profondeur courante (tests).
 ---@return integer
 function hits.depth()
@@ -281,4 +401,18 @@ function hits.forget(src)
     rates[src] = nil
     for _, bySource in pairs(rates) do bySource[src] = nil end
     logged['rate:' .. src] = nil
+    trialRates[src] = nil
+    logged['trial:' .. src] = nil
 end
+
+--- Débit des coups d'essai borné (1 à 100), contrôlé au démarrage : `true`, ou `false, raison`.
+---@return boolean ok
+---@return string|nil err
+function hits.checkTrialConfig()
+    local value = cfg.maxTrialsPerSecond
+    if mathType(value) ~= 'integer' or value < 1 or value > 100 then
+        return false, 'chain.maxTrialsPerSecond : entier de 1 à 100 attendu'
+    end
+    return true
+end
+
