@@ -724,10 +724,20 @@ versé à T-014 ; les autres points déjà couverts sont précisés dans T-012 �
 - Critères : essai que chaque fichier transformé est identique au caractère près hors commentaires (chaînes longues,
   `--[[ ]]` dans une chaîne, `--` dans une chaîne) ; numéros de ligne des erreurs gardés (lignes vides laissées) ;
   mesure avant et après par `scripts/poids-client.sh` ; aucune dépendance ajoutée.
+- Note de T-157 : traiter les fichiers de la directive `vava_conseil_lua` (paquet du Conseil, `scripts/lib/manifeste.awk`
+  les liste côté `conseil`) comme des `client_scripts`, et `config_conseil.lua` comme une config livrée ; le serveur de
+  l'Atelier lit la copie déployée (`LoadResourceFile`) : le paquet s'allège sans rien changer à T-157 ; garder les
+  lignes (numéros d'erreur du paquet). `vava_conseil_web` (JS, CSS) n'est pas du ressort de T-154.
 
 ### T-157 — Code de l'Atelier livré au seul Conseil — **décision du porteur du projet**
-- Agents : vava-architecte → vava-dev-lua + vava-dev-nui · Dépend de : T-102 · Statut : en cours (validée par
-  le porteur du projet le 2 novembre 2026 : changement d'architecture et d'outillage)
+- Agents : vava-architecte → vava-dev-lua + vava-dev-nui · Dépend de : T-102 · Statut : en cours (fait, relectures
+  sécurité et réseau à faire ; validée par le porteur du projet le 2 novembre 2026 : changement d'architecture et
+  d'outillage)
+- Fait le 2 novembre 2026 : `vava_atelier` 1.4.0 (spec `docs/plan/specs/T-157.md`, rapport
+  `docs/plan/rapports/T-157.md`, contrat de la page `docs/plan/rapports/T-157-contrat.md`). Chaque joueur télécharge
+  55 273 o (20 960 compressés) au lieu de 262 381 (82 448) ; paquet du Conseil 245 560 o, une fois par version et par
+  membre. Procédure : `docs/tests/atelier.md` § 25. Reste au porteur du projet : la ligne de `CLAUDE.md` sur
+  `config_conseil.lua` et les directives `vava_conseil_*`.
 - Trouvé pendant T-102 (relecture réseau R-1, piste pour le porteur du projet) : ≈ 51 Ko de code de `vava_atelier`
   (outil de placement, séance, relais, page) ne servent qu'au Conseil mais sont téléchargés par tous les joueurs.
   Proposition : livraison à la demande, en latent, à l'ouverture de l'Atelier par un membre (droit relu), gardée en
@@ -751,6 +761,22 @@ versé à T-014 ; les autres points déjà couverts sont précisés dans T-012 �
 - Trouvé pendant T-146 : rien ne vérifie qu'un `shared/*.lua` présent dans un module est bien listé à son manifeste ;
   sans la ligne de `shared/cycle.lua`, `vava_time` tomberait au premier tirage du ciel. Ajouter le contrôle à
   `config_split_spec` (T0) ou à l'audit, avec un cas d'essai.
+- Note de T-157 : compter les fichiers de la directive `vava_conseil_lua` comme listés au manifeste (`lists.council` de
+  `config_split_spec`, côté `conseil` de `scripts/lib/manifeste.awk`) : `shared/aim.lua` de `vava_atelier` n'est plus
+  qu'en `vava_conseil_lua`.
+
+### T-160 — Livraison à la demande dans le core — **décision du porteur du projet**
+- Agents : vava-architecte → vava-dev-lua (cette tâche autorise à toucher le core) · Dépend de : T-157 validée en jeu ·
+  Statut : à faire (proposée, à valider par le porteur du projet avant de la prendre)
+- Proposée par T-157 (spec § 13) : déplacer dans le core (`core.delivery`) le format du paquet, l'empreinte, le chargeur,
+  le stockage local et la construction de `vava_atelier` 1.4.0 ; un module déclare `vava_conseil_*` et une fonction de
+  droit, le core construit, sert, garde et charge. Candidats à mesurer alors : Registre de `vava_admin` (panneau et
+  outils), éditeur des zones de voix (`vava_voice/client/editor.lua`), outil du temps (`vava_time/client/tool.lua`). La
+  même tâche peut contrôler l'origine des réponses RPC côté client (`client/core/rpc.lua:123`) après avoir vérifié en
+  jeu ce que vaut `source` pour un évènement venu du serveur et pour un `TriggerEvent` local ; et rapprocher les deux
+  copies de FNV-1a (`shared/fingerprint.lua`, `shared/digest.lua`).
+- Critères : `vava_atelier` passe au mécanisme du core sans changement de comportement ni de poids ; mesure des
+  candidats avant et après ; essais repris du module.
 
 ### T-150 — Métadonnées de la pile dans le hook `vava_inventory:use`
 - Agent : vava-dev-lua (cette tâche autorise à toucher `vava_inventory`) · Dépend de : — · Statut : à faire

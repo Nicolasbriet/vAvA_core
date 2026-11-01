@@ -1,12 +1,13 @@
 # L'Atelier du Conseil — procédure de test en jeu
 
-Procédure pour vérifier en jeu `vava_atelier` 1.3.0 avec son exemple `vava_example_atelier` 1.1.0 et
+Procédure pour vérifier en jeu `vava_atelier` 1.4.0 avec son exemple `vava_example_atelier` 1.1.0 et
 `vava_gathering` 1.8.0. § 1 à 9 (T-100, le socle) : ouverture et fermeture, ce que chacun voit selon son rang, la liste
 et la fiche d'un atelier, « Vérifier », la recherche, le journal du Conseil, les redémarrages, ce qui passe sur le
 réseau. § 10 à 17 (T-101, les définitions gardées) : brouillon, essai, publication, retour en arrière, deux membres sur
 une fiche, la config et la base, les archives, les redémarrages. § 19 à 24 (T-102, l'outil de placement et l'atelier
 « Récolte ») : placer une zone, poser des points, essai à blanc, publication vue des proches et non des lointains,
-changements, refus. Comptez une heure pour T-100, une heure et demie pour T-101, une heure et demie pour T-102 ; les
+changements, refus. § 25 (T-157) : le code du Conseil livré au seul Conseil. Comptez une heure pour T-100, une heure
+et demie pour T-101, une heure et demie pour T-102, une demi-heure pour T-157 ; les
 tests à plusieurs joueurs sont marqués **(2 joueurs)** ou **(3 joueurs)**. Un test se cite « atelier 3-4 ». Préparation commune, mesure du resmon et remontée des
 écarts : [LISEZMOI.md](LISEZMOI.md).
 
@@ -310,7 +311,34 @@ Brume, Mine du Val, Prairie Haute, Rivière Claire).
 | 14 | A pose des points pendant que A2 a la fiche de la zone ouverte. | Chez A2 : une seule relecture de la fiche après la dernière pose (pas une par pose). |
 | 15 | B (sans rang) ouvre `resmon` près d'une zone suivie pendant que A récolte dix fois. | `vava_gathering` reste au plus bas (une récolte ne fait regrouper aucun point chez B). |
 
-## 25. Fin du test
+## 25. Code livré au seul Conseil (T-157)
+
+Préparation : A Souverain, B Sénéchal, C habitant sans rang ; ressource `vava_atelier` 1.4.0 ; F8 ouvert.
+
+| # | Faire | Attendu |
+|---|---|---|
+| 1 | Démarrer le serveur. | Console : `paquet du Conseil : 24 fichiers, 245 560 octets, 4 morceaux, empreinte …` ; aucun avertissement. Si la ligne dit « directive vava_conseil_lua vide ou absente », FXServer n'a pas lu la forme en table : écrire une ligne par fichier (`vava_conseil_lua 'config_conseil.lua'`, …), même effet. |
+| 2 | Hors jeu : `./scripts/poids-client.sh --detail vava_atelier`. | Ligne `vava_atelier` 55 273 o (20 960 compressés) ; ni `placer.lua` ni `app.js` dans le détail du joueur ; ligne `vava_atelier@conseil` 245 560 o. |
+| 3 | **(2 joueurs)** C appuie sur F9 ; A lance `/vava_reseau joueur <C>`. | « L'Atelier est réservé au Conseil. » ; chez C : seulement `rpc vava_atelier:code`, ≈ 40 o ; aucun envoi latent. |
+| 4 | C ouvre Paramètres › Raccourcis › FiveM. | « Atelier : annuler le dernier placement » n'y est pas ; « Ouvrir l'Atelier du Conseil » y est. |
+| 5 | B (stockage vide : première fois) appuie sur F9. | « On apporte les registres de l'Atelier : un instant… », puis l'Atelier s'ouvre en ≈ 4 à 5 s ; `/vava_reseau joueur <B>` : `rpc vava_atelier:code` ≈ 245 Ko, 4 latents. |
+| 6 | B ferme puis rouvre (F9 deux fois). | Ouverture immédiate ; aucun `code` de plus. |
+| 7 | B se reconnecte, F9. | Ouverture en moins d'une demi-seconde, sans notification ; un seul `code` (≈ 85 o). |
+| 8 | B parcourt : accueil, Récolte, une zone, « Placer », molette, Maj, clic droit, Ctrl+Z, Échap, essai joué, F9 retour. | Tout comme en 1.3.0 (§ 19 à 21 en raccourci) ; Ctrl+Z annule (AZERTY compris) ; rendu au pixel près des maquettes `Main` et `Recolte`. |
+| 9 | Pendant le téléchargement de l'étape 10 (nouvelle version), B appuie dix fois sur F9. | Un seul téléchargement ; aucune erreur ; l'Atelier s'ouvre une fois. |
+| 10 | Changer un commentaire de `client/placer.lua`, `restart vava_atelier`, B F9. | Nouvelle empreinte en console ; B retélécharge une fois (notification), puis 7 redevient vrai. |
+| 11 | `restart vava_atelier` Atelier ouvert chez B ; B F9. | Atelier fermé proprement (souris rendue) ; F9 le rouvre depuis le stockage local (pas de téléchargement). |
+| 12 | (développeur) Ajouter `error('essai')` à la ligne 30 de `client/drawing.lua`, restart, B F9 ; puis retirer. | F8 : `vava_atelier/client/drawing.lua:30: essai` (sans `@@` ; sinon passer `CHUNK_PREFIX` de `client/loader.lua` à `'@'`) ; « Les registres de l'Atelier n'ont pas pu être ouverts… » ; F9 suivant : même message, aucun RPC. |
+| 13 | (développeur) Ajouter `throw new Error('essai')` en tête de `web/js/widgets.js`, restart, B F9 ; puis retirer. | Console F8 : `paquet du Conseil : page : la page signale web/js/widgets.js` ; message `loadFailed`. Dans `nui_devtools`, les sources s'appellent `vava_atelier/web/js/…`. |
+| 14 | **(2 joueurs)** B a l'Atelier ouvert ; A retire le rang de B (Registre). | Chez B : « Votre place au Conseil a changé : l'Atelier se ferme. » ; F9 → « réservé au Conseil » ; A rend le rang : B retélécharge (stockage effacé). |
+| 15 | **(2 joueurs)** A retire le rang de B pendant le téléchargement de B (étape 5 relancée). | Téléchargement interrompu, rien d'exécuté, « réservé au Conseil ». |
+| 16 | **(2 joueurs)** A et B ouvrent l'Atelier en même temps, stockages vides. | Les deux reçoivent le paquet ; chacun ≈ 245 Ko dans `/vava_reseau`. |
+| 17 | A (n'a jamais ouvert l'Atelier de la séance) lance `/atelier_archives etat`. | Réponse au chat (« Atelier »), sans téléchargement. |
+| 18 | B `resmon 1` : au repos après une ouverture, Atelier fermé ; puis en visée. | `vava_atelier` 0,00 ms au repos ; visée ≤ 0,15 ms (comme T-102). |
+| 19 | B sans personnage (sélection) appuie sur F9. | « Choisissez d'abord un personnage. » ; aucun morceau envoyé. |
+| 20 | `restart vava_admin` puis aussitôt B F9 (après une reconnexion). | « Le Registre du Conseil s'éveille… » ; F9 quelques secondes plus tard : ouverture normale depuis le stockage local. |
+
+## 26. Fin du test
 
 Remettre `log.level = 'info'`, retirer B du Conseil s'il n'en était pas (`vava_conseil <B> aucun`), arrêter
 `vava_example_atelier` si le serveur doit servir à autre chose. Les lignes de test restent au journal (365 jours) :

@@ -3149,6 +3149,56 @@ par le client). Chaque valeur reçue de la page est bornée par le Lua (forme co
 8 Ko), tout vers le seul membre ; rien aux autres joueurs avant la publication. Client : 0,00 ms hors visée ; en visée,
 un lancer de rayon par image, ≤ 3 marqueurs d'aire, ≤ 12 étiquettes, ≤ 13 fantômes.
 
+#### Code livré au seul Conseil (T-157, `vava_atelier` 1.4.0)
+
+Le code client réservé au Conseil (outil de placement, séance, relais de la page, config du placement, et la page
+entière) n'est plus téléchargé par les joueurs : ils ne reçoivent qu'une **amorce** (`client/core.lua`, `nui.lua`,
+`notice.lua`, `loader.lua`, `main.lua`, `shared/digest.lua`, `shared/codepack.lua`, `web/index.html`, `web/boot.js`).
+Le reste part chez un membre, à son premier F9 de chaque version, dans un **paquet** construit par le serveur.
+
+**Directives du manifeste** (métadonnées que FXServer garde sans servir les fichiers ; lues par le seul module en
+1.4.0, par `GetNumResourceMetadata` / `GetResourceMetadata`) :
+
+```lua
+vava_conseil_lua { 'config_conseil.lua', 'shared/placerules.lua', 'shared/aim.lua', 'client/session.lua', … }  -- exécutés dans l'ordre
+vava_conseil_web { 'web/css/style.css', 'web/js/strings.js', …, 'web/js/app.js' }                             -- insérés dans l'ordre
+```
+
+Chemins en minuscules ASCII (`shared/codepack.lua › validName` : 96 octets, 5 segments au plus), `.lua` pour la
+première, `.css` / `.js` pour la seconde, jamais `config.lua` (audit, règle C), ni joker, ni aussi livrés par `files`,
+`client_scripts` ou `shared_scripts` (`config_split_spec`, T5). `scripts/lib/manifeste.awk` les liste côté `conseil` ;
+`scripts/poids-client.sh` les compte à part (ligne `<ressource>@conseil`).
+
+**`config_conseil.lua`** : réglages lus par le seul client du Conseil (dans le paquet) et par le serveur
+(`server_scripts`, juste avant `config.lua`) : `placement` et les textes de la séance (`modeLine`, `revoked`,
+`trialLineDefault`, `trialEndedFeed`). Il complète la table ouverte par `config_client.lua` sans en réécrire une clé ;
+`config.lua` le complète à son tour. Rien de secret (il part chez chaque membre).
+
+**RPC `vava_atelier:code`** (`args` : empreinte `''` ou 16 chiffres hexadécimaux minuscules ; morceau, entier 0 à 8 ;
+débit `rateLimits.code` = 12, puis 1 toutes les 5 s ; réponse latente du core au-delà de 8 Ko) :
+
+| Demande | Réponse (au seul appelant) |
+|---|---|
+| `('', 0)` ou `(fp, 0)` | `true, { fp, parts, bytes }` : empreinte FNV-1a 64 bits du paquet, morceaux, octets |
+| `(fp, k)`, 1 ≤ k ≤ `parts` | `true, <chaîne de 64 Ko au plus>` ; leur suite est le paquet, d'empreinte `fp` |
+| refus | `false, code` : `no_character`, `not_ready`, `not_allowed` (droit d'ouvrir l'Atelier, **relu à chaque appel**), `unavailable` (paquet non construit), `stale` (empreinte qui n'est plus celle du serveur), `bad_request` (morceau au-delà), `rate_limited` (plus de `delivery.hourlyPackages` = 3 paquets entiers par heure glissante et par joueur) ; codes de transport du core en plus |
+
+Aucune séance n'est exigée (le code précède `home`) ; aucun évènement nouveau. Format du paquet : `VAVAPAQ1\n` puis,
+pour chaque fichier, `<genre> <chemin> <octets>\n<octets du fichier>\n` (genres `L`, `C`, `J`, tous les `L` d'abord ;
+48 fichiers et 512 Ko au plus : `VavaAtelier.CODEPACK`).
+
+**Chez le membre** : stockage local de la ressource (KVP `paquet:empreinte` écrit en dernier, `paquet:taille`,
+`paquet:morceaux`, `paquet:1` … `paquet:16`, morceaux de 32 Ko), relu seulement si l'empreinte, la taille et
+l'empreinte recalculée valent celles que le serveur vient d'annoncer ; chaque fichier Lua exécuté par
+`load(code, '@@vava_atelier/<chemin>', 't', env)` dans un environnement du paquet ; page amorcée par messages NUI
+(`hello`, `bootPiece`, `bootEnd` ; rappels `pageReady`, `booted` : `docs/plan/rapports/T-157-contrat.md`). Effacé sur
+`not_allowed` et `vava_atelier:revoked`. Export client `isOpen()` : faux tant que le paquet n'est pas chargé.
+
+**Coût** (mesuré, `scripts/poids-client.sh`) : par joueur, 55 273 o (20 960 compressés) au lieu de 262 381 (82 448) ;
+paquet 245 560 o non compressé, 4 morceaux, une fois par version et par membre ; ensuite une description (≈ 85 o) par
+séance. Serveur : construction une fois au démarrage (lecture, compilation de contrôle, empreinte, découpe) ; O(1) par
+appel.
+
 ### `vava_chat`
 
 Le chat du royaume, à la place de la ressource `chat` de FiveM (`ensure vava_chat` remplace `ensure chat`, juste après
