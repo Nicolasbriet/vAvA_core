@@ -7,7 +7,8 @@
  *        modules/vava_ui/web/fonts/) ; sans vava_ui, polices de repli et cuir sans grain, toujours lisible.
  * Performance : aucun filtre ni flou ; l'anneau ne change qu'à une mise à jour ; la lueur critique et l'arrivée ou
  *        le départ d'une notification n'animent que l'opacité et la position ; la barre de progression avance par une
- *        seule transition de transform sur toute sa durée (aucune mise à jour par image). Chiffres des coups (T-155) :
+ *        seule transition de transform sur toute sa durée (aucune mise à jour par image) ; la remontée d'une jauge
+ *        (T-114, .is-refilling) aussi, linéaire, posée par la page. Chiffres des coups (T-155) :
  *        sur la scène, sans fond ; animés et suivis par transform et opacité seulement, dans un calque isolé.
  */
 
@@ -312,8 +313,8 @@ body.dev { background: radial-gradient(ellipse at 40% 60%, #5a6b4c 0%, #2c3829 5
 }
 
 @media (prefers-reduced-motion: reduce) {
-  /* la barre de progression garde sa transition : elle porte l'information, et non un ornement */
-  *:not(.progress-fill),
+  /* la barre de progression et la remontée d'une jauge (T-114) gardent leur transition : elles portent l'information */
+  *:not(.progress-fill):not(.is-refilling),
   *::before,
   *::after { transition: none !important; animation: none !important; }
 }
