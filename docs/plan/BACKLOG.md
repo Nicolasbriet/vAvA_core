@@ -716,8 +716,8 @@ versé à T-014 ; les autres points déjà couverts sont précisés dans T-012 �
 ### T-154 — Lua livré sans commentaires — **décision du porteur du projet**
 - Agents : vava-architecte → vava-dev-lua (cette tâche autorise à toucher `chancellerie/`, dans les limites de la spec) · Dépend de : — · Statut : à tester en jeu (relu sécurité et réseau, suites appliquées ; validée par le porteur du
   projet le 2 novembre 2026) — **à fusionner avec T-160, même mise à jour** (la première mise à jour allégée fait
-  retélécharger une fois le paquet des 33 ressources ; livrer T-160 avec évite un second retéléchargement, ≈ 1,67 Mo
-  par joueur qui revient)
+  retélécharger une fois le paquet de chaque ressource ; livrer T-160 avec évite un second retéléchargement, ≈ 3,28 Mo
+  bruts, ≈ 2,13 Mo compressés par joueur qui revient, chiffre corrigé par la relecture réseau R-1 de T-160)
 - Fait le 2 novembre 2026 : Chancellerie 1.9.0 (`lib/luastrip.js`, lexeur calqué sur Lua 5.4 qui garde chaque fin de
   ligne et se contrôle à chaque fichier ; `lib/delivery.js`, choix des fichiers d'après les manifestes ; allègement dans
   `fetchSource`, à l'installation et aux mises à jour, avant les empreintes ; `updates.leanLua`), `scripts/livraison.js`
@@ -819,9 +819,10 @@ versé à T-014 ; les autres points déjà couverts sont précisés dans T-012 �
 
 ### T-160 — Pages web livrées sans commentaires
 - Agents : vava-architecte → vava-dev-lua (outillage ; cette tâche autorise à toucher `chancellerie/`, validé par le
-  porteur du projet le 2 novembre 2026) · Dépend de : T-154 · Statut : en cours (fait, relectures sécurité et réseau à
-  faire) — **à livrer dans la même mise à jour que T-154** (relecture réseau R-1 de T-154 : `vava_loading` et `vava_ui`
-  ne seront retéléchargés qu'une fois)
+  porteur du projet le 2 novembre 2026) · Dépend de : T-154 · Statut : à tester en jeu (relu sécurité et réseau, suites
+  appliquées) — **à fusionner avec T-154, même mise à jour** (un seul retéléchargement par joueur qui revient : ≈ 3,48 Mo
+  bruts, ≈ 2,20 Mo compressés pour les 27 paquets d'un serveur public, 3,65 / 2,31 avec `[vava-dev]` ; à part, T-160 en
+  coûterait un second, ≈ 3,28 Mo / 2,13 Mo)
 - Fait le 2 novembre 2026 : Chancellerie 1.10.0 (`lib/webstrip.js`, lexeurs JavaScript, CSS et HTML qui gardent chaque
   fin de ligne, refusent ce qu'ils ne tranchent pas sûrement et se contrôlent à chaque fichier ; `lib/delivery.js`,
   choix des pages d'après les manifestes et compilation V8 sans exécution de chaque script avant et après ; allègement
@@ -831,6 +832,13 @@ versé à T-014 ; les autres points déjà couverts sont précisés dans T-012 �
   la copie allégée dans `scripts/verifier.sh`. Mesure : JS + CSS + HTML livrés aux joueurs 1 047 795 → 897 811 octets
   (− 146 Ko), 342 708 → 270 297 compressés (− 71 Ko) ; page du paquet du Conseil 152 127 → 144 119 octets. Aucun
   module de jeu touché.
+- Relectures du 2 novembre 2026 : sécurité OK (5 mineurs latents), réseau OK (4 mineurs) ; suites appliquées : SVG et
+  MathML en ligne (tout commentaire ou élément brut y fait refuser la page), états d'attributs de WHATWG, commentaire de
+  plusieurs lignes retiré seulement avant `<body>`, `extends` et `++`/`--` préfixe devant `/`, temporaire créé en
+  exclusivité (`wx`) ; chiffres de la mise à jour corrigés ; `verifier.sh` plus court hors `--tout`.
+- Note (relecture réseau R-2) : l'indentation des pages (≈ 69,5 Ko bruts, ≈ 5,7 Ko compressés) est à trancher avec
+  celle du Lua (R-4 de T-154), en une seule version ou pas du tout : chaque évolution de l'allègement fait retélécharger
+  une fois les paquets concernés.
 - Spec : `docs/plan/specs/T-160.md` · rapport : `docs/plan/rapports/T-160.md` · test en jeu : `docs/tests/reseau.md`
   § 7-G (même séance que le § 7-F de T-154).
 - Trouvé pendant T-154 (spec § 15) : les pages livrées (`web/**/*.js`, `*.css`, `*.html` des `files`, et la page du
@@ -850,6 +858,9 @@ versé à T-014 ; les autres points déjà couverts sont précisés dans T-012 �
   l'exploitant et dans chaque sauvegarde de la ressource. Les ajouter à `ROOT_EXCLUDED` (en gardant ce que le core lit).
 - Critères : une installation neuve ne pose plus ces dossiers ; une mise à jour retire ceux d'une installation existante
   qui n'ont pas été modifiés (règle de fusion existante) ; essai de `layout`.
+- Note de T-160 (relecture réseau R-3), pour cette tâche ou la prochaine de la Chancellerie : l'allègement de la copie
+  téléchargée (Lua et pages) bloque la Chancellerie ≈ 1,8 s, de façon synchrone ; le faire ressource par ressource en
+  rendant la main entre deux (`setImmediate`) ramènerait le plus long blocage à ≈ 0,3 s.
 
 ### T-164 — Catalogue des sorts de `vava_magic` servi à tous
 - Agents : vava-architecte → vava-dev-lua (cette tâche autorise à toucher `vava_magic`) · Dépend de : T-154 · Statut :
@@ -878,7 +889,8 @@ versé à T-014 ; les autres points déjà couverts sont précisés dans T-012 �
   la livraison serait une transformation de code, pas de commentaire : étudier plutôt de déplacer l'amorce hors jeu
   dans `web/dev/` (une page de développement qui charge la page livrée), comme `vava_atelier` le fait depuis T-157.
 - Critères : aucune page livrée ne contient plus la ligne ; la page reste ouvrable hors jeu avec ses données simulées ;
-  essais de pages et audit inchangés ; mesure avant et après.
+  essais de pages et audit inchangés ; mesure avant et après ; chaque `index.html` n'est retouché que quand son module
+  change déjà de version (relecture réseau R-2 de T-160 : ≈ 3 Ko ne valent pas un retéléchargement de plus).
 
 ## Phase 2 — Arrivée
 
