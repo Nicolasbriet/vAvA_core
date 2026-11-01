@@ -1333,7 +1333,8 @@ faire tout le système de combat ») : la porte T-119 reste à passer en jeu.
   `vava_magic`). Rapport `docs/plan/rapports/T-113.md`. Procédure : `docs/tests/combat.md` § 4 (31 tests).
 
 ### T-114 — Endurance et HUD
-- Agents : vava-dev-lua + vava-dev-nui · Dépend de : T-112 · Statut : à faire
+- Agents : vava-architecte → vava-dev-lua + vava-dev-nui (cette tâche autorise à toucher `vava_hud`) · Dépend de :
+  T-112 · Statut : en cours
 - Laissé par T-113 (spec § 13) : remplacer `VavaCombat.defense.spend` (`server/defense.lua`) et supprimer
   `config.defense.guardBreak` et la table `points` (compteur provisoire de garde brisée) ; refus `exhausted` d'une
   parade ou d'un pas à l'admission (`defense.refusal`) ; dépenser `stamina` des techniques (défensives comprises).
