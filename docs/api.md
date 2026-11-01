@@ -1208,7 +1208,7 @@ noir.
 ### `vava_health`
 
 Santé, mise à terre, réanimation, et **chaîne de dégâts commune** (1.3.0 ; coup déjà lancé et `vocabulary().pvp` :
-1.4.0 ; `docs/plan/COMBAT_V1.md` § 1). Champ
+1.4.0 ; coup d'essai `trial` des mannequins : 1.6.0 ; `docs/plan/COMBAT_V1.md` § 1). Champ
 `vava_health:state` `{ health, downed, downedFor }` (visibilité `owner`) : `health` de 0 à 1, part de la vie au-dessus
 du seuil où GTA met un joueur à terre. Délais à terre, touches et messages : `config_client.lua` ; lieux de soins,
 distances, chaîne : `config.lua`.
@@ -1306,6 +1306,7 @@ core.registry.add('vava_health:modifiers', 'vava_magic:protections', {
     priority = 50,                -- facultatif : 0 à 99 dans l'étape (défaut 50), plus petit = plus tôt
     label = 'Protections magiques', -- 1 à 48 octets
     kinds = { 'feu', 'eau' },     -- facultatif : appelé seulement pour ces types
+    trial = false,                -- facultatif (1.6.0) : true = appelé aussi pour les coups d'essai (mannequins)
     apply = function(ctx) return nil end,
 })
 ```
@@ -1320,6 +1321,23 @@ s'exécutent (une ligne de console par minute) ; plus de 5 ms : signalé, jamais
 (ni `Wait`, ni base, ni `callClient`) ni lancer `hit` (un renvoi part du hook `after`). Exemple vivant :
 `examples/vava_example_combat` (développement seulement).
 
+**Coup d'essai** (1.6.0, T-156) : `exports.vava_health:trial(paquet, lieu)` donne le montant d'un coup **comme s'il**
+frappait quelqu'un, **sans rien appliquer** — c'est le coup d'un mannequin d'entraînement (`vava_combat` 1.5.0). `lieu` :
+`{ x, y, z }` (seules clés, nombres finis, |x|, |y| ≤ 50 000, |z| ≤ 5 000 ; sinon `invalid_place`) ; paquet contrôlé
+comme celui de `hit` (mêmes codes ; `kind = 'monde'` refusé) ; `source` obligatoire (`invalid_source`) et suivie
+(`no_character`) ; débit propre de `chain.maxTrialsPerSecond` (20, borné de 1 à 100 au démarrage) essais par seconde et
+par source, à part de celui des vrais coups (`too_many_hits`, une ligne de console par minute et par source ; oublié au
+départ) ; source à terre : annulé `source_downed` (même règle que `hit`, coup déjà lancé compris). Puis les **seuls
+modificateurs inscrits** (`trial = true`), dans l'ordre fixe, avec `ctx = { id = 0, trial = true, target = 0,
+targetCharacter = 0, position, origin, kind, amount, base, stage, tags, health = 100, source, sourceCharacter, part?,
+weapon?, technique?, spell?, launchedAt? }`. Rend `{ trial = true, amount, base, blocked, absorbed, resisted, added,
+cancelled?, stage? }` (ni `id`, ni `applied`, ni `downed`, ni `health`) ou `nil, code` (`not_ready`, `invalid_place`,
+codes du paquet, `invalid_source`, `no_character`, `too_many_hits`, `hit_error`). **Ne se déclenche pas** : vie, mise à
+terre, `vava_health:set`, hooks `vava_health:hit` (`before` et `after`) et `vava_health:downed`, journal, numéro de coup,
+débit par paire, `chain.pvp`, modificateurs non inscrits. Un modificateur inscrit est aussi appelé pour les vrais coups ;
+contrat : il lit `ctx.trial`, ne lit aucune donnée de joueur pour `target = 0` et ne change **rien** (un bouclier ne
+s'use pas sur un essai). Aucun module ne s'inscrit en 1.6.0.
+
 **Journal des coups** `vava_health_hits` : tout coup venu d'un autre joueur qui a atteint la chaîne (annulé compris) et
 toute mise à terre par la chaîne ou par une perte native (personnages, ressource appelante, type, technique ou sort,
 arme, points, annulation, position) ; écrit par lots (un lot refusé par la base est réessayé ligne à ligne, une ligne
@@ -1330,8 +1348,9 @@ refusée est abandonnée et comptée en console), purgé après 30 jours.
 | Export | Retour |
 |---|---|
 | `hit(cible, paquet)` | résultat ou `nil, code` (ci-dessus) |
+| `trial(paquet, lieu)` | 1.6.0 : coup d'essai (mannequin) : `{ trial = true, amount, base, blocked, absorbed, resisted, added, cancelled?, stage? }` ou `nil, code` (ci-dessus) ; rien d'appliqué, aucun hook |
 | `vocabulary()` | copie `{ healthPoints, maxAmount, kinds, parts, tags, stages, pvp, launchedMaxMs }` : listes pour les éditeurs de l'Atelier et les modules ; `pvp` (1.4.0) : interrupteur `chain.pvp`, pour qu'un module coupe aussi ses effets sans dégâts (poussées, gel…) quand les combats entre joueurs sont coupés |
-| `modifiers()` | liste ordonnée `{ { key, stage, priority, label, kinds? } }` (sans les fonctions) |
+| `modifiers()` | liste ordonnée `{ { key, stage, priority, label, kinds?, trial } }` (sans les fonctions ; `trial` : 1.6.0) |
 | `get(source)` | `{ health, downed, downedFor }` ou `nil, code` — `health` : vie du serveur (0 à terre) |
 | `isDowned(source)` | booléen — à appeler (isolé, `pcall`) par tout module qui refuse une action à terre, plutôt que de recopier la règle ; module absent : pas à terre |
 | `setHealth(source, vie)` | `true` ou `false, code` — de 0 à 1 ; 0 met à terre aussitôt (`reason = 'api'`, `cause = 'set'`) |
@@ -1827,7 +1846,8 @@ trois modificateurs de la chaîne de dégâts, garde brisée. Demande le core 0.
 `vava_chat`, `vava_magic` (export `hardControl`, `vava_magic` ≥ 2.12.0, T-149 : gelé, renversé ou chancelant par un
 sort → refus `controlled` ; plus ancien, arrêté ou en erreur : aucun refus de ce côté). Ordre de démarrage : après `vava_health` et
 `vava_crafting`. **Deux RPC, aucune NUI, aucune table SQL.** Détail, valeurs et tests en jeu :
-`modules/vava_combat/README.md`, `docs/tests/combat.md` § 2 à § 4 et § 6.
+`modules/vava_combat/README.md`, `docs/tests/combat.md` § 2 à § 4 et § 6 à § 8. Depuis 1.5.0 (T-156) : **mannequins
+d'entraînement** (ci-dessous) ; demande `vava_health` 1.6.0.
 
 - **Arme en main** = l'objet tenu de l'inventaire (`held`, T-045), jamais une arme GTA ; le serveur lit
   `vava_inventory:held(src)`. Modèles vanilla provisoires dans `items[…].held` (`-- PLACEHOLDER`). Les outils ne sont pas
@@ -1979,6 +1999,31 @@ défense oubliés), `vava_health:hit` (`after`, 1.3.0 : suites d'une défense) e
 (modificateurs redéclarés), en plus de ceux de 1.1.0. **Modificateurs** visibles par `exports.vava_health:modifiers()` :
 `vava_combat:esquive`, `vava_combat:parade`, `vava_combat:blocage`.
 
+**Mannequins d'entraînement** (1.5.0, T-156) : mannequins en config (`config_client.lua` → `dummies.list` :
+`{ id (^[a-z0-9_]+$, 32 octets, unique), x, y, z (pied), heading, model?, bucket?, label? }`, 64 au plus, contrôlés au
+démarrage ; modèle et places `-- PLACEHOLDER` ; numéro `n` = place dans la liste ; centre visé = pied + 1 m). Props
+**locaux** chez chaque client, créés à 60 m, retirés au-delà de 70 m (boucle 0,5 s près, 2 s loin, personnage apparu
+seulement). Un relevé de technique voit un mannequin **après les joueurs** (un joueur dans l'arc est toujours frappé
+d'abord), avec les mêmes portée, angle, hauteur, instance et arme tenue ; une fois par coup, compté dans `maxTargets` ;
+montant par `vava_health:trial` (même paquet qu'un coup sur un joueur, rien d'appliqué) ; Fendant → issue `stagger`
+montrée sans rien poser ; jamais `strike`, `hit`, réactions, défense ; frappable à l'arme en zone de paix ou combats
+coupés ; usure un coup sur quatre (`dummies.wearChance`) ; aucune XP. **Évènement** `vava_combat:dummy(n, attaquant[,
+issue, dixièmes|false])` (`core.net.send` à des listes) : à l'attaquant (≈ 28 o, un par coup qui atteint un mannequin),
+issue et, si `numbers.enabled` et `numbers.attacker`, montant en dixièmes ou `false` pour un mot (absent sinon) ; aux
+joueurs à `witnessRadius` (15 m) du mannequin dans son instance, sans l'attaquant, `n` et l'attaquant seuls (≈ 22 o,
+balancement), au plus un par mannequin et par `witnessMinMs` (0,8 s). Client : balancement (boucle par image ≤ 0,9 s),
+éclats, chiffre `hitText('dealt', { x, y, z + 1,9 }, issue, dixièmes)` chez l'attaquant seul. **Hook**
+`vava_combat:trained` (`after`) : `{ source, characterId, dummy, n, kind = 'melee' | 'spell', technique?, item?, spell?,
+amount, outcome }`, une fois par coup qui atteint un mannequin, jamais pour un coup retenu — T-115 : XP de combat tant
+que le niveau de la compétence de l'arme est sous `config.dummies.xpMaxLevel` (9) ; T-121 : retour de l'essai d'une
+technique.
+
+| Export serveur (1.5.0) | Retour |
+|---|---|
+| `dummiesNear(point, rayon)` | `{ { n, id, x, y, z, distance } }` (centre visé, distance 3D, tri par distance puis `n`, `nearMax` = 8 au plus) ; point illisible, rayon hors de ]0, `nearMaxRadius` = 50], module pas prêt : `{}` ; lecture seule, toute ressource |
+| `dummyHit(n, paquet)` | `{ outcome, amount }` ou `nil, code` — réservé à `dummies.callers` (`vava_magic` ; sinon `not_allowed`, une ligne de console par minute et par ressource) ; `not_ready`, `invalid_dummy`, `no_character` (`paquet.source` sans personnage actif), `too_far` (autre instance, ou lanceur à plus de `spellMaxDistance` = 80 m, positions du serveur), codes de `vava_health:trial` (paquet transmis tel quel), `health_unavailable` ; envoi au lanceur et hook `trained` (`kind = 'spell'`) ; `outcome = nil` : coup retenu, rien d'envoyé |
+| `dummies()` | `{ { n, id, label, x, y, z, heading, bucket, model } }` (pied, copies) — T-121, outils du Conseil |
+
 **Touches** (registre `core:commands`, chapitre Combat ; Paramètres > Raccourcis > FiveM) : attaque légère (clic gauche),
 attaque lourde (clic droit), verrouiller un adversaire (clic molette ; maintenu : relâcher), parer ou se garder (R : appui
 bref ou maintenu ; R éveille le mode), pas de côté (Espace, mode combat actif seulement : le saut et recharger de GTA y
@@ -2080,8 +2125,18 @@ restriction ; 1.2.0 : rengainement et mode combat, T-149).
   ≈ 23 o par morsure, esquive ou absorbé à la victime ; ≈ 18 o + ≈ 8 à 12 o par touché au lanceur. Les deux
   évènements partent par `bridge.SendTo` (`core.net.send` : comptés par `/vava_reseau` ; core sans `core.net` : envoi
   direct).
+- **Sorts sur les mannequins** (2.14.0, T-156, `config.dummies.enabled`) : projectiles (impact sur le décor à
+  `targetMargin` du centre d'un mannequin, hors rempart, dégâts de base du niveau ; éclats sur les mannequins du rayon,
+  sauf celui-là, pas à travers un rempart), Nova ardente (mannequins du rayon, sans rempart ; hors du bonus d'XP) et
+  Secousse (mannequins du cercle, avec l'instant du présage) frappent « à blanc » les mannequins de `vava_combat` ≥ 1.5.0
+  : demandés par `exports.vava_combat:dummiesNear` (sans ceux d'une zone de paix), coup confié par `dummyHit` avec le
+  même paquet qu'un coup sur un joueur. Ni état, ni poussée, ni combinaison, ni bonus d'XP ; `combat.pvp` non lu ;
+  lanceur qui joue un autre personnage : rien. Le chiffre du lanceur part de `vava_combat` (`vava_combat:dummy`), jamais
+  par `vava_magic:dealt`. Sans `vava_combat` (ou plus ancien, ou en erreur) : aucun mannequin. Aucun export, aucun hook
+  nouveau.
 - **Modificateurs** (registre `vava_health:modifiers`, redéclarés à chaque démarrage de `vava_health`) :
   `vava_magic:zones` (étape `annulation`, seulement si `combat.protectedZones` en compte : personne n'est blessé dans une
+
   zone de paix, ni par un sort ni par une lame, et personne n'en blesse un autre depuis l'intérieur ; annulé
   `zone_protegee` ; la faim, si), `vava_magic:protections` (étape
   `bouclier` : boucliers du joueur touché, le plus proche de sa fin d'abord, jusqu'à leur réserve ; sorts et lames, pas
