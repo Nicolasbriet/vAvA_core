@@ -50,8 +50,8 @@ end
 
 --- Déclare une jauge : id `<ressource>:<nom>`, options { label, icon = 'nui://…', order?, low?, critical? }.
 exports('defineGauge', function(id, options) return gauges.define(caller(), id, options) end)
---- Met à jour une jauge (0 à 1).
-exports('setGauge', function(id, value) return gauges.set(caller(), id, value) end)
+--- Met à jour une jauge (0 à 1) ; `refill` facultatif (1.8.0) : `{ perSecond, delayMs }`, remontée que la page anime.
+exports('setGauge', function(id, value, refill) return gauges.set(caller(), id, value, refill) end)
 --- Allume ou éteint la lueur de laiton d'une jauge (le joueur parle, un effet est en cours…).
 exports('setGaugeActive', function(id, active) return gauges.setActive(caller(), id, active) end)
 exports('removeGauge', function(id) return gauges.remove(caller(), id) end)

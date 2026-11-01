@@ -1,14 +1,16 @@
 --[[
     vava_hud/client/gauges.lua
     Rôle : jauges déclarées par les modules. Un module ne gère que les siennes (identifiant préfixé par son nom de
-           ressource) ; elles disparaissent à son arrêt. Valeurs de 0 à 1, et un état « actif » (lueur de laiton :
-           parole, effet en cours…) ; l'interface n'est prévenue que d'un changement réel.
+           ressource) ; elles disparaissent à son arrêt. Valeurs de 0 à 1, remontée que la page anime seule (1.8.0,
+           T-114), et un état « actif » (lueur de laiton : parole, effet en cours…) ; l'interface n'est prévenue que
+           d'un changement réel.
     Dépendances : config_client.lua, client/nui.lua
 ]]
 
 local type, pairs, sort = type, pairs, table.sort
-local mathType = math.type
+local mathType, floor, huge, max, abs = math.type, math.floor, math.huge, math.max, math.abs
 local find, sub = string.find, string.sub
+local GetGameTimer = GetGameTimer
 
 local cfg = VavaHud.config
 local nui = VavaHud.nui
@@ -16,6 +18,9 @@ local nui = VavaHud.nui
 local ID_PATTERN = '^[%w_%-%.]+:[%w_%-%.]+$'
 -- images locales uniquement : une adresse externe ferait sortir une requête de chaque client
 local ICON_PREFIX = 'nui://'
+-- même remontée qu'au dernier envoi : départ à 1 ms près
+local SAME_START_MS = 1
+local REFILL_KEYS = { perSecond = true, delayMs = true }
 
 local gauges = {}
 VavaHud.gauges = gauges
@@ -28,20 +33,56 @@ VavaHud.gauges = gauges
 ---@field order integer
 ---@field low number       palier bas (0 à 1)
 ---@field critical number  palier critique (0 à 1)
----@field value number
+---@field value number     valeur de départ (0 à 1)
+---@field refill { perSecond: number, startAt: integer }|nil  remontée linéaire jusqu'à 1 (horloge GetGameTimer)
 ---@field active boolean   lueur de laiton
 
 ---@type table<string, vAvA.Gauge>
 local list = {}
 local count = 0
 
+--- Valeur projetée à `now` et remontée restante (`{ perSecond, delayMs }`), ou la valeur seule (pleine, sans remontée).
+---@param gauge vAvA.Gauge
+---@param now integer
+---@return number value
+---@return table|nil refill
+local function projected(gauge, now)
+    local refill = gauge.refill
+    if not refill then return gauge.value, nil end
+    local value = gauge.value + max(0, now - refill.startAt) / 1000 * refill.perSecond
+    if value >= 1 then return 1, nil end
+    return value, { perSecond = refill.perSecond, delayMs = max(0, refill.startAt - now) }
+end
+
 ---@param gauge vAvA.Gauge
 ---@return table
 local function public(gauge)
+    local value, refill = projected(gauge, GetGameTimer())
     return {
         id = gauge.id, label = gauge.label, icon = gauge.icon, order = gauge.order,
-        low = gauge.low, critical = gauge.critical, value = gauge.value, active = gauge.active,
+        low = gauge.low, critical = gauge.critical, value = value, active = gauge.active, refill = refill,
     }
+end
+
+---@param value any
+---@return boolean
+local function finite(value)
+    return type(value) == 'number' and value == value and value ~= huge and value ~= -huge
+end
+
+--- Remontée demandée : nil, ou `{ perSecond, delayMs }` aux seules clés connues, `0 < perSecond ≤ refill.maxPerSecond`
+--- (part de la jauge par seconde), `delayMs` entier de 0 à `refill.maxDelayMs`. Rend vrai si elle est valable.
+---@param refill any
+---@return boolean
+local function validRefill(refill)
+    if refill == nil then return true end
+    if type(refill) ~= 'table' then return false end
+    for key in pairs(refill) do
+        if not REFILL_KEYS[key] then return false end
+    end
+    local perSecond, delayMs, bounds = refill.perSecond, refill.delayMs, cfg.refill
+    if not finite(perSecond) or perSecond <= 0 or perSecond > bounds.maxPerSecond then return false end
+    return finite(delayMs) and delayMs == floor(delayMs) and delayMs >= 0 and delayMs <= bounds.maxDelayMs
 end
 
 ---@param value any
@@ -58,7 +99,7 @@ local function owns(owner, id)
         and sub(id, 1, #owner + 1) == owner .. ':'
 end
 
---- Déclare (ou redéclare) une jauge.
+--- Déclare (ou redéclare : valeur et remontée gardées) une jauge.
 ---@param owner string
 ---@param id any
 ---@param options any  { label, icon, order?, low?, critical? }
@@ -79,7 +120,7 @@ function gauges.define(owner, id, options)
     local gauge = {
         id = id, owner = owner, label = label, icon = icon, order = order,
         low = low, critical = critical, value = existing and existing.value or 1,
-        active = existing ~= nil and existing.active,
+        refill = existing and existing.refill or nil, active = existing ~= nil and existing.active,
     }
     if not existing then count = count + 1 end
     list[id] = gauge
@@ -87,20 +128,36 @@ function gauges.define(owner, id, options)
     return true
 end
 
+--- Met une jauge à `value` (0 à 1). `refill` (1.8.0) : `{ perSecond, delayMs }`, la jauge remonte seule, linéairement
+--- jusqu'à 1, `delayMs` après l'appel (la page l'anime : aucun envoi pendant la remontée) ; absent : toute remontée en
+--- cours s'arrête (comportement de 1.7.0). Même valeur et même remontée qu'au dernier envoi : rien n'est envoyé.
 ---@param owner string
 ---@param id any
 ---@param value any  0 à 1
+---@param refill any  nil ou { perSecond, delayMs }
 ---@return boolean ok
 ---@return string|nil code
-function gauges.set(owner, id, value)
+function gauges.set(owner, id, value, refill)
     local gauge = type(id) == 'string' and list[id]
     if not gauge then return false, 'not_found' end
     if gauge.owner ~= owner then return false, 'not_owner' end
     if type(value) ~= 'number' or value ~= value then return false, 'invalid_value' end
+    if not validRefill(refill) then return false, 'invalid_refill' end
     if value < 0 then value = 0 elseif value > 1 then value = 1 end
-    if value == gauge.value then return true end
-    gauge.value = value
-    nui.send('value', { id = id, value = value })
+    -- une jauge pleine n'a rien à remonter
+    local wanted = nil
+    if refill and value < 1 then
+        wanted = { perSecond = refill.perSecond, startAt = GetGameTimer() + floor(refill.delayMs) }
+    end
+    local old = gauge.refill
+    if value == gauge.value and ((old == nil and wanted == nil) or (old and wanted and old.perSecond == wanted.perSecond
+        and abs(old.startAt - wanted.startAt) <= SAME_START_MS)) then
+        return true
+    end
+    gauge.value, gauge.refill = value, wanted
+    local payload = { id = id, value = value }
+    if wanted then payload.refill = { perSecond = wanted.perSecond, delayMs = floor(refill.delayMs) } end
+    nui.send('value', payload)
     return true
 end
 
@@ -147,7 +204,7 @@ function gauges.purgeOwner(owner)
     end
 end
 
---- Toutes les jauges, dans l'ordre d'affichage.
+--- Toutes les jauges, dans l'ordre d'affichage (valeur projetée et remontée restante : page rechargée).
 ---@return table[]
 function gauges.all()
     local out = {}

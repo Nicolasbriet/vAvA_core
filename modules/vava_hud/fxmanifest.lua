@@ -14,7 +14,7 @@ use_experimental_fxv2_oal 'yes'
 
 name 'vava_hud'
 description 'Affichage en jeu vAvA (jauges, notifications, progression)'
-version '1.7.0'
+version '1.8.0'
 
 dependency 'vAvA_core'
 dependency 'vava_ui'
