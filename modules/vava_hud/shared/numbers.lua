@@ -145,17 +145,12 @@ local function between(value, low, high)
     return finite(value) and value >= low and value <= high
 end
 
---- Contrôle de config.numbers au démarrage : nil, ou la raison.
+--- Contrôle de config.numbers au démarrage (bornes qui évitent une erreur ou un coût) : nil, ou la raison.
 function rules.checkConfig(n)
     if type(n) ~= 'table' then return 'numbers attendu (table)' end
-    if type(n.enabled) ~= 'boolean' then return 'numbers.enabled attendu (booléen)' end
-    if not MODES[n.defaultMode] then return "numbers.defaultMode : 'tous', 'infliges' ou 'aucun' attendu" end
     for _, b in ipairs({
-        { 'durationMs', 400, 3000, true }, { 'riseVh', 0, 20 }, { 'maxAlive', 1, 30, true },
-        { 'maxPerSecond', 1, 60, true }, { 'followMs', 50, 500, true }, { 'followEpsilon', 0, 0.1 },
-        { 'stackMs', 0, 2000, true }, { 'stackMax', 1, 8, true }, { 'stackStepVh', 0, 10 }, { 'stackStepVw', 0, 10 },
-        { 'jitterVw', 0, 5 }, { 'maxDistance', 1, 500 }, { 'headBone', 0, 65535, true }, { 'headOffset', -2, 2 },
-        { 'decimals', 0, 1, true },
+        { 'durationMs', 400, 3000, true }, { 'maxAlive', 1, 30, true }, { 'maxPerSecond', 1, 60, true },
+        { 'followMs', 50, 500, true }, { 'stackMax', 1, 8, true },
     }) do
         local value = n[b[1]]
         if not between(value, b[2], b[3]) or (b[4] and mathType(value) ~= 'integer') then

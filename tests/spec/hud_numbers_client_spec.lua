@@ -237,6 +237,26 @@ describe('vava_hud client : chiffres des coups', function()
         assert.equal(1, #threads)
     end)
 
+    -- relecture réseau R-5 : une lecture de la tête à la création, une par ped et par passage ; positions à 1e-4
+    it('une lecture de la tête par chiffre créé, puis une par ped et par passage ; positions arrondies', function()
+        local reads = 0
+        local real = _G.GetPedBoneCoords
+        _G.GetPedBoneCoords = function(...)
+            reads = reads + 1
+            return real(...)
+        end
+        load()
+        for _ = 1, 3 do numbers.hit('dealt', TARGET, 'hit', 120) end
+        assert.equal(3, reads)
+        step(0)
+        positions[PED_TARGET] = { 11.123456, 5, 0 }
+        step(cfg.followMs)
+        assert.equal(4, reads)
+        local move = sent('numbersMove')[1].list[1]
+        assert.equal(0.6112, move.x)       -- 0,61123456
+        assert.equal(3, #sent('numbersMove')[1].list)
+    end)
+
     it('cascade : deux coups rapprochés sur la même cible ne se recouvrent pas', function()
         load()
         numbers.hit('dealt', TARGET, 'hit', 120)

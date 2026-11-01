@@ -64,14 +64,35 @@ local function headOf(ped)
     return bone.x, bone.y, bone.z + cfg.headOffset
 end
 
---- Projection d'une entrée : sx, sy à l'écran, ou nil (hors de l'écran : position de repli d'un chiffre reçu).
-local function project(entry)
-    local x, y, z = entry.x, entry.y, entry.z
-    if entry.ped then x, y, z = headOf(entry.ped) end
-    if x then
-        local onScreen, sx, sy = GetScreenCoordFromWorldCoord(x, y, z)
-        if onScreen then return clamp01(sx), clamp01(sy) end
+-- position d'écran envoyée à la page : arrondie à 1e-4 (message plus court, aucun écart visible)
+local function round4(value)
+    return floor(clamp01(value) * 10000 + 0.5) / 10000
+end
+
+--- Projection d'un point : sx, sy à l'écran, ou nil.
+local function screen(x, y, z)
+    if not x then return nil end
+    local onScreen, sx, sy = GetScreenCoordFromWorldCoord(x, y, z)
+    if not onScreen then return nil end
+    return round4(sx), round4(sy)
+end
+
+--- Projection d'une entrée (point fixe, ou tête de son ped ; `cache` : projection par ped pour un passage) ; hors de
+--- l'écran : position de repli d'un chiffre reçu, sinon nil.
+local function project(entry, cache)
+    local sx, sy
+    if entry.ped then
+        local hit = cache and cache[entry.ped]
+        if hit then
+            sx, sy = hit[1], hit[2]
+        else
+            sx, sy = screen(headOf(entry.ped))
+            if cache then cache[entry.ped] = { sx, sy } end
+        end
+    else
+        sx, sy = screen(entry.x, entry.y, entry.z)
     end
+    if sx then return sx, sy end
     if entry.side == 'taken' then return cfg.takenFallback.x, cfg.takenFallback.y end
     return nil
 end
@@ -80,11 +101,11 @@ local function follow()
     while #alive > 0 do
         Wait(cfg.followMs)
         local now = GetGameTimer()
-        local kept, moves = {}, nil
+        local kept, moves, cache = {}, nil, {}
         for _, entry in ipairs(alive) do
             if now < entry.endsAt then
                 kept[#kept + 1] = entry
-                local sx, sy = project(entry)
+                local sx, sy = project(entry, cache)
                 local move = nil
                 if not sx then
                     if not entry.hidden then move = { id = entry.id, hidden = true } end
@@ -130,13 +151,17 @@ function numbers.hit(side, anchor, issue, tenths)
         entry.x, entry.y, entry.z = x, y, z
         entry.key = 'c:' .. floor(x + 0.5) .. ':' .. floor(y + 0.5)
     end
+    local sx, sy
     if x then
         local cam = GetFinalRenderedCamCoord()
         local dx, dy, dz = x - cam.x, y - cam.y, z - cam.z
         if dx * dx + dy * dy + dz * dz > cfg.maxDistance * cfg.maxDistance then return false, 'far' end
+        sx, sy = screen(x, y, z)          -- une seule lecture de la tête à la création
     end
-    local sx, sy = project(entry)
-    if not sx then return false, 'offscreen' end
+    if not sx then
+        if side ~= 'taken' then return false, 'offscreen' end
+        sx, sy = cfg.takenFallback.x, cfg.takenFallback.y
+    end
     local shift, last = rules.stack(lastByAnchor[entry.key], now, cfg, random)
     lastByAnchor[entry.key] = last
     local view = rules.compose(side, issue, rules.tenths(tenths), cfg)

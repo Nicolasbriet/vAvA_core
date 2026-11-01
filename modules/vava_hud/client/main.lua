@@ -1,10 +1,7 @@
 --[[
     vava_hud/client/main.lua
-    Rôle : exports (jauges, notifications, progression), retrait de l'interface native de GTA, et visibilité du HUD :
-           affiché quand un personnage est en jeu, masqué pendant la sélection, le menu pause et les fondus au noir
-           (apparition, chargement) et, depuis 1.6.0, pendant la bannière du royaume (vava_pause). Une progression en
-           cours est interrompue au retour à la sélection. Chiffres des coups (1.7.0) : export hitText, effacés quand
-           le HUD est masqué.
+    Rôle : exports, retrait de l'interface native de GTA, visibilité du HUD (personnage en jeu ; masqué en sélection,
+           menu pause, fondu, bannière) ; progression interrompue à la sélection, chiffres effacés HUD masqué.
     Dépendances : config_client.lua, client/core.lua, client/nui.lua, client/gauges.lua, client/native.lua,
                   client/notify.lua, client/progress.lua, client/pause.lua, client/numbers.lua
 ]]

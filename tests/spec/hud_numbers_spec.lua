@@ -178,11 +178,12 @@ describe('vava_hud : règles des chiffres des coups', function()
             assert.is_nil(rules.checkConfig(cfg))
         end)
 
-        it('bornes, types, mots : la raison', function()
+        -- bornes qui évitent une erreur ou un coût (relecture réseau R-2 : les autres ne sont plus contrôlées)
+        it('bornes qui évitent une erreur ou un coût, mots, repli : la raison', function()
             local cases = {
-                { 'durationMs', 300 }, { 'durationMs', 900.5 }, { 'riseVh', 21 }, { 'maxAlive', 0 },
-                { 'maxPerSecond', 61 }, { 'followMs', 0 }, { 'followMs', 40 }, { 'decimals', 2 }, { 'headBone', 70000 },
-                { 'defaultMode', 'tout' }, { 'enabled', 'oui' }, { 'maxDistance', 0 },
+                { 'durationMs', 300 }, { 'durationMs', 900.5 }, { 'durationMs', nil }, { 'maxAlive', 0 },
+                { 'maxAlive', 31 }, { 'maxPerSecond', 61 }, { 'followMs', 0 }, { 'followMs', 40 }, { 'stackMax', 0 },
+                { 'stackMax', 1.5 },
             }
             for _, case in ipairs(cases) do
                 local bad = copy(cfg)

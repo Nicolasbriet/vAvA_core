@@ -97,7 +97,7 @@ VavaPause.config = {
               choices = { 'tous', 'infliges', 'aucun' }, labels = { 'Donnés et reçus', 'Donnés seulement', 'Aucun' },
               uses = { 'vava_hud' },
               label = 'Chiffres des coups',
-              help = 'Ce que vos coups emportent, et ce que vous encaissez, au-dessus de la cible.' },
+              help = 'Ce que vaut chaque coup, au-dessus de qui le reçoit.' },
             { key = 'voice.circle', tab = 'voix', kind = 'lever', default = true, uses = { 'vava_voice' },
               label = 'Cercle de portée au sol', help = 'Montre jusqu\'où porte votre voix quand vous en changez.' },
         },
