@@ -8,7 +8,9 @@
  *        (`/` après `}` ou après un mot contextuel) est refusé. CSS : commentaires (seulement s'ils touchent un blanc : en
  *        CSS un commentaire n'est pas un blanc) et blancs de fin de ligne ; chaînes et `url()` non cités lus d'un bloc.
  *        HTML : commentaires seulement, entre deux blancs, jamais dans `<pre>` ni au prix d'un nœud de texte créé ; aucun
- *        blanc retiré ; contenus de `<script>`, `<style>`, `<textarea>`, `<title>` jamais touchés. Refusé (fichier laissé
+ *        blanc retiré ; contenus de `<script>`, `<style>`, `<textarea>`, `<title>` jamais touchés ; balises lues par les
+ *        états d'attributs de WHATWG ; dans du SVG ou du MathML en ligne, tout commentaire ou élément brut est refusé ; un
+ *        commentaire de plusieurs lignes n'est retiré qu'avant `<body>`. Refusé (fichier laissé
  *        tel quel par l'appelant) : tout ce qui n'est pas tranché sûrement (§ 6 de la spec T-160). Chaque allègement se
  *        contrôle lui-même (signature : même suite de lexèmes, chacun à sa ligne). Le texte est lu en latin1 : un
  *        caractère = un octet, rien n'est interprété. Temps linéaire : un seul passage, fermetures cherchées par
@@ -60,8 +62,9 @@ function lineAt(text, index, newline = isNewline) {
 // JavaScript ------------------------------------------------------------------------------------------------------------
 
 const JS_BLANK = (c) => c === ' ' || c === '\t' || c === '\v' || c === '\f';
-// après ces mots, `/` ouvre une expression régulière
-const REGEX_AFTER = new Set(['return', 'typeof', 'instanceof', 'in', 'new', 'delete', 'void', 'throw', 'case', 'do', 'else']);
+// après ces mots, `/` ouvre une expression régulière (`extends` : relecture sécurité S-4)
+const REGEX_AFTER = new Set(['return', 'typeof', 'instanceof', 'in', 'new', 'delete', 'void', 'throw', 'case', 'do', 'else',
+  'extends']);
 // mots contextuels : `/` après eux ne se tranche pas sans analyse complète
 const UNDECIDABLE = new Set(['of', 'yield', 'await', 'let', 'static', 'async', 'get', 'set']);
 // `(` après ces mots : `/` après la `)` appariée ouvre une expression régulière (`if (x) /re/.test(y)`)
@@ -70,12 +73,16 @@ const CLOSERS = { ')': '(', ']': '[', '}': '{' };
 
 /**
  * `/` en mode code : expression régulière (true), division (false), ou raison du refus (chaîne), d'après le lexème
- * significatif précédent.
+ * significatif précédent. `++`/`--` suffixe (`a++ / 2`) : division ; préfixe (là où une expression commence) : refus
+ * (relecture sécurité S-4). Limite connue, sans refus : après `for await (…)`, `/` est lu comme une division (`await`
+ * n'est pas suivi comme `for`) ; une expression régulière à cet endroit garde son texte ou fait refuser la page (contrôle,
+ * V8, preuve), jamais rien d'autre.
  */
 function slashOpensRegex(prev) {
   if (!prev) return true;
   if (prev.kind === 'punct') {
     if (prev.text === ')') return prev.keyword === true;
+    if ((prev.text === '++' || prev.text === '--') && prev.prefix) return `« / » après « ${prev.text} » préfixe : indécidable`;
     if (prev.text === ']' || prev.text === '++' || prev.text === '--') return false;
     if (prev.text === '}') return '« / » après « } » : division ou expression régulière indécidable';
     return true;
@@ -297,7 +304,8 @@ function scanJs(text) {
     } else if ((c === '+' || c === '-') && text[i + 1] === c) {
       i += 2;
       push('punct', start, i, at);
-      prev = { kind: 'punct', text: c + c };
+      // préfixe là où une expression commence (là où `/` ouvrirait une expression régulière), ou indécidable
+      prev = { kind: 'punct', text: c + c, prefix: slashOpensRegex(prev) !== false };
     } else {
       i += 1;
       push('punct', start, i, at);
@@ -431,10 +439,13 @@ const HTML_BLANK = (c) => c === ' ' || c === '\t' || c === '\f';
 // contenus jamais modifiés : texte brut (et script), RCDATA
 const RAW_ELEMENTS = new Set(['script', 'style', 'xmp', 'iframe', 'noembed', 'noframes', 'noscript', 'title', 'textarea']);
 const PRE_ELEMENTS = new Set(['pre', 'listing']);
+// contenu étranger (relecture sécurité S-1) : `<style>`, `<title>`, `<textarea>` n'y sont pas bruts et un commentaire y
+// change de sens ; tout commentaire ou élément brut y est refusé (la page est laissée telle quelle)
+const FOREIGN_ELEMENTS = new Set(['svg', 'math']);
 
 /**
  * Évènements HTML dans l'ordre : { kind, start, end, line } ; kind : 'bom' | 'text' | 'eol' | 'comment' (`pre`,
- * `lines`) | 'decl' | 'tag' | 'raw' ; ou { kind: 'error', line, reason } en dernier.
+ * `body` : après la balise `<body>`, `lines`) | 'decl' | 'tag' | 'raw' ; ou { kind: 'error', line, reason } en dernier.
  * @param {string} text  texte lu en latin1
  */
 function scanHtml(text) {
@@ -443,6 +454,9 @@ function scanHtml(text) {
   let i = 0;
   let line = 1;
   let pre = false;
+  let body = false;   // balise `<body>` déjà lue (relecture sécurité S-3)
+  let foreign = 0;    // profondeur de `<svg>` et `<math>` ouverts (relecture sécurité S-1)
+  let selfClosing = false;   // la dernière balise lue finit par `/>` (posé par tagEnd)
   let lower = null;   // texte en minuscules (même longueur en latin1), calculé au premier élément brut
   let bang = null;    // position du prochain `--!>` (recherche monotone)
   const push = (kind, start, end, at, extra) => events.push({ kind, start, end, line: at, ...extra });
@@ -454,32 +468,47 @@ function scanHtml(text) {
     push('bom', 0, 3, 1);
     i = 3;
   }
-  // fin (exclue) d'une balise dont les attributs commencent en `j` : `>` hors des valeurs entre guillemets ; -1 si absente
+  // fin (exclue) d'une balise dont les attributs commencent en `from`, selon les états d'attributs de WHATWG (relecture
+  // sécurité S-2) : un guillemet n'ouvre une valeur qu'après un `=` qui suit un nom d'attribut ; -1 si absente.
+  // `selfClosing` : la balise finit par `/>` hors d'une valeur sans guillemets
   const tagEnd = (from) => {
     let j = from;
+    let state = 'before';   // before | name | afterName | beforeValue | unquoted
+    selfClosing = false;
     for (;;) {
       if (j >= n) return -1;
       const d = text[j];
-      if (d === '>') return j + 1;
+      const blank = HTML_BLANK(d) || isNewline(d);
       if (isNewline(d)) {
         j += newlineLength(text, j);
         line += 1;
-        continue;
-      }
-      j += 1;
-      if (d !== '=') continue;
-      while (j < n && (HTML_BLANK(text[j]) || isNewline(text[j]))) {
-        if (isNewline(text[j])) {
-          j += newlineLength(text, j);
-          line += 1;
-        } else j += 1;
-      }
-      const q = text[j];
-      if (q !== '"' && q !== '\'') continue;
-      const close = text.indexOf(q, j + 1);
-      if (close < 0) return -1;
-      line += newlinesOf(text, j, close).length;
-      j = close + 1;
+      } else j += 1;
+      if (state === 'unquoted') {
+        if (d === '>') return j;
+        if (blank) state = 'before';
+      } else if (state === 'beforeValue') {
+        if (blank) continue;
+        if (d === '>') return j;
+        if (d === '"' || d === '\'') {
+          const close = text.indexOf(d, j);
+          if (close < 0) return -1;
+          line += newlinesOf(text, j, close).length;
+          j = close + 1;
+          state = 'before';
+        } else state = 'unquoted';
+      } else if (d === '>') {
+        return j;
+      } else if (d === '/') {
+        if (text[j] === '>') {
+          selfClosing = true;
+          return j + 1;
+        }
+        state = 'before';
+      } else if (blank) {
+        if (state === 'name') state = 'afterName';
+      } else if (d === '=' && (state === 'name' || state === 'afterName')) {
+        state = 'beforeValue';
+      } else state = 'name';   // nom d'attribut (un `=`, un guillemet en tête en font partie)
     }
   };
   // début de la balise de fin `</nom` suivie d'un blanc, de `/` ou de `>` (sans la casse), depuis `from` ; -1 si absente
@@ -505,10 +534,11 @@ function scanHtml(text) {
       if (close < 0) return fail(at, 'commentaire HTML non fermé');
       if (bang === null || (bang >= 0 && bang < from)) bang = text.indexOf('--!>', from);
       if (bang >= 0 && bang < close) return fail(at, '« --!> » dans un commentaire HTML');
+      if (foreign > 0) return fail(at, 'commentaire dans du SVG ou du MathML en ligne');
       i = close + 3;
       const lines = newlinesOf(text, start, i).length;
       line += lines;
-      push('comment', start, i, at, { pre, lines });
+      push('comment', start, i, at, { pre, body, lines });
     } else if (c === '<' && text.startsWith('![CDATA[', i + 1)) {
       return fail(at, 'CDATA refusé');
     } else if (c === '<' && (text[i + 1] === '!' || text[i + 1] === '?')) {
@@ -526,6 +556,7 @@ function scanHtml(text) {
       i = end;
       push('tag', start, i, at);
       if (PRE_ELEMENTS.has(name)) pre = false;
+      if (FOREIGN_ELEMENTS.has(name) && foreign > 0) foreign -= 1;
     } else if (c === '<' && isLetter(text[i + 1] || '')) {
       let j = i + 1;
       while (j < n && (isLetter(text[j]) || isDigit(text[j]) || text[j] === '-' || text[j] === ':')) j += 1;
@@ -535,6 +566,11 @@ function scanHtml(text) {
       i = end;
       push('tag', start, i, at);
       if (name === 'plaintext') return fail(at, '<plaintext> refusé');
+      if (name === 'body') body = true;
+      if (foreign > 0 && (RAW_ELEMENTS.has(name) || PRE_ELEMENTS.has(name))) {
+        return fail(at, `élément <${name}> dans du SVG ou du MathML en ligne`);
+      }
+      if (FOREIGN_ELEMENTS.has(name) && !selfClosing) foreign += 1;
       if (RAW_ELEMENTS.has(name)) {
         if (lower === null) {
           lower = text.toLowerCase();
@@ -566,7 +602,10 @@ const isHtmlBlank = (text, start, end) => {
   return true;
 };
 
-/** Pour chaque commentaire HTML : retirable ? (textes voisins blancs, hors `<pre>`, aucun nœud blanc créé). */
+/**
+ * Pour chaque commentaire HTML : retirable ? (textes voisins blancs, hors `<pre>`, aucun nœud blanc créé ; s'il a une fin
+ * de ligne, seulement avant `<body>`).
+ */
 function removableComments(text, events) {
   // runs[m] : texte entre le balisage m-1 (ou le début) et le balisage m ; le dernier va jusqu'à la fin
   const runs = [{ empty: true, blank: true }];
@@ -589,6 +628,9 @@ function removableComments(text, events) {
     const after = runs[m + 1];
     if (!before.blank || !after.blank) return;
     if (e.lines && before.empty && after.empty) return;
+    // une fin de ligne retirée dans le corps pourrait se voir (élément en `white-space: pre` posé par le CSS) : un
+    // commentaire de plusieurs lignes n'est retiré qu'avant `<body>` (relecture sécurité S-3)
+    if (e.lines && e.body) return;
     removable.add(k);
   });
   return removable;

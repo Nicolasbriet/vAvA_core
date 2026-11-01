@@ -452,18 +452,24 @@ function leanFile(file) {
 
 /**
  * Écrit à côté puis renomme : un arrêt brutal ne laisse jamais un fichier à moitié écrit (S-4) ; une erreur d'écriture
- * est levée (l'opération échoue, l'original reste), le temporaire retiré.
+ * est levée (l'opération échoue, l'original reste), le temporaire retiré s'il a été créé ici. Le temporaire est créé en
+ * exclusivité (`wx`) : un fichier, un dossier ou un lien déjà à sa place fait échouer l'écriture, jamais suivi ni
+ * écrasé (relecture sécurité S-5 de T-160).
  */
 function writeAtomic(file, buffer) {
   const temporary = `${file}.tmp`;
+  let created = false;
   try {
-    fs.writeFileSync(temporary, buffer);
+    fs.writeFileSync(temporary, buffer, { flag: 'wx' });
+    created = true;
     fs.renameSync(temporary, file);
   } catch (error) {
-    try {
-      if (fs.lstatSync(temporary).isFile()) fs.rmSync(temporary, { force: true });
-    } catch (ignored) {
-      // rien à retirer
+    if (created) {
+      try {
+        fs.rmSync(temporary, { force: true });
+      } catch (ignored) {
+        // rien à retirer
+      }
     }
     throw error;
   }

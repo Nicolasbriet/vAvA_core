@@ -317,16 +317,18 @@ téléchargement d'un joueur, ≈ 190 Ko compressés). Le dépôt, lui, reste co
   le gain porte sur la taille de chaque téléchargement, pas sur leur nombre.
 - **Première mise à jour allégée** : la mise à jour qui apporte la Chancellerie 1.9.0 est préparée par l'ancienne (Lua
   encore commenté) ; c'est la **suivante** qui allège. FiveM range scripts, fichiers et manifeste d'une ressource dans
-  un seul paquet (`resource.rpf`) : chaque manifeste étant allégé, **chacune des 33 ressources** change, et chaque
-  joueur qui revient retélécharge une fois leur paquet entier, déjà allégé — ≈ 3,8 Mo bruts, ≈ 2,4 Mo compressés au
-  2 novembre 2026 (après T-157), dont 1,44 Mo pour l'écran de chargement (`vava_loading`). Les suivantes ne coûtent que ce qui change. Livrer
-  cette mise à jour avec celle qui allège les pages web (T-160) évite un second retéléchargement complet. Un fichier
-  livré que vous aviez modifié sur place est remplacé et le vôtre gardé à côté (`.local`), comme d'habitude. Vos
-  réglages ne bougent pas.
+  un seul paquet (`resource.rpf`) : chaque manifeste étant allégé, **chaque ressource posée** change (27 sur un serveur
+  public, 33 avec les outils de développement `[vava-dev]`), et chaque joueur qui revient retélécharge une fois leur
+  paquet entier, déjà allégé — Lua et pages ensemble (1.10.0, ci-dessous) : ≈ 3,48 Mo bruts, ≈ 2,20 Mo compressés au
+  2 novembre 2026 sur un serveur public (3,65 / 2,31 Mo avec `[vava-dev]`), dont 1,42 Mo pour l'écran de chargement
+  (`vava_loading`). Les suivantes ne coûtent que ce qui change. Les pages étant allégées dans la même version, ce
+  retéléchargement n'a lieu qu'une fois ; à part, il en aurait coûté un second (≈ 3,28 Mo bruts, ≈ 2,13 Mo compressés :
+  les 20 paquets à pages). Un fichier livré que vous aviez modifié sur place est remplacé et le vôtre gardé à côté
+  (`.local`), comme d'habitude. Vos réglages ne bougent pas.
 - **Couper l'allègement** : `updates.leanLua` à `false` dans `data/config.json`, puis relancer la Chancellerie ; à la
   mise à jour suivante, les fichiers livrés sont reposés avec leurs commentaires (journal : « Allègement du Lua livré
   désactivé (updates.leanLua) … »). Basculer la clé, dans un sens ou dans l'autre, relance le même retéléchargement
-  complet des 33 paquets chez chaque joueur.
+  complet des paquets chez chaque joueur.
 - **Sans la Chancellerie** : `node scripts/livraison.js --sortie <dossier>` depuis une copie du dépôt produit la même
   copie allégée (`[vava]`, `[vava-dev]`), à copier dans `resources/`. Le dossier doit être neuf ou vide, hors du dépôt
   et de toute copie git.
@@ -341,7 +343,9 @@ paquet du Conseil). Le dépôt, lui, reste commenté.
 - **Allégés** : les fichiers `.js`, `.css`, `.html` (et `.htm`) désignés par `files`, `file`, `ui_page`, `loadscreen` et
   `vava_conseil_web` (page de l'Atelier, paquet du Conseil) de chaque manifeste. JavaScript et CSS perdent leurs
   commentaires et leurs blancs de fin de ligne ; HTML ses seuls commentaires placés entre deux blancs (aucun blanc
-  retiré, rien dans `<pre>`, `<script>`, `<style>`, `<textarea>`, `<title>`, ni dans un attribut).
+  retiré, rien dans `<pre>`, `<script>`, `<style>`, `<textarea>`, `<title>`, ni dans un attribut ; dans le corps de la
+  page, un commentaire de plusieurs lignes est gardé ; une page qui a un commentaire ou un élément brut dans du SVG ou
+  du MathML en ligne est laissée telle quelle).
 - **Jamais touchés** : le réglage de l'écran de chargement (`web/js/config.js` : ses commentaires sont son mode
   d'emploi), les fichiers déjà minifiés (`*.min.js`, `*.min.css`), les images (SVG compris), polices et JSON, le
   JavaScript exécuté par FiveM (`client_script`), `web/dev/` (jamais livré), les commentaires de licence et les
@@ -358,8 +362,12 @@ paquet du Conseil). Le dépôt, lui, reste commenté.
   de l'opération ajoute « pages allégées : N fichiers, R refusées ». Aucune ligne s'il n'y a aucune page.
 - **Première mise à jour allégée** : celle qui apporte la Chancellerie 1.10.0 est préparée par l'ancienne ; c'est la
   **suivante** qui allège, le Lua (1.9.0) et les pages ensemble : chaque joueur qui revient retélécharge **une** fois le
-  paquet de chaque ressource (≈ 3,6 Mo bruts, ≈ 2,3 Mo compressés au 2 novembre 2026), pas deux. Une page modifiée sur
-  place est remplacée et la vôtre gardée à côté (`.local`) ; `web/js/config.js` ne bouge pas.
+  paquet de chaque ressource (≈ 3,48 Mo bruts, ≈ 2,20 Mo compressés au 2 novembre 2026 : 27 paquets d'un serveur public ;
+  3,65 / 2,31 Mo avec `[vava-dev]`), pas deux (un second aurait coûté ≈ 3,28 Mo bruts, ≈ 2,13 Mo compressés). Une page
+  modifiée sur place est remplacée et la vôtre gardée à côté (`.local`) ; `web/js/config.js` ne bouge pas.
+- **Évolutions** : toute évolution de l'allègement (Lua ou pages : règle, lexeur, retrait de l'indentation un jour)
+  fait retélécharger une fois les paquets concernés à chaque joueur qui revient ; elles sont donc groupées dans une
+  seule version.
 - **Couper l'allègement des pages** : `updates.leanWeb` à `false` dans `data/config.json`, puis relancer la
   Chancellerie ; à la mise à jour suivante, les pages sont reposées avec leurs commentaires (« Allègement des pages
   livrées désactivé (updates.leanWeb) … ») ; le Lua reste allégé si `updates.leanLua` est vrai (deux interrupteurs
