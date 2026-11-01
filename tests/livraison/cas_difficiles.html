@@ -1,0 +1,51 @@
+<!doctype html>
+<!--
+  tests/livraison/cas_difficiles.html
+  Rôle : page valide truffée des pièges de l'allègement des pages (T-160, spec § 12.1 cas HTML 1 à 16, § 12.2) :
+         commentaires entre blancs (retirés), dans du texte, dans un élément vide, dans des attributs, dans <pre>,
+         <script>, <style>, <textarea>, <title>, après un SVG en ligne, sur plusieurs lignes dans le corps (gardé), ligne
+         « hors jeu ». Prouvée par scripts/lib/meme-page.js
+         à chaque vérification ; jamais servie aux joueurs.
+-->
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <!--
+  en-tête
+  -->
+  <title>a <!-- b --></title>
+  <style>/* c */ a {}</style>
+  <STYLE>/* c */</Style >
+  <script>x = '<script src="a"><\/script>';</script>
+  <!-- c -->
+</head>
+<body>
+  <p>a<!-- c -->b</p>
+  <div><!-- c --></div>
+  <div><!--
+c
+--></div>
+  <div class="a<!--b-->"></div>
+  <a title='x>y<!-- z -->'></a>
+  <textarea><!-- pas un commentaire --></textarea>
+  <pre>
+<!-- c -->
+</pre>
+  <!-- a -- b -->
+  <p></p>
+  <ul>
+    <!-- c
+    -->
+  </ul>
+  <svg>
+    <path d="M5 .8"/>
+  </svg>
+  <!-- après le SVG en ligne (dedans, un commentaire ferait refuser la page) -->
+  <!-- a --><!-- b -->
+  <p>
+    <!-- c -->
+    texte</p>
+  <!-- hors jeu seulement : données simulées -->
+  <script>typeof GetParentResourceName === 'function' || document.write('<script src="x.js"><\/script>');</script>
+</body>
+</html>

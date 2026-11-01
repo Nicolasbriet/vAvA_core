@@ -17,7 +17,8 @@
  *        - Sauvegarde des ressources touchées avant d'écrire, et restauration à l'identique (retour en arrière).
  *        - Première installation : FXServer (build recommandée par Cfx.re), oxmysql (dernière version).
  *        - Copie téléchargée : Lua servi aux joueurs allégé de ses commentaires avant les empreintes (lib/delivery.js,
- *          T-154 ; updates.leanLua) ; les réglages et le Lua du seul serveur gardent les leurs.
+ *          T-154 ; updates.leanLua) ; les réglages et le Lua du seul serveur gardent les leurs. Pages servies (JS, CSS,
+ *          HTML) allégées de même (T-160 ; updates.leanWeb) ; le réglage de page `config.js` garde les siens.
  *        - La Chancellerie elle-même : nouvelle version vérifiée (elle doit se charger) avant de remplacer les
  *          fichiers ; l'ancienne est gardée, et demarrer.bat la remet si la nouvelle ne démarre pas.
  */
@@ -284,8 +285,11 @@ async function fetchSource(updates, ref, job) {
   await dl.extract(archive, dir);
   fs.rmSync(archive, { force: true });
   const root = dl.unwrap(dir);
-  if (updates.leanLua !== false) leanSource(root, job);
-  else say(job, 'Allègement du Lua livré désactivé (updates.leanLua) : fichiers livrés avec leurs commentaires.');
+  const lua = updates.leanLua !== false;
+  const web = updates.leanWeb !== false;
+  if (!lua) say(job, 'Allègement du Lua livré désactivé (updates.leanLua) : fichiers livrés avec leurs commentaires.');
+  if (!web) say(job, 'Allègement des pages livrées désactivé (updates.leanWeb) : pages livrées avec leurs commentaires.');
+  if (lua || web) leanSource(root, job, { lua, web });
   return root;
 }
 
@@ -294,26 +298,46 @@ const kilobytes = (bytes) => String(Math.round(bytes / 1024)).replace(/\B(?=(\d{
 const REFUSED_SHOWN = 10;
 
 /**
- * Lua servi aux joueurs allégé de ses commentaires dans la copie téléchargée (T-154), avant toute empreinte : chaque
- * fichier n'est réécrit qu'après son propre contrôle (un fichier refusé reste tel quel). Une erreur (écriture,
- * défaut du code) fait échouer l'opération avant que rien ne soit écrit sur le serveur (relecture sécurité S-4).
- * `job.lean` : bilan court, repris dans le résumé de l'opération.
+ * Lua (T-154) et pages (T-160) servis aux joueurs allégés de leurs commentaires dans la copie téléchargée, avant toute
+ * empreinte : chaque fichier n'est réécrit qu'après son propre contrôle (un fichier refusé reste tel quel). Une erreur
+ * (écriture, défaut du code) fait échouer l'opération avant que rien ne soit écrit sur le serveur (relecture sécurité
+ * S-4). `job.lean` : bilan court, repris dans le résumé de l'opération. Sans page allégée ni refusée, aucune ligne de
+ * pages ; les ressources illisibles sont dites une fois (si le Lua est allégé, ou s'il y a des pages).
+ * @param {{ lua?: boolean, web?: boolean }} [options]  défaut : le Lua seul
  */
-function leanSource(root, job) {
+function leanSource(root, job, options = { lua: true, web: false }) {
   try {
-    const summary = leanResources(layout(root).resources);
-    if (job) job.lean = `Lua allégé : ${summary.files} fichiers, ${summary.refused.length} refusés`;
-    say(job, `Lua servi aux joueurs allégé de ses commentaires : ${summary.files} fichiers, ${kilobytes(summary.before)} → ${kilobytes(summary.after)} Ko.`);
-    for (const item of summary.refused.slice(0, REFUSED_SHOWN)) {
-      say(job, `Laissé avec ses commentaires (ligne ${item.line} : ${item.reason}) : ${item.file}`);
+    const lua = options.lua !== false;
+    const web = options.web === true;
+    const summary = leanResources(layout(root).resources, { lua, web });
+    const pages = summary.pages;
+    const pagesSeen = web && (pages.files > 0 || pages.refused.length > 0);
+    const lean = [];
+    if (lua) {
+      lean.push(`Lua allégé : ${summary.files} fichiers, ${summary.refused.length} refusés`);
+      say(job, `Lua servi aux joueurs allégé de ses commentaires : ${summary.files} fichiers, ${kilobytes(summary.before)} → ${kilobytes(summary.after)} Ko.`);
+      shown(job, summary.refused, 'Laissé avec ses commentaires');
     }
-    if (summary.refused.length > REFUSED_SHOWN) say(job, `… et ${summary.refused.length - REFUSED_SHOWN} autres`);
-    for (const item of summary.skipped) {
-      say(job, `Ressource ${item.resource} laissée telle quelle : manifeste illisible pour l'allègement (${item.reason}).`);
+    if (pagesSeen) {
+      lean.push(`${lua ? 'pages' : 'Pages'} allégées : ${pages.files} fichiers, ${pages.refused.length} refusées`);
+      say(job, `Pages servies aux joueurs allégées de leurs commentaires : ${pages.files} fichiers, ${kilobytes(pages.before)} → ${kilobytes(pages.after)} Ko.`);
+      shown(job, pages.refused, 'Page laissée avec ses commentaires');
+    }
+    if (job && lean.length) job.lean = lean.join(' ; ');
+    if (lua || pagesSeen) {
+      for (const item of summary.skipped) {
+        say(job, `Ressource ${item.resource} laissée telle quelle : manifeste illisible pour l'allègement (${item.reason}).`);
+      }
     }
   } catch (error) {
-    throw dl.failure('lean_failed', `allègement du Lua livré interrompu (${error.message}) ; rien n'a été changé sur le serveur`);
+    throw dl.failure('lean_failed', `allègement des fichiers livrés interrompu (${error.message}) ; rien n'a été changé sur le serveur`);
   }
+}
+
+/** Refus dits au journal : 10 au plus, puis « … et N autres ». */
+function shown(job, refused, label) {
+  for (const item of refused.slice(0, REFUSED_SHOWN)) say(job, `${label} (ligne ${item.line} : ${item.reason}) : ${item.file}`);
+  if (refused.length > REFUSED_SHOWN) say(job, `… et ${refused.length - REFUSED_SHOWN} autres`);
 }
 
 /** Build recommandée de FXServer pour cette machine : { build, url }. */

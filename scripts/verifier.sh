@@ -8,7 +8,14 @@
 #      scripts/lib/manifeste.awk ; hors --tout, seuls les .lua modifiés sont prouvés et les listes ne sont recoupées
 #      que si un manifeste a changé, sauf si l'outillage de la livraison a changé (tout alors) ; node absent :
 #      message, échec en CI ; lua absent : échec
-#   5. audit réseau et sécurité statique (scripts/audit-reseau.sh), puis son essai sur les cas de tests/audit/
+#   5. pages livrées sans commentaires (T-160) : essais des lexeurs et de la livraison des pages (node), allègement des
+#      pages suivies par git (JS, CSS, HTML) prouvé par un second lecteur et par V8 (scripts/lib/meme-page.js), liste des
+#      pages servies recoupée avec scripts/lib/manifeste.awk, essais de pages relancés sur une copie allégée
+#      (`livraison.js --sortie`) ; hors --tout, seules les pages modifiées sont prouvées, les listes recoupées si un
+#      manifeste a changé, les essais relancés si une page ou un manifeste de module a changé, sauf si l'outillage a
+#      changé (tout alors) ; essais des lexeurs seulement si une page ou l'outillage a changé ; liste de
+#      poids-client.sh --liste calculée une fois pour les étapes 4 et 5 ; node absent : message, échec en CI
+#   6. audit réseau et sécurité statique (scripts/audit-reseau.sh), puis son essai sur les cas de tests/audit/
 # Code de sortie 0 seulement si tout passe.
 set -uo pipefail
 cd "$(dirname "$0")/.."
@@ -23,6 +30,13 @@ outils_de "$PWD" || outils_de "$(cd "$(git rev-parse --git-common-dir 2>/dev/nul
 echec=0
 
 titre() { printf '\n== %s\n' "$1"; }
+
+# chemins servis selon scripts/lib/manifeste.awk (poids-client.sh --liste), calculés une fois et partagés par les étapes
+# T-154 et T-160 (relecture réseau R-4 de T-160) : `liste_poids` remplit le fichier $LISTE_POIDS au premier appel (hors
+# d'un sous-shell) ; retiré à la sortie
+LISTE_POIDS=""
+liste_poids() { if [[ -z "$LISTE_POIDS" ]]; then LISTE_POIDS=$(mktemp); ./scripts/poids-client.sh --liste > "$LISTE_POIDS"; fi; }
+trap 'if [[ -n "$LISTE_POIDS" ]]; then rm -f "$LISTE_POIDS"; fi' EXIT
 
 # Sous Windows, LuaRocks pose des lanceurs luacheck.bat et busted.bat, qui fixent déjà l'interpréteur ; un .bat passe
 # par cmd.exe, limité à 8 191 caractères par ligne : la liste des fichiers est donc découpée par xargs.
@@ -95,13 +109,68 @@ else
     fi
     if grep -Eq "$OUTILLAGE_LIVRAISON|(^|/)fxmanifest\.lua$" <<< "$fichiers_tous"; then
         node scripts/livraison.js --liste | cut -f1,2 | sort -u > "$tmp/js.txt" || echec=1
-        ./scripts/poids-client.sh --liste | grep -i '\.lua$' | sort -u > "$tmp/awk.txt"
+        liste_poids
+        grep -i '\.lua$' "$LISTE_POIDS" | sort -u > "$tmp/awk.txt"
         if ! diff -u "$tmp/awk.txt" "$tmp/js.txt"; then
             echo "ÉCART : la livraison (chancellerie/lib/delivery.js) et scripts/lib/manifeste.awk ne voient pas les mêmes fichiers Lua servis"
             echec=1
         fi
     else
         echo "aucun manifeste modifié : listes non recoupées"
+    fi
+    rm -rf "$tmp"
+fi
+
+titre "Pages livrées sans commentaires (T-160)"
+# pages (JS, CSS, HTML) des fichiers suivis par git allégées par webstrip (Chancellerie), prouvées par un second lecteur
+# et par V8 (scripts/lib/meme-page.js) ; liste recoupée avec scripts/lib/manifeste.awk ; essais des pages relancés sur
+# la copie allégée (mêmes fichiers d'essai, chemins inchangés : chacun lit ses pages depuis son propre dossier). Hors
+# --tout : essais des lexeurs et preuve seulement si une page (ou l'outillage) a changé, et des seules pages modifiées ;
+# listes recoupées si un manifeste a changé ; essais relancés si une page ou un manifeste de module a changé ; tout si
+# l'outillage a changé (relecture réseau R-4). node absent : échec en CI.
+OUTILLAGE_PAGES='^(chancellerie/lib/(webstrip|delivery|installer)\.js|scripts/livraison\.js|scripts/lib/(meme-page\.js|manifeste\.awk)|scripts/poids-client\.sh|scripts/verifier\.sh|tests/livraison/)'
+if ! command -v node >/dev/null; then
+    echo "node absent : pages livrées non essayées"; [[ -n "${CI:-}" ]] && echec=1
+else
+    tmp=$(mktemp -d)
+    tout_pages=0
+    if [[ "$MODE" == "--tout" ]] || grep -Eq "$OUTILLAGE_PAGES" <<< "$fichiers_tous"; then tout_pages=1; fi
+    mapfile -t pages < <(grep -iE '\.(js|css|html?)$' <<< "$fichiers_tous" || true)
+    if [[ $tout_pages -eq 1 || ${#pages[@]} -gt 0 ]]; then
+        node tests/livraison/essais-pages.js || echec=1
+    else
+        echo "aucune page ni outillage modifié : essais des lexeurs de pages non lancés"
+    fi
+    if [[ $tout_pages -eq 1 ]]; then
+        node scripts/livraison.js --essai-pages "$tmp/pages" > "$tmp/pages.txt" || echec=1
+        node scripts/lib/meme-page.js "$tmp/pages" < "$tmp/pages.txt" || echec=1
+    elif [[ ${#pages[@]} -gt 0 ]]; then
+        node scripts/livraison.js --essai-pages "$tmp/pages" "${pages[@]}" > "$tmp/pages.txt" || echec=1
+        node scripts/lib/meme-page.js "$tmp/pages" < "$tmp/pages.txt" || echec=1
+    else
+        echo "aucune page modifiée : preuve sans objet"
+    fi
+    if [[ $tout_pages -eq 1 ]] || grep -Eq '(^|/)fxmanifest\.lua$' <<< "$fichiers_tous"; then
+        node scripts/livraison.js --liste-pages | cut -f1,2 | sort -u > "$tmp/js.txt" || echec=1
+        liste_poids
+        grep -iE '\.(js|css|html?)$' "$LISTE_POIDS" | sort -u > "$tmp/awk.txt"
+        if ! diff -u "$tmp/awk.txt" "$tmp/js.txt"; then
+            echo "ÉCART : la livraison (chancellerie/lib/delivery.js) et scripts/lib/manifeste.awk ne voient pas les mêmes pages servies"
+            echec=1
+        fi
+    else
+        echo "aucun manifeste modifié : listes des pages non recoupées"
+    fi
+    if [[ $tout_pages -eq 1 ]] || grep -Eq '^modules/[^/]+/(web/|fxmanifest\.lua$)' <<< "$fichiers_tous"; then
+        node scripts/livraison.js --sortie "$tmp/copie" > "$tmp/sortie.txt" || { cat "$tmp/sortie.txt"; echec=1; }
+        for essai in "${ESSAIS_PAGES[@]}"; do
+            m=${essai#modules/}; m=${m%%/*}
+            # lancé depuis le dossier de la ressource : sous Git Bash, un chemin à crochets passé à node n'est pas
+            # converti en chemin Windows
+            ( cd "$tmp/copie/[vava]/$m" && node "${essai#modules/"$m"/}" ) || { echo "essai sur la copie allégée en échec : $essai"; echec=1; }
+        done
+    else
+        echo "aucune page ni manifeste modifié : essais de pages non relancés sur la copie"
     fi
     rm -rf "$tmp"
 fi
