@@ -12,7 +12,7 @@ use_experimental_fxv2_oal 'yes'
 
 name 'vava_combat'
 description 'Combat vAvA : armes de corps à corps, techniques, défense, usure, bouclier accroché'
-version '1.3.0'
+version '1.4.0'
 
 dependency 'vAvA_core'
 dependency 'vava_inventory'

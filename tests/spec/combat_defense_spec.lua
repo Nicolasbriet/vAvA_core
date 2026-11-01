@@ -332,6 +332,7 @@ describe('vava_combat défense (serveur)', function()
             if not p then return nil end
             return p[1], p[2], p[3]
         end
+        local around = {}
         local bridge = {
             CONSOLE = 0, INVENTORY = 'vava_inventory', HEALTH = 'vava_health', CRAFTING = 'vava_crafting',
             SKILLS = 'vava_skills',
@@ -355,6 +356,36 @@ describe('vava_combat défense (serveur)', function()
                 end
                 table.sort(out)
                 return out
+            end,
+            -- T-155 : proches d'une instance (attaquant et cible compris), puis un envoi par liste ; chaque envoi note
+            -- la dernière recherche (instance, point, rayon) ; jamais une liste vide, jamais -1
+            PlayersAround = function(bucket, coords, radius)
+                assert.equal('integer', math.type(bucket))
+                assert.is_true(bucket >= 0)
+                around[#around + 1] = { bucket = bucket, coords = copy(coords), radius = radius }
+                local out = {}
+                for other in pairs(active) do
+                    local p = positions[other]
+                    if p and (buckets[other] or 0) == bucket then
+                        local dx, dy, dz = p[1] - coords.x, p[2] - coords.y, p[3] - coords.z
+                        if dx * dx + dy * dy + dz * dz <= radius * radius then out[#out + 1] = other end
+                    end
+                end
+                table.sort(out)
+                return out
+            end,
+            SendTo = function(list, event, ...)
+                assert.is_true(#list >= 1)
+                for key, id in pairs(list) do
+                    assert.equal('integer', math.type(key))
+                    assert.equal('integer', math.type(id))
+                    assert.is_true(id > 0)
+                end
+                local last = around[#around]
+                sent[#sent + 1] = { list = copy(list), bucket = last.bucket, coords = last.coords, radius = last.radius,
+                    event = event, args = table.pack(...) }
+                sent[#sent].args.n = nil
+                return true
             end,
             SendNear = function(bucket, coords, radius, event, ...)
                 assert.equal('integer', math.type(bucket))
@@ -473,7 +504,9 @@ describe('vava_combat défense (serveur)', function()
             assert.equal('parried', swings.of(A).cancelled)
             assert.same({ false, 'staggered', 890 }, (function() at(1130) return use(A, 'taille_descendante', B) end)())
             assert.same({ 'parry' }, outcomes())
-            assert.same({ A, B, 'parry' }, sent[1].args)
+            -- T-155 : aux deux seuls participants, 4e valeur false (un mot, aucun montant)
+            assert.same({ A, B }, sent[1].list)
+            assert.same({ A, B, 'parry', false }, sent[1].args)
             -- arme de A usée par strike (dans la chaîne), arme de B hors de la chaîne (SetTimeout 0)
             assert.equal(1, #patched(A, 10))
             local parryWear = patched(B, 20)
@@ -569,14 +602,18 @@ describe('vava_combat défense (serveur)', function()
     end)
 
     describe('pas de côté', function()
-        it('invulnérable de 1 050 à 1 300 : esquivé sans envoi ni usure, touché à 1 301 ; 1,5 s entre deux', function()
+        it('invulnérable de 1 050 à 1 300 : esquivé (le mot aux deux seuls participants) sans usure, touché à 1 301 ; '
+            .. '1,5 s entre deux', function()
             at(780)
             use(A, 'taille_descendante', B)           -- relevé à 1 100
             at(1000)
             assert.same({ true }, use(B, 'pas_de_cote'))
             at(1100)
             assert.same({ 'esquive', 'esquive' }, { lastHit().cancelled, lastHit().stage })
-            assert.equal(0, #sent)
+            -- T-155 : « Esquivé » aux seuls attaquant et cible (jamais aux témoins), sans montant
+            assert.equal(1, #sent)
+            assert.same({ A, B }, sent[1].list)
+            assert.same({ A, B, 'dodge', false }, sent[1].args)
             assert.equal(0, #patched(A, 10))
             assert.equal(0, #patched(B, 20))
             assert.same('dodge', afters[1].payload.outcome)

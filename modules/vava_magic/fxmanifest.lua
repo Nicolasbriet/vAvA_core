@@ -15,8 +15,8 @@
            évènements ciblés, reçus des seuls joueurs proches.
     Dépendances : vAvA_core ≥ 0.5.0 ; vava_ui ≥ 1.0.0 (polices, grain, papier et coins de la page, par
                   nui://vava_ui/…) ; facultatives : vava_inventory ≥ 1.3.0 (grimoire et registre), vava_hud
-                  (notifications), vava_health ≥ 1.3.0 (chaîne de dégâts : sans lui, aucun sort ne blesse ; à terre ;
-                  1.4.0 : coups déjà lancés, interrupteur pvp), vava_combat ≥ 1.0.0 (mains vides pour incanter : arme
+                  (notifications ; ≥ 1.7.0 : chiffres des sorts), vava_health ≥ 1.3.0 (chaîne de dégâts : sans lui,
+                  aucun sort ne blesse ; à terre ; 1.4.0 : coups déjà lancés, interrupteur pvp), vava_combat ≥ 1.0.0 (mains vides pour incanter : arme
                   tenue ou bouclier au bras refusés ; sans lui, aucune restriction ; 1.2.0 : rengainement), vava_admin
                   (droits et journal du Conseil ; ≥ 1.11.0 : membre invulnérable épargné des effets sans dégâts),
                   vava_chat
@@ -29,7 +29,7 @@ use_experimental_fxv2_oal 'yes'
 
 name 'vava_magic'
 description 'Magie vAvA : mana, progression, roue des sorts, états, sorts de feu, eau et terre, Murmure, Lueur, grimoire et registre'
-version '2.12.0'
+version '2.13.0'
 
 dependency 'vAvA_core'
 dependency 'vava_ui'
@@ -76,6 +76,7 @@ server_scripts {
     'server/mana.lua',
     'server/spells.lua',
     'server/progression.lua',
+    'server/numbers.lua',
     'server/combat.lua',
     'server/protections.lua',
     'server/states.lua',
@@ -120,6 +121,7 @@ client_scripts {
     'client/controls.lua',
     'client/wheel.lua',
     'client/states.lua',
+    'client/numbers.lua',
     'client/ambient.lua',
     'client/zones.lua',
     'client/clouds.lua',

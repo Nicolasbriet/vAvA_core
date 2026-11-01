@@ -5,6 +5,10 @@
            récolte), intentions du client (RPC à schéma strict et débit limité : commencer, interrompre, finir, ferrer,
            zones), joueurs partis, boucle lente d'écriture, de republication et de nouvel essai des zones refusées,
            commande du Conseil.
+           T-102 : ordre du démarrage : graine (config.lua) → zones du core → atelier « Récolte » de l'Atelier (la base
+           fait foi ensuite) ; état de zone entier avec `def` et `p:` ; liste de la carte (RPC map) ; la boucle lente
+           diffuse aussi les zones notées depuis plus de `editor.flushGraceMs` (garde si le `last` d'un lot n'est jamais
+           venu) ; un essai oublié au départ de son auteur.
     Dépendances : tous les fichiers server/ du module
 ]]
 
@@ -23,6 +27,9 @@ local zonestate = VavaGathering.zonestate
 local zones = VavaGathering.zones
 local nodes = VavaGathering.nodes
 local harvest = VavaGathering.harvest
+local trials = VavaGathering.trials
+local map = VavaGathering.map
+local atelier = VavaGathering.atelier
 local fishing = VavaGathering.fishing
 local admin = VavaGathering.admin
 local geometry = VavaGathering.geometry
@@ -33,6 +40,7 @@ local RPC = VavaGathering.RPC
 local NODE = { type = 'string', min = 1, max = 48, pattern = VavaGathering.ID_PATTERN }
 local TOKEN = { type = 'integer', min = 1, max = VavaGathering.MAX_TOKEN }
 local BOOL = { type = 'boolean' }
+local MAP_VERSION = { type = 'string', min = 0, max = 16, pattern = '^%x*$' }
 
 --- Zones vues par un joueur, de la plus proche à la plus lointaine (distance lue côté serveur).
 ---@param src integer
@@ -56,15 +64,27 @@ local function publishedCharges(node)
     return nodes.published(node.id)
 end
 
---- Déclare au core les zones de récolte (toutes, ou seulement celles qui ne le sont pas encore), avec leur état entier
---- tel que publié en dernier : bande, cicatrice, charges de chaque nœud. Une zone refusée est écrite en console par
---- share.lua et n'empêche pas les autres.
+--- État entier d'une zone tel que publié en dernier : bande, cicatrice, nom, type et lieu, ressource, lieu et charges
+--- de chaque nœud ; nil si la zone n'existe plus (ou n'a pas encore d'état).
+---@param id string
+---@return vAvA.ZoneDefinition|nil
+---@return table|nil
+local function buildZone(id)
+    local def = catalog.zone(id)
+    if not def then return nil, nil end
+    local value = zones.published(id)
+    if not value then return nil, nil end
+    return def, zonestate.build(value, catalog.nodesOf(id), publishedCharges, def)
+end
+
+--- Déclare au core les zones de récolte (toutes, ou seulement celles qui ne le sont pas encore), avec leur état entier.
+--- Une zone refusée est écrite en console par share.lua et n'empêche pas les autres.
 ---@param missingOnly boolean
 local function shareZones(missingOnly)
-    for _, def in ipairs(catalog.zones()) do
-        if not (missingOnly and share.isDeclared(def.id)) then
-            local value = zones.published(def.id)
-            if value then share.declare(def, zonestate.build(value, catalog.nodesOf(def.id), publishedCharges)) end
+    for _, zone in ipairs(catalog.zones()) do
+        if not (missingOnly and share.isDeclared(zone.id)) then
+            local def, state = buildZone(zone.id)
+            if def then share.declare(def, state) end
         end
     end
 end
@@ -73,6 +93,8 @@ end
 local function flush()
     zones.tick()
     nodes.tick()
+    -- diffusions de l'Atelier restées en attente (le `last` d'un lot n'est jamais venu)
+    share.flush(cfg.editor.flushGraceMs)
     shareZones(true)
     local queries = {}
     zones.collect(queries)
@@ -97,6 +119,10 @@ local function setup()
     end
     local declared, declareErr = VavaGathering.commands.declare()
     if not declared then return false, 'commandes : ' .. tostring(declareErr) end
+    if cfg.legacyClientPlaces then
+        VavaGathering.log.warn('config_client.lua d\'avant 1.8.0 : ses zones et nœuds sont ignorés (graine : config.lua, '
+            .. 'puis la base de l\'Atelier)')
+    end
     local ok, err = catalog.define()
     if not ok then return false, 'catalogue : ' .. tostring(err) end
     journal.purge()
@@ -108,7 +134,9 @@ local function setup()
     zones.tick()
     nodes.tick()
     share.clearLegacy()
+    share.configure(buildZone, map.refresh)
     shareZones(false)
+    map.refresh()
 
     for _, def in ipairs({
         { RPC.BEGIN, { NODE }, limits.begin, harvest.begin },
@@ -119,6 +147,7 @@ local function setup()
             if not bridge.GetCharacterId(src) then return false, 'no_character' end
             return true, zonesFor(src)
         end },
+        { RPC.MAP, { MAP_VERSION }, limits.map, map.rpc },
     }) do
         ok, err = core.rpc.register(def[1], { args = def[2], rateLimit = def[3] }, def[4])
         if not ok then return false, def[1] .. ' : ' .. tostring(err) end
@@ -126,7 +155,10 @@ local function setup()
 
     for _, def in ipairs({
         { 'core:character:unloading', function(payload) harvest.forget(payload.source) end },
-        { 'core:player:dropped', function(payload) harvest.forget(payload.source) end },
+        { 'core:player:dropped', function(payload)
+            harvest.forget(payload.source)
+            trials.forget(payload.source)
+        end },
     }) do
         local id, hookErr = core.hooks.after(def[1], def[2])
         if not id then return false, hookErr end
@@ -141,6 +173,9 @@ local function setup()
         end
     end)
     admin.start()
+    -- l'atelier « Récolte » en dernier : l'Atelier synchronise aussitôt (la base fait foi)
+    ok, err = atelier.start()
+    if not ok then return false, 'atelier : ' .. tostring(err) end
     VavaGathering.ready = true
     return true
 end

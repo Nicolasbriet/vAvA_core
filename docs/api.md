@@ -1157,6 +1157,7 @@ noir.
 | `progress(id, { label, durationMs, cancelable? })` | `true` ou `false, code` (`invalid_id`, `invalid_options`, `busy`) — barre de progression d'une action longue (récolte, artisanat, réparation, leçon…) au centre bas de l'écran, de 0 à 100 % sur `durationMs` (entier, 250 à 120 000 ms) ; `label` texte brut, 60 caractères au plus ; **une seule à la fois** ; depuis 1.3.0 |
 | `cancelProgress(id)` | `true` ou `false, code` (`not_found`, `not_owner`) — interrompt la progression en cours ; seule la ressource qui l'a lancée le peut ; depuis 1.3.0 |
 | `currentProgress()` | `{ id, label, endsAt }` (`endsAt` : horloge `GetGameTimer`) ou `nil` ; depuis 1.3.0 |
+| `hitText(side, anchor, issue, tenths?)` | `true` ou `false, code` (`invalid_side`, `invalid_anchor`, `invalid_issue`, `invalid_amount`, `off`, `hidden`, `far`, `offscreen`, `too_many`) — chiffre d'un coup au-dessus de la cible ; depuis 1.7.0 (T-155) |
 
 - `id` : `<ressource>:<nom>` ; un module ne gère que ses jauges et sa progression, retirées à son arrêt.
 - `icon` : image `nui://<ressource>/<chemin>` listée dans les `files` du module (aucune adresse externe).
@@ -1178,6 +1179,28 @@ noir.
   notifications (`config.notifyDurations`, multiplicateur de `notifications.durationMs`). La page reçoit
   `settings = { scale, durationMs }` dans `init`, puis le message `settings` (`{ scale, durationMs }`) au seul
   changement. Sans `vava_pause` : comportement d'avant (`config.pauseResource`).
+- **Chiffres des coups** (1.7.0, T-155) : `hitText(side, anchor, issue, tenths)` montre, au-dessus de la cible, le
+  montant d'un coup ou le mot d'une issue sans dégâts ; il monte et s'efface en `numbers.durationMs` (900 ms).
+  `side` : `dealt` (ce que j'inflige, laiton) ou `taken` (ce que je reçois, rouge) ; `anchor` : numéro serveur d'un
+  joueur (1 à 65 535 ; le sien pour `taken` : son propre ped) ou point fixe `{ x =, y =, z = }`, `{ x, y, z }` ou
+  `vector3` (|x|, |y| ≤ 50 000, |z| ≤ 5 000 : mannequin de T-156) ; `issue` : `hit`, `tick` (morsure, zone qui dure :
+  petit), `stagger` (grand, « Chancelle » dessous), `down` (le plus grand, « À terre »), `block` et `break` (le reste et
+  « Bloqué » / « Garde brisée » dessous, ou le mot seul), `parry`, `dodge`, `absorb` (le mot seul) ; `tenths` : nil ou
+  entier de 0 à 2 000 (dixièmes de point ; 0 → « Sans effet »). Montré en entier arrondi, au moins 1 dès que le coup
+  porte (`numbers.decimals = 1` : « 7,2 »). Refus : `off` (`numbers.enabled = false`, ou réglage du joueur
+  `combat.numbers` de la bannière : `tous`, `infliges` = donnés seulement, `aucun` ; sans `vava_pause` :
+  `numbers.defaultMode`), `hidden` (HUD masqué : sélection, bannière, menu de GTA, fondu), `far` (ancre à plus de
+  `maxDistance` = 60 m de la caméra), `offscreen` (ancre hors de l'écran pour `dealt` ; `taken` prend alors
+  `takenFallback`, un peu sous le centre), `too_many` (`maxPerSecond` = 16 chiffres créés par seconde), `invalid_anchor`
+  (aussi : joueur inconnu de ce client pour `dealt`). Au plus `maxAlive` = 10 à l'écran (le plus ancien cède la place) ;
+  coups rapprochés sur une même ancre (`stackMs`) en cascade de `stackMax` crans. **Affichage seulement, jamais une
+  décision** : un client modifié ne peut tromper que son propre écran. Aucune boucle au repos : la position de la tête
+  est suivie toutes les `followMs` (100 ms) tant qu'un chiffre vit, puis plus rien ; la page reçoit `number`, puis un
+  `numbersMove` seulement si un chiffre a bougé de plus de `followEpsilon` ou s'est caché, et `numbersClear` quand le
+  HUD est masqué (contrat : `docs/plan/rapports/T-155-contrat.md`). Config contrôlée au démarrage (bornes qui évitent une
+  erreur ou un coût : `durationMs`, `maxAlive`, `maxPerSecond`, `followMs`, `stackMax`, `takenFallback`, mots de 1 à 32
+  octets) : une valeur hors bornes coupe les chiffres (une ligne de console). Appelé par `vava_combat` (≥ 1.4.0) et
+  `vava_magic` (≥ 2.13.0), isolé (`pcall`) : sans `vava_hud`, rien ne s'affiche et rien ne change au combat.
 - Pour travailler le rendu sans le jeu : `web/index.html?values=0.8,0.62,0.08` dans un navigateur ; `&progress=1`
   (barre de 8 s menée à son terme) ou `&progress=cancel` (interrompue à 60 %). Depuis 1.4.0, polices et grain viennent
   de `vava_ui` (dépendance déclarée) et les données simulées de `web/dev/devmock.js`, jamais livré.
@@ -1865,6 +1888,7 @@ sort → refus `controlled` ; plus ancien, arrêté ou en erreur : aucun refus d
 - **Réseau** : RPC `vava_combat:use` (≈ 40 o, réponse au seul appelant ≈ 15 o) et `vava_combat:lower` (≈ 25 o, un par
   garde abaissée, rien pendant la tenue) ; `vava_combat:hit` aux joueurs à 30 m de la cible dans l'instance de
   l'attaquant, **un par cible touchée** (l'issue d'un coup défendu le remplace), jamais pour un coup manqué ou refusé ;
+  depuis 1.4.0 le montant (+ 1 à 3 o) aux deux seuls participants, l'esquive et l'absorbé (≈ 25 o) à eux seuls ;
   `vava_combat:notify` (`core.net.send`) au seul porteur dont l'arme passe un seuil, au seul attaquant dont le coup est
   retenu (un par raison et par 10 s) ou au seul membre du Conseil sans `vava_chat` ; le statebag du bouclier au
   changement seulement ; + ≈ 450 o une fois dans `GlobalState['vava_inventory:heldModels']` (mécanisme de
@@ -1894,12 +1918,22 @@ récupération) ; `VavaCombat.defense.spend(src, 'block' | 'parry' | 'dodge', { 
 `ok, broken` : coût d'un geste défensif, seul point que T-114 remplacera (1.3.0 : compteur provisoire pour `block`,
 toujours `true, false` sinon).
 
-**Évènement** `vava_combat:hit(attaquant, cible, issue)` (serveur → clients proches, `core.net.sendNearWith` avec
-l'instance de l'attaquant, 30 m autour de la cible) : `issue` ∈ `hit`, `stagger`, `down`, `block` (même partiel : rien
-ne tressaille), `parry` (l'attaquant chancelle), `break` (garde brisée : la cible chancelle) ; `dodge` et `absorb`, que
-personne ne montre, ne sont pas envoyés (`config.reactions.silent`, jamais `parry` ni `break`) ; un coup d'une autre
-ressource défendu n'envoie rien. La cible joue sa réaction, l'attaquant entend la touche (`hit`, `stagger`, `down`),
-tous voient l'effet d'impact (étincelles pour `block`, `parry`, `break`). T-155 ajoutera le montant en 4e valeur.
+**Évènement** `vava_combat:hit(attaquant, cible, issue[, dixièmes])` (serveur → joueurs de l'instance de l'attaquant à
+30 m de la cible, listes calculées par le serveur) : `issue` ∈ `hit`, `stagger`, `down`, `block` (même partiel : rien
+ne tressaille), `parry` (l'attaquant chancelle), `break` (garde brisée : la cible chancelle), `dodge`, `absorb` ; un coup
+d'une autre ressource défendu n'envoie rien. La cible joue sa réaction, l'attaquant entend la touche (`hit`, `stagger`,
+`down`), tous voient l'effet d'impact (étincelles pour `block`, `parry`, `break`).
+**Chiffres des coups** (1.4.0, T-155, `config.numbers`) : l'attaquant (`numbers.attacker`) et la cible
+(`numbers.target`) reçoivent **une 4e valeur** : le montant du coup après modificateurs (`result.amount`, jamais la vie
+retirée) en dixièmes entiers (0 à 2 000 ; `weapons.wireAmount`), ou **`false`** pour une issue sans montant (`parry`,
+`dodge`, `absorb`, `block` ou `break` dont rien n'a passé) — `false` et non `nil`, qu'un message perdrait en fin de
+liste ; leur client appelle `vava_hud:hitText` (`dealt` chez l'attaquant, `taken` chez la cible). Les témoins
+reçoivent le message à 3 valeurs, comme en 1.3.0, et jamais `dodge` ni `absorb` (`config.reactions.silent`, jamais
+`parry` ni `break`), qui ne partent donc qu'aux participants désignés ; un participant non désigné est traité en témoin.
+Recherche des proches : `core.net.playersNear(…, { bucket })` ; destinataires d'une même charge réunis en une liste
+(`core.net.send`) : deux envois au plus par coup (participants, témoins), un s'il n'y a pas de témoin.
+`numbers.witnesses = true` : les témoins reçoivent aussi le montant (jamais en v1). `numbers.enabled = false` :
+comportement de 1.3.0 (`core.net.sendNearWith`, 3 valeurs, esquive et absorbé tus pour tous).
 
 | Export serveur | Retour |
 |---|---|
@@ -2029,6 +2063,23 @@ restriction ; 1.2.0 : rengainement et mode combat, T-149).
   appel à `damage`, plus d'évènement `vava_magic:damage` au client : sans `vava_health`, les sorts ne blessent personne
   (le lanceur le lit au plus une fois par minute). Journal : `vava_health_hits` (`origin = vava_magic`) ;
   `vava_magic_damage_log` n'est plus écrit, purgé des lignes de plus de `combat.log.retentionDays` jours (30).
+- **Chiffres des sorts** (2.13.0, T-155, `config.numbers`) : issue et montant d'un coup lus dans le résultat de la
+  chaîne (`harm.outcome` : `amount` après modificateurs en dixièmes, jamais la vie retirée ; `dodge`, `parry`, `block`,
+  `absorb` pour un coup arrêté à leur étape ou entièrement pris ; `down` ; `tick` pour une zone qui dure ou une
+  brûlure ; sinon `hit` ; rien pour un coup retenu : zone de paix, combats coupés, crochet). **Victime**
+  (`numbers.target`) : `vava_magic:hit(réaction|false, dixièmes|false, issue?)`, toujours à elle seule — avec sa
+  réaction pour un coup qui blesse (`issue` absente pour `hit`), `réaction = false` pour une morsure de brûlure, une
+  esquive, un coup absorbé ou sans effet ; son client appelle `vava_hud:hitText('taken', …)`. **Lanceur**
+  (`numbers.caster`) : évènement nouveau `vava_magic:dealt(liste)` au seul lanceur, **un par tour
+  du serveur** où il a touché quelqu'un (fin du tour : `SetTimeout(0)` posé au premier touché), liste pure de 1 à
+  `maxPerMessage` (10 ; 1 à 32) entrées `{ cible, issue[, dixièmes] }` ; jamais quand il est lui-même la victime, rien
+  s'il n'a plus de personnage à la fin du tour ; son client appelle `hitText('dealt', cible, …)` pour chaque entrée
+  valide. `numbers.overTime = false` : ni morsures ni zones qui durent ; `numbers.enabled = false` : comportement de
+  2.12.0 (`vava_magic:hit(réaction)`, rien au lanceur). Config contrôlée au démarrage (`harm.checkNumbers` : quatre
+  booléens, `maxPerMessage` entier de 1 à 32 ; sinon le module ne démarre pas). Coût : + 1 à 3 o dans `vava_magic:hit`,
+  ≈ 23 o par morsure, esquive ou absorbé à la victime ; ≈ 18 o + ≈ 8 à 12 o par touché au lanceur. Les deux
+  évènements partent par `bridge.SendTo` (`core.net.send` : comptés par `/vava_reseau` ; core sans `core.net` : envoi
+  direct).
 - **Modificateurs** (registre `vava_health:modifiers`, redéclarés à chaque démarrage de `vava_health`) :
   `vava_magic:zones` (étape `annulation`, seulement si `combat.protectedZones` en compte : personne n'est blessé dans une
   zone de paix, ni par un sort ni par une lame, et personne n'en blesse un autre depuis l'intérieur ; annulé
@@ -2185,10 +2236,14 @@ jeu : `modules/vava_gathering/README.md`. Demande le core 0.11.0 (abonnements de
 `vava_skills` 1.0.0 ; facultatifs : `vava_hud`, `vava_admin` (droit `metiers`), `vava_chat`, `vava_health` (à terre),
 `vava_time` (saisons).
 
-- **Données** en `config_client.lua` (1.7.0 : le client les lit) : zones (centre, rayon, coût, régénération, cicatrice), nœuds (position, ressource, charges,
-  délai, props normal et épuisé — tous les nœuds ont un prop créé par le client), ressources (objet, compétence, outil,
-  difficulté, XP, fourchette, durée, animation, pièce supplémentaire), outils ; en `config.lua` : objets déclarés à
-  l'inventaire. Les zones livrées sont des exemples.
+- **Données** (1.8.0, T-102 : chaque entrée a une part client et une part serveur) : en `config_client.lua`, ce que
+  lit le client — outils (`{ kind }`), ressources (`{ label, tool?, anim, prop = { model, depleted } }` : l'apparence
+  d'un point est celle de sa ressource) ; en `config.lua`, servi au seul serveur — zones et nœuds (**graine** de
+  l'Atelier : version 1 au premier démarrage, puis la base fait foi ; sans l'Atelier, la récolte tourne dessus),
+  `resourceStats` (objet, compétence, difficulté, XP, fourchette, durée, pêche, pièce supplémentaire), `toolStats`
+  (puissance, bonus, usure), `looks` (apparence dite au Conseil), `editor` (atelier « Récolte »), objets déclarés à
+  l'inventaire. Mêmes identifiants des deux côtés, sinon le module refuse de démarrer avec le nom en cause. Les zones
+  livrées sont des exemples.
 - **État** (1.6.0) envoyé aux seuls joueurs proches par les abonnements de zone du core (§ `core.zones`) : une zone du
   core par zone de récolte (nom local = identifiant de la zone ; centre de la zone, rayon qui englobe ses nœuds au sol,
   marge `streaming.radius` + `streaming.subscribeSlack` = 100 m) ; état `zone` → `{ band, scarred }` et `n:<nœud>` →
@@ -2196,7 +2251,36 @@ jeu : `modules/vava_gathering/README.md`. Demande le core 0.11.0 (abonnements de
   La vitalité n'est jamais envoyée (export `getZone` et panneau `vava_gathering:zones` pour la lire). Plus aucune clé
   GlobalState (les anciennes `vava_gathering:zone:<id>` et `vava_gathering:node:<id>` sont effacées une fois au
   démarrage). État public (rien de secret) : chaque action revérifie la distance côté serveur. Identifiants : zone
-  48 octets au plus, nœud 46.
+  48 octets au plus, nœud 46. Depuis 1.8.0 (T-102), l'état porte aussi `def` → `{ nom, type, x, y, z, rayon }` et
+  `p:<nœud>` → `{ ressource, x, y, z, cap }` (ressource, lieu et cap d'un point), **listes** au format compact :
+  longueurs en centimètres entiers, cap en dixièmes de degré entiers dans [0, 3600) ; le client divise (relecture
+  réseau R-3). Le client ne lit plus aucune zone ni aucun nœud dans sa config. Ni coût, ni repos, ni cicatrice réglée,
+  ni charges maximales, ni repousse, ni nom d'un point dans l'état : changer la fatigue d'une zone n'envoie rien. 120
+  points au plus par zone (2 + 2 × 120 = 242 clés sur 256 ; ≈ 4,9 Ko pour 120 points aux identifiants courts, sous le
+  seuil du latent ; ≈ 15,9 Ko au pire, identifiants de 46 octets). Une récolte (charges, bande) ne fait regrouper aucun
+  point chez les abonnés (relecture réseau R-2). Construction de l'état : `shared/zonebuild.lua`, servi au seul
+  serveur.
+- **Atelier « Récolte »** (1.8.0, T-102) : atelier gardé `vava_gathering:zones` (famille monde, droit `metiers`,
+  `trialPlay`), types `zone` (cercle, rayon de 10 à 300 m) et `node` (« point », orienté, enfant d'une zone, à 5 m au
+  plus hors de son cercle, 2 m entre deux points), déclaré au démarrage et au hook `vava_atelier:editorsReady`. `apply`
+  et `remove` changent le catalogue à chaud, tout ou rien (vitalité et charges reprises de la base, gardées en base au
+  retrait ; récoltes en cours sur un point changé oubliées : `unknown_node` à la fin) et **notent** la zone ; la
+  diffusion part au seul appel marqué `info.last` : zone nouvelle déclarée entière, zone connue déplacée si son
+  cercle change puis sa différence (clés changées et retirées, par paquets de 64 dans le même tour), zone retirée
+  (`core.zones.remove`) ; garde de la boucle lente au-delà de `editor.flushGraceMs` (2 s). Au dernier appel d'un lot,
+  chaque zone touchée doit tenir dans les bornes d'une zone du core et garder chaque point dans son rayon + 5 m, sinon
+  `apply` / `remove` rend `false` : ce refus suit un catalogue déjà changé, réparé par le rapprochement de l'Atelier ;
+  d'ici là, la boucle lente garde la zone hors bornes notée et ne l'envoie jamais (une ligne en console). Règles : `validate` (nom
+  unique sans accents ni casse, type connu, lieu exigé à l'essai et à la publication, chevauchement de 10 m au plus
+  avec une autre zone publiée ; point : ressource connue, poisson ⇔ eau, dedans sa zone si elle n'est pas dans le lot),
+  `validateLot` (120 points, cercle neuf, écart, cercle englobant de 500 m), `placeCheck` (chevauchement, 256 zones,
+  120 points). **Essai à blanc** (décision du 31 octobre 2026) : la zone essayée et ses points ne sont envoyés qu'à
+  leur auteur (`vava_gathering:trial`, puis `trialEnd`), jamais dans l'état de zone ; seul l'auteur peut récolter un
+  point d'essai, avec tous les contrôles d'une vraie récolte, et rien n'est donné (ni objet, ni XP, ni usure, ni
+  vitalité, ni charge réelle, ni hook `harvesting` / `harvested`).
+- **Carte** (1.8.0) : la liste des zones n'est jamais poussée ; chaque client la garde en stockage local (KVP
+  `vava_gathering:map`, 16 Ko et 256 zones au plus, contrôlée à la relecture) avec sa version et la redemande une fois
+  par séance (RPC `vava_gathering:map`) ; une zone suivie corrige son blip depuis sa `def`.
 - **Serveur maître** : distance lue côté serveur au début et à la fin, durée revérifiée, jeton par geste, cooldown,
   une récolte à la fois. Pêche (1.4.0, décision du 30 octobre 2026 : le serveur tire la réussite) : le booléen « a
   tenu la tension » de `vava_gathering:reel` ne peut que faire rater (`false` : code `escaped`) ; à `true`, le serveur
@@ -2221,7 +2305,7 @@ config, ouvert aux autres modules (une hache d'artisan de phase 3 s'y déclare, 
 | Export serveur | Retour |
 |---|---|
 | `getZone(id)` | `{ id, label, kind, vitality, band, scarred, x, y, z, radius }` ou `nil, code` |
-| `getZones()` | liste, dans l'ordre de la config |
+| `getZones()` | liste, dans l'ordre de la graine puis de création dans l'Atelier (catalogue courant) |
 | `setVitality(id, valeur)` | `true` ou `false, code` — 0 à 100, lève la cicatrice si > 0 ; journalisé au nom du module |
 | `nodeState(id)` | `{ id, zone, resource, charges, max }` |
 | `getResource(id)` · `getTool(objet)` | définitions, ou `nil` |
@@ -2231,9 +2315,21 @@ config, ouvert aux autres modules (une hache d'artisan de phase 3 s'y déclare, 
 terre sacrée, nuit, état…), `harvested` (`after` : `+ quantity, tier, band, extra?`), `zoneDepleted` (`after` :
 `{ zone, vitality }`), `zoneScarred` (`{ zone, scarredUntil, depletions }`), `earthReaction` (`{ zone, depletions }`).
 
+| RPC (1.8.0) | Arguments | Réponse |
+|---|---|---|
+| `vava_gathering:map` | version gardée (0 à 16 hexadécimaux) ; débit `map` (2, puis 1 / 20 s) | `{ version }` si elle n'a pas changé (≈ 30 o), sinon `{ version, zones = { { i, l, k, x, y, r } } }` (au mètre, ≈ 60 o par zone) ; `no_character` |
+
+| Évènement (1.8.0) | Cible | Charge |
+|---|---|---|
+| `vava_gathering:trial` | le seul auteur de l'essai (`core.net`, toujours fiable : `latent = 'never'`, l'essai entier puis ses différences arrivent dans l'ordre ; ≈ 0,1 Ko + 35 à 75 o par point : ≈ 8,9 Ko au pire pour 120 points aux identifiants de 46 octets, ≈ 13,3 Ko avant le format compact) | `{ zone, mode = 'full', def, nodes = { [id] = { ressource, x, y, z, cap, charges } } }` (format compact de l'état), puis `{ zone, mode = 'patch', def?, nodes?, hidden? }` (relance après une sauvegarde ou une pose ; charge d'essai prise : `nodes = { [id] = charges }`, un nombre) |
+| `vava_gathering:trialEnd` | le seul auteur, s'il est encore là | identifiant de la zone |
+
+La réponse de `vava_gathering:begin` porte `trial = true` pour un point d'essai, et `durationMs` est la seule durée du
+geste que lit le client (sa config ne la porte plus).
+
 **Commande** `/recolte zones | zone <id> | noeud <id> | vitalite <zone> <0-100> | recharger <noeud>` (droit `metiers`).
 Touches : `E` récolter, `O` panneau des zones (« Marquer » y pose le repère de la carte sur une zone). Carte : un blip
-nommé par zone et le cercle de son rayon, posés par le client depuis la config (`map`). Rendu hors jeu :
+nommé par zone et le cercle de son rayon, posés par le client depuis sa liste gardée (`map`, 1.8.0). Rendu hors jeu :
 `web/index.html?view=prompt` (ou `tension`, `zones`).
 
 ### `vava_crafting`
@@ -2645,7 +2741,9 @@ facultatif. Aucune table en base. Détail et réglages : `modules/vava_pause/REA
 
 Crochets client émis : `vava_pause:state` (`after`, `{ open }`), `vava_pause:settingChanged` (`after`, `{ key, value }`).
 Réglages du joueur (stockage local de FiveM, `vava_pause:reglages`, jamais envoyés au serveur) : `ui.scale` (90, 100,
-115 ; bannière et `vava_hud`), `hud.notifyDuration` (`courte`, `normale`, `longue` ; `vava_hud`), `voice.circle`
+115 ; bannière et `vava_hud`), `hud.notifyDuration` (`courte`, `normale`, `longue` ; `vava_hud`), `combat.numbers`
+(1.1.0, T-155 : `tous` = donnés et reçus, `infliges` = donnés seulement, `aucun` ; « Chiffres des coups », onglet
+Interface ; `vava_hud`, qui filtre en Lua : le serveur envoie les mêmes octets), `voice.circle`
 (levier ; `vava_voice`). Un réglage n'est montré que si une ressource de son `uses` tourne ; sa valeur effective est
 décidée par le module qui l'applique. Registre `core:commands` : touche `vava_pause` (« Déployer la bannière du
 royaume », `Échap ou P`, chapitre Royaume).
@@ -2715,7 +2813,7 @@ Registre). Touche `F9` (réglable ; `keys.open` de `config_client.lua` depuis 1.
 (T-101), un atelier dont le module déclare `apply` et `remove` est **gardé** : ses fiches vivent en base (une ligne par
 version), avec brouillon, essai, publication groupée, retour en arrière, retrait, historique ; la config du module est
 la graine, la base fait foi. Un atelier sans `apply` reste en lecture (comportement de 1.0.0). Le placement en jeu vient
-avec T-102.
+avec T-102 (1.3.0, § « Outil de placement » ci-dessous).
 
 **Déclarer un éditeur** (registre `vava_atelier:editors`, 32 entrées au plus ; clé `<ressource>:<nom>` au motif
 `^[%w_]+:[%w_]+$`, 64 octets ; une clé dont le préfixe n'est pas la ressource qui l'ajoute est retirée aussitôt). Un
@@ -2836,7 +2934,7 @@ qu'il détient. La recopie au Registre et le hook `vava_atelier:journal` partent
 | `vava_atelier:editorsReady` | serveur, after | `{}` — fin du démarrage : (re)déclarer ses éditeurs |
 | `vava_atelier:session` | serveur, after | `{ source, accountId, open }` |
 | `vava_atelier:journal` | serveur, after | `{ id, editor, kind, defId?, action, title, summary?, version?, actor = { accountId?, label } }` |
-| `vava_atelier:state` | client, local | `{ open }` |
+| `vava_atelier:state` | client, local | `{ open, placing, suspended }` (T-102 : `placing` pendant la visée ; `open = false, suspended = true` pendant l'essai joué) |
 
 #### Définitions gardées (T-101, `vava_atelier` 1.1.0)
 
@@ -2969,6 +3067,87 @@ jamais rien et garde les brouillons ; résumé puis `confirmer` sous 60 s.
 Exemple complet, sans une ligne d'interface : `examples/vava_example_atelier` (mode développement). Hors jeu :
 `web/index.html?screen=home` (puis `list`, `entry`, `entry&layout=side`, `journal`, `confirm`, `keys`…), données
 simulées de `web/dev/devmock.js`, jamais livré.
+
+#### Outil de placement (T-102, `vava_atelier` 1.3.0)
+
+Un type à `placement` (`point`, `oriented`, `circle`, `polygon` ; `door` reste à T-106 : l'outil refuse de démarrer
+dessus) se pose **en jeu** : visée depuis la caméra, aperçu vert ou rouge avec sa raison, molette (cap, rayon), `Maj`
+(pas fin), clic droit (choisir un point ou un sommet), `Ctrl+Z` (commande-touche `+vava_atelier_annuler`, `Z`, suit la
+disposition du clavier), `Entrée` (fermer un tracé), `Échap` (quitter ; un second appui sous 2 s abandonne un tracé
+commencé). La boucle par image ne vit que pendant la visée, chez le seul membre ; les fantômes sont des objets locaux.
+**Le serveur ne croit aucun lieu du client** : il relit la position du personnage, la forme, la portée, les règles et
+le module à chaque pose. Une pose n'écrit qu'un **brouillon** : rien ne part aux joueurs avant la publication.
+
+**Déclaration** (en plus de T-101 ; toute autre clé reste refusée ; descripteur ≤ 32 Ko) — par type :
+
+```lua
+rules = {
+    inside = { slack = 5.0 },   -- dans le lieu du parent (cercle : r + slack ; tracé : dedans ou à slack m du bord) ;
+                                -- seulement pour un type à parent dont le parent est un cercle ou un tracé ; 0 à 50
+    spacing = 2.0,              -- au moins n m au sol des autres fiches du même type et du même parent ; 0 à 100
+    radius = { min = 10.0, max = 300.0, default = 60.0 },   -- cercle seulement ; 0 < min ≤ default ≤ max ≤ place.maxRadius
+    vertices = { min = 3, max = 32 },                       -- tracé seulement, dans place.polygonPoints
+},
+template = { 'ressource', 'charges', 'repousse' },  -- type à parent : champs du bloc « Prochain … à poser » (1 à 8,
+                                                    -- jamais le titleField) ; leurs valeurs partent avec chaque clic
+autoTitle = 'ressource',          -- type à parent, champ select ou segmented : titre d'un enfant nouveau = libellé du
+                                  -- choix + premier numéro libre parmi les frères (« Chêne 4 »)
+hintField = 'charges', hintFormat = { one = '%s récolte', many = '%s récoltes' },
+                                  -- slider ou duration ; un texte, ou { one, many } accordé selon la valeur (`one`
+                                  -- pour 0 et 1) ; 24 octets, un seul %s chacun : indice d'une ligne
+ghost = { field = 'ressource',    -- select, segmented ou model : le fantôme suit ce champ
+          models = { chene = { model = 'prop_tree_oak_01', label = 'chêne de GTA', provisional = true } } },
+                                  -- models facultatif (sans lui : la valeur du champ est le modèle) ; 64 entrées,
+                                  -- model au motif ^[A-Za-z0-9_]+$ de 64 octets, label 40
+```
+
+— par éditeur : `trialPlay = true` (l'essai se joue en jeu : la page se met de côté, `F9` la rend) ; `texts.banner`
+(1 à 32 octets, facultatif : titre du bandeau du volet, sinon le libellé de l'atelier : « Atelier de la récolte ») ;
+`placeCheck(kind, place, ctx)` (facultatif, seulement avec `apply`) → `true` ou `false, 'texte'` (≤ 160) ;
+`ctx = { source, accountId, id, parent?, data, siblings, parentData? }` : `id` vaut `''` pour une fiche nouvelle, `data`
+est la data normalisée (celle du modèle pour un enfant nouveau), `siblings` le nombre de frères vivants après la pose,
+`parentData` la data du parent telle que le membre la voit (son brouillon s'il en tient un, sinon la publiée) ; `place` est
+déjà arrondi et a passé les règles déclarées. Sert à ce que les règles ne savent pas dire (chevauchement de deux zones,
+nombre de points d'une zone). Le placement **n'appelle pas** `validate` : `validate` reste juge de tout, lieu compris,
+à l'essai et à la publication. `trial` reçoit aussi `ctx.removed = { { kind, id } }` (retraits préparés du lot, à
+cacher pendant l'essai) avec `reason = 'start'`.
+
+| RPC | Arguments | Débit | Réponse |
+|---|---|---|---|
+| `vava_atelier:place` | atelier, type, fiche (`''` : nouvelle), révision lue, lieu `{ x?, y?, z?, h?, r?, points? }` (nombres bornés, 3 à 32 sommets), parent (`''` : aucun), valeurs — fiche nouvelle : valeurs du modèle et parent (type à parent) ; fiche existante : valeurs vides, parent `''` ou son propre parent (« Poser des points » depuis la fiche parent) | 6, puis 2 / s | `{ done = true, id, rev, title, state, footer, place, row = { kind, id, title, hint?, tone, place, look?, rev }, parent = { id, rev, state, footer }? }` ; refus de lieu `{ done = false, errors = { { field = 'place', text } } }` ; refus de structure `false, code` |
+| `vava_atelier:children` | atelier, type, fiche | 4, puis 1 / s | `{ self = { place? }, parent = { kind, id, title, place? }?, rows }` — `rows` : les enfants de la fiche (type parent) ou ses frères, elle comprise (type enfant), 200 au plus, triés par titre ; `tone` ∈ `live`, `draft`, `new`, `removal`, `other` ; `look` (fantôme) pour une ligne pas encore publiée |
+
+Contrôles de `place`, dans l'ordre : séance, personnage, droit effectif relu (T-100) ; atelier gardé et disponible,
+type placé (`not_placeable`) ; instance du royaume (`placement.bucket`, sinon `instance`) ; personnage présent, position
+lue par le serveur (`not_ready`) ; forme du lieu (`place.check` : clés de la forme seulement, nombres finis, bornes,
+arrondis) ; portée : centre à `placement.reach` (60 m, 3D), chaque sommet d'un tracé à `reach × polygonFactor` (120 m,
+au sol) ; fiche nouvelle : valeurs du modèle par la forme et le monde, parent vivant (publié, ou brouillon du membre ;
+sinon `parent_missing`), titre donné tout seul, plafonds (`full`) ; fiche existante : vivante (`unknown_entry`), sans
+valeurs (`bad_request`) ; règles déclarées avec le lieu du parent et ceux des frères lus en base ; `placeCheck` ;
+écriture sous les verrous de la fiche et de son parent (table de décision `lc.placePlan` : `draft_taken`, `not_holder`,
+`stale`, `bad_request` ; brouillon du parent copié de sa publiée **dans la même transaction** s'il le faut) ; puis essai
+du membre relancé (un enfant nouveau du tenant rejoint l'essai), `entryChanged saved` aux autres membres sur la fiche
+et sur son parent. Journal : une fiche sans parent créée par une pose → `created` ; premier brouillon d'une publiée →
+`saved` ; un enfant posé → aucune ligne (la publication dit « 5 points ajoutés, déplacée de 12 m »). Codes ajoutés :
+`not_placeable`, `instance`, `bad_request`.
+
+`read` rend aussi `place` (lieu de la fiche lue) et `parent`. Aucun RPC pour annuler : `Ctrl+Z` d'une création appelle
+`discard`, d'un déplacement `place` avec le lieu d'avant. Base : `sql/0003_parent_index.sql` (index `editor, parent`
+des enfants).
+
+**Messages entre le jeu et la page** (aucun à chaque image) — Lua → page : `placing { on, mode = 'self' | 'children',
+shape, keys }`, `placed { kind, id, rev, title, state, footer, place, distance?, row, parent? }`, `placeRefused { text }`,
+`undone { kind, id, rev?, place?, gone? }`, `suspended { on }` (la page compose la ligne d'essai : `texts.trialLine` de
+l'atelier et la touche de retour). Page → Lua : `children { editor, kind, id }` (relais ; la réponse est gardée pour
+l'outil, avec `self.distance`), `placeStart { editor, kind, id, rev, mode, shape, rules, title, ghost? }` — en mode
+`children` : `kind` = le type enfant, `id = ''`, `rev = 0`, plus `parent` (la fiche ouverte), `parentRev`, `template`,
+`label` (libellé du choix `autoTitle` courant) —, `placeStop`, `templateChanged { values, ghost?, label? }`,
+`goTo { x, y }` (repère GPS seulement), `suspend`. `read` reçoit aussi `distance` (mètres du personnage au lieu, calculés
+par le client). Chaque valeur reçue de la page est bornée par le Lua (forme connue, nombres finis, modèle au motif).
+
+**Coût** : une pose ≈ 0,4 Ko aller-retour, `children` ≈ 0,7 Ko pour 5 points (≈ 22 Ko au pire, latent au-delà de
+8 Ko), tout vers le seul membre ; rien aux autres joueurs avant la publication. Client : 0,00 ms hors visée ; en visée,
+un lancer de rayon par image, ≤ 3 marqueurs d'aire, ≤ 12 étiquettes, ≤ 13 fantômes.
 
 ### `vava_chat`
 

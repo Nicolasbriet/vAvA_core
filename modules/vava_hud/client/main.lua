@@ -1,11 +1,9 @@
 --[[
     vava_hud/client/main.lua
-    Rôle : exports (jauges, notifications, progression), retrait de l'interface native de GTA, et visibilité du HUD :
-           affiché quand un personnage est en jeu, masqué pendant la sélection, le menu pause et les fondus au noir
-           (apparition, chargement) et, depuis 1.6.0, pendant la bannière du royaume (vava_pause). Une progression en
-           cours est interrompue au retour à la sélection.
+    Rôle : exports, retrait de l'interface native de GTA, visibilité du HUD (personnage en jeu ; masqué en sélection,
+           menu pause, fondu, bannière) ; progression interrompue à la sélection, chiffres effacés HUD masqué.
     Dépendances : config_client.lua, client/core.lua, client/nui.lua, client/gauges.lua, client/native.lua,
-                  client/notify.lua, client/progress.lua, client/pause.lua
+                  client/notify.lua, client/progress.lua, client/pause.lua, client/numbers.lua
 ]]
 
 local CreateThread, Wait, AddEventHandler = CreateThread, Wait, AddEventHandler
@@ -17,7 +15,7 @@ if not core then return end
 
 local cfg = VavaHud.config
 local nui, gauges, native, notify, progress = VavaHud.nui, VavaHud.gauges, VavaHud.native, VavaHud.notify, VavaHud.progress
-local pause = VavaHud.pause
+local pause, numbers = VavaHud.pause, VavaHud.numbers
 
 -- personnage en jeu (apparu), d'après les hooks du core
 local playing = core.characters.current() ~= nil and not core.characters.awaitingSelection()
@@ -32,13 +30,14 @@ local function refresh()
     local show = shouldShow()
     if show == visible then return end
     visible = show
+    numbers.setVisible(show)
     nui.send('visible', { visible = show })
 end
 
 nui.onReady(function()
     return {
         position = cfg.position, gauges = gauges.all(), visible = visible, notifications = cfg.notifications,
-        progress = progress.snapshot(), settings = pause.settings(),
+        progress = progress.snapshot(), settings = pause.settings(), numbers = numbers.settings(),
     }
 end)
 -- bannière déployée ou repliée (1.6.0) : visibilité relue aussitôt, sans attendre le prochain relevé
@@ -65,6 +64,9 @@ exports('progress', function(id, options) return progress.start(caller(), id, op
 exports('cancelProgress', function(id) return progress.cancel(caller(), id) end)
 --- Progression en cours : { id, label, endsAt } (horloge GetGameTimer), ou nil.
 exports('currentProgress', function() return progress.current() end)
+--- Chiffre d'un coup (T-155) : side 'dealt' | 'taken', ancre (numéro serveur d'un joueur ou point { x, y, z }), issue,
+--- dixièmes (nil ou 0 à 2 000). Rend true, ou false et un code. Affichage seulement : jamais une décision.
+exports('hitText', function(side, anchor, issue, tenths) return numbers.hit(side, anchor, issue, tenths) end)
 
 core.hooks.after('core:character:spawning', function()
     playing = true

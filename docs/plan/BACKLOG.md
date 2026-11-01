@@ -725,6 +725,27 @@ versé à T-014 ; les autres points déjà couverts sont précisés dans T-012 �
   `--[[ ]]` dans une chaîne, `--` dans une chaîne) ; numéros de ligne des erreurs gardés (lignes vides laissées) ;
   mesure avant et après par `scripts/poids-client.sh` ; aucune dépendance ajoutée.
 
+### T-157 — Code de l'Atelier livré au seul Conseil — **décision du porteur du projet**
+- Agents : vava-architecte → vava-dev-lua + vava-dev-nui · Dépend de : T-102 · Statut : à faire (proposée, à valider par
+  le porteur du projet avant de la prendre : changement d'architecture et d'outillage)
+- Trouvé pendant T-102 (relecture réseau R-1, piste pour le porteur du projet) : ≈ 51 Ko de code de `vava_atelier`
+  (outil de placement, séance, relais, page) ne servent qu'au Conseil mais sont téléchargés par tous les joueurs.
+  Proposition : livraison à la demande, en latent, à l'ouverture de l'Atelier par un membre (droit relu), gardée en
+  stockage local (KVP) avec son empreinte et chargée par `load` ; rien pour un joueur hors du Conseil.
+- Critères : un joueur hors du Conseil ne télécharge plus ce code (`scripts/poids-client.sh`, `/vava_reseau`) ; un
+  membre le reçoit une fois par version (empreinte) ; code chargé seulement après contrôle de l'empreinte ; aucune
+  dépendance ajoutée ; mesure avant et après.
+
+### T-158 — Disposition des zones de récolte gardée par le client
+- Agents : vava-architecte → vava-dev-lua · Dépend de : T-102 · Statut : à faire
+- Trouvé pendant T-102 (relecture réseau R-6) : chaque entrée dans une zone de récolte renvoie son état entier, lieux
+  des points compris (≈ 5 Ko pour 120 points), alors que la disposition ne change qu'à une publication de l'Atelier.
+  Proposition : une empreinte de la disposition (`def` et `p:`) dans l'état de zone, la disposition gardée en stockage
+  local (KVP) par zone, un RPC seulement si l'empreinte reçue diffère de celle gardée ; ≈ 1,4 Ko par entrée au lieu
+  de ≈ 5 Ko.
+- Critères : à la seconde entrée dans une zone inchangée, aucun lieu de point n'est reçu (`/vava_reseau`) ; une zone
+  republiée est relue une fois ; KVP bornée et contrôlée à la relecture (comme la liste de la carte) ; essais.
+
 ### T-148 — Fichiers `shared/` absents du manifeste
 - Agent : vava-dev-lua · Dépend de : T-132 · Statut : à faire
 - Trouvé pendant T-146 : rien ne vérifie qu'un `shared/*.lua` présent dans un module est bien listé à son manifeste ;
@@ -996,7 +1017,15 @@ maquettes.
   redémarrage.
 
 ### T-102 — Outil de placement et créateur de récolte
-- Agents : vava-architecte → vava-dev-lua + vava-dev-nui · Dépend de : T-101, T-015, T-141 · Statut : à faire
+- Agents : vava-architecte → vava-dev-lua + vava-dev-nui · Dépend de : T-101, T-015, T-141 · Statut : à tester en jeu
+  (relu sécurité, réseau et lore, deux contre-relectures ; suites appliquées)
+- Fait le 1er novembre 2026 : `vava_atelier` 1.3.0, `vava_gathering` 1.8.0 (pages dans `agents/T-102-nui`) ; rapport
+  `docs/plan/rapports/T-102.md` ; procédures en jeu `docs/tests/atelier.md` § 19 à 25 et `docs/tests/metiers.md` § 3.5.
+- Spec : `docs/plan/specs/T-102.md`, avec les décisions du porteur du projet du 31 octobre 2026 (essai à blanc, recommandations
+  retenues). Rapport : `docs/plan/rapports/T-102.md` (et `T-102-nui.md` pour les pages) ; procédure en jeu :
+  `docs/tests/atelier.md` § 19 à 24, `docs/tests/metiers.md` § 3.5. `vava_atelier` 1.3.0, `vava_gathering` 1.8.0.
+  Reste hors de ce lot : `vava_example_atelier` 1.2.0 (enclos en tracé, bornes) de la spec § 2.1, pour essayer en jeu
+  les formes que la récolte n'utilise pas (point, polygone).
 - Outil de placement commun (point, point orienté avec modèle, cercle, polygone ; aperçu vert/rouge ; molette,
   `Maj`, clic droit, `Ctrl+Z`, `Échap` ; barre des touches) sur le modèle de l'éditeur de `vava_voice`.
 - `vava_gathering` déclare ses éditeurs zone et point (maquette `Recolte`) ; « Tester la récolte » en essai.
@@ -1007,6 +1036,8 @@ maquettes.
   serveur (`resources.*` : objet, compétence, difficulté, XP, rendement, pièce en plus, 1 045 o ; `tools.*` : puissance,
   bonus, usure, 285 o ; `zones` et `nodes` : coût, régénération, cicatrice, charges, 411 o). En passant ces données à
   l'Atelier, donner à chaque entrée une part client et une part serveur (contrôle T4 de `config_split_spec` vert).
+  **Fait** (1.8.0) : `zones` et `nodes` dans `config.lua` (graine), `resourceStats` et `toolStats` dans `config.lua`,
+  `resources` (libellé, outil, geste, modèles) et `tools` (genre) seuls dans `config_client.lua` ; T4 vert.
 
 ### T-103 — Créateur d'agriculture
 - Agent : vava-dev-lua (+ vava-dev-nui si widget) · Dépend de : T-102, T-016 · Statut : à faire
@@ -1184,7 +1215,7 @@ faire tout le système de combat ») : la porte T-119 reste à passer en jeu.
   par le crochet `vava_combat:using` ; XP de défense par le hook `vava_combat:defended`.
 
 ### T-155 — Chiffres des coups (dégâts affichés)
-- Agents : vava-architecte → vava-dev-lua · Dépend de : T-112 (après T-113, même module) · Statut : à faire
+- Agents : vava-architecte → vava-dev-lua + vava-dev-nui (cette tâche autorise à toucher `vava_hud`, `vava_pause`, `vava_magic`) · Dépend de : T-112 (après T-113, même module) · Statut : à tester en jeu (relu sécurité, réseau et lore ; suites appliquées)
 - Demande du porteur du projet (31 octobre 2026), « comme les MMO » : le montant de chaque coup s'affiche au-dessus de
   la cible, le temps d'un souffle (chiffre qui monte et s'efface) ; issues sans dégâts écrites en mots (« Paré »,
   « Bloqué », « Esquivé », « Absorbé ») ; coup qui met à terre ou fait chanceler distingué. Valable pour les coups
@@ -1194,6 +1225,22 @@ faire tout le système de combat ») : la porte T-119 reste à passer en jeu.
   réponse de `use`) ; quelques octets de plus, rien à chaque image hors du temps d'affichage.
 - Réglage du joueur pour les masquer (Réglages de la bannière `vava_pause`, stockage local) et réglage du serveur
   (activé, qui voit quoi) ; dessin sans NUI à chaque image ou par NUI avec envois des seuls changements (spec).
+- Fait le 1er novembre 2026 (branche `agents/T-155`, spec `docs/plan/specs/T-155.md`, rapport
+  `docs/plan/rapports/T-155.md`) : `vava_hud` 1.7.0 (export client `hitText`, chiffres posés sur la page, suivis toutes
+  les 100 ms tant qu'ils vivent, rien au repos ; réglage `combat.numbers` lu chez la bannière), `vava_pause` 1.1.0
+  (réglage « Chiffres des coups » : Donnés et reçus, Donnés seulement, Aucun), `vava_combat` 1.4.0 (montant en 4e
+  valeur de `vava_combat:hit` aux seuls attaquant et cible, `false` pour un mot ; esquivé et absorbé à eux seuls,
+  jamais aux témoins ; `config.numbers`), `vava_magic` 2.13.0 (montant dans `vava_magic:hit` pour la victime, morsures,
+  esquives et absorbés compris ; `vava_magic:dealt` au lanceur, un par tour du serveur ; `config.numbers`). Procédures
+  `combat` § 7 et `magie` § 21.
+- Fait le 2 novembre 2026 : relu sécurité (OK, 2 mineurs), réseau (R-1 important, 4 mineurs) et lore (2 à corriger,
+  mineurs) ; suites appliquées, versions inchangées : bornes des chiffres écrites une fois (`VavaCombat.TENTHS_MAX`,
+  `VavaMagic.NUMBERS`), liste refusée tracée ; envois de la magie (`vava_magic:hit`, `vava_magic:dealt`) comptés par
+  `core.net` (`bridge.SendTo`) ; relecture en double retirée côté client de la magie, issues au seul serveur ; bornes de
+  la config du HUD réduites à celles qui évitent une erreur ou un coût ; annotations et en-têtes livrés allégés ;
+  `maxPerMessage` 10 ; une lecture de la tête par chiffre, projection par ped et par passage, positions à 1e-4 ; tailles
+  des procédures et de la spec corrigées ; aide du réglage « Ce que vaut chaque coup, au-dessus de qui le reçoit. » ;
+  page allégée (`vava-dev-nui`). L-6 et L-8 laissés à T-119.
 
 ### T-156 — Mannequin d'entraînement
 - Agents : vava-architecte → vava-dev-lua · Dépend de : T-112 (après T-113, même module) ; T-102 pour le placement
@@ -1207,6 +1254,9 @@ faire tout le système de combat ») : la porte T-119 reste à passer en jeu.
   T-115).
 - Mannequins posés en config (coordonnées `-- PLACEHOLDER`) en v1, puis définition de l'Atelier (outil de placement de
   T-102) ; props créés à portée seulement ; état transmis aux seuls proches.
+- Note de T-155 : `exports.vava_hud:hitText('dealt', { x =, y =, z = }, issue, dixièmes)` accepte une ancre fixe (point
+  du mannequin, |x|, |y| ≤ 50 000, |z| ≤ 5 000) ; le mannequin envoie son montant à l'attaquant seul, par son propre
+  message ; `stagger` y sert de « comme si ».
 
 ### T-116 — La magie sur la chaîne de dégâts
 - Agent : vava-dev-lua · Dépend de : T-110 · Statut : à tester en jeu (relu sécurité et réseau, contre-relecture
@@ -1301,6 +1351,10 @@ faire tout le système de combat ») : la porte T-119 reste à passer en jeu.
   4 coups), seuils du compteur de garde ; réussite des parades à 30, 80, 150 ms de ping (test combat 4-23). Relecture
   sécurité de T-113 : observer ce que le serveur ne voit pas (garde tenue en sprint, gestes sans animation, pas de côté
   sans déplacement) ; mesurer le coût serveur des modificateurs (test combat 4-29, relecture réseau R-2).
+- Laissé par T-155 (spec § 13 et relecture lore) : durée, montée, cascade, couleurs et tailles des chiffres, `decimals` 0
+  ou 1 ; les témoins doivent-ils voir les mots (`parry`, `break`) ; un même mot sous deux allures (italique seul, petites
+  capitales sous un chiffre : n'en garder qu'une, L-6) ; « À terre » en rouge chez l'attaquant alors que le rouge dit
+  « reçu » partout ailleurs (L-8).
 
 ### T-159 — Filtre par étiquettes à l'inscription d'un modificateur de `vava_health`
 - Agent : vava-dev-lua (cette tâche autorise à toucher `vava_health`) · Dépend de : T-113 · Statut : à faire

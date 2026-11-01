@@ -79,6 +79,17 @@ config.combat.kinds = { feu = 'feu', eau = 'eau', terre = 'terre', lumiere = 'lu
 -- au démarrage du module, puis une fois par jour (0 : jamais)
 config.combat.log = { retentionDays = 30 }
 
+-- Chiffres des sorts (T-155) : la victime reçoit le montant dans vava_magic:hit (déjà envoyé à elle seule) ; le lanceur
+-- reçoit ce qu'il inflige par vava_magic:dealt, un message par tour du serveur où il a touché quelqu'un.
+config.numbers = {
+    enabled = true,       -- false : comportement de 2.12.0 (vava_magic:hit sans montant, rien au lanceur)
+    caster = true,        -- le lanceur voit ce que ses sorts infligent
+    target = true,        -- la victime voit ce qu'elle reçoit (morsures de brûlure, esquives, absorbés compris)
+    overTime = true,      -- morsures de brûlure et zones qui durent (mur de flammes, vapeur) : petits chiffres
+    maxPerMessage = 10,   -- touchés d'un tour dans un même message au lanceur (au-delà : ignorés) ; 1 à 32 ; pas plus que
+                          -- les chiffres à l'écran de vava_hud (numbers.maxAlive, 10)
+}
+
 -- Protections magiques, tenues par le serveur et portées par la chaîne de dégâts de vava_health : un bouclier
 -- absorbe les coups (sorts et lames) jusqu'à sa réserve (modificateur `vava_magic:protections`, étape bouclier) ;
 -- une résistance retire une part des dégâts d'un type, une faiblesse en ajoute une (`vava_magic:resistances`,
