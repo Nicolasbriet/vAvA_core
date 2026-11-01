@@ -193,28 +193,35 @@ fi
 signal BLOQUANT '(query|single|scalar|insert|update|execute|prepare)[A-Za-z]*\([[:space:]]*[^,]*\.\.' "SQL construit par concaténation (utiliser ?)"
 signal BLOQUANT 'loadstring\(|[=(,][[:space:]]*load\([[:space:]]*["'"'"'a-z_]+[^)]*\)\(\)' "exécution de code dynamique"
 
-# --- Code dynamique (T-157) : `load` de Lua dans un fichier de modules/ ou examples/ (exemples compris), appelé
-# (`load(`, `load (`), passé ou rangé comme valeur (`pcall(load, …)`, `local f = load`), ou lu dans `_G` / `_ENV`
-# (`_G.load`, `_ENV['load']`) ; `x.load(`, `x:load(`, `LoadResourceFile(` ne comptent pas, ni la définition d'une
-# fonction nommée load (`local function load(` ; son appel reste signalé). Cherché dans le code seul : commentaires
-# retirés (`--[[ … ]]` compris), contenu des chaînes longues retiré, chaînes courtes gardées (`_G['load']`). Seuls
-# permis : les appels inscrits dans scripts/audit-exceptions.txt avec leur raison (chargeur et construction du paquet du
-# Conseil de vava_atelier) ; « audit: ok » ne fait rien taire.
+# --- Code dynamique (T-157, renforcé par la relecture sécurité S-4) : dans un fichier Lua de modules/ ou examples/,
+# relevé dans le code seul (commentaires `--` et `--[[ ]]` retirés, contenu des chaînes retiré sauf une chaîne qui vaut
+# exactement load, loadfile, loadstring, dofile, _G ou _ENV) : tout mot `load`, `loadfile`, `loadstring` ou `dofile` qui
+# n'est pas précédé de `.` ou `:` (appel, valeur passée, rangée, alias, `x and load or nil`, `(load)(…)`), et tout mot
+# `_G` ou `_ENV` (`rawget(_G, …)`, `_G[…]`, `local n = _G`). Ne comptent pas : `x.load(`, `x:load(`,
+# `LoadResourceFile(`, la définition d'une fonction nommée load (`local function load(` ; ses appels comptent) et le nom
+# déclaré par `local load =`. Exception : seulement par une ligne de scripts/audit-exceptions.txt dont l'extrait est la
+# ligne ENTIÈRE (commentaire de fin retiré, bords ignorés) ; « audit: ok » ne fait rien taire.
 LOAD_AWK='
-function verifie(code) {
-    gsub(/function[ \t]+load[ \t]*\(/, "function _(", code)
-    if (code ~ /(^|[^A-Za-z0-9_.:])load[ \t]*(\(|$|[,)};])/ ||
-        code ~ ("(_G|_ENV)[ \t]*([.][ \t]*load([^A-Za-z0-9_]|$)|\\[[ \t]*[\"" Q "]load[\"" Q "])"))
-        print FILENAME ":" FNR ":" ligne
+function special(s) { return s == "load" || s == "loadfile" || s == "loadstring" || s == "dofile" || s == "_G" || s == "_ENV" }
+function verifie(code, kept,    c) {
+    c = code
+    gsub(/function[ \t]+load[ \t]*\(/, "function _(", c)
+    sub(/^[ \t]*local[ \t]+load[ \t]*=/, "local _ =", c)
+    if (c ~ /(^|[^A-Za-z0-9_.:])(load|loadfile|loadstring|dofile)([^A-Za-z0-9_]|$)/ ||
+        c ~ /(^|[^A-Za-z0-9_.:])(_G|_ENV)([^A-Za-z0-9_]|$)/) {
+        sub(/^[ \t]+/, "", kept); sub(/[ \t]+$/, "", kept)
+        print FILENAME ":" FNR ":" ligne "\037" kept
+    }
 }
 FNR == 1 { mode = "" }
 {
-    l = $0; sub(/\r$/, "", l); ligne = l; n = length(l); i = 1; code = ""
+    l = $0; sub(/\r$/, "", l); ligne = l; n = length(l); i = 1; code = ""; kept = ""
     while (i <= n) {
         if (mode == "C" || mode == "L") {
             k = index(substr(l, i), ferme)
-            if (!k) break
-            i += k - 1 + length(ferme); if (mode == "L") code = code "\"\""; mode = ""; continue
+            if (!k) { if (mode == "L") kept = kept substr(l, i); break }
+            if (mode == "L") { kept = kept substr(l, i, k - 1 + length(ferme)); code = code "\"\"" }
+            i += k - 1 + length(ferme); mode = ""; continue
         }
         ch = substr(l, i, 1)
         if (ch == "-" && substr(l, i + 1, 1) == "-") {
@@ -224,21 +231,39 @@ FNR == 1 { mode = "" }
             break
         }
         if (ch == "[" && match(substr(l, i), /^\[=*\[/)) {
-            ferme = "]" substr(l, i + 1, RLENGTH - 2) "]"; mode = "L"; i += RLENGTH; continue
+            ferme = "]" substr(l, i + 1, RLENGTH - 2) "]"; mode = "L"; kept = kept substr(l, i, RLENGTH)
+            i += RLENGTH; continue
         }
         if (ch == "\"" || ch == Q) {
             j = i + 1
             while (j <= n && substr(l, j, 1) != ch) j += (substr(l, j, 1) == "\\") ? 2 : 1
-            code = code substr(l, i, j - i + 1); i = j + 1; continue
+            inner = substr(l, i + 1, j - i - 1)
+            code = code (special(inner) ? " " inner " " : "\"\""); kept = kept substr(l, i, j - i + 1)
+            i = j + 1; continue
         }
-        code = code ch; i++
+        code = code ch; kept = kept ch; i++
     }
-    verifie(code)
+    verifie(code, kept)
 }
 '
+# exception de ligne entière : « chemin:ligne:contenu<US>code de la ligne » gardée sauf si une exception du même chemin a
+# pour extrait exactement ce code (bords ignorés)
+filtrer_ligne_entiere() {
+    local ligne chemin code i extrait garde
+    while IFS= read -r ligne; do
+        [[ -z "$ligne" ]] && continue
+        code="${ligne#*$'\037'}"; ligne="${ligne%%$'\037'*}"; chemin="${ligne%%:*}"; garde=1
+        for i in "${!exc_chemin[@]}"; do
+            extrait="${exc_extrait[$i]}"
+            extrait="${extrait#"${extrait%%[![:space:]]*}"}"; extrait="${extrait%"${extrait##*[![:space:]]}"}"
+            if [[ "${exc_chemin[$i]}" == "$chemin" && "$extrait" == "$code" ]]; then garde=0; break; fi
+        done
+        [[ $garde -eq 1 ]] && printf '%s\n' "$ligne"
+    done
+}
 if [[ ${#lua_code[@]} -gt 0 ]]; then
-    res=$(awk -v Q="'" "$LOAD_AWK" "${lua_code[@]}" 2>/dev/null | filtrer code strict || true)
-    noter BLOQUANT "load de Lua (code exécuté à la volée) hors des appels inscrits aux exceptions (T-157)" "$res"
+    res=$(awk -v Q="'" "$LOAD_AWK" "${lua_code[@]}" 2>/dev/null | filtrer_ligne_entiere || true)
+    noter BLOQUANT "code exécuté à la volée (load, loadfile, loadstring, dofile, _G, _ENV) hors des lignes inscrites aux exceptions (T-157)" "$res"
 fi
 # --- fin du bloc T-157
 lua_sans_chancellerie=(); for f in "${lua[@]}"; do [[ "$f" == modules/vava_chancellerie/* ]] || lua_sans_chancellerie+=("$f"); done
