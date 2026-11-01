@@ -17,11 +17,11 @@ if [[ "${1:-}" == "--essai" ]]; then ESSAI=1; shift; fi
 # Exceptions justifiées : une par ligne « chemin<TAB>extrait exact du contenu de la ligne<TAB>raison » ; un chemin qui
 # finit par « / » couvre les constats de fichier (« [fichier] ») de tout le dossier, et rien d'autre.
 EXCEPTIONS="scripts/audit-exceptions.txt"
-lua=(); web=(); chemins=(); manifestes=()
+lua=(); web=(); chemins=(); manifestes=(); lua_code=()
 declare -A lieu_chemin=()   # essai : chemin fictif → « tests/audit/chemins.txt:ligne »
 if [[ $ESSAI -eq 1 ]]; then
     EXCEPTIONS="tests/audit/exceptions.txt"
-    for f in tests/audit/*.lua; do [[ -f "$f" ]] && lua+=("$f"); done
+    for f in tests/audit/*.lua; do [[ -f "$f" ]] && lua+=("$f") && lua_code+=("$f"); done
     for f in tests/audit/*.css tests/audit/*.svg tests/audit/*.html tests/audit/*.js; do [[ -f "$f" ]] && web+=("$f"); done
     [[ -f tests/audit/fxmanifest.lua ]] && manifestes+=(tests/audit/fxmanifest.lua)
     if [[ -f tests/audit/chemins.txt ]]; then
@@ -38,6 +38,7 @@ else
         [[ -f "$f" ]] || continue
         case "$f" in modules/*/web/*) chemins+=("$f") ;; esac
         case "$f" in modules/*/fxmanifest.lua|examples/*/fxmanifest.lua) manifestes+=("$f") ;; esac
+        case "$f" in modules/*.lua|examples/*.lua) lua_code+=("$f") ;; esac
         case "$f" in
             chancellerie/*|tests/*|examples/*) ;;
             *.lua) lua+=("$f") ;;
@@ -191,6 +192,83 @@ fi
 
 signal BLOQUANT '(query|single|scalar|insert|update|execute|prepare)[A-Za-z]*\([[:space:]]*[^,]*\.\.' "SQL construit par concaténation (utiliser ?)"
 signal BLOQUANT 'loadstring\(|[=(,][[:space:]]*load\([[:space:]]*["'"'"'a-z_]+[^)]*\)\(\)' "exécution de code dynamique"
+
+# --- Code dynamique (T-157, renforcé par la relecture sécurité S-4) : dans un fichier Lua de modules/ ou examples/,
+# relevé dans le code seul (commentaires `--` et `--[[ ]]` retirés, contenu des chaînes retiré sauf une chaîne qui vaut
+# exactement load, loadfile, loadstring, dofile, _G ou _ENV) : tout mot `load`, `loadfile`, `loadstring` ou `dofile` qui
+# n'est pas précédé de `.` ou `:` (appel, valeur passée, rangée, alias, `x and load or nil`, `(load)(…)`) ; tout mot
+# `_G` ou `_ENV`, même précédé de `.` (`rawget(_G, …)`, `_G[…]`, `local n = _G`, `package.loaded._G`) ; et (contre-
+# relecture C-1) tout mot `debug` non précédé de `.` ou `:` sauf `debug.traceback` (`debug.getregistry()`,
+# `debug.getupvalue`…), tout mot `package` non précédé de `.` ou `:` (`package.loaded`). Ne comptent pas : `x.load(`, `x:load(`,
+# `LoadResourceFile(`, la définition d'une fonction nommée load (`local function load(` ; ses appels comptent) et le nom
+# déclaré par `local load =`. Exception : seulement par une ligne de scripts/audit-exceptions.txt dont l'extrait est la
+# ligne ENTIÈRE (commentaire de fin retiré, bords ignorés) ; « audit: ok » ne fait rien taire.
+LOAD_AWK='
+function special(s) { return s == "load" || s == "loadfile" || s == "loadstring" || s == "dofile" || s == "_G" || s == "_ENV" || s == "debug" || s == "package" }
+function verifie(code, kept,    c) {
+    c = code
+    gsub(/function[ \t]+load[ \t]*\(/, "function _(", c)
+    sub(/^[ \t]*local[ \t]+load[ \t]*=/, "local _ =", c)
+    gsub(/(^|[^A-Za-z0-9_.:])debug[ \t]*\.[ \t]*traceback([^A-Za-z0-9_]|$)/, " _ ", c)
+    if (c ~ /(^|[^A-Za-z0-9_.:])(load|loadfile|loadstring|dofile|debug|package)([^A-Za-z0-9_]|$)/ ||
+        c ~ /(^|[^A-Za-z0-9_])(_G|_ENV)([^A-Za-z0-9_]|$)/) {
+        sub(/^[ \t]+/, "", kept); sub(/[ \t]+$/, "", kept)
+        print FILENAME ":" FNR ":" ligne "\037" kept
+    }
+}
+FNR == 1 { mode = "" }
+{
+    l = $0; sub(/\r$/, "", l); ligne = l; n = length(l); i = 1; code = ""; kept = ""
+    while (i <= n) {
+        if (mode == "C" || mode == "L") {
+            k = index(substr(l, i), ferme)
+            if (!k) { if (mode == "L") kept = kept substr(l, i); break }
+            if (mode == "L") { kept = kept substr(l, i, k - 1 + length(ferme)); code = code "\"\"" }
+            i += k - 1 + length(ferme); mode = ""; continue
+        }
+        ch = substr(l, i, 1)
+        if (ch == "-" && substr(l, i + 1, 1) == "-") {
+            if (match(substr(l, i + 2), /^\[=*\[/)) {
+                ferme = "]" substr(l, i + 3, RLENGTH - 2) "]"; mode = "C"; i += 2 + RLENGTH; continue
+            }
+            break
+        }
+        if (ch == "[" && match(substr(l, i), /^\[=*\[/)) {
+            ferme = "]" substr(l, i + 1, RLENGTH - 2) "]"; mode = "L"; kept = kept substr(l, i, RLENGTH)
+            i += RLENGTH; continue
+        }
+        if (ch == "\"" || ch == Q) {
+            j = i + 1
+            while (j <= n && substr(l, j, 1) != ch) j += (substr(l, j, 1) == "\\") ? 2 : 1
+            inner = substr(l, i + 1, j - i - 1)
+            code = code (special(inner) ? " " inner " " : "\"\""); kept = kept substr(l, i, j - i + 1)
+            i = j + 1; continue
+        }
+        code = code ch; kept = kept ch; i++
+    }
+    verifie(code, kept)
+}
+'
+# exception de ligne entière : « chemin:ligne:contenu<US>code de la ligne » gardée sauf si une exception du même chemin a
+# pour extrait exactement ce code (bords ignorés)
+filtrer_ligne_entiere() {
+    local ligne chemin code i extrait garde
+    while IFS= read -r ligne; do
+        [[ -z "$ligne" ]] && continue
+        code="${ligne#*$'\037'}"; ligne="${ligne%%$'\037'*}"; chemin="${ligne%%:*}"; garde=1
+        for i in "${!exc_chemin[@]}"; do
+            extrait="${exc_extrait[$i]}"
+            extrait="${extrait#"${extrait%%[![:space:]]*}"}"; extrait="${extrait%"${extrait##*[![:space:]]}"}"
+            if [[ "${exc_chemin[$i]}" == "$chemin" && "$extrait" == "$code" ]]; then garde=0; break; fi
+        done
+        [[ $garde -eq 1 ]] && printf '%s\n' "$ligne"
+    done
+}
+if [[ ${#lua_code[@]} -gt 0 ]]; then
+    res=$(awk -v Q="'" "$LOAD_AWK" "${lua_code[@]}" 2>/dev/null | filtrer_ligne_entiere || true)
+    noter BLOQUANT "code exécuté à la volée (load, loadfile, loadstring, dofile, _G, _ENV, debug, package) hors des lignes inscrites aux exceptions (T-157)" "$res"
+fi
+# --- fin du bloc T-157
 lua_sans_chancellerie=(); for f in "${lua[@]}"; do [[ "$f" == modules/vava_chancellerie/* ]] || lua_sans_chancellerie+=("$f"); done
 if [[ ${#lua_sans_chancellerie[@]} -gt 0 ]]; then
     res=$(grep -HnE 'PerformHttpRequest\(' "${lua_sans_chancellerie[@]}" 2>/dev/null | filtrer || true)

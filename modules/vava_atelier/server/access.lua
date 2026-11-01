@@ -5,7 +5,7 @@
            d'ouvrir l'Atelier (relu auprès de vava_admin, jamais gardé), session de ce compte, atelier déclaré, droit
            effectif de l'atelier (relu), type et champ déclarés. Une seule lecture ou vérification de module à la fois
            par joueur (`busy`, tenu par joueur et non par séance, repris au-delà de `limits.busyMs`). Un refus pour droit écrit une ligne en console, une
-           fois par intervalle et par joueur.
+           fois par intervalle et par joueur. T-157 : `allowed`, les mêmes contrôles communs sans séance (RPC `code`).
     Dépendances : shared/constants.lua, config.lua, bridge/server.lua, server/core.lua, server/editors.lua
 ]]
 
@@ -67,6 +67,16 @@ local function base(source, rpc)
         return nil, 'not_allowed'
     end
     return { source = source, accountId = accountId }
+end
+
+--- T-157 : contrôles communs sans séance (personnage, Registre, droit d'ouvrir relu), ceux de `home` sans ouvrir de
+--- séance : RPC `code` (le code du Conseil précède la séance).
+---@param source integer
+---@param rpc string
+---@return vAvA.AtelierContext|nil ctx
+---@return string|nil code
+function access.allowed(source, rpc)
+    return base(source, rpc)
 end
 
 --- Ouvre (ou remplace) la session d'un joueur : RPC `home`. Le hook `vava_atelier:session` part à l'ouverture, pas

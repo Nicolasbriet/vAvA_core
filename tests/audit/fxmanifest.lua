@@ -117,3 +117,15 @@ client_script '../vava_autre/client/b.lua' -- exception D inscrite  -- attendu: 
 client_script '../vava_autre/client/c.lua' -- audit: ok  -- attendu: BLOQUANT
 shared_scripts(autre) -- exception X inscrite  -- attendu: BLOQUANT
 shared_scripts(encore) -- audit: ok  -- attendu: BLOQUANT
+-- T-157 : code du seul Conseil (vava_conseil_lua, vava_conseil_web) ; config.lua n'entre jamais dans un paquet
+vava_conseil_lua {
+    'config_conseil.lua',  -- attendu: rien
+    'client/session.lua',  -- attendu: rien
+    'config.lua',  -- attendu: BLOQUANT
+    '*.lua',  -- attendu: BLOQUANT
+}
+vava_conseil_web { 'web/css/style.css', 'web/js/app.js' }  -- attendu: rien
+vava_conseil_lua 'Config.lua'  -- attendu: BLOQUANT
+vava_conseil_web 'config.lua'  -- attendu: BLOQUANT
+vava_conseil_lua '../vava_autre/client/a.lua'  -- attendu: BLOQUANT
+vava_conseil_lua(liste)  -- attendu: BLOQUANT

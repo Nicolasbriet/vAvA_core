@@ -1,7 +1,8 @@
 --[[
     vava_atelier/client/drawing.lua
     Rôle : dessin de la visée par les natives du jeu : anneaux, poteaux, segments, chevrons, étiquettes, ligne à l'écran.
-    Dépendances : shared/constants.lua, config_client.lua
+           Livré dans le paquet du Conseil (T-157).
+    Dépendances : shared/constants.lua, config_conseil.lua
 ]]
 
 local DrawMarker, DrawLine, DrawRect = DrawMarker, DrawLine, DrawRect

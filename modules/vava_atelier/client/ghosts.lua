@@ -1,8 +1,8 @@
 --[[
     vava_atelier/client/ghosts.lua
     Rôle : fantômes de l'outil de placement : objets locaux (jamais réseau), translucides, à portée seulement, retirés à la
-           sortie.
-    Dépendances : shared/constants.lua, config_client.lua, client/core.lua
+           sortie. Livré dans le paquet du Conseil (T-157).
+    Dépendances : shared/constants.lua, config_conseil.lua, client/core.lua
 ]]
 
 local pairs, type = pairs, type
