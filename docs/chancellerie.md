@@ -242,7 +242,8 @@ oxmysql, FXServer), les changements arrivés depuis et les parties touchées.
 
 Le compte maître l'applique (« Mettre à jour »), ou la laisse s'appliquer au prochain redémarrage planifié. Déroulé :
 
-1. Téléchargement de la nouvelle version et comparaison, fichier par fichier, avec ce qui est installé.
+1. Téléchargement de la nouvelle version, allègement du Lua servi aux joueurs (voir plus bas) et comparaison,
+   fichier par fichier, avec ce qui est installé.
 2. Si la Chancellerie change : sa nouvelle version doit se charger, sinon tout s'arrête là, sans rien toucher.
 3. Sauvegarde de la base (si mysqldump est là ; un échec arrête la mise à jour).
 4. Joueurs prévenus par une proclamation, le délai choisi (tout de suite, 1, 5 ou 10 minutes), puis arrêt propre du
@@ -283,6 +284,35 @@ Une copie suivie par git (dossier de développement) n'est jamais écrasée, y c
 ou un lien vers un dépôt (le vrai dossier est vérifié) : la page le signale, `git pull` reste l'outil.
 Sur un serveur où vAvA a été posé à la main, la version installée est inconnue : la première mise à jour garde les
 réglages qui diffèrent et remplace le reste ; les suivantes savent exactement ce qui a été modifié sur place.
+
+### Lua livré sans commentaires (1.9.0)
+
+À l'installation comme à chaque mise à jour, la copie téléchargée est allégée **avant** la comparaison : le Lua que
+télécharge chaque joueur perd ses commentaires et ses blancs de fin de ligne (≈ 430 Ko de moins au premier
+téléchargement d'un joueur, ≈ 190 Ko compressés). Le dépôt, lui, reste commenté.
+
+- **Allégés** : les fichiers Lua des `shared_scripts` et `client_scripts` de chaque manifeste, ceux du paquet du
+  Conseil (`vava_conseil_lua`, `config_conseil.lua` compris) et chaque `fxmanifest.lua`.
+- **Jamais touchés** : vos réglages (`config.lua`, `config_client.lua`, dossier `config/` : leurs commentaires sont leur
+  mode d'emploi, les `-- PLACEHOLDER` y restent), le Lua du seul serveur, les `files`, les pages web.
+- **Numéros de ligne gardés** : chaque fin de ligne reste à sa place ; une erreur `@vava_x/client/y.lua:123` (`F8`,
+  console) désigne la même ligne que le dépôt au commit installé (`data/install.json`, `source`), où se lisent les
+  commentaires. Chaque fichier est contrôlé après allègement (même suite de lexèmes, chacun à sa ligne) ; un fichier qui
+  ne passe pas est laissé tel quel et nommé au journal (« Laissé avec ses commentaires (ligne … : …) »), une ressource
+  au manifeste illisible aussi. Le dépôt prouve l'allègement par le compilateur Lua à chaque vérification.
+- **Journal** : « Lua servi aux joueurs allégé de ses commentaires : N fichiers, X → Y Ko. »
+- **Empreintes** : celles des fichiers allégés, tels qu'ils sont sur le disque. Une version qui ne change que des
+  commentaires d'un fichier livré ne touche plus ce fichier : rien à retélécharger pour les joueurs.
+- **Première mise à jour allégée** : la mise à jour qui apporte la Chancellerie 1.9.0 est préparée par l'ancienne (Lua
+  encore commenté) ; c'est la **suivante** qui allège. Elle remplace une fois chaque fichier livré (toutes les
+  ressources à script client sont « mises à jour », chaque joueur retélécharge une fois leur Lua, allégé). Un fichier
+  livré que vous aviez modifié sur place est remplacé et le vôtre gardé à côté (`.local`), comme d'habitude. Vos
+  réglages ne bougent pas.
+- **Couper l'allègement** : `updates.leanLua` à `false` dans `data/config.json`, puis relancer la Chancellerie ; à la
+  mise à jour suivante, les fichiers livrés sont reposés avec leurs commentaires (journal : « Allègement du Lua livré
+  désactivé (updates.leanLua) … »).
+- **Sans la Chancellerie** : `node scripts/livraison.js --sortie <dossier>` depuis une copie du dépôt produit la même
+  copie allégée (`[vava]`, `[vava-dev]`), à copier dans `resources/`. Le dossier doit être neuf ou vide, hors du dépôt.
 
 ## Comptes
 
@@ -470,6 +500,7 @@ Pour les comptes qui ont un rang du Conseil, quand le serveur de jeu tourne avec
 | `lib/routes-ops.js` | performances, ressources, server.cfg brut, sauvegardes, planification |
 | `lib/download.js` · `jobs.js` | téléchargements, extraction (tar de la machine), opération longue en cours |
 | `lib/installer.js` · `updates.js` · `routes-updates.js` | installation, fusion des mises à jour, contrôle et retour arrière, mise à jour de la Chancellerie |
+| `lib/delivery.js` · `luastrip.js` | Lua servi aux joueurs allégé de ses commentaires, lignes gardées (choix des fichiers d'après les manifestes, lexeur Lua 5.4 contrôlé) |
 | `lib/bridge.js` · `camera.js` · `routes-game.js` | pont du serveur de jeu, caméras, royaume |
 | `lib/routes-accounts.js` | comptes du panneau |
 | `web/` | l'interface |
@@ -498,6 +529,7 @@ Réglages de `data/config.json` (créé au premier lancement) :
 | `updates.channel` | `commits` | `commits` : chaque commit de la branche ; `releases` : les releases publiées |
 | `updates.autoCheck` / `checkEveryMin` | `true` / `60` | vérification à intervalle |
 | `updates.applyAtRestart` | `false` | appliquer la mise à jour au redémarrage planifié |
+| `updates.leanLua` | `true` | alléger de ses commentaires le Lua servi aux joueurs, à l'installation et aux mises à jour (sans page : à la main, effet à la prochaine) |
 | `discord.*` | désactivé | bot Discord : jeton, serveur, salons, liens, liste blanche (réglés depuis la page Discord) |
 
 `data/install.json` retient ce qui est installé (version, empreinte de chaque fichier) : c'est lui qui permet de
