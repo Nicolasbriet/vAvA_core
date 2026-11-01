@@ -305,6 +305,13 @@ function bootEssais() {
   p.send({});
   p.say('open', {});
   eq(p.posts.length, 2);
+  // relecture sécurité S-2 : un message venu d'un autre cadre (autre source que la page ou son parent) est ignoré ;
+  // celui de la page elle-même ou de son parent est lu
+  p.send({ data: { action: 'hello', payload: {} }, source: { autreCadre: true } });
+  eq(p.posts.length, 2, 'hello venu d\'un autre cadre ignoré');
+  p.send({ data: { action: 'hello', payload: {} }, source: p.page });
+  eq(js(p.posts[2]), js(['pageReady', {}]), 'hello de la page elle-même lu');
+  p.posts.pop();
   // feuille puis deux scripts, le second lit la constante de premier niveau du premier (comme des <script src>)
   const CSS = '.app { color: red; }\n';
   const A_JS = '\'use strict\';\nconst Premier = { n: 1 };\n';

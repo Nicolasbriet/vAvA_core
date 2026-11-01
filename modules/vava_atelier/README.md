@@ -190,11 +190,12 @@ secret**. `config.lua` porte tout le reste, lu par le seul serveur. Chacun compl
 | `placement.bucket` / `childrenMax` | 0 / 200 | instance où l'on place (ailleurs : « Vous êtes hors du monde commun (intérieur, cachot…) : revenez-y pour placer. ») ; lignes au plus d'une réponse `children` |
 | `rateLimits.place` / `children` | 6, 2 / s / 4, 1 / s | poser ou déplacer ; lieux d'une fiche |
 | `texts.changes.place` | — | résumés d'un lieu changé (« déplacée de 12 m », « rayon de 120 m à 140 m », « tournée de 40° », « tracé redessiné (6 sommets) », « posée ») |
-| `texts.refused`, `sayAuthor` **(client)** | — | textes affichés par l'amorce hors de la page : refus d'un RPC, nom des réponses de `/atelier_archives` au chat (`sayAuthor`, ancien `texts.archives.author`) |
+| `texts.refused` (7 refus), `sayAuthor` **(client)** | — | textes affichés par l'amorce hors de la page : refus du RPC `code` et du transport (`not_ready`, `no_character`, `not_allowed`, `unavailable`, `rate_limited`, `busy`, `bad_request`), nom des réponses de `/atelier_archives` au chat (`sayAuthor`, ancien `texts.archives.author`) |
+| `texts.refused` (25 autres refus) **(conseil)** | — | refus des RPC de la séance (`not_open`, `stale`, `draft_taken`…), complétés dans la même table par `config_conseil.lua` (relecture réseau R-3) ; le serveur les lit aussi |
 | `texts.loading`, `loadFailed` **(client)** | « On apporte les registres de l'Atelier : un instant… » / « Les registres de l'Atelier n'ont pas pu être ouverts : prévenez un développeur. » | T-157 : premier envoi d'une version ; fichier du paquet ou page en erreur (160 octets au plus, contrôlés au démarrage) |
 | `delivery.pageWaitMs` / `bootWaitMs` **(client)** | 5 000 / 5 000 | T-157 : attente au plus de la page vide (« prête »), puis de son compte rendu après ses scripts (1 000 à 30 000, contrôlés au démarrage : le module refuse de démarrer sinon) |
 | `texts.modeLine`, `revoked`, `trialLineDefault`, `trialEndedFeed` **(conseil)** | — | textes de la séance : bandeaux du volet, révocation, fin d'essai |
-| `delivery.hourlyPackages` | 3 | T-157 : paquets entiers envoyés au plus à un même joueur par heure glissante (1 à 20 ; au-delà : `rate_limited`) |
+| `delivery.hourlyPackages` | 3 | T-157 : budget **par compte**, seau qui se remplit de ce nombre de paquets entiers par heure (plein au départ, gardé à la reconnexion ; 1 à 20 ; au-delà : `rate_limited`) |
 | `rateLimits.code` | 12, puis 1 / 5 s | T-157 : description du paquet et ses morceaux (8 au plus) |
 | `texts` (le reste) | — | textes envoyés par le serveur (erreurs de champ, verbes du journal, libellés du Registre, résumés, réponses de `/atelier_archives`) ; l'interface a les siens (`web/js/strings.js`) |
 
@@ -212,15 +213,19 @@ directives du manifeste, `vava_conseil_lua` (ordre d'exécution) et `vava_consei
 - **Au démarrage**, le serveur (`server/delivery.lua`) lit ces fichiers sur la copie déployée, ramène `\r\n` à `\n`,
   refuse un octet nul, **compile** chaque fichier Lua sans l'exécuter, assemble le paquet (`shared/codepack.lua` :
   « VAVAPAQ1 », puis chaque fichier précédé de son genre, son chemin et sa taille), calcule son empreinte (FNV-1a 64
-  bits, `shared/digest.lua`) et le coupe en morceaux de 64 Ko. Console : `paquet du Conseil : 24 fichiers, 245 560
-  octets, 4 morceaux, empreinte …`. Un paquet qui ne se construit pas **n'arrête pas** le module (les modules déclarent
+  bits, `shared/digest.lua`) et le coupe en morceaux de 64 Ko. Console : `paquet du Conseil : 24 fichiers, 248 218
+  octets, 4 morceaux, empreinte …, SHA-256 …`. Jamais dans un paquet : `config.lua`, `server/…`, `bridge/…` (refus
+  au démarrage, raison en console). Un paquet qui ne se construit pas **n'arrête pas** le module (les modules déclarent
   leurs éditeurs, les RPC répondent) : erreur en console, et le membre lit « L'Atelier est indisponible pour le
   moment. ».
 - **Au premier F9** d'une séance de jeu, le chargeur (`client/loader.lua`) demande la description du paquet (RPC
   `code`, `('', 0)`), relit son stockage local (KVP de la ressource, morceaux de 32 Ko, empreinte écrite en dernier) et
   ne s'en sert que si l'empreinte, la taille **et l'empreinte recalculée** valent celles que le serveur vient
   d'annoncer ; sinon il télécharge les morceaux l'un après l'autre (réponse latente du core, 64 Ko/s), vérifie taille et
-  empreinte, garde le paquet. Chaque fichier Lua est exécuté par `load(code, '@@vava_atelier/<chemin>', 't', env)` :
+  empreinte, garde le paquet. Puis, quelle que soit la provenance du texte, il recalcule sa **SHA-256** et la compare à
+  celle de la description (relecture sécurité S-1 : un autre serveur pourrait écrire le stockage local de la ressource) ;
+  un écart efface le stockage et n'exécute rien. Le travail est étalé sur plusieurs images (une image cédée tous les
+  16 Ko de SHA-256, après la lecture et après l'exécution). Chaque fichier Lua est exécuté par `load(code, '@@vava_atelier/<chemin>', 't', env)` :
   texte seul, dans un environnement du paquet (lectures dans `_G`, écritures gardées à part avec un avertissement),
   sous son nom d'origine (une erreur se lit `vava_atelier/client/placer.lua:123: …`). Puis la page vide reçoit sa
   feuille et ses scripts (`bootPiece`, `bootEnd`) et les insère (`web/boot.js`, contrat :
@@ -294,9 +299,13 @@ directives du manifeste, `vava_conseil_lua` (ordre d'exécution) et `vava_consei
   le texte de la réponse de ce RPC ou de son propre stockage local, **après** l'avoir comparé à l'empreinte que le
   serveur vient d'annoncer dans cette séance : aucun évènement réseau, rappel de la page, export ou commande ne mène à
   `load` ; mode `'t'` (jamais de code précompilé), environnement du paquet (`_G` jamais écrit). FNV-1a protège contre
-  l'usure, la coupure et la version périmée, pas contre le propriétaire du disque (qui exécute déjà ce qu'il veut chez
-  lui, sans pouvoir de plus). `config.lua` ne peut entrer dans un paquet (audit, règle C ; `config_split_spec`, T5) ;
-  `load(` est refusé par l'audit partout ailleurs dans `modules/` et `examples/`.
+  l'usure, la coupure et la version périmée ; la **SHA-256** annoncée par le serveur, recalculée sur le texte entier
+  juste avant `load`, ferme le stockage local écrit par un autre serveur (S-1). Le propriétaire du disque, lui, exécute
+  déjà ce qu'il veut chez lui, sans pouvoir de plus. `config.lua`, `server/…` et `bridge/…` ne peuvent entrer dans un
+  paquet (refus à la construction, S-3 ; audit, règle C ; `config_split_spec`, T5). L'audit refuse partout ailleurs
+  dans `modules/` et `examples/` `load`, `loadfile`, `loadstring`, `dofile`, `_G` et `_ENV` (exception : la ligne
+  entière inscrite, S-4). La page n'écoute que les messages de sa propre fenêtre ou de son parent (S-2). Le budget est
+  tenu **par compte** (seau rempli de 3 paquets par heure, gardé à la reconnexion : S-5, R-2).
 
 ## Réseau et coût
 
@@ -316,7 +325,7 @@ directives du manifeste, `vava_conseil_lua` (ordre d'exécution) et `vava_consei
 | évènement `vava_atelier:entryChanged` | les seuls membres dont la séance a **cette fiche** ouverte (droit de l'atelier relu), sauf l'auteur du changement ; le tenant d'un essai qui prend fin sans qu'il l'ait demandé ; l'ancien tenant d'un brouillon repris ; T-102 : une pose l'écrit aussi sur la fiche parent | ≈ 90 o |
 | RPC `place` (T-102) | l'appelant | ≈ 0,4 Ko aller-retour |
 | RPC `children` (T-102) | l'appelant | 0,2 Ko (vide), ≈ 0,7 Ko pour 5 points, ≈ 22 Ko au pire (200 lignes, latent au-delà de 8 Ko) |
-| RPC `code` (T-157) | l'appelant | description : ≈ 25 o aller, ≈ 60 o retour ; morceau : 64 Ko au plus, **latent** (64 Ko/s), 4 morceaux pour le paquet de 1.4.0 (245 560 o) ; refus ≈ 20 o. Habitant : 1 refus par F9 ; membre : une fois par version, puis la description seule à chaque séance |
+| RPC `code` (T-157) | l'appelant | description : ≈ 25 o aller, ≈ 60 o retour ; morceau : 64 Ko au plus, **latent** (64 Ko/s), 4 morceaux pour le paquet de 1.4.0 (248 218 o) ; refus ≈ 20 o. Habitant : 1 refus par F9 ; membre : une fois par version, puis la description seule à chaque séance |
 
 Trois formes de réponse sont pensées pour ne rien envoyer deux fois :
 
@@ -346,12 +355,12 @@ accepté par le porteur du projet). La cible de la spec pour le Lua (≤ 18 Ko b
 au seul Conseil, décision du porteur du projet). `shared/aim.lua` est en tête des `client_scripts` (lu par le seul
 client).
 
-**1.4.0 (T-157)** : mesuré par `scripts/poids-client.sh --detail vava_atelier`, chaque joueur télécharge **55 273 o
-(20 960 compressés)** au lieu de 262 381 o (82 448 compressés) : Lua 42 485 o (15 847), page 8 212 o (3 437 :
-`index.html` et `boot.js`), manifeste 4 576 o (1 676). Le paquet du Conseil (ligne `vava_atelier@conseil`) pèse
-245 560 o (92 780 de Lua, 152 127 de page, en-têtes compris), non compressé (il part en latent) : un membre le reçoit
+**1.4.0 (T-157)** : mesuré par `scripts/poids-client.sh --detail vava_atelier`, chaque joueur télécharge **57 668 o
+(22 359 compressés)** au lieu de 262 381 o (82 448 compressés) : Lua 44 328 o (17 032), page 8 654 o (3 614 :
+`index.html` et `boot.js`), manifeste 4 686 o (1 713). Le paquet du Conseil (ligne `vava_atelier@conseil`) pèse
+248 218 o (95 437 de Lua, 152 127 de page, en-têtes compris), non compressé (il part en latent) : un membre le reçoit
 une fois par version (≈ 4 s), en 5 RPC ; ensuite, une description par séance (≈ 85 o) et ≈ 0,2 s de relecture locale.
-Exemple, 60 joueurs dont 4 membres, une version : 60 × 262 Ko ≈ 15,7 Mo avant, 60 × 55 Ko + 4 × 246 Ko ≈ 4,3 Mo après.
+Exemple, 60 joueurs dont 4 membres, une version : 60 × 262 Ko ≈ 15,7 Mo avant, 60 × 58 Ko + 4 × 248 Ko ≈ 4,5 Mo après.
 Client : aucune boucle ajoutée ; le chargement coûte ≈ 20 ms de Lua sur une image, une fois par séance de jeu.
 
 Visée (T-102) : une seule boucle par image, **seulement pendant la visée**, chez le seul membre qui place (≤ 0,15 ms
@@ -411,7 +420,8 @@ l'Atelier (il est alors resynchronisé).
 | `config_client.lua` | réglages lus par le client de chaque joueur (touche, commande, textes de l'amorce, attentes du chargeur) : téléchargé par chaque joueur, ouvre `VavaAtelier.config` |
 | `config_conseil.lua` | T-157 : réglages du seul client du Conseil (outil de placement, textes de la séance) : dans le paquet, et au serveur (avant `config.lua`) |
 | `config.lua` | tous les autres réglages, servi au seul serveur (en tête des `server_scripts`, après `config_conseil.lua`) : complète la table |
-| `shared/digest.lua`, `shared/codepack.lua` | T-157, purs, livrés à tous (serveur et chargeur) : empreinte FNV-1a 64 bits ; format du paquet, noms, découpe UTF-8 (`atelier_codepack_spec.lua`) |
+| `shared/digest.lua`, `shared/codepack.lua` | T-157, purs, livrés à tous (serveur et chargeur) : empreintes FNV-1a 64 bits et SHA-256 ; lecture du paquet, noms, découpe UTF-8 (`atelier_codepack_spec.lua`) |
+| `shared/codepack_encode.lua` | T-157, pur, au seul serveur : écriture du paquet (`atelier_codepack_spec.lua`) |
 | `server/delivery.lua` | T-157 : construction du paquet au démarrage, RPC `code`, budget horaire (`atelier_delivery_spec.lua`) |
 | `client/notice.lua`, `client/loader.lua` | T-157, amorce : notifications, refus, réponse de `/atelier_archives` ; chargeur (stockage local, morceaux, empreinte, `load`, amorce de la page) (`atelier_loader_client_spec.lua`) |
 | `shared/formschema.lua` | pur : contrôle d'une déclaration d'éditeur (testé : `tests/spec/atelier_formschema_spec.lua`) |

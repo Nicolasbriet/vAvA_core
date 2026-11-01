@@ -36,9 +36,16 @@ local CHANGES = {
 -- descripteur, son empreinte et son nom (bandeau du volet). '' ou absent : rien de gardé.
 local known = { home = '', editors = {} }
 
---- Message hors de l'interface, texte d'un refus : ceux de l'amorce (client/notice.lua), gardés sous ces noms.
+--- Message hors de l'interface : celui de l'amorce (client/notice.lua), gardé sous ce nom.
 session.feed = notice.feed
-session.refusal = notice.refusal
+
+--- Texte d'un refus (code du serveur ou du transport), parmi tous ceux de la séance (config_client.lua et
+--- config_conseil.lua) ; un code inconnu prend le texte « indisponible ».
+---@param code any
+---@return string
+function session.refusal(code)
+    return texts.refused[code] or texts.refused.unavailable
+end
 
 ---@return boolean
 function session.isOpen()

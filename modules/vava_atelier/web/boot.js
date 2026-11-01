@@ -91,6 +91,11 @@ const Boot = (() => {
   function attach(win, doc, post, log) {
     const state = newState();
     function onMessage(event) {
+      // relecture sécurité S-2 : seulement les messages de cette page ou de son parent (SendNUIMessage) ; la source
+      // vide est gardée tant que l'essai en jeu n'a pas montré ce que vaut event.source pour SendNUIMessage
+      // (atelier 25-21) ; l'iframe d'une autre ressource a toujours une source, la sienne
+      const source = event && event.source;
+      if (source != null && source !== win && source !== win.parent) return;
       const m = event && event.data;
       if (!isObject(m) || typeof m.action !== 'string') return;
       if (m.action === 'hello') {

@@ -18,6 +18,7 @@ describe('vava_atelier paquet du Conseil (pur)', function()
             'modules/vava_atelier/shared/fingerprint.lua',
             'modules/vava_atelier/shared/digest.lua',
             'modules/vava_atelier/shared/codepack.lua',
+            'modules/vava_atelier/shared/codepack_encode.lua',
         })
         digest, codepack, LIMITS = VavaAtelier.digest, VavaAtelier.codepack, VavaAtelier.CODEPACK
     end)
@@ -65,6 +66,42 @@ describe('vava_atelier paquet du Conseil (pur)', function()
             assert.is_nil(digest(12))
             assert.is_nil(digest({}))
         end)
+    end)
+
+    -- relecture sécurité S-1 : SHA-256 (FIPS 180-4), vecteurs publiés (NIST)
+    describe('SHA-256', function()
+        it('vecteurs publiés : vide, « abc », deux blocs (448 et 896 bits)', function()
+            local sha = VavaAtelier.sha256
+            assert.equal('e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855', sha(''))
+            assert.equal('ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad', sha('abc'))
+            assert.equal('248d6a61d20638b8e5c026930c3e6039a33ce45964ff2167f6ecedd419db06c1',
+                sha('abcdbcdecdefdefgefghfghighijhijkijkljklmklmnlmnomnopnopq'))
+            assert.equal('cf5b16a778af8380036ce59e7b0492370b249b11e8f07a51afac45037afee9d1',
+                sha('abcdefghbcdefghicdefghijdefghijkefghijklfghijklmghijklmnhijklmnoijklmnopjklmnopqklmnopqrlmnopqrs'
+                    .. 'mnopqrstnopqrstu'))
+        end)
+
+        it('un million de « a » (vecteur publié), avec une pause tous les 16 Ko', function()
+            local pauses = 0
+            assert.equal('cdc76e5c9914fb9281a1c7e284d73e67f1809a48a497200e046d39ccc7112cd0',
+                VavaAtelier.sha256(string.rep('a', 1000000), function() pauses = pauses + 1 end))
+            assert.equal(61, pauses)   -- 15 626 blocs de 64 octets, une pause tous les 256
+        end)
+
+        it('bords de bloc (55, 56, 63, 64 octets) et accents : distincts et stables ; autre chose qu\'une chaîne : nil',
+            function()
+                local seen = {}
+                for _, n in ipairs({ 55, 56, 63, 64, 65 }) do
+                    local value = VavaAtelier.sha256(string.rep('é', n))
+                    assert.equal(64, #value)
+                    assert.truthy(value:find('^[0-9a-f]+$'))
+                    assert.is_nil(seen[value])
+                    seen[value] = true
+                    assert.equal(value, VavaAtelier.sha256(string.rep('é', n)))
+                end
+                assert.is_nil(VavaAtelier.sha256(nil))
+                assert.is_nil(VavaAtelier.sha256(12))
+            end)
     end)
 
     describe('noms', function()

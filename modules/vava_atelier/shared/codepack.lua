@@ -1,7 +1,8 @@
 --[[
     vava_atelier/shared/codepack.lua
-    Rôle : logique pure du paquet du Conseil (T-157) : format (encode, decode), noms des fichiers, découpe en morceaux
-           sans couper un caractère UTF-8. Le serveur l'assemble au démarrage (server/delivery.lua), le chargeur du
+    Rôle : logique pure du paquet du Conseil (T-157) : lecture (decode), noms des fichiers, découpe en morceaux sans
+           couper un caractère UTF-8 ; l'écriture (encode) est servie au seul serveur (shared/codepack_encode.lua,
+           relecture réseau R-3). Le serveur assemble le paquet au démarrage (server/delivery.lua), le chargeur du
            membre le relit (client/loader.lua). Aucune fonction ne lève d'erreur. Testée :
            tests/spec/atelier_codepack_spec.lua.
            Format : « VAVAPAQ1\n », puis pour chaque fichier « <genre> <chemin> <octets>\n<octets du fichier>\n » ;
@@ -13,7 +14,6 @@
 local type, tonumber = type, tonumber
 local mathType = math.type
 local find, sub, byte, match, gmatch = string.find, string.sub, string.byte, string.match, string.gmatch
-local concat = table.concat
 
 local LIMITS = VavaAtelier.CODEPACK
 local HEAD = LIMITS.MAGIC .. '\n'
@@ -25,6 +25,9 @@ local NEWLINE = 10
 
 local codepack = {}
 VavaAtelier.codepack = codepack
+-- pour shared/codepack_encode.lua (serveur) : en-tête du format et extension de chaque genre
+codepack.HEAD = HEAD
+codepack.EXTENSION = EXTENSION
 
 --- Genre d'un fichier de page tel que la page le nomme (`bootPiece.kind`).
 codepack.WEB_KIND = { C = 'css', J = 'js' }
@@ -48,37 +51,6 @@ function codepack.validName(name, kind)
     return match(segments[count], '^[a-z][a-z0-9_%-]*%.([a-z]+)$') == extension
 end
 local validName = codepack.validName
-
---- Paquet à partir de ses fichiers, dans l'ordre donné.
----@param pieces { kind: string, name: string, code: string }[]  liste pure
----@return string|nil text
----@return string|nil err  too_many | bad_kind | bad_name | bad_order | not_string | nul_byte | duplicate | too_large
-function codepack.encode(pieces)
-    if type(pieces) ~= 'table' then return nil, 'not_string' end
-    if #pieces > LIMITS.MAX_PIECES then return nil, 'too_many' end
-    local out, n, size, web, seen = { HEAD }, 1, #HEAD, false, {}
-    for i = 1, #pieces do
-        local piece = pieces[i]
-        if type(piece) ~= 'table' or not EXTENSION[piece.kind] then return nil, 'bad_kind' end
-        local kind, name, code = piece.kind, piece.name, piece.code
-        if not validName(name, kind) then return nil, 'bad_name' end
-        if kind == 'L' then
-            if web then return nil, 'bad_order' end
-        else
-            web = true
-        end
-        if type(code) ~= 'string' then return nil, 'not_string' end
-        if find(code, '\0', 1, true) then return nil, 'nul_byte' end
-        if seen[name] then return nil, 'duplicate' end
-        seen[name] = true
-        local header = kind .. ' ' .. name .. ' ' .. #code .. '\n'
-        size = size + #header + #code + 1
-        if size > LIMITS.MAX_BYTES then return nil, 'too_large' end
-        out[n + 1], out[n + 2], out[n + 3] = header, code, '\n'
-        n = n + 3
-    end
-    return concat(out, '', 1, n)
-end
 
 --- Lecture stricte d'un paquet : chaque longueur délimite son fichier, rien n'est accepté en dehors du format.
 ---@param text any

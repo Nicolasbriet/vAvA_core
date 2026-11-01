@@ -13,7 +13,7 @@
            réparation (essais rendus aux brouillons, doublons), editorsReady, puis (après `history.purgeDelayMs`)
            purge de l'historique.
            T-157 : RPC `code` (paquet du Conseil, server/delivery.lua) ; au setup, bornes du chargeur contrôlées (refus)
-           puis paquet construit (un échec n'arrête pas le module) ; départ → budget du joueur oublié.
+           puis paquet construit (un échec n'arrête pas le module) ; le budget, par compte, survit au départ.
     Dépendances : tous les fichiers server/ du module, bridge/server.lua
 ]]
 
@@ -238,7 +238,6 @@ local function onDropped(payload)
     if session then trials.sessionClosed(session.accountId, 'dropped') end
     access.forget(payload.source)
     archives.forget(payload.source)
-    delivery.forget(payload.source)
 end
 
 --- Séance fermée (fermeture, déchargement, révocation) : l'essai du membre prend fin.

@@ -63,6 +63,7 @@ describe('vava_atelier paquet du Conseil (serveur)', function()
             DIR .. 'config.lua',
             DIR .. 'shared/digest.lua',
             DIR .. 'shared/codepack.lua',
+            DIR .. 'shared/codepack_encode.lua',
         })
         logs = { info = {}, warn = {}, error = {} }
         local function logger(level)
@@ -146,12 +147,13 @@ describe('vava_atelier paquet du Conseil (serveur)', function()
             assert.equal(4, status.parts)
             assert.equal(1, #logs.info)
             assert.truthy(logs.info[1]:find('^paquet du Conseil : 24 fichiers, %d+ %d%d%d octets, 4 morceaux, '
-                .. 'empreinte [0-9a-f]+$'), logs.info[1])
+                .. 'empreinte [0-9a-f]+, SHA%-256 [0-9a-f]+$'), logs.info[1])
             -- morceaux concaténés : le paquet, dans l'ordre des deux listes, tous les L d'abord
             local ok, info = delivery.rpc(7, '', 0)
             assert.is_true(ok)
             local text = fetchAll(7, info.fp, info.parts)
             assert.equal(info.fp, VavaAtelier.digest(text))
+            assert.equal(info.sha, VavaAtelier.sha256(text))
             local pieces = assert(VavaAtelier.codepack.decode(text))
             for i, name in ipairs(names) do
                 assert.equal(name, pieces[i].name)
@@ -196,12 +198,20 @@ describe('vava_atelier paquet du Conseil (serveur)', function()
             { 'extension hors de sa liste', { 'client/a.lua' }, { 'web/js/a.lua' }, 'chemin refusé' },
             { 'config.lua jamais (extension .lua hors de la page, et fichier du serveur)', { 'client/a.lua' },
                 { 'config.lua' }, 'chemin refusé' },
+            -- relecture sécurité S-3 : réglages et code du seul serveur, même listés en vava_conseil_lua
+            { 'config.lua dans la liste Lua', { 'client/a.lua', 'config.lua' }, { 'web/js/a.js' },
+                'config.lua ne part jamais dans un paquet (réglages du seul serveur)' },
+            { 'un fichier de server/', { 'client/a.lua', 'server/main.lua' }, { 'web/js/a.js' },
+                'server/main.lua ne part jamais dans un paquet (code du seul serveur, server/)' },
+            { 'un fichier de bridge/', { 'bridge/server.lua' }, { 'web/js/a.js' },
+                'bridge/server.lua ne part jamais dans un paquet (code du seul serveur, bridge/)' },
             { 'trop gros', { 'client/a.lua', 'client/gros.lua' }, { 'web/js/a.js' }, 'too_large' },
         }
         local FILES = {
             ['client/a.lua'] = 'return 1\n', ['web/js/a.js'] = 'a();\n', ['client/nul.lua'] = 'return "\0"\n',
             ['client/syntaxe.lua'] = 'local a = 1\nlocal = 2\n', ['client/gros.lua'] = '--' .. string.rep('x', 530000),
             ['client/A.lua'] = 'return 1\n', ['web/js/a.lua'] = 'return 1\n', ['config.lua'] = 'return 1\n',
+            ['server/main.lua'] = 'return 1\n', ['bridge/server.lua'] = 'return 1\n',
         }
         for _, case in ipairs(BROKEN) do
             it('non construit : ' .. case[1] .. ' → unavailable, erreur en console', function()
@@ -231,9 +241,11 @@ describe('vava_atelier paquet du Conseil (serveur)', function()
             assert.is_true(ok)
         end)
 
-        it('description : empreinte, morceaux, taille ; même réponse avec une empreinte périmée', function()
+        it('description : empreintes FNV-1a et SHA-256, morceaux, taille ; même réponse avec une empreinte périmée',
+            function()
             local status = delivery.status()
-            assert.same({ fp = status.fp, parts = 4, bytes = status.bytes }, info)
+            assert.same({ fp = status.fp, sha = status.sha, parts = 4, bytes = status.bytes }, info)
+            assert.equal(64, #info.sha)
             assert.same({ true, info }, { delivery.rpc(7, 'ffffffffffffffff', 0) })
         end)
 
@@ -279,27 +291,38 @@ describe('vava_atelier paquet du Conseil (serveur)', function()
             assert.same({ false, 'not_allowed' }, { delivery.rpc(7, info.fp, 3) })
         end)
 
-        it('budget : 3 paquets par heure glissante, le 4e refusé (rate_limited), rendu après l\'heure', function()
+        -- relectures S-5 et R-2 : seau par compte, rempli de 3 paquets par heure, gardé à la reconnexion
+        it('budget : 3 paquets d\'affilée, le 4e refusé (rate_limited) ; un paquet de plus toutes les 20 minutes', function()
             for _ = 1, 3 do fetchAll(7, info.fp, info.parts) end
             assert.same({ false, 'rate_limited' }, { delivery.rpc(7, info.fp, 1) })
-            -- la description reste permise ; un autre membre a son propre budget
+            -- la description reste permise ; un autre compte a son propre budget
             assert.is_true((delivery.rpc(7, '', 0)))
             chars[8], can[8] = { accountId = 13 }, true
             fetchAll(8, info.fp, info.parts)
-            now = now + HOUR_MS - 1
+            -- une seconde avant 20 minutes : pas tout à fait un paquet (le dernier morceau ne passe pas) ; à 20 minutes,
+            -- il passe, et rien de plus
+            now = now + HOUR_MS // 3 - 1000
+            for k = 1, 3 do assert.is_true((delivery.rpc(7, info.fp, k))) end
+            assert.same({ false, 'rate_limited' }, { delivery.rpc(7, info.fp, 4) })
+            now = now + 1000
+            assert.is_true((delivery.rpc(7, info.fp, 4)))
             assert.same({ false, 'rate_limited' }, { delivery.rpc(7, info.fp, 1) })
-            now = now + 1
-            fetchAll(7, info.fp, info.parts)
+            -- une heure ou plus : plein, jamais au-delà de 3 paquets
+            now = now + 5 * HOUR_MS
+            for _ = 1, 3 do fetchAll(7, info.fp, info.parts) end
+            assert.same({ false, 'rate_limited' }, { delivery.rpc(7, info.fp, 1) })
         end)
 
-        it('ligne de console une fois par (joueur, empreinte) ; départ : budget oublié', function()
+        it('reconnexion (autre numéro de joueur, même compte) : budget gardé ; ligne de console une fois par '
+            .. '(compte, empreinte)', function()
             for _ = 1, 3 do fetchAll(7, info.fp, info.parts) end
             assert.equal(2, #logs.info)   -- construction, puis un seul envoi
             assert.truthy(logs.info[2]:find('^paquet du Conseil envoyé : joueur 7, compte 12, %d+ %d%d%d octets$'),
                 logs.info[2])
-            delivery.forget(7)
-            fetchAll(7, info.fp, info.parts)
-            assert.equal(3, #logs.info)
+            chars[7], can[7] = nil, nil
+            chars[9], can[9] = { accountId = 12 }, true
+            assert.same({ false, 'rate_limited' }, { delivery.rpc(9, info.fp, 1) })
+            assert.equal(2, #logs.info)
         end)
     end)
 
@@ -375,7 +398,7 @@ describe('vava_atelier paquet du Conseil (setup du module)', function()
         VavaAtelier = nil
         helper.loadAll({
             DIR .. 'shared/constants.lua', DIR .. 'shared/bounds.lua', DIR .. 'config.lua', DIR .. 'shared/rights.lua',
-            DIR .. 'shared/digest.lua', DIR .. 'shared/codepack.lua',
+            DIR .. 'shared/digest.lua', DIR .. 'shared/codepack.lua', DIR .. 'shared/codepack_encode.lua',
         })
         local quiet = function() end
         VavaAtelier.log = { info = quiet, warn = quiet, error = quiet }
@@ -426,7 +449,9 @@ describe('vava_atelier paquet du Conseil (setup du module)', function()
         assert.same({ type = 'string', min = 0, max = 16, pattern = '^[0-9a-f]*$' }, code.options.args[1])
         assert.same({ type = 'integer', min = 0, max = 8 }, code.options.args[2])
         assert.is_nil(code.options.latent)
-        assert.is_true((code.handler(1, '', 0)))
+        local ok, info = code.handler(1, '', 0)
+        assert.is_true(ok)
+        assert.equal(64, #info.sha)
     end)
 
     it('paquet impossible à construire : le module démarre quand même, code répond unavailable', function()

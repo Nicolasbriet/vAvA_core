@@ -32,10 +32,13 @@ describe('vava_atelier accueil côté client', function()
     end)
 
     -- T-157 : la réponse de /atelier_archives est écoutée par l'amorce (client/notice.lua), plus par la séance
-    it('la séance n\'écoute plus say ; feed et refusal sont ceux de l\'amorce', function()
+    it('la séance n\'écoute plus say ; feed est celui de l\'amorce, refusal lit tous les refus', function()
         assert.is_nil(handlers[VavaAtelier.EVENTS.SAY])
         assert.equal(VavaAtelier.notice.feed, session.feed)
-        assert.equal(VavaAtelier.notice.refusal, session.refusal)
+        local refused = VavaAtelier.config.texts.refused
+        assert.equal('L\'Atelier s\'est refermé : rouvrez-le.', session.refusal('not_open'))   -- config_conseil.lua
+        assert.equal(refused.not_allowed, session.refusal('not_allowed'))                        -- config_client.lua
+        assert.equal(refused.unavailable, session.refusal('inconnu'))
     end)
 
     it('revoked efface le stockage local du paquet (loader.forget)', function()
@@ -119,9 +122,17 @@ describe('vava_atelier réponse de /atelier_archives (amorce)', function()
         assert.equal(0, #triggered)
     end)
 
-    it('refus : texte de config_client.lua, repli « indisponible »', function()
+    it('refus : texte de config_client.lua, repli « indisponible » ; la vue de l\'amorce n\'a que ses 7 refus', function()
         local refused = VavaAtelier.config.texts.refused
-        assert.equal(refused.not_allowed, VavaAtelier.notice.refusal('not_allowed'))
+        for _, code in ipairs({ 'not_ready', 'no_character', 'not_allowed', 'unavailable', 'rate_limited', 'busy',
+            'bad_request' }) do
+            assert.is_string(refused[code])
+            assert.equal(refused[code], VavaAtelier.notice.refusal(code))
+        end
+        local count = 0
+        for _ in pairs(refused) do count = count + 1 end
+        assert.equal(7, count)
+        assert.equal(refused.unavailable, VavaAtelier.notice.refusal('not_open'))
         assert.equal(refused.unavailable, VavaAtelier.notice.refusal('inconnu'))
         assert.equal(refused.unavailable, VavaAtelier.notice.refusal(nil))
     end)

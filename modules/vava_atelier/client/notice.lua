@@ -16,6 +16,7 @@ if not core then return end
 
 local cfg = VavaAtelier.config
 local texts = cfg.texts
+local refused = texts.refused
 local EVENTS = VavaAtelier.EVENTS
 
 local HUD = 'vava_hud'
@@ -25,6 +26,14 @@ local FEED_TEXT = 'STRING'
 
 local notice = {}
 VavaAtelier.notice = notice
+
+-- refus que l'amorce peut montrer (RPC `code` et transport) ; les autres sont chez le seul Conseil (config_conseil.lua,
+-- client/session.lua › refusal)
+local SHOWN = {
+    not_ready = refused.not_ready, no_character = refused.no_character, not_allowed = refused.not_allowed,
+    unavailable = refused.unavailable, rate_limited = refused.rate_limited, busy = refused.busy,
+    bad_request = refused.bad_request,
+}
 
 local function hudNotify(message, kind)
     return exports[HUD]:notify(message, kind)
@@ -44,11 +53,11 @@ function notice.feed(message, kind)
     EndTextCommandThefeedPostTicker(false, false)
 end
 
---- Texte d'un refus (code du serveur ou du transport) ; un code inconnu prend le texte « indisponible ».
+--- Texte d'un refus de l'amorce (code du serveur ou du transport) ; un autre code prend le texte « indisponible ».
 ---@param code any
 ---@return string
 function notice.refusal(code)
-    return texts.refused[code] or texts.refused.unavailable
+    return SHOWN[code] or refused.unavailable
 end
 
 -- Réponse d'une commande de l'Atelier (/atelier_archives) : au chat s'il est là, sinon en notification.

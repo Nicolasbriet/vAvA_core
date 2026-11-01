@@ -3,12 +3,14 @@
     Rôle : chargeur du code du Conseil (amorce livrée à tous, T-157). Au premier F9 d'une séance de jeu : description du
            paquet par le RPC `code` (refusée hors du Conseil : stockage local effacé), stockage local de la ressource
            (KVP, morceaux de 32 Ko, empreinte écrite en dernier) relu et recalculé contre l'empreinte que le serveur
-           vient d'annoncer, sinon morceaux téléchargés l'un après l'autre ; puis chaque fichier Lua exécuté par `load`
-           en mode texte dans un environnement du paquet (jamais dans _G), puis la page amorcée (feuille et scripts
-           envoyés à web/boot.js, compte rendu attendu). Seul chemin vers `load` : le texte de la réponse du RPC de la
-           ressource ou de son stockage local, après comparaison à l'empreinte annoncée dans cette séance ; aucun
-           évènement réseau, rappel de page, export ou commande n'y mène. Contrat avec la page :
-           docs/plan/rapports/T-157-contrat.md. Aucune boucle.
+           vient d'annoncer, sinon morceaux téléchargés l'un après l'autre ; puis, quelle que soit sa provenance, la
+           SHA-256 du texte entier recalculée et comparée à celle annoncée dans cette séance (relecture sécurité S-1 :
+           FNV-1a s'inverse, un autre serveur pourrait écrire le stockage local) ; puis chaque fichier Lua exécuté par
+           `load` en mode texte dans un environnement du paquet (jamais dans _G), puis la page amorcée (feuille et
+           scripts envoyés à web/boot.js, compte rendu attendu). Seul chemin vers `load` : ce texte-là ; aucun évènement
+           réseau, rappel de page, export ou commande n'y mène. Le travail est étalé sur plusieurs images (une image
+           cédée tous les 16 Ko de SHA-256, après la lecture et après l'exécution : relecture réseau R-4). Contrat avec
+           la page : docs/plan/rapports/T-157-contrat.md. Aucune boucle.
     Dépendances : shared/constants.lua, config_client.lua, shared/digest.lua, shared/codepack.lua, client/core.lua,
                   client/nui.lua, client/notice.lua
 ]]
@@ -20,7 +22,7 @@ local concat = table.concat
 local traceback = debug.traceback
 local GetResourceKvpString, GetResourceKvpInt, SetResourceKvp, SetResourceKvpInt, DeleteResourceKvp =
     GetResourceKvpString, GetResourceKvpInt, SetResourceKvp, SetResourceKvpInt, DeleteResourceKvp
-local SetTimeout, GetCurrentResourceName = SetTimeout, GetCurrentResourceName
+local SetTimeout, GetCurrentResourceName, Wait = SetTimeout, GetCurrentResourceName, Wait
 
 local core = VavaAtelier.core
 if not core then return end
@@ -30,7 +32,7 @@ local texts = cfg.texts
 local waits = cfg.delivery
 local RPC = VavaAtelier.RPC
 local LIMITS = VavaAtelier.CODEPACK
-local digest, codepack = VavaAtelier.digest, VavaAtelier.codepack
+local digest, sha256, codepack = VavaAtelier.digest, VavaAtelier.sha256, VavaAtelier.codepack
 local nui, notice = VavaAtelier.nui, VavaAtelier.notice
 
 -- nom des fichiers d'une ressource dans FiveM : une erreur se lit « vava_atelier/client/placer.lua:123: … » (si F8
@@ -39,6 +41,7 @@ local CHUNK_PREFIX = '@@' .. GetCurrentResourceName() .. '/'
 -- stockage local : empreinte (écrite en dernier, effacée en premier), taille, nombre de morceaux, morceaux 1 à 16
 local KEY_FP, KEY_SIZE, KEY_COUNT, KEY_PART = 'paquet:empreinte', 'paquet:taille', 'paquet:morceaux', 'paquet:'
 local HEX = '^[0-9a-f]+$'
+local SHA_LENGTH = 64
 local BOOTED, EITHER = { booted = true }, { pageReady = true, booted = true }
 
 local loader = {}
@@ -62,6 +65,11 @@ end
 ---@param high integer
 local function integerIn(value, low, high)
     return mathType(value) == 'integer' and value >= low and value <= high
+end
+
+--- Une image cédée (une fois par étape du premier chargement d'une séance, jamais en boucle).
+local function pause()
+    Wait(0) -- audit: ok (une image cédée pendant le chargement, R-4 ; pas une boucle par image)
 end
 
 -- Stockage local ---------------------------------------------------------------------------------------------------
@@ -129,7 +137,8 @@ end
 
 -- Paquet -----------------------------------------------------------------------------------------------------------
 
---- Description annoncée par le serveur : `{ fp, parts, bytes }` contrôlée, ou nil et le code (transport ou refus).
+--- Description annoncée par le serveur : `{ fp, sha, parts, bytes }` contrôlée, ou nil et le code (transport ou
+--- refus).
 ---@return table|nil info
 ---@return string|nil code
 local function describe()
@@ -137,11 +146,12 @@ local function describe()
     if not ok then return nil, success end
     if not success then return nil, info end
     if type(info) ~= 'table' or type(info.fp) ~= 'string' or #info.fp ~= LIMITS.DIGEST_LENGTH
-        or not find(info.fp, HEX) or not integerIn(info.parts, 1, LIMITS.MAX_PARTS)
+        or not find(info.fp, HEX) or type(info.sha) ~= 'string' or #info.sha ~= SHA_LENGTH or not find(info.sha, HEX)
+        or not integerIn(info.parts, 1, LIMITS.MAX_PARTS)
         or not integerIn(info.bytes, 1, LIMITS.MAX_BYTES) or info.bytes > info.parts * LIMITS.PART_BYTES then
         return nil, 'unavailable'
     end
-    return { fp = info.fp, parts = info.parts, bytes = info.bytes }
+    return { fp = info.fp, sha = info.sha, parts = info.parts, bytes = info.bytes }
 end
 
 --- Morceaux 1 à `parts` du paquet annoncé, l'un après l'autre ; le texte n'est rendu que s'il a exactement la taille et
@@ -173,6 +183,7 @@ end
 --- (`stale` : le serveur a redémarré l'Atelier entre-temps) relance une seule fois depuis la description.
 ---@return string|nil text
 ---@return string|nil code
+---@return string|nil sha  SHA-256 annoncée par le serveur dans cette séance
 local function obtain()
     for _ = 1, 2 do
         local info, code = describe()
@@ -181,12 +192,12 @@ local function obtain()
             return nil, code
         end
         local text = cache.read(info)
-        if text then return text end
+        if text then return text, nil, info.sha end
         notice.feed(texts.loading, 'info')
         text, code = download(info)
         if text then
             cache.write(info.fp, text)
-            return text
+            return text, nil, info.sha
         end
         if code == 'not_allowed' then cache.clear() end
         if code ~= 'stale' then return nil, code end
@@ -297,9 +308,17 @@ end
 --- code Lua sont lâchés au retour), ou nil (refus ou échec déjà annoncés).
 ---@return table[]|nil web
 local function runLua()
-    local text, code = obtain()
+    local text, code, sha = obtain()
     if not text then
         notice.feed(notice.refusal(code), 'warning')
+        return nil
+    end
+    pause()
+    -- dernière garde avant `load`, quelle que soit la provenance du texte (stockage local ou morceaux de la séance)
+    if sha256(text, pause) ~= sha then
+        cache.clear()
+        log('warn', 'paquet du Conseil : SHA-256 différente de celle annoncée par le serveur, rien n\'est exécuté')
+        notice.feed(notice.refusal('unavailable'), 'warning')
         return nil
     end
     local pieces, err = codepack.decode(text)
@@ -313,7 +332,9 @@ local function runLua()
     for _, piece in ipairs(pieces) do
         if piece.kind == 'L' then lua[#lua + 1] = piece else web[#web + 1] = piece end
     end
+    pause()
     if not run(lua) then return nil end
+    pause()
     if not VavaAtelier.session or not VavaAtelier.placer then
         fail('paquet', 'séance ou outil de placement absent après exécution')
         return nil

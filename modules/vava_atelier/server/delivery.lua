@@ -1,19 +1,22 @@
 --[[
     vava_atelier/server/delivery.lua
-    Rôle : code du Conseil livré à la demande (T-157). Au démarrage : paquet assemblé depuis les fichiers des directives
-           `vava_conseil_lua` puis `vava_conseil_web` du manifeste, dans leur ordre, lus sur la copie déployée ; chaque
-           fichier Lua compilé sans être exécuté (contrôle) ; empreinte FNV-1a ; découpe en morceaux de 64 Ko. Un paquet
-           qui ne se construit pas n'empêche pas le module de démarrer : le RPC répond `unavailable`. RPC `code` :
-           description du paquet ou un morceau, au seul joueur qui a le droit d'ouvrir l'Atelier (relu à chaque appel),
-           dans un budget de paquets par heure glissante et par joueur ; oubli au départ. Aucune base, aucune attente.
-           Bornes des réglages du chargeur contrôlées au setup (`checkSettings`).
+    Rôle : code du Conseil livré à la demande (T-157). Au démarrage : paquet assemblé depuis les fichiers des
+           directives `vava_conseil_lua` puis `vava_conseil_web` du manifeste, dans leur ordre, lus sur la copie
+           déployée ; chaque fichier Lua compilé sans être exécuté (contrôle) ; empreintes FNV-1a (version, morceaux)
+           et SHA-256 (recalculée par le chargeur avant tout `load`) ; découpe en morceaux de 64 Ko. Jamais dans un
+           paquet : `config.lua`, `server/`, `bridge/` (relecture sécurité S-3). Un paquet qui ne se construit pas
+           n'empêche pas le module de démarrer : le RPC répond `unavailable`. RPC `code` : description du paquet ou un
+           morceau, au seul joueur qui a le droit d'ouvrir l'Atelier (relu à chaque appel), dans un budget par compte
+           (seau rempli de `hourlyPackages` paquets par heure, relectures S-5 et R-2 : une reconnexion ne le remet pas
+           à neuf). Aucune base, aucune attente. Bornes des réglages du chargeur contrôlées au setup.
     Dépendances : shared/constants.lua, config_client.lua, config.lua, shared/digest.lua, shared/codepack.lua,
-                  server/core.lua, server/access.lua
+                  shared/codepack_encode.lua, server/core.lua, server/access.lua
 ]]
 
 local type, ipairs, tostring = type, ipairs, tostring
-local mathType = math.type
-local find, gsub, match, reverse = string.find, string.gsub, string.match, string.reverse
+local mathType, min = math.type, math.min
+local find, gsub, match, reverse, sub, lower = string.find, string.gsub, string.match, string.reverse, string.sub,
+    string.lower
 local GetNumResourceMetadata, GetResourceMetadata, LoadResourceFile, GetGameTimer =
     GetNumResourceMetadata, GetResourceMetadata, LoadResourceFile, GetGameTimer
 
@@ -23,7 +26,8 @@ if not core then return end
 local cfg = VavaAtelier.config
 local RPC = VavaAtelier.RPC
 local LIMITS = VavaAtelier.CODEPACK
-local codepack, digest, access = VavaAtelier.codepack, VavaAtelier.digest, VavaAtelier.access
+local codepack, digest, sha256, access = VavaAtelier.codepack, VavaAtelier.digest, VavaAtelier.sha256,
+    VavaAtelier.access
 local log = VavaAtelier.log
 
 local RESOURCE = VavaAtelier.resource
@@ -39,10 +43,15 @@ local LISTS = {
 local delivery = {}
 VavaAtelier.delivery = delivery
 
--- paquet construit : { ready, fp, bytes, parts, pieces, err } (le texte entier n'est pas gardé)
+-- dossiers du seul serveur, jamais dans un paquet (relecture sécurité S-3 ; config.lua : FORBIDDEN_FILES)
+local FORBIDDEN_DIRS = { 'server/', 'bridge/' }
+local FORBIDDEN_FILES = { ['config.lua'] = true }
+
+-- paquet construit : { ready, fp, sha, bytes, parts, pieces, err } (le texte entier n'est pas gardé)
 local state = { ready = false, err = 'non construit' }
--- par joueur : { bytes, since, logged } — octets de morceaux envoyés depuis `since` (heure glissante), empreinte
--- dont l'envoi est déjà écrit en console
+-- par compte : { allowance, at, logged } — octets que le compte peut encore recevoir (seau rempli de
+-- hourlyPackages × taille du paquet par heure, plein au départ), dernière mise à jour, empreinte dont l'envoi est déjà
+-- écrit en console. Gardé d'une connexion à l'autre (quelques octets par membre qui a téléchargé l'outil).
 local served = {}
 
 --- Entier écrit par groupes de trois chiffres (« 250 368 »).
@@ -121,6 +130,14 @@ local function gather()
             if not kind or not codepack.validName(name, kind) then
                 return nil, ('chemin refusé dans %s : %s'):format(list.directive, tostring(name))
             end
+            if FORBIDDEN_FILES[lower(name)] then
+                return nil, ('%s ne part jamais dans un paquet (réglages du seul serveur)'):format(name)
+            end
+            for _, dir in ipairs(FORBIDDEN_DIRS) do
+                if sub(name, 1, #dir) == dir then
+                    return nil, ('%s ne part jamais dans un paquet (code du seul serveur, %s)'):format(name, dir)
+                end
+            end
             if seen[name] then return nil, ('fichier listé deux fois : %s'):format(name) end
             seen[name] = true
             local code = LoadResourceFile(RESOURCE, name)
@@ -157,21 +174,21 @@ function delivery.build()
         log.error('paquet du Conseil non construit : %s ; l\'Atelier ne s\'ouvrira chez aucun membre', state.err)
         return false, state.err
     end
-    state = { ready = true, fp = digest(text), bytes = #text, parts = parts, pieces = #pieces }
-    log.info('paquet du Conseil : %d fichiers, %s octets, %d morceaux, empreinte %s', state.pieces,
-        grouped(state.bytes), #parts, state.fp)
+    state = { ready = true, fp = digest(text), sha = sha256(text), bytes = #text, parts = parts, pieces = #pieces }
+    log.info('paquet du Conseil : %d fichiers, %s octets, %d morceaux, empreinte %s, SHA-256 %s', state.pieces,
+        grouped(state.bytes), #parts, state.fp, state.sha)
     return true
 end
 
---- État du paquet (lecture seule) : { ready, fp?, bytes?, parts?, pieces?, err? }.
+--- État du paquet (lecture seule) : { ready, fp?, sha?, bytes?, parts?, pieces?, err? }.
 ---@return table
 function delivery.status()
-    return { ready = state.ready, fp = state.fp, bytes = state.bytes, parts = state.parts and #state.parts,
-        pieces = state.pieces, err = state.err }
+    return { ready = state.ready, fp = state.fp, sha = state.sha, bytes = state.bytes,
+        parts = state.parts and #state.parts, pieces = state.pieces, err = state.err }
 end
 
---- RPC `code` : `part == 0` → description `{ fp, parts, bytes }` ; sinon le morceau `part` du paquet d'empreinte `fp`.
---- Droit relu à chaque appel (un rang retiré entre deux morceaux arrête l'envoi).
+--- RPC `code` : `part == 0` → description `{ fp, sha, parts, bytes }` ; sinon le morceau `part` du paquet d'empreinte
+--- `fp`. Droit relu à chaque appel (un rang retiré entre deux morceaux arrête l'envoi).
 ---@param source integer
 ---@param fp string    '' ou 16 chiffres hexadécimaux (schéma du RPC)
 ---@param part integer 0 à MAX_PARTS (schéma du RPC)
@@ -181,30 +198,29 @@ function delivery.rpc(source, fp, part)
     local ctx, code = access.allowed(source, RPC.CODE)
     if not ctx then return false, code end
     if not state.ready then return false, 'unavailable' end
-    if part == 0 then return true, { fp = state.fp, parts = #state.parts, bytes = state.bytes } end
+    if part == 0 then
+        return true, { fp = state.fp, sha = state.sha, parts = #state.parts, bytes = state.bytes }
+    end
     if fp ~= state.fp then return false, 'stale' end
     local chunk = state.parts[part]
     if not chunk then return false, 'bad_request' end
-    local now = GetGameTimer()
-    local mine = served[source]
+    -- seau du compte : plein au départ, rempli au fil de l'heure (hourlyPackages paquets entiers par heure au plus)
+    local now, cap = GetGameTimer(), cfg.delivery.hourlyPackages * state.bytes
+    local key = ctx.accountId or ('joueur ' .. source)
+    local mine = served[key]
     if not mine then
-        mine = { bytes = 0, since = now }
-        served[source] = mine
-    elseif now - mine.since >= HOUR_MS then
-        mine.bytes, mine.since = 0, now
+        mine = { allowance = cap, at = now }
+        served[key] = mine
+    else
+        mine.allowance = min(cap, mine.allowance + (now - mine.at) * cap / HOUR_MS)
+        mine.at = now
     end
-    if mine.bytes + #chunk > cfg.delivery.hourlyPackages * state.bytes then return false, 'rate_limited' end
-    mine.bytes = mine.bytes + #chunk
+    if #chunk > mine.allowance then return false, 'rate_limited' end
+    mine.allowance = mine.allowance - #chunk
     if part == 1 and mine.logged ~= state.fp then
         mine.logged = state.fp
         log.info('paquet du Conseil envoyé : joueur %d, compte %s, %s octets', source, tostring(ctx.accountId),
             grouped(state.bytes))
     end
     return true, chunk
-end
-
---- Joueur parti : son budget est oublié.
----@param source integer
-function delivery.forget(source)
-    served[source] = nil
 end

@@ -45,7 +45,7 @@ describe('vava_atelier chargeur du code du Conseil (client)', function()
     --- Paquet servi : texte, empreinte, morceaux (codepack réel).
     local function serve(pieces)
         local text = assert(VavaAtelier.codepack.encode(pieces))
-        server.text, server.fp = text, VavaAtelier.digest(text)
+        server.text, server.fp, server.sha = text, VavaAtelier.digest(text), VavaAtelier.sha256(text)
         server.parts = assert(VavaAtelier.codepack.cut(text, VavaAtelier.CODEPACK.PART_BYTES))
     end
 
@@ -56,6 +56,9 @@ describe('vava_atelier chargeur du code du Conseil (client)', function()
         helper.loadClientView('modules/vava_atelier', 'VavaAtelier')
         assert.is_nil(VavaAtelier.config.placement, 'config_conseil.lua ne doit pas être dans la vue de l\'amorce')
         helper.loadAll({ 'modules/vava_atelier/shared/digest.lua', 'modules/vava_atelier/shared/codepack.lua' })
+        assert.is_nil(VavaAtelier.codepack.encode, 'l\'écriture du paquet est au seul serveur')
+        -- le paquet servi est écrit comme au serveur
+        helper.load('modules/vava_atelier/shared/codepack_encode.lua')
         VavaAtelier.ran = {}
         logs = { warn = {}, error = {}, info = {} }
         local function logger(level) return function(fmt, ...) table.insert(logs[level], fmt:format(...)) end end
@@ -68,8 +71,8 @@ describe('vava_atelier chargeur du code du Conseil (client)', function()
                 if server.onCall then server.onCall(fp, part) end
                 if server.transport then return false, server.transport end
                 if not server.allowed then return true, false, 'not_allowed' end
-                if part == 0 then return true, true, server.describe or { fp = server.fp, parts = #server.parts,
-                    bytes = #server.text } end
+                if part == 0 then return true, true, server.describe or { fp = server.fp, sha = server.sha,
+                    parts = #server.parts, bytes = #server.text } end
                 if server.staleLeft > 0 then
                     server.staleLeft = server.staleLeft - 1
                     return true, false, 'stale'
@@ -323,6 +326,36 @@ describe('vava_atelier chargeur du code du Conseil (client)', function()
         assert.equal('ready', VavaAtelier.loader.state())
     end)
 
+    -- relecture sécurité S-1 : un stockage écrit ailleurs (même nom de ressource sur un autre serveur) avec la bonne
+    -- empreinte FNV-1a et la bonne taille, mais pas le paquet de ce serveur : la SHA-256 annoncée le refuse
+    it('stockage de même FNV-1a et même taille mais SHA-256 différente : rien d\'exécuté, stockage effacé', function()
+        local forged = assert(VavaAtelier.codepack.encode(concatLists({ LUA_PIECES[1],
+            { kind = 'L', name = 'client/session.lua', code = 'VavaAtelier.pirate = true\n' }, LUA_PIECES[3] },
+            WEB_PIECES)))
+        local parts = assert(VavaAtelier.codepack.cut(forged, VavaAtelier.CODEPACK.KVP_CHUNK))
+        for i, part in ipairs(parts) do kvp['paquet:' .. i] = part end
+        kvp['paquet:morceaux'], kvp['paquet:taille'] = #parts, #forged
+        kvp['paquet:empreinte'] = VavaAtelier.digest(forged)
+        -- le serveur annonce cette empreinte FNV-1a (collision supposée) et la SHA-256 de son vrai paquet
+        server.describe = { fp = VavaAtelier.digest(forged), sha = server.sha, parts = #server.parts, bytes = #forged }
+        f9()
+        assert.equal(0, #loads)
+        assert.is_nil(VavaAtelier.pirate)
+        assert.equal(0, partCalls())
+        assert.same({}, kvp)
+        assert.same({ VavaAtelier.config.texts.refused.unavailable }, feeds)
+        assert.truthy(logs.warn[#logs.warn]:find('SHA-256', 1, true))
+        assert.equal('idle', VavaAtelier.loader.state())
+    end)
+
+    it('paquet téléchargé dont la SHA-256 n\'est pas celle annoncée : rien d\'exécuté', function()
+        server.sha = string.rep('0', 64)
+        f9()
+        assert.equal(0, #loads)
+        assert.is_nil(kvp['paquet:empreinte'])
+        assert.equal('idle', VavaAtelier.loader.state())
+    end)
+
     it('morceaux reçus dont l\'empreinte diffère : rien d\'exécuté, rien de gardé', function()
         server.tamper = true
         f9()
@@ -334,8 +367,11 @@ describe('vava_atelier chargeur du code du Conseil (client)', function()
     end)
 
     it('description incohérente (empreinte, morceaux, taille) : rien demandé de plus', function()
-        for _, bad in ipairs({ { fp = 'XYZ', parts = 1, bytes = 1 }, { fp = server.fp, parts = 9, bytes = 1 },
-            { fp = server.fp, parts = 1, bytes = 65537 }, { fp = server.fp, parts = 1, bytes = 0 }, 'texte' }) do
+        local sha = server.sha
+        for _, bad in ipairs({ { fp = 'XYZ', sha = sha, parts = 1, bytes = 1 }, { fp = server.fp, sha = sha, parts = 9,
+            bytes = 1 }, { fp = server.fp, sha = sha, parts = 1, bytes = 65537 }, { fp = server.fp, sha = sha, parts = 1,
+            bytes = 0 }, { fp = server.fp, parts = 1, bytes = 1 }, { fp = server.fp, sha = 'abc', parts = 1, bytes = 1 },
+            'texte' }) do
             server.describe, server.calls = bad, {}
             f9()
             assert.equal(1, #server.calls)

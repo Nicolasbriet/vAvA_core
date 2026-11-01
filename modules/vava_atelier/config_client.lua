@@ -18,42 +18,15 @@ VavaAtelier.config = {
     -- Textes affichés par le client hors de la page (l'interface a les siens : web/js/strings.js) ; le serveur lit
     -- aussi les refus. Ceux de la séance du Conseil sont dans config_conseil.lua, les autres dans config.lua (texts.*).
     texts = {
-        -- refus d'un RPC (codes du § 6.2 de la spec), montrés hors de l'interface quand elle ne peut pas s'ouvrir
+        -- refus que l'amorce peut montrer (RPC `code` et transport, client/notice.lua) ; les autres refus, ceux de la
+        -- séance du Conseil, sont dans config_conseil.lua (relecture réseau R-3 de T-157)
         refused = {
             not_ready = 'Le Registre du Conseil s\'éveille : réessayez dans un instant.',
             no_character = 'Choisissez d\'abord un personnage.',
             not_allowed = 'L\'Atelier est réservé au Conseil.',
-            not_open = 'L\'Atelier s\'est refermé : rouvrez-le.',
-            unknown_editor = 'Cet atelier n\'existe plus.',
-            unknown_kind = 'Ce genre de fiche n\'existe plus dans cet atelier.',
-            unknown_entry = 'Cette fiche n\'existe plus.',
-            unknown_field = 'Ce réglage n\'existe pas dans cette fiche.',
-            busy = 'Un instant : la demande précédente n\'est pas finie.',
-            editor_error = 'Cet atelier ne répond pas : prévenez un développeur.',
-            db_error = 'Les registres de l\'Atelier ne répondent pas : réessayez dans un instant.',
-            rate_limited = 'Doucement : patientez un instant.',
             unavailable = 'L\'Atelier est indisponible pour le moment.',
-            stale = 'Cette fiche a changé depuis que vous l\'avez ouverte : rouvrez-la pour voir la dernière version.',
-            draft_taken = 'Un autre membre du Conseil tient déjà un brouillon de cette fiche : ouvrez-le pour le lire '
-                .. 'ou le reprendre.',
-            draft_open = 'Vous avez déjà un brouillon de cette fiche : abandonnez-le d\'abord.',
-            not_holder = 'Ce brouillon est tenu par un autre membre du Conseil.',
-            no_draft = 'Cette fiche n\'a pas de brouillon en cours.',
-            not_stored = 'Cet atelier ne garde encore rien : on peut seulement y vérifier une fiche.',
-            too_large = 'Cette fiche est trop lourde pour être gardée : raccourcissez ses textes.',
-            full = 'Trop de fiches ou de brouillons : publiez ou abandonnez-en d\'abord.',
-            parent_missing = 'Cette fiche dépend d\'une autre qui n\'est pas publiée : publiez-la ou rétablissez-la '
-                .. 'd\'abord.',
-            trial_busy = 'Vous avez déjà un essai en cours : arrêtez-le d\'abord.',
-            no_trial = 'Cet atelier ne propose pas d\'essai.',
-            syncing = 'L\'atelier se met à jour : réessayez dans un instant.',
-            unknown_version = 'Cette version n\'existe plus.',
-            not_archived = 'Seule une ancienne version peut être rétablie.',
-            unchanged = 'Rien n\'a changé depuis la version publiée.',
-            unreadable = 'Cette version ne peut plus être lue par cet atelier.',
-            -- T-102 (outil de placement)
-            not_placeable = 'Cette fiche ne se place pas en jeu.',
-            instance = 'Vous êtes hors du monde commun (intérieur, cachot…) : revenez-y pour placer.',
+            rate_limited = 'Doucement : patientez un instant.',
+            busy = 'Un instant : la demande précédente n\'est pas finie.',
             bad_request = 'Demande refusée : rouvrez la fiche.',
         },
         -- nom des réponses de /atelier_archives dans le chat du membre (ancien texts.archives.author)

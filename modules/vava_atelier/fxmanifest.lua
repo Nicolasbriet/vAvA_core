@@ -59,6 +59,7 @@ server_scripts {
     'shared/stored.lua',
     'shared/lifecycle.lua',
     'shared/exchange.lua',
+    'shared/codepack_encode.lua', -- T-157 : écriture du paquet du Conseil (le chargeur ne fait que le lire)
     'shared/placerules.lua',     -- T-102 : règles de placement, mêmes pour l'aperçu (paquet) et la décision (serveur)
     'bridge/server.lua',
     'server/editors.lua',
