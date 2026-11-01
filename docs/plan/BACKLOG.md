@@ -818,8 +818,8 @@ versé à T-014 ; les autres points déjà couverts sont précisés dans T-012 �
   simplifier `vava_provisions` (retirer le relevé).
 
 ### T-160 — Pages web livrées sans commentaires
-- Agents : vava-architecte → vava-dev-nui (outillage ; à valider par le porteur du projet s'il faut toucher
-  `chancellerie/`) · Dépend de : T-154 · Statut : à faire — **à livrer dans la même mise à jour que T-154** (relecture
+- Agents : vava-architecte → vava-dev-lua (outillage ; cette tâche autorise à toucher `chancellerie/`, validé par le
+  porteur du projet le 2 novembre 2026) · Dépend de : T-154 · Statut : en cours — **à livrer dans la même mise à jour que T-154** (relecture
   réseau R-1 de T-154 : `vava_loading` et `vava_ui` ne seront retéléchargés qu'une fois)
 - Trouvé pendant T-154 (spec § 15) : les pages livrées (`web/**/*.js`, `*.css`, `*.html` des `files`, et la page du
   paquet du Conseil `vava_conseil_web` de T-157) gardent leurs commentaires ; le Lua, lui, est allégé depuis T-154.
