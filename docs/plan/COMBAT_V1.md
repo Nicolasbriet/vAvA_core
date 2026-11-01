@@ -134,9 +134,9 @@ Décisions de T-113 (`vava_combat` 1.3.0, spec `docs/plan/specs/T-113.md`, recom
 - **Parade réussie** : coup annulé, attaquant chancelant 0,9 s même pendant son immunité, qu'elle renouvelle ; parade
   ratée : 600 ms sans parade après la fin de sa fenêtre.
 - **Blocage** : part arrêtée de l'arme tenue ou du bouclier au bras (fiche `block`), montré « bloqué » même partiel, le
-  Fendant bloqué ne fait pas chanceler. **Garde brisée** : chancellement 1,2 s, ni garde ni parade ; en attendant
-  l'endurance (T-114), un compteur provisoire : 4 coups bloqués (6 au bouclier, un lourd compte 2), remis à zéro après
-  3 s sans coup.
+  Fendant bloqué ne fait pas chanceler. **Garde brisée** : chancellement 1,2 s, ni garde ni parade ; depuis T-114,
+  quand un coup bloqué coûte au moins ce qui reste d'endurance (le compteur provisoire de T-113 est retiré : mêmes
+  seuils depuis une jauge pleine, 4 coups bloqués, 6 au bouclier, un lourd compte 2).
 - **Usure** : l'arme qui pare, le bouclier (sinon l'arme) qui bloque ; rien sur une esquive.
 - **Issues** dans `vava_combat:hit` : `parry`, `block`, `break` (à la place de `hit`) ; `dodge` et `absorb` tues.
 
@@ -145,6 +145,28 @@ Décisions de T-113 (`vava_combat` 1.3.0, spec `docs/plan/specs/T-113.md`, recom
 Jauge serveur de 0 à 100, affichée dans le HUD ; se recharge après un délai sans effort ; consommée par les coups,
 le blocage, l'esquive, et la course plus tard si on le souhaite. Faim et soif basses ralentissent la recharge
 (`vava_needs`).
+
+Décisions de T-114 (`vava_combat` 1.6.0, `vava_hud` 1.8.0, spec `docs/plan/specs/T-114.md`, recommandations retenues le
+2 novembre 2026) :
+- **Où vit la jauge** : en mémoire du serveur, par personnage en jeu, jamais sauvegardée (pleine à l'arrivée et au
+  relevé) ; **aucune minuterie** : valeur, reprise de la recharge et pente, le niveau se calcule à la lecture (comme la
+  mana).
+- **Dépenses** à l'acceptation du geste, manqué ou non, mannequin compris : Taille 12, Estoc 9, Revers 11, Fendant 25,
+  Parade 6, Pas de côté 20 ; **coup bloqué** : 25 (lourd × 2, bouclier × 0,67) ; tenir la garde ne coûte rien et
+  n'arrête pas la recharge, mais il faut 25 pour la lever. Rien pour courir (hors T-114), incanter, être frappé.
+- **Seuil** : coût entier exigé (refus « Vous êtes à bout de souffle. ») ; un coup bloqué qui coûte au moins ce qui reste
+  brise la garde.
+- **Recharge** 20 / s après 1 s sans dépense ; faim ou soif à 30 ou moins × 0,75, à 10 ou moins × 0,5 (le besoin le
+  plus bas, relu au plus toutes les 30 s, à un geste).
+- **Réseau** : l'état de sa seule jauge dans la réponse de `vava_combat:use` et un évènement court
+  `vava_combat:stamina` (coup bloqué, chute) ; rien au repos, rien à un autre joueur ; la page de `vava_hud` anime la
+  remontée.
+- **HUD** : médaillon « Endurance » en dernier, montré en mode combat éveillé ou tant qu'il n'est pas plein (puis 3 s) ;
+  ambre sous 25 %, rouge sous 10 %.
+- **Défense bornée** : alterner pas de côté et parades ratées ne protège plus ≈ 35 % du temps (T-113) mais ≈ 15 à 18 %
+  selon la stratégie (relecture sécurité S-1 de T-114), sous 20 % sur 60 s.
+- Magie : aucun lien (les sorts ne coûtent pas d'endurance). Délais de la parade ratée et du pas de côté gardés (à revoir
+  à T-119). `/armes voir` montre la jauge ; aucune commande ne la change.
 
 ## 6. Styles et progression (T-115)
 
@@ -172,4 +194,5 @@ désarmement.
 
 Tolérance de portée + 0,25 m, tolérance d'angle + 10° (resserrées, sans contrôle des murs : décision du porteur du
 projet, 31 octobre 2026, T-112), dégainer 0,8 s et rengainer 1,5 s, fenêtre de parade 200 ms, invulnérabilité d'esquive
-250 ms, recharge de l'endurance 20 / s après 1 s sans effort, garde brisée 1,2 s.
+250 ms, recharge de l'endurance 20 / s après 1 s sans effort, garde brisée 1,2 s ; coûts d'endurance (T-114) : Taille
+12, Estoc 9, Revers 11, Fendant 25, Garde 25 par coup léger bloqué, Parade 6, Pas de côté 20.

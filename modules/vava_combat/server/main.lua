@@ -6,10 +6,10 @@
            bornés, limites de débit), modificateurs de la défense déclarés (et redéclarés au retour de vava_health),
            hooks (retour de l'inventaire, de l'artisanat, des compétences et de la santé ; apparition, déchargement et
            départ ; pile du bouclier qui quitte la besace ; prise en main : dégainer et rengainer ; mise à terre : coup
-           annulé ; coup de la chaîne : suites d'une défense), boucliers et armes en main repris pour les personnages
+           annulé, endurance remise à plein ; coup de la chaîne : suites d'une défense), boucliers et armes en main repris pour les personnages
            déjà en jeu, mannequins d'entraînement chargés (liste contrôlée : refus avec la raison). Aucune table SQL.
-           À l'arrêt de la ressource, les statebags de bouclier sont vidés, les coups en cours annulés, les mannequins
-           oubliés.
+           À l'arrêt de la ressource, les statebags de bouclier sont vidés, les coups en cours annulés, les mannequins et
+           les jauges d'endurance oubliés.
     Dépendances : tous les fichiers server/ du module
 ]]
 
@@ -28,6 +28,7 @@ local hands = VavaCombat.hands
 local reactions = VavaCombat.reactions
 local swings = VavaCombat.swings
 local defense = VavaCombat.defense
+local stamina = VavaCombat.stamina
 local dummies = VavaCombat.dummies
 local commands = VavaCombat.commands
 local cfg = VavaCombat.config
@@ -70,15 +71,17 @@ local function forget(payload)
     hands.forget(src)
     reactions.forget(src)
     defense.forget(src)
+    stamina.forget(src)
 end
 
---- Mise à terre : coup en cours annulé, chancellement oublié.
+--- Mise à terre : coup en cours annulé, chancellement oublié, endurance remise à plein (envoyée si elle ne l'était pas).
 ---@param payload { source: integer }
 local function onDowned(payload)
     if type(payload) ~= 'table' or type(payload.source) ~= 'number' then return end
     swings.onDowned(payload.source)
     reactions.onDowned(payload.source)
     defense.onDowned(payload.source)
+    stamina.onDowned(payload.source)
 end
 
 local function setup()
@@ -158,6 +161,7 @@ AddEventHandler('onResourceStop', function(resource)
     hands.stop()
     reactions.stop()
     defense.stop()
+    stamina.stop()
     dummies.stop()
     pedState.stop()
 

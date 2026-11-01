@@ -3,11 +3,11 @@
     Rôle : réglages des armes que lit le seul serveur (servi au seul serveur, jamais téléchargé par les joueurs) :
            fiches des armes (part du serveur), délais du serveur du bouclier, catégories, familles et types de dégâts,
            objets déclarés à l'inventaire, recettes déclarées à l'artisanat, qualité et usure, filet de la brique
-           `strike`, débits des RPC (techniques, garde), défense (part du serveur : délais, étiquettes, garde brisée
-           provisoire, modificateurs), cycle d'un coup, tolérances, géométrie, réactions, chiffres des coups (T-155),
-           mannequins (part du serveur, T-156), commandes du Conseil, journal, textes. Complète la table ouverte par
+           `strike`, débits des RPC (techniques, garde), défense (part du serveur : délais, étiquettes, modificateurs),
+           endurance (T-114 : recharge, coup bloqué, faim et soif), cycle d'un coup, tolérances, géométrie, réactions,
+           chiffres des coups (T-155), mannequins (part du serveur, T-156), commandes du Conseil, journal, textes. Complète la table ouverte par
            config_client.lua (classes des armes, bouclier accroché, placements, contrôles natifs, techniques, styles,
-           mode combat, touches, mannequins) sans en réécrire une clé (T-132).
+           mode combat, touches, mannequins, jauge d'endurance du HUD) sans en réécrire une clé (T-132).
     Les modèles sont des remplaçants vanilla (-- PLACEHOLDER, docs/plan/ASSETS_PLACEHOLDERS.md) : le jour où les armes
     médiévales arrivent, seuls `items[…].held.model` et `weapons[…].provisional` (ici), et `shields[…]`
     (config_client.lua) changent. Les chiffres (solidité, usure, tolérances) sont des valeurs de départ, à régler à la
@@ -72,13 +72,30 @@ config.defense.dodge = {
 config.defense.block = { tags = { 'melee' }, shieldArcBonus = 40 }
 -- Parade : coups `parryable` portant une de ces étiquettes.
 config.defense.parryTags = { 'melee' }
--- Garde brisée PROVISOIRE, remplacée par l'endurance de T-114 : points par coup bloqué (un coup lourd en vaut
--- `heavyWeight`), garde brisée à `points` (au bouclier : `shieldPoints`), compte remis à zéro après `resetMs` sans coup
--- bloqué (lever et baisser la garde ne le remet pas à zéro).
-config.defense.guardBreak = { points = 4, shieldPoints = 6, heavyWeight = 2, resetMs = 3000 }
 config.defense.modifierPriority = 50   -- priorité des trois modificateurs dans leur étape (0 à 99)
 config.defense.memoMax = 64            -- décisions en attente de leur suite (une par coup en cours de chaîne ; 8 à 512)
 config.defense.memoMs = 1000           -- décision plus vieille oubliée (coup tombé en erreur avant sa suite)
+
+-- Endurance (T-114), lue par le seul serveur. Jauge de 0 à 100 par personnage en jeu, jamais sauvegardée (pleine à
+-- l'arrivée, à la mise à terre) ; recharge calculée à la lecture, aucune minuterie. Coûts : `stamina` des techniques
+-- (config_client.lua), payé à l'acceptation du geste ; la garde ne coûte que par coup bloqué (sa `stamina` : coût d'un
+-- coup léger bloqué, exigé pour la lever) ; la garde cède quand un coup bloqué coûte au moins ce qui reste.
+config.endurance = {
+    regenPerSecond = 20,    -- points rendus par seconde (1 à 100)
+    regenDelayMs = 1000,    -- la recharge reprend ce délai après la dernière dépense (0 à 10 000)
+    block = {
+        heavyWeight = 2,    -- un coup lourd bloqué coûte autant que ce nombre de coups légers (1 à 5)
+        shieldFactor = 0.67, -- au bouclier (au bras, encore accroché), un coup bloqué coûte cette part (0,1 à 1)
+    },
+    -- Faim et soif (vava_needs) : le besoin le plus bas ralentit la recharge ; le palier le plus bas atteint compte
+    -- (`at` : valeur du besoin, 0 à 100, comprise ; `factor` : part de la recharge, 0,1 à 1 ; 4 paliers au plus).
+    needs = {
+        { at = 30, factor = 0.75 },   -- faim ou soif à 30 ou moins : 15 / s
+        { at = 10, factor = 0.5 },    -- à 10 ou moins : 10 / s
+    },
+    needsReadMs = 30000,    -- faim et soif relues au plus une fois par ce délai, quand le joueur fait un geste (1 000 à
+                            -- 300 000)
+}
 
 -- Cycle d'un coup tenu par le serveur.
 config.timing = {
@@ -267,6 +284,9 @@ config.messages = {
     dullSuffix = ', émoussée',
     -- libellé, position, solidité, maximale
     inspectShield = 'Bouclier accroché : %s, %s, solidité %d / %d',
+    -- endurance (T-114) : valeur, recharge par seconde, « ralentie » (faim ou soif)
+    inspectEndurance = 'Endurance : %s / 100, recharge %s / s%s',
+    enduranceSlowed = ' (ralentie par la faim ou la soif)',
     positions = { arm = 'au bras', back = 'dans le dos' },
     -- libellé, avant, après, n°
     wornByCouncil = '%s : solidité %d → %d (joueur %d).',

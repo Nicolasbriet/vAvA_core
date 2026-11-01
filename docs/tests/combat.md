@@ -8,7 +8,8 @@ essayées avec `/frapper_arme` de `vava_example_combat` 1.1.0. Section 3 : les *
 Section 4 : la **défense** de `vava_combat` 1.3.0 (T-113 : parade, garde, pas de côté, garde brisée) ;
 section 6 : la **magie et le mode combat** (`vava_magic` 2.12.0, T-149) ; section 7 : les **chiffres des coups**
 (`vava_combat` 1.4.0, `vava_hud` 1.7.0, T-155) ; section 8 : les **mannequins d'entraînement** (`vava_combat` 1.5.0,
-`vava_health` 1.6.0, `vava_magic` 2.14.0, T-156). L'endurance (T-114) viendra ensuite.
+`vava_health` 1.6.0, `vava_magic` 2.14.0, T-156) ; section 9 : l'**endurance** (`vava_combat` 1.6.0, `vava_hud` 1.8.0,
+T-114).
 Comptez 1 h par section, presque tout à deux ; les tests à deux joueurs sont marqués **(2 joueurs)**. Un test se cite
 « combat 1-8 ».
 
@@ -48,6 +49,11 @@ Comptez 1 h par section, presque tout à deux ; les tests à deux joueurs sont m
    mage (Boule de feu niveau 3, Nova ardente, Secousse : `/magie` du Conseil) ; aller à la cour provisoire de Paleto
    (`dummies.list` de `config_client.lua` de `vava_combat`) ; `/armes voir <A>` pour la solidité ; un troisième joueur
    C témoin.
+10. **Endurance** (section 9) : la préparation 0.8, `vava_combat` 1.6.0, `vava_hud` 1.8.0, `vava_needs` démarré. A et B
+    ont une Épée courte, B aussi un Bouclier rond ; A est mage (Boule de feu) ; outils `/vie`, `/besoins` (faim et soif,
+    [sante 0](sante.md)), `/armes voir <n°>` (l'endurance en dernière ligne) ; un troisième joueur C, Épée courte en
+    main, pour 9-8 et 9-22 ; ping de chacun noté. Les tests 4-7 à 4-9 (compteur provisoire de 1.3.0) sont remplacés par
+    9-6 à 9-9.
 
 ## 1. Chaîne de dégâts
 
@@ -190,9 +196,9 @@ Préparation : 0.8.
 | 4 | **(2 joueurs)** B `/vie 100`, garde levée face à A ; A Taille. | B perd 7,2 (pas 12) ; étincelles, pas de sang, B ne tressaille pas ; l'épée de B s'use le plus souvent (`/armes voir <B>`, 4 fois sur 5 à qualité 50). |
 | 5 | **(2 joueurs)** Idem, B bouclier accroché (au bras) et épée en main. | B perd 3,6 ; la solidité du **bouclier** baisse (`/armes voir <B>`), pas celle de l'épée. |
 | 6 | **(2 joueurs)** A frappe B de dos, garde levée. | 12 perdus, sang ; la garde reste levée. |
-| 7 | **(2 joueurs)** A enchaîne 4 coups légers sur la garde de B (épée), en moins de 3 s entre deux. | Au 4e : B chancelle, « Votre garde est brisée. » ; R maintenue ne relève rien pendant 1,2 s (il faut relâcher et ré-appuyer). |
-| 8 | **(2 joueurs)** Même chose, B au bouclier. | La garde tient 5 coups, cède au 6e. |
-| 9 | **(2 joueurs)** A deux Fendants sur la garde de B. | Le premier : bloqué (8,6 arrêtés à l'épée), B ne chancelle pas ; le second brise la garde. |
+| 7 | Remplacé depuis 1.6.0 (compteur provisoire retiré) : voir 9-6. | — |
+| 8 | Remplacé : voir 9-7. | — |
+| 9 | Remplacé : voir 9-8 (le premier Fendant reste bloqué, 8,6 arrêtés à l'épée, sans chancellement). | — |
 | 10 | **(2 joueurs)** B appuie brièvement R quand la lame de A arrive (Taille). | Aucun dégât ; A chancelle (geste, secousse) et ne frappe plus 0,9 s ; étincelles chez les deux. |
 | 11 | **(2 joueurs)** B pare trop tôt, puis ré-appuie aussitôt R. | La seconde parade ne part pas avant 0,6 s après la fin de la première (rien n'est dit) ; la Taille porte. |
 | 12 | **(2 joueurs)** B pare un Fendant. | Le Fendant porte et B chancelle : il faut le bloquer ou l'esquiver. |
@@ -253,6 +259,8 @@ Préparation : 0.8.
   synchronisée ; R et Espace sur AZERTY ; une touche liée (R, Espace) répond-elle encore quand recharger (45) et le saut
   (22) sont coupés en mode combat (4-3, 4-14) ; le sprint coupé garde levée ; parade au dernier moment à 150 ms de ping
   (4-23) ; la direction du pas de côté lue à l'appui (`GetControlNormal` 30 et 31).
+- Endurance (T-114) : rendu de l'icône `endurance.svg` à 720p et en 4K ; fluidité de la remontée (une transition CSS
+  dans CEF) ; lisibilité de l'anneau ambre et rouge sur le cuir (9-2 à 9-5, 9-26).
 
 ## 6. La magie et le mode combat (`vava_magic` 2.12.0, T-149)
 
@@ -363,3 +371,53 @@ du modèle, déchargement et arrêt, chiffre chez l'attaquant seul, balancement 
 `magic_dummies_spec.lua` (projectiles, éclats, rempart, Nova, Secousse, zone de paix, autre personnage, `vava_combat`
 absent). À voir en jeu seulement : les modèles provisoires et leur pose au sol, le sens du balancement, l'effet
 d'éclats, le rayon du client qui touche le prop local d'un mannequin (Boule de feu), la mesure réseau et resmon.
+
+## 9. Endurance (`vava_combat` 1.6.0, `vava_hud` 1.8.0, T-114)
+
+Chaque coup, chaque parade, chaque pas de côté coûte du souffle ; une garde qui encaisse se vide jusqu'à céder. Un
+médaillon « Endurance » s'allume à côté de la santé quand on prend les armes, descend à chaque effort, remonte seul
+après une seconde de répit, plus lentement le ventre vide. À bout de souffle, on ne frappe plus. Le **serveur** tient la
+jauge ; le client n'en montre qu'une projection. Préparation : 0.10. Coûts : Taille 12, Estoc 9, Revers 11, Fendant 25,
+Parade 6, Pas de côté 20 ; coup bloqué 25 à l'épée (16,8 au bouclier), le double pour un Fendant ; recharge 20 / s
+une seconde après la dernière dépense.
+
+| # | Faire | Attendu |
+|---|---|---|
+| 1 | Démarrer le serveur. Puis, sur une copie d'essai, remettre l'ancien `config.lua` (sans `endurance`) ; puis le nouveau avec `defense.guardBreak = { points = 4, shieldPoints = 6, heavyWeight = 2, resetMs = 3000 }` en plus. | `vava_combat` v1.6.0 prêt, aucune erreur. Ancien fichier : module refusé, « config.lua : réglage `endurance` absent (fichier d'avant 1.6.0 gardé par une mise à jour ?) : reportez vos changements depuis config.lua.nouveau ». `guardBreak` en trop : une ligne « réglage `defense.guardBreak` retiré en 1.6.0 … », module prêt. |
+| 2 | A, épée en main, clic gauche dans le vide (mode combat éveillé). | Médaillon « Endurance » à la droite des autres, plein, sans décaler santé, faim, soif ni voix ; la Taille fait baisser l'anneau d'environ un huitième. |
+| 3 | A frappe quatre Tailles dans le vide, puis s'arrête. | L'anneau baisse à chaque coup ; une seconde après le dernier, il remonte d'un seul mouvement régulier (≈ 2,2 s) ; `/vava_reseau joueur <A>` : **aucun** `vava_combat:stamina` (tout est dans la réponse de `use`). |
+| 4 | A martèle le clic gauche sans répit. | Après 9 à 11 coups : plus rien ne part, « Vous êtes à bout de souffle. » une fois toutes les 3 s au plus ; anneau rouge et lueur sous 10 % ; aucun `use` envoyé tant que la jauge ne suffit pas (`/vava_reseau`), puis une Taille toutes les ≈ 1,6 s. |
+| 5 | A arrête tout 10 s (le mode s'endort), jauge pleine. Refaire en s'arrêtant jauge à moitié. | Jauge pleine : le médaillon disparaît 3 s après l'endormissement. À moitié : il reste jusqu'à être plein, puis 3 s. |
+| 6 | **(2 joueurs)** B garde levée face à A ; A enchaîne des Tailles. | Chez B, l'anneau perd un quart par coup ; au 4e : « Votre garde est brisée. », B chancelle 1,2 s. |
+| 7 | **(2 joueurs)** Même chose, bouclier au bras de B. Puis B décroche son bouclier pendant la garde. | La garde tient 5 coups, cède au 6e ; décroché : le coût redevient celui de l'épée (un quart par coup). |
+| 8 | **(3 joueurs)** A et C, côte à côte, chacun un Fendant sur la garde de B (épée) à moins d'une seconde d'écart. Puis A seul : trois Fendants de suite sur la garde de B ; puis quatre sur le bouclier. | Deux attaquants : brisée au 2e. A seul : le 2e laisse B à ≈ 11 (0,55 s de recharge entre deux Fendants), brisée au 3e ; au bouclier, au 4e. `/vava_reseau joueur <A>` et `<C>` : aucun `vava_combat:stamina` ; `<B>` : un par coup bloqué. |
+| 9 | **(2 joueurs)** B bloque deux coups, A s'arrête 3 s puis recommence. | B a récupéré ≈ 40 : sa garde cède de nouveau au 4e coup (50 + 40 = 90 ; 65, 40, 15, puis 0). |
+| 10 | **(2 joueurs)** Garde de B brisée ; B garde R enfoncée. | Ni garde ni parade pendant le chancellement ; la garde ne se relève pas avant ≈ 2,25 s (« à bout de souffle » une fois) ; aucun second chancellement d'affilée. |
+| 11 | **(2 joueurs)** B tape R en rafale pendant les coups de A (parades ratées). | ≈ 16 parades au plus, puis plus rien ne part tant que la jauge ne remonte pas. |
+| 12 | B martèle Espace (mode combat actif). | Neuf pas de côté en ≈ 12 s, puis « à bout de souffle » ; la jauge remonte une seconde après le dernier pas. |
+| 13 | **(2 joueurs)** B alterne pas de côté et parades pendant 30 s face aux Tailles de A. | Les 5 premières secondes, B évite beaucoup ; ensuite la plupart des Tailles portent (≈ 15 à 18 % du temps protégé selon la façon de faire, au lieu de 35 % en 1.5.0). |
+| 14 | A, `/besoins` faim 25 ; vider la jauge, attendre. Puis soif 5. | Remontée plus lente (≈ 6,7 s de vide à plein au lieu de 5 s) ; `/armes voir <A>` : « recharge 15 / s (ralentie par la faim ou la soif) ». Soif 5 : 10 / s (≈ 10 s). |
+| 15 | A mange (faim → 80) en plein combat. | La recharge redevient 20 / s au plus tard 30 s après, au premier geste suivant (`/armes voir`). |
+| 16 | A, Taille sur un mannequin de la cour d'armes (§ 8). | Même baisse que sur un joueur ou dans le vide. |
+| 17 | **(2 joueurs)** A met B à terre jauge à moitié ; un tiers relève B. | Chez B, le médaillon se remplit à la chute (un `vava_combat:stamina`) ; relevé, jauge pleine. |
+| 18 | A, mage, mains vides : trois Boules de feu. | L'endurance ne bouge pas ; la mana ne dépend pas de l'endurance. |
+| 19 | A court 30 s sans arme, puis avec. | La jauge de combat ne bouge pas ; l'essoufflement de course reste celui de GTA (réduit sous 10 de faim, `vava_needs`). |
+| 20 | A ouvre la bannière (Échap) pendant une remontée, la referme. | HUD masqué puis rendu ; l'anneau est à la bonne valeur et continue. |
+| 21 | `restart vava_hud` pendant une remontée. | Le médaillon revient à la bonne valeur et continue de remonter ; aucune erreur F8. |
+| 22 | **(3 joueurs)** A et B échangent 2 min ; C à 10 m. | `/vava_reseau ressource vava_combat` : `vava_combat:stamina` ≤ ≈ 0,1 Ko/s ; chez C, aucun. Au repos 2 min ensuite : plus rien. |
+| 23 | `resmon 1` chez A : au repos armé, pendant une remontée, en mêlée. Puis comparer les images par seconde (`cl_drawfps 1`) au repos, médaillon plein, et pendant une remontée (la page repeint l'anneau). | `vava_combat` et `vava_hud` au repos ≤ 0,01 ms ; remontée : inchangé (la page anime) ; mêlée ≤ 0,15 ms ; images par seconde : aucun écart visible pendant une remontée (noter les deux valeurs). |
+| 24 | **(2 joueurs)** B à 150 ms de ping : coups jusqu'à l'épuisement. | La jauge vue par B suit celle du serveur (`/armes voir <B>`) ; un coup refusé alors que l'anneau montrait assez : rare, recalé aussitôt (réponse `exhausted` avec l'état). |
+| 25 | `restart vava_combat` jauge à moitié. | Le médaillon disparaît sans erreur, revient plein au premier geste. |
+| 26 | Hors jeu : `modules/vava_hud/web/index.html?values=0.8,0.62,0.08,0.5&refill=0.2,1000`. | Le 5e médaillon (15 %) remonte d'un mouvement linéaire après 1 s ; ambre puis laiton au passage de 25 %. |
+
+Prouvé hors jeu : `tests/spec/combat_endurance_spec.lua` (règles pures de la jauge ; serveur réel : réponses de `use`,
+refus avant la réservation, prise au dernier pas après un crochet qui cède la main, garde à 24 et à 25, quatre coups,
+bouclier, Fendants, mise à terre, parade, pas de côté, bornes de la défense — alternance pas / parades 16,3 % de 10 à 60 s,
+repos puis parades en rafale 19,9 % sur 60 s, mesurés au pas de 10 ms —, faim et soif, jauge remplacée pendant la
+lecture des besoins, jauge d'un autre personnage, `/armes voir`, aucun envoi au repos ; bridge `NeedsValues`),
+`combat_endurance_client_spec.lua` (état reçu, médaillon, visibilité, demandes retenues localement, aucune boucle),
+`hud_gauges_spec.lua` (remontée validée, gardée, projetée), `combat_defense_spec.lua` (garde brisée aux mêmes seuils
+que 1.3.0), les essais de la page de `vava_hud` (`web/dev/essais.js`) et 20 contre-essais vus échouer (rapport
+`docs/plan/rapports/T-114.md`). À voir en jeu seulement : l'icône à 720p et en 4K, la fluidité de la remontée (transition
+CSS dans CEF), la lisibilité ambre et rouge sur le cuir, les sensations à 30, 80 et 150 ms de ping, la mesure réseau et
+resmon.

@@ -62,6 +62,10 @@ VavaHud.config = {
     -- vérification à cet intervalle.
     pollMs = 250,
 
+    -- Remontée d'une jauge que la page anime seule (1.8.0, T-114 : endurance) : part de la jauge par seconde (0 exclu à
+    -- maxPerSecond) et attente avant de remonter (0 à maxDelayMs ms) ; au-delà, setGauge rend 'invalid_refill'.
+    refill = { maxPerSecond = 10, maxDelayMs = 60000 },
+
     -- Bornes d'une déclaration de jauge.
     maxGauges = 12,
     maxIdLength = 64,

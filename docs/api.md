@@ -1150,7 +1150,7 @@ noir.
 | Export client | Retour |
 |---|---|
 | `defineGauge(id, { label, icon, order?, low?, critical? })` | `true` ou `false, code` |
-| `setGauge(id, valeur)` | `true` ou `false, code` — de 0 à 1 ; rien n'est envoyé à l'interface si la valeur ne change pas |
+| `setGauge(id, valeur, refill?)` | `true` ou `false, code` — de 0 à 1 ; rien n'est envoyé à l'interface si la valeur (et la remontée) ne change pas ; 1.8.0 : `refill = { perSecond, delayMs }` (parts de la jauge par seconde, 0 exclu à 10 ; attente en ms, entier de 0 à 60 000 ; aucune autre clé, sinon `invalid_refill`) fait remonter la jauge seule, linéairement jusqu'à 1, animée par la page (aucun envoi pendant la remontée) ; sans `refill`, toute remontée s'arrête (comportement de 1.7.0) ; une page rechargée ou une jauge redéclarée reprend à la valeur projetée |
 | `setGaugeActive(id, actif)` | `true` ou `false, code` — lueur de laiton autour du médaillon (le joueur parle, un effet est en cours…) ; depuis 1.2.0 |
 | `removeGauge(id)` | `true` ou `false, code` |
 | `notify(message, nature?)` | `true` ou `false, code` — nature `info` (défaut), `warning` ou `danger` ; texte brut, 200 caractères au plus |
@@ -1898,14 +1898,25 @@ d'entraînement** (ci-dessous) ; demande `vava_health` 1.6.0.
   (arc 120° + 10° de tolérance sur le demi-angle ; au contact, l'angle ne compte pas) ; blocage des coups de corps à
   corps non `unblockable`, de face (160° bouclier au bras) : `blocked` = part de l'arme ou du bouclier **encore
   accroché** (émoussé : × 0,5). Suites au hook `vava_health:hit` after : attaquant paré qui chancelle 0,9 s (même
-  immunisé ; immunité renouvelée), coup et suite réservée annulés ; garde brisée au 4e coup bloqué (6e au bouclier, un
-  lourd compte 2, remis à zéro après 3 s : **compteur provisoire**, `defense.spend` remplacé par T-114) : chancellement
+  immunisé ; immunité renouvelée), coup et suite réservée annulés ; coup bloqué payé en endurance (1.6.0) et garde
+  brisée quand il coûte au moins ce qui reste (depuis une jauge pleine : 4e coup léger, 6e au bouclier) : chancellement
   1,2 s, ni garde ni parade ; usure différée (`SetTimeout(0)`) de l'arme qui pare ou de ce qui bloque.
+- **Endurance** (1.6.0, T-114, spec `docs/plan/specs/T-114.md`) : jauge de 0 à 100 par personnage en jeu, tenue par le
+  serveur en mémoire (dixièmes), jamais sauvegardée (pleine à l'arrivée et au relevé d'une mise à terre), **sans
+  minuterie** : le niveau se calcule à chaque lecture. Dépenses à l'**acceptation** d'un geste : `stamina` × 10 de la
+  technique (attaque, manquée ou non, mannequin compris ; parade ; pas de côté) ; coup bloqué : `stamina` de la Garde ×
+  2 (coup lourd) × 0,67 (bouclier encore accroché) ; rien pour tenir la garde, mais il faut 25 pour la lever. Recharge
+  20 / s, 1 s après la dernière dépense ; faim ou soif (`vava_needs:get`, lu par le serveur au plus une fois par 30 s
+  et par combattant, à un geste) à 30 ou moins : × 0,75, à 10 ou moins : × 0,5. Refus `exhausted` en mémoire avant la
+  réservation (ligne 8 bis, après `dodge_cooldown`, avant `busy`), revérifié et dépensé au **dernier pas** de la
+  vérification. Le client reçoit son seul état (réponse de `use`, évènement `vava_combat:stamina`) et le montre dans
+  `vava_hud` (jauge `vava_combat:endurance`, remontée animée par la page) ; il ne demande pas ce que sa jauge ne paie
+  pas (à 2 points près). Réglages : `config.lua` → `endurance`, `config_client.lua` → `gauge`.
 - **Dégainer et rengainer** (1.2.0, décision du porteur du projet) : arme prise en main (hook `vava_inventory:hold`), aucune
   technique avant **0,8 s** (`drawing`) ; arme rangée, `armed(src)` rend encore `{ …, sheathing = true, readyInMs }`
   pendant **1,5 s** : la magie refuse d'incanter (« rangez votre arme ») sans que `vava_magic` change. Dégainer ne
   touche pas la magie (l'arme en main suffit).
-- **Réseau** : RPC `vava_combat:use` (≈ 40 o, réponse au seul appelant ≈ 15 o) et `vava_combat:lower` (≈ 25 o, un par
+- **Réseau** : RPC `vava_combat:use` (≈ 40 o, réponse au seul appelant ≈ 24 o, endurance comprise) et `vava_combat:lower` (≈ 25 o, un par
   garde abaissée, rien pendant la tenue) ; `vava_combat:hit` aux joueurs à 30 m de la cible dans l'instance de
   l'attaquant, **un par cible touchée** (l'issue d'un coup défendu le remplace), jamais pour un coup manqué ou refusé ;
   depuis 1.4.0 le montant (+ 1 à 3 o) aux deux seuls participants, l'esquive et l'absorbé (≈ 25 o) à eux seuls ;
@@ -1914,16 +1925,20 @@ d'entraînement** (ci-dessous) ; demande `vava_health` 1.6.0.
   changement seulement ; + ≈ 450 o une fois dans `GlobalState['vava_inventory:heldModels']` (mécanisme de
   l'inventaire). Gestes (coup, réaction, dégainer, rengainer, chancellement) joués par chaque client sur son propre ped :
   OneSync les montre. Aucun envoi à tous, aucune clé GlobalState propre, aucun state bag nouveau. Joueur armé au repos :
-  0 octet.
+  0 octet. 1.6.0 : `vava_combat:stamina` (≈ 26 à 28 o comptés par `core.net`) au seul porteur de la jauge, un par coup bloqué et par chute ; rien
+  au repos ni pendant une remontée ; l'endurance n'entre jamais dans `vava_combat:hit`.
 
 **RPC** `vava_combat:use(technique, cible)` — `technique` : chaîne de 1 à 32 octets `^[a-z0-9_]+$` ; `cible` : entier
 0 à 65535 (joueur verrouillé, 0 : aucun ; ne sert qu'à l'ordre des candidats, n'allonge ni la portée ni l'angle) ;
-4 d'avance puis 3 / s (`rateLimits.use`). Réponse : `true` (fenêtre programmée ; aucun résultat : il arrive par
-`vava_combat:hit`, ou jamais), `false, code`, `false, code, attente` (ms : `busy`, `chain_limit`, `drawing`,
-`staggered`, `guard_broken`, `parry_cooldown`, `dodge_cooldown`) ou `false, 'refused', raison` (texte d'un crochet,
-120 octets, contrôles retirés). Codes : `not_ready`, `unknown_technique`, `not_attack` (type `garde`), `not_opener`,
-`busy`, `chain_limit`, `guarding` (garde levée, sans attente), `staggered`, `drawing`, `guard_broken`, `parry_cooldown`,
-`dodge_cooldown`, `no_character`, `no_weapon`, `no_style`, `not_in_style`, `downed`, `vehicle`, `controlled`, `refused`,
+4 d'avance puis 3 / s (`rateLimits.use`). Réponse : `true, valeur, reprise, pente` (fenêtre programmée ; aucun
+résultat : il arrive par `vava_combat:hit`, ou jamais ; 1.6.0 : état de la jauge d'endurance de l'appelant après la
+dépense, trois entiers — dixièmes 0 à 1 000, ms avant la reprise de la recharge 0 à 10 000, dixièmes par seconde 0 à
+1 000 ; jamais un instant du serveur), `false, code`, `false, code, attente` (ms : `busy`, `chain_limit`, `drawing`,
+`staggered`, `guard_broken`, `parry_cooldown`, `dodge_cooldown`), `false, 'exhausted', attente, valeur, reprise, pente`
+(1.6.0 : coût plus grand que ce qui reste ; attente jusqu'à ce qu'il soit payable, 30 000 ms au plus) ou
+`false, 'refused', raison` (texte d'un crochet, 120 octets, contrôles retirés). Codes : `not_ready`,
+`unknown_technique`, `not_attack` (type `garde`), `not_opener`, `busy`, `chain_limit`, `guarding` (garde levée, sans
+attente), `staggered`, `drawing`, `guard_broken`, `parry_cooldown`, `dodge_cooldown`, `exhausted`, `no_character`, `no_weapon`, `no_style`, `not_in_style`, `downed`, `vehicle`, `controlled`, `refused`,
 `error` (erreur pendant la vérification : la place est rendue, une ligne de console par minute au plus). Gestes
 défensifs (`blocage`, `parade`, `esquive`) : même schéma, même débit ; la cible est ignorée.
 
@@ -1934,9 +1949,16 @@ abaissée, ou abaissement noté sur une garde encore réservée : fermée à son
 Interne (jamais exporté) : `VavaCombat.swings.of(src)` rend le dernier coup du joueur (`pending` : réservé, pas encore
 accepté ; `cancelled` : annulé) ; `swings.cancel(src, raison)` annule le coup en cours et, pendant une réservation, le
 coup d'avant qu'un refus rendrait (`cancelled` est toujours fiable), et ferme une garde ouverte (tenue minimale,
-récupération) ; `VavaCombat.defense.spend(src, 'block' | 'parry' | 'dodge', { technique, weight, shield, now })` →
-`ok, broken` : coût d'un geste défensif, seul point que T-114 remplacera (1.3.0 : compteur provisoire pour `block`,
-toujours `true, false` sinon).
+récupération) ; `VavaCombat.stamina.block(cible, garde, poids, bouclier, maintenant, personnage)` → `broken` (1.6.0,
+serveur seul : coup bloqué payé par le défenseur, état envoyé à lui seul ; remplace `VavaCombat.defense.spend` de 1.3.0,
+supprimé avec le compteur provisoire, `defense.addPoints` et `config.defense.guardBreak`) ; `stamina.inspect(src)` →
+`{ value, rate, factor }` (lecture du Conseil).
+
+**Évènement** `vava_combat:stamina(valeur, reprise, pente)` (1.6.0, serveur → le **seul** porteur de la jauge) : sa jauge
+a changé hors de sa demande (coup bloqué, remise à plein à la mise à terre si elle n'était pas pleine) ; trois entiers
+bornés par `VavaCombat.ENDURANCE_MAX`, `ENDURANCE_REST_MAX`, `ENDURANCE_RATE_MAX` (`shared/constants.lua`), relus par le
+client (`endurance.read`), sinon ignorés. Le client date l'état à son arrivée et projette avec la règle partagée
+(`shared/endurance.lua`).
 
 **Évènement** `vava_combat:hit(attaquant, cible, issue[, dixièmes])` (serveur → joueurs de l'instance de l'attaquant à
 30 m de la cible, listes calculées par le serveur) : `issue` ∈ `hit`, `stagger`, `down`, `block` (même partiel : rien

@@ -1333,7 +1333,14 @@ faire tout le système de combat ») : la porte T-119 reste à passer en jeu.
   `vava_magic`). Rapport `docs/plan/rapports/T-113.md`. Procédure : `docs/tests/combat.md` § 4 (31 tests).
 
 ### T-114 — Endurance et HUD
-- Agents : vava-dev-lua + vava-dev-nui · Dépend de : T-112 · Statut : à faire
+- Agents : vava-architecte → vava-dev-lua + vava-dev-nui (cette tâche autorise à toucher `vava_hud`) · Dépend de :
+  T-112 · Statut : à tester en jeu (relu sécurité et réseau, suites appliquées)
+- Fait le 2 novembre 2026 : rapport `docs/plan/rapports/T-114.md` (relectures sécurité et réseau OK, 4 mineurs chacune,
+  suites appliquées), procédure `docs/tests/combat.md` § 9.
+- Fait (`vava_combat` 1.6.0, `vava_hud` 1.8.0, rapport `docs/plan/rapports/T-114.md`) : jauge tenue par le serveur sans
+  minuterie, refus `exhausted`, garde brisée quand l'endurance est vide (compteur provisoire retiré, mêmes seuils), faim
+  et soif par `vava_needs:get`, état au seul porteur (réponse de `use`, `vava_combat:stamina`), médaillon de `vava_hud`
+  animé par la page ; procédure `docs/tests/combat.md` § 9 (26 tests).
 - Laissé par T-113 (spec § 13) : remplacer `VavaCombat.defense.spend` (`server/defense.lua`) et supprimer
   `config.defense.guardBreak` et la table `points` (compteur provisoire de garde brisée) ; refus `exhausted` d'une
   parade ou d'un pas à l'admission (`defense.refusal`) ; dépenser `stamina` des techniques (défensives comprises).
@@ -1356,6 +1363,9 @@ faire tout le système de combat ») : la porte T-119 reste à passer en jeu.
   hook par mannequin touché) comme un seul gain.
 - Relecture lore de T-156 (L-9) : le maître pourrait voir les chiffres de son apprenti au mannequin (≈ 28 o par coup, à
   lui seul).
+- Laissé par T-114 : coûts d'endurance (`stamina`) des techniques des autres armes ; une compétence pourrait alléger
+  un coût ou hâter la recharge (un facteur de plus dans `stamina.rateOf` de `vava_combat`, à décider) ; l'endurance
+  n'entre pas dans l'XP.
 
 ### T-155 — Chiffres des coups (dégâts affichés)
 - Agents : vava-architecte → vava-dev-lua + vava-dev-nui (cette tâche autorise à toucher `vava_hud`, `vava_pause`, `vava_magic`) · Dépend de : T-112 (après T-113, même module) · Statut : à tester en jeu (relu sécurité, réseau et lore ; suites appliquées)
@@ -1519,6 +1529,12 @@ faire tout le système de combat ») : la porte T-119 reste à passer en jeu.
 - Laissé par T-156 (spec § 13) : usure sur un mannequin (`dummies.wearChance`, 0,25), distances des props (60 / 70 m),
   balancement (0,9 s, 14°, deux allers-retours, sens à vérifier), témoins (15 m, 0,8 s) ; modèle définitif du mannequin
   de paille (aperçu de `docs/maquettes/Combat.html`).
+- Laissé par T-114 : valeurs de l'endurance (recharge 20 / s après 1 s, coûts 12 / 9 / 11 / 25, Garde 25, Parade 6,
+  Pas de côté 20, bouclier × 0,67, lourd × 2, paliers de faim et soif, seuils d'affichage 25 % et 10 %) ;
+  `parry_cooldown` et `dodge_cooldown` peuvent baisser maintenant que l'endurance borne la défense ; deux Fendants d'un
+  même attaquant (1,55 s d'écart) ne brisent plus la garde à l'épée (recharge entre eux : il en faut trois, quatre au
+  bouclier), à juger ; montrer aux autres un combattant essoufflé (geste, son) ; sensations à 30, 80, 150 ms
+  (combat 9-24).
 
 ### T-159 — Filtre par étiquettes à l'inscription d'un modificateur de `vava_health`
 - Agent : vava-dev-lua (cette tâche autorise à toucher `vava_health`) · Dépend de : T-113 · Statut : à faire
@@ -1633,6 +1649,9 @@ faire tout le système de combat ») : la porte T-119 reste à passer en jeu.
   techniques, n'envoyer aux joueurs que la part client (`style`, `type`, `gesture`, `phases`, `chain`, `styles.keys`),
   une fois avec un numéro de version puis par différences, jamais la part du serveur ; découper la table comme
   `weaponClasses` / `weapons`.
+- Laissé par T-114 : curseur « Endurance » de la maquette `Combat.html` à relibeller selon le type (Garde : « coût d'un
+  coup bloqué » ; Parade, Pas de côté : « coût du geste ») ; aide : « Ce que coûte le geste ; à vide, on ne frappe plus,
+  la garde cède. »
 
 ### T-122 — Atelier des effets
 - Agents : vava-architecte → vava-dev-lua + vava-dev-nui · Dépend de : T-101 · Statut : à faire

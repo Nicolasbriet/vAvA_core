@@ -8,7 +8,9 @@
  *        à son terme) ou ?progress=cancel (interrompue à 60 %). Réglages de la bannière (1.6.0) : ?scale=90|100|115
  *        (taille de l'interface), ?notify=courte|normale|longue (durée des notifications : 0,6, 1 ou 1,6 × 4,5 s ; sans
  *        ce paramètre, les notifications simulées restent à l'écran). Chiffres des coups (T-155) : ?numbers=1|mots|plafond,
- *        &mode=tous|infliges|aucun, &cache=1 (détail au second bloc, plus bas).
+ *        &mode=tous|infliges|aucun, &cache=1 (détail au second bloc, plus bas). Endurance (T-114) : 5ᵉ valeur de
+ *        ?values (médaillon immobile), ?refill=0.2,1000 (remontée de 0,2 par seconde après 1 s, depuis la 5ᵉ valeur ou
+ *        15 %), ?endurance=jeu (combat simulé, troisième bloc, plus bas).
  */
 
 (() => {
@@ -18,6 +20,9 @@
     document.body.classList.add('dev');
     const params = new URLSearchParams(window.location.search);
     const values = (params.get('values') || '0.8,0.62,0.24,0.5').split(',').map(Number);
+    // ?refill=0.2,1000 : remontée de l'endurance (parts de la jauge par seconde, délai en ms), comme client/gauges.lua
+    const [perSecond, delayMs] = (params.get('refill') || '').split(',').map(Number);
+    const refill = Number.isFinite(perSecond) && perSecond > 0 ? { perSecond, delayMs: Number.isFinite(delayMs) ? delayMs : 0 } : null;
     const gauge = (id, label, order, value) => {
       const [resource, name] = id.split(':');
       return { id, label, icon: icon(resource, name), order, low: 0.3, critical: 0.1, value };
@@ -29,6 +34,9 @@
         gauge('vava_needs:hunger', 'Faim', 10, values[1]),
         gauge('vava_needs:thirst', 'Soif', 20, values[2]),
         { ...gauge('vava_voice:voice', 'Voix', 40, values[3] ?? 0.5), low: 0, critical: 0 },
+        // Endurance (T-114) : 5ᵉ valeur, ou ?refill (15 % par défaut : ambre, puis laiton en remontant)
+        ...(Number.isFinite(values[4]) || refill ? [{ ...gauge('vava_combat:endurance', 'Endurance', 60,
+          Number.isFinite(values[4]) ? values[4] : 0.15), low: 0.25, critical: 0.1 }] : []),
       ],
       visible: true,
       notifications: { durationMs: 600000, maxVisible: 4 },
@@ -42,6 +50,10 @@
         scale: (Number(params.get('scale')) || 100) / 100,
         durationMs: factors[params.get('notify')] ? 4500 * factors[params.get('notify')] : undefined,
       } }, '*');
+    }
+    if (refill) {
+      const value = Number.isFinite(values[4]) ? values[4] : 0.15;
+      window.postMessage({ action: 'value', payload: { id: 'vava_combat:endurance', value, refill } }, '*');
     }
     if (params.get('talking') === '1') {
       window.postMessage({ action: 'active', payload: { id: 'vava_voice:voice', active: true } }, '*');
@@ -184,5 +196,139 @@
     setTimeout(burst, 300);
     document.addEventListener('click', burst);
     document.addEventListener('keydown', (event) => { if (event.key === 'n' || event.key === 'N') burst(); });
+  });
+})();
+
+/*
+ * Endurance (T-114), ?endurance=jeu : combat simulé comme le mèneraient le serveur (shared/stamina.lua : 0 à 100 points,
+ * recharge 20 / s une seconde après la dernière dépense, × 0,75 si faim ou soif ≤ 30, × 0,5 si ≤ 10) et le client de
+ * vava_combat (client/endurance.lua : médaillon montré en mode combat éveillé ou tant qu'il n'est pas plein, retiré 3 s
+ * après le plein une fois le mode endormi ; un `value` avec `refill` par état reçu). Le mode s'endort ici 4 s après le
+ * dernier geste. Scénario joué une fois : quatre Tailles, repos ; trois coups bloqués puis la garde brisée ; épuisement
+ * (« à bout de souffle ») ; faim à 25 : pente plus douce ; repos jusqu'au retrait. Touches : T Taille (12), F Fendant
+ * (25), E pas de côté (20), B coup bloqué (25), H faim (62 → 25 → 5 → 62). La légende en haut à gauche suit l'état
+ * (mise à jour à chaque geste, jamais par image).
+ */
+(() => {
+  if (typeof GetParentResourceName === 'function') return;
+  const params = new URLSearchParams(window.location.search);
+  if (params.get('endurance') !== 'jeu') return;
+  const post = (action, payload) => window.postMessage({ action, payload }, '*');
+  const ID = 'vava_combat:endurance';
+  const MAX = 100;
+  const cfg = { regen: 20, delayMs: 1000, lingerMs: 3000, sleepMs: 4000, noticeMs: 3000 };
+  const costs = { t: [12, 'Taille'], f: [25, 'Fendant'], e: [20, 'Pas de côté'] };
+  const hungers = [62, 25, 5];
+  let hunger = 0;
+  // état serveur : nil = pleine
+  let view = null;
+  let awake = false;
+  let shown = false;
+  let sleepTimer = null;
+  let hideTimer = null;
+  let lastNotice = -Infinity;
+  let legend = null;
+
+  const factor = () => (hungers[hunger] <= 10 ? 0.5 : hungers[hunger] <= 30 ? 0.75 : 1);
+  const level = (now) => (view ? Math.min(MAX, view.value + (now < view.restAt ? 0 : view.rate * (now - view.restAt) / 1000)) : MAX);
+  // instant du plein (shared/endurance.lua, fullAt)
+  function fullAt(now) {
+    if (!view) return now;
+    const from = Math.max(now, view.restAt);
+    return from + (MAX - level(from)) / view.rate * 1000;
+  }
+
+  function describe(text) {
+    if (!legend) {
+      legend = document.createElement('div');
+      Object.assign(legend.style, { position: 'fixed', top: '2.5vh', left: '1.5vw', maxWidth: '30rem', padding: '0.5rem 0.8rem',
+        background: 'rgba(7,5,4,0.7)', color: '#ece1c8', font: '15px/1.4 "EB Garamond", Georgia, serif', borderRadius: '3px' });
+      document.body.append(legend);
+    }
+    const now = performance.now();
+    const rate = view ? view.rate : cfg.regen * factor();
+    legend.textContent = `${text} — endurance ${Math.round(level(now))} / ${MAX}, recharge ${rate} / s`
+      + `${factor() < 1 ? ' (ralentie par la faim)' : ''}, faim ${hungers[hunger]}. Touches : T, F, E, B, H.`;
+  }
+
+  function notice(message) {
+    const now = performance.now();
+    if (now - lastNotice < cfg.noticeMs) return;
+    lastNotice = now;
+    post('notify', { id: Math.round(now), message, kind: 'warning' });
+  }
+
+  // client/endurance.lua : push, show, hide, scheduleHide
+  function push() {
+    const now = performance.now();
+    const value = level(now);
+    if (value >= MAX) { view = null; post('value', { id: ID, value: 1 }); return; }
+    post('value', { id: ID, value: value / MAX, refill: { perSecond: view.rate / MAX, delayMs: Math.max(0, Math.round(view.restAt - now)) } });
+  }
+  function show() {
+    if (!shown) post('define', { id: ID, label: 'Endurance', icon: '../../vava_combat/web/icons/endurance.svg', order: 60, low: 0.25, critical: 0.1, value: 1 });
+    shown = true;
+    push();
+  }
+  function scheduleHide() {
+    clearTimeout(hideTimer);
+    const now = performance.now();
+    hideTimer = setTimeout(() => {
+      if (awake || level(performance.now()) < MAX) return;
+      post('remove', { id: ID });
+      shown = false;
+      describe('Médaillon retiré (plein, mode endormi depuis 3 s)');
+    }, Math.max(0, fullAt(now) - now) + cfg.lingerMs);
+  }
+  function wake() {
+    awake = true;
+    clearTimeout(hideTimer);
+    clearTimeout(sleepTimer);
+    sleepTimer = setTimeout(() => { awake = false; scheduleHide(); describe('Mode combat endormi'); }, cfg.sleepMs);
+  }
+
+  // shared/stamina.lua : dépense à l'acceptation, refus `exhausted`, coup bloqué qui brise la garde
+  function spend(cost, label) {
+    const now = performance.now();
+    wake();
+    const current = level(now);
+    if (cost > current) {
+      notice('Vous êtes à bout de souffle.');
+      describe(`${label} refusé`);
+      return;
+    }
+    view = { value: current - cost, restAt: now + cfg.delayMs, rate: cfg.regen * factor() };
+    show();
+    describe(label);
+  }
+  function blocked() {
+    const now = performance.now();
+    wake();
+    const current = level(now);
+    const broken = 25 >= current;
+    view = { value: broken ? 0 : current - 25, restAt: now + cfg.delayMs, rate: cfg.regen * factor() };
+    if (broken) notice('Votre garde est brisée.');
+    show();
+    describe(broken ? 'Coup bloqué : garde brisée' : 'Coup bloqué');
+  }
+  // la faim n'est relue par le serveur qu'au geste suivant : la pente change avec le prochain état
+  function hungry() {
+    hunger = (hunger + 1) % hungers.length;
+    post('value', { id: 'vava_needs:hunger', value: hungers[hunger] / 100 });
+    describe('Faim changée (la pente suivra au prochain geste)');
+  }
+
+  const act = { t: () => spend(...costs.t), f: () => spend(...costs.f), e: () => spend(...costs.e), b: blocked, h: hungry };
+  const script = [
+    [300, 't'], [900, 't'], [1500, 't'], [2100, 't'],
+    [6500, 'b'], [7100, 'b'], [7700, 'b'], [8300, 'b'],
+    ...Array.from({ length: 12 }, (_, i) => [12000 + i * 300, 't']),
+    [17500, 'h'], [18000, 'f'], [18500, 'f'], [19000, 'f'],
+  ];
+
+  window.addEventListener('DOMContentLoaded', () => {
+    describe('Combat simulé');
+    script.forEach(([at, key]) => setTimeout(act[key], at));
+    document.addEventListener('keydown', (event) => { const fn = act[event.key.toLowerCase()]; if (fn) fn(); });
   });
 })();

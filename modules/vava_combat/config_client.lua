@@ -85,12 +85,12 @@ VavaCombat.config = {
             learn = { skill = 'armes_une_main', level = 15 },
         },
         -- défense (T-113) : blocage = garde tenue (active : tenue minimale), parade (active : fenêtre), esquive
-        -- (active : invulnérable) ; hit.angle = arc protégé ; stamina = coût d'un coup bloqué, d'une parade, d'un pas
+        -- (active : invulnérable) ; hit.angle = arc protégé ; stamina : coût d'endurance (Garde : par coup bloqué, README)
         garde_epee = {
             label = 'Garde', style = 'epee_une_main', type = 'blocage',
             gesture = { dict = 'anim@melee@machete@streamed_core@', clip = 'plyr_block_idle', flag = 49 }, -- PLACEHOLDER
             phases = { windup = 100, active = 200, recovery = 250 },
-            hit = { angle = 120 }, stamina = 8, chain = {},
+            hit = { angle = 120 }, stamina = 25, chain = {},
             learn = { skill = 'armes_une_main', level = 0 },
         },
         parade_epee = {
@@ -216,6 +216,17 @@ VavaCombat.config = {
         },
     },
 
+    -- Jauge d'endurance dans vava_hud (T-114) : montrée en mode combat éveillé, ou tant qu'elle n'est pas pleine.
+    gauge = {
+        label = 'Endurance',
+        icon = 'nui://vava_combat/web/icons/endurance.svg',
+        order = 60,          -- après santé (5), faim (10), soif (20), voix (40) : apparaître ne décale aucun médaillon
+        low = 0.25,          -- anneau ambre : moins qu'un coup bloqué (plus de quoi lever la garde)
+        critical = 0.10,     -- anneau rouge, lueur : moins qu'une attaque légère
+        lingerMs = 3000,     -- reste affichée ce délai après être redevenue pleine, mode combat endormi (0 à 30 000)
+        margin = 2,          -- points : une demande part si la jauge vue du client en manque au plus autant (0 à 10)
+    },
+
     -- Refus montrés (code du serveur → texte ; absent : `default` ; `false` : rien).
 
     refusals = {
@@ -228,6 +239,7 @@ VavaCombat.config = {
         no_style = 'Vous ne connaissez aucune technique pour cette arme.',
         downed = 'Vous êtes à terre.',
         vehicle = 'Descendez d\'abord.',
+        exhausted = 'Vous êtes à bout de souffle.',
         refused = 'Votre geste est retenu.',
         default = 'Coup impossible pour le moment.',
     },

@@ -5,13 +5,13 @@
            geste accepté (fenêtre gardée en mémoire, SANS minuterie), garde abaissée (RPC `vava_combat:lower`), trois
            modificateurs de la chaîne de dégâts (esquive, parade, blocage) qui ne lisent que la mémoire du module et les
            positions lues par le serveur, rendent un résultat et notent leur décision ; suites dans le hook
-           `vava_health:hit` after (attaquant paré qui chancelle, compteur provisoire et garde brisée, usure différée
-           de l'arme qui pare ou du bouclier qui bloque, issue imposée à server/reactions.lua, hook
-           `vava_combat:defended`) ; `defense.spend`, seul point que l'endurance (T-114) remplacera. Mémoire bornée par
-           le nombre de joueurs (et `memoMax` pour les coups en cours), oubliée au déchargement, au départ, à l'arrêt.
+           `vava_health:hit` after (attaquant paré qui chancelle, coup bloqué payé en endurance par server/stamina.lua et
+           garde brisée quand elle est vide, usure différée de l'arme qui pare ou du bouclier qui bloque, issue imposée
+           à server/reactions.lua, hook `vava_combat:defended`). Mémoire bornée par le nombre de joueurs (et `memoMax`
+           pour les coups en cours), oubliée au déchargement, au départ, à l'arrêt.
     Dépendances : shared/constants.lua, config_client.lua, config.lua, shared/defense.lua, shared/weapons.lua,
                   shared/shield.lua, server/core.lua, bridge/server.lua, server/catalog.lua, server/wear.lua,
-                  server/shields.lua, server/reactions.lua (server/swings.lua lu à l'appel)
+                  server/shields.lua, server/reactions.lua (server/stamina.lua et server/swings.lua lus à l'appel)
 ]]
 
 local type, pairs, ipairs = type, pairs, ipairs
@@ -39,8 +39,6 @@ local defense = VavaCombat.defense
 local active = {}
 -- source → dernière parade acceptée ; source → départ du dernier pas de côté
 local lastParry, lastDodge = {}, {}
--- source → { value, at } : compteur provisoire de garde (T-114 le remplace)
-local points = {}
 -- source → fin de la garde brisée
 local brokenUntil = {}
 -- numéro du coup → décision d'un modificateur en attente de sa suite ; issue imposée en attente de reactions.after
@@ -335,20 +333,6 @@ end
 
 -- Suites d'une défense --------------------------------------------------------------------------------------------------
 
---- Coût d'un geste défensif. 1.3.0 : `block` passe par le compteur provisoire de garde ; `parry` et `dodge` rendent
---- toujours vrai (bornés par leurs délais). T-114 remplacera cette fonction (jauge d'endurance, refus `exhausted`).
----@param src integer
----@param action 'block'|'parry'|'dodge'
----@param ctx { technique: table, weight: integer, shield: boolean, now: integer }
----@return boolean ok
----@return boolean broken
-function defense.spend(src, action, ctx)
-    if action ~= 'block' then return true, false end
-    local state, broken = defense.addPoints(points[src], ctx.weight, ctx.now, cfg, ctx.shield)
-    points[src] = state
-    return true, broken
-end
-
 --- Usure de l'arme qui pare ou de ce qui bloque, hors de la chaîne (SetTimeout 0) ; wear.apply relit la pile. Pièce
 --- émoussée pendant la garde : cache mis à jour.
 ---@param target integer
@@ -408,8 +392,8 @@ function defense.onHitAfter(payload)
         -- coup annulé plus loin, ou mise à terre : elle l'emporte, rien d'autre
         if payload.cancelled ~= nil or payload.downed then return end
         local byShield = entry.by == 'shield'
-        local _, broken = defense.spend(target, 'block', { technique = swing.def, weight = entry.weight,
-            shield = byShield, now = now })
+        -- endurance du défenseur (T-114) : coût selon le coup et ce qui bloque ; vide → la garde cède
+        local broken = VavaCombat.stamina.block(target, swing.def, entry.weight, byShield, now, swing.characterId)
         local guard = swing.guard
         if byShield then
             wearLater(target, swing, guard.shieldInstanceId, guard.shieldItem, 'shield')
@@ -421,7 +405,7 @@ function defense.onHitAfter(payload)
             outcome = 'break'
             local ms = cfg.defense.guardBrokenMs
             VavaCombat.swings.cancel(target, 'broken')
-            brokenUntil[target], points[target] = now + ms, nil
+            brokenUntil[target] = now + ms
             reactions.stagger(target, ms, now, true)
         end
         if ours then impose(id, target, outcome, now) end
@@ -440,12 +424,12 @@ end
 --- Déchargement, départ : tout est oublié.
 ---@param src integer
 function defense.forget(src)
-    active[src], lastParry[src], lastDodge[src], points[src], brokenUntil[src] = nil, nil, nil, nil, nil
+    active[src], lastParry[src], lastDodge[src], brokenUntil[src] = nil, nil, nil, nil
 end
 
 --- Arrêt du module.
 function defense.stop()
-    active, lastParry, lastDodge, points, brokenUntil = {}, {}, {}, {}, {}
+    active, lastParry, lastDodge, brokenUntil = {}, {}, {}, {}
     memo, memoCount, outcomes, outcomeCount, fullWarnAt = {}, 0, {}, 0, nil
 end
 

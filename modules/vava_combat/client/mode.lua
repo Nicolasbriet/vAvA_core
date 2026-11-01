@@ -1,9 +1,10 @@
 --[[
     vava_combat/client/mode.lua
-    Rôle : mode combat éveillé par une touche du combat, actif à pied et sans interface, endormi après `mode.idleMs` ;
-           seule boucle par image du module, et seulement éveillée et active.
-    Dépendances : shared/constants.lua, config_client.lua, client/core.lua, bridge/client.lua, client/hands.lua,
-                  client/keys.lua, client/targeting.lua, client/attack.lua, client/defense.lua
+    Rôle : mode combat éveillé par une touche du combat, actif à pied et sans interface, endormi après `mode.idleMs`
+           (médaillon d'endurance prévenu à l'éveil et au sommeil) ; seule boucle par image du module, et seulement
+           éveillée et active.
+    Dépendances : shared/constants.lua, config_client.lua, client/core.lua, bridge/client.lua, client/endurance.lua,
+                  client/hands.lua, client/keys.lua, client/targeting.lua, client/attack.lua, client/defense.lua
 ]]
 
 local ipairs = ipairs
@@ -23,6 +24,7 @@ local keys = VavaCombat.keys
 local targeting = VavaCombat.targeting
 local attack = VavaCombat.attack
 local defense = VavaCombat.stance
+local gaugeView = VavaCombat.gaugeView
 
 local mode = {}
 VavaCombat.mode = mode
@@ -98,6 +100,7 @@ local function run()
         targeting.release()
         attack.reset()
         running = false
+        gaugeView.setAwake(false)
     end)
 end
 
@@ -117,6 +120,7 @@ function mode.wake()
     lastActivity = GetGameTimer()
     if not awake then
         awake = true
+        gaugeView.setAwake(true)
         setActive(conditionsMet(PlayerPedId()))
         run()
     end

@@ -6,7 +6,11 @@
  *        Le texte d'un chiffre, son mot, l'arrondi, la cascade, les bornes, le débit et le filtre du réglage sont
  *        décidés par le Lua, seul émetteur (essayé par tests/spec/hud_numbers*_spec.lua) ; ici, ce que la page relit
  *        encore : types, classes permises, plus anciens retirés, position.
- * Dépendances : js/numbers.js (chargé par require, comme module.exports)
+ *        Remontée d'une jauge (T-114) : règles pures de js/refill.js (palier, remontée relue, plan, projection), puis
+ *        js/hud.js chargé dans un faux DOM à horloge manuelle (dev/fauxdom.js) : transition linéaire différée, classe
+ *        is-refilling, un seul minuteur vivant, paliers franchis, annulation par le message suivant, médaillon
+ *        Endurance ajouté ou retiré sans décaler les autres.
+ * Dépendances : js/numbers.js, js/refill.js (chargés par require, comme module.exports), dev/fauxdom.js
  */
 'use strict';
 
@@ -141,21 +145,282 @@ test('page : calque des chiffres présent, numbers.js chargé avant hud.js, aucu
   const html = fs.readFileSync(path.join(web, 'index.html'), 'utf8');
   assert.ok(/<div id="numbers" class="numbers" aria-hidden="true"><\/div>/.test(html), 'calque');
   assert.ok(html.indexOf('js/numbers.js') > 0 && html.indexOf('js/numbers.js') < html.indexOf('js/hud.js'), 'ordre des scripts');
-  for (const file of ['index.html', 'css/style.css', 'js/hud.js', 'js/numbers.js']) {
+  for (const file of ['index.html', 'css/style.css', 'js/hud.js', 'js/numbers.js', 'js/refill.js']) {
     // seules adresses permises : l'espace de noms SVG et le rappel NUI `ready` de la ressource elle-même
     assert.ok(!/https?:\/\/(?!www\.w3\.org|\$\{)/.test(fs.readFileSync(path.join(web, file), 'utf8')), `${file} : adresse externe`);
   }
 });
 
-// fichiers livrés : ceux des `files` du manifeste (web/index.html, web/css/*.css, web/js/*.js)
-test('poids de la page livrée ≤ 32 Ko', () => {
+// fichiers livrés : ceux des `files` du manifeste (web/index.html, web/css/*.css, web/js/*.js), comptés en fins de
+// ligne LF comme dans le dépôt (une copie Windows en CRLF ne change rien) ; source ≤ 32 Ko et, quand l'allègement de la
+// Chancellerie (chancellerie/lib/webstrip.js, T-160) est là, page livrée allégée ≤ 26 Ko (relecture réseau R-1, T-114)
+test('poids de la page livrée : source ≤ 32 Ko, allégée ≤ 26 Ko', () => {
   const files = ['index.html'];
   for (const [dir, ext] of [['css', '.css'], ['js', '.js']]) {
     for (const file of fs.readdirSync(path.join(web, dir))) if (file.endsWith(ext)) files.push(`${dir}/${file}`);
   }
-  const total = files.reduce((sum, file) => sum + fs.statSync(path.join(web, file)).size, 0);
+  const texts = files.map((file) => fs.readFileSync(path.join(web, file), 'latin1').replace(/\r/g, ''));
+  const total = texts.reduce((sum, text) => sum + text.length, 0);
   console.log(`vava_hud : page livrée ${total} octets (${files.length} fichiers)`);
   assert.ok(total <= 32 * 1024, `${total} octets`);
+  const stripPath = path.join(web, '..', '..', '..', 'chancellerie', 'lib', 'webstrip.js');
+  if (!fs.existsSync(stripPath)) return;
+  const webstrip = require(stripPath);
+  const lean = texts.reduce((sum, text, i) => {
+    const kind = files[i].endsWith('.html') ? 'html' : files[i].endsWith('.css') ? 'css' : 'js';
+    const result = webstrip.strip(text, kind);
+    return sum + (result.ok ? result.text.length : text.length);
+  }, 0);
+  console.log(`vava_hud : page allégée ${lean} octets`);
+  assert.ok(lean <= 26 * 1024, `${lean} octets allégés`);
+});
+
+// Remontée d'une jauge (T-114) : règles pures ----------------------------------------------------------------
+
+const R = require('../js/refill.js');
+// départ d'une remontée au plus tôt (js/refill.js) ; projection d'un plan à un instant, pour les essais seulement (la
+// page n'en a pas besoin : la transition CSS anime ; relecture réseau R-4)
+const MIN_DELAY_MS = 600;
+R.valueAt = (p, elapsedMs) => {
+  if (!p || elapsedMs <= p.startMs) return p ? p.from : null;
+  return Math.min(1, p.from + (1 - p.from) * ((elapsedMs - p.startMs) / p.durationMs));
+};
+// jauge Endurance de vava_combat (config_client.lua, gauge) : ambre sous 25 %, rouge sous 10 %
+const LOW = 0.25;
+const CRIT = 0.1;
+const plan = (value, refill) => R.plan(value, refill, LOW, CRIT);
+
+test('plan : départ au plus tôt à 600 ms (la baisse se peint avant), même sans attente', () => {
+  eq([plan(0.5, { perSecond: 0.5, delayMs: 0 }).startMs, plan(0.5, { perSecond: 0.5, delayMs: 599 }).startMs,
+    plan(0.5, { perSecond: 0.5, delayMs: 601 }).startMs], [MIN_DELAY_MS, MIN_DELAY_MS, 601]);
+});
+
+test('palier : rouge jusqu\'à 10 %, ambre jusqu\'à 25 %, laiton au-dessus (bornes comme les autres jauges)', () => {
+  eq([0, 0.05, 0.1].map((v) => R.level(v, LOW, CRIT)), ['critical', 'critical', 'critical']);
+  eq([0.1001, 0.2, 0.25].map((v) => R.level(v, LOW, CRIT)), ['low', 'low', 'low']);
+  eq([0.2501, 0.88, 1].map((v) => R.level(v, LOW, CRIT)), ['ok', 'ok', 'ok']);
+  // voix : paliers à 0, jamais d'ambre
+  eq([R.level(0, 0, 0), R.level(0.01, 0, 0)], ['critical', 'ok']);
+});
+test('remontée relue : nombres finis, pente > 0, délai ≥ 0, jauge pas pleine ; sinon aucune', () => {
+  eq(R.read({ perSecond: 0.2, delayMs: 1000 }, 0.3), { perSecond: 0.2, delayMs: 1000 });
+  eq(R.read({ perSecond: 0.2, delayMs: 0 }, 0), { perSecond: 0.2, delayMs: 0 });
+  for (const bad of [null, undefined, [0.2, 1000], 'x', { perSecond: 0, delayMs: 0 }, { perSecond: -1, delayMs: 0 },
+    { perSecond: NaN, delayMs: 0 }, { perSecond: Infinity, delayMs: 0 }, { perSecond: '0.2', delayMs: 0 },
+    { perSecond: 0.2, delayMs: -1 }, { perSecond: 0.2 }, { delayMs: 1000 }]) {
+    eq(R.read(bad, 0.3), null);
+  }
+  eq(R.read({ perSecond: 0.2, delayMs: 0 }, 1), null);
+  eq(R.read({ perSecond: 0.2, delayMs: 0 }, NaN), null);
+  // pente si faible que la minuterie déborderait : aucune remontée (sinon le plein partirait aussitôt)
+  eq(plan(0, { perSecond: 1e-7, delayMs: 0 }), null);
+});
+test('plan : départ différé de max(délai, 600 ms), durée (1 − valeur) / pente, plein au bout', () => {
+  eq(plan(0.3, { perSecond: 0.2, delayMs: 1000 }),
+    { from: 0.3, startMs: 1000, durationMs: 3500, steps: [{ at: 4500, value: 1, level: 'ok' }] });
+  eq(plan(0.88, { perSecond: 0.2, delayMs: 0 }).startMs, 600);
+  eq(plan(0.88, { perSecond: 0.2, delayMs: 599 }).startMs, 600);
+  eq(plan(0.88, { perSecond: 0.2, delayMs: 601 }).startMs, 601);
+  eq(plan(0.88, { perSecond: 0.2, delayMs: 1000 }).durationMs, 600);
+});
+test('plan : paliers franchis en montant (rouge → ambre → laiton), au plus deux, à l\'instant calculé', () => {
+  eq(plan(0.05, { perSecond: 0.2, delayMs: 1000 }).steps, [
+    { at: 1250, value: 0.1, level: 'low' },
+    { at: 2000, value: 0.25, level: 'ok' },
+    { at: 5750, value: 1, level: 'ok' },
+  ]);
+  eq(plan(0.2, { perSecond: 0.2, delayMs: 1000 }).steps.map((s) => s.at), [1250, 5000]);
+  // jauge sur un palier : encore de sa couleur, il est franchi dès que la remontée part
+  eq(plan(0.25, { perSecond: 0.2, delayMs: 1000 }).steps[0], { at: 1000, value: 0.25, level: 'ok' });
+  // paliers confondus (voix à 0) : une seule étape
+  eq(R.plan(0, { perSecond: 0.5, delayMs: 0 }, 0, 0).steps, [{ at: 600, value: 0, level: 'ok' }, { at: 2600, value: 1, level: 'ok' }]);
+});
+test('projection : celle du Lua (gauges.all) pour un délai ≥ 600 ms ; immobile avant le départ, plein au bout', () => {
+  const p = plan(0.3, { perSecond: 0.2, delayMs: 1000 });
+  eq(R.valueAt(p, 0), 0.3);
+  eq(R.valueAt(p, 500), 0.3);
+  eq(R.valueAt(p, 1000), 0.3);
+  assert.ok(Math.abs(R.valueAt(p, 2000) - 0.5) < 1e-9);
+  assert.ok(Math.abs(R.valueAt(p, 3000) - 0.7) < 1e-9);
+  eq(R.valueAt(p, 4500), 1);
+  eq(R.valueAt(p, 6000), 1);
+  eq(R.valueAt(null, 100), null);
+  // chaque palier tombe sur sa valeur
+  const low = plan(0, { perSecond: 0.2, delayMs: 1000 });
+  for (const step of low.steps) assert.ok(Math.abs(R.valueAt(low, step.at) - step.value) < 0.001, `${step.value}`);
+});
+test('projection : faim ou soif basses ralentissent la pente (vide → plein 5 s, 6,7 s à × 0,75, 10 s à × 0,5)', () => {
+  eq([0.2, 0.15, 0.1].map((perSecond) => plan(0, { perSecond, delayMs: 1000 }).durationMs), [5000, 6667, 10000]);
+});
+
+// Remontée d'une jauge (T-114) : la page, dans un faux DOM ---------------------------------------------------
+
+const { load } = require('./fauxdom.js');
+const icon = (name) => `nui://x/${name}.svg`;
+const def = (id, order, value, extra) => ({ id, label: id, icon: icon(id), order, low: 0.3, critical: 0.1, value, ...extra });
+const ENDURANCE = 'vava_combat:endurance';
+const endurance = (value, extra) => def(ENDURANCE, 60, value, { label: 'Endurance', low: LOW, critical: CRIT, ...extra });
+function page(withEndurance = true) {
+  const p = load(web, ['js/numbers.js', 'js/refill.js', 'js/hud.js']);
+  p.post('init', { visible: true, gauges: [def('vava_health:health', 5, 0.8), def('vava_needs:hunger', 10, 0.62),
+    def('vava_needs:thirst', 20, 0.08), { ...def('vava_voice:voice', 40, 0.5), low: 0, critical: 0 }] });
+  if (withEndurance) p.post('define', endurance(1));
+  p.ring = (id = ENDURANCE) => p.byId.hud.children.find((n) => n.dataset.id === id);
+  p.fill = (id) => p.ring(id).children[0].children[1];
+  return p;
+}
+const state = (p) => {
+  const fill = p.fill(ENDURANCE);
+  return { dash: fill.getAttribute('stroke-dasharray'), transition: fill.style.transition || '',
+    refilling: fill.classList.contains('is-refilling'), level: p.ring().dataset.level, aria: p.ring().getAttribute('aria-valuenow'),
+    timers: p.timers.size };
+};
+
+test('page : médaillon Endurance (ordre 60) en dernier, ajouté puis retiré sans déplacer les autres', () => {
+  const p = page(false);
+  const before = [...p.byId.hud.children];
+  p.post('define', endurance(1));
+  const after = p.byId.hud.children;
+  eq(after.length, 5);
+  before.forEach((node, i) => assert.ok(after[i] === node, `médaillon ${i} déplacé`));
+  eq(after[4].dataset.id, ENDURANCE);
+  eq([after[4].getAttribute('aria-label'), after[4].dataset.level, after[4].getAttribute('aria-valuenow')], ['Endurance', 'ok', '100']);
+  p.post('remove', { id: ENDURANCE });
+  eq(p.byId.hud.children.length, 4);
+  before.forEach((node, i) => assert.ok(p.byId.hud.children[i] === node, `médaillon ${i} déplacé au retrait`));
+});
+test('page : dépense puis remontée — baisse peinte, puis UNE transition linéaire différée, classe is-refilling', () => {
+  const p = page();
+  p.post('value', { id: ENDURANCE, value: 0.3, refill: { perSecond: 0.2, delayMs: 1000 } });
+  eq(state(p), { dash: '30 100', transition: '', refilling: false, level: 'ok', aria: '30', timers: 1 });
+  p.advance(999);
+  eq(state(p).refilling, false);
+  p.advance(1);
+  eq(state(p), { dash: '100 100', transition: 'stroke-dasharray 3500ms linear', refilling: true, level: 'ok', aria: '30', timers: 1 });
+  assert.ok(/^stroke-dasharray \d+ms linear$/.test(state(p).transition));
+  p.advance(3499);
+  eq(state(p).refilling, true);
+  p.advance(1);
+  eq(state(p), { dash: '100 100', transition: '', refilling: false, level: 'ok', aria: '100', timers: 0 });
+});
+test('page : la transition linéaire ne part jamais avant 600 ms (la baisse se voit d\'abord)', () => {
+  const p = page();
+  p.post('value', { id: ENDURANCE, value: 0.6, refill: { perSecond: 0.2, delayMs: 0 } });
+  p.advance(599);
+  eq(state(p).refilling, false);
+  p.advance(1);
+  eq([state(p).refilling, state(p).transition], [true, 'stroke-dasharray 2000ms linear']);
+});
+test('page : épuisement — rouge, puis ambre, puis laiton aux instants calculés, un seul minuteur vivant', () => {
+  const p = page();
+  p.post('value', { id: ENDURANCE, value: 0, refill: { perSecond: 0.2, delayMs: 1000 } });
+  eq([state(p).level, state(p).dash, state(p).timers], ['critical', '0 100', 1]);
+  const seen = [];
+  for (let t = 0; t < 7000; t += 50) {
+    p.advance(50);
+    assert.ok(p.timers.size <= 1, `${p.timers.size} minuteurs à ${t + 50} ms`);
+    const s = state(p);
+    if (seen.length === 0 || seen[seen.length - 1][1] !== s.level) seen.push([t + 50, s.level, s.aria]);
+  }
+  eq(seen, [[50, 'critical', '0'], [1500, 'low', '10'], [2250, 'ok', '25']]);
+  eq([state(p).aria, state(p).refilling, p.timers.size], ['100', false, 0]);
+});
+test('page : un nouveau `value` annule la remontée en cours et ses minuteries (coup bloqué en pleine remontée)', () => {
+  const p = page();
+  p.post('value', { id: ENDURANCE, value: 0.05, refill: { perSecond: 0.2, delayMs: 1000 } });
+  p.advance(1300);
+  eq([state(p).refilling, state(p).level], [true, 'low']);
+  // coup bloqué : nouvelle baisse, nouvelle remontée
+  p.post('value', { id: ENDURANCE, value: 0, refill: { perSecond: 0.2, delayMs: 1000 } });
+  eq(state(p), { dash: '0 100', transition: '', refilling: false, level: 'critical', aria: '0', timers: 1 });
+  p.advance(1000);
+  eq([state(p).refilling, state(p).transition], [true, 'stroke-dasharray 5000ms linear']);
+  // valeur sans remontée (pleine à la mise à terre) : plus de transition linéaire ni de minuterie
+  p.post('value', { id: ENDURANCE, value: 1 });
+  eq(state(p), { dash: '100 100', transition: '', refilling: false, level: 'ok', aria: '100', timers: 0 });
+  p.post('value', { id: ENDURANCE, value: 0.4, refill: { perSecond: 0.2, delayMs: 1000 } });
+  p.post('value', { id: ENDURANCE, value: 0.4 });
+  eq([state(p).timers, state(p).refilling], [0, false]);
+  p.advance(10000);
+  eq(state(p).dash, '40 100');
+});
+test('page : faim basse — même départ, pente plus douce (durée de la transition allongée)', () => {
+  const p = page();
+  p.post('value', { id: ENDURANCE, value: 0, refill: { perSecond: 0.15, delayMs: 1000 } });
+  p.advance(1000);
+  eq(state(p).transition, 'stroke-dasharray 6667ms linear');
+});
+test('page : remontée mal formée ignorée (valeur posée, aucune minuterie)', () => {
+  const p = page();
+  for (const refill of [{ perSecond: 0, delayMs: 0 }, { perSecond: 'x', delayMs: 0 }, { perSecond: 0.2, delayMs: -5 }, 'oui', [0.2, 0]]) {
+    p.post('value', { id: ENDURANCE, value: 0.5, refill });
+    eq([state(p).dash, state(p).timers, state(p).refilling], ['50 100', 0, false]);
+  }
+  p.post('value', { id: ENDURANCE, value: 1, refill: { perSecond: 0.2, delayMs: 0 } });
+  eq(state(p).timers, 0);
+});
+test('page : retrait, `init` ou redéclaration pendant une remontée → minuteries annulées ; `define` avec remontée repart', () => {
+  const p = page();
+  p.post('value', { id: ENDURANCE, value: 0.3, refill: { perSecond: 0.2, delayMs: 1000 } });
+  p.post('remove', { id: ENDURANCE });
+  eq(p.timers.size, 0);
+  // page rechargée (gauges.all) : valeur projetée et remontée restante dans l'état complet
+  p.post('init', { visible: true, gauges: [endurance(0.5, { refill: { perSecond: 0.2, delayMs: 0 } })] });
+  eq([state(p).dash, state(p).timers], ['50 100', 1]);
+  p.advance(600);
+  eq([state(p).refilling, state(p).transition], [true, 'stroke-dasharray 2500ms linear']);
+  p.post('init', { visible: true, gauges: [] });
+  eq(p.timers.size, 0);
+  p.post('define', endurance(0.2, { refill: { perSecond: 0.2, delayMs: 1000 } }));
+  eq([state(p).level, p.timers.size], ['low', 1]);
+  p.post('define', endurance(0.2));
+  eq([state(p).refilling, p.timers.size], [false, 0]);
+});
+test('page : une jauge déclarée pendant une remontée ne sort pas l\'Endurance du document (transition gardée)', () => {
+  const p = page();
+  p.post('value', { id: ENDURANCE, value: 0.3, refill: { perSecond: 0.2, delayMs: 1000 } });
+  p.advance(1500);
+  const node = p.ring();
+  const before = node.detached || 0;
+  p.post('define', def('vava_magic:mana', 30, 0.7));
+  p.post('define', def('vava_zz:after', 80, 0.7));
+  p.post('define', def('vava_needs:hunger', 10, 0.5));
+  eq(p.byId.hud.children.map((n) => n.dataset.id), ['vava_health:health', 'vava_needs:hunger', 'vava_needs:thirst',
+    'vava_magic:mana', 'vava_voice:voice', ENDURANCE, 'vava_zz:after']);
+  eq([node.detached || 0, state(p).refilling], [before, true]);
+  // ordre changé (une jauge redéclarée plus loin) : seule celle-ci est déplacée
+  p.post('define', def('vava_needs:hunger', 70, 0.5));
+  eq(p.byId.hud.children.map((n) => n.dataset.id).slice(-3), [ENDURANCE, 'vava_needs:hunger', 'vava_zz:after']);
+  eq(node.detached || 0, before);
+  // une jauge ramenée devant : seule elle bouge
+  p.post('define', def('vava_zz:after', 1, 0.7));
+  eq(p.byId.hud.children.map((n) => n.dataset.id)[0], 'vava_zz:after');
+  eq([node.detached || 0, p.byId.hud.children.length], [before, 7]);
+});
+test('ordre : plus longue suite déjà en place (les nouveaux, -1, jamais gardés)', () => {
+  eq(R.steady([]), []);
+  eq(R.steady([0, 1, 2]), [0, 1, 2]);
+  eq(R.steady([0, 1, -1, 2]), [0, 1, 3]);
+  eq(R.steady([0, 2, 3, 4, 5, 1, 6]), [0, 1, 2, 3, 4, 6]);
+  eq(R.steady([6, 0, 1, 2, 3, 4, 5]), [1, 2, 3, 4, 5, 6]);
+  eq(R.steady([-1, -1]), []);
+});
+test('page : les autres jauges (sans remontée) se peignent comme avant', () => {
+  const p = page();
+  p.post('value', { id: 'vava_needs:hunger', value: 0.25 });
+  const fill = p.fill('vava_needs:hunger');
+  eq([fill.getAttribute('stroke-dasharray'), fill.style.transition || '', p.ring('vava_needs:hunger').dataset.level, p.timers.size],
+    ['25 100', '', 'low', 0]);
+});
+test('page : aucune animation par image ; remontée gardée sous « mouvement réduit », le reste coupé', () => {
+  const hud = fs.readFileSync(path.join(web, 'js', 'hud.js'), 'utf8');
+  assert.ok(!/requestAnimationFrame|setInterval/.test(hud));
+  const css = fs.readFileSync(path.join(web, 'css', 'style.css'), 'utf8').replace(/\/\*[\s\S]*?\*\//g, '');
+  const reduced = css.match(/@media \(prefers-reduced-motion: reduce\) \{([\s\S]*?)\n\}/);
+  assert.ok(reduced && /\*:not\(\.progress-fill\):not\(\.is-refilling\)/.test(reduced[1]), 'remontée gardée');
+  assert.ok(/transition: none !important/.test(reduced[1]), 'le reste coupé');
+  const html = fs.readFileSync(path.join(web, 'index.html'), 'utf8');
+  assert.ok(html.indexOf('js/refill.js') > 0 && html.indexOf('js/refill.js') < html.indexOf('js/hud.js'), 'refill.js avant hud.js');
 });
 
 console.log(`vava_hud : ${passed} essais réussis, ${failed} en échec`);

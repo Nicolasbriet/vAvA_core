@@ -3,7 +3,8 @@
 Retire l'interface native de GTA (minimap et ses barres de vie, argent, noms de rue, munitions, notifications) et la
 remplace par l'affichage du royaume : des médaillons de cuir à anneau de laiton (santé, faim, soif, voix…), des
 notifications en cartes de cuir, une barre de progression des actions longues (récolte, artisanat, leçon…) et, depuis
-1.7.0, les chiffres des coups (montant d'un coup au-dessus de la cible). Les autres modules s'en servent par exports ; le HUD ne décide de rien et n'envoie rien au serveur. Ressource cliente
+1.7.0, les chiffres des coups (montant d'un coup au-dessus de la cible) ; depuis 1.8.0, une jauge peut **remonter
+seule** (endurance du combat) : la page anime la remontée, aucun envoi pendant qu'elle monte. Les autres modules s'en servent par exports ; le HUD ne décide de rien et n'envoie rien au serveur. Ressource cliente
 uniquement : aucun RPC, aucune table, aucun évènement réseau.
 
 Ordre de démarrage : après `vAvA_core` (≥ 0.3.0) et `vava_ui` (≥ 1.0.0, polices et grain de la page). Les deux sont
@@ -29,6 +30,7 @@ réglages dans config_client.lua »), mais il n'est plus au manifeste et n'est p
 | Taille de l'interface (1.6.0) | réglage `ui.scale` de la bannière : 90 → 0,9, 100 → 1, 115 → 1,15 | `scales` |
 | Durée des notifications (1.6.0) | réglage `hud.notifyDuration` : courte × 0,6, normale × 1, longue × 1,6 | `notifyDurations` |
 | Chiffres des coups (1.7.0, T-155) | activés ; réglage du joueur `combat.numbers` (sans `vava_pause` : `tous`) ; vie 900 ms, montée 5 vh ; 10 à l'écran, 16 créés par seconde au plus ; suivi toutes les 100 ms (seuil 0,004 de l'écran) tant qu'un chiffre vit ; cascade : 350 ms, 4 crans de 3,4 vh et 1,2 vw, écart au hasard 0,6 vw ; rien au-delà de 60 m de la caméra ; ancre : os de la tête 31086 + 0,45 m ; chiffre reçu hors de l'écran au point (0,5 ; 0,58) ; entiers arrondis (`decimals` 0 ou 1) ; mots « Bloqué », « Paré », « Esquivé », « Absorbé », « Garde brisée », « Chancelle », « À terre », « Sans effet ». Contrôlés au démarrage (durée, plafonds, suivi, crans, repli, mots) : hors bornes, chiffres coupés (une ligne de console) | `numbers` |
+| Remontée d'une jauge (1.8.0, T-114) | `setGauge(id, valeur, { perSecond, delayMs })` : remontée linéaire jusqu'à 1, de `perSecond` parts de la jauge par seconde (0 exclu à 10), `delayMs` après l'appel (entier, 0 à 60 000) ; au-delà, ou clé inconnue : `invalid_refill`, rien d'envoyé | `refill.maxPerSecond`, `refill.maxDelayMs` |
 | Bornes d'une jauge | 12 jauges, identifiant de 64 caractères, libellé de 32, icône de 200, ordre de 0 à 1 000 | `maxGauges`… |
 
 ## Pour les autres modules
@@ -36,6 +38,14 @@ réglages dans config_client.lua »), mais il n'est plus au manifeste et n'est p
 Exports client (`defineGauge`, `setGauge`, `setGaugeActive`, `removeGauge`, `notify`, `progress`, `cancelProgress`,
 `currentProgress`, `hitText` depuis 1.7.0), hooks `vava_hud:progressDone` et `vava_hud:progressCancelled` : `docs/api.md`, section `vava_hud`.
 L'icône d'une jauge est une image `nui://<ressource>/<chemin>` citée dans les `files` de son module.
+
+**Remontée** (1.8.0, T-114) : `setGauge(id, valeur, refill?)` ; `refill = { perSecond, delayMs }` (parts de la jauge par
+seconde, attente avant de remonter) : la jauge part de `valeur` et remonte seule, d'une transition linéaire, jusqu'à 1 ;
+un nouvel appel (avec ou sans `refill`) l'arrête et repart de sa valeur. Sans troisième argument : comportement de 1.7.0
+(faim, soif, santé, voix inchangées). Même valeur et même remontée (départ à 1 ms près) : rien n'est envoyé à la page.
+La valeur et la remontée sont gardées par le Lua : une page rechargée, une jauge redéclarée reprennent à la valeur
+**projetée** avec l'attente restante. Contrat des messages : `docs/plan/rapports/T-114-contrat.md` (`value` et `define`
+portent `refill`, comme les jauges de `init`). Premier utilisateur : la jauge d'endurance de `vava_combat` 1.6.0.
 
 ## Bannière du royaume (1.6.0)
 
@@ -62,18 +72,34 @@ cascade, fenêtre d'une seconde, contrôle de la config) ; chiffres vivants et s
 
 ## Interface
 
-`web/index.html`, `web/css/style.css`, `web/js/hud.js` : sans framework, textes reçus insérés par `textContent`. La
+`web/index.html`, `web/css/style.css`, `web/js/hud.js`, `web/js/numbers.js` et `web/js/refill.js` (1.8.0 : règles
+pures de la remontée — remontée reçue relue, durée de la transition, instants des paliers franchis en montant) : sans
+framework, textes reçus insérés par `textContent`. La
 page lie `nui://vava_ui/web/css/vava_ui.css` avant sa feuille : polices Cinzel et EB Garamond, grain du cuir
 (`var(--ui-grain, none)`). Sans `vava_ui`, elle reste lisible (polices de repli, cuir sans grain). Aucune animation par
-image : l'anneau ne change qu'à une mise à jour, la barre avance par une seule transition CSS.
+image : l'anneau ne change qu'à une mise à jour, la barre avance par une seule transition CSS ; une remontée (1.8.0)
+est **une** transition linéaire de l'anneau, différée d'au moins 600 ms (le temps de peindre la baisse), classe
+`is-refilling` gardée sous « mouvement réduit » (elle porte l'information), paliers ambre et rouge franchis par des
+minuteries posées une fois, annulées au message suivant ; jamais de `requestAnimationFrame`. Réordonner les médaillons
+ne réinsère que ceux qui changent de place (une remontée en cours n'est pas coupée).
 
 Hors jeu : ouvrir `web/index.html` dans un navigateur depuis le dépôt (Edge ou Chrome : option
 `--allow-file-access-from-files` pour les polices en `file://`). La ligne hors jeu de la page charge
 `modules/vava_ui/web/dev/horsjeu.js` puis les données simulées de `web/dev/devmock.js` (jamais livrés : `web/dev/`
 n'est pas dans `files`). Paramètres : `?values=0.8,0.62,0.08,0.5` (santé, faim, soif, voix), `&talking=1` (lueur du
-médaillon de la voix), `&progress=1` (barre de 8 s menée à son terme) ou `&progress=cancel` (interrompue à 60 %).
+médaillon de la voix), `&progress=1` (barre de 8 s menée à son terme) ou `&progress=cancel` (interrompue à 60 %) ;
+1.8.0 : une 5ᵉ valeur de `?values` ajoute le médaillon Endurance (immobile), `&refill=0.2,1000` le fait remonter de 0,2
+par seconde après 1 s (depuis la 5ᵉ valeur, sinon 15 % : ambre, puis laiton au passage de 25 %), `&endurance=jeu` simule
+un combat comme le mèneraient le serveur et `vava_combat` (médaillon montré au réveil du mode, baisses, remontées,
+retiré 3 s après le plein). Essais de la page : `web/dev/essais.js` (lancés par `scripts/verifier.sh` quand la page
+change), sur un faux DOM sans dépendance (`web/dev/fauxdom.js`).
 
 ## À vérifier en jeu
+
+- Remontée (1.8.0, T-114) : `docs/tests/combat.md` § 9 — médaillon Endurance à la droite des autres sans en décaler
+  aucun ; remontée d'un seul mouvement régulier dans CEF ; ambre puis laiton au passage de 25 % ; bannière ouverte puis
+  refermée pendant une remontée, `restart vava_hud` : l'anneau reprend à la bonne valeur ; lisibilité de l'icône à 720p
+  et en 4K ; `resmon` inchangé pendant une remontée (la page anime).
 
 - Chiffres des coups (1.7.0) : `docs/tests/combat.md` § 7 et `docs/tests/magie.md` § 21 — projection de la tête (os
   31086 + 0,45 m), vue subjective (repli sous le centre), suivi sans saut quand la caméra tourne, lisibilité à 720p et

@@ -21,7 +21,7 @@ describe('vava_combat client : main, dégainer, mode combat', function()
         'GetEntityCoords', 'GetEntityHeading', 'SetEntityHeading', 'GetGameplayCamRot', 'GetGameplayCamCoord',
         'HasEntityClearLosToEntity', 'DrawMarker', 'exports', 'GetControlNormal', 'RegisterNetEvent',
         'GetPlayerFromServerId', 'HasNamedPtfxAssetLoaded', 'UseParticleFxAsset', 'StartParticleFxNonLoopedOnPedBone',
-        'ShakeGameplayCam', 'PlaySoundFrontend', 'RequestNamedPtfxAsset' }
+        'ShakeGameplayCam', 'PlaySoundFrontend', 'RequestNamedPtfxAsset', 'AddEventHandler' }
 
     local function fire(name, payload)
         for _, fn in ipairs(hooks[name] or {}) do fn(payload) end
@@ -79,7 +79,9 @@ describe('vava_combat client : main, dégainer, mode combat', function()
         helper.loadAll({
             'modules/vava_combat/shared/heading.lua',
             'modules/vava_combat/shared/techniques.lua',
+            'modules/vava_combat/shared/endurance.lua',
             'modules/vava_combat/bridge/client.lua',
+            'modules/vava_combat/client/endurance.lua',
             'modules/vava_combat/client/hands.lua',
             'modules/vava_combat/client/keys.lua',
             'modules/vava_combat/client/targeting.lua',
@@ -129,6 +131,7 @@ describe('vava_combat client : main, dégainer, mode combat', function()
         _G.GetGameplayCamCoord = function() return { x = 0, y = -3, z = 1 } end
         _G.exports = setmetatable({}, { __call = function() end })
         _G.GetControlNormal = function() return 0 end
+        _G.AddEventHandler = function() end
     end)
 
     after_each(function()
@@ -508,6 +511,35 @@ describe('vava_combat client : main, dégainer, mode combat', function()
             commands['vava_combat_esquive']()
             runThreads()
             assert.equal(5, #rpcCalls)
+        end)
+
+        -- T-114 : la garde exige 25 (un coup léger bloqué) ; marge du client 2 : elle part dès 23 vus d'ici
+        it('endurance : la garde ne part pas sous 23 (texte, rien d\'envoyé) ; à 23, elle part et le serveur décide',
+            function()
+            armed()
+            rpcAnswer = { true, true, 229, 1000, 200 }        -- parade acceptée : 22,9 points restent
+            down()
+            runThreads()
+            clock = clock + 200
+            stance.tick(clock)
+            for _ = 1, 10 do stance.tick(clock + 10) end
+            runThreads()
+            assert.same({ 'parade_epee' }, names())
+            assert.is_false(stance.guarding())
+            assert.same({ cfg.refusals.exhausted }, feed)
+            up()
+            clock = clock + 500
+            rpcAnswer = { true, true, 230, 1000, 200 }        -- 23 points restent
+            down()
+            runThreads()
+            clock = clock + 200
+            stance.tick(clock)
+            rpcAnswer = { true, false, 'exhausted', 100, 230, 800, 200 }
+            runThreads()
+            assert.same({ 'parade_epee', 'parade_epee', 'garde_epee' }, names())
+            assert.is_false(stance.guarding())
+            -- une seule fois le texte en 3 s, même R tenue
+            assert.same({ cfg.refusals.exhausted }, feed)
         end)
 
         it('garde brisée reçue du serveur : garde tombée, chancellement, aucun lower', function()

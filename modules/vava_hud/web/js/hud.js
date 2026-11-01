@@ -9,8 +9,10 @@
  *        `init.settings`) : échelle du HUD par transform (--hud-scale), durée des notifications ; valeurs bornées ici.
  *        Chiffres des coups (T-155) : `number`, `numbersMove`, `numbersClear`, rythme dans `init.numbers` ; montée
  *        par animation CSS, suivi par transition de transform, retrait à la fin de l'animation ; rien ne tourne sans
- *        chiffre à l'écran.
- * Dépendances : js/numbers.js (HudNumbers), chargé avant
+ *        chiffre à l'écran. Remontée d'une jauge (T-114) : `value` (ou `define`) avec `refill` { perSecond, delayMs } :
+ *        la baisse se peint, puis une seule transition linéaire jusqu'au plein ; un seul minuteur vivant par jauge
+ *        (départ, paliers franchis, plein), annulé au message suivant.
+ * Dépendances : js/numbers.js (HudNumbers), js/refill.js (HudRefill), chargés avant
  */
 
 (() => {
@@ -26,6 +28,7 @@
   const barHint = bar.querySelector('.progress-hint');
   const entries = new Map();
   const N = HudNumbers;
+  const R = HudRefill;
   const layer = document.getElementById('numbers');
   // chiffres à l'écran, du plus ancien au plus récent : id → { node, dx, dy, timer }
   const alive = new Map();
@@ -91,11 +94,7 @@
     setTimeout(() => dismiss(node), toastRules.durationMs);
   }
 
-  const level = (entry) => {
-    if (entry.value <= entry.critical) return 'critical';
-    if (entry.value <= entry.low) return 'low';
-    return 'ok';
-  };
+  const level = (entry) => R.level(entry.value, entry.low, entry.critical);
 
   function circle(className) {
     const node = document.createElementNS(SVG, 'circle');
@@ -137,22 +136,67 @@
   }
 
   function order() {
-    const sorted = [...entries.values()].sort((a, b) => a.order - b.order || (a.id < b.id ? -1 : 1));
-    root.replaceChildren(...sorted.map((entry) => entry.node));
+    const sorted = [...entries.values()].sort((a, b) => a.order - b.order || (a.id < b.id ? -1 : 1)).map((entry) => entry.node);
+    // la plus longue suite déjà en ordre reste en place, seuls les autres sont réinsérés : sortir un nœud du document
+    // couperait sa remontée (T-114)
+    const placed = [...root.children];
+    const keep = new Set(R.steady(sorted.map((node) => placed.indexOf(node))).map((i) => sorted[i]));
+    let next = null;
+    for (let i = sorted.length - 1; i >= 0; i -= 1) {
+      if (!keep.has(sorted[i])) root.insertBefore(sorted[i], next);
+      next = sorted[i];
+    }
+  }
+
+  // Remontée (T-114) ---------------------------------------------------------------------------------------
+
+  function refillStop(entry) {
+    clearTimeout(entry.timer);
+    entry.timer = null;
+    if (!entry.plan) return;
+    entry.plan = null;
+    entry.fill.classList.remove('is-refilling');
+    entry.fill.style.transition = '';
+  }
+
+  function refillNext(entry, index) {
+    const plan = entry.plan;
+    const step = plan.steps[index];
+    entry.timer = setTimeout(() => {
+      entry.value = step.value;
+      entry.node.dataset.level = step.level;
+      entry.node.setAttribute('aria-valuenow', String(Math.round(step.value * 100)));
+      if (index + 1 < plan.steps.length) refillNext(entry, index + 1);
+      else refillStop(entry);
+    }, Math.max(0, step.at - (performance.now() - plan.t0)));
+  }
+
+  function refillStart(entry, raw) {
+    const plan = R.plan(entry.value, raw, entry.low, entry.critical);
+    if (!plan) return;
+    entry.plan = { ...plan, t0: performance.now() };
+    entry.timer = setTimeout(() => {
+      entry.fill.classList.add('is-refilling');
+      entry.fill.style.transition = `stroke-dasharray ${plan.durationMs}ms linear`;
+      entry.fill.setAttribute('stroke-dasharray', '100 100');
+      refillNext(entry, 0);
+    }, plan.startMs);
   }
 
   function define(def) {
     let entry = entries.get(def.id);
     if (!entry) {
-      entry = { id: def.id, ...build(def) };
+      entry = { id: def.id, ...build(def), timer: null, plan: null };
       entries.set(def.id, entry);
     }
+    refillStop(entry);
     Object.assign(entry, { label: def.label, order: def.order, low: def.low, critical: def.critical, value: def.value });
     entry.node.classList.toggle('is-active', Boolean(def.active));
     entry.node.setAttribute('aria-label', def.label);
     if (entry.icon.getAttribute('src') !== def.icon) entry.icon.src = def.icon;
     paint(entry);
     order();
+    if (def.refill) refillStart(entry, def.refill);
   }
 
   // réglages de la bannière : échelle de 0,5 à 2, durée d'une notification de 0,5 à 60 s ; une valeur hors bornes est
@@ -229,6 +273,7 @@
       if (tuned && typeof tuned === 'object') settings(tuned);
       if (position.left) root.style.setProperty('--left', position.left);
       if (position.bottom) root.style.setProperty('--bottom', position.bottom);
+      for (const entry of entries.values()) refillStop(entry);
       entries.clear();
       root.replaceChildren();
       for (const def of gauges) define(def);
@@ -238,11 +283,13 @@
       if (progress) progressStart(progress);
     },
     define,
-    value({ id, value }) {
+    value({ id, value, refill }) {
       const entry = entries.get(id);
       if (!entry) return;
+      refillStop(entry);
       entry.value = value;
       paint(entry);
+      if (refill) refillStart(entry, refill);
     },
     active({ id, active }) {
       const entry = entries.get(id);
@@ -251,6 +298,7 @@
     remove({ id }) {
       const entry = entries.get(id);
       if (!entry) return;
+      refillStop(entry);
       entry.node.remove();
       entries.delete(id);
     },

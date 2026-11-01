@@ -1,7 +1,7 @@
 --[[
     vava_combat/fxmanifest.lua
     Rôle : combat de corps à corps d'Eldoria : armes, usure, bouclier accroché, techniques jugées par le serveur (voir
-           README.md), mannequins d'entraînement. Aucune NUI, aucune table SQL.
+           README.md), mannequins d'entraînement, endurance (jauge du HUD). Aucune NUI, aucune table SQL.
     Dépendances : vAvA_core ≥ 0.10.0, vava_inventory ≥ 1.7.0, vava_health ≥ 1.6.0 ; facultatifs : voir README.md
 ]]
 
@@ -11,8 +11,8 @@ lua54 'yes'
 use_experimental_fxv2_oal 'yes'
 
 name 'vava_combat'
-description 'Combat vAvA : armes de corps à corps, techniques, défense, usure, bouclier accroché, mannequins'
-version '1.5.0'
+description 'Combat vAvA : armes de corps à corps, techniques, défense, endurance, usure, bouclier accroché, mannequins'
+version '1.6.0'
 
 dependency 'vAvA_core'
 dependency 'vava_inventory'
@@ -20,6 +20,7 @@ dependency 'vava_health'
 
 files {
     'web/items/*.svg',
+    'web/icons/*.svg',
 }
 
 -- Ordre explicite. Les joueurs ne téléchargent que shared_scripts et client_scripts (T-132).
@@ -30,6 +31,7 @@ shared_scripts {
     'shared/shield.lua',
     'shared/heading.lua',
     'shared/techniques.lua',
+    'shared/endurance.lua',
 }
 
 server_scripts {
@@ -38,6 +40,7 @@ server_scripts {
     'shared/geometry.lua',
     'shared/admission.lua',
     'shared/defense.lua',
+    'shared/stamina.lua',
     'shared/weapons.lua',
     'shared/guard.lua',
     'server/core.lua',
@@ -50,6 +53,7 @@ server_scripts {
     'server/hands.lua',
     'server/reactions.lua',
     'server/dummies.lua',
+    'server/stamina.lua',
     'server/defense.lua',
     'server/swings.lua',
     'server/api.lua',
@@ -60,6 +64,7 @@ server_scripts {
 client_scripts {
     'client/core.lua',
     'bridge/client.lua',
+    'client/endurance.lua',
     'client/natives.lua',
     'client/shields.lua',
     'client/hands.lua',

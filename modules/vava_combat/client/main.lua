@@ -1,9 +1,10 @@
 --[[
     vava_combat/client/main.lua
-    Rôle : assemblage côté joueur : notifications du serveur, exports `armed()`, `inCombatMode()`, `shieldHung()`,
-           démarrage des contrôles natifs, des boucliers et des mannequins d'entraînement.
+    Rôle : assemblage côté joueur : notifications et état d'endurance du serveur, exports `armed()`, `inCombatMode()`,
+           `shieldHung()`, démarrage des contrôles natifs, des boucliers et des mannequins d'entraînement.
     Dépendances : shared/constants.lua, config_client.lua, shared/shield.lua, client/core.lua, bridge/client.lua,
-                  client/natives.lua, client/shields.lua, client/hands.lua, client/mode.lua, client/dummies.lua
+                  client/endurance.lua, client/natives.lua, client/shields.lua, client/hands.lua, client/mode.lua,
+                  client/dummies.lua
 ]]
 
 local type = type
@@ -20,6 +21,11 @@ local mode = VavaCombat.mode
 local EVENTS = VavaCombat.EVENTS
 local SHIELD_STATE = VavaCombat.SHIELD_STATE
 local MAX_NOTIFICATION = VavaCombat.MAX_NOTIFICATION
+
+-- jauge d'endurance changée hors d'une demande (coup bloqué, mise à terre) : trois entiers bornés, sinon ignorée
+RegisterNetEvent(EVENTS.STAMINA, function(value, restIn, rate)
+    VavaCombat.gaugeView.apply(value, restIn, rate)
+end)
 
 -- seuil d'usure, coup retenu ou réponse du Conseil : texte borné, nature parmi celles du HUD (bridge)
 RegisterNetEvent(EVENTS.NOTIFY, function(text, kind)

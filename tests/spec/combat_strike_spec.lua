@@ -1,5 +1,8 @@
 local helper = require('tests.helper')
 
+-- T-114 : états d'endurance envoyés au seul porteur (doublure bridge.Send)
+local staminaSent = {}
+
 -- Armes côté serveur (modules/vava_combat/server/catalog.lua, wear.lua, strike.lua, pedstate.lua, shields.lua, api.lua,
 -- commands.lua, T-111) avec des doublures : bridge (personnages, positions, à terre, main tenue, piles de la besace,
 -- besace, patchMetadata qui applique le patch, registres, hit qui note le paquet et rend un résultat réglable,
@@ -142,6 +145,8 @@ describe('vava_combat server', function()
             'modules/vava_combat/shared/techniques.lua',
             'modules/vava_combat/shared/admission.lua',
             'modules/vava_combat/shared/defense.lua',
+            'modules/vava_combat/shared/endurance.lua',
+            'modules/vava_combat/shared/stamina.lua',
         })
         cfg, HOOKS, SHIELD_STATE = VavaCombat.config, VavaCombat.HOOKS, VavaCombat.SHIELD_STATE
         VavaCombat.resource = 'vava_combat'
@@ -242,6 +247,14 @@ describe('vava_combat server', function()
             Chat = function(src, text) chats[#chats + 1] = { source = src, text = text } end,
             ChatLines = function(src, lines) chatLines[#chatLines + 1] = { source = src, lines = copy(lines) } end,
             Timer = function() return clock end,
+            -- T-114 : faim et soif (vava_needs absent : facteur 1) ; état d'endurance au seul porteur
+            NeedsValues = function() return nil end,
+            Send = function(target, event, ...)
+                assert.equal('integer', math.type(target))
+                assert.is_true(target > 0)
+                staminaSent[#staminaSent + 1] = { target = target, event = event, args = { ... } }
+                return true
+            end,
         }
         helper.loadAll({
             'modules/vava_combat/server/catalog.lua',
@@ -251,6 +264,7 @@ describe('vava_combat server', function()
             'modules/vava_combat/server/strike.lua',
             'modules/vava_combat/server/hands.lua',
             'modules/vava_combat/server/reactions.lua',
+            'modules/vava_combat/server/stamina.lua',
             'modules/vava_combat/server/defense.lua',
             'modules/vava_combat/server/swings.lua',
             'modules/vava_combat/server/api.lua',
@@ -780,7 +794,9 @@ describe('vava_combat server', function()
             assert.matches('modèle provisoire', chatLines[1].lines[2])
             give(B, pile(40, 'epee_courte', { quality = 64, tier = 3, durability = 149, max_durability = 150 }), true)
             commands.handle(A, { 'voir', tostring(B) })
-            assert.matches('coup 12 → 12,5', chats[#chats].text)
+            assert.matches('coup 12 → 12,5', chats[#chats - 1].text)
+            -- T-114 : l'endurance du joueur, en dernière ligne (jauge absente : pleine, recharge de base)
+            assert.equal('Endurance : 100 / 100, recharge 20 / s', chats[#chats].text)
             assert.same({ source = A, label = cfg.journal.inspect, details = { cible = B, objet = 'epee_courte' } }, adminLogs[1])
             commands.handle(A, { 'voir', '42' })
             assert.equal(cfg.messages.adminNoPlayer, chats[#chats].text)

@@ -29,6 +29,13 @@ l'arme s'use un peu, comme à l'exercice (un coup sur quatre). On y répète seu
 des premiers rangs sans un partenaire ou un maître (aucune XP ici ; T-115 la plafonnera au niveau 9). Spécification :
 `docs/plan/specs/T-156.md`.
 
+Version 1.6.0 (T-114) : l'**endurance**. Chaque coup, chaque parade, chaque pas de côté coûte du souffle ; une garde qui
+encaisse se vide jusqu'à céder. Un médaillon « Endurance » s'allume à côté de la santé quand on prend les armes, descend
+à chaque effort et remonte seul après une seconde de répit, plus lentement le ventre vide ou la gorge sèche. À bout de
+souffle, on ne frappe plus : il faut rompre, reculer, laisser un compagnon prendre le relais. La jauge est tenue par le
+serveur seul ; elle remplace le compteur provisoire de garde brisée de 1.3.0 **aux mêmes seuils** (4 coups bloqués à
+l'épée, 6 au bouclier). Spécification : `docs/plan/specs/T-114.md`.
+
 Ordre de démarrage : après `vAvA_core` (≥ 0.10.0 : `core.net`, registre `core:commands`), `vava_inventory`
 (≥ 1.7.0 : objet tenu et statebag de la main), `vava_health` (≥ 1.6.0 : chaîne de dégâts, coup d'essai des
 mannequins), et après `vava_crafting` et
@@ -37,7 +44,10 @@ isolés dans le bridge : `vava_crafting` ≥ 1.5.0 et `vava_skills` ≥ 1.0.0 (s
 une ligne de console), `vava_hud` (notifications ; sans lui, celles du jeu), `vava_admin` (droit `metiers`, journal du
 Registre ; sans lui, ACE `combat.admin`), `vava_chat` (réponses de `/armes` ; sans lui, une notification au seul membre),
 `vava_magic` (export `hardControl`, `vava_magic` ≥ 2.12.0, T-149 : un joueur gelé, renversé ou chancelant par un sort
-ne frappe pas, refus `controlled` ; plus ancien, arrêté ou en erreur : aucun refus de ce côté).
+ne frappe pas, refus `controlled` ; plus ancien, arrêté ou en erreur : aucun refus de ce côté), `vava_needs` (export
+serveur `get`, 1.6.0 : la faim et la soif ralentissent la recharge de l'endurance ; sans lui, recharge pleine),
+`vava_hud` ≥ 1.8.0 pour la jauge d'endurance animée (plus ancien : la jauge ne bouge qu'à chaque état reçu ; sans lui,
+pas de jauge, le combat ne change pas).
 **Deux RPC (`vava_combat:use`, `vava_combat:lower`), aucune NUI, aucune table SQL.** **À ne pas arrêter sur un serveur ouvert** : pendant
 l'arrêt, les armes sont « gardées à part » par l'inventaire, les recettes quittent les stations et les gestes natifs de
 GTA reviennent (sans dégâts entre joueurs : `vava_health` les annule).
@@ -53,9 +63,11 @@ provisoire) dans `config.lua` ; le bouclier accroché garde sa part client (`shi
 `weaponClasses`, `techniques`, `styles`, `keys`, `refusals` et `effects` sont entiers côté client (lus par une clé
 variable) : une technique n'a rien de secret. `dummies` (1.5.0) est coupée au second niveau : modèles, distances,
 balancement, éclats et liste dans `config_client.lua`, part du serveur (usure, témoins, appelants, plafonds) ajoutée par
-`config.lua`. Les joueurs téléchargent les constantes, `config_client.lua`, `shared/dummies.lua`,
-`shared/shield.lua`, `shared/heading.lua`, `shared/techniques.lua` et les `client/*.lua` ; `config.lua`,
-`shared/weapons.lua` et `shared/guard.lua` sont servis au seul serveur.
+`config.lua`. `endurance` (1.6.0) est entière dans `config.lua` (le client n'en lit rien : pente et reprise lui
+arrivent dans chaque état), `gauge` entière dans `config_client.lua` (le serveur la contrôle seulement). Les joueurs
+téléchargent les constantes, `config_client.lua`, `shared/dummies.lua`, `shared/shield.lua`, `shared/heading.lua`,
+`shared/techniques.lua`, `shared/endurance.lua` et les `client/*.lua` ; `config.lua`, `shared/weapons.lua`,
+`shared/guard.lua`, `shared/stamina.lua` et `server/stamina.lua` sont servis au seul serveur.
 
 | Règle | Défaut | Clé |
 |---|---|---|
@@ -76,10 +88,12 @@ balancement, éclats et liste dans `config_client.lua`, part du serveur (usure, 
 | Combat natif coupé (client) | drapeau 122 (corps à corps désactivé), changement d'arme bloqué, armes GTA retirées ; contrôle à 1 Hz ; rendu à GTA à l'arrêt | `natives` |
 | Conseil | `/armes`, droit `metiers` (sans `vava_admin` : ACE `combat.admin`), `user` jusqu'à 1 000 points | `admin`, `journal` |
 | Techniques (client) | quatre techniques du style `epee_une_main` (ci-dessous), format de `COMBAT_V1.md` § 3 contrôlé au démarrage (bornes des curseurs de la maquette Combat : préparation 80 à 1 500 ms, frappe 40 à 500, récupération 0 à 2 000, 3 000 en tout ; portée 1 à 4 m ; angle 10 à 180° d'ouverture **totale** ; dégâts × 0,5 à × 2 ; endurance 0 à 40 ; chaîne de 4 techniques du même style au plus ; toute autre clé refuse le module ; une technique que rien n'atteint : avertissement) ; gestes `-- PLACEHOLDER` | `techniques` |
-| Techniques défensives (client) | Garde (`blocage`), Parade (`parade`), Pas de côté (`esquive`) du style `epee_une_main` (ci-dessous) ; format selon le type : préparation dès 0 ms, ni `damage`, ni `parryable`, ni `staggers`, ni `hit.range` (refusés au démarrage) ; `hit.angle` = arc protégé ; une esquive n'a pas de `hit` ; `stamina` = coût d'un coup bloqué, d'une parade, d'un pas (lu par T-114) | `techniques` |
+| Techniques défensives (client) | Garde (`blocage`), Parade (`parade`), Pas de côté (`esquive`) du style `epee_une_main` (ci-dessous) ; format selon le type : préparation dès 0 ms, ni `damage`, ni `parryable`, ni `staggers`, ni `hit.range` (refusés au démarrage) ; `hit.angle` = arc protégé ; une esquive n'a pas de `hit` ; `stamina` = coût d'un coup **léger** bloqué (Garde : 25, exigé pour la lever ; un lourd × 2, au bouclier × 0,67), d'une parade (6), d'un pas (20) | `techniques` |
 | Styles (client) | style = `<famille>_<catégorie>` de l'arme tenue ; technique qui ouvre chaque touche (`legere`, `lourde`, `blocage`, `parade`, `esquive`, chacune d'une technique de son type ; une touche absente ne fait rien) | `styles` |
 | Défense (client) | garde brisée 1,2 s (chancellement, ni garde ni parade) et son geste ; 1,5 s entre deux pas de côté (connu du client : rien n'est demandé avant ; tenu par le serveur) ; sprint coupé garde levée (8 contrôles au plus, jamais Échap ni P) ; gestes du pas de côté selon la direction tenue (avant, gauche, droite ; sinon celui de la technique) | `defense.guardBrokenMs`, `dodgeCooldownMs`, `brokenGesture`, `guardBlocked`, `dodgeGestures` (-- PLACEHOLDER) |
-| Défense (serveur) | parade ratée → aucune autre parade avant fin de fenêtre + 0,6 s ; pas de côté : évite `melee` et `ranged` (projectiles de sorts compris), jamais `undodgeable`, `area`, `overTime`, `native`, `reflected`, et n'est appelé ni pour la faim (`privation`) ni pour les pertes du monde (`kinds`) ; garde et parade : `melee` seulement ; arc protégé + 40° au bouclier ; garde brisée **provisoire** (remplacée par l'endurance de T-114) : 4 coups bloqués (6 au bouclier, un coup lourd en vaut 2), compte remis à zéro après 3 s sans coup bloqué ; priorité des modificateurs 50 ; 64 décisions en attente au plus, oubliées après 1 s | `defense.parry`, `dodge`, `block`, `parryTags`, `guardBreak`, `modifierPriority`, `memoMax`, `memoMs` |
+| Défense (serveur) | parade ratée → aucune autre parade avant fin de fenêtre + 0,6 s ; pas de côté : évite `melee` et `ranged` (projectiles de sorts compris), jamais `undodgeable`, `area`, `overTime`, `native`, `reflected`, et n'est appelé ni pour la faim (`privation`) ni pour les pertes du monde (`kinds`) ; garde et parade : `melee` seulement ; arc protégé + 40° au bouclier ; la garde cède quand un coup bloqué coûte au moins ce qui reste d'endurance (1.6.0 ; `defense.guardBreak` de 1.3.0 retiré : présent dans un ancien `config.lua`, une ligne de console, sans effet) ; priorité des modificateurs 50 ; 64 décisions en attente au plus, oubliées après 1 s | `defense.parry`, `dodge`, `block`, `parryTags`, `modifierPriority`, `memoMax`, `memoMs` |
+| Endurance (serveur, 1.6.0, T-114) | jauge de 0 à 100 par personnage en jeu, jamais sauvegardée (pleine à l'arrivée et au relevé) ; recharge **20 / s** (1 à 100) **1 s** (0 à 10 000 ms) après la dernière dépense ; coup bloqué : `stamina` de la Garde × 2 pour un coup lourd (1 à 5) × 0,67 au bouclier encore accroché (0,1 à 1) ; faim ou soif (le besoin le plus bas, `vava_needs`) à 30 ou moins : × 0,75, à 10 ou moins : × 0,5 (4 paliers au plus, `at` 0 à 100, `factor` 0,1 à 1), relues au plus une fois par 30 s (1 000 à 300 000 ms) et par combattant, à un geste. Absente (ancien `config.lua`) : le module refuse de démarrer avec la marche à suivre | `endurance.regenPerSecond`, `regenDelayMs`, `block.heavyWeight`, `block.shieldFactor`, `needs`, `needsReadMs` |
+| Jauge d'endurance (client, 1.6.0) | médaillon « Endurance » de `vava_hud`, icône `web/icons/endurance.svg`, ordre 60 (dernier : n'en décale aucun), anneau ambre sous 25 % (plus de quoi lever la garde), rouge et lueur sous 10 % ; montré en mode combat éveillé, ou tant qu'il n'est pas plein, puis 3 s (0 à 30 000 ms) ; marge de prédiction 2 points (0 à 10) : une demande ne part que si la jauge vue d'ici en manque au plus autant. Contrôlé au démarrage par le serveur (bornes de `vava_hud`, icône `nui://vava_combat/…`) | `gauge` |
 | Dégainer, rengainer | aucune technique avant **0,8 s** après la prise en main ; une arme rangée laisse les mains prises **1,5 s** (`armed()` : pas de sort) ; gestes `-- PLACEHOLDER` (décision du porteur du projet) | `draw` |
 | Chancellement | 0,9 s sans frapper, coup en cours coupé ; aucun autre avant 3 s | `stagger`, `timing.staggerImmunityMs` |
 | Cycle d'un coup (serveur) | demande admise 60 ms avant d'être permise (gigue) ; 3 techniques enchaînées au plus après celle qui ouvre ; deux relevés pendant la frappe (ouverture, fin) ; un coup **annulé** (quelle qu'en soit la cause) garde sa récupération et son compte d'enchaînement, comme s'il était allé au bout | `timing` |
@@ -95,9 +109,9 @@ balancement, éclats et liste dans `config_client.lua`, part du serveur (usure, 
 | Touches (client) | clic gauche (attaque légère), clic droit (attaque lourde), clic molette (verrouiller ; maintenu : relâcher), **R** (appui bref : parer ; maintenu : se garder), **Espace** (pas de côté, mode combat actif seulement : le saut de GTA y est coupé) ; réglables dans Paramètres > Raccourcis > FiveM | `keys` |
 | Verrou (client) | 6 m, 30° autour du centre de l'écran, en vue ; maintenu 0,6 s : relâché ; perdu à 7 m ou hors de vue 4 relevés de suite ; virage de 540°/s vers la cible pendant la préparation et la frappe | `lock` |
 | Effets (client) | tressaillement, sang, étincelles (blocage, parade), secousse de caméra, son (aucun par défaut) ; 12 effets par seconde au plus | `effects` (-- PLACEHOLDER) |
-| Refus montrés (client) | texte par code du serveur, `false` : rien | `refusals` |
+| Refus montrés (client) | texte par code du serveur, `false` : rien ; 200 octets au plus (contrôlé au démarrage, 1.6.0) ; `exhausted` : « Vous êtes à bout de souffle. » | `refusals` |
 | Réglage en jeu (serveur) | une ligne de console par relevé (distance, angle, portée, issue) ; faux en service | `debug.logSamples` |
-| Textes | notifications, réponses des commandes, coups retenus | `messages` |
+| Textes | notifications, réponses des commandes, coups retenus, endurance vue par le Conseil (`inspectEndurance`, `enduranceSlowed`) | `messages` |
 
 ### Les armes (valeurs de départ, à régler à la porte T-119)
 
@@ -140,9 +154,12 @@ dos de son porteur, à portée de vue seulement.
 | Estoc rapide (`estoc_rapide`) | légère | 220, 120, 380 ms | 2,4 m, 40° | × 0,8 | Revers, Fendant | parable |
 | Revers (`revers`) | légère | 280, 160, 460 ms | 2,1 m, 90° | × 0,9 | Taille descendante, Fendant | parable |
 | Fendant (`fendant`) | lourde, ouvre | 650, 200, 700 ms | 2,3 m, 60° | × 1,8 | rien | non parable, fait chanceler |
-| Garde (`garde_epee`) | R maintenue | mise en garde 100, tenue minimale 200, garde abaissée 250 ms | arc 120° (160° au bouclier) | — | rien (pas de riposte directe) | coût 8 par coup bloqué (T-114) |
-| Parade (`parade_epee`) | R, appui bref | 0, **fenêtre 200**, 250 ms | arc 120° | — | Garde (R maintenue) | coût 6 (T-114) |
-| Pas de côté (`pas_de_cote`) | Espace | élan 50, **invulnérable 250**, 350 ms | — | — | rien | coût 20 (T-114) |
+| Garde (`garde_epee`) | R maintenue | mise en garde 100, tenue minimale 200, garde abaissée 250 ms | arc 120° (160° au bouclier) | — | rien (pas de riposte directe) | 25 d'endurance par coup léger bloqué (lourd 50 ; au bouclier 16,8 et 33,5) ; 25 exigés pour la lever, rien dépensé à la levée |
+| Parade (`parade_epee`) | R, appui bref | 0, **fenêtre 200**, 250 ms | arc 120° | — | Garde (R maintenue) | 6 d'endurance, réussie ou ratée |
+| Pas de côté (`pas_de_cote`) | Espace | élan 50, **invulnérable 250**, 350 ms | — | — | rien | 20 d'endurance |
+
+Endurance des attaques (1.6.0) : Taille 12, Estoc 9, Revers 11, Fendant 25, payée à l'acceptation, que le coup porte ou
+non (manqué, paré, esquivé, sur un mannequin).
 
 Format (`config_client.lua` → `techniques`, `COMBAT_V1.md` § 3, identique dans l'Atelier) : clé = identifiant
 (`^[a-z0-9_]+$`, 32 octets) ; `phases` en ms ; `hit.range` en mètres (plus le bonus de l'arme) ; `hit.angle` = ouverture
@@ -151,8 +168,8 @@ style qui peuvent partir pendant la récupération. Portée réelle = portée de
 demi-angle = angle / 2 + 10°. Épée courte et Taille
 descendante : 2,45 m, 45° de chaque côté, 2,0 m de hauteur. Seule l'**épée à une main** a des techniques en 1.3.0 (les
 autres styles viendront avec T-115) : une autre arme en main, le joueur lit « Vous ne connaissez aucune technique pour
-cette arme. » et rien ne s'éveille. `learn` (compétence, niveau) est lu par T-115, jamais appliqué ici ; `stamina` par
-T-114.
+cette arme. » et rien ne s'éveille. `learn` (compétence, niveau) est lu par T-115, jamais appliqué ici ; `stamina` est
+le coût d'endurance (1.6.0).
 
 ### Un coup de technique
 
@@ -160,7 +177,7 @@ T-114.
    suite de la chaîne pendant la récupération), se tourne vers la cible verrouillée ou la caméra (90° au plus), **joue le
    geste aussitôt** et demande `vava_combat:use(technique, cible)`. Une touche pressée un peu tôt (250 ms) est gardée.
 2. Le serveur refuse d'abord ce qu'il tient en mémoire (technique inconnue, type de défense, chancellement, arme encore
-   dégainée, coup en cours, enchaînement), puis vérifie personnage, arme **réellement tenue**, style de l'arme, à terre,
+   dégainée, souffle, coup en cours, enchaînement), puis vérifie personnage, arme **réellement tenue**, style de l'arme, à terre,
    véhicule, contrôle de la magie, crochet `vava_combat:using`. Refus : le client coupe le geste (et montre le texte du
    refus, sauf pour un coup trop tôt).
 3. Le serveur programme la **fenêtre de frappe** : un relevé à la fin de la préparation, un à la fin de la frappe. À chaque
@@ -190,9 +207,10 @@ bond) compte comme allé au bout : on ne gagne rien à couper son propre coup. *
    200 ms). Un coup de corps à corps de face (arc 120°, 160° bouclier au bras) est amorti : part arrêtée de l'arme tenue
    (Épée courte 0,40) ou du **bouclier accroché au bras** (Bouclier rond 0,70) ; émoussé : moitié moins. Ce qui bloque
    s'use (le bouclier s'il sert, sinon l'arme). Un coup de dos porte entièrement. Pas d'attaque garde levée, pas de
-   course ; relâcher R l'abaisse (250 ms avant de frapper). Au 4e coup bloqué de suite (6e au bouclier, un coup lourd
-   compte double, remis à zéro après 3 s sans coup), la **garde est brisée** : chancellement 1,2 s, ni garde ni parade
-   pendant ce temps, « Votre garde est brisée. ». Ce compteur est **provisoire** : l'endurance de T-114 le remplacera.
+   course ; relâcher R l'abaisse (250 ms avant de frapper). Chaque coup bloqué coûte de l'endurance (25 à l'épée, 16,8
+   au bouclier, le double pour un coup lourd) ; un coup bloqué qui coûte au moins ce qui reste **brise la garde** :
+   chancellement 1,2 s, ni garde ni parade pendant ce temps, « Votre garde est brisée. » (depuis une jauge pleine : au
+   4e coup léger, au 6e au bouclier). La garde ne se lève qu'avec 25 d'endurance (de quoi bloquer un coup).
 3. **Pas de côté** (Espace, mode combat actif seulement) : roulade selon la direction tenue ; invulnérable 250 ms
    après 50 ms d'élan, contre les coups de corps à corps et les projectiles (sorts compris), jamais contre une zone, un
    effet qui dure ni un coup `undodgeable`. 1,5 s entre deux départs. Rien ne s'use, rien n'est envoyé aux autres.
@@ -202,6 +220,29 @@ Exemples (Épée courte qualité 50, Taille 12) : garde à l'épée 4,8 arrêté
 Un geste défensif est un coup au sens du cycle (T-112) : annulé (main changée, à terre, chancellement), il garde sa
 récupération ; une garde annulée est fermée avec sa tenue minimale. Sous un contrôle dur de la magie (gelé, renversé,
 chancelant), ni parade, ni garde, ni pas de côté ne protègent.
+
+### L'endurance (1.6.0, T-114)
+
+- **Jauge** : 0 à 100 par personnage en jeu, tenue par le serveur en dixièmes, jamais sauvegardée (pleine à l'arrivée, au
+  relevé d'une mise à terre, après un retour à la sélection). **Aucune minuterie, aucune boucle** : le niveau se calcule
+  à chaque lecture (valeur à un instant, reprise de la recharge, pente), comme la mana de `vava_magic`.
+- **Dépenses**, toutes à l'**acceptation** du geste (un geste refusé ne coûte rien) : attaques (12, 9, 11, 25), parade
+  (6), pas de côté (20), coup bloqué (25 × poids × bouclier). Rien pour tenir la garde, courir, incanter, être frappé
+  sans bloquer. Un coup qui met à terre ne coûte rien au défenseur (la mise à terre l'emporte).
+- **Recharge** : 20 points par seconde, 1 s après la dernière dépense ; tenir la garde ne l'arrête pas. Faim ou soif à
+  30 ou moins : 15 / s ; à 10 ou moins : 10 / s (le besoin le plus bas). De vide à plein : 6 s (7,7 s ventre creux,
+  11 s affamé).
+- **À bout de souffle** : un geste dont le coût dépasse ce qui reste est refusé (« Vous êtes à bout de souffle. »), avec
+  l'attente avant qu'il soit payable ; le client ne demande même pas ce que sa jauge (vue de chez lui, à 2 points près)
+  ne paie pas. Seuls les gestes plus chers sont retenus : à 10 points, une Taille part encore.
+- **Rythme** : Tailles toutes les 0,9 s depuis une jauge pleine : huit, puis une toutes les 1,6 s environ (1 s de répit, 0,6 s de recharge) ; neuf pas de côté de
+  suite ; après une garde brisée, la garde ne se relève pas avant 2,25 s. Deux Fendants **à moins d'une seconde**
+  (deux attaquants) brisent la garde à l'épée ; un seul attaquant, ses Fendants espacés de 1,55 s, la brise au
+  troisième (0,55 s de recharge entre deux). Alterner pas de côté et parades ratées ne protège plus ≈ 35 % du temps
+  (1.3.0) mais ≈ 15 à 18 % selon la façon de faire (pas et parades dès que permis : ≈ 15 % une fois le souffle
+  épuisé ; repos jusqu'au plein puis parades en rafale : ≈ 18 %) ; ≤ 20 % sur 60 s dans les deux cas (essais).
+- **Ce que voit le joueur** : le médaillon « Endurance » de `vava_hud` (animé par la page : une mise à jour par état,
+  aucune boucle), ambre sous 25 %, rouge sous 10 %. Les autres ne voient rien de sa jauge.
 
 ### Le mode combat
 
@@ -259,18 +300,22 @@ garde d'emblée. Le serveur tient ces durées (hook `vava_inventory:hold`) ; le 
   de la prise en main, rengainement en cours, dernière arme vue en main, chancellement et immunité, derniers avis ;
   bornée par le nombre de joueurs, oubliée au déchargement, au départ et à l'arrêt ; au plus deux minuteries par coup.
   1.3.0 : geste défensif en cours (fenêtre = paire d'instants, **aucune minuterie** ; garde : part bloquée et bouclier
-  lus une fois), dernière parade, dernier pas de côté, compteur provisoire de garde, fin de garde brisée (oubliés aussi
+  lus une fois), dernière parade, dernier pas de côté, fin de garde brisée (oubliés aussi
   à la mise à terre) ; décisions des modificateurs en attente de leur suite (64 au plus, retirées dans le même tour,
   oubliées après 1 s).
   1.5.0 : mannequins chargés (64 au plus) ; par mannequin, instant du dernier balancement envoyé aux témoins ; par coup,
   mannequins déjà frappés ; oubliés à l'arrêt.
+  1.6.0 : une jauge d'endurance par joueur qui a fait un geste (personnage, valeur, instant, reprise, pente, part due
+  aux besoins, dernière lecture de `vava_needs`), oubliée au déchargement, au départ, à la mise à terre, à l'arrêt ;
+  le compteur provisoire de 1.3.0 disparaît.
 - Aucune table SQL, aucune migration, aucun champ ni métadonnée nouveaux.
 
 ## Réseau
 
 | Quoi | Cible | Taille | Fréquence |
 |---|---|---|---|
-| RPC `vava_combat:use(technique, cible)` (`core.rpc`, schéma borné : chaîne de 1 à 32 octets `^[a-z0-9_]+$`, entier 0 à 65535) | le serveur ; réponse au seul appelant (`true`, `false, code[, attente]`) | ≈ 40 o + ≈ 15 o | un par coup, par parade, par pas de côté, par garde levée ; 4 d'avance puis 3 / s |
+| RPC `vava_combat:use(technique, cible)` (`core.rpc`, schéma borné : chaîne de 1 à 32 octets `^[a-z0-9_]+$`, entier 0 à 65535) | le serveur ; réponse au seul appelant (`true, valeur, reprise, pente` ; `false, code[, attente]` ; `false, 'exhausted', attente, valeur, reprise, pente`) | ≈ 40 o + ≈ 24 o (≈ 35 o à bout de souffle) | un par coup, par parade, par pas de côté, par garde levée ; 4 d'avance puis 3 / s |
+| `vava_combat:stamina` (1.6.0, `core.net.send`, compté) : valeur (dixièmes), ms avant la recharge, pente (dixièmes / s) | le **seul porteur** de la jauge, quand elle change hors de sa demande : coup bloqué (défenseur), remise à plein à la mise à terre si elle n'était pas pleine | ≈ 26 à 28 o comptés par `core.net` | un par coup bloqué, un par chute ; **jamais au repos** ni pendant une remontée ; jamais à l'attaquant ni aux témoins |
 | RPC `vava_combat:lower()` (aucun argument) | le serveur ; réponse au seul appelant (`true`, `false, 'no_guard'`) | ≈ 25 o + ≈ 10 o | un par garde abaissée ; 4 d'avance puis 3 / s ; **rien pendant la tenue** |
 | `vava_combat:hit` (`core.net.playersNear` dans l'instance de l'attaquant, puis `core.net.send` à une liste) : attaquant, cible, issue (`hit`, `stagger`, `down`, `block`, `parry`, `break`, `dodge`, `absorb`) et, pour l'attaquant et la cible seulement (1.4.0), le montant en dixièmes ou `false` | les joueurs apparus à 30 m de la **cible**, dans l'instance de l'attaquant (cible, attaquant paré, témoins) ; `dodge` et `absorb` aux deux seuls participants | ≈ 23 à 32 o comptés par `core.net` (nom + charge) ; 4e valeur des participants : 1 o (`false`, jusqu'à 127 dixièmes), 2 o (jusqu'à 255), 3 o au-delà | **un** par cible touchée et par coup de technique (un adversaire par coup), en **deux envois** au plus (participants, témoins ; un sans témoin) ; un coup paré, bloqué ou qui brise la garde envoie son issue **à la place** de `hit` ; jamais pour un coup manqué, refusé ou annulé, ni pour un coup d'une autre ressource ; une esquive ou un coup absorbé : ≈ 25 o à chacun des deux seuls participants (rien en 1.3.0) |
 | `vava_combat:notify` (`core.net.send`, compté) | le **seul** porteur dont l'arme passe un seuil ; le seul attaquant dont le coup est retenu (combats coupés, lieu de paix, crochet) ; le seul membre du Conseil qui tape `/armes` sans `vava_chat` | ≈ 70 à 160 o | 2 par arme et par cycle d'usure ; un avis par raison et par 10 s ; réponses de commande |
@@ -288,6 +333,12 @@ Attente d'une parade ratée ou d'un pas de côté : propre à sa touche chez le 
 attaques ; le délai du pas de côté est connu du client, qui ne demande rien avant. Un coup manqué : la requête et sa
 réponse, à l'attaquant seul. Mêlée à six vue d'un témoin : ≤ 12 `vava_combat:hit` par seconde (≈ 0,4 Ko/s), 12 effets
 par seconde au plus.
+
+Endurance (1.6.0) : au repos, armé ou non, jauge pleine ou en recharge : **0 octet** (aucune synchronisation périodique,
+la page de `vava_hud` anime la remontée) ; un geste : + 9 o dans la réponse déjà envoyée ; une garde qui encaisse
+quatre coups : ≈ 110 o au seul défenseur ; faim et soif n'envoient rien (la pente part avec la réponse du geste
+suivant) ; rien de plus du client vers le serveur. Mêlée à six, au pire : ≈ 0,4 Ko/s en tout (≈ 65 o/s par joueur).
+L'endurance n'entre jamais dans `vava_combat:hit` (elle révélerait la jauge du défenseur).
 
 Mannequins (1.5.0) : leur présence ne coûte rien (la liste est dans la config) ; rien ne part tant que personne ne
 frappe ; aucun RPC nouveau (un coup part par `use`, un sort par les RPC de la magie). Séance de 10 min à 1,5 coup / s
@@ -310,11 +361,18 @@ lecture du personnage) ; les dictionnaires des gestes du style de l'arme sont ch
   par le serveur (même personnage, à pied, sans contrôle dur de la magie). Parade : fenêtre ≤ 500 ms (format), 200 par
   défaut, 0,6 s sans parade après un raté, une seule place à la fois (pas de parade sous une garde ni pendant un coup) ;
   pas de côté : invulnérabilité ≤ 500 ms (250), 1,5 s entre deux départs ; garde : de face seulement, part arrêtée < 1,
-  aucune attaque garde levée (`guarding`), brisée par le compteur provisoire. Un geste défensif annulé garde son cycle.
+  aucune attaque garde levée (`guarding`), brisée quand l'endurance est vide (1.6.0). Un geste défensif annulé garde son
+  cycle.
   Bouclier relu en mémoire (numéro de pile accrochée) à chaque coup ; usure par `wear.apply`, qui relit la pile, hors
   de la chaîne. Non fermé : le cap déclaré par le client (OneSync) — la parade reste une affaire de **temps** tenue par
   le serveur, le blocage n'arrête qu'une part ; journal `vava_health_hits` (étape d'annulation, montant bloqué).
 
+- **Endurance (1.6.0)** : tenue par le serveur seul ; aucun RPC ni argument ne porte une valeur d'endurance (le client
+  n'affiche qu'une projection) ; refus `exhausted` en mémoire avant la réservation et tout export, puis revérifié et
+  dépensé au **dernier pas** de la vérification, sans rien qui cède la main ensuite (un coup bloqué pendant un crochet
+  qui cède la main est vu) ; dépense une fois, à l'acceptation ; coût d'un coup bloqué selon la technique **lue par le
+  serveur** et ce qui bloque au moment du coup ; faim et soif lues par le serveur (`vava_needs:get`, isolé), jamais par
+  le client ; jauge jamais envoyée à un autre que son porteur.
 - **Le serveur décide de chaque coup** : aucun RPC ne porte un résultat ; la frappe est jugée au relevé du serveur, sur
   les positions et le **cap qu'il lit** (`GetEntityCoords`, `GetEntityHeading` du ped), dans l'instance de l'attaquant
   (`core.net.playersNear`), avec des tolérances bornées au démarrage (≤ + 1 m, ≤ + 30°, ≤ + 1 m). `strike` revérifie la
@@ -369,19 +427,22 @@ lecture du personnage) ; les dictionnaires des gestes du style de l'arme sont ch
 | Commande | Effet |
 |---|---|
 | `/armes liste` | une ligne par arme (libellé, catégorie, type, coup, solidité, « modèle provisoire »), regroupées en deux messages de chat (sans `vava_chat` : notifications de 200 signes) |
-| `/armes voir <n°>` | arme en main (qualité, palier, solidité, coup de base → coup effectif à × 1,0, émoussée) et bouclier accroché (position, solidité) ; **journal** « Combat : armes consultées » |
+| `/armes voir <n°>` | arme en main (qualité, palier, solidité, coup de base → coup effectif à × 1,0, émoussée), bouclier accroché (position, solidité) et endurance (1.6.0 : « Endurance : 42,5 / 100, recharge 15 / s (ralentie par la faim ou la soif) », lecture seule : aucune commande ne la change) ; **journal** « Combat : armes consultées » |
 | `/armes user <n°> <points>` | baisse la solidité de l'arme en main (1 à 1 000 points ; jamais au-dessus), seuils prévenus comme une usure ; écriture refusée (arme partie, garde de l'artisanat) : message à part (`adminFailed`), rien au journal ; sinon **journal** « Combat : arme usée » (avant, après) — essais d'émoussage et de réparation |
 
 Console admise (`armes …`). Déclarée au registre `core:commands` (chapitre « Combat »), avec les trois touches du combat.
 
 ## API
 
-**RPC** `vava_combat:use(technique, cible)` → `true` (coup accepté, fenêtre programmée ; geste défensif : fenêtre
-ouverte ; aucun résultat : il arrive par `vava_combat:hit`, ou jamais), `false, code`, `false, code, attente` (ms :
-`busy`, `chain_limit`, `drawing`, `staggered`, `guard_broken`, `parry_cooldown`, `dodge_cooldown`) ou
+**RPC** `vava_combat:use(technique, cible)` → `true, valeur, reprise, pente` (coup accepté, fenêtre programmée ; geste
+défensif : fenêtre ouverte ; aucun résultat : il arrive par `vava_combat:hit`, ou jamais ; 1.6.0 : état de **sa**
+jauge d'endurance après la dépense — dixièmes 0 à 1 000, ms avant la reprise de la recharge 0 à 10 000, dixièmes par
+seconde 0 à 1 000 —, jamais un instant du serveur), `false, code`, `false, code, attente` (ms : `busy`, `chain_limit`,
+`drawing`, `staggered`, `guard_broken`, `parry_cooldown`, `dodge_cooldown`), `false, 'exhausted', attente, valeur,
+reprise, pente` (1.6.0 : coût plus grand que ce qui reste ; attente jusqu'à ce qu'il soit payable, 30 000 au plus) ou
 `false, 'refused', raison` (crochet). Codes : `not_ready`, `unknown_technique`, `not_attack` (type `garde`),
 `not_opener`, `busy`, `chain_limit`, `guarding` (garde levée : l'abaisser d'abord), `staggered`, `drawing`,
-`guard_broken`, `parry_cooldown`, `dodge_cooldown`, `no_character`, `no_weapon`, `no_style`, `not_in_style`, `downed`,
+`guard_broken`, `parry_cooldown`, `dodge_cooldown`, `exhausted`, `no_character`, `no_weapon`, `no_style`, `not_in_style`, `downed`,
 `vehicle`, `controlled`, `refused`, `error` ; au-delà du débit, `rate_limited` du core. Pour un geste défensif, la cible
 est ignorée.
 
@@ -423,6 +484,13 @@ chancellement oublié, défense oubliée), `vava_health:hit` (`after` : suites d
 `vava_health` (modificateurs redéclarés) ; client : `core:character:loaded`, `fieldChanged`, `unloaded` (cache de la
 main) ; `core:character:spawning`, `selection`, `unloaded` (boucle des mannequins).
 
+**Évènement** `vava_combat:stamina(valeur, reprise, pente)` (1.6.0, serveur → le seul porteur) : sa jauge a changé
+hors de sa demande (coup bloqué, remise à plein à la mise à terre) ; trois entiers bornés (`VavaCombat.ENDURANCE_*` de
+`shared/constants.lua`), relus par `endurance.read`, sinon ignorés.
+
+**Interne** (1.6.0) : `VavaCombat.stamina.block(cible, garde, poids, bouclier, maintenant, personnage)` (serveur
+seul) remplace `VavaCombat.defense.spend` de 1.3.0 : un coup bloqué, rend vrai si la garde cède.
+
 **Évènement** `vava_combat:dummy(n, attaquant[, issue, dixièmes|false])` (1.5.0, serveur → clients ciblés) : à
 l'attaquant, l'issue et, si `numbers.enabled` et `numbers.attacker`, le montant en dixièmes ou `false` pour un mot ; aux
 témoins, `n` et l'attaquant seuls (balancement). Le client relit chaque valeur (`n` d'un mannequin connu, joueur 1 à
@@ -438,17 +506,27 @@ la main ; personne ne se défend : une lecture de table, aucune native.
 - **T-113** (fait, 1.3.0) : Garde, Parade, Pas de côté en données ; fenêtres tenues par le serveur sans minuterie ;
   trois modificateurs ; suites dans le hook `vava_health:hit` after ; compteur provisoire de garde brisée ; touches R et
   Espace ; issues `parry`, `block`, `break`.
-- **T-114** (endurance) : remplacer `VavaCombat.defense.spend(src, action, ctx)` (`server/defense.lua`, seul point à
-  changer : `block` → `ok, broken` ; jauge à 0 → `broken = true`), supprimer `config.defense.guardBreak` et la table
-  `points` ; refus `exhausted` d'une parade ou d'un pas à l'admission (`defense.refusal`) ; dépenser `stamina` de chaque
-  technique (coup, coup bloqué, parade, pas) ; `parry_cooldown` et `dodge_cooldown` peuvent rester ; HUD : jauge,
-  `inCombatMode()` (et un export client `guarding()` s'il le faut : `VavaCombat.stance.guarding()`).
+- **T-114** (fait, 1.6.0) : endurance tenue par le serveur (`shared/stamina.lua`, `server/stamina.lua`), refus
+  `exhausted`, garde brisée quand elle est vide (compteur provisoire, `defense.spend`, `defense.addPoints`,
+  `config.defense.guardBreak` retirés), faim et soif par `vava_needs:get`, état au seul porteur, jauge de `vava_hud`
+  1.8.0 animée par la page. Aucun export `guarding()` (inutile : la jauge est menée par ce module).
+- **T-115** : coûts des techniques des autres armes ; une compétence pourrait alléger un coût ou hâter la recharge (un
+  facteur de plus dans `stamina.rateOf`, à décider alors) ; l'endurance n'entre pas dans l'XP.
+- **T-119** (endurance) : valeurs (20 / s, 1 s, coûts 12 / 9 / 11 / 25, Garde 25, parade 6, pas 20, bouclier × 0,67,
+  lourd × 2, paliers de faim et soif, seuils d'affichage) ; `parry_cooldown` et `dodge_cooldown` peuvent baisser
+  maintenant que l'endurance borne la défense ; deux Fendants d'un même attaquant ne brisent plus la garde (recharge
+  entre eux), à juger ; montrer aux autres un combattant essoufflé (geste, son).
+- **T-121** : curseur « Endurance » de la maquette `Combat.html` à relibeller selon le type (Garde : « coût d'un coup
+  bloqué » ; Parade, Pas de côté : « coût du geste ») ; aide : « Ce que coûte le geste ; à vide, on ne frappe plus, la
+  garde cède. »
+- **Plus tard** : course (pente négative en mode combat, à proposer), effet « Renforcer » de la magie (modificateur de
+  pente posé par un export à ajouter alors), réglage « Jauges toujours visibles » (`vava_pause` + `vava_hud`).
 - **T-115** (styles et progression) : `learn` (compétence, niveau) lu et contrôlé, jamais appliqué (la Parade demande
   le niveau 10) ; autres styles (`hache_une_main`, `masse_une_main`, `dague_dague`, `baton_baton`, et `epee_deux_mains`
   à décider), et leurs techniques défensives ; XP de défense par le hook `vava_combat:defended` sur une vraie cible ;
   `techniques()`.
 - **T-119** (réglages) : fenêtre de parade et sa préparation, invulnérabilité, délais, arcs protégés, parts bloquées des
-  fiches (épée 0,40 peut-être trop faible face à 4 coups), seuils du compteur, sensations à 30, 80 et 150 ms de ping
+  fiches (épée 0,40 peut-être trop faible face à 4 coups), sensations à 30, 80 et 150 ms de ping
   (aucune compensation de latence : le défenseur lent anticipe d'un aller de son ping).
 - **T-155** (chiffres des coups, fait en 1.4.0) : montant en 4e valeur de `vava_combat:hit` (dixièmes, ou `false`
   pour un mot) aux seuls participants désignés par `config.numbers` ; `dodge` et `absorb` à eux seuls, jamais aux
@@ -523,8 +601,12 @@ Les en-têtes des fichiers servis aux joueurs sont courts (relecture réseau R-2
 | `client/hands.lua` | tous | arme du royaume en main (jamais un bouclier) et son style ; prise en main : geste de dégainer, en garde après `draw.drawMs` ; arme rangée : geste de rengainer et `sheathing` pendant `draw.sheatheMs` ; main restaurée (chargement, redémarrage) : en garde d'emblée ; gestes du style chargés à l'avance, ceux de l'ancien style rendus ; geste ponctuel (dégainer, rengainer, chancellement, tressaillement) : dictionnaire rendu juste après le geste ; dictionnaire absent : rien n'est joué, une ligne de console par nom et par minute |
 | `client/keys.lua` | tous | une commande par action, liée par `RegisterKeyMapping` (souris par défaut) ; déclarées au registre `core:commands` par `server/commands.lua` (Codex) |
 | `client/targeting.lua` | tous | règles de `vava_magic/client/targeting.lua` : appui court → le joueur le plus proche du centre de l'écran (`lock.range`, `coneDeg`, en vue) ; nouvel appui : le suivant ; maintenu `holdMs` : relâché ; perdu hors de portée (+ `rangeMargin`), hors de vue `lostChecks` relevés de suite, mort, ou au sommeil du mode ; candidats faits à l'appui seulement |
-| `shared/defense.lua` | serveur | règles pures de la défense : fenêtre ouverte, garde abaissée (tenue minimale), attaquant de face, étiquettes, part bloquée, montant bloqué, délais de la parade ratée et du pas de côté, compteur provisoire de garde, poids d'un coup |
-| `server/defense.lua` | serveur | refus en mémoire (garde brisée, délais), cache de la garde, geste accepté, RPC `lower`, trois modificateurs (esquive, parade, blocage ; une lecture de table si personne ne se défend), décisions notées puis suites au hook `vava_health:hit` after (attaquant paré, compteur et garde brisée, usure différée, issue imposée, hook `defended`), `spend` (T-114) |
+| `shared/defense.lua` | serveur | règles pures de la défense : fenêtre ouverte, garde abaissée (tenue minimale), attaquant de face, étiquettes, part bloquée, montant bloqué, délais de la parade ratée et du pas de côté, poids d'un coup bloqué |
+| `server/defense.lua` | serveur | refus en mémoire (garde brisée, délais), cache de la garde, geste accepté, RPC `lower`, trois modificateurs (esquive, parade, blocage ; une lecture de table si personne ne se défend), décisions notées puis suites au hook `vava_health:hit` after (attaquant paré, coup bloqué payé par `stamina.block` et garde brisée, usure différée, issue imposée, hook `defended`) |
+| `shared/endurance.lua` | tous | 1.6.0 : niveau d'un état de la jauge à un instant, lecture bornée d'un état reçu, instant où elle est pleine (table `VavaCombat.endurance`) |
+| `shared/stamina.lua` | serveur | 1.6.0 : règles pures de l'endurance : coût d'une technique, dépense, coût et suite d'un coup bloqué, attente, part laissée par la faim et la soif, pente, changement de pente, état envoyé (table `VavaCombat.stamina`, jamais lue par un fichier client) |
+| `server/stamina.lua` | serveur | 1.6.0 : jauges en mémoire (sans minuterie), refus `exhausted`, préparation (faim et soif), prise au dernier pas, coup bloqué, état au seul porteur, remise à plein à la mise à terre, oubli, lecture du Conseil |
+| `client/endurance.lua` | tous | 1.6.0 : table `VavaCombat.gaugeView` : état reçu daté à l'arrivée, niveau projeté, médaillon de `vava_hud` (déclaré, mis à jour avec sa remontée, retiré en différé : un `SetTimeout` au plus), visibilité, prédiction du coût ; aucune boucle |
 | `client/defense.lua` | tous | table `VavaCombat.stance` : R (appui : parade ; maintenue : garde à la fin de la fenêtre de parade ; relâchée : `lower`), Espace (pas de côté, direction lue une fois) ; aucune boucle (`tick` appelé par la boucle du mode : garde demandée, sprint coupé) ; garde tombée sans `lower` au chancellement et à la garde brisée |
 | `client/attack.lua` | tous | technique choisie par `pick`, personnage tourné vers la cible verrouillée ou la caméra (`faceMaxDeg`), geste aussitôt, demande dans un thread ; refus ou transport en échec : geste coupé, texte (un par code et par `noticeMs`), attente du serveur respectée ; touche pressée trop tôt gardée (`bufferMs`) ; virage vers la cible pendant la préparation et la frappe ; chancellement : geste coupé, cycle gardé (comme au serveur) |
 | `client/mode.lua` | tous | patron de `vava_magic/client/controls.lua` : éveil par une touche du combat si l'arme a un style (sinon le texte, une fois par arme sortie) ; actif à pied, debout, pas à terre, pas ligoté, sans interface ni menu (relevé à `conditionsMs`) ; sommeil après `idleMs` sans coup ni appui sur le verrou, ou aussitôt que la main change ou le personnage est déchargé ; boucle par image seulement éveillée et active (contrôles coupés, anneau, verrou, touche gardée, virage) |
@@ -533,7 +615,7 @@ Les en-têtes des fichiers servis aux joueurs sont courts (relecture réseau R-2
 | `server/dummies.lua` | serveur | mannequins chargés, candidat d'un relevé (après les joueurs, instance lue seulement si un mannequin est près), coup d'arme à blanc (`vava_health:trial`), coup de sort (`dummyHit`), usure réduite, envois `vava_combat:dummy` (attaquant, témoins au plus un par 0,8 s), hook `trained`, `dummiesNear`, `dummies()` ; table `VavaCombat.dummies` |
 | `client/dummies.lua` | tous | table `VavaCombat.dummyProps` : liste indexée sous `pcall` (illisible : une ligne, aucun prop), props locaux streamés (patron de `vava_gathering/client/props.lua`), boucle lente seulement personnage apparu, modèle de repli, modèle qui ne se charge pas gardé sans prop jusqu'à la sortie de portée (une ligne par modèle),
  balancement (une boucle par image le temps du balancement, ≤ 0,9 s), éclats, chiffre et son chez l'attaquant ; tout retiré au déchargement, à la sélection et à l'arrêt |
-| `client/main.lua` | tous | notifications du serveur, exports client, démarrage des contrôles natifs, du suivi des boucliers et des mannequins |
+| `client/main.lua` | tous | notifications et état d'endurance du serveur, exports client, démarrage des contrôles natifs, du suivi des boucliers et des mannequins |
 
 ## Installation
 
@@ -566,6 +648,13 @@ module **refuse de démarrer** avec un message clair (« config_client.lua d'ava
 **Mise à jour vers 1.1.0 (T-132)** : les fiches des armes, le bouclier accroché, le placement des boucliers et les
 contrôles natifs ont quitté `config.lua` pour `config_client.lua`.
 
+**Mise à jour vers 1.6.0 (T-114)** : `config.lua` gagne `endurance` (et deux textes, `messages.inspectEndurance`,
+`enduranceSlowed`) et perd `defense.guardBreak` ; `config_client.lua` gagne `gauge` et le refus `exhausted`, et la
+Garde coûte 25 (au lieu de 8). Un `config.lua` modifié et gardé par l'installeur (le nouveau posé en `.nouveau`) fait
+**refuser le démarrage** (« config.lua : réglage `endurance` absent … ») : reportez vos changements depuis
+`config.lua.nouveau` ; `defense.guardBreak` resté en place ne gêne pas (une ligne de console). De même pour un
+`config_client.lua` gardé (« réglage `gauge` absent »). Jauge animée avec `vava_hud` ≥ 1.8.0.
+
 ## Tests
 
 - Hors jeu : `tests/spec/combat_weapons_spec.lua` (catalogue en deux parts, qualité, solidité, montant, usure, options,
@@ -584,9 +673,13 @@ contrôles natifs ont quitté `config.lua` pour `config_client.lua`.
   mannequin : après les joueurs, portée, angle, hauteur, instance, une fois par coup, Fendant, usure 1 sur 4, hook,
   envois et témoins au plus un par 0,8 s ; `dummyHit`, `dummiesNear`, `dummies()`), `combat_dummies_client_spec.lua`
   (props streamés à 60 / 70 m, cadence de la boucle, repli du modèle, déchargement, arrêt ; `vava_combat:dummy` relu,
-  chiffre chez l'attaquant seul, balancement qui s'arrête de lui-même).
+  chiffre chez l'attaquant seul, balancement qui s'arrête de lui-même), `combat_endurance_spec.lua` (1.6.0 : règles
+  pures de la jauge ; serveur réel : réponses de `use`, refus avant la réservation, prise au dernier pas, garde, bouclier,
+  Fendants, mise à terre, parade, pas de côté, borne de l'alternance pas / parades, faim et soif, `/armes voir`,
+  réseau ; bridge `NeedsValues`), `combat_endurance_client_spec.lua` (1.6.0 : état reçu, jauge du HUD, visibilité,
+  demandes retenues, aucune boucle).
 - En jeu : [docs/tests/combat.md](../../docs/tests/combat.md) § 2 (armes), § 3 (techniques), § 4 (défense), § 7
-  (chiffres des coups) et § 8 (mannequins).
+  (chiffres des coups), § 8 (mannequins) et § 9 (endurance).
 
 ## À vérifier en jeu
 
@@ -613,4 +706,7 @@ contrôles natifs ont quitté `config.lua` pour `config_client.lua`.
   place ; effet `core` / `ent_dst_wood_splinter` présent ; sens du balancement (il doit s'écarter de l'attaquant : signe
   de l'inclinaison selon l'ordre de rotation 2) ; chiffre à 1,9 m au-dessus du pied ; resmon près d'une cour ; un
   mannequin à 60-70 m ne clignote pas ([docs/tests/combat.md](../../docs/tests/combat.md) § 8).
-
+- Endurance (1.6.0) : médaillon à la droite des autres sans en décaler aucun, icône lisible à 720p et en 4K, ambre et
+  rouge lisibles sur le cuir ; remontée d'un seul mouvement régulier (transition CSS dans CEF) ; à 150 ms de ping, un
+  coup refusé alors que l'anneau montrait assez reste rare et se recale aussitôt ; `/vava_reseau` : aucun
+  `vava_combat:stamina` au repos ni chez un témoin ([docs/tests/combat.md](../../docs/tests/combat.md) § 9).
