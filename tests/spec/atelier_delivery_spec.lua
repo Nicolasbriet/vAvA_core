@@ -6,8 +6,8 @@ local helper = require('tests.helper')
 --   construction au démarrage dans l'ordre de vava_conseil_lua puis vava_conseil_web, `\r\n` ramené, fichiers Lua
 --   compilés sans être exécutés, empreinte, morceaux de 64 Ko ; un paquet qui ne se construit pas laisse le module
 --   démarrer et le RPC répond `unavailable` ; RPC `code` : personnage, Registre, droit relu à CHAQUE appel, description
---   ou morceau d'empreinte courante, budget de 3 paquets par heure glissante et par joueur, ligne de console une fois par
---   (joueur, empreinte), oubli au départ.
+--   ou morceau d'empreinte courante, budget par compte (seau rempli de 3 paquets par heure, gardé à la reconnexion,
+--   refus écrit en console une fois par minute), ligne de console d'envoi une fois par (compte, empreinte).
 
 local ROOT = (os.getenv('VAVA_ROOT') or '.') .. '/'
 local DIR = 'modules/vava_atelier/'
@@ -311,6 +311,20 @@ describe('vava_atelier paquet du Conseil (serveur)', function()
             now = now + 5 * HOUR_MS
             for _ = 1, 3 do fetchAll(7, info.fp, info.parts) end
             assert.same({ false, 'rate_limited' }, { delivery.rpc(7, info.fp, 1) })
+        end)
+
+        it('budget épuisé : une ligne de console par compte et par minute (contre-relecture C-5)', function()
+            for _ = 1, 3 do fetchAll(7, info.fp, info.parts) end
+            for _ = 1, 5 do assert.same({ false, 'rate_limited' }, { delivery.rpc(7, info.fp, 1) }) end
+            assert.equal(1, #logs.warn)
+            assert.truthy(logs.warn[1]:find('budget épuisé, joueur 7, compte 12 (3 paquets par heure)', 1, true),
+                logs.warn[1])
+            now = now + 59999
+            delivery.rpc(7, info.fp, 1)
+            assert.equal(1, #logs.warn)
+            now = now + 1
+            delivery.rpc(7, info.fp, 2)
+            assert.equal(2, #logs.warn)
         end)
 
         it('reconnexion (autre numéro de joueur, même compte) : budget gardé ; ligne de console une fois par '

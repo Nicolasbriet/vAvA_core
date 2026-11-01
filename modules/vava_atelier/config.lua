@@ -144,8 +144,8 @@ config.rateLimits = {
 }
 
 -- T-157 : code du Conseil livré à la demande (server/delivery.lua) ; la table `delivery` est ouverte par
--- config_client.lua (attentes du chargeur), complétée ici. Paquets entiers envoyés au plus à un même joueur par heure
--- glissante (1 à 20 ; au-delà : rate_limited).
+-- config_client.lua (attentes du chargeur), complétée ici. Budget par compte : seau rempli de N paquets entiers par
+-- heure, plein au départ, gardé à la reconnexion (1 à 20 ; au-delà : rate_limited, une ligne en console par minute).
 config.delivery.hourlyPackages = 3
 
 -- Textes vus par les membres (l'interface a les siens : web/js/strings.js), lus par le seul serveur. Ceux que lit le

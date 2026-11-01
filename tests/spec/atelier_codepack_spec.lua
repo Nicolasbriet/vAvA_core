@@ -88,6 +88,15 @@ describe('vava_atelier paquet du Conseil (pur)', function()
             assert.equal(61, pauses)   -- 15 626 blocs de 64 octets, une pause tous les 256
         end)
 
+        -- contre-relecture C-4 : valeurs de référence (hashlib.sha256) aux bords du remplissage
+        it('bords du remplissage : 55, 56, 64 et 119 octets de « a » (valeurs de référence)', function()
+            local sha = VavaAtelier.sha256
+            assert.equal('9f4390f8d30c2dd92ec9f095b65e2b9ae9b0a925a5258e241c9f1e910f734318', sha(string.rep('a', 55)))
+            assert.equal('b35439a4ac6f0948b6d6f9e3c6af0f5f590ce20f1bde7090ef7970686ec6738a', sha(string.rep('a', 56)))
+            assert.equal('ffe054fe7ae0cb6dc65c3af9b61d5209f439851db43d0ba5997337df154668eb', sha(string.rep('a', 64)))
+            assert.equal('31eba51c313a5c08226adf18d4a359cfdfd8d2e816b13f4af952f7ea6584dcfb', sha(string.rep('a', 119)))
+        end)
+
         it('bords de bloc (55, 56, 63, 64 octets) et accents : distincts et stables ; autre chose qu\'une chaîne : nil',
             function()
                 local seen = {}

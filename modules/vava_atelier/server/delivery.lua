@@ -49,9 +49,10 @@ local FORBIDDEN_FILES = { ['config.lua'] = true }
 
 -- paquet construit : { ready, fp, sha, bytes, parts, pieces, err } (le texte entier n'est pas gardé)
 local state = { ready = false, err = 'non construit' }
--- par compte : { allowance, at, logged } — octets que le compte peut encore recevoir (seau rempli de
+-- par compte : { allowance, at, logged, warned } — octets que le compte peut encore recevoir (seau rempli de
 -- hourlyPackages × taille du paquet par heure, plein au départ), dernière mise à jour, empreinte dont l'envoi est déjà
--- écrit en console. Gardé d'une connexion à l'autre (quelques octets par membre qui a téléchargé l'outil).
+-- écrit en console, dernier refus écrit en console. Gardé d'une connexion à l'autre (quelques octets par membre qui a
+-- téléchargé l'outil).
 local served = {}
 
 --- Entier écrit par groupes de trois chiffres (« 250 368 »).
@@ -215,7 +216,15 @@ function delivery.rpc(source, fp, part)
         mine.allowance = min(cap, mine.allowance + (now - mine.at) * cap / HOUR_MS)
         mine.at = now
     end
-    if #chunk > mine.allowance then return false, 'rate_limited' end
+    if #chunk > mine.allowance then
+        -- contre-relecture C-5 : un client qui insiste se voit en console, une ligne par compte et par intervalle
+        if not mine.warned or now - mine.warned >= cfg.limits.refusalLogMs then
+            mine.warned = now
+            log.warn('paquet du Conseil : budget épuisé, joueur %d, compte %s (%d paquets par heure)', source,
+                tostring(ctx.accountId), cfg.delivery.hourlyPackages)
+        end
+        return false, 'rate_limited'
+    end
     mine.allowance = mine.allowance - #chunk
     if part == 1 and mine.logged ~= state.fp then
         mine.logged = state.fp

@@ -295,10 +295,12 @@ directives du manifeste, `vava_conseil_lua` (ordre d'exécution) et `vava_consei
   bande passante et ne déplace aucune décision vers le client ; chaque RPC de l'Atelier revérifie comme avant. Le RPC
   `code` relit le personnage, le Registre et le droit d'ouvrir l'Atelier **à chaque appel** (description et chaque
   morceau), ne répond qu'à l'appelant, refuse une empreinte qui n'est plus celle du serveur (`stale`) et tient un budget
-  de 3 paquets par heure et par joueur (≈ 735 Ko), en plus du débit (12, puis 1 toutes les 5 s). Le client n'exécute que
+  par compte, seau rempli de 3 paquets par heure, gardé à la reconnexion (≈ 745 Ko d'avance au plus ; refus écrit en
+  console une fois par minute et par compte), en plus du débit (12, puis 1 toutes les 5 s). Le client n'exécute que
   le texte de la réponse de ce RPC ou de son propre stockage local, **après** l'avoir comparé à l'empreinte que le
   serveur vient d'annoncer dans cette séance : aucun évènement réseau, rappel de la page, export ou commande ne mène à
-  `load` ; mode `'t'` (jamais de code précompilé), environnement du paquet (`_G` jamais écrit). FNV-1a protège contre
+  `load` ; mode `'t'` (jamais de code précompilé), environnement du paquet (`_G` jamais écrit par une globale
+  oubliée ; une écriture explicite est refusée par l'audit). FNV-1a protège contre
   l'usure, la coupure et la version périmée ; la **SHA-256** annoncée par le serveur, recalculée sur le texte entier
   juste avant `load`, ferme le stockage local écrit par un autre serveur (S-1). Le propriétaire du disque, lui, exécute
   déjà ce qu'il veut chez lui, sans pouvoir de plus. `config.lua`, `server/…` et `bridge/…` ne peuvent entrer dans un
