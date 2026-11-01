@@ -1,19 +1,25 @@
 'use strict';
 /*
  * lib/delivery.js
- * Rôle : ce qui est livré aux joueurs et allégé de ses commentaires (T-154). D'après le manifeste de chaque ressource :
- *        le Lua des `shared_script(s)` et `client_script(s)`, celui du paquet du Conseil (`vava_conseil_lua`, T-157)
- *        et le `fxmanifest.lua` lui-même. Jamais : les réglages de l'exploitant (`config.lua`, `config_client.lua`,
- *        `config_conseil.lua`, `config/…`), le Lua du seul serveur, les `files`, le web. Le manifeste est
- *        lu comme par scripts/lib/manifeste.awk (recoupé à chaque vérification) ; une forme illisible laisse toute la
- *        ressource telle quelle. Chaque fichier n'est réécrit qu'après son propre contrôle (lib/luastrip.js).
+ * Rôle : ce qui est livré aux joueurs et allégé de ses commentaires. D'après le manifeste de chaque ressource :
+ *        - Lua (T-154) : celui des `shared_script(s)` et `client_script(s)`, celui du paquet du Conseil
+ *          (`vava_conseil_lua`, T-157) et le `fxmanifest.lua` lui-même. Jamais : les réglages de l'exploitant
+ *          (`config.lua`, `config_client.lua`, `config_conseil.lua`, `config/…`), le Lua du seul serveur, les `files`.
+ *        - Pages (T-160) : JavaScript, CSS et HTML des `files`, `file`, `ui_page`, `loadscreen` et du paquet du Conseil
+ *          (`vava_conseil_web`). Jamais : le réglage de page `config.js`, les `*.min.js` et `*.min.css`, le JavaScript
+ *          exécuté par FiveM (`client_script`), les SVG, JSON, polices et images, `web/dev/` (jamais au manifeste).
+ *        Le manifeste est lu comme par scripts/lib/manifeste.awk (recoupé à chaque vérification) ; une forme illisible
+ *        laisse toute la ressource telle quelle. Chaque fichier n'est réécrit qu'après son propre contrôle
+ *        (lib/luastrip.js, lib/webstrip.js ; pour le JavaScript, aussi la compilation par V8, jamais exécutée).
  *        Utilisé par l'installeur (copie téléchargée, avant les empreintes) et par scripts/livraison.js.
- * Dépendances : fs, path, ./luastrip.
+ * Dépendances : fs, path, vm (node), ./luastrip, ./webstrip.
  */
 
 const fs = require('fs');
 const path = require('path');
+const vm = require('vm');
 const luastrip = require('./luastrip');
+const webstrip = require('./webstrip');
 
 // directives lues dans un manifeste (celles de scripts/lib/manifeste.awk)
 const TRACKED_DIRECTIVES = ['files', 'file', 'ui_page', 'loadscreen', 'shared_script', 'shared_scripts', 'client_script',
@@ -29,6 +35,15 @@ const COUNCIL_SIDE = ['vava_conseil_lua', 'vava_conseil_web'];
 // 86 Ko)
 const MAX_BYTES = 1024 * 1024;
 const MANIFEST = 'fxmanifest.lua';
+
+// pages (T-160) : directives qui les servent telles quelles aux joueurs (ou au Conseil), sortes par extension (sans la
+// casse), réglages de page jamais allégés (nom de base, sans la casse), fichiers déjà minifiés gardés
+const PAGE_DIRECTIVES = ['files', 'file', 'ui_page', 'loadscreen', 'vava_conseil_web'];
+const PAGE_KINDS = Object.freeze({ '.js': 'js', '.css': 'css', '.html': 'html', '.htm': 'html' });
+const PAGE_SETTINGS = ['config.js'];
+const PAGE_MINIFIED = ['.min.js', '.min.css'];
+// JavaScript exécuté par FiveM : listé (recoupement), jamais allégé
+const SCRIPT_DIRECTIVES = ['shared_script', 'shared_scripts', 'client_script', 'client_scripts'];
 
 // réglages de l'exploitant : gardés à la mise à jour (« .nouveau » à côté), jamais allégés ; config_conseil.lua
 // (réglages du paquet du Conseil, T-157) en est un (relecture réseau R-5 de T-157)
@@ -278,6 +293,19 @@ function expand(root, pattern) {
 
 const isLua = (relative) => relative.toLowerCase().endsWith('.lua');
 
+/** Chaînes du manifeste d'une ressource ({ strings }) ; ou { reason } : absent, trop gros, forme illisible. */
+function readManifest(resourceDir) {
+  const manifest = path.join(resourceDir, MANIFEST);
+  let text;
+  try {
+    if (fs.statSync(manifest).size > MAX_BYTES) return { reason: 'manifeste trop gros' };
+    text = fs.readFileSync(manifest).toString('latin1');
+  } catch (error) {
+    return { reason: 'manifeste absent' };
+  }
+  return manifestStrings(text);
+}
+
 /**
  * Lua servi par une ressource, d'après son manifeste.
  * `state` : 'lean' (allégé), 'kept-config' (réglage de l'exploitant), 'kept-files' (donnée : files, file, ui_page,
@@ -286,15 +314,7 @@ const isLua = (relative) => relative.toLowerCase().endsWith('.lua');
  * @returns {{ ok: true, files: { path: string, state: string, council: boolean }[] } | { ok: false, reason: string }}
  */
 function servedLua(resourceDir) {
-  const manifest = path.join(resourceDir, MANIFEST);
-  let text;
-  try {
-    if (fs.statSync(manifest).size > MAX_BYTES) return { ok: false, reason: 'manifeste trop gros' };
-    text = fs.readFileSync(manifest).toString('latin1');
-  } catch (error) {
-    return { ok: false, reason: 'manifeste absent' };
-  }
-  const read = manifestStrings(text);
+  const read = readManifest(resourceDir);
   if (!read.strings) return { ok: false, reason: read.reason };
   const files = [{ path: MANIFEST, state: 'lean', council: false }];
   const index = new Map([[`0:${MANIFEST}`, files[0]]]);
@@ -322,6 +342,63 @@ function servedLua(resourceDir) {
         continue;
       }
       const entry = { path: relative, state, council };
+      index.set(key, entry);
+      files.push(entry);
+    }
+  }
+  return { ok: true, files };
+}
+
+/** Sorte d'une page d'après son extension (sans la casse) : 'js', 'css', 'html', ou null. */
+function pageKind(relative) {
+  const extension = path.posix.extname(relative.toLowerCase());
+  return Object.prototype.hasOwnProperty.call(PAGE_KINDS, extension) ? PAGE_KINDS[extension] : null;
+}
+
+/** État d'une page servie telle quelle (files…) : réglage, déjà minifiée, ou allégée. */
+function pageState(relative) {
+  const base = path.posix.basename(relative.toLowerCase());
+  if (PAGE_SETTINGS.includes(base)) return 'kept-config';
+  if (PAGE_MINIFIED.some((suffix) => base.endsWith(suffix))) return 'kept-min';
+  return 'lean';
+}
+
+/**
+ * Pages servies par une ressource, d'après son manifeste (T-160).
+ * kind : 'js' | 'css' | 'html' ; state : 'lean' | 'kept-config' | 'kept-min' | 'kept-script' ;
+ * council : fichier du paquet du Conseil (vava_conseil_web).
+ * @param {string} resourceDir
+ * @returns {{ ok: true, files: { path: string, kind: string, state: string, council: boolean }[] } | { ok: false, reason: string }}
+ */
+function servedPages(resourceDir) {
+  const read = readManifest(resourceDir);
+  if (!read.strings) return { ok: false, reason: read.reason };
+  const files = [];
+  const index = new Map();
+  const RANK = { 'kept-script': 0, 'kept-config': 1, 'kept-min': 1, lean: 2 };
+  for (const { directive, value } of read.strings) {
+    const served = PAGE_DIRECTIVES.includes(directive);
+    if (!served && !SCRIPT_DIRECTIVES.includes(directive)) continue;   // server_script(s), vava_conseil_lua
+    const pattern = normalize(value);
+    if (!pattern) continue;
+    let matched;
+    try {
+      matched = expand(resourceDir, pattern);
+    } catch (error) {
+      return { ok: false, reason: `forme illisible (motif ${pattern})` };
+    }
+    const council = COUNCIL_SIDE.includes(directive);
+    for (const relative of matched) {
+      const kind = pageKind(relative);
+      if (!kind || (!served && kind !== 'js')) continue;
+      const state = served ? pageState(relative) : 'kept-script';
+      const key = `${council ? 1 : 0}:${relative}`;
+      const known = index.get(key);
+      if (known) {
+        if (RANK[state] > RANK[known.state]) known.state = state;
+        continue;
+      }
+      const entry = { path: relative, kind, state, council };
       index.set(key, entry);
       files.push(entry);
     }
@@ -365,49 +442,158 @@ function leanText(buffer) {
  * @returns {{ ok: true, before: number, after: number } | { ok: false, line: number, reason: string }}
  */
 function leanFile(file) {
-  let buffer;
-  try {
-    if (fs.statSync(file).size > MAX_BYTES) return { ok: false, line: 0, reason: 'fichier trop gros' };
-    buffer = fs.readFileSync(file);
-  } catch (error) {
-    return { ok: false, line: 0, reason: 'fichier illisible' };
-  }
-  const result = leanText(buffer);
+  const read = readBounded(file);
+  if (!read.buffer) return read;
+  const result = leanText(read.buffer);
   if (!result.ok) return result;
-  if (result.changed) {
-    // écrit à côté puis renommé : un arrêt brutal ne laisse jamais un fichier à moitié écrit (S-4) ; une erreur
-    // d'écriture est levée (l'opération échoue, l'original reste)
-    const temporary = `${file}.tmp`;
-    try {
-      fs.writeFileSync(temporary, result.buffer);
-      fs.renameSync(temporary, file);
-    } catch (error) {
-      try {
-        if (fs.lstatSync(temporary).isFile()) fs.rmSync(temporary, { force: true });
-      } catch (ignored) {
-        // rien à retirer
-      }
-      throw error;
-    }
-  }
+  if (result.changed) writeAtomic(file, result.buffer);
   return { ok: true, before: result.before, after: result.after };
 }
 
 /**
- * Allège le Lua livré de chaque ressource (dossiers d'une copie, jamais le dépôt) : le manifeste en dernier.
- * @param {{ name: string, dir: string }[]} resources
- * @returns {{ resources: number, files: number, before: number, after: number,
- *   refused: { file: string, line: number, reason: string }[], skipped: { resource: string, reason: string }[] }}
+ * Écrit à côté puis renomme : un arrêt brutal ne laisse jamais un fichier à moitié écrit (S-4) ; une erreur d'écriture
+ * est levée (l'opération échoue, l'original reste), le temporaire retiré.
  */
-function leanResources(resources) {
-  const summary = { resources: 0, files: 0, before: 0, after: 0, refused: [], skipped: [] };
+function writeAtomic(file, buffer) {
+  const temporary = `${file}.tmp`;
+  try {
+    fs.writeFileSync(temporary, buffer);
+    fs.renameSync(temporary, file);
+  } catch (error) {
+    try {
+      if (fs.lstatSync(temporary).isFile()) fs.rmSync(temporary, { force: true });
+    } catch (ignored) {
+      // rien à retirer
+    }
+    throw error;
+  }
+}
+
+/** Fichier lu en octets, borné à MAX_BYTES : { buffer } ; ou { ok: false, line: 0, reason }. */
+function readBounded(file) {
+  try {
+    if (fs.statSync(file).size > MAX_BYTES) return { ok: false, line: 0, reason: 'fichier trop gros' };
+    return { buffer: fs.readFileSync(file) };
+  } catch (error) {
+    return { ok: false, line: 0, reason: 'fichier illisible' };
+  }
+}
+
+// Pages (T-160) -------------------------------------------------------------------------------------------------------
+
+/** Ligne d'une erreur de compilation de V8 (`nom:ligne` en tête de sa pile), ou 0. */
+function errorLine(error, name) {
+  const head = String((error && error.stack) || '').split('\n')[0];
+  const prefix = `${name}:`;
+  if (!head.startsWith(prefix)) return 0;
+  const value = Number.parseInt(head.slice(prefix.length), 10);
+  return Number.isInteger(value) && value > 0 ? value : 0;
+}
+
+/**
+ * Le texte se compile-t-il en script classique ? Compilé par V8 (`vm.Script`), **jamais exécuté** (ni contexte, ni
+ * import dynamique). Une erreur de pile d'un texte piégé est un refus comme un autre.
+ * @param {string} text  texte décodé en UTF-8
+ * @param {string} name  nom donné à V8 (messages)
+ * @returns {{ ok: true } | { ok: false, line: number }}
+ */
+function engineCompiles(text, name) {
+  try {
+    new vm.Script(text, { filename: name });   // eslint-disable-line no-new
+    return { ok: true };
+  } catch (error) {
+    return { ok: false, line: errorLine(error, name) };
+  }
+}
+
+/**
+ * Allège une page (octets) : refusée au-delà de MAX_BYTES, si le lexeur refuse ou si son contrôle échoue ; pour le
+ * JavaScript, refusée aussi si l'original ou l'allégé ne se compile pas (V8, sans exécution).
+ * @param {Buffer} buffer
+ * @param {'js'|'css'|'html'} kind
+ * @param {string} name  chemin donné à V8 (messages)
+ * @returns {{ ok: true, buffer: Buffer, changed: boolean, before: number, after: number } | { ok: false, line: number, reason: string }}
+ */
+function leanPageText(buffer, kind, name) {
+  if (buffer.length > MAX_BYTES) return { ok: false, line: 0, reason: 'fichier trop gros' };
+  const text = buffer.toString('latin1');
+  const result = webstrip.strip(text, kind);
+  if (!result.ok) return { ok: false, line: result.line, reason: result.reason };
+  const changed = result.text !== text;
+  const out = changed ? Buffer.from(result.text, 'latin1') : buffer;
+  if (kind === 'js') {
+    const original = engineCompiles(buffer.toString('utf8'), name);
+    if (!original.ok) return { ok: false, line: original.line, reason: 'original non compilable' };
+    if (changed) {
+      const lean = engineCompiles(out.toString('utf8'), name);
+      if (!lean.ok) return { ok: false, line: lean.line, reason: 'contrôle du moteur après allègement' };
+    }
+  }
+  return { ok: true, buffer: out, changed, before: buffer.length, after: out.length };
+}
+
+/**
+ * Allège une page sur place : refusée au-delà de MAX_BYTES ; réécrite seulement si le texte change (écriture atomique ;
+ * une erreur d'écriture est levée).
+ * @returns {{ ok: true, before: number, after: number } | { ok: false, line: number, reason: string }}
+ */
+function leanPage(file, kind) {
+  const read = readBounded(file);
+  if (!read.buffer) return read;
+  const result = leanPageText(read.buffer, kind, path.basename(file));
+  if (!result.ok) return result;
+  if (result.changed) writeAtomic(file, result.buffer);
+  return { ok: true, before: result.before, after: result.after };
+}
+
+/**
+ * Allège ce qui est livré par chaque ressource (dossiers d'une copie, jamais le dépôt) : ses pages (`web`, T-160), puis
+ * son Lua (`lua`, T-154), le manifeste en dernier. `options` absent : le Lua seul, comme T-154 (ses appelants et ses
+ * essais inchangés) ; donné : `lua` et `web` vrais sauf `false`. Résumé du Lua inchangé ; celui des pages dans `pages`.
+ * Une ressource au manifeste illisible est laissée telle quelle (une entrée `skipped`, pour les deux).
+ * @param {{ name: string, dir: string }[]} resources
+ * @param {{ lua?: boolean, web?: boolean }} [options]
+ * @returns {{ resources: number, files: number, before: number, after: number,
+ *   refused: { file: string, line: number, reason: string }[], skipped: { resource: string, reason: string }[],
+ *   pages: { files: number, before: number, after: number, refused: { file: string, line: number, reason: string }[] } }}
+ */
+function leanResources(resources, options) {
+  const lua = options === undefined || options.lua !== false;
+  const web = options !== undefined && options.web !== false;
+  const pages = { files: 0, before: 0, after: 0, refused: [] };
+  const summary = { resources: 0, files: 0, before: 0, after: 0, refused: [], skipped: [], pages };
   for (const resource of resources) {
-    const served = servedLua(resource.dir);
-    if (!served.ok) {
-      summary.skipped.push({ resource: resource.name, reason: served.reason });
+    const served = lua ? servedLua(resource.dir) : null;
+    const page = web ? servedPages(resource.dir) : null;
+    const unreadable = [served, page].find((read) => read && !read.ok);
+    if (unreadable) {
+      summary.skipped.push({ resource: resource.name, reason: unreadable.reason });
       continue;
     }
     summary.resources += 1;
+    if (page) {
+      // une page servie aux joueurs et au Conseil n'est allégée qu'une fois
+      const seen = new Set();
+      for (const entry of page.files) {
+        if (entry.state !== 'lean' || seen.has(entry.path)) continue;
+        seen.add(entry.path);
+        const file = path.join(resource.dir, entry.path);
+        const name = `${resource.name}/${entry.path}`;
+        if (!inside(resource.dir, file)) {
+          pages.refused.push({ file: name, line: 0, reason: 'lien ou chemin hors de la ressource' });
+          continue;
+        }
+        const result = leanPage(file, entry.kind);
+        if (!result.ok) {
+          pages.refused.push({ file: name, line: result.line, reason: result.reason });
+          continue;
+        }
+        pages.files += 1;
+        pages.before += result.before;
+        pages.after += result.after;
+      }
+    }
+    if (!served) continue;
     const lean = [...new Set(served.files.filter((f) => f.state === 'lean').map((f) => f.path))];
     lean.push(...lean.splice(lean.indexOf(MANIFEST), 1));
     for (const relative of lean) {
@@ -432,4 +618,5 @@ function leanResources(resources) {
 module.exports = {
   TRACKED_DIRECTIVES, LEAN_DIRECTIVES, COUNCIL_DIRECTIVES, MAX_BYTES, userOwned, normalize, manifestStrings, expand,
   servedLua, leanText, leanFile, leanResources,
+  PAGE_DIRECTIVES, PAGE_KINDS, PAGE_SETTINGS, pageKind, servedPages, engineCompiles, leanPageText, leanPage,
 };

@@ -14,7 +14,7 @@ const HOME = path.resolve(process.env.CHANCELLERIE_HOME || path.join(__dirname, 
 const DATA = path.join(HOME, 'data');
 const FILE = path.join(DATA, 'config.json');
 const GUESS_LEVELS = 4;
-const VERSION = '1.9.0';
+const VERSION = '1.10.0';
 
 const DEFAULTS = Object.freeze({
   http: { host: '127.0.0.1', port: 40120, secureCookies: false },
@@ -44,10 +44,11 @@ const DEFAULTS = Object.freeze({
   backups: { dumpPath: '', keep: 14 },
   // Installation et mises à jour de vAvA : dépôt GitHub, branche suivie (channel « commits ») ou dernière release
   // (« releases ») ; vérification à intervalle ; mise à jour appliquée au redémarrage planifié si demandé ; Lua servi
-  // aux joueurs allégé de ses commentaires à l'installation et aux mises à jour (T-154 ; false : livré tel quel).
+  // aux joueurs allégé de ses commentaires à l'installation et aux mises à jour (T-154 ; false : livré tel quel) ;
+  // pages servies (JS, CSS, HTML) allégées de même, indépendamment (T-160 ; false : livrées telles quelles).
   updates: {
     repo: 'Nicolasbriet/vAvA_core', branch: 'main', channel: 'commits', autoCheck: true, checkEveryMin: 60, applyAtRestart: false,
-    leanLua: true,
+    leanLua: true, leanWeb: true,
     api: 'https://api.github.com', codeload: 'https://codeload.github.com',
   },
   // Bot Discord : jeton (secret, jamais renvoyé au navigateur), serveur Discord, salons (statut, annonces, staff),

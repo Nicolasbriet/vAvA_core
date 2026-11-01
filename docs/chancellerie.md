@@ -308,8 +308,9 @@ téléchargement d'un joueur, ≈ 190 Ko compressés). Le dépôt, lui, reste co
 - **Journal** : « Lua servi aux joueurs allégé de ses commentaires : N fichiers, X → Y Ko. » ; le résumé de l'opération
   (historique des mises à jour) se termine par « Lua allégé : N fichiers, R refusés ».
 - **Erreur** : si un fichier ne peut pas être réécrit (disque plein, droits), l'installation ou la mise à jour échoue
-  aussitôt, avant que rien ne soit écrit sur le serveur (« allègement du Lua livré interrompu … ; rien n'a été changé
-  sur le serveur ») ; chaque fichier est écrit à côté puis renommé, jamais à moitié.
+  aussitôt, avant que rien ne soit écrit sur le serveur (« allègement des fichiers livrés interrompu … ; rien n'a été
+  changé sur le serveur » ; « … du Lua livré … » avant 1.10.0) ; chaque fichier est écrit à côté puis renommé, jamais à
+  moitié.
 - **Empreintes** : celles des fichiers allégés, tels qu'ils sont sur le disque. Une version qui ne retouche que des
   commentaires d'un fichier livré sans changer son nombre de lignes donne le même fichier livré ; mais la version du
   manifeste, qui monte à chaque changement d'un module, fait de toute façon retélécharger le paquet de la ressource :
@@ -329,6 +330,42 @@ téléchargement d'un joueur, ≈ 190 Ko compressés). Le dépôt, lui, reste co
 - **Sans la Chancellerie** : `node scripts/livraison.js --sortie <dossier>` depuis une copie du dépôt produit la même
   copie allégée (`[vava]`, `[vava-dev]`), à copier dans `resources/`. Le dossier doit être neuf ou vide, hors du dépôt
   et de toute copie git.
+
+### Pages livrées sans commentaires (1.10.0)
+
+Même chose pour les pages des interfaces, au même moment (copie téléchargée allégée **avant** la comparaison) : les
+scripts, feuilles de style et pages HTML que télécharge chaque joueur perdent leurs commentaires (≈ 146 Ko de moins au
+premier téléchargement d'un joueur, ≈ 71 Ko compressés, mesuré le 2 novembre 2026 ; ≈ 8 Ko de moins par membre dans le
+paquet du Conseil). Le dépôt, lui, reste commenté.
+
+- **Allégés** : les fichiers `.js`, `.css`, `.html` (et `.htm`) désignés par `files`, `file`, `ui_page`, `loadscreen` et
+  `vava_conseil_web` (page de l'Atelier, paquet du Conseil) de chaque manifeste. JavaScript et CSS perdent leurs
+  commentaires et leurs blancs de fin de ligne ; HTML ses seuls commentaires placés entre deux blancs (aucun blanc
+  retiré, rien dans `<pre>`, `<script>`, `<style>`, `<textarea>`, `<title>`, ni dans un attribut).
+- **Jamais touchés** : le réglage de l'écran de chargement (`web/js/config.js` : ses commentaires sont son mode
+  d'emploi), les fichiers déjà minifiés (`*.min.js`, `*.min.css`), les images (SVG compris), polices et JSON, le
+  JavaScript exécuté par FiveM (`client_script`), `web/dev/` (jamais livré), les commentaires de licence et les
+  directives (`/*!`, `//#`, `//@`, `/*#`, `/*@`).
+- **Numéros de ligne gardés** : chaque fin de ligne reste à sa place ; une erreur `app.js:123` dans la console d'une
+  interface (`nui_devtools`) désigne la même ligne que le dépôt au commit installé (seules les colonnes peuvent bouger
+  sur une ligne où un commentaire précédait du code). Chaque page est contrôlée après allègement (même suite de
+  lexèmes, chacun à sa ligne) et, pour le JavaScript, l'original et l'allégé sont **compilés par le moteur** (V8, sans
+  rien exécuter). Ce qui ne se tranche pas sûrement (une barre `/` après `}`, un caractère non ASCII hors d'une chaîne,
+  `<!--` dans un `<script>`…) laisse la page telle quelle, nommée au journal. Le dépôt prouve l'allègement de chaque
+  page par un second lecteur indépendant, et relance les essais des pages sur la copie allégée, à chaque vérification.
+- **Journal** : « Pages servies aux joueurs allégées de leurs commentaires : N fichiers, X → Y Ko. », puis « Page
+  laissée avec ses commentaires (ligne … : …) : vava_x/web/js/y.js » pour chaque page refusée (dix au plus) ; le résumé
+  de l'opération ajoute « pages allégées : N fichiers, R refusées ». Aucune ligne s'il n'y a aucune page.
+- **Première mise à jour allégée** : celle qui apporte la Chancellerie 1.10.0 est préparée par l'ancienne ; c'est la
+  **suivante** qui allège, le Lua (1.9.0) et les pages ensemble : chaque joueur qui revient retélécharge **une** fois le
+  paquet de chaque ressource (≈ 3,6 Mo bruts, ≈ 2,3 Mo compressés au 2 novembre 2026), pas deux. Une page modifiée sur
+  place est remplacée et la vôtre gardée à côté (`.local`) ; `web/js/config.js` ne bouge pas.
+- **Couper l'allègement des pages** : `updates.leanWeb` à `false` dans `data/config.json`, puis relancer la
+  Chancellerie ; à la mise à jour suivante, les pages sont reposées avec leurs commentaires (« Allègement des pages
+  livrées désactivé (updates.leanWeb) … ») ; le Lua reste allégé si `updates.leanLua` est vrai (deux interrupteurs
+  indépendants). Basculer la clé fait retélécharger une fois le paquet des 20 ressources à pages.
+- **Sans la Chancellerie** : `node scripts/livraison.js --sortie <dossier>` allège aussi les pages (seconde ligne de
+  bilan « Pages : … »).
 
 ## Comptes
 
@@ -516,7 +553,7 @@ Pour les comptes qui ont un rang du Conseil, quand le serveur de jeu tourne avec
 | `lib/routes-ops.js` | performances, ressources, server.cfg brut, sauvegardes, planification |
 | `lib/download.js` · `jobs.js` | téléchargements, extraction (tar de la machine), opération longue en cours |
 | `lib/installer.js` · `updates.js` · `routes-updates.js` | installation, fusion des mises à jour, contrôle et retour arrière, mise à jour de la Chancellerie |
-| `lib/delivery.js` · `luastrip.js` | Lua servi aux joueurs allégé de ses commentaires, lignes gardées (choix des fichiers d'après les manifestes, lexeur Lua 5.4 contrôlé) |
+| `lib/delivery.js` · `luastrip.js` · `webstrip.js` | Lua et pages servis aux joueurs allégés de leurs commentaires, lignes gardées (choix des fichiers d'après les manifestes, lexeur Lua 5.4 et lexeurs JavaScript, CSS, HTML contrôlés ; JavaScript compilé par V8 sans être exécuté) |
 | `lib/bridge.js` · `camera.js` · `routes-game.js` | pont du serveur de jeu, caméras, royaume |
 | `lib/routes-accounts.js` | comptes du panneau |
 | `web/` | l'interface |
@@ -546,6 +583,7 @@ Réglages de `data/config.json` (créé au premier lancement) :
 | `updates.autoCheck` / `checkEveryMin` | `true` / `60` | vérification à intervalle |
 | `updates.applyAtRestart` | `false` | appliquer la mise à jour au redémarrage planifié |
 | `updates.leanLua` | `true` | alléger de ses commentaires le Lua servi aux joueurs, à l'installation et aux mises à jour (sans page : à la main, effet à la prochaine ; basculer fait retélécharger une fois les 33 paquets) |
+| `updates.leanWeb` | `true` | alléger de leurs commentaires les pages servies aux joueurs (JS, CSS, HTML), indépendamment de `leanLua` (sans page : à la main, effet à la prochaine installation ou mise à jour ; basculer fait retélécharger une fois les 20 paquets à pages) |
 | `discord.*` | désactivé | bot Discord : jeton, serveur, salons, liens, liste blanche (réglés depuis la page Discord) |
 
 `data/install.json` retient ce qui est installé (version, empreinte de chaque fichier) : c'est lui qui permet de
