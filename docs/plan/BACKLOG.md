@@ -1215,7 +1215,7 @@ faire tout le système de combat ») : la porte T-119 reste à passer en jeu.
   par le crochet `vava_combat:using` ; XP de défense par le hook `vava_combat:defended`.
 
 ### T-155 — Chiffres des coups (dégâts affichés)
-- Agents : vava-architecte → vava-dev-lua + vava-dev-nui (cette tâche autorise à toucher `vava_hud`, `vava_pause`, `vava_magic`) · Dépend de : T-112 (après T-113, même module) · Statut : en cours
+- Agents : vava-architecte → vava-dev-lua + vava-dev-nui (cette tâche autorise à toucher `vava_hud`, `vava_pause`, `vava_magic`) · Dépend de : T-112 (après T-113, même module) · Statut : en cours (fait ; relectures sécurité, réseau et lore à faire)
 - Demande du porteur du projet (31 octobre 2026), « comme les MMO » : le montant de chaque coup s'affiche au-dessus de
   la cible, le temps d'un souffle (chiffre qui monte et s'efface) ; issues sans dégâts écrites en mots (« Paré »,
   « Bloqué », « Esquivé », « Absorbé ») ; coup qui met à terre ou fait chanceler distingué. Valable pour les coups
@@ -1225,6 +1225,14 @@ faire tout le système de combat ») : la porte T-119 reste à passer en jeu.
   réponse de `use`) ; quelques octets de plus, rien à chaque image hors du temps d'affichage.
 - Réglage du joueur pour les masquer (Réglages de la bannière `vava_pause`, stockage local) et réglage du serveur
   (activé, qui voit quoi) ; dessin sans NUI à chaque image ou par NUI avec envois des seuls changements (spec).
+- Fait le 1er novembre 2026 (branche `agents/T-155`, spec `docs/plan/specs/T-155.md`, rapport
+  `docs/plan/rapports/T-155.md`) : `vava_hud` 1.7.0 (export client `hitText`, chiffres posés sur la page, suivis toutes
+  les 100 ms tant qu'ils vivent, rien au repos ; réglage `combat.numbers` lu chez la bannière), `vava_pause` 1.1.0
+  (réglage « Chiffres des coups » : Donnés et reçus, Donnés seulement, Aucun), `vava_combat` 1.4.0 (montant en 4e
+  valeur de `vava_combat:hit` aux seuls attaquant et cible, `false` pour un mot ; esquivé et absorbé à eux seuls,
+  jamais aux témoins ; `config.numbers`), `vava_magic` 2.13.0 (montant dans `vava_magic:hit` pour la victime, morsures,
+  esquives et absorbés compris ; `vava_magic:dealt` au lanceur, un par tour du serveur ; `config.numbers`). Procédures
+  `combat` § 7 et `magie` § 21. Relectures sécurité, réseau et lore à faire.
 
 ### T-156 — Mannequin d'entraînement
 - Agents : vava-architecte → vava-dev-lua · Dépend de : T-112 (après T-113, même module) ; T-102 pour le placement
@@ -1238,6 +1246,9 @@ faire tout le système de combat ») : la porte T-119 reste à passer en jeu.
   T-115).
 - Mannequins posés en config (coordonnées `-- PLACEHOLDER`) en v1, puis définition de l'Atelier (outil de placement de
   T-102) ; props créés à portée seulement ; état transmis aux seuls proches.
+- Note de T-155 : `exports.vava_hud:hitText('dealt', { x =, y =, z = }, issue, dixièmes)` accepte une ancre fixe (point
+  du mannequin, |x|, |y| ≤ 50 000, |z| ≤ 5 000) ; le mannequin envoie son montant à l'attaquant seul, par son propre
+  message ; `stagger` y sert de « comme si ».
 
 ### T-116 — La magie sur la chaîne de dégâts
 - Agent : vava-dev-lua · Dépend de : T-110 · Statut : à tester en jeu (relu sécurité et réseau, contre-relecture

@@ -6,7 +6,8 @@ déconnexions, redémarrage et resmon ; la section 18 éprouve les blessures por
 `vava_health` 1.3.0 (T-116 : mêmes dégâts, boucliers et résistances, combats entre joueurs coupés, lanceur à terre,
 incantation brisée par un coup, `vava_health` arrêté) ; la section 19, les mains vides pour incanter (T-140) ; la
 section 20, la magie et le mode combat (2.12.0, T-149 : silence arme du royaume en main, rengainement, contrôles durs
-qui empêchent de frapper, membre du Conseil invulnérable épargné des effets sans dégâts). Le module n'a encore jamais été joué : chaque écart compte, même petit. Comptez
+qui empêchent de frapper, membre du Conseil invulnérable épargné des effets sans dégâts) ; la section 21, les
+chiffres des sorts (2.13.0, T-155). Le module n'a encore jamais été joué : chaque écart compte, même petit. Comptez
 trois heures seul et une heure et demie à plusieurs ; les tests à deux sont marqués **(2 joueurs)**, ceux qui
 demandent un témoin ou un voisin **(3 joueurs)**.
 
@@ -712,3 +713,34 @@ Ce qui est prouvé hors jeu (`tests/spec/magic_combat_mode_spec.lua`, `magic_cha
 `magic_hands_spec.lua`) : règles des mots et du verrou, refus `sheathing` du serveur, export `hardControl` (échéance
 comprise) lu par le bridge de `vava_combat`, une lecture de `isInvulnerable` par effet (Vague : une par cible ; sol
 mouillé, brume, boue : une par pose, jamais à chaque vérification), vava_admin absent ou en erreur.
+
+## 21. Chiffres des sorts (2.13.0, T-155)
+
+Le lanceur voit en laiton ce que ses sorts infligent, la victime en rouge ce qu'elle reçoit ; morsures de brûlure et
+zones qui durent en petits chiffres. Le lanceur reçoit **un** message `vava_magic:dealt` par tour du serveur où il
+touche quelqu'un. Préparation : 0 (A mage avec Boule de feu niveau 4 au moins, Nova ardente, Mur de flammes ; `/magie
+tous`), `vava_hud` 1.7.0, `vava_example_combat` (`/bouclier`), B porteur d'une Épée courte ; un troisième joueur C.
+Réglage « Chiffres des coups » à « Donnés et reçus » chez tous. Entre deux tests : `/magie mana`, `/magie recharges`.
+
+| # | Faire | Attendu |
+|---|---|---|
+| 1 | **(2 joueurs)** A Boule de feu sur B. | `vava_magic` v2.13.0 prêt. Chez A : chiffre de laiton sur B ; chez B : chiffre rouge et sa réaction de feu. |
+| 2 | **(3 joueurs)** Boule de feu niveau 3 sur B, C à côté (éclats). | Chez A : deux chiffres (B, C), arrivés ensemble ; `/vava_reseau joueur <A>` : **un** `vava_magic:dealt` pour l'impact. |
+| 3 | **(2 joueurs)** Boule de feu niveau 4 (brûlure). | Puis des petits chiffres, un par seconde, chez A et chez B. |
+| 4 | **(3 joueurs)** Nova ardente au milieu de B et C. | Chez A : deux chiffres dans un même `vava_magic:dealt`. |
+| 5 | **(2 joueurs)** Mur de flammes, B dedans 3 s. | Petits chiffres réguliers chez les deux (un par passe, 500 ms). |
+| 6 | **(2 joueurs)** B épée en main fait un pas de côté devant la Boule de feu. | « Esquivé » chez A et chez B. |
+| 7 | **(2 joueurs)** `/bouclier 100` sur B ; A Boule de feu. | « Absorbé » chez les deux. |
+| 8 | **(2 joueurs)** B dans une zone de paix ; A tire. | Aucun chiffre, aucun message de chiffre (`/vava_reseau joueur <A>` et `<B>`). |
+| 9 | **(2 joueurs)** `numbers.overTime = false` (`config.lua`, redémarrage). | Plus de petits chiffres de brûlure ni de mur ; les autres restent. |
+| 10 | **(2 joueurs)** `numbers.enabled = false`. | Plus aucun chiffre des sorts ; `vava_magic:hit` comme en 2.12.0 (une valeur), aucun `vava_magic:dealt`. |
+| 11 | **(2 joueurs)** B règle « Donnés seulement » ; A tire sur B. | B ne voit pas le chiffre reçu ; sa réaction reste. |
+| 12 | A se brûle à son propre mur. | Chiffre rouge chez A seulement, aucun `vava_magic:dealt` à lui-même. |
+| 13 | `numbers.maxPerMessage = 40` (hors bornes), redémarrage. | Le module refuse de démarrer : « config.lua : numbers.maxPerMessage attendu (entier de 1 à 32) ». Remettre 16. |
+| 14 | `resmon 1` chez A pendant un Mur de flammes sur B. | `vava_magic` comme en 19-13 ; `vava_hud` ≤ 0,03 ms pendant les chiffres, ≈ 0 ensuite. |
+
+Ce qui est prouvé hors jeu (`tests/spec/magic_numbers_spec.lua`, `magic_harm_spec.lua`) : issue et montant d'un
+résultat (esquive, absorbé, à terre, morsure, zone de paix), un `dealt` par tour avec tous les touchés (16 au plus),
+rien au lanceur qui se blesse ou qui est parti, rien pour un coup retenu, `overTime` et `enabled` coupés, valeur
+rendue par `combat.damage` inchangée ; côté joueur, `vava_magic:hit` et `vava_magic:dealt` relus et bornés avant
+`hitText`.

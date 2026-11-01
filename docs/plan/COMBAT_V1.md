@@ -109,6 +109,7 @@ Déroulement d'un coup :
    (tolérance de portée et d'angle en config pour la latence, bornée), puis appelle la chaîne de dégâts.
 4. Le résultat part à l'attaquant, à la cible et aux joueurs proches qui doivent voir la réaction (chancellement) :
    **jamais à tout le serveur**. L'animation elle-même est synchronisée par le moteur, rien d'autre à envoyer.
+   Le montant du coup (chiffres des coups, T-155) ne part qu'à l'attaquant et à la cible, jamais aux témoins.
 
 Enchaînement : une technique listée dans `chain` peut démarrer pendant la `recovery` de la précédente.
 
