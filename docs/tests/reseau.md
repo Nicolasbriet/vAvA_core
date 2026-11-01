@@ -242,6 +242,42 @@ neuve par l'assistant, « Nouveau serveur », dans `D:\vAvA_essai`) :
 | 15 | Un serveur installé par la Chancellerie 1.8.6 : mise à jour qui apporte la 1.9.0, puis la mise à jour suivante. | Première : Chancellerie 1.9.0, Lua encore commenté (aucune ligne « allégé ») ; seconde : ligne « allégé », **les 33 ressources** listées une fois (chaque manifeste change) ; un joueur qui revient retélécharge une fois le paquet de chacune (≈ 3,8 Mo bruts, ≈ 2,4 Mo compressés au 2 novembre 2026, dont 1,44 Mo pour `vava_loading` ; à fusionner avec T-160 pour ne le faire qu'une fois) ; un `client/*.lua` modifié à la main avant : remplacé, le sien en `.local` ; un `config_conseil.lua` adapté : gardé, `.nouveau` à côté s'il a changé en amont. |
 | 16 | `updates.leanLua` à `false` dans `data/config.json`, relancer la Chancellerie, appliquer la mise à jour suivante. | « Allègement du Lua livré désactivé … » ; fichiers livrés reposés avec leurs commentaires, les 33 ressources listées (même retéléchargement complet qu'au n° 15) ; serveur sain. |
 
+### 7-G — Pages livrées sans commentaires (T-160, Chancellerie 1.10.0)
+
+La Chancellerie (et `scripts/livraison.js`) retire aussi les commentaires des pages servies aux joueurs (JS, CSS, HTML
+des `files`, `ui_page`, `loadscreen` et `vava_conseil_web`), en gardant chaque ligne à sa place ; le réglage
+`vava_loading/web/js/config.js`, les SVG et `web/dev/` ne sont jamais touchés. Mesure hors jeu du 2 novembre 2026 (filtre
+du § 10.5 de la spec, lignes des joueurs) : JS + CSS + HTML **1 047 795 → 897 811 octets (− 149 984, ≈ − 146 Ko)**,
+**342 708 → 270 297 compressés (− 72 411)** ; page du paquet du Conseil 152 127 → 144 119 octets. À faire **dans la
+même séance que le § 7-F** (même copie `[livraison]`, faite par le `livraison.js` de T-160 : elle allège Lua et pages).
+Préparation, mises en garde PowerShell (`-LiteralPath`, jamais `Remove-Item -Recurse` sur un dossier à jonctions) et
+remise en place : celles du § 7-F. **A** Souverain, **B** hors du Conseil. `F8` ouvert ; pour les pages, la console de
+`nui_devtools` (commande `nui_devtools` dans `F8`).
+
+| # | Faire | Attendu |
+|---|---|---|
+| 1 | Hors jeu : `./scripts/verifier.sh --tout`. | Étape « Pages livrées sans commentaires (T-160) » : « ESSAIS PAGES : OK (…) », « ESSAI DES PAGES : … fichiers lus, … refusés. », « MÊME PAGE : OK (… fichiers prouvés, dont 172 livrés …) », aucune ligne `ÉCART`, aucun `diff`, les six essais de pages passent sur la copie (« … essais réussis », « 381 essais passés »…). |
+| 2 | Hors jeu : `node scripts/livraison.js --liste-pages`. | Chaque `web/index.html`, `web/css/*.css`, `web/js/*.js` des pages « allégé » ; `vava_loading web/js/config.js` « gardé (réglage) » ; aucun `web/dev/` ; aucun `.svg` ; quinze lignes `vava_atelier@conseil` « allégé ». |
+| 3 | Copie `[livraison]` (7-F-3, si ce n'est pas déjà fait). | Deux lignes de bilan : « … 284 fichiers allégés … 0 refusé(s). » et « Pages : 172 fichiers allégés, … octets (− …), 0 refusée(s). ». `…\[vava]\vava_inventory\web\js\view.js` : aucun commentaire, **même nombre de lignes** que dans le dépôt (525) ; `…\[vava]\vava_loading\web\js\config.js` identique au dépôt ; `…\[vava]\vava_codex\web\index.html` sans `<!--`, même nombre de lignes (47). |
+| 4 | Git Bash : mesure du § 10.5 de la spec (`poids-client.sh --detail` avant, puis `--detail --dossier '/d/vAvA_core_phase1/resources/[livraison]'`, filtre `awk` sur `.js`, `.css`, `.html`). | JS + CSS + HTML en baisse d'**au moins 150 Ko bruts** sur les lignes du filtre (joueurs et Conseil : ≈ − 158 000 octets attendus ; joueurs seuls ≈ − 150 000) ; noter avant et après, bruts et compressés. |
+| 5 | Démarrer le serveur sur `[livraison]`. | Chaque module « prêt » ; aucune erreur. |
+| 6 | **(2 joueurs)** A vide son cache FiveM puis se connecte ; B se connecte. | Écran de chargement complet chez les deux : ouverture (lettres qui s'embrasent, rideau), ambiances en fondu, braises, six feux, éclair puis sélection ; aucune erreur dans `nui_devtools`. |
+| 7 | A fait le tour des pages : sélection et création du personnage ; HUD (jauges, chiffres de coups) ; inventaire (I : glisser, infobulle, catalogue) ; Codex (F1 : lecture, recherche) ; chat (onglets, suggestions) ; menu de pause (Échap : rubriques, réglages, touches) ; compétences (livre, mentorat) ; une station d'artisanat ; une parcelle ; une récolte (tension) ; magie (grimoire, roue, incantation) ; vivres (invite) ; Atelier (F9) ; voix, caméras, administration, temps (si droits). | Chaque page s'affiche et répond comme sur la copie git ; aucune erreur dans la console de `nui_devtools` ni en `F8`. |
+| 8 | **(2 joueurs)** A donne un objet à B par l'inventaire ; A et B se parlent au chat ; A frappe B qui garde (chiffres des coups chez les deux). | Comme avant. |
+| 9 | A : `resmon 1` au repos. | Mêmes valeurs qu'avant. |
+| 10 | Facultatif (numéros de ligne) : serveur arrêté ; dans la **copie** `…\[livraison]\[vava]\vava_codex\web\js\app.js`, ajouter `;throw new Error('essai T-160')` à la fin d'une ligne de code exécutée au chargement, **sans ajouter de ligne** ; démarrer ; A se connecte, `nui_devtools`, Console. | `app.js:<n>` ; la ligne `<n>` de `modules/vava_codex/web/js/app.js` du dépôt est la même instruction. Retirer l'ajout. |
+| 11 | Si possible (avec 7-F-12) : cache vidé, tailles de `cache/files/vava_loading/resource.rpf` et `vava_ui/resource.rpf` chez A sur `[livraison]`, puis sur la copie git. | Plus petites sur `[livraison]` (hors jeu : `vava_loading` 1 445 832 → 1 420 474 octets, `vava_ui` 224 590 → 222 295, Lua et pages) ; noter. |
+| 12 | A appuie sur F9 pour la première fois de cette version. | Console du serveur : `paquet du Conseil : … octets` plus petit que sur la copie git (hors jeu : 248 218 → 220 494, Lua et pages ; noter) ; l'Atelier s'ouvre et marche ; sources `vava_atelier/web/js/…` dans `nui_devtools`, aux lignes du dépôt. |
+| 13 | Remise en place (7-F-11). | Le serveur tourne de nouveau sur la copie git commentée. |
+
+Chancellerie, **après fusion sur `main`** (T-154 et T-160 ensemble), sur un serveur qui n'est pas une copie git :
+
+| # | Faire | Attendu |
+|---|---|---|
+| 14 | Installation neuve. | Journal : la ligne « Lua servi … » **et** « Pages servies aux joueurs allégées de leurs commentaires : 172 fichiers, … → … Ko. » ; résumé terminé par « Lua allégé : … ; pages allégées : 172 fichiers, 0 refusées » ; `…\[vava]\vava_inventory\web\js\view.js` sans commentaire ; `…\[vava]\vava_loading\web\js\config.js` commenté ; `data/install.json` : empreinte de `web/js/view.js` = SHA-256 du fichier posé. |
+| 15 | Un serveur installé par la Chancellerie 1.8.6 : mise à jour qui apporte la 1.10.0, puis la suivante. | Première : Chancellerie 1.10.0, rien d'allégé ; seconde : les deux lignes « allégé », chaque ressource listée **une** fois (un seul retéléchargement par joueur, Lua et pages ensemble : ≈ 3,6 Mo bruts, ≈ 2,3 Mo compressés). |
+| 16 | `updates.leanWeb` à `false`, relancer la Chancellerie, appliquer la mise à jour suivante. | « Allègement des pages livrées désactivé … » ; pages reposées commentées (les 20 ressources à pages listées) ; Lua toujours allégé ; serveur sain. |
+
 ## Ce qui n'est pas compté
 
 GlobalState, state bags, et les envois que les modules font encore eux-mêmes par `TriggerClientEvent` (inventaire,
@@ -263,3 +299,6 @@ passera par `core.net`.
 - Lua livré sans commentaires (7-F) : aucune `SCRIPT ERROR` sur la copie allégée, numéros de ligne des erreurs en jeu
   identiques au dépôt (7-F-10), taille réelle de `resource.rpf` (7-F-12), journal de la Chancellerie à l'installation
   et à la première mise à jour allégée (7-F-13 à 16).
+- Pages livrées sans commentaires (7-G) : chaque interface s'affiche et répond sur la copie allégée, aucune erreur dans
+  `nui_devtools`, numéros de ligne d'une erreur de page identiques au dépôt (7-G-10), paquets `vava_loading` et `vava_ui`
+  retéléchargés une seule fois avec le Lua (7-G-11, 7-G-15), journal de la Chancellerie (7-G-14 à 16).

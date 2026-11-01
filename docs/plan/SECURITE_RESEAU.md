@@ -64,7 +64,9 @@ du Conseil par appel direct du RPC.
    Les commentaires du Lua servi ne sont jamais livrés (T-154) : la Chancellerie (et `scripts/livraison.js`) les retire
    en gardant chaque ligne à sa place, prouvé par le compilateur Lua à chaque vérification ; les réglages de
    l'exploitant (`config.lua`, `config_client.lua`, `config_conseil.lua`, `config/…`) et le Lua du seul serveur
-   gardent les leurs.
+   gardent les leurs. De même pour les pages servies (JS, CSS, HTML des `files`, `ui_page`, `loadscreen`,
+   `vava_conseil_web` ; T-160) : commentaires retirés, chaque ligne gardée, prouvé par un second lecteur et par V8, essais
+   des pages relancés sur la copie allégée ; le réglage `web/js/config.js` de l'écran de chargement garde les siens.
 8. **Code réservé au Conseil.** Un code client qui ne sert qu'au Conseil est livré à la demande à ses seuls membres
    (droit relu par le serveur à chaque envoi), gardé avec son empreinte et exécuté par `load` en mode texte après
    comparaison à l'empreinte que le serveur vient d'annoncer ; il ne porte aucune décision (chaque action reste

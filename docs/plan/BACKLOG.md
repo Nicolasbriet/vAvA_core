@@ -819,8 +819,20 @@ versé à T-014 ; les autres points déjà couverts sont précisés dans T-012 �
 
 ### T-160 — Pages web livrées sans commentaires
 - Agents : vava-architecte → vava-dev-lua (outillage ; cette tâche autorise à toucher `chancellerie/`, validé par le
-  porteur du projet le 2 novembre 2026) · Dépend de : T-154 · Statut : en cours — **à livrer dans la même mise à jour que T-154** (relecture
-  réseau R-1 de T-154 : `vava_loading` et `vava_ui` ne seront retéléchargés qu'une fois)
+  porteur du projet le 2 novembre 2026) · Dépend de : T-154 · Statut : en cours (fait, relectures sécurité et réseau à
+  faire) — **à livrer dans la même mise à jour que T-154** (relecture réseau R-1 de T-154 : `vava_loading` et `vava_ui`
+  ne seront retéléchargés qu'une fois)
+- Fait le 2 novembre 2026 : Chancellerie 1.10.0 (`lib/webstrip.js`, lexeurs JavaScript, CSS et HTML qui gardent chaque
+  fin de ligne, refusent ce qu'ils ne tranchent pas sûrement et se contrôlent à chaque fichier ; `lib/delivery.js`,
+  choix des pages d'après les manifestes et compilation V8 sans exécution de chaque script avant et après ; allègement
+  dans `fetchSource` avec le Lua, avant les empreintes ; `updates.leanWeb`), `scripts/livraison.js` (`--liste-pages`,
+  `--essai-pages`, `--sortie` qui allège aussi les pages), preuve par un second lecteur indépendant
+  (`scripts/lib/meme-page.js`, sur les 297 pages suivies du dépôt, dont 172 livrées) et essais des six pages relancés sur
+  la copie allégée dans `scripts/verifier.sh`. Mesure : JS + CSS + HTML livrés aux joueurs 1 047 795 → 897 811 octets
+  (− 146 Ko), 342 708 → 270 297 compressés (− 71 Ko) ; page du paquet du Conseil 152 127 → 144 119 octets. Aucun
+  module de jeu touché.
+- Spec : `docs/plan/specs/T-160.md` · rapport : `docs/plan/rapports/T-160.md` · test en jeu : `docs/tests/reseau.md`
+  § 7-G (même séance que le § 7-F de T-154).
 - Trouvé pendant T-154 (spec § 15) : les pages livrées (`web/**/*.js`, `*.css`, `*.html` des `files`, et la page du
   paquet du Conseil `vava_conseil_web` de T-157) gardent leurs commentaires ; le Lua, lui, est allégé depuis T-154.
   Mesurer d'abord le gain (`./scripts/poids-client.sh --detail`, colonne `autres`, ≈ 2,9 Mo bruts dont ≈ 1,4 Mo pour
@@ -849,6 +861,24 @@ versé à T-014 ; les autres points déjà couverts sont précisés dans T-012 �
   serveur, `config.lua`), ou une définition de l'Atelier envoyée à la demande, comme T-157 le fait pour le Conseil.
 - Critères : mesure avant et après (`scripts/poids-client.sh vava_magic`) ; aucune règle de jeu ni texte changé ;
   `config_split_spec` passe.
+
+### T-166 — Réglage de page gardé à la mise à jour
+- Agent : vava-dev-lua (cette tâche autorise à toucher `chancellerie/`) · Dépend de : T-160 · Statut : à faire
+- Trouvé pendant T-160 (spec § 15) : `vava_loading/web/js/config.js`, réglage de l'écran de chargement que l'exploitant
+  peut adapter, n'est pas un réglage pour la fusion de l'installeur (`delivery.userOwned`) : une version modifiée sur
+  place est remplacée à la mise à jour (la sienne gardée en `.local`) au lieu d'être gardée avec un `.nouveau` à côté.
+  T-160 le garde commenté (jamais allégé) mais ne touche pas à la fusion. Ajouter le réglage de page à `userOwned`.
+- Critères : `userOwned('web/js/config.js')` vrai (sans la casse) ; essai de `plan` (modifié des deux côtés → gardé,
+  `.nouveau` à côté) ; `docs/chancellerie.md` à jour.
+
+### T-167 — Ligne « hors jeu » des pages livrée aux joueurs
+- Agents : vava-architecte → vava-dev-nui · Dépend de : T-160 · Statut : à faire (constat, à étudier)
+- Trouvé pendant T-160 (spec § 15) : 18 `web/index.html` portent un `<script>` qui ne fait rien en jeu (`document.write`
+  de `web/dev/devmock.js` hors de FiveM), livré à chaque joueur (3 205 octets en tout au 2 novembre 2026). Le retirer à
+  la livraison serait une transformation de code, pas de commentaire : étudier plutôt de déplacer l'amorce hors jeu
+  dans `web/dev/` (une page de développement qui charge la page livrée), comme `vava_atelier` le fait depuis T-157.
+- Critères : aucune page livrée ne contient plus la ligne ; la page reste ouvrable hors jeu avec ses données simulées ;
+  essais de pages et audit inchangés ; mesure avant et après.
 
 ## Phase 2 — Arrivée
 
