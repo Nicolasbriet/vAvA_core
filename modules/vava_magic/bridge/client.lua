@@ -1,8 +1,9 @@
 --[[
     vava_magic/bridge/client.lua
-    Rôle : SEUL point de contact, côté client, entre la magie et les autres modules : notifications (vava_hud), état
-           « à terre » (vava_health), droit d'incanter (CanUseMagic), arme en main (CombatHands, IsArmed, vava_combat :
-           affichage seulement), cible verrouillée (GetLockedTarget), lignes et suggestions du chat. Aucune blessure n'est appliquée ici : les sorts blessent par la chaîne de dégâts de
+    Rôle : SEUL point de contact, côté client, entre la magie et les autres modules : notifications et chiffres des
+           sorts (vava_hud), état « à terre » (vava_health), droit d'incanter (CanUseMagic), arme en main
+           (CombatHands, IsArmed, vava_combat : affichage seulement), cible verrouillée (GetLockedTarget), lignes et
+           suggestions du chat. Aucune blessure n'est appliquée ici : les sorts blessent par la chaîne de dégâts de
            vava_health, côté serveur (sans lui, ils ne blessent personne).
            Pour un autre core, réécrire ces fonctions (et bridge/server.lua).
     Implémentation : modules officiels vAvA ; appels isolés, chaque module est facultatif (sans vava_hud : notification
@@ -11,7 +12,7 @@
 ]]
 
 local type, pcall, tostring, ipairs = type, pcall, tostring, ipairs
-local GetResourceState, TriggerEvent = GetResourceState, TriggerEvent
+local GetResourceState, TriggerEvent, GetGameTimer = GetResourceState, TriggerEvent, GetGameTimer
 local PlayerPedId, IsEntityDead, IsPedCuffed, IsPedBeingStunned = PlayerPedId, IsEntityDead, IsPedCuffed, IsPedBeingStunned
 local BeginTextCommandThefeedPost, AddTextComponentSubstringPlayerName, EndTextCommandThefeedPostTicker =
     BeginTextCommandThefeedPost, AddTextComponentSubstringPlayerName, EndTextCommandThefeedPostTicker
@@ -52,6 +53,27 @@ function Bridge.Notify(message, kind)
     BeginTextCommandThefeedPost('STRING')
     AddTextComponentSubstringPlayerName(message)
     EndTextCommandThefeedPostTicker(false, false)
+end
+
+local hitTextWarnedAt = nil
+
+local function hudHitText(side, anchor, issue, tenths)
+    return exports[LINKS.HUD]:hitText(side, anchor, issue, tenths)
+end
+
+--- Chiffre d'un sort (vava_hud:hitText, T-155) ; sans vava_hud : rien. Erreur : une ligne de console par minute.
+---@param side string  dealt | taken
+---@param anchor integer
+---@param issue string
+---@param tenths integer|nil
+function Bridge.HitText(side, anchor, issue, tenths)
+    if GetResourceState(LINKS.HUD) ~= 'started' then return end
+    local ok, err = pcall(hudHitText, side, anchor, issue, tenths)
+    if ok then return end
+    local now = GetGameTimer()
+    if hitTextWarnedAt and now - hitTextWarnedAt < 60000 then return end
+    hitTextWarnedAt = now
+    VavaMagic.log.warn('%s.hitText en erreur : %s', LINKS.HUD, tostring(err))
 end
 
 --- Le joueur est-il à terre (vava_health) ?

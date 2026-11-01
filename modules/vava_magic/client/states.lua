@@ -6,13 +6,15 @@
         saut, attaque et visée coupées (Gelé : le serveur seul fige le ped et le libère, en tenant compte du Registre
         du Conseil), démarche chancelante et caméra qui tangue (Chancelant), chute (Renversé) ;
       - impossible d'incanter pendant un contrôle dur (pré-vérification : le serveur refuse de toute façon) ;
-      - réactions : geste bref et effet d'écran à chaque coup (selon l'élément du sort), recul d'une nova.
+      - réactions : geste bref et effet d'écran à chaque coup (selon l'élément du sort), recul d'une nova ;
+        chiffre reçu (T-155).
     La boucle par image ne tourne que tant que le joueur est ralenti, gelé ou chancelant, ou pendant un recul.
     Dépendances : shared/, config_client.lua, client/nui.lua, client/casting.lua, client/fx.lua
 ]]
 
-local type, ipairs, pairs, max = type, ipairs, pairs, math.max
+local type, ipairs, pairs, max, mathType = type, ipairs, pairs, math.max, math.type
 local CreateThread, Wait, GetGameTimer, RegisterNetEvent = CreateThread, Wait, GetGameTimer, RegisterNetEvent
+local PlayerId, GetPlayerServerId = PlayerId, GetPlayerServerId
 local PlayerPedId, IsPedRagdoll, IsEntityDead, GetEntityVelocity, SetEntityVelocity =
     PlayerPedId, IsPedRagdoll, IsEntityDead, GetEntityVelocity, SetEntityVelocity
 local SetPedMoveRateOverride, DisableControlAction, SetPedToRagdoll = SetPedMoveRateOverride, DisableControlAction, SetPedToRagdoll
@@ -25,6 +27,9 @@ local cfg = VavaMagic.config
 local statesCfg = cfg.states
 local combatCfg = cfg.combat
 local EVENTS = VavaMagic.EVENTS
+local bridge = VavaMagic.bridge
+local ISSUES = {}
+for _, issue in ipairs(VavaMagic.NUMBER_ISSUES) do ISSUES[issue] = true end
 local CONTROL_SPRINT, CONTROL_JUMP, CONTROL_ATTACK, CONTROL_AIM = 21, 22, 24, 25
 local CLIPSET_BLEND = 0.25
 local CLIPSET_POLL_MS, CLIPSET_TRIES = 20, 50
@@ -154,13 +159,21 @@ RegisterNetEvent(EVENTS.CONDITIONS, function(timers)
     if type(timers) == 'table' then conditions.set(timers) end
 end)
 
--- coup reçu : geste bref (si l'on n'est ni à terre ni en train d'incanter) et effet d'écran de l'élément
-RegisterNetEvent(EVENTS.HIT, function(element)
+-- coup reçu : geste bref (si l'on n'est ni à terre ni en train d'incanter) et effet d'écran de l'élément ; chiffre
+-- reçu si le serveur en donne un (dixièmes ou false, issue absente pour `hit`)
+RegisterNetEvent(EVENTS.HIT, function(element, tenths, issue)
     local reaction = type(element) == 'string' and combatCfg.reactions[element]
-    if not reaction then return end
-    local ped = PlayerPedId()
-    if not casting.isCasting() and not IsPedRagdoll(ped) and not IsEntityDead(ped) then casting.playOnce(reaction.anim) end
-    if reaction.screen then nui.send('screen:hit', { kind = reaction.screen }) end
+    if reaction then
+        local ped = PlayerPedId()
+        if not casting.isCasting() and not IsPedRagdoll(ped) and not IsEntityDead(ped) then
+            casting.playOnce(reaction.anim)
+        end
+        if reaction.screen then nui.send('screen:hit', { kind = reaction.screen }) end
+    end
+    if tenths == nil and issue == nil then return end
+    if issue ~= nil and not ISSUES[issue] then return end
+    local amount = mathType(tenths) == 'integer' and tenths >= 0 and tenths <= 2000 and tenths or nil
+    bridge.HitText('taken', GetPlayerServerId(PlayerId()), issue or 'hit', amount)
 end)
 
 -- recul (nova) : poussé dans la direction donnée par le serveur, le temps de `combat.knockbackMs`

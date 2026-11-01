@@ -409,4 +409,58 @@ describe('vava_magic blessures sur la chaîne de dégâts', function()
             assert.equal(30, state.amount)
         end)
     end)
+    -- T-155 : issue et montant (dixièmes) d'un coup de sort, contrôle de config.numbers
+    describe('chiffres des sorts', function()
+        local N = { IMPACT = 'impact', ZONE = 'zone', AURA = 'aura', BURN = 'brulure' }
+
+        it('arrêté à une étape de défense : son mot, sans montant ; autre annulation : rien', function()
+            assert.same({ 'dodge' }, { harm.outcome({ amount = 0, cancelled = 'esquive', stage = 'esquive' }, N.IMPACT) })
+            assert.same({ 'absorb' }, { harm.outcome({ amount = 0, cancelled = 'egide', stage = 'bouclier' }, N.IMPACT) })
+            assert.same({ 'parry' }, { harm.outcome({ amount = 0, cancelled = 'parade', stage = 'parade' }, N.IMPACT) })
+            assert.same({ 'block' }, { harm.outcome({ amount = 0, cancelled = 'blocage', stage = 'blocage' }, N.ZONE) })
+            assert.same({}, { harm.outcome({ amount = 0, cancelled = 'zone_protegee', stage = 'annulation' }, N.IMPACT) })
+            assert.same({}, { harm.outcome({ amount = 0, cancelled = 'pvp_off' }, N.IMPACT) })
+            assert.same({}, { harm.outcome({ amount = 0, cancelled = 'treve', stage = 'before' }, N.IMPACT) })
+            assert.same({}, { harm.outcome(nil, N.IMPACT) })
+        end)
+
+        it('entièrement pris : absorbé, bloqué ; à terre : le montant du coup', function()
+            assert.same({ 'absorb' }, { harm.outcome({ amount = 0, applied = 0, absorbed = 5, blocked = 0 }, N.IMPACT) })
+            assert.same({ 'block' }, { harm.outcome({ amount = 0, applied = 0, absorbed = 0, blocked = 5 }, N.IMPACT) })
+            assert.same({ 'down', 120 }, { harm.outcome({ amount = 12, applied = 3, downed = true }, N.IMPACT) })
+        end)
+
+        it('zone qui dure, brûlure : tick ; impact, zone : hit ; 0 sans rien : hit 0', function()
+            assert.same({ 'tick', 20 }, { harm.outcome({ amount = 2, applied = 2 }, N.BURN) })
+            assert.same({ 'tick', 35 }, { harm.outcome({ amount = 3.5, applied = 3.5 }, N.AURA) })
+            assert.same({ 'hit', 140 }, { harm.outcome({ amount = 14, applied = 14 }, N.IMPACT) })
+            assert.same({ 'hit', 72 }, { harm.outcome({ amount = 7.24, applied = 7.24 }, N.ZONE) })
+            assert.same({ 'hit', 0 }, { harm.outcome({ amount = 0, applied = 0, absorbed = 0, blocked = 0 }, N.IMPACT) })
+            assert.same({ 'hit', 2000 }, { harm.outcome({ amount = 250, applied = 100 }, N.IMPACT) })
+        end)
+
+        it('montant illisible, négatif ou absent : rien', function()
+            for _, bad in ipairs({ 0 / 0, -1, math.huge, '12' }) do
+                assert.same({}, { harm.outcome({ amount = bad, applied = 1 }, N.IMPACT) })
+            end
+            assert.same({}, { harm.outcome({ applied = 5 }, N.IMPACT) })
+        end)
+
+        it('checkNumbers : la config livrée passe ; clé inconnue, booléen manquant, maxPerMessage hors bornes', function()
+            assert.same({ true }, { harm.checkNumbers(magicCfg.numbers) })
+            local function with(key, value)
+                local copy = {}
+                for k, v in pairs(magicCfg.numbers) do copy[k] = v end
+                copy[key] = value
+                return copy
+            end
+            for _, case in ipairs({ { 'witnesses', true }, { 'overTime', nil }, { 'caster', 'oui' },
+                { 'maxPerMessage', 0 }, { 'maxPerMessage', 33 }, { 'maxPerMessage', 4.5 } }) do
+                local ok, err = harm.checkNumbers(with(case[1], case[2]))
+                assert.is_false(ok)
+                assert.matches(case[1], err)
+            end
+            assert.is_false((harm.checkNumbers(nil)))
+        end)
+    end)
 end)

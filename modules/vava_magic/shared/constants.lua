@@ -28,7 +28,10 @@ VavaMagic.EVENTS = {
     ADMIN = 'vava_magic:admin',             -- le joueur peut se servir des commandes du Conseil (suggestions)
     COOLDOWNS = 'vava_magic:cooldowns',     -- () recharges effacées par le Conseil
     CONDITIONS = 'vava_magic:conditions',   -- { état = durée en ms } au seul joueur affecté (minuteries de ses icônes)
-    HIT = 'vava_magic:hit',                 -- (élément) à la seule victime d'un sort : geste de réaction, effet d'écran
+    HIT = 'vava_magic:hit',                 -- (élément|false[, dixièmes|false[, issue]]) à la seule victime d'un sort :
+                                            -- geste de réaction, effet d'écran, chiffre reçu (T-155)
+    DEALT = 'vava_magic:dealt',             -- ({ { cible, issue[, dixièmes] }, … }) au seul lanceur : ses touchés d'un
+                                            -- tour du serveur (chiffres des coups, T-155)
     PUSH = 'vava_magic:push',               -- (dx, dy, vitesse) à la seule victime d'un recul
     ZONE = 'vava_magic:zone',               -- zone au sol { id, kind, element, spell, level, shape, … } aux joueurs proches
     ZONE_END = 'vava_magic:zoneEnd',        -- (id) zone éteinte, à ceux qui la connaissaient
@@ -37,6 +40,9 @@ VavaMagic.EVENTS = {
                                             -- spell = 'combo', combo = son nom)
     COMBO = 'vava_magic:combo',             -- (nom) au seul lanceur d'une combinaison réussie : mot bref à l'écran
 }
+
+-- Issues d'un chiffre de sort (T-155), comprises par vava_hud:hitText.
+VavaMagic.NUMBER_ISSUES = { 'hit', 'tick', 'down', 'dodge', 'absorb', 'block', 'parry' }
 
 -- Intentions du client (RPC du core). Chaque sort a en plus les siennes : BEGIN_PREFIX .. sort, FINISH_PREFIX .. sort.
 VavaMagic.RPC = {
