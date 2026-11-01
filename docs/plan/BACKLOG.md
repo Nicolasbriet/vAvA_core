@@ -714,7 +714,7 @@ versé à T-014 ; les autres points déjà couverts sont précisés dans T-012 �
   (sans effet) et un fichier livré qui dépasse (BLOQUANT) ; mesures avant et après dans le rapport.
 
 ### T-154 — Lua livré sans commentaires — **décision du porteur du projet**
-- Agents : vava-architecte → vava-dev-lua · Dépend de : — · Statut : en cours (validée par le porteur du projet le
+- Agents : vava-architecte → vava-dev-lua (cette tâche autorise à toucher `chancellerie/`, dans les limites de la spec) · Dépend de : — · Statut : en cours (validée par le porteur du projet le
   2 novembre 2026)
 - Trouvé pendant T-112 (relecture réseau R-2) : sur tout le dépôt, ≈ 478 Ko des 1 255 Ko de Lua livré aux joueurs sont
   des commentaires (≈ 206 Ko compressés, ≈ 11 % du premier téléchargement de 4,3 Mo) ; une retouche d'un seul
