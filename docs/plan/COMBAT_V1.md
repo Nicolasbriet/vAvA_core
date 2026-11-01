@@ -151,7 +151,10 @@ le blocage, l'esquive, et la course plus tard si on le souhaite. Faim et soif ba
 Un style = une catégorie d'arme + une liste de techniques attribuées aux touches (légère, lourde, défense,
 esquive). Compétences de combat dans `vava_skills` (armes à une main, à deux mains, dagues, bâton, bouclier) ; les
 techniques avancées se débloquent par rang ; XP donnée au serveur pour les coups portés **sur une vraie cible**
-(pas sur un mannequin au-delà d'un niveau, pour éviter le farm), bonus de mentorat avec un maître d'armes.
+(pas sur un mannequin au-delà d'un niveau, pour éviter le farm), bonus de mentorat avec un maître d'armes. Mannequin
+d'entraînement (T-156, `vava_combat` 1.5.0) : aucune XP en T-156 ; le hook `vava_combat:trained` sert à T-115, qui n'en
+donnera plus à partir du niveau `dummies.xpMaxLevel` (9) de la compétence de l'arme — la Parade (niveau 10) se gagne
+face à quelqu'un.
 
 ## Hors v1
 

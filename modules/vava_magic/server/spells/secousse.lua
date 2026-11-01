@@ -9,7 +9,8 @@
         mouillé sous le cercle devient de la boue (combinaison) ; ceux qui se tiennent alors dans le cercle (positions
         serveur, jamais le lanceur) perdent des points de vie et chancellent
         (ou sont renversés dès le niveau 4 : contrôles durs, protégés ensuite des autres). Si elle a touché quelqu'un
-        et que le lancer a rapporté, le lanceur toujours là gagne le bonus d'XP du sort.
+        et que le lancer a rapporté, le lanceur toujours là gagne le bonus d'XP du sort. Les mannequins du cercle
+        (T-156) sont frappés « à blanc » au même moment (ni chancellement, ni renversement, ni bonus d'XP).
     Dépendances : shared/, config.lua, server/ (noyau, combat, states, zones, combos)
 ]]
 
@@ -75,6 +76,13 @@ local function strike(zone)
             states.apply(victim, data.control, { durationMs = data.controlMs, caster = zone.owner, spell = NAME })
         end
     end
+    for _, dummy in ipairs(combat.dummiesAround(center, zone.radius + HEIGHT)) do
+        if zones.contains(zone, dummy) then
+            combat.dummyStrike(zone.owner, dummy.n, NAME, data.damage, combat.KIND.ZONE, zone.ownerCharacter, nil,
+                zone.createdAt)
+        end
+    end
+
     if touched > 0 and data.rewarded and ownerHere then experience.bonus(zone.owner, NAME, spellCfg.hitXp or 0) end
 end
 

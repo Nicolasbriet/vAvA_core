@@ -7,8 +7,9 @@
 #   --dossier <d> (T-154) : mesure une copie disposée comme par l'installeur de la Chancellerie ou par
 #   `node scripts/livraison.js --sortie <d>` : ressources <d>/[catégorie]/<nom> et <d>/<nom>, nommées par leur dossier ;
 #   --liste (T-154) : chemins servis, sans calcul de taille : « ressource<TAB>chemin » par fichier servi (manifeste
-#   compris), puis « ressource@conseil<TAB>chemin » par fichier du côté conseil de manifeste.awk (`vava_conseil_lua`,
-#   `vava_conseil_web` : paquet du Conseil, T-157) ; recoupé par scripts/verifier.sh avec scripts/livraison.js --liste.
+#   compris) et « ressource@conseil<TAB>chemin » par fichier du côté conseil de manifeste.awk (`vava_conseil_lua`,
+#   `vava_conseil_web` : paquet du Conseil, T-157, même fonction que sa ligne de mesure ci-dessous) ; recoupé par
+#   scripts/verifier.sh avec scripts/livraison.js --liste.
 # Lit les chaînes des manifestes avec le lecteur de l'audit (scripts/lib/manifeste.awk) : directives servies aux
 # joueurs (`shared_script(s)`, `client_script(s)`, `files`, `file`, `ui_page`, `loadscreen`), `@ressource/…` ignoré.
 # Chaque motif est développé depuis le dossier de la ressource, sans doublon ; un motif absolu ou qui contient `..`
@@ -20,6 +21,11 @@
 # Sortie : une ligne par ressource « ressource  lua  lua_gz  autres  autres_gz  manifeste  manif_gz  stream  stream_gz
 # total  total_gz », puis le total ; --detail : une ligne par fichier (« ressource  chemin  brut  gzip »), avant celle
 # de sa ressource.
+# T-157 : les fichiers des directives `vava_conseil_lua` et `vava_conseil_web` (code du seul Conseil, livré à la demande
+# par la ressource) ne comptent pas chez le joueur ; ils ont leur ligne « <ressource>@conseil », après celle de la
+# ressource et hors du total : lua et autres en brut (le paquet part en latent, sans compression : colonnes gzip « - »),
+# total = taille exacte du paquet (« VAVAPAQ1 », en-tête de chaque fichier et fins de ligne compris) ; avec --detail,
+# ses fichiers avant elle (« <ressource>@conseil  chemin  brut  - »).
 set -uo pipefail
 ORIGINE=$PWD
 cd "$(dirname "$0")/.."
@@ -76,9 +82,9 @@ for k in lb lg ab ag mb mg sb sg; do T[$k]=0; done
 ligne() { printf '%-22s %9s %8s %9s %8s %9s %8s %9s %8s %10s %9s\n' "$@"; }
 [[ $LISTE -eq 1 ]] || ligne ressource lua lua_gz autres autres_gz manifeste manif_gz stream stream_gz total total_gz
 for d in "${dossiers[@]}"; do
-    declare -A vus=() vusc=() R=()
+    declare -A vus=() R=() cvus=()
     res=$(nom "$d")
-    conseil=()
+    cl=0; ca=0; cpaq=0; cdet=
     for k in lb lg ab ag mb mg sb sg; do R[$k]=0; done
     compter() { # fichier colonne(l, a, m, s)
         local f="$1" col="$2" brut gz
@@ -91,32 +97,41 @@ for d in "${dossiers[@]}"; do
         [[ $DETAIL -eq 1 ]] && printf '  %-20s %-48s %8s %8s\n' "$res" "${f#"$d"/}" "$brut" "$gz"
         return 0
     }
+    conseil() { # fichier du paquet du Conseil : brut seulement, en-tête « <genre> <chemin> <octets>\n » et fin de ligne
+        local f="$1" brut rel
+        [[ -f "$f" && -z "${cvus[$f]:-}" ]] || return 0
+        cvus[$f]=1
+        rel="${f#"$d"/}"
+        if [[ $LISTE -eq 1 ]]; then printf '%s@conseil\t%s\n' "$res" "$rel"; return 0; fi
+        brut=$(tr -d '\r' < "$f" | wc -c); brut=$((brut + 0))
+        if [[ "$f" == *.lua ]]; then cl=$((cl + brut)); else ca=$((ca + brut)); fi
+        [[ $cpaq -eq 0 ]] && cpaq=9    # « VAVAPAQ1\n »
+        cpaq=$(( cpaq + 2 + ${#rel} + 1 + ${#brut} + 1 + brut + 1 ))
+        [[ $DETAIL -eq 1 ]] && cdet+=$(printf '  %-20s %-48s %8s %8s' "$res@conseil" "$rel" "$brut" "-")$'\n'
+        return 0
+    }
     compter "$d/fxmanifest.lua" m
     for f in "$d"/stream/**; do compter "$f" s; done
     while IFS=$'\t' read -r _ cote _ motif; do
-        [[ "$cote" != serveur && -n "$motif" && "$motif" != @* ]] || continue
+        [[ ( "$cote" == client || "$cote" == conseil ) && -n "$motif" && "$motif" != @* ]] || continue
         if [[ "$motif" == /* || "/$motif/" == */../* ]]; then
-            echo "$(nom "$d") : motif refusé (absolu ou avec ..) : $motif" >&2; continue
+            echo "$res : motif refusé (absolu ou avec ..) : $motif" >&2; continue
         fi
-        if [[ "$cote" == conseil ]]; then conseil+=("$motif"); continue; fi
+        if [[ "$cote" == conseil ]]; then
+            for f in "$d"/$motif; do conseil "$f"; done    # paquet du Conseil (T-157), dans la ressource seule
+            continue
+        fi
         for f in "$d"/$motif; do compter "$f" a; done    # motif développé exprès (joker), dans la ressource seule
     done < <(awk -v Q="'" -v MODE=liste -f scripts/lib/manifeste.awk "$d/fxmanifest.lua" | tr -d '\r')
-    if [[ $LISTE -eq 1 ]]; then
-        # côté conseil (paquet du Conseil, T-157) : listé à part, jamais compté chez le joueur
-        for motif in "${conseil[@]}"; do
-            for f in "$d"/$motif; do
-                [[ -f "$f" && -z "${vusc[$f]:-}" ]] || continue
-                vusc[$f]=1
-                printf '%s@conseil\t%s\n' "$res" "${f#"$d"/}"
-            done
-        done
-        unset vus vusc R
-        continue
-    fi
-    ligne "$(nom "$d")" "${R[lb]}" "${R[lg]}" "${R[ab]}" "${R[ag]}" "${R[mb]}" "${R[mg]}" "${R[sb]}" "${R[sg]}" \
+    if [[ $LISTE -eq 1 ]]; then unset vus R cvus; continue; fi
+    ligne "$res" "${R[lb]}" "${R[lg]}" "${R[ab]}" "${R[ag]}" "${R[mb]}" "${R[mg]}" "${R[sb]}" "${R[sg]}" \
         $(( R[lb] + R[ab] + R[mb] + R[sb] )) $(( R[lg] + R[ag] + R[mg] + R[sg] ))
     for k in lb lg ab ag mb mg sb sg; do T[$k]=$(( ${T[$k]} + ${R[$k]} )); done
-    unset vus vusc R
+    if [[ $cpaq -gt 0 ]]; then
+        printf '%s' "$cdet"
+        ligne "$res@conseil" "$cl" - "$ca" - 0 - 0 - "$cpaq" -
+    fi
+    unset vus R cvus
 done
 [[ $LISTE -eq 1 ]] && exit 0
 ligne total "${T[lb]}" "${T[lg]}" "${T[ab]}" "${T[ag]}" "${T[mb]}" "${T[mg]}" "${T[sb]}" "${T[sg]}" \

@@ -741,10 +741,24 @@ versé à T-014 ; les autres points déjà couverts sont précisés dans T-012 �
 - Critères : essai que chaque fichier transformé est identique au caractère près hors commentaires (chaînes longues,
   `--[[ ]]` dans une chaîne, `--` dans une chaîne) ; numéros de ligne des erreurs gardés (lignes vides laissées) ;
   mesure avant et après par `scripts/poids-client.sh` ; aucune dépendance ajoutée.
+- Note de T-157 : traiter les fichiers de la directive `vava_conseil_lua` (paquet du Conseil, `scripts/lib/manifeste.awk`
+  les liste côté `conseil`) comme des `client_scripts`, et `config_conseil.lua` comme une config livrée ; le serveur de
+  l'Atelier lit la copie déployée (`LoadResourceFile`) : le paquet s'allège sans rien changer à T-157 ; garder les
+  lignes (numéros d'erreur du paquet). `vava_conseil_web` (JS, CSS) n'est pas du ressort de T-154.
 
 ### T-157 — Code de l'Atelier livré au seul Conseil — **décision du porteur du projet**
-- Agents : vava-architecte → vava-dev-lua + vava-dev-nui · Dépend de : T-102 · Statut : à faire (proposée, à valider par
-  le porteur du projet avant de la prendre : changement d'architecture et d'outillage)
+- Agents : vava-architecte → vava-dev-lua + vava-dev-nui · Dépend de : T-102 · Statut : à tester en jeu (relu
+  sécurité, réseau, contre-relu ; suites appliquées ; validée par le porteur du projet le 2 novembre 2026 : changement
+  d'architecture et d'outillage)
+- Fait le 2 novembre 2026 : `vava_atelier` 1.4.0 (spec `docs/plan/specs/T-157.md`, rapport
+  `docs/plan/rapports/T-157.md` avec les relectures sécurité, réseau et la contre-relecture et leurs suites, contrat de
+  la page `docs/plan/rapports/T-157-contrat.md`). Chaque joueur télécharge 57 668 o (22 359 compressés) au lieu de
+  262 381 (82 448) ; paquet du Conseil 248 218 o, une fois par version et par membre, vérifié par SHA-256 avant
+  exécution. **À tester en jeu** : `docs/tests/atelier.md` § 25 (23 tests), en priorité 25-1 (directives lues), 25-12
+  (noms sans `@@`), 25-21 et 25-22 (sécurité), 25-23 (à-coup). Reste au porteur du projet : la ligne de `CLAUDE.md` sur
+  `config_conseil.lua` et les directives `vava_conseil_*`.
+- À faire après l'essai 25-21 (contre-relecture C-3) : si `event.source` d'un message de `SendNUIMessage` n'est pas
+  `null`, retirer de `web/boot.js` la clause qui accepte la source vide (seules la page et son parent resteront lus).
 - Trouvé pendant T-102 (relecture réseau R-1, piste pour le porteur du projet) : ≈ 51 Ko de code de `vava_atelier`
   (outil de placement, séance, relais, page) ne servent qu'au Conseil mais sont téléchargés par tous les joueurs.
   Proposition : livraison à la demande, en latent, à l'ouverture de l'Atelier par un membre (droit relu), gardée en
@@ -768,6 +782,32 @@ versé à T-014 ; les autres points déjà couverts sont précisés dans T-012 �
 - Trouvé pendant T-146 : rien ne vérifie qu'un `shared/*.lua` présent dans un module est bien listé à son manifeste ;
   sans la ligne de `shared/cycle.lua`, `vava_time` tomberait au premier tirage du ciel. Ajouter le contrôle à
   `config_split_spec` (T0) ou à l'audit, avec un cas d'essai.
+- Note de T-157 : compter les fichiers de la directive `vava_conseil_lua` comme listés au manifeste (`lists.council` de
+  `config_split_spec`, côté `conseil` de `scripts/lib/manifeste.awk`) : `shared/aim.lua` de `vava_atelier` n'est plus
+  qu'en `vava_conseil_lua`.
+
+### T-165 — Paquet du Conseil compressé — **décision du porteur du projet**
+- Agents : vava-architecte → vava-dev-lua · Dépend de : T-157 validée en jeu · Statut : à faire (proposée, à valider
+  par le porteur du projet ; à prendre avec T-163 ou quand le Conseil devient nombreux)
+- Trouvé pendant T-157 (relecture réseau R-1) : le paquet du Conseil (≈ 248 Ko) part en latent sans compression ;
+  gzip le ramènerait à ≈ 65 Ko (≈ 57 Ko après T-154), un LZ décodable en Lua pur à ≈ 105 Ko. Proposition : compresser
+  au démarrage du serveur, décompresser chez le membre avant la SHA-256 (qui reste calculée sur le texte décompressé),
+  décodeur borné (taille de sortie annoncée, 512 Ko au plus) et testé hors jeu.
+- Critères : paquet envoyé ≤ 110 Ko ; décodeur sans dépendance, borné, essais (vecteurs, entrée tronquée ou gonflée) ;
+  temps de décompression mesuré chez le membre ; mesure avant et après.
+
+### T-163 — Livraison à la demande dans le core — **décision du porteur du projet**
+- Agents : vava-architecte → vava-dev-lua (cette tâche autorise à toucher le core) · Dépend de : T-157 validée en jeu ·
+  Statut : à faire (proposée, à valider par le porteur du projet avant de la prendre)
+- Proposée par T-157 (spec § 13) : déplacer dans le core (`core.delivery`) le format du paquet, l'empreinte, le chargeur,
+  le stockage local et la construction de `vava_atelier` 1.4.0 ; un module déclare `vava_conseil_*` et une fonction de
+  droit, le core construit, sert, garde et charge. Candidats à mesurer alors : Registre de `vava_admin` (panneau et
+  outils), éditeur des zones de voix (`vava_voice/client/editor.lua`), outil du temps (`vava_time/client/tool.lua`). La
+  même tâche peut contrôler l'origine des réponses RPC côté client (`client/core/rpc.lua:123`) après avoir vérifié en
+  jeu ce que vaut `source` pour un évènement venu du serveur et pour un `TriggerEvent` local ; et rapprocher les deux
+  copies de FNV-1a (`shared/fingerprint.lua`, `shared/digest.lua`).
+- Critères : `vava_atelier` passe au mécanisme du core sans changement de comportement ni de poids ; mesure des
+  candidats avant et après ; essais repris du module.
 
 ### T-150 — Métadonnées de la pile dans le hook `vava_inventory:use`
 - Agent : vava-dev-lua (cette tâche autorise à toucher `vava_inventory`) · Dépend de : — · Statut : à faire
@@ -1263,6 +1303,16 @@ faire tout le système de combat ») : la porte T-119 reste à passer en jeu.
   mentorat du maître d'armes ; techniques de hache, masse, dague, bâton et bouclier en config.
 - Relecture sécurité de T-113 : `learn` des techniques (défensives comprises : la Parade demande le niveau 10) vérifié
   par le crochet `vava_combat:using` ; XP de défense par le hook `vava_combat:defended`.
+- Laissé par T-156 : XP de combat sur un mannequin par le hook `vava_combat:trained` (`{ source, characterId, dummy, n,
+  kind, technique?, item?, spell?, amount, outcome }`) tant que le niveau dans la compétence de l'arme est **sous**
+  `config.dummies.xpMaxLevel` (9, `vava_combat`) ; aucune XP de défense sur un mannequin ; mentorat : auprès de son
+  maître, l'apprenti progresse plus vite sous le plafond, sans le lever (au-delà, le maître se fait partenaire : la
+  Parade se gagne face à quelqu'un) ; à décider (relecture lore L-4).
+- Relecture sécurité de T-156 (S-4) : le point d'impact d'un projectile est annoncé par le client ; quand des XP seront
+  branchées sur `trained`, appliquer `xpMaxLevel`, un débit d'XP par personnage, et compter les éclats et la Nova (un
+  hook par mannequin touché) comme un seul gain.
+- Relecture lore de T-156 (L-9) : le maître pourrait voir les chiffres de son apprenti au mannequin (≈ 28 o par coup, à
+  lui seul).
 
 ### T-155 — Chiffres des coups (dégâts affichés)
 - Agents : vava-architecte → vava-dev-lua + vava-dev-nui (cette tâche autorise à toucher `vava_hud`, `vava_pause`, `vava_magic`) · Dépend de : T-112 (après T-113, même module) · Statut : à tester en jeu (relu sécurité, réseau et lore ; suites appliquées)
@@ -1293,8 +1343,8 @@ faire tout le système de combat ») : la porte T-119 reste à passer en jeu.
   page allégée (`vava-dev-nui`). L-6 et L-8 laissés à T-119.
 
 ### T-156 — Mannequin d'entraînement
-- Agents : vava-architecte → vava-dev-lua · Dépend de : T-112 (après T-113, même module) ; T-102 pour le placement
-  par l'Atelier · Statut : à faire
+- Agents : vava-architecte → vava-dev-lua (cette tâche autorise à toucher `vava_health`, `vava_magic`) · Dépend de : T-112 (après T-113, même module) ; T-102 pour le placement
+  par l'Atelier · Statut : à tester en jeu (relu sécurité, réseau et lore ; suites appliquées)
 - Demande du porteur du projet (31 octobre 2026), « comme les MMO » : un mannequin de paille (modèle `-- PLACEHOLDER`)
   qu'on frappe dans une cour d'armes pour essayer ses techniques ; il encaisse sans jamais tomber, montre le montant de
   chaque coup (T-155), se « remet » seul ; coups d'arme et sorts.
@@ -1307,6 +1357,24 @@ faire tout le système de combat ») : la porte T-119 reste à passer en jeu.
 - Note de T-155 : `exports.vava_hud:hitText('dealt', { x =, y =, z = }, issue, dixièmes)` accepte une ancre fixe (point
   du mannequin, |x|, |y| ≤ 50 000, |z| ≤ 5 000) ; le mannequin envoie son montant à l'attaquant seul, par son propre
   message ; `stagger` y sert de « comme si ».
+- Fait le 1er novembre 2026 (branche `agents/T-156`, spec `docs/plan/specs/T-156.md`, rapport
+  `docs/plan/rapports/T-156.md`) : `vava_health` 1.6.0 (export `trial(paquet, lieu)` : montant « comme si », seuls les
+  modificateurs inscrits `trial = true`, aucun en 1.6.0 ; ni vie, ni mise à terre, ni hooks, ni journal, ni numéro, ni
+  débit des vrais coups, ni `chain.pvp` ; débit propre de 20 essais par seconde et par source), `vava_combat` 1.5.0 (trois
+  mannequins en config, modèle et places `-- PLACEHOLDER` ; props locaux créés à 60 m, retirés à 70 m ; un relevé frappe
+  un mannequin quand aucun joueur ne l'est ; Fendant « Chancelle » sans rien poser ; usure un coup sur quatre ; aucune
+  XP, hook `vava_combat:trained` ; évènement `vava_combat:dummy` : issue et montant à l'attaquant seul, balancement aux
+  témoins à 15 m au plus un par mannequin et par 0,8 s ; exports `dummiesNear`, `dummyHit`, `dummies`), `vava_magic`
+  2.14.0 (projectiles, éclats, Nova ardente et Secousse sur les mannequins). Procédure `combat` § 8 (28 tests).
+  Relectures sécurité, réseau et lore à faire.
+- Fait le 2 novembre 2026 : relu sécurité (OK, 4 mineurs), réseau (R-1 important, 5 mineurs) et lore (à corriger,
+  mineur) ; suites appliquées, versions inchangées : un mannequin ne compte plus dans les adversaires d'un coup (au plus
+  un, aucun si un joueur a été frappé, S-1) ; aucun mannequin frappé par un lanceur posté en zone de paix (S-2) ; essai
+  du bouclier tenu (S-3) ; contrôle de la liste au seul serveur, le client n'en reçoit que l'index (R-1 : `vava_combat`
+  servi − 5,8 Ko bruts, − 1,7 Ko gzip) ; resmon d'un témoin (R-2) ; modèle qui ne se charge pas gardé sans prop jusqu'à
+  la sortie de portée (R-3) ; libellé au serveur, `hitText` en un appel (R-5) ; tailles comptées par `core.net` et coût au
+  pire (R-6) ; textes du README, de la spec et de la procédure (L-1 à L-6) ; notes à T-115 (S-4, L-4, L-9) et T-162 (R-4,
+  L-7, L-8). **À tester en jeu** : `docs/tests/combat.md` § 8 (28 tests).
 
 ### T-116 — La magie sur la chaîne de dégâts
 - Agent : vava-dev-lua · Dépend de : T-110 · Statut : à tester en jeu (relu sécurité et réseau, contre-relecture
@@ -1405,6 +1473,9 @@ faire tout le système de combat ») : la porte T-119 reste à passer en jeu.
   ou 1 ; les témoins doivent-ils voir les mots (`parry`, `break`) ; un même mot sous deux allures (italique seul, petites
   capitales sous un chiffre : n'en garder qu'une, L-6) ; « À terre » en rouge chez l'attaquant alors que le rouge dit
   « reçu » partout ailleurs (L-8).
+- Laissé par T-156 (spec § 13) : usure sur un mannequin (`dummies.wearChance`, 0,25), distances des props (60 / 70 m),
+  balancement (0,9 s, 14°, deux allers-retours, sens à vérifier), témoins (15 m, 0,8 s) ; modèle définitif du mannequin
+  de paille (aperçu de `docs/maquettes/Combat.html`).
 
 ### T-159 — Filtre par étiquettes à l'inscription d'un modificateur de `vava_health`
 - Agent : vava-dev-lua (cette tâche autorise à toucher `vava_health`) · Dépend de : T-113 · Statut : à faire
@@ -1413,6 +1484,24 @@ faire tout le système de combat ») : la porte T-119 reste à passer en jeu.
   de `vava_combat`). Permettre à une entrée du registre `vava_health:modifiers` de déclarer des étiquettes voulues
   (`tags`) et interdites (`never`), filtrées par la chaîne avant l'appel : ne pas appeler un modificateur pour les zones
   ni les effets qui durent. Puis `vava_combat` les déclare (esquive : `melee`, `ranged` ; jamais `area`, `overTime`…).
+
+### T-162 — Cour d'armes dans l'Atelier
+- Agents : vava-dev-lua + vava-dev-nui (cette tâche autorise à toucher `vava_atelier`) · Dépend de : T-156, T-102 ·
+  Statut : à faire
+- Proposée par T-156 (spec § 5.2 et § 13) : éditeur `vava_combat:cour` (famille `monde`, droit `metiers`, libellé
+  « Cour d'armes »), sorte `dummy`, schéma de la spec T-156 § 5.1 (mots du jeu : « Mannequin », « Place »,
+  « Orientation », « Modèle », « Lieu clos » pour `bucket`), placement `prop` de l'outil de T-102, modèle provisoire
+  signalé ; `dummies.list` de `config_client.lua` importée comme version 1, la base fait foi ensuite.
+- Diffusion : une zone `core.zones` par mannequin (`dummy:<id>`, rayon `streamRadius`, marge 20 m, instance), état
+  `{ d = { n, x, y, z, h, m? } }` ; le client remplace la liste de la config par les zones suivies ; un mannequin en essai
+  part à son seul auteur ; la liste quitte `config_client.lua` (≈ 80 o par mannequin servis aujourd'hui) pour
+  `config.lua` ; `server/dummies.lua` garde son interface (`dummies.replace`). Numéro `n` donné par le serveur à la
+  publication, gardé tant que l'`id` existe, jamais redonné pendant la vie du serveur.
+- Relecture réseau de T-156 (R-4) : les sorts appellent `vava_combat:dummiesNear` même loin de toute cour ; avec les
+  zones, la magie peut garder sa propre copie des places et ne rien demander hors d'une cour.
+- Relecture lore de T-156 : placer la cour sur la carte du royaume, dans le bourg, sur un passage, près de l'arrivée
+  des voyageurs (L-7) ; un mannequin qui s'use et se regarnit avec la paille d'un fermier et les poteaux d'un
+  menuisier, roussi par une Boule de feu (L-8).
 
 ## Phase 5 — Interactions RP
 
@@ -1459,6 +1548,8 @@ faire tout le système de combat ») : la porte T-119 reste à passer en jeu.
   `vava_farming`) : créer à `radius`, retirer à `radius + 10` m. Et aucun point de récolte, station ou point d'eau ne
   vérifie l'instance (routing bucket) du joueur : un joueur dans une instance, aux coordonnées d'un puits, peut puiser.
   Ajouter `bucket` aux zones concernées et le contrôle dans `near`.
+- Laissé par T-156 : les mannequins de `vava_combat` (1.5.0) sont dessinés chez un joueur d'une autre instance (le
+  client ne connaît pas son instance de façon sûre) ; le serveur refuse déjà leurs coups venus d'une autre instance.
 
 ### T-039 — PORTE : soirée RP de test — **HUMAIN**
 - Dépend de : phase 5 · Statut : à faire
@@ -1483,6 +1574,9 @@ faire tout le système de combat ») : la porte T-119 reste à passer en jeu.
 - Agents : vava-dev-lua + vava-dev-nui · Dépend de : T-120, T-119 · Statut : à faire
 - Maquette `Combat` : frise des phases réglable à la souris, aperçu au ralenti, zone touchée dessinée au sol,
   essai contre un mannequin ; les techniques de la config sont importées comme version 1.
+- Laissé par T-156 : « Essayer contre un mannequin » par `exports.vava_combat:dummies()` (mannequin le plus proche de
+  l'auteur), technique en essai jouée par son seul auteur, chiffre par T-155, hook `vava_combat:trained` pour le retour.
+
 - Relectures de T-142 (réseau R-2 et R-3, sécurité S-2) : `weapons` de `vava_combat` reste entier dans
   `config_client.lua` (≈ 1,9 Ko : `damage`, `durability`, `block`, `reachBonus`) alors que le client n'en lit que
   `category` et `family`, et `shield` y sert les délais du serveur (`toggleMs`, `verifyMs`, `missesToDrop`,

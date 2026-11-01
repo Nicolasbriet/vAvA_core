@@ -1,8 +1,9 @@
 --[[
     vava_atelier/client/relay.lua
     Rôle : retours de la page → RPC du serveur (clés attendues seulement, réponse { ok, error?, data? }), versions gardées,
-           bandeau du volet, relais de l'outil de placement.
-    Dépendances : shared/constants.lua, config_client.lua, client/core.lua, client/nui.lua, client/session.lua
+           bandeau du volet, relais de l'outil de placement. Livré dans le paquet du Conseil (T-157).
+    Dépendances : shared/constants.lua, config_client.lua, config_conseil.lua, client/core.lua, client/nui.lua,
+                  client/session.lua
 ]]
 
 local type, tostring, tonumber, ipairs = type, tostring, tonumber, ipairs

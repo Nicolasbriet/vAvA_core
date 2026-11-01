@@ -17,6 +17,8 @@ VavaCombat.RPC = {
 VavaCombat.EVENTS = {
     NOTIFY = 'vava_combat:notify',      -- texte, nature : au seul joueur concerné (usure, /armes, coup retenu)
     HIT = 'vava_combat:hit',            -- attaquant, cible, issue[, dixièmes|false] : à 30 m de la cible, même instance
+    -- mannequin, attaquant[, issue, dixièmes|false] : issue à l'attaquant, balancement seul aux témoins à 15 m (T-156)
+    DUMMY = 'vava_combat:dummy',
 }
 
 -- Statebag du ped du porteur d'un bouclier accroché : { id, item } ou rien, écrit et gardé par le serveur.
@@ -69,3 +71,5 @@ VavaCombat.MODEL_MAX = 64                      -- octets d'un nom de modèle
 VavaCombat.MAX_PLAYER = 65535                  -- plus grand numéro de joueur (cible d'un coup, évènement HIT)
 VavaCombat.TENTHS_MAX = 2000                   -- montant d'un coup en dixièmes (4e valeur de HIT, T-155)
 VavaCombat.MAX_REASON = 120                    -- octets d'une raison de refus d'un crochet, montrée au joueur
+VavaCombat.MAX_DUMMIES = 64                    -- mannequins d'entraînement au plus (numéro `n` de vava_combat:dummy)
+

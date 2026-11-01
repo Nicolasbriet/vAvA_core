@@ -34,6 +34,8 @@ VavaAtelier.RPC = {
     -- T-102 : outil de placement (server/placement.lua)
     PLACE = 'vava_atelier:place',             -- atelier, type, entrée ('' : nouvelle), révision, lieu, parent, valeurs
     CHILDREN = 'vava_atelier:children',       -- atelier, type, entrée : lieux de la fiche, de son parent, de ses enfants
+    -- T-157 : code du Conseil livré à la demande (server/delivery.lua, client/loader.lua)
+    CODE = 'vava_atelier:code',               -- empreinte ('' : aucune), morceau (0 : description) : paquet du Conseil
 }
 
 -- Évènements serveur → client, toujours vers les seuls membres concernés (core.net).
@@ -73,3 +75,18 @@ VavaAtelier.MODEL_PATTERN = '^[A-Za-z0-9_]+$'     -- nom d'un modèle de fantôm
 VavaAtelier.MAX_MODEL = 64
 VavaAtelier.MAX_ROWS = 200                        -- lignes d'une réponse `children` gardées par l'outil
 VavaAtelier.MAX_VERTICES = 32                     -- sommets d'un tracé (config.place.polygonPoints.max)
+
+-- T-157 : paquet du Conseil (shared/codepack.lua, client/loader.lua ; web/boot.js en garde une copie vérifiée par
+-- essai). Bornes que le client applique à ce qu'il reçoit, aussi lues par le serveur.
+VavaAtelier.CODEPACK = {
+    MAGIC = 'VAVAPAQ1',          -- première ligne du paquet (format 1)
+    MAX_BYTES = 524288,          -- paquet entier, 512 Ko
+    PART_BYTES = 65536,          -- un morceau envoyé, 64 Ko
+    MAX_PARTS = 8,               -- MAX_BYTES / PART_BYTES
+    MAX_PIECES = 48,             -- fichiers d'un paquet
+    MAX_NAME = 96,               -- chemin d'un fichier, octets
+    MAX_DEPTH = 4,               -- dossiers au plus dans un chemin
+    DIGEST_LENGTH = 16,          -- empreinte : 16 chiffres hexadécimaux (minuscules)
+    KVP_CHUNK = 32768,           -- morceau gardé en stockage local
+    KVP_MAX_CHUNKS = 16,         -- MAX_BYTES / KVP_CHUNK
+}

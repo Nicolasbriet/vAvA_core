@@ -90,7 +90,12 @@ config.numbers = {
                           -- les chiffres à l'écran de vava_hud (numbers.maxAlive, 10)
 }
 
+-- Mannequins d'entraînement (vava_combat ≥ 1.5.0, T-156) : les projectiles, leurs éclats, la Nova et la Secousse les
+-- frappent « à blanc » (rien n'est appliqué, aucun état, aucun bonus d'XP). false : les sorts les traversent.
+config.dummies = { enabled = true }
+
 -- Protections magiques, tenues par le serveur et portées par la chaîne de dégâts de vava_health : un bouclier
+
 -- absorbe les coups (sorts et lames) jusqu'à sa réserve (modificateur `vava_magic:protections`, étape bouclier) ;
 -- une résistance retire une part des dégâts d'un type, une faiblesse en ajoute une (`vava_magic:resistances`,
 -- étape resistance ; la plus forte de chaque sens l'emporte, jamais cumulées). Aucun des onze sorts n'en pose

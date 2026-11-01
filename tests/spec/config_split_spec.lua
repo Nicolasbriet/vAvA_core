@@ -13,6 +13,14 @@ local helper = require('tests.helper')
 -- fonction, parcourue, rangée ailleurs, alias non suivi (`local c = cfg or {}`) — doit être ENTIÈRE dans la vue client
 -- (relecture réseau R-1 et R-2). Une clé absente des deux vues (facultative) est ignorée. Un alias de la table du
 -- module (`local m = <Global>` puis `m.config`) n'est pas suivi : T2 le refuse (relecture réseau R-6 de T-142).
+--
+-- T-157 (spec § 11.1) : code du seul Conseil livré à la demande. Directives `vava_conseil_lua` (fichiers Lua du paquet,
+-- `lists.council`) et `vava_conseil_web` (feuille et scripts de la page, `lists.councilWeb`) ; `config_conseil.lua`
+-- (lu par le serveur et par le seul client du Conseil, dans le paquet) complète la table après config_client.lua et
+-- avant config.lua. Seule T0 est assouplie, pour ce fichier nommé (permis entre les constantes et config.lua) ; en
+-- échange : T1 aussi pour config_conseil.lua ; T2 et T4 séparent l'amorce (vue config_client.lua) du paquet (vue
+-- config_client.lua + config_conseil.lua) ; T3 exige qu'un shared/ du serveur lu par le paquet soit dans le paquet, et
+-- qu'un shared/ du paquet y soit lu ; T5 (nouvelle) contrôle les entrées des deux directives.
 
 local ROOT = (os.getenv('VAVA_ROOT') or '.') .. '/'
 
@@ -57,7 +65,14 @@ local SCRIPT_LISTS = {
     shared_script = 'shared', shared_scripts = 'shared',
     client_script = 'client', client_scripts = 'client',
     server_script = 'server', server_scripts = 'server',
+    -- T-157 : code du seul Conseil (jamais téléchargé par un joueur), et fichiers livrés (pour T5)
+    vava_conseil_lua = 'council', vava_conseil_web = 'councilWeb',
+    files = 'files', file = 'files',
 }
+
+local function emptyLists()
+    return { shared = {}, client = {}, server = {}, wild = {}, council = {}, councilWeb = {}, files = {} }
+end
 
 local function read(path)
     local file = io.open(ROOT .. path, 'rb')
@@ -130,12 +145,13 @@ local function strip(src, dropStrings)
     return table.concat(out)
 end
 
---- Chaînes des listes de scripts d'un manifeste : { shared = {…}, client = {…}, server = {…}, wild = {…} } (entrées
---- `@ressource/…` sautées ; `wild` : chaînes à joker, refusées dans une liste de scripts).
+--- Chaînes des listes de scripts d'un manifeste : { shared = {…}, client = {…}, server = {…}, wild = {…}, council = {…},
+--- councilWeb = {…}, files = {…} } (entrées `@ressource/…` sautées ; `wild` : chaînes à joker d'une liste de scripts ou
+--- d'une directive vava_conseil_*, refusées ; `files` : motifs de `files` et `file`, jokers permis).
 ---@param manifest string
 local function parseManifest(manifest)
     local code = strip(manifest)
-    local lists = { shared = {}, client = {}, server = {}, wild = {} }
+    local lists = emptyLists()
     local i, n = 1, #code
     local function readString(at)
         local q = code:sub(at, at)
@@ -156,7 +172,7 @@ local function parseManifest(manifest)
     local function add(side, value)
         value = value:gsub('\\', '/'):gsub('^%./', '')
         if value:sub(1, 1) == '@' then return end
-        if value:find('[%*%?%[]') then lists.wild[#lists.wild + 1] = value end
+        if side ~= 'files' and value:find('[%*%?%[]') then lists.wild[#lists.wild + 1] = value end
         local list = lists[side]
         list[#list + 1] = value
     end
@@ -221,21 +237,12 @@ local function run(path)
     chunk()
 end
 
---- Charge les constantes, puis config_client.lua (s'il existe) et rend la vue client (copie), puis config.lua (s'il
---- existe) sous garde : toute écriture d'une clé déjà posée par config_client.lua est relevée. Rend la vue client,
---- la vue complète, les réécritures et vrai si config.lua a remplacé la table.
-local function loadViews(mod)
-    helper.reset()
-    _G[mod.global] = nil
-    if exists(mod.dir .. '/shared/constants.lua') then run(mod.dir .. '/shared/constants.lua') end
-    local hasClient, hasServer = exists(mod.dir .. '/config_client.lua'), exists(mod.dir .. '/config.lua')
-    if hasClient then run(mod.dir .. '/config_client.lua') end
-    local root = _G[mod.global]
-    local opened = root and root.config
-    local clientView = deepCopy(opened)
-    local rewrites, guarded = {}, {}
-    -- garde : chaque table posée par config_client.lua est vidée dans une ombre, lue et complétée par métatable
-    local function guard(t, path)
+--- Lance `path` sous garde : chaque table déjà posée sous `opened` est vidée dans une ombre, lue et complétée par
+--- métatable ; toute écriture d'une clé déjà posée est relevée dans `rewrites` (« fichier : chemin »), puis les tables
+--- sont rendues telles quelles.
+local function runGuarded(opened, path, file, rewrites)
+    local guarded = {}
+    local function guard(t, at)
         local shadow = {}
         for k, v in pairs(t) do shadow[k] = v end
         for k in pairs(shadow) do rawset(t, k, nil) end
@@ -243,27 +250,51 @@ local function loadViews(mod)
         setmetatable(t, {
             __index = shadow,
             __newindex = function(_, k, v)
-                if shadow[k] ~= nil then rewrites[#rewrites + 1] = path .. '.' .. tostring(k) end
+                if shadow[k] ~= nil then rewrites[#rewrites + 1] = file .. ' : ' .. at .. '.' .. tostring(k) end
                 shadow[k] = v
             end,
             __pairs = function() return next, shadow, nil end,
         })
         for k, v in pairs(shadow) do
-            if type(v) == 'table' then guard(v, path .. '.' .. tostring(k)) end
+            if type(v) == 'table' then guard(v, at .. '.' .. tostring(k)) end
         end
     end
-    if type(opened) == 'table' and hasServer then guard(opened, 'config') end
-    if hasServer then run(mod.dir .. '/config.lua') end
+    if type(opened) == 'table' then guard(opened, 'config') end
+    run(path)
     for i = #guarded, 1, -1 do
         local g = guarded[i]
         setmetatable(g.t, nil)
         for k, v in pairs(g.shadow) do rawset(g.t, k, v) end
     end
+end
+
+--- Charge les constantes, puis config_client.lua (s'il existe) et rend la vue client (copie), puis config_conseil.lua
+--- (T-157, s'il existe) et rend la vue du Conseil (copie), puis config.lua (s'il existe), chacun des deux derniers sous
+--- garde : toute écriture d'une clé déjà posée est relevée. Rend la vue client, la vue complète, les réécritures, vrai si
+--- un fichier a remplacé la table, et la vue du Conseil (= vue client sans config_conseil.lua).
+local function loadViews(mod)
+    helper.reset()
+    _G[mod.global] = nil
+    if exists(mod.dir .. '/shared/constants.lua') then run(mod.dir .. '/shared/constants.lua') end
+    local hasClient, hasServer = exists(mod.dir .. '/config_client.lua'), exists(mod.dir .. '/config.lua')
+    local hasCouncil = exists(mod.dir .. '/config_conseil.lua')
+    if hasClient then run(mod.dir .. '/config_client.lua') end
+    local root = _G[mod.global]
+    local opened = root and root.config
+    local clientView = deepCopy(opened)
+    local rewrites = {}
+    local councilView = clientView
+    if hasCouncil then
+        runGuarded(opened, mod.dir .. '/config_conseil.lua', 'config_conseil.lua', rewrites)
+        root = _G[mod.global]
+        councilView = deepCopy(root and root.config)
+    end
+    if hasServer then runGuarded(opened, mod.dir .. '/config.lua', 'config.lua', rewrites) end
     root = _G[mod.global]
     local full = root and root.config
     local replaced = opened ~= nil and not rawequal(opened, full)
     _G[mod.global] = nil
-    return clientView, full, rewrites, replaced
+    return clientView, full, rewrites, replaced, councilView
 end
 
 --- Chemins des feuilles et des tables de `view` : « a.b.c » → valeur.
@@ -292,8 +323,58 @@ local function at(view, path)
     return value
 end
 
+--- T-157 : fichiers Lua du paquet du Conseil (vava_conseil_lua), hors config_conseil.lua (la config, lue par eux).
+local function councilFiles(lists)
+    local files = {}
+    for _, f in ipairs(lists.council) do
+        if f:match('%.lua$') and f ~= 'config_conseil.lua' then files[#files + 1] = f end
+    end
+    return files
+end
+
+--- Motif de `files` (joker `*`, `?`, `**`) qui couvre le chemin `path`.
+local function globCovers(glob, path)
+    local pattern = glob:gsub('[%^%$%(%)%%%.%[%]%+%-]', '%%%0'):gsub('%*%*', '\0'):gsub('%*', '[^/]*')
+        :gsub('%?', '[^/]'):gsub('\0', '.*')
+    return path:find('^' .. pattern .. '$') ~= nil
+end
+
+--- T5 : nil, ou le premier manquement des directives vava_conseil_* : entrée sans joker, au bon genre (`.lua` ; `.css`
+--- ou `.js`), présente sur le disque, listée une fois, jamais config.lua, ni aussi livrée à tous (files, client_scripts,
+--- shared_scripts).
+---@param lists table  parseManifest
+---@param present fun(path: string): boolean
+---@return string|nil
+local function councilProblem(lists, present)
+    local seen = {}
+    for _, entry in ipairs({
+        { list = lists.council, name = 'vava_conseil_lua', ext = { lua = true } },
+        { list = lists.councilWeb, name = 'vava_conseil_web', ext = { css = true, js = true } },
+    }) do
+        for _, f in ipairs(entry.list) do
+            if f:find('[%*%?%[]') then return entry.name .. ' : joker refusé : ' .. f end
+            if f:lower() == 'config.lua' then   -- casse ignorée (NTFS)
+                return entry.name .. ' : config.lua (réglages du seul serveur) dans un paquet : ' .. f
+            end
+            local ext = f:match('%.([%w]+)$')
+            if not ext or not entry.ext[ext] then return entry.name .. ' : extension refusée : ' .. f end
+            if seen[f] then return entry.name .. ' : listé deux fois : ' .. f end
+            seen[f] = true
+            if not present(f) then return entry.name .. ' : fichier absent : ' .. f end
+            for _, side in ipairs({ 'files', 'client', 'shared' }) do
+                for _, g in ipairs(lists[side]) do
+                    if globCovers(g, f) then
+                        return ('%s : %s aussi livré à tous (%s : %s)'):format(entry.name, f, side, g)
+                    end
+                end
+            end
+        end
+    end
+    return nil
+end
+
 --- Fichiers servis au client par le manifeste : client_scripts, et shared/*.lua de shared_scripts (hors constantes et
---- config_client.lua).
+--- config_client.lua) — l'amorce, pour un module qui a un paquet du Conseil (T-157).
 local function clientFiles(lists)
     local files = {}
     for _, f in ipairs(lists.client) do
@@ -564,8 +645,9 @@ describe('configs partagées (T-132)', function()
 
         describe(name, function()
             local manifest = read(mod.dir .. '/fxmanifest.lua')
-            local lists = manifest and parseManifest(manifest) or { shared = {}, client = {}, server = {}, wild = {} }
+            local lists = manifest and parseManifest(manifest) or emptyLists()
             local hasClient, hasServer = exists(mod.dir .. '/config_client.lua'), exists(mod.dir .. '/config.lua')
+            local hasCouncil = exists(mod.dir .. '/config_conseil.lua')
 
             it('T0 : listes de scripts explicites, config_client.lua partagé, config.lua en tête des server_scripts',
                 function()
@@ -582,10 +664,22 @@ describe('configs partagées (T-132)', function()
                         assert.is_nil(indexOf(lists.client, 'config.lua'), 'config.lua servi aux joueurs (client_scripts)')
                         local i = indexOf(lists.server, 'config.lua')
                         assert(i, 'config.lua attendu en server_scripts')
+                        -- T-157 : seule exception nommée, config_conseil.lua (complété par config.lua, chargé après lui)
                         for j = 1, i - 1 do
-                            assert.equal('shared/constants.lua', lists.server[j],
-                                'config.lua attendu en tête des server_scripts (seules les constantes avant lui)')
+                            assert(lists.server[j] == 'shared/constants.lua' or lists.server[j] == 'config_conseil.lua',
+                                'config.lua attendu en tête des server_scripts (seuls les constantes et '
+                                .. 'config_conseil.lua avant lui) : ' .. tostring(lists.server[j]))
                         end
+                    end
+                    -- T-157 : config_conseil.lua, s'il existe, au serveur et dans le paquet, jamais livré à tous
+                    if hasCouncil then
+                        assert(indexOf(lists.server, 'config_conseil.lua'), 'config_conseil.lua attendu en server_scripts')
+                        assert(indexOf(lists.council, 'config_conseil.lua'), 'config_conseil.lua attendu en vava_conseil_lua')
+                        assert.is_nil(indexOf(lists.shared, 'config_conseil.lua'), 'config_conseil.lua en shared_scripts')
+                        assert.is_nil(indexOf(lists.client, 'config_conseil.lua'), 'config_conseil.lua en client_scripts')
+                        assert(hasClient, 'config_conseil.lua complète la table de config_client.lua, absent')
+                    else
+                        assert.is_nil(indexOf(lists.council, 'config_conseil.lua'), 'config_conseil.lua listé, absent')
                     end
                     if hasClient and hasServer then
                         local clientView = loadViews(mod)
@@ -600,13 +694,24 @@ describe('configs partagées (T-132)', function()
                     end
                 end)
 
-            it('T1 : aucune valeur écrite deux fois (config.lua complète config_client.lua)', function()
-                if not (hasClient and hasServer) then return end
-                local clientView, full, rewrites, replaced = loadViews(mod)
-                assert.is_false(replaced, 'config.lua remplace la table ouverte par config_client.lua')
+            it('T1 : aucune valeur écrite deux fois (config_conseil.lua puis config.lua complètent config_client.lua)',
+                function()
+                if not (hasClient and (hasServer or hasCouncil)) then return end
+                local clientView, full, rewrites, replaced, councilView = loadViews(mod)
+                assert.is_false(replaced, 'config_conseil.lua ou config.lua remplace la table ouverte par '
+                    .. 'config_client.lua')
                 table.sort(rewrites)
                 for _, path in ipairs(rewrites) do
-                    error(('config.lua réécrit %s, déjà dans config_client.lua'):format(path))
+                    error(('%s, clé déjà posée par un fichier chargé avant'):format(path))
+                end
+                -- T-157 : chaque feuille de la vue du Conseil se retrouve telle quelle dans la vue complète
+                for _, entry in ipairs(paths(councilView, 'config')) do
+                    local value = at(full, entry.path:sub(#'config.' + 1))
+                    if type(entry.value) == 'table' then
+                        assert.equal('table', type(value), entry.path .. ' : table attendue')
+                    else
+                        assert.equal(entry.value, value, entry.path)
+                    end
                 end
                 for _, entry in ipairs(paths(clientView, 'config')) do
                     local value = at(full, entry.path:sub(#'config.' + 1))
@@ -618,15 +723,23 @@ describe('configs partagées (T-132)', function()
                 end
             end)
 
-            it('T2 : le client ne lit que sa part de la config', function()
-                local clientView, full = loadViews(mod)
+            it('T2 : le client ne lit que sa part de la config (amorce : config_client.lua ; paquet : + config_conseil.lua)',
+                function()
+                local clientView, full, _, _, councilView = loadViews(mod)
                 clientView = clientView or {}
+                councilView = councilView or {}
                 full = full or {}
                 for _, file in ipairs(clientFiles(lists)) do
                     local src = read(mod.dir .. '/' .. file)
                     assert(src, mod.dir .. '/' .. file .. ' introuvable')
                     local failure = checkReads(file, strip(src, true), mod.global, full, clientView)
                     if failure then error(failure) end
+                end
+                for _, file in ipairs(councilFiles(lists)) do
+                    local src = read(mod.dir .. '/' .. file)
+                    assert(src, mod.dir .. '/' .. file .. ' introuvable')
+                    local failure = checkReads(file, strip(src, true), mod.global, full, councilView)
+                    if failure then error('paquet du Conseil, ' .. failure) end
                 end
             end)
 
@@ -645,6 +758,31 @@ describe('configs partagées (T-132)', function()
                 end
             end)
 
+            -- T-157 : chaque feuille de config_conseil.lua (absente de la vue client) est lue par un fichier du paquet
+            it('T4 : config_conseil.lua ne sert au Conseil que ce que lit son paquet', function()
+                if not hasCouncil then return end
+                local clientView, _, _, _, councilView = loadViews(mod)
+                local reads = {}
+                for _, file in ipairs(councilFiles(lists)) do
+                    local code = strip(read(mod.dir .. '/' .. file) or '', true)
+                    for _, r in ipairs(configReads(code, mod.global)) do reads[#reads + 1] = r end
+                end
+                local unread = {}
+                for _, path in ipairs(unreadLeaves(councilView or {}, reads)) do
+                    if at(clientView or {}, path) == nil then unread[#unread + 1] = path end
+                end
+                if #unread > 0 then
+                    error(('config_conseil.lua sert config.%s, qu\'aucun fichier du paquet ne lit : l\'ajouter par '
+                        .. 'config.lua'):format(table.concat(unread, ', config.')))
+                end
+            end)
+
+            it('T5 : directives vava_conseil_* : chaque entrée présente, sans joker, au bon genre, jamais livrée à '
+                .. 'tous ni config.lua', function()
+                local problem = councilProblem(lists, function(f) return exists(mod.dir .. '/' .. f) end)
+                if problem then error(problem) end
+            end)
+
             it('T3 : logique de shared/ partagée seulement si un fichier client s\'en sert', function()
                 local client = {}
                 for _, file in ipairs(clientFiles(lists)) do
@@ -661,6 +799,11 @@ describe('configs partagées (T-132)', function()
                         assert(used, file .. ' n\'est lu par aucun fichier client : le servir au seul serveur')
                     end
                 end
+                -- T-157 : fichiers du paquet du Conseil
+                local council = {}
+                for _, file in ipairs(councilFiles(lists)) do
+                    council[file] = strip(read(mod.dir .. '/' .. file) or '', true)
+                end
                 for _, file in ipairs(lists.server) do
                     if file:match('^shared/.+%.lua$') then
                         local code = strip(read(mod.dir .. '/' .. file) or '', true)
@@ -671,7 +814,26 @@ describe('configs partagées (T-132)', function()
                                         mod.global, field))
                                 end
                             end
+                            for other, councilCode in pairs(council) do
+                                if other ~= file and cites(councilCode, mod.global, field)
+                                    and not indexOf(lists.council, file) then
+                                    error(('%s servi au seul serveur mais lu par %s, du paquet du Conseil (%s.%s) : '
+                                        .. 'l\'ajouter à vava_conseil_lua'):format(file, other, mod.global, field))
+                                end
+                            end
                         end
+                    end
+                end
+                -- un shared/ du paquet est lu par un autre fichier du paquet (sinon il n'a rien à y faire)
+                for _, file in ipairs(lists.council) do
+                    if file:match('^shared/.+%.lua$') then
+                        local used = false
+                        for field in pairs(exports(council[file] or '', mod.global)) do
+                            for other, code in pairs(council) do
+                                if other ~= file and cites(code, mod.global, field) then used = true end
+                            end
+                        end
+                        assert(used, file .. ' est dans vava_conseil_lua, mais aucun fichier du paquet ne le lit')
                     end
                 end
             end)
@@ -785,5 +947,58 @@ describe('configs partagées : T4 sur des sources d\'essai', function()
         assert.same({}, unread('show(VavaX.config)'))
         assert.same({ 'crops.ble.growMinutes', 'crops.ble.stages.1', 'interact.distance', 'interact.serverTolerance',
             'texts.refused.busy', 'texts.refused.wait', 'texts.title' }, unread('local x = 1'))
+    end)
+end)
+
+-- T-157 (spec § 11.1) : lecture des directives du paquet du Conseil, T5 et T2 (amorce / paquet) sur des sources
+-- écrites ici.
+describe('configs partagées : paquet du Conseil (T-157)', function()
+    it('lit vava_conseil_lua et vava_conseil_web à part, sans les compter côté client', function()
+        local lists = parseManifest([=[
+client_scripts { 'client/main.lua' }
+-- vava_conseil_lua { 'client/commentaire.lua' }
+vava_conseil_lua { 'config_conseil.lua', 'client/placer.lua' }
+vava_conseil_web 'web/js/app.js'
+files { 'web/index.html', 'web/js/*.js' }
+]=])
+        assert.same({ 'config_conseil.lua', 'client/placer.lua' }, lists.council)
+        assert.same({ 'web/js/app.js' }, lists.councilWeb)
+        assert.same({ 'client/main.lua' }, lists.client)
+        assert.same({ 'web/index.html', 'web/js/*.js' }, lists.files)
+        assert.same({}, lists.wild)
+        assert.same({ 'client/placer.lua' }, councilFiles(lists))
+        assert.same({ 'client/main.lua' }, clientFiles(lists))
+        -- un joker dans une directive du paquet est relevé comme dans une liste de scripts
+        assert.same({ 'client/*.lua' }, parseManifest("vava_conseil_lua { 'client/*.lua' }").wild)
+    end)
+
+    it('T5 : entrée présente, sans joker, au bon genre, une fois, jamais config.lua ni livrée à tous', function()
+        local function present() return true end
+        local function problem(src, exists_) return councilProblem(parseManifest(src), exists_ or present) end
+        assert.is_nil(problem("vava_conseil_lua { 'client/a.lua' } vava_conseil_web { 'web/css/a.css', 'web/js/a.js' }"))
+        assert.is_nil(problem("files { 'web/index.html', 'web/boot.js' } vava_conseil_web 'web/js/app.js'"))
+        assert.matches('joker refusé', problem("vava_conseil_lua { 'client/*.lua' }"), 1, true)
+        assert.matches('config.lua', problem("vava_conseil_lua 'config.lua'"), 1, true)
+        assert.matches('config.lua', problem("vava_conseil_lua 'Config.lua'"), 1, true)
+        assert.matches('extension refusée', problem("vava_conseil_lua 'web/js/a.js'"), 1, true)
+        assert.matches('extension refusée', problem("vava_conseil_web 'client/a.lua'"), 1, true)
+        assert.matches('listé deux fois', problem("vava_conseil_lua { 'client/a.lua', 'client/a.lua' }"), 1, true)
+        assert.matches('fichier absent', problem("vava_conseil_lua 'client/a.lua'", function() return false end), 1, true)
+        assert.matches('aussi livré à tous', problem("client_scripts { 'client/a.lua' } vava_conseil_lua 'client/a.lua'"),
+            1, true)
+        assert.matches('aussi livré à tous', problem("shared_scripts { 'shared/a.lua' } vava_conseil_lua 'shared/a.lua'"),
+            1, true)
+        assert.matches('aussi livré à tous', problem("files { 'web/js/*.js' } vava_conseil_web 'web/js/app.js'"), 1, true)
+        assert.matches('aussi livré à tous', problem("files { 'web/**' } vava_conseil_web 'web/js/app.js'"), 1, true)
+    end)
+
+    it('T2 : une lecture du placement est refusée dans l\'amorce, permise dans le paquet', function()
+        local full = { placement = { reach = 60 }, keys = { open = 'F9' } }
+        local client = { keys = { open = 'F9' } }
+        local council = { keys = { open = 'F9' }, placement = { reach = 60 } }
+        local src = strip('local cfg = VavaX.config\nprint(cfg.keys.open, cfg.placement.reach)', true)
+        assert.matches('client/main.lua:2 lit config.placement.reach', checkReads('client/main.lua', src, 'VavaX', full,
+            client), 1, true)
+        assert.is_nil(checkReads('client/placer.lua', src, 'VavaX', full, council))
     end)
 end)

@@ -1,9 +1,9 @@
 --[[
     vava_combat/client/main.lua
     Rôle : assemblage côté joueur : notifications du serveur, exports `armed()`, `inCombatMode()`, `shieldHung()`,
-           démarrage des contrôles natifs et des boucliers.
+           démarrage des contrôles natifs, des boucliers et des mannequins d'entraînement.
     Dépendances : shared/constants.lua, config_client.lua, shared/shield.lua, client/core.lua, bridge/client.lua,
-                  client/natives.lua, client/shields.lua, client/hands.lua, client/mode.lua
+                  client/natives.lua, client/shields.lua, client/hands.lua, client/mode.lua, client/dummies.lua
 ]]
 
 local type = type
@@ -50,3 +50,4 @@ end)
 
 VavaCombat.natives.start()
 VavaCombat.shields.start()
+VavaCombat.dummyProps.start()

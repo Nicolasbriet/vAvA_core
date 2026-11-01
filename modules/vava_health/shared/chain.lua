@@ -2,7 +2,7 @@
     vava_health/shared/chain.lua
     Rôle : règles pures de la chaîne de dégâts (docs/plan/COMBAT_V1.md § 1, spec T-110 § 5.2 et § 7.2) :
       - contrôle d'une entrée du registre vava_health:modifiers (clé `<ressource>:<nom>`, étape, priorité, libellé,
-        types, fonction) ;
+        types, inscription aux coups d'essai `trial` (1.6.0), fonction) ;
       - ordre d'appel : rang de l'étape, puis priorité (0 à 99, défaut 50), puis clé ; toujours une copie triée ;
       - pas d'un résultat : ce que rend un modificateur (cancel, blocked, absorbed, resisted, added), borné ;
       - déroulé de la chaîne avec un invocateur, une horloge et des rapports injectés (le serveur y met pcall,
@@ -101,6 +101,8 @@ function chain.checkEntry(key, data, kinds)
         for _ in pairs(kinds) do known = known + 1 end
         if count > known then return false, 'types attendus : liste de 1 à 11 valeurs' end
     end
+    -- 1.6.0 : inscrit aux coups d'essai (mannequins, export trial) ; facultatif
+    if data.trial ~= nil and type(data.trial) ~= 'boolean' then return false, 'trial attendu : booléen' end
     if not isCallable(data.apply) then return false, 'fonction apply attendue' end
     return true
 end

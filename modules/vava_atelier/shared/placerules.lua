@@ -1,7 +1,8 @@
 --[[
     vava_atelier/shared/placerules.lua
     Rôle : règles de placement pures, les mêmes pour l'aperçu (client) et la décision (serveur) : portée, dedans, écart,
-           rayon, sommets, tracé qui se croise. Testée : tests/spec/atelier_placerules_spec.lua.
+           rayon, sommets, tracé qui se croise. Servie au serveur, et au client du Conseil par le paquet (T-157).
+           Testée : tests/spec/atelier_placerules_spec.lua.
     Dépendances : shared/constants.lua
 ]]
 

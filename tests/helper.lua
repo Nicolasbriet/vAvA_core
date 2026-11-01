@@ -86,13 +86,16 @@ local function exists(path)
 end
 
 --- Charge un fichier du dépôt (chemin relatif à la racine).
---- Pour `modules/<m>/config.lua` ou `examples/<m>/config.lua`, charge d'abord `config_client.lua` du même dossier s'il
---- existe, comme le manifeste (T-132) : config_client.lua partagé ouvre la table, config.lua en tête des server_scripts
---- la complète. Un test « côté client » charge `config_client.lua` seul.
+--- Pour `modules/<m>/config.lua` ou `examples/<m>/config.lua`, charge d'abord `config_client.lua` puis
+--- `config_conseil.lua` du même dossier s'ils existent, comme le manifeste (T-132, T-157) : config_client.lua partagé
+--- ouvre la table, config_conseil.lua (serveur, et paquet du Conseil) puis config.lua en tête des server_scripts la
+--- complètent. Un test « côté client » charge `config_client.lua` seul (helper.loadClientView), un test du paquet du
+--- Conseil les deux premiers (helper.loadCouncilView).
 ---@param path string
 function helper.load(path)
     local dir = path:match('^(modules/[^/]+/)config%.lua$') or path:match('^(examples/[^/]+/)config%.lua$')
     if dir and exists(dir .. 'config_client.lua') then loadOne(dir .. 'config_client.lua') end
+    if dir and exists(dir .. 'config_conseil.lua') then loadOne(dir .. 'config_conseil.lua') end
     return loadOne(path)
 end
 
@@ -106,6 +109,18 @@ function helper.loadClientView(dir, global)
     _G[global] = nil
     if exists(dir .. '/shared/constants.lua') then loadOne(dir .. '/shared/constants.lua') end
     if exists(dir .. '/config_client.lua') then loadOne(dir .. '/config_client.lua') end
+    return _G[global]
+end
+
+--- Vue du client d'un membre du Conseil (T-157) : la vue client (`shared/constants.lua`, `config_client.lua`) plus
+--- `config_conseil.lua` (livré dans le paquet), et rien d'autre : `config.lua` n'est pas lu. Pour essayer un fichier du
+--- paquet (outil de placement, séance) sur ce que le membre a vraiment ; rend la table du module.
+---@param dir string  dossier du module, par exemple 'modules/vava_atelier'
+---@param global string  table du module, par exemple 'VavaAtelier'
+---@return table|nil
+function helper.loadCouncilView(dir, global)
+    helper.loadClientView(dir, global)
+    if exists(dir .. '/config_conseil.lua') then loadOne(dir .. '/config_conseil.lua') end
     return _G[global]
 end
 

@@ -49,7 +49,10 @@ local function setup()
             .. 'réglages lus par les joueurs sont dans config_client.lua ; reportez vos changements d\'après '
             .. 'config.lua.nouveau')
     end
+    local trialOk, trialErr = hits.checkTrialConfig()
+    if not trialOk then return false, 'config : ' .. tostring(trialErr) end
     local declared, declareErr = VavaHealth.commands.declare()
+
     if not declared then return false, 'commandes : ' .. tostring(declareErr) end
     local ok, err = state.define()
     if not ok then return false, err end
