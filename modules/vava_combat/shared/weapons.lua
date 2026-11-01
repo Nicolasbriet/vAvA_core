@@ -709,7 +709,7 @@ end
 -- issues qui ne sont qu'un mot ; issues dont seul le reste compte (rien passé : le mot seul)
 local WORD_ONLY = { parry = true, dodge = true, absorb = true }
 local REST_ONLY = { block = true, ['break'] = true }
-local TENTHS_MAX = 2000
+local TENTHS_MAX = VavaCombat.TENTHS_MAX
 
 --- Montant en dixièmes entiers (arrondi), borné à 2 000.
 ---@param amount number

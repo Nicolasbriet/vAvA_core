@@ -1,7 +1,7 @@
 --[[
     vava_combat/bridge/client.lua
     Rôle : SEUL point de contact du client avec les autres modules : notification, chiffres des coups (vava_hud),
-           main du personnage local en cache (hooks du core), changement de main annoncé, à terre. Chaque appel isolé.
+           main du personnage local en cache, à terre. Chaque appel isolé.
     Dépendances : shared/constants.lua, config_client.lua, client/core.lua
 ]]
 
@@ -27,8 +27,6 @@ local function hudNotify(message, kind)
 end
 
 --- Message au joueur : notification de vava_hud, sinon celle du jeu.
----@param message string
----@param kind? string  info | warning | danger
 function Bridge.Notify(message, kind)
     if GetResourceState(HUD) == 'started' then
         local called, ok = pcall(hudNotify, message, NATURES[kind] or 'info')
@@ -47,10 +45,6 @@ end
 local hitTextWarnedAt = nil
 
 --- Chiffre d'un coup (vava_hud:hitText, T-155) ; sans vava_hud : rien. Erreur : une ligne de console par minute.
----@param side string  dealt | taken
----@param anchor integer
----@param issue string
----@param tenths integer|nil
 function Bridge.HitText(side, anchor, issue, tenths)
     if GetResourceState(HUD) ~= 'started' then return end
     local called, err = pcall(hudHitText, side, anchor, issue, tenths)
@@ -65,27 +59,20 @@ end
 
 -- objet tenu (nil : mains vides, ou aucun personnage)
 local handItem = nil
----@type fun(old: string|nil, new: string|nil, reason: string)[]
 local handListeners = {}
 
 --- Objet tenu d'après la valeur du champ de la main (seul `item` est lu ; toute autre forme : mains vides).
----@param value any
----@return string|nil
 local function itemOf(value)
     if type(value) == 'table' and type(value.item) == 'string' then return value.item end
     return nil
 end
 
 --- Objet tenu d'après un personnage `{ fields }` (chargé, ou courant).
----@param character any
----@return string|nil
 local function itemOfCharacter(character)
     local fields = type(character) == 'table' and character.fields or nil
     return itemOf(type(fields) == 'table' and fields[HANDS_FIELD] or nil)
 end
 
----@param item string|nil
----@param reason string  loaded | changed | unloaded
 local function setHand(item, reason)
     if item == handItem and reason == 'changed' then return end
     local old = handItem
@@ -97,14 +84,12 @@ local function setHand(item, reason)
 end
 
 --- Objet tenu en main par le personnage local, ou nil : lecture d'une variable locale (aucun appel au core).
----@return string|nil
 function Bridge.HandItem()
     return handItem
 end
 
 --- Prévient `handler(ancien, nouveau, raison)` quand la main change : `loaded` (personnage chargé, main restaurée,
 --- sans geste), `changed` (prise en main ou dépôt), `unloaded` (retour à la sélection).
----@param handler fun(old: string|nil, new: string|nil, reason: string)
 function Bridge.OnHandChanged(handler)
     handListeners[#handListeners + 1] = handler
 end
@@ -130,7 +115,6 @@ end
 
 --- Vrai si le joueur local est à terre (vava_health:get) ; module absent ou en erreur : faux. Lu au relevé des
 --- conditions du mode combat (200 ms), jamais à chaque image.
----@return boolean
 function Bridge.IsDowned()
     if GetResourceState(HEALTH) ~= 'started' then return false end
     local ok, state = pcall(healthGet)

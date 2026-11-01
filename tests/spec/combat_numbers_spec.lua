@@ -257,3 +257,49 @@ describe('vava_combat : chiffres des coups', function()
         end)
     end)
 end)
+
+-- Bridge serveur réel (vava_combat/bridge/server.lua) : SendTo envoie une liste pure par core.net.send ; une liste vide
+-- n'envoie rien ; une liste invalide est refusée avec une ligne de console par minute (relecture sécurité S-2).
+describe('vava_combat bridge : SendTo', function()
+    local bridge, sends, warns, clock
+
+    before_each(function()
+        helper.reset()
+        VavaCombat = nil
+        sends, warns, clock = {}, {}, 1000
+        helper.loadAll({ 'modules/vava_combat/shared/constants.lua', 'modules/vava_combat/config.lua' })
+        local log = { warn = function(fmt, ...) warns[#warns + 1] = fmt:format(...) end, info = function() end }
+        VavaCombat.log, VavaCombat.resource = log, 'vava_combat'
+        VavaCombat.core = { log = log, net = { send = function(list, event, ...)
+            sends[#sends + 1] = { list = list, event = event, args = table.pack(...) }
+            return true
+        end } }
+        _G.GetGameTimer = function() return clock end
+        _G.AddEventHandler = function() end
+        helper.load('modules/vava_combat/bridge/server.lua')
+        bridge = VavaCombat.bridge
+    end)
+
+    after_each(function()
+        _G.AddEventHandler = nil
+        VavaCombat = nil
+    end)
+
+    it('liste pure : un envoi ; vide : rien ; invalide : refusée, une ligne de console par minute', function()
+        assert.is_true(bridge.SendTo({ 1, 2 }, 'vava_combat:hit', 1, 2, 'hit', 120))
+        assert.same({ 1, 2 }, sends[1].list)
+        assert.same({ 1, 2, 'hit', 120, n = 4 }, sends[1].args)
+        assert.is_true(bridge.SendTo({}, 'vava_combat:hit', 1, 2, 'hit'))
+        local long = {}
+        for i = 1, 257 do long[i] = i end
+        assert.is_false(bridge.SendTo(long, 'vava_combat:hit', 1, 2, 'hit'))
+        assert.is_false(bridge.SendTo({ 1, -1 }, 'vava_combat:hit', 1, 2, 'hit'))
+        assert.is_false(bridge.SendTo(-1, 'vava_combat:hit', 1, 2, 'hit'))
+        assert.equal(1, #sends)
+        assert.equal(1, #warns)
+        assert.matches('vava_combat:hit', warns[1])
+        clock = clock + 60000
+        bridge.SendTo({ 0 }, 'vava_combat:hit', 1, 2, 'hit')
+        assert.equal(2, #warns)
+    end)
+end)

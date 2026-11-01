@@ -208,13 +208,16 @@ end
 ---@param event string
 ---@return boolean ok
 function Bridge.SendTo(list, event, ...)
-    if type(list) ~= 'table' then return false end
-    local count = #list
+    local count = type(list) == 'table' and #list or -1
     if count == 0 then return true end
-    if count > SEND_LIST_MAX then return false end
-    for i = 1, count do
+    local valid = count > 0 and count <= SEND_LIST_MAX
+    for i = 1, valid and count or 0 do
         local id = list[i]
-        if mathType(id) ~= 'integer' or id <= 0 then return false end
+        if mathType(id) ~= 'integer' or id <= 0 then valid = false end
+    end
+    if not valid then
+        warnLimited('sendTo:' .. event, "envoi de '%s' à une liste refusé : destinataires invalides (%d)", event, count)
+        return false
     end
     local ok, code = core.net.send(list, event, ...)
     if not ok then

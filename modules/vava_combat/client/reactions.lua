@@ -1,8 +1,7 @@
 --[[
     vava_combat/client/reactions.lua
-    Rôle : ce que voit chacun d'un coup qui porte (`vava_combat:hit`) : réaction de la cible (garde brisée comprise),
-           attaquant paré qui chancelle, son de l'attaquant, effet d'impact local borné ; chiffre du coup chez
-           l'attaquant et la cible désignés (4e valeur, T-155). Aucune boucle.
+    Rôle : ce que voit chacun d'un coup qui porte (`vava_combat:hit`) : réaction de la cible, attaquant paré qui
+           chancelle, son, effet d'impact borné, chiffre du coup chez l'attaquant et la cible. Aucune boucle.
     Dépendances : shared/constants.lua, config_client.lua, client/core.lua, client/hands.lua, client/attack.lua
 ]]
 
@@ -37,7 +36,7 @@ for _, outcome in ipairs(VavaCombat.OUTCOMES) do OUTCOMES[outcome] = true end
 local ASSET_POLL_MS = 20
 -- une ligne de console par actif et par minute au plus
 local WARN_MS = 60000
-local TENTHS_MAX = 2000
+local TENTHS_MAX = VavaCombat.TENTHS_MAX
 
 -- fenêtre d'une seconde des effets montrés
 local windowAt, windowCount = 0, 0

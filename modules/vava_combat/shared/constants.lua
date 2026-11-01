@@ -67,4 +67,5 @@ VavaCombat.MAX_NOTIFICATION = 200              -- octets d'une notification du H
 VavaCombat.MAX_JOURNAL_LABEL = 32              -- libellé du journal du Registre (vava_admin)
 VavaCombat.MODEL_MAX = 64                      -- octets d'un nom de modèle
 VavaCombat.MAX_PLAYER = 65535                  -- plus grand numéro de joueur (cible d'un coup, évènement HIT)
+VavaCombat.TENTHS_MAX = 2000                   -- montant d'un coup en dixièmes (4e valeur de HIT, T-155)
 VavaCombat.MAX_REASON = 120                    -- octets d'une raison de refus d'un crochet, montrée au joueur
