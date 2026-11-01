@@ -32,23 +32,20 @@ local bridge = VavaCombat.bridge
 local EVENTS = VavaCombat.EVENTS
 local MAX_PLAYER, TENTHS_MAX = VavaCombat.MAX_PLAYER, VavaCombat.TENTHS_MAX
 local LOAD_POLL_MS = 50
--- marge ajoutée à keepRadius sous laquelle la boucle passe à nearPollMs
 local NEAR_MARGIN = 20.0
 local OUTCOMES = {}
 for _, outcome in pairs(VavaCombat.OUTCOMES) do OUTCOMES[outcome] = true end
--- issues qui font entendre la touche chez l'attaquant
 local SOUND_OF = { hit = true, stagger = true }
 
 local dummyProps = {}
 VavaCombat.dummyProps = dummyProps
 
--- part client, lue clé par clé (la part du serveur n'est pas servie)
+-- part client, lue clé par clé
 local part = {
     label = d.label, model = d.model, fallbackModel = d.fallbackModel, modelTimeoutMs = d.modelTimeoutMs,
     streamRadius = d.streamRadius, keepRadius = d.keepRadius, nearPollMs = d.nearPollMs, farPollMs = d.farPollMs,
     centerHeight = d.centerHeight, anchorHeight = d.anchorHeight, wobble = d.wobble, fx = d.fx, list = d.list,
 }
----@type vAvA.CombatDummy[]
 local entries = {}
 local valid, invalidReason = rules.check(part)
 if valid then
@@ -56,7 +53,6 @@ if valid then
 else
     core.log.warn('mannequins non montrés : %s', tostring(invalidReason))
 end
--- distances au carré (liste invalide : aucune entrée, rien n'est mesuré)
 local STREAM_SQ = valid and part.streamRadius * part.streamRadius or 0
 local KEEP_SQ = valid and part.keepRadius * part.keepRadius or 0
 local NEAR_SQ = valid and (part.keepRadius + NEAR_MARGIN) ^ 2 or 0
@@ -67,12 +63,9 @@ local shown = {}
 -- balancements en cours : n → { startedAt, dirX, dirY }
 local wobbling = {}
 local running, playing, wobbleRunning = false, false, false
--- modèle → déjà signalé introuvable (une ligne de console par modèle)
 local warnedModel = {}
--- fenêtre d'une seconde des éclats montrés ; actif de particules en cours de chargement
 local windowAt, windowCount, loadingFx = 0, 0, false
 
----@param n integer
 local function remove(n)
     local slot = shown[n]
     if not slot then return end
@@ -85,9 +78,7 @@ local function removeAll()
     for n in pairs(shown) do remove(n) end
 end
 
---- Premier modèle connu du jeu : celui du mannequin, sinon le repli ; nil (une ligne par modèle) si aucun.
----@param entry vAvA.CombatDummy
----@return integer|nil hash
+-- modèle du mannequin, sinon le repli ; une ligne par modèle inconnu
 local function modelOf(entry)
     for _, name in ipairs({ entry.model, part.fallbackModel }) do
         local hash = GetHashKey(name)
@@ -100,22 +91,20 @@ local function modelOf(entry)
     return nil
 end
 
---- Crée le prop LOCAL d'un mannequin (modèle chargé avec une attente bornée), dans son propre thread.
----@param entry vAvA.CombatDummy
+-- prop LOCAL (jamais réseau), attente bornée du modèle
 local function spawn(entry)
     local slot = { entity = nil, loading = true }
     shown[entry.n] = slot
     CreateThread(function()
         local hash = modelOf(entry)
         if not hash then
-            -- gardé (sans prop) tant qu'on reste à portée : pas un nouvel essai à chaque passage
+            -- gardé sans prop tant qu'on reste à portée
             slot.loading, slot.failed = false, true
             return
         end
         RequestModel(hash)
         local deadline = GetGameTimer() + part.modelTimeoutMs
         while not HasModelLoaded(hash) and GetGameTimer() < deadline do Wait(LOAD_POLL_MS) end
-        -- sorti de portée (ou arrêt) pendant le chargement : abandonné
         if shown[entry.n] ~= slot or not HasModelLoaded(hash) then
             if shown[entry.n] == slot then shown[entry.n] = nil end
             SetModelAsNoLongerNeeded(hash)
@@ -133,9 +122,7 @@ local function spawn(entry)
     end)
 end
 
---- Un passage : une distance au carré par mannequin ; créé à streamRadius, retiré au-delà de keepRadius. Ne cède jamais
---- la main. Rend l'intervalle du prochain passage.
----@return integer
+-- un passage : créé à streamRadius, retiré au-delà de keepRadius ; rend l'intervalle suivant
 function dummyProps.step()
     local coords = GetEntityCoords(PlayerPedId())
     local px, py, pz = coords.x, coords.y, coords.z
@@ -153,7 +140,6 @@ function dummyProps.step()
     return near and part.nearPollMs or part.farPollMs
 end
 
---- Boucle lente, seulement personnage en jeu et mannequins à montrer.
 local function loop()
     while playing do
         Wait(dummyProps.step())
@@ -162,8 +148,6 @@ local function loop()
     running = false
 end
 
---- Personnage en jeu ou non : la boucle démarre, ou s'arrête et retire tout.
----@param flag boolean
 function dummyProps.setPlaying(flag)
     playing = flag == true
     if not playing then
@@ -176,16 +160,12 @@ function dummyProps.setPlaying(flag)
     end
 end
 
---- Entité du prop d'un mannequin, ou nil (essais).
----@param n integer
----@return integer|nil
 function dummyProps.entity(n)
     local slot = shown[n]
     return slot and slot.entity or nil
 end
 
---- Balancement : une seule boucle pour tous, à chaque image tant qu'un mannequin bouge (au plus wobble.ms après le
---- dernier coup), puis remis droit exactement.
+-- une seule boucle de balancement pour tous, puis remis droit exactement
 local function wobbleLoop()
     local period = wobbleCfg.ms
     while next(wobbling) ~= nil do
@@ -201,7 +181,6 @@ local function wobbleLoop()
                     SetEntityRotation(entity, 0.0, 0.0, entry.heading, 2, true)
                     wobbling[n] = nil
                 else
-                    -- inclinaison autour de l'axe horizontal perpendiculaire au coup, amplitude décroissante
                     local tilt = wobbleCfg.angle * (1 - t) * sin(2 * pi * wobbleCfg.cycles * t)
                     local h = rad(entry.heading)
                     local along = w.dirX * -sin(h) + w.dirY * cos(h)
@@ -215,10 +194,7 @@ local function wobbleLoop()
     wobbleRunning = false
 end
 
---- Lance le balancement d'un mannequin montré, en s'écartant de l'attaquant `src` (sa position si on la voit, sinon
---- vers l'arrière du mannequin). Un nouveau coup repart de zéro.
----@param entry vAvA.CombatDummy
----@param src integer
+-- s'écarte de l'attaquant (vu), sinon vers l'arrière du mannequin
 local function wobble(entry, src)
     local slot = shown[entry.n]
     if not slot or not slot.entity or wobbleCfg.ms <= 0 or wobbleCfg.angle <= 0 then return end
@@ -241,8 +217,6 @@ local function wobble(entry, src)
     end
 end
 
----@param now integer
----@return boolean
 local function allowFx(now)
     if now - windowAt >= 1000 then windowAt, windowCount = now, 0 end
     if windowCount >= effects.maxPerSecond then return false end
@@ -250,8 +224,6 @@ local function allowFx(now)
     return true
 end
 
---- Éclats au centre du mannequin (actif de particules demandé une fois, attente bornée ; sinon rien cette fois).
----@param entry vAvA.CombatDummy
 local function splinters(entry)
     local fx = part.fx
     if not fx or not allowFx(GetGameTimer()) then return end
@@ -271,12 +243,7 @@ local function splinters(entry)
     StartParticleFxNonLoopedAtCoord(fx.name, c.x, c.y, c.z, 0.0, 0.0, 0.0, fx.scale, false, false, false)
 end
 
---- vava_combat:dummy(n, attaquant[, issue, dixièmes|false]) : issue et montant à l'attaquant seul, balancement seul
---- aux témoins. Valeurs relues ; une valeur hors bornes : message ignoré (montant illisible : pas de chiffre).
----@param n any
----@param src any
----@param issue any
----@param tenths any
+-- vava_combat:dummy(n, attaquant[, issue, dixièmes|false]) ; valeurs relues
 function dummyProps.receive(n, src, issue, tenths)
     if mathType(n) ~= 'integer' or mathType(src) ~= 'integer' or src < 1 or src > MAX_PLAYER then return end
     local entry = entries[n]
@@ -289,7 +256,7 @@ function dummyProps.receive(n, src, issue, tenths)
         local sound = effects.sounds.hit
         if type(sound) == 'table' and type(sound.name) == 'string' then PlaySoundFrontend(-1, sound.name, sound.set, true) end
     end
-    -- 4e valeur : seulement si le serveur montre les chiffres à l'attaquant (false : le mot seul)
+    -- 4e valeur absente : chiffres coupés par le serveur ; false : le mot seul
     if tenths == false then
         bridge.HitText('dealt', { x = entry.x, y = entry.y, z = entry.z + part.anchorHeight }, issue, nil)
     elseif mathType(tenths) == 'integer' and tenths >= 0 and tenths <= TENTHS_MAX then
@@ -297,7 +264,6 @@ function dummyProps.receive(n, src, issue, tenths)
     end
 end
 
---- Suit la vie du personnage (boucle seulement personnage apparu) et l'évènement du serveur. Appelé par client/main.lua.
 function dummyProps.start()
     RegisterNetEvent(EVENTS.DUMMY, dummyProps.receive)
     core.hooks.after('core:character:spawning', function() dummyProps.setPlaying(true) end)

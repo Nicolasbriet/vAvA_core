@@ -21,26 +21,15 @@ local FX_KEYS = { asset = true, name = true, scale = true }
 local dummyRules = {}
 VavaCombat.dummyRules = dummyRules
 
----@param value any
----@param low number
----@param high number
----@return boolean
 local function between(value, low, high)
     return type(value) == 'number' and value == value and value ~= huge and value ~= -huge and value >= low
         and value <= high
 end
 
----@param value any
----@param low integer
----@param high integer
----@return boolean
 local function integerIn(value, low, high)
     return mathType(value) == 'integer' and value >= low and value <= high
 end
 
----@param value any
----@param max integer
----@return boolean
 local function text(value, max)
     return type(value) == 'string' and #value >= 1 and #value <= max
 end
@@ -54,9 +43,6 @@ local function extraKey(map, allowed)
 end
 
 --- Un mannequin de la liste : nil, ou la raison.
----@param i integer
----@param d any
----@return string|nil
 local function entryError(i, d)
     local where = format('dummies.list[%d]', i)
     if type(d) ~= 'table' then return where .. ' : table attendue' end
@@ -84,8 +70,6 @@ local function entryError(i, d)
 end
 
 --- Liste pure de mannequins (64 au plus, identifiants uniques) : nil, ou la raison.
----@param list any
----@return string|nil
 local function listError(list)
     if type(list) ~= 'table' then return 'dummies.list : liste attendue' end
     local count = 0
@@ -104,9 +88,6 @@ end
 
 --- Contrôle de la part client des mannequins (`config.dummies`, ou une table aux mêmes clés). Les autres clés (part du
 --- serveur) sont ignorées ici. Rend `true`, ou `false, raison`.
----@param part any
----@return boolean ok
----@return string|nil err
 function dummyRules.check(part)
     if type(part) ~= 'table' then return false, 'dummies : table attendue' end
     if not text(part.label, LABEL_MAX) then return false, 'dummies.label attendu (1 à 48 octets)' end
@@ -141,23 +122,8 @@ function dummyRules.check(part)
     return true
 end
 
----@class vAvA.CombatDummy
----@field n integer        numéro (place dans la liste) : désigne le mannequin sur le réseau
----@field id string
----@field x number
----@field y number
----@field z number         pied
----@field heading number
----@field model string     modèle de l'entrée, sinon celui de `dummies.model`
----@field bucket integer   instance (0 par défaut)
----@field label string
----@field center { x: number, y: number, z: number }  point visé (pied + centerHeight)
 
 --- Index d'une liste déjà contrôlée : mannequins par numéro (liste) et par identifiant.
----@param list table[]
----@param part table  part client contrôlée (model, label, centerHeight)
----@return vAvA.CombatDummy[] byN
----@return table<string, vAvA.CombatDummy> byId
 function dummyRules.index(list, part)
     local byN, byId = {}, {}
     for n, d in ipairs(list) do
