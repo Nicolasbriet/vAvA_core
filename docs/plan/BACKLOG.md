@@ -765,7 +765,7 @@ versé à T-014 ; les autres points déjà couverts sont précisés dans T-012 �
   `config_split_spec`, côté `conseil` de `scripts/lib/manifeste.awk`) : `shared/aim.lua` de `vava_atelier` n'est plus
   qu'en `vava_conseil_lua`.
 
-### T-160 — Livraison à la demande dans le core — **décision du porteur du projet**
+### T-163 — Livraison à la demande dans le core — **décision du porteur du projet**
 - Agents : vava-architecte → vava-dev-lua (cette tâche autorise à toucher le core) · Dépend de : T-157 validée en jeu ·
   Statut : à faire (proposée, à valider par le porteur du projet avant de la prendre)
 - Proposée par T-157 (spec § 13) : déplacer dans le core (`core.delivery`) le format du paquet, l'empreinte, le chargeur,
