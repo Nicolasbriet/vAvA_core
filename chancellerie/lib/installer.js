@@ -8,13 +8,16 @@
  *        - Fusion à trois voies, fichier par fichier : la version installée (empreintes gardées dans
  *          data/install.json), celle du disque, la nouvelle. Un fichier que personne n'a touché est remplacé ; un
  *          fichier modifié sur place et inchangé en amont est gardé ; modifié des deux côtés, un fichier de réglages
- *          (config.lua, config_client.lua, config/…) est gardé et la nouvelle version posée à côté (« .nouveau »),
+ *          (config.lua, config_client.lua, config_conseil.lua, config/… : lib/delivery.js userOwned) est gardé et la
+ *          nouvelle version posée à côté (« .nouveau »),
  *          un autre fichier est remplacé et l'ancien gardé à côté (« .local »). Sans version installée connue (vAvA
  *          posé à la main), les fichiers de réglages qui diffèrent sont gardés, les autres remplacés. Un fichier
  *          retiré en amont est retiré s'il n'a pas été touché ; un fichier de réglages modifié et retiré en amont
  *          (config.lua d'un module renommé config_client.lua, T-132) est gardé et signalé : la ressource ne le lit plus.
  *        - Sauvegarde des ressources touchées avant d'écrire, et restauration à l'identique (retour en arrière).
  *        - Première installation : FXServer (build recommandée par Cfx.re), oxmysql (dernière version).
+ *        - Copie téléchargée : Lua servi aux joueurs allégé de ses commentaires avant les empreintes (lib/delivery.js,
+ *          T-154 ; updates.leanLua) ; les réglages et le Lua du seul serveur gardent les leurs.
  *        - La Chancellerie elle-même : nouvelle version vérifiée (elle doit se charger) avant de remplacer les
  *          fichiers ; l'ancienne est gardée, et demarrer.bat la remet si la nouvelle ne démarre pas.
  */
@@ -24,6 +27,7 @@ const path = require('path');
 const { spawn } = require('child_process');
 const config = require('./config');
 const dl = require('./download');
+const { userOwned, leanResources } = require('./delivery');
 const resources = require('./resources');
 
 const STATE_FILE = path.join(config.DATA, 'install.json');
@@ -63,11 +67,6 @@ function saveState(value) {
 }
 
 const resourcesRoot = (serverDataPath) => path.join(serverDataPath, 'resources');
-
-/** Fichier de réglages, que son propriétaire a pu adapter ? */
-function userOwned(relative) {
-  return ['config.lua', 'config_client.lua'].includes(path.posix.basename(relative)) || relative.startsWith('config/');
-}
 
 // Dépôt ---------------------------------------------------------------------------------------------------------------
 
@@ -284,7 +283,37 @@ async function fetchSource(updates, ref, job) {
   await dl.downloadTo(`${updates.codeload}/${updates.repo}/tar.gz/${encodeURIComponent(ref)}`, archive, job ? job.track : undefined);
   await dl.extract(archive, dir);
   fs.rmSync(archive, { force: true });
-  return dl.unwrap(dir);
+  const root = dl.unwrap(dir);
+  if (updates.leanLua !== false) leanSource(root, job);
+  else say(job, 'Allègement du Lua livré désactivé (updates.leanLua) : fichiers livrés avec leurs commentaires.');
+  return root;
+}
+
+const say = (job, message) => { if (job && job.say) job.say(message); };
+const kilobytes = (bytes) => String(Math.round(bytes / 1024)).replace(/\B(?=(\d{3})+(?!\d))/g, ' ');
+const REFUSED_SHOWN = 10;
+
+/**
+ * Lua servi aux joueurs allégé de ses commentaires dans la copie téléchargée (T-154), avant toute empreinte : chaque
+ * fichier n'est réécrit qu'après son propre contrôle (un fichier refusé reste tel quel). Une erreur (écriture,
+ * défaut du code) fait échouer l'opération avant que rien ne soit écrit sur le serveur (relecture sécurité S-4).
+ * `job.lean` : bilan court, repris dans le résumé de l'opération.
+ */
+function leanSource(root, job) {
+  try {
+    const summary = leanResources(layout(root).resources);
+    if (job) job.lean = `Lua allégé : ${summary.files} fichiers, ${summary.refused.length} refusés`;
+    say(job, `Lua servi aux joueurs allégé de ses commentaires : ${summary.files} fichiers, ${kilobytes(summary.before)} → ${kilobytes(summary.after)} Ko.`);
+    for (const item of summary.refused.slice(0, REFUSED_SHOWN)) {
+      say(job, `Laissé avec ses commentaires (ligne ${item.line} : ${item.reason}) : ${item.file}`);
+    }
+    if (summary.refused.length > REFUSED_SHOWN) say(job, `… et ${summary.refused.length - REFUSED_SHOWN} autres`);
+    for (const item of summary.skipped) {
+      say(job, `Ressource ${item.resource} laissée telle quelle : manifeste illisible pour l'allègement (${item.reason}).`);
+    }
+  } catch (error) {
+    throw dl.failure('lean_failed', `allègement du Lua livré interrompu (${error.message}) ; rien n'a été changé sur le serveur`);
+  }
 }
 
 /** Build recommandée de FXServer pour cette machine : { build, url }. */

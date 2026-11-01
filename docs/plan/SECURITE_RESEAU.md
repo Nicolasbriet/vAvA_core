@@ -61,6 +61,10 @@ du Conseil par appel direct du RPC.
    serveur sont en `server_scripts` ; `config_client.lua`, `shared/constants.lua` et la logique dont un fichier
    client se sert en `shared_scripts` (T-132 ; `scripts/audit-reseau.sh` et `tests/spec/config_split_spec.lua` ;
    mesure : `scripts/poids-client.sh`). Un réglage du serveur retouché ne fait plus retélécharger la ressource.
+   Les commentaires du Lua servi ne sont jamais livrés (T-154) : la Chancellerie (et `scripts/livraison.js`) les retire
+   en gardant chaque ligne à sa place, prouvé par le compilateur Lua à chaque vérification ; les réglages de
+   l'exploitant (`config.lua`, `config_client.lua`, `config_conseil.lua`, `config/…`) et le Lua du seul serveur
+   gardent les leurs.
 8. **Code réservé au Conseil.** Un code client qui ne sert qu'au Conseil est livré à la demande à ses seuls membres
    (droit relu par le serveur à chaque envoi), gardé avec son empreinte et exécuté par `load` en mode texte après
    comparaison à l'empreinte que le serveur vient d'annoncer ; il ne porte aucune décision (chaque action reste

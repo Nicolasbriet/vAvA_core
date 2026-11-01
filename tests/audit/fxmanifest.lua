@@ -129,3 +129,7 @@ vava_conseil_lua 'Config.lua'  -- attendu: BLOQUANT
 vava_conseil_web 'config.lua'  -- attendu: BLOQUANT
 vava_conseil_lua '../vava_autre/client/a.lua'  -- attendu: BLOQUANT
 vava_conseil_lua(liste)  -- attendu: BLOQUANT
+-- T-154 : le paquet du Conseil en table, suivi par le lecteur : règles D et X
+vava_conseil_lua { 'client/a.lua' }  -- attendu: rien
+vava_conseil_lua { nom }  -- attendu: BLOQUANT
+vava_conseil_lua { '../x.lua' }  -- attendu: BLOQUANT

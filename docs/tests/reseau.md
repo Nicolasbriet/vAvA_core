@@ -204,6 +204,44 @@ les « réglages pour aller vite » du ciel, désormais dans `config.lua`. Hors 
 | 8 | Serveur arrêté ; remplacer `modules/vava_time/config.lua` par celui de 1.3.0 (`git show 3014bfc:modules/vava_time/config.lua`) ; démarrer ; `/date`. | Console : « config.lua garde la forme d'avant 1.4.0 … le cours des ciels (successeurs, poids, neige, durées, transition) est pris dans cet ancien config.lua … » ; le module démarre, `/date` et le ciel marchent. Remettre le fichier de 1.5.0. |
 | 9 | Si possible : comme 7-A-14, avant (serveur sur `main`) et après, taille de `cache/files/vava_time/resource.rpf`. | Ordre de grandeur cohérent avec la colonne `total` de `poids-client.sh` : ≈ 76 Ko (≈ 81 avant) ; noter au rapport. |
 
+### 7-F — Lua livré sans commentaires (T-154, Chancellerie 1.9.0)
+
+La Chancellerie (et `scripts/livraison.js`) retire les commentaires et les blancs de fin de ligne du Lua servi aux
+joueurs (`shared_scripts`, `client_scripts`, `vava_conseil_lua`, manifestes), en gardant chaque ligne à sa place ; les
+réglages (`config.lua`, `config_client.lua`, `config_conseil.lua`, `config/…`) et le Lua du seul serveur ne sont
+jamais touchés. Mesure hors jeu sur `main` du 2 novembre 2026 (T-155, T-156, T-157 comprises) : `lua + manifeste` du
+total de `poids-client.sh` **1 377 793 → 937 427 octets (− 440 366, ≈ − 430 Ko)**, **495 992 → 302 275 compressés
+(− 193 717)** ; paquet du Conseil (`vava_atelier@conseil`) 248 218 → 228 502 octets. Préparation : serveur de test du porteur,
+branche de T-154 dans la copie de travail ; **A** Souverain, **B** hors du Conseil ; `F8` ouvert chez chacun (repérer
+`SCRIPT ERROR`). PowerShell : les chemins à crochets demandent `-LiteralPath`. **Ne jamais** lancer
+`Remove-Item -Recurse` sur un dossier qui contient des jonctions (`[vava]`, `[vava-dev]`).
+
+| # | Faire | Attendu |
+|---|---|---|
+| 1 | Hors jeu : `./scripts/verifier.sh`. | Étape « Lua livré sans commentaires (T-154) » : « ESSAIS LIVRAISON : OK (…) », « MÊME CODE : OK (… fichiers prouvés, dont … livrés …) », aucune ligne `ÉCART`, aucun `diff`. |
+| 2 | Hors jeu : `node scripts/livraison.js --liste`. | Chaque `fxmanifest.lua` « allégé » ; chaque `config_client.lua` et `vAvA_core/config/shared.lua` « gardé (réglage) » ; aucun `server/…`, aucun `config.lua`, aucun `content/…`. Si T-157 est fusionnée : neuf lignes `vava_atelier@conseil`, toutes « allégé » sauf `config_conseil.lua` « gardé (réglage) » (réglages de l'exploitant, relecture réseau R-5 de T-157). |
+| 3 | Chancellerie : Arrêter. PowerShell : `Move-Item -LiteralPath 'D:\vAvA_core_phase1\resources\[vava]' 'D:\vAvA_core_phase1\vava-git'` ; idem `[vava-dev]` → `vava-dev-git`. Depuis la copie de travail : `node scripts/livraison.js --sortie 'D:\vAvA_core_phase1\resources\[livraison]'`. | Résumé : 33 ressources, ≈ 284 fichiers allégés, octets avant → après, « 0 refusé(s) ». `…\[livraison]\[vava]\vava_combat\client\attack.lua` : aucun commentaire, **même nombre de lignes** que `modules/vava_combat/client/attack.lua` ; `…\[vava]\vava_combat\config_client.lua` identique au dépôt. |
+| 4 | Git Bash : `./scripts/poids-client.sh` puis `./scripts/poids-client.sh --dossier '/d/vAvA_core_phase1/resources/[livraison]'`. | `lua + manifeste` du total en baisse d'**au moins 350 Ko bruts** (≈ 433 Ko attendus) ; noter avant et après (bruts et compressés) au rapport. |
+| 5 | Démarrer le serveur (Chancellerie). | Chaque module « prêt » avec sa version habituelle ; aucune erreur Lua en console. |
+| 6 | **(2 joueurs)** A vide son cache FiveM puis se connecte ; B se connecte. | Écran de chargement, sélection, apparition comme d'habitude ; aucune `SCRIPT ERROR` chez l'un ni l'autre. |
+| 7 | A fait le tour : inventaire (I), Codex, HUD, chat, `/atelier` (F9), une récolte, une incantation, le mode combat (épée en main). | Tout répond comme avant. |
+| 8 | **(2 joueurs)** A donne un objet à B ; A frappe B qui lève sa garde (combat 4-4) ; A parle à B (voix de proximité). | Comme avant (échange, coup bloqué, voix). |
+| 9 | A : `resmon 1` au repos. | Mêmes valeurs qu'avant (rien de plus ne tourne). |
+| 10 | Facultatif (numéros de ligne) : serveur arrêté ; dans la **copie** `…\[livraison]\[vava]\vava_codex\client\main.lua`, ajouter `; error('essai T-154')` à la fin d'une ligne de code de premier niveau (hors fonction), **sans ajouter de ligne** ; démarrer ; A se connecte. | `F8` : `@vava_codex/client/main.lua:<n>` ; la ligne `<n>` de `modules/vava_codex/client/main.lua` du dépôt est la même instruction. Retirer l'ajout. |
+| 11 | Remise en place : Arrêter ; `Remove-Item -LiteralPath 'D:\vAvA_core_phase1\resources\[livraison]' -Recurse -Force` (dossier ordinaire, sans jonction) ; `Move-Item` des deux dossiers en sens inverse ; Démarrer. | Le serveur tourne de nouveau sur la copie git commentée, comme avant. |
+| 12a | Si T-157 est déjà fusionnée (sinon : sans objet, à faire au test de T-157) : sur `[livraison]`, A (Souverain) appuie sur F9 pour la première fois de cette version. | Console du serveur au démarrage : `paquet du Conseil : … octets` **plus petit** que sur la copie git (noter les deux) ; l'Atelier s'ouvre, l'outil de placement marche (atelier 25) ; aucune erreur du paquet en `F8`. |
+| 12 | Si possible (avant le n° 11) : cache vidé, tailles de `cache/files/vava_magic/resource.rpf` et de `cache/files/vava_ui/resource.rpf` (aucun Lua : seul son manifeste change) chez A sur `[livraison]`, puis sur la copie git. | `vava_magic` plus petit sur `[livraison]` ; `vava_ui` presque identique (≈ 600 o de moins) **mais retéléchargé** : noter les quatre tailles, et si FXServer compresse le paquet (décide du retrait de l'indentation, relecture réseau R-4). |
+
+Chancellerie, **après fusion sur `main`**, sur un serveur qui n'est pas une copie git (par exemple une installation
+neuve par l'assistant, « Nouveau serveur », dans `D:\vAvA_essai`) :
+
+| # | Faire | Attendu |
+|---|---|---|
+| 13 | Installation neuve. | Journal de l'opération : « Lua servi aux joueurs allégé de ses commentaires : … fichiers, … → … Ko. » ; résumé de l'opération terminé par « Lua allégé : … fichiers, 0 refusés » ; `…\server-data\resources\[vava]\vava_combat\client\attack.lua` sans commentaire ; `config_client.lua` et `config.lua` commentés ; `data/install.json` : l'empreinte de `client/attack.lua` est le SHA-256 du fichier posé. |
+| 14 | Lancer ce serveur ; A se connecte. | Comme les n° 5 à 7. |
+| 15 | Un serveur installé par la Chancellerie 1.8.6 : mise à jour qui apporte la 1.9.0, puis la mise à jour suivante. | Première : Chancellerie 1.9.0, Lua encore commenté (aucune ligne « allégé ») ; seconde : ligne « allégé », **les 33 ressources** listées une fois (chaque manifeste change) ; un joueur qui revient retélécharge une fois le paquet de chacune (≈ 3,8 Mo bruts, ≈ 2,4 Mo compressés au 2 novembre 2026, dont 1,44 Mo pour `vava_loading` ; à fusionner avec T-160 pour ne le faire qu'une fois) ; un `client/*.lua` modifié à la main avant : remplacé, le sien en `.local` ; un `config_conseil.lua` adapté : gardé, `.nouveau` à côté s'il a changé en amont. |
+| 16 | `updates.leanLua` à `false` dans `data/config.json`, relancer la Chancellerie, appliquer la mise à jour suivante. | « Allègement du Lua livré désactivé … » ; fichiers livrés reposés avec leurs commentaires, les 33 ressources listées (même retéléchargement complet qu'au n° 15) ; serveur sain. |
+
 ## Ce qui n'est pas compté
 
 GlobalState, state bags, et les envois que les modules font encore eux-mêmes par `TriggerClientEvent` (inventaire,
@@ -222,3 +260,6 @@ passera par `core.net`.
   pas donner de « délai dépassé ».
 - Écart entre les octets du compteur et `netgraph` pour un envoi connu (l'en-tête réseau n'est pas compté).
 - Coût serveur d'un `sendNear` à beaucoup de joueurs (profiler de FXServer) : attendu bien sous 0,1 ms.
+- Lua livré sans commentaires (7-F) : aucune `SCRIPT ERROR` sur la copie allégée, numéros de ligne des erreurs en jeu
+  identiques au dépôt (7-F-10), taille réelle de `resource.rpf` (7-F-12), journal de la Chancellerie à l'installation
+  et à la première mise à jour allégée (7-F-13 à 16).

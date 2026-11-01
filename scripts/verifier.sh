@@ -3,7 +3,12 @@
 #   1. lint (luacheck) : fichiers Lua modifiés depuis BASE, ou tout le dépôt avec --tout
 #   2. tests unitaires (busted)
 #   3. essais des fonctions pures des pages (node, s'il est présent ; sinon un message, sans échec)
-#   4. audit réseau et sécurité statique (scripts/audit-reseau.sh), puis son essai sur les cas de tests/audit/
+#   4. Lua livré sans commentaires (T-154) : essais du lexeur et de la livraison (node), allègement du Lua suivi par git
+#      prouvé par le compilateur Lua 5.4 (scripts/lib/meme-code.lua), liste des fichiers allégés recoupée avec
+#      scripts/lib/manifeste.awk ; hors --tout, seuls les .lua modifiés sont prouvés et les listes ne sont recoupées
+#      que si un manifeste a changé, sauf si l'outillage de la livraison a changé (tout alors) ; node absent :
+#      message, échec en CI ; lua absent : échec
+#   5. audit réseau et sécurité statique (scripts/audit-reseau.sh), puis son essai sur les cas de tests/audit/
 # Code de sortie 0 seulement si tout passe.
 set -uo pipefail
 cd "$(dirname "$0")/.."
@@ -62,6 +67,43 @@ else
         if [[ -f "$essai" ]]; then node "$essai" || echec=1
         else echo "$essai introuvable"; echec=1; fi
     done
+fi
+
+titre "Lua livré sans commentaires (T-154)"
+# allègement des fichiers Lua suivis par git par le lexeur de la Chancellerie, prouvé par le compilateur Lua 5.4
+# (scripts/lib/meme-code.lua) ; liste des fichiers allégés recoupée avec scripts/lib/manifeste.awk ; essais du lexeur.
+# Hors --tout (relecture réseau R-6) : seuls les .lua modifiés sont prouvés, les listes ne sont recoupées que si un
+# manifeste a changé ; tout est repris si l'outillage de la livraison a changé (en --tout, il est dans la liste).
+# node absent : rien n'est lancé (échec en CI) ; lua absent : échec (comme busted)
+OUTILLAGE_LIVRAISON='^(chancellerie/lib/(luastrip|delivery|installer)\.js|scripts/livraison\.js|scripts/lib/(meme-code\.lua|manifeste\.awk)|scripts/poids-client\.sh|scripts/verifier\.sh|tests/livraison/)'
+LUA=$(command -v lua5.4 || command -v lua || true)
+if ! command -v node >/dev/null; then
+    echo "node absent : livraison non essayée"; [[ -n "${CI:-}" ]] && echec=1
+elif [[ -z "$LUA" ]]; then
+    echo "lua absent : preuve de la livraison non lancée"; echec=1
+else
+    tmp=$(mktemp -d)
+    node tests/livraison/essais.js || echec=1
+    preuve=()   # vide : tout le Lua suivi
+    if ! grep -Eq "$OUTILLAGE_LIVRAISON" <<< "$fichiers_tous"; then
+        mapfile -t preuve < <(printf '%s\n' "$fichiers_lua" | grep -v '^$' || true)
+        [[ ${#preuve[@]} -eq 0 ]] && echo "aucun fichier Lua modifié : preuve sans objet"
+    fi
+    if grep -Eq "$OUTILLAGE_LIVRAISON" <<< "$fichiers_tous" || [[ ${#preuve[@]} -gt 0 ]]; then
+        node scripts/livraison.js --essai "$tmp/allege" "${preuve[@]}" > "$tmp/liste.txt" || echec=1
+        "$LUA" scripts/lib/meme-code.lua "$tmp/allege" < "$tmp/liste.txt" || echec=1
+    fi
+    if grep -Eq "$OUTILLAGE_LIVRAISON|(^|/)fxmanifest\.lua$" <<< "$fichiers_tous"; then
+        node scripts/livraison.js --liste | cut -f1,2 | sort -u > "$tmp/js.txt" || echec=1
+        ./scripts/poids-client.sh --liste | grep -i '\.lua$' | sort -u > "$tmp/awk.txt"
+        if ! diff -u "$tmp/awk.txt" "$tmp/js.txt"; then
+            echo "ÉCART : la livraison (chancellerie/lib/delivery.js) et scripts/lib/manifeste.awk ne voient pas les mêmes fichiers Lua servis"
+            echec=1
+        fi
+    else
+        echo "aucun manifeste modifié : listes non recoupées"
+    fi
+    rm -rf "$tmp"
 fi
 
 titre "Audit réseau et sécurité"

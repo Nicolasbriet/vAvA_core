@@ -285,7 +285,7 @@ class Updates extends EventEmitter {
       if (panelSource) installer.recordPanel(panelSource, head.ref);
       installer.cleanStaging();
       this.check();
-      return { summary: `déjà à jour (${head.label})` };
+      return { summary: `déjà à jour (${head.label})${job.lean ? ` ; ${job.lean}` : ''}` };
     }
     job.say(`À mettre à jour : ${[...touched.map((p) => p.name), ...(panelChanges ? ['Chancellerie'] : [])].join(', ')}.`);
     if (panelChanges) {
@@ -323,7 +323,7 @@ class Updates extends EventEmitter {
     sayOrphans(job, report);
     if (report.added.length) job.say(`Nouveaux modules : ${report.added.join(', ')} (à activer dans la page Ressources).`);
     const expected = this.expected(startedBefore);
-    const summary = `${head.label} : ${[...report.changed, ...report.added, ...(panelChanges ? ['Chancellerie'] : [])].join(', ') || 'rien'}`;
+    const summary = `${head.label} : ${[...report.changed, ...report.added, ...(panelChanges ? ['Chancellerie'] : [])].join(', ') || 'rien'}${job.lean ? ` ; ${job.lean}` : ''}`;
 
     if (panelChanges) {
       job.stepTo('panel', 'Écriture de la nouvelle Chancellerie…');
@@ -412,7 +412,7 @@ class Updates extends EventEmitter {
       installer.cleanStaging();
       this.check();
       job.say('Installation terminée : la suite de l\'assistant écrit le server.cfg.');
-      return { summary: `vAvA ${head.label}`, serverDataPath, fxserverPath, report };
+      return { summary: `vAvA ${head.label}${job.lean ? ` ; ${job.lean}` : ''}`, serverDataPath, fxserverPath, report };
     });
   }
 }

@@ -714,8 +714,26 @@ versé à T-014 ; les autres points déjà couverts sont précisés dans T-012 �
   (sans effet) et un fichier livré qui dépasse (BLOQUANT) ; mesures avant et après dans le rapport.
 
 ### T-154 — Lua livré sans commentaires — **décision du porteur du projet**
-- Agents : vava-architecte → vava-dev-lua · Dépend de : — · Statut : à faire (proposée, à valider par le porteur du
-  projet avant de la prendre)
+- Agents : vava-architecte → vava-dev-lua (cette tâche autorise à toucher `chancellerie/`, dans les limites de la spec) · Dépend de : — · Statut : à tester en jeu (relu sécurité et réseau, suites appliquées ; validée par le porteur du
+  projet le 2 novembre 2026) — **à fusionner avec T-160, même mise à jour** (la première mise à jour allégée fait
+  retélécharger une fois le paquet des 33 ressources ; livrer T-160 avec évite un second retéléchargement, ≈ 1,67 Mo
+  par joueur qui revient)
+- Fait le 2 novembre 2026 : Chancellerie 1.9.0 (`lib/luastrip.js`, lexeur calqué sur Lua 5.4 qui garde chaque fin de
+  ligne et se contrôle à chaque fichier ; `lib/delivery.js`, choix des fichiers d'après les manifestes ; allègement dans
+  `fetchSource`, à l'installation et aux mises à jour, avant les empreintes ; `updates.leanLua`), `scripts/livraison.js`
+  (`--liste`, `--essai`, `--sortie`), preuve par le compilateur (`scripts/lib/meme-code.lua`, `string.dump` sur les 825
+  fichiers Lua suivis) et recoupement avec `scripts/lib/manifeste.awk` (qui suit `vava_conseil_lua` et
+  `vava_conseil_web`, comme le prévoit T-157) dans `scripts/verifier.sh`. Mesure sur `main` après T-157 : `lua +
+  manifeste` livrés 1 377 793 → 937 427 octets (− 430 Ko), 495 992 → 302 275 compressés (− 189 Ko) ; paquet du
+  Conseil 248 218 → 228 502 octets. Aucun module de jeu touché.
+- Relectures du 2 novembre 2026 : sécurité OK (7 mineurs), réseau à corriger (documentation) ; suites appliquées :
+  première ligne `#` et `/*` refusés, jokers comparés sans expression régulière, 1 Mio par fichier, écriture atomique
+  et échec propre de l'opération, réglages sans la casse, `--sortie` hors de toute copie git, bilan dans le résumé de
+  l'opération, coût de la première mise à jour allégée documenté (33 paquets, ≈ 3,9 Mo bruts), preuve partielle hors
+  `--tout`. `config_conseil.lua` (T-157) est un réglage de l'exploitant : gardé à la mise à jour, jamais allégé
+  (relecture réseau R-5 de T-157).
+- Spec : `docs/plan/specs/T-154.md` · rapport : `docs/plan/rapports/T-154.md` · test en jeu : `docs/tests/reseau.md`
+  § 7-F.
 - Trouvé pendant T-112 (relecture réseau R-2) : sur tout le dépôt, ≈ 478 Ko des 1 255 Ko de Lua livré aux joueurs sont
   des commentaires (≈ 206 Ko compressés, ≈ 11 % du premier téléchargement de 4,3 Mo) ; une retouche d'un seul
   commentaire d'un fichier client fait tout retélécharger ce fichier. Proposition : la copie déployée (installeur et
@@ -798,6 +816,39 @@ versé à T-014 ; les autres points déjà couverts sont précisés dans T-012 �
   avec sa dernière unité ; `vava_provisions` relève le palier par un abonné `before` (relecture sécurité S-2 : suppose
   que rien ne cède la main entre `before` et `after`). Joindre une copie bornée des métadonnées au payload, puis
   simplifier `vava_provisions` (retirer le relevé).
+
+### T-160 — Pages web livrées sans commentaires
+- Agents : vava-architecte → vava-dev-nui (outillage ; à valider par le porteur du projet s'il faut toucher
+  `chancellerie/`) · Dépend de : T-154 · Statut : à faire — **à livrer dans la même mise à jour que T-154** (relecture
+  réseau R-1 de T-154 : `vava_loading` et `vava_ui` ne seront retéléchargés qu'une fois)
+- Trouvé pendant T-154 (spec § 15) : les pages livrées (`web/**/*.js`, `*.css`, `*.html` des `files`, et la page du
+  paquet du Conseil `vava_conseil_web` de T-157) gardent leurs commentaires ; le Lua, lui, est allégé depuis T-154.
+  Mesurer d'abord le gain (`./scripts/poids-client.sh --detail`, colonne `autres`, ≈ 2,9 Mo bruts dont ≈ 1,4 Mo pour
+  l'écran de chargement), puis un lexeur JavaScript et CSS propre (expressions régulières littérales, gabarits,
+  commentaires dans les chaînes) et une preuve adaptée (second lecteur, ou `node --check` et comparaison de l'arbre
+  syntaxique, à spécifier), sur le modèle de T-154 (une implémentation pour la Chancellerie et `scripts/livraison.js`).
+- Critères : chaque page livrée allégée garde son comportement (essais des pages relancés sur la copie allégée) ; mesure
+  avant et après ; aucune dépendance ajoutée.
+
+### T-161 — Installeur : ne pas poser les dossiers du dépôt inutiles au serveur
+- Agent : vava-dev-lua (cette tâche autorise à toucher `chancellerie/`) · Dépend de : — · Statut : à faire
+- Trouvé pendant T-154 (spec § 15) : l'installeur et `scripts/livraison.js --sortie` posent dans `vAvA_core` tout ce que
+  la racine du dépôt contient hors de `ROOT_EXCLUDED` : `tests/`, `scripts/`, `.claude/`, fichiers de configuration des
+  outils (`.luacheckrc`…). Jamais servis aux joueurs (hors manifeste), seulement de l'encombrement sur le disque de
+  l'exploitant et dans chaque sauvegarde de la ressource. Les ajouter à `ROOT_EXCLUDED` (en gardant ce que le core lit).
+- Critères : une installation neuve ne pose plus ces dossiers ; une mise à jour retire ceux d'une installation existante
+  qui n'ont pas été modifiés (règle de fusion existante) ; essai de `layout`.
+
+### T-164 — Catalogue des sorts de `vava_magic` servi à tous
+- Agents : vava-architecte → vava-dev-lua (cette tâche autorise à toucher `vava_magic`) · Dépend de : T-154 · Statut :
+  à faire
+- Trouvé pendant T-154 (relecture réseau R-3) : le catalogue `spells` de `modules/vava_magic/config_client.lua` pèse
+  ≈ 61 Ko une fois allégé et reste commenté à la livraison (réglage de l'exploitant), alors que c'est une donnée de jeu
+  servie à chaque joueur, dont un joueur ne lit que les sorts qu'il connaît. Plus gros levier restant sur le Lua livré.
+  Proposition à étudier par l'architecte : ne servir au client que ce qu'il lit pour l'affichage (le reste au seul
+  serveur, `config.lua`), ou une définition de l'Atelier envoyée à la demande, comme T-157 le fait pour le Conseil.
+- Critères : mesure avant et après (`scripts/poids-client.sh vava_magic`) ; aucune règle de jeu ni texte changé ;
+  `config_split_spec` passe.
 
 ## Phase 2 — Arrivée
 
