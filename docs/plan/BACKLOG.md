@@ -714,8 +714,17 @@ versé à T-014 ; les autres points déjà couverts sont précisés dans T-012 �
   (sans effet) et un fichier livré qui dépasse (BLOQUANT) ; mesures avant et après dans le rapport.
 
 ### T-154 — Lua livré sans commentaires — **décision du porteur du projet**
-- Agents : vava-architecte → vava-dev-lua (cette tâche autorise à toucher `chancellerie/`, dans les limites de la spec) · Dépend de : — · Statut : en cours (validée par le porteur du projet le
+- Agents : vava-architecte → vava-dev-lua (cette tâche autorise à toucher `chancellerie/`, dans les limites de la spec) · Dépend de : — · Statut : en cours (fait, relectures sécurité et réseau à faire ; validée par le porteur du projet le
   2 novembre 2026)
+- Fait le 2 novembre 2026 : Chancellerie 1.9.0 (`lib/luastrip.js`, lexeur calqué sur Lua 5.4 qui garde chaque fin de
+  ligne et se contrôle à chaque fichier ; `lib/delivery.js`, choix des fichiers d'après les manifestes ; allègement dans
+  `fetchSource`, à l'installation et aux mises à jour, avant les empreintes ; `updates.leanLua`), `scripts/livraison.js`
+  (`--liste`, `--essai`, `--sortie`), preuve par le compilateur (`scripts/lib/meme-code.lua`, `string.dump` sur les 825
+  fichiers Lua suivis) et recoupement avec `scripts/lib/manifeste.awk` (qui suit `vava_conseil_lua` et
+  `vava_conseil_web`, comme le prévoit T-157) dans `scripts/verifier.sh`. Mesure : `lua + manifeste` livrés
+  1 422 293 → 978 830 octets (− 433 Ko), 506 268 → 310 918 compressés (− 191 Ko). Aucun module de jeu touché.
+- Spec : `docs/plan/specs/T-154.md` · rapport : `docs/plan/rapports/T-154.md` · test en jeu : `docs/tests/reseau.md`
+  § 7-F.
 - Trouvé pendant T-112 (relecture réseau R-2) : sur tout le dépôt, ≈ 478 Ko des 1 255 Ko de Lua livré aux joueurs sont
   des commentaires (≈ 206 Ko compressés, ≈ 11 % du premier téléchargement de 4,3 Mo) ; une retouche d'un seul
   commentaire d'un fichier client fait tout retélécharger ce fichier. Proposition : la copie déployée (installeur et
@@ -758,6 +767,27 @@ versé à T-014 ; les autres points déjà couverts sont précisés dans T-012 �
   avec sa dernière unité ; `vava_provisions` relève le palier par un abonné `before` (relecture sécurité S-2 : suppose
   que rien ne cède la main entre `before` et `after`). Joindre une copie bornée des métadonnées au payload, puis
   simplifier `vava_provisions` (retirer le relevé).
+
+### T-160 — Pages web livrées sans commentaires
+- Agents : vava-architecte → vava-dev-nui (outillage ; à valider par le porteur du projet s'il faut toucher
+  `chancellerie/`) · Dépend de : T-154 · Statut : à faire
+- Trouvé pendant T-154 (spec § 15) : les pages livrées (`web/**/*.js`, `*.css`, `*.html` des `files`, et la page du
+  paquet du Conseil `vava_conseil_web` de T-157) gardent leurs commentaires ; le Lua, lui, est allégé depuis T-154.
+  Mesurer d'abord le gain (`./scripts/poids-client.sh --detail`, colonne `autres`, ≈ 2,9 Mo bruts dont ≈ 1,4 Mo pour
+  l'écran de chargement), puis un lexeur JavaScript et CSS propre (expressions régulières littérales, gabarits,
+  commentaires dans les chaînes) et une preuve adaptée (second lecteur, ou `node --check` et comparaison de l'arbre
+  syntaxique, à spécifier), sur le modèle de T-154 (une implémentation pour la Chancellerie et `scripts/livraison.js`).
+- Critères : chaque page livrée allégée garde son comportement (essais des pages relancés sur la copie allégée) ; mesure
+  avant et après ; aucune dépendance ajoutée.
+
+### T-161 — Installeur : ne pas poser les dossiers du dépôt inutiles au serveur
+- Agent : vava-dev-lua (cette tâche autorise à toucher `chancellerie/`) · Dépend de : — · Statut : à faire
+- Trouvé pendant T-154 (spec § 15) : l'installeur et `scripts/livraison.js --sortie` posent dans `vAvA_core` tout ce que
+  la racine du dépôt contient hors de `ROOT_EXCLUDED` : `tests/`, `scripts/`, `.claude/`, fichiers de configuration des
+  outils (`.luacheckrc`…). Jamais servis aux joueurs (hors manifeste), seulement de l'encombrement sur le disque de
+  l'exploitant et dans chaque sauvegarde de la ressource. Les ajouter à `ROOT_EXCLUDED` (en gardant ce que le core lit).
+- Critères : une installation neuve ne pose plus ces dossiers ; une mise à jour retire ceux d'une installation existante
+  qui n'ont pas été modifiés (règle de fusion existante) ; essai de `layout`.
 
 ## Phase 2 — Arrivée
 
