@@ -90,6 +90,9 @@ local function setup()
     if not boundOk then
         return false, 'config_client.lua : spells.murmure.textMaxBytes (borne d\'un RPC) : ' .. boundWhy
     end
+    -- chiffres des sorts (T-155) : quatre booléens et maxPerMessage de 1 à 32, sinon le module ne démarre pas
+    local numbersOk, numbersWhy = VavaMagic.harm.checkNumbers(cfg.numbers)
+    if not numbersOk then return false, 'config.lua : ' .. numbersWhy end
     local declared, declareErr = VavaMagic.commands.declare()
     if not declared then return false, 'commandes : ' .. tostring(declareErr) end
     local ok, err = bridge.DefineSheet(sheets.SCHEMA)

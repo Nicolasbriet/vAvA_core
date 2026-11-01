@@ -1157,6 +1157,7 @@ noir.
 | `progress(id, { label, durationMs, cancelable? })` | `true` ou `false, code` (`invalid_id`, `invalid_options`, `busy`) — barre de progression d'une action longue (récolte, artisanat, réparation, leçon…) au centre bas de l'écran, de 0 à 100 % sur `durationMs` (entier, 250 à 120 000 ms) ; `label` texte brut, 60 caractères au plus ; **une seule à la fois** ; depuis 1.3.0 |
 | `cancelProgress(id)` | `true` ou `false, code` (`not_found`, `not_owner`) — interrompt la progression en cours ; seule la ressource qui l'a lancée le peut ; depuis 1.3.0 |
 | `currentProgress()` | `{ id, label, endsAt }` (`endsAt` : horloge `GetGameTimer`) ou `nil` ; depuis 1.3.0 |
+| `hitText(side, anchor, issue, tenths?)` | `true` ou `false, code` (`invalid_side`, `invalid_anchor`, `invalid_issue`, `invalid_amount`, `off`, `hidden`, `far`, `offscreen`, `too_many`) — chiffre d'un coup au-dessus de la cible ; depuis 1.7.0 (T-155) |
 
 - `id` : `<ressource>:<nom>` ; un module ne gère que ses jauges et sa progression, retirées à son arrêt.
 - `icon` : image `nui://<ressource>/<chemin>` listée dans les `files` du module (aucune adresse externe).
@@ -1178,6 +1179,28 @@ noir.
   notifications (`config.notifyDurations`, multiplicateur de `notifications.durationMs`). La page reçoit
   `settings = { scale, durationMs }` dans `init`, puis le message `settings` (`{ scale, durationMs }`) au seul
   changement. Sans `vava_pause` : comportement d'avant (`config.pauseResource`).
+- **Chiffres des coups** (1.7.0, T-155) : `hitText(side, anchor, issue, tenths)` montre, au-dessus de la cible, le
+  montant d'un coup ou le mot d'une issue sans dégâts ; il monte et s'efface en `numbers.durationMs` (900 ms).
+  `side` : `dealt` (ce que j'inflige, laiton) ou `taken` (ce que je reçois, rouge) ; `anchor` : numéro serveur d'un
+  joueur (1 à 65 535 ; le sien pour `taken` : son propre ped) ou point fixe `{ x =, y =, z = }`, `{ x, y, z }` ou
+  `vector3` (|x|, |y| ≤ 50 000, |z| ≤ 5 000 : mannequin de T-156) ; `issue` : `hit`, `tick` (morsure, zone qui dure :
+  petit), `stagger` (grand, « Chancelle » dessous), `down` (le plus grand, « À terre »), `block` et `break` (le reste et
+  « Bloqué » / « Garde brisée » dessous, ou le mot seul), `parry`, `dodge`, `absorb` (le mot seul) ; `tenths` : nil ou
+  entier de 0 à 2 000 (dixièmes de point ; 0 → « Sans effet »). Montré en entier arrondi, au moins 1 dès que le coup
+  porte (`numbers.decimals = 1` : « 7,2 »). Refus : `off` (`numbers.enabled = false`, ou réglage du joueur
+  `combat.numbers` de la bannière : `tous`, `infliges` = donnés seulement, `aucun` ; sans `vava_pause` :
+  `numbers.defaultMode`), `hidden` (HUD masqué : sélection, bannière, menu de GTA, fondu), `far` (ancre à plus de
+  `maxDistance` = 60 m de la caméra), `offscreen` (ancre hors de l'écran pour `dealt` ; `taken` prend alors
+  `takenFallback`, un peu sous le centre), `too_many` (`maxPerSecond` = 16 chiffres créés par seconde), `invalid_anchor`
+  (aussi : joueur inconnu de ce client pour `dealt`). Au plus `maxAlive` = 10 à l'écran (le plus ancien cède la place) ;
+  coups rapprochés sur une même ancre (`stackMs`) en cascade de `stackMax` crans. **Affichage seulement, jamais une
+  décision** : un client modifié ne peut tromper que son propre écran. Aucune boucle au repos : la position de la tête
+  est suivie toutes les `followMs` (100 ms) tant qu'un chiffre vit, puis plus rien ; la page reçoit `number`, puis un
+  `numbersMove` seulement si un chiffre a bougé de plus de `followEpsilon` ou s'est caché, et `numbersClear` quand le
+  HUD est masqué (contrat : `docs/plan/rapports/T-155-contrat.md`). Config contrôlée au démarrage (bornes qui évitent une
+  erreur ou un coût : `durationMs`, `maxAlive`, `maxPerSecond`, `followMs`, `stackMax`, `takenFallback`, mots de 1 à 32
+  octets) : une valeur hors bornes coupe les chiffres (une ligne de console). Appelé par `vava_combat` (≥ 1.4.0) et
+  `vava_magic` (≥ 2.13.0), isolé (`pcall`) : sans `vava_hud`, rien ne s'affiche et rien ne change au combat.
 - Pour travailler le rendu sans le jeu : `web/index.html?values=0.8,0.62,0.08` dans un navigateur ; `&progress=1`
   (barre de 8 s menée à son terme) ou `&progress=cancel` (interrompue à 60 %). Depuis 1.4.0, polices et grain viennent
   de `vava_ui` (dépendance déclarée) et les données simulées de `web/dev/devmock.js`, jamais livré.
@@ -1865,6 +1888,7 @@ sort → refus `controlled` ; plus ancien, arrêté ou en erreur : aucun refus d
 - **Réseau** : RPC `vava_combat:use` (≈ 40 o, réponse au seul appelant ≈ 15 o) et `vava_combat:lower` (≈ 25 o, un par
   garde abaissée, rien pendant la tenue) ; `vava_combat:hit` aux joueurs à 30 m de la cible dans l'instance de
   l'attaquant, **un par cible touchée** (l'issue d'un coup défendu le remplace), jamais pour un coup manqué ou refusé ;
+  depuis 1.4.0 le montant (+ 1 à 3 o) aux deux seuls participants, l'esquive et l'absorbé (≈ 25 o) à eux seuls ;
   `vava_combat:notify` (`core.net.send`) au seul porteur dont l'arme passe un seuil, au seul attaquant dont le coup est
   retenu (un par raison et par 10 s) ou au seul membre du Conseil sans `vava_chat` ; le statebag du bouclier au
   changement seulement ; + ≈ 450 o une fois dans `GlobalState['vava_inventory:heldModels']` (mécanisme de
@@ -1894,12 +1918,22 @@ récupération) ; `VavaCombat.defense.spend(src, 'block' | 'parry' | 'dodge', { 
 `ok, broken` : coût d'un geste défensif, seul point que T-114 remplacera (1.3.0 : compteur provisoire pour `block`,
 toujours `true, false` sinon).
 
-**Évènement** `vava_combat:hit(attaquant, cible, issue)` (serveur → clients proches, `core.net.sendNearWith` avec
-l'instance de l'attaquant, 30 m autour de la cible) : `issue` ∈ `hit`, `stagger`, `down`, `block` (même partiel : rien
-ne tressaille), `parry` (l'attaquant chancelle), `break` (garde brisée : la cible chancelle) ; `dodge` et `absorb`, que
-personne ne montre, ne sont pas envoyés (`config.reactions.silent`, jamais `parry` ni `break`) ; un coup d'une autre
-ressource défendu n'envoie rien. La cible joue sa réaction, l'attaquant entend la touche (`hit`, `stagger`, `down`),
-tous voient l'effet d'impact (étincelles pour `block`, `parry`, `break`). T-155 ajoutera le montant en 4e valeur.
+**Évènement** `vava_combat:hit(attaquant, cible, issue[, dixièmes])` (serveur → joueurs de l'instance de l'attaquant à
+30 m de la cible, listes calculées par le serveur) : `issue` ∈ `hit`, `stagger`, `down`, `block` (même partiel : rien
+ne tressaille), `parry` (l'attaquant chancelle), `break` (garde brisée : la cible chancelle), `dodge`, `absorb` ; un coup
+d'une autre ressource défendu n'envoie rien. La cible joue sa réaction, l'attaquant entend la touche (`hit`, `stagger`,
+`down`), tous voient l'effet d'impact (étincelles pour `block`, `parry`, `break`).
+**Chiffres des coups** (1.4.0, T-155, `config.numbers`) : l'attaquant (`numbers.attacker`) et la cible
+(`numbers.target`) reçoivent **une 4e valeur** : le montant du coup après modificateurs (`result.amount`, jamais la vie
+retirée) en dixièmes entiers (0 à 2 000 ; `weapons.wireAmount`), ou **`false`** pour une issue sans montant (`parry`,
+`dodge`, `absorb`, `block` ou `break` dont rien n'a passé) — `false` et non `nil`, qu'un message perdrait en fin de
+liste ; leur client appelle `vava_hud:hitText` (`dealt` chez l'attaquant, `taken` chez la cible). Les témoins
+reçoivent le message à 3 valeurs, comme en 1.3.0, et jamais `dodge` ni `absorb` (`config.reactions.silent`, jamais
+`parry` ni `break`), qui ne partent donc qu'aux participants désignés ; un participant non désigné est traité en témoin.
+Recherche des proches : `core.net.playersNear(…, { bucket })` ; destinataires d'une même charge réunis en une liste
+(`core.net.send`) : deux envois au plus par coup (participants, témoins), un s'il n'y a pas de témoin.
+`numbers.witnesses = true` : les témoins reçoivent aussi le montant (jamais en v1). `numbers.enabled = false` :
+comportement de 1.3.0 (`core.net.sendNearWith`, 3 valeurs, esquive et absorbé tus pour tous).
 
 | Export serveur | Retour |
 |---|---|
@@ -2029,6 +2063,23 @@ restriction ; 1.2.0 : rengainement et mode combat, T-149).
   appel à `damage`, plus d'évènement `vava_magic:damage` au client : sans `vava_health`, les sorts ne blessent personne
   (le lanceur le lit au plus une fois par minute). Journal : `vava_health_hits` (`origin = vava_magic`) ;
   `vava_magic_damage_log` n'est plus écrit, purgé des lignes de plus de `combat.log.retentionDays` jours (30).
+- **Chiffres des sorts** (2.13.0, T-155, `config.numbers`) : issue et montant d'un coup lus dans le résultat de la
+  chaîne (`harm.outcome` : `amount` après modificateurs en dixièmes, jamais la vie retirée ; `dodge`, `parry`, `block`,
+  `absorb` pour un coup arrêté à leur étape ou entièrement pris ; `down` ; `tick` pour une zone qui dure ou une
+  brûlure ; sinon `hit` ; rien pour un coup retenu : zone de paix, combats coupés, crochet). **Victime**
+  (`numbers.target`) : `vava_magic:hit(réaction|false, dixièmes|false, issue?)`, toujours à elle seule — avec sa
+  réaction pour un coup qui blesse (`issue` absente pour `hit`), `réaction = false` pour une morsure de brûlure, une
+  esquive, un coup absorbé ou sans effet ; son client appelle `vava_hud:hitText('taken', …)`. **Lanceur**
+  (`numbers.caster`) : évènement nouveau `vava_magic:dealt(liste)` au seul lanceur, **un par tour
+  du serveur** où il a touché quelqu'un (fin du tour : `SetTimeout(0)` posé au premier touché), liste pure de 1 à
+  `maxPerMessage` (10 ; 1 à 32) entrées `{ cible, issue[, dixièmes] }` ; jamais quand il est lui-même la victime, rien
+  s'il n'a plus de personnage à la fin du tour ; son client appelle `hitText('dealt', cible, …)` pour chaque entrée
+  valide. `numbers.overTime = false` : ni morsures ni zones qui durent ; `numbers.enabled = false` : comportement de
+  2.12.0 (`vava_magic:hit(réaction)`, rien au lanceur). Config contrôlée au démarrage (`harm.checkNumbers` : quatre
+  booléens, `maxPerMessage` entier de 1 à 32 ; sinon le module ne démarre pas). Coût : + 1 à 3 o dans `vava_magic:hit`,
+  ≈ 23 o par morsure, esquive ou absorbé à la victime ; ≈ 18 o + ≈ 8 à 12 o par touché au lanceur. Les deux
+  évènements partent par `bridge.SendTo` (`core.net.send` : comptés par `/vava_reseau` ; core sans `core.net` : envoi
+  direct).
 - **Modificateurs** (registre `vava_health:modifiers`, redéclarés à chaque démarrage de `vava_health`) :
   `vava_magic:zones` (étape `annulation`, seulement si `combat.protectedZones` en compte : personne n'est blessé dans une
   zone de paix, ni par un sort ni par une lame, et personne n'en blesse un autre depuis l'intérieur ; annulé
@@ -2690,7 +2741,9 @@ facultatif. Aucune table en base. Détail et réglages : `modules/vava_pause/REA
 
 Crochets client émis : `vava_pause:state` (`after`, `{ open }`), `vava_pause:settingChanged` (`after`, `{ key, value }`).
 Réglages du joueur (stockage local de FiveM, `vava_pause:reglages`, jamais envoyés au serveur) : `ui.scale` (90, 100,
-115 ; bannière et `vava_hud`), `hud.notifyDuration` (`courte`, `normale`, `longue` ; `vava_hud`), `voice.circle`
+115 ; bannière et `vava_hud`), `hud.notifyDuration` (`courte`, `normale`, `longue` ; `vava_hud`), `combat.numbers`
+(1.1.0, T-155 : `tous` = donnés et reçus, `infliges` = donnés seulement, `aucun` ; « Chiffres des coups », onglet
+Interface ; `vava_hud`, qui filtre en Lua : le serveur envoie les mêmes octets), `voice.circle`
 (levier ; `vava_voice`). Un réglage n'est montré que si une ressource de son `uses` tourne ; sa valeur effective est
 décidée par le module qui l'applique. Registre `core:commands` : touche `vava_pause` (« Déployer la bannière du
 royaume », `Échap ou P`, chapitre Royaume).

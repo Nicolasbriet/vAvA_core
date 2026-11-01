@@ -1,9 +1,7 @@
 --[[
     vava_hud/client/pause.lua
-    Rôle : lien avec la bannière du royaume (vava_pause, 1.6.0) : bannière déployée ou non (crochet vava_pause:state,
-           remis à « repliée » à l'arrêt de sa ressource) ; réglages du joueur lus chez elle (export setting, isolé) et
-           suivis (crochet vava_pause:settingChanged) : taille de l'interface et durée des notifications, envoyées à la
-           page (message `settings`) seulement quand elles changent. Sans vava_pause : échelle 1, durée de base.
+    Rôle : lien avec la bannière (vava_pause) : déployée ou non, réglages du joueur lus et suivis (taille, durée des
+           notifications, chiffres des coups) ; sans elle, valeurs de base.
     Dépendances : config_client.lua, client/core.lua, client/nui.lua
 ]]
 
@@ -17,7 +15,7 @@ if not core then return end
 local cfg = VavaHud.config
 local nui = VavaHud.nui
 local PAUSE = cfg.pauseResource
-local SCALE_KEY, DURATION_KEY = 'ui.scale', 'hud.notifyDuration'
+local SCALE_KEY, DURATION_KEY, NUMBERS_KEY = 'ui.scale', 'hud.notifyDuration', 'combat.numbers'
 local DEFAULT_SCALE, DEFAULT_DURATION = 1.0, cfg.notifications.durationMs
 
 local pause = {}
@@ -25,18 +23,16 @@ VavaHud.pause = pause
 
 local open = false
 local current = { scale = DEFAULT_SCALE, durationMs = DEFAULT_DURATION }
+-- réglage « Chiffres des coups » tel que lu (nil : bannière absente ; une valeur inconnue vaut numbers.defaultMode)
+local numbersMode = nil
 -- après chaque changement : appelé par main.lua (visibilité du HUD)
 local onChange = nil
 
----@param key string
----@return any
 local function readSetting(key)
     return exports[PAUSE]:setting(key)
 end
 
 --- Réglage de la bannière, ou nil (ressource arrêtée, ancienne ou en erreur).
----@param key string
----@return any
 local function setting(key)
     if type(PAUSE) ~= 'string' or GetResourceState(PAUSE) ~= 'started' then return nil end
     local ok, value = pcall(readSetting, key)
@@ -48,16 +44,12 @@ local function setting(key)
 end
 
 --- Valeurs effectives d'après les réglages (choix inconnu : valeur de base).
----@param scaleChoice any
----@param durationChoice any
----@return { scale: number, durationMs: integer }
 local function effective(scaleChoice, durationChoice)
     local scale = cfg.scales and cfg.scales[scaleChoice] or DEFAULT_SCALE
     local factor = cfg.notifyDurations and cfg.notifyDurations[durationChoice] or 1.0
     return { scale = scale, durationMs = floor(DEFAULT_DURATION * factor + 0.5) }
 end
 
----@param value { scale: number, durationMs: integer }
 local function apply(value)
     if value.scale == current.scale and value.durationMs == current.durationMs then return end
     current = value
@@ -67,20 +59,23 @@ end
 --- Relit les deux réglages chez la bannière (démarrage, bannière démarrée ou arrêtée).
 local function reload()
     apply(effective(setting(SCALE_KEY), setting(DURATION_KEY)))
+    numbersMode = setting(NUMBERS_KEY)
 end
 
----@return boolean  bannière déployée
 function pause.isOpen()
     return open
 end
 
 --- Réglages effectifs, pour l'état complet envoyé à la page prête.
----@return { scale: number, durationMs: integer }
 function pause.settings()
     return { scale = current.scale, durationMs = current.durationMs }
 end
 
----@param handler fun()
+--- Réglage « Chiffres des coups » (`tous`, `infliges`, `aucun`), ou nil.
+function pause.numbersMode()
+    return numbersMode
+end
+
 function pause.onChange(handler)
     onChange = handler
 end
@@ -92,7 +87,11 @@ end)
 
 core.hooks.after('vava_pause:settingChanged', function(payload)
     if type(payload) ~= 'table' then return end
-    if payload.key == SCALE_KEY or payload.key == DURATION_KEY then reload() end
+    if payload.key == SCALE_KEY or payload.key == DURATION_KEY then
+        reload()
+    elseif payload.key == NUMBERS_KEY then
+        numbersMode = setting(NUMBERS_KEY)
+    end
 end)
 
 AddEventHandler('onClientResourceStart', function(resource)
@@ -102,6 +101,7 @@ end)
 AddEventHandler('onClientResourceStop', function(resource)
     if resource ~= PAUSE then return end
     open = false
+    numbersMode = nil
     apply(effective(nil, nil))
     if onChange then onChange() end
 end)

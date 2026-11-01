@@ -9,13 +9,15 @@
         coup est alors refusé), paquet de `hit` (avec `launchedAt`, instant du lancement, pour un coup déjà lancé) ;
       - protections lues par les modificateurs de la magie : absorption des boucliers (le plus proche de sa fin
         d'abord, chacun jusqu'à sa réserve), résistance ou faiblesse à un type (la plus forte de chaque sens
-        l'emporte, jamais cumulée).
+        l'emporte, jamais cumulée) ;
+      - chiffres des sorts (T-155) : issue et montant (dixièmes) d'un résultat de la chaîne, contrôle de
+        config.numbers.
     Aucune native ni aucun état : servi au seul serveur (server_scripts) et essayé hors jeu (tests/spec).
     Dépendances : shared/constants.lua
 ]]
 
-local type, ipairs, pairs, min, max, huge = type, ipairs, pairs, math.min, math.max, math.huge
-local mathType, find = math.type, string.find
+local type, ipairs, pairs, min, max, huge, floor = type, ipairs, pairs, math.min, math.max, math.huge, math.floor
+local mathType, find, tostring = math.type, string.find, tostring
 
 local harm = {}
 VavaMagic.harm = harm
@@ -190,6 +192,63 @@ function harm.resist(resistances, kind, amount, now)
     if net > 0 then return { resisted = amount * net } end
     if net < 0 then return { added = amount * -net } end
     return nil
+end
+
+-- Chiffres des sorts (T-155) ------------------------------------------------------------------------------------------
+
+local TENTHS_MAX, MAX_ENTRIES = VavaMagic.NUMBERS.TENTHS_MAX, VavaMagic.NUMBERS.MAX_ENTRIES
+-- issues d'un chiffre de sort, comprises par vava_hud:hitText (serveur seul : le HUD relit l'issue reçue)
+harm.NUMBER_ISSUES = { 'hit', 'tick', 'down', 'dodge', 'absorb', 'block', 'parry' }
+-- étape d'annulation de la chaîne → issue montrée (le coup a été arrêté)
+local CANCELLED = { esquive = 'dodge', parade = 'parry', blocage = 'block', bouclier = 'absorb' }
+local NUMBERS_FLAGS = { 'enabled', 'caster', 'target', 'overTime' }
+local NUMBERS_KEYS = { enabled = true, caster = true, target = true, overTime = true, maxPerMessage = true }
+
+--- Montant en dixièmes entiers (arrondi), borné à 2 000.
+---@param amount number
+---@return integer
+function harm.tenths(amount)
+    return min(TENTHS_MAX, floor(amount * 10 + 0.5))
+end
+
+--- Issue d'un coup de sort et son montant (dixièmes), d'après le résultat de la chaîne : `dodge`, `parry`, `block`,
+--- `absorb` pour un coup arrêté à leur étape (sans montant) ; nil pour une autre annulation (zone de paix, combats
+--- coupés, crochet, à terre) ou un montant illisible ; `down`, puis `absorb` ou `block` pour un coup entièrement pris,
+--- `tick` pour une zone qui dure ou une brûlure, sinon `hit`. Le montant est celui du coup après modificateurs
+--- (`amount`), jamais la vie retirée.
+---@param result any
+---@param nature string  harm.NATURE
+---@return string|nil issue
+---@return integer|nil tenths
+function harm.outcome(result, nature)
+    if type(result) ~= 'table' then return nil end
+    if result.cancelled ~= nil and result.cancelled ~= false then return CANCELLED[result.stage] end
+    local amount = result.amount
+    if not isFinite(amount) or amount < 0 then return nil end
+    if result.downed == true then return 'down', harm.tenths(amount) end
+    if amount == 0 and isFinite(result.absorbed) and result.absorbed > 0 then return 'absorb' end
+    if amount == 0 and isFinite(result.blocked) and result.blocked > 0 then return 'block' end
+    if nature == harm.NATURE.AURA or nature == harm.NATURE.BURN then return 'tick', harm.tenths(amount) end
+    return 'hit', harm.tenths(amount)
+end
+
+--- Contrôle de config.numbers au démarrage : `true`, ou `false, raison`.
+---@param numbers any
+---@return boolean ok
+---@return string|nil err
+function harm.checkNumbers(numbers)
+    if type(numbers) ~= 'table' then return false, 'numbers attendu (table)' end
+    for key in pairs(numbers) do
+        if not NUMBERS_KEYS[key] then return false, "numbers : clé inconnue '" .. tostring(key) .. "'" end
+    end
+    for _, key in ipairs(NUMBERS_FLAGS) do
+        if type(numbers[key]) ~= 'boolean' then return false, 'numbers.' .. key .. ' attendu (booléen)' end
+    end
+    local most = numbers.maxPerMessage
+    if mathType(most) ~= 'integer' or most < 1 or most > MAX_ENTRIES then
+        return false, 'numbers.maxPerMessage attendu (entier de 1 à ' .. MAX_ENTRIES .. ')'
+    end
+    return true
 end
 
 --- Ensemble (clé → true) d'une liste de types, ou nil pour une liste absente ou vide.
