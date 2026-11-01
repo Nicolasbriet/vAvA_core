@@ -4,7 +4,9 @@
  * Rôle : retirer d'un fichier Lua 5.4 ce que Lua ignore (commentaires, blancs de fin de ligne) en gardant chaque fin de
  *        ligne à sa place : une erreur en jeu désigne la même ligne que le dépôt (T-154). Lexeur calqué sur llex.c :
  *        chaînes courtes (échappements, `\z`, fin de ligne échappée), chaînes et commentaires longs de tout niveau,
- *        nombres, noms, BOM et première ligne `#` ; la contre-apostrophe de CfxLua est lue comme une chaîne. Chaque
+ *        nombres, noms, BOM ; la contre-apostrophe de CfxLua est lue comme une chaîne. Refusés (fichier laissé tel
+ *        quel) : une première ligne `#` (rien de livré n'en a ; Lua et ce lexeur ne la finissent pas au même octet,
+ *        relecture sécurité S-1) et `/*` hors chaîne et hors commentaire (commentaire de CfxLua, S-7). Chaque
  *        allègement se contrôle lui-même (même suite de lexèmes, chacun à sa ligne) ; sinon le fichier est rendu tel
  *        quel par l'appelant. Le texte est lu en latin1 : un caractère = un octet, rien n'est interprété.
  *        La preuve indépendante est faite par le compilateur Lua (scripts/lib/meme-code.lua).
@@ -49,9 +51,9 @@ function newlinesOf(text, start, end) {
 }
 
 /**
- * Évènements dans l'ordre : { kind, start, end, line } (`long: true` pour un commentaire long) ; kind : 'bom' |
- * 'shebang' | 'ws' | 'eol' | 'comment' | 'string' | 'long' | 'number' | 'name' | 'punct' ; ou { kind: 'error', line,
- * reason } en dernier.
+ * Évènements dans l'ordre : { kind, start, end, line } (`long: true` pour un commentaire long) ; kind : 'bom' | 'ws' |
+ * 'eol' | 'comment' | 'string' | 'long' | 'number' | 'name' | 'punct' ; ou { kind: 'error', line, reason } en
+ * dernier.
  * @param {string} text  texte lu en latin1
  */
 function scan(text) {
@@ -68,12 +70,8 @@ function scan(text) {
     push('bom', 0, 3, 1);
     i = 3;
   }
-  if (text[i] === '#') {
-    let j = i;
-    while (j < n && !isNewline(text[j])) j += 1;
-    push('shebang', i, j, 1);
-    i = j;
-  }
+  // première ligne `#` : sautée par luaL_loadfile jusqu'au seul `\n` ; jamais dans un fichier livré (S-1)
+  if (text[i] === '#') return fail(1, 'première ligne « # » refusée');
   // fin (exclue) d'un bloc long de niveau `level` dont le contenu commence en `from`, ou -1
   const closeLong = (from, level) => {
     const close = `]${'='.repeat(level)}]`;
@@ -163,6 +161,9 @@ function scan(text) {
       }
       if (i < n && isAlpha(text[i])) i += 1;
       push('number', start, i, at);
+    } else if (c === '/' && text[i + 1] === '*') {
+      // jamais valide en Lua 5.4 ; commentaire `/* */` de CfxLua, qui pourrait cacher `--` ou une fin de ligne (S-7)
+      return fail(at, '« /* » hors chaîne (syntaxe de CfxLua)');
     } else if (isAlpha(c)) {
       i += 1;
       while (i < n && (isAlpha(text[i]) || isDigit(text[i]))) i += 1;

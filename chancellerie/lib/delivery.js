@@ -2,9 +2,9 @@
 /*
  * lib/delivery.js
  * Rôle : ce qui est livré aux joueurs et allégé de ses commentaires (T-154). D'après le manifeste de chaque ressource :
- *        le Lua des `shared_script(s)` et `client_script(s)`, celui du paquet du Conseil (`vava_conseil_lua`, T-157,
- *        `config_conseil.lua` compris) et le `fxmanifest.lua` lui-même. Jamais : les réglages de l'exploitant
- *        (`config.lua`, `config_client.lua`, `config/…`), le Lua du seul serveur, les `files`, le web. Le manifeste est
+ *        le Lua des `shared_script(s)` et `client_script(s)`, celui du paquet du Conseil (`vava_conseil_lua`, T-157)
+ *        et le `fxmanifest.lua` lui-même. Jamais : les réglages de l'exploitant (`config.lua`, `config_client.lua`,
+ *        `config_conseil.lua`, `config/…`), le Lua du seul serveur, les `files`, le web. Le manifeste est
  *        lu comme par scripts/lib/manifeste.awk (recoupé à chaque vérification) ; une forme illisible laisse toute la
  *        ressource telle quelle. Chaque fichier n'est réécrit qu'après son propre contrôle (lib/luastrip.js).
  *        Utilisé par l'installeur (copie téléchargée, avant les empreintes) et par scripts/livraison.js.
@@ -25,12 +25,19 @@ const COUNCIL_DIRECTIVES = ['vava_conseil_lua'];
 // données servies telles quelles (même en .lua)
 const DATA_DIRECTIVES = ['files', 'file', 'ui_page', 'loadscreen'];
 const COUNCIL_SIDE = ['vava_conseil_lua', 'vava_conseil_web'];
-const MAX_BYTES = 4 * 1024 * 1024;
+// borne d'un fichier lu ou allégé (relecture sécurité S-3 : mémoire du lexeur bornée ; le plus gros fichier livré fait
+// 86 Ko)
+const MAX_BYTES = 1024 * 1024;
 const MANIFEST = 'fxmanifest.lua';
 
-/** Fichier de réglages, que son propriétaire a pu adapter ? */
+// réglages de l'exploitant : gardés à la mise à jour (« .nouveau » à côté), jamais allégés ; config_conseil.lua
+// (réglages du paquet du Conseil, T-157) en est un (relecture réseau R-5 de T-157)
+const USER_FILES = ['config.lua', 'config_client.lua', 'config_conseil.lua'];
+
+/** Fichier de réglages, que son propriétaire a pu adapter ? (sans la casse : NTFS ne la distingue pas, S-5) */
 function userOwned(relative) {
-  return ['config.lua', 'config_client.lua'].includes(path.posix.basename(relative)) || relative.startsWith('config/');
+  const lower = relative.toLowerCase();
+  return USER_FILES.includes(path.posix.basename(lower)) || lower.startsWith('config/');
 }
 
 // Lecture du manifeste ------------------------------------------------------------------------------------------------
@@ -61,7 +68,7 @@ function stringValue(text, e) {
 }
 
 // évènements du lexeur sans effet sur la lecture d'un manifeste
-const SKIPPED = new Set(['ws', 'eol', 'comment', 'bom', 'shebang']);
+const SKIPPED = new Set(['ws', 'eol', 'comment', 'bom']);
 
 /**
  * Chaînes des directives suivies : [{ directive, value }] dans l'ordre ; ou { reason } si une directive est suivie
@@ -125,22 +132,75 @@ function manifestStrings(text) {
 
 const hasGlob = (part) => /[*?[]/.test(part);
 
-/** Une partie de chemin à jokers en expression régulière (`*`, `?`, `[…]`, `[!…]`). */
-function partRegex(part) {
-  let out = '';
+/**
+ * Une partie de chemin à jokers en éléments : '*', '?', { set, negate } pour `[…]` / `[!…]`, ou un caractère. Un `[`
+ * sans `]` est un caractère ; un intervalle à l'envers (`[z-a]`) ne prend rien, comme bash.
+ */
+function compilePart(part) {
+  const out = [];
   for (let i = 0; i < part.length; i += 1) {
     const c = part[i];
-    if (c === '*') out += '[^/]*';
-    else if (c === '?') out += '[^/]';
-    else if (c === '[' && part.indexOf(']', i + 2) > 0) {
-      const close = part.indexOf(']', i + 2);
-      let body = part.slice(i + 1, close);
-      if (body[0] === '!' || body[0] === '^') body = `^${body.slice(1)}`;
-      out += `[${body.replace(/\\/g, '\\\\')}]`;
-      i = close;
-    } else out += c.replace(/[.+^${}()|\\\]]/g, '\\$&');
+    if (c === '*') {
+      if (out[out.length - 1] !== '*') out.push('*');
+      continue;
+    }
+    if (c === '?') {
+      out.push('?');
+      continue;
+    }
+    let j = i + 1;
+    const negate = c === '[' && (part[j] === '!' || part[j] === '^');
+    if (negate) j += 1;
+    const close = c === '[' ? part.indexOf(']', j + 1) : -1;
+    if (close < 0) {
+      out.push(c);
+      continue;
+    }
+    const ranges = [];
+    for (let k = j; k < close; k += 1) {
+      if (part[k + 1] === '-' && k + 2 < close) {
+        ranges.push([part[k], part[k + 2]]);
+        k += 2;
+      } else ranges.push([part[k], part[k]]);
+    }
+    out.push({ ranges, negate });
+    i = close;
   }
-  return new RegExp(`^${out}$`);
+  return out;
+}
+
+function matchOne(item, ch) {
+  if (item === '?') return true;
+  if (typeof item === 'string') return item === ch;
+  const inside = item.ranges.some(([lo, hi]) => ch >= lo && ch <= hi);
+  return inside !== item.negate;
+}
+
+/**
+ * Le nom correspond-il aux éléments ? Parcours sans retour arrière exponentiel (une seule étoile retenue à la fois :
+ * au plus nom × motif comparaisons, relecture sécurité S-2), aucune expression régulière.
+ */
+function matchPart(items, name) {
+  let p = 0;
+  let s = 0;
+  let star = -1;
+  let mark = 0;
+  while (s < name.length) {
+    if (p < items.length && items[p] !== '*' && matchOne(items[p], name[s])) {
+      p += 1;
+      s += 1;
+    } else if (p < items.length && items[p] === '*') {
+      star = p;
+      mark = s;
+      p += 1;
+    } else if (star >= 0) {
+      p = star + 1;
+      mark += 1;
+      s = mark;
+    } else return false;
+  }
+  while (p < items.length && items[p] === '*') p += 1;
+  return p === items.length;
 }
 
 function entriesOf(dir) {
@@ -202,10 +262,10 @@ function expand(root, pattern) {
       walk(path.join(dir, part), join(part), k + 1);
       return;
     }
-    const regex = partRegex(part.replace(/\*\*+/g, '*'));
+    const items = compilePart(part);
     for (const entry of entriesOf(dir)) {
       if (entry.name.startsWith('.') && !part.startsWith('.')) continue;
-      if (!regex.test(entry.name)) continue;
+      if (!matchPart(items, entry.name)) continue;
       if (k < parts.length - 1 && !isDir(dir, entry)) continue;
       walk(path.join(dir, entry.name), join(entry.name), k + 1);
     }
@@ -244,7 +304,13 @@ function servedLua(resourceDir) {
     const pattern = normalize(value);
     if (!pattern) continue;
     const council = COUNCIL_SIDE.includes(directive);
-    for (const relative of expand(resourceDir, pattern)) {
+    let matched;
+    try {
+      matched = expand(resourceDir, pattern);
+    } catch (error) {
+      return { ok: false, reason: `forme illisible (motif ${pattern})` };
+    }
+    for (const relative of matched) {
       if (!isLua(relative)) continue;
       let state = 'kept-files';
       if (LEAN_DIRECTIVES.includes(directive) || COUNCIL_DIRECTIVES.includes(directive)) state = userOwned(relative) ? 'kept-config' : 'lean';
@@ -294,7 +360,8 @@ function leanText(buffer) {
 }
 
 /**
- * Allège un fichier sur place : refusé au-delà de MAX_BYTES ; réécrit seulement si le texte change.
+ * Allège un fichier sur place : refusé au-delà de MAX_BYTES ; réécrit seulement si le texte change (écriture
+ * atomique ; une erreur d'écriture est levée).
  * @returns {{ ok: true, before: number, after: number } | { ok: false, line: number, reason: string }}
  */
 function leanFile(file) {
@@ -307,7 +374,22 @@ function leanFile(file) {
   }
   const result = leanText(buffer);
   if (!result.ok) return result;
-  if (result.changed) fs.writeFileSync(file, result.buffer);
+  if (result.changed) {
+    // écrit à côté puis renommé : un arrêt brutal ne laisse jamais un fichier à moitié écrit (S-4) ; une erreur
+    // d'écriture est levée (l'opération échoue, l'original reste)
+    const temporary = `${file}.tmp`;
+    try {
+      fs.writeFileSync(temporary, result.buffer);
+      fs.renameSync(temporary, file);
+    } catch (error) {
+      try {
+        if (fs.lstatSync(temporary).isFile()) fs.rmSync(temporary, { force: true });
+      } catch (ignored) {
+        // rien à retirer
+      }
+      throw error;
+    }
+  }
   return { ok: true, before: result.before, after: result.after };
 }
 

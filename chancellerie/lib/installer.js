@@ -8,7 +8,8 @@
  *        - Fusion à trois voies, fichier par fichier : la version installée (empreintes gardées dans
  *          data/install.json), celle du disque, la nouvelle. Un fichier que personne n'a touché est remplacé ; un
  *          fichier modifié sur place et inchangé en amont est gardé ; modifié des deux côtés, un fichier de réglages
- *          (config.lua, config_client.lua, config/…) est gardé et la nouvelle version posée à côté (« .nouveau »),
+ *          (config.lua, config_client.lua, config_conseil.lua, config/… : lib/delivery.js userOwned) est gardé et la
+ *          nouvelle version posée à côté (« .nouveau »),
  *          un autre fichier est remplacé et l'ancien gardé à côté (« .local »). Sans version installée connue (vAvA
  *          posé à la main), les fichiers de réglages qui diffèrent sont gardés, les autres remplacés. Un fichier
  *          retiré en amont est retiré s'il n'a pas été touché ; un fichier de réglages modifié et retiré en amont
@@ -294,11 +295,14 @@ const REFUSED_SHOWN = 10;
 
 /**
  * Lua servi aux joueurs allégé de ses commentaires dans la copie téléchargée (T-154), avant toute empreinte : chaque
- * fichier n'est réécrit qu'après son propre contrôle ; une erreur est dite au journal et n'arrête rien.
+ * fichier n'est réécrit qu'après son propre contrôle (un fichier refusé reste tel quel). Une erreur (écriture,
+ * défaut du code) fait échouer l'opération avant que rien ne soit écrit sur le serveur (relecture sécurité S-4).
+ * `job.lean` : bilan court, repris dans le résumé de l'opération.
  */
 function leanSource(root, job) {
   try {
     const summary = leanResources(layout(root).resources);
+    if (job) job.lean = `Lua allégé : ${summary.files} fichiers, ${summary.refused.length} refusés`;
     say(job, `Lua servi aux joueurs allégé de ses commentaires : ${summary.files} fichiers, ${kilobytes(summary.before)} → ${kilobytes(summary.after)} Ko.`);
     for (const item of summary.refused.slice(0, REFUSED_SHOWN)) {
       say(job, `Laissé avec ses commentaires (ligne ${item.line} : ${item.reason}) : ${item.file}`);
@@ -308,7 +312,7 @@ function leanSource(root, job) {
       say(job, `Ressource ${item.resource} laissée telle quelle : manifeste illisible pour l'allègement (${item.reason}).`);
     }
   } catch (error) {
-    say(job, `Allègement du Lua livré interrompu (${error.message}) : les fichiers restants gardent leurs commentaires.`);
+    throw dl.failure('lean_failed', `allègement du Lua livré interrompu (${error.message}) ; rien n'a été changé sur le serveur`);
   }
 }
 

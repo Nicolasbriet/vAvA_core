@@ -252,7 +252,8 @@ Le compte maître l'applique (« Mettre à jour »), ou la laisse s'appliquer au
 6. Écriture de la nouvelle version, qui garde ce que vous avez modifié :
    - un fichier que vous n'avez pas touché est remplacé ; un fichier supprimé en amont est retiré ;
    - un fichier que vous avez modifié et qui n'a pas changé en amont est gardé ;
-   - un **réglage** (`config.lua`, `config_client.lua` depuis 1.8.5, dossier `config/`) modifié des deux côtés est
+   - un **réglage** (`config.lua`, `config_client.lua` depuis 1.8.5, `config_conseil.lua` depuis 1.9.0, dossier
+     `config/` ; la casse du nom ne compte pas depuis 1.9.0) modifié des deux côtés est
      gardé, et la nouvelle version posée à côté (`config.lua.nouveau`) pour que vous repreniez ses nouveautés ; quand
      un module partage ses réglages entre `config.lua` et `config_client.lua` (T-132), un ancien `config.lua` gardé
      le fait signaler en console au démarrage (« config.lua garde la forme d'avant … ») : reportez vos réglages dans les
@@ -292,27 +293,42 @@ télécharge chaque joueur perd ses commentaires et ses blancs de fin de ligne (
 téléchargement d'un joueur, ≈ 190 Ko compressés). Le dépôt, lui, reste commenté.
 
 - **Allégés** : les fichiers Lua des `shared_scripts` et `client_scripts` de chaque manifeste, ceux du paquet du
-  Conseil (`vava_conseil_lua`, `config_conseil.lua` compris) et chaque `fxmanifest.lua`.
-- **Jamais touchés** : vos réglages (`config.lua`, `config_client.lua`, dossier `config/` : leurs commentaires sont leur
-  mode d'emploi, les `-- PLACEHOLDER` y restent), le Lua du seul serveur, les `files`, les pages web.
+  Conseil (`vava_conseil_lua`) et chaque `fxmanifest.lua`.
+- **Jamais touchés** : vos réglages (`config.lua`, `config_client.lua`, `config_conseil.lua` — réglages du paquet du
+  Conseil —, dossier `config/`, quelle que soit la casse : leurs commentaires sont leur mode d'emploi, les
+  `-- PLACEHOLDER` y restent ; gardés à la mise à jour, `.nouveau` à côté), le Lua du seul serveur, les `files`, les
+  pages web.
 - **Numéros de ligne gardés** : chaque fin de ligne reste à sa place ; une erreur `@vava_x/client/y.lua:123` (`F8`,
   console) désigne la même ligne que le dépôt au commit installé (`data/install.json`, `source`), où se lisent les
   commentaires. Chaque fichier est contrôlé après allègement (même suite de lexèmes, chacun à sa ligne) ; un fichier qui
   ne passe pas est laissé tel quel et nommé au journal (« Laissé avec ses commentaires (ligne … : …) »), une ressource
-  au manifeste illisible aussi. Le dépôt prouve l'allègement par le compilateur Lua à chaque vérification.
-- **Journal** : « Lua servi aux joueurs allégé de ses commentaires : N fichiers, X → Y Ko. »
-- **Empreintes** : celles des fichiers allégés, tels qu'ils sont sur le disque. Une version qui ne change que des
-  commentaires d'un fichier livré ne touche plus ce fichier : rien à retélécharger pour les joueurs.
+  au manifeste illisible aussi ; de même un fichier de plus de 1 Mio, un fichier dont la première ligne commence par
+  `#`, ou qui contient `/*` hors d'une chaîne (syntaxe de CfxLua). Le dépôt prouve l'allègement par le compilateur Lua
+  à chaque vérification.
+- **Journal** : « Lua servi aux joueurs allégé de ses commentaires : N fichiers, X → Y Ko. » ; le résumé de l'opération
+  (historique des mises à jour) se termine par « Lua allégé : N fichiers, R refusés ».
+- **Erreur** : si un fichier ne peut pas être réécrit (disque plein, droits), l'installation ou la mise à jour échoue
+  aussitôt, avant que rien ne soit écrit sur le serveur (« allègement du Lua livré interrompu … ; rien n'a été changé
+  sur le serveur ») ; chaque fichier est écrit à côté puis renommé, jamais à moitié.
+- **Empreintes** : celles des fichiers allégés, tels qu'ils sont sur le disque. Une version qui ne retouche que des
+  commentaires d'un fichier livré sans changer son nombre de lignes donne le même fichier livré ; mais la version du
+  manifeste, qui monte à chaque changement d'un module, fait de toute façon retélécharger le paquet de la ressource :
+  le gain porte sur la taille de chaque téléchargement, pas sur leur nombre.
 - **Première mise à jour allégée** : la mise à jour qui apporte la Chancellerie 1.9.0 est préparée par l'ancienne (Lua
-  encore commenté) ; c'est la **suivante** qui allège. Elle remplace une fois chaque fichier livré (toutes les
-  ressources à script client sont « mises à jour », chaque joueur retélécharge une fois leur Lua, allégé). Un fichier
+  encore commenté) ; c'est la **suivante** qui allège. FiveM range scripts, fichiers et manifeste d'une ressource dans
+  un seul paquet (`resource.rpf`) : chaque manifeste étant allégé, **chacune des 33 ressources** change, et chaque
+  joueur qui revient retélécharge une fois leur paquet entier — ≈ 3,9 Mo bruts, ≈ 2,3 Mo compressés au 2 novembre
+  2026, dont 1,44 Mo pour l'écran de chargement (`vava_loading`). Les suivantes ne coûtent que ce qui change. Livrer
+  cette mise à jour avec celle qui allège les pages web (T-160) évite un second retéléchargement complet. Un fichier
   livré que vous aviez modifié sur place est remplacé et le vôtre gardé à côté (`.local`), comme d'habitude. Vos
   réglages ne bougent pas.
 - **Couper l'allègement** : `updates.leanLua` à `false` dans `data/config.json`, puis relancer la Chancellerie ; à la
   mise à jour suivante, les fichiers livrés sont reposés avec leurs commentaires (journal : « Allègement du Lua livré
-  désactivé (updates.leanLua) … »).
+  désactivé (updates.leanLua) … »). Basculer la clé, dans un sens ou dans l'autre, relance le même retéléchargement
+  complet des 33 paquets chez chaque joueur.
 - **Sans la Chancellerie** : `node scripts/livraison.js --sortie <dossier>` depuis une copie du dépôt produit la même
-  copie allégée (`[vava]`, `[vava-dev]`), à copier dans `resources/`. Le dossier doit être neuf ou vide, hors du dépôt.
+  copie allégée (`[vava]`, `[vava-dev]`), à copier dans `resources/`. Le dossier doit être neuf ou vide, hors du dépôt
+  et de toute copie git.
 
 ## Comptes
 
@@ -529,7 +545,7 @@ Réglages de `data/config.json` (créé au premier lancement) :
 | `updates.channel` | `commits` | `commits` : chaque commit de la branche ; `releases` : les releases publiées |
 | `updates.autoCheck` / `checkEveryMin` | `true` / `60` | vérification à intervalle |
 | `updates.applyAtRestart` | `false` | appliquer la mise à jour au redémarrage planifié |
-| `updates.leanLua` | `true` | alléger de ses commentaires le Lua servi aux joueurs, à l'installation et aux mises à jour (sans page : à la main, effet à la prochaine) |
+| `updates.leanLua` | `true` | alléger de ses commentaires le Lua servi aux joueurs, à l'installation et aux mises à jour (sans page : à la main, effet à la prochaine ; basculer fait retélécharger une fois les 33 paquets) |
 | `discord.*` | désactivé | bot Discord : jeton, serveur, salons, liens, liste blanche (réglés depuis la page Discord) |
 
 `data/install.json` retient ce qui est installé (version, empreinte de chaque fichier) : c'est lui qui permet de
