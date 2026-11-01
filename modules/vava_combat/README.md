@@ -239,7 +239,8 @@ chancelant), ni parade, ni garde, ni pas de côté ne protègent.
   suite ; après une garde brisée, la garde ne se relève pas avant 2,25 s. Deux Fendants **à moins d'une seconde**
   (deux attaquants) brisent la garde à l'épée ; un seul attaquant, ses Fendants espacés de 1,55 s, la brise au
   troisième (0,55 s de recharge entre deux). Alterner pas de côté et parades ratées ne protège plus ≈ 35 % du temps
-  (1.3.0) mais ≈ 15 % une fois le souffle épuisé (≤ 17 % de 10 à 60 s : essai).
+  (1.3.0) mais ≈ 15 à 18 % selon la façon de faire (pas et parades dès que permis : ≈ 15 % une fois le souffle
+  épuisé ; repos jusqu'au plein puis parades en rafale : ≈ 18 %) ; ≤ 20 % sur 60 s dans les deux cas (essais).
 - **Ce que voit le joueur** : le médaillon « Endurance » de `vava_hud` (animé par la page : une mise à jour par état,
   aucune boucle), ambre sous 25 %, rouge sous 10 %. Les autres ne voient rien de sa jauge.
 
@@ -314,7 +315,7 @@ garde d'emblée. Le serveur tient ces durées (hook `vava_inventory:hold`) ; le 
 | Quoi | Cible | Taille | Fréquence |
 |---|---|---|---|
 | RPC `vava_combat:use(technique, cible)` (`core.rpc`, schéma borné : chaîne de 1 à 32 octets `^[a-z0-9_]+$`, entier 0 à 65535) | le serveur ; réponse au seul appelant (`true, valeur, reprise, pente` ; `false, code[, attente]` ; `false, 'exhausted', attente, valeur, reprise, pente`) | ≈ 40 o + ≈ 24 o (≈ 35 o à bout de souffle) | un par coup, par parade, par pas de côté, par garde levée ; 4 d'avance puis 3 / s |
-| `vava_combat:stamina` (1.6.0, `core.net.send`, compté) : valeur (dixièmes), ms avant la recharge, pente (dixièmes / s) | le **seul porteur** de la jauge, quand elle change hors de sa demande : coup bloqué (défenseur), remise à plein à la mise à terre si elle n'était pas pleine | ≈ 32 o | un par coup bloqué, un par chute ; **jamais au repos** ni pendant une remontée ; jamais à l'attaquant ni aux témoins |
+| `vava_combat:stamina` (1.6.0, `core.net.send`, compté) : valeur (dixièmes), ms avant la recharge, pente (dixièmes / s) | le **seul porteur** de la jauge, quand elle change hors de sa demande : coup bloqué (défenseur), remise à plein à la mise à terre si elle n'était pas pleine | ≈ 26 à 28 o comptés par `core.net` | un par coup bloqué, un par chute ; **jamais au repos** ni pendant une remontée ; jamais à l'attaquant ni aux témoins |
 | RPC `vava_combat:lower()` (aucun argument) | le serveur ; réponse au seul appelant (`true`, `false, 'no_guard'`) | ≈ 25 o + ≈ 10 o | un par garde abaissée ; 4 d'avance puis 3 / s ; **rien pendant la tenue** |
 | `vava_combat:hit` (`core.net.playersNear` dans l'instance de l'attaquant, puis `core.net.send` à une liste) : attaquant, cible, issue (`hit`, `stagger`, `down`, `block`, `parry`, `break`, `dodge`, `absorb`) et, pour l'attaquant et la cible seulement (1.4.0), le montant en dixièmes ou `false` | les joueurs apparus à 30 m de la **cible**, dans l'instance de l'attaquant (cible, attaquant paré, témoins) ; `dodge` et `absorb` aux deux seuls participants | ≈ 23 à 32 o comptés par `core.net` (nom + charge) ; 4e valeur des participants : 1 o (`false`, jusqu'à 127 dixièmes), 2 o (jusqu'à 255), 3 o au-delà | **un** par cible touchée et par coup de technique (un adversaire par coup), en **deux envois** au plus (participants, témoins ; un sans témoin) ; un coup paré, bloqué ou qui brise la garde envoie son issue **à la place** de `hit` ; jamais pour un coup manqué, refusé ou annulé, ni pour un coup d'une autre ressource ; une esquive ou un coup absorbé : ≈ 25 o à chacun des deux seuls participants (rien en 1.3.0) |
 | `vava_combat:notify` (`core.net.send`, compté) | le **seul** porteur dont l'arme passe un seuil ; le seul attaquant dont le coup est retenu (combats coupés, lieu de paix, crochet) ; le seul membre du Conseil qui tape `/armes` sans `vava_chat` | ≈ 70 à 160 o | 2 par arme et par cycle d'usure ; un avis par raison et par 10 s ; réponses de commande |
@@ -335,7 +336,7 @@ par seconde au plus.
 
 Endurance (1.6.0) : au repos, armé ou non, jauge pleine ou en recharge : **0 octet** (aucune synchronisation périodique,
 la page de `vava_hud` anime la remontée) ; un geste : + 9 o dans la réponse déjà envoyée ; une garde qui encaisse
-quatre coups : ≈ 130 o au seul défenseur ; faim et soif n'envoient rien (la pente part avec la réponse du geste
+quatre coups : ≈ 110 o au seul défenseur ; faim et soif n'envoient rien (la pente part avec la réponse du geste
 suivant) ; rien de plus du client vers le serveur. Mêlée à six, au pire : ≈ 0,4 Ko/s en tout (≈ 65 o/s par joueur).
 L'endurance n'entre jamais dans `vava_combat:hit` (elle révélerait la jauge du défenseur).
 

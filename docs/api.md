@@ -1925,7 +1925,7 @@ d'entraînement** (ci-dessous) ; demande `vava_health` 1.6.0.
   changement seulement ; + ≈ 450 o une fois dans `GlobalState['vava_inventory:heldModels']` (mécanisme de
   l'inventaire). Gestes (coup, réaction, dégainer, rengainer, chancellement) joués par chaque client sur son propre ped :
   OneSync les montre. Aucun envoi à tous, aucune clé GlobalState propre, aucun state bag nouveau. Joueur armé au repos :
-  0 octet. 1.6.0 : `vava_combat:stamina` (≈ 32 o) au seul porteur de la jauge, un par coup bloqué et par chute ; rien
+  0 octet. 1.6.0 : `vava_combat:stamina` (≈ 26 à 28 o comptés par `core.net`) au seul porteur de la jauge, un par coup bloqué et par chute ; rien
   au repos ni pendant une remontée ; l'endurance n'entre jamais dans `vava_combat:hit`.
 
 **RPC** `vava_combat:use(technique, cible)` — `technique` : chaîne de 1 à 32 octets `^[a-z0-9_]+$` ; `cible` : entier

@@ -1334,7 +1334,9 @@ faire tout le système de combat ») : la porte T-119 reste à passer en jeu.
 
 ### T-114 — Endurance et HUD
 - Agents : vava-architecte → vava-dev-lua + vava-dev-nui (cette tâche autorise à toucher `vava_hud`) · Dépend de :
-  T-112 · Statut : en cours (fait, relectures sécurité et réseau à faire)
+  T-112 · Statut : à tester en jeu (relu sécurité et réseau, suites appliquées)
+- Fait le 2 novembre 2026 : rapport `docs/plan/rapports/T-114.md` (relectures sécurité et réseau OK, 4 mineurs chacune,
+  suites appliquées), procédure `docs/tests/combat.md` § 9.
 - Fait (`vava_combat` 1.6.0, `vava_hud` 1.8.0, rapport `docs/plan/rapports/T-114.md`) : jauge tenue par le serveur sans
   minuterie, refus `exhausted`, garde brisée quand l'endurance est vide (compteur provisoire retiré, mêmes seuils), faim
   et soif par `vava_needs:get`, état au seul porteur (réponse de `use`, `vava_combat:stamina`), médaillon de `vava_hud`

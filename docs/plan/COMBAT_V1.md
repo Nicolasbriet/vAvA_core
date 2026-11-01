@@ -163,6 +163,8 @@ Décisions de T-114 (`vava_combat` 1.6.0, `vava_hud` 1.8.0, spec `docs/plan/spec
   remontée.
 - **HUD** : médaillon « Endurance » en dernier, montré en mode combat éveillé ou tant qu'il n'est pas plein (puis 3 s) ;
   ambre sous 25 %, rouge sous 10 %.
+- **Défense bornée** : alterner pas de côté et parades ratées ne protège plus ≈ 35 % du temps (T-113) mais ≈ 15 à 18 %
+  selon la stratégie (relecture sécurité S-1 de T-114), sous 20 % sur 60 s.
 - Magie : aucun lien (les sorts ne coûtent pas d'endurance). Délais de la parade ratée et du pas de côté gardés (à revoir
   à T-119). `/armes voir` montre la jauge ; aucune commande ne la change.
 

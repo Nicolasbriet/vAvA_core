@@ -395,7 +395,7 @@ une seconde après la dernière dépense.
 | 10 | **(2 joueurs)** Garde de B brisée ; B garde R enfoncée. | Ni garde ni parade pendant le chancellement ; la garde ne se relève pas avant ≈ 2,25 s (« à bout de souffle » une fois) ; aucun second chancellement d'affilée. |
 | 11 | **(2 joueurs)** B tape R en rafale pendant les coups de A (parades ratées). | ≈ 16 parades au plus, puis plus rien ne part tant que la jauge ne remonte pas. |
 | 12 | B martèle Espace (mode combat actif). | Neuf pas de côté en ≈ 12 s, puis « à bout de souffle » ; la jauge remonte une seconde après le dernier pas. |
-| 13 | **(2 joueurs)** B alterne pas de côté et parades pendant 30 s face aux Tailles de A. | Les 5 premières secondes, B évite beaucoup ; ensuite la plupart des Tailles portent (relecture T-113 : ≈ 15 % du temps protégé au lieu de 35 %). |
+| 13 | **(2 joueurs)** B alterne pas de côté et parades pendant 30 s face aux Tailles de A. | Les 5 premières secondes, B évite beaucoup ; ensuite la plupart des Tailles portent (≈ 15 à 18 % du temps protégé selon la façon de faire, au lieu de 35 % en 1.5.0). |
 | 14 | A, `/besoins` faim 25 ; vider la jauge, attendre. Puis soif 5. | Remontée plus lente (≈ 6,7 s de vide à plein au lieu de 5 s) ; `/armes voir <A>` : « recharge 15 / s (ralentie par la faim ou la soif) ». Soif 5 : 10 / s (≈ 10 s). |
 | 15 | A mange (faim → 80) en plein combat. | La recharge redevient 20 / s au plus tard 30 s après, au premier geste suivant (`/armes voir`). |
 | 16 | A, Taille sur un mannequin de la cour d'armes (§ 8). | Même baisse que sur un joueur ou dans le vide. |
@@ -405,18 +405,19 @@ une seconde après la dernière dépense.
 | 20 | A ouvre la bannière (Échap) pendant une remontée, la referme. | HUD masqué puis rendu ; l'anneau est à la bonne valeur et continue. |
 | 21 | `restart vava_hud` pendant une remontée. | Le médaillon revient à la bonne valeur et continue de remonter ; aucune erreur F8. |
 | 22 | **(3 joueurs)** A et B échangent 2 min ; C à 10 m. | `/vava_reseau ressource vava_combat` : `vava_combat:stamina` ≤ ≈ 0,1 Ko/s ; chez C, aucun. Au repos 2 min ensuite : plus rien. |
-| 23 | `resmon 1` chez A : au repos armé, pendant une remontée, en mêlée. | `vava_combat` et `vava_hud` au repos ≤ 0,01 ms ; remontée : inchangé (la page anime) ; mêlée ≤ 0,15 ms. |
+| 23 | `resmon 1` chez A : au repos armé, pendant une remontée, en mêlée. Puis comparer les images par seconde (`cl_drawfps 1`) au repos, médaillon plein, et pendant une remontée (la page repeint l'anneau). | `vava_combat` et `vava_hud` au repos ≤ 0,01 ms ; remontée : inchangé (la page anime) ; mêlée ≤ 0,15 ms ; images par seconde : aucun écart visible pendant une remontée (noter les deux valeurs). |
 | 24 | **(2 joueurs)** B à 150 ms de ping : coups jusqu'à l'épuisement. | La jauge vue par B suit celle du serveur (`/armes voir <B>`) ; un coup refusé alors que l'anneau montrait assez : rare, recalé aussitôt (réponse `exhausted` avec l'état). |
 | 25 | `restart vava_combat` jauge à moitié. | Le médaillon disparaît sans erreur, revient plein au premier geste. |
 | 26 | Hors jeu : `modules/vava_hud/web/index.html?values=0.8,0.62,0.08,0.5&refill=0.2,1000`. | Le 5e médaillon (15 %) remonte d'un mouvement linéaire après 1 s ; ambre puis laiton au passage de 25 %. |
 
 Prouvé hors jeu : `tests/spec/combat_endurance_spec.lua` (règles pures de la jauge ; serveur réel : réponses de `use`,
 refus avant la réservation, prise au dernier pas après un crochet qui cède la main, garde à 24 et à 25, quatre coups,
-bouclier, Fendants, mise à terre, parade, pas de côté, borne de l'alternance pas / parades — 16,3 % de 10 à 60 s, mesuré
-au pas de 10 ms —, faim et soif, `/armes voir`, aucun envoi au repos ; bridge `NeedsValues`),
+bouclier, Fendants, mise à terre, parade, pas de côté, bornes de la défense — alternance pas / parades 16,3 % de 10 à 60 s,
+repos puis parades en rafale 19,9 % sur 60 s, mesurés au pas de 10 ms —, faim et soif, jauge remplacée pendant la
+lecture des besoins, jauge d'un autre personnage, `/armes voir`, aucun envoi au repos ; bridge `NeedsValues`),
 `combat_endurance_client_spec.lua` (état reçu, médaillon, visibilité, demandes retenues localement, aucune boucle),
 `hud_gauges_spec.lua` (remontée validée, gardée, projetée), `combat_defense_spec.lua` (garde brisée aux mêmes seuils
-que 1.3.0), les essais de la page de `vava_hud` (`web/dev/essais.js`) et 18 contre-essais vus échouer (rapport
+que 1.3.0), les essais de la page de `vava_hud` (`web/dev/essais.js`) et 20 contre-essais vus échouer (rapport
 `docs/plan/rapports/T-114.md`). À voir en jeu seulement : l'icône à 720p et en 4K, la fluidité de la remontée (transition
 CSS dans CEF), la lisibilité ambre et rouge sur le cuir, les sensations à 30, 80 et 150 ms de ping, la mesure réseau et
 resmon.
