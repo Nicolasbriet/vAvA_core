@@ -730,12 +730,12 @@ versé à T-014 ; les autres points déjà couverts sont précisés dans T-012 �
   lignes (numéros d'erreur du paquet). `vava_conseil_web` (JS, CSS) n'est pas du ressort de T-154.
 
 ### T-157 — Code de l'Atelier livré au seul Conseil — **décision du porteur du projet**
-- Agents : vava-architecte → vava-dev-lua + vava-dev-nui · Dépend de : T-102 · Statut : en cours (fait, relectures
-  sécurité et réseau à faire ; validée par le porteur du projet le 2 novembre 2026 : changement d'architecture et
-  d'outillage)
+- Agents : vava-architecte → vava-dev-lua + vava-dev-nui · Dépend de : T-102 · Statut : en cours (suites appliquées,
+  contre-relecture sécurité à faire ; validée par le porteur du projet le 2 novembre 2026 : changement d'architecture
+  et d'outillage)
 - Fait le 2 novembre 2026 : `vava_atelier` 1.4.0 (spec `docs/plan/specs/T-157.md`, rapport
   `docs/plan/rapports/T-157.md`, contrat de la page `docs/plan/rapports/T-157-contrat.md`). Chaque joueur télécharge
-  55 273 o (20 960 compressés) au lieu de 262 381 (82 448) ; paquet du Conseil 245 560 o, une fois par version et par
+  57 668 o (22 359 compressés) au lieu de 262 381 (82 448) ; paquet du Conseil 248 218 o, une fois par version et par
   membre. Procédure : `docs/tests/atelier.md` § 25. Reste au porteur du projet : la ligne de `CLAUDE.md` sur
   `config_conseil.lua` et les directives `vava_conseil_*`.
 - Trouvé pendant T-102 (relecture réseau R-1, piste pour le porteur du projet) : ≈ 51 Ko de code de `vava_atelier`
@@ -764,6 +764,16 @@ versé à T-014 ; les autres points déjà couverts sont précisés dans T-012 �
 - Note de T-157 : compter les fichiers de la directive `vava_conseil_lua` comme listés au manifeste (`lists.council` de
   `config_split_spec`, côté `conseil` de `scripts/lib/manifeste.awk`) : `shared/aim.lua` de `vava_atelier` n'est plus
   qu'en `vava_conseil_lua`.
+
+### T-165 — Paquet du Conseil compressé — **décision du porteur du projet**
+- Agents : vava-architecte → vava-dev-lua · Dépend de : T-157 validée en jeu · Statut : à faire (proposée, à valider
+  par le porteur du projet ; à prendre avec T-163 ou quand le Conseil devient nombreux)
+- Trouvé pendant T-157 (relecture réseau R-1) : le paquet du Conseil (≈ 248 Ko) part en latent sans compression ;
+  gzip le ramènerait à ≈ 65 Ko (≈ 57 Ko après T-154), un LZ décodable en Lua pur à ≈ 105 Ko. Proposition : compresser
+  au démarrage du serveur, décompresser chez le membre avant la SHA-256 (qui reste calculée sur le texte décompressé),
+  décodeur borné (taille de sortie annoncée, 512 Ko au plus) et testé hors jeu.
+- Critères : paquet envoyé ≤ 110 Ko ; décodeur sans dépendance, borné, essais (vecteurs, entrée tronquée ou gonflée) ;
+  temps de décompression mesuré chez le membre ; mesure avant et après.
 
 ### T-163 — Livraison à la demande dans le core — **décision du porteur du projet**
 - Agents : vava-architecte → vava-dev-lua (cette tâche autorise à toucher le core) · Dépend de : T-157 validée en jeu ·

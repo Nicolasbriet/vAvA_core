@@ -3165,7 +3165,8 @@ vava_conseil_web { 'web/css/style.css', 'web/js/strings.js', …, 'web/js/app.js
 ```
 
 Chemins en minuscules ASCII (`shared/codepack.lua › validName` : 96 octets, 5 segments au plus), `.lua` pour la
-première, `.css` / `.js` pour la seconde, jamais `config.lua` (audit, règle C), ni joker, ni aussi livrés par `files`,
+première, `.css` / `.js` pour la seconde, jamais `config.lua`, `server/…` ni `bridge/…` (refus à la construction ;
+audit, règle C), ni joker, ni aussi livrés par `files`,
 `client_scripts` ou `shared_scripts` (`config_split_spec`, T5). `scripts/lib/manifeste.awk` les liste côté `conseil` ;
 `scripts/poids-client.sh` les compte à part (ligne `<ressource>@conseil`).
 
@@ -3179,9 +3180,9 @@ débit `rateLimits.code` = 12, puis 1 toutes les 5 s ; réponse latente du core 
 
 | Demande | Réponse (au seul appelant) |
 |---|---|
-| `('', 0)` ou `(fp, 0)` | `true, { fp, parts, bytes }` : empreinte FNV-1a 64 bits du paquet, morceaux, octets |
+| `('', 0)` ou `(fp, 0)` | `true, { fp, sha, parts, bytes }` : empreinte FNV-1a 64 bits du paquet (version, `stale`), SHA-256 (64 chiffres hexadécimaux, recalculée par le chargeur avant tout `load`), morceaux, octets |
 | `(fp, k)`, 1 ≤ k ≤ `parts` | `true, <chaîne de 64 Ko au plus>` ; leur suite est le paquet, d'empreinte `fp` |
-| refus | `false, code` : `no_character`, `not_ready`, `not_allowed` (droit d'ouvrir l'Atelier, **relu à chaque appel**), `unavailable` (paquet non construit), `stale` (empreinte qui n'est plus celle du serveur), `bad_request` (morceau au-delà), `rate_limited` (plus de `delivery.hourlyPackages` = 3 paquets entiers par heure glissante et par joueur) ; codes de transport du core en plus |
+| refus | `false, code` : `no_character`, `not_ready`, `not_allowed` (droit d'ouvrir l'Atelier, **relu à chaque appel**), `unavailable` (paquet non construit), `stale` (empreinte qui n'est plus celle du serveur), `bad_request` (morceau au-delà), `rate_limited` (budget **par compte** : seau qui se remplit de `delivery.hourlyPackages` = 3 paquets entiers par heure, plein au départ, gardé à la reconnexion) ; codes de transport du core en plus |
 
 Aucune séance n'est exigée (le code précède `home`) ; aucun évènement nouveau. Format du paquet : `VAVAPAQ1\n` puis,
 pour chaque fichier, `<genre> <chemin> <octets>\n<octets du fichier>\n` (genres `L`, `C`, `J`, tous les `L` d'abord ;
@@ -3189,13 +3190,14 @@ pour chaque fichier, `<genre> <chemin> <octets>\n<octets du fichier>\n` (genres 
 
 **Chez le membre** : stockage local de la ressource (KVP `paquet:empreinte` écrit en dernier, `paquet:taille`,
 `paquet:morceaux`, `paquet:1` … `paquet:16`, morceaux de 32 Ko), relu seulement si l'empreinte, la taille et
-l'empreinte recalculée valent celles que le serveur vient d'annoncer ; chaque fichier Lua exécuté par
+l'empreinte recalculée valent celles que le serveur vient d'annoncer ; quelle que soit la provenance du texte, sa SHA-256
+recalculée doit valoir celle de la description (sinon : stockage effacé, rien d'exécuté) ; chaque fichier Lua exécuté par
 `load(code, '@@vava_atelier/<chemin>', 't', env)` dans un environnement du paquet ; page amorcée par messages NUI
 (`hello`, `bootPiece`, `bootEnd` ; rappels `pageReady`, `booted` : `docs/plan/rapports/T-157-contrat.md`). Effacé sur
 `not_allowed` et `vava_atelier:revoked`. Export client `isOpen()` : faux tant que le paquet n'est pas chargé.
 
-**Coût** (mesuré, `scripts/poids-client.sh`) : par joueur, 55 273 o (20 960 compressés) au lieu de 262 381 (82 448) ;
-paquet 245 560 o non compressé, 4 morceaux, une fois par version et par membre ; ensuite une description (≈ 85 o) par
+**Coût** (mesuré, `scripts/poids-client.sh`) : par joueur, 57 668 o (22 359 compressés) au lieu de 262 381 (82 448) ;
+paquet 248 218 o non compressé, 4 morceaux, une fois par version et par membre ; ensuite une description (≈ 85 o) par
 séance. Serveur : construction une fois au démarrage (lecture, compilation de contrôle, empreinte, découpe) ; O(1) par
 appel.
 

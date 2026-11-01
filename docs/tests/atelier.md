@@ -317,8 +317,8 @@ Préparation : A Souverain, B Sénéchal, C habitant sans rang ; ressource `vava
 
 | # | Faire | Attendu |
 |---|---|---|
-| 1 | Démarrer le serveur. | Console : `paquet du Conseil : 24 fichiers, 245 560 octets, 4 morceaux, empreinte …` ; aucun avertissement. Si la ligne dit « directive vava_conseil_lua vide ou absente », FXServer n'a pas lu la forme en table : écrire une ligne par fichier (`vava_conseil_lua 'config_conseil.lua'`, …), même effet. |
-| 2 | Hors jeu : `./scripts/poids-client.sh --detail vava_atelier`. | Ligne `vava_atelier` 55 273 o (20 960 compressés) ; ni `placer.lua` ni `app.js` dans le détail du joueur ; ligne `vava_atelier@conseil` 245 560 o. |
+| 1 | Démarrer le serveur. | Console : `paquet du Conseil : 24 fichiers, 248 218 octets, 4 morceaux, empreinte …, SHA-256 …` ; aucun avertissement. Si la ligne dit « directive vava_conseil_lua vide ou absente », FXServer n'a pas lu la forme en table : écrire une ligne par fichier (`vava_conseil_lua 'config_conseil.lua'`, …), même effet. |
+| 2 | Hors jeu : `./scripts/poids-client.sh --detail vava_atelier`. | Ligne `vava_atelier` 57 668 o (22 359 compressés) ; ni `placer.lua` ni `app.js` dans le détail du joueur ; ligne `vava_atelier@conseil` 248 218 o. |
 | 3 | **(2 joueurs)** C appuie sur F9 ; A lance `/vava_reseau joueur <C>`. | « L'Atelier est réservé au Conseil. » ; chez C : seulement `rpc vava_atelier:code`, ≈ 40 o ; aucun envoi latent. |
 | 4 | C ouvre Paramètres › Raccourcis › FiveM. | « Atelier : annuler le dernier placement » n'y est pas ; « Ouvrir l'Atelier du Conseil » y est. |
 | 5 | B (stockage vide : première fois) appuie sur F9. | « On apporte les registres de l'Atelier : un instant… », puis l'Atelier s'ouvre en ≈ 4 à 5 s ; `/vava_reseau joueur <B>` : `rpc vava_atelier:code` ≈ 245 Ko, 4 latents. |
@@ -337,6 +337,9 @@ Préparation : A Souverain, B Sénéchal, C habitant sans rang ; ressource `vava
 | 18 | B `resmon 1` : au repos après une ouverture, Atelier fermé ; puis en visée. | `vava_atelier` 0,00 ms au repos ; visée ≤ 0,15 ms (comme T-102). |
 | 19 | B sans personnage (sélection) appuie sur F9. | « Choisissez d'abord un personnage. » ; aucun morceau envoyé. |
 | 20 | `restart vava_admin` puis aussitôt B F9 (après une reconnexion). | « Le Registre du Conseil s'éveille… » ; F9 quelques secondes plus tard : ouverture normale depuis le stockage local. |
+| 21 | (développeur, relecture sécurité S-2) B ouvre l'Atelier ; dans `nui_devtools`, sur la page de `vava_atelier`, poser un point d'arrêt dans `onMessage` de `boot.js` et regarder `event.source` d'un message `hello` (F9 après un `restart vava_atelier`). | Noter ce que vaut `event.source` pour `SendNUIMessage` (la page, son parent ou `null`). Si c'est `null`, la garde de `boot.js` garde la source vide (rien à changer) ; si c'est la page ou son parent, la clause « source vide » peut être retirée. Dans tous les cas l'Atelier s'ouvre. |
+| 22 | **(2 serveurs, relecture sécurité S-1)** Sur un second serveur de test (autre adresse) avec une ressource nommée `vava_atelier` qui écrit `SetResourceKvp('paquet:empreinte', 'essai-autre-serveur')` à son démarrage, B se connecte, puis revient sur Eldoria ; dans F8 d'Eldoria, `GetResourceKvpString('paquet:empreinte')` (ressource de débogage, ou ligne ajoutée au chargeur le temps de l'essai). | Noter si la valeur lue est celle du second serveur (stockage partagé entre serveurs : S-1 confirmé) ou celle d'Eldoria. Dans les deux cas, B ouvre l'Atelier sans rien exécuter de faux : avec une valeur étrangère, l'empreinte ne correspond pas et le paquet est retéléchargé ; un faux paquet de même empreinte FNV-1a serait refusé par la SHA-256 (console : « SHA-256 différente de celle annoncée par le serveur, rien n'est exécuté »). |
+| 23 | B `resmon 1`, stockage vide puis plein, F9 (relecture réseau R-4). | Pas d'à-coup visible à l'ouverture ; la SHA-256 (≈ 70 ms de Lua en tout) est étalée sur ≈ 16 images. |
 
 ## 26. Fin du test
 
