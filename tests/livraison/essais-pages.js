@@ -138,6 +138,10 @@ cases('js', [
   [31, 't = `a\\\r\n${b}`; // c\n', 't = `a\\\r\n${b}`;\n'],
   [31, 'x = o.return / 2; // c\n', 'x = o.return / 2;\n'],
   [31, 'x = a.if(1) / 2; // c\n', 'x = a.if(1) / 2;\n'],
+  // relecture sécurité S-4 : expression régulière après `extends` ; `++`/`--` suffixe suivi d'une division
+  [32, 'class A extends /a*/ {} /* b */ ;\n', 'class A extends /a*/ {}  ;\n'],
+  [32, 'class A extends /[/*]/.constructor {} /*/ ;/*]*/\n', 'class A extends /[/*]/.constructor {}\n'],
+  [32, 'x = a-- / 2; y = (b)++ / 2; // c\n', 'x = a-- / 2; y = (b)++ / 2;\n'],
 ]);
 
 const DEEP = `${'('.repeat(1025)}`;
@@ -147,6 +151,8 @@ refusals('js', [
   ['function f() {} /a/.test(s);\n', 1, '« / » après « } » : division ou expression régulière indécidable'],
   ['a;\nb;\nx = {} / 2;\n', 3, '« / » après « } » : division ou expression régulière indécidable'],
   ['x = await /a/;\n', 1, '« / » après « await » : indécidable'],
+  ['x = ++/a/.lastIndex; // c\n', 1, '« / » après « ++ » préfixe : indécidable'],
+  ['x = 1;\n--/[/*]/.lastIndex; y = [/*/]*/];\n', 2, '« / » après « -- » préfixe : indécidable'],
   ['for (x of /a/g.exec(s)) {}\n', 1, '« / » après « of » : indécidable'],
   ['#!/usr/bin/env node\nx;\n', 1, 'première ligne « #! » refusée'],
   [`${BOM}#!/usr/bin/env node\nx;\n`, 1, 'première ligne « #! » refusée'],
@@ -244,7 +250,9 @@ cases('html', [
   [10, '<pre>\n<!-- c -->\n</pre>', null],
   [11, '<!-- a -- b -->\n<p></p>', '\n<p></p>'],
   [12, '<ul>\r\n  <!-- c\r\n  -->\r\n</ul>', '<ul>\r\n  \r\n\r\n</ul>'],
-  [13, '<svg>\n  <!-- c -->\n  <path d="M5 .8"/>\n</svg>', '<svg>\n  \n  <path d="M5 .8"/>\n</svg>'],
+  // SVG en ligne : aucun commentaire dedans (relecture sécurité S-1) ; après sa fermeture, ou après `<svg/>`, retiré
+  [13, '<svg>\n  <path d="M5 .8"/>\n</svg>\n<!-- c -->\n', '<svg>\n  <path d="M5 .8"/>\n</svg>\n\n'],
+  [13, '<svg/>\n<!-- c -->\n<math></math>\n<!-- d -->\n', '<svg/>\n\n<math></math>\n\n'],
   [14, '<!-- a --><!-- b -->', ''],
   [15, '<p>\n  <!-- c -->\n  texte</p>', null],
   [16, `  <!-- hors jeu seulement : … -->\n  ${HORS_JEU_SCRIPT}`, `  \n  ${HORS_JEU_SCRIPT}`],
@@ -252,6 +260,13 @@ cases('html', [
   [17, '<pre><!-- a --></pre>\n<!-- b -->\n', '<pre><!-- a --></pre>\n\n'],
   [17, '<!--\n en-tête\n-->\n<!doctype html>\n', '\n\n\n<!doctype html>\n'],
   [17, '<div>\n<!--\nc\n--></div>', '<div>\n\n\n</div>'],
+  // relecture sécurité S-2 : un guillemet n'ouvre une valeur qu'après un `=` qui suit un nom d'attribut
+  [18, '<a ="x>\n<!-- c -->\n<b>"></a>', '<a ="x>\n\n<b>"></a>'],
+  [18, '<a x= =">\n<!-- c -->\n<b>"></a>', '<a x= =">\n\n<b>"></a>'],
+  [18, '<a x = \'y>\n<!-- c -->\n<b>\'></a>', null],
+  // relecture sécurité S-3 : dans le corps, un commentaire de plusieurs lignes reste ; sur une ligne, il part
+  [19, '<body>\n<ul>\n  <!-- c\n  -->\n</ul>', null],
+  [19, '<head>\n<!--\n c\n-->\n</head>\n<body>\n<!-- c -->\n<p></p>', '<head>\n\n\n\n</head>\n<body>\n\n<p></p>'],
 ]);
 
 refusals('html', [
@@ -264,6 +279,13 @@ refusals('html', [
   ['<script>x', 1, 'élément <script> non fermé'],
   ['<script><!-- x --></script>', 1, '« <!-- » dans un <script>'],
   ['<div title="a', 1, 'balise non fermée'],
+  // relecture sécurité S-1 : SVG et MathML en ligne (cas du relecteur : un `<style>` de SVG n'est pas brut, son `<!--`
+  // ouvrirait un commentaire que le retrait d'un autre laisserait sans fin)
+  ['<svg><style>a { x: "<!--" }</style></svg>\n<!-- c -->\n<p>visible</p>', 1, 'élément <style> dans du SVG ou du MathML en ligne'],
+  ['<p></p>\n<svg>\n  <!-- c -->\n</svg>', 3, 'commentaire dans du SVG ou du MathML en ligne'],
+  ['<svg><svg></svg>\n<!-- c -->\n</svg>', 2, 'commentaire dans du SVG ou du MathML en ligne'],
+  ['<math><title>x</title></math>', 1, 'élément <title> dans du SVG ou du MathML en ligne'],
+  ['<svg><pre></pre></svg>', 1, 'élément <pre> dans du SVG ou du MathML en ligne'],
 ]);
 
 essai('html : recherche de `--!>` monotone (temps linéaire sur 20 000 commentaires)', () => {
@@ -489,6 +511,38 @@ essai('allègement : écriture atomique ; une erreur d\'écriture est levée, l\
   fs.rmSync(path.join(dir, 'web', 'a.js.tmp'), { recursive: true });
   assert.strictEqual(delivery.leanPage(path.join(dir, 'web', 'a.js'), 'js').ok, true);
   assert.deepStrictEqual(fs.readdirSync(path.join(dir, 'web')).sort(), ['a.js']);
+});
+
+essai('allègement : le temporaire est créé en exclusivité, jamais suivi ni écrasé (S-5)', () => {
+  const outside = tree(path.join(TMP, 'dehors-tmp'), { 'cible.js': 'cible\n', 'd/x': 'x' });
+  const dir = tree(path.join(TMP, 'res', 'tmp-pris'), { 'web/a.js': JS, 'web/a.js.tmp': 'déjà là\n', 'web/b.js': JS, 'web/c.js': JS });
+  // un fichier ordinaire déjà à la place du temporaire : refus, rien d'écrasé ni de retiré
+  assert.throws(() => delivery.leanPage(path.join(dir, 'web', 'a.js'), 'js'), (error) => error.code === 'EEXIST');
+  assert.strictEqual(read(dir, 'web/a.js'), JS);
+  assert.strictEqual(read(dir, 'web/a.js.tmp'), 'déjà là\n');
+  // une jonction vers un dossier extérieur : refus, le dossier n'est pas touché
+  fs.symlinkSync(path.join(outside, 'd'), path.join(dir, 'web', 'b.js.tmp'), 'junction');
+  assert.throws(() => delivery.leanPage(path.join(dir, 'web', 'b.js'), 'js'));
+  assert.strictEqual(read(dir, 'web/b.js'), JS);
+  assert.deepStrictEqual(fs.readdirSync(path.join(outside, 'd')), ['x']);
+  assert.ok(fs.lstatSync(path.join(dir, 'web', 'b.js.tmp')).isSymbolicLink());
+  // un lien vers un fichier extérieur (si le système permet d'en créer : sous Windows, mode développeur ou administrateur)
+  let linked = true;
+  try {
+    fs.symlinkSync(path.join(outside, 'cible.js'), path.join(dir, 'web', 'c.js.tmp'), 'file');
+  } catch (error) {
+    if (error.code !== 'EPERM') throw error;
+    linked = false;
+  }
+  if (linked) {
+    assert.throws(() => delivery.leanPage(path.join(dir, 'web', 'c.js'), 'js'));
+    assert.strictEqual(read(outside, 'cible.js'), 'cible\n');
+    assert.strictEqual(read(dir, 'web/c.js'), JS);
+  }
+  // le Lua (T-154) passe par la même écriture
+  const lua = tree(path.join(TMP, 'res', 'tmp-pris-lua'), { 'a.lua': LUA, 'a.lua.tmp': 'déjà là\n' });
+  assert.throws(() => delivery.leanFile(path.join(lua, 'a.lua')));
+  assert.deepStrictEqual([read(lua, 'a.lua'), read(lua, 'a.lua.tmp')], [LUA, 'déjà là\n']);
 });
 
 essai('allègement : idempotent (allégé deux fois → identique)', () => {

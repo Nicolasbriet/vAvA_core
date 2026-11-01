@@ -3,7 +3,8 @@
   tests/livraison/cas_difficiles.html
   Rôle : page valide truffée des pièges de l'allègement des pages (T-160, spec § 12.1 cas HTML 1 à 16, § 12.2) :
          commentaires entre blancs (retirés), dans du texte, dans un élément vide, dans des attributs, dans <pre>,
-         <script>, <style>, <textarea>, <title>, SVG en ligne, ligne « hors jeu ». Prouvée par scripts/lib/meme-page.js
+         <script>, <style>, <textarea>, <title>, après un SVG en ligne, sur plusieurs lignes dans le corps (gardé), ligne
+         « hors jeu ». Prouvée par scripts/lib/meme-page.js
          à chaque vérification ; jamais servie aux joueurs.
 -->
 <html lang="fr">
@@ -37,9 +38,9 @@ c
     -->
   </ul>
   <svg>
-    <!-- c -->
     <path d="M5 .8"/>
   </svg>
+  <!-- après le SVG en ligne (dedans, un commentaire ferait refuser la page) -->
   <!-- a --><!-- b -->
   <p>
     <!-- c -->
