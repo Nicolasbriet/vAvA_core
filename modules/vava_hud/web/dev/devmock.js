@@ -70,9 +70,9 @@
  * Chiffres des coups (T-155), simulés comme les enverrait client/numbers.lua (texte et mot déjà composés, cascade déjà
  * calculée) : ?numbers=1 une rafale (12, 7 « Bloqué », « Paré », 22 « Chancelle », 18 « À terre », un coup reçu, trois
  * petits 3 de brûlure) ; ?numbers=mots les autres issues (« Esquivé », « Absorbé », « Garde brisée », « Bloqué » seul,
- * « Sans effet », un reçu « À terre ») ; ?numbers=plafond vingt coups en 0,4 s (filets de la page : 10 à l'écran, 16
- * par seconde). &mode=tous|infliges|aucun : réglage « Chiffres des coups » de la bannière (le filtre est en Lua ; il
- * est imité ici). &cache=1 : la cible passe un instant hors de l'écran (chiffres masqués, puis revenus). La cible
+ * « Sans effet », un reçu « À terre ») ; ?numbers=plafond vingt coups en 0,4 s (la page en garde 10 à l'écran ; le
+ * débit de 16 par seconde est celui du Lua, non imité). &mode=tous|infliges|aucun : réglage « Chiffres des coups »
+ * de la bannière (le filtre est en Lua ; il est imité ici). &cache=1 : la cible passe un instant hors de l'écran (chiffres masqués, puis revenus). La cible
  * (point de laiton) glisse : un `numbersMove` part toutes les 100 ms tant qu'un chiffre vit, comme la boucle de suivi
  * du Lua, et s'arrête ensuite. Un clic ou la touche N rejoue la rafale. &figer=300 : chiffres arrêtés à 300 ms de leur
  * vie (captures d'écran).

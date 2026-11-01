@@ -181,7 +181,7 @@ test('réglages : définitions relues, valeurs hors liste → défaut', () => {
 // « Chiffres des coups » (T-155) : la ligne de config_client.lua, telle que la page la reçoit dans `open`
 const numbersDef = { key: 'combat.numbers', tab: 'interface', kind: 'choice', default: 'tous', choices: ['tous', 'infliges', 'aucun'],
   labels: ['Donnés et reçus', 'Donnés seulement', 'Aucun'], uses: ['vava_hud'], label: 'Chiffres des coups',
-  help: 'Ce que vos coups emportent, et ce que vous encaissez, au-dessus de la cible.' };
+  help: 'Ce que vaut chaque coup, au-dessus de qui le reçoit.' };
 test('chiffres des coups : réglage à choix de l\'onglet Interface, libellés entiers', () => {
   const [def] = M.settingDefs([numbersDef]);
   eq([def.key, def.tab, def.kind, def.default], ['combat.numbers', 'interface', 'choice', 'tous']);

@@ -30,7 +30,6 @@
   // chiffres à l'écran, du plus ancien au plus récent : id → { node, dx, dy, timer }
   const alive = new Map();
   let numberRules = N.rules(null);
-  let numberTimes = [];
   // réglages des notifications, reçus à l'initialisation
   let toastRules = { durationMs: 4500, maxVisible: 4 };
   let barTimer = null;
@@ -177,7 +176,6 @@
   function numbersClear() {
     for (const entry of alive.values()) clearTimeout(entry.timer);
     alive.clear();
-    numberTimes = [];
     layer.replaceChildren();
   }
 
@@ -193,9 +191,6 @@
     const n = N.read(raw);
     if (!n) return;
     numberDrop(n.id);
-    const gate = N.admit(numberTimes, performance.now(), numberRules.maxPerSecond);
-    numberTimes = gate.times;
-    if (!gate.ok) return;
     for (const old of N.evict([...alive.keys()], numberRules.maxAlive)) numberDrop(old);
     const node = document.createElement('div');
     node.className = 'number';

@@ -70,7 +70,7 @@ const DevMock = (() => {
     { key: 'ui.scale', tab: 'interface', kind: 'choice', default: 100, choices: [90, 100, 115], labels: ['90 %', '100 %', '115 %'], label: 'Taille de l\'interface', help: 'Plus lisible de loin, sur un grand écran.' },
     { key: 'hud.notifyDuration', tab: 'interface', kind: 'choice', default: 'normale', choices: ['courte', 'normale', 'longue'], labels: ['Courte', 'Normale', 'Longue'], label: 'Durée des notifications', help: 'Le temps qu\'un message reste à l\'écran.' },
     // T-155 : la ligne de config_client.lua (settings.list), servie à la page par le message `open`
-    { key: 'combat.numbers', tab: 'interface', kind: 'choice', default: 'tous', choices: ['tous', 'infliges', 'aucun'], labels: ['Donnés et reçus', 'Donnés seulement', 'Aucun'], label: 'Chiffres des coups', help: 'Ce que vos coups emportent, et ce que vous encaissez, au-dessus de la cible.' },
+    { key: 'combat.numbers', tab: 'interface', kind: 'choice', default: 'tous', choices: ['tous', 'infliges', 'aucun'], labels: ['Donnés et reçus', 'Donnés seulement', 'Aucun'], label: 'Chiffres des coups', help: 'Ce que vaut chaque coup, au-dessus de qui le reçoit.' },
     ...(params.get('voice') === '0' ? [] : [{ key: 'voice.circle', tab: 'voix', kind: 'lever', default: true, label: 'Cercle de portée au sol', help: 'Montre jusqu\'où porte votre voix quand vous en changez.' }]),
   ];
   const DEFAULTS = { 'ui.scale': 100, 'hud.notifyDuration': 'normale', 'combat.numbers': 'tous', 'voice.circle': true };
