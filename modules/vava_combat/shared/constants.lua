@@ -16,7 +16,7 @@ VavaCombat.RPC = {
 -- Évènements serveur → client, toujours ciblés (core.net, comptés) : jamais à tous.
 VavaCombat.EVENTS = {
     NOTIFY = 'vava_combat:notify',      -- texte, nature : au seul joueur concerné (usure, /armes, coup retenu)
-    HIT = 'vava_combat:hit',            -- attaquant, cible, issue : aux joueurs à 30 m de la cible, même instance
+    HIT = 'vava_combat:hit',            -- attaquant, cible, issue[, dixièmes|false] : à 30 m de la cible, même instance
 }
 
 -- Statebag du ped du porteur d'un bouclier accroché : { id, item } ou rien, écrit et gardé par le serveur.
@@ -67,4 +67,5 @@ VavaCombat.MAX_NOTIFICATION = 200              -- octets d'une notification du H
 VavaCombat.MAX_JOURNAL_LABEL = 32              -- libellé du journal du Registre (vava_admin)
 VavaCombat.MODEL_MAX = 64                      -- octets d'un nom de modèle
 VavaCombat.MAX_PLAYER = 65535                  -- plus grand numéro de joueur (cible d'un coup, évènement HIT)
+VavaCombat.TENTHS_MAX = 2000                   -- montant d'un coup en dixièmes (4e valeur de HIT, T-155)
 VavaCombat.MAX_REASON = 120                    -- octets d'une raison de refus d'un crochet, montrée au joueur

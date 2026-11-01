@@ -149,7 +149,7 @@ button:disabled { cursor: default; opacity: 0.45; }
 .brass-b { min-height: 3rem; padding: 0 1.375rem; border: 0; border-radius: 3px; background: var(--brass-metal); box-shadow: 0 0 0 1px #1d140b, inset 0 1px 0 rgba(255, 243, 210, 0.6), 0 2px 4px rgba(0, 0, 0, 0.45); color: #1d140b; font-size: 1.125rem; }
 .plain { padding: 0; border: 0; background: transparent; color: var(--ink-muted); font-size: 1rem; text-decoration: underline dotted rgba(86, 68, 47, 0.5); text-underline-offset: 0.2em; }
 .plain:hover { color: var(--rubric); }
-.stamps { display: flex; flex-wrap: wrap; gap: 0.375rem; }
+.stamps { display: flex; flex-shrink: 0; gap: 0.375rem; }
 .stamp { min-height: 2.25rem; padding: 0 0.875rem; border: 1px solid rgba(36, 27, 18, 0.55); border-radius: 2px; background: transparent; color: var(--ink); font-size: 1rem; }
 .stamp:hover { background: rgba(36, 27, 18, 0.06); }
 .stamp[aria-pressed="true"] { border-color: var(--rubric); background: rgba(142, 44, 29, 0.1); color: var(--rubric); transform: rotate(-1.5deg); }

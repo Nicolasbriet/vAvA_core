@@ -4,10 +4,10 @@
            fiches des armes (part du serveur), délais du serveur du bouclier, catégories, familles et types de dégâts,
            objets déclarés à l'inventaire, recettes déclarées à l'artisanat, qualité et usure, filet de la brique
            `strike`, débits des RPC (techniques, garde), défense (part du serveur : délais, étiquettes, garde brisée
-           provisoire, modificateurs), cycle d'un coup, tolérances, géométrie, réactions, commandes du Conseil, journal,
-           textes. Complète la table ouverte par config_client.lua (classes des armes, bouclier
-           accroché, placements, contrôles natifs, techniques, styles, mode combat, touches) sans en réécrire une clé
-           (T-132).
+           provisoire, modificateurs), cycle d'un coup, tolérances, géométrie, réactions, chiffres des coups (T-155),
+           commandes du Conseil, journal, textes. Complète la table ouverte par config_client.lua (classes des armes,
+           bouclier accroché, placements, contrôles natifs, techniques, styles, mode combat, touches) sans en réécrire
+           une clé (T-132).
     Les modèles sont des remplaçants vanilla (-- PLACEHOLDER, docs/plan/ASSETS_PLACEHOLDERS.md) : le jour où les armes
     médiévales arrivent, seuls `items[…].held.model` et `weapons[…].provisional` (ici), et `shields[…]`
     (config_client.lua) changent. Les chiffres (solidité, usure, tolérances) sont des valeurs de départ, à régler à la
@@ -102,9 +102,20 @@ config.lunge = { maxSpeed = 8.0, margin = 0.5 }
 
 -- Réactions : rayon des joueurs prévenus d'un coup qui porte (même instance que l'attaquant).
 config.reactions = { radius = 30.0 }
--- Issues jamais envoyées aux proches (personne ne les montre en 1.3.0 ; T-155 pourra changer cette liste ; jamais
--- `parry` ni `break` : l'attaquant paré et le défenseur brisé doivent l'apprendre).
+-- Issues jamais envoyées aux TÉMOINS (personne ne les montre au monde) ; depuis 1.4.0, envoyées à l'attaquant et à la
+-- cible quand numbers.enabled (le mot « Esquivé », « Absorbé ») ; jamais `parry` ni `break` (l'attaquant paré et le
+-- défenseur brisé doivent l'apprendre).
 config.reactions.silent = { 'dodge', 'absorb' }
+
+-- Chiffres des coups (T-155) : le montant d'un coup (dixièmes de point) part en 4e valeur de vava_combat:hit, aux seuls
+-- joueurs désignés ici ; les autres reçoivent l'issue comme en 1.3.0. `enabled = false` : comportement de 1.3.0
+-- (aucun montant ; esquive et absorbé tus pour tous).
+config.numbers = {
+    enabled = true,
+    attacker = true,     -- l'attaquant voit ce qu'il inflige
+    target = true,       -- la cible voit ce qu'elle reçoit
+    witnesses = false,   -- les témoins (joueurs à reactions.radius) : jamais en v1 (décision du porteur du projet)
+}
 
 -- Avis à l'attaquant d'un coup retenu (combats coupés, lieu de paix, refus d'un crochet) : un par raison et par délai.
 config.notices = { intervalMs = 10000 }

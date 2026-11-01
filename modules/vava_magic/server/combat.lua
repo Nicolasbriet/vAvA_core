@@ -16,23 +16,28 @@
            un joueur à terre, ni un membre du Conseil que vava_admin tient pour invulnérable — lu une fois par effet,
            jamais par vérification d'une zone : T-149 —, rien quand `combat.pvp` ou `chain.pvp` de vava_health est
            coupé).
+           Chiffres des sorts (T-155, `numbers`) : issue et montant du résultat (harm.outcome) ; la victime les reçoit
+           dans vava_magic:hit (avec sa réaction, ou seuls pour une morsure, une esquive, un coup absorbé) ; le lanceur,
+           par server/numbers.lua (un message par tour) ; rien pour un coup retenu ou refusé.
            Sans vava_health (arrêté ou en erreur), aucun sort ne blesse personne : une ligne de console par minute, un
            message au lanceur au plus une fois par minute. Le journal des coups est celui de vava_health
            (`vava_health_hits`) : `vava_magic_damage_log` n'est plus écrit, ses lignes anciennes sont encore retirées au
            démarrage puis chaque jour (`combat.log.retentionDays`), par lots bornés.
-    Dépendances : shared/, config.lua, server/core.lua, bridge/server.lua, server/world.lua, server/spells.lua
+    Dépendances : shared/, config.lua, server/core.lua, bridge/server.lua, server/world.lua, server/spells.lua,
+                  server/numbers.lua
 ]]
 
 local type, tostring, tonumber, floor = type, tostring, tonumber, math.floor
 local time = os.time
-local SetTimeout, CreateThread, Wait, TriggerClientEvent, GetGameTimer =
-    SetTimeout, CreateThread, Wait, TriggerClientEvent, GetGameTimer
+local SetTimeout, CreateThread, Wait, GetGameTimer = SetTimeout, CreateThread, Wait, GetGameTimer
 
 local bridge = VavaMagic.bridge
 local world = VavaMagic.world
 local geometry = VavaMagic.geometry
 local harm = VavaMagic.harm
 local cfg = VavaMagic.config.combat
+local numbersCfg = VavaMagic.config.numbers
+local numbers = VavaMagic.numbers
 local notify = VavaMagic.config.texts.notify
 local EVENTS = VavaMagic.EVENTS
 -- purge des lignes anciennes du journal d'avant la chaîne : par lots bornés (index sur `at`), une courte pause entre
@@ -96,12 +101,49 @@ function combat.affects(target, caster, casterCharacter)
     return position
 end
 
---- La victime d'un sort réagit : geste bref et effet d'écran selon le sort (son élément, ou son champ `reaction`).
+--- La victime d'un sort réagit : geste bref et effet d'écran selon le sort (son élément, ou son champ `reaction`) ;
+--- avec un chiffre (T-155) : dixièmes (ou false) et issue (absente pour `hit`). Sort inconnu : le chiffre seul.
 ---@param target integer
 ---@param spell string
-function combat.react(target, spell)
+---@param tenths? integer|false
+---@param issue? string
+function combat.react(target, spell, tenths, issue)
     local def = VavaMagic.spells.get(spell)
-    if def then TriggerClientEvent(EVENTS.HIT, target, def.config.reaction or def.config.element) end
+    local reaction = def and (def.config.reaction or def.config.element) or false
+    if tenths == nil and issue == nil then
+        if reaction then bridge.SendTo(target, EVENTS.HIT, reaction) end
+    elseif issue == nil then
+        bridge.SendTo(target, EVENTS.HIT, reaction, tenths)
+    else
+        bridge.SendTo(target, EVENTS.HIT, reaction, tenths or false, issue)
+    end
+end
+
+--- Chiffres d'un coup jugé par la chaîne (T-155) : à la victime (avec sa réaction s'il l'a blessée) et au lanceur.
+--- Sans chiffre (coupés, coup retenu, morsure quand `overTime` est coupé) : la réaction de 2.12.0 seule.
+---@param source integer|nil  lanceur, source du coup
+---@param target integer
+---@param spell string
+---@param kind string
+---@param result table
+---@param hurt boolean  le coup a retiré de la vie
+local function after(source, target, spell, kind, result, hurt)
+    local reacts = hurt and kind ~= combat.KIND.BURN
+    local issue, tenths = nil, nil
+    if numbersCfg.enabled then issue, tenths = harm.outcome(result, kind) end
+    if issue == 'tick' and not numbersCfg.overTime then issue = nil end
+    if not issue then
+        if reacts then combat.react(target, spell) end
+        return
+    end
+    if not numbersCfg.target then
+        if reacts then combat.react(target, spell) end
+    elseif reacts then
+        combat.react(target, spell, tenths or false, issue ~= 'hit' and issue or nil)
+    else
+        bridge.SendTo(target, EVENTS.HIT, false, tenths or false, issue)
+    end
+    if numbersCfg.caster and source and source ~= target then numbers.add(source, target, issue, tenths) end
 end
 
 --- Ligne de console au plus une fois par minute et par clé.
@@ -175,9 +217,9 @@ function combat.damage(caster, target, spell, points, kind, casterCharacter, ele
         end
         return false
     end
-    if result.cancelled or type(result.applied) ~= 'number' or result.applied <= 0 then return false end
-    if kind ~= combat.KIND.BURN then combat.react(target, spell) end
-    return true
+    local hurt = not result.cancelled and type(result.applied) == 'number' and result.applied > 0
+    after(source, target, spell, kind, result, hurt)
+    return hurt
 end
 
 --- Retire du journal d'avant la chaîne les lignes plus anciennes que `log.retentionDays` jours, par lots bornés.

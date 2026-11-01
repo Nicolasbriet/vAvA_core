@@ -7,7 +7,8 @@
  *        modules/vava_ui/web/fonts/) ; sans vava_ui, polices de repli et cuir sans grain, toujours lisible.
  * Performance : aucun filtre ni flou ; l'anneau ne change qu'à une mise à jour ; la lueur critique et l'arrivée ou
  *        le départ d'une notification n'animent que l'opacité et la position ; la barre de progression avance par une
- *        seule transition de transform sur toute sa durée (aucune mise à jour par image).
+ *        seule transition de transform sur toute sa durée (aucune mise à jour par image). Chiffres des coups (T-155) :
+ *        sur la scène, sans fond ; animés et suivis par transform et opacité seulement, dans un calque isolé.
  */
 
 :root {
@@ -133,6 +134,7 @@ body.dev { background: radial-gradient(ellipse at 40% 60%, #5a6b4c 0%, #2c3829 5
   flex-direction: column;
   align-items: flex-end;
   gap: 0.5rem;
+  z-index: 2;
   width: min(24rem, 40vw);
   pointer-events: none;
   transform: scale(var(--hud-scale));
@@ -240,6 +242,74 @@ body.dev { background: radial-gradient(ellipse at 40% 60%, #5a6b4c 0%, #2c3829 5
   color: rgba(236, 225, 200, 0.7);
 }
 .progress-hint:empty { display: none; }
+
+/* Chiffres des coups (T-155) ------------------------------------------------------------------------------ */
+
+/* au-dessus des jauges, sous les notifications ; contain : un chiffre ne fait jamais recalculer le reste de la page */
+.numbers {
+  --number-ms: 900ms;
+  --number-rise: 5vh;
+  --number-follow: 100ms;
+  position: fixed;
+  inset: 0;
+  z-index: 1;
+  overflow: hidden;
+  pointer-events: none;
+  contain: strict;
+}
+
+/* ancre : posée et suivie par transform (jamais left ni top), la transition lisse le suivi */
+.number {
+  position: absolute;
+  left: 0;
+  top: 0;
+  transition: transform var(--number-follow) linear, opacity 120ms linear;
+}
+.number.is-hidden { opacity: 0; }
+
+/* corps : laiton (donné), sang (reçu), centré au-dessus de l'ancre */
+.number-body {
+  --pop: 1.25;
+  --number-color: #e8c46a;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  color: var(--number-color);
+  font-family: "EB Garamond", "Palatino Linotype", Georgia, serif;
+  font-weight: 700;
+  font-size: calc(max(16px, 2.4vh) * var(--hud-scale));
+  font-variant-numeric: lining-nums tabular-nums;
+  line-height: 1;
+  white-space: nowrap;
+  text-shadow: 0 0 3px #000, 0 1px 2px #000;
+  transform: translate(-50%, -100%);
+  transform-origin: 50% 100%;
+  animation: number-rise var(--number-ms) cubic-bezier(0.2, 0.7, 0.3, 1) forwards;
+}
+.number-body.taken { --number-color: #d9533f; }
+.number-body.small { --pop: 1; font-size: calc(max(13px, 1.7vh) * var(--hud-scale)); }
+.number-body.big { --pop: 1.35; font-size: calc(max(19px, 2.9vh) * var(--hud-scale)); }
+.number-body.huge { --pop: 1.45; font-size: calc(max(22px, 3.3vh) * var(--hud-scale)); }
+/* mot seul (Paré, Esquivé…) : parchemin, italique */
+.number-body.word { --number-color: #f4e8cc; font-style: italic; font-weight: 600; }
+
+/* mot sous le chiffre (Bloqué…) : petites capitales ; « À terre » en sang */
+.number-sub {
+  margin-top: 0.08em;
+  color: #f4e8cc;
+  font-size: calc(max(12px, 1.5vh) * var(--hud-scale));
+  font-variant-caps: small-caps;
+  letter-spacing: 0.04em;
+}
+.number-body.huge .number-sub { color: #d9533f; }
+
+/* saut bref (≈ 120 ms), montée, effacé après les deux tiers */
+@keyframes number-rise {
+  0% { transform: translate(-50%, -100%) scale(var(--pop)); opacity: 1; }
+  13% { transform: translate(-50%, calc(-100% - var(--number-rise) * 0.22)) scale(1); }
+  65% { opacity: 1; }
+  100% { transform: translate(-50%, calc(-100% - var(--number-rise))) scale(1); opacity: 0; }
+}
 
 @media (prefers-reduced-motion: reduce) {
   /* la barre de progression garde sa transition : elle porte l'information, et non un ornement */

@@ -3,9 +3,13 @@
     Rôle : ce qui suit un coup jugé par la chaîne de dégâts (docs/plan/specs/T-112.md § 7.6). Issue (règle pure
            weapons.outcome, ou issue imposée par la défense : parry, block, break) envoyée aux SEULS joueurs à
            `reactions.radius` de la cible dans l'instance de l'attaquant (vava_combat:hit, un message par cible touchée,
-           à la place de `hit`) ; rien pour les issues de `reactions.silent` (esquive, coup absorbé : personne ne les
-           montre) ; rien pour un coup refusé ou annulé avant la cible, seulement un avis à l'attaquant (combats coupés,
-           lieu de paix, crochet), un par raison et par `notices.intervalMs`.
+           à la place de `hit`) ; rien pour un coup refusé ou annulé avant la cible, seulement un avis à l'attaquant
+           (combats coupés, lieu de paix, crochet), un par raison et par `notices.intervalMs`.
+           Chiffres des coups (T-155, `numbers`) : l'attaquant et la cible désignés reçoivent une 4e valeur, le montant
+           du coup en dixièmes (weapons.wireAmount) ou `false` pour une issue sans montant ; les issues de
+           `reactions.silent` (esquive, coup absorbé) ne partent qu'à eux ; les témoins reçoivent le message de 1.3.0.
+           Destinataires d'une même charge réunis en une liste (core.net.send) : deux envois au plus par coup.
+           `numbers.enabled = false` : comportement de 1.3.0 (un envoi de proximité, issues tues pour tous).
            Chancellement d'un coup `staggers` : la cible ne frappe plus pendant `stagger.durationMs`, son coup en cours
            est annulé, puis elle n'en reprend pas avant `timing.staggerImmunityMs` (pas d'enchaînement de contrôles) ;
            attaquant paré et garde brisée : chancellement forcé, qui renouvelle l'immunité (T-113).
@@ -21,7 +25,8 @@ local weapons = VavaCombat.weapons
 local cfg = VavaCombat.config
 local EVENTS = VavaCombat.EVENTS
 local defense = VavaCombat.defense
--- issues que personne ne montre (ni réaction, ni effet, ni son) : rien n'est envoyé (relecture réseau R-3 de T-112)
+-- issues qu'aucun témoin ne montre (ni réaction, ni effet, ni son) : jamais envoyées aux témoins (relecture réseau R-3
+-- de T-112) ; aux seuls participants désignés depuis T-155
 local SILENT = {}
 for _, outcome in ipairs(cfg.reactions.silent) do SILENT[outcome] = true end
 
@@ -104,11 +109,35 @@ function reactions.after(swing, target, result)
     if outcome == 'hit' and swing.def.staggers and reactions.stagger(target, cfg.stagger.durationMs, now) then
         outcome = 'stagger'
     end
-    if SILENT[outcome] then return outcome end
+    local numbers = cfg.numbers
+    if SILENT[outcome] and not numbers.enabled then return outcome end
     local x, y, z = bridge.Position(target)
     if not x then x, y, z = bridge.Position(src) end
     if not x then return outcome end
-    bridge.SendNear(bridge.Bucket(src), { x = x, y = y, z = z }, cfg.reactions.radius, EVENTS.HIT, src, target, outcome)
+    local coords = { x = x, y = y, z = z }
+    if not numbers.enabled then
+        bridge.SendNear(bridge.Bucket(src), coords, cfg.reactions.radius, EVENTS.HIT, src, target, outcome)
+        return outcome
+    end
+    local silent = SILENT[outcome]
+    -- participants désignés (et témoins si numbers.witnesses) : 4 valeurs ; les autres : 3, rien pour une issue tue
+    local full, plain = {}, {}
+    for _, id in ipairs(bridge.PlayersAround(bridge.Bucket(src), coords, cfg.reactions.radius)) do
+        local designated
+        if id == src or id == target then
+            designated = (id == src and numbers.attacker) or (id == target and numbers.target)
+        else
+            designated = numbers.witnesses and not silent
+        end
+        if designated then
+            full[#full + 1] = id
+        elseif not silent then
+            plain[#plain + 1] = id
+        end
+    end
+    local amount = weapons.wireAmount(result, outcome)
+    if #full > 0 then bridge.SendTo(full, EVENTS.HIT, src, target, outcome, amount or false) end
+    if #plain > 0 then bridge.SendTo(plain, EVENTS.HIT, src, target, outcome) end
     return outcome
 end
 

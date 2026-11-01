@@ -63,14 +63,16 @@ vava_magic/
             hands.lua (mains prises et mode combat, 2.12.0) : en tête des client_scripts, lu par le seul client
             text.lua (UTF-8) · pages.lua (lots du registre) · harm.lua (blessures sur la chaîne) : servis au seul serveur
   bridge/   server.lua · client.lua                 ← seul contact avec le core et les autres modules
-  server/   core · world · sheets · mana · spells · progression · combat (coups par la chaîne) · protections
+  server/   core · world · sheets · mana · spells · progression · numbers (chiffres du lanceur, un message par tour)
+            combat (coups par la chaîne) · protections
             (boucliers, résistances, zones de paix : modificateurs) · states (états) · obstacles (remparts…)
             zones (au sol) · grounds (sol mouillé) · combos (combinaisons) · projectiles (noyau commun) · registers
             sigils · casting · admin · api · main
             spells/murmure · lueur · boule_de_feu · mur_de_flammes · nova_ardente · trait_de_glace · vague · brume
             projectile_de_roche · secousse · rempart
   client/   core · nui · state · messages · fx (budget des effets) · hud (barre de mana) · keys · aim · targeting
-            casting · controls (mode magie, aperçus) · wheel (roue) · states (états sur soi) · ambient
+            casting · controls (mode magie, aperçus) · wheel (roue) · states (états sur soi, chiffre reçu)
+            numbers (chiffres du lanceur) · ambient
             zones (rendu, sol mouillé) · clouds (nuées : brume, vapeur) · bursts (effets instantanés)
             projectiles (vol et rendu communs) · combos (mot bref, effets, vapeur, boue) · sigils · grimoire
             register · main
@@ -365,6 +367,34 @@ blessent personne, et rien de ce qui suit un coup ne part ; le lanceur lit « Vo
 une fois par minute, la console le signale. Plus aucun ordre de blessure n'est envoyé au client (l'ancien évènement
 `vava_magic:damage` n'existe plus) : aucune blessure ne se décide hors du serveur.
 
+## Chiffres des sorts (2.13.0, T-155)
+
+Le lanceur voit en laiton ce que ses sorts infligent, la victime en rouge ce qu'elle reçoit, au-dessus de la cible
+(affichés par `vava_hud` ≥ 1.7.0, export `hitText` ; sans lui, rien ne s'affiche et rien ne change). Le montant est
+celui du coup après modificateurs, lu par le serveur dans le résultat de la chaîne (`harm.outcome`), jamais la vie
+retirée ; une esquive (pas de côté de `vava_combat`) ou un coup absorbé par un bouclier se lisent en un mot ; morsures
+de brûlure et zones qui durent en petits chiffres ; rien pour un coup retenu (zone de paix, combats coupés, crochet).
+Les témoins ne voient rien.
+
+- **Envois comptés** : `vava_magic:hit` et `vava_magic:dealt` partent par `bridge.SendTo` (`core.net.send`), vus par
+  `/vava_reseau` ; core sans `core.net` (avant 0.10.0) : envoi direct.
+- **Victime** : le montant voyage dans `vava_magic:hit`, déjà envoyé à elle seule (+ 1 à 3 o) ; un message
+  `vava_magic:hit(false, dixièmes|false, issue)` (≈ 25 o) pour ce qui ne lui envoyait rien : morsure, esquive, absorbé.
+- **Lanceur** : message nouveau `vava_magic:dealt` (`server/numbers.lua`), **un par tour du serveur** où il touche
+  quelqu'un (éclats, Nova, Secousse, passe d'un mur : tous les touchés ensemble ; ≈ 18 o + ≈ 8 à 12 o par touché ; 10 au
+  plus), jamais quand il est lui-même la victime, rien s'il n'a plus de personnage à la fin du tour.
+- Réglages (`config.lua` → `numbers`, contrôlés au démarrage : sinon le module ne démarre pas) :
+
+| Clé | Défaut | Rôle |
+| --- | --- | --- |
+| `enabled` | `true` | `false` : comportement de 2.12.0 (`vava_magic:hit` sans montant, rien au lanceur) |
+| `caster` | `true` | le lanceur voit ce que ses sorts infligent |
+| `target` | `true` | la victime voit ce qu'elle reçoit (morsures, esquives, absorbés compris) |
+| `overTime` | `true` | morsures de brûlure et zones qui durent (mur de flammes, vapeur) : petits chiffres |
+| `maxPerMessage` | `10` | touchés d'un tour dans un même message au lanceur (au-delà : ignorés) ; 1 à 32 ; pas plus que les chiffres à l'écran du HUD (10) |
+
+Le joueur choisit dans la bannière (Réglages > Interface, « Chiffres des coups ») : « Donnés et reçus », « Donnés seulement », « Aucun » ; le filtre est chez lui (`vava_hud`), le serveur envoie les mêmes octets.
+
 ## Mains vides pour incanter
 
 Décision du porteur du projet (31 octobre 2026, T-140) : **on n'incante pas avec une arme ou un bouclier en main**.
@@ -596,6 +626,8 @@ au point de l'effet). Aucun fichier n'est fourni.
   jamais celle du ped) et mains vides. Interrompue : rien n'est consommé.
 - Blessures : un seul chemin, `exports.vava_health:hit`, après les contrôles du sort ; aucun RPC ni évènement ne peut
   en demander une, aucun client n'en applique une.
+- Chiffres des sorts (2.13.0) : montant et issue lus par le serveur dans le résultat de la chaîne, envoyés à la seule
+  victime et au seul lanceur ; aucun RPC n'en porte, un client modifié ne peut tromper que son propre écran.
 - Projectiles : un seul impact par lancer, point d'impact dans la portée et dans l'axe annoncé, délai cohérent avec la
   vitesse, cible réelle près du point (position serveur), zones protégées ; un rempart sur le trajet l'arrête là, quoi
   qu'annonce le client ; les dégâts ne partent qu'ensuite. Le serveur ne voit pas les murs de GTA : un tricheur ne
@@ -637,6 +669,9 @@ sans action). La brume ne relit la position du joueur que toutes les 200 ms, tan
 lumières et de particules, rien au-delà de 150 m.
 
 ## À vérifier en jeu (noms tirés de GTA V)
+
+Chiffres des sorts (2.13.0) : `docs/tests/magie.md` § 21 (un `vava_magic:dealt` par impact, morsures, esquive,
+absorbé, zone de paix, lanceur qui se brûle).
 
 | Usage | Animation, particule ou bouton | Réglage |
 | --- | --- | --- |

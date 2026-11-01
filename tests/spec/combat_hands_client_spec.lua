@@ -546,4 +546,79 @@ describe('vava_combat client : main, dégainer, mode combat', function()
             assert.equal(2, #rpcCalls)
         end)
     end)
+    -- T-155 : 4e valeur de vava_combat:hit (dixièmes, ou false) → vava_hud:hitText chez l'attaquant et la cible
+    -- désignés seulement ; un témoin (3 valeurs) n'appelle jamais hitText ; vava_hud arrêté : rien, aucune erreur
+    describe('chiffres des coups', function()
+        local net, texts, hudState, me
+
+        local function setup()
+            net, texts, hudState, me = {}, {}, 'started', 1
+            _G.GetPlayerServerId = function() return me end
+            _G.RegisterNetEvent = function(name, fn) net[name] = fn end
+            _G.GetPlayerFromServerId = function() return 0 end
+            _G.HasNamedPtfxAssetLoaded = function() return true end
+            _G.UseParticleFxAsset = function() end
+            _G.StartParticleFxNonLoopedOnPedBone = function() end
+            _G.ShakeGameplayCam = function() end
+            _G.PlaySoundFrontend = function() end
+            _G.RequestNamedPtfxAsset = function() end
+            _G.GetResourceState = function(name) return name == 'vava_hud' and hudState or 'missing' end
+            _G.exports = setmetatable({ vava_hud = {
+                hitText = function(_, ...)
+                    texts[#texts + 1] = table.pack(...)
+                    return true
+                end,
+            } }, { __call = function() end })
+            load(nil)
+            helper.load('modules/vava_combat/client/reactions.lua')
+        end
+
+        local function args(i)
+            return { table.unpack(texts[i], 1, texts[i].n) }
+        end
+
+        it('chez l\'attaquant : dealt sur la cible ; chez la cible : taken sur soi', function()
+            setup()
+            me = 1
+            net['vava_combat:hit'](1, 2, 'hit', 120)
+            assert.equal(1, #texts)
+            assert.same({ 'dealt', 2, 'hit', 120 }, args(1))
+            me = 2
+            net['vava_combat:hit'](1, 2, 'hit', 120)
+            assert.same({ 'taken', 2, 'hit', 120 }, args(2))
+            net['vava_combat:hit'](1, 2, 'dodge', false)
+            assert.same({ 'taken', 2, 'dodge', nil }, args(3))
+            assert.equal(4, texts[3].n)
+        end)
+
+        it('témoin (3 valeurs) ou participant non désigné : aucun appel', function()
+            setup()
+            me = 3
+            net['vava_combat:hit'](1, 2, 'hit', 120)
+            net['vava_combat:hit'](1, 2, 'parry')
+            me = 1
+            net['vava_combat:hit'](1, 2, 'hit')
+            net['vava_combat:hit'](1, 2, 'parry')
+            assert.equal(0, #texts)
+        end)
+
+        it('4e valeur invalide (7,5, -1, 2 001, texte) : chiffre sans montant', function()
+            setup()
+            me = 1
+            for _, bad in ipairs({ 7.5, -1, 2001, '12' }) do net['vava_combat:hit'](1, 2, 'hit', bad) end
+            assert.equal(4, #texts)
+            for i = 1, 4 do assert.same({ 'dealt', 2, 'hit', nil }, args(i)) end
+        end)
+
+        it('vava_hud arrêté, ou en erreur : aucun appel, aucune erreur', function()
+            setup()
+            me = 1
+            hudState = 'stopped'
+            net['vava_combat:hit'](1, 2, 'hit', 120)
+            assert.equal(0, #texts)
+            hudState = 'started'
+            _G.exports.vava_hud.hitText = function() error('panne') end
+            assert.has_no.errors(function() net['vava_combat:hit'](1, 2, 'hit', 120) end)
+        end)
+    end)
 end)
