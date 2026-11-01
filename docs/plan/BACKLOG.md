@@ -726,8 +726,8 @@ versé à T-014 ; les autres points déjà couverts sont précisés dans T-012 �
   mesure avant et après par `scripts/poids-client.sh` ; aucune dépendance ajoutée.
 
 ### T-157 — Code de l'Atelier livré au seul Conseil — **décision du porteur du projet**
-- Agents : vava-architecte → vava-dev-lua + vava-dev-nui · Dépend de : T-102 · Statut : à faire (proposée, à valider par
-  le porteur du projet avant de la prendre : changement d'architecture et d'outillage)
+- Agents : vava-architecte → vava-dev-lua + vava-dev-nui · Dépend de : T-102 · Statut : en cours (validée par
+  le porteur du projet le 2 novembre 2026 : changement d'architecture et d'outillage)
 - Trouvé pendant T-102 (relecture réseau R-1, piste pour le porteur du projet) : ≈ 51 Ko de code de `vava_atelier`
   (outil de placement, séance, relais, page) ne servent qu'au Conseil mais sont téléchargés par tous les joueurs.
   Proposition : livraison à la demande, en latent, à l'ouverture de l'Atelier par un membre (droit relu), gardée en
