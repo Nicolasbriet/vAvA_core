@@ -208,9 +208,10 @@ les « réglages pour aller vite » du ciel, désormais dans `config.lua`. Hors 
 
 La Chancellerie (et `scripts/livraison.js`) retire les commentaires et les blancs de fin de ligne du Lua servi aux
 joueurs (`shared_scripts`, `client_scripts`, `vava_conseil_lua`, manifestes), en gardant chaque ligne à sa place ; les
-réglages (`config.lua`, `config_client.lua`, `config/…`) et le Lua du seul serveur ne sont jamais touchés. Mesure hors
-jeu sur le dépôt du 2 novembre 2026 : `lua + manifeste` du total de `poids-client.sh` **1 422 293 → 978 830 octets
-(− 443 463, ≈ − 433 Ko)**, **506 268 → 310 918 compressés (− 195 350)**. Préparation : serveur de test du porteur,
+réglages (`config.lua`, `config_client.lua`, `config_conseil.lua`, `config/…`) et le Lua du seul serveur ne sont
+jamais touchés. Mesure hors jeu sur `main` du 2 novembre 2026 (T-155, T-156, T-157 comprises) : `lua + manifeste` du
+total de `poids-client.sh` **1 377 793 → 937 427 octets (− 440 366, ≈ − 430 Ko)**, **495 992 → 302 275 compressés
+(− 193 717)** ; paquet du Conseil (`vava_atelier@conseil`) 248 218 → 228 502 octets. Préparation : serveur de test du porteur,
 branche de T-154 dans la copie de travail ; **A** Souverain, **B** hors du Conseil ; `F8` ouvert chez chacun (repérer
 `SCRIPT ERROR`). PowerShell : les chemins à crochets demandent `-LiteralPath`. **Ne jamais** lancer
 `Remove-Item -Recurse` sur un dossier qui contient des jonctions (`[vava]`, `[vava-dev]`).
@@ -219,7 +220,7 @@ branche de T-154 dans la copie de travail ; **A** Souverain, **B** hors du Conse
 |---|---|---|
 | 1 | Hors jeu : `./scripts/verifier.sh`. | Étape « Lua livré sans commentaires (T-154) » : « ESSAIS LIVRAISON : OK (…) », « MÊME CODE : OK (… fichiers prouvés, dont … livrés …) », aucune ligne `ÉCART`, aucun `diff`. |
 | 2 | Hors jeu : `node scripts/livraison.js --liste`. | Chaque `fxmanifest.lua` « allégé » ; chaque `config_client.lua` et `vAvA_core/config/shared.lua` « gardé (réglage) » ; aucun `server/…`, aucun `config.lua`, aucun `content/…`. Si T-157 est fusionnée : neuf lignes `vava_atelier@conseil`, toutes « allégé » sauf `config_conseil.lua` « gardé (réglage) » (réglages de l'exploitant, relecture réseau R-5 de T-157). |
-| 3 | Chancellerie : Arrêter. PowerShell : `Move-Item -LiteralPath 'D:\vAvA_core_phase1\resources\[vava]' 'D:\vAvA_core_phase1\vava-git'` ; idem `[vava-dev]` → `vava-dev-git`. Depuis la copie de travail : `node scripts/livraison.js --sortie 'D:\vAvA_core_phase1\resources\[livraison]'`. | Résumé : 33 ressources, ≈ 277 fichiers allégés, octets avant → après, « 0 refusé(s) ». `…\[livraison]\[vava]\vava_combat\client\attack.lua` : aucun commentaire, **même nombre de lignes** que `modules/vava_combat/client/attack.lua` ; `…\[vava]\vava_combat\config_client.lua` identique au dépôt. |
+| 3 | Chancellerie : Arrêter. PowerShell : `Move-Item -LiteralPath 'D:\vAvA_core_phase1\resources\[vava]' 'D:\vAvA_core_phase1\vava-git'` ; idem `[vava-dev]` → `vava-dev-git`. Depuis la copie de travail : `node scripts/livraison.js --sortie 'D:\vAvA_core_phase1\resources\[livraison]'`. | Résumé : 33 ressources, ≈ 284 fichiers allégés, octets avant → après, « 0 refusé(s) ». `…\[livraison]\[vava]\vava_combat\client\attack.lua` : aucun commentaire, **même nombre de lignes** que `modules/vava_combat/client/attack.lua` ; `…\[vava]\vava_combat\config_client.lua` identique au dépôt. |
 | 4 | Git Bash : `./scripts/poids-client.sh` puis `./scripts/poids-client.sh --dossier '/d/vAvA_core_phase1/resources/[livraison]'`. | `lua + manifeste` du total en baisse d'**au moins 350 Ko bruts** (≈ 433 Ko attendus) ; noter avant et après (bruts et compressés) au rapport. |
 | 5 | Démarrer le serveur (Chancellerie). | Chaque module « prêt » avec sa version habituelle ; aucune erreur Lua en console. |
 | 6 | **(2 joueurs)** A vide son cache FiveM puis se connecte ; B se connecte. | Écran de chargement, sélection, apparition comme d'habitude ; aucune `SCRIPT ERROR` chez l'un ni l'autre. |
@@ -238,7 +239,7 @@ neuve par l'assistant, « Nouveau serveur », dans `D:\vAvA_essai`) :
 |---|---|---|
 | 13 | Installation neuve. | Journal de l'opération : « Lua servi aux joueurs allégé de ses commentaires : … fichiers, … → … Ko. » ; résumé de l'opération terminé par « Lua allégé : … fichiers, 0 refusés » ; `…\server-data\resources\[vava]\vava_combat\client\attack.lua` sans commentaire ; `config_client.lua` et `config.lua` commentés ; `data/install.json` : l'empreinte de `client/attack.lua` est le SHA-256 du fichier posé. |
 | 14 | Lancer ce serveur ; A se connecte. | Comme les n° 5 à 7. |
-| 15 | Un serveur installé par la Chancellerie 1.8.6 : mise à jour qui apporte la 1.9.0, puis la mise à jour suivante. | Première : Chancellerie 1.9.0, Lua encore commenté (aucune ligne « allégé ») ; seconde : ligne « allégé », **les 33 ressources** listées une fois (chaque manifeste change) ; un joueur qui revient retélécharge une fois le paquet de chacune (≈ 3,9 Mo bruts, ≈ 2,3 Mo compressés au 2 novembre 2026, dont 1,44 Mo pour `vava_loading` ; à fusionner avec T-160 pour ne le faire qu'une fois) ; un `client/*.lua` modifié à la main avant : remplacé, le sien en `.local` ; un `config_conseil.lua` adapté : gardé, `.nouveau` à côté s'il a changé en amont. |
+| 15 | Un serveur installé par la Chancellerie 1.8.6 : mise à jour qui apporte la 1.9.0, puis la mise à jour suivante. | Première : Chancellerie 1.9.0, Lua encore commenté (aucune ligne « allégé ») ; seconde : ligne « allégé », **les 33 ressources** listées une fois (chaque manifeste change) ; un joueur qui revient retélécharge une fois le paquet de chacune (≈ 3,8 Mo bruts, ≈ 2,4 Mo compressés au 2 novembre 2026, dont 1,44 Mo pour `vava_loading` ; à fusionner avec T-160 pour ne le faire qu'une fois) ; un `client/*.lua` modifié à la main avant : remplacé, le sien en `.local` ; un `config_conseil.lua` adapté : gardé, `.nouveau` à côté s'il a changé en amont. |
 | 16 | `updates.leanLua` à `false` dans `data/config.json`, relancer la Chancellerie, appliquer la mise à jour suivante. | « Allègement du Lua livré désactivé … » ; fichiers livrés reposés avec leurs commentaires, les 33 ressources listées (même retéléchargement complet qu'au n° 15) ; serveur sain. |
 
 ## Ce qui n'est pas compté

@@ -723,8 +723,9 @@ versé à T-014 ; les autres points déjà couverts sont précisés dans T-012 �
   `fetchSource`, à l'installation et aux mises à jour, avant les empreintes ; `updates.leanLua`), `scripts/livraison.js`
   (`--liste`, `--essai`, `--sortie`), preuve par le compilateur (`scripts/lib/meme-code.lua`, `string.dump` sur les 825
   fichiers Lua suivis) et recoupement avec `scripts/lib/manifeste.awk` (qui suit `vava_conseil_lua` et
-  `vava_conseil_web`, comme le prévoit T-157) dans `scripts/verifier.sh`. Mesure : `lua + manifeste` livrés
-  1 422 293 → 978 830 octets (− 433 Ko), 506 268 → 310 918 compressés (− 191 Ko). Aucun module de jeu touché.
+  `vava_conseil_web`, comme le prévoit T-157) dans `scripts/verifier.sh`. Mesure sur `main` après T-157 : `lua +
+  manifeste` livrés 1 377 793 → 937 427 octets (− 430 Ko), 495 992 → 302 275 compressés (− 189 Ko) ; paquet du
+  Conseil 248 218 → 228 502 octets. Aucun module de jeu touché.
 - Relectures du 2 novembre 2026 : sécurité OK (7 mineurs), réseau à corriger (documentation) ; suites appliquées :
   première ligne `#` et `/*` refusés, jokers comparés sans expression régulière, 1 Mio par fichier, écriture atomique
   et échec propre de l'opération, réglages sans la casse, `--sortie` hors de toute copie git, bilan dans le résumé de
