@@ -6,6 +6,8 @@
         abrite, perdent des points de vie (un joueur mouillé sèche : dégâts réduits, pas de brûlure) ; au niveau 3, ils sont repoussés (le serveur donne la direction, depuis le lanceur, à la seule victime) ;
         au niveau 4, ils repartent en Brûlure. Les joueurs proches voient la nova ; si elle a touché quelqu'un et que
         le lancer a rapporté, le lanceur gagne le bonus d'XP du sort.
+      - Mannequins (T-156) : ceux du rayon, sans rempart entre eux et le lanceur, sont frappés « à blanc » (ni poussée,
+        ni brûlure) ; ils ne comptent pas pour le bonus d'XP.
     Dépendances : shared/, config.lua, server/ (noyau, combat, states, combos, obstacles)
 ]]
 
@@ -61,8 +63,14 @@ local function finish(ctx)
             end
         end
     end
+    for _, dummy in ipairs(combat.dummiesAround(position, levelCfg.radius)) do
+        if not obstacles.blocked(position, dummy) then
+            combat.dummyStrike(src, dummy.n, NAME, levelCfg.damage, combat.KIND.ZONE, ctx.characterId)
+        end
+    end
     return {
         success = true, result = { touched = touched },
+
         rewarded = function(granted)
             if granted and touched > 0 then experience.bonus(src, NAME, spellCfg.hitXp or 0) end
         end,

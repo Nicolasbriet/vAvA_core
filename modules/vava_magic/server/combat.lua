@@ -23,11 +23,16 @@
            message au lanceur au plus une fois par minute. Le journal des coups est celui de vava_health
            (`vava_health_hits`) : `vava_magic_damage_log` n'est plus écrit, ses lignes anciennes sont encore retirées au
            démarrage puis chaque jour (`combat.log.retentionDays`), par lots bornés.
+           Mannequins d'entraînement (T-156, vava_combat ≥ 1.5.0, `config.dummies`) : la magie ne les connaît pas, elle
+           les demande à vava_combat (hors zone de paix, comme un joueur) et lui confie le coup, avec le même paquet
+           qu'un coup sur un joueur ; calcul « à blanc » (rien d'appliqué), ni état, ni poussée, ni bonus d'XP ;
+           `combat.pvp` n'est pas lu (un mannequin n'est pas un habitant). Le chiffre du lanceur part de vava_combat.
     Dépendances : shared/, config.lua, server/core.lua, bridge/server.lua, server/world.lua, server/spells.lua,
                   server/numbers.lua
 ]]
 
-local type, tostring, tonumber, floor = type, tostring, tonumber, math.floor
+local type, ipairs, tostring, tonumber, floor = type, ipairs, tostring, tonumber, math.floor
+
 local time = os.time
 local SetTimeout, CreateThread, Wait, GetGameTimer = SetTimeout, CreateThread, Wait, GetGameTimer
 
@@ -38,6 +43,7 @@ local harm = VavaMagic.harm
 local cfg = VavaMagic.config.combat
 local numbersCfg = VavaMagic.config.numbers
 local numbers = VavaMagic.numbers
+local dummiesCfg = VavaMagic.config.dummies
 local notify = VavaMagic.config.texts.notify
 local EVENTS = VavaMagic.EVENTS
 -- purge des lignes anciennes du journal d'avant la chaîne : par lots bornés (index sur `at`), une courte pause entre
@@ -220,6 +226,59 @@ function combat.damage(caster, target, spell, points, kind, casterCharacter, ele
     local hurt = not result.cancelled and type(result.applied) == 'number' and result.applied > 0
     after(source, target, spell, kind, result, hurt)
     return hurt
+end
+
+---@return boolean
+local function dummiesEnabled()
+    return type(dummiesCfg) == 'table' and dummiesCfg.enabled == true
+end
+
+--- Mannequins dont le centre est à `radius` du point et hors zone de paix (même règle qu'un joueur) : `{ { n, x, y,
+--- z } }`, du plus proche au plus loin ; `config.dummies.enabled = false`, ou vava_combat absent : `{}`.
+---@param point table
+---@param radius number
+---@return table[]
+function combat.dummiesAround(point, radius)
+    if not dummiesEnabled() then return {} end
+    local out = {}
+    for _, dummy in ipairs(bridge.DummiesNear(point, radius)) do
+        if not combat.protected(dummy) then out[#out + 1] = dummy end
+    end
+    return out
+end
+
+--- Un sort frappe le mannequin `n` (T-156) : même montant et même paquet qu'un coup sur un joueur (type de l'élément,
+--- étiquettes de la nature, instant du lancement), confiés à vava_combat (`dummyHit`), qui juge et envoie le chiffre.
+--- Lanceur qui joue désormais un autre personnage : rien. Rend `{ outcome, amount }`, ou nil.
+---@param caster integer
+---@param n integer
+---@param spell string
+---@param points number
+---@param kind string      nature : combat.KIND
+---@param casterCharacter? integer
+---@param element? string
+---@param launchedAt? integer
+---@return table|nil
+function combat.dummyStrike(caster, n, spell, points, kind, casterCharacter, element, launchedAt)
+    if not dummiesEnabled() then return nil end
+    local amount = harm.amount(points, cfg.healthPoints, bridge.ChainHealthPoints())
+    if not amount then return nil end
+    local current = type(caster) == 'number' and caster > 0 and bridge.GetCharacterId(caster) or nil
+    local source, sourceCharacter = harm.source(caster, casterCharacter, current)
+    if not source then return nil end
+    local result, code = bridge.DummyHit(n, harm.packet({
+        amount = amount, kind = harm.kindOf(elementOf(spell, element), cfg.kinds), nature = kind,
+        source = source, sourceCharacter = sourceCharacter, spell = spell,
+        launchedAt = launchedAt and bridge.ChainKnowsLaunched() and launchedAt or nil,
+    }))
+    if not result then
+        if code ~= 'combat_unavailable' and due('dummy:' .. tostring(code)) then
+            VavaMagic.log.warn("coup du sort '%s' sur un mannequin refusé par vava_combat : %s", tostring(spell),
+                tostring(code))
+        end
+        return nil
+    end
+    return result
 end
 
 --- Retire du journal d'avant la chaîne les lignes plus anciennes que `log.retentionDays` jours, par lots bornés.

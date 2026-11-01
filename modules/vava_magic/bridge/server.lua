@@ -5,7 +5,8 @@
            dégâts de vava_health : coups des sorts, vie tenue par le serveur, hook des coups, modificateurs), mains vides
            pour incanter (arme de GTA sur le ped, arme, rengainement et bouclier au bras lus par vava_combat, prises en
            main suivies par le hook vava_inventory:hold), membre du Conseil invulnérable (vava_admin:isInvulnerable :
-           effets sans dégâts épargnés), envois comptés par core.net (chiffres des sorts et réaction de la victime).
+           effets sans dégâts épargnés), envois comptés par core.net (chiffres des sorts et réaction de la victime),
+           mannequins d'entraînement de vava_combat ≥ 1.5.0 (dummiesNear, dummyHit : sorts sur un mannequin, T-156).
            Pour brancher la magie sur un autre core, réécrire les fonctions de ce fichier (et de bridge/client.lua) :
            le reste du module ne connaît qu'elles.
     Implémentation : vAvA_core (API documentée dans docs/api.md) et ses modules officiels. Chaque appel à une autre
@@ -15,6 +16,7 @@
 
 local type, pairs, ipairs, pcall, tostring, tonumber = type, pairs, ipairs, pcall, tostring, tonumber
 local mathType, huge = math.type, math.huge
+local find = string.find
 local pack, unpack, concat = table.pack, table.unpack, table.concat
 local GetResourceState, TriggerClientEvent, IsPlayerAceAllowed, CreateThread, GetPlayers, GetGameTimer =
     GetResourceState, TriggerClientEvent, IsPlayerAceAllowed, CreateThread, GetPlayers, GetGameTimer
@@ -588,6 +590,73 @@ function Bridge.HandsBusy(source)
     return nil
 end
 
+-- Mannequins d'entraînement (vava_combat ≥ 1.5.0, T-156) ------------------------------------------------------------
+
+-- vava_combat sans les exports des mannequins (plus ancien que 1.5.0) : plus cherchés avant ce délai, ou avant son
+-- prochain démarrage
+local DUMMY_RETRY_MS = 60000
+local dummyMissingAt = nil
+
+---@param value any
+---@return boolean
+local function finite(value)
+    return type(value) == 'number' and value == value and value ~= huge and value ~= -huge
+end
+
+--- Export des mannequins de vava_combat, isolé : ok (appel réussi), puis ses valeurs. Absent ou arrêté : rien, sans
+--- bruit ; plus ancien (export inconnu) ou en erreur : une ligne de console par minute.
+---@return boolean called
+local function dummyExport(fn, ...)
+    if GetResourceState(LINKS.COMBAT) ~= 'started' then return false end
+    local now = GetGameTimer()
+    if dummyMissingAt and now - dummyMissingAt < DUMMY_RETRY_MS then return false end
+    local called, result, code = pcall(invoke, LINKS.COMBAT, fn, ...)
+    if not called then
+        local message = tostring(result)
+        if find(message, 'No such export', 1, true) then
+            dummyMissingAt = now
+            warnCombat('%s sans export %s (plus ancien que 1.5.0) : les sorts ne frappent aucun mannequin', LINKS.COMBAT,
+                fn)
+        else
+            warnCombat('%s.%s en erreur : %s', LINKS.COMBAT, fn, message)
+        end
+        return false
+    end
+    dummyMissingAt = nil
+    return true, result, code
+end
+
+--- Mannequins dont le centre est à `radius` du point (`vava_combat:dummiesNear`), relus : `{ { n, x, y, z } }` (centre
+--- visé), du plus proche au plus loin ; vava_combat absent, plus ancien ou en erreur : `{}`.
+---@param point table
+---@param radius number
+---@return table[]
+function Bridge.DummiesNear(point, radius)
+    local called, list = dummyExport('dummiesNear', { x = point.x, y = point.y, z = point.z }, radius)
+    if not called or type(list) ~= 'table' then return {} end
+    local out = {}
+    for _, entry in ipairs(list) do
+        if type(entry) == 'table' and mathType(entry.n) == 'integer' and finite(entry.x) and finite(entry.y)
+            and finite(entry.z) then
+            out[#out + 1] = { n = entry.n, x = entry.x, y = entry.y, z = entry.z }
+        end
+    end
+    return out
+end
+
+--- Confie à vava_combat le coup d'un sort sur le mannequin `n` (`vava_combat:dummyHit`, calcul « à blanc » : rien n'est
+--- appliqué) : `{ outcome, amount }`, ou `nil, code` (`combat_unavailable` si vava_combat ne répond pas).
+---@param n integer
+---@param packet table  paquet de la chaîne (harm.packet), identique à celui d'un coup sur un joueur
+---@return table|nil result
+---@return string|nil code
+function Bridge.DummyHit(n, packet)
+    local called, result, code = dummyExport('dummyHit', n, packet)
+    if not called then return nil, 'combat_unavailable' end
+    if type(result) ~= 'table' then return nil, type(code) == 'string' and code or 'refused' end
+    return result
+end
+
 --- Prévient `handler` après chaque prise en main ou dépôt (hook `vava_inventory:hold` after : { source, instanceId,
 --- item, previous, owner }) : une arme ou un bouclier pris pendant une incantation la brise aussitôt. Le hook
 --- appartient au core : l'abonnement survit aux redémarrages de l'inventaire.
@@ -612,7 +681,11 @@ function Bridge.start()
             for name in pairs(usable) do declare(name) end
         elseif payload.name == LINKS.HEALTH then
             declareModifiers()
+        elseif payload.name == LINKS.COMBAT then
+            -- une version plus récente a pu arriver : ses exports des mannequins sont relus aussitôt
+            dummyMissingAt = nil
         end
+
     end)
     if not id then return false, err end
     return true
