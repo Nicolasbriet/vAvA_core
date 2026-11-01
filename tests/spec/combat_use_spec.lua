@@ -1,5 +1,8 @@
 local helper = require('tests.helper')
 
+-- T-114 : états d'endurance envoyés au seul porteur (doublure bridge.Send)
+local staminaSent = {}
+
 -- Un coup de technique côté serveur (modules/vava_combat/server/swings.lua, hands.lua, reactions.lua, strike.lua,
 -- api.lua réels, T-112) avec des doublures : bridge (personnages, main tenue, positions et caps réglables, instances,
 -- joueurs proches filtrés par instance et par rayon, à terre, véhicule, contrôle de la magie, hit qui note le paquet et
@@ -58,8 +61,16 @@ describe('vava_combat techniques (serveur)', function()
         clock = target
     end
 
+    --- Réponse de swings.use. Geste accepté (T-114) : l'état d'endurance qui suit `true` (trois entiers bornés) est
+    --- contrôlé puis retiré ; ses valeurs sont essayées dans combat_endurance_spec.
     local function use(src, id, target)
-        return { swings.use(src, id, target or 0) }
+        local out = { swings.use(src, id, target or 0) }
+        if out[1] == true then
+            assert.equal(4, #out)
+            assert.is_not_nil(VavaCombat.endurance.read(out[2], out[3], out[4]))
+            return { true }
+        end
+        return out
     end
 
     local function exportCalls()
@@ -95,6 +106,8 @@ describe('vava_combat techniques (serveur)', function()
             'modules/vava_combat/shared/techniques.lua',
             'modules/vava_combat/shared/admission.lua',
             'modules/vava_combat/shared/defense.lua',
+            'modules/vava_combat/shared/endurance.lua',
+            'modules/vava_combat/shared/stamina.lua',
             'modules/vava_combat/shared/weapons.lua',
             'modules/vava_combat/shared/guard.lua',
         })
@@ -217,6 +230,14 @@ describe('vava_combat techniques (serveur)', function()
             SetShieldField = function() end,
             ShieldField = function() return nil end,
             Timer = function() return clock end,
+            -- T-114 : faim et soif (vava_needs absent : facteur 1) ; état d'endurance au seul porteur
+            NeedsValues = function() return nil end,
+            Send = function(target, event, ...)
+                assert.equal('integer', math.type(target))
+                assert.is_true(target > 0)
+                staminaSent[#staminaSent + 1] = { target = target, event = event, args = { ... } }
+                return true
+            end,
         }
         for _, name in ipairs(COUNTED) do
             local fn = bridge[name]
@@ -234,6 +255,7 @@ describe('vava_combat techniques (serveur)', function()
             'modules/vava_combat/server/strike.lua',
             'modules/vava_combat/server/hands.lua',
             'modules/vava_combat/server/reactions.lua',
+            'modules/vava_combat/server/stamina.lua',
             'modules/vava_combat/server/defense.lua',
             'modules/vava_combat/server/swings.lua',
             'modules/vava_combat/server/api.lua',
@@ -691,7 +713,7 @@ describe('vava_combat techniques (serveur)', function()
             local _, third = request(A, 'fendant', B)      -- suite de la chaîne : attendre la fin de la frappe réservée
             assert.same({ false, 'busy', 420 }, third)
             assert.equal(1, #befores)                    -- la seconde n'atteint jamais le crochet
-            assert.same({ true }, finish(first))
+            assert.same({ true, 880, 1000, 200 }, finish(first))
             assert.is_nil(swings.of(A).pending)
             assert.equal(2, #timers)
             at(2000)
@@ -760,7 +782,7 @@ describe('vava_combat techniques (serveur)', function()
         it('repris tard : les relevés gardent l\'heure de la demande', function()
             local co = request(A, 'taille_descendante', B)
             clock = T0 + 100                             -- 100 ms en suspens
-            assert.same({ true }, finish(co))
+            assert.same({ true, 880, 1000, 200 }, finish(co))
             at(319)
             assert.equal(0, #hits)
             at(320)
@@ -774,7 +796,7 @@ describe('vava_combat techniques (serveur)', function()
             local b = request(A, 'taille_descendante', B)
             assert.equal(T0 + 840, swings.of(A).startedAt)
             assert.same({ false, 'busy' }, finish(a))
-            assert.same({ true }, finish(b))
+            assert.same({ true, 880, 1000, 200 }, finish(b))
             assert.equal(2, #timers)
             at(3000)
             assert.equal(1, #hits)
@@ -912,6 +934,8 @@ describe('vava_combat techniques (serveur)', function()
         local function strikeWith(answer)
             hitAnswer = function() return answer end
             hits, sent = {}, {}
+            -- T-114 : chaque coup part d'une jauge pleine (dix Tailles d'affilée épuiseraient A ; essai des issues)
+            VavaCombat.stamina.forget(A)
             use(A, 'taille_descendante', B)
             at(clock - T0 + 900)
         end
@@ -962,6 +986,8 @@ describe('vava_combat techniques (serveur)', function()
             hitAnswer = nil
             VavaCombat.bridge.Hit = function() return nil, 'too_many_hits' end
             hits, sent = {}, {}
+            -- T-114 : chaque coup part d'une jauge pleine (dix Tailles d'affilée épuiseraient A ; essai des issues)
+            VavaCombat.stamina.forget(A)
             use(A, 'taille_descendante', B)
             at(clock - T0 + 900)
             assert.equal(0, #sent)
@@ -1063,6 +1089,28 @@ describe('vava_combat techniques (serveur)', function()
             held[A] = nil
             hands.onHold({ source = A, instanceId = 0, previous = 0 })
             assert.same({ nil, 'no_weapon' }, { api.armed(A) })
+        end)
+    end)
+
+    -- T-114 : refus `exhausted` (ligne 8 bis : après dodge_cooldown, avant busy), réponses à 4 et 6 valeurs
+    describe('endurance', function()
+        it('accepté : true et l\'état (3 entiers) ; à bout de souffle : 6 valeurs, avant busy, après les délais', function()
+            assert.same({ true, 880, 1000, 200 }, { swings.use(A, 'taille_descendante', B) })
+            VavaCombat.stamina.block(A, { stamina = 40 }, 2, false, clock, CHAR_A)      -- 880 − 800 = 80
+            at(100)
+            -- busy (fin du coup à 900) viendrait après : la ligne 8 bis passe avant l'admission
+            assert.same({ false, 'exhausted', 1750, 80, 900, 200 }, { swings.use(A, 'fendant', B) })
+            -- chancelant : le chancellement d'abord
+            reactions.stagger(A, 900, clock, true)
+            assert.same({ false, 'staggered', 900 }, { swings.use(A, 'fendant', B) })
+            -- pas de côté trop tôt : son délai d'abord, puis le souffle
+            arm(B, 20, 'epee_courte')
+            assert.same({ true, 800, 1000, 200 }, { swings.use(B, 'pas_de_cote', 0) })
+            VavaCombat.stamina.block(B, { stamina = 40 }, 2, false, clock, CHAR_B)      -- 800 − 800 = 0
+            at(200)
+            assert.same({ false, 'dodge_cooldown', 1400 }, { swings.use(B, 'pas_de_cote', 0) })
+            at(1600)
+            assert.same({ false, 'exhausted', 500, 100, 0, 200 }, { swings.use(B, 'pas_de_cote', 0) })
         end)
     end)
 

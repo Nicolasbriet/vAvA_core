@@ -1,9 +1,10 @@
 --[[
     vava_combat/client/attack.lua
-    Rôle : un geste côté client (coup ou défense), prédiction sans décision : technique choisie, geste aussitôt,
-           demande `vava_combat:use`, refus et attente du serveur respectés, touche gardée, virage vers la cible.
+    Rôle : un geste côté client (coup ou défense), prédiction sans décision : technique choisie (et payable, d'après
+           la jauge reçue), geste aussitôt, demande `vava_combat:use`, refus et attente du serveur respectés, état de la
+           jauge lu dans la réponse, touche gardée, virage vers la cible.
     Dépendances : shared/constants.lua, config_client.lua, shared/heading.lua, shared/techniques.lua, client/core.lua,
-                  bridge/client.lua, client/hands.lua, client/targeting.lua
+                  bridge/client.lua, client/endurance.lua, client/hands.lua, client/targeting.lua
 ]]
 
 local type, ipairs, sub = type, ipairs, string.sub
@@ -21,6 +22,7 @@ local refusals = cfg.refusals
 local bridge = VavaCombat.bridge
 local headingTo = VavaCombat.heading.to
 local techniques = VavaCombat.techniques
+local gaugeView = VavaCombat.gaugeView
 local hands = VavaCombat.hands
 local targeting = VavaCombat.targeting
 local RPC = VavaCombat.RPC
@@ -41,7 +43,7 @@ local current = nil
 local buffered = nil
 -- attente donnée par le serveur (busy, chain_limit…) : aucune demande avant
 local waitUntil = 0
--- attentes propres à une touche (parade ratée, pas de côté) : elles ne retiennent ni la garde ni les attaques
+-- attentes propres à une touche (parade ratée, pas de côté, souffle) : une touche moins chère n'est pas retenue
 local slotUntil = {}
 local SLOT_OF = { parry_cooldown = 'parade', dodge_cooldown = 'esquive' }
 -- chancellement reçu du serveur : aucune technique avant
@@ -97,11 +99,16 @@ end
 ---@param locked integer
 local function request(swing, locked)
     CreateThread(function()
-        local transport, accepted, code, detail = core.rpc.call(RPC.USE, swing.id, locked)
-        if transport and accepted == true then return end
+        local transport, accepted, code, detail, value, restIn, rate = core.rpc.call(RPC.USE, swing.id, locked)
+        if transport and accepted == true then
+            -- état de la jauge après la dépense : valeur, ms avant la recharge, pente (code, detail, value en place)
+            gaugeView.apply(code, detail, value)
+            return
+        end
         if not transport then code, detail = accepted, nil end
+        if code == 'exhausted' then gaugeView.apply(value, restIn, rate) end
         if mathType(detail) == 'integer' and detail > 0 then
-            local slot = SLOT_OF[code]
+            local slot = code == 'exhausted' and swing.def.type or SLOT_OF[code]
             if slot then
                 slotUntil[slot] = max(slotUntil[slot] or 0, GetGameTimer() + detail)
             else
@@ -152,7 +159,8 @@ local function keep(slot, now, wait)
 end
 
 --- Technique d'une touche si elle peut partir à `now` (chancellement, dégainer, style, attente du serveur, cycle en
---- cours) : son identifiant, ou `nil[, attente]` ; `quiet` : aucun texte.
+--- cours, endurance) : son identifiant, ou `nil[, attente]` ; `quiet` : aucun texte (sauf le souffle : une touche
+--- maintenue sans effet ne reste pas muette ; texte borné à un par `noticeMs`).
 ---@param slot string
 ---@param now integer
 ---@param quiet? boolean
@@ -167,7 +175,14 @@ function attack.choose(slot, now, quiet)
     end
     local until_ = max(waitUntil, slotUntil[slot] or 0)
     if now < until_ then return nil, until_ - now end
-    return techniques.pick(cfg.styles[hands.style()], slot, current, current and current.def, now, cfg.techniques)
+    local id, wait = techniques.pick(cfg.styles[hands.style()], slot, current, current and current.def, now,
+        cfg.techniques)
+    -- technique que la jauge vue d'ici ne paie pas : aucune demande (le serveur la refuserait)
+    if id and not gaugeView.allows(cfg.techniques[id].stamina, now) then
+        attack.notice('exhausted')
+        return nil
+    end
+    return id, wait
 end
 
 --- Appui sur une touche d'attaque (`legere`, `lourde`), le mode combat éveillé et actif.

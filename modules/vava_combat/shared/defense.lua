@@ -3,8 +3,8 @@
     Rôle : règles pures de la défense, servies au seul serveur (docs/plan/specs/T-113.md § 7.2) : fenêtre ouverte d'un
            geste défensif, garde abaissée (tenue minimale, récupération), adversaire de face, étiquettes évitées,
            bloquées ou parées, part bloquée (bouclier encore accroché, sinon l'arme ; émoussée : × dullFactor), délais
-           d'une parade ratée et entre deux pas de côté, compteur provisoire de garde brisée (remplacé par l'endurance de
-           T-114), poids d'un coup. Aucune native, aucun état ; une valeur non finie rend faux ou nil, jamais une erreur.
+           d'une parade ratée et entre deux pas de côté, poids d'un coup bloqué (son coût d'endurance : shared/stamina.lua,
+           T-114). Aucune native, aucun état ; une valeur non finie rend faux ou nil, jamais une erreur.
            Complète VavaCombat.defense (server/defense.lua y ajoute la part qui tient la mémoire).
     Dépendances : shared/constants.lua, shared/geometry.lua
 ]]
@@ -139,30 +139,11 @@ function defense.dodgeWait(lastStart, now, cfg)
     return wait > 0 and wait or nil
 end
 
---- Compteur provisoire de garde (T-114 le remplace) : remis à 0 après `resetMs` sans coup bloqué, puis + `weight` ;
---- brisée à `points` (au bouclier : `shieldPoints`). Rend le nouvel état `{ value, at }` et vrai si la garde cède.
----@param state table|nil
----@param weight integer
----@param now integer
----@param cfg table
----@param shield boolean
----@return { value: integer, at: integer } state
----@return boolean broken
-function defense.addPoints(state, weight, now, cfg, shield)
-    local rules = cfg.defense.guardBreak
-    local value = 0
-    if type(state) == 'table' and finite(state.value) and finite(state.at) and now - state.at < rules.resetMs then
-        value = state.value
-    end
-    value = value + (finite(weight) and weight or 1)
-    return { value = value, at = now }, value >= (shield and rules.shieldPoints or rules.points)
-end
-
---- Poids d'un coup bloqué : `heavyWeight` pour une technique `lourde`, sinon 1 (technique inconnue : 1).
+--- Poids d'un coup bloqué : `endurance.block.heavyWeight` pour une technique `lourde`, sinon 1 (technique inconnue : 1).
 ---@param def table|nil
 ---@param cfg table
 ---@return integer
 function defense.weightOf(def, cfg)
-    if type(def) == 'table' and def.type == 'lourde' then return cfg.defense.guardBreak.heavyWeight end
+    if type(def) == 'table' and def.type == 'lourde' then return cfg.endurance.block.heavyWeight end
     return 1
 end

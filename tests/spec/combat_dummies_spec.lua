@@ -1,5 +1,8 @@
 local helper = require('tests.helper')
 
+-- T-114 : états d'endurance envoyés au seul porteur (doublure bridge.Send)
+local staminaSent = {}
+
 -- Mannequins d'entraînement côté serveur (T-156, spec § 5.1, § 7.3 à § 7.9 et § 11.1) : règles pures de
 -- shared/dummies.lua, issue « comme si » (weapons.trialOutcome), part du serveur contrôlée (weapons.checkEngine), puis
 -- server/dummies.lua, swings.lua (relevés réels), api.lua avec des doublures du bridge (comme combat_use_spec) : coup
@@ -205,8 +208,16 @@ describe('vava_combat mannequins (serveur)', function()
         clock = target
     end
 
+    --- Réponse de swings.use. Geste accepté (T-114) : l'état d'endurance qui suit `true` (trois entiers bornés) est
+    --- contrôlé puis retiré ; ses valeurs sont essayées dans combat_endurance_spec.
     local function use(src, id, target)
-        return { swings.use(src, id, target or 0) }
+        local out = { swings.use(src, id, target or 0) }
+        if out[1] == true then
+            assert.equal(4, #out)
+            assert.is_not_nil(VavaCombat.endurance.read(out[2], out[3], out[4]))
+            return { true }
+        end
+        return out
     end
 
     local function sentOf(event)
@@ -254,6 +265,8 @@ describe('vava_combat mannequins (serveur)', function()
             'modules/vava_combat/shared/techniques.lua',
             'modules/vava_combat/shared/admission.lua',
             'modules/vava_combat/shared/defense.lua',
+            'modules/vava_combat/shared/endurance.lua',
+            'modules/vava_combat/shared/stamina.lua',
             'modules/vava_combat/shared/weapons.lua',
             'modules/vava_combat/shared/guard.lua',
         })
@@ -368,6 +381,14 @@ describe('vava_combat mannequins (serveur)', function()
             SetShieldField = function() end,
             ShieldField = function() return nil end,
             Timer = function() return clock end,
+            -- T-114 : faim et soif (vava_needs absent : facteur 1) ; état d'endurance au seul porteur
+            NeedsValues = function() return nil end,
+            Send = function(target, event, ...)
+                assert.equal('integer', math.type(target))
+                assert.is_true(target > 0)
+                staminaSent[#staminaSent + 1] = { target = target, event = event, args = { ... } }
+                return true
+            end,
         }
         helper.loadAll({
             'modules/vava_combat/server/catalog.lua',
@@ -378,6 +399,7 @@ describe('vava_combat mannequins (serveur)', function()
             'modules/vava_combat/server/hands.lua',
             'modules/vava_combat/server/reactions.lua',
             'modules/vava_combat/server/dummies.lua',
+            'modules/vava_combat/server/stamina.lua',
             'modules/vava_combat/server/defense.lua',
             'modules/vava_combat/server/swings.lua',
             'modules/vava_combat/server/api.lua',
@@ -425,6 +447,16 @@ describe('vava_combat mannequins (serveur)', function()
             at(480)
             assert.equal(1, #trials)
             assert.equal(1, #sent)
+        end)
+
+        -- T-114 : une Taille sur un mannequin coûte ce qu'elle coûte dans le vide ou sur un joueur (payée à l'acceptation)
+        it('endurance : la Taille sur le mannequin est payée comme une autre (880), rien n\'est rendu', function()
+            assert.same({ true, 880, 1000, 200 }, { swings.use(A, 'taille_descendante', 0) })
+            at(320)
+            assert.equal(1, #trials)
+            at(900)
+            assert.equal(880, VavaCombat.stamina.inspect(A).value)
+            assert.equal(0, #staminaSent)
         end)
 
         it('témoin C à 10 m : balancement seul ; à 20 m : rien', function()

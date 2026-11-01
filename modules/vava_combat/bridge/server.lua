@@ -10,7 +10,7 @@
            champ privé du bouclier accroché, hooks émis et écoutés (prise en main, mise à terre), RPC, droits et journal du Conseil (vava_admin), chat (vava_chat), envoi au seul joueur
            concerné (core.net.send), à une liste calculée par le serveur (proches d'une instance :
            core.net.playersNear, puis core.net.send à la liste, T-155) ou aux proches d'une instance
-           (core.net.sendNearWith), comptés. Chaque appel à une autre ressource est isolé (pcall) : un module absent ou
+           (core.net.sendNearWith), comptés ; faim et soif lues par vava_needs:get (endurance, T-114). Chaque appel à une autre ressource est isolé (pcall) : un module absent ou
            en erreur ne retire que la fonction concernée.
     Dépendances : shared/constants.lua, config.lua, server/core.lua
 ]]
@@ -32,13 +32,13 @@ local EVENTS = VavaCombat.EVENTS
 local SHIELD_FIELD = VavaCombat.SHIELD_FIELD
 local CONSOLE = 0
 local INVENTORY, HEALTH, ADMIN, CHAT = 'vava_inventory', 'vava_health', 'vava_admin', 'vava_chat'
-local CRAFTING, SKILLS, MAGIC = 'vava_crafting', 'vava_skills', 'vava_magic'
+local CRAFTING, SKILLS, MAGIC, NEEDS = 'vava_crafting', 'vava_skills', 'vava_magic', 'vava_needs'
 -- hooks d'autres modules écoutés par ce module (phase after)
 local HOLD_HOOK, DOWNED_HOOK, HIT_HOOK = 'vava_inventory:hold', 'vava_health:downed', 'vava_health:hit'
 local MODIFIERS_REGISTRY = 'vava_health:modifiers'
 -- une ligne de console par minute au plus pour un envoi de proximité refusé, une erreur de la magie
 local WARN_MS = 60000
--- export de la magie absent : plus cherché avant ce délai (vava_magic d'avant T-149)
+-- export de la magie (vava_magic d'avant T-149) ou des besoins absent : plus cherché avant ce délai
 local MAGIC_RETRY_MS = 60000
 -- nom d'un état de contrôle de la magie (gelé, renversé…) : identifiant court
 local STATE_MAX = 32
@@ -228,11 +228,15 @@ function Bridge.SendTo(list, event, ...)
     return true
 end
 
--- vava_magic sans export hardControl (avant T-149) : instant du dernier essai ; oublié quand vava_magic (re)démarre
--- (une version qui a l'export est relue aussitôt : relecture sécurité S-4 de T-149)
-local magicMissingAt = nil
+-- vava_magic sans export hardControl (avant T-149), vava_needs sans export get : instant du dernier essai ; oublié quand
+-- la ressource (re)démarre (une version qui a l'export est relue aussitôt : relecture sécurité S-4 de T-149)
+local magicMissingAt, needsMissingAt = nil, nil
 AddEventHandler('onResourceStart', function(resource)
-    if resource == MAGIC then magicMissingAt = nil end
+    if resource == MAGIC then
+        magicMissingAt = nil
+    elseif resource == NEEDS then
+        needsMissingAt = nil
+    end
 end)
 
 local function magicHardControl(source)
@@ -261,6 +265,34 @@ function Bridge.MagicHardControl(source)
     magicMissingAt = nil
     if type(state) ~= 'string' or state == '' then return nil end
     return sub(state, 1, STATE_MAX)
+end
+
+local function needsGet(source)
+    return exports[NEEDS]:get(source)
+end
+
+--- Besoins du personnage actif (`{ hunger, thirst, … }` de 0 à 100, lus en mémoire par vava_needs), ou nil : vava_needs
+--- absent, arrêté, sans export `get` (plus cherché pendant une minute, relu à son démarrage), refus, ou en erreur (une
+--- ligne de console par minute). Lu par l'endurance au plus une fois par `endurance.needsReadMs` et par combattant.
+---@param source integer
+---@return table|nil
+function Bridge.NeedsValues(source)
+    if GetResourceState(NEEDS) ~= 'started' then return nil end
+    local now = GetGameTimer()
+    if needsMissingAt and now - needsMissingAt < MAGIC_RETRY_MS then return nil end
+    local ok, values = pcall(needsGet, source)
+    if not ok then
+        local message = tostring(values)
+        if find(message, 'No such export', 1, true) then
+            needsMissingAt = now
+        else
+            warnLimited('needs', '%s.get en erreur : %s', NEEDS, message)
+        end
+        return nil
+    end
+    needsMissingAt = nil
+    if type(values) ~= 'table' then return nil end
+    return values
 end
 
 --- Vrai si le joueur est à terre (règle de vava_health) ; module absent ou en erreur : pas à terre.

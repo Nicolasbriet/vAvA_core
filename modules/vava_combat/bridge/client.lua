@@ -1,12 +1,12 @@
 --[[
     vava_combat/bridge/client.lua
-    Rôle : SEUL point de contact du client avec les autres modules : notification, chiffres des coups (vava_hud),
-           main du personnage local en cache, à terre. Chaque appel isolé.
+    Rôle : SEUL point de contact du client avec les autres modules : notification, chiffres des coups et jauge
+           d'endurance (vava_hud), main du personnage local en cache, à terre. Chaque appel isolé.
     Dépendances : shared/constants.lua, config_client.lua, client/core.lua
 ]]
 
 local type, pcall, tostring, ipairs = type, pcall, tostring, ipairs
-local GetResourceState, GetGameTimer = GetResourceState, GetGameTimer
+local GetResourceState, GetGameTimer, AddEventHandler = GetResourceState, GetGameTimer, AddEventHandler
 local BeginTextCommandThefeedPost, AddTextComponentSubstringPlayerName, EndTextCommandThefeedPostTicker =
     BeginTextCommandThefeedPost, AddTextComponentSubstringPlayerName, EndTextCommandThefeedPostTicker
 
@@ -53,6 +53,37 @@ function Bridge.HitText(side, anchor, issue, tenths)
     if hitTextWarnedAt and now - hitTextWarnedAt < WARN_MS then return end
     hitTextWarnedAt = now
     VavaCombat.log.warn('%s.hitText en erreur : %s', HUD, tostring(err))
+end
+
+local function hudGauge(fn, ...)
+    local hud = exports[HUD]
+    return hud[fn](hud, ...)
+end
+
+local gaugeWarnedAt = nil
+
+--- Jauge du HUD (`defineGauge`, `setGauge`, `removeGauge` de vava_hud) : vrai si le HUD l'a prise ; sans vava_hud :
+--- faux, rien (le combat ne change pas). Erreur ou refus du HUD : une ligne de console par minute.
+---@param fn string
+---@return boolean
+function Bridge.HudGauge(fn, ...)
+    if GetResourceState(HUD) ~= 'started' then return false end
+    local called, ok, code = pcall(hudGauge, fn, ...)
+    if called and ok == true then return true end
+    local now = GetGameTimer()
+    if not gaugeWarnedAt or now - gaugeWarnedAt >= WARN_MS then
+        gaugeWarnedAt = now
+        VavaCombat.log.warn('%s.%s : %s', HUD, tostring(fn), tostring(called and code or ok))
+    end
+    return false
+end
+
+--- Prévient `handler()` à chaque (re)démarrage de vava_hud (évènement local : ses jauges sont à redéclarer).
+---@param handler fun()
+function Bridge.OnHudRestart(handler)
+    AddEventHandler('onClientResourceStart', function(resource)
+        if resource == HUD then handler() end
+    end)
 end
 
 -- Main du personnage local ---------------------------------------------------------------------------------------

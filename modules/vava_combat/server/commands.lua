@@ -1,13 +1,14 @@
 --[[
     vava_combat/server/commands.lua
     Rôle : commandes du Conseil `/armes liste | voir <n°> | user <n°> <points>` (droit `metiers` de vava_admin, sinon
-           ACE `combat.admin`, revérifié à chaque appel ; console admise) et leur déclaration au registre
+           ACE `combat.admin`, revérifié à chaque appel ; console admise ; `voir` montre aussi l'endurance, sans la
+           changer) et leur déclaration au registre
            `core:commands` (chapitre « Combat »), avec les touches du combat (attaques, verrou, garde,
            pas de côté ; config_client.lua → keys). `voir` et `user` sont inscrits au journal du Registre ; `user` ne fait
            que BAISSER la solidité (la garde de l'artisanat refuserait toute remontée), seuils prévenus comme une usure.
            Réponses au seul lanceur (vava_chat, sinon notification ; console : print).
     Dépendances : shared/constants.lua, config.lua, shared/weapons.lua, shared/shield.lua, server/core.lua,
-                  bridge/server.lua, server/catalog.lua, server/wear.lua, server/shields.lua
+                  bridge/server.lua, server/catalog.lua, server/wear.lua, server/shields.lua, server/stamina.lua
 ]]
 
 local type, tostring, tonumber, ipairs, pairs = type, tostring, tonumber, ipairs, pairs
@@ -19,6 +20,7 @@ local weapons = VavaCombat.weapons
 local catalog = VavaCombat.catalog
 local wear = VavaCombat.wear
 local shields = VavaCombat.shields
+local stamina = VavaCombat.stamina
 local cfg = VavaCombat.config
 local SHIELD = VavaCombat.SHIELD_CATEGORY
 local REGISTRY = 'core:commands'
@@ -34,7 +36,7 @@ local function entries()
             label = 'Armes du royaume', description = 'Les armes de corps à corps, l\'arme d\'un joueur, et son usure pour les essais.',
             actions = {
                 { id = 'liste', label = 'Liste des armes', description = 'Chaque arme, sa catégorie, son type, son coup et sa solidité.' },
-                { id = 'voir', label = 'Arme d\'un joueur', description = 'Arme en main et bouclier accroché (inscrit au journal).',
+                { id = 'voir', label = 'Arme d\'un joueur', description = 'Arme en main, bouclier accroché et endurance (inscrit au journal).',
                     args = { { name = 'joueur', type = 'player' } } },
                 { id = 'user', label = 'User une arme', description = 'Baisse la solidité de l\'arme en main (inscrit au journal).',
                     args = { { name = 'joueur', type = 'player' }, { name = 'points', type = 'integer', min = 1, max = admin.maxWear } } },
@@ -134,6 +136,10 @@ local function inspect(source, target)
             messages.positions[view.position] or view.position, view.durability, view.maxDurability))
         details.bouclier = view.item
     end
+    -- endurance (T-114) : lecture seule, en points
+    local gauge = stamina.inspect(target)
+    reply(source, format(messages.inspectEndurance, number(gauge.value / 10), number(gauge.rate / 10),
+        gauge.factor < 1 and messages.enduranceSlowed or ''))
     bridge.AdminLog(source, cfg.journal.inspect, details)
 end
 

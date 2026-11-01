@@ -2,7 +2,8 @@
     vava_combat/shared/weapons.lua
     Rôle : règles pures des armes, servies au seul serveur (server_scripts) : contrôle du catalogue de la config au
            démarrage (classes de config_client.lua et fiches de config.lua), contrôle des techniques et des styles
-           (format de COMBAT_V1.md § 3) et des réglages du moteur, qualité lue et facteur de dégâts, solidité lue
+           (format de COMBAT_V1.md § 3) et des réglages du moteur (endurance et sa jauge du HUD comprises, T-114),
+           qualité lue et facteur de dégâts, solidité lue
            (émoussée ou non), montant d'un coup, chance et pas d'usure, coup qui use (d'après le résultat de
            vava_health:hit), issue d'un coup montrée aux proches, montant envoyé aux deux participants (dixièmes,
            T-155), contrôle des mannequins et issue « comme si » d'un coup sur l'un d'eux (T-156), options d'un appel à `strike`, paquet `hit`, raison
@@ -585,14 +586,95 @@ local function defenseError(d)
         return 'defense.block : tags (1 à 8 étiquettes) et shieldArcBonus (0 à 90) attendus'
     end
     if not tagList(d.parryTags) then return 'defense.parryTags : 1 à 8 étiquettes attendues' end
-    local gb = d.guardBreak
-    if type(gb) ~= 'table' or integerIn(gb.points, 1, 20) == nil or integerIn(gb.shieldPoints, 1, 20) == nil
-        or integerIn(gb.heavyWeight, 1, 10) == nil or integerIn(gb.resetMs, 500, 30000) == nil then
-        return 'defense.guardBreak : points et shieldPoints (1 à 20), heavyWeight (1 à 10), resetMs (500 à 30 000) attendus'
-    end
     if integerIn(d.modifierPriority, 0, 99) == nil then return 'defense.modifierPriority entier de 0 à 99 attendu' end
     if integerIn(d.memoMax, 8, 512) == nil or integerIn(d.memoMs, 100, 10000) == nil then
         return 'defense : memoMax (8 à 512) et memoMs (100 à 10 000) entiers attendus'
+    end
+    return nil
+end
+
+-- endurance (T-114) : clés admises, paliers de faim et soif au plus
+local ENDURANCE_KEYS = { regenPerSecond = true, regenDelayMs = true, block = true, needs = true, needsReadMs = true }
+local ENDURANCE_BLOCK_KEYS = { heavyWeight = true, shieldFactor = true }
+local NEED_TIER_KEYS = { at = true, factor = true }
+local NEED_TIERS_MAX = 4
+local GAUGE_KEYS = { label = true, icon = true, order = true, low = true, critical = true, lingerMs = true, margin = true }
+-- bornes d'une jauge de vava_hud (une déclaration refusée par le HUD ne doit jamais arriver)
+local GAUGE_LABEL_MAX, GAUGE_ICON_MAX, GAUGE_ORDER_MAX = 32, 200, 1000
+local GAUGE_ICON_PREFIX = 'nui://vava_combat/'
+local REFUSAL_MAX = 200
+
+--- Endurance (T-114, config.lua) : recharge, coup bloqué, faim et soif. Rend nil ou la raison.
+---@param e any
+---@return string|nil err
+local function enduranceError(e)
+    if e == nil then
+        return "config.lua : réglage `endurance` absent (fichier d'avant 1.6.0 gardé par une mise à jour ?) : reportez "
+            .. 'vos changements depuis config.lua.nouveau'
+    end
+    if type(e) ~= 'table' then return 'endurance : table attendue' end
+    local extra = extraKey(e, ENDURANCE_KEYS)
+    if extra ~= nil then return format("endurance : clé inconnue '%s'", tostring(extra)) end
+    if not between(e.regenPerSecond, 1, 100) then return 'endurance.regenPerSecond attendu de 1 à 100' end
+    if integerIn(e.regenDelayMs, 0, VavaCombat.ENDURANCE_REST_MAX) == nil then
+        return 'endurance.regenDelayMs entier de 0 à 10 000 attendu'
+    end
+    local b = e.block
+    if type(b) ~= 'table' or extraKey(b, ENDURANCE_BLOCK_KEYS) ~= nil or integerIn(b.heavyWeight, 1, 5) == nil
+        or not between(b.shieldFactor, 0.1, 1) then
+        return 'endurance.block : { heavyWeight (entier de 1 à 5), shieldFactor (0,1 à 1) } attendu'
+    end
+    if not pureList(e.needs, NEED_TIERS_MAX) then
+        return format('endurance.needs : liste pure de %d paliers au plus attendue', NEED_TIERS_MAX)
+    end
+    for i, tier in ipairs(e.needs) do
+        if type(tier) ~= 'table' or extraKey(tier, NEED_TIER_KEYS) ~= nil or integerIn(tier.at, 0, 100) == nil
+            or not between(tier.factor, 0.1, 1) then
+            return format('endurance.needs[%d] : { at (entier de 0 à 100), factor (0,1 à 1) } attendu', i)
+        end
+    end
+    if integerIn(e.needsReadMs, 1000, 300000) == nil then
+        return 'endurance.needsReadMs entier de 1 000 à 300 000 attendu'
+    end
+    return nil
+end
+
+--- Jauge d'endurance du HUD (T-114, config_client.lua) : bornes de vava_hud reprises. Rend nil ou la raison.
+---@param g any
+---@return string|nil err
+local function gaugeError(g)
+    if g == nil then
+        return "config_client.lua : réglage `gauge` absent (fichier d'avant 1.6.0 gardé par une mise à jour ?) : "
+            .. 'reportez vos changements depuis config_client.lua.nouveau'
+    end
+    if type(g) ~= 'table' then return 'gauge : table attendue' end
+    local extra = extraKey(g, GAUGE_KEYS)
+    if extra ~= nil then return format("gauge : clé inconnue '%s'", tostring(extra)) end
+    if not text(g.label, GAUGE_LABEL_MAX) then return format('gauge.label attendu (1 à %d octets)', GAUGE_LABEL_MAX) end
+    if not text(g.icon, GAUGE_ICON_MAX) or g.icon:sub(1, #GAUGE_ICON_PREFIX) ~= GAUGE_ICON_PREFIX then
+        return format('gauge.icon attendu : image du module (%s…, %d octets au plus)', GAUGE_ICON_PREFIX, GAUGE_ICON_MAX)
+    end
+    if mathType(g.order) ~= 'integer' or g.order < 0 or g.order > GAUGE_ORDER_MAX then
+        return 'gauge.order entier de 0 à 1 000 attendu'
+    end
+    if not between(g.low, 0, 1) or not between(g.critical, 0, 1) or g.critical > g.low then
+        return 'gauge : low et critical attendus de 0 à 1, critical ≤ low'
+    end
+    if integerIn(g.lingerMs, 0, 30000) == nil then return 'gauge.lingerMs entier de 0 à 30 000 attendu' end
+    if not between(g.margin, 0, 10) then return 'gauge.margin attendu de 0 à 10' end
+    return nil
+end
+
+--- Textes des refus (config_client.lua) : chaque valeur est une chaîne de 200 octets au plus ou `false`. Rend nil ou
+--- la raison.
+---@param r any
+---@return string|nil err
+local function refusalsError(r)
+    if type(r) ~= 'table' then return 'refusals : table attendue' end
+    for code, message in pairs(r) do
+        if type(code) ~= 'string' or (message ~= false and not text(message, REFUSAL_MAX)) then
+            return format("refusals.%s : texte de 1 à %d octets ou false attendu", tostring(code), REFUSAL_MAX)
+        end
     end
     return nil
 end
@@ -718,11 +800,12 @@ local function dummiesError(d)
 end
 
 --- Contrôle des réglages du moteur (cycle, tolérances bornées, géométrie, bond, réactions, dégainer, chancellement,
---- contrôles de GTA coupés en mode combat : jamais Échap ni P ; défense ; part du serveur des mannequins).
---- Rend `true`, ou `false, raison` à la première erreur.
+--- contrôles de GTA coupés en mode combat : jamais Échap ni P ; défense ; endurance et sa jauge ; textes des refus ;
+--- part du serveur des mannequins). Rend `true` (et un avertissement pour un réglage retiré encore présent), ou
+--- `false, raison` à la première erreur.
 ---@param cfg table
 ---@return boolean ok
----@return string|nil err
+---@return string|nil err_or_warning
 function weapons.checkEngine(cfg)
     local limits = type(cfg.rateLimits) == 'table' and cfg.rateLimits or {}
     if not rateLimit(limits.use) then
@@ -793,6 +876,13 @@ function weapons.checkEngine(cfg)
     end
     err = dummiesError(cfg.dummies)
     if err then return false, err end
+    err = enduranceError(cfg.endurance) or gaugeError(cfg.gauge) or refusalsError(cfg.refusals)
+    if err then return false, err end
+    -- compteur provisoire de T-113 gardé par un ancien config.lua : sans effet, signalé
+    if cfg.defense.guardBreak ~= nil then
+        return true, "réglage `defense.guardBreak` retiré en 1.6.0 : la garde cède quand l'endurance est vide "
+            .. '(config.endurance)'
+    end
     return true
 end
 

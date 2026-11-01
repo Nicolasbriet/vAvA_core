@@ -1,12 +1,13 @@
 --[[
     vava_combat/server/swings.lua
     Rôle : un coup de technique, décidé par le serveur (docs/plan/specs/T-112.md § 7.1, § 7.5 ; geste défensif :
-           T-113 § 7.1). Handler du RPC `vava_combat:use(technique, cible)` : refus en mémoire d'abord (technique, type,
-           chancellement, dégainer, garde brisée, délais de la parade et du pas de côté, admission : délai,
-           enchaînement, garde levée), puis le coup est RÉSERVÉ (il tient la place du coup en cours) avant
-           tout appel qui pourrait céder la main : exports (personnage, arme RÉELLEMENT tenue, style de l'arme, à
-           terre, véhicule, contrôle de la magie, crochet `vava_combat:using`, position) ; un refus rend la place au
-           coup d'avant, tel quel ; deux demandes simultanées ne passent donc jamais toutes les deux, même si un
+           T-113 § 7.1 ; endurance : T-114 § 7.1). Handler du RPC `vava_combat:use(technique, cible)` : refus en
+           mémoire d'abord (technique, type, chancellement, dégainer, garde brisée, délais de la parade et du pas de
+           côté, endurance, admission : délai, enchaînement, garde levée), puis le coup est RÉSERVÉ (il tient la place
+           du coup en cours) avant tout appel qui pourrait céder la main : exports (personnage, faim et soif de
+           l'endurance, arme RÉELLEMENT tenue, style de l'arme, à terre, véhicule, contrôle de la magie, crochet
+           `vava_combat:using`, position) ; au dernier pas, en mémoire, l'endurance est revérifiée puis dépensée (un
+           geste refusé ne coûte rien) ; un refus rend la place au coup d'avant, tel quel ; deux demandes simultanées ne passent donc jamais toutes les deux, même si un
            crochet cède la main. Un coup annulé, quelle qu'en soit la cause (chancellement, à terre, main changée,
            véhicule, bond, départ), garde son cycle : récupération et compte d'enchaînement comptent comme s'il était
            allé au bout (s'annuler soi-même ne libère jamais plus tôt ; une garde annulée est fermée avec sa tenue
@@ -21,13 +22,13 @@
            joueur n'a été frappé, un mannequin d'entraînement peut l'être (server/dummies.lua, T-156 : mêmes portée,
            angle, hauteur, instance ; un seul par coup ; il ne compte pas dans `maxTargets` : un joueur entré dans
            l'arc au relevé suivant est encore frappé). Rien n'est
-           rendu au client que l'acceptation ou le refus : aucun résultat. N'attend jamais lui-même (aucune attente,
+           rendu au client que l'acceptation ou le refus, avec l'état de sa propre jauge d'endurance : aucun résultat. N'attend jamais lui-même (aucune attente,
            aucune base, aucun callClient) ; s'il est repris après un crochet ou un export qui a cédé la main, il
            revérifie que sa réservation tient toujours.
     Dépendances : shared/constants.lua, config_client.lua, config.lua, shared/weapons.lua, shared/geometry.lua,
                   shared/techniques.lua, shared/admission.lua, shared/defense.lua, server/core.lua, bridge/server.lua,
                   server/catalog.lua, server/strike.lua, server/hands.lua, server/reactions.lua, server/dummies.lua,
-                  server/defense.lua
+                  server/stamina.lua, server/defense.lua
 ]]
 
 local type, pairs, ipairs, tostring, pcall = type, pairs, ipairs, tostring, pcall
@@ -43,6 +44,7 @@ local strike = VavaCombat.strike
 local hands = VavaCombat.hands
 local reactions = VavaCombat.reactions
 local defense = VavaCombat.defense
+local stamina = VavaCombat.stamina
 local dummies = VavaCombat.dummies
 local cfg = VavaCombat.config
 local HOOKS = VavaCombat.HOOKS
@@ -252,6 +254,8 @@ local function confirm(src, swing, target)
     local id, def = swing.id, swing.def
     local characterId = bridge.ActiveCharacterId(src)
     if not characterId then return false, 'no_character' end
+    -- jauge du personnage actif, faim et soif relues au plus une fois par needsReadMs (export, phase des exports)
+    stamina.prepare(src, characterId, bridge.Timer())
     local held = bridge.Held(src)
     local item = held and held.item
     local weapon = catalog.weapon(item)
@@ -289,18 +293,24 @@ local function confirm(src, swing, target)
     swing.style, swing.item, swing.instanceId, swing.characterId = style, item, held.id, characterId
     swing.target, swing.origin = target, { x = x, y = y, z = z }
     if attack then swing.arc = geometry.arcOf(def, weapon, cfg) end
+    -- dernier pas, en mémoire, rien ne cède la main après : endurance revérifiée (un coup bloqué a pu la vider pendant
+    -- un crochet) puis dépensée (garde : exigée, pas dépensée)
+    local paid, wait = stamina.take(src, def, bridge.Timer(), characterId)
+    if not paid then return false, 'exhausted', wait end
     return true
 end
 
---- Handler du RPC `vava_combat:use` (arguments déjà validés par le schéma). Rend `true` (coup accepté, fenêtre
---- programmée ; geste défensif : fenêtre ouverte), `false, code`, `false, code, attente` (busy, chain_limit, drawing,
---- staggered, guard_broken, parry_cooldown, dodge_cooldown) ou `false, 'refused', raison`.
+--- Handler du RPC `vava_combat:use` (arguments déjà validés par le schéma). Rend `true, value, restIn, rate` (coup
+--- accepté, fenêtre programmée ; geste défensif : fenêtre ouverte ; état de la jauge d'endurance après la dépense),
+--- `false, code`, `false, code, attente` (busy, chain_limit, drawing, staggered, guard_broken, parry_cooldown,
+--- dodge_cooldown), `false, 'exhausted', attente, value, restIn, rate` ou `false, 'refused', raison`.
 ---@param src integer
 ---@param id string
 ---@param target integer
 ---@return boolean ok
 ---@return string|nil code
 ---@return integer|string|nil detail
+---@return integer|nil ...  état de la jauge (value, restIn, rate)
 function swings.use(src, id, target)
     -- refus en mémoire d'abord
     if not VavaCombat.ready then return false, 'not_ready' end
@@ -314,6 +324,9 @@ function swings.use(src, id, target)
     if drawing then return false, 'drawing', drawing end
     local refusal, refusalWait = defense.refusal(src, def, now)
     if refusal then return false, refusal, refusalWait end
+    -- endurance (T-114, ligne 8 bis) : coût payable, en mémoire, avant la réservation et tout export
+    local tired, tiredWait = stamina.refusal(src, def, now)
+    if tired then return false, tired, tiredWait, stamina.wire(src, now) end
     -- le dernier coup compte même annulé (quelle qu'en soit la cause) : récupération et enchaînement comme s'il était
     -- allé au bout ; s'annuler soi-même (bond, véhicule, arme changée) ne libère jamais plus tôt
     local prev = current[src]
@@ -348,6 +361,7 @@ function swings.use(src, id, target)
         -- cette réservation : rien n'est rendu à un joueur oublié ni par-dessus une autre réservation)
         swing.pending, swing.refused = nil, true
         if current[src] == swing then current[src] = standing(swing.prev) end
+        if code == 'exhausted' then return false, code, detail, stamina.wire(src, bridge.Timer()) end
         return false, code, detail
     end
     swing.pending, swing.prev = nil, nil
@@ -355,7 +369,7 @@ function swings.use(src, id, target)
     local accepted = bridge.Timer()
     defense.onAccepted(src, swing, accepted)
     -- geste défensif : aucune minuterie, sa fenêtre est une paire d'instants comparée à l'horloge quand un coup arrive
-    if not ATTACKS[def.type] then return true end
+    if not ATTACKS[def.type] then return true, stamina.wire(src, accepted) end
     -- le cycle part de l'arrivée de la demande : le temps passé en suspens (0 d'ordinaire) est déduit des minuteries
     local late = accepted - now
     local phases = def.phases
@@ -363,7 +377,7 @@ function swings.use(src, id, target)
     if cfg.timing.samples == 2 then
         SetTimeout(max(0, phases.windup + phases.active - late), function() sample(swing, 2) end)
     end
-    return true
+    return true, stamina.wire(src, accepted)
 end
 
 --- Mise à terre (hook vava_health:downed) : coup en cours annulé.

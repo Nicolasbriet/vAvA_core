@@ -1,7 +1,7 @@
 --[[
     vava_combat/shared/constants.lua
     Rôle : table du module (seule globale) et constantes de protocole : RPC, évènements, bouclier accroché, hooks,
-           catégories, types de techniques, issues, bornes et motifs.
+           catégories, types de techniques, issues, bornes et motifs (endurance comprise).
     Dépendances : aucune
 ]]
 
@@ -19,6 +19,8 @@ VavaCombat.EVENTS = {
     HIT = 'vava_combat:hit',            -- attaquant, cible, issue[, dixièmes|false] : à 30 m de la cible, même instance
     -- mannequin, attaquant[, issue, dixièmes|false] : issue à l'attaquant, balancement seul aux témoins à 15 m (T-156)
     DUMMY = 'vava_combat:dummy',
+    -- dixièmes, ms avant la recharge, dixièmes / s : au SEUL porteur de la jauge, changée hors de sa demande (T-114)
+    STAMINA = 'vava_combat:stamina',
 }
 
 -- Statebag du ped du porteur d'un bouclier accroché : { id, item } ou rien, écrit et gardé par le serveur.
@@ -72,4 +74,8 @@ VavaCombat.MAX_PLAYER = 65535                  -- plus grand numéro de joueur (
 VavaCombat.TENTHS_MAX = 2000                   -- montant d'un coup en dixièmes (4e valeur de HIT, T-155)
 VavaCombat.MAX_REASON = 120                    -- octets d'une raison de refus d'un crochet, montrée au joueur
 VavaCombat.MAX_DUMMIES = 64                    -- mannequins d'entraînement au plus (numéro `n` de vava_combat:dummy)
+-- jauge d'endurance (T-114) : état reçu (vava_combat:stamina, réponse de vava_combat:use), bornes lues par le client
+VavaCombat.ENDURANCE_MAX = 1000                -- dixièmes de point (100 points)
+VavaCombat.ENDURANCE_REST_MAX = 10000          -- ms avant la reprise de la recharge, au plus
+VavaCombat.ENDURANCE_RATE_MAX = 1000           -- dixièmes par seconde, au plus
 

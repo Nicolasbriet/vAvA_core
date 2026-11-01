@@ -341,6 +341,8 @@ function catalog.setup()
     for _, line in ipairs(warnings) do VavaCombat.log.warn('%s', line) end
     ok, err = weapons.checkEngine(cfg)
     if not ok then return false, 'config : ' .. tostring(err) end
+    -- réglage retiré gardé par un ancien config.lua : une ligne de console, module prêt
+    if err then VavaCombat.log.warn('%s', err) end
     build()
     local kinds = bridge.HealthKinds()
     if not kinds then

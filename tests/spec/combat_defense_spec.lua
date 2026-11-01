@@ -34,6 +34,8 @@ local function loadPure()
         'modules/vava_combat/shared/heading.lua',
         'modules/vava_combat/shared/geometry.lua',
         'modules/vava_combat/shared/defense.lua',
+        'modules/vava_combat/shared/endurance.lua',
+        'modules/vava_combat/shared/stamina.lua',
     })
     return VavaCombat.defense, VavaCombat.config
 end
@@ -154,29 +156,52 @@ describe('vava_combat défense : règles pures', function()
         assert.is_nil(defense.dodgeWait(nil, 1, cfg))
     end)
 
-    it('addPoints : 4 coups (6 au bouclier), un lourd en vaut 2, remis à zéro après 3 s sans coup', function()
+    -- T-114 : le compteur provisoire de T-113 (addPoints) est remplacé par l'endurance, aux mêmes seuils
+    it('drain : 4 coups (6 au bouclier), un lourd en vaut 2 ; 3 s sans coup : la recharge rend 40', function()
+        local stamina = VavaCombat.stamina
+        local guard = cfg.techniques.garde_epee
+        local light = stamina.blockCost(guard, defense.weightOf(cfg.techniques.taille_descendante, cfg), false, cfg)
+        local heavy = stamina.blockCost(guard, defense.weightOf(cfg.techniques.fendant, cfg), false, cfg)
+        local lightShield = stamina.blockCost(guard, 1, true, cfg)
+        local heavyShield = stamina.blockCost(guard, 2, true, cfg)
+        assert.same({ 250, 500, 168, 335 }, { light, heavy, lightShield, heavyShield })
         local state, broken = nil, false
         for i = 1, 3 do
-            state, broken = defense.addPoints(state, 1, i * 100, cfg, false)
+            state, broken = stamina.drain(state, light, i * 100, cfg)
             assert.is_false(broken)
         end
-        state, broken = defense.addPoints(state, 1, 400, cfg, false)
+        state, broken = stamina.drain(state, light, 400, cfg)
         assert.is_true(broken)
-        state = defense.addPoints(nil, defense.weightOf(cfg.techniques.fendant, cfg), 0, cfg, false)
-        assert.equal(2, state.value)
-        assert.is_true(select(2, defense.addPoints(state, 2, 1550, cfg, false)))
+        assert.equal(0, state.value)
+        -- deux Fendants à moins d'1 s (aucune recharge entre eux) : le second brise
+        state = stamina.drain(nil, heavy, 0, cfg)
+        assert.equal(500, state.value)
+        assert.is_true(select(2, stamina.drain(state, heavy, 900, cfg)))
+        -- 1,55 s plus tard (un seul attaquant), 0,55 s de recharge : le second tient (reste 11)
+        local later, held = stamina.drain(state, heavy, 1550, cfg)
+        assert.same({ 110, false }, { later.value, held })
+        -- au bouclier : 6 coups légers, 3 Fendants
         state = nil
         for i = 1, 5 do
-            state, broken = defense.addPoints(state, 1, i * 100, cfg, true)
+            state, broken = stamina.drain(state, lightShield, i * 100, cfg)
             assert.is_false(broken)
         end
-        assert.is_true(select(2, defense.addPoints(state, 1, 600, cfg, true)))
+        assert.equal(160, state.value)
+        assert.is_true(select(2, stamina.drain(state, lightShield, 600, cfg)))
         state = nil
-        for i = 1, 3 do state = defense.addPoints(state, 1, i * 100, cfg, false) end
-        state, broken = defense.addPoints(state, 1, 3300, cfg, false)
-        assert.same({ 1, false }, { state.value, broken })
+        for i = 1, 2 do
+            state, broken = stamina.drain(state, heavyShield, i * 100, cfg)
+            assert.is_false(broken)
+        end
+        assert.is_true(select(2, stamina.drain(state, heavyShield, 300, cfg)))
+        -- trois coups, puis 3 s sans coup : 1 s de répit, 2 s à 20 / s → + 40 ; la garde tient de nouveau
+        state = nil
+        for i = 1, 3 do state = stamina.drain(state, light, i * 100, cfg) end
+        state, broken = stamina.drain(state, light, 3300, cfg)
+        assert.same({ 400, false }, { state.value, broken })
         assert.equal(1, defense.weightOf(cfg.techniques.taille_descendante, cfg))
         assert.equal(1, defense.weightOf(nil, cfg))
+        assert.is_nil(defense.addPoints)
     end)
 end)
 
@@ -184,7 +209,7 @@ describe('vava_combat défense (serveur)', function()
     local cfg, swings, defense, reactions, hands
     local clock, timers, active, positions, headings, buckets, downed, vehicles, held, piles, magic, hung
     local hits, sent, notifies, befores, beforeAnswer, afters, patches, logs, calls, itemDefs
-    local registry, registryExists, hitAfter, hitSeq, inChain, downOnHit
+    local registry, registryExists, hitAfter, hitSeq, inChain, downOnHit, staminaSent
     local realRandom = math.random
     local STUBBED = { 'SetTimeout', 'GetGameTimer', 'exports', 'GetInvokingResource', 'Wait' }
     local COUNTED = { 'ActiveCharacterId', 'Held', 'IsDowned', 'InVehicle', 'MagicHardControl', 'Position', 'Heading',
@@ -216,8 +241,16 @@ describe('vava_combat défense (serveur)', function()
         clock = target
     end
 
+    --- Réponse de swings.use. Geste accepté (T-114) : l'état d'endurance qui suit `true` (trois entiers bornés) est
+    --- contrôlé puis retiré ; ses valeurs sont essayées dans combat_endurance_spec.
     local function use(src, id, target)
-        return { swings.use(src, id, target or 0) }
+        local out = { swings.use(src, id, target or 0) }
+        if out[1] == true then
+            assert.equal(4, #out)
+            assert.is_not_nil(VavaCombat.endurance.read(out[2], out[3], out[4]))
+            return { true }
+        end
+        return out
     end
 
     local function nativeCalls()
@@ -300,6 +333,7 @@ describe('vava_combat défense (serveur)', function()
         hits, sent, notifies, befores, beforeAnswer, afters, patches = {}, {}, {}, {}, nil, {}, {}
         logs, calls = { warn = {}, info = {} }, {}
         registry, registryExists, hitAfter, hitSeq, inChain, downOnHit = {}, true, nil, 0, false, {}
+        staminaSent = {}
         itemDefs = { epee_courte = { label = 'Épée courte', stack = 1, held = { model = 'w_me_machette_lr' } } }
 
         _G.GetGameTimer = function() return clock end
@@ -318,6 +352,8 @@ describe('vava_combat défense (serveur)', function()
             'modules/vava_combat/shared/techniques.lua',
             'modules/vava_combat/shared/admission.lua',
             'modules/vava_combat/shared/defense.lua',
+            'modules/vava_combat/shared/endurance.lua',
+            'modules/vava_combat/shared/stamina.lua',
             'modules/vava_combat/shared/weapons.lua',
             'modules/vava_combat/shared/guard.lua',
         })
@@ -452,6 +488,14 @@ describe('vava_combat défense (serveur)', function()
             SetShieldField = function() end,
             ShieldField = function() return nil end,
             Timer = function() return clock end,
+            -- T-114 : faim et soif (vava_needs absent : facteur 1) ; état d'endurance au seul porteur
+            NeedsValues = function() return nil end,
+            Send = function(target, event, ...)
+                assert.equal('integer', math.type(target))
+                assert.is_true(target > 0)
+                staminaSent[#staminaSent + 1] = { target = target, event = event, args = { ... } }
+                return true
+            end,
         }
         for _, name in ipairs(COUNTED) do
             local fn = bridge[name]
@@ -469,6 +513,7 @@ describe('vava_combat défense (serveur)', function()
             'modules/vava_combat/server/strike.lua',
             'modules/vava_combat/server/hands.lua',
             'modules/vava_combat/server/reactions.lua',
+            'modules/vava_combat/server/stamina.lua',
             'modules/vava_combat/server/defense.lua',
             'modules/vava_combat/server/swings.lua',
             'modules/vava_combat/server/api.lua',
@@ -712,12 +757,21 @@ describe('vava_combat défense (serveur)', function()
             assert.is_false(defense.open(swings.of(B), clock))
             assert.equal(1200, reactions.staggeredLeft(B, clock))
             assert.equal('break', afters[4].payload.outcome)
+            -- T-114 : un état d'endurance par coup bloqué, au SEUL défenseur ; à 0 au quatrième
+            assert.equal(4, #staminaSent)
+            for i, entry in ipairs(staminaSent) do
+                assert.same({ target = B, event = 'vava_combat:stamina' }, { target = entry.target, event = entry.event })
+                assert.same({ 1000 - 250 * i, 1000, 200 }, entry.args)
+            end
             at(3020 + 1199)
             -- le chancellement passe en premier (même durée) ; oublié, la garde brisée reste
             assert.same({ false, 'staggered', 1 }, use(B, 'garde_epee'))
             reactions.onDowned(B)
             assert.same({ false, 'guard_broken', 1 }, use(B, 'garde_epee'))
             assert.same({ false, 'guard_broken', 1 }, use(B, 'parade_epee'))
+            -- la garde brisée ne retient pas le pas de côté ; l'endurance vide, si (199 ms de recharge : 3,9 points)
+            assert.same({ false, 'exhausted', 801, 39, 0, 200 }, use(B, 'pas_de_cote'))
+            VavaCombat.stamina.forget(B)
             assert.same({ true }, use(B, 'pas_de_cote'))
             swings.forget(B)
             at(3020 + 1200)
@@ -725,16 +779,44 @@ describe('vava_combat défense (serveur)', function()
         end)
 
         it('deux Fendants bloqués : le premier sans chancellement (block), le second brise la garde', function()
+            -- T-114 : le second tombe moins d'1 s après le premier (aucune recharge) : C, à côté de A, frappe aussi
+            positions[C], headings[C] = { 1, 0, 0 }, 26.6      -- à 1 m de A (au-delà du contact), tourné vers B
+            arm(C, 30, 'epee_courte')
             raise(0)
             use(A, 'fendant', B)
+            at(300)
+            use(C, 'fendant', B)
+            -- issues reçues par B (C, attaquant à son tour, est aussi témoin du premier coup)
+            local function toB()
+                local out = {}
+                for _, entry in ipairs(sent) do
+                    for _, id in ipairs(entry.list) do
+                        if id == B then out[#out + 1] = entry.args[3] end
+                    end
+                end
+                return out
+            end
             at(650)
             assert.same({ 8.6, 13.0 }, { lastHit().blocked, tenth(lastHit().applied) })
-            assert.same({ 'block' }, outcomes())
+            assert.same({ 'block' }, toB())
             assert.is_nil(reactions.staggeredLeft(B, clock))
-            at(1550)
-            use(A, 'fendant', B)
-            at(2200)
-            assert.same({ 'block', 'break' }, outcomes())
+            at(950)
+            assert.same({ 'block', 'break' }, toB())
+            assert.equal(0, VavaCombat.stamina.inspect(B).value)
+            assert.equal(1200, reactions.staggeredLeft(B, clock))
+        end)
+
+        it('T-114 : un seul attaquant, Fendants à 1,55 s : 0,55 s de recharge entre eux, la garde cède au troisième',
+            function()
+            raise(0)
+            for k = 0, 2 do
+                at(k * 1550)
+                assert.same({ true }, use(A, 'fendant', B))
+                at(k * 1550 + 650)
+            end
+            assert.same({ 'block', 'block', 'break' }, outcomes())
+            assert.same({ { 500, 1000, 200 }, { 110, 1000, 200 }, { 0, 1000, 200 } },
+                { staminaSent[1].args, staminaSent[2].args, staminaSent[3].args })
         end)
 
         it('coup bloqué qui met B à terre : issue down, compteur inchangé', function()
@@ -750,15 +832,25 @@ describe('vava_combat défense (serveur)', function()
             at(3020)
             assert.same({ 'block', 'block', 'block', 'down' }, outcomes())
             assert.is_nil(defense.brokenLeft(B, clock))
+            -- T-114 : rien n'est dépensé pour le coup qui met à terre (250 restent, aucun envoi de plus)
+            assert.equal(250, VavaCombat.stamina.inspect(B).value)
+            assert.equal(3, #staminaSent)
             downOnHit[B] = nil
             at(3600)
             use(A, 'taille_descendante', B)
             at(3920)
-            assert.equal('break', outcomes()[5])
+            -- 0,8 s de recharge depuis le dernier coup bloqué (2 120 + 1 000) : 410 − 250, la garde tient
+            assert.equal('block', outcomes()[5])
+            assert.equal(160, VavaCombat.stamina.inspect(B).value)
+            at(4500)
+            use(A, 'taille_descendante', B)
+            at(4820)
+            assert.equal('break', outcomes()[6])
         end)
 
-        it('defense.spend remplaçable : une doublure qui brise dès le premier coup → break', function()
-            defense.spend = function() return true, true end
+        it('stamina.block remplaçable (T-114, à la place de defense.spend) : une doublure qui brise dès le premier coup '
+            .. '→ break', function()
+            VavaCombat.stamina.block = function() return true end
             raise(0)
             use(A, 'taille_descendante', B)
             at(320)
@@ -892,7 +984,8 @@ describe('vava_combat défense (serveur)', function()
             local co = request(B, 'garde_epee')
             at(20)
             assert.same({ true }, { defense.lowerRpc(B) })
-            assert.same({ true }, finish(co))
+            -- T-114 : garde acceptée, jauge inchangée (pleine)
+            assert.same({ true, 1000, 0, 200 }, finish(co))
             local guard = swings.of(B)
             assert.same({ 300, 550 }, { guard.closeAt - T0, guard.endAt - T0 })
         end)
@@ -1128,6 +1221,8 @@ describe('vava_combat défense : démarrage (server/main.lua)', function()
             'modules/vava_combat/shared/techniques.lua',
             'modules/vava_combat/shared/admission.lua',
             'modules/vava_combat/shared/defense.lua',
+            'modules/vava_combat/shared/endurance.lua',
+            'modules/vava_combat/shared/stamina.lua',
             'modules/vava_combat/shared/weapons.lua',
             'modules/vava_combat/shared/guard.lua',
             'modules/vava_combat/shared/dummies.lua',
@@ -1180,6 +1275,7 @@ describe('vava_combat défense : démarrage (server/main.lua)', function()
             'modules/vava_combat/server/hands.lua',
             'modules/vava_combat/server/reactions.lua',
             'modules/vava_combat/server/dummies.lua',
+            'modules/vava_combat/server/stamina.lua',
             'modules/vava_combat/server/defense.lua',
             'modules/vava_combat/server/swings.lua',
             'modules/vava_combat/server/api.lua',
