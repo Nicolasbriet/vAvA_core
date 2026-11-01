@@ -1215,8 +1215,14 @@ faire tout le système de combat ») : la porte T-119 reste à passer en jeu.
   par le crochet `vava_combat:using` ; XP de défense par le hook `vava_combat:defended`.
 - Laissé par T-156 : XP de combat sur un mannequin par le hook `vava_combat:trained` (`{ source, characterId, dummy, n,
   kind, technique?, item?, spell?, amount, outcome }`) tant que le niveau dans la compétence de l'arme est **sous**
-  `config.dummies.xpMaxLevel` (9, `vava_combat`) ; aucune XP de défense sur un mannequin ; mentorat (un apprenti qui
-  frappe un mannequin à côté de son maître pourrait dépasser le plafond) à décider.
+  `config.dummies.xpMaxLevel` (9, `vava_combat`) ; aucune XP de défense sur un mannequin ; mentorat : auprès de son
+  maître, l'apprenti progresse plus vite sous le plafond, sans le lever (au-delà, le maître se fait partenaire : la
+  Parade se gagne face à quelqu'un) ; à décider (relecture lore L-4).
+- Relecture sécurité de T-156 (S-4) : le point d'impact d'un projectile est annoncé par le client ; quand des XP seront
+  branchées sur `trained`, appliquer `xpMaxLevel`, un débit d'XP par personnage, et compter les éclats et la Nova (un
+  hook par mannequin touché) comme un seul gain.
+- Relecture lore de T-156 (L-9) : le maître pourrait voir les chiffres de son apprenti au mannequin (≈ 28 o par coup, à
+  lui seul).
 
 ### T-155 — Chiffres des coups (dégâts affichés)
 - Agents : vava-architecte → vava-dev-lua + vava-dev-nui (cette tâche autorise à toucher `vava_hud`, `vava_pause`, `vava_magic`) · Dépend de : T-112 (après T-113, même module) · Statut : à tester en jeu (relu sécurité, réseau et lore ; suites appliquées)
@@ -1248,7 +1254,7 @@ faire tout le système de combat ») : la porte T-119 reste à passer en jeu.
 
 ### T-156 — Mannequin d'entraînement
 - Agents : vava-architecte → vava-dev-lua (cette tâche autorise à toucher `vava_health`, `vava_magic`) · Dépend de : T-112 (après T-113, même module) ; T-102 pour le placement
-  par l'Atelier · Statut : en cours (fait ; relectures sécurité, réseau et lore à faire)
+  par l'Atelier · Statut : à tester en jeu (relu sécurité, réseau et lore ; suites appliquées)
 - Demande du porteur du projet (31 octobre 2026), « comme les MMO » : un mannequin de paille (modèle `-- PLACEHOLDER`)
   qu'on frappe dans une cour d'armes pour essayer ses techniques ; il encaisse sans jamais tomber, montre le montant de
   chaque coup (T-155), se « remet » seul ; coups d'arme et sorts.
@@ -1271,6 +1277,14 @@ faire tout le système de combat ») : la porte T-119 reste à passer en jeu.
   témoins à 15 m au plus un par mannequin et par 0,8 s ; exports `dummiesNear`, `dummyHit`, `dummies`), `vava_magic`
   2.14.0 (projectiles, éclats, Nova ardente et Secousse sur les mannequins). Procédure `combat` § 8 (28 tests).
   Relectures sécurité, réseau et lore à faire.
+- Fait le 2 novembre 2026 : relu sécurité (OK, 4 mineurs), réseau (R-1 important, 5 mineurs) et lore (à corriger,
+  mineur) ; suites appliquées, versions inchangées : un mannequin ne compte plus dans les adversaires d'un coup (au plus
+  un, aucun si un joueur a été frappé, S-1) ; aucun mannequin frappé par un lanceur posté en zone de paix (S-2) ; essai
+  du bouclier tenu (S-3) ; contrôle de la liste au seul serveur, le client n'en reçoit que l'index (R-1 : `vava_combat`
+  servi − 5,8 Ko bruts, − 1,7 Ko gzip) ; resmon d'un témoin (R-2) ; modèle qui ne se charge pas gardé sans prop jusqu'à
+  la sortie de portée (R-3) ; libellé au serveur, `hitText` en un appel (R-5) ; tailles comptées par `core.net` et coût au
+  pire (R-6) ; textes du README, de la spec et de la procédure (L-1 à L-6) ; notes à T-115 (S-4, L-4, L-9) et T-162 (R-4,
+  L-7, L-8). **À tester en jeu** : `docs/tests/combat.md` § 8 (28 tests).
 
 ### T-116 — La magie sur la chaîne de dégâts
 - Agent : vava-dev-lua · Dépend de : T-110 · Statut : à tester en jeu (relu sécurité et réseau, contre-relecture
@@ -1393,6 +1407,11 @@ faire tout le système de combat ») : la porte T-119 reste à passer en jeu.
   part à son seul auteur ; la liste quitte `config_client.lua` (≈ 80 o par mannequin servis aujourd'hui) pour
   `config.lua` ; `server/dummies.lua` garde son interface (`dummies.replace`). Numéro `n` donné par le serveur à la
   publication, gardé tant que l'`id` existe, jamais redonné pendant la vie du serveur.
+- Relecture réseau de T-156 (R-4) : les sorts appellent `vava_combat:dummiesNear` même loin de toute cour ; avec les
+  zones, la magie peut garder sa propre copie des places et ne rien demander hors d'une cour.
+- Relecture lore de T-156 : placer la cour sur la carte du royaume, dans le bourg, sur un passage, près de l'arrivée
+  des voyageurs (L-7) ; un mannequin qui s'use et se regarnit avec la paille d'un fermier et les poteaux d'un
+  menuisier, roussi par une Boule de feu (L-8).
 
 ## Phase 5 — Interactions RP
 

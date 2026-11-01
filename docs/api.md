@@ -2001,16 +2001,17 @@ défense oubliés), `vava_health:hit` (`after`, 1.3.0 : suites d'une défense) e
 
 **Mannequins d'entraînement** (1.5.0, T-156) : mannequins en config (`config_client.lua` → `dummies.list` :
 `{ id (^[a-z0-9_]+$, 32 octets, unique), x, y, z (pied), heading, model?, bucket?, label? }`, 64 au plus, contrôlés au
-démarrage ; modèle et places `-- PLACEHOLDER` ; numéro `n` = place dans la liste ; centre visé = pied + 1 m). Props
+démarrage par le seul serveur, le client ne fait qu'indexer la liste ; modèle et places `-- PLACEHOLDER` ; numéro `n` = place dans la liste ; centre visé = pied + 1 m). Props
 **locaux** chez chaque client, créés à 60 m, retirés au-delà de 70 m (boucle 0,5 s près, 2 s loin, personnage apparu
 seulement). Un relevé de technique voit un mannequin **après les joueurs** (un joueur dans l'arc est toujours frappé
-d'abord), avec les mêmes portée, angle, hauteur, instance et arme tenue ; une fois par coup, compté dans `maxTargets` ;
+d'abord), avec les mêmes portée, angle, hauteur, instance et arme tenue ; un seul par coup, aucun si un joueur a été
+frappé, jamais compté dans `maxTargets` (un joueur entré dans l'arc au relevé suivant est encore frappé) ;
 montant par `vava_health:trial` (même paquet qu'un coup sur un joueur, rien d'appliqué) ; Fendant → issue `stagger`
 montrée sans rien poser ; jamais `strike`, `hit`, réactions, défense ; frappable à l'arme en zone de paix ou combats
 coupés ; usure un coup sur quatre (`dummies.wearChance`) ; aucune XP. **Évènement** `vava_combat:dummy(n, attaquant[,
-issue, dixièmes|false])` (`core.net.send` à des listes) : à l'attaquant (≈ 28 o, un par coup qui atteint un mannequin),
+issue, dixièmes|false])` (`core.net.send` à des listes) : à l'attaquant (26 à 32 o, un par coup qui atteint un mannequin),
 issue et, si `numbers.enabled` et `numbers.attacker`, montant en dixièmes ou `false` pour un mot (absent sinon) ; aux
-joueurs à `witnessRadius` (15 m) du mannequin dans son instance, sans l'attaquant, `n` et l'attaquant seuls (≈ 22 o,
+joueurs à `witnessRadius` (15 m) du mannequin dans son instance, sans l'attaquant, `n` et l'attaquant seuls (20 à 23 o,
 balancement), au plus un par mannequin et par `witnessMinMs` (0,8 s). Client : balancement (boucle par image ≤ 0,9 s),
 éclats, chiffre `hitText('dealt', { x, y, z + 1,9 }, issue, dixièmes)` chez l'attaquant seul. **Hook**
 `vava_combat:trained` (`after`) : `{ source, characterId, dummy, n, kind = 'melee' | 'spell', technique?, item?, spell?,

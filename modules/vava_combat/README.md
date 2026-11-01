@@ -25,8 +25,9 @@ toujours un coup sans technique.
 Version 1.5.0 (T-156) : les **mannequins d'entraînement**. Dans la cour d'armes, des mannequins de paille attendent sur
 leur poteau : on y essaie une taille, un enchaînement, le Fendant, une Boule de feu ; le mannequin encaisse, se balance
 et se redresse seul, et le chiffre de chaque coup monte au-dessus de lui (chez celui qui frappe). Personne n'est blessé ;
-la lame s'use un peu, comme à l'exercice (un coup sur quatre). On y apprend les gestes seul ; on ne progresse pas
-au-delà sans un partenaire ou un maître (aucune XP ici ; T-115 la plafonnera). Spécification : `docs/plan/specs/T-156.md`.
+l'arme s'use un peu, comme à l'exercice (un coup sur quatre). On y répète seul ses gestes ; on ne progresse pas au-delà
+des premiers rangs sans un partenaire ou un maître (aucune XP ici ; T-115 la plafonnera au niveau 9). Spécification :
+`docs/plan/specs/T-156.md`.
 
 Ordre de démarrage : après `vAvA_core` (≥ 0.10.0 : `core.net`, registre `core:commands`), `vava_inventory`
 (≥ 1.7.0 : objet tenu et statebag de la main), `vava_health` (≥ 1.6.0 : chaîne de dégâts, coup d'essai des
@@ -87,8 +88,8 @@ balancement, éclats et liste dans `config_client.lua`, part du serveur (usure, 
 | Bond de l'attaquant (serveur) | 8 m/s + 0,5 m entre la demande et un relevé, sinon coup annulé (console) ; large pendant une longue préparation (5,7 m au Fendant) : à resserrer à la porte T-119 (≈ 4 à 5 m/s) | `lunge` |
 | Réactions (serveur) | joueurs prévenus à 30 m de la cible, dans l'instance de l'attaquant ; issues jamais envoyées aux témoins : `dodge`, `absorb` (jamais `parry` ni `break`, refusés au démarrage) ; avis d'un coup retenu au seul attaquant, un par raison et par 10 s | `reactions`, `notices`, `messages.pvpOff`, `peace`, `held` |
 | Chiffres des coups (serveur, 1.4.0, T-155) | activés ; le montant du coup (dixièmes, après modificateurs) à l'attaquant et à la cible, jamais aux témoins ; « Esquivé » et « Absorbé » chez les deux seuls participants ; `enabled = false` : comme en 1.3.0. Quatre booléens contrôlés au démarrage | `numbers` (`enabled`, `attacker`, `target`, `witnesses`) |
-| Mannequins (client, 1.5.0, T-156) | trois mannequins de la cour provisoire de Paleto (identifiant, place, cap, modèle, instance, libellé facultatifs) ; modèle sac de frappe, repli botte de foin ; props **locaux** créés à 60 m, retirés au-delà de 70 m ; boucle toutes les 0,5 s à moins de 90 m d'un mannequin, 2 s sinon ; point visé 1 m au-dessus du pied, chiffre à 1,9 m ; balancement 0,9 s, 14°, deux allers-retours ; éclats ; 64 mannequins au plus. Contrôlé au démarrage (refus du module avec la raison) | `dummies` (-- PLACEHOLDER : modèles, places, éclats) |
-| Mannequins (serveur, 1.5.0) | un coup sur quatre use l'arme ; témoins du balancement à 15 m (0 : aucun), au plus un envoi par mannequin et par 0,8 s ; `dummyHit` réservé à `vava_magic`, lanceur à 80 m au plus ; `dummiesNear` : 8 au plus, rayon 50 m au plus ; niveau 9 : plafond d'XP lu par T-115 | `dummies.wearChance`, `witnessRadius`, `witnessMinMs`, `callers`, `spellMaxDistance`, `nearMax`, `nearMaxRadius`, `xpMaxLevel` |
+| Mannequins (client, 1.5.0, T-156) | trois mannequins de la cour provisoire de Paleto (identifiant, place, cap, modèle, instance, libellé facultatifs) ; modèle sac de frappe, repli botte de foin ; props **locaux** créés à 60 m, retirés au-delà de 70 m ; boucle toutes les 0,5 s à moins de 90 m d'un mannequin, 2 s sinon ; point visé 1 m au-dessus du pied, chiffre à 1,9 m ; balancement 0,9 s, 14°, deux allers-retours ; éclats ; 64 mannequins au plus. Contrôlé au démarrage par le seul serveur (`weapons.checkDummies` : refus du module avec la raison) ; le client ne fait qu'indexer la liste | `dummies` (-- PLACEHOLDER : modèles, places, éclats) |
+| Mannequins (serveur, 1.5.0) | libellé par défaut « Mannequin de paille » (outils, Atelier) ; un coup sur quatre use l'arme (la paille use peu le fil) ; témoins du balancement à 15 m (0 : aucun), au plus un envoi par mannequin et par 0,8 s ; `dummyHit` réservé à `vava_magic`, lanceur à 80 m au plus ; `dummiesNear` : 8 au plus, rayon 50 m au plus ; niveau 9 : plafond d'XP lu par T-115 | `dummies.wearChance`, `witnessRadius`, `witnessMinMs`, `callers`, `spellMaxDistance`, `nearMax`, `nearMaxRadius`, `xpMaxLevel` |
 | Débit des RPC (serveur) | `use` et `lower` : 4 d'avance, puis 3 par seconde chacun | `rateLimits.use`, `rateLimits.lower` |
 | Mode combat (client) | endormi après 10 s sans coup ni verrou (jamais garde levée) ; conditions relevées à 200 ms ; touche gardée 250 ms ; virage de 90° au plus au départ du coup ; un même refus redit au plus toutes les 3 s ; contrôles de GTA coupés à chaque image en mode actif, saut (22) et recharger (45) compris (jamais Échap ni P : 199, 200, 322 refusés au démarrage ; 32 au plus) | `mode` |
 | Touches (client) | clic gauche (attaque légère), clic droit (attaque lourde), clic molette (verrouiller ; maintenu : relâcher), **R** (appui bref : parer ; maintenu : se garder), **Espace** (pas de côté, mode combat actif seulement : le saut de GTA y est coupé) ; réglables dans Paramètres > Raccourcis > FiveM | `keys` |
@@ -222,10 +223,11 @@ garde d'emblée. Le serveur tient ces durées (hook `vava_inventory:hold`) ; le 
 
 - **Coup d'arme** : un mannequin est une cible du relevé d'une technique **après les joueurs** (un joueur dans l'arc
   est toujours frappé d'abord : un mannequin ne protège personne et ne vole aucun coup), avec les mêmes portée, angle,
-  hauteur, instance et l'arme réellement tenue ; il compte dans l'adversaire unique d'un coup et n'est frappé qu'une
-  fois par coup. Le paquet est **le même** qu'un coup sur un joueur ; le montant vient de `vava_health:trial` (coup
+  hauteur, instance et l'arme réellement tenue ; un seul par coup, aucun si un joueur a été frappé ; il ne compte pas
+  dans les adversaires d'un coup : frappé au premier relevé, il n'empêche pas de frapper un joueur entré dans l'arc
+  avant le second (relecture sécurité S-1). Le paquet est **le même** qu'un coup sur un joueur ; le montant vient de `vava_health:trial` (coup
   d'essai : rien d'appliqué, aucun hook, aucun journal). Jamais `strike`, jamais `hit`, jamais les réactions.
-- **Issue** : « coup » et son montant ; le **Fendant** montre « Chancelle » sans rien poser (on apprend ce que fait la
+- **Issue** : le montant seul ; le **Fendant** y ajoute « Chancelle » sans rien poser (on apprend ce que fait la
   technique) ; jamais « À terre » ni « Garde brisée » ; un mannequin ne pare, ne bloque, n'esquive ni n'absorbe rien
   (aucun modificateur ne s'inscrit aux coups d'essai en 1.5.0).
 - **Zones de paix, combats coupés** : le mannequin reste frappable à l'arme (personne n'est blessé : une cour d'armes
@@ -275,8 +277,8 @@ garde d'emblée. Le serveur tient ces durées (hook `vava_inventory:hold`) ; le 
 | Statebag de ped `vava_combat:shield` (`{ id, item }`) | OneSync : les joueurs qui ont ce ped à portée | ≈ 30 o | à l'accroche, au décrochage, à un nouveau ped du porteur ; jamais périodique |
 | `GlobalState['vava_inventory:heldModels']` (mécanisme de l'inventaire) | tous | + ≈ 450 o | une fois, à la déclaration des objets |
 | `vava_health:set` (existant) | la seule cible d'un coup | ≈ 26 o | un par coup appliqué |
-| `vava_combat:dummy` (1.5.0, `core.net.send` à une liste) : mannequin `n`, attaquant, issue et montant (dixièmes, ou `false` pour un mot ; absent si les chiffres sont coupés) | l'**attaquant** (ou le lanceur) seul | ≈ 28 o | un par coup qui atteint un mannequin |
-| `vava_combat:dummy` (balancement seul : `n`, attaquant) | les joueurs à 15 m du **mannequin**, dans son instance, sans l'attaquant (`core.net.playersNear`) | ≈ 22 o | au plus **un par mannequin et par 0,8 s**, quel que soit le nombre d'attaquants ; aucun si `witnessRadius = 0` |
+| `vava_combat:dummy` (1.5.0, `core.net.send` à une liste) : mannequin `n`, attaquant, issue et montant (dixièmes, ou `false` pour un mot ; absent si les chiffres sont coupés) | l'**attaquant** (ou le lanceur) seul | 26 à 32 o comptés par `core.net` | un par coup qui atteint un mannequin |
+| `vava_combat:dummy` (balancement seul : `n`, attaquant) | les joueurs à 15 m du **mannequin**, dans son instance, sans l'attaquant (`core.net.playersNear`) | 20 à 23 o comptés par `core.net` | au plus **un par mannequin et par 0,8 s**, quel que soit le nombre d'attaquants ; aucun si `witnessRadius = 0` |
 
 Aucun envoi à tous, aucune clé GlobalState propre, aucun state bag nouveau, aucun envoi latent. Les gestes (coup,
 réaction, dégainer, rengainer, chancellement) sont joués par chaque client sur son propre ped : OneSync les montre, rien
@@ -289,7 +291,8 @@ par seconde au plus.
 
 Mannequins (1.5.0) : leur présence ne coûte rien (la liste est dans la config) ; rien ne part tant que personne ne
 frappe ; aucun RPC nouveau (un coup part par `use`, un sort par les RPC de la magie). Séance de 10 min à 1,5 coup / s
-avec deux témoins : ≈ 25 Ko pour l'attaquant, ≈ 33 Ko pour les témoins. Client : boucle des mannequins toutes les 2 s
+avec deux témoins : ≈ 25 Ko pour l'attaquant, ≈ 33 Ko pour les témoins. Au pire (3 mannequins, 8 joueurs dont 3 qui
+frappent sans relâche) : ≈ 0,83 Ko/s sortants pour tout le serveur, ≈ 82 o/s au plus reçus par un témoin. Client : boucle des mannequins toutes les 2 s
 loin d'une cour (≤ 64 distances), 0,5 s près, seulement personnage apparu ; balancement : une native par image et par
 mannequin qui bouge, pendant 0,9 s au plus après le dernier coup.
 
@@ -355,8 +358,9 @@ lecture du personnage) ; les dictionnaires des gestes du style de l'arme sont ch
   (rien d'appliqué, débit propre de 20 essais par seconde) ; `dummyHit` réservé à `dummies.callers`
   (`GetInvokingResource`, `not_allowed`, une ligne de console par minute et par ressource), lanceur à personnage actif,
   même instance, 80 m au plus ; `dummiesNear` en lecture seule (places publiques). Un coup d'essai ne déclenche ni
-  défense, ni incantation brisée, ni journal, ni XP. Liste contrôlée au démarrage (bornes, identifiants uniques, champs
-  connus, 64 au plus) ; le client relit chaque valeur de `vava_combat:dummy` (numéro, joueur, issue, montant).
+  défense, ni incantation brisée, ni journal, ni XP. Liste contrôlée au démarrage par le seul serveur (bornes,
+  identifiants uniques, champs connus, 64 au plus) ; le client relit chaque valeur de `vava_combat:dummy` (numéro,
+  joueur, issue, montant).
 - Armes et coups natifs de GTA : retirés à 1 Hz côté client, drapeau du corps à corps, touches coupées en mode combat ;
   **dégâts annulés côté serveur** quoi que fasse le client (`vava_health` 1.3.0).
 
@@ -456,8 +460,10 @@ la main ; personne ne se défend : une lecture de table, aucune native.
   `trained`, exports `dummiesNear`, `dummyHit`, `dummies`. Un mannequin n'est jamais défendu (les modificateurs ne
   décident que pour un joueur) ; un calcul « à blanc » ne déclenche aucune suite.
 - **T-115** (XP) : XP de combat par `vava_combat:trained` tant que le niveau dans la compétence de l'arme est **sous**
-  `config.dummies.xpMaxLevel` (9) ; aucune XP de défense sur un mannequin ; mentorat (apprenti à côté de son maître) à
-  décider avec T-115.
+  `config.dummies.xpMaxLevel` (9) ; aucune XP de défense sur un mannequin ; mentorat : auprès de son maître, l'apprenti
+  progresse plus vite sous le plafond, sans le lever (au-delà, le maître se fait partenaire : la Parade se gagne face à
+  quelqu'un) ; à décider avec T-115. Débit d'XP par personnage ; éclats et Nova comptés comme un seul gain (relecture
+  sécurité S-4).
 - **T-121** (éditeur des techniques) : « Essayer contre un mannequin » : `dummies()`, technique en essai jouée par son
   auteur sur le mannequin le plus proche, chiffre par T-155, `trained` pour le retour.
 - **Cour d'armes dans l'Atelier** (tâche proposée au backlog, après T-102) : éditeur `vava_combat:cour` (famille
@@ -510,7 +516,7 @@ Les en-têtes des fichiers servis aux joueurs sont courts (relecture réseau R-2
 | `shared/techniques.lua` | tous | style d'une arme (`<famille>_<catégorie>`), cycle d'un coup (`plan`), technique d'une touche côté client (`pick` : libre, l'ouvreur ; pendant la récupération, la première de la chaîne du type de la touche ; sinon l'attente) |
 | `shared/geometry.lua` | serveur | avant d'un cap, distance au sol et écart de hauteur, angle à plat, arc d'une technique et cible dans l'arc, ordre des candidats, bond plausible ; jamais d'erreur sur une valeur non finie |
 | `shared/admission.lua` | serveur | admission d'une demande : libre → l'ouvreur seul (`not_opener`) ; pendant la récupération (frappe finie, à `earlyMs` près) → une technique de `chain` dans la limite de `chainMax` (`chain_limit`) ; sinon `busy` et l'attente |
-| `shared/weapons.lua`, `shared/guard.lua` | serveur | constantes du seul serveur (types défensifs, types qu'on peut demander, hook `defended`), contrôle de la config, qualité, solidité, usure, issue d'un coup, options de `strike` ; délai de la garde du statebag |
+| `shared/weapons.lua`, `shared/guard.lua` | serveur | constantes du seul serveur (types défensifs, types qu'on peut demander, hooks `defended` et `trained`), contrôle de la config (mannequins compris : `checkDummies`), qualité, solidité, usure, issue d'un coup, options de `strike` ; délai de la garde du statebag |
 | `bridge/client.lua` | tous | seul point de contact du client : notification (`vava_hud`, sinon celle du jeu) ; main du personnage local (`owner` de `vava_inventory:hands`) gardée en cache, tenue par `core:character:loaded`, `fieldChanged`, `unloaded` (aucune lecture du personnage à chaque appel, rapport T-140 R-1) ; changement de main annoncé ; à terre (`vava_health:get`) ; nom du statebag de la main |
 | `client/natives.lua` | tous | drapeau de ped 122, changement d'arme bloqué, armes GTA retirées (menu de triche, `/arme` de l'exemple) ; ces bascules tiennent jusqu'au changement de ped : contrôle à `natives.pollMs` (trois natives par seconde au repos) ; rendues à GTA à l'arrêt (`restoreOnStop`) ; le filet reste l'annulation serveur de `vava_health` |
 | `client/shields.lua` | tous | patron de `vava_inventory/client/hands.lua` : objet **local** sans collision attaché au ped du porteur (bras ou dos), réattaché sans être recréé quand la main change ; boucle lente seulement tant qu'un bouclier est suivi (ped ou modèle attendu, objet détaché, ped disparu, distance de `showRadius`) ; modèle invalide : une ligne de console, aucun nouvel essai avant que la valeur change |
@@ -523,9 +529,10 @@ Les en-têtes des fichiers servis aux joueurs sont courts (relecture réseau R-2
 | `client/attack.lua` | tous | technique choisie par `pick`, personnage tourné vers la cible verrouillée ou la caméra (`faceMaxDeg`), geste aussitôt, demande dans un thread ; refus ou transport en échec : geste coupé, texte (un par code et par `noticeMs`), attente du serveur respectée ; touche pressée trop tôt gardée (`bufferMs`) ; virage vers la cible pendant la préparation et la frappe ; chancellement : geste coupé, cycle gardé (comme au serveur) |
 | `client/mode.lua` | tous | patron de `vava_magic/client/controls.lua` : éveil par une touche du combat si l'arme a un style (sinon le texte, une fois par arme sortie) ; actif à pied, debout, pas à terre, pas ligoté, sans interface ni menu (relevé à `conditionsMs`) ; sommeil après `idleMs` sans coup ni appui sur le verrou, ou aussitôt que la main change ou le personnage est déchargé ; boucle par image seulement éveillée et active (contrôles coupés, anneau, verrou, touche gardée, virage) |
 | `client/reactions.lua` | tous | cible : chancellement (geste, coup coupé, secousse) ou tressaillement (si elle ne frappe pas) ; attaquant : son de touche réglé, pour `hit`, `stagger`, `down` ; tous : effet d'impact sur le ped de la cible (sang ; étincelles pour un blocage ou une parade), `effects.maxPerSecond` au plus ; aucun objet créé |
-| `shared/dummies.lua` | tous | règles pures des mannequins (1.5.0) : contrôle de la part client de `dummies` (modèles, distances, balancement, éclats, liste pure de 64 au plus, identifiants uniques, champs connus et bornés), index (numéro = place dans la liste, centre visé) ; table `VavaCombat.dummyRules` |
+| `shared/dummies.lua` | tous | index des mannequins (1.5.0) : numéro = place dans la liste, centre visé ; table `VavaCombat.dummyRules` (le contrôle de la liste est au seul serveur, `shared/weapons.lua`) |
 | `server/dummies.lua` | serveur | mannequins chargés, candidat d'un relevé (après les joueurs, instance lue seulement si un mannequin est près), coup d'arme à blanc (`vava_health:trial`), coup de sort (`dummyHit`), usure réduite, envois `vava_combat:dummy` (attaquant, témoins au plus un par 0,8 s), hook `trained`, `dummiesNear`, `dummies()` ; table `VavaCombat.dummies` |
-| `client/dummies.lua` | tous | table `VavaCombat.dummyProps` : props locaux streamés (patron de `vava_gathering/client/props.lua`), boucle lente seulement personnage apparu, modèle de repli, balancement (une boucle par image le temps du balancement, ≤ 0,9 s), éclats, chiffre et son chez l'attaquant ; tout retiré au déchargement, à la sélection et à l'arrêt |
+| `client/dummies.lua` | tous | table `VavaCombat.dummyProps` : liste indexée sous `pcall` (illisible : une ligne, aucun prop), props locaux streamés (patron de `vava_gathering/client/props.lua`), boucle lente seulement personnage apparu, modèle de repli, modèle qui ne se charge pas gardé sans prop jusqu'à la sortie de portée (une ligne par modèle),
+ balancement (une boucle par image le temps du balancement, ≤ 0,9 s), éclats, chiffre et son chez l'attaquant ; tout retiré au déchargement, à la sélection et à l'arrêt |
 | `client/main.lua` | tous | notifications du serveur, exports client, démarrage des contrôles natifs, du suivi des boucliers et des mannequins |
 
 ## Installation

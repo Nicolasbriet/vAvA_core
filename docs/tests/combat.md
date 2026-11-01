@@ -331,9 +331,9 @@ chiffre. Préparation : 0.9.
 | 4 | A frappe le mannequin 1 d'une Taille. | « 12 » de laiton au-dessus du mannequin ; il se balance en s'écartant de A et se redresse seul en moins d'une seconde ; éclats. |
 | 5 | A enchaîne Taille, Estoc, Revers. | Trois chiffres en cascade ; le mannequin repart à chaque coup ; jamais à terre. |
 | 6 | A Fendant. | Chiffre plus grand (« 22 ») et « Chancelle » ; le mannequin ne fait rien de plus ; A peut frapper aussitôt après sa récupération. |
-| 7 | A frappe le mannequin de dos, à 3 m, puis perché à 3 m au-dessus. | Aucun chiffre, aucun balancement. |
+| 7 | A frappe le mannequin trois fois : dos tourné vers lui, puis face à lui à 3 m, puis face à lui, perché 3 m au-dessus. | Dans les trois cas : aucun chiffre, aucun balancement. |
 | 8 | **(2 joueurs)** B se tient devant le mannequin ; A frappe dans leur direction. | B est frappé (12 chez A, sang), le mannequin n'a rien. |
-| 9 | **(3 joueurs)** C regarde à 10 m pendant que A frappe vite. | C voit le mannequin se balancer, **aucun chiffre** ; `/vava_reseau joueur <C>` : `vava_combat:dummy` ≈ 22 o, pas plus d'un par 0,8 s. |
+| 9 | **(3 joueurs)** C regarde à 10 m pendant que A frappe vite. | C voit le mannequin se balancer, **aucun chiffre** ; `/vava_reseau joueur <C>` : `vava_combat:dummy` 20 à 23 o, pas plus d'un par 0,8 s (au pire, 3 mannequins frappés sans relâche : ≈ 82 o/s chez C) ; `resmon 1` chez C pendant que A frappe : `vava_combat` ≤ 0,02 ms. |
 | 10 | **(3 joueurs)** C à 20 m. | C ne reçoit rien de `vava_combat` (le balancement n'est pas vu). |
 | 11 | A frappe 40 fois ; `/armes voir <A>`. | La solidité a baissé d'environ 8 points (un tirage : entre 4 et 12). |
 | 12 | A frappe le mannequin avec une arme émoussée (`/armes user <A> 1000`). | Chiffre ≈ moitié (6). |
@@ -345,10 +345,10 @@ chiffre. Préparation : 0.9.
 | 18 | `/vie` de A avant et après 20 coups ; `/chaine`. | Vie inchangée ; `SELECT * FROM vava_health_hits ORDER BY id DESC LIMIT 5` : aucune ligne nouvelle. |
 | 19 | A frappe le mannequin puis ouvre aussitôt la bannière (Échap). | La bannière s'ouvre (s'entraîner n'est pas combattre). |
 | 20 | **(2 joueurs)** A incante une Boule de feu ; B frappe le mannequin à côté de lui. | L'incantation de A n'est pas brisée. |
-| 21 | `chain.pvp = false` (`config.lua` de `vava_health`, redémarrage) ; A frappe le mannequin. | Le chiffre s'affiche ; aucun avis « combats suspendus ». Remettre `true`. |
+| 21 | `chain.pvp = false` (`config.lua` de `vava_health`, redémarrage) ; A frappe le mannequin. | Le chiffre s'affiche ; aucun avis « Les combats entre habitants sont suspendus : votre lame s'arrête. ». Remettre `true`. |
 | 22 | A, à terre (`/vie 0`), tente de frapper. | Rien ne part (refus du mode combat) ; une Boule de feu lancée debout juste avant porte encore. |
 | 23 | A martèle le clic gauche 10 s. | Pas plus d'un coup par cycle de technique ; F8 propre ; resmon ≤ 0,03 ms. |
-| 24 | `/vava_reseau joueur <A>` pendant 10 coups. | `rpc vava_combat:use` et `vava_combat:dummy` ≈ 28 o par coup ; rien d'autre de nouveau. |
+| 24 | `/vava_reseau joueur <A>` pendant 10 coups. | `rpc vava_combat:use` et `vava_combat:dummy` 26 à 32 o par coup (comptés par `core.net`) ; rien d'autre de nouveau. |
 | 25 | `resmon 1` chez A : loin de la cour, près sans frapper, en frappant. | Loin ≈ 0 ; près ≤ 0,01 ms ; en frappant ≤ 0,03 ms. |
 | 26 | `restart vava_combat` près de la cour. | Mannequins retirés puis recréés ; aucun reste dans le monde. |
 | 27 | `restart vava_health` pendant que A frappe. | Pendant l'arrêt : ni chiffre ni balancement (aucun envoi), une ligne de console par minute (`health_unavailable`) ; dès son retour, les chiffres reviennent. |
