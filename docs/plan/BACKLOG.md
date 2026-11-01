@@ -1243,8 +1243,8 @@ faire tout le système de combat ») : la porte T-119 reste à passer en jeu.
   page allégée (`vava-dev-nui`). L-6 et L-8 laissés à T-119.
 
 ### T-156 — Mannequin d'entraînement
-- Agents : vava-architecte → vava-dev-lua · Dépend de : T-112 (après T-113, même module) ; T-102 pour le placement
-  par l'Atelier · Statut : à faire
+- Agents : vava-architecte → vava-dev-lua (cette tâche autorise à toucher `vava_health`, `vava_magic`) · Dépend de : T-112 (après T-113, même module) ; T-102 pour le placement
+  par l'Atelier · Statut : en cours
 - Demande du porteur du projet (31 octobre 2026), « comme les MMO » : un mannequin de paille (modèle `-- PLACEHOLDER`)
   qu'on frappe dans une cour d'armes pour essayer ses techniques ; il encaisse sans jamais tomber, montre le montant de
   chaque coup (T-155), se « remet » seul ; coups d'arme et sorts.
