@@ -1,7 +1,8 @@
 local helper = require('tests.helper')
 
--- Visée de l'outil de placement (T-102, modules/vava_atelier/shared/aim.lua), sur la seule vue client (constantes et
--- config_client.lua). Règles documentées : spec T-102 § 8.1 et § 8.2, README de vava_atelier :
+-- Visée de l'outil de placement (T-102, modules/vava_atelier/shared/aim.lua), sur la seule vue du client d'un membre
+-- du Conseil (constantes, config_client.lua et config_conseil.lua, livré dans le paquet, T-157). Règles documentées :
+-- spec T-102 § 8.1 et § 8.2, README de vava_atelier :
 --   molette : ±15° (±1° avec Maj), cap dans [0, 360) ; rayon ±5 m (±0,5 m avec Maj), arrondi au pas, borné par les
 --   règles du type ; candidat selon la forme ; pile d'annulation de 20 gestes (le plus ancien sort) : création →
 --   abandon du brouillon, déplacement → lieu d'avant, sommet non envoyé → retiré sans RPC ; clic droit : l'élément le
@@ -11,7 +12,8 @@ describe('vava_atelier aim', function()
 
     before_each(function()
         helper.reset()
-        VavaAtelier = helper.loadClientView('modules/vava_atelier', 'VavaAtelier')
+        VavaAtelier = helper.loadCouncilView('modules/vava_atelier', 'VavaAtelier')
+        assert.is_nil(VavaAtelier.config.rights, 'config.lua ne doit pas être chargé dans la vue du Conseil')
         helper.load('modules/vava_atelier/shared/aim.lua')
         aim = VavaAtelier.aim
         placement = VavaAtelier.config.placement

@@ -12,6 +12,8 @@
            hooks : séance fermée ou départ → fin de l'essai du membre ; /atelier_archives ; au démarrage, dans un fil :
            réparation (essais rendus aux brouillons, doublons), editorsReady, puis (après `history.purgeDelayMs`)
            purge de l'historique.
+           T-157 : RPC `code` (paquet du Conseil, server/delivery.lua) ; au setup, bornes du chargeur contrôlées (refus)
+           puis paquet construit (un échec n'arrête pas le module) ; départ → budget du joueur oublié.
     Dépendances : tous les fichiers server/ du module, bridge/server.lua
 ]]
 
@@ -31,6 +33,7 @@ local rights = VavaAtelier.rights
 local cycle, history, trials, sync = VavaAtelier.cycle, VavaAtelier.history, VavaAtelier.trials, VavaAtelier.sync
 local archives = VavaAtelier.archives
 local placement = VavaAtelier.placement
+local delivery = VavaAtelier.delivery
 local limits = cfg.rateLimits
 local DEF = VavaAtelier.DEF
 
@@ -79,6 +82,11 @@ local PLACE = { type = 'table', fields = {
         optional = true, items = { type = 'table', fields = { x = COORD, y = COORD } } },
 } }
 local PARENT = ENTRY_OR_NEW
+
+-- T-157 (§ 6.1 de la spec) : empreinte du paquet ('' : aucune) et morceau demandé (0 : description).
+local CODEPACK = VavaAtelier.CODEPACK
+local PACK_FP = { type = 'string', min = 0, max = CODEPACK.DIGEST_LENGTH, pattern = '^[0-9a-f]*$' }
+local PACK_PART = { type = 'integer', min = 0, max = CODEPACK.MAX_PARTS }
 
 -- Handlers ----------------------------------------------------------------------------------------------------------
 
@@ -186,6 +194,8 @@ local RPCS = {
     { RPC.PLACE, { EDITOR, KIND, ENTRY_OR_NEW, REV, PLACE, PARENT, VALUES }, limits.place,
         storedRpc(RPC.PLACE, placement.place) },
     { RPC.CHILDREN, { EDITOR, KIND, ENTRY }, limits.children, storedRpc(RPC.CHILDREN, placement.children) },
+    -- T-157 : code du Conseil (réponse latente du core au-delà de 8 Ko, 64 Ko/s)
+    { RPC.CODE, { PACK_FP, PACK_PART }, limits.code, delivery.rpc },
 }
 
 -- Hooks -------------------------------------------------------------------------------------------------------------
@@ -228,6 +238,7 @@ local function onDropped(payload)
     if session then trials.sessionClosed(session.accountId, 'dropped') end
     access.forget(payload.source)
     archives.forget(payload.source)
+    delivery.forget(payload.source)
 end
 
 --- Séance fermée (fermeture, déchargement, révocation) : l'essai du membre prend fin.
@@ -273,6 +284,11 @@ local function setup()
     -- un plancher, une surcharge ou le droit d'ouvrir hors des droits permis ouvrirait ou fermerait un atelier à tort
     local valid, invalid = rights.checkSettings(cfg)
     if not valid then return false, 'config.lua, droits : ' .. tostring(invalid) end
+    -- T-157 : attentes et textes du chargeur, budget horaire ; puis le paquet du Conseil (un paquet impossible à
+    -- construire laisse le module démarrer : `code` répond `unavailable`, l'erreur est en console)
+    valid, invalid = delivery.checkSettings(cfg)
+    if not valid then return false, invalid end
+    delivery.build()
     for _, hook in ipairs(HOOKED) do
         local id, err = core.hooks.after(hook[1], hook[2])
         if not id then return false, hook[1] .. ' : ' .. tostring(err) end

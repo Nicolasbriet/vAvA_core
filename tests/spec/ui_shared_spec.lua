@@ -23,7 +23,9 @@ local PAGES = {
     { module = 'vava_cameras', sheet = 'wall.css' },
     { module = 'vava_admin', sheet = 'style.css' },
     { module = 'vava_magic', sheet = 'style.css' },
-    { module = 'vava_atelier', sheet = 'style.css' },
+    -- T-157 : web/index.html est l'amorce livrée à tous (balisage, boot.js) ; la page entière, jamais livrée, est
+    -- web/dev/index.html (`dev`)
+    { module = 'vava_atelier', sheet = 'style.css', dev = 'web/dev/index.html' },
     { module = 'vava_pause', sheet = 'pause.css' },
 }
 
@@ -194,6 +196,28 @@ for _, page in ipairs(PAGES) do
         end)
 
         it('lie la feuille commune avant la sienne, et ne charge les données simulées que hors jeu', function()
+            if page.dev then
+                -- amorce livrée à tous : la feuille commune une fois, aucune feuille propre, un seul script (boot.js),
+                -- aucune donnée simulée ni ligne hors jeu
+                assert.equal(1, count(html, COMMON_LINK))
+                assert.equal(1, count(html, 'vava_ui.css'))
+                assert.is_nil(find(html, 'href="css/'))
+                assert.is_nil(find(html, '../css/'))
+                assert.is_nil(find(html, 'devmock'))
+                assert.is_nil(find(html, 'GetParentResourceName'))
+                assert.equal(1, count(html, '<script'))
+                assert.equal(1, count(html, '<script src="boot.js"></script>'))
+                -- page de développement (jamais livrée) : feuille commune avant la sienne, données simulées une fois
+                local dev = assert(read(base .. page.dev))
+                local common, own = find(dev, COMMON_LINK), find(dev, 'href="../css/')
+                assert.is_not_nil(common)
+                assert.is_not_nil(own)
+                assert.is_true(common < own)
+                assert.equal(1, count(dev, 'vava_ui.css'))
+                assert.equal(1, count(dev, '<script src="devmock.js"></script>'))
+                assert.equal(1, count(dev, 'vava_ui/web/dev/horsjeu.js'))
+                return
+            end
             local common = find(html, COMMON_LINK)
             local own = find(html, 'href="css/')
             assert.is_not_nil(common)

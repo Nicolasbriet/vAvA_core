@@ -22,6 +22,12 @@ se règle à la molette, un tracé se dessine sommet par sommet. Le serveur rev�
 portée, règles du type, module) et n'écrit qu'un brouillon. « Tester » d'un atelier joué en jeu (la récolte) range la
 page : le membre essaie seul, `F9` le ramène. Premier atelier réel : la récolte (`vava_gathering` 1.8.0).
 
+**Version 1.4.0 (T-157) : le code du Conseil livré au seul Conseil.** Rien ne change pour un habitant, sinon qu'il ne
+télécharge plus les registres du Conseil : il ne reçoit qu'une **amorce** (touche et commande, notifications, réponse de
+`/atelier_archives`, chargeur, page vide). L'outil de placement, la séance, le relais et la page entière partent chez
+un membre la première fois qu'il ouvre l'Atelier d'une version (« On apporte les registres de l'Atelier : un
+instant… », quelques secondes une fois), puis sont gardés dans son stockage local. Voir « Code livré au seul Conseil ».
+
 ## Ce qu'un module déclare
 
 Un module **n'écrit aucune interface** : il déclare un éditeur au registre `vava_atelier:editors` (clé
@@ -136,11 +142,15 @@ rien ne s'écrit sans son nom au journal (une ligne refusée par le journal est 
 Un retour à l'original ou un import publie de nouvelles versions (`origin` seed ou import), n'en retire jamais, garde
 les brouillons, puis le module les applique et l'atelier est resynchronisé.
 
-## Règles (config.lua, config_client.lua)
+## Règles (config.lua, config_client.lua, config_conseil.lua)
 
-Depuis 1.2.0 (T-132), les réglages sont dans deux fichiers et chacun n'est écrit qu'une fois : `config_client.lua`
-(marqués **(client)** ci-dessous) porte ce que lit le client et le serveur ; `config.lua` porte tout le reste, lu par le
-seul serveur, et complète la table sans réécrire une clé de `config_client.lua`.
+Depuis 1.2.0 (T-132), les réglages sont dans des fichiers distincts et chacun n'est écrit qu'une fois :
+`config_client.lua` (marqués **(client)** ci-dessous) porte ce que lit le client de chaque joueur (l'amorce) et que relit
+le serveur ; depuis 1.4.0 (T-157), `config_conseil.lua` (marqués **(conseil)**) porte ce que lit le seul client d'un
+membre du Conseil (outil de placement, textes de la séance) : il part dans le paquet du Conseil, jamais chez un
+habitant, et le serveur le lit aussi (en tête des `server_scripts`, avant `config.lua`) ; il ne contient **rien de
+secret**. `config.lua` porte tout le reste, lu par le seul serveur. Chacun complète la table ouverte par
+`config_client.lua` sans réécrire une clé posée avant lui.
 
 | Clé | Défaut | Rôle |
 |---|---|---|
@@ -173,20 +183,55 @@ seul serveur, et complète la table sans réécrire une clé de `config_client.l
 | `sync.sliceMs` / `retryMs` / `retries` | 4 / 10 000 / 3 | travail au plus (ms) entre deux pauses d'un fil de synchronisation ou d'archives ; nouvel essai si la base est muette ; essais au plus |
 | `archives.command` / `folder` / `maxBytes` / `confirmMs` / `cooldownMs` / `exportCooldownMs` | `atelier_archives` / `echanges` / 4 Mo / 60 000 / 2 000 / 60 000 | commande, dossier des archives (jamais servi aux joueurs), fichier lu ou écrit au plus, délai de confirmation, délai entre deux commandes d'un membre, délai entre deux exports (tous membres confondus) |
 | `place.maxXY` / `maxZ` / `maxRadius` / `polygonPoints` | 50 000 / 5 000 / 500 / 3 à 32 | bornes d'un lieu (formes point, orienté, cercle, polygone, porte) |
-| `placement.reach` / `polygonFactor` **(client)** | 60 m / 2 | portée d'une pose (centre, 3D) ; un sommet de tracé à 120 m au plus (au sol) — relus par le serveur |
-| `placement.aim`, `labels`, `ghosts`, `steps`, `pickRadius`, `undoMax`, `refreshMs`, `sortMs`, `quitConfirmMs` **(client)** | 80 m, 17 / 12 à 40 m / 12 à 60 m, alpha 160, 3 s / 15°, 1°, 5 m, 0,5 m / 2,5 m / 20 / 100 ms / 500 ms / 2 s | visée, étiquettes, fantômes, pas de la molette, choix au clic droit, annulations, rythme de l'aperçu et du tri, second `Échap` |
-| `placement.colors`, `ringAlpha`, `markers`, `controls`, `disabled`, `undoKey`, `keybar` **(client)** | maquette `Recolte` | teintes, marqueurs, contrôles lus et neutralisés, touche `Z`, barre des touches par mode |
-| `placement.texts` **(client)** | — | aperçu et refus (« Trop loin de vous (72 m) : approchez-vous. », « Hors de %s. », « Trop près de « %s » (%s m). »…) ; le serveur rend les mêmes |
+| `placement.reach` / `polygonFactor` **(conseil)** | 60 m / 2 | portée d'une pose (centre, 3D) ; un sommet de tracé à 120 m au plus (au sol) — relus par le serveur |
+| `placement.aim`, `labels`, `ghosts`, `steps`, `pickRadius`, `undoMax`, `refreshMs`, `sortMs`, `quitConfirmMs` **(conseil)** | 80 m, 17 / 12 à 40 m / 12 à 60 m, alpha 160, 3 s / 15°, 1°, 5 m, 0,5 m / 2,5 m / 20 / 100 ms / 500 ms / 2 s | visée, étiquettes, fantômes, pas de la molette, choix au clic droit, annulations, rythme de l'aperçu et du tri, second `Échap` |
+| `placement.colors`, `ringAlpha`, `markers`, `controls`, `disabled`, `undoKey`, `keybar` **(conseil)** | maquette `Recolte` | teintes, marqueurs, contrôles lus et neutralisés, touche `Z`, barre des touches par mode |
+| `placement.texts` **(conseil)** | — | aperçu et refus (« Trop loin de vous (72 m) : approchez-vous. », « Hors de %s. », « Trop près de « %s » (%s m). »…) ; le serveur rend les mêmes |
 | `placement.bucket` / `childrenMax` | 0 / 200 | instance où l'on place (ailleurs : « Vous êtes hors du monde commun (intérieur, cachot…) : revenez-y pour placer. ») ; lignes au plus d'une réponse `children` |
 | `rateLimits.place` / `children` | 6, 2 / s / 4, 1 / s | poser ou déplacer ; lieux d'une fiche |
 | `texts.changes.place` | — | résumés d'un lieu changé (« déplacée de 12 m », « rayon de 120 m à 140 m », « tournée de 40° », « tracé redessiné (6 sommets) », « posée ») |
-| `texts.refused`, `modeLine`, `revoked`, `trialLineDefault`, `trialEndedFeed`, `sayAuthor` **(client)** | — | textes affichés par le client hors de la page : refus d'un RPC, bandeaux du volet, notifications, nom des réponses de `/atelier_archives` au chat (`sayAuthor`, ancien `texts.archives.author`) |
+| `texts.refused`, `sayAuthor` **(client)** | — | textes affichés par l'amorce hors de la page : refus d'un RPC, nom des réponses de `/atelier_archives` au chat (`sayAuthor`, ancien `texts.archives.author`) |
+| `texts.loading`, `loadFailed` **(client)** | « On apporte les registres de l'Atelier : un instant… » / « Les registres de l'Atelier n'ont pas pu être ouverts : prévenez un développeur. » | T-157 : premier envoi d'une version ; fichier du paquet ou page en erreur (160 octets au plus, contrôlés au démarrage) |
+| `delivery.pageWaitMs` / `bootWaitMs` **(client)** | 5 000 / 5 000 | T-157 : attente au plus de la page vide (« prête »), puis de son compte rendu après ses scripts (1 000 à 30 000, contrôlés au démarrage : le module refuse de démarrer sinon) |
+| `texts.modeLine`, `revoked`, `trialLineDefault`, `trialEndedFeed` **(conseil)** | — | textes de la séance : bandeaux du volet, révocation, fin d'essai |
+| `delivery.hourlyPackages` | 3 | T-157 : paquets entiers envoyés au plus à un même joueur par heure glissante (1 à 20 ; au-delà : `rate_limited`) |
+| `rateLimits.code` | 12, puis 1 / 5 s | T-157 : description du paquet et ses morceaux (8 au plus) |
 | `texts` (le reste) | — | textes envoyés par le serveur (erreurs de champ, verbes du journal, libellés du Registre, résumés, réponses de `/atelier_archives`) ; l'interface a les siens (`web/js/strings.js`) |
 
 **Droit effectif d'un atelier** : la surcharge de `rights.overrides` si elle est permise ; sinon le plus fort du droit
 déclaré et du plancher de sa famille. Un Sénéchal (`metiers`) ne voit donc que le monde ; seule la config peut lui ouvrir
 un atelier de la société ou des arts. Un plancher, une surcharge ou `rights.open` hors de `rights.allowed` : l'Atelier
 refuse de démarrer (« config.lua, droits : rights.overrides['…'] = '…' : pas un droit permis (metiers, staff) »).
+
+## Code livré au seul Conseil (1.4.0, T-157)
+
+Le code client réservé au Conseil (neuf fichiers Lua et la page) n'est plus servi par FiveM : il est listé dans deux
+directives du manifeste, `vava_conseil_lua` (ordre d'exécution) et `vava_conseil_web` (ordre d'insertion, celui de
+`web/dev/index.html`), que FXServer garde comme métadonnées sans les servir.
+
+- **Au démarrage**, le serveur (`server/delivery.lua`) lit ces fichiers sur la copie déployée, ramène `\r\n` à `\n`,
+  refuse un octet nul, **compile** chaque fichier Lua sans l'exécuter, assemble le paquet (`shared/codepack.lua` :
+  « VAVAPAQ1 », puis chaque fichier précédé de son genre, son chemin et sa taille), calcule son empreinte (FNV-1a 64
+  bits, `shared/digest.lua`) et le coupe en morceaux de 64 Ko. Console : `paquet du Conseil : 24 fichiers, 245 560
+  octets, 4 morceaux, empreinte …`. Un paquet qui ne se construit pas **n'arrête pas** le module (les modules déclarent
+  leurs éditeurs, les RPC répondent) : erreur en console, et le membre lit « L'Atelier est indisponible pour le
+  moment. ».
+- **Au premier F9** d'une séance de jeu, le chargeur (`client/loader.lua`) demande la description du paquet (RPC
+  `code`, `('', 0)`), relit son stockage local (KVP de la ressource, morceaux de 32 Ko, empreinte écrite en dernier) et
+  ne s'en sert que si l'empreinte, la taille **et l'empreinte recalculée** valent celles que le serveur vient
+  d'annoncer ; sinon il télécharge les morceaux l'un après l'autre (réponse latente du core, 64 Ko/s), vérifie taille et
+  empreinte, garde le paquet. Chaque fichier Lua est exécuté par `load(code, '@@vava_atelier/<chemin>', 't', env)` :
+  texte seul, dans un environnement du paquet (lectures dans `_G`, écritures gardées à part avec un avertissement),
+  sous son nom d'origine (une erreur se lit `vava_atelier/client/placer.lua:123: …`). Puis la page vide reçoit sa
+  feuille et ses scripts (`bootPiece`, `bootEnd`) et les insère (`web/boot.js`, contrat :
+  `docs/plan/rapports/T-157-contrat.md`) ; l'Atelier s'ouvre.
+- **Refus** : hors du Conseil, `not_allowed` (« L'Atelier est réservé au Conseil. ») et le stockage local est effacé ;
+  un rang retiré pendant un téléchargement arrête le morceau suivant ; un rang retiré Atelier ouvert ferme la séance
+  (comme en 1.3.0) et efface le stockage. Un fichier qui lève une erreur, ou une page qui signale un script en erreur :
+  « Les registres de l'Atelier n'ont pas pu être ouverts… », plus d'essai jusqu'au prochain redémarrage de la ressource
+  ou à la reconnexion. Page muette : le F9 suivant ne refait que l'amorce de la page.
+- `/atelier_archives` répond au chat sans paquet chargé (l'amorce l'écoute) ; `Ctrl+Z` de la visée n'est déclaré qu'au
+  client d'un membre qui a ouvert l'Atelier (`client/keys.lua`, dernier fichier du paquet).
 
 ## Sécurité
 
@@ -241,6 +286,17 @@ refuse de démarrer (« config.lua, droits : rights.overrides['…'] = '…' : p
   2 / s côté serveur. Les fantômes sont des objets locaux (`isNetwork = false`) : personne d'autre ne les voit. Chaque
   valeur reçue de la page (`placeStart`, `templateChanged`, `goTo`) est bornée par le Lua ; « Marquer … sur la carte » ne pose que le
   repère GPS (pas de téléportation, décision du 31 octobre 2026).
+- **T-157** : le code du Conseil n'est **pas un secret** (le dépôt est public) : sa livraison à la demande économise la
+  bande passante et ne déplace aucune décision vers le client ; chaque RPC de l'Atelier revérifie comme avant. Le RPC
+  `code` relit le personnage, le Registre et le droit d'ouvrir l'Atelier **à chaque appel** (description et chaque
+  morceau), ne répond qu'à l'appelant, refuse une empreinte qui n'est plus celle du serveur (`stale`) et tient un budget
+  de 3 paquets par heure et par joueur (≈ 735 Ko), en plus du débit (12, puis 1 toutes les 5 s). Le client n'exécute que
+  le texte de la réponse de ce RPC ou de son propre stockage local, **après** l'avoir comparé à l'empreinte que le
+  serveur vient d'annoncer dans cette séance : aucun évènement réseau, rappel de la page, export ou commande ne mène à
+  `load` ; mode `'t'` (jamais de code précompilé), environnement du paquet (`_G` jamais écrit). FNV-1a protège contre
+  l'usure, la coupure et la version périmée, pas contre le propriétaire du disque (qui exécute déjà ce qu'il veut chez
+  lui, sans pouvoir de plus). `config.lua` ne peut entrer dans un paquet (audit, règle C ; `config_split_spec`, T5) ;
+  `load(` est refusé par l'audit partout ailleurs dans `modules/` et `examples/`.
 
 ## Réseau et coût
 
@@ -260,6 +316,7 @@ refuse de démarrer (« config.lua, droits : rights.overrides['…'] = '…' : p
 | évènement `vava_atelier:entryChanged` | les seuls membres dont la séance a **cette fiche** ouverte (droit de l'atelier relu), sauf l'auteur du changement ; le tenant d'un essai qui prend fin sans qu'il l'ait demandé ; l'ancien tenant d'un brouillon repris ; T-102 : une pose l'écrit aussi sur la fiche parent | ≈ 90 o |
 | RPC `place` (T-102) | l'appelant | ≈ 0,4 Ko aller-retour |
 | RPC `children` (T-102) | l'appelant | 0,2 Ko (vide), ≈ 0,7 Ko pour 5 points, ≈ 22 Ko au pire (200 lignes, latent au-delà de 8 Ko) |
+| RPC `code` (T-157) | l'appelant | description : ≈ 25 o aller, ≈ 60 o retour ; morceau : 64 Ko au plus, **latent** (64 Ko/s), 4 morceaux pour le paquet de 1.4.0 (245 560 o) ; refus ≈ 20 o. Habitant : 1 refus par F9 ; membre : une fois par version, puis la description seule à chaque séance |
 
 Trois formes de réponse sont pensées pour ne rien envoyer deux fois :
 
@@ -288,6 +345,14 @@ accepté par le porteur du projet). La cible de la spec pour le Lua (≤ 18 Ko b
 (≈ + 75 Ko bruts, dont ≈ 58 Ko de code) : pistes T-154 (Lua livré sans commentaires) et T-157 (code de l'Atelier livré
 au seul Conseil, décision du porteur du projet). `shared/aim.lua` est en tête des `client_scripts` (lu par le seul
 client).
+
+**1.4.0 (T-157)** : mesuré par `scripts/poids-client.sh --detail vava_atelier`, chaque joueur télécharge **55 273 o
+(20 960 compressés)** au lieu de 262 381 o (82 448 compressés) : Lua 42 485 o (15 847), page 8 212 o (3 437 :
+`index.html` et `boot.js`), manifeste 4 576 o (1 676). Le paquet du Conseil (ligne `vava_atelier@conseil`) pèse
+245 560 o (92 780 de Lua, 152 127 de page, en-têtes compris), non compressé (il part en latent) : un membre le reçoit
+une fois par version (≈ 4 s), en 5 RPC ; ensuite, une description par séance (≈ 85 o) et ≈ 0,2 s de relecture locale.
+Exemple, 60 joueurs dont 4 membres, une version : 60 × 262 Ko ≈ 15,7 Mo avant, 60 × 55 Ko + 4 × 246 Ko ≈ 4,3 Mo après.
+Client : aucune boucle ajoutée ; le chargement coûte ≈ 20 ms de Lua sur une image, une fois par séance de jeu.
 
 Visée (T-102) : une seule boucle par image, **seulement pendant la visée**, chez le seul membre qui place (≤ 0,15 ms
 visée : un lancer de rayon asynchrone par image, un seul en vol ; ≤ 3 marqueurs d'aire ; ≤ 12 étiquettes ; le fantôme
@@ -326,6 +391,15 @@ gardé par l'installeur de la Chancellerie (le nouveau posé en `config.lua.nouv
 démarre, mais la console le signale (« config.lua garde la forme d'avant 1.2.0 … ») et un réglage client changé dans ce
 fichier reste sans effet. Reportez vos réglages dans `config.lua` et `config_client.lua` d'après les nouveaux fichiers.
 
+**Mise à jour vers 1.4.0 (T-157)** : `placement` et quatre textes de la séance (`modeLine`, `revoked`,
+`trialLineDefault`, `trialEndedFeed`) quittent `config_client.lua` pour le nouveau `config_conseil.lua` ;
+`config_client.lua` gagne `delivery` et deux textes (`loading`, `loadFailed`), `config.lua` gagne `rateLimits.code` et
+`delivery.hourlyPackages`. Un `config_client.lua` ou un `config.lua` de 1.3.0 gardé par l'installeur fait refuser le
+démarrage avec sa raison (« config_client.lua, delivery.pageWaitMs : entier de 1000 à 30000 attendu », « config.lua,
+rateLimits.code : débit attendu », « config.lua, delivery.hourlyPackages : entier de 1 à 20 attendu ») : reportez vos
+réglages d'après les nouveaux fichiers (`*.nouveau`). Un `config.lua` de 1.3.0 ne réécrit rien de `config_conseil.lua`
+(il n'écrit que `bucket` et `childrenMax` dans `placement`).
+
 **L'ordre compte** : tant que l'Atelier n'a pas synchronisé un module gardé, ce module tourne sur sa config. Ne pas
 arrêter `vava_atelier` en jeu : un module redémarré pendant ce temps reviendrait à sa config jusqu'au retour de
 l'Atelier (il est alors resynchronisé).
@@ -334,8 +408,12 @@ l'Atelier (il est alors resynchronisé).
 
 | Fichier | Rôle |
 |---|---|
-| `config_client.lua` | réglages lus par le client (touche, commande, textes affichés hors de la page) : téléchargé par chaque joueur, ouvre `VavaAtelier.config` |
-| `config.lua` | tous les autres réglages, servi au seul serveur (en tête des `server_scripts`) : complète la table |
+| `config_client.lua` | réglages lus par le client de chaque joueur (touche, commande, textes de l'amorce, attentes du chargeur) : téléchargé par chaque joueur, ouvre `VavaAtelier.config` |
+| `config_conseil.lua` | T-157 : réglages du seul client du Conseil (outil de placement, textes de la séance) : dans le paquet, et au serveur (avant `config.lua`) |
+| `config.lua` | tous les autres réglages, servi au seul serveur (en tête des `server_scripts`, après `config_conseil.lua`) : complète la table |
+| `shared/digest.lua`, `shared/codepack.lua` | T-157, purs, livrés à tous (serveur et chargeur) : empreinte FNV-1a 64 bits ; format du paquet, noms, découpe UTF-8 (`atelier_codepack_spec.lua`) |
+| `server/delivery.lua` | T-157 : construction du paquet au démarrage, RPC `code`, budget horaire (`atelier_delivery_spec.lua`) |
+| `client/notice.lua`, `client/loader.lua` | T-157, amorce : notifications, refus, réponse de `/atelier_archives` ; chargeur (stockage local, morceaux, empreinte, `load`, amorce de la page) (`atelier_loader_client_spec.lua`) |
 | `shared/formschema.lua` | pur : contrôle d'une déclaration d'éditeur (testé : `tests/spec/atelier_formschema_spec.lua`) |
 | `shared/formvalues.lua` | pur : valeurs reçues → data du module, et l'inverse, défauts (`atelier_formvalues_spec.lua`) |
 | `shared/text.lua` | pur : UTF-8, longueur en caractères, jeux de caractères, recherche sans accents (`atelier_text_spec.lua`) |
@@ -352,13 +430,15 @@ l'Atelier (il est alors resynchronisé).
 | `server/access.lua` | sessions et contrôle de chaque appel |
 | `server/home.lua`, `entries.lua`, `check.lua`, `journal.lua` | accueil ; listes, fiches, valeurs, recherche ; « Vérifier » ; journal |
 | `server/commands.lua`, `api.lua`, `main.lua` | Codex ; exports ; module, RPC, hooks |
-| `client/nui.lua` | seul pont avec la page |
-| `client/session.lua`, `relay.lua`, `main.lua` | ouverture, versions gardées, évènements, essai joué ; retours de la page → RPC ; touche, commande et `Z` d'annulation |
-| `shared/placerules.lua`, `shared/aim.lua` | purs, livrés au client (T-102) : règles de placement, les mêmes pour l'aperçu et la décision ; visée (candidat, molette, pile d'annulation, choix, étiquettes, barre des touches) (`atelier_placerules_spec.lua`, `atelier_aim_spec.lua`) |
+| `client/nui.lua`, `client/core.lua`, `client/main.lua` | amorce : seul pont avec la page ; API du core ; touche et commande (chargeur puis séance), déchargement, arrêt, export `isOpen` |
+| `client/session.lua`, `relay.lua`, `keys.lua` | paquet : ouverture, versions gardées, évènements, essai joué ; retours de la page → RPC ; `Z` d'annulation |
+| `shared/placerules.lua`, `shared/aim.lua` | purs (T-102) : règles de placement, les mêmes pour l'aperçu (paquet) et la décision (serveur) ; visée (candidat, molette, pile d'annulation, choix, étiquettes, barre des touches), dans le paquet seul (`atelier_placerules_spec.lua`, `atelier_aim_spec.lua`) |
 | `server/placement.lua` | RPC `place` et `children` (T-102, `atelier_placement_spec.lua`) |
-| `client/placer.lua`, `ghosts.lua`, `drawing.lua` | outil de placement : états, LA boucle par image de la visée, envois, annulation ; fantômes locaux ; marqueurs, anneaux, tracés, étiquettes |
+| `client/placer.lua`, `ghosts.lua`, `drawing.lua` | paquet, outil de placement : états, LA boucle par image de la visée, envois, annulation ; fantômes locaux ; marqueurs, anneaux, tracés, étiquettes |
 | `sql/0003_parent_index.sql` | index des enfants d'une fiche (`editor`, `parent`) |
-| `web/` | la page unique ; `index.html?screen=…` s'ouvre hors jeu avec `web/dev/devmock.js` (jamais livré) |
+| `web/index.html`, `web/boot.js` | amorce de la page, livrée à tous (T-157) : balisage vide ; insère la feuille et les scripts reçus du chargeur |
+| `web/css/`, `web/js/` | la page de l'Atelier, dans le paquet du Conseil (`vava_conseil_web`) |
+| `web/dev/` | jamais livré : `web/dev/index.html?screen=…` ouvre la page entière hors jeu avec `web/dev/devmock.js` ; `essais.js` |
 
 ## À vérifier en jeu
 
@@ -379,3 +459,9 @@ T-102 : visée et touches, AZERTY compris (atelier 19, 20-10) ; `Échap` sans ba
 la rend (21) ; publication vue d'un proche en moins d'une seconde, rien chez un joueur loin (22-2, 22-3) ; appels
 directs refusés (24) ; fantômes retirés et focus rendu à l'arrêt de la ressource (24-6) ; rendu du volet fidèle à la
 maquette `Recolte`.
+
+T-157 : ligne `paquet du Conseil : 24 fichiers…` au démarrage, directives lues en forme de table (atelier 25-1) ; un
+habitant ne reçoit aucun code et n'a plus la liaison « Atelier : annuler le dernier placement » (25-3, 25-4) ; premier
+F9 d'un membre ≈ 4 à 5 s, puis ouverture immédiate et, après reconnexion, sans téléchargement (25-5 à 25-7) ; tout
+l'Atelier comme en 1.3.0, Ctrl+Z compris (25-8) ; erreurs nommées sans `@@` (25-12, 25-13) ; rang retiré pendant et
+après un téléchargement (25-14, 25-15) ; `resmon` 0,00 ms au repos (25-18).

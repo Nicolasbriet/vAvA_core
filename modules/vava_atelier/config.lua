@@ -3,9 +3,10 @@
     Rôle : réglages de l'Atelier lus par le seul serveur (servi au seul serveur, jamais téléchargé par les joueurs) :
            familles de l'accueil et leur droit plancher, cartes « Bientôt », droits, bornes, journal, définitions
            gardées (fiches, brouillons, historique, essai, synchronisation, archives, lieux), débits, textes envoyés par
-           le serveur. Complète la table ouverte par config_client.lua (touche, commande, textes affichés par le
-           client) sans en réécrire une clé (T-132).
-    Dépendances : shared/constants.lua, config_client.lua
+           le serveur, livraison du code du Conseil. Complète la table ouverte par config_client.lua (touche,
+           commande, textes affichés par le client) et config_conseil.lua (outil de placement, textes de la séance)
+           sans en réécrire une clé (T-132, T-157).
+    Dépendances : shared/constants.lua, config_client.lua, config_conseil.lua
 ]]
 
 local config = VavaAtelier.config
@@ -123,7 +124,7 @@ config.place = {
     maxRadius = 500.0,
     polygonPoints = { min = 3, max = 32 },
 }
--- T-102 : outil de placement, ce que lit le seul serveur (le reste : config_client.lua, `placement`).
+-- T-102 : outil de placement, ce que lit le seul serveur (le reste : config_conseil.lua, `placement`).
 config.placement.bucket = 0          -- instance où l'on place (les zones du royaume vivent dans l'instance 0)
 config.placement.childrenMax = 200   -- lignes au plus d'une réponse `children` (= bundle.maxChildren)
 
@@ -139,10 +140,17 @@ config.rateLimits = {
     publish = { capacity = 2, refillPerSecond = 0.2 },  -- publier, revenir à une version
     place = { capacity = 6, refillPerSecond = 2 },      -- T-102 : poser ou déplacer (six clics d'affilée, puis 2 / s)
     children = { capacity = 4, refillPerSecond = 1 },   -- T-102 : lieux d'une fiche, de son parent, de ses enfants
+    code = { capacity = 12, refillPerSecond = 0.2 },    -- T-157 : description du paquet et ses morceaux (8 au plus)
 }
 
+-- T-157 : code du Conseil livré à la demande (server/delivery.lua) ; la table `delivery` est ouverte par
+-- config_client.lua (attentes du chargeur), complétée ici. Paquets entiers envoyés au plus à un même joueur par heure
+-- glissante (1 à 20 ; au-delà : rate_limited).
+config.delivery.hourlyPackages = 3
+
 -- Textes vus par les membres (l'interface a les siens : web/js/strings.js), lus par le seul serveur. Ceux que lit le
--- client (refus, bandeaux du volet, fin d'essai, auteur des réponses au chat) sont dans config_client.lua (texts.*).
+-- client de chaque joueur (refus, chargement des registres, auteur des réponses au chat) sont dans config_client.lua,
+-- ceux de la séance du Conseil (bandeaux du volet, fin d'essai, révocation) dans config_conseil.lua (texts.*).
 local texts = config.texts
 texts.title = 'L\'Atelier du Conseil'
 texts.subtitle = 'Créez et modifiez le royaume en jeu, sans redémarrer le serveur. Chaque changement est inscrit au journal.'

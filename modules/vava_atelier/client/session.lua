@@ -1,16 +1,15 @@
 --[[
     vava_atelier/client/session.lua
     Rôle : séance de l'Atelier côté joueur : ouverture, fermeture, essai joué (page mise de côté), versions gardées,
-           évènements du serveur.
-    Dépendances : shared/constants.lua, config_client.lua, client/core.lua, client/nui.lua
+           évènements du serveur. Livré dans le paquet du Conseil (T-157) : notifications, refus et réponse de
+           /atelier_archives sont dans l'amorce (client/notice.lua) ; `revoked` efface aussi le stockage local.
+    Dépendances : shared/constants.lua, config_client.lua, config_conseil.lua, client/core.lua, client/nui.lua,
+                  client/notice.lua, client/loader.lua
 ]]
 
-local type, pcall, tostring = type, pcall, tostring
+local type = type
 local find = string.find
-local CreateThread, RegisterNetEvent, GetResourceState, IsPauseMenuActive, TriggerEvent =
-    CreateThread, RegisterNetEvent, GetResourceState, IsPauseMenuActive, TriggerEvent
-local BeginTextCommandThefeedPost, AddTextComponentSubstringPlayerName, EndTextCommandThefeedPostTicker =
-    BeginTextCommandThefeedPost, AddTextComponentSubstringPlayerName, EndTextCommandThefeedPostTicker
+local CreateThread, RegisterNetEvent, IsPauseMenuActive = CreateThread, RegisterNetEvent, IsPauseMenuActive
 
 local core = VavaAtelier.core
 if not core then return end
@@ -18,12 +17,7 @@ if not core then return end
 local cfg = VavaAtelier.config
 local texts = cfg.texts
 local RPC, EVENTS, HOOKS = VavaAtelier.RPC, VavaAtelier.EVENTS, VavaAtelier.HOOKS
-local nui = VavaAtelier.nui
-
-local HUD = 'vava_hud'
-local CHAT, CHAT_EVENT = 'vava_chat', 'chat:addMessage'
-local SAY_MAX = 480
-local FEED_TEXT = 'STRING'
+local nui, notice, loader = VavaAtelier.nui, VavaAtelier.notice, VavaAtelier.loader
 
 local session = {}
 VavaAtelier.session = session
@@ -42,30 +36,9 @@ local CHANGES = {
 -- descripteur, son empreinte et son nom (bandeau du volet). '' ou absent : rien de gardé.
 local known = { home = '', editors = {} }
 
-local function hudNotify(message, kind)
-    return exports[HUD]:notify(message, kind)
-end
-
---- Message hors de l'interface : notification de vava_hud, sinon celle du jeu.
----@param message string
----@param kind? string  info | warning | danger
-function session.feed(message, kind)
-    if GetResourceState(HUD) == 'started' then
-        local called, ok = pcall(hudNotify, message, kind)
-        if called and ok then return end
-        if not called then core.log.warn('%s.notify en erreur : %s', HUD, tostring(ok)) end
-    end
-    BeginTextCommandThefeedPost(FEED_TEXT)
-    AddTextComponentSubstringPlayerName(message)
-    EndTextCommandThefeedPostTicker(false, false)
-end
-
---- Texte d'un refus (code du serveur ou du transport).
----@param code any
----@return string
-function session.refusal(code)
-    return texts.refused[code] or texts.refused.unavailable
-end
+--- Message hors de l'interface, texte d'un refus : ceux de l'amorce (client/notice.lua), gardés sous ces noms.
+session.feed = notice.feed
+session.refusal = notice.refusal
 
 ---@return boolean
 function session.isOpen()
@@ -212,9 +185,11 @@ function session.isSuspended()
     return suspended
 end
 
--- Le membre a perdu le droit d'ouvrir l'Atelier : le serveur a déjà fermé sa session.
+-- Le membre a perdu le droit d'ouvrir l'Atelier : le serveur a déjà fermé sa session. Le stockage local du paquet est
+-- effacé (T-157) : rendu le rang, le membre le retéléchargera.
 RegisterNetEvent(EVENTS.REVOKED, function()
     session.forget()
+    if loader then loader.forget() end
     if not open then return end
     session.close(false)
     session.feed(texts.revoked, 'warning')
@@ -235,16 +210,6 @@ end)
 local function isId(value, pattern, max)
     return type(value) == 'string' and #value <= max and find(value, pattern) ~= nil
 end
-
--- Réponse d'une commande de l'Atelier (/atelier_archives) : au chat s'il est là, sinon en notification.
-RegisterNetEvent(EVENTS.SAY, function(line)
-    if type(line) ~= 'string' or #line > SAY_MAX then return end
-    if GetResourceState(CHAT) == 'started' then
-        TriggerEvent(CHAT_EVENT, { args = { texts.sayAuthor, line } })
-    else
-        session.feed(line, 'info')
-    end
-end)
 
 -- Une fiche de l'atelier ouvert a changé ailleurs (publication, reprise, fin d'essai…) : la page relit la fiche ou
 -- avertit. Fin d'un essai alors que l'Atelier est fermé ou sur un autre atelier : notification.

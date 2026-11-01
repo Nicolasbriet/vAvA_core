@@ -1,7 +1,9 @@
 --[[
     vava_atelier/config_client.lua
-    Rôle : réglages lus par le client (et relus par le serveur) : touche, commande, textes affichés hors de la page, outil
-           de placement. Le reste : config.lua, servi au seul serveur. Détail : README (Règles).
+    Rôle : réglages lus par le client de chaque joueur (et relus par le serveur) : touche, commande, textes de l'amorce
+           (refus, chargement des registres, réponses au chat), attentes du chargeur. Ce que lit le seul client du
+           Conseil (outil de placement, textes de la séance) : config_conseil.lua, livré dans le paquet (T-157) ; le
+           reste : config.lua, servi au seul serveur. Détail : README (Règles).
     Dépendances : shared/constants.lua
 ]]
 
@@ -14,10 +16,8 @@ VavaAtelier.config = {
     command = 'atelier',
 
     -- Textes affichés par le client hors de la page (l'interface a les siens : web/js/strings.js) ; le serveur lit
-    -- aussi les refus. Les autres textes sont dans config.lua (texts.*).
+    -- aussi les refus. Ceux de la séance du Conseil sont dans config_conseil.lua, les autres dans config.lua (texts.*).
     texts = {
-        modeLine = 'Mode édition : visible par vous seul',      -- bandeau du volet (message `mode`)
-        revoked = 'Votre place au Conseil a changé : l\'Atelier se ferme.',
         -- refus d'un RPC (codes du § 6.2 de la spec), montrés hors de l'interface quand elle ne peut pas s'ouvrir
         refused = {
             not_ready = 'Le Registre du Conseil s\'éveille : réessayez dans un instant.',
@@ -56,96 +56,16 @@ VavaAtelier.config = {
             instance = 'Vous êtes hors du monde commun (intérieur, cachot…) : revenez-y pour placer.',
             bad_request = 'Demande refusée : rouvrez la fiche.',
         },
-        -- bandeau du volet pendant un essai, si l'éditeur n'a pas de texts.trialLine
-        trialLineDefault = 'Mode essai : vous seul voyez ce changement en jeu',
-        trialEndedFeed = 'L\'essai de « %s » a pris fin.',
         -- nom des réponses de /atelier_archives dans le chat du membre (ancien texts.archives.author)
         sayAuthor = 'Atelier',
+        -- T-157 : chargeur (160 octets au plus) ; premier envoi d'une version, puis échec d'un fichier ou de la page
+        loading = 'On apporte les registres de l\'Atelier : un instant…',
+        loadFailed = 'Les registres de l\'Atelier n\'ont pas pu être ouverts : prévenez un développeur.',
     },
 
-    -- T-102 : outil de placement (client/placer.lua). Le serveur relit `reach`, `polygonFactor` et `texts` : il
-    -- revérifie chaque pose avec les mêmes règles (shared/placerules.lua) et rend les mêmes textes.
-    placement = {
-        reach = 60.0,                -- distance au plus (m, 3D) entre le personnage et le lieu posé (centre, point)
-        polygonFactor = 2.0,         -- un sommet de tracé peut être à reach × polygonFactor (au sol)
-        -- visée depuis la caméra : longueur (m) et drapeaux du lancer de rayon (1 sol + 16 objets)
-        aim = { distance = 80.0, flags = 17 },
-        labels = { distance = 40.0, max = 12 },   -- étiquettes : les 12 plus proches à moins de 40 m
-        -- fantômes des enfants pas encore publiés (et du candidat) : objets locaux, jamais réseau
-        ghosts = { distance = 60.0, max = 12, alpha = 160, loadTimeoutMs = 3000 },
-        -- un cran de molette ; Maj tenue : pas fin
-        steps = { heading = 15.0, headingFine = 1.0, radius = 5.0, radiusFine = 0.5 },
-        pickRadius = 2.5,            -- clic droit : élément de la fiche le plus proche du point visé, à 2,5 m au plus
-        undoMax = 20,                -- gestes annulables par Ctrl+Z dans une visée
-        refreshMs = 100,             -- règles réévaluées au plus toutes les 100 ms (ou dès que le candidat bouge)
-        sortMs = 500,                -- tri des éléments proches (étiquettes, fantômes)
-        quitConfirmMs = 2000,        -- tracé commencé : un second Échap dans ce délai l'abandonne
-        -- teintes (maquette Recolte : vert #7fc46a, rouge #e8a48f, laiton #dcc08a)
-        colors = {
-            valid = { 127, 196, 106 }, refused = { 232, 164, 143 }, area = { 220, 192, 138 },
-            child = { 244, 232, 204 }, picked = { 214, 224, 230 },
-        },
-        ringAlpha = 70,              -- opacité des anneaux (cylindre de 1,5 m de haut)
-        markers = { area = 1, point = 2, vertex = 1 },   -- types de DrawMarker (cylindre, chevron)
-        -- contrôles lus (indépendants de la disposition du clavier)
-        controls = { place = 24, pick = 25, wheelUp = 15, wheelDown = 14, fine = 21, ctrl = 36, quit = 200, close = 191 },
-        -- contrôles neutralisés pendant la visée (tir, visée, roue des armes, course, accroupi, couverture, mêlée, pause)
-        disabled = { 24, 25, 14, 15, 16, 17, 37, 21, 36, 44, 140, 141, 142, 199, 200, 257, 263 },
-        -- Z en commande-touche (suit la disposition du clavier), avec Ctrl ; déclarée au registre core:commands
-        undoKey = { command = 'vava_atelier_annuler', key = 'Z', label = 'Atelier : annuler le dernier placement (avec Ctrl)' },
-        -- barre des touches par mode (maquette Recolte)
-        keybar = {
-            children = {
-                { keys = 'Clic', label = 'Poser ici' }, { keys = 'Molette', label = 'Tourner' },
-                { keys = 'Maj', label = 'Placement précis' }, { keys = 'Clic droit', label = 'Choisir un point' },
-                { keys = 'Ctrl Z', label = 'Annuler' }, { keys = 'Échap', label = 'Quitter' },
-            },
-            picked = {
-                { keys = 'Clic', label = 'Déplacer ici' }, { keys = 'Molette', label = 'Tourner' },
-                { keys = 'Maj', label = 'Placement précis' }, { keys = 'Clic droit', label = 'Lâcher le point' },
-                { keys = 'Ctrl Z', label = 'Annuler' }, { keys = 'Échap', label = 'Quitter' },
-            },
-            circle = {
-                { keys = 'Clic', label = 'Poser ici' }, { keys = 'Molette', label = 'Rayon' },
-                { keys = 'Maj', label = 'Réglage fin' }, { keys = 'Ctrl Z', label = 'Annuler' },
-                { keys = 'Échap', label = 'Quitter' },
-            },
-            point = {
-                { keys = 'Clic', label = 'Poser ici' }, { keys = 'Ctrl Z', label = 'Annuler' },
-                { keys = 'Échap', label = 'Quitter' },
-            },
-            oriented = {
-                { keys = 'Clic', label = 'Poser ici' }, { keys = 'Molette', label = 'Tourner' },
-                { keys = 'Maj', label = 'Placement précis' }, { keys = 'Ctrl Z', label = 'Annuler' },
-                { keys = 'Échap', label = 'Quitter' },
-            },
-            polygon = {
-                { keys = 'Clic', label = 'Ajouter un sommet' }, { keys = 'Entrée', label = 'Fermer le tracé' },
-                { keys = 'Clic droit', label = 'Choisir un sommet' }, { keys = 'Ctrl Z', label = 'Retirer le dernier' },
-                { keys = 'Échap', label = 'Quitter' },
-            },
-        },
-        -- textes de l'aperçu et des refus (le serveur rend les mêmes)
-        texts = {
-            valid = '%s, emplacement valide',
-            refused = '%s — %s',
-            area = '%s, rayon %s m',
-            far = 'Trop loin de vous (%d m) : approchez-vous.',
-            ground = 'Visez le sol.',
-            inside = 'Hors de %s.',
-            spacing = 'Trop près de « %s » (%s m).',
-            radius = 'Rayon de %d à %d m.',
-            vertices = 'De %d à %d sommets.',
-            crossing = 'Le tracé se croise.',
-            busy = 'Un instant…',
-            undoNone = 'Rien à annuler.',
-            undoFailed = 'Impossible d\'annuler : la fiche a changé.',
-            picked = '%s : cliquez à sa nouvelle place',
-            trace = 'Sommets posés : %d (Entrée pour fermer le tracé)',
-            quitTrace = 'Appuyez encore sur Échap pour abandonner le tracé.',
-            vehicle = 'Descendez de votre monture pour placer.',
-            new = 'nouveau',
-            removal = 'retiré',
-        },
+    -- T-157 : attentes du chargeur de l'Atelier (client/loader.lua), en millisecondes (1 000 à 30 000)
+    delivery = {
+        pageWaitMs = 5000,    -- attente au plus de la page vide (« prête ») avant de lui donner ses scripts
+        bootWaitMs = 5000,    -- attente au plus du compte rendu de la page après ses scripts
     },
 }

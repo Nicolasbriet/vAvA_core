@@ -1,7 +1,7 @@
 --[[
     vava_atelier/shared/aim.lua
     Rôle : logique pure de la visée (client) : candidat, molette, pile d'annulation, choix, étiquettes, barre des touches.
-           Testée : tests/spec/atelier_aim_spec.lua.
+           Livrée dans le paquet du Conseil (T-157). Testée : tests/spec/atelier_aim_spec.lua.
     Dépendances : shared/constants.lua
 ]]
 

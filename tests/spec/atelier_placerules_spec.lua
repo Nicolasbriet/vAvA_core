@@ -15,6 +15,7 @@ describe('vava_atelier placerules', function()
         helper.loadAll({
             'modules/vava_atelier/shared/constants.lua',
             'modules/vava_atelier/config_client.lua',
+            'modules/vava_atelier/config_conseil.lua',     -- T-157 : config du placement, livrée dans le paquet
             'modules/vava_atelier/shared/placerules.lua',
         })
         rules = VavaAtelier.placerules
