@@ -3,7 +3,10 @@
 #   1. lint (luacheck) : fichiers Lua modifiés depuis BASE, ou tout le dépôt avec --tout
 #   2. tests unitaires (busted)
 #   3. essais des fonctions pures des pages (node, s'il est présent ; sinon un message, sans échec)
-#   4. audit réseau et sécurité statique (scripts/audit-reseau.sh), puis son essai sur les cas de tests/audit/
+#   4. Lua livré sans commentaires (T-154) : essais du lexeur et de la livraison (node), allègement de tout le Lua suivi
+#      par git prouvé par le compilateur Lua 5.4 (scripts/lib/meme-code.lua), liste des fichiers allégés recoupée avec
+#      scripts/lib/manifeste.awk (node absent : message, échec en CI ; lua absent : échec)
+#   5. audit réseau et sécurité statique (scripts/audit-reseau.sh), puis son essai sur les cas de tests/audit/
 # Code de sortie 0 seulement si tout passe.
 set -uo pipefail
 cd "$(dirname "$0")/.."
@@ -62,6 +65,29 @@ else
         if [[ -f "$essai" ]]; then node "$essai" || echec=1
         else echo "$essai introuvable"; echec=1; fi
     done
+fi
+
+titre "Lua livré sans commentaires (T-154)"
+# allègement de chaque fichier Lua suivi par git par le lexeur de la Chancellerie, prouvé par le compilateur Lua 5.4
+# (scripts/lib/meme-code.lua) ; liste des fichiers allégés recoupée avec scripts/lib/manifeste.awk ; essais du lexeur.
+# node absent : rien n'est lancé (échec en CI) ; lua absent : échec (comme busted)
+LUA=$(command -v lua5.4 || command -v lua || true)
+if ! command -v node >/dev/null; then
+    echo "node absent : livraison non essayée"; [[ -n "${CI:-}" ]] && echec=1
+elif [[ -z "$LUA" ]]; then
+    echo "lua absent : preuve de la livraison non lancée"; echec=1
+else
+    tmp=$(mktemp -d)
+    node tests/livraison/essais.js || echec=1
+    node scripts/livraison.js --essai "$tmp/allege" > "$tmp/liste.txt" || echec=1
+    "$LUA" scripts/lib/meme-code.lua "$tmp/allege" < "$tmp/liste.txt" || echec=1
+    node scripts/livraison.js --liste | cut -f1,2 | sort -u > "$tmp/js.txt" || echec=1
+    ./scripts/poids-client.sh --liste | grep -i '\.lua$' | sort -u > "$tmp/awk.txt"
+    if ! diff -u "$tmp/awk.txt" "$tmp/js.txt"; then
+        echo "ÉCART : la livraison (chancellerie/lib/delivery.js) et scripts/lib/manifeste.awk ne voient pas les mêmes fichiers Lua servis"
+        echec=1
+    fi
+    rm -rf "$tmp"
 fi
 
 titre "Audit réseau et sécurité"

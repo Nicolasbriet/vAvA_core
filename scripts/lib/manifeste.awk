@@ -4,9 +4,11 @@
 #
 # Lecture du Lua : commentaires de fin de ligne et blocs (`--[[ ]]`, `--[==[ ]==]`) ignorés, chaînes courtes et longues
 # (`[[…]]`, `[==[…]==]`, sur plusieurs lignes) lues. Directives suivies : `files`, `file`, `ui_page`, `loadscreen`,
-# `shared_script(s)`, `client_script(s)`, `server_script(s)`, en forme simple (`file 'x'`) ou en table (`{ … }`, tables
-# imbriquées comprises). Chaque chaîne est normalisée (`\` → `/`, `./` et `/./` retirés, `//` réduit) ; pour les
-# règles, mise en minuscules (NTFS ne distingue pas la casse), préfixe `@<ressource>/` retiré, `x/../` réduit.
+# `shared_script(s)`, `client_script(s)`, `server_script(s)`, `vava_conseil_lua` et `vava_conseil_web` (T-157 : code et
+# page du seul Conseil, livrés à la demande, jamais téléchargés à la connexion), en forme simple (`file 'x'`) ou en table
+# (`{ … }`, tables imbriquées comprises). Chaque chaîne est normalisée (`\` → `/`, `./` et `/./` retirés, `//`
+# réduit) ; pour les règles, mise en minuscules (NTFS ne distingue pas la casse), préfixe `@<ressource>/` retiré,
+# `x/../` réduit.
 #
 # MODE vide (audit) : une ligne par constat, « étiquette<TAB>chemin:ligne:contenu de la ligne où commence la chaîne »
 # (une seule fois par étiquette et par ligne) :
@@ -19,8 +21,9 @@
 #   D — (T-132) chaîne d'une directive suivie qui sort de la ressource (un `..` de trop) ;
 #   X — (T-132) directive suivie d'autre chose qu'une chaîne ou une table de chaînes (nom, concaténation `..`, appel,
 #       index) : valeur illisible pour l'audit, donc refusée (l'écrire en toutes lettres).
-# MODE=liste : une ligne par chaîne, « chemin<TAB>client|serveur<TAB>directive<TAB>chaîne normalisée » (côté client :
-# tout sauf `server_script(s)` ; casse gardée, pour lire le disque).
+# MODE=liste : une ligne par chaîne, « chemin<TAB>client|serveur|conseil<TAB>directive<TAB>chaîne normalisée » (côté
+# serveur : `server_script(s)` ; côté conseil : `vava_conseil_lua`, `vava_conseil_web` ; côté client : le reste ; casse
+# gardée, pour lire le disque).
 
 function norm(m) {
     gsub(/\\/, "/", m)
@@ -78,7 +81,7 @@ function reduire(m,    n, p, out, k, i, r) {
 function suivie(mot) {
     return mot == "files" || mot == "file" || mot == "ui_page" || mot == "loadscreen" ||
         mot == "shared_script" || mot == "shared_scripts" || mot == "client_script" || mot == "client_scripts" ||
-        mot == "server_script" || mot == "server_scripts"
+        mot == "server_script" || mot == "server_scripts" || mot == "vava_conseil_lua" || mot == "vava_conseil_web"
 }
 function livre(d) { return d == "files" || d == "file" || d == "ui_page" || d == "loadscreen" }
 function constat(etiquette) {
@@ -97,7 +100,7 @@ function valeur(s,    d, m) {
     m = norm(s)
     if (MODE == "liste") {
         gsub(/\n/, "", m)
-        print FILENAME "\t" (d ~ /^server_script/ ? "serveur" : "client") "\t" d "\t" m
+        print FILENAME "\t" (d ~ /^server_script/ ? "serveur" : d ~ /^vava_conseil_/ ? "conseil" : "client") "\t" d "\t" m
         return
     }
     m = tolower(m)

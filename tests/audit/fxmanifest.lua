@@ -117,3 +117,7 @@ client_script '../vava_autre/client/b.lua' -- exception D inscrite  -- attendu: 
 client_script '../vava_autre/client/c.lua' -- audit: ok  -- attendu: BLOQUANT
 shared_scripts(autre) -- exception X inscrite  -- attendu: BLOQUANT
 shared_scripts(encore) -- audit: ok  -- attendu: BLOQUANT
+-- T-154 et T-157 : code du seul Conseil (vava_conseil_lua), suivi par le lecteur : règles D et X
+vava_conseil_lua { 'client/a.lua' }  -- attendu: rien
+vava_conseil_lua { nom }  -- attendu: BLOQUANT
+vava_conseil_lua { '../x.lua' }  -- attendu: BLOQUANT
