@@ -3,7 +3,8 @@
     Rôle : lien avec la bannière du royaume (vava_pause, 1.6.0) : bannière déployée ou non (crochet vava_pause:state,
            remis à « repliée » à l'arrêt de sa ressource) ; réglages du joueur lus chez elle (export setting, isolé) et
            suivis (crochet vava_pause:settingChanged) : taille de l'interface et durée des notifications, envoyées à la
-           page (message `settings`) seulement quand elles changent. Sans vava_pause : échelle 1, durée de base.
+           page (message `settings`) seulement quand elles changent ; chiffres des coups (T-155), gardés ici (filtre
+           en Lua). Sans vava_pause : échelle 1, durée de base, numbers.defaultMode.
     Dépendances : config_client.lua, client/core.lua, client/nui.lua
 ]]
 
@@ -17,7 +18,7 @@ if not core then return end
 local cfg = VavaHud.config
 local nui = VavaHud.nui
 local PAUSE = cfg.pauseResource
-local SCALE_KEY, DURATION_KEY = 'ui.scale', 'hud.notifyDuration'
+local SCALE_KEY, DURATION_KEY, NUMBERS_KEY = 'ui.scale', 'hud.notifyDuration', 'combat.numbers'
 local DEFAULT_SCALE, DEFAULT_DURATION = 1.0, cfg.notifications.durationMs
 
 local pause = {}
@@ -25,6 +26,8 @@ VavaHud.pause = pause
 
 local open = false
 local current = { scale = DEFAULT_SCALE, durationMs = DEFAULT_DURATION }
+-- réglage « Chiffres des coups » tel que lu (nil : bannière absente ; une valeur inconnue vaut numbers.defaultMode)
+local numbersMode = nil
 -- après chaque changement : appelé par main.lua (visibilité du HUD)
 local onChange = nil
 
@@ -67,6 +70,7 @@ end
 --- Relit les deux réglages chez la bannière (démarrage, bannière démarrée ou arrêtée).
 local function reload()
     apply(effective(setting(SCALE_KEY), setting(DURATION_KEY)))
+    numbersMode = setting(NUMBERS_KEY)
 end
 
 ---@return boolean  bannière déployée
@@ -78,6 +82,12 @@ end
 ---@return { scale: number, durationMs: integer }
 function pause.settings()
     return { scale = current.scale, durationMs = current.durationMs }
+end
+
+--- Réglage « Chiffres des coups » (`tous`, `infliges`, `aucun`), ou nil.
+---@return any
+function pause.numbersMode()
+    return numbersMode
 end
 
 ---@param handler fun()
@@ -92,7 +102,11 @@ end)
 
 core.hooks.after('vava_pause:settingChanged', function(payload)
     if type(payload) ~= 'table' then return end
-    if payload.key == SCALE_KEY or payload.key == DURATION_KEY then reload() end
+    if payload.key == SCALE_KEY or payload.key == DURATION_KEY then
+        reload()
+    elseif payload.key == NUMBERS_KEY then
+        numbersMode = setting(NUMBERS_KEY)
+    end
 end)
 
 AddEventHandler('onClientResourceStart', function(resource)
@@ -102,6 +116,7 @@ end)
 AddEventHandler('onClientResourceStop', function(resource)
     if resource ~= PAUSE then return end
     open = false
+    numbersMode = nil
     apply(effective(nil, nil))
     if onChange then onChange() end
 end)

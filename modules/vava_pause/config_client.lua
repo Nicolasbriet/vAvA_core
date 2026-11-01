@@ -92,6 +92,12 @@ VavaPause.config = {
               choices = { 'courte', 'normale', 'longue' }, labels = { 'Courte', 'Normale', 'Longue' },
               uses = { 'vava_hud' },
               label = 'Durée des notifications', help = 'Le temps qu\'un message reste à l\'écran.' },
+            -- chiffres des coups (T-155), filtrés par vava_hud sur cette machine : le serveur envoie les mêmes octets
+            { key = 'combat.numbers', tab = 'interface', kind = 'choice', default = 'tous',
+              choices = { 'tous', 'infliges', 'aucun' }, labels = { 'Donnés et reçus', 'Donnés seulement', 'Aucun' },
+              uses = { 'vava_hud' },
+              label = 'Chiffres des coups',
+              help = 'Ce que vos coups emportent, et ce que vous encaissez, au-dessus de la cible.' },
             { key = 'voice.circle', tab = 'voix', kind = 'lever', default = true, uses = { 'vava_voice' },
               label = 'Cercle de portée au sol', help = 'Montre jusqu\'où porte votre voix quand vous en changez.' },
         },

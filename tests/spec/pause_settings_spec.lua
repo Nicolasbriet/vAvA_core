@@ -1,9 +1,11 @@
 local helper = require('tests.helper')
 
--- Réglages du joueur (vava_pause 1.0.0, T-145 § 5.2) : logique pure de shared/settings.lua, sur la vue client.
+-- Réglages du joueur (vava_pause 1.0.0, T-145 § 5.2 ; 1.1.0 : chiffres des coups, T-155) : logique pure de
+-- shared/settings.lua, sur la vue client.
 describe('vava_pause : réglages du joueur', function()
     local settings, list
-    local DEFAULTS = { ['ui.scale'] = 100, ['hud.notifyDuration'] = 'normale', ['voice.circle'] = true }
+    local DEFAULTS = { ['ui.scale'] = 100, ['hud.notifyDuration'] = 'normale', ['voice.circle'] = true,
+        ['combat.numbers'] = 'tous' }
 
     -- aller-retour sans JSON : la table encodée est rendue telle quelle par le « décodeur »
     local stored = {}
@@ -36,8 +38,9 @@ describe('vava_pause : réglages du joueur', function()
 
     it('clé inconnue retirée, valeurs permises gardées', function()
         local values = settings.normalize({ ['ui.scale'] = 115, ['hud.notifyDuration'] = 'longue', ['voice.circle'] = false,
-            ['autre.chose'] = 1 }, list)
-        assert.same({ ['ui.scale'] = 115, ['hud.notifyDuration'] = 'longue', ['voice.circle'] = false }, values)
+            ['combat.numbers'] = 'infliges', ['autre.chose'] = 1 }, list)
+        assert.same({ ['ui.scale'] = 115, ['hud.notifyDuration'] = 'longue', ['voice.circle'] = false,
+            ['combat.numbers'] = 'infliges' }, values)
     end)
 
     it('choix hors liste, type faux, NaN : défaut de la clé', function()
@@ -45,6 +48,8 @@ describe('vava_pause : réglages du joueur', function()
         assert.equal(100, settings.normalize({ ['ui.scale'] = '115' }, list)['ui.scale'])
         assert.equal(100, settings.normalize({ ['ui.scale'] = 0 / 0 }, list)['ui.scale'])
         assert.equal('normale', settings.normalize({ ['hud.notifyDuration'] = 'éternelle' }, list)['hud.notifyDuration'])
+        assert.equal('tous', settings.normalize({ ['combat.numbers'] = 'tout' }, list)['combat.numbers'])
+        assert.equal('tous', settings.normalize({ ['combat.numbers'] = true }, list)['combat.numbers'])
     end)
 
     it('un choix lu en flottant (115.0) rend la valeur de la liste', function()
@@ -75,15 +80,21 @@ describe('vava_pause : réglages du joueur', function()
         assert.equal('ui.scale', visible[1].key)
         assert.is_nil(visible[1].uses)
         running.vava_hud, running.vava_voice = true, true
-        assert.equal(3, #settings.visible(list, function(name) return running[name] == true end))
+        assert.equal(4, #settings.visible(list, function(name) return running[name] == true end))
+        -- chiffres des coups : seulement avec vava_hud, qui les montre
+        running.vava_hud = false
+        for _, def in ipairs(settings.visible(list, function(name) return running[name] == true end)) do
+            assert.not_equal('combat.numbers', def.key)
+        end
     end)
 
     it('aller-retour : encodable puis read rend les mêmes valeurs', function()
-        local values = { ['ui.scale'] = 115, ['hud.notifyDuration'] = 'courte', ['voice.circle'] = false, extra = 1 }
+        local values = { ['ui.scale'] = 115, ['hud.notifyDuration'] = 'courte', ['voice.circle'] = false,
+            ['combat.numbers'] = 'aucun', extra = 1 }
         local kept = settings.encodable(values, list)
         assert.is_nil(kept.extra)
-        assert.same({ ['ui.scale'] = 115, ['hud.notifyDuration'] = 'courte', ['voice.circle'] = false },
-            settings.read(encode(kept), list, decode))
+        assert.same({ ['ui.scale'] = 115, ['hud.notifyDuration'] = 'courte', ['voice.circle'] = false,
+            ['combat.numbers'] = 'aucun' }, settings.read(encode(kept), list, decode))
     end)
 
     it('chaque réglage de la config est bien formé (défaut permis, libellés, onglet)', function()

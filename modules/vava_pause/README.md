@@ -25,7 +25,8 @@ Spec : `docs/plan/specs/T-145.md` (avec les décisions du porteur du projet du 3
   « ouvrir la fiche complète » ouvre le livre des compétences.
 - **Codex** : le livre de `vava_codex` s'ouvre à droite de la bannière (Codex en panneau, `vava_codex` ≥ 1.7.0).
 - **Carte** : la carte de GTA en attendant la carte du royaume ; Échap la ferme et la bannière revient.
-- **Réglages** : taille de l'interface (bannière et HUD), durée des notifications, cercle de portée de la voix ; touches
+- **Réglages** : taille de l'interface (bannière et HUD), durée des notifications, chiffres des coups (Donnés et
+  reçus, Donnés seulement, Aucun ; 1.1.0), cercle de portée de la voix ; touches
   du joueur (celles qu'il a liées). Gardés **sur sa machine**, pour tous ses personnages ; rien ne part au serveur.
 - **Le Conseil** : une question, un signalement de joueur, un bug, autre ; position jointe au choix (toujours pour un
   signalement : le Conseil saura qui se trouvait près de vous) ; suivi de la demande (envoyée, prise en charge, close).
@@ -53,7 +54,7 @@ Spec : `docs/plan/specs/T-145.md` (avec les décisions du porteur du projet du 3
 | Fiche complète | commande `vava_skills` | `sheet` (client) |
 | Bannière royale, tampons de rang | garance, champ bleu, croix ; encres par rang | `royal`, `rankInks` (client) |
 | Plaque | périodes du jour, saisons, habitants | `plaque` (client) |
-| Réglages du joueur | `ui.scale`, `hud.notifyDuration`, `voice.circle` ; stockage local `vava_pause:reglages` | `settings` (client) |
+| Réglages du joueur | `ui.scale`, `hud.notifyDuration`, `combat.numbers` (1.1.0, T-155 : chiffres des coups, `tous` / `infliges` / `aucun`, lu par `vava_hud`), `voice.circle` ; stockage local `vava_pause:reglages` | `settings` (client) |
 | Essai du ligotage | `''` (commande absente) | `devCuffCommand` (client) |
 | Textes du client | refus, repli, indisponible | `messages` (client) |
 | Débits | ouverture 4 puis 1 / 4 s ; Conseil 2 puis 1 / min ; quitter 2 puis 1 / 10 s | `rateLimits` |
@@ -149,3 +150,5 @@ Tests hors jeu : `tests/spec/pause_gate_spec.lua`, `pause_settings_spec.lua`, `p
 - Focus rendu au Codex en panneau, puis repris par la bannière.
 - Menu de GTA jamais visible, même une image (`SetPauseMenuActive(false)` à chaque image).
 - `resmon` ≤ 0,02 ms au repos, ≤ 0,15 ms bannière ouverte.
+- Réglage « Chiffres des coups » (1.1.0) : onglet Interface, trois tampons sur une ligne, suivi aussitôt par `vava_hud`
+  (`docs/tests/combat.md` § 7, 1, 13 et 14).
