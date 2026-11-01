@@ -1,12 +1,12 @@
 --[[
     vava_combat/bridge/client.lua
-    Rôle : SEUL point de contact du client avec les autres modules : notification, main du personnage local en cache
-           (hooks du core), changement de main annoncé, à terre. Chaque appel isolé.
+    Rôle : SEUL point de contact du client avec les autres modules : notification, chiffres des coups (vava_hud),
+           main du personnage local en cache (hooks du core), changement de main annoncé, à terre. Chaque appel isolé.
     Dépendances : shared/constants.lua, config_client.lua, client/core.lua
 ]]
 
 local type, pcall, tostring, ipairs = type, pcall, tostring, ipairs
-local GetResourceState = GetResourceState
+local GetResourceState, GetGameTimer = GetResourceState, GetGameTimer
 local BeginTextCommandThefeedPost, AddTextComponentSubstringPlayerName, EndTextCommandThefeedPostTicker =
     BeginTextCommandThefeedPost, AddTextComponentSubstringPlayerName, EndTextCommandThefeedPostTicker
 
@@ -17,6 +17,7 @@ local HUD, HEALTH = 'vava_hud', 'vava_health'
 local HANDS_FIELD = VavaCombat.INVENTORY_HANDS_FIELD
 -- natures de notification comprises par vava_hud
 local NATURES = { info = 'info', warning = 'warning', danger = 'danger' }
+local WARN_MS = 60000
 
 local Bridge = {}
 VavaCombat.bridge = Bridge
@@ -37,6 +38,27 @@ function Bridge.Notify(message, kind)
     BeginTextCommandThefeedPost('STRING')
     AddTextComponentSubstringPlayerName(message)
     EndTextCommandThefeedPostTicker(false, false)
+end
+
+local function hudHitText(side, anchor, issue, tenths)
+    return exports[HUD]:hitText(side, anchor, issue, tenths)
+end
+
+local hitTextWarnedAt = nil
+
+--- Chiffre d'un coup (vava_hud:hitText, T-155) ; sans vava_hud : rien. Erreur : une ligne de console par minute.
+---@param side string  dealt | taken
+---@param anchor integer
+---@param issue string
+---@param tenths integer|nil
+function Bridge.HitText(side, anchor, issue, tenths)
+    if GetResourceState(HUD) ~= 'started' then return end
+    local called, err = pcall(hudHitText, side, anchor, issue, tenths)
+    if called then return end
+    local now = GetGameTimer()
+    if hitTextWarnedAt and now - hitTextWarnedAt < WARN_MS then return end
+    hitTextWarnedAt = now
+    VavaCombat.log.warn('%s.hitText en erreur : %s', HUD, tostring(err))
 end
 
 -- Main du personnage local ---------------------------------------------------------------------------------------

@@ -76,7 +76,8 @@ variable) : une technique n'a rien de secret. Les joueurs téléchargent les con
 | Tolérances (serveur) | **+ 0,25 m** à la portée, **+ 10°** au demi-angle, + 0,4 m à la hauteur (resserrées : décision du porteur du projet ; bornées au démarrage à 1 m, 30°, 1 m) ; aucun contrôle des murs | `tolerance` |
 | Géométrie (serveur) | hauteur 1,6 m (+ tolérance), contact sous 0,6 m (l'angle ne compte plus), **un** adversaire par coup, marge de recherche des proches 1 m | `geometry` |
 | Bond de l'attaquant (serveur) | 8 m/s + 0,5 m entre la demande et un relevé, sinon coup annulé (console) ; large pendant une longue préparation (5,7 m au Fendant) : à resserrer à la porte T-119 (≈ 4 à 5 m/s) | `lunge` |
-| Réactions (serveur) | joueurs prévenus à 30 m de la cible, dans l'instance de l'attaquant ; issues jamais envoyées : `dodge`, `absorb` (jamais `parry` ni `break`, refusés au démarrage) ; avis d'un coup retenu au seul attaquant, un par raison et par 10 s | `reactions`, `notices`, `messages.pvpOff`, `peace`, `held` |
+| Réactions (serveur) | joueurs prévenus à 30 m de la cible, dans l'instance de l'attaquant ; issues jamais envoyées aux témoins : `dodge`, `absorb` (jamais `parry` ni `break`, refusés au démarrage) ; avis d'un coup retenu au seul attaquant, un par raison et par 10 s | `reactions`, `notices`, `messages.pvpOff`, `peace`, `held` |
+| Chiffres des coups (serveur, 1.4.0, T-155) | activés ; le montant du coup (dixièmes, après modificateurs) à l'attaquant et à la cible, jamais aux témoins ; « Esquivé » et « Absorbé » aux deux seuls ; `enabled = false` : comme en 1.3.0. Quatre booléens contrôlés au démarrage | `numbers` (`enabled`, `attacker`, `target`, `witnesses`) |
 | Débit des RPC (serveur) | `use` et `lower` : 4 d'avance, puis 3 par seconde chacun | `rateLimits.use`, `rateLimits.lower` |
 | Mode combat (client) | endormi après 10 s sans coup ni verrou (jamais garde levée) ; conditions relevées à 200 ms ; touche gardée 250 ms ; virage de 90° au plus au départ du coup ; un même refus redit au plus toutes les 3 s ; contrôles de GTA coupés à chaque image en mode actif, saut (22) et recharger (45) compris (jamais Échap ni P : 199, 200, 322 refusés au démarrage ; 32 au plus) | `mode` |
 | Touches (client) | clic gauche (attaque légère), clic droit (attaque lourde), clic molette (verrouiller ; maintenu : relâcher), **R** (appui bref : parer ; maintenu : se garder), **Espace** (pas de côté, mode combat actif seulement : le saut de GTA y est coupé) ; réglables dans Paramètres > Raccourcis > FiveM | `keys` |
@@ -155,8 +156,9 @@ T-114.
    de son instance sur les positions et le cap **qu'il lit lui-même** : portée, demi-angle, hauteur ; un adversaire par
    coup (le verrouillé d'abord, puis le plus en face, le plus proche), touché une fois.
 4. Le coup passe par `strike` et la chaîne de dégâts (`vava_health:hit`) ; l'arme s'use. L'issue part aux seuls joueurs
-   à 30 m de la cible (`vava_combat:hit`) : la cible tressaille ou chancelle, chacun voit l'impact. Un coup retenu
-   (combats coupés, lieu de paix, crochet) : un avis à l'attaquant seul.
+   à 30 m de la cible (`vava_combat:hit`) : la cible tressaille ou chancelle, chacun voit l'impact. L'attaquant et la
+   cible voient en plus le montant du coup au-dessus de la cible (chiffres des coups, 1.4.0, par `vava_hud`) ; les
+   témoins, jamais. Un coup retenu (combats coupés, lieu de paix, crochet) : un avis à l'attaquant seul.
 
 **Enchaînement** : une technique de la chaîne part pendant la récupération de la précédente (qui est coupée) ; quatre
 coups de suite au plus, puis la récupération entière. Un coup annulé (chancellement, à terre, arme changée, véhicule,
@@ -229,7 +231,7 @@ garde d'emblée. Le serveur tient ces durées (hook `vava_inventory:hold`) ; le 
 |---|---|---|---|
 | RPC `vava_combat:use(technique, cible)` (`core.rpc`, schéma borné : chaîne de 1 à 32 octets `^[a-z0-9_]+$`, entier 0 à 65535) | le serveur ; réponse au seul appelant (`true`, `false, code[, attente]`) | ≈ 40 o + ≈ 15 o | un par coup, par parade, par pas de côté, par garde levée ; 4 d'avance puis 3 / s |
 | RPC `vava_combat:lower()` (aucun argument) | le serveur ; réponse au seul appelant (`true`, `false, 'no_guard'`) | ≈ 25 o + ≈ 10 o | un par garde abaissée ; 4 d'avance puis 3 / s ; **rien pendant la tenue** |
-| `vava_combat:hit` (`core.net.sendNearWith`, instance de l'attaquant) : attaquant, cible, issue (`hit`, `stagger`, `down`, `block`, `parry`, `break`) | les joueurs apparus à 30 m de la **cible**, dans l'instance de l'attaquant (cible, attaquant paré, témoins) | ≈ 30 à 40 o | **un** par cible touchée et par coup de technique (un adversaire par coup) ; un coup paré, bloqué ou qui brise la garde envoie son issue **à la place** de `hit` ; jamais pour un coup manqué, refusé ou annulé, ni pour une esquive ou un coup absorbé (`reactions.silent`), ni pour un coup d'une autre ressource |
+| `vava_combat:hit` (`core.net.playersNear` dans l'instance de l'attaquant, puis `core.net.send` à une liste) : attaquant, cible, issue (`hit`, `stagger`, `down`, `block`, `parry`, `break`, `dodge`, `absorb`) et, pour l'attaquant et la cible seulement (1.4.0), le montant en dixièmes ou `false` | les joueurs apparus à 30 m de la **cible**, dans l'instance de l'attaquant (cible, attaquant paré, témoins) ; `dodge` et `absorb` aux deux seuls participants | ≈ 30 à 40 o ; + 1 à 3 o pour les deux participants | **un** par cible touchée et par coup de technique (un adversaire par coup), en **deux envois** au plus (participants, témoins ; un sans témoin) ; un coup paré, bloqué ou qui brise la garde envoie son issue **à la place** de `hit` ; jamais pour un coup manqué, refusé ou annulé, ni pour un coup d'une autre ressource ; une esquive ou un coup absorbé : ≈ 32 o aux deux seuls participants (rien en 1.3.0) |
 | `vava_combat:notify` (`core.net.send`, compté) | le **seul** porteur dont l'arme passe un seuil ; le seul attaquant dont le coup est retenu (combats coupés, lieu de paix, crochet) ; le seul membre du Conseil qui tape `/armes` sans `vava_chat` | ≈ 70 à 160 o | 2 par arme et par cycle d'usure ; un avis par raison et par 10 s ; réponses de commande |
 | Statebag de ped `vava_combat:shield` (`{ id, item }`) | OneSync : les joueurs qui ont ce ped à portée | ≈ 30 o | à l'accroche, au décrochage, à un nouveau ped du porteur ; jamais périodique |
 | `GlobalState['vava_inventory:heldModels']` (mécanisme de l'inventaire) | tous | + ≈ 450 o | une fois, à la déclaration des objets |
@@ -380,9 +382,12 @@ la main ; personne ne se défend : une lecture de table, aucune native.
 - **T-119** (réglages) : fenêtre de parade et sa préparation, invulnérabilité, délais, arcs protégés, parts bloquées des
   fiches (épée 0,40 peut-être trop faible face à 4 coups), seuils du compteur, sensations à 30, 80 et 150 ms de ping
   (aucune compensation de latence : le défenseur lent anticipe d'un aller de son ping).
-- **T-155** (chiffres des coups) : une issue par coup dans `vava_combat:hit(attaquant, cible, issue)` ; ajouter le montant
-  en 4e valeur (dixièmes) sans nouveau message ; `dodge` et `absorb` sont nommés mais tus (`config.reactions.silent`) ;
-  un coup d'une autre ressource défendu n'envoie rien (le hook `vava_combat:defended` en porte l'issue).
+- **T-155** (chiffres des coups, fait en 1.4.0) : montant en 4e valeur de `vava_combat:hit` (dixièmes, ou `false`
+  pour un mot) aux seuls participants désignés par `config.numbers` ; `dodge` et `absorb` à eux seuls, jamais aux
+  témoins ; un coup d'une autre ressource défendu n'envoie toujours rien (le hook `vava_combat:defended` en porte
+  l'issue).
+- **T-119** (chiffres des coups) : voir si les témoins doivent voir les mots (`parry`, `break`) ou les chiffres
+  (`numbers.witnesses`, une clé, pas une refonte).
 - **T-156** (mannequin) : les modificateurs ne décident que sur le geste défensif tenu pour un **joueur** ; un mannequin
   n'est jamais défendu ; un calcul « à blanc » hors de `vava_health:hit` ne déclenche aucune suite.
 - **T-121** (éditeur des techniques) : `techniques()`, `weapons()`, `provisional` ; le format et ses bornes sont ceux
@@ -445,6 +450,11 @@ Les en-têtes des fichiers servis aux joueurs sont courts (relecture réseau R-2
 coup sans technique en développement : `set vava_env dev` et `ensure vava_example_combat` (1.1.0), puis
 `/frapper_arme <n°>`.
 
+**Mise à jour vers 1.4.0 (T-155)** : `config.lua` gagne `numbers` (quatre booléens). Un `config.lua` modifié et gardé
+par l'installeur (le nouveau posé en `.nouveau`) fait **refuser le démarrage** (« numbers attendu … ») : reportez
+`config.numbers` d'après le nouveau fichier. Les chiffres s'affichent par `vava_hud` ≥ 1.7.0 (sans lui, rien ne
+s'affiche et le combat est inchangé).
+
 **Mise à jour vers 1.3.0 (T-113)** : `config_client.lua` gagne trois techniques, les touches `blocage`, `parade`,
 `esquive` du style, la table `defense`, les touches `garde` et `esquive`, deux contrôles coupés (22, 45) et cinq refus ;
 `config.lua` gagne `rateLimits.lower`, la part du serveur de `defense`, `reactions.silent` et `messages.modifiers`. Un
@@ -472,8 +482,10 @@ contrôles natifs ont quitté `config.lua` pour `config_client.lua`.
   chancellement, dégainer et rengainer, exports ; bridge : export `hardControl` relu au démarrage de la magie),
   `combat_hands_client_spec.lua` (cache de la main, rengainement, mode combat, coup prédit puis coupé ; R, Espace,
   garde brisée), `combat_defense_spec.lua` (règles pures de la défense ; serveur réel avec une chaîne d'essai : parade,
-  pas de côté, garde, bouclier, garde brisée, abaissement, annulations, réservation, modificateurs, réseau, démarrage).
-- En jeu : [docs/tests/combat.md](../../docs/tests/combat.md) § 2 (armes), § 3 (techniques) et § 4 (défense).
+  pas de côté, garde, bouclier, garde brisée, abaissement, annulations, réservation, modificateurs, réseau, démarrage),
+  `combat_numbers_spec.lua` (1.4.0 : montant envoyé, destinataires des chiffres, `numbers` au démarrage).
+- En jeu : [docs/tests/combat.md](../../docs/tests/combat.md) § 2 (armes), § 3 (techniques), § 4 (défense) et § 7
+  (chiffres des coups).
 
 ## À vérifier en jeu
 
@@ -494,3 +506,5 @@ contrôles natifs ont quitté `config.lua` pour `config_client.lua`.
   `move_strafe@roll`) présents et vus des autres (garde en boucle synchronisée) ; R et Espace en AZERTY ; une touche
   liée (Espace, R) répond-elle encore quand le saut (22) et recharger (45) sont coupés ; parade au dernier moment à
   150 ms de ping ; sprint coupé garde levée.
+- Chiffres des coups (1.4.0) : chez l'attaquant et la cible seulement, jamais chez un témoin ; « Esquivé » et
+  « Absorbé » ; taille de `vava_combat:hit` par `/vava_reseau` ([docs/tests/combat.md](../../docs/tests/combat.md) § 7).

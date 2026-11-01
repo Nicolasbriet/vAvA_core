@@ -16,7 +16,7 @@ VavaCombat.RPC = {
 -- Évènements serveur → client, toujours ciblés (core.net, comptés) : jamais à tous.
 VavaCombat.EVENTS = {
     NOTIFY = 'vava_combat:notify',      -- texte, nature : au seul joueur concerné (usure, /armes, coup retenu)
-    HIT = 'vava_combat:hit',            -- attaquant, cible, issue : aux joueurs à 30 m de la cible, même instance
+    HIT = 'vava_combat:hit',            -- attaquant, cible, issue[, dixièmes|false] : à 30 m de la cible, même instance
 }
 
 -- Statebag du ped du porteur d'un bouclier accroché : { id, item } ou rien, écrit et gardé par le serveur.

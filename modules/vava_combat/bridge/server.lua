@@ -7,8 +7,10 @@
            registres (objets, recettes de l'artisanat et des compétences), versions des modules, coup par la chaîne de
            dégâts (vava_health:hit), vocabulaire et modificateurs (registre vava_health:modifiers, hook hit after),
            champ privé du bouclier accroché, hooks émis et écoutés (prise en main, mise à terre), RPC, droits et journal du Conseil (vava_admin), chat (vava_chat), envoi au seul joueur
-           concerné (core.net.send) ou aux proches d'une instance (core.net.sendNearWith), comptés. Chaque appel à une
-           autre ressource est isolé (pcall) : un module absent ou en erreur ne retire que la fonction concernée.
+           concerné (core.net.send), à une liste calculée par le serveur (proches d'une instance :
+           core.net.playersNear, puis core.net.send à la liste, T-155) ou aux proches d'une instance
+           (core.net.sendNearWith), comptés. Chaque appel à une autre ressource est isolé (pcall) : un module absent ou
+           en erreur ne retire que la fonction concernée.
     Dépendances : shared/constants.lua, config.lua, server/core.lua
 ]]
 
@@ -43,6 +45,8 @@ local ITEMS_REGISTRY = 'vava_inventory:items'
 local RECIPES_REGISTRY = 'vava_crafting:recipes'
 local SKILL_RECIPES_REGISTRY = 'vava_skills:recipes'
 local READY = 'ready'
+-- joueurs d'une liste d'envoi (core.net.send)
+local SEND_LIST_MAX = 256
 -- octets d'un message de chat regroupé (vava_chat coupe au-delà de 500 signes)
 local CHAT_GROUP_MAX = 480
 
@@ -176,6 +180,45 @@ function Bridge.SendNear(bucket, coords, radius, event, ...)
     local ok, code = core.net.sendNearWith({ bucket = bucket }, coords, radius, event, ...)
     if not ok then
         warnLimited('send:' .. event, "envoi de proximité de '%s' refusé : %s", event, tostring(code))
+        return false
+    end
+    return true
+end
+
+--- Joueurs d'une instance à `radius` d'un point (core.net.playersNear avec `bucket` : attaquant et cible compris s'ils
+--- y sont) ; erreur : liste vide, une ligne de console par minute.
+---@param bucket integer
+---@param coords { x: number, y: number, z: number }
+---@param radius number
+---@return integer[]
+function Bridge.PlayersAround(bucket, coords, radius)
+    if mathType(bucket) ~= 'integer' or bucket < 0 then return {} end
+    local list, code = core.net.playersNear(coords, radius, { bucket = bucket })
+    if type(list) ~= 'table' then
+        warnLimited('around', 'recherche des joueurs proches refusée : %s', tostring(code))
+        return {}
+    end
+    return list
+end
+
+--- Envoie un évènement du module à une liste de joueurs calculée par le serveur (liste pure d'entiers > 0, 256 au
+--- plus ; jamais -1) : core.net.send, compté sous vava_combat. Liste vide : rien, vrai. Refus : une ligne de console
+--- par minute et par évènement.
+---@param list integer[]
+---@param event string
+---@return boolean ok
+function Bridge.SendTo(list, event, ...)
+    if type(list) ~= 'table' then return false end
+    local count = #list
+    if count == 0 then return true end
+    if count > SEND_LIST_MAX then return false end
+    for i = 1, count do
+        local id = list[i]
+        if mathType(id) ~= 'integer' or id <= 0 then return false end
+    end
+    local ok, code = core.net.send(list, event, ...)
+    if not ok then
+        warnLimited('sendTo:' .. event, "envoi de '%s' à une liste refusé : %s", event, tostring(code))
         return false
     end
     return true

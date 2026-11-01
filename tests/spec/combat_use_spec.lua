@@ -109,6 +109,7 @@ describe('vava_combat techniques (serveur)', function()
             if not p then return nil end
             return p[1], p[2], p[3]
         end
+        local around = {}
         local bridge = {
             CONSOLE = 0, INVENTORY = 'vava_inventory', HEALTH = 'vava_health', CRAFTING = 'vava_crafting',
             SKILLS = 'vava_skills',
@@ -132,6 +133,36 @@ describe('vava_combat techniques (serveur)', function()
                 end
                 table.sort(out)
                 return out
+            end,
+            -- T-155 : proches d'une instance (attaquant et cible compris), puis un envoi par liste ; chaque envoi note
+            -- la dernière recherche (instance, point, rayon) ; jamais une liste vide, jamais -1
+            PlayersAround = function(bucket, coords, radius)
+                assert.equal('integer', math.type(bucket))
+                assert.is_true(bucket >= 0)
+                around[#around + 1] = { bucket = bucket, coords = copy(coords), radius = radius }
+                local out = {}
+                for other in pairs(active) do
+                    local p = positions[other]
+                    if p and (buckets[other] or 0) == bucket then
+                        local dx, dy, dz = p[1] - coords.x, p[2] - coords.y, p[3] - coords.z
+                        if dx * dx + dy * dy + dz * dz <= radius * radius then out[#out + 1] = other end
+                    end
+                end
+                table.sort(out)
+                return out
+            end,
+            SendTo = function(list, event, ...)
+                assert.is_true(#list >= 1)
+                for key, id in pairs(list) do
+                    assert.equal('integer', math.type(key))
+                    assert.equal('integer', math.type(id))
+                    assert.is_true(id > 0)
+                end
+                local last = around[#around]
+                sent[#sent + 1] = { list = copy(list), bucket = last.bucket, coords = last.coords, radius = last.radius,
+                    event = event, args = table.pack(...) }
+                sent[#sent].args.n = nil
+                return true
             end,
             SendNear = function(bucket, coords, radius, event, ...)
                 assert.equal('integer', math.type(bucket))
@@ -234,8 +265,9 @@ describe('vava_combat techniques (serveur)', function()
             assert.same({ amount = 12, kind = 'tranchant', source = A, weapon = 'epee_courte',
                 technique = 'taille_descendante', tags = { melee = true, parryable = true } }, hits[1].packet)
             assert.equal(1, #sent)
-            assert.same({ bucket = 0, coords = { x = 0, y = 2, z = 0 }, radius = 30.0, event = 'vava_combat:hit',
-                args = { A, B, 'hit' } }, sent[1])
+            -- T-155 : attaquant et cible désignés, montant en dixièmes en 4e valeur (C est à plus de 30 m)
+            assert.same({ list = { A, B }, bucket = 0, coords = { x = 0, y = 2, z = 0 }, radius = 30.0,
+                event = 'vava_combat:hit', args = { A, B, 'hit', 120 } }, sent[1])
             at(480)
             assert.equal(1, #hits)
             assert.equal(1, #sent)
@@ -885,17 +917,31 @@ describe('vava_combat techniques (serveur)', function()
         end
 
         -- relecture réseau R-3 : une issue que personne ne montre (esquive, coup absorbé) n'est pas envoyée
-        it('esquive, coup absorbé : rien envoyé ; coup bloqué → block, coup qui met à terre → down', function()
+        it('esquive, coup absorbé : aux deux seuls participants (T-155) ; coup bloqué → block, à terre → down', function()
             strikeWith({ id = 1, amount = 0, applied = 0, cancelled = 'esquive', stage = 'esquive', downed = false })
             assert.equal(1, #hits)
-            assert.equal(0, #sent)
+            assert.equal(1, #sent)
+            assert.same({ list = { A, B }, args = { A, B, 'dodge', false } }, { list = sent[1].list, args = sent[1].args })
             strikeWith({ id = 4, amount = 0, applied = 0, cancelled = 'egide', stage = 'bouclier', downed = false })
-            assert.equal(0, #sent)
+            assert.same({ A, B, 'absorb', false }, sent[1].args)
             strikeWith({ id = 5, amount = 0, applied = 0, blocked = 0, absorbed = 12, downed = false })
-            assert.equal(0, #sent)
+            assert.same({ A, B, 'absorb', false }, sent[1].args)
             strikeWith({ id = 2, amount = 0, applied = 0, blocked = 12, absorbed = 0, downed = false })
-            assert.same({ A, B, 'block' }, sent[1].args)
+            assert.same({ A, B, 'block', false }, sent[1].args)
             strikeWith({ id = 3, amount = 12, applied = 12, blocked = 0, absorbed = 0, downed = true })
+            assert.same({ A, B, 'down', 120 }, sent[1].args)
+            -- relecture réseau R-3 de T-112, gardée par numbers.enabled = false (1.3.0) : esquive, absorbé → rien
+            cfg.numbers.enabled = false
+            strikeWith({ id = 6, amount = 0, applied = 0, cancelled = 'esquive', stage = 'esquive', downed = false })
+            assert.equal(0, #sent)
+            strikeWith({ id = 7, amount = 0, applied = 0, cancelled = 'egide', stage = 'bouclier', downed = false })
+            assert.equal(0, #sent)
+            strikeWith({ id = 8, amount = 0, applied = 0, blocked = 0, absorbed = 12, downed = false })
+            assert.equal(0, #sent)
+            strikeWith({ id = 9, amount = 0, applied = 0, blocked = 12, absorbed = 0, downed = false })
+            assert.same({ A, B, 'block' }, sent[1].args)
+            assert.is_nil(sent[1].list)
+            strikeWith({ id = 10, amount = 12, applied = 12, blocked = 0, absorbed = 0, downed = true })
             assert.same({ A, B, 'down' }, sent[1].args)
         end)
 
@@ -928,7 +974,7 @@ describe('vava_combat techniques (serveur)', function()
             at(400)
             assert.same({ true }, use(B, 'taille_descendante', A)) -- frappe à 720
             at(650)
-            assert.same({ A, B, 'stagger' }, sent[1].args)
+            assert.same({ A, B, 'stagger', 216 }, sent[1].args)
             at(1000)
             assert.equal(1, #hits)                             -- le coup de B n'a pas porté
             assert.same({ false, 'staggered', 550 }, use(B, 'taille_descendante', A))
@@ -940,12 +986,12 @@ describe('vava_combat techniques (serveur)', function()
             at(2000)
             use(A, 'fendant', B)
             at(3000)
-            assert.same({ A, B, 'hit' }, sent[1].args)
+            assert.same({ A, B, 'hit', 216 }, sent[1].args)
             -- à 4 s : frappe à 4,65 s, l'immunité est passée
             at(4000)
             use(A, 'fendant', B)
             at(5000)
-            assert.same({ A, B, 'stagger' }, sent[2].args)
+            assert.same({ A, B, 'stagger', 216 }, sent[2].args)
         end)
 
         it('l\'envoi part toujours dans l\'instance de l\'attaquant, autour de la cible', function()

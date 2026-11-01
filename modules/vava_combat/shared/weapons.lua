@@ -4,14 +4,15 @@
            démarrage (classes de config_client.lua et fiches de config.lua), contrôle des techniques et des styles
            (format de COMBAT_V1.md § 3) et des réglages du moteur, qualité lue et facteur de dégâts, solidité lue
            (émoussée ou non), montant d'un coup, chance et pas d'usure, coup qui use (d'après le résultat de
-           vava_health:hit), issue d'un coup montrée aux proches, options d'un appel à `strike`, paquet `hit`, raison
+           vava_health:hit), issue d'un coup montrée aux proches, montant envoyé aux deux participants (dixièmes,
+           T-155), options d'un appel à `strike`, paquet `hit`, raison
            d'un refus montrée au joueur, comparaison de versions. Aucun état, aucune native, ne lève jamais d'erreur sur
            une donnée reçue.
     Dépendances : shared/constants.lua
 ]]
 
 local type, pairs, ipairs, next, tostring, tonumber = type, pairs, ipairs, next, tostring, tonumber
-local floor, huge, mathType, tointeger = math.floor, math.huge, math.type, math.tointeger
+local floor, huge, mathType, tointeger, min = math.floor, math.huge, math.type, math.tointeger, math.min
 local find, format, gmatch = string.find, string.format, string.gmatch
 local sort = table.sort
 
@@ -323,6 +324,8 @@ local PHASES_TOTAL_MAX = 3000
 -- vava_pause (199 : P et Start, 200 : Échap, 322 : Échap aussi)
 local BLOCKED_MAX, CONTROL_MAX = 32, 360
 local RESERVED_CONTROLS = { [199] = true, [200] = true, [322] = true }
+-- chiffres des coups (T-155) : quatre booléens, aucune autre clé
+local NUMBERS_KEYS = { enabled = true, attacker = true, target = true, witnesses = true }
 
 ---@param value any
 ---@param max integer
@@ -673,6 +676,13 @@ function weapons.checkEngine(cfg)
     if err then return false, err end
     err = defenseError(cfg.defense)
     if err then return false, err end
+    local n = cfg.numbers
+    if type(n) ~= 'table' then return false, 'numbers attendu ({ enabled, attacker, target, witnesses })' end
+    local extra = extraKey(n, NUMBERS_KEYS)
+    if extra ~= nil then return false, format("numbers : clé inconnue '%s'", tostring(extra)) end
+    for key in pairs(NUMBERS_KEYS) do
+        if type(n[key]) ~= 'boolean' then return false, format('numbers.%s attendu (booléen)', key) end
+    end
     return true
 end
 
@@ -694,6 +704,31 @@ function weapons.outcome(result)
     if applied == 0 and finite(result.blocked) and result.blocked > 0 then return 'block' end
     if applied == 0 and finite(result.absorbed) and result.absorbed > 0 then return 'absorb' end
     return 'hit'
+end
+
+-- issues qui ne sont qu'un mot ; issues dont seul le reste compte (rien passé : le mot seul)
+local WORD_ONLY = { parry = true, dodge = true, absorb = true }
+local REST_ONLY = { block = true, ['break'] = true }
+local TENTHS_MAX = 2000
+
+--- Montant en dixièmes entiers (arrondi), borné à 2 000.
+---@param amount number
+---@return integer
+function weapons.tenths(amount)
+    return min(TENTHS_MAX, floor(amount * 10 + 0.5))
+end
+
+--- Montant d'un coup envoyé aux deux participants (T-155) : `result.amount` (après modificateurs, jamais la vie
+--- retirée) en dixièmes ; nil pour une issue qui n'est qu'un mot, un reste nul d'un coup bloqué, un résultat illisible.
+---@param result any
+---@param issue string
+---@return integer|nil
+function weapons.wireAmount(result, issue)
+    if type(result) ~= 'table' or not OUTCOME_SET[issue] or WORD_ONLY[issue] then return nil end
+    local amount = result.amount
+    if not finite(amount) or amount < 0 then return nil end
+    if REST_ONLY[issue] and amount == 0 then return nil end
+    return weapons.tenths(amount)
 end
 
 --- Avis à l'attaquant d'un coup retenu (clé de config.messages), ou nil : combats coupés (`pvpOff`), lieu de paix

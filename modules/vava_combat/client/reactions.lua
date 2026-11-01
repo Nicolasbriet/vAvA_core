@@ -1,12 +1,13 @@
 --[[
     vava_combat/client/reactions.lua
     Rôle : ce que voit chacun d'un coup qui porte (`vava_combat:hit`) : réaction de la cible (garde brisée comprise),
-           attaquant paré qui chancelle, son de l'attaquant, effet d'impact local borné. Aucune boucle.
+           attaquant paré qui chancelle, son de l'attaquant, effet d'impact local borné ; chiffre du coup chez
+           l'attaquant et la cible désignés (4e valeur, T-155). Aucune boucle.
     Dépendances : shared/constants.lua, config_client.lua, client/core.lua, client/hands.lua, client/attack.lua
 ]]
 
 local type, ipairs, tostring = type, ipairs, tostring
-local tointeger = math.tointeger
+local tointeger, mathType = math.tointeger, math.type
 local CreateThread, Wait, GetGameTimer, RegisterNetEvent = CreateThread, Wait, GetGameTimer, RegisterNetEvent
 local PlayerId, GetPlayerServerId, GetPlayerFromServerId, GetPlayerPed, DoesEntityExist =
     PlayerId, GetPlayerServerId, GetPlayerFromServerId, GetPlayerPed, DoesEntityExist
@@ -22,6 +23,7 @@ local effects = cfg.effects
 local stagger = cfg.stagger
 local guardCfg = cfg.defense
 local hands = VavaCombat.hands
+local bridge = VavaCombat.bridge
 local attack = VavaCombat.attack
 local EVENTS = VavaCombat.EVENTS
 local MAX_PLAYER = VavaCombat.MAX_PLAYER
@@ -35,6 +37,7 @@ for _, outcome in ipairs(VavaCombat.OUTCOMES) do OUTCOMES[outcome] = true end
 local ASSET_POLL_MS = 20
 -- une ligne de console par actif et par minute au plus
 local WARN_MS = 60000
+local TENTHS_MAX = 2000
 
 -- fenêtre d'une seconde des effets montrés
 local windowAt, windowCount = 0, 0
@@ -100,7 +103,7 @@ local function particle(ped, fx)
     end)
 end
 
-RegisterNetEvent(EVENTS.HIT, function(attackerId, targetId, outcome)
+RegisterNetEvent(EVENTS.HIT, function(attackerId, targetId, outcome, amount)
     local attacker, target = player(attackerId), player(targetId)
     if not attacker or not target or type(outcome) ~= 'string' or not OUTCOMES[outcome] then return end
     local me = GetPlayerServerId(PlayerId())
@@ -130,6 +133,15 @@ RegisterNetEvent(EVENTS.HIT, function(attackerId, targetId, outcome)
         local sound = effects.sounds.hit
         if type(sound) == 'table' and type(sound.name) == 'string' then
             PlaySoundFrontend(-1, sound.name, sound.set, true)
+        end
+    end
+    -- 4e valeur (dixièmes, ou false) : seulement chez l'attaquant et la cible désignés par le serveur
+    if amount ~= nil then
+        local tenths = mathType(amount) == 'integer' and amount >= 0 and amount <= TENTHS_MAX and amount or nil
+        if attacker == me then
+            bridge.HitText('dealt', target, outcome, tenths)
+        elseif target == me then
+            bridge.HitText('taken', me, outcome, tenths)
         end
     end
     local fx = FX_OF[outcome] and effects[FX_OF[outcome]]
