@@ -11,7 +11,8 @@ Depuis 1.3.0, `vava_health` porte aussi la **chaîne de dégâts commune** (`doc
 d'épée, une boule de feu, la faim passent tous par l'export `hit`, ses modificateurs (esquive, parade, blocage,
 boucliers, résistances déclarés par les autres modules) et son journal ; les coups natifs de GTA entre joueurs sont
 annulés par le serveur. Depuis 1.4.0, un coup **déjà lancé** debout (projectile en vol, présage d'un sort) porte encore
-si son auteur tombe à terre avant l'impact, et `vocabulary()` donne l'interrupteur `pvp` aux modules.
+si son auteur tombe à terre avant l'impact, et `vocabulary()` donne l'interrupteur `pvp` aux modules. Depuis 1.6.0, le
+**coup d'essai** (`trial`) donne le montant d'un coup sur un mannequin d'entraînement sans rien appliquer à personne.
 
 Ordre de démarrage : après `vAvA_core` (≥ 0.10.0) et `vava_ui` (≥ 1.0.0, polices, grain et ornements de l'écran à
 terre ; déclaré en dépendance, à ne jamais arrêter sur un serveur ouvert), avant les modules qui lisent l'état « à
@@ -44,6 +45,7 @@ dans `config.lua` et `config_client.lua` d'après les nouveaux fichiers.
 | Lecture du ped | ped de chaque joueur lu toutes les 500 ms ; 3 s de grâce après une apparition ou une relève ; ignoré 1,5 s + 2 × ping (1 s au plus) après chaque ordre de vie ; plus bas que le serveur de plus de 2 % : perte native acceptée ; au seuil : mise à terre ; plus haut : vie du serveur renvoyée après 2 s, puis après un délai doublé à chaque correction sans effet (jusqu'à 30 s, 2 s de nouveau dès l'accord ; console à la 1re puis toutes les 10) | `pollMs`, `graceMs`, `sync` |
 | Apparition non confirmée | ped lu d'office 20 s après l'ordre d'apparition, s'il existe | `spawn.confirmTimeoutMs` |
 | Chaîne de dégâts | 100 points pour une vie pleine ; un coup de 200 au plus ; onze types, quatre parties du corps, onze étiquettes (listes fermées) ; 20 coups par seconde d'une même source sur une même cible ; un renvoi permis, pas un renvoi de renvoi ; 32 modificateurs ; combats entre joueurs permis (`pvp`) | `chain` |
+| Coups d'essai (1.6.0) | 20 par seconde et par source (1 à 100, contrôlé au démarrage), compte à part de celui des vrais coups ; au-delà `too_many_hits`, une ligne de console par minute et par source | `chain.maxTrialsPerSecond` |
 | Dégâts natifs | coups d'arme ou de poing d'un joueur sur un autre (ou sur une victime introuvable), explosions, feux et projectiles lancés par un joueur : annulés par le serveur ; une ligne de console par joueur et par minute | `natives` |
 | Journal des coups | écrit par lots de 50 toutes les 10 s, 2 000 lignes en attente au plus, purgé après 30 jours | `journal` |
 | Tir ami | coupé côté client à chaque apparition (confort) | `client.protect` |
@@ -102,6 +104,33 @@ en erreur est **ignoré pour ce coup** (une panne de bouclier ne rend personne i
 minute ; un modificateur lent (plus de 5 ms) est signalé, jamais coupé. Règles pures testées :
 `tests/spec/health_chain_spec.lua`, `health_packet_spec.lua`, `health_sync_spec.lua` ; harnais serveur :
 `health_hit_spec.lua`.
+
+### Coup d'essai (1.6.0, mannequins)
+
+`exports.vava_health:trial(paquet, lieu)` calcule le montant d'un coup **comme s'il** frappait quelqu'un, sans rien
+appliquer à personne : c'est ce que `vava_combat` (1.5.0) appelle quand une lame ou un sort atteint un mannequin
+d'entraînement (spec `docs/plan/specs/T-156.md` § 7.1). `lieu` : le point visé `{ x, y, z }` (seules clés, nombres
+finis, |x|, |y| ≤ 50 000, |z| ≤ 5 000 ; sinon `invalid_place`). Le paquet est contrôlé comme celui de `hit` (mêmes
+codes, `monde` refusé) ; la `source` est obligatoire (`invalid_source`) et doit être un personnage suivi
+(`no_character`). Une source à terre est annulée (`source_downed`) comme pour `hit`, sauf un coup déjà lancé debout.
+Puis les seuls modificateurs **inscrits** (`trial = true` à leur déclaration) dans l'ordre fixe, avec un contexte
+`{ id = 0, trial = true, target = 0, targetCharacter = 0, position, origin, kind, amount, base, stage, tags,
+health = 100, source, sourceCharacter, part?, weapon?, technique?, spell?, launchedAt? }`. Rendu : `{ trial = true,
+amount, base, blocked, absorbed, resisted, added, cancelled?, stage? }` (ni `id`, ni `applied`, ni `downed`, ni
+`health`), ou `nil, code` (`not_ready`, `invalid_place`, codes du paquet, `invalid_source`, `no_character`,
+`too_many_hits`, `hit_error`).
+
+**Ce qui ne se déclenche pas** pour un essai : ni vie ni mise à terre, ni `vava_health:set` ni `vava_health:downed` ;
+ni hook `vava_health:hit` `before` ou `after` (donc ni suites de la défense, ni incantation brisée, ni fenêtre de combat
+de la bannière, ni XP « vraie cible ») ; ni journal `vava_health_hits` ; ni numéro de coup ; ni débit par paire des vrais
+coups (un débit propre, `chain.maxTrialsPerSecond`, par source, oublié au départ) ; `chain.pvp` n'est pas lu (un
+mannequin n'est pas un habitant) ; aucun modificateur non inscrit (défense, boucliers et résistances de la magie, zones
+de paix : ils lisent des joueurs, et un bouclier de la magie perd des points en absorbant).
+
+**Modificateur inscrit** : champ facultatif `trial` (booléen ; autre type : entrée refusée) du registre. Il est appelé
+aussi pour les vrais coups. Contrat : il lit `ctx.trial`, ne lit aucune donnée de joueur pour `target = 0` et ne
+change **rien** (un bouclier ne s'use pas sur un essai). En 1.6.0 aucun module ne s'inscrit : le montant d'un essai est
+celui du paquet. Essais : `tests/spec/health_trial_spec.lua` (chaque garde a son contre-essai par `hit`).
 
 Les pertes que GTA applique lui-même (chute, noyade, feu du décor, animal) sont lues sur le ped et acceptées telles
 quelles, **sans modificateurs** (un bouclier arrête les coups et les sorts, pas une chute) ; elles passent par le hook
@@ -185,7 +214,9 @@ jamais cet instant. Ce n'est pas `overTime`, réservé aux effets qui durent.
 `vocabulary()` donne aussi `pvp` (1.4.0) : un module coupe ses effets sans dégâts entre joueurs (poussées, gel…) quand
 `chain.pvp = false`, comme la chaîne coupe les dégâts.
 
-Exports complets (`hit`, `vocabulary`, `modifiers`, `get`, `isDowned`, `setHealth`, `heal`, `damage`, `down`,
+Coup d'essai (1.6.0) : `trial(paquet, lieu)`, voir « Coup d'essai » plus haut ; `modifiers()` rend aussi `trial`.
+
+Exports complets (`hit`, `trial`, `vocabulary`, `modifiers`, `get`, `isDowned`, `setHealth`, `heal`, `damage`, `down`,
 `revive`), codes et hooks (`vava_health:hit`, `downed`, `reviving` annulable, `revived`, `respawned`) : `docs/api.md`,
 section `vava_health`. Export client `get()` : `{ health, downed }` du joueur local. Appeler `isDowned` par son bridge,
 isolé (`pcall`), module absent = pas à terre.
@@ -223,6 +254,9 @@ La procédure complète est `docs/tests/sante.md`, et `docs/tests/combat.md` § 
   un coup de poing (confort ; sans eux, l'annulation serveur suffit).
 - **Fenêtre d'application** (1,5 s + 2 × ping) : un soin n'est jamais pris pour une perte, même à 150 ms de ping
   (`combat` 1-7).
+- **Coup d'essai** (1.6.0, `combat` 8-1, 8-18 à 8-21, 8-27) : frapper un mannequin ne change ni la vie, ni le journal
+  `vava_health_hits`, ni l'incantation d'un mage voisin, ni la bannière ; `chain.pvp = false` ne coupe pas l'exercice.
+
 - **Client qui ment** : `/tricher` → vie remise en 2 à 3 s, une ligne de console (`combat` 1-21).
 - **Coup déjà lancé** (1.4.0, `combat` 1-32 et `magie` 18-12) : un projectile lancé debout porte encore si son auteur
   tombe pendant le vol ; un coup arrivé plus de 4 s après le lancement, non.

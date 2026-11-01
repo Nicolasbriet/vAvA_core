@@ -1,8 +1,8 @@
 --[[
     vava_combat/fxmanifest.lua
     Rôle : combat de corps à corps d'Eldoria : armes, usure, bouclier accroché, techniques jugées par le serveur (voir
-           README.md). Aucune NUI, aucune table SQL.
-    Dépendances : vAvA_core ≥ 0.10.0, vava_inventory ≥ 1.7.0, vava_health ≥ 1.3.0 ; facultatifs : voir README.md
+           README.md), mannequins d'entraînement. Aucune NUI, aucune table SQL.
+    Dépendances : vAvA_core ≥ 0.10.0, vava_inventory ≥ 1.7.0, vava_health ≥ 1.6.0 ; facultatifs : voir README.md
 ]]
 
 fx_version 'cerulean'
@@ -11,8 +11,8 @@ lua54 'yes'
 use_experimental_fxv2_oal 'yes'
 
 name 'vava_combat'
-description 'Combat vAvA : armes de corps à corps, techniques, défense, usure, bouclier accroché'
-version '1.4.0'
+description 'Combat vAvA : armes de corps à corps, techniques, défense, usure, bouclier accroché, mannequins'
+version '1.5.0'
 
 dependency 'vAvA_core'
 dependency 'vava_inventory'
@@ -26,6 +26,7 @@ files {
 shared_scripts {
     'shared/constants.lua',
     'config_client.lua',
+    'shared/dummies.lua',
     'shared/shield.lua',
     'shared/heading.lua',
     'shared/techniques.lua',
@@ -48,6 +49,7 @@ server_scripts {
     'server/strike.lua',
     'server/hands.lua',
     'server/reactions.lua',
+    'server/dummies.lua',
     'server/defense.lua',
     'server/swings.lua',
     'server/api.lua',
@@ -67,5 +69,6 @@ client_scripts {
     'client/defense.lua',
     'client/mode.lua',
     'client/reactions.lua',
+    'client/dummies.lua',
     'client/main.lua',
 }

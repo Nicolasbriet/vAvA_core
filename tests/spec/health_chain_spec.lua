@@ -110,6 +110,17 @@ describe('vava_health chaîne de dégâts', function()
             assert.is_false((chain.checkEntry('a:b', 'x', KINDS)))
             assert.is_false((chain.checkEntry(12, {}, KINDS)))
         end)
+
+        -- 1.6.0 (T-156) : inscription facultative aux coups d'essai (mannequins), un booléen seulement
+        it('champ trial : booléen admis, toute autre valeur refusée', function()
+            assert.is_true(check('a:b', { trial = true }))
+            assert.is_true(check('a:b', { trial = false }))
+            for i, value in ipairs({ 'oui', 1, 0, {}, noop }) do
+                local ok, reason = check('a:b', { trial = value })
+                assert.is_false(ok, 'cas ' .. i)
+                assert.equal('trial attendu : booléen', reason, 'cas ' .. i)
+            end
+        end)
     end)
 
     describe('pas d\'un rendu', function()

@@ -2,9 +2,9 @@
 /*
  * vava_atelier/web/dev/devmock.js
  * Rôle : Atelier simulé quand la page est ouverte dans un navigateur (hors FiveM), pour voir chaque écran sans lancer
- *        le jeu. Jamais livré (absent des `files`), jamais chargé en jeu : la ligne hors jeu de index.html ne l'insère
- *        que hors FiveM. Réponses de la forme de client/relay.lua : { ok, error?, data? }.
- *        Paramètres d'URL (§ 9.5 de la spec T-100) :
+ *        le jeu. Jamais livré (absent des `files` et du paquet du Conseil), jamais chargé en jeu : seule la page de
+ *        développement web/dev/index.html le charge (T-157). Réponses de la forme de client/relay.lua : { ok, error?, data? }.
+ *        Paramètres d'URL de web/dev/index.html (§ 9.5 de la spec T-100) :
  *          ?screen=home                 accueil d'un Souverain (trois familles, brouillons, journal)
  *          ?screen=home&rank=senechal   seulement « Le monde »
  *          ?screen=home&empty=1         ni brouillon ni journal

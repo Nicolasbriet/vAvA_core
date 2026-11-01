@@ -65,6 +65,12 @@ du Conseil par appel direct du RPC.
    en gardant chaque ligne à sa place, prouvé par le compilateur Lua à chaque vérification ; les réglages de
    l'exploitant (`config.lua`, `config_client.lua`, `config_conseil.lua`, `config/…`) et le Lua du seul serveur
    gardent les leurs.
+8. **Code réservé au Conseil.** Un code client qui ne sert qu'au Conseil est livré à la demande à ses seuls membres
+   (droit relu par le serveur à chaque envoi), gardé avec son empreinte et exécuté par `load` en mode texte après
+   comparaison à l'empreinte que le serveur vient d'annoncer ; il ne porte aucune décision (chaque action reste
+   revérifiée par le serveur) et rien de secret (le dépôt est public). Premier usage : `vava_atelier` 1.4.0 (T-157,
+   directives `vava_conseil_lua` et `vava_conseil_web`, `config_conseil.lua`) ; `load(` est refusé par l'audit partout
+   ailleurs.
 
 ## État des lieux (lecture du dépôt, octobre 2026)
 

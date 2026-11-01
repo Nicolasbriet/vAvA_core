@@ -317,8 +317,8 @@ téléchargement d'un joueur, ≈ 190 Ko compressés). Le dépôt, lui, reste co
 - **Première mise à jour allégée** : la mise à jour qui apporte la Chancellerie 1.9.0 est préparée par l'ancienne (Lua
   encore commenté) ; c'est la **suivante** qui allège. FiveM range scripts, fichiers et manifeste d'une ressource dans
   un seul paquet (`resource.rpf`) : chaque manifeste étant allégé, **chacune des 33 ressources** change, et chaque
-  joueur qui revient retélécharge une fois leur paquet entier — ≈ 3,9 Mo bruts, ≈ 2,3 Mo compressés au 2 novembre
-  2026, dont 1,44 Mo pour l'écran de chargement (`vava_loading`). Les suivantes ne coûtent que ce qui change. Livrer
+  joueur qui revient retélécharge une fois leur paquet entier, déjà allégé — ≈ 3,8 Mo bruts, ≈ 2,4 Mo compressés au
+  2 novembre 2026 (après T-157), dont 1,44 Mo pour l'écran de chargement (`vava_loading`). Les suivantes ne coûtent que ce qui change. Livrer
   cette mise à jour avec celle qui allège les pages web (T-160) évite un second retéléchargement complet. Un fichier
   livré que vous aviez modifié sur place est remplacé et le vôtre gardé à côté (`.local`), comme d'habitude. Vos
   réglages ne bougent pas.

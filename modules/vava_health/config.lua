@@ -38,6 +38,8 @@ config.chain = {
     -- plus (le plus long vol ou présage, plus la latence du signalement d'impact) ; au-delà, annulé source_downed
     launchedMaxMs = 4000,
     maxHitsPerSecond = 20,  -- coups traités par cible et par seconde ; au-delà : too_many_hits
+    maxTrialsPerSecond = 20, -- coups d'essai (mannequins, export trial) par source et par seconde (1 à 100) ; au-delà :
+                            -- too_many_hits ; compte à part, jamais mêlé à celui des vrais coups
     maxDepth = 2,           -- un coup lancé pendant un autre (renvoi) est permis une fois ; au-delà : too_deep
     maxModifiers = 32,      -- entrées du registre vava_health:modifiers
     slowModifierMs = 5,     -- modificateur plus lent : signalé (une ligne par minute et par modificateur)

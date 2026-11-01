@@ -19,7 +19,9 @@ vides pour incanter »). Les réglages sont en deux fichiers depuis 2.11.0 (T-14
 « Configuration ». **La magie et le mode combat** (2.12.0, T-149 : voir « La magie et le mode combat ») : arme du
 royaume en main, la magie se tait aux touches et ne verrouille personne, un mot propre pendant le rengainement ;
 l'export `hardControl` dit à vava_combat qu'un joueur gelé, renversé ou chancelant ne frappe pas ; les effets sans
-dégâts épargnent un membre du Conseil que vava_admin tient pour invulnérable.
+dégâts épargnent un membre du Conseil que vava_admin tient pour invulnérable. **Sorts sur les mannequins
+d'entraînement** (2.14.0, T-156 : voir « Sorts sur un mannequin ») : projectiles, éclats, Nova ardente et Secousse
+frappent « à blanc » les mannequins de vava_combat ≥ 1.5.0.
 Rien n'a encore été joué en vrai : voir « À vérifier en jeu », « Tests à faire en jeu » et la procédure complète
 `docs/tests/magie.md`.
 
@@ -111,6 +113,7 @@ Le noyau utilise en plus l'infrastructure du core (`core.rpc` à schéma strict 
 | `HandsBusy(source)` | arme de GTA sur le ped (`GetSelectedPedWeapon`) ou `vava_combat:armed(source)` (arme tenue) → `armed` (`sheathing` si l'arme est encore rengainée, `sheathing = true`), sinon `vava_combat:shield(source).ready` (bouclier au bras) → `shielded`, sinon nil ; vava_combat absent, pas prêt ou en erreur : nil, aucune restriction (une ligne de console par minute au plus ; aussi quand `not_ready` dure plus d'une minute) |
 | `OnHold(rappel)` | hook `vava_inventory:hold` (after) : une arme ou un bouclier pris en main brise l'incantation en cours |
 | `SetModifiers(liste)` · `ChainHealthPoints()` | registre `vava_health:modifiers` (redéclarés à chaque démarrage de vava_health) · `vocabulary().healthPoints` |
+| `DummiesNear(point, rayon)` · `DummyHit(n, paquet)` | `vava_combat:dummiesNear` · `dummyHit` (≥ 1.5.0, T-156) : mannequins du rayon (relus : `{ n, x, y, z }`), coup d'un sort confié à vava_combat ; vava_combat arrêté : `{}` · `nil, 'combat_unavailable'`, sans bruit ; plus ancien (export inconnu) ou en erreur : une ligne de console par minute au plus (un export inconnu n'est plus cherché pendant une minute, ou jusqu'au prochain démarrage de vava_combat) |
 
 | Fonction client | Implémentation vAvA |
 | --- | --- |
@@ -395,6 +398,32 @@ Les témoins ne voient rien.
 
 Le joueur choisit dans la bannière (Réglages > Interface, « Chiffres des coups ») : « Donnés et reçus », « Donnés seulement », « Aucun » ; le filtre est chez lui (`vava_hud`), le serveur envoie les mêmes octets.
 
+## Sorts sur un mannequin (2.14.0, T-156)
+
+Dans la cour d'armes, une Boule de feu sur un mannequin de paille montre son chiffre au-dessus de lui (chez le lanceur),
+le mannequin se balance et se redresse ; personne n'est blessé. La magie ne connaît pas les mannequins : elle les
+demande à `vava_combat` (≥ 1.5.0 : `dummiesNear`, hors zone de paix, même règle qu'un joueur) et lui confie le coup
+(`dummyHit`), avec **le même paquet** qu'un coup sur un joueur (type de l'élément, étiquettes de la nature, instant du
+lancement) ; `vava_combat` le fait calculer « à blanc » par `vava_health:trial` et envoie le chiffre au lanceur
+(`vava_combat:dummy`, jamais `vava_magic:dealt`). `combat.pvp` n'est pas lu (un mannequin n'est pas un habitant) ; la
+magie ne se lance de toute façon pas depuis une zone de paix.
+
+- **Projectiles** (Boule de feu, Trait de glace, Projectile de roche) : un impact sur le décor à `targetMargin`
+  (2,5 m) du centre d'un mannequin le frappe (le plus proche), aux dégâts de base du niveau (un mannequin n'est ni
+  mouillé ni gelé) ; un rempart qui arrête le projectile protège ce qui est derrière. **Éclats** : les mannequins du
+  rayon, sauf celui qui a pris l'impact, pas à travers un rempart, à la part des éclats.
+- **Nova ardente** : les mannequins du rayon, sans rempart entre eux et le lanceur ; ils ne comptent pas pour le bonus
+  d'XP. **Secousse** : les mannequins du cercle quand le sol se soulève (avec l'instant du présage).
+- **Jamais** : état (brûlure, mouillé, ralenti, chancellement, renversement), poussée, combinaison, bonus d'XP d'un sort
+  qui touche. Ni Mur de flammes, ni vapeur (zones qui durent), ni Vague, Brume, Rempart, Lueur, Murmure.
+- Lanceur qui joue désormais un autre personnage : rien. `vava_combat` absent, plus ancien que 1.5.0 ou en erreur :
+  aucun mannequin, aucun coup.
+- Réglage (`config.lua`) : `dummies = { enabled = true }` ; `false` : les sorts traversent les mannequins.
+- Coût : un appel à `dummiesNear` par impact de projectile sur le décor, par éclats, par Nova et par Secousse (une
+  lecture en mémoire chez `vava_combat`, ≤ 64 distances) ; un `dummyHit` par mannequin frappé. Aucun envoi de la magie.
+- Essais : `tests/spec/magic_dummies_spec.lua` (projectiles, éclats, rempart, Nova, Secousse, zone de paix, autre
+  personnage, `vava_combat` absent, `enabled = false` ; bridge réel : arrêté, plus ancien, en erreur).
+
 ## Mains vides pour incanter
 
 Décision du porteur du projet (31 octobre 2026, T-140) : **on n'incante pas avec une arme ou un bouclier en main**.
@@ -628,6 +657,8 @@ au point de l'effet). Aucun fichier n'est fourni.
   en demander une, aucun client n'en applique une.
 - Chiffres des sorts (2.13.0) : montant et issue lus par le serveur dans le résultat de la chaîne, envoyés à la seule
   victime et au seul lanceur ; aucun RPC n'en porte, un client modifié ne peut tromper que son propre écran.
+- Mannequins (2.14.0) : seulement à partir d'un impact déjà validé (portée, axe, délai, rempart) ou d'une zone jugée
+  par le serveur ; `vava_combat` revérifie l'appelant, l'instance et la distance du lanceur (80 m) ; rien n'est appliqué.
 - Projectiles : un seul impact par lancer, point d'impact dans la portée et dans l'axe annoncé, délai cohérent avec la
   vitesse, cible réelle près du point (position serveur), zones protégées ; un rempart sur le trajet l'arrête là, quoi
   qu'annonce le client ; les dégâts ne partent qu'ensuite. Le serveur ne voit pas les murs de GTA : un tricheur ne
@@ -672,6 +703,10 @@ lumières et de particules, rien au-delà de 150 m.
 
 Chiffres des sorts (2.13.0) : `docs/tests/magie.md` § 21 (un `vava_magic:dealt` par impact, morsures, esquive,
 absorbé, zone de paix, lanceur qui se brûle).
+
+Sorts sur un mannequin (2.14.0) : `docs/tests/combat.md` § 8, tests 13 à 17 et 20 (impact sur le prop local du
+mannequin vu par le rayon du client, éclats, Nova, Secousse, Mur de flammes sans effet, incantation voisine non brisée).
+
 
 | Usage | Animation, particule ou bouton | Réglage |
 | --- | --- | --- |

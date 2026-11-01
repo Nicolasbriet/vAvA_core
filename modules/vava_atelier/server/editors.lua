@@ -132,7 +132,7 @@ end
 ---@param id string
 ---@param owner string
 ---@return boolean ok
-local function load(id, owner)
+local function loadEditor(id, owner)
     local data = core.registry.get(REGISTRY, id)
     if type(data) ~= 'table' then return false end
     local fns = {}
@@ -205,7 +205,7 @@ function editors.added(key, owner)
         core.registry.remove(REGISTRY, key)
         return
     end
-    if load(key, owner) then
+    if loadEditor(key, owner) then
         local editor = loaded[key]
         VavaAtelier.log.info("atelier '%s' déclaré par %s (droit %s%s)", key, owner, editor.right,
             editor.stored and ', gardé' or ', en lecture')

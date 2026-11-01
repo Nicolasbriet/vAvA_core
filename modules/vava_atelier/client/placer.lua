@@ -1,8 +1,9 @@
 --[[
     vava_atelier/client/placer.lua
     Rôle : outil de placement du membre : états, LA boucle par image de la visée (seulement pendant la visée), envois,
-           annulation ; garde les lieux de la fiche ouverte. Détail : README (Outil de placement).
-    Dépendances : shared/constants.lua, config_client.lua, shared/placerules.lua, shared/aim.lua,
+           annulation ; garde les lieux de la fiche ouverte. Livré dans le paquet du Conseil (T-157). Détail : README
+           (Outil de placement).
+    Dépendances : shared/constants.lua, config_client.lua, config_conseil.lua, shared/placerules.lua, shared/aim.lua,
                   client/core.lua, client/nui.lua, client/session.lua, client/drawing.lua, client/ghosts.lua
 ]]
 

@@ -7,7 +7,8 @@ essayées avec `/frapper_arme` de `vava_example_combat` 1.1.0. Section 3 : les *
 (T-112 : coups à la souris jugés par le serveur, enchaînement, chancellement, mode combat, dégainer et rengainer).
 Section 4 : la **défense** de `vava_combat` 1.3.0 (T-113 : parade, garde, pas de côté, garde brisée) ;
 section 6 : la **magie et le mode combat** (`vava_magic` 2.12.0, T-149) ; section 7 : les **chiffres des coups**
-(`vava_combat` 1.4.0, `vava_hud` 1.7.0, T-155). L'endurance (T-114) viendra ensuite.
+(`vava_combat` 1.4.0, `vava_hud` 1.7.0, T-155) ; section 8 : les **mannequins d'entraînement** (`vava_combat` 1.5.0,
+`vava_health` 1.6.0, `vava_magic` 2.14.0, T-156). L'endurance (T-114) viendra ensuite.
 Comptez 1 h par section, presque tout à deux ; les tests à deux joueurs sont marqués **(2 joueurs)**. Un test se cite
 « combat 1-8 ».
 
@@ -42,8 +43,14 @@ Comptez 1 h par section, presque tout à deux ; les tests à deux joueurs sont m
    arme`), B aussi un Bouclier rond (« utiliser » pour l'accrocher) ; `vava_example_combat` pour `/vie`, `/chaine`. Un
    troisième joueur C pour les tests 24 et 25. Noter le ping de chacun (F8 : `netgraph`). Touches : **R** (appui bref :
    parer ; maintenu : se garder), **Espace** (pas de côté, mode combat actif seulement).
+9. **Mannequins** (section 8) : la préparation 0.8, `vava_combat` 1.5.0, `vava_health` 1.6.0, `vava_magic` 2.14.0 ;
+   T-155 en place (`vava_hud` 1.7.0, « Chiffres des coups » à « Donnés et reçus ») ; A et B ont une Épée courte, A est
+   mage (Boule de feu niveau 3, Nova ardente, Secousse : `/magie` du Conseil) ; aller à la cour provisoire de Paleto
+   (`dummies.list` de `config_client.lua` de `vava_combat`) ; `/armes voir <A>` pour la solidité ; un troisième joueur
+   C témoin.
 
 ## 1. Chaîne de dégâts
+
 
 La vie est tenue par le serveur : un coup la baisse aussitôt, le client applique. Les modificateurs s'appliquent dans
 l'ordre annulation → esquive → parade → blocage → bouclier → résistance. Les coups natifs entre joueurs sont annulés
@@ -308,3 +315,51 @@ et `combat_defense_spec.lua` (envois de la frappe et de la défense), `combat_ha
 forme, réglage, cascade, plafonds, suivi à 100 ms sans attente de 0 ms, effacement). À voir en jeu seulement : la
 projection de la tête (`GetPedBoneCoords` 31086 + 0,45 m), la vue subjective, la lisibilité à 720p et en 4K, le rendu de
 la page (T-119 : durée, montée, cascade, couleurs, tailles).
+
+## 8. Mannequin d'entraînement (`vava_combat` 1.5.0, `vava_health` 1.6.0, `vava_magic` 2.14.0, T-156)
+
+Dans la cour d'armes, des mannequins de paille (pour l'heure un sac de frappe de GTA) encaissent sans jamais tomber : le
+chiffre de chaque coup monte au-dessus d'eux chez celui qui frappe, ils se balancent et se redressent seuls. Personne
+n'est blessé ; la lame s'use un peu (un coup sur quatre) ; aucune XP. Les témoins voient le balancement, jamais le
+chiffre. Préparation : 0.9.
+
+| # | Faire | Attendu |
+|---|---|---|
+| 1 | Démarrer ; console. | `vava_combat` v1.5.0 prêt, « … 3 mannequin(s) » ; `vava_health` v1.6.0 ; `vava_magic` v2.14.0 ; aucune erreur. |
+| 2 | A arrive à 80 m de la cour, puis à 55 m. | Rien à 80 m ; les trois mannequins apparaissent vers 60 m, à leur place, droits. |
+| 3 | A s'éloigne à 65 m, puis à 75 m. | Toujours là à 65 m ; disparus au-delà de 70 m ; pas de clignotement en restant entre 60 et 70 m. |
+| 4 | A frappe le mannequin 1 d'une Taille. | « 12 » de laiton au-dessus du mannequin ; il se balance en s'écartant de A et se redresse seul en moins d'une seconde ; éclats. |
+| 5 | A enchaîne Taille, Estoc, Revers. | Trois chiffres en cascade ; le mannequin repart à chaque coup ; jamais à terre. |
+| 6 | A Fendant. | Chiffre plus grand (« 22 ») et « Chancelle » ; le mannequin ne fait rien de plus ; A peut frapper aussitôt après sa récupération. |
+| 7 | A frappe le mannequin trois fois : dos tourné vers lui, puis face à lui à 3 m, puis face à lui, perché 3 m au-dessus. | Dans les trois cas : aucun chiffre, aucun balancement. |
+| 8 | **(2 joueurs)** B se tient devant le mannequin ; A frappe dans leur direction. | B est frappé (12 chez A, sang), le mannequin n'a rien. |
+| 9 | **(3 joueurs)** C regarde à 10 m pendant que A frappe vite. | C voit le mannequin se balancer, **aucun chiffre** ; `/vava_reseau joueur <C>` : `vava_combat:dummy` 20 à 23 o, pas plus d'un par 0,8 s (au pire, 3 mannequins frappés sans relâche : ≈ 82 o/s chez C) ; `resmon 1` chez C pendant que A frappe : `vava_combat` ≤ 0,02 ms. |
+| 10 | **(3 joueurs)** C à 20 m. | C ne reçoit rien de `vava_combat` (le balancement n'est pas vu). |
+| 11 | A frappe 40 fois ; `/armes voir <A>`. | La solidité a baissé d'environ 8 points (un tirage : entre 4 et 12). |
+| 12 | A frappe le mannequin avec une arme émoussée (`/armes user <A> 1000`). | Chiffre ≈ moitié (6). |
+| 13 | A Boule de feu sur le mannequin 2. | Chiffre de laiton au-dessus de lui, balancement ; aucun état, aucune flamme qui reste. |
+| 14 | A Boule de feu niveau 3 entre deux mannequins (sur l'un). | Le visé et l'autre (éclats, plus petit) montrent un chiffre chacun. |
+| 15 | A Nova ardente au milieu de la cour. | Un chiffre sur chaque mannequin du rayon ; aucun n'est repoussé. |
+| 16 | A Secousse sur les mannequins. | Chiffres au moment où le sol se soulève. |
+| 17 | A Mur de flammes sur un mannequin. | Rien (hors v1), aucune erreur. |
+| 18 | `/vie` de A avant et après 20 coups ; `/chaine`. | Vie inchangée ; `SELECT * FROM vava_health_hits ORDER BY id DESC LIMIT 5` : aucune ligne nouvelle. |
+| 19 | A frappe le mannequin puis ouvre aussitôt la bannière (Échap). | La bannière s'ouvre (s'entraîner n'est pas combattre). |
+| 20 | **(2 joueurs)** A incante une Boule de feu ; B frappe le mannequin à côté de lui. | L'incantation de A n'est pas brisée. |
+| 21 | `chain.pvp = false` (`config.lua` de `vava_health`, redémarrage) ; A frappe le mannequin. | Le chiffre s'affiche ; aucun avis « Les combats entre habitants sont suspendus : votre lame s'arrête. ». Remettre `true`. |
+| 22 | A, à terre (`/vie 0`), tente de frapper. | Rien ne part (refus du mode combat) ; une Boule de feu lancée debout juste avant porte encore. |
+| 23 | A martèle le clic gauche 10 s. | Pas plus d'un coup par cycle de technique ; F8 propre ; resmon ≤ 0,03 ms. |
+| 24 | `/vava_reseau joueur <A>` pendant 10 coups. | `rpc vava_combat:use` et `vava_combat:dummy` 26 à 32 o par coup (comptés par `core.net`) ; rien d'autre de nouveau. |
+| 25 | `resmon 1` chez A : loin de la cour, près sans frapper, en frappant. | Loin ≈ 0 ; près ≤ 0,01 ms ; en frappant ≤ 0,03 ms. |
+| 26 | `restart vava_combat` près de la cour. | Mannequins retirés puis recréés ; aucun reste dans le monde. |
+| 27 | `restart vava_health` pendant que A frappe. | Pendant l'arrêt : ni chiffre ni balancement (aucun envoi), une ligne de console par minute (`health_unavailable`) ; dès son retour, les chiffres reviennent. |
+| 28 | Mettre `model = 'inconnu_xyz'` sur `paleto_1` (`config_client.lua` de `vava_combat`), redémarrer. | Une ligne de console, botte de foin à sa place ; les autres inchangés. |
+
+Prouvé hors jeu : `tests/spec/health_trial_spec.lua` (coup d'essai : rien d'appliqué, ni hook, ni journal, ni numéro, ni
+débit des vrais coups, ni `chain.pvp`, modificateurs inscrits seulement ; chaque garde avec son contre-essai par `hit`),
+`combat_dummies_spec.lua` (liste, issue « comme si », relevés réels : après les joueurs, portée, angle, hauteur,
+instance, une fois par coup, Fendant, usure 1 sur 4, hook `trained`, envois et témoins au plus un par 0,8 s ;
+`dummyHit`, `dummiesNear`, `dummies()`), `combat_dummies_client_spec.lua` (props à 60 / 70 m, cadence 0,5 / 2 s, repli
+du modèle, déchargement et arrêt, chiffre chez l'attaquant seul, balancement qui s'arrête de lui-même) et
+`magic_dummies_spec.lua` (projectiles, éclats, rempart, Nova, Secousse, zone de paix, autre personnage, `vava_combat`
+absent). À voir en jeu seulement : les modèles provisoires et leur pose au sol, le sens du balancement, l'effet
+d'éclats, le rayon du client qui touche le prop local d'un mannequin (Boule de feu), la mesure réseau et resmon.
