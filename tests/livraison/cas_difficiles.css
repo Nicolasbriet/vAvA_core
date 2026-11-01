@@ -1,0 +1,32 @@
+@charset "UTF-8";
+/*
+ * tests/livraison/cas_difficiles.css
+ * Rôle : feuille valide truffée des pièges de l'allègement des pages (T-160, spec § 12.1 cas CSS 1 à 16, § 12.2) :
+ *        commentaires dans des chaînes et des url() non citées, commentaires qui ne touchent aucun blanc (gardés),
+ *        échappements, licence gardée, CDO/CDC, blancs de fin de ligne. Prouvée par scripts/lib/meme-page.js à chaque
+ *        vérification ; jamais servie aux joueurs.
+ */
+a { color: red; } /* c */
+/*
+ * en-tête
+ */
+b { content: "/* pas */"; } /* c */
+c { background: url(nui://vava_ui/web/img/x.png); } /* c */
+d { background: url(a/*b*/c.png); }
+div/**/p {}
+e/*
+x
+*/f {}
+div /**/p {}
+div/**/ p {}
+g { margin: 1px/* x */ 2px; }
+.a\/\*b {}
+/*! garde */
+/*# garde aussi */
+h {}   
+i { content: "x  \
+ y"; }
+<!-- j {} -->
+k { --x: /* c */ 1px; }
+l /* x
+ y */ m {}
