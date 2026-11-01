@@ -745,6 +745,27 @@ describe('vava_combat endurance (serveur)', function()
             assert.is_true(late >= 0.13, ('%.3f de 10 à 60 s'):format(late))
             assert.equal(0, #staminaSent)
         end)
+
+        -- relecture sécurité S-1 de T-114 : une autre stratégie, repos jusqu'au plein puis parades ratées en rafale
+        it('borne, repos jusqu\'au plein puis parades ratées en rafale pendant 60 s : ≤ 20 % protégé', function()
+            local resting, protected, steps, bursts = false, 0, 0, 0
+            for ms = 0, 59990, 10 do
+                at(ms)
+                if resting and level(B) >= 1000 then resting = false end
+                if not resting then
+                    local ok, code = swings.use(B, 'parade_epee', 0)
+                    if ok ~= true and code == 'exhausted' then
+                        resting, bursts = true, bursts + 1
+                    end
+                end
+                steps = steps + 1
+                if defense.open(defense.activeOf(B), clock) then protected = protected + 1 end
+            end
+            local share = protected / steps
+            assert.is_true(bursts >= 3, tostring(bursts))
+            assert.is_true(share <= 0.20, ('%.3f sur 60 s'):format(share))
+            assert.is_true(share >= 0.12, ('%.3f sur 60 s'):format(share))
+        end)
     end)
 
     describe('faim et soif', function()
@@ -784,6 +805,35 @@ describe('vava_combat endurance (serveur)', function()
             assert.same({ true, 880, 1000, 100 }, use(A, 'taille_descendante'))
             at(31500 + 600)
             assert.equal(940, level(A))
+        end)
+
+        -- relecture sécurité S-2 : la lecture vaut pour la jauge courante du même personnage, même remplacée entre-temps
+        it('jauge remplacée pendant la lecture des besoins (coup bloqué) : la pente s\'applique quand même ; oubliée : rien',
+            function()
+            needsAnswer = function(src)
+                stamina.block(src, cfg.techniques.garde_epee, 1, false, clock, CHAR_A)     -- 1 000 − 250
+                return { hunger = 25, thirst = 90 }
+            end
+            assert.same({ true, 630, 1000, 150 }, use(A, 'taille_descendante'))
+            assert.same({ 630, 150, 0.75 }, { stamina.inspect(A).value, stamina.inspect(A).rate, stamina.inspect(A).factor })
+            -- jauge oubliée pendant la lecture : la prise la recrée pleine (facteur 1, besoins relus au geste suivant)
+            stamina.forget(A)
+            needsAnswer = function(src)
+                stamina.forget(src)
+                return { hunger = 5, thirst = 5 }
+            end
+            at(900)
+            assert.same({ true, 880, 1000, 200 }, use(A, 'taille_descendante'))
+        end)
+
+        -- relecture sécurité S-3 : une jauge laissée par un autre personnage ne refuse rien ; prepare la remplace
+        it('jauge vide d\'un autre personnage sur le même numéro : pas de refus exhausted, jauge neuve pleine', function()
+            stamina.block(A, { stamina = 40 }, 2.5, false, clock, 999)                       -- 1 000 − 1 000
+            assert.same({ true, 880, 1000, 200 }, use(A, 'taille_descendante'))
+            -- contre-épreuve : la même jauge vide, de ce personnage, refuse
+            stamina.forget(A)
+            stamina.block(A, { stamina = 40 }, 2.5, false, clock, CHAR_A)
+            assert.equal('exhausted', use(A, 'taille_descendante')[2])
         end)
 
         it('vava_needs absent ou en refus : facteur 1, aucune erreur ; autre personnage sur le numéro : jauge neuve', function()

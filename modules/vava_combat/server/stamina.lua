@@ -51,7 +51,8 @@ local function fresh(characterId, now)
 end
 
 --- Refus en mémoire (ligne 8 bis de swings.use) : `'exhausted', attente` si le coût de la technique dépasse ce qui
---- reste (garde : de quoi bloquer un coup léger), sinon nil. Ne lit aucun export.
+--- reste (garde : de quoi bloquer un coup léger), sinon nil. Ne lit aucun export ; une jauge d'un autre personnage que
+--- celui en cours (lu au core, seulement avant de refuser) est ignorée : `prepare` tranchera (relecture S-3).
 ---@param src integer
 ---@param def table
 ---@param now integer
@@ -60,9 +61,10 @@ end
 function stamina.refusal(src, def, now)
     local need = stamina.needOf(def)
     if need <= 0 then return nil end
-    local wait = stamina.waitFor(gauges[src], need, now)
-    if wait then return 'exhausted', wait end
-    return nil
+    local g = gauges[src]
+    local wait = stamina.waitFor(g, need, now)
+    if not wait or g.characterId ~= bridge.ActiveCharacterId(src) then return nil end
+    return 'exhausted', wait
 end
 
 --- Début de la vérification d'un geste (phase des exports) : jauge du personnage actif (recréée pleine pour un autre
@@ -81,16 +83,18 @@ function stamina.prepare(src, characterId, now)
     if g.needsAt ~= nil and now - g.needsAt < rules.needsReadMs then return end
     g.needsAt = now
     local values = bridge.NeedsValues(src)
-    -- l'export a pu céder la main : la jauge a pu être oubliée ou remplacée entre-temps
-    if gauges[src] ~= g then return end
+    -- l'export a pu céder la main : la jauge a pu être oubliée (rien à faire) ou remplacée entre-temps (coup bloqué) ;
+    -- la lecture vaut pour la jauge courante du même personnage (relecture S-2)
+    local current = gauges[src]
+    if not current or current.characterId ~= characterId then return end
+    current.needsAt = now
     local factor = 1
     if values ~= nil then
         factor = stamina.needsFactor(values, rules.needs)
-        g.needsKnown = true
+        current.needsKnown = true
     end
-    if factor ~= g.factor then
-        local rebased = stamina.rebase(g, now, stamina.rateOf(factor, cfg), factor)
-        gauges[src] = rebased
+    if factor ~= current.factor then
+        gauges[src] = stamina.rebase(current, bridge.Timer(), stamina.rateOf(factor, cfg), factor)
     end
 end
 

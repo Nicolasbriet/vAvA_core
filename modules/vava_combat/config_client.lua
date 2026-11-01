@@ -85,9 +85,7 @@ VavaCombat.config = {
             learn = { skill = 'armes_une_main', level = 15 },
         },
         -- défense (T-113) : blocage = garde tenue (active : tenue minimale), parade (active : fenêtre), esquive
-        -- (active : invulnérable) ; hit.angle = arc protégé ; stamina (T-114) = coût d'un coup léger bloqué (lourd × 2,
-        -- au bouclier × 0,67 : config.lua → endurance.block ; il faut l'avoir pour lever la garde), d'une parade tentée
-        -- (lever la garde commence par une), d'un pas
+        -- (active : invulnérable) ; hit.angle = arc protégé ; stamina : coût d'endurance (Garde : par coup bloqué, README)
         garde_epee = {
             label = 'Garde', style = 'epee_une_main', type = 'blocage',
             gesture = { dict = 'anim@melee@machete@streamed_core@', clip = 'plyr_block_idle', flag = 49 }, -- PLACEHOLDER
