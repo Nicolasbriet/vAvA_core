@@ -19,7 +19,7 @@ use_experimental_fxv2_oal 'yes'
 
 name 'vava_pause'
 description 'Bannière du royaume vAvA : menu pause d\'Eldoria'
-version '1.0.0'
+version '1.1.0'
 
 dependency 'vAvA_core'
 dependency 'vava_ui'
