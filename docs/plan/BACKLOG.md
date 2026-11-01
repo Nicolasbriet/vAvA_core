@@ -730,14 +730,18 @@ versé à T-014 ; les autres points déjà couverts sont précisés dans T-012 �
   lignes (numéros d'erreur du paquet). `vava_conseil_web` (JS, CSS) n'est pas du ressort de T-154.
 
 ### T-157 — Code de l'Atelier livré au seul Conseil — **décision du porteur du projet**
-- Agents : vava-architecte → vava-dev-lua + vava-dev-nui · Dépend de : T-102 · Statut : en cours (suites appliquées,
-  contre-relecture sécurité à faire ; validée par le porteur du projet le 2 novembre 2026 : changement d'architecture
-  et d'outillage)
+- Agents : vava-architecte → vava-dev-lua + vava-dev-nui · Dépend de : T-102 · Statut : à tester en jeu (relu
+  sécurité, réseau, contre-relu ; suites appliquées ; validée par le porteur du projet le 2 novembre 2026 : changement
+  d'architecture et d'outillage)
 - Fait le 2 novembre 2026 : `vava_atelier` 1.4.0 (spec `docs/plan/specs/T-157.md`, rapport
-  `docs/plan/rapports/T-157.md`, contrat de la page `docs/plan/rapports/T-157-contrat.md`). Chaque joueur télécharge
-  57 668 o (22 359 compressés) au lieu de 262 381 (82 448) ; paquet du Conseil 248 218 o, une fois par version et par
-  membre. Procédure : `docs/tests/atelier.md` § 25. Reste au porteur du projet : la ligne de `CLAUDE.md` sur
+  `docs/plan/rapports/T-157.md` avec les relectures sécurité, réseau et la contre-relecture et leurs suites, contrat de
+  la page `docs/plan/rapports/T-157-contrat.md`). Chaque joueur télécharge 57 668 o (22 359 compressés) au lieu de
+  262 381 (82 448) ; paquet du Conseil 248 218 o, une fois par version et par membre, vérifié par SHA-256 avant
+  exécution. **À tester en jeu** : `docs/tests/atelier.md` § 25 (23 tests), en priorité 25-1 (directives lues), 25-12
+  (noms sans `@@`), 25-21 et 25-22 (sécurité), 25-23 (à-coup). Reste au porteur du projet : la ligne de `CLAUDE.md` sur
   `config_conseil.lua` et les directives `vava_conseil_*`.
+- À faire après l'essai 25-21 (contre-relecture C-3) : si `event.source` d'un message de `SendNUIMessage` n'est pas
+  `null`, retirer de `web/boot.js` la clause qui accepte la source vide (seules la page et son parent resteront lus).
 - Trouvé pendant T-102 (relecture réseau R-1, piste pour le porteur du projet) : ≈ 51 Ko de code de `vava_atelier`
   (outil de placement, séance, relais, page) ne servent qu'au Conseil mais sont téléchargés par tous les joueurs.
   Proposition : livraison à la demande, en latent, à l'ouverture de l'Atelier par un membre (droit relu), gardée en
