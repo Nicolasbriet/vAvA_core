@@ -195,9 +195,8 @@ VavaCombat.config = {
     -- Mannequins d'entraînement (T-156). v1 : posés ici ; plus tard, définitions de l'Atelier (cette liste en sera la
     -- version 1, la base fera foi). Le client lit modèles et places (props LOCAUX créés à portée) ; le serveur lit les
     -- mêmes places pour juger les coups (part du serveur : config.lua). Aucun mannequin ne tombe, ne pare ni ne garde
-    -- quoi que ce soit. Contrôlé au démarrage (shared/dummies.lua) ; détail : README.md.
+    -- quoi que ce soit. Contrôlé au démarrage par le serveur ; détail : README.md.
     dummies = {
-        label = 'Mannequin de paille',
         model = 'prop_beach_punchbag',      -- PLACEHOLDER : sac de frappe de GTA, en attendant le mannequin de paille
         fallbackModel = 'prop_haybale_03',  -- PLACEHOLDER : botte de foin, si le premier modèle est inconnu
         modelTimeoutMs = 5000,              -- attente maximale du chargement d'un modèle (500 à 30 000)

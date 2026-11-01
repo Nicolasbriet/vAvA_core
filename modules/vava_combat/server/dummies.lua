@@ -72,16 +72,17 @@ end
 --- Remplace la liste des mannequins (déjà contrôlée) : config en v1, définitions de l'Atelier plus tard.
 ---@param entries table[]
 function dummies.replace(entries)
-    list, byId = rules.index(entries, cfg.dummies)
+    local d = cfg.dummies
+    list, byId = rules.index(entries, d.model, d.centerHeight, d.label)
     witnessAt = {}
 end
 
---- Démarrage : part client (shared/dummies.lua) contrôlée, index, ressources admises. La part du serveur est contrôlée
---- avec le moteur (weapons.checkEngine). Rend `true`, ou `false, raison` (le module refuse de démarrer).
+--- Démarrage : mannequins contrôlés (weapons.checkDummies, au seul serveur), index, ressources admises. Rend `true`,
+--- ou `false, raison` (le module refuse de démarrer).
 ---@return boolean ok
 ---@return string|nil err
 function dummies.start()
-    local ok, err = rules.check(cfg.dummies)
+    local ok, err = weapons.checkDummies(cfg.dummies)
     if not ok then return false, err end
     dummies.replace(cfg.dummies.list)
     callers = {}
@@ -116,26 +117,23 @@ end
 ---@param position table   position de l'attaquant lue par le serveur
 ---@param heading number   son cap
 ---@param arc table        arc de la technique (geometry.arcOf)
----@param done table<integer, true>  mannequins déjà frappés par ce coup
 ---@return vAvA.CombatDummy|nil
 ---@return number|nil distance
 ---@return number|nil angle
-function dummies.candidate(src, position, heading, arc, done)
+function dummies.candidate(src, position, heading, arc)
     local radius = arc.reach + cfg.geometry.searchMargin
     local limit = radius * radius
     local bucket, found = nil, nil
     for n, d in ipairs(list) do
-        if not done[n] then
-            local c = d.center
-            local dx, dy, dz = c.x - position.x, c.y - position.y, c.z - position.z
-            if dx * dx + dy * dy + dz * dz <= limit then
-                bucket = bucket or bridge.Bucket(src)
-                if d.bucket == bucket then
-                    local inside, flat, angle = geometry.inArc(position, heading, c, arc)
-                    if inside then
-                        found = found or {}
-                        found[#found + 1] = { player = n, distance = flat, angle = angle }
-                    end
+        local c = d.center
+        local dx, dy, dz = c.x - position.x, c.y - position.y, c.z - position.z
+        if dx * dx + dy * dy + dz * dz <= limit then
+            bucket = bucket or bridge.Bucket(src)
+            if d.bucket == bucket then
+                local inside, flat, angle = geometry.inArc(position, heading, c, arc)
+                if inside then
+                    found = found or {}
+                    found[#found + 1] = { player = n, distance = flat, angle = angle }
                 end
             end
         end

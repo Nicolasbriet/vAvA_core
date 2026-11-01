@@ -5,7 +5,7 @@
            (format de COMBAT_V1.md § 3) et des réglages du moteur, qualité lue et facteur de dégâts, solidité lue
            (émoussée ou non), montant d'un coup, chance et pas d'usure, coup qui use (d'après le résultat de
            vava_health:hit), issue d'un coup montrée aux proches, montant envoyé aux deux participants (dixièmes,
-           T-155), issue « comme si » d'un coup sur un mannequin (T-156), options d'un appel à `strike`, paquet `hit`, raison
+           T-155), contrôle des mannequins et issue « comme si » d'un coup sur l'un d'eux (T-156), options d'un appel à `strike`, paquet `hit`, raison
            d'un refus montrée au joueur, comparaison de versions. Aucun état, aucune native, ne lève jamais d'erreur sur
            une donnée reçue.
     Dépendances : shared/constants.lua
@@ -613,11 +613,93 @@ end
 -- ressource admise à frapper un mannequin (dummies.callers) : classes ASCII explicites
 local RESOURCE_PATTERN, RESOURCE_MAX = '^[A-Za-z0-9_%-]+$', 64
 
---- Part du serveur des mannequins (T-156). Rend nil ou la raison.
+-- mannequins (T-156) : bornes de la liste, contrôlée ici au seul serveur (le client n'en reçoit que l'index)
+local DUMMY_ID_MAX, DUMMY_LABEL_MAX = 32, 48
+local DUMMY_XY_MAX, DUMMY_Z_MIN, DUMMY_Z_MAX = 50000, -200, 2000
+local DUMMY_KEYS = { id = true, x = true, y = true, z = true, heading = true, model = true, bucket = true, label = true }
+local WOBBLE_KEYS = { ms = true, angle = true, cycles = true }
+local FX_KEYS = { asset = true, name = true, scale = true }
+
+--- Un mannequin de la liste : nil, ou la raison.
+---@param i integer
+---@param d any
+---@return string|nil
+local function dummyEntryError(i, d)
+    local where = format('dummies.list[%d]', i)
+    if type(d) ~= 'table' then return where .. ' : table attendue' end
+    local extra = extraKey(d, DUMMY_KEYS)
+    if extra ~= nil then return format("%s : champ inconnu '%s'", where, tostring(extra)) end
+    if not text(d.id, DUMMY_ID_MAX) or not find(d.id, ID_PATTERN) then
+        return format('%s : id attendu (^[a-z0-9_]+$, 1 à %d octets)', where, DUMMY_ID_MAX)
+    end
+    where = format("dummies.list[%d] '%s'", i, d.id)
+    if not between(d.x, -DUMMY_XY_MAX, DUMMY_XY_MAX) or not between(d.y, -DUMMY_XY_MAX, DUMMY_XY_MAX) then
+        return where .. ' : x et y attendus (nombres finis, 50 000 au plus en valeur absolue)'
+    end
+    if not between(d.z, DUMMY_Z_MIN, DUMMY_Z_MAX) then return where .. ' : z attendu de -200 à 2 000' end
+    if not between(d.heading, 0, 360) then return where .. ' : heading attendu de 0 à 360' end
+    if d.model ~= nil and not text(d.model, MODEL_MAX) then
+        return format('%s : model attendu (1 à %d octets)', where, MODEL_MAX)
+    end
+    if d.bucket ~= nil and (mathType(d.bucket) ~= 'integer' or d.bucket < 0 or d.bucket > 65535) then
+        return where .. ' : bucket attendu (entier de 0 à 65 535)'
+    end
+    if d.label ~= nil and not text(d.label, DUMMY_LABEL_MAX) then
+        return format('%s : label attendu (1 à %d octets)', where, DUMMY_LABEL_MAX)
+    end
+    return nil
+end
+
+--- Liste pure de mannequins (MAX_DUMMIES au plus, identifiants uniques) : nil, ou la raison.
+---@param list any
+---@return string|nil
+local function dummyListError(list)
+    if not pureList(list, VavaCombat.MAX_DUMMIES) then
+        return format('dummies.list : liste pure de %d mannequins au plus attendue', VavaCombat.MAX_DUMMIES)
+    end
+    local seen = {}
+    for i, d in ipairs(list) do
+        local err = dummyEntryError(i, d)
+        if err then return err end
+        if seen[d.id] then return format("dummies.list : id '%s' en double", d.id) end
+        seen[d.id] = true
+    end
+    return nil
+end
+
+--- Mannequins (T-156), part du client (config_client.lua) et part du serveur (config.lua). Rend nil ou la raison.
 ---@param d any
 ---@return string|nil err
 local function dummiesError(d)
     if type(d) ~= 'table' then return 'dummies : table attendue' end
+    if not text(d.label, DUMMY_LABEL_MAX) then return 'dummies.label attendu (1 à 48 octets)' end
+    if not text(d.model, MODEL_MAX) or not text(d.fallbackModel, MODEL_MAX) then
+        return 'dummies.model et fallbackModel attendus (1 à 64 octets)'
+    end
+    if integerIn(d.modelTimeoutMs, 500, 30000) == nil then
+        return 'dummies.modelTimeoutMs entier de 500 à 30 000 attendu'
+    end
+    if not between(d.streamRadius, 10, 200) or not between(d.keepRadius, 10, 200) or d.keepRadius <= d.streamRadius then
+        return 'dummies : 10 ≤ streamRadius < keepRadius ≤ 200 attendu'
+    end
+    if integerIn(d.nearPollMs, 100, 5000) == nil or integerIn(d.farPollMs, 500, 10000) == nil then
+        return 'dummies : nearPollMs (100 à 5 000) et farPollMs (500 à 10 000) entiers attendus'
+    end
+    if not between(d.centerHeight, 0.2, 2) or not between(d.anchorHeight, 0.5, 3) then
+        return 'dummies : centerHeight (0,2 à 2) et anchorHeight (0,5 à 3) attendus'
+    end
+    local w = d.wobble
+    if type(w) ~= 'table' or extraKey(w, WOBBLE_KEYS) ~= nil or integerIn(w.ms, 0, 3000) == nil
+        or not between(w.angle, 0, 45) or integerIn(w.cycles, 1, 4) == nil then
+        return 'dummies.wobble : { ms (0 à 3 000), angle (0 à 45), cycles (entier de 1 à 4) } attendu'
+    end
+    local fx = d.fx
+    if fx ~= false and (type(fx) ~= 'table' or extraKey(fx, FX_KEYS) ~= nil or not text(fx.asset, MODEL_MAX)
+        or not text(fx.name, MODEL_MAX) or not between(fx.scale, 0, 5)) then
+        return 'dummies.fx : false ou { asset, name (1 à 64 octets), scale (0 à 5) } attendu'
+    end
+    local listErr = dummyListError(d.list)
+    if listErr then return listErr end
     if not between(d.wearChance, 0, 1) then return 'dummies.wearChance attendu de 0 à 1' end
     if not between(d.witnessRadius, 0, 30) then return 'dummies.witnessRadius attendu de 0 à 30 m' end
     if integerIn(d.witnessMinMs, 0, 10000) == nil then return 'dummies.witnessMinMs entier de 0 à 10 000 attendu' end
@@ -713,6 +795,18 @@ function weapons.checkEngine(cfg)
     if err then return false, err end
     return true
 end
+
+--- Mannequins seuls (part du client et part du serveur), relus au démarrage de server/dummies.lua : `true`, ou
+--- `false, raison`.
+---@param d any
+---@return boolean ok
+---@return string|nil err
+function weapons.checkDummies(d)
+    local err = dummiesError(d)
+    if err then return false, err end
+    return true
+end
+
 
 -- Issue d'un coup -----------------------------------------------------------------------------------------------------
 

@@ -10,7 +10,7 @@ describe('vava_combat mannequins (client)', function()
     local props, cfg, dummy1
     local clock, threads, waits, player, attackerAt
     local created, deleted, entities, rotations, frozen, hitTexts, sounds, particles, warns, hooks, netEvents, stops
-    local validModels, nextEntity
+    local validModels, nextEntity, loads, modelLoads
     local ME, OTHER = 5, 7
     local FRAME_MS = 16
 
@@ -58,7 +58,7 @@ describe('vava_combat mannequins (client)', function()
         created, deleted, entities, rotations, frozen = {}, {}, {}, {}, {}
         hitTexts, sounds, particles, warns, hooks, netEvents, stops = {}, {}, {}, {}, {}, {}, {}
         validModels = { [cfg.dummies.model] = true, [cfg.dummies.fallbackModel] = true }
-        nextEntity, attackerAt = 100, nil
+        nextEntity, attackerAt, loads, modelLoads = 100, nil, true, 0
         standAt(100)
 
         VavaCombat.resource = 'vava_combat'
@@ -99,8 +99,8 @@ describe('vava_combat mannequins (client)', function()
         end
         _G.GetHashKey = function(name) return 'h:' .. name end
         _G.IsModelValid = function(hash) return validModels[hash:sub(3)] == true end
-        _G.RequestModel = function() end
-        _G.HasModelLoaded = function() return true end
+        _G.RequestModel = function() modelLoads = modelLoads + 1 end
+        _G.HasModelLoaded = function() return loads end
         _G.SetModelAsNoLongerNeeded = function() end
         _G.CreateObjectNoOffset = function(hash, x, y, z, networked, missionEntity, door)
             nextEntity = nextEntity + 1
@@ -200,6 +200,48 @@ describe('vava_combat mannequins (client)', function()
             assert.equal(1, #warns)
         end)
 
+        it('R-3 : modèle connu qui ne se charge pas : aucun prop, une ligne, pas de nouvel essai avant la sortie de portée', function()
+            loads = false
+            spawned()
+            standAt(10)
+            run(2000)
+            run(9000)                         -- attente bornée (5 s) épuisée
+            assert.equal(0, #created)
+            assert.equal(3, modelLoads)       -- un essai par mannequin
+            local lines = 0
+            for _, line in ipairs(warns) do
+                if line:find('non chargé', 1, true) then lines = lines + 1 end
+            end
+            assert.equal(1, lines)            -- une ligne par modèle
+            run(20000)
+            assert.equal(3, modelLoads)       -- aucun nouvel essai tant qu'on reste à portée
+            -- sorti de portée puis revenu : nouvel essai, sans nouvelle ligne
+            standAt(100)
+            run(23000)
+            loads = true
+            standAt(10)
+            run(26000)
+            assert.equal(6, modelLoads)
+            assert.equal(3, #created)
+            assert.equal(1, #warns)
+        end)
+
+        it('R-1 : liste illisible (contrôlée au seul serveur) : une ligne, aucune boucle, aucune erreur', function()
+            cfg.dummies.list = { 'paleto' }
+            warns, threads, waits = {}, {}, {}
+            helper.load('modules/vava_combat/client/dummies.lua')
+            props = VavaCombat.dummyProps
+            props.start()
+            assert.equal(1, #warns)
+            assert.matches('mannequins non montrés', warns[1])
+            spawned()
+            run(5000)
+            assert.equal(0, #waits)
+            assert.equal(0, #created)
+            assert.has_no.errors(function() props.receive(1, ME, 'hit', 120) end)
+            assert.equal(0, #hitTexts)
+        end)
+
         it('déchargement : tout retiré, boucle arrêtée ; arrêt de la ressource : tout retiré', function()
             spawned()
             standAt(10)
@@ -235,7 +277,7 @@ describe('vava_combat mannequins (client)', function()
             standAt(10)
             spawned()
             run(1000)
-            assert.is_number(props.entity(1))
+            assert.equal(3, count(entities))
             assert.equal(props.receive, netEvents['vava_combat:dummy'])
             waits = {}
         end)
@@ -313,7 +355,7 @@ describe('vava_combat mannequins (client)', function()
         it('mannequin sans prop (hors de portée) : rien ne bouge, aucune erreur', function()
             standAt(100)
             run(clock + 3000)
-            assert.is_nil(props.entity(1))
+            assert.equal(0, count(entities))
             rotations = {}
             props.receive(1, OTHER)
             run(clock + 1000)

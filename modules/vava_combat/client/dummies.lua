@@ -6,7 +6,7 @@
     Dépendances : shared/constants.lua, config_client.lua, shared/dummies.lua, client/core.lua, bridge/client.lua
 ]]
 
-local type, pairs, ipairs, next, tostring = type, pairs, ipairs, next, tostring
+local type, pairs, ipairs, next, pcall, tostring = type, pairs, ipairs, next, pcall, tostring
 local mathType, sqrt, sin, cos, rad, pi = math.type, math.sqrt, math.sin, math.cos, math.rad, math.pi
 local CreateThread, Wait, GetGameTimer, AddEventHandler, RegisterNetEvent =
     CreateThread, Wait, GetGameTimer, AddEventHandler, RegisterNetEvent
@@ -27,7 +27,7 @@ if not core then return end
 local cfg = VavaCombat.config
 local d = cfg.dummies
 local effects = cfg.effects
-local rules = VavaCombat.dummyRules
+local wobbleCfg, fx = d.wobble, d.fx
 local bridge = VavaCombat.bridge
 local EVENTS = VavaCombat.EVENTS
 local MAX_PLAYER, TENTHS_MAX = VavaCombat.MAX_PLAYER, VavaCombat.TENTHS_MAX
@@ -40,23 +40,15 @@ local SOUND_OF = { hit = true, stagger = true }
 local dummyProps = {}
 VavaCombat.dummyProps = dummyProps
 
--- part client, lue clé par clé
-local part = {
-    label = d.label, model = d.model, fallbackModel = d.fallbackModel, modelTimeoutMs = d.modelTimeoutMs,
-    streamRadius = d.streamRadius, keepRadius = d.keepRadius, nearPollMs = d.nearPollMs, farPollMs = d.farPollMs,
-    centerHeight = d.centerHeight, anchorHeight = d.anchorHeight, wobble = d.wobble, fx = d.fx, list = d.list,
-}
-local entries = {}
-local valid, invalidReason = rules.check(part)
-if valid then
-    entries = rules.index(part.list, part)
-else
-    core.log.warn('mannequins non montrés : %s', tostring(invalidReason))
-end
-local STREAM_SQ = valid and part.streamRadius * part.streamRadius or 0
-local KEEP_SQ = valid and part.keepRadius * part.keepRadius or 0
-local NEAR_SQ = valid and (part.keepRadius + NEAR_MARGIN) ^ 2 or 0
-local wobbleCfg = part.wobble
+-- liste contrôlée par le serveur (qui refuse le module sinon) ; illisible ici : aucun prop
+local entries, STREAM_SQ, KEEP_SQ, NEAR_SQ = {}, 0, 0, 0
+local indexed, indexErr = pcall(function()
+    local list = VavaCombat.dummyRules.index(d.list, d.model, d.centerHeight)
+    STREAM_SQ, KEEP_SQ = d.streamRadius * d.streamRadius, d.keepRadius * d.keepRadius
+    NEAR_SQ = (d.keepRadius + NEAR_MARGIN) ^ 2
+    entries = list
+end)
+if not indexed then core.log.warn('mannequins non montrés : %s', tostring(indexErr)) end
 
 -- props montrés : n → { entity, loading, failed }
 local shown = {}
@@ -78,42 +70,49 @@ local function removeAll()
     for n in pairs(shown) do remove(n) end
 end
 
+local function warnModel(name, fmt, ...)
+    if warnedModel[name] then return end
+    warnedModel[name] = true
+    core.log.warn(fmt, ...)
+end
+
 -- modèle du mannequin, sinon le repli ; une ligne par modèle inconnu
 local function modelOf(entry)
-    for _, name in ipairs({ entry.model, part.fallbackModel }) do
+    for _, name in ipairs({ entry.model, d.fallbackModel }) do
         local hash = GetHashKey(name)
-        if IsModelValid(hash) then return hash end
-        if not warnedModel[name] then
-            warnedModel[name] = true
-            core.log.warn("mannequin '%s' : modèle inconnu '%s'", entry.id, name)
-        end
+        if IsModelValid(hash) then return hash, name end
+        warnModel(name, "mannequin '%s' : modèle inconnu '%s'", entry.id, name)
     end
     return nil
 end
 
--- prop LOCAL (jamais réseau), attente bornée du modèle
+-- prop LOCAL (jamais réseau), attente bornée du modèle ; échec : gardé sans prop jusqu'à la sortie de portée
 local function spawn(entry)
     local slot = { entity = nil, loading = true }
     shown[entry.n] = slot
     CreateThread(function()
-        local hash = modelOf(entry)
-        if not hash then
-            -- gardé sans prop tant qu'on reste à portée
-            slot.loading, slot.failed = false, true
+        local hash, name = modelOf(entry)
+        if hash then
+            RequestModel(hash)
+            local deadline = GetGameTimer() + d.modelTimeoutMs
+            while not HasModelLoaded(hash) and GetGameTimer() < deadline do Wait(LOAD_POLL_MS) end
+        end
+        if shown[entry.n] ~= slot then
+            if hash then SetModelAsNoLongerNeeded(hash) end
             return
         end
-        RequestModel(hash)
-        local deadline = GetGameTimer() + part.modelTimeoutMs
-        while not HasModelLoaded(hash) and GetGameTimer() < deadline do Wait(LOAD_POLL_MS) end
-        if shown[entry.n] ~= slot or not HasModelLoaded(hash) then
-            if shown[entry.n] == slot then shown[entry.n] = nil end
-            SetModelAsNoLongerNeeded(hash)
+        if not hash or not HasModelLoaded(hash) then
+            if hash then
+                SetModelAsNoLongerNeeded(hash)
+                warnModel(name, "mannequin '%s' : modèle '%s' non chargé en %d ms", entry.id, name, d.modelTimeoutMs)
+            end
+            slot.loading, slot.failed = false, true
             return
         end
         local entity = CreateObjectNoOffset(hash, entry.x, entry.y, entry.z, false, false, false)
         SetModelAsNoLongerNeeded(hash)
         if not entity or entity == 0 then
-            shown[entry.n] = nil
+            slot.loading, slot.failed = false, true
             return
         end
         SetEntityHeading(entity, entry.heading)
@@ -137,7 +136,7 @@ function dummyProps.step()
             remove(n)
         end
     end
-    return near and part.nearPollMs or part.farPollMs
+    return near and d.nearPollMs or d.farPollMs
 end
 
 local function loop()
@@ -158,11 +157,6 @@ function dummyProps.setPlaying(flag)
         running = true
         CreateThread(loop)
     end
-end
-
-function dummyProps.entity(n)
-    local slot = shown[n]
-    return slot and slot.entity or nil
 end
 
 -- une seule boucle de balancement pour tous, puis remis droit exactement
@@ -225,14 +219,13 @@ local function allowFx(now)
 end
 
 local function splinters(entry)
-    local fx = part.fx
     if not fx or not allowFx(GetGameTimer()) then return end
     if not HasNamedPtfxAssetLoaded(fx.asset) then
         if loadingFx then return end
         loadingFx = true
         RequestNamedPtfxAsset(fx.asset)
         CreateThread(function()
-            local deadline = GetGameTimer() + part.modelTimeoutMs
+            local deadline = GetGameTimer() + d.modelTimeoutMs
             while not HasNamedPtfxAssetLoaded(fx.asset) and GetGameTimer() < deadline do Wait(LOAD_POLL_MS) end
             loadingFx = false
         end)
@@ -257,10 +250,9 @@ function dummyProps.receive(n, src, issue, tenths)
         if type(sound) == 'table' and type(sound.name) == 'string' then PlaySoundFrontend(-1, sound.name, sound.set, true) end
     end
     -- 4e valeur absente : chiffres coupés par le serveur ; false : le mot seul
-    if tenths == false then
-        bridge.HitText('dealt', { x = entry.x, y = entry.y, z = entry.z + part.anchorHeight }, issue, nil)
-    elseif mathType(tenths) == 'integer' and tenths >= 0 and tenths <= TENTHS_MAX then
-        bridge.HitText('dealt', { x = entry.x, y = entry.y, z = entry.z + part.anchorHeight }, issue, tenths)
+    local valid = tenths == false or (mathType(tenths) == 'integer' and tenths >= 0 and tenths <= TENTHS_MAX)
+    if valid then
+        bridge.HitText('dealt', { x = entry.x, y = entry.y, z = entry.z + d.anchorHeight }, issue, tenths or nil)
     end
 end
 

@@ -17,9 +17,10 @@
            depuis la demande ; candidats = joueurs proches de la même instance, jugés sur les positions et le cap LUS
            PAR LE SERVEUR (portée + bonus de l'arme + tolérance, demi-angle + tolérance, hauteur), triés (cible
            verrouillée d'abord, puis angle, distance, numéro), une cible touchée une fois par coup, `maxTargets` par
-           coup ; chaque cible passe par strike.run (chaîne de dégâts, usure), puis server/reactions.lua. Quand aucun
+           coup ; chaque cible passe par strike.run (chaîne de dégâts, usure), puis server/reactions.lua. Tant qu'aucun
            joueur n'a été frappé, un mannequin d'entraînement peut l'être (server/dummies.lua, T-156 : mêmes portée,
-           angle, hauteur, instance ; une fois par coup ; il compte dans `maxTargets`). Rien n'est
+           angle, hauteur, instance ; un seul par coup ; il ne compte pas dans `maxTargets` : un joueur entré dans
+           l'arc au relevé suivant est encore frappé). Rien n'est
            rendu au client que l'acceptation ou le refus : aucun résultat. N'attend jamais lui-même (aucune attente,
            aucune base, aucun callClient) ; s'il est repris après un crochet ou un export qui a cédé la main, il
            revérifie que sa réservation tient toujours.
@@ -80,7 +81,7 @@ VavaCombat.swings = swings
 ---@field origin table         position lue à la demande
 ---@field arc table            arc de la technique avec l'arme tenue
 ---@field hits table<integer, true>
----@field dummyHits table<integer, true>|nil  mannequins déjà frappés par ce coup (T-156)
+---@field dummyHit integer|nil   mannequin frappé par ce coup (T-156 : un au plus)
 ---@field hitCount integer
 ---@field cancelled string|nil   annulé : ses relevés ne frappent plus, son cycle compte toujours
 ---@field pending true|nil       réservé, pas encore accepté (demande en cours de vérification)
@@ -225,14 +226,12 @@ local function sample(swing, k)
         local outcome = reactions.after(swing, target, result)
         if logging then logSample(swing, k, target, entry.distance, entry.angle, outcome or code or 'retenu') end
     end
-    -- un mannequin, seulement si aucun joueur n'a été frappé (il ne protège personne et ne vole aucun coup)
-    if dummies and not swing.cancelled and swing.hitCount < cfg.geometry.maxTargets and dummies.count() > 0 then
-        local done = swing.dummyHits or {}
-        swing.dummyHits = done
-        local d, distance, angle = dummies.candidate(src, position, heading, arc, done)
+    -- un mannequin au plus par coup, et seulement si aucun joueur n'a été frappé ; il ne compte pas dans `hitCount` :
+    -- il ne protège personne et n'empêche jamais de frapper un joueur au relevé suivant
+    if dummies and not swing.cancelled and swing.hitCount == 0 and not swing.dummyHit and dummies.count() > 0 then
+        local d, distance, angle = dummies.candidate(src, position, heading, arc)
         if d then
-            done[d.n] = true
-            swing.hitCount = swing.hitCount + 1
+            swing.dummyHit = d.n
             local outcome = dummies.strike(swing, d.n, held, position)
             if logging then logSample(swing, k, 'd' .. d.n, distance, angle, outcome or 'retenu') end
         end

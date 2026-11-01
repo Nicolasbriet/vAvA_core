@@ -28,7 +28,7 @@ local function testList()
 end
 
 describe('vava_combat mannequins : règles pures', function()
-    local rules, weapons, cfg
+    local rules, weapons, cfg, check
 
     before_each(function()
         helper.reset()
@@ -40,6 +40,7 @@ describe('vava_combat mannequins : règles pures', function()
             'modules/vava_combat/shared/weapons.lua',
         })
         rules, weapons, cfg = VavaCombat.dummyRules, VavaCombat.weapons, VavaCombat.config
+        check = weapons.checkDummies
     end)
 
     after_each(function() VavaCombat = nil end)
@@ -62,9 +63,9 @@ describe('vava_combat mannequins : règles pures', function()
     end
 
     it('la config livrée est admise ; fx = false aussi ; liste vide aussi', function()
-        assert.is_true(rules.check(cfg.dummies))
-        assert.is_true(rules.check(partWith({ fx = false })))
-        assert.is_true(rules.check(partWith({ list = {} })))
+        assert.is_true(check(cfg.dummies))
+        assert.is_true(check(partWith({ fx = false })))
+        assert.is_true(check(partWith({ list = {} })))
         assert.equal(3, #cfg.dummies.list)
     end)
 
@@ -94,13 +95,13 @@ describe('vava_combat mannequins : règles pures', function()
         cases[#cases + 1] = partWith({ list = many })
         cases[#cases + 1] = partWith({ list = 'paleto' })
         for i, part in ipairs(cases) do
-            local ok, reason = rules.check(part)
+            local ok, reason = check(part)
             assert.is_false(ok, 'cas ' .. i)
             assert.is_string(reason, 'cas ' .. i)
         end
         -- 64 mannequins : admis
         many[65] = nil
-        assert.is_true(rules.check(partWith({ list = many })))
+        assert.is_true(check(partWith({ list = many })))
     end)
 
     it('refuse chaque défaut des réglages du client', function()
@@ -114,17 +115,17 @@ describe('vava_combat mannequins : règles pures', function()
             { fx = { asset = 'core', name = 'x', scale = 6 } }, { fx = { asset = 'core', scale = 1 } },
         }
         for i, changes in ipairs(cases) do
-            local ok, reason = rules.check(partWith(changes))
+            local ok, reason = check(partWith(changes))
             assert.is_false(ok, 'cas ' .. i)
             assert.is_string(reason, 'cas ' .. i)
         end
-        assert.is_false((rules.check(nil)))
+        assert.is_false((check(nil)))
     end)
 
     it('index : numéro = place dans la liste, centre au-dessus du pied, valeurs par défaut', function()
         local part = partWith({ list = testList() })
-        assert.is_true(rules.check(part))
-        local byN, byId = rules.index(part.list, part)
+        assert.is_true(check(part))
+        local byN, byId = rules.index(part.list, cfg.dummies.model, cfg.dummies.centerHeight, cfg.dummies.label)
         assert.equal(3, #byN)
         assert.same({ n = 1, id = 'essai_1', x = 0.0, y = 1.8, z = -1.0, heading = 180.0, model = cfg.dummies.model,
             bucket = 0, label = cfg.dummies.label, center = { x = 0.0, y = 1.8, z = 0.0 } }, byN[1])
@@ -500,19 +501,37 @@ describe('vava_combat mannequins (serveur)', function()
             assert.equal(0, #sentOf('vava_combat:dummy'))
         end)
 
-        it('deux adversaires par coup : B d\'abord, puis le mannequin ; coup paré par B : le mannequin n\'a rien', function()
+        it('S-1 : un mannequin n\'empêche jamais de frapper un joueur entré dans l\'arc au relevé suivant', function()
+            positions[B] = { 0.3, 6.0, 0 }   -- hors de portée à l'ouverture de la frappe
+            use(A, 'taille_descendante')
+            at(320)
+            assert.equal(1, #trials)
+            assert.equal(0, #hits)
+            positions[B] = { 0.3, 1.5, 0 }   -- entré dans l'arc avant le second relevé
+            at(480)
+            assert.equal(1, #hits)
+            assert.equal(B, hits[1].target)
+            assert.equal(1, #trials)       -- le mannequin n'est pas frappé une seconde fois
+        end)
+
+        it('S-1 : aucun mannequin si un joueur a été frappé, même avec deux adversaires par coup', function()
             cfg.geometry.maxTargets = 2
             positions[B] = { 0.3, 1.5, 0 }
             use(A, 'taille_descendante')
             at(480)
             assert.equal(1, #hits)
-            assert.equal(1, #trials)
-            -- B pare (suite de la défense : le coup de A est annulé pendant sa chaîne)
-            onHit = function() swings.cancel(A, 'parried') end
-            at(3000)
-            use(A, 'taille_descendante')
-            at(3480)
-            assert.equal(2, #hits)
+            assert.equal(0, #trials)
+        end)
+
+        it('S-3 : bouclier tenu (ou objet inconnu) : rien, aucun essai', function()
+            local swing = { source = A, id = 'taille_descendante', def = cfg.techniques.taille_descendante,
+                characterId = CHAR_A }
+            local at0 = { x = 0, y = 0, z = 0 }
+            assert.is_nil(dummies.strike(swing, 1, { id = 11, item = 'bouclier_rond', metadata = {} }, at0))
+            assert.is_nil(dummies.strike(swing, 1, { id = 12, item = 'caillou', metadata = {} }, at0))
+            assert.equal(0, #trials)
+            -- contre-essai : l'épée tenue frappe
+            assert.equal('hit', dummies.strike(swing, 1, held[A], at0))
             assert.equal(1, #trials)
         end)
 

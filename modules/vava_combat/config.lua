@@ -120,7 +120,9 @@ config.numbers = {
 
 -- Mannequins (T-156), part du serveur (ajoutée à la part client de config_client.lua). Valeurs de départ, à juger à la
 -- porte T-119 ; bornées au démarrage.
-config.dummies.wearChance = 0.25        -- part des coups sur un mannequin qui usent l'arme comme un vrai coup (paille)
+config.dummies.label = 'Mannequin de paille'  -- nom d'un mannequin sans libellé propre (outils, Atelier)
+config.dummies.wearChance = 0.25        -- part des coups sur un mannequin qui usent l'arme comme un vrai coup (la paille use
+                                        -- peu le fil)
 config.dummies.witnessRadius = 15.0     -- témoins prévenus du balancement (m) ; 0 : seul l'attaquant le voit
 config.dummies.witnessMinMs = 800       -- par mannequin, au plus un balancement envoyé aux témoins par ce délai
 config.dummies.callers = { 'vava_magic' }  -- ressources admises à frapper un mannequin par l'export dummyHit (sorts)
