@@ -196,19 +196,22 @@ signal BLOQUANT 'loadstring\(|[=(,][[:space:]]*load\([[:space:]]*["'"'"'a-z_]+[^
 # --- Code dynamique (T-157, renforcé par la relecture sécurité S-4) : dans un fichier Lua de modules/ ou examples/,
 # relevé dans le code seul (commentaires `--` et `--[[ ]]` retirés, contenu des chaînes retiré sauf une chaîne qui vaut
 # exactement load, loadfile, loadstring, dofile, _G ou _ENV) : tout mot `load`, `loadfile`, `loadstring` ou `dofile` qui
-# n'est pas précédé de `.` ou `:` (appel, valeur passée, rangée, alias, `x and load or nil`, `(load)(…)`), et tout mot
-# `_G` ou `_ENV` (`rawget(_G, …)`, `_G[…]`, `local n = _G`). Ne comptent pas : `x.load(`, `x:load(`,
+# n'est pas précédé de `.` ou `:` (appel, valeur passée, rangée, alias, `x and load or nil`, `(load)(…)`) ; tout mot
+# `_G` ou `_ENV`, même précédé de `.` (`rawget(_G, …)`, `_G[…]`, `local n = _G`, `package.loaded._G`) ; et (contre-
+# relecture C-1) tout mot `debug` non précédé de `.` ou `:` sauf `debug.traceback` (`debug.getregistry()`,
+# `debug.getupvalue`…), tout mot `package` non précédé de `.` ou `:` (`package.loaded`). Ne comptent pas : `x.load(`, `x:load(`,
 # `LoadResourceFile(`, la définition d'une fonction nommée load (`local function load(` ; ses appels comptent) et le nom
 # déclaré par `local load =`. Exception : seulement par une ligne de scripts/audit-exceptions.txt dont l'extrait est la
 # ligne ENTIÈRE (commentaire de fin retiré, bords ignorés) ; « audit: ok » ne fait rien taire.
 LOAD_AWK='
-function special(s) { return s == "load" || s == "loadfile" || s == "loadstring" || s == "dofile" || s == "_G" || s == "_ENV" }
+function special(s) { return s == "load" || s == "loadfile" || s == "loadstring" || s == "dofile" || s == "_G" || s == "_ENV" || s == "debug" || s == "package" }
 function verifie(code, kept,    c) {
     c = code
     gsub(/function[ \t]+load[ \t]*\(/, "function _(", c)
     sub(/^[ \t]*local[ \t]+load[ \t]*=/, "local _ =", c)
-    if (c ~ /(^|[^A-Za-z0-9_.:])(load|loadfile|loadstring|dofile)([^A-Za-z0-9_]|$)/ ||
-        c ~ /(^|[^A-Za-z0-9_.:])(_G|_ENV)([^A-Za-z0-9_]|$)/) {
+    gsub(/(^|[^A-Za-z0-9_.:])debug[ \t]*\.[ \t]*traceback([^A-Za-z0-9_]|$)/, " _ ", c)
+    if (c ~ /(^|[^A-Za-z0-9_.:])(load|loadfile|loadstring|dofile|debug|package)([^A-Za-z0-9_]|$)/ ||
+        c ~ /(^|[^A-Za-z0-9_])(_G|_ENV)([^A-Za-z0-9_]|$)/) {
         sub(/^[ \t]+/, "", kept); sub(/[ \t]+$/, "", kept)
         print FILENAME ":" FNR ":" ligne "\037" kept
     }
@@ -263,7 +266,7 @@ filtrer_ligne_entiere() {
 }
 if [[ ${#lua_code[@]} -gt 0 ]]; then
     res=$(awk -v Q="'" "$LOAD_AWK" "${lua_code[@]}" 2>/dev/null | filtrer_ligne_entiere || true)
-    noter BLOQUANT "code exécuté à la volée (load, loadfile, loadstring, dofile, _G, _ENV) hors des lignes inscrites aux exceptions (T-157)" "$res"
+    noter BLOQUANT "code exécuté à la volée (load, loadfile, loadstring, dofile, _G, _ENV, debug, package) hors des lignes inscrites aux exceptions (T-157)" "$res"
 fi
 # --- fin du bloc T-157
 lua_sans_chancellerie=(); for f in "${lua[@]}"; do [[ "$f" == modules/vava_chancellerie/* ]] || lua_sans_chancellerie+=("$f"); done

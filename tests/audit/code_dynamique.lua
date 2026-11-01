@@ -47,6 +47,17 @@ obj:load(2)  -- attendu: rien
 local text = LoadResourceFile('vava_essai', 'x.lua')  -- attendu: rien
 local reloaded = reload(3)  -- attendu: rien
 local loaded = { 'chargé', 'loader', 'payload' }  -- attendu: rien
+-- cas de la contre-relecture sécurité C-1
+local g3 = debug.getregistry()[2]; g3.load(code)()  -- attendu: BLOQUANT
+local _, env2 = debug.getupvalue(fn, 1); env2.load(code)()  -- attendu: BLOQUANT
+package.loaded._G.load(code)()  -- attendu: BLOQUANT
+local t2 = package.loaded['string']  -- attendu: BLOQUANT
+local p2 = x._G  -- attendu: BLOQUANT
+local d2 = debug  -- attendu: BLOQUANT
+local traceback = debug.traceback  -- attendu: rien
+local tb = xpcall(fn, debug.traceback)  -- attendu: rien
+local samples = cfg.debug.logSamples  -- attendu: rien
+local level = core.log.debug('debug et package dans une phrase')  -- attendu: rien
 
 return f, g, ok, h, i, j, k, a, b, c, d, e, s1, g2, h2, i2, i3, j2, k2, l2, m2, o2, s2, s3, s4, fn2, fn3, text,
-    reloaded, loaded
+    reloaded, loaded, t2, p2, d2, traceback, tb, samples, level
