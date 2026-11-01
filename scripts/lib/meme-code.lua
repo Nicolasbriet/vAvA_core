@@ -70,7 +70,7 @@ end
 --- Preuve de toute une sortie de livraison.js --essai ; renvoie le code de sortie.
 ---@param dossier string
 function M.run(dossier)
-    local proved, delivered, gaps, skipped = 0, 0, 0, {}
+    local proved, delivered, gaps, seen, skipped = 0, 0, 0, 0, {}
     local function gap(path, reason)
         gaps = gaps + 1
         write(format('ÉCART %s : %s\n', path, reason))
@@ -80,6 +80,7 @@ function M.run(dossier)
         local f = fields(line)
         local kind, path = f[1], f[2]
         if (kind == 'livre' or kind == 'depot' or kind == 'refuse') and path and path ~= '' then
+            seen = seen + 1
             local original = readFile(path)
             if not original then
                 gap(path, 'original introuvable')
@@ -112,7 +113,7 @@ function M.run(dossier)
         write(format('MÊME CODE : ÉCHEC (%d écarts ; %d fichiers prouvés, dont %d livrés)\n', gaps, proved, delivered))
         return 1
     end
-    if proved == 0 then
+    if seen == 0 then
         write('MÊME CODE : ÉCHEC (aucun fichier lu sur l\'entrée)\n')
         return 1
     end

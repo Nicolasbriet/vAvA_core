@@ -77,7 +77,6 @@ const CASES = [
   [12, 'local s = "a\\\n-- dans la chaîne"\n', null],
   [13, 'x = 1 ---[[ court\ny = 2\n--]]\n', 'x = 1\ny = 2\n\n'],
   [14, '--[ court\n--[=x court\n', '\n\n'],
-  [15, '#!/usr/bin/lua\n-- c\nx = 1\n', '#!/usr/bin/lua\n\nx = 1\n'],
   [16, `${BOM}-- c\nx = 1\n`, `${BOM}\nx = 1\n`],
   [17, 'a = 1 -- c\r\nb = 2\r\n--[[ x\r\n y ]]\r\n', 'a = 1\r\nb = 2\r\n\r\n\r\n'],
   [18, 'a = 1   \t\n', 'a = 1\n'],
@@ -117,6 +116,12 @@ const ERRORS = [
   ["s = 'abc", 1, 'chaîne non fermée'],
   ['x = 1\ny = 2\ns = [==[ a ]] ]=]\n', 3, 'chaîne longue non fermée'],
   ['s = "a\\', 1, 'chaîne non fermée'],
+  // relecture sécurité S-1 : une première ligne `#` est refusée (Lua la finit au seul `\n`), BOM ou non
+  ['#!/usr/bin/lua\n-- c\nx = 1\n', 1, 'première ligne « # » refusée'],
+  [`${BOM}#!/usr/bin/lua\r\nx = 1 -- c\r\n`, 1, 'première ligne « # » refusée'],
+  // relecture sécurité S-7 : `/*` hors chaîne et hors commentaire (commentaire de CfxLua)
+  ['x = 1\ny = 2 /* c -- */\n', 2, '« /* » hors chaîne (syntaxe de CfxLua)'],
+  ['x = a/*b*/c\n', 1, '« /* » hors chaîne (syntaxe de CfxLua)'],
 ];
 for (const [input, line, reason] of ERRORS) {
   essai(`lexeur, refus : ${JSON.stringify(input)}`, () => {
@@ -136,6 +141,13 @@ essai('lexeur : nombres lus comme read_numeral (exposant signé, hexadécimal, l
   assert.deepStrictEqual(kinds('0x1e-2'), ['number:0x1e', 'punct:-', 'number:2']);
   assert.deepStrictEqual(kinds('12abc'), ['number:12abc']);
   assert.deepStrictEqual(kinds('a.b..c'), ['name:a', 'punct:.', 'name:b', 'punct:.', 'punct:.', 'name:c']);
+});
+
+essai('lexeur : `#` et `/*` acceptés dans une chaîne ou un commentaire, `/` seul accepté (S-1, S-7)', () => {
+  for (const ok of ['x = "/*" -- /* c\n', "x = '#' --[[ /* ]]\n", 'x = a / b // c\n', '\n#t\n', 'x = [[/*]]\n']) {
+    const result = lean(ok);
+    assert.strictEqual(result.ok, true, ok);
+  }
 });
 
 essai('lexeur : un commentaire court en fin de fichier, une chaîne longue en clé', () => {
@@ -274,9 +286,9 @@ const council = tree(path.join(TMP, 'res', 'conseil'), {
   'client/r.lua': LUA, 'web/js/a.js': '// a\n', 'web/css/b.css': '/* b */\n',
 });
 
-essai('manifeste : paquet du Conseil (vava_conseil_lua), config_conseil.lua allégé, réglages gardés', () => {
+essai('manifeste : paquet du Conseil (vava_conseil_lua) allégé, réglages gardés (config_conseil.lua compris)', () => {
   assert.deepStrictEqual(listOf(delivery.servedLua(council)), [
-    'fxmanifest.lua:lean', 'shared/p.lua:lean', '@config_conseil.lua:lean', '@shared/p.lua:lean', '@client/q.lua:lean',
+    'fxmanifest.lua:lean', 'shared/p.lua:lean', '@config_conseil.lua:kept-config', '@shared/p.lua:lean', '@client/q.lua:lean',
     '@config.lua:kept-config', '@config_client.lua:kept-config', '@client/r.lua:lean',
   ]);
 });
@@ -287,10 +299,10 @@ essai('allègement : fichiers servis allégés une fois, le reste intact', () =>
   const summary = delivery.leanResources([{ name: 'conseil', dir: council }]);
   assert.deepStrictEqual(summary.refused, []);
   assert.deepStrictEqual(summary.skipped, []);
-  assert.strictEqual(summary.files, 5);   // manifeste, shared/p, config_conseil, client/q, client/r
+  assert.strictEqual(summary.files, 4);   // manifeste, shared/p, client/q, client/r
   const read = (relative) => fs.readFileSync(path.join(council, relative), 'utf8');
   assert.strictEqual(read('shared/p.lua'), '\nlocal x = 1\nreturn x\n');
-  assert.strictEqual(read('config_conseil.lua'), '\nlocal x = 1\nreturn x\n');
+  assert.strictEqual(read('config_conseil.lua'), LUA);   // réglage de l'exploitant (relecture réseau R-5 de T-157)
   assert.strictEqual(read('config.lua'), LUA);
   assert.strictEqual(read('config_client.lua'), LUA);
   assert.strictEqual(read('web/js/a.js'), '// a\n');
@@ -323,7 +335,30 @@ essai('allègement : manifeste illisible, fichier refusé, fichier trop gros, li
   assert.strictEqual(summary.files, 2);   // b.lua et le manifeste
   const tooBig = delivery.leanText(Buffer.from(big, 'latin1'));
   assert.deepStrictEqual([tooBig.ok, tooBig.reason], [false, 'fichier trop gros']);
-  assert.strictEqual(delivery.leanText(Buffer.from(big.slice(4), 'latin1')).ok, true);   // 4 Mio tout juste
+  assert.strictEqual(delivery.leanText(Buffer.from(big.slice(4), 'latin1')).ok, true);   // 1 Mio tout juste
+  assert.strictEqual(delivery.MAX_BYTES, 1024 * 1024);   // relecture sécurité S-3
+});
+
+essai('allègement : jokers comparés sans retour arrière ni expression régulière (S-2)', () => {
+  const name = `${'a'.repeat(200)}.lua`;
+  const dir = tree(path.join(TMP, 'res', 'jokers'), {
+    'fxmanifest.lua': `client_scripts { '${'*a'.repeat(40)}*b', '[z-a].lua', 'c[b-d].lua', 'x[!0-9].lua', '[.lua' }\n`,
+    [name]: LUA, 'z.lua': LUA, 'a.lua': LUA, 'cc.lua': LUA, 'xa.lua': LUA, 'x1.lua': LUA, '[.lua': LUA,
+  });
+  const started = Date.now();
+  const served = delivery.servedLua(dir);
+  assert.ok(Date.now() - started < 1000, `${Date.now() - started} ms`);
+  assert.deepStrictEqual(listOf(served), ['fxmanifest.lua:lean', 'cc.lua:lean', 'xa.lua:lean', '[.lua:lean']);
+});
+
+essai('allègement : écriture atomique ; une erreur d\'écriture est levée, l\'original reste (S-4)', () => {
+  const dir = tree(path.join(TMP, 'res', 'ecriture'), { 'fxmanifest.lua': "client_script 'a.lua'\n", 'a.lua': LUA, 'a.lua.tmp/x': 'x' });
+  assert.throws(() => delivery.leanFile(path.join(dir, 'a.lua')));
+  assert.strictEqual(fs.readFileSync(path.join(dir, 'a.lua'), 'utf8'), LUA);
+  assert.throws(() => delivery.leanResources([{ name: 'ecriture', dir }]));
+  fs.rmSync(path.join(dir, 'a.lua.tmp'), { recursive: true });
+  assert.strictEqual(delivery.leanFile(path.join(dir, 'a.lua')).ok, true);
+  assert.deepStrictEqual(fs.readdirSync(dir).sort(), ['a.lua', 'fxmanifest.lua']);
 });
 
 // Installeur : fusion inchangée, sur des fichiers allégés -------------------------------------------------------------
@@ -331,13 +366,23 @@ essai('allègement : manifeste illisible, fichier refusé, fichier trop gros, li
 essai('installeur : userOwned inchangé après son déménagement', () => {
   assert.strictEqual(installer.userOwned, delivery.userOwned);
   for (const yes of ['config.lua', 'config_client.lua', 'config/a.lua', 'sous/config.lua']) assert.strictEqual(installer.userOwned(yes), true, yes);
-  for (const no of ['client/config.lua.bak', 'configs/a.lua', 'config_conseil.lua', 'client/main.lua']) assert.strictEqual(installer.userOwned(no), false, no);
+  for (const no of ['client/config.lua.bak', 'configs/a.lua', 'config_conseil.lua.bak', 'client/main.lua']) assert.strictEqual(installer.userOwned(no), false, no);
+  // réglages du paquet du Conseil (T-157) : gardés à la mise à jour (relecture réseau R-5 de T-157)
+  for (const yes of ['config_conseil.lua', 'Config_Conseil.lua']) assert.strictEqual(installer.userOwned(yes), true, yes);
+  // sans la casse (S-5)
+  for (const yes of ['Config_Client.lua', 'CONFIG.LUA', 'Config/a.lua', 'sous/Config.Lua']) assert.strictEqual(installer.userOwned(yes), true, yes);
+});
+
+essai('manifeste : un réglage écrit avec une autre casse reste gardé (S-5)', () => {
+  const dir = tree(path.join(TMP, 'res', 'casse'), { 'fxmanifest.lua': "shared_scripts { 'Config_Client.lua' }\n", 'Config_Client.lua': LUA });
+  assert.deepStrictEqual(listOf(delivery.servedLua(dir)), ['fxmanifest.lua:lean', 'Config_Client.lua:kept-config']);
 });
 
 function resourceV(version, comment) {
   return {
     'fxmanifest.lua': "-- manifeste\nshared_script 'config_client.lua'\nclient_scripts { 'client/a.lua', 'client/b.lua' }\n"
-      + "server_scripts { 'config.lua', 'server/s.lua' }\n",
+      + "server_scripts { 'config_conseil.lua', 'config.lua', 'server/s.lua' }\nvava_conseil_lua { 'config_conseil.lua' }\n",
+    'config_conseil.lua': `-- réglages du placement\nreturn { reach = ${version === 1 ? 60 : 70} }\n`,
     'config_client.lua': '-- réglage expliqué\nreturn { a = 1 }\n',
     'config.lua': '-- réglage serveur\nreturn { b = 2 }\n',
     'client/a.lua': `-- ${comment}\nlocal a = ${version}\nreturn a\n`,
@@ -380,6 +425,19 @@ essai('installeur : première mise à jour allégée, puis une version qui ne ch
   assert.strictEqual(installer.changes(p2), 0);
 });
 
+essai('installeur : config_conseil.lua adapté sur place et changé en amont → gardé, « .nouveau » à côté, jamais allégé', () => {
+  const base = path.join(TMP, 'fusion-conseil');
+  const target = tree(path.join(base, 'installe'), resourceV(1, 'premier'));
+  const baseline = dl.hashTree(target);
+  fs.writeFileSync(path.join(target, 'config_conseil.lua'), '-- à ma façon\nreturn { reach = 40 }\n');
+  const staged = tree(path.join(base, 'v2'), resourceV(2, 'second'));
+  delivery.leanResources([{ name: 'r', dir: staged }]);
+  assert.strictEqual(fs.readFileSync(path.join(staged, 'config_conseil.lua'), 'utf8'), '-- réglages du placement\nreturn { reach = 70 }\n');
+  const p = installer.plan(target, dl.hashTree(staged), baseline);
+  assert.deepStrictEqual(p.sideNew, ['config_conseil.lua']);
+  assert.ok(!p.copy.includes('config_conseil.lua') && !p.sideLocal.includes('config_conseil.lua'));
+});
+
 // scripts/livraison.js : garde-fous ------------------------------------------------------------------------------------
 
 essai('livraison.js : dossier de sortie refusé (non vide, dans le dépôt, contenant le dépôt, par une jonction)', () => {
@@ -395,6 +453,11 @@ essai('livraison.js : dossier de sortie refusé (non vide, dans le dépôt, cont
   fs.mkdirSync(path.join(TMP, 'vide'));
   assert.strictEqual(livraison.refusal(path.join(TMP, 'vide')), null);
   assert.strictEqual(livraison.refusal(path.join(TMP, 'neuf', 'sous')), null);
+  // toute copie git, pas seulement ce dépôt (S-6) : dossier `.git` ou fichier `.git` d'un worktree
+  const clone = tree(path.join(TMP, 'clone'), { '.git/HEAD': 'ref: refs/heads/main\n' });
+  assert.match(livraison.refusal(path.join(clone, 'sortie')), /copie git/);
+  const worktree = tree(path.join(TMP, 'worktree'), { '.git': 'gitdir: ailleurs\n' });
+  assert.match(livraison.refusal(path.join(worktree, 'a', 'b')), /copie git/);
   assert.ok(!fs.existsSync(path.join(ROOT, 'jamais-cree')));
 });
 
@@ -414,6 +477,12 @@ essai('livraison.js : la ligne de commande refuse avant d\'écrire', () => {
   assert.strictEqual(run('--essai').status, 2);
   assert.strictEqual(run('--autre', 'x').status, 2);
   assert.deepStrictEqual(fs.readdirSync(full), ['x.txt']);
+  // --essai suivi de chemins : ces seuls fichiers (verifier.sh hors --tout, relecture réseau R-6)
+  out = run('--essai', path.join(TMP, 'essai-partiel'), 'tests/livraison/cas_difficiles.lua', 'absent.lua');
+  assert.strictEqual(out.status, 0, out.stderr);
+  assert.strictEqual(out.stdout, 'depot\ttests/livraison/cas_difficiles.lua\n');
+  assert.ok(fs.existsSync(path.join(TMP, 'essai-partiel', 'tests', 'livraison', 'cas_difficiles.lua')));
+  assert.strictEqual(run('--sortie', path.join(TMP, 'sortie-x'), 'a.lua').status, 2);
 });
 
 // Installeur : fetchSource allège la copie téléchargée (updates.leanLua), avant toute empreinte ---------------------------
@@ -432,17 +501,25 @@ async function fetchEssais() {
   });
   const archive = path.join(TMP, 'source.tar.gz');
   execFileSync(TAR, ['-czf', archive, '-C', path.join(TMP, 'archive'), 'auteur-depot-abc'], { windowsHide: true });
+  // archive dont un fichier livré ne peut pas être réécrit (un dossier occupe la place de son fichier temporaire)
+  tree(path.join(TMP, 'archive2', 'auteur-depot-bad'), {
+    'fxmanifest.lua': "client_script 'client/b.lua'\n", 'client/b.lua': LUA, 'client/b.lua.tmp/x': 'x',
+  });
+  const archive2 = path.join(TMP, 'source2.tar.gz');
+  execFileSync(TAR, ['-czf', archive2, '-C', path.join(TMP, 'archive2'), 'auteur-depot-bad'], { windowsHide: true });
   const server = http.createServer((request, response) => {
     response.writeHead(200, { 'content-type': 'application/gzip' });
-    fs.createReadStream(archive).pipe(response);
+    fs.createReadStream(request.url.endsWith('/bad') ? archive2 : archive).pipe(response);
   });
   await new Promise((resolve) => server.listen(0, '127.0.0.1', resolve));
   const codeload = `http://127.0.0.1:${server.address().port}`;
   try {
     await essaiAsync('installeur : fetchSource allège la copie téléchargée et le dit au journal', async () => {
       const said = [];
-      const root = await installer.fetchSource({ codeload, repo: 'a/b', leanLua: true }, 'abc', { say: (m) => said.push(m), track() {} });
+      const job = { say: (m) => said.push(m), track() {} };
+      const root = await installer.fetchSource({ codeload, repo: 'a/b', leanLua: true }, 'abc', job);
       assert.strictEqual(path.basename(root), 'auteur-depot-abc');
+      assert.strictEqual(job.lean, 'Lua allégé : 5 fichiers, 1 refusés');   // repris dans le résumé de l'opération
       const read = (relative) => fs.readFileSync(path.join(root, relative), 'utf8');
       assert.strictEqual(read('shared/a.lua'), '\nlocal x = 1\nreturn x\n');
       assert.strictEqual(read('modules/vava_m/client/b.lua'), '\nlocal x = 1\nreturn x\n');
@@ -471,6 +548,13 @@ async function fetchEssais() {
     await essaiAsync('installeur : sans journal (job absent), l\'allègement se fait sans erreur', async () => {
       const root = await installer.fetchSource({ codeload, repo: 'a/b' }, 'abe');
       assert.strictEqual(fs.readFileSync(path.join(root, 'shared/a.lua'), 'utf8'), '\nlocal x = 1\nreturn x\n');
+    });
+    await essaiAsync('installeur : une erreur d\'écriture fait échouer l\'opération avant le serveur (S-4)', async () => {
+      await assert.rejects(installer.fetchSource({ codeload, repo: 'a/b' }, 'bad'), (error) => {
+        assert.strictEqual(error.code, 'lean_failed');
+        assert.match(error.message, /rien n'a été changé sur le serveur/);
+        return true;
+      });
     });
   } finally {
     server.close();

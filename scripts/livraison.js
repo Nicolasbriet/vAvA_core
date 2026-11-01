@@ -10,11 +10,12 @@
  *                             manifeste illisible : « ressource<TAB>-<TAB>illisible : raison » (code 1)
  *          --essai <dossier>  chaque fichier Lua suivi par git allégé dans <dossier>/<chemin du dépôt> : « livre<TAB>chemin »
  *                             (allégé à la livraison), « depot<TAB>chemin » (essayé seulement), « refuse<TAB>chemin<TAB>
- *                             ligne<TAB>raison » ; lu par scripts/lib/meme-code.lua (preuve par le compilateur)
+ *                             ligne<TAB>raison » ; lu par scripts/lib/meme-code.lua (preuve par le compilateur) ;
+ *                             suivi de chemins (`--essai <dossier> a.lua b.lua`) : ces seuls fichiers (verifier.sh)
  *          --sortie <dossier> copie de livraison disposée comme par l'installeur ([vava]/vAvA_core, [vava]/<module>,
  *                             [vava-dev]/<exemple>), fichiers suivis par git seulement, puis allégée
- *        <dossier> : absent ou vide, ni dans le dépôt ni le contenant (chemin réel : une jonction vers la copie git est
- *        suivie), jamais un lien ; le dépôt lui-même n'est jamais écrit. Codes : 0 succès, 1 écart ou refus, 2 usage.
+ *        <dossier> : absent ou vide, ni dans le dépôt ni le contenant, ni dans une autre copie git (chemin réel : une
+ *        jonction vers la copie git est suivie), jamais un lien ; le dépôt lui-même n'est jamais écrit. Codes : 0 succès, 1 écart ou refus, 2 usage.
  * Dépendances : node, git (--essai, --sortie), chancellerie/lib/delivery.js, chancellerie/lib/installer.js.
  */
 
@@ -26,7 +27,7 @@ const { layout } = require('../chancellerie/lib/installer');
 
 const ROOT = path.resolve(__dirname, '..');
 const STATES = { lean: 'allégé', 'kept-config': 'gardé (réglage)', 'kept-files': 'gardé (files)' };
-const USAGE = 'usage : node scripts/livraison.js --liste | --essai <dossier> | --sortie <dossier>';
+const USAGE = 'usage : node scripts/livraison.js --liste | --essai <dossier> [chemin.lua…] | --sortie <dossier>';
 
 const say = (line) => process.stdout.write(`${line}\n`);
 const warn = (line) => process.stderr.write(`${line}\n`);
@@ -51,6 +52,17 @@ function realTarget(target) {
   return path.join(fs.realpathSync.native(current), ...rest);
 }
 
+/** Racine de la copie git (dossier qui porte un `.git`, dossier ou fichier de worktree) qui contient `real`, ou null. */
+function gitCheckoutOf(real) {
+  let current = real;
+  for (;;) {
+    if (fs.existsSync(path.join(current, '.git'))) return current;
+    const parent = path.dirname(current);
+    if (parent === current) return null;
+    current = parent;
+  }
+}
+
 /**
  * Raison de refuser un dossier de sortie, ou null.
  * @param {string} target
@@ -61,6 +73,9 @@ function refusal(target, repo = ROOT) {
   const repoReal = fs.realpathSync.native(repo);
   if (within(repoReal, real)) return `dossier dans le dépôt (${real}) : le dépôt n'est jamais écrit`;
   if (within(real, repoReal)) return `dossier qui contient le dépôt (${real})`;
+  // toute copie git (autre worktree, autre clone), comme installer.inGitCheckout (relecture sécurité S-6)
+  const checkout = gitCheckoutOf(real);
+  if (checkout) return `dossier dans une copie git (${checkout}) : choisir un dossier hors de toute copie git`;
   let stat = null;
   try {
     stat = fs.lstatSync(target);
@@ -97,7 +112,7 @@ function liste() {
   return code;
 }
 
-function essai(target) {
+function essai(target, only = []) {
   let code = 0;
   const delivered = new Set();
   for (const { resource, served } of servedResources()) {
@@ -112,7 +127,10 @@ function essai(target) {
   }
   let counted = 0;
   let refused = 0;
+  // chemins donnés (fichiers modifiés, scripts/verifier.sh hors --tout) : les seuls essayés parmi le Lua suivi
+  const wanted = only.length ? new Set(only.map((p) => slash(p))) : null;
   for (const relative of gitFiles('*.lua')) {
+    if (wanted && !wanted.has(relative)) continue;
     const source = path.join(ROOT, relative);
     if (!fs.existsSync(source)) continue;
     const kind = delivered.has(relative.toLowerCase()) ? 'livre' : 'depot';
@@ -158,9 +176,9 @@ function sortie(target) {
 }
 
 function main(argv) {
-  const [mode, target, extra] = argv;
+  const [mode, target, ...rest] = argv;
   if (mode === '--liste' && target === undefined) return liste();
-  if ((mode !== '--essai' && mode !== '--sortie') || !target || extra !== undefined) {
+  if ((mode !== '--essai' && mode !== '--sortie') || !target || target.startsWith('--') || (mode === '--sortie' && rest.length)) {
     warn(USAGE);
     return 2;
   }
@@ -170,9 +188,9 @@ function main(argv) {
     return 1;
   }
   fs.mkdirSync(target, { recursive: true });
-  return mode === '--essai' ? essai(target) : sortie(target);
+  return mode === '--essai' ? essai(target, rest) : sortie(target);
 }
 
 if (require.main === module) process.exitCode = main(process.argv.slice(2));
 
-module.exports = { refusal, within, realTarget };
+module.exports = { refusal, within, realTarget, gitCheckoutOf };
