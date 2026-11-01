@@ -7,3 +7,4 @@ tests/audit/fxmanifest.lua	{ 'config.lua' } -- exception inscrite	cas d'essai : 
 tests/audit/fxmanifest.lua	-- exception S inscrite	cas d'essai : une exception ne fait pas taire config_client.lua servi au seul serveur (T-143)
 tests/audit/fxmanifest.lua	-- exception D inscrite	cas d'essai : une exception ne fait pas taire un chemin hors de la ressource (T-143)
 tests/audit/fxmanifest.lua	-- exception X inscrite	cas d'essai : une exception ne fait pas taire une directive calculée (T-143)
+tests/audit/code_dynamique.lua	load(chunk, '@@essai', 't', env)	cas d'essai : un appel de load inscrit aux exceptions (T-157)

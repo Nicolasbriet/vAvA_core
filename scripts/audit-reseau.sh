@@ -17,11 +17,11 @@ if [[ "${1:-}" == "--essai" ]]; then ESSAI=1; shift; fi
 # Exceptions justifiées : une par ligne « chemin<TAB>extrait exact du contenu de la ligne<TAB>raison » ; un chemin qui
 # finit par « / » couvre les constats de fichier (« [fichier] ») de tout le dossier, et rien d'autre.
 EXCEPTIONS="scripts/audit-exceptions.txt"
-lua=(); web=(); chemins=(); manifestes=()
+lua=(); web=(); chemins=(); manifestes=(); lua_code=()
 declare -A lieu_chemin=()   # essai : chemin fictif → « tests/audit/chemins.txt:ligne »
 if [[ $ESSAI -eq 1 ]]; then
     EXCEPTIONS="tests/audit/exceptions.txt"
-    for f in tests/audit/*.lua; do [[ -f "$f" ]] && lua+=("$f"); done
+    for f in tests/audit/*.lua; do [[ -f "$f" ]] && lua+=("$f") && lua_code+=("$f"); done
     for f in tests/audit/*.css tests/audit/*.svg tests/audit/*.html tests/audit/*.js; do [[ -f "$f" ]] && web+=("$f"); done
     [[ -f tests/audit/fxmanifest.lua ]] && manifestes+=(tests/audit/fxmanifest.lua)
     if [[ -f tests/audit/chemins.txt ]]; then
@@ -38,6 +38,7 @@ else
         [[ -f "$f" ]] || continue
         case "$f" in modules/*/web/*) chemins+=("$f") ;; esac
         case "$f" in modules/*/fxmanifest.lua|examples/*/fxmanifest.lua) manifestes+=("$f") ;; esac
+        case "$f" in modules/*.lua|examples/*.lua) lua_code+=("$f") ;; esac
         case "$f" in
             chancellerie/*|tests/*|examples/*) ;;
             *.lua) lua+=("$f") ;;
@@ -191,6 +192,55 @@ fi
 
 signal BLOQUANT '(query|single|scalar|insert|update|execute|prepare)[A-Za-z]*\([[:space:]]*[^,]*\.\.' "SQL construit par concaténation (utiliser ?)"
 signal BLOQUANT 'loadstring\(|[=(,][[:space:]]*load\([[:space:]]*["'"'"'a-z_]+[^)]*\)\(\)' "exécution de code dynamique"
+
+# --- Code dynamique (T-157) : `load` de Lua dans un fichier de modules/ ou examples/ (exemples compris), appelé
+# (`load(`, `load (`), passé ou rangé comme valeur (`pcall(load, …)`, `local f = load`), ou lu dans `_G` / `_ENV`
+# (`_G.load`, `_ENV['load']`) ; `x.load(`, `x:load(`, `LoadResourceFile(` ne comptent pas, ni la définition d'une
+# fonction nommée load (`local function load(` ; son appel reste signalé). Cherché dans le code seul : commentaires
+# retirés (`--[[ … ]]` compris), contenu des chaînes longues retiré, chaînes courtes gardées (`_G['load']`). Seuls
+# permis : les appels inscrits dans scripts/audit-exceptions.txt avec leur raison (chargeur et construction du paquet du
+# Conseil de vava_atelier) ; « audit: ok » ne fait rien taire.
+LOAD_AWK='
+function verifie(code) {
+    gsub(/function[ \t]+load[ \t]*\(/, "function _(", code)
+    if (code ~ /(^|[^A-Za-z0-9_.:])load[ \t]*(\(|$|[,)};])/ ||
+        code ~ ("(_G|_ENV)[ \t]*([.][ \t]*load([^A-Za-z0-9_]|$)|\\[[ \t]*[\"" Q "]load[\"" Q "])"))
+        print FILENAME ":" FNR ":" ligne
+}
+FNR == 1 { mode = "" }
+{
+    l = $0; sub(/\r$/, "", l); ligne = l; n = length(l); i = 1; code = ""
+    while (i <= n) {
+        if (mode == "C" || mode == "L") {
+            k = index(substr(l, i), ferme)
+            if (!k) break
+            i += k - 1 + length(ferme); if (mode == "L") code = code "\"\""; mode = ""; continue
+        }
+        ch = substr(l, i, 1)
+        if (ch == "-" && substr(l, i + 1, 1) == "-") {
+            if (match(substr(l, i + 2), /^\[=*\[/)) {
+                ferme = "]" substr(l, i + 3, RLENGTH - 2) "]"; mode = "C"; i += 2 + RLENGTH; continue
+            }
+            break
+        }
+        if (ch == "[" && match(substr(l, i), /^\[=*\[/)) {
+            ferme = "]" substr(l, i + 1, RLENGTH - 2) "]"; mode = "L"; i += RLENGTH; continue
+        }
+        if (ch == "\"" || ch == Q) {
+            j = i + 1
+            while (j <= n && substr(l, j, 1) != ch) j += (substr(l, j, 1) == "\\") ? 2 : 1
+            code = code substr(l, i, j - i + 1); i = j + 1; continue
+        }
+        code = code ch; i++
+    }
+    verifie(code)
+}
+'
+if [[ ${#lua_code[@]} -gt 0 ]]; then
+    res=$(awk -v Q="'" "$LOAD_AWK" "${lua_code[@]}" 2>/dev/null | filtrer code strict || true)
+    noter BLOQUANT "load de Lua (code exécuté à la volée) hors des appels inscrits aux exceptions (T-157)" "$res"
+fi
+# --- fin du bloc T-157
 lua_sans_chancellerie=(); for f in "${lua[@]}"; do [[ "$f" == modules/vava_chancellerie/* ]] || lua_sans_chancellerie+=("$f"); done
 if [[ ${#lua_sans_chancellerie[@]} -gt 0 ]]; then
     res=$(grep -HnE 'PerformHttpRequest\(' "${lua_sans_chancellerie[@]}" 2>/dev/null | filtrer || true)
