@@ -5,7 +5,7 @@
            dégâts de vava_health : coups des sorts, vie tenue par le serveur, hook des coups, modificateurs), mains vides
            pour incanter (arme de GTA sur le ped, arme, rengainement et bouclier au bras lus par vava_combat, prises en
            main suivies par le hook vava_inventory:hold), membre du Conseil invulnérable (vava_admin:isInvulnerable :
-           effets sans dégâts épargnés).
+           effets sans dégâts épargnés), envois comptés par core.net (chiffres des sorts et réaction de la victime).
            Pour brancher la magie sur un autre core, réécrire les fonctions de ce fichier (et de bridge/client.lua) :
            le reste du module ne connaît qu'elles.
     Implémentation : vAvA_core (API documentée dans docs/api.md) et ses modules officiels. Chaque appel à une autre
@@ -186,6 +186,54 @@ function Bridge.Notify(source, message, kind)
         return
     end
     TriggerClientEvent(EVENTS.NOTIFY, source, message, kind or 'info')
+end
+
+-- Envois comptés (T-155, relecture réseau R-1) ------------------------------------------------------------------------
+
+local SEND_LIST_MAX = 256
+local SEND_WARN_MS = 60000
+---@type table<string, integer>  évènement → dernière ligne de console
+local sendWarnedAt = {}
+
+---@param key string
+local function sendWarn(key, fmt, ...)
+    local now = GetGameTimer()
+    if sendWarnedAt[key] and now - sendWarnedAt[key] < SEND_WARN_MS then return end
+    sendWarnedAt[key] = now
+    VavaMagic.log.warn(fmt, ...)
+end
+
+--- Envoie un évènement du module à un joueur, ou à une liste de joueurs calculée par le serveur (liste pure d'entiers
+--- > 0, 256 au plus ; jamais -1) : core.net.send, compté dans /vava_reseau. Liste vide : rien, vrai. Core sans
+--- core.net (avant 0.10.0) : TriggerClientEvent au joueur ou à chacun. Refus : une ligne de console par minute et par
+--- évènement.
+---@param target integer|integer[]
+---@param event string
+---@return boolean ok
+function Bridge.SendTo(target, event, ...)
+    local list = type(target) == 'table' and target or { target }
+    local count = #list
+    if count == 0 then return true end
+    local valid = count <= SEND_LIST_MAX
+    for i = 1, count do
+        local id = list[i]
+        if mathType(id) ~= 'integer' or id <= 0 then valid = false end
+    end
+    if not valid then
+        sendWarn('invalid:' .. event, "envoi de '%s' refusé : destinataires invalides", event)
+        return false
+    end
+    local net = core.net
+    if type(net) ~= 'table' or type(net.send) ~= 'function' then
+        for i = 1, count do TriggerClientEvent(event, list[i], ...) end
+        return true
+    end
+    local ok, code = net.send(type(target) == 'table' and list or target, event, ...)
+    if not ok then
+        sendWarn('send:' .. event, "envoi de '%s' refusé : %s", event, tostring(code))
+        return false
+    end
+    return true
 end
 
 -- Objets (vava_inventory) ------------------------------------------------------------------------------------------

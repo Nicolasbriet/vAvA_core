@@ -29,8 +29,7 @@
 
 local type, tostring, tonumber, floor = type, tostring, tonumber, math.floor
 local time = os.time
-local SetTimeout, CreateThread, Wait, TriggerClientEvent, GetGameTimer =
-    SetTimeout, CreateThread, Wait, TriggerClientEvent, GetGameTimer
+local SetTimeout, CreateThread, Wait, GetGameTimer = SetTimeout, CreateThread, Wait, GetGameTimer
 
 local bridge = VavaMagic.bridge
 local world = VavaMagic.world
@@ -112,11 +111,11 @@ function combat.react(target, spell, tenths, issue)
     local def = VavaMagic.spells.get(spell)
     local reaction = def and (def.config.reaction or def.config.element) or false
     if tenths == nil and issue == nil then
-        if reaction then TriggerClientEvent(EVENTS.HIT, target, reaction) end
+        if reaction then bridge.SendTo(target, EVENTS.HIT, reaction) end
     elseif issue == nil then
-        TriggerClientEvent(EVENTS.HIT, target, reaction, tenths)
+        bridge.SendTo(target, EVENTS.HIT, reaction, tenths)
     else
-        TriggerClientEvent(EVENTS.HIT, target, reaction, tenths or false, issue)
+        bridge.SendTo(target, EVENTS.HIT, reaction, tenths or false, issue)
     end
 end
 
@@ -142,7 +141,7 @@ local function after(source, target, spell, kind, result, hurt)
     elseif reacts then
         combat.react(target, spell, tenths or false, issue ~= 'hit' and issue or nil)
     else
-        TriggerClientEvent(EVENTS.HIT, target, false, tenths or false, issue)
+        bridge.SendTo(target, EVENTS.HIT, false, tenths or false, issue)
     end
     if numbersCfg.caster and source and source ~= target then numbers.add(source, target, issue, tenths) end
 end

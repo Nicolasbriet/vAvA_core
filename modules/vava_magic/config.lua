@@ -86,7 +86,8 @@ config.numbers = {
     caster = true,        -- le lanceur voit ce que ses sorts infligent
     target = true,        -- la victime voit ce qu'elle reçoit (morsures de brûlure, esquives, absorbés compris)
     overTime = true,      -- morsures de brûlure et zones qui durent (mur de flammes, vapeur) : petits chiffres
-    maxPerMessage = 16,   -- touchés d'un tour dans un même message au lanceur (au-delà : ignorés) ; 1 à 32
+    maxPerMessage = 10,   -- touchés d'un tour dans un même message au lanceur (au-delà : ignorés) ; 1 à 32 ; pas plus que
+                          -- les chiffres à l'écran de vava_hud (numbers.maxAlive, 10)
 }
 
 -- Protections magiques, tenues par le serveur et portées par la chaîne de dégâts de vava_health : un bouclier

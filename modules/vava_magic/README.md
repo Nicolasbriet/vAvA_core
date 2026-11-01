@@ -376,10 +376,12 @@ retirée ; une esquive (pas de côté de `vava_combat`) ou un coup absorbé par 
 de brûlure et zones qui durent en petits chiffres ; rien pour un coup retenu (zone de paix, combats coupés, crochet).
 Les témoins ne voient rien.
 
+- **Envois comptés** : `vava_magic:hit` et `vava_magic:dealt` partent par `bridge.SendTo` (`core.net.send`), vus par
+  `/vava_reseau` ; core sans `core.net` (avant 0.10.0) : envoi direct.
 - **Victime** : le montant voyage dans `vava_magic:hit`, déjà envoyé à elle seule (+ 1 à 3 o) ; un message
   `vava_magic:hit(false, dixièmes|false, issue)` (≈ 25 o) pour ce qui ne lui envoyait rien : morsure, esquive, absorbé.
 - **Lanceur** : message nouveau `vava_magic:dealt` (`server/numbers.lua`), **un par tour du serveur** où il touche
-  quelqu'un (éclats, Nova, Secousse, passe d'un mur : tous les touchés ensemble ; ≈ 18 o + ≈ 8 o par touché ; 16 au
+  quelqu'un (éclats, Nova, Secousse, passe d'un mur : tous les touchés ensemble ; ≈ 18 o + ≈ 8 à 12 o par touché ; 10 au
   plus), jamais quand il est lui-même la victime, rien s'il n'a plus de personnage à la fin du tour.
 - Réglages (`config.lua` → `numbers`, contrôlés au démarrage : sinon le module ne démarre pas) :
 
@@ -389,10 +391,9 @@ Les témoins ne voient rien.
 | `caster` | `true` | le lanceur voit ce que ses sorts infligent |
 | `target` | `true` | la victime voit ce qu'elle reçoit (morsures, esquives, absorbés compris) |
 | `overTime` | `true` | morsures de brûlure et zones qui durent (mur de flammes, vapeur) : petits chiffres |
-| `maxPerMessage` | `16` | touchés d'un tour dans un même message au lanceur (au-delà : ignorés) ; 1 à 32 |
+| `maxPerMessage` | `10` | touchés d'un tour dans un même message au lanceur (au-delà : ignorés) ; 1 à 32 ; pas plus que les chiffres à l'écran du HUD (10) |
 
-Le joueur choisit dans la bannière (Réglages > Interface, « Chiffres des coups ») : donnés et reçus, donnés seulement,
-aucun ; le filtre est chez lui (`vava_hud`), le serveur envoie les mêmes octets.
+Le joueur choisit dans la bannière (Réglages > Interface, « Chiffres des coups ») : « Donnés et reçus », « Donnés seulement », « Aucun » ; le filtre est chez lui (`vava_hud`), le serveur envoie les mêmes octets.
 
 ## Mains vides pour incanter
 

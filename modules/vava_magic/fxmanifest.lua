@@ -10,9 +10,9 @@
            (messages), grimoire (avec ses combinaisons découvertes) et registre des murmures (objets),
            commandes du Conseil ; mains vides pour incanter (ni arme ni bouclier au bras) ; mode combat respecté (ni
            rappel ni verrou de la magie arme du royaume en main, mot du rengainement), contrôles durs lus par
-           vava_combat (export hardControl), effets sans dégâts qui épargnent un membre invulnérable du Conseil,
-           chiffres des sorts aux seuls lanceur et victime (T-155). Le serveur décide de tout ; les effets visibles
-           passent par des state bags posés par le serveur et des évènements ciblés, reçus des seuls joueurs proches.
+           vava_combat (export hardControl), effets sans dégâts qui épargnent un membre invulnérable du Conseil. Le
+           serveur décide de tout ; les effets visibles passent par des state bags posés par le serveur et des
+           évènements ciblés, reçus des seuls joueurs proches.
     Dépendances : vAvA_core ≥ 0.5.0 ; vava_ui ≥ 1.0.0 (polices, grain, papier et coins de la page, par
                   nui://vava_ui/…) ; facultatives : vava_inventory ≥ 1.3.0 (grimoire et registre), vava_hud
                   (notifications ; ≥ 1.7.0 : chiffres des sorts), vava_health ≥ 1.3.0 (chaîne de dégâts : sans lui,

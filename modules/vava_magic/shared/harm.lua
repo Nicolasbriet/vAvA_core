@@ -196,7 +196,9 @@ end
 
 -- Chiffres des sorts (T-155) ------------------------------------------------------------------------------------------
 
-local TENTHS_MAX = 2000
+local TENTHS_MAX, MAX_ENTRIES = VavaMagic.NUMBERS.TENTHS_MAX, VavaMagic.NUMBERS.MAX_ENTRIES
+-- issues d'un chiffre de sort, comprises par vava_hud:hitText (serveur seul : le HUD relit l'issue reçue)
+harm.NUMBER_ISSUES = { 'hit', 'tick', 'down', 'dodge', 'absorb', 'block', 'parry' }
 -- étape d'annulation de la chaîne → issue montrée (le coup a été arrêté)
 local CANCELLED = { esquive = 'dodge', parade = 'parry', blocage = 'block', bouclier = 'absorb' }
 local NUMBERS_FLAGS = { 'enabled', 'caster', 'target', 'overTime' }
@@ -243,8 +245,8 @@ function harm.checkNumbers(numbers)
         if type(numbers[key]) ~= 'boolean' then return false, 'numbers.' .. key .. ' attendu (booléen)' end
     end
     local most = numbers.maxPerMessage
-    if mathType(most) ~= 'integer' or most < 1 or most > 32 then
-        return false, 'numbers.maxPerMessage attendu (entier de 1 à 32)'
+    if mathType(most) ~= 'integer' or most < 1 or most > MAX_ENTRIES then
+        return false, 'numbers.maxPerMessage attendu (entier de 1 à ' .. MAX_ENTRIES .. ')'
     end
     return true
 end

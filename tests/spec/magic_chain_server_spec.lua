@@ -63,6 +63,11 @@ describe('vava_magic sur la chaîne de dégâts (serveur)', function()
             HandsBusy = function() return nil end,
             OnHold = function() return true end,
             Notify = function(src, message, kind) notified[#notified + 1] = { target = src, message = message, kind = kind } end,
+            -- envois comptés par core.net (T-155, relecture réseau R-1) : notés comme les envois directs
+            SendTo = function(target, event, ...)
+                clientEvents[#clientEvents + 1] = { event = event, target = target, args = { ... } }
+                return true
+            end,
             Hit = function(target, packet)
                 hits[#hits + 1] = { target = target, packet = packet }
                 if hitCode then return nil, hitCode end

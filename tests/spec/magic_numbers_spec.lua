@@ -28,14 +28,19 @@ describe('vava_magic : chiffres des sorts (serveur)', function()
             characters[id] = 1000 + id
             positions[id] = { x = id, y = 0, z = 0 }
         end
-        _G.TriggerClientEvent = function(event, target, ...)
-            events[#events + 1] = { event = event, target = target, args = table.pack(...) }
-        end
+        -- plus aucun envoi direct (relecture réseau R-1)
+        _G.TriggerClientEvent = function() error('TriggerClientEvent direct') end
         VavaMagic.resource = 'vava_magic'
         VavaMagic.log = { warn = function() end, info = function() end, error = function() end }
         VavaMagic.bridge = {
             GetCharacterId = function(src) return characters[src] end,
             Notify = function() end,
+            -- envois comptés par core.net (relecture réseau R-1) : seul chemin des chiffres et des réactions
+            SendTo = function(target, event, ...)
+                assert.equal('integer', math.type(target))
+                events[#events + 1] = { event = event, target = target, args = table.pack(...) }
+                return true
+            end,
             Hit = function(_, packet)
                 if hitResult then return hitResult(packet) end
                 return { amount = packet.amount, applied = packet.amount, blocked = 0, absorbed = 0, resisted = 0,
@@ -113,15 +118,19 @@ describe('vava_magic : chiffres des sorts (serveur)', function()
         assert.equal(2, #of(DEALT, CASTER))
     end)
 
-    it('17 touchés dans un tour : 16 entrées', function()
+    it('17 touchés dans un tour : maxPerMessage (10, relecture réseau R-3) entrées', function()
         load()
         for id = 20, 36 do combat.damage(CASTER, id, 'nova_ardente', 5, combat.KIND.ZONE) end
         endOfTurn()
         local dealt = of(DEALT, CASTER)
         assert.equal(1, #dealt)
-        assert.equal(cfg.numbers.maxPerMessage, #dealt[1][1])
-        assert.equal(16, #dealt[1][1])
-        assert.same({ 35, 'hit', 50 }, dealt[1][1][16])
+        assert.equal(10, cfg.numbers.maxPerMessage)
+        assert.equal(10, #dealt[1][1])
+        assert.same({ 29, 'hit', 50 }, dealt[1][1][10])
+        load(function(n) n.maxPerMessage = 16 end)
+        for id = 20, 36 do combat.damage(CASTER, id, 'nova_ardente', 5, combat.KIND.ZONE) end
+        endOfTurn()
+        assert.equal(16, #of(DEALT, CASTER)[1][1])
     end)
 
     it('morsure de brûlure : (false, 20, tick) à la victime, tick au lanceur ; overTime coupé : rien', function()
@@ -280,25 +289,102 @@ describe('vava_magic : chiffres des sorts (client)', function()
         assert.same({ 'taken', 7, 'tick', 20 }, args(2))
         net['vava_magic:hit'](false, false, 'dodge')
         assert.same({ 'taken', 7, 'dodge', nil }, args(3))
-        -- issue inconnue : rien ; montant invalide : chiffre sans montant
+        -- issue et montant relus par vava_hud (hitText), pas ici
         net['vava_magic:hit'](false, 20, 'soin')
-        net['vava_magic:hit']('feu', 7.5)
+        assert.same({ 'taken', 7, 'soin', 20 }, args(4))
         assert.equal(4, #texts)
-        assert.same({ 'taken', 7, 'hit', nil }, args(4))
     end)
 
-    it('vava_magic:dealt : une entrée par touché, les entrées invalides sautées, une liste invalide ignorée', function()
-        net['vava_magic:dealt']({ { 9, 'hit', 140 }, { 12, 'dodge' }, { 0, 'hit', 5 }, { 13, 'soin', 5 },
-            { 14, 'hit', 2001 }, { 15, 'tick', 7.5 }, { 16 }, { 17, 'down', 120, 'x' }, 'x', { x = 1 } })
-        assert.equal(2, #texts)
-        assert.same({ 'dealt', 9, 'hit', 140 }, args(1))
-        assert.same({ 'dealt', 12, 'dodge', nil }, args(2))
+    it('vava_magic:dealt : une entrée (table) par touché, relue par vava_hud ; plus de 32 ou pas une table : ignoré',
+        function()
+            net['vava_magic:dealt']({ { 9, 'hit', 140 }, { 12, 'dodge' }, 'x', 5 })
+            assert.equal(2, #texts)
+            assert.same({ 'dealt', 9, 'hit', 140 }, args(1))
+            assert.same({ 'dealt', 12, 'dodge', nil }, args(2))
+            local long = {}
+            for i = 1, 33 do long[i] = { i, 'hit', 10 } end
+            net['vava_magic:dealt'](long)
+            net['vava_magic:dealt']({})
+            net['vava_magic:dealt']('x')
+            assert.equal(2, #texts)
+            long[33] = nil
+            net['vava_magic:dealt'](long)
+            assert.equal(34, #texts)
+        end)
+end)
+
+-- Bridge serveur réel (vava_magic/bridge/server.lua) : Bridge.SendTo passe par core.net.send (compté par /vava_reseau),
+-- à un joueur ou à une liste ; destinataires invalides refusés (une ligne de console par minute) ; core sans core.net :
+-- envoi direct à chacun (relecture réseau R-1).
+describe('vava_magic : Bridge.SendTo (serveur)', function()
+    local bridge, sends, direct, warns, clock, netAnswer
+
+    before_each(function()
+        helper.reset()
+        VavaMagic = nil
+        helper.loadAll({ 'modules/vava_magic/shared/constants.lua', 'modules/vava_magic/config.lua' })
+        sends, direct, warns, clock, netAnswer = {}, {}, {}, 1000, { true, 1, 20 }
+        _G.GetGameTimer = function() return clock end
+        _G.TriggerClientEvent = function(event, target, ...)
+            direct[#direct + 1] = { event = event, target = target, args = table.pack(...) }
+        end
+        VavaMagic.resource = 'vava_magic'
+        VavaMagic.log = { warn = function(fmt, ...) warns[#warns + 1] = fmt:format(...) end, info = function() end }
+        VavaMagic.core = {
+            net = {
+                send = function(target, event, ...)
+                    sends[#sends + 1] = { target = target, event = event, args = table.pack(...) }
+                    return table.unpack(netAnswer)
+                end,
+            },
+        }
+        helper.load('modules/vava_magic/bridge/server.lua')
+        bridge = VavaMagic.bridge
+    end)
+
+    after_each(function()
+        _G.TriggerClientEvent = nil
+        VavaMagic = nil
+    end)
+
+    it('un joueur, une liste : core.net.send, rien en direct ; valeurs gardées (false compris)', function()
+        assert.is_true(bridge.SendTo(7, 'vava_magic:hit', false, false, 'dodge'))
+        assert.is_true(bridge.SendTo({ 3, 7 }, 'vava_magic:dealt', { { 7, 'hit', 140 } }))
+        assert.equal(2, #sends)
+        assert.equal(7, sends[1].target)
+        assert.same({ false, false, 'dodge', n = 3 }, sends[1].args)
+        assert.same({ 3, 7 }, sends[2].target)
+        assert.equal(0, #direct)
+    end)
+
+    it('liste vide : rien, vrai ; -1, 0, flottant, texte, plus de 256 : refusé, une ligne par minute', function()
+        assert.is_true(bridge.SendTo({}, 'vava_magic:hit', 'feu'))
+        for _, bad in ipairs({ -1, 0, 1.5, '7' }) do assert.is_false(bridge.SendTo(bad, 'vava_magic:hit', 'feu')) end
         local long = {}
-        for i = 1, 33 do long[i] = { i, 'hit', 10 } end
-        net['vava_magic:dealt'](long)
-        net['vava_magic:dealt']({ [1] = { 9, 'hit', 1 }, extra = true })
-        net['vava_magic:dealt']({})
-        net['vava_magic:dealt']('x')
-        assert.equal(2, #texts)
+        for i = 1, 257 do long[i] = i end
+        assert.is_false(bridge.SendTo(long, 'vava_magic:hit', 'feu'))
+        assert.equal(0, #sends)
+        assert.equal(0, #direct)
+        assert.equal(1, #warns)
+        clock = clock + 60000
+        bridge.SendTo(-1, 'vava_magic:hit', 'feu')
+        assert.equal(2, #warns)
+    end)
+
+    it('refus de core.net : faux, une ligne de console par minute et par évènement', function()
+        netAnswer = { false, 'invalid_target' }
+        assert.is_false(bridge.SendTo(7, 'vava_magic:hit', 'feu'))
+        assert.is_false(bridge.SendTo(7, 'vava_magic:hit', 'feu'))
+        assert.is_false(bridge.SendTo(7, 'vava_magic:dealt', {}))
+        assert.equal(2, #warns)
+        assert.matches('invalid_target', warns[1])
+    end)
+
+    it('core sans core.net (avant 0.10.0) : envoi direct à chacun', function()
+        VavaMagic.core.net = nil
+        assert.is_true(bridge.SendTo({ 3, 7 }, 'vava_magic:hit', 'feu', 140))
+        assert.equal(2, #direct)
+        assert.same({ 3, 'feu', 140 }, { direct[1].target, direct[1].args[1], direct[1].args[2] })
+        assert.equal(7, direct[2].target)
     end)
 end)

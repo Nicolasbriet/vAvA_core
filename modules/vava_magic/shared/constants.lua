@@ -41,8 +41,8 @@ VavaMagic.EVENTS = {
     COMBO = 'vava_magic:combo',             -- (nom) au seul lanceur d'une combinaison réussie : mot bref à l'écran
 }
 
--- Issues d'un chiffre de sort (T-155), comprises par vava_hud:hitText.
-VavaMagic.NUMBER_ISSUES = { 'hit', 'tick', 'down', 'dodge', 'absorb', 'block', 'parry' }
+-- Chiffres des sorts (T-155) : montant en dixièmes au plus, touchés d'un vava_magic:dealt au plus.
+VavaMagic.NUMBERS = { TENTHS_MAX = 2000, MAX_ENTRIES = 32 }
 
 -- Intentions du client (RPC du core). Chaque sort a en plus les siennes : BEGIN_PREFIX .. sort, FINISH_PREFIX .. sort.
 VavaMagic.RPC = {
