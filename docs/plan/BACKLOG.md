@@ -1381,7 +1381,7 @@ faire tout le système de combat ») : la porte T-119 reste à passer en jeu.
   (`tags`) et interdites (`never`), filtrées par la chaîne avant l'appel : ne pas appeler un modificateur pour les zones
   ni les effets qui durent. Puis `vava_combat` les déclare (esquive : `melee`, `ranged` ; jamais `area`, `overTime`…).
 
-### T-160 — Cour d'armes dans l'Atelier
+### T-162 — Cour d'armes dans l'Atelier
 - Agents : vava-dev-lua + vava-dev-nui (cette tâche autorise à toucher `vava_atelier`) · Dépend de : T-156, T-102 ·
   Statut : à faire
 - Proposée par T-156 (spec § 5.2 et § 13) : éditeur `vava_combat:cour` (famille `monde`, droit `metiers`, libellé
