@@ -3,7 +3,8 @@
  * vava_atelier/web/dev/essais.js
  * Rôle : essais des fonctions pures de l'interface (format.js, lifecycle.js, contrôles de confort de form.js, textes
  *        de strings.js) et d'app.js sur une page factice (libellés de read, étiquettes de l'accueil, confirmation de
- *        sortie ; cycle d'une fiche : enregistrer, essayer, publier, reprendre, changement venu d'ailleurs),
+ *        sortie ; cycle d'une fiche : enregistrer, essayer, publier, reprendre, changement venu d'ailleurs), et de
+ *        l'amorce boot.js (T-157 : bornes, noms, ordre, insertion unique, refus, sourceURL ; pages et manifeste),
  *        hors jeu, sans navigateur : `node modules/vava_atelier/web/dev/essais.js`. Jamais livré (dossier dev/).
  */
 
@@ -192,6 +193,209 @@ eq(S.place.many('points'), 'Poser des points');
 eq(S.place.list('points', L.ofNoun(ZONE)), 'Points de la zone');
 eq(S.place.put(L.theNoun(ZONE)), 'Placer la zone');
 eq(S.place.move(L.theNoun(NODE)), 'Déplacer le point');
+
+// Amorce de la page (T-157, web/boot.js) : bornes copiées de CODEPACK, noms, ordre, insertion unique, refus, sourceURL,
+// compte rendu ; page factice dont les scripts insérés s'exécutent vraiment (vm), avec leurs erreurs
+function bootEssais() {
+  const WEB = path.join(__dirname, '..');
+  const MODULE = path.join(WEB, '..');
+  const bootCtx = vm.createContext({});
+  vm.runInContext(`${fs.readFileSync(path.join(WEB, 'boot.js'), 'utf8')}\nthis.Boot = Boot;`, bootCtx);
+  const B = bootCtx.Boot;
+  const js = (v) => JSON.stringify(v);
+
+  // bornes : copies exactes de VavaAtelier.CODEPACK (shared/constants.lua)
+  const constants = fs.readFileSync(path.join(MODULE, 'shared', 'constants.lua'), 'utf8');
+  const codepack = (constants.match(/VavaAtelier\.CODEPACK\s*=\s*\{([\s\S]*?)\n\}/) || [])[1] || '';
+  for (const key of ['MAX_PIECES', 'MAX_BYTES', 'MAX_NAME', 'MAX_DEPTH']) {
+    const lua = codepack.match(new RegExp(`\\b${key}\\s*=\\s*(\\d+)`));
+    eq(Boolean(lua) && Number(lua[1]) === B.LIMITS[key], true, `${key} de boot.js égal à CODEPACK`);
+  }
+
+  // noms : la règle de codepack.validName
+  for (const [name, kind] of [['web/css/style.css', 'css'], ['web/js/app.js', 'js'], ['web/js/view-home.js', 'js'], ['web/js/a_b-c.js', 'js'],
+    ['a.js', 'js'], ['a/b/c/d/e.js', 'js'], [`web/js/${'a'.repeat(86)}.js`, 'js']]) eq(B.validName(name, kind), true, name);
+  for (const [name, kind] of [['../x.js', 'js'], ['/x.js', 'js'], ['web\\js\\x.js', 'js'], ['web/js/A.js', 'js'], ['Web/js/a.js', 'js'],
+    ['web/js/a.css', 'js'], ['web/css/style.css', 'js'], ['web/js/a.js', 'css'], ['web/js/a.js', 'html'], ['web/js/a.js', 'toString'],
+    ['web/js/.js', 'js'], ['web/js/a.b.js', 'js'], ['web/js/a', 'js'], ['web//a.js', 'js'], ['web/js/', 'js'], ['', 'js'],
+    ['a/b/c/d/e/f.js', 'js'], [`web/js/${'a'.repeat(87)}.js`, 'js'], ['web/js/é.js', 'js'], ['web/js/a.js ', 'js'], [7, 'js'], [null, 'js']]) {
+    eq(B.validName(name, kind), false, String(name));
+  }
+
+  // Boot.accept (pur) : le fichier suivant attendu seulement
+  const piece = (index, name = `web/js/f${index}.js`, kind = 'js', code = '') => ({ index, kind, name, code });
+  const st = B.newState();
+  eq(js(B.accept(st, piece(0, 'web/css/style.css', 'css', 'a{}'))), js({ ok: true }));
+  eq(js(B.accept(st, piece(0, 'web/js/a.js', 'js', 'é'))), js({ ok: true }));
+  eq(js(st), js(B.newState()), 'accept ne change rien');
+  const reason = (state, message) => B.accept(state, message).reason;
+  eq(reason(st, piece(1)), 'bad_index', 'premier index : 0');
+  eq(reason(st, piece(-1)), 'bad_index');
+  eq(reason(st, piece(0.5)), 'bad_index');
+  eq(reason(st, { ...piece(0), index: '0' }), 'bad_index');
+  eq(reason(st, piece(0, 'web/js/a.js', 'html')), 'bad_kind');
+  eq(reason(st, piece(0, 'web/js/a.js', 'css')), 'bad_name', 'extension du genre');
+  eq(reason(st, piece(0, '../a.js')), 'bad_name');
+  eq(reason(st, piece(0, 'web/js/a.js', 'js', 7)), 'bad_code');
+  eq(reason(st, { index: 0, kind: 'js', name: 'web/js/a.js' }), 'bad_code');
+  eq(reason(st, null), 'not_object');
+  eq(reason(st, [piece(0)]), 'not_object');
+  eq(reason(st, 'x'), 'not_object');
+  eq(reason(null, piece(0)), 'bad_state');
+  const two = { ...B.newState(), pieces: [piece(0), piece(1)], size: 0 };
+  eq(B.accept(two, piece(2)).ok, true);
+  eq(reason(two, piece(1, 'web/js/x.js')), 'bad_index', 'pas de retour en arrière');
+  eq(reason(two, piece(3)), 'bad_index', 'pas de trou');
+  eq(reason(two, piece(2, 'web/js/f0.js')), 'duplicate');
+  const full = { ...B.newState(), pieces: Array.from({ length: B.LIMITS.MAX_PIECES }, (_, i) => piece(i)) };
+  eq(reason(full, piece(B.LIMITS.MAX_PIECES)), 'too_many');
+  const heavy = { ...B.newState(), pieces: [piece(0)], size: B.LIMITS.MAX_BYTES - 2 };
+  eq(B.accept(heavy, piece(1, 'web/js/b.js', 'js', 'ab')).ok, true, 'jusqu\'à MAX_BYTES compris');
+  eq(reason(heavy, piece(1, 'web/js/b.js', 'js', 'abc')), 'too_large');
+    eq(reason({ ...heavy, size: B.LIMITS.MAX_BYTES }, piece(1, 'web/js/b.js', 'js', 'a')), 'too_large');
+  eq(reason({ ...two, ended: true }, piece(2)), 'ended');
+
+  // Boot.finish (pur)
+  eq(js(B.finish(two, { count: 2 })), js({ insert: true }));
+  eq(js(B.finish(two, { count: 3 })), js({ insert: false, result: { ok: false, piece: 'refus' } }), 'compte faux');
+  eq(js(B.finish(two, { count: '2' })), js({ insert: false, result: { ok: false, piece: 'refus' } }));
+  eq(js(B.finish(two, null)), js({ insert: false, result: { ok: false, piece: 'refus' } }));
+  eq(js(B.finish({ ...two, refused: 'bad_name' }, { count: 2 })), js({ insert: false, result: { ok: false, piece: 'refus' } }), 'un refus : rien');
+  eq(js(B.finish(B.newState(), { count: 0 })), js({ insert: false, result: { ok: false, piece: 'refus' } }), 'aucun fichier');
+  eq(js(B.finish({ ...two, ended: true, result: { ok: true, count: 2 } }, { count: 2 })), js({ insert: false, result: null }), 'une seule fin');
+
+  // page factice : <style> et <script> enregistrés ; un <script> inséré s'exécute aussitôt dans la page (vm), une
+  // erreur (syntaxe ou exécution) est signalée à l'évènement `error` de la fenêtre, comme dans le navigateur
+  function fakePage() {
+    const listeners = { message: [], error: [] };
+    const page = vm.createContext({});
+    page.window = page;
+    page.addEventListener = (type, fn) => { (listeners[type] = listeners[type] || []).push(fn); };
+    page.removeEventListener = (type, fn) => { listeners[type] = (listeners[type] || []).filter((f) => f !== fn); };
+    const head = [], body = [], posts = [], logs = [];
+    const doc = {
+      createElement: (tag) => ({ tag, textContent: '' }),
+      head: { appendChild: (el) => { head.push(el); return el; } },
+      body: {
+        appendChild: (el) => {
+          body.push(el);
+          if (el.tag === 'script') {
+            try { vm.runInContext(el.textContent, page); } catch (error) {
+              for (const fn of listeners.error) fn({ message: `${error.name}: ${error.message}`, lineno: 0 });
+            }
+          }
+          return el;
+        },
+      },
+    };
+    const send = B.attach(page, doc, (name, data) => posts.push([name, data]), (text) => logs.push(text));
+    const say = (action, payload) => send({ data: { action, payload } });
+    return { page, head, body, posts, logs, say, listeners, send };
+  }
+
+  // amorce : « prête » au chargement et à chaque hello ; un seul écouteur de messages
+  const p = fakePage();
+  eq(js(p.posts), js([['pageReady', {}]]));
+  eq(p.listeners.message.length, 1);
+  p.say('hello', {});
+  eq(js(p.posts[1]), js(['pageReady', {}]));
+  // messages étrangers ignorés
+  p.send({ data: null });
+  p.send({ data: { action: 7 } });
+  p.send({});
+  p.say('open', {});
+  eq(p.posts.length, 2);
+  // feuille puis deux scripts, le second lit la constante de premier niveau du premier (comme des <script src>)
+  const CSS = '.app { color: red; }\n';
+  const A_JS = '\'use strict\';\nconst Premier = { n: 1 };\n';
+  const B_JS = '\'use strict\';\nwindow.vu = Premier.n + 1; // fin sans saut de ligne';
+  p.say('bootPiece', { index: 0, kind: 'css', name: 'web/css/style.css', code: CSS });
+  p.say('bootPiece', { index: 1, kind: 'js', name: 'web/js/a.js', code: A_JS });
+  p.say('bootPiece', { index: 2, kind: 'js', name: 'web/js/b.js', code: B_JS });
+  eq([p.head.length, p.body.length, p.posts.length], [0, 0, 2], 'rien d\'inséré avant bootEnd');
+  p.say('bootEnd', { count: 3 });
+  eq(js(p.posts[2]), js(['booted', { ok: true, count: 3 }]));
+  eq(js(p.head.map((el) => el.tag)), js(['style']));
+  eq(p.head[0].textContent, `${CSS}\n/*# sourceURL=vava_atelier/web/css/style.css */`);
+  eq(js(p.body.map((el) => el.tag)), js(['script', 'script']), 'dans l\'ordre');
+  eq(p.body[0].textContent, `${A_JS}\n;window.__vavaBootMark(1);\n//# sourceURL=vava_atelier/web/js/a.js`);
+  eq(p.body[1].textContent.startsWith(B_JS), true, 'rien ajouté devant : lignes d\'origine');
+  eq(p.body[1].textContent.endsWith('\n//# sourceURL=vava_atelier/web/js/b.js'), true);
+  eq(p.page.vu, 2, 'scripts exécutés dans l\'ordre, constantes partagées');
+  eq(Object.prototype.hasOwnProperty.call(p.page, '__vavaBootMark'), false, 'marque retirée');
+  eq(p.listeners.error.length, 0, 'écouteur d\'erreurs retiré');
+  eq(p.logs.length, 0);
+  // insertion unique : après bootEnd, ni bootPiece ni bootEnd ne sont relus ; hello rend le même compte rendu
+  p.say('bootPiece', { index: 3, kind: 'js', name: 'web/js/c.js', code: 'window.vu = 99;' });
+  p.say('bootPiece', { index: 0, kind: 'js', name: 'web/js/a2.js', code: 'window.vu = 98;' });
+  p.say('bootEnd', { count: 1 });
+  p.say('bootEnd', { count: 4 });
+  eq([p.head.length, p.body.length, p.posts.length, p.page.vu], [1, 2, 3, 2], 'aucune réinsertion');
+  p.say('hello', {});
+  eq(js(p.posts[3]), js(['booted', { ok: true, count: 3 }]), 'page muette pour le Lua : même compte rendu');
+
+  // un message mal formé : ignoré, rien d'inséré, booted { ok: false, piece: 'refus' }
+  for (const bad of [
+    { index: 1, kind: 'js', name: 'web/js/a.js', code: '' },               // hors d'ordre
+    { index: 0, kind: 'js', name: 'web/js/a.css', code: '' },              // extension
+    { index: 0, kind: 'html', name: 'web/a.html', code: '' },              // genre
+    { index: 0, kind: 'js', name: '../../vava_admin/web/js/x.js', code: '' },
+    { index: 0, kind: 'js', name: 'web/js/a.js', code: { toString: () => 'x' } },
+    null,
+  ]) {
+    const q = fakePage();
+    q.say('bootPiece', bad);
+    q.say('bootPiece', { index: 0, kind: 'js', name: 'web/js/ok.js', code: 'window.vu = 1;' });
+    q.say('bootEnd', { count: 1 });
+    eq(js(q.posts.slice(1)), js([['booted', { ok: false, piece: 'refus' }]]), js(bad));
+    eq([q.head.length, q.body.length, q.page.vu], [0, 0, undefined], 'rien d\'inséré');
+    eq(q.logs.length >= 1 && q.logs[0].startsWith('[vava_atelier] fichier de la page refusé'), true);
+  }
+  // compte faux : rien d'inséré
+  const r = fakePage();
+  r.say('bootPiece', { index: 0, kind: 'js', name: 'web/js/a.js', code: 'window.vu = 1;' });
+  r.say('bootEnd', { count: 2 });
+  eq([js(r.posts[1]), r.body.length], [js(['booted', { ok: false, piece: 'refus' }]), 0]);
+  r.say('hello', {});
+  eq(js(r.posts[2]), js(['booted', { ok: false, piece: 'refus' }]));
+
+  // un script en erreur (exécution, puis syntaxe) : on s'arrête à lui et on le nomme ; les suivants ne sont pas insérés
+  for (const [code, word] of [['throw new Error(\'essai\');', 'essai'], ['const = ;', 'SyntaxError']]) {
+    const e = fakePage();
+    e.say('bootPiece', { index: 0, kind: 'js', name: 'web/js/a.js', code: 'window.vu = 1;' });
+    e.say('bootPiece', { index: 1, kind: 'js', name: 'web/js/widgets.js', code });
+    e.say('bootPiece', { index: 2, kind: 'js', name: 'web/js/c.js', code: 'window.vu = 3;' });
+    e.say('bootEnd', { count: 3 });
+    eq(js(e.posts[1]), js(['booted', { ok: false, piece: 'web/js/widgets.js' }]), word);
+    eq([e.body.length, e.page.vu], [2, 1], 'arrêt au fichier fautif');
+    eq(e.logs.length === 1 && e.logs[0].includes('web/js/widgets.js') && e.logs[0].includes(word), true, e.logs[0]);
+    eq(Object.prototype.hasOwnProperty.call(e.page, '__vavaBootMark'), false);
+    eq(e.listeners.error.length, 0);
+  }
+
+  // pages : l'amorce livrée garde le balisage de la page de développement et ne charge que boot.js ; la page de
+  // développement charge la feuille et les scripts dans l'ordre de vava_conseil_web, chacun présent, aucun oublié
+  const lf = (text) => text.replace(/\r\n/g, '\n');   // copie de travail en CRLF sous Windows (core.autocrlf)
+  const amorce = lf(fs.readFileSync(path.join(WEB, 'index.html'), 'utf8'));
+  const dev = lf(fs.readFileSync(path.join(WEB, 'dev', 'index.html'), 'utf8'));
+  const markup = (html) => (html.match(/<div id="app"[\s\S]*?\n {2}<\/div>\n/) || [''])[0];
+  eq(markup(amorce).length > 0 && markup(amorce) === markup(dev), true, 'même balisage');
+  eq(js(Array.from(amorce.matchAll(/<script\b[^>]*>/g), (m) => m[0])), js(['<script src="boot.js">']));
+  eq(js(Array.from(amorce.matchAll(/<link\b[^>]*>/g), (m) => m[0])), js(['<link rel="stylesheet" href="nui://vava_ui/web/css/vava_ui.css">']));
+  eq(/devmock|horsjeu|GetParentResourceName|css\/style|js\//.test(amorce.replace(/<!--[\s\S]*?-->/g, '')), false);
+  const devOrder = Array.from(dev.matchAll(/(?:href|src)="\.\.\/((?:css|js)\/[^"]+)"/g), (m) => `web/${m[1]}`);
+  const onDisk = [...fs.readdirSync(path.join(WEB, 'css')).filter((f) => f.endsWith('.css')).map((f) => `web/css/${f}`),
+    ...fs.readdirSync(path.join(WEB, 'js')).filter((f) => f.endsWith('.js')).map((f) => `web/js/${f}`)];
+  eq(js([...devOrder].sort()), js(onDisk.sort()), 'chaque fichier de la page, une fois');
+  // directive en table, ou une ligne par fichier (spec § 3.2) ; commentaires Lua retirés
+  const manifest = fs.readFileSync(path.join(MODULE, 'fxmanifest.lua'), 'utf8').replace(/--\[(=*)\[[\s\S]*?\]\1\]/g, '').replace(/--[^\n]*/g, '');
+  const block = (manifest.match(/\bvava_conseil_web\s*\{([^}]*)\}/) || [])[1];
+  const listed = block !== undefined ? Array.from(block.matchAll(/'([^']+)'/g), (m) => m[1])
+    : Array.from(manifest.matchAll(/\bvava_conseil_web\s*'([^']+)'/g), (m) => m[1]);
+  eq(listed.length > 0, true, 'directive vava_conseil_web au manifeste');
+  eq(js(listed), js(devOrder), 'ordre de vava_conseil_web = ordre de web/dev/index.html');
+  for (const name of devOrder) eq(B.validName(name, name.endsWith('.css') ? 'css' : 'js'), true, name);
+}
 
 // app.js chargé sur une page factice : libellés pris dans `read` sans RPC options, étiquettes renouvelées à chaque
 // accueil, confirmation de sortie dès qu'une valeur a changé depuis l'ouverture, même après « Vérifier »
@@ -582,4 +786,5 @@ async function placementEssais() {
   eq(A.state.suspended, false);
 }
 
+bootEssais();
 appEssais().then(cycleEssais).then(placementEssais).then(() => console.log(`${passed} essais passés`), (error) => { console.error(error); process.exitCode = 1; });
