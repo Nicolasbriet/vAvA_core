@@ -269,8 +269,8 @@ et `tests/spec/combat_use_spec.lua` (`MagicHardControl` → `controlled`).
 ## 7. Chiffres des coups (`vava_combat` 1.4.0, `vava_hud` 1.7.0, `vava_pause` 1.1.0, T-155)
 
 Le montant de chaque coup monte au-dessus de la cible et s'efface en moins d'une seconde : en laiton chez l'attaquant
-(ce qu'il inflige), en rouge chez la cible (ce qu'elle reçoit) ; une parade, une garde, un pas de côté, un bouclier se
-lisent en un mot. **Les témoins ne voient aucun chiffre.** Le chiffre est celui du coup après modificateurs, jamais la
+(ce qu'il inflige), en rouge chez la cible (ce qu'elle reçoit) ; une parade, un pas de côté, un bouclier de magie se
+lisent en un mot ; une garde, en un mot sous ce qui a passé. **Les témoins ne voient aucun chiffre.** Le chiffre est celui du coup après modificateurs, jamais la
 vie retirée. Préparation : 0 (A et B une Épée courte, B un Bouclier rond ; `/vie`, `/bouclier` de
 `vava_example_combat`) ; un troisième joueur C, témoin. Réglage « Chiffres des coups » à « Donnés et reçus » chez tous.
 
@@ -278,7 +278,7 @@ vie retirée. Préparation : 0 (A et B une Épée courte, B un Bouclier rond ; `
 |---|---|---|
 | 1 | Démarrer ; A ouvre la bannière, Réglages > Interface. | `vava_hud` v1.7.0, `vava_combat` v1.4.0 prêts, aucun avertissement ; « Chiffres des coups » : Donnés et reçus, Donnés seulement, Aucun ; aide d'une ligne. |
 | 2 | **(2 joueurs)** B `/vie 100` ; A frappe B d'une Taille. | Chez A : « 12 » de laiton monte au-dessus de la tête de B et s'efface en moins d'une seconde. Chez B : « 12 » rouge au-dessus de lui. |
-| 3 | **(3 joueurs)** C regarde à 10 m. | C voit le sang et la réaction de B, **aucun chiffre** ; `/vava_reseau joueur <C>` : `vava_combat:hit` de la même taille qu'en 1.3.0 (≈ 35 o). |
+| 3 | **(3 joueurs)** C regarde à 10 m. | C voit le sang et la réaction de B, **aucun chiffre** ; `/vava_reseau joueur <C>` : `vava_combat:hit` de la même taille qu'en 1.3.0 (3 valeurs, ≈ 23 à 29 o comptés par `core.net`). |
 | 4 | **(2 joueurs)** A enchaîne Taille, Estoc, Revers sur B. | Trois chiffres en cascade (décalés, sans se couvrir, même avec un mot dessous), chacun s'efface seul. |
 | 5 | **(2 joueurs)** A Fendant sur B. | Chiffre plus grand (« 22 ») et « Chancelle » dessous, chez A et chez B. |
 | 6 | **(2 joueurs)** B `/vie 10` ; A frappe. | Chiffre le plus grand et « À terre » en rouge ; le chiffre est celui du coup (12), pas la vie restante. |
@@ -288,14 +288,14 @@ vie retirée. Préparation : 0 (A et B une Épée courte, B un Bouclier rond ; `
 | 10 | **(2 joueurs)** B pare une Taille. | « Paré » chez les deux ; A chancelle comme en 1.3.0. |
 | 11 | **(3 joueurs)** B fait un pas de côté au bon moment. | « Esquivé » chez A et chez B ; C ne reçoit **rien** (`/vava_reseau joueur <C>` : aucun `vava_combat:hit`). |
 | 12 | **(3 joueurs)** `/bouclier 50` sur B ; A frappe. | « Absorbé » chez les deux, rien chez C. |
-| 13 | **(2 joueurs)** B règle « Donnés seulement » ; A frappe B, B frappe A. | B voit ses chiffres sur A, plus ceux qu'il reçoit ; A voit tout. |
+| 13 | **(2 joueurs)** B règle « Donnés seulement » ; A frappe B, B frappe A. | B voit les chiffres de ses coups sur A, mais plus ceux qu'il reçoit ; A voit tout. |
 | 14 | **(2 joueurs)** B règle « Aucun ». | Plus rien chez B ; ses réactions, sons et étincelles restent. |
 | 15 | **(2 joueurs)** `numbers.attacker = false` (`config.lua` de `vava_combat`, redémarrage). | A ne voit plus ses chiffres (ni « Paré ») ; B voit les siens ; une esquive de B : « Esquivé » chez B seulement. |
 | 16 | `numbers.enabled = false`. | Plus aucun chiffre ; tout le reste comme en 1.3.0 (esquive et absorbé : aucun `vava_combat:hit`). |
 | 17 | **(2 joueurs)** B frappe A pendant que la bannière de A est déployée. | Rien ne s'affiche chez A tant qu'elle est ouverte ; aucun reste à la fermeture. |
 | 18 | **(2 joueurs)** A en vue subjective, B le frappe. | Le chiffre reçu apparaît au milieu de l'écran, un peu sous le centre. |
 | 19 | **(2 joueurs)** A frappe B et tourne la caméra vite. | Le chiffre suit la tête de B (léger retard, sans saut). |
-| 20 | **(2 joueurs)** `/vava_reseau joueur <A>` pendant 10 coups. | `vava_combat:hit` ≈ 37 o par coup ; aucun autre évènement nouveau. |
+| 20 | **(2 joueurs)** `/vava_reseau joueur <A>` pendant 10 coups. | `vava_combat:hit` ≈ 23 à 32 o comptés par `core.net` (nom + charge) ; 4e valeur : 1 o pour `false` ou jusqu'à 127 dixièmes, 2 o jusqu'à 255, 3 o au-delà ; aucun autre évènement nouveau. |
 | 21 | `resmon 1` chez A : au repos, puis pendant une rafale. | `vava_hud` au repos ≤ 0,01 ms ; pendant ≤ 0,03 ms. |
 | 22 | `restart vava_hud` pendant une rafale. | Aucune erreur ; les chiffres reviennent au coup suivant. |
 | 23 | `stop vava_hud`, A frappe B. | Aucune erreur F8 ; pas de chiffres ; le combat est inchangé. |

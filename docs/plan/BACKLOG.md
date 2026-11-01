@@ -1215,7 +1215,7 @@ faire tout le système de combat ») : la porte T-119 reste à passer en jeu.
   par le crochet `vava_combat:using` ; XP de défense par le hook `vava_combat:defended`.
 
 ### T-155 — Chiffres des coups (dégâts affichés)
-- Agents : vava-architecte → vava-dev-lua + vava-dev-nui (cette tâche autorise à toucher `vava_hud`, `vava_pause`, `vava_magic`) · Dépend de : T-112 (après T-113, même module) · Statut : en cours (fait ; relectures sécurité, réseau et lore à faire)
+- Agents : vava-architecte → vava-dev-lua + vava-dev-nui (cette tâche autorise à toucher `vava_hud`, `vava_pause`, `vava_magic`) · Dépend de : T-112 (après T-113, même module) · Statut : à tester en jeu (relu sécurité, réseau et lore ; suites appliquées)
 - Demande du porteur du projet (31 octobre 2026), « comme les MMO » : le montant de chaque coup s'affiche au-dessus de
   la cible, le temps d'un souffle (chiffre qui monte et s'efface) ; issues sans dégâts écrites en mots (« Paré »,
   « Bloqué », « Esquivé », « Absorbé ») ; coup qui met à terre ou fait chanceler distingué. Valable pour les coups
@@ -1232,7 +1232,15 @@ faire tout le système de combat ») : la porte T-119 reste à passer en jeu.
   valeur de `vava_combat:hit` aux seuls attaquant et cible, `false` pour un mot ; esquivé et absorbé à eux seuls,
   jamais aux témoins ; `config.numbers`), `vava_magic` 2.13.0 (montant dans `vava_magic:hit` pour la victime, morsures,
   esquives et absorbés compris ; `vava_magic:dealt` au lanceur, un par tour du serveur ; `config.numbers`). Procédures
-  `combat` § 7 et `magie` § 21. Relectures sécurité, réseau et lore à faire.
+  `combat` § 7 et `magie` § 21.
+- Fait le 2 novembre 2026 : relu sécurité (OK, 2 mineurs), réseau (R-1 important, 4 mineurs) et lore (2 à corriger,
+  mineurs) ; suites appliquées, versions inchangées : bornes des chiffres écrites une fois (`VavaCombat.TENTHS_MAX`,
+  `VavaMagic.NUMBERS`), liste refusée tracée ; envois de la magie (`vava_magic:hit`, `vava_magic:dealt`) comptés par
+  `core.net` (`bridge.SendTo`) ; relecture en double retirée côté client de la magie, issues au seul serveur ; bornes de
+  la config du HUD réduites à celles qui évitent une erreur ou un coût ; annotations et en-têtes livrés allégés ;
+  `maxPerMessage` 10 ; une lecture de la tête par chiffre, projection par ped et par passage, positions à 1e-4 ; tailles
+  des procédures et de la spec corrigées ; aide du réglage « Ce que vaut chaque coup, au-dessus de qui le reçoit. » ;
+  page allégée (`vava-dev-nui`). L-6 et L-8 laissés à T-119.
 
 ### T-156 — Mannequin d'entraînement
 - Agents : vava-architecte → vava-dev-lua · Dépend de : T-112 (après T-113, même module) ; T-102 pour le placement
@@ -1343,6 +1351,10 @@ faire tout le système de combat ») : la porte T-119 reste à passer en jeu.
   4 coups), seuils du compteur de garde ; réussite des parades à 30, 80, 150 ms de ping (test combat 4-23). Relecture
   sécurité de T-113 : observer ce que le serveur ne voit pas (garde tenue en sprint, gestes sans animation, pas de côté
   sans déplacement) ; mesurer le coût serveur des modificateurs (test combat 4-29, relecture réseau R-2).
+- Laissé par T-155 (spec § 13 et relecture lore) : durée, montée, cascade, couleurs et tailles des chiffres, `decimals` 0
+  ou 1 ; les témoins doivent-ils voir les mots (`parry`, `break`) ; un même mot sous deux allures (italique seul, petites
+  capitales sous un chiffre : n'en garder qu'une, L-6) ; « À terre » en rouge chez l'attaquant alors que le rouge dit
+  « reçu » partout ailleurs (L-8).
 
 ### T-159 — Filtre par étiquettes à l'inscription d'un modificateur de `vava_health`
 - Agent : vava-dev-lua (cette tâche autorise à toucher `vava_health`) · Dépend de : T-113 · Statut : à faire

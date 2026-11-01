@@ -1197,8 +1197,9 @@ noir.
   décision** : un client modifié ne peut tromper que son propre écran. Aucune boucle au repos : la position de la tête
   est suivie toutes les `followMs` (100 ms) tant qu'un chiffre vit, puis plus rien ; la page reçoit `number`, puis un
   `numbersMove` seulement si un chiffre a bougé de plus de `followEpsilon` ou s'est caché, et `numbersClear` quand le
-  HUD est masqué (contrat : `docs/plan/rapports/T-155-contrat.md`). Config contrôlée au démarrage (bornes, mots de 1 à
-  32 octets) : une valeur hors bornes coupe les chiffres (une ligne de console). Appelé par `vava_combat` (≥ 1.4.0) et
+  HUD est masqué (contrat : `docs/plan/rapports/T-155-contrat.md`). Config contrôlée au démarrage (bornes qui évitent une
+  erreur ou un coût : `durationMs`, `maxAlive`, `maxPerSecond`, `followMs`, `stackMax`, `takenFallback`, mots de 1 à 32
+  octets) : une valeur hors bornes coupe les chiffres (une ligne de console). Appelé par `vava_combat` (≥ 1.4.0) et
   `vava_magic` (≥ 2.13.0), isolé (`pcall`) : sans `vava_hud`, rien ne s'affiche et rien ne change au combat.
 - Pour travailler le rendu sans le jeu : `web/index.html?values=0.8,0.62,0.08` dans un navigateur ; `&progress=1`
   (barre de 8 s menée à son terme) ou `&progress=cancel` (interrompue à 60 %). Depuis 1.4.0, polices et grain viennent
@@ -1887,7 +1888,7 @@ sort → refus `controlled` ; plus ancien, arrêté ou en erreur : aucun refus d
 - **Réseau** : RPC `vava_combat:use` (≈ 40 o, réponse au seul appelant ≈ 15 o) et `vava_combat:lower` (≈ 25 o, un par
   garde abaissée, rien pendant la tenue) ; `vava_combat:hit` aux joueurs à 30 m de la cible dans l'instance de
   l'attaquant, **un par cible touchée** (l'issue d'un coup défendu le remplace), jamais pour un coup manqué ou refusé ;
-  depuis 1.4.0 le montant (+ 1 à 3 o) aux deux seuls participants, l'esquive et l'absorbé (≈ 32 o) à eux seuls ;
+  depuis 1.4.0 le montant (+ 1 à 3 o) aux deux seuls participants, l'esquive et l'absorbé (≈ 25 o) à eux seuls ;
   `vava_combat:notify` (`core.net.send`) au seul porteur dont l'arme passe un seuil, au seul attaquant dont le coup est
   retenu (un par raison et par 10 s) ou au seul membre du Conseil sans `vava_chat` ; le statebag du bouclier au
   changement seulement ; + ≈ 450 o une fois dans `GlobalState['vava_inventory:heldModels']` (mécanisme de
@@ -2069,14 +2070,16 @@ restriction ; 1.2.0 : rengainement et mode combat, T-149).
   (`numbers.target`) : `vava_magic:hit(réaction|false, dixièmes|false, issue?)`, toujours à elle seule — avec sa
   réaction pour un coup qui blesse (`issue` absente pour `hit`), `réaction = false` pour une morsure de brûlure, une
   esquive, un coup absorbé ou sans effet ; son client appelle `vava_hud:hitText('taken', …)`. **Lanceur**
-  (`numbers.caster`) : évènement nouveau `vava_magic:dealt(liste)` au seul lanceur (`TriggerClientEvent`), **un par tour
+  (`numbers.caster`) : évènement nouveau `vava_magic:dealt(liste)` au seul lanceur, **un par tour
   du serveur** où il a touché quelqu'un (fin du tour : `SetTimeout(0)` posé au premier touché), liste pure de 1 à
-  `maxPerMessage` (16 ; 1 à 32) entrées `{ cible, issue[, dixièmes] }` ; jamais quand il est lui-même la victime, rien
+  `maxPerMessage` (10 ; 1 à 32) entrées `{ cible, issue[, dixièmes] }` ; jamais quand il est lui-même la victime, rien
   s'il n'a plus de personnage à la fin du tour ; son client appelle `hitText('dealt', cible, …)` pour chaque entrée
   valide. `numbers.overTime = false` : ni morsures ni zones qui durent ; `numbers.enabled = false` : comportement de
   2.12.0 (`vava_magic:hit(réaction)`, rien au lanceur). Config contrôlée au démarrage (`harm.checkNumbers` : quatre
   booléens, `maxPerMessage` entier de 1 à 32 ; sinon le module ne démarre pas). Coût : + 1 à 3 o dans `vava_magic:hit`,
-  ≈ 25 o par morsure, esquive ou absorbé à la victime ; ≈ 18 o + ≈ 8 o par touché au lanceur.
+  ≈ 23 o par morsure, esquive ou absorbé à la victime ; ≈ 18 o + ≈ 8 à 12 o par touché au lanceur. Les deux
+  évènements partent par `bridge.SendTo` (`core.net.send` : comptés par `/vava_reseau` ; core sans `core.net` : envoi
+  direct).
 - **Modificateurs** (registre `vava_health:modifiers`, redéclarés à chaque démarrage de `vava_health`) :
   `vava_magic:zones` (étape `annulation`, seulement si `combat.protectedZones` en compte : personne n'est blessé dans une
   zone de paix, ni par un sort ni par une lame, et personne n'en blesse un autre depuis l'intérieur ; annulé
